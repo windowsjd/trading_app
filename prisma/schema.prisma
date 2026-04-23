@@ -1,0 +1,109 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+enum UserStatus {
+  active
+  suspended
+  deleted
+}
+
+enum SeasonStatus {
+  upcoming
+  active
+  ended
+  settled
+}
+
+enum ParticipantStatus {
+  registered
+  active
+  finished
+  rewarded
+}
+
+enum CurrencyCode {
+  KRW
+  USD
+}
+
+model User {
+  id              String              @id @default(uuid())
+  email           String              @unique
+  passwordHash    String              @map("password_hash")
+  nickname        String              @unique
+  profileImageUrl String?             @map("profile_image_url")
+  status          UserStatus          @default(active)
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  seasonParticipants SeasonParticipant[]
+
+  @@map("users")
+}
+
+model Season {
+  id                String              @id @default(uuid())
+  name              String
+  status            SeasonStatus
+  startAt           DateTime            @map("start_at")
+  endAt             DateTime            @map("end_at")
+  initialCapitalKrw Decimal             @db.Decimal(24, 8) @map("initial_capital_krw")
+  tradeFeeRate      Decimal             @db.Decimal(10, 6) @map("trade_fee_rate")
+  fxFeeRate         Decimal             @db.Decimal(10, 6) @map("fx_fee_rate")
+  rewardPolicyJson  Json?               @map("reward_policy_json")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  participants      SeasonParticipant[]
+
+  @@map("seasons")
+}
+
+model SeasonParticipant {
+  id               String              @id @default(uuid())
+  seasonId         String              @map("season_id")
+  userId           String              @map("user_id")
+  joinedAt         DateTime            @map("joined_at")
+  participantStatus ParticipantStatus  @default(registered) @map("participant_status")
+  initialCapitalKrw Decimal            @db.Decimal(24, 8) @map("initial_capital_krw")
+  totalAssetKrw    Decimal             @db.Decimal(24, 8) @map("total_asset_krw")
+  totalReturnRate  Decimal             @db.Decimal(12, 8) @map("total_return_rate")
+  maxDrawdown      Decimal             @db.Decimal(12, 8) @map("max_drawdown")
+  totalFillCount   Int                 @default(0) @map("total_fill_count")
+  currentRank      Int?                @map("current_rank")
+  finalRank        Int?                @map("final_rank")
+  finalTier        String?             @map("final_tier")
+  rewardGrantedAt  DateTime?           @map("reward_granted_at")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+
+  season           Season              @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cashWallets      CashWallet[]
+
+  @@unique([seasonId, userId])
+  @@index([seasonId])
+  @@index([userId])
+  @@map("season_participants")
+}
+
+model CashWallet {
+  id                  String             @id @default(uuid())
+  seasonParticipantId String             @map("season_participant_id")
+  currencyCode        CurrencyCode       @map("currency_code")
+  balanceAmount       Decimal            @db.Decimal(24, 8) @map("balance_amount")
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+
+  seasonParticipant   SeasonParticipant  @relation(fields: [seasonParticipantId], references: [id], onDelete: Cascade)
+
+  @@unique([seasonParticipantId, currencyCode])
+  @@index([seasonParticipantId])
+  @@map("cash_wallets")
+}
