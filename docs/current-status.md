@@ -109,9 +109,9 @@
 - `wallet_transactions`: cash wallet 증감 원장 확보
 - `exchange_transactions`: KRW/USD 환전 이력 및 수수료 근거 확보
 - `equity_snapshots`: 참가자 단위 평가 스냅샷 근거 확보
-- near-term migration 설계 문서는 `docs/near-term-migration-plan.md`에 작성됨
-- 아직 Prisma schema/migration은 미적용
-- 다음 단계는 설계 합의 후 Prisma schema 반영 검토
+- near-term migration 설계 확정안 후보 작성됨
+- 아직 Prisma schema/migration 미적용
+- 다음 단계는 Prisma schema 반영 프롬프트 작성 전 최종 검토
 2단계(full `/home` blockers 해소):
 - `assets`: 종목 마스터 확보
 - `asset_price_snapshots`: 자산 평가 가격 소스 확보

@@ -1,10 +1,11 @@
-# Near-Term Migration Plan Draft
+# Near-Term Migration Plan Proposed Final Candidate
 
 ## Status
-- This document is a design draft only.
+- This document is a Prisma schema reflection candidate, not a schema change.
 - Target tables: `wallet_transactions`, `exchange_transactions`, `equity_snapshots`.
 - Prisma schema, migration files, seed, generated client, and runtime code are not changed by this document.
-- Final table names, field types, enum values, precision, indexes, and relations require agreement before Prisma schema work.
+- Field names, enum values, precision, indexes, and relation policies below are proposed final decisions for the next review.
+- Actual Prisma schema reflection still requires one final review prompt before implementation.
 
 ## Source Context
 - Current Prisma models are centered on `users`, `seasons`, `season_participants`, and `cash_wallets`.
@@ -14,14 +15,24 @@
 - All financial values exposed through APIs remain strings.
 - Prisma 7 with `prisma.config.ts` and adapter-based `PrismaService` must be preserved.
 
-## Shared Design Candidates
+## Shared Proposed Final Decisions
 - Primary keys: `String @id @default(uuid())`
 - Timestamps: `DateTime`, serialized as UTC ISO strings at the API boundary
-- Money amounts: `Decimal @db.Decimal(24, 8)` candidate
-- Rates and fee rates: `Decimal @db.Decimal(18, 8)` or existing `Decimal @db.Decimal(10, 6)` candidate, final scale needs agreement
-- Return rates and MDD-related values: existing `Decimal @db.Decimal(12, 8)` candidate
-- Currency fields: reuse existing `CurrencyCode` enum candidate where values are limited to KRW/USD
-- Delete behavior: prefer preserving ledgers/snapshots; cascade strategy must be explicitly agreed before schema work
+- Money amounts: `Decimal @db.Decimal(24, 8)`
+- Quantity fields: none in these three tables
+- `feeRate`: `Decimal @db.Decimal(10, 6)`
+- `appliedRate`: `Decimal @db.Decimal(18, 8)`
+- Return rate and MDD-related values: `Decimal @db.Decimal(12, 8)`
+- Currency fields: reuse existing `CurrencyCode` enum where values are limited to KRW/USD
+- Precision alignment: `Decimal(24, 8)` matches existing `Season.initialCapitalKrw`, `SeasonParticipant.totalAssetKrw`, and `CashWallet.balanceAmount`
+- Precision alignment: `Decimal(10, 6)` matches existing `Season.tradeFeeRate` and `Season.fxFeeRate`
+- Precision alignment: `Decimal(12, 8)` matches existing `SeasonParticipant.totalReturnRate` and `SeasonParticipant.maxDrawdown`
+
+## FK Delete Behavior Proposed Final Decision
+- Ledger and snapshot tables are audit-oriented, so preserving rows is more important than convenient cascading deletion.
+- Current `SeasonParticipant` relations from `seasons`, `users`, and `cash_wallets` use cascade behavior, which may conflict with audit preservation.
+- Proposed final decision: review `Restrict`, soft-delete, or another preservation-first policy for ledger/snapshot relations before Prisma schema reflection.
+- Do not reflect a cascade policy for these audit tables until that final decision is made.
 
 ---
 
@@ -40,6 +51,18 @@
 - `cash_wallets.balanceAmount` only stores the current balance.
 - Records, audits, exchange execution, order cash movement, and future balance repair need an immutable movement history.
 - `/home` can safely display cash only when wallet balances can be reconciled against a ledger.
+
+### Proposed Final Decisions
+- `WalletTransactionDirection`: use `credit` and `debit`.
+- Reason: `credit/debit` is unambiguous for a wallet ledger and maps directly to balance increase/decrease.
+- If API display later wants `in/out`, keep DB enum as `credit/debit` and map at the API boundary.
+- `WalletTransactionType`: use detailed values instead of broad `exchange`, `order`, and `fee` only.
+- Reason: separating exchange source/target and order buy/sell makes ledger verification and debugging easier.
+- `WalletTransactionReferenceType`: use source categories that map to durable business events, not UI labels.
+- `referenceId`: nullable, but should be present whenever the transaction is tied to a durable source row.
+- `referenceId` may be null for manual or bootstrap cases only when no durable source row exists yet.
+- Idempotency unique key: defer until actual execute logic is designed.
+- Reason: unique key shape depends on quote/execute idempotency inputs that are not fixed yet.
 
 ### Field List and Type Candidates
 
@@ -64,8 +87,8 @@
 
 ### Enum Candidates
 - `WalletTransactionDirection`: `credit`, `debit`
-- `WalletTransactionType`: `initial_grant`, `exchange`, `order`, `fee`, `adjustment`, `settlement`
-- `WalletTransactionReferenceType`: `season_join`, `exchange_transaction`, `order_execution`, `manual_adjustment`, `settlement`
+- `WalletTransactionType`: `initial_grant`, `exchange_source`, `exchange_target`, `order_buy`, `order_sell`, `fee`, `adjustment`, `settlement`
+- `WalletTransactionReferenceType`: `season_join`, `exchange_transaction`, `order`, `manual_adjustment`, `settlement`
 
 ### Relation Candidates
 - `wallet_transactions.seasonParticipantId` -> `season_participants.id`
@@ -77,7 +100,7 @@
 - Index: `[seasonParticipantId, occurredAt]`
 - Index: `[walletId, occurredAt]`
 - Index: `[referenceType, referenceId]`
-- Optional uniqueness to discuss: prevent duplicate ledger rows for the same wallet/reference/type/direction when idempotency rules are finalized
+- Unique idempotency key: hold until exchange/order execute logic is fixed
 
 ### Connectivity
 - Records: provides cash movement audit support behind future records views.
@@ -90,8 +113,8 @@
 - Should `referenceType` be required when `referenceId` is null?
 - Should balance reconciliation be enforced transactionally in application code only, or also with database constraints where possible?
 - Should adjustment rows require an operator/admin reference table later?
-- Should delete behavior be restricted rather than cascade to preserve audit history?
-- Should `txType` split exchange source, exchange target, order buy, order sell, and fee into separate enum values?
+- Which preservation-first FK delete behavior should be used in Prisma?
+- Which execute idempotency key should later protect duplicate ledger writes?
 
 ### Do Not Implement In This Step
 - No Prisma model.
@@ -118,6 +141,20 @@
 - `cash_wallets` alone cannot explain why KRW/USD balances changed.
 - Records exchanges contract requires stable fields that need a durable execution source.
 - Future fx quote/execute must be auditable and idempotency-safe.
+
+### Proposed Final Decisions
+- DB field name: use `appliedRate`.
+- API mapping: records exchanges item keeps `rate` from `docs/records-api-contract.md`.
+- Reason: DB should state that this was the exchange rate applied at execution time, while API keeps the frontend contract.
+- Fee currency rule: KRW -> USD uses `feeCurrency = USD`.
+- Fee currency rule: USD -> KRW uses `feeCurrency = KRW`.
+- Fee calculation rule: fee is deducted from `grossTargetAmount` in the target currency.
+- Currency constraint: `fromCurrency` and `toCurrency` must not be equal.
+- MVP currency scope: allow only KRW/USD and USD/KRW.
+- Wallet ledger rule: one exchange transaction must create at least two `wallet_transactions` rows.
+- Wallet ledger row 1: source wallet `debit`.
+- Wallet ledger row 2: target wallet `credit`.
+- Fee ledger representation: keep as final open question until execute logic is designed.
 
 ### Field List and Type Candidates
 
@@ -158,7 +195,7 @@
 - Primary key: `id`
 - Index: `[seasonParticipantId, executedAt]`
 - Index: `[fromCurrency, toCurrency, executedAt]`
-- Optional unique idempotency key is not included in this field set and needs separate agreement if quote/execute requires it
+- Unique idempotency key: hold until quote/execute command shape is fixed
 
 ### Connectivity
 - Records: directly backs `records/me/seasons/{seasonId}/exchanges` item fields.
@@ -168,12 +205,10 @@
 - Ranking: indirect input through cash correctness and equity snapshot creation after exchange.
 
 ### Questions To Finalize
-- Is `appliedRate` the public `rate` field name at API mapping only, or should DB field also be named `rate`?
 - Should exchange rows store quote metadata or a quote id in a later design?
-- Should `fromCurrency` and `toCurrency` be constrained to different values?
-- Which currency should fee use for each exchange direction?
 - Should `grossTargetAmount` be exposed anywhere, or remain internal audit data?
-- Should a completed exchange always create two wallet transaction rows plus optional fee rows?
+- Should fee be represented as a separate `wallet_transactions` row, or only as netted target credit?
+- Which execute idempotency key should later protect duplicate exchange writes?
 
 ### Do Not Implement In This Step
 - No Prisma model.
@@ -202,6 +237,18 @@
 - `/home` chart, ranking replay, settlement validation, and future records diagnostics need time-based equity evidence.
 - MDD cannot be verified from only the current participant row.
 
+### Proposed Final Decisions
+- Include both `capturedAt` and `createdAt`.
+- `capturedAt`: valuation 기준 시각.
+- `createdAt`: row 생성 시각.
+- Add `snapshotReason` from the start.
+- Reason: MDD, ranking replay, and settlement verification need to know which event produced each snapshot.
+- Authoritative condition: `equity_snapshots` cannot be a complete valuation source without `positions`, `asset_price_snapshots`, and `fx_rate_snapshots`.
+- Near-term step prepares the structure only and does not make `/home` full implementation possible.
+- `equity_snapshots` and `daily_portfolio_snapshots` must stay separate.
+- `equity_snapshots`: event/periodic valuation snapshots.
+- `daily_portfolio_snapshots`: day-level summary for home/records charts.
+
 ### Field List and Type Candidates
 
 | Field | Type Candidate | Required | Notes |
@@ -215,7 +262,9 @@
 | `domesticStockValueKrw` | `Decimal @db.Decimal(24, 8)` | yes | Domestic stock valuation in KRW |
 | `usStockValueKrw` | `Decimal @db.Decimal(24, 8)` | yes | US stock valuation in KRW |
 | `cryptoValueKrw` | `Decimal @db.Decimal(24, 8)` | yes | Crypto valuation in KRW |
+| `snapshotReason` | `SnapshotReason` | yes | Capture trigger |
 | `capturedAt` | `DateTime` | yes | Valuation capture time |
+| `createdAt` | `DateTime @default(now())` | yes | Row creation time |
 
 ### Decimal Precision Candidates
 - `totalAssetKrw`: `Decimal(24, 8)`
@@ -227,8 +276,7 @@
 - `cryptoValueKrw`: `Decimal(24, 8)`
 
 ### Enum Candidates
-- No required enum in the requested field set.
-- Optional future `SnapshotReason`: `season_join`, `exchange_executed`, `order_executed`, `scheduled`, `settlement` if capture source needs to be tracked.
+- `SnapshotReason`: `season_join`, `exchange_executed`, `order_executed`, `scheduled`, `settlement`
 
 ### Relation Candidates
 - `equity_snapshots.seasonParticipantId` -> `season_participants.id`
@@ -249,12 +297,10 @@
 - Ranking: provides replay and audit evidence for rankings and settlement, but `season_rankings` is still needed for authoritative ranking output.
 
 ### Questions To Finalize
-- Should `equity_snapshots` include `createdAt`, even though the requested candidate list only includes `capturedAt`?
-- Should snapshots include a reason/source field now, or defer until order/fx implementations?
 - Which source tables must be present before snapshots are considered authoritative?
 - Should there be one snapshot after every order/exchange, a scheduled snapshot, or both?
-- Should daily chart use this table directly or wait for `daily_portfolio_snapshots`?
 - How should incomplete valuation be represented when price or FX source is missing?
+- Which preservation-first FK delete behavior should be used in Prisma?
 
 ### Do Not Implement In This Step
 - No Prisma model.
