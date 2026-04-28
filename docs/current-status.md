@@ -75,6 +75,8 @@
 - `/home`의 `active + not joined` 응답은 rulepack상 `blocked/guide`여야 한다는 규칙만 있고 필드 shape는 아직 문서상 미고정
 - `/home`의 `upcoming`, `ended`, `settled` 응답 shape도 아직 문서상 미고정
 - 따라서 상태별 payload 계약 확정 전에는 `/home` 구현 진행 금지
+- `/home` 상태별 응답 계약 초안은 `docs/home-api-contract.md`에 작성됨
+- 아직 합의 전 초안이므로 구현 금지
 
 ---
 
