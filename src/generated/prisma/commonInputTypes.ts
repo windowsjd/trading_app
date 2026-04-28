@@ -335,6 +335,74 @@ export type EnumCurrencyCodeWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedEnumCurrencyCodeFilter<$PrismaModel>
 }
 
+export type EnumWalletTransactionDirectionFilter<$PrismaModel = never> = {
+  equals?: $Enums.WalletTransactionDirection | Prisma.EnumWalletTransactionDirectionFieldRefInput<$PrismaModel>
+  in?: $Enums.WalletTransactionDirection[] | Prisma.ListEnumWalletTransactionDirectionFieldRefInput<$PrismaModel>
+  notIn?: $Enums.WalletTransactionDirection[] | Prisma.ListEnumWalletTransactionDirectionFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumWalletTransactionDirectionFilter<$PrismaModel> | $Enums.WalletTransactionDirection
+}
+
+export type EnumWalletTransactionTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.WalletTransactionType | Prisma.EnumWalletTransactionTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.WalletTransactionType[] | Prisma.ListEnumWalletTransactionTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.WalletTransactionType[] | Prisma.ListEnumWalletTransactionTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumWalletTransactionTypeFilter<$PrismaModel> | $Enums.WalletTransactionType
+}
+
+export type EnumWalletTransactionReferenceTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.WalletTransactionReferenceType | Prisma.EnumWalletTransactionReferenceTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.WalletTransactionReferenceType[] | Prisma.ListEnumWalletTransactionReferenceTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.WalletTransactionReferenceType[] | Prisma.ListEnumWalletTransactionReferenceTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumWalletTransactionReferenceTypeFilter<$PrismaModel> | $Enums.WalletTransactionReferenceType
+}
+
+export type EnumWalletTransactionDirectionWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.WalletTransactionDirection | Prisma.EnumWalletTransactionDirectionFieldRefInput<$PrismaModel>
+  in?: $Enums.WalletTransactionDirection[] | Prisma.ListEnumWalletTransactionDirectionFieldRefInput<$PrismaModel>
+  notIn?: $Enums.WalletTransactionDirection[] | Prisma.ListEnumWalletTransactionDirectionFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumWalletTransactionDirectionWithAggregatesFilter<$PrismaModel> | $Enums.WalletTransactionDirection
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumWalletTransactionDirectionFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumWalletTransactionDirectionFilter<$PrismaModel>
+}
+
+export type EnumWalletTransactionTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.WalletTransactionType | Prisma.EnumWalletTransactionTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.WalletTransactionType[] | Prisma.ListEnumWalletTransactionTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.WalletTransactionType[] | Prisma.ListEnumWalletTransactionTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumWalletTransactionTypeWithAggregatesFilter<$PrismaModel> | $Enums.WalletTransactionType
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumWalletTransactionTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumWalletTransactionTypeFilter<$PrismaModel>
+}
+
+export type EnumWalletTransactionReferenceTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.WalletTransactionReferenceType | Prisma.EnumWalletTransactionReferenceTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.WalletTransactionReferenceType[] | Prisma.ListEnumWalletTransactionReferenceTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.WalletTransactionReferenceType[] | Prisma.ListEnumWalletTransactionReferenceTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumWalletTransactionReferenceTypeWithAggregatesFilter<$PrismaModel> | $Enums.WalletTransactionReferenceType
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumWalletTransactionReferenceTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumWalletTransactionReferenceTypeFilter<$PrismaModel>
+}
+
+export type EnumSnapshotReasonFilter<$PrismaModel = never> = {
+  equals?: $Enums.SnapshotReason | Prisma.EnumSnapshotReasonFieldRefInput<$PrismaModel>
+  in?: $Enums.SnapshotReason[] | Prisma.ListEnumSnapshotReasonFieldRefInput<$PrismaModel>
+  notIn?: $Enums.SnapshotReason[] | Prisma.ListEnumSnapshotReasonFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumSnapshotReasonFilter<$PrismaModel> | $Enums.SnapshotReason
+}
+
+export type EnumSnapshotReasonWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.SnapshotReason | Prisma.EnumSnapshotReasonFieldRefInput<$PrismaModel>
+  in?: $Enums.SnapshotReason[] | Prisma.ListEnumSnapshotReasonFieldRefInput<$PrismaModel>
+  notIn?: $Enums.SnapshotReason[] | Prisma.ListEnumSnapshotReasonFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumSnapshotReasonWithAggregatesFilter<$PrismaModel> | $Enums.SnapshotReason
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumSnapshotReasonFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumSnapshotReasonFilter<$PrismaModel>
+}
+
 export type NestedStringFilter<$PrismaModel = never> = {
   equals?: string | Prisma.StringFieldRefInput<$PrismaModel>
   in?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel>
@@ -640,6 +708,74 @@ export type NestedEnumCurrencyCodeWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumCurrencyCodeFilter<$PrismaModel>
   _max?: Prisma.NestedEnumCurrencyCodeFilter<$PrismaModel>
+}
+
+export type NestedEnumWalletTransactionDirectionFilter<$PrismaModel = never> = {
+  equals?: $Enums.WalletTransactionDirection | Prisma.EnumWalletTransactionDirectionFieldRefInput<$PrismaModel>
+  in?: $Enums.WalletTransactionDirection[] | Prisma.ListEnumWalletTransactionDirectionFieldRefInput<$PrismaModel>
+  notIn?: $Enums.WalletTransactionDirection[] | Prisma.ListEnumWalletTransactionDirectionFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumWalletTransactionDirectionFilter<$PrismaModel> | $Enums.WalletTransactionDirection
+}
+
+export type NestedEnumWalletTransactionTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.WalletTransactionType | Prisma.EnumWalletTransactionTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.WalletTransactionType[] | Prisma.ListEnumWalletTransactionTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.WalletTransactionType[] | Prisma.ListEnumWalletTransactionTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumWalletTransactionTypeFilter<$PrismaModel> | $Enums.WalletTransactionType
+}
+
+export type NestedEnumWalletTransactionReferenceTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.WalletTransactionReferenceType | Prisma.EnumWalletTransactionReferenceTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.WalletTransactionReferenceType[] | Prisma.ListEnumWalletTransactionReferenceTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.WalletTransactionReferenceType[] | Prisma.ListEnumWalletTransactionReferenceTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumWalletTransactionReferenceTypeFilter<$PrismaModel> | $Enums.WalletTransactionReferenceType
+}
+
+export type NestedEnumWalletTransactionDirectionWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.WalletTransactionDirection | Prisma.EnumWalletTransactionDirectionFieldRefInput<$PrismaModel>
+  in?: $Enums.WalletTransactionDirection[] | Prisma.ListEnumWalletTransactionDirectionFieldRefInput<$PrismaModel>
+  notIn?: $Enums.WalletTransactionDirection[] | Prisma.ListEnumWalletTransactionDirectionFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumWalletTransactionDirectionWithAggregatesFilter<$PrismaModel> | $Enums.WalletTransactionDirection
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumWalletTransactionDirectionFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumWalletTransactionDirectionFilter<$PrismaModel>
+}
+
+export type NestedEnumWalletTransactionTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.WalletTransactionType | Prisma.EnumWalletTransactionTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.WalletTransactionType[] | Prisma.ListEnumWalletTransactionTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.WalletTransactionType[] | Prisma.ListEnumWalletTransactionTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumWalletTransactionTypeWithAggregatesFilter<$PrismaModel> | $Enums.WalletTransactionType
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumWalletTransactionTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumWalletTransactionTypeFilter<$PrismaModel>
+}
+
+export type NestedEnumWalletTransactionReferenceTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.WalletTransactionReferenceType | Prisma.EnumWalletTransactionReferenceTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.WalletTransactionReferenceType[] | Prisma.ListEnumWalletTransactionReferenceTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.WalletTransactionReferenceType[] | Prisma.ListEnumWalletTransactionReferenceTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumWalletTransactionReferenceTypeWithAggregatesFilter<$PrismaModel> | $Enums.WalletTransactionReferenceType
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumWalletTransactionReferenceTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumWalletTransactionReferenceTypeFilter<$PrismaModel>
+}
+
+export type NestedEnumSnapshotReasonFilter<$PrismaModel = never> = {
+  equals?: $Enums.SnapshotReason | Prisma.EnumSnapshotReasonFieldRefInput<$PrismaModel>
+  in?: $Enums.SnapshotReason[] | Prisma.ListEnumSnapshotReasonFieldRefInput<$PrismaModel>
+  notIn?: $Enums.SnapshotReason[] | Prisma.ListEnumSnapshotReasonFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumSnapshotReasonFilter<$PrismaModel> | $Enums.SnapshotReason
+}
+
+export type NestedEnumSnapshotReasonWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.SnapshotReason | Prisma.EnumSnapshotReasonFieldRefInput<$PrismaModel>
+  in?: $Enums.SnapshotReason[] | Prisma.ListEnumSnapshotReasonFieldRefInput<$PrismaModel>
+  notIn?: $Enums.SnapshotReason[] | Prisma.ListEnumSnapshotReasonFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumSnapshotReasonWithAggregatesFilter<$PrismaModel> | $Enums.SnapshotReason
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumSnapshotReasonFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumSnapshotReasonFilter<$PrismaModel>
 }
 
 

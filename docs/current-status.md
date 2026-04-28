@@ -29,17 +29,22 @@
 - seasons
 - season_participants
 - cash_wallets
+- wallet_transactions
+- exchange_transactions
+- equity_snapshots
 
 ### 현재 DB 상태(아직 없음 / 미도입)
 - assets
 - asset_price_snapshots
-- wallet_transactions
-- exchange_transactions
 - fx_rate_snapshots
 - positions
-- equity_snapshots
 - daily_portfolio_snapshots
 - season_rankings
+
+### near-term 1단계 상태
+- `wallet_transactions`: Prisma schema 반영됨, migration 생성/DB 적용 완료, API/write path 미구현
+- `exchange_transactions`: Prisma schema 반영됨, migration 생성/DB 적용 완료, API/write path 미구현
+- `equity_snapshots`: Prisma schema 반영됨, migration 생성/DB 적용 완료, API/write path 미구현
 
 ---
 
@@ -111,10 +116,12 @@
 - `equity_snapshots`: 참가자 단위 평가 스냅샷 근거 확보
 - near-term migration 설계 확정안 후보 작성됨
 - near-term 1단계 Prisma schema 반영됨
-- `add_near_term_ledger_tables` migration 생성됨(create-only, DB 미적용)
+- `add_near_term_ledger_tables` migration 생성 및 로컬 DB 적용 완료
+- Prisma Client generate 완료
+- build 통과
 - 아직 API 구현 없음
 - `/home` full implementation은 여전히 불가
-- 다음 단계는 migration 검증 후 wallet/fx write path 설계
+- 다음 단계는 wallet/fx write path 설계
 2단계(full `/home` blockers 해소):
 - `assets`: 종목 마스터 확보
 - `asset_price_snapshots`: 자산 평가 가격 소스 확보
@@ -146,13 +153,14 @@
 - schema 변경 없이 구현됨
 - `/home` controller/service는 미구현 유지
 - Prisma adapter 방식 유지 중
+- near-term 1단계 migration DB 적용 완료
+- Prisma Client generate 완료
+- build 통과
 
 ---
 
 ## TODO
-- wallet_transactions 도입
-- exchange_transactions 도입
-- equity_snapshots 도입
+- wallet/fx write path 설계
 - assets 도입
 - asset_price_snapshots 도입
 - fx_rate_snapshots 도입

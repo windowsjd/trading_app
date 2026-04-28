@@ -54,7 +54,10 @@ export const ModelName = {
   User: 'User',
   Season: 'Season',
   SeasonParticipant: 'SeasonParticipant',
-  CashWallet: 'CashWallet'
+  CashWallet: 'CashWallet',
+  WalletTransaction: 'WalletTransaction',
+  ExchangeTransaction: 'ExchangeTransaction',
+  EquitySnapshot: 'EquitySnapshot'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -136,6 +139,61 @@ export const CashWalletScalarFieldEnum = {
 } as const
 
 export type CashWalletScalarFieldEnum = (typeof CashWalletScalarFieldEnum)[keyof typeof CashWalletScalarFieldEnum]
+
+
+export const WalletTransactionScalarFieldEnum = {
+  id: 'id',
+  seasonParticipantId: 'seasonParticipantId',
+  walletId: 'walletId',
+  currencyCode: 'currencyCode',
+  direction: 'direction',
+  txType: 'txType',
+  referenceType: 'referenceType',
+  referenceId: 'referenceId',
+  amount: 'amount',
+  balanceAfter: 'balanceAfter',
+  occurredAt: 'occurredAt',
+  createdAt: 'createdAt'
+} as const
+
+export type WalletTransactionScalarFieldEnum = (typeof WalletTransactionScalarFieldEnum)[keyof typeof WalletTransactionScalarFieldEnum]
+
+
+export const ExchangeTransactionScalarFieldEnum = {
+  id: 'id',
+  seasonParticipantId: 'seasonParticipantId',
+  fromCurrency: 'fromCurrency',
+  toCurrency: 'toCurrency',
+  sourceAmount: 'sourceAmount',
+  grossTargetAmount: 'grossTargetAmount',
+  feeRate: 'feeRate',
+  feeAmount: 'feeAmount',
+  feeCurrency: 'feeCurrency',
+  appliedRate: 'appliedRate',
+  netTargetAmount: 'netTargetAmount',
+  executedAt: 'executedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type ExchangeTransactionScalarFieldEnum = (typeof ExchangeTransactionScalarFieldEnum)[keyof typeof ExchangeTransactionScalarFieldEnum]
+
+
+export const EquitySnapshotScalarFieldEnum = {
+  id: 'id',
+  seasonParticipantId: 'seasonParticipantId',
+  totalAssetKrw: 'totalAssetKrw',
+  returnRate: 'returnRate',
+  krwCash: 'krwCash',
+  usdCashKrw: 'usdCashKrw',
+  domesticStockValueKrw: 'domesticStockValueKrw',
+  usStockValueKrw: 'usStockValueKrw',
+  cryptoValueKrw: 'cryptoValueKrw',
+  snapshotReason: 'snapshotReason',
+  capturedAt: 'capturedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type EquitySnapshotScalarFieldEnum = (typeof EquitySnapshotScalarFieldEnum)[keyof typeof EquitySnapshotScalarFieldEnum]
 
 
 export const SortOrder = {

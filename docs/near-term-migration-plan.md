@@ -2,9 +2,12 @@
 
 ## Status
 - Prisma schema reflection completed for the near-term 1 tables.
-- Migration file created with `add_near_term_ledger_tables` as create-only.
+- Migration file created with `add_near_term_ledger_tables` and applied to the local DB.
+- Prisma Client generate completed.
+- Build verification passed.
 - Target tables: `wallet_transactions`, `exchange_transactions`, `equity_snapshots`.
-- Seed, generated client, and runtime API code are not changed by this work.
+- Prisma generated client was updated by `prisma generate`.
+- Seed and runtime API code are not changed by this work.
 - Field names, enum values, precision, indexes, and relation policies below were reflected into Prisma schema.
 
 ## Source Context
@@ -117,8 +120,9 @@
 - Which execute idempotency key should later protect duplicate ledger writes?
 
 ### Do Not Implement In This Step
-- No Prisma model.
-- No migration.
+- Prisma model reflected.
+- Migration file created.
+- DB apply completed.
 - No seed rows.
 - No wallet balance recalculation job.
 - No wallet API or records API implementation.
@@ -211,8 +215,9 @@
 - Which execute idempotency key should later protect duplicate exchange writes?
 
 ### Do Not Implement In This Step
-- No Prisma model.
-- No migration.
+- Prisma model reflected.
+- Migration file created.
+- DB apply completed.
 - No seed rows.
 - No fx quote/execute code.
 - No records exchanges endpoint.
@@ -303,8 +308,9 @@
 - Which preservation-first FK delete behavior should be used in Prisma?
 
 ### Do Not Implement In This Step
-- No Prisma model.
-- No migration.
+- Prisma model reflected.
+- Migration file created.
+- DB apply completed.
 - No seed rows.
 - No snapshot capture job.
 - No MDD/ranking/settlement calculation.
@@ -313,15 +319,13 @@
 ---
 
 ## Implementation Order Candidate
-1. Agree field names, enums, precision, and index strategy for the three near-term tables.
-2. Review delete behavior and audit preservation rules.
-3. After agreement, update Prisma schema using the current Prisma 7 config and adapter pattern.
-4. Generate migration only after schema review.
-5. Implement write paths only when fx/orders/wallet behavior is separately agreed.
+1. Design wallet/fx write paths.
+2. Define transaction boundaries for exchange execution and wallet ledger writes.
+3. Decide fee ledger representation and idempotency strategy.
+4. Implement write paths only when fx/orders/wallet behavior is separately agreed.
 
 ## Explicit Non-Goals
 - No API contract changes.
 - No `/home`, `/wallets`, `/fx`, `/orders`, or `/records` implementation.
 - No fake backfill data.
-- No generated Prisma Client changes.
 - No claim that `/home` full implementation is now possible.

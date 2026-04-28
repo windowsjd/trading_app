@@ -44,3 +44,47 @@ export const CurrencyCode = {
 } as const
 
 export type CurrencyCode = (typeof CurrencyCode)[keyof typeof CurrencyCode]
+
+
+export const WalletTransactionDirection = {
+  credit: 'credit',
+  debit: 'debit'
+} as const
+
+export type WalletTransactionDirection = (typeof WalletTransactionDirection)[keyof typeof WalletTransactionDirection]
+
+
+export const WalletTransactionType = {
+  initial_grant: 'initial_grant',
+  exchange_source: 'exchange_source',
+  exchange_target: 'exchange_target',
+  order_buy: 'order_buy',
+  order_sell: 'order_sell',
+  fee: 'fee',
+  adjustment: 'adjustment',
+  settlement: 'settlement'
+} as const
+
+export type WalletTransactionType = (typeof WalletTransactionType)[keyof typeof WalletTransactionType]
+
+
+export const WalletTransactionReferenceType = {
+  season_join: 'season_join',
+  exchange_transaction: 'exchange_transaction',
+  order: 'order',
+  manual_adjustment: 'manual_adjustment',
+  settlement: 'settlement'
+} as const
+
+export type WalletTransactionReferenceType = (typeof WalletTransactionReferenceType)[keyof typeof WalletTransactionReferenceType]
+
+
+export const SnapshotReason = {
+  season_join: 'season_join',
+  exchange_executed: 'exchange_executed',
+  order_executed: 'order_executed',
+  scheduled: 'scheduled',
+  settlement: 'settlement'
+} as const
+
+export type SnapshotReason = (typeof SnapshotReason)[keyof typeof SnapshotReason]

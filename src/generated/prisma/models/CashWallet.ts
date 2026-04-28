@@ -225,6 +225,7 @@ export type CashWalletWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"CashWallet"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"CashWallet"> | Date | string
   seasonParticipant?: Prisma.XOR<Prisma.SeasonParticipantScalarRelationFilter, Prisma.SeasonParticipantWhereInput>
+  walletTransactions?: Prisma.WalletTransactionListRelationFilter
 }
 
 export type CashWalletOrderByWithRelationInput = {
@@ -235,6 +236,7 @@ export type CashWalletOrderByWithRelationInput = {
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   seasonParticipant?: Prisma.SeasonParticipantOrderByWithRelationInput
+  walletTransactions?: Prisma.WalletTransactionOrderByRelationAggregateInput
 }
 
 export type CashWalletWhereUniqueInput = Prisma.AtLeast<{
@@ -249,6 +251,7 @@ export type CashWalletWhereUniqueInput = Prisma.AtLeast<{
   createdAt?: Prisma.DateTimeFilter<"CashWallet"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"CashWallet"> | Date | string
   seasonParticipant?: Prisma.XOR<Prisma.SeasonParticipantScalarRelationFilter, Prisma.SeasonParticipantWhereInput>
+  walletTransactions?: Prisma.WalletTransactionListRelationFilter
 }, "id" | "seasonParticipantId_currencyCode">
 
 export type CashWalletOrderByWithAggregationInput = {
@@ -284,6 +287,7 @@ export type CashWalletCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipant: Prisma.SeasonParticipantCreateNestedOneWithoutCashWalletsInput
+  walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutWalletInput
 }
 
 export type CashWalletUncheckedCreateInput = {
@@ -293,6 +297,7 @@ export type CashWalletUncheckedCreateInput = {
   balanceAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Date | string
   updatedAt?: Date | string
+  walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutWalletInput
 }
 
 export type CashWalletUpdateInput = {
@@ -302,6 +307,7 @@ export type CashWalletUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneRequiredWithoutCashWalletsNestedInput
+  walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutWalletNestedInput
 }
 
 export type CashWalletUncheckedUpdateInput = {
@@ -311,6 +317,7 @@ export type CashWalletUncheckedUpdateInput = {
   balanceAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutWalletNestedInput
 }
 
 export type CashWalletCreateManyInput = {
@@ -389,6 +396,11 @@ export type CashWalletSumOrderByAggregateInput = {
   balanceAmount?: Prisma.SortOrder
 }
 
+export type CashWalletScalarRelationFilter = {
+  is?: Prisma.CashWalletWhereInput
+  isNot?: Prisma.CashWalletWhereInput
+}
+
 export type CashWalletCreateNestedManyWithoutSeasonParticipantInput = {
   create?: Prisma.XOR<Prisma.CashWalletCreateWithoutSeasonParticipantInput, Prisma.CashWalletUncheckedCreateWithoutSeasonParticipantInput> | Prisma.CashWalletCreateWithoutSeasonParticipantInput[] | Prisma.CashWalletUncheckedCreateWithoutSeasonParticipantInput[]
   connectOrCreate?: Prisma.CashWalletCreateOrConnectWithoutSeasonParticipantInput | Prisma.CashWalletCreateOrConnectWithoutSeasonParticipantInput[]
@@ -435,12 +447,27 @@ export type EnumCurrencyCodeFieldUpdateOperationsInput = {
   set?: $Enums.CurrencyCode
 }
 
+export type CashWalletCreateNestedOneWithoutWalletTransactionsInput = {
+  create?: Prisma.XOR<Prisma.CashWalletCreateWithoutWalletTransactionsInput, Prisma.CashWalletUncheckedCreateWithoutWalletTransactionsInput>
+  connectOrCreate?: Prisma.CashWalletCreateOrConnectWithoutWalletTransactionsInput
+  connect?: Prisma.CashWalletWhereUniqueInput
+}
+
+export type CashWalletUpdateOneRequiredWithoutWalletTransactionsNestedInput = {
+  create?: Prisma.XOR<Prisma.CashWalletCreateWithoutWalletTransactionsInput, Prisma.CashWalletUncheckedCreateWithoutWalletTransactionsInput>
+  connectOrCreate?: Prisma.CashWalletCreateOrConnectWithoutWalletTransactionsInput
+  upsert?: Prisma.CashWalletUpsertWithoutWalletTransactionsInput
+  connect?: Prisma.CashWalletWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.CashWalletUpdateToOneWithWhereWithoutWalletTransactionsInput, Prisma.CashWalletUpdateWithoutWalletTransactionsInput>, Prisma.CashWalletUncheckedUpdateWithoutWalletTransactionsInput>
+}
+
 export type CashWalletCreateWithoutSeasonParticipantInput = {
   id?: string
   currencyCode: $Enums.CurrencyCode
   balanceAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Date | string
   updatedAt?: Date | string
+  walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutWalletInput
 }
 
 export type CashWalletUncheckedCreateWithoutSeasonParticipantInput = {
@@ -449,6 +476,7 @@ export type CashWalletUncheckedCreateWithoutSeasonParticipantInput = {
   balanceAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Date | string
   updatedAt?: Date | string
+  walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutWalletInput
 }
 
 export type CashWalletCreateOrConnectWithoutSeasonParticipantInput = {
@@ -489,6 +517,58 @@ export type CashWalletScalarWhereInput = {
   updatedAt?: Prisma.DateTimeFilter<"CashWallet"> | Date | string
 }
 
+export type CashWalletCreateWithoutWalletTransactionsInput = {
+  id?: string
+  currencyCode: $Enums.CurrencyCode
+  balanceAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  seasonParticipant: Prisma.SeasonParticipantCreateNestedOneWithoutCashWalletsInput
+}
+
+export type CashWalletUncheckedCreateWithoutWalletTransactionsInput = {
+  id?: string
+  seasonParticipantId: string
+  currencyCode: $Enums.CurrencyCode
+  balanceAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+}
+
+export type CashWalletCreateOrConnectWithoutWalletTransactionsInput = {
+  where: Prisma.CashWalletWhereUniqueInput
+  create: Prisma.XOR<Prisma.CashWalletCreateWithoutWalletTransactionsInput, Prisma.CashWalletUncheckedCreateWithoutWalletTransactionsInput>
+}
+
+export type CashWalletUpsertWithoutWalletTransactionsInput = {
+  update: Prisma.XOR<Prisma.CashWalletUpdateWithoutWalletTransactionsInput, Prisma.CashWalletUncheckedUpdateWithoutWalletTransactionsInput>
+  create: Prisma.XOR<Prisma.CashWalletCreateWithoutWalletTransactionsInput, Prisma.CashWalletUncheckedCreateWithoutWalletTransactionsInput>
+  where?: Prisma.CashWalletWhereInput
+}
+
+export type CashWalletUpdateToOneWithWhereWithoutWalletTransactionsInput = {
+  where?: Prisma.CashWalletWhereInput
+  data: Prisma.XOR<Prisma.CashWalletUpdateWithoutWalletTransactionsInput, Prisma.CashWalletUncheckedUpdateWithoutWalletTransactionsInput>
+}
+
+export type CashWalletUpdateWithoutWalletTransactionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  balanceAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonParticipant?: Prisma.SeasonParticipantUpdateOneRequiredWithoutCashWalletsNestedInput
+}
+
+export type CashWalletUncheckedUpdateWithoutWalletTransactionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  balanceAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
 export type CashWalletCreateManySeasonParticipantInput = {
   id?: string
   currencyCode: $Enums.CurrencyCode
@@ -503,6 +583,7 @@ export type CashWalletUpdateWithoutSeasonParticipantInput = {
   balanceAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutWalletNestedInput
 }
 
 export type CashWalletUncheckedUpdateWithoutSeasonParticipantInput = {
@@ -511,6 +592,7 @@ export type CashWalletUncheckedUpdateWithoutSeasonParticipantInput = {
   balanceAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutWalletNestedInput
 }
 
 export type CashWalletUncheckedUpdateManyWithoutSeasonParticipantInput = {
@@ -522,6 +604,35 @@ export type CashWalletUncheckedUpdateManyWithoutSeasonParticipantInput = {
 }
 
 
+/**
+ * Count Type CashWalletCountOutputType
+ */
+
+export type CashWalletCountOutputType = {
+  walletTransactions: number
+}
+
+export type CashWalletCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  walletTransactions?: boolean | CashWalletCountOutputTypeCountWalletTransactionsArgs
+}
+
+/**
+ * CashWalletCountOutputType without action
+ */
+export type CashWalletCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the CashWalletCountOutputType
+   */
+  select?: Prisma.CashWalletCountOutputTypeSelect<ExtArgs> | null
+}
+
+/**
+ * CashWalletCountOutputType without action
+ */
+export type CashWalletCountOutputTypeCountWalletTransactionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.WalletTransactionWhereInput
+}
+
 
 export type CashWalletSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -531,6 +642,8 @@ export type CashWalletSelect<ExtArgs extends runtime.Types.Extensions.InternalAr
   createdAt?: boolean
   updatedAt?: boolean
   seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
+  walletTransactions?: boolean | Prisma.CashWallet$walletTransactionsArgs<ExtArgs>
+  _count?: boolean | Prisma.CashWalletCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["cashWallet"]>
 
 export type CashWalletSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -565,6 +678,8 @@ export type CashWalletSelectScalar = {
 export type CashWalletOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "seasonParticipantId" | "currencyCode" | "balanceAmount" | "createdAt" | "updatedAt", ExtArgs["result"]["cashWallet"]>
 export type CashWalletInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
+  walletTransactions?: boolean | Prisma.CashWallet$walletTransactionsArgs<ExtArgs>
+  _count?: boolean | Prisma.CashWalletCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type CashWalletIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
@@ -577,6 +692,7 @@ export type $CashWalletPayload<ExtArgs extends runtime.Types.Extensions.Internal
   name: "CashWallet"
   objects: {
     seasonParticipant: Prisma.$SeasonParticipantPayload<ExtArgs>
+    walletTransactions: Prisma.$WalletTransactionPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -980,6 +1096,7 @@ readonly fields: CashWalletFieldRefs;
 export interface Prisma__CashWalletClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   seasonParticipant<T extends Prisma.SeasonParticipantDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.SeasonParticipantDefaultArgs<ExtArgs>>): Prisma.Prisma__SeasonParticipantClient<runtime.Types.Result.GetResult<Prisma.$SeasonParticipantPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  walletTransactions<T extends Prisma.CashWallet$walletTransactionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.CashWallet$walletTransactionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WalletTransactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1413,6 +1530,30 @@ export type CashWalletDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.In
    * Limit how many CashWallets to delete.
    */
   limit?: number
+}
+
+/**
+ * CashWallet.walletTransactions
+ */
+export type CashWallet$walletTransactionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the WalletTransaction
+   */
+  select?: Prisma.WalletTransactionSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the WalletTransaction
+   */
+  omit?: Prisma.WalletTransactionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.WalletTransactionInclude<ExtArgs> | null
+  where?: Prisma.WalletTransactionWhereInput
+  orderBy?: Prisma.WalletTransactionOrderByWithRelationInput | Prisma.WalletTransactionOrderByWithRelationInput[]
+  cursor?: Prisma.WalletTransactionWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.WalletTransactionScalarFieldEnum | Prisma.WalletTransactionScalarFieldEnum[]
 }
 
 /**
