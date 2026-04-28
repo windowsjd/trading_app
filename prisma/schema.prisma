@@ -32,6 +32,38 @@ enum CurrencyCode {
   USD
 }
 
+enum WalletTransactionDirection {
+  credit
+  debit
+}
+
+enum WalletTransactionType {
+  initial_grant
+  exchange_source
+  exchange_target
+  order_buy
+  order_sell
+  fee
+  adjustment
+  settlement
+}
+
+enum WalletTransactionReferenceType {
+  season_join
+  exchange_transaction
+  order
+  manual_adjustment
+  settlement
+}
+
+enum SnapshotReason {
+  season_join
+  exchange_executed
+  order_executed
+  scheduled
+  settlement
+}
+
 model User {
   id              String              @id @default(uuid())
   email           String              @unique
@@ -86,6 +118,9 @@ model SeasonParticipant {
   season           Season              @relation(fields: [seasonId], references: [id], onDelete: Cascade)
   user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   cashWallets      CashWallet[]
+  walletTransactions   WalletTransaction[]
+  exchangeTransactions ExchangeTransaction[]
+  equitySnapshots     EquitySnapshot[]
 
   @@unique([seasonId, userId])
   @@index([seasonId])
@@ -102,8 +137,75 @@ model CashWallet {
   updatedAt           DateTime           @updatedAt @map("updated_at")
 
   seasonParticipant   SeasonParticipant  @relation(fields: [seasonParticipantId], references: [id], onDelete: Cascade)
+  walletTransactions WalletTransaction[]
 
   @@unique([seasonParticipantId, currencyCode])
   @@index([seasonParticipantId])
   @@map("cash_wallets")
+}
+
+model WalletTransaction {
+  id                  String                         @id @default(uuid())
+  seasonParticipantId String                         @map("season_participant_id")
+  walletId            String                         @map("wallet_id")
+  currencyCode        CurrencyCode                   @map("currency_code")
+  direction           WalletTransactionDirection
+  txType              WalletTransactionType          @map("tx_type")
+  referenceType       WalletTransactionReferenceType @map("reference_type")
+  referenceId         String?                        @map("reference_id")
+  amount              Decimal                        @db.Decimal(24, 8)
+  balanceAfter        Decimal                        @db.Decimal(24, 8) @map("balance_after")
+  occurredAt          DateTime                       @map("occurred_at")
+  createdAt           DateTime                       @default(now()) @map("created_at")
+
+  seasonParticipant SeasonParticipant @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
+  wallet            CashWallet        @relation(fields: [walletId], references: [id], onDelete: Restrict)
+
+  @@index([seasonParticipantId, occurredAt])
+  @@index([walletId, occurredAt])
+  @@index([referenceType, referenceId])
+  @@map("wallet_transactions")
+}
+
+model ExchangeTransaction {
+  id                  String       @id @default(uuid())
+  seasonParticipantId String       @map("season_participant_id")
+  fromCurrency        CurrencyCode @map("from_currency")
+  toCurrency          CurrencyCode @map("to_currency")
+  sourceAmount        Decimal      @db.Decimal(24, 8) @map("source_amount")
+  grossTargetAmount   Decimal      @db.Decimal(24, 8) @map("gross_target_amount")
+  feeRate             Decimal      @db.Decimal(10, 6) @map("fee_rate")
+  feeAmount           Decimal      @db.Decimal(24, 8) @map("fee_amount")
+  feeCurrency         CurrencyCode @map("fee_currency")
+  appliedRate         Decimal      @db.Decimal(18, 8) @map("applied_rate")
+  netTargetAmount     Decimal      @db.Decimal(24, 8) @map("net_target_amount")
+  executedAt          DateTime     @map("executed_at")
+  createdAt           DateTime     @default(now()) @map("created_at")
+
+  seasonParticipant SeasonParticipant @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
+
+  @@index([seasonParticipantId, executedAt])
+  @@index([fromCurrency, toCurrency, executedAt])
+  @@map("exchange_transactions")
+}
+
+model EquitySnapshot {
+  id                    String         @id @default(uuid())
+  seasonParticipantId   String         @map("season_participant_id")
+  totalAssetKrw         Decimal        @db.Decimal(24, 8) @map("total_asset_krw")
+  returnRate            Decimal        @db.Decimal(12, 8) @map("return_rate")
+  krwCash               Decimal        @db.Decimal(24, 8) @map("krw_cash")
+  usdCashKrw            Decimal        @db.Decimal(24, 8) @map("usd_cash_krw")
+  domesticStockValueKrw Decimal        @db.Decimal(24, 8) @map("domestic_stock_value_krw")
+  usStockValueKrw       Decimal        @db.Decimal(24, 8) @map("us_stock_value_krw")
+  cryptoValueKrw        Decimal        @db.Decimal(24, 8) @map("crypto_value_krw")
+  snapshotReason        SnapshotReason @map("snapshot_reason")
+  capturedAt            DateTime       @map("captured_at")
+  createdAt             DateTime       @default(now()) @map("created_at")
+
+  seasonParticipant SeasonParticipant @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
+
+  @@index([seasonParticipantId, capturedAt])
+  @@index([snapshotReason, capturedAt])
+  @@map("equity_snapshots")
 }

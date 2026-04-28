@@ -1,11 +1,11 @@
 # Near-Term Migration Plan Proposed Final Candidate
 
 ## Status
-- This document is a Prisma schema reflection candidate, not a schema change.
+- Prisma schema reflection completed for the near-term 1 tables.
+- Migration file created with `add_near_term_ledger_tables` as create-only.
 - Target tables: `wallet_transactions`, `exchange_transactions`, `equity_snapshots`.
-- Prisma schema, migration files, seed, generated client, and runtime code are not changed by this document.
-- Field names, enum values, precision, indexes, and relation policies below are proposed final decisions for the next review.
-- Actual Prisma schema reflection still requires one final review prompt before implementation.
+- Seed, generated client, and runtime API code are not changed by this work.
+- Field names, enum values, precision, indexes, and relation policies below were reflected into Prisma schema.
 
 ## Source Context
 - Current Prisma models are centered on `users`, `seasons`, `season_participants`, and `cash_wallets`.
