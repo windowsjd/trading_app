@@ -31,12 +31,50 @@
 - cash_wallets
 
 ### 현재 DB 상태(아직 없음 / 미도입)
+- assets
+- asset_price_snapshots
 - wallet_transactions
 - exchange_transactions
 - fx_rate_snapshots
 - positions
 - equity_snapshots
+- daily_portfolio_snapshots
 - season_rankings
+
+---
+
+## GET /api/v1/home 구현 판단
+
+### 결론
+- `GET /api/v1/home` full implementation은 현재 불가
+- 현재 단계는 `/home` controller/service 구현이 아니라 STOP 보고 + 선행 migration 범위 확정까지만 수행
+- 임시 API 계약 추가 금지
+- fake 데이터 금지
+
+### 현재 가능한 범위(문서 + 실제 스키마 기준)
+- 현재 시즌 메타 조회
+- 현재 사용자의 시즌 참여 여부 조회
+- 참여한 경우 KRW/USD wallet 잔액 조회
+- `season_participants`에 저장된 집계 필드 원시값 조회
+- 단, 위 원시값만으로 `/home` full response를 truthfully 보장할 수는 없음
+
+### hard blockers (full implementation 기준)
+- assets
+- asset_price_snapshots
+- fx_rate_snapshots
+- positions
+- daily_portfolio_snapshots
+- season_rankings
+
+### near-term required (선행 migration 범위)
+- wallet_transactions
+- exchange_transactions
+- equity_snapshots
+
+### API/state gap
+- `/home`의 `active + not joined` 응답은 rulepack상 `blocked/guide`여야 한다는 규칙만 있고 필드 shape는 아직 문서상 미고정
+- `/home`의 `upcoming`, `ended`, `settled` 응답 shape도 아직 문서상 미고정
+- 따라서 상태별 payload 계약 확정 전에는 `/home` 구현 진행 금지
 
 ---
 
@@ -52,15 +90,34 @@
 ---
 
 ## 다음 작업
-- 1순위: GET /api/v1/home
-- 단, 구현 전에 현재 스키마로 truthfully 가능한지 먼저 판단
-- 불가능하면 구현하지 말고 STOP 후 부족한 구조 보고
+- 1순위: `/home` controller/service 구현 아님
+- 먼저 Prisma migration 범위와 상태별 API 계약을 문서로 합의
+- full implementation 가능 판정은 선행 테이블 확보 후 재검토
 
 ### 다음 작업 STOP 가능성
 - ranking 계산 근거 부족 가능
 - allocation 계산 근거 부족 가능
 - equityChart 생성 근거 부족 가능
 - USD KRW 환산용 환율 소스 부족 가능
+
+### Prisma migration 계획 초안
+- 원칙: Prisma 7 + `prisma.config.ts` + adapter 방식 유지
+- 원칙: 기존 migration/seed 임의 변경 금지
+1단계(near-term):
+- `wallet_transactions`: cash wallet 증감 원장 확보
+- `exchange_transactions`: KRW/USD 환전 이력 및 수수료 근거 확보
+- `equity_snapshots`: 참가자 단위 평가 스냅샷 근거 확보
+2단계(full `/home` blockers 해소):
+- `assets`: 종목 마스터 확보
+- `asset_price_snapshots`: 자산 평가 가격 소스 확보
+- `fx_rate_snapshots`: USD -> KRW 환산 소스 확보
+- `positions`: 보유 수량/평단/실현손익 근거 확보
+- `daily_portfolio_snapshots`: 일별 총자산/수익률/드로다운 추이 근거 확보
+- `season_rankings`: 시즌 랭킹/티어 근거 확보
+보류:
+- `/home` controller/service 구현
+- 임시 응답 shape 추가
+- fake 데이터 기반 계산
 
 ---
 
@@ -78,13 +135,18 @@
 - join API는 request.user.userId 기준
 - join 시 KRW/USD wallet 2개 생성
 - schema 변경 없이 구현됨
+- `/home` controller/service는 미구현 유지
+- Prisma adapter 방식 유지 중
 
 ---
 
 ## TODO
 - wallet_transactions 도입
 - exchange_transactions 도입
-- fx_rate_snapshots 도입
 - equity_snapshots 도입
+- assets 도입
+- asset_price_snapshots 도입
+- fx_rate_snapshots 도입
 - positions 도입
+- daily_portfolio_snapshots 도입
 - season_rankings 도입
