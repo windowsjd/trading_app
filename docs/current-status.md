@@ -124,6 +124,7 @@
 ---
 
 ## 최근 합의(외부 공유된 계약)
+- Developer A에게 전달한 records orders/exchanges item response shape를 API 계약 문서에 고정함.
 - records orders item에 `side` 포함
 - records orders item에 `orderId`, `assetId`, `name` 포함 방향 유지
 - records exchanges item에 `feeCurrency` 포함
