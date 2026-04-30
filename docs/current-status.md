@@ -119,6 +119,11 @@
 - `add_near_term_ledger_tables` migration 생성 및 로컬 DB 적용 완료
 - Prisma Client generate 완료
 - build 통과
+- 오래된 Hello World 테스트는 현재 health API 기준으로 정리됨
+- package dependency 이상 항목(`config`) 정리됨
+- initial_grant ledger 규칙 문서화됨: `docs/season-join-ledger-plan.md`
+- 아직 `joinSeason`/seed initial_grant ledger 구현은 안 함
+- 다음 단계는 season join initial_grant ledger 구현 검토
 - 아직 API 구현 없음
 - wallet/fx write path 설계 문서 작성됨: `docs/wallet-fx-write-path-plan.md`
 - 아직 `/fx` API 구현 없음
