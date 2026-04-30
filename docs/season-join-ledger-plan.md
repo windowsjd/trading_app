@@ -1,10 +1,10 @@
 # Season Join Ledger Plan
 
 ## Status
-- This document fixes the near-term initial grant wallet ledger rule for agreement.
-- This is documentation only.
-- Do not implement `joinSeason` ledger writes or seed ledger writes from this document in this step.
-- Do not add Prisma schema changes, migrations, seed changes, fake data, backfill data, or API contract changes from this document.
+- KRW `initial_grant` wallet ledger is implemented for `joinSeason`.
+- Dev seed ledger consistency is implemented with deterministic wallet transaction id `wtx_initial_grant_dev_001`.
+- USD 0 amount wallet ledger row remains deferred.
+- Do not add Prisma schema changes, migrations, fake data, backfill data, or API contract changes from this document.
 
 ## Source Rules
 - Season join creates the participant's starting cash wallets.
@@ -16,15 +16,15 @@
 - On successful season join, `joinSeason` creates:
   - KRW wallet with `balanceAmount = season.initialCapitalKrw`
   - USD wallet with `balanceAmount = 0`
-- Current `joinSeason` code does not create `wallet_transactions` rows.
-- Current seed data creates a dev participant and KRW/USD wallets, but does not create `wallet_transactions` rows.
+- Current `joinSeason` code creates one KRW `initial_grant` `wallet_transactions` row.
+- Current seed data creates a dev participant, KRW/USD wallets, and one deterministic KRW `initial_grant` `wallet_transactions` row.
 
 ## Why Initial Grant Ledger Is Needed
 - `cash_wallets.balanceAmount` stores the current wallet balance only.
 - If `wallet_transactions` is used as a trustworthy ledger, the KRW starting balance must be represented by a durable ledger row.
 - Without the initial grant row, future ledger reconciliation would see a KRW wallet balance that did not originate from the wallet ledger.
 
-## Initial Grant Row Candidate
+## Initial Grant Row
 When season join succeeds, create one KRW wallet ledger row in the same DB transaction as the participant and wallet creation.
 
 - `seasonParticipantId`: created `seasonParticipant.id`
@@ -45,13 +45,11 @@ When season join succeeds, create one KRW wallet ledger row in the same DB trans
 - If a 0 amount row is later required, agree first on whether `amount = 0` is valid for `wallet_transactions` and how reconciliation treats zero rows.
 
 ## Seed Data Decision
-- Dev seed currently creates a participant and wallets without ledger rows.
-- If seed participants are expected to be ledger-consistent, seed should also create the matching KRW `initial_grant` row.
-- Whether seed should create ledger rows is a separate implementation decision.
-- This task does not change seed data.
+- Dev seed creates the matching KRW `initial_grant` row.
+- Dev seed uses deterministic wallet transaction id `wtx_initial_grant_dev_001` so repeated seed runs do not create duplicate ledger rows.
+- Dev seed uses a stable `joinedAt` so `occurredAt` remains stable.
 
 ## Implementation Boundary
-- Do not update `joinSeason` in this step.
-- Do not update `prisma/seed.ts` in this step.
-- Actual initial grant ledger implementation should be a separate follow-up task.
-- Future implementation should keep participant creation, KRW/USD wallet creation, and the KRW initial grant ledger row inside one DB transaction.
+- `joinSeason` keeps participant creation, KRW/USD wallet creation, and the KRW initial grant ledger row inside one DB transaction.
+- USD 0 amount ledger row is not implemented.
+- No API response shape changes are made by this ledger implementation.

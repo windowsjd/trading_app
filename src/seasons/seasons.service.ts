@@ -4,6 +4,9 @@ import {
   ParticipantStatus,
   Prisma,
   SeasonStatus,
+  WalletTransactionDirection,
+  WalletTransactionReferenceType,
+  WalletTransactionType,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -164,19 +167,35 @@ export class SeasonsService {
           },
         });
 
-        await tx.cashWallet.createMany({
-          data: [
-            {
-              seasonParticipantId: participant.id,
-              currencyCode: CurrencyCode.KRW,
-              balanceAmount: initialCapitalKrw,
-            },
-            {
-              seasonParticipantId: participant.id,
-              currencyCode: CurrencyCode.USD,
-              balanceAmount: ZERO_AMOUNT,
-            },
-          ],
+        const krwWallet = await tx.cashWallet.create({
+          data: {
+            seasonParticipantId: participant.id,
+            currencyCode: CurrencyCode.KRW,
+            balanceAmount: initialCapitalKrw,
+          },
+        });
+
+        await tx.cashWallet.create({
+          data: {
+            seasonParticipantId: participant.id,
+            currencyCode: CurrencyCode.USD,
+            balanceAmount: ZERO_AMOUNT,
+          },
+        });
+
+        await tx.walletTransaction.create({
+          data: {
+            seasonParticipantId: participant.id,
+            walletId: krwWallet.id,
+            currencyCode: CurrencyCode.KRW,
+            direction: WalletTransactionDirection.credit,
+            txType: WalletTransactionType.initial_grant,
+            referenceType: WalletTransactionReferenceType.season_join,
+            referenceId: participant.id,
+            amount: initialCapitalKrw,
+            balanceAfter: initialCapitalKrw,
+            occurredAt: joinedAt,
+          },
         });
 
         return {

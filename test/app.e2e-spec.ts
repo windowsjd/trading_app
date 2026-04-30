@@ -19,6 +19,16 @@ jest.mock('../src/generated/prisma/client', () => ({
     ended: 'ended',
     settled: 'settled',
   },
+  WalletTransactionDirection: {
+    credit: 'credit',
+    debit: 'debit',
+  },
+  WalletTransactionReferenceType: {
+    season_join: 'season_join',
+  },
+  WalletTransactionType: {
+    initial_grant: 'initial_grant',
+  },
 }));
 
 jest.mock('../src/prisma/prisma.service', () => ({

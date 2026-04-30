@@ -6,6 +6,9 @@ import {
   SeasonStatus,
   ParticipantStatus,
   CurrencyCode,
+  WalletTransactionDirection,
+  WalletTransactionReferenceType,
+  WalletTransactionType,
 } from "../src/generated/prisma/client";
 
 const adapter = new PrismaPg({
@@ -15,6 +18,10 @@ const adapter = new PrismaPg({
 const prisma = new PrismaClient({
   adapter,
 });
+
+const DEV_JOINED_AT = new Date("2026-03-30T00:00:00Z");
+const DEV_INITIAL_CAPITAL_KRW = "10000000.00000000";
+const ZERO_AMOUNT = "0.00000000";
 
 async function main() {
   const user = await prisma.user.upsert({
@@ -39,7 +46,7 @@ async function main() {
       status: SeasonStatus.active,
       startAt: new Date("2026-03-30T00:00:00Z"),
       endAt: new Date("2026-04-12T14:59:00Z"),
-      initialCapitalKrw: "10000000.00000000",
+      initialCapitalKrw: DEV_INITIAL_CAPITAL_KRW,
       tradeFeeRate: "0.001000",
       fxFeeRate: "0.001000",
     },
@@ -49,7 +56,7 @@ async function main() {
       status: SeasonStatus.active,
       startAt: new Date("2026-03-30T00:00:00Z"),
       endAt: new Date("2026-04-12T14:59:00Z"),
-      initialCapitalKrw: "10000000.00000000",
+      initialCapitalKrw: DEV_INITIAL_CAPITAL_KRW,
       tradeFeeRate: "0.001000",
       fxFeeRate: "0.001000",
     },
@@ -63,11 +70,12 @@ async function main() {
       },
     },
     update: {
+      joinedAt: DEV_JOINED_AT,
       participantStatus: ParticipantStatus.active,
-      initialCapitalKrw: "10000000.00000000",
-      totalAssetKrw: "10000000.00000000",
-      totalReturnRate: "0.00000000",
-      maxDrawdown: "0.00000000",
+      initialCapitalKrw: DEV_INITIAL_CAPITAL_KRW,
+      totalAssetKrw: DEV_INITIAL_CAPITAL_KRW,
+      totalReturnRate: ZERO_AMOUNT,
+      maxDrawdown: ZERO_AMOUNT,
       currentRank: null,
       finalRank: null,
       finalTier: null,
@@ -76,16 +84,16 @@ async function main() {
       id: "sp_dev_001",
       seasonId: season.id,
       userId: user.id,
-      joinedAt: new Date(),
+      joinedAt: DEV_JOINED_AT,
       participantStatus: ParticipantStatus.active,
-      initialCapitalKrw: "10000000.00000000",
-      totalAssetKrw: "10000000.00000000",
-      totalReturnRate: "0.00000000",
-      maxDrawdown: "0.00000000",
+      initialCapitalKrw: DEV_INITIAL_CAPITAL_KRW,
+      totalAssetKrw: DEV_INITIAL_CAPITAL_KRW,
+      totalReturnRate: ZERO_AMOUNT,
+      maxDrawdown: ZERO_AMOUNT,
     },
   });
 
-  await prisma.cashWallet.upsert({
+  const krwWallet = await prisma.cashWallet.upsert({
     where: {
       seasonParticipantId_currencyCode: {
         seasonParticipantId: seasonParticipant.id,
@@ -93,13 +101,13 @@ async function main() {
       },
     },
     update: {
-      balanceAmount: "10000000.00000000",
+      balanceAmount: DEV_INITIAL_CAPITAL_KRW,
     },
     create: {
       id: "wal_krw_dev_001",
       seasonParticipantId: seasonParticipant.id,
       currencyCode: CurrencyCode.KRW,
-      balanceAmount: "10000000.00000000",
+      balanceAmount: DEV_INITIAL_CAPITAL_KRW,
     },
   });
 
@@ -111,13 +119,44 @@ async function main() {
       },
     },
     update: {
-      balanceAmount: "0.00000000",
+      balanceAmount: ZERO_AMOUNT,
     },
     create: {
       id: "wal_usd_dev_001",
       seasonParticipantId: seasonParticipant.id,
       currencyCode: CurrencyCode.USD,
-      balanceAmount: "0.00000000",
+      balanceAmount: ZERO_AMOUNT,
+    },
+  });
+
+  await prisma.walletTransaction.upsert({
+    where: {
+      id: "wtx_initial_grant_dev_001",
+    },
+    update: {
+      seasonParticipantId: seasonParticipant.id,
+      walletId: krwWallet.id,
+      currencyCode: CurrencyCode.KRW,
+      direction: WalletTransactionDirection.credit,
+      txType: WalletTransactionType.initial_grant,
+      referenceType: WalletTransactionReferenceType.season_join,
+      referenceId: seasonParticipant.id,
+      amount: DEV_INITIAL_CAPITAL_KRW,
+      balanceAfter: DEV_INITIAL_CAPITAL_KRW,
+      occurredAt: seasonParticipant.joinedAt,
+    },
+    create: {
+      id: "wtx_initial_grant_dev_001",
+      seasonParticipantId: seasonParticipant.id,
+      walletId: krwWallet.id,
+      currencyCode: CurrencyCode.KRW,
+      direction: WalletTransactionDirection.credit,
+      txType: WalletTransactionType.initial_grant,
+      referenceType: WalletTransactionReferenceType.season_join,
+      referenceId: seasonParticipant.id,
+      amount: DEV_INITIAL_CAPITAL_KRW,
+      balanceAfter: DEV_INITIAL_CAPITAL_KRW,
+      occurredAt: seasonParticipant.joinedAt,
     },
   });
 

@@ -42,7 +42,7 @@
 - season_rankings
 
 ### near-term 1단계 상태
-- `wallet_transactions`: Prisma schema 반영됨, migration 생성/DB 적용 완료, API/write path 미구현
+- `wallet_transactions`: Prisma schema 반영됨, migration 생성/DB 적용 완료, season join initial_grant write path 구현됨
 - `exchange_transactions`: Prisma schema 반영됨, migration 생성/DB 적용 완료, API/write path 미구현
 - `equity_snapshots`: Prisma schema 반영됨, migration 생성/DB 적용 완료, API/write path 미구현
 
@@ -121,9 +121,11 @@
 - build 통과
 - 오래된 Hello World 테스트는 현재 health API 기준으로 정리됨
 - package dependency 이상 항목(`config`) 정리됨
-- initial_grant ledger 규칙 문서화됨: `docs/season-join-ledger-plan.md`
-- 아직 `joinSeason`/seed initial_grant ledger 구현은 안 함
-- 다음 단계는 season join initial_grant ledger 구현 검토
+- season join 시 KRW initial_grant ledger 구현됨
+- seed dev participant에도 initial_grant ledger 정합성 반영됨
+- USD 0 amount ledger row는 여전히 생성하지 않음
+- `/fx`, `/wallets`, `/home` 구현 없음
+- 다음 단계는 `/fx` quote/execute API 계약 문서화 또는 idempotency/동시성 결정
 - 아직 API 구현 없음
 - wallet/fx write path 설계 문서 작성됨: `docs/wallet-fx-write-path-plan.md`
 - 아직 `/fx` API 구현 없음
