@@ -120,8 +120,11 @@
 - Prisma Client generate 완료
 - build 통과
 - 아직 API 구현 없음
+- wallet/fx write path 설계 문서 작성됨: `docs/wallet-fx-write-path-plan.md`
+- 아직 `/fx` API 구현 없음
+- idempotency, 동시성, `equity_snapshots` 생성 여부는 구현 전 최종 결정 필요
 - `/home` full implementation은 여전히 불가
-- 다음 단계는 wallet/fx write path 설계
+- 다음 단계는 `/fx` quote/execute API 계약 문서화 또는 write path 구현 전 STOP 검토
 2단계(full `/home` blockers 해소):
 - `assets`: 종목 마스터 확보
 - `asset_price_snapshots`: 자산 평가 가격 소스 확보
@@ -160,7 +163,7 @@
 ---
 
 ## TODO
-- wallet/fx write path 설계
+- `/fx` quote/execute API 계약 문서화 또는 write path 구현 전 STOP 검토
 - assets 도입
 - asset_price_snapshots 도입
 - fx_rate_snapshots 도입
