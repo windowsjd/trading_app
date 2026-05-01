@@ -125,11 +125,15 @@
 - seed dev participant에도 initial_grant ledger 정합성 반영됨
 - USD 0 amount ledger row는 여전히 생성하지 않음
 - `/fx` quote/execute API 계약 문서 작성됨: `docs/fx-api-contract.md`
+- `/fx` execute safety plan 문서 작성됨: `docs/fx-execute-safety-plan.md`
 - `/fx`, `/wallets`, `/home` 구현 없음
 - 아직 API 구현 없음
 - wallet/fx write path 설계 문서 작성됨: `docs/wallet-fx-write-path-plan.md`
 - 아직 `/fx` API 구현 없음
-- idempotency 전략과 wallet 동시성 전략은 구현 전 schema/migration 최종 결정 필요
+- 권장 idempotency 전략은 `fx_execute_requests` command table
+- 권장 wallet safety 전략은 conditional update 우선 검토
+- 아직 idempotency/동시성 schema/migration 미적용
+- appliedRate 출처 미정으로 `/fx execute` 구현 STOP 유지
 - `equity_snapshots` 생성 여부는 구현 전 최종 결정 필요
 - `/home` full implementation은 여전히 불가
 2단계(full `/home` blockers 해소):
@@ -170,7 +174,7 @@
 ---
 
 ## TODO
-- `/fx` execute 구현 전 idempotency/동시성 schema/migration STOP 검토
+- `fx_execute_requests` schema/migration 반영 검토 또는 `fx_rate_snapshots` 선행 여부 결정
 - assets 도입
 - asset_price_snapshots 도입
 - fx_rate_snapshots 도입
