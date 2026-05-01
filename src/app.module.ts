@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { FxModule } from './fx/fx.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SeasonsModule } from './seasons/seasons.module';
 
@@ -11,6 +12,7 @@ import { SeasonsModule } from './seasons/seasons.module';
       isGlobal: true,
       envFilePath: ['.env.development', '.env'],
     }),
+    FxModule,
     PrismaModule,
     SeasonsModule,
   ],

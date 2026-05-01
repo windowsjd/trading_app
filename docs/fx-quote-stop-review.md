@@ -2,6 +2,7 @@
 
 ## Status
 - This document is the final pre-implementation STOP review for `/fx quote`.
+- `/fx quote` read-only implementation is completed according to this review.
 - This is documentation only.
 - Do not implement `/fx quote`, `/fx execute`, `/wallets`, `/orders`, `/records`, `/home`, admin APIs, or CLI scripts from this document.
 - Do not add Prisma schema changes, migrations, seed changes, Prisma Client generate, package changes, fake FX rates, static FX rates, or temporary FX rates from this document.

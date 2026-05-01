@@ -12,6 +12,7 @@
 ### 구현 완료 API
 - GET /api/v1/seasons/current
 - POST /api/v1/seasons/{seasonId}/join
+- POST /api/v1/fx/quote
 
 ### 현재 구조
 - Nest
@@ -89,7 +90,7 @@
 ## 아직 안 한 것
 - home API
 - wallets API
-- fx API
+- fx execute API
 - orders API
 - ranking
 - records
@@ -99,7 +100,7 @@
 
 ## 다음 작업
 - 1순위: `/home` controller/service 구현 아님
-- 먼저 `/fx quote` STOP review 수락 여부 확인
+- 먼저 rate input CLI 설계/구현 또는 `/fx quote` 통합 검증
 - `/home` full implementation 가능 판정은 남은 valuation/ranking source table 확보 후 재검토
 
 ### 다음 작업 STOP 가능성
@@ -130,10 +131,10 @@
 - `fx_rate_snapshots` 설계 문서 작성됨: `docs/fx-rate-snapshots-plan.md`
 - rate input path 설계 문서 작성됨: `docs/fx-rate-input-path-plan.md`
 - `/fx quote` STOP review 문서 작성됨: `docs/fx-quote-stop-review.md`
-- `/fx`, `/wallets`, `/home` 구현 없음
-- 아직 API 구현 없음
+- `/fx quote` read-only 구현됨
+- `/fx execute`, `/wallets`, `/home` 구현 없음
 - wallet/fx write path 설계 문서 작성됨: `docs/wallet-fx-write-path-plan.md`
-- 아직 `/fx` API 구현 없음
+- `/fx quote` read-only 구현됨
 - 권장 idempotency 전략은 `fx_execute_requests` command table
 - 권장 wallet safety 전략은 conditional update 우선 검토
 - idempotency용 `fx_execute_requests` schema/migration 반영됨
@@ -145,20 +146,22 @@
 - `/fx` migration 생성 및 로컬 DB 적용 완료: `20260501212120_add_fx_rate_and_execute_safety_tables`
 - Prisma Client generate 완료
 - build/test/e2e 통과
-- 아직 `/fx` API 구현 없음
 - fake/static/temporary FX rate 금지 유지
 - `fx_rate_snapshots` seed 없음
 - MVP rate input 우선안은 `admin_manual`
 - 구현 경로 후보는 internal CLI script 우선
 - 아직 rate input 구현 없음
-- 아직 `/fx quote` 구현 없음
-- `/fx quote` read-only 구현 가능 판정 후보
-- MVP quote stale policy는 no-threshold 후보
-- quoteId/expiresAt은 null 권장
-- rateCapturedAt/rateEffectiveAt 응답 포함 권장
+- snapshot 없으면 `FX_RATE_UNAVAILABLE`
+- no-threshold MVP 정책 적용
+- `rateCapturedAt`/`rateEffectiveAt` 응답 포함
+- `/fx quote`는 wallet mutation 없음
+- `exchange_transactions`/`wallet_transactions`/`fx_execute_requests`/`equity_snapshots` 생성 없음
+- MVP quote stale policy는 no-threshold
+- quoteId/expiresAt은 null
+- rateCapturedAt/rateEffectiveAt 응답 포함
 - `/fx execute` 구현 STOP 유지
-- `/fx quote` 구현 전 STOP 검토 가능 단계로 진전
-- 문서설계 단계는 `/fx quote` 기준으로 거의 완료, `/fx execute` 기준으로는 일부 정책 보류
+- `/fx quote` 문서설계 및 read-only 구현 완료
+- `/fx execute` 기준으로는 일부 정책 보류
 - `equity_snapshots` 생성 여부는 구현 전 최종 결정 필요
 - `/home` full implementation은 여전히 불가
 2단계(full `/home` blockers 해소):
@@ -199,7 +202,8 @@
 ---
 
 ## TODO
-- `/fx quote` STOP review 수락
+- rate input CLI 설계/구현
+- `/fx quote` 통합 검증
 - wallet conditional update 검증
 - Decimal rounding/scale 규칙 확정
 - failed command lifecycle 정책 확정
