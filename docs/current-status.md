@@ -99,7 +99,7 @@
 
 ## 다음 작업
 - 1순위: `/home` controller/service 구현 아님
-- 먼저 rate input path 설계와 `/fx quote` 구현 전 STOP 조건 재검토
+- 먼저 `/fx quote` STOP review 수락 여부 확인
 - `/home` full implementation 가능 판정은 남은 valuation/ranking source table 확보 후 재검토
 
 ### 다음 작업 STOP 가능성
@@ -129,6 +129,7 @@
 - `/fx` execute safety plan 문서 작성됨: `docs/fx-execute-safety-plan.md`
 - `fx_rate_snapshots` 설계 문서 작성됨: `docs/fx-rate-snapshots-plan.md`
 - rate input path 설계 문서 작성됨: `docs/fx-rate-input-path-plan.md`
+- `/fx quote` STOP review 문서 작성됨: `docs/fx-quote-stop-review.md`
 - `/fx`, `/wallets`, `/home` 구현 없음
 - 아직 API 구현 없음
 - wallet/fx write path 설계 문서 작성됨: `docs/wallet-fx-write-path-plan.md`
@@ -151,6 +152,10 @@
 - 구현 경로 후보는 internal CLI script 우선
 - 아직 rate input 구현 없음
 - 아직 `/fx quote` 구현 없음
+- `/fx quote` read-only 구현 가능 판정 후보
+- MVP quote stale policy는 no-threshold 후보
+- quoteId/expiresAt은 null 권장
+- rateCapturedAt/rateEffectiveAt 응답 포함 권장
 - `/fx execute` 구현 STOP 유지
 - `/fx quote` 구현 전 STOP 검토 가능 단계로 진전
 - 문서설계 단계는 `/fx quote` 기준으로 거의 완료, `/fx execute` 기준으로는 일부 정책 보류
@@ -194,7 +199,7 @@
 ---
 
 ## TODO
-- `/fx quote` 구현 전 STOP 검토
+- `/fx quote` STOP review 수락
 - wallet conditional update 검증
 - Decimal rounding/scale 규칙 확정
 - failed command lifecycle 정책 확정
