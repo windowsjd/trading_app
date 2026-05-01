@@ -128,6 +128,7 @@
 - `/fx` quote/execute API 계약 문서 작성됨: `docs/fx-api-contract.md`
 - `/fx` execute safety plan 문서 작성됨: `docs/fx-execute-safety-plan.md`
 - `fx_rate_snapshots` 설계 문서 작성됨: `docs/fx-rate-snapshots-plan.md`
+- rate input path 설계 문서 작성됨: `docs/fx-rate-input-path-plan.md`
 - `/fx`, `/wallets`, `/home` 구현 없음
 - 아직 API 구현 없음
 - wallet/fx write path 설계 문서 작성됨: `docs/wallet-fx-write-path-plan.md`
@@ -146,8 +147,13 @@
 - 아직 `/fx` API 구현 없음
 - fake/static/temporary FX rate 금지 유지
 - `fx_rate_snapshots` seed 없음
+- MVP rate input 우선안은 `admin_manual`
+- 구현 경로 후보는 internal CLI script 우선
+- 아직 rate input 구현 없음
+- 아직 `/fx quote` 구현 없음
 - `/fx execute` 구현 STOP 유지
-- 다음 단계는 rate input path 설계 또는 `/fx quote` 구현 전 STOP 검토
+- `/fx quote` 구현 전 STOP 검토 가능 단계로 진전
+- 문서설계 단계는 `/fx quote` 기준으로 거의 완료, `/fx execute` 기준으로는 일부 정책 보류
 - `equity_snapshots` 생성 여부는 구현 전 최종 결정 필요
 - `/home` full implementation은 여전히 불가
 2단계(full `/home` blockers 해소):
@@ -188,7 +194,6 @@
 ---
 
 ## TODO
-- rate input path 설계
 - `/fx quote` 구현 전 STOP 검토
 - wallet conditional update 검증
 - Decimal rounding/scale 규칙 확정
