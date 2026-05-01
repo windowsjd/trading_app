@@ -136,8 +136,13 @@
 - 아직 idempotency/동시성 schema/migration 미적용
 - appliedRate 출처 STOP은 `fx_rate_snapshots` 설계 후보 작성 단계로 진전됨
 - 아직 `fx_rate_snapshots` schema/migration 미적용
-- fake/temporary FX rate 금지 유지
+- `/fx` migration scope plan 문서 작성됨: `docs/fx-migration-scope-plan.md`
+- 권장 migration 범위는 `fx_rate_snapshots` + `fx_execute_requests` + `exchange_transactions.fxRateSnapshotId`
+- 아직 위 `/fx` schema/migration 미적용
+- 아직 `/fx` API 구현 없음
+- fake/static/temporary FX rate 금지 유지
 - `/fx execute` 구현 STOP 유지
+- 다음 단계는 위 범위를 Prisma schema/migration에 반영할지 최종 검토
 - `equity_snapshots` 생성 여부는 구현 전 최종 결정 필요
 - `/home` full implementation은 여전히 불가
 2단계(full `/home` blockers 해소):
