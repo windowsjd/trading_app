@@ -64,6 +64,18 @@ enum SnapshotReason {
   settlement
 }
 
+enum FxRateSourceType {
+  official_batch
+  provider_api
+  admin_manual
+}
+
+enum FxExecuteRequestStatus {
+  pending
+  succeeded
+  failed
+}
+
 model User {
   id              String              @id @default(uuid())
   email           String              @unique
@@ -75,6 +87,7 @@ model User {
   updatedAt       DateTime            @updatedAt @map("updated_at")
 
   seasonParticipants SeasonParticipant[]
+  fxExecuteRequests  FxExecuteRequest[]
 
   @@map("users")
 }
@@ -121,6 +134,7 @@ model SeasonParticipant {
   walletTransactions   WalletTransaction[]
   exchangeTransactions ExchangeTransaction[]
   equitySnapshots     EquitySnapshot[]
+  fxExecuteRequests   FxExecuteRequest[]
 
   @@unique([seasonId, userId])
   @@index([seasonId])
@@ -170,6 +184,7 @@ model WalletTransaction {
 model ExchangeTransaction {
   id                  String       @id @default(uuid())
   seasonParticipantId String       @map("season_participant_id")
+  fxRateSnapshotId    String?      @map("fx_rate_snapshot_id")
   fromCurrency        CurrencyCode @map("from_currency")
   toCurrency          CurrencyCode @map("to_currency")
   sourceAmount        Decimal      @db.Decimal(24, 8) @map("source_amount")
@@ -183,10 +198,66 @@ model ExchangeTransaction {
   createdAt           DateTime     @default(now()) @map("created_at")
 
   seasonParticipant SeasonParticipant @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
+  fxRateSnapshot    FxRateSnapshot?    @relation(fields: [fxRateSnapshotId], references: [id], onDelete: Restrict)
+  fxExecuteRequests FxExecuteRequest[]
 
   @@index([seasonParticipantId, executedAt])
+  @@index([fxRateSnapshotId])
   @@index([fromCurrency, toCurrency, executedAt])
   @@map("exchange_transactions")
+}
+
+model FxRateSnapshot {
+  id               String           @id @default(uuid())
+  baseCurrency     CurrencyCode     @map("base_currency")
+  quoteCurrency    CurrencyCode     @map("quote_currency")
+  rate             Decimal          @db.Decimal(18, 8)
+  sourceType       FxRateSourceType @map("source_type")
+  sourceName       String?          @map("source_name")
+  sourceTimestamp  DateTime?        @map("source_timestamp")
+  effectiveAt      DateTime         @map("effective_at")
+  capturedAt       DateTime         @map("captured_at")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  rawPayloadJson   Json?            @map("raw_payload_json")
+  approvedByUserId String?          @map("approved_by_user_id")
+  note             String?
+
+  exchangeTransactions ExchangeTransaction[]
+
+  @@index([baseCurrency, quoteCurrency, effectiveAt])
+  @@index([baseCurrency, quoteCurrency, capturedAt])
+  @@index([sourceType, effectiveAt])
+  @@map("fx_rate_snapshots")
+}
+
+model FxExecuteRequest {
+  id                    String                 @id @default(uuid())
+  userId                String                 @map("user_id")
+  seasonParticipantId   String                 @map("season_participant_id")
+  idempotencyKey        String                 @map("idempotency_key")
+  requestHash           String                 @map("request_hash")
+  fromCurrency          CurrencyCode           @map("from_currency")
+  toCurrency            CurrencyCode           @map("to_currency")
+  sourceAmount          Decimal                @db.Decimal(24, 8) @map("source_amount")
+  status                FxExecuteRequestStatus
+  exchangeTransactionId String?                @map("exchange_transaction_id")
+  responsePayloadJson   Json?                  @map("response_payload_json")
+  errorCode             String?                @map("error_code")
+  errorMessage          String?                @map("error_message")
+  requestedAt           DateTime               @map("requested_at")
+  completedAt           DateTime?              @map("completed_at")
+  createdAt             DateTime               @default(now()) @map("created_at")
+  updatedAt             DateTime               @updatedAt @map("updated_at")
+
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
+  seasonParticipant   SeasonParticipant    @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
+  exchangeTransaction ExchangeTransaction? @relation(fields: [exchangeTransactionId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, idempotencyKey])
+  @@index([seasonParticipantId, requestedAt])
+  @@index([status, requestedAt])
+  @@index([exchangeTransactionId])
+  @@map("fx_execute_requests")
 }
 
 model EquitySnapshot {

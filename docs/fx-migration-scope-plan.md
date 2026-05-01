@@ -2,9 +2,11 @@
 
 ## Status
 - This document fixes the final candidate scope before reflecting `/fx` quote/execute prerequisite DB structures into Prisma schema and migration.
-- This is documentation only.
+- Prisma schema reflection has been attempted for this scope.
+- Migration creation is still blocked until the local PostgreSQL database is available.
 - Do not implement `/fx quote`, `/fx execute`, `/wallets`, `/orders`, `/records`, or `/home` from this document.
-- Do not add Prisma schema changes, migrations, seed changes, Prisma Client generate, package changes, fake FX rates, static FX rates, or temporary FX rates from this document.
+- Do not hand-write a migration as a workaround for `prisma migrate dev --create-only` failure.
+- Do not add seed changes, Prisma Client generate, package changes, fake FX rates, static FX rates, or temporary FX rates from this document.
 
 ## Purpose
 - Decide the DB structure required before `/fx quote` and `/fx execute` implementation.

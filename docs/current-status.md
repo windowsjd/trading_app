@@ -138,11 +138,13 @@
 - 아직 `fx_rate_snapshots` schema/migration 미적용
 - `/fx` migration scope plan 문서 작성됨: `docs/fx-migration-scope-plan.md`
 - 권장 migration 범위는 `fx_rate_snapshots` + `fx_execute_requests` + `exchange_transactions.fxRateSnapshotId`
-- 아직 위 `/fx` schema/migration 미적용
+- `/fx` schema는 Prisma schema에 반영됨
+- `/fx` migration 생성은 로컬 PostgreSQL 미기동으로 아직 미완료
 - 아직 `/fx` API 구현 없음
 - fake/static/temporary FX rate 금지 유지
+- `fx_rate_snapshots` seed 없음
 - `/fx execute` 구현 STOP 유지
-- 다음 단계는 위 범위를 Prisma schema/migration에 반영할지 최종 검토
+- 다음 단계는 로컬 DB 준비 후 migration 생성/적용/generate/build 검증 또는 rate input path 설계
 - `equity_snapshots` 생성 여부는 구현 전 최종 결정 필요
 - `/home` full implementation은 여전히 불가
 2단계(full `/home` blockers 해소):
