@@ -48,6 +48,16 @@ export type WalletTransaction = Prisma.WalletTransactionModel
  */
 export type ExchangeTransaction = Prisma.ExchangeTransactionModel
 /**
+ * Model FxRateSnapshot
+ *
+ */
+export type FxRateSnapshot = Prisma.FxRateSnapshotModel
+/**
+ * Model FxExecuteRequest
+ *
+ */
+export type FxExecuteRequest = Prisma.FxExecuteRequestModel
+/**
  * Model EquitySnapshot
  *
  */

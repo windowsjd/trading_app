@@ -386,6 +386,40 @@ export type EnumWalletTransactionReferenceTypeWithAggregatesFilter<$PrismaModel 
   _max?: Prisma.NestedEnumWalletTransactionReferenceTypeFilter<$PrismaModel>
 }
 
+export type EnumFxRateSourceTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.FxRateSourceType | Prisma.EnumFxRateSourceTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.FxRateSourceType[] | Prisma.ListEnumFxRateSourceTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.FxRateSourceType[] | Prisma.ListEnumFxRateSourceTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumFxRateSourceTypeFilter<$PrismaModel> | $Enums.FxRateSourceType
+}
+
+export type EnumFxRateSourceTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.FxRateSourceType | Prisma.EnumFxRateSourceTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.FxRateSourceType[] | Prisma.ListEnumFxRateSourceTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.FxRateSourceType[] | Prisma.ListEnumFxRateSourceTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumFxRateSourceTypeWithAggregatesFilter<$PrismaModel> | $Enums.FxRateSourceType
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumFxRateSourceTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumFxRateSourceTypeFilter<$PrismaModel>
+}
+
+export type EnumFxExecuteRequestStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.FxExecuteRequestStatus | Prisma.EnumFxExecuteRequestStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.FxExecuteRequestStatus[] | Prisma.ListEnumFxExecuteRequestStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.FxExecuteRequestStatus[] | Prisma.ListEnumFxExecuteRequestStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumFxExecuteRequestStatusFilter<$PrismaModel> | $Enums.FxExecuteRequestStatus
+}
+
+export type EnumFxExecuteRequestStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.FxExecuteRequestStatus | Prisma.EnumFxExecuteRequestStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.FxExecuteRequestStatus[] | Prisma.ListEnumFxExecuteRequestStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.FxExecuteRequestStatus[] | Prisma.ListEnumFxExecuteRequestStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumFxExecuteRequestStatusWithAggregatesFilter<$PrismaModel> | $Enums.FxExecuteRequestStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumFxExecuteRequestStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumFxExecuteRequestStatusFilter<$PrismaModel>
+}
+
 export type EnumSnapshotReasonFilter<$PrismaModel = never> = {
   equals?: $Enums.SnapshotReason | Prisma.EnumSnapshotReasonFieldRefInput<$PrismaModel>
   in?: $Enums.SnapshotReason[] | Prisma.ListEnumSnapshotReasonFieldRefInput<$PrismaModel>
@@ -759,6 +793,40 @@ export type NestedEnumWalletTransactionReferenceTypeWithAggregatesFilter<$Prisma
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumWalletTransactionReferenceTypeFilter<$PrismaModel>
   _max?: Prisma.NestedEnumWalletTransactionReferenceTypeFilter<$PrismaModel>
+}
+
+export type NestedEnumFxRateSourceTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.FxRateSourceType | Prisma.EnumFxRateSourceTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.FxRateSourceType[] | Prisma.ListEnumFxRateSourceTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.FxRateSourceType[] | Prisma.ListEnumFxRateSourceTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumFxRateSourceTypeFilter<$PrismaModel> | $Enums.FxRateSourceType
+}
+
+export type NestedEnumFxRateSourceTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.FxRateSourceType | Prisma.EnumFxRateSourceTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.FxRateSourceType[] | Prisma.ListEnumFxRateSourceTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.FxRateSourceType[] | Prisma.ListEnumFxRateSourceTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumFxRateSourceTypeWithAggregatesFilter<$PrismaModel> | $Enums.FxRateSourceType
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumFxRateSourceTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumFxRateSourceTypeFilter<$PrismaModel>
+}
+
+export type NestedEnumFxExecuteRequestStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.FxExecuteRequestStatus | Prisma.EnumFxExecuteRequestStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.FxExecuteRequestStatus[] | Prisma.ListEnumFxExecuteRequestStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.FxExecuteRequestStatus[] | Prisma.ListEnumFxExecuteRequestStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumFxExecuteRequestStatusFilter<$PrismaModel> | $Enums.FxExecuteRequestStatus
+}
+
+export type NestedEnumFxExecuteRequestStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.FxExecuteRequestStatus | Prisma.EnumFxExecuteRequestStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.FxExecuteRequestStatus[] | Prisma.ListEnumFxExecuteRequestStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.FxExecuteRequestStatus[] | Prisma.ListEnumFxExecuteRequestStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumFxExecuteRequestStatusWithAggregatesFilter<$PrismaModel> | $Enums.FxExecuteRequestStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumFxExecuteRequestStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumFxExecuteRequestStatusFilter<$PrismaModel>
 }
 
 export type NestedEnumSnapshotReasonFilter<$PrismaModel = never> = {

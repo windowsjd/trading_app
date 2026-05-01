@@ -390,6 +390,8 @@ export const ModelName = {
   CashWallet: 'CashWallet',
   WalletTransaction: 'WalletTransaction',
   ExchangeTransaction: 'ExchangeTransaction',
+  FxRateSnapshot: 'FxRateSnapshot',
+  FxExecuteRequest: 'FxExecuteRequest',
   EquitySnapshot: 'EquitySnapshot'
 } as const
 
@@ -406,7 +408,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "season" | "seasonParticipant" | "cashWallet" | "walletTransaction" | "exchangeTransaction" | "equitySnapshot"
+    modelProps: "user" | "season" | "seasonParticipant" | "cashWallet" | "walletTransaction" | "exchangeTransaction" | "fxRateSnapshot" | "fxExecuteRequest" | "equitySnapshot"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -854,6 +856,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    FxRateSnapshot: {
+      payload: Prisma.$FxRateSnapshotPayload<ExtArgs>
+      fields: Prisma.FxRateSnapshotFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.FxRateSnapshotFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FxRateSnapshotPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.FxRateSnapshotFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FxRateSnapshotPayload>
+        }
+        findFirst: {
+          args: Prisma.FxRateSnapshotFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FxRateSnapshotPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.FxRateSnapshotFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FxRateSnapshotPayload>
+        }
+        findMany: {
+          args: Prisma.FxRateSnapshotFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FxRateSnapshotPayload>[]
+        }
+        create: {
+          args: Prisma.FxRateSnapshotCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FxRateSnapshotPayload>
+        }
+        createMany: {
+          args: Prisma.FxRateSnapshotCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.FxRateSnapshotCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FxRateSnapshotPayload>[]
+        }
+        delete: {
+          args: Prisma.FxRateSnapshotDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FxRateSnapshotPayload>
+        }
+        update: {
+          args: Prisma.FxRateSnapshotUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FxRateSnapshotPayload>
+        }
+        deleteMany: {
+          args: Prisma.FxRateSnapshotDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.FxRateSnapshotUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.FxRateSnapshotUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FxRateSnapshotPayload>[]
+        }
+        upsert: {
+          args: Prisma.FxRateSnapshotUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FxRateSnapshotPayload>
+        }
+        aggregate: {
+          args: Prisma.FxRateSnapshotAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateFxRateSnapshot>
+        }
+        groupBy: {
+          args: Prisma.FxRateSnapshotGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FxRateSnapshotGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.FxRateSnapshotCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FxRateSnapshotCountAggregateOutputType> | number
+        }
+      }
+    }
+    FxExecuteRequest: {
+      payload: Prisma.$FxExecuteRequestPayload<ExtArgs>
+      fields: Prisma.FxExecuteRequestFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.FxExecuteRequestFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FxExecuteRequestPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.FxExecuteRequestFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FxExecuteRequestPayload>
+        }
+        findFirst: {
+          args: Prisma.FxExecuteRequestFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FxExecuteRequestPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.FxExecuteRequestFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FxExecuteRequestPayload>
+        }
+        findMany: {
+          args: Prisma.FxExecuteRequestFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FxExecuteRequestPayload>[]
+        }
+        create: {
+          args: Prisma.FxExecuteRequestCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FxExecuteRequestPayload>
+        }
+        createMany: {
+          args: Prisma.FxExecuteRequestCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.FxExecuteRequestCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FxExecuteRequestPayload>[]
+        }
+        delete: {
+          args: Prisma.FxExecuteRequestDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FxExecuteRequestPayload>
+        }
+        update: {
+          args: Prisma.FxExecuteRequestUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FxExecuteRequestPayload>
+        }
+        deleteMany: {
+          args: Prisma.FxExecuteRequestDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.FxExecuteRequestUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.FxExecuteRequestUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FxExecuteRequestPayload>[]
+        }
+        upsert: {
+          args: Prisma.FxExecuteRequestUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FxExecuteRequestPayload>
+        }
+        aggregate: {
+          args: Prisma.FxExecuteRequestAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateFxExecuteRequest>
+        }
+        groupBy: {
+          args: Prisma.FxExecuteRequestGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FxExecuteRequestGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.FxExecuteRequestCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FxExecuteRequestCountAggregateOutputType> | number
+        }
+      }
+    }
     EquitySnapshot: {
       payload: Prisma.$EquitySnapshotPayload<ExtArgs>
       fields: Prisma.EquitySnapshotFieldRefs
@@ -1053,6 +1203,7 @@ export type WalletTransactionScalarFieldEnum = (typeof WalletTransactionScalarFi
 export const ExchangeTransactionScalarFieldEnum = {
   id: 'id',
   seasonParticipantId: 'seasonParticipantId',
+  fxRateSnapshotId: 'fxRateSnapshotId',
   fromCurrency: 'fromCurrency',
   toCurrency: 'toCurrency',
   sourceAmount: 'sourceAmount',
@@ -1067,6 +1218,48 @@ export const ExchangeTransactionScalarFieldEnum = {
 } as const
 
 export type ExchangeTransactionScalarFieldEnum = (typeof ExchangeTransactionScalarFieldEnum)[keyof typeof ExchangeTransactionScalarFieldEnum]
+
+
+export const FxRateSnapshotScalarFieldEnum = {
+  id: 'id',
+  baseCurrency: 'baseCurrency',
+  quoteCurrency: 'quoteCurrency',
+  rate: 'rate',
+  sourceType: 'sourceType',
+  sourceName: 'sourceName',
+  sourceTimestamp: 'sourceTimestamp',
+  effectiveAt: 'effectiveAt',
+  capturedAt: 'capturedAt',
+  createdAt: 'createdAt',
+  rawPayloadJson: 'rawPayloadJson',
+  approvedByUserId: 'approvedByUserId',
+  note: 'note'
+} as const
+
+export type FxRateSnapshotScalarFieldEnum = (typeof FxRateSnapshotScalarFieldEnum)[keyof typeof FxRateSnapshotScalarFieldEnum]
+
+
+export const FxExecuteRequestScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  seasonParticipantId: 'seasonParticipantId',
+  idempotencyKey: 'idempotencyKey',
+  requestHash: 'requestHash',
+  fromCurrency: 'fromCurrency',
+  toCurrency: 'toCurrency',
+  sourceAmount: 'sourceAmount',
+  status: 'status',
+  exchangeTransactionId: 'exchangeTransactionId',
+  responsePayloadJson: 'responsePayloadJson',
+  errorCode: 'errorCode',
+  errorMessage: 'errorMessage',
+  requestedAt: 'requestedAt',
+  completedAt: 'completedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type FxExecuteRequestScalarFieldEnum = (typeof FxExecuteRequestScalarFieldEnum)[keyof typeof FxExecuteRequestScalarFieldEnum]
 
 
 export const EquitySnapshotScalarFieldEnum = {
@@ -1303,6 +1496,34 @@ export type ListEnumWalletTransactionReferenceTypeFieldRefInput<$PrismaModel> = 
 
 
 /**
+ * Reference to a field of type 'FxRateSourceType'
+ */
+export type EnumFxRateSourceTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FxRateSourceType'>
+
+
+
+/**
+ * Reference to a field of type 'FxRateSourceType[]'
+ */
+export type ListEnumFxRateSourceTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FxRateSourceType[]'>
+
+
+
+/**
+ * Reference to a field of type 'FxExecuteRequestStatus'
+ */
+export type EnumFxExecuteRequestStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FxExecuteRequestStatus'>
+
+
+
+/**
+ * Reference to a field of type 'FxExecuteRequestStatus[]'
+ */
+export type ListEnumFxExecuteRequestStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FxExecuteRequestStatus[]'>
+
+
+
+/**
  * Reference to a field of type 'SnapshotReason'
  */
 export type EnumSnapshotReasonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SnapshotReason'>
@@ -1430,6 +1651,8 @@ export type GlobalOmitConfig = {
   cashWallet?: Prisma.CashWalletOmit
   walletTransaction?: Prisma.WalletTransactionOmit
   exchangeTransaction?: Prisma.ExchangeTransactionOmit
+  fxRateSnapshot?: Prisma.FxRateSnapshotOmit
+  fxExecuteRequest?: Prisma.FxExecuteRequestOmit
   equitySnapshot?: Prisma.EquitySnapshotOmit
 }
 

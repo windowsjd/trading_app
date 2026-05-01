@@ -88,3 +88,21 @@ export const SnapshotReason = {
 } as const
 
 export type SnapshotReason = (typeof SnapshotReason)[keyof typeof SnapshotReason]
+
+
+export const FxRateSourceType = {
+  official_batch: 'official_batch',
+  provider_api: 'provider_api',
+  admin_manual: 'admin_manual'
+} as const
+
+export type FxRateSourceType = (typeof FxRateSourceType)[keyof typeof FxRateSourceType]
+
+
+export const FxExecuteRequestStatus = {
+  pending: 'pending',
+  succeeded: 'succeeded',
+  failed: 'failed'
+} as const
+
+export type FxExecuteRequestStatus = (typeof FxExecuteRequestStatus)[keyof typeof FxExecuteRequestStatus]

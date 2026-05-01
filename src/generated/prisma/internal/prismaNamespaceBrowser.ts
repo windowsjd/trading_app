@@ -57,6 +57,8 @@ export const ModelName = {
   CashWallet: 'CashWallet',
   WalletTransaction: 'WalletTransaction',
   ExchangeTransaction: 'ExchangeTransaction',
+  FxRateSnapshot: 'FxRateSnapshot',
+  FxExecuteRequest: 'FxExecuteRequest',
   EquitySnapshot: 'EquitySnapshot'
 } as const
 
@@ -162,6 +164,7 @@ export type WalletTransactionScalarFieldEnum = (typeof WalletTransactionScalarFi
 export const ExchangeTransactionScalarFieldEnum = {
   id: 'id',
   seasonParticipantId: 'seasonParticipantId',
+  fxRateSnapshotId: 'fxRateSnapshotId',
   fromCurrency: 'fromCurrency',
   toCurrency: 'toCurrency',
   sourceAmount: 'sourceAmount',
@@ -176,6 +179,48 @@ export const ExchangeTransactionScalarFieldEnum = {
 } as const
 
 export type ExchangeTransactionScalarFieldEnum = (typeof ExchangeTransactionScalarFieldEnum)[keyof typeof ExchangeTransactionScalarFieldEnum]
+
+
+export const FxRateSnapshotScalarFieldEnum = {
+  id: 'id',
+  baseCurrency: 'baseCurrency',
+  quoteCurrency: 'quoteCurrency',
+  rate: 'rate',
+  sourceType: 'sourceType',
+  sourceName: 'sourceName',
+  sourceTimestamp: 'sourceTimestamp',
+  effectiveAt: 'effectiveAt',
+  capturedAt: 'capturedAt',
+  createdAt: 'createdAt',
+  rawPayloadJson: 'rawPayloadJson',
+  approvedByUserId: 'approvedByUserId',
+  note: 'note'
+} as const
+
+export type FxRateSnapshotScalarFieldEnum = (typeof FxRateSnapshotScalarFieldEnum)[keyof typeof FxRateSnapshotScalarFieldEnum]
+
+
+export const FxExecuteRequestScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  seasonParticipantId: 'seasonParticipantId',
+  idempotencyKey: 'idempotencyKey',
+  requestHash: 'requestHash',
+  fromCurrency: 'fromCurrency',
+  toCurrency: 'toCurrency',
+  sourceAmount: 'sourceAmount',
+  status: 'status',
+  exchangeTransactionId: 'exchangeTransactionId',
+  responsePayloadJson: 'responsePayloadJson',
+  errorCode: 'errorCode',
+  errorMessage: 'errorMessage',
+  requestedAt: 'requestedAt',
+  completedAt: 'completedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type FxExecuteRequestScalarFieldEnum = (typeof FxExecuteRequestScalarFieldEnum)[keyof typeof FxExecuteRequestScalarFieldEnum]
 
 
 export const EquitySnapshotScalarFieldEnum = {

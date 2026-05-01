@@ -2,11 +2,12 @@
 
 ## Status
 - This document fixes the final candidate scope before reflecting `/fx` quote/execute prerequisite DB structures into Prisma schema and migration.
-- Prisma schema reflection has been attempted for this scope.
-- Migration creation is still blocked until the local PostgreSQL database is available.
+- Prisma schema reflection is complete for this scope.
+- Migration `20260501212120_add_fx_rate_and_execute_safety_tables` has been created and applied to the local DB.
+- Prisma Client generate, build, test, and e2e verification passed.
 - Do not implement `/fx quote`, `/fx execute`, `/wallets`, `/orders`, `/records`, or `/home` from this document.
 - Do not hand-write a migration as a workaround for `prisma migrate dev --create-only` failure.
-- Do not add seed changes, Prisma Client generate, package changes, fake FX rates, static FX rates, or temporary FX rates from this document.
+- Do not add seed changes, package changes, fake FX rates, static FX rates, or temporary FX rates from this document.
 
 ## Purpose
 - Decide the DB structure required before `/fx quote` and `/fx execute` implementation.
@@ -17,12 +18,12 @@
 
 ## Current Premises
 - `/fx` API implementation is still forbidden.
-- `fx_rate_snapshots` is not reflected in schema or migration yet.
-- `fx_execute_requests` is not reflected in schema or migration yet.
-- `exchange_transactions` does not have `fxRateSnapshotId`.
+- `fx_rate_snapshots` is reflected in schema and migration.
+- `fx_execute_requests` is reflected in schema and migration.
+- `exchange_transactions` has nullable `fxRateSnapshotId`.
 - Fake, static, and temporary FX rates are forbidden.
 - The `appliedRate` source has advanced to the `fx_rate_snapshots` design candidate, but is not implementation-ready yet.
-- This task changes documentation only.
+- This document does not authorize API implementation.
 
 ## Migration Scope Candidates
 
@@ -201,8 +202,7 @@ Reason:
 ## Non-Goals
 - No `/fx` controller or service.
 - No wallet, order, records, or home implementation.
-- No schema or migration creation in this task.
+- No schema or migration changes beyond this agreed `/fx` DB foundation.
 - No seed changes.
-- No Prisma Client generate.
 - No API contract changes.
 - No fake, static, or temporary FX rate.
