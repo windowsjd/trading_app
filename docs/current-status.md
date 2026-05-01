@@ -126,6 +126,7 @@
 - USD 0 amount ledger row는 여전히 생성하지 않음
 - `/fx` quote/execute API 계약 문서 작성됨: `docs/fx-api-contract.md`
 - `/fx` execute safety plan 문서 작성됨: `docs/fx-execute-safety-plan.md`
+- `fx_rate_snapshots` 설계 문서 작성됨: `docs/fx-rate-snapshots-plan.md`
 - `/fx`, `/wallets`, `/home` 구현 없음
 - 아직 API 구현 없음
 - wallet/fx write path 설계 문서 작성됨: `docs/wallet-fx-write-path-plan.md`
@@ -133,7 +134,10 @@
 - 권장 idempotency 전략은 `fx_execute_requests` command table
 - 권장 wallet safety 전략은 conditional update 우선 검토
 - 아직 idempotency/동시성 schema/migration 미적용
-- appliedRate 출처 미정으로 `/fx execute` 구현 STOP 유지
+- appliedRate 출처 STOP은 `fx_rate_snapshots` 설계 후보 작성 단계로 진전됨
+- 아직 `fx_rate_snapshots` schema/migration 미적용
+- fake/temporary FX rate 금지 유지
+- `/fx execute` 구현 STOP 유지
 - `equity_snapshots` 생성 여부는 구현 전 최종 결정 필요
 - `/home` full implementation은 여전히 불가
 2단계(full `/home` blockers 해소):
@@ -174,7 +178,7 @@
 ---
 
 ## TODO
-- `fx_execute_requests` schema/migration 반영 검토 또는 `fx_rate_snapshots` 선행 여부 결정
+- `fx_rate_snapshots` schema/migration 반영 검토 또는 `fx_execute_requests`와 함께 migration 범위 조정
 - assets 도입
 - asset_price_snapshots 도입
 - fx_rate_snapshots 도입
