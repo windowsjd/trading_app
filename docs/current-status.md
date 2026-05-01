@@ -68,10 +68,10 @@
 ### hard blockers (full implementation 기준)
 - assets
 - asset_price_snapshots
-- fx_rate_snapshots
 - positions
 - daily_portfolio_snapshots
 - season_rankings
+- rate input 운영 데이터 및 valuation freshness 정책
 
 ### near-term required (선행 migration 범위)
 - wallet_transactions
@@ -123,22 +123,21 @@
 - build 통과
 - 오래된 Hello World 테스트는 현재 health API 기준으로 정리됨
 - package dependency 이상 항목(`config`) 정리됨
+- current-status 중복 문장 정리됨
 - season join 시 KRW initial_grant ledger 구현됨
 - seed dev participant에도 initial_grant ledger 정합성 반영됨
 - USD 0 amount ledger row는 여전히 생성하지 않음
 - `/fx` quote/execute API 계약 문서 작성됨: `docs/fx-api-contract.md`
 - `/fx` execute safety plan 문서 작성됨: `docs/fx-execute-safety-plan.md`
 - `fx_rate_snapshots` 설계 문서 작성됨: `docs/fx-rate-snapshots-plan.md`
-- rate input path 설계 문서 작성됨: `docs/fx-rate-input-path-plan.md`
 - `/fx quote` STOP review 문서 작성됨: `docs/fx-quote-stop-review.md`
+- wallet/fx write path 설계 문서 작성됨: `docs/wallet-fx-write-path-plan.md`
+- rate input path 설계 문서 작성됨: `docs/fx-rate-input-path-plan.md`
 - `/fx quote` read-only 구현됨
 - `/fx execute`, `/wallets`, `/home` 구현 없음
-- wallet/fx write path 설계 문서 작성됨: `docs/wallet-fx-write-path-plan.md`
-- `/fx quote` read-only 구현됨
 - 권장 idempotency 전략은 `fx_execute_requests` command table
 - 권장 wallet safety 전략은 conditional update 우선 검토
 - idempotency용 `fx_execute_requests` schema/migration 반영됨
-- appliedRate 출처 STOP은 `fx_rate_snapshots` 설계 후보 작성 단계로 진전됨
 - `fx_rate_snapshots` schema/migration 반영됨
 - `/fx` migration scope plan 문서 작성됨: `docs/fx-migration-scope-plan.md`
 - 권장 migration 범위는 `fx_rate_snapshots` + `fx_execute_requests` + `exchange_transactions.fxRateSnapshotId`
@@ -149,16 +148,19 @@
 - fake/static/temporary FX rate 금지 유지
 - `fx_rate_snapshots` seed 없음
 - MVP rate input 우선안은 `admin_manual`
-- 구현 경로 후보는 internal CLI script 우선
-- 아직 rate input 구현 없음
+- `admin_manual` FX rate input CLI 구현됨: `scripts/admin-insert-fx-rate.ts`
+- CLI는 create only이며 upsert하지 않음
+- CLI dry-run 지원
+- CLI는 fake/static/temporary/sample/placeholder/test 성격 rate 입력 거부
+- `/fx quote` 통합 검증 절차 문서 작성됨: `docs/fx-quote-integration-check.md`
+- 아직 admin API 없음
+- 아직 provider/batch rate input 없음
 - snapshot 없으면 `FX_RATE_UNAVAILABLE`
 - no-threshold MVP 정책 적용
 - `rateCapturedAt`/`rateEffectiveAt` 응답 포함
 - `/fx quote`는 wallet mutation 없음
 - `exchange_transactions`/`wallet_transactions`/`fx_execute_requests`/`equity_snapshots` 생성 없음
-- MVP quote stale policy는 no-threshold
 - quoteId/expiresAt은 null
-- rateCapturedAt/rateEffectiveAt 응답 포함
 - `/fx execute` 구현 STOP 유지
 - `/fx quote` 문서설계 및 read-only 구현 완료
 - `/fx execute` 기준으로는 일부 정책 보류
@@ -202,8 +204,8 @@
 ---
 
 ## TODO
-- rate input CLI 설계/구현
 - `/fx quote` 통합 검증
+- rate input 운영 절차 보강
 - wallet conditional update 검증
 - Decimal rounding/scale 규칙 확정
 - failed command lifecycle 정책 확정

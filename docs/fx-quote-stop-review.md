@@ -17,9 +17,9 @@
 ## Current Premises
 - `fx_rate_snapshots` schema and migration are created and applied locally.
 - Prisma Client generate, build, test, and e2e verification passed.
-- `docs/fx-rate-input-path-plan.md` defines `admin_manual` as the MVP rate input path candidate.
-- There is still no rate input implementation.
-- There is still no `/fx quote` implementation.
+- `docs/fx-rate-input-path-plan.md` defines `admin_manual` as the MVP rate input path.
+- The internal `admin_manual` CLI exists at `scripts/admin-insert-fx-rate.ts`.
+- `/fx quote` read-only implementation exists.
 - There is still no `/fx execute` implementation.
 - Fake, static, and temporary FX rates are forbidden.
 

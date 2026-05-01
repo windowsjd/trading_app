@@ -2,8 +2,9 @@
 
 ## Status
 - This document fixes the rate input path candidate for `fx_rate_snapshots`.
-- This is documentation only.
-- Do not implement `/fx quote`, `/fx execute`, `/wallets`, `/orders`, `/records`, `/home`, admin APIs, or CLI scripts from this document.
+- The approved internal CLI implementation now exists at `scripts/admin-insert-fx-rate.ts`.
+- The `/fx quote` integration check is documented in `docs/fx-quote-integration-check.md`.
+- Do not implement `/fx execute`, `/wallets`, `/orders`, `/records`, `/home`, admin APIs, or additional CLI scripts from this document.
 - Do not add Prisma schema changes, migrations, seed changes, Prisma Client generate, package changes, fake FX rates, static FX rates, or temporary FX rates from this document.
 
 ## Purpose
@@ -16,7 +17,8 @@
 - `fx_rate_snapshots` schema and migration are created and applied locally.
 - `fx_execute_requests` schema and migration are created and applied locally.
 - Prisma Client generate, build, test, and e2e verification passed.
-- `/fx` API implementation does not exist yet.
+- `/fx quote` read-only implementation exists.
+- `/fx execute` implementation does not exist yet.
 - There is no `fx_rate_snapshots` seed data.
 - Fake, static, and temporary FX rates are forbidden.
 - `/fx quote` must return `FX_RATE_UNAVAILABLE` when there is no eligible `fx_rate_snapshots` row.
@@ -172,7 +174,7 @@ Cons:
 
 Recommended implementation path:
 - Prefer an approved internal CLI script immediately before MVP.
-- Do not create the script in this task.
+- The MVP internal CLI script exists and remains create-only.
 - Admin API should wait for auth/admin model agreement.
 - Official batch and provider API should be separate follow-up designs.
 
