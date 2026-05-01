@@ -32,11 +32,12 @@
 - wallet_transactions
 - exchange_transactions
 - equity_snapshots
+- fx_rate_snapshots
+- fx_execute_requests
 
 ### 현재 DB 상태(아직 없음 / 미도입)
 - assets
 - asset_price_snapshots
-- fx_rate_snapshots
 - positions
 - daily_portfolio_snapshots
 - season_rankings
@@ -98,8 +99,8 @@
 
 ## 다음 작업
 - 1순위: `/home` controller/service 구현 아님
-- 먼저 Prisma migration 범위와 상태별 API 계약을 문서로 합의
-- full implementation 가능 판정은 선행 테이블 확보 후 재검토
+- 먼저 rate input path 설계와 `/fx quote` 구현 전 STOP 조건 재검토
+- `/home` full implementation 가능 판정은 남은 valuation/ranking source table 확보 후 재검토
 
 ### 다음 작업 STOP 가능성
 - ranking 계산 근거 부족 가능
@@ -187,10 +188,13 @@
 ---
 
 ## TODO
-- `fx_rate_snapshots` schema/migration 반영 검토 또는 `fx_execute_requests`와 함께 migration 범위 조정
+- rate input path 설계
+- `/fx quote` 구현 전 STOP 검토
+- wallet conditional update 검증
+- Decimal rounding/scale 규칙 확정
+- failed command lifecycle 정책 확정
 - assets 도입
 - asset_price_snapshots 도입
-- fx_rate_snapshots 도입
 - positions 도입
 - daily_portfolio_snapshots 도입
 - season_rankings 도입
