@@ -7,6 +7,7 @@
 - Do not implement `/wallets`, `/fx execute`, `/orders`, `/records`, or `/home` from this document.
 - Do not add fake data, Prisma schema changes, migrations, seed changes, Prisma Client generate, or API contract changes from this document.
 - Current schema and local DB already include `wallet_transactions`, `exchange_transactions`, and `equity_snapshots`.
+- Current schema and local DB also include `fx_rate_snapshots`, `fx_execute_requests`, and nullable `exchange_transactions.fxRateSnapshotId`.
 - `/home` full implementation remains blocked.
 
 ## Source Rules
@@ -24,6 +25,8 @@
   - USD -> KRW
 - Target tables:
   - `cash_wallets`
+  - `fx_rate_snapshots`
+  - `fx_execute_requests`
   - `exchange_transactions`
   - `wallet_transactions`
   - `equity_snapshots`
@@ -101,7 +104,7 @@ The whole exchange execute write path must be wrapped in a single DB transaction
 1. Read `seasonParticipant` and verify active season participation.
 2. Read source wallet and target wallet.
 3. Verify source wallet balance is greater than or equal to `sourceAmount`.
-4. Determine `appliedRate`.
+4. Select a fresh USD/KRW `fx_rate_snapshots` row for `appliedRate` and audit linkage.
 5. Calculate `grossTargetAmount`, `feeAmount`, and `netTargetAmount`.
 6. Decrease source wallet balance by `sourceAmount`.
 7. Increase target wallet balance by `netTargetAmount`.
@@ -178,6 +181,7 @@ One successful execute creates one exchange execution row.
 - `feeAmount`
 - `feeCurrency`
 - `appliedRate`
+- `fxRateSnapshotId` if the execute write path confirms snapshot linkage for the exchange row
 - `netTargetAmount`
 - `executedAt`
 
@@ -195,29 +199,34 @@ One successful execute creates one exchange execution row.
 ## `equity_snapshots` Decision
 ### Selected Near-Term Option: A
 - Near-term exchange execute should not create `equity_snapshots` yet.
-- Reason: current schema still lacks `positions`, `asset_price_snapshots`, and `fx_rate_snapshots`.
-- Without those source tables, a complete authoritative KRW equity snapshot cannot be produced.
+- Reason: `fx_rate_snapshots` exists, but `positions` and `asset_price_snapshots` are still missing.
+- Without position and asset price valuation sources, a complete authoritative KRW equity snapshot cannot be produced.
 - Creating cash-only snapshots after exchange could be mistaken as `/home`, ranking, settlement, or final KRW evaluation evidence.
-- `equity_snapshots` write path must be revisited after positions, asset price snapshots, and FX rate snapshots are designed.
+- `equity_snapshots` write path must be revisited after positions, asset price snapshots, and execute-time FX snapshot policy are finalized.
 
 ### Rejected Near-Term Option: B
 - Cash-only snapshot creation is technically possible but should not be the default.
 - If later selected, it must be explicitly labeled non-authoritative and must not power `/home` full implementation, rankings, settlement, or final evaluation.
 
 ## Idempotency
-- Current schema has no `idempotencyKey`.
-- Current schema has no unique key that protects exchange execute retry duplication.
-- Exchange execute API implementation must decide idempotency before code is written.
+- `fx_execute_requests` command table is reflected in schema and migration.
+- `fx_execute_requests` has `unique(userId, idempotencyKey)`.
+- `exchange_transactions` still has no `idempotencyKey`; idempotency belongs to `fx_execute_requests`.
+- `/fx execute` lifecycle behavior is not implemented.
+- Request hash conflict handling, pending/succeeded/failed behavior, and `responsePayloadJson` replay policy remain STOP decisions.
 
-### Candidate Strategies
-- Add a request id or idempotency key column to `exchange_transactions`.
-- Add a separate command/request table for execute requests.
-- Manage idempotency at the API layer with a durable store.
+### Reflected Foundation
+- Command/request table: `fx_execute_requests`.
+- Unique retry boundary: `unique(userId, idempotencyKey)`.
+- Linked success row candidate: `fx_execute_requests.exchangeTransactionId`.
+- Stored response candidate: `fx_execute_requests.responsePayloadJson`.
 
-### Near-Term Decision
-- Do not change schema in this step.
-- Keep idempotency as an implementation blocker.
-- Before actual `/fx execute` implementation, decide the idempotency strategy and the unique constraint or durable storage boundary.
+### Remaining STOP Decisions
+- Normalize request payload and compute `requestHash`.
+- Define same-key same-hash replay behavior for `pending`, `succeeded`, and `failed`.
+- Define different-hash `IDEMPOTENCY_CONFLICT`.
+- Decide whether failed commands are persisted and replayed.
+- Decide how `responsePayloadJson` is populated and reused.
 
 ## Concurrency And Balance Safety
 - Concurrent exchange or order requests against the same wallet can cause race condition issues.
@@ -235,7 +244,11 @@ One successful execute creates one exchange execution row.
 - Confirm how order execution will share the same wallet safety pattern.
 
 ## Implementation STOP Points
-- Adding idempotency columns, unique keys, or command tables requires schema/migration agreement.
+- `/fx quote` read-only implementation exists.
+- `/fx execute` remains STOP.
+- Wallet conditional update must be verified.
+- Decimal rounding/scale must be finalized.
+- Failed command lifecycle must be finalized.
+- Execute-time snapshot selection, freshness, and sourceType policy must be reviewed.
 - Creating `equity_snapshots` on exchange execute requires a valuation-source agreement.
-- Implementing `/fx quote` or `/fx execute` requires API contract agreement.
 - Implementing `/home` remains blocked by missing valuation, ranking, position, and snapshot source tables.

@@ -1,4 +1,4 @@
-# FX Rate Snapshots Plan
+# FX Rate Snapshots Foundation Plan
 
 ## Status
 - This document records the accepted `fx_rate_snapshots` design and current usage.
@@ -15,6 +15,7 @@
 - Support future `/home`, asset valuation, settlement, ranking, and daily portfolio snapshots.
 - Allow calculations without fake or temporary FX rates.
 - Maintain the accepted schema/migration rationale after implementation.
+- Keep remaining ingestion and `/fx execute` policy decisions visible.
 
 ## Rate Meaning And Direction
 - `rate` or `usdKrwRate` means KRW per 1 USD.
@@ -76,9 +77,9 @@ Decision:
 - `/fx quote` is implemented, but successful responses require a fresh eligible snapshot.
 - `/fx execute` remains STOP.
 
-## `fx_rate_snapshots` Table Candidate
+## Reflected `fx_rate_snapshots` Table
 
-| Field | Type Candidate | Purpose |
+| Field | Reflected Type | Purpose |
 | --- | --- | --- |
 | `id` | `String @id @default(uuid())` | Snapshot row id. |
 | `baseCurrency` | `CurrencyCode` | Base currency; MVP uses `USD`. |
@@ -94,7 +95,7 @@ Decision:
 | `approvedByUserId` | `String?` | Optional approving operator/admin user id. |
 | `note` | `String?` | Optional audit note. |
 
-## Enum Candidate
+## Reflected Enum
 `FxRateSourceType`:
 - `official_batch`
 - `provider_api`
@@ -102,8 +103,8 @@ Decision:
 
 Do not add `fake`, `static`, `temporary`, or similar source types.
 
-## Unique And Index Candidates
-Recommended indexes:
+## Reflected Indexes And Deferred Unique Policy
+Reflected indexes:
 - `index(baseCurrency, quoteCurrency, effectiveAt)`
 - `index(baseCurrency, quoteCurrency, capturedAt)`
 - `index(sourceType, effectiveAt)`
@@ -113,8 +114,8 @@ Unique constraint:
 - Same `effectiveAt` may need to support multiple sources or correction workflows.
 - Decide later whether to add uniqueness such as `[baseCurrency, quoteCurrency, sourceType, effectiveAt]` or a separate active/approved marker.
 
-## Quote Snapshot Selection Candidate
-For `POST /api/v1/fx/quote`:
+## Implemented Quote Snapshot Selection
+Implemented for `POST /api/v1/fx/quote`:
 1. Verify active season joined state.
 2. Validate KRW/USD currency pair and positive `sourceAmount`.
 3. Query `fx_rate_snapshots` where:
@@ -126,7 +127,7 @@ For `POST /api/v1/fx/quote`:
 6. If selected snapshot `effectiveAt` is older than 60 seconds, return `FX_RATE_STALE`.
 7. Use selected snapshot `rate` as `appliedRate`.
 
-## Execute Snapshot Selection Candidate
+## Execute Snapshot Selection STOP Candidate
 For direct execute Candidate B in `docs/fx-api-contract.md`:
 1. At execute time, select the latest effective USD/KRW snapshot using the same rule as quote.
 2. Use selected snapshot `rate` as `appliedRate`.

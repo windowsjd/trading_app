@@ -1,7 +1,7 @@
 # FX API Contract Draft
 
 ## Status
-- This document fixes the `/fx` quote/execute API contract candidate and implementation STOP decisions for agreement.
+- This document records the implemented `/fx quote` contract and future `/fx execute` contract candidates.
 - This is documentation only.
 - Do not implement `/fx execute`, `/wallets`, `/orders`, `/records`, or `/home` from this document.
 - Do not add fake FX rates, temporary FX rates, Prisma schema changes, migrations, seed changes, Prisma Client generate, or package changes from this document.
@@ -86,14 +86,15 @@ Return a KRW/USD exchange quote without changing wallet balances or writing exch
 
 ### Quote STOP Decisions
 - Current schema has no durable quote table.
-- `quoteId` cannot be durable unless a quote table, request table, or command table is designed.
-- MVP quote is stateless/read-only.
-- `quoteId` and `expiresAt` are `null`.
+- `/fx quote` is implemented as stateless/read-only.
+- `quoteId` is fixed to `null` for the current implementation.
+- `expiresAt` is fixed to `null` for the current implementation.
 - `rateCapturedAt` and `rateEffectiveAt` are returned for rate timing transparency.
 - `appliedRate` source is `fx_rate_snapshots`.
 - Missing eligible snapshot returns `FX_RATE_UNAVAILABLE`.
 - Selected snapshot older than 60 seconds by `effectiveAt` returns `FX_RATE_STALE`.
 - `/fx execute` remains a separate STOP and must not be inferred from quote readiness.
+- Durable quote storage, non-null `quoteId`, and quote expiry are future enhancements only.
 
 ## POST /api/v1/fx/execute
 
@@ -125,11 +126,11 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 - Candidate A can support quote expiry and exact replay of quoted values.
 - Candidate B is simpler for near-term MVP because it does not require a quote table.
 - Candidate B still must recompute using a legitimate `appliedRate` source at execution time.
-- Candidate B still requires durable idempotency before implementation.
+- Candidate B uses the reflected `fx_execute_requests` durable idempotency foundation, but lifecycle policy remains STOP.
 
 ### Recommended Candidate
 - Near-term MVP should document Candidate B, direct execute, as the preferred request shape.
-- This recommendation is conditional: actual implementation must first add or choose durable idempotency storage.
+- This recommendation is conditional: actual implementation must first finalize requestHash conflict handling, command lifecycle, wallet safety, and execute-time rate policy.
 - If a durable quote table is introduced later, execute can move to Candidate A.
 
 ### Success Response Shape Candidate
@@ -184,21 +185,23 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 
 ### Current State
 - `exchange_transactions` has no `idempotencyKey` column.
-- There is no unique key protecting duplicate execute requests.
+- `fx_execute_requests` exists as the command/request table foundation.
+- `fx_execute_requests` has `unique(userId, idempotencyKey)` for execute retry deduplication.
 - `wallet_transactions` has `[referenceType, referenceId]` index only, not an idempotency unique key.
+- `/fx execute` lifecycle code is not implemented yet.
 
 ### Candidate A: Add `exchange_transactions.idempotencyKey`
 - Pros: simple lookup against the executed exchange row.
 - Pros: can make duplicate execute return the original exchange response.
-- Cons: requires schema and migration.
+- Cons: would require a new schema/migration change because this column is intentionally absent.
 - Cons: less flexible for recording pending/failed command state before exchange row creation.
 
-### Candidate B: Add `fx_execute_requests` Or Command Table
+### Candidate B: Use Reflected `fx_execute_requests` Command Table
 - Pros: can record request lifecycle before wallet mutation.
 - Pros: can store request hash, status, response payload, failure reason, and linked `exchangeTransactionId`.
+- Pros: provides `unique(userId, idempotencyKey)`.
 - Pros: clearer boundary for idempotent retries and conflicts.
-- Cons: requires schema and migration.
-- Cons: adds one more table and implementation path.
+- Cons: lifecycle implementation policy is still not finalized.
 
 ### Candidate C: API Layer Durable Store
 - Pros: can avoid touching exchange table shape.
@@ -213,9 +216,9 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 - Duplicate `exchange_transactions` and `wallet_transactions` rows would be hard to distinguish from real user actions.
 
 ### Recommendation
-- Prefer Candidate B, a separate request/command table, when command lifecycle needs to be explicit.
-- Candidate A, `exchange_transactions.idempotencyKey`, is acceptable for the smallest MVP if pending/failed request tracking is not needed.
-- Do not implement execute until one of these durable strategies is agreed and reflected through schema/migration.
+- Use the reflected `fx_execute_requests` command table.
+- Keep `exchange_transactions.idempotencyKey` absent unless a later schema review deliberately changes ownership.
+- Do not implement execute until requestHash conflict handling, pending/succeeded/failed lifecycle, and response replay policy are agreed.
 
 ## Wallet Concurrency And Overspend Prevention
 
@@ -259,16 +262,24 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 ## Equity Snapshots
 - `/fx execute` should not create `equity_snapshots` yet.
 - This matches `docs/wallet-fx-write-path-plan.md` Option A.
-- Current schema still lacks `positions`, `asset_price_snapshots`, and `fx_rate_snapshots`.
-- Without those source tables, an authoritative KRW total equity snapshot cannot be produced.
+- `fx_rate_snapshots` exists, but `positions` and `asset_price_snapshots` are still missing.
+- Authoritative total equity snapshots require positions, asset price snapshots, and FX snapshot evidence together.
+- `/fx execute` currently does not create `equity_snapshots`.
 - Cash-only snapshots could be mistaken as `/home`, ranking, settlement, or final evaluation evidence.
 - Revisit `equity_snapshots` write path after valuation source tables are designed.
 
 ## Implementation STOP Checklist
-- Decide `appliedRate` source; fake or temporary FX rates are forbidden.
-- Decide stateless quote vs durable quote storage.
-- Decide quote expiry policy if `quoteId` is emitted.
-- Decide execute idempotency storage and schema/migration.
-- Decide wallet concurrency/overspend strategy.
-- Decide Decimal rounding/scale rules.
+- Quote status:
+  - `/fx quote` implementation is complete.
+  - `/fx quote` is stateless/read-only.
+  - `quoteId` and `expiresAt` are fixed to `null`.
+  - `rateCapturedAt` and `rateEffectiveAt` are included.
+  - `FX_RATE_UNAVAILABLE` and `FX_RATE_STALE` are distinguished.
+- Execute STOP:
+  - `/fx execute` remains STOP.
+  - Wallet conditional update must be verified.
+  - Decimal rounding/scale must be finalized.
+  - Failed command lifecycle must be finalized.
+  - Execute-time sourceType priority and snapshot freshness policy must be reviewed.
+  - Provider/batch ingestion assumptions must be reviewed before long-running execute operation.
 - Keep `/home` full implementation blocked until valuation/ranking source tables exist.

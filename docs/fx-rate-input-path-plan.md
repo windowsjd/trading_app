@@ -1,7 +1,7 @@
 # FX Rate Input Path Plan
 
 ## Status
-- This document fixes the rate input path candidate for `fx_rate_snapshots`.
+- This document records the accepted rate input path for `fx_rate_snapshots`.
 - The approved internal CLI implementation now exists at `scripts/admin-insert-fx-rate.ts`.
 - The `/fx quote` integration check is documented in `docs/fx-quote-integration-check.md`.
 - `/fx quote` read-only implementation exists and applies a 60-second stale threshold.
@@ -73,11 +73,10 @@ Cons:
 - Seeded, hardcoded, fake, static, or temporary rates must not be used as `/fx quote` or `/fx execute` evidence.
 - This includes test-looking business rows that can be mistaken for real operating data.
 
-## Recommended Rate Input Decision
-- MVP should prefer `admin_manual` input path.
-- This must be treated as a separate operating input path, not seed data.
-- Before implementation, the path must be clearly separated from fake/static seed and hardcoded fallback behavior.
-- Near-term implementation candidate can be an approved internal CLI script.
+## Reflected Rate Input Decision
+- MVP uses the implemented `admin_manual` internal CLI as the bootstrap/manual correction path.
+- This is treated as a separate operating input path, not seed data.
+- The CLI path is separated from fake/static seed and hardcoded fallback behavior.
 - Admin API should wait until auth/admin authorization is finalized.
 - `admin_manual` is an MVP operating/bootstrap path, not the final long-term rate ingestion design.
 - Production-oriented rate ingestion should move toward `provider_api` or `official_batch` automatic/periodic updates.
@@ -193,14 +192,14 @@ Recommended implementation path:
 Required for successful `/fx quote` responses:
 - `fx_rate_snapshots` migration applied.
 - Prisma Client generate completed.
-- Rate input path decided.
-- At least one valid USD/KRW snapshot can be inserted through the approved path.
-- Snapshot selection rule finalized.
-- Stale threshold finalized as 60 seconds.
+- Rate input path decided and implemented as the internal `admin_manual` CLI.
+- At least one approved fresh USD/KRW snapshot inserted through the approved path.
+- Snapshot selection rule finalized and implemented.
+- Stale threshold finalized and implemented as 60 seconds.
 - No eligible snapshot returns `FX_RATE_UNAVAILABLE`.
 - Stale selected snapshot returns `FX_RATE_STALE`.
 
-Do not do during `/fx quote` implementation:
+Read-only quote write prohibitions:
 - Do not implement `/fx execute`.
 - Do not mutate wallets.
 - Do not create `exchange_transactions`.

@@ -65,8 +65,8 @@ Cons:
 - Reason: if these are split, the project is likely to need another immediate follow-up migration before real `/fx` implementation.
 - No additional schema or migration change is implied by this document.
 
-## `FxRateSourceType` Enum Candidate
-Recommended values:
+## Reflected `FxRateSourceType` Enum
+Reflected values:
 - `official_batch`
 - `provider_api`
 - `admin_manual`
@@ -76,11 +76,11 @@ Forbidden values:
 - `static`
 - `temporary`
 
-## `FxRateSnapshot` Model Candidate
+## Reflected `FxRateSnapshot` Model
 Table name:
 - `@@map("fx_rate_snapshots")`
 
-Field candidates:
+Reflected fields:
 - `id: String @id @default(uuid())`
 - `baseCurrency: CurrencyCode @map("base_currency")`
 - `quoteCurrency: CurrencyCode @map("quote_currency")`
@@ -95,7 +95,7 @@ Field candidates:
 - `approvedByUserId: String? @map("approved_by_user_id")`
 - `note: String?`
 
-Relation candidates:
+Reflected and deferred relations:
 - `ExchangeTransaction -> FxRateSnapshot?` through `exchange_transactions.fxRateSnapshotId`.
 - `FxRateSnapshot -> ExchangeTransaction[]`.
 - `approvedByUserId` can either stay as a plain nullable `String` or become a relation to `User` or a future admin/operator model.
@@ -106,7 +106,7 @@ Recommended `approvedByUserId` decision:
 - Reason: the auth/admin body is still incomplete.
 - Reason: creating the wrong FK now can increase migration burden when the operator/admin model changes.
 
-Recommended indexes:
+Reflected indexes:
 - `@@index([baseCurrency, quoteCurrency, effectiveAt])`
 - `@@index([baseCurrency, quoteCurrency, capturedAt])`
 - `@@index([sourceType, effectiveAt])`
@@ -116,17 +116,17 @@ Unique constraint:
 - Reason: the same `effectiveAt` may need multiple sources, correction rows, or re-approval workflow.
 - Reason: there is no agreed `approved` or `latest` marker policy yet.
 
-## `FxExecuteRequestStatus` Enum Candidate
-Recommended values:
+## Reflected `FxExecuteRequestStatus` Enum
+Reflected values:
 - `pending`
 - `succeeded`
 - `failed`
 
-## `FxExecuteRequest` Model Candidate
+## Reflected `FxExecuteRequest` Model
 Table name:
 - `@@map("fx_execute_requests")`
 
-Field candidates:
+Reflected fields:
 - `id: String @id @default(uuid())`
 - `userId: String @map("user_id")`
 - `seasonParticipantId: String @map("season_participant_id")`
@@ -145,40 +145,40 @@ Field candidates:
 - `createdAt: DateTime @default(now()) @map("created_at")`
 - `updatedAt: DateTime @updatedAt @map("updated_at")`
 
-Relation candidates:
+Reflected relations:
 - `User -> FxExecuteRequest[]`.
 - `SeasonParticipant -> FxExecuteRequest[]`.
 - `FxExecuteRequest -> ExchangeTransaction?`.
 - If strict one-to-one between request and exchange is required, `exchangeTransactionId` uniqueness must be explicitly reviewed. The current candidate keeps the requested index-only policy.
 
-Recommended unique:
+Reflected unique:
 - `@@unique([userId, idempotencyKey])`
 
-Recommended indexes:
+Reflected indexes:
 - `@@index([seasonParticipantId, requestedAt])`
 - `@@index([status, requestedAt])`
 - `@@index([exchangeTransactionId])`
 
-FK delete behavior candidate:
+FK delete behavior:
 - Command/request rows are audit and replay records, so preservation is preferred.
 - Prefer reviewing `onDelete: Restrict` first.
 - Current `User` and `SeasonParticipant` relations include cascade paths, so this may conflict with existing deletion behavior.
 - If the existing cascade policy conflicts with preservation-first command records, STOP and report before schema reflection.
 - Do not choose `Cascade` arbitrarily.
 
-## `exchange_transactions.fxRateSnapshotId` Candidate
-Recommendation:
-- Add `exchange_transactions.fxRateSnapshotId`.
+## Reflected `exchange_transactions.fxRateSnapshotId`
+Decision:
+- `exchange_transactions.fxRateSnapshotId` is added.
 
-Nullable policy candidate:
-- Required would be ideal for newly implemented `/fx execute`.
-- Nullable `String?` should be reviewed first for migration safety because existing `exchange_transactions` rows may exist.
+Nullable policy:
+- `String?` nullable is reflected for migration safety because existing `exchange_transactions` rows may exist.
+- Required linkage can be reconsidered only in a later execute write-path review.
 
-Relation candidate:
+Reflected relation:
 - `ExchangeTransaction -> FxRateSnapshot?`.
 - `FxRateSnapshot -> ExchangeTransaction[]`.
 
-Index candidate:
+Reflected index:
 - `@@index([fxRateSnapshotId])`
 - Keep existing `exchange_transactions` indexes.
 

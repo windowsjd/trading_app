@@ -2,6 +2,7 @@
 
 ## Status
 - This document designs future USD/KRW rate ingestion for `fx_rate_snapshots`.
+- Provider/source investigation STOP review is documented in `docs/fx-ingestion-stop-review.md`.
 - This is documentation only.
 - Do not implement `provider_api`, `official_batch`, schedulers, admin APIs, `/fx execute`, wallet writes, schema changes, migrations, seed changes, Prisma Client generate, or package changes from this document.
 

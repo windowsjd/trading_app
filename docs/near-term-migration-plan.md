@@ -3,9 +3,14 @@
 ## Status
 - Prisma schema reflection completed for the near-term 1 tables.
 - Migration file created with `add_near_term_ledger_tables` and applied to the local DB.
+- Follow-up `/fx` DB foundation migration `20260501212120_add_fx_rate_and_execute_safety_tables` is also created and applied locally.
 - Prisma Client generate completed.
 - Build verification passed.
 - Target tables: `wallet_transactions`, `exchange_transactions`, `equity_snapshots`.
+- Additional `/fx` foundation tables/fields now reflected: `fx_rate_snapshots`, `fx_execute_requests`, and `exchange_transactions.fxRateSnapshotId`.
+- `/fx quote` read-only implementation exists.
+- `/fx execute` write path remains unimplemented.
+- `equity_snapshots` write path remains unimplemented and deferred.
 - Prisma generated client was updated by `prisma generate`.
 - Seed and runtime API code are not changed by this work.
 - Field names, enum values, precision, indexes, and relation policies below were reflected into Prisma schema.
@@ -64,8 +69,8 @@
 - `WalletTransactionReferenceType`: use source categories that map to durable business events, not UI labels.
 - `referenceId`: nullable, but should be present whenever the transaction is tied to a durable source row.
 - `referenceId` may be null for manual or bootstrap cases only when no durable source row exists yet.
-- Idempotency unique key: defer until actual execute logic is designed.
-- Reason: unique key shape depends on quote/execute idempotency inputs that are not fixed yet.
+- Wallet ledger idempotency unique key: keep deferred to execute implementation.
+- Reason: `/fx execute` retry deduplication is owned by reflected `fx_execute_requests.unique(userId, idempotencyKey)`; wallet ledger rows should be protected through the execute transaction and reference linkage.
 
 ### Field List and Type Candidates
 
@@ -119,9 +124,9 @@
 - Which preservation-first FK delete behavior should be used in Prisma?
 - Which execute idempotency key should later protect duplicate ledger writes?
 
-### Do Not Implement In This Step
+### Reflected / Not Implemented
 - Prisma model reflected.
-- Migration file created.
+- Migration file created and applied.
 - DB apply completed.
 - No seed rows.
 - No wallet balance recalculation job.
@@ -166,6 +171,7 @@
 | --- | --- | --- | --- |
 | `id` | `String @id @default(uuid())` | yes | Exchange execution id; maps to `exchangeId` in records |
 | `seasonParticipantId` | `String` | yes | FK to `season_participants.id` |
+| `fxRateSnapshotId` | `String?` | no | Nullable FK to `fx_rate_snapshots.id`, reflected by the follow-up `/fx` migration |
 | `fromCurrency` | `CurrencyCode` | yes | Source wallet currency |
 | `toCurrency` | `CurrencyCode` | yes | Target wallet currency |
 | `sourceAmount` | `Decimal @db.Decimal(24, 8)` | yes | Records `sourceAmount` |
@@ -192,14 +198,15 @@
 
 ### Relation Candidates
 - `exchange_transactions.seasonParticipantId` -> `season_participants.id`
+- `exchange_transactions.fxRateSnapshotId` -> `fx_rate_snapshots.id` exists as a nullable relation.
 - `wallet_transactions.referenceType = exchange_transaction` + `referenceId = exchange_transactions.id`
-- Future relation to `fx_rate_snapshots` may be needed once that blocker table is designed
 
 ### Unique and Index Candidates
 - Primary key: `id`
 - Index: `[seasonParticipantId, executedAt]`
+- Index: `[fxRateSnapshotId]`
 - Index: `[fromCurrency, toCurrency, executedAt]`
-- Unique idempotency key: hold until quote/execute command shape is fixed
+- No `exchange_transactions.idempotencyKey`; `fx_execute_requests.unique(userId, idempotencyKey)` owns execute retry deduplication.
 
 ### Connectivity
 - Records: directly backs `records/me/seasons/{seasonId}/exchanges` item fields.
@@ -214,12 +221,13 @@
 - Should fee be represented as a separate `wallet_transactions` row, or only as netted target credit?
 - Which execute idempotency key should later protect duplicate exchange writes?
 
-### Do Not Implement In This Step
+### Reflected / Not Implemented
 - Prisma model reflected.
-- Migration file created.
+- Migration file created and applied.
 - DB apply completed.
 - No seed rows.
-- No fx quote/execute code.
+- `/fx quote` read-only code exists.
+- No `/fx execute` code.
 - No records exchanges endpoint.
 - No fake exchange history.
 
@@ -248,7 +256,7 @@
 - `createdAt`: row 생성 시각.
 - Add `snapshotReason` from the start.
 - Reason: MDD, ranking replay, and settlement verification need to know which event produced each snapshot.
-- Authoritative condition: `equity_snapshots` cannot be a complete valuation source without `positions`, `asset_price_snapshots`, and `fx_rate_snapshots`.
+- Authoritative condition: `equity_snapshots` cannot be a complete valuation source without `positions`, `asset_price_snapshots`, and usable `fx_rate_snapshots` evidence.
 - Near-term step prepares the structure only and does not make `/home` full implementation possible.
 - `equity_snapshots` and `daily_portfolio_snapshots` must stay separate.
 - `equity_snapshots`: event/periodic valuation snapshots.
@@ -285,8 +293,8 @@
 
 ### Relation Candidates
 - `equity_snapshots.seasonParticipantId` -> `season_participants.id`
-- Future relation to `fx_rate_snapshots` may be needed to prove USD conversion.
-- Future relation to price snapshot batches may be needed to prove asset valuation.
+- Additional `equity_snapshots` relation to `fx_rate_snapshots` may be reviewed later to prove USD conversion.
+- Additional relation to price snapshot batches may be reviewed later to prove asset valuation.
 
 ### Unique and Index Candidates
 - Primary key: `id`
@@ -307,9 +315,9 @@
 - How should incomplete valuation be represented when price or FX source is missing?
 - Which preservation-first FK delete behavior should be used in Prisma?
 
-### Do Not Implement In This Step
+### Reflected / Not Implemented
 - Prisma model reflected.
-- Migration file created.
+- Migration file created and applied.
 - DB apply completed.
 - No seed rows.
 - No snapshot capture job.

@@ -36,7 +36,7 @@ Cons:
 - Hard to record command state before wallet mutation.
 - Awkward place for request payload hash and conflict decision metadata.
 
-### Candidate B: Add `fx_execute_requests` Command Table
+### Candidate B: Use Reflected `fx_execute_requests` Command Table
 Pros:
 - Explicitly records request lifecycle.
 - Supports `pending`, `succeeded`, and `failed` states.
@@ -45,7 +45,7 @@ Pros:
 - Can become the same command pattern for future order execute.
 
 Cons:
-- Adds one table.
+- Command lifecycle implementation is still required.
 - Slightly increases implementation complexity.
 
 ### Candidate C: API Layer Durable Store
@@ -73,7 +73,7 @@ Decision:
 - `exchange_transactions.idempotencyKey` remains intentionally absent because the command table owns idempotency.
 - This document does not authorize additional schema changes or `/fx execute` implementation.
 
-## `fx_execute_requests` Table Candidate
+## Reflected `fx_execute_requests` Foundation
 
 | Field | Purpose |
 | --- | --- |
@@ -84,7 +84,7 @@ Decision:
 | `requestHash` | Hash of normalized execute request payload; detects same key with different payload. |
 | `fromCurrency` | Source wallet currency. |
 | `toCurrency` | Target wallet currency. |
-| `sourceAmount` | Requested debit amount, stored as `Decimal(24, 8)` candidate. |
+| `sourceAmount` | Requested debit amount, stored as `Decimal(24, 8)`. |
 | `status` | Command lifecycle status. |
 | `exchangeTransactionId` | Linked `exchange_transactions.id` after success. |
 | `responsePayloadJson` | Optional stored success response for replaying duplicate retry. |
@@ -95,21 +95,21 @@ Decision:
 | `createdAt` | Row creation timestamp. |
 | `updatedAt` | Row update timestamp. |
 
-## Enum Candidate
+## Reflected Enum
 `FxExecuteRequestStatus`:
 - `pending`
 - `succeeded`
 - `failed`
 
-## Unique And Index Candidates
+## Reflected Unique And Indexes
 
-Recommended unique:
+Reflected unique:
 - `unique(userId, idempotencyKey)`
 
 Alternative unique to review:
 - `unique(seasonParticipantId, idempotencyKey)`
 
-Indexes:
+Reflected indexes:
 - `index(seasonParticipantId, requestedAt)`
 - `index(status, requestedAt)`
 - `index(exchangeTransactionId)`
