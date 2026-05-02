@@ -3,7 +3,7 @@
 ## Status
 - This document fixes the `/fx` quote/execute API contract candidate and implementation STOP decisions for agreement.
 - This is documentation only.
-- Do not implement `/fx`, `/wallets`, `/orders`, `/records`, or `/home` from this document.
+- Do not implement `/fx execute`, `/wallets`, `/orders`, `/records`, or `/home` from this document.
 - Do not add fake FX rates, temporary FX rates, Prisma schema changes, migrations, seed changes, Prisma Client generate, or package changes from this document.
 - `/home` full implementation remains blocked.
 
@@ -50,7 +50,7 @@ Return a KRW/USD exchange quote without changing wallet balances or writing exch
 }
 ```
 
-### Success Response Shape Candidate
+### Implemented Success Response Shape
 
 ```json
 {
@@ -82,7 +82,7 @@ Return a KRW/USD exchange quote without changing wallet balances or writing exch
 - Fee is charged in the target currency.
 - KRW -> USD uses `feeCurrency = USD`.
 - USD -> KRW uses `feeCurrency = KRW`.
-- Decimal rounding and scale rules must be fixed before implementation.
+- Current quote returns decimal strings with implemented API formatting; broader execute, settlement, and valuation rounding policy remains a STOP item.
 
 ### Quote STOP Decisions
 - Current schema has no durable quote table.
@@ -93,6 +93,7 @@ Return a KRW/USD exchange quote without changing wallet balances or writing exch
 - `appliedRate` source is `fx_rate_snapshots`.
 - Missing eligible snapshot returns `FX_RATE_UNAVAILABLE`.
 - Selected snapshot older than 60 seconds by `effectiveAt` returns `FX_RATE_STALE`.
+- `/fx execute` remains a separate STOP and must not be inferred from quote readiness.
 
 ## POST /api/v1/fx/execute
 

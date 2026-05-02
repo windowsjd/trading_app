@@ -212,7 +212,7 @@ Do not do during `/fx quote` implementation:
 ## Design Phase Status
 - `/fx quote` documentation design and read-only implementation are complete.
 - `/fx quote` integration smoke requires an approved fresh snapshot within the 60-second stale threshold.
-- FX provider/batch ingestion design is the next priority for reliable quote operation.
+- FX provider/batch ingestion design is documented in `docs/fx-rate-ingestion-plan.md`; the next step is implementation STOP review and provider/source selection.
 - For `/fx execute`, document design still has open implementation policy points:
   - conditional update verification,
   - Decimal rounding and scale rules,

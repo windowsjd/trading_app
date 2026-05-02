@@ -1,18 +1,18 @@
 # FX Quote STOP Review
 
 ## Status
-- This document is the final pre-implementation STOP review for `/fx quote`.
+- This document records the accepted STOP review and implemented read-only `/fx quote` constraints.
 - `/fx quote` read-only implementation is completed according to this review.
 - This is documentation only.
-- Do not implement `/fx quote`, `/fx execute`, `/wallets`, `/orders`, `/records`, `/home`, admin APIs, or CLI scripts from this document.
+- Do not implement `/fx execute`, `/wallets`, `/orders`, `/records`, `/home`, admin APIs, provider/batch ingestion, or additional CLI scripts from this document.
 - Do not add Prisma schema changes, migrations, seed changes, Prisma Client generate, package changes, fake FX rates, static FX rates, or temporary FX rates from this document.
 
 ## Purpose
-- Decide whether `/fx quote` read-only implementation can proceed.
-- Finalize stale threshold policy for MVP quote.
-- Finalize the `fx_rate_snapshots` selection rule at implementation level.
+- Record why `/fx quote` read-only implementation is allowed and what it must not do.
+- Record the stale threshold policy for MVP quote.
+- Keep the implemented `fx_rate_snapshots` selection rule visible.
 - Reconfirm implementation non-goals and forbidden write behavior.
-- List the remaining blockers immediately before implementation.
+- List the remaining blockers after quote implementation.
 
 ## Current Premises
 - `fx_rate_snapshots` schema and migration are created and applied locally.
@@ -25,9 +25,9 @@
 
 ## Quote Implementation Scope
 
-`/fx quote` may be implemented only as a read-only API.
+`/fx quote` is implemented only as a read-only API.
 
-Allowed:
+Implemented read-only behavior:
 - Validate active season joined state.
 - Validate `fromCurrency`, `toCurrency`, and `sourceAmount`.
 - Read `fx_rate_snapshots`.
@@ -165,17 +165,17 @@ Common error envelope:
 }
 ```
 
-## Remaining Pre-Implementation Checks
-- Confirm 60-second stale threshold is accepted for MVP quote.
-- Confirm `rateCapturedAt` and `rateEffectiveAt` response fields with frontend.
-- Confirm Decimal rounding and display scale for quote calculations.
-- Confirm `fxFeeRate` source from the active season.
-- Confirm no quote request persistence in MVP.
+## Remaining Follow-Up Checks
+- Confirm whether frontend needs display formatting beyond API decimal strings.
+- Keep `rateCapturedAt` and `rateEffectiveAt` in the response contract.
+- Keep `fxFeeRate` sourced from the active season.
+- Keep quote request persistence out of MVP unless a durable quote table is explicitly designed.
+- Review provider/batch ingestion before relying on long-running quote freshness.
 
 ## Final Decision
-- `/fx quote` read-only implementation can proceed after this STOP review is accepted.
-- `/fx quote` implementation must not include execute, wallet mutation, ledger writes, or fake fallback.
+- `/fx quote` read-only implementation exists according to this STOP review.
+- `/fx quote` must not include execute, wallet mutation, ledger writes, or fake fallback.
 - `/fx execute` remains STOP.
-- Rate input implementation is still needed to get successful quote responses.
+- Rate input CLI exists, but successful quote responses still require an approved fresh snapshot row.
 - Without snapshot data, `/fx quote` returns `FX_RATE_UNAVAILABLE`.
 - With a stale selected snapshot, `/fx quote` returns `FX_RATE_STALE`.

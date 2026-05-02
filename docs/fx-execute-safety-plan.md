@@ -1,7 +1,8 @@
 # FX Execute Safety Plan
 
 ## Status
-- This document fixes the pre-implementation safety design for `/fx execute`.
+- This document records the accepted safety design for future `/fx execute`.
+- `fx_execute_requests` schema/migration foundation is reflected, but `/fx execute` is not implemented.
 - This is documentation only.
 - Do not implement `/fx execute` from this document yet.
 - Do not add Prisma schema changes, migrations, seed changes, Prisma Client generate, package changes, fake FX rates, or temporary FX rates from this document.
@@ -9,18 +10,18 @@
 ## Purpose
 - Prevent duplicate `/fx execute` execution before wallet mutation.
 - Prevent wallet overspend under concurrent exchange/order requests.
-- Decide an idempotency storage strategy before schema/migration reflection.
-- Decide a wallet concurrency control strategy before implementation.
-- Provide a schema/migration-ready design candidate for agreement.
+- Preserve the accepted idempotency storage strategy.
+- Keep wallet concurrency, rounding, and failed command lifecycle STOP points visible before execute implementation.
 
 ## Current Constraints
-- `exchange_transactions` exists but has no `idempotencyKey`.
+- `exchange_transactions` exists, has nullable `fxRateSnapshotId`, and still has no `idempotencyKey`.
 - `wallet_transactions` exists and has `[referenceType, referenceId]` index only.
-- There is no execute request or command table.
+- `fx_execute_requests` exists as the durable execute request/command table foundation.
 - `/fx quote/execute` contract candidates are documented in `docs/fx-api-contract.md`.
 - Fake or temporary FX rates are forbidden.
-- `fx_rate_snapshots` does not exist, so the legal `appliedRate` source is still a STOP decision.
-- Even if idempotency and concurrency schema are added, actual execute implementation remains blocked until `appliedRate` source is decided.
+- `fx_rate_snapshots` exists and `/fx quote` uses it for the legal `appliedRate` source.
+- Production provider/batch ingestion is not implemented yet.
+- Actual execute implementation remains blocked until wallet conditional update, Decimal rounding/scale, failed command lifecycle, and execute-time rate/source policy are finalized.
 
 ## Idempotency Strategy Candidates
 
@@ -64,13 +65,13 @@ Decision:
 - Duplicate `exchange_transactions` and `wallet_transactions` rows would look like real user actions.
 
 ## Recommended Idempotency Decision
-- Recommend Candidate B: separate `fx_execute_requests` command table.
+- Candidate B is accepted and reflected: separate `fx_execute_requests` command table.
 - Reason: execute request can be recorded before wallet mutation.
 - Reason: lifecycle can be tracked as `pending`, `succeeded`, or `failed`.
 - Reason: duplicate retry and payload conflict can be separated by `idempotencyKey` plus `requestHash`.
 - Reason: future order execute can reuse the same command table pattern.
-- Do not add `exchange_transactions.idempotencyKey` in the first schema proposal because the command table owns idempotency.
-- This task does not modify schema. Prisma model and migration require a separate STOP review.
+- `exchange_transactions.idempotencyKey` remains intentionally absent because the command table owns idempotency.
+- This document does not authorize additional schema changes or `/fx execute` implementation.
 
 ## `fx_execute_requests` Table Candidate
 
@@ -178,31 +179,31 @@ Indexes:
 - `wallet_transactions` source debit and target credit rows are created in the same transaction.
 - `wallet_transactions.balanceAfter` must use actual post-update wallet balances.
 
-## Schema/Migration Reflection Candidate
-Next schema/migration task should consider:
-- Add enum `FxExecuteRequestStatus`.
-- Add model `FxExecuteRequest`.
-- Add relations:
+## Reflected Schema/Migration Foundation
+The accepted migration already includes:
+- enum `FxExecuteRequestStatus`.
+- model `FxExecuteRequest`.
+- relations:
   - `User -> FxExecuteRequest[]`
   - `SeasonParticipant -> FxExecuteRequest[]`
   - `FxExecuteRequest -> ExchangeTransaction?`
-- Add `unique(userId, idempotencyKey)`.
-- Add indexes:
+- `unique(userId, idempotencyKey)`.
+- indexes:
   - `[seasonParticipantId, requestedAt]`
   - `[status, requestedAt]`
   - `[exchangeTransactionId]`
-- Do not add `exchange_transactions.idempotencyKey` in the first proposal because `fx_execute_requests` owns idempotency.
+- No `exchange_transactions.idempotencyKey`, because `fx_execute_requests` owns idempotency.
 
 ## FK Delete Behavior STOP
 - Request/command rows are audit and replay records.
 - Preservation is preferred over convenient cascading deletion.
 - Existing `User` and `SeasonParticipant` delete behavior may conflict with preservation-first command records.
-- Final `onDelete` policy must be decided before Prisma reflection.
-- Do not choose a cascade/restrict/soft-delete policy without explicit schema review.
+- Current reflected relation policy uses `onDelete: Restrict`.
+- Do not change cascade/restrict/soft-delete policy without explicit schema review.
 
 ## Applied Rate STOP
-- `fx_rate_snapshots` does not exist.
-- There is no legal authoritative `appliedRate` source yet.
+- `fx_rate_snapshots` exists as the authoritative rate snapshot structure.
+- `/fx quote` uses the latest fresh USD/KRW snapshot and returns `FX_RATE_UNAVAILABLE` or `FX_RATE_STALE` when appropriate.
 - Fake or temporary FX rates are forbidden.
 - Adding idempotency and wallet safety schema does not make `/fx execute` implementable by itself.
-- Actual execute implementation remains blocked until `appliedRate` source is decided.
+- Actual execute implementation remains blocked until execute-time snapshot selection, 60-second freshness behavior, sourceType priority, and provider/batch ingestion assumptions are reviewed for execute.

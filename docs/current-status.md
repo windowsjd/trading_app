@@ -100,7 +100,9 @@
 
 ## 다음 작업
 - 1순위: `/home` controller/service 구현 아님
-- 먼저 rate input CLI 설계/구현 또는 `/fx quote` 통합 검증
+- 다음은 승인된 fresh snapshot으로 `/fx quote` 통합 smoke 검증
+- FX provider/batch ingestion 구현 전 STOP review와 provider 후보/API 계약 조사 필요
+- `/fx execute` 전 wallet conditional update, Decimal rounding/scale, failed command lifecycle 정책 확정 필요
 - `/home` full implementation 가능 판정은 남은 valuation/ranking source table 확보 후 재검토
 
 ### 다음 작업 STOP 가능성
@@ -220,7 +222,8 @@
 
 ## TODO
 - 승인된 운영값으로 non-dry-run CLI 입력 후 `/fx quote` 통합 smoke 검증
-- FX provider/batch ingestion 구현 전 STOP 검토
+- FX provider/batch ingestion 구현 전 STOP review
+- provider 후보 선정 및 API 계약 조사
 - rate input 운영 절차 보강
 - wallet conditional update 검증
 - Decimal rounding/scale 규칙 확정

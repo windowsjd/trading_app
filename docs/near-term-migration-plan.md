@@ -326,6 +326,6 @@
 
 ## Explicit Non-Goals
 - No API contract changes.
-- No `/home`, `/wallets`, `/fx`, `/orders`, or `/records` implementation.
+- No `/home`, `/wallets`, `/fx execute`, `/orders`, or `/records` implementation.
 - No fake backfill data.
 - No claim that `/home` full implementation is now possible.

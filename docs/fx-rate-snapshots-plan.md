@@ -146,9 +146,10 @@ Recommendation:
 
 ## Exchange Transaction Connectivity
 - `exchange_transactions` has nullable `fxRateSnapshotId`.
+- `ExchangeTransaction -> FxRateSnapshot?` relation exists through `fxRateSnapshotId`.
 - `exchange_transactions.appliedRate` preserves the executed numeric rate.
 - Numeric `appliedRate` alone is enough to reproduce wallet amounts, but weak for source audit.
-- `fxRateSnapshotId` is available for future `/fx execute` audit linkage.
+- Future `/fx execute` write path must decide and set `exchange_transactions.fxRateSnapshotId` for audit linkage.
 - `/fx quote` does not create `exchange_transactions`.
 
 ## Home, Valuation, And Settlement Connectivity

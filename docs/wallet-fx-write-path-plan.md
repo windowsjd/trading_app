@@ -3,7 +3,8 @@
 ## Status
 - This document fixes the near-term wallet/fx write path design for agreement.
 - This is documentation only.
-- Do not implement `/wallets`, `/fx`, `/orders`, `/records`, or `/home` from this document.
+- `/fx quote` read-only implementation exists; this document is about future write paths.
+- Do not implement `/wallets`, `/fx execute`, `/orders`, `/records`, or `/home` from this document.
 - Do not add fake data, Prisma schema changes, migrations, seed changes, Prisma Client generate, or API contract changes from this document.
 - Current schema and local DB already include `wallet_transactions`, `exchange_transactions`, and `equity_snapshots`.
 - `/home` full implementation remains blocked.
@@ -34,7 +35,7 @@
 - No migration changes or generation.
 - No seed changes.
 - No Prisma Client generate.
-- No `/wallets`, `/fx`, `/orders`, `/records`, or `/home` API implementation.
+- No `/wallets`, `/fx execute`, `/orders`, `/records`, or `/home` API implementation.
 - No fake or backfilled ledger/snapshot data.
 - No changes to existing home or records API contracts.
 

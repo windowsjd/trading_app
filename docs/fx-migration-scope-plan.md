@@ -205,6 +205,7 @@ Reason:
 ## Non-Goals
 - No `/fx execute` implementation.
 - No wallet, order, records, or home implementation.
+- No provider/batch scheduler implementation.
 - No additional schema or migration changes beyond this agreed `/fx` DB foundation.
 - No seed changes.
 - No API contract changes.
