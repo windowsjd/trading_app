@@ -40,6 +40,8 @@ Notes:
 - Do not run the non-dry-run command without an actual approved rate value.
 - This document only describes dry-run and approved manual execution procedures.
 - A non-dry-run smoke should use a current UTC `effectiveAt`; otherwise quote returns `FX_RATE_STALE`.
+- Before provider ingestion is implemented, quote success smoke is possible only with a fresh `admin_manual` snapshot.
+- If provider ingestion is introduced, this smoke procedure must be rewritten around a fresh `provider_api` snapshot.
 - The CLI is create-only; it does not upsert.
 - Operators must avoid duplicate input for the same `effectiveAt`, `sourceName`, and `rate` until correction/re-approval workflow exists.
 - The CLI rejects wording that would make the row look like non-operating data.

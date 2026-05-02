@@ -3,8 +3,10 @@
 ## Status
 - This document designs future USD/KRW rate ingestion for `fx_rate_snapshots`.
 - Provider/source investigation STOP review is documented in `docs/fx-ingestion-stop-review.md`.
+- Official-document provider research is documented in `docs/fx-provider-research.md`.
 - This is documentation only.
 - Do not implement `provider_api`, `official_batch`, schedulers, admin APIs, `/fx execute`, wallet writes, schema changes, migrations, seed changes, Prisma Client generate, or package changes from this document.
+- Provider final selection is pending.
 
 ## Purpose
 - Define how USD/KRW rates should be updated periodically like stock or crypto prices.
@@ -72,9 +74,18 @@ Conclusion:
 
 ## Recommended Direction
 - Primary service ingestion should prefer `provider_api` polling.
-- `official_batch` should be reviewed as a settlement/reference source or secondary operating benchmark.
+- Official-document research is summarized in `docs/fx-provider-research.md`.
+- `official_batch` should be reviewed as a settlement/reference source or secondary operating benchmark, not assumed to be quote primary.
 - `admin_manual` should remain bootstrap/fallback/manual correction.
 - Do not implement ingestion before selecting an actual provider or official source.
+
+## Provider Research Summary
+- Korea Eximbank Open API and Bank of Korea ECOS are official/reference candidates, but official docs/data shape indicate daily/date-level or publication-time behavior that may not satisfy `/fx quote` 60-second freshness.
+- Open Exchange Rates normal plans are slower than 60 seconds; VIP-level updates require separate contract review.
+- Currencylayer and exchangerate.host include 60-second update tiers, but this is tight against a 60-second stale threshold and needs provider timestamp/polling/terms review.
+- Twelve Data and OANDA remain provider_api candidates with stronger freshness potential, but USD/KRW exact support, commercial usage, timestamp reliability, and polling permission must be confirmed.
+- Alpha Vantage remains a provider_api candidate only after real-key USD/KRW validation and commercial/polling review.
+- No provider is selected yet.
 
 ## Polling Interval And Stale Threshold
 - `/fx quote` stale threshold is 60 seconds.
@@ -82,12 +93,13 @@ Conclusion:
 
 Polling candidates:
 - 10 seconds: freshest, but higher provider load and rate-limit risk.
-- 30 seconds: recommended initial candidate.
+- 30 seconds: recommended initial candidate, not final.
 - 60 seconds: too close to the stale threshold and leaves no failure margin.
 
 Recommendation:
 - Use 30 seconds as the first provider polling candidate.
-- Adjust after provider rate limits, pricing, latency, and reliability are known.
+- Adjust after provider rate limits, terms, pricing, latency, and reliability are known.
+- Do not finalize 30-second polling until the selected provider's official docs or contract allow the interval.
 
 ## Storage Policy
 Candidates:

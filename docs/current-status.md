@@ -125,6 +125,9 @@
 - `admin_manual`은 bootstrap/fallback/manual correction 경로이며, 실제 approved rate row insert는 아직 없음
 - FX ingestion 설계 문서 작성됨: `docs/fx-rate-ingestion-plan.md`
 - FX ingestion STOP review 문서 작성됨: `docs/fx-ingestion-stop-review.md`
+- FX provider 후보 공식 문서 기반 조사 문서 작성됨: `docs/fx-provider-research.md`
+- FX provider 최종 선정은 아직 안 됨
+- 30초 polling은 후보이며 provider rate limit/terms 확인 후 확정
 - provider/batch ingestion, admin API, retention 구현 없음
 - `/fx execute`는 STOP: wallet conditional update, Decimal rounding/scale, failed command lifecycle, execute-time source policy 확정 필요
 - `/home` full implementation은 여전히 불가: `assets`, `asset_price_snapshots`, `positions`, `daily_portfolio_snapshots`, `season_rankings` 필요
@@ -158,7 +161,7 @@
 ## TODO
 - 승인된 운영값으로 non-dry-run CLI 입력 후 `/fx quote` 통합 smoke 검증
 - FX provider/batch ingestion STOP review 수락
-- provider 후보 선정 및 API 계약 조사
+- provider final selection STOP review 또는 provider config/scheduler 설계
 - rate input 운영 절차 보강
 - wallet conditional update 검증
 - Decimal rounding/scale 규칙 확정
