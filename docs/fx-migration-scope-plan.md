@@ -1,29 +1,31 @@
 # FX Migration Scope Plan
 
 ## Status
-- This document fixes the final candidate scope before reflecting `/fx` quote/execute prerequisite DB structures into Prisma schema and migration.
+- This document records the accepted `/fx` DB foundation and migration scope history.
+- Candidate C was accepted and reflected into Prisma schema and migration.
 - Prisma schema reflection is complete for this scope.
 - Migration `20260501212120_add_fx_rate_and_execute_safety_tables` has been created and applied to the local DB.
 - Prisma Client generate, build, test, and e2e verification passed.
-- Do not implement `/fx quote`, `/fx execute`, `/wallets`, `/orders`, `/records`, or `/home` from this document.
+- `/fx quote` read-only implementation exists.
+- `/fx execute` remains forbidden.
+- Do not implement `/fx execute`, `/wallets`, `/orders`, `/records`, or `/home` from this document.
 - Do not hand-write a migration as a workaround for `prisma migrate dev --create-only` failure.
 - Do not add seed changes, package changes, fake FX rates, static FX rates, or temporary FX rates from this document.
 
 ## Purpose
-- Decide the DB structure required before `/fx quote` and `/fx execute` implementation.
-- Decide whether `fx_rate_snapshots` should be migrated first by itself.
-- Decide whether `fx_execute_requests` should be migrated together with `fx_rate_snapshots`.
-- Decide whether `exchange_transactions.fxRateSnapshotId` should be included in the same migration.
-- Provide a final agreement document before changing `prisma/schema.prisma`.
+- Preserve the accepted DB foundation decision for `/fx`.
+- Record why `fx_rate_snapshots`, `fx_execute_requests`, and `exchange_transactions.fxRateSnapshotId` were migrated together.
+- Keep the remaining `/fx execute` and production ingestion STOP conditions visible.
 
 ## Current Premises
-- `/fx` API implementation is still forbidden.
+- `/fx quote` read-only implementation exists.
+- `/fx execute` remains forbidden.
 - `fx_rate_snapshots` is reflected in schema and migration.
 - `fx_execute_requests` is reflected in schema and migration.
 - `exchange_transactions` has nullable `fxRateSnapshotId`.
 - Fake, static, and temporary FX rates are forbidden.
-- The `appliedRate` source has advanced to the `fx_rate_snapshots` design candidate, but is not implementation-ready yet.
-- This document does not authorize API implementation.
+- `fx_rate_snapshots` source structure exists, but production ingestion path is not implemented.
+- This document does not authorize `/fx execute` or wallet write path implementation.
 
 ## Migration Scope Candidates
 
@@ -57,11 +59,11 @@ Cons:
 - FK delete behavior, nullable policy, and seed policy need careful review.
 
 ## Recommended Migration Scope
-- Recommend Candidate C.
+- Candidate C was selected and implemented.
 - Reason: `/fx execute` needs both an authoritative `appliedRate` source and durable idempotency.
 - Reason: adding `exchange_transactions.fxRateSnapshotId` in the same migration makes the rate source used at execution auditable.
 - Reason: if these are split, the project is likely to need another immediate follow-up migration before real `/fx` implementation.
-- This recommendation does not mean schema or migration should be changed in this task.
+- No additional schema or migration change is implied by this document.
 
 ## `FxRateSourceType` Enum Candidate
 Recommended values:
@@ -188,21 +190,22 @@ Reason:
 ## Seed Policy
 - Do not add seed data in this migration scope by default.
 - Do not create fake, static, or temporary FX rate rows.
-- Real `fx_rate_snapshots` rows require an approved source input path such as `admin_manual` or `official_batch`.
+- Real `fx_rate_snapshots` rows require an approved source input path such as `admin_manual`, `provider_api`, or `official_batch`.
 
 ## Remaining STOP Conditions After Candidate C Migration
-- Actual rate source operating policy must be finalized.
-- `admin_manual` or `official_batch` input path must exist before real rate data can be used.
+- Production rate ingestion policy must be finalized.
+- `provider_api` or `official_batch` ingestion is not implemented.
 - Safe Prisma conditional update for wallet debit must be verified.
 - Failed command lifecycle persistence policy must be finalized.
 - Decimal rounding and scale rules must be finalized.
 - `/fx execute` must not be considered implementation-ready immediately after this migration.
-- `/fx quote` must return `FX_RATE_UNAVAILABLE` when no eligible rate snapshot data exists after migration.
+- `/fx quote` returns `FX_RATE_UNAVAILABLE` when no eligible rate snapshot exists.
+- `/fx quote` returns `FX_RATE_STALE` when the selected snapshot is older than the 60-second threshold.
 
 ## Non-Goals
-- No `/fx` controller or service.
+- No `/fx execute` implementation.
 - No wallet, order, records, or home implementation.
-- No schema or migration changes beyond this agreed `/fx` DB foundation.
+- No additional schema or migration changes beyond this agreed `/fx` DB foundation.
 - No seed changes.
 - No API contract changes.
 - No fake, static, or temporary FX rate.

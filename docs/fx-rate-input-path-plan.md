@@ -4,14 +4,16 @@
 - This document fixes the rate input path candidate for `fx_rate_snapshots`.
 - The approved internal CLI implementation now exists at `scripts/admin-insert-fx-rate.ts`.
 - The `/fx quote` integration check is documented in `docs/fx-quote-integration-check.md`.
+- `/fx quote` read-only implementation exists and applies a 60-second stale threshold.
+- `admin_manual` is a bootstrap/manual correction path, not the long-term primary ingestion path.
 - Do not implement `/fx execute`, `/wallets`, `/orders`, `/records`, `/home`, admin APIs, or additional CLI scripts from this document.
 - Do not add Prisma schema changes, migrations, seed changes, Prisma Client generate, package changes, fake FX rates, static FX rates, or temporary FX rates from this document.
 
 ## Purpose
 - Decide how authoritative USD/KRW rates enter `fx_rate_snapshots`.
 - Define the minimum operational path that can make `/fx quote` work without fake, static, or temporary rates.
-- Decide whether MVP should prefer `admin_manual` or `official_batch`.
-- Decide whether the `/fx quote` implementation STOP can move to a final pre-implementation review.
+- Record the accepted `admin_manual` bootstrap path.
+- Clarify why provider/batch ingestion is required after `/fx quote` adopted a 60-second stale threshold.
 
 ## Current Premises
 - `fx_rate_snapshots` schema and migration are created and applied locally.
@@ -112,7 +114,7 @@ Validation rules:
 - For `/fx quote` success, the selected snapshot `effectiveAt` must be within 60 seconds of quote time.
 - `sourceName` must not be an empty string.
 - `sourceName`, `note`, and `rawPayloadJson` must not describe the rate as fake, static, temporary, sample, placeholder, or test business data.
-- Whether a very old `effectiveAt` snapshot may still be used must be decided before `/fx quote` implementation.
+- Old `effectiveAt` snapshots may remain stored for audit, but `/fx quote` rejects them with `FX_RATE_STALE`.
 
 Audit guidance:
 - `sourceName` should identify the approved operating source clearly enough for debugging.
@@ -184,10 +186,11 @@ Recommended implementation path:
 - The MVP internal CLI script exists and remains create-only.
 - Admin API should wait for auth/admin model agreement.
 - Official batch and provider API should be separate follow-up designs.
+- Production operation should prioritize `provider_api` polling or `official_batch` ingestion design.
 
-## `/fx quote` Implementation Preconditions
+## `/fx quote` Operating Preconditions
 
-Required before `/fx quote` implementation:
+Required for successful `/fx quote` responses:
 - `fx_rate_snapshots` migration applied.
 - Prisma Client generate completed.
 - Rate input path decided.
@@ -207,10 +210,11 @@ Do not do during `/fx quote` implementation:
 - Do not add fake/static/temporary fallback rates.
 
 ## Design Phase Status
-- For `/fx quote`, documentation design is sufficient once this rate input path plan is accepted and the final STOP review confirms the stale threshold policy.
+- `/fx quote` documentation design and read-only implementation are complete.
+- `/fx quote` integration smoke requires an approved fresh snapshot within the 60-second stale threshold.
+- FX provider/batch ingestion design is the next priority for reliable quote operation.
 - For `/fx execute`, document design still has open implementation policy points:
   - conditional update verification,
   - Decimal rounding and scale rules,
   - failed command lifecycle details.
-- The next step may move to `/fx quote` read-only implementation STOP review.
 - Full `/fx execute` implementation remains forbidden.

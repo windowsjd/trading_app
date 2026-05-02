@@ -165,6 +165,13 @@
 - 선택된 snapshot `effectiveAt`이 quote 시점 기준 60초를 초과하면 `FX_RATE_STALE`
 - `admin_manual`은 임시 운영 입력/부트스트랩 경로
 - 실서비스 환율은 `provider_api` 또는 `official_batch` 기반 주기 업데이트 설계 필요
+- FX ingestion 설계 문서 작성됨: `docs/fx-rate-ingestion-plan.md`
+- 실서비스 primary ingestion 후보는 `provider_api` polling
+- provider polling interval은 30초 후보
+- `sourceTimestamp`/`effectiveAt`/`capturedAt` timestamp 정책 후보 작성됨
+- 아직 provider 구현 없음
+- 아직 official_batch 구현 없음
+- 아직 retention 구현 없음
 - `rateCapturedAt`/`rateEffectiveAt` 응답 포함
 - `/fx quote`는 wallet mutation 없음
 - `exchange_transactions`/`wallet_transactions`/`fx_execute_requests`/`equity_snapshots` 생성 없음
@@ -213,7 +220,7 @@
 
 ## TODO
 - 승인된 운영값으로 non-dry-run CLI 입력 후 `/fx quote` 통합 smoke 검증
-- FX provider/batch ingestion 설계
+- FX provider/batch ingestion 구현 전 STOP 검토
 - rate input 운영 절차 보강
 - wallet conditional update 검증
 - Decimal rounding/scale 규칙 확정

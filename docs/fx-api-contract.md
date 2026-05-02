@@ -56,7 +56,7 @@ Return a KRW/USD exchange quote without changing wallet balances or writing exch
 {
   "success": true,
   "data": {
-    "quoteId": "<string | null>",
+    "quoteId": null,
     "fromCurrency": "KRW",
     "toCurrency": "USD",
     "sourceAmount": "<amount string>",
@@ -66,7 +66,9 @@ Return a KRW/USD exchange quote without changing wallet balances or writing exch
     "feeAmount": "<amount string>",
     "feeCurrency": "USD",
     "netTargetAmount": "<amount string>",
-    "expiresAt": "<UTC ISO string | null>"
+    "expiresAt": null,
+    "rateCapturedAt": "<UTC ISO string>",
+    "rateEffectiveAt": "<UTC ISO string>"
   }
 }
 ```
@@ -85,9 +87,9 @@ Return a KRW/USD exchange quote without changing wallet balances or writing exch
 ### Quote STOP Decisions
 - Current schema has no durable quote table.
 - `quoteId` cannot be durable unless a quote table, request table, or command table is designed.
-- `expiresAt` policy is not fixed.
-- MVP must decide whether stateless quote is allowed or quote persistence is required.
-- `quoteId` and `expiresAt` are contract candidates only until that decision is made.
+- MVP quote is stateless/read-only.
+- `quoteId` and `expiresAt` are `null`.
+- `rateCapturedAt` and `rateEffectiveAt` are returned for rate timing transparency.
 - `appliedRate` source is `fx_rate_snapshots`.
 - Missing eligible snapshot returns `FX_RATE_UNAVAILABLE`.
 - Selected snapshot older than 60 seconds by `effectiveAt` returns `FX_RATE_STALE`.
@@ -170,6 +172,7 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 - `INVALID_AMOUNT`
 - `INSUFFICIENT_BALANCE`
 - `FX_RATE_UNAVAILABLE`
+- `FX_RATE_STALE`
 - `IDEMPOTENCY_REQUIRED`
 - `IDEMPOTENCY_CONFLICT`
 - `QUOTE_EXPIRED`

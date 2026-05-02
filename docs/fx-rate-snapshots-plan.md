@@ -1,9 +1,12 @@
 # FX Rate Snapshots Plan
 
 ## Status
-- This document fixes the pre-schema design candidate for `fx_rate_snapshots`.
-- This is documentation only.
-- Do not implement `/fx quote`, `/fx execute`, `/home`, `/wallets`, `/orders`, or `/records` from this document.
+- This document records the accepted `fx_rate_snapshots` design and current usage.
+- `fx_rate_snapshots` schema and migration are reflected in the project.
+- `exchange_transactions.fxRateSnapshotId` is reflected in schema and migration.
+- `/fx quote` read-only implementation exists and uses `fx_rate_snapshots`.
+- `/fx execute` remains STOP.
+- Do not implement `/fx execute`, `/home`, `/wallets`, `/orders`, or `/records` from this document.
 - Do not add Prisma schema changes, migrations, seed changes, Prisma Client generate, package changes, fake FX rates, static FX rates, or temporary FX rates from this document.
 
 ## Purpose
@@ -11,7 +14,7 @@
 - Provide USD -> KRW valuation evidence.
 - Support future `/home`, asset valuation, settlement, ranking, and daily portfolio snapshots.
 - Allow calculations without fake or temporary FX rates.
-- Prepare a Prisma schema/migration candidate for agreement before implementation.
+- Maintain the accepted schema/migration rationale after implementation.
 
 ## Rate Meaning And Direction
 - `rate` or `usdKrwRate` means KRW per 1 USD.
@@ -66,13 +69,12 @@ Decision:
 - Do not use hardcoded, fake, static, or temporary rates for `/fx quote`, `/fx execute`, valuation, settlement, or tests that can be mistaken as business data.
 
 ## Recommended Source Policy
-- MVP should use either:
-  - administrator/operator approved rate snapshots, or
-  - official reference rate batch input.
-- External provider direct integration can be split into a separate task.
+- Current bootstrap path is administrator/operator approved `admin_manual` snapshots through the internal CLI.
+- Long-running operation should use `provider_api` polling or `official_batch` ingestion.
+- External provider direct integration is a follow-up design/implementation task.
 - Fake/static hardcoded rates remain forbidden.
-- Actual source policy must be decided before API implementation.
-- Until the source is decided and `fx_rate_snapshots` exists, `/fx quote` and `/fx execute` remain STOP.
+- `/fx quote` is implemented, but successful responses require a fresh eligible snapshot.
+- `/fx execute` remains STOP.
 
 ## `fx_rate_snapshots` Table Candidate
 
@@ -140,14 +142,14 @@ Candidates:
 Recommendation:
 - MVP quote response should not expose `fxRateSnapshotId`.
 - Internal audit should still retain which snapshot was used where possible.
-- Next exchange schema design should review whether `exchange_transactions.fxRateSnapshotId` is required.
+- Future `/fx execute` should use `exchange_transactions.fxRateSnapshotId` for audit linkage.
 
 ## Exchange Transaction Connectivity
-- Current `exchange_transactions` has no `fxRateSnapshotId`.
-- Current `exchange_transactions.appliedRate` preserves the executed numeric rate.
+- `exchange_transactions` has nullable `fxRateSnapshotId`.
+- `exchange_transactions.appliedRate` preserves the executed numeric rate.
 - Numeric `appliedRate` alone is enough to reproduce wallet amounts, but weak for source audit.
-- Future schema should consider adding `exchange_transactions.fxRateSnapshotId`.
-- This task does not change schema.
+- `fxRateSnapshotId` is available for future `/fx execute` audit linkage.
+- `/fx quote` does not create `exchange_transactions`.
 
 ## Home, Valuation, And Settlement Connectivity
 `fx_rate_snapshots` should become the KRW conversion evidence for:
@@ -159,9 +161,8 @@ Recommendation:
 - `/home` summary and chart calculations once other blocker tables exist.
 
 ## Implementation STOP Points
-- Decide actual source policy: approved manual/admin snapshot or official reference batch for MVP.
-- Reflect `fx_rate_snapshots` schema/migration before `/fx quote` or `/fx execute`.
-- Decide whether `exchange_transactions.fxRateSnapshotId` is needed in the same migration.
+- Production ingestion path is not implemented.
+- Decide provider/batch ingestion before relying on long-running `/fx quote` operation.
 - Keep fake/static/temporary FX rates forbidden.
 - `/fx execute` also remains blocked by idempotency/concurrency schema decisions in `docs/fx-execute-safety-plan.md`.
 - `/home` full implementation remains blocked by positions, asset prices, daily snapshots, ranking, and valuation source completion.
