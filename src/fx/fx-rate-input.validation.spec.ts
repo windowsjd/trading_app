@@ -50,6 +50,26 @@ describe('buildAdminFxRateSnapshotPayload', () => {
     );
   });
 
+  it('accepts strict UTC ISO timestamps for capturedAt and sourceTimestamp', () => {
+    const payload = buildAdminFxRateSnapshotPayload({
+      rate: '1350.12345678',
+      sourceName: 'manual-approved-usd-krw',
+      effectiveAt: '2026-05-01T00:00:00.000Z',
+      capturedAt: '2026-05-01T01:02:03.004Z',
+      sourceTimestamp: '2026-05-01T00:30:00.005Z',
+    });
+
+    expect(payload.effectiveAt.toISOString()).toBe(
+      '2026-05-01T00:00:00.000Z',
+    );
+    expect(payload.capturedAt.toISOString()).toBe(
+      '2026-05-01T01:02:03.004Z',
+    );
+    expect(payload.sourceTimestamp?.toISOString()).toBe(
+      '2026-05-01T00:30:00.005Z',
+    );
+  });
+
   it('rejects invalid rate values', () => {
     expect(() =>
       buildAdminFxRateSnapshotPayload({
@@ -80,6 +100,60 @@ describe('buildAdminFxRateSnapshotPayload', () => {
     ).toThrow('Invalid --effective-at');
   });
 
+  it('rejects date-only effectiveAt', () => {
+    expect(() =>
+      buildAdminFxRateSnapshotPayload({
+        rate: '1350.12345678',
+        sourceName: 'manual-approved-usd-krw',
+        effectiveAt: '2026-05-01',
+      }),
+    ).toThrow(
+      'Invalid --effective-at: must be UTC ISO timestamp like 2026-05-01T00:00:00.000Z.',
+    );
+  });
+
+  it('rejects effectiveAt with timezone offset', () => {
+    expect(() =>
+      buildAdminFxRateSnapshotPayload({
+        rate: '1350.12345678',
+        sourceName: 'manual-approved-usd-krw',
+        effectiveAt: '2026-05-01T00:00:00+09:00',
+      }),
+    ).toThrow('Invalid --effective-at');
+  });
+
+  it('rejects effectiveAt without milliseconds', () => {
+    expect(() =>
+      buildAdminFxRateSnapshotPayload({
+        rate: '1350.12345678',
+        sourceName: 'manual-approved-usd-krw',
+        effectiveAt: '2026-05-01T00:00:00Z',
+      }),
+    ).toThrow('Invalid --effective-at');
+  });
+
+  it('rejects invalid capturedAt', () => {
+    expect(() =>
+      buildAdminFxRateSnapshotPayload({
+        rate: '1350.12345678',
+        sourceName: 'manual-approved-usd-krw',
+        effectiveAt: '2026-05-01T00:00:00.000Z',
+        capturedAt: '2026-05-01T00:00:00',
+      }),
+    ).toThrow('Invalid --captured-at');
+  });
+
+  it('rejects invalid sourceTimestamp', () => {
+    expect(() =>
+      buildAdminFxRateSnapshotPayload({
+        rate: '1350.12345678',
+        sourceName: 'manual-approved-usd-krw',
+        effectiveAt: '2026-05-01T00:00:00.000Z',
+        sourceTimestamp: 'not-a-date',
+      }),
+    ).toThrow('Invalid --source-timestamp');
+  });
+
   it('rejects forbidden input wording', () => {
     expect(() =>
       buildAdminFxRateSnapshotPayload({
@@ -88,6 +162,28 @@ describe('buildAdminFxRateSnapshotPayload', () => {
         effectiveAt: '2026-05-01T00:00:00.000Z',
       }),
     ).toThrow('forbidden term');
+  });
+
+  it('rejects forbidden wording in note', () => {
+    expect(() =>
+      buildAdminFxRateSnapshotPayload({
+        rate: '1350.12345678',
+        sourceName: 'manual-approved-usd-krw',
+        effectiveAt: '2026-05-01T00:00:00.000Z',
+        note: 'temporary operating input',
+      }),
+    ).toThrow('Invalid --note');
+  });
+
+  it('rejects forbidden wording in raw payload JSON', () => {
+    expect(() =>
+      buildAdminFxRateSnapshotPayload({
+        rate: '1350.12345678',
+        sourceName: 'manual-approved-usd-krw',
+        effectiveAt: '2026-05-01T00:00:00.000Z',
+        rawPayloadJson: '{"kind":"placeholder"}',
+      }),
+    ).toThrow('Invalid --raw-payload-json');
   });
 
   it('parses raw payload JSON', () => {
@@ -101,5 +197,16 @@ describe('buildAdminFxRateSnapshotPayload', () => {
     expect(payload.rawPayloadJson).toEqual({
       source: 'manual-approved-usd-krw',
     });
+  });
+
+  it('normalizes empty approvedByUserId to undefined', () => {
+    const payload = buildAdminFxRateSnapshotPayload({
+      rate: '1350.12345678',
+      sourceName: 'manual-approved-usd-krw',
+      effectiveAt: '2026-05-01T00:00:00.000Z',
+      approvedByUserId: '',
+    });
+
+    expect(payload.approvedByUserId).toBeUndefined();
   });
 });

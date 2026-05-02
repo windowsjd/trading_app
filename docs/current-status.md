@@ -152,7 +152,11 @@
 - CLI는 create only이며 upsert하지 않음
 - CLI dry-run 지원
 - CLI는 fake/static/temporary/sample/placeholder/test 성격 rate 입력 거부
+- CLI timestamp validation은 strict UTC ISO 형식(`YYYY-MM-DDTHH:mm:ss.sssZ`)으로 강화됨
 - `/fx quote` 통합 검증 절차 문서 작성됨: `docs/fx-quote-integration-check.md`
+- `/fx quote` unauthenticated e2e smoke 추가됨
+- `/fx quote` snapshot selection query unit 검증 보강됨
+- 아직 실제 approved rate row insert 없음
 - 아직 admin API 없음
 - 아직 provider/batch rate input 없음
 - snapshot 없으면 `FX_RATE_UNAVAILABLE`
@@ -204,7 +208,7 @@
 ---
 
 ## TODO
-- `/fx quote` 통합 검증
+- 승인된 운영값으로 non-dry-run CLI 입력 후 `/fx quote` 통합 smoke 검증
 - rate input 운영 절차 보강
 - wallet conditional update 검증
 - Decimal rounding/scale 규칙 확정

@@ -76,4 +76,23 @@ describe('AppController (e2e)', () => {
         },
       });
   });
+
+  it('/api/v1/fx/quote (POST) rejects unauthenticated requests', () => {
+    return request(app.getHttpServer())
+      .post('/api/v1/fx/quote')
+      .send({
+        fromCurrency: 'KRW',
+        toCurrency: 'USD',
+        sourceAmount: '135000',
+      })
+      .expect(401)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+          },
+        });
+      });
+  });
 });

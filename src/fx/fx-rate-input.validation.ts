@@ -40,6 +40,9 @@ const FORBIDDEN_INPUT_TERMS = [
 ] as const;
 
 const MAX_FX_RATE_DECIMAL = new Prisma.Decimal('9999999999.99999999');
+const UTC_ISO_TIMESTAMP_PATTERN =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+const UTC_ISO_TIMESTAMP_EXAMPLE = '2026-05-01T00:00:00.000Z';
 
 export function buildAdminFxRateSnapshotPayload(
   args: AdminFxRateInputArgs,
@@ -128,13 +131,24 @@ function parseOptionalText(value: string | undefined): string | undefined {
 
 function parseDate(value: string | undefined, fieldName: string): Date {
   const text = parseRequiredText(value, fieldName);
+
+  if (!UTC_ISO_TIMESTAMP_PATTERN.test(text)) {
+    throwInvalidTimestamp(fieldName);
+  }
+
   const date = new Date(text);
 
-  if (Number.isNaN(date.getTime())) {
-    throw new Error(`Invalid --${fieldName}: must be a valid UTC ISO date.`);
+  if (Number.isNaN(date.getTime()) || date.toISOString() !== text) {
+    throwInvalidTimestamp(fieldName);
   }
 
   return date;
+}
+
+function throwInvalidTimestamp(fieldName: string): never {
+  throw new Error(
+    `Invalid --${fieldName}: must be UTC ISO timestamp like ${UTC_ISO_TIMESTAMP_EXAMPLE}.`,
+  );
 }
 
 function parseRawPayloadJson(value: string | undefined): unknown {

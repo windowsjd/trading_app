@@ -14,6 +14,13 @@
 
 ## Insert Approved USD/KRW Snapshot
 
+CLI timestamps must use strict UTC ISO format:
+- Required shape: `YYYY-MM-DDTHH:mm:ss.sssZ`
+- Example: `2026-05-01T00:00:00.000Z`
+- Date-only values such as `2026-05-01` are rejected.
+- Values without milliseconds are rejected.
+- Timezone offsets such as `2026-05-01T00:00:00+09:00` are rejected.
+
 Dry-run first:
 
 ```bash
@@ -28,6 +35,8 @@ pnpm tsx scripts/admin-insert-fx-rate.ts --rate 1350.12345678 --source-name "man
 
 Notes:
 - The rate must be an approved operating value.
+- Do not run the non-dry-run command without an actual approved rate value.
+- This document only describes dry-run and approved manual execution procedures.
 - The CLI is create-only; it does not upsert.
 - Operators must avoid duplicate input for the same `effectiveAt`, `sourceName`, and `rate` until correction/re-approval workflow exists.
 - The CLI rejects wording that would make the row look like non-operating data.

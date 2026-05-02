@@ -102,8 +102,10 @@ Validation rules:
 - `quoteCurrency` must be `KRW`.
 - `baseCurrency` and `quoteCurrency` must not be equal.
 - `rate` must be greater than 0.
-- `effectiveAt` must be a UTC ISO timestamp.
-- `capturedAt` must be a UTC ISO timestamp.
+- `effectiveAt` must be a strict UTC ISO timestamp like `2026-05-01T00:00:00.000Z`.
+- `capturedAt` must be a strict UTC ISO timestamp like `2026-05-01T00:00:00.000Z`.
+- `sourceTimestamp`, when provided, must be a strict UTC ISO timestamp like `2026-05-01T00:00:00.000Z`.
+- Date-only values, timezone offsets, and timestamps without milliseconds are rejected.
 - `capturedAt` should represent input time or approval time.
 - `sourceName` must not be an empty string.
 - `sourceName`, `note`, and `rawPayloadJson` must not describe the rate as fake, static, temporary, sample, placeholder, or test business data.

@@ -182,6 +182,39 @@ describe('FxService', () => {
     );
   });
 
+  it('selects the latest eligible USD/KRW rate snapshot', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    mockJoinedParticipant(prisma);
+    mockApprovedRateSnapshot(prisma);
+
+    await service.quote('user-1', {
+      fromCurrency: 'KRW',
+      toCurrency: 'USD',
+      sourceAmount: '135000',
+    });
+
+    expect(prisma.fxRateSnapshot.findFirst).toHaveBeenCalledWith({
+      where: {
+        baseCurrency: CurrencyCode.USD,
+        quoteCurrency: CurrencyCode.KRW,
+        effectiveAt: {
+          lte: expect.any(Date),
+        },
+      },
+      orderBy: [
+        { effectiveAt: 'desc' },
+        { capturedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      select: {
+        rate: true,
+        capturedAt: true,
+        effectiveAt: true,
+      },
+    });
+  });
+
   it('calculates KRW to USD quote', async () => {
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
