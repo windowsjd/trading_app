@@ -23,8 +23,11 @@ import { HttpException } from '@nestjs/common';
 import { CurrencyCode, Prisma, SeasonStatus } from '../generated/prisma/client';
 import { FxService } from './fx.service';
 
-const capturedAt = new Date('2026-05-01T01:02:03.000Z');
-const effectiveAt = new Date('2026-05-01T00:00:00.000Z');
+const now = new Date('2026-05-01T00:01:00.000Z');
+const capturedAt = new Date('2026-05-01T00:00:30.000Z');
+const freshEffectiveAt = new Date('2026-05-01T00:00:30.000Z');
+const thresholdEffectiveAt = new Date('2026-05-01T00:00:00.000Z');
+const staleEffectiveAt = new Date('2026-04-30T23:59:59.999Z');
 
 describe('FxService', () => {
   const createPrisma = () => ({
@@ -36,6 +39,18 @@ describe('FxService', () => {
     },
     fxRateSnapshot: {
       findFirst: jest.fn(),
+    },
+    exchangeTransaction: {
+      create: jest.fn(),
+    },
+    walletTransaction: {
+      create: jest.fn(),
+    },
+    fxExecuteRequest: {
+      create: jest.fn(),
+    },
+    equitySnapshot: {
+      create: jest.fn(),
     },
   });
 
@@ -81,7 +96,18 @@ describe('FxService', () => {
     });
   };
 
-  const mockApprovedRateSnapshot = (prisma: ReturnType<typeof createPrisma>) => {
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(now);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  const mockApprovedRateSnapshot = (
+    prisma: ReturnType<typeof createPrisma>,
+    effectiveAt = freshEffectiveAt,
+  ) => {
     prisma.fxRateSnapshot.findFirst.mockResolvedValueOnce({
       rate: new Prisma.Decimal('1350.00000000'),
       capturedAt,
@@ -213,6 +239,49 @@ describe('FxService', () => {
         effectiveAt: true,
       },
     });
+    expect(
+      prisma.fxRateSnapshot.findFirst.mock.calls[0][0].where.effectiveAt.lte,
+    ).toEqual(now);
+  });
+
+  it('rejects when selected rate snapshot is stale', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    mockJoinedParticipant(prisma);
+    mockApprovedRateSnapshot(prisma, staleEffectiveAt);
+
+    await expectErrorCode(
+      service.quote('user-1', {
+        fromCurrency: 'KRW',
+        toCurrency: 'USD',
+        sourceAmount: '135000',
+      }),
+      'FX_RATE_STALE',
+    );
+    expect(prisma.exchangeTransaction.create).not.toHaveBeenCalled();
+    expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+    expect(prisma.fxExecuteRequest.create).not.toHaveBeenCalled();
+    expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
+  });
+
+  it('accepts a rate snapshot exactly at the 60 second threshold', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    mockJoinedParticipant(prisma);
+    mockApprovedRateSnapshot(prisma, thresholdEffectiveAt);
+
+    await expect(
+      service.quote('user-1', {
+        fromCurrency: 'KRW',
+        toCurrency: 'USD',
+        sourceAmount: '135000',
+      }),
+    ).resolves.toMatchObject({
+      success: true,
+      data: {
+        rateEffectiveAt: thresholdEffectiveAt.toISOString(),
+      },
+    });
   });
 
   it('calculates KRW to USD quote', async () => {
@@ -242,7 +311,7 @@ describe('FxService', () => {
         netTargetAmount: '99.90000000',
         expiresAt: null,
         rateCapturedAt: capturedAt.toISOString(),
-        rateEffectiveAt: effectiveAt.toISOString(),
+        rateEffectiveAt: freshEffectiveAt.toISOString(),
       },
     });
   });
@@ -272,7 +341,7 @@ describe('FxService', () => {
         feeCurrency: CurrencyCode.KRW,
         netTargetAmount: '134865.00000000',
         rateCapturedAt: capturedAt.toISOString(),
-        rateEffectiveAt: effectiveAt.toISOString(),
+        rateEffectiveAt: freshEffectiveAt.toISOString(),
       },
     });
   });

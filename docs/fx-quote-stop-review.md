@@ -72,22 +72,24 @@ Both supported quote directions use the same USD/KRW snapshot:
 ## Stale Threshold Decision
 
 Candidates:
-- 60 seconds: strong freshness, but too strict for manual input.
-- 5 minutes: still too strict without provider or batch automation.
-- 1 hour: more tolerant, but can still reject valid manually approved MVP rates.
-- Current day: closer to manual operation, but needs business-day/time-zone policy.
-- MVP no-threshold: use latest eligible `effectiveAt <= now` snapshot.
+- 60 seconds: selected by the game rule for quote freshness.
+- 5 minutes: rejected because it is looser than the game rule.
+- 1 hour: rejected because it is looser than the game rule.
+- Current day: rejected because it is looser than the game rule.
+- Deprecated MVP no-threshold: rejected because quote must block stale rates.
 
-Recommended MVP decision:
-- Start MVP `/fx quote` with no-threshold.
-- Reason: with `admin_manual` input, the important condition is that an approved latest snapshot exists, not second-level freshness.
-- Reason: without `provider_api` or `official_batch` automation, 60-second or 5-minute thresholds can make normal manual operation return `FX_RATE_UNAVAILABLE` too often.
-- Reason: no-threshold can still be transparent if the response includes rate timestamps.
+Final MVP decision:
+- `/fx quote` uses a 60-second stale threshold.
+- Select the latest eligible USD/KRW snapshot with the existing selection rule.
+- If no eligible snapshot exists, return `FX_RATE_UNAVAILABLE`.
+- If the selected snapshot `effectiveAt` is older than `now - 60 seconds`, return `FX_RATE_STALE`.
+- If `now.getTime() - effectiveAt.getTime() > 60_000`, the snapshot is stale.
 
 Required constraints:
-- No-threshold does not allow fake/static/temporary fallback.
+- A 60-second threshold does not allow fake/static/temporary fallback.
 - No eligible snapshot still returns `FX_RATE_UNAVAILABLE`.
-- Revisit stale threshold when `provider_api` or `official_batch` is introduced.
+- Stale selected snapshot returns `FX_RATE_STALE`.
+- Revisit freshness operations when `provider_api` or `official_batch` is introduced.
 - Order execution, settlement, ranking, and valuation freshness need separate policies.
 
 ## Request Shape
@@ -132,10 +134,11 @@ Recommended success response:
 
 Response decisions:
 - `quoteId` should be `null` because there is no durable quote table.
-- `expiresAt` should be `null` because stale threshold and quote expiry are not active in MVP quote.
+- `expiresAt` should be `null` because durable quote expiry is not active in MVP quote.
+- `quoteId`/`expiresAt` are separate from rate freshness; freshness is enforced through the selected snapshot `effectiveAt`.
 - Include `rateCapturedAt`.
 - Include `rateEffectiveAt`.
-- Reason: no-threshold quote needs transparent rate timing for users and debugging.
+- Reason: quote needs transparent rate timing for users and debugging.
 
 ## Error Codes
 
@@ -147,12 +150,8 @@ Required implementation codes:
 - `INVALID_CURRENCY_PAIR`
 - `INVALID_AMOUNT`
 - `FX_RATE_UNAVAILABLE`
-- `INTERNAL_ERROR`
-
-Reserved future code:
 - `FX_RATE_STALE`
-- Not used while MVP quote uses no-threshold.
-- Use when a stale threshold policy is introduced later.
+- `INTERNAL_ERROR`
 
 Common error envelope:
 
@@ -167,7 +166,7 @@ Common error envelope:
 ```
 
 ## Remaining Pre-Implementation Checks
-- Confirm whether no-threshold is accepted for MVP quote.
+- Confirm 60-second stale threshold is accepted for MVP quote.
 - Confirm `rateCapturedAt` and `rateEffectiveAt` response fields with frontend.
 - Confirm Decimal rounding and display scale for quote calculations.
 - Confirm `fxFeeRate` source from the active season.
@@ -179,3 +178,4 @@ Common error envelope:
 - `/fx execute` remains STOP.
 - Rate input implementation is still needed to get successful quote responses.
 - Without snapshot data, `/fx quote` returns `FX_RATE_UNAVAILABLE`.
+- With a stale selected snapshot, `/fx quote` returns `FX_RATE_STALE`.

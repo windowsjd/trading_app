@@ -77,7 +77,8 @@ Cons:
 - Before implementation, the path must be clearly separated from fake/static seed and hardcoded fallback behavior.
 - Near-term implementation candidate can be an approved internal CLI script.
 - Admin API should wait until auth/admin authorization is finalized.
-- `official_batch` and `provider_api` should be follow-up operating improvements.
+- `admin_manual` is an MVP operating/bootstrap path, not the final long-term rate ingestion design.
+- Production-oriented rate ingestion should move toward `provider_api` or `official_batch` automatic/periodic updates.
 
 ## `admin_manual` Input Policy
 
@@ -107,6 +108,8 @@ Validation rules:
 - `sourceTimestamp`, when provided, must be a strict UTC ISO timestamp like `2026-05-01T00:00:00.000Z`.
 - Date-only values, timezone offsets, and timestamps without milliseconds are rejected.
 - `capturedAt` should represent input time or approval time.
+- `effectiveAt` should represent the latest valid FX rate time for quote freshness.
+- For `/fx quote` success, the selected snapshot `effectiveAt` must be within 60 seconds of quote time.
 - `sourceName` must not be an empty string.
 - `sourceName`, `note`, and `rawPayloadJson` must not describe the rate as fake, static, temporary, sample, placeholder, or test business data.
 - Whether a very old `effectiveAt` snapshot may still be used must be decided before `/fx quote` implementation.
@@ -132,9 +135,11 @@ Freshness candidates:
 - Treat snapshots outside the current business day as stale.
 
 Recommendation:
-- MVP initial design should use the latest eligible `effectiveAt` snapshot.
-- Stale threshold remains a STOP decision before `/fx quote` implementation.
-- If the team intentionally defers a threshold for MVP, that deferral must be explicit and documented before coding.
+- MVP quote uses the latest eligible `effectiveAt` snapshot and a 60-second stale threshold.
+- If the selected snapshot `effectiveAt` is older than quote time by more than 60 seconds, return `FX_RATE_STALE`.
+- If no eligible snapshot exists, return `FX_RATE_UNAVAILABLE`.
+- `admin_manual` input can bootstrap MVP testing, but operators must input a current approved rate for successful quote responses.
+- Long-running operation should use `provider_api` or `official_batch` automatic/periodic updates.
 - `/fx quote` must never fall back to fake/static/temporary rates when snapshots are missing or stale.
 
 ## Implementation Path Candidates
@@ -188,8 +193,9 @@ Required before `/fx quote` implementation:
 - Rate input path decided.
 - At least one valid USD/KRW snapshot can be inserted through the approved path.
 - Snapshot selection rule finalized.
-- Stale threshold finalized, or explicit MVP no-threshold deferral policy finalized.
+- Stale threshold finalized as 60 seconds.
 - No eligible snapshot returns `FX_RATE_UNAVAILABLE`.
+- Stale selected snapshot returns `FX_RATE_STALE`.
 
 Do not do during `/fx quote` implementation:
 - Do not implement `/fx execute`.

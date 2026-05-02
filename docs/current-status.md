@@ -160,7 +160,11 @@
 - 아직 admin API 없음
 - 아직 provider/batch rate input 없음
 - snapshot 없으면 `FX_RATE_UNAVAILABLE`
-- no-threshold MVP 정책 적용
+- `/fx quote` no-threshold 정책 폐기됨
+- 환율 stale threshold 60초 적용
+- 선택된 snapshot `effectiveAt`이 quote 시점 기준 60초를 초과하면 `FX_RATE_STALE`
+- `admin_manual`은 임시 운영 입력/부트스트랩 경로
+- 실서비스 환율은 `provider_api` 또는 `official_batch` 기반 주기 업데이트 설계 필요
 - `rateCapturedAt`/`rateEffectiveAt` 응답 포함
 - `/fx quote`는 wallet mutation 없음
 - `exchange_transactions`/`wallet_transactions`/`fx_execute_requests`/`equity_snapshots` 생성 없음
@@ -209,6 +213,7 @@
 
 ## TODO
 - 승인된 운영값으로 non-dry-run CLI 입력 후 `/fx quote` 통합 smoke 검증
+- FX provider/batch ingestion 설계
 - rate input 운영 절차 보강
 - wallet conditional update 검증
 - Decimal rounding/scale 규칙 확정

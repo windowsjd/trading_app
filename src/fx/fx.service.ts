@@ -51,6 +51,7 @@ const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
   SeasonStatus.ended,
   SeasonStatus.settled,
 ];
+const FX_RATE_STALE_THRESHOLD_MS = 60_000;
 
 @Injectable()
 export class FxService {
@@ -96,12 +97,13 @@ export class FxService {
         );
       }
 
+      const now = new Date();
       const rateSnapshot = await this.prisma.fxRateSnapshot.findFirst({
         where: {
           baseCurrency: CurrencyCode.USD,
           quoteCurrency: CurrencyCode.KRW,
           effectiveAt: {
-            lte: new Date(),
+            lte: now,
           },
         },
         orderBy: [
@@ -121,6 +123,17 @@ export class FxService {
           HttpStatus.SERVICE_UNAVAILABLE,
           'FX_RATE_UNAVAILABLE',
           'FX rate is unavailable',
+        );
+      }
+
+      if (
+        now.getTime() - rateSnapshot.effectiveAt.getTime() >
+        FX_RATE_STALE_THRESHOLD_MS
+      ) {
+        this.throwApiError(
+          HttpStatus.SERVICE_UNAVAILABLE,
+          'FX_RATE_STALE',
+          'FX rate is stale',
         );
       }
 

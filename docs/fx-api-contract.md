@@ -19,7 +19,8 @@
 - Quote and execute are allowed only when the user has joined an active season.
 - Upcoming, ended, and settled seasons block quote and execute.
 - Fake FX rates and temporary FX rates are forbidden.
-- `fx_rate_snapshots` does not exist yet, so the `appliedRate` source is an implementation STOP decision.
+- `/fx quote` requires an eligible USD/KRW `fx_rate_snapshots` row.
+- `/fx quote` blocks selected snapshots whose `effectiveAt` is older than 60 seconds.
 
 ## Common Error Envelope
 All `/fx` errors should use the common error envelope.
@@ -87,7 +88,9 @@ Return a KRW/USD exchange quote without changing wallet balances or writing exch
 - `expiresAt` policy is not fixed.
 - MVP must decide whether stateless quote is allowed or quote persistence is required.
 - `quoteId` and `expiresAt` are contract candidates only until that decision is made.
-- `appliedRate` source must be decided before implementation because `fx_rate_snapshots` does not exist.
+- `appliedRate` source is `fx_rate_snapshots`.
+- Missing eligible snapshot returns `FX_RATE_UNAVAILABLE`.
+- Selected snapshot older than 60 seconds by `effectiveAt` returns `FX_RATE_STALE`.
 
 ## POST /api/v1/fx/execute
 

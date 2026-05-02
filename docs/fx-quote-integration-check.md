@@ -16,27 +16,30 @@
 
 CLI timestamps must use strict UTC ISO format:
 - Required shape: `YYYY-MM-DDTHH:mm:ss.sssZ`
-- Example: `2026-05-01T00:00:00.000Z`
+- Format example only: `2026-05-01T00:00:00.000Z`
 - Date-only values such as `2026-05-01` are rejected.
 - Values without milliseconds are rejected.
 - Timezone offsets such as `2026-05-01T00:00:00+09:00` are rejected.
+- For a successful quote smoke test, `effectiveAt` must be within 60 seconds of the current UTC time.
+- Do not reuse old fixed timestamps as success-smoke data.
 
 Dry-run first:
 
 ```bash
-pnpm tsx scripts/admin-insert-fx-rate.ts --dry-run --rate 1350.12345678 --source-name "manual-approved-usd-krw" --effective-at 2026-05-01T00:00:00.000Z --note "approved operating input"
+pnpm tsx scripts/admin-insert-fx-rate.ts --dry-run --rate 1350.12345678 --source-name "manual-approved-usd-krw" --effective-at <current UTC timestamp within 60 seconds> --note "approved operating input"
 ```
 
 Create the row after review:
 
 ```bash
-pnpm tsx scripts/admin-insert-fx-rate.ts --rate 1350.12345678 --source-name "manual-approved-usd-krw" --effective-at 2026-05-01T00:00:00.000Z --note "approved operating input"
+pnpm tsx scripts/admin-insert-fx-rate.ts --rate 1350.12345678 --source-name "manual-approved-usd-krw" --effective-at <current UTC timestamp within 60 seconds> --note "approved operating input"
 ```
 
 Notes:
 - The rate must be an approved operating value.
 - Do not run the non-dry-run command without an actual approved rate value.
 - This document only describes dry-run and approved manual execution procedures.
+- A non-dry-run smoke should use a current UTC `effectiveAt`; otherwise quote returns `FX_RATE_STALE`.
 - The CLI is create-only; it does not upsert.
 - Operators must avoid duplicate input for the same `effectiveAt`, `sourceName`, and `rate` until correction/re-approval workflow exists.
 - The CLI rejects wording that would make the row look like non-operating data.
@@ -56,7 +59,8 @@ Notes:
 ```
 
 4. If no eligible snapshot exists, confirm `FX_RATE_UNAVAILABLE`.
-5. If a snapshot exists, confirm:
+5. If the selected snapshot exists but `effectiveAt` is older than 60 seconds, confirm `FX_RATE_STALE`.
+6. If the selected snapshot is fresh, confirm:
    - `quoteId` is `null`.
    - `expiresAt` is `null`.
    - `rateCapturedAt` is present.

@@ -121,7 +121,8 @@ For `POST /api/v1/fx/quote`:
    - `effectiveAt <= now`
 4. Select the most recent `effectiveAt` snapshot.
 5. If no snapshot exists, return `FX_RATE_UNAVAILABLE`.
-6. Use selected snapshot `rate` as `appliedRate`.
+6. If selected snapshot `effectiveAt` is older than 60 seconds, return `FX_RATE_STALE`.
+7. Use selected snapshot `rate` as `appliedRate`.
 
 ## Execute Snapshot Selection Candidate
 For direct execute Candidate B in `docs/fx-api-contract.md`:
