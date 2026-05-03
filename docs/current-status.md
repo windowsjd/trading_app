@@ -133,6 +133,9 @@
 - 30초 polling은 후보이며 provider rate limit/terms 확인 후 확정
 - provider_api/official_batch/scheduler 구현 없음
 - provider/batch ingestion, admin API, retention 구현 없음
+- `/fx execute` preimplementation readiness audit 문서 작성됨: `docs/fx-execute-preimplementation-readiness-audit.md`
+- `/fx execute` 구현 전 readiness audit 문서화 완료
+- 코드/스키마/마이그레이션/seed/package 변경 없이 문서 상태만 반영
 - `/fx execute`는 STOP: wallet conditional update, Decimal rounding/scale, failed command lifecycle, execute-time source policy 확정 필요
 - `/home` full implementation은 여전히 불가: `assets`, `asset_price_snapshots`, `positions`, `daily_portfolio_snapshots`, `season_rankings` 필요
 - 보류: `/home` controller/service 구현, 임시 응답 shape 추가, fake 데이터 기반 계산
