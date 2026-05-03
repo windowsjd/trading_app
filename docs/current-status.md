@@ -126,8 +126,12 @@
 - FX ingestion 설계 문서 작성됨: `docs/fx-rate-ingestion-plan.md`
 - FX ingestion STOP review 문서 작성됨: `docs/fx-ingestion-stop-review.md`
 - FX provider 후보 공식 문서 기반 조사 문서 작성됨: `docs/fx-provider-research.md`
+- FX provider final selection STOP review 문서 작성됨: `docs/fx-provider-final-selection-stop-review.md`
+- OANDA는 primary candidate, Twelve Data는 secondary candidate로 정리됨
 - FX provider 최종 선정은 아직 안 됨
+- provider final selection은 아직 확정 아님
 - 30초 polling은 후보이며 provider rate limit/terms 확인 후 확정
+- provider_api/official_batch/scheduler 구현 없음
 - provider/batch ingestion, admin API, retention 구현 없음
 - `/fx execute`는 STOP: wallet conditional update, Decimal rounding/scale, failed command lifecycle, execute-time source policy 확정 필요
 - `/home` full implementation은 여전히 불가: `assets`, `asset_price_snapshots`, `positions`, `daily_portfolio_snapshots`, `season_rankings` 필요
@@ -162,6 +166,7 @@
 - 승인된 운영값으로 non-dry-run CLI 입력 후 `/fx quote` 통합 smoke 검증
 - FX provider/batch ingestion STOP review 수락
 - provider final selection STOP review 또는 provider config/scheduler 설계
+- OANDA trial/API 계약 검증 전 provider_api/official_batch/scheduler 구현 STOP 유지
 - rate input 운영 절차 보강
 - wallet conditional update 검증
 - Decimal rounding/scale 규칙 확정
