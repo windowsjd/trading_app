@@ -3,7 +3,8 @@
 ## Status
 - Documentation only.
 - `/fx execute` remains STOP.
-- Candidate policy only unless explicitly accepted later.
+- Decimal rounding mode and scale/formatting policy are accepted for future implementation prompts.
+- This document is not permission to implement `/fx execute`.
 - No code/schema/migration/package changes.
 
 ## Purpose
@@ -40,7 +41,7 @@
 - `EquitySnapshot.cryptoValueKrw`: `Decimal(24, 8)`
 - `EquitySnapshot.returnRate`: `Decimal(12, 8)`
 
-## Candidate calculation policy
+## Accepted calculation policy
 - API request financial amount values are accepted only as strings.
 - Do not use JS number for money, FX rate, fee rate, wallet balance, ledger, ranking, or settlement calculations.
 - Use `Prisma.Decimal` or a Decimal-compatible calculation path only.
@@ -53,35 +54,33 @@
 - Target wallet credit is `netTargetAmount`.
 - MVP creates no separate fee wallet transaction row.
 
-## Candidate storage scale policy
+## Accepted storage scale policy
 - Wallet/cash/exchange monetary amounts: store at scale 8.
 - FX rate: store at scale 8.
 - `feeRate`: store at scale 6.
-- Response financial amounts should match the current quote shape and use scale 8 strings.
-- Rate response values should use scale 8 strings.
-- `feeRate` response values should use scale 6 strings.
-- `returnRate` and `maxDrawdown` response values are scale 8 string candidates.
+- API financial amount response values use scale 8 strings.
+- API rate response values use scale 8 strings.
+- API `feeRate` response values use scale 6 strings.
+- `returnRate` and `maxDrawdown` response values use scale 8 strings.
 
-## Rounding mode STOP
-- Rounding mode is not finally accepted.
-- Rounding mode must be accepted before `/fx execute` implementation.
-- Candidate modes:
-  - half-up
-  - half-even
-  - truncate/down
-- One mode must be selected according to finance/game fairness policy.
-- Do not implement `/fx execute` before selecting the rounding mode.
-- Once selected, the same mode must be applied consistently to quote, execute, records, ranking, and settlement.
+## Accepted rounding mode
+- Rounding mode: half-up.
+- For positive monetary values, if the first discarded digit is 5 or greater, round up.
+- Internal calculations must use sufficient Decimal precision.
+- Explicitly half-up round to the target column scale immediately before DB storage.
+- API responses return strings with the same scale as DB stored values or values that will be stored.
+- Wallet update amount and `wallet_transactions.amount` use the same rounded value.
+- `wallet_transactions.balanceAfter` uses the actual post-update wallet balance.
+- `exchange_transactions.grossTargetAmount`, `feeAmount`, and `netTargetAmount` must match the execute response.
+- Quote, execute, records, ranking, and settlement must apply the same half-up policy.
 
-## Candidate default before final acceptance
-These are candidate defaults only, not final approval.
-
-- Perform internal calculations with sufficient Decimal precision.
-- Explicitly quantize/round to the target column scale immediately before DB storage.
-- Response values should be the same scale strings as DB stored values or values that will be stored.
-- Wallet update amount and `wallet_transactions.amount` should use the same rounded value.
-- `wallet_transactions.balanceAfter` should use the actual post-update wallet balance.
-- `exchange_transactions.grossTargetAmount`, `feeAmount`, and `netTargetAmount` should match the execute response.
+## Rejected alternatives
+- half-even:
+  - Benefit: can reduce cumulative rounding bias.
+  - Rejected for MVP default because user/game display intuition is lower than half-up.
+- truncate/down:
+  - Benefit: mechanically simple.
+  - Rejected for MVP default because it can appear unfavorable to users and increases fairness explanation burden.
 
 ## Defect scenarios
 - Quote and execute use different rounding and differ by `0.00000001`.
@@ -90,6 +89,7 @@ These are candidate defaults only, not final approval.
 - Records display rebuilt from `exchange_transactions` disagrees with the original execute response.
 - Ranking or settlement recalculation disagrees with original transaction values.
 - JS number arithmetic loses precision for large or highly fractional values.
+- Half-up boundary values are not tested, so values ending in discarded digit 5 drift from expected behavior.
 
 ## Required tests before implementation
 Do not add these tests in this documentation task.
@@ -98,6 +98,8 @@ Do not add these tests in this documentation task.
 - KRW -> USD repeating decimal case.
 - USD -> KRW multiplication case.
 - `feeAmount` rounding boundary.
+- Half-up boundary where first discarded digit is 5.
+- Half-up boundary where first discarded digit is below 5.
 - `netTargetAmount = grossTargetAmount - feeAmount`.
 - Target wallet credit equals `netTargetAmount`.
 - Source wallet debit equals `sourceAmount`.

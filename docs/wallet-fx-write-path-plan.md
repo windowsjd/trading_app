@@ -73,7 +73,7 @@ Formula direction assumes `appliedRate` means KRW per 1 USD:
 - USD -> KRW: `grossTargetAmount = sourceAmount * appliedRate`
 - Both directions: `feeAmount = grossTargetAmount * feeRate`
 - Both directions: `netTargetAmount = grossTargetAmount - feeAmount`
-- Decimal rounding/scale rules must be fixed before `/fx execute` implementation.
+- Decimal rounding/scale rules are accepted in `docs/fx-decimal-rounding-scale-policy.md`; implementation still remains blocked by other STOP decisions.
 
 ### KRW -> USD
 - `sourceAmount` is KRW.
@@ -215,7 +215,8 @@ One successful execute creates one exchange execution row.
 - `fx_execute_requests` has `unique(userId, idempotencyKey)`.
 - `exchange_transactions` still has no `idempotencyKey`; idempotency belongs to `fx_execute_requests`.
 - `/fx execute` lifecycle behavior is not implemented.
-- Request hash conflict handling, pending/succeeded/failed behavior, and `responsePayloadJson` replay policy remain STOP decisions.
+- RequestHash canonical rule is accepted in `docs/fx-idempotency-lifecycle-policy.md`.
+- Pending/succeeded/failed behavior and `responsePayloadJson` replay policy remain STOP decisions.
 
 ### Reflected Foundation
 - Command/request table: `fx_execute_requests`.
@@ -224,7 +225,7 @@ One successful execute creates one exchange execution row.
 - Stored response candidate: `fx_execute_requests.responsePayloadJson`.
 
 ### Remaining STOP Decisions
-- Normalize request payload and compute `requestHash`.
+- Use the accepted canonical request payload rule to compute `requestHash`.
 - Define same-key same-hash replay behavior for `pending`, `succeeded`, and `failed`.
 - Define different-hash `IDEMPOTENCY_CONFLICT`.
 - Decide whether failed commands are persisted and replayed.
@@ -249,7 +250,7 @@ One successful execute creates one exchange execution row.
 - `/fx quote` read-only implementation exists.
 - `/fx execute` remains STOP.
 - Wallet conditional update must be verified.
-- Decimal rounding/scale must be finalized.
+- Decimal rounding/scale policy is accepted and must be implemented with tests.
 - Failed command lifecycle must be finalized.
 - Execute-time snapshot selection, freshness, and sourceType policy must be reviewed.
 - Creating `equity_snapshots` on exchange execute requires a valuation-source agreement.

@@ -23,7 +23,8 @@
 - Fake or temporary FX rates are forbidden.
 - `fx_rate_snapshots` exists and `/fx quote` uses it for the legal `appliedRate` source.
 - Production provider/batch ingestion is not implemented yet.
-- Actual execute implementation remains blocked until wallet conditional update, Decimal rounding/scale, failed command lifecycle, and execute-time rate/source policy are finalized.
+- Decimal rounding/scale and `requestHash` canonical rule are accepted in their policy documents.
+- Actual execute implementation remains blocked until wallet conditional update, pending/failed command lifecycle, stale pending recovery, execute-time sourceType policy, provider coexistence, error mapping, and rollback test gates are finalized.
 
 ## Idempotency Strategy Candidates
 
@@ -208,4 +209,4 @@ The accepted migration already includes:
 - `/fx quote` uses the latest fresh USD/KRW snapshot and returns `FX_RATE_UNAVAILABLE` or `FX_RATE_STALE` when appropriate.
 - Fake or temporary FX rates are forbidden.
 - Adding idempotency and wallet safety schema does not make `/fx execute` implementable by itself.
-- Actual execute implementation remains blocked until execute-time snapshot selection, 60-second freshness behavior, sourceType priority, and provider/batch ingestion assumptions are reviewed for execute.
+- Actual execute implementation remains blocked until execute-time snapshot selection, 60-second freshness behavior, sourceType priority, provider/batch/manual coexistence, pending/failed lifecycle, wallet safety, error mapping, and rollback test gates are reviewed for execute.

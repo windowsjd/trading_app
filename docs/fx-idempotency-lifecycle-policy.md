@@ -4,6 +4,7 @@
 - Documentation only.
 - `/fx execute` implementation remains STOP.
 - Candidate lifecycle policy for `fx_execute_requests`.
+- `requestHash` canonical rule is accepted, while pending/failed lifecycle and stale pending recovery remain STOP.
 - No code/schema/migration changes.
 
 ## Purpose
@@ -34,26 +35,48 @@
 - `unique(userId, idempotencyKey)`
 - status enum: `pending`, `succeeded`, `failed`
 
-## Candidate requestHash normalization
-- Candidate basis: canonical JSON.
-- Candidate included fields:
-  - API version
-  - `userId`
-  - `seasonId` or `seasonParticipantId`
-  - `fromCurrency`
-  - `toCurrency`
-  - normalized `sourceAmount`
-- Candidate excluded fields:
-  - timestamp
+## Accepted requestHash canonical rule
+- Purpose:
+  - The same economic request must always produce the same `requestHash`.
+  - A different economic request sent with the same `idempotencyKey` must conflict.
+  - Client formatting, whitespace, and decimal representation differences must not change the hash.
+  - Execution-time values such as rate snapshot, current timestamp, and wallet balance must not be included.
+- Hash algorithm: SHA-256.
+- Canonical JSON rules:
+  - JSON object key order is fixed.
+  - Undefined, null, and optional display fields are excluded.
+  - Whitespace does not affect the hash.
+  - All string fields are converted to canonical form before JSON serialization.
+  - The canonical JSON UTF-8 string is the SHA-256 input.
+- Accepted fields and order:
+
+```json
+{
+  "apiVersion": "fx-execute:v1",
+  "userId": "<authenticated user id>",
+  "seasonParticipantId": "<active season participant id>",
+  "fromCurrency": "<UPPERCASE currency code>",
+  "toCurrency": "<UPPERCASE currency code>",
+  "sourceAmount": "<scale 8 decimal string>"
+}
+```
+
+- Field normalization:
+  - `apiVersion` is exactly `fx-execute:v1`.
+  - `userId` is the authenticated user id string.
+  - `seasonParticipantId` is the active joined season participant id string.
+  - `fromCurrency` and `toCurrency` are uppercase currency codes.
+  - `sourceAmount` is parsed as Decimal and canonicalized to a scale 8 decimal string using the accepted half-up rounding/scale policy.
+- Excluded fields:
+  - `idempotencyKey`
+  - `quoteId`
+  - rate snapshot id
+  - applied rate
+  - current timestamp
+  - wallet balance
   - client display formatting
   - whitespace
-- `sourceAmount` normalization candidate:
-  - parse string input as Decimal
-  - convert to canonical scale or canonical decimal string
-- Hash algorithm candidate:
-  - SHA-256
-- STOP:
-  - Exact canonical fields and scale must be accepted before implementation.
+  - request arrival time
 
 ## Candidate lifecycle table
 | Existing row state | Incoming requestHash | Candidate behavior | Wallet mutation allowed? | Response candidate | Status |
@@ -112,6 +135,7 @@ STOP:
 - Failed row retries and double debits.
 - `requestHash` includes timestamp, so the same request gets a different hash every time.
 - Decimal formatting differences make the same `sourceAmount` conflict.
+- Rate snapshot or wallet balance is included in the hash, causing safe retry to conflict after state changes.
 
 ## Required tests before implementation
 Do not add these tests in this documentation task.
@@ -127,6 +151,8 @@ Do not add these tests in this documentation task.
 - No second wallet mutation on retry.
 - `requestHash` canonical decimal equivalence.
 - `requestHash` canonical currency casing.
+- `requestHash` excludes timestamp, rate snapshot, and wallet balance.
+- `requestHash` field order is stable.
 - Conflict creates no wallet mutation.
 
 ## Explicit non-goals

@@ -53,13 +53,14 @@
 - Source wallet debit, target wallet credit, exchange row, and wallet transaction rows must be atomic inside one DB transaction.
 - `wallet_transactions.balanceAfter` must be based on the actual post-update wallet balance.
 - Fake, static, temporary, sample, or test business FX rates are forbidden.
-- Decimal rounding/scale is not fully accepted for execute and remains STOP.
+- Decimal rounding/scale policy is accepted as half-up with fixed scale/formatting, but `/fx execute` remains STOP because other safety decisions are unresolved.
+- `requestHash` canonical rule is accepted, but pending/failed lifecycle and stale pending recovery remain STOP.
 
 ## Remaining STOP decisions
 | Area | Decision needed | Current risk if unresolved | Suggested default | Implementation allowed? |
 | --- | --- | --- | --- | --- |
 | `idempotencyKey` required 여부와 missing key error | Decide whether every execute request must include a non-empty `idempotencyKey` and which error code/status is returned when missing. | Client retries can double debit if execution is allowed without a durable key. | Require non-empty string and return `IDEMPOTENCY_REQUIRED`. | No |
-| `requestHash` normalization rule | Define canonical payload fields, trim rules, decimal normalization, currency casing, and hash algorithm. | Same economic request can hash differently, or different payloads can hash the same by accident-prone normalization. | Hash canonical JSON of `fromCurrency`, `toCurrency`, normalized `sourceAmount`, active season/participant scope if accepted, and API version. | No |
+| `requestHash` normalization rule | Accepted rule must be carried into implementation tests. | Same economic request can hash differently if implementation deviates from the accepted rule. | Use accepted canonical JSON/SHA-256 rule in `docs/fx-idempotency-lifecycle-policy.md`. | No; other STOP remain |
 | Same key + same hash + `pending` | Decide whether to return pending/in-progress, retry execution, wait, or recover stale pending. | Duplicate request can run twice or remain blocked forever. | Return deterministic `IDEMPOTENCY_PENDING` for fresh pending; recover only after stale-pending policy. | No |
 | Same key + same hash + `succeeded` replay | Decide whether to return stored `responsePayloadJson` or rebuild response from `exchangeTransactionId`. | Successful retry can create another exchange or return a response that disagrees with committed rows. | Store and return `responsePayloadJson`; fallback rebuild only if explicitly tested. | No |
 | Same key + same hash + `failed` | Decide whether failure is replayed, retryable, or creates a new attempt under same key. | A failed command can either block legitimate retry or execute unexpectedly after a client retry. | Persist terminal validation failures; allow retry only for explicitly retryable infrastructure failures after recovery rule. | No |
@@ -70,7 +71,7 @@
 | Affected row count 0 classification | Decide how to distinguish `INSUFFICIENT_BALANCE` from `CONCURRENT_WALLET_UPDATE`. | Users get misleading errors and retry policy becomes unsafe. | Reread source wallet after zero affected rows; insufficient balance returns `INSUFFICIENT_BALANCE`, otherwise `CONCURRENT_WALLET_UPDATE`. | No |
 | Source/target wallet update order | Decide lock/update order for source and target wallets. | Deadlocks, partial assumptions, or incorrect `balanceAfter` values. | Lock/read wallets in deterministic currency/id order if using locks; perform guarded source debit before target credit inside one transaction. | No |
 | `wallet_transactions.balanceAfter` basis | Decide whether balanceAfter uses returned update value, reread value, or calculated value. | Ledger can disagree with actual wallet balance. | Use actual post-update wallet balances captured inside the transaction. | No |
-| Decimal rounding/scale rule | Decide input precision, calculation precision, rounding mode, storage scale, and response formatting. | Quote, execute, wallet, exchange, and records can disagree by one unit of scale. | Keep API strings; calculate with Decimal; store money as scale 8 and feeRate as scale 6 until a stricter currency-specific rule is accepted. | No |
+| Decimal rounding/scale rule | Accepted rule must be carried into implementation tests. | Quote, execute, wallet, exchange, and records can disagree by one unit of scale if implementation deviates from half-up/scale policy. | Use accepted half-up and scale policy in `docs/fx-decimal-rounding-scale-policy.md`. | No; other STOP remain |
 | Execute-time FX snapshot selection | Decide whether execute reuses quote snapshot or selects latest fresh snapshot at execute time. | Execute can use a rate the user did not see or use an unavailable snapshot. | Near-term direct execute selects latest eligible USD/KRW snapshot at execute time, matching quote ordering, until durable quote exists. | No |
 | Execute-time 60-second freshness | Decide stale threshold and exact boundary for execute. | Quote rejects stale rates while execute succeeds on stale rates. | Use the same `> 60_000 ms` stale rule and exactly-60-second acceptance as quote. | No |
 | `sourceType` priority | Decide priority when `provider_api`, `official_batch`, and `admin_manual` rows coexist. | Execute can use an official batch/reference row or manual row unexpectedly. | STOP 유지; do not mix source types for execute until priority is accepted. | No |
@@ -149,9 +150,10 @@ Move to implementation only after all of the following are true:
 - This readiness audit has been reviewed.
 - STOP decisions are resolved or explicitly deferred with a safe default.
 - Wallet safety approach is confirmed.
-- Decimal rounding/scale is confirmed.
+- Decimal rounding/scale accepted policy is included in implementation tests.
 - Execute-time FX snapshot selection, freshness, and `sourceType` policy are confirmed.
-- Idempotency lifecycle is confirmed.
+- `requestHash` canonical rule is included in implementation tests.
+- Pending/failed idempotency lifecycle is confirmed.
 - The test matrix is included in the implementation task.
 - There is a local smoke procedure using an approved fresh `admin_manual` snapshot independent of provider final selection.
 - Partial-write rollback behavior is testable before production provider ingestion.

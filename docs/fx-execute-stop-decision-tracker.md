@@ -25,21 +25,23 @@
 - MVP creates no separate fee wallet transaction row.
 - Target wallet credit equals `netTargetAmount`.
 - Near-term execute does not create `equity_snapshots`.
+- Decimal rounding mode and scale/formatting policy are accepted in `docs/fx-decimal-rounding-scale-policy.md`.
+- `requestHash` canonical rule is accepted in `docs/fx-idempotency-lifecycle-policy.md`.
 - All wallet, exchange, ledger, and command finalization writes must be atomic.
 - Provider final selection is not confirmed.
 - `sourceType` priority is not confirmed.
 
-## Reference policy drafts
-- Decimal rounding/scale candidate policy: `docs/fx-decimal-rounding-scale-policy.md`.
+## Reference policy documents
+- Decimal rounding/scale accepted policy: `docs/fx-decimal-rounding-scale-policy.md`.
 - Execute error/status/retryability candidate policy: `docs/fx-execute-error-policy.md`.
-- Idempotency lifecycle candidate policy: `docs/fx-idempotency-lifecycle-policy.md`.
+- Idempotency lifecycle policy with accepted requestHash rule: `docs/fx-idempotency-lifecycle-policy.md`.
 - Readiness audit and test gates: `docs/fx-execute-preimplementation-readiness-audit.md`.
 
 ## STOP decision table
 | ID | Area | Decision | Current candidate/default | Risk if wrong | Needed before implementation | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | FXE-001 | idempotencyKey required | Decide whether execute requires a non-empty `idempotencyKey` and the missing-key error. | Non-empty `idempotencyKey` required; missing -> `IDEMPOTENCY_REQUIRED`. | Retry after timeout can double debit. | Request validation and error code/status acceptance. | candidate |
-| FXE-002 | requestHash normalization | Define canonical request hash fields, normalization, and hash algorithm. | Canonical request hash rule required. | Same request may conflict, or different payload may replay. | Accept canonical JSON/decimal/currency rule; see `docs/fx-idempotency-lifecycle-policy.md`. | STOP |
+| FXE-002 | requestHash normalization | Define canonical request hash fields, normalization, and hash algorithm. | Accepted canonical JSON with SHA-256, fixed fields, uppercase currencies, and scale 8 `sourceAmount`. | Same request may conflict, or different payload may replay. | Implementation tests for canonical equivalence; see `docs/fx-idempotency-lifecycle-policy.md`. | accepted |
 | FXE-003 | same key + same hash + pending behavior | Decide fresh pending duplicate behavior. | Pending policy unresolved. | Duplicate can execute twice or block forever. | Accept pending behavior; see `docs/fx-idempotency-lifecycle-policy.md`. | STOP |
 | FXE-004 | same key + same hash + succeeded replay | Decide replay source for succeeded duplicate. | Replay stored `responsePayloadJson`. | Replay can drift from original rate, rounding, or balances. | Accept stored replay policy; see `docs/fx-idempotency-lifecycle-policy.md`. | candidate |
 | FXE-005 | same key + same hash + failed behavior | Decide failed duplicate replay/retry behavior. | Failed replay/retry policy unresolved. | Failed commands can block safe retry or re-execute unexpectedly. | Accept failed lifecycle; see `docs/fx-idempotency-lifecycle-policy.md`. | STOP |
@@ -50,7 +52,7 @@
 | FXE-010 | affected row count 0 classification | Decide `INSUFFICIENT_BALANCE` vs `CONCURRENT_WALLET_UPDATE`. | Reread wallet; insufficient -> `INSUFFICIENT_BALANCE`, otherwise `CONCURRENT_WALLET_UPDATE`. | Incorrect retry behavior and confusing user errors. | Classification rule and tests accepted. | candidate |
 | FXE-011 | source/target wallet update order | Decide deterministic update/lock order. | Guarded source debit before target credit inside transaction; lock order deterministic if locking. | Deadlocks or incorrect balances. | Update/lock order accepted. | candidate |
 | FXE-012 | wallet_transactions.balanceAfter source of truth | Decide how `balanceAfter` is computed. | Use actual post-update wallet balances inside transaction. | Ledger and wallet balances can diverge. | Returned/reread post-update balance strategy accepted. | candidate |
-| FXE-013 | Decimal rounding/scale | Decide calculation precision, rounding mode, storage scale, and response scale. | Rounding/scale rule must be fixed before implementation. | Quote, execute, ledger, records, and wallet values can drift. | Accept Decimal policy and boundary tests; see `docs/fx-decimal-rounding-scale-policy.md`. | STOP |
+| FXE-013 | Decimal rounding/scale | Decide calculation precision, rounding mode, storage scale, and response scale. | Accepted half-up rounding with scale 8 monetary/rate strings and scale 6 `feeRate` strings. | Quote, execute, ledger, records, and wallet values can drift. | Implementation tests for half-up boundaries and stored/response equality; see `docs/fx-decimal-rounding-scale-policy.md`. | accepted |
 | FXE-014 | execute-time FX snapshot selection | Decide snapshot selection for direct execute. | Direct execute selects latest eligible snapshot at execute time until durable quote exists. | Execute can use unexpected or unavailable rate. | Selection query and audit linkage accepted. | candidate |
 | FXE-015 | execute-time 60-second freshness boundary | Decide execute stale threshold and boundary. | Same as quote: `> 60_000ms` stale, exactly 60s accepted. | Quote and execute can disagree on stale rate behavior. | Boundary rule accepted with tests. | candidate |
 | FXE-016 | sourceType priority | Decide priority among `provider_api`, `official_batch`, and `admin_manual`. | SourceType priority unresolved. | Execute can select wrong operational source. | Accepted source priority or explicit single-source gate. | STOP |
@@ -63,14 +65,17 @@
 | FXE-023 | records exchange mapping after execute | Confirm future records mapping from exchange row. | `exchange_transactions` fields map to records exchange response later. | Records can expose inconsistent `exchangeId`, `feeCurrency`, or `rate`. | Mapping assertion included in execute/records task. | candidate |
 | FXE-024 | local smoke using approved fresh admin_manual snapshot | Decide local smoke data source without provider. | Local smoke can use approved fresh `admin_manual` snapshot, not fake/static/temp/sample/test. | Smoke may rely on forbidden fake data or provider work. | Approved CLI procedure available. | candidate |
 
-## Safe defaults that can be carried into an implementation prompt later
-These are candidate defaults only. This is not implementation permission. Do not implement until STOP items are resolved or explicitly approved as safe defaults.
+## Accepted decisions and safe defaults that can be carried into an implementation prompt later
+These are not implementation permission. Do not implement until remaining STOP items are resolved or explicitly approved as safe defaults.
 
-Reference drafts:
+Reference documents:
 - `docs/fx-decimal-rounding-scale-policy.md`
 - `docs/fx-execute-error-policy.md`
 - `docs/fx-idempotency-lifecycle-policy.md`
 
+- Use half-up rounding.
+- Use accepted scale/formatting rules from `docs/fx-decimal-rounding-scale-policy.md`.
+- Use accepted `requestHash` canonical JSON and SHA-256 rule.
 - Require non-empty `idempotencyKey`.
 - Return conflict on same key + different `requestHash`.
 - Replay stored `responsePayloadJson` for succeeded duplicate.
@@ -84,6 +89,8 @@ Reference drafts:
 - Do not add `exchange_transactions.idempotencyKey` unless an explicit schema review approves it.
 - Do not create `equity_snapshots` in near-term execute.
 - Do not add a fee wallet transaction row in MVP.
+- Do not change accepted half-up rounding/scale policy without explicit document review.
+- Do not change accepted `requestHash` canonical fields without explicit document review.
 - Do not implement `provider_api` or scheduler before provider final selection is confirmed.
 - Do not add fake/static/temporary/sample/test business FX rates.
 - Do not bypass `/home` blockers.
@@ -94,10 +101,10 @@ Reference drafts:
 - Decimal rounding/scale policy reviewed.
 - Execute error policy reviewed.
 - Idempotency lifecycle policy reviewed.
-- `requestHash` normalization accepted.
+- `requestHash` normalization accepted and included in tests.
 - Pending/succeeded/failed lifecycle accepted.
 - Wallet safety strategy accepted.
-- Rounding/scale accepted.
+- Rounding/scale accepted and included in tests.
 - Execute-time snapshot/freshness/sourceType accepted.
 - Rollback tests included.
 - Idempotency tests included.

@@ -96,11 +96,10 @@ near-term ledger/FX foundation:
 - `/fx execute` 구현 전 남은 STOP:
   - idempotency lifecycle
   - wallet conditional update/row-level lock
-  - Decimal rounding/scale
   - failed command lifecycle
   - execute-time snapshot selection/freshness/sourceType policy
-- rounding mode는 아직 최종 확정 아님.
-- requestHash normalization은 아직 최종 확정 아님.
+- Decimal rounding mode와 scale/formatting 정책은 half-up 기준으로 문서상 확정됨.
+- requestHash canonical rule은 SHA-256/canonical JSON 기준으로 문서상 확정됨.
 - pending/failed lifecycle은 아직 최종 확정 아님.
 - error code/status mapping은 candidate이며 최종 확정 전 구현 금지.
 - idempotency는 `fx_execute_requests`가 소유.
@@ -157,11 +156,10 @@ near-term ledger/FX foundation:
 - 승인된 운영값으로 non-dry-run CLI 입력 후 `/fx quote` 통합 smoke 검증.
 - provider final selection STOP review 수락 및 OANDA trial/API 계약 검증.
 - `/fx execute` STOP decision tracker 검토.
-- requestHash normalization 확정.
 - pending/succeeded/failed idempotency lifecycle 확정.
 - wallet conditional update 또는 row-level lock 전략 확정.
-- Decimal rounding/scale 규칙 확정.
 - error code/status/retryability mapping 확정.
+- half-up Decimal 및 requestHash canonical rule 구현 전 테스트 gate 반영.
 - execute-time snapshot selection/freshness/sourceType policy 확정.
 - assets 도입.
 - asset_price_snapshots 도입.
