@@ -66,6 +66,9 @@ near-term ledger/FX foundation:
 - wallet/FX write path plan: `docs/wallet-fx-write-path-plan.md`.
 - `/fx execute` preimplementation readiness audit: `docs/fx-execute-preimplementation-readiness-audit.md`.
 - `/fx execute` STOP decision tracker: `docs/fx-execute-stop-decision-tracker.md`.
+- FX Decimal rounding/scale policy: `docs/fx-decimal-rounding-scale-policy.md`.
+- FX execute error policy: `docs/fx-execute-error-policy.md`.
+- FX idempotency lifecycle policy: `docs/fx-idempotency-lifecycle-policy.md`.
 
 ## 8. 주요 STOP 상태
 ### `/fx quote`
@@ -96,11 +99,16 @@ near-term ledger/FX foundation:
   - Decimal rounding/scale
   - failed command lifecycle
   - execute-time snapshot selection/freshness/sourceType policy
+- rounding mode는 아직 최종 확정 아님.
+- requestHash normalization은 아직 최종 확정 아님.
+- pending/failed lifecycle은 아직 최종 확정 아님.
+- error code/status mapping은 candidate이며 최종 확정 전 구현 금지.
 - idempotency는 `fx_execute_requests`가 소유.
 - `exchange_transactions.idempotencyKey`는 없음.
 - near-term execute는 `equity_snapshots`를 생성하지 않음.
 - MVP execute는 별도 fee wallet transaction row를 만들지 않음.
 - target wallet credit은 `netTargetAmount`.
+- 코드/스키마/마이그레이션/seed/package/env 변경 없이 policy 문서만 보강됨.
 
 ### `/home`
 - `/home` full implementation은 여전히 불가.
@@ -153,6 +161,7 @@ near-term ledger/FX foundation:
 - pending/succeeded/failed idempotency lifecycle 확정.
 - wallet conditional update 또는 row-level lock 전략 확정.
 - Decimal rounding/scale 규칙 확정.
+- error code/status/retryability mapping 확정.
 - execute-time snapshot selection/freshness/sourceType policy 확정.
 - assets 도입.
 - asset_price_snapshots 도입.

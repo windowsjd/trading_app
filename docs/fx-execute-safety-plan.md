@@ -5,6 +5,7 @@
 - `fx_execute_requests` schema/migration foundation is reflected, but `/fx execute` is not implemented.
 - This is documentation only.
 - Detailed unresolved decision tracker: `docs/fx-execute-stop-decision-tracker.md`.
+- Related candidate policies: `docs/fx-decimal-rounding-scale-policy.md`, `docs/fx-execute-error-policy.md`, `docs/fx-idempotency-lifecycle-policy.md`.
 - Do not implement `/fx execute` from this document yet.
 - Do not add Prisma schema changes, migrations, seed changes, Prisma Client generate, package changes, fake FX rates, or temporary FX rates from this document.
 
