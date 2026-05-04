@@ -4,6 +4,7 @@
 - Documentation only.
 - `/fx execute` implementation remains STOP.
 - This document is a preimplementation defect readiness audit, not an implementation instruction.
+- Detailed unresolved decision tracker: `docs/fx-execute-stop-decision-tracker.md`.
 - Do not implement controller, service, DTO, test, Prisma schema, migration, seed, provider ingestion, scheduler, package, or environment changes from this document.
 
 ## Purpose

@@ -4,6 +4,7 @@
 - This document records the accepted safety design for future `/fx execute`.
 - `fx_execute_requests` schema/migration foundation is reflected, but `/fx execute` is not implemented.
 - This is documentation only.
+- Detailed unresolved decision tracker: `docs/fx-execute-stop-decision-tracker.md`.
 - Do not implement `/fx execute` from this document yet.
 - Do not add Prisma schema changes, migrations, seed changes, Prisma Client generate, package changes, fake FX rates, or temporary FX rates from this document.
 

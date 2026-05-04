@@ -4,6 +4,7 @@
 - This document fixes the near-term wallet/fx write path design for agreement.
 - This is documentation only.
 - `/fx quote` read-only implementation exists; this document is about future write paths.
+- Detailed unresolved `/fx execute` decision tracker: `docs/fx-execute-stop-decision-tracker.md`.
 - Do not implement `/wallets`, `/fx execute`, `/orders`, `/records`, or `/home` from this document.
 - Do not add fake data, Prisma schema changes, migrations, seed changes, Prisma Client generate, or API contract changes from this document.
 - Current schema and local DB already include `wallet_transactions`, `exchange_transactions`, and `equity_snapshots`.
