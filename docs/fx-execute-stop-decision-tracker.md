@@ -27,6 +27,8 @@
 - Near-term execute does not create `equity_snapshots`.
 - Decimal rounding mode and scale/formatting policy are accepted in `docs/fx-decimal-rounding-scale-policy.md`.
 - `requestHash` canonical rule is accepted in `docs/fx-idempotency-lifecycle-policy.md`.
+- Wallet safety strategy is accepted as guarded conditional source debit MVP default, with implementation proof/tests still required.
+- Rollback/partial-write test gate is accepted, with test implementation required in the future implementation task.
 - All wallet, exchange, ledger, and command finalization writes must be atomic.
 - Provider final selection is not confirmed.
 - `sourceType` priority is not confirmed.
@@ -48,10 +50,10 @@
 | FXE-006 | same key + different hash conflict | Decide conflict behavior and mutation prohibition. | Accepted: return `IDEMPOTENCY_CONFLICT`; no wallet mutation. | Same key can execute a different payload. | Include conflict no-mutation tests; see `docs/fx-idempotency-lifecycle-policy.md`. | accepted |
 | FXE-007 | stale pending recovery | Define stale pending timeout and recovery path. | Accepted MVP safety: automatic re-execution forbidden; return `IDEMPOTENCY_PENDING_STALE` and require manual/server recovery. Recovery tool/job is future work. | Stuck commands can permanently block retries or invite unsafe re-run. | Include stale pending recovery-required tests; see `docs/fx-idempotency-lifecycle-policy.md`. | accepted |
 | FXE-008 | responsePayloadJson storage/replay | Decide exactly what is stored and reused. | Accepted: store and replay exact success `responsePayloadJson`; no silent recomputation. | Duplicate response can disagree with committed rows. | Include missing-payload recovery-required tests; see `docs/fx-idempotency-lifecycle-policy.md`. | accepted |
-| FXE-009 | wallet safety strategy | Choose conditional update vs row-level lock. | Conditional update candidate, but Prisma/raw SQL feasibility must be verified. | Concurrent requests can overspend source wallet. | Feasibility proof and chosen DB transaction pattern. | STOP |
-| FXE-010 | affected row count 0 classification | Decide `INSUFFICIENT_BALANCE` vs `CONCURRENT_WALLET_UPDATE`. | Reread wallet; insufficient -> `INSUFFICIENT_BALANCE`, otherwise `CONCURRENT_WALLET_UPDATE`. | Incorrect retry behavior and confusing user errors. | Classification rule and tests accepted. | candidate |
-| FXE-011 | source/target wallet update order | Decide deterministic update/lock order. | Guarded source debit before target credit inside transaction; lock order deterministic if locking. | Deadlocks or incorrect balances. | Update/lock order accepted. | candidate |
-| FXE-012 | wallet_transactions.balanceAfter source of truth | Decide how `balanceAfter` is computed. | Use actual post-update wallet balances inside transaction. | Ledger and wallet balances can diverge. | Returned/reread post-update balance strategy accepted. | candidate |
+| FXE-009 | wallet safety strategy | Choose conditional update vs row-level lock. | Accepted policy: guarded conditional source debit is MVP default strategy. Implementation proof and tests still required before execute implementation. | Concurrent requests can overspend source wallet. | Prove Prisma/raw SQL/locking implementation and include concurrency tests. | accepted |
+| FXE-010 | affected row count 0 classification | Decide `INSUFFICIENT_BALANCE` vs `CONCURRENT_WALLET_UPDATE`. | Accepted: reread source wallet; missing -> `SOURCE_WALLET_NOT_FOUND`, insufficient -> `INSUFFICIENT_BALANCE`, otherwise `CONCURRENT_WALLET_UPDATE`. | Incorrect retry behavior and confusing user errors. | Include classification tests. | accepted |
+| FXE-011 | source/target wallet update order | Decide deterministic update/lock order. | Accepted: guarded source debit before target credit inside transaction; deterministic/atomic update order documented. | Deadlocks or incorrect balances. | Include update-order and no-partial-row tests. | accepted |
+| FXE-012 | wallet_transactions.balanceAfter source of truth | Decide how `balanceAfter` is computed. | Accepted: actual post-update wallet balances inside transaction. | Ledger and wallet balances can diverge. | Include ledger/response balance equality tests. | accepted |
 | FXE-013 | Decimal rounding/scale | Decide calculation precision, rounding mode, storage scale, and response scale. | Accepted half-up rounding with scale 8 monetary/rate strings and scale 6 `feeRate` strings. | Quote, execute, ledger, records, and wallet values can drift. | Implementation tests for half-up boundaries and stored/response equality; see `docs/fx-decimal-rounding-scale-policy.md`. | accepted |
 | FXE-014 | execute-time FX snapshot selection | Decide snapshot selection for direct execute. | Direct execute selects latest eligible snapshot at execute time until durable quote exists. | Execute can use unexpected or unavailable rate. | Selection query and audit linkage accepted. | candidate |
 | FXE-015 | execute-time 60-second freshness boundary | Decide execute stale threshold and boundary. | Same as quote: `> 60_000ms` stale, exactly 60s accepted. | Quote and execute can disagree on stale rate behavior. | Boundary rule accepted with tests. | candidate |
@@ -61,7 +63,7 @@
 | FXE-019 | fee wallet transaction row | Decide MVP fee ledger row behavior. | No separate fee wallet transaction row for MVP. | Ledger can double-count or conflict with net target credit. | Keep no-fee-row test in implementation task. | accepted |
 | FXE-020 | error code/status mapping | Confirm exact HTTP statuses and error codes. | Accepted error table in `docs/fx-execute-error-policy.md`. | Clients cannot distinguish retryable, conflict, stale, and validation errors. | Include accepted status/code tests. | accepted |
 | FXE-021 | retryable vs non-retryable errors | Classify retryability. | Accepted retryability policy in `docs/fx-execute-error-policy.md`. | Clients can retry unsafe failures or miss safe retries. | Include retryability/no-mutation tests. | accepted |
-| FXE-022 | rollback/partial write testing | Decide required rollback test coverage. | Rollback/partial-write tests required. | Partial financial writes can commit silently. | Include readiness audit and error policy rollback tests. | STOP |
+| FXE-022 | rollback/partial write testing | Decide required rollback test coverage. | Accepted test gate: implementation cannot be considered complete without required rollback/partial-write tests. Test implementation itself is future task work. | Partial financial writes can commit silently. | Include full rollback/partial-write matrix in implementation task. | accepted |
 | FXE-023 | records exchange mapping after execute | Confirm future records mapping from exchange row. | `exchange_transactions` fields map to records exchange response later. | Records can expose inconsistent `exchangeId`, `feeCurrency`, or `rate`. | Mapping assertion included in execute/records task. | candidate |
 | FXE-024 | local smoke using approved fresh admin_manual snapshot | Decide local smoke data source without provider. | Local smoke can use approved fresh `admin_manual` snapshot, not fake/static/temp/sample/test. | Smoke may rely on forbidden fake data or provider work. | Approved CLI procedure available. | candidate |
 
@@ -83,6 +85,11 @@ Reference documents:
 - Return `IDEMPOTENCY_PENDING_STALE` for stale pending same-key/same-hash duplicate; do not re-execute automatically.
 - Return `IDEMPOTENCY_FAILED` or stored original failure payload for failed same-key/same-hash duplicate; do not re-execute automatically.
 - Use accepted error code/status/retryability table from `docs/fx-execute-error-policy.md`.
+- Use guarded conditional source debit as the MVP wallet safety default.
+- Classify guarded debit affected row count 0 as missing wallet, insufficient balance, or concurrent update after a safe reread.
+- Perform target wallet credit only after successful guarded source debit in the same DB transaction.
+- Use actual post-update wallet balances as `wallet_transactions.balanceAfter`.
+- Treat rollback/partial-write tests as a required implementation completion gate.
 - Do not create a fee wallet transaction row.
 - Do not create `equity_snapshots` on execute.
 - Target wallet credit uses `netTargetAmount`.
@@ -112,13 +119,16 @@ Reference documents:
 - Stale pending automatic re-execution forbidden accepted.
 - `requestHash` normalization accepted and included in tests.
 - Wallet safety strategy accepted.
+- Affected row count 0 classification accepted.
+- Source/target wallet update order accepted.
+- `wallet_transactions.balanceAfter` source of truth accepted.
 - Rounding/scale accepted and included in tests.
-- Execute-time snapshot/freshness/sourceType accepted.
-- Rollback tests included.
+- Execute-time snapshot/freshness/sourceType final gate resolved.
+- Rollback/partial-write test gate accepted and tests included.
 - Idempotency tests included.
 - No equity snapshot and no fee row tests included.
 - Local smoke with approved fresh `admin_manual` snapshot available.
-- Still blocked by wallet safety, provider coexistence/sourceType, rollback tests, execute-time snapshot/freshness/sourceType final gate, and implementation test matrix inclusion.
+- Still blocked by provider coexistence/sourceType, execute-time snapshot/freshness/sourceType final gate, implementation proof, and implementation test matrix inclusion.
 
 ## Explicit non-goals
 - No implementation.

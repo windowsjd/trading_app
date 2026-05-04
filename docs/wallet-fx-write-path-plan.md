@@ -6,7 +6,7 @@
 - `/fx quote` read-only implementation exists; this document is about future write paths.
 - Detailed unresolved `/fx execute` decision tracker: `docs/fx-execute-stop-decision-tracker.md`.
 - Accepted policy references: `docs/fx-decimal-rounding-scale-policy.md`, `docs/fx-execute-error-policy.md`, `docs/fx-idempotency-lifecycle-policy.md`.
-- Error/status/retryability and idempotency pending/succeeded/failed MVP lifecycle are accepted, but `/fx execute` remains STOP on wallet safety, sourceType/provider coexistence, rollback/partial-write tests, and execute-time snapshot/freshness/sourceType final gate.
+- Error/status/retryability, idempotency pending/succeeded/failed MVP lifecycle, wallet safety strategy, and rollback/partial-write test gate are accepted, but `/fx execute` remains STOP on sourceType/provider coexistence, execute-time snapshot/freshness/sourceType final gate, implementation proof, and implementation test matrix.
 - Do not implement `/wallets`, `/fx execute`, `/orders`, `/records`, or `/home` from this document.
 - Do not add fake data, Prisma schema changes, migrations, seed changes, Prisma Client generate, or API contract changes from this document.
 - Current schema and local DB already include `wallet_transactions`, `exchange_transactions`, and `equity_snapshots`.
@@ -103,35 +103,103 @@ Formula direction assumes `appliedRate` means KRW per 1 USD:
 ## DB Transaction Boundary
 The whole exchange execute write path must be wrapped in a single DB transaction.
 
-### Transaction-Internal Order
-1. Read `seasonParticipant` and verify active season participation.
-2. Read source wallet and target wallet.
-3. Verify source wallet balance is greater than or equal to `sourceAmount`.
-4. Select a fresh USD/KRW `fx_rate_snapshots` row for `appliedRate` and audit linkage.
-5. Calculate `grossTargetAmount`, `feeAmount`, and `netTargetAmount`.
-6. Decrease source wallet balance by `sourceAmount`.
-7. Increase target wallet balance by `netTargetAmount`.
-8. Create one `exchange_transactions` row.
-9. Create source debit `wallet_transactions` row.
-10. Create target credit `wallet_transactions` row.
-11. Decide whether an `equity_snapshots` row should be created.
+### Accepted Transaction-Internal Order
+This order is a policy gate, not implementation permission. The exact command-row pending creation and DB transaction grouping remain implementation-sensitive, but partial writes must not commit.
+
+1. Validate request and idempotency preconditions.
+2. Select a fresh eligible FX snapshot according to the execute-time policy candidate/final gate.
+3. Calculate rounded `sourceAmount`, `grossTargetAmount`, `feeAmount`, and `netTargetAmount` using the accepted Decimal policy.
+4. Resolve source wallet and target wallet.
+5. Perform guarded conditional source debit.
+6. If debit fails, classify the failure and stop with no partial rows.
+7. Perform target wallet credit in the same DB transaction.
+8. Capture actual post-update balances for both wallets.
+9. Create `exchange_transactions` row.
+10. Create source debit `wallet_transactions` row using actual source `balanceAfter`.
+11. Create target credit `wallet_transactions` row using actual target `balanceAfter`.
+12. Finalize `fx_execute_requests` to `succeeded` with `exchangeTransactionId` and exact `responsePayloadJson`.
+13. Commit transaction.
+14. Succeeded duplicate later replays stored `responsePayloadJson`.
 
 ### Atomicity Rules
 - Source wallet debit and target wallet credit must be committed together.
 - `exchange_transactions` must be committed in the same transaction as both wallet balance updates.
 - Both `wallet_transactions` rows must be committed in the same transaction as the exchange row.
+- `fx_execute_requests` success finalization must be atomic with the wallet, exchange, and ledger writes, or a recovery-required behavior must be explicitly tested.
 - `wallet_transactions.balanceAfter` must match each wallet balance after its update.
 - If ledger row creation fails after wallet balance updates, the wallet balance updates must roll back.
+- If any partial-write failure is injected, the implementation task must prove rollback or recovery-required behavior with tests.
+
+## Accepted Wallet Safety Strategy
+- MVP `/fx execute` source wallet debit uses guarded conditional debit as the default strategy.
+- The source wallet debit must run inside the DB transaction.
+- The guarded debit condition must include at least:
+  - wallet id
+  - `seasonParticipantId`
+  - source `currencyCode`
+  - `balanceAmount >= rounded sourceAmount`
+- If source wallet debit does not succeed, target wallet credit, `exchange_transactions`, `wallet_transactions`, and `fx_execute_requests` succeeded update must not happen.
+- Target wallet credit runs only after source debit succeeds and only inside the same DB transaction.
+- `exchange_transactions`, source debit `wallet_transactions`, target credit `wallet_transactions`, and `fx_execute_requests` finalization must be handled as one atomic unit.
+- Application-level mutex is not a correctness boundary for financial balances.
+- Redis lock or process-local lock may be an auxiliary optimization, but cannot be the only financial consistency guarantee.
+- Row-level lock remains a fallback/alternative. The MVP default strategy is guarded conditional debit.
+- If Prisma Client cannot safely provide affected row count and actual post-update balances, implementation must switch to raw SQL or row-level lock.
+- This accepted strategy is not code implementation permission. Prisma/raw SQL feasibility proof and tests are still required in the implementation task.
+
+Why this strategy:
+- Source debit must be guarded first because it is the only step that proves the source wallet can fund the exchange under concurrency.
+- Target credit must wait for successful source debit so the system never credits target currency without debiting the source.
+- Application-only locking cannot protect correctness across process restarts, multiple app instances, direct DB writes, or lock service failures.
+- Partial write prevention must be tested because a financial write path is only safe if wallet balances, exchange rows, command status, and ledger rows commit or roll back together.
+
+## Accepted Affected Row Count 0 Classification
+- If guarded source debit affected row count is 0, do not treat the execute as successful.
+- Reread the source wallet in the same transaction or another safe read context.
+- If reread finds no source wallet, return `SOURCE_WALLET_NOT_FOUND`.
+- If reread finds `balanceAmount < rounded sourceAmount`, return `INSUFFICIENT_BALANCE`.
+- If reread finds `balanceAmount >= rounded sourceAmount` but guarded debit failed, return `CONCURRENT_WALLET_UPDATE`.
+- In all three cases, do not create target wallet credit, exchange row, or wallet transaction rows.
+- `CONCURRENT_WALLET_UPDATE` retry behavior follows `docs/fx-execute-error-policy.md`.
+- This classification must be included in implementation tests.
+
+## Accepted `balanceAfter` Source Of Truth
+- `wallet_transactions.balanceAfter` uses the actual post-update wallet balance as source of truth.
+- Do not write `balanceAfter` from an estimated `preReadBalance - amount` or `preReadBalance + amount` alone.
+- Source debit row `balanceAfter` is the actual source wallet balance after debit.
+- Target credit row `balanceAfter` is the actual target wallet balance after credit.
+- If the response includes wallet balances, it must use the same post-update balances as the ledger rows.
+- If DB update cannot directly return post-update balances, reread inside the same transaction or use a safe raw SQL/locking strategy.
+- Ledger amount and wallet update amount must use the accepted Decimal scale/rounding policy.
+
+## Accepted Rollback / Partial-Write Test Gate
+Do not add tests in this documentation task. A future `/fx execute` implementation task is not complete unless it includes these tests:
+
+1. Source debit failure -> no target credit, no exchange row, no wallet transaction rows, command not succeeded.
+2. Target credit failure after source debit attempt -> entire transaction rollback.
+3. `exchange_transactions` create failure -> wallet balances rollback, no `wallet_transactions`, command not succeeded.
+4. Source `wallet_transactions` create failure -> wallet balances rollback, no exchange committed, command not succeeded.
+5. Target `wallet_transactions` create failure -> wallet balances rollback, no exchange committed, command not succeeded.
+6. `fx_execute_requests` finalization failure -> wallet/exchange/ledger rollback or recovery-required behavior explicitly tested.
+7. `responsePayloadJson` storage failure -> no committed success unless recovery path is explicitly proven.
+8. Duplicate retry after simulated response loss -> no second wallet mutation, replay or recovery-required behavior.
+9. Insufficient balance -> no exchange/ledger rows.
+10. Concurrent wallet update conflict -> no partial exchange/ledger rows.
+11. Wallet not found -> no exchange/ledger rows.
+12. Stale/no FX rate -> no wallet mutation.
+13. Idempotency conflict -> no wallet mutation.
+14. No `equity_snapshots` created.
+15. No fee wallet transaction row created.
 
 ## `cash_wallets` Write Rules
 - Source wallet:
   - Currency must match `fromCurrency`.
-  - Balance decreases by `sourceAmount`.
-  - Updated balance becomes source `wallet_transactions.balanceAfter`.
+  - Balance decreases by rounded `sourceAmount` through guarded conditional debit.
+  - Actual post-update balance becomes source `wallet_transactions.balanceAfter`.
 - Target wallet:
   - Currency must match `toCurrency`.
-  - Balance increases by `netTargetAmount`.
-  - Updated balance becomes target `wallet_transactions.balanceAfter`.
+  - Balance increases by rounded `netTargetAmount` only after guarded source debit succeeds.
+  - Actual post-update balance becomes target `wallet_transactions.balanceAfter`.
 - No other wallet rows should be touched for one KRW/USD exchange.
 
 ## `wallet_transactions` Row Rules
@@ -218,7 +286,7 @@ One successful execute creates one exchange execution row.
 - `/fx execute` lifecycle behavior is not implemented.
 - RequestHash canonical rule is accepted in `docs/fx-idempotency-lifecycle-policy.md`.
 - Pending/succeeded/failed MVP behavior and `responsePayloadJson` replay policy are accepted in `docs/fx-idempotency-lifecycle-policy.md`.
-- Implementation remains STOP until wallet safety, sourceType/provider coexistence, rollback/partial-write tests, and execute-time snapshot/freshness/sourceType final gate are resolved.
+- Wallet safety strategy and rollback/partial-write test gate are accepted policy, but implementation remains STOP until proof/tests are included in the implementation task and provider/sourceType/freshness final gates are resolved.
 
 ### Reflected Foundation
 - Command/request table: `fx_execute_requests`.
@@ -226,34 +294,31 @@ One successful execute creates one exchange execution row.
 - Linked success row candidate: `fx_execute_requests.exchangeTransactionId`.
 - Stored response candidate: `fx_execute_requests.responsePayloadJson`.
 
-### Remaining STOP Decisions
+### Accepted Idempotency Decisions To Carry Forward
 - Use the accepted canonical request payload rule to compute `requestHash`.
-- Define same-key same-hash replay behavior for `pending`, `succeeded`, and `failed`.
-- Define different-hash `IDEMPOTENCY_CONFLICT`.
-- Decide whether failed commands are persisted and replayed.
-- Decide how `responsePayloadJson` is populated and reused.
+- Use accepted same-key same-hash behavior for `pending`, `succeeded`, and `failed`.
+- Use accepted different-hash `IDEMPOTENCY_CONFLICT`.
+- Do not automatically re-execute failed same-key commands.
+- Replay exact stored `responsePayloadJson` for succeeded duplicates.
 
 ## Concurrency And Balance Safety
 - Concurrent exchange or order requests against the same wallet can cause race condition issues.
 - If source wallet balance validation and update are separated without locking or conditional update, overspend can occur.
-- Future implementation must choose a safe balance update strategy before writing execute code.
+- The accepted MVP strategy is guarded conditional source debit inside the DB transaction.
 
-### Prisma-Safe Implementation Candidates
-- Use an interactive transaction and acquire row-level lock on the source and target wallet rows before balance validation.
-- Use a conditional update for source wallet debit where `balanceAmount >= sourceAmount`, then require exactly one updated row.
-- Use raw SQL inside the transaction for row-level lock or conditional update if Prisma Client cannot express the needed locking safely.
-- Keep source wallet debit, target wallet credit, exchange row, and wallet ledger rows inside the same transaction regardless of the chosen locking strategy.
-
-### Decision Still Needed
-- Choose between row-level lock and conditional update before `/fx execute` implementation.
-- Confirm how order execution will share the same wallet safety pattern.
+### Implementation Alternatives
+- Default: guarded conditional debit for source wallet where `balanceAmount >= rounded sourceAmount`, then require exactly one updated row.
+- Fallback: raw SQL conditional update if Prisma cannot safely expose affected row count or post-update balances.
+- Fallback: row-level lock if conditional update cannot be implemented safely.
+- Application-level mutex, Redis lock, or process-local lock must not be the only correctness boundary.
+- Order execution should reuse the accepted wallet safety pattern when it is implemented later.
 
 ## Implementation STOP Points
 - `/fx quote` read-only implementation exists.
 - `/fx execute` remains STOP.
-- Wallet conditional update must be verified.
+- Guarded conditional source debit strategy is accepted, but implementation proof/tests are still required.
 - Decimal rounding/scale policy is accepted and must be implemented with tests.
-- Failed command lifecycle must be finalized.
+- Idempotency lifecycle policy is accepted and must be implemented with tests.
 - Execute-time snapshot selection, freshness, and sourceType policy must be reviewed.
 - Creating `equity_snapshots` on exchange execute requires a valuation-source agreement.
 - Implementing `/home` remains blocked by missing valuation, ranking, position, and snapshot source tables.
