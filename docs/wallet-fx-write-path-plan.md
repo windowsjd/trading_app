@@ -6,7 +6,9 @@
 - `/fx quote` read-only implementation exists; this document is about future write paths.
 - Detailed unresolved `/fx execute` decision tracker: `docs/fx-execute-stop-decision-tracker.md`.
 - Accepted policy references: `docs/fx-decimal-rounding-scale-policy.md`, `docs/fx-execute-error-policy.md`, `docs/fx-idempotency-lifecycle-policy.md`.
-- Error/status/retryability, idempotency pending/succeeded/failed MVP lifecycle, wallet safety strategy, and rollback/partial-write test gate are accepted, but `/fx execute` remains STOP on sourceType/provider coexistence, execute-time snapshot/freshness/sourceType final gate, implementation proof, and implementation test matrix.
+- Error/status/retryability, idempotency pending/succeeded/failed MVP lifecycle, wallet safety strategy, rollback/partial-write test gate, sourceType eligibility, execute-time snapshot selection, and execute-time freshness are accepted.
+- Final implementation gate and test matrix: `docs/fx-execute-final-implementation-gate.md`.
+- `/fx execute` is still not implemented; implementation requires a separate task with full test matrix and wallet safety proof.
 - Do not implement `/wallets`, `/fx execute`, `/orders`, `/records`, or `/home` from this document.
 - Do not add fake data, Prisma schema changes, migrations, seed changes, Prisma Client generate, or API contract changes from this document.
 - Current schema and local DB already include `wallet_transactions`, `exchange_transactions`, and `equity_snapshots`.
@@ -107,7 +109,7 @@ The whole exchange execute write path must be wrapped in a single DB transaction
 This order is a policy gate, not implementation permission. The exact command-row pending creation and DB transaction grouping remain implementation-sensitive, but partial writes must not commit.
 
 1. Validate request and idempotency preconditions.
-2. Select a fresh eligible FX snapshot according to the execute-time policy candidate/final gate.
+2. Select a fresh eligible FX snapshot according to the accepted execute-time sourceType, snapshot selection, and freshness policy.
 3. Calculate rounded `sourceAmount`, `grossTargetAmount`, `feeAmount`, and `netTargetAmount` using the accepted Decimal policy.
 4. Resolve source wallet and target wallet.
 5. Perform guarded conditional source debit.
@@ -152,6 +154,41 @@ Why this strategy:
 - Target credit must wait for successful source debit so the system never credits target currency without debiting the source.
 - Application-only locking cannot protect correctness across process restarts, multiple app instances, direct DB writes, or lock service failures.
 - Partial write prevention must be tested because a financial write path is only safe if wallet balances, exchange rows, command status, and ledger rows commit or roll back together.
+
+## Accepted Provider / SourceType Policy For Execute
+- Provider final selection is not confirmed.
+- OANDA remains the primary provider candidate and Twelve Data remains the secondary candidate.
+- `provider_api`, `official_batch`, and scheduler ingestion are not implemented.
+- `admin_manual` remains bootstrap/fallback/manual correction.
+- `official_batch` is not a real-time execute source; it remains settlement/reference/reconciliation candidate.
+- Near-term `/fx execute` uses explicit sourceType eligibility, not implicit priority.
+- Current allowed execute sourceType is approved fresh `admin_manual` only.
+- Current not-allowed execute sourceTypes are `provider_api` and `official_batch`.
+- Automatic fallback is forbidden for MVP. Do not automatically fallback from stale/unavailable `provider_api` to `admin_manual`.
+- Future `provider_api` eligibility requires provider final selection, contract/API trial validation, ingestion implementation, and separate document review.
+- Approved fresh `admin_manual` snapshots used for local/integration smoke must not be fake/static/temporary/sample/test business FX rate data.
+
+## Accepted Execute-Time Snapshot Selection And Freshness
+- Direct execute selects the FX snapshot at execute time because durable quotes do not exist yet.
+- Selection happens before wallet mutation.
+- Selection target:
+  - pair USD/KRW
+  - allowed sourceType only
+  - usable current schema rows only; there is no separate status column in the current schema
+  - `effectiveAt <= executeNow`
+  - positive `rate`
+- Ordering:
+  1. `effectiveAt desc`
+  2. `capturedAt desc`
+  3. `createdAt desc`
+- If no eligible snapshot exists, return `FX_RATE_UNAVAILABLE`.
+- If `executeNow - selectedSnapshot.effectiveAt > 60_000ms`, return `FX_RATE_STALE`.
+- Exactly `60_000ms` is accepted.
+- Future `effectiveAt` snapshots are ignored.
+- The selected snapshot id is stored in successful `exchange_transactions.fxRateSnapshotId`.
+- The selected snapshot `rate` becomes `appliedRate`.
+- Execute response and stored `responsePayloadJson` should include `rateCapturedAt` and `rateEffectiveAt`.
+- No rate/stale rate must not create wallet mutation, exchange row, wallet transaction row, or command succeeded finalization.
 
 ## Accepted Affected Row Count 0 Classification
 - If guarded source debit affected row count is 0, do not treat the execute as successful.
@@ -286,7 +323,8 @@ One successful execute creates one exchange execution row.
 - `/fx execute` lifecycle behavior is not implemented.
 - RequestHash canonical rule is accepted in `docs/fx-idempotency-lifecycle-policy.md`.
 - Pending/succeeded/failed MVP behavior and `responsePayloadJson` replay policy are accepted in `docs/fx-idempotency-lifecycle-policy.md`.
-- Wallet safety strategy and rollback/partial-write test gate are accepted policy, but implementation remains STOP until proof/tests are included in the implementation task and provider/sourceType/freshness final gates are resolved.
+- Wallet safety strategy, rollback/partial-write test gate, provider/sourceType policy, snapshot selection, and freshness are accepted policy, but `/fx execute` is still not implemented.
+- Future implementation must include proof/tests from `docs/fx-execute-final-implementation-gate.md`.
 
 ### Reflected Foundation
 - Command/request table: `fx_execute_requests`.
@@ -313,12 +351,12 @@ One successful execute creates one exchange execution row.
 - Application-level mutex, Redis lock, or process-local lock must not be the only correctness boundary.
 - Order execution should reuse the accepted wallet safety pattern when it is implemented later.
 
-## Implementation STOP Points
+## Implementation Gate Points
 - `/fx quote` read-only implementation exists.
 - `/fx execute` remains STOP.
 - Guarded conditional source debit strategy is accepted, but implementation proof/tests are still required.
 - Decimal rounding/scale policy is accepted and must be implemented with tests.
 - Idempotency lifecycle policy is accepted and must be implemented with tests.
-- Execute-time snapshot selection, freshness, and sourceType policy must be reviewed.
+- Execute-time snapshot selection, freshness, and sourceType policy are accepted and must be implemented with tests.
 - Creating `equity_snapshots` on exchange execute requires a valuation-source agreement.
 - Implementing `/home` remains blocked by missing valuation, ranking, position, and snapshot source tables.

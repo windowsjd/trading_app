@@ -21,6 +21,8 @@
 - Fake FX rates and temporary FX rates are forbidden.
 - `/fx quote` requires an eligible USD/KRW `fx_rate_snapshots` row.
 - `/fx quote` blocks selected snapshots whose `effectiveAt` is older than 60 seconds.
+- Near-term `/fx execute` uses approved fresh `admin_manual` snapshots only as allowed sourceType.
+- Provider final selection is not confirmed, and `provider_api`/`official_batch` ingestion is not implemented.
 
 ## Common Error Envelope
 All `/fx` errors should use the common error envelope.
@@ -126,12 +128,32 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 - Candidate A can support quote expiry and exact replay of quoted values.
 - Candidate B is simpler for near-term MVP because it does not require a quote table.
 - Candidate B still must recompute using a legitimate `appliedRate` source at execution time.
-- Candidate B uses the reflected `fx_execute_requests` durable idempotency foundation, but lifecycle policy remains STOP.
+- Candidate B uses the reflected `fx_execute_requests` durable idempotency foundation.
 
 ### Recommended Candidate
-- Near-term MVP should document Candidate B, direct execute, as the preferred request shape.
-- This recommendation is conditional: actual implementation must first finalize requestHash conflict handling, command lifecycle, wallet safety, and execute-time rate policy.
+- Near-term MVP uses Candidate B, direct execute, for the implementation gate because durable quote storage does not exist.
+- Actual implementation must still happen in a separate task with the final test matrix in `docs/fx-execute-final-implementation-gate.md`.
 - If a durable quote table is introduced later, execute can move to Candidate A.
+
+### Execute-Time Snapshot Selection
+- Direct execute selects the FX snapshot at execute time.
+- Selection target:
+  - pair USD/KRW
+  - allowed sourceType only
+  - `effectiveAt <= executeNow`
+  - positive `rate`
+- Current allowed execute sourceType is approved fresh `admin_manual` only.
+- Current not-allowed execute sourceTypes are `provider_api` and `official_batch`.
+- Selection ordering:
+  1. `effectiveAt desc`
+  2. `capturedAt desc`
+  3. `createdAt desc`
+- No eligible snapshot returns `FX_RATE_UNAVAILABLE`.
+- Selected snapshot with `executeNow - effectiveAt > 60_000ms` returns `FX_RATE_STALE`.
+- Exactly `60_000ms` is accepted.
+- Future `effectiveAt` snapshots are ignored.
+- Selected snapshot id maps to `exchange_transactions.fxRateSnapshotId`, and selected `rate` is stored as `appliedRate`.
+- Snapshot selection/freshness failure must happen before wallet mutation.
 
 ### Success Response Shape Candidate
 
@@ -150,6 +172,8 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
     "feeAmount": "<amount string>",
     "feeCurrency": "USD",
     "netTargetAmount": "<amount string>",
+    "rateCapturedAt": "<UTC ISO string>",
+    "rateEffectiveAt": "<UTC ISO string>",
     "wallets": {
       "KRW": "<amount string>",
       "USD": "<amount string>"
@@ -164,8 +188,10 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 - This matches records exchanges mapping where `appliedRate -> rate`.
 - `exchangeId` maps to `exchange_transactions.id`.
 - `wallets.KRW` and `wallets.USD` are post-execute wallet balances.
+- `rateCapturedAt` maps to the selected snapshot `capturedAt`.
+- `rateEffectiveAt` maps to the selected snapshot `effectiveAt`.
 
-### Required Error Code Candidates
+### Execute Error Codes
 - `UNAUTHORIZED`
 - `SEASON_NOT_FOUND`
 - `SEASON_NOT_ACTIVE`
@@ -177,8 +203,13 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 - `FX_RATE_STALE`
 - `IDEMPOTENCY_REQUIRED`
 - `IDEMPOTENCY_CONFLICT`
-- `QUOTE_EXPIRED`
 - `CONCURRENT_WALLET_UPDATE`
+- `SOURCE_WALLET_NOT_FOUND`
+- `TARGET_WALLET_NOT_FOUND`
+- `IDEMPOTENCY_PENDING`
+- `IDEMPOTENCY_PENDING_STALE`
+- `IDEMPOTENCY_FAILED`
+- `EXECUTE_TRANSACTION_FAILED`
 - `INTERNAL_ERROR`
 
 ## Execute Idempotency
@@ -189,6 +220,7 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 - `fx_execute_requests` has `unique(userId, idempotencyKey)` for execute retry deduplication.
 - `wallet_transactions` has `[referenceType, referenceId]` index only, not an idempotency unique key.
 - `/fx execute` lifecycle code is not implemented yet.
+- Accepted lifecycle policy is documented in `docs/fx-idempotency-lifecycle-policy.md`.
 
 ### Candidate A: Add `exchange_transactions.idempotencyKey`
 - Pros: simple lookup against the executed exchange row.
@@ -201,7 +233,7 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 - Pros: can store request hash, status, response payload, failure reason, and linked `exchangeTransactionId`.
 - Pros: provides `unique(userId, idempotencyKey)`.
 - Pros: clearer boundary for idempotent retries and conflicts.
-- Cons: lifecycle implementation policy is still not finalized.
+- Cons: lifecycle implementation and tests are still future implementation work.
 
 ### Candidate C: API Layer Durable Store
 - Pros: can avoid touching exchange table shape.
@@ -218,7 +250,8 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 ### Recommendation
 - Use the reflected `fx_execute_requests` command table.
 - Keep `exchange_transactions.idempotencyKey` absent unless a later schema review deliberately changes ownership.
-- Do not implement execute until requestHash conflict handling, pending/succeeded/failed lifecycle, and response replay policy are agreed.
+- Use accepted requestHash conflict handling, pending/succeeded/failed lifecycle, and response replay policy.
+- Do not implement execute in this documentation task.
 
 ## Wallet Concurrency And Overspend Prevention
 
@@ -253,11 +286,22 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 - Cons: should not be the only correctness boundary for wallet money.
 
 ### Recommendation
-- MVP should first evaluate Candidate B, conditional update.
+- MVP uses Candidate B, guarded conditional update, as the accepted wallet safety strategy.
 - Source wallet debit must be guarded by `balanceAmount >= sourceAmount`, and affected row count must be exactly 1.
 - If Prisma Client cannot safely express this, use raw SQL inside the DB transaction or switch to interactive transaction plus row-level lock.
 - Order execute must use the same wallet safety pattern as FX execute.
-- Final strategy is a STOP decision before implementation.
+- Guarded conditional source debit is the accepted MVP wallet safety strategy; implementation proof and tests remain required in the implementation task.
+
+## Provider / SourceType Policy For Execute
+- Provider final selection is not confirmed.
+- OANDA is primary candidate and Twelve Data is secondary candidate only.
+- `provider_api`, `official_batch`, and scheduler ingestion are not implemented.
+- `admin_manual` is bootstrap/fallback/manual correction.
+- `official_batch` is not a real-time execute source; it remains settlement/reference/reconciliation candidate.
+- Near-term execute uses explicit allowed sourceType eligibility, not implicit priority.
+- Current allowed execute sourceType: `admin_manual` only.
+- Automatic fallback is forbidden for MVP.
+- Approved fresh `admin_manual` snapshots used for execute smoke must not be fake/static/temporary/sample/test business FX rate data.
 
 ## Equity Snapshots
 - `/fx execute` should not create `equity_snapshots` yet.
@@ -268,18 +312,17 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 - Cash-only snapshots could be mistaken as `/home`, ranking, settlement, or final evaluation evidence.
 - Revisit `equity_snapshots` write path after valuation source tables are designed.
 
-## Implementation STOP Checklist
+## Implementation Gate Checklist
 - Quote status:
   - `/fx quote` implementation is complete.
   - `/fx quote` is stateless/read-only.
   - `quoteId` and `expiresAt` are fixed to `null`.
   - `rateCapturedAt` and `rateEffectiveAt` are included.
   - `FX_RATE_UNAVAILABLE` and `FX_RATE_STALE` are distinguished.
-- Execute STOP:
-  - `/fx execute` remains STOP.
-  - Wallet conditional update must be verified.
-  - Decimal rounding/scale must be finalized.
-  - Failed command lifecycle must be finalized.
-  - Execute-time sourceType priority and snapshot freshness policy must be reviewed.
-  - Provider/batch ingestion assumptions must be reviewed before long-running execute operation.
+- Execute implementation gate:
+  - `/fx execute` is still not implemented.
+  - Implementation requires the final test matrix in `docs/fx-execute-final-implementation-gate.md`.
+  - Wallet safety proof must be verified with tests.
+  - Provider final selection remains separate and pending.
+  - `provider_api` and `official_batch` are not near-term execute sources.
 - Keep `/home` full implementation blocked until valuation/ranking source tables exist.

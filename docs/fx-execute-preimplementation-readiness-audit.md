@@ -2,11 +2,13 @@
 
 ## Status
 - Documentation only.
-- `/fx execute` implementation remains STOP.
+- `/fx execute` is still not implemented.
 - This document is a preimplementation defect readiness audit, not an implementation instruction.
 - Detailed unresolved decision tracker: `docs/fx-execute-stop-decision-tracker.md`.
 - Accepted policy references: `docs/fx-decimal-rounding-scale-policy.md`, `docs/fx-execute-error-policy.md`, `docs/fx-idempotency-lifecycle-policy.md`.
-- Error/status/retryability, idempotency pending/succeeded/failed MVP lifecycle, wallet safety strategy, and rollback/partial-write test gate are accepted, but `/fx execute` remains STOP on sourceType/provider coexistence, execute-time snapshot/freshness/sourceType final gate, implementation proof, and implementation test matrix.
+- Error/status/retryability, idempotency pending/succeeded/failed MVP lifecycle, wallet safety strategy, rollback/partial-write test gate, provider/sourceType eligibility, execute-time snapshot selection, and execute-time freshness are accepted.
+- Final implementation gate and test matrix: `docs/fx-execute-final-implementation-gate.md`.
+- `/fx execute` is still not implemented; future implementation requires full test matrix and wallet safety proof.
 - Do not implement controller, service, DTO, test, Prisma schema, migration, seed, provider ingestion, scheduler, package, or environment changes from this document.
 
 ## Purpose
@@ -64,9 +66,13 @@
 - Source/target wallet update order is accepted: guarded source debit before target credit inside one atomic unit.
 - `wallet_transactions.balanceAfter` source of truth is accepted as actual post-update wallet balance inside the transaction.
 - Rollback/partial-write test gate is accepted, but tests are not implemented in this documentation task.
-- `/fx execute` remains STOP because sourceType/provider coexistence, execute-time snapshot/freshness/sourceType final gate, implementation proof, and implementation test matrix remain unresolved.
+- Provider/sourceType coexistence policy is accepted: no automatic fallback, near-term allowed execute sourceType is approved fresh `admin_manual` only, and provider final selection remains pending.
+- Execute-time snapshot selection is accepted: USD/KRW, allowed sourceType only, `effectiveAt <= executeNow`, positive rate, ordered by `effectiveAt desc`, `capturedAt desc`, `createdAt desc`.
+- Execute-time freshness is accepted: same as quote, `> 60_000ms` stale and exactly `60_000ms` accepted.
+- Final implementation test matrix is documented in `docs/fx-execute-final-implementation-gate.md`.
+- `/fx execute` remains unimplemented; implementation may be drafted only as a separate task with full test matrix and wallet safety proof.
 
-## Remaining STOP decisions
+## Implementation gate decisions
 | Area | Decision needed | Current risk if unresolved | Suggested default | Implementation allowed? |
 | --- | --- | --- | --- | --- |
 | `idempotencyKey` required 여부와 missing key error | Accepted rule must be carried into implementation tests. | Client retries can double debit if execution deviates from the accepted rule. | Require non-empty string and return `IDEMPOTENCY_REQUIRED`. | No; other STOP remain |
@@ -82,10 +88,10 @@
 | Source/target wallet update order | Accepted update order must be carried into implementation tests. | Deadlocks, partial assumptions, or incorrect `balanceAfter` values. | Guarded source debit before target credit inside one atomic unit; stop with no partial rows on debit failure. | No; tests required |
 | `wallet_transactions.balanceAfter` basis | Accepted balance source must be carried into implementation tests. | Ledger can disagree with actual wallet balance. | Use actual post-update wallet balances captured inside the transaction; do not use estimated pre-read arithmetic alone. | No; tests required |
 | Decimal rounding/scale rule | Accepted rule must be carried into implementation tests. | Quote, execute, wallet, exchange, and records can disagree by one unit of scale if implementation deviates from half-up/scale policy. | Use accepted half-up and scale policy in `docs/fx-decimal-rounding-scale-policy.md`. | No; other STOP remain |
-| Execute-time FX snapshot selection | Decide whether execute reuses quote snapshot or selects latest fresh snapshot at execute time. | Execute can use a rate the user did not see or use an unavailable snapshot. | Near-term direct execute selects latest eligible USD/KRW snapshot at execute time, matching quote ordering, until durable quote exists. | No |
-| Execute-time 60-second freshness | Decide stale threshold and exact boundary for execute. | Quote rejects stale rates while execute succeeds on stale rates. | Use the same `> 60_000 ms` stale rule and exactly-60-second acceptance as quote. | No |
-| `sourceType` priority | Decide priority when `provider_api`, `official_batch`, and `admin_manual` rows coexist. | Execute can use an official batch/reference row or manual row unexpectedly. | STOP 유지; do not mix source types for execute until priority is accepted. | No |
-| Provider coexistence | Decide provider_api/official_batch/admin_manual coexistence and fallback rules. | Manual correction or official reference rows can override provider rows without intent. | For local smoke, allow approved fresh `admin_manual`; production coexistence remains STOP. | No |
+| Execute-time FX snapshot selection | Accepted selection rule must be carried into implementation tests. | Execute can use a rate the user did not see or use an unavailable snapshot. | Direct execute selects latest eligible allowed-sourceType USD/KRW snapshot at execute time. | No; tests/proof required |
+| Execute-time 60-second freshness | Accepted freshness rule must be carried into implementation tests. | Quote rejects stale rates while execute succeeds on stale rates. | Use quote-matching `> 60_000ms` stale rule and exactly-60-second acceptance. | No; tests required |
+| `sourceType` priority | Accepted explicit sourceType eligibility must be carried into implementation tests. | Execute can use an official batch/reference row or manual row unexpectedly. | No implicit priority; near-term allowed sourceType is approved fresh `admin_manual` only. | No; tests required |
+| Provider coexistence | Accepted coexistence/fallback policy must be carried into implementation tests. | Manual correction or official reference rows can override provider rows unintentionally. | No automatic fallback; `provider_api` needs separate final selection/ingestion approval; `official_batch` is settlement/reference/reconciliation only. | No; tests required |
 | `/fx execute` equity snapshot creation | Decide whether execute creates `equity_snapshots`. | Cash-only snapshots can be mistaken as authoritative valuation. | Do not create `equity_snapshots` in near-term execute. | No |
 | Error envelope/code | Accepted error/status policy must be carried into implementation tests. | Frontend and retry logic cannot distinguish validation, stale rate, duplicate, or concurrency errors. | Use accepted table in `docs/fx-execute-error-policy.md`. | No; other STOP remain |
 | Retryable vs non-retryable errors | Accepted retryability policy must be carried into implementation tests. | Clients can retry non-retryable financial failures or fail to retry safe transient failures. | Use accepted retryability policy in `docs/fx-execute-error-policy.md`. | No; other STOP remain |
@@ -122,6 +128,11 @@ Do not add these tests in this documentation task. Include them in the implement
 - No FX snapshot.
 - Stale FX snapshot.
 - Exactly 60 seconds boundary.
+- Future `effectiveAt` snapshot ignored.
+- Disallowed `sourceType` ignored.
+- Latest eligible snapshot selected by `effectiveAt desc`, `capturedAt desc`, `createdAt desc`.
+- Selected snapshot id stored as `exchange_transactions.fxRateSnapshotId`.
+- `rateCapturedAt` and `rateEffectiveAt` included in `responsePayloadJson`.
 - Insufficient source balance.
 - Duplicate same `idempotencyKey` and same `requestHash` succeeded replay.
 - Duplicate same `idempotencyKey` and different `requestHash` conflict.
@@ -150,6 +161,18 @@ Do not add these tests in this documentation task. Include them in the implement
 - `fx_execute_requests` status transitions for success and handled failure.
 - `responsePayloadJson` replay uses original execution values.
 
+## Final Implementation Test Matrix
+The complete final matrix is centralized in `docs/fx-execute-final-implementation-gate.md`. It must be included in the future implementation task and covers:
+
+- Auth / validation / season.
+- FX snapshot selection / freshness.
+- Decimal / calculation.
+- Idempotency.
+- Wallet safety / concurrency.
+- Ledger / exchange rows.
+- Rollback / partial write.
+- Response / records readiness.
+
 ## Required e2e/smoke test matrix before implementation
 Do not add these tests in this documentation task. Include them in the implementation task or a dedicated verification task.
 
@@ -168,16 +191,17 @@ Do not add these tests in this documentation task. Include them in the implement
 Move to implementation only after all of the following are true:
 
 - This readiness audit has been reviewed.
-- STOP decisions are resolved or explicitly deferred with a safe default.
+- STOP decisions are resolved or explicitly deferred with a safe default in `docs/fx-execute-final-implementation-gate.md`.
 - Wallet safety approach is accepted and implementation proof/tests are included.
 - Decimal rounding/scale accepted policy is included in implementation tests.
-- Execute-time FX snapshot selection, freshness, and `sourceType` policy are confirmed.
+- Execute-time FX snapshot selection, freshness, and `sourceType` policy are accepted and included in tests.
 - `requestHash` canonical rule is included in implementation tests.
 - Pending/succeeded/failed idempotency lifecycle is accepted and included in tests.
 - The test matrix is included in the implementation task.
 - There is a local smoke procedure using an approved fresh `admin_manual` snapshot independent of provider final selection.
 - Partial-write rollback behavior is included in implementation tests before production provider ingestion.
 - Error envelope, error codes, and retryability rules are accepted.
+- Provider final selection remains separate and must not be treated as complete for this near-term execute task.
 
 ## Explicit non-goals
 - No `/fx execute` implementation.

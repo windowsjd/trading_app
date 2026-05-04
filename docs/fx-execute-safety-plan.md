@@ -6,7 +6,9 @@
 - This is documentation only.
 - Detailed unresolved decision tracker: `docs/fx-execute-stop-decision-tracker.md`.
 - Accepted policy references: `docs/fx-decimal-rounding-scale-policy.md`, `docs/fx-execute-error-policy.md`, `docs/fx-idempotency-lifecycle-policy.md`.
-- Error/status/retryability, idempotency pending/succeeded/failed MVP lifecycle, wallet safety strategy, and rollback/partial-write test gate are accepted, but `/fx execute` remains STOP on sourceType/provider coexistence, execute-time snapshot/freshness/sourceType final gate, implementation proof, and implementation test matrix.
+- Error/status/retryability, idempotency pending/succeeded/failed MVP lifecycle, wallet safety strategy, rollback/partial-write test gate, sourceType eligibility, execute-time snapshot selection, and execute-time freshness are accepted.
+- Final implementation gate and test matrix: `docs/fx-execute-final-implementation-gate.md`.
+- `/fx execute` is still not implemented; implementation requires a separate task with full test matrix and wallet safety proof.
 - Do not implement `/fx execute` from this document yet.
 - Do not add Prisma schema changes, migrations, seed changes, Prisma Client generate, package changes, fake FX rates, or temporary FX rates from this document.
 
@@ -25,7 +27,10 @@
 - `fx_rate_snapshots` exists and `/fx quote` uses it for the legal `appliedRate` source.
 - Production provider/batch ingestion is not implemented yet.
 - Decimal rounding/scale and `requestHash` canonical rule are accepted in their policy documents.
-- Actual execute implementation remains blocked until execute-time sourceType policy, provider coexistence, execute-time snapshot/freshness/sourceType final gate, implementation proof, and required test matrix are finalized.
+- `provider_api`, `official_batch`, and scheduler ingestion are not implemented.
+- Provider final selection is not confirmed; OANDA is primary candidate and Twelve Data is secondary candidate only.
+- Near-term execute source eligibility allows approved fresh `admin_manual` only.
+- Actual execute implementation requires a separate implementation task with full test matrix and wallet safety proof.
 
 ## Idempotency Strategy Candidates
 
@@ -250,9 +255,26 @@ The accepted migration already includes:
 - Current reflected relation policy uses `onDelete: Restrict`.
 - Do not change cascade/restrict/soft-delete policy without explicit schema review.
 
-## Applied Rate STOP
+## Applied Rate Implementation Gate
 - `fx_rate_snapshots` exists as the authoritative rate snapshot structure.
 - `/fx quote` uses the latest fresh USD/KRW snapshot and returns `FX_RATE_UNAVAILABLE` or `FX_RATE_STALE` when appropriate.
 - Fake or temporary FX rates are forbidden.
 - Adding idempotency and wallet safety schema does not make `/fx execute` implementable by itself.
-- Actual execute implementation remains blocked until execute-time snapshot selection, 60-second freshness behavior, sourceType priority, provider/batch/manual coexistence, implementation proof, and required test matrix are reviewed for execute.
+- Execute-time source selection policy is accepted for near-term execute:
+  - use explicit allowed sourceType gate, not implicit priority;
+  - allowed sourceType is approved fresh `admin_manual` only;
+  - `provider_api` is excluded until provider final selection, contract/API validation, ingestion implementation, and separate document review;
+  - `official_batch` is excluded from real-time execute and remains settlement/reference/reconciliation candidate;
+  - automatic fallback between source types is forbidden for MVP.
+- Execute-time snapshot selection is accepted:
+  - pair USD/KRW;
+  - allowed sourceType only;
+  - usable current schema rows only;
+  - `effectiveAt <= executeNow`;
+  - positive `rate`;
+  - order by `effectiveAt desc`, `capturedAt desc`, `createdAt desc`.
+- Selected snapshot id must be linked to `exchange_transactions.fxRateSnapshotId`, and selected `rate` becomes `appliedRate`.
+- Execute-time freshness is accepted as quote-matching: `executeNow - selectedSnapshot.effectiveAt > 60_000ms` returns `FX_RATE_STALE`; exactly `60_000ms` is accepted.
+- Snapshot selection and freshness checks must happen before wallet mutation.
+- No eligible snapshot or stale snapshot must create no wallet mutation, exchange row, wallet ledger row, or command succeeded finalization.
+- Actual `/fx execute` implementation is not performed here; future implementation must include the final test matrix in `docs/fx-execute-final-implementation-gate.md`.

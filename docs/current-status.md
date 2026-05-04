@@ -70,6 +70,7 @@ near-term ledger/FX foundation:
 - FX Decimal rounding/scale policy: `docs/fx-decimal-rounding-scale-policy.md`.
 - FX execute error policy: `docs/fx-execute-error-policy.md`.
 - FX idempotency lifecycle policy: `docs/fx-idempotency-lifecycle-policy.md`.
+- `/fx execute` final implementation gate: `docs/fx-execute-final-implementation-gate.md`.
 
 ## 8. 주요 STOP 상태
 ### `/fx quote`
@@ -92,14 +93,10 @@ near-term ledger/FX foundation:
 - 30초 polling은 후보이며 provider rate limit/terms 확인 후 확정.
 
 ### `/fx execute`
-- `/fx execute`는 STOP.
+- `/fx execute`는 아직 구현되지 않음.
 - `/fx execute` 구현 전 readiness audit 문서화 완료.
-- `/fx execute` 구현 전 남은 STOP:
-  - provider coexistence/fallback policy
-  - execute-time sourceType priority
-  - execute-time snapshot selection/freshness/sourceType policy final gate
-  - 실제 구현 전 test matrix 반영
-  - wallet safety implementation proof 및 테스트 검증
+- `/fx execute` final implementation gate 문서화 완료.
+- `/fx execute` 구현 prompt는 문서 review 후 작성 가능하나, 실제 구현은 full test matrix와 wallet safety proof를 포함한 별도 task가 필요.
 - Decimal rounding mode와 scale/formatting 정책은 half-up 기준으로 문서상 확정됨.
 - requestHash canonical rule은 SHA-256/canonical JSON 기준으로 문서상 확정됨.
 - error code/status/retryability mapping은 문서상 확정됨.
@@ -111,6 +108,13 @@ near-term ledger/FX foundation:
 - source/target wallet update order는 문서상 확정됨.
 - `wallet_transactions.balanceAfter` source of truth는 actual post-update wallet balance로 문서상 확정됨.
 - rollback/partial-write test gate는 문서상 확정됨.
+- provider/sourceType coexistence policy는 문서상 확정됨.
+- near-term allowed execute sourceType은 approved fresh `admin_manual` only.
+- `provider_api`는 provider final selection + ingestion implementation approval 전까지 execute source로 허용하지 않음.
+- `official_batch`는 settlement/reference/reconciliation 후보이며 real-time execute source가 아님.
+- execute-time snapshot selection은 문서상 확정됨: allowed sourceType only, USD/KRW, `effectiveAt <= executeNow`, positive rate, order by `effectiveAt desc`, `capturedAt desc`, `createdAt desc`.
+- execute-time freshness rule은 문서상 확정됨: `> 60_000ms` stale, exactly 60s accepted.
+- final implementation test matrix는 `docs/fx-execute-final-implementation-gate.md`에 문서화됨.
 - succeeded duplicate replay는 stored `responsePayloadJson`를 사용.
 - failed duplicate는 자동 재실행하지 않음.
 - stale pending은 recovery-required behavior를 반환.
@@ -137,8 +141,8 @@ near-term ledger/FX foundation:
 ## 9. 다음 gate
 - 승인된 fresh `admin_manual` snapshot으로 `/fx quote` 통합 smoke 검증.
 - OANDA trial/API 계약 검증 전 provider_api/official_batch/scheduler 구현 STOP 유지.
-- `/fx execute`는 `docs/fx-execute-stop-decision-tracker.md`의 STOP decision 해소 또는 safe default 승인 후 별도 구현 task로 진행.
-- `/fx execute`는 error/idempotency/wallet safety/rollback gate accepted 이후에도 provider/sourceType, execute-time snapshot policy final gate, implementation proof, test matrix 때문에 STOP 유지.
+- `/fx execute` 구현 prompt는 `docs/fx-execute-final-implementation-gate.md` review 후 별도 task로 작성 가능.
+- `/fx execute` 실제 구현 task는 full test matrix, wallet safety proof, rollback/partial-write proof를 포함해야 함.
 - `/home` full implementation 가능 판정은 valuation/ranking source table 확보 후 재검토.
 
 ## 10. 아직 안 한 것
@@ -168,12 +172,10 @@ near-term ledger/FX foundation:
 ## 12. TODO
 - 승인된 운영값으로 non-dry-run CLI 입력 후 `/fx quote` 통합 smoke 검증.
 - provider final selection STOP review 수락 및 OANDA trial/API 계약 검증.
-- `/fx execute` STOP decision tracker 검토.
-- provider coexistence/fallback policy 확정.
-- execute-time sourceType priority 확정.
+- `/fx execute` final implementation gate review.
+- `/fx execute` 구현 prompt 작성 시 final test matrix 전체 반영.
 - guarded conditional source debit 구현 proof 및 concurrency/rollback 테스트 반영.
 - half-up Decimal 및 requestHash canonical rule 구현 전 테스트 gate 반영.
-- execute-time snapshot selection/freshness/sourceType policy 확정.
 - error/idempotency lifecycle accepted 정책 구현 전 테스트 matrix 반영.
 - assets 도입.
 - asset_price_snapshots 도입.
