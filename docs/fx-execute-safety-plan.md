@@ -5,7 +5,8 @@
 - `fx_execute_requests` schema/migration foundation is reflected, but `/fx execute` is not implemented.
 - This is documentation only.
 - Detailed unresolved decision tracker: `docs/fx-execute-stop-decision-tracker.md`.
-- Related candidate policies: `docs/fx-decimal-rounding-scale-policy.md`, `docs/fx-execute-error-policy.md`, `docs/fx-idempotency-lifecycle-policy.md`.
+- Accepted policy references: `docs/fx-decimal-rounding-scale-policy.md`, `docs/fx-execute-error-policy.md`, `docs/fx-idempotency-lifecycle-policy.md`.
+- Error/status/retryability and idempotency pending/succeeded/failed MVP lifecycle are accepted, but `/fx execute` remains STOP on wallet safety, sourceType/provider coexistence, rollback/partial-write tests, and execute-time snapshot/freshness/sourceType final gate.
 - Do not implement `/fx execute` from this document yet.
 - Do not add Prisma schema changes, migrations, seed changes, Prisma Client generate, package changes, fake FX rates, or temporary FX rates from this document.
 
@@ -24,7 +25,7 @@
 - `fx_rate_snapshots` exists and `/fx quote` uses it for the legal `appliedRate` source.
 - Production provider/batch ingestion is not implemented yet.
 - Decimal rounding/scale and `requestHash` canonical rule are accepted in their policy documents.
-- Actual execute implementation remains blocked until wallet conditional update, pending/failed command lifecycle, stale pending recovery, execute-time sourceType policy, provider coexistence, error mapping, and rollback test gates are finalized.
+- Actual execute implementation remains blocked until wallet conditional update, execute-time sourceType policy, provider coexistence, execute-time snapshot/freshness/sourceType final gate, and rollback test gates are finalized.
 
 ## Idempotency Strategy Candidates
 
@@ -123,13 +124,15 @@ Reflected indexes:
 - This makes duplicate user request detection clear even if active season participant context changes.
 - `/fx execute` is still allowed only for an active joined season, so `seasonParticipantId` must also be stored.
 
-## Idempotent Execute Lifecycle Candidate
+## Idempotent Execute Lifecycle Accepted MVP Policy
 1. Normalize request payload.
 2. Compute `requestHash`.
 3. Insert `fx_execute_requests` row with `pending` status and `unique(userId, idempotencyKey)`.
 4. If the same key already exists:
-   - same `requestHash` and `succeeded`: return stored response or rebuild response from `exchangeTransactionId`.
-   - same `requestHash` and `pending`: return or retry according to final API policy.
+   - same `requestHash` and `succeeded`: return stored `responsePayloadJson`; do not recompute.
+   - same `requestHash` and fresh `pending`: return `IDEMPOTENCY_PENDING`; do not mutate wallets.
+   - same `requestHash` and stale `pending`: return `IDEMPOTENCY_PENDING_STALE`; do not automatically re-execute.
+   - same `requestHash` and `failed`: return `IDEMPOTENCY_FAILED` or stored original failure payload; do not automatically re-execute.
    - different `requestHash`: return `IDEMPOTENCY_CONFLICT`.
 5. Execute wallet mutation and exchange ledger writes in one DB transaction.
 6. On success, set status to `succeeded`, store `exchangeTransactionId`, `responsePayloadJson`, and `completedAt`.
@@ -209,4 +212,4 @@ The accepted migration already includes:
 - `/fx quote` uses the latest fresh USD/KRW snapshot and returns `FX_RATE_UNAVAILABLE` or `FX_RATE_STALE` when appropriate.
 - Fake or temporary FX rates are forbidden.
 - Adding idempotency and wallet safety schema does not make `/fx execute` implementable by itself.
-- Actual execute implementation remains blocked until execute-time snapshot selection, 60-second freshness behavior, sourceType priority, provider/batch/manual coexistence, pending/failed lifecycle, wallet safety, error mapping, and rollback test gates are reviewed for execute.
+- Actual execute implementation remains blocked until execute-time snapshot selection, 60-second freshness behavior, sourceType priority, provider/batch/manual coexistence, wallet safety, and rollback test gates are reviewed for execute.

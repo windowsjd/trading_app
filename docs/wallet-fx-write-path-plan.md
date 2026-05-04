@@ -5,7 +5,8 @@
 - This is documentation only.
 - `/fx quote` read-only implementation exists; this document is about future write paths.
 - Detailed unresolved `/fx execute` decision tracker: `docs/fx-execute-stop-decision-tracker.md`.
-- Related candidate policies: `docs/fx-decimal-rounding-scale-policy.md`, `docs/fx-execute-error-policy.md`, `docs/fx-idempotency-lifecycle-policy.md`.
+- Accepted policy references: `docs/fx-decimal-rounding-scale-policy.md`, `docs/fx-execute-error-policy.md`, `docs/fx-idempotency-lifecycle-policy.md`.
+- Error/status/retryability and idempotency pending/succeeded/failed MVP lifecycle are accepted, but `/fx execute` remains STOP on wallet safety, sourceType/provider coexistence, rollback/partial-write tests, and execute-time snapshot/freshness/sourceType final gate.
 - Do not implement `/wallets`, `/fx execute`, `/orders`, `/records`, or `/home` from this document.
 - Do not add fake data, Prisma schema changes, migrations, seed changes, Prisma Client generate, or API contract changes from this document.
 - Current schema and local DB already include `wallet_transactions`, `exchange_transactions`, and `equity_snapshots`.
@@ -216,7 +217,8 @@ One successful execute creates one exchange execution row.
 - `exchange_transactions` still has no `idempotencyKey`; idempotency belongs to `fx_execute_requests`.
 - `/fx execute` lifecycle behavior is not implemented.
 - RequestHash canonical rule is accepted in `docs/fx-idempotency-lifecycle-policy.md`.
-- Pending/succeeded/failed behavior and `responsePayloadJson` replay policy remain STOP decisions.
+- Pending/succeeded/failed MVP behavior and `responsePayloadJson` replay policy are accepted in `docs/fx-idempotency-lifecycle-policy.md`.
+- Implementation remains STOP until wallet safety, sourceType/provider coexistence, rollback/partial-write tests, and execute-time snapshot/freshness/sourceType final gate are resolved.
 
 ### Reflected Foundation
 - Command/request table: `fx_execute_requests`.

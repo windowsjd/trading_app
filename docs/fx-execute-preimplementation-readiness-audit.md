@@ -5,7 +5,8 @@
 - `/fx execute` implementation remains STOP.
 - This document is a preimplementation defect readiness audit, not an implementation instruction.
 - Detailed unresolved decision tracker: `docs/fx-execute-stop-decision-tracker.md`.
-- Related candidate policies: `docs/fx-decimal-rounding-scale-policy.md`, `docs/fx-execute-error-policy.md`, `docs/fx-idempotency-lifecycle-policy.md`.
+- Accepted policy references: `docs/fx-decimal-rounding-scale-policy.md`, `docs/fx-execute-error-policy.md`, `docs/fx-idempotency-lifecycle-policy.md`.
+- Error/status/retryability and idempotency pending/succeeded/failed MVP lifecycle are accepted, but `/fx execute` remains STOP on wallet safety, sourceType/provider coexistence, rollback/partial-write tests, and execute-time snapshot/freshness/sourceType final gate.
 - Do not implement controller, service, DTO, test, Prisma schema, migration, seed, provider ingestion, scheduler, package, or environment changes from this document.
 
 ## Purpose
@@ -54,19 +55,23 @@
 - `wallet_transactions.balanceAfter` must be based on the actual post-update wallet balance.
 - Fake, static, temporary, sample, or test business FX rates are forbidden.
 - Decimal rounding/scale policy is accepted as half-up with fixed scale/formatting, but `/fx execute` remains STOP because other safety decisions are unresolved.
-- `requestHash` canonical rule is accepted, but pending/failed lifecycle and stale pending recovery remain STOP.
+- `requestHash` canonical rule is accepted.
+- Error code/status/retryability policy is accepted.
+- Idempotency pending/succeeded/failed MVP lifecycle is accepted.
+- Stale pending automatic re-execution is forbidden; stale pending returns recovery-required behavior.
+- `/fx execute` remains STOP because wallet safety strategy, sourceType/provider coexistence, rollback/partial-write tests, and execute-time snapshot/freshness/sourceType final gate remain unresolved.
 
 ## Remaining STOP decisions
 | Area | Decision needed | Current risk if unresolved | Suggested default | Implementation allowed? |
 | --- | --- | --- | --- | --- |
-| `idempotencyKey` required 여부와 missing key error | Decide whether every execute request must include a non-empty `idempotencyKey` and which error code/status is returned when missing. | Client retries can double debit if execution is allowed without a durable key. | Require non-empty string and return `IDEMPOTENCY_REQUIRED`. | No |
+| `idempotencyKey` required 여부와 missing key error | Accepted rule must be carried into implementation tests. | Client retries can double debit if execution deviates from the accepted rule. | Require non-empty string and return `IDEMPOTENCY_REQUIRED`. | No; other STOP remain |
 | `requestHash` normalization rule | Accepted rule must be carried into implementation tests. | Same economic request can hash differently if implementation deviates from the accepted rule. | Use accepted canonical JSON/SHA-256 rule in `docs/fx-idempotency-lifecycle-policy.md`. | No; other STOP remain |
-| Same key + same hash + `pending` | Decide whether to return pending/in-progress, retry execution, wait, or recover stale pending. | Duplicate request can run twice or remain blocked forever. | Return deterministic `IDEMPOTENCY_PENDING` for fresh pending; recover only after stale-pending policy. | No |
-| Same key + same hash + `succeeded` replay | Decide whether to return stored `responsePayloadJson` or rebuild response from `exchangeTransactionId`. | Successful retry can create another exchange or return a response that disagrees with committed rows. | Store and return `responsePayloadJson`; fallback rebuild only if explicitly tested. | No |
-| Same key + same hash + `failed` | Decide whether failure is replayed, retryable, or creates a new attempt under same key. | A failed command can either block legitimate retry or execute unexpectedly after a client retry. | Persist terminal validation failures; allow retry only for explicitly retryable infrastructure failures after recovery rule. | No |
-| Same key + different hash conflict | Decide conflict response code/status and whether any write occurs. | Same idempotency key can execute different payloads. | Return `IDEMPOTENCY_CONFLICT`; do not mutate wallets. | No |
-| `responsePayloadJson` storage/reuse | Decide exact success response payload, serialization format, and replay source of truth. | Duplicate replay can drift from original execution values, balances, or rounding. | Store the exact success response JSON after all DB writes succeed in the same transaction. | No |
-| Stale pending command recovery | Define pending timeout, recovery job/manual path, and status transition rules. | Stuck pending rows can permanently block retries or invite unsafe re-execution. | Treat recent pending as in-progress; review stale pending via explicit recovery policy before retrying. | No |
+| Same key + same hash + `pending` | Accepted MVP lifecycle must be carried into implementation tests. | Duplicate request can run twice or remain blocked forever if implementation deviates. | Fresh pending returns `IDEMPOTENCY_PENDING`; stale pending returns `IDEMPOTENCY_PENDING_STALE`; no automatic re-execution. | No; other STOP remain |
+| Same key + same hash + `succeeded` replay | Accepted replay policy must be carried into implementation tests. | Successful retry can create another exchange or return a response that disagrees with committed rows. | Store and return exact `responsePayloadJson`; do not silently recompute. | No; other STOP remain |
+| Same key + same hash + `failed` | Accepted MVP lifecycle must be carried into implementation tests. | A failed command can execute unexpectedly after a client retry. | Return `IDEMPOTENCY_FAILED` or stored original failure payload; do not automatically re-execute. | No; other STOP remain |
+| Same key + different hash conflict | Accepted conflict policy must be carried into implementation tests. | Same idempotency key can execute different payloads. | Return `IDEMPOTENCY_CONFLICT`; do not mutate wallets. | No; other STOP remain |
+| `responsePayloadJson` storage/reuse | Accepted replay policy must be carried into implementation tests. | Duplicate replay can drift from original execution values, balances, or rounding. | Store exact success response JSON; missing payload with `exchangeTransactionId` is recovery-required STOP. | No; other STOP remain |
+| Stale pending command recovery | Accepted MVP safety behavior must be carried into implementation tests. | Stuck pending rows can permanently block retries or invite unsafe re-execution. | 2-minute stale threshold; automatic re-execution forbidden; recovery tool/job is future work. | No; other STOP remain |
 | Wallet conditional update vs row-level lock | Choose conditional update, row-level lock, serializable transaction, or a combined approach. | Concurrent requests can overspend the source wallet. | Start with conditional source wallet debit inside DB transaction; use raw SQL or row lock if Prisma cannot express it safely. | No |
 | Affected row count 0 classification | Decide how to distinguish `INSUFFICIENT_BALANCE` from `CONCURRENT_WALLET_UPDATE`. | Users get misleading errors and retry policy becomes unsafe. | Reread source wallet after zero affected rows; insufficient balance returns `INSUFFICIENT_BALANCE`, otherwise `CONCURRENT_WALLET_UPDATE`. | No |
 | Source/target wallet update order | Decide lock/update order for source and target wallets. | Deadlocks, partial assumptions, or incorrect `balanceAfter` values. | Lock/read wallets in deterministic currency/id order if using locks; perform guarded source debit before target credit inside one transaction. | No |
@@ -77,8 +82,8 @@
 | `sourceType` priority | Decide priority when `provider_api`, `official_batch`, and `admin_manual` rows coexist. | Execute can use an official batch/reference row or manual row unexpectedly. | STOP 유지; do not mix source types for execute until priority is accepted. | No |
 | Provider coexistence | Decide provider_api/official_batch/admin_manual coexistence and fallback rules. | Manual correction or official reference rows can override provider rows without intent. | For local smoke, allow approved fresh `admin_manual`; production coexistence remains STOP. | No |
 | `/fx execute` equity snapshot creation | Decide whether execute creates `equity_snapshots`. | Cash-only snapshots can be mistaken as authoritative valuation. | Do not create `equity_snapshots` in near-term execute. | No |
-| Error envelope/code | Confirm execute error codes, HTTP statuses, and response envelope. | Frontend and retry logic cannot distinguish validation, stale rate, duplicate, or concurrency errors. | Reuse common `{ success: false, error: { code, message } }`; finalize execute-specific code list before coding. | No |
-| Retryable vs non-retryable errors | Classify stale rate, insufficient balance, idempotency conflict, concurrency, and infrastructure failures. | Clients can retry non-retryable financial failures or fail to retry safe transient failures. | Non-retryable: validation, conflict, insufficient balance, stale rate. Retryable only after explicit infra/concurrency classification. | No |
+| Error envelope/code | Accepted error/status policy must be carried into implementation tests. | Frontend and retry logic cannot distinguish validation, stale rate, duplicate, or concurrency errors. | Use accepted table in `docs/fx-execute-error-policy.md`. | No; other STOP remain |
+| Retryable vs non-retryable errors | Accepted retryability policy must be carried into implementation tests. | Clients can retry non-retryable financial failures or fail to retry safe transient failures. | Use accepted retryability policy in `docs/fx-execute-error-policy.md`. | No; other STOP remain |
 
 ## Defect scenarios to prevent
 - Client timeout after a successful commit leads to retry with the same request and the source wallet is debited twice.
@@ -114,8 +119,9 @@ Do not add these tests in this documentation task. Include them in the implement
 - Insufficient source balance.
 - Duplicate same `idempotencyKey` and same `requestHash` succeeded replay.
 - Duplicate same `idempotencyKey` and different `requestHash` conflict.
-- Pending duplicate behavior.
-- Failed duplicate behavior.
+- Fresh pending duplicate returns `IDEMPOTENCY_PENDING`.
+- Stale pending duplicate returns `IDEMPOTENCY_PENDING_STALE`.
+- Failed duplicate returns `IDEMPOTENCY_FAILED` or stored original failure payload without wallet mutation.
 - KRW -> USD calculation.
 - USD -> KRW calculation.
 - Source wallet debit amount.
@@ -153,7 +159,7 @@ Move to implementation only after all of the following are true:
 - Decimal rounding/scale accepted policy is included in implementation tests.
 - Execute-time FX snapshot selection, freshness, and `sourceType` policy are confirmed.
 - `requestHash` canonical rule is included in implementation tests.
-- Pending/failed idempotency lifecycle is confirmed.
+- Pending/succeeded/failed idempotency lifecycle is accepted and included in tests.
 - The test matrix is included in the implementation task.
 - There is a local smoke procedure using an approved fresh `admin_manual` snapshot independent of provider final selection.
 - Partial-write rollback behavior is testable before production provider ingestion.
