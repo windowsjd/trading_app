@@ -7,7 +7,8 @@
 - health API 완료.
 - Prisma 7 + `prisma.config.ts` + adapter 방식 유지 중.
 - 기존 migration/seed 임의 변경 금지.
-- fake 데이터 기반 계산 또는 fake/static/temporary business FX rate 금지.
+- fake 데이터 기반 계산 금지.
+- fake/static/temporary/sample/test business FX rate 금지.
 
 ## 2. 구현 완료 API
 - `GET /api/v1/seasons/current`
@@ -98,6 +99,8 @@ near-term ledger/FX foundation:
   - wallet conditional update/row-level lock
   - failed command lifecycle
   - execute-time snapshot selection/freshness/sourceType policy
+  - provider_api / official_batch / admin_manual coexistence
+  - rollback / partial-write test gate
 - Decimal rounding mode와 scale/formatting 정책은 half-up 기준으로 문서상 확정됨.
 - requestHash canonical rule은 SHA-256/canonical JSON 기준으로 문서상 확정됨.
 - pending/failed lifecycle은 아직 최종 확정 아님.
@@ -158,7 +161,9 @@ near-term ledger/FX foundation:
 - `/fx execute` STOP decision tracker 검토.
 - pending/succeeded/failed idempotency lifecycle 확정.
 - wallet conditional update 또는 row-level lock 전략 확정.
+- provider coexistence/fallback policy 확정.
 - error code/status/retryability mapping 확정.
+- rollback/partial-write test gate 확정.
 - half-up Decimal 및 requestHash canonical rule 구현 전 테스트 gate 반영.
 - execute-time snapshot selection/freshness/sourceType policy 확정.
 - assets 도입.
