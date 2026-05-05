@@ -26,6 +26,7 @@ describe('fx execute error policy', () => {
     FX_RATE_STALE: 503,
     CONCURRENT_WALLET_UPDATE: 409,
     EXECUTE_TRANSACTION_FAILED: 500,
+    EXECUTE_WRITE_PATH_NOT_IMPLEMENTED: 501,
     INTERNAL_ERROR: 500,
   } as const;
 
@@ -61,6 +62,7 @@ describe('fx execute error policy', () => {
       'SOURCE_WALLET_NOT_FOUND',
       'TARGET_WALLET_NOT_FOUND',
       'INSUFFICIENT_BALANCE',
+      'EXECUTE_WRITE_PATH_NOT_IMPLEMENTED',
     ] as const;
 
     for (const code of noMutationCodes) {

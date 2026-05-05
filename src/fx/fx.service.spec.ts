@@ -6,6 +6,11 @@ jest.mock('../generated/prisma/client', () => {
       KRW: 'KRW',
       USD: 'USD',
     },
+    FxRateSourceType: {
+      official_batch: 'official_batch',
+      provider_api: 'provider_api',
+      admin_manual: 'admin_manual',
+    },
     Prisma: {
       Decimal,
     },
@@ -21,7 +26,12 @@ jest.mock('../generated/prisma/client', () => {
 
 import { HttpException } from '@nestjs/common';
 import { CurrencyCode, Prisma, SeasonStatus } from '../generated/prisma/client';
-import { FxService } from './fx.service';
+import {
+  FxService,
+  mapFxExecuteOrchestrationDecisionToSkeletonResponse,
+} from './fx.service';
+import { fxExecuteErrorMetadata } from './fx-execute-error-policy';
+import type { FxExecuteOrchestrationDecision } from './fx-execute-orchestration-policy';
 
 const now = new Date('2026-05-01T00:01:00.000Z');
 const capturedAt = new Date('2026-05-01T00:00:30.000Z');
@@ -31,11 +41,15 @@ const staleEffectiveAt = new Date('2026-04-30T23:59:59.999Z');
 
 describe('FxService', () => {
   const createPrisma = () => ({
+    $transaction: jest.fn(),
     season: {
       findFirst: jest.fn(),
     },
     seasonParticipant: {
       findUnique: jest.fn(),
+    },
+    cashWallet: {
+      update: jest.fn(),
     },
     fxRateSnapshot: {
       findFirst: jest.fn(),
@@ -48,6 +62,7 @@ describe('FxService', () => {
     },
     fxExecuteRequest: {
       create: jest.fn(),
+      update: jest.fn(),
     },
     equitySnapshot: {
       create: jest.fn(),
@@ -62,7 +77,23 @@ describe('FxService', () => {
     return response.error.code;
   };
 
-  const expectErrorCode = async (
+  const getErrorResponse = (error: unknown) =>
+    (error as HttpException).getResponse() as {
+      success: false;
+      error: { code: string; message: string };
+    };
+
+  const expectErrorCode = async (promise: Promise<unknown>, code: string) => {
+    await expect(promise).rejects.toBeInstanceOf(HttpException);
+
+    try {
+      await promise;
+    } catch (error) {
+      expect(getErrorCode(error)).toBe(code);
+    }
+  };
+
+  const expectExecuteErrorCode = async (
     promise: Promise<unknown>,
     code: string,
   ) => {
@@ -71,8 +102,30 @@ describe('FxService', () => {
     try {
       await promise;
     } catch (error) {
-      expect(getErrorCode(error)).toBe(code);
+      expect(getErrorResponse(error)).toEqual({
+        success: false,
+        error: {
+          code,
+          message:
+            fxExecuteErrorMetadata[code as keyof typeof fxExecuteErrorMetadata]
+              .defaultMessage,
+        },
+      });
+      expect((error as HttpException).getStatus()).toBe(
+        fxExecuteErrorMetadata[code as keyof typeof fxExecuteErrorMetadata]
+          .httpStatus,
+      );
     }
+  };
+
+  const expectNoExecuteWrites = (prisma: ReturnType<typeof createPrisma>) => {
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.cashWallet.update).not.toHaveBeenCalled();
+    expect(prisma.exchangeTransaction.create).not.toHaveBeenCalled();
+    expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+    expect(prisma.fxExecuteRequest.create).not.toHaveBeenCalled();
+    expect(prisma.fxExecuteRequest.update).not.toHaveBeenCalled();
+    expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
   };
 
   const createService = () => {
@@ -159,13 +212,11 @@ describe('FxService', () => {
 
   it('rejects when current season is not active', async () => {
     const { prisma, service } = createService();
-    prisma.season.findFirst
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({
-        id: 'season-1',
-        status: SeasonStatus.upcoming,
-        fxFeeRate: new Prisma.Decimal('0.001000'),
-      });
+    prisma.season.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({
+      id: 'season-1',
+      status: SeasonStatus.upcoming,
+      fxFeeRate: new Prisma.Decimal('0.001000'),
+    });
 
     await expectErrorCode(
       service.quote('user-1', {
@@ -343,6 +394,222 @@ describe('FxService', () => {
         rateCapturedAt: capturedAt.toISOString(),
         rateEffectiveAt: freshEffectiveAt.toISOString(),
       },
+    });
+  });
+
+  describe('execute skeleton', () => {
+    const validExecuteBody = {
+      fromCurrency: 'KRW',
+      toCurrency: 'USD',
+      sourceAmount: '1000',
+      idempotencyKey: 'idempotency-key-1',
+    };
+
+    it('returns IDEMPOTENCY_REQUIRED for missing idempotencyKey', async () => {
+      const { prisma, service } = createService();
+
+      await expectExecuteErrorCode(
+        service.execute('user-1', {
+          ...validExecuteBody,
+          idempotencyKey: undefined,
+        }),
+        'IDEMPOTENCY_REQUIRED',
+      );
+      expectNoExecuteWrites(prisma);
+      expect(prisma.season.findFirst).not.toHaveBeenCalled();
+      expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('returns INVALID_CURRENCY_PAIR for invalid pair', async () => {
+      const { prisma, service } = createService();
+
+      await expectExecuteErrorCode(
+        service.execute('user-1', {
+          ...validExecuteBody,
+          toCurrency: 'KRW',
+        }),
+        'INVALID_CURRENCY_PAIR',
+      );
+      expectNoExecuteWrites(prisma);
+      expect(prisma.season.findFirst).not.toHaveBeenCalled();
+      expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('returns INVALID_AMOUNT for invalid amount', async () => {
+      const { prisma, service } = createService();
+
+      await expectExecuteErrorCode(
+        service.execute('user-1', {
+          ...validExecuteBody,
+          sourceAmount: '0',
+        }),
+        'INVALID_AMOUNT',
+      );
+      expectNoExecuteWrites(prisma);
+      expect(prisma.season.findFirst).not.toHaveBeenCalled();
+      expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('returns EXECUTE_WRITE_PATH_NOT_IMPLEMENTED for a valid request', async () => {
+      const { prisma, service } = createService();
+
+      await expectExecuteErrorCode(
+        service.execute('user-1', validExecuteBody),
+        'EXECUTE_WRITE_PATH_NOT_IMPLEMENTED',
+      );
+      expectNoExecuteWrites(prisma);
+      expect(prisma.season.findFirst).not.toHaveBeenCalled();
+      expect(prisma.seasonParticipant.findUnique).not.toHaveBeenCalled();
+      expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('defines EXECUTE_WRITE_PATH_NOT_IMPLEMENTED as a 501 skeleton code', () => {
+      expect(
+        fxExecuteErrorMetadata.EXECUTE_WRITE_PATH_NOT_IMPLEMENTED,
+      ).toMatchObject({
+        httpStatus: 501,
+        retryability: 'non_retryable',
+        walletMutationAllowed: 'no',
+        defaultMessage: '/fx execute write path is not implemented yet.',
+      });
+    });
+  });
+
+  describe('execute orchestration decision mapper', () => {
+    const mapDecision = (decision: FxExecuteOrchestrationDecision) =>
+      mapFxExecuteOrchestrationDecisionToSkeletonResponse(decision);
+
+    it('maps request_preflight error decision to an error envelope', () => {
+      expect(
+        mapDecision({
+          action: 'return_error',
+          source: 'request_preflight',
+          errorCode: 'INVALID_AMOUNT',
+        }),
+      ).toEqual({
+        success: false,
+        error: {
+          code: 'INVALID_AMOUNT',
+          message: 'Invalid amount',
+        },
+      });
+    });
+
+    it('maps idempotency error decision to an error envelope', () => {
+      expect(
+        mapDecision({
+          action: 'return_error',
+          source: 'idempotency',
+          errorCode: 'IDEMPOTENCY_PENDING',
+          commandId: 'command-1',
+        }),
+      ).toEqual({
+        success: false,
+        error: {
+          code: 'IDEMPOTENCY_PENDING',
+          message: 'Idempotent request is still pending',
+        },
+      });
+    });
+
+    it('maps idempotency_recovery decision to an INTERNAL_ERROR envelope', () => {
+      expect(
+        mapDecision({
+          action: 'return_error',
+          source: 'idempotency_recovery',
+          errorCode: 'INTERNAL_ERROR',
+          commandId: 'command-1',
+          reason: 'succeeded command is missing responsePayloadJson',
+        }),
+      ).toEqual({
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Internal server error',
+        },
+      });
+    });
+
+    it('maps plan error decision to an error envelope', () => {
+      expect(
+        mapDecision({
+          action: 'return_error',
+          source: 'plan',
+          errorCode: 'SOURCE_WALLET_NOT_FOUND',
+        }),
+      ).toEqual({
+        success: false,
+        error: {
+          code: 'SOURCE_WALLET_NOT_FOUND',
+          message: 'Source wallet not found',
+        },
+      });
+    });
+
+    it('returns replay_succeeded stored responsePayloadJson unchanged', () => {
+      const responsePayloadJson = {
+        success: true,
+        data: {
+          exchangeId: 'exchange-1',
+          rate: 'stored-rate',
+        },
+      };
+
+      const response = mapDecision({
+        action: 'replay_succeeded',
+        commandId: 'command-1',
+        responsePayloadJson,
+      });
+
+      expect(response).toBe(responsePayloadJson);
+    });
+
+    it('maps create_pending_and_execute to write path not implemented', () => {
+      expect(
+        mapDecision({
+          action: 'create_pending_and_execute',
+          normalizedRequest: {} as never,
+          plan: {} as never,
+        }),
+      ).toEqual({
+        success: false,
+        error: {
+          code: 'EXECUTE_WRITE_PATH_NOT_IMPLEMENTED',
+          message: '/fx execute write path is not implemented yet.',
+        },
+      });
+    });
+
+    it('service pre-mutation skeleton calls orchestration and maps its decision', () => {
+      const { prisma, service } = createService();
+
+      expect(
+        service.executePreMutationSkeleton({
+          body: {
+            fromCurrency: 'KRW',
+            toCurrency: 'USD',
+            sourceAmount: '1000',
+            idempotencyKey: 'idempotency-key-1',
+          },
+          context: {
+            userId: 'user-1',
+            seasonParticipantId: 'participant-1',
+          },
+          existingCommand: null,
+          sourceWallet: null,
+          targetWallet: null,
+          snapshots: [],
+          fxFeeRate: '0.001000',
+          executeNow: now,
+        }),
+      ).toEqual({
+        success: false,
+        error: {
+          code: 'SOURCE_WALLET_NOT_FOUND',
+          message: 'Source wallet not found',
+        },
+      });
+      expectNoExecuteWrites(prisma);
     });
   });
 });

@@ -37,6 +37,7 @@ export const fxExecuteErrorCodes = {
   FX_RATE_STALE: 'FX_RATE_STALE',
   CONCURRENT_WALLET_UPDATE: 'CONCURRENT_WALLET_UPDATE',
   EXECUTE_TRANSACTION_FAILED: 'EXECUTE_TRANSACTION_FAILED',
+  EXECUTE_WRITE_PATH_NOT_IMPLEMENTED: 'EXECUTE_WRITE_PATH_NOT_IMPLEMENTED',
   INTERNAL_ERROR: 'INTERNAL_ERROR',
 } as const;
 
@@ -164,10 +165,17 @@ export const fxExecuteErrorMetadata: Record<
     walletMutationAllowed: fxExecuteWalletMutationPolicy.rollback_only,
     defaultMessage: 'Execute transaction failed',
   },
+  EXECUTE_WRITE_PATH_NOT_IMPLEMENTED: {
+    httpStatus: 501,
+    retryability: fxExecuteRetryability.non_retryable,
+    walletMutationAllowed: fxExecuteWalletMutationPolicy.no,
+    defaultMessage: '/fx execute write path is not implemented yet.',
+  },
   INTERNAL_ERROR: {
     httpStatus: 500,
     retryability: fxExecuteRetryability.retryable_only_with_idempotency_proof,
-    walletMutationAllowed: fxExecuteWalletMutationPolicy.rollback_or_replay_only,
+    walletMutationAllowed:
+      fxExecuteWalletMutationPolicy.rollback_or_replay_only,
     defaultMessage: 'Internal server error',
   },
 };

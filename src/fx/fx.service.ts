@@ -1,16 +1,32 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import {
-  CurrencyCode,
-  Prisma,
-  SeasonStatus,
-} from '../generated/prisma/client';
+import { CurrencyCode, Prisma, SeasonStatus } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  buildFxExecuteErrorEnvelope,
+  fxExecuteErrorCodes,
+  fxExecuteErrorMetadata,
+  type FxExecuteErrorCode,
+  type FxExecuteErrorEnvelope,
+} from './fx-execute-error-policy';
+import {
+  orchestrateFxExecutePreMutation,
+  type FxExecuteOrchestrationDecision,
+  type FxExecuteOrchestrationInput,
+} from './fx-execute-orchestration-policy';
+import {
+  preflightFxExecuteRequest,
+  type FxExecuteRequestBodyLike,
+} from './fx-execute-request-policy';
 
 export type FxQuoteRequestBody = {
   fromCurrency?: unknown;
   toCurrency?: unknown;
   sourceAmount?: unknown;
 };
+
+export type FxExecuteRequestBody = FxExecuteRequestBodyLike;
+
+export type FxExecuteSkeletonResponse = FxExecuteErrorEnvelope | unknown;
 
 type ErrorBody = {
   success: false;
@@ -52,6 +68,23 @@ const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
   SeasonStatus.settled,
 ];
 const FX_RATE_STALE_THRESHOLD_MS = 60_000;
+const EXECUTE_SKELETON_PARTICIPANT_CONTEXT =
+  'execute-skeleton-participant-context-not-loaded';
+
+export function mapFxExecuteOrchestrationDecisionToSkeletonResponse(
+  decision: FxExecuteOrchestrationDecision,
+): FxExecuteSkeletonResponse {
+  switch (decision.action) {
+    case 'return_error':
+      return buildFxExecuteErrorEnvelope(decision.errorCode);
+    case 'replay_succeeded':
+      return decision.responsePayloadJson;
+    case 'create_pending_and_execute':
+      return buildFxExecuteErrorEnvelope(
+        fxExecuteErrorCodes.EXECUTE_WRITE_PATH_NOT_IMPLEMENTED,
+      );
+  }
+}
 
 @Injectable()
 export class FxService {
@@ -63,7 +96,11 @@ export class FxService {
   ): Promise<FxQuoteResponse> {
     try {
       if (!userId) {
-        this.throwApiError(HttpStatus.UNAUTHORIZED, 'UNAUTHORIZED', 'Unauthorized');
+        this.throwApiError(
+          HttpStatus.UNAUTHORIZED,
+          'UNAUTHORIZED',
+          'Unauthorized',
+        );
       }
 
       const request = this.validateQuoteRequest(body);
@@ -178,6 +215,36 @@ export class FxService {
         'Internal server error',
       );
     }
+  }
+
+  async execute(
+    userId: string | undefined,
+    body: FxExecuteRequestBody,
+  ): Promise<never> {
+    if (!userId) {
+      this.throwFxExecuteError(fxExecuteErrorCodes.UNAUTHORIZED);
+    }
+
+    const preflightResult = preflightFxExecuteRequest(body, {
+      userId,
+      seasonParticipantId: EXECUTE_SKELETON_PARTICIPANT_CONTEXT,
+    });
+
+    if (!preflightResult.ok) {
+      this.throwFxExecuteError(preflightResult.errorCode);
+    }
+
+    this.throwFxExecuteError(
+      fxExecuteErrorCodes.EXECUTE_WRITE_PATH_NOT_IMPLEMENTED,
+    );
+  }
+
+  executePreMutationSkeleton(
+    input: FxExecuteOrchestrationInput,
+  ): FxExecuteSkeletonResponse {
+    return mapFxExecuteOrchestrationDecisionToSkeletonResponse(
+      orchestrateFxExecutePreMutation(input),
+    );
   }
 
   private async findCurrentSeason(): Promise<ActiveSeasonRecord> {
@@ -298,7 +365,20 @@ export class FxService {
     };
   }
 
-  private throwApiError(status: HttpStatus, code: string, message: string): never {
+  private throwApiError(
+    status: HttpStatus,
+    code: string,
+    message: string,
+  ): never {
     throw new HttpException(this.createErrorBody(code, message), status);
+  }
+
+  private throwFxExecuteError(code: FxExecuteErrorCode): never {
+    const metadata = fxExecuteErrorMetadata[code];
+
+    throw new HttpException(
+      buildFxExecuteErrorEnvelope(code),
+      metadata.httpStatus,
+    );
   }
 }
