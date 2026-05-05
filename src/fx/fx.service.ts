@@ -1,5 +1,11 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { CurrencyCode, Prisma, SeasonStatus } from '../generated/prisma/client';
+import {
+  CurrencyCode,
+  FxExecuteRequestStatus,
+  FxRateSourceType,
+  Prisma,
+  SeasonStatus,
+} from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   buildFxExecuteErrorEnvelope,
@@ -8,11 +14,16 @@ import {
   type FxExecuteErrorCode,
   type FxExecuteErrorEnvelope,
 } from './fx-execute-error-policy';
+import type { FxExecuteCommandCandidate } from './fx-execute-idempotency-decision-policy';
 import {
   orchestrateFxExecutePreMutation,
   type FxExecuteOrchestrationDecision,
   type FxExecuteOrchestrationInput,
 } from './fx-execute-orchestration-policy';
+import type {
+  FxExecuteSnapshotWithId,
+  FxExecuteWalletCandidate,
+} from './fx-execute-plan-policy';
 import {
   preflightFxExecuteRequest,
   type FxExecuteRequestBodyLike,
@@ -70,6 +81,7 @@ const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
 const FX_RATE_STALE_THRESHOLD_MS = 60_000;
 const EXECUTE_SKELETON_PARTICIPANT_CONTEXT =
   'execute-skeleton-participant-context-not-loaded';
+const FX_EXECUTE_SNAPSHOT_CANDIDATE_LIMIT = 5;
 
 export function mapFxExecuteOrchestrationDecisionToSkeletonResponse(
   decision: FxExecuteOrchestrationDecision,
@@ -220,23 +232,95 @@ export class FxService {
   async execute(
     userId: string | undefined,
     body: FxExecuteRequestBody,
-  ): Promise<never> {
-    if (!userId) {
-      this.throwFxExecuteError(fxExecuteErrorCodes.UNAUTHORIZED);
+  ): Promise<FxExecuteSkeletonResponse> {
+    try {
+      if (!userId) {
+        this.throwFxExecuteError(fxExecuteErrorCodes.UNAUTHORIZED);
+      }
+
+      const basicPreflightResult = preflightFxExecuteRequest(body, {
+        userId,
+        seasonParticipantId: EXECUTE_SKELETON_PARTICIPANT_CONTEXT,
+      });
+
+      if (!basicPreflightResult.ok) {
+        this.throwFxExecuteError(basicPreflightResult.errorCode);
+      }
+
+      const season = await this.findCurrentSeason();
+
+      if (season.status !== SeasonStatus.active) {
+        this.throwFxExecuteError(fxExecuteErrorCodes.SEASON_NOT_ACTIVE);
+      }
+
+      const participant = await this.prisma.seasonParticipant.findUnique({
+        where: {
+          seasonId_userId: {
+            seasonId: season.id,
+            userId,
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!participant) {
+        this.throwFxExecuteError(fxExecuteErrorCodes.SEASON_NOT_JOINED);
+      }
+
+      const preflightResult = preflightFxExecuteRequest(body, {
+        userId,
+        seasonParticipantId: participant.id,
+      });
+
+      if (!preflightResult.ok) {
+        this.throwFxExecuteError(preflightResult.errorCode);
+      }
+
+      const normalizedRequest = preflightResult.value;
+      const executeNow = new Date();
+      const [existingCommand, sourceWallet, targetWallet, snapshots] =
+        await Promise.all([
+          this.findFxExecuteCommandCandidate(
+            userId,
+            normalizedRequest.idempotencyKey,
+          ),
+          this.findFxExecuteWalletCandidate(
+            participant.id,
+            normalizedRequest.fromCurrency,
+          ),
+          this.findFxExecuteWalletCandidate(
+            participant.id,
+            normalizedRequest.toCurrency,
+          ),
+          this.findFxExecuteSnapshotCandidates(executeNow),
+        ]);
+
+      const response = mapFxExecuteOrchestrationDecisionToSkeletonResponse(
+        orchestrateFxExecutePreMutation({
+          body,
+          context: {
+            userId,
+            seasonParticipantId: participant.id,
+          },
+          existingCommand,
+          sourceWallet,
+          targetWallet,
+          snapshots,
+          fxFeeRate: this.formatDecimal(season.fxFeeRate, 6),
+          executeNow,
+        }),
+      );
+
+      return this.returnFxExecuteSkeletonResponseOrThrow(response);
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.throwFxExecuteError(fxExecuteErrorCodes.INTERNAL_ERROR);
     }
-
-    const preflightResult = preflightFxExecuteRequest(body, {
-      userId,
-      seasonParticipantId: EXECUTE_SKELETON_PARTICIPANT_CONTEXT,
-    });
-
-    if (!preflightResult.ok) {
-      this.throwFxExecuteError(preflightResult.errorCode);
-    }
-
-    this.throwFxExecuteError(
-      fxExecuteErrorCodes.EXECUTE_WRITE_PATH_NOT_IMPLEMENTED,
-    );
   }
 
   executePreMutationSkeleton(
@@ -353,6 +437,145 @@ export class FxService {
 
   private formatDecimal(value: Prisma.Decimal, scale: number) {
     return value.toFixed(scale);
+  }
+
+  private async findFxExecuteCommandCandidate(
+    userId: string,
+    idempotencyKey: string,
+  ): Promise<FxExecuteCommandCandidate | null> {
+    const command = await this.prisma.fxExecuteRequest.findUnique({
+      where: {
+        userId_idempotencyKey: {
+          userId,
+          idempotencyKey,
+        },
+      },
+      select: {
+        id: true,
+        idempotencyKey: true,
+        requestHash: true,
+        status: true,
+        requestedAt: true,
+        completedAt: true,
+        responsePayloadJson: true,
+        errorCode: true,
+        errorMessage: true,
+        exchangeTransactionId: true,
+      },
+    });
+
+    if (!command) {
+      return null;
+    }
+
+    return {
+      ...command,
+      status: this.toFxExecuteCommandStatus(command.status),
+    };
+  }
+
+  private toFxExecuteCommandStatus(
+    status: FxExecuteRequestStatus | string,
+  ): FxExecuteCommandCandidate['status'] {
+    switch (status) {
+      case FxExecuteRequestStatus.pending:
+        return 'pending';
+      case FxExecuteRequestStatus.succeeded:
+        return 'succeeded';
+      case FxExecuteRequestStatus.failed:
+        return 'failed';
+      default:
+        return status as FxExecuteCommandCandidate['status'];
+    }
+  }
+
+  private async findFxExecuteWalletCandidate(
+    seasonParticipantId: string,
+    currencyCode: FxExecuteWalletCandidate['currencyCode'],
+  ): Promise<FxExecuteWalletCandidate | null> {
+    return this.prisma.cashWallet.findUnique({
+      where: {
+        seasonParticipantId_currencyCode: {
+          seasonParticipantId,
+          currencyCode,
+        },
+      },
+      select: {
+        id: true,
+        seasonParticipantId: true,
+        currencyCode: true,
+        balanceAmount: true,
+      },
+    });
+  }
+
+  private async findFxExecuteSnapshotCandidates(
+    executeNow: Date,
+  ): Promise<FxExecuteSnapshotWithId[]> {
+    return this.prisma.fxRateSnapshot.findMany({
+      where: {
+        baseCurrency: CurrencyCode.USD,
+        quoteCurrency: CurrencyCode.KRW,
+        sourceType: FxRateSourceType.admin_manual,
+        effectiveAt: {
+          lte: executeNow,
+        },
+      },
+      orderBy: [
+        { effectiveAt: 'desc' },
+        { capturedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      take: FX_EXECUTE_SNAPSHOT_CANDIDATE_LIMIT,
+      select: {
+        id: true,
+        baseCurrency: true,
+        quoteCurrency: true,
+        sourceType: true,
+        rate: true,
+        effectiveAt: true,
+        capturedAt: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  private returnFxExecuteSkeletonResponseOrThrow(
+    response: FxExecuteSkeletonResponse,
+  ): FxExecuteSkeletonResponse {
+    if (this.isFxExecuteErrorEnvelope(response)) {
+      this.throwFxExecuteError(response.error.code);
+    }
+
+    if (response == null) {
+      this.throwFxExecuteError(fxExecuteErrorCodes.INTERNAL_ERROR);
+    }
+
+    return response;
+  }
+
+  private isFxExecuteErrorEnvelope(
+    value: FxExecuteSkeletonResponse,
+  ): value is FxExecuteErrorEnvelope {
+    if (typeof value !== 'object' || value === null) {
+      return false;
+    }
+
+    const maybeEnvelope = value as Partial<FxExecuteErrorEnvelope>;
+
+    return (
+      maybeEnvelope.success === false &&
+      typeof maybeEnvelope.error === 'object' &&
+      maybeEnvelope.error !== null &&
+      this.isFxExecuteErrorCode(maybeEnvelope.error.code)
+    );
+  }
+
+  private isFxExecuteErrorCode(value: unknown): value is FxExecuteErrorCode {
+    return (
+      typeof value === 'string' &&
+      fxExecuteErrorCodes[value as keyof typeof fxExecuteErrorCodes] === value
+    );
   }
 
   private createErrorBody(code: string, message: string): ErrorBody {
