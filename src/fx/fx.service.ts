@@ -280,22 +280,42 @@ export class FxService {
 
       const normalizedRequest = preflightResult.value;
       const executeNow = new Date();
-      const [existingCommand, sourceWallet, targetWallet, snapshots] =
-        await Promise.all([
-          this.findFxExecuteCommandCandidate(
-            userId,
-            normalizedRequest.idempotencyKey,
-          ),
-          this.findFxExecuteWalletCandidate(
-            participant.id,
-            normalizedRequest.fromCurrency,
-          ),
-          this.findFxExecuteWalletCandidate(
-            participant.id,
-            normalizedRequest.toCurrency,
-          ),
-          this.findFxExecuteSnapshotCandidates(executeNow),
-        ]);
+      const existingCommand = await this.findFxExecuteCommandCandidate(
+        userId,
+        normalizedRequest.idempotencyKey,
+      );
+
+      if (existingCommand) {
+        const response = mapFxExecuteOrchestrationDecisionToSkeletonResponse(
+          orchestrateFxExecutePreMutation({
+            body,
+            context: {
+              userId,
+              seasonParticipantId: participant.id,
+            },
+            existingCommand,
+            sourceWallet: null,
+            targetWallet: null,
+            snapshots: [],
+            fxFeeRate: this.formatDecimal(season.fxFeeRate, 6),
+            executeNow,
+          }),
+        );
+
+        return this.returnFxExecuteSkeletonResponseOrThrow(response);
+      }
+
+      const [sourceWallet, targetWallet, snapshots] = await Promise.all([
+        this.findFxExecuteWalletCandidate(
+          participant.id,
+          normalizedRequest.fromCurrency,
+        ),
+        this.findFxExecuteWalletCandidate(
+          participant.id,
+          normalizedRequest.toCurrency,
+        ),
+        this.findFxExecuteSnapshotCandidates(executeNow),
+      ]);
 
       const response = mapFxExecuteOrchestrationDecisionToSkeletonResponse(
         orchestrateFxExecutePreMutation({

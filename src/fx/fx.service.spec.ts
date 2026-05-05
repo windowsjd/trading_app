@@ -148,6 +148,21 @@ describe('FxService', () => {
     expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
   };
 
+  const expectNoExecutePlanReads = (
+    prisma: ReturnType<typeof createPrisma>,
+  ) => {
+    expect(prisma.cashWallet.findUnique).not.toHaveBeenCalled();
+    expect(prisma.fxRateSnapshot.findMany).not.toHaveBeenCalled();
+  };
+
+  const expectExecutePlanReads = (
+    prisma: ReturnType<typeof createPrisma>,
+  ) => {
+    expect(prisma.fxExecuteRequest.findUnique).toHaveBeenCalledTimes(1);
+    expect(prisma.cashWallet.findUnique).toHaveBeenCalledTimes(2);
+    expect(prisma.fxRateSnapshot.findMany).toHaveBeenCalledTimes(1);
+  };
+
   const createService = () => {
     const prisma = createPrisma();
     const service = new FxService(prisma as never);
@@ -647,6 +662,8 @@ describe('FxService', () => {
         service.execute('user-1', validExecuteBody),
         'IDEMPOTENCY_PENDING',
       );
+      expect(prisma.fxExecuteRequest.findUnique).toHaveBeenCalledTimes(1);
+      expectNoExecutePlanReads(prisma);
       expectNoExecuteWrites(prisma);
     });
 
@@ -664,6 +681,8 @@ describe('FxService', () => {
         service.execute('user-1', validExecuteBody),
         'IDEMPOTENCY_PENDING_STALE',
       );
+      expect(prisma.fxExecuteRequest.findUnique).toHaveBeenCalledTimes(1);
+      expectNoExecutePlanReads(prisma);
       expectNoExecuteWrites(prisma);
     });
 
@@ -681,6 +700,8 @@ describe('FxService', () => {
         service.execute('user-1', validExecuteBody),
         'IDEMPOTENCY_CONFLICT',
       );
+      expect(prisma.fxExecuteRequest.findUnique).toHaveBeenCalledTimes(1);
+      expectNoExecutePlanReads(prisma);
       expectNoExecuteWrites(prisma);
     });
 
@@ -700,6 +721,8 @@ describe('FxService', () => {
         service.execute('user-1', validExecuteBody),
         'IDEMPOTENCY_FAILED',
       );
+      expect(prisma.fxExecuteRequest.findUnique).toHaveBeenCalledTimes(1);
+      expectNoExecutePlanReads(prisma);
       expectNoExecuteWrites(prisma);
     });
 
@@ -718,6 +741,8 @@ describe('FxService', () => {
       await expect(
         service.execute('user-1', validExecuteBody),
       ).resolves.toBe(storedSucceededPayload);
+      expect(prisma.fxExecuteRequest.findUnique).toHaveBeenCalledTimes(1);
+      expectNoExecutePlanReads(prisma);
       expectNoExecuteWrites(prisma);
     });
 
@@ -736,6 +761,8 @@ describe('FxService', () => {
         service.execute('user-1', validExecuteBody),
         'INTERNAL_ERROR',
       );
+      expect(prisma.fxExecuteRequest.findUnique).toHaveBeenCalledTimes(1);
+      expectNoExecutePlanReads(prisma);
       expectNoExecuteWrites(prisma);
     });
 
@@ -751,6 +778,8 @@ describe('FxService', () => {
         service.execute('user-1', validExecuteBody),
         'INTERNAL_ERROR',
       );
+      expect(prisma.fxExecuteRequest.findUnique).toHaveBeenCalledTimes(1);
+      expectNoExecutePlanReads(prisma);
       expectNoExecuteWrites(prisma);
     });
 
@@ -766,6 +795,7 @@ describe('FxService', () => {
         service.execute('user-1', validExecuteBody),
         'SOURCE_WALLET_NOT_FOUND',
       );
+      expectExecutePlanReads(prisma);
       expectNoExecuteWrites(prisma);
     });
 
@@ -781,6 +811,7 @@ describe('FxService', () => {
         service.execute('user-1', validExecuteBody),
         'TARGET_WALLET_NOT_FOUND',
       );
+      expectExecutePlanReads(prisma);
       expectNoExecuteWrites(prisma);
     });
 
@@ -796,6 +827,7 @@ describe('FxService', () => {
         service.execute('user-1', validExecuteBody),
         'FX_RATE_UNAVAILABLE',
       );
+      expectExecutePlanReads(prisma);
       expectNoExecuteWrites(prisma);
     });
 
@@ -816,6 +848,7 @@ describe('FxService', () => {
         service.execute('user-1', validExecuteBody),
         'FX_RATE_STALE',
       );
+      expectExecutePlanReads(prisma);
       expectNoExecuteWrites(prisma);
     });
 
@@ -834,6 +867,7 @@ describe('FxService', () => {
         service.execute('user-1', validExecuteBody),
         'INSUFFICIENT_BALANCE',
       );
+      expectExecutePlanReads(prisma);
       expectNoExecuteWrites(prisma);
     });
 
@@ -847,6 +881,7 @@ describe('FxService', () => {
         service.execute('user-1', validExecuteBody),
         'EXECUTE_WRITE_PATH_NOT_IMPLEMENTED',
       );
+      expectExecutePlanReads(prisma);
       expectNoExecuteWrites(prisma);
     });
 
@@ -943,6 +978,25 @@ describe('FxService', () => {
       });
       expectNoExecuteWrites(prisma);
     });
+
+    /*
+     * Execute write path atomic transaction scaffold/checklist for the next task:
+     * - creates pending fxExecuteRequest before guarded write path
+     * - guarded conditional source debit prevents overspend
+     * - source debit affected row count 0 classification
+     * - target credit occurs only after source debit success
+     * - exchangeTransaction row is created with plan values
+     * - source walletTransaction row is created with actual post-update balanceAfter
+     * - target walletTransaction row is created with actual post-update balanceAfter
+     * - fxExecuteRequest finalized to succeeded with exchangeTransactionId and responsePayloadJson
+     * - target credit failure rolls back source debit
+     * - exchange row failure rolls back wallet changes
+     * - ledger row failure rolls back wallet/exchange changes
+     * - responsePayloadJson storage failure does not commit success
+     * - duplicate retry after response loss does not create second wallet mutation
+     * - no equitySnapshot row is created
+     * - no fee walletTransaction row is created
+     */
 
     it('defines EXECUTE_WRITE_PATH_NOT_IMPLEMENTED as a 501 skeleton code', () => {
       expect(
