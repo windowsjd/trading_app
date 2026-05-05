@@ -5,6 +5,9 @@ import {
   FxRateSourceType,
   Prisma,
   SeasonStatus,
+  WalletTransactionDirection,
+  WalletTransactionReferenceType,
+  WalletTransactionType,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -21,11 +24,13 @@ import {
   type FxExecuteOrchestrationInput,
 } from './fx-execute-orchestration-policy';
 import type {
+  FxExecutePlan,
   FxExecuteSnapshotWithId,
   FxExecuteWalletCandidate,
 } from './fx-execute-plan-policy';
 import {
   preflightFxExecuteRequest,
+  type NormalizedFxExecuteRequest,
   type FxExecuteRequestBodyLike,
 } from './fx-execute-request-policy';
 
@@ -38,6 +43,30 @@ export type FxQuoteRequestBody = {
 export type FxExecuteRequestBody = FxExecuteRequestBodyLike;
 
 export type FxExecuteSkeletonResponse = FxExecuteErrorEnvelope | unknown;
+
+export type FxExecuteSuccessResponse = {
+  success: true;
+  data: {
+    exchangeId: string;
+    executedAt: string;
+    fromCurrency: CurrencyCode;
+    toCurrency: CurrencyCode;
+    sourceAmount: string;
+    grossTargetAmount: string;
+    feeRate: string;
+    feeAmount: string;
+    feeCurrency: CurrencyCode;
+    appliedRate: string;
+    netTargetAmount: string;
+    sourceWalletId: string;
+    targetWalletId: string;
+    sourceWalletBalanceAfter: string;
+    targetWalletBalanceAfter: string;
+    fxRateSnapshotId: string;
+    rateCapturedAt: string;
+    rateEffectiveAt: string;
+  };
+};
 
 type ErrorBody = {
   success: false;
@@ -82,6 +111,15 @@ const FX_RATE_STALE_THRESHOLD_MS = 60_000;
 const EXECUTE_SKELETON_PARTICIPANT_CONTEXT =
   'execute-skeleton-participant-context-not-loaded';
 const FX_EXECUTE_SNAPSHOT_CANDIDATE_LIMIT = 5;
+
+type FxExecuteTransactionClient = Prisma.TransactionClient;
+
+type FxExecutePostUpdateWallet = {
+  id: string;
+  seasonParticipantId: string;
+  currencyCode: CurrencyCode;
+  balanceAmount: Prisma.Decimal;
+};
 
 export function mapFxExecuteOrchestrationDecisionToSkeletonResponse(
   decision: FxExecuteOrchestrationDecision,
@@ -317,23 +355,32 @@ export class FxService {
         this.findFxExecuteSnapshotCandidates(executeNow),
       ]);
 
-      const response = mapFxExecuteOrchestrationDecisionToSkeletonResponse(
-        orchestrateFxExecutePreMutation({
-          body,
-          context: {
-            userId,
-            seasonParticipantId: participant.id,
-          },
-          existingCommand,
-          sourceWallet,
-          targetWallet,
-          snapshots,
-          fxFeeRate: this.formatDecimal(season.fxFeeRate, 6),
-          executeNow,
-        }),
-      );
+      const decision = orchestrateFxExecutePreMutation({
+        body,
+        context: {
+          userId,
+          seasonParticipantId: participant.id,
+        },
+        existingCommand,
+        sourceWallet,
+        targetWallet,
+        snapshots,
+        fxFeeRate: this.formatDecimal(season.fxFeeRate, 6),
+        executeNow,
+      });
 
-      return this.returnFxExecuteSkeletonResponseOrThrow(response);
+      if (decision.action !== 'create_pending_and_execute') {
+        return this.returnFxExecuteSkeletonResponseOrThrow(
+          mapFxExecuteOrchestrationDecisionToSkeletonResponse(decision),
+        );
+      }
+
+      return await this.executeFxWritePath({
+        body,
+        normalizedRequest,
+        plan: decision.plan,
+        executeNow,
+      });
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -558,6 +605,337 @@ export class FxService {
         createdAt: true,
       },
     });
+  }
+
+  private async executeFxWritePath(input: {
+    body: FxExecuteRequestBody;
+    normalizedRequest: NormalizedFxExecuteRequest;
+    plan: FxExecutePlan;
+    executeNow: Date;
+  }): Promise<FxExecuteSuccessResponse> {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        return this.executeFxWritePathInTransaction(tx, input);
+      });
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      if (this.isUniqueConstraintError(error)) {
+        const existingCommand = await this.findFxExecuteCommandCandidate(
+          input.normalizedRequest.userId,
+          input.normalizedRequest.idempotencyKey,
+        );
+
+        if (existingCommand) {
+          const response = mapFxExecuteOrchestrationDecisionToSkeletonResponse(
+            orchestrateFxExecutePreMutation({
+              body: input.body,
+              context: {
+                userId: input.normalizedRequest.userId,
+                seasonParticipantId: input.normalizedRequest.seasonParticipantId,
+              },
+              existingCommand,
+              sourceWallet: null,
+              targetWallet: null,
+              snapshots: [],
+              fxFeeRate: input.plan.feeRate,
+              executeNow: input.executeNow,
+            }),
+          );
+
+          return this.returnFxExecuteSkeletonResponseOrThrow(
+            response,
+          ) as FxExecuteSuccessResponse;
+        }
+      }
+
+      this.throwFxExecuteError(fxExecuteErrorCodes.EXECUTE_TRANSACTION_FAILED);
+    }
+  }
+
+  private async executeFxWritePathInTransaction(
+    tx: FxExecuteTransactionClient,
+    input: {
+      normalizedRequest: NormalizedFxExecuteRequest;
+      plan: FxExecutePlan;
+      executeNow: Date;
+    },
+  ): Promise<FxExecuteSuccessResponse> {
+    const { normalizedRequest, plan, executeNow } = input;
+
+    const command = await tx.fxExecuteRequest.create({
+      data: {
+        userId: normalizedRequest.userId,
+        seasonParticipantId: normalizedRequest.seasonParticipantId,
+        idempotencyKey: normalizedRequest.idempotencyKey,
+        requestHash: normalizedRequest.requestHash,
+        fromCurrency: normalizedRequest.fromCurrency,
+        toCurrency: normalizedRequest.toCurrency,
+        sourceAmount: normalizedRequest.sourceAmount,
+        status: FxExecuteRequestStatus.pending,
+        requestedAt: executeNow,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const sourceWallet = await this.debitSourceWalletOrThrow(tx, plan);
+    const targetWallet = await this.creditTargetWalletOrThrow(tx, plan);
+
+    const exchangeTransaction = await tx.exchangeTransaction.create({
+      data: {
+        seasonParticipantId: plan.seasonParticipantId,
+        fxRateSnapshotId: plan.fxRateSnapshotId,
+        fromCurrency: plan.fromCurrency,
+        toCurrency: plan.toCurrency,
+        sourceAmount: plan.sourceAmount,
+        grossTargetAmount: plan.grossTargetAmount,
+        feeRate: plan.feeRate,
+        feeAmount: plan.feeAmount,
+        feeCurrency: plan.feeCurrency,
+        appliedRate: plan.appliedRate,
+        netTargetAmount: plan.netTargetAmount,
+        executedAt: executeNow,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    await tx.walletTransaction.create({
+      data: {
+        seasonParticipantId: plan.seasonParticipantId,
+        walletId: plan.sourceWalletId,
+        currencyCode: plan.fromCurrency,
+        direction: WalletTransactionDirection.debit,
+        txType: WalletTransactionType.exchange_source,
+        referenceType: WalletTransactionReferenceType.exchange_transaction,
+        referenceId: exchangeTransaction.id,
+        amount: plan.sourceDebitAmount,
+        balanceAfter: this.formatDecimal(sourceWallet.balanceAmount, 8),
+        occurredAt: executeNow,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    await tx.walletTransaction.create({
+      data: {
+        seasonParticipantId: plan.seasonParticipantId,
+        walletId: plan.targetWalletId,
+        currencyCode: plan.toCurrency,
+        direction: WalletTransactionDirection.credit,
+        txType: WalletTransactionType.exchange_target,
+        referenceType: WalletTransactionReferenceType.exchange_transaction,
+        referenceId: exchangeTransaction.id,
+        amount: plan.targetCreditAmount,
+        balanceAfter: this.formatDecimal(targetWallet.balanceAmount, 8),
+        occurredAt: executeNow,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const responsePayloadJson = this.buildFxExecuteSuccessResponse({
+      exchangeId: exchangeTransaction.id,
+      executedAt: executeNow,
+      plan,
+      sourceWallet,
+      targetWallet,
+    });
+
+    await tx.fxExecuteRequest.update({
+      where: {
+        id: command.id,
+      },
+      data: {
+        status: FxExecuteRequestStatus.succeeded,
+        exchangeTransactionId: exchangeTransaction.id,
+        responsePayloadJson,
+        completedAt: executeNow,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    return responsePayloadJson;
+  }
+
+  private async debitSourceWalletOrThrow(
+    tx: FxExecuteTransactionClient,
+    plan: FxExecutePlan,
+  ): Promise<FxExecutePostUpdateWallet> {
+    const debitResult = await tx.cashWallet.updateMany({
+      where: {
+        id: plan.sourceWalletId,
+        seasonParticipantId: plan.seasonParticipantId,
+        currencyCode: plan.fromCurrency,
+        balanceAmount: {
+          gte: plan.sourceDebitAmount,
+        },
+      },
+      data: {
+        balanceAmount: {
+          decrement: plan.sourceDebitAmount,
+        },
+      },
+    });
+
+    if (debitResult.count !== 1) {
+      await this.throwSourceDebitFailure(tx, plan);
+    }
+
+    return this.findPostUpdateWalletOrThrow(tx, {
+      walletId: plan.sourceWalletId,
+      seasonParticipantId: plan.seasonParticipantId,
+      currencyCode: plan.fromCurrency,
+      missingErrorCode: fxExecuteErrorCodes.SOURCE_WALLET_NOT_FOUND,
+    });
+  }
+
+  private async creditTargetWalletOrThrow(
+    tx: FxExecuteTransactionClient,
+    plan: FxExecutePlan,
+  ): Promise<FxExecutePostUpdateWallet> {
+    const creditResult = await tx.cashWallet.updateMany({
+      where: {
+        id: plan.targetWalletId,
+        seasonParticipantId: plan.seasonParticipantId,
+        currencyCode: plan.toCurrency,
+      },
+      data: {
+        balanceAmount: {
+          increment: plan.targetCreditAmount,
+        },
+      },
+    });
+
+    if (creditResult.count !== 1) {
+      this.throwFxExecuteError(fxExecuteErrorCodes.TARGET_WALLET_NOT_FOUND);
+    }
+
+    return this.findPostUpdateWalletOrThrow(tx, {
+      walletId: plan.targetWalletId,
+      seasonParticipantId: plan.seasonParticipantId,
+      currencyCode: plan.toCurrency,
+      missingErrorCode: fxExecuteErrorCodes.TARGET_WALLET_NOT_FOUND,
+    });
+  }
+
+  private async throwSourceDebitFailure(
+    tx: FxExecuteTransactionClient,
+    plan: FxExecutePlan,
+  ): Promise<never> {
+    const sourceWallet = await tx.cashWallet.findFirst({
+      where: {
+        id: plan.sourceWalletId,
+        seasonParticipantId: plan.seasonParticipantId,
+        currencyCode: plan.fromCurrency,
+      },
+      select: {
+        balanceAmount: true,
+      },
+    });
+
+    if (!sourceWallet) {
+      this.throwFxExecuteError(fxExecuteErrorCodes.SOURCE_WALLET_NOT_FOUND);
+    }
+
+    if (
+      this.toDecimal(sourceWallet.balanceAmount).lt(
+        this.toDecimal(plan.sourceDebitAmount),
+      )
+    ) {
+      this.throwFxExecuteError(fxExecuteErrorCodes.INSUFFICIENT_BALANCE);
+    }
+
+    this.throwFxExecuteError(fxExecuteErrorCodes.CONCURRENT_WALLET_UPDATE);
+  }
+
+  private async findPostUpdateWalletOrThrow(
+    tx: FxExecuteTransactionClient,
+    input: {
+      walletId: string;
+      seasonParticipantId: string;
+      currencyCode: CurrencyCode;
+      missingErrorCode: FxExecuteErrorCode;
+    },
+  ): Promise<FxExecutePostUpdateWallet> {
+    const wallet = await tx.cashWallet.findFirst({
+      where: {
+        id: input.walletId,
+        seasonParticipantId: input.seasonParticipantId,
+        currencyCode: input.currencyCode,
+      },
+      select: {
+        id: true,
+        seasonParticipantId: true,
+        currencyCode: true,
+        balanceAmount: true,
+      },
+    });
+
+    if (!wallet) {
+      this.throwFxExecuteError(input.missingErrorCode);
+    }
+
+    return wallet;
+  }
+
+  private buildFxExecuteSuccessResponse(input: {
+    exchangeId: string;
+    executedAt: Date;
+    plan: FxExecutePlan;
+    sourceWallet: FxExecutePostUpdateWallet;
+    targetWallet: FxExecutePostUpdateWallet;
+  }): FxExecuteSuccessResponse {
+    return {
+      success: true,
+      data: {
+        exchangeId: input.exchangeId,
+        executedAt: input.executedAt.toISOString(),
+        fromCurrency: input.plan.fromCurrency,
+        toCurrency: input.plan.toCurrency,
+        sourceAmount: input.plan.sourceAmount,
+        grossTargetAmount: input.plan.grossTargetAmount,
+        feeRate: input.plan.feeRate,
+        feeAmount: input.plan.feeAmount,
+        feeCurrency: input.plan.feeCurrency,
+        appliedRate: input.plan.appliedRate,
+        netTargetAmount: input.plan.netTargetAmount,
+        sourceWalletId: input.plan.sourceWalletId,
+        targetWalletId: input.plan.targetWalletId,
+        sourceWalletBalanceAfter: this.formatDecimal(
+          input.sourceWallet.balanceAmount,
+          8,
+        ),
+        targetWalletBalanceAfter: this.formatDecimal(
+          input.targetWallet.balanceAmount,
+          8,
+        ),
+        fxRateSnapshotId: input.plan.fxRateSnapshotId,
+        rateCapturedAt: input.plan.rateCapturedAt.toISOString(),
+        rateEffectiveAt: input.plan.rateEffectiveAt.toISOString(),
+      },
+    };
+  }
+
+  private toDecimal(value: Prisma.Decimal | string): Prisma.Decimal {
+    return typeof value === 'string' ? new Prisma.Decimal(value) : value;
+  }
+
+  private isUniqueConstraintError(error: unknown): boolean {
+    if (typeof error !== 'object' || error === null) {
+      return false;
+    }
+
+    return (error as { code?: unknown }).code === 'P2002';
   }
 
   private returnFxExecuteSkeletonResponseOrThrow(

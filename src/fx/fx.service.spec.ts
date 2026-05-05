@@ -16,6 +16,27 @@ jest.mock('../generated/prisma/client', () => {
       succeeded: 'succeeded',
       failed: 'failed',
     },
+    WalletTransactionDirection: {
+      credit: 'credit',
+      debit: 'debit',
+    },
+    WalletTransactionReferenceType: {
+      season_join: 'season_join',
+      exchange_transaction: 'exchange_transaction',
+      order: 'order',
+      manual_adjustment: 'manual_adjustment',
+      settlement: 'settlement',
+    },
+    WalletTransactionType: {
+      initial_grant: 'initial_grant',
+      exchange_source: 'exchange_source',
+      exchange_target: 'exchange_target',
+      order_buy: 'order_buy',
+      order_sell: 'order_sell',
+      fee: 'fee',
+      adjustment: 'adjustment',
+      settlement: 'settlement',
+    },
     Prisma: {
       Decimal,
     },
@@ -36,6 +57,9 @@ import {
   FxRateSourceType,
   Prisma,
   SeasonStatus,
+  WalletTransactionDirection,
+  WalletTransactionReferenceType,
+  WalletTransactionType,
 } from '../generated/prisma/client';
 import {
   FxService,
@@ -57,37 +81,45 @@ const stalePendingRequestedAt = new Date('2026-04-30T23:58:59.999Z');
 const createdAt = new Date('2026-05-01T00:00:20.000Z');
 
 describe('FxService', () => {
-  const createPrisma = () => ({
-    $transaction: jest.fn(),
-    season: {
-      findFirst: jest.fn(),
-    },
-    seasonParticipant: {
-      findUnique: jest.fn(),
-    },
-    cashWallet: {
-      findUnique: jest.fn(),
-      update: jest.fn(),
-    },
-    fxRateSnapshot: {
-      findFirst: jest.fn(),
-      findMany: jest.fn(),
-    },
-    exchangeTransaction: {
-      create: jest.fn(),
-    },
-    walletTransaction: {
-      create: jest.fn(),
-    },
-    fxExecuteRequest: {
-      findUnique: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-    },
-    equitySnapshot: {
-      create: jest.fn(),
-    },
-  });
+  const createPrisma = () => {
+    const prisma = {
+      $transaction: jest.fn(),
+      season: {
+        findFirst: jest.fn(),
+      },
+      seasonParticipant: {
+        findUnique: jest.fn(),
+      },
+      cashWallet: {
+        findUnique: jest.fn(),
+        findFirst: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+      },
+      fxRateSnapshot: {
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
+      },
+      exchangeTransaction: {
+        create: jest.fn(),
+      },
+      walletTransaction: {
+        create: jest.fn(),
+      },
+      fxExecuteRequest: {
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+      equitySnapshot: {
+        create: jest.fn(),
+      },
+    };
+
+    prisma.$transaction.mockImplementation(async (callback) => callback(prisma));
+
+    return prisma;
+  };
 
   const getErrorCode = (error: unknown) => {
     const response = (error as HttpException).getResponse() as {
@@ -141,6 +173,7 @@ describe('FxService', () => {
   const expectNoExecuteWrites = (prisma: ReturnType<typeof createPrisma>) => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(prisma.cashWallet.update).not.toHaveBeenCalled();
+    expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
     expect(prisma.exchangeTransaction.create).not.toHaveBeenCalled();
     expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
     expect(prisma.fxExecuteRequest.create).not.toHaveBeenCalled();
@@ -484,6 +517,14 @@ describe('FxService', () => {
         rate: '1350.00000000',
       },
     };
+    const sourceWalletAfterDebit = {
+      ...sourceWallet,
+      balanceAmount: new Prisma.Decimal('0.00000000'),
+    };
+    const targetWalletAfterCredit = {
+      ...targetWallet,
+      balanceAmount: new Prisma.Decimal('0.74000000'),
+    };
 
     const mockExecuteReadCandidates = (
       prisma: ReturnType<typeof createPrisma>,
@@ -528,6 +569,103 @@ describe('FxService', () => {
       exchangeTransactionId: null,
       ...overrides,
     });
+
+    const mockSuccessfulWritePath = (
+      prisma: ReturnType<typeof createPrisma>,
+    ) => {
+      prisma.fxExecuteRequest.create.mockResolvedValueOnce({
+        id: 'command-1',
+      });
+      prisma.cashWallet.updateMany
+        .mockResolvedValueOnce({ count: 1 })
+        .mockResolvedValueOnce({ count: 1 });
+      prisma.cashWallet.findFirst
+        .mockResolvedValueOnce(sourceWalletAfterDebit)
+        .mockResolvedValueOnce(targetWalletAfterCredit);
+      prisma.exchangeTransaction.create.mockResolvedValueOnce({
+        id: 'exchange-1',
+      });
+      prisma.walletTransaction.create
+        .mockResolvedValueOnce({ id: 'wallet-tx-source' })
+        .mockResolvedValueOnce({ id: 'wallet-tx-target' });
+      prisma.fxExecuteRequest.update.mockResolvedValueOnce({
+        id: 'command-1',
+      });
+    };
+
+    const expectWritePathBeforeSuccessFinalization = (
+      prisma: ReturnType<typeof createPrisma>,
+    ) => {
+      expect(prisma.fxExecuteRequest.create).toHaveBeenCalledWith({
+        data: {
+          userId: 'user-1',
+          seasonParticipantId: 'participant-1',
+          idempotencyKey: 'idempotency-key-1',
+          requestHash: getExecuteRequestHash(validExecuteBody),
+          fromCurrency: CurrencyCode.KRW,
+          toCurrency: CurrencyCode.USD,
+          sourceAmount: '1000.00000000',
+          status: FxExecuteRequestStatus.pending,
+          requestedAt: now,
+        },
+        select: {
+          id: true,
+        },
+      });
+      expect(prisma.cashWallet.updateMany).toHaveBeenNthCalledWith(1, {
+        where: {
+          id: 'source-wallet-1',
+          seasonParticipantId: 'participant-1',
+          currencyCode: CurrencyCode.KRW,
+          balanceAmount: {
+            gte: '1000.00000000',
+          },
+        },
+        data: {
+          balanceAmount: {
+            decrement: '1000.00000000',
+          },
+        },
+      });
+      expect(prisma.cashWallet.updateMany).toHaveBeenNthCalledWith(2, {
+        where: {
+          id: 'target-wallet-1',
+          seasonParticipantId: 'participant-1',
+          currencyCode: CurrencyCode.USD,
+        },
+        data: {
+          balanceAmount: {
+            increment: '0.74000000',
+          },
+        },
+      });
+      expect(prisma.exchangeTransaction.create).toHaveBeenCalledWith({
+        data: {
+          seasonParticipantId: 'participant-1',
+          fxRateSnapshotId: 'fx-snapshot-1',
+          fromCurrency: CurrencyCode.KRW,
+          toCurrency: CurrencyCode.USD,
+          sourceAmount: '1000.00000000',
+          grossTargetAmount: '0.74074074',
+          feeRate: '0.001000',
+          feeAmount: '0.00074074',
+          feeCurrency: CurrencyCode.USD,
+          appliedRate: '1350.00000000',
+          netTargetAmount: '0.74000000',
+          executedAt: now,
+        },
+        select: {
+          id: true,
+        },
+      });
+    };
+
+    const expectNoCommittedSuccess = (
+      prisma: ReturnType<typeof createPrisma>,
+    ) => {
+      expect(prisma.fxExecuteRequest.update).not.toHaveBeenCalled();
+      expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
+    };
 
     it('returns UNAUTHORIZED for missing userId', async () => {
       const { prisma, service } = createService();
@@ -871,18 +1009,304 @@ describe('FxService', () => {
       expectNoExecuteWrites(prisma);
     });
 
-    it('returns EXECUTE_WRITE_PATH_NOT_IMPLEMENTED for a valid request', async () => {
+    it('executes a valid new request and stores the exact responsePayloadJson', async () => {
       const { prisma, service } = createService();
       mockActiveSeason(prisma);
       mockJoinedParticipant(prisma);
       mockExecuteReadCandidates(prisma);
+      mockSuccessfulWritePath(prisma);
+
+      const response = await service.execute('user-1', validExecuteBody);
+
+      expect(response).toEqual({
+        success: true,
+        data: {
+          exchangeId: 'exchange-1',
+          executedAt: now.toISOString(),
+          fromCurrency: CurrencyCode.KRW,
+          toCurrency: CurrencyCode.USD,
+          sourceAmount: '1000.00000000',
+          grossTargetAmount: '0.74074074',
+          feeRate: '0.001000',
+          feeAmount: '0.00074074',
+          feeCurrency: CurrencyCode.USD,
+          appliedRate: '1350.00000000',
+          netTargetAmount: '0.74000000',
+          sourceWalletId: 'source-wallet-1',
+          targetWalletId: 'target-wallet-1',
+          sourceWalletBalanceAfter: '0.00000000',
+          targetWalletBalanceAfter: '0.74000000',
+          fxRateSnapshotId: 'fx-snapshot-1',
+          rateCapturedAt: capturedAt.toISOString(),
+          rateEffectiveAt: freshEffectiveAt.toISOString(),
+        },
+      });
+      expectExecutePlanReads(prisma);
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expectWritePathBeforeSuccessFinalization(prisma);
+      expect(prisma.walletTransaction.create).toHaveBeenCalledTimes(2);
+      expect(prisma.walletTransaction.create).toHaveBeenNthCalledWith(1, {
+        data: {
+          seasonParticipantId: 'participant-1',
+          walletId: 'source-wallet-1',
+          currencyCode: CurrencyCode.KRW,
+          direction: WalletTransactionDirection.debit,
+          txType: WalletTransactionType.exchange_source,
+          referenceType: WalletTransactionReferenceType.exchange_transaction,
+          referenceId: 'exchange-1',
+          amount: '1000.00000000',
+          balanceAfter: '0.00000000',
+          occurredAt: now,
+        },
+        select: {
+          id: true,
+        },
+      });
+      expect(prisma.walletTransaction.create).toHaveBeenNthCalledWith(2, {
+        data: {
+          seasonParticipantId: 'participant-1',
+          walletId: 'target-wallet-1',
+          currencyCode: CurrencyCode.USD,
+          direction: WalletTransactionDirection.credit,
+          txType: WalletTransactionType.exchange_target,
+          referenceType: WalletTransactionReferenceType.exchange_transaction,
+          referenceId: 'exchange-1',
+          amount: '0.74000000',
+          balanceAfter: '0.74000000',
+          occurredAt: now,
+        },
+        select: {
+          id: true,
+        },
+      });
+      expect(prisma.walletTransaction.create).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            txType: WalletTransactionType.fee,
+          }),
+        }),
+      );
+      expect(prisma.fxExecuteRequest.update).toHaveBeenCalledTimes(1);
+      expect(prisma.fxExecuteRequest.update).toHaveBeenCalledWith({
+        where: {
+          id: 'command-1',
+        },
+        data: {
+          status: FxExecuteRequestStatus.succeeded,
+          exchangeTransactionId: 'exchange-1',
+          responsePayloadJson: response,
+          completedAt: now,
+        },
+        select: {
+          id: true,
+        },
+      });
+      expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
+    });
+
+    it('replays a command created by a unique-race without wallet mutation', async () => {
+      const { prisma, service } = createService();
+      mockActiveSeason(prisma);
+      mockJoinedParticipant(prisma);
+      mockExecuteReadCandidates(prisma);
+      prisma.fxExecuteRequest.create.mockRejectedValueOnce({ code: 'P2002' });
+      prisma.fxExecuteRequest.findUnique.mockResolvedValueOnce(
+        buildExistingCommand(FxExecuteRequestStatus.succeeded, {
+          completedAt: capturedAt,
+          responsePayloadJson: storedSucceededPayload,
+          exchangeTransactionId: 'exchange-1',
+        }),
+      );
+
+      await expect(
+        service.execute('user-1', validExecuteBody),
+      ).resolves.toBe(storedSucceededPayload);
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
+      expect(prisma.exchangeTransaction.create).not.toHaveBeenCalled();
+      expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+      expect(prisma.fxExecuteRequest.update).not.toHaveBeenCalled();
+      expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
+    });
+
+    it('classifies guarded source debit failure when the source wallet disappeared', async () => {
+      const { prisma, service } = createService();
+      mockActiveSeason(prisma);
+      mockJoinedParticipant(prisma);
+      mockExecuteReadCandidates(prisma);
+      prisma.fxExecuteRequest.create.mockResolvedValueOnce({ id: 'command-1' });
+      prisma.cashWallet.updateMany.mockResolvedValueOnce({ count: 0 });
+      prisma.cashWallet.findFirst.mockResolvedValueOnce(null);
 
       await expectExecuteErrorCode(
         service.execute('user-1', validExecuteBody),
-        'EXECUTE_WRITE_PATH_NOT_IMPLEMENTED',
+        'SOURCE_WALLET_NOT_FOUND',
       );
       expectExecutePlanReads(prisma);
-      expectNoExecuteWrites(prisma);
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.cashWallet.updateMany).toHaveBeenCalledTimes(1);
+      expect(prisma.exchangeTransaction.create).not.toHaveBeenCalled();
+      expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+      expectNoCommittedSuccess(prisma);
+    });
+
+    it('classifies guarded source debit failure when balance is insufficient at mutation time', async () => {
+      const { prisma, service } = createService();
+      mockActiveSeason(prisma);
+      mockJoinedParticipant(prisma);
+      mockExecuteReadCandidates(prisma);
+      prisma.fxExecuteRequest.create.mockResolvedValueOnce({ id: 'command-1' });
+      prisma.cashWallet.updateMany.mockResolvedValueOnce({ count: 0 });
+      prisma.cashWallet.findFirst.mockResolvedValueOnce({
+        balanceAmount: new Prisma.Decimal('999.99999999'),
+      });
+
+      await expectExecuteErrorCode(
+        service.execute('user-1', validExecuteBody),
+        'INSUFFICIENT_BALANCE',
+      );
+      expect(prisma.cashWallet.updateMany).toHaveBeenCalledTimes(1);
+      expect(prisma.exchangeTransaction.create).not.toHaveBeenCalled();
+      expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+      expectNoCommittedSuccess(prisma);
+    });
+
+    it('classifies guarded source debit failure as a concurrent wallet update when reread is sufficient', async () => {
+      const { prisma, service } = createService();
+      mockActiveSeason(prisma);
+      mockJoinedParticipant(prisma);
+      mockExecuteReadCandidates(prisma);
+      prisma.fxExecuteRequest.create.mockResolvedValueOnce({ id: 'command-1' });
+      prisma.cashWallet.updateMany.mockResolvedValueOnce({ count: 0 });
+      prisma.cashWallet.findFirst.mockResolvedValueOnce({
+        balanceAmount: new Prisma.Decimal('1000.00000000'),
+      });
+
+      await expectExecuteErrorCode(
+        service.execute('user-1', validExecuteBody),
+        'CONCURRENT_WALLET_UPDATE',
+      );
+      expect(prisma.cashWallet.updateMany).toHaveBeenCalledTimes(1);
+      expect(prisma.exchangeTransaction.create).not.toHaveBeenCalled();
+      expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+      expectNoCommittedSuccess(prisma);
+    });
+
+    it('returns EXECUTE_TRANSACTION_FAILED when target credit fails after source debit', async () => {
+      const { prisma, service } = createService();
+      mockActiveSeason(prisma);
+      mockJoinedParticipant(prisma);
+      mockExecuteReadCandidates(prisma);
+      prisma.fxExecuteRequest.create.mockResolvedValueOnce({ id: 'command-1' });
+      prisma.cashWallet.updateMany
+        .mockResolvedValueOnce({ count: 1 })
+        .mockRejectedValueOnce(new Error('target credit failed'));
+      prisma.cashWallet.findFirst.mockResolvedValueOnce(sourceWalletAfterDebit);
+
+      await expectExecuteErrorCode(
+        service.execute('user-1', validExecuteBody),
+        'EXECUTE_TRANSACTION_FAILED',
+      );
+      expect(prisma.exchangeTransaction.create).not.toHaveBeenCalled();
+      expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+      expectNoCommittedSuccess(prisma);
+    });
+
+    it('returns EXECUTE_TRANSACTION_FAILED when exchange row creation fails', async () => {
+      const { prisma, service } = createService();
+      mockActiveSeason(prisma);
+      mockJoinedParticipant(prisma);
+      mockExecuteReadCandidates(prisma);
+      prisma.fxExecuteRequest.create.mockResolvedValueOnce({ id: 'command-1' });
+      prisma.cashWallet.updateMany
+        .mockResolvedValueOnce({ count: 1 })
+        .mockResolvedValueOnce({ count: 1 });
+      prisma.cashWallet.findFirst
+        .mockResolvedValueOnce(sourceWalletAfterDebit)
+        .mockResolvedValueOnce(targetWalletAfterCredit);
+      prisma.exchangeTransaction.create.mockRejectedValueOnce(
+        new Error('exchange failed'),
+      );
+
+      await expectExecuteErrorCode(
+        service.execute('user-1', validExecuteBody),
+        'EXECUTE_TRANSACTION_FAILED',
+      );
+      expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+      expectNoCommittedSuccess(prisma);
+    });
+
+    it('returns EXECUTE_TRANSACTION_FAILED when source ledger row creation fails', async () => {
+      const { prisma, service } = createService();
+      mockActiveSeason(prisma);
+      mockJoinedParticipant(prisma);
+      mockExecuteReadCandidates(prisma);
+      prisma.fxExecuteRequest.create.mockResolvedValueOnce({ id: 'command-1' });
+      prisma.cashWallet.updateMany
+        .mockResolvedValueOnce({ count: 1 })
+        .mockResolvedValueOnce({ count: 1 });
+      prisma.cashWallet.findFirst
+        .mockResolvedValueOnce(sourceWalletAfterDebit)
+        .mockResolvedValueOnce(targetWalletAfterCredit);
+      prisma.exchangeTransaction.create.mockResolvedValueOnce({
+        id: 'exchange-1',
+      });
+      prisma.walletTransaction.create.mockRejectedValueOnce(
+        new Error('source ledger failed'),
+      );
+
+      await expectExecuteErrorCode(
+        service.execute('user-1', validExecuteBody),
+        'EXECUTE_TRANSACTION_FAILED',
+      );
+      expect(prisma.walletTransaction.create).toHaveBeenCalledTimes(1);
+      expectNoCommittedSuccess(prisma);
+    });
+
+    it('returns EXECUTE_TRANSACTION_FAILED when target ledger row creation fails', async () => {
+      const { prisma, service } = createService();
+      mockActiveSeason(prisma);
+      mockJoinedParticipant(prisma);
+      mockExecuteReadCandidates(prisma);
+      prisma.fxExecuteRequest.create.mockResolvedValueOnce({ id: 'command-1' });
+      prisma.cashWallet.updateMany
+        .mockResolvedValueOnce({ count: 1 })
+        .mockResolvedValueOnce({ count: 1 });
+      prisma.cashWallet.findFirst
+        .mockResolvedValueOnce(sourceWalletAfterDebit)
+        .mockResolvedValueOnce(targetWalletAfterCredit);
+      prisma.exchangeTransaction.create.mockResolvedValueOnce({
+        id: 'exchange-1',
+      });
+      prisma.walletTransaction.create
+        .mockResolvedValueOnce({ id: 'wallet-tx-source' })
+        .mockRejectedValueOnce(new Error('target ledger failed'));
+
+      await expectExecuteErrorCode(
+        service.execute('user-1', validExecuteBody),
+        'EXECUTE_TRANSACTION_FAILED',
+      );
+      expect(prisma.walletTransaction.create).toHaveBeenCalledTimes(2);
+      expectNoCommittedSuccess(prisma);
+    });
+
+    it('returns EXECUTE_TRANSACTION_FAILED when succeeded finalization fails', async () => {
+      const { prisma, service } = createService();
+      mockActiveSeason(prisma);
+      mockJoinedParticipant(prisma);
+      mockExecuteReadCandidates(prisma);
+      mockSuccessfulWritePath(prisma);
+      prisma.fxExecuteRequest.update.mockReset();
+      prisma.fxExecuteRequest.update.mockRejectedValueOnce(
+        new Error('finalization failed'),
+      );
+
+      await expectExecuteErrorCode(
+        service.execute('user-1', validExecuteBody),
+        'EXECUTE_TRANSACTION_FAILED',
+      );
+      expect(prisma.fxExecuteRequest.update).toHaveBeenCalledTimes(1);
+      expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
     });
 
     it('uses normalized idempotency key, currencies, and execute snapshot filters for read candidates', async () => {
@@ -895,11 +1319,13 @@ describe('FxService', () => {
       };
       mockActiveSeason(prisma);
       mockJoinedParticipant(prisma);
-      mockExecuteReadCandidates(prisma);
+      mockExecuteReadCandidates(prisma, {
+        snapshots: [],
+      });
 
       await expectExecuteErrorCode(
         service.execute('user-1', body),
-        'EXECUTE_WRITE_PATH_NOT_IMPLEMENTED',
+        'FX_RATE_UNAVAILABLE',
       );
 
       expect(prisma.fxExecuteRequest.findUnique).toHaveBeenCalledWith({
