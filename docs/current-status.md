@@ -13,6 +13,8 @@
 ## 2. 구현 완료 API
 - `GET /api/v1/home` read-only MVP
 - `GET /api/v1/ranking` read-only MVP
+- `GET /api/v1/wallets` read-only MVP
+- `GET /api/v1/records` read-only MVP
 - `GET /api/v1/seasons/current`
 - `POST /api/v1/seasons/{seasonId}/join`
 - `POST /api/v1/fx/quote`
@@ -73,11 +75,12 @@ near-term ledger/FX foundation:
 
 ## 6. 현재 미도입 DB 상태
 - 현재 문서화된 핵심 DB foundation 기준 추가 미도입 테이블 없음.
-- 단, 주문 체결/position mutation/provider price ingestion/orders/records/settlement API/scheduler/batch 기반 자동 daily valuation/ranking 생성 경로는 아직 미구현.
+- 단, 주문 체결/position mutation/provider price ingestion/orders/settlement API/scheduler/batch 기반 자동 daily valuation/ranking 생성 경로는 아직 미구현.
 
 ## 7. 완료된 문서/설계 상태
 - `/home` 상태별 응답 계약 초안: `docs/home-api-contract.md`.
 - `/ranking` read-only MVP 계약: `docs/ranking-api-contract.md`.
+- `/wallets` read-only MVP 계약: `docs/wallets-api-contract.md`.
 - records API 계약: `docs/records-api-contract.md`에 orders `side`/`orderId`/`assetId`/`name`, exchanges `feeCurrency`/`exchangeId` 방향 반영.
 - `/fx quote` STOP review: `docs/fx-quote-stop-review.md`.
 - `/fx` API 계약 초안: `docs/fx-api-contract.md`.
@@ -245,7 +248,7 @@ near-term ledger/FX foundation:
 - near-term execute는 `equity_snapshots`를 생성하지 않음.
 - MVP execute는 별도 fee wallet transaction row를 만들지 않음.
 - target wallet credit은 `netTargetAmount`.
-- provider_api ingestion, official_batch ingestion, scheduler, provider final selection, stale pending recovery tool/job, durable quote, records/settlement는 여전히 미구현.
+- provider_api ingestion, official_batch ingestion, scheduler, provider final selection, stale pending recovery tool/job, durable quote, settlement는 여전히 미구현.
 - DB integration 검증은 Docker compose의 기존 Postgres/Redis 컨테이너로 수행됨.
 - DB 연결 확인과 migration status 확인 성공.
 - `pnpm test`, `pnpm build`, `FX_EXECUTE_DB_INTEGRATION=1 pnpm test -- fx.execute.integration.spec.ts` 통과.
@@ -308,15 +311,46 @@ near-term ledger/FX foundation:
   - 고급 필터/기간별 ranking/시즌 히스토리.
   - reward/settlement 연동.
 
+### `/wallets`
+- `GET /api/v1/wallets` read-only MVP 구현 완료.
+- auth 본체는 미완성이나 API는 기존 보호 API와 동일하게 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
+- current season 선택 우선순위는 `/home`, `/ranking`과 동일: active, upcoming, ended, settled.
+- joined participant가 있으면 season status와 무관하게 기존 `cash_wallets`를 read-only로 조회.
+- 미참가면 fake wallet 없이 `state = not_joined`, no current season이면 `state = unavailable`.
+- wallet balance 재계산, FX 환산 valuation, wallet 생성/수정 없음.
+- `/wallets` 호출은 wallet row를 생성/수정/삭제하지 않음.
+
+### `/records`
+- `GET /api/v1/records` read-only MVP 구현 완료.
+- auth 본체는 미완성이나 API는 기존 보호 API와 동일하게 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
+- query parameter:
+  - `seasonId` optional.
+  - `type` optional, default `all`, allowed `all`/`exchanges`/`wallets`/`orders`.
+  - `limit` optional, default 50, max 100 clamp.
+  - `offset` optional, default 0.
+  - `currencyCode` optional, allowed `KRW`/`USD`.
+- records source:
+  - `exchange_transactions`
+  - `wallet_transactions`
+- access control:
+  - 로그인 사용자의 `season_participants` 기준으로만 조회.
+  - 미참가면 records 배열을 비우고 `state = not_joined`.
+- order records:
+  - order table/write path 미구현 상태이므로 fake 없이 `orders.state = unavailable`, `reason = ORDERS_NOT_IMPLEMENTED`.
+  - `/orders` API 또는 order execution 구현 없음.
+- `/records` 호출은 exchange/wallet/order row를 생성/수정/삭제하지 않음.
+- 아직 미구현:
+  - full records filters/export/detail views.
+  - `/orders` API.
+  - order execution/position mutation.
+
 ## 9. 다음 gate
 - OANDA trial/API 계약 검증 전 provider_api/official_batch/scheduler 구현 STOP 유지.
 - `/fx execute` 남은 DB-level rollback/partial-write hardening 및 stale pending/unknown outcome recovery 설계.
 - `/home` full implementation 가능 판정은 자동 valuation/ranking 생성, provider ingestion, order/position mutation 이후 재검토.
 
 ## 10. 아직 안 한 것
-- wallets API
 - orders API
-- records
 - settlement
 - orders 체결
 - position mutation
@@ -356,6 +390,8 @@ near-term ledger/FX foundation:
 - `pnpm build` 통과.
 - `pnpm test -- home` 통과.
 - `pnpm test -- ranking` 통과.
+- `pnpm test -- wallets` 통과.
+- `pnpm test -- records` 통과.
 - `pnpm test -- fx.service.spec.ts` 통과.
 - `FX_EXECUTE_DB_INTEGRATION=1 pnpm test -- fx.execute.integration.spec.ts` 통과.
 - `/fx execute` DB integration spec은 실제 PostgreSQL 환경에서 통과.

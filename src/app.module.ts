@@ -6,7 +6,9 @@ import { FxModule } from './fx/fx.module';
 import { HomeModule } from './home/home.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RankingModule } from './ranking/ranking.module';
+import { RecordsModule } from './records/records.module';
 import { SeasonsModule } from './seasons/seasons.module';
+import { WalletsModule } from './wallets/wallets.module';
 
 @Module({
   imports: [
@@ -18,7 +20,9 @@ import { SeasonsModule } from './seasons/seasons.module';
     HomeModule,
     PrismaModule,
     RankingModule,
+    RecordsModule,
     SeasonsModule,
+    WalletsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
