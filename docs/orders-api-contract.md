@@ -5,7 +5,9 @@
 - `GET /api/v1/orders` read-only MVP is implemented.
 - `POST /api/v1/orders/quote` read-only MVP is implemented.
 - `POST /api/v1/orders` submitted order create MVP is implemented.
+- `POST /api/v1/orders/:orderId/cancel` submitted order cancel MVP is implemented.
 - `POST /api/v1/orders` creates one `orders` row with `status = submitted`.
+- `POST /api/v1/orders/:orderId/cancel` updates an owned submitted order row to `status = canceled`.
 - The APIs do not execute orders, debit or credit wallets, mutate positions, create wallet transactions, create equity snapshots, run settlement, or synthesize fake order data.
 - Stored gross/fee/net amounts on submitted orders are pre-execution quote estimates, not confirmed fill amounts.
 
@@ -213,9 +215,53 @@ Same body as `POST /api/v1/orders/quote`.
 }
 ```
 
+## POST /api/v1/orders/:orderId/cancel
+
+### Request
+
+- `orderId` path parameter is required.
+- Request body is optional and ignored in this MVP.
+- Cancel reason is not stored because the current schema has no cancel reason field.
+
+### Behavior
+
+- Uses `request.user.userId`; no `x-user-id` fallback.
+- The order must belong to one of the authenticated user's season participants.
+- Missing or unowned orders return `ORDER_NOT_FOUND` without revealing ownership.
+- Only `status = submitted` orders can be canceled.
+- `executed`, `canceled`, and `rejected` orders are not cancelable.
+- Cancel uses a guarded `orders` update with `id + seasonParticipantId + status = submitted`.
+- Successful cancel updates only:
+  - `status = canceled`
+  - `canceledAt = <cancel time>`
+  - `updatedAt` through Prisma `@updatedAt`
+- `executedAt`, `rejectedAt`, and `rejectReason` are not changed.
+- No wallet, position, wallet transaction, equity snapshot, settlement, execution, scheduler, or provider behavior runs.
+- Canceled orders are visible from `GET /api/v1/orders` and `GET /api/v1/records?type=orders`.
+
+### Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "order": "<GET /api/v1/orders order item with status=canceled>",
+    "execution": {
+      "state": "not_executed",
+      "reason": "ORDER_CANCELED_BEFORE_EXECUTION",
+      "message": "Order was canceled before execution."
+    }
+  }
+}
+```
+
 ## Error Codes
 
 - `UNAUTHORIZED`
+- `INVALID_ORDER_ID`
+- `ORDER_NOT_FOUND`
+- `ORDER_NOT_CANCELABLE`
+- `ORDER_CANCEL_CONFLICT`
 - `INVALID_ORDER_STATUS`
 - `INVALID_ORDER_SIDE`
 - `INVALID_ORDER_TYPE`
@@ -239,8 +285,8 @@ Same body as `POST /api/v1/orders/quote`.
 ## Not Implemented
 
 - Order execution.
-- Order cancel API.
 - Order idempotency.
+- Durable order quote.
 - Wallet debit/credit for orders.
 - Position mutation.
 - Provider price ingestion.

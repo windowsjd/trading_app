@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
 import { Request } from 'express';
 import { OrdersService } from './orders.service';
 import type { OrderRequestBody, OrdersQuery } from './orders.service';
@@ -32,6 +32,14 @@ export class OrdersController {
     @Body() body: OrderRequestBody,
   ) {
     return this.ordersService.createOrder(this.extractUserId(request), body);
+  }
+
+  @Post(':orderId/cancel')
+  cancelOrder(
+    @Req() request: AuthenticatedRequest,
+    @Param('orderId') orderId: string,
+  ) {
+    return this.ordersService.cancelOrder(this.extractUserId(request), orderId);
   }
 
   private extractUserId(request: AuthenticatedRequest) {

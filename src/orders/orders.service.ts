@@ -170,6 +170,18 @@ type CreateOrderResponse = {
   };
 };
 
+type CancelOrderResponse = {
+  success: true;
+  data: {
+    order: NonNullable<OrdersResponse['data']['orders']>[number];
+    execution: {
+      state: 'not_executed';
+      reason: 'ORDER_CANCELED_BEFORE_EXECUTION';
+      message: string;
+    };
+  };
+};
+
 const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
   SeasonStatus.active,
   SeasonStatus.upcoming,
@@ -270,6 +282,128 @@ export class OrdersService {
           state: 'not_executed',
           reason: 'ORDER_EXECUTION_NOT_IMPLEMENTED',
           message: 'Order execution is not implemented in this MVP.',
+        },
+      },
+    };
+  }
+
+  async cancelOrder(
+    userId: string | undefined,
+    orderId: string | undefined,
+  ): Promise<CancelOrderResponse> {
+    if (!userId) {
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
+    }
+
+    const parsedOrderId = this.parseCancelOrderId(orderId);
+    const existingOrder = await this.prisma.order.findFirst({
+      where: {
+        id: parsedOrderId,
+        seasonParticipant: {
+          userId,
+        },
+      },
+      select: {
+        id: true,
+        seasonParticipantId: true,
+        status: true,
+      },
+    });
+
+    if (!existingOrder) {
+      this.throwApiError(
+        HttpStatus.NOT_FOUND,
+        'ORDER_NOT_FOUND',
+        'Order not found.',
+      );
+    }
+
+    if (existingOrder.status !== OrderStatus.submitted) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'ORDER_NOT_CANCELABLE',
+        'Only submitted orders can be canceled.',
+      );
+    }
+
+    const canceledAt = new Date();
+    const updateResult = await this.prisma.order.updateMany({
+      where: {
+        id: existingOrder.id,
+        seasonParticipantId: existingOrder.seasonParticipantId,
+        status: OrderStatus.submitted,
+      },
+      data: {
+        status: OrderStatus.canceled,
+        canceledAt,
+      },
+    });
+
+    if (updateResult.count !== 1) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'ORDER_CANCEL_CONFLICT',
+        'Order cancel conflicted with another state change.',
+      );
+    }
+
+    const canceledOrder = await this.prisma.order.findUnique({
+      where: {
+        id: existingOrder.id,
+      },
+      select: {
+        id: true,
+        side: true,
+        orderType: true,
+        status: true,
+        quantity: true,
+        limitPrice: true,
+        executedPrice: true,
+        currencyCode: true,
+        grossAmount: true,
+        feeAmount: true,
+        netAmount: true,
+        assetPriceSnapshotId: true,
+        fxRateSnapshotId: true,
+        submittedAt: true,
+        executedAt: true,
+        canceledAt: true,
+        rejectedAt: true,
+        rejectReason: true,
+        createdAt: true,
+        updatedAt: true,
+        asset: {
+          select: {
+            id: true,
+            symbol: true,
+            name: true,
+            market: true,
+            currencyCode: true,
+          },
+        },
+      },
+    });
+
+    if (!canceledOrder) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'ORDER_CANCEL_CONFLICT',
+        'Canceled order could not be read back.',
+      );
+    }
+
+    return {
+      success: true,
+      data: {
+        order: this.formatOrder(canceledOrder),
+        execution: {
+          state: 'not_executed',
+          reason: 'ORDER_CANCELED_BEFORE_EXECUTION',
+          message: 'Order was canceled before execution.',
         },
       },
     };
@@ -510,6 +644,18 @@ export class OrdersService {
       limitPrice,
       currencyCode: this.parseOptionalCurrencyCode(body.currencyCode),
     };
+  }
+
+  private parseCancelOrderId(orderId: string | undefined): string {
+    if (typeof orderId !== 'string' || orderId.trim() === '') {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'INVALID_ORDER_ID',
+        'orderId is required.',
+      );
+    }
+
+    return orderId.trim();
   }
 
   private parseOrderType(value: unknown): OrderType {

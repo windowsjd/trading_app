@@ -67,6 +67,7 @@ describe('OrdersService', () => {
   const joinedAt = new Date('2026-05-02T00:00:00.000Z');
   const submittedAt = new Date('2026-05-07T00:01:00.000Z');
   const executedAt = new Date('2026-05-07T00:02:00.000Z');
+  const canceledAt = new Date('2026-05-07T00:03:00.000Z');
   const createdAt = new Date('2026-05-07T00:01:01.000Z');
   const updatedAt = new Date('2026-05-07T00:02:01.000Z');
 
@@ -106,9 +107,12 @@ describe('OrdersService', () => {
     },
     order: {
       count: jest.fn(),
+      findFirst: jest.fn(),
       findMany: jest.fn(),
+      findUnique: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
       upsert: jest.fn(),
       delete: jest.fn(),
     },
@@ -281,6 +285,7 @@ describe('OrdersService', () => {
       expect(model.delete).not.toHaveBeenCalled();
     }
 
+    expect(prisma.order.updateMany).not.toHaveBeenCalled();
     expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
     expect(prisma.exchangeTransaction.create).not.toHaveBeenCalled();
     expect(prisma.fxExecuteRequest.create).not.toHaveBeenCalled();
@@ -309,6 +314,38 @@ describe('OrdersService', () => {
 
     expect(prisma.order.create).toHaveBeenCalledTimes(1);
     expect(prisma.order.update).not.toHaveBeenCalled();
+    expect(prisma.order.updateMany).not.toHaveBeenCalled();
+    expect(prisma.order.upsert).not.toHaveBeenCalled();
+    expect(prisma.order.delete).not.toHaveBeenCalled();
+    expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+    expect(prisma.exchangeTransaction.create).not.toHaveBeenCalled();
+    expect(prisma.fxExecuteRequest.create).not.toHaveBeenCalled();
+    expect(prisma.fxExecuteRequest.update).not.toHaveBeenCalled();
+    expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  };
+
+  const expectOnlyOrderCancelWrite = (
+    prisma: ReturnType<typeof createPrisma>,
+  ) => {
+    for (const model of [
+      prisma.season,
+      prisma.seasonParticipant,
+      prisma.asset,
+      prisma.assetPriceSnapshot,
+      prisma.fxRateSnapshot,
+      prisma.cashWallet,
+      prisma.position,
+    ]) {
+      expect(model.create).not.toHaveBeenCalled();
+      expect(model.update).not.toHaveBeenCalled();
+      expect(model.upsert).not.toHaveBeenCalled();
+      expect(model.delete).not.toHaveBeenCalled();
+    }
+
+    expect(prisma.order.create).not.toHaveBeenCalled();
+    expect(prisma.order.update).not.toHaveBeenCalled();
+    expect(prisma.order.updateMany).toHaveBeenCalledTimes(1);
     expect(prisma.order.upsert).not.toHaveBeenCalled();
     expect(prisma.order.delete).not.toHaveBeenCalled();
     expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
@@ -712,6 +749,145 @@ describe('OrdersService', () => {
     expectNoOrderWrites(prisma);
   });
 
+  it('cancels submitted orders with a guarded status update', async () => {
+    const { prisma, service } = createService();
+    prisma.order.findFirst.mockResolvedValueOnce({
+      id: 'order-submitted-1',
+      seasonParticipantId: 'sp-1',
+      status: OrderStatus.submitted,
+    });
+    prisma.order.updateMany.mockResolvedValueOnce({ count: 1 });
+    prisma.order.findUnique.mockResolvedValueOnce({
+      id: 'order-submitted-1',
+      side: OrderSide.buy,
+      orderType: OrderType.limit,
+      status: OrderStatus.canceled,
+      quantity: new Prisma.Decimal('1.00000000'),
+      limitPrice: new Prisma.Decimal('50000.00000000'),
+      executedPrice: null,
+      currencyCode: CurrencyCode.KRW,
+      grossAmount: new Prisma.Decimal('50000.00000000'),
+      feeAmount: new Prisma.Decimal('50.00000000'),
+      netAmount: new Prisma.Decimal('50050.00000000'),
+      assetPriceSnapshotId: null,
+      fxRateSnapshotId: null,
+      submittedAt,
+      executedAt: null,
+      canceledAt,
+      rejectedAt: null,
+      rejectReason: null,
+      createdAt,
+      updatedAt,
+      asset: {
+        id: 'asset-1',
+        symbol: '005930',
+        name: 'Samsung',
+        market: 'KRX',
+        currencyCode: CurrencyCode.KRW,
+      },
+    });
+
+    const response = await service.cancelOrder('user-1', ' order-submitted-1 ');
+
+    expect(response.data).toMatchObject({
+      order: {
+        orderId: 'order-submitted-1',
+        status: OrderStatus.canceled,
+        canceledAt: '2026-05-07T00:03:00.000Z',
+        executedAt: null,
+        rejectedAt: null,
+      },
+      execution: {
+        state: 'not_executed',
+        reason: 'ORDER_CANCELED_BEFORE_EXECUTION',
+      },
+    });
+    expect(prisma.order.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'order-submitted-1',
+        seasonParticipant: {
+          userId: 'user-1',
+        },
+      },
+      select: {
+        id: true,
+        seasonParticipantId: true,
+        status: true,
+      },
+    });
+    expect(prisma.order.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'order-submitted-1',
+        seasonParticipantId: 'sp-1',
+        status: OrderStatus.submitted,
+      },
+      data: {
+        status: OrderStatus.canceled,
+        canceledAt: expect.any(Date),
+      },
+    });
+    expectOnlyOrderCancelWrite(prisma);
+  });
+
+  it('reads canceled orders with status filter', async () => {
+    const { prisma, service } = createService();
+    mockCurrentSeason(prisma);
+    mockJoined(prisma);
+    prisma.order.count.mockResolvedValueOnce(1);
+    prisma.order.findMany.mockResolvedValueOnce([
+      {
+        id: 'order-canceled-1',
+        side: OrderSide.buy,
+        orderType: OrderType.limit,
+        status: OrderStatus.canceled,
+        quantity: new Prisma.Decimal('1.00000000'),
+        limitPrice: new Prisma.Decimal('50000.00000000'),
+        executedPrice: null,
+        currencyCode: CurrencyCode.KRW,
+        grossAmount: new Prisma.Decimal('50000.00000000'),
+        feeAmount: new Prisma.Decimal('50.00000000'),
+        netAmount: new Prisma.Decimal('50050.00000000'),
+        assetPriceSnapshotId: null,
+        fxRateSnapshotId: null,
+        submittedAt,
+        executedAt: null,
+        canceledAt,
+        rejectedAt: null,
+        rejectReason: null,
+        createdAt,
+        updatedAt,
+        asset: {
+          id: 'asset-1',
+          symbol: '005930',
+          name: 'Samsung',
+          market: 'KRX',
+          currencyCode: CurrencyCode.KRW,
+        },
+      },
+    ]);
+
+    const response = await service.getOrders('user-1', {
+      status: 'canceled',
+    });
+
+    expect(response.data.orders).toMatchObject([
+      {
+        orderId: 'order-canceled-1',
+        status: OrderStatus.canceled,
+        canceledAt: '2026-05-07T00:03:00.000Z',
+      },
+    ]);
+    expect(prisma.order.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          seasonParticipantId: 'sp-1',
+          status: OrderStatus.canceled,
+        },
+      }),
+    );
+    expectNoOrderWrites(prisma);
+  });
+
   it('reads submitted orders created by the create MVP', async () => {
     const { prisma, service } = createService();
     mockCurrentSeason(prisma);
@@ -882,6 +1058,62 @@ describe('OrdersService', () => {
         limitPrice: '100.00000000',
       }),
     ).rejects.toBeInstanceOf(HttpException);
+    await expect(
+      service.cancelOrder(undefined, 'order-1'),
+    ).rejects.toBeInstanceOf(HttpException);
+  });
+
+  it('rejects cancel with empty orderId', async () => {
+    const { service } = createService();
+
+    await expect(service.cancelOrder('user-1', ' ')).rejects.toBeInstanceOf(
+      HttpException,
+    );
+  });
+
+  it('returns not found for missing or unowned orders', async () => {
+    const { prisma, service } = createService();
+    prisma.order.findFirst.mockResolvedValueOnce(null);
+
+    await expect(
+      service.cancelOrder('user-1', 'order-other-user'),
+    ).rejects.toBeInstanceOf(HttpException);
+    expect(prisma.order.updateMany).not.toHaveBeenCalled();
+    expectNoOrderWrites(prisma);
+  });
+
+  it.each([OrderStatus.executed, OrderStatus.canceled, OrderStatus.rejected])(
+    'rejects cancel for %s orders',
+    async (status) => {
+      const { prisma, service } = createService();
+      prisma.order.findFirst.mockResolvedValueOnce({
+        id: 'order-1',
+        seasonParticipantId: 'sp-1',
+        status,
+      });
+
+      await expect(
+        service.cancelOrder('user-1', 'order-1'),
+      ).rejects.toBeInstanceOf(HttpException);
+      expect(prisma.order.updateMany).not.toHaveBeenCalled();
+      expectNoOrderWrites(prisma);
+    },
+  );
+
+  it('returns conflict when guarded cancel update affects no rows', async () => {
+    const { prisma, service } = createService();
+    prisma.order.findFirst.mockResolvedValueOnce({
+      id: 'order-1',
+      seasonParticipantId: 'sp-1',
+      status: OrderStatus.submitted,
+    });
+    prisma.order.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await expect(
+      service.cancelOrder('user-1', 'order-1'),
+    ).rejects.toBeInstanceOf(HttpException);
+    expect(prisma.order.findUnique).not.toHaveBeenCalled();
+    expectOnlyOrderCancelWrite(prisma);
   });
 
   it('rejects create when user has not joined the active season', async () => {

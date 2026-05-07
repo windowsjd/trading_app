@@ -20,6 +20,7 @@
 - `GET /api/v1/orders` read-only MVP
 - `POST /api/v1/orders/quote` read-only MVP
 - `POST /api/v1/orders` submitted order create MVP
+- `POST /api/v1/orders/:orderId/cancel` submitted order cancel MVP
 - `GET /api/v1/seasons/current`
 - `POST /api/v1/seasons/{seasonId}/join`
 - `POST /api/v1/fx/quote`
@@ -93,6 +94,12 @@ near-term ledger/FX foundation:
   - quote와 동일 계산/검증 후 `orders` row 1건만 `submitted`로 생성.
   - wallet debit/credit, wallet_transactions, position mutation, equity snapshot, settlement 없음.
   - 저장된 gross/fee/net amount는 체결 확정 금액이 아니라 제출 시점 quote estimate.
+- `POST /api/v1/orders/:orderId/cancel` submitted order cancel MVP 구현 완료:
+  - 로그인 사용자의 season participant 소유 order만 cancel 가능.
+  - `submitted` 상태만 `canceled`로 변경 가능.
+  - guarded update 조건: `id + seasonParticipantId + status = submitted`.
+  - order row의 `status`, `canceledAt`, `updatedAt`만 변경.
+  - wallet debit/credit, wallet_transactions, position mutation, equity snapshot, settlement 없음.
 - `/records` orders section은 `orders` table 기반 read-only 조회로 연결 완료.
 - `admin_manual` asset/price bootstrap CLI 구현 완료:
   - `scripts/admin-upsert-asset.ts`
@@ -116,7 +123,8 @@ near-term ledger/FX foundation:
 - `/wallets` read-only MVP 계약: `docs/wallets-api-contract.md`.
 - `/orders` read-only MVP 계약: `docs/orders-api-contract.md`.
 - `/orders` quote/create MVP 계약: `docs/orders-api-contract.md`.
-- records API 계약: `docs/records-api-contract.md`에 submitted order 조회 가능 상태 반영.
+- `/orders` cancel MVP 계약: `docs/orders-api-contract.md`.
+- records API 계약: `docs/records-api-contract.md`에 submitted/canceled order 조회 가능 상태 반영.
 - `/fx quote` STOP review: `docs/fx-quote-stop-review.md`.
 - `/fx` API 계약 초안: `docs/fx-api-contract.md`.
 - FX rate input path plan: `docs/fx-rate-input-path-plan.md`.
@@ -213,7 +221,7 @@ near-term ledger/FX foundation:
   - 기존 ranking row는 transaction 안에서 임시 음수 rank로 이동한 뒤 `(seasonId, rankType, rankingDate, seasonParticipantId)` unique 기준 upsert하여 rank unique 충돌을 피함.
 - 이 작업은 `/home`과 `/ranking` 구현 준비를 진전시켰지만, 자동 데이터 생성/외부 시세 공급/API 응답은 아직 없음.
 - scheduler/batch/provider ingestion/order execution/position mutation/settlement 구현 없음.
-- order quote/create MVP는 구현됐지만 execution은 STOP 상태.
+- order quote/create/cancel MVP는 구현됐지만 execution은 STOP 상태.
 
 ### `/fx execute`
 
@@ -386,6 +394,7 @@ near-term ledger/FX foundation:
   - `orders` table 기반 read-only 조회로 연결 완료.
   - order row가 없으면 fake 없이 `orders.state = available`, empty records.
   - `POST /api/v1/orders`로 생성된 submitted order 조회 가능.
+  - `POST /api/v1/orders/:orderId/cancel`로 canceled 처리된 order 조회 가능.
   - order execution 구현 없음.
 - `/records` 호출은 exchange/wallet/order row를 생성/수정/삭제하지 않음.
 - 아직 미구현:
@@ -397,6 +406,7 @@ near-term ledger/FX foundation:
 - `GET /api/v1/orders` read-only MVP 구현 완료.
 - `POST /api/v1/orders/quote` read-only MVP 구현 완료.
 - `POST /api/v1/orders` submitted order create MVP 구현 완료.
+- `POST /api/v1/orders/:orderId/cancel` submitted order cancel MVP 구현 완료.
 - auth 본체는 미완성이나 API는 기존 보호 API와 동일하게 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
 - query parameter:
   - `seasonId` optional.
@@ -421,7 +431,15 @@ near-term ledger/FX foundation:
   - quote와 동일 validation/calculation 후 `orders` row만 `submitted`로 생성.
   - wallet 차감/증가, wallet transaction, position mutation, equity snapshot, settlement 없음.
   - order idempotency는 아직 없음.
-- 주문 체결, order cancel API, settlement는 없음.
+- cancel:
+  - path `orderId` required.
+  - 소유자가 아니거나 없는 order는 `ORDER_NOT_FOUND`.
+  - `submitted` order만 cancel 가능.
+  - `executed`/`canceled`/`rejected` order는 `ORDER_NOT_CANCELABLE`.
+  - race로 guarded update가 실패하면 `ORDER_CANCEL_CONFLICT`.
+  - order row 상태만 `canceled`로 변경하고 `canceledAt` 기록.
+  - wallet 차감/증가, wallet transaction, position mutation, equity snapshot, settlement 없음.
+- 주문 체결, settlement는 없음.
 
 ## 9. 다음 gate
 
@@ -488,6 +506,7 @@ near-term ledger/FX foundation:
 - Prisma raw query로 `orders` table, order enum, index, FK, `prisma.order.count()` 확인 완료.
 - `pnpm test -- orders` 통과.
 - `pnpm test -- records` 통과.
+- `POST /api/v1/orders/:orderId/cancel` unit tests 통과.
 - DB integration의 no eligible snapshot helper는 기존 eligible `admin_manual` snapshot 변경을 커밋하지 않도록 transaction rollback isolation 방식으로 개선됨.
 - 코드/schema/migration/package/seed/test 변경 없이 `/fx quote` smoke 검증됨.
 - integration/test assertion 완화 없음.

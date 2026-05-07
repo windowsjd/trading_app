@@ -80,6 +80,7 @@ describe('RecordsService', () => {
   const endAt = new Date('2026-05-31T00:00:00.000Z');
   const joinedAt = new Date('2026-05-02T00:00:00.000Z');
   const occurredAt = new Date('2026-05-07T00:01:00.000Z');
+  const canceledAt = new Date('2026-05-07T00:03:00.000Z');
   const createdAt = new Date('2026-05-07T00:01:01.000Z');
 
   const season = {
@@ -117,6 +118,7 @@ describe('RecordsService', () => {
       findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
       upsert: jest.fn(),
       delete: jest.fn(),
     },
@@ -238,6 +240,39 @@ describe('RecordsService', () => {
     ]);
   };
 
+  const mockCanceledOrderRecords = (
+    prisma: ReturnType<typeof createPrisma>,
+  ) => {
+    prisma.order.count.mockResolvedValueOnce(1);
+    prisma.order.findMany.mockResolvedValueOnce([
+      {
+        id: 'order-canceled-1',
+        submittedAt: occurredAt,
+        executedAt: null,
+        canceledAt,
+        rejectedAt: null,
+        side: OrderSide.buy,
+        orderType: OrderType.limit,
+        status: OrderStatus.canceled,
+        quantity: new Prisma.Decimal('2.50000000'),
+        limitPrice: new Prisma.Decimal('100.00000000'),
+        executedPrice: null,
+        currencyCode: CurrencyCode.USD,
+        grossAmount: new Prisma.Decimal('250.00000000'),
+        feeAmount: new Prisma.Decimal('0.25000000'),
+        netAmount: new Prisma.Decimal('250.25000000'),
+        assetPriceSnapshotId: null,
+        fxRateSnapshotId: null,
+        createdAt,
+        asset: {
+          id: 'asset-1',
+          symbol: 'AAPL',
+          name: 'Apple Inc.',
+        },
+      },
+    ]);
+  };
+
   const expectNoRecordWrites = (prisma: ReturnType<typeof createPrisma>) => {
     for (const model of [
       prisma.season,
@@ -249,6 +284,9 @@ describe('RecordsService', () => {
     ]) {
       expect(model.create).not.toHaveBeenCalled();
       expect(model.update).not.toHaveBeenCalled();
+      if ('updateMany' in model) {
+        expect(model.updateMany).not.toHaveBeenCalled();
+      }
       expect(model.upsert).not.toHaveBeenCalled();
       expect(model.delete).not.toHaveBeenCalled();
     }
@@ -426,6 +464,62 @@ describe('RecordsService', () => {
     );
     expect(prisma.exchangeTransaction.findMany).not.toHaveBeenCalled();
     expect(prisma.walletTransaction.findMany).not.toHaveBeenCalled();
+    expectNoRecordWrites(prisma);
+  });
+
+  it('returns canceled order records from actual order rows', async () => {
+    const { prisma, service } = createService();
+    mockCurrentSeason(prisma);
+    mockJoined(prisma);
+    mockCanceledOrderRecords(prisma);
+
+    const response = await service.getRecords('user-1', {
+      type: 'orders',
+      currencyCode: 'USD',
+    });
+
+    expect(response.data.orders).toMatchObject({
+      state: 'available',
+      records: [
+        {
+          orderId: 'order-canceled-1',
+          submittedAt: '2026-05-07T00:01:00.000Z',
+          executedAt: null,
+          canceledAt: '2026-05-07T00:03:00.000Z',
+          rejectedAt: null,
+          assetId: 'asset-1',
+          symbol: 'AAPL',
+          status: OrderStatus.canceled,
+          quantity: '2.50000000',
+          grossAmount: '250.00000000',
+          feeAmount: '0.25000000',
+          netAmount: '250.25000000',
+        },
+      ],
+    });
+    expectNoRecordWrites(prisma);
+  });
+
+  it('includes canceled order records for type all', async () => {
+    const { prisma, service } = createService();
+    mockCurrentSeason(prisma);
+    mockJoined(prisma);
+    mockExchangeRecords(prisma);
+    mockWalletRecords(prisma);
+    mockCanceledOrderRecords(prisma);
+
+    const response = await service.getRecords('user-1', {});
+
+    expect(response.data.orders).toMatchObject({
+      state: 'available',
+      records: [
+        {
+          orderId: 'order-canceled-1',
+          status: OrderStatus.canceled,
+          canceledAt: '2026-05-07T00:03:00.000Z',
+        },
+      ],
+    });
     expectNoRecordWrites(prisma);
   });
 

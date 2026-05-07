@@ -7,7 +7,8 @@
 - The MVP reads existing `exchange_transactions`, `wallet_transactions`, and `orders` rows only.
 - Order records are backed by the `orders` DB foundation.
 - Submitted orders created by `POST /api/v1/orders` are visible in the orders section.
-- Order records can include `status = submitted`; this is not an execution/fill record.
+- Order records can include `status = submitted` or `status = canceled`; these are not execution/fill records.
+- Canceled orders from `POST /api/v1/orders/:orderId/cancel` are visible in the orders section.
 - Do not add fake data, Prisma schema changes, migrations, or seed changes from this document.
 
 ## Source Rules
@@ -156,6 +157,7 @@
 - If no current season or selected season exists, `data.state` is `unavailable`.
 - `type=orders` returns `data.state = available` for joined participants and reads actual `orders` rows.
 - `type=orders` can return submitted orders before execution exists.
+- `type=orders` can return canceled orders, including `canceledAt`.
 - The API does not synthesize or fake order records.
 - The API does not mutate DB rows.
 
