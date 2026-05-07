@@ -1,4 +1,5 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   AssetPriceSourceType,
   CurrencyCode,
@@ -36,6 +37,7 @@ export type OrderRequestBody = {
   quantity?: unknown;
   limitPrice?: unknown;
   currencyCode?: unknown;
+  idempotencyKey?: unknown;
 };
 
 type OrdersState = 'available' | 'not_joined' | 'unavailable';
@@ -74,6 +76,11 @@ type ParsedOrderRequest = {
   quantity: Prisma.Decimal;
   limitPrice: Prisma.Decimal | null;
   currencyCode?: CurrencyCode;
+};
+
+type OrderCreateIdempotency = {
+  idempotencyKey: string;
+  requestHash: string;
 };
 
 type ParsedOrdersQuery = {
@@ -191,6 +198,7 @@ const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 const MAX_DECIMAL_24_8 = new Prisma.Decimal('9999999999999999.99999999');
+const ORDER_CREATE_REQUEST_HASH_API_VERSION = 'order-create:v1';
 
 @Injectable()
 export class OrdersService {
@@ -212,27 +220,51 @@ export class OrdersService {
     userId: string | undefined,
     body: OrderRequestBody = {},
   ): Promise<CreateOrderResponse> {
-    const quote = await this.buildOrderQuote(userId, body, new Date());
-    const createdOrder = await this.prisma.order.create({
-      data: {
-        seasonParticipantId: quote.participant.id,
-        assetId: quote.asset.id,
+    if (!userId) {
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
+    }
+
+    const request = this.parseOrderRequest(body);
+    const idempotency = this.buildOrderCreateIdempotency(body, request);
+    const quoteAt = new Date();
+    const season = await this.findActiveSeasonOrThrow();
+    const participant = await this.findParticipantOrThrow(season.id, userId);
+    const existingOrder = await this.findIdempotentCreateOrder(
+      participant.id,
+      idempotency.idempotencyKey,
+    );
+
+    if (existingOrder) {
+      return this.replayIdempotentCreateOrder(existingOrder, idempotency);
+    }
+
+    const quote = await this.buildOrderQuoteForContext({
+      season,
+      participant,
+      request,
+      quoteAt,
+    });
+    const orderId = randomUUID();
+    const responsePayloadJson = this.buildCreateOrderResponse(
+      this.formatOrder({
+        id: orderId,
         side: quote.request.side,
         orderType: quote.request.orderType,
         status: OrderStatus.submitted,
-        quantity: this.formatDecimal(quote.request.quantity, monetaryScale),
+        quantity: quote.request.quantity,
         limitPrice:
           quote.request.orderType === OrderType.limit
-            ? this.formatNullableDecimal(
-                quote.request.limitPrice,
-                monetaryScale,
-              )
+            ? quote.request.limitPrice
             : null,
         executedPrice: null,
         currencyCode: quote.asset.currencyCode,
-        grossAmount: this.formatDecimal(quote.grossAmount, monetaryScale),
-        feeAmount: this.formatDecimal(quote.feeAmount, monetaryScale),
-        netAmount: this.formatDecimal(quote.netAmount, monetaryScale),
+        grossAmount: quote.grossAmount,
+        feeAmount: quote.feeAmount,
+        netAmount: quote.netAmount,
         assetPriceSnapshotId: quote.assetPriceSnapshotId,
         fxRateSnapshotId: quote.fxRateSnapshotId,
         submittedAt: quote.quoteAt,
@@ -240,51 +272,79 @@ export class OrdersService {
         canceledAt: null,
         rejectedAt: null,
         rejectReason: null,
-      },
-      select: {
-        id: true,
-        side: true,
-        orderType: true,
-        status: true,
-        quantity: true,
-        limitPrice: true,
-        executedPrice: true,
-        currencyCode: true,
-        grossAmount: true,
-        feeAmount: true,
-        netAmount: true,
-        assetPriceSnapshotId: true,
-        fxRateSnapshotId: true,
-        submittedAt: true,
-        executedAt: true,
-        canceledAt: true,
-        rejectedAt: true,
-        rejectReason: true,
-        createdAt: true,
-        updatedAt: true,
+        createdAt: quote.quoteAt,
+        updatedAt: quote.quoteAt,
         asset: {
-          select: {
-            id: true,
-            symbol: true,
-            name: true,
-            market: true,
-            currencyCode: true,
-          },
+          id: quote.asset.id,
+          symbol: quote.asset.symbol,
+          name: quote.asset.name,
+          market: quote.asset.market,
+          currencyCode: quote.asset.currencyCode,
         },
-      },
-    });
+      }),
+    );
 
-    return {
-      success: true,
-      data: {
-        order: this.formatOrder(createdOrder),
-        execution: {
-          state: 'not_executed',
-          reason: 'ORDER_EXECUTION_NOT_IMPLEMENTED',
-          message: 'Order execution is not implemented in this MVP.',
+    try {
+      await this.prisma.order.create({
+        data: {
+          id: orderId,
+          seasonParticipantId: quote.participant.id,
+          assetId: quote.asset.id,
+          side: quote.request.side,
+          orderType: quote.request.orderType,
+          status: OrderStatus.submitted,
+          quantity: this.formatDecimal(quote.request.quantity, monetaryScale),
+          limitPrice:
+            quote.request.orderType === OrderType.limit
+              ? this.formatNullableDecimal(
+                  quote.request.limitPrice,
+                  monetaryScale,
+                )
+              : null,
+          executedPrice: null,
+          currencyCode: quote.asset.currencyCode,
+          grossAmount: this.formatDecimal(quote.grossAmount, monetaryScale),
+          feeAmount: this.formatDecimal(quote.feeAmount, monetaryScale),
+          netAmount: this.formatDecimal(quote.netAmount, monetaryScale),
+          assetPriceSnapshotId: quote.assetPriceSnapshotId,
+          fxRateSnapshotId: quote.fxRateSnapshotId,
+          idempotencyKey: idempotency.idempotencyKey,
+          requestHash: idempotency.requestHash,
+          responsePayloadJson,
+          submittedAt: quote.quoteAt,
+          executedAt: null,
+          canceledAt: null,
+          rejectedAt: null,
+          rejectReason: null,
+          createdAt: quote.quoteAt,
+          updatedAt: quote.quoteAt,
         },
-      },
-    };
+        select: {
+          id: true,
+        },
+      });
+
+      return responsePayloadJson;
+    } catch (error) {
+      if (!this.isUniqueConstraintError(error)) {
+        throw error;
+      }
+
+      const racedOrder = await this.findIdempotentCreateOrder(
+        quote.participant.id,
+        idempotency.idempotencyKey,
+      );
+
+      if (!racedOrder) {
+        this.throwApiError(
+          HttpStatus.CONFLICT,
+          'ORDER_IDEMPOTENCY_CONFLICT',
+          'Order idempotency conflict.',
+        );
+      }
+
+      return this.replayIdempotentCreateOrder(racedOrder, idempotency);
+    }
   }
 
   async cancelOrder(
@@ -531,24 +591,32 @@ export class OrdersService {
     }
 
     const request = this.parseOrderRequest(body);
-    const season = await this.findActiveSeason();
-    if (!season) {
-      this.throwApiError(
-        HttpStatus.CONFLICT,
-        'SEASON_NOT_ACTIVE',
-        'Season is not active.',
-      );
-    }
+    return this.buildOrderQuoteFromParsedRequest(userId, request, quoteAt);
+  }
 
-    const participant = await this.findParticipant(season.id, userId);
-    if (!participant) {
-      this.throwApiError(
-        HttpStatus.FORBIDDEN,
-        'SEASON_NOT_JOINED',
-        'Season is not joined.',
-      );
-    }
+  private async buildOrderQuoteFromParsedRequest(
+    userId: string,
+    request: ParsedOrderRequest,
+    quoteAt: Date,
+  ): Promise<OrderQuoteCalculation> {
+    const season = await this.findActiveSeasonOrThrow();
+    const participant = await this.findParticipantOrThrow(season.id, userId);
 
+    return this.buildOrderQuoteForContext({
+      season,
+      participant,
+      request,
+      quoteAt,
+    });
+  }
+
+  private async buildOrderQuoteForContext(input: {
+    season: ActiveOrderSeason;
+    participant: OrdersParticipant;
+    request: ParsedOrderRequest;
+    quoteAt: Date;
+  }): Promise<OrderQuoteCalculation> {
+    const { season, participant, request, quoteAt } = input;
     const asset = await this.findUsableAsset(request.assetId);
     if (request.currencyCode && request.currencyCode !== asset.currencyCode) {
       this.throwApiError(
@@ -621,6 +689,63 @@ export class OrdersService {
     };
   }
 
+  private async findActiveSeasonOrThrow(): Promise<ActiveOrderSeason> {
+    const season = await this.findActiveSeason();
+    if (!season) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'SEASON_NOT_ACTIVE',
+        'Season is not active.',
+      );
+    }
+
+    return season;
+  }
+
+  private async findParticipantOrThrow(
+    seasonId: string,
+    userId: string,
+  ): Promise<OrdersParticipant> {
+    const participant = await this.findParticipant(seasonId, userId);
+    if (!participant) {
+      this.throwApiError(
+        HttpStatus.FORBIDDEN,
+        'SEASON_NOT_JOINED',
+        'Season is not joined.',
+      );
+    }
+
+    return participant;
+  }
+
+  private buildOrderCreateIdempotency(
+    body: OrderRequestBody,
+    request: ParsedOrderRequest,
+  ): OrderCreateIdempotency {
+    const idempotencyKey = this.parseIdempotencyKey(body.idempotencyKey);
+    const canonicalPayload = {
+      apiVersion: ORDER_CREATE_REQUEST_HASH_API_VERSION,
+      assetId: request.assetId,
+      side: request.side,
+      orderType: request.orderType,
+      quantity: this.formatDecimal(request.quantity, monetaryScale),
+      limitPrice:
+        request.orderType === OrderType.limit
+          ? this.formatNullableDecimal(request.limitPrice, monetaryScale)
+          : null,
+      currencyCode: request.currencyCode ?? null,
+    };
+    const canonicalJson = JSON.stringify(canonicalPayload);
+    const requestHash = createHash('sha256')
+      .update(canonicalJson, 'utf8')
+      .digest('hex');
+
+    return {
+      idempotencyKey,
+      requestHash,
+    };
+  }
+
   private parseOrderRequest(body: OrderRequestBody): ParsedOrderRequest {
     if (!body || typeof body !== 'object') {
       this.throwApiError(
@@ -656,6 +781,100 @@ export class OrdersService {
     }
 
     return orderId.trim();
+  }
+
+  private parseIdempotencyKey(value: unknown): string {
+    if (typeof value !== 'string' || value.trim() === '') {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'INVALID_IDEMPOTENCY_KEY',
+        'idempotencyKey is required.',
+      );
+    }
+
+    return value.trim();
+  }
+
+  private async findIdempotentCreateOrder(
+    seasonParticipantId: string,
+    idempotencyKey: string,
+  ) {
+    return this.prisma.order.findFirst({
+      where: {
+        seasonParticipantId,
+        idempotencyKey,
+      },
+      select: {
+        id: true,
+        requestHash: true,
+        responsePayloadJson: true,
+        side: true,
+        orderType: true,
+        status: true,
+        quantity: true,
+        limitPrice: true,
+        executedPrice: true,
+        currencyCode: true,
+        grossAmount: true,
+        feeAmount: true,
+        netAmount: true,
+        assetPriceSnapshotId: true,
+        fxRateSnapshotId: true,
+        submittedAt: true,
+        executedAt: true,
+        canceledAt: true,
+        rejectedAt: true,
+        rejectReason: true,
+        createdAt: true,
+        updatedAt: true,
+        asset: {
+          select: {
+            id: true,
+            symbol: true,
+            name: true,
+            market: true,
+            currencyCode: true,
+          },
+        },
+      },
+    });
+  }
+
+  private replayIdempotentCreateOrder(
+    order: NonNullable<
+      Awaited<ReturnType<OrdersService['findIdempotentCreateOrder']>>
+    >,
+    idempotency: OrderCreateIdempotency,
+  ): CreateOrderResponse {
+    if (order.requestHash !== idempotency.requestHash) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'ORDER_IDEMPOTENCY_CONFLICT',
+        'Same idempotencyKey was used with a different order create request.',
+      );
+    }
+
+    if (order.responsePayloadJson) {
+      return order.responsePayloadJson as unknown as CreateOrderResponse;
+    }
+
+    return this.buildCreateOrderResponse(this.formatOrder(order));
+  }
+
+  private buildCreateOrderResponse(
+    order: NonNullable<OrdersResponse['data']['orders']>[number],
+  ): CreateOrderResponse {
+    return {
+      success: true,
+      data: {
+        order,
+        execution: {
+          state: 'not_executed',
+          reason: 'ORDER_EXECUTION_NOT_IMPLEMENTED',
+          message: 'Order execution is not implemented in this MVP.',
+        },
+      },
+    };
   }
 
   private parseOrderType(value: unknown): OrderType {
@@ -1364,5 +1583,13 @@ export class OrdersService {
     message: string,
   ): never {
     throw new HttpException(this.createErrorBody(code, message), status);
+  }
+
+  private isUniqueConstraintError(error: unknown): boolean {
+    if (typeof error !== 'object' || error === null) {
+      return false;
+    }
+
+    return (error as { code?: unknown }).code === 'P2002';
   }
 }

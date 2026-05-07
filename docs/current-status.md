@@ -20,6 +20,7 @@
 - `GET /api/v1/orders` read-only MVP
 - `POST /api/v1/orders/quote` read-only MVP
 - `POST /api/v1/orders` submitted order create MVP
+- `POST /api/v1/orders` create idempotency MVP
 - `POST /api/v1/orders/:orderId/cancel` submitted order cancel MVP
 - `GET /api/v1/seasons/current`
 - `POST /api/v1/seasons/{seasonId}/join`
@@ -77,6 +78,7 @@ near-term ledger/FX foundation:
 - order storage foundation 반영 완료: `orders`, `OrderSide`, `OrderType`, `OrderStatus`.
 - order foundation migration 생성 완료: `20260508093000_add_order_foundation`.
 - order foundation migration 로컬 DB 적용 완료: `20260508093000_add_order_foundation`.
+- order create idempotency migration 생성 및 로컬 DB 적용 완료: `20260508110000_add_order_create_idempotency`.
 - DB catalog 확인 완료:
   - `orders` table 존재.
   - `OrderSide`, `OrderType`, `OrderStatus` enum 존재.
@@ -92,6 +94,10 @@ near-term ledger/FX foundation:
   - DB mutation 없음.
 - `POST /api/v1/orders` submitted order create MVP 구현 완료:
   - quote와 동일 계산/검증 후 `orders` row 1건만 `submitted`로 생성.
+  - body `idempotencyKey` required.
+  - 동일 participant + 동일 `idempotencyKey` + 동일 canonical requestHash는 stored `responsePayloadJson` replay.
+  - 동일 participant + 동일 `idempotencyKey` + 다른 requestHash는 `ORDER_IDEMPOTENCY_CONFLICT`.
+  - `(seasonParticipantId, idempotencyKey)` unique constraint와 P2002 reread로 duplicate order create 방지.
   - wallet debit/credit, wallet_transactions, position mutation, equity snapshot, settlement 없음.
   - 저장된 gross/fee/net amount는 체결 확정 금액이 아니라 제출 시점 quote estimate.
 - `POST /api/v1/orders/:orderId/cancel` submitted order cancel MVP 구현 완료:
@@ -406,6 +412,7 @@ near-term ledger/FX foundation:
 - `GET /api/v1/orders` read-only MVP 구현 완료.
 - `POST /api/v1/orders/quote` read-only MVP 구현 완료.
 - `POST /api/v1/orders` submitted order create MVP 구현 완료.
+- `POST /api/v1/orders` create idempotency MVP 구현 완료.
 - `POST /api/v1/orders/:orderId/cancel` submitted order cancel MVP 구현 완료.
 - auth 본체는 미완성이나 API는 기존 보호 API와 동일하게 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
 - query parameter:
@@ -429,8 +436,14 @@ near-term ledger/FX foundation:
   - DB mutation 없음.
 - create:
   - quote와 동일 validation/calculation 후 `orders` row만 `submitted`로 생성.
+  - `idempotencyKey` required.
+  - requestHash는 `assetId`, `side`, `orderType`, `quantity`, `limitPrice`, `currencyCode` canonical JSON + SHA-256.
+  - `idempotencyKey` 자체는 requestHash 대상에서 제외.
+  - 동일 participant + 동일 key + 동일 hash는 stored `responsePayloadJson` replay.
+  - 동일 participant + 동일 key + 다른 hash는 `ORDER_IDEMPOTENCY_CONFLICT`.
+  - P2002 unique race 발생 시 기존 order를 reread 후 replay 또는 conflict.
+  - cancel 이후 같은 idempotencyKey 재호출도 create command replay 정책상 stored create response를 우선 반환할 수 있음.
   - wallet 차감/증가, wallet transaction, position mutation, equity snapshot, settlement 없음.
-  - order idempotency는 아직 없음.
 - cancel:
   - path `orderId` required.
   - 소유자가 아니거나 없는 order는 `ORDER_NOT_FOUND`.
@@ -507,6 +520,8 @@ near-term ledger/FX foundation:
 - `pnpm test -- orders` 통과.
 - `pnpm test -- records` 통과.
 - `POST /api/v1/orders/:orderId/cancel` unit tests 통과.
+- `POST /api/v1/orders` create idempotency unit tests 통과.
+- `pnpm exec prisma migrate dev --name add_order_create_idempotency`로 order create idempotency migration 적용 완료.
 - DB integration의 no eligible snapshot helper는 기존 eligible `admin_manual` snapshot 변경을 커밋하지 않도록 transaction rollback isolation 방식으로 개선됨.
 - 코드/schema/migration/package/seed/test 변경 없이 `/fx quote` smoke 검증됨.
 - integration/test assertion 완화 없음.

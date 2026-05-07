@@ -5,6 +5,7 @@
 - `GET /api/v1/orders` read-only MVP is implemented.
 - `POST /api/v1/orders/quote` read-only MVP is implemented.
 - `POST /api/v1/orders` submitted order create MVP is implemented.
+- `POST /api/v1/orders` create idempotency MVP is implemented.
 - `POST /api/v1/orders/:orderId/cancel` submitted order cancel MVP is implemented.
 - `POST /api/v1/orders` creates one `orders` row with `status = submitted`.
 - `POST /api/v1/orders/:orderId/cancel` updates an owned submitted order row to `status = canceled`.
@@ -186,17 +187,52 @@
 
 Same body as `POST /api/v1/orders/quote`.
 
+`idempotencyKey` is required for `POST /api/v1/orders` only:
+
+```json
+{
+  "assetId": "<string>",
+  "side": "buy | sell",
+  "orderType": "market | limit",
+  "quantity": "<decimal string>",
+  "limitPrice": "<amount string, required for limit>",
+  "currencyCode": "KRW | USD optional",
+  "idempotencyKey": "<non-empty string>"
+}
+```
+
 ### Behavior
 
-- Runs the same validation and quote calculation as `POST /api/v1/orders/quote`.
+- Validates `idempotencyKey` after auth and order body parsing.
+- Idempotency applies only to `POST /api/v1/orders` create.
+- `POST /api/v1/orders/quote` is read-only and does not require or store an idempotency key.
+- `POST /api/v1/orders/:orderId/cancel` does not require or store an idempotency key in this MVP.
+- The request hash is SHA-256 over canonical JSON for:
+  - `assetId`
+  - `side`
+  - `orderType`
+  - `quantity`
+  - `limitPrice`
+  - `currencyCode`
+- `idempotencyKey` is excluded from the request hash.
+- Same `seasonParticipantId + idempotencyKey` and same request hash replays the stored create response without creating a second order.
+- Same `seasonParticipantId + idempotencyKey` and different request hash returns `ORDER_IDEMPOTENCY_CONFLICT`.
+- DB unique constraint `(season_participant_id, idempotency_key)` prevents duplicate submitted order rows under races.
+- If create hits a unique race (`P2002`), the service rereads the existing order:
+  - same request hash: replay.
+  - different request hash: `ORDER_IDEMPOTENCY_CONFLICT`.
+- Replay prefers stored `orders.response_payload_json`.
+- If stored response is missing, replay falls back to formatting the existing order row.
+- If an order was later canceled, duplicate create replay still prefers the original stored create response. This can show the original submitted create response rather than current canceled status; a stricter current-state command history would require a separate idempotency command table.
+- New create runs the same validation and quote calculation as `POST /api/v1/orders/quote`.
 - Creates exactly one `orders` row with `status = submitted`.
+- Stores `idempotencyKey`, `requestHash`, and `responsePayloadJson` on that order row.
 - Does not execute the order.
 - Does not debit or credit wallets.
 - Does not create `wallet_transactions`.
 - Does not mutate `positions`.
 - Does not create `equity_snapshots`.
 - Does not run settlement or scheduler behavior.
-- No idempotency key is implemented in this MVP.
 - Created submitted orders are visible from `GET /api/v1/orders` and `GET /api/v1/records?type=orders`.
 
 ### Response
@@ -262,6 +298,8 @@ Same body as `POST /api/v1/orders/quote`.
 - `ORDER_NOT_FOUND`
 - `ORDER_NOT_CANCELABLE`
 - `ORDER_CANCEL_CONFLICT`
+- `INVALID_IDEMPOTENCY_KEY`
+- `ORDER_IDEMPOTENCY_CONFLICT`
 - `INVALID_ORDER_STATUS`
 - `INVALID_ORDER_SIDE`
 - `INVALID_ORDER_TYPE`
@@ -285,7 +323,6 @@ Same body as `POST /api/v1/orders/quote`.
 ## Not Implemented
 
 - Order execution.
-- Order idempotency.
 - Durable order quote.
 - Wallet debit/credit for orders.
 - Position mutation.

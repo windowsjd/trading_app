@@ -50,6 +50,7 @@ jest.mock('../generated/prisma/client', () => {
 });
 
 import { HttpException } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import {
   CurrencyCode,
   OrderSide,
@@ -267,6 +268,86 @@ describe('OrdersService', () => {
       },
     ]);
   };
+
+  const hashOrderCreateRequest = (body: {
+    assetId: string;
+    side: OrderSide;
+    orderType: OrderType;
+    quantity: string;
+    limitPrice?: string;
+    currencyCode?: CurrencyCode;
+  }) =>
+    createHash('sha256')
+      .update(
+        JSON.stringify({
+          apiVersion: 'order-create:v1',
+          assetId: body.assetId,
+          side: body.side,
+          orderType: body.orderType,
+          quantity: new Prisma.Decimal(body.quantity).toFixed(8),
+          limitPrice:
+            body.orderType === OrderType.limit
+              ? new Prisma.Decimal(body.limitPrice ?? '0').toFixed(8)
+              : null,
+          currencyCode: body.currencyCode ?? null,
+        }),
+        'utf8',
+      )
+      .digest('hex');
+
+  const orderCreateBody = {
+    assetId: 'asset-1',
+    side: OrderSide.buy,
+    orderType: OrderType.limit,
+    quantity: '1.00000000',
+    limitPrice: '50000.00000000',
+    idempotencyKey: 'order-create-key-duplicate',
+  };
+
+  const idempotentOrderRecord = (requestHash: string) => ({
+    id: 'order-idempotent-1',
+    requestHash,
+    responsePayloadJson: {
+      success: true,
+      data: {
+        order: {
+          orderId: 'order-idempotent-1',
+          status: OrderStatus.submitted,
+        },
+        execution: {
+          state: 'not_executed',
+          reason: 'ORDER_EXECUTION_NOT_IMPLEMENTED',
+          message: 'Order execution is not implemented in this MVP.',
+        },
+      },
+    },
+    side: OrderSide.buy,
+    orderType: OrderType.limit,
+    status: OrderStatus.submitted,
+    quantity: new Prisma.Decimal('1.00000000'),
+    limitPrice: new Prisma.Decimal('50000.00000000'),
+    executedPrice: null,
+    currencyCode: CurrencyCode.KRW,
+    grossAmount: new Prisma.Decimal('50000.00000000'),
+    feeAmount: new Prisma.Decimal('50.00000000'),
+    netAmount: new Prisma.Decimal('50050.00000000'),
+    assetPriceSnapshotId: null,
+    fxRateSnapshotId: null,
+    submittedAt,
+    executedAt: null,
+    canceledAt: null,
+    rejectedAt: null,
+    rejectReason: null,
+    createdAt,
+    updatedAt,
+    asset: {
+      id: 'asset-1',
+      symbol: '005930',
+      name: 'Samsung',
+      market: 'KRX',
+      currencyCode: CurrencyCode.KRW,
+    },
+  });
 
   const expectNoOrderWrites = (prisma: ReturnType<typeof createPrisma>) => {
     for (const model of [
@@ -585,11 +666,12 @@ describe('OrdersService', () => {
       side: 'buy',
       orderType: 'market',
       quantity: '2.00000000',
+      idempotencyKey: 'order-create-key-1',
     });
 
     expect(response.data).toMatchObject({
       order: {
-        orderId: 'order-submitted-1',
+        orderId: expect.any(String),
         status: OrderStatus.submitted,
         executedAt: null,
         grossAmount: '200.00000000',
@@ -617,6 +699,17 @@ describe('OrdersService', () => {
           netAmount: '200.20000000',
           assetPriceSnapshotId: 'aps-1',
           fxRateSnapshotId: 'fx-1',
+          idempotencyKey: 'order-create-key-1',
+          requestHash: expect.any(String),
+          responsePayloadJson: {
+            success: true,
+            data: expect.objectContaining({
+              order: expect.objectContaining({
+                orderId: expect.any(String),
+                status: OrderStatus.submitted,
+              }),
+            }),
+          },
           executedAt: null,
           canceledAt: null,
           rejectedAt: null,
@@ -668,10 +761,11 @@ describe('OrdersService', () => {
       orderType: 'limit',
       quantity: '1.00000000',
       limitPrice: '50000.00000000',
+      idempotencyKey: 'order-create-key-2',
     });
 
     expect(response.data.order).toMatchObject({
-      orderId: 'order-submitted-2',
+      orderId: expect.any(String),
       status: OrderStatus.submitted,
       limitPrice: '50000.00000000',
       assetPriceSnapshotId: null,
@@ -685,6 +779,118 @@ describe('OrdersService', () => {
         }),
       }),
     );
+    expectOnlyOrderCreateWrite(prisma);
+  });
+
+  it('rejects create without idempotencyKey', async () => {
+    const { prisma, service } = createService();
+
+    await expect(
+      service.createOrder('user-1', {
+        assetId: 'asset-1',
+        side: 'buy',
+        orderType: 'limit',
+        quantity: '1.00000000',
+        limitPrice: '50000.00000000',
+      }),
+    ).rejects.toBeInstanceOf(HttpException);
+    expectNoOrderWrites(prisma);
+  });
+
+  it('rejects create with invalid idempotencyKey', async () => {
+    const { prisma, service } = createService();
+
+    await expect(
+      service.createOrder('user-1', {
+        assetId: 'asset-1',
+        side: 'buy',
+        orderType: 'limit',
+        quantity: '1.00000000',
+        limitPrice: '50000.00000000',
+        idempotencyKey: '   ',
+      }),
+    ).rejects.toBeInstanceOf(HttpException);
+    expectNoOrderWrites(prisma);
+  });
+
+  it('replays duplicate create with same idempotencyKey and same payload', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    mockJoined(prisma);
+    mockAsset(prisma, CurrencyCode.KRW);
+    mockCashWallet(prisma, '1000000.00000000');
+    const requestHash = hashOrderCreateRequest(orderCreateBody);
+    const existingOrder = idempotentOrderRecord(requestHash);
+    prisma.order.findFirst.mockResolvedValueOnce(existingOrder);
+
+    const response = await service.createOrder('user-1', orderCreateBody);
+
+    expect(response).toBe(existingOrder.responsePayloadJson);
+    expect(prisma.order.create).not.toHaveBeenCalled();
+    expectNoOrderWrites(prisma);
+  });
+
+  it('conflicts duplicate create with same idempotencyKey and different payload', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    mockJoined(prisma);
+    mockAsset(prisma, CurrencyCode.KRW);
+    mockCashWallet(prisma, '1000000.00000000');
+    prisma.order.findFirst.mockResolvedValueOnce(
+      idempotentOrderRecord('different-request-hash'),
+    );
+
+    await expect(
+      service.createOrder('user-1', orderCreateBody),
+    ).rejects.toBeInstanceOf(HttpException);
+    expect(prisma.order.create).not.toHaveBeenCalled();
+    expectNoOrderWrites(prisma);
+  });
+
+  it('replays existing order after a unique idempotency race with same payload', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    mockJoined(prisma);
+    mockAsset(prisma, CurrencyCode.KRW);
+    mockCashWallet(prisma, '1000000.00000000');
+    let racedRequestHash = '';
+    prisma.order.findFirst.mockResolvedValueOnce(null);
+    prisma.order.create.mockImplementationOnce((args) => {
+      racedRequestHash = args.data.requestHash;
+
+      return Promise.reject({ code: 'P2002' });
+    });
+    const existingOrder = idempotentOrderRecord('');
+    prisma.order.findFirst.mockImplementationOnce(() =>
+      Promise.resolve({
+        ...existingOrder,
+        requestHash: racedRequestHash,
+      }),
+    );
+
+    const response = await service.createOrder('user-1', orderCreateBody);
+
+    expect(response).toBe(existingOrder.responsePayloadJson);
+    expect(prisma.order.create).toHaveBeenCalledTimes(1);
+    expectOnlyOrderCreateWrite(prisma);
+  });
+
+  it('conflicts after a unique idempotency race with different payload', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    mockJoined(prisma);
+    mockAsset(prisma, CurrencyCode.KRW);
+    mockCashWallet(prisma, '1000000.00000000');
+    prisma.order.findFirst.mockResolvedValueOnce(null);
+    prisma.order.create.mockRejectedValueOnce({ code: 'P2002' });
+    prisma.order.findFirst.mockResolvedValueOnce(
+      idempotentOrderRecord('different-request-hash'),
+    );
+
+    await expect(
+      service.createOrder('user-1', orderCreateBody),
+    ).rejects.toBeInstanceOf(HttpException);
+    expect(prisma.order.create).toHaveBeenCalledTimes(1);
     expectOnlyOrderCreateWrite(prisma);
   });
 
@@ -1056,6 +1262,7 @@ describe('OrdersService', () => {
         orderType: 'limit',
         quantity: '1.00000000',
         limitPrice: '100.00000000',
+        idempotencyKey: 'order-create-key-auth',
       }),
     ).rejects.toBeInstanceOf(HttpException);
     await expect(
@@ -1128,6 +1335,7 @@ describe('OrdersService', () => {
         orderType: 'limit',
         quantity: '1.00000000',
         limitPrice: '100.00000000',
+        idempotencyKey: 'order-create-key-not-joined',
       }),
     ).rejects.toBeInstanceOf(HttpException);
     expect(prisma.order.create).not.toHaveBeenCalled();
@@ -1144,6 +1352,7 @@ describe('OrdersService', () => {
         orderType: 'limit',
         quantity: '1.00000000',
         limitPrice: '100.00000000',
+        idempotencyKey: 'order-create-key-invalid-side',
       }),
     ).rejects.toBeInstanceOf(HttpException);
     await expect(
@@ -1153,6 +1362,7 @@ describe('OrdersService', () => {
         orderType: 'stop',
         quantity: '1.00000000',
         limitPrice: '100.00000000',
+        idempotencyKey: 'order-create-key-invalid-type',
       }),
     ).rejects.toBeInstanceOf(HttpException);
     await expect(
@@ -1162,6 +1372,7 @@ describe('OrdersService', () => {
         orderType: 'limit',
         quantity: '0',
         limitPrice: '100.00000000',
+        idempotencyKey: 'order-create-key-invalid-quantity',
       }),
     ).rejects.toBeInstanceOf(HttpException);
     await expect(
@@ -1170,6 +1381,7 @@ describe('OrdersService', () => {
         side: 'buy',
         orderType: 'limit',
         quantity: '1.00000000',
+        idempotencyKey: 'order-create-key-invalid-limit',
       }),
     ).rejects.toBeInstanceOf(HttpException);
   });
