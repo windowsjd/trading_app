@@ -59,6 +59,10 @@ near-term ledger/FX foundation:
 - asset/price/position migration 생성 및 로컬 DB 적용 완료: `20260507120158_add_asset_price_position_foundation`.
 - valuation/ranking foundation 반영 완료: `daily_portfolio_snapshots`, `season_rankings`.
 - valuation/ranking foundation migration 생성 및 로컬 DB 적용 완료: `20260507121528_add_daily_portfolio_snapshot_and_ranking_foundation`.
+- `admin_manual` asset/price bootstrap CLI 구현 완료:
+  - `scripts/admin-upsert-asset.ts`
+  - `scripts/admin-insert-asset-price.ts`
+  - dry-run, validation, asset existence/isActive/currency match check 지원.
 
 ## 6. 현재 미도입 DB 상태
 - 현재 문서화된 핵심 DB foundation 기준 추가 미도입 테이블 없음.
@@ -111,6 +115,16 @@ near-term ledger/FX foundation:
 - OANDA는 primary candidate, Twelve Data는 secondary candidate.
 - OANDA trial/API 계약 검증 전 provider implementation STOP.
 - 30초 polling은 후보이며 provider rate limit/terms 확인 후 확정.
+
+### Asset/price input
+- `admin_manual` asset upsert CLI 구현 완료: `scripts/admin-upsert-asset.ts`.
+- `admin_manual` asset price snapshot input CLI 구현 완료: `scripts/admin-insert-asset-price.ts`.
+- asset upsert는 `(market, symbol)` unique 기준으로 create/update.
+- asset price input은 `asset_price_snapshots.sourceType = admin_manual`만 허용.
+- asset price input은 asset 존재, active 상태, asset currency와 price currency 일치를 검증.
+- 두 CLI 모두 dry-run을 지원하며, seed/fake/static/sample data를 추가하지 않음.
+- 이 작업으로 운영자 승인 수동 asset/price bootstrap 경로는 생겼지만, 자동 가격 공급/provider ingestion/scheduler/valuation/ranking 계산은 아직 없음.
+- provider_api/official_batch/scheduler 기반 price ingestion 구현 없음.
 
 ### `/fx execute`
 - `/fx execute`는 write path 1차 구현 완료 상태.
@@ -226,6 +240,7 @@ near-term ledger/FX foundation:
 - valuation 계산
 - ranking 계산
 - provider price ingestion
+- automatic asset price ingestion
 - daily portfolio snapshot 생성 경로
 - season ranking 생성 경로
 - provider_api ingestion
@@ -254,6 +269,7 @@ near-term ledger/FX foundation:
 - migration status 확인 성공.
 - `assets`, `asset_price_snapshots`, `positions` foundation migration 생성 및 로컬 DB 적용 완료.
 - `daily_portfolio_snapshots`, `season_rankings` foundation migration 생성 및 로컬 DB 적용 완료.
+- `admin_manual` asset/price input CLI 구현 및 validation unit test 통과.
 - `pnpm test` 통과.
 - `pnpm build` 통과.
 - `pnpm test -- fx.service.spec.ts` 통과.
@@ -272,6 +288,7 @@ near-term ledger/FX foundation:
 - ledger insert/exchange row/finalization 실패 유도 integration hardening 검토.
 - 지속적인 `/fx quote` 성공을 위한 승인 snapshot 공급 운영 절차 또는 provider/batch ingestion 경로 검토.
 - asset price ingestion/source/freshness 정책 설계.
+- asset/price admin CLI 운영 승인 절차 정리.
 - order execute/position mutation 설계 및 구현.
 - valuation 계산 및 daily portfolio snapshot 생성 경로 설계/구현.
 - ranking 계산 및 season ranking 생성 경로 설계/구현.
