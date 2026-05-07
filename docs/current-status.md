@@ -63,10 +63,15 @@ near-term ledger/FX foundation:
   - `scripts/admin-upsert-asset.ts`
   - `scripts/admin-insert-asset-price.ts`
   - dry-run, validation, asset existence/isActive/currency match check 지원.
+- valuation/ranking 수동 foundation 구현 완료:
+  - portfolio valuation 계산 service/helper: `src/portfolio/portfolio-valuation.service.ts`, `src/portfolio/portfolio-valuation.policy.ts`.
+  - daily portfolio snapshot 수동 생성 CLI: `scripts/admin-generate-daily-portfolio-snapshot.ts`.
+  - season ranking 수동 생성 CLI: `scripts/admin-generate-season-ranking.ts`.
+  - CLI는 dry-run/non-dry-run을 지원하며 seed/fake/static/sample business data를 생성하지 않음.
 
 ## 6. 현재 미도입 DB 상태
 - 현재 문서화된 핵심 DB foundation 기준 추가 미도입 테이블 없음.
-- 단, 주문 체결/position mutation/provider price ingestion/daily valuation/ranking 계산 및 생성 경로는 아직 미구현.
+- 단, 주문 체결/position mutation/provider price ingestion/API/scheduler/batch 기반 자동 daily valuation/ranking 생성 경로는 아직 미구현.
 
 ## 7. 완료된 문서/설계 상태
 - `/home` 상태별 응답 계약 초안: `docs/home-api-contract.md`.
@@ -123,8 +128,45 @@ near-term ledger/FX foundation:
 - asset price input은 `asset_price_snapshots.sourceType = admin_manual`만 허용.
 - asset price input은 asset 존재, active 상태, asset currency와 price currency 일치를 검증.
 - 두 CLI 모두 dry-run을 지원하며, seed/fake/static/sample data를 추가하지 않음.
-- 이 작업으로 운영자 승인 수동 asset/price bootstrap 경로는 생겼지만, 자동 가격 공급/provider ingestion/scheduler/valuation/ranking 계산은 아직 없음.
+- 이 작업으로 운영자 승인 수동 asset/price bootstrap 경로는 생겼고, 별도 수동 valuation/ranking 생성 경로도 추가됨.
+- 자동 가격 공급/provider ingestion/scheduler/API 응답 생성은 아직 없음.
 - provider_api/official_batch/scheduler 기반 price ingestion 구현 없음.
+- asset price freshness threshold는 아직 최종 정책 미확정.
+  - near-term valuation은 `admin_manual` sourceType이고 `effectiveAt <= valuationAt`인 최신 price snapshot만 선택함.
+  - stale/freshness 기준은 TODO로 남아 있으며 provider/official_batch 사용은 아직 허용하지 않음.
+
+### Valuation/ranking manual foundation
+- Portfolio valuation 계산 foundation 구현 완료.
+- 계산 대상:
+  - KRW cash wallet.
+  - USD cash wallet.
+  - positions.
+  - latest eligible `admin_manual` asset price snapshot.
+  - USD 환산이 필요한 경우 approved fresh `admin_manual` USD/KRW FX snapshot.
+- 계산 정책:
+  - 금융 값은 문자열로 반환.
+  - JS number 금액 계산 금지, `Prisma.Decimal` 기반 계산.
+  - monetary scale 8, returnRate scale 8 기준 formatting.
+  - `totalAssetKrw = krwCash + usdCashKrw + assetValueKrw`.
+  - `returnRate = (totalAssetKrw - initialCapitalKrw) / initialCapitalKrw`.
+  - `realizedPnlKrw`는 positions.realizedPnl 합산 후 USD 자산은 USD/KRW 환산.
+  - `unrealizedPnlKrw`는 `(currentPrice - averageCost) * quantity` 후 USD 자산은 USD/KRW 환산.
+  - initialCapitalKrw가 0 이하이면 error.
+  - price snapshot이 없으면 fake price 없이 error.
+  - USD 환산이 필요한데 approved fresh FX snapshot이 없거나 stale이면 error.
+- Daily portfolio snapshot 수동 생성 CLI 구현 완료: `scripts/admin-generate-daily-portfolio-snapshot.ts`.
+  - 옵션: `--season-participant-id` 또는 `--season-id`, `--snapshot-date`, `--captured-at`, `--dry-run`.
+  - `(seasonParticipantId, snapshotDate)` unique 기준 upsert.
+  - 단일 participant 모드는 missing data 발생 시 fail.
+  - season 전체 모드는 active participants별 실패를 보고하고 성공 가능한 participant만 처리.
+- Season ranking 수동 생성 CLI 구현 완료: `scripts/admin-generate-season-ranking.ts`.
+  - 옵션: `--season-id`, `--ranking-date`, `--rank-type`, `--dry-run`.
+  - rankingDate의 `daily_portfolio_snapshots`만 읽음.
+  - 정렬 기준: `totalAssetKrw desc`, `returnRate desc`, `capturedAt asc`, `seasonParticipantId asc`.
+  - rank는 1부터 순차 부여.
+  - 기존 ranking row는 transaction 안에서 임시 음수 rank로 이동한 뒤 `(seasonId, rankType, rankingDate, seasonParticipantId)` unique 기준 upsert하여 rank unique 충돌을 피함.
+- 이 작업은 `/home`과 `/ranking` 구현 준비를 진전시켰지만, 자동 데이터 생성/외부 시세 공급/API 응답은 아직 없음.
+- scheduler/batch/provider ingestion/order execution/position mutation/settlement 구현 없음.
 
 ### `/fx execute`
 - `/fx execute`는 write path 1차 구현 완료 상태.
@@ -210,14 +252,16 @@ near-term ledger/FX foundation:
 
 ### `/home`
 - `/home` full implementation은 여전히 불가.
-- asset/price/position 및 daily/ranking foundation 도입으로 `/home`과 `/ranking` 구현 준비는 진전됨.
-- 다만 가격 ingestion/freshness 정책, position mutation, valuation 계산, ranking 계산, scheduler/batch 데이터 생성 경로가 아직 없어 조회 가능한 신뢰 데이터가 자동 생성되지는 않음.
+- asset/price/position, daily/ranking DB foundation, 수동 valuation/ranking 생성 경로 도입으로 `/home`과 `/ranking` 구현 준비는 진전됨.
+- 다만 가격 ingestion/freshness 정책, position mutation, scheduler/batch 자동 데이터 생성 경로가 아직 없어 조회 가능한 신뢰 데이터가 자동 생성되지는 않음.
 - blocker:
   - provider price ingestion
   - asset price freshness policy
   - orders 체결/position mutation
-  - valuation 계산 및 daily portfolio snapshot 생성
-  - ranking 계산 및 season ranking 생성
+  - scheduler/batch daily portfolio snapshot 자동 생성
+  - scheduler/batch season ranking 자동 생성
+  - `/home` API
+  - `/ranking` API
   - scheduler/batch
 - `/home`의 `active + not joined` 응답은 rulepack상 `blocked/guide`여야 하나, 최종 field shape는 아직 미고정.
 - `/home`의 `upcoming`, `ended`, `settled` 응답 shape도 아직 미고정.
