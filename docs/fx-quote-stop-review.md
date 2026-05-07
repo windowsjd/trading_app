@@ -20,6 +20,12 @@
 - `docs/fx-rate-input-path-plan.md` defines `admin_manual` as the MVP rate input path.
 - The internal `admin_manual` CLI exists at `scripts/admin-insert-fx-rate.ts`.
 - `/fx quote` read-only implementation exists.
+- `/fx quote` integration smoke passed with an approved fresh `admin_manual` USD/KRW snapshot inserted through the CLI.
+  - Snapshot used: rate `1450.00000000`, sourceType/sourceName `admin_manual`, approvedByUserId `usr_dev_001`, effectiveAt/capturedAt `2026-05-07T10:01:53.000Z`.
+  - Smoke used direct `FxService.quote(userId, body)` calls against real Prisma/PostgreSQL because HTTP auth is not finalized.
+  - KRW -> USD and USD -> KRW quote both succeeded.
+  - `quoteId = null`, `expiresAt = null`, `rateCapturedAt`, and `rateEffectiveAt` were verified.
+  - No mutation count increase was observed for `exchange_transactions`, `wallet_transactions`, `fx_execute_requests`, or `equity_snapshots`.
 - There is still no `/fx execute` implementation.
 - Fake, static, and temporary FX rates are forbidden.
 
@@ -171,6 +177,8 @@ Common error envelope:
 - Keep `fxFeeRate` sourced from the active season.
 - Keep quote request persistence out of MVP unless a durable quote table is explicitly designed.
 - Review provider/batch ingestion before relying on long-running quote freshness.
+- The smoke snapshot was fresh at verification time only; after the 60-second threshold it is expected to return `FX_RATE_STALE`.
+- Sustained successful quotes still require a repeated approved snapshot input process or a future approved ingestion path.
 
 ## Final Decision
 - `/fx quote` read-only implementation exists according to this STOP review.

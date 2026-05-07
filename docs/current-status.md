@@ -85,11 +85,20 @@ near-term ledger/FX foundation:
 - snapshot 없음이면 `FX_RATE_UNAVAILABLE`.
 - selected snapshot `effectiveAt`이 quote 시점 기준 60초 초과 stale이면 `FX_RATE_STALE`.
 - quote response는 `quoteId = null`, `expiresAt = null`, `rateCapturedAt`, `rateEffectiveAt` 포함.
+- 승인된 `admin_manual` USD/KRW snapshot 기준 `/fx quote` 통합 smoke 검증 통과.
+  - CLI dry-run 후 non-dry-run snapshot 입력 성공.
+  - 입력 snapshot: rate `1450.00000000`, sourceType/sourceName `admin_manual`, approvedByUserId `usr_dev_001`, effectiveAt/capturedAt `2026-05-07T10:01:53.000Z`.
+  - smoke 당시 fresh 조건 통과: `ageMsAtCheck = 41822`로 60초 이내.
+  - auth 본체 미완성으로 HTTP 대신 실제 Prisma/PostgreSQL을 사용하는 `FxService.quote(userId, body)` 직접 호출 검증.
+  - KRW -> USD, USD -> KRW 양방향 quote 성공.
+  - quote 응답의 `quoteId = null`, `expiresAt = null`, `rateCapturedAt`, `rateEffectiveAt` 확인.
+  - quote 전후 mutation 없음 확인: `exchange_transactions 0 -> 0`, `wallet_transactions 1 -> 1`, `fx_execute_requests 0 -> 0`, `equity_snapshots 0 -> 0`.
 
 ### FX rate input/provider
 - `admin_manual` FX rate input CLI 구현 완료: `scripts/admin-insert-fx-rate.ts`.
 - `admin_manual`은 bootstrap/fallback/manual correction 경로.
-- 실제 approved rate row insert는 아직 없음.
+- `/fx quote` smoke용 승인된 `admin_manual` snapshot 1건 입력 및 소비 검증 완료.
+- 입력한 manual snapshot은 smoke 당시 fresh였지만 60초 이후에는 정책상 stale이 되므로, 지속적인 quote 성공에는 별도 승인 snapshot 입력 또는 향후 ingestion 경로가 필요함.
 - provider_api/official_batch/scheduler 구현 없음.
 - provider final selection은 아직 확정 아님.
 - OANDA는 primary candidate, Twelve Data는 secondary candidate.
@@ -177,7 +186,6 @@ near-term ledger/FX foundation:
 - `/home` controller/service 구현, 임시 응답 shape 추가, fake 데이터 기반 계산 금지.
 
 ## 9. 다음 gate
-- 승인된 fresh `admin_manual` snapshot으로 `/fx quote` 통합 smoke 검증.
 - OANDA trial/API 계약 검증 전 provider_api/official_batch/scheduler 구현 STOP 유지.
 - `/fx execute` failure injection 기반 rollback/partial-write proof 보강.
 - `/fx execute` unique idempotency race 추가 검증.
@@ -200,6 +208,11 @@ near-term ledger/FX foundation:
 
 ## 11. 마지막 검증 상태
 - season current / season join / fx quote / fx execute unit 기준 test/build 통과.
+- 승인된 `admin_manual` USD/KRW snapshot 기준 `/fx quote` 통합 smoke 통과.
+  - snapshot 입력: `1450.00000000`, sourceType/sourceName `admin_manual`, approvedByUserId `usr_dev_001`, effectiveAt/capturedAt `2026-05-07T10:01:53.000Z`.
+  - `FxService.quote(userId, body)` 직접 호출로 실제 PostgreSQL snapshot 소비 확인.
+  - KRW -> USD, USD -> KRW 양방향 성공.
+  - quote 전후 `exchange_transactions`, `wallet_transactions`, `fx_execute_requests`, `equity_snapshots` row count 증가 없음.
 - join API는 `request.user.userId` 기준.
 - join 시 KRW/USD wallet 2개 생성.
 - schema 변경 없이 구현됨.
@@ -213,13 +226,16 @@ near-term ledger/FX foundation:
 - `pnpm build` 통과.
 - `FX_EXECUTE_DB_INTEGRATION=1 pnpm test -- fx.execute.integration.spec.ts` 통과.
 - `/fx execute` DB integration spec은 실제 PostgreSQL 환경에서 통과.
+- 코드/schema/migration/package/seed/test 변경 없이 `/fx quote` smoke 검증됨.
+- integration/test assertion 완화 없음.
+- sandbox 내부 `pnpm tsx`는 `/tmp/tsx-1000/*.pipe` IPC `EPERM`으로 실패했으나, sandbox 밖 재실행으로 dry-run, snapshot 입력, smoke 검증 통과.
 
 ## 12. TODO
-- 승인된 운영값으로 non-dry-run CLI 입력 후 `/fx quote` 통합 smoke 검증.
 - provider final selection STOP review 수락 및 OANDA trial/API 계약 검증.
 - `/fx execute` failure injection 기반 rollback 검증 보강.
 - unique idempotency race 검증 보강.
 - ledger insert/exchange row/finalization 실패 유도 integration hardening 검토.
+- 지속적인 `/fx quote` 성공을 위한 승인 snapshot 공급 운영 절차 또는 provider/batch ingestion 경로 검토.
 - assets 도입.
 - asset_price_snapshots 도입.
 - positions 도입.
