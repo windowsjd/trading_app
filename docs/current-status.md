@@ -132,10 +132,14 @@ near-term ledger/FX foundation:
   - concurrent overspend prevention: one success only, source balance non-negative.
   - exchange row, source/target ledger rows, ledger `balanceAfter`, no fee row, no `equitySnapshot` checks.
 - 아직 필요한 DB hardening/남은 리스크:
-  - finalization 실패 failure injection.
-  - ledger insert 실패 failure injection.
-  - exchange row 실패 failure injection.
-  - target credit 실패 failure injection.
+  - unit/mock 기반 transaction rollback proof는 보강됨:
+    - source debit failure.
+    - target credit failure.
+    - exchange row create failure.
+    - source ledger create failure.
+    - target ledger create failure.
+    - `fxExecuteRequest` succeeded finalization / `responsePayloadJson` storage failure.
+    - 각 실패에서 staged transaction writes가 commit되지 않음을 검증.
   - 실제 DB에서 강제 실패를 유도하는 더 깊은 rollback hardening.
   - unique idempotency race 추가 검증.
 - Decimal rounding mode와 scale/formatting 정책은 half-up 기준으로 구현 반영됨.
@@ -224,6 +228,7 @@ near-term ledger/FX foundation:
 - migration status 확인 성공.
 - `pnpm test` 통과.
 - `pnpm build` 통과.
+- `pnpm test -- fx.service.spec.ts` 통과.
 - `FX_EXECUTE_DB_INTEGRATION=1 pnpm test -- fx.execute.integration.spec.ts` 통과.
 - `/fx execute` DB integration spec은 실제 PostgreSQL 환경에서 통과.
 - 코드/schema/migration/package/seed/test 변경 없이 `/fx quote` smoke 검증됨.
@@ -232,7 +237,7 @@ near-term ledger/FX foundation:
 
 ## 12. TODO
 - provider final selection STOP review 수락 및 OANDA trial/API 계약 검증.
-- `/fx execute` failure injection 기반 rollback 검증 보강.
+- `/fx execute` 실제 DB transaction 내부 강제 실패 기반 rollback 검증 보강.
 - unique idempotency race 검증 보강.
 - ledger insert/exchange row/finalization 실패 유도 integration hardening 검토.
 - 지속적인 `/fx quote` 성공을 위한 승인 snapshot 공급 운영 절차 또는 provider/batch ingestion 경로 검토.

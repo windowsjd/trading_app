@@ -276,10 +276,12 @@ async function testNoEligibleSnapshot() {
   try {
     const before = await readMutationState(scenario);
 
-    await expectExecuteError(
-      service.execute(scenario.userId, buildKrwToUsdBody('no-rate-key')),
-      'FX_RATE_UNAVAILABLE',
-    );
+    await withoutEligibleAdminManualSnapshots(async () => {
+      await expectExecuteError(
+        service.execute(scenario.userId, buildKrwToUsdBody('no-rate-key')),
+        'FX_RATE_UNAVAILABLE',
+      );
+    });
 
     const after = await readMutationState(scenario);
     assert.deepEqual(after, before);
@@ -526,6 +528,56 @@ async function expectNoEquitySnapshot(scenario) {
     }),
     0,
   );
+}
+
+async function withoutEligibleAdminManualSnapshots(fn) {
+  const existingSnapshots = await prisma.fxRateSnapshot.findMany({
+    where: {
+      baseCurrency: CurrencyCode.USD,
+      quoteCurrency: CurrencyCode.KRW,
+      sourceType: FxRateSourceType.admin_manual,
+      effectiveAt: {
+        lte: new Date(),
+      },
+    },
+    select: {
+      id: true,
+      effectiveAt: true,
+    },
+  });
+
+  if (existingSnapshots.length === 0) {
+    await fn();
+    return;
+  }
+
+  await prisma.fxRateSnapshot.updateMany({
+    where: {
+      id: {
+        in: existingSnapshots.map((snapshot) => snapshot.id),
+      },
+    },
+    data: {
+      effectiveAt: new Date(Date.now() + 60_000),
+    },
+  });
+
+  try {
+    await fn();
+  } finally {
+    await Promise.all(
+      existingSnapshots.map((snapshot) =>
+        prisma.fxRateSnapshot.update({
+          where: {
+            id: snapshot.id,
+          },
+          data: {
+            effectiveAt: snapshot.effectiveAt,
+          },
+        }),
+      ),
+    );
+  }
 }
 
 function formatScale8(value) {

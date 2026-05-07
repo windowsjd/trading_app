@@ -26,7 +26,7 @@
   - KRW -> USD and USD -> KRW quote both succeeded.
   - `quoteId = null`, `expiresAt = null`, `rateCapturedAt`, and `rateEffectiveAt` were verified.
   - No mutation count increase was observed for `exchange_transactions`, `wallet_transactions`, `fx_execute_requests`, or `equity_snapshots`.
-- There is still no `/fx execute` implementation.
+- `/fx execute` has a separate 1st write path implementation and hardening track; this `/fx quote` document does not authorize additional execute changes.
 - Fake, static, and temporary FX rates are forbidden.
 
 ## Quote Implementation Scope
@@ -48,7 +48,7 @@ Forbidden:
 - `fx_execute_requests` creation.
 - `equity_snapshots` creation.
 - Fake, static, or temporary fallback rate usage.
-- `/fx execute` implementation.
+- Additional `/fx execute` changes from this `/fx quote` review.
 
 DB write policy:
 - MVP `/fx quote` must not write to the database.
@@ -183,7 +183,7 @@ Common error envelope:
 ## Final Decision
 - `/fx quote` read-only implementation exists according to this STOP review.
 - `/fx quote` must not include execute, wallet mutation, ledger writes, or fake fallback.
-- `/fx execute` remains STOP.
+- Additional `/fx execute` changes are out of scope for this `/fx quote` review.
 - Rate input CLI exists, but successful quote responses still require an approved fresh snapshot row.
 - Without snapshot data, `/fx quote` returns `FX_RATE_UNAVAILABLE`.
 - With a stale selected snapshot, `/fx quote` returns `FX_RATE_STALE`.

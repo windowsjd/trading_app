@@ -593,6 +593,122 @@ describe('FxService', () => {
       });
     };
 
+    type AtomicFailureStep =
+      | 'source-debit'
+      | 'target-credit'
+      | 'exchange'
+      | 'source-ledger'
+      | 'target-ledger'
+      | 'finalization';
+
+    const mockAtomicWritePathFailure = (
+      prisma: ReturnType<typeof createPrisma>,
+      failAt: AtomicFailureStep,
+    ) => {
+      const committedWrites: string[] = [];
+      const rolledBackWrites: string[][] = [];
+
+      prisma.$transaction.mockImplementationOnce(async (callback) => {
+        const stagedWrites: string[] = [];
+        let walletUpdateCallCount = 0;
+        let walletFindCallCount = 0;
+        let ledgerCreateCallCount = 0;
+
+        const stage = (writeName: string) => {
+          stagedWrites.push(writeName);
+        };
+
+        const failIf = (step: AtomicFailureStep) => {
+          if (failAt === step) {
+            throw new Error(`${step} failed`);
+          }
+        };
+
+        const tx = {
+          ...prisma,
+          fxExecuteRequest: {
+            ...prisma.fxExecuteRequest,
+            create: jest.fn(async () => {
+              stage('fxExecuteRequest.create:pending');
+              return { id: 'command-1' };
+            }),
+            update: jest.fn(async () => {
+              failIf('finalization');
+              stage('fxExecuteRequest.update:succeeded');
+              return { id: 'command-1' };
+            }),
+          },
+          cashWallet: {
+            ...prisma.cashWallet,
+            updateMany: jest.fn(async () => {
+              walletUpdateCallCount += 1;
+
+              if (walletUpdateCallCount === 1) {
+                if (failAt === 'source-debit') {
+                  return { count: 0 };
+                }
+
+                stage('cashWallet.updateMany:source-debit');
+                return { count: 1 };
+              }
+
+              failIf('target-credit');
+              stage('cashWallet.updateMany:target-credit');
+              return { count: 1 };
+            }),
+            findFirst: jest.fn(async () => {
+              walletFindCallCount += 1;
+
+              if (failAt === 'source-debit') {
+                return {
+                  balanceAmount: new Prisma.Decimal('999.99999999'),
+                };
+              }
+
+              return walletFindCallCount === 1
+                ? sourceWalletAfterDebit
+                : targetWalletAfterCredit;
+            }),
+          },
+          exchangeTransaction: {
+            ...prisma.exchangeTransaction,
+            create: jest.fn(async () => {
+              failIf('exchange');
+              stage('exchangeTransaction.create');
+              return { id: 'exchange-1' };
+            }),
+          },
+          walletTransaction: {
+            ...prisma.walletTransaction,
+            create: jest.fn(async () => {
+              ledgerCreateCallCount += 1;
+
+              if (ledgerCreateCallCount === 1) {
+                failIf('source-ledger');
+                stage('walletTransaction.create:source');
+                return { id: 'wallet-tx-source' };
+              }
+
+              failIf('target-ledger');
+              stage('walletTransaction.create:target');
+              return { id: 'wallet-tx-target' };
+            }),
+          },
+        };
+
+        try {
+          const result = await callback(tx);
+          committedWrites.push(...stagedWrites);
+          return result;
+        } catch (error) {
+          rolledBackWrites.push([...stagedWrites]);
+          throw error;
+        }
+      });
+
+      return { committedWrites, rolledBackWrites };
+    };
+
     const expectWritePathBeforeSuccessFinalization = (
       prisma: ReturnType<typeof createPrisma>,
     ) => {
@@ -1308,6 +1424,97 @@ describe('FxService', () => {
       expect(prisma.fxExecuteRequest.update).toHaveBeenCalledTimes(1);
       expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
     });
+
+    it.each<
+      [
+        string,
+        AtomicFailureStep,
+        string,
+        string[],
+      ]
+    >([
+      [
+        'source debit classification fails',
+        'source-debit',
+        'INSUFFICIENT_BALANCE',
+        ['fxExecuteRequest.create:pending'],
+      ],
+      [
+        'target credit fails after source debit',
+        'target-credit',
+        'EXECUTE_TRANSACTION_FAILED',
+        [
+          'fxExecuteRequest.create:pending',
+          'cashWallet.updateMany:source-debit',
+        ],
+      ],
+      [
+        'exchange row creation fails after wallet updates',
+        'exchange',
+        'EXECUTE_TRANSACTION_FAILED',
+        [
+          'fxExecuteRequest.create:pending',
+          'cashWallet.updateMany:source-debit',
+          'cashWallet.updateMany:target-credit',
+        ],
+      ],
+      [
+        'source ledger creation fails after exchange row',
+        'source-ledger',
+        'EXECUTE_TRANSACTION_FAILED',
+        [
+          'fxExecuteRequest.create:pending',
+          'cashWallet.updateMany:source-debit',
+          'cashWallet.updateMany:target-credit',
+          'exchangeTransaction.create',
+        ],
+      ],
+      [
+        'target ledger creation fails after source ledger',
+        'target-ledger',
+        'EXECUTE_TRANSACTION_FAILED',
+        [
+          'fxExecuteRequest.create:pending',
+          'cashWallet.updateMany:source-debit',
+          'cashWallet.updateMany:target-credit',
+          'exchangeTransaction.create',
+          'walletTransaction.create:source',
+        ],
+      ],
+      [
+        'succeeded finalization and responsePayloadJson storage fail',
+        'finalization',
+        'EXECUTE_TRANSACTION_FAILED',
+        [
+          'fxExecuteRequest.create:pending',
+          'cashWallet.updateMany:source-debit',
+          'cashWallet.updateMany:target-credit',
+          'exchangeTransaction.create',
+          'walletTransaction.create:source',
+          'walletTransaction.create:target',
+        ],
+      ],
+    ])(
+      'rolls back staged writes when %s',
+      async (_label, failAt, expectedCode, expectedRolledBackWrites) => {
+        const { prisma, service } = createService();
+        mockActiveSeason(prisma);
+        mockJoinedParticipant(prisma);
+        mockExecuteReadCandidates(prisma);
+        const transactionState = mockAtomicWritePathFailure(prisma, failAt);
+
+        await expectExecuteErrorCode(
+          service.execute('user-1', validExecuteBody),
+          expectedCode,
+        );
+
+        expect(transactionState.rolledBackWrites).toEqual([
+          expectedRolledBackWrites,
+        ]);
+        expect(transactionState.committedWrites).toEqual([]);
+        expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
+      },
+    );
 
     it('uses normalized idempotency key, currencies, and execute snapshot filters for read candidates', async () => {
       const { prisma, service } = createService();
