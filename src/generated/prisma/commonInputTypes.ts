@@ -325,6 +325,18 @@ export type EnumCurrencyCodeFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumCurrencyCodeFilter<$PrismaModel> | $Enums.CurrencyCode
 }
 
+export type EnumAssetTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.AssetType | Prisma.EnumAssetTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.AssetType[] | Prisma.ListEnumAssetTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.AssetType[] | Prisma.ListEnumAssetTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumAssetTypeFilter<$PrismaModel> | $Enums.AssetType
+}
+
+export type BoolFilter<$PrismaModel = never> = {
+  equals?: boolean | Prisma.BooleanFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedBoolFilter<$PrismaModel> | boolean
+}
+
 export type EnumCurrencyCodeWithAggregatesFilter<$PrismaModel = never> = {
   equals?: $Enums.CurrencyCode | Prisma.EnumCurrencyCodeFieldRefInput<$PrismaModel>
   in?: $Enums.CurrencyCode[] | Prisma.ListEnumCurrencyCodeFieldRefInput<$PrismaModel>
@@ -333,6 +345,41 @@ export type EnumCurrencyCodeWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumCurrencyCodeFilter<$PrismaModel>
   _max?: Prisma.NestedEnumCurrencyCodeFilter<$PrismaModel>
+}
+
+export type EnumAssetTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.AssetType | Prisma.EnumAssetTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.AssetType[] | Prisma.ListEnumAssetTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.AssetType[] | Prisma.ListEnumAssetTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumAssetTypeWithAggregatesFilter<$PrismaModel> | $Enums.AssetType
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumAssetTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumAssetTypeFilter<$PrismaModel>
+}
+
+export type BoolWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: boolean | Prisma.BooleanFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedBoolWithAggregatesFilter<$PrismaModel> | boolean
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedBoolFilter<$PrismaModel>
+  _max?: Prisma.NestedBoolFilter<$PrismaModel>
+}
+
+export type EnumAssetPriceSourceTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.AssetPriceSourceType | Prisma.EnumAssetPriceSourceTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.AssetPriceSourceType[] | Prisma.ListEnumAssetPriceSourceTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.AssetPriceSourceType[] | Prisma.ListEnumAssetPriceSourceTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumAssetPriceSourceTypeFilter<$PrismaModel> | $Enums.AssetPriceSourceType
+}
+
+export type EnumAssetPriceSourceTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.AssetPriceSourceType | Prisma.EnumAssetPriceSourceTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.AssetPriceSourceType[] | Prisma.ListEnumAssetPriceSourceTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.AssetPriceSourceType[] | Prisma.ListEnumAssetPriceSourceTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumAssetPriceSourceTypeWithAggregatesFilter<$PrismaModel> | $Enums.AssetPriceSourceType
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumAssetPriceSourceTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumAssetPriceSourceTypeFilter<$PrismaModel>
 }
 
 export type EnumWalletTransactionDirectionFilter<$PrismaModel = never> = {
@@ -734,6 +781,18 @@ export type NestedEnumCurrencyCodeFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumCurrencyCodeFilter<$PrismaModel> | $Enums.CurrencyCode
 }
 
+export type NestedEnumAssetTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.AssetType | Prisma.EnumAssetTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.AssetType[] | Prisma.ListEnumAssetTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.AssetType[] | Prisma.ListEnumAssetTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumAssetTypeFilter<$PrismaModel> | $Enums.AssetType
+}
+
+export type NestedBoolFilter<$PrismaModel = never> = {
+  equals?: boolean | Prisma.BooleanFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedBoolFilter<$PrismaModel> | boolean
+}
+
 export type NestedEnumCurrencyCodeWithAggregatesFilter<$PrismaModel = never> = {
   equals?: $Enums.CurrencyCode | Prisma.EnumCurrencyCodeFieldRefInput<$PrismaModel>
   in?: $Enums.CurrencyCode[] | Prisma.ListEnumCurrencyCodeFieldRefInput<$PrismaModel>
@@ -742,6 +801,41 @@ export type NestedEnumCurrencyCodeWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumCurrencyCodeFilter<$PrismaModel>
   _max?: Prisma.NestedEnumCurrencyCodeFilter<$PrismaModel>
+}
+
+export type NestedEnumAssetTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.AssetType | Prisma.EnumAssetTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.AssetType[] | Prisma.ListEnumAssetTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.AssetType[] | Prisma.ListEnumAssetTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumAssetTypeWithAggregatesFilter<$PrismaModel> | $Enums.AssetType
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumAssetTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumAssetTypeFilter<$PrismaModel>
+}
+
+export type NestedBoolWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: boolean | Prisma.BooleanFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedBoolWithAggregatesFilter<$PrismaModel> | boolean
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedBoolFilter<$PrismaModel>
+  _max?: Prisma.NestedBoolFilter<$PrismaModel>
+}
+
+export type NestedEnumAssetPriceSourceTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.AssetPriceSourceType | Prisma.EnumAssetPriceSourceTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.AssetPriceSourceType[] | Prisma.ListEnumAssetPriceSourceTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.AssetPriceSourceType[] | Prisma.ListEnumAssetPriceSourceTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumAssetPriceSourceTypeFilter<$PrismaModel> | $Enums.AssetPriceSourceType
+}
+
+export type NestedEnumAssetPriceSourceTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.AssetPriceSourceType | Prisma.EnumAssetPriceSourceTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.AssetPriceSourceType[] | Prisma.ListEnumAssetPriceSourceTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.AssetPriceSourceType[] | Prisma.ListEnumAssetPriceSourceTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumAssetPriceSourceTypeWithAggregatesFilter<$PrismaModel> | $Enums.AssetPriceSourceType
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumAssetPriceSourceTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumAssetPriceSourceTypeFilter<$PrismaModel>
 }
 
 export type NestedEnumWalletTransactionDirectionFilter<$PrismaModel = never> = {

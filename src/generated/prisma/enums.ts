@@ -106,3 +106,21 @@ export const FxExecuteRequestStatus = {
 } as const
 
 export type FxExecuteRequestStatus = (typeof FxExecuteRequestStatus)[keyof typeof FxExecuteRequestStatus]
+
+
+export const AssetType = {
+  domestic_stock: 'domestic_stock',
+  us_stock: 'us_stock',
+  crypto: 'crypto'
+} as const
+
+export type AssetType = (typeof AssetType)[keyof typeof AssetType]
+
+
+export const AssetPriceSourceType = {
+  official_batch: 'official_batch',
+  provider_api: 'provider_api',
+  admin_manual: 'admin_manual'
+} as const
+
+export type AssetPriceSourceType = (typeof AssetPriceSourceType)[keyof typeof AssetPriceSourceType]

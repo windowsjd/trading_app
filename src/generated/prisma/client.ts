@@ -55,6 +55,21 @@ export type Season = Prisma.SeasonModel
  */
 export type SeasonParticipant = Prisma.SeasonParticipantModel
 /**
+ * Model Asset
+ *
+ */
+export type Asset = Prisma.AssetModel
+/**
+ * Model AssetPriceSnapshot
+ *
+ */
+export type AssetPriceSnapshot = Prisma.AssetPriceSnapshotModel
+/**
+ * Model Position
+ *
+ */
+export type Position = Prisma.PositionModel
+/**
  * Model CashWallet
  *
  */

@@ -54,6 +54,9 @@ export const ModelName = {
   User: 'User',
   Season: 'Season',
   SeasonParticipant: 'SeasonParticipant',
+  Asset: 'Asset',
+  AssetPriceSnapshot: 'AssetPriceSnapshot',
+  Position: 'Position',
   CashWallet: 'CashWallet',
   WalletTransaction: 'WalletTransaction',
   ExchangeTransaction: 'ExchangeTransaction',
@@ -129,6 +132,54 @@ export const SeasonParticipantScalarFieldEnum = {
 } as const
 
 export type SeasonParticipantScalarFieldEnum = (typeof SeasonParticipantScalarFieldEnum)[keyof typeof SeasonParticipantScalarFieldEnum]
+
+
+export const AssetScalarFieldEnum = {
+  id: 'id',
+  symbol: 'symbol',
+  name: 'name',
+  market: 'market',
+  currencyCode: 'currencyCode',
+  assetType: 'assetType',
+  isActive: 'isActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type AssetScalarFieldEnum = (typeof AssetScalarFieldEnum)[keyof typeof AssetScalarFieldEnum]
+
+
+export const AssetPriceSnapshotScalarFieldEnum = {
+  id: 'id',
+  assetId: 'assetId',
+  price: 'price',
+  currencyCode: 'currencyCode',
+  sourceType: 'sourceType',
+  sourceName: 'sourceName',
+  sourceTimestamp: 'sourceTimestamp',
+  effectiveAt: 'effectiveAt',
+  capturedAt: 'capturedAt',
+  createdAt: 'createdAt',
+  rawPayloadJson: 'rawPayloadJson',
+  note: 'note'
+} as const
+
+export type AssetPriceSnapshotScalarFieldEnum = (typeof AssetPriceSnapshotScalarFieldEnum)[keyof typeof AssetPriceSnapshotScalarFieldEnum]
+
+
+export const PositionScalarFieldEnum = {
+  id: 'id',
+  seasonParticipantId: 'seasonParticipantId',
+  assetId: 'assetId',
+  quantity: 'quantity',
+  averageCost: 'averageCost',
+  currencyCode: 'currencyCode',
+  realizedPnl: 'realizedPnl',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PositionScalarFieldEnum = (typeof PositionScalarFieldEnum)[keyof typeof PositionScalarFieldEnum]
 
 
 export const CashWalletScalarFieldEnum = {

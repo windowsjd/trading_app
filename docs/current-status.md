@@ -43,6 +43,9 @@
 - `equity_snapshots`
 - `fx_rate_snapshots`
 - `fx_execute_requests`
+- `assets`
+- `asset_price_snapshots`
+- `positions`
 
 near-term ledger/FX foundation:
 - `wallet_transactions`: Prisma schema 반영, migration 생성/DB 적용 완료, season join initial_grant write path 구현 완료.
@@ -50,11 +53,10 @@ near-term ledger/FX foundation:
 - `equity_snapshots`: Prisma schema 반영, migration 생성/DB 적용 완료, API/write path 미구현.
 - `/fx` DB foundation 반영 완료: `fx_rate_snapshots`, `fx_execute_requests`, `exchange_transactions.fxRateSnapshotId`.
 - `/fx` migration 생성 및 로컬 DB 적용 완료: `20260501212120_add_fx_rate_and_execute_safety_tables`.
+- asset/price/position foundation 반영 완료: `assets`, `asset_price_snapshots`, `positions`.
+- asset/price/position migration 생성 및 로컬 DB 적용 완료: `20260507120158_add_asset_price_position_foundation`.
 
 ## 6. 현재 미도입 DB 상태
-- `assets`
-- `asset_price_snapshots`
-- `positions`
 - `daily_portfolio_snapshots`
 - `season_rankings`
 
@@ -190,10 +192,12 @@ near-term ledger/FX foundation:
 
 ### `/home`
 - `/home` full implementation은 여전히 불가.
+- 이번 asset/price/position foundation 도입으로 `/home` 구현 준비는 일부 진전됨.
+- 다만 가격 ingestion/freshness 정책, position mutation, daily portfolio snapshot, ranking source가 아직 없어 valuation/ranking source가 완전히 갖춰진 것은 아님.
 - blocker:
-  - `assets`
-  - `asset_price_snapshots`
-  - `positions`
+  - provider price ingestion
+  - asset price freshness policy
+  - orders 체결/position mutation
   - `daily_portfolio_snapshots`
   - `season_rankings`
   - valuation/ranking source 부족
@@ -213,6 +217,9 @@ near-term ledger/FX foundation:
 - ranking
 - records
 - settlement
+- orders 체결
+- position mutation
+- provider price ingestion
 - provider_api ingestion
 - official_batch ingestion
 - scheduler
@@ -230,13 +237,14 @@ near-term ledger/FX foundation:
   - quote 전후 `exchange_transactions`, `wallet_transactions`, `fx_execute_requests`, `equity_snapshots` row count 증가 없음.
 - join API는 `request.user.userId` 기준.
 - join 시 KRW/USD wallet 2개 생성.
-- schema 변경 없이 구현됨.
+- 이번 asset/price/position foundation 작업은 schema/migration/Prisma generated client 변경 포함.
 - `/home` controller/service는 미구현 유지.
 - Prisma adapter 방식 유지 중.
 - near-term 1단계 migration DB 적용 완료.
 - Prisma Client generate 완료.
 - DB 연결 확인 성공.
 - migration status 확인 성공.
+- `assets`, `asset_price_snapshots`, `positions` foundation migration 생성 및 로컬 DB 적용 완료.
 - `pnpm test` 통과.
 - `pnpm build` 통과.
 - `pnpm test -- fx.service.spec.ts` 통과.
@@ -254,8 +262,7 @@ near-term ledger/FX foundation:
 - `/fx execute` 실제 DB transaction 내부 강제 실패 기반 rollback 검증 보강.
 - ledger insert/exchange row/finalization 실패 유도 integration hardening 검토.
 - 지속적인 `/fx quote` 성공을 위한 승인 snapshot 공급 운영 절차 또는 provider/batch ingestion 경로 검토.
-- assets 도입.
-- asset_price_snapshots 도입.
-- positions 도입.
+- asset price ingestion/source/freshness 정책 설계.
+- order execute/position mutation 설계 및 구현.
 - daily_portfolio_snapshots 도입.
 - season_rankings 도입.

@@ -443,10 +443,6 @@ export type CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput = {
   deleteMany?: Prisma.CashWalletScalarWhereInput | Prisma.CashWalletScalarWhereInput[]
 }
 
-export type EnumCurrencyCodeFieldUpdateOperationsInput = {
-  set?: $Enums.CurrencyCode
-}
-
 export type CashWalletCreateNestedOneWithoutWalletTransactionsInput = {
   create?: Prisma.XOR<Prisma.CashWalletCreateWithoutWalletTransactionsInput, Prisma.CashWalletUncheckedCreateWithoutWalletTransactionsInput>
   connectOrCreate?: Prisma.CashWalletCreateOrConnectWithoutWalletTransactionsInput
