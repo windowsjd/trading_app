@@ -269,6 +269,7 @@ export type SeasonWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"Season"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Season"> | Date | string
   participants?: Prisma.SeasonParticipantListRelationFilter
+  seasonRankings?: Prisma.SeasonRankingListRelationFilter
 }
 
 export type SeasonOrderByWithRelationInput = {
@@ -284,6 +285,7 @@ export type SeasonOrderByWithRelationInput = {
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   participants?: Prisma.SeasonParticipantOrderByRelationAggregateInput
+  seasonRankings?: Prisma.SeasonRankingOrderByRelationAggregateInput
 }
 
 export type SeasonWhereUniqueInput = Prisma.AtLeast<{
@@ -302,6 +304,7 @@ export type SeasonWhereUniqueInput = Prisma.AtLeast<{
   createdAt?: Prisma.DateTimeFilter<"Season"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Season"> | Date | string
   participants?: Prisma.SeasonParticipantListRelationFilter
+  seasonRankings?: Prisma.SeasonRankingListRelationFilter
 }, "id">
 
 export type SeasonOrderByWithAggregationInput = {
@@ -353,6 +356,7 @@ export type SeasonCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   participants?: Prisma.SeasonParticipantCreateNestedManyWithoutSeasonInput
+  seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutSeasonInput
 }
 
 export type SeasonUncheckedCreateInput = {
@@ -368,6 +372,7 @@ export type SeasonUncheckedCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   participants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutSeasonInput
+  seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutSeasonInput
 }
 
 export type SeasonUpdateInput = {
@@ -383,6 +388,7 @@ export type SeasonUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   participants?: Prisma.SeasonParticipantUpdateManyWithoutSeasonNestedInput
+  seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutSeasonNestedInput
 }
 
 export type SeasonUncheckedUpdateInput = {
@@ -398,6 +404,7 @@ export type SeasonUncheckedUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   participants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutSeasonNestedInput
+  seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutSeasonNestedInput
 }
 
 export type SeasonCreateManyInput = {
@@ -525,6 +532,20 @@ export type SeasonUpdateOneRequiredWithoutParticipantsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.SeasonUpdateToOneWithWhereWithoutParticipantsInput, Prisma.SeasonUpdateWithoutParticipantsInput>, Prisma.SeasonUncheckedUpdateWithoutParticipantsInput>
 }
 
+export type SeasonCreateNestedOneWithoutSeasonRankingsInput = {
+  create?: Prisma.XOR<Prisma.SeasonCreateWithoutSeasonRankingsInput, Prisma.SeasonUncheckedCreateWithoutSeasonRankingsInput>
+  connectOrCreate?: Prisma.SeasonCreateOrConnectWithoutSeasonRankingsInput
+  connect?: Prisma.SeasonWhereUniqueInput
+}
+
+export type SeasonUpdateOneRequiredWithoutSeasonRankingsNestedInput = {
+  create?: Prisma.XOR<Prisma.SeasonCreateWithoutSeasonRankingsInput, Prisma.SeasonUncheckedCreateWithoutSeasonRankingsInput>
+  connectOrCreate?: Prisma.SeasonCreateOrConnectWithoutSeasonRankingsInput
+  upsert?: Prisma.SeasonUpsertWithoutSeasonRankingsInput
+  connect?: Prisma.SeasonWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.SeasonUpdateToOneWithWhereWithoutSeasonRankingsInput, Prisma.SeasonUpdateWithoutSeasonRankingsInput>, Prisma.SeasonUncheckedUpdateWithoutSeasonRankingsInput>
+}
+
 export type SeasonCreateWithoutParticipantsInput = {
   id?: string
   name: string
@@ -537,6 +558,7 @@ export type SeasonCreateWithoutParticipantsInput = {
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
+  seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutSeasonInput
 }
 
 export type SeasonUncheckedCreateWithoutParticipantsInput = {
@@ -551,6 +573,7 @@ export type SeasonUncheckedCreateWithoutParticipantsInput = {
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
+  seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutSeasonInput
 }
 
 export type SeasonCreateOrConnectWithoutParticipantsInput = {
@@ -581,6 +604,7 @@ export type SeasonUpdateWithoutParticipantsInput = {
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutSeasonNestedInput
 }
 
 export type SeasonUncheckedUpdateWithoutParticipantsInput = {
@@ -595,6 +619,83 @@ export type SeasonUncheckedUpdateWithoutParticipantsInput = {
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutSeasonNestedInput
+}
+
+export type SeasonCreateWithoutSeasonRankingsInput = {
+  id?: string
+  name: string
+  status: $Enums.SeasonStatus
+  startAt: Date | string
+  endAt: Date | string
+  initialCapitalKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  tradeFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  fxFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  participants?: Prisma.SeasonParticipantCreateNestedManyWithoutSeasonInput
+}
+
+export type SeasonUncheckedCreateWithoutSeasonRankingsInput = {
+  id?: string
+  name: string
+  status: $Enums.SeasonStatus
+  startAt: Date | string
+  endAt: Date | string
+  initialCapitalKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  tradeFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  fxFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  participants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutSeasonInput
+}
+
+export type SeasonCreateOrConnectWithoutSeasonRankingsInput = {
+  where: Prisma.SeasonWhereUniqueInput
+  create: Prisma.XOR<Prisma.SeasonCreateWithoutSeasonRankingsInput, Prisma.SeasonUncheckedCreateWithoutSeasonRankingsInput>
+}
+
+export type SeasonUpsertWithoutSeasonRankingsInput = {
+  update: Prisma.XOR<Prisma.SeasonUpdateWithoutSeasonRankingsInput, Prisma.SeasonUncheckedUpdateWithoutSeasonRankingsInput>
+  create: Prisma.XOR<Prisma.SeasonCreateWithoutSeasonRankingsInput, Prisma.SeasonUncheckedCreateWithoutSeasonRankingsInput>
+  where?: Prisma.SeasonWhereInput
+}
+
+export type SeasonUpdateToOneWithWhereWithoutSeasonRankingsInput = {
+  where?: Prisma.SeasonWhereInput
+  data: Prisma.XOR<Prisma.SeasonUpdateWithoutSeasonRankingsInput, Prisma.SeasonUncheckedUpdateWithoutSeasonRankingsInput>
+}
+
+export type SeasonUpdateWithoutSeasonRankingsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumSeasonStatusFieldUpdateOperationsInput | $Enums.SeasonStatus
+  startAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  initialCapitalKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  participants?: Prisma.SeasonParticipantUpdateManyWithoutSeasonNestedInput
+}
+
+export type SeasonUncheckedUpdateWithoutSeasonRankingsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumSeasonStatusFieldUpdateOperationsInput | $Enums.SeasonStatus
+  startAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  initialCapitalKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  participants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutSeasonNestedInput
 }
 
 
@@ -604,10 +705,12 @@ export type SeasonUncheckedUpdateWithoutParticipantsInput = {
 
 export type SeasonCountOutputType = {
   participants: number
+  seasonRankings: number
 }
 
 export type SeasonCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   participants?: boolean | SeasonCountOutputTypeCountParticipantsArgs
+  seasonRankings?: boolean | SeasonCountOutputTypeCountSeasonRankingsArgs
 }
 
 /**
@@ -627,6 +730,13 @@ export type SeasonCountOutputTypeCountParticipantsArgs<ExtArgs extends runtime.T
   where?: Prisma.SeasonParticipantWhereInput
 }
 
+/**
+ * SeasonCountOutputType without action
+ */
+export type SeasonCountOutputTypeCountSeasonRankingsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.SeasonRankingWhereInput
+}
+
 
 export type SeasonSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -641,6 +751,7 @@ export type SeasonSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   createdAt?: boolean
   updatedAt?: boolean
   participants?: boolean | Prisma.Season$participantsArgs<ExtArgs>
+  seasonRankings?: boolean | Prisma.Season$seasonRankingsArgs<ExtArgs>
   _count?: boolean | Prisma.SeasonCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["season"]>
 
@@ -689,6 +800,7 @@ export type SeasonSelectScalar = {
 export type SeasonOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "status" | "startAt" | "endAt" | "initialCapitalKrw" | "tradeFeeRate" | "fxFeeRate" | "rewardPolicyJson" | "createdAt" | "updatedAt", ExtArgs["result"]["season"]>
 export type SeasonInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   participants?: boolean | Prisma.Season$participantsArgs<ExtArgs>
+  seasonRankings?: boolean | Prisma.Season$seasonRankingsArgs<ExtArgs>
   _count?: boolean | Prisma.SeasonCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type SeasonIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -698,6 +810,7 @@ export type $SeasonPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs
   name: "Season"
   objects: {
     participants: Prisma.$SeasonParticipantPayload<ExtArgs>[]
+    seasonRankings: Prisma.$SeasonRankingPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1106,6 +1219,7 @@ readonly fields: SeasonFieldRefs;
 export interface Prisma__SeasonClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   participants<T extends Prisma.Season$participantsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Season$participantsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SeasonParticipantPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  seasonRankings<T extends Prisma.Season$seasonRankingsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Season$seasonRankingsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SeasonRankingPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1560,6 +1674,30 @@ export type Season$participantsArgs<ExtArgs extends runtime.Types.Extensions.Int
   take?: number
   skip?: number
   distinct?: Prisma.SeasonParticipantScalarFieldEnum | Prisma.SeasonParticipantScalarFieldEnum[]
+}
+
+/**
+ * Season.seasonRankings
+ */
+export type Season$seasonRankingsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the SeasonRanking
+   */
+  select?: Prisma.SeasonRankingSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the SeasonRanking
+   */
+  omit?: Prisma.SeasonRankingOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.SeasonRankingInclude<ExtArgs> | null
+  where?: Prisma.SeasonRankingWhereInput
+  orderBy?: Prisma.SeasonRankingOrderByWithRelationInput | Prisma.SeasonRankingOrderByWithRelationInput[]
+  cursor?: Prisma.SeasonRankingWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.SeasonRankingScalarFieldEnum | Prisma.SeasonRankingScalarFieldEnum[]
 }
 
 /**

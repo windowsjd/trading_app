@@ -46,6 +46,8 @@
 - `assets`
 - `asset_price_snapshots`
 - `positions`
+- `daily_portfolio_snapshots`
+- `season_rankings`
 
 near-term ledger/FX foundation:
 - `wallet_transactions`: Prisma schema 반영, migration 생성/DB 적용 완료, season join initial_grant write path 구현 완료.
@@ -55,10 +57,12 @@ near-term ledger/FX foundation:
 - `/fx` migration 생성 및 로컬 DB 적용 완료: `20260501212120_add_fx_rate_and_execute_safety_tables`.
 - asset/price/position foundation 반영 완료: `assets`, `asset_price_snapshots`, `positions`.
 - asset/price/position migration 생성 및 로컬 DB 적용 완료: `20260507120158_add_asset_price_position_foundation`.
+- valuation/ranking foundation 반영 완료: `daily_portfolio_snapshots`, `season_rankings`.
+- valuation/ranking foundation migration 생성 및 로컬 DB 적용 완료: `20260507121528_add_daily_portfolio_snapshot_and_ranking_foundation`.
 
 ## 6. 현재 미도입 DB 상태
-- `daily_portfolio_snapshots`
-- `season_rankings`
+- 현재 문서화된 핵심 DB foundation 기준 추가 미도입 테이블 없음.
+- 단, 주문 체결/position mutation/provider price ingestion/daily valuation/ranking 계산 및 생성 경로는 아직 미구현.
 
 ## 7. 완료된 문서/설계 상태
 - `/home` 상태별 응답 계약 초안: `docs/home-api-contract.md`.
@@ -192,15 +196,15 @@ near-term ledger/FX foundation:
 
 ### `/home`
 - `/home` full implementation은 여전히 불가.
-- 이번 asset/price/position foundation 도입으로 `/home` 구현 준비는 일부 진전됨.
-- 다만 가격 ingestion/freshness 정책, position mutation, daily portfolio snapshot, ranking source가 아직 없어 valuation/ranking source가 완전히 갖춰진 것은 아님.
+- asset/price/position 및 daily/ranking foundation 도입으로 `/home`과 `/ranking` 구현 준비는 진전됨.
+- 다만 가격 ingestion/freshness 정책, position mutation, valuation 계산, ranking 계산, scheduler/batch 데이터 생성 경로가 아직 없어 조회 가능한 신뢰 데이터가 자동 생성되지는 않음.
 - blocker:
   - provider price ingestion
   - asset price freshness policy
   - orders 체결/position mutation
-  - `daily_portfolio_snapshots`
-  - `season_rankings`
-  - valuation/ranking source 부족
+  - valuation 계산 및 daily portfolio snapshot 생성
+  - ranking 계산 및 season ranking 생성
+  - scheduler/batch
 - `/home`의 `active + not joined` 응답은 rulepack상 `blocked/guide`여야 하나, 최종 field shape는 아직 미고정.
 - `/home`의 `upcoming`, `ended`, `settled` 응답 shape도 아직 미고정.
 - `/home` controller/service 구현, 임시 응답 shape 추가, fake 데이터 기반 계산 금지.
@@ -219,7 +223,11 @@ near-term ledger/FX foundation:
 - settlement
 - orders 체결
 - position mutation
+- valuation 계산
+- ranking 계산
 - provider price ingestion
+- daily portfolio snapshot 생성 경로
+- season ranking 생성 경로
 - provider_api ingestion
 - official_batch ingestion
 - scheduler
@@ -237,7 +245,7 @@ near-term ledger/FX foundation:
   - quote 전후 `exchange_transactions`, `wallet_transactions`, `fx_execute_requests`, `equity_snapshots` row count 증가 없음.
 - join API는 `request.user.userId` 기준.
 - join 시 KRW/USD wallet 2개 생성.
-- 이번 asset/price/position foundation 작업은 schema/migration/Prisma generated client 변경 포함.
+- 이번 asset/price/position 및 daily/ranking foundation 작업은 schema/migration/Prisma generated client 변경 포함.
 - `/home` controller/service는 미구현 유지.
 - Prisma adapter 방식 유지 중.
 - near-term 1단계 migration DB 적용 완료.
@@ -245,6 +253,7 @@ near-term ledger/FX foundation:
 - DB 연결 확인 성공.
 - migration status 확인 성공.
 - `assets`, `asset_price_snapshots`, `positions` foundation migration 생성 및 로컬 DB 적용 완료.
+- `daily_portfolio_snapshots`, `season_rankings` foundation migration 생성 및 로컬 DB 적용 완료.
 - `pnpm test` 통과.
 - `pnpm build` 통과.
 - `pnpm test -- fx.service.spec.ts` 통과.
@@ -264,5 +273,6 @@ near-term ledger/FX foundation:
 - 지속적인 `/fx quote` 성공을 위한 승인 snapshot 공급 운영 절차 또는 provider/batch ingestion 경로 검토.
 - asset price ingestion/source/freshness 정책 설계.
 - order execute/position mutation 설계 및 구현.
-- daily_portfolio_snapshots 도입.
-- season_rankings 도입.
+- valuation 계산 및 daily portfolio snapshot 생성 경로 설계/구현.
+- ranking 계산 및 season ranking 생성 경로 설계/구현.
+- settlement 보상/확정 로직 설계/구현.

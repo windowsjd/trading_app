@@ -395,7 +395,9 @@ export const ModelName = {
   ExchangeTransaction: 'ExchangeTransaction',
   FxRateSnapshot: 'FxRateSnapshot',
   FxExecuteRequest: 'FxExecuteRequest',
-  EquitySnapshot: 'EquitySnapshot'
+  EquitySnapshot: 'EquitySnapshot',
+  DailyPortfolioSnapshot: 'DailyPortfolioSnapshot',
+  SeasonRanking: 'SeasonRanking'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -411,7 +413,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "season" | "seasonParticipant" | "asset" | "assetPriceSnapshot" | "position" | "cashWallet" | "walletTransaction" | "exchangeTransaction" | "fxRateSnapshot" | "fxExecuteRequest" | "equitySnapshot"
+    modelProps: "user" | "season" | "seasonParticipant" | "asset" | "assetPriceSnapshot" | "position" | "cashWallet" | "walletTransaction" | "exchangeTransaction" | "fxRateSnapshot" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1303,6 +1305,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    DailyPortfolioSnapshot: {
+      payload: Prisma.$DailyPortfolioSnapshotPayload<ExtArgs>
+      fields: Prisma.DailyPortfolioSnapshotFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.DailyPortfolioSnapshotFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DailyPortfolioSnapshotPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.DailyPortfolioSnapshotFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DailyPortfolioSnapshotPayload>
+        }
+        findFirst: {
+          args: Prisma.DailyPortfolioSnapshotFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DailyPortfolioSnapshotPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.DailyPortfolioSnapshotFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DailyPortfolioSnapshotPayload>
+        }
+        findMany: {
+          args: Prisma.DailyPortfolioSnapshotFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DailyPortfolioSnapshotPayload>[]
+        }
+        create: {
+          args: Prisma.DailyPortfolioSnapshotCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DailyPortfolioSnapshotPayload>
+        }
+        createMany: {
+          args: Prisma.DailyPortfolioSnapshotCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.DailyPortfolioSnapshotCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DailyPortfolioSnapshotPayload>[]
+        }
+        delete: {
+          args: Prisma.DailyPortfolioSnapshotDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DailyPortfolioSnapshotPayload>
+        }
+        update: {
+          args: Prisma.DailyPortfolioSnapshotUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DailyPortfolioSnapshotPayload>
+        }
+        deleteMany: {
+          args: Prisma.DailyPortfolioSnapshotDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.DailyPortfolioSnapshotUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.DailyPortfolioSnapshotUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DailyPortfolioSnapshotPayload>[]
+        }
+        upsert: {
+          args: Prisma.DailyPortfolioSnapshotUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DailyPortfolioSnapshotPayload>
+        }
+        aggregate: {
+          args: Prisma.DailyPortfolioSnapshotAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateDailyPortfolioSnapshot>
+        }
+        groupBy: {
+          args: Prisma.DailyPortfolioSnapshotGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DailyPortfolioSnapshotGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.DailyPortfolioSnapshotCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DailyPortfolioSnapshotCountAggregateOutputType> | number
+        }
+      }
+    }
+    SeasonRanking: {
+      payload: Prisma.$SeasonRankingPayload<ExtArgs>
+      fields: Prisma.SeasonRankingFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.SeasonRankingFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SeasonRankingPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.SeasonRankingFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SeasonRankingPayload>
+        }
+        findFirst: {
+          args: Prisma.SeasonRankingFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SeasonRankingPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.SeasonRankingFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SeasonRankingPayload>
+        }
+        findMany: {
+          args: Prisma.SeasonRankingFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SeasonRankingPayload>[]
+        }
+        create: {
+          args: Prisma.SeasonRankingCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SeasonRankingPayload>
+        }
+        createMany: {
+          args: Prisma.SeasonRankingCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.SeasonRankingCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SeasonRankingPayload>[]
+        }
+        delete: {
+          args: Prisma.SeasonRankingDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SeasonRankingPayload>
+        }
+        update: {
+          args: Prisma.SeasonRankingUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SeasonRankingPayload>
+        }
+        deleteMany: {
+          args: Prisma.SeasonRankingDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.SeasonRankingUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.SeasonRankingUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SeasonRankingPayload>[]
+        }
+        upsert: {
+          args: Prisma.SeasonRankingUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SeasonRankingPayload>
+        }
+        aggregate: {
+          args: Prisma.SeasonRankingAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateSeasonRanking>
+        }
+        groupBy: {
+          args: Prisma.SeasonRankingGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SeasonRankingGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.SeasonRankingCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SeasonRankingCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -1551,6 +1701,40 @@ export const EquitySnapshotScalarFieldEnum = {
 } as const
 
 export type EquitySnapshotScalarFieldEnum = (typeof EquitySnapshotScalarFieldEnum)[keyof typeof EquitySnapshotScalarFieldEnum]
+
+
+export const DailyPortfolioSnapshotScalarFieldEnum = {
+  id: 'id',
+  seasonParticipantId: 'seasonParticipantId',
+  snapshotDate: 'snapshotDate',
+  totalAssetKrw: 'totalAssetKrw',
+  returnRate: 'returnRate',
+  krwCash: 'krwCash',
+  usdCashKrw: 'usdCashKrw',
+  assetValueKrw: 'assetValueKrw',
+  realizedPnlKrw: 'realizedPnlKrw',
+  unrealizedPnlKrw: 'unrealizedPnlKrw',
+  capturedAt: 'capturedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type DailyPortfolioSnapshotScalarFieldEnum = (typeof DailyPortfolioSnapshotScalarFieldEnum)[keyof typeof DailyPortfolioSnapshotScalarFieldEnum]
+
+
+export const SeasonRankingScalarFieldEnum = {
+  id: 'id',
+  seasonId: 'seasonId',
+  seasonParticipantId: 'seasonParticipantId',
+  rankType: 'rankType',
+  rank: 'rank',
+  totalAssetKrw: 'totalAssetKrw',
+  returnRate: 'returnRate',
+  rankingDate: 'rankingDate',
+  capturedAt: 'capturedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type SeasonRankingScalarFieldEnum = (typeof SeasonRankingScalarFieldEnum)[keyof typeof SeasonRankingScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -1846,6 +2030,20 @@ export type ListEnumSnapshotReasonFieldRefInput<$PrismaModel> = FieldRefInputTyp
 
 
 /**
+ * Reference to a field of type 'SeasonRankingType'
+ */
+export type EnumSeasonRankingTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SeasonRankingType'>
+
+
+
+/**
+ * Reference to a field of type 'SeasonRankingType[]'
+ */
+export type ListEnumSeasonRankingTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SeasonRankingType[]'>
+
+
+
+/**
  * Reference to a field of type 'Float'
  */
 export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
@@ -1965,6 +2163,8 @@ export type GlobalOmitConfig = {
   fxRateSnapshot?: Prisma.FxRateSnapshotOmit
   fxExecuteRequest?: Prisma.FxExecuteRequestOmit
   equitySnapshot?: Prisma.EquitySnapshotOmit
+  dailyPortfolioSnapshot?: Prisma.DailyPortfolioSnapshotOmit
+  seasonRanking?: Prisma.SeasonRankingOmit
 }
 
 /* Types for Logging */

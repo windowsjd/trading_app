@@ -484,6 +484,23 @@ export type EnumSnapshotReasonWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedEnumSnapshotReasonFilter<$PrismaModel>
 }
 
+export type EnumSeasonRankingTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.SeasonRankingType | Prisma.EnumSeasonRankingTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.SeasonRankingType[] | Prisma.ListEnumSeasonRankingTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.SeasonRankingType[] | Prisma.ListEnumSeasonRankingTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumSeasonRankingTypeFilter<$PrismaModel> | $Enums.SeasonRankingType
+}
+
+export type EnumSeasonRankingTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.SeasonRankingType | Prisma.EnumSeasonRankingTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.SeasonRankingType[] | Prisma.ListEnumSeasonRankingTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.SeasonRankingType[] | Prisma.ListEnumSeasonRankingTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumSeasonRankingTypeWithAggregatesFilter<$PrismaModel> | $Enums.SeasonRankingType
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumSeasonRankingTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumSeasonRankingTypeFilter<$PrismaModel>
+}
+
 export type NestedStringFilter<$PrismaModel = never> = {
   equals?: string | Prisma.StringFieldRefInput<$PrismaModel>
   in?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel>
@@ -938,6 +955,23 @@ export type NestedEnumSnapshotReasonWithAggregatesFilter<$PrismaModel = never> =
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumSnapshotReasonFilter<$PrismaModel>
   _max?: Prisma.NestedEnumSnapshotReasonFilter<$PrismaModel>
+}
+
+export type NestedEnumSeasonRankingTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.SeasonRankingType | Prisma.EnumSeasonRankingTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.SeasonRankingType[] | Prisma.ListEnumSeasonRankingTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.SeasonRankingType[] | Prisma.ListEnumSeasonRankingTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumSeasonRankingTypeFilter<$PrismaModel> | $Enums.SeasonRankingType
+}
+
+export type NestedEnumSeasonRankingTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.SeasonRankingType | Prisma.EnumSeasonRankingTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.SeasonRankingType[] | Prisma.ListEnumSeasonRankingTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.SeasonRankingType[] | Prisma.ListEnumSeasonRankingTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumSeasonRankingTypeWithAggregatesFilter<$PrismaModel> | $Enums.SeasonRankingType
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumSeasonRankingTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumSeasonRankingTypeFilter<$PrismaModel>
 }
 
 

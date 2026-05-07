@@ -62,7 +62,9 @@ export const ModelName = {
   ExchangeTransaction: 'ExchangeTransaction',
   FxRateSnapshot: 'FxRateSnapshot',
   FxExecuteRequest: 'FxExecuteRequest',
-  EquitySnapshot: 'EquitySnapshot'
+  EquitySnapshot: 'EquitySnapshot',
+  DailyPortfolioSnapshot: 'DailyPortfolioSnapshot',
+  SeasonRanking: 'SeasonRanking'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -290,6 +292,40 @@ export const EquitySnapshotScalarFieldEnum = {
 } as const
 
 export type EquitySnapshotScalarFieldEnum = (typeof EquitySnapshotScalarFieldEnum)[keyof typeof EquitySnapshotScalarFieldEnum]
+
+
+export const DailyPortfolioSnapshotScalarFieldEnum = {
+  id: 'id',
+  seasonParticipantId: 'seasonParticipantId',
+  snapshotDate: 'snapshotDate',
+  totalAssetKrw: 'totalAssetKrw',
+  returnRate: 'returnRate',
+  krwCash: 'krwCash',
+  usdCashKrw: 'usdCashKrw',
+  assetValueKrw: 'assetValueKrw',
+  realizedPnlKrw: 'realizedPnlKrw',
+  unrealizedPnlKrw: 'unrealizedPnlKrw',
+  capturedAt: 'capturedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type DailyPortfolioSnapshotScalarFieldEnum = (typeof DailyPortfolioSnapshotScalarFieldEnum)[keyof typeof DailyPortfolioSnapshotScalarFieldEnum]
+
+
+export const SeasonRankingScalarFieldEnum = {
+  id: 'id',
+  seasonId: 'seasonId',
+  seasonParticipantId: 'seasonParticipantId',
+  rankType: 'rankType',
+  rank: 'rank',
+  totalAssetKrw: 'totalAssetKrw',
+  returnRate: 'returnRate',
+  rankingDate: 'rankingDate',
+  capturedAt: 'capturedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type SeasonRankingScalarFieldEnum = (typeof SeasonRankingScalarFieldEnum)[keyof typeof SeasonRankingScalarFieldEnum]
 
 
 export const SortOrder = {

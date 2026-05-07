@@ -124,3 +124,11 @@ export const AssetPriceSourceType = {
 } as const
 
 export type AssetPriceSourceType = (typeof AssetPriceSourceType)[keyof typeof AssetPriceSourceType]
+
+
+export const SeasonRankingType = {
+  daily: 'daily',
+  final: 'final'
+} as const
+
+export type SeasonRankingType = (typeof SeasonRankingType)[keyof typeof SeasonRankingType]

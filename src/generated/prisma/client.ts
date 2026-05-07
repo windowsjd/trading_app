@@ -99,3 +99,13 @@ export type FxExecuteRequest = Prisma.FxExecuteRequestModel
  *
  */
 export type EquitySnapshot = Prisma.EquitySnapshotModel
+/**
+ * Model DailyPortfolioSnapshot
+ *
+ */
+export type DailyPortfolioSnapshot = Prisma.DailyPortfolioSnapshotModel
+/**
+ * Model SeasonRanking
+ *
+ */
+export type SeasonRanking = Prisma.SeasonRankingModel
