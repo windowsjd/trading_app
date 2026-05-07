@@ -5,7 +5,7 @@ const itDbIntegration = RUN_DB_INTEGRATION ? it : it.skip;
 
 describe('FxService.execute DB integration', () => {
   itDbIntegration(
-    'verifies write path, replay, conflict, no-rate/stale-rate, and overspend safety against PostgreSQL',
+    'verifies write path, rollback proof, replay, conflict, no-rate/stale-rate, and overspend safety against PostgreSQL',
     () => {
       const result = spawnSync('pnpm', ['tsx', '-e', FX_EXECUTE_DB_RUNNER], {
         cwd: process.cwd(),
@@ -70,6 +70,10 @@ async function main() {
     await runCase('insufficient balance', testInsufficientBalance);
     await runCase('no eligible snapshot', testNoEligibleSnapshot);
     await runCase('stale snapshot', testStaleSnapshot);
+    await runCase(
+      'db transaction rollback failure injection',
+      testDbTransactionRollbackFailureInjection,
+    );
     await runCase('concurrent overspend prevention', testConcurrentOverspend);
     console.log('fx execute db integration ok');
   } finally {
@@ -387,6 +391,81 @@ async function testConcurrentOverspend() {
   }
 }
 
+async function testDbTransactionRollbackFailureInjection() {
+  const failureCases = [
+    {
+      label: 'source debit wallet missing after pending command',
+      idempotencyKey: 'rollback-source-debit-wallet-missing-key',
+      expectedCode: 'SOURCE_WALLET_NOT_FOUND',
+      mode: 'source-debit-wallet-missing',
+    },
+    {
+      label: 'target credit numeric overflow after source debit',
+      idempotencyKey: 'rollback-target-credit-overflow-key',
+      expectedCode: 'EXECUTE_TRANSACTION_FAILED',
+      mode: null,
+      options: {
+        targetBalance: '9999999999999999.99999999',
+      },
+    },
+    {
+      label: 'exchange row snapshot FK failure after wallet updates',
+      idempotencyKey: 'rollback-exchange-snapshot-fk-key',
+      expectedCode: 'EXECUTE_TRANSACTION_FAILED',
+      mode: 'exchange-snapshot-fk',
+    },
+    {
+      label: 'source ledger wallet FK failure after exchange row',
+      idempotencyKey: 'rollback-source-ledger-wallet-fk-key',
+      expectedCode: 'EXECUTE_TRANSACTION_FAILED',
+      mode: 'source-ledger-wallet-fk',
+    },
+    {
+      label: 'target ledger wallet FK failure after source ledger',
+      idempotencyKey: 'rollback-target-ledger-wallet-fk-key',
+      expectedCode: 'EXECUTE_TRANSACTION_FAILED',
+      mode: 'target-ledger-wallet-fk',
+    },
+    {
+      label: 'finalization exchange FK failure after ledger rows',
+      idempotencyKey: 'rollback-finalization-exchange-fk-key',
+      expectedCode: 'EXECUTE_TRANSACTION_FAILED',
+      mode: 'finalization-exchange-fk',
+    },
+  ];
+
+  for (const failureCase of failureCases) {
+    const scenario = await createScenario(
+      'rollback-' + failureCase.idempotencyKey,
+      failureCase.options ?? {},
+    );
+
+    try {
+      const before = await readRollbackProofState(scenario);
+      const injectedService = failureCase.mode
+        ? createDbFailureInjectionService(failureCase.mode, scenario)
+        : service;
+
+      await expectExecuteError(
+        injectedService.execute(
+          scenario.userId,
+          buildKrwToUsdBody(failureCase.idempotencyKey),
+        ),
+        failureCase.expectedCode,
+      );
+
+      const after = await readRollbackProofState(scenario);
+      assert.deepEqual(
+        after,
+        before,
+        failureCase.label + ' left partial writes',
+      );
+    } finally {
+      await cleanupScenario(scenario);
+    }
+  }
+}
+
 async function createScenario(label, options = {}) {
   const suffix = String(Date.now()) + '-' + Math.random().toString(16).slice(2);
   const sourceCurrency = options.sourceCurrency ?? CurrencyCode.KRW;
@@ -560,6 +639,40 @@ async function readMutationState(scenario) {
   };
 }
 
+async function readRollbackProofState(scenario) {
+  const mutationState = await readMutationState(scenario);
+  const commandRows = await prisma.fxExecuteRequest.findMany({
+    where: { userId: scenario.userId },
+    select: {
+      status: true,
+      exchangeTransactionId: true,
+      responsePayloadJson: true,
+    },
+  });
+  const equitySnapshotCount = await prisma.equitySnapshot.count({
+    where: { seasonParticipantId: scenario.participantId },
+  });
+  const snapshotCount = scenario.snapshotId
+    ? await prisma.fxRateSnapshot.count({ where: { id: scenario.snapshotId } })
+    : 0;
+
+  return {
+    ...mutationState,
+    commandCount: commandRows.length,
+    succeededCommandCount: commandRows.filter(
+      (row) => row.status === FxExecuteRequestStatus.succeeded,
+    ).length,
+    finalizedCommandCount: commandRows.filter(
+      (row) => row.exchangeTransactionId !== null,
+    ).length,
+    responsePayloadJsonCount: commandRows.filter(
+      (row) => row.responsePayloadJson !== null,
+    ).length,
+    equitySnapshotCount,
+    snapshotCount,
+  };
+}
+
 async function countCommandsForUser(userId) {
   return prisma.fxExecuteRequest.count({ where: { userId } });
 }
@@ -634,6 +747,133 @@ async function withoutEligibleAdminManualSnapshots(fn) {
 
     throw error;
   }
+}
+
+function createDbFailureInjectionService(mode, scenario) {
+  const injectedPrisma = new Proxy(prisma, {
+    get(target, property, receiver) {
+      if (property === '$transaction') {
+        const transaction = Reflect.get(target, property, receiver);
+
+        return async (callback, ...rest) =>
+          Reflect.apply(transaction, target, [
+            async (tx) =>
+              callback(createDbFailureInjectionTransaction(tx, mode, scenario)),
+            ...rest,
+          ]);
+      }
+
+      const value = Reflect.get(target, property, receiver);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+
+  return new FxService(injectedPrisma);
+}
+
+function createDbFailureInjectionTransaction(tx, mode, scenario) {
+  let walletTransactionCreateCount = 0;
+
+  return new Proxy(tx, {
+    get(target, property, receiver) {
+      if (property === 'fxExecuteRequest') {
+        return new Proxy(target.fxExecuteRequest, {
+          get(model, method, modelReceiver) {
+            const value = Reflect.get(model, method, modelReceiver);
+
+            if (method === 'create') {
+              return async (...args) => {
+                const result = await Reflect.apply(value, model, args);
+
+                if (mode === 'source-debit-wallet-missing') {
+                  await tx.cashWallet.delete({
+                    where: { id: scenario.sourceWalletId },
+                  });
+                }
+
+                return result;
+              };
+            }
+
+            if (method === 'update') {
+              return async (...args) => {
+                if (mode === 'finalization-exchange-fk') {
+                  await tx.exchangeTransaction.delete({
+                    where: { id: args[0].data.exchangeTransactionId },
+                  });
+                }
+
+                return Reflect.apply(value, model, args);
+              };
+            }
+
+            return typeof value === 'function' ? value.bind(model) : value;
+          },
+        });
+      }
+
+      if (property === 'exchangeTransaction') {
+        return new Proxy(target.exchangeTransaction, {
+          get(model, method, modelReceiver) {
+            const value = Reflect.get(model, method, modelReceiver);
+
+            if (method === 'create') {
+              return async (...args) => {
+                if (mode === 'exchange-snapshot-fk') {
+                  await tx.fxRateSnapshot.delete({
+                    where: { id: scenario.snapshotId },
+                  });
+                }
+
+                return Reflect.apply(value, model, args);
+              };
+            }
+
+            return typeof value === 'function' ? value.bind(model) : value;
+          },
+        });
+      }
+
+      if (property === 'walletTransaction') {
+        return new Proxy(target.walletTransaction, {
+          get(model, method, modelReceiver) {
+            const value = Reflect.get(model, method, modelReceiver);
+
+            if (method === 'create') {
+              return async (...args) => {
+                walletTransactionCreateCount += 1;
+
+                if (
+                  mode === 'source-ledger-wallet-fk' &&
+                  walletTransactionCreateCount === 1
+                ) {
+                  await tx.cashWallet.delete({
+                    where: { id: scenario.sourceWalletId },
+                  });
+                }
+
+                if (
+                  mode === 'target-ledger-wallet-fk' &&
+                  walletTransactionCreateCount === 2
+                ) {
+                  await tx.cashWallet.delete({
+                    where: { id: scenario.targetWalletId },
+                  });
+                }
+
+                return Reflect.apply(value, model, args);
+              };
+            }
+
+            return typeof value === 'function' ? value.bind(model) : value;
+          },
+        });
+      }
+
+      const value = Reflect.get(target, property, receiver);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
 }
 
 function formatScale8(value) {
