@@ -12,6 +12,7 @@
 
 ## 2. 구현 완료 API
 - `GET /api/v1/home` read-only MVP
+- `GET /api/v1/ranking` read-only MVP
 - `GET /api/v1/seasons/current`
 - `POST /api/v1/seasons/{seasonId}/join`
 - `POST /api/v1/fx/quote`
@@ -72,10 +73,11 @@ near-term ledger/FX foundation:
 
 ## 6. 현재 미도입 DB 상태
 - 현재 문서화된 핵심 DB foundation 기준 추가 미도입 테이블 없음.
-- 단, 주문 체결/position mutation/provider price ingestion/API/scheduler/batch 기반 자동 daily valuation/ranking 생성 경로는 아직 미구현.
+- 단, 주문 체결/position mutation/provider price ingestion/orders/records/settlement API/scheduler/batch 기반 자동 daily valuation/ranking 생성 경로는 아직 미구현.
 
 ## 7. 완료된 문서/설계 상태
 - `/home` 상태별 응답 계약 초안: `docs/home-api-contract.md`.
+- `/ranking` read-only MVP 계약: `docs/ranking-api-contract.md`.
 - records API 계약: `docs/records-api-contract.md`에 orders `side`/`orderId`/`assetId`/`name`, exchanges `feeCurrency`/`exchangeId` 방향 반영.
 - `/fx quote` STOP review: `docs/fx-quote-stop-review.md`.
 - `/fx` API 계약 초안: `docs/fx-api-contract.md`.
@@ -243,7 +245,7 @@ near-term ledger/FX foundation:
 - near-term execute는 `equity_snapshots`를 생성하지 않음.
 - MVP execute는 별도 fee wallet transaction row를 만들지 않음.
 - target wallet credit은 `netTargetAmount`.
-- provider_api ingestion, official_batch ingestion, scheduler, provider final selection, stale pending recovery tool/job, durable quote, records/ranking/settlement는 여전히 미구현.
+- provider_api ingestion, official_batch ingestion, scheduler, provider final selection, stale pending recovery tool/job, durable quote, records/settlement는 여전히 미구현.
 - DB integration 검증은 Docker compose의 기존 Postgres/Redis 컨테이너로 수행됨.
 - DB 연결 확인과 migration status 확인 성공.
 - `pnpm test`, `pnpm build`, `FX_EXECUTE_DB_INTEGRATION=1 pnpm test -- fx.execute.integration.spec.ts` 통과.
@@ -279,9 +281,32 @@ near-term ledger/FX foundation:
   - orders 체결/position mutation
   - scheduler/batch daily portfolio snapshot 자동 생성
   - scheduler/batch season ranking 자동 생성
-  - `/ranking` API
   - scheduler/batch
 - `/home` read-only MVP는 fake 데이터 기반 계산 금지를 유지.
+
+### `/ranking`
+- `GET /api/v1/ranking` read-only MVP 구현 완료.
+- auth 본체는 미완성이나 API는 기존 보호 API와 동일하게 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
+- query parameter:
+  - `seasonId` optional.
+  - `rankingDate` optional, `YYYY-MM-DD`.
+  - `rankType` optional, default `daily`, allowed `daily`/`final`.
+  - `limit` optional, default 50, max 100 clamp.
+  - `offset` optional, default 0.
+- source of truth:
+  - `season_rankings`만 read-only로 조회.
+  - `daily_portfolio_snapshots` 기반 즉석 ranking 계산 없음.
+  - `season_participants.currentRank`를 source of truth로 사용하지 않음.
+- ranking row가 없으면 fake rank 없이 `data.state = unavailable`.
+- `myRanking`은 로그인 사용자의 `season_participants` 기준:
+  - 미참가면 `state = not_joined`.
+  - 참가했지만 ranking row가 없으면 `state = unavailable`.
+  - row가 있으면 `state = available`.
+- `/ranking` 호출은 ranking row를 생성/수정/삭제하지 않음.
+- 아직 미구현:
+  - scheduler/batch 기반 season ranking 자동 생성.
+  - 고급 필터/기간별 ranking/시즌 히스토리.
+  - reward/settlement 연동.
 
 ## 9. 다음 gate
 - OANDA trial/API 계약 검증 전 provider_api/official_batch/scheduler 구현 STOP 유지.
@@ -291,7 +316,6 @@ near-term ledger/FX foundation:
 ## 10. 아직 안 한 것
 - wallets API
 - orders API
-- ranking
 - records
 - settlement
 - orders 체결
@@ -331,6 +355,7 @@ near-term ledger/FX foundation:
 - `pnpm test` 통과.
 - `pnpm build` 통과.
 - `pnpm test -- home` 통과.
+- `pnpm test -- ranking` 통과.
 - `pnpm test -- fx.service.spec.ts` 통과.
 - `FX_EXECUTE_DB_INTEGRATION=1 pnpm test -- fx.execute.integration.spec.ts` 통과.
 - `/fx execute` DB integration spec은 실제 PostgreSQL 환경에서 통과.
