@@ -1,15 +1,42 @@
 # FX Execute Final Implementation Gate
 
 ## Status
-- Documentation only.
-- `/fx execute` is still not implemented.
-- This document consolidates the remaining accepted implementation gates before drafting a future `/fx execute` implementation prompt.
-- This document is not permission to implement controller, service, DTO, test, provider ingestion, scheduler, admin API, schema, migration, seed, package, or environment changes.
+- Historical implementation gate and current hardening reference.
+- `/fx execute` 1st write path implementation is complete.
+- Real PostgreSQL/Prisma DB integration spec has passed for the core MVP paths.
+- This document preserves the accepted policy and test matrix used for implementation and follow-up hardening.
+- This document is not permission to implement additional controller, service, DTO, provider ingestion, scheduler, admin API, schema, migration, seed, package, or environment changes.
+- Remaining hardening is limited to deeper failure-injection rollback proof and future recovery/provider work unless separately approved.
 
 ## Purpose
-- Close the remaining provider/sourceType, execute-time snapshot selection, freshness, and final test-matrix decisions for near-term `/fx execute`.
+- Preserve the provider/sourceType, execute-time snapshot selection, freshness, and final test-matrix decisions for near-term `/fx execute`.
 - Keep provider final selection separate from near-term execute readiness.
-- Provide a single checklist that a future implementation task must satisfy with code and tests.
+- Provide a single checklist for validating the implemented 1st write path and future hardening tasks.
+
+## Current Verification Result
+- `/fx execute` 1st write path is implemented.
+- Actual DB verification used Docker compose's existing PostgreSQL/Redis containers.
+- DB connection check succeeded.
+- Prisma migration status check succeeded.
+- `pnpm test` passed.
+- `pnpm build` passed.
+- `FX_EXECUTE_DB_INTEGRATION=1 pnpm test -- fx.execute.integration.spec.ts` passed against PostgreSQL.
+- The DB integration spec covers success, succeeded duplicate replay, idempotency conflict, insufficient balance, no eligible snapshot, stale snapshot, and concurrent overspend prevention.
+- The successful DB path verifies one `exchange_transactions` row, two source/target `wallet_transactions` rows, actual `balanceAfter`, stored `responsePayloadJson`, no fee wallet transaction row, and no `equity_snapshots` row.
+- The first sandbox-internal run hit `/tmp/tsx-1000/*.pipe` IPC `EPERM`; the same command passed outside the sandbox, so the initial failure was treated as a sandbox limitation rather than a DB/code failure.
+- Schema, migrations, seed, package files, service code, and integration spec assertions were not changed or weakened for this verification.
+
+## Remaining Hardening
+- finalization failure injection.
+- ledger insert failure injection.
+- exchange row failure injection.
+- target credit failure injection.
+- deeper rollback proof with failures forced inside the actual DB transaction.
+- unique idempotency race hardening beyond the current core replay/conflict checks.
+- stale pending recovery tool/job remains unimplemented.
+- durable quote, `quoteId`, and `expiresAt` remain unimplemented.
+- `provider_api`, `official_batch`, and scheduler remain unimplemented.
+- `/home`, `/orders`, `/positions`, `/assets`, `/ranking`, `/records`, and `/settlement` remain unimplemented.
 
 ## Accepted Provider And Source Coexistence Policy
 - Provider final selection is not confirmed.
@@ -74,7 +101,7 @@
 - Stale failure must not create wallet mutation, exchange row, wallet transaction row, or command succeeded finalization.
 
 ## Final Implementation Readiness Gate
-A future `/fx execute` implementation prompt may be drafted after this document is reviewed, but implementation is not performed in this task. The implementation task must include:
+The 1st `/fx execute` write path has been implemented and the core PostgreSQL integration spec has passed. This gate remains as the checklist for judging the implemented path and planning any follow-up hardening. The implementation and hardening tasks must include:
 
 - Accepted Decimal half-up and scale/formatting policy.
 - Accepted `requestHash` canonical rule.
@@ -92,7 +119,7 @@ A future `/fx execute` implementation prompt may be drafted after this document 
 - Local/integration smoke path using approved fresh `admin_manual` snapshot only.
 
 ## Final Implementation Test Matrix
-Do not add tests in this documentation task.
+This matrix is retained as the policy/test coverage reference. Items covered by unit tests and the current DB integration spec should remain protected; deeper failure-injection items remain hardening work.
 
 ### A. Auth / Validation / Season
 - unauthenticated -> `UNAUTHORIZED`
@@ -179,8 +206,8 @@ Do not add tests in this documentation task.
 - no ranking/settlement side effect introduced
 
 ## Explicit Non-Goals
-- No `/fx execute` implementation.
-- No controller/service/DTO/test code.
+- No additional `/fx execute` feature expansion from this document.
+- No controller/service/DTO/test code changes in this documentation sync.
 - No provider final selection.
 - No `provider_api`, `official_batch`, scheduler, or admin API implementation.
 - No schema/migration/seed/package/env changes.

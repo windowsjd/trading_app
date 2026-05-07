@@ -16,7 +16,8 @@
 - `POST /api/v1/fx/quote`
 - `POST /api/v1/fx/execute` 1차 구현 완료
   - write path는 구현됨.
-  - 실제 PostgreSQL/Prisma integration hardening은 진행 단계.
+  - 실제 PostgreSQL/Prisma DB integration spec 통과.
+  - 더 깊은 failure injection 기반 rollback hardening은 남아 있음.
 
 ## 3. 현재 구조
 - Nest
@@ -97,7 +98,7 @@ near-term ledger/FX foundation:
 
 ### `/fx execute`
 - `/fx execute`는 write path 1차 구현 완료 상태.
-- 현재 단계는 실제 PostgreSQL/Prisma DB integration hardening 진행 단계.
+- 실제 PostgreSQL/Prisma DB integration spec 통과 상태.
 - 구현된 범위:
   - request validation/preflight.
   - active season/participant read.
@@ -112,12 +113,22 @@ near-term ledger/FX foundation:
   - `fxExecuteRequest` succeeded finalization.
   - exact `responsePayloadJson` 저장.
   - succeeded duplicate replay.
-- 아직 필요한 DB integration 검증/남은 리스크:
-  - 실제 PostgreSQL transaction rollback 검증.
-  - concurrent debit / overspend 방지 검증.
-  - unique idempotency race 검증.
-  - ledger consistency 검증.
-  - `responsePayloadJson` replay 검증.
+- 실제 DB integration 통과 범위:
+  - KRW -> USD success write path.
+  - succeeded duplicate stored `responsePayloadJson` replay.
+  - same idempotencyKey + different payload conflict.
+  - insufficient balance no-mutation behavior.
+  - no eligible snapshot `FX_RATE_UNAVAILABLE`.
+  - stale snapshot `FX_RATE_STALE`.
+  - concurrent overspend prevention: one success only, source balance non-negative.
+  - exchange row, source/target ledger rows, ledger `balanceAfter`, no fee row, no `equitySnapshot` checks.
+- 아직 필요한 DB hardening/남은 리스크:
+  - finalization 실패 failure injection.
+  - ledger insert 실패 failure injection.
+  - exchange row 실패 failure injection.
+  - target credit 실패 failure injection.
+  - 실제 DB에서 강제 실패를 유도하는 더 깊은 rollback hardening.
+  - unique idempotency race 추가 검증.
 - Decimal rounding mode와 scale/formatting 정책은 half-up 기준으로 구현 반영됨.
 - requestHash canonical rule은 SHA-256/canonical JSON 기준으로 구현 반영됨.
 - error code/status/retryability mapping은 구현 반영됨.
@@ -145,7 +156,12 @@ near-term ledger/FX foundation:
 - MVP execute는 별도 fee wallet transaction row를 만들지 않음.
 - target wallet credit은 `netTargetAmount`.
 - provider_api ingestion, official_batch ingestion, scheduler, provider final selection, stale pending recovery tool/job, durable quote, records/ranking/settlement는 여전히 미구현.
-- 이번 문서 동기화 및 DB integration test 추가 작업에서 schema/migration/seed/package/env/controller/service 변경은 하지 않음.
+- DB integration 검증은 Docker compose의 기존 Postgres/Redis 컨테이너로 수행됨.
+- DB 연결 확인과 migration status 확인 성공.
+- `pnpm test`, `pnpm build`, `FX_EXECUTE_DB_INTEGRATION=1 pnpm test -- fx.execute.integration.spec.ts` 통과.
+- schema/migration/seed/package/env/controller/service/test 변경 없이 검증됨.
+- integration spec 삭제/skip/완화 또는 assertion 완화 없음.
+- 최초 sandbox 내부 실행은 `/tmp/tsx-1000/*.pipe` IPC `EPERM`으로 실패했으나, sandbox 제한 문제로 판단했고 sandbox 밖 동일 명령 재실행으로 실제 PostgreSQL integration 통과.
 
 ### `/home`
 - `/home` full implementation은 여전히 불가.
@@ -163,10 +179,8 @@ near-term ledger/FX foundation:
 ## 9. 다음 gate
 - 승인된 fresh `admin_manual` snapshot으로 `/fx quote` 통합 smoke 검증.
 - OANDA trial/API 계약 검증 전 provider_api/official_batch/scheduler 구현 STOP 유지.
-- `/fx execute` 실제 PostgreSQL/Prisma integration 검증.
-- `/fx execute` concurrent debit / overspend 방지 검증.
-- `/fx execute` unique idempotency race 검증.
-- `/fx execute` rollback/partial-write proof 보강.
+- `/fx execute` failure injection 기반 rollback/partial-write proof 보강.
+- `/fx execute` unique idempotency race 추가 검증.
 - `/home` full implementation 가능 판정은 valuation/ranking source table 확보 후 재검토.
 
 ## 10. 아직 안 한 것
@@ -180,12 +194,12 @@ near-term ledger/FX foundation:
 - official_batch ingestion
 - scheduler
 - admin API
-- fx execute DB integration hardening
+- fx execute deeper rollback hardening
 - stale pending recovery tool/job
 - durable quote/quoteId/expiresAt
 
 ## 11. 마지막 검증 상태
-- season current / season join / fx quote / fx execute unit 기준 build 통과.
+- season current / season join / fx quote / fx execute unit 기준 test/build 통과.
 - join API는 `request.user.userId` 기준.
 - join 시 KRW/USD wallet 2개 생성.
 - schema 변경 없이 구현됨.
@@ -193,16 +207,19 @@ near-term ledger/FX foundation:
 - Prisma adapter 방식 유지 중.
 - near-term 1단계 migration DB 적용 완료.
 - Prisma Client generate 완료.
-- build 통과.
-- `/fx execute` DB integration spec은 추가되었으나, 현재 로컬 환경은 PostgreSQL `127.0.0.1:5432` 연결 불가 상태라 실제 DB 실행은 pending.
+- DB 연결 확인 성공.
+- migration status 확인 성공.
+- `pnpm test` 통과.
+- `pnpm build` 통과.
+- `FX_EXECUTE_DB_INTEGRATION=1 pnpm test -- fx.execute.integration.spec.ts` 통과.
+- `/fx execute` DB integration spec은 실제 PostgreSQL 환경에서 통과.
 
 ## 12. TODO
 - 승인된 운영값으로 non-dry-run CLI 입력 후 `/fx quote` 통합 smoke 검증.
 - provider final selection STOP review 수락 및 OANDA trial/API 계약 검증.
-- `/fx execute` DB integration spec을 실제 PostgreSQL 환경에서 실행.
-- guarded conditional source debit concurrency/rollback 검증 보강.
+- `/fx execute` failure injection 기반 rollback 검증 보강.
 - unique idempotency race 검증 보강.
-- ledger consistency 및 `responsePayloadJson` replay integration 검증 보강.
+- ledger insert/exchange row/finalization 실패 유도 integration hardening 검토.
 - assets 도입.
 - asset_price_snapshots 도입.
 - positions 도입.
