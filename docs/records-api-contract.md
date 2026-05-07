@@ -3,8 +3,8 @@
 ## Status
 - `GET /api/v1/records` read-only MVP is implemented.
 - Legacy item shapes for future per-resource records APIs remain documented below.
-- The MVP reads existing `exchange_transactions` and `wallet_transactions` rows only.
-- Order records are unavailable until order execution and order storage are implemented.
+- The MVP reads existing `exchange_transactions`, `wallet_transactions`, and `orders` rows only.
+- Order records are backed by the `orders` DB foundation.
 - Do not add fake data, Prisma schema changes, migrations, or seed changes from this document.
 
 ## Source Rules
@@ -109,10 +109,38 @@
       ]
     },
     "orders": {
-      "state": "unavailable",
-      "reason": "ORDERS_NOT_IMPLEMENTED",
-      "message": "Order records are not available until order execution is implemented.",
-      "records": []
+      "state": "available",
+      "pagination": {
+        "limit": 50,
+        "offset": 0,
+        "total": 1,
+        "returned": 1
+      },
+      "records": [
+        {
+          "orderId": "<string>",
+          "submittedAt": "<UTC ISO string>",
+          "executedAt": "<UTC ISO string | null>",
+          "canceledAt": "<UTC ISO string | null>",
+          "rejectedAt": "<UTC ISO string | null>",
+          "assetId": "<string>",
+          "symbol": "<string>",
+          "name": "<string>",
+          "side": "buy | sell",
+          "orderType": "market | limit",
+          "status": "submitted | executed | canceled | rejected",
+          "quantity": "<decimal string>",
+          "limitPrice": "<amount string | null>",
+          "executedPrice": "<amount string | null>",
+          "currencyCode": "KRW | USD",
+          "grossAmount": "<amount string | null>",
+          "feeAmount": "<amount string | null>",
+          "netAmount": "<amount string | null>",
+          "assetPriceSnapshotId": "<string | null>",
+          "fxRateSnapshotId": "<string | null>",
+          "createdAt": "<UTC ISO string>"
+        }
+      ]
     }
   }
 }
@@ -122,7 +150,7 @@
 
 - If the user has not joined the selected season, `data.state` is `not_joined` and record arrays are empty.
 - If no current season or selected season exists, `data.state` is `unavailable`.
-- `type=orders` returns `data.state = unavailable` with an unavailable orders section.
+- `type=orders` returns `data.state = available` for joined participants and reads actual `orders` rows.
 - The API does not synthesize or fake order records.
 - The API does not mutate DB rows.
 
@@ -141,34 +169,57 @@
 ```json
 {
   "orderId": "<string>",
-  "executedAt": "<UTC ISO string>",
+  "submittedAt": "<UTC ISO string>",
+  "executedAt": "<UTC ISO string | null>",
+  "canceledAt": "<UTC ISO string | null>",
+  "rejectedAt": "<UTC ISO string | null>",
   "assetId": "<string>",
   "symbol": "<string>",
   "name": "<string>",
-  "side": "<string>",
+  "side": "buy | sell",
+  "orderType": "market | limit",
+  "status": "submitted | executed | canceled | rejected",
   "quantity": "<decimal string>",
-  "fillPriceLocal": "<amount string>",
-  "fillCurrency": "<string>",
-  "netAmountLocal": "<amount string>"
+  "limitPrice": "<amount string | null>",
+  "executedPrice": "<amount string | null>",
+  "currencyCode": "KRW | USD",
+  "grossAmount": "<amount string | null>",
+  "feeAmount": "<amount string | null>",
+  "netAmount": "<amount string | null>",
+  "assetPriceSnapshotId": "<string | null>",
+  "fxRateSnapshotId": "<string | null>",
+  "createdAt": "<UTC ISO string>"
 }
 ```
 
 ### Fixed Fields
 - `orderId`
+- `submittedAt`
 - `executedAt`
+- `canceledAt`
+- `rejectedAt`
 - `assetId`
 - `symbol`
 - `name`
 - `side`
+- `orderType`
+- `status`
 - `quantity`
-- `fillPriceLocal`
-- `fillCurrency`
-- `netAmountLocal`
+- `limitPrice`
+- `executedPrice`
+- `currencyCode`
+- `grossAmount`
+- `feeAmount`
+- `netAmount`
+- `assetPriceSnapshotId`
+- `fxRateSnapshotId`
+- `createdAt`
 
 ### Notes
-- `executedAt` must be a UTC ISO timestamp.
-- `quantity`, `fillPriceLocal`, and `netAmountLocal` must be strings.
-- `fillCurrency` is the currency used for the local fill price and net amount.
+- `submittedAt` must be a UTC ISO timestamp.
+- lifecycle timestamps are UTC ISO strings or null.
+- `quantity`, price, and amount fields must be strings when present.
+- `currencyCode` is the currency used for price and amount fields.
 - This document fixes the item response shape only. Pagination, filters, sorting, and full list envelope are not changed here.
 
 ## GET /api/v1/records/me/seasons/{seasonId}/exchanges

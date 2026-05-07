@@ -4,6 +4,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { FxModule } from './fx/fx.module';
 import { HomeModule } from './home/home.module';
+import { OrdersModule } from './orders/orders.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RankingModule } from './ranking/ranking.module';
 import { RecordsModule } from './records/records.module';
@@ -18,6 +19,7 @@ import { WalletsModule } from './wallets/wallets.module';
     }),
     FxModule,
     HomeModule,
+    OrdersModule,
     PrismaModule,
     RankingModule,
     RecordsModule,

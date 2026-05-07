@@ -6,6 +6,20 @@ jest.mock('../generated/prisma/client', () => {
       KRW: 'KRW',
       USD: 'USD',
     },
+    OrderSide: {
+      buy: 'buy',
+      sell: 'sell',
+    },
+    OrderStatus: {
+      submitted: 'submitted',
+      executed: 'executed',
+      canceled: 'canceled',
+      rejected: 'rejected',
+    },
+    OrderType: {
+      market: 'market',
+      limit: 'limit',
+    },
     ParticipantStatus: {
       registered: 'registered',
       active: 'active',
@@ -49,6 +63,9 @@ jest.mock('../generated/prisma/client', () => {
 import { HttpException } from '@nestjs/common';
 import {
   CurrencyCode,
+  OrderSide,
+  OrderStatus,
+  OrderType,
   ParticipantStatus,
   Prisma,
   SeasonStatus,
@@ -104,6 +121,14 @@ describe('RecordsService', () => {
       delete: jest.fn(),
     },
     walletTransaction: {
+      count: jest.fn(),
+      findMany: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      upsert: jest.fn(),
+      delete: jest.fn(),
+    },
+    order: {
       count: jest.fn(),
       findMany: jest.fn(),
       create: jest.fn(),
@@ -182,12 +207,44 @@ describe('RecordsService', () => {
     ]);
   };
 
+  const mockOrderRecords = (prisma: ReturnType<typeof createPrisma>) => {
+    prisma.order.count.mockResolvedValueOnce(1);
+    prisma.order.findMany.mockResolvedValueOnce([
+      {
+        id: 'order-1',
+        submittedAt: occurredAt,
+        executedAt: null,
+        canceledAt: null,
+        rejectedAt: null,
+        side: OrderSide.buy,
+        orderType: OrderType.limit,
+        status: OrderStatus.submitted,
+        quantity: new Prisma.Decimal('2.50000000'),
+        limitPrice: new Prisma.Decimal('100.00000000'),
+        executedPrice: null,
+        currencyCode: CurrencyCode.USD,
+        grossAmount: null,
+        feeAmount: null,
+        netAmount: null,
+        assetPriceSnapshotId: null,
+        fxRateSnapshotId: null,
+        createdAt,
+        asset: {
+          id: 'asset-1',
+          symbol: 'AAPL',
+          name: 'Apple Inc.',
+        },
+      },
+    ]);
+  };
+
   const expectNoRecordWrites = (prisma: ReturnType<typeof createPrisma>) => {
     for (const model of [
       prisma.season,
       prisma.seasonParticipant,
       prisma.exchangeTransaction,
       prisma.walletTransaction,
+      prisma.order,
       prisma.cashWallet,
     ]) {
       expect(model.create).not.toHaveBeenCalled();
@@ -282,12 +339,13 @@ describe('RecordsService', () => {
     expectNoRecordWrites(prisma);
   });
 
-  it('returns exchange and wallet sections for type all with orders unavailable', async () => {
+  it('returns exchange, wallet, and order sections for type all', async () => {
     const { prisma, service } = createService();
     mockCurrentSeason(prisma);
     mockJoined(prisma);
     mockExchangeRecords(prisma);
     mockWalletRecords(prisma);
+    mockOrderRecords(prisma);
 
     const response = await service.getRecords('user-1', {});
 
@@ -301,31 +359,71 @@ describe('RecordsService', () => {
         state: 'available',
       },
       orders: {
-        state: 'unavailable',
-        reason: 'ORDERS_NOT_IMPLEMENTED',
-        records: [],
+        state: 'available',
+        records: [
+          {
+            orderId: 'order-1',
+            assetId: 'asset-1',
+            symbol: 'AAPL',
+            side: OrderSide.buy,
+            orderType: OrderType.limit,
+            status: OrderStatus.submitted,
+            quantity: '2.50000000',
+            limitPrice: '100.00000000',
+          },
+        ],
       },
     });
     expectNoRecordWrites(prisma);
   });
 
-  it('returns orders unavailable without fake order records', async () => {
+  it('returns order records from actual order rows', async () => {
     const { prisma, service } = createService();
     mockCurrentSeason(prisma);
     mockJoined(prisma);
+    mockOrderRecords(prisma);
 
     const response = await service.getRecords('user-1', {
       type: 'orders',
+      currencyCode: 'USD',
     });
 
     expect(response.data).toMatchObject({
-      state: 'unavailable',
+      state: 'available',
       orders: {
-        state: 'unavailable',
-        reason: 'ORDERS_NOT_IMPLEMENTED',
-        records: [],
+        state: 'available',
+        pagination: {
+          limit: 50,
+          offset: 0,
+          total: 1,
+          returned: 1,
+        },
+        records: [
+          {
+            orderId: 'order-1',
+            submittedAt: '2026-05-07T00:01:00.000Z',
+            executedAt: null,
+            assetId: 'asset-1',
+            symbol: 'AAPL',
+            name: 'Apple Inc.',
+            side: OrderSide.buy,
+            orderType: OrderType.limit,
+            status: OrderStatus.submitted,
+            quantity: '2.50000000',
+            limitPrice: '100.00000000',
+            currencyCode: CurrencyCode.USD,
+          },
+        ],
       },
     });
+    expect(prisma.order.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          seasonParticipantId: 'sp-1',
+          currencyCode: CurrencyCode.USD,
+        },
+      }),
+    );
     expect(prisma.exchangeTransaction.findMany).not.toHaveBeenCalled();
     expect(prisma.walletTransaction.findMany).not.toHaveBeenCalled();
     expectNoRecordWrites(prisma);
@@ -348,11 +446,13 @@ describe('RecordsService', () => {
         records: [],
       },
       orders: {
-        state: 'unavailable',
+        state: 'available',
+        records: [],
       },
     });
     expect(prisma.exchangeTransaction.findMany).not.toHaveBeenCalled();
     expect(prisma.walletTransaction.findMany).not.toHaveBeenCalled();
+    expect(prisma.order.findMany).not.toHaveBeenCalled();
     expectNoRecordWrites(prisma);
   });
 

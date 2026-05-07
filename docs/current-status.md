@@ -15,6 +15,7 @@
 - `GET /api/v1/ranking` read-only MVP
 - `GET /api/v1/wallets` read-only MVP
 - `GET /api/v1/records` read-only MVP
+- `GET /api/v1/orders` read-only MVP
 - `GET /api/v1/seasons/current`
 - `POST /api/v1/seasons/{seasonId}/join`
 - `POST /api/v1/fx/quote`
@@ -63,6 +64,11 @@ near-term ledger/FX foundation:
 - asset/price/position migration 생성 및 로컬 DB 적용 완료: `20260507120158_add_asset_price_position_foundation`.
 - valuation/ranking foundation 반영 완료: `daily_portfolio_snapshots`, `season_rankings`.
 - valuation/ranking foundation migration 생성 및 로컬 DB 적용 완료: `20260507121528_add_daily_portfolio_snapshot_and_ranking_foundation`.
+- order storage foundation 반영 완료: `orders`, `OrderSide`, `OrderType`, `OrderStatus`.
+- order foundation migration 생성 완료: `20260508093000_add_order_foundation`.
+- 현재 작업 환경에서는 PostgreSQL schema engine 연결 실패 및 Docker CLI 부재로 order migration 로컬 DB 적용 여부는 미확인.
+- `/orders` read-only MVP 구현 완료: 기존 `orders` row만 조회하며 주문 생성/체결/wallet/position/settlement mutation 없음.
+- `/records` orders section은 `orders` table 기반 read-only 조회로 연결 완료.
 - `admin_manual` asset/price bootstrap CLI 구현 완료:
   - `scripts/admin-upsert-asset.ts`
   - `scripts/admin-insert-asset-price.ts`
@@ -74,14 +80,16 @@ near-term ledger/FX foundation:
   - CLI는 dry-run/non-dry-run을 지원하며 seed/fake/static/sample business data를 생성하지 않음.
 
 ## 6. 현재 미도입 DB 상태
-- 현재 문서화된 핵심 DB foundation 기준 추가 미도입 테이블 없음.
-- 단, 주문 체결/position mutation/provider price ingestion/orders/settlement API/scheduler/batch 기반 자동 daily valuation/ranking 생성 경로는 아직 미구현.
+- Prisma schema/migration 기준 현재 문서화된 핵심 DB foundation 추가 미도입 테이블 없음.
+- 단, `orders` migration의 로컬 DB 적용 확인은 현재 작업 환경에서 미완료.
+- 단, 주문 생성/체결/position mutation/provider price ingestion/settlement API/scheduler/batch 기반 자동 daily valuation/ranking 생성 경로는 아직 미구현.
 
 ## 7. 완료된 문서/설계 상태
 - `/home` 상태별 응답 계약 초안: `docs/home-api-contract.md`.
 - `/ranking` read-only MVP 계약: `docs/ranking-api-contract.md`.
 - `/wallets` read-only MVP 계약: `docs/wallets-api-contract.md`.
-- records API 계약: `docs/records-api-contract.md`에 orders `side`/`orderId`/`assetId`/`name`, exchanges `feeCurrency`/`exchangeId` 방향 반영.
+- `/orders` read-only MVP 계약: `docs/orders-api-contract.md`.
+- records API 계약: `docs/records-api-contract.md`에 실제 `orders` table 기반 orders section 반영.
 - `/fx quote` STOP review: `docs/fx-quote-stop-review.md`.
 - `/fx` API 계약 초안: `docs/fx-api-contract.md`.
 - FX rate input path plan: `docs/fx-rate-input-path-plan.md`.
@@ -172,7 +180,7 @@ near-term ledger/FX foundation:
   - rank는 1부터 순차 부여.
   - 기존 ranking row는 transaction 안에서 임시 음수 rank로 이동한 뒤 `(seasonId, rankType, rankingDate, seasonParticipantId)` unique 기준 upsert하여 rank unique 충돌을 피함.
 - 이 작업은 `/home`과 `/ranking` 구현 준비를 진전시켰지만, 자동 데이터 생성/외부 시세 공급/API 응답은 아직 없음.
-- scheduler/batch/provider ingestion/order execution/position mutation/settlement 구현 없음.
+- scheduler/batch/provider ingestion/order create/order execution/position mutation/settlement 구현 없음.
 
 ### `/fx execute`
 - `/fx execute`는 write path 1차 구현 완료 상태.
@@ -332,17 +340,32 @@ near-term ledger/FX foundation:
 - records source:
   - `exchange_transactions`
   - `wallet_transactions`
+  - `orders`
 - access control:
   - 로그인 사용자의 `season_participants` 기준으로만 조회.
   - 미참가면 records 배열을 비우고 `state = not_joined`.
 - order records:
-  - order table/write path 미구현 상태이므로 fake 없이 `orders.state = unavailable`, `reason = ORDERS_NOT_IMPLEMENTED`.
-  - `/orders` API 또는 order execution 구현 없음.
+  - `orders` table 기반 read-only 조회로 연결 완료.
+  - order row가 없으면 fake 없이 `orders.state = available`, empty records.
+  - order execution 구현 없음.
 - `/records` 호출은 exchange/wallet/order row를 생성/수정/삭제하지 않음.
 - 아직 미구현:
   - full records filters/export/detail views.
-  - `/orders` API.
   - order execution/position mutation.
+
+### `/orders`
+- `GET /api/v1/orders` read-only MVP 구현 완료.
+- auth 본체는 미완성이나 API는 기존 보호 API와 동일하게 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
+- query parameter:
+  - `seasonId` optional.
+  - `status` optional, allowed `submitted`/`executed`/`canceled`/`rejected`.
+  - `side` optional, allowed `buy`/`sell`.
+  - `assetId` optional.
+  - `limit` optional, default 50, max 100 clamp.
+  - `offset` optional, default 0.
+- 로그인 사용자의 `season_participants` 기준으로만 `orders` row를 read-only 조회.
+- 미참가면 order row를 조회하지 않고 `state = not_joined`.
+- 주문 생성/체결, wallet 차감/증가, position mutation, settlement 없음.
 
 ## 9. 다음 gate
 - OANDA trial/API 계약 검증 전 provider_api/official_batch/scheduler 구현 STOP 유지.
@@ -350,8 +373,8 @@ near-term ledger/FX foundation:
 - `/home` full implementation 가능 판정은 자동 valuation/ranking 생성, provider ingestion, order/position mutation 이후 재검토.
 
 ## 10. 아직 안 한 것
-- orders API
 - settlement
+- order quote/create API
 - orders 체결
 - position mutation
 - valuation/ranking 자동 생성 scheduler
@@ -397,6 +420,11 @@ near-term ledger/FX foundation:
 - `/fx execute` DB integration spec은 실제 PostgreSQL 환경에서 통과.
 - `/fx execute` DB integration spec에 concurrent same idempotencyKey race 검증 추가 통과.
 - `/fx execute` DB integration spec에 실제 PostgreSQL transaction 내부 DB-level failure injection rollback proof 일부 보강 통과.
+- `npm test -- orders.service.spec.ts records.service.spec.ts` 통과.
+- `npm run build` 통과.
+- `npx prisma validate` 통과.
+- `npx prisma generate` 완료.
+- orders migration status/DB 적용 확인은 현재 환경의 PostgreSQL schema engine 연결 실패 및 Docker CLI 부재로 미확인.
 - DB integration의 no eligible snapshot helper는 기존 eligible `admin_manual` snapshot 변경을 커밋하지 않도록 transaction rollback isolation 방식으로 개선됨.
 - 코드/schema/migration/package/seed/test 변경 없이 `/fx quote` smoke 검증됨.
 - integration/test assertion 완화 없음.

@@ -132,3 +132,29 @@ export const SeasonRankingType = {
 } as const
 
 export type SeasonRankingType = (typeof SeasonRankingType)[keyof typeof SeasonRankingType]
+
+
+export const OrderSide = {
+  buy: 'buy',
+  sell: 'sell'
+} as const
+
+export type OrderSide = (typeof OrderSide)[keyof typeof OrderSide]
+
+
+export const OrderType = {
+  market: 'market',
+  limit: 'limit'
+} as const
+
+export type OrderType = (typeof OrderType)[keyof typeof OrderType]
+
+
+export const OrderStatus = {
+  submitted: 'submitted',
+  executed: 'executed',
+  canceled: 'canceled',
+  rejected: 'rejected'
+} as const
+
+export type OrderStatus = (typeof OrderStatus)[keyof typeof OrderStatus]

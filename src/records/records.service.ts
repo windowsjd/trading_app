@@ -1,6 +1,9 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import {
   CurrencyCode,
+  OrderSide,
+  OrderStatus,
+  OrderType,
   ParticipantStatus,
   Prisma,
   SeasonStatus,
@@ -95,10 +98,31 @@ type RecordsResponse = {
       }>;
     };
     orders?: {
-      state: 'unavailable';
-      reason: string;
-      message: string;
-      records: [];
+      state: SectionState;
+      pagination: SectionPagination;
+      records: Array<{
+        orderId: string;
+        submittedAt: string;
+        executedAt: string | null;
+        canceledAt: string | null;
+        rejectedAt: string | null;
+        assetId: string;
+        symbol: string;
+        name: string;
+        side: OrderSide;
+        orderType: OrderType;
+        status: OrderStatus;
+        quantity: string;
+        limitPrice: string | null;
+        executedPrice: string | null;
+        currencyCode: CurrencyCode;
+        grossAmount: string | null;
+        feeAmount: string | null;
+        netAmount: string | null;
+        assetPriceSnapshotId: string | null;
+        fxRateSnapshotId: string | null;
+        createdAt: string;
+      }>;
     };
     reason?: string;
     message?: string;
@@ -165,7 +189,7 @@ export class RecordsService {
     }
 
     const base = {
-      state: parsedQuery.type === 'orders' ? 'unavailable' : 'available',
+      state: 'available',
       season: this.formatSeason(season),
       participant: this.formatParticipant(participant),
       type: parsedQuery.type,
@@ -174,25 +198,15 @@ export class RecordsService {
       },
     } as const;
 
-    if (parsedQuery.type === 'orders') {
-      return {
-        success: true,
-        data: {
-          ...base,
-          orders: this.ordersUnavailableSection(),
-          reason: 'ORDERS_NOT_IMPLEMENTED',
-          message:
-            'Order records are not available until order execution is implemented.',
-        },
-      };
-    }
-
-    const [exchanges, walletTransactions] = await Promise.all([
+    const [exchanges, walletTransactions, orders] = await Promise.all([
       parsedQuery.type === 'all' || parsedQuery.type === 'exchanges'
         ? this.buildExchangeSection(participant.id, parsedQuery)
         : Promise.resolve(undefined),
       parsedQuery.type === 'all' || parsedQuery.type === 'wallets'
         ? this.buildWalletTransactionSection(participant.id, parsedQuery)
+        : Promise.resolve(undefined),
+      parsedQuery.type === 'all' || parsedQuery.type === 'orders'
+        ? this.buildOrderSection(participant.id, parsedQuery)
         : Promise.resolve(undefined),
     ]);
 
@@ -202,9 +216,7 @@ export class RecordsService {
         ...base,
         ...(exchanges ? { exchanges } : {}),
         ...(walletTransactions ? { walletTransactions } : {}),
-        ...(parsedQuery.type === 'all'
-          ? { orders: this.ordersUnavailableSection() }
-          : {}),
+        ...(orders ? { orders } : {}),
       },
     };
   }
@@ -315,6 +327,80 @@ export class RecordsService {
         referenceType: record.referenceType,
         referenceId: record.referenceId,
         occurredAt: record.occurredAt.toISOString(),
+        createdAt: record.createdAt.toISOString(),
+      })),
+    };
+  }
+
+  private async buildOrderSection(
+    seasonParticipantId: string,
+    query: ParsedRecordsQuery,
+  ): Promise<NonNullable<RecordsResponse['data']['orders']>> {
+    const where = {
+      seasonParticipantId,
+      ...(query.currencyCode ? { currencyCode: query.currencyCode } : {}),
+    };
+    const [total, records] = await Promise.all([
+      this.prisma.order.count({ where }),
+      this.prisma.order.findMany({
+        where,
+        orderBy: [{ submittedAt: 'desc' }, { createdAt: 'desc' }],
+        skip: query.offset,
+        take: query.limit,
+        select: {
+          id: true,
+          submittedAt: true,
+          executedAt: true,
+          canceledAt: true,
+          rejectedAt: true,
+          side: true,
+          orderType: true,
+          status: true,
+          quantity: true,
+          limitPrice: true,
+          executedPrice: true,
+          currencyCode: true,
+          grossAmount: true,
+          feeAmount: true,
+          netAmount: true,
+          assetPriceSnapshotId: true,
+          fxRateSnapshotId: true,
+          createdAt: true,
+          asset: {
+            select: {
+              id: true,
+              symbol: true,
+              name: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      state: 'available',
+      pagination: this.pagination(query, total, records.length),
+      records: records.map((record) => ({
+        orderId: record.id,
+        submittedAt: record.submittedAt.toISOString(),
+        executedAt: this.formatNullableDate(record.executedAt),
+        canceledAt: this.formatNullableDate(record.canceledAt),
+        rejectedAt: this.formatNullableDate(record.rejectedAt),
+        assetId: record.asset.id,
+        symbol: record.asset.symbol,
+        name: record.asset.name,
+        side: record.side,
+        orderType: record.orderType,
+        status: record.status,
+        quantity: this.formatDecimal(record.quantity, 8),
+        limitPrice: this.formatNullableDecimal(record.limitPrice, 8),
+        executedPrice: this.formatNullableDecimal(record.executedPrice, 8),
+        currencyCode: record.currencyCode,
+        grossAmount: this.formatNullableDecimal(record.grossAmount, 8),
+        feeAmount: this.formatNullableDecimal(record.feeAmount, 8),
+        netAmount: this.formatNullableDecimal(record.netAmount, 8),
+        assetPriceSnapshotId: record.assetPriceSnapshotId,
+        fxRateSnapshotId: record.fxRateSnapshotId,
         createdAt: record.createdAt.toISOString(),
       })),
     };
@@ -532,7 +618,7 @@ export class RecordsService {
         ? { walletTransactions: this.emptySection(query) }
         : {}),
       ...(query.type === 'all' || query.type === 'orders'
-        ? { orders: this.ordersUnavailableSection() }
+        ? { orders: this.emptySection(query) }
         : {}),
     };
   }
@@ -541,18 +627,6 @@ export class RecordsService {
     return {
       state: 'available' as const,
       pagination: this.pagination(query, 0, 0),
-      records: [],
-    };
-  }
-
-  private ordersUnavailableSection(): NonNullable<
-    RecordsResponse['data']['orders']
-  > {
-    return {
-      state: 'unavailable',
-      reason: 'ORDERS_NOT_IMPLEMENTED',
-      message:
-        'Order records are not available until order execution is implemented.',
       records: [],
     };
   }
@@ -590,6 +664,14 @@ export class RecordsService {
 
   private formatDecimal(value: Prisma.Decimal, scale: number) {
     return value.toFixed(scale);
+  }
+
+  private formatNullableDecimal(value: Prisma.Decimal | null, scale: number) {
+    return value ? this.formatDecimal(value, scale) : null;
+  }
+
+  private formatNullableDate(value: Date | null) {
+    return value ? value.toISOString() : null;
   }
 
   private createErrorBody(code: string, message: string) {

@@ -57,6 +57,7 @@ export const ModelName = {
   Asset: 'Asset',
   AssetPriceSnapshot: 'AssetPriceSnapshot',
   Position: 'Position',
+  Order: 'Order',
   CashWallet: 'CashWallet',
   WalletTransaction: 'WalletTransaction',
   ExchangeTransaction: 'ExchangeTransaction',
@@ -182,6 +183,34 @@ export const PositionScalarFieldEnum = {
 } as const
 
 export type PositionScalarFieldEnum = (typeof PositionScalarFieldEnum)[keyof typeof PositionScalarFieldEnum]
+
+
+export const OrderScalarFieldEnum = {
+  id: 'id',
+  seasonParticipantId: 'seasonParticipantId',
+  assetId: 'assetId',
+  side: 'side',
+  orderType: 'orderType',
+  status: 'status',
+  quantity: 'quantity',
+  limitPrice: 'limitPrice',
+  executedPrice: 'executedPrice',
+  currencyCode: 'currencyCode',
+  grossAmount: 'grossAmount',
+  feeAmount: 'feeAmount',
+  netAmount: 'netAmount',
+  assetPriceSnapshotId: 'assetPriceSnapshotId',
+  fxRateSnapshotId: 'fxRateSnapshotId',
+  submittedAt: 'submittedAt',
+  executedAt: 'executedAt',
+  canceledAt: 'canceledAt',
+  rejectedAt: 'rejectedAt',
+  rejectReason: 'rejectReason',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type OrderScalarFieldEnum = (typeof OrderScalarFieldEnum)[keyof typeof OrderScalarFieldEnum]
 
 
 export const CashWalletScalarFieldEnum = {
