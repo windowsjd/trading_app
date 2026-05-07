@@ -62,6 +62,10 @@ async function main() {
   try {
     await runCase('success write path', testSuccessWritePath);
     await runCase('succeeded duplicate replay', testSucceededDuplicateReplay);
+    await runCase(
+      'concurrent same idempotency key replay',
+      testConcurrentSameIdempotencyKeyReplay,
+    );
     await runCase('idempotency conflict', testIdempotencyConflict);
     await runCase('insufficient balance', testInsufficientBalance);
     await runCase('no eligible snapshot', testNoEligibleSnapshot);
@@ -225,6 +229,42 @@ async function testSucceededDuplicateReplay() {
   }
 }
 
+async function testConcurrentSameIdempotencyKeyReplay() {
+  const scenario = await createScenario('same-key-race');
+
+  try {
+    const body = buildKrwToUsdBody('same-key-race-key');
+    const results = await Promise.allSettled([
+      service.execute(scenario.userId, body),
+      service.execute(scenario.userId, body),
+    ]);
+
+    const failures = results.filter((result) => result.status === 'rejected');
+    assert.equal(failures.length, 0);
+
+    const responses = results.map((result) => result.value);
+    assert.deepEqual(responses[1], responses[0]);
+    assert.equal(responses[0].success, true);
+
+    const state = await readMutationState(scenario);
+    assert.equal(state.sourceBalance, '1000.00000000');
+    assert.equal(state.targetBalance, '0.99900000');
+    assert.equal(state.exchangeCount, 1);
+    assert.equal(state.ledgerCount, 2);
+    assert.equal(await countCommandsForUser(scenario.userId), 1);
+
+    const commandRows = await prisma.fxExecuteRequest.findMany({
+      where: { userId: scenario.userId },
+    });
+    assert.equal(commandRows.length, 1);
+    assert.equal(commandRows[0].status, FxExecuteRequestStatus.succeeded);
+    assert.deepEqual(commandRows[0].responsePayloadJson, responses[0]);
+    await expectNoEquitySnapshot(scenario);
+  } finally {
+    await cleanupScenario(scenario);
+  }
+}
+
 async function testIdempotencyConflict() {
   const scenario = await createScenario('conflict');
 
@@ -276,9 +316,12 @@ async function testNoEligibleSnapshot() {
   try {
     const before = await readMutationState(scenario);
 
-    await withoutEligibleAdminManualSnapshots(async () => {
+    await withoutEligibleAdminManualSnapshots(async (isolatedService) => {
       await expectExecuteError(
-        service.execute(scenario.userId, buildKrwToUsdBody('no-rate-key')),
+        isolatedService.execute(
+          scenario.userId,
+          buildKrwToUsdBody('no-rate-key'),
+        ),
         'FX_RATE_UNAVAILABLE',
       );
     });
@@ -531,52 +574,65 @@ async function expectNoEquitySnapshot(scenario) {
 }
 
 async function withoutEligibleAdminManualSnapshots(fn) {
-  const existingSnapshots = await prisma.fxRateSnapshot.findMany({
-    where: {
-      baseCurrency: CurrencyCode.USD,
-      quoteCurrency: CurrencyCode.KRW,
-      sourceType: FxRateSourceType.admin_manual,
-      effectiveAt: {
-        lte: new Date(),
-      },
-    },
-    select: {
-      id: true,
-      effectiveAt: true,
-    },
-  });
-
-  if (existingSnapshots.length === 0) {
-    await fn();
-    return;
-  }
-
-  await prisma.fxRateSnapshot.updateMany({
-    where: {
-      id: {
-        in: existingSnapshots.map((snapshot) => snapshot.id),
-      },
-    },
-    data: {
-      effectiveAt: new Date(Date.now() + 60_000),
-    },
-  });
+  const rollbackMessage = 'rollback snapshot isolation transaction';
 
   try {
-    await fn();
-  } finally {
-    await Promise.all(
-      existingSnapshots.map((snapshot) =>
-        prisma.fxRateSnapshot.update({
+    await prisma.$transaction(async (tx) => {
+      const existingSnapshots = await tx.fxRateSnapshot.findMany({
+        where: {
+          baseCurrency: CurrencyCode.USD,
+          quoteCurrency: CurrencyCode.KRW,
+          sourceType: FxRateSourceType.admin_manual,
+          effectiveAt: {
+            lte: new Date(),
+          },
+        },
+        select: {
+          id: true,
+          effectiveAt: true,
+          capturedAt: true,
+          sourceName: true,
+          note: true,
+        },
+      });
+
+      if (existingSnapshots.length > 0) {
+        const future = new Date(Date.now() + 3_600_000);
+        const result = await tx.fxRateSnapshot.updateMany({
           where: {
-            id: snapshot.id,
+            id: {
+              in: existingSnapshots.map((snapshot) => snapshot.id),
+            },
           },
           data: {
-            effectiveAt: snapshot.effectiveAt,
+            effectiveAt: future,
+            capturedAt: future,
           },
-        }),
-      ),
-    );
+        });
+
+        if (result.count !== existingSnapshots.length) {
+          throw new Error(
+            [
+              'snapshot isolation failed to hide all eligible rows',
+              'ids=' + existingSnapshots.map((snapshot) => snapshot.id).join(','),
+              'updated=' + result.count,
+              'expected=' + existingSnapshots.length,
+            ].join(' '),
+          );
+        }
+      }
+
+      const isolatedService = new FxService(tx);
+      await fn(isolatedService);
+
+      throw new Error(rollbackMessage);
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === rollbackMessage) {
+      return;
+    }
+
+    throw error;
   }
 }
 

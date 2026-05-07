@@ -130,6 +130,7 @@ near-term ledger/FX foundation:
   - no eligible snapshot `FX_RATE_UNAVAILABLE`.
   - stale snapshot `FX_RATE_STALE`.
   - concurrent overspend prevention: one success only, source balance non-negative.
+  - concurrent same user + same idempotencyKey + same requestHash race: duplicate request replays stored `responsePayloadJson`; wallet/exchange/ledger mutation은 1회만 발생.
   - exchange row, source/target ledger rows, ledger `balanceAfter`, no fee row, no `equitySnapshot` checks.
 - 아직 필요한 DB hardening/남은 리스크:
   - unit/mock 기반 transaction rollback proof는 보강됨:
@@ -141,7 +142,6 @@ near-term ledger/FX foundation:
     - `fxExecuteRequest` succeeded finalization / `responsePayloadJson` storage failure.
     - 각 실패에서 staged transaction writes가 commit되지 않음을 검증.
   - 실제 DB에서 강제 실패를 유도하는 더 깊은 rollback hardening.
-  - unique idempotency race 추가 검증.
 - Decimal rounding mode와 scale/formatting 정책은 half-up 기준으로 구현 반영됨.
 - requestHash canonical rule은 SHA-256/canonical JSON 기준으로 구현 반영됨.
 - error code/status/retryability mapping은 구현 반영됨.
@@ -191,8 +191,7 @@ near-term ledger/FX foundation:
 
 ## 9. 다음 gate
 - OANDA trial/API 계약 검증 전 provider_api/official_batch/scheduler 구현 STOP 유지.
-- `/fx execute` failure injection 기반 rollback/partial-write proof 보강.
-- `/fx execute` unique idempotency race 추가 검증.
+- `/fx execute` 실제 DB transaction 내부 강제 실패 기반 rollback/partial-write proof 보강.
 - `/home` full implementation 가능 판정은 valuation/ranking source table 확보 후 재검토.
 
 ## 10. 아직 안 한 것
@@ -231,6 +230,8 @@ near-term ledger/FX foundation:
 - `pnpm test -- fx.service.spec.ts` 통과.
 - `FX_EXECUTE_DB_INTEGRATION=1 pnpm test -- fx.execute.integration.spec.ts` 통과.
 - `/fx execute` DB integration spec은 실제 PostgreSQL 환경에서 통과.
+- `/fx execute` DB integration spec에 concurrent same idempotencyKey race 검증 추가 통과.
+- DB integration의 no eligible snapshot helper는 기존 eligible `admin_manual` snapshot 변경을 커밋하지 않도록 transaction rollback isolation 방식으로 개선됨.
 - 코드/schema/migration/package/seed/test 변경 없이 `/fx quote` smoke 검증됨.
 - integration/test assertion 완화 없음.
 - sandbox 내부 `pnpm tsx`는 `/tmp/tsx-1000/*.pipe` IPC `EPERM`으로 실패했으나, sandbox 밖 재실행으로 dry-run, snapshot 입력, smoke 검증 통과.
@@ -238,7 +239,6 @@ near-term ledger/FX foundation:
 ## 12. TODO
 - provider final selection STOP review 수락 및 OANDA trial/API 계약 검증.
 - `/fx execute` 실제 DB transaction 내부 강제 실패 기반 rollback 검증 보강.
-- unique idempotency race 검증 보강.
 - ledger insert/exchange row/finalization 실패 유도 integration hardening 검토.
 - 지속적인 `/fx quote` 성공을 위한 승인 snapshot 공급 운영 절차 또는 provider/batch ingestion 경로 검토.
 - assets 도입.
