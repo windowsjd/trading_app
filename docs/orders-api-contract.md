@@ -1,12 +1,16 @@
-# GET /api/v1/orders API Contract
+# Orders API Contract
 
 ## Status
+
 - `GET /api/v1/orders` read-only MVP is implemented.
-- The API reads existing `orders` rows only.
-- The API does not create orders, execute orders, debit wallets, mutate positions, create settlement rows, or synthesize fake order data.
-- Order rows may be empty until a future approved order quote/execute write path exists.
+- `POST /api/v1/orders/quote` read-only MVP is implemented.
+- `POST /api/v1/orders` submitted order create MVP is implemented.
+- `POST /api/v1/orders` creates one `orders` row with `status = submitted`.
+- The APIs do not execute orders, debit or credit wallets, mutate positions, create wallet transactions, create equity snapshots, run settlement, or synthesize fake order data.
+- Stored gross/fee/net amounts on submitted orders are pre-execution quote estimates, not confirmed fill amounts.
 
 ## Source Rules
+
 - Order source of truth is `orders`.
 - Amount values are strings.
 - Timestamps are UTC ISO strings.
@@ -100,21 +104,145 @@
 ```
 
 ## State Rules
+
 - If the user has not joined the selected season, `data.state` is `not_joined` and `orders` is empty.
 - If no current season or selected season exists, `data.state` is `unavailable`.
 - Empty order rows for a joined participant are valid: `state = available`, `orders = []`.
 - The API does not mutate DB rows.
 
+## POST /api/v1/orders/quote
+
+### Request Body
+
+```json
+{
+  "assetId": "<string>",
+  "side": "buy | sell",
+  "orderType": "market | limit",
+  "quantity": "<decimal string>",
+  "limitPrice": "<amount string, required for limit>",
+  "currencyCode": "KRW | USD optional"
+}
+```
+
+### Calculation
+
+- Active season and joined participant are required.
+- Asset must exist and be active.
+- `quantity` must be a positive decimal string fitting `Decimal(24, 8)`.
+- `limitPrice` is required for limit orders and must be positive.
+- Market orders use the latest eligible `admin_manual` `asset_price_snapshots` row with `effectiveAt <= quoteAt`.
+- Limit orders use `limitPrice`; no asset price snapshot is required.
+- Asset price source is `admin_manual` only.
+- No asset price stale threshold is applied yet.
+- `currencyCode`, if provided, must match `asset.currencyCode`.
+- USD assets require approved fresh `admin_manual` USD/KRW FX. FX freshness uses the existing 60 second rule.
+- Buy quote validates cash wallet balance read-only.
+- Sell quote validates position quantity read-only.
+- No DB rows are created or mutated.
+
+### Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "state": "available",
+    "season": "<season object>",
+    "participant": "<participant object>",
+    "asset": {
+      "id": "<string>",
+      "symbol": "<string>",
+      "name": "<string>",
+      "market": "<string>",
+      "currencyCode": "KRW | USD"
+    },
+    "side": "buy | sell",
+    "orderType": "market | limit",
+    "quantity": "<decimal string>",
+    "price": "<amount string>",
+    "currencyCode": "KRW | USD",
+    "grossAmount": "<amount string>",
+    "feeRate": "<decimal string>",
+    "feeAmount": "<amount string>",
+    "netAmount": "<amount string>",
+    "krwGrossAmount": "<amount string>",
+    "krwFeeAmount": "<amount string>",
+    "krwNetAmount": "<amount string>",
+    "assetPriceSnapshotId": "<string | null>",
+    "fxRateSnapshotId": "<string | null>",
+    "quoteId": null,
+    "expiresAt": null,
+    "quoteAt": "<UTC ISO string>"
+  }
+}
+```
+
+## POST /api/v1/orders
+
+### Request Body
+
+Same body as `POST /api/v1/orders/quote`.
+
+### Behavior
+
+- Runs the same validation and quote calculation as `POST /api/v1/orders/quote`.
+- Creates exactly one `orders` row with `status = submitted`.
+- Does not execute the order.
+- Does not debit or credit wallets.
+- Does not create `wallet_transactions`.
+- Does not mutate `positions`.
+- Does not create `equity_snapshots`.
+- Does not run settlement or scheduler behavior.
+- No idempotency key is implemented in this MVP.
+- Created submitted orders are visible from `GET /api/v1/orders` and `GET /api/v1/records?type=orders`.
+
+### Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "order": "<GET /api/v1/orders order item>",
+    "execution": {
+      "state": "not_executed",
+      "reason": "ORDER_EXECUTION_NOT_IMPLEMENTED",
+      "message": "Order execution is not implemented in this MVP."
+    }
+  }
+}
+```
+
 ## Error Codes
+
 - `UNAUTHORIZED`
 - `INVALID_ORDER_STATUS`
 - `INVALID_ORDER_SIDE`
+- `INVALID_ORDER_TYPE`
+- `INVALID_ASSET_ID`
+- `INVALID_QUANTITY`
+- `INVALID_LIMIT_PRICE`
+- `INVALID_CURRENCY_CODE`
+- `ASSET_CURRENCY_MISMATCH`
+- `SEASON_NOT_ACTIVE`
+- `SEASON_NOT_JOINED`
+- `ASSET_NOT_FOUND`
+- `ASSET_INACTIVE`
+- `ASSET_PRICE_UNAVAILABLE`
+- `FX_RATE_UNAVAILABLE`
+- `FX_RATE_STALE`
+- `INSUFFICIENT_CASH_BALANCE`
+- `INSUFFICIENT_POSITION_QUANTITY`
 - `INVALID_LIMIT`
 - `INVALID_OFFSET`
 
 ## Not Implemented
-- Order quote.
-- Order create/execute.
+
+- Order execution.
+- Order cancel API.
+- Order idempotency.
 - Wallet debit/credit for orders.
 - Position mutation.
+- Provider price ingestion.
+- Scheduler/batch.
 - Settlement.

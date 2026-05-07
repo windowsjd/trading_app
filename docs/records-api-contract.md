@@ -1,13 +1,17 @@
 # Records API Contract
 
 ## Status
+
 - `GET /api/v1/records` read-only MVP is implemented.
 - Legacy item shapes for future per-resource records APIs remain documented below.
 - The MVP reads existing `exchange_transactions`, `wallet_transactions`, and `orders` rows only.
 - Order records are backed by the `orders` DB foundation.
+- Submitted orders created by `POST /api/v1/orders` are visible in the orders section.
+- Order records can include `status = submitted`; this is not an execution/fill record.
 - Do not add fake data, Prisma schema changes, migrations, or seed changes from this document.
 
 ## Source Rules
+
 - Amount values are strings.
 - Timestamps are UTC ISO strings.
 - Keep the existing `success/data` response direction.
@@ -151,6 +155,7 @@
 - If the user has not joined the selected season, `data.state` is `not_joined` and record arrays are empty.
 - If no current season or selected season exists, `data.state` is `unavailable`.
 - `type=orders` returns `data.state = available` for joined participants and reads actual `orders` rows.
+- `type=orders` can return submitted orders before execution exists.
 - The API does not synthesize or fake order records.
 - The API does not mutate DB rows.
 
@@ -193,6 +198,7 @@
 ```
 
 ### Fixed Fields
+
 - `orderId`
 - `submittedAt`
 - `executedAt`
@@ -216,6 +222,7 @@
 - `createdAt`
 
 ### Notes
+
 - `submittedAt` must be a UTC ISO timestamp.
 - lifecycle timestamps are UTC ISO strings or null.
 - `quantity`, price, and amount fields must be strings when present.
@@ -241,6 +248,7 @@
 ```
 
 ### Fixed Fields
+
 - `exchangeId`
 - `executedAt`
 - `fromCurrency`
@@ -252,6 +260,7 @@
 - `netTargetAmount`
 
 ### Notes
+
 - `executedAt` must be a UTC ISO timestamp.
 - `sourceAmount`, `rate`, `feeAmount`, and `netTargetAmount` must be strings.
 - `feeCurrency` is fixed as a frontend mapping field.

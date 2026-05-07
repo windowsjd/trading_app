@@ -1,6 +1,8 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import {
+  AssetPriceSourceType,
   CurrencyCode,
+  FxRateSourceType,
   OrderSide,
   OrderStatus,
   OrderType,
@@ -8,6 +10,14 @@ import {
   Prisma,
   SeasonStatus,
 } from '../generated/prisma/client';
+import {
+  feeRateScale,
+  formatDecimalScale,
+  monetaryScale,
+  parsePositiveDecimalString,
+  roundDecimalHalfUp,
+} from '../fx/fx-decimal-policy';
+import { isFxSnapshotStale } from '../fx/fx-execute-snapshot-policy';
 import { PrismaService } from '../prisma/prisma.service';
 
 export type OrdersQuery = {
@@ -17,6 +27,15 @@ export type OrdersQuery = {
   assetId?: string;
   limit?: string;
   offset?: string;
+};
+
+export type OrderRequestBody = {
+  assetId?: unknown;
+  side?: unknown;
+  orderType?: unknown;
+  quantity?: unknown;
+  limitPrice?: unknown;
+  currencyCode?: unknown;
 };
 
 type OrdersState = 'available' | 'not_joined' | 'unavailable';
@@ -33,6 +52,28 @@ type OrdersParticipant = {
   id: string;
   participantStatus: ParticipantStatus;
   joinedAt: Date;
+};
+
+type ActiveOrderSeason = OrdersSeason & {
+  tradeFeeRate: Prisma.Decimal;
+};
+
+type OrderAsset = {
+  id: string;
+  symbol: string;
+  name: string;
+  market: string;
+  currencyCode: CurrencyCode;
+  isActive: boolean;
+};
+
+type ParsedOrderRequest = {
+  assetId: string;
+  side: OrderSide;
+  orderType: OrderType;
+  quantity: Prisma.Decimal;
+  limitPrice: Prisma.Decimal | null;
+  currencyCode?: CurrencyCode;
 };
 
 type ParsedOrdersQuery = {
@@ -95,6 +136,40 @@ type OrdersResponse = {
   };
 };
 
+type OrderQuoteCalculation = {
+  season: ActiveOrderSeason;
+  participant: OrdersParticipant;
+  asset: OrderAsset;
+  request: ParsedOrderRequest;
+  price: Prisma.Decimal;
+  grossAmount: Prisma.Decimal;
+  feeAmount: Prisma.Decimal;
+  netAmount: Prisma.Decimal;
+  krwGrossAmount: Prisma.Decimal;
+  krwFeeAmount: Prisma.Decimal;
+  krwNetAmount: Prisma.Decimal;
+  assetPriceSnapshotId: string | null;
+  fxRateSnapshotId: string | null;
+  quoteAt: Date;
+};
+
+type OrderQuoteResponse = {
+  success: true;
+  data: ReturnType<OrdersService['formatOrderQuoteData']>;
+};
+
+type CreateOrderResponse = {
+  success: true;
+  data: {
+    order: NonNullable<OrdersResponse['data']['orders']>[number];
+    execution: {
+      state: 'not_executed';
+      reason: 'ORDER_EXECUTION_NOT_IMPLEMENTED';
+      message: string;
+    };
+  };
+};
+
 const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
   SeasonStatus.active,
   SeasonStatus.upcoming,
@@ -103,17 +178,113 @@ const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
 ];
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
+const MAX_DECIMAL_24_8 = new Prisma.Decimal('9999999999999999.99999999');
 
 @Injectable()
 export class OrdersService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async quoteOrder(
+    userId: string | undefined,
+    body: OrderRequestBody = {},
+  ): Promise<OrderQuoteResponse> {
+    const quote = await this.buildOrderQuote(userId, body, new Date());
+
+    return {
+      success: true,
+      data: this.formatOrderQuoteData(quote),
+    };
+  }
+
+  async createOrder(
+    userId: string | undefined,
+    body: OrderRequestBody = {},
+  ): Promise<CreateOrderResponse> {
+    const quote = await this.buildOrderQuote(userId, body, new Date());
+    const createdOrder = await this.prisma.order.create({
+      data: {
+        seasonParticipantId: quote.participant.id,
+        assetId: quote.asset.id,
+        side: quote.request.side,
+        orderType: quote.request.orderType,
+        status: OrderStatus.submitted,
+        quantity: this.formatDecimal(quote.request.quantity, monetaryScale),
+        limitPrice:
+          quote.request.orderType === OrderType.limit
+            ? this.formatNullableDecimal(
+                quote.request.limitPrice,
+                monetaryScale,
+              )
+            : null,
+        executedPrice: null,
+        currencyCode: quote.asset.currencyCode,
+        grossAmount: this.formatDecimal(quote.grossAmount, monetaryScale),
+        feeAmount: this.formatDecimal(quote.feeAmount, monetaryScale),
+        netAmount: this.formatDecimal(quote.netAmount, monetaryScale),
+        assetPriceSnapshotId: quote.assetPriceSnapshotId,
+        fxRateSnapshotId: quote.fxRateSnapshotId,
+        submittedAt: quote.quoteAt,
+        executedAt: null,
+        canceledAt: null,
+        rejectedAt: null,
+        rejectReason: null,
+      },
+      select: {
+        id: true,
+        side: true,
+        orderType: true,
+        status: true,
+        quantity: true,
+        limitPrice: true,
+        executedPrice: true,
+        currencyCode: true,
+        grossAmount: true,
+        feeAmount: true,
+        netAmount: true,
+        assetPriceSnapshotId: true,
+        fxRateSnapshotId: true,
+        submittedAt: true,
+        executedAt: true,
+        canceledAt: true,
+        rejectedAt: true,
+        rejectReason: true,
+        createdAt: true,
+        updatedAt: true,
+        asset: {
+          select: {
+            id: true,
+            symbol: true,
+            name: true,
+            market: true,
+            currencyCode: true,
+          },
+        },
+      },
+    });
+
+    return {
+      success: true,
+      data: {
+        order: this.formatOrder(createdOrder),
+        execution: {
+          state: 'not_executed',
+          reason: 'ORDER_EXECUTION_NOT_IMPLEMENTED',
+          message: 'Order execution is not implemented in this MVP.',
+        },
+      },
+    };
+  }
 
   async getOrders(
     userId: string | undefined,
     query: OrdersQuery = {},
   ): Promise<OrdersResponse> {
     if (!userId) {
-      this.throwApiError(HttpStatus.UNAUTHORIZED, 'UNAUTHORIZED', 'Unauthorized');
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
     }
 
     const parsedQuery = this.parseQuery(query);
@@ -207,31 +378,482 @@ export class OrdersService {
         participant: this.formatParticipant(participant),
         filters: this.formatFilters(parsedQuery),
         pagination: this.pagination(parsedQuery, total, orders.length),
-        orders: orders.map((order) => ({
-          orderId: order.id,
-          asset: order.asset,
-          side: order.side,
-          orderType: order.orderType,
-          status: order.status,
-          quantity: this.formatDecimal(order.quantity, 8),
-          limitPrice: this.formatNullableDecimal(order.limitPrice, 8),
-          executedPrice: this.formatNullableDecimal(order.executedPrice, 8),
-          currencyCode: order.currencyCode,
-          grossAmount: this.formatNullableDecimal(order.grossAmount, 8),
-          feeAmount: this.formatNullableDecimal(order.feeAmount, 8),
-          netAmount: this.formatNullableDecimal(order.netAmount, 8),
-          assetPriceSnapshotId: order.assetPriceSnapshotId,
-          fxRateSnapshotId: order.fxRateSnapshotId,
-          submittedAt: order.submittedAt.toISOString(),
-          executedAt: this.formatNullableDate(order.executedAt),
-          canceledAt: this.formatNullableDate(order.canceledAt),
-          rejectedAt: this.formatNullableDate(order.rejectedAt),
-          rejectReason: order.rejectReason,
-          createdAt: order.createdAt.toISOString(),
-          updatedAt: order.updatedAt.toISOString(),
-        })),
+        orders: orders.map((order) => this.formatOrder(order)),
       },
     };
+  }
+
+  private async buildOrderQuote(
+    userId: string | undefined,
+    body: OrderRequestBody,
+    quoteAt: Date,
+  ): Promise<OrderQuoteCalculation> {
+    if (!userId) {
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
+    }
+
+    const request = this.parseOrderRequest(body);
+    const season = await this.findActiveSeason();
+    if (!season) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'SEASON_NOT_ACTIVE',
+        'Season is not active.',
+      );
+    }
+
+    const participant = await this.findParticipant(season.id, userId);
+    if (!participant) {
+      this.throwApiError(
+        HttpStatus.FORBIDDEN,
+        'SEASON_NOT_JOINED',
+        'Season is not joined.',
+      );
+    }
+
+    const asset = await this.findUsableAsset(request.assetId);
+    if (request.currencyCode && request.currencyCode !== asset.currencyCode) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'ASSET_CURRENCY_MISMATCH',
+        'currencyCode must match asset currencyCode.',
+      );
+    }
+
+    const priceContext = await this.resolveOrderPrice(request, asset, quoteAt);
+    const grossAmount = roundDecimalHalfUp(
+      request.quantity.mul(priceContext.price),
+      monetaryScale,
+    );
+    const feeAmount = roundDecimalHalfUp(
+      grossAmount.mul(season.tradeFeeRate),
+      monetaryScale,
+    );
+    const netAmount =
+      request.side === OrderSide.buy
+        ? roundDecimalHalfUp(grossAmount.add(feeAmount), monetaryScale)
+        : roundDecimalHalfUp(grossAmount.sub(feeAmount), monetaryScale);
+
+    if (netAmount.lt(0)) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'INVALID_TRADE_FEE_RATE',
+        'Trade fee rate makes net amount negative.',
+      );
+    }
+
+    const fxSnapshot =
+      asset.currencyCode === CurrencyCode.USD
+        ? await this.findFreshUsdKrwSnapshot(quoteAt)
+        : null;
+    const krwAmounts = this.calculateKrwAmounts(
+      {
+        grossAmount,
+        feeAmount,
+        netAmount,
+      },
+      asset.currencyCode,
+      fxSnapshot?.rate ?? null,
+    );
+
+    await this.assertOrderResourcesAvailable({
+      participantId: participant.id,
+      assetId: asset.id,
+      side: request.side,
+      currencyCode: asset.currencyCode,
+      quantity: request.quantity,
+      netAmount,
+    });
+
+    return {
+      season,
+      participant,
+      asset,
+      request,
+      price: priceContext.price,
+      grossAmount,
+      feeAmount,
+      netAmount,
+      krwGrossAmount: krwAmounts.krwGrossAmount,
+      krwFeeAmount: krwAmounts.krwFeeAmount,
+      krwNetAmount: krwAmounts.krwNetAmount,
+      assetPriceSnapshotId: priceContext.assetPriceSnapshotId,
+      fxRateSnapshotId: fxSnapshot?.id ?? null,
+      quoteAt,
+    };
+  }
+
+  private parseOrderRequest(body: OrderRequestBody): ParsedOrderRequest {
+    if (!body || typeof body !== 'object') {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'INVALID_ORDER_REQUEST',
+        'Order request body is required.',
+      );
+    }
+
+    const orderType = this.parseOrderType(body.orderType);
+    const limitPrice =
+      orderType === OrderType.limit
+        ? this.parsePositiveDecimalField(body.limitPrice, 'limitPrice')
+        : null;
+
+    return {
+      assetId: this.parseRequiredText(body.assetId, 'assetId'),
+      side: this.parseRequiredSide(body.side),
+      orderType,
+      quantity: this.parsePositiveDecimalField(body.quantity, 'quantity'),
+      limitPrice,
+      currencyCode: this.parseOptionalCurrencyCode(body.currencyCode),
+    };
+  }
+
+  private parseOrderType(value: unknown): OrderType {
+    const text = this.parseRequiredText(value, 'orderType');
+    if (text === OrderType.market || text === OrderType.limit) {
+      return text;
+    }
+
+    this.throwApiError(
+      HttpStatus.BAD_REQUEST,
+      'INVALID_ORDER_TYPE',
+      'Invalid orderType.',
+    );
+  }
+
+  private parseRequiredSide(value: unknown): OrderSide {
+    const text = this.parseRequiredText(value, 'side');
+    if (text === OrderSide.buy || text === OrderSide.sell) {
+      return text;
+    }
+
+    this.throwApiError(
+      HttpStatus.BAD_REQUEST,
+      'INVALID_ORDER_SIDE',
+      'Invalid order side.',
+    );
+  }
+
+  private parsePositiveDecimalField(
+    value: unknown,
+    fieldName: string,
+  ): Prisma.Decimal {
+    try {
+      const decimal = parsePositiveDecimalString(value);
+      if (decimal.decimalPlaces() > monetaryScale) {
+        throw new Error(`${fieldName} must fit Decimal(24, 8) scale.`);
+      }
+
+      if (decimal.gt(MAX_DECIMAL_24_8)) {
+        throw new Error(`${fieldName} must fit Decimal(24, 8) precision.`);
+      }
+
+      return decimal;
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : `${fieldName} must be a positive decimal string.`;
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        `INVALID_${this.toErrorFieldName(fieldName)}`,
+        message,
+      );
+    }
+  }
+
+  private parseRequiredText(value: unknown, fieldName: string): string {
+    if (typeof value !== 'string' || value.trim() === '') {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        `INVALID_${this.toErrorFieldName(fieldName)}`,
+        `${fieldName} is required.`,
+      );
+    }
+
+    return value.trim();
+  }
+
+  private parseOptionalCurrencyCode(value: unknown): CurrencyCode | undefined {
+    if (value === undefined || value === null || value === '') {
+      return undefined;
+    }
+
+    if (value === CurrencyCode.KRW || value === CurrencyCode.USD) {
+      return value;
+    }
+
+    this.throwApiError(
+      HttpStatus.BAD_REQUEST,
+      'INVALID_CURRENCY_CODE',
+      'Invalid currencyCode.',
+    );
+  }
+
+  private toErrorFieldName(fieldName: string) {
+    return fieldName.replace(/[A-Z]/g, (char) => `_${char}`).toUpperCase();
+  }
+
+  private async findActiveSeason(): Promise<ActiveOrderSeason | null> {
+    return this.prisma.season.findFirst({
+      where: {
+        status: SeasonStatus.active,
+      },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        startAt: true,
+        endAt: true,
+        tradeFeeRate: true,
+      },
+      orderBy: this.getSeasonOrderBy(SeasonStatus.active),
+    });
+  }
+
+  private async findUsableAsset(assetId: string): Promise<OrderAsset> {
+    const asset = await this.prisma.asset.findUnique({
+      where: {
+        id: assetId,
+      },
+      select: {
+        id: true,
+        symbol: true,
+        name: true,
+        market: true,
+        currencyCode: true,
+        isActive: true,
+      },
+    });
+
+    if (!asset) {
+      this.throwApiError(
+        HttpStatus.NOT_FOUND,
+        'ASSET_NOT_FOUND',
+        'Asset not found.',
+      );
+    }
+
+    if (!asset.isActive) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'ASSET_INACTIVE',
+        'Asset is inactive.',
+      );
+    }
+
+    return asset;
+  }
+
+  private async resolveOrderPrice(
+    request: ParsedOrderRequest,
+    asset: OrderAsset,
+    quoteAt: Date,
+  ): Promise<{
+    price: Prisma.Decimal;
+    assetPriceSnapshotId: string | null;
+  }> {
+    if (request.orderType === OrderType.limit) {
+      if (!request.limitPrice) {
+        this.throwApiError(
+          HttpStatus.BAD_REQUEST,
+          'INVALID_LIMIT_PRICE',
+          'limitPrice is required for limit orders.',
+        );
+      }
+
+      return {
+        price: roundDecimalHalfUp(request.limitPrice, monetaryScale),
+        assetPriceSnapshotId: null,
+      };
+    }
+
+    const snapshot = await this.prisma.assetPriceSnapshot.findFirst({
+      where: {
+        assetId: asset.id,
+        currencyCode: asset.currencyCode,
+        sourceType: AssetPriceSourceType.admin_manual,
+        effectiveAt: {
+          lte: quoteAt,
+        },
+        price: {
+          gt: 0,
+        },
+      },
+      orderBy: [
+        { effectiveAt: 'desc' },
+        { capturedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      select: {
+        id: true,
+        price: true,
+      },
+    });
+
+    if (!snapshot) {
+      this.throwApiError(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'ASSET_PRICE_UNAVAILABLE',
+        'Asset price is unavailable.',
+      );
+    }
+
+    return {
+      price: roundDecimalHalfUp(snapshot.price, monetaryScale),
+      assetPriceSnapshotId: snapshot.id,
+    };
+  }
+
+  private async findFreshUsdKrwSnapshot(quoteAt: Date): Promise<{
+    id: string;
+    rate: Prisma.Decimal;
+  }> {
+    const snapshot = await this.prisma.fxRateSnapshot.findFirst({
+      where: {
+        baseCurrency: CurrencyCode.USD,
+        quoteCurrency: CurrencyCode.KRW,
+        sourceType: FxRateSourceType.admin_manual,
+        approvedByUserId: {
+          not: null,
+        },
+        effectiveAt: {
+          lte: quoteAt,
+        },
+        rate: {
+          gt: 0,
+        },
+      },
+      orderBy: [
+        { effectiveAt: 'desc' },
+        { capturedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      select: {
+        id: true,
+        rate: true,
+        effectiveAt: true,
+      },
+    });
+
+    if (!snapshot) {
+      this.throwApiError(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'FX_RATE_UNAVAILABLE',
+        'FX rate is unavailable.',
+      );
+    }
+
+    if (isFxSnapshotStale(snapshot.effectiveAt, quoteAt)) {
+      this.throwApiError(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'FX_RATE_STALE',
+        'FX rate is stale.',
+      );
+    }
+
+    return {
+      id: snapshot.id,
+      rate: roundDecimalHalfUp(snapshot.rate, monetaryScale),
+    };
+  }
+
+  private calculateKrwAmounts(
+    amounts: {
+      grossAmount: Prisma.Decimal;
+      feeAmount: Prisma.Decimal;
+      netAmount: Prisma.Decimal;
+    },
+    currencyCode: CurrencyCode,
+    usdKrwRate: Prisma.Decimal | null,
+  ) {
+    if (currencyCode === CurrencyCode.KRW) {
+      return {
+        krwGrossAmount: amounts.grossAmount,
+        krwFeeAmount: amounts.feeAmount,
+        krwNetAmount: amounts.netAmount,
+      };
+    }
+
+    if (!usdKrwRate) {
+      this.throwApiError(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'FX_RATE_UNAVAILABLE',
+        'FX rate is unavailable.',
+      );
+    }
+
+    return {
+      krwGrossAmount: roundDecimalHalfUp(
+        amounts.grossAmount.mul(usdKrwRate),
+        monetaryScale,
+      ),
+      krwFeeAmount: roundDecimalHalfUp(
+        amounts.feeAmount.mul(usdKrwRate),
+        monetaryScale,
+      ),
+      krwNetAmount: roundDecimalHalfUp(
+        amounts.netAmount.mul(usdKrwRate),
+        monetaryScale,
+      ),
+    };
+  }
+
+  private async assertOrderResourcesAvailable(input: {
+    participantId: string;
+    assetId: string;
+    side: OrderSide;
+    currencyCode: CurrencyCode;
+    quantity: Prisma.Decimal;
+    netAmount: Prisma.Decimal;
+  }) {
+    if (input.side === OrderSide.buy) {
+      const wallet = await this.prisma.cashWallet.findUnique({
+        where: {
+          seasonParticipantId_currencyCode: {
+            seasonParticipantId: input.participantId,
+            currencyCode: input.currencyCode,
+          },
+        },
+        select: {
+          balanceAmount: true,
+        },
+      });
+
+      if (!wallet || wallet.balanceAmount.lt(input.netAmount)) {
+        this.throwApiError(
+          HttpStatus.CONFLICT,
+          'INSUFFICIENT_CASH_BALANCE',
+          'Cash wallet balance is insufficient.',
+        );
+      }
+
+      return;
+    }
+
+    const position = await this.prisma.position.findUnique({
+      where: {
+        seasonParticipantId_assetId: {
+          seasonParticipantId: input.participantId,
+          assetId: input.assetId,
+        },
+      },
+      select: {
+        quantity: true,
+      },
+    });
+
+    if (!position || position.quantity.lt(input.quantity)) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'INSUFFICIENT_POSITION_QUANTITY',
+        'Position quantity is insufficient.',
+      );
+    }
   }
 
   private parseQuery(query: OrdersQuery): ParsedOrdersQuery {
@@ -440,6 +1062,95 @@ export class OrdersService {
     };
   }
 
+  private formatOrderQuoteData(quote: OrderQuoteCalculation) {
+    return {
+      state: 'available' as const,
+      season: this.formatSeason(quote.season),
+      participant: this.formatParticipant(quote.participant),
+      asset: {
+        id: quote.asset.id,
+        symbol: quote.asset.symbol,
+        name: quote.asset.name,
+        market: quote.asset.market,
+        currencyCode: quote.asset.currencyCode,
+      },
+      side: quote.request.side,
+      orderType: quote.request.orderType,
+      quantity: this.formatDecimal(quote.request.quantity, monetaryScale),
+      price: this.formatDecimal(quote.price, monetaryScale),
+      currencyCode: quote.asset.currencyCode,
+      grossAmount: this.formatDecimal(quote.grossAmount, monetaryScale),
+      feeRate: formatDecimalScale(quote.season.tradeFeeRate, feeRateScale),
+      feeAmount: this.formatDecimal(quote.feeAmount, monetaryScale),
+      netAmount: this.formatDecimal(quote.netAmount, monetaryScale),
+      krwGrossAmount: this.formatDecimal(quote.krwGrossAmount, monetaryScale),
+      krwFeeAmount: this.formatDecimal(quote.krwFeeAmount, monetaryScale),
+      krwNetAmount: this.formatDecimal(quote.krwNetAmount, monetaryScale),
+      assetPriceSnapshotId: quote.assetPriceSnapshotId,
+      fxRateSnapshotId: quote.fxRateSnapshotId,
+      quoteId: null,
+      expiresAt: null,
+      quoteAt: quote.quoteAt.toISOString(),
+    };
+  }
+
+  private formatOrder(order: {
+    id: string;
+    side: OrderSide;
+    orderType: OrderType;
+    status: OrderStatus;
+    quantity: Prisma.Decimal;
+    limitPrice: Prisma.Decimal | null;
+    executedPrice: Prisma.Decimal | null;
+    currencyCode: CurrencyCode;
+    grossAmount: Prisma.Decimal | null;
+    feeAmount: Prisma.Decimal | null;
+    netAmount: Prisma.Decimal | null;
+    assetPriceSnapshotId: string | null;
+    fxRateSnapshotId: string | null;
+    submittedAt: Date;
+    executedAt: Date | null;
+    canceledAt: Date | null;
+    rejectedAt: Date | null;
+    rejectReason: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+    asset: {
+      id: string;
+      symbol: string;
+      name: string;
+      market: string;
+      currencyCode: CurrencyCode;
+    };
+  }) {
+    return {
+      orderId: order.id,
+      asset: order.asset,
+      side: order.side,
+      orderType: order.orderType,
+      status: order.status,
+      quantity: this.formatDecimal(order.quantity, monetaryScale),
+      limitPrice: this.formatNullableDecimal(order.limitPrice, monetaryScale),
+      executedPrice: this.formatNullableDecimal(
+        order.executedPrice,
+        monetaryScale,
+      ),
+      currencyCode: order.currencyCode,
+      grossAmount: this.formatNullableDecimal(order.grossAmount, monetaryScale),
+      feeAmount: this.formatNullableDecimal(order.feeAmount, monetaryScale),
+      netAmount: this.formatNullableDecimal(order.netAmount, monetaryScale),
+      assetPriceSnapshotId: order.assetPriceSnapshotId,
+      fxRateSnapshotId: order.fxRateSnapshotId,
+      submittedAt: order.submittedAt.toISOString(),
+      executedAt: this.formatNullableDate(order.executedAt),
+      canceledAt: this.formatNullableDate(order.canceledAt),
+      rejectedAt: this.formatNullableDate(order.rejectedAt),
+      rejectReason: order.rejectReason,
+      createdAt: order.createdAt.toISOString(),
+      updatedAt: order.updatedAt.toISOString(),
+    };
+  }
+
   private formatFilters(query: ParsedOrdersQuery) {
     return {
       status: query.status ?? null,
@@ -480,7 +1191,7 @@ export class OrdersService {
   }
 
   private formatDecimal(value: Prisma.Decimal, scale: number) {
-    return value.toFixed(scale);
+    return formatDecimalScale(value, scale);
   }
 
   private formatNullableDecimal(value: Prisma.Decimal | null, scale: number) {
@@ -501,7 +1212,11 @@ export class OrdersService {
     };
   }
 
-  private throwApiError(status: HttpStatus, code: string, message: string): never {
+  private throwApiError(
+    status: HttpStatus,
+    code: string,
+    message: string,
+  ): never {
     throw new HttpException(this.createErrorBody(code, message), status);
   }
 }

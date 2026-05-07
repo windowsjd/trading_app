@@ -1,6 +1,7 @@
 # current-status.md
 
 ## 1. 현재 상태
+
 - 개발환경 세팅 완료.
 - Nest + Prisma + PostgreSQL 연결 완료.
 - 기존 migration/seed 적용 완료.
@@ -11,11 +12,14 @@
 - fake/static/temporary/sample/test business FX rate 금지.
 
 ## 2. 구현 완료 API
+
 - `GET /api/v1/home` read-only MVP
 - `GET /api/v1/ranking` read-only MVP
 - `GET /api/v1/wallets` read-only MVP
 - `GET /api/v1/records` read-only MVP
 - `GET /api/v1/orders` read-only MVP
+- `POST /api/v1/orders/quote` read-only MVP
+- `POST /api/v1/orders` submitted order create MVP
 - `GET /api/v1/seasons/current`
 - `POST /api/v1/seasons/{seasonId}/join`
 - `POST /api/v1/fx/quote`
@@ -26,19 +30,23 @@
   - `responsePayloadJson` storage 단독 DB-level failure injection 등 일부 hardening은 남아 있음.
 
 ## 3. 현재 구조
+
 - Nest
 - Prisma 7 adapter 방식
 - PostgreSQL (Docker)
 - Redis (Docker)
 
 ## 4. 현재 인증 가정
+
 - 보호 API에서 사용자 식별자는 `request.user.userId` 기준.
 - auth 본체는 아직 미구현 또는 미완성.
 - 보호 API는 실제 auth 연결 전까지 런타임 검증 필요.
 - `x-user-id` fallback 제거 완료.
 
 ## 5. 현재 DB 상태
+
 실제 존재 확인 기준:
+
 - `users`
 - `seasons`
 - `season_participants`
@@ -55,6 +63,7 @@
 - `season_rankings`
 
 near-term ledger/FX foundation:
+
 - `wallet_transactions`: Prisma schema 반영, migration 생성/DB 적용 완료, season join initial_grant write path 구현 완료.
 - `exchange_transactions`: Prisma schema 반영, migration 생성/DB 적용 완료, `/fx execute` 1차 write path에서 생성.
 - `equity_snapshots`: Prisma schema 반영, migration 생성/DB 적용 완료, API/write path 미구현.
@@ -66,8 +75,24 @@ near-term ledger/FX foundation:
 - valuation/ranking foundation migration 생성 및 로컬 DB 적용 완료: `20260507121528_add_daily_portfolio_snapshot_and_ranking_foundation`.
 - order storage foundation 반영 완료: `orders`, `OrderSide`, `OrderType`, `OrderStatus`.
 - order foundation migration 생성 완료: `20260508093000_add_order_foundation`.
-- 현재 작업 환경에서는 PostgreSQL schema engine 연결 실패 및 Docker CLI 부재로 order migration 로컬 DB 적용 여부는 미확인.
+- order foundation migration 로컬 DB 적용 완료: `20260508093000_add_order_foundation`.
+- DB catalog 확인 완료:
+  - `orders` table 존재.
+  - `OrderSide`, `OrderType`, `OrderStatus` enum 존재.
+  - orders index/FK 생성 확인.
+  - Prisma Client `prisma.order.count()` 접근 확인.
 - `/orders` read-only MVP 구현 완료: 기존 `orders` row만 조회하며 주문 생성/체결/wallet/position/settlement mutation 없음.
+- `/orders/quote` read-only MVP 구현 완료:
+  - active season + joined participant만 허용.
+  - market order는 latest eligible `admin_manual` asset price snapshot 사용.
+  - limit order는 `limitPrice` 사용.
+  - USD 자산은 approved fresh `admin_manual` USD/KRW FX snapshot 필요.
+  - buy는 cash wallet balance, sell은 position quantity를 read-only로 검증.
+  - DB mutation 없음.
+- `POST /api/v1/orders` submitted order create MVP 구현 완료:
+  - quote와 동일 계산/검증 후 `orders` row 1건만 `submitted`로 생성.
+  - wallet debit/credit, wallet_transactions, position mutation, equity snapshot, settlement 없음.
+  - 저장된 gross/fee/net amount는 체결 확정 금액이 아니라 제출 시점 quote estimate.
 - `/records` orders section은 `orders` table 기반 read-only 조회로 연결 완료.
 - `admin_manual` asset/price bootstrap CLI 구현 완료:
   - `scripts/admin-upsert-asset.ts`
@@ -80,16 +105,18 @@ near-term ledger/FX foundation:
   - CLI는 dry-run/non-dry-run을 지원하며 seed/fake/static/sample business data를 생성하지 않음.
 
 ## 6. 현재 미도입 DB 상태
+
 - Prisma schema/migration 기준 현재 문서화된 핵심 DB foundation 추가 미도입 테이블 없음.
-- 단, `orders` migration의 로컬 DB 적용 확인은 현재 작업 환경에서 미완료.
-- 단, 주문 생성/체결/position mutation/provider price ingestion/settlement API/scheduler/batch 기반 자동 daily valuation/ranking 생성 경로는 아직 미구현.
+- 단, 주문 체결/position mutation/provider price ingestion/settlement API/scheduler/batch 기반 자동 daily valuation/ranking 생성 경로는 아직 미구현.
 
 ## 7. 완료된 문서/설계 상태
+
 - `/home` 상태별 응답 계약 초안: `docs/home-api-contract.md`.
 - `/ranking` read-only MVP 계약: `docs/ranking-api-contract.md`.
 - `/wallets` read-only MVP 계약: `docs/wallets-api-contract.md`.
 - `/orders` read-only MVP 계약: `docs/orders-api-contract.md`.
-- records API 계약: `docs/records-api-contract.md`에 실제 `orders` table 기반 orders section 반영.
+- `/orders` quote/create MVP 계약: `docs/orders-api-contract.md`.
+- records API 계약: `docs/records-api-contract.md`에 submitted order 조회 가능 상태 반영.
 - `/fx quote` STOP review: `docs/fx-quote-stop-review.md`.
 - `/fx` API 계약 초안: `docs/fx-api-contract.md`.
 - FX rate input path plan: `docs/fx-rate-input-path-plan.md`.
@@ -107,7 +134,9 @@ near-term ledger/FX foundation:
 - `/fx execute` final implementation gate: `docs/fx-execute-final-implementation-gate.md`.
 
 ## 8. 주요 STOP 상태
+
 ### `/fx quote`
+
 - `POST /api/v1/fx/quote` read-only 구현 완료.
 - `/fx quote`는 USD/KRW `fx_rate_snapshots`를 읽음.
 - `/fx quote`는 wallet mutation 없음.
@@ -125,6 +154,7 @@ near-term ledger/FX foundation:
   - quote 전후 mutation 없음 확인: `exchange_transactions 0 -> 0`, `wallet_transactions 1 -> 1`, `fx_execute_requests 0 -> 0`, `equity_snapshots 0 -> 0`.
 
 ### FX rate input/provider
+
 - `admin_manual` FX rate input CLI 구현 완료: `scripts/admin-insert-fx-rate.ts`.
 - `admin_manual`은 bootstrap/fallback/manual correction 경로.
 - `/fx quote` smoke용 승인된 `admin_manual` snapshot 1건 입력 및 소비 검증 완료.
@@ -136,6 +166,7 @@ near-term ledger/FX foundation:
 - 30초 polling은 후보이며 provider rate limit/terms 확인 후 확정.
 
 ### Asset/price input
+
 - `admin_manual` asset upsert CLI 구현 완료: `scripts/admin-upsert-asset.ts`.
 - `admin_manual` asset price snapshot input CLI 구현 완료: `scripts/admin-insert-asset-price.ts`.
 - asset upsert는 `(market, symbol)` unique 기준으로 create/update.
@@ -150,6 +181,7 @@ near-term ledger/FX foundation:
   - stale/freshness 기준은 TODO로 남아 있으며 provider/official_batch 사용은 아직 허용하지 않음.
 
 ### Valuation/ranking manual foundation
+
 - Portfolio valuation 계산 foundation 구현 완료.
 - 계산 대상:
   - KRW cash wallet.
@@ -180,9 +212,11 @@ near-term ledger/FX foundation:
   - rank는 1부터 순차 부여.
   - 기존 ranking row는 transaction 안에서 임시 음수 rank로 이동한 뒤 `(seasonId, rankType, rankingDate, seasonParticipantId)` unique 기준 upsert하여 rank unique 충돌을 피함.
 - 이 작업은 `/home`과 `/ranking` 구현 준비를 진전시켰지만, 자동 데이터 생성/외부 시세 공급/API 응답은 아직 없음.
-- scheduler/batch/provider ingestion/order create/order execution/position mutation/settlement 구현 없음.
+- scheduler/batch/provider ingestion/order execution/position mutation/settlement 구현 없음.
+- order quote/create MVP는 구현됐지만 execution은 STOP 상태.
 
 ### `/fx execute`
+
 - `/fx execute`는 write path 1차 구현 완료 상태.
 - 실제 PostgreSQL/Prisma DB integration spec 통과 상태.
 - 구현된 범위:
@@ -265,6 +299,7 @@ near-term ledger/FX foundation:
 - 최초 sandbox 내부 실행은 `/tmp/tsx-1000/*.pipe` IPC `EPERM`으로 실패했으나, sandbox 제한 문제로 판단했고 sandbox 밖 동일 명령 재실행으로 실제 PostgreSQL integration 통과.
 
 ### `/home`
+
 - `GET /api/v1/home` read-only MVP 구현 완료.
 - auth 본체는 미완성이나 API는 기존 보호 API와 동일하게 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
 - 구현된 mode:
@@ -296,6 +331,7 @@ near-term ledger/FX foundation:
 - `/home` read-only MVP는 fake 데이터 기반 계산 금지를 유지.
 
 ### `/ranking`
+
 - `GET /api/v1/ranking` read-only MVP 구현 완료.
 - auth 본체는 미완성이나 API는 기존 보호 API와 동일하게 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
 - query parameter:
@@ -320,6 +356,7 @@ near-term ledger/FX foundation:
   - reward/settlement 연동.
 
 ### `/wallets`
+
 - `GET /api/v1/wallets` read-only MVP 구현 완료.
 - auth 본체는 미완성이나 API는 기존 보호 API와 동일하게 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
 - current season 선택 우선순위는 `/home`, `/ranking`과 동일: active, upcoming, ended, settled.
@@ -329,6 +366,7 @@ near-term ledger/FX foundation:
 - `/wallets` 호출은 wallet row를 생성/수정/삭제하지 않음.
 
 ### `/records`
+
 - `GET /api/v1/records` read-only MVP 구현 완료.
 - auth 본체는 미완성이나 API는 기존 보호 API와 동일하게 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
 - query parameter:
@@ -347,6 +385,7 @@ near-term ledger/FX foundation:
 - order records:
   - `orders` table 기반 read-only 조회로 연결 완료.
   - order row가 없으면 fake 없이 `orders.state = available`, empty records.
+  - `POST /api/v1/orders`로 생성된 submitted order 조회 가능.
   - order execution 구현 없음.
 - `/records` 호출은 exchange/wallet/order row를 생성/수정/삭제하지 않음.
 - 아직 미구현:
@@ -354,7 +393,10 @@ near-term ledger/FX foundation:
   - order execution/position mutation.
 
 ### `/orders`
+
 - `GET /api/v1/orders` read-only MVP 구현 완료.
+- `POST /api/v1/orders/quote` read-only MVP 구현 완료.
+- `POST /api/v1/orders` submitted order create MVP 구현 완료.
 - auth 본체는 미완성이나 API는 기존 보호 API와 동일하게 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
 - query parameter:
   - `seasonId` optional.
@@ -365,16 +407,31 @@ near-term ledger/FX foundation:
   - `offset` optional, default 0.
 - 로그인 사용자의 `season_participants` 기준으로만 `orders` row를 read-only 조회.
 - 미참가면 order row를 조회하지 않고 `state = not_joined`.
-- 주문 생성/체결, wallet 차감/증가, position mutation, settlement 없음.
+- quote:
+  - active season + joined participant만 허용.
+  - asset 존재/isActive 확인.
+  - quantity > 0, limit order는 limitPrice > 0 필요.
+  - market order는 latest eligible `admin_manual` asset price snapshot 사용.
+  - limit order는 `limitPrice`를 quote price로 사용.
+  - asset price stale threshold는 아직 적용하지 않음.
+  - USD 자산은 approved fresh `admin_manual` USD/KRW FX snapshot 사용, freshness 60초.
+  - buy cash balance, sell position quantity를 read-only 검증.
+  - DB mutation 없음.
+- create:
+  - quote와 동일 validation/calculation 후 `orders` row만 `submitted`로 생성.
+  - wallet 차감/증가, wallet transaction, position mutation, equity snapshot, settlement 없음.
+  - order idempotency는 아직 없음.
+- 주문 체결, order cancel API, settlement는 없음.
 
 ## 9. 다음 gate
+
 - OANDA trial/API 계약 검증 전 provider_api/official_batch/scheduler 구현 STOP 유지.
 - `/fx execute` 남은 DB-level rollback/partial-write hardening 및 stale pending/unknown outcome recovery 설계.
 - `/home` full implementation 가능 판정은 자동 valuation/ranking 생성, provider ingestion, order/position mutation 이후 재검토.
 
 ## 10. 아직 안 한 것
+
 - settlement
-- order quote/create API
 - orders 체결
 - position mutation
 - valuation/ranking 자동 생성 scheduler
@@ -391,6 +448,7 @@ near-term ledger/FX foundation:
 - durable quote/quoteId/expiresAt
 
 ## 11. 마지막 검증 상태
+
 - season current / season join / fx quote / fx execute unit 기준 test/build 통과.
 - 승인된 `admin_manual` USD/KRW snapshot 기준 `/fx quote` 통합 smoke 통과.
   - snapshot 입력: `1450.00000000`, sourceType/sourceName `admin_manual`, approvedByUserId `usr_dev_001`, effectiveAt/capturedAt `2026-05-07T10:01:53.000Z`.
@@ -424,13 +482,19 @@ near-term ledger/FX foundation:
 - `npm run build` 통과.
 - `npx prisma validate` 통과.
 - `npx prisma generate` 완료.
-- orders migration status/DB 적용 확인은 현재 환경의 PostgreSQL schema engine 연결 실패 및 Docker CLI 부재로 미확인.
+- `pnpm exec prisma validate` 통과.
+- `pnpm exec prisma migrate status`에서 order foundation pending 확인 후 `pnpm exec prisma migrate dev`로 적용 완료.
+- `pnpm exec prisma migrate status` 재확인: Database schema is up to date.
+- Prisma raw query로 `orders` table, order enum, index, FK, `prisma.order.count()` 확인 완료.
+- `pnpm test -- orders` 통과.
+- `pnpm test -- records` 통과.
 - DB integration의 no eligible snapshot helper는 기존 eligible `admin_manual` snapshot 변경을 커밋하지 않도록 transaction rollback isolation 방식으로 개선됨.
 - 코드/schema/migration/package/seed/test 변경 없이 `/fx quote` smoke 검증됨.
 - integration/test assertion 완화 없음.
 - sandbox 내부 `pnpm tsx`는 `/tmp/tsx-1000/*.pipe` IPC `EPERM`으로 실패했으나, sandbox 밖 재실행으로 dry-run, snapshot 입력, smoke 검증 통과.
 
 ## 12. TODO
+
 - provider final selection STOP review 수락 및 OANDA trial/API 계약 검증.
 - `/fx execute` 실제 DB transaction 내부 강제 실패 기반 rollback 검증 보강.
 - ledger insert/exchange row/finalization 실패 유도 integration hardening 검토.
