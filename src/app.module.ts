@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { FxModule } from './fx/fx.module';
+import { HomeModule } from './home/home.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SeasonsModule } from './seasons/seasons.module';
 
@@ -13,6 +14,7 @@ import { SeasonsModule } from './seasons/seasons.module';
       envFilePath: ['.env.development', '.env'],
     }),
     FxModule,
+    HomeModule,
     PrismaModule,
     SeasonsModule,
   ],

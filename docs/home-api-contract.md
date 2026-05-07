@@ -1,9 +1,9 @@
-# GET /api/v1/home API Contract Draft
+# GET /api/v1/home API Contract
 
 ## Status
-- This document is a draft for agreement only.
-- `GET /api/v1/home` full implementation is currently blocked.
-- Do not implement `/home` controller/service from this draft until the contract is accepted.
+- `GET /api/v1/home` read-only MVP is implemented.
+- The full dashboard implementation is still blocked by provider price ingestion, order/position mutation, scheduler/batch automatic snapshot generation, and fuller section APIs.
+- The implemented MVP uses only existing DB rows and live valuation foundation when possible.
 - Do not add fake data, temporary runtime contracts, Prisma schema changes, migrations, or seed changes from this draft.
 
 ## Source Rules
@@ -25,7 +25,7 @@ All successful `/home` responses use a top-level `mode` so the frontend can choo
 {
   "success": true,
   "data": {
-    "mode": "active_joined | active_not_joined | upcoming | ended | settled",
+    "mode": "active_joined | active_not_joined | upcoming | ended | settled | no_current_season",
     "season": {
       "id": "<string>",
       "name": "<string>",
@@ -137,19 +137,22 @@ Render the normal joined-season home dashboard. Trading and exchange entry point
 - `season.status`
 - `season.startAt`
 - `season.endAt`
-- `summary.cashKrw`
-- `summary.cashUsd`
-- raw participant fields from `season_participants`, but not as full trusted home summary
+- `participant.id`
+- `participant.status`
+- `participant.joinedAt`
+- `participant.initialCapitalKrw`
+- `summary` from latest `daily_portfolio_snapshots` when present.
+- `summary` from `PortfolioValuationService.calculateSeasonParticipantValuation()` when snapshot is absent and required price/FX data exists.
+- `ranking` from latest `season_rankings` when present.
+- `walletSummary.cashWallets`
+- `walletSummary.positionsCount`
+- `walletSummary.openPositionsCount`
 
 ### Currently Not Implementable Fields
-- `summary.assetValueKrw`
-- fully trusted `summary.totalAssetKrw`
-- fully trusted `summary.totalReturnRate`
-- fully trusted `summary.maxDrawdown`
-- `ranking`
 - `allocation`
 - `topPositions`
 - `equityChart`
+- automatic data freshness from scheduler/batch
 
 ### Required Preceding Tables
 - `wallet_transactions`
@@ -162,8 +165,105 @@ Render the normal joined-season home dashboard. Trading and exchange entry point
 - `daily_portfolio_snapshots`
 - `season_rankings`
 
+### Read-Only MVP Shape
+
+The implemented MVP may return available summary/ranking sections or explicit unavailable sections.
+
+```json
+{
+  "success": true,
+  "data": {
+    "mode": "active_joined",
+    "season": {
+      "id": "<string>",
+      "name": "<string>",
+      "status": "active",
+      "startAt": "<UTC ISO string>",
+      "endAt": "<UTC ISO string>"
+    },
+    "participant": {
+      "id": "<string>",
+      "status": "<string>",
+      "joinedAt": "<UTC ISO string>",
+      "initialCapitalKrw": "<amount string>"
+    },
+    "summary": {
+      "state": "available",
+      "valuationSource": "daily_snapshot | live_valuation",
+      "totalAssetKrw": "<amount string>",
+      "returnRate": "<decimal string>",
+      "krwCash": "<amount string>",
+      "usdCashKrw": "<amount string>",
+      "assetValueKrw": "<amount string>",
+      "realizedPnlKrw": "<amount string>",
+      "unrealizedPnlKrw": "<amount string>",
+      "valuationCapturedAt": "<UTC ISO string | only daily_snapshot>",
+      "valuationAt": "<UTC ISO string | only live_valuation>",
+      "dataFreshness": {
+        "status": "available",
+        "asOf": "<UTC ISO string>"
+      }
+    },
+    "ranking": {
+      "state": "available",
+      "rankingSource": "season_rankings",
+      "currentRank": "<number>",
+      "totalParticipants": "<number>",
+      "rankedParticipants": "<number>",
+      "rankType": "daily | final",
+      "rankingDate": "<YYYY-MM-DD>",
+      "totalAssetKrw": "<amount string>",
+      "returnRate": "<decimal string>",
+      "capturedAt": "<UTC ISO string>"
+    },
+    "walletSummary": {
+      "state": "available",
+      "cashWallets": [
+        {
+          "currencyCode": "KRW | USD",
+          "balanceAmount": "<amount string>"
+        }
+      ],
+      "positionsCount": "<number>",
+      "openPositionsCount": "<number>"
+    },
+    "allocation": {
+      "state": "unavailable",
+      "reason": "ALLOCATION_NOT_IMPLEMENTED",
+      "message": "<string>"
+    },
+    "topPositions": {
+      "state": "unavailable",
+      "reason": "TOP_POSITIONS_NOT_IMPLEMENTED",
+      "message": "<string>"
+    },
+    "equityChart": {
+      "state": "unavailable",
+      "reason": "EQUITY_CHART_NOT_IMPLEMENTED",
+      "message": "<string>"
+    },
+    "sectionErrors": []
+  }
+}
+```
+
+If daily snapshot and live valuation are both unavailable, `summary` is returned as:
+
+```json
+{
+  "state": "unavailable",
+  "reason": "<valuation error code>",
+  "message": "Portfolio valuation is unavailable because required market data is missing.",
+  "valuationSource": "unavailable",
+  "dataFreshness": {
+    "status": "unavailable",
+    "reason": "<valuation error code>"
+  }
+}
+```
+
 ### Implementation Decision
-Not implementable now. The full response shape is only a contract draft.
+Read-only MVP is implemented. Full dashboard sections remain future work.
 
 ## active + not joined
 
@@ -246,7 +346,7 @@ Render a blocked/guide state with a join action. Do not render empty portfolio, 
 - Full portfolio sections still require the active joined blockers.
 
 ### Implementation Decision
-Guide-only shape is conceptually implementable after contract agreement, but this task does not implement it.
+Guide-only shape is implemented in the read-only MVP.
 
 ## upcoming
 
@@ -310,7 +410,7 @@ Render upcoming-season information and a not-yet-open state. Trading and exchang
 - Full portfolio sections require the active joined blockers when the season becomes active.
 
 ### Implementation Decision
-Guide-only shape is conceptually implementable after contract agreement, but this task does not implement it.
+Guide-only shape is implemented in the read-only MVP.
 
 ## ended
 
@@ -385,7 +485,7 @@ Render settlement-in-progress state. Trading and exchange must be blocked. Final
 - `asset_price_snapshots`
 
 ### Implementation Decision
-Not fully implementable now. Settlement-facing guide shape is only a contract draft.
+Settlement-facing guide shape is implemented in the read-only MVP. Final settlement summary remains unavailable.
 
 ## settled
 
@@ -469,7 +569,33 @@ Render final result view. Trading and exchange must be blocked.
 - `asset_price_snapshots`
 
 ### Implementation Decision
-Not fully implementable now. Final result shape is only a contract draft.
+Settled guide and trading/exchange block shape are implemented in the read-only MVP. Authoritative final result remains unavailable.
+
+## no current season
+
+### Purpose
+Make the home response explicit when no current season row exists.
+
+### Success Response JSON Shape
+
+```json
+{
+  "success": true,
+  "data": {
+    "mode": "no_current_season",
+    "season": null,
+    "guide": {
+      "state": "unavailable",
+      "reason": "CURRENT_SEASON_NOT_FOUND",
+      "message": "Current season is not configured."
+    },
+    "sectionErrors": []
+  }
+}
+```
+
+### Implementation Decision
+Implemented in the read-only MVP.
 
 ## partial error
 
@@ -610,12 +736,13 @@ Render the global error state for the page.
 Only the common error shape direction is documented. No `/home` error implementation in this task.
 
 ## Current Full Implementation Blockers
-- `assets`
-- `asset_price_snapshots`
-- `fx_rate_snapshots`
-- `positions`
-- `daily_portfolio_snapshots`
-- `season_rankings`
+- provider price ingestion
+- asset price freshness policy
+- order execution
+- position mutation
+- scheduler/batch automatic daily portfolio snapshot generation
+- scheduler/batch automatic season ranking generation
+- richer `/ranking`, `/orders`, `/records`, `/settlement` APIs
 
 ## Near-Term Required Tables
 - `wallet_transactions`

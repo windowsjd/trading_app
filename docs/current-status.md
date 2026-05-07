@@ -11,6 +11,7 @@
 - fake/static/temporary/sample/test business FX rate 금지.
 
 ## 2. 구현 완료 API
+- `GET /api/v1/home` read-only MVP
 - `GET /api/v1/seasons/current`
 - `POST /api/v1/seasons/{seasonId}/join`
 - `POST /api/v1/fx/quote`
@@ -251,29 +252,43 @@ near-term ledger/FX foundation:
 - 최초 sandbox 내부 실행은 `/tmp/tsx-1000/*.pipe` IPC `EPERM`으로 실패했으나, sandbox 제한 문제로 판단했고 sandbox 밖 동일 명령 재실행으로 실제 PostgreSQL integration 통과.
 
 ### `/home`
-- `/home` full implementation은 여전히 불가.
-- asset/price/position, daily/ranking DB foundation, 수동 valuation/ranking 생성 경로 도입으로 `/home`과 `/ranking` 구현 준비는 진전됨.
-- 다만 가격 ingestion/freshness 정책, position mutation, scheduler/batch 자동 데이터 생성 경로가 아직 없어 조회 가능한 신뢰 데이터가 자동 생성되지는 않음.
-- blocker:
+- `GET /api/v1/home` read-only MVP 구현 완료.
+- auth 본체는 미완성이나 API는 기존 보호 API와 동일하게 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
+- 구현된 mode:
+  - `active_joined`
+  - `active_not_joined`
+  - `upcoming`
+  - `ended`
+  - `settled`
+  - `no_current_season`
+- active joined summary source:
+  - 최신 `daily_portfolio_snapshots` 우선.
+  - daily snapshot이 없으면 `PortfolioValuationService.calculateSeasonParticipantValuation()` 기반 live valuation 시도.
+  - valuation에 필요한 asset price 또는 FX snapshot이 없으면 fake 값 없이 `summary.state = unavailable`.
+- ranking source:
+  - 최신 `season_rankings`를 read-only로 조회.
+  - ranking row가 없으면 fake rank 없이 `ranking.state = unavailable`.
+  - `/home` 호출 중 ranking 생성 없음.
+- wallet/position summary:
+  - cash wallets와 positions/openPositions count만 read-only로 반환.
+  - 상세 positions, allocation, topPositions, equityChart 계산은 MVP에서 unavailable.
+- `/home` 호출은 wallet/position/snapshot/ranking row를 생성/수정/삭제하지 않음.
+- full home implementation blocker:
   - provider price ingestion
   - asset price freshness policy
   - orders 체결/position mutation
   - scheduler/batch daily portfolio snapshot 자동 생성
   - scheduler/batch season ranking 자동 생성
-  - `/home` API
   - `/ranking` API
   - scheduler/batch
-- `/home`의 `active + not joined` 응답은 rulepack상 `blocked/guide`여야 하나, 최종 field shape는 아직 미고정.
-- `/home`의 `upcoming`, `ended`, `settled` 응답 shape도 아직 미고정.
-- `/home` controller/service 구현, 임시 응답 shape 추가, fake 데이터 기반 계산 금지.
+- `/home` read-only MVP는 fake 데이터 기반 계산 금지를 유지.
 
 ## 9. 다음 gate
 - OANDA trial/API 계약 검증 전 provider_api/official_batch/scheduler 구현 STOP 유지.
 - `/fx execute` 남은 DB-level rollback/partial-write hardening 및 stale pending/unknown outcome recovery 설계.
-- `/home` full implementation 가능 판정은 valuation/ranking source table 확보 후 재검토.
+- `/home` full implementation 가능 판정은 자동 valuation/ranking 생성, provider ingestion, order/position mutation 이후 재검토.
 
 ## 10. 아직 안 한 것
-- home API
 - wallets API
 - orders API
 - ranking
@@ -281,12 +296,11 @@ near-term ledger/FX foundation:
 - settlement
 - orders 체결
 - position mutation
-- valuation 계산
-- ranking 계산
+- valuation/ranking 자동 생성 scheduler
 - provider price ingestion
 - automatic asset price ingestion
-- daily portfolio snapshot 생성 경로
-- season ranking 생성 경로
+- daily portfolio snapshot 자동 생성 경로
+- season ranking 자동 생성 경로
 - provider_api ingestion
 - official_batch ingestion
 - scheduler
@@ -305,7 +319,7 @@ near-term ledger/FX foundation:
 - join API는 `request.user.userId` 기준.
 - join 시 KRW/USD wallet 2개 생성.
 - 이번 asset/price/position 및 daily/ranking foundation 작업은 schema/migration/Prisma generated client 변경 포함.
-- `/home` controller/service는 미구현 유지.
+- `/home` read-only MVP controller/service 구현 완료.
 - Prisma adapter 방식 유지 중.
 - near-term 1단계 migration DB 적용 완료.
 - Prisma Client generate 완료.
@@ -316,6 +330,7 @@ near-term ledger/FX foundation:
 - `admin_manual` asset/price input CLI 구현 및 validation unit test 통과.
 - `pnpm test` 통과.
 - `pnpm build` 통과.
+- `pnpm test -- home` 통과.
 - `pnpm test -- fx.service.spec.ts` 통과.
 - `FX_EXECUTE_DB_INTEGRATION=1 pnpm test -- fx.execute.integration.spec.ts` 통과.
 - `/fx execute` DB integration spec은 실제 PostgreSQL 환경에서 통과.
@@ -334,6 +349,5 @@ near-term ledger/FX foundation:
 - asset price ingestion/source/freshness 정책 설계.
 - asset/price admin CLI 운영 승인 절차 정리.
 - order execute/position mutation 설계 및 구현.
-- valuation 계산 및 daily portfolio snapshot 생성 경로 설계/구현.
-- ranking 계산 및 season ranking 생성 경로 설계/구현.
+- valuation/ranking 자동 생성 scheduler/API 연동 설계/구현.
 - settlement 보상/확정 로직 설계/구현.
