@@ -46,6 +46,27 @@ jest.mock('../generated/prisma/client', () => {
       ended: 'ended',
       settled: 'settled',
     },
+    WalletTransactionDirection: {
+      credit: 'credit',
+      debit: 'debit',
+    },
+    WalletTransactionReferenceType: {
+      season_join: 'season_join',
+      exchange_transaction: 'exchange_transaction',
+      order: 'order',
+      manual_adjustment: 'manual_adjustment',
+      settlement: 'settlement',
+    },
+    WalletTransactionType: {
+      initial_grant: 'initial_grant',
+      exchange_source: 'exchange_source',
+      exchange_target: 'exchange_target',
+      order_buy: 'order_buy',
+      order_sell: 'order_sell',
+      fee: 'fee',
+      adjustment: 'adjustment',
+      settlement: 'settlement',
+    },
   };
 });
 
@@ -59,6 +80,9 @@ import {
   ParticipantStatus,
   Prisma,
   SeasonStatus,
+  WalletTransactionDirection,
+  WalletTransactionReferenceType,
+  WalletTransactionType,
 } from '../generated/prisma/client';
 import { OrdersService } from './orders.service';
 
@@ -146,8 +170,10 @@ describe('OrdersService', () => {
     },
     cashWallet: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
       upsert: jest.fn(),
       delete: jest.fn(),
     },
@@ -158,10 +184,18 @@ describe('OrdersService', () => {
     equitySnapshot: {
       create: jest.fn(),
     },
+    dailyPortfolioSnapshot: {
+      create: jest.fn(),
+    },
+    seasonRanking: {
+      create: jest.fn(),
+    },
     position: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
       upsert: jest.fn(),
       delete: jest.fn(),
     },
@@ -170,6 +204,7 @@ describe('OrdersService', () => {
 
   const createService = () => {
     const prisma = createPrisma();
+    prisma.$transaction.mockImplementation(async (callback) => callback(prisma));
     const service = new OrdersService(prisma as never);
 
     return { prisma, service };
@@ -349,6 +384,127 @@ describe('OrdersService', () => {
     },
   });
 
+  const orderExecutionRecord = (
+    overrides: Record<string, unknown> = {},
+  ) => ({
+    id: 'order-execute-1',
+    seasonParticipantId: 'sp-1',
+    assetId: 'asset-1',
+    side: OrderSide.buy,
+    orderType: OrderType.market,
+    status: OrderStatus.submitted,
+    quantity: new Prisma.Decimal('2.00000000'),
+    limitPrice: null,
+    executedPrice: null,
+    currencyCode: CurrencyCode.KRW,
+    grossAmount: new Prisma.Decimal('190.00000000'),
+    feeAmount: new Prisma.Decimal('0.19000000'),
+    netAmount: new Prisma.Decimal('190.19000000'),
+    assetPriceSnapshotId: null,
+    fxRateSnapshotId: null,
+    submittedAt,
+    executedAt: null,
+    canceledAt: null,
+    rejectedAt: null,
+    rejectReason: null,
+    createdAt,
+    updatedAt,
+    asset: {
+      id: 'asset-1',
+      symbol: '005930',
+      name: 'Samsung',
+      market: 'KRX',
+      currencyCode: CurrencyCode.KRW,
+    },
+    seasonParticipant: {
+      ...participant,
+      season: activeSeason,
+    },
+    ...overrides,
+  });
+
+  const executedOrderExecutionRecord = (
+    overrides: Record<string, unknown> = {},
+  ) => ({
+    ...orderExecutionRecord(),
+    status: OrderStatus.executed,
+    executedPrice: new Prisma.Decimal('100.00000000'),
+    grossAmount: new Prisma.Decimal('200.00000000'),
+    feeAmount: new Prisma.Decimal('0.20000000'),
+    netAmount: new Prisma.Decimal('200.20000000'),
+    assetPriceSnapshotId: 'aps-exec-1',
+    executedAt,
+    updatedAt,
+    ...overrides,
+  });
+
+  const mockExecutionPrice = (
+    prisma: ReturnType<typeof createPrisma>,
+    price = '100.00000000',
+  ) => {
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce({
+      id: 'aps-exec-1',
+      price: new Prisma.Decimal(price),
+    });
+  };
+
+  const mockExecutionWallet = (
+    prisma: ReturnType<typeof createPrisma>,
+    before = '1000.00000000',
+    after = '799.80000000',
+  ) => {
+    prisma.cashWallet.findUnique.mockResolvedValueOnce({
+      id: 'wallet-1',
+      seasonParticipantId: 'sp-1',
+      currencyCode: CurrencyCode.KRW,
+      balanceAmount: new Prisma.Decimal(before),
+    });
+    prisma.cashWallet.updateMany.mockResolvedValueOnce({ count: 1 });
+    prisma.cashWallet.findFirst.mockResolvedValueOnce({
+      id: 'wallet-1',
+      seasonParticipantId: 'sp-1',
+      currencyCode: CurrencyCode.KRW,
+      balanceAmount: new Prisma.Decimal(after),
+    });
+  };
+
+  const mockOrderFinalization = (
+    prisma: ReturnType<typeof createPrisma>,
+    order = executedOrderExecutionRecord(),
+  ) => {
+    prisma.order.updateMany.mockResolvedValueOnce({ count: 1 });
+    prisma.order.findUnique.mockResolvedValueOnce(order);
+  };
+
+  const getErrorCode = (error: unknown) => {
+    const response = (error as HttpException).getResponse() as {
+      error: { code: string };
+    };
+
+    return response.error.code;
+  };
+
+  const expectErrorCode = async (promise: Promise<unknown>, code: string) => {
+    await expect(promise).rejects.toBeInstanceOf(HttpException);
+
+    try {
+      await promise;
+    } catch (error) {
+      expect(getErrorCode(error)).toBe(code);
+    }
+  };
+
+  const expectNoForbiddenExecuteSideEffects = (
+    prisma: ReturnType<typeof createPrisma>,
+  ) => {
+    expect(prisma.exchangeTransaction.create).not.toHaveBeenCalled();
+    expect(prisma.fxExecuteRequest.create).not.toHaveBeenCalled();
+    expect(prisma.fxExecuteRequest.update).not.toHaveBeenCalled();
+    expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
+    expect(prisma.dailyPortfolioSnapshot.create).not.toHaveBeenCalled();
+    expect(prisma.seasonRanking.create).not.toHaveBeenCalled();
+  };
+
   const expectNoOrderWrites = (prisma: ReturnType<typeof createPrisma>) => {
     for (const model of [
       prisma.season,
@@ -362,16 +518,20 @@ describe('OrdersService', () => {
     ]) {
       expect(model.create).not.toHaveBeenCalled();
       expect(model.update).not.toHaveBeenCalled();
+      if ('updateMany' in model) {
+        expect(model.updateMany).not.toHaveBeenCalled();
+      }
       expect(model.upsert).not.toHaveBeenCalled();
       expect(model.delete).not.toHaveBeenCalled();
     }
 
-    expect(prisma.order.updateMany).not.toHaveBeenCalled();
     expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
     expect(prisma.exchangeTransaction.create).not.toHaveBeenCalled();
     expect(prisma.fxExecuteRequest.create).not.toHaveBeenCalled();
     expect(prisma.fxExecuteRequest.update).not.toHaveBeenCalled();
     expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
+    expect(prisma.dailyPortfolioSnapshot.create).not.toHaveBeenCalled();
+    expect(prisma.seasonRanking.create).not.toHaveBeenCalled();
     expect(prisma.$transaction).not.toHaveBeenCalled();
   };
 
@@ -389,6 +549,9 @@ describe('OrdersService', () => {
     ]) {
       expect(model.create).not.toHaveBeenCalled();
       expect(model.update).not.toHaveBeenCalled();
+      if ('updateMany' in model) {
+        expect(model.updateMany).not.toHaveBeenCalled();
+      }
       expect(model.upsert).not.toHaveBeenCalled();
       expect(model.delete).not.toHaveBeenCalled();
     }
@@ -403,6 +566,8 @@ describe('OrdersService', () => {
     expect(prisma.fxExecuteRequest.create).not.toHaveBeenCalled();
     expect(prisma.fxExecuteRequest.update).not.toHaveBeenCalled();
     expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
+    expect(prisma.dailyPortfolioSnapshot.create).not.toHaveBeenCalled();
+    expect(prisma.seasonRanking.create).not.toHaveBeenCalled();
     expect(prisma.$transaction).not.toHaveBeenCalled();
   };
 
@@ -420,6 +585,9 @@ describe('OrdersService', () => {
     ]) {
       expect(model.create).not.toHaveBeenCalled();
       expect(model.update).not.toHaveBeenCalled();
+      if ('updateMany' in model) {
+        expect(model.updateMany).not.toHaveBeenCalled();
+      }
       expect(model.upsert).not.toHaveBeenCalled();
       expect(model.delete).not.toHaveBeenCalled();
     }
@@ -434,6 +602,8 @@ describe('OrdersService', () => {
     expect(prisma.fxExecuteRequest.create).not.toHaveBeenCalled();
     expect(prisma.fxExecuteRequest.update).not.toHaveBeenCalled();
     expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
+    expect(prisma.dailyPortfolioSnapshot.create).not.toHaveBeenCalled();
+    expect(prisma.seasonRanking.create).not.toHaveBeenCalled();
     expect(prisma.$transaction).not.toHaveBeenCalled();
   };
 
@@ -1384,5 +1554,521 @@ describe('OrdersService', () => {
         idempotencyKey: 'order-create-key-invalid-limit',
       }),
     ).rejects.toBeInstanceOf(HttpException);
+  });
+
+  describe('executeOrder', () => {
+    beforeEach(() => {
+      jest.useFakeTimers().setSystemTime(executedAt);
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('executes buy orders and creates a new position', async () => {
+      const { prisma, service } = createService();
+      prisma.order.findFirst.mockResolvedValueOnce(orderExecutionRecord());
+      mockExecutionPrice(prisma);
+      mockExecutionWallet(prisma, '1000.00000000', '799.80000000');
+      prisma.position.findUnique.mockResolvedValueOnce(null);
+      prisma.position.create.mockResolvedValueOnce({ id: 'position-1' });
+      prisma.walletTransaction.create.mockResolvedValueOnce({
+        id: 'wallet-tx-buy-1',
+      });
+      mockOrderFinalization(prisma);
+
+      const response = await service.executeOrder('user-1', 'order-execute-1');
+
+      expect(response.data).toMatchObject({
+        order: {
+          orderId: 'order-execute-1',
+          status: OrderStatus.executed,
+          executedPrice: '100.00000000',
+          grossAmount: '200.00000000',
+          feeAmount: '0.20000000',
+          netAmount: '200.20000000',
+          assetPriceSnapshotId: 'aps-exec-1',
+          fxRateSnapshotId: null,
+        },
+        execution: {
+          state: 'executed',
+          executedAt: executedAt.toISOString(),
+          priceSource: 'admin_manual',
+          assetPriceSnapshotId: 'aps-exec-1',
+          fxRateSnapshotId: null,
+          walletTransactionId: 'wallet-tx-buy-1',
+          walletBalanceAfter: '799.80000000',
+          positionId: 'position-1',
+          duplicate: false,
+        },
+      });
+      expect(prisma.cashWallet.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'wallet-1',
+          seasonParticipantId: 'sp-1',
+          currencyCode: CurrencyCode.KRW,
+          balanceAmount: {
+            gte: '200.20000000',
+          },
+        },
+        data: {
+          balanceAmount: {
+            decrement: '200.20000000',
+          },
+        },
+      });
+      expect(prisma.position.create).toHaveBeenCalledWith({
+        data: {
+          seasonParticipantId: 'sp-1',
+          assetId: 'asset-1',
+          quantity: '2.00000000',
+          averageCost: '100.10000000',
+          currencyCode: CurrencyCode.KRW,
+          realizedPnl: '0.00000000',
+        },
+        select: {
+          id: true,
+        },
+      });
+      expect(prisma.walletTransaction.create).toHaveBeenCalledWith({
+        data: {
+          seasonParticipantId: 'sp-1',
+          walletId: 'wallet-1',
+          currencyCode: CurrencyCode.KRW,
+          direction: WalletTransactionDirection.debit,
+          txType: WalletTransactionType.order_buy,
+          referenceType: WalletTransactionReferenceType.order,
+          referenceId: 'order-execute-1',
+          amount: '200.20000000',
+          balanceAfter: '799.80000000',
+          occurredAt: executedAt,
+        },
+        select: {
+          id: true,
+        },
+      });
+      expect(prisma.order.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'order-execute-1',
+          seasonParticipantId: 'sp-1',
+          status: OrderStatus.submitted,
+        },
+        data: {
+          status: OrderStatus.executed,
+          executedPrice: '100.00000000',
+          grossAmount: '200.00000000',
+          feeAmount: '0.20000000',
+          netAmount: '200.20000000',
+          assetPriceSnapshotId: 'aps-exec-1',
+          fxRateSnapshotId: null,
+          executedAt,
+        },
+      });
+      expectNoForbiddenExecuteSideEffects(prisma);
+    });
+
+    it('executes buy orders and updates weighted average for an existing position', async () => {
+      const { prisma, service } = createService();
+      prisma.order.findFirst.mockResolvedValueOnce(orderExecutionRecord());
+      mockExecutionPrice(prisma);
+      mockExecutionWallet(prisma, '1000.00000000', '799.80000000');
+      prisma.position.findUnique.mockResolvedValueOnce({
+        id: 'position-1',
+        quantity: new Prisma.Decimal('3.00000000'),
+        averageCost: new Prisma.Decimal('90.00000000'),
+        currencyCode: CurrencyCode.KRW,
+      });
+      prisma.position.updateMany.mockResolvedValueOnce({ count: 1 });
+      prisma.walletTransaction.create.mockResolvedValueOnce({
+        id: 'wallet-tx-buy-1',
+      });
+      mockOrderFinalization(prisma);
+
+      const response = await service.executeOrder('user-1', 'order-execute-1');
+
+      expect(response.data.execution.positionId).toBe('position-1');
+      expect(prisma.position.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'position-1',
+          seasonParticipantId: 'sp-1',
+          assetId: 'asset-1',
+          quantity: '3.00000000',
+          averageCost: '90.00000000',
+        },
+        data: {
+          quantity: '5.00000000',
+          averageCost: '94.04000000',
+        },
+      });
+      expectNoForbiddenExecuteSideEffects(prisma);
+    });
+
+    it('executes sell orders with position decrement and realizedPnl update', async () => {
+      const { prisma, service } = createService();
+      prisma.order.findFirst.mockResolvedValueOnce(
+        orderExecutionRecord({
+          side: OrderSide.sell,
+        }),
+      );
+      mockExecutionPrice(prisma);
+      prisma.position.findUnique.mockResolvedValueOnce({
+        id: 'position-1',
+        quantity: new Prisma.Decimal('5.00000000'),
+        averageCost: new Prisma.Decimal('80.00000000'),
+        currencyCode: CurrencyCode.KRW,
+      });
+      prisma.position.updateMany.mockResolvedValueOnce({ count: 1 });
+      mockExecutionWallet(prisma, '100.00000000', '299.80000000');
+      prisma.walletTransaction.create.mockResolvedValueOnce({
+        id: 'wallet-tx-sell-1',
+      });
+      mockOrderFinalization(
+        prisma,
+        executedOrderExecutionRecord({
+          side: OrderSide.sell,
+          netAmount: new Prisma.Decimal('199.80000000'),
+          feeAmount: new Prisma.Decimal('0.20000000'),
+        }),
+      );
+
+      const response = await service.executeOrder('user-1', 'order-execute-1');
+
+      expect(response.data.execution.walletBalanceAfter).toBe('299.80000000');
+      expect(prisma.position.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'position-1',
+          seasonParticipantId: 'sp-1',
+          assetId: 'asset-1',
+          quantity: {
+            gte: '2.00000000',
+          },
+        },
+        data: {
+          quantity: {
+            decrement: '2.00000000',
+          },
+          realizedPnl: {
+            increment: '39.80000000',
+          },
+        },
+      });
+      expect(prisma.cashWallet.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'wallet-1',
+          seasonParticipantId: 'sp-1',
+          currencyCode: CurrencyCode.KRW,
+        },
+        data: {
+          balanceAmount: {
+            increment: '199.80000000',
+          },
+        },
+      });
+      expect(prisma.walletTransaction.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            direction: WalletTransactionDirection.credit,
+            txType: WalletTransactionType.order_sell,
+            amount: '199.80000000',
+            balanceAfter: '299.80000000',
+          }),
+        }),
+      );
+      expectNoForbiddenExecuteSideEffects(prisma);
+    });
+
+    it('rejects execute without authenticated user or valid orderId', async () => {
+      const { prisma, service } = createService();
+
+      await expectErrorCode(
+        service.executeOrder(undefined, 'order-execute-1'),
+        'UNAUTHORIZED',
+      );
+      await expectErrorCode(
+        service.executeOrder('user-1', '   '),
+        'INVALID_ORDER_ID',
+      );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('returns not found for missing or unowned execute orders', async () => {
+      const { prisma, service } = createService();
+      prisma.order.findFirst.mockResolvedValueOnce(null);
+
+      await expectErrorCode(
+        service.executeOrder('user-1', 'order-other-user'),
+        'ORDER_NOT_FOUND',
+      );
+      expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
+      expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+    });
+
+    it.each([OrderStatus.canceled, OrderStatus.rejected])(
+      'rejects execute for %s orders',
+      async (status) => {
+        const { prisma, service } = createService();
+        prisma.order.findFirst.mockResolvedValueOnce(
+          orderExecutionRecord({ status }),
+        );
+
+        await expectErrorCode(
+          service.executeOrder('user-1', 'order-execute-1'),
+          'ORDER_NOT_EXECUTABLE',
+        );
+        expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
+        expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+      },
+    );
+
+    it('returns already executed current-state response without mutation', async () => {
+      const { prisma, service } = createService();
+      prisma.order.findFirst.mockResolvedValueOnce(executedOrderExecutionRecord());
+
+      const response = await service.executeOrder('user-1', 'order-execute-1');
+
+      expect(response.data).toMatchObject({
+        order: {
+          orderId: 'order-execute-1',
+          status: OrderStatus.executed,
+          executedAt: executedAt.toISOString(),
+        },
+        execution: {
+          state: 'already_executed',
+          executedAt: executedAt.toISOString(),
+          walletTransactionId: null,
+          walletBalanceAfter: null,
+          positionId: null,
+          duplicate: true,
+        },
+      });
+      expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
+      expect(prisma.position.create).not.toHaveBeenCalled();
+      expect(prisma.position.updateMany).not.toHaveBeenCalled();
+      expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+      expect(prisma.order.updateMany).not.toHaveBeenCalled();
+      expectNoForbiddenExecuteSideEffects(prisma);
+    });
+
+    it('rejects execute when market price is unavailable', async () => {
+      const { prisma, service } = createService();
+      prisma.order.findFirst.mockResolvedValueOnce(orderExecutionRecord());
+      prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(null);
+
+      await expectErrorCode(
+        service.executeOrder('user-1', 'order-execute-1'),
+        'ORDER_PRICE_UNAVAILABLE',
+      );
+      expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
+      expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects non-marketable buy and sell limit orders', async () => {
+      const buy = createService();
+      buy.prisma.order.findFirst.mockResolvedValueOnce(
+        orderExecutionRecord({
+          orderType: OrderType.limit,
+          limitPrice: new Prisma.Decimal('99.00000000'),
+        }),
+      );
+      mockExecutionPrice(buy.prisma, '100.00000000');
+
+      await expectErrorCode(
+        buy.service.executeOrder('user-1', 'order-execute-1'),
+        'ORDER_LIMIT_NOT_MARKETABLE',
+      );
+
+      const sell = createService();
+      sell.prisma.order.findFirst.mockResolvedValueOnce(
+        orderExecutionRecord({
+          side: OrderSide.sell,
+          orderType: OrderType.limit,
+          limitPrice: new Prisma.Decimal('101.00000000'),
+        }),
+      );
+      mockExecutionPrice(sell.prisma, '100.00000000');
+
+      await expectErrorCode(
+        sell.service.executeOrder('user-1', 'order-execute-1'),
+        'ORDER_LIMIT_NOT_MARKETABLE',
+      );
+      expect(buy.prisma.cashWallet.updateMany).not.toHaveBeenCalled();
+      expect(sell.prisma.cashWallet.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('rejects USD execute when FX is unavailable or stale', async () => {
+      const usdOrder = orderExecutionRecord({
+        currencyCode: CurrencyCode.USD,
+        asset: {
+          id: 'asset-1',
+          symbol: 'AAPL',
+          name: 'Apple Inc.',
+          market: 'NASDAQ',
+          currencyCode: CurrencyCode.USD,
+        },
+      });
+      const unavailable = createService();
+      unavailable.prisma.order.findFirst.mockResolvedValueOnce(usdOrder);
+      mockExecutionPrice(unavailable.prisma);
+      unavailable.prisma.fxRateSnapshot.findFirst.mockResolvedValueOnce(null);
+
+      await expectErrorCode(
+        unavailable.service.executeOrder('user-1', 'order-execute-1'),
+        'FX_RATE_UNAVAILABLE',
+      );
+
+      const stale = createService();
+      stale.prisma.order.findFirst.mockResolvedValueOnce(usdOrder);
+      mockExecutionPrice(stale.prisma);
+      stale.prisma.fxRateSnapshot.findFirst.mockResolvedValueOnce({
+        id: 'fx-stale-1',
+        effectiveAt: new Date(executedAt.getTime() - 61_000),
+      });
+
+      await expectErrorCode(
+        stale.service.executeOrder('user-1', 'order-execute-1'),
+        'FX_RATE_STALE',
+      );
+      expect(unavailable.prisma.cashWallet.updateMany).not.toHaveBeenCalled();
+      expect(stale.prisma.cashWallet.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('rejects buy when cash balance is insufficient after guarded debit', async () => {
+      const { prisma, service } = createService();
+      prisma.order.findFirst.mockResolvedValueOnce(orderExecutionRecord());
+      mockExecutionPrice(prisma);
+      prisma.cashWallet.findUnique.mockResolvedValueOnce({
+        id: 'wallet-1',
+        seasonParticipantId: 'sp-1',
+        currencyCode: CurrencyCode.KRW,
+        balanceAmount: new Prisma.Decimal('1000.00000000'),
+      });
+      prisma.cashWallet.updateMany.mockResolvedValueOnce({ count: 0 });
+      prisma.cashWallet.findFirst.mockResolvedValueOnce({
+        balanceAmount: new Prisma.Decimal('199.00000000'),
+      });
+
+      await expectErrorCode(
+        service.executeOrder('user-1', 'order-execute-1'),
+        'INSUFFICIENT_CASH_BALANCE',
+      );
+      expect(prisma.position.create).not.toHaveBeenCalled();
+      expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+      expect(prisma.order.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('rejects sell when position is missing or quantity is insufficient', async () => {
+      const missing = createService();
+      missing.prisma.order.findFirst.mockResolvedValueOnce(
+        orderExecutionRecord({ side: OrderSide.sell }),
+      );
+      mockExecutionPrice(missing.prisma);
+      missing.prisma.position.findUnique.mockResolvedValueOnce(null);
+
+      await expectErrorCode(
+        missing.service.executeOrder('user-1', 'order-execute-1'),
+        'ORDER_POSITION_NOT_FOUND',
+      );
+
+      const insufficient = createService();
+      insufficient.prisma.order.findFirst.mockResolvedValueOnce(
+        orderExecutionRecord({ side: OrderSide.sell }),
+      );
+      mockExecutionPrice(insufficient.prisma);
+      insufficient.prisma.position.findUnique.mockResolvedValueOnce({
+        id: 'position-1',
+        quantity: new Prisma.Decimal('1.00000000'),
+        averageCost: new Prisma.Decimal('80.00000000'),
+        currencyCode: CurrencyCode.KRW,
+      });
+      insufficient.prisma.position.updateMany.mockResolvedValueOnce({ count: 0 });
+      insufficient.prisma.position.findFirst.mockResolvedValueOnce({
+        quantity: new Prisma.Decimal('1.00000000'),
+      });
+
+      await expectErrorCode(
+        insufficient.service.executeOrder('user-1', 'order-execute-1'),
+        'INSUFFICIENT_POSITION_QUANTITY',
+      );
+      expect(missing.prisma.cashWallet.updateMany).not.toHaveBeenCalled();
+      expect(insufficient.prisma.cashWallet.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('uses actual post-update wallet balance for walletTransaction balanceAfter', async () => {
+      const { prisma, service } = createService();
+      prisma.order.findFirst.mockResolvedValueOnce(orderExecutionRecord());
+      mockExecutionPrice(prisma);
+      mockExecutionWallet(prisma, '1000.00000000', '777.77777777');
+      prisma.position.findUnique.mockResolvedValueOnce(null);
+      prisma.position.create.mockResolvedValueOnce({ id: 'position-1' });
+      prisma.walletTransaction.create.mockResolvedValueOnce({
+        id: 'wallet-tx-buy-1',
+      });
+      mockOrderFinalization(prisma);
+
+      await service.executeOrder('user-1', 'order-execute-1');
+
+      expect(prisma.walletTransaction.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            balanceAfter: '777.77777777',
+          }),
+        }),
+      );
+    });
+
+    it('uses guarded finalization for cancel/execute conflicts', async () => {
+      const { prisma, service } = createService();
+      prisma.order.findFirst.mockResolvedValueOnce(orderExecutionRecord());
+      mockExecutionPrice(prisma);
+      mockExecutionWallet(prisma, '1000.00000000', '799.80000000');
+      prisma.position.findUnique.mockResolvedValueOnce(null);
+      prisma.position.create.mockResolvedValueOnce({ id: 'position-1' });
+      prisma.walletTransaction.create.mockResolvedValueOnce({
+        id: 'wallet-tx-buy-1',
+      });
+      prisma.order.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      await expectErrorCode(
+        service.executeOrder('user-1', 'order-execute-1'),
+        'ORDER_EXECUTION_CONFLICT',
+      );
+      expect(prisma.order.findUnique).not.toHaveBeenCalled();
+      expectNoForbiddenExecuteSideEffects(prisma);
+    });
+
+    it('uses guarded finalization for order double execution conflicts', async () => {
+      const { prisma, service } = createService();
+      prisma.order.findFirst.mockResolvedValueOnce(
+        orderExecutionRecord({
+          side: OrderSide.sell,
+        }),
+      );
+      mockExecutionPrice(prisma);
+      prisma.position.findUnique.mockResolvedValueOnce({
+        id: 'position-1',
+        quantity: new Prisma.Decimal('2.00000000'),
+        averageCost: new Prisma.Decimal('80.00000000'),
+        currencyCode: CurrencyCode.KRW,
+      });
+      prisma.position.updateMany.mockResolvedValueOnce({ count: 1 });
+      mockExecutionWallet(prisma, '100.00000000', '299.80000000');
+      prisma.walletTransaction.create.mockResolvedValueOnce({
+        id: 'wallet-tx-sell-1',
+      });
+      prisma.order.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      await expectErrorCode(
+        service.executeOrder('user-1', 'order-execute-1'),
+        'ORDER_EXECUTION_CONFLICT',
+      );
+      expect(prisma.order.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: OrderStatus.submitted,
+          }),
+        }),
+      );
+      expectNoForbiddenExecuteSideEffects(prisma);
+    });
   });
 });

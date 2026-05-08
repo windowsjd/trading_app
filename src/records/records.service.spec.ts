@@ -209,6 +209,27 @@ describe('RecordsService', () => {
     ]);
   };
 
+  const mockOrderWalletRecords = (
+    prisma: ReturnType<typeof createPrisma>,
+  ) => {
+    prisma.walletTransaction.count.mockResolvedValueOnce(1);
+    prisma.walletTransaction.findMany.mockResolvedValueOnce([
+      {
+        id: 'wt-order-buy-1',
+        walletId: 'wallet-1',
+        currencyCode: CurrencyCode.KRW,
+        direction: WalletTransactionDirection.debit,
+        txType: WalletTransactionType.order_buy,
+        referenceType: WalletTransactionReferenceType.order,
+        referenceId: 'order-1',
+        amount: new Prisma.Decimal('200.20000000'),
+        balanceAfter: new Prisma.Decimal('799.80000000'),
+        occurredAt,
+        createdAt,
+      },
+    ]);
+  };
+
   const mockOrderRecords = (prisma: ReturnType<typeof createPrisma>) => {
     prisma.order.count.mockResolvedValueOnce(1);
     prisma.order.findMany.mockResolvedValueOnce([
@@ -371,6 +392,35 @@ describe('RecordsService', () => {
           balanceAfter: '10000000.00000000',
           referenceType: WalletTransactionReferenceType.season_join,
           referenceId: 'sp-1',
+        },
+      ],
+    });
+    expectNoRecordWrites(prisma);
+  });
+
+  it('returns order wallet transaction records', async () => {
+    const { prisma, service } = createService();
+    mockCurrentSeason(prisma);
+    mockJoined(prisma);
+    mockOrderWalletRecords(prisma);
+
+    const response = await service.getRecords('user-1', {
+      type: 'wallets',
+    });
+
+    expect(response.data.walletTransactions).toMatchObject({
+      state: 'available',
+      records: [
+        {
+          walletTransactionId: 'wt-order-buy-1',
+          walletId: 'wallet-1',
+          currencyCode: CurrencyCode.KRW,
+          direction: WalletTransactionDirection.debit,
+          transactionType: WalletTransactionType.order_buy,
+          amount: '200.20000000',
+          balanceAfter: '799.80000000',
+          referenceType: WalletTransactionReferenceType.order,
+          referenceId: 'order-1',
         },
       ],
     });

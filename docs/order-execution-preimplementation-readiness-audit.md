@@ -7,7 +7,8 @@ Verdict:
 - Current schema can support a market/limit full-fill MVP.
 - Current schema can support wallet debit/credit, position mutation, one order ledger row, and order finalization in one transaction.
 - Current schema cannot support exact execute response replay without overloading create `responsePayloadJson`.
-- Order execution must remain unimplemented until the safety plan STOP conditions are accepted.
+- Order execution full-fill MVP has been implemented after accepting the safety plan STOP decisions for this constrained scope.
+- Exact execute response replay, partial fill, matching engine, settlement, provider ingestion, and automatic snapshot/ranking generation remain out of scope.
 
 ## 2. Schema Readiness
 
@@ -107,29 +108,29 @@ Patterns not directly reusable:
 
 ## 6. Blockers Before Implementation
 
-Blocker decisions:
+Accepted MVP decisions:
 
 - Exact limit execution policy:
-  - whether limit execution must use latest market snapshot and crossing check.
-  - whether executedPrice is selected snapshot price or limitPrice.
+  - limit execution uses latest eligible market snapshot and crossing check.
+  - executedPrice is selected snapshot price, not limitPrice.
 - Cost basis policy:
-  - whether buy averageCost includes buy fee.
-  - whether sell realizedPnl subtracts sell fee through netAmount.
+  - buy averageCost includes buy fee through netAmount.
+  - sell realizedPnl subtracts sell fee through netAmount.
 - Duplicate executed response:
-  - current-state response is acceptable for MVP, or execute response storage is required.
+  - current-state response is accepted for MVP.
 - Error taxonomy:
-  - final code names and HTTP statuses.
+  - final code names and HTTP statuses are implemented in the service.
 - Transaction test matrix:
-  - which DB failure points are mandatory in the implementation task.
+  - unit tests and an env-gated DB integration spec were added.
 
 Operational blockers:
 
 - Successful local smoke requires real active season, joined participant, eligible asset price, eligible wallets/positions, and fresh approved USD/KRW snapshot for USD orders.
 - Do not create fake/static/sample business data to unblock smoke.
 
-## 7. Minimum MVP Scope That May Be Implemented Later
+## 7. Implemented MVP Scope
 
-Allowed later, after explicit implementation approval:
+Implemented after explicit implementation approval:
 
 - Add `POST /api/v1/orders/:orderId/execute` route.
 - Execute only owned active-season `submitted` orders.
@@ -149,6 +150,11 @@ Allowed later, after explicit implementation approval:
 - Already executed owned order returns current executed response without mutation.
 - No equity snapshot, settlement, ranking, provider ingestion, scheduler, or partial fill.
 
+Current verification note:
+
+- Unit/build validation is expected to run in the normal Jest/build path.
+- `ORDER_EXECUTE_DB_INTEGRATION=1 pnpm test -- orders.execute.integration.spec.ts` was added for PostgreSQL proof, but the current WSL environment could not run it because Docker is unavailable and PostgreSQL at `127.0.0.1:5432` was unreachable.
+
 ## 8. Scope That Must Not Be Implemented In The MVP
 
 - Partial fills.
@@ -165,30 +171,19 @@ Allowed later, after explicit implementation approval:
 - Fake/static/sample business data.
 - `x-user-id` fallback.
 
-## 9. Next Implementation Prompt Recommendation
+## 9. Next Follow-Up Recommendation
 
 Recommended next prompt scope:
 
-- Implement `POST /api/v1/orders/:orderId/execute` MVP only after accepting `docs/order-execution-safety-plan.md`.
-- No schema change unless exact execute response replay is required.
-- Include unit tests and DB integration tests in the same implementation task.
-- Require DB integration proof for:
-  - buy success.
-  - sell success.
-  - concurrent buy overspend.
-  - concurrent sell oversell.
-  - same order double execute.
-  - cancel vs execute race.
-  - rollback after wallet mutation.
-  - rollback after position mutation.
-  - rollback after wallet transaction creation.
-  - rollback during finalization.
-- Keep provider, settlement, scheduler, ranking automation, and equity snapshot creation out of scope.
+- Re-run `ORDER_EXECUTE_DB_INTEGRATION=1 pnpm test -- orders.execute.integration.spec.ts` in an environment where Docker/PostgreSQL is available.
+- Keep schema unchanged unless exact execute response replay, partial fills, separate fee ledger rows, or command lifecycle states are explicitly approved.
+- Design future exact execute replay separately if current-state duplicate response is insufficient.
+- Keep provider, settlement, scheduler, ranking automation, and equity snapshot creation out of scope unless a separate implementation gate approves them.
 
 ## 10. Audit Summary
 
-- Execution is feasible as a constrained full-fill MVP.
-- Current schema is ready for execution state and core financial writes.
+- Execution is implemented as a constrained full-fill MVP.
+- Current schema supported execution state and core financial writes without schema changes.
 - Current schema is intentionally limited for exact replay and partial fill audit.
 - FX execute provides the strongest transaction and rollback pattern.
-- The next step should be an implementation gate review, not immediate code.
+- The next step is DB integration verification in an environment with PostgreSQL/Docker available, plus future design for exact replay/partial fill if needed.

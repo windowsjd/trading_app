@@ -7,8 +7,10 @@
 - The MVP reads existing `exchange_transactions`, `wallet_transactions`, and `orders` rows only.
 - Order records are backed by the `orders` DB foundation.
 - Submitted orders created by `POST /api/v1/orders` are visible in the orders section.
-- Order records can include `status = submitted` or `status = canceled`; these are not execution/fill records.
+- Order records can include `status = submitted`, `status = executed`, `status = canceled`, or `status = rejected`.
 - Canceled orders from `POST /api/v1/orders/:orderId/cancel` are visible in the orders section.
+- Executed orders from `POST /api/v1/orders/:orderId/execute` are visible in the orders section with execution price/amount fields.
+- Order execute wallet transactions are visible in the wallet transaction section as `order_buy` or `order_sell` rows with `referenceType = order`.
 - Do not add fake data, Prisma schema changes, migrations, or seed changes from this document.
 
 ## Source Rules
@@ -156,8 +158,10 @@
 - If the user has not joined the selected season, `data.state` is `not_joined` and record arrays are empty.
 - If no current season or selected season exists, `data.state` is `unavailable`.
 - `type=orders` returns `data.state = available` for joined participants and reads actual `orders` rows.
-- `type=orders` can return submitted orders before execution exists.
+- `type=orders` can return submitted orders before execution.
+- `type=orders` can return executed orders, including `executedAt`, `executedPrice`, `grossAmount`, `feeAmount`, `netAmount`, `assetPriceSnapshotId`, and `fxRateSnapshotId`.
 - `type=orders` can return canceled orders, including `canceledAt`.
+- `type=wallets` can return order ledger rows with `transactionType = order_buy | order_sell` and `referenceType = order`.
 - The API does not synthesize or fake order records.
 - The API does not mutate DB rows.
 

@@ -7,11 +7,13 @@
 - `POST /api/v1/orders` submitted order create MVP is implemented.
 - `POST /api/v1/orders` create idempotency MVP is implemented.
 - `POST /api/v1/orders/:orderId/cancel` submitted order cancel MVP is implemented.
-- `POST /api/v1/orders/:orderId/execute` is not implemented; safety planning is documented in `docs/order-execution-safety-plan.md` and `docs/order-execution-preimplementation-readiness-audit.md`.
+- `POST /api/v1/orders/:orderId/execute` full-fill MVP is implemented.
 - `POST /api/v1/orders` creates one `orders` row with `status = submitted`.
 - `POST /api/v1/orders/:orderId/cancel` updates an owned submitted order row to `status = canceled`.
-- The APIs do not execute orders, debit or credit wallets, mutate positions, create wallet transactions, create equity snapshots, run settlement, or synthesize fake order data.
+- `POST /api/v1/orders/:orderId/execute` executes owned submitted orders as a full fill, debits or credits the cash wallet, mutates the position, creates one order wallet transaction, and finalizes the order to `executed`.
+- Quote/create/cancel/list APIs do not execute orders, debit or credit wallets, mutate positions, create wallet transactions, create equity snapshots, run settlement, or synthesize fake order data.
 - Stored gross/fee/net amounts on submitted orders are pre-execution quote estimates, not confirmed fill amounts.
+- Execute recalculates and stores actual `executedPrice`, `grossAmount`, `feeAmount`, and `netAmount` at execution time.
 
 ## Source Rules
 
@@ -292,6 +294,108 @@ Same body as `POST /api/v1/orders/quote`.
 }
 ```
 
+## POST /api/v1/orders/:orderId/execute
+
+### Request
+
+- `orderId` path parameter is required.
+- Request body is optional and ignored in this MVP.
+- Execute does not accept `idempotencyKey`; `orderId` is the command identity.
+- Uses `request.user.userId`; no `x-user-id` fallback.
+
+### Behavior
+
+- Missing auth returns `UNAUTHORIZED`.
+- Empty `orderId` returns `INVALID_ORDER_ID`.
+- Missing or unowned orders return `ORDER_NOT_FOUND`.
+- The order's season must be active; ended/settled/upcoming seasons cannot execute.
+- Only `status = submitted` can create a new execution.
+- `status = executed` returns a duplicate current-state response without wallet, position, ledger, or order mutation.
+- `status = canceled` and `status = rejected` return `ORDER_NOT_EXECUTABLE`.
+- Execute does not reuse create idempotency fields:
+  - `orders.idempotencyKey`
+  - `orders.requestHash`
+  - `orders.responsePayloadJson`
+- Already executed duplicate response is not an exact original execute replay. It is a current-state order response from the current row.
+- Submitted order gross/fee/net values are estimates only. Execute recalculates actual values and stores them on the order.
+- Market orders select the latest eligible `admin_manual` asset price snapshot:
+  - same asset.
+  - same currency.
+  - `sourceType = admin_manual`.
+  - `price > 0`.
+  - `effectiveAt <= executedAt`.
+  - ordered by `effectiveAt desc`, `capturedAt desc`, `createdAt desc`.
+- Limit orders use the same latest eligible market snapshot at execution time:
+  - buy executes only when selected price `<= limitPrice`.
+  - sell executes only when selected price `>= limitPrice`.
+  - `executedPrice` is the selected snapshot price, not the submitted `limitPrice`.
+- USD orders debit or credit the USD wallet. FX is not used to convert wallet amounts.
+- USD orders still select an approved fresh `admin_manual` USD/KRW snapshot for audit consistency and store `fxRateSnapshotId`.
+- KRW orders store `fxRateSnapshotId = null`.
+- Buy execute:
+  - guarded conditional cash wallet debit by `balanceAmount >= netAmount`.
+  - create or update position.
+  - average cost includes buy fee through `netAmount / quantity`.
+  - creates one `wallet_transactions` row with `direction = debit`, `txType = order_buy`, `referenceType = order`.
+  - finalizes order to `executed` with actual execution fields.
+- Sell execute:
+  - guarded conditional position decrement by `quantity >= sell quantity`.
+  - realized PnL delta is `netAmount - oldAverageCost * sellQuantity`.
+  - credits cash wallet by `netAmount`.
+  - creates one `wallet_transactions` row with `direction = credit`, `txType = order_sell`, `referenceType = order`.
+  - finalizes order to `executed` with actual execution fields.
+- Wallet mutation, position mutation, wallet transaction creation, and order finalization run in one Prisma transaction.
+- Guarded order finalization uses `id + seasonParticipantId + status = submitted`.
+- If finalization affects zero rows after prior writes inside the transaction, execute returns `ORDER_EXECUTION_CONFLICT` and rolls back all prior writes.
+- Execute creates no `equity_snapshots`, no `daily_portfolio_snapshots`, no `season_rankings`, no settlement rows, no scheduler/provider calls, and no separate fee wallet transaction row.
+- Executed orders are visible from `GET /api/v1/orders` and `GET /api/v1/records?type=orders`.
+- Order wallet transactions are visible from `GET /api/v1/records?type=wallets`.
+- Updated wallet balances are visible from `GET /api/v1/wallets`.
+
+### Success Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "order": "<GET /api/v1/orders order item with status=executed>",
+    "execution": {
+      "state": "executed",
+      "executedAt": "<UTC ISO string>",
+      "priceSource": "admin_manual",
+      "assetPriceSnapshotId": "<string>",
+      "fxRateSnapshotId": "<string | null>",
+      "walletTransactionId": "<string>",
+      "walletBalanceAfter": "<amount string>",
+      "positionId": "<string | null>",
+      "duplicate": false
+    }
+  }
+}
+```
+
+### Already Executed Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "order": "<current executed order item>",
+    "execution": {
+      "state": "already_executed",
+      "executedAt": "<UTC ISO string | null>",
+      "priceSource": "admin_manual",
+      "assetPriceSnapshotId": "<string | null>",
+      "fxRateSnapshotId": "<string | null>",
+      "walletTransactionId": null,
+      "walletBalanceAfter": null,
+      "positionId": null,
+      "duplicate": true
+    }
+  }
+}
+```
+
 ## Error Codes
 
 - `UNAUTHORIZED`
@@ -299,6 +403,15 @@ Same body as `POST /api/v1/orders/quote`.
 - `ORDER_NOT_FOUND`
 - `ORDER_NOT_CANCELABLE`
 - `ORDER_CANCEL_CONFLICT`
+- `ORDER_NOT_EXECUTABLE`
+- `ORDER_EXECUTION_CONFLICT`
+- `ORDER_PRICE_UNAVAILABLE`
+- `ORDER_LIMIT_NOT_MARKETABLE`
+- `ORDER_CASH_WALLET_NOT_FOUND`
+- `ORDER_POSITION_NOT_FOUND`
+- `CONCURRENT_WALLET_UPDATE`
+- `CONCURRENT_POSITION_UPDATE`
+- `ORDER_EXECUTION_TRANSACTION_FAILED`
 - `INVALID_IDEMPOTENCY_KEY`
 - `ORDER_IDEMPOTENCY_CONFLICT`
 - `INVALID_ORDER_STATUS`
@@ -323,12 +436,13 @@ Same body as `POST /api/v1/orders/quote`.
 
 ## Not Implemented
 
-- Order execution.
-  - Preimplementation safety plan exists.
-  - No route/service/write path is implemented yet.
 - Durable order quote.
-- Wallet debit/credit for orders.
-- Position mutation.
+- Partial fills.
+- Matching engine.
+- Execute-specific exact response replay.
 - Provider price ingestion.
 - Scheduler/batch.
 - Settlement.
+- Equity snapshot creation from order execution.
+- Daily portfolio snapshot automatic generation.
+- Ranking automatic generation.

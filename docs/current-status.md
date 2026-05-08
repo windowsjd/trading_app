@@ -22,6 +22,7 @@
 - `POST /api/v1/orders` submitted order create MVP
 - `POST /api/v1/orders` create idempotency MVP
 - `POST /api/v1/orders/:orderId/cancel` submitted order cancel MVP
+- `POST /api/v1/orders/:orderId/execute` full-fill MVP
 - `GET /api/v1/seasons/current`
 - `POST /api/v1/seasons/{seasonId}/join`
 - `POST /api/v1/fx/quote`
@@ -106,6 +107,22 @@ near-term ledger/FX foundation:
   - guarded update 조건: `id + seasonParticipantId + status = submitted`.
   - order row의 `status`, `canceledAt`, `updatedAt`만 변경.
   - wallet debit/credit, wallet_transactions, position mutation, equity snapshot, settlement 없음.
+- `POST /api/v1/orders/:orderId/execute` full-fill MVP 구현 완료:
+  - 로그인 사용자의 season participant 소유 active-season order만 execute 가능.
+  - `submitted` order만 buy/sell full-fill execute.
+  - `executed` order는 새 mutation 없이 current-state duplicate response 반환.
+  - `canceled`/`rejected` order는 `ORDER_NOT_EXECUTABLE`.
+  - market/limit 모두 execution 시점 latest eligible `admin_manual` asset price snapshot 사용.
+  - limit buy는 selected price `<= limitPrice`, limit sell은 selected price `>= limitPrice`일 때만 execute.
+  - actual `executedPrice`는 selected snapshot price이며 submitted estimate/limitPrice를 그대로 쓰지 않음.
+  - USD order는 USD wallet debit/credit을 사용하고, audit consistency용 approved fresh `admin_manual` USD/KRW snapshot id를 저장.
+  - KRW order는 `fxRateSnapshotId = null`.
+  - buy는 guarded cash wallet debit, position create/update, `order_buy` wallet transaction, guarded executed finalization 수행.
+  - sell은 guarded position decrement, realizedPnl update, cash wallet credit, `order_sell` wallet transaction, guarded executed finalization 수행.
+  - wallet mutation, position mutation, wallet transaction create, order finalization은 단일 Prisma transaction 안에서 처리.
+  - create idempotency용 `responsePayloadJson`은 execute replay에 사용하지 않음.
+  - exact execute response replay, partial fill, matching engine, settlement, provider/scheduler, separate fee wallet transaction row 없음.
+  - equity_snapshots, daily_portfolio_snapshots, season_rankings 자동 생성 없음.
 - `/records` orders section은 `orders` table 기반 read-only 조회로 연결 완료.
 - `admin_manual` asset/price bootstrap CLI 구현 완료:
   - `scripts/admin-upsert-asset.ts`
@@ -132,7 +149,7 @@ near-term ledger/FX foundation:
 - `/orders` cancel MVP 계약: `docs/orders-api-contract.md`.
 - `/orders` execution safety plan: `docs/order-execution-safety-plan.md`.
 - `/orders` execution preimplementation readiness audit: `docs/order-execution-preimplementation-readiness-audit.md`.
-- records API 계약: `docs/records-api-contract.md`에 submitted/canceled order 조회 가능 상태 반영.
+- records API 계약: `docs/records-api-contract.md`에 submitted/executed/canceled order 및 order wallet transaction 조회 가능 상태 반영.
 - `/fx quote` STOP review: `docs/fx-quote-stop-review.md`.
 - `/fx` API 계약 초안: `docs/fx-api-contract.md`.
 - FX rate input path plan: `docs/fx-rate-input-path-plan.md`.
@@ -228,10 +245,10 @@ near-term ledger/FX foundation:
   - rank는 1부터 순차 부여.
   - 기존 ranking row는 transaction 안에서 임시 음수 rank로 이동한 뒤 `(seasonId, rankType, rankingDate, seasonParticipantId)` unique 기준 upsert하여 rank unique 충돌을 피함.
 - 이 작업은 `/home`과 `/ranking` 구현 준비를 진전시켰지만, 자동 데이터 생성/외부 시세 공급/API 응답은 아직 없음.
-- scheduler/batch/provider ingestion/order execution/position mutation/settlement 구현 없음.
-- order quote/create/cancel MVP는 구현됐지만 execution은 STOP 상태.
-- order execution safety plan/preimplementation readiness audit 작성 완료.
-- order execution 구현 여부 판단은 별도 gate로 분리.
+- scheduler/batch/provider ingestion/settlement 구현 없음.
+- order quote/create/cancel/execute full-fill MVP 구현 완료.
+- order execution safety plan/preimplementation readiness audit 기준 full-fill MVP 범위는 코드에 반영됨.
+- order execution exact replay/partial fill/matching engine/settlement/provider ingestion은 별도 gate로 남음.
 
 ### `/fx execute`
 
@@ -342,7 +359,7 @@ near-term ledger/FX foundation:
 - full home implementation blocker:
   - provider price ingestion
   - asset price freshness policy
-  - orders 체결/position mutation
+  - order execution 이후 자동 daily portfolio snapshot/ranking 생성 정책
   - scheduler/batch daily portfolio snapshot 자동 생성
   - scheduler/batch season ranking 자동 생성
   - scheduler/batch
@@ -405,11 +422,12 @@ near-term ledger/FX foundation:
   - order row가 없으면 fake 없이 `orders.state = available`, empty records.
   - `POST /api/v1/orders`로 생성된 submitted order 조회 가능.
   - `POST /api/v1/orders/:orderId/cancel`로 canceled 처리된 order 조회 가능.
-  - order execution 구현 없음.
+  - `POST /api/v1/orders/:orderId/execute`로 executed 처리된 order 조회 가능.
+- wallet transaction records:
+  - order execute가 생성한 `order_buy`/`order_sell` wallet transaction 조회 가능.
 - `/records` 호출은 exchange/wallet/order row를 생성/수정/삭제하지 않음.
 - 아직 미구현:
   - full records filters/export/detail views.
-  - order execution/position mutation.
 
 ### `/orders`
 
@@ -418,7 +436,7 @@ near-term ledger/FX foundation:
 - `POST /api/v1/orders` submitted order create MVP 구현 완료.
 - `POST /api/v1/orders` create idempotency MVP 구현 완료.
 - `POST /api/v1/orders/:orderId/cancel` submitted order cancel MVP 구현 완료.
-- `POST /api/v1/orders/:orderId/execute`는 safety plan/preimplementation audit만 작성 완료, 구현 없음.
+- `POST /api/v1/orders/:orderId/execute` full-fill MVP 구현 완료.
 - auth 본체는 미완성이나 API는 기존 보호 API와 동일하게 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
 - query parameter:
   - `seasonId` optional.
@@ -457,26 +475,37 @@ near-term ledger/FX foundation:
   - race로 guarded update가 실패하면 `ORDER_CANCEL_CONFLICT`.
   - order row 상태만 `canceled`로 변경하고 `canceledAt` 기록.
   - wallet 차감/증가, wallet transaction, position mutation, equity snapshot, settlement 없음.
-- 주문 체결, settlement는 없음.
-- order execution 구현 전 STOP 조건은 `docs/order-execution-safety-plan.md`와 `docs/order-execution-preimplementation-readiness-audit.md` 기준으로 검토 필요.
+- execute:
+  - path `orderId` required, body optional.
+  - execute idempotencyKey는 받지 않음.
+  - 소유자가 아니거나 없는 order는 `ORDER_NOT_FOUND`.
+  - active season의 `submitted` order만 full-fill execute 가능.
+  - `executed` order는 새 mutation 없이 current-state duplicate response 반환.
+  - exact execute response replay는 현재 schema 제한으로 제공하지 않음.
+  - market/limit execution price는 execution 시점 latest eligible `admin_manual` asset price snapshot 기준.
+  - limit order는 selected market price crossing 조건을 만족해야 하며, selected price를 `executedPrice`로 저장.
+  - buy는 cash wallet debit, position create/update, `order_buy` wallet transaction 생성.
+  - sell은 position decrement/realizedPnl update, cash wallet credit, `order_sell` wallet transaction 생성.
+  - order finalization은 `id + seasonParticipantId + status = submitted` guarded update.
+  - 모든 financial write는 단일 Prisma transaction 안에서 처리.
+  - equity snapshot, daily snapshot, ranking, settlement, provider/scheduler, partial fill 없음.
+- settlement는 없음.
 
 ## 9. 다음 gate
 
 - OANDA trial/API 계약 검증 전 provider_api/official_batch/scheduler 구현 STOP 유지.
 - `/fx execute` 남은 DB-level rollback/partial-write hardening 및 stale pending/unknown outcome recovery 설계.
-- `/orders/:orderId/execute` MVP 구현 여부 gate:
-  - full-fill MVP 범위 수락.
-  - price selection/limit execution policy 수락.
-  - position averageCost/realizedPnl policy 수락.
-  - duplicate executed response policy 수락.
-  - rollback/concurrency DB integration test matrix 수락.
+- `/orders/:orderId/execute` MVP 후속 gate:
+  - exact execute response replay가 필요하면 schema/command table 별도 검토.
+  - partial fill/matching engine/settlement/provider ingestion은 별도 설계 필요.
+  - Docker/PostgreSQL 접근 가능 환경에서 `ORDER_EXECUTE_DB_INTEGRATION=1 pnpm test -- orders.execute.integration.spec.ts` 재검증 필요.
 - `/home` full implementation 가능 판정은 자동 valuation/ranking 생성, provider ingestion, order/position mutation 이후 재검토.
 
 ## 10. 아직 안 한 것
 
 - settlement
-- orders 체결
-- position mutation
+- order exact execute replay
+- order partial fill/matching engine
 - valuation/ranking 자동 생성 scheduler
 - provider price ingestion
 - automatic asset price ingestion
@@ -531,6 +560,12 @@ near-term ledger/FX foundation:
 - Prisma raw query로 `orders` table, order enum, index, FK, `prisma.order.count()` 확인 완료.
 - `pnpm test -- orders` 통과.
 - `pnpm test -- records` 통과.
+- `pnpm test -- orders --runInBand` 통과: order execute unit 포함, DB integration spec은 flag off로 skip.
+- `pnpm test -- records --runInBand` 통과: order wallet transaction records unit 포함.
+- `ORDER_EXECUTE_DB_INTEGRATION=1 pnpm test -- orders.execute.integration.spec.ts`는 현재 환경에서 blocked:
+  - sandbox 내부 최초 실행은 `/tmp/tsx-1000/*.pipe` IPC `EPERM`.
+  - sandbox 밖 재실행은 PostgreSQL `127.0.0.1:5432` 접속 실패(`P1001`).
+  - `docker compose ps` 확인 시 현재 WSL distro에서 `docker` 명령을 찾을 수 없음.
 - `POST /api/v1/orders/:orderId/cancel` unit tests 통과.
 - `POST /api/v1/orders` create idempotency unit tests 통과.
 - `pnpm exec prisma migrate dev --name add_order_create_idempotency`로 order create idempotency migration 적용 완료.
@@ -547,7 +582,6 @@ near-term ledger/FX foundation:
 - 지속적인 `/fx quote` 성공을 위한 승인 snapshot 공급 운영 절차 또는 provider/batch ingestion 경로 검토.
 - asset price ingestion/source/freshness 정책 설계.
 - asset/price admin CLI 운영 승인 절차 정리.
-- order execution MVP 구현 전 safety plan STOP 조건 수락.
-- order execute/position mutation 구현.
+- order execute DB integration은 현재 WSL 환경의 Docker 명령 부재/PostgreSQL 미접속으로 재실행 필요.
 - valuation/ranking 자동 생성 scheduler/API 연동 설계/구현.
 - settlement 보상/확정 로직 설계/구현.

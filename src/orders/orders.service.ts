@@ -10,6 +10,9 @@ import {
   ParticipantStatus,
   Prisma,
   SeasonStatus,
+  WalletTransactionDirection,
+  WalletTransactionReferenceType,
+  WalletTransactionType,
 } from '../generated/prisma/client';
 import {
   feeRateScale,
@@ -189,6 +192,82 @@ type CancelOrderResponse = {
   };
 };
 
+type ExecuteOrderResponse = {
+  success: true;
+  data: {
+    order: NonNullable<OrdersResponse['data']['orders']>[number];
+    execution: {
+      state: 'executed' | 'already_executed';
+      executedAt: string | null;
+      priceSource: 'admin_manual';
+      assetPriceSnapshotId: string | null;
+      fxRateSnapshotId: string | null;
+      walletTransactionId: string | null;
+      walletBalanceAfter: string | null;
+      positionId: string | null;
+      duplicate: boolean;
+    };
+  };
+};
+
+type OrderExecutionRecord = {
+  id: string;
+  seasonParticipantId: string;
+  assetId: string;
+  side: OrderSide;
+  orderType: OrderType;
+  status: OrderStatus;
+  quantity: Prisma.Decimal;
+  limitPrice: Prisma.Decimal | null;
+  executedPrice: Prisma.Decimal | null;
+  currencyCode: CurrencyCode;
+  grossAmount: Prisma.Decimal | null;
+  feeAmount: Prisma.Decimal | null;
+  netAmount: Prisma.Decimal | null;
+  assetPriceSnapshotId: string | null;
+  fxRateSnapshotId: string | null;
+  submittedAt: Date;
+  executedAt: Date | null;
+  canceledAt: Date | null;
+  rejectedAt: Date | null;
+  rejectReason: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  asset: {
+    id: string;
+    symbol: string;
+    name: string;
+    market: string;
+    currencyCode: CurrencyCode;
+  };
+  seasonParticipant: {
+    id: string;
+    participantStatus: ParticipantStatus;
+    joinedAt: Date;
+    season: ActiveOrderSeason;
+  };
+};
+
+type OrderExecutionPlan = {
+  executedAt: Date;
+  executedPrice: Prisma.Decimal;
+  grossAmount: Prisma.Decimal;
+  feeAmount: Prisma.Decimal;
+  netAmount: Prisma.Decimal;
+  assetPriceSnapshotId: string;
+  fxRateSnapshotId: string | null;
+};
+
+type OrderExecutionTransactionResult = {
+  order: NonNullable<OrdersResponse['data']['orders']>[number];
+  walletTransactionId: string;
+  walletBalanceAfter: string;
+  positionId: string | null;
+  plan: OrderExecutionPlan;
+};
+
+type OrderExecuteTransactionClient = Prisma.TransactionClient;
+
 const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
   SeasonStatus.active,
   SeasonStatus.upcoming,
@@ -199,6 +278,57 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 const MAX_DECIMAL_24_8 = new Prisma.Decimal('9999999999999999.99999999');
 const ORDER_CREATE_REQUEST_HASH_API_VERSION = 'order-create:v1';
+const ZERO_MONEY = '0.00000000';
+const ORDER_EXECUTION_SELECT = {
+  id: true,
+  seasonParticipantId: true,
+  assetId: true,
+  side: true,
+  orderType: true,
+  status: true,
+  quantity: true,
+  limitPrice: true,
+  executedPrice: true,
+  currencyCode: true,
+  grossAmount: true,
+  feeAmount: true,
+  netAmount: true,
+  assetPriceSnapshotId: true,
+  fxRateSnapshotId: true,
+  submittedAt: true,
+  executedAt: true,
+  canceledAt: true,
+  rejectedAt: true,
+  rejectReason: true,
+  createdAt: true,
+  updatedAt: true,
+  asset: {
+    select: {
+      id: true,
+      symbol: true,
+      name: true,
+      market: true,
+      currencyCode: true,
+    },
+  },
+  seasonParticipant: {
+    select: {
+      id: true,
+      participantStatus: true,
+      joinedAt: true,
+      season: {
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          startAt: true,
+          endAt: true,
+          tradeFeeRate: true,
+        },
+      },
+    },
+  },
+} as const;
 
 @Injectable()
 export class OrdersService {
@@ -469,6 +599,85 @@ export class OrdersService {
     };
   }
 
+  async executeOrder(
+    userId: string | undefined,
+    orderId: string | undefined,
+  ): Promise<ExecuteOrderResponse> {
+    if (!userId) {
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
+    }
+
+    const parsedOrderId = this.parseOrderId(orderId);
+    const executedAt = new Date();
+
+    try {
+      const result = await this.prisma.$transaction(async (tx) => {
+        const order = await this.findOwnedOrderForExecution(
+          tx,
+          parsedOrderId,
+          userId,
+        );
+
+        if (!order) {
+          this.throwApiError(
+            HttpStatus.NOT_FOUND,
+            'ORDER_NOT_FOUND',
+            'Order not found.',
+          );
+        }
+
+        this.assertExecutableSeasonAndAsset(order);
+
+        if (order.status === OrderStatus.executed) {
+          return this.buildAlreadyExecutedOrderResponse(order);
+        }
+
+        if (order.status !== OrderStatus.submitted) {
+          this.throwApiError(
+            HttpStatus.CONFLICT,
+            'ORDER_NOT_EXECUTABLE',
+            'Only submitted orders can be executed.',
+          );
+        }
+
+        const plan = await this.buildOrderExecutionPlan(tx, order, executedAt);
+
+        return order.side === OrderSide.buy
+          ? this.executeBuyOrderInTransaction(tx, order, plan)
+          : this.executeSellOrderInTransaction(tx, order, plan);
+      });
+
+      if (
+        typeof result === 'object' &&
+        result !== null &&
+        'data' in result &&
+        typeof result.data === 'object' &&
+        result.data !== null &&
+        'execution' in result.data
+      ) {
+        return result as ExecuteOrderResponse;
+      }
+
+      return this.buildExecutedOrderResponse(
+        result as OrderExecutionTransactionResult,
+      );
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'ORDER_EXECUTION_TRANSACTION_FAILED',
+        'Order execution transaction failed.',
+      );
+    }
+  }
+
   async getOrders(
     userId: string | undefined,
     query: OrdersQuery = {},
@@ -573,6 +782,790 @@ export class OrdersService {
         filters: this.formatFilters(parsedQuery),
         pagination: this.pagination(parsedQuery, total, orders.length),
         orders: orders.map((order) => this.formatOrder(order)),
+      },
+    };
+  }
+
+  private async findOwnedOrderForExecution(
+    tx: OrderExecuteTransactionClient,
+    orderId: string,
+    userId: string,
+  ): Promise<OrderExecutionRecord | null> {
+    const order = await tx.order.findFirst({
+      where: {
+        id: orderId,
+        seasonParticipant: {
+          userId,
+        },
+      },
+      select: ORDER_EXECUTION_SELECT,
+    });
+
+    return order as OrderExecutionRecord | null;
+  }
+
+  private assertExecutableSeasonAndAsset(order: OrderExecutionRecord) {
+    if (order.seasonParticipant.season.status !== SeasonStatus.active) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'SEASON_NOT_ACTIVE',
+        'Season is not active.',
+      );
+    }
+
+    if (order.asset.currencyCode !== order.currencyCode) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'ORDER_EXECUTION_TRANSACTION_FAILED',
+        'Order asset currency does not match order currency.',
+      );
+    }
+  }
+
+  private async buildOrderExecutionPlan(
+    tx: OrderExecuteTransactionClient,
+    order: OrderExecutionRecord,
+    executedAt: Date,
+  ): Promise<OrderExecutionPlan> {
+    const priceContext = await this.resolveExecutionPrice(tx, order, executedAt);
+    const tradeFeeRate = roundDecimalHalfUp(
+      order.seasonParticipant.season.tradeFeeRate,
+      feeRateScale,
+    );
+    const grossAmount = roundDecimalHalfUp(
+      order.quantity.mul(priceContext.price),
+      monetaryScale,
+    );
+    const feeAmount = roundDecimalHalfUp(
+      grossAmount.mul(tradeFeeRate),
+      monetaryScale,
+    );
+    const netAmount =
+      order.side === OrderSide.buy
+        ? roundDecimalHalfUp(grossAmount.add(feeAmount), monetaryScale)
+        : roundDecimalHalfUp(grossAmount.sub(feeAmount), monetaryScale);
+
+    if (netAmount.lt(0)) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'ORDER_EXECUTION_TRANSACTION_FAILED',
+        'Trade fee rate makes order net amount negative.',
+      );
+    }
+
+    const fxSnapshot =
+      order.currencyCode === CurrencyCode.USD
+        ? await this.findFreshUsdKrwSnapshotForExecution(tx, executedAt)
+        : null;
+
+    return {
+      executedAt,
+      executedPrice: priceContext.price,
+      grossAmount,
+      feeAmount,
+      netAmount,
+      assetPriceSnapshotId: priceContext.assetPriceSnapshotId,
+      fxRateSnapshotId: fxSnapshot?.id ?? null,
+    };
+  }
+
+  private async resolveExecutionPrice(
+    tx: OrderExecuteTransactionClient,
+    order: OrderExecutionRecord,
+    executedAt: Date,
+  ): Promise<{
+    price: Prisma.Decimal;
+    assetPriceSnapshotId: string;
+  }> {
+    const snapshot = await tx.assetPriceSnapshot.findFirst({
+      where: {
+        assetId: order.assetId,
+        currencyCode: order.currencyCode,
+        sourceType: AssetPriceSourceType.admin_manual,
+        effectiveAt: {
+          lte: executedAt,
+        },
+        price: {
+          gt: 0,
+        },
+      },
+      orderBy: [
+        { effectiveAt: 'desc' },
+        { capturedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      select: {
+        id: true,
+        price: true,
+      },
+    });
+
+    if (!snapshot) {
+      this.throwApiError(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'ORDER_PRICE_UNAVAILABLE',
+        'Order execution price is unavailable.',
+      );
+    }
+
+    const price = roundDecimalHalfUp(snapshot.price, monetaryScale);
+
+    if (order.orderType === OrderType.limit) {
+      if (!order.limitPrice) {
+        this.throwApiError(
+          HttpStatus.INTERNAL_SERVER_ERROR,
+          'ORDER_EXECUTION_TRANSACTION_FAILED',
+          'Limit order is missing limitPrice.',
+        );
+      }
+
+      const limitPrice = roundDecimalHalfUp(order.limitPrice, monetaryScale);
+      const isMarketable =
+        order.side === OrderSide.buy
+          ? price.lte(limitPrice)
+          : price.gte(limitPrice);
+
+      if (!isMarketable) {
+        this.throwApiError(
+          HttpStatus.CONFLICT,
+          'ORDER_LIMIT_NOT_MARKETABLE',
+          'Limit order is not marketable at the selected execution price.',
+        );
+      }
+    }
+
+    return {
+      price,
+      assetPriceSnapshotId: snapshot.id,
+    };
+  }
+
+  private async findFreshUsdKrwSnapshotForExecution(
+    tx: OrderExecuteTransactionClient,
+    executedAt: Date,
+  ): Promise<{ id: string }> {
+    const snapshot = await tx.fxRateSnapshot.findFirst({
+      where: {
+        baseCurrency: CurrencyCode.USD,
+        quoteCurrency: CurrencyCode.KRW,
+        sourceType: FxRateSourceType.admin_manual,
+        approvedByUserId: {
+          not: null,
+        },
+        effectiveAt: {
+          lte: executedAt,
+        },
+        rate: {
+          gt: 0,
+        },
+      },
+      orderBy: [
+        { effectiveAt: 'desc' },
+        { capturedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      select: {
+        id: true,
+        effectiveAt: true,
+      },
+    });
+
+    if (!snapshot) {
+      this.throwApiError(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'FX_RATE_UNAVAILABLE',
+        'FX rate is unavailable.',
+      );
+    }
+
+    if (isFxSnapshotStale(snapshot.effectiveAt, executedAt)) {
+      this.throwApiError(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'FX_RATE_STALE',
+        'FX rate is stale.',
+      );
+    }
+
+    return {
+      id: snapshot.id,
+    };
+  }
+
+  private async executeBuyOrderInTransaction(
+    tx: OrderExecuteTransactionClient,
+    order: OrderExecutionRecord,
+    plan: OrderExecutionPlan,
+  ): Promise<OrderExecutionTransactionResult> {
+    const wallet = await this.findCashWalletForExecution(
+      tx,
+      order.seasonParticipantId,
+      order.currencyCode,
+    );
+    const netAmount = this.formatDecimal(plan.netAmount, monetaryScale);
+    const debitResult = await tx.cashWallet.updateMany({
+      where: {
+        id: wallet.id,
+        seasonParticipantId: order.seasonParticipantId,
+        currencyCode: order.currencyCode,
+        balanceAmount: {
+          gte: netAmount,
+        },
+      },
+      data: {
+        balanceAmount: {
+          decrement: netAmount,
+        },
+      },
+    });
+
+    if (debitResult.count !== 1) {
+      await this.throwCashDebitFailure(tx, {
+        walletId: wallet.id,
+        seasonParticipantId: order.seasonParticipantId,
+        currencyCode: order.currencyCode,
+        amount: plan.netAmount,
+      });
+    }
+
+    const postWallet = await this.findCashWalletAfterUpdateOrThrow(tx, {
+      walletId: wallet.id,
+      seasonParticipantId: order.seasonParticipantId,
+      currencyCode: order.currencyCode,
+    });
+    const positionId = await this.createOrUpdateBuyPosition(tx, order, plan);
+    const walletTransaction = await tx.walletTransaction.create({
+      data: {
+        seasonParticipantId: order.seasonParticipantId,
+        walletId: wallet.id,
+        currencyCode: order.currencyCode,
+        direction: WalletTransactionDirection.debit,
+        txType: WalletTransactionType.order_buy,
+        referenceType: WalletTransactionReferenceType.order,
+        referenceId: order.id,
+        amount: netAmount,
+        balanceAfter: this.formatDecimal(postWallet.balanceAmount, monetaryScale),
+        occurredAt: plan.executedAt,
+      },
+      select: {
+        id: true,
+      },
+    });
+    const finalizedOrder = await this.finalizeExecutedOrder(tx, order, plan);
+
+    return {
+      order: this.formatOrder(finalizedOrder),
+      walletTransactionId: walletTransaction.id,
+      walletBalanceAfter: this.formatDecimal(
+        postWallet.balanceAmount,
+        monetaryScale,
+      ),
+      positionId,
+      plan,
+    };
+  }
+
+  private async executeSellOrderInTransaction(
+    tx: OrderExecuteTransactionClient,
+    order: OrderExecutionRecord,
+    plan: OrderExecutionPlan,
+  ): Promise<OrderExecutionTransactionResult> {
+    const position = await tx.position.findUnique({
+      where: {
+        seasonParticipantId_assetId: {
+          seasonParticipantId: order.seasonParticipantId,
+          assetId: order.assetId,
+        },
+      },
+      select: {
+        id: true,
+        quantity: true,
+        averageCost: true,
+        currencyCode: true,
+      },
+    });
+
+    if (!position) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'ORDER_POSITION_NOT_FOUND',
+        'Order position was not found.',
+      );
+    }
+
+    if (position.currencyCode !== order.currencyCode) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'ORDER_EXECUTION_TRANSACTION_FAILED',
+        'Position currency does not match order currency.',
+      );
+    }
+
+    const costBasis = roundDecimalHalfUp(
+      position.averageCost.mul(order.quantity),
+      monetaryScale,
+    );
+    const realizedPnlDelta = roundDecimalHalfUp(
+      plan.netAmount.sub(costBasis),
+      monetaryScale,
+    );
+    const positionUpdateResult = await tx.position.updateMany({
+      where: {
+        id: position.id,
+        seasonParticipantId: order.seasonParticipantId,
+        assetId: order.assetId,
+        quantity: {
+          gte: this.formatDecimal(order.quantity, monetaryScale),
+        },
+      },
+      data: {
+        quantity: {
+          decrement: this.formatDecimal(order.quantity, monetaryScale),
+        },
+        realizedPnl: this.buildDecimalDeltaUpdate(realizedPnlDelta),
+      },
+    });
+
+    if (positionUpdateResult.count !== 1) {
+      await this.throwPositionDecrementFailure(tx, {
+        positionId: position.id,
+        seasonParticipantId: order.seasonParticipantId,
+        assetId: order.assetId,
+        quantity: order.quantity,
+      });
+    }
+
+    const wallet = await this.findCashWalletForExecution(
+      tx,
+      order.seasonParticipantId,
+      order.currencyCode,
+    );
+    const netAmount = this.formatDecimal(plan.netAmount, monetaryScale);
+    const creditResult = await tx.cashWallet.updateMany({
+      where: {
+        id: wallet.id,
+        seasonParticipantId: order.seasonParticipantId,
+        currencyCode: order.currencyCode,
+      },
+      data: {
+        balanceAmount: {
+          increment: netAmount,
+        },
+      },
+    });
+
+    if (creditResult.count !== 1) {
+      await this.throwCashCreditFailure(tx, {
+        walletId: wallet.id,
+        seasonParticipantId: order.seasonParticipantId,
+        currencyCode: order.currencyCode,
+      });
+    }
+
+    const postWallet = await this.findCashWalletAfterUpdateOrThrow(tx, {
+      walletId: wallet.id,
+      seasonParticipantId: order.seasonParticipantId,
+      currencyCode: order.currencyCode,
+    });
+    const walletTransaction = await tx.walletTransaction.create({
+      data: {
+        seasonParticipantId: order.seasonParticipantId,
+        walletId: wallet.id,
+        currencyCode: order.currencyCode,
+        direction: WalletTransactionDirection.credit,
+        txType: WalletTransactionType.order_sell,
+        referenceType: WalletTransactionReferenceType.order,
+        referenceId: order.id,
+        amount: netAmount,
+        balanceAfter: this.formatDecimal(postWallet.balanceAmount, monetaryScale),
+        occurredAt: plan.executedAt,
+      },
+      select: {
+        id: true,
+      },
+    });
+    const finalizedOrder = await this.finalizeExecutedOrder(tx, order, plan);
+
+    return {
+      order: this.formatOrder(finalizedOrder),
+      walletTransactionId: walletTransaction.id,
+      walletBalanceAfter: this.formatDecimal(
+        postWallet.balanceAmount,
+        monetaryScale,
+      ),
+      positionId: position.id,
+      plan,
+    };
+  }
+
+  private async findCashWalletForExecution(
+    tx: OrderExecuteTransactionClient,
+    seasonParticipantId: string,
+    currencyCode: CurrencyCode,
+  ) {
+    const wallet = await tx.cashWallet.findUnique({
+      where: {
+        seasonParticipantId_currencyCode: {
+          seasonParticipantId,
+          currencyCode,
+        },
+      },
+      select: {
+        id: true,
+        seasonParticipantId: true,
+        currencyCode: true,
+        balanceAmount: true,
+      },
+    });
+
+    if (!wallet) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'ORDER_CASH_WALLET_NOT_FOUND',
+        'Order cash wallet was not found.',
+      );
+    }
+
+    return wallet;
+  }
+
+  private async findCashWalletAfterUpdateOrThrow(
+    tx: OrderExecuteTransactionClient,
+    input: {
+      walletId: string;
+      seasonParticipantId: string;
+      currencyCode: CurrencyCode;
+    },
+  ) {
+    const wallet = await tx.cashWallet.findFirst({
+      where: {
+        id: input.walletId,
+        seasonParticipantId: input.seasonParticipantId,
+        currencyCode: input.currencyCode,
+      },
+      select: {
+        id: true,
+        seasonParticipantId: true,
+        currencyCode: true,
+        balanceAmount: true,
+      },
+    });
+
+    if (!wallet) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'ORDER_CASH_WALLET_NOT_FOUND',
+        'Order cash wallet was not found.',
+      );
+    }
+
+    return wallet;
+  }
+
+  private async throwCashDebitFailure(
+    tx: OrderExecuteTransactionClient,
+    input: {
+      walletId: string;
+      seasonParticipantId: string;
+      currencyCode: CurrencyCode;
+      amount: Prisma.Decimal;
+    },
+  ): Promise<never> {
+    const wallet = await tx.cashWallet.findFirst({
+      where: {
+        id: input.walletId,
+        seasonParticipantId: input.seasonParticipantId,
+        currencyCode: input.currencyCode,
+      },
+      select: {
+        balanceAmount: true,
+      },
+    });
+
+    if (!wallet) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'ORDER_CASH_WALLET_NOT_FOUND',
+        'Order cash wallet was not found.',
+      );
+    }
+
+    if (wallet.balanceAmount.lt(input.amount)) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'INSUFFICIENT_CASH_BALANCE',
+        'Cash wallet balance is insufficient.',
+      );
+    }
+
+    this.throwApiError(
+      HttpStatus.CONFLICT,
+      'CONCURRENT_WALLET_UPDATE',
+      'Cash wallet was updated concurrently.',
+    );
+  }
+
+  private async throwCashCreditFailure(
+    tx: OrderExecuteTransactionClient,
+    input: {
+      walletId: string;
+      seasonParticipantId: string;
+      currencyCode: CurrencyCode;
+    },
+  ): Promise<never> {
+    const wallet = await tx.cashWallet.findFirst({
+      where: {
+        id: input.walletId,
+        seasonParticipantId: input.seasonParticipantId,
+        currencyCode: input.currencyCode,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!wallet) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'ORDER_CASH_WALLET_NOT_FOUND',
+        'Order cash wallet was not found.',
+      );
+    }
+
+    this.throwApiError(
+      HttpStatus.CONFLICT,
+      'CONCURRENT_WALLET_UPDATE',
+      'Cash wallet was updated concurrently.',
+    );
+  }
+
+  private async createOrUpdateBuyPosition(
+    tx: OrderExecuteTransactionClient,
+    order: OrderExecutionRecord,
+    plan: OrderExecutionPlan,
+  ): Promise<string> {
+    const position = await tx.position.findUnique({
+      where: {
+        seasonParticipantId_assetId: {
+          seasonParticipantId: order.seasonParticipantId,
+          assetId: order.assetId,
+        },
+      },
+      select: {
+        id: true,
+        quantity: true,
+        averageCost: true,
+        currencyCode: true,
+      },
+    });
+
+    if (!position) {
+      const averageCost = roundDecimalHalfUp(
+        plan.netAmount.div(order.quantity),
+        monetaryScale,
+      );
+      const created = await tx.position.create({
+        data: {
+          seasonParticipantId: order.seasonParticipantId,
+          assetId: order.assetId,
+          quantity: this.formatDecimal(order.quantity, monetaryScale),
+          averageCost: this.formatDecimal(averageCost, monetaryScale),
+          currencyCode: order.currencyCode,
+          realizedPnl: ZERO_MONEY,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      return created.id;
+    }
+
+    if (position.currencyCode !== order.currencyCode) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'ORDER_EXECUTION_TRANSACTION_FAILED',
+        'Position currency does not match order currency.',
+      );
+    }
+
+    const newQuantity = roundDecimalHalfUp(
+      position.quantity.add(order.quantity),
+      monetaryScale,
+    );
+    const oldCostBasis = position.averageCost.mul(position.quantity);
+    const newAverageCost = roundDecimalHalfUp(
+      oldCostBasis.add(plan.netAmount).div(newQuantity),
+      monetaryScale,
+    );
+    const updateResult = await tx.position.updateMany({
+      where: {
+        id: position.id,
+        seasonParticipantId: order.seasonParticipantId,
+        assetId: order.assetId,
+        quantity: this.formatDecimal(position.quantity, monetaryScale),
+        averageCost: this.formatDecimal(position.averageCost, monetaryScale),
+      },
+      data: {
+        quantity: this.formatDecimal(newQuantity, monetaryScale),
+        averageCost: this.formatDecimal(newAverageCost, monetaryScale),
+      },
+    });
+
+    if (updateResult.count !== 1) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'CONCURRENT_POSITION_UPDATE',
+        'Position was updated concurrently.',
+      );
+    }
+
+    return position.id;
+  }
+
+  private buildDecimalDeltaUpdate(delta: Prisma.Decimal) {
+    if (delta.gte(0)) {
+      return {
+        increment: this.formatDecimal(delta, monetaryScale),
+      };
+    }
+
+    return {
+      decrement: this.formatDecimal(delta.abs(), monetaryScale),
+    };
+  }
+
+  private async throwPositionDecrementFailure(
+    tx: OrderExecuteTransactionClient,
+    input: {
+      positionId: string;
+      seasonParticipantId: string;
+      assetId: string;
+      quantity: Prisma.Decimal;
+    },
+  ): Promise<never> {
+    const position = await tx.position.findFirst({
+      where: {
+        id: input.positionId,
+        seasonParticipantId: input.seasonParticipantId,
+        assetId: input.assetId,
+      },
+      select: {
+        quantity: true,
+      },
+    });
+
+    if (!position) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'ORDER_POSITION_NOT_FOUND',
+        'Order position was not found.',
+      );
+    }
+
+    if (position.quantity.lt(input.quantity)) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'INSUFFICIENT_POSITION_QUANTITY',
+        'Position quantity is insufficient.',
+      );
+    }
+
+    this.throwApiError(
+      HttpStatus.CONFLICT,
+      'CONCURRENT_POSITION_UPDATE',
+      'Position was updated concurrently.',
+    );
+  }
+
+  private async finalizeExecutedOrder(
+    tx: OrderExecuteTransactionClient,
+    order: OrderExecutionRecord,
+    plan: OrderExecutionPlan,
+  ): Promise<OrderExecutionRecord> {
+    const finalizationResult = await tx.order.updateMany({
+      where: {
+        id: order.id,
+        seasonParticipantId: order.seasonParticipantId,
+        status: OrderStatus.submitted,
+      },
+      data: {
+        status: OrderStatus.executed,
+        executedPrice: this.formatDecimal(plan.executedPrice, monetaryScale),
+        grossAmount: this.formatDecimal(plan.grossAmount, monetaryScale),
+        feeAmount: this.formatDecimal(plan.feeAmount, monetaryScale),
+        netAmount: this.formatDecimal(plan.netAmount, monetaryScale),
+        assetPriceSnapshotId: plan.assetPriceSnapshotId,
+        fxRateSnapshotId: plan.fxRateSnapshotId,
+        executedAt: plan.executedAt,
+      },
+    });
+
+    if (finalizationResult.count !== 1) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'ORDER_EXECUTION_CONFLICT',
+        'Order execution conflicted with another state change.',
+      );
+    }
+
+    const finalizedOrder = await tx.order.findUnique({
+      where: {
+        id: order.id,
+      },
+      select: ORDER_EXECUTION_SELECT,
+    });
+
+    if (!finalizedOrder) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'ORDER_EXECUTION_CONFLICT',
+        'Executed order could not be read back.',
+      );
+    }
+
+    return finalizedOrder as OrderExecutionRecord;
+  }
+
+  private buildExecutedOrderResponse(
+    result: OrderExecutionTransactionResult,
+  ): ExecuteOrderResponse {
+    return {
+      success: true,
+      data: {
+        order: result.order,
+        execution: {
+          state: 'executed',
+          executedAt: result.plan.executedAt.toISOString(),
+          priceSource: 'admin_manual',
+          assetPriceSnapshotId: result.plan.assetPriceSnapshotId,
+          fxRateSnapshotId: result.plan.fxRateSnapshotId,
+          walletTransactionId: result.walletTransactionId,
+          walletBalanceAfter: result.walletBalanceAfter,
+          positionId: result.positionId,
+          duplicate: false,
+        },
+      },
+    };
+  }
+
+  private buildAlreadyExecutedOrderResponse(
+    order: OrderExecutionRecord,
+  ): ExecuteOrderResponse {
+    return {
+      success: true,
+      data: {
+        order: this.formatOrder(order),
+        execution: {
+          state: 'already_executed',
+          executedAt: this.formatNullableDate(order.executedAt),
+          priceSource: 'admin_manual',
+          assetPriceSnapshotId: order.assetPriceSnapshotId,
+          fxRateSnapshotId: order.fxRateSnapshotId,
+          walletTransactionId: null,
+          walletBalanceAfter: null,
+          positionId: null,
+          duplicate: true,
+        },
       },
     };
   }
@@ -772,6 +1765,10 @@ export class OrdersService {
   }
 
   private parseCancelOrderId(orderId: string | undefined): string {
+    return this.parseOrderId(orderId);
+  }
+
+  private parseOrderId(orderId: string | undefined): string {
     if (typeof orderId !== 'string' || orderId.trim() === '') {
       this.throwApiError(
         HttpStatus.BAD_REQUEST,

@@ -7,10 +7,11 @@ Goal:
 - Define the safety design for future `POST /api/v1/orders/:orderId/execute`.
 - Limit the first implementation to full-fill execution of existing owned `submitted` orders.
 - Prevent duplicate execution, cancel/execute races, concurrent buy overspend, concurrent sell oversell, and partial financial writes.
+- Implementation note: the full-fill MVP route/write path has now been implemented according to this plan. Future expansions still require a separate plan.
 
 Non-goal:
 
-- Do not implement the route, service, schema, migration, seed, provider ingestion, scheduler, settlement, or test changes from this document.
+- Do not implement additional schema, migration, seed, provider ingestion, scheduler, settlement, or feature expansion from this document.
 - Do not implement partial fills, a matching engine, durable quotes, provider price ingestion, automatic daily ranking, or settlement.
 
 ## 2. Current Implementation State
@@ -19,8 +20,9 @@ Non-goal:
 - `POST /api/v1/orders/quote` is read-only and performs current resource checks.
 - `POST /api/v1/orders` creates one submitted order row and stores create idempotency fields.
 - `POST /api/v1/orders/:orderId/cancel` can change an owned submitted order to canceled with a guarded update.
-- Order execution is not implemented.
-- Order wallet debit/credit, order wallet transactions, position mutation, order equity snapshots, settlement, provider ingestion, and scheduler/batch are not implemented.
+- Order execution full-fill MVP is implemented.
+- Order wallet debit/credit, one order wallet transaction, position mutation, and guarded order finalization are implemented for the MVP.
+- Order equity snapshots, settlement, provider ingestion, scheduler/batch, matching engine, and partial fills are not implemented.
 - `/fx execute` has the most relevant local pattern: one transaction, guarded wallet updates, durable idempotency, stored response replay, rollback tests, and no equity snapshot in the near-term execute path.
 
 ## 3. Execution State Transition Policy
@@ -334,7 +336,7 @@ DB integration candidates:
 
 ## 17. STOP Conditions
 
-Do not implement order execution until these are accepted:
+The full-fill MVP implementation accepted these conditions for the current scope:
 
 - Final price selection policy for market and limit orders.
 - Final position cost basis and realizedPnl policy.
@@ -343,3 +345,13 @@ Do not implement order execution until these are accepted:
 - Error code names and HTTP statuses.
 - Rollback and concurrency DB integration test scope.
 - Confirmation that execution MVP does not create `equity_snapshots`, daily snapshots, rankings, settlement rows, provider ingestion, or scheduler jobs.
+
+Still STOP for future scope:
+
+- Partial fills.
+- Matching engine.
+- Exact execute response replay.
+- Separate fee wallet transaction rows.
+- Settlement.
+- Provider/scheduler execution.
+- Automatic daily portfolio snapshots or rankings from execution.
