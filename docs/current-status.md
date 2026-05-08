@@ -62,6 +62,7 @@
 - `assets`
 - `asset_price_snapshots`
 - `positions`
+- `orders`
 - `daily_portfolio_snapshots`
 - `season_rankings`
 
@@ -137,7 +138,7 @@ near-term ledger/FX foundation:
 ## 6. 현재 미도입 DB 상태
 
 - Prisma schema/migration 기준 현재 문서화된 핵심 DB foundation 추가 미도입 테이블 없음.
-- 단, 주문 체결/position mutation/provider price ingestion/settlement API/scheduler/batch 기반 자동 daily valuation/ranking 생성 경로는 아직 미구현.
+- order execution full-fill MVP와 position mutation 1차 write path는 구현 완료. 단, exact replay, durable quote, partial fill, matching engine, provider price ingestion, settlement API, scheduler/batch 기반 자동 daily valuation/ranking 생성 경로는 아직 미구현.
 
 ## 7. 완료된 문서/설계 상태
 
@@ -498,8 +499,8 @@ near-term ledger/FX foundation:
 - `/orders/:orderId/execute` MVP 후속 gate:
   - exact execute response replay가 필요하면 schema/command table 별도 검토.
   - partial fill/matching engine/settlement/provider ingestion은 별도 설계 필요.
-  - Docker/PostgreSQL 접근 가능 환경에서 `ORDER_EXECUTE_DB_INTEGRATION=1 pnpm test -- orders.execute.integration.spec.ts` 재검증 필요.
-- `/home` full implementation 가능 판정은 자동 valuation/ranking 생성, provider ingestion, order/position mutation 이후 재검토.
+  - DB integration은 실제 PostgreSQL 환경에서 통과했으며, 향후 schema/transaction 변경 시 재검증 필요.
+- `/home` full implementation 가능 판정은 자동 valuation/ranking 생성, provider ingestion, settlement 정책 이후 재검토.
 
 ## 10. 아직 안 한 것
 
@@ -562,10 +563,18 @@ near-term ledger/FX foundation:
 - `pnpm test -- records` 통과.
 - `pnpm test -- orders --runInBand` 통과: order execute unit 포함, DB integration spec은 flag off로 skip.
 - `pnpm test -- records --runInBand` 통과: order wallet transaction records unit 포함.
-- `ORDER_EXECUTE_DB_INTEGRATION=1 pnpm test -- orders.execute.integration.spec.ts`는 현재 환경에서 blocked:
-  - sandbox 내부 최초 실행은 `/tmp/tsx-1000/*.pipe` IPC `EPERM`.
-  - sandbox 밖 재실행은 PostgreSQL `127.0.0.1:5432` 접속 실패(`P1001`).
-  - `docker compose ps` 확인 시 현재 WSL distro에서 `docker` 명령을 찾을 수 없음.
+- `ORDER_EXECUTE_DB_INTEGRATION=1 pnpm test -- orders.execute.integration.spec.ts` 통과.
+- `/orders execute` DB integration spec은 실제 PostgreSQL 환경에서 통과.
+- `/orders execute` DB integration spec 검증 범위:
+  - buy execution one transaction success.
+  - sell execution one transaction success.
+  - concurrent buy overspend prevention.
+  - concurrent sell oversell prevention.
+  - same order concurrent execute one success only.
+  - cancel vs execute race one terminal state only.
+  - rollback failure injection.
+  - executed order and wallet transaction read visibility.
+- sandbox 내부 `ORDER_EXECUTE_DB_INTEGRATION=1 pnpm test -- orders.execute.integration.spec.ts`는 `/tmp/tsx-1000/*.pipe` IPC `EPERM`으로 실패했으나, sandbox 밖 동일 명령 재실행으로 통과.
 - `POST /api/v1/orders/:orderId/cancel` unit tests 통과.
 - `POST /api/v1/orders` create idempotency unit tests 통과.
 - `pnpm exec prisma migrate dev --name add_order_create_idempotency`로 order create idempotency migration 적용 완료.
@@ -582,6 +591,6 @@ near-term ledger/FX foundation:
 - 지속적인 `/fx quote` 성공을 위한 승인 snapshot 공급 운영 절차 또는 provider/batch ingestion 경로 검토.
 - asset price ingestion/source/freshness 정책 설계.
 - asset/price admin CLI 운영 승인 절차 정리.
-- order execute DB integration은 현재 WSL 환경의 Docker 명령 부재/PostgreSQL 미접속으로 재실행 필요.
+- order execute exact replay/partial fill/matching engine은 별도 설계 필요.
 - valuation/ranking 자동 생성 scheduler/API 연동 설계/구현.
 - settlement 보상/확정 로직 설계/구현.
