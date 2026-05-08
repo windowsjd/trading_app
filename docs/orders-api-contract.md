@@ -7,6 +7,7 @@
 - `POST /api/v1/orders` submitted order create MVP is implemented.
 - `POST /api/v1/orders` create idempotency MVP is implemented.
 - `POST /api/v1/orders/:orderId/cancel` submitted order cancel MVP is implemented.
+- `POST /api/v1/orders/:orderId/execute` is not implemented; safety planning is documented in `docs/order-execution-safety-plan.md` and `docs/order-execution-preimplementation-readiness-audit.md`.
 - `POST /api/v1/orders` creates one `orders` row with `status = submitted`.
 - `POST /api/v1/orders/:orderId/cancel` updates an owned submitted order row to `status = canceled`.
 - The APIs do not execute orders, debit or credit wallets, mutate positions, create wallet transactions, create equity snapshots, run settlement, or synthesize fake order data.
@@ -323,6 +324,8 @@ Same body as `POST /api/v1/orders/quote`.
 ## Not Implemented
 
 - Order execution.
+  - Preimplementation safety plan exists.
+  - No route/service/write path is implemented yet.
 - Durable order quote.
 - Wallet debit/credit for orders.
 - Position mutation.

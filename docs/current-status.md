@@ -130,6 +130,8 @@ near-term ledger/FX foundation:
 - `/orders` read-only MVP 계약: `docs/orders-api-contract.md`.
 - `/orders` quote/create MVP 계약: `docs/orders-api-contract.md`.
 - `/orders` cancel MVP 계약: `docs/orders-api-contract.md`.
+- `/orders` execution safety plan: `docs/order-execution-safety-plan.md`.
+- `/orders` execution preimplementation readiness audit: `docs/order-execution-preimplementation-readiness-audit.md`.
 - records API 계약: `docs/records-api-contract.md`에 submitted/canceled order 조회 가능 상태 반영.
 - `/fx quote` STOP review: `docs/fx-quote-stop-review.md`.
 - `/fx` API 계약 초안: `docs/fx-api-contract.md`.
@@ -228,6 +230,8 @@ near-term ledger/FX foundation:
 - 이 작업은 `/home`과 `/ranking` 구현 준비를 진전시켰지만, 자동 데이터 생성/외부 시세 공급/API 응답은 아직 없음.
 - scheduler/batch/provider ingestion/order execution/position mutation/settlement 구현 없음.
 - order quote/create/cancel MVP는 구현됐지만 execution은 STOP 상태.
+- order execution safety plan/preimplementation readiness audit 작성 완료.
+- order execution 구현 여부 판단은 별도 gate로 분리.
 
 ### `/fx execute`
 
@@ -414,6 +418,7 @@ near-term ledger/FX foundation:
 - `POST /api/v1/orders` submitted order create MVP 구현 완료.
 - `POST /api/v1/orders` create idempotency MVP 구현 완료.
 - `POST /api/v1/orders/:orderId/cancel` submitted order cancel MVP 구현 완료.
+- `POST /api/v1/orders/:orderId/execute`는 safety plan/preimplementation audit만 작성 완료, 구현 없음.
 - auth 본체는 미완성이나 API는 기존 보호 API와 동일하게 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
 - query parameter:
   - `seasonId` optional.
@@ -453,11 +458,18 @@ near-term ledger/FX foundation:
   - order row 상태만 `canceled`로 변경하고 `canceledAt` 기록.
   - wallet 차감/증가, wallet transaction, position mutation, equity snapshot, settlement 없음.
 - 주문 체결, settlement는 없음.
+- order execution 구현 전 STOP 조건은 `docs/order-execution-safety-plan.md`와 `docs/order-execution-preimplementation-readiness-audit.md` 기준으로 검토 필요.
 
 ## 9. 다음 gate
 
 - OANDA trial/API 계약 검증 전 provider_api/official_batch/scheduler 구현 STOP 유지.
 - `/fx execute` 남은 DB-level rollback/partial-write hardening 및 stale pending/unknown outcome recovery 설계.
+- `/orders/:orderId/execute` MVP 구현 여부 gate:
+  - full-fill MVP 범위 수락.
+  - price selection/limit execution policy 수락.
+  - position averageCost/realizedPnl policy 수락.
+  - duplicate executed response policy 수락.
+  - rollback/concurrency DB integration test matrix 수락.
 - `/home` full implementation 가능 판정은 자동 valuation/ranking 생성, provider ingestion, order/position mutation 이후 재검토.
 
 ## 10. 아직 안 한 것
@@ -535,6 +547,7 @@ near-term ledger/FX foundation:
 - 지속적인 `/fx quote` 성공을 위한 승인 snapshot 공급 운영 절차 또는 provider/batch ingestion 경로 검토.
 - asset price ingestion/source/freshness 정책 설계.
 - asset/price admin CLI 운영 승인 절차 정리.
-- order execute/position mutation 설계 및 구현.
+- order execution MVP 구현 전 safety plan STOP 조건 수락.
+- order execute/position mutation 구현.
 - valuation/ranking 자동 생성 scheduler/API 연동 설계/구현.
 - settlement 보상/확정 로직 설계/구현.
