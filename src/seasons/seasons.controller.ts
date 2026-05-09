@@ -1,5 +1,6 @@
 import { Controller, Get, Param, Post, Req } from '@nestjs/common';
 import { Request } from 'express';
+import { OptionalAuth } from '../auth/auth.decorators';
 import { SeasonsService } from './seasons.service';
 
 type AuthenticatedRequest = Request & {
@@ -12,6 +13,7 @@ type AuthenticatedRequest = Request & {
 export class SeasonsController {
   constructor(private readonly seasonsService: SeasonsService) {}
 
+  @OptionalAuth()
   @Get('current')
   getCurrentSeason(@Req() request: AuthenticatedRequest) {
     const userId = this.extractUserId(request);

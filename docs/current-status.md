@@ -13,6 +13,9 @@
 
 ## 2. 구현 완료 API
 
+- `POST /api/v1/auth/signup` access-token-only Auth MVP
+- `POST /api/v1/auth/login` access-token-only Auth MVP
+- `GET /api/v1/me` access-token-only Auth MVP
 - `GET /api/v1/home` read-only MVP
 - `GET /api/v1/ranking` read-only MVP
 - `GET /api/v1/wallets` read-only MVP
@@ -39,12 +42,24 @@
 - PostgreSQL (Docker)
 - Redis (Docker)
 
-## 4. 현재 인증 가정
+## 4. 현재 인증 상태
 
-- 보호 API에서 사용자 식별자는 `request.user.userId` 기준.
-- auth 본체는 아직 미구현 또는 미완성.
-- 보호 API는 실제 auth 연결 전까지 런타임 검증 필요.
-- `x-user-id` fallback 제거 완료.
+- access-token-only Auth MVP 구현 완료.
+- `POST /api/v1/auth/signup`, `POST /api/v1/auth/login`, `GET /api/v1/me` 구현 완료.
+- 전역 access token guard가 JWT를 검증하고 DB의 active user를 확인한 뒤 `request.user = { userId }`를 주입.
+- 보호 API에서 사용자 식별자는 계속 `request.user.userId` 기준.
+- `GET /api/v1/seasons/current`는 optional auth:
+  - Authorization header가 없으면 anonymous 허용.
+  - Authorization header가 있으면 반드시 검증하며 invalid/expired/malformed token은 anonymous downgrade 없이 `UNAUTHORIZED`.
+- public route:
+  - AppController health route.
+  - `POST /api/v1/auth/signup`.
+  - `POST /api/v1/auth/login`.
+- inactive user:
+  - missing/invalid/expired/forged token 또는 unknown user는 `UNAUTHORIZED`.
+  - `User.status`가 `suspended` 또는 `deleted`이면 `FORBIDDEN` + `USER_NOT_ACTIVE`.
+- refresh token, session/cookie auth, token revocation/logout은 아직 미구현.
+- `x-user-id` fallback 없음 유지.
 
 ## 5. 현재 DB 상태
 
@@ -182,7 +197,7 @@ near-term ledger/FX foundation:
   - CLI dry-run 후 non-dry-run snapshot 입력 성공.
   - 입력 snapshot: rate `1450.00000000`, sourceType/sourceName `admin_manual`, approvedByUserId `usr_dev_001`, effectiveAt/capturedAt `2026-05-07T10:01:53.000Z`.
   - smoke 당시 fresh 조건 통과: `ageMsAtCheck = 41822`로 60초 이내.
-  - auth 본체 미완성으로 HTTP 대신 실제 Prisma/PostgreSQL을 사용하는 `FxService.quote(userId, body)` 직접 호출 검증.
+  - access-token-only Auth MVP 이전 smoke였으므로 HTTP 대신 실제 Prisma/PostgreSQL을 사용하는 `FxService.quote(userId, body)` 직접 호출 검증.
   - KRW -> USD, USD -> KRW 양방향 quote 성공.
   - quote 응답의 `quoteId = null`, `expiresAt = null`, `rateCapturedAt`, `rateEffectiveAt` 확인.
   - quote 전후 mutation 없음 확인: `exchange_transactions 0 -> 0`, `wallet_transactions 1 -> 1`, `fx_execute_requests 0 -> 0`, `equity_snapshots 0 -> 0`.
@@ -337,7 +352,7 @@ near-term ledger/FX foundation:
 ### `/home`
 
 - `GET /api/v1/home` read-only MVP 구현 완료.
-- auth 본체는 미완성이나 API는 기존 보호 API와 동일하게 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
+- access-token-only Auth MVP 이후 API는 전역 guard가 주입한 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
 - 구현된 mode:
   - `active_joined`
   - `active_not_joined`
@@ -369,7 +384,7 @@ near-term ledger/FX foundation:
 ### `/ranking`
 
 - `GET /api/v1/ranking` read-only MVP 구현 완료.
-- auth 본체는 미완성이나 API는 기존 보호 API와 동일하게 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
+- access-token-only Auth MVP 이후 API는 전역 guard가 주입한 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
 - query parameter:
   - `seasonId` optional.
   - `rankingDate` optional, `YYYY-MM-DD`.
@@ -394,7 +409,7 @@ near-term ledger/FX foundation:
 ### `/wallets`
 
 - `GET /api/v1/wallets` read-only MVP 구현 완료.
-- auth 본체는 미완성이나 API는 기존 보호 API와 동일하게 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
+- access-token-only Auth MVP 이후 API는 전역 guard가 주입한 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
 - current season 선택 우선순위는 `/home`, `/ranking`과 동일: active, upcoming, ended, settled.
 - joined participant가 있으면 season status와 무관하게 기존 `cash_wallets`를 read-only로 조회.
 - 미참가면 fake wallet 없이 `state = not_joined`, no current season이면 `state = unavailable`.
@@ -404,7 +419,7 @@ near-term ledger/FX foundation:
 ### `/records`
 
 - `GET /api/v1/records` read-only MVP 구현 완료.
-- auth 본체는 미완성이나 API는 기존 보호 API와 동일하게 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
+- access-token-only Auth MVP 이후 API는 전역 guard가 주입한 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
 - query parameter:
   - `seasonId` optional.
   - `type` optional, default `all`, allowed `all`/`exchanges`/`wallets`/`orders`.
@@ -438,7 +453,7 @@ near-term ledger/FX foundation:
 - `POST /api/v1/orders` create idempotency MVP 구현 완료.
 - `POST /api/v1/orders/:orderId/cancel` submitted order cancel MVP 구현 완료.
 - `POST /api/v1/orders/:orderId/execute` full-fill MVP 구현 완료.
-- auth 본체는 미완성이나 API는 기존 보호 API와 동일하게 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
+- access-token-only Auth MVP 이후 API는 전역 guard가 주입한 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
 - query parameter:
   - `seasonId` optional.
   - `status` optional, allowed `submitted`/`executed`/`canceled`/`rejected`.
@@ -505,6 +520,10 @@ near-term ledger/FX foundation:
 ## 10. 아직 안 한 것
 
 - settlement
+- refresh token/session management
+- token revocation/logout
+- 더 넓은 HTTP e2e coverage
+- 운영 secret 관리
 - order exact execute replay
 - order partial fill/matching engine
 - valuation/ranking 자동 생성 scheduler
@@ -542,6 +561,11 @@ near-term ledger/FX foundation:
 - `admin_manual` asset/price input CLI 구현 및 validation unit test 통과.
 - `pnpm test` 통과.
 - `pnpm build` 통과.
+- access-token-only Auth MVP 검증:
+  - `pnpm test -- auth` 통과.
+  - `pnpm run test:e2e` 통과.
+  - `GET /api/v1/home` missing token 차단, `GET /api/v1/seasons/current` optional auth, `GET /api/v1/me` token 인증 smoke 확인.
+- `pnpm test -- seasons` 통과.
 - `pnpm test -- home` 통과.
 - `pnpm test -- ranking` 통과.
 - `pnpm test -- wallets` 통과.
