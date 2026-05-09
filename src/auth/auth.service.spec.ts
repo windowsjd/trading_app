@@ -39,7 +39,9 @@ describe('AuthService', () => {
     },
   });
 
-  const createService = () => {
+  const createService = (
+    options: { secret?: string | undefined; ttl?: string | undefined } = {},
+  ) => {
     const prisma = createPrisma();
     const jwtService = {
       signAsync: jest.fn().mockResolvedValue('access-token'),
@@ -47,11 +49,11 @@ describe('AuthService', () => {
     const configService = {
       get: jest.fn((key: string) => {
         if (key === 'JWT_ACCESS_SECRET') {
-          return 'test-secret';
+          return options.secret === undefined ? 'test-secret' : options.secret;
         }
 
         if (key === 'JWT_ACCESS_TTL') {
-          return '15m';
+          return options.ttl === undefined ? '15m' : options.ttl;
         }
 
         return undefined;
@@ -194,6 +196,59 @@ describe('AuthService', () => {
     );
     expect(response.data.tokens.accessToken).toBe('access-token');
     expect(JSON.stringify(response)).not.toContain('passwordHash');
+  });
+
+  it.each(['15m', '1h', '30s'])(
+    'accepts JWT_ACCESS_TTL=%s',
+    async (ttl) => {
+      const { jwtService, prisma, service } = createService({ ttl });
+      prisma.user.findUnique.mockResolvedValueOnce(activeUser);
+
+      await service.login({
+        email: 'user@example.com',
+        password: 'Password123!',
+      });
+
+      expect(jwtService.signAsync).toHaveBeenCalledWith(
+        { sub: activeUser.id },
+        { secret: 'test-secret', expiresIn: ttl },
+      );
+    },
+  );
+
+  it.each(['900', '15 m', '1y', '500ms'])(
+    'rejects invalid JWT_ACCESS_TTL=%s',
+    async (ttl) => {
+      const { prisma, service } = createService({ ttl });
+      prisma.user.findUnique.mockResolvedValueOnce(activeUser);
+
+      await expectHttpError(
+        service.login({
+          email: 'user@example.com',
+          password: 'Password123!',
+        }),
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'AUTH_CONFIGURATION_ERROR',
+      );
+    },
+  );
+
+  it('fails closed when JWT_ACCESS_SECRET is missing', () => {
+    const { service } = createService({ secret: '' });
+
+    expect(() => service.onModuleInit()).toThrow(HttpException);
+    try {
+      service.onModuleInit();
+    } catch (error) {
+      const httpError = error as HttpException;
+      expect(httpError.getStatus()).toBe(HttpStatus.INTERNAL_SERVER_ERROR);
+      expect(httpError.getResponse()).toMatchObject({
+        success: false,
+        error: {
+          code: 'AUTH_CONFIGURATION_ERROR',
+        },
+      });
+    }
   });
 
   it('rejects login with a wrong password', async () => {

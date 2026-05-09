@@ -46,8 +46,15 @@
 
 - access-token-only Auth MVP 구현 완료.
 - `POST /api/v1/auth/signup`, `POST /api/v1/auth/login`, `GET /api/v1/me` 구현 완료.
+- `POST /api/v1/auth/signup`은 명시적으로 `201 Created`.
+- `POST /api/v1/auth/login`은 명시적으로 `200 OK`.
 - 전역 access token guard가 JWT를 검증하고 DB의 active user를 확인한 뒤 `request.user = { userId }`를 주입.
 - 보호 API에서 사용자 식별자는 계속 `request.user.userId` 기준.
+- `JWT_ACCESS_SECRET`이 없으면 앱은 fail closed.
+- `JWT_ACCESS_TTL`은 공백 없는 숫자+단위 문자열만 허용.
+  - 허용 단위: `s`, `m`, `h`, `d`, `w`.
+  - 허용 예: `30s`, `15m`, `1h`, `7d`, `2w`.
+  - 금지 예: `900`, `15 m`, `500ms`, `1y`, 빈 문자열.
 - `GET /api/v1/seasons/current`는 optional auth:
   - Authorization header가 없으면 anonymous 허용.
   - Authorization header가 있으면 반드시 검증하며 invalid/expired/malformed token은 anonymous downgrade 없이 `UNAUTHORIZED`.
@@ -564,6 +571,10 @@ near-term ledger/FX foundation:
 - access-token-only Auth MVP 검증:
   - `pnpm test -- auth` 통과.
   - `pnpm run test:e2e` 통과.
+  - `AUTH_DB_SMOKE=1 pnpm test -- auth.integration.spec.ts`용 실제 PostgreSQL smoke spec 추가.
+  - `AUTH_DB_SMOKE=1 pnpm test -- auth.integration.spec.ts` 통과.
+  - DB smoke 검증 범위: 실제 Prisma user create, argon2 hash 저장/검증, login 성공, access token 발급, guard active user 확인, `me` 확인, suspended user `USER_NOT_ACTIVE`, cleanup.
+  - `AUTH_DB_SMOKE=1`이 없으면 DB smoke는 명시적으로 disabled 상태로 통과하며 DB row를 생성하지 않음.
   - `GET /api/v1/home` missing token 차단, `GET /api/v1/seasons/current` optional auth, `GET /api/v1/me` token 인증 smoke 확인.
 - `pnpm test -- seasons` 통과.
 - `pnpm test -- home` 통과.

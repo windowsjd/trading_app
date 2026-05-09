@@ -31,6 +31,25 @@
 $ npm install
 ```
 
+## Environment variables
+
+Required local environment variables:
+
+- `DATABASE_URL`
+- `REDIS_URL`
+- `JWT_ACCESS_SECRET`
+- `JWT_ACCESS_TTL`
+
+Auth notes:
+
+- `JWT_ACCESS_SECRET` must be set to a strong secret in local and production environments.
+- The `change-me` value in `.env.example` is only a placeholder and must not be used in production.
+- If `JWT_ACCESS_SECRET` is missing, auth fails closed.
+- `JWT_ACCESS_TTL` must be a string with an explicit unit.
+- Allowed TTL examples: `15m`, `1h`, `7d`, `30s`, `2w`.
+- Invalid TTL examples: `900`, `15 m`, `500ms`, `1y`.
+- Refresh tokens, logout, token revocation, session auth, and cookie auth are not implemented in the current access-token-only MVP.
+
 ## Compile and run the project
 
 ```bash

@@ -266,7 +266,7 @@ describe('AppController (e2e)', () => {
         email: 'USER@example.com',
         password: 'Password123!',
       })
-      .expect(201)
+      .expect(200)
       .expect((response) => {
         expect(response.body.success).toBe(true);
         expect(response.body.data.user).toEqual({
@@ -366,6 +366,22 @@ describe('AppController (e2e)', () => {
     return request(app.getHttpServer())
       .get('/api/v1/seasons/current')
       .set('Authorization', 'Bearer invalid-token')
+      .expect(401)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+          },
+        });
+        expect(prisma.season.findFirst).not.toHaveBeenCalled();
+      });
+  });
+
+  it('/api/v1/seasons/current (GET) rejects malformed optional auth headers', () => {
+    return request(app.getHttpServer())
+      .get('/api/v1/seasons/current')
+      .set('Authorization', 'Token invalid-token')
       .expect(401)
       .expect((response) => {
         expect(response.body).toMatchObject({

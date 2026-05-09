@@ -101,9 +101,11 @@ export class AccessTokenGuard implements CanActivate {
   }
 
   private async verifyToken(token: string): Promise<AccessTokenPayload> {
+    const secret = this.getAccessSecret();
+
     try {
       return await this.jwtService.verifyAsync<AccessTokenPayload>(token, {
-        secret: this.getAccessSecret(),
+        secret,
       });
     } catch {
       this.throwUnauthorized();

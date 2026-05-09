@@ -20,11 +20,8 @@ import type {
   SignupRequestBody,
 } from './auth.types';
 
-type JwtTtlUnit = 'ms' | 's' | 'm' | 'h' | 'd' | 'w' | 'y';
-type JwtExpiresIn =
-  | `${number}`
-  | `${number}${JwtTtlUnit}`
-  | `${number} ${JwtTtlUnit}`;
+type JwtTtlUnit = 's' | 'm' | 'h' | 'd' | 'w';
+type JwtExpiresIn = `${number}${JwtTtlUnit}`;
 
 type ParsedSignupRequest = {
   email: string;
@@ -294,7 +291,7 @@ export class AuthService implements OnModuleInit {
     const ttl =
       this.configService.get<string>('JWT_ACCESS_TTL')?.trim() ||
       DEFAULT_ACCESS_TTL;
-    if (/^\d+(?:\s?(?:ms|s|m|h|d|w|y))?$/.test(ttl)) {
+    if (/^\d+(?:s|m|h|d|w)$/.test(ttl)) {
       return ttl as JwtExpiresIn;
     }
 

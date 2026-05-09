@@ -34,7 +34,7 @@ describe('AccessTokenGuard', () => {
       })),
     }) as unknown as ExecutionContext;
 
-  const createGuard = () => {
+  const createGuard = (options: { secret?: string | undefined } = {}) => {
     const jwtService = {
       verifyAsync: jest.fn(),
     };
@@ -48,7 +48,11 @@ describe('AccessTokenGuard', () => {
     } as unknown as jest.Mocked<Reflector>;
     const configService = {
       get: jest.fn((key: string) =>
-        key === 'JWT_ACCESS_SECRET' ? 'test-secret' : undefined,
+        key === 'JWT_ACCESS_SECRET'
+          ? options.secret === undefined
+            ? 'test-secret'
+            : options.secret
+          : undefined,
       ),
     };
     const guard = new AccessTokenGuard(
@@ -110,6 +114,16 @@ describe('AccessTokenGuard', () => {
     expect(prisma.user.findUnique).not.toHaveBeenCalled();
   });
 
+  it('allows public routes without reading JWT_ACCESS_SECRET', async () => {
+    const { configService, guard, reflector } = createGuard({ secret: '' });
+    mockRouteMetadata(reflector, { public: true });
+
+    await expect(guard.canActivate(createContext(createRequest()))).resolves.toBe(
+      true,
+    );
+    expect(configService.get).not.toHaveBeenCalled();
+  });
+
   it('injects request.user.userId for a valid active-user token', async () => {
     const { guard, jwtService, prisma, reflector } = createGuard();
     mockRouteMetadata(reflector);
@@ -156,6 +170,19 @@ describe('AccessTokenGuard', () => {
       'UNAUTHORIZED',
     );
     expect(prisma.user.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when JWT_ACCESS_SECRET is missing for protected routes', async () => {
+    const { guard, reflector } = createGuard({ secret: '' });
+    mockRouteMetadata(reflector);
+
+    await expectHttpError(
+      guard.canActivate(
+        createContext(createRequest({ authorization: 'Bearer valid-token' })),
+      ),
+      HttpStatus.INTERNAL_SERVER_ERROR,
+      'AUTH_CONFIGURATION_ERROR',
+    );
   });
 
   it('allows optional auth routes without a token', async () => {
