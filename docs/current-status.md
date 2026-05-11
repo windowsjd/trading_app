@@ -67,6 +67,13 @@
   - `User.status`가 `suspended` 또는 `deleted`이면 `FORBIDDEN` + `USER_NOT_ACTIVE`.
 - refresh token, session/cookie auth, token revocation/logout은 아직 미구현.
 - `x-user-id` fallback 없음 유지.
+- Auth 적용 후 HTTP e2e coverage 확대 완료:
+  - public route: `GET /health`, `GET /health/db`, `POST /api/v1/auth/signup`, `POST /api/v1/auth/login`.
+  - optional auth route: `GET /api/v1/seasons/current` anonymous/valid token/invalid token/malformed Authorization/`x-user-id` only 회귀 검증.
+  - protected read-only route: `GET /api/v1/me`, `/home`, `/ranking`, `/wallets`, `/records`, `/orders` missing token 및 `x-user-id` only `UNAUTHORIZED` 검증.
+  - protected read-only route valid token smoke: `GET /api/v1/me`, `/home`, `/ranking`, `/wallets`, `/records`, `/orders`가 guard를 통과해 service-level 정상 응답 또는 known unavailable/not_joined 계약으로 진입하는지 검증.
+  - protected write-path route: `POST /api/v1/seasons/:seasonId/join`, `/fx/quote`, `/fx/execute`, `/orders/quote`, `/orders`, `/orders/:orderId/cancel`, `/orders/:orderId/execute` missing token 및 `x-user-id` only 차단 검증.
+  - write-path API는 guard-level 차단 회귀를 HTTP e2e에서 담당하고, full write-path DB integration은 기존 service/integration 테스트가 담당.
 
 ## 5. 현재 DB 상태
 
@@ -529,7 +536,7 @@ near-term ledger/FX foundation:
 - settlement
 - refresh token/session management
 - token revocation/logout
-- 더 넓은 HTTP e2e coverage
+- auth guard 회귀 외 추가 비즈니스 시나리오별 HTTP e2e coverage
 - 운영 secret 관리
 - order exact execute replay
 - order partial fill/matching engine
@@ -576,6 +583,9 @@ near-term ledger/FX foundation:
   - DB smoke 검증 범위: 실제 Prisma user create, argon2 hash 저장/검증, login 성공, access token 발급, guard active user 확인, `me` 확인, suspended user `USER_NOT_ACTIVE`, cleanup.
   - `AUTH_DB_SMOKE=1`이 없으면 DB smoke는 명시적으로 disabled 상태로 통과하며 DB row를 생성하지 않음.
   - `GET /api/v1/home` missing token 차단, `GET /api/v1/seasons/current` optional auth, `GET /api/v1/me` token 인증 smoke 확인.
+  - Auth protected route HTTP e2e 회귀 검증 확대 완료.
+  - public/optional/protected read-only/write-path route의 missing token, invalid/malformed token, `x-user-id` only, valid token smoke 범위가 `test/app.e2e-spec.ts`에 반영됨.
+  - write-path API의 full execute mutation 검증은 기존 service/unit/DB integration spec이 담당하며, HTTP e2e는 guard 차단과 quote-level valid-token smoke 중심으로 유지.
 - `pnpm test -- seasons` 통과.
 - `pnpm test -- home` 통과.
 - `pnpm test -- ranking` 통과.

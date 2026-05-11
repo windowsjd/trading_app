@@ -52,6 +52,10 @@ jest.mock('../src/generated/prisma/client', () => {
       ended: 'ended',
       settled: 'settled',
     },
+    SeasonRankingType: {
+      daily: 'daily',
+      final: 'final',
+    },
     UserStatus: {
       active: 'active',
       suspended: 'suspended',
@@ -96,29 +100,94 @@ import { JwtService } from '@nestjs/jwt';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
+import { Prisma } from './../src/generated/prisma/client';
 import { PrismaService } from './../src/prisma/prisma.service';
 import * as argon2 from 'argon2';
 
 const mockedArgon2 = jest.mocked(argon2);
 
+type HttpMethod = 'get' | 'post';
+
+type PrismaMock = {
+  $connect: jest.Mock;
+  $disconnect: jest.Mock;
+  $queryRaw: jest.Mock;
+  $transaction: jest.Mock;
+  asset: {
+    findUnique: jest.Mock;
+  };
+  assetPriceSnapshot: {
+    findFirst: jest.Mock;
+  };
+  cashWallet: {
+    create: jest.Mock;
+    findFirst: jest.Mock;
+    findMany: jest.Mock;
+    findUnique: jest.Mock;
+    updateMany: jest.Mock;
+  };
+  dailyPortfolioSnapshot: {
+    findFirst: jest.Mock;
+  };
+  exchangeTransaction: {
+    count: jest.Mock;
+    create: jest.Mock;
+    findMany: jest.Mock;
+  };
+  fxExecuteRequest: {
+    create: jest.Mock;
+    findUnique: jest.Mock;
+    update: jest.Mock;
+  };
+  fxRateSnapshot: {
+    findFirst: jest.Mock;
+    findMany: jest.Mock;
+  };
+  order: {
+    count: jest.Mock;
+    create: jest.Mock;
+    findFirst: jest.Mock;
+    findMany: jest.Mock;
+    findUnique: jest.Mock;
+    update: jest.Mock;
+    updateMany: jest.Mock;
+  };
+  position: {
+    create: jest.Mock;
+    findFirst: jest.Mock;
+    findUnique: jest.Mock;
+    update: jest.Mock;
+    updateMany: jest.Mock;
+  };
+  season: {
+    findFirst: jest.Mock;
+    findUnique: jest.Mock;
+  };
+  seasonParticipant: {
+    create: jest.Mock;
+    findUnique: jest.Mock;
+  };
+  seasonRanking: {
+    count: jest.Mock;
+    findFirst: jest.Mock;
+    findMany: jest.Mock;
+    findUnique: jest.Mock;
+  };
+  user: {
+    create: jest.Mock;
+    findUnique: jest.Mock;
+  };
+  walletTransaction: {
+    count: jest.Mock;
+    create: jest.Mock;
+    findMany: jest.Mock;
+  };
+};
+
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
   let jwtService: JwtService;
-  let prisma: {
-    $connect: jest.Mock;
-    $disconnect: jest.Mock;
-    $queryRaw: jest.Mock;
-    season: {
-      findFirst: jest.Mock;
-    };
-    seasonParticipant: {
-      findUnique: jest.Mock;
-    };
-    user: {
-      findUnique: jest.Mock;
-      create: jest.Mock;
-    };
-  };
+  let prisma: PrismaMock;
 
   const originalJwtAccessSecret = process.env.JWT_ACCESS_SECRET;
   const originalJwtAccessTtl = process.env.JWT_ACCESS_TTL;
@@ -138,15 +207,37 @@ describe('AppController (e2e)', () => {
     status: 'active',
     startAt: new Date('2026-05-01T00:00:00.000Z'),
     endAt: new Date('2026-05-31T00:00:00.000Z'),
-    initialCapitalKrw: {
-      toFixed: jest.fn(() => '10000000.00000000'),
-    },
-    tradeFeeRate: {
-      toFixed: jest.fn(() => '0.001000'),
-    },
-    fxFeeRate: {
-      toFixed: jest.fn(() => '0.001000'),
-    },
+    initialCapitalKrw: new Prisma.Decimal('10000000.00000000'),
+    tradeFeeRate: new Prisma.Decimal('0.001000'),
+    fxFeeRate: new Prisma.Decimal('0.001000'),
+  };
+  const participant = {
+    id: 'participant-1',
+    participantStatus: 'active',
+    joinedAt: now,
+    initialCapitalKrw: new Prisma.Decimal('10000000.00000000'),
+  };
+  const krwWallet = {
+    id: 'wallet-krw-1',
+    seasonParticipantId: participant.id,
+    currencyCode: 'KRW',
+    balanceAmount: new Prisma.Decimal('10000000.00000000'),
+    updatedAt: now,
+  };
+  const usdWallet = {
+    id: 'wallet-usd-1',
+    seasonParticipantId: participant.id,
+    currencyCode: 'USD',
+    balanceAmount: new Prisma.Decimal('0.00000000'),
+    updatedAt: now,
+  };
+  const asset = {
+    id: 'asset-1',
+    symbol: '005930',
+    name: 'Samsung Electronics',
+    market: 'KRX',
+    currencyCode: 'KRW',
+    isActive: true,
   };
 
   beforeAll(() => {
@@ -176,16 +267,76 @@ describe('AppController (e2e)', () => {
     prisma = {
       $connect: jest.fn(),
       $disconnect: jest.fn(),
-      $queryRaw: jest.fn(),
-      season: {
+      $queryRaw: jest.fn().mockResolvedValue([{ result: 1 }]),
+      $transaction: jest.fn(),
+      asset: {
+        findUnique: jest.fn(),
+      },
+      assetPriceSnapshot: {
         findFirst: jest.fn(),
       },
+      cashWallet: {
+        create: jest.fn(),
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        updateMany: jest.fn(),
+      },
+      dailyPortfolioSnapshot: {
+        findFirst: jest.fn(),
+      },
+      exchangeTransaction: {
+        count: jest.fn(),
+        create: jest.fn(),
+        findMany: jest.fn(),
+      },
+      fxExecuteRequest: {
+        create: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
+      fxRateSnapshot: {
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
+      },
+      order: {
+        count: jest.fn(),
+        create: jest.fn(),
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+      },
+      position: {
+        create: jest.fn(),
+        findFirst: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+      },
+      season: {
+        findFirst: jest.fn(),
+        findUnique: jest.fn(),
+      },
       seasonParticipant: {
+        create: jest.fn(),
+        findUnique: jest.fn(),
+      },
+      seasonRanking: {
+        count: jest.fn(),
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
         findUnique: jest.fn(),
       },
       user: {
-        findUnique: jest.fn(),
         create: jest.fn(),
+        findUnique: jest.fn(),
+      },
+      walletTransaction: {
+        count: jest.fn(),
+        create: jest.fn(),
+        findMany: jest.fn(),
       },
     };
 
@@ -205,6 +356,151 @@ describe('AppController (e2e)', () => {
     await app.close();
   });
 
+  const resetPrismaMocks = () => {
+    const resetMockObject = (value: unknown) => {
+      if (typeof value === 'function' && 'mockReset' in value) {
+        (value as jest.Mock).mockReset();
+        return;
+      }
+
+      if (value && typeof value === 'object') {
+        Object.values(value).forEach(resetMockObject);
+      }
+    };
+
+    resetMockObject(prisma);
+    prisma.$queryRaw.mockResolvedValue([{ result: 1 }]);
+  };
+
+  const createValidAccessToken = (userId = user.id) =>
+    jwtService.signAsync(
+      {
+        sub: userId,
+      },
+      {
+        secret: 'test-secret',
+        expiresIn: '15m',
+      },
+    );
+
+  const mockActiveUser = (userId = user.id) => {
+    prisma.user.findUnique.mockResolvedValue({
+      ...user,
+      id: userId,
+      status: 'active',
+    });
+  };
+
+  const mockActiveSeason = () => {
+    prisma.season.findFirst.mockResolvedValue({
+      ...season,
+      tradeFeeRate: new Prisma.Decimal('0.001000'),
+      fxFeeRate: new Prisma.Decimal('0.001000'),
+    });
+  };
+
+  const mockJoinedParticipant = () => {
+    prisma.seasonParticipant.findUnique.mockResolvedValue({
+      ...participant,
+      cashWallets: [krwWallet, usdWallet],
+      positions: [],
+    });
+  };
+
+  const buildRequest = (method: HttpMethod, path: string) => {
+    const http = request(app.getHttpServer());
+    return method === 'get' ? http.get(path) : http.post(path);
+  };
+
+  const expectUnauthorizedBody = (body: unknown) => {
+    expect(body).toMatchObject({
+      success: false,
+      error: {
+        code: 'UNAUTHORIZED',
+      },
+    });
+  };
+
+  const expectNoWriteMutationCalls = () => {
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.seasonParticipant.create).not.toHaveBeenCalled();
+    expect(prisma.cashWallet.create).not.toHaveBeenCalled();
+    expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
+    expect(prisma.fxExecuteRequest.create).not.toHaveBeenCalled();
+    expect(prisma.fxExecuteRequest.update).not.toHaveBeenCalled();
+    expect(prisma.exchangeTransaction.create).not.toHaveBeenCalled();
+    expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+    expect(prisma.order.create).not.toHaveBeenCalled();
+    expect(prisma.order.update).not.toHaveBeenCalled();
+    expect(prisma.order.updateMany).not.toHaveBeenCalled();
+    expect(prisma.position.create).not.toHaveBeenCalled();
+    expect(prisma.position.update).not.toHaveBeenCalled();
+    expect(prisma.position.updateMany).not.toHaveBeenCalled();
+  };
+
+  const expectNoServiceDatabaseCalls = () => {
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(prisma.season.findFirst).not.toHaveBeenCalled();
+    expect(prisma.season.findUnique).not.toHaveBeenCalled();
+    expect(prisma.seasonParticipant.findUnique).not.toHaveBeenCalled();
+    expect(prisma.cashWallet.findMany).not.toHaveBeenCalled();
+    expect(prisma.cashWallet.findUnique).not.toHaveBeenCalled();
+    expect(prisma.dailyPortfolioSnapshot.findFirst).not.toHaveBeenCalled();
+    expect(prisma.exchangeTransaction.count).not.toHaveBeenCalled();
+    expect(prisma.exchangeTransaction.findMany).not.toHaveBeenCalled();
+    expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
+    expect(prisma.fxRateSnapshot.findMany).not.toHaveBeenCalled();
+    expect(prisma.fxExecuteRequest.findUnique).not.toHaveBeenCalled();
+    expect(prisma.asset.findUnique).not.toHaveBeenCalled();
+    expect(prisma.assetPriceSnapshot.findFirst).not.toHaveBeenCalled();
+    expect(prisma.order.count).not.toHaveBeenCalled();
+    expect(prisma.order.findFirst).not.toHaveBeenCalled();
+    expect(prisma.order.findMany).not.toHaveBeenCalled();
+    expect(prisma.order.findUnique).not.toHaveBeenCalled();
+    expect(prisma.position.findFirst).not.toHaveBeenCalled();
+    expect(prisma.position.findUnique).not.toHaveBeenCalled();
+    expect(prisma.seasonRanking.findFirst).not.toHaveBeenCalled();
+    expect(prisma.seasonRanking.findMany).not.toHaveBeenCalled();
+    expect(prisma.seasonRanking.findUnique).not.toHaveBeenCalled();
+    expect(prisma.walletTransaction.count).not.toHaveBeenCalled();
+    expect(prisma.walletTransaction.findMany).not.toHaveBeenCalled();
+    expectNoWriteMutationCalls();
+  };
+
+  const expectUnauthorizedWithoutToken = async (
+    method: HttpMethod,
+    path: string,
+    body?: object,
+  ) => {
+    resetPrismaMocks();
+    const testRequest = buildRequest(method, path);
+    if (body) {
+      testRequest.send(body);
+    }
+
+    await testRequest.expect(401).expect((response) => {
+      expectUnauthorizedBody(response.body);
+      expectNoServiceDatabaseCalls();
+    });
+  };
+
+  const expectUnauthorizedWithXUserId = async (
+    method: HttpMethod,
+    path: string,
+    body?: object,
+  ) => {
+    resetPrismaMocks();
+    const testRequest = buildRequest(method, path).set('x-user-id', user.id);
+    if (body) {
+      testRequest.send(body);
+    }
+
+    await testRequest.expect(401).expect((response) => {
+      expectUnauthorizedBody(response.body);
+      expectNoServiceDatabaseCalls();
+    });
+  };
+
   it('/health (GET)', () => {
     return request(app.getHttpServer())
       .get('/health')
@@ -214,6 +510,23 @@ describe('AppController (e2e)', () => {
         data: {
           service: 'ok',
         },
+      });
+  });
+
+  it('/health/db (GET) allows public DB health checks without a token', () => {
+    prisma.$queryRaw.mockResolvedValueOnce([{ result: 1 }]);
+
+    return request(app.getHttpServer())
+      .get('/health/db')
+      .expect(200)
+      .expect({
+        success: true,
+        data: {
+          database: 'ok',
+        },
+      })
+      .expect(() => {
+        expect(prisma.user.findUnique).not.toHaveBeenCalled();
       });
   });
 
@@ -362,6 +675,27 @@ describe('AppController (e2e)', () => {
       });
   });
 
+  it('/api/v1/seasons/current (GET) ignores x-user-id and stays anonymous without a token', () => {
+    prisma.season.findFirst.mockResolvedValueOnce(season);
+
+    return request(app.getHttpServer())
+      .get('/api/v1/seasons/current')
+      .set('x-user-id', user.id)
+      .expect(200)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: true,
+          data: {
+            id: season.id,
+            joined: false,
+            joinedAt: null,
+          },
+        });
+        expect(prisma.user.findUnique).not.toHaveBeenCalled();
+        expect(prisma.seasonParticipant.findUnique).not.toHaveBeenCalled();
+      });
+  });
+
   it('/api/v1/seasons/current (GET) rejects invalid optional auth tokens', () => {
     return request(app.getHttpServer())
       .get('/api/v1/seasons/current')
@@ -433,6 +767,344 @@ describe('AppController (e2e)', () => {
             },
           }),
         );
+      });
+  });
+
+  it.each([
+    ['GET /api/v1/me', 'get', '/api/v1/me'],
+    ['GET /api/v1/home', 'get', '/api/v1/home'],
+    ['GET /api/v1/ranking', 'get', '/api/v1/ranking'],
+    ['GET /api/v1/wallets', 'get', '/api/v1/wallets'],
+    ['GET /api/v1/records', 'get', '/api/v1/records'],
+    ['GET /api/v1/orders', 'get', '/api/v1/orders'],
+  ] as const)(
+    '%s rejects missing token and x-user-id-only requests before service work',
+    async (_label, method, path) => {
+      await expectUnauthorizedWithoutToken(method, path);
+      await expectUnauthorizedWithXUserId(method, path);
+    },
+  );
+
+  it.each([
+    [
+      'GET /api/v1/me',
+      '/api/v1/me',
+      () => {
+        mockActiveUser();
+      },
+      (body: Record<string, unknown>) => {
+        expect(body).toMatchObject({
+          success: true,
+          data: {
+            id: user.id,
+            email: user.email,
+          },
+        });
+        expect(prisma.user.findUnique).toHaveBeenCalledTimes(2);
+      },
+    ],
+    [
+      'GET /api/v1/home',
+      '/api/v1/home',
+      () => {
+        mockActiveUser();
+        mockActiveSeason();
+        mockJoinedParticipant();
+        prisma.dailyPortfolioSnapshot.findFirst.mockResolvedValueOnce({
+          snapshotDate: now,
+          totalAssetKrw: new Prisma.Decimal('10000000.00000000'),
+          returnRate: new Prisma.Decimal('0.00000000'),
+          krwCash: new Prisma.Decimal('10000000.00000000'),
+          usdCashKrw: new Prisma.Decimal('0.00000000'),
+          assetValueKrw: new Prisma.Decimal('0.00000000'),
+          realizedPnlKrw: new Prisma.Decimal('0.00000000'),
+          unrealizedPnlKrw: new Prisma.Decimal('0.00000000'),
+          capturedAt: now,
+        });
+        prisma.seasonRanking.findFirst.mockResolvedValueOnce(null);
+      },
+      (body: Record<string, unknown>) => {
+        expect(body).toMatchObject({
+          success: true,
+          data: {
+            mode: 'active_joined',
+          },
+        });
+        expect(prisma.dailyPortfolioSnapshot.findFirst).toHaveBeenCalled();
+      },
+    ],
+    [
+      'GET /api/v1/ranking',
+      '/api/v1/ranking',
+      () => {
+        mockActiveUser();
+        mockActiveSeason();
+        mockJoinedParticipant();
+        prisma.seasonRanking.findFirst.mockResolvedValueOnce(null);
+      },
+      (body: Record<string, unknown>) => {
+        expect(body).toMatchObject({
+          success: true,
+          data: {
+            state: 'unavailable',
+            reason: 'RANKING_UNAVAILABLE',
+          },
+        });
+        expect(prisma.seasonParticipant.findUnique).toHaveBeenCalled();
+      },
+    ],
+    [
+      'GET /api/v1/wallets',
+      '/api/v1/wallets',
+      () => {
+        mockActiveUser();
+        mockActiveSeason();
+        mockJoinedParticipant();
+        prisma.cashWallet.findMany.mockResolvedValueOnce([krwWallet, usdWallet]);
+      },
+      (body: Record<string, unknown>) => {
+        expect(body).toMatchObject({
+          success: true,
+          data: {
+            state: 'available',
+            summary: {
+              totalWallets: 2,
+              hasKrwWallet: true,
+              hasUsdWallet: true,
+            },
+          },
+        });
+        expect(prisma.cashWallet.findMany).toHaveBeenCalled();
+      },
+    ],
+    [
+      'GET /api/v1/records',
+      '/api/v1/records',
+      () => {
+        mockActiveUser();
+        mockActiveSeason();
+        mockJoinedParticipant();
+        prisma.exchangeTransaction.count.mockResolvedValueOnce(0);
+        prisma.exchangeTransaction.findMany.mockResolvedValueOnce([]);
+        prisma.walletTransaction.count.mockResolvedValueOnce(0);
+        prisma.walletTransaction.findMany.mockResolvedValueOnce([]);
+        prisma.order.count.mockResolvedValueOnce(0);
+        prisma.order.findMany.mockResolvedValueOnce([]);
+      },
+      (body: Record<string, unknown>) => {
+        expect(body).toMatchObject({
+          success: true,
+          data: {
+            state: 'available',
+            exchanges: {
+              records: [],
+            },
+            walletTransactions: {
+              records: [],
+            },
+            orders: {
+              records: [],
+            },
+          },
+        });
+        expect(prisma.exchangeTransaction.count).toHaveBeenCalled();
+        expect(prisma.walletTransaction.count).toHaveBeenCalled();
+        expect(prisma.order.count).toHaveBeenCalled();
+      },
+    ],
+    [
+      'GET /api/v1/orders',
+      '/api/v1/orders',
+      () => {
+        mockActiveUser();
+        mockActiveSeason();
+        mockJoinedParticipant();
+        prisma.order.count.mockResolvedValueOnce(0);
+        prisma.order.findMany.mockResolvedValueOnce([]);
+      },
+      (body: Record<string, unknown>) => {
+        expect(body).toMatchObject({
+          success: true,
+          data: {
+            state: 'available',
+            orders: [],
+          },
+        });
+        expect(prisma.order.findMany).toHaveBeenCalled();
+      },
+    ],
+  ] as Array<
+    [string, string, () => void, (body: Record<string, unknown>) => void]
+  >)('%s accepts a valid active-user token and reaches the service', async (
+    _label,
+    path,
+    setup,
+    assertBody,
+  ) => {
+    resetPrismaMocks();
+    setup();
+    const token = await createValidAccessToken();
+
+    return request(app.getHttpServer())
+      .get(path)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+      .expect((response) => {
+        expect(response.body.error?.code).not.toBe('UNAUTHORIZED');
+        assertBody(response.body);
+      });
+  });
+
+  it.each([
+    [
+      'POST /api/v1/seasons/:seasonId/join',
+      'post',
+      '/api/v1/seasons/season-1/join',
+      undefined,
+    ],
+    [
+      'POST /api/v1/fx/quote',
+      'post',
+      '/api/v1/fx/quote',
+      {
+        fromCurrency: 'KRW',
+        toCurrency: 'USD',
+        sourceAmount: '1000',
+      },
+    ],
+    [
+      'POST /api/v1/fx/execute',
+      'post',
+      '/api/v1/fx/execute',
+      {
+        idempotencyKey: 'e2e-fx-exec-1',
+        fromCurrency: 'KRW',
+        toCurrency: 'USD',
+        sourceAmount: '1000',
+      },
+    ],
+    [
+      'POST /api/v1/orders/quote',
+      'post',
+      '/api/v1/orders/quote',
+      {
+        assetId: 'asset-1',
+        side: 'buy',
+        orderType: 'market',
+        quantity: '1',
+        idempotencyKey: 'e2e-order-1',
+      },
+    ],
+    [
+      'POST /api/v1/orders',
+      'post',
+      '/api/v1/orders',
+      {
+        assetId: 'asset-1',
+        side: 'buy',
+        orderType: 'market',
+        quantity: '1',
+        idempotencyKey: 'e2e-order-1',
+      },
+    ],
+    [
+      'POST /api/v1/orders/:orderId/cancel',
+      'post',
+      '/api/v1/orders/order-1/cancel',
+      undefined,
+    ],
+    [
+      'POST /api/v1/orders/:orderId/execute',
+      'post',
+      '/api/v1/orders/order-1/execute',
+      undefined,
+    ],
+  ] as const)(
+    '%s rejects missing token and x-user-id-only requests before write mutation',
+    async (_label, method, path, body) => {
+      await expectUnauthorizedWithoutToken(method, path, body);
+      await expectUnauthorizedWithXUserId(method, path, body);
+    },
+  );
+
+  it('/api/v1/fx/quote (POST) accepts a valid token and stays read-only', async () => {
+    resetPrismaMocks();
+    mockActiveUser();
+    mockActiveSeason();
+    mockJoinedParticipant();
+    const snapshotAt = new Date();
+    prisma.fxRateSnapshot.findFirst.mockResolvedValueOnce({
+      rate: new Prisma.Decimal('1400.00000000'),
+      capturedAt: snapshotAt,
+      effectiveAt: snapshotAt,
+    });
+    const token = await createValidAccessToken();
+
+    return request(app.getHttpServer())
+      .post('/api/v1/fx/quote')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        fromCurrency: 'KRW',
+        toCurrency: 'USD',
+        sourceAmount: '1000',
+      })
+      .expect(201)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: true,
+          data: {
+            fromCurrency: 'KRW',
+            toCurrency: 'USD',
+            quoteId: null,
+            expiresAt: null,
+          },
+        });
+        expect(response.body.error?.code).not.toBe('UNAUTHORIZED');
+        expect(prisma.fxRateSnapshot.findFirst).toHaveBeenCalled();
+        expectNoWriteMutationCalls();
+      });
+  });
+
+  it('/api/v1/orders/quote (POST) accepts a valid token and stays read-only', async () => {
+    resetPrismaMocks();
+    mockActiveUser();
+    mockActiveSeason();
+    mockJoinedParticipant();
+    prisma.asset.findUnique.mockResolvedValueOnce(asset);
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce({
+      id: 'asset-price-snapshot-1',
+      price: new Prisma.Decimal('70000.00000000'),
+    });
+    prisma.cashWallet.findUnique.mockResolvedValueOnce(krwWallet);
+    const token = await createValidAccessToken();
+
+    return request(app.getHttpServer())
+      .post('/api/v1/orders/quote')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        assetId: 'asset-1',
+        side: 'buy',
+        orderType: 'market',
+        quantity: '1',
+        idempotencyKey: 'e2e-order-1',
+      })
+      .expect(201)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: true,
+          data: {
+            state: 'available',
+            asset: {
+              id: 'asset-1',
+            },
+            side: 'buy',
+            orderType: 'market',
+          },
+        });
+        expect(response.body.error?.code).not.toBe('UNAUTHORIZED');
+        expect(prisma.assetPriceSnapshot.findFirst).toHaveBeenCalled();
+        expect(prisma.cashWallet.findUnique).toHaveBeenCalled();
+        expectNoWriteMutationCalls();
       });
   });
 
