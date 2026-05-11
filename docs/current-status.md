@@ -195,6 +195,8 @@ near-term ledger/FX foundation:
 - FX execute error policy: `docs/fx-execute-error-policy.md`.
 - FX idempotency lifecycle policy: `docs/fx-idempotency-lifecycle-policy.md`.
 - `/fx execute` final implementation gate: `docs/fx-execute-final-implementation-gate.md`.
+- Backend gate roadmap 및 current backend audit: `docs/backend-gate-roadmap.md`.
+- Backend test coverage matrix: `docs/backend-test-coverage-matrix.md`.
 
 ## 8. 주요 STOP 상태
 
@@ -523,6 +525,14 @@ near-term ledger/FX foundation:
 
 ## 9. 다음 gate
 
+- 다음 recommended gate: Gate B Provider final selection readiness re-check.
+  - 상세 gate 순서와 STOP/GO 조건은 `docs/backend-gate-roadmap.md` 기준.
+  - 구현 착수 전 OANDA trial/API 계약, Twelve Data fallback 계약, timestamp/freshness, sourceType/sourceName 우선순위, polling/rate-limit 정책을 다시 확인해야 함.
+- Gate A Protected API HTTP e2e baseline은 완료 상태로 본다.
+  - 완료 범위: public/optional/protected guard baseline, missing token/`x-user-id` 차단, valid-token read-only smoke, selected quote smoke.
+  - 남은 gap: 모든 protected route별 invalid-token HTTP e2e exhaustive coverage와 valid-token full write-path HTTP e2e는 아직 없음.
+  - full financial write-path 검증은 현재 service/unit 및 opt-in PostgreSQL integration spec이 담당.
+- 테스트 커버리지 상세는 `docs/backend-test-coverage-matrix.md` 기준.
 - OANDA trial/API 계약 검증 전 provider_api/official_batch/scheduler 구현 STOP 유지.
 - `/fx execute` 남은 DB-level rollback/partial-write hardening 및 stale pending/unknown outcome recovery 설계.
 - `/orders/:orderId/execute` MVP 후속 gate:
@@ -533,6 +543,15 @@ near-term ledger/FX foundation:
 
 ## 10. 아직 안 한 것
 
+- high-risk backend gaps:
+  - provider final selection 및 provider ingestion.
+  - asset price freshness/source policy finalization.
+  - scheduler/batch foundation 및 automatic daily snapshot/ranking.
+  - settlement/reward/badge/trophy.
+  - refresh token/logout/revocation schema 및 정책.
+  - durable quote, order exact execute replay, partial fill, matching engine.
+  - FX stale pending/unknown outcome recovery.
+  - deployment/operations readiness.
 - settlement
 - refresh token/session management
 - token revocation/logout

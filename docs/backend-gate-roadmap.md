@@ -1,0 +1,415 @@
+# Backend Gate Roadmap
+
+## Status
+
+- Documentation-only audit based on the current workspace state on 2026-05-11.
+- No source, test, package, Prisma schema, migration, seed, provider, scheduler, settlement, reward, or refresh-token implementation is authorized by this document.
+- `docs/current-status.md` remains the short status summary. This document is the detailed backend gate roadmap.
+
+## Audit Basis
+
+Reviewed source-of-truth documents:
+
+- `docs/codex-rulepack.md`
+- `docs/current-status.md`
+- `docs/auth-preimplementation-readiness-audit.md`
+- `docs/fx-api-contract.md`
+- `docs/fx-execute-safety-plan.md`
+- `docs/fx-execute-final-implementation-gate.md`
+- `docs/fx-provider-research.md`
+- `docs/fx-provider-final-selection-stop-review.md`
+- `docs/fx-ingestion-stop-review.md`
+- `docs/orders-api-contract.md`
+- `docs/order-execution-safety-plan.md`
+- `docs/order-execution-preimplementation-readiness-audit.md`
+- `docs/home-api-contract.md`
+- `docs/ranking-api-contract.md`
+- `docs/wallets-api-contract.md`
+- `docs/records-api-contract.md`
+- `README.md`
+
+Reviewed code/test surface:
+
+- `package.json`, `prisma/schema.prisma`
+- `src/app.module.ts`, `src/app.controller.ts`
+- `src/auth/*`
+- `src/seasons/*`
+- `src/fx/*`
+- `src/orders/*`
+- `src/home/*`
+- `src/ranking/*`
+- `src/wallets/*`
+- `src/records/*`
+- `src/portfolio/*`
+- `scripts/admin-*`
+- `test/app.e2e-spec.ts`
+- domain specs under `src/**/**/*.spec.ts`
+
+Consistency note:
+
+- Some older design documents still say a feature was not implemented at the time they were written. Current code, current contracts, and `docs/current-status.md` show `/fx execute` and `/orders/:orderId/execute` full-fill MVP are now implemented. This roadmap treats those older statements as historical gate context, not current truth.
+
+## Current Backend Implementation Status
+
+### Environment / Project Setup
+
+- Current status: NestJS backend with Prisma 7 adapter style, PostgreSQL datasource, Docker-oriented local DB assumptions, and Jest test scripts are in place.
+- Implemented files: `package.json`, `src/app.module.ts`, `src/prisma/prisma.service.ts`, `README.md`.
+- Source of truth: `docs/current-status.md`, `docs/codex-rulepack.md`, `README.md`.
+- Existing tests: `src/app.controller.spec.ts`, `test/app.e2e-spec.ts`, build/test scripts in `package.json`.
+- Known limitations: README is still mostly Nest starter text outside the env/auth notes; deployment/ops runbook is not defined.
+- Remaining work: deployment env/secret/healthcheck/runbook gate.
+- Risk level: MEDIUM.
+- Recommended next action: keep setup stable; do not touch package/lockfile unless a gate explicitly approves it.
+
+### Database Foundation
+
+- Current status: Core user, season, wallet, ledger, FX, asset, price, position, order, daily snapshot, and ranking tables are represented in Prisma schema and migrations.
+- Implemented files: `prisma/schema.prisma`, migrations under `prisma/migrations/*`.
+- Source of truth: `docs/current-status.md`, `docs/near-term-migration-plan.md`.
+- Existing tests: `pnpm exec prisma validate` history in `docs/current-status.md`; integration specs use real Prisma/PostgreSQL when env flags are enabled.
+- Known limitations: no refresh-token/session schema, no settlement/reward schema beyond existing participant reward fields, no order fill/execute request table, no provider ingestion metadata table beyond snapshot raw payload fields.
+- Remaining work: schema gates only when refresh-token, settlement, reward, exact order execute replay, or provider-specific needs are approved.
+- Risk level: MEDIUM.
+- Recommended next action: no schema changes in planning gates; validate schema before any later implementation gate.
+
+### Auth
+
+- Current status: access-token-only Auth MVP implemented with signup, login, `GET /api/v1/me`, global access token guard, public and optional-auth route metadata, active-user DB lookup, inactive user block, and no `x-user-id` fallback.
+- Implemented files: `src/auth/auth.module.ts`, `src/auth/auth.controller.ts`, `src/auth/auth.service.ts`, `src/auth/access-token.guard.ts`, `src/auth/auth.decorators.ts`, `src/auth/auth.types.ts`, `src/app.module.ts`.
+- Source of truth: `docs/auth-preimplementation-readiness-audit.md`, `docs/current-status.md`, `README.md`.
+- Existing tests: `src/auth/auth.service.spec.ts`, `src/auth/access-token.guard.spec.ts`, `src/auth/auth.integration.spec.ts`, `test/app.e2e-spec.ts`.
+- Known limitations: refresh token, logout, revocation, sessions, cookie auth, issuer/audience policy, and token rotation are not implemented.
+- Remaining work: keep access-token MVP as current auth boundary; run schema gate before refresh/logout/revocation.
+- Risk level: MEDIUM.
+- Recommended next action: keep protected API HTTP e2e baseline green; defer refresh-token schema to Gate K.
+
+### Seasons
+
+- Current status: current season read with optional auth and season join write path implemented.
+- Implemented files: `src/seasons/seasons.controller.ts`, `src/seasons/seasons.service.ts`.
+- Source of truth: `docs/codex-rulepack.md`, `docs/current-status.md`, `docs/season-join-ledger-plan.md`.
+- Existing tests: `src/seasons/seasons.controller.spec.ts`, `test/app.e2e-spec.ts` auth baseline.
+- Known limitations: no service unit spec dedicated to `joinSeason` transaction behavior; no real PostgreSQL integration test for duplicate join/concurrency/rollback.
+- Remaining work: add high-value join integration coverage before launch if join races become a concern.
+- Risk level: MEDIUM.
+- Recommended next action: do not change join logic now; document as implemented but less deeply proven than FX/order execute.
+
+### Wallets
+
+- Current status: `GET /api/v1/wallets` read-only MVP implemented; reads `cash_wallets` for authenticated participant.
+- Implemented files: `src/wallets/wallets.controller.ts`, `src/wallets/wallets.service.ts`.
+- Source of truth: `docs/wallets-api-contract.md`, `docs/current-status.md`.
+- Existing tests: `src/wallets/wallets.service.spec.ts`, `test/app.e2e-spec.ts`.
+- Known limitations: no wallet admin adjustment API, no valuation conversion in wallets endpoint, no real DB integration for read-only no-mutation.
+- Remaining work: keep read-only; wallet mutation remains owned by join, FX execute, order execute, or future settlement/admin gates.
+- Risk level: LOW.
+- Recommended next action: no implementation until settlement/admin adjustment is explicitly gated.
+
+### FX Quote
+
+- Current status: `POST /api/v1/fx/quote` read-only MVP implemented; KRW/USD only; uses latest eligible USD/KRW snapshot and 60-second freshness.
+- Implemented files: `src/fx/fx.controller.ts`, `src/fx/fx.service.ts`, `src/fx/fx-decimal-policy.ts`, `scripts/admin-insert-fx-rate.ts`.
+- Source of truth: `docs/fx-api-contract.md`, `docs/fx-quote-stop-review.md`, `docs/current-status.md`.
+- Existing tests: `src/fx/fx.service.spec.ts`, `src/fx/fx-decimal-policy.spec.ts`, `src/fx/fx-rate-input.validation.spec.ts`, `test/app.e2e-spec.ts`.
+- Known limitations: quote is not durable; `quoteId` and `expiresAt` are `null`; sourceType priority is not finalized for mixed provider/manual rows; provider ingestion is absent.
+- Remaining work: provider final selection and sourceType priority before provider rows are introduced.
+- Risk level: MEDIUM.
+- Recommended next action: Gate B provider final selection readiness, not quote code changes.
+
+### FX Execute
+
+- Current status: `POST /api/v1/fx/execute` first write path implemented with direct execute, durable idempotency via `fx_execute_requests`, guarded source debit, target credit, exchange row, two wallet ledger rows, succeeded response replay, and no equity snapshot.
+- Implemented files: `src/fx/fx.service.ts`, `src/fx/fx-execute-*.ts`.
+- Source of truth: `docs/fx-execute-final-implementation-gate.md`, `docs/fx-api-contract.md`, `docs/current-status.md`.
+- Existing tests: `src/fx/fx.service.spec.ts`, `src/fx/fx.execute.integration.spec.ts`, FX execute policy specs under `src/fx/*spec.ts`, `test/app.e2e-spec.ts` auth baseline.
+- Known limitations: no durable quote; no provider_api/official_batch source; stale pending recovery tool/job absent; some DB-level failure injection remains hardening-only; responsePayloadJson-only storage failure remains hard to force with current schema.
+- Remaining work: recovery/hardening gate after provider/scheduler decisions, not before provider selection.
+- Risk level: HIGH.
+- Recommended next action: keep existing execute source as approved fresh `admin_manual`; do not expand allowed sourceType until provider gate completes.
+
+### Assets / Price Input
+
+- Current status: asset upsert CLI and admin_manual asset price snapshot CLI implemented; validation rejects inactive assets, currency mismatch, non-admin_manual source, invalid decimals, and forbidden wording.
+- Implemented files: `scripts/admin-upsert-asset.ts`, `scripts/admin-insert-asset-price.ts`, `src/assets/asset-admin-input.validation.ts`.
+- Source of truth: `docs/current-status.md`, `docs/orders-api-contract.md`, `docs/home-api-contract.md`.
+- Existing tests: `src/assets/asset-admin-input.validation.spec.ts`.
+- Known limitations: no provider price ingestion; no asset price freshness threshold; no scheduler; no admin HTTP API.
+- Remaining work: asset price freshness policy and provider ingestion gate.
+- Risk level: MEDIUM.
+- Recommended next action: finalize freshness policy after or alongside provider readiness.
+
+### Orders Read
+
+- Current status: `GET /api/v1/orders` read-only MVP implemented against real `orders` rows for authenticated participant.
+- Implemented files: `src/orders/orders.controller.ts`, `src/orders/orders.service.ts`.
+- Source of truth: `docs/orders-api-contract.md`, `docs/current-status.md`.
+- Existing tests: `src/orders/orders.service.spec.ts`, `test/app.e2e-spec.ts`.
+- Known limitations: no public order book, no advanced filters beyond MVP, no real DB read-only no-mutation test.
+- Remaining work: preserve read-only contract; enrich only after product/API agreement.
+- Risk level: LOW.
+- Recommended next action: no change.
+
+### Orders Quote
+
+- Current status: `POST /api/v1/orders/quote` read-only MVP implemented; active season + joined participant; market uses admin_manual asset price; limit uses limitPrice; USD assets require fresh approved admin_manual USD/KRW; buy/sell resource checks are read-only.
+- Implemented files: `src/orders/orders.controller.ts`, `src/orders/orders.service.ts`.
+- Source of truth: `docs/orders-api-contract.md`, `docs/current-status.md`.
+- Existing tests: `src/orders/orders.service.spec.ts`, `test/app.e2e-spec.ts`.
+- Known limitations: no durable quote, no quote expiry, no asset price stale threshold, no provider price source.
+- Remaining work: asset price freshness policy and durable quote gate if required.
+- Risk level: MEDIUM.
+- Recommended next action: do not add durable quote in provider/scheduler gates.
+
+### Orders Create
+
+- Current status: submitted order create MVP implemented; creates one `orders` row, stores create idempotency key/hash/response payload, and performs no wallet/position/settlement mutation.
+- Implemented files: `src/orders/orders.service.ts`, `src/orders/orders.controller.ts`, `prisma/schema.prisma` order idempotency fields.
+- Source of truth: `docs/orders-api-contract.md`, `docs/current-status.md`.
+- Existing tests: `src/orders/orders.service.spec.ts`, `test/app.e2e-spec.ts` auth baseline.
+- Known limitations: no DB integration for create idempotency races beyond mocked P2002; duplicate replay after cancellation returns original create response by design.
+- Remaining work: add real DB idempotency race coverage if create path becomes a launch blocker.
+- Risk level: MEDIUM.
+- Recommended next action: no code change; keep command semantics documented.
+
+### Orders Cancel
+
+- Current status: submitted order cancel MVP implemented with ownership check and guarded `id + seasonParticipantId + status=submitted` update; no wallet/position/ledger mutation.
+- Implemented files: `src/orders/orders.service.ts`, `src/orders/orders.controller.ts`.
+- Source of truth: `docs/orders-api-contract.md`, `docs/order-execution-safety-plan.md`.
+- Existing tests: `src/orders/orders.service.spec.ts`, `src/orders/orders.execute.integration.spec.ts` cancel-vs-execute race, `test/app.e2e-spec.ts` auth baseline.
+- Known limitations: no cancel reason schema, no cancel idempotency key, no standalone real DB cancel integration beyond order execute race spec.
+- Remaining work: keep scope as submitted-only cancel unless product/API change is approved.
+- Risk level: MEDIUM.
+- Recommended next action: no change.
+
+### Orders Execute
+
+- Current status: full-fill execute MVP implemented. Buy debits cash wallet, creates/updates position, creates one `order_buy` ledger row, and finalizes order. Sell decrements position, credits cash wallet, creates one `order_sell` ledger row, and finalizes order. All financial writes run in one Prisma transaction.
+- Implemented files: `src/orders/orders.service.ts`, `src/orders/orders.controller.ts`.
+- Source of truth: `docs/orders-api-contract.md`, `docs/order-execution-safety-plan.md`, `docs/order-execution-preimplementation-readiness-audit.md`, `docs/current-status.md`.
+- Existing tests: `src/orders/orders.service.spec.ts`, `src/orders/orders.execute.integration.spec.ts`, `test/app.e2e-spec.ts` auth baseline.
+- Known limitations: no exact execute response replay, no execute-specific command table, no partial fill, no matching engine, no provider price ingestion, no settlement side effect, no automatic snapshots/rankings.
+- Remaining work: exact replay/partial fill/matching/settlement each require separate gate.
+- Risk level: HIGH.
+- Recommended next action: keep full-fill MVP stable; do not expand matching/settlement before provider/scheduler/settlement audits.
+
+### Portfolio Valuation
+
+- Current status: valuation service/policy implemented for KRW cash, USD cash conversion, positions, admin_manual asset prices, fresh approved admin_manual USD/KRW, KRW total assets, and return rate.
+- Implemented files: `src/portfolio/portfolio-valuation.service.ts`, `src/portfolio/portfolio-valuation.policy.ts`.
+- Source of truth: `docs/current-status.md`, `docs/home-api-contract.md`.
+- Existing tests: `src/portfolio/portfolio-valuation.policy.spec.ts`, `src/home/home.service.spec.ts`.
+- Known limitations: no asset price stale threshold; no provider price source; no automatic snapshot schedule; live valuation can be unavailable when price/FX evidence is missing.
+- Remaining work: asset price freshness policy and scheduler/batch foundation.
+- Risk level: MEDIUM.
+- Recommended next action: treat as calculation foundation, not final settlement evidence.
+
+### Daily Portfolio Snapshot
+
+- Current status: manual CLI foundation implemented. It can calculate valuation and upsert daily snapshots by participant or active participants of a season, with dry-run support.
+- Implemented files: `scripts/admin-generate-daily-portfolio-snapshot.ts`, `src/portfolio/daily-portfolio-snapshot-generation.ts`.
+- Source of truth: `docs/current-status.md`, `docs/home-api-contract.md`.
+- Existing tests: `src/portfolio/snapshot-ranking-generation.spec.ts` dry-run only.
+- Known limitations: no automatic scheduler/batch; no real DB CLI integration; season-wide mode skips failed participants but no operational retry/alert policy.
+- Remaining work: scheduler/batch foundation and automatic daily generation gate.
+- Risk level: MEDIUM.
+- Recommended next action: Gate E before any automatic generation.
+
+### Ranking
+
+- Current status: `GET /api/v1/ranking` read-only MVP implemented; manual ranking generation helper/CLI implemented; API reads `season_rankings` only.
+- Implemented files: `src/ranking/ranking.controller.ts`, `src/ranking/ranking.service.ts`, `scripts/admin-generate-season-ranking.ts`, `src/portfolio/portfolio-ranking.policy.ts`, `src/portfolio/season-ranking-generation.ts`.
+- Source of truth: `docs/ranking-api-contract.md`, `docs/current-status.md`.
+- Existing tests: `src/ranking/ranking.service.spec.ts`, `src/portfolio/portfolio-ranking.policy.spec.ts`, `src/portfolio/snapshot-ranking-generation.spec.ts`, `test/app.e2e-spec.ts`.
+- Known limitations: no automatic season ranking generation, no final settlement/reward integration, no real DB ranking generator test.
+- Remaining work: automatic ranking generation after scheduler foundation.
+- Risk level: MEDIUM.
+- Recommended next action: Gate G only after Gate E and F.
+
+### Home
+
+- Current status: `GET /api/v1/home` aggregate read-only MVP implemented. Supports active_joined, active_not_joined, upcoming, ended, settled, no_current_season. Uses latest daily snapshot first, then live valuation if possible. Uses season_rankings for ranking section only.
+- Implemented files: `src/home/home.controller.ts`, `src/home/home.service.ts`.
+- Source of truth: `docs/home-api-contract.md`, `docs/current-status.md`.
+- Existing tests: `src/home/home.service.spec.ts`, `test/app.e2e-spec.ts`.
+- Known limitations: allocation, top positions, equity chart, authoritative final result, automatic freshness, settlement summary are unavailable/blocked.
+- Remaining work: provider ingestion, asset price freshness, scheduler daily snapshots, ranking automation, settlement.
+- Risk level: MEDIUM.
+- Recommended next action: no home expansion before provider/scheduler/settlement gates.
+
+### Records
+
+- Current status: `GET /api/v1/records` read-only MVP implemented for exchanges, wallet transactions, and orders.
+- Implemented files: `src/records/records.controller.ts`, `src/records/records.service.ts`.
+- Source of truth: `docs/records-api-contract.md`, `docs/current-status.md`.
+- Existing tests: `src/records/records.service.spec.ts`, `src/orders/orders.execute.integration.spec.ts` read visibility, `test/app.e2e-spec.ts`.
+- Known limitations: no export/detail views; no real DB read-only no-mutation test for all filters.
+- Remaining work: product/API gate for richer records.
+- Risk level: LOW.
+- Recommended next action: no change.
+
+### Admin CLI
+
+- Current status: manual admin CLIs exist for FX rate input, asset upsert, asset price input, daily snapshot generation, and season ranking generation.
+- Implemented files: `scripts/admin-insert-fx-rate.ts`, `scripts/admin-upsert-asset.ts`, `scripts/admin-insert-asset-price.ts`, `scripts/admin-generate-daily-portfolio-snapshot.ts`, `scripts/admin-generate-season-ranking.ts`.
+- Source of truth: `docs/current-status.md`, `docs/fx-rate-input-path-plan.md`.
+- Existing tests: validation specs for FX/asset input; dry-run helper specs for snapshot/ranking.
+- Known limitations: no CLI e2e against PostgreSQL, no operator approval runbook, no admin HTTP API.
+- Remaining work: ops runbook and smoke tests if manual operations remain part of MVP.
+- Risk level: MEDIUM.
+- Recommended next action: keep CLI as manual/bootstrap path; do not replace with provider/scheduler without gates.
+
+### Provider Ingestion
+
+- Current status: not implemented. OANDA is primary candidate, Twelve Data secondary, but final provider selection is STOP.
+- Implemented files: none for ingestion.
+- Source of truth: `docs/fx-provider-research.md`, `docs/fx-provider-final-selection-stop-review.md`, `docs/fx-ingestion-stop-review.md`.
+- Existing tests: none.
+- Known limitations: no API key management, polling, retry/backoff, sourceType priority, retention, alerting, contract validation, or USD/KRW trial response mapping.
+- Remaining work: Gate B then Gate C/Gate D.
+- Risk level: HIGH.
+- Recommended next action: Provider final selection readiness re-check.
+
+### Scheduler / Batch
+
+- Current status: not implemented. Manual CLIs exist, but no scheduler/batch runner, lock, retry, idempotency, metrics, or operation policy exists.
+- Implemented files: none for automatic scheduler.
+- Source of truth: `docs/current-status.md`, `docs/home-api-contract.md`, provider STOP docs.
+- Existing tests: none for scheduler; only manual helper dry-run tests.
+- Known limitations: manual CLI and automatic scheduler must not be conflated.
+- Remaining work: Gate E scheduler/batch foundation audit/implementation.
+- Risk level: HIGH.
+- Recommended next action: audit after provider/freshness decisions, before automatic snapshots/rankings.
+
+### Settlement
+
+- Current status: not implemented.
+- Implemented files: none.
+- Source of truth: `docs/codex-rulepack.md`, `docs/current-status.md`, `docs/home-api-contract.md`.
+- Existing tests: none.
+- Known limitations: final KRW evaluation policy exists, but settlement timing, final snapshot source, season state transition, rollback/retry, and reward handoff are not designed.
+- Remaining work: Gate H preimplementation audit before Gate I implementation.
+- Risk level: HIGH.
+- Recommended next action: do not implement before provider/scheduler evidence path is reliable.
+
+### Reward
+
+- Current status: not implemented. Schema has participant fields such as `finalRank`, `finalTier`, and `rewardGrantedAt`, but no reward/badge/trophy workflow.
+- Implemented files: none for reward.
+- Source of truth: `docs/current-status.md`, `prisma/schema.prisma`.
+- Existing tests: none.
+- Known limitations: no reward policy, badge/trophy schema, grant idempotency, or settlement linkage.
+- Remaining work: Gate J after settlement.
+- Risk level: HIGH.
+- Recommended next action: STOP until settlement implementation is accepted.
+
+### Refresh Token / Logout / Revocation
+
+- Current status: not implemented; access-token-only MVP is current auth.
+- Implemented files: none for refresh/logout/revocation.
+- Source of truth: `docs/auth-preimplementation-readiness-audit.md`, `docs/current-status.md`, `README.md`.
+- Existing tests: auth service/guard tests cover access tokens only.
+- Known limitations: no refresh token table/hash, no logout, no token revocation, no session/cookie auth.
+- Remaining work: Gate K schema gate.
+- Risk level: HIGH.
+- Recommended next action: DO LATER; do not mix with provider/scheduler/settlement work.
+
+### Deployment / Operations
+
+- Current status: basic health and DB health endpoints exist. Operational readiness is not complete.
+- Implemented files: `src/app.controller.ts`, `src/app.service.ts`, `README.md`.
+- Source of truth: `README.md`, `docs/current-status.md`.
+- Existing tests: `src/app.controller.spec.ts`, `test/app.e2e-spec.ts`.
+- Known limitations: no deployment target, secret policy, migration deployment runbook, scheduler ops, provider key rotation, observability, alerting, or incident recovery plan.
+- Remaining work: Gate L.
+- Risk level: HIGH.
+- Recommended next action: start after provider/scheduler architecture is known.
+
+## API Auth Policy Matrix
+
+| API | Controller | Auth policy | Identity source | Expected missing token result | Expected invalid token result | `x-user-id` behavior | Current e2e coverage | Remaining coverage gap |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `GET /health` | `AppController` | public | none | 200 | allowed; token ignored | ignored | Public success in `test/app.e2e-spec.ts` | invalid-token-on-public not explicitly asserted |
+| `GET /health/db` | `AppController` | public | none | 200 | allowed; token ignored | ignored | Public DB health success without user lookup | invalid-token-on-public not explicitly asserted |
+| `POST /api/v1/auth/signup` | `AuthController` | public | request body email/password/nickname | 201 when valid body | allowed; token ignored | ignored | signup success and no passwordHash e2e | invalid token ignored not explicitly asserted |
+| `POST /api/v1/auth/login` | `AuthController` | public | request body email/password | 200 when valid body | allowed; token ignored | ignored | login success and no passwordHash e2e | invalid token ignored not explicitly asserted |
+| `GET /api/v1/me` | `AuthController` | protected | `request.user.userId` from bearer JWT | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only, valid token smoke | per-route invalid token e2e; guard unit covers invalid token |
+| `GET /api/v1/seasons/current` | `SeasonsController` | optional | none if anonymous; `request.user.userId` if valid token | 200 anonymous | 401 `UNAUTHORIZED` | anonymous, not identity | anonymous, `x-user-id` anonymous, invalid/malformed token, valid token | unknown/inactive optional token path covered by guard unit, not this route |
+| `POST /api/v1/seasons/:seasonId/join` | `SeasonsController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only blocked | valid-token HTTP write smoke not covered; service/controller tests cover identity handoff |
+| `GET /api/v1/home` | `HomeController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only, valid token smoke | per-route invalid token e2e; deeper HTTP state matrix |
+| `GET /api/v1/ranking` | `RankingController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only, valid token smoke | per-route invalid token e2e |
+| `GET /api/v1/wallets` | `WalletsController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only, valid token smoke | per-route invalid token e2e |
+| `GET /api/v1/records` | `RecordsController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only, valid token smoke | per-route invalid token e2e |
+| `GET /api/v1/orders` | `OrdersController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only, valid token smoke | per-route invalid token e2e |
+| `POST /api/v1/orders/quote` | `OrdersController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only, valid token read-only smoke | invalid token e2e; more HTTP quote business failures |
+| `POST /api/v1/orders` | `OrdersController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only blocked | valid-token HTTP create smoke not covered; service tests cover create |
+| `POST /api/v1/orders/:orderId/cancel` | `OrdersController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only blocked | valid-token HTTP cancel smoke not covered; service/integration cover cancel |
+| `POST /api/v1/orders/:orderId/execute` | `OrdersController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only blocked | valid-token HTTP execute smoke not covered; service/DB integration cover execute |
+| `POST /api/v1/fx/quote` | `FxController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only, valid token read-only smoke | invalid token e2e; more HTTP quote business failures |
+| `POST /api/v1/fx/execute` | `FxController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only blocked | valid-token HTTP execute smoke not covered; service/DB integration cover execute |
+
+## Financial Write Path Safety
+
+| Write path | Transaction boundary | Idempotency status | Ownership check | Balance / position guard | Ledger write status | Rollback proof status | Concurrency proof status | Known unresolved risks | Next hardening candidate |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| season join | Implemented in one Prisma `$transaction` for participant, KRW wallet, USD wallet, initial grant ledger | No idempotency key; DB unique `(seasonId,userId)` and P2002 handling prevent duplicate participant | token-derived `userId`; no `x-user-id`; active season only | initial KRW from season; USD zero; no debit guard needed | one `initial_grant` wallet transaction for KRW only | Not proven by real PostgreSQL failure injection | Not proven by real PostgreSQL concurrent join test | duplicate join is handled by unique constraint, but partial-write rollback and race behavior are less tested than FX/order execute | Real DB join duplicate/concurrency/rollback integration |
+| FX execute | Implemented in one Prisma `$transaction` covering command create, source debit, target credit, exchange, two ledgers, command finalization | Implemented via `fx_execute_requests` unique `(userId,idempotencyKey)`, requestHash, pending/succeeded/failed handling, stored success replay | token-derived `userId`; active joined participant; wallet ids scoped to participant | guarded source wallet `updateMany` with `balanceAmount >= sourceAmount`; target wallet guarded by id/participant/currency | two ledger rows: `exchange_source`, `exchange_target`; no fee row; no equity snapshot | Unit/mock rollback and env-gated PostgreSQL DB failure injection cover several failure points | Env-gated PostgreSQL covers overspend and same-key duplicate replay race | stale pending recovery tool/job absent; responsePayloadJson-only storage failure not DB-forced; no provider source; no durable quote | Recovery/hardening gate after provider/scheduler decisions |
+| order create | No explicit transaction; single `order.create` after read-only quote validation | Implemented for create only via `(seasonParticipantId,idempotencyKey)` unique, requestHash, responsePayloadJson replay, P2002 reread | token-derived participant; active season + joined participant | read-only buy wallet balance or sell position check before create; no reservation | no wallet ledger; creates only submitted order row | Mock tests assert no wallet/position/settlement writes | Mock P2002 race handling; no real DB concurrent create integration | race between quote-time resource check and later execute is accepted because create does not reserve funds | Real DB create idempotency race if needed before launch |
+| order cancel | No explicit transaction; guarded single order `updateMany` then readback | No cancel idempotency key; repeated cancel returns not cancelable | order lookup requires authenticated user's participant; update also scopes `seasonParticipantId` | no balance/position mutation | no ledger | Unit tests cover guarded update conflict and no financial writes | Env-gated order execute integration covers cancel-vs-execute race | standalone real DB cancel duplicate/race not separately proven; no cancel reason | keep as is unless cancel UX requires stronger idempotency |
+| order execute | Implemented in one Prisma `$transaction` covering price resolution, wallet/position mutation, ledger, finalization | No execute-specific idempotency key; `orderId` is command identity; already executed returns current-state response without mutation | owned order lookup by token-derived user; finalization scopes `id + seasonParticipantId + status=submitted` | buy guarded wallet debit; sell guarded position decrement; sell wallet credit guarded by wallet identity | one ledger row per execute: `order_buy` or `order_sell`; no fee row; no snapshots/rankings/settlement | Unit tests and env-gated PostgreSQL rollback injection cover several failure points | Env-gated PostgreSQL covers buy overspend, sell oversell, same-order execute, cancel-vs-execute | exact execute response replay absent; no partial fill; no matching engine; no provider price; asset price staleness missing | exact replay or partial fill only after schema/gate; otherwise keep full-fill MVP |
+
+Safety classification:
+
+- Already implemented safety: token-derived ownership, no `x-user-id`, guarded wallet/position updates for FX/order execute, FX execute durable idempotency, order create idempotency, transaction boundaries for join/FX/order execute.
+- Tested safety: auth guard regression, read-only no-mutation service tests, FX/order execute unit and env-gated PostgreSQL integration tests, order cancel guarded update unit tests, provider/static/fake input rejection for admin FX/asset paths.
+- Intended but under-tested: season join rollback/concurrency; order create real DB idempotency race; route-by-route invalid token e2e beyond guard unit.
+- Not implemented: provider ingestion, scheduler/batch, settlement, reward, refresh/logout/revocation, durable quote, exact order execute replay, partial fill, matching engine.
+
+## Backend Gates
+
+| Gate | Purpose | Prerequisites | Allowed file changes | Forbidden changes | Required tests | STOP conditions | GO conditions | Recommended Codex prompt title | Estimated risk | Dependency gates |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Gate A: Protected API HTTP e2e baseline | Keep public/optional/protected auth behavior stable across current APIs | Access-token MVP implemented | `test/app.e2e-spec.ts`, docs only if extending coverage | source logic, schema, package, seed, migration | `pnpm run test:e2e`, `pnpm test -- auth` | any `x-user-id` fallback, missing-token protected route reaches service, optional invalid token downgrades to anonymous | current baseline passes and protected APIs reject missing/`x-user-id` only | `Gate A - Protected API HTTP e2e baseline audit` | LOW | none |
+| Gate B: Provider final selection readiness | Re-check provider selection before ingestion | current provider STOP docs, current quote/execute source policy | docs only; possibly a separate trial-result doc if approved | provider code, scheduler, schema, package, env changes | docs consistency check; no build required unless docs tooling exists | no OANDA/Twelve Data live/trial evidence, no contract/cost/polling/timestamp decision, sourceType priority undecided | final selection criteria and remaining STOP list accepted | `Gate B - Provider final selection readiness re-check` | MEDIUM | Gate A |
+| Gate C: FX provider ingestion implementation | Insert real provider USD/KRW snapshots | Gate B GO | provider module/service/tests, config/env docs if approved | settlement, order execution changes, scheduler if not in scope, fake/static/manual fallback | unit, mock provider tests, no-fake policy, Prisma validate/build, e2e smoke if HTTP exists | API key policy missing, source timestamp mapping uncertain, retry/backoff absent | provider snapshot insertion is idempotent/observable and quote can consume it by policy | `Gate C - FX provider ingestion implementation` | HIGH | Gate B |
+| Gate D: Asset price provider ingestion implementation | Insert real asset price snapshots for supported markets | asset universe decision, asset price freshness policy, provider/source decision | asset provider files/tests/docs | FX provider code unless shared abstraction approved, scheduler if not in scope, fake/sample prices | unit/provider mapping tests, no-fake policy, Prisma validate/build | freshness/source/license/market coverage undecided | approved source mapping and freshness policy exist | `Gate D - Asset price provider ingestion implementation` | HIGH | Gate B |
+| Gate E: Scheduler/batch foundation | Define safe automatic job runner foundation | provider/freshness decisions enough to know job needs | scheduler module/foundation/tests/docs if approved | daily snapshot/ranking/settlement business jobs unless included | unit tests for locking/idempotency/retry; build | no lock/idempotency/retry/observability policy; deployment model unknown | scheduler foundation can run one safe no-op or bounded job with tests | `Gate E - Scheduler batch foundation preimplementation audit` | HIGH | Gate B |
+| Gate F: Automatic daily portfolio snapshot generation | Automate daily snapshot generation | Gate E, valuation inputs reliable, asset/FX freshness policy | scheduler job + tests/docs | ranking, settlement, rewards unless explicit | unit + integration/smoke for job idempotency and partial participant failures | provider data unavailable, freshness policy unresolved, job retry undefined | automatic snapshots are idempotent and observable | `Gate F - Automatic daily portfolio snapshot generation` | HIGH | Gate E |
+| Gate G: Automatic season ranking generation | Automate rankings from daily snapshots | Gate F | ranking job/tests/docs | settlement/reward unless explicit | unit/integration for rank ordering, uniqueness, rerun idempotency | daily snapshots absent or inconsistent, rank date policy unclear | repeatable ranking generation from snapshot source | `Gate G - Automatic season ranking generation` | MEDIUM | Gate F |
+| Gate H: Settlement preimplementation audit | Decide final evaluation, season close, transaction boundaries, and recovery | Gate F/G recommended | docs only | settlement code/schema unless gate explicitly changes to implementation | no build required; maybe `prisma validate` | final price/FX evidence, season state transition, retry/idempotency, reward handoff undecided | implementation scope and test matrix accepted | `Gate H - Settlement preimplementation readiness audit` | MEDIUM | Gate F, Gate G |
+| Gate I: Settlement implementation | Implement final KRW evaluation and season settlement | Gate H GO | settlement service/job/tests/docs/schema only if approved | rewards unless in Gate J, provider/scheduler unrelated changes | unit, integration, rollback/concurrency/idempotency, build | no final audit acceptance; schema needs unclear | final settlement writes are durable, idempotent, and tested | `Gate I - Settlement implementation` | HIGH | Gate H |
+| Gate J: Reward/badge/trophy implementation | Grant rewards from settled final result | Gate I | reward service/schema/tests/docs if approved | settlement recalculation unless explicit | unit/integration/idempotency | no reward policy/schema/user-facing contract | reward grant is idempotent and tied to settled evidence | `Gate J - Reward badge trophy implementation` | HIGH | Gate I |
+| Gate K: Refresh token/logout/revocation schema gate | Decide session model beyond access-token MVP | Auth MVP stable; product session requirements | docs/schema/migration only if approved | provider/scheduler/settlement/reward changes | auth unit/e2e; Prisma validate if schema changes | refresh token storage/rotation/logout policy undecided | schema and lifecycle accepted before implementation | `Gate K - Refresh token logout revocation schema gate` | HIGH | Gate A |
+| Gate L: Deployment/ops readiness | Prepare production runtime and operations | provider/scheduler shape known | docs/config/ops scripts if approved | business logic expansions | build, health checks, migration status, smoke checklist | secret/runbook/monitoring/migration/scheduler ownership missing | deployment checklist and rollback plan accepted | `Gate L - Deployment ops readiness` | HIGH | Gate E recommended |
+
+## Next 5 Implementation Candidate Priority
+
+| Candidate | MVP impact | Financial stability impact | Implementation risk | External dependency | Test difficulty | Current prerequisites met? | Start now? | Recommendation | Reason | Required prior decisions | Suggested next prompt scope |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1. Provider final selection readiness re-check | HIGH | HIGH | MEDIUM as docs/trial audit | HIGH | LOW for docs, MEDIUM for trial smoke | Partially | Yes, as docs/trial readiness only | DO NOW | Provider choice blocks FX provider ingestion and informs sourceType priority/freshness. It should remain an audit, not ingestion code. | OANDA trial evidence plan, cost/contract owner, polling/timestamp/rate-basis checklist | Review provider STOP docs, record exact remaining decisions, do not code ingestion |
+| 2. Asset price freshness policy finalization | HIGH | HIGH | MEDIUM | MEDIUM | MEDIUM | Partially | Yes after provider readiness framing | DO NOW, second | Home/valuation/order quote/execute need stale asset price policy before automation. It depends on source/provider assumptions. | supported markets/assets, freshness thresholds by source/market, stale behavior | Docs-only asset price freshness policy gate |
+| 3. Settlement preimplementation readiness audit | HIGH | VERY HIGH | MEDIUM as docs, HIGH later | MEDIUM | HIGH | Not fully | Not yet | DO LATER | Settlement needs reliable final daily snapshots/rankings and price/FX evidence first. | final evidence source, season state transition, idempotency, reward handoff | Docs-only audit after provider/scheduler/freshness |
+| 4. Scheduler/batch foundation preimplementation audit | HIGH | HIGH | MEDIUM | MEDIUM | HIGH | Partially | After provider/freshness decisions | DO LATER | Scheduler foundation is necessary, but job requirements depend on provider/freshness and ops model. | runner model, lock/idempotency/retry/observability/deployment | Docs-only scheduler foundation audit |
+| 5. Refresh token/logout/revocation schema gate | MEDIUM | MEDIUM | HIGH | LOW | HIGH | Auth MVP only | No | DO LATER | Important for sessions, but not a blocker for provider/scheduler/settlement correctness and requires schema/lifecycle decisions. | token rotation, revocation model, cookie/session requirements, schema | Separate auth schema gate; no trading code |
+
+Recommended next task:
+
+- Gate B: Provider final selection readiness re-check.
+
+## STOP / GO Summary
+
+GO or completed:
+
+- Gate A protected API HTTP e2e baseline is complete enough for current access-token MVP.
+- Existing read-only APIs may continue using service/unit plus guard e2e coverage.
+- Manual admin CLIs may remain bootstrap/manual paths.
+
+STOP:
+
+- Provider ingestion until Gate B decisions are accepted.
+- Scheduler/batch until Gate E.
+- Settlement until Gate H then Gate I.
+- Reward/badge/trophy until Gate J after settlement.
+- Refresh token/logout/revocation until Gate K schema/lifecycle approval.
+- Durable quote, order exact execute replay, partial fill, matching engine, and fake/static/sample business data remain out of scope.
