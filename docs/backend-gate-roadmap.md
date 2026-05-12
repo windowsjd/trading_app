@@ -3,6 +3,7 @@
 ## Status
 
 - Documentation-only audit based on the current workspace state on 2026-05-11.
+- Gate B provider readiness and asset price freshness policy were re-checked on 2026-05-12 as docs-only updates.
 - No source, test, package, Prisma schema, migration, seed, provider, scheduler, settlement, reward, or refresh-token implementation is authorized by this document.
 - `docs/current-status.md` remains the short status summary. This document is the detailed backend gate roadmap.
 
@@ -26,6 +27,8 @@ Reviewed source-of-truth documents:
 - `docs/ranking-api-contract.md`
 - `docs/wallets-api-contract.md`
 - `docs/records-api-contract.md`
+- `docs/provider-final-selection-readiness-recheck.md`
+- `docs/asset-price-freshness-policy.md`
 - `README.md`
 
 Reviewed code/test surface:
@@ -115,7 +118,7 @@ Consistency note:
 - Known limitations: quote is not durable; `quoteId` and `expiresAt` are `null`; sourceType priority is not finalized for mixed provider/manual rows; provider ingestion is absent.
 - Remaining work: provider final selection and sourceType priority before provider rows are introduced.
 - Risk level: MEDIUM.
-- Recommended next action: Gate B provider final selection readiness, not quote code changes.
+- Recommended next action: Gate C/D provider evidence capture, not quote code changes.
 
 ### FX Execute
 
@@ -134,10 +137,10 @@ Consistency note:
 - Implemented files: `scripts/admin-upsert-asset.ts`, `scripts/admin-insert-asset-price.ts`, `src/assets/asset-admin-input.validation.ts`.
 - Source of truth: `docs/current-status.md`, `docs/orders-api-contract.md`, `docs/home-api-contract.md`.
 - Existing tests: `src/assets/asset-admin-input.validation.spec.ts`.
-- Known limitations: no provider price ingestion; no asset price freshness threshold; no scheduler; no admin HTTP API.
-- Remaining work: asset price freshness policy and provider ingestion gate.
+- Known limitations: no provider price ingestion; no implemented asset price stale threshold; no scheduler; no admin HTTP API.
+- Remaining work: provider evidence capture, source eligibility implementation, and tests before any provider_api asset price ingestion.
 - Risk level: MEDIUM.
-- Recommended next action: finalize freshness policy after or alongside provider readiness.
+- Recommended next action: use `docs/asset-price-freshness-policy.md` as the implementation policy for later Gate D; do not change price input code in Gate B.
 
 ### Orders Read
 
@@ -157,7 +160,7 @@ Consistency note:
 - Source of truth: `docs/orders-api-contract.md`, `docs/current-status.md`.
 - Existing tests: `src/orders/orders.service.spec.ts`, `test/app.e2e-spec.ts`.
 - Known limitations: no durable quote, no quote expiry, no asset price stale threshold, no provider price source.
-- Remaining work: asset price freshness policy and durable quote gate if required.
+- Remaining work: asset price freshness policy implementation and durable quote gate if required.
 - Risk level: MEDIUM.
 - Recommended next action: do not add durable quote in provider/scheduler gates.
 
@@ -201,7 +204,7 @@ Consistency note:
 - Source of truth: `docs/current-status.md`, `docs/home-api-contract.md`.
 - Existing tests: `src/portfolio/portfolio-valuation.policy.spec.ts`, `src/home/home.service.spec.ts`.
 - Known limitations: no asset price stale threshold; no provider price source; no automatic snapshot schedule; live valuation can be unavailable when price/FX evidence is missing.
-- Remaining work: asset price freshness policy and scheduler/batch foundation.
+- Remaining work: asset price freshness implementation and scheduler/batch foundation.
 - Risk level: MEDIUM.
 - Recommended next action: treat as calculation foundation, not final settlement evidence.
 
@@ -234,7 +237,7 @@ Consistency note:
 - Source of truth: `docs/home-api-contract.md`, `docs/current-status.md`.
 - Existing tests: `src/home/home.service.spec.ts`, `test/app.e2e-spec.ts`.
 - Known limitations: allocation, top positions, equity chart, authoritative final result, automatic freshness, settlement summary are unavailable/blocked.
-- Remaining work: provider ingestion, asset price freshness, scheduler daily snapshots, ranking automation, settlement.
+- Remaining work: provider ingestion, asset price freshness implementation, scheduler daily snapshots, ranking automation, settlement.
 - Risk level: MEDIUM.
 - Recommended next action: no home expansion before provider/scheduler/settlement gates.
 
@@ -262,14 +265,14 @@ Consistency note:
 
 ### Provider Ingestion
 
-- Current status: not implemented. OANDA is primary candidate, Twelve Data secondary, but final provider selection is STOP.
+- Current status: not implemented. Gate B re-check is complete as `CONDITIONAL GO`, not implementation GO.
 - Implemented files: none for ingestion.
-- Source of truth: `docs/fx-provider-research.md`, `docs/fx-provider-final-selection-stop-review.md`, `docs/fx-ingestion-stop-review.md`.
+- Source of truth: `docs/fx-provider-research.md`, `docs/fx-provider-final-selection-stop-review.md`, `docs/fx-ingestion-stop-review.md`, `docs/provider-final-selection-readiness-recheck.md`, `docs/asset-price-freshness-policy.md`.
 - Existing tests: none.
-- Known limitations: no API key management, polling, retry/backoff, sourceType priority, retention, alerting, contract validation, or USD/KRW trial response mapping.
-- Remaining work: Gate B then Gate C/Gate D.
+- Known limitations: no API key management, polling, retry/backoff, sourceType priority implementation, retention, alerting, contract validation, or USD/KRW/asset live fixture response mapping.
+- Remaining work: Gate C/D evidence capture before implementation. OANDA is the conditional primary FX candidate; Twelve Data is the conditional US stock/crypto candidate and secondary FX candidate; KRX quote/execute remains blocked/unverified.
 - Risk level: HIGH.
-- Recommended next action: Provider final selection readiness re-check.
+- Recommended next action: capture official/trial response evidence and terms decisions before code.
 
 ### Scheduler / Batch
 
@@ -375,7 +378,7 @@ Safety classification:
 | Gate C: FX provider ingestion implementation | Insert real provider USD/KRW snapshots | Gate B GO | provider module/service/tests, config/env docs if approved | settlement, order execution changes, scheduler if not in scope, fake/static/manual fallback | unit, mock provider tests, no-fake policy, Prisma validate/build, e2e smoke if HTTP exists | API key policy missing, source timestamp mapping uncertain, retry/backoff absent | provider snapshot insertion is idempotent/observable and quote can consume it by policy | `Gate C - FX provider ingestion implementation` | HIGH | Gate B |
 | Gate D: Asset price provider ingestion implementation | Insert real asset price snapshots for supported markets | asset universe decision, asset price freshness policy, provider/source decision | asset provider files/tests/docs | FX provider code unless shared abstraction approved, scheduler if not in scope, fake/sample prices | unit/provider mapping tests, no-fake policy, Prisma validate/build | freshness/source/license/market coverage undecided | approved source mapping and freshness policy exist | `Gate D - Asset price provider ingestion implementation` | HIGH | Gate B |
 | Gate E: Scheduler/batch foundation | Define safe automatic job runner foundation | provider/freshness decisions enough to know job needs | scheduler module/foundation/tests/docs if approved | daily snapshot/ranking/settlement business jobs unless included | unit tests for locking/idempotency/retry; build | no lock/idempotency/retry/observability policy; deployment model unknown | scheduler foundation can run one safe no-op or bounded job with tests | `Gate E - Scheduler batch foundation preimplementation audit` | HIGH | Gate B |
-| Gate F: Automatic daily portfolio snapshot generation | Automate daily snapshot generation | Gate E, valuation inputs reliable, asset/FX freshness policy | scheduler job + tests/docs | ranking, settlement, rewards unless explicit | unit + integration/smoke for job idempotency and partial participant failures | provider data unavailable, freshness policy unresolved, job retry undefined | automatic snapshots are idempotent and observable | `Gate F - Automatic daily portfolio snapshot generation` | HIGH | Gate E |
+| Gate F: Automatic daily portfolio snapshot generation | Automate daily snapshot generation | Gate E, valuation inputs reliable, asset/FX freshness policy | scheduler job + tests/docs | ranking, settlement, rewards unless explicit | unit + integration/smoke for job idempotency and partial participant failures | provider data unavailable, freshness implementation absent, job retry undefined | automatic snapshots are idempotent and observable | `Gate F - Automatic daily portfolio snapshot generation` | HIGH | Gate E |
 | Gate G: Automatic season ranking generation | Automate rankings from daily snapshots | Gate F | ranking job/tests/docs | settlement/reward unless explicit | unit/integration for rank ordering, uniqueness, rerun idempotency | daily snapshots absent or inconsistent, rank date policy unclear | repeatable ranking generation from snapshot source | `Gate G - Automatic season ranking generation` | MEDIUM | Gate F |
 | Gate H: Settlement preimplementation audit | Decide final evaluation, season close, transaction boundaries, and recovery | Gate F/G recommended | docs only | settlement code/schema unless gate explicitly changes to implementation | no build required; maybe `prisma validate` | final price/FX evidence, season state transition, retry/idempotency, reward handoff undecided | implementation scope and test matrix accepted | `Gate H - Settlement preimplementation readiness audit` | MEDIUM | Gate F, Gate G |
 | Gate I: Settlement implementation | Implement final KRW evaluation and season settlement | Gate H GO | settlement service/job/tests/docs/schema only if approved | rewards unless in Gate J, provider/scheduler unrelated changes | unit, integration, rollback/concurrency/idempotency, build | no final audit acceptance; schema needs unclear | final settlement writes are durable, idempotent, and tested | `Gate I - Settlement implementation` | HIGH | Gate H |
@@ -383,19 +386,43 @@ Safety classification:
 | Gate K: Refresh token/logout/revocation schema gate | Decide session model beyond access-token MVP | Auth MVP stable; product session requirements | docs/schema/migration only if approved | provider/scheduler/settlement/reward changes | auth unit/e2e; Prisma validate if schema changes | refresh token storage/rotation/logout policy undecided | schema and lifecycle accepted before implementation | `Gate K - Refresh token logout revocation schema gate` | HIGH | Gate A |
 | Gate L: Deployment/ops readiness | Prepare production runtime and operations | provider/scheduler shape known | docs/config/ops scripts if approved | business logic expansions | build, health checks, migration status, smoke checklist | secret/runbook/monitoring/migration/scheduler ownership missing | deployment checklist and rollback plan accepted | `Gate L - Deployment ops readiness` | HIGH | Gate E recommended |
 
+## Gate B Re-check Result (2026-05-12)
+
+Gate B was completed as a docs-only readiness re-check in `docs/provider-final-selection-readiness-recheck.md` and `docs/asset-price-freshness-policy.md`.
+
+| Area | Decision | Roadmap effect | Required before implementation |
+|---|---|---|---|
+| Gate B Provider final selection readiness | CONDITIONAL GO | Provider roles and source/freshness policy are clear enough for evidence capture and narrow Gate C/D prompts | No code yet; keep official docs and trial/API evidence together |
+| Gate C FX provider ingestion | CONDITIONAL GO for evidence capture; implementation still gated | OANDA is conditional primary FX provider; Twelve Data is conditional secondary FX provider | OANDA USD/KRW trial/API response, exact endpoint/field mapping, provider timestamp -> `effectiveAt`, `capturedAt`, bid/ask/mid or rate basis, contract/cost/polling approval |
+| Gate D Asset price provider ingestion | CONDITIONAL GO for US/crypto evidence; BLOCKED for KRX quote/execute | Twelve Data is conditional candidate for US stock and crypto; KRX real-time quote/execute remains blocked | Twelve Data `/quote` or WebSocket fixtures, symbol mapping, timestamp proof, plan/terms approval, separate domestic/US/crypto freshness tests |
+| Gate E Scheduler/batch foundation | CONDITIONAL GO for preimplementation audit only | Freshness and polling requirements are clearer, but no scheduler/batch implementation is authorized | job lock, idempotency, retry/backoff, partial failure, provider outage, manual CLI coexistence policy |
+| Gate H Settlement preimplementation audit | CONDITIONAL GO for docs-only audit; implementation STOP | Settlement can be audited next only after acknowledging final evidence source is still undecided | final valuation source, season cutoff, rerun/idempotency, rollback, reward handoff, official/reference snapshot decision |
+
+Still blocked:
+
+- KRX provider_api quote/execute until real-time official provider evidence exists.
+- Provider ingestion implementation until Gate C/D evidence is captured and accepted.
+- Scheduler/batch implementation until Gate E defines lock/idempotency/retry/ops behavior.
+- Settlement implementation until Gate H/I fixes final price evidence and transaction/recovery behavior.
+- Reward/badge/trophy until settlement is implemented and accepted.
+
+Recommended next Codex prompt title:
+
+- `Gate C/D Provider Evidence Capture - OANDA USD/KRW and Twelve Data Asset Fixture Review`
+
 ## Next 5 Implementation Candidate Priority
 
 | Candidate | MVP impact | Financial stability impact | Implementation risk | External dependency | Test difficulty | Current prerequisites met? | Start now? | Recommendation | Reason | Required prior decisions | Suggested next prompt scope |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1. Provider final selection readiness re-check | HIGH | HIGH | MEDIUM as docs/trial audit | HIGH | LOW for docs, MEDIUM for trial smoke | Partially | Yes, as docs/trial readiness only | DO NOW | Provider choice blocks FX provider ingestion and informs sourceType priority/freshness. It should remain an audit, not ingestion code. | OANDA trial evidence plan, cost/contract owner, polling/timestamp/rate-basis checklist | Review provider STOP docs, record exact remaining decisions, do not code ingestion |
-| 2. Asset price freshness policy finalization | HIGH | HIGH | MEDIUM | MEDIUM | MEDIUM | Partially | Yes after provider readiness framing | DO NOW, second | Home/valuation/order quote/execute need stale asset price policy before automation. It depends on source/provider assumptions. | supported markets/assets, freshness thresholds by source/market, stale behavior | Docs-only asset price freshness policy gate |
+| 1. Provider final selection readiness re-check | HIGH | HIGH | MEDIUM as docs/trial audit | HIGH | LOW for docs, MEDIUM for trial smoke | Partially | Completed as docs-only re-check | DONE, CONDITIONAL GO | Provider roles are now clear enough for evidence capture, but ingestion code is still gated. | OANDA trial response, cost/contract owner, polling/timestamp/rate-basis checklist | Gate C/D provider evidence capture, do not code ingestion yet |
+| 2. Asset price freshness policy finalization | HIGH | HIGH | MEDIUM | MEDIUM | MEDIUM | Partially | Completed as docs-only policy | DONE, CONDITIONAL GO | SourceType roles, timestamp semantics, market freshness, and stale behavior are now documented for future Gate D/F/H work. | supported asset universe, live fixtures, market-hours acceptance, settlement evidence | Use policy in provider evidence capture and later implementation gates |
 | 3. Settlement preimplementation readiness audit | HIGH | VERY HIGH | MEDIUM as docs, HIGH later | MEDIUM | HIGH | Not fully | Not yet | DO LATER | Settlement needs reliable final daily snapshots/rankings and price/FX evidence first. | final evidence source, season state transition, idempotency, reward handoff | Docs-only audit after provider/scheduler/freshness |
 | 4. Scheduler/batch foundation preimplementation audit | HIGH | HIGH | MEDIUM | MEDIUM | HIGH | Partially | After provider/freshness decisions | DO LATER | Scheduler foundation is necessary, but job requirements depend on provider/freshness and ops model. | runner model, lock/idempotency/retry/observability/deployment | Docs-only scheduler foundation audit |
 | 5. Refresh token/logout/revocation schema gate | MEDIUM | MEDIUM | HIGH | LOW | HIGH | Auth MVP only | No | DO LATER | Important for sessions, but not a blocker for provider/scheduler/settlement correctness and requires schema/lifecycle decisions. | token rotation, revocation model, cookie/session requirements, schema | Separate auth schema gate; no trading code |
 
 Recommended next task:
 
-- Gate B: Provider final selection readiness re-check.
+- Gate C/D Provider Evidence Capture - OANDA USD/KRW and Twelve Data Asset Fixture Review.
 
 ## STOP / GO Summary
 
@@ -407,9 +434,10 @@ GO or completed:
 
 STOP:
 
-- Provider ingestion until Gate B decisions are accepted.
-- Scheduler/batch until Gate E.
-- Settlement until Gate H then Gate I.
+- Provider ingestion implementation until Gate C/D evidence and implementation scope are accepted.
+- KRX provider_api quote/execute until real-time KRX source evidence exists.
+- Scheduler/batch implementation until Gate E.
+- Settlement implementation until Gate H then Gate I.
 - Reward/badge/trophy until Gate J after settlement.
 - Refresh token/logout/revocation until Gate K schema/lifecycle approval.
 - Durable quote, order exact execute replay, partial fill, matching engine, and fake/static/sample business data remain out of scope.

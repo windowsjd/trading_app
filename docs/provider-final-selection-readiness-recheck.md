@@ -47,18 +47,18 @@ Not re-promoted in this document:
 
 ## 5. Official Documentation Checked
 
-Checked date: 2026-05-11.
+Checked date: 2026-05-12.
 
 | Provider | Official URL | Checked items | Result |
 |---|---|---|---|
 | OANDA | https://www.oanda.com/foreign-exchange-data-services/en/exchange-rates-api/ | REST/HTTPS/GET, UTC timestamps, JSON/XML/CSV formats, real-time rates, bid/ask/mid data sets, 7-day trial, broad currency pair coverage | Official marketing/product docs are sufficient for readiness, but exact endpoint response mapping remains unverified |
-| OANDA | https://www.oanda.com/foreign-exchange-data-services/en/exchange-rates-api/api-plans/ | Pricing and plan features, 100,000 quotes/month Lite, higher plan unlimited quotes, 3-5 second spot, streaming, cryptocurrency plan | Current as checked on 2026-05-11; cost/contract approval still required |
+| OANDA | https://www.oanda.com/foreign-exchange-data-services/en/exchange-rates-api/api-plans/ | Pricing and plan features, 100,000 quotes/month Lite, higher plan unlimited quotes, 3-5 second spot, streaming, cryptocurrency plan | Current as checked on 2026-05-12; cost/contract approval still required |
 | OANDA | https://www.oanda.com/foreign-exchange-data-services/en/exchange-rates-api/api-accuracy/ | Data source quality, real FX market inputs, outlier removal, central-bank/reference source claims | Supports OANDA as a strong FX-quality candidate |
 | OANDA | https://exchange-rates-api.oanda.com/ | Developer/API documentation entry point | Page rendered as an iframe shell in this check; exact endpoint fields remain unverified |
 | Twelve Data | https://twelvedata.com/docs | `/exchange_rate`, `/quote`, `/price`, `/time_series`, `/forex_pairs`, `/cryptocurrencies`, `/market_state`, auth, errors, API shape | Official docs are broad enough for readiness, but exact live response evidence is still required |
-| Twelve Data | https://twelvedata.com/pricing | Individual plan usage, API credits per minute, Basic/Grow/Pro/Ultra limits, personal/internal/non-commercial positioning | Current as checked on 2026-05-11 |
-| Twelve Data | https://twelvedata.com/pricing-business | Business plan positioning, external display data access, commercial/professional plan context | Current as checked on 2026-05-11; production terms still require owner approval |
-| Twelve Data | https://support.twelvedata.com/en/articles/5615854-credits | API/WS credit reset and 429 behavior | Current as checked on 2026-05-11 |
+| Twelve Data | https://twelvedata.com/pricing | Individual plan usage, API credits per minute, Basic/Grow/Pro/Ultra limits, personal/internal/non-commercial positioning | Current as checked on 2026-05-12 |
+| Twelve Data | https://twelvedata.com/pricing-business | Business plan positioning, external display data access, commercial/professional plan context | Current as checked on 2026-05-12; production terms still require owner approval |
+| Twelve Data | https://support.twelvedata.com/en/articles/5615854-credits | API/WS credit reset and 429 behavior | Current as checked on 2026-05-12 |
 | Twelve Data | https://twelvedata.com/stocks | US/international coverage, real-time US, South Korea EOD delay, plan tiers | KRX real-time quote/execute remains unverified/blocked |
 | Twelve Data | https://twelvedata.com/cryptocurrency | Crypto coverage, real-time low-latency streaming, exchanges | Crypto candidate only after symbol/exchange/timestamp trial evidence |
 | Twelve Data | https://twelvedata.com/markets/938314/forex/usd-krw | USD/KRW instrument page | Confirms official USD/KRW market page exists; API response still must be verified |
@@ -73,7 +73,7 @@ OANDA official documents support the following:
 - Real-time rates include streaming bid, ask, and midpoint rates through REST or FIX.
 - API plan material lists 3-5 second spot and streaming rates on higher plans.
 - API key and account are required. A 7-day free API key trial is available.
-- Current as checked on 2026-05-11: OANDA listed Lite at USD 450/month or USD 4,850/year, with 100,000 quotes/month. Higher plans list unlimited quotes and higher-rate features.
+- Current as checked on 2026-05-12: OANDA listed Lite at USD 450/month or USD 4,850/year, with 100,000 quotes/month. Higher plans list unlimited quotes and higher-rate features.
 - One USD/KRW poll every 30 seconds is roughly 86,400 requests/month, which appears within Lite monthly quote volume for one pair, but contract terms and quote accounting must still be confirmed.
 
 OANDA unverified items:
@@ -176,13 +176,13 @@ Twelve Data:
 
 OANDA:
 
-- Current as checked on 2026-05-11: Lite listed 100,000 quotes/month; higher plans list unlimited quotes.
+- Current as checked on 2026-05-12: Lite listed 100,000 quotes/month; higher plans list unlimited quotes.
 - One USD/KRW poll every 30 seconds is approximately 86,400 polls per 30-day month.
 - This looks technically feasible for one FX pair on Lite volume, but contract terms, quote counting, retries, monitoring calls, and production usage must be confirmed before implementation.
 
 Twelve Data:
 
-- Current as checked on 2026-05-11: API credits reset per minute; endpoint costs are documented per endpoint.
+- Current as checked on 2026-05-12: API credits reset per minute; endpoint costs are documented per endpoint.
 - `/exchange_rate`, `/quote`, and `/price` are documented as 1 credit per symbol.
 - Basic 8 credits/minute may support tiny trials but not broad asset polling. Paid/business plans are required for production-like polling.
 - Scheduler design must prevent credit exhaustion and handle 429 without fake fallback.

@@ -197,6 +197,8 @@ near-term ledger/FX foundation:
 - `/fx execute` final implementation gate: `docs/fx-execute-final-implementation-gate.md`.
 - Backend gate roadmap 및 current backend audit: `docs/backend-gate-roadmap.md`.
 - Backend test coverage matrix: `docs/backend-test-coverage-matrix.md`.
+- Provider final selection readiness re-check: `docs/provider-final-selection-readiness-recheck.md`.
+- Asset price freshness policy: `docs/asset-price-freshness-policy.md`.
 
 ## 8. 주요 STOP 상태
 
@@ -225,8 +227,9 @@ near-term ledger/FX foundation:
 - `/fx quote` smoke용 승인된 `admin_manual` snapshot 1건 입력 및 소비 검증 완료.
 - 입력한 manual snapshot은 smoke 당시 fresh였지만 60초 이후에는 정책상 stale이 되므로, 지속적인 quote 성공에는 별도 승인 snapshot 입력 또는 향후 ingestion 경로가 필요함.
 - provider_api/official_batch/scheduler 구현 없음.
-- provider final selection은 아직 확정 아님.
-- OANDA는 primary candidate, Twelve Data는 secondary candidate.
+- Gate B provider role은 `CONDITIONAL GO`로 정리됨.
+- OANDA는 conditional primary FX candidate, Twelve Data는 conditional secondary FX 및 US stock/crypto candidate.
+- KRX quote/execute provider는 real-time 공식 검증 부족으로 `BLOCKED`.
 - OANDA trial/API 계약 검증 전 provider implementation STOP.
 - 30초 polling은 후보이며 provider rate limit/terms 확인 후 확정.
 
@@ -241,9 +244,9 @@ near-term ledger/FX foundation:
 - 이 작업으로 운영자 승인 수동 asset/price bootstrap 경로는 생겼고, 별도 수동 valuation/ranking 생성 경로도 추가됨.
 - 자동 가격 공급/provider ingestion/scheduler/API 응답 생성은 아직 없음.
 - provider_api/official_batch/scheduler 기반 price ingestion 구현 없음.
-- asset price freshness threshold는 아직 최종 정책 미확정.
+- asset price freshness/sourceType 정책은 `docs/asset-price-freshness-policy.md`에 문서화 완료.
   - near-term valuation은 `admin_manual` sourceType이고 `effectiveAt <= valuationAt`인 최신 price snapshot만 선택함.
-  - stale/freshness 기준은 TODO로 남아 있으며 provider/official_batch 사용은 아직 허용하지 않음.
+  - asset price stale/freshness 기준은 아직 코드에 구현되지 않았고 provider/official_batch 사용은 아직 허용하지 않음.
 
 ### Valuation/ranking manual foundation
 
@@ -390,7 +393,7 @@ near-term ledger/FX foundation:
 - `/home` 호출은 wallet/position/snapshot/ranking row를 생성/수정/삭제하지 않음.
 - full home implementation blocker:
   - provider price ingestion
-  - asset price freshness policy
+  - asset price freshness policy implementation and provider evidence
   - order execution 이후 자동 daily portfolio snapshot/ranking 생성 정책
   - scheduler/batch daily portfolio snapshot 자동 생성
   - scheduler/batch season ranking 자동 생성
@@ -525,14 +528,27 @@ near-term ledger/FX foundation:
 
 ## 9. 다음 gate
 
-- 다음 recommended gate: Gate B Provider final selection readiness re-check.
-  - 상세 gate 순서와 STOP/GO 조건은 `docs/backend-gate-roadmap.md` 기준.
-  - 구현 착수 전 OANDA trial/API 계약, Twelve Data fallback 계약, timestamp/freshness, sourceType/sourceName 우선순위, polling/rate-limit 정책을 다시 확인해야 함.
+- Gate B Provider final selection readiness re-check 및 Asset Price Freshness Policy 문서화 완료.
+  - 상세 결과: `docs/provider-final-selection-readiness-recheck.md`, `docs/asset-price-freshness-policy.md`.
+  - Gate B 판단은 `CONDITIONAL GO`.
+  - 이것은 evidence capture와 다음 구현 프롬프트를 열기 위한 조건부 판단이며, provider ingestion 구현 GO가 아님.
+- 다음 recommended gate: Gate C/D Provider Evidence Capture - OANDA USD/KRW and Twelve Data Asset Fixture Review.
+  - 구현 착수 전 OANDA trial/API USD/KRW 응답, timestamp/effectiveAt mapping, bid/ask/mid 또는 rate basis, Twelve Data asset quote fixtures, symbol mapping, plan/terms, sourceType/sourceName 우선순위, polling/rate-limit 정책을 확인해야 함.
 - Gate A Protected API HTTP e2e baseline은 완료 상태로 본다.
   - 완료 범위: public/optional/protected guard baseline, missing token/`x-user-id` 차단, valid-token read-only smoke, selected quote smoke.
   - 남은 gap: 모든 protected route별 invalid-token HTTP e2e exhaustive coverage와 valid-token full write-path HTTP e2e는 아직 없음.
   - full financial write-path 검증은 현재 service/unit 및 opt-in PostgreSQL integration spec이 담당.
 - 테스트 커버리지 상세는 `docs/backend-test-coverage-matrix.md` 기준.
+- provider ingestion은 여전히 미구현이며 Gate C/D 전까지 구현 STOP 유지.
+- scheduler/batch는 여전히 미구현이며 Gate E 전까지 구현 STOP 유지.
+- settlement/reward는 여전히 미구현이며 Gate H/I/J 전까지 구현 STOP 유지.
+- asset price freshness 정책 요약:
+  - FX USD/KRW quote/execute는 현행 60초 `effectiveAt` freshness 유지.
+  - `provider_api`는 provider timestamp를 `effectiveAt`으로 매핑할 수 있을 때만 허용 후보.
+  - `capturedAt`은 서버 수신/admin 저장 시점이며, `createdAt`은 DB row tie-breaker 전용.
+  - KRX quote/execute provider는 real-time 공식 검증 부족으로 `BLOCKED`.
+  - Twelve Data는 US stock/crypto 후보이나 live fixture, symbol mapping, plan/terms 확인 전 `CONDITIONAL GO`.
+  - `official_batch`는 reference/reconciliation/settlement 후보이며 real-time execute source가 아님.
 - OANDA trial/API 계약 검증 전 provider_api/official_batch/scheduler 구현 STOP 유지.
 - `/fx execute` 남은 DB-level rollback/partial-write hardening 및 stale pending/unknown outcome recovery 설계.
 - `/orders/:orderId/execute` MVP 후속 gate:
@@ -544,8 +560,8 @@ near-term ledger/FX foundation:
 ## 10. 아직 안 한 것
 
 - high-risk backend gaps:
-  - provider final selection 및 provider ingestion.
-  - asset price freshness/source policy finalization.
+  - provider trial/API evidence capture 및 provider ingestion.
+  - asset price freshness/source policy 구현 반영 및 고위험 테스트.
   - scheduler/batch foundation 및 automatic daily snapshot/ranking.
   - settlement/reward/badge/trophy.
   - refresh token/logout/revocation schema 및 정책.
@@ -649,11 +665,11 @@ near-term ledger/FX foundation:
 
 ## 12. TODO
 
-- provider final selection STOP review 수락 및 OANDA trial/API 계약 검증.
+- Gate C/D provider evidence capture 및 OANDA trial/API 계약 검증.
 - `/fx execute` 실제 DB transaction 내부 강제 실패 기반 rollback 검증 보강.
 - ledger insert/exchange row/finalization 실패 유도 integration hardening 검토.
 - 지속적인 `/fx quote` 성공을 위한 승인 snapshot 공급 운영 절차 또는 provider/batch ingestion 경로 검토.
-- asset price ingestion/source/freshness 정책 설계.
+- asset price ingestion/source/freshness 정책의 구현 반영 및 테스트 설계.
 - asset/price admin CLI 운영 승인 절차 정리.
 - order execute exact replay/partial fill/matching engine은 별도 설계 필요.
 - valuation/ranking 자동 생성 scheduler/API 연동 설계/구현.
