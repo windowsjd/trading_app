@@ -199,6 +199,7 @@ near-term ledger/FX foundation:
 - Backend test coverage matrix: `docs/backend-test-coverage-matrix.md`.
 - Provider final selection readiness re-check: `docs/provider-final-selection-readiness-recheck.md`.
 - Asset price freshness policy: `docs/asset-price-freshness-policy.md`.
+- Provider evidence capture: `docs/provider-evidence-capture.md`.
 
 ## 8. 주요 STOP 상태
 
@@ -528,18 +529,25 @@ near-term ledger/FX foundation:
 
 ## 9. 다음 gate
 
+- Gate C/D Provider Evidence Capture 문서화 완료.
+  - 상세 결과: `docs/provider-evidence-capture.md`.
+  - fixture 파일은 추가하지 않음. OANDA/Twelve Data credentials가 없어 live fixture capture는 모두 `BLOCKED`.
+  - OANDA USD/KRW evidence: 공식 문서 기준 후보 유지, live fixture `BLOCKED`.
+  - Twelve Data USD/KRW evidence: `/exchange_rate` 공식 mapping 후보 확인, live fixture `BLOCKED`.
+  - Twelve Data US stock evidence: `/quote` 공식 mapping 후보 확인, live fixture `BLOCKED`.
+  - Twelve Data crypto evidence: `/exchange_rate`, `/quote`, WebSocket 후보 확인, live fixture `BLOCKED`.
 - Gate B Provider final selection readiness re-check 및 Asset Price Freshness Policy 문서화 완료.
   - 상세 결과: `docs/provider-final-selection-readiness-recheck.md`, `docs/asset-price-freshness-policy.md`.
   - Gate B 판단은 `CONDITIONAL GO`.
   - 이것은 evidence capture와 다음 구현 프롬프트를 열기 위한 조건부 판단이며, provider ingestion 구현 GO가 아님.
-- 다음 recommended gate: Gate C/D Provider Evidence Capture - OANDA USD/KRW and Twelve Data Asset Fixture Review.
-  - 구현 착수 전 OANDA trial/API USD/KRW 응답, timestamp/effectiveAt mapping, bid/ask/mid 또는 rate basis, Twelve Data asset quote fixtures, symbol mapping, plan/terms, sourceType/sourceName 우선순위, polling/rate-limit 정책을 확인해야 함.
+- 다음 recommended gate: Gate C/D Live Provider Fixture Capture - Provide OANDA and Twelve Data Credentials.
+  - 구현 착수 전 OANDA trial/API USD/KRW 응답, timestamp/effectiveAt mapping, bid/ask/mid 또는 rate basis, Twelve Data USD/KRW/US stock/crypto fixtures, symbol mapping, plan/terms, sourceType/sourceName 우선순위, polling/rate-limit 정책을 확인해야 함.
 - Gate A Protected API HTTP e2e baseline은 완료 상태로 본다.
   - 완료 범위: public/optional/protected guard baseline, missing token/`x-user-id` 차단, valid-token read-only smoke, selected quote smoke.
   - 남은 gap: 모든 protected route별 invalid-token HTTP e2e exhaustive coverage와 valid-token full write-path HTTP e2e는 아직 없음.
   - full financial write-path 검증은 현재 service/unit 및 opt-in PostgreSQL integration spec이 담당.
 - 테스트 커버리지 상세는 `docs/backend-test-coverage-matrix.md` 기준.
-- provider ingestion은 여전히 미구현이며 Gate C/D 전까지 구현 STOP 유지.
+- provider ingestion은 여전히 미구현이며 live fixture와 owner decision 수락 전 구현 `BLOCKED` 유지.
 - scheduler/batch는 여전히 미구현이며 Gate E 전까지 구현 STOP 유지.
 - settlement/reward는 여전히 미구현이며 Gate H/I/J 전까지 구현 STOP 유지.
 - asset price freshness 정책 요약:
@@ -560,7 +568,7 @@ near-term ledger/FX foundation:
 ## 10. 아직 안 한 것
 
 - high-risk backend gaps:
-  - provider trial/API evidence capture 및 provider ingestion.
+  - provider credentials 확보, live fixture capture, provider ingestion.
   - asset price freshness/source policy 구현 반영 및 고위험 테스트.
   - scheduler/batch foundation 및 automatic daily snapshot/ranking.
   - settlement/reward/badge/trophy.
@@ -665,7 +673,7 @@ near-term ledger/FX foundation:
 
 ## 12. TODO
 
-- Gate C/D provider evidence capture 및 OANDA trial/API 계약 검증.
+- Gate C/D live provider fixture capture 및 OANDA/Twelve Data credential/account/terms 검증.
 - `/fx execute` 실제 DB transaction 내부 강제 실패 기반 rollback 검증 보강.
 - ledger insert/exchange row/finalization 실패 유도 integration hardening 검토.
 - 지속적인 `/fx quote` 성공을 위한 승인 snapshot 공급 운영 절차 또는 provider/batch ingestion 경로 검토.

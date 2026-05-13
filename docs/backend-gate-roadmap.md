@@ -408,13 +408,41 @@ Still blocked:
 
 Recommended next Codex prompt title:
 
-- `Gate C/D Provider Evidence Capture - OANDA USD/KRW and Twelve Data Asset Fixture Review`
+- `Gate C/D Live Provider Fixture Capture - Provide OANDA and Twelve Data Credentials`
+
+## Gate C/D Evidence Capture Result (2026-05-12)
+
+Gate C/D evidence capture is documented in `docs/provider-evidence-capture.md`.
+
+| Area | Decision | Roadmap effect | Required before implementation |
+|---|---|---|---|
+| OANDA USD/KRW fixture capture | BLOCKED | OANDA remains conditional FX candidate, but live evidence was not captured | Provide OANDA credentials, capture USD/KRW response, verify endpoint/fields/timestamp/content type/rate basis and terms |
+| Twelve Data USD/KRW fixture capture | BLOCKED | Twelve Data remains conditional secondary FX candidate, but live evidence was not captured | Provide `TWELVE_DATA_API_KEY`, capture `/exchange_rate?symbol=USD/KRW`, verify `rate`, `timestamp`, freshness, errors, terms |
+| Twelve Data US stock fixture capture | BLOCKED | Twelve Data remains conditional US stock candidate, but live evidence was not captured | Capture `/quote?symbol=AAPL` or `MSFT`, verify currency, `close`, `timestamp`/`last_quote_at`, `is_market_open`, plan/terms |
+| Twelve Data crypto fixture capture | BLOCKED | Twelve Data remains conditional crypto candidate, but endpoint choice is still open | Capture BTC/USD or ETH/USD fixture, decide `/exchange_rate` vs `/quote` vs WebSocket, verify timestamp, exchange/aggregation, terms |
+| Gate C FX provider ingestion | BLOCKED for implementation | No provider client/ingestion work should start yet | Live fixture, sourceType eligibility, timestamp mapping, rate basis, and owner terms decisions |
+| Gate D Asset price provider ingestion | BLOCKED for implementation | No asset provider ingestion work should start yet | Live US/crypto fixtures, symbol/currency mapping, market-open policy, delayed/EOD rejection, owner terms decisions |
+| Gate E Scheduler/batch foundation | CONDITIONAL GO for docs-only audit; STOP for implementation | Generic scheduler audit may proceed, but provider polling jobs cannot be implemented | Lock/idempotency/retry/ops policy plus accepted provider evidence |
+| Gate H Settlement preimplementation audit | CONDITIONAL GO for docs-only audit; STOP for implementation | Settlement can audit final evidence needs, not implement settlement | Final valuation source, official/reference snapshot policy, recovery/idempotency |
+
+Blocked reasons:
+
+- Local environment has no OANDA or Twelve Data credentials.
+- No live provider response fixtures exist.
+- OANDA exact endpoint, response fields, timestamp field, and bid/ask/mid mapping are still unverified.
+- Twelve Data live timestamp freshness is unmeasured for USD/KRW, US stock, and crypto.
+- Production terms/account approval is still missing.
+- KRX provider_api quote/execute remains blocked due missing real-time evidence.
+
+Next recommended Codex prompt title:
+
+- `Gate C/D Live Provider Fixture Capture - Provide OANDA and Twelve Data Credentials`
 
 ## Next 5 Implementation Candidate Priority
 
 | Candidate | MVP impact | Financial stability impact | Implementation risk | External dependency | Test difficulty | Current prerequisites met? | Start now? | Recommendation | Reason | Required prior decisions | Suggested next prompt scope |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1. Provider final selection readiness re-check | HIGH | HIGH | MEDIUM as docs/trial audit | HIGH | LOW for docs, MEDIUM for trial smoke | Partially | Completed as docs-only re-check | DONE, CONDITIONAL GO | Provider roles are now clear enough for evidence capture, but ingestion code is still gated. | OANDA trial response, cost/contract owner, polling/timestamp/rate-basis checklist | Gate C/D provider evidence capture, do not code ingestion yet |
+| 1. Provider final selection readiness re-check | HIGH | HIGH | MEDIUM as docs/trial audit | HIGH | LOW for docs, MEDIUM for trial smoke | Partially | Completed as docs-only re-check | DONE, CONDITIONAL GO | Provider roles are now clear enough for evidence capture, but ingestion code is still gated. | OANDA trial response, cost/contract owner, polling/timestamp/rate-basis checklist | Gate C/D live fixture capture with credentials, do not code ingestion yet |
 | 2. Asset price freshness policy finalization | HIGH | HIGH | MEDIUM | MEDIUM | MEDIUM | Partially | Completed as docs-only policy | DONE, CONDITIONAL GO | SourceType roles, timestamp semantics, market freshness, and stale behavior are now documented for future Gate D/F/H work. | supported asset universe, live fixtures, market-hours acceptance, settlement evidence | Use policy in provider evidence capture and later implementation gates |
 | 3. Settlement preimplementation readiness audit | HIGH | VERY HIGH | MEDIUM as docs, HIGH later | MEDIUM | HIGH | Not fully | Not yet | DO LATER | Settlement needs reliable final daily snapshots/rankings and price/FX evidence first. | final evidence source, season state transition, idempotency, reward handoff | Docs-only audit after provider/scheduler/freshness |
 | 4. Scheduler/batch foundation preimplementation audit | HIGH | HIGH | MEDIUM | MEDIUM | HIGH | Partially | After provider/freshness decisions | DO LATER | Scheduler foundation is necessary, but job requirements depend on provider/freshness and ops model. | runner model, lock/idempotency/retry/observability/deployment | Docs-only scheduler foundation audit |
@@ -422,7 +450,7 @@ Recommended next Codex prompt title:
 
 Recommended next task:
 
-- Gate C/D Provider Evidence Capture - OANDA USD/KRW and Twelve Data Asset Fixture Review.
+- Gate C/D Live Provider Fixture Capture - Provide OANDA and Twelve Data Credentials.
 
 ## STOP / GO Summary
 
@@ -434,7 +462,7 @@ GO or completed:
 
 STOP:
 
-- Provider ingestion implementation until Gate C/D evidence and implementation scope are accepted.
+- Provider ingestion implementation until live Gate C/D fixtures and implementation scope are accepted.
 - KRX provider_api quote/execute until real-time KRX source evidence exists.
 - Scheduler/batch implementation until Gate E.
 - Settlement implementation until Gate H then Gate I.
