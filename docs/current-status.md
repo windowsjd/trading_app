@@ -529,13 +529,18 @@ near-term ledger/FX foundation:
 
 ## 9. 다음 gate
 
-- Gate C/D Provider Evidence Capture 문서화 완료.
+- Gate C/D Live Provider Fixture Capture 재확인 완료(2026-05-13).
   - 상세 결과: `docs/provider-evidence-capture.md`.
-  - fixture 파일은 추가하지 않음. OANDA/Twelve Data credentials가 없어 live fixture capture는 모두 `BLOCKED`.
-  - OANDA USD/KRW evidence: 공식 문서 기준 후보 유지, live fixture `BLOCKED`.
-  - Twelve Data USD/KRW evidence: `/exchange_rate` 공식 mapping 후보 확인, live fixture `BLOCKED`.
-  - Twelve Data US stock evidence: `/quote` 공식 mapping 후보 확인, live fixture `BLOCKED`.
-  - Twelve Data crypto evidence: `/exchange_rate`, `/quote`, WebSocket 후보 확인, live fixture `BLOCKED`.
+  - credential 존재 여부만 확인했고 값은 출력/문서화하지 않음.
+  - 추가된 fixture/evidence 파일: `docs/provider-fixtures/provider-error-samples.md`.
+  - live JSON fixture 파일은 추가하지 않음. OANDA/Twelve Data credentials가 없어 live fixture capture는 모두 `BLOCKED`.
+  - OANDA USD/KRW fixture 상태: `BLOCKED`, credentials unavailable, exact endpoint/field/timestamp/rate basis unverified.
+  - Twelve Data USD/KRW fixture 상태: `BLOCKED`, `TWELVE_DATA_API_KEY` unavailable, `/exchange_rate`는 공식 mapping 후보만 유지.
+  - Twelve Data US stock fixture 상태: `BLOCKED`, `TWELVE_DATA_API_KEY` unavailable, `/quote`는 공식 mapping 후보만 유지.
+  - Twelve Data crypto fixture 상태: `BLOCKED`, `TWELVE_DATA_API_KEY` unavailable, `/exchange_rate`/`quote`/future WebSocket 후보만 유지.
+  - provider ingestion은 아직 미구현이며 live fixture와 owner decision 수락 전 구현 `BLOCKED` 유지.
+  - scheduler/batch는 아직 미구현이며 Gate E 전까지 구현 STOP 유지.
+  - settlement/reward는 아직 미구현이며 Gate H/I/J 전까지 구현 STOP 유지.
 - Gate B Provider final selection readiness re-check 및 Asset Price Freshness Policy 문서화 완료.
   - 상세 결과: `docs/provider-final-selection-readiness-recheck.md`, `docs/asset-price-freshness-policy.md`.
   - Gate B 판단은 `CONDITIONAL GO`.
