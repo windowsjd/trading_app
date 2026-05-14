@@ -19,18 +19,18 @@ Crypto policy update:
 - Source of truth:
   - `docs/codex-rulepack.md`
   - `docs/current-status.md`
-- API contracts and safety documents:
-  - `docs/auth-preimplementation-readiness-audit.md`
+- API contracts and provider policy documents:
   - `docs/fx-api-contract.md`
-  - `docs/fx-execute-safety-plan.md`
-  - `docs/fx-execute-final-implementation-gate.md`
   - `docs/orders-api-contract.md`
-  - `docs/order-execution-safety-plan.md`
-  - `docs/order-execution-preimplementation-readiness-audit.md`
   - `docs/home-api-contract.md`
   - `docs/ranking-api-contract.md`
   - `docs/wallets-api-contract.md`
   - `docs/records-api-contract.md`
+  - `docs/crypto-usd-settlement-policy-update.md`
+  - `docs/provider-final-selection-readiness-recheck.md`
+  - `docs/asset-price-freshness-policy.md`
+  - `docs/provider-evidence-capture.md`
+- Historical safety/preimplementation documents are archived in `docs/archive/` and are not current source of truth.
 - Code/test files inspected:
   - `src/auth/**`
   - `src/seasons/**`

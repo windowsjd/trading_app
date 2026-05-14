@@ -1,3 +1,7 @@
+> Historical document.
+> This file is not the current source of truth.
+> See `docs/current-status.md`, `docs/backend-gate-roadmap.md`, and the relevant API contract or provider policy document.
+
 # FX Decimal Rounding And Scale Policy
 
 ## Status

@@ -12,28 +12,25 @@
 
 ## Audit Basis
 
-Reviewed source-of-truth documents:
+Current source-of-truth and active reference documents:
 
 - `docs/codex-rulepack.md`
 - `docs/current-status.md`
-- `docs/auth-preimplementation-readiness-audit.md`
+- `docs/backend-test-coverage-matrix.md`
 - `docs/fx-api-contract.md`
-- `docs/fx-execute-safety-plan.md`
-- `docs/fx-execute-final-implementation-gate.md`
-- `docs/fx-provider-research.md`
-- `docs/fx-provider-final-selection-stop-review.md`
-- `docs/fx-ingestion-stop-review.md`
 - `docs/orders-api-contract.md`
-- `docs/order-execution-safety-plan.md`
-- `docs/order-execution-preimplementation-readiness-audit.md`
 - `docs/home-api-contract.md`
 - `docs/ranking-api-contract.md`
 - `docs/wallets-api-contract.md`
 - `docs/records-api-contract.md`
+- `docs/crypto-usd-settlement-policy-update.md`
 - `docs/provider-final-selection-readiness-recheck.md`
 - `docs/asset-price-freshness-policy.md`
 - `docs/provider-evidence-capture.md`
+- `docs/docs-inventory.md`
 - `README.md`
+
+Historical planning and STOP/review/preimplementation documents are archived in `docs/archive/` and are not current source of truth.
 
 Reviewed code/test surface:
 
@@ -73,7 +70,7 @@ Consistency note:
 
 - Current status: Core user, season, wallet, ledger, FX, asset, price, position, order, daily snapshot, and ranking tables are represented in Prisma schema and migrations.
 - Implemented files: `prisma/schema.prisma`, migrations under `prisma/migrations/*`.
-- Source of truth: `docs/current-status.md`, `docs/near-term-migration-plan.md`.
+- Source of truth: `docs/current-status.md`, `docs/backend-gate-roadmap.md`.
 - Existing tests: `pnpm exec prisma validate` history in `docs/current-status.md`; integration specs use real Prisma/PostgreSQL when env flags are enabled.
 - Known limitations: no refresh-token/session schema, no settlement/reward schema beyond existing participant reward fields, no order fill/execute request table, no provider ingestion metadata table beyond snapshot raw payload fields.
 - Remaining work: schema gates only when refresh-token, settlement, reward, exact order execute replay, or provider-specific needs are approved.
@@ -84,7 +81,7 @@ Consistency note:
 
 - Current status: access-token-only Auth MVP implemented with signup, login, `GET /api/v1/me`, global access token guard, public and optional-auth route metadata, active-user DB lookup, inactive user block, and no `x-user-id` fallback.
 - Implemented files: `src/auth/auth.module.ts`, `src/auth/auth.controller.ts`, `src/auth/auth.service.ts`, `src/auth/access-token.guard.ts`, `src/auth/auth.decorators.ts`, `src/auth/auth.types.ts`, `src/app.module.ts`.
-- Source of truth: `docs/auth-preimplementation-readiness-audit.md`, `docs/current-status.md`, `README.md`.
+- Source of truth: `docs/current-status.md`, `docs/backend-gate-roadmap.md`, `README.md`.
 - Existing tests: `src/auth/auth.service.spec.ts`, `src/auth/access-token.guard.spec.ts`, `src/auth/auth.integration.spec.ts`, `test/app.e2e-spec.ts`.
 - Known limitations: refresh token, logout, revocation, sessions, cookie auth, issuer/audience policy, and token rotation are not implemented.
 - Remaining work: keep access-token MVP as current auth boundary; run schema gate before refresh/logout/revocation.
@@ -95,7 +92,7 @@ Consistency note:
 
 - Current status: current season read with optional auth and season join write path implemented.
 - Implemented files: `src/seasons/seasons.controller.ts`, `src/seasons/seasons.service.ts`.
-- Source of truth: `docs/codex-rulepack.md`, `docs/current-status.md`, `docs/season-join-ledger-plan.md`.
+- Source of truth: `docs/codex-rulepack.md`, `docs/current-status.md`.
 - Existing tests: `src/seasons/seasons.controller.spec.ts`, `test/app.e2e-spec.ts` auth baseline.
 - Known limitations: no service unit spec dedicated to `joinSeason` transaction behavior; no real PostgreSQL integration test for duplicate join/concurrency/rollback.
 - Remaining work: add high-value join integration coverage before launch if join races become a concern.
@@ -117,7 +114,7 @@ Consistency note:
 
 - Current status: `POST /api/v1/fx/quote` read-only MVP implemented; KRW/USD only; uses latest eligible USD/KRW snapshot and 60-second freshness.
 - Implemented files: `src/fx/fx.controller.ts`, `src/fx/fx.service.ts`, `src/fx/fx-decimal-policy.ts`, `scripts/admin-insert-fx-rate.ts`.
-- Source of truth: `docs/fx-api-contract.md`, `docs/fx-quote-stop-review.md`, `docs/current-status.md`.
+- Source of truth: `docs/fx-api-contract.md`, `docs/current-status.md`.
 - Existing tests: `src/fx/fx.service.spec.ts`, `src/fx/fx-decimal-policy.spec.ts`, `src/fx/fx-rate-input.validation.spec.ts`, `test/app.e2e-spec.ts`.
 - Known limitations: quote is not durable; `quoteId` and `expiresAt` are `null`; sourceType priority is not finalized for mixed provider/manual rows; provider ingestion is absent.
 - Remaining work: provider final selection and sourceType priority before provider rows are introduced.
@@ -128,7 +125,7 @@ Consistency note:
 
 - Current status: `POST /api/v1/fx/execute` first write path implemented with direct execute, durable idempotency via `fx_execute_requests`, guarded source debit, target credit, exchange row, two wallet ledger rows, succeeded response replay, and no equity snapshot.
 - Implemented files: `src/fx/fx.service.ts`, `src/fx/fx-execute-*.ts`.
-- Source of truth: `docs/fx-execute-final-implementation-gate.md`, `docs/fx-api-contract.md`, `docs/current-status.md`.
+- Source of truth: `docs/fx-api-contract.md`, `docs/current-status.md`.
 - Existing tests: `src/fx/fx.service.spec.ts`, `src/fx/fx.execute.integration.spec.ts`, FX execute policy specs under `src/fx/*spec.ts`, `test/app.e2e-spec.ts` auth baseline.
 - Known limitations: no durable quote; no provider_api/official_batch source; stale pending recovery tool/job absent; some DB-level failure injection remains hardening-only; responsePayloadJson-only storage failure remains hard to force with current schema.
 - Remaining work: recovery/hardening gate after provider/scheduler decisions, not before provider selection.
@@ -183,7 +180,7 @@ Consistency note:
 
 - Current status: submitted order cancel MVP implemented with ownership check and guarded `id + seasonParticipantId + status=submitted` update; no wallet/position/ledger mutation.
 - Implemented files: `src/orders/orders.service.ts`, `src/orders/orders.controller.ts`.
-- Source of truth: `docs/orders-api-contract.md`, `docs/order-execution-safety-plan.md`.
+- Source of truth: `docs/orders-api-contract.md`, `docs/current-status.md`.
 - Existing tests: `src/orders/orders.service.spec.ts`, `src/orders/orders.execute.integration.spec.ts` cancel-vs-execute race, `test/app.e2e-spec.ts` auth baseline.
 - Known limitations: no cancel reason schema, no cancel idempotency key, no standalone real DB cancel integration beyond order execute race spec.
 - Remaining work: keep scope as submitted-only cancel unless product/API change is approved.
@@ -194,7 +191,7 @@ Consistency note:
 
 - Current status: full-fill execute MVP implemented. Buy debits cash wallet, creates/updates position, creates one `order_buy` ledger row, and finalizes order. Sell decrements position, credits cash wallet, creates one `order_sell` ledger row, and finalizes order. All financial writes run in one Prisma transaction.
 - Implemented files: `src/orders/orders.service.ts`, `src/orders/orders.controller.ts`.
-- Source of truth: `docs/orders-api-contract.md`, `docs/order-execution-safety-plan.md`, `docs/order-execution-preimplementation-readiness-audit.md`, `docs/current-status.md`.
+- Source of truth: `docs/orders-api-contract.md`, `docs/current-status.md`.
 - Existing tests: `src/orders/orders.service.spec.ts`, `src/orders/orders.execute.integration.spec.ts`, `test/app.e2e-spec.ts` auth baseline.
 - Known limitations: no exact execute response replay, no execute-specific command table, no partial fill, no matching engine, no provider price ingestion, no settlement side effect, no automatic snapshots/rankings.
 - Remaining work: exact replay/partial fill/matching/settlement each require separate gate.
@@ -260,7 +257,7 @@ Consistency note:
 
 - Current status: manual admin CLIs exist for FX rate input, asset upsert, asset price input, daily snapshot generation, and season ranking generation.
 - Implemented files: `scripts/admin-insert-fx-rate.ts`, `scripts/admin-upsert-asset.ts`, `scripts/admin-insert-asset-price.ts`, `scripts/admin-generate-daily-portfolio-snapshot.ts`, `scripts/admin-generate-season-ranking.ts`.
-- Source of truth: `docs/current-status.md`, `docs/fx-rate-input-path-plan.md`.
+- Source of truth: `docs/current-status.md`, `docs/fx-api-contract.md`.
 - Existing tests: validation specs for FX/asset input; dry-run helper specs for snapshot/ranking.
 - Known limitations: no CLI e2e against PostgreSQL, no operator approval runbook, no admin HTTP API.
 - Remaining work: ops runbook and smoke tests if manual operations remain part of MVP.
@@ -271,7 +268,7 @@ Consistency note:
 
 - Current status: not implemented. Gate B re-check is complete as `CONDITIONAL GO`, not implementation GO.
 - Implemented files: none for ingestion.
-- Source of truth: `docs/fx-provider-research.md`, `docs/fx-provider-final-selection-stop-review.md`, `docs/fx-ingestion-stop-review.md`, `docs/provider-final-selection-readiness-recheck.md`, `docs/asset-price-freshness-policy.md`.
+- Source of truth: `docs/provider-final-selection-readiness-recheck.md`, `docs/asset-price-freshness-policy.md`, `docs/provider-evidence-capture.md`, `docs/crypto-usd-settlement-policy-update.md`.
 - Existing tests: none.
 - Known limitations: no API key management, polling, retry/backoff, sourceType priority implementation, retention, alerting, contract validation, or USD/KRW/asset live fixture response mapping.
 - Remaining work: Gate C/D evidence capture before implementation. OANDA is the conditional primary FX candidate; Twelve Data is the conditional US stock candidate and secondary FX candidate; Binance is the MVP crypto provider target with USD settlement; KRX quote/execute remains blocked/unverified.
@@ -315,7 +312,7 @@ Consistency note:
 
 - Current status: not implemented; access-token-only MVP is current auth.
 - Implemented files: none for refresh/logout/revocation.
-- Source of truth: `docs/auth-preimplementation-readiness-audit.md`, `docs/current-status.md`, `README.md`.
+- Source of truth: `docs/current-status.md`, `docs/backend-gate-roadmap.md`, `README.md`.
 - Existing tests: auth service/guard tests cover access tokens only.
 - Known limitations: no refresh token table/hash, no logout, no token revocation, no session/cookie auth.
 - Remaining work: Gate K schema gate.

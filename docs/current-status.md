@@ -178,35 +178,25 @@ near-term ledger/FX foundation:
 
 ## 7. 완료된 문서/설계 상태
 
-- `/home` 상태별 응답 계약 초안: `docs/home-api-contract.md`.
-- `/ranking` read-only MVP 계약: `docs/ranking-api-contract.md`.
-- `/wallets` read-only MVP 계약: `docs/wallets-api-contract.md`.
-- `/orders` read-only MVP 계약: `docs/orders-api-contract.md`.
-- `/orders` quote/create MVP 계약: `docs/orders-api-contract.md`.
-- `/orders` cancel MVP 계약: `docs/orders-api-contract.md`.
-- `/orders` execution safety plan: `docs/order-execution-safety-plan.md`.
-- `/orders` execution preimplementation readiness audit: `docs/order-execution-preimplementation-readiness-audit.md`.
-- records API 계약: `docs/records-api-contract.md`에 submitted/executed/canceled order 및 order wallet transaction 조회 가능 상태 반영.
-- `/fx quote` STOP review: `docs/fx-quote-stop-review.md`.
-- `/fx` API 계약 초안: `docs/fx-api-contract.md`.
-- FX rate input path plan: `docs/fx-rate-input-path-plan.md`.
-- FX rate ingestion plan: `docs/fx-rate-ingestion-plan.md`.
-- FX ingestion STOP review: `docs/fx-ingestion-stop-review.md`.
-- FX provider 후보 공식 문서 기반 조사: `docs/fx-provider-research.md`.
-- FX provider final selection STOP review: `docs/fx-provider-final-selection-stop-review.md`.
-- `/fx execute` safety plan: `docs/fx-execute-safety-plan.md`.
-- wallet/FX write path plan: `docs/wallet-fx-write-path-plan.md`.
-- `/fx execute` preimplementation readiness audit: `docs/fx-execute-preimplementation-readiness-audit.md`.
-- `/fx execute` STOP decision tracker: `docs/fx-execute-stop-decision-tracker.md`.
-- FX Decimal rounding/scale policy: `docs/fx-decimal-rounding-scale-policy.md`.
-- FX execute error policy: `docs/fx-execute-error-policy.md`.
-- FX idempotency lifecycle policy: `docs/fx-idempotency-lifecycle-policy.md`.
-- `/fx execute` final implementation gate: `docs/fx-execute-final-implementation-gate.md`.
-- Backend gate roadmap 및 current backend audit: `docs/backend-gate-roadmap.md`.
-- Backend test coverage matrix: `docs/backend-test-coverage-matrix.md`.
-- Provider final selection readiness re-check: `docs/provider-final-selection-readiness-recheck.md`.
-- Asset price freshness policy: `docs/asset-price-freshness-policy.md`.
-- Provider evidence capture: `docs/provider-evidence-capture.md`.
+- Current implementation source of truth: `docs/current-status.md`.
+- Gate decision source of truth: `docs/backend-gate-roadmap.md`.
+- Test coverage source of truth: `docs/backend-test-coverage-matrix.md`.
+- Docs navigation/inventory: `docs/README.md`, `docs/docs-inventory.md`.
+- API contracts:
+  - `docs/fx-api-contract.md`
+  - `docs/orders-api-contract.md`
+  - `docs/home-api-contract.md`
+  - `docs/ranking-api-contract.md`
+  - `docs/wallets-api-contract.md`
+  - `docs/records-api-contract.md`
+- Provider/freshness/crypto policy and evidence:
+  - `docs/crypto-usd-settlement-policy-update.md`
+  - `docs/provider-final-selection-readiness-recheck.md`
+  - `docs/asset-price-freshness-policy.md`
+  - `docs/provider-evidence-capture.md`
+- Historical STOP/review/preimplementation/plan documents are archived under `docs/archive/`.
+  - Archived documents are not current source of truth.
+  - Use them only for historical context after checking the current documents above.
 
 ## 8. 주요 STOP 상태
 
@@ -361,7 +351,7 @@ near-term ledger/FX foundation:
 - `official_batch`는 settlement/reference/reconciliation 후보이며 real-time execute source가 아님.
 - execute-time snapshot selection은 구현 반영됨: allowed sourceType only, USD/KRW, `effectiveAt <= executeNow`, positive rate, order by `effectiveAt desc`, `capturedAt desc`, `createdAt desc`.
 - execute-time freshness rule은 구현 반영됨: `> 60_000ms` stale, exactly 60s accepted.
-- final implementation test matrix는 `docs/fx-execute-final-implementation-gate.md`에 문서화됨.
+- historical final implementation test matrix는 `docs/archive/fx-execute-final-implementation-gate.md`에 보관됨. 현재 검증 상태는 이 문서와 `docs/backend-test-coverage-matrix.md` 기준.
 - succeeded duplicate replay는 stored `responsePayloadJson`를 사용.
 - failed duplicate는 자동 재실행하지 않음.
 - stale pending은 recovery-required behavior를 반환.

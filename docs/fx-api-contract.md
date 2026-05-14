@@ -103,7 +103,7 @@ Return a KRW/USD exchange quote without changing wallet balances or writing exch
 ## POST /api/v1/fx/execute
 
 ### Purpose
-Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, and create source/target `wallet_transactions` rows according to `docs/wallet-fx-write-path-plan.md`.
+Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, and create source/target `wallet_transactions` rows according to this API contract and the current implementation summary in `docs/current-status.md`.
 
 ### Request Shape Candidate A: Quote-Based Execute
 
@@ -134,7 +134,7 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 
 ### Recommended Candidate
 - Near-term MVP uses Candidate B, direct execute, for the implementation gate because durable quote storage does not exist.
-- Actual implementation must still happen in a separate task with the final test matrix in `docs/fx-execute-final-implementation-gate.md`.
+- Historical implementation-gate detail is archived in `docs/archive/fx-execute-final-implementation-gate.md`; current implementation status is tracked in `docs/current-status.md`.
 - If a durable quote table is introduced later, execute can move to Candidate A.
 
 ### Execute-Time Snapshot Selection
@@ -222,7 +222,7 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 - `fx_execute_requests` has `unique(userId, idempotencyKey)` for execute retry deduplication.
 - `wallet_transactions` has `[referenceType, referenceId]` index only, not an idempotency unique key.
 - `/fx execute` lifecycle code is not implemented yet.
-- Accepted lifecycle policy is documented in `docs/fx-idempotency-lifecycle-policy.md`.
+- Historical lifecycle planning is archived in `docs/archive/fx-idempotency-lifecycle-policy.md`; current behavior is tracked in `docs/current-status.md`.
 
 ### Candidate A: Add `exchange_transactions.idempotencyKey`
 - Pros: simple lookup against the executed exchange row.
@@ -307,7 +307,7 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 
 ## Equity Snapshots
 - `/fx execute` should not create `equity_snapshots` yet.
-- This matches `docs/wallet-fx-write-path-plan.md` Option A.
+- Historical write-path planning is archived in `docs/archive/wallet-fx-write-path-plan.md`; current behavior is summarized in `docs/current-status.md`.
 - `fx_rate_snapshots` exists, but `positions` and `asset_price_snapshots` are still missing.
 - Authoritative total equity snapshots require positions, asset price snapshots, and FX snapshot evidence together.
 - `/fx execute` currently does not create `equity_snapshots`.
@@ -323,7 +323,7 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
   - `FX_RATE_UNAVAILABLE` and `FX_RATE_STALE` are distinguished.
 - Execute implementation gate:
   - `/fx execute` is still not implemented.
-  - Implementation requires the final test matrix in `docs/fx-execute-final-implementation-gate.md`.
+  - Historical implementation-gate detail is archived in `docs/archive/fx-execute-final-implementation-gate.md`.
   - Wallet safety proof must be verified with tests.
   - Provider final selection remains separate and pending.
   - `provider_api` and `official_batch` are not near-term execute sources.
