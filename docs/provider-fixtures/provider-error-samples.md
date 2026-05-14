@@ -1,8 +1,8 @@
 # Provider Error / Rate-Limit Evidence Samples
 
-Checked date: 2026-05-13.
+Checked date: 2026-05-14.
 
-This file records official-document evidence only. No live provider error request was sent because OANDA and Twelve Data credentials were unavailable in the local environment.
+This file records official-document error/rate-limit evidence only. No live provider error request was sent because OANDA and Twelve Data credentials were unavailable in the local environment, and Binance error/rate-limit behavior was not intentionally triggered. Binance public success fixtures were captured separately.
 
 ## Scope
 
@@ -73,15 +73,15 @@ Policy status:
 
 - Binance is the MVP crypto provider target.
 - Crypto is USD-settled internally and uses the USD Wallet.
-- Public fixture targets are `BTCUSDT` ticker/price and `BTCUSDT` orderbook.
+- Public fixture targets `BTCUSDT` ticker and `BTCUSDT` orderbook were captured as success fixtures.
 - No private key is required for public market-data fixture capture.
 - `CurrencyCode.USDT` must not be added; USDT-to-USD-equivalent normalization versus Binance USD quote pair requirement remains an owner decision.
 
-Safe request templates, not called:
+Safe public success request templates, called once each for fixture capture:
 
 ```text
-GET <binance-public-ticker-endpoint-for-BTCUSDT>
-GET <binance-public-orderbook-endpoint-for-BTCUSDT>
+GET https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT
+GET https://api.binance.com/api/v3/depth?symbol=BTCUSDT&limit=5
 ```
 
 Implementation policy until live evidence exists:
@@ -96,7 +96,8 @@ Implementation policy until live evidence exists:
 |---|---|---|---|---|
 | OANDA | Error/rate-limit | No | `BLOCKED` | Credentials unavailable; no safe live request possible |
 | Twelve Data | Error/rate-limit | No | `BLOCKED` | `TWELVE_DATA_API_KEY` unavailable; no safe live request possible |
-| Binance | Error/rate-limit | No | `NOT CAPTURED` | Public fixture/error capture deferred to next Gate C/D task |
+| Binance | Error/rate-limit | No | `NOT CAPTURED` | Success fixtures captured; error/rate-limit triggering intentionally avoided |
+| Binance | Public success fixture | Yes | `CAPTURED` | `BTCUSDT` ticker and orderbook public endpoints returned HTTP 200 without auth |
 
 ## Redaction Review
 

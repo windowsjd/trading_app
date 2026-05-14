@@ -1,0 +1,88 @@
+{
+  "provider": "binance",
+  "purpose": "btc_usdt_crypto_usd_settled_evidence",
+  "capturedAt": "2026-05-14T04:29:33.440Z",
+  "request": {
+    "method": "GET",
+    "urlTemplate": "https://api.binance.com/api/v3/depth?symbol={symbol}&limit=5",
+    "symbolOrPair": "BTCUSDT",
+    "auth": "none_public_market_data"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=UTF-8"
+    },
+    "body": {
+      "lastUpdateId": 93652591138,
+      "bids": [
+        [
+          "79336.00000000",
+          "0.22737000"
+        ],
+        [
+          "79335.99000000",
+          "0.14839000"
+        ],
+        [
+          "79335.05000000",
+          "0.00010000"
+        ],
+        [
+          "79334.89000000",
+          "0.00007000"
+        ],
+        [
+          "79334.80000000",
+          "0.00010000"
+        ]
+      ],
+      "asks": [
+        [
+          "79336.01000000",
+          "9.16370000"
+        ],
+        [
+          "79336.02000000",
+          "0.81006000"
+        ],
+        [
+          "79336.09000000",
+          "0.04648000"
+        ],
+        [
+          "79336.10000000",
+          "0.01293000"
+        ],
+        [
+          "79336.29000000",
+          "0.01136000"
+        ]
+      ]
+    }
+  },
+  "mappingCandidate": {
+    "internalTable": "asset_price_snapshots",
+    "sourceType": "provider_api",
+    "sourceName": "binance_orderbook",
+    "assetSymbol": "BTCUSDT",
+    "market": "BINANCE",
+    "internalCurrencyCode": "USD",
+    "providerQuoteCurrency": "USDT",
+    "priceField": "best bid and best ask candidate; midpoint can be calculated as (bestBid + bestAsk) / 2; owner decision required",
+    "sourceTimestampField": "none in response; lastUpdateId is an order book update sequence id, not a timestamp",
+    "effectiveAtMapping": "blocked for standalone provider_api snapshot because response has no source timestamp; could be paired with another timestamped endpoint only after owner decision and tests",
+    "capturedAtMapping": "server receipt time",
+    "usdtToUsdPolicy": "owner decision required unless fixture supports true USD quote pair"
+  },
+  "redaction": {
+    "apiKeyRemoved": true,
+    "authorizationHeaderRemoved": true,
+    "accountIdRemoved": true,
+    "privateDataAbsent": true
+  },
+  "terms": {
+    "rawPayloadStorageAllowed": "unverified",
+    "notes": "Public market-data endpoint was called without API key. Binance terms/raw-payload retention approval is still required before provider ingestion."
+  }
+}

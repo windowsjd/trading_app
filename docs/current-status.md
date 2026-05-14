@@ -15,7 +15,7 @@
   - Crypto KRW valuation remains required for `totalAssetKrw`, ranking, home summary, snapshots, and final evaluation.
   - No schema migration is needed because the current `currencyCode`-driven model supports `AssetType.crypto`, `CurrencyCode.USD`, `Asset.market = BINANCE`, USD orders/positions, and USD/KRW FX conversion.
   - Upbit/Bithumb are removed from the MVP provider stack.
-  - Binance fixture capture is the next crypto provider evidence step.
+  - Binance `BTCUSDT` public ticker/orderbook fixtures were captured in Gate C prep; provider ingestion remains STOP.
   - KRX domestic stock remains STOP.
 
 ## 2. 구현 완료 API
@@ -538,25 +538,29 @@ near-term ledger/FX foundation:
 
 ## 9. 다음 gate
 
-- Gate C/D Live Provider Fixture Capture 재확인 완료(2026-05-13).
+- Gate C Provider Fixture Capture Prep 완료(2026-05-14).
   - 상세 결과: `docs/provider-evidence-capture.md`.
   - credential 존재 여부만 확인했고 값은 출력/문서화하지 않음.
-  - 추가된 fixture/evidence 파일: `docs/provider-fixtures/provider-error-samples.md`.
-  - live JSON fixture 파일은 추가하지 않음. OANDA/Twelve Data credentials가 없어 live fixture capture는 모두 `BLOCKED`.
+  - asset-price-freshness-policy의 crypto residual wording을 수정함: Crypto freshness는 Twelve Data 후보가 아니라 Binance MVP provider 기준.
+  - 추가/수정된 fixture/evidence 파일: `docs/provider-fixtures/binance-btcusdt-ticker-sample.json`, `docs/provider-fixtures/binance-btcusdt-orderbook-sample.json`, `docs/provider-fixtures/provider-error-samples.md`.
   - OANDA USD/KRW fixture 상태: `BLOCKED`, credentials unavailable, exact endpoint/field/timestamp/rate basis unverified.
   - Twelve Data USD/KRW fixture 상태: `BLOCKED`, `TWELVE_DATA_API_KEY` unavailable, `/exchange_rate`는 공식 mapping 후보만 유지.
-  - Twelve Data US stock fixture 상태: `BLOCKED`, `TWELVE_DATA_API_KEY` unavailable, `/quote`는 공식 mapping 후보만 유지.
-  - Binance crypto fixture 상태: `CONDITIONAL GO` for next evidence task only. `BTCUSDT` ticker/orderbook public fixture capture가 다음 단계이며 이 문서에서는 live call/fixture file을 만들지 않음.
+  - Twelve Data AAPL quote fixture 상태: `BLOCKED`, `TWELVE_DATA_API_KEY` unavailable, `/quote`는 공식 mapping 후보만 유지.
+  - Binance `BTCUSDT` ticker fixture 상태: `GO` for fixture capture, `CONDITIONAL GO` for mapping. Public `/api/v3/ticker/24hr` returned HTTP 200 and includes `lastPrice`, `bidPrice`, `askPrice`, `openTime`, `closeTime`.
+  - Binance `BTCUSDT` orderbook fixture 상태: `CONDITIONAL GO`. Public `/api/v3/depth` returned HTTP 200 and includes bid/ask levels, but no source timestamp.
   - Crypto fixture blocker: `BTCUSDT` 같은 USDT quote를 USD-equivalent로 정규화할지, Binance USD quote pair만 허용할지 owner decision 필요.
-  - provider ingestion은 아직 미구현이며 live fixture와 owner decision 수락 전 구현 `BLOCKED` 유지.
+  - Binance ingestion implementation은 fixture가 있어도 effectiveAt mapping, sourceType eligibility, price-field decision, terms approval, USDT-to-USD owner decision 전까지 `STOP`.
+  - OANDA/Twelve Data ingestion implementation은 credentialed fixture, mapping, terms, sourceType tests 전까지 `STOP/BLOCKED`.
+  - KRX domestic stock remains STOP.
   - scheduler/batch는 아직 미구현이며 Gate E 전까지 구현 STOP 유지.
   - settlement/reward는 아직 미구현이며 Gate H/I/J 전까지 구현 STOP 유지.
 - Gate B Provider final selection readiness re-check 및 Asset Price Freshness Policy 문서화 완료.
   - 상세 결과: `docs/provider-final-selection-readiness-recheck.md`, `docs/asset-price-freshness-policy.md`.
   - Gate B 판단은 `CONDITIONAL GO`.
   - 이것은 evidence capture와 다음 구현 프롬프트를 열기 위한 조건부 판단이며, provider ingestion 구현 GO가 아님.
-- 다음 recommended gate: Gate C Binance Crypto Fixture Capture + OANDA/Twelve Data Fixture Capture.
-  - 구현 착수 전 OANDA trial/API USD/KRW 응답, timestamp/effectiveAt mapping, bid/ask/mid 또는 rate basis, Twelve Data USD/KRW/US stock fixtures, Binance BTCUSDT ticker/orderbook fixtures, Binance USDT-to-USD owner decision, symbol mapping, plan/terms, sourceType/sourceName 우선순위, polling/rate-limit 정책을 확인해야 함.
+- 다음 recommended gate: Gate C/D Provider Mapping Decision - Binance USDT-to-USD Policy and SourceType Eligibility.
+  - credential이 확보되면 별도 후속으로 Gate C OANDA/Twelve Data Live Fixture Completion을 진행.
+  - 구현 착수 전 OANDA trial/API USD/KRW 응답, timestamp/effectiveAt mapping, bid/ask/mid 또는 rate basis, Twelve Data USD/KRW/US stock fixtures, Binance USDT-to-USD owner decision, Binance price/effectiveAt mapping, symbol mapping, plan/terms, sourceType/sourceName 우선순위, polling/rate-limit 정책을 확인해야 함.
 - Gate A Protected API HTTP e2e baseline은 완료 상태로 본다.
   - 완료 범위: public/optional/protected guard baseline, missing token/`x-user-id` 차단, valid-token read-only smoke, selected quote smoke.
   - 남은 gap: 모든 protected route별 invalid-token HTTP e2e exhaustive coverage와 valid-token full write-path HTTP e2e는 아직 없음.

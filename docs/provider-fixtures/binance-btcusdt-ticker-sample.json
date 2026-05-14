@@ -1,0 +1,64 @@
+{
+  "provider": "binance",
+  "purpose": "btc_usdt_crypto_usd_settled_evidence",
+  "capturedAt": "2026-05-14T04:29:33.440Z",
+  "request": {
+    "method": "GET",
+    "urlTemplate": "https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}",
+    "symbolOrPair": "BTCUSDT",
+    "auth": "none_public_market_data"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=UTF-8"
+    },
+    "body": {
+      "symbol": "BTCUSDT",
+      "priceChange": "-1843.61000000",
+      "priceChangePercent": "-2.271",
+      "weightedAvgPrice": "79807.89333875",
+      "prevClosePrice": "81179.61000000",
+      "lastPrice": "79336.00000000",
+      "lastQty": "0.01400000",
+      "bidPrice": "79336.00000000",
+      "bidQty": "0.23028000",
+      "askPrice": "79336.01000000",
+      "askQty": "9.12764000",
+      "openPrice": "81179.61000000",
+      "highPrice": "81324.64000000",
+      "lowPrice": "78754.65000000",
+      "volume": "15570.66984000",
+      "quoteVolume": "1242662357.80353580",
+      "openTime": 1778646537003,
+      "closeTime": 1778732937003,
+      "firstId": 6291301243,
+      "lastId": 6293733030,
+      "count": 2431788
+    }
+  },
+  "mappingCandidate": {
+    "internalTable": "asset_price_snapshots",
+    "sourceType": "provider_api",
+    "sourceName": "binance_ticker",
+    "assetSymbol": "BTCUSDT",
+    "market": "BINANCE",
+    "internalCurrencyCode": "USD",
+    "providerQuoteCurrency": "USDT",
+    "priceField": "lastPrice candidate; bidPrice and askPrice also present; owner decision required",
+    "sourceTimestampField": "closeTime candidate; Unix milliseconds; openTime also present",
+    "effectiveAtMapping": "closeTime Unix milliseconds -> UTC DateTime candidate; conditional because 24hr ticker closeTime is rolling ticker window close time and must be accepted before ingestion",
+    "capturedAtMapping": "server receipt time",
+    "usdtToUsdPolicy": "owner decision required unless fixture supports true USD quote pair"
+  },
+  "redaction": {
+    "apiKeyRemoved": true,
+    "authorizationHeaderRemoved": true,
+    "accountIdRemoved": true,
+    "privateDataAbsent": true
+  },
+  "terms": {
+    "rawPayloadStorageAllowed": "unverified",
+    "notes": "Public market-data endpoint was called without API key. Binance terms/raw-payload retention approval is still required before provider ingestion."
+  }
+}

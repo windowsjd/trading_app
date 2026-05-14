@@ -123,7 +123,7 @@ Target policy after provider ingestion:
 - Quote/execute should require a provider timestamp no older than 30 seconds.
 - Home live valuation should require a provider timestamp no older than 60 seconds.
 - Daily snapshot capture should use a timestamp close to the scheduled capture time, with a maximum provider age of 5 minutes unless a later gate narrows it.
-- Binance `BTCUSDT` ticker/orderbook public fixtures are the next evidence target.
+- Binance `BTCUSDT` ticker/orderbook public fixtures were captured in Gate C prep; mapping remains conditional.
 - `CurrencyCode.USDT` must not be added. Gate C/D must decide whether USDT quote pairs are normalized as USD-equivalent or whether Binance USD quote pairs are required.
 
 ## 9. Quote vs Execute vs Valuation vs Ranking vs Settlement
@@ -315,7 +315,7 @@ Settlement implementation tests:
 | FX USD/KRW current 60-second policy | GO for current `admin_manual` behavior | Existing code and tests already use the 60-second threshold |
 | FX provider freshness | CONDITIONAL GO | Requires OANDA/Twelve Data live response timestamp evidence before ingestion code |
 | US stock freshness | CONDITIONAL GO | Twelve Data is a candidate, but live fixtures, symbol mapping, plan, and terms are required |
-| Crypto freshness | CONDITIONAL GO | Twelve Data is a candidate, but exchange/symbol aggregation and timestamp proof are required |
+| Crypto freshness | CONDITIONAL GO | Binance is the MVP crypto provider target, but fixture/effectiveAt mapping, price-field decision, USDT-to-USD owner decision, and terms approval are required |
 | KRX quote/execute freshness | BLOCKED | Real-time KRX provider evidence is not verified; checked Twelve Data coverage indicates Korea exchanges are EOD delay |
 | Scheduler/batch foundation | CONDITIONAL GO for audit only | Freshness requirements are clearer, but scheduler implementation needs its own gate |
 | Settlement implementation | STOP | Final evidence source and reproducibility policy belong to Gate H/I |

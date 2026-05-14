@@ -5,7 +5,8 @@
 - Documentation-only audit based on the current workspace state on 2026-05-11.
 - Gate B provider readiness and asset price freshness policy were re-checked on 2026-05-12 as docs-only updates.
 - Gate C/D live provider fixture capture was re-checked on 2026-05-13 as a docs/fixture-only blocked pass because credentials were unavailable.
-- Crypto MVP policy changed on 2026-05-14 to Binance-based USD-settled crypto using the USD Wallet. Upbit/Bithumb are excluded from MVP, and Binance BTCUSDT fixture capture is the next crypto evidence step.
+- Crypto MVP policy changed on 2026-05-14 to Binance-based USD-settled crypto using the USD Wallet. Upbit/Bithumb are excluded from MVP, and Binance BTCUSDT public ticker/orderbook fixtures have been captured.
+- Gate C provider fixture capture prep on 2026-05-14 captured Binance public `BTCUSDT` ticker/orderbook fixtures and fixed residual crypto freshness wording; OANDA/Twelve Data fixtures remain credential-blocked.
 - No source, test, package, Prisma schema, migration, seed, provider, scheduler, settlement, reward, or refresh-token implementation is authorized by this document.
 - `docs/current-status.md` remains the short status summary. This document is the detailed backend gate roadmap.
 
@@ -411,7 +412,7 @@ Still blocked:
 
 Recommended next Codex prompt title:
 
-- `Gate C Binance Crypto Fixture Capture + OANDA/Twelve Data Fixture Capture`
+- `Gate C/D Provider Mapping Decision - Binance USDT-to-USD Policy and SourceType Eligibility`
 
 ## Gate C/D Live Fixture Capture Result (2026-05-13)
 
@@ -451,6 +452,35 @@ Next recommended Codex prompt title:
 
 - `Gate C Binance Crypto Fixture Capture + OANDA/Twelve Data Fixture Capture`
 
+## Gate C Provider Fixture Capture Prep Result (2026-05-14)
+
+Gate C fixture prep is documented in `docs/provider-evidence-capture.md`.
+
+| Area | Decision | Roadmap effect | Required before implementation |
+|---|---|---|---|
+| Crypto freshness docs consistency | FIXED | `docs/asset-price-freshness-policy.md` now states Binance, not Twelve Data, as the crypto MVP provider target | Keep Twelve Data scoped to FX fallback and US stock candidate only |
+| Binance BTCUSDT ticker fixture | GO for fixture capture; CONDITIONAL GO for mapping | Public `/api/v3/ticker/24hr?symbol=BTCUSDT` returned HTTP 200 and was saved to `docs/provider-fixtures/binance-btcusdt-ticker-sample.json` | Decide price field, accept or reject `closeTime` as `effectiveAt`, approve USDT-to-USD policy, sourceType tests, terms |
+| Binance BTCUSDT orderbook fixture | CONDITIONAL GO | Public `/api/v3/depth?symbol=BTCUSDT&limit=5` returned HTTP 200 and was saved to `docs/provider-fixtures/binance-btcusdt-orderbook-sample.json` | Pair with accepted timestamp source or choose a timestamped endpoint; decide bid/ask/mid policy |
+| OANDA USD/KRW fixture | BLOCKED | Credentials remain unavailable; no live OANDA call was made | Provide credentials and capture USD/KRW response with endpoint/fields/timestamp/rate basis |
+| Twelve Data USD/KRW fixture | BLOCKED | `TWELVE_DATA_API_KEY` remains unavailable; no live call was made | Provide key and capture `/exchange_rate?symbol=USD/KRW` |
+| Twelve Data AAPL quote fixture | BLOCKED | `TWELVE_DATA_API_KEY` remains unavailable; no live call was made | Provide key and capture `/quote?symbol=AAPL` |
+| Gate D mapping blockers | STOP for implementation | Binance fixture response shape exists but policy decisions are missing | USDT-to-USD policy, effectiveAt mapping, sourceType eligibility, price-field decision, terms approval |
+| Gate E scheduler audit | CONDITIONAL GO for docs-only audit | Scheduler design can be audited, but provider polling jobs remain STOP | Accepted provider/source policy and ops design |
+| Gate F/G/H/I implementation | STOP | Provider/source policy and scheduler/final-evidence decisions are not accepted | Complete provider mapping and later scheduler/settlement gates |
+
+Blocked reasons:
+
+- Binance `BTCUSDT` uses provider quote currency `USDT`; internal `CurrencyCode` remains `USD`, so owner decision is required.
+- Binance ticker has timestamp candidates, but `closeTime` semantics must be accepted before `effectiveAt` mapping.
+- Binance orderbook provides bid/ask levels but no source timestamp.
+- OANDA/Twelve Data credentials are not present, so credentialed fixtures remain blocked.
+- Production terms/account/raw-payload storage approval is still missing.
+- KRX provider_api quote/execute remains blocked due missing real-time evidence.
+
+Next recommended Codex prompt title:
+
+- `Gate C/D Provider Mapping Decision - Binance USDT-to-USD Policy and SourceType Eligibility`
+
 ## Next 5 Implementation Candidate Priority
 
 | Candidate | MVP impact | Financial stability impact | Implementation risk | External dependency | Test difficulty | Current prerequisites met? | Start now? | Recommendation | Reason | Required prior decisions | Suggested next prompt scope |
@@ -463,7 +493,7 @@ Next recommended Codex prompt title:
 
 Recommended next task:
 
-- Gate C Binance Crypto Fixture Capture + OANDA/Twelve Data Fixture Capture.
+- Gate C/D Provider Mapping Decision - Binance USDT-to-USD Policy and SourceType Eligibility.
 
 ## STOP / GO Summary
 
