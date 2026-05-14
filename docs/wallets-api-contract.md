@@ -12,6 +12,8 @@
 - Timestamps are UTC ISO strings.
 - Responses keep the existing `success/data` or `success/error` structure.
 - User identity is `request.user.userId`; there is no `x-user-id` fallback.
+- MVP crypto is Binance-based USD-settled crypto and uses the existing USD Wallet.
+- There is no USDT wallet/currency in MVP.
 
 ## Route
 

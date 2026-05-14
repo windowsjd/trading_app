@@ -22,6 +22,10 @@
 - Timestamps are UTC ISO strings.
 - Responses keep the existing `success/data` or `success/error` structure.
 - User identity is `request.user.userId`; there is no `x-user-id` fallback.
+- MVP crypto is Binance-based USD-settled crypto.
+- Crypto orders use the USD Wallet like US stock orders.
+- Upbit/Bithumb and KRW crypto trading are out of MVP scope.
+- `CurrencyCode.USDT` is not introduced; Binance `BTCUSDT` fixture mapping must decide USD-equivalent normalization or require Binance USD pair evidence before provider ingestion.
 
 ## Route
 
@@ -143,6 +147,7 @@
 - No asset price stale threshold is applied yet.
 - `currencyCode`, if provided, must match `asset.currencyCode`.
 - USD assets require approved fresh `admin_manual` USD/KRW FX. FX freshness uses the existing 60 second rule.
+- USD-settled crypto assets follow the same USD asset rule: order currency is USD, buy/sell resource checks use the USD Wallet, and `krwGrossAmount`/`krwFeeAmount`/`krwNetAmount` are USD amounts converted through USD/KRW.
 - Buy quote validates cash wallet balance read-only.
 - Sell quote validates position quantity read-only.
 - No DB rows are created or mutated.
@@ -331,6 +336,7 @@ Same body as `POST /api/v1/orders/quote`.
   - `executedPrice` is the selected snapshot price, not the submitted `limitPrice`.
 - USD orders debit or credit the USD wallet. FX is not used to convert wallet amounts.
 - USD orders still select an approved fresh `admin_manual` USD/KRW snapshot for audit consistency and store `fxRateSnapshotId`.
+- Binance crypto USD orders are USD orders for wallet/position/ledger purposes.
 - KRW orders store `fxRateSnapshotId = null`.
 - Buy execute:
   - guarded conditional cash wallet debit by `balanceAmount >= netAmount`.

@@ -20,6 +20,9 @@
 - Keep the existing `success/data` response direction.
 - Field names in this document are fixed for frontend mapping.
 - User identity is `request.user.userId`; there is no `x-user-id` fallback.
+- MVP crypto is Binance-based USD-settled crypto.
+- Crypto order and wallet transaction records use `currencyCode = USD` because crypto trades use the USD Wallet.
+- Upbit/Bithumb and KRW crypto trading are excluded from MVP records.
 
 ## GET /api/v1/records
 

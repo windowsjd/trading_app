@@ -10,6 +10,13 @@
 - 기존 migration/seed 임의 변경 금지.
 - fake 데이터 기반 계산 금지.
 - fake/static/temporary/sample/test business FX rate 금지.
+- Crypto MVP policy changed to Binance-based USD-settled crypto.
+  - Crypto uses USD Wallet like US stocks.
+  - Crypto KRW valuation remains required for `totalAssetKrw`, ranking, home summary, snapshots, and final evaluation.
+  - No schema migration is needed because the current `currencyCode`-driven model supports `AssetType.crypto`, `CurrencyCode.USD`, `Asset.market = BINANCE`, USD orders/positions, and USD/KRW FX conversion.
+  - Upbit/Bithumb are removed from the MVP provider stack.
+  - Binance fixture capture is the next crypto provider evidence step.
+  - KRX domestic stock remains STOP.
 
 ## 2. 구현 완료 API
 
@@ -229,7 +236,9 @@ near-term ledger/FX foundation:
 - 입력한 manual snapshot은 smoke 당시 fresh였지만 60초 이후에는 정책상 stale이 되므로, 지속적인 quote 성공에는 별도 승인 snapshot 입력 또는 향후 ingestion 경로가 필요함.
 - provider_api/official_batch/scheduler 구현 없음.
 - Gate B provider role은 `CONDITIONAL GO`로 정리됨.
-- OANDA는 conditional primary FX candidate, Twelve Data는 conditional secondary FX 및 US stock/crypto candidate.
+- OANDA는 conditional primary FX candidate, Twelve Data는 conditional secondary FX 및 US stock candidate.
+- Crypto MVP provider는 Binance로 고정하며 USD-settled crypto로 처리한다.
+- Crypto 주문/정산은 미국주식과 동일하게 USD Wallet을 사용하고, KRW 평가는 USD crypto value를 USD/KRW로 환산한다.
 - KRX quote/execute provider는 real-time 공식 검증 부족으로 `BLOCKED`.
 - OANDA trial/API 계약 검증 전 provider implementation STOP.
 - 30초 polling은 후보이며 provider rate limit/terms 확인 후 확정.
@@ -537,7 +546,8 @@ near-term ledger/FX foundation:
   - OANDA USD/KRW fixture 상태: `BLOCKED`, credentials unavailable, exact endpoint/field/timestamp/rate basis unverified.
   - Twelve Data USD/KRW fixture 상태: `BLOCKED`, `TWELVE_DATA_API_KEY` unavailable, `/exchange_rate`는 공식 mapping 후보만 유지.
   - Twelve Data US stock fixture 상태: `BLOCKED`, `TWELVE_DATA_API_KEY` unavailable, `/quote`는 공식 mapping 후보만 유지.
-  - Twelve Data crypto fixture 상태: `BLOCKED`, `TWELVE_DATA_API_KEY` unavailable, `/exchange_rate`/`quote`/future WebSocket 후보만 유지.
+  - Binance crypto fixture 상태: `CONDITIONAL GO` for next evidence task only. `BTCUSDT` ticker/orderbook public fixture capture가 다음 단계이며 이 문서에서는 live call/fixture file을 만들지 않음.
+  - Crypto fixture blocker: `BTCUSDT` 같은 USDT quote를 USD-equivalent로 정규화할지, Binance USD quote pair만 허용할지 owner decision 필요.
   - provider ingestion은 아직 미구현이며 live fixture와 owner decision 수락 전 구현 `BLOCKED` 유지.
   - scheduler/batch는 아직 미구현이며 Gate E 전까지 구현 STOP 유지.
   - settlement/reward는 아직 미구현이며 Gate H/I/J 전까지 구현 STOP 유지.
@@ -545,8 +555,8 @@ near-term ledger/FX foundation:
   - 상세 결과: `docs/provider-final-selection-readiness-recheck.md`, `docs/asset-price-freshness-policy.md`.
   - Gate B 판단은 `CONDITIONAL GO`.
   - 이것은 evidence capture와 다음 구현 프롬프트를 열기 위한 조건부 판단이며, provider ingestion 구현 GO가 아님.
-- 다음 recommended gate: Gate C/D Live Provider Fixture Capture - Provide OANDA and Twelve Data Credentials.
-  - 구현 착수 전 OANDA trial/API USD/KRW 응답, timestamp/effectiveAt mapping, bid/ask/mid 또는 rate basis, Twelve Data USD/KRW/US stock/crypto fixtures, symbol mapping, plan/terms, sourceType/sourceName 우선순위, polling/rate-limit 정책을 확인해야 함.
+- 다음 recommended gate: Gate C Binance Crypto Fixture Capture + OANDA/Twelve Data Fixture Capture.
+  - 구현 착수 전 OANDA trial/API USD/KRW 응답, timestamp/effectiveAt mapping, bid/ask/mid 또는 rate basis, Twelve Data USD/KRW/US stock fixtures, Binance BTCUSDT ticker/orderbook fixtures, Binance USDT-to-USD owner decision, symbol mapping, plan/terms, sourceType/sourceName 우선순위, polling/rate-limit 정책을 확인해야 함.
 - Gate A Protected API HTTP e2e baseline은 완료 상태로 본다.
   - 완료 범위: public/optional/protected guard baseline, missing token/`x-user-id` 차단, valid-token read-only smoke, selected quote smoke.
   - 남은 gap: 모든 protected route별 invalid-token HTTP e2e exhaustive coverage와 valid-token full write-path HTTP e2e는 아직 없음.
@@ -560,7 +570,8 @@ near-term ledger/FX foundation:
   - `provider_api`는 provider timestamp를 `effectiveAt`으로 매핑할 수 있을 때만 허용 후보.
   - `capturedAt`은 서버 수신/admin 저장 시점이며, `createdAt`은 DB row tie-breaker 전용.
   - KRX quote/execute provider는 real-time 공식 검증 부족으로 `BLOCKED`.
-  - Twelve Data는 US stock/crypto 후보이나 live fixture, symbol mapping, plan/terms 확인 전 `CONDITIONAL GO`.
+  - Twelve Data는 US stock 후보이나 live fixture, symbol mapping, plan/terms 확인 전 `CONDITIONAL GO`.
+  - Crypto는 Binance-based USD-settled crypto로 고정하며 Upbit/Bithumb은 MVP provider stack에서 제외.
   - `official_batch`는 reference/reconciliation/settlement 후보이며 real-time execute source가 아님.
 - OANDA trial/API 계약 검증 전 provider_api/official_batch/scheduler 구현 STOP 유지.
 - `/fx execute` 남은 DB-level rollback/partial-write hardening 및 stale pending/unknown outcome recovery 설계.

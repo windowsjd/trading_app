@@ -66,6 +66,25 @@ describe('buildAdminAssetUpsertPayload', () => {
     ).toBe(false);
   });
 
+  it('parses Binance USD-settled crypto asset input', () => {
+    expect(
+      buildAdminAssetUpsertPayload({
+        symbol: 'BTCUSDT',
+        name: 'Bitcoin',
+        market: 'BINANCE',
+        currencyCode: 'USD',
+        assetType: 'crypto',
+      }),
+    ).toEqual({
+      symbol: 'BTCUSDT',
+      name: 'Bitcoin',
+      market: 'BINANCE',
+      currencyCode: CurrencyCode.USD,
+      assetType: AssetType.crypto,
+      isActive: true,
+    });
+  });
+
   it.each(['symbol', 'name', 'market'] as const)(
     'rejects empty %s',
     (fieldName) => {
@@ -115,6 +134,13 @@ describe('buildAdminAssetPriceSnapshotPayload', () => {
     currencyCode: CurrencyCode.USD,
     isActive: true,
   };
+  const activeBinanceCryptoAsset = {
+    id: 'asset-btc',
+    symbol: 'BTCUSDT',
+    market: 'BINANCE',
+    currencyCode: CurrencyCode.USD,
+    isActive: true,
+  };
 
   it('parses valid admin_manual price input by assetId', () => {
     const payload = buildAdminAssetPriceSnapshotPayload(
@@ -160,6 +186,29 @@ describe('buildAdminAssetPriceSnapshotPayload', () => {
 
     expect(payload.effectiveAt).toBe(now);
     expect(payload.capturedAt).toBe(now);
+  });
+
+  it('parses Binance USD crypto price input', () => {
+    const payload = buildAdminAssetPriceSnapshotPayload(
+      {
+        market: 'BINANCE',
+        symbol: 'BTCUSDT',
+        price: '50000.12345678',
+        currencyCode: 'USD',
+        sourceName: 'manual-approved-binance-btcusdt',
+      },
+      activeBinanceCryptoAsset,
+      now,
+    );
+
+    expect(payload).toMatchObject({
+      market: 'BINANCE',
+      symbol: 'BTCUSDT',
+      price: '50000.12345678',
+      currencyCode: CurrencyCode.USD,
+      sourceType: AssetPriceSourceType.admin_manual,
+      sourceName: 'manual-approved-binance-btcusdt',
+    });
   });
 
   it('rejects price <= 0', () => {

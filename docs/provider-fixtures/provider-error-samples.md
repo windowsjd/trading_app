@@ -59,7 +59,6 @@ Safe request templates, not called:
 ```text
 GET https://api.twelvedata.com/exchange_rate?symbol=USD/KRW&apikey=<redacted>
 GET https://api.twelvedata.com/quote?symbol=AAPL&apikey=<redacted>
-GET https://api.twelvedata.com/exchange_rate?symbol=BTC/USD&apikey=<redacted>
 ```
 
 Implementation policy until live evidence exists:
@@ -68,12 +67,36 @@ Implementation policy until live evidence exists:
 - Do not create `fx_rate_snapshots` or `asset_price_snapshots` rows from responses missing a usable provider timestamp.
 - Do not fall back to fake/static/sample data or silent `admin_manual` rows.
 
+## Binance
+
+Policy status:
+
+- Binance is the MVP crypto provider target.
+- Crypto is USD-settled internally and uses the USD Wallet.
+- Public fixture targets are `BTCUSDT` ticker/price and `BTCUSDT` orderbook.
+- No private key is required for public market-data fixture capture.
+- `CurrencyCode.USDT` must not be added; USDT-to-USD-equivalent normalization versus Binance USD quote pair requirement remains an owner decision.
+
+Safe request templates, not called:
+
+```text
+GET <binance-public-ticker-endpoint-for-BTCUSDT>
+GET <binance-public-orderbook-endpoint-for-BTCUSDT>
+```
+
+Implementation policy until live evidence exists:
+
+- Treat Binance timeout, rate limit, invalid symbol, malformed response, and missing timestamp as no-insert provider failures.
+- Do not create `asset_price_snapshots` rows until fixture mapping fixes price field, timestamp -> `effectiveAt`, `sourceName`, and USD-equivalent policy.
+- Do not store secrets; public endpoints must not require API key/Authorization headers for MVP fixture capture.
+
 ## Live Error Capture Status
 
 | Provider | Evidence type | Live call made? | Status | Reason |
 |---|---|---|---|---|
 | OANDA | Error/rate-limit | No | `BLOCKED` | Credentials unavailable; no safe live request possible |
 | Twelve Data | Error/rate-limit | No | `BLOCKED` | `TWELVE_DATA_API_KEY` unavailable; no safe live request possible |
+| Binance | Error/rate-limit | No | `NOT CAPTURED` | Public fixture/error capture deferred to next Gate C/D task |
 
 ## Redaction Review
 

@@ -1,5 +1,6 @@
 import {
   AssetPriceSourceType,
+  AssetType,
   CurrencyCode,
   FxRateSourceType,
   Prisma,
@@ -20,6 +21,7 @@ export type PortfolioCashWalletInput = {
 
 export type PortfolioPositionInput = {
   assetId: string;
+  assetType: AssetType;
   quantity: DecimalInput;
   averageCost: DecimalInput;
   currencyCode: CurrencyCode;
@@ -64,6 +66,9 @@ export type PortfolioValuationResult = {
   krwCash: string;
   usdCashKrw: string;
   assetValueKrw: string;
+  domesticStockValueKrw: string;
+  usStockValueKrw: string;
+  cryptoValueKrw: string;
   realizedPnlKrw: string;
   unrealizedPnlKrw: string;
   valuationAt: Date;
@@ -109,6 +114,9 @@ export function calculatePortfolioValuation(
   }
 
   let assetValueKrw = new Prisma.Decimal(0);
+  let domesticStockValueKrw = new Prisma.Decimal(0);
+  let usStockValueKrw = new Prisma.Decimal(0);
+  let cryptoValueKrw = new Prisma.Decimal(0);
   let realizedPnlKrw = new Prisma.Decimal(0);
   let unrealizedPnlKrw = new Prisma.Decimal(0);
 
@@ -149,10 +157,25 @@ export function calculatePortfolioValuation(
     const unrealizedPnl = currentPrice.sub(averageCost).mul(quantity);
     const conversionRate =
       priceSnapshot.currencyCode === CurrencyCode.USD ? usdKrwRate : null;
-
-    assetValueKrw = assetValueKrw.add(
-      convertToKrw(positionValue, priceSnapshot.currencyCode, conversionRate),
+    const positionValueKrw = convertToKrw(
+      positionValue,
+      priceSnapshot.currencyCode,
+      conversionRate,
     );
+
+    assetValueKrw = assetValueKrw.add(positionValueKrw);
+    switch (position.assetType) {
+      case AssetType.domestic_stock:
+        domesticStockValueKrw =
+          domesticStockValueKrw.add(positionValueKrw);
+        break;
+      case AssetType.us_stock:
+        usStockValueKrw = usStockValueKrw.add(positionValueKrw);
+        break;
+      case AssetType.crypto:
+        cryptoValueKrw = cryptoValueKrw.add(positionValueKrw);
+        break;
+    }
     unrealizedPnlKrw = unrealizedPnlKrw.add(
       convertToKrw(unrealizedPnl, position.currencyCode, usdKrwRate),
     );
@@ -170,6 +193,9 @@ export function calculatePortfolioValuation(
     krwCash: formatMoneyScale8(krwCash),
     usdCashKrw: formatMoneyScale8(usdCashKrw),
     assetValueKrw: formatMoneyScale8(assetValueKrw),
+    domesticStockValueKrw: formatMoneyScale8(domesticStockValueKrw),
+    usStockValueKrw: formatMoneyScale8(usStockValueKrw),
+    cryptoValueKrw: formatMoneyScale8(cryptoValueKrw),
     realizedPnlKrw: formatMoneyScale8(realizedPnlKrw),
     unrealizedPnlKrw: formatMoneyScale8(unrealizedPnlKrw),
     valuationAt: input.valuationAt,

@@ -5,6 +5,7 @@
 - Documentation-only audit based on the current workspace state on 2026-05-11.
 - Gate B provider readiness and asset price freshness policy were re-checked on 2026-05-12 as docs-only updates.
 - Gate C/D live provider fixture capture was re-checked on 2026-05-13 as a docs/fixture-only blocked pass because credentials were unavailable.
+- Crypto MVP policy changed on 2026-05-14 to Binance-based USD-settled crypto using the USD Wallet. Upbit/Bithumb are excluded from MVP, and Binance BTCUSDT fixture capture is the next crypto evidence step.
 - No source, test, package, Prisma schema, migration, seed, provider, scheduler, settlement, reward, or refresh-token implementation is authorized by this document.
 - `docs/current-status.md` remains the short status summary. This document is the detailed backend gate roadmap.
 
@@ -272,7 +273,7 @@ Consistency note:
 - Source of truth: `docs/fx-provider-research.md`, `docs/fx-provider-final-selection-stop-review.md`, `docs/fx-ingestion-stop-review.md`, `docs/provider-final-selection-readiness-recheck.md`, `docs/asset-price-freshness-policy.md`.
 - Existing tests: none.
 - Known limitations: no API key management, polling, retry/backoff, sourceType priority implementation, retention, alerting, contract validation, or USD/KRW/asset live fixture response mapping.
-- Remaining work: Gate C/D evidence capture before implementation. OANDA is the conditional primary FX candidate; Twelve Data is the conditional US stock/crypto candidate and secondary FX candidate; KRX quote/execute remains blocked/unverified.
+- Remaining work: Gate C/D evidence capture before implementation. OANDA is the conditional primary FX candidate; Twelve Data is the conditional US stock candidate and secondary FX candidate; Binance is the MVP crypto provider target with USD settlement; KRX quote/execute remains blocked/unverified.
 - Risk level: HIGH.
 - Recommended next action: capture official/trial response evidence and terms decisions before code.
 
@@ -396,7 +397,7 @@ Gate B was completed as a docs-only readiness re-check in `docs/provider-final-s
 |---|---|---|---|
 | Gate B Provider final selection readiness | CONDITIONAL GO | Provider roles and source/freshness policy are clear enough for evidence capture and narrow Gate C/D prompts | No code yet; keep official docs and trial/API evidence together |
 | Gate C FX provider ingestion | CONDITIONAL GO for evidence capture; implementation still gated | OANDA is conditional primary FX provider; Twelve Data is conditional secondary FX provider | OANDA USD/KRW trial/API response, exact endpoint/field mapping, provider timestamp -> `effectiveAt`, `capturedAt`, bid/ask/mid or rate basis, contract/cost/polling approval |
-| Gate D Asset price provider ingestion | CONDITIONAL GO for US/crypto evidence; BLOCKED for KRX quote/execute | Twelve Data is conditional candidate for US stock and crypto; KRX real-time quote/execute remains blocked | Twelve Data `/quote` or WebSocket fixtures, symbol mapping, timestamp proof, plan/terms approval, separate domestic/US/crypto freshness tests |
+| Gate D Asset price provider ingestion | CONDITIONAL GO for US stock and Binance crypto evidence; BLOCKED for KRX quote/execute | Twelve Data is conditional candidate for US stock; Binance is MVP crypto provider target with USD settlement; KRX real-time quote/execute remains blocked | Twelve Data `/quote` fixture for US stock, Binance `BTCUSDT` ticker/orderbook fixtures, USDT-to-USD owner decision or Binance USD-pair evidence, symbol mapping, timestamp proof, plan/terms approval, separate domestic/US/crypto freshness tests |
 | Gate E Scheduler/batch foundation | CONDITIONAL GO for preimplementation audit only | Freshness and polling requirements are clearer, but no scheduler/batch implementation is authorized | job lock, idempotency, retry/backoff, partial failure, provider outage, manual CLI coexistence policy |
 | Gate H Settlement preimplementation audit | CONDITIONAL GO for docs-only audit; implementation STOP | Settlement can be audited next only after acknowledging final evidence source is still undecided | final valuation source, season cutoff, rerun/idempotency, rollback, reward handoff, official/reference snapshot decision |
 
@@ -410,7 +411,7 @@ Still blocked:
 
 Recommended next Codex prompt title:
 
-- `Gate C/D Live Provider Fixture Capture - Provide OANDA and Twelve Data Credentials`
+- `Gate C Binance Crypto Fixture Capture + OANDA/Twelve Data Fixture Capture`
 
 ## Gate C/D Live Fixture Capture Result (2026-05-13)
 
@@ -421,9 +422,9 @@ Gate C/D evidence capture is documented in `docs/provider-evidence-capture.md`.
 | OANDA USD/KRW live fixture | BLOCKED | OANDA remains conditional FX candidate, but live evidence was not captured because credentials were unavailable | Provide OANDA credentials, capture USD/KRW response, verify endpoint/fields/timestamp/content type/rate basis and terms |
 | Twelve Data USD/KRW live fixture | BLOCKED | Twelve Data remains conditional secondary FX candidate, but live evidence was not captured because `TWELVE_DATA_API_KEY` was unavailable | Provide `TWELVE_DATA_API_KEY`, capture `/exchange_rate?symbol=USD/KRW`, verify `rate`, `timestamp`, freshness, errors, terms |
 | Twelve Data US stock live fixture | BLOCKED | Twelve Data remains conditional US stock candidate, but live evidence was not captured because `TWELVE_DATA_API_KEY` was unavailable | Capture `/quote?symbol=AAPL`, verify currency, `close`, `timestamp`/`last_quote_at`, `is_market_open`, delayed/real-time status, plan/terms |
-| Twelve Data crypto live fixture | BLOCKED | Twelve Data remains conditional crypto candidate, but endpoint choice is still open and no live evidence was captured | Capture BTC/USD fixture, decide `/exchange_rate` vs `/quote` vs future WebSocket, verify timestamp, exchange/aggregation, terms |
+| Binance crypto fixture | CONDITIONAL GO for fixture capture, STOP for ingestion | Crypto provider target changed to Binance USD-settled crypto; no live Binance fixture was captured in the previous pass | Capture public `BTCUSDT` ticker and orderbook fixtures, verify timestamp/effectiveAt mapping, decide USDT-to-USD-equivalent normalization or require Binance USD quote pair evidence |
 | Gate C FX provider ingestion | BLOCKED for implementation | No provider client/ingestion work should start yet | Live fixture, sourceType eligibility, timestamp mapping, rate basis, and owner terms decisions |
-| Gate D Asset price provider ingestion | BLOCKED for implementation | No asset provider ingestion work should start yet | Live US/crypto fixtures, symbol/currency mapping, market-open policy, delayed/EOD rejection, owner terms decisions |
+| Gate D Asset price provider ingestion | BLOCKED for implementation | No asset provider ingestion work should start yet | Live US fixtures, Binance crypto fixtures, symbol/currency mapping, market-open policy, delayed/EOD rejection, USDT-to-USD decision, owner terms decisions |
 | Gate E Scheduler/batch foundation | CONDITIONAL GO for docs-only audit; STOP for implementation | Generic scheduler audit may proceed, but provider polling jobs cannot be implemented | Lock/idempotency/retry/ops policy plus accepted provider evidence |
 | Gate H Settlement preimplementation audit | CONDITIONAL GO for docs-only audit; STOP for implementation | Settlement can audit final evidence needs, not implement settlement | Final valuation source, official/reference snapshot policy, recovery/idempotency |
 
@@ -433,7 +434,8 @@ Blocked reasons:
 - No live provider response fixtures exist.
 - Official-document error/rate-limit evidence was added in `docs/provider-fixtures/provider-error-samples.md`; no live error or quota calls were made.
 - OANDA exact endpoint, response fields, timestamp field, and bid/ask/mid mapping are still unverified.
-- Twelve Data live timestamp freshness is unmeasured for USD/KRW, US stock, and crypto.
+- Twelve Data live timestamp freshness is unmeasured for USD/KRW and US stock.
+- Binance crypto timestamp freshness and USDT-to-USD-equivalent policy are unverified.
 - Production terms/account approval is still missing.
 - KRX provider_api quote/execute remains blocked due missing real-time evidence.
 
@@ -441,12 +443,13 @@ Gate transition effect:
 
 - Gate C FX provider ingestion implementation cannot start from this result; it remains `BLOCKED`.
 - Gate D asset price provider ingestion implementation cannot start from this result; it remains `BLOCKED`.
+- Crypto ingestion implementation must not start until Binance fixture evidence plus USDT-to-USD owner decision/sourceType eligibility tests are accepted.
 - Gate E scheduler/batch foundation may proceed only as a docs-only preimplementation audit; implementation remains `STOP`.
 - Settlement preimplementation audit may proceed only as a docs-only audit; implementation remains `STOP`.
 
 Next recommended Codex prompt title:
 
-- `Gate C/D Live Provider Fixture Capture - Provide OANDA and Twelve Data Credentials`
+- `Gate C Binance Crypto Fixture Capture + OANDA/Twelve Data Fixture Capture`
 
 ## Next 5 Implementation Candidate Priority
 
@@ -460,7 +463,7 @@ Next recommended Codex prompt title:
 
 Recommended next task:
 
-- Gate C/D Live Provider Fixture Capture - Provide OANDA and Twelve Data Credentials.
+- Gate C Binance Crypto Fixture Capture + OANDA/Twelve Data Fixture Capture.
 
 ## STOP / GO Summary
 

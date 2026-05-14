@@ -13,6 +13,9 @@
 - Dates use `YYYY-MM-DD`.
 - Responses keep the existing `success/data` or `success/error` structure.
 - `season_participants.currentRank` is not used as source of truth.
+- Ranking values remain KRW-based.
+- MVP crypto is Binance-based USD-settled crypto; crypto positions must be converted from USD value to KRW using USD/KRW before contributing to `totalAssetKrw` and `returnRate`.
+- Upbit/Bithumb and KRW crypto trading are not MVP ranking inputs.
 
 ## Route
 

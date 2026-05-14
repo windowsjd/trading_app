@@ -233,6 +233,17 @@ describe('OrdersService', () => {
       market: currencyCode === CurrencyCode.USD ? 'NASDAQ' : 'KRX',
       currencyCode,
       isActive: true,
+      });
+  };
+
+  const mockBinanceCryptoAsset = (prisma: ReturnType<typeof createPrisma>) => {
+    prisma.asset.findUnique.mockResolvedValueOnce({
+      id: 'asset-btc',
+      symbol: 'BTCUSDT',
+      name: 'Bitcoin',
+      market: 'BINANCE',
+      currencyCode: CurrencyCode.USD,
+      isActive: true,
     });
   };
 
@@ -441,9 +452,10 @@ describe('OrdersService', () => {
   const mockExecutionPrice = (
     prisma: ReturnType<typeof createPrisma>,
     price = '100.00000000',
+    snapshotId = 'aps-exec-1',
   ) => {
     prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce({
-      id: 'aps-exec-1',
+      id: snapshotId,
       price: new Prisma.Decimal(price),
     });
   };
@@ -452,18 +464,19 @@ describe('OrdersService', () => {
     prisma: ReturnType<typeof createPrisma>,
     before = '1000.00000000',
     after = '799.80000000',
+    currencyCode = CurrencyCode.KRW,
   ) => {
     prisma.cashWallet.findUnique.mockResolvedValueOnce({
       id: 'wallet-1',
       seasonParticipantId: 'sp-1',
-      currencyCode: CurrencyCode.KRW,
+      currencyCode,
       balanceAmount: new Prisma.Decimal(before),
     });
     prisma.cashWallet.updateMany.mockResolvedValueOnce({ count: 1 });
     prisma.cashWallet.findFirst.mockResolvedValueOnce({
       id: 'wallet-1',
       seasonParticipantId: 'sp-1',
-      currencyCode: CurrencyCode.KRW,
+      currencyCode,
       balanceAmount: new Prisma.Decimal(after),
     });
   };
@@ -475,6 +488,48 @@ describe('OrdersService', () => {
     prisma.order.updateMany.mockResolvedValueOnce({ count: 1 });
     prisma.order.findUnique.mockResolvedValueOnce(order);
   };
+
+  const cryptoUsdOrderExecutionRecord = (
+    overrides: Record<string, unknown> = {},
+  ) =>
+    orderExecutionRecord({
+      id: 'order-btc-execute-1',
+      assetId: 'asset-btc',
+      quantity: new Prisma.Decimal('0.01000000'),
+      currencyCode: CurrencyCode.USD,
+      asset: {
+        id: 'asset-btc',
+        symbol: 'BTCUSDT',
+        name: 'Bitcoin',
+        market: 'BINANCE',
+        currencyCode: CurrencyCode.USD,
+      },
+      ...overrides,
+    });
+
+  const executedCryptoUsdOrderExecutionRecord = (
+    overrides: Record<string, unknown> = {},
+  ) =>
+    executedOrderExecutionRecord({
+      id: 'order-btc-execute-1',
+      assetId: 'asset-btc',
+      quantity: new Prisma.Decimal('0.01000000'),
+      executedPrice: new Prisma.Decimal('50000.00000000'),
+      currencyCode: CurrencyCode.USD,
+      grossAmount: new Prisma.Decimal('500.00000000'),
+      feeAmount: new Prisma.Decimal('0.50000000'),
+      netAmount: new Prisma.Decimal('500.50000000'),
+      assetPriceSnapshotId: 'aps-btc-exec-1',
+      fxRateSnapshotId: 'fx-exec-1',
+      asset: {
+        id: 'asset-btc',
+        symbol: 'BTCUSDT',
+        name: 'Bitcoin',
+        market: 'BINANCE',
+        currencyCode: CurrencyCode.USD,
+      },
+      ...overrides,
+    });
 
   const getErrorCode = (error: unknown) => {
     const response = (error as HttpException).getResponse() as {
@@ -646,6 +701,103 @@ describe('OrdersService', () => {
       expiresAt: null,
     });
     expect(prisma.order.create).not.toHaveBeenCalled();
+    expectNoOrderWrites(prisma);
+  });
+
+  it('quotes Binance crypto USD buy orders against the USD wallet and USD/KRW FX', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    mockJoined(prisma);
+    mockBinanceCryptoAsset(prisma);
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce({
+      id: 'aps-btc-1',
+      price: new Prisma.Decimal('50000.00000000'),
+    });
+    mockFreshFx(prisma);
+    mockCashWallet(prisma, '1000.00000000');
+
+    const response = await service.quoteOrder('user-1', {
+      assetId: 'asset-btc',
+      side: 'buy',
+      orderType: 'market',
+      quantity: '0.01000000',
+    });
+
+    expect(response.data).toMatchObject({
+      asset: {
+        id: 'asset-btc',
+        symbol: 'BTCUSDT',
+        market: 'BINANCE',
+        currencyCode: CurrencyCode.USD,
+      },
+      currencyCode: CurrencyCode.USD,
+      grossAmount: '500.00000000',
+      feeAmount: '0.50000000',
+      netAmount: '500.50000000',
+      krwGrossAmount: '700000.00000000',
+      krwFeeAmount: '700.00000000',
+      krwNetAmount: '700700.00000000',
+      assetPriceSnapshotId: 'aps-btc-1',
+      fxRateSnapshotId: 'fx-1',
+    });
+    expect(prisma.cashWallet.findUnique).toHaveBeenCalledWith({
+      where: {
+        seasonParticipantId_currencyCode: {
+          seasonParticipantId: 'sp-1',
+          currencyCode: CurrencyCode.USD,
+        },
+      },
+      select: {
+        balanceAmount: true,
+      },
+    });
+    expect(prisma.fxRateSnapshot.findFirst).toHaveBeenCalled();
+    expectNoOrderWrites(prisma);
+  });
+
+  it('quotes Binance crypto USD sell orders with USD net and KRW converted amounts', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    mockJoined(prisma);
+    mockBinanceCryptoAsset(prisma);
+    mockFreshFx(prisma);
+    mockPosition(prisma, '0.02000000');
+
+    const response = await service.quoteOrder('user-1', {
+      assetId: 'asset-btc',
+      side: 'sell',
+      orderType: 'limit',
+      quantity: '0.01000000',
+      limitPrice: '50000.00000000',
+    });
+
+    expect(response.data).toMatchObject({
+      asset: {
+        id: 'asset-btc',
+        symbol: 'BTCUSDT',
+        market: 'BINANCE',
+      },
+      side: OrderSide.sell,
+      currencyCode: CurrencyCode.USD,
+      grossAmount: '500.00000000',
+      feeAmount: '0.50000000',
+      netAmount: '499.50000000',
+      krwGrossAmount: '700000.00000000',
+      krwFeeAmount: '700.00000000',
+      krwNetAmount: '699300.00000000',
+      fxRateSnapshotId: 'fx-1',
+    });
+    expect(prisma.position.findUnique).toHaveBeenCalledWith({
+      where: {
+        seasonParticipantId_assetId: {
+          seasonParticipantId: 'sp-1',
+          assetId: 'asset-btc',
+        },
+      },
+      select: {
+        quantity: true,
+      },
+    });
     expectNoOrderWrites(prisma);
   });
 
@@ -883,6 +1035,68 @@ describe('OrdersService', () => {
           executedAt: null,
           canceledAt: null,
           rejectedAt: null,
+        }),
+      }),
+    );
+    expectOnlyOrderCreateWrite(prisma);
+  });
+
+  it('creates submitted Binance crypto USD market orders with USD currency and FX audit snapshot', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    mockJoined(prisma);
+    mockBinanceCryptoAsset(prisma);
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce({
+      id: 'aps-btc-1',
+      price: new Prisma.Decimal('50000.00000000'),
+    });
+    mockFreshFx(prisma);
+    mockCashWallet(prisma, '1000.00000000');
+    prisma.order.create.mockResolvedValueOnce({ id: 'order-btc-1' });
+
+    const response = await service.createOrder('user-1', {
+      assetId: 'asset-btc',
+      side: 'buy',
+      orderType: 'market',
+      quantity: '0.01000000',
+      idempotencyKey: 'order-create-key-btc',
+    });
+
+    expect(response.data.order).toMatchObject({
+      status: OrderStatus.submitted,
+      asset: {
+        symbol: 'BTCUSDT',
+        market: 'BINANCE',
+        currencyCode: CurrencyCode.USD,
+      },
+      currencyCode: CurrencyCode.USD,
+      grossAmount: '500.00000000',
+      feeAmount: '0.50000000',
+      netAmount: '500.50000000',
+      assetPriceSnapshotId: 'aps-btc-1',
+      fxRateSnapshotId: 'fx-1',
+    });
+    expect(prisma.cashWallet.findUnique).toHaveBeenCalledWith({
+      where: {
+        seasonParticipantId_currencyCode: {
+          seasonParticipantId: 'sp-1',
+          currencyCode: CurrencyCode.USD,
+        },
+      },
+      select: {
+        balanceAmount: true,
+      },
+    });
+    expect(prisma.order.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          assetId: 'asset-btc',
+          currencyCode: CurrencyCode.USD,
+          grossAmount: '500.00000000',
+          feeAmount: '0.50000000',
+          netAmount: '500.50000000',
+          assetPriceSnapshotId: 'aps-btc-1',
+          fxRateSnapshotId: 'fx-1',
         }),
       }),
     );
@@ -1663,7 +1877,107 @@ describe('OrdersService', () => {
           fxRateSnapshotId: null,
           executedAt,
         },
+    });
+      expectNoForbiddenExecuteSideEffects(prisma);
+    });
+
+    it('executes Binance crypto USD buys with USD wallet debit, USD position, and FX snapshot audit', async () => {
+      const { prisma, service } = createService();
+      prisma.order.findFirst.mockResolvedValueOnce(cryptoUsdOrderExecutionRecord());
+      mockExecutionPrice(prisma, '50000.00000000', 'aps-btc-exec-1');
+      prisma.fxRateSnapshot.findFirst.mockResolvedValueOnce({
+        id: 'fx-exec-1',
+        effectiveAt: executedAt,
       });
+      mockExecutionWallet(
+        prisma,
+        '1000.00000000',
+        '499.50000000',
+        CurrencyCode.USD,
+      );
+      prisma.position.findUnique.mockResolvedValueOnce(null);
+      prisma.position.create.mockResolvedValueOnce({ id: 'position-btc-1' });
+      prisma.walletTransaction.create.mockResolvedValueOnce({
+        id: 'wallet-tx-btc-buy-1',
+      });
+      mockOrderFinalization(prisma, executedCryptoUsdOrderExecutionRecord());
+
+      const response = await service.executeOrder(
+        'user-1',
+        'order-btc-execute-1',
+      );
+
+      expect(response.data).toMatchObject({
+        order: {
+          orderId: 'order-btc-execute-1',
+          asset: {
+            symbol: 'BTCUSDT',
+            market: 'BINANCE',
+            currencyCode: CurrencyCode.USD,
+          },
+          currencyCode: CurrencyCode.USD,
+          status: OrderStatus.executed,
+          grossAmount: '500.00000000',
+          feeAmount: '0.50000000',
+          netAmount: '500.50000000',
+          assetPriceSnapshotId: 'aps-btc-exec-1',
+          fxRateSnapshotId: 'fx-exec-1',
+        },
+        execution: {
+          state: 'executed',
+          fxRateSnapshotId: 'fx-exec-1',
+          walletTransactionId: 'wallet-tx-btc-buy-1',
+          walletBalanceAfter: '499.50000000',
+          positionId: 'position-btc-1',
+        },
+      });
+      expect(prisma.cashWallet.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'wallet-1',
+          seasonParticipantId: 'sp-1',
+          currencyCode: CurrencyCode.USD,
+          balanceAmount: {
+            gte: '500.50000000',
+          },
+        },
+        data: {
+          balanceAmount: {
+            decrement: '500.50000000',
+          },
+        },
+      });
+      expect(prisma.position.create).toHaveBeenCalledWith({
+        data: {
+          seasonParticipantId: 'sp-1',
+          assetId: 'asset-btc',
+          quantity: '0.01000000',
+          averageCost: '50050.00000000',
+          currencyCode: CurrencyCode.USD,
+          realizedPnl: '0.00000000',
+        },
+        select: {
+          id: true,
+        },
+      });
+      expect(prisma.walletTransaction.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          currencyCode: CurrencyCode.USD,
+          direction: WalletTransactionDirection.debit,
+          txType: WalletTransactionType.order_buy,
+          amount: '500.50000000',
+          balanceAfter: '499.50000000',
+        }),
+        select: {
+          id: true,
+        },
+      });
+      expect(prisma.order.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            fxRateSnapshotId: 'fx-exec-1',
+          }),
+        }),
+      );
       expectNoForbiddenExecuteSideEffects(prisma);
     });
 
@@ -1771,6 +2085,105 @@ describe('OrdersService', () => {
             txType: WalletTransactionType.order_sell,
             amount: '199.80000000',
             balanceAfter: '299.80000000',
+          }),
+        }),
+      );
+      expectNoForbiddenExecuteSideEffects(prisma);
+    });
+
+    it('executes Binance crypto USD sells with USD wallet credit and USD ledger currency', async () => {
+      const { prisma, service } = createService();
+      prisma.order.findFirst.mockResolvedValueOnce(
+        cryptoUsdOrderExecutionRecord({
+          side: OrderSide.sell,
+        }),
+      );
+      mockExecutionPrice(prisma, '50000.00000000', 'aps-btc-exec-1');
+      prisma.fxRateSnapshot.findFirst.mockResolvedValueOnce({
+        id: 'fx-exec-1',
+        effectiveAt: executedAt,
+      });
+      prisma.position.findUnique.mockResolvedValueOnce({
+        id: 'position-btc-1',
+        quantity: new Prisma.Decimal('0.02000000'),
+        averageCost: new Prisma.Decimal('40000.00000000'),
+        currencyCode: CurrencyCode.USD,
+      });
+      prisma.position.updateMany.mockResolvedValueOnce({ count: 1 });
+      mockExecutionWallet(
+        prisma,
+        '100.00000000',
+        '599.50000000',
+        CurrencyCode.USD,
+      );
+      prisma.walletTransaction.create.mockResolvedValueOnce({
+        id: 'wallet-tx-btc-sell-1',
+      });
+      mockOrderFinalization(
+        prisma,
+        executedCryptoUsdOrderExecutionRecord({
+          side: OrderSide.sell,
+          netAmount: new Prisma.Decimal('499.50000000'),
+        }),
+      );
+
+      const response = await service.executeOrder(
+        'user-1',
+        'order-btc-execute-1',
+      );
+
+      expect(response.data).toMatchObject({
+        order: {
+          orderId: 'order-btc-execute-1',
+          side: OrderSide.sell,
+          currencyCode: CurrencyCode.USD,
+          netAmount: '499.50000000',
+          fxRateSnapshotId: 'fx-exec-1',
+        },
+        execution: {
+          walletTransactionId: 'wallet-tx-btc-sell-1',
+          walletBalanceAfter: '599.50000000',
+          positionId: 'position-btc-1',
+        },
+      });
+      expect(prisma.position.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'position-btc-1',
+          seasonParticipantId: 'sp-1',
+          assetId: 'asset-btc',
+          quantity: {
+            gte: '0.01000000',
+          },
+        },
+        data: {
+          quantity: {
+            decrement: '0.01000000',
+          },
+          realizedPnl: {
+            increment: '99.50000000',
+          },
+        },
+      });
+      expect(prisma.cashWallet.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'wallet-1',
+          seasonParticipantId: 'sp-1',
+          currencyCode: CurrencyCode.USD,
+        },
+        data: {
+          balanceAmount: {
+            increment: '499.50000000',
+          },
+        },
+      });
+      expect(prisma.walletTransaction.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            currencyCode: CurrencyCode.USD,
+            direction: WalletTransactionDirection.credit,
+            txType: WalletTransactionType.order_sell,
+            amount: '499.50000000',
+            balanceAfter: '599.50000000',
           }),
         }),
       );

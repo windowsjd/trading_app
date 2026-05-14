@@ -23,6 +23,8 @@
 - `/fx quote` blocks selected snapshots whose `effectiveAt` is older than 60 seconds.
 - Near-term `/fx execute` uses approved fresh `admin_manual` snapshots only as allowed sourceType.
 - Provider final selection is not confirmed, and `provider_api`/`official_batch` ingestion is not implemented.
+- USD/KRW snapshots are also the KRW conversion evidence for USD-settled crypto valuation.
+- MVP crypto uses Binance-based USD settlement and the USD Wallet; no `USDT` wallet/currency is introduced.
 
 ## Common Error Envelope
 All `/fx` errors should use the common error envelope.

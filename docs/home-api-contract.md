@@ -14,6 +14,9 @@
 - Season non-participation is not an empty portfolio. It is a blocked/guide state.
 - Season ended and settled states block trading and exchange.
 - Final evaluation is based on total assets in KRW.
+- MVP crypto is Binance-based USD-settled crypto and uses the USD Wallet.
+- Crypto KRW valuation is crypto USD price * quantity * USD/KRW rate.
+- `cryptoValueKrw` means KRW-converted value of crypto positions; `totalAssetKrw` and `returnRate` remain KRW-based.
 
 ## Common Success Shape
 

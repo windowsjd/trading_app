@@ -116,10 +116,15 @@ Current implementation:
 Target policy after provider ingestion:
 
 - Crypto is treated as 24/7.
+- MVP crypto provider is Binance.
+- MVP crypto is USD-settled and uses the USD Wallet.
+- Crypto KRW valuation is crypto USD value converted with USD/KRW.
+- Upbit/Bithumb are excluded from the MVP provider stack.
 - Quote/execute should require a provider timestamp no older than 30 seconds.
 - Home live valuation should require a provider timestamp no older than 60 seconds.
 - Daily snapshot capture should use a timestamp close to the scheduled capture time, with a maximum provider age of 5 minutes unless a later gate narrows it.
-- Twelve Data is a conditional crypto provider candidate, but exchange/symbol aggregation and timestamp evidence must be accepted first.
+- Binance `BTCUSDT` ticker/orderbook public fixtures are the next evidence target.
+- `CurrencyCode.USDT` must not be added. Gate C/D must decide whether USDT quote pairs are normalized as USD-equivalent or whether Binance USD quote pairs are required.
 
 ## 9. Quote vs Execute vs Valuation vs Ranking vs Settlement
 
@@ -319,7 +324,8 @@ Settlement implementation tests:
 
 - Which OANDA field and rate basis, bid/ask/midpoint, will be canonical for USD/KRW?
 - What exact OANDA endpoint and response field maps to `effectiveAt`?
-- Which Twelve Data endpoint, `/quote` or WebSocket, will be canonical for US stocks and crypto?
+- Which Twelve Data endpoint, `/quote` or WebSocket, will be canonical for US stocks?
+- Will Binance crypto use USDT quote pairs normalized as USD-equivalent, or require Binance USD quote pairs?
 - Is delayed US or domestic stock data ever acceptable for virtual trading UX?
 - What provider or official batch source will cover KRX if domestic stocks remain in MVP?
 - Should asset quote/execute stale errors be separate public API error codes before provider code?
@@ -341,7 +347,7 @@ Settlement implementation tests:
 | FX USD/KRW | approved `admin_manual`; OANDA/Twelve Data candidates | 60 seconds by `effectiveAt` | 60 seconds by `effectiveAt` | 60 seconds when live valuation needs USD/KRW | Current manual CLI valuation still depends on fresh FX when USD conversion is needed; future batch/reference policy pending | Inherited from snapshot source | Gate H decision; likely official/reference snapshot | GO for current 60-second policy; CONDITIONAL GO for provider | OANDA endpoint/field/rate basis, contract, trial response |
 | Domestic stock KRX | `admin_manual` only | BLOCKED for provider market-open quote; target would be max 60 seconds if real-time source is verified | BLOCKED for provider market-open execute; target would be max 60 seconds if real-time source is verified | Conditional read-only valuation using explicit manual/EOD/reference evidence | Conditional EOD/reference after batch/source gate | Inherited from daily snapshots | Gate H decision | BLOCKED for KRX quote/execute provider_api | Real-time KRX source, delayed/EOD product acceptance, official close source |
 | US stock | `admin_manual` only; Twelve Data candidate | Target max 60 seconds during market hours | Target max 60 seconds during market hours | Target max 15 minutes during market hours, latest regular close when clearly closed | Official close/EOD or provider snapshot near scheduled capture, Gate F decision | Inherited from daily snapshots | Gate H decision | CONDITIONAL GO | Twelve Data live fixture, plan/terms, delayed data acceptance |
-| Crypto | `admin_manual` only; Twelve Data candidate | Target max 30 seconds | Target max 30 seconds | Target max 60 seconds | Target max 5 minutes near scheduled capture | Inherited from daily snapshots | Gate H decision | CONDITIONAL GO | Exchange/symbol aggregation, provider timestamp, volatility tolerance |
+| Crypto | `admin_manual` only; Binance MVP provider target | Target max 30 seconds | Target max 30 seconds | Target max 60 seconds | Target max 5 minutes near scheduled capture | Inherited from daily snapshots | Gate H decision | CONDITIONAL GO for fixture capture, STOP for ingestion | Binance BTCUSDT fixture, USDT-to-USD policy, provider timestamp, volatility tolerance |
 
 ## Stale Behavior Matrix
 

@@ -6,12 +6,22 @@ This document re-checks provider readiness before any `provider_api` ingestion, 
 
 Scope is documentation and policy only. It does not authorize OANDA/Twelve Data API clients, provider ingestion, scheduler/batch jobs, settlement, rewards, schema changes, migrations, package changes, seed changes, or fake/static/sample business price data.
 
+Crypto policy update on 2026-05-14:
+
+- MVP crypto provider is Binance.
+- MVP crypto is USD-settled and uses the USD Wallet.
+- Upbit/Bithumb are excluded from the MVP provider stack.
+- Twelve Data remains a conditional US stock/FX candidate, not the MVP crypto provider.
+- `CurrencyCode.USDT` must not be added. Binance USDT quote pairs such as `BTCUSDT` require a fixture/evidence owner decision for USD-equivalent normalization, or Binance USD quote pair evidence.
+
 ## 2. Current Project Requirements
 
 - Financial amounts and rates must cross API boundaries as strings.
 - FX and order flows use quote -> execute.
 - US stock orders use the USD cash wallet.
+- Crypto orders use the USD cash wallet.
 - Final evaluation is total assets in KRW.
+- Crypto valuation in KRW is crypto USD value converted by USD/KRW.
 - Trading and FX exchange must be blocked after season end.
 - Missing or stale prices must produce explicit errors or unavailable states, not fake data.
 - `admin_manual` is an approved bootstrap/manual correction path, not a long-running production provider.
@@ -60,7 +70,7 @@ Checked date: 2026-05-12.
 | Twelve Data | https://twelvedata.com/pricing-business | Business plan positioning, external display data access, commercial/professional plan context | Current as checked on 2026-05-12; production terms still require owner approval |
 | Twelve Data | https://support.twelvedata.com/en/articles/5615854-credits | API/WS credit reset and 429 behavior | Current as checked on 2026-05-12 |
 | Twelve Data | https://twelvedata.com/stocks | US/international coverage, real-time US, South Korea EOD delay, plan tiers | KRX real-time quote/execute remains unverified/blocked |
-| Twelve Data | https://twelvedata.com/cryptocurrency | Crypto coverage, real-time low-latency streaming, exchanges | Crypto candidate only after symbol/exchange/timestamp trial evidence |
+| Twelve Data | https://twelvedata.com/cryptocurrency | Crypto coverage, real-time low-latency streaming, exchanges | Historical/prior crypto candidate evidence only; MVP crypto provider is now Binance |
 | Twelve Data | https://twelvedata.com/markets/938314/forex/usd-krw | USD/KRW instrument page | Confirms official USD/KRW market page exists; API response still must be verified |
 
 ## 6. OANDA Review
@@ -90,7 +100,7 @@ OANDA readiness conclusion:
 
 - OANDA remains the recommended primary FX provider candidate.
 - OANDA is not a stock provider for this project.
-- OANDA must not be treated as the primary crypto provider unless a separate crypto-specific contract/API proof is accepted.
+- OANDA must not be treated as the primary crypto provider.
 
 ## 7. Twelve Data Review
 
@@ -122,7 +132,8 @@ Twelve Data unverified items:
 Twelve Data readiness conclusion:
 
 - Twelve Data remains the secondary FX provider candidate.
-- Twelve Data is the recommended conditional candidate for US stock and crypto prices.
+- Twelve Data is the recommended conditional candidate for US stock prices.
+- Twelve Data is no longer the MVP crypto provider target because MVP crypto is Binance-based USD-settled crypto.
 - Twelve Data is not accepted as KRX quote/execute provider in this re-check because official checked coverage shows South Korea EOD delay, not quote/execute-grade real-time coverage.
 
 ## 8. FX USD/KRW Requirements
@@ -149,7 +160,7 @@ Required before asset price provider ingestion:
 - Candidate provider endpoint for asset prices is Twelve Data `/quote` or another endpoint with timestamp and close/last quote fields, not timestamp-less `/price`.
 - Domestic/KRX, US stock, and crypto must have separate freshness and market-hours rules.
 - Delayed/EOD data must not silently power order quote/execute when product expects market-open execution.
-- Crypto symbols must include exchange or aggregation policy before use.
+- Crypto symbols must use Binance spot-market mapping before use. Initial fixture candidates are `BTCUSDT` and `ETHUSDT`; USDT-to-USD-equivalent normalization versus strict Binance USD quote pairs remains a Gate C/D owner decision.
 - Manual fallback must not silently outrank fresh provider data.
 
 ## 10. Timestamp / Freshness Evidence
@@ -223,7 +234,7 @@ Twelve Data:
 
 - Broad multi-asset coverage candidate.
 - US stock: conditional candidate due real-time US market docs and `/quote` timestamp.
-- Crypto: conditional candidate due real-time/streaming crypto docs, but exchange/symbol policy is required.
+- Crypto: Binance MVP provider target; fixture/evidence must prove symbol, timestamp, price, and USDT-to-USD policy before ingestion implementation.
 - KRX/domestic stock: not GO for quote/execute. Official checked page lists South Korea as EOD delay, so domestic stock real-time provider remains unverified.
 
 ## 15. Failure Mode and Fallback Policy
@@ -243,7 +254,7 @@ Twelve Data:
 - Primary FX provider: OANDA, CONDITIONAL. Use only after trial/API response proves USD/KRW, timestamp, rate fields, and contract/polling approval.
 - Secondary FX provider: Twelve Data, CONDITIONAL. Use only after live-key USD/KRW response and timestamp freshness measurements.
 - Primary US stock provider: Twelve Data, CONDITIONAL. Candidate endpoint is `/quote` or WebSocket with timestamp evidence, not `/price` alone.
-- Primary crypto provider: Twelve Data, CONDITIONAL. Requires exchange/symbol policy and timestamp freshness proof.
+- Primary crypto provider: Binance, CONDITIONAL for fixture capture and STOP for ingestion implementation. Requires Binance BTCUSDT ticker/orderbook fixtures, timestamp freshness proof, terms approval, and USDT-to-USD-equivalent owner decision or Binance USD quote pair evidence.
 - KRX domestic stock provider: BLOCKED/UNVERIFIED for quote/execute. Twelve Data may be an EOD/reference candidate only if product accepts delayed/EOD use.
 - Manual fallback: `admin_manual`, explicit operator action only.
 - Official batch role: reference, reconciliation, daily snapshot, and settlement candidate only; not real-time order execute.
@@ -255,7 +266,7 @@ Twelve Data:
 |---|---|---|
 | Gate B Provider final selection readiness | CONDITIONAL GO | Official docs were rechecked and provider roles are now clear enough to proceed to evidence collection and narrow Gate C/D prompts |
 | FX provider ingestion | CONDITIONAL GO, not implementation GO | OANDA is primary candidate, but trial/API response mapping and contract approval are still required before code |
-| Asset price provider ingestion | CONDITIONAL GO for US/crypto, BLOCKED for KRX quote/execute | Twelve Data is a candidate for US/crypto; KRX real-time remains unverified and checked official coverage indicates EOD delay |
+| Asset price provider ingestion | CONDITIONAL GO for US stock and Binance crypto fixture capture, BLOCKED for KRX quote/execute | Twelve Data is a candidate for US stock; Binance is the MVP crypto target but ingestion waits for fixtures and USDT-to-USD decision; KRX real-time remains unverified and checked official coverage indicates EOD delay |
 | Scheduler/batch foundation | CONDITIONAL GO for preimplementation audit only | Polling/credit/failure rules are clearer, but scheduler implementation still needs provider decisions and tests |
 | Settlement preimplementation audit | CONDITIONAL GO for docs-only audit, STOP for implementation | Freshness/source policy is clearer, but final official/reference source remains a settlement gate decision |
 
@@ -277,7 +288,8 @@ Before asset price provider ingestion:
 
 - Twelve Data symbol mapping for each supported market/asset.
 - US stock `/quote` or WebSocket response fixture with timestamp.
-- Crypto symbol/exchange response fixture with timestamp.
+- Binance crypto ticker/orderbook fixture with timestamp/effectiveAt mapping.
+- USDT-to-USD-equivalent normalization decision or Binance USD quote pair evidence.
 - KRX provider proof or explicit product decision to avoid KRX quote/execute until real-time data is available.
 - Delayed/EOD handling policy.
 - Business/commercial terms approval.
@@ -286,10 +298,11 @@ Before asset price provider ingestion:
 
 Recommended next prompt title:
 
-- `Gate C/D Provider Evidence Capture - OANDA USD/KRW and Twelve Data Asset Fixture Review`
+- `Gate C Binance Crypto Fixture Capture + OANDA/Twelve Data Fixture Capture`
 
 Allowed scope for that prompt:
 
 - Docs-only or trial-response evidence capture.
 - Record raw provider response fixtures if approved, without adding clients or ingestion code.
+- Capture Binance BTCUSDT ticker/orderbook public fixtures in the next fixture task only; no private key and no provider ingestion implementation.
 - No scheduler, settlement, reward, schema, migration, package, seed, or business logic changes.

@@ -40,6 +40,11 @@ export class PortfolioValuationService {
             averageCost: true,
             currencyCode: true,
             realizedPnl: true,
+            asset: {
+              select: {
+                assetType: true,
+              },
+            },
           },
         },
       },
@@ -54,7 +59,12 @@ export class PortfolioValuationService {
 
     const positions = await Promise.all(
       participant.positions.map(async (position) => ({
-        ...position,
+        assetId: position.assetId,
+        assetType: position.asset.assetType,
+        quantity: position.quantity,
+        averageCost: position.averageCost,
+        currencyCode: position.currencyCode,
+        realizedPnl: position.realizedPnl,
         latestPriceSnapshot: await this.findLatestEligibleAssetPriceSnapshot(
           position.assetId,
           valuationAt,

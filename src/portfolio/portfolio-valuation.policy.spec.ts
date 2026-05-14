@@ -7,6 +7,11 @@ jest.mock('../generated/prisma/client', () => {
       provider_api: 'provider_api',
       admin_manual: 'admin_manual',
     },
+    AssetType: {
+      domestic_stock: 'domestic_stock',
+      us_stock: 'us_stock',
+      crypto: 'crypto',
+    },
     CurrencyCode: {
       KRW: 'KRW',
       USD: 'USD',
@@ -24,6 +29,7 @@ jest.mock('../generated/prisma/client', () => {
 
 import {
   AssetPriceSourceType,
+  AssetType,
   CurrencyCode,
   FxRateSourceType,
 } from '../generated/prisma/client';
@@ -115,6 +121,7 @@ describe('portfolio valuation policy', () => {
         positions: [
           {
             assetId: 'asset-krw',
+            assetType: AssetType.domestic_stock,
             quantity: '10.00000000',
             averageCost: '10000.00000000',
             currencyCode: CurrencyCode.KRW,
@@ -146,6 +153,7 @@ describe('portfolio valuation policy', () => {
         positions: [
           {
             assetId: 'asset-usd',
+            assetType: AssetType.us_stock,
             quantity: '2.00000000',
             averageCost: '100.00000000',
             currencyCode: CurrencyCode.USD,
@@ -164,8 +172,42 @@ describe('portfolio valuation policy', () => {
       totalAssetKrw: '420000.00000000',
       returnRate: '-0.58000000',
       assetValueKrw: '420000.00000000',
+      usStockValueKrw: '420000.00000000',
       realizedPnlKrw: '14000.00000000',
       unrealizedPnlKrw: '140000.00000000',
+    });
+  });
+
+  it('calculates USD-settled crypto position value in cryptoValueKrw', () => {
+    expect(
+      calculatePortfolioValuation({
+        seasonParticipantId: 'sp-1',
+        initialCapitalKrw: '1000000.00000000',
+        cashWallets: wallets('0.00000000'),
+        positions: [
+          {
+            assetId: 'asset-btc',
+            assetType: AssetType.crypto,
+            quantity: '0.01000000',
+            averageCost: '40000.00000000',
+            currencyCode: CurrencyCode.USD,
+            realizedPnl: '0.00000000',
+            latestPriceSnapshot: price(
+              'asset-btc',
+              '50000.00000000',
+              CurrencyCode.USD,
+            ),
+          },
+        ],
+        usdKrwSnapshot: freshUsdKrwSnapshot,
+        valuationAt,
+      }),
+    ).toMatchObject({
+      totalAssetKrw: '700000.00000000',
+      assetValueKrw: '700000.00000000',
+      cryptoValueKrw: '700000.00000000',
+      domesticStockValueKrw: '0.00000000',
+      usStockValueKrw: '0.00000000',
     });
   });
 
@@ -178,6 +220,7 @@ describe('portfolio valuation policy', () => {
         positions: [
           {
             assetId: 'asset-krw',
+            assetType: AssetType.domestic_stock,
             quantity: '1.00000000',
             averageCost: '10000.00000000',
             currencyCode: CurrencyCode.KRW,
@@ -199,6 +242,7 @@ describe('portfolio valuation policy', () => {
         positions: [
           {
             assetId: 'asset-krw',
+            assetType: AssetType.domestic_stock,
             quantity: '0.00000000',
             averageCost: '10000.00000000',
             currencyCode: CurrencyCode.KRW,
