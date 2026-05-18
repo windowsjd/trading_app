@@ -231,14 +231,6 @@ describe('AppController (e2e)', () => {
     balanceAmount: new Prisma.Decimal('0.00000000'),
     updatedAt: now,
   };
-  const asset = {
-    id: 'asset-1',
-    symbol: '005930',
-    name: 'Samsung Electronics',
-    market: 'KRX',
-    currencyCode: 'KRW',
-    isActive: true,
-  };
 
   beforeAll(() => {
     process.env.JWT_ACCESS_SECRET = 'test-secret';
@@ -339,6 +331,7 @@ describe('AppController (e2e)', () => {
         findMany: jest.fn(),
       },
     };
+    mockTransactionPassthrough();
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -370,6 +363,13 @@ describe('AppController (e2e)', () => {
 
     resetMockObject(prisma);
     prisma.$queryRaw.mockResolvedValue([{ result: 1 }]);
+    mockTransactionPassthrough();
+  };
+
+  const mockTransactionPassthrough = () => {
+    prisma.$transaction.mockImplementation(
+      async (callback: (tx: PrismaMock) => unknown) => callback(prisma),
+    );
   };
 
   const createValidAccessToken = (userId = user.id) =>
@@ -423,6 +423,10 @@ describe('AppController (e2e)', () => {
 
   const expectNoWriteMutationCalls = () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
+    expectNoModelWriteMutationCalls();
+  };
+
+  const expectNoModelWriteMutationCalls = () => {
     expect(prisma.seasonParticipant.create).not.toHaveBeenCalled();
     expect(prisma.cashWallet.create).not.toHaveBeenCalled();
     expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
@@ -500,6 +504,95 @@ describe('AppController (e2e)', () => {
       expectNoServiceDatabaseCalls();
     });
   };
+
+  const expectUnauthorizedWithAuthorization = async (
+    method: HttpMethod,
+    path: string,
+    authorization: string,
+    body?: object,
+  ) => {
+    resetPrismaMocks();
+    const testRequest = buildRequest(method, path).set(
+      'Authorization',
+      authorization,
+    );
+    if (body) {
+      testRequest.send(body);
+    }
+
+    await testRequest.expect(401).expect((response) => {
+      expectUnauthorizedBody(response.body);
+      expectNoServiceDatabaseCalls();
+    });
+  };
+
+  const protectedWritePathRequests: Array<{
+    label: string;
+    method: HttpMethod;
+    path: string;
+    body?: Record<string, unknown>;
+  }> = [
+    {
+      label: 'POST /api/v1/seasons/:seasonId/join',
+      method: 'post',
+      path: '/api/v1/seasons/season-1/join',
+    },
+    {
+      label: 'POST /api/v1/fx/quote',
+      method: 'post',
+      path: '/api/v1/fx/quote',
+      body: {
+        fromCurrency: 'KRW',
+        toCurrency: 'USD',
+        sourceAmount: '1000',
+      },
+    },
+    {
+      label: 'POST /api/v1/fx/execute',
+      method: 'post',
+      path: '/api/v1/fx/execute',
+      body: {
+        idempotencyKey: 'e2e-fx-exec-1',
+        fromCurrency: 'KRW',
+        toCurrency: 'USD',
+        sourceAmount: '1000',
+      },
+    },
+    {
+      label: 'POST /api/v1/orders/quote',
+      method: 'post',
+      path: '/api/v1/orders/quote',
+      body: {
+        assetId: 'asset-1',
+        side: 'buy',
+        orderType: 'market',
+        quantity: '1',
+        idempotencyKey: 'e2e-order-quote-1',
+      },
+    },
+    {
+      label: 'POST /api/v1/orders',
+      method: 'post',
+      path: '/api/v1/orders',
+      body: {
+        assetId: 'asset-1',
+        side: 'buy',
+        orderType: 'market',
+        quantity: '1',
+        idempotencyKey: 'e2e-order-create-1',
+      },
+    },
+    {
+      label: 'POST /api/v1/orders/:orderId/cancel',
+      method: 'post',
+      path: '/api/v1/orders/order-1/cancel',
+    },
+    {
+      label: 'POST /api/v1/orders/:orderId/execute',
+      method: 'post',
+      path: '/api/v1/orders/order-1/execute',
+    },
+  ];
 
   it('/health (GET)', () => {
     return request(app.getHttpServer())
@@ -955,175 +1048,239 @@ describe('AppController (e2e)', () => {
       });
   });
 
-  it.each([
-    [
-      'POST /api/v1/seasons/:seasonId/join',
-      'post',
-      '/api/v1/seasons/season-1/join',
-      undefined,
-    ],
-    [
-      'POST /api/v1/fx/quote',
-      'post',
-      '/api/v1/fx/quote',
-      {
-        fromCurrency: 'KRW',
-        toCurrency: 'USD',
-        sourceAmount: '1000',
-      },
-    ],
-    [
-      'POST /api/v1/fx/execute',
-      'post',
-      '/api/v1/fx/execute',
-      {
-        idempotencyKey: 'e2e-fx-exec-1',
-        fromCurrency: 'KRW',
-        toCurrency: 'USD',
-        sourceAmount: '1000',
-      },
-    ],
-    [
-      'POST /api/v1/orders/quote',
-      'post',
-      '/api/v1/orders/quote',
-      {
-        assetId: 'asset-1',
-        side: 'buy',
-        orderType: 'market',
-        quantity: '1',
-        idempotencyKey: 'e2e-order-1',
-      },
-    ],
-    [
-      'POST /api/v1/orders',
-      'post',
-      '/api/v1/orders',
-      {
-        assetId: 'asset-1',
-        side: 'buy',
-        orderType: 'market',
-        quantity: '1',
-        idempotencyKey: 'e2e-order-1',
-      },
-    ],
-    [
-      'POST /api/v1/orders/:orderId/cancel',
-      'post',
-      '/api/v1/orders/order-1/cancel',
-      undefined,
-    ],
-    [
-      'POST /api/v1/orders/:orderId/execute',
-      'post',
-      '/api/v1/orders/order-1/execute',
-      undefined,
-    ],
-  ] as const)(
-    '%s rejects missing token and x-user-id-only requests before write mutation',
-    async (_label, method, path, body) => {
+  it.each(protectedWritePathRequests)(
+    '$label rejects missing token and x-user-id-only requests before write mutation',
+    async ({ method, path, body }) => {
       await expectUnauthorizedWithoutToken(method, path, body);
       await expectUnauthorizedWithXUserId(method, path, body);
     },
   );
 
-  it('/api/v1/fx/quote (POST) accepts a valid token and stays read-only', async () => {
-    resetPrismaMocks();
-    mockActiveUser();
-    mockActiveSeason();
-    mockJoinedParticipant();
-    const snapshotAt = new Date();
-    prisma.fxRateSnapshot.findFirst.mockResolvedValueOnce({
-      rate: new Prisma.Decimal('1400.00000000'),
-      capturedAt: snapshotAt,
-      effectiveAt: snapshotAt,
-    });
-    const token = await createValidAccessToken();
+  it.each(protectedWritePathRequests)(
+    '$label rejects invalid and malformed bearer tokens before service work',
+    async ({ method, path, body }) => {
+      await expectUnauthorizedWithAuthorization(
+        method,
+        path,
+        'Bearer invalid-token',
+        body,
+      );
+      await expectUnauthorizedWithAuthorization(
+        method,
+        path,
+        'Token invalid-token',
+        body,
+      );
+    },
+  );
 
-    return request(app.getHttpServer())
-      .post('/api/v1/fx/quote')
-      .set('Authorization', `Bearer ${token}`)
-      .send({
+  it.each([
+    {
+      label: 'POST /api/v1/seasons/:seasonId/join',
+      path: '/api/v1/seasons/season-1/join',
+      body: undefined,
+      expectedStatus: 201,
+      setup: () => {
+        mockActiveUser();
+        prisma.season.findUnique.mockResolvedValueOnce(season);
+        prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
+        prisma.seasonParticipant.create.mockResolvedValueOnce({
+          id: participant.id,
+        });
+        prisma.cashWallet.create
+          .mockResolvedValueOnce({ id: krwWallet.id })
+          .mockResolvedValueOnce({ id: usdWallet.id });
+        prisma.walletTransaction.create.mockResolvedValueOnce({
+          id: 'wallet-transaction-1',
+        });
+      },
+      assertBody: (body: Record<string, unknown>) => {
+        expect(body).toMatchObject({
+          success: true,
+          data: {
+            seasonParticipantId: participant.id,
+            seasonId: season.id,
+            wallets: {
+              KRW: '10000000.00000000',
+              USD: '0.00000000',
+            },
+          },
+        });
+        expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+        expect(prisma.seasonParticipant.create).toHaveBeenCalled();
+        expect(prisma.cashWallet.create).toHaveBeenCalledTimes(2);
+        expect(prisma.walletTransaction.create).toHaveBeenCalledTimes(1);
+      },
+    },
+    {
+      label: 'POST /api/v1/fx/quote',
+      path: '/api/v1/fx/quote',
+      body: {
         fromCurrency: 'KRW',
         toCurrency: 'USD',
         sourceAmount: '1000',
-      })
-      .expect(201)
-      .expect((response) => {
-        expect(response.body).toMatchObject({
-          success: true,
-          data: {
-            fromCurrency: 'KRW',
-            toCurrency: 'USD',
-            quoteId: null,
-            expiresAt: null,
+      },
+      expectedStatus: 403,
+      setup: () => {
+        mockActiveUser();
+        mockActiveSeason();
+        prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
+      },
+      assertBody: (body: Record<string, unknown>) => {
+        expect(body).toMatchObject({
+          success: false,
+          error: {
+            code: 'SEASON_NOT_JOINED',
           },
         });
-        expect(response.body.error?.code).not.toBe('UNAUTHORIZED');
-        expect(prisma.fxRateSnapshot.findFirst).toHaveBeenCalled();
+        expect(prisma.season.findFirst).toHaveBeenCalled();
+        expect(prisma.seasonParticipant.findUnique).toHaveBeenCalled();
         expectNoWriteMutationCalls();
-      });
-  });
-
-  it('/api/v1/orders/quote (POST) accepts a valid token and stays read-only', async () => {
-    resetPrismaMocks();
-    mockActiveUser();
-    mockActiveSeason();
-    mockJoinedParticipant();
-    prisma.asset.findUnique.mockResolvedValueOnce(asset);
-    prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce({
-      id: 'asset-price-snapshot-1',
-      price: new Prisma.Decimal('70000.00000000'),
-    });
-    prisma.cashWallet.findUnique.mockResolvedValueOnce(krwWallet);
-    const token = await createValidAccessToken();
-
-    return request(app.getHttpServer())
-      .post('/api/v1/orders/quote')
-      .set('Authorization', `Bearer ${token}`)
-      .send({
+      },
+    },
+    {
+      label: 'POST /api/v1/fx/execute',
+      path: '/api/v1/fx/execute',
+      body: {
+        idempotencyKey: 'e2e-fx-exec-1',
+        fromCurrency: 'KRW',
+        toCurrency: 'USD',
+        sourceAmount: '1000',
+      },
+      expectedStatus: 403,
+      setup: () => {
+        mockActiveUser();
+        mockActiveSeason();
+        prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
+      },
+      assertBody: (body: Record<string, unknown>) => {
+        expect(body).toMatchObject({
+          success: false,
+          error: {
+            code: 'SEASON_NOT_JOINED',
+          },
+        });
+        expect(prisma.season.findFirst).toHaveBeenCalled();
+        expect(prisma.seasonParticipant.findUnique).toHaveBeenCalled();
+        expectNoWriteMutationCalls();
+      },
+    },
+    {
+      label: 'POST /api/v1/orders/quote',
+      path: '/api/v1/orders/quote',
+      body: {
         assetId: 'asset-1',
         side: 'buy',
         orderType: 'market',
         quantity: '1',
-        idempotencyKey: 'e2e-order-1',
-      })
-      .expect(201)
-      .expect((response) => {
-        expect(response.body).toMatchObject({
-          success: true,
-          data: {
-            state: 'available',
-            asset: {
-              id: 'asset-1',
-            },
-            side: 'buy',
-            orderType: 'market',
-          },
-        });
-        expect(response.body.error?.code).not.toBe('UNAUTHORIZED');
-        expect(prisma.assetPriceSnapshot.findFirst).toHaveBeenCalled();
-        expect(prisma.cashWallet.findUnique).toHaveBeenCalled();
-        expectNoWriteMutationCalls();
-      });
-  });
-
-  it('/api/v1/fx/quote (POST) rejects unauthenticated requests', () => {
-    return request(app.getHttpServer())
-      .post('/api/v1/fx/quote')
-      .send({
-        fromCurrency: 'KRW',
-        toCurrency: 'USD',
-        sourceAmount: '135000',
-      })
-      .expect(401)
-      .expect((response) => {
-        expect(response.body).toMatchObject({
+        idempotencyKey: 'e2e-order-quote-1',
+      },
+      expectedStatus: 403,
+      setup: () => {
+        mockActiveUser();
+        mockActiveSeason();
+        prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
+      },
+      assertBody: (body: Record<string, unknown>) => {
+        expect(body).toMatchObject({
           success: false,
           error: {
-            code: 'UNAUTHORIZED',
+            code: 'SEASON_NOT_JOINED',
           },
         });
+        expect(prisma.season.findFirst).toHaveBeenCalled();
+        expect(prisma.seasonParticipant.findUnique).toHaveBeenCalled();
+        expectNoWriteMutationCalls();
+      },
+    },
+    {
+      label: 'POST /api/v1/orders',
+      path: '/api/v1/orders',
+      body: {
+        assetId: 'asset-1',
+        side: 'buy',
+        orderType: 'market',
+        quantity: '1',
+        idempotencyKey: 'e2e-order-create-1',
+      },
+      expectedStatus: 403,
+      setup: () => {
+        mockActiveUser();
+        mockActiveSeason();
+        prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
+      },
+      assertBody: (body: Record<string, unknown>) => {
+        expect(body).toMatchObject({
+          success: false,
+          error: {
+            code: 'SEASON_NOT_JOINED',
+          },
+        });
+        expect(prisma.season.findFirst).toHaveBeenCalled();
+        expect(prisma.seasonParticipant.findUnique).toHaveBeenCalled();
+        expectNoWriteMutationCalls();
+      },
+    },
+    {
+      label: 'POST /api/v1/orders/:orderId/cancel',
+      path: '/api/v1/orders/order-1/cancel',
+      body: undefined,
+      expectedStatus: 404,
+      setup: () => {
+        mockActiveUser();
+        prisma.order.findFirst.mockResolvedValueOnce(null);
+      },
+      assertBody: (body: Record<string, unknown>) => {
+        expect(body).toMatchObject({
+          success: false,
+          error: {
+            code: 'ORDER_NOT_FOUND',
+          },
+        });
+        expect(prisma.order.findFirst).toHaveBeenCalled();
+        expectNoWriteMutationCalls();
+      },
+    },
+    {
+      label: 'POST /api/v1/orders/:orderId/execute',
+      path: '/api/v1/orders/order-1/execute',
+      body: undefined,
+      expectedStatus: 404,
+      setup: () => {
+        mockActiveUser();
+        prisma.order.findFirst.mockResolvedValueOnce(null);
+      },
+      assertBody: (body: Record<string, unknown>) => {
+        expect(body).toMatchObject({
+          success: false,
+          error: {
+            code: 'ORDER_NOT_FOUND',
+          },
+        });
+        expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+        expect(prisma.order.findFirst).toHaveBeenCalled();
+        expectNoModelWriteMutationCalls();
+      },
+    },
+  ])(
+    '$label accepts a valid bearer token and reaches a service-level response',
+    async ({ path, body, expectedStatus, setup, assertBody }) => {
+      resetPrismaMocks();
+      setup();
+      const token = await createValidAccessToken();
+      const testRequest = request(app.getHttpServer())
+        .post(path)
+        .set('Authorization', `Bearer ${token}`);
+
+      if (body) {
+        testRequest.send(body);
+      }
+
+      return testRequest.expect(expectedStatus).expect((response) => {
+        expect(response.body.error?.code).not.toBe('UNAUTHORIZED');
+        expect(prisma.user.findUnique).toHaveBeenCalled();
+        assertBody(response.body);
       });
-  });
+    },
+  );
 });

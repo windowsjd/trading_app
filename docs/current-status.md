@@ -79,8 +79,9 @@
   - optional auth route: `GET /api/v1/seasons/current` anonymous/valid token/invalid token/malformed Authorization/`x-user-id` only 회귀 검증.
   - protected read-only route: `GET /api/v1/me`, `/home`, `/ranking`, `/wallets`, `/records`, `/orders` missing token 및 `x-user-id` only `UNAUTHORIZED` 검증.
   - protected read-only route valid token smoke: `GET /api/v1/me`, `/home`, `/ranking`, `/wallets`, `/records`, `/orders`가 guard를 통과해 service-level 정상 응답 또는 known unavailable/not_joined 계약으로 진입하는지 검증.
-  - protected write-path route: `POST /api/v1/seasons/:seasonId/join`, `/fx/quote`, `/fx/execute`, `/orders/quote`, `/orders`, `/orders/:orderId/cancel`, `/orders/:orderId/execute` missing token 및 `x-user-id` only 차단 검증.
-  - write-path API는 guard-level 차단 회귀를 HTTP e2e에서 담당하고, full write-path DB integration은 기존 service/integration 테스트가 담당.
+  - protected write-path route: `POST /api/v1/seasons/:seasonId/join`, `/fx/quote`, `/fx/execute`, `/orders/quote`, `/orders`, `/orders/:orderId/cancel`, `/orders/:orderId/execute` missing token, `x-user-id` only, invalid bearer token, malformed Authorization 차단 검증.
+  - protected write-path route valid token smoke: 위 write API들이 guard를 통과해 service-level success 또는 known domain error(`SEASON_NOT_JOINED`, `ORDER_NOT_FOUND`)까지 진입하는지 검증.
+  - write-path API의 full mutation 검증은 service/unit/opt-in DB integration spec이 담당하며, HTTP e2e는 guard routing, `request.user` 주입, controller/service 진입 회귀를 담당.
 
 ## 5. 현재 DB 상태
 
@@ -105,6 +106,7 @@
 near-term ledger/FX foundation:
 
 - `wallet_transactions`: Prisma schema 반영, migration 생성/DB 적용 완료, season join initial_grant write path 구현 완료.
+  - `SEASON_JOIN_DB_INTEGRATION=1` opt-in PostgreSQL integration spec가 active join participant/KRW wallet/USD wallet/initial_grant ledger 생성, duplicate/race conflict, inactive rejection, failure-injection rollback을 검증.
 - `exchange_transactions`: Prisma schema 반영, migration 생성/DB 적용 완료, `/fx execute` 1차 write path에서 생성.
 - `equity_snapshots`: Prisma schema 반영, migration 생성/DB 적용 완료, API/write path 미구현.
 - `/fx` DB foundation 반영 완료: `fx_rate_snapshots`, `fx_execute_requests`, `exchange_transactions.fxRateSnapshotId`.
@@ -638,7 +640,7 @@ near-term ledger/FX foundation:
   - `GET /api/v1/home` missing token 차단, `GET /api/v1/seasons/current` optional auth, `GET /api/v1/me` token 인증 smoke 확인.
   - Auth protected route HTTP e2e 회귀 검증 확대 완료.
   - public/optional/protected read-only/write-path route의 missing token, invalid/malformed token, `x-user-id` only, valid token smoke 범위가 `test/app.e2e-spec.ts`에 반영됨.
-  - write-path API의 full execute mutation 검증은 기존 service/unit/DB integration spec이 담당하며, HTTP e2e는 guard 차단과 quote-level valid-token smoke 중심으로 유지.
+  - write-path API의 full execute mutation 검증은 기존 service/unit/DB integration spec이 담당하며, HTTP e2e는 guard 차단과 protected write-path valid-token service-entry smoke 중심으로 유지.
 - `pnpm test -- seasons` 통과.
 - `pnpm test -- home` 통과.
 - `pnpm test -- ranking` 통과.

@@ -61,7 +61,7 @@ Consistency note:
 - Implemented files: `package.json`, `src/app.module.ts`, `src/prisma/prisma.service.ts`, `README.md`.
 - Source of truth: `docs/current-status.md`, `docs/codex-rulepack.md`, `README.md`.
 - Existing tests: `src/app.controller.spec.ts`, `test/app.e2e-spec.ts`, build/test scripts in `package.json`.
-- Known limitations: README is still mostly Nest starter text outside the env/auth notes; deployment/ops runbook is not defined.
+- Known limitations: README is now project-specific onboarding, but deployment/ops runbook is not defined.
 - Remaining work: deployment env/secret/healthcheck/runbook gate.
 - Risk level: MEDIUM.
 - Recommended next action: keep setup stable; do not touch package/lockfile unless a gate explicitly approves it.
@@ -93,11 +93,11 @@ Consistency note:
 - Current status: current season read with optional auth and season join write path implemented.
 - Implemented files: `src/seasons/seasons.controller.ts`, `src/seasons/seasons.service.ts`.
 - Source of truth: `docs/codex-rulepack.md`, `docs/current-status.md`.
-- Existing tests: `src/seasons/seasons.controller.spec.ts`, `test/app.e2e-spec.ts` auth baseline.
-- Known limitations: no service unit spec dedicated to `joinSeason` transaction behavior; no real PostgreSQL integration test for duplicate join/concurrency/rollback.
-- Remaining work: add high-value join integration coverage before launch if join races become a concern.
+- Existing tests: `src/seasons/seasons.controller.spec.ts`, `src/seasons/seasons.join.integration.spec.ts`, `test/app.e2e-spec.ts` auth/write-path baseline.
+- Known limitations: no service unit spec dedicated to `joinSeason` transaction behavior; real HTTP join backed by PostgreSQL is not covered.
+- Remaining work: keep opt-in join integration green; add real HTTP DB join coverage only if needed before launch.
 - Risk level: MEDIUM.
-- Recommended next action: do not change join logic now; document as implemented but less deeply proven than FX/order execute.
+- Recommended next action: do not change join logic now; keep provider/scheduler/settlement unrelated gates closed.
 
 ### Wallets
 
@@ -340,24 +340,24 @@ Consistency note:
 | `POST /api/v1/auth/login` | `AuthController` | public | request body email/password | 200 when valid body | allowed; token ignored | ignored | login success and no passwordHash e2e | invalid token ignored not explicitly asserted |
 | `GET /api/v1/me` | `AuthController` | protected | `request.user.userId` from bearer JWT | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only, valid token smoke | per-route invalid token e2e; guard unit covers invalid token |
 | `GET /api/v1/seasons/current` | `SeasonsController` | optional | none if anonymous; `request.user.userId` if valid token | 200 anonymous | 401 `UNAUTHORIZED` | anonymous, not identity | anonymous, `x-user-id` anonymous, invalid/malformed token, valid token | unknown/inactive optional token path covered by guard unit, not this route |
-| `POST /api/v1/seasons/:seasonId/join` | `SeasonsController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only blocked | valid-token HTTP write smoke not covered; service/controller tests cover identity handoff |
+| `POST /api/v1/seasons/:seasonId/join` | `SeasonsController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only + invalid/malformed blocked, valid-token service-entry smoke | real HTTP join backed by PostgreSQL not covered |
 | `GET /api/v1/home` | `HomeController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only, valid token smoke | per-route invalid token e2e; deeper HTTP state matrix |
 | `GET /api/v1/ranking` | `RankingController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only, valid token smoke | per-route invalid token e2e |
 | `GET /api/v1/wallets` | `WalletsController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only, valid token smoke | per-route invalid token e2e |
 | `GET /api/v1/records` | `RecordsController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only, valid token smoke | per-route invalid token e2e |
 | `GET /api/v1/orders` | `OrdersController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only, valid token smoke | per-route invalid token e2e |
-| `POST /api/v1/orders/quote` | `OrdersController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only, valid token read-only smoke | invalid token e2e; more HTTP quote business failures |
-| `POST /api/v1/orders` | `OrdersController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only blocked | valid-token HTTP create smoke not covered; service tests cover create |
-| `POST /api/v1/orders/:orderId/cancel` | `OrdersController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only blocked | valid-token HTTP cancel smoke not covered; service/integration cover cancel |
-| `POST /api/v1/orders/:orderId/execute` | `OrdersController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only blocked | valid-token HTTP execute smoke not covered; service/DB integration cover execute |
-| `POST /api/v1/fx/quote` | `FxController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only, valid token read-only smoke | invalid token e2e; more HTTP quote business failures |
-| `POST /api/v1/fx/execute` | `FxController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only blocked | valid-token HTTP execute smoke not covered; service/DB integration cover execute |
+| `POST /api/v1/orders/quote` | `OrdersController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only + invalid/malformed blocked, valid-token service-entry smoke | more HTTP quote business failures |
+| `POST /api/v1/orders` | `OrdersController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only + invalid/malformed blocked, valid-token service-entry smoke | real DB create idempotency race not covered |
+| `POST /api/v1/orders/:orderId/cancel` | `OrdersController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only + invalid/malformed blocked, valid-token service-entry smoke | real DB cancel visibility not separately covered |
+| `POST /api/v1/orders/:orderId/execute` | `OrdersController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only + invalid/malformed blocked, valid-token service-entry smoke | exact execute response replay not implemented |
+| `POST /api/v1/fx/quote` | `FxController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only + invalid/malformed blocked, valid-token service-entry smoke | more HTTP quote business failures |
+| `POST /api/v1/fx/execute` | `FxController` | protected | `request.user.userId` | 401 `UNAUTHORIZED` | 401 `UNAUTHORIZED` | cannot authenticate | missing + `x-user-id` only + invalid/malformed blocked, valid-token service-entry smoke | stale pending recovery remains unresolved |
 
 ## Financial Write Path Safety
 
 | Write path | Transaction boundary | Idempotency status | Ownership check | Balance / position guard | Ledger write status | Rollback proof status | Concurrency proof status | Known unresolved risks | Next hardening candidate |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| season join | Implemented in one Prisma `$transaction` for participant, KRW wallet, USD wallet, initial grant ledger | No idempotency key; DB unique `(seasonId,userId)` and P2002 handling prevent duplicate participant | token-derived `userId`; no `x-user-id`; active season only | initial KRW from season; USD zero; no debit guard needed | one `initial_grant` wallet transaction for KRW only | Not proven by real PostgreSQL failure injection | Not proven by real PostgreSQL concurrent join test | duplicate join is handled by unique constraint, but partial-write rollback and race behavior are less tested than FX/order execute | Real DB join duplicate/concurrency/rollback integration |
+| season join | Implemented in one Prisma `$transaction` for participant, KRW wallet, USD wallet, initial grant ledger | No idempotency key; DB unique `(seasonId,userId)` and P2002 handling prevent duplicate participant | token-derived `userId`; no `x-user-id`; active season only | initial KRW from season; USD zero; no debit guard needed | one `initial_grant` wallet transaction for KRW only | Env-gated PostgreSQL failure injection covers participant/wallet/ledger rollback | Env-gated PostgreSQL covers duplicate join race without double wallet/ledger rows | no idempotency key; real HTTP DB join not covered | Keep opt-in DB integration; add HTTP DB join only if needed |
 | FX execute | Implemented in one Prisma `$transaction` covering command create, source debit, target credit, exchange, two ledgers, command finalization | Implemented via `fx_execute_requests` unique `(userId,idempotencyKey)`, requestHash, pending/succeeded/failed handling, stored success replay | token-derived `userId`; active joined participant; wallet ids scoped to participant | guarded source wallet `updateMany` with `balanceAmount >= sourceAmount`; target wallet guarded by id/participant/currency | two ledger rows: `exchange_source`, `exchange_target`; no fee row; no equity snapshot | Unit/mock rollback and env-gated PostgreSQL DB failure injection cover several failure points | Env-gated PostgreSQL covers overspend and same-key duplicate replay race | stale pending recovery tool/job absent; responsePayloadJson-only storage failure not DB-forced; no provider source; no durable quote | Recovery/hardening gate after provider/scheduler decisions |
 | order create | No explicit transaction; single `order.create` after read-only quote validation | Implemented for create only via `(seasonParticipantId,idempotencyKey)` unique, requestHash, responsePayloadJson replay, P2002 reread | token-derived participant; active season + joined participant | read-only buy wallet balance or sell position check before create; no reservation | no wallet ledger; creates only submitted order row | Mock tests assert no wallet/position/settlement writes | Mock P2002 race handling; no real DB concurrent create integration | race between quote-time resource check and later execute is accepted because create does not reserve funds | Real DB create idempotency race if needed before launch |
 | order cancel | No explicit transaction; guarded single order `updateMany` then readback | No cancel idempotency key; repeated cancel returns not cancelable | order lookup requires authenticated user's participant; update also scopes `seasonParticipantId` | no balance/position mutation | no ledger | Unit tests cover guarded update conflict and no financial writes | Env-gated order execute integration covers cancel-vs-execute race | standalone real DB cancel duplicate/race not separately proven; no cancel reason | keep as is unless cancel UX requires stronger idempotency |
@@ -366,8 +366,8 @@ Consistency note:
 Safety classification:
 
 - Already implemented safety: token-derived ownership, no `x-user-id`, guarded wallet/position updates for FX/order execute, FX execute durable idempotency, order create idempotency, transaction boundaries for join/FX/order execute.
-- Tested safety: auth guard regression, read-only no-mutation service tests, FX/order execute unit and env-gated PostgreSQL integration tests, order cancel guarded update unit tests, provider/static/fake input rejection for admin FX/asset paths.
-- Intended but under-tested: season join rollback/concurrency; order create real DB idempotency race; route-by-route invalid token e2e beyond guard unit.
+- Tested safety: auth guard regression, protected write-path valid-token HTTP service-entry smoke, read-only no-mutation service tests, season join/FX/order execute env-gated PostgreSQL integration tests, order cancel guarded update unit tests, provider/static/fake input rejection for admin FX/asset paths.
+- Intended but under-tested: order create real DB idempotency race; route-by-route invalid token e2e for read paths beyond guard unit.
 - Not implemented: provider ingestion, scheduler/batch, settlement, reward, refresh/logout/revocation, durable quote, exact order execute replay, partial fill, matching engine.
 
 ## Backend Gates

@@ -1,117 +1,110 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# trading_app Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Season-based virtual trading app backend built with NestJS, Prisma 7 adapter style, PostgreSQL, and Redis.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+This service owns backend APIs, database access, financial calculations, and server-side write paths for the MVP. Financial values are exchanged as strings.
 
-## Description
+## Current MVP Scope
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- Access-token-only auth: signup, login, and `GET /api/v1/me`.
+- Current season lookup and season join.
+- Home as one aggregate API.
+- Wallets, records, ranking, and orders read APIs.
+- FX quote and execute for KRW/USD using approved `admin_manual` FX snapshots.
+- Submitted order create, cancel, and full-fill execute MVP.
+- KRW and USD cash wallets. US stocks and USD-settled crypto use the USD wallet.
+- Final valuation policy is KRW total assets.
 
-## Project setup
+## STOP / Not Implemented
 
-```bash
-$ npm install
-```
+These are intentionally outside the current implementation and should not be added without a separate gate:
 
-## Environment variables
+- Provider ingestion for OANDA, Twelve Data, Binance, or any other market data provider.
+- Scheduler or batch jobs.
+- Settlement.
+- Reward, badge, or trophy grants.
+- Refresh token, logout, revocation, session auth, and cookie auth.
+- Matching engine, partial fill, durable quote, or exact order execute replay.
+- Fake, static, sample, temporary, or fallback business price data.
 
-Required local environment variables:
+## Environment Variables
 
-- `DATABASE_URL`
-- `REDIS_URL`
-- `JWT_ACCESS_SECRET`
-- `JWT_ACCESS_TTL`
+Required for local application work:
 
-Auth notes:
+- `DATABASE_URL`: PostgreSQL connection string used by Prisma.
+- `REDIS_URL`: Redis connection string reserved for backend runtime integration.
+- `JWT_ACCESS_SECRET`: strong secret for access-token signing and verification.
+- `JWT_ACCESS_TTL`: explicit access-token lifetime.
 
-- `JWT_ACCESS_SECRET` must be set to a strong secret in local and production environments.
-- The `change-me` value in `.env.example` is only a placeholder and must not be used in production.
-- If `JWT_ACCESS_SECRET` is missing, auth fails closed.
-- `JWT_ACCESS_TTL` must be a string with an explicit unit.
-- Allowed TTL examples: `15m`, `1h`, `7d`, `30s`, `2w`.
-- Invalid TTL examples: `900`, `15 m`, `500ms`, `1y`.
-- Refresh tokens, logout, token revocation, session auth, and cookie auth are not implemented in the current access-token-only MVP.
+`JWT_ACCESS_SECRET` is fail-closed. If it is missing, protected auth cannot succeed.
 
-## Compile and run the project
+`JWT_ACCESS_TTL` must be a number plus one allowed unit with no spaces:
+
+- Allowed: `30s`, `15m`, `1h`, `7d`, `2w`
+- Rejected: `900`, `15 m`, `500ms`, `1y`, empty string
+
+## Local Commands
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+pnpm install
+docker compose up -d
+pnpm start:dev
 ```
 
-## Run tests
+Do not add provider API keys for the current MVP hardening work. Provider-backed ingestion is still STOP.
+
+## Tests
 
 ```bash
-# unit tests
-$ npm run test
+# unit and opt-in-disabled integration specs
+pnpm test
 
-# e2e tests
-$ npm run test:e2e
+# HTTP e2e with mocked Prisma
+pnpm test:e2e
 
-# test coverage
-$ npm run test:cov
+# Prisma schema validation
+pnpm exec prisma validate
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+Opt-in real PostgreSQL integration tests require a reachable `DATABASE_URL` and an explicit env flag:
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+AUTH_DB_SMOKE=1 pnpm test -- auth.integration.spec.ts
+SEASON_JOIN_DB_INTEGRATION=1 pnpm test -- seasons.join.integration.spec.ts
+FX_EXECUTE_DB_INTEGRATION=1 pnpm test -- fx.execute.integration.spec.ts
+ORDER_EXECUTE_DB_INTEGRATION=1 pnpm test -- orders.execute.integration.spec.ts
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+These tests create isolated rows and clean them up. They do not call external providers.
 
-## Resources
+## Docs Entry Point
 
-Check out a few resources that may come in handy when working with NestJS:
+Start with `docs/README.md`.
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+Current source of truth order:
 
-## Support
+1. `docs/README.md`
+2. `docs/current-status.md`
+3. `docs/backend-gate-roadmap.md`
+4. `docs/backend-test-coverage-matrix.md`
+5. API contract docs under `docs/*-api-contract.md`
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+`docs/archive/` is historical reference only and must not override the current documents above.
 
-## Stay in touch
+## Working Without Provider Keys
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+Possible now:
 
-## License
+- Auth, season join, wallet, records, ranking, home, FX, and order backend hardening.
+- Mocked HTTP e2e coverage for guard routing and controller/service entry.
+- Opt-in real PostgreSQL integration tests for implemented DB write paths.
+- Manual admin input paths using operator-approved real data.
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Not possible without a separate provider gate:
+
+- OANDA/Twelve Data/Binance ingestion.
+- Provider-backed FX, stock, or crypto price freshness claims.
+- Scheduler-driven snapshots/rankings.
+- Settlement or reward automation.
+
+Never create fake/static/sample business prices to make a test or local flow pass.
