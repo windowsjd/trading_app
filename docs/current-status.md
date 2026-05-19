@@ -389,16 +389,20 @@ near-term ledger/FX foundation:
   - 최신 `season_rankings`를 read-only로 조회.
   - ranking row가 없으면 fake rank 없이 `ranking.state = unavailable`.
   - `/home` 호출 중 ranking 생성 없음.
-- wallet/position summary:
+- wallet/position/allocation/top positions/equity chart:
   - cash wallets와 positions/openPositions count만 read-only로 반환.
-  - 상세 positions, allocation, topPositions, equityChart 계산은 MVP에서 unavailable.
+  - `allocation`은 live valuation 기반으로 KRW cash, USD cash KRW 환산, domestic stock, US stock, crypto 비중을 반환.
+  - `topPositions`는 기존 open positions와 최신 eligible `admin_manual` asset price, 필요한 경우 fresh approved `admin_manual` USD/KRW로 KRW 평가금액을 계산해 상위 5개를 반환.
+  - `equityChart`는 기존 `daily_portfolio_snapshots` 최신 30개를 읽어 오래된 날짜순으로 반환.
+  - 필요한 admin_manual 가격 데이터가 없거나 USD/KRW FX 데이터가 없거나 stale이면 fake fallback 없이 해당 section을 `unavailable`로 반환.
 - `/home` 호출은 wallet/position/snapshot/ranking row를 생성/수정/삭제하지 않음.
 - full home implementation blocker:
   - provider price ingestion
-  - asset price freshness policy implementation and provider evidence
+  - provider-backed asset price freshness evidence
   - order execution 이후 자동 daily portfolio snapshot/ranking 생성 정책
   - scheduler/batch daily portfolio snapshot 자동 생성
   - scheduler/batch season ranking 자동 생성
+  - settlement/reward 연동
   - scheduler/batch
 - `/home` read-only MVP는 fake 데이터 기반 계산 금지를 유지.
 

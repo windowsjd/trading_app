@@ -233,14 +233,14 @@ Consistency note:
 
 ### Home
 
-- Current status: `GET /api/v1/home` aggregate read-only MVP implemented. Supports active_joined, active_not_joined, upcoming, ended, settled, no_current_season. Uses latest daily snapshot first, then live valuation if possible. Uses season_rankings for ranking section only.
+- Current status: `GET /api/v1/home` aggregate read-only MVP implemented. Supports active_joined, active_not_joined, upcoming, ended, settled, no_current_season. Uses latest daily snapshot first, then live valuation if possible. Uses season_rankings for ranking section only. Active joined allocation/top positions/equity chart are read-only and available when required DB/admin_manual data exists.
 - Implemented files: `src/home/home.controller.ts`, `src/home/home.service.ts`.
 - Source of truth: `docs/home-api-contract.md`, `docs/current-status.md`.
 - Existing tests: `src/home/home.service.spec.ts`, `test/app.e2e-spec.ts`.
-- Known limitations: allocation, top positions, equity chart, authoritative final result, automatic freshness, settlement summary are unavailable/blocked.
-- Remaining work: provider ingestion, asset price freshness implementation, scheduler daily snapshots, ranking automation, settlement.
+- Known limitations: provider-backed price freshness evidence, automatic snapshot/ranking generation, authoritative final result, settlement summary, and reward integration remain unavailable/blocked. Equity chart reads existing snapshots only and does not generate them.
+- Remaining work: provider ingestion gate, scheduler daily snapshots, ranking automation, settlement, reward.
 - Risk level: MEDIUM.
-- Recommended next action: no home expansion before provider/scheduler/settlement gates.
+- Recommended next action: keep provider/scheduler/settlement/reward gates closed; add real DB Home scenarios if this read-only surface becomes launch-critical.
 
 ### Records
 

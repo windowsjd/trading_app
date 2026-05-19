@@ -2,6 +2,11 @@ jest.mock('../generated/prisma/client', () => {
   const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
 
   return {
+    AssetType: {
+      domestic_stock: 'domestic_stock',
+      us_stock: 'us_stock',
+      crypto: 'crypto',
+    },
     CurrencyCode: {
       KRW: 'KRW',
       USD: 'USD',
@@ -41,7 +46,9 @@ jest.mock('../generated/prisma/client', () => {
 
 import { HttpException } from '@nestjs/common';
 import {
+  AssetType,
   CurrencyCode,
+  FxRateSourceType,
   ParticipantStatus,
   Prisma,
   SeasonRankingType,
@@ -73,6 +80,7 @@ describe('HomeService', () => {
       },
       dailyPortfolioSnapshot: {
         findFirst: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn(),
         update: jest.fn(),
         upsert: jest.fn(),
@@ -88,6 +96,33 @@ describe('HomeService', () => {
         deleteMany: jest.fn(),
       },
       cashWallet: {
+        create: jest.fn(),
+        update: jest.fn(),
+        upsert: jest.fn(),
+        delete: jest.fn(),
+      },
+      position: {
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn(),
+        update: jest.fn(),
+        upsert: jest.fn(),
+        delete: jest.fn(),
+      },
+      order: {
+        create: jest.fn(),
+        update: jest.fn(),
+        upsert: jest.fn(),
+        delete: jest.fn(),
+      },
+      assetPriceSnapshot: {
+        findFirst: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        upsert: jest.fn(),
+        delete: jest.fn(),
+      },
+      fxRateSnapshot: {
+        findFirst: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
         upsert: jest.fn(),
@@ -112,7 +147,20 @@ describe('HomeService', () => {
   };
 
   const createValuationService = () => ({
-    calculateSeasonParticipantValuation: jest.fn(),
+    calculateSeasonParticipantValuation: jest.fn().mockResolvedValue({
+      seasonParticipantId: 'participant-1',
+      totalAssetKrw: '1200000.00000000',
+      returnRate: '0.20000000',
+      krwCash: '900000.00000000',
+      usdCashKrw: '140000.00000000',
+      assetValueKrw: '160000.00000000',
+      domesticStockValueKrw: '60000.00000000',
+      usStockValueKrw: '70000.00000000',
+      cryptoValueKrw: '30000.00000000',
+      realizedPnlKrw: '10000.00000000',
+      unrealizedPnlKrw: '20000.00000000',
+      valuationAt: new Date('2026-05-07T00:02:00.000Z'),
+    }),
   });
 
   const createService = () => {
@@ -160,6 +208,61 @@ describe('HomeService', () => {
     prisma.season.findFirst.mockResolvedValueOnce(activeSeason);
   };
 
+  const latestSnapshot = {
+    snapshotDate: new Date('2026-05-07T00:00:00.000Z'),
+    totalAssetKrw: new Prisma.Decimal('1100000.00000000'),
+    returnRate: new Prisma.Decimal('0.10000000'),
+    krwCash: new Prisma.Decimal('900000.00000000'),
+    usdCashKrw: new Prisma.Decimal('140000.00000000'),
+    assetValueKrw: new Prisma.Decimal('60000.00000000'),
+    realizedPnlKrw: new Prisma.Decimal('10000.00000000'),
+    unrealizedPnlKrw: new Prisma.Decimal('20000.00000000'),
+    capturedAt: new Date('2026-05-07T00:01:00.000Z'),
+  };
+
+  const freshUsdKrwSnapshot = () => ({
+    id: 'fx-rate-snapshot-1',
+    rate: new Prisma.Decimal('1400.00000000'),
+    sourceType: FxRateSourceType.admin_manual,
+    effectiveAt: new Date(Date.now() - 1_000),
+    capturedAt: new Date(Date.now() - 1_000),
+    approvedByUserId: 'operator-1',
+  });
+
+  const priceSnapshot = (
+    id: string,
+    price: string,
+    currencyCode = CurrencyCode.KRW,
+  ) => ({
+    id,
+    price: new Prisma.Decimal(price),
+    currencyCode,
+    effectiveAt: new Date('2026-05-07T00:00:00.000Z'),
+    capturedAt: new Date('2026-05-07T00:00:10.000Z'),
+  });
+
+  const position = (
+    id: string,
+    assetId: string,
+    quantity: string,
+    averageCost: string,
+    currencyCode = CurrencyCode.KRW,
+    assetType = AssetType.domestic_stock,
+  ) => ({
+    id,
+    assetId,
+    quantity: new Prisma.Decimal(quantity),
+    averageCost: new Prisma.Decimal(averageCost),
+    currencyCode,
+    asset: {
+      symbol: assetId.toUpperCase(),
+      name: `Asset ${assetId}`,
+      market: currencyCode === CurrencyCode.USD ? 'NASDAQ' : 'KRX',
+      assetType,
+      currencyCode,
+    },
+  });
+
   const expectNoHomeWrites = (prisma: ReturnType<typeof createPrisma>) => {
     for (const model of [
       prisma.season,
@@ -167,6 +270,10 @@ describe('HomeService', () => {
       prisma.dailyPortfolioSnapshot,
       prisma.seasonRanking,
       prisma.cashWallet,
+      prisma.position,
+      prisma.order,
+      prisma.assetPriceSnapshot,
+      prisma.fxRateSnapshot,
     ]) {
       expect(model.create).not.toHaveBeenCalled();
       expect(model.update).not.toHaveBeenCalled();
@@ -186,17 +293,9 @@ describe('HomeService', () => {
     const { prisma, valuationService, service } = createService();
     mockActiveSeason(prisma);
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
-    prisma.dailyPortfolioSnapshot.findFirst.mockResolvedValueOnce({
-      snapshotDate: new Date('2026-05-07T00:00:00.000Z'),
-      totalAssetKrw: new Prisma.Decimal('1100000.00000000'),
-      returnRate: new Prisma.Decimal('0.10000000'),
-      krwCash: new Prisma.Decimal('900000.00000000'),
-      usdCashKrw: new Prisma.Decimal('140000.00000000'),
-      assetValueKrw: new Prisma.Decimal('60000.00000000'),
-      realizedPnlKrw: new Prisma.Decimal('10000.00000000'),
-      unrealizedPnlKrw: new Prisma.Decimal('20000.00000000'),
-      capturedAt: new Date('2026-05-07T00:01:00.000Z'),
-    });
+    prisma.dailyPortfolioSnapshot.findFirst.mockResolvedValueOnce(
+      latestSnapshot,
+    );
     prisma.seasonRanking.findFirst.mockResolvedValueOnce(null);
 
     const response = await service.getHome('user-1');
@@ -218,9 +317,46 @@ describe('HomeService', () => {
       positionsCount: 2,
       openPositionsCount: 1,
     });
+    expect(response.data.allocation).toMatchObject({
+      state: 'available',
+      allocationSource: 'live_valuation',
+      totalAssetKrw: '1200000.00000000',
+      items: [
+        {
+          category: 'krw_cash',
+          amountKrw: '900000.00000000',
+          percentage: '75.00000000',
+        },
+        {
+          category: 'usd_cash',
+          amountKrw: '140000.00000000',
+        },
+        {
+          category: 'domestic_stock',
+          amountKrw: '60000.00000000',
+        },
+        {
+          category: 'us_stock',
+          amountKrw: '70000.00000000',
+        },
+        {
+          category: 'crypto',
+          amountKrw: '30000.00000000',
+        },
+      ],
+    });
+    expect(response.data.topPositions).toMatchObject({
+      state: 'available',
+      items: [],
+    });
+    expect(response.data.equityChart).toMatchObject({
+      state: 'unavailable',
+      reason: 'EQUITY_CHART_UNAVAILABLE',
+      items: [],
+    });
     expect(
       valuationService.calculateSeasonParticipantValuation,
-    ).not.toHaveBeenCalled();
+    ).toHaveBeenCalledTimes(1);
     expectNoHomeWrites(prisma);
   });
 
@@ -236,6 +372,9 @@ describe('HomeService', () => {
       krwCash: '900000.00000000',
       usdCashKrw: '140000.00000000',
       assetValueKrw: '160000.00000000',
+      domesticStockValueKrw: '60000.00000000',
+      usStockValueKrw: '70000.00000000',
+      cryptoValueKrw: '30000.00000000',
       realizedPnlKrw: '10000.00000000',
       unrealizedPnlKrw: '20000.00000000',
       valuationAt: new Date('2026-05-07T00:02:00.000Z'),
@@ -265,9 +404,16 @@ describe('HomeService', () => {
       totalParticipants: 10,
       rankingDate: '2026-05-07',
     });
+    expect(response.data.allocation).toMatchObject({
+      state: 'available',
+      totalAssetKrw: '1200000.00000000',
+    });
     expect(
       valuationService.calculateSeasonParticipantValuation,
     ).toHaveBeenCalledWith('participant-1');
+    expect(
+      valuationService.calculateSeasonParticipantValuation,
+    ).toHaveBeenCalledTimes(1);
     expectNoHomeWrites(prisma);
   });
 
@@ -292,13 +438,318 @@ describe('HomeService', () => {
       valuationSource: 'unavailable',
     });
     expect(response.data.summary).not.toHaveProperty('totalAssetKrw');
-    expect(response.data.sectionErrors).toEqual([
+    expect(response.data.allocation).toMatchObject({
+      state: 'unavailable',
+      reason: 'ASSET_PRICE_UNAVAILABLE',
+    });
+    expect(response.data.sectionErrors).toEqual(
+      expect.arrayContaining([
+        {
+          section: 'summary',
+          code: 'ASSET_PRICE_UNAVAILABLE',
+          message: 'Asset price snapshot is unavailable.',
+        },
+        {
+          section: 'allocation',
+          code: 'ASSET_PRICE_UNAVAILABLE',
+          message: 'Asset price snapshot is unavailable.',
+        },
+      ]),
+    );
+    expect(response.data.sectionErrors).toHaveLength(2);
+    expectNoHomeWrites(prisma);
+  });
+
+  it('converts USD positions with fresh approved admin_manual USD/KRW and returns top positions sorted and limited', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
+    prisma.dailyPortfolioSnapshot.findFirst.mockResolvedValueOnce(
+      latestSnapshot,
+    );
+    prisma.seasonRanking.findFirst.mockResolvedValueOnce(null);
+    prisma.fxRateSnapshot.findFirst.mockResolvedValueOnce(
+      freshUsdKrwSnapshot(),
+    );
+    prisma.position.findMany.mockResolvedValueOnce([
+      position('position-zero', 'asset-zero', '0.00000000', '100.00000000'),
+      position('position-small', 'asset-small', '1.00000000', '100.00000000'),
+      position('position-large', 'asset-large', '5.00000000', '90.00000000'),
+      position(
+        'position-usd',
+        'asset-usd',
+        '2.00000000',
+        '80.00000000',
+        CurrencyCode.USD,
+        AssetType.us_stock,
+      ),
+      position('position-mid', 'asset-mid', '3.00000000', '100.00000000'),
+      position(
+        'position-crypto',
+        'asset-crypto',
+        '1.00000000',
+        '40.00000000',
+        CurrencyCode.USD,
+        AssetType.crypto,
+      ),
+      position('position-fifth', 'asset-fifth', '4.00000000', '100.00000000'),
+      position('position-sixth', 'asset-sixth', '2.00000000', '100.00000000'),
+    ]);
+    prisma.assetPriceSnapshot.findFirst
+      .mockResolvedValueOnce(
+        priceSnapshot('price-small', '100.00000000', CurrencyCode.KRW),
+      )
+      .mockResolvedValueOnce(
+        priceSnapshot('price-large', '100.00000000', CurrencyCode.KRW),
+      )
+      .mockResolvedValueOnce(
+        priceSnapshot('price-usd', '100.00000000', CurrencyCode.USD),
+      )
+      .mockResolvedValueOnce(
+        priceSnapshot('price-mid', '100.00000000', CurrencyCode.KRW),
+      )
+      .mockResolvedValueOnce(
+        priceSnapshot('price-crypto', '50.00000000', CurrencyCode.USD),
+      )
+      .mockResolvedValueOnce(
+        priceSnapshot('price-fifth', '100.00000000', CurrencyCode.KRW),
+      )
+      .mockResolvedValueOnce(
+        priceSnapshot('price-sixth', '100.00000000', CurrencyCode.KRW),
+      );
+
+    const response = await service.getHome('user-1');
+
+    expect(prisma.position.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          seasonParticipantId: 'participant-1',
+          quantity: {
+            gt: 0,
+          },
+        },
+      }),
+    );
+    expect(response.data.topPositions).toMatchObject({
+      state: 'available',
+      limit: 5,
+      items: [
+        {
+          assetId: 'asset-usd',
+          assetType: AssetType.us_stock,
+          currencyCode: CurrencyCode.USD,
+          positionValueKrw: '280000.00000000',
+        },
+        {
+          assetId: 'asset-crypto',
+          assetType: AssetType.crypto,
+          currencyCode: CurrencyCode.USD,
+          positionValueKrw: '70000.00000000',
+        },
+        {
+          assetId: 'asset-large',
+          positionValueKrw: '500.00000000',
+        },
+        {
+          assetId: 'asset-fifth',
+          positionValueKrw: '400.00000000',
+        },
+        {
+          assetId: 'asset-mid',
+          positionValueKrw: '300.00000000',
+        },
+      ],
+    });
+    expect(
+      (response.data.topPositions as { items: Array<{ assetId: string }> })
+        .items,
+    ).toHaveLength(5);
+    expect(JSON.stringify(response.data.topPositions)).not.toContain(
+      'asset-zero',
+    );
+    expect(JSON.stringify(response.data.topPositions)).not.toContain(
+      'asset-small',
+    );
+    expectNoHomeWrites(prisma);
+  });
+
+  it('marks allocation and topPositions unavailable without fake fallback when USD/KRW FX is stale', async () => {
+    const { prisma, valuationService, service } = createService();
+    mockActiveSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
+    prisma.dailyPortfolioSnapshot.findFirst.mockResolvedValueOnce(
+      latestSnapshot,
+    );
+    valuationService.calculateSeasonParticipantValuation.mockRejectedValueOnce(
+      new PortfolioValuationError(
+        'FX_RATE_STALE',
+        'USD/KRW FX rate snapshot is stale.',
+      ),
+    );
+    prisma.seasonRanking.findFirst.mockResolvedValueOnce(null);
+    prisma.position.findMany.mockResolvedValueOnce([
+      position(
+        'position-usd',
+        'asset-usd',
+        '1.00000000',
+        '100.00000000',
+        CurrencyCode.USD,
+        AssetType.us_stock,
+      ),
+    ]);
+    prisma.fxRateSnapshot.findFirst.mockResolvedValueOnce({
+      ...freshUsdKrwSnapshot(),
+      effectiveAt: new Date(Date.now() - 61_000),
+    });
+
+    const response = await service.getHome('user-1');
+
+    expect(response.data.summary).toMatchObject({
+      state: 'available',
+      valuationSource: 'daily_snapshot',
+    });
+    expect(response.data.allocation).toMatchObject({
+      state: 'unavailable',
+      reason: 'FX_RATE_STALE',
+    });
+    expect(response.data.topPositions).toMatchObject({
+      state: 'unavailable',
+      reason: 'FX_RATE_STALE',
+    });
+    expect(response.data.sectionErrors).toEqual(
+      expect.arrayContaining([
+        {
+          section: 'allocation',
+          code: 'FX_RATE_STALE',
+          message: 'USD/KRW FX rate snapshot is stale.',
+        },
+        {
+          section: 'topPositions',
+          code: 'FX_RATE_STALE',
+          message: 'USD/KRW FX rate snapshot is stale.',
+        },
+      ]),
+    );
+    expect(response.data.sectionErrors).toHaveLength(2);
+    expect(prisma.assetPriceSnapshot.findFirst).not.toHaveBeenCalled();
+    expectNoHomeWrites(prisma);
+  });
+
+  it('marks allocation and topPositions unavailable without fake fallback when required price or FX data is missing', async () => {
+    const { prisma, valuationService, service } = createService();
+    mockActiveSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
+    prisma.dailyPortfolioSnapshot.findFirst.mockResolvedValueOnce(
+      latestSnapshot,
+    );
+    valuationService.calculateSeasonParticipantValuation.mockRejectedValueOnce(
+      new PortfolioValuationError(
+        'FX_RATE_UNAVAILABLE',
+        'USD/KRW FX rate snapshot is unavailable.',
+      ),
+    );
+    prisma.seasonRanking.findFirst.mockResolvedValueOnce(null);
+    prisma.position.findMany.mockResolvedValueOnce([
+      position('position-1', 'asset-1', '1.00000000', '100.00000000'),
+    ]);
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(null);
+
+    const response = await service.getHome('user-1');
+
+    expect(response.data.allocation).toMatchObject({
+      state: 'unavailable',
+      reason: 'FX_RATE_UNAVAILABLE',
+    });
+    expect(response.data.topPositions).toMatchObject({
+      state: 'unavailable',
+      reason: 'ASSET_PRICE_UNAVAILABLE',
+    });
+    expect(response.data.sectionErrors).toEqual(
+      expect.arrayContaining([
+        {
+          section: 'allocation',
+          code: 'FX_RATE_UNAVAILABLE',
+          message: 'USD/KRW FX rate snapshot is unavailable.',
+        },
+        {
+          section: 'topPositions',
+          code: 'ASSET_PRICE_UNAVAILABLE',
+          message: 'Asset price snapshot is unavailable for asset asset-1.',
+        },
+      ]),
+    );
+    expect(response.data.sectionErrors).toHaveLength(2);
+    expectNoHomeWrites(prisma);
+  });
+
+  it('returns equityChart from existing daily portfolio snapshots in chronological order', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
+    prisma.dailyPortfolioSnapshot.findFirst.mockResolvedValueOnce(null);
+    prisma.dailyPortfolioSnapshot.findMany.mockResolvedValueOnce([
       {
-        section: 'summary',
-        code: 'ASSET_PRICE_UNAVAILABLE',
-        message: 'Asset price snapshot is unavailable.',
+        snapshotDate: new Date('2026-05-08T00:00:00.000Z'),
+        totalAssetKrw: new Prisma.Decimal('1210000.00000000'),
+        returnRate: new Prisma.Decimal('0.21000000'),
+        capturedAt: new Date('2026-05-08T00:01:00.000Z'),
+      },
+      {
+        snapshotDate: new Date('2026-05-07T00:00:00.000Z'),
+        totalAssetKrw: new Prisma.Decimal('1200000.00000000'),
+        returnRate: new Prisma.Decimal('0.20000000'),
+        capturedAt: new Date('2026-05-07T00:01:00.000Z'),
       },
     ]);
+    prisma.seasonRanking.findFirst.mockResolvedValueOnce(null);
+
+    const response = await service.getHome('user-1');
+
+    expect(prisma.dailyPortfolioSnapshot.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          seasonParticipantId: 'participant-1',
+        },
+        take: 30,
+      }),
+    );
+    expect(response.data.equityChart).toMatchObject({
+      state: 'available',
+      chartSource: 'daily_portfolio_snapshots',
+      items: [
+        {
+          snapshotDate: '2026-05-07',
+          totalAssetKrw: '1200000.00000000',
+          returnRate: '0.20000000',
+          capturedAt: '2026-05-07T00:01:00.000Z',
+        },
+        {
+          snapshotDate: '2026-05-08',
+          totalAssetKrw: '1210000.00000000',
+          returnRate: '0.21000000',
+          capturedAt: '2026-05-08T00:01:00.000Z',
+        },
+      ],
+    });
+    expectNoHomeWrites(prisma);
+  });
+
+  it('returns equityChart unavailable when no daily portfolio snapshots exist', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
+    prisma.dailyPortfolioSnapshot.findFirst.mockResolvedValueOnce(null);
+    prisma.dailyPortfolioSnapshot.findMany.mockResolvedValueOnce([]);
+    prisma.seasonRanking.findFirst.mockResolvedValueOnce(null);
+
+    const response = await service.getHome('user-1');
+
+    expect(response.data.equityChart).toMatchObject({
+      state: 'unavailable',
+      reason: 'EQUITY_CHART_UNAVAILABLE',
+      chartSource: 'daily_portfolio_snapshots',
+      items: [],
+    });
     expectNoHomeWrites(prisma);
   });
 
@@ -345,12 +796,10 @@ describe('HomeService', () => {
 
   it('returns upcoming season blocked guide state', async () => {
     const { prisma, service } = createService();
-    prisma.season.findFirst
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({
-        ...activeSeason,
-        status: SeasonStatus.upcoming,
-      });
+    prisma.season.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({
+      ...activeSeason,
+      status: SeasonStatus.upcoming,
+    });
 
     const response = await service.getHome('user-1');
 

@@ -2,8 +2,9 @@
 
 ## Status
 - `GET /api/v1/home` read-only MVP is implemented.
-- The full dashboard implementation is still blocked by provider price ingestion, order/position mutation, scheduler/batch automatic snapshot generation, and fuller section APIs.
-- The implemented MVP uses only existing DB rows and live valuation foundation when possible.
+- The active joined dashboard now implements `summary`, `ranking`, `walletSummary`, `allocation`, `topPositions`, and `equityChart` when the required DB/admin_manual data exists.
+- The implemented MVP uses only existing DB rows, approved `admin_manual` market data, live valuation foundation, and existing `daily_portfolio_snapshots` when possible.
+- Provider ingestion, scheduler/batch automatic snapshot generation, settlement, and reward remain STOP.
 - Do not add fake data, temporary runtime contracts, Prisma schema changes, migrations, or seed changes from this draft.
 
 ## Source Rules
@@ -63,7 +64,7 @@ Show the full home dashboard for a user who joined the active season.
 
 ### Success Response JSON Shape
 
-This is the target full response candidate. It is not currently implementable.
+This is the target full response candidate. It is implemented only where the required DB/admin_manual data exists; otherwise section-level unavailable responses are returned without fake fallback values.
 
 ```json
 {
@@ -98,7 +99,8 @@ This is the target full response candidate. It is not currently implementable.
         {
           "label": "<string>",
           "amountKrw": "<amount string>",
-          "rate": "<decimal string>"
+          "rate": "<decimal string>",
+          "percentage": "<decimal string>"
         }
       ]
     },
@@ -110,8 +112,10 @@ This is the target full response candidate. It is not currently implementable.
           "symbol": "<string>",
           "name": "<string>",
           "market": "<string>",
+          "assetType": "domestic_stock | us_stock | crypto",
+          "currencyCode": "KRW | USD",
           "quantity": "<decimal string>",
-          "evaluationAmountKrw": "<amount string>",
+          "positionValueKrw": "<amount string>",
           "returnRate": "<decimal string>"
         }
       ]
@@ -121,8 +125,10 @@ This is the target full response candidate. It is not currently implementable.
       "items": [
         {
           "date": "<YYYY-MM-DD>",
+          "snapshotDate": "<YYYY-MM-DD>",
           "totalAssetKrw": "<amount string>",
-          "returnRate": "<decimal string>"
+          "returnRate": "<decimal string>",
+          "capturedAt": "<UTC ISO string>"
         }
       ]
     },
@@ -150,11 +156,11 @@ Render the normal joined-season home dashboard. Trading and exchange entry point
 - `walletSummary.cashWallets`
 - `walletSummary.positionsCount`
 - `walletSummary.openPositionsCount`
+- `allocation` from live valuation based on existing wallets, positions, latest eligible `admin_manual` asset price snapshots, and fresh approved `admin_manual` USD/KRW when needed.
+- `topPositions` from existing open positions, latest eligible `admin_manual` asset price snapshots, and fresh approved `admin_manual` USD/KRW when needed.
+- `equityChart` from existing `daily_portfolio_snapshots`.
 
 ### Currently Not Implementable Fields
-- `allocation`
-- `topPositions`
-- `equityChart`
 - automatic data freshness from scheduler/batch
 
 ### Required Preceding Tables
@@ -231,19 +237,60 @@ The implemented MVP may return available summary/ranking sections or explicit un
       "openPositionsCount": "<number>"
     },
     "allocation": {
-      "state": "unavailable",
-      "reason": "ALLOCATION_NOT_IMPLEMENTED",
-      "message": "<string>"
+      "state": "available",
+      "allocationSource": "live_valuation",
+      "totalAssetKrw": "<amount string>",
+      "valuationAt": "<UTC ISO string>",
+      "items": [
+        {
+          "category": "krw_cash | usd_cash | domestic_stock | us_stock | crypto",
+          "label": "<string>",
+          "amountKrw": "<amount string>",
+          "rate": "<decimal string>",
+          "percentage": "<decimal string>"
+        }
+      ]
     },
     "topPositions": {
-      "state": "unavailable",
-      "reason": "TOP_POSITIONS_NOT_IMPLEMENTED",
-      "message": "<string>"
+      "state": "available",
+      "positionsSource": "positions",
+      "valuationAt": "<UTC ISO string>",
+      "limit": 5,
+      "items": [
+        {
+          "positionId": "<string>",
+          "assetId": "<string>",
+          "symbol": "<string>",
+          "name": "<string>",
+          "market": "<string>",
+          "assetType": "domestic_stock | us_stock | crypto",
+          "currencyCode": "KRW | USD",
+          "quantity": "<decimal string>",
+          "averageCost": "<amount string>",
+          "currentPrice": "<amount string>",
+          "priceCurrency": "KRW | USD",
+          "positionValueKrw": "<amount string>",
+          "unrealizedPnlKrw": "<amount string>",
+          "returnRate": "<decimal string>",
+          "assetPriceSnapshotId": "<string>",
+          "priceEffectiveAt": "<UTC ISO string>",
+          "priceCapturedAt": "<UTC ISO string>"
+        }
+      ]
     },
     "equityChart": {
-      "state": "unavailable",
-      "reason": "EQUITY_CHART_NOT_IMPLEMENTED",
-      "message": "<string>"
+      "state": "available",
+      "chartSource": "daily_portfolio_snapshots",
+      "limit": 30,
+      "items": [
+        {
+          "snapshotDate": "<YYYY-MM-DD>",
+          "date": "<YYYY-MM-DD>",
+          "totalAssetKrw": "<amount string>",
+          "returnRate": "<decimal string>",
+          "capturedAt": "<UTC ISO string>"
+        }
+      ]
     },
     "sectionErrors": []
   }
@@ -266,7 +313,12 @@ If daily snapshot and live valuation are both unavailable, `summary` is returned
 ```
 
 ### Implementation Decision
-Read-only MVP is implemented. Full dashboard sections remain future work.
+Read-only MVP is implemented for active joined `summary`, `ranking`, `walletSummary`, `allocation`, `topPositions`, and `equityChart`.
+
+- `allocation` uses live valuation and returns unavailable when required `admin_manual` asset price is missing/not eligible, or fresh approved `admin_manual` USD/KRW data is missing or stale. `percentage` is a 0-100 decimal string, and `rate` is the 0-1 decimal fraction.
+- `topPositions` excludes zero-quantity positions, uses latest eligible `admin_manual` asset prices, converts USD assets with fresh approved `admin_manual` USD/KRW, sorts by `positionValueKrw` descending, and limits to 5.
+- `equityChart` reads the latest 30 existing `daily_portfolio_snapshots` and returns them in chronological order. It does not synthesize live valuation chart points and does not create snapshots.
+- Provider ingestion, scheduler/batch, settlement, reward, fake/static/sample business data, Prisma schema changes, migrations, and seed changes remain out of scope.
 
 ## active + not joined
 
@@ -689,16 +741,18 @@ This is a section-level error shape. It is not a separate home `mode`.
 Render available sections and show section-level fallback states only for failed sections. Do not treat this as a full page error.
 
 ### Currently Implementable Fields
-- Contract only. No code implementation in this task.
+- Implemented section-level unavailable fallback for active joined `summary`, `allocation`, `topPositions`, `ranking`, and `equityChart`.
+- `summary`, `allocation`, and `topPositions` add section errors when required DB/admin_manual market data is missing or stale.
+- Missing `season_rankings` or `daily_portfolio_snapshots` return section-level unavailable states without creating rows.
 
 ### Currently Not Implementable Fields
-- Any runtime section fallback behavior.
+- Automatic recovery, retry, or generation for missing provider/scheduler/settlement data.
 
 ### Required Preceding Tables
 - Same tables as the section that failed.
 
 ### Implementation Decision
-Not implemented now. This is a contract draft for future section-level resilience.
+Implemented for the read-only MVP. Section fallback keeps the Home response usable without promoting missing data to fake portfolio values or full-page success data.
 
 ## full error
 
@@ -739,13 +793,13 @@ Render the global error state for the page.
 Only the common error shape direction is documented. No `/home` error implementation in this task.
 
 ## Current Full Implementation Blockers
-- provider price ingestion
-- asset price freshness policy
-- order execution
-- position mutation
+- provider price ingestion and provider-backed source evidence
 - scheduler/batch automatic daily portfolio snapshot generation
 - scheduler/batch automatic season ranking generation
+- settlement/reward integration and authoritative final result
 - richer `/ranking`, `/orders`, `/records`, `/settlement` APIs
+
+`allocation`, `topPositions`, and `equityChart` are no longer placeholder blockers for active joined Home. They remain dependent on existing wallets, positions, latest eligible `admin_manual` asset prices, fresh approved `admin_manual` USD/KRW where needed, and existing `daily_portfolio_snapshots`.
 
 ## Near-Term Required Tables
 - `wallet_transactions`

@@ -128,6 +128,7 @@ type PrismaMock = {
   };
   dailyPortfolioSnapshot: {
     findFirst: jest.Mock;
+    findMany: jest.Mock;
   };
   exchangeTransaction: {
     count: jest.Mock;
@@ -155,6 +156,7 @@ type PrismaMock = {
   position: {
     create: jest.Mock;
     findFirst: jest.Mock;
+    findMany: jest.Mock;
     findUnique: jest.Mock;
     update: jest.Mock;
     updateMany: jest.Mock;
@@ -276,6 +278,7 @@ describe('AppController (e2e)', () => {
       },
       dailyPortfolioSnapshot: {
         findFirst: jest.fn(),
+        findMany: jest.fn(),
       },
       exchangeTransaction: {
         count: jest.fn(),
@@ -303,6 +306,7 @@ describe('AppController (e2e)', () => {
       position: {
         create: jest.fn(),
         findFirst: jest.fn(),
+        findMany: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),
@@ -450,6 +454,7 @@ describe('AppController (e2e)', () => {
     expect(prisma.cashWallet.findMany).not.toHaveBeenCalled();
     expect(prisma.cashWallet.findUnique).not.toHaveBeenCalled();
     expect(prisma.dailyPortfolioSnapshot.findFirst).not.toHaveBeenCalled();
+    expect(prisma.dailyPortfolioSnapshot.findMany).not.toHaveBeenCalled();
     expect(prisma.exchangeTransaction.count).not.toHaveBeenCalled();
     expect(prisma.exchangeTransaction.findMany).not.toHaveBeenCalled();
     expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
@@ -462,6 +467,7 @@ describe('AppController (e2e)', () => {
     expect(prisma.order.findMany).not.toHaveBeenCalled();
     expect(prisma.order.findUnique).not.toHaveBeenCalled();
     expect(prisma.position.findFirst).not.toHaveBeenCalled();
+    expect(prisma.position.findMany).not.toHaveBeenCalled();
     expect(prisma.position.findUnique).not.toHaveBeenCalled();
     expect(prisma.seasonRanking.findFirst).not.toHaveBeenCalled();
     expect(prisma.seasonRanking.findMany).not.toHaveBeenCalled();
@@ -624,7 +630,9 @@ describe('AppController (e2e)', () => {
   });
 
   it('/api/v1/auth/signup (POST) creates a user and returns an access token', () => {
-    prisma.user.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+    prisma.user.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
     prisma.user.create.mockResolvedValueOnce({
       id: user.id,
       email: user.email,
@@ -914,6 +922,8 @@ describe('AppController (e2e)', () => {
           unrealizedPnlKrw: new Prisma.Decimal('0.00000000'),
           capturedAt: now,
         });
+        prisma.dailyPortfolioSnapshot.findMany.mockResolvedValueOnce([]);
+        prisma.position.findMany.mockResolvedValueOnce([]);
         prisma.seasonRanking.findFirst.mockResolvedValueOnce(null);
       },
       (body: Record<string, unknown>) => {
@@ -924,6 +934,8 @@ describe('AppController (e2e)', () => {
           },
         });
         expect(prisma.dailyPortfolioSnapshot.findFirst).toHaveBeenCalled();
+        expect(prisma.dailyPortfolioSnapshot.findMany).toHaveBeenCalled();
+        expect(prisma.position.findMany).toHaveBeenCalled();
       },
     ],
     [
@@ -953,7 +965,10 @@ describe('AppController (e2e)', () => {
         mockActiveUser();
         mockActiveSeason();
         mockJoinedParticipant();
-        prisma.cashWallet.findMany.mockResolvedValueOnce([krwWallet, usdWallet]);
+        prisma.cashWallet.findMany.mockResolvedValueOnce([
+          krwWallet,
+          usdWallet,
+        ]);
       },
       (body: Record<string, unknown>) => {
         expect(body).toMatchObject({
@@ -1028,25 +1043,23 @@ describe('AppController (e2e)', () => {
     ],
   ] as Array<
     [string, string, () => void, (body: Record<string, unknown>) => void]
-  >)('%s accepts a valid active-user token and reaches the service', async (
-    _label,
-    path,
-    setup,
-    assertBody,
-  ) => {
-    resetPrismaMocks();
-    setup();
-    const token = await createValidAccessToken();
+  >)(
+    '%s accepts a valid active-user token and reaches the service',
+    async (_label, path, setup, assertBody) => {
+      resetPrismaMocks();
+      setup();
+      const token = await createValidAccessToken();
 
-    return request(app.getHttpServer())
-      .get(path)
-      .set('Authorization', `Bearer ${token}`)
-      .expect(200)
-      .expect((response) => {
-        expect(response.body.error?.code).not.toBe('UNAUTHORIZED');
-        assertBody(response.body);
-      });
-  });
+      return request(app.getHttpServer())
+        .get(path)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200)
+        .expect((response) => {
+          expect(response.body.error?.code).not.toBe('UNAUTHORIZED');
+          assertBody(response.body);
+        });
+    },
+  );
 
   it.each(protectedWritePathRequests)(
     '$label rejects missing token and x-user-id-only requests before write mutation',
