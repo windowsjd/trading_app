@@ -8,6 +8,7 @@
 - Crypto MVP policy changed on 2026-05-14 to Binance-based USD-settled crypto using the USD Wallet. Upbit/Bithumb are excluded from MVP, and Binance BTCUSDT public ticker/orderbook fixtures have been captured.
 - Gate C provider fixture capture prep on 2026-05-14 captured Binance public `BTCUSDT` ticker/orderbook fixtures and fixed residual crypto freshness wording; OANDA/Twelve Data fixtures remain credential-blocked.
 - Auth refresh-token/logout/revocation MVP is now implemented by the current codebase. This document does not authorize provider, scheduler, settlement, reward, package, seed, or unrelated schema changes.
+- Provider-key-free `MVP_FLOW_DB_SMOKE=1` real PostgreSQL smoke is available as a service-composed opt-in check for the implemented Auth -> season join -> wallets/assets -> FX -> orders -> positions/records/home/ranking flow using isolated test-only `admin_manual` fixtures. It is not provider ingestion, scheduler, settlement, reward, seed, or sample business data.
 - `docs/current-status.md` remains the short status summary. This document is the detailed backend gate roadmap.
 
 ## Audit Basis
@@ -385,9 +386,9 @@ Consistency note:
 Safety classification:
 
 - Already implemented safety: token-derived ownership, no `x-user-id`, guarded wallet/position updates for FX/order execute, FX execute durable idempotency, order create idempotency, transaction boundaries for join/FX/order execute.
-- Tested safety: auth guard regression, protected write-path valid-token HTTP service-entry smoke, read-only no-mutation service tests, season join/FX/order execute env-gated PostgreSQL integration tests, order cancel guarded update unit tests, provider/static/fake input rejection for admin FX/asset paths.
+- Tested safety: auth guard regression, protected write-path valid-token HTTP service-entry smoke, read-only no-mutation service tests, season join/FX/order execute env-gated PostgreSQL integration tests, `MVP_FLOW_DB_SMOKE=1` service-composed real PostgreSQL flow smoke, order cancel guarded update unit tests, provider/static/fake input rejection for admin FX/asset paths.
 - Intended but under-tested: order create real DB idempotency race; route-by-route invalid token e2e for read paths beyond guard unit.
-- Not implemented: provider ingestion, scheduler/batch, settlement, reward, refresh/logout/revocation, durable quote, exact order execute replay, partial fill, matching engine.
+- Not implemented: provider ingestion, scheduler/batch, settlement, reward, durable quote, exact order execute replay, partial fill, matching engine.
 
 ## Backend Gates
 

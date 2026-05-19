@@ -742,6 +742,14 @@ near-term ledger/FX foundation:
   - Auth protected route HTTP e2e 회귀 검증 확대 완료.
   - public/optional/protected read-only/write-path route의 missing token, invalid/malformed token, `x-user-id` only, valid token smoke 범위가 `test/app.e2e-spec.ts`에 반영됨.
   - write-path API의 full execute mutation 검증은 기존 service/unit/DB integration spec이 담당하며, HTTP e2e는 guard 차단과 protected write-path valid-token service-entry smoke 중심으로 유지.
+- provider API key 없는 실제 PostgreSQL MVP flow smoke 추가:
+  - `src/mvp-flow.integration.spec.ts`.
+  - `MVP_FLOW_DB_SMOKE=1 pnpm test -- mvp-flow.integration.spec.ts`로만 실행되는 opt-in smoke이며, flag가 없으면 기본 `pnpm test`에서 skip.
+  - 기존 `tsx` runner 기반 실제 DB integration 패턴에 맞춘 service-composed smoke로, 실제 Nest HTTP app 검증은 아님.
+  - 검증 범위: Auth signup/login/me/refresh, refresh token hash-only 저장, refresh rotation, season current/join, KRW/USD wallets, test-only `admin_manual` USD/KRW snapshot, test-only `admin_manual` KRW/USD asset price snapshot, assets list/detail, FX quote/execute, exchange/wallet ledger side effects, orders quote/create/execute, position valuation, records visibility, home live valuation, ranking unavailable 정상 케이스, logout-all.
+  - read-only assets/wallets/records/orders/positions/home/ranking 호출 전후로 주요 mutation row count 증가가 없음을 확인.
+  - 테스트 fixture는 고유 `mvp-flow-db-smoke` prefix로 생성하고 시작 전/finally cleanup하며, committed seed나 sample business data가 아님.
+  - provider ingestion, scheduler/batch, settlement, reward, matching/partial fill/durable quote 구현을 의미하지 않음.
 - `pnpm test -- seasons` 통과.
 - `pnpm test -- home` 통과.
 - `pnpm test -- ranking` 통과.

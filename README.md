@@ -77,9 +77,11 @@ AUTH_DB_SMOKE=1 pnpm test -- auth.integration.spec.ts
 SEASON_JOIN_DB_INTEGRATION=1 pnpm test -- seasons.join.integration.spec.ts
 FX_EXECUTE_DB_INTEGRATION=1 pnpm test -- fx.execute.integration.spec.ts
 ORDER_EXECUTE_DB_INTEGRATION=1 pnpm test -- orders.execute.integration.spec.ts
+MVP_FLOW_DB_SMOKE=1 pnpm test -- mvp-flow.integration.spec.ts
 ```
 
 These tests create isolated rows and clean them up. They do not call external providers.
+`MVP_FLOW_DB_SMOKE=1` is a service-composed real PostgreSQL smoke for the current MVP user flow: Auth signup/login/refresh, season join, wallets, admin_manual FX/asset/price test fixtures, assets, FX quote/execute, orders quote/create/execute, positions, records, home, ranking unavailable, and logout-all. It uses test-only fixture rows and is not provider ingestion, scheduler, settlement, reward, seed, or sample business data.
 
 ## Docs Entry Point
 
