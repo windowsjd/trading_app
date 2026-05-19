@@ -11,6 +11,7 @@ Use this directory in this order:
    - `docs/home-api-contract.md`
    - `docs/ranking-api-contract.md`
    - `docs/wallets-api-contract.md`
+   - `docs/positions-api-contract.md`
    - `docs/records-api-contract.md`
 5. Provider/freshness/crypto policy:
    - `docs/crypto-usd-settlement-policy-update.md`

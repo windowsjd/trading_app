@@ -190,6 +190,7 @@ near-term ledger/FX foundation:
   - `docs/home-api-contract.md`
   - `docs/ranking-api-contract.md`
   - `docs/wallets-api-contract.md`
+  - `docs/positions-api-contract.md`
   - `docs/records-api-contract.md`
 - Provider/freshness/crypto policy and evidence:
   - `docs/crypto-usd-settlement-policy-update.md`
@@ -440,6 +441,28 @@ near-term ledger/FX foundation:
 - 미참가면 fake wallet 없이 `state = not_joined`, no current season이면 `state = unavailable`.
 - wallet balance 재계산, FX 환산 valuation, wallet 생성/수정 없음.
 - `/wallets` 호출은 wallet row를 생성/수정/삭제하지 않음.
+
+### `/positions`
+
+- `GET /api/v1/positions` read-only MVP 구현 완료.
+- Home `topPositions`는 상위 5개 요약이고, `/positions`는 전체 보유 포지션 조회 전용 API.
+- access-token-only Auth MVP 이후 API는 전역 guard가 주입한 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
+- query parameter:
+  - `seasonId` optional.
+  - `includeClosed` optional, default false.
+  - `limit` optional, default 50, max 100 clamp.
+  - `offset` optional, default 0.
+  - `assetType` optional, allowed `domestic_stock`/`us_stock`/`crypto`.
+  - `currencyCode` optional, allowed `KRW`/`USD`.
+- source:
+  - 기존 `positions`와 `assets`.
+  - latest eligible `admin_manual` `asset_price_snapshots`.
+  - USD position KRW valuation에 필요한 fresh approved `admin_manual` USD/KRW `fx_rate_snapshots`.
+- valuation data가 없으면 전체 API 실패나 fake fallback 없이 해당 position의 `valuation.state = unavailable`로 반환.
+- KRW position은 USD/KRW 없이 valuation 가능하고, USD position은 FX missing/stale이면 해당 valuation만 unavailable.
+- `totalPositionValueKrw`는 valuation available position만 합산.
+- provider_api/official_batch ingestion, scheduler/batch, settlement/reward 구현 없음.
+- `/positions` 호출은 wallet/order/position/snapshot/ranking/ledger row를 생성/수정/삭제하지 않음.
 
 ### `/records`
 

@@ -7,6 +7,11 @@ jest.mock('../src/generated/prisma/client', () => {
       official_batch: 'official_batch',
       provider_api: 'provider_api',
     },
+    AssetType: {
+      domestic_stock: 'domestic_stock',
+      us_stock: 'us_stock',
+      crypto: 'crypto',
+    },
     CurrencyCode: {
       KRW: 'KRW',
       USD: 'USD',
@@ -876,6 +881,7 @@ describe('AppController (e2e)', () => {
     ['GET /api/v1/home', 'get', '/api/v1/home'],
     ['GET /api/v1/ranking', 'get', '/api/v1/ranking'],
     ['GET /api/v1/wallets', 'get', '/api/v1/wallets'],
+    ['GET /api/v1/positions', 'get', '/api/v1/positions'],
     ['GET /api/v1/records', 'get', '/api/v1/records'],
     ['GET /api/v1/orders', 'get', '/api/v1/orders'],
   ] as const)(
@@ -885,6 +891,19 @@ describe('AppController (e2e)', () => {
       await expectUnauthorizedWithXUserId(method, path);
     },
   );
+
+  it('/api/v1/positions (GET) rejects invalid and malformed bearer tokens before service work', async () => {
+    await expectUnauthorizedWithAuthorization(
+      'get',
+      '/api/v1/positions',
+      'Bearer invalid-token',
+    );
+    await expectUnauthorizedWithAuthorization(
+      'get',
+      '/api/v1/positions',
+      'Token invalid-token',
+    );
+  });
 
   it.each([
     [
@@ -983,6 +1002,26 @@ describe('AppController (e2e)', () => {
           },
         });
         expect(prisma.cashWallet.findMany).toHaveBeenCalled();
+      },
+    ],
+    [
+      'GET /api/v1/positions',
+      '/api/v1/positions',
+      () => {
+        mockActiveUser();
+        mockActiveSeason();
+        mockJoinedParticipant();
+        prisma.position.findMany.mockResolvedValueOnce([]);
+      },
+      (body: Record<string, unknown>) => {
+        expect(body).toMatchObject({
+          success: true,
+          data: {
+            state: 'available',
+            positions: [],
+          },
+        });
+        expect(prisma.position.findMany).toHaveBeenCalled();
       },
     ],
     [

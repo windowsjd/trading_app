@@ -15,6 +15,7 @@ This inventory separates current source-of-truth documents from historical plann
 | `docs/home-api-contract.md` | KEEP_API_CONTRACT | Yes | n/a | Keep | Current home API contract |
 | `docs/ranking-api-contract.md` | KEEP_API_CONTRACT | Yes | n/a | Keep | Current ranking API contract |
 | `docs/wallets-api-contract.md` | KEEP_API_CONTRACT | Yes | n/a | Keep | Current wallets API contract |
+| `docs/positions-api-contract.md` | KEEP_API_CONTRACT | Yes | n/a | Keep | Current positions API contract |
 | `docs/records-api-contract.md` | KEEP_API_CONTRACT | Yes | n/a | Keep | Current records API contract |
 | `docs/crypto-usd-settlement-policy-update.md` | KEEP_PROVIDER_POLICY | Yes | n/a | Keep | Current crypto USD settlement policy |
 | `docs/provider-final-selection-readiness-recheck.md` | KEEP_PROVIDER_POLICY | Yes | n/a | Keep | Current provider role/readiness policy |

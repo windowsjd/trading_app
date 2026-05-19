@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { FxModule } from './fx/fx.module';
 import { HomeModule } from './home/home.module';
 import { OrdersModule } from './orders/orders.module';
+import { PositionsModule } from './positions/positions.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RankingModule } from './ranking/ranking.module';
 import { RecordsModule } from './records/records.module';
@@ -22,6 +23,7 @@ import { WalletsModule } from './wallets/wallets.module';
     FxModule,
     HomeModule,
     OrdersModule,
+    PositionsModule,
     PrismaModule,
     RankingModule,
     RecordsModule,

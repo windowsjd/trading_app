@@ -22,6 +22,7 @@ Current source-of-truth and active reference documents:
 - `docs/home-api-contract.md`
 - `docs/ranking-api-contract.md`
 - `docs/wallets-api-contract.md`
+- `docs/positions-api-contract.md`
 - `docs/records-api-contract.md`
 - `docs/crypto-usd-settlement-policy-update.md`
 - `docs/provider-final-selection-readiness-recheck.md`
@@ -43,6 +44,7 @@ Reviewed code/test surface:
 - `src/home/*`
 - `src/ranking/*`
 - `src/wallets/*`
+- `src/positions/*`
 - `src/records/*`
 - `src/portfolio/*`
 - `scripts/admin-*`
@@ -109,6 +111,17 @@ Consistency note:
 - Remaining work: keep read-only; wallet mutation remains owned by join, FX execute, order execute, or future settlement/admin gates.
 - Risk level: LOW.
 - Recommended next action: no implementation until settlement/admin adjustment is explicitly gated.
+
+### Positions
+
+- Current status: `GET /api/v1/positions` read-only MVP implemented for full holdings/positions screen. It reads existing positions/assets, latest eligible `admin_manual` asset prices, and fresh approved `admin_manual` USD/KRW when USD valuation is needed.
+- Implemented files: `src/positions/positions.controller.ts`, `src/positions/positions.service.ts`, `src/positions/positions.module.ts`.
+- Source of truth: `docs/positions-api-contract.md`, `docs/current-status.md`.
+- Existing tests: `src/positions/positions.service.spec.ts`, `test/app.e2e-spec.ts`.
+- Known limitations: no provider price source, no implemented asset price stale threshold, no real DB positions read integration, no settlement/final-result integration.
+- Remaining work: real PostgreSQL read-only scenario if launch-critical; asset price freshness/provider work only after provider gates.
+- Risk level: MEDIUM.
+- Recommended next action: keep read-only and admin_manual-only; do not expand provider/scheduler/settlement/reward from this endpoint.
 
 ### FX Quote
 
