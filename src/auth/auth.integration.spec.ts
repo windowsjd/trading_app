@@ -20,6 +20,7 @@ describe('Auth DB smoke', () => {
           JWT_ACCESS_SECRET:
             process.env.JWT_ACCESS_SECRET || 'auth-db-smoke-test-secret',
           JWT_ACCESS_TTL: process.env.JWT_ACCESS_TTL || '15m',
+          REFRESH_TOKEN_TTL: process.env.REFRESH_TOKEN_TTL || '7d',
         },
         encoding: 'utf8',
         timeout: 60_000,
@@ -47,9 +48,10 @@ describe('Auth DB smoke', () => {
 const AUTH_DB_SMOKE_RUNNER = `
 import 'dotenv/config';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { HttpException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { UserStatus } from './src/generated/prisma/client';
+import { RefreshTokenSessionStatus, UserStatus } from './src/generated/prisma/client';
 import { PrismaService } from './src/prisma/prisma.service';
 import { AuthService } from './src/auth/auth.service';
 import { AccessTokenGuard } from './src/auth/access-token.guard';
@@ -72,6 +74,10 @@ const configService = {
 
     if (key === 'JWT_ACCESS_TTL') {
       return process.env.JWT_ACCESS_TTL || '15m';
+    }
+
+    if (key === 'REFRESH_TOKEN_TTL') {
+      return process.env.REFRESH_TOKEN_TTL;
     }
 
     return undefined;
@@ -101,6 +107,7 @@ async function main() {
     assert.equal(signupResponse.data.user.nickname, activeNickname);
     assert.equal(signupResponse.data.user.status, UserStatus.active);
     assert.ok(signupResponse.data.tokens.accessToken);
+    assert.ok(signupResponse.data.tokens.refreshToken);
     assert.equal(JSON.stringify(signupResponse).includes('passwordHash'), false);
 
     const activeUser = await prisma.user.findUniqueOrThrow({
@@ -108,6 +115,14 @@ async function main() {
     });
     assert.notEqual(activeUser.passwordHash, password);
     assert.equal(await argon2.verify(activeUser.passwordHash, password), true);
+    const signupRefreshSession = await prisma.refreshTokenSession.findUniqueOrThrow({
+      where: {
+        tokenHash: hashRefreshToken(signupResponse.data.tokens.refreshToken),
+      },
+    });
+    assert.equal(signupRefreshSession.userId, activeUser.id);
+    assert.equal(signupRefreshSession.status, RefreshTokenSessionStatus.active);
+    assert.notEqual(signupRefreshSession.tokenHash, signupResponse.data.tokens.refreshToken);
 
     const loginResponse = await authService.login({
       email: activeEmail,
@@ -115,6 +130,78 @@ async function main() {
     });
     assert.equal(loginResponse.success, true);
     assert.ok(loginResponse.data.tokens.accessToken);
+    assert.ok(loginResponse.data.tokens.refreshToken);
+
+    const refreshResponse = await authService.refresh({
+      refreshToken: loginResponse.data.tokens.refreshToken,
+    });
+    assert.equal(refreshResponse.success, true);
+    assert.ok(refreshResponse.data.tokens.accessToken);
+    assert.ok(refreshResponse.data.tokens.refreshToken);
+    assert.notEqual(
+      refreshResponse.data.tokens.refreshToken,
+      loginResponse.data.tokens.refreshToken,
+    );
+    const oldLoginRefreshSession = await prisma.refreshTokenSession.findUniqueOrThrow({
+      where: {
+        tokenHash: hashRefreshToken(loginResponse.data.tokens.refreshToken),
+      },
+    });
+    const rotatedRefreshSession = await prisma.refreshTokenSession.findUniqueOrThrow({
+      where: {
+        tokenHash: hashRefreshToken(refreshResponse.data.tokens.refreshToken),
+      },
+    });
+    assert.equal(oldLoginRefreshSession.status, RefreshTokenSessionStatus.revoked);
+    assert.equal(oldLoginRefreshSession.replacedBySessionId, rotatedRefreshSession.id);
+    assert.equal(rotatedRefreshSession.status, RefreshTokenSessionStatus.active);
+
+    try {
+      await authService.refresh({
+        refreshToken: loginResponse.data.tokens.refreshToken,
+      });
+      throw new Error('Expected old refresh token reuse to fail');
+    } catch (error) {
+      assert.ok(error instanceof HttpException);
+      assert.equal(error.getStatus(), 401);
+      assert.equal(error.getResponse().error.code, 'INVALID_REFRESH_TOKEN');
+    }
+
+    const logoutResponse = await authService.logout({
+      refreshToken: refreshResponse.data.tokens.refreshToken,
+    });
+    assert.equal(logoutResponse.success, true);
+    assert.equal(logoutResponse.data.revoked, true);
+    const loggedOutSession = await prisma.refreshTokenSession.findUniqueOrThrow({
+      where: {
+        tokenHash: hashRefreshToken(refreshResponse.data.tokens.refreshToken),
+      },
+    });
+    assert.equal(loggedOutSession.status, RefreshTokenSessionStatus.revoked);
+    const secondLogoutResponse = await authService.logout({
+      refreshToken: refreshResponse.data.tokens.refreshToken,
+    });
+    assert.equal(secondLogoutResponse.success, true);
+
+    const logoutAllLoginOne = await authService.login({
+      email: activeEmail,
+      password,
+    });
+    const logoutAllLoginTwo = await authService.login({
+      email: activeEmail,
+      password,
+    });
+    assert.ok(logoutAllLoginOne.data.tokens.refreshToken);
+    assert.ok(logoutAllLoginTwo.data.tokens.refreshToken);
+    const logoutAllResponse = await authService.logoutAll(activeUser.id);
+    assert.equal(logoutAllResponse.success, true);
+    const activeRefreshSessionCount = await prisma.refreshTokenSession.count({
+      where: {
+        userId: activeUser.id,
+        status: RefreshTokenSessionStatus.active,
+      },
+    });
+    assert.equal(activeRefreshSessionCount, 0);
 
     const request = {
       headers: {
@@ -200,6 +287,10 @@ async function cleanup() {
       },
     },
   });
+}
+
+function hashRefreshToken(token) {
+  return createHash('sha256').update(token).digest('hex');
 }
 
 main().catch((error) => {

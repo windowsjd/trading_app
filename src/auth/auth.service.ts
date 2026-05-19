@@ -10,13 +10,20 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
-import { UserStatus } from '../generated/prisma/client';
+import { createHash, randomBytes } from 'node:crypto';
+import {
+  RefreshTokenSessionStatus,
+  UserStatus,
+} from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type {
   AuthTokenResponse,
   AuthUser,
   CurrentUserResponse,
   LoginRequestBody,
+  LogoutResponse,
+  RefreshTokenRequestBody,
+  RequestAuthMetadata,
   SignupRequestBody,
 } from './auth.types';
 
@@ -34,7 +41,15 @@ type ParsedLoginRequest = {
   password: string;
 };
 
+type RefreshTokenArtifacts = {
+  token: string;
+  tokenHash: string;
+  expiresAt: Date;
+};
+
 const DEFAULT_ACCESS_TTL: JwtExpiresIn = '15m';
+const REFRESH_TOKEN_BYTE_LENGTH = 48;
+const REFRESH_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43,512}$/;
 
 @Injectable()
 export class AuthService implements OnModuleInit {
@@ -45,11 +60,15 @@ export class AuthService implements OnModuleInit {
   ) {}
 
   onModuleInit() {
-    this.getAccessSecret();
+    this.validateAuthConfiguration();
   }
 
-  async signup(body: SignupRequestBody = {}): Promise<AuthTokenResponse> {
+  async signup(
+    body: SignupRequestBody = {},
+    metadata: RequestAuthMetadata = {},
+  ): Promise<AuthTokenResponse> {
     const request = this.parseSignupRequest(body);
+    this.validateAuthConfiguration();
     const existingEmail = await this.prisma.user.findUnique({
       where: {
         email: request.email,
@@ -77,24 +96,36 @@ export class AuthService implements OnModuleInit {
     }
 
     const passwordHash = await argon2.hash(request.password);
+    const refreshToken = this.createRefreshTokenArtifacts();
 
     try {
-      const user = await this.prisma.user.create({
-        data: {
-          email: request.email,
-          passwordHash,
-          nickname: request.nickname,
-          status: UserStatus.active,
-        },
-        select: {
-          id: true,
-          email: true,
-          nickname: true,
-          status: true,
-        },
+      const user = await this.prisma.$transaction(async (tx) => {
+        const createdUser = await tx.user.create({
+          data: {
+            email: request.email,
+            passwordHash,
+            nickname: request.nickname,
+            status: UserStatus.active,
+          },
+          select: {
+            id: true,
+            email: true,
+            nickname: true,
+            status: true,
+          },
+        });
+
+        await this.createRefreshSession(
+          tx,
+          createdUser.id,
+          metadata,
+          refreshToken,
+        );
+
+        return createdUser;
       });
 
-      return this.buildAuthTokenResponse(user);
+      return this.buildAuthTokenResponse(user, refreshToken);
     } catch (error) {
       if (this.isUniqueConstraintError(error)) {
         this.throwSignupUniqueConflict(error);
@@ -104,8 +135,12 @@ export class AuthService implements OnModuleInit {
     }
   }
 
-  async login(body: LoginRequestBody = {}): Promise<AuthTokenResponse> {
+  async login(
+    body: LoginRequestBody = {},
+    metadata: RequestAuthMetadata = {},
+  ): Promise<AuthTokenResponse> {
     const request = this.parseLoginRequest(body);
+    this.validateAuthConfiguration();
     const user = await this.prisma.user.findUnique({
       where: {
         email: request.email,
@@ -135,12 +170,142 @@ export class AuthService implements OnModuleInit {
       this.throwUserNotActive();
     }
 
-    return this.buildAuthTokenResponse({
-      id: user.id,
-      email: user.email,
-      nickname: user.nickname,
-      status: user.status,
+    return this.createAuthTokenResponse(
+      {
+        id: user.id,
+        email: user.email,
+        nickname: user.nickname,
+        status: user.status,
+      },
+      metadata,
+    );
+  }
+
+  async refresh(
+    body: RefreshTokenRequestBody = {},
+    metadata: RequestAuthMetadata = {},
+  ): Promise<AuthTokenResponse> {
+    const refreshToken = this.parseRefreshToken(body.refreshToken);
+    this.validateAuthConfiguration();
+    const tokenHash = this.hashRefreshToken(refreshToken);
+    const nextRefreshToken = this.createRefreshTokenArtifacts();
+    const now = new Date();
+
+    const user = await this.prisma.$transaction(async (tx) => {
+      const session = await tx.refreshTokenSession.findUnique({
+        where: {
+          tokenHash,
+        },
+        select: {
+          id: true,
+          userId: true,
+          status: true,
+          expiresAt: true,
+          user: {
+            select: {
+              id: true,
+              email: true,
+              nickname: true,
+              status: true,
+            },
+          },
+        },
+      });
+
+      if (!session) {
+        this.throwInvalidRefreshToken();
+      }
+
+      if (session.status !== RefreshTokenSessionStatus.active) {
+        this.throwInvalidRefreshToken();
+      }
+
+      if (session.expiresAt.getTime() <= now.getTime()) {
+        this.throwInvalidRefreshToken();
+      }
+
+      if (session.user.status !== UserStatus.active) {
+        this.throwUserNotActive();
+      }
+
+      const newSession = await this.createRefreshSession(
+        tx,
+        session.userId,
+        metadata,
+        nextRefreshToken,
+      );
+      const revokeResult = await tx.refreshTokenSession.updateMany({
+        where: {
+          id: session.id,
+          status: RefreshTokenSessionStatus.active,
+        },
+        data: {
+          status: RefreshTokenSessionStatus.revoked,
+          revokedAt: now,
+          replacedBySessionId: newSession.id,
+        },
+      });
+
+      if (revokeResult.count !== 1) {
+        this.throwInvalidRefreshToken();
+      }
+
+      return {
+        id: session.user.id,
+        email: session.user.email,
+        nickname: session.user.nickname,
+        status: session.user.status,
+      };
     });
+
+    return this.buildAuthTokenResponse(user, nextRefreshToken);
+  }
+
+  async logout(body: RefreshTokenRequestBody = {}): Promise<LogoutResponse> {
+    const refreshToken = this.parseOptionalRefreshToken(body.refreshToken);
+    if (refreshToken) {
+      await this.prisma.refreshTokenSession.updateMany({
+        where: {
+          tokenHash: this.hashRefreshToken(refreshToken),
+          status: RefreshTokenSessionStatus.active,
+        },
+        data: {
+          status: RefreshTokenSessionStatus.revoked,
+          revokedAt: new Date(),
+        },
+      });
+    }
+
+    return {
+      success: true,
+      data: {
+        revoked: Boolean(refreshToken),
+      },
+    };
+  }
+
+  async logoutAll(userId: string | undefined): Promise<LogoutResponse> {
+    if (!userId) {
+      this.throwUnauthorized();
+    }
+
+    await this.prisma.refreshTokenSession.updateMany({
+      where: {
+        userId,
+        status: RefreshTokenSessionStatus.active,
+      },
+      data: {
+        status: RefreshTokenSessionStatus.revoked,
+        revokedAt: new Date(),
+      },
+    });
+
+    return {
+      success: true,
+      data: {
+        revoked: true,
+      },
+    };
   }
 
   async me(userId: string | undefined): Promise<CurrentUserResponse> {
@@ -249,26 +414,112 @@ export class AuthService implements OnModuleInit {
 
   private async buildAuthTokenResponse(
     user: AuthUser,
+    refreshToken: RefreshTokenArtifacts,
   ): Promise<AuthTokenResponse> {
+    const accessTokenExpiresIn = this.getAccessTtl();
+
     return {
       success: true,
       data: {
         user,
         tokens: {
-          accessToken: await this.signAccessToken(user.id),
+          accessToken: await this.signAccessToken(
+            user.id,
+            accessTokenExpiresIn,
+          ),
+          refreshToken: refreshToken.token,
+          accessTokenExpiresIn,
+          refreshTokenExpiresAt: refreshToken.expiresAt.toISOString(),
         },
       },
     };
   }
 
-  private signAccessToken(userId: string) {
+  private async createAuthTokenResponse(
+    user: AuthUser,
+    metadata: RequestAuthMetadata,
+  ) {
+    const refreshToken = this.createRefreshTokenArtifacts();
+
+    await this.createRefreshSession(
+      this.prisma,
+      user.id,
+      metadata,
+      refreshToken,
+    );
+
+    return this.buildAuthTokenResponse(user, refreshToken);
+  }
+
+  private async createRefreshSession(
+    client: Pick<PrismaService, 'refreshTokenSession'>,
+    userId: string,
+    metadata: RequestAuthMetadata,
+    refreshToken: RefreshTokenArtifacts,
+  ) {
+    return client.refreshTokenSession.create({
+      data: {
+        userId,
+        tokenHash: refreshToken.tokenHash,
+        status: RefreshTokenSessionStatus.active,
+        expiresAt: refreshToken.expiresAt,
+        userAgent: metadata.userAgent,
+        ipAddress: metadata.ipAddress,
+      },
+      select: {
+        id: true,
+      },
+    });
+  }
+
+  private createRefreshTokenArtifacts(): RefreshTokenArtifacts {
+    const token = randomBytes(REFRESH_TOKEN_BYTE_LENGTH).toString('base64url');
+
+    return {
+      token,
+      tokenHash: this.hashRefreshToken(token),
+      expiresAt: this.calculateExpiresAt(this.getRefreshTtl()),
+    };
+  }
+
+  private hashRefreshToken(token: string) {
+    return createHash('sha256').update(token).digest('hex');
+  }
+
+  private parseRefreshToken(value: unknown) {
+    if (typeof value !== 'string') {
+      this.throwInvalidRefreshToken();
+    }
+
+    const token = value.trim();
+    if (!this.isValidRefreshToken(token)) {
+      this.throwInvalidRefreshToken();
+    }
+
+    return token;
+  }
+
+  private parseOptionalRefreshToken(value: unknown) {
+    if (typeof value !== 'string') {
+      return null;
+    }
+
+    const token = value.trim();
+    return this.isValidRefreshToken(token) ? token : null;
+  }
+
+  private isValidRefreshToken(token: string) {
+    return REFRESH_TOKEN_PATTERN.test(token);
+  }
+
+  private signAccessToken(userId: string, expiresIn = this.getAccessTtl()) {
     return this.jwtService.signAsync(
       {
         sub: userId,
       },
       {
         secret: this.getAccessSecret(),
-        expiresIn: this.getAccessTtl(),
+        expiresIn,
       },
     );
   }
@@ -291,7 +542,32 @@ export class AuthService implements OnModuleInit {
     const ttl =
       this.configService.get<string>('JWT_ACCESS_TTL')?.trim() ||
       DEFAULT_ACCESS_TTL;
-    if (/^\d+(?:s|m|h|d|w)$/.test(ttl)) {
+    return this.validateTtl(ttl);
+  }
+
+  private getRefreshTtl(): JwtExpiresIn {
+    const ttl = this.configService.get<string>('REFRESH_TOKEN_TTL')?.trim();
+    if (!ttl) {
+      throw new InternalServerErrorException(
+        this.createErrorBody(
+          'AUTH_CONFIGURATION_ERROR',
+          'Auth configuration is missing.',
+        ),
+      );
+    }
+
+    return this.validateTtl(ttl);
+  }
+
+  private validateAuthConfiguration() {
+    this.getAccessSecret();
+    this.getAccessTtl();
+    this.getRefreshTtl();
+  }
+
+  private validateTtl(ttl: string): JwtExpiresIn {
+    const match = /^(\d+)(s|m|h|d|w)$/.exec(ttl);
+    if (match && Number(match[1]) > 0) {
       return ttl as JwtExpiresIn;
     }
 
@@ -301,6 +577,30 @@ export class AuthService implements OnModuleInit {
         'Auth configuration is invalid.',
       ),
     );
+  }
+
+  private calculateExpiresAt(ttl: JwtExpiresIn) {
+    const match = /^(\d+)(s|m|h|d|w)$/.exec(ttl);
+    if (!match) {
+      throw new InternalServerErrorException(
+        this.createErrorBody(
+          'AUTH_CONFIGURATION_ERROR',
+          'Auth configuration is invalid.',
+        ),
+      );
+    }
+
+    const amount = Number(match[1]);
+    const unit = match[2] as JwtTtlUnit;
+    const unitMs: Record<JwtTtlUnit, number> = {
+      s: 1_000,
+      m: 60_000,
+      h: 3_600_000,
+      d: 86_400_000,
+      w: 604_800_000,
+    };
+
+    return new Date(Date.now() + amount * unitMs[unit]);
   }
 
   private getUniqueConstraintTargets(error: unknown) {
@@ -349,6 +649,12 @@ export class AuthService implements OnModuleInit {
   private throwUnauthorized(): never {
     throw new UnauthorizedException(
       this.createErrorBody('UNAUTHORIZED', 'Unauthorized'),
+    );
+  }
+
+  private throwInvalidRefreshToken(): never {
+    throw new UnauthorizedException(
+      this.createErrorBody('INVALID_REFRESH_TOKEN', 'Invalid refresh token.'),
     );
   }
 

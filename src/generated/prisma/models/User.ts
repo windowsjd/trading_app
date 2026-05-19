@@ -208,6 +208,7 @@ export type UserWhereInput = {
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
   seasonParticipants?: Prisma.SeasonParticipantListRelationFilter
   fxExecuteRequests?: Prisma.FxExecuteRequestListRelationFilter
+  refreshTokenSessions?: Prisma.RefreshTokenSessionListRelationFilter
 }
 
 export type UserOrderByWithRelationInput = {
@@ -221,6 +222,7 @@ export type UserOrderByWithRelationInput = {
   updatedAt?: Prisma.SortOrder
   seasonParticipants?: Prisma.SeasonParticipantOrderByRelationAggregateInput
   fxExecuteRequests?: Prisma.FxExecuteRequestOrderByRelationAggregateInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionOrderByRelationAggregateInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -237,6 +239,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
   seasonParticipants?: Prisma.SeasonParticipantListRelationFilter
   fxExecuteRequests?: Prisma.FxExecuteRequestListRelationFilter
+  refreshTokenSessions?: Prisma.RefreshTokenSessionListRelationFilter
 }, "id" | "email" | "nickname">
 
 export type UserOrderByWithAggregationInput = {
@@ -278,6 +281,7 @@ export type UserCreateInput = {
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -291,6 +295,7 @@ export type UserUncheckedCreateInput = {
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserUpdateInput = {
@@ -304,6 +309,7 @@ export type UserUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -317,6 +323,7 @@ export type UserUncheckedUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -406,6 +413,20 @@ export type DateTimeFieldUpdateOperationsInput = {
   set?: Date | string
 }
 
+export type UserCreateNestedOneWithoutRefreshTokenSessionsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutRefreshTokenSessionsInput, Prisma.UserUncheckedCreateWithoutRefreshTokenSessionsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutRefreshTokenSessionsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutRefreshTokenSessionsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutRefreshTokenSessionsInput, Prisma.UserUncheckedCreateWithoutRefreshTokenSessionsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutRefreshTokenSessionsInput
+  upsert?: Prisma.UserUpsertWithoutRefreshTokenSessionsInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutRefreshTokenSessionsInput, Prisma.UserUpdateWithoutRefreshTokenSessionsInput>, Prisma.UserUncheckedUpdateWithoutRefreshTokenSessionsInput>
+}
+
 export type UserCreateNestedOneWithoutSeasonParticipantsInput = {
   create?: Prisma.XOR<Prisma.UserCreateWithoutSeasonParticipantsInput, Prisma.UserUncheckedCreateWithoutSeasonParticipantsInput>
   connectOrCreate?: Prisma.UserCreateOrConnectWithoutSeasonParticipantsInput
@@ -434,6 +455,74 @@ export type UserUpdateOneRequiredWithoutFxExecuteRequestsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutFxExecuteRequestsInput, Prisma.UserUpdateWithoutFxExecuteRequestsInput>, Prisma.UserUncheckedUpdateWithoutFxExecuteRequestsInput>
 }
 
+export type UserCreateWithoutRefreshTokenSessionsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  nickname: string
+  profileImageUrl?: string | null
+  status?: $Enums.UserStatus
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutRefreshTokenSessionsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  nickname: string
+  profileImageUrl?: string | null
+  status?: $Enums.UserStatus
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutRefreshTokenSessionsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutRefreshTokenSessionsInput, Prisma.UserUncheckedCreateWithoutRefreshTokenSessionsInput>
+}
+
+export type UserUpsertWithoutRefreshTokenSessionsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutRefreshTokenSessionsInput, Prisma.UserUncheckedUpdateWithoutRefreshTokenSessionsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutRefreshTokenSessionsInput, Prisma.UserUncheckedCreateWithoutRefreshTokenSessionsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutRefreshTokenSessionsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutRefreshTokenSessionsInput, Prisma.UserUncheckedUpdateWithoutRefreshTokenSessionsInput>
+}
+
+export type UserUpdateWithoutRefreshTokenSessionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutRefreshTokenSessionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+}
+
 export type UserCreateWithoutSeasonParticipantsInput = {
   id?: string
   email: string
@@ -444,6 +533,7 @@ export type UserCreateWithoutSeasonParticipantsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutSeasonParticipantsInput = {
@@ -456,6 +546,7 @@ export type UserUncheckedCreateWithoutSeasonParticipantsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutSeasonParticipantsInput = {
@@ -484,6 +575,7 @@ export type UserUpdateWithoutSeasonParticipantsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSeasonParticipantsInput = {
@@ -496,6 +588,7 @@ export type UserUncheckedUpdateWithoutSeasonParticipantsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutFxExecuteRequestsInput = {
@@ -508,6 +601,7 @@ export type UserCreateWithoutFxExecuteRequestsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutFxExecuteRequestsInput = {
@@ -520,6 +614,7 @@ export type UserUncheckedCreateWithoutFxExecuteRequestsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutFxExecuteRequestsInput = {
@@ -548,6 +643,7 @@ export type UserUpdateWithoutFxExecuteRequestsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutFxExecuteRequestsInput = {
@@ -560,6 +656,7 @@ export type UserUncheckedUpdateWithoutFxExecuteRequestsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 
@@ -570,11 +667,13 @@ export type UserUncheckedUpdateWithoutFxExecuteRequestsInput = {
 export type UserCountOutputType = {
   seasonParticipants: number
   fxExecuteRequests: number
+  refreshTokenSessions: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   seasonParticipants?: boolean | UserCountOutputTypeCountSeasonParticipantsArgs
   fxExecuteRequests?: boolean | UserCountOutputTypeCountFxExecuteRequestsArgs
+  refreshTokenSessions?: boolean | UserCountOutputTypeCountRefreshTokenSessionsArgs
 }
 
 /**
@@ -601,6 +700,13 @@ export type UserCountOutputTypeCountFxExecuteRequestsArgs<ExtArgs extends runtim
   where?: Prisma.FxExecuteRequestWhereInput
 }
 
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountRefreshTokenSessionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.RefreshTokenSessionWhereInput
+}
+
 
 export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -613,6 +719,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   updatedAt?: boolean
   seasonParticipants?: boolean | Prisma.User$seasonParticipantsArgs<ExtArgs>
   fxExecuteRequests?: boolean | Prisma.User$fxExecuteRequestsArgs<ExtArgs>
+  refreshTokenSessions?: boolean | Prisma.User$refreshTokenSessionsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -653,6 +760,7 @@ export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = run
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   seasonParticipants?: boolean | Prisma.User$seasonParticipantsArgs<ExtArgs>
   fxExecuteRequests?: boolean | Prisma.User$fxExecuteRequestsArgs<ExtArgs>
+  refreshTokenSessions?: boolean | Prisma.User$refreshTokenSessionsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -663,6 +771,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   objects: {
     seasonParticipants: Prisma.$SeasonParticipantPayload<ExtArgs>[]
     fxExecuteRequests: Prisma.$FxExecuteRequestPayload<ExtArgs>[]
+    refreshTokenSessions: Prisma.$RefreshTokenSessionPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1069,6 +1178,7 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   readonly [Symbol.toStringTag]: "PrismaPromise"
   seasonParticipants<T extends Prisma.User$seasonParticipantsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$seasonParticipantsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SeasonParticipantPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   fxExecuteRequests<T extends Prisma.User$fxExecuteRequestsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$fxExecuteRequestsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FxExecuteRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  refreshTokenSessions<T extends Prisma.User$refreshTokenSessionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$refreshTokenSessionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RefreshTokenSessionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1544,6 +1654,30 @@ export type User$fxExecuteRequestsArgs<ExtArgs extends runtime.Types.Extensions.
   take?: number
   skip?: number
   distinct?: Prisma.FxExecuteRequestScalarFieldEnum | Prisma.FxExecuteRequestScalarFieldEnum[]
+}
+
+/**
+ * User.refreshTokenSessions
+ */
+export type User$refreshTokenSessionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the RefreshTokenSession
+   */
+  select?: Prisma.RefreshTokenSessionSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the RefreshTokenSession
+   */
+  omit?: Prisma.RefreshTokenSessionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.RefreshTokenSessionInclude<ExtArgs> | null
+  where?: Prisma.RefreshTokenSessionWhereInput
+  orderBy?: Prisma.RefreshTokenSessionOrderByWithRelationInput | Prisma.RefreshTokenSessionOrderByWithRelationInput[]
+  cursor?: Prisma.RefreshTokenSessionWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.RefreshTokenSessionScalarFieldEnum | Prisma.RefreshTokenSessionScalarFieldEnum[]
 }
 
 /**

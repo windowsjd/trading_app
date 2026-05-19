@@ -51,6 +51,10 @@ jest.mock('../src/generated/prisma/client', () => {
       PrismaClientKnownRequestError: class PrismaClientKnownRequestError extends Error {},
     },
     PrismaClient: class PrismaClient {},
+    RefreshTokenSessionStatus: {
+      active: 'active',
+      revoked: 'revoked',
+    },
     SeasonStatus: {
       active: 'active',
       upcoming: 'upcoming',
@@ -105,9 +109,13 @@ import { JwtService } from '@nestjs/jwt';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
-import { Prisma } from './../src/generated/prisma/client';
+import {
+  Prisma,
+  RefreshTokenSessionStatus,
+} from './../src/generated/prisma/client';
 import { PrismaService } from './../src/prisma/prisma.service';
 import * as argon2 from 'argon2';
+import { createHash } from 'node:crypto';
 
 const mockedArgon2 = jest.mocked(argon2);
 
@@ -168,6 +176,11 @@ type PrismaMock = {
     update: jest.Mock;
     updateMany: jest.Mock;
   };
+  refreshTokenSession: {
+    create: jest.Mock;
+    findUnique: jest.Mock;
+    updateMany: jest.Mock;
+  };
   season: {
     findFirst: jest.Mock;
     findUnique: jest.Mock;
@@ -200,6 +213,7 @@ describe('AppController (e2e)', () => {
 
   const originalJwtAccessSecret = process.env.JWT_ACCESS_SECRET;
   const originalJwtAccessTtl = process.env.JWT_ACCESS_TTL;
+  const originalRefreshTokenTtl = process.env.REFRESH_TOKEN_TTL;
   const now = new Date('2026-05-09T00:00:00.000Z');
   const user = {
     id: 'user-1',
@@ -240,10 +254,15 @@ describe('AppController (e2e)', () => {
     balanceAmount: new Prisma.Decimal('0.00000000'),
     updatedAt: now,
   };
+  const refreshToken = 'r'.repeat(64);
+  const refreshTokenHash = createHash('sha256')
+    .update(refreshToken)
+    .digest('hex');
 
   beforeAll(() => {
     process.env.JWT_ACCESS_SECRET = 'test-secret';
     process.env.JWT_ACCESS_TTL = '15m';
+    process.env.REFRESH_TOKEN_TTL = '7d';
   });
 
   afterAll(() => {
@@ -257,6 +276,12 @@ describe('AppController (e2e)', () => {
       delete process.env.JWT_ACCESS_TTL;
     } else {
       process.env.JWT_ACCESS_TTL = originalJwtAccessTtl;
+    }
+
+    if (originalRefreshTokenTtl === undefined) {
+      delete process.env.REFRESH_TOKEN_TTL;
+    } else {
+      process.env.REFRESH_TOKEN_TTL = originalRefreshTokenTtl;
     }
   });
 
@@ -319,6 +344,11 @@ describe('AppController (e2e)', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),
+      },
+      refreshTokenSession: {
+        create: jest.fn().mockResolvedValue({ id: 'refresh-session-1' }),
+        findUnique: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       season: {
         findFirst: jest.fn(),
@@ -453,6 +483,8 @@ describe('AppController (e2e)', () => {
     expect(prisma.position.create).not.toHaveBeenCalled();
     expect(prisma.position.update).not.toHaveBeenCalled();
     expect(prisma.position.updateMany).not.toHaveBeenCalled();
+    expect(prisma.refreshTokenSession.create).not.toHaveBeenCalled();
+    expect(prisma.refreshTokenSession.updateMany).not.toHaveBeenCalled();
   };
 
   const expectNoServiceDatabaseCalls = () => {
@@ -480,6 +512,7 @@ describe('AppController (e2e)', () => {
     expect(prisma.position.findFirst).not.toHaveBeenCalled();
     expect(prisma.position.findMany).not.toHaveBeenCalled();
     expect(prisma.position.findUnique).not.toHaveBeenCalled();
+    expect(prisma.refreshTokenSession.findUnique).not.toHaveBeenCalled();
     expect(prisma.seasonRanking.findFirst).not.toHaveBeenCalled();
     expect(prisma.seasonRanking.findMany).not.toHaveBeenCalled();
     expect(prisma.seasonRanking.findUnique).not.toHaveBeenCalled();
@@ -640,7 +673,7 @@ describe('AppController (e2e)', () => {
       });
   });
 
-  it('/api/v1/auth/signup (POST) creates a user and returns an access token', () => {
+  it('/api/v1/auth/signup (POST) creates a user and returns access and refresh tokens', () => {
     prisma.user.findUnique
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null);
@@ -670,6 +703,13 @@ describe('AppController (e2e)', () => {
         expect(response.body.data.tokens.accessToken).toEqual(
           expect.any(String),
         );
+        expect(response.body.data.tokens.refreshToken).toEqual(
+          expect.any(String),
+        );
+        expect(response.body.data.tokens.accessTokenExpiresIn).toBe('15m');
+        expect(response.body.data.tokens.refreshTokenExpiresAt).toEqual(
+          expect.any(String),
+        );
         expect(JSON.stringify(response.body)).not.toContain('passwordHash');
         expect(prisma.user.create).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -679,10 +719,30 @@ describe('AppController (e2e)', () => {
             }),
           }),
         );
+        expect(prisma.refreshTokenSession.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              userId: user.id,
+              tokenHash: expect.any(String),
+              status: RefreshTokenSessionStatus.active,
+              expiresAt: expect.any(Date),
+            }),
+          }),
+        );
+        const storedTokenHash =
+          prisma.refreshTokenSession.create.mock.calls[0][0].data.tokenHash;
+        expect(storedTokenHash).not.toBe(
+          response.body.data.tokens.refreshToken,
+        );
+        expect(storedTokenHash).toBe(
+          createHash('sha256')
+            .update(response.body.data.tokens.refreshToken)
+            .digest('hex'),
+        );
       });
   });
 
-  it('/api/v1/auth/login (POST) authenticates a user and returns an access token', () => {
+  it('/api/v1/auth/login (POST) authenticates a user and returns access and refresh tokens', () => {
     prisma.user.findUnique.mockResolvedValueOnce(user);
 
     return request(app.getHttpServer())
@@ -703,7 +763,250 @@ describe('AppController (e2e)', () => {
         expect(response.body.data.tokens.accessToken).toEqual(
           expect.any(String),
         );
+        expect(response.body.data.tokens.refreshToken).toEqual(
+          expect.any(String),
+        );
+        expect(response.body.data.tokens.accessTokenExpiresIn).toBe('15m');
+        expect(response.body.data.tokens.refreshTokenExpiresAt).toEqual(
+          expect.any(String),
+        );
+        expect(prisma.refreshTokenSession.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              userId: user.id,
+              tokenHash: expect.any(String),
+              status: RefreshTokenSessionStatus.active,
+              expiresAt: expect.any(Date),
+            }),
+          }),
+        );
         expect(JSON.stringify(response.body)).not.toContain('passwordHash');
+      });
+  });
+
+  it('/api/v1/auth/refresh (POST) rejects missing and malformed refresh tokens', async () => {
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/refresh')
+      .send({})
+      .expect(401)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: false,
+          error: {
+            code: 'INVALID_REFRESH_TOKEN',
+          },
+        });
+        expect(prisma.refreshTokenSession.findUnique).not.toHaveBeenCalled();
+      });
+
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/refresh')
+      .send({
+        refreshToken: 'not a token',
+      })
+      .expect(401)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: false,
+          error: {
+            code: 'INVALID_REFRESH_TOKEN',
+          },
+        });
+        expect(prisma.refreshTokenSession.findUnique).not.toHaveBeenCalled();
+      });
+  });
+
+  it('/api/v1/auth/refresh (POST) rotates a valid refresh token', () => {
+    prisma.refreshTokenSession.findUnique.mockResolvedValueOnce({
+      id: 'refresh-session-1',
+      userId: user.id,
+      status: RefreshTokenSessionStatus.active,
+      expiresAt: new Date('2030-01-01T00:00:00.000Z'),
+      user: {
+        id: user.id,
+        email: user.email,
+        nickname: user.nickname,
+        status: user.status,
+      },
+    });
+    prisma.refreshTokenSession.create.mockResolvedValueOnce({
+      id: 'refresh-session-2',
+    });
+    prisma.refreshTokenSession.updateMany.mockResolvedValueOnce({ count: 1 });
+
+    return request(app.getHttpServer())
+      .post('/api/v1/auth/refresh')
+      .send({
+        refreshToken,
+      })
+      .expect(200)
+      .expect((response) => {
+        expect(response.body.success).toBe(true);
+        expect(response.body.data.user).toEqual({
+          id: user.id,
+          email: user.email,
+          nickname: user.nickname,
+          status: user.status,
+        });
+        expect(response.body.data.tokens.accessToken).toEqual(
+          expect.any(String),
+        );
+        expect(response.body.data.tokens.refreshToken).toEqual(
+          expect.any(String),
+        );
+        expect(response.body.data.tokens.refreshToken).not.toBe(refreshToken);
+        expect(prisma.refreshTokenSession.findUnique).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: {
+              tokenHash: refreshTokenHash,
+            },
+          }),
+        );
+        expect(prisma.refreshTokenSession.updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: {
+              id: 'refresh-session-1',
+              status: RefreshTokenSessionStatus.active,
+            },
+            data: expect.objectContaining({
+              status: RefreshTokenSessionStatus.revoked,
+              replacedBySessionId: 'refresh-session-2',
+            }),
+          }),
+        );
+      });
+  });
+
+  it('/api/v1/auth/refresh (POST) rejects old refresh token reuse after rotation', async () => {
+    prisma.refreshTokenSession.findUnique
+      .mockResolvedValueOnce({
+        id: 'refresh-session-1',
+        userId: user.id,
+        status: RefreshTokenSessionStatus.active,
+        expiresAt: new Date('2030-01-01T00:00:00.000Z'),
+        user: {
+          id: user.id,
+          email: user.email,
+          nickname: user.nickname,
+          status: user.status,
+        },
+      })
+      .mockResolvedValueOnce({
+        id: 'refresh-session-1',
+        userId: user.id,
+        status: RefreshTokenSessionStatus.revoked,
+        expiresAt: new Date('2030-01-01T00:00:00.000Z'),
+        user: {
+          id: user.id,
+          email: user.email,
+          nickname: user.nickname,
+          status: user.status,
+        },
+      });
+    prisma.refreshTokenSession.create.mockResolvedValueOnce({
+      id: 'refresh-session-2',
+    });
+    prisma.refreshTokenSession.updateMany.mockResolvedValueOnce({ count: 1 });
+
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/refresh')
+      .send({
+        refreshToken,
+      })
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/refresh')
+      .send({
+        refreshToken,
+      })
+      .expect(401)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: false,
+          error: {
+            code: 'INVALID_REFRESH_TOKEN',
+          },
+        });
+      });
+  });
+
+  it('/api/v1/auth/logout (POST) is idempotent and does not expose token existence', async () => {
+    prisma.refreshTokenSession.updateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
+
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/logout')
+      .send({
+        refreshToken,
+      })
+      .expect(200)
+      .expect({
+        success: true,
+        data: {
+          revoked: true,
+        },
+      });
+
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/logout')
+      .send({
+        refreshToken,
+      })
+      .expect(200)
+      .expect({
+        success: true,
+        data: {
+          revoked: true,
+        },
+      });
+    expect(prisma.refreshTokenSession.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          tokenHash: refreshTokenHash,
+          status: RefreshTokenSessionStatus.active,
+        },
+      }),
+    );
+  });
+
+  it('/api/v1/auth/logout-all (POST) rejects missing token', async () => {
+    await expectUnauthorizedWithoutToken('post', '/api/v1/auth/logout-all');
+  });
+
+  it('/api/v1/auth/logout-all (POST) rejects x-user-id only', async () => {
+    await expectUnauthorizedWithXUserId('post', '/api/v1/auth/logout-all');
+  });
+
+  it('/api/v1/auth/logout-all (POST) revokes active refresh sessions for the authenticated user', async () => {
+    mockActiveUser();
+    prisma.refreshTokenSession.updateMany.mockResolvedValueOnce({ count: 2 });
+    const token = await createValidAccessToken();
+
+    return request(app.getHttpServer())
+      .post('/api/v1/auth/logout-all')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+      .expect((response) => {
+        expect(response.body).toEqual({
+          success: true,
+          data: {
+            revoked: true,
+          },
+        });
+        expect(prisma.refreshTokenSession.updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: {
+              userId: user.id,
+              status: RefreshTokenSessionStatus.active,
+            },
+            data: expect.objectContaining({
+              status: RefreshTokenSessionStatus.revoked,
+              revokedAt: expect.any(Date),
+            }),
+          }),
+        );
       });
   });
 

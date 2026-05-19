@@ -24,6 +24,15 @@ export type LoginRequestBody = {
   password?: unknown;
 };
 
+export type RefreshTokenRequestBody = {
+  refreshToken?: unknown;
+};
+
+export type RequestAuthMetadata = {
+  userAgent?: string;
+  ipAddress?: string;
+};
+
 export type AuthUser = {
   id: string;
   email: string;
@@ -37,7 +46,17 @@ export type AuthTokenResponse = {
     user: AuthUser;
     tokens: {
       accessToken: string;
+      refreshToken: string;
+      accessTokenExpiresIn: string;
+      refreshTokenExpiresAt: string;
     };
+  };
+};
+
+export type LogoutResponse = {
+  success: true;
+  data: {
+    revoked: boolean;
   };
 };
 

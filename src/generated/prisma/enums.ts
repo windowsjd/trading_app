@@ -18,6 +18,14 @@ export const UserStatus = {
 export type UserStatus = (typeof UserStatus)[keyof typeof UserStatus]
 
 
+export const RefreshTokenSessionStatus = {
+  active: 'active',
+  revoked: 'revoked'
+} as const
+
+export type RefreshTokenSessionStatus = (typeof RefreshTokenSessionStatus)[keyof typeof RefreshTokenSessionStatus]
+
+
 export const SeasonStatus = {
   upcoming: 'upcoming',
   active: 'active',

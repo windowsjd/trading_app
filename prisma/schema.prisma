@@ -14,6 +14,11 @@ enum UserStatus {
   deleted
 }
 
+enum RefreshTokenSessionStatus {
+  active
+  revoked
+}
+
 enum SeasonStatus {
   upcoming
   active
@@ -121,10 +126,33 @@ model User {
   createdAt       DateTime   @default(now()) @map("created_at")
   updatedAt       DateTime   @updatedAt @map("updated_at")
 
-  seasonParticipants SeasonParticipant[]
-  fxExecuteRequests  FxExecuteRequest[]
+  seasonParticipants   SeasonParticipant[]
+  fxExecuteRequests    FxExecuteRequest[]
+  refreshTokenSessions RefreshTokenSession[]
 
   @@map("users")
+}
+
+model RefreshTokenSession {
+  id                  String                    @id @default(uuid())
+  userId              String                    @map("user_id")
+  tokenHash           String                    @unique @map("token_hash")
+  status              RefreshTokenSessionStatus @default(active)
+  expiresAt           DateTime                  @map("expires_at")
+  createdAt           DateTime                  @default(now()) @map("created_at")
+  updatedAt           DateTime                  @updatedAt @map("updated_at")
+  revokedAt           DateTime?                 @map("revoked_at")
+  replacedBySessionId String?                   @map("replaced_by_session_id")
+  userAgent           String?                   @map("user_agent")
+  ipAddress           String?                   @map("ip_address")
+
+  user                      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replacedBySession         RefreshTokenSession?  @relation("RefreshTokenSessionReplacement", fields: [replacedBySessionId], references: [id], onDelete: SetNull)
+  replacementSourceSessions RefreshTokenSession[] @relation("RefreshTokenSessionReplacement")
+
+  @@index([userId])
+  @@index([status, expiresAt])
+  @@map("refresh_token_sessions")
 }
 
 model Season {
@@ -278,12 +306,12 @@ model Order {
   assetPriceSnapshot AssetPriceSnapshot? @relation(fields: [assetPriceSnapshotId], references: [id], onDelete: Restrict)
   fxRateSnapshot     FxRateSnapshot?     @relation(fields: [fxRateSnapshotId], references: [id], onDelete: Restrict)
 
+  @@unique([seasonParticipantId, idempotencyKey])
   @@index([seasonParticipantId, submittedAt])
   @@index([seasonParticipantId, status])
   @@index([assetId])
   @@index([assetPriceSnapshotId])
   @@index([fxRateSnapshotId])
-  @@unique([seasonParticipantId, idempotencyKey])
   @@index([submittedAt])
   @@index([status])
   @@map("orders")

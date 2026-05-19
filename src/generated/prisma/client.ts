@@ -41,9 +41,14 @@ export { Prisma }
 
 /**
  * Model User
- * 
+ *
  */
 export type User = Prisma.UserModel
+/**
+ * Model RefreshTokenSession
+ *
+ */
+export type RefreshTokenSession = Prisma.RefreshTokenSessionModel
 /**
  * Model Season
  * 

@@ -20,9 +20,12 @@
 
 ## 2. 구현 완료 API
 
-- `POST /api/v1/auth/signup` access-token-only Auth MVP
-- `POST /api/v1/auth/login` access-token-only Auth MVP
-- `GET /api/v1/me` access-token-only Auth MVP
+- `POST /api/v1/auth/signup` access token + refresh token Auth MVP
+- `POST /api/v1/auth/login` access token + refresh token Auth MVP
+- `POST /api/v1/auth/refresh` refresh token rotation MVP
+- `POST /api/v1/auth/logout` refresh session revoke MVP
+- `POST /api/v1/auth/logout-all` user refresh sessions revoke MVP
+- `GET /api/v1/me` Bearer access token Auth MVP
 - `GET /api/v1/home` read-only MVP
 - `GET /api/v1/ranking` read-only MVP
 - `GET /api/v1/wallets` read-only MVP
@@ -53,10 +56,11 @@
 
 ## 4. 현재 인증 상태
 
-- access-token-only Auth MVP 구현 완료.
-- `POST /api/v1/auth/signup`, `POST /api/v1/auth/login`, `GET /api/v1/me` 구현 완료.
+- access token + refresh token Auth MVP 구현 완료.
+- `POST /api/v1/auth/signup`, `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout`, `POST /api/v1/auth/logout-all`, `GET /api/v1/me` 구현 완료.
 - `POST /api/v1/auth/signup`은 명시적으로 `201 Created`.
 - `POST /api/v1/auth/login`은 명시적으로 `200 OK`.
+- `POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout`, `POST /api/v1/auth/logout-all`은 명시적으로 `200 OK`.
 - 전역 access token guard가 JWT를 검증하고 DB의 active user를 확인한 뒤 `request.user = { userId }`를 주입.
 - 보호 API에서 사용자 식별자는 계속 `request.user.userId` 기준.
 - `JWT_ACCESS_SECRET`이 없으면 앱은 fail closed.
@@ -64,6 +68,21 @@
   - 허용 단위: `s`, `m`, `h`, `d`, `w`.
   - 허용 예: `30s`, `15m`, `1h`, `7d`, `2w`.
   - 금지 예: `900`, `15 m`, `500ms`, `1y`, 빈 문자열.
+- `REFRESH_TOKEN_TTL`은 필수이며 없으면 앱은 fail closed.
+  - 기존 TTL 형식과 동일한 공백 없는 양수 숫자+단위 문자열만 허용.
+  - 권장 예: `7d`, `14d`, `30d`.
+  - 금지 예: `900`, `15 d`, `500ms`, `1y`, 빈 문자열.
+- refresh token은 opaque random token이며 DB에는 SHA-256 `tokenHash`만 저장.
+- refresh session은 `refresh_token_sessions`에 저장하며 status는 `active`, `revoked`.
+- refresh는 rotation 방식:
+  - valid active refresh token 성공 시 기존 session을 `revoked`로 바꾸고 새 active session을 생성.
+  - old refresh token 재사용은 `401 INVALID_REFRESH_TOKEN`.
+  - rotation DB write는 단일 Prisma transaction으로 처리.
+- logout은 public route이며 refresh token body 기준 active refresh session을 revoke.
+  - unknown/revoked/expired token도 idempotent success를 반환하고 token 존재 여부를 노출하지 않음.
+- logout-all은 protected route이며 access token guard가 주입한 `request.user.userId` 기준 active refresh sessions를 모두 revoke.
+- access token은 stateless JWT이며 이번 MVP에서 blacklist/revocation table은 없음.
+- cookie/session auth는 이번 MVP 범위가 아님.
 - `GET /api/v1/seasons/current`는 optional auth:
   - Authorization header가 없으면 anonymous 허용.
   - Authorization header가 있으면 반드시 검증하며 invalid/expired/malformed token은 anonymous downgrade 없이 `UNAUTHORIZED`.
@@ -71,13 +90,18 @@
   - AppController health route.
   - `POST /api/v1/auth/signup`.
   - `POST /api/v1/auth/login`.
+  - `POST /api/v1/auth/refresh`.
+  - `POST /api/v1/auth/logout`.
+- protected Auth route:
+  - `POST /api/v1/auth/logout-all`.
 - inactive user:
   - missing/invalid/expired/forged token 또는 unknown user는 `UNAUTHORIZED`.
   - `User.status`가 `suspended` 또는 `deleted`이면 `FORBIDDEN` + `USER_NOT_ACTIVE`.
-- refresh token, session/cookie auth, token revocation/logout은 아직 미구현.
 - `x-user-id` fallback 없음 유지.
 - Auth 적용 후 HTTP e2e coverage 확대 완료:
-  - public route: `GET /health`, `GET /health/db`, `POST /api/v1/auth/signup`, `POST /api/v1/auth/login`.
+  - public route: `GET /health`, `GET /health/db`, `POST /api/v1/auth/signup`, `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout`.
+  - Auth refresh/logout route: missing/malformed refresh token 거절, valid refresh rotation, old refresh token reuse 실패, logout idempotent success 검증.
+  - Auth logout-all route: missing token, `x-user-id` only `UNAUTHORIZED`, valid token success 검증.
   - optional auth route: `GET /api/v1/seasons/current` anonymous/valid token/invalid token/malformed Authorization/`x-user-id` only 회귀 검증.
   - protected read-only route: `GET /api/v1/me`, `/home`, `/ranking`, `/wallets`, `/records`, `/orders` missing token 및 `x-user-id` only `UNAUTHORIZED` 검증.
   - protected read-only route valid token smoke: `GET /api/v1/me`, `/home`, `/ranking`, `/wallets`, `/records`, `/orders`가 guard를 통과해 service-level 정상 응답 또는 known unavailable/not_joined 계약으로 진입하는지 검증.
@@ -104,9 +128,13 @@
 - `orders`
 - `daily_portfolio_snapshots`
 - `season_rankings`
+- `refresh_token_sessions`
 
 near-term ledger/FX foundation:
 
+- Auth refresh session foundation 반영 완료: `RefreshTokenSessionStatus`, `refresh_token_sessions`.
+- Auth refresh session migration 생성 완료: `20260519090000_add_refresh_token_sessions`.
+- Auth refresh session migration 로컬 DB 적용 완료: `20260519090000_add_refresh_token_sessions`.
 - `wallet_transactions`: Prisma schema 반영, migration 생성/DB 적용 완료, season join initial_grant write path 구현 완료.
   - `SEASON_JOIN_DB_INTEGRATION=1` opt-in PostgreSQL integration spec가 active join participant/KRW wallet/USD wallet/initial_grant ledger 생성, duplicate/race conflict, inactive rejection, failure-injection rollback을 검증.
 - `exchange_transactions`: Prisma schema 반영, migration 생성/DB 적용 완료, `/fx execute` 1차 write path에서 생성.
@@ -197,6 +225,7 @@ near-term ledger/FX foundation:
 - Test coverage source of truth: `docs/backend-test-coverage-matrix.md`.
 - Docs navigation/inventory: `docs/README.md`, `docs/docs-inventory.md`.
 - API contracts:
+  - `docs/auth-api-contract.md`
   - `docs/fx-api-contract.md`
   - `docs/orders-api-contract.md`
   - `docs/assets-api-contract.md`
@@ -229,7 +258,7 @@ near-term ledger/FX foundation:
   - CLI dry-run 후 non-dry-run snapshot 입력 성공.
   - 입력 snapshot: rate `1450.00000000`, sourceType/sourceName `admin_manual`, approvedByUserId `usr_dev_001`, effectiveAt/capturedAt `2026-05-07T10:01:53.000Z`.
   - smoke 당시 fresh 조건 통과: `ageMsAtCheck = 41822`로 60초 이내.
-  - access-token-only Auth MVP 이전 smoke였으므로 HTTP 대신 실제 Prisma/PostgreSQL을 사용하는 `FxService.quote(userId, body)` 직접 호출 검증.
+  - Bearer access token Auth MVP 이전 smoke였으므로 HTTP 대신 실제 Prisma/PostgreSQL을 사용하는 `FxService.quote(userId, body)` 직접 호출 검증.
   - KRW -> USD, USD -> KRW 양방향 quote 성공.
   - quote 응답의 `quoteId = null`, `expiresAt = null`, `rateCapturedAt`, `rateEffectiveAt` 확인.
   - quote 전후 mutation 없음 확인: `exchange_transactions 0 -> 0`, `wallet_transactions 1 -> 1`, `fx_execute_requests 0 -> 0`, `equity_snapshots 0 -> 0`.
@@ -387,7 +416,7 @@ near-term ledger/FX foundation:
 ### `/home`
 
 - `GET /api/v1/home` read-only MVP 구현 완료.
-- access-token-only Auth MVP 이후 API는 전역 guard가 주입한 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
+- Bearer access token Auth MVP 이후 API는 전역 guard가 주입한 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
 - 구현된 mode:
   - `active_joined`
   - `active_not_joined`
@@ -423,7 +452,7 @@ near-term ledger/FX foundation:
 ### `/ranking`
 
 - `GET /api/v1/ranking` read-only MVP 구현 완료.
-- access-token-only Auth MVP 이후 API는 전역 guard가 주입한 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
+- Bearer access token Auth MVP 이후 API는 전역 guard가 주입한 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
 - query parameter:
   - `seasonId` optional.
   - `rankingDate` optional, `YYYY-MM-DD`.
@@ -448,7 +477,7 @@ near-term ledger/FX foundation:
 ### `/wallets`
 
 - `GET /api/v1/wallets` read-only MVP 구현 완료.
-- access-token-only Auth MVP 이후 API는 전역 guard가 주입한 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
+- Bearer access token Auth MVP 이후 API는 전역 guard가 주입한 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
 - current season 선택 우선순위는 `/home`, `/ranking`과 동일: active, upcoming, ended, settled.
 - joined participant가 있으면 season status와 무관하게 기존 `cash_wallets`를 read-only로 조회.
 - 미참가면 fake wallet 없이 `state = not_joined`, no current season이면 `state = unavailable`.
@@ -459,7 +488,7 @@ near-term ledger/FX foundation:
 
 - `GET /api/v1/positions` read-only MVP 구현 완료.
 - Home `topPositions`는 상위 5개 요약이고, `/positions`는 전체 보유 포지션 조회 전용 API.
-- access-token-only Auth MVP 이후 API는 전역 guard가 주입한 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
+- Bearer access token Auth MVP 이후 API는 전역 guard가 주입한 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
 - query parameter:
   - `seasonId` optional.
   - `includeClosed` optional, default false.
@@ -483,7 +512,7 @@ near-term ledger/FX foundation:
 - `GET /api/v1/assets/:assetId` read-only MVP 구현 완료.
 - Orders quote/create가 요구하는 `assetId`를 사용자가 찾고 선택할 수 있는 전용 조회 API.
 - Home `topPositions`는 홈 요약 top 5, `/positions`는 보유 포지션 전체, `/assets`는 거래할 종목 목록/상세 조회 역할.
-- access-token-only Auth MVP 이후 API는 전역 guard가 주입한 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
+- Bearer access token Auth MVP 이후 API는 전역 guard가 주입한 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
 - query parameter:
   - `assetType` optional, allowed `domestic_stock`/`us_stock`/`crypto`.
   - `currencyCode` optional, allowed `KRW`/`USD`.
@@ -508,7 +537,7 @@ near-term ledger/FX foundation:
 ### `/records`
 
 - `GET /api/v1/records` read-only MVP 구현 완료.
-- access-token-only Auth MVP 이후 API는 전역 guard가 주입한 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
+- Bearer access token Auth MVP 이후 API는 전역 guard가 주입한 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
 - query parameter:
   - `seasonId` optional.
   - `type` optional, default `all`, allowed `all`/`exchanges`/`wallets`/`orders`.
@@ -542,7 +571,7 @@ near-term ledger/FX foundation:
 - `POST /api/v1/orders` create idempotency MVP 구현 완료.
 - `POST /api/v1/orders/:orderId/cancel` submitted order cancel MVP 구현 완료.
 - `POST /api/v1/orders/:orderId/execute` full-fill MVP 구현 완료.
-- access-token-only Auth MVP 이후 API는 전역 guard가 주입한 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
+- Bearer access token Auth MVP 이후 API는 전역 guard가 주입한 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
 - query parameter:
   - `seasonId` optional.
   - `status` optional, allowed `submitted`/`executed`/`canceled`/`rejected`.
@@ -652,13 +681,14 @@ near-term ledger/FX foundation:
   - asset price freshness/source policy 구현 반영 및 고위험 테스트.
   - scheduler/batch foundation 및 automatic daily snapshot/ranking.
   - settlement/reward/badge/trophy.
-  - refresh token/logout/revocation schema 및 정책.
+  - access token blacklist/revocation, cookie/session auth, refresh token reuse theft-response hardening.
   - durable quote, order exact execute replay, partial fill, matching engine.
   - FX stale pending/unknown outcome recovery.
   - deployment/operations readiness.
 - settlement
-- refresh token/session management
-- token revocation/logout
+- access token blacklist/revocation
+- cookie/session auth
+- refresh token reuse detection 시 user active sessions 전체 revoke 정책
 - auth guard 회귀 외 추가 비즈니스 시나리오별 HTTP e2e coverage
 - 운영 secret 관리
 - order exact execute replay
@@ -698,14 +728,17 @@ near-term ledger/FX foundation:
 - `admin_manual` asset/price input CLI 구현 및 validation unit test 통과.
 - `pnpm test` 통과.
 - `pnpm build` 통과.
-- access-token-only Auth MVP 검증:
+- access token + refresh token Auth MVP 검증:
   - `pnpm test -- auth` 통과.
   - `pnpm run test:e2e` 통과.
   - `AUTH_DB_SMOKE=1 pnpm test -- auth.integration.spec.ts`용 실제 PostgreSQL smoke spec 추가.
   - `AUTH_DB_SMOKE=1 pnpm test -- auth.integration.spec.ts` 통과.
-  - DB smoke 검증 범위: 실제 Prisma user create, argon2 hash 저장/검증, login 성공, access token 발급, guard active user 확인, `me` 확인, suspended user `USER_NOT_ACTIVE`, cleanup.
+  - DB smoke 검증 범위: 실제 Prisma user create, argon2 hash 저장/검증, signup/login refresh session 생성, refresh token hash-only 저장, refresh rotation, old refresh token reuse 실패, logout revoke/idempotency, logout-all active session revoke, access token guard active user 확인, `me` 확인, suspended user `USER_NOT_ACTIVE`, cleanup.
   - `AUTH_DB_SMOKE=1`이 없으면 DB smoke는 명시적으로 disabled 상태로 통과하며 DB row를 생성하지 않음.
   - `GET /api/v1/home` missing token 차단, `GET /api/v1/seasons/current` optional auth, `GET /api/v1/me` token 인증 smoke 확인.
+  - `POST /api/v1/auth/refresh` missing/malformed token 거절, valid rotation, old token reuse 실패 확인.
+  - `POST /api/v1/auth/logout` idempotent success 확인.
+  - `POST /api/v1/auth/logout-all` missing token/`x-user-id` only 차단 및 valid access token success 확인.
   - Auth protected route HTTP e2e 회귀 검증 확대 완료.
   - public/optional/protected read-only/write-path route의 missing token, invalid/malformed token, `x-user-id` only, valid token smoke 범위가 `test/app.e2e-spec.ts`에 반영됨.
   - write-path API의 full execute mutation 검증은 기존 service/unit/DB integration spec이 담당하며, HTTP e2e는 guard 차단과 protected write-path valid-token service-entry smoke 중심으로 유지.

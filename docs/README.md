@@ -6,6 +6,7 @@ Use this directory in this order:
 2. `docs/backend-gate-roadmap.md` - gate decision and next-work source of truth.
 3. `docs/backend-test-coverage-matrix.md` - test coverage source of truth.
 4. API contracts:
+   - `docs/auth-api-contract.md`
    - `docs/fx-api-contract.md`
    - `docs/orders-api-contract.md`
    - `docs/assets-api-contract.md`

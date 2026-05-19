@@ -6,7 +6,7 @@ This service owns backend APIs, database access, financial calculations, and ser
 
 ## Current MVP Scope
 
-- Access-token-only auth: signup, login, and `GET /api/v1/me`.
+- Access token + refresh token auth: signup, login, refresh, logout, logout-all, and `GET /api/v1/me`.
 - Current season lookup and season join.
 - Home as one aggregate API.
 - Wallets, records, ranking, and orders read APIs.
@@ -23,7 +23,7 @@ These are intentionally outside the current implementation and should not be add
 - Scheduler or batch jobs.
 - Settlement.
 - Reward, badge, or trophy grants.
-- Refresh token, logout, revocation, session auth, and cookie auth.
+- Access token blacklist/revocation, server-side session auth, and cookie auth.
 - Matching engine, partial fill, durable quote, or exact order execute replay.
 - Fake, static, sample, temporary, or fallback business price data.
 
@@ -35,13 +35,17 @@ Required for local application work:
 - `REDIS_URL`: Redis connection string reserved for backend runtime integration.
 - `JWT_ACCESS_SECRET`: strong secret for access-token signing and verification.
 - `JWT_ACCESS_TTL`: explicit access-token lifetime.
+- `REFRESH_TOKEN_TTL`: explicit opaque refresh-token lifetime.
 
-`JWT_ACCESS_SECRET` is fail-closed. If it is missing, protected auth cannot succeed.
+`JWT_ACCESS_SECRET` and `REFRESH_TOKEN_TTL` are fail-closed. If either is missing, auth configuration validation fails.
 
-`JWT_ACCESS_TTL` must be a number plus one allowed unit with no spaces:
+`JWT_ACCESS_TTL` and `REFRESH_TOKEN_TTL` must be a number plus one allowed unit with no spaces:
 
 - Allowed: `30s`, `15m`, `1h`, `7d`, `2w`
-- Rejected: `900`, `15 m`, `500ms`, `1y`, empty string
+- Common refresh examples: `7d`, `14d`, `30d`
+- Rejected: `900`, `15 m`, `15 d`, `500ms`, `1y`, empty string
+
+Refresh tokens are opaque random tokens. The raw token is returned to the client and never stored in PostgreSQL; only a SHA-256 hash is stored in `refresh_token_sessions`. Refresh uses token rotation. Logout revokes refresh sessions. Access tokens remain stateless Bearer JWTs and are not blacklisted in this MVP.
 
 ## Local Commands
 
@@ -87,7 +91,7 @@ Current source of truth order:
 2. `docs/current-status.md`
 3. `docs/backend-gate-roadmap.md`
 4. `docs/backend-test-coverage-matrix.md`
-5. API contract docs under `docs/*-api-contract.md`
+5. `docs/auth-api-contract.md` and API contract docs under `docs/*-api-contract.md`
 
 `docs/archive/` is historical reference only and must not override the current documents above.
 

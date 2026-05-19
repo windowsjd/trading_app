@@ -385,6 +385,7 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 
 export const ModelName = {
   User: 'User',
+  RefreshTokenSession: 'RefreshTokenSession',
   Season: 'Season',
   SeasonParticipant: 'SeasonParticipant',
   Asset: 'Asset',
@@ -414,7 +415,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "season" | "seasonParticipant" | "asset" | "assetPriceSnapshot" | "position" | "order" | "cashWallet" | "walletTransaction" | "exchangeTransaction" | "fxRateSnapshot" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking"
+    modelProps: "user" | "refreshTokenSession" | "season" | "seasonParticipant" | "asset" | "assetPriceSnapshot" | "position" | "order" | "cashWallet" | "walletTransaction" | "exchangeTransaction" | "fxRateSnapshot" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -489,6 +490,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.UserCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.UserCountAggregateOutputType> | number
+        }
+      }
+    }
+    RefreshTokenSession: {
+      payload: Prisma.$RefreshTokenSessionPayload<ExtArgs>
+      fields: Prisma.RefreshTokenSessionFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.RefreshTokenSessionFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshTokenSessionPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.RefreshTokenSessionFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshTokenSessionPayload>
+        }
+        findFirst: {
+          args: Prisma.RefreshTokenSessionFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshTokenSessionPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.RefreshTokenSessionFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshTokenSessionPayload>
+        }
+        findMany: {
+          args: Prisma.RefreshTokenSessionFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshTokenSessionPayload>[]
+        }
+        create: {
+          args: Prisma.RefreshTokenSessionCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshTokenSessionPayload>
+        }
+        createMany: {
+          args: Prisma.RefreshTokenSessionCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.RefreshTokenSessionCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshTokenSessionPayload>[]
+        }
+        delete: {
+          args: Prisma.RefreshTokenSessionDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshTokenSessionPayload>
+        }
+        update: {
+          args: Prisma.RefreshTokenSessionUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshTokenSessionPayload>
+        }
+        deleteMany: {
+          args: Prisma.RefreshTokenSessionDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.RefreshTokenSessionUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.RefreshTokenSessionUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshTokenSessionPayload>[]
+        }
+        upsert: {
+          args: Prisma.RefreshTokenSessionUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshTokenSessionPayload>
+        }
+        aggregate: {
+          args: Prisma.RefreshTokenSessionAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateRefreshTokenSession>
+        }
+        groupBy: {
+          args: Prisma.RefreshTokenSessionGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.RefreshTokenSessionGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.RefreshTokenSessionCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.RefreshTokenSessionCountAggregateOutputType> | number
         }
       }
     }
@@ -1581,6 +1656,23 @@ export const UserScalarFieldEnum = {
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
 
 
+export const RefreshTokenSessionScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  tokenHash: 'tokenHash',
+  status: 'status',
+  expiresAt: 'expiresAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  revokedAt: 'revokedAt',
+  replacedBySessionId: 'replacedBySessionId',
+  userAgent: 'userAgent',
+  ipAddress: 'ipAddress'
+} as const
+
+export type RefreshTokenSessionScalarFieldEnum = (typeof RefreshTokenSessionScalarFieldEnum)[keyof typeof RefreshTokenSessionScalarFieldEnum]
+
+
 export const SeasonScalarFieldEnum = {
   id: 'id',
   name: 'name',
@@ -1930,6 +2022,20 @@ export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel
  */
 export type ListDateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime[]'>
     
+
+
+/**
+ * Reference to a field of type 'RefreshTokenSessionStatus'
+ */
+export type EnumRefreshTokenSessionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'RefreshTokenSessionStatus'>
+
+
+
+/**
+ * Reference to a field of type 'RefreshTokenSessionStatus[]'
+ */
+export type ListEnumRefreshTokenSessionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'RefreshTokenSessionStatus[]'>
+
 
 
 /**
@@ -2300,6 +2406,7 @@ export type PrismaClientOptions = ({
 }
 export type GlobalOmitConfig = {
   user?: Prisma.UserOmit
+  refreshTokenSession?: Prisma.RefreshTokenSessionOmit
   season?: Prisma.SeasonOmit
   seasonParticipant?: Prisma.SeasonParticipantOmit
   asset?: Prisma.AssetOmit
@@ -2376,4 +2483,3 @@ export type PrismaAction =
  * `PrismaClient` proxy available in interactive transactions.
  */
 export type TransactionClient = Omit<DefaultPrismaClient, runtime.ITXClientDenyList>
-
