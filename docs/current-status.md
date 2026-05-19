@@ -33,6 +33,8 @@
 - `POST /api/v1/orders` create idempotency MVP
 - `POST /api/v1/orders/:orderId/cancel` submitted order cancel MVP
 - `POST /api/v1/orders/:orderId/execute` full-fill MVP
+- `GET /api/v1/assets` read-only MVP
+- `GET /api/v1/assets/:assetId` read-only MVP
 - `GET /api/v1/seasons/current`
 - `POST /api/v1/seasons/{seasonId}/join`
 - `POST /api/v1/fx/quote`
@@ -167,6 +169,16 @@ near-term ledger/FX foundation:
   - `scripts/admin-upsert-asset.ts`
   - `scripts/admin-insert-asset-price.ts`
   - dry-run, validation, asset existence/isActive/currency match check 지원.
+- `/assets` read-only MVP 구현 완료:
+  - 주문 전 asset 선택/검색/상세 확인용 API.
+  - `GET /api/v1/assets`, `GET /api/v1/assets/:assetId`.
+  - 기존 `assets`와 latest eligible `admin_manual` `asset_price_snapshots`만 asset price source로 사용.
+  - USD asset의 `priceKrw` 계산에는 fresh approved `admin_manual` USD/KRW `fx_rate_snapshots`를 사용.
+  - 가격 또는 FX 데이터가 없거나 stale이면 fake fallback 없이 asset별 price/priceKrw unavailable로 반환.
+  - `withPrice=false`는 price/FX snapshot 조회 없이 asset metadata만 반환.
+  - schema의 `assets.isActive`를 사용해 기본 목록은 active assets만 반환하고, `includeInactive=true`일 때 inactive assets도 포함.
+  - provider API key, provider client, provider ingestion, scheduler/batch 없이 동작.
+  - asset/price/wallet/order/position/snapshot/ranking/ledger row를 생성/수정/삭제하지 않음.
 - valuation/ranking 수동 foundation 구현 완료:
   - portfolio valuation 계산 service/helper: `src/portfolio/portfolio-valuation.service.ts`, `src/portfolio/portfolio-valuation.policy.ts`.
   - daily portfolio snapshot 수동 생성 CLI: `scripts/admin-generate-daily-portfolio-snapshot.ts`.
@@ -187,6 +199,7 @@ near-term ledger/FX foundation:
 - API contracts:
   - `docs/fx-api-contract.md`
   - `docs/orders-api-contract.md`
+  - `docs/assets-api-contract.md`
   - `docs/home-api-contract.md`
   - `docs/ranking-api-contract.md`
   - `docs/wallets-api-contract.md`
@@ -463,6 +476,34 @@ near-term ledger/FX foundation:
 - `totalPositionValueKrw`는 valuation available position만 합산.
 - provider_api/official_batch ingestion, scheduler/batch, settlement/reward 구현 없음.
 - `/positions` 호출은 wallet/order/position/snapshot/ranking/ledger row를 생성/수정/삭제하지 않음.
+
+### `/assets`
+
+- `GET /api/v1/assets` read-only MVP 구현 완료.
+- `GET /api/v1/assets/:assetId` read-only MVP 구현 완료.
+- Orders quote/create가 요구하는 `assetId`를 사용자가 찾고 선택할 수 있는 전용 조회 API.
+- Home `topPositions`는 홈 요약 top 5, `/positions`는 보유 포지션 전체, `/assets`는 거래할 종목 목록/상세 조회 역할.
+- access-token-only Auth MVP 이후 API는 전역 guard가 주입한 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
+- query parameter:
+  - `assetType` optional, allowed `domestic_stock`/`us_stock`/`crypto`.
+  - `currencyCode` optional, allowed `KRW`/`USD`.
+  - `market` optional, existing `assets.market` exact match.
+  - `search` optional, `symbol`/`name` partial match.
+  - `includeInactive` optional, default false, schema의 `assets.isActive` 사용.
+  - `withPrice` optional, default true.
+  - `limit` optional, default 50, max 100 clamp.
+  - `offset` optional, default 0.
+- source:
+  - 기존 `assets`.
+  - latest eligible `admin_manual` `asset_price_snapshots`.
+  - USD asset KRW 환산에 필요한 fresh approved `admin_manual` USD/KRW `fx_rate_snapshots`.
+- 가격 데이터가 없으면 asset을 숨기지 않고 해당 asset의 `price.state = unavailable`.
+- USD/KRW가 missing/stale이면 USD asset의 price 자체는 available일 수 있으나 `priceKrwState = unavailable`.
+- KRW asset은 USD/KRW 없이 `priceKrw` 계산 가능.
+- `withPrice=false`는 price/FX snapshot을 조회하지 않고 asset metadata만 반환.
+- `provider_api`/`official_batch`를 새 price source로 허용하지 않음.
+- provider client/API call/ingestion, scheduler/batch, settlement/reward 구현 없음.
+- `/assets` 호출은 asset/price/wallet/order/position/snapshot/ranking/ledger row를 생성/수정/삭제하지 않음.
 
 ### `/records`
 

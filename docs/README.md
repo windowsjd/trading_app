@@ -8,6 +8,7 @@ Use this directory in this order:
 4. API contracts:
    - `docs/fx-api-contract.md`
    - `docs/orders-api-contract.md`
+   - `docs/assets-api-contract.md`
    - `docs/home-api-contract.md`
    - `docs/ranking-api-contract.md`
    - `docs/wallets-api-contract.md`

@@ -228,6 +228,27 @@ describe('PositionsService', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   };
 
+  const expectApiError = async (
+    promise: Promise<unknown>,
+    status: number,
+    code: string,
+  ) => {
+    try {
+      await promise;
+      throw new Error('Expected promise to reject.');
+    } catch (error) {
+      expect(error).toBeInstanceOf(HttpException);
+      const httpError = error as HttpException;
+      expect(httpError.getStatus()).toBe(status);
+      expect(httpError.getResponse()).toMatchObject({
+        success: false,
+        error: {
+          code,
+        },
+      });
+    }
+  };
+
   it('rejects missing authenticated user', async () => {
     const { service } = createService();
 
@@ -425,21 +446,89 @@ describe('PositionsService', () => {
   it('rejects invalid query with BAD_REQUEST', async () => {
     const { service } = createService();
 
-    await expect(
+    await expectApiError(
       service.getPositions('user-1', {
         includeClosed: 'yes',
       }),
-    ).rejects.toMatchObject({
-      status: 400,
-    });
+      400,
+      'INVALID_INCLUDE_CLOSED',
+    );
 
-    await expect(
+    await expectApiError(
       service.getPositions('user-1', {
         assetType: 'forex',
       }),
-    ).rejects.toMatchObject({
-      status: 400,
+      400,
+      'INVALID_ASSET_TYPE',
+    );
+  });
+
+  it.each([
+    ['0', 'INVALID_LIMIT'],
+    ['-1', 'INVALID_LIMIT'],
+    ['abc', 'INVALID_LIMIT'],
+  ])('rejects invalid limit=%s with BAD_REQUEST', async (limit, code) => {
+    const { service } = createService();
+
+    await expectApiError(
+      service.getPositions('user-1', {
+        limit,
+      }),
+      400,
+      code,
+    );
+  });
+
+  it.each([
+    ['-1', 'INVALID_OFFSET'],
+    ['abc', 'INVALID_OFFSET'],
+  ])('rejects invalid offset=%s with BAD_REQUEST', async (offset, code) => {
+    const { service } = createService();
+
+    await expectApiError(
+      service.getPositions('user-1', {
+        offset,
+      }),
+      400,
+      code,
+    );
+  });
+
+  it.each([
+    ['USDT', 'INVALID_CURRENCY_CODE'],
+    ['EUR', 'INVALID_CURRENCY_CODE'],
+  ])(
+    'rejects invalid currencyCode=%s with BAD_REQUEST',
+    async (currencyCode, code) => {
+      const { service } = createService();
+
+      await expectApiError(
+        service.getPositions('user-1', {
+          currencyCode,
+        }),
+        400,
+        code,
+      );
+    },
+  );
+
+  it('clamps limit greater than 100 to 100', async () => {
+    const { prisma, service } = createService();
+    mockCurrentSeason(prisma);
+    mockJoined(prisma);
+    prisma.position.findMany.mockResolvedValueOnce([]);
+
+    const response = await service.getPositions('user-1', {
+      limit: '500',
     });
+
+    expect(response.data.pagination).toMatchObject({
+      limit: 100,
+      offset: 0,
+      total: 0,
+      returned: 0,
+    });
+    expectNoPositionWrites(prisma);
   });
 
   it('returns KRW position valuation from admin_manual asset price', async () => {

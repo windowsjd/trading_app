@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AssetsModule } from './assets/assets.module';
 import { AuthModule } from './auth/auth.module';
 import { FxModule } from './fx/fx.module';
 import { HomeModule } from './home/home.module';
@@ -19,6 +20,7 @@ import { WalletsModule } from './wallets/wallets.module';
       isGlobal: true,
       envFilePath: ['.env.development', '.env'],
     }),
+    AssetsModule,
     AuthModule,
     FxModule,
     HomeModule,

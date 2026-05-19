@@ -119,6 +119,8 @@ type PrismaMock = {
   $queryRaw: jest.Mock;
   $transaction: jest.Mock;
   asset: {
+    count: jest.Mock;
+    findMany: jest.Mock;
     findUnique: jest.Mock;
   };
   assetPriceSnapshot: {
@@ -269,6 +271,8 @@ describe('AppController (e2e)', () => {
       $queryRaw: jest.fn().mockResolvedValue([{ result: 1 }]),
       $transaction: jest.fn(),
       asset: {
+        count: jest.fn(),
+        findMany: jest.fn(),
         findUnique: jest.fn(),
       },
       assetPriceSnapshot: {
@@ -465,6 +469,8 @@ describe('AppController (e2e)', () => {
     expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
     expect(prisma.fxRateSnapshot.findMany).not.toHaveBeenCalled();
     expect(prisma.fxExecuteRequest.findUnique).not.toHaveBeenCalled();
+    expect(prisma.asset.count).not.toHaveBeenCalled();
+    expect(prisma.asset.findMany).not.toHaveBeenCalled();
     expect(prisma.asset.findUnique).not.toHaveBeenCalled();
     expect(prisma.assetPriceSnapshot.findFirst).not.toHaveBeenCalled();
     expect(prisma.order.count).not.toHaveBeenCalled();
@@ -881,6 +887,7 @@ describe('AppController (e2e)', () => {
     ['GET /api/v1/home', 'get', '/api/v1/home'],
     ['GET /api/v1/ranking', 'get', '/api/v1/ranking'],
     ['GET /api/v1/wallets', 'get', '/api/v1/wallets'],
+    ['GET /api/v1/assets', 'get', '/api/v1/assets'],
     ['GET /api/v1/positions', 'get', '/api/v1/positions'],
     ['GET /api/v1/records', 'get', '/api/v1/records'],
     ['GET /api/v1/orders', 'get', '/api/v1/orders'],
@@ -901,6 +908,19 @@ describe('AppController (e2e)', () => {
     await expectUnauthorizedWithAuthorization(
       'get',
       '/api/v1/positions',
+      'Token invalid-token',
+    );
+  });
+
+  it('/api/v1/assets (GET) rejects invalid and malformed bearer tokens before service work', async () => {
+    await expectUnauthorizedWithAuthorization(
+      'get',
+      '/api/v1/assets',
+      'Bearer invalid-token',
+    );
+    await expectUnauthorizedWithAuthorization(
+      'get',
+      '/api/v1/assets',
       'Token invalid-token',
     );
   });
@@ -1005,6 +1025,26 @@ describe('AppController (e2e)', () => {
       },
     ],
     [
+      'GET /api/v1/assets',
+      '/api/v1/assets',
+      () => {
+        mockActiveUser();
+        prisma.asset.count.mockResolvedValueOnce(0);
+        prisma.asset.findMany.mockResolvedValueOnce([]);
+      },
+      (body: Record<string, unknown>) => {
+        expect(body).toMatchObject({
+          success: true,
+          data: {
+            state: 'available',
+            assets: [],
+          },
+        });
+        expect(prisma.asset.count).toHaveBeenCalled();
+        expect(prisma.asset.findMany).toHaveBeenCalled();
+      },
+    ],
+    [
       'GET /api/v1/positions',
       '/api/v1/positions',
       () => {
@@ -1099,6 +1139,36 @@ describe('AppController (e2e)', () => {
         });
     },
   );
+
+  it('/api/v1/assets/:assetId (GET) accepts a valid bearer token and reaches service-level ASSET_NOT_FOUND', async () => {
+    resetPrismaMocks();
+    mockActiveUser();
+    prisma.asset.findUnique.mockResolvedValueOnce(null);
+    const token = await createValidAccessToken();
+
+    return request(app.getHttpServer())
+      .get('/api/v1/assets/asset-missing')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(404)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: false,
+          error: {
+            code: 'ASSET_NOT_FOUND',
+          },
+        });
+        expect(response.body.error?.code).not.toBe('UNAUTHORIZED');
+        expect(prisma.user.findUnique).toHaveBeenCalled();
+        expect(prisma.asset.findUnique).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: {
+              id: 'asset-missing',
+            },
+          }),
+        );
+        expectNoWriteMutationCalls();
+      });
+  });
 
   it.each(protectedWritePathRequests)(
     '$label rejects missing token and x-user-id-only requests before write mutation',

@@ -565,7 +565,7 @@ export class HomeService {
       const usdKrwSnapshot = needsUsdConversion
         ? await this.findLatestEligibleUsdKrwSnapshot(valuationAt)
         : null;
-      const usdKrwRate = needsUsdConversion
+      const usdKrwRate = usdKrwSnapshot
         ? this.selectUsableUsdKrwRate(usdKrwSnapshot, valuationAt)
         : null;
 

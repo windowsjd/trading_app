@@ -1,0 +1,740 @@
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  AssetPriceSourceType,
+  AssetType,
+  CurrencyCode,
+  FxRateSourceType,
+  Prisma,
+} from '../generated/prisma/client';
+import { isFxSnapshotStaleForPortfolioValuation } from '../portfolio/portfolio-valuation.policy';
+import { PrismaService } from '../prisma/prisma.service';
+
+export type AssetsQuery = {
+  assetType?: string;
+  currencyCode?: string;
+  market?: string;
+  search?: string;
+  includeInactive?: string;
+  withPrice?: string;
+  limit?: string;
+  offset?: string;
+};
+
+type ParsedAssetsQuery = {
+  assetType?: AssetType;
+  currencyCode?: CurrencyCode;
+  market?: string;
+  search?: string;
+  includeInactive: boolean;
+  withPrice: boolean;
+  limit: number;
+  offset: number;
+};
+
+type AssetRecord = {
+  id: string;
+  symbol: string;
+  name: string;
+  market: string;
+  assetType: AssetType;
+  currencyCode: CurrencyCode;
+  isActive: boolean;
+};
+
+type AssetPriceSnapshotRecord = {
+  id: string;
+  price: Prisma.Decimal;
+  currencyCode: CurrencyCode;
+  effectiveAt: Date;
+  capturedAt: Date;
+};
+
+type AssetPriceError = {
+  assetId: string;
+  code: 'ASSET_PRICE_UNAVAILABLE' | 'FX_RATE_UNAVAILABLE' | 'FX_RATE_STALE';
+  message: string;
+};
+
+type UsdKrwSelection =
+  | {
+      state: 'available';
+      rate: Prisma.Decimal;
+    }
+  | {
+      state: 'unavailable';
+      code: 'FX_RATE_UNAVAILABLE' | 'FX_RATE_STALE';
+      message: string;
+    };
+
+type AssetPricePayload =
+  | {
+      state: 'available';
+      currentPrice: string;
+      priceCurrency: CurrencyCode;
+      priceKrwState: 'available';
+      priceKrw: string;
+      assetPriceSnapshotId: string;
+      priceEffectiveAt: string;
+      priceCapturedAt: string;
+    }
+  | {
+      state: 'available';
+      currentPrice: string;
+      priceCurrency: CurrencyCode;
+      priceKrwState: 'unavailable';
+      priceKrwReason: 'FX_RATE_UNAVAILABLE' | 'FX_RATE_STALE';
+      priceKrwMessage: string;
+      assetPriceSnapshotId: string;
+      priceEffectiveAt: string;
+      priceCapturedAt: string;
+    }
+  | {
+      state: 'unavailable';
+      reason: 'ASSET_PRICE_UNAVAILABLE';
+      message: string;
+    };
+
+type AssetListItem = ReturnType<AssetsService['formatAssetMetadata']> & {
+  price?: AssetPricePayload;
+};
+
+type AssetsListResponse = {
+  success: true;
+  data: {
+    state: 'available';
+    filters: ReturnType<AssetsService['formatFilters']>;
+    pagination: {
+      limit: number;
+      offset: number;
+      total: number;
+      returned: number;
+    };
+    assets: AssetListItem[];
+    priceErrors: AssetPriceError[];
+  };
+};
+
+type AssetDetailResponse = {
+  success: true;
+  data: {
+    state: 'available';
+    asset: AssetListItem & {
+      price: AssetPricePayload;
+      tradingNote: ReturnType<AssetsService['buildTradingNote']>;
+    };
+    priceErrors: AssetPriceError[];
+  };
+};
+
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 100;
+
+@Injectable()
+export class AssetsService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async getAssets(
+    userId: string | undefined,
+    query: AssetsQuery = {},
+  ): Promise<AssetsListResponse> {
+    if (!userId) {
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
+    }
+
+    const parsedQuery = this.parseQuery(query);
+    const where = this.buildAssetWhere(parsedQuery);
+    const [total, assets] = await Promise.all([
+      this.prisma.asset.count({ where }),
+      this.prisma.asset.findMany({
+        where,
+        orderBy: [{ symbol: 'asc' }, { id: 'asc' }],
+        skip: parsedQuery.offset,
+        take: parsedQuery.limit,
+        select: this.assetSelect(),
+      }),
+    ]);
+    const pricedAssets = parsedQuery.withPrice
+      ? await this.buildAssetsWithPrices(assets)
+      : {
+          assets: assets.map((asset) => this.formatAssetMetadata(asset)),
+          priceErrors: [],
+        };
+
+    return {
+      success: true,
+      data: {
+        state: 'available',
+        filters: this.formatFilters(parsedQuery),
+        pagination: this.pagination(parsedQuery, total, assets.length),
+        assets: pricedAssets.assets,
+        priceErrors: pricedAssets.priceErrors,
+      },
+    };
+  }
+
+  async getAsset(
+    userId: string | undefined,
+    assetId: string | undefined,
+  ): Promise<AssetDetailResponse> {
+    if (!userId) {
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
+    }
+
+    const parsedAssetId = this.parseAssetId(assetId);
+    const asset = await this.prisma.asset.findUnique({
+      where: {
+        id: parsedAssetId,
+      },
+      select: this.assetSelect(),
+    });
+
+    if (!asset) {
+      this.throwApiError(
+        HttpStatus.NOT_FOUND,
+        'ASSET_NOT_FOUND',
+        'Asset not found.',
+      );
+    }
+
+    const pricedAssets = await this.buildAssetsWithPrices([asset]);
+    const pricedAsset = pricedAssets.assets[0];
+
+    if (!pricedAsset?.price) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'ASSET_PRICE_STATE_ERROR',
+        'Asset price state could not be built.',
+      );
+    }
+
+    return {
+      success: true,
+      data: {
+        state: 'available',
+        asset: {
+          ...pricedAsset,
+          price: pricedAsset.price,
+          tradingNote: this.buildTradingNote(asset),
+        },
+        priceErrors: pricedAssets.priceErrors,
+      },
+    };
+  }
+
+  private async buildAssetsWithPrices(assets: readonly AssetRecord[]): Promise<{
+    assets: AssetListItem[];
+    priceErrors: AssetPriceError[];
+  }> {
+    if (assets.length === 0) {
+      return {
+        assets: [],
+        priceErrors: [],
+      };
+    }
+
+    const valuationAt = new Date();
+    const usdKrwSelection = assets.some(
+      (asset) => asset.currencyCode === CurrencyCode.USD,
+    )
+      ? await this.findUsdKrwSelection(valuationAt)
+      : null;
+    const results = await Promise.all(
+      assets.map(async (asset) => {
+        const price = await this.buildAssetPrice(
+          asset,
+          valuationAt,
+          usdKrwSelection,
+        );
+
+        return {
+          asset: {
+            ...this.formatAssetMetadata(asset),
+            price: price.payload,
+          },
+          error: price.error,
+        };
+      }),
+    );
+
+    return {
+      assets: results.map((result) => result.asset),
+      priceErrors: results
+        .map((result) => result.error)
+        .filter((error): error is AssetPriceError => Boolean(error)),
+    };
+  }
+
+  private async buildAssetPrice(
+    asset: AssetRecord,
+    valuationAt: Date,
+    usdKrwSelection: UsdKrwSelection | null,
+  ): Promise<{
+    payload: AssetPricePayload;
+    error?: AssetPriceError;
+  }> {
+    const snapshot = await this.findLatestEligibleAssetPriceSnapshot(
+      asset.id,
+      asset.currencyCode,
+      valuationAt,
+    );
+
+    if (!snapshot) {
+      const message = `Asset price snapshot is unavailable for asset ${asset.id}.`;
+
+      return {
+        payload: {
+          state: 'unavailable',
+          reason: 'ASSET_PRICE_UNAVAILABLE',
+          message,
+        },
+        error: {
+          assetId: asset.id,
+          code: 'ASSET_PRICE_UNAVAILABLE',
+          message,
+        },
+      };
+    }
+
+    const basePayload = {
+      state: 'available' as const,
+      currentPrice: this.formatDecimal(snapshot.price, 8),
+      priceCurrency: snapshot.currencyCode,
+      assetPriceSnapshotId: snapshot.id,
+      priceEffectiveAt: snapshot.effectiveAt.toISOString(),
+      priceCapturedAt: snapshot.capturedAt.toISOString(),
+    };
+
+    if (asset.currencyCode === CurrencyCode.KRW) {
+      return {
+        payload: {
+          ...basePayload,
+          priceKrwState: 'available',
+          priceKrw: this.formatDecimal(snapshot.price, 8),
+        },
+      };
+    }
+
+    if (usdKrwSelection?.state === 'available') {
+      return {
+        payload: {
+          ...basePayload,
+          priceKrwState: 'available',
+          priceKrw: this.formatDecimal(
+            snapshot.price.mul(usdKrwSelection.rate),
+            8,
+          ),
+        },
+      };
+    }
+
+    const error = usdKrwSelection ?? {
+      state: 'unavailable' as const,
+      code: 'FX_RATE_UNAVAILABLE' as const,
+      message: 'USD/KRW FX rate snapshot is unavailable.',
+    };
+
+    return {
+      payload: {
+        ...basePayload,
+        priceKrwState: 'unavailable',
+        priceKrwReason: error.code,
+        priceKrwMessage: error.message,
+      },
+      error: {
+        assetId: asset.id,
+        code: error.code,
+        message: error.message,
+      },
+    };
+  }
+
+  private async findLatestEligibleAssetPriceSnapshot(
+    assetId: string,
+    currencyCode: CurrencyCode,
+    valuationAt: Date,
+  ): Promise<AssetPriceSnapshotRecord | null> {
+    return this.prisma.assetPriceSnapshot.findFirst({
+      where: {
+        assetId,
+        currencyCode,
+        sourceType: AssetPriceSourceType.admin_manual,
+        effectiveAt: {
+          lte: valuationAt,
+        },
+        price: {
+          gt: 0,
+        },
+      },
+      orderBy: [
+        { effectiveAt: 'desc' },
+        { capturedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      select: {
+        id: true,
+        price: true,
+        currencyCode: true,
+        effectiveAt: true,
+        capturedAt: true,
+      },
+    });
+  }
+
+  private async findUsdKrwSelection(
+    valuationAt: Date,
+  ): Promise<UsdKrwSelection> {
+    const snapshot = await this.prisma.fxRateSnapshot.findFirst({
+      where: {
+        baseCurrency: CurrencyCode.USD,
+        quoteCurrency: CurrencyCode.KRW,
+        sourceType: FxRateSourceType.admin_manual,
+        approvedByUserId: {
+          not: null,
+        },
+        effectiveAt: {
+          lte: valuationAt,
+        },
+        rate: {
+          gt: 0,
+        },
+      },
+      orderBy: [
+        { effectiveAt: 'desc' },
+        { capturedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      select: {
+        rate: true,
+        sourceType: true,
+        effectiveAt: true,
+        approvedByUserId: true,
+      },
+    });
+
+    if (!snapshot) {
+      return {
+        state: 'unavailable',
+        code: 'FX_RATE_UNAVAILABLE',
+        message: 'USD/KRW FX rate snapshot is unavailable.',
+      };
+    }
+
+    if (
+      snapshot.sourceType !== FxRateSourceType.admin_manual ||
+      !snapshot.approvedByUserId
+    ) {
+      return {
+        state: 'unavailable',
+        code: 'FX_RATE_UNAVAILABLE',
+        message:
+          'No approved admin_manual USD/KRW FX rate snapshot is available.',
+      };
+    }
+
+    if (
+      isFxSnapshotStaleForPortfolioValuation(snapshot.effectiveAt, valuationAt)
+    ) {
+      return {
+        state: 'unavailable',
+        code: 'FX_RATE_STALE',
+        message: 'USD/KRW FX rate snapshot is stale.',
+      };
+    }
+
+    return {
+      state: 'available',
+      rate: snapshot.rate,
+    };
+  }
+
+  private buildAssetWhere(query: ParsedAssetsQuery): Prisma.AssetWhereInput {
+    return {
+      ...(query.includeInactive ? {} : { isActive: true }),
+      ...(query.assetType ? { assetType: query.assetType } : {}),
+      ...(query.currencyCode ? { currencyCode: query.currencyCode } : {}),
+      ...(query.market ? { market: query.market } : {}),
+      ...(query.search
+        ? {
+            OR: [
+              {
+                symbol: {
+                  contains: query.search,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                name: {
+                  contains: query.search,
+                  mode: 'insensitive',
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+  }
+
+  private parseQuery(query: AssetsQuery): ParsedAssetsQuery {
+    return {
+      assetType: this.parseAssetType(query.assetType),
+      currencyCode: this.parseCurrencyCode(query.currencyCode),
+      market: this.parseOptionalText(query.market),
+      search: this.parseOptionalText(query.search),
+      includeInactive: this.parseBoolean(
+        query.includeInactive,
+        false,
+        'INVALID_INCLUDE_INACTIVE',
+        'includeInactive',
+      ),
+      withPrice: this.parseBoolean(
+        query.withPrice,
+        true,
+        'INVALID_WITH_PRICE',
+        'withPrice',
+      ),
+      limit: this.parseLimit(query.limit),
+      offset: this.parseOffset(query.offset),
+    };
+  }
+
+  private parseAssetType(value: string | undefined): AssetType | undefined {
+    const text = this.parseOptionalText(value);
+    if (!text) {
+      return undefined;
+    }
+
+    if (
+      text === AssetType.domestic_stock ||
+      text === AssetType.us_stock ||
+      text === AssetType.crypto
+    ) {
+      return text;
+    }
+
+    this.throwApiError(
+      HttpStatus.BAD_REQUEST,
+      'INVALID_ASSET_TYPE',
+      'Invalid assetType.',
+    );
+  }
+
+  private parseCurrencyCode(
+    value: string | undefined,
+  ): CurrencyCode | undefined {
+    const text = this.parseOptionalText(value);
+    if (!text) {
+      return undefined;
+    }
+
+    if (text === CurrencyCode.KRW || text === CurrencyCode.USD) {
+      return text;
+    }
+
+    this.throwApiError(
+      HttpStatus.BAD_REQUEST,
+      'INVALID_CURRENCY_CODE',
+      'Invalid currencyCode.',
+    );
+  }
+
+  private parseBoolean(
+    value: string | undefined,
+    defaultValue: boolean,
+    code: string,
+    fieldName: string,
+  ): boolean {
+    const text = this.parseOptionalText(value);
+    if (!text) {
+      return defaultValue;
+    }
+
+    if (text === 'true') {
+      return true;
+    }
+
+    if (text === 'false') {
+      return false;
+    }
+
+    this.throwApiError(
+      HttpStatus.BAD_REQUEST,
+      code,
+      `${fieldName} must be true or false.`,
+    );
+  }
+
+  private parseLimit(value: string | undefined): number {
+    if (value === undefined) {
+      return DEFAULT_LIMIT;
+    }
+
+    const limit = this.parseNonNegativeInteger(value, 'INVALID_LIMIT', 'limit');
+    if (limit < 1) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'INVALID_LIMIT',
+        'limit must be greater than 0.',
+      );
+    }
+
+    return Math.min(limit, MAX_LIMIT);
+  }
+
+  private parseOffset(value: string | undefined): number {
+    if (value === undefined) {
+      return 0;
+    }
+
+    return this.parseNonNegativeInteger(value, 'INVALID_OFFSET', 'offset');
+  }
+
+  private parseNonNegativeInteger(
+    value: string,
+    code: string,
+    fieldName: string,
+  ): number {
+    if (!/^\d+$/.test(value.trim())) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        code,
+        `${fieldName} must be a non-negative integer.`,
+      );
+    }
+
+    const parsed = Number(value);
+    if (!Number.isSafeInteger(parsed)) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        code,
+        `${fieldName} must be a safe integer.`,
+      );
+    }
+
+    return parsed;
+  }
+
+  private parseAssetId(value: string | undefined): string {
+    const text = this.parseOptionalText(value);
+    if (!text) {
+      this.throwApiError(
+        HttpStatus.NOT_FOUND,
+        'ASSET_NOT_FOUND',
+        'Asset not found.',
+      );
+    }
+
+    return text;
+  }
+
+  private parseOptionalText(value: string | undefined): string | undefined {
+    if (typeof value !== 'string') {
+      return undefined;
+    }
+
+    const trimmed = value.trim();
+    return trimmed === '' ? undefined : trimmed;
+  }
+
+  private assetSelect() {
+    return {
+      id: true,
+      symbol: true,
+      name: true,
+      market: true,
+      assetType: true,
+      currencyCode: true,
+      isActive: true,
+    } as const;
+  }
+
+  private pagination(
+    query: ParsedAssetsQuery,
+    total: number,
+    returned: number,
+  ) {
+    return {
+      limit: query.limit,
+      offset: query.offset,
+      total,
+      returned,
+    };
+  }
+
+  private formatFilters(query: ParsedAssetsQuery) {
+    return {
+      assetType: query.assetType ?? null,
+      currencyCode: query.currencyCode ?? null,
+      market: query.market ?? null,
+      search: query.search ?? null,
+      includeInactive: query.includeInactive,
+      withPrice: query.withPrice,
+    };
+  }
+
+  private formatAssetMetadata(asset: AssetRecord) {
+    return {
+      assetId: asset.id,
+      symbol: asset.symbol,
+      name: asset.name,
+      market: asset.market,
+      assetType: asset.assetType,
+      currencyCode: asset.currencyCode,
+      isActive: asset.isActive,
+    };
+  }
+
+  private buildTradingNote(asset: AssetRecord) {
+    if (asset.assetType === AssetType.domestic_stock) {
+      return {
+        walletCurrency: CurrencyCode.KRW,
+        settlementCurrency: CurrencyCode.KRW,
+        message: 'Domestic stock orders use the KRW wallet.',
+      };
+    }
+
+    if (asset.assetType === AssetType.crypto) {
+      return {
+        walletCurrency: CurrencyCode.USD,
+        settlementCurrency: CurrencyCode.USD,
+        message:
+          'Crypto is USD-settled and uses the USD wallet under the current MVP policy.',
+      };
+    }
+
+    return {
+      walletCurrency: CurrencyCode.USD,
+      settlementCurrency: CurrencyCode.USD,
+      message: 'US stock orders use the USD wallet.',
+    };
+  }
+
+  private formatDecimal(value: Prisma.Decimal, scale: number) {
+    return value.toFixed(scale);
+  }
+
+  private createErrorBody(code: string, message: string) {
+    return {
+      success: false,
+      error: {
+        code,
+        message,
+      },
+    };
+  }
+
+  private throwApiError(
+    status: HttpStatus,
+    code: string,
+    message: string,
+  ): never {
+    throw new HttpException(this.createErrorBody(code, message), status);
+  }
+}
