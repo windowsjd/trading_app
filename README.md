@@ -14,14 +14,14 @@ This service owns backend APIs, database access, financial calculations, and ser
 - Submitted order create, cancel, and full-fill execute MVP.
 - KRW and USD cash wallets. US stocks and USD-settled crypto use the USD wallet.
 - Final valuation policy is KRW total assets.
-- Batch job execution foundation with idempotent `batch_job_runs` recording and operator-only noop/health-check script.
+- Batch job execution foundation with idempotent `batch_job_runs` recording, operator-only noop/health-check script, and operator-run daily portfolio snapshot generation.
 
 ## STOP / Not Implemented
 
 These are intentionally outside the current implementation and should not be added without a separate gate:
 
 - Provider ingestion for OANDA, Twelve Data, Binance, or any other market data provider.
-- Cron scheduler, provider ingestion jobs, automatic daily snapshot/ranking jobs, settlement jobs, or reward jobs.
+- Cron scheduler, provider ingestion jobs, automatic ranking jobs, settlement jobs, or reward jobs.
 - Settlement.
 - Reward, badge, or trophy grants.
 - Access token blacklist/revocation, server-side session auth, and cookie auth.
@@ -72,7 +72,12 @@ pnpm exec prisma validate
 
 # operator-only batch foundation smoke, no provider or trading business rows
 pnpm tsx scripts/admin-run-batch-job.ts --job noop --idempotency-key noop:local-check --dry-run --requested-by local-operator --payload-json '{"purpose":"batch-foundation-check"}'
+
+# operator-run daily portfolio snapshot dry-run, no provider calls
+pnpm tsx scripts/admin-run-batch-job.ts --job daily-portfolio-snapshot --season-id <SEASON_ID> --snapshot-date <YYYY-MM-DD> --dry-run --requested-by local-operator
 ```
+
+`daily-portfolio-snapshot` uses the idempotency key `daily-portfolio-snapshot:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. Dry-run reports `wouldCreate`, `existing`, and participant-level failures without inserting snapshots. Non-dry-run inserts only available participant snapshots, skips existing `(seasonParticipantId, snapshotDate)` rows without overwrite, and uses only existing approved fresh `admin_manual` USD/KRW plus latest eligible `admin_manual` asset price data. It does not call providers, schedule cron, generate rankings, settle seasons, or grant rewards.
 
 Opt-in real PostgreSQL integration tests require a reachable `DATABASE_URL` and an explicit env flag:
 
@@ -110,12 +115,13 @@ Possible now:
 - Mocked HTTP e2e coverage for guard routing and controller/service entry.
 - Opt-in real PostgreSQL integration tests for implemented DB write paths.
 - Manual admin input paths using operator-approved real data.
+- Operator-run daily portfolio snapshot batch jobs using existing `admin_manual` DB data.
 
 Not possible without a separate provider gate:
 
 - OANDA/Twelve Data/Binance ingestion.
 - Provider-backed FX, stock, or crypto price freshness claims.
-- Scheduler-driven snapshots/rankings.
+- Cron scheduler-driven snapshots/rankings.
 - Settlement or reward automation.
 
 Never create fake/static/sample business prices to make a test or local flow pass.

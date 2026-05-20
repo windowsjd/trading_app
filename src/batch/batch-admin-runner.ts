@@ -1,10 +1,16 @@
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client';
+import { PortfolioValuationService } from '../portfolio/portfolio-valuation.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { DailyPortfolioSnapshotJobService } from './daily-portfolio-snapshot-job.service';
 import { BatchService } from './batch.service';
+import { DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME } from './daily-portfolio-snapshot-job.types';
 
-type SupportedAdminBatchJob = 'noop' | 'health-check';
+type SupportedAdminBatchJob =
+  | 'noop'
+  | 'health-check'
+  | typeof DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME;
 
 export type AdminRunBatchJobArgs = {
   job?: SupportedAdminBatchJob;
@@ -12,6 +18,8 @@ export type AdminRunBatchJobArgs = {
   dryRun?: boolean;
   requestedBy?: string;
   payloadJson?: unknown;
+  seasonId?: string;
+  snapshotDate?: string;
 };
 
 type CliValueOptionName = Exclude<keyof AdminRunBatchJobArgs, 'dryRun'>;
@@ -21,6 +29,8 @@ const VALUE_OPTIONS: Record<string, CliValueOptionName> = {
   '--idempotency-key': 'idempotencyKey',
   '--requested-by': 'requestedBy',
   '--payload-json': 'payloadJson',
+  '--season-id': 'seasonId',
+  '--snapshot-date': 'snapshotDate',
 };
 
 const BOOLEAN_OPTIONS: Record<string, 'dryRun'> = {
@@ -61,10 +71,21 @@ export function parseAdminRunBatchJobArgs(
   }
 
   parsed.job = parseJob(parsed.job);
-  parsed.idempotencyKey = parseRequiredText(
-    parsed.idempotencyKey,
-    'idempotency-key',
-  );
+  if (parsed.job === DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME) {
+    parsed.seasonId = parseRequiredText(parsed.seasonId, 'season-id');
+    parsed.snapshotDate = parseDateOnlyText(
+      parsed.snapshotDate,
+      'snapshot-date',
+    );
+    parsed.idempotencyKey =
+      parseOptionalText(parsed.idempotencyKey) ??
+      `${DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME}:${parsed.seasonId}:${parsed.snapshotDate}`;
+  } else {
+    parsed.idempotencyKey = parseRequiredText(
+      parsed.idempotencyKey,
+      'idempotency-key',
+    );
+  }
   parsed.requestedBy = parseOptionalText(parsed.requestedBy);
 
   return parsed;
@@ -82,19 +103,36 @@ export async function runAdminRunBatchJob(argv: string[]) {
   });
   const prisma = new PrismaClient({ adapter });
   const batchService = new BatchService(prisma as unknown as PrismaService);
+  const portfolioValuationService = new PortfolioValuationService(
+    prisma as unknown as PrismaService,
+  );
+  const dailyPortfolioSnapshotJobService = new DailyPortfolioSnapshotJobService(
+    batchService,
+    prisma as unknown as PrismaService,
+    portfolioValuationService,
+  );
 
   try {
-    const response = await batchService.runJob({
-      jobName: args.job as string,
-      idempotencyKey: args.idempotencyKey as string,
-      dryRun: args.dryRun === true,
-      requestedBy: args.requestedBy,
-      requestPayload: {
-        job: args.job,
-        payload: args.payloadJson ?? null,
-      },
-      handler: async () => runSupportedJob(prisma, args),
-    });
+    const response =
+      args.job === DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME
+        ? await dailyPortfolioSnapshotJobService.run({
+            seasonId: args.seasonId,
+            snapshotDate: args.snapshotDate,
+            idempotencyKey: args.idempotencyKey,
+            dryRun: args.dryRun === true,
+            requestedBy: args.requestedBy,
+          })
+        : await batchService.runJob({
+            jobName: args.job as string,
+            idempotencyKey: args.idempotencyKey as string,
+            dryRun: args.dryRun === true,
+            requestedBy: args.requestedBy,
+            requestPayload: {
+              job: args.job,
+              payload: args.payloadJson ?? null,
+            },
+            handler: async () => runSupportedJob(prisma, args),
+          });
 
     console.log('batch job completed');
     console.log(JSON.stringify(response.data, null, 2));
@@ -138,7 +176,11 @@ async function runSupportedJob(
 
 function parseJob(value: string | undefined): SupportedAdminBatchJob {
   const text = parseRequiredText(value, 'job');
-  if (text === 'noop' || text === 'health-check') {
+  if (
+    text === 'noop' ||
+    text === 'health-check' ||
+    text === DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME
+  ) {
     return text;
   }
 
@@ -151,6 +193,27 @@ function parsePayloadJson(value: string) {
   } catch {
     throw new Error('Invalid --payload-json: must be valid JSON.');
   }
+}
+
+function parseDateOnlyText(
+  value: string | undefined,
+  fieldName: string,
+): string {
+  const text = parseRequiredText(value, fieldName);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    throw new Error(`Invalid --${fieldName}: must be YYYY-MM-DD.`);
+  }
+
+  const date = new Date(`${text}T00:00:00.000Z`);
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.toISOString().slice(0, 10) !== text
+  ) {
+    throw new Error(`Invalid --${fieldName}: must be YYYY-MM-DD.`);
+  }
+
+  return text;
 }
 
 function parseRequiredText(

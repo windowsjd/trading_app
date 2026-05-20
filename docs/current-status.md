@@ -144,8 +144,13 @@ near-term ledger/FX foundation:
   - `failed` key retry는 새 `idempotencyKey` 필요.
   - service 자체는 provider/FX/order/wallet/position/ledger/snapshot/ranking business row를 생성하지 않음.
 - Batch operator script 추가 완료: `scripts/admin-run-batch-job.ts`.
-  - 현재 지원 job은 `noop`, `health-check`만.
-  - 실제 cron scheduler, provider ingestion, automatic daily snapshot/ranking, settlement/reward 실행은 아직 없음.
+  - 현재 지원 job은 `noop`, `health-check`, `daily-portfolio-snapshot`.
+  - `daily-portfolio-snapshot`은 operator-run job이며 cron scheduler가 아님.
+  - `daily-portfolio-snapshot`은 기존 DB의 approved fresh `admin_manual` USD/KRW 및 latest eligible `admin_manual` asset price만 사용.
+  - `daily-portfolio-snapshot`은 `daily_portfolio_snapshots`만 생성하며 ranking, settlement, reward, provider ingestion을 수행하지 않음.
+  - missing/stale FX 또는 missing price evidence는 fake fallback 없이 participant-level failure로 기록하고 해당 snapshot row를 생성하지 않음.
+  - 동일 participant + snapshotDate snapshot이 이미 있으면 overwrite하지 않고 `existing`으로 분류.
+  - 실제 cron scheduler, provider ingestion, automatic ranking, settlement/reward 실행은 아직 없음.
   - admin 권한 모델이 없으므로 batch 실행 HTTP API는 만들지 않음.
 - Auth refresh session foundation 반영 완료: `RefreshTokenSessionStatus`, `refresh_token_sessions`.
 - Auth refresh session migration 생성 완료: `20260519090000_add_refresh_token_sessions`.
@@ -225,13 +230,14 @@ near-term ledger/FX foundation:
 - valuation/ranking 수동 foundation 구현 완료:
   - portfolio valuation 계산 service/helper: `src/portfolio/portfolio-valuation.service.ts`, `src/portfolio/portfolio-valuation.policy.ts`.
   - daily portfolio snapshot 수동 생성 CLI: `scripts/admin-generate-daily-portfolio-snapshot.ts`.
+  - daily portfolio snapshot batch job: `src/batch/daily-portfolio-snapshot-job.service.ts`, `scripts/admin-run-batch-job.ts --job daily-portfolio-snapshot`.
   - season ranking 수동 생성 CLI: `scripts/admin-generate-season-ranking.ts`.
   - CLI는 dry-run/non-dry-run을 지원하며 seed/fake/static/sample business data를 생성하지 않음.
 
 ## 6. 현재 미도입 DB 상태
 
 - Prisma schema/migration 기준 현재 문서화된 핵심 DB foundation 추가 미도입 테이블 없음.
-- Batch job run/lock 기록 foundation은 구현 완료. 단, 실제 cron scheduler, provider ingestion job, automatic daily valuation/ranking job, settlement/reward job은 아직 미구현.
+- Batch job run/lock 기록 foundation과 operator-run daily portfolio snapshot job은 구현 완료. 단, 실제 cron scheduler, provider ingestion job, automatic ranking job, settlement/reward job은 아직 미구현.
 - order execution full-fill MVP와 position mutation 1차 write path는 구현 완료. 단, exact replay, durable quote, partial fill, matching engine, provider price ingestion, settlement API, scheduler 기반 자동 daily valuation/ranking 생성 경로는 아직 미구현.
 
 ## 7. 완료된 문서/설계 상태

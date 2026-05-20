@@ -21,6 +21,19 @@ export type DailyPortfolioSnapshotWriteResult = {
   dryRun: boolean;
 };
 
+export type DailyPortfolioSnapshotPersistenceData = {
+  seasonParticipantId: string;
+  snapshotDate: Date;
+  totalAssetKrw: string;
+  returnRate: string;
+  krwCash: string;
+  usdCashKrw: string;
+  assetValueKrw: string;
+  realizedPnlKrw: string;
+  unrealizedPnlKrw: string;
+  capturedAt: Date;
+};
+
 type DailyPortfolioSnapshotWriter = {
   dailyPortfolioSnapshot: {
     upsert: (args: unknown) => Promise<{
@@ -52,8 +65,8 @@ export async function writeDailyPortfolioSnapshot(
         snapshotDate: input.snapshotDate,
       },
     },
-    create: toSnapshotData(input),
-    update: toSnapshotData(input),
+    create: buildDailyPortfolioSnapshotData(input),
+    update: buildDailyPortfolioSnapshotData(input),
     select: {
       seasonParticipantId: true,
       totalAssetKrw: true,
@@ -81,7 +94,9 @@ export async function writeDailyPortfolioSnapshot(
   };
 }
 
-function toSnapshotData(input: DailyPortfolioSnapshotWriteInput) {
+export function buildDailyPortfolioSnapshotData(
+  input: DailyPortfolioSnapshotWriteInput,
+): DailyPortfolioSnapshotPersistenceData {
   return {
     seasonParticipantId: input.valuation.seasonParticipantId,
     snapshotDate: input.snapshotDate,

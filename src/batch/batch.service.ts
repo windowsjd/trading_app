@@ -88,8 +88,7 @@ export class BatchService {
         skipped: false,
       });
     } catch (error) {
-      const errorCode = this.extractErrorCode(error);
-      const errorMessage = this.extractErrorMessage(error);
+      const failure = this.extractFailure(error);
       const failedRun = await this.prisma.batchJobRun.update({
         where: {
           id: run.id,
@@ -97,19 +96,22 @@ export class BatchService {
         data: {
           status: BatchJobStatus.failed,
           finishedAt: new Date(),
-          errorCode,
-          errorMessage,
+          errorCode: failure.errorCode,
+          errorMessage: failure.errorMessage,
         },
       });
 
       throw new HttpException(
         {
-          ...this.createErrorBody('BATCH_JOB_FAILED', 'Batch job failed.'),
+          ...this.createErrorBody(
+            failure.responseCode,
+            failure.responseMessage,
+          ),
           data: {
             run: this.serializeRun(failedRun),
           },
         },
-        HttpStatus.INTERNAL_SERVER_ERROR,
+        failure.status,
       );
     }
   }
@@ -384,7 +386,44 @@ export class BatchService {
     );
   }
 
+  private extractFailure(error: unknown): {
+    status: HttpStatus;
+    errorCode: string;
+    errorMessage: string;
+    responseCode: string;
+    responseMessage: string;
+  } {
+    const errorCode = this.extractErrorCode(error);
+    const errorMessage = this.extractErrorMessage(error);
+
+    if (error instanceof HttpException) {
+      return {
+        status: error.getStatus(),
+        errorCode,
+        errorMessage,
+        responseCode: errorCode,
+        responseMessage: errorMessage,
+      };
+    }
+
+    return {
+      status: HttpStatus.INTERNAL_SERVER_ERROR,
+      errorCode,
+      errorMessage,
+      responseCode: 'BATCH_JOB_FAILED',
+      responseMessage: 'Batch job failed.',
+    };
+  }
+
   private extractErrorCode(error: unknown) {
+    const responseErrorCode = this.extractHttpExceptionErrorField(
+      error,
+      'code',
+    );
+    if (responseErrorCode) {
+      return responseErrorCode;
+    }
+
     if (
       typeof error === 'object' &&
       error !== null &&
@@ -399,11 +438,47 @@ export class BatchService {
   }
 
   private extractErrorMessage(error: unknown) {
+    const responseErrorMessage = this.extractHttpExceptionErrorField(
+      error,
+      'message',
+    );
+    if (responseErrorMessage) {
+      return responseErrorMessage;
+    }
+
     if (error instanceof Error && error.message.trim() !== '') {
       return error.message;
     }
 
     return 'Batch job failed.';
+  }
+
+  private extractHttpExceptionErrorField(
+    error: unknown,
+    fieldName: 'code' | 'message',
+  ): string | undefined {
+    if (!(error instanceof HttpException)) {
+      return undefined;
+    }
+
+    const response = error.getResponse();
+    if (
+      typeof response !== 'object' ||
+      response === null ||
+      !('error' in response) ||
+      typeof response.error !== 'object' ||
+      response.error === null ||
+      !(fieldName in response.error)
+    ) {
+      return undefined;
+    }
+
+    const value = response.error[fieldName];
+    if (typeof value !== 'string' || value.trim() === '') {
+      return undefined;
+    }
+
+    return value.trim();
   }
 
   private createErrorBody(code: string, message: string) {
@@ -416,7 +491,11 @@ export class BatchService {
     };
   }
 
-  private throwApiError(status: HttpStatus, code: string, message: string): never {
+  private throwApiError(
+    status: HttpStatus,
+    code: string,
+    message: string,
+  ): never {
     throw new HttpException(this.createErrorBody(code, message), status);
   }
 }

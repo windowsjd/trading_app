@@ -149,6 +149,52 @@ describe('BatchService', () => {
     });
   });
 
+  it('preserves handler HttpException status/code while storing failed run details', async () => {
+    prisma.batchJobRun.create.mockResolvedValue(
+      makeRun({ status: BatchJobStatus.running }),
+    );
+    prisma.batchJobRun.update.mockResolvedValue(
+      makeRun({
+        status: BatchJobStatus.failed,
+        errorCode: 'BAD_REQUEST',
+        errorMessage: 'snapshotDate must be YYYY-MM-DD.',
+        finishedAt: new Date('2026-05-19T00:00:01.000Z'),
+      }),
+    );
+
+    const error = new HttpException(
+      {
+        success: false,
+        error: {
+          code: 'BAD_REQUEST',
+          message: 'snapshotDate must be YYYY-MM-DD.',
+        },
+      },
+      HttpStatus.BAD_REQUEST,
+    );
+
+    await expect(
+      service.runJob({
+        jobName: 'daily-portfolio-snapshot',
+        idempotencyKey: 'daily-portfolio-snapshot:season-1:bad-date',
+        handler: () => {
+          throw error;
+        },
+      }),
+    ).rejects.toMatchObject({
+      status: HttpStatus.BAD_REQUEST,
+    });
+
+    expect(prisma.batchJobRun.update).toHaveBeenCalledWith({
+      where: { id: 'run-1' },
+      data: expect.objectContaining({
+        status: BatchJobStatus.failed,
+        errorCode: 'BAD_REQUEST',
+        errorMessage: 'snapshotDate must be YYYY-MM-DD.',
+      }),
+    });
+  });
+
   it('returns an already succeeded run without executing the handler again', async () => {
     prisma.batchJobRun.create.mockRejectedValue({ code: 'P2002' });
     prisma.batchJobRun.findUnique.mockResolvedValue(
@@ -186,15 +232,15 @@ describe('BatchService', () => {
       makeRun({ status: BatchJobStatus.failed }),
     );
 
-    await expectDuplicateError(
-      'BATCH_JOB_RETRY_REQUIRES_NEW_IDEMPOTENCY_KEY',
-    );
+    await expectDuplicateError('BATCH_JOB_RETRY_REQUIRES_NEW_IDEMPOTENCY_KEY');
   });
 
   it('rejects invalid list query values', async () => {
-    await expect(service.listJobRuns({ status: 'done' })).rejects.toMatchObject({
-      status: HttpStatus.BAD_REQUEST,
-    });
+    await expect(service.listJobRuns({ status: 'done' })).rejects.toMatchObject(
+      {
+        status: HttpStatus.BAD_REQUEST,
+      },
+    );
   });
 
   it('clamps list limit to 100 and applies jobName/status filters', async () => {
