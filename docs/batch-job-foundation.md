@@ -1,12 +1,12 @@
 # Batch Job Foundation
 
-Status: implemented foundation with an operator-run daily portfolio snapshot job, no cron scheduler.
+Status: implemented foundation with operator-run daily portfolio snapshot and season ranking jobs, no cron scheduler.
 
 ## Scope
 
-The batch foundation is a common job execution envelope for future operator-run or scheduler-run work. It records job start, finish, result, failure, dry-run mode, request payload, and idempotency state in `batch_job_runs`.
+The batch foundation is a common job execution envelope for operator-run work and possible future scheduler-run work. It records job start, finish, result, failure, dry-run mode, request payload, and idempotency state in `batch_job_runs`.
 
-This is not provider ingestion, cron scheduling, automatic ranking generation, settlement, or reward.
+This is not provider ingestion, cron scheduling, daily snapshot automation, settlement, or reward.
 
 ## Current Components
 
@@ -15,6 +15,7 @@ This is not provider ingestion, cron scheduling, automatic ranking generation, s
 - Prisma model/table: `BatchJobRun` / `batch_job_runs`
 - Service: `BatchService`
 - Business job: `DailyPortfolioSnapshotJobService`
+- Business job: `SeasonRankingJobService`
 - Module: `BatchModule`
 - Operator script: `scripts/admin-run-batch-job.ts`
 
@@ -34,7 +35,7 @@ Each run is keyed by `(jobName, idempotencyKey)`.
 Current business key examples:
 
 - `daily-portfolio-snapshot:<season-id>:<YYYY-MM-DD>`
-- `season-ranking:<season-id>:YYYY-MM-DD`
+- `season-ranking:<season-id>:<YYYY-MM-DD>`
 
 ## Operator Script
 
@@ -43,6 +44,7 @@ Supported jobs now:
 - `noop`: records the batch run lifecycle only.
 - `health-check`: checks DB reachability only.
 - `daily-portfolio-snapshot`: creates `daily_portfolio_snapshots` for active participants of one season/date using existing DB `admin_manual` price/FX data only.
+- `season-ranking`: creates `season_rankings` for one season/date from existing `daily_portfolio_snapshots` only.
 
 Example:
 
@@ -78,6 +80,32 @@ Daily snapshot policy:
 - Only approved fresh `admin_manual` USD/KRW and latest eligible `admin_manual` asset prices are used. The job does not allow `provider_api` or `official_batch` sources.
 - The job does not generate rankings, settlement, rewards, provider rows, or scheduler registrations.
 
+Season ranking example:
+
+```bash
+pnpm tsx scripts/admin-run-batch-job.ts \
+  --job season-ranking \
+  --season-id <SEASON_ID> \
+  --snapshot-date <YYYY-MM-DD> \
+  --dry-run \
+  --requested-by local-operator
+```
+
+Season ranking policy:
+
+- If `--idempotency-key` is omitted, it is generated as `season-ranking:<season-id>:<YYYY-MM-DD>`. An explicit key is allowed for controlled retries or operator grouping.
+- `--dry-run` reads eligible participants and existing daily snapshots, returns `wouldCreate` and `topRanks`, and does not insert `season_rankings`.
+- Non-dry-run inserts `season_rankings` only when no ranking rows already exist for the same `seasonId`, `rankType=daily`, and `snapshotDate`.
+- Existing ranking rows are classified as `existing`/`skipped`; the job does not overwrite, delete, recreate, or upsert them.
+- Ranking writes are wrapped in a Prisma transaction to avoid partial ranking creation.
+- Source of truth is existing `daily_portfolio_snapshots` for the requested date. The job does not create daily snapshots, call providers, read provider APIs, create price/FX rows, mutate wallets/orders/positions, settle seasons, or grant rewards.
+- Allowed season status is `active` or `ended`. `upcoming` and `settled` are job-level errors.
+- Ranking candidates are participants in `active`, `finished`, or `rewarded` status that have a daily snapshot for the requested date. Missing participant snapshots are excluded from ranking and counted as `missingSnapshots`.
+- If no snapshots are available, the job succeeds with `reason=NO_SNAPSHOTS_AVAILABLE`, `created=0`, and no fake ranking rows.
+- Ranking uses `totalAssetKrw desc` and stable ordering by `userId asc`, then `seasonParticipantId asc`.
+- Current `season_rankings` has a unique `(seasonId, rankType, rankingDate, rank)` constraint, so this job persists deterministic unique sequential ranks. A true competition-rank tie policy such as `1, 2, 2, 4` requires a separate schema/migration gate and is not implemented here.
+- `topRanks` is capped at 10 rows in the batch result payload.
+
 ## Future Work
 
-Season ranking jobs can be added later on top of this envelope in a separate gate. Provider ingestion, cron scheduling, settlement, and reward remain separate gates.
+Cron scheduling, provider ingestion, daily snapshot automation, ranking overwrite/regeneration, settlement, and reward remain separate gates.

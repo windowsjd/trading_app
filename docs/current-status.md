@@ -144,13 +144,19 @@ near-term ledger/FX foundation:
   - `failed` key retry는 새 `idempotencyKey` 필요.
   - service 자체는 provider/FX/order/wallet/position/ledger/snapshot/ranking business row를 생성하지 않음.
 - Batch operator script 추가 완료: `scripts/admin-run-batch-job.ts`.
-  - 현재 지원 job은 `noop`, `health-check`, `daily-portfolio-snapshot`.
+  - 현재 지원 job은 `noop`, `health-check`, `daily-portfolio-snapshot`, `season-ranking`.
   - `daily-portfolio-snapshot`은 operator-run job이며 cron scheduler가 아님.
   - `daily-portfolio-snapshot`은 기존 DB의 approved fresh `admin_manual` USD/KRW 및 latest eligible `admin_manual` asset price만 사용.
   - `daily-portfolio-snapshot`은 `daily_portfolio_snapshots`만 생성하며 ranking, settlement, reward, provider ingestion을 수행하지 않음.
   - missing/stale FX 또는 missing price evidence는 fake fallback 없이 participant-level failure로 기록하고 해당 snapshot row를 생성하지 않음.
   - 동일 participant + snapshotDate snapshot이 이미 있으면 overwrite하지 않고 `existing`으로 분류.
-  - 실제 cron scheduler, provider ingestion, automatic ranking, settlement/reward 실행은 아직 없음.
+  - `season-ranking`은 operator-run job이며 cron scheduler가 아님.
+  - `season-ranking`은 특정 seasonId + snapshotDate의 기존 `daily_portfolio_snapshots`만 읽어 `season_rankings`를 생성.
+  - `season-ranking`은 daily snapshot 생성, provider ingestion/API 호출, asset/FX price 생성, wallet/order/position/snapshot mutation, settlement, reward를 수행하지 않음.
+  - 동일 seasonId + `rankType=daily` + snapshotDate ranking row가 이미 있으면 overwrite/delete/recreate 없이 `existing`/`skipped`로 분류.
+  - no snapshots는 job-level success + `reason=NO_SNAPSHOTS_AVAILABLE` + created=0으로 처리하고 fake ranking을 만들지 않음.
+  - current `season_rankings` schema의 `(seasonId, rankType, rankingDate, rank)` unique 제약 때문에 persisted rank는 `totalAssetKrw desc`, `userId asc`, `seasonParticipantId asc` 기반 deterministic unique sequential rank. true competition tie rank(`1,2,2,4`)는 별도 schema/migration gate 필요.
+  - 실제 cron scheduler, provider ingestion, settlement/reward 실행은 아직 없음.
   - admin 권한 모델이 없으므로 batch 실행 HTTP API는 만들지 않음.
 - Auth refresh session foundation 반영 완료: `RefreshTokenSessionStatus`, `refresh_token_sessions`.
 - Auth refresh session migration 생성 완료: `20260519090000_add_refresh_token_sessions`.
@@ -237,7 +243,7 @@ near-term ledger/FX foundation:
 ## 6. 현재 미도입 DB 상태
 
 - Prisma schema/migration 기준 현재 문서화된 핵심 DB foundation 추가 미도입 테이블 없음.
-- Batch job run/lock 기록 foundation과 operator-run daily portfolio snapshot job은 구현 완료. 단, 실제 cron scheduler, provider ingestion job, automatic ranking job, settlement/reward job은 아직 미구현.
+- Batch job run/lock 기록 foundation과 operator-run daily portfolio snapshot/season ranking job은 구현 완료. 단, 실제 cron scheduler, provider ingestion job, ranking overwrite/regeneration job, settlement/reward job은 아직 미구현.
 - order execution full-fill MVP와 position mutation 1차 write path는 구현 완료. 단, exact replay, durable quote, partial fill, matching engine, provider price ingestion, settlement API, scheduler 기반 자동 daily valuation/ranking 생성 경로는 아직 미구현.
 
 ## 7. 완료된 문서/설계 상태
@@ -348,6 +354,19 @@ near-term ledger/FX foundation:
   - 정렬 기준: `totalAssetKrw desc`, `returnRate desc`, `capturedAt asc`, `seasonParticipantId asc`.
   - rank는 1부터 순차 부여.
   - 기존 ranking row는 transaction 안에서 임시 음수 rank로 이동한 뒤 `(seasonId, rankType, rankingDate, seasonParticipantId)` unique 기준 upsert하여 rank unique 충돌을 피함.
+- Season ranking batch job 구현 완료: `src/batch/season-ranking-job.service.ts`, `scripts/admin-run-batch-job.ts --job season-ranking`.
+  - 옵션: `--season-id`, `--snapshot-date`, `--idempotency-key`, `--dry-run`, `--requested-by`.
+  - idempotencyKey 기본값: `season-ranking:<season-id>:<YYYY-MM-DD>`.
+  - `BatchService.runJob()` envelope으로 `batch_job_runs`의 running/succeeded/failed/result payload 기록.
+  - source of truth는 요청 날짜의 기존 `daily_portfolio_snapshots`.
+  - active/ended season만 허용하고 upcoming/settled는 job-level error.
+  - active/finished/rewarded participant 중 snapshot이 있는 participant만 ranking 대상.
+  - snapshot이 없는 participant는 ranking 대상에서 제외하고 `missingSnapshots`에 반영.
+  - dry-run은 생성 계획과 topRanks만 반환하고 `season_rankings`를 생성하지 않음.
+  - non-dry-run은 ranking row가 없을 때만 transaction 안에서 `season_rankings`를 생성.
+  - 기존 ranking row가 있으면 overwrite/delete/recreate 없이 existing/skipped로 성공 종료.
+  - daily snapshot 생성, provider ingestion/API 호출, settlement/reward 없음.
+  - current schema의 rank unique 제약으로 competition tie rank는 미구현이며, 같은 `totalAssetKrw`는 `userId`, `seasonParticipantId` 순서로 deterministic sequential rank 저장.
 - 이 작업은 `/home`과 `/ranking` 구현 준비를 진전시켰지만, 자동 데이터 생성/외부 시세 공급/API 응답은 아직 없음.
 - scheduler/batch/provider ingestion/settlement 구현 없음.
 - order quote/create/cancel/execute full-fill MVP 구현 완료.

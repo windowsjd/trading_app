@@ -9,7 +9,7 @@
 - Gate C provider fixture capture prep on 2026-05-14 captured Binance public `BTCUSDT` ticker/orderbook fixtures and fixed residual crypto freshness wording; OANDA/Twelve Data fixtures remain credential-blocked.
 - Auth refresh-token/logout/revocation MVP is now implemented by the current codebase. This document does not authorize provider, scheduler, settlement, reward, package, seed, or unrelated schema changes.
 - Provider-key-free `MVP_FLOW_DB_SMOKE=1` real PostgreSQL smoke is available as a service-composed opt-in check for the implemented Auth -> season join -> wallets/assets -> FX -> orders -> positions/records/home/ranking flow using isolated test-only `admin_manual` fixtures. It is not provider ingestion, scheduler, settlement, reward, seed, or sample business data.
-- Batch job execution foundation is implemented with `BatchJobRun`/`BatchJobStatus`, `BatchService`, an operator-only noop/health-check script, and an operator-run `daily-portfolio-snapshot` job. It is not a cron scheduler, provider ingestion, automatic ranking, settlement, or reward implementation.
+- Batch job execution foundation is implemented with `BatchJobRun`/`BatchJobStatus`, `BatchService`, an operator-only noop/health-check script, an operator-run `daily-portfolio-snapshot` job, and an operator-run `season-ranking` job. It is not a cron scheduler, provider ingestion, settlement, or reward implementation.
 - `docs/current-status.md` remains the short status summary. This document is the detailed backend gate roadmap.
 
 ## Audit Basis
@@ -86,14 +86,14 @@ Consistency note:
 
 ### Batch Job Foundation
 
-- Current status: common batch job execution envelope implemented for operator/scheduler work, plus an operator-run daily portfolio snapshot job. `BatchJobRun` records jobName, idempotencyKey, status, dryRun, start/finish timestamps, request/result JSON, and failure code/message.
-- Implemented files: `src/batch/batch.module.ts`, `src/batch/batch.service.ts`, `src/batch/batch.types.ts`, `src/batch/batch-admin-runner.ts`, `src/batch/daily-portfolio-snapshot-job.service.ts`, `src/batch/daily-portfolio-snapshot-job.types.ts`, `scripts/admin-run-batch-job.ts`, `prisma/schema.prisma`, migration `20260519095458_add_batch_job_runs`.
+- Current status: common batch job execution envelope implemented for operator/scheduler work, plus operator-run daily portfolio snapshot and season ranking jobs. `BatchJobRun` records jobName, idempotencyKey, status, dryRun, start/finish timestamps, request/result JSON, and failure code/message.
+- Implemented files: `src/batch/batch.module.ts`, `src/batch/batch.service.ts`, `src/batch/batch.types.ts`, `src/batch/batch-admin-runner.ts`, `src/batch/daily-portfolio-snapshot-job.service.ts`, `src/batch/daily-portfolio-snapshot-job.types.ts`, `src/batch/season-ranking-job.service.ts`, `src/batch/season-ranking-job.types.ts`, `scripts/admin-run-batch-job.ts`, `prisma/schema.prisma`, migration `20260519095458_add_batch_job_runs`.
 - Source of truth: `docs/batch-job-foundation.md`, `docs/current-status.md`, `docs/backend-gate-roadmap.md`.
-- Existing tests: `src/batch/batch.service.spec.ts`, `src/batch/batch-admin-runner.spec.ts`.
-- Known limitations: no cron scheduler, no provider ingestion job, no automatic ranking job, no settlement/reward job, and no batch execution HTTP API because admin roles are not implemented. The daily snapshot job uses existing DB `admin_manual` evidence only and does not create rankings.
-- Remaining work: add season ranking job later on top of this foundation only after the corresponding gate; define deployment scheduler ownership separately.
+- Existing tests: `src/batch/batch.service.spec.ts`, `src/batch/daily-portfolio-snapshot-job.service.spec.ts`, `src/batch/season-ranking-job.service.spec.ts`, `src/batch/batch-admin-runner.spec.ts`.
+- Known limitations: no cron scheduler, no provider ingestion job, no settlement/reward job, no ranking overwrite/regeneration policy, and no batch execution HTTP API because admin roles are not implemented. The daily snapshot job uses existing DB `admin_manual` evidence only and does not create rankings. The season ranking job reads existing `daily_portfolio_snapshots` only and does not create snapshots.
+- Remaining work: define deployment scheduler ownership separately; ranking automation/overwrite, provider ingestion, settlement, and reward remain separate gates.
 - Risk level: MEDIUM.
-- Recommended next action: keep the executable jobs limited to `noop`, `health-check`, and `daily-portfolio-snapshot`; open a separate gate for ranking generation.
+- Recommended next action: keep executable jobs limited to `noop`, `health-check`, `daily-portfolio-snapshot`, and `season-ranking`; open separate gates for scheduler automation, provider ingestion, settlement, and reward.
 
 ### Auth
 
@@ -244,19 +244,19 @@ Consistency note:
 - Implemented files: `scripts/admin-generate-daily-portfolio-snapshot.ts`, `src/portfolio/daily-portfolio-snapshot-generation.ts`, `src/batch/daily-portfolio-snapshot-job.service.ts`, `src/batch/daily-portfolio-snapshot-job.types.ts`, `src/batch/batch-admin-runner.ts`.
 - Source of truth: `docs/current-status.md`, `docs/home-api-contract.md`, `docs/batch-job-foundation.md`.
 - Existing tests: `src/portfolio/snapshot-ranking-generation.spec.ts`, `src/batch/daily-portfolio-snapshot-job.service.spec.ts`, `src/batch/batch-admin-runner.spec.ts`.
-- Known limitations: no cron scheduler; no provider ingestion; no automatic ranking, settlement, or reward generation; no real DB batch script smoke yet.
-- Remaining work: season ranking job gate, then separate scheduler/deployment ownership gate if automation is required.
+- Known limitations: no cron scheduler; no provider ingestion; no settlement or reward generation; no real DB batch script smoke yet.
+- Remaining work: separate scheduler/deployment ownership gate if automation is required.
 - Risk level: MEDIUM.
-- Recommended next action: open a separate season ranking job gate before any automatic generation.
+- Recommended next action: keep daily snapshot generation operator-run; use `season-ranking` as the separate operator-run ranking path; defer cron automation to a scheduler/deployment gate.
 
 ### Ranking
 
-- Current status: `GET /api/v1/ranking` read-only MVP implemented; manual ranking generation helper/CLI implemented; API reads `season_rankings` only.
-- Implemented files: `src/ranking/ranking.controller.ts`, `src/ranking/ranking.service.ts`, `scripts/admin-generate-season-ranking.ts`, `src/portfolio/portfolio-ranking.policy.ts`, `src/portfolio/season-ranking-generation.ts`.
+- Current status: `GET /api/v1/ranking` read-only MVP implemented; manual ranking generation helper/CLI and operator-run season ranking batch job implemented; API reads `season_rankings` only.
+- Implemented files: `src/ranking/ranking.controller.ts`, `src/ranking/ranking.service.ts`, `scripts/admin-generate-season-ranking.ts`, `src/portfolio/portfolio-ranking.policy.ts`, `src/portfolio/season-ranking-generation.ts`, `src/batch/season-ranking-job.service.ts`.
 - Source of truth: `docs/ranking-api-contract.md`, `docs/current-status.md`.
-- Existing tests: `src/ranking/ranking.service.spec.ts`, `src/portfolio/portfolio-ranking.policy.spec.ts`, `src/portfolio/snapshot-ranking-generation.spec.ts`, `test/app.e2e-spec.ts`.
-- Known limitations: no automatic season ranking generation, no final settlement/reward integration, no real DB ranking generator test.
-- Remaining work: automatic ranking generation after scheduler foundation.
+- Existing tests: `src/ranking/ranking.service.spec.ts`, `src/portfolio/portfolio-ranking.policy.spec.ts`, `src/portfolio/snapshot-ranking-generation.spec.ts`, `src/batch/season-ranking-job.service.spec.ts`, `test/app.e2e-spec.ts`.
+- Known limitations: no cron-driven automatic season ranking generation, no final settlement/reward integration, no real DB ranking generator test. Current schema enforces unique persisted rank per season/date/type, so true same-rank competition ties require a separate schema gate.
+- Remaining work: scheduler-driven ranking automation only after scheduler/deployment ownership is defined.
 - Risk level: MEDIUM.
 - Recommended next action: Gate G only after Gate E and F.
 
@@ -306,14 +306,14 @@ Consistency note:
 
 ### Scheduler / Batch
 
-- Current status: batch job execution envelope and operator-run daily portfolio snapshot job are implemented; cron scheduler is not implemented.
+- Current status: batch job execution envelope and operator-run daily portfolio snapshot/season ranking jobs are implemented; cron scheduler is not implemented.
 - Implemented files: `src/batch/**`, `scripts/admin-run-batch-job.ts`, `prisma/migrations/20260519095458_add_batch_job_runs/migration.sql`.
 - Source of truth: `docs/batch-job-foundation.md`, `docs/current-status.md`, provider STOP docs.
-- Existing tests: `src/batch/batch.service.spec.ts`, `src/batch/batch-admin-runner.spec.ts`; manual helper dry-run tests remain separate.
-- Known limitations: manual CLI, operator-run batch jobs, cron scheduler, and automatic business jobs must not be conflated. Daily snapshots are operator-run and use DB `admin_manual` evidence only.
-- Remaining work: cron/deployment ownership and separate ranking/provider/settlement job policies before automatic rankings/provider jobs.
+- Existing tests: `src/batch/batch.service.spec.ts`, `src/batch/daily-portfolio-snapshot-job.service.spec.ts`, `src/batch/season-ranking-job.service.spec.ts`, `src/batch/batch-admin-runner.spec.ts`; manual helper dry-run tests remain separate.
+- Known limitations: manual CLI, operator-run batch jobs, cron scheduler, and automatic business jobs must not be conflated. Daily snapshots are operator-run and use DB `admin_manual` evidence only. Season rankings are operator-run and read existing daily snapshots only.
+- Remaining work: cron/deployment ownership and separate provider/settlement/reward policies before automatic provider or settlement jobs.
 - Risk level: HIGH.
-- Recommended next action: keep executable jobs limited to `noop`, `health-check`, and `daily-portfolio-snapshot` until a separate ranking/provider/settlement gate opens.
+- Recommended next action: keep executable jobs limited to `noop`, `health-check`, `daily-portfolio-snapshot`, and `season-ranking` until a separate scheduler/provider/settlement gate opens.
 
 ### Settlement
 

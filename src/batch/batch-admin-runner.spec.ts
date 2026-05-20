@@ -9,11 +9,21 @@ jest.mock('../generated/prisma/client', () => ({
   FxRateSourceType: {
     admin_manual: 'admin_manual',
   },
+  ParticipantStatus: {
+    registered: 'registered',
+    active: 'active',
+    finished: 'finished',
+    rewarded: 'rewarded',
+  },
   Prisma: {
     Decimal: jest.fn(),
     JsonNull: null,
   },
   PrismaClient: class PrismaClient {},
+  SeasonRankingType: {
+    daily: 'daily',
+    final: 'final',
+  },
 }));
 
 import { parseAdminRunBatchJobArgs } from './batch-admin-runner';
@@ -74,6 +84,43 @@ describe('parseAdminRunBatchJobArgs', () => {
       idempotencyKey: 'daily-portfolio-snapshot:season-1:2026-05-20',
       dryRun: true,
       requestedBy: 'operator',
+    });
+  });
+
+  it('parses season ranking job options and generates idempotency key', () => {
+    expect(
+      parseAdminRunBatchJobArgs([
+        '--job',
+        'season-ranking',
+        '--season-id',
+        'season-1',
+        '--snapshot-date',
+        '2026-05-20',
+        '--dry-run',
+        '--requested-by',
+        'operator',
+      ]),
+    ).toMatchObject({
+      job: 'season-ranking',
+      seasonId: 'season-1',
+      snapshotDate: '2026-05-20',
+      idempotencyKey: 'season-ranking:season-1:2026-05-20',
+      dryRun: true,
+      requestedBy: 'operator',
+    });
+  });
+
+  it('keeps explicit season ranking idempotency key', () => {
+    expect(
+      parseAdminRunBatchJobArgs([
+        '--job=season-ranking',
+        '--season-id=season-1',
+        '--snapshot-date=2026-05-20',
+        '--idempotency-key=manual-key',
+      ]),
+    ).toMatchObject({
+      job: 'season-ranking',
+      idempotencyKey: 'manual-key',
     });
   });
 
@@ -145,11 +192,44 @@ describe('parseAdminRunBatchJobArgs', () => {
     ).toThrow('Missing or empty --snapshot-date.');
   });
 
+  it('rejects missing season ranking required options', () => {
+    expect(() =>
+      parseAdminRunBatchJobArgs([
+        '--job',
+        'season-ranking',
+        '--snapshot-date',
+        '2026-05-20',
+      ]),
+    ).toThrow('Missing or empty --season-id.');
+
+    expect(() =>
+      parseAdminRunBatchJobArgs([
+        '--job',
+        'season-ranking',
+        '--season-id',
+        'season-1',
+      ]),
+    ).toThrow('Missing or empty --snapshot-date.');
+  });
+
   it('rejects invalid daily portfolio snapshot dates', () => {
     expect(() =>
       parseAdminRunBatchJobArgs([
         '--job',
         'daily-portfolio-snapshot',
+        '--season-id',
+        'season-1',
+        '--snapshot-date',
+        '2026-02-31',
+      ]),
+    ).toThrow('Invalid --snapshot-date: must be YYYY-MM-DD.');
+  });
+
+  it('rejects invalid season ranking dates', () => {
+    expect(() =>
+      parseAdminRunBatchJobArgs([
+        '--job',
+        'season-ranking',
         '--season-id',
         'season-1',
         '--snapshot-date',

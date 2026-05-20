@@ -6,11 +6,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { DailyPortfolioSnapshotJobService } from './daily-portfolio-snapshot-job.service';
 import { BatchService } from './batch.service';
 import { DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME } from './daily-portfolio-snapshot-job.types';
+import { SeasonRankingJobService } from './season-ranking-job.service';
+import { SEASON_RANKING_JOB_NAME } from './season-ranking-job.types';
 
 type SupportedAdminBatchJob =
   | 'noop'
   | 'health-check'
-  | typeof DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME;
+  | typeof DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME
+  | typeof SEASON_RANKING_JOB_NAME;
 
 export type AdminRunBatchJobArgs = {
   job?: SupportedAdminBatchJob;
@@ -71,7 +74,7 @@ export function parseAdminRunBatchJobArgs(
   }
 
   parsed.job = parseJob(parsed.job);
-  if (parsed.job === DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME) {
+  if (isSeasonDateJob(parsed.job)) {
     parsed.seasonId = parseRequiredText(parsed.seasonId, 'season-id');
     parsed.snapshotDate = parseDateOnlyText(
       parsed.snapshotDate,
@@ -79,7 +82,7 @@ export function parseAdminRunBatchJobArgs(
     );
     parsed.idempotencyKey =
       parseOptionalText(parsed.idempotencyKey) ??
-      `${DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME}:${parsed.seasonId}:${parsed.snapshotDate}`;
+      `${parsed.job}:${parsed.seasonId}:${parsed.snapshotDate}`;
   } else {
     parsed.idempotencyKey = parseRequiredText(
       parsed.idempotencyKey,
@@ -111,28 +114,42 @@ export async function runAdminRunBatchJob(argv: string[]) {
     prisma as unknown as PrismaService,
     portfolioValuationService,
   );
+  const seasonRankingJobService = new SeasonRankingJobService(
+    batchService,
+    prisma as unknown as PrismaService,
+  );
 
   try {
-    const response =
-      args.job === DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME
-        ? await dailyPortfolioSnapshotJobService.run({
-            seasonId: args.seasonId,
-            snapshotDate: args.snapshotDate,
-            idempotencyKey: args.idempotencyKey,
-            dryRun: args.dryRun === true,
-            requestedBy: args.requestedBy,
-          })
-        : await batchService.runJob({
-            jobName: args.job as string,
-            idempotencyKey: args.idempotencyKey as string,
-            dryRun: args.dryRun === true,
-            requestedBy: args.requestedBy,
-            requestPayload: {
-              job: args.job,
-              payload: args.payloadJson ?? null,
-            },
-            handler: async () => runSupportedJob(prisma, args),
-          });
+    let response;
+    if (args.job === DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME) {
+      response = await dailyPortfolioSnapshotJobService.run({
+        seasonId: args.seasonId,
+        snapshotDate: args.snapshotDate,
+        idempotencyKey: args.idempotencyKey,
+        dryRun: args.dryRun === true,
+        requestedBy: args.requestedBy,
+      });
+    } else if (args.job === SEASON_RANKING_JOB_NAME) {
+      response = await seasonRankingJobService.run({
+        seasonId: args.seasonId,
+        snapshotDate: args.snapshotDate,
+        idempotencyKey: args.idempotencyKey,
+        dryRun: args.dryRun === true,
+        requestedBy: args.requestedBy,
+      });
+    } else {
+      response = await batchService.runJob({
+        jobName: args.job as string,
+        idempotencyKey: args.idempotencyKey as string,
+        dryRun: args.dryRun === true,
+        requestedBy: args.requestedBy,
+        requestPayload: {
+          job: args.job,
+          payload: args.payloadJson ?? null,
+        },
+        handler: async () => runSupportedJob(prisma, args),
+      });
+    }
 
     console.log('batch job completed');
     console.log(JSON.stringify(response.data, null, 2));
@@ -179,7 +196,8 @@ function parseJob(value: string | undefined): SupportedAdminBatchJob {
   if (
     text === 'noop' ||
     text === 'health-check' ||
-    text === DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME
+    text === DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME ||
+    text === SEASON_RANKING_JOB_NAME
   ) {
     return text;
   }
@@ -234,4 +252,14 @@ function parseOptionalText(value: string | undefined): string | undefined {
 
   const text = value.trim();
   return text === '' ? undefined : text;
+}
+
+function isSeasonDateJob(
+  job: SupportedAdminBatchJob | undefined,
+): job is
+  | typeof DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME
+  | typeof SEASON_RANKING_JOB_NAME {
+  return (
+    job === DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME || job === SEASON_RANKING_JOB_NAME
+  );
 }

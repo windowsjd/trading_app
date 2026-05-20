@@ -14,14 +14,14 @@ This service owns backend APIs, database access, financial calculations, and ser
 - Submitted order create, cancel, and full-fill execute MVP.
 - KRW and USD cash wallets. US stocks and USD-settled crypto use the USD wallet.
 - Final valuation policy is KRW total assets.
-- Batch job execution foundation with idempotent `batch_job_runs` recording, operator-only noop/health-check script, and operator-run daily portfolio snapshot generation.
+- Batch job execution foundation with idempotent `batch_job_runs` recording, operator-only noop/health-check script, operator-run daily portfolio snapshot generation, and operator-run season ranking generation from existing daily snapshots.
 
 ## STOP / Not Implemented
 
 These are intentionally outside the current implementation and should not be added without a separate gate:
 
 - Provider ingestion for OANDA, Twelve Data, Binance, or any other market data provider.
-- Cron scheduler, provider ingestion jobs, automatic ranking jobs, settlement jobs, or reward jobs.
+- Cron scheduler, provider ingestion jobs, scheduler-driven snapshot/ranking jobs, settlement jobs, or reward jobs.
 - Settlement.
 - Reward, badge, or trophy grants.
 - Access token blacklist/revocation, server-side session auth, and cookie auth.
@@ -75,9 +75,14 @@ pnpm tsx scripts/admin-run-batch-job.ts --job noop --idempotency-key noop:local-
 
 # operator-run daily portfolio snapshot dry-run, no provider calls
 pnpm tsx scripts/admin-run-batch-job.ts --job daily-portfolio-snapshot --season-id <SEASON_ID> --snapshot-date <YYYY-MM-DD> --dry-run --requested-by local-operator
+
+# operator-run season ranking dry-run from existing daily snapshots, no provider calls
+pnpm tsx scripts/admin-run-batch-job.ts --job season-ranking --season-id <SEASON_ID> --snapshot-date <YYYY-MM-DD> --dry-run --requested-by local-operator
 ```
 
 `daily-portfolio-snapshot` uses the idempotency key `daily-portfolio-snapshot:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. Dry-run reports `wouldCreate`, `existing`, and participant-level failures without inserting snapshots. Non-dry-run inserts only available participant snapshots, skips existing `(seasonParticipantId, snapshotDate)` rows without overwrite, and uses only existing approved fresh `admin_manual` USD/KRW plus latest eligible `admin_manual` asset price data. It does not call providers, schedule cron, generate rankings, settle seasons, or grant rewards.
+
+`season-ranking` uses the idempotency key `season-ranking:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. Dry-run reads existing `daily_portfolio_snapshots` and reports planned rankings without inserting rows. Non-dry-run creates `season_rankings` only when no rows already exist for the same season/date/type; existing rankings are skipped without overwrite. It does not call providers, create daily snapshots, mutate wallets/orders/positions, settle seasons, or grant rewards. Ranking is `totalAssetKrw desc` with stable user/participant ordering; the current schema requires unique persisted ranks, so true same-rank competition ties need a future schema gate.
 
 Opt-in real PostgreSQL integration tests require a reachable `DATABASE_URL` and an explicit env flag:
 
@@ -116,6 +121,7 @@ Possible now:
 - Opt-in real PostgreSQL integration tests for implemented DB write paths.
 - Manual admin input paths using operator-approved real data.
 - Operator-run daily portfolio snapshot batch jobs using existing `admin_manual` DB data.
+- Operator-run season ranking batch jobs using existing `daily_portfolio_snapshots`.
 
 Not possible without a separate provider gate:
 
