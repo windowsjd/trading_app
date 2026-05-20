@@ -4,6 +4,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AssetsModule } from './assets/assets.module';
 import { AuthModule } from './auth/auth.module';
+import { BatchModule } from './batch/batch.module';
 import { FxModule } from './fx/fx.module';
 import { HomeModule } from './home/home.module';
 import { OrdersModule } from './orders/orders.module';
@@ -22,6 +23,7 @@ import { WalletsModule } from './wallets/wallets.module';
     }),
     AssetsModule,
     AuthModule,
+    BatchModule,
     FxModule,
     HomeModule,
     OrdersModule,

@@ -116,6 +116,14 @@ enum OrderStatus {
   rejected
 }
 
+enum BatchJobStatus {
+  pending
+  running
+  succeeded
+  failed
+  skipped
+}
+
 model User {
   id              String     @id @default(uuid())
   email           String     @unique
@@ -499,4 +507,27 @@ model SeasonRanking {
   @@index([seasonId, rankType, rankingDate, rank])
   @@index([seasonParticipantId, rankingDate])
   @@map("season_rankings")
+}
+
+model BatchJobRun {
+  id                 String         @id @default(uuid())
+  jobName            String         @map("job_name")
+  idempotencyKey     String         @map("idempotency_key")
+  status             BatchJobStatus @default(pending)
+  dryRun             Boolean        @default(false) @map("dry_run")
+  startedAt          DateTime?      @map("started_at")
+  finishedAt         DateTime?      @map("finished_at")
+  requestedBy        String?        @map("requested_by")
+  requestPayloadJson Json?          @map("request_payload_json")
+  resultPayloadJson  Json?          @map("result_payload_json")
+  errorCode          String?        @map("error_code")
+  errorMessage       String?        @map("error_message")
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
+
+  @@unique([jobName, idempotencyKey])
+  @@index([jobName, status])
+  @@index([jobName, createdAt])
+  @@index([status, createdAt])
+  @@map("batch_job_runs")
 }

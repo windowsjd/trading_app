@@ -129,9 +129,24 @@
 - `daily_portfolio_snapshots`
 - `season_rankings`
 - `refresh_token_sessions`
+- `batch_job_runs`
 
 near-term ledger/FX foundation:
 
+- Batch job execution foundation 반영 완료: `BatchJobStatus`, `batch_job_runs`.
+- Batch job run migration 생성 및 로컬 DB 적용 완료: `20260519095458_add_batch_job_runs`.
+- `BatchService` 구현 완료:
+  - `(jobName, idempotencyKey)` unique 기반 중복 실행 방지.
+  - 신규 run은 `running`으로 기록 후 성공 시 `succeeded`, 실패 시 `failed`로 업데이트.
+  - `dryRun`, `requestedBy`, `requestPayloadJson`, `resultPayloadJson`, `errorCode`, `errorMessage` 기록.
+  - 이미 `succeeded`인 key는 handler를 재실행하지 않고 기존 run을 deduplicated/skipped 응답으로 반환.
+  - `running`/`pending` key는 중복 실행 차단.
+  - `failed` key retry는 새 `idempotencyKey` 필요.
+  - service 자체는 provider/FX/order/wallet/position/ledger/snapshot/ranking business row를 생성하지 않음.
+- Batch operator script 추가 완료: `scripts/admin-run-batch-job.ts`.
+  - 현재 지원 job은 `noop`, `health-check`만.
+  - 실제 cron scheduler, provider ingestion, automatic daily snapshot/ranking, settlement/reward 실행은 아직 없음.
+  - admin 권한 모델이 없으므로 batch 실행 HTTP API는 만들지 않음.
 - Auth refresh session foundation 반영 완료: `RefreshTokenSessionStatus`, `refresh_token_sessions`.
 - Auth refresh session migration 생성 완료: `20260519090000_add_refresh_token_sessions`.
 - Auth refresh session migration 로컬 DB 적용 완료: `20260519090000_add_refresh_token_sessions`.
@@ -216,7 +231,8 @@ near-term ledger/FX foundation:
 ## 6. 현재 미도입 DB 상태
 
 - Prisma schema/migration 기준 현재 문서화된 핵심 DB foundation 추가 미도입 테이블 없음.
-- order execution full-fill MVP와 position mutation 1차 write path는 구현 완료. 단, exact replay, durable quote, partial fill, matching engine, provider price ingestion, settlement API, scheduler/batch 기반 자동 daily valuation/ranking 생성 경로는 아직 미구현.
+- Batch job run/lock 기록 foundation은 구현 완료. 단, 실제 cron scheduler, provider ingestion job, automatic daily valuation/ranking job, settlement/reward job은 아직 미구현.
+- order execution full-fill MVP와 position mutation 1차 write path는 구현 완료. 단, exact replay, durable quote, partial fill, matching engine, provider price ingestion, settlement API, scheduler 기반 자동 daily valuation/ranking 생성 경로는 아직 미구현.
 
 ## 7. 완료된 문서/설계 상태
 
@@ -234,6 +250,8 @@ near-term ledger/FX foundation:
   - `docs/wallets-api-contract.md`
   - `docs/positions-api-contract.md`
   - `docs/records-api-contract.md`
+- Batch foundation:
+  - `docs/batch-job-foundation.md`
 - Provider/freshness/crypto policy and evidence:
   - `docs/crypto-usd-settlement-policy-update.md`
   - `docs/provider-final-selection-readiness-recheck.md`
@@ -641,7 +659,7 @@ near-term ledger/FX foundation:
   - Binance ingestion implementation은 fixture가 있어도 effectiveAt mapping, sourceType eligibility, price-field decision, terms approval, USDT-to-USD owner decision 전까지 `STOP`.
   - OANDA/Twelve Data ingestion implementation은 credentialed fixture, mapping, terms, sourceType tests 전까지 `STOP/BLOCKED`.
   - KRX domestic stock remains STOP.
-  - scheduler/batch는 아직 미구현이며 Gate E 전까지 구현 STOP 유지.
+  - Batch job run foundation은 구현됨. 실제 cron scheduler와 provider/snapshot/ranking/settlement/reward job은 STOP 유지.
   - settlement/reward는 아직 미구현이며 Gate H/I/J 전까지 구현 STOP 유지.
 - Gate B Provider final selection readiness re-check 및 Asset Price Freshness Policy 문서화 완료.
   - 상세 결과: `docs/provider-final-selection-readiness-recheck.md`, `docs/asset-price-freshness-policy.md`.
@@ -656,7 +674,7 @@ near-term ledger/FX foundation:
   - full financial write-path 검증은 현재 service/unit 및 opt-in PostgreSQL integration spec이 담당.
 - 테스트 커버리지 상세는 `docs/backend-test-coverage-matrix.md` 기준.
 - provider ingestion은 여전히 미구현이며 live fixture와 owner decision 수락 전 구현 `BLOCKED` 유지.
-- scheduler/batch는 여전히 미구현이며 Gate E 전까지 구현 STOP 유지.
+- Batch job run foundation은 구현됨. 실제 cron scheduler와 provider/snapshot/ranking/settlement/reward job은 STOP 유지.
 - settlement/reward는 여전히 미구현이며 Gate H/I/J 전까지 구현 STOP 유지.
 - asset price freshness 정책 요약:
   - FX USD/KRW quote/execute는 현행 60초 `effectiveAt` freshness 유지.
@@ -666,7 +684,7 @@ near-term ledger/FX foundation:
   - Twelve Data는 US stock 후보이나 live fixture, symbol mapping, plan/terms 확인 전 `CONDITIONAL GO`.
   - Crypto는 Binance-based USD-settled crypto로 고정하며 Upbit/Bithumb은 MVP provider stack에서 제외.
   - `official_batch`는 reference/reconciliation/settlement 후보이며 real-time execute source가 아님.
-- OANDA trial/API 계약 검증 전 provider_api/official_batch/scheduler 구현 STOP 유지.
+- OANDA trial/API 계약 검증 전 provider_api/official_batch/cron scheduler 구현 STOP 유지.
 - `/fx execute` 남은 DB-level rollback/partial-write hardening 및 stale pending/unknown outcome recovery 설계.
 - `/orders/:orderId/execute` MVP 후속 gate:
   - exact execute response replay가 필요하면 schema/command table 별도 검토.
@@ -679,7 +697,7 @@ near-term ledger/FX foundation:
 - high-risk backend gaps:
   - provider credentials 확보, live fixture capture, provider ingestion.
   - asset price freshness/source policy 구현 반영 및 고위험 테스트.
-  - scheduler/batch foundation 및 automatic daily snapshot/ranking.
+  - cron scheduler 및 automatic daily snapshot/ranking job.
   - settlement/reward/badge/trophy.
   - access token blacklist/revocation, cookie/session auth, refresh token reuse theft-response hardening.
   - durable quote, order exact execute replay, partial fill, matching engine.

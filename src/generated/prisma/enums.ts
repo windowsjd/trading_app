@@ -166,3 +166,14 @@ export const OrderStatus = {
 } as const
 
 export type OrderStatus = (typeof OrderStatus)[keyof typeof OrderStatus]
+
+
+export const BatchJobStatus = {
+  pending: 'pending',
+  running: 'running',
+  succeeded: 'succeeded',
+  failed: 'failed',
+  skipped: 'skipped'
+} as const
+
+export type BatchJobStatus = (typeof BatchJobStatus)[keyof typeof BatchJobStatus]

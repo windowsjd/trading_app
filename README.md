@@ -14,13 +14,14 @@ This service owns backend APIs, database access, financial calculations, and ser
 - Submitted order create, cancel, and full-fill execute MVP.
 - KRW and USD cash wallets. US stocks and USD-settled crypto use the USD wallet.
 - Final valuation policy is KRW total assets.
+- Batch job execution foundation with idempotent `batch_job_runs` recording and operator-only noop/health-check script.
 
 ## STOP / Not Implemented
 
 These are intentionally outside the current implementation and should not be added without a separate gate:
 
 - Provider ingestion for OANDA, Twelve Data, Binance, or any other market data provider.
-- Scheduler or batch jobs.
+- Cron scheduler, provider ingestion jobs, automatic daily snapshot/ranking jobs, settlement jobs, or reward jobs.
 - Settlement.
 - Reward, badge, or trophy grants.
 - Access token blacklist/revocation, server-side session auth, and cookie auth.
@@ -68,6 +69,9 @@ pnpm test:e2e
 
 # Prisma schema validation
 pnpm exec prisma validate
+
+# operator-only batch foundation smoke, no provider or trading business rows
+pnpm tsx scripts/admin-run-batch-job.ts --job noop --idempotency-key noop:local-check --dry-run --requested-by local-operator --payload-json '{"purpose":"batch-foundation-check"}'
 ```
 
 Opt-in real PostgreSQL integration tests require a reachable `DATABASE_URL` and an explicit env flag:
@@ -94,6 +98,7 @@ Current source of truth order:
 3. `docs/backend-gate-roadmap.md`
 4. `docs/backend-test-coverage-matrix.md`
 5. `docs/auth-api-contract.md` and API contract docs under `docs/*-api-contract.md`
+6. `docs/batch-job-foundation.md`
 
 `docs/archive/` is historical reference only and must not override the current documents above.
 

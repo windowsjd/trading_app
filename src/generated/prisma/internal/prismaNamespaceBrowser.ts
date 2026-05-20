@@ -66,7 +66,8 @@ export const ModelName = {
   FxExecuteRequest: 'FxExecuteRequest',
   EquitySnapshot: 'EquitySnapshot',
   DailyPortfolioSnapshot: 'DailyPortfolioSnapshot',
-  SeasonRanking: 'SeasonRanking'
+  SeasonRanking: 'SeasonRanking',
+  BatchJobRun: 'BatchJobRun'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -376,6 +377,26 @@ export const SeasonRankingScalarFieldEnum = {
 } as const
 
 export type SeasonRankingScalarFieldEnum = (typeof SeasonRankingScalarFieldEnum)[keyof typeof SeasonRankingScalarFieldEnum]
+
+
+export const BatchJobRunScalarFieldEnum = {
+  id: 'id',
+  jobName: 'jobName',
+  idempotencyKey: 'idempotencyKey',
+  status: 'status',
+  dryRun: 'dryRun',
+  startedAt: 'startedAt',
+  finishedAt: 'finishedAt',
+  requestedBy: 'requestedBy',
+  requestPayloadJson: 'requestPayloadJson',
+  resultPayloadJson: 'resultPayloadJson',
+  errorCode: 'errorCode',
+  errorMessage: 'errorMessage',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type BatchJobRunScalarFieldEnum = (typeof BatchJobRunScalarFieldEnum)[keyof typeof BatchJobRunScalarFieldEnum]
 
 
 export const SortOrder = {

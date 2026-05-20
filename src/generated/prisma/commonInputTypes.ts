@@ -596,6 +596,23 @@ export type EnumSeasonRankingTypeWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedEnumSeasonRankingTypeFilter<$PrismaModel>
 }
 
+export type EnumBatchJobStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.BatchJobStatus | Prisma.EnumBatchJobStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.BatchJobStatus[] | Prisma.ListEnumBatchJobStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.BatchJobStatus[] | Prisma.ListEnumBatchJobStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumBatchJobStatusFilter<$PrismaModel> | $Enums.BatchJobStatus
+}
+
+export type EnumBatchJobStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.BatchJobStatus | Prisma.EnumBatchJobStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.BatchJobStatus[] | Prisma.ListEnumBatchJobStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.BatchJobStatus[] | Prisma.ListEnumBatchJobStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumBatchJobStatusWithAggregatesFilter<$PrismaModel> | $Enums.BatchJobStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumBatchJobStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumBatchJobStatusFilter<$PrismaModel>
+}
+
 export type NestedStringFilter<$PrismaModel = never> = {
   equals?: string | Prisma.StringFieldRefInput<$PrismaModel>
   in?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel>
@@ -1162,6 +1179,23 @@ export type NestedEnumSeasonRankingTypeWithAggregatesFilter<$PrismaModel = never
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumSeasonRankingTypeFilter<$PrismaModel>
   _max?: Prisma.NestedEnumSeasonRankingTypeFilter<$PrismaModel>
+}
+
+export type NestedEnumBatchJobStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.BatchJobStatus | Prisma.EnumBatchJobStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.BatchJobStatus[] | Prisma.ListEnumBatchJobStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.BatchJobStatus[] | Prisma.ListEnumBatchJobStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumBatchJobStatusFilter<$PrismaModel> | $Enums.BatchJobStatus
+}
+
+export type NestedEnumBatchJobStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.BatchJobStatus | Prisma.EnumBatchJobStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.BatchJobStatus[] | Prisma.ListEnumBatchJobStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.BatchJobStatus[] | Prisma.ListEnumBatchJobStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumBatchJobStatusWithAggregatesFilter<$PrismaModel> | $Enums.BatchJobStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumBatchJobStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumBatchJobStatusFilter<$PrismaModel>
 }
 
 
