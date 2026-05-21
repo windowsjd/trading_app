@@ -1071,6 +1071,63 @@ describe('AppController (e2e)', () => {
       });
   });
 
+  it('/api/v1/home (GET) reaches settled final-result branch with a valid token', async () => {
+    resetPrismaMocks();
+    mockActiveUser();
+    prisma.season.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        ...season,
+        status: 'settled',
+      });
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+      ...participant,
+      finalTier: null,
+      rewardGrantedAt: null,
+    });
+    prisma.seasonRanking.findFirst.mockResolvedValueOnce({
+      rank: 1,
+      totalAssetKrw: new Prisma.Decimal('10100000.00000000'),
+      returnRate: new Prisma.Decimal('0.01000000'),
+      rankingDate: new Date('2026-05-31T00:00:00.000Z'),
+      capturedAt: new Date('2026-05-31T00:00:30.000Z'),
+    });
+    prisma.seasonRanking.count.mockResolvedValueOnce(1);
+    prisma.dailyPortfolioSnapshot.findMany.mockResolvedValueOnce([]);
+    const token = await createValidAccessToken();
+
+    return request(app.getHttpServer())
+      .get('/api/v1/home')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: true,
+          data: {
+            mode: 'settled_joined',
+            finalResult: {
+              state: 'available',
+              rankType: 'final',
+              rank: 1,
+              totalParticipants: 1,
+              totalAssetKrw: '10100000.00000000',
+              returnRate: '0.01000000',
+            },
+            equityChart: {
+              state: 'unavailable',
+              reason: 'FINAL_SNAPSHOT_UNAVAILABLE',
+            },
+          },
+        });
+        expect(response.body.error?.code).not.toBe('UNAUTHORIZED');
+        expect(prisma.dailyPortfolioSnapshot.findFirst).not.toHaveBeenCalled();
+        expect(prisma.position.findMany).not.toHaveBeenCalled();
+        expectNoWriteMutationCalls();
+      });
+  });
+
   it('/api/v1/seasons/current (GET) allows anonymous optional auth', () => {
     prisma.season.findFirst.mockResolvedValueOnce(season);
 

@@ -1,13 +1,16 @@
 # GET /api/v1/home API Contract
 
 ## Status
+
 - `GET /api/v1/home` read-only MVP is implemented.
 - The active joined dashboard now implements `summary`, `ranking`, `walletSummary`, `allocation`, `topPositions`, and `equityChart` when the required DB/admin_manual data exists.
+- Settled joined Home now implements an authoritative final-result read model from existing `rankType=final` `season_rankings`, with `daily_portfolio_snapshots` used only as supporting chart data.
 - The implemented MVP uses only existing DB rows, approved `admin_manual` market data, live valuation foundation, and existing `daily_portfolio_snapshots` when possible.
-- Provider ingestion, scheduler/batch automatic snapshot generation, settlement, and reward remain STOP.
+- Provider ingestion, cron scheduler, automatic snapshot/ranking generation, settlement write-policy extensions, final tier assignment, and reward grants remain STOP.
 - Do not add fake data, temporary runtime contracts, Prisma schema changes, migrations, or seed changes from this draft.
 
 ## Source Rules
+
 - Amount values are strings.
 - Timestamps are UTC ISO strings.
 - Responses keep the existing `success/data` or `success/error` structure.
@@ -16,7 +19,7 @@
 - Season ended and settled states block trading and exchange.
 - Final evaluation is based on total assets in KRW.
 - MVP crypto is Binance-based USD-settled crypto and uses the USD Wallet.
-- Crypto KRW valuation is crypto USD price * quantity * USD/KRW rate.
+- Crypto KRW valuation is crypto USD price x quantity x USD/KRW rate.
 - `cryptoValueKrw` means KRW-converted value of crypto positions; `totalAssetKrw` and `returnRate` remain KRW-based.
 
 ## Common Success Shape
@@ -29,7 +32,7 @@ All successful `/home` responses use a top-level `mode` so the frontend can choo
 {
   "success": true,
   "data": {
-    "mode": "active_joined | active_not_joined | upcoming | ended | settled | no_current_season",
+    "mode": "active_joined | active_not_joined | upcoming | ended | settled_joined | settled_not_joined | no_current_season",
     "season": {
       "id": "<string>",
       "name": "<string>",
@@ -56,9 +59,11 @@ Sections that cannot truthfully return data must expose their state instead of f
 ## active + joined
 
 ### Purpose
+
 Show the full home dashboard for a user who joined the active season.
 
 ### Usage Condition
+
 - Current season status is `active`.
 - `season_participants` exists for `request.user.userId` and the current season.
 
@@ -138,9 +143,11 @@ This is the target full response candidate. It is implemented only where the req
 ```
 
 ### Frontend Meaning
+
 Render the normal joined-season home dashboard. Trading and exchange entry points may be shown because the season is active.
 
 ### Currently Implementable Fields
+
 - `season.id`
 - `season.name`
 - `season.status`
@@ -161,9 +168,11 @@ Render the normal joined-season home dashboard. Trading and exchange entry point
 - `equityChart` from existing `daily_portfolio_snapshots`.
 
 ### Currently Not Implementable Fields
+
 - automatic data freshness from scheduler/batch
 
 ### Required Preceding Tables
+
 - `wallet_transactions`
 - `exchange_transactions`
 - `equity_snapshots`
@@ -313,6 +322,7 @@ If daily snapshot and live valuation are both unavailable, `summary` is returned
 ```
 
 ### Implementation Decision
+
 Read-only MVP is implemented for active joined `summary`, `ranking`, `walletSummary`, `allocation`, `topPositions`, and `equityChart`.
 
 - `allocation` uses live valuation and returns unavailable when required `admin_manual` asset price is missing/not eligible, or fresh approved `admin_manual` USD/KRW data is missing or stale. `percentage` is a 0-100 decimal string, and `rate` is the 0-1 decimal fraction.
@@ -323,9 +333,11 @@ Read-only MVP is implemented for active joined `summary`, `ranking`, `walletSumm
 ## active + not joined
 
 ### Purpose
+
 Guide the user to join the active season without showing fake portfolio data.
 
 ### Usage Condition
+
 - Current season status is `active`.
 - No `season_participants` row exists for `request.user.userId` and the current season.
 
@@ -380,9 +392,11 @@ Guide the user to join the active season without showing fake portfolio data.
 ```
 
 ### Frontend Meaning
+
 Render a blocked/guide state with a join action. Do not render empty portfolio, summary, ranking, allocation, positions, or chart data.
 
 ### Currently Implementable Fields
+
 - `season`
 - join status
 - `guide.state`
@@ -390,6 +404,7 @@ Render a blocked/guide state with a join action. Do not render empty portfolio, 
 - `guide.action`
 
 ### Currently Not Implementable Fields
+
 - Portfolio `summary`
 - `ranking`
 - `allocation`
@@ -397,18 +412,22 @@ Render a blocked/guide state with a join action. Do not render empty portfolio, 
 - `equityChart`
 
 ### Required Preceding Tables
+
 - No extra table is needed for the guide state itself.
 - Full portfolio sections still require the active joined blockers.
 
 ### Implementation Decision
+
 Guide-only shape is implemented in the read-only MVP.
 
 ## upcoming
 
 ### Purpose
+
 Show the next season and make clear that trading is not available yet.
 
 ### Usage Condition
+
 - Current selected season status is `upcoming`.
 
 ### Success Response JSON Shape
@@ -445,15 +464,18 @@ Show the next season and make clear that trading is not available yet.
 ```
 
 ### Frontend Meaning
+
 Render upcoming-season information and a not-yet-open state. Trading and exchange entry points must be blocked.
 
 ### Currently Implementable Fields
+
 - `season`
 - `guide`
 - `trading.state`
 - `exchange.state`
 
 ### Currently Not Implementable Fields
+
 - Portfolio `summary`
 - `ranking`
 - `allocation`
@@ -461,18 +483,22 @@ Render upcoming-season information and a not-yet-open state. Trading and exchang
 - `equityChart`
 
 ### Required Preceding Tables
+
 - No extra table is needed for upcoming guide state.
 - Full portfolio sections require the active joined blockers when the season becomes active.
 
 ### Implementation Decision
+
 Guide-only shape is implemented in the read-only MVP.
 
 ## ended
 
 ### Purpose
+
 Show that the season has ended and settlement is in progress.
 
 ### Usage Condition
+
 - Current selected season status is `ended`.
 
 ### Success Response JSON Shape
@@ -517,21 +543,25 @@ Show that the season has ended and settlement is in progress.
 ```
 
 ### Frontend Meaning
+
 Render settlement-in-progress state. Trading and exchange must be blocked. Final result should not be shown as settled.
 
 ### Currently Implementable Fields
+
 - `season`
 - `guide`
 - blocked `trading`
 - blocked `exchange`
 
 ### Currently Not Implementable Fields
+
 - Final `summary`
 - Final `ranking`
 - Final tier/result
 - Historical `equityChart`
 
 ### Required Preceding Tables
+
 - `daily_portfolio_snapshots`
 - `equity_snapshots`
 - `season_rankings`
@@ -540,14 +570,17 @@ Render settlement-in-progress state. Trading and exchange must be blocked. Final
 - `asset_price_snapshots`
 
 ### Implementation Decision
+
 Settlement-facing guide shape is implemented in the read-only MVP. Final settlement summary remains unavailable.
 
 ## settled
 
 ### Purpose
+
 Show final season results after settlement.
 
 ### Usage Condition
+
 - Current selected season status is `settled`.
 
 ### Success Response JSON Shape
@@ -556,7 +589,7 @@ Show final season results after settlement.
 {
   "success": true,
   "data": {
-    "mode": "settled",
+    "mode": "settled_joined",
     "season": {
       "id": "<string>",
       "name": "<string>",
@@ -580,18 +613,38 @@ Show final season results after settlement.
     },
     "finalResult": {
       "state": "available",
+      "resultSource": "season_rankings",
+      "rankType": "final",
+      "rank": "<number>",
+      "totalParticipants": "<number>",
       "totalAssetKrw": "<amount string>",
-      "finalRank": "<number | null>",
-      "finalTier": "<string | null>",
-      "totalReturnRate": "<decimal string>"
+      "returnRate": "<decimal string>",
+      "rankingDate": "<YYYY-MM-DD>",
+      "capturedAt": "<UTC ISO string>",
+      "tier": {
+        "state": "available | unavailable",
+        "finalTier": "<string | only when available>",
+        "code": "FINAL_TIER_UNAVAILABLE | only when unavailable",
+        "message": "<string | only when unavailable>"
+      },
+      "reward": {
+        "state": "granted | pending",
+        "grantedAt": "<UTC ISO string | null>",
+        "code": "REWARD_NOT_GRANTED | only when pending",
+        "message": "<string | only when pending>"
+      }
     },
     "equityChart": {
       "state": "available",
+      "chartSource": "daily_portfolio_snapshots",
+      "limit": 30,
       "items": [
         {
+          "snapshotDate": "<YYYY-MM-DD>",
           "date": "<YYYY-MM-DD>",
           "totalAssetKrw": "<amount string>",
-          "returnRate": "<decimal string>"
+          "returnRate": "<decimal string>",
+          "capturedAt": "<UTC ISO string>"
         }
       ]
     },
@@ -601,34 +654,53 @@ Show final season results after settlement.
 ```
 
 ### Frontend Meaning
+
 Render final result view. Trading and exchange must be blocked.
 
 ### Currently Implementable Fields
+
 - `season`
 - blocked `trading`
 - blocked `exchange`
-- raw `finalRank`, `finalTier`, and participant aggregate fields when present, but not as trusted final settlement result
+- `participant`
+- `finalResult` from existing `season_rankings` rows where `rankType=final`
+- `finalResult.totalParticipants` counted for the selected final `rankingDate`
+- `finalResult.tier` as a read-only reflection of `season_participants.finalTier`
+- `finalResult.reward` as a read-only reflection of `season_participants.rewardGrantedAt`
+- `equityChart` from existing `daily_portfolio_snapshots`
 
 ### Currently Not Implementable Fields
-- trusted `finalResult.totalAssetKrw`
-- trusted `finalResult.totalReturnRate`
-- authoritative final ranking
-- historical `equityChart`
+
+- final tier assignment/calculation
+- reward/payment/badge/trophy grant
+- provider-backed final valuation recalculation
+- automatic recovery or synthesis for missing final ranking/chart data
 
 ### Required Preceding Tables
+
 - `season_rankings`
 - `daily_portfolio_snapshots`
-- `equity_snapshots`
-- `fx_rate_snapshots`
-- `positions`
-- `asset_price_snapshots`
+- `season_participants`
 
 ### Implementation Decision
-Settled guide and trading/exchange block shape are implemented in the read-only MVP. Authoritative final result remains unavailable.
+
+Settled joined read model is implemented in the read-only MVP.
+
+- Joined users receive `mode = settled_joined`.
+- Non-participants receive `mode = settled_not_joined` with `SEASON_NOT_JOINED` guide/fallback; no final ranking lookup is performed for them.
+- `finalResult` uses existing `season_rankings` as the source of truth with `seasonId`, the user's `seasonParticipantId`, and `rankType=final`.
+- If multiple final ranking dates exist, Home selects the latest row by `rankingDate desc`, then `capturedAt desc`.
+- `totalParticipants` is counted from final ranking rows with the same `seasonId`, `rankType=final`, and selected `rankingDate`.
+- Missing final ranking returns `finalResult.state = unavailable` with `FINAL_RANKING_UNAVAILABLE`; Home does not use live valuation or participant aggregate fields as a fallback.
+- Missing `finalTier` returns `finalResult.tier.state = unavailable` with `FINAL_TIER_UNAVAILABLE`; existing `finalTier` is read only.
+- Missing `rewardGrantedAt` returns `finalResult.reward.state = pending` with `REWARD_NOT_GRANTED`; existing `rewardGrantedAt` is read only.
+- Missing `daily_portfolio_snapshots` returns `equityChart.state = unavailable` with `FINAL_SNAPSHOT_UNAVAILABLE` but does not make `finalResult` unavailable when final ranking exists.
+- Home settled read creates no wallet/order/position/snapshot/ranking/ledger/season/reward mutations.
 
 ## no current season
 
 ### Purpose
+
 Make the home response explicit when no current season row exists.
 
 ### Success Response JSON Shape
@@ -650,14 +722,17 @@ Make the home response explicit when no current season row exists.
 ```
 
 ### Implementation Decision
+
 Implemented in the read-only MVP.
 
 ## partial error
 
 ### Purpose
+
 Represent a partial section failure while keeping the home response usable.
 
 ### Usage Condition
+
 - The base home state can be resolved.
 - One or more non-critical sections fail to load.
 - This is not used when the whole request cannot be authorized or the current season cannot be resolved.
@@ -738,28 +813,35 @@ This is a section-level error shape. It is not a separate home `mode`.
 ```
 
 ### Frontend Meaning
+
 Render available sections and show section-level fallback states only for failed sections. Do not treat this as a full page error.
 
 ### Currently Implementable Fields
+
 - Implemented section-level unavailable fallback for active joined `summary`, `allocation`, `topPositions`, `ranking`, and `equityChart`.
 - `summary`, `allocation`, and `topPositions` add section errors when required DB/admin_manual market data is missing or stale.
 - Missing `season_rankings` or `daily_portfolio_snapshots` return section-level unavailable states without creating rows.
 
 ### Currently Not Implementable Fields
+
 - Automatic recovery, retry, or generation for missing provider/scheduler/settlement data.
 
 ### Required Preceding Tables
+
 - Same tables as the section that failed.
 
 ### Implementation Decision
+
 Implemented for the read-only MVP. Section fallback keeps the Home response usable without promoting missing data to fake portfolio values or full-page success data.
 
 ## full error
 
 ### Purpose
+
 Represent a full request failure using the existing common error direction.
 
 ### Usage Condition
+
 - Authentication fails.
 - Current season cannot be resolved.
 - Request cannot produce any valid home state.
@@ -778,30 +860,37 @@ Represent a full request failure using the existing common error direction.
 ```
 
 ### Frontend Meaning
+
 Render the global error state for the page.
 
 ### Currently Implementable Fields
+
 - Existing common error envelope direction only.
 
 ### Currently Not Implementable Fields
+
 - `/home`-specific error code mapping is not fixed in this draft.
 
 ### Required Preceding Tables
+
 - Not applicable for the envelope itself.
 
 ### Implementation Decision
+
 Only the common error shape direction is documented. No `/home` error implementation in this task.
 
 ## Current Full Implementation Blockers
+
 - provider price ingestion and provider-backed source evidence
 - scheduler/batch automatic daily portfolio snapshot generation
 - scheduler/batch automatic season ranking generation
-- settlement/reward integration and authoritative final result
+- final tier assignment and reward grant integration
 - richer `/ranking`, `/orders`, `/records`, `/settlement` APIs
 
 `allocation`, `topPositions`, and `equityChart` are no longer placeholder blockers for active joined Home. They remain dependent on existing wallets, positions, latest eligible `admin_manual` asset prices, fresh approved `admin_manual` USD/KRW where needed, and existing `daily_portfolio_snapshots`.
 
 ## Near-Term Required Tables
+
 - `wallet_transactions`
 - `exchange_transactions`
 - `equity_snapshots`

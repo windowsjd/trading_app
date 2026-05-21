@@ -165,8 +165,8 @@ Season settlement policy:
 - Current `season_rankings` has a unique `(seasonId, rankType, rankingDate, rank)` constraint, so final rankings persist deterministic unique sequential ranks. True competition tie ranks remain a separate schema/migration gate.
 - `topRanks` is capped at 10 rows in the batch result payload.
 - The job does not call providers, create price/FX rows, register a scheduler, expose an HTTP batch execution API, or grant rewards. Reward handoff remains a separate gate.
-- `GET /api/v1/ranking` already supports `rankType=final`, so generated final rankings are readable there. `GET /api/v1/home` still returns the existing settled-season final result limitation until a participant-specific final result view is defined.
+- `GET /api/v1/ranking` supports `rankType=final`, and settled joined `GET /api/v1/home` reads generated final rankings as its authoritative final result. Missing final rankings remain unavailable; Home does not use live valuation fallback for settled final results.
 
 ## Future Work
 
-Cron scheduling, provider ingestion, daily snapshot automation, ranking overwrite/regeneration, settlement extensions, Home final-result integration, and reward remain separate gates.
+Cron scheduling, provider ingestion, daily snapshot automation, ranking overwrite/regeneration, settlement extensions, final tier assignment, and reward remain separate gates.

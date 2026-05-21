@@ -68,29 +68,36 @@ describe('HomeService', () => {
         findFirst: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
         upsert: jest.fn(),
         delete: jest.fn(),
+        deleteMany: jest.fn(),
       },
       seasonParticipant: {
         findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
         upsert: jest.fn(),
         delete: jest.fn(),
+        deleteMany: jest.fn(),
       },
       dailyPortfolioSnapshot: {
         findFirst: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
         upsert: jest.fn(),
         delete: jest.fn(),
+        deleteMany: jest.fn(),
       },
       seasonRanking: {
         findFirst: jest.fn(),
         count: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
         upsert: jest.fn(),
         delete: jest.fn(),
         deleteMany: jest.fn(),
@@ -133,6 +140,11 @@ describe('HomeService', () => {
       },
       exchangeTransaction: {
         create: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+        upsert: jest.fn(),
+        delete: jest.fn(),
+        deleteMany: jest.fn(),
       },
       fxExecuteRequest: {
         create: jest.fn(),
@@ -178,6 +190,10 @@ describe('HomeService', () => {
     startAt,
     endAt,
   };
+  const settledSeason = {
+    ...activeSeason,
+    status: SeasonStatus.settled,
+  };
 
   const participant = {
     id: 'participant-1',
@@ -207,6 +223,42 @@ describe('HomeService', () => {
   const mockActiveSeason = (prisma: ReturnType<typeof createPrisma>) => {
     prisma.season.findFirst.mockResolvedValueOnce(activeSeason);
   };
+
+  const mockSettledSeason = (prisma: ReturnType<typeof createPrisma>) => {
+    prisma.season.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(settledSeason);
+  };
+
+  const settledParticipant = {
+    id: 'participant-1',
+    participantStatus: ParticipantStatus.finished,
+    joinedAt,
+    initialCapitalKrw: new Prisma.Decimal('1000000.00000000'),
+    finalTier: 'gold',
+    rewardGrantedAt: null,
+  };
+
+  const finalRanking = {
+    rank: 12,
+    totalAssetKrw: new Prisma.Decimal('11230000.00000000'),
+    returnRate: new Prisma.Decimal('12.30000000'),
+    rankingDate: new Date('2026-05-21T00:00:00.000Z'),
+    capturedAt: new Date('2026-05-21T00:00:30.000Z'),
+  };
+
+  const chartSnapshot = (
+    snapshotDate: string,
+    totalAssetKrw: string,
+    returnRate: string,
+  ) => ({
+    snapshotDate: new Date(`${snapshotDate}T00:00:00.000Z`),
+    totalAssetKrw: new Prisma.Decimal(totalAssetKrw),
+    returnRate: new Prisma.Decimal(returnRate),
+    capturedAt: new Date(`${snapshotDate}T00:01:00.000Z`),
+  });
 
   const latestSnapshot = {
     snapshotDate: new Date('2026-05-07T00:00:00.000Z'),
@@ -274,14 +326,22 @@ describe('HomeService', () => {
       prisma.order,
       prisma.assetPriceSnapshot,
       prisma.fxRateSnapshot,
+      prisma.exchangeTransaction,
     ]) {
-      expect(model.create).not.toHaveBeenCalled();
-      expect(model.update).not.toHaveBeenCalled();
-      expect(model.upsert).not.toHaveBeenCalled();
-      expect(model.delete).not.toHaveBeenCalled();
+      for (const method of [
+        'create',
+        'update',
+        'updateMany',
+        'upsert',
+        'delete',
+        'deleteMany',
+      ] as const) {
+        if (method in model) {
+          expect(model[method]).not.toHaveBeenCalled();
+        }
+      }
     }
 
-    expect(prisma.seasonRanking.deleteMany).not.toHaveBeenCalled();
     expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
     expect(prisma.exchangeTransaction.create).not.toHaveBeenCalled();
     expect(prisma.fxExecuteRequest.create).not.toHaveBeenCalled();
@@ -849,21 +909,65 @@ describe('HomeService', () => {
     expectNoHomeWrites(prisma);
   });
 
-  it('returns settled season read-only blocked trading state', async () => {
+  it('returns settled joined final result from final season rankings and daily snapshots without writes', async () => {
     const { prisma, service } = createService();
-    prisma.season.findFirst
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({
-        ...activeSeason,
-        status: SeasonStatus.settled,
-      });
+    mockSettledSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+      settledParticipant,
+    );
+    prisma.seasonRanking.findFirst.mockResolvedValueOnce(finalRanking);
+    prisma.seasonRanking.count.mockResolvedValueOnce(100);
+    prisma.dailyPortfolioSnapshot.findMany.mockResolvedValueOnce([
+      chartSnapshot('2026-05-21', '11230000.00000000', '12.30000000'),
+      chartSnapshot('2026-05-20', '11000000.00000000', '10.00000000'),
+    ]);
 
     const response = await service.getHome('user-1');
 
+    expect(prisma.seasonParticipant.findUnique).toHaveBeenCalledWith({
+      where: {
+        seasonId_userId: {
+          seasonId: 'season-1',
+          userId: 'user-1',
+        },
+      },
+      select: {
+        id: true,
+        participantStatus: true,
+        joinedAt: true,
+        initialCapitalKrw: true,
+        finalTier: true,
+        rewardGrantedAt: true,
+      },
+    });
+    expect(prisma.seasonRanking.findFirst).toHaveBeenCalledWith({
+      where: {
+        seasonId: 'season-1',
+        seasonParticipantId: 'participant-1',
+        rankType: SeasonRankingType.final,
+      },
+      orderBy: [
+        { rankingDate: 'desc' },
+        { capturedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      select: {
+        rank: true,
+        totalAssetKrw: true,
+        returnRate: true,
+        rankingDate: true,
+        capturedAt: true,
+      },
+    });
+    expect(prisma.seasonRanking.count).toHaveBeenCalledWith({
+      where: {
+        seasonId: 'season-1',
+        rankType: SeasonRankingType.final,
+        rankingDate: finalRanking.rankingDate,
+      },
+    });
     expect(response.data).toMatchObject({
-      mode: 'settled',
+      mode: 'settled_joined',
       trading: {
         state: 'blocked',
         reason: 'SEASON_SETTLED',
@@ -873,10 +977,190 @@ describe('HomeService', () => {
         reason: 'SEASON_SETTLED',
       },
       finalResult: {
-        state: 'unavailable',
-        reason: 'FINAL_RESULT_UNAVAILABLE',
+        state: 'available',
+        resultSource: 'season_rankings',
+        rankType: SeasonRankingType.final,
+        rank: 12,
+        totalParticipants: 100,
+        totalAssetKrw: '11230000.00000000',
+        returnRate: '12.30000000',
+        rankingDate: '2026-05-21',
+        capturedAt: '2026-05-21T00:00:30.000Z',
+        tier: {
+          state: 'available',
+          finalTier: 'gold',
+        },
+        reward: {
+          state: 'pending',
+          grantedAt: null,
+          code: 'REWARD_NOT_GRANTED',
+        },
+      },
+      equityChart: {
+        state: 'available',
+        chartSource: 'daily_portfolio_snapshots',
+        items: [
+          {
+            snapshotDate: '2026-05-20',
+            totalAssetKrw: '11000000.00000000',
+            returnRate: '10.00000000',
+          },
+          {
+            snapshotDate: '2026-05-21',
+            totalAssetKrw: '11230000.00000000',
+            returnRate: '12.30000000',
+          },
+        ],
       },
     });
+    expect(response.data.sectionErrors).toEqual([
+      {
+        section: 'finalResult.reward',
+        code: 'REWARD_NOT_GRANTED',
+        message: 'Reward has not been granted yet.',
+      },
+    ]);
+    expectNoHomeWrites(prisma);
+  });
+
+  it('returns settled joined final tier unavailable and granted reward states from participant fields', async () => {
+    const { prisma, service } = createService();
+    mockSettledSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+      ...settledParticipant,
+      finalTier: null,
+      rewardGrantedAt: new Date('2026-05-22T00:00:00.000Z'),
+    });
+    prisma.seasonRanking.findFirst.mockResolvedValueOnce(finalRanking);
+    prisma.seasonRanking.count.mockResolvedValueOnce(100);
+    prisma.dailyPortfolioSnapshot.findMany.mockResolvedValueOnce([
+      chartSnapshot('2026-05-21', '11230000.00000000', '12.30000000'),
+    ]);
+
+    const response = await service.getHome('user-1');
+
+    expect(response.data.finalResult).toMatchObject({
+      state: 'available',
+      tier: {
+        state: 'unavailable',
+        code: 'FINAL_TIER_UNAVAILABLE',
+      },
+      reward: {
+        state: 'granted',
+        grantedAt: '2026-05-22T00:00:00.000Z',
+      },
+    });
+    expect(response.data.sectionErrors).toEqual([
+      {
+        section: 'finalResult.tier',
+        code: 'FINAL_TIER_UNAVAILABLE',
+        message: 'Final tier assignment is not available yet.',
+      },
+    ]);
+    expectNoHomeWrites(prisma);
+  });
+
+  it('returns settled joined finalResult unavailable when final ranking is missing without fake fallback', async () => {
+    const { prisma, valuationService, service } = createService();
+    mockSettledSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+      settledParticipant,
+    );
+    prisma.seasonRanking.findFirst.mockResolvedValueOnce(null);
+    prisma.dailyPortfolioSnapshot.findMany.mockResolvedValueOnce([
+      chartSnapshot('2026-05-21', '11230000.00000000', '12.30000000'),
+    ]);
+
+    const response = await service.getHome('user-1');
+
+    expect(response.data).toMatchObject({
+      mode: 'settled_joined',
+      finalResult: {
+        state: 'unavailable',
+        reason: 'FINAL_RANKING_UNAVAILABLE',
+        resultSource: 'season_rankings',
+        rankType: SeasonRankingType.final,
+      },
+    });
+    expect(response.data.finalResult).not.toHaveProperty('rank');
+    expect(response.data.finalResult).not.toHaveProperty('totalAssetKrw');
+    expect(prisma.seasonRanking.count).not.toHaveBeenCalled();
+    expect(
+      valuationService.calculateSeasonParticipantValuation,
+    ).not.toHaveBeenCalled();
+    expect(response.data.sectionErrors).toEqual(
+      expect.arrayContaining([
+        {
+          section: 'finalResult',
+          code: 'FINAL_RANKING_UNAVAILABLE',
+          message:
+            'Final ranking is unavailable for the settled season participant.',
+        },
+      ]),
+    );
+    expectNoHomeWrites(prisma);
+  });
+
+  it('keeps settled finalResult available when daily snapshots for chart are missing', async () => {
+    const { prisma, service } = createService();
+    mockSettledSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+      settledParticipant,
+    );
+    prisma.seasonRanking.findFirst.mockResolvedValueOnce(finalRanking);
+    prisma.seasonRanking.count.mockResolvedValueOnce(100);
+    prisma.dailyPortfolioSnapshot.findMany.mockResolvedValueOnce([]);
+
+    const response = await service.getHome('user-1');
+
+    expect(response.data.finalResult).toMatchObject({
+      state: 'available',
+      rank: 12,
+    });
+    expect(response.data.equityChart).toMatchObject({
+      state: 'unavailable',
+      reason: 'FINAL_SNAPSHOT_UNAVAILABLE',
+      chartSource: 'daily_portfolio_snapshots',
+      items: [],
+    });
+    expect(response.data.sectionErrors).toEqual(
+      expect.arrayContaining([
+        {
+          section: 'equityChart',
+          code: 'FINAL_SNAPSHOT_UNAVAILABLE',
+          message:
+            'Final equity chart is unavailable because daily portfolio snapshots are missing.',
+        },
+      ]),
+    );
+    expectNoHomeWrites(prisma);
+  });
+
+  it('returns settled not joined guide state without final result lookup', async () => {
+    const { prisma, service } = createService();
+    mockSettledSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
+
+    const response = await service.getHome('user-1');
+
+    expect(response.data).toMatchObject({
+      mode: 'settled_not_joined',
+      guide: {
+        state: 'blocked',
+        reason: 'SEASON_NOT_JOINED',
+        action: null,
+      },
+      finalResult: {
+        state: 'blocked',
+        reason: 'SEASON_NOT_JOINED',
+      },
+      equityChart: {
+        state: 'blocked',
+        reason: 'SEASON_NOT_JOINED',
+      },
+    });
+    expect(prisma.seasonRanking.findFirst).not.toHaveBeenCalled();
+    expect(prisma.dailyPortfolioSnapshot.findMany).not.toHaveBeenCalled();
     expectNoHomeWrites(prisma);
   });
 

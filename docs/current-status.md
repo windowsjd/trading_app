@@ -27,6 +27,7 @@
 - `POST /api/v1/auth/logout-all` user refresh sessions revoke MVP
 - `GET /api/v1/me` Bearer access token Auth MVP
 - `GET /api/v1/home` read-only MVP
+  - settled season joined read model은 `rankType=final` `season_rankings`를 authoritative final result로 읽음.
 - `GET /api/v1/ranking` read-only MVP
 - `GET /api/v1/wallets` read-only MVP
 - `GET /api/v1/records` read-only MVP
@@ -179,7 +180,8 @@ near-term ledger/FX foundation:
   - final ranking write와 season status transition은 단일 Prisma transaction으로 처리.
   - final ranking은 `totalAssetKrw desc`, `userId asc`, `seasonParticipantId asc` 기반 deterministic sequential rank를 사용. current `season_rankings` unique rank 제약 때문에 true competition tie rank는 별도 schema/migration gate 필요.
   - `season-settlement`은 provider ingestion/API 호출, cron scheduler 등록, price/FX/wallet/order/position/snapshot 재계산/변경, reward/payment/badge/trophy 지급, HTTP batch 실행 API를 수행하지 않음.
-  - 실제 cron scheduler, provider ingestion, reward 실행은 아직 없음.
+  - Home settled final-result read model은 생성된 final ranking을 읽을 수 있음.
+  - 실제 cron scheduler, provider ingestion, final tier assignment, reward 실행은 아직 없음.
   - admin 권한 모델이 없으므로 batch 실행 HTTP API는 만들지 않음.
 - Auth refresh session foundation 반영 완료: `RefreshTokenSessionStatus`, `refresh_token_sessions`.
 - Auth refresh session migration 생성 완료: `20260519090000_add_refresh_token_sessions`.
@@ -411,7 +413,7 @@ near-term ledger/FX foundation:
   - no/missing final snapshot은 job-level failure이며 fake final result를 만들지 않음.
   - existing final ranking은 overwrite/delete/recreate하지 않고 existing/skipped로 처리.
   - provider ingestion/API 호출, cron scheduler, HTTP batch run API, reward 지급 없음.
-- 이 작업은 `/home`과 `/ranking` 구현 준비를 진전시켰지만, 자동 데이터 생성/외부 시세 공급/API 응답은 아직 없음.
+- 이 작업은 `/home` settled final-result read model과 `/ranking` 구현 준비를 진전시켰지만, 자동 데이터 생성/외부 시세 공급/API 응답은 아직 없음.
 - cron scheduler/provider ingestion/settlement extension 구현 없음.
 - order quote/create/cancel/execute full-fill MVP 구현 완료.
 - order execution safety plan/preimplementation readiness audit 기준 full-fill MVP 범위는 코드에 반영됨.
@@ -509,7 +511,8 @@ near-term ledger/FX foundation:
   - `active_not_joined`
   - `upcoming`
   - `ended`
-  - `settled`
+  - `settled_joined`
+  - `settled_not_joined`
   - `no_current_season`
 - active joined summary source:
   - 최신 `daily_portfolio_snapshots` 우선.
@@ -519,6 +522,15 @@ near-term ledger/FX foundation:
   - 최신 `season_rankings`를 read-only로 조회.
   - ranking row가 없으면 fake rank 없이 `ranking.state = unavailable`.
   - `/home` 호출 중 ranking 생성 없음.
+- settled final result source:
+  - settled joined Home은 해당 season/user participant의 `rankType=final` `season_rankings`를 authoritative source로 읽음.
+  - 여러 final `rankingDate`가 있으면 `rankingDate desc`, `capturedAt desc` 기준 최신 row를 선택함.
+  - `totalParticipants`는 선택된 final `rankingDate`의 final ranking row count로 계산함.
+  - final ranking이 없으면 fake/live valuation fallback 없이 `finalResult.state = unavailable` + `FINAL_RANKING_UNAVAILABLE`.
+  - `finalTier`는 `season_participants.finalTier`가 있으면 읽기만 하고, 없으면 `FINAL_TIER_UNAVAILABLE`.
+  - `rewardGrantedAt`은 있으면 granted 상태로 읽기만 하고, 없으면 `REWARD_NOT_GRANTED` pending.
+  - `equityChart`는 기존 `daily_portfolio_snapshots` 기반 보조 데이터이며, snapshot이 없어도 final ranking이 있으면 `finalResult`는 유지됨.
+  - settled 미참가자는 `settled_not_joined` guide/fallback으로 반환하고 final ranking 조회를 하지 않음.
 - wallet/position/allocation/top positions/equity chart:
   - cash wallets와 positions/openPositions count만 read-only로 반환.
   - `allocation`은 live valuation 기반으로 KRW cash, USD cash KRW 환산, domestic stock, US stock, crypto 비중을 반환.
@@ -532,7 +544,7 @@ near-term ledger/FX foundation:
   - order execution 이후 자동 daily portfolio snapshot/ranking 생성 정책
   - scheduler/batch daily portfolio snapshot 자동 생성
   - scheduler/batch season ranking 자동 생성
-  - settlement/reward 연동
+  - final tier assignment/reward grant 연동
   - scheduler/batch
 - `/home` read-only MVP는 fake 데이터 기반 계산 금지를 유지.
 
@@ -759,7 +771,7 @@ near-term ledger/FX foundation:
   - exact execute response replay가 필요하면 schema/command table 별도 검토.
   - partial fill/matching engine/settlement/provider ingestion은 별도 설계 필요.
   - DB integration은 실제 PostgreSQL 환경에서 통과했으며, 향후 schema/transaction 변경 시 재검증 필요.
-- `/home` full implementation 가능 판정은 자동 valuation/ranking 생성, provider ingestion, settlement 정책 이후 재검토.
+- `/home` full implementation 가능 판정은 자동 valuation/ranking 생성, provider ingestion, final tier assignment/reward 정책 이후 재검토.
 
 ## 10. 아직 안 한 것
 
@@ -772,7 +784,7 @@ near-term ledger/FX foundation:
   - durable quote, order exact execute replay, partial fill, matching engine.
   - FX stale pending/unknown outcome recovery.
   - deployment/operations readiness.
-- Home authoritative final-result integration / settlement extension
+- Settlement extension/reward handoff beyond Home final-result read model
 - access token blacklist/revocation
 - cookie/session auth
 - refresh token reuse detection 시 user active sessions 전체 revoke 정책

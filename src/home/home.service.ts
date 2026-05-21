@@ -22,7 +22,8 @@ type HomeMode =
   | 'active_not_joined'
   | 'upcoming'
   | 'ended'
-  | 'settled'
+  | 'settled_joined'
+  | 'settled_not_joined'
   | 'no_current_season';
 
 type CurrentSeasonRecord = {
@@ -64,6 +65,15 @@ type JoinedParticipant = {
   positions: Array<{
     quantity: Prisma.Decimal;
   }>;
+};
+
+type SettledParticipant = {
+  id: string;
+  participantStatus: ParticipantStatus;
+  joinedAt: Date;
+  initialCapitalKrw: Prisma.Decimal;
+  finalTier: string | null;
+  rewardGrantedAt: Date | null;
 };
 
 const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
@@ -109,7 +119,7 @@ export class HomeService {
     }
 
     if (season.status !== SeasonStatus.active) {
-      return this.buildNonActiveSeasonHome(season);
+      return this.buildNonActiveSeasonHome(season, userId);
     }
 
     const participant = await this.prisma.seasonParticipant.findUnique({
@@ -236,7 +246,10 @@ export class HomeService {
     };
   }
 
-  private buildNonActiveSeasonHome(season: CurrentSeasonRecord): HomeResponse {
+  private async buildNonActiveSeasonHome(
+    season: CurrentSeasonRecord,
+    userId: string,
+  ): Promise<HomeResponse> {
     const base = {
       season: this.formatSeason(season),
       sectionErrors: [],
@@ -292,11 +305,92 @@ export class HomeService {
       };
     }
 
+    return this.buildSettledSeasonHome(season, userId);
+  }
+
+  private async buildSettledSeasonHome(
+    season: CurrentSeasonRecord,
+    userId: string,
+  ): Promise<HomeResponse> {
+    const participant = await this.prisma.seasonParticipant.findUnique({
+      where: {
+        seasonId_userId: {
+          seasonId: season.id,
+          userId,
+        },
+      },
+      select: {
+        id: true,
+        participantStatus: true,
+        joinedAt: true,
+        initialCapitalKrw: true,
+        finalTier: true,
+        rewardGrantedAt: true,
+      },
+    });
+
+    if (!participant) {
+      return this.buildSettledNotJoinedHome(season);
+    }
+
+    return this.buildSettledJoinedHome(season, participant);
+  }
+
+  private buildSettledNotJoinedHome(season: CurrentSeasonRecord): HomeResponse {
+    const message = 'Final result is available only to season participants.';
+
     return {
       success: true,
       data: {
-        mode: 'settled',
-        ...base,
+        mode: 'settled_not_joined',
+        season: this.formatSeason(season),
+        guide: {
+          ...this.fallback('blocked', 'SEASON_NOT_JOINED', message),
+          action: null,
+        },
+        trading: this.blockedReason('SEASON_SETTLED'),
+        exchange: this.blockedReason('SEASON_SETTLED'),
+        finalResult: this.fallback('blocked', 'SEASON_NOT_JOINED', message),
+        equityChart: this.fallback(
+          'blocked',
+          'SEASON_NOT_JOINED',
+          'Equity chart is available only to season participants.',
+        ),
+        sectionErrors: [
+          {
+            section: 'finalResult',
+            code: 'SEASON_NOT_JOINED',
+            message,
+          },
+        ],
+      },
+    };
+  }
+
+  private async buildSettledJoinedHome(
+    season: CurrentSeasonRecord,
+    participant: SettledParticipant,
+  ): Promise<HomeResponse> {
+    const sectionErrors: SectionError[] = [];
+    const [finalResult, equityChart] = await Promise.all([
+      this.buildFinalResult(season.id, participant, sectionErrors),
+      this.buildSettledEquityChart(participant.id, sectionErrors),
+    ]);
+
+    return {
+      success: true,
+      data: {
+        mode: 'settled_joined',
+        season: this.formatSeason(season),
+        participant: {
+          id: participant.id,
+          status: participant.participantStatus,
+          joinedAt: participant.joinedAt.toISOString(),
+          initialCapitalKrw: this.formatDecimal(
+            participant.initialCapitalKrw,
+            8,
+          ),
+        },
         guide: {
           ...this.fallback(
             'available',
@@ -307,18 +401,162 @@ export class HomeService {
         },
         trading: this.blockedReason('SEASON_SETTLED'),
         exchange: this.blockedReason('SEASON_SETTLED'),
-        finalResult: this.fallback(
-          'unavailable',
-          'FINAL_RESULT_UNAVAILABLE',
-          'Final result API is not available in the read-only MVP.',
-        ),
-        equityChart: this.fallback(
-          'unavailable',
-          'EQUITY_CHART_UNAVAILABLE',
-          'Equity chart is unavailable for settled seasons until a participant-specific final result view is defined.',
-        ),
+        finalResult,
+        equityChart,
+        sectionErrors,
       },
     };
+  }
+
+  private async buildFinalResult(
+    seasonId: string,
+    participant: SettledParticipant,
+    sectionErrors: SectionError[],
+  ) {
+    const ranking = await this.findLatestFinalRanking(seasonId, participant.id);
+    const tier = this.buildFinalTier(participant, sectionErrors);
+    const reward = this.buildRewardState(participant, sectionErrors);
+
+    if (!ranking) {
+      const message =
+        'Final ranking is unavailable for the settled season participant.';
+      sectionErrors.push({
+        section: 'finalResult',
+        code: 'FINAL_RANKING_UNAVAILABLE',
+        message,
+      });
+
+      return {
+        ...this.fallback('unavailable', 'FINAL_RANKING_UNAVAILABLE', message),
+        resultSource: 'season_rankings',
+        rankType: SeasonRankingType.final,
+        tier,
+        reward,
+      };
+    }
+
+    const totalParticipants = await this.prisma.seasonRanking.count({
+      where: {
+        seasonId,
+        rankType: SeasonRankingType.final,
+        rankingDate: ranking.rankingDate,
+      },
+    });
+
+    return {
+      state: 'available',
+      resultSource: 'season_rankings',
+      rankType: SeasonRankingType.final,
+      rank: ranking.rank,
+      totalParticipants,
+      totalAssetKrw: this.formatDecimal(ranking.totalAssetKrw, 8),
+      returnRate: this.formatDecimal(ranking.returnRate, 8),
+      rankingDate: this.formatDateOnly(ranking.rankingDate),
+      capturedAt: ranking.capturedAt.toISOString(),
+      tier,
+      reward,
+    };
+  }
+
+  private async findLatestFinalRanking(
+    seasonId: string,
+    seasonParticipantId: string,
+  ) {
+    return this.prisma.seasonRanking.findFirst({
+      where: {
+        seasonId,
+        seasonParticipantId,
+        rankType: SeasonRankingType.final,
+      },
+      orderBy: [
+        { rankingDate: 'desc' },
+        { capturedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      select: {
+        rank: true,
+        totalAssetKrw: true,
+        returnRate: true,
+        rankingDate: true,
+        capturedAt: true,
+      },
+    });
+  }
+
+  private buildFinalTier(
+    participant: SettledParticipant,
+    sectionErrors: SectionError[],
+  ) {
+    if (participant.finalTier) {
+      return {
+        state: 'available',
+        finalTier: participant.finalTier,
+      };
+    }
+
+    const message = 'Final tier assignment is not available yet.';
+    sectionErrors.push({
+      section: 'finalResult.tier',
+      code: 'FINAL_TIER_UNAVAILABLE',
+      message,
+    });
+
+    return {
+      state: 'unavailable',
+      code: 'FINAL_TIER_UNAVAILABLE',
+      message,
+    };
+  }
+
+  private buildRewardState(
+    participant: SettledParticipant,
+    sectionErrors: SectionError[],
+  ) {
+    if (participant.rewardGrantedAt) {
+      return {
+        state: 'granted',
+        grantedAt: participant.rewardGrantedAt.toISOString(),
+      };
+    }
+
+    const message = 'Reward has not been granted yet.';
+    sectionErrors.push({
+      section: 'finalResult.reward',
+      code: 'REWARD_NOT_GRANTED',
+      message,
+    });
+
+    return {
+      state: 'pending',
+      grantedAt: null,
+      code: 'REWARD_NOT_GRANTED',
+      message,
+    };
+  }
+
+  private async buildSettledEquityChart(
+    seasonParticipantId: string,
+    sectionErrors: SectionError[],
+  ) {
+    const equityChart = await this.buildEquityChart(seasonParticipantId);
+
+    if (equityChart.state !== 'available') {
+      const message =
+        'Final equity chart is unavailable because daily portfolio snapshots are missing.';
+      sectionErrors.push({
+        section: 'equityChart',
+        code: 'FINAL_SNAPSHOT_UNAVAILABLE',
+        message,
+      });
+
+      return {
+        ...equityChart,
+        reason: 'FINAL_SNAPSHOT_UNAVAILABLE',
+        message,
+      };
+    }
+
+    return equityChart;
   }
 
   private createLiveValuationLoader(seasonParticipantId: string) {

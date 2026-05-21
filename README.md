@@ -9,6 +9,7 @@ This service owns backend APIs, database access, financial calculations, and ser
 - Access token + refresh token auth: signup, login, refresh, logout, logout-all, and `GET /api/v1/me`.
 - Current season lookup and season join.
 - Home as one aggregate API.
+- Home settled final-result read model from existing `rankType=final` `season_rankings`.
 - Wallets, records, ranking, and orders read APIs.
 - FX quote and execute for KRW/USD using approved `admin_manual` FX snapshots.
 - Submitted order create, cancel, and full-fill execute MVP.
@@ -22,7 +23,7 @@ These are intentionally outside the current implementation and should not be add
 
 - Provider ingestion for OANDA, Twelve Data, Binance, or any other market data provider.
 - Cron scheduler, provider ingestion jobs, scheduler-driven snapshot/ranking jobs, settlement extension jobs, or reward jobs.
-- Provider-backed settlement recalculation or Home authoritative final-result expansion.
+- Provider-backed settlement recalculation, final tier assignment, or reward automation.
 - Reward, badge, or trophy grants.
 - Access token blacklist/revocation, server-side session auth, and cookie auth.
 - Matching engine, partial fill, durable quote, or exact order execute replay.
@@ -92,7 +93,7 @@ pnpm tsx scripts/admin-run-batch-job.ts --job season-settlement --season-id <SEA
 
 `daily-season-cycle` uses the idempotency key `daily-season-cycle:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. It runs `daily-portfolio-snapshot` first and `season-ranking` second through their existing services. Dry-run is passed to both child jobs. A daily snapshot job-level failure stops ranking and fails the cycle; participant-level snapshot failures are summarized but ranking still runs against existing snapshots. A season ranking job-level failure fails the cycle. It is not cron scheduling, provider ingestion, settlement, or reward.
 
-`season-settlement` uses the idempotency key `season-settlement:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. Dry-run validates settleability and planned final rankings without writing. Non-dry-run requires an `ended` season, uses existing settlement-date `daily_portfolio_snapshots`, creates `rankType=final` `season_rankings`, and transitions the season to `settled` in one transaction. Existing final rankings are never overwritten; an `ended` season with existing final rows only has its status settled. Already `settled` seasons return idempotent existing/skipped success. No settlement-date snapshots fail with `NO_FINAL_SNAPSHOTS_AVAILABLE`, and missing eligible participant snapshots fail with `MISSING_FINAL_SNAPSHOTS`. The job does not call providers, recalculate prices/FX/wallets/orders/positions/snapshots, run cron, expose an HTTP batch API, or grant rewards. `GET /api/v1/ranking?rankType=final` can read generated final rankings; Home settled finalResult remains a documented limitation.
+`season-settlement` uses the idempotency key `season-settlement:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. Dry-run validates settleability and planned final rankings without writing. Non-dry-run requires an `ended` season, uses existing settlement-date `daily_portfolio_snapshots`, creates `rankType=final` `season_rankings`, and transitions the season to `settled` in one transaction. Existing final rankings are never overwritten; an `ended` season with existing final rows only has its status settled. Already `settled` seasons return idempotent existing/skipped success. No settlement-date snapshots fail with `NO_FINAL_SNAPSHOTS_AVAILABLE`, and missing eligible participant snapshots fail with `MISSING_FINAL_SNAPSHOTS`. The job does not call providers, recalculate prices/FX/wallets/orders/positions/snapshots, run cron, expose an HTTP batch API, or grant rewards. `GET /api/v1/ranking?rankType=final` and settled joined `GET /api/v1/home` can read generated final rankings.
 
 Opt-in real PostgreSQL integration tests require a reachable `DATABASE_URL` and an explicit env flag:
 
@@ -134,12 +135,13 @@ Possible now:
 - Operator-run season ranking batch jobs using existing `daily_portfolio_snapshots`.
 - Operator-run daily season cycle batch jobs that run daily snapshot and season ranking in order.
 - Operator-run season settlement MVP jobs that finalize from existing `daily_portfolio_snapshots`.
+- Settled joined Home final-result reads from existing `rankType=final` `season_rankings`; missing final rankings return unavailable without live valuation fallback.
 
 Not possible without a separate provider gate:
 
 - OANDA/Twelve Data/Binance ingestion.
 - Provider-backed FX, stock, or crypto price freshness claims.
 - Cron scheduler-driven snapshots/rankings.
-- Provider-backed settlement recalculation, Home authoritative final-result expansion, or reward automation.
+- Provider-backed settlement recalculation, final tier assignment, or reward automation.
 
 Never create fake/static/sample business prices to make a test or local flow pass.
