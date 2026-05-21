@@ -14,15 +14,15 @@ This service owns backend APIs, database access, financial calculations, and ser
 - Submitted order create, cancel, and full-fill execute MVP.
 - KRW and USD cash wallets. US stocks and USD-settled crypto use the USD wallet.
 - Final valuation policy is KRW total assets.
-- Batch job execution foundation with idempotent `batch_job_runs` recording, operator-only noop/health-check script, operator-run daily portfolio snapshot generation, operator-run season ranking generation from existing daily snapshots, and an operator-run daily season cycle orchestration job.
+- Batch job execution foundation with idempotent `batch_job_runs` recording, operator-only noop/health-check script, operator-run daily portfolio snapshot generation, operator-run season ranking generation from existing daily snapshots, an operator-run daily season cycle orchestration job, and an operator-run season settlement MVP job.
 
 ## STOP / Not Implemented
 
 These are intentionally outside the current implementation and should not be added without a separate gate:
 
 - Provider ingestion for OANDA, Twelve Data, Binance, or any other market data provider.
-- Cron scheduler, provider ingestion jobs, scheduler-driven snapshot/ranking jobs, settlement jobs, or reward jobs.
-- Settlement.
+- Cron scheduler, provider ingestion jobs, scheduler-driven snapshot/ranking jobs, settlement extension jobs, or reward jobs.
+- Provider-backed settlement recalculation or Home authoritative final-result expansion.
 - Reward, badge, or trophy grants.
 - Access token blacklist/revocation, server-side session auth, and cookie auth.
 - Matching engine, partial fill, durable quote, or exact order execute replay.
@@ -81,6 +81,9 @@ pnpm tsx scripts/admin-run-batch-job.ts --job season-ranking --season-id <SEASON
 
 # operator-run daily season cycle dry-run: daily snapshot, then ranking
 pnpm tsx scripts/admin-run-batch-job.ts --job daily-season-cycle --season-id <SEASON_ID> --snapshot-date <YYYY-MM-DD> --dry-run --requested-by local-operator
+
+# operator-run season settlement dry-run from existing daily snapshots, no provider calls
+pnpm tsx scripts/admin-run-batch-job.ts --job season-settlement --season-id <SEASON_ID> --settlement-date <YYYY-MM-DD> --dry-run --requested-by local-operator
 ```
 
 `daily-portfolio-snapshot` uses the idempotency key `daily-portfolio-snapshot:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. Dry-run reports `wouldCreate`, `existing`, and participant-level failures without inserting snapshots. Non-dry-run inserts only available participant snapshots, skips existing `(seasonParticipantId, snapshotDate)` rows without overwrite, and uses only existing approved fresh `admin_manual` USD/KRW plus latest eligible `admin_manual` asset price data. It does not call providers, schedule cron, generate rankings, settle seasons, or grant rewards.
@@ -88,6 +91,8 @@ pnpm tsx scripts/admin-run-batch-job.ts --job daily-season-cycle --season-id <SE
 `season-ranking` uses the idempotency key `season-ranking:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. Dry-run reads existing `daily_portfolio_snapshots` and reports planned rankings without inserting rows. Non-dry-run creates `season_rankings` only when no rows already exist for the same season/date/type; existing rankings are skipped without overwrite. It does not call providers, create daily snapshots, mutate wallets/orders/positions, settle seasons, or grant rewards. Ranking is `totalAssetKrw desc` with stable user/participant ordering; the current schema requires unique persisted ranks, so true same-rank competition ties need a future schema gate.
 
 `daily-season-cycle` uses the idempotency key `daily-season-cycle:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. It runs `daily-portfolio-snapshot` first and `season-ranking` second through their existing services. Dry-run is passed to both child jobs. A daily snapshot job-level failure stops ranking and fails the cycle; participant-level snapshot failures are summarized but ranking still runs against existing snapshots. A season ranking job-level failure fails the cycle. It is not cron scheduling, provider ingestion, settlement, or reward.
+
+`season-settlement` uses the idempotency key `season-settlement:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. Dry-run validates settleability and planned final rankings without writing. Non-dry-run requires an `ended` season, uses existing settlement-date `daily_portfolio_snapshots`, creates `rankType=final` `season_rankings`, and transitions the season to `settled` in one transaction. Existing final rankings are never overwritten; an `ended` season with existing final rows only has its status settled. Already `settled` seasons return idempotent existing/skipped success. No settlement-date snapshots fail with `NO_FINAL_SNAPSHOTS_AVAILABLE`, and missing eligible participant snapshots fail with `MISSING_FINAL_SNAPSHOTS`. The job does not call providers, recalculate prices/FX/wallets/orders/positions/snapshots, run cron, expose an HTTP batch API, or grant rewards. `GET /api/v1/ranking?rankType=final` can read generated final rankings; Home settled finalResult remains a documented limitation.
 
 Opt-in real PostgreSQL integration tests require a reachable `DATABASE_URL` and an explicit env flag:
 
@@ -128,12 +133,13 @@ Possible now:
 - Operator-run daily portfolio snapshot batch jobs using existing `admin_manual` DB data.
 - Operator-run season ranking batch jobs using existing `daily_portfolio_snapshots`.
 - Operator-run daily season cycle batch jobs that run daily snapshot and season ranking in order.
+- Operator-run season settlement MVP jobs that finalize from existing `daily_portfolio_snapshots`.
 
 Not possible without a separate provider gate:
 
 - OANDA/Twelve Data/Binance ingestion.
 - Provider-backed FX, stock, or crypto price freshness claims.
 - Cron scheduler-driven snapshots/rankings.
-- Settlement or reward automation.
+- Provider-backed settlement recalculation, Home authoritative final-result expansion, or reward automation.
 
 Never create fake/static/sample business prices to make a test or local flow pass.

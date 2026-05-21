@@ -144,7 +144,7 @@ near-term ledger/FX foundation:
   - `failed` key retry는 새 `idempotencyKey` 필요.
   - service 자체는 provider/FX/order/wallet/position/ledger/snapshot/ranking business row를 생성하지 않음.
 - Batch operator script 추가 완료: `scripts/admin-run-batch-job.ts`.
-  - 현재 지원 job은 `noop`, `health-check`, `daily-portfolio-snapshot`, `season-ranking`, `daily-season-cycle`.
+  - 현재 지원 job은 `noop`, `health-check`, `daily-portfolio-snapshot`, `season-ranking`, `daily-season-cycle`, `season-settlement`.
   - `daily-portfolio-snapshot`은 operator-run job이며 cron scheduler가 아님.
   - `daily-portfolio-snapshot`은 기존 DB의 approved fresh `admin_manual` USD/KRW 및 latest eligible `admin_manual` asset price만 사용.
   - `daily-portfolio-snapshot`은 `daily_portfolio_snapshots`만 생성하며 ranking, settlement, reward, provider ingestion을 수행하지 않음.
@@ -166,7 +166,20 @@ near-term ledger/FX foundation:
   - child deduplicated/skipped 응답은 cycle summary에 반영하고 다음 step 진행.
   - cycle child idempotencyKey는 `<cycle-idempotency-key>:daily-portfolio-snapshot`, `<cycle-idempotency-key>:season-ranking` 형식으로 생성해 standalone child job key와 분리.
   - `daily-season-cycle`은 provider ingestion/API 호출, cron scheduler 등록, settlement, reward, HTTP batch 실행 API를 수행하지 않음.
-  - 실제 cron scheduler, provider ingestion, settlement/reward 실행은 아직 없음.
+  - `season-settlement`은 operator-run settlement MVP job이며 cron scheduler가 아님.
+  - `season-settlement`은 특정 ended seasonId + settlementDate의 기존 `daily_portfolio_snapshots`만 읽어 `rankType=final` `season_rankings`를 생성하고 season status를 `settled`로 전환.
+  - `season-settlement`은 BatchService.runJob envelope을 사용해 `batch_job_runs`에 request/result/error, dryRun, idempotency 상태를 기록.
+  - `season-settlement` idempotencyKey 기본값은 `season-settlement:<season-id>:<YYYY-MM-DD>`이며 명시 key도 허용.
+  - `season-settlement` dry-run은 settle 가능 여부와 final ranking 계획만 반환하고 final ranking/season status DB write를 하지 않음.
+  - `active`/`upcoming` season은 `SEASON_STATUS_NOT_ALLOWED` job-level error.
+  - 이미 `settled` season은 idempotent existing/skipped success로 처리하며 final ranking 존재 여부를 result에 포함.
+  - final ranking이 이미 존재하는 `ended` season은 final ranking을 overwrite/delete/recreate하지 않고 season status만 `settled`로 전환.
+  - final ranking이 없고 settlementDate snapshot이 없으면 `NO_FINAL_SNAPSHOTS_AVAILABLE` job-level failure.
+  - eligible participant(`active`, `finished`, `rewarded`) 중 settlementDate snapshot 누락이 있으면 `MISSING_FINAL_SNAPSHOTS` job-level failure.
+  - final ranking write와 season status transition은 단일 Prisma transaction으로 처리.
+  - final ranking은 `totalAssetKrw desc`, `userId asc`, `seasonParticipantId asc` 기반 deterministic sequential rank를 사용. current `season_rankings` unique rank 제약 때문에 true competition tie rank는 별도 schema/migration gate 필요.
+  - `season-settlement`은 provider ingestion/API 호출, cron scheduler 등록, price/FX/wallet/order/position/snapshot 재계산/변경, reward/payment/badge/trophy 지급, HTTP batch 실행 API를 수행하지 않음.
+  - 실제 cron scheduler, provider ingestion, reward 실행은 아직 없음.
   - admin 권한 모델이 없으므로 batch 실행 HTTP API는 만들지 않음.
 - Auth refresh session foundation 반영 완료: `RefreshTokenSessionStatus`, `refresh_token_sessions`.
 - Auth refresh session migration 생성 완료: `20260519090000_add_refresh_token_sessions`.
@@ -249,12 +262,13 @@ near-term ledger/FX foundation:
   - daily portfolio snapshot batch job: `src/batch/daily-portfolio-snapshot-job.service.ts`, `scripts/admin-run-batch-job.ts --job daily-portfolio-snapshot`.
   - season ranking 수동 생성 CLI: `scripts/admin-generate-season-ranking.ts`.
   - daily season cycle batch job: `src/batch/daily-season-cycle-job.service.ts`, `scripts/admin-run-batch-job.ts --job daily-season-cycle`.
+  - season settlement MVP batch job: `src/batch/season-settlement-job.service.ts`, `scripts/admin-run-batch-job.ts --job season-settlement`.
   - CLI는 dry-run/non-dry-run을 지원하며 seed/fake/static/sample business data를 생성하지 않음.
 
 ## 6. 현재 미도입 DB 상태
 
 - Prisma schema/migration 기준 현재 문서화된 핵심 DB foundation 추가 미도입 테이블 없음.
-- Batch job run/lock 기록 foundation과 operator-run daily portfolio snapshot/season ranking/daily season cycle job은 구현 완료. 단, 실제 cron scheduler, provider ingestion job, ranking overwrite/regeneration job, settlement/reward job은 아직 미구현.
+- Batch job run/lock 기록 foundation과 operator-run daily portfolio snapshot/season ranking/daily season cycle/season settlement MVP job은 구현 완료. 단, 실제 cron scheduler, provider ingestion job, ranking overwrite/regeneration job, reward job은 아직 미구현.
 - order execution full-fill MVP와 position mutation 1차 write path는 구현 완료. 단, exact replay, durable quote, partial fill, matching engine, provider price ingestion, settlement API, scheduler 기반 자동 daily valuation/ranking 생성 경로는 아직 미구현.
 
 ## 7. 완료된 문서/설계 상태
@@ -390,8 +404,15 @@ near-term ledger/FX foundation:
   - season ranking job-level failure는 cycle failed.
   - child deduplicated/skipped 응답은 cycle summary에 반영.
   - provider ingestion/API 호출, cron scheduler, HTTP batch run API, settlement/reward 없음.
+- Season settlement MVP batch job 구현 완료: `src/batch/season-settlement-job.service.ts`, `scripts/admin-run-batch-job.ts --job season-settlement`.
+  - 옵션: `--season-id`, `--settlement-date`, `--idempotency-key`, `--dry-run`, `--requested-by`.
+  - idempotencyKey 기본값: `season-settlement:<season-id>:<YYYY-MM-DD>`.
+  - 기존 settlementDate `daily_portfolio_snapshots`만 읽어 `rankType=final` ranking row를 만들고 ended season을 `settled`로 전환.
+  - no/missing final snapshot은 job-level failure이며 fake final result를 만들지 않음.
+  - existing final ranking은 overwrite/delete/recreate하지 않고 existing/skipped로 처리.
+  - provider ingestion/API 호출, cron scheduler, HTTP batch run API, reward 지급 없음.
 - 이 작업은 `/home`과 `/ranking` 구현 준비를 진전시켰지만, 자동 데이터 생성/외부 시세 공급/API 응답은 아직 없음.
-- scheduler/batch/provider ingestion/settlement 구현 없음.
+- cron scheduler/provider ingestion/settlement extension 구현 없음.
 - order quote/create/cancel/execute full-fill MVP 구현 완료.
 - order execution safety plan/preimplementation readiness audit 기준 full-fill MVP 범위는 코드에 반영됨.
 - order execution exact replay/partial fill/matching engine/settlement/provider ingestion은 별도 gate로 남음.
@@ -471,7 +492,7 @@ near-term ledger/FX foundation:
 - near-term execute는 `equity_snapshots`를 생성하지 않음.
 - MVP execute는 별도 fee wallet transaction row를 만들지 않음.
 - target wallet credit은 `netTargetAmount`.
-- provider_api ingestion, official_batch ingestion, scheduler, provider final selection, stale pending recovery tool/job, durable quote, settlement는 여전히 미구현.
+- provider_api ingestion, official_batch ingestion, scheduler, provider final selection, stale pending recovery tool/job, durable quote, FX execute settlement side effect는 여전히 미구현. Season settlement MVP는 별도 operator-run batch job으로 분리됨.
 - DB integration 검증은 Docker compose의 기존 Postgres/Redis 컨테이너로 수행됨.
 - DB 연결 확인과 migration status 확인 성공.
 - `pnpm test`, `pnpm build`, `FX_EXECUTE_DB_INTEGRATION=1 pnpm test -- fx.execute.integration.spec.ts` 통과.
@@ -688,8 +709,8 @@ near-term ledger/FX foundation:
   - sell은 position decrement/realizedPnl update, cash wallet credit, `order_sell` wallet transaction 생성.
   - order finalization은 `id + seasonParticipantId + status = submitted` guarded update.
   - 모든 financial write는 단일 Prisma transaction 안에서 처리.
-  - equity snapshot, daily snapshot, ranking, settlement, provider/scheduler, partial fill 없음.
-- settlement는 없음.
+  - equity snapshot, daily snapshot, ranking, settlement side effect, provider/scheduler, partial fill 없음.
+- settlement는 operator-run `season-settlement` MVP job으로만 가능하며 order execute side effect가 아님.
 
 ## 9. 다음 gate
 
@@ -707,8 +728,8 @@ near-term ledger/FX foundation:
   - Binance ingestion implementation은 fixture가 있어도 effectiveAt mapping, sourceType eligibility, price-field decision, terms approval, USDT-to-USD owner decision 전까지 `STOP`.
   - OANDA/Twelve Data ingestion implementation은 credentialed fixture, mapping, terms, sourceType tests 전까지 `STOP/BLOCKED`.
   - KRX domestic stock remains STOP.
-  - Batch job run foundation은 구현됨. 실제 cron scheduler와 provider/snapshot/ranking/settlement/reward job은 STOP 유지.
-  - settlement/reward는 아직 미구현이며 Gate H/I/J 전까지 구현 STOP 유지.
+  - Batch job run foundation과 operator-run snapshot/ranking/cycle/settlement MVP job은 구현됨. 실제 cron scheduler와 provider ingestion/reward job은 STOP 유지.
+  - settlement extension/reward는 Gate H/I/J 전까지 구현 STOP 유지.
 - Gate B Provider final selection readiness re-check 및 Asset Price Freshness Policy 문서화 완료.
   - 상세 결과: `docs/provider-final-selection-readiness-recheck.md`, `docs/asset-price-freshness-policy.md`.
   - Gate B 판단은 `CONDITIONAL GO`.
@@ -722,8 +743,8 @@ near-term ledger/FX foundation:
   - full financial write-path 검증은 현재 service/unit 및 opt-in PostgreSQL integration spec이 담당.
 - 테스트 커버리지 상세는 `docs/backend-test-coverage-matrix.md` 기준.
 - provider ingestion은 여전히 미구현이며 live fixture와 owner decision 수락 전 구현 `BLOCKED` 유지.
-- Batch job run foundation은 구현됨. 실제 cron scheduler와 provider/snapshot/ranking/settlement/reward job은 STOP 유지.
-- settlement/reward는 여전히 미구현이며 Gate H/I/J 전까지 구현 STOP 유지.
+- Batch job run foundation과 operator-run snapshot/ranking/cycle/settlement MVP job은 구현됨. 실제 cron scheduler와 provider ingestion/reward job은 STOP 유지.
+- settlement extension/reward는 Gate H/I/J 전까지 구현 STOP 유지.
 - asset price freshness 정책 요약:
   - FX USD/KRW quote/execute는 현행 60초 `effectiveAt` freshness 유지.
   - `provider_api`는 provider timestamp를 `effectiveAt`으로 매핑할 수 있을 때만 허용 후보.
@@ -746,12 +767,12 @@ near-term ledger/FX foundation:
   - provider credentials 확보, live fixture capture, provider ingestion.
   - asset price freshness/source policy 구현 반영 및 고위험 테스트.
   - cron scheduler 및 automatic daily snapshot/ranking job.
-  - settlement/reward/badge/trophy.
+  - settlement extension/reward/badge/trophy.
   - access token blacklist/revocation, cookie/session auth, refresh token reuse theft-response hardening.
   - durable quote, order exact execute replay, partial fill, matching engine.
   - FX stale pending/unknown outcome recovery.
   - deployment/operations readiness.
-- settlement
+- Home authoritative final-result integration / settlement extension
 - access token blacklist/revocation
 - cookie/session auth
 - refresh token reuse detection 시 user active sessions 전체 revoke 정책

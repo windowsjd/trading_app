@@ -24,6 +24,12 @@ jest.mock('../generated/prisma/client', () => ({
     daily: 'daily',
     final: 'final',
   },
+  SeasonStatus: {
+    upcoming: 'upcoming',
+    active: 'active',
+    ended: 'ended',
+    settled: 'settled',
+  },
 }));
 
 import { parseAdminRunBatchJobArgs } from './batch-admin-runner';
@@ -133,6 +139,29 @@ describe('parseAdminRunBatchJobArgs', () => {
     });
   });
 
+  it('parses season settlement job options and generates idempotency key', () => {
+    expect(
+      parseAdminRunBatchJobArgs([
+        '--job',
+        'season-settlement',
+        '--season-id',
+        'season-1',
+        '--settlement-date',
+        '2026-05-21',
+        '--dry-run',
+        '--requested-by',
+        'operator',
+      ]),
+    ).toMatchObject({
+      job: 'season-settlement',
+      seasonId: 'season-1',
+      settlementDate: '2026-05-21',
+      idempotencyKey: 'season-settlement:season-1:2026-05-21',
+      dryRun: true,
+      requestedBy: 'operator',
+    });
+  });
+
   it('keeps explicit season ranking idempotency key', () => {
     expect(
       parseAdminRunBatchJobArgs([
@@ -171,6 +200,20 @@ describe('parseAdminRunBatchJobArgs', () => {
       ]),
     ).toMatchObject({
       job: 'daily-portfolio-snapshot',
+      idempotencyKey: 'manual-key',
+    });
+  });
+
+  it('keeps explicit season settlement idempotency key', () => {
+    expect(
+      parseAdminRunBatchJobArgs([
+        '--job=season-settlement',
+        '--season-id=season-1',
+        '--settlement-date=2026-05-21',
+        '--idempotency-key=manual-key',
+      ]),
+    ).toMatchObject({
+      job: 'season-settlement',
       idempotencyKey: 'manual-key',
     });
   });
@@ -269,6 +312,26 @@ describe('parseAdminRunBatchJobArgs', () => {
     ).toThrow('Missing or empty --snapshot-date.');
   });
 
+  it('rejects missing season settlement required options', () => {
+    expect(() =>
+      parseAdminRunBatchJobArgs([
+        '--job',
+        'season-settlement',
+        '--settlement-date',
+        '2026-05-21',
+      ]),
+    ).toThrow('Missing or empty --season-id.');
+
+    expect(() =>
+      parseAdminRunBatchJobArgs([
+        '--job',
+        'season-settlement',
+        '--season-id',
+        'season-1',
+      ]),
+    ).toThrow('Missing or empty --settlement-date.');
+  });
+
   it('rejects invalid daily portfolio snapshot dates', () => {
     expect(() =>
       parseAdminRunBatchJobArgs([
@@ -306,5 +369,18 @@ describe('parseAdminRunBatchJobArgs', () => {
         '2026-02-31',
       ]),
     ).toThrow('Invalid --snapshot-date: must be YYYY-MM-DD.');
+  });
+
+  it('rejects invalid season settlement dates', () => {
+    expect(() =>
+      parseAdminRunBatchJobArgs([
+        '--job',
+        'season-settlement',
+        '--season-id',
+        'season-1',
+        '--settlement-date',
+        '2026-02-31',
+      ]),
+    ).toThrow('Invalid --settlement-date: must be YYYY-MM-DD.');
   });
 });

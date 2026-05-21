@@ -1,12 +1,12 @@
 # Batch Job Foundation
 
-Status: implemented foundation with operator-run daily portfolio snapshot, season ranking, and daily season cycle jobs, no cron scheduler.
+Status: implemented foundation with operator-run daily portfolio snapshot, season ranking, daily season cycle, and season settlement MVP jobs, no cron scheduler.
 
 ## Scope
 
 The batch foundation is a common job execution envelope for operator-run work and possible future scheduler-run work. It records job start, finish, result, failure, dry-run mode, request payload, and idempotency state in `batch_job_runs`.
 
-This is not provider ingestion, cron scheduling, daily snapshot automation, settlement, or reward.
+This is not provider ingestion, cron scheduling, daily snapshot automation, or reward. Settlement is limited to the operator-run MVP job described below.
 
 ## Current Components
 
@@ -17,6 +17,7 @@ This is not provider ingestion, cron scheduling, daily snapshot automation, sett
 - Business job: `DailyPortfolioSnapshotJobService`
 - Business job: `SeasonRankingJobService`
 - Orchestration job: `DailySeasonCycleJobService`
+- Business job: `SeasonSettlementJobService`
 - Module: `BatchModule`
 - Operator script: `scripts/admin-run-batch-job.ts`
 
@@ -38,6 +39,7 @@ Current business key examples:
 - `daily-portfolio-snapshot:<season-id>:<YYYY-MM-DD>`
 - `season-ranking:<season-id>:<YYYY-MM-DD>`
 - `daily-season-cycle:<season-id>:<YYYY-MM-DD>`
+- `season-settlement:<season-id>:<YYYY-MM-DD>`
 
 ## Operator Script
 
@@ -48,6 +50,7 @@ Supported jobs now:
 - `daily-portfolio-snapshot`: creates `daily_portfolio_snapshots` for active participants of one season/date using existing DB `admin_manual` price/FX data only.
 - `season-ranking`: creates `season_rankings` for one season/date from existing `daily_portfolio_snapshots` only.
 - `daily-season-cycle`: runs daily portfolio snapshot, then season ranking, for one season/date.
+- `season-settlement`: creates final `season_rankings` from existing `daily_portfolio_snapshots` for one ended season/date and transitions the season to `settled`.
 
 Example:
 
@@ -60,7 +63,7 @@ pnpm tsx scripts/admin-run-batch-job.ts \
   --payload-json '{"purpose":"batch-foundation-check"}'
 ```
 
-The script requires `DATABASE_URL`. `noop` and `health-check` create only `batch_job_runs` rows. `daily-portfolio-snapshot` additionally creates `daily_portfolio_snapshots` only when `--dry-run` is not set and participant valuation is available. `season-ranking` additionally creates `season_rankings` only when `--dry-run` is not set and ranking rows do not already exist. `daily-season-cycle` creates its own cycle `batch_job_runs` row and child batch runs for daily snapshot and season ranking. None of these jobs create provider, FX, asset price, wallet, order, position, settlement, or reward rows outside their stated scope.
+The script requires `DATABASE_URL`. `noop` and `health-check` create only `batch_job_runs` rows. `daily-portfolio-snapshot` additionally creates `daily_portfolio_snapshots` only when `--dry-run` is not set and participant valuation is available. `season-ranking` additionally creates daily `season_rankings` only when `--dry-run` is not set and ranking rows do not already exist. `daily-season-cycle` creates its own cycle `batch_job_runs` row and child batch runs for daily snapshot and season ranking. `season-settlement` additionally creates final `season_rankings` and updates the season status to `settled` only when `--dry-run` is not set and settlement prerequisites pass. None of these jobs create provider, FX, asset price, wallet, order, position, reward, badge, or trophy rows outside their stated scope.
 
 Daily snapshot example:
 
@@ -135,6 +138,35 @@ Daily season cycle policy:
 - Cycle-level validation covers required `seasonId` and `snapshotDate` format. Season existence and status validation are delegated to the child jobs, which currently allow active/ended seasons and reject upcoming/settled seasons.
 - The cycle does not call providers, create price/FX rows, register a scheduler, settle seasons, grant rewards, or expose an HTTP batch execution API.
 
+Season settlement example:
+
+```bash
+pnpm tsx scripts/admin-run-batch-job.ts \
+  --job season-settlement \
+  --season-id <SEASON_ID> \
+  --settlement-date <YYYY-MM-DD> \
+  --dry-run \
+  --requested-by local-operator
+```
+
+Season settlement policy:
+
+- If `--idempotency-key` is omitted, it is generated as `season-settlement:<season-id>:<YYYY-MM-DD>`. An explicit key is allowed for controlled retries or operator grouping.
+- `--dry-run` validates settleability, reads existing final rankings or settlement-date snapshots, returns `wouldCreate` and `topRanks`, and does not insert final rankings or update season status.
+- Settlement target season must be `ended`. `active` and `upcoming` seasons are job-level errors with `SEASON_STATUS_NOT_ALLOWED`.
+- An already `settled` season returns idempotent success with existing/skipped final ranking counts when final rows exist. If no final rows exist for the date, the result says so and does not synthesize rows.
+- Source of truth is existing `daily_portfolio_snapshots` for `settlementDate`. The job never recalculates wallets, positions, prices, FX, daily snapshots, or daily rankings.
+- If no settlement-date snapshots exist and final rankings do not already exist, settlement fails with `NO_FINAL_SNAPSHOTS_AVAILABLE`.
+- Eligible participants are `active`, `finished`, and `rewarded`. If any eligible participant is missing a settlement-date snapshot and final rankings do not already exist, settlement fails with `MISSING_FINAL_SNAPSHOTS`.
+- Final ranking rows use `rankType=final`, `rankingDate=settlementDate`, and `capturedAt` from the batch run start time.
+- Existing final ranking rows are never overwritten, deleted, recreated, or upserted. If final rows already exist while the season is still `ended`, the job leaves them as-is and only transitions the season status to `settled`.
+- New final ranking writes and the season status transition run in one Prisma transaction to avoid partial final result creation.
+- Ranking uses `totalAssetKrw desc`, then `userId asc`, then `seasonParticipantId asc`.
+- Current `season_rankings` has a unique `(seasonId, rankType, rankingDate, rank)` constraint, so final rankings persist deterministic unique sequential ranks. True competition tie ranks remain a separate schema/migration gate.
+- `topRanks` is capped at 10 rows in the batch result payload.
+- The job does not call providers, create price/FX rows, register a scheduler, expose an HTTP batch execution API, or grant rewards. Reward handoff remains a separate gate.
+- `GET /api/v1/ranking` already supports `rankType=final`, so generated final rankings are readable there. `GET /api/v1/home` still returns the existing settled-season final result limitation until a participant-specific final result view is defined.
+
 ## Future Work
 
-Cron scheduling, provider ingestion, daily snapshot automation, ranking overwrite/regeneration, settlement, and reward remain separate gates.
+Cron scheduling, provider ingestion, daily snapshot automation, ranking overwrite/regeneration, settlement extensions, Home final-result integration, and reward remain separate gates.

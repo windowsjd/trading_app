@@ -5,6 +5,7 @@ import { BatchService } from './batch.service';
 import { DailyPortfolioSnapshotJobService } from './daily-portfolio-snapshot-job.service';
 import { DailySeasonCycleJobService } from './daily-season-cycle-job.service';
 import { SeasonRankingJobService } from './season-ranking-job.service';
+import { SeasonSettlementJobService } from './season-settlement-job.service';
 
 @Module({
   imports: [PrismaModule],
@@ -13,6 +14,7 @@ import { SeasonRankingJobService } from './season-ranking-job.service';
     DailyPortfolioSnapshotJobService,
     DailySeasonCycleJobService,
     SeasonRankingJobService,
+    SeasonSettlementJobService,
     PortfolioValuationService,
   ],
   exports: [
@@ -20,6 +22,7 @@ import { SeasonRankingJobService } from './season-ranking-job.service';
     DailyPortfolioSnapshotJobService,
     DailySeasonCycleJobService,
     SeasonRankingJobService,
+    SeasonSettlementJobService,
   ],
 })
 export class BatchModule {}

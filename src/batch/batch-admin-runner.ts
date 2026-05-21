@@ -10,13 +10,16 @@ import { DailySeasonCycleJobService } from './daily-season-cycle-job.service';
 import { DAILY_SEASON_CYCLE_JOB_NAME } from './daily-season-cycle-job.types';
 import { SeasonRankingJobService } from './season-ranking-job.service';
 import { SEASON_RANKING_JOB_NAME } from './season-ranking-job.types';
+import { SeasonSettlementJobService } from './season-settlement-job.service';
+import { SEASON_SETTLEMENT_JOB_NAME } from './season-settlement-job.types';
 
 type SupportedAdminBatchJob =
   | 'noop'
   | 'health-check'
   | typeof DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME
   | typeof SEASON_RANKING_JOB_NAME
-  | typeof DAILY_SEASON_CYCLE_JOB_NAME;
+  | typeof DAILY_SEASON_CYCLE_JOB_NAME
+  | typeof SEASON_SETTLEMENT_JOB_NAME;
 
 export type AdminRunBatchJobArgs = {
   job?: SupportedAdminBatchJob;
@@ -26,6 +29,7 @@ export type AdminRunBatchJobArgs = {
   payloadJson?: unknown;
   seasonId?: string;
   snapshotDate?: string;
+  settlementDate?: string;
 };
 
 type CliValueOptionName = Exclude<keyof AdminRunBatchJobArgs, 'dryRun'>;
@@ -37,6 +41,7 @@ const VALUE_OPTIONS: Record<string, CliValueOptionName> = {
   '--payload-json': 'payloadJson',
   '--season-id': 'seasonId',
   '--snapshot-date': 'snapshotDate',
+  '--settlement-date': 'settlementDate',
 };
 
 const BOOLEAN_OPTIONS: Record<string, 'dryRun'> = {
@@ -77,7 +82,16 @@ export function parseAdminRunBatchJobArgs(
   }
 
   parsed.job = parseJob(parsed.job);
-  if (isSeasonDateJob(parsed.job)) {
+  if (parsed.job === SEASON_SETTLEMENT_JOB_NAME) {
+    parsed.seasonId = parseRequiredText(parsed.seasonId, 'season-id');
+    parsed.settlementDate = parseDateOnlyText(
+      parsed.settlementDate,
+      'settlement-date',
+    );
+    parsed.idempotencyKey =
+      parseOptionalText(parsed.idempotencyKey) ??
+      `${parsed.job}:${parsed.seasonId}:${parsed.settlementDate}`;
+  } else if (isSeasonDateJob(parsed.job)) {
     parsed.seasonId = parseRequiredText(parsed.seasonId, 'season-id');
     parsed.snapshotDate = parseDateOnlyText(
       parsed.snapshotDate,
@@ -126,10 +140,22 @@ export async function runAdminRunBatchJob(argv: string[]) {
     dailyPortfolioSnapshotJobService,
     seasonRankingJobService,
   );
+  const seasonSettlementJobService = new SeasonSettlementJobService(
+    batchService,
+    prisma as unknown as PrismaService,
+  );
 
   try {
     let response;
-    if (args.job === DAILY_SEASON_CYCLE_JOB_NAME) {
+    if (args.job === SEASON_SETTLEMENT_JOB_NAME) {
+      response = await seasonSettlementJobService.run({
+        seasonId: args.seasonId,
+        settlementDate: args.settlementDate,
+        idempotencyKey: args.idempotencyKey,
+        dryRun: args.dryRun === true,
+        requestedBy: args.requestedBy,
+      });
+    } else if (args.job === DAILY_SEASON_CYCLE_JOB_NAME) {
       response = await dailySeasonCycleJobService.run({
         seasonId: args.seasonId,
         snapshotDate: args.snapshotDate,
@@ -214,7 +240,8 @@ function parseJob(value: string | undefined): SupportedAdminBatchJob {
     text === 'health-check' ||
     text === DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME ||
     text === SEASON_RANKING_JOB_NAME ||
-    text === DAILY_SEASON_CYCLE_JOB_NAME
+    text === DAILY_SEASON_CYCLE_JOB_NAME ||
+    text === SEASON_SETTLEMENT_JOB_NAME
   ) {
     return text;
   }
