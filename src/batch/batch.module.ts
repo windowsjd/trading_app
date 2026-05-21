@@ -3,6 +3,7 @@ import { PortfolioValuationService } from '../portfolio/portfolio-valuation.serv
 import { PrismaModule } from '../prisma/prisma.module';
 import { BatchService } from './batch.service';
 import { DailyPortfolioSnapshotJobService } from './daily-portfolio-snapshot-job.service';
+import { DailySeasonCycleJobService } from './daily-season-cycle-job.service';
 import { SeasonRankingJobService } from './season-ranking-job.service';
 
 @Module({
@@ -10,12 +11,14 @@ import { SeasonRankingJobService } from './season-ranking-job.service';
   providers: [
     BatchService,
     DailyPortfolioSnapshotJobService,
+    DailySeasonCycleJobService,
     SeasonRankingJobService,
     PortfolioValuationService,
   ],
   exports: [
     BatchService,
     DailyPortfolioSnapshotJobService,
+    DailySeasonCycleJobService,
     SeasonRankingJobService,
   ],
 })

@@ -110,6 +110,29 @@ describe('parseAdminRunBatchJobArgs', () => {
     });
   });
 
+  it('parses daily season cycle job options and generates idempotency key', () => {
+    expect(
+      parseAdminRunBatchJobArgs([
+        '--job',
+        'daily-season-cycle',
+        '--season-id',
+        'season-1',
+        '--snapshot-date',
+        '2026-05-20',
+        '--dry-run',
+        '--requested-by',
+        'operator',
+      ]),
+    ).toMatchObject({
+      job: 'daily-season-cycle',
+      seasonId: 'season-1',
+      snapshotDate: '2026-05-20',
+      idempotencyKey: 'daily-season-cycle:season-1:2026-05-20',
+      dryRun: true,
+      requestedBy: 'operator',
+    });
+  });
+
   it('keeps explicit season ranking idempotency key', () => {
     expect(
       parseAdminRunBatchJobArgs([
@@ -120,6 +143,20 @@ describe('parseAdminRunBatchJobArgs', () => {
       ]),
     ).toMatchObject({
       job: 'season-ranking',
+      idempotencyKey: 'manual-key',
+    });
+  });
+
+  it('keeps explicit daily season cycle idempotency key', () => {
+    expect(
+      parseAdminRunBatchJobArgs([
+        '--job=daily-season-cycle',
+        '--season-id=season-1',
+        '--snapshot-date=2026-05-20',
+        '--idempotency-key=manual-key',
+      ]),
+    ).toMatchObject({
+      job: 'daily-season-cycle',
       idempotencyKey: 'manual-key',
     });
   });
@@ -212,6 +249,26 @@ describe('parseAdminRunBatchJobArgs', () => {
     ).toThrow('Missing or empty --snapshot-date.');
   });
 
+  it('rejects missing daily season cycle required options', () => {
+    expect(() =>
+      parseAdminRunBatchJobArgs([
+        '--job',
+        'daily-season-cycle',
+        '--snapshot-date',
+        '2026-05-20',
+      ]),
+    ).toThrow('Missing or empty --season-id.');
+
+    expect(() =>
+      parseAdminRunBatchJobArgs([
+        '--job',
+        'daily-season-cycle',
+        '--season-id',
+        'season-1',
+      ]),
+    ).toThrow('Missing or empty --snapshot-date.');
+  });
+
   it('rejects invalid daily portfolio snapshot dates', () => {
     expect(() =>
       parseAdminRunBatchJobArgs([
@@ -230,6 +287,19 @@ describe('parseAdminRunBatchJobArgs', () => {
       parseAdminRunBatchJobArgs([
         '--job',
         'season-ranking',
+        '--season-id',
+        'season-1',
+        '--snapshot-date',
+        '2026-02-31',
+      ]),
+    ).toThrow('Invalid --snapshot-date: must be YYYY-MM-DD.');
+  });
+
+  it('rejects invalid daily season cycle dates', () => {
+    expect(() =>
+      parseAdminRunBatchJobArgs([
+        '--job',
+        'daily-season-cycle',
         '--season-id',
         'season-1',
         '--snapshot-date',

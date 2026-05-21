@@ -6,6 +6,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { DailyPortfolioSnapshotJobService } from './daily-portfolio-snapshot-job.service';
 import { BatchService } from './batch.service';
 import { DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME } from './daily-portfolio-snapshot-job.types';
+import { DailySeasonCycleJobService } from './daily-season-cycle-job.service';
+import { DAILY_SEASON_CYCLE_JOB_NAME } from './daily-season-cycle-job.types';
 import { SeasonRankingJobService } from './season-ranking-job.service';
 import { SEASON_RANKING_JOB_NAME } from './season-ranking-job.types';
 
@@ -13,7 +15,8 @@ type SupportedAdminBatchJob =
   | 'noop'
   | 'health-check'
   | typeof DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME
-  | typeof SEASON_RANKING_JOB_NAME;
+  | typeof SEASON_RANKING_JOB_NAME
+  | typeof DAILY_SEASON_CYCLE_JOB_NAME;
 
 export type AdminRunBatchJobArgs = {
   job?: SupportedAdminBatchJob;
@@ -118,10 +121,23 @@ export async function runAdminRunBatchJob(argv: string[]) {
     batchService,
     prisma as unknown as PrismaService,
   );
+  const dailySeasonCycleJobService = new DailySeasonCycleJobService(
+    batchService,
+    dailyPortfolioSnapshotJobService,
+    seasonRankingJobService,
+  );
 
   try {
     let response;
-    if (args.job === DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME) {
+    if (args.job === DAILY_SEASON_CYCLE_JOB_NAME) {
+      response = await dailySeasonCycleJobService.run({
+        seasonId: args.seasonId,
+        snapshotDate: args.snapshotDate,
+        idempotencyKey: args.idempotencyKey,
+        dryRun: args.dryRun === true,
+        requestedBy: args.requestedBy,
+      });
+    } else if (args.job === DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME) {
       response = await dailyPortfolioSnapshotJobService.run({
         seasonId: args.seasonId,
         snapshotDate: args.snapshotDate,
@@ -197,7 +213,8 @@ function parseJob(value: string | undefined): SupportedAdminBatchJob {
     text === 'noop' ||
     text === 'health-check' ||
     text === DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME ||
-    text === SEASON_RANKING_JOB_NAME
+    text === SEASON_RANKING_JOB_NAME ||
+    text === DAILY_SEASON_CYCLE_JOB_NAME
   ) {
     return text;
   }
@@ -258,8 +275,11 @@ function isSeasonDateJob(
   job: SupportedAdminBatchJob | undefined,
 ): job is
   | typeof DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME
-  | typeof SEASON_RANKING_JOB_NAME {
+  | typeof SEASON_RANKING_JOB_NAME
+  | typeof DAILY_SEASON_CYCLE_JOB_NAME {
   return (
-    job === DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME || job === SEASON_RANKING_JOB_NAME
+    job === DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME ||
+    job === SEASON_RANKING_JOB_NAME ||
+    job === DAILY_SEASON_CYCLE_JOB_NAME
   );
 }

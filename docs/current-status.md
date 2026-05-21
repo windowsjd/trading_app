@@ -144,7 +144,7 @@ near-term ledger/FX foundation:
   - `failed` key retry는 새 `idempotencyKey` 필요.
   - service 자체는 provider/FX/order/wallet/position/ledger/snapshot/ranking business row를 생성하지 않음.
 - Batch operator script 추가 완료: `scripts/admin-run-batch-job.ts`.
-  - 현재 지원 job은 `noop`, `health-check`, `daily-portfolio-snapshot`, `season-ranking`.
+  - 현재 지원 job은 `noop`, `health-check`, `daily-portfolio-snapshot`, `season-ranking`, `daily-season-cycle`.
   - `daily-portfolio-snapshot`은 operator-run job이며 cron scheduler가 아님.
   - `daily-portfolio-snapshot`은 기존 DB의 approved fresh `admin_manual` USD/KRW 및 latest eligible `admin_manual` asset price만 사용.
   - `daily-portfolio-snapshot`은 `daily_portfolio_snapshots`만 생성하며 ranking, settlement, reward, provider ingestion을 수행하지 않음.
@@ -156,6 +156,16 @@ near-term ledger/FX foundation:
   - 동일 seasonId + `rankType=daily` + snapshotDate ranking row가 이미 있으면 overwrite/delete/recreate 없이 `existing`/`skipped`로 분류.
   - no snapshots는 job-level success + `reason=NO_SNAPSHOTS_AVAILABLE` + created=0으로 처리하고 fake ranking을 만들지 않음.
   - current `season_rankings` schema의 `(seasonId, rankType, rankingDate, rank)` unique 제약 때문에 persisted rank는 `totalAssetKrw desc`, `userId asc`, `seasonParticipantId asc` 기반 deterministic unique sequential rank. true competition tie rank(`1,2,2,4`)는 별도 schema/migration gate 필요.
+  - `daily-season-cycle`은 operator-run orchestration job이며 cron scheduler가 아님.
+  - `daily-season-cycle`은 기존 `DailyPortfolioSnapshotJobService.run()`을 먼저 호출하고, 이어서 `SeasonRankingJobService.run()`을 호출.
+  - `daily-season-cycle`은 valuation/ranking 계산을 중복 구현하지 않고 child job result를 cycle `resultPayloadJson`에 요약.
+  - `daily-season-cycle` dry-run은 두 child job 모두 dry-run으로 실행.
+  - daily snapshot child job-level failure 시 season ranking child job은 실행하지 않고 cycle failed.
+  - daily snapshot participant-level failure만 있으면 cycle은 season ranking child job을 계속 실행.
+  - season ranking child job-level failure 시 cycle failed.
+  - child deduplicated/skipped 응답은 cycle summary에 반영하고 다음 step 진행.
+  - cycle child idempotencyKey는 `<cycle-idempotency-key>:daily-portfolio-snapshot`, `<cycle-idempotency-key>:season-ranking` 형식으로 생성해 standalone child job key와 분리.
+  - `daily-season-cycle`은 provider ingestion/API 호출, cron scheduler 등록, settlement, reward, HTTP batch 실행 API를 수행하지 않음.
   - 실제 cron scheduler, provider ingestion, settlement/reward 실행은 아직 없음.
   - admin 권한 모델이 없으므로 batch 실행 HTTP API는 만들지 않음.
 - Auth refresh session foundation 반영 완료: `RefreshTokenSessionStatus`, `refresh_token_sessions`.
@@ -238,12 +248,13 @@ near-term ledger/FX foundation:
   - daily portfolio snapshot 수동 생성 CLI: `scripts/admin-generate-daily-portfolio-snapshot.ts`.
   - daily portfolio snapshot batch job: `src/batch/daily-portfolio-snapshot-job.service.ts`, `scripts/admin-run-batch-job.ts --job daily-portfolio-snapshot`.
   - season ranking 수동 생성 CLI: `scripts/admin-generate-season-ranking.ts`.
+  - daily season cycle batch job: `src/batch/daily-season-cycle-job.service.ts`, `scripts/admin-run-batch-job.ts --job daily-season-cycle`.
   - CLI는 dry-run/non-dry-run을 지원하며 seed/fake/static/sample business data를 생성하지 않음.
 
 ## 6. 현재 미도입 DB 상태
 
 - Prisma schema/migration 기준 현재 문서화된 핵심 DB foundation 추가 미도입 테이블 없음.
-- Batch job run/lock 기록 foundation과 operator-run daily portfolio snapshot/season ranking job은 구현 완료. 단, 실제 cron scheduler, provider ingestion job, ranking overwrite/regeneration job, settlement/reward job은 아직 미구현.
+- Batch job run/lock 기록 foundation과 operator-run daily portfolio snapshot/season ranking/daily season cycle job은 구현 완료. 단, 실제 cron scheduler, provider ingestion job, ranking overwrite/regeneration job, settlement/reward job은 아직 미구현.
 - order execution full-fill MVP와 position mutation 1차 write path는 구현 완료. 단, exact replay, durable quote, partial fill, matching engine, provider price ingestion, settlement API, scheduler 기반 자동 daily valuation/ranking 생성 경로는 아직 미구현.
 
 ## 7. 완료된 문서/설계 상태
@@ -367,6 +378,18 @@ near-term ledger/FX foundation:
   - 기존 ranking row가 있으면 overwrite/delete/recreate 없이 existing/skipped로 성공 종료.
   - daily snapshot 생성, provider ingestion/API 호출, settlement/reward 없음.
   - current schema의 rank unique 제약으로 competition tie rank는 미구현이며, 같은 `totalAssetKrw`는 `userId`, `seasonParticipantId` 순서로 deterministic sequential rank 저장.
+- Daily season cycle batch job 구현 완료: `src/batch/daily-season-cycle-job.service.ts`, `scripts/admin-run-batch-job.ts --job daily-season-cycle`.
+  - 옵션: `--season-id`, `--snapshot-date`, `--idempotency-key`, `--dry-run`, `--requested-by`.
+  - idempotencyKey 기본값: `daily-season-cycle:<season-id>:<YYYY-MM-DD>`.
+  - cycle 전체는 `BatchService.runJob()` envelope으로 `batch_job_runs`에 기록.
+  - child job은 daily snapshot, season ranking 순서로 기존 service를 호출.
+  - child job idempotencyKey는 `<cycle-idempotency-key>:daily-portfolio-snapshot`, `<cycle-idempotency-key>:season-ranking`.
+  - dry-run은 두 child job에 그대로 전달.
+  - daily snapshot job-level failure는 ranking 미실행 + cycle failed.
+  - daily snapshot participant-level failure는 cycle failed가 아니며 ranking job 계속 실행.
+  - season ranking job-level failure는 cycle failed.
+  - child deduplicated/skipped 응답은 cycle summary에 반영.
+  - provider ingestion/API 호출, cron scheduler, HTTP batch run API, settlement/reward 없음.
 - 이 작업은 `/home`과 `/ranking` 구현 준비를 진전시켰지만, 자동 데이터 생성/외부 시세 공급/API 응답은 아직 없음.
 - scheduler/batch/provider ingestion/settlement 구현 없음.
 - order quote/create/cancel/execute full-fill MVP 구현 완료.

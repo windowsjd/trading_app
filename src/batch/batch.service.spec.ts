@@ -195,6 +195,61 @@ describe('BatchService', () => {
     });
   });
 
+  it('stores resultPayloadJson for failed runs when the handler provides a failure summary', async () => {
+    prisma.batchJobRun.create.mockResolvedValue(
+      makeRun({ status: BatchJobStatus.running }),
+    );
+    prisma.batchJobRun.update.mockResolvedValue(
+      makeRun({
+        status: BatchJobStatus.failed,
+        errorCode: 'DAILY_SEASON_CYCLE_FAILED',
+        errorMessage: 'Daily season cycle failed.',
+        resultPayloadJson: { step: 'dailyPortfolioSnapshot' },
+        finishedAt: new Date('2026-05-19T00:00:01.000Z'),
+      }),
+    );
+
+    const error = new HttpException(
+      {
+        success: false,
+        error: {
+          code: 'DAILY_SEASON_CYCLE_FAILED',
+          message: 'Daily season cycle failed.',
+        },
+        data: {
+          resultPayloadJson: {
+            step: 'dailyPortfolioSnapshot',
+          },
+        },
+      },
+      HttpStatus.BAD_REQUEST,
+    );
+
+    await expect(
+      service.runJob({
+        jobName: 'daily-season-cycle',
+        idempotencyKey: 'daily-season-cycle:season-1:2026-05-21',
+        handler: () => {
+          throw error;
+        },
+      }),
+    ).rejects.toMatchObject({
+      status: HttpStatus.BAD_REQUEST,
+    });
+
+    expect(prisma.batchJobRun.update).toHaveBeenCalledWith({
+      where: { id: 'run-1' },
+      data: expect.objectContaining({
+        status: BatchJobStatus.failed,
+        errorCode: 'DAILY_SEASON_CYCLE_FAILED',
+        errorMessage: 'Daily season cycle failed.',
+        resultPayloadJson: {
+          step: 'dailyPortfolioSnapshot',
+        },
+      }),
+    });
+  });
+
   it('returns an already succeeded run without executing the handler again', async () => {
     prisma.batchJobRun.create.mockRejectedValue({ code: 'P2002' });
     prisma.batchJobRun.findUnique.mockResolvedValue(

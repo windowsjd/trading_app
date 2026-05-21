@@ -98,6 +98,11 @@ export class BatchService {
           finishedAt: new Date(),
           errorCode: failure.errorCode,
           errorMessage: failure.errorMessage,
+          ...(failure.resultPayload === undefined
+            ? {}
+            : {
+                resultPayloadJson: this.toJsonInput(failure.resultPayload),
+              }),
         },
       });
 
@@ -392,9 +397,11 @@ export class BatchService {
     errorMessage: string;
     responseCode: string;
     responseMessage: string;
+    resultPayload?: unknown;
   } {
     const errorCode = this.extractErrorCode(error);
     const errorMessage = this.extractErrorMessage(error);
+    const resultPayload = this.extractHttpExceptionResultPayload(error);
 
     if (error instanceof HttpException) {
       return {
@@ -403,6 +410,7 @@ export class BatchService {
         errorMessage,
         responseCode: errorCode,
         responseMessage: errorMessage,
+        resultPayload,
       };
     }
 
@@ -412,6 +420,7 @@ export class BatchService {
       errorMessage,
       responseCode: 'BATCH_JOB_FAILED',
       responseMessage: 'Batch job failed.',
+      resultPayload,
     };
   }
 
@@ -479,6 +488,26 @@ export class BatchService {
     }
 
     return value.trim();
+  }
+
+  private extractHttpExceptionResultPayload(error: unknown): unknown {
+    if (!(error instanceof HttpException)) {
+      return undefined;
+    }
+
+    const response = error.getResponse();
+    if (
+      typeof response !== 'object' ||
+      response === null ||
+      !('data' in response) ||
+      typeof response.data !== 'object' ||
+      response.data === null ||
+      !('resultPayloadJson' in response.data)
+    ) {
+      return undefined;
+    }
+
+    return response.data.resultPayloadJson;
   }
 
   private createErrorBody(code: string, message: string) {
