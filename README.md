@@ -16,14 +16,15 @@ This service owns backend APIs, database access, financial calculations, and ser
 - KRW and USD cash wallets. US stocks and USD-settled crypto use the USD wallet.
 - Final valuation policy is KRW total assets.
 - Batch job execution foundation with idempotent `batch_job_runs` recording, operator-only noop/health-check script, operator-run daily portfolio snapshot generation, operator-run season ranking generation from existing daily snapshots, an operator-run daily season cycle orchestration job, and an operator-run season settlement MVP job.
+- Operator-run final tier assignment MVP job from existing final `season_rankings`.
 
 ## STOP / Not Implemented
 
 These are intentionally outside the current implementation and should not be added without a separate gate:
 
 - Provider ingestion for OANDA, Twelve Data, Binance, or any other market data provider.
-- Cron scheduler, provider ingestion jobs, scheduler-driven snapshot/ranking jobs, settlement extension jobs, or reward jobs.
-- Provider-backed settlement recalculation, final tier assignment, or reward automation.
+- Cron scheduler, provider ingestion jobs, scheduler-driven snapshot/ranking jobs, settlement extension jobs beyond final tier assignment, or reward jobs.
+- Provider-backed settlement recalculation or reward automation.
 - Reward, badge, or trophy grants.
 - Access token blacklist/revocation, server-side session auth, and cookie auth.
 - Matching engine, partial fill, durable quote, or exact order execute replay.
@@ -85,6 +86,9 @@ pnpm tsx scripts/admin-run-batch-job.ts --job daily-season-cycle --season-id <SE
 
 # operator-run season settlement dry-run from existing daily snapshots, no provider calls
 pnpm tsx scripts/admin-run-batch-job.ts --job season-settlement --season-id <SEASON_ID> --settlement-date <YYYY-MM-DD> --dry-run --requested-by local-operator
+
+# operator-run final tier assignment dry-run from existing final rankings, no provider calls
+pnpm tsx scripts/admin-run-batch-job.ts --job final-tier-assignment --season-id <SEASON_ID> --ranking-date <YYYY-MM-DD> --dry-run --requested-by local-operator
 ```
 
 `daily-portfolio-snapshot` uses the idempotency key `daily-portfolio-snapshot:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. Dry-run reports `wouldCreate`, `existing`, and participant-level failures without inserting snapshots. Non-dry-run inserts only available participant snapshots, skips existing `(seasonParticipantId, snapshotDate)` rows without overwrite, and uses only existing approved fresh `admin_manual` USD/KRW plus latest eligible `admin_manual` asset price data. It does not call providers, schedule cron, generate rankings, settle seasons, or grant rewards.
@@ -94,6 +98,8 @@ pnpm tsx scripts/admin-run-batch-job.ts --job season-settlement --season-id <SEA
 `daily-season-cycle` uses the idempotency key `daily-season-cycle:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. It runs `daily-portfolio-snapshot` first and `season-ranking` second through their existing services. Dry-run is passed to both child jobs. A daily snapshot job-level failure stops ranking and fails the cycle; participant-level snapshot failures are summarized but ranking still runs against existing snapshots. A season ranking job-level failure fails the cycle. It is not cron scheduling, provider ingestion, settlement, or reward.
 
 `season-settlement` uses the idempotency key `season-settlement:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. Dry-run validates settleability and planned final rankings without writing. Non-dry-run requires an `ended` season, uses existing settlement-date `daily_portfolio_snapshots`, creates `rankType=final` `season_rankings`, and transitions the season to `settled` in one transaction. Existing final rankings are never overwritten; an `ended` season with existing final rows only has its status settled. Already `settled` seasons return idempotent existing/skipped success. No settlement-date snapshots fail with `NO_FINAL_SNAPSHOTS_AVAILABLE`, and missing eligible participant snapshots fail with `MISSING_FINAL_SNAPSHOTS`. The job does not call providers, recalculate prices/FX/wallets/orders/positions/snapshots, run cron, expose an HTTP batch API, or grant rewards. `GET /api/v1/ranking?rankType=final` and settled joined `GET /api/v1/home` can read generated final rankings.
+
+`final-tier-assignment` uses the idempotency key `final-tier-assignment:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. Dry-run reads existing `rankType=final` `season_rankings` for the requested `--ranking-date` and returns the assignment plan without writing. Non-dry-run requires a `settled` season and updates only `SeasonParticipant.finalRank` and `finalTier` for participants with both fields still null. Existing `finalRank` or `finalTier` is treated as existing/skipped and is not overwritten. Missing final rankings fail with `FINAL_RANKING_UNAVAILABLE`. The default MVP tier policy is rank 1 `master`, rank 2-3 `diamond`, rank 4-10 `platinum`, top 30% `gold`, top 60% `silver`, and fallback `bronze`; clear `Season.rewardPolicyJson.tierPolicy.tiers` rules may override tier assignment only. The job does not update `rewardGrantedAt`, grant rewards, call providers, run cron, expose an HTTP batch API, or mutate price/FX/wallet/order/position/snapshot/ranking rows. Settled joined Home reads the assigned `finalTier` read-only.
 
 Opt-in real PostgreSQL integration tests require a reachable `DATABASE_URL` and an explicit env flag:
 
@@ -135,6 +141,7 @@ Possible now:
 - Operator-run season ranking batch jobs using existing `daily_portfolio_snapshots`.
 - Operator-run daily season cycle batch jobs that run daily snapshot and season ranking in order.
 - Operator-run season settlement MVP jobs that finalize from existing `daily_portfolio_snapshots`.
+- Operator-run final tier assignment MVP jobs that assign final rank/tier from existing final `season_rankings`.
 - Settled joined Home final-result reads from existing `rankType=final` `season_rankings`; missing final rankings return unavailable without live valuation fallback.
 
 Not possible without a separate provider gate:
@@ -142,6 +149,6 @@ Not possible without a separate provider gate:
 - OANDA/Twelve Data/Binance ingestion.
 - Provider-backed FX, stock, or crypto price freshness claims.
 - Cron scheduler-driven snapshots/rankings.
-- Provider-backed settlement recalculation, final tier assignment, or reward automation.
+- Provider-backed settlement recalculation or reward automation.
 
 Never create fake/static/sample business prices to make a test or local flow pass.

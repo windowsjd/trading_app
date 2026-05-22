@@ -145,7 +145,7 @@ near-term ledger/FX foundation:
   - `failed` key retry는 새 `idempotencyKey` 필요.
   - service 자체는 provider/FX/order/wallet/position/ledger/snapshot/ranking business row를 생성하지 않음.
 - Batch operator script 추가 완료: `scripts/admin-run-batch-job.ts`.
-  - 현재 지원 job은 `noop`, `health-check`, `daily-portfolio-snapshot`, `season-ranking`, `daily-season-cycle`, `season-settlement`.
+  - 현재 지원 job은 `noop`, `health-check`, `daily-portfolio-snapshot`, `season-ranking`, `daily-season-cycle`, `season-settlement`, `final-tier-assignment`.
   - `daily-portfolio-snapshot`은 operator-run job이며 cron scheduler가 아님.
   - `daily-portfolio-snapshot`은 기존 DB의 approved fresh `admin_manual` USD/KRW 및 latest eligible `admin_manual` asset price만 사용.
   - `daily-portfolio-snapshot`은 `daily_portfolio_snapshots`만 생성하며 ranking, settlement, reward, provider ingestion을 수행하지 않음.
@@ -181,7 +181,20 @@ near-term ledger/FX foundation:
   - final ranking은 `totalAssetKrw desc`, `userId asc`, `seasonParticipantId asc` 기반 deterministic sequential rank를 사용. current `season_rankings` unique rank 제약 때문에 true competition tie rank는 별도 schema/migration gate 필요.
   - `season-settlement`은 provider ingestion/API 호출, cron scheduler 등록, price/FX/wallet/order/position/snapshot 재계산/변경, reward/payment/badge/trophy 지급, HTTP batch 실행 API를 수행하지 않음.
   - Home settled final-result read model은 생성된 final ranking을 읽을 수 있음.
-  - 실제 cron scheduler, provider ingestion, final tier assignment, reward 실행은 아직 없음.
+  - `final-tier-assignment`는 operator-run final tier assignment MVP job이며 cron scheduler가 아님.
+  - `final-tier-assignment`는 settled season의 특정 `rankingDate` `rankType=final` `season_rankings`를 source of truth로 읽어 `SeasonParticipant.finalRank`와 `finalTier`만 배정.
+  - `final-tier-assignment` idempotencyKey 기본값은 `final-tier-assignment:<season-id>:<YYYY-MM-DD>`이며 명시 key도 허용.
+  - `final-tier-assignment` dry-run은 배정 계획과 `topAssignments`만 반환하고 DB write를 하지 않음.
+  - final ranking이 없으면 fake fallback 없이 `FINAL_RANKING_UNAVAILABLE` job-level failure.
+  - `ended` season은 `SETTLEMENT_REQUIRED`, `active`/`upcoming` season은 `SEASON_STATUS_NOT_ALLOWED`.
+  - 기본 MVP tier policy는 rank 1 `master`, 2-3 `diamond`, 4-10 `platinum`, top 30% `gold`, top 60% `silver`, 나머지 `bronze`.
+  - 명확한 `Season.rewardPolicyJson.tierPolicy.tiers`가 있으면 tier rule만 읽을 수 있고, 복잡하거나 불명확하면 `default_mvp` policy 사용. reward amount/badge/trophy/payment는 무시.
+  - 이미 `finalRank` 또는 `finalTier` 중 하나라도 있으면 existing/skipped로 보고 overwrite하지 않음.
+  - non-dry-run participant finalRank/finalTier update는 Prisma transaction 안에서 처리.
+  - `rewardGrantedAt`은 업데이트하지 않고 reward/payment/badge/trophy row도 만들지 않음.
+  - provider ingestion/API 호출, cron scheduler 등록, price/FX/wallet/order/position/snapshot/ranking row 생성/수정/삭제, HTTP batch 실행 API를 수행하지 않음.
+  - Home settled final-result read model은 배정된 `finalTier`를 read-only로 available 표시할 수 있음. 없으면 `FINAL_TIER_UNAVAILABLE` 유지.
+  - 실제 cron scheduler, provider ingestion, reward 실행은 아직 없음.
   - admin 권한 모델이 없으므로 batch 실행 HTTP API는 만들지 않음.
 - Auth refresh session foundation 반영 완료: `RefreshTokenSessionStatus`, `refresh_token_sessions`.
 - Auth refresh session migration 생성 완료: `20260519090000_add_refresh_token_sessions`.
@@ -413,6 +426,13 @@ near-term ledger/FX foundation:
   - no/missing final snapshot은 job-level failure이며 fake final result를 만들지 않음.
   - existing final ranking은 overwrite/delete/recreate하지 않고 existing/skipped로 처리.
   - provider ingestion/API 호출, cron scheduler, HTTP batch run API, reward 지급 없음.
+- Final tier assignment MVP batch job 구현 완료: `src/batch/final-tier-assignment-job.service.ts`, `scripts/admin-run-batch-job.ts --job final-tier-assignment`.
+  - 옵션: `--season-id`, `--ranking-date`, `--idempotency-key`, `--dry-run`, `--requested-by`.
+  - idempotencyKey 기본값: `final-tier-assignment:<season-id>:<YYYY-MM-DD>`.
+  - settled season + selected final rankingDate의 `rankType=final` `season_rankings`만 읽어 `SeasonParticipant.finalRank/finalTier`를 배정.
+  - `dry-run`은 update 없이 `wouldAssign`, `existing`, policy source, `topAssignments`를 반환.
+  - existing `finalRank`/`finalTier`는 overwrite하지 않고, 둘 중 하나라도 있으면 existing/skipped로 처리.
+  - reward 지급, `rewardGrantedAt` 업데이트, provider ingestion/API 호출, cron scheduler, HTTP batch run API 없음.
 - 이 작업은 `/home` settled final-result read model과 `/ranking` 구현 준비를 진전시켰지만, 자동 데이터 생성/외부 시세 공급/API 응답은 아직 없음.
 - cron scheduler/provider ingestion/settlement extension 구현 없음.
 - order quote/create/cancel/execute full-fill MVP 구현 완료.
@@ -527,7 +547,7 @@ near-term ledger/FX foundation:
   - 여러 final `rankingDate`가 있으면 `rankingDate desc`, `capturedAt desc` 기준 최신 row를 선택함.
   - `totalParticipants`는 선택된 final `rankingDate`의 final ranking row count로 계산함.
   - final ranking이 없으면 fake/live valuation fallback 없이 `finalResult.state = unavailable` + `FINAL_RANKING_UNAVAILABLE`.
-  - `finalTier`는 `season_participants.finalTier`가 있으면 읽기만 하고, 없으면 `FINAL_TIER_UNAVAILABLE`.
+  - `finalTier`는 operator-run `final-tier-assignment` job이 배정한 `season_participants.finalTier`가 있으면 읽기만 하고 available로 반환. 없으면 `FINAL_TIER_UNAVAILABLE`.
   - `rewardGrantedAt`은 있으면 granted 상태로 읽기만 하고, 없으면 `REWARD_NOT_GRANTED` pending.
   - `equityChart`는 기존 `daily_portfolio_snapshots` 기반 보조 데이터이며, snapshot이 없어도 final ranking이 있으면 `finalResult`는 유지됨.
   - settled 미참가자는 `settled_not_joined` guide/fallback으로 반환하고 final ranking 조회를 하지 않음.
@@ -544,7 +564,7 @@ near-term ledger/FX foundation:
   - order execution 이후 자동 daily portfolio snapshot/ranking 생성 정책
   - scheduler/batch daily portfolio snapshot 자동 생성
   - scheduler/batch season ranking 자동 생성
-  - final tier assignment/reward grant 연동
+  - reward grant 연동
   - scheduler/batch
 - `/home` read-only MVP는 fake 데이터 기반 계산 금지를 유지.
 
@@ -771,7 +791,7 @@ near-term ledger/FX foundation:
   - exact execute response replay가 필요하면 schema/command table 별도 검토.
   - partial fill/matching engine/settlement/provider ingestion은 별도 설계 필요.
   - DB integration은 실제 PostgreSQL 환경에서 통과했으며, 향후 schema/transaction 변경 시 재검증 필요.
-- `/home` full implementation 가능 판정은 자동 valuation/ranking 생성, provider ingestion, final tier assignment/reward 정책 이후 재검토.
+- `/home` full implementation 가능 판정은 자동 valuation/ranking 생성, provider ingestion, reward 정책 이후 재검토.
 
 ## 10. 아직 안 한 것
 
@@ -784,7 +804,7 @@ near-term ledger/FX foundation:
   - durable quote, order exact execute replay, partial fill, matching engine.
   - FX stale pending/unknown outcome recovery.
   - deployment/operations readiness.
-- Settlement extension/reward handoff beyond Home final-result read model
+- Settlement extension/reward handoff beyond Home final-result read model and final tier assignment MVP
 - access token blacklist/revocation
 - cookie/session auth
 - refresh token reuse detection 시 user active sessions 전체 revoke 정책

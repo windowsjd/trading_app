@@ -162,6 +162,29 @@ describe('parseAdminRunBatchJobArgs', () => {
     });
   });
 
+  it('parses final tier assignment job options and generates idempotency key', () => {
+    expect(
+      parseAdminRunBatchJobArgs([
+        '--job',
+        'final-tier-assignment',
+        '--season-id',
+        'season-1',
+        '--ranking-date',
+        '2026-05-21',
+        '--dry-run',
+        '--requested-by',
+        'operator',
+      ]),
+    ).toMatchObject({
+      job: 'final-tier-assignment',
+      seasonId: 'season-1',
+      rankingDate: '2026-05-21',
+      idempotencyKey: 'final-tier-assignment:season-1:2026-05-21',
+      dryRun: true,
+      requestedBy: 'operator',
+    });
+  });
+
   it('keeps explicit season ranking idempotency key', () => {
     expect(
       parseAdminRunBatchJobArgs([
@@ -214,6 +237,20 @@ describe('parseAdminRunBatchJobArgs', () => {
       ]),
     ).toMatchObject({
       job: 'season-settlement',
+      idempotencyKey: 'manual-key',
+    });
+  });
+
+  it('keeps explicit final tier assignment idempotency key', () => {
+    expect(
+      parseAdminRunBatchJobArgs([
+        '--job=final-tier-assignment',
+        '--season-id=season-1',
+        '--ranking-date=2026-05-21',
+        '--idempotency-key=manual-key',
+      ]),
+    ).toMatchObject({
+      job: 'final-tier-assignment',
       idempotencyKey: 'manual-key',
     });
   });
@@ -332,6 +369,26 @@ describe('parseAdminRunBatchJobArgs', () => {
     ).toThrow('Missing or empty --settlement-date.');
   });
 
+  it('rejects missing final tier assignment required options', () => {
+    expect(() =>
+      parseAdminRunBatchJobArgs([
+        '--job',
+        'final-tier-assignment',
+        '--ranking-date',
+        '2026-05-21',
+      ]),
+    ).toThrow('Missing or empty --season-id.');
+
+    expect(() =>
+      parseAdminRunBatchJobArgs([
+        '--job',
+        'final-tier-assignment',
+        '--season-id',
+        'season-1',
+      ]),
+    ).toThrow('Missing or empty --ranking-date.');
+  });
+
   it('rejects invalid daily portfolio snapshot dates', () => {
     expect(() =>
       parseAdminRunBatchJobArgs([
@@ -382,5 +439,18 @@ describe('parseAdminRunBatchJobArgs', () => {
         '2026-02-31',
       ]),
     ).toThrow('Invalid --settlement-date: must be YYYY-MM-DD.');
+  });
+
+  it('rejects invalid final tier assignment dates', () => {
+    expect(() =>
+      parseAdminRunBatchJobArgs([
+        '--job',
+        'final-tier-assignment',
+        '--season-id',
+        'season-1',
+        '--ranking-date',
+        '2026-02-31',
+      ]),
+    ).toThrow('Invalid --ranking-date: must be YYYY-MM-DD.');
   });
 });

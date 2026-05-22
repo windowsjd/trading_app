@@ -1,12 +1,12 @@
 # Batch Job Foundation
 
-Status: implemented foundation with operator-run daily portfolio snapshot, season ranking, daily season cycle, and season settlement MVP jobs, no cron scheduler.
+Status: implemented foundation with operator-run daily portfolio snapshot, season ranking, daily season cycle, season settlement MVP, and final tier assignment MVP jobs, no cron scheduler.
 
 ## Scope
 
 The batch foundation is a common job execution envelope for operator-run work and possible future scheduler-run work. It records job start, finish, result, failure, dry-run mode, request payload, and idempotency state in `batch_job_runs`.
 
-This is not provider ingestion, cron scheduling, daily snapshot automation, or reward. Settlement is limited to the operator-run MVP job described below.
+This is not provider ingestion, cron scheduling, daily snapshot automation, or reward. Settlement and final tier assignment are limited to the operator-run MVP jobs described below.
 
 ## Current Components
 
@@ -18,6 +18,7 @@ This is not provider ingestion, cron scheduling, daily snapshot automation, or r
 - Business job: `SeasonRankingJobService`
 - Orchestration job: `DailySeasonCycleJobService`
 - Business job: `SeasonSettlementJobService`
+- Business job: `FinalTierAssignmentJobService`
 - Module: `BatchModule`
 - Operator script: `scripts/admin-run-batch-job.ts`
 
@@ -40,6 +41,7 @@ Current business key examples:
 - `season-ranking:<season-id>:<YYYY-MM-DD>`
 - `daily-season-cycle:<season-id>:<YYYY-MM-DD>`
 - `season-settlement:<season-id>:<YYYY-MM-DD>`
+- `final-tier-assignment:<season-id>:<YYYY-MM-DD>`
 
 ## Operator Script
 
@@ -51,6 +53,7 @@ Supported jobs now:
 - `season-ranking`: creates `season_rankings` for one season/date from existing `daily_portfolio_snapshots` only.
 - `daily-season-cycle`: runs daily portfolio snapshot, then season ranking, for one season/date.
 - `season-settlement`: creates final `season_rankings` from existing `daily_portfolio_snapshots` for one ended season/date and transitions the season to `settled`.
+- `final-tier-assignment`: assigns `SeasonParticipant.finalRank` and `SeasonParticipant.finalTier` from existing final `season_rankings` for one settled season/date.
 
 Example:
 
@@ -63,7 +66,7 @@ pnpm tsx scripts/admin-run-batch-job.ts \
   --payload-json '{"purpose":"batch-foundation-check"}'
 ```
 
-The script requires `DATABASE_URL`. `noop` and `health-check` create only `batch_job_runs` rows. `daily-portfolio-snapshot` additionally creates `daily_portfolio_snapshots` only when `--dry-run` is not set and participant valuation is available. `season-ranking` additionally creates daily `season_rankings` only when `--dry-run` is not set and ranking rows do not already exist. `daily-season-cycle` creates its own cycle `batch_job_runs` row and child batch runs for daily snapshot and season ranking. `season-settlement` additionally creates final `season_rankings` and updates the season status to `settled` only when `--dry-run` is not set and settlement prerequisites pass. None of these jobs create provider, FX, asset price, wallet, order, position, reward, badge, or trophy rows outside their stated scope.
+The script requires `DATABASE_URL`. `noop` and `health-check` create only `batch_job_runs` rows. `daily-portfolio-snapshot` additionally creates `daily_portfolio_snapshots` only when `--dry-run` is not set and participant valuation is available. `season-ranking` additionally creates daily `season_rankings` only when `--dry-run` is not set and ranking rows do not already exist. `daily-season-cycle` creates its own cycle `batch_job_runs` row and child batch runs for daily snapshot and season ranking. `season-settlement` additionally creates final `season_rankings` and updates the season status to `settled` only when `--dry-run` is not set and settlement prerequisites pass. `final-tier-assignment` updates only `season_participants.final_rank` and `season_participants.final_tier` when `--dry-run` is not set and assignment prerequisites pass. None of these jobs create provider, FX, asset price, wallet, order, position, reward, badge, or trophy rows outside their stated scope.
 
 Daily snapshot example:
 
@@ -167,6 +170,42 @@ Season settlement policy:
 - The job does not call providers, create price/FX rows, register a scheduler, expose an HTTP batch execution API, or grant rewards. Reward handoff remains a separate gate.
 - `GET /api/v1/ranking` supports `rankType=final`, and settled joined `GET /api/v1/home` reads generated final rankings as its authoritative final result. Missing final rankings remain unavailable; Home does not use live valuation fallback for settled final results.
 
+Final tier assignment example:
+
+```bash
+pnpm tsx scripts/admin-run-batch-job.ts \
+  --job final-tier-assignment \
+  --season-id <SEASON_ID> \
+  --ranking-date <YYYY-MM-DD> \
+  --dry-run \
+  --requested-by local-operator
+```
+
+Final tier assignment policy:
+
+- If `--idempotency-key` is omitted, it is generated as `final-tier-assignment:<season-id>:<YYYY-MM-DD>`. An explicit key is allowed for controlled retries or operator grouping.
+- The target season must be `settled`. `ended` seasons fail with `SETTLEMENT_REQUIRED`; `active` and `upcoming` seasons fail with `SEASON_STATUS_NOT_ALLOWED`.
+- Source of truth is existing `rankType=final` `season_rankings` for the requested `rankingDate`. The job never selects the latest date automatically and never creates fake final rankings.
+- If no final rows exist for the requested date, the job fails with `FINAL_RANKING_UNAVAILABLE`.
+- Final ranking rows may cover only a subset of participants; this job assigns only participants present in the selected final ranking rows and does not re-check settlement snapshot completeness.
+- `finalRank` is copied from `season_rankings.rank`.
+- `finalTier` uses this default MVP policy when no clear `Season.rewardPolicyJson.tierPolicy.tiers` exists:
+  - rank 1: `master`
+  - rank 2-3: `diamond`
+  - rank 4-10: `platinum`
+  - `rank / totalParticipants <= 0.30`: `gold`
+  - `rank / totalParticipants <= 0.60`: `silver`
+  - fallback: `bronze`
+- Tier strings are lowercase: `master`, `diamond`, `platinum`, `gold`, `silver`, `bronze`.
+- A clear season reward tier policy may be read from `rewardPolicyJson.tierPolicy.tiers` when entries use only tier assignment rules such as exact rank, max rank, max percent, and fallback. Reward amounts, badges, trophies, and payment fields are ignored. Ambiguous or complex policy JSON falls back to `default_mvp`; custom policy parsing beyond this MVP is a separate gate.
+- `--dry-run` returns the assignment plan, policy source, participant counts, and up to 10 `topAssignments` without updating participants.
+- Non-dry-run updates only participants where both `finalRank` and `finalTier` are null. If either field is already present, the participant is classified as `existing`/`skipped` and is not overwritten.
+- Non-dry-run writes run in a Prisma transaction for the participant updates to avoid partial assignment.
+- The job never updates `rewardGrantedAt` and never creates reward/payment/badge/trophy rows. Reward handoff remains a separate gate.
+- The job does not call providers, create price/FX rows, register a scheduler, expose an HTTP batch execution API, mutate wallets/orders/positions/snapshots/rankings, or change the settlement final ranking policy.
+- Current final rankings use deterministic unique sequential ranks because `season_rankings` has a unique `(seasonId, rankType, rankingDate, rank)` constraint. True competition tie rank remains a separate schema/migration gate.
+- Settled joined `GET /api/v1/home` reads `season_participants.finalTier`; after this job assigns it, `finalResult.tier` becomes available. Missing `finalTier` remains `FINAL_TIER_UNAVAILABLE`.
+
 ## Future Work
 
-Cron scheduling, provider ingestion, daily snapshot automation, ranking overwrite/regeneration, settlement extensions, final tier assignment, and reward remain separate gates.
+Cron scheduling, provider ingestion, daily snapshot automation, ranking overwrite/regeneration, settlement extensions beyond final tier assignment, true competition tie rank, and reward remain separate gates.

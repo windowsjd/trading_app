@@ -8,6 +8,8 @@ import { BatchService } from './batch.service';
 import { DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME } from './daily-portfolio-snapshot-job.types';
 import { DailySeasonCycleJobService } from './daily-season-cycle-job.service';
 import { DAILY_SEASON_CYCLE_JOB_NAME } from './daily-season-cycle-job.types';
+import { FinalTierAssignmentJobService } from './final-tier-assignment-job.service';
+import { FINAL_TIER_ASSIGNMENT_JOB_NAME } from './final-tier-assignment-job.types';
 import { SeasonRankingJobService } from './season-ranking-job.service';
 import { SEASON_RANKING_JOB_NAME } from './season-ranking-job.types';
 import { SeasonSettlementJobService } from './season-settlement-job.service';
@@ -19,7 +21,8 @@ type SupportedAdminBatchJob =
   | typeof DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME
   | typeof SEASON_RANKING_JOB_NAME
   | typeof DAILY_SEASON_CYCLE_JOB_NAME
-  | typeof SEASON_SETTLEMENT_JOB_NAME;
+  | typeof SEASON_SETTLEMENT_JOB_NAME
+  | typeof FINAL_TIER_ASSIGNMENT_JOB_NAME;
 
 export type AdminRunBatchJobArgs = {
   job?: SupportedAdminBatchJob;
@@ -30,6 +33,7 @@ export type AdminRunBatchJobArgs = {
   seasonId?: string;
   snapshotDate?: string;
   settlementDate?: string;
+  rankingDate?: string;
 };
 
 type CliValueOptionName = Exclude<keyof AdminRunBatchJobArgs, 'dryRun'>;
@@ -42,6 +46,7 @@ const VALUE_OPTIONS: Record<string, CliValueOptionName> = {
   '--season-id': 'seasonId',
   '--snapshot-date': 'snapshotDate',
   '--settlement-date': 'settlementDate',
+  '--ranking-date': 'rankingDate',
 };
 
 const BOOLEAN_OPTIONS: Record<string, 'dryRun'> = {
@@ -91,6 +96,12 @@ export function parseAdminRunBatchJobArgs(
     parsed.idempotencyKey =
       parseOptionalText(parsed.idempotencyKey) ??
       `${parsed.job}:${parsed.seasonId}:${parsed.settlementDate}`;
+  } else if (parsed.job === FINAL_TIER_ASSIGNMENT_JOB_NAME) {
+    parsed.seasonId = parseRequiredText(parsed.seasonId, 'season-id');
+    parsed.rankingDate = parseDateOnlyText(parsed.rankingDate, 'ranking-date');
+    parsed.idempotencyKey =
+      parseOptionalText(parsed.idempotencyKey) ??
+      `${parsed.job}:${parsed.seasonId}:${parsed.rankingDate}`;
   } else if (isSeasonDateJob(parsed.job)) {
     parsed.seasonId = parseRequiredText(parsed.seasonId, 'season-id');
     parsed.snapshotDate = parseDateOnlyText(
@@ -144,10 +155,22 @@ export async function runAdminRunBatchJob(argv: string[]) {
     batchService,
     prisma as unknown as PrismaService,
   );
+  const finalTierAssignmentJobService = new FinalTierAssignmentJobService(
+    batchService,
+    prisma as unknown as PrismaService,
+  );
 
   try {
     let response;
-    if (args.job === SEASON_SETTLEMENT_JOB_NAME) {
+    if (args.job === FINAL_TIER_ASSIGNMENT_JOB_NAME) {
+      response = await finalTierAssignmentJobService.run({
+        seasonId: args.seasonId,
+        rankingDate: args.rankingDate,
+        idempotencyKey: args.idempotencyKey,
+        dryRun: args.dryRun === true,
+        requestedBy: args.requestedBy,
+      });
+    } else if (args.job === SEASON_SETTLEMENT_JOB_NAME) {
       response = await seasonSettlementJobService.run({
         seasonId: args.seasonId,
         settlementDate: args.settlementDate,
@@ -241,7 +264,8 @@ function parseJob(value: string | undefined): SupportedAdminBatchJob {
     text === DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME ||
     text === SEASON_RANKING_JOB_NAME ||
     text === DAILY_SEASON_CYCLE_JOB_NAME ||
-    text === SEASON_SETTLEMENT_JOB_NAME
+    text === SEASON_SETTLEMENT_JOB_NAME ||
+    text === FINAL_TIER_ASSIGNMENT_JOB_NAME
   ) {
     return text;
   }

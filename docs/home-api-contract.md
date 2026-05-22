@@ -6,7 +6,7 @@
 - The active joined dashboard now implements `summary`, `ranking`, `walletSummary`, `allocation`, `topPositions`, and `equityChart` when the required DB/admin_manual data exists.
 - Settled joined Home now implements an authoritative final-result read model from existing `rankType=final` `season_rankings`, with `daily_portfolio_snapshots` used only as supporting chart data.
 - The implemented MVP uses only existing DB rows, approved `admin_manual` market data, live valuation foundation, and existing `daily_portfolio_snapshots` when possible.
-- Provider ingestion, cron scheduler, automatic snapshot/ranking generation, settlement write-policy extensions, final tier assignment, and reward grants remain STOP.
+- Provider ingestion, cron scheduler, automatic snapshot/ranking generation, settlement write-policy extensions beyond final tier assignment, and reward grants remain STOP.
 - Do not add fake data, temporary runtime contracts, Prisma schema changes, migrations, or seed changes from this draft.
 
 ## Source Rules
@@ -671,7 +671,6 @@ Render final result view. Trading and exchange must be blocked.
 
 ### Currently Not Implementable Fields
 
-- final tier assignment/calculation
 - reward/payment/badge/trophy grant
 - provider-backed final valuation recalculation
 - automatic recovery or synthesis for missing final ranking/chart data
@@ -692,7 +691,8 @@ Settled joined read model is implemented in the read-only MVP.
 - If multiple final ranking dates exist, Home selects the latest row by `rankingDate desc`, then `capturedAt desc`.
 - `totalParticipants` is counted from final ranking rows with the same `seasonId`, `rankType=final`, and selected `rankingDate`.
 - Missing final ranking returns `finalResult.state = unavailable` with `FINAL_RANKING_UNAVAILABLE`; Home does not use live valuation or participant aggregate fields as a fallback.
-- Missing `finalTier` returns `finalResult.tier.state = unavailable` with `FINAL_TIER_UNAVAILABLE`; existing `finalTier` is read only.
+- `finalTier` is assigned by the operator-run `final-tier-assignment` batch job from existing final rankings. Home does not calculate tiers and does not write during reads.
+- Missing `finalTier` returns `finalResult.tier.state = unavailable` with `FINAL_TIER_UNAVAILABLE`; existing `finalTier` is read only and returns `finalResult.tier.state = available`.
 - Missing `rewardGrantedAt` returns `finalResult.reward.state = pending` with `REWARD_NOT_GRANTED`; existing `rewardGrantedAt` is read only.
 - Missing `daily_portfolio_snapshots` returns `equityChart.state = unavailable` with `FINAL_SNAPSHOT_UNAVAILABLE` but does not make `finalResult` unavailable when final ranking exists.
 - Home settled read creates no wallet/order/position/snapshot/ranking/ledger/season/reward mutations.
@@ -884,7 +884,7 @@ Only the common error shape direction is documented. No `/home` error implementa
 - provider price ingestion and provider-backed source evidence
 - scheduler/batch automatic daily portfolio snapshot generation
 - scheduler/batch automatic season ranking generation
-- final tier assignment and reward grant integration
+- reward grant integration
 - richer `/ranking`, `/orders`, `/records`, `/settlement` APIs
 
 `allocation`, `topPositions`, and `equityChart` are no longer placeholder blockers for active joined Home. They remain dependent on existing wallets, positions, latest eligible `admin_manual` asset prices, fresh approved `admin_manual` USD/KRW where needed, and existing `daily_portfolio_snapshots`.
