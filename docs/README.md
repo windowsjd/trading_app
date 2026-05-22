@@ -20,7 +20,7 @@ Use this directory in this order:
    - `docs/provider-final-selection-readiness-recheck.md`
    - `docs/asset-price-freshness-policy.md`
    - `docs/provider-evidence-capture.md`
-6. Batch foundation and operator-run daily snapshot/ranking/cycle/settlement/final-tier jobs:
+6. Batch foundation and operator-run daily snapshot/ranking/cycle/settlement/final-tier/reward-grant marker jobs:
    - `docs/batch-job-foundation.md`
 
 `docs/archive/` contains historical STOP/review/preimplementation/plan documents. Archived files are not current source of truth and must not be used to override the current documents above.

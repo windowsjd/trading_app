@@ -15,7 +15,7 @@ This service owns backend APIs, database access, financial calculations, and ser
 - Submitted order create, cancel, and full-fill execute MVP.
 - KRW and USD cash wallets. US stocks and USD-settled crypto use the USD wallet.
 - Final valuation policy is KRW total assets.
-- Batch job execution foundation with idempotent `batch_job_runs` recording, operator-only noop/health-check script, operator-run daily portfolio snapshot generation, operator-run season ranking generation from existing daily snapshots, an operator-run daily season cycle orchestration job, and an operator-run season settlement MVP job.
+- Batch job execution foundation with idempotent `batch_job_runs` recording, operator-only noop/health-check script, operator-run daily portfolio snapshot generation, operator-run season ranking generation from existing daily snapshots, an operator-run daily season cycle orchestration job, an operator-run season settlement MVP job, and an operator-run reward grant marker MVP job.
 - Operator-run final tier assignment MVP job from existing final `season_rankings`.
 
 ## STOP / Not Implemented
@@ -23,9 +23,9 @@ This service owns backend APIs, database access, financial calculations, and ser
 These are intentionally outside the current implementation and should not be added without a separate gate:
 
 - Provider ingestion for OANDA, Twelve Data, Binance, or any other market data provider.
-- Cron scheduler, provider ingestion jobs, scheduler-driven snapshot/ranking jobs, settlement extension jobs beyond final tier assignment, or reward jobs.
+- Cron scheduler, provider ingestion jobs, scheduler-driven snapshot/ranking jobs, settlement extension jobs beyond final tier assignment, or actual reward fulfillment jobs.
 - Provider-backed settlement recalculation or reward automation.
-- Reward, badge, or trophy grants.
+- Actual payment, point, badge, or trophy fulfillment beyond the `rewardGrantedAt` marker MVP.
 - Access token blacklist/revocation, server-side session auth, and cookie auth.
 - Matching engine, partial fill, durable quote, or exact order execute replay.
 - Fake, static, sample, temporary, or fallback business price data.
@@ -89,6 +89,12 @@ pnpm tsx scripts/admin-run-batch-job.ts --job season-settlement --season-id <SEA
 
 # operator-run final tier assignment dry-run from existing final rankings, no provider calls
 pnpm tsx scripts/admin-run-batch-job.ts --job final-tier-assignment --season-id <SEASON_ID> --ranking-date <YYYY-MM-DD> --dry-run --requested-by local-operator
+
+# operator-run reward grant marker dry-run, no provider calls or payment/badge/trophy fulfillment
+pnpm tsx scripts/admin-run-batch-job.ts --job reward-grant --season-id <SEASON_ID> --dry-run --requested-by local-operator
+
+# operator-run reward grant marker dry-run with explicit marker date
+pnpm tsx scripts/admin-run-batch-job.ts --job reward-grant --season-id <SEASON_ID> --grant-date <YYYY-MM-DD> --dry-run --requested-by local-operator
 ```
 
 `daily-portfolio-snapshot` uses the idempotency key `daily-portfolio-snapshot:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. Dry-run reports `wouldCreate`, `existing`, and participant-level failures without inserting snapshots. Non-dry-run inserts only available participant snapshots, skips existing `(seasonParticipantId, snapshotDate)` rows without overwrite, and uses only existing approved fresh `admin_manual` USD/KRW plus latest eligible `admin_manual` asset price data. It does not call providers, schedule cron, generate rankings, settle seasons, or grant rewards.
@@ -100,6 +106,8 @@ pnpm tsx scripts/admin-run-batch-job.ts --job final-tier-assignment --season-id 
 `season-settlement` uses the idempotency key `season-settlement:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. Dry-run validates settleability and planned final rankings without writing. Non-dry-run requires an `ended` season, uses existing settlement-date `daily_portfolio_snapshots`, creates `rankType=final` `season_rankings`, and transitions the season to `settled` in one transaction. Existing final rankings are never overwritten; an `ended` season with existing final rows only has its status settled. Already `settled` seasons return idempotent existing/skipped success. No settlement-date snapshots fail with `NO_FINAL_SNAPSHOTS_AVAILABLE`, and missing eligible participant snapshots fail with `MISSING_FINAL_SNAPSHOTS`. The job does not call providers, recalculate prices/FX/wallets/orders/positions/snapshots, run cron, expose an HTTP batch API, or grant rewards. `GET /api/v1/ranking?rankType=final` and settled joined `GET /api/v1/home` can read generated final rankings.
 
 `final-tier-assignment` uses the idempotency key `final-tier-assignment:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. Dry-run reads existing `rankType=final` `season_rankings` for the requested `--ranking-date` and returns the assignment plan without writing. Non-dry-run requires a `settled` season and updates only `SeasonParticipant.finalRank` and `finalTier` for participants with both fields still null. Existing `finalRank` or `finalTier` is treated as existing/skipped and is not overwritten. Missing final rankings fail with `FINAL_RANKING_UNAVAILABLE`. The default MVP tier policy is rank 1 `master`, rank 2-3 `diamond`, rank 4-10 `platinum`, top 30% `gold`, top 60% `silver`, and fallback `bronze`; clear `Season.rewardPolicyJson.tierPolicy.tiers` rules may override tier assignment only. The job does not update `rewardGrantedAt`, grant rewards, call providers, run cron, expose an HTTP batch API, or mutate price/FX/wallet/order/position/snapshot/ranking rows. Settled joined Home reads the assigned `finalTier` read-only.
+
+`reward-grant` uses the idempotency key `reward-grant:<season-id>` when `--idempotency-key` is omitted. If `--grant-date <YYYY-MM-DD>` is provided, the generated key is `reward-grant:<season-id>:<YYYY-MM-DD>` and the marker timestamp is `<YYYY-MM-DD>T00:00:00.000Z`; otherwise the batch run start timestamp is used. Dry-run reports grantable, existing, ineligible, skipped, and `topGranted` preview counts without writing. Non-dry-run requires a `settled` season and updates only `SeasonParticipant.rewardGrantedAt` for participants that already have both `finalRank` and `finalTier` and still have null `rewardGrantedAt`. Existing `rewardGrantedAt` is treated as existing/skipped and is not overwritten. If no participant has both `finalRank` and `finalTier`, the job fails with `FINAL_TIER_ASSIGNMENT_REQUIRED`. The job does not calculate reward amounts, create payment/point/badge/trophy rows, call providers, run cron, expose an HTTP batch API, mutate price/FX/wallet/order/position/snapshot/ranking rows, or change settlement/final-tier policy. Settled joined Home reads `rewardGrantedAt` read-only and returns `finalResult.reward.state = granted` when present.
 
 Opt-in real PostgreSQL integration tests require a reachable `DATABASE_URL` and an explicit env flag:
 
@@ -142,6 +150,7 @@ Possible now:
 - Operator-run daily season cycle batch jobs that run daily snapshot and season ranking in order.
 - Operator-run season settlement MVP jobs that finalize from existing `daily_portfolio_snapshots`.
 - Operator-run final tier assignment MVP jobs that assign final rank/tier from existing final `season_rankings`.
+- Operator-run reward grant marker MVP jobs that set `SeasonParticipant.rewardGrantedAt` after settlement and final tier assignment.
 - Settled joined Home final-result reads from existing `rankType=final` `season_rankings`; missing final rankings return unavailable without live valuation fallback.
 
 Not possible without a separate provider gate:
@@ -150,5 +159,6 @@ Not possible without a separate provider gate:
 - Provider-backed FX, stock, or crypto price freshness claims.
 - Cron scheduler-driven snapshots/rankings.
 - Provider-backed settlement recalculation or reward automation.
+- Actual payment, point, badge, or trophy fulfillment.
 
 Never create fake/static/sample business prices to make a test or local flow pass.

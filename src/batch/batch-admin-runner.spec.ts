@@ -185,6 +185,46 @@ describe('parseAdminRunBatchJobArgs', () => {
     });
   });
 
+  it('parses reward grant job options and generates idempotency key without grant date', () => {
+    expect(
+      parseAdminRunBatchJobArgs([
+        '--job',
+        'reward-grant',
+        '--season-id',
+        'season-1',
+        '--dry-run',
+        '--requested-by',
+        'operator',
+      ]),
+    ).toMatchObject({
+      job: 'reward-grant',
+      seasonId: 'season-1',
+      idempotencyKey: 'reward-grant:season-1',
+      dryRun: true,
+      requestedBy: 'operator',
+    });
+  });
+
+  it('parses reward grant job options and generates idempotency key with grant date', () => {
+    expect(
+      parseAdminRunBatchJobArgs([
+        '--job',
+        'reward-grant',
+        '--season-id',
+        'season-1',
+        '--grant-date',
+        '2026-05-22',
+        '--dry-run',
+      ]),
+    ).toMatchObject({
+      job: 'reward-grant',
+      seasonId: 'season-1',
+      grantDate: '2026-05-22',
+      idempotencyKey: 'reward-grant:season-1:2026-05-22',
+      dryRun: true,
+    });
+  });
+
   it('keeps explicit season ranking idempotency key', () => {
     expect(
       parseAdminRunBatchJobArgs([
@@ -252,6 +292,21 @@ describe('parseAdminRunBatchJobArgs', () => {
     ).toMatchObject({
       job: 'final-tier-assignment',
       idempotencyKey: 'manual-key',
+    });
+  });
+
+  it('keeps explicit reward grant idempotency key', () => {
+    expect(
+      parseAdminRunBatchJobArgs([
+        '--job=reward-grant',
+        '--season-id=season-1',
+        '--grant-date=2026-05-22',
+        '--idempotency-key=manual-key',
+      ]),
+    ).toMatchObject({
+      job: 'reward-grant',
+      idempotencyKey: 'manual-key',
+      grantDate: '2026-05-22',
     });
   });
 
@@ -389,6 +444,12 @@ describe('parseAdminRunBatchJobArgs', () => {
     ).toThrow('Missing or empty --ranking-date.');
   });
 
+  it('rejects missing reward grant required options', () => {
+    expect(() => parseAdminRunBatchJobArgs(['--job', 'reward-grant'])).toThrow(
+      'Missing or empty --season-id.',
+    );
+  });
+
   it('rejects invalid daily portfolio snapshot dates', () => {
     expect(() =>
       parseAdminRunBatchJobArgs([
@@ -452,5 +513,18 @@ describe('parseAdminRunBatchJobArgs', () => {
         '2026-02-31',
       ]),
     ).toThrow('Invalid --ranking-date: must be YYYY-MM-DD.');
+  });
+
+  it('rejects invalid reward grant dates', () => {
+    expect(() =>
+      parseAdminRunBatchJobArgs([
+        '--job',
+        'reward-grant',
+        '--season-id',
+        'season-1',
+        '--grant-date',
+        '2026-02-31',
+      ]),
+    ).toThrow('Invalid --grant-date: must be YYYY-MM-DD.');
   });
 });

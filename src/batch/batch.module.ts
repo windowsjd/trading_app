@@ -5,6 +5,7 @@ import { BatchService } from './batch.service';
 import { DailyPortfolioSnapshotJobService } from './daily-portfolio-snapshot-job.service';
 import { DailySeasonCycleJobService } from './daily-season-cycle-job.service';
 import { FinalTierAssignmentJobService } from './final-tier-assignment-job.service';
+import { RewardGrantJobService } from './reward-grant-job.service';
 import { SeasonRankingJobService } from './season-ranking-job.service';
 import { SeasonSettlementJobService } from './season-settlement-job.service';
 
@@ -15,6 +16,7 @@ import { SeasonSettlementJobService } from './season-settlement-job.service';
     DailyPortfolioSnapshotJobService,
     DailySeasonCycleJobService,
     FinalTierAssignmentJobService,
+    RewardGrantJobService,
     SeasonRankingJobService,
     SeasonSettlementJobService,
     PortfolioValuationService,
@@ -24,6 +26,7 @@ import { SeasonSettlementJobService } from './season-settlement-job.service';
     DailyPortfolioSnapshotJobService,
     DailySeasonCycleJobService,
     FinalTierAssignmentJobService,
+    RewardGrantJobService,
     SeasonRankingJobService,
     SeasonSettlementJobService,
   ],

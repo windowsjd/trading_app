@@ -1060,6 +1060,36 @@ describe('HomeService', () => {
     expectNoHomeWrites(prisma);
   });
 
+  it('returns settled joined granted reward state when rewardGrantedAt exists', async () => {
+    const { prisma, service } = createService();
+    mockSettledSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+      ...settledParticipant,
+      rewardGrantedAt: new Date('2026-05-22T01:02:03.000Z'),
+    });
+    prisma.seasonRanking.findFirst.mockResolvedValueOnce(finalRanking);
+    prisma.seasonRanking.count.mockResolvedValueOnce(100);
+    prisma.dailyPortfolioSnapshot.findMany.mockResolvedValueOnce([
+      chartSnapshot('2026-05-21', '11230000.00000000', '12.30000000'),
+    ]);
+
+    const response = await service.getHome('user-1');
+
+    expect(response.data.finalResult).toMatchObject({
+      state: 'available',
+      tier: {
+        state: 'available',
+        finalTier: 'gold',
+      },
+      reward: {
+        state: 'granted',
+        grantedAt: '2026-05-22T01:02:03.000Z',
+      },
+    });
+    expect(response.data.sectionErrors).toEqual([]);
+    expectNoHomeWrites(prisma);
+  });
+
   it('returns settled joined finalResult unavailable when final ranking is missing without fake fallback', async () => {
     const { prisma, valuationService, service } = createService();
     mockSettledSeason(prisma);
