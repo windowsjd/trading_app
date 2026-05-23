@@ -124,6 +124,16 @@ enum BatchJobStatus {
   skipped
 }
 
+enum BadgeType {
+  tier_badge
+  ranker_trophy
+}
+
+enum SeasonRewardType {
+  badge
+  trophy
+}
+
 model User {
   id              String     @id @default(uuid())
   email           String     @unique
@@ -137,6 +147,8 @@ model User {
   seasonParticipants   SeasonParticipant[]
   fxExecuteRequests    FxExecuteRequest[]
   refreshTokenSessions RefreshTokenSession[]
+  userBadges           UserBadge[]
+  seasonRewards        SeasonReward[]
 
   @@map("users")
 }
@@ -178,6 +190,8 @@ model Season {
 
   participants   SeasonParticipant[]
   seasonRankings SeasonRanking[]
+  userBadges     UserBadge[]
+  seasonRewards  SeasonReward[]
 
   @@map("seasons")
 }
@@ -211,11 +225,70 @@ model SeasonParticipant {
   orders                  Order[]
   dailyPortfolioSnapshots DailyPortfolioSnapshot[]
   seasonRankings          SeasonRanking[]
+  seasonRewards           SeasonReward[]
 
   @@unique([seasonId, userId])
   @@index([seasonId])
   @@index([userId])
   @@map("season_participants")
+}
+
+model Badge {
+  id          String    @id @default(uuid())
+  badgeType   BadgeType @map("badge_type")
+  code        String    @unique
+  name        String
+  description String?
+  iconUrl     String?   @map("icon_url")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  userBadges UserBadge[]
+
+  @@index([badgeType])
+  @@map("badges")
+}
+
+model UserBadge {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  badgeId   String   @map("badge_id")
+  seasonId  String   @map("season_id")
+  awardedAt DateTime @map("awarded_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge  Badge  @relation(fields: [badgeId], references: [id], onDelete: Restrict)
+  season Season @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId, seasonId])
+  @@index([userId, awardedAt])
+  @@index([badgeId])
+  @@index([seasonId])
+  @@map("user_badges")
+}
+
+model SeasonReward {
+  id                  String           @id @default(uuid())
+  seasonId            String           @map("season_id")
+  seasonParticipantId String           @map("season_participant_id")
+  userId              String           @map("user_id")
+  rewardType          SeasonRewardType @map("reward_type")
+  rewardCode          String           @map("reward_code")
+  rewardName          String           @map("reward_name")
+  rewardValueJson     Json?            @map("reward_value_json")
+  grantedAt           DateTime         @map("granted_at")
+  createdAt           DateTime         @default(now()) @map("created_at")
+
+  season            Season            @relation(fields: [seasonId], references: [id], onDelete: Restrict)
+  seasonParticipant SeasonParticipant @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
+  user              User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([seasonParticipantId, rewardCode])
+  @@index([seasonId, grantedAt])
+  @@index([userId, grantedAt])
+  @@index([rewardType, rewardCode])
+  @@map("season_rewards")
 }
 
 model Asset {

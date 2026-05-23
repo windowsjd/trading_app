@@ -513,6 +513,7 @@ describe('AppController (e2e)', () => {
     expect(prisma.position.findMany).not.toHaveBeenCalled();
     expect(prisma.position.findUnique).not.toHaveBeenCalled();
     expect(prisma.refreshTokenSession.findUnique).not.toHaveBeenCalled();
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
     expect(prisma.seasonRanking.findFirst).not.toHaveBeenCalled();
     expect(prisma.seasonRanking.findMany).not.toHaveBeenCalled();
     expect(prisma.seasonRanking.findUnique).not.toHaveBeenCalled();
@@ -1250,6 +1251,8 @@ describe('AppController (e2e)', () => {
     ['GET /api/v1/assets', 'get', '/api/v1/assets'],
     ['GET /api/v1/positions', 'get', '/api/v1/positions'],
     ['GET /api/v1/records', 'get', '/api/v1/records'],
+    ['GET /api/v1/rewards/me', 'get', '/api/v1/rewards/me'],
+    ['GET /api/v1/badges/me', 'get', '/api/v1/badges/me'],
     ['GET /api/v1/orders', 'get', '/api/v1/orders'],
   ] as const)(
     '%s rejects missing token and x-user-id-only requests before service work',
@@ -1457,6 +1460,42 @@ describe('AppController (e2e)', () => {
         expect(prisma.exchangeTransaction.count).toHaveBeenCalled();
         expect(prisma.walletTransaction.count).toHaveBeenCalled();
         expect(prisma.order.count).toHaveBeenCalled();
+      },
+    ],
+    [
+      'GET /api/v1/rewards/me',
+      '/api/v1/rewards/me',
+      () => {
+        mockActiveUser();
+        prisma.$queryRaw.mockResolvedValueOnce([]);
+      },
+      (body: Record<string, unknown>) => {
+        expect(body).toMatchObject({
+          success: true,
+          data: {
+            state: 'empty',
+            items: [],
+          },
+        });
+        expect(prisma.$queryRaw).toHaveBeenCalled();
+      },
+    ],
+    [
+      'GET /api/v1/badges/me',
+      '/api/v1/badges/me',
+      () => {
+        mockActiveUser();
+        prisma.$queryRaw.mockResolvedValueOnce([]);
+      },
+      (body: Record<string, unknown>) => {
+        expect(body).toMatchObject({
+          success: true,
+          data: {
+            state: 'empty',
+            items: [],
+          },
+        });
+        expect(prisma.$queryRaw).toHaveBeenCalled();
       },
     ],
     [

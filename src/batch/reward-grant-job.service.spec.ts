@@ -8,6 +8,13 @@ jest.mock('../generated/prisma/client', () => ({
   },
   Prisma: {
     JsonNull: null,
+    join: (values: unknown[]) => ({
+      values,
+    }),
+    sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({
+      strings: Array.from(strings),
+      values,
+    }),
   },
   PrismaClient: class PrismaClient {},
   SeasonStatus: {
@@ -122,13 +129,16 @@ describe('RewardGrantJobService', () => {
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(prisma.__tx.seasonParticipant.updateMany).not.toHaveBeenCalled();
+    expect(rawCalls(prisma, 'INSERT INTO "badges"')).toHaveLength(0);
+    expect(rawCalls(prisma, 'INSERT INTO "user_badges"')).toHaveLength(0);
+    expect(rawCalls(prisma, 'INSERT INTO "season_rewards"')).toHaveLength(0);
     expect(result).toMatchObject({
       seasonId: 'season-1',
       dryRun: true,
       grantTimestamp: '2026-05-22T01:02:03.000Z',
       grantDate: null,
       policy: {
-        source: 'reward_marker_mvp',
+        source: 'internal_reward_foundation_mvp',
         rewardPolicyJsonAvailable: true,
       },
       participants: {
@@ -141,6 +151,28 @@ describe('RewardGrantJobService', () => {
         skipped: 3,
       },
       grantedParticipantIds: [],
+      rewardRows: {
+        total: {
+          wouldCreate: 4,
+          created: 0,
+          existing: 0,
+        },
+        tierBadge: {
+          wouldCreate: 2,
+          created: 0,
+          existing: 0,
+        },
+        trophy: {
+          wouldCreate: 2,
+          created: 0,
+          existing: 0,
+        },
+      },
+      userBadges: {
+        wouldCreate: 4,
+        created: 0,
+        existing: 0,
+      },
     });
     expect(result.topGranted).toEqual([
       {
@@ -208,11 +240,103 @@ describe('RewardGrantJobService', () => {
         wouldGrant: 2,
         granted: 2,
       },
+      rewardRows: {
+        total: {
+          wouldCreate: 4,
+          created: 4,
+          existing: 0,
+        },
+        tierBadge: {
+          wouldCreate: 2,
+          created: 2,
+          existing: 0,
+        },
+        trophy: {
+          wouldCreate: 2,
+          created: 2,
+          existing: 0,
+        },
+      },
+      userBadges: {
+        wouldCreate: 4,
+        created: 4,
+        existing: 0,
+      },
       grantedParticipantIds: ['sp-1', 'sp-2'],
     });
+    expect(rawCalls(prisma, 'INSERT INTO "badges"')).toHaveLength(4);
+    expect(rawCalls(prisma, 'INSERT INTO "user_badges"')).toHaveLength(4);
+    expect(rawCalls(prisma, 'INSERT INTO "season_rewards"')).toHaveLength(4);
     expect(new Set(updateTimestamps(prisma))).toEqual(
       new Set(['2026-05-22T00:00:00.000Z']),
     );
+  });
+
+  it('creates tier badge reward rows for finalTier', async () => {
+    const { service, prisma } = createService();
+    mockSeason(prisma, SeasonStatus.settled);
+    mockParticipants(prisma, [participant('sp-1', 'user-1', 11, 'gold')]);
+
+    const result = await runAndGetResult(service, {
+      seasonId: 'season-1',
+    });
+
+    expect(result.rewardRows).toMatchObject({
+      total: {
+        created: 1,
+      },
+      tierBadge: {
+        created: 1,
+      },
+      trophy: {
+        created: 0,
+      },
+    });
+    expect(insertedSeasonRewardCodes(prisma)).toEqual(['TIER_GOLD']);
+    expect(insertedBadgeCodes(prisma)).toEqual(['TIER_GOLD']);
+  });
+
+  it('creates TOP10 trophy reward rows for finalRank <= 10', async () => {
+    const { service, prisma } = createService();
+    mockSeason(prisma, SeasonStatus.settled);
+    mockParticipants(prisma, [participant('sp-1', 'user-1', 10, 'platinum')]);
+
+    const result = await runAndGetResult(service, {
+      seasonId: 'season-1',
+    });
+
+    expect(result.rewardRows).toMatchObject({
+      total: {
+        created: 2,
+      },
+      tierBadge: {
+        created: 1,
+      },
+      trophy: {
+        created: 1,
+      },
+    });
+    expect(insertedSeasonRewardCodes(prisma)).toEqual([
+      'TIER_PLATINUM',
+      'TROPHY_TOP10',
+    ]);
+    expect(insertedBadgeCodes(prisma)).toEqual([
+      'TIER_PLATINUM',
+      'TROPHY_TOP10',
+    ]);
+  });
+
+  it('does not create TOP10 trophy reward rows for finalRank > 10', async () => {
+    const { service, prisma } = createService();
+    mockSeason(prisma, SeasonStatus.settled);
+    mockParticipants(prisma, [participant('sp-1', 'user-1', 11, 'gold')]);
+
+    await runAndGetResult(service, {
+      seasonId: 'season-1',
+    });
+
+    expect(insertedSeasonRewardCodes(prisma)).toEqual(['TIER_GOLD']);
+    expect(insertedSeasonRewardCodes(prisma)).not.toContain('TROPHY_TOP10');
   });
 
   it('classifies finalRank/finalTier missing participants as ineligible and skipped', async () => {
@@ -275,13 +399,20 @@ describe('RewardGrantJobService', () => {
   it('succeeds when all final-assigned participants are already granted', async () => {
     const { service, prisma } = createService();
     mockSeason(prisma, SeasonStatus.settled);
-    mockParticipants(prisma, [
+    const participants = [
       participant('sp-1', 'user-1', 1, 'master', {
         rewardGrantedAt: new Date('2026-05-20T00:00:00.000Z'),
       }),
       participant('sp-2', 'user-2', 2, 'diamond', {
         rewardGrantedAt: new Date('2026-05-20T00:00:00.000Z'),
       }),
+    ];
+    mockParticipants(prisma, participants);
+    mockExistingRewardRows(prisma, [
+      existingReward('sp-1', 'user-1', 'TIER_MASTER'),
+      existingReward('sp-1', 'user-1', 'TROPHY_TOP10'),
+      existingReward('sp-2', 'user-2', 'TIER_DIAMOND'),
+      existingReward('sp-2', 'user-2', 'TROPHY_TOP10'),
     ]);
 
     const result = await runAndGetResult(service, {
@@ -298,8 +429,84 @@ describe('RewardGrantJobService', () => {
       ineligible: 0,
       skipped: 2,
     });
+    expect(result.rewardRows.total).toEqual({
+      wouldCreate: 0,
+      created: 0,
+      existing: 4,
+    });
+    expect(result.userBadges).toEqual({
+      wouldCreate: 0,
+      created: 0,
+      existing: 4,
+    });
     expect(result.grantedParticipantIds).toEqual([]);
     expect(result.topGranted).toEqual([]);
+  });
+
+  it('is idempotent and does not duplicate Badge/UserBadge/SeasonReward rows', async () => {
+    const { service, prisma } = createService();
+    mockSeason(prisma, SeasonStatus.settled);
+    mockParticipants(prisma, [
+      participant('sp-1', 'user-1', 1, 'master', {
+        rewardGrantedAt: new Date('2026-05-20T00:00:00.000Z'),
+      }),
+    ]);
+    mockExistingRewardRows(prisma, [
+      existingReward('sp-1', 'user-1', 'TIER_MASTER'),
+      existingReward('sp-1', 'user-1', 'TROPHY_TOP10'),
+    ]);
+
+    const result = await runAndGetResult(service, {
+      seasonId: 'season-1',
+    });
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(rawCalls(prisma, 'INSERT INTO "badges"')).toHaveLength(0);
+    expect(rawCalls(prisma, 'INSERT INTO "user_badges"')).toHaveLength(0);
+    expect(rawCalls(prisma, 'INSERT INTO "season_rewards"')).toHaveLength(0);
+    expect(result.rewardRows.total).toEqual({
+      wouldCreate: 0,
+      created: 0,
+      existing: 2,
+    });
+    expect(result.userBadges).toEqual({
+      wouldCreate: 0,
+      created: 0,
+      existing: 2,
+    });
+  });
+
+  it('can backfill missing reward rows when rewardGrantedAt already exists', async () => {
+    const { service, prisma } = createService();
+    mockSeason(prisma, SeasonStatus.settled);
+    mockParticipants(prisma, [
+      participant('sp-1', 'user-1', 1, 'master', {
+        rewardGrantedAt: new Date('2026-05-20T00:00:00.000Z'),
+      }),
+    ]);
+
+    const result = await runAndGetResult(service, {
+      seasonId: 'season-1',
+      grantDate: '2026-05-22',
+    });
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.__tx.seasonParticipant.updateMany).not.toHaveBeenCalled();
+    expect(result.participants).toMatchObject({
+      eligible: 0,
+      granted: 0,
+      existing: 1,
+    });
+    expect(result.rewardRows.total).toMatchObject({
+      wouldCreate: 2,
+      created: 2,
+      existing: 0,
+    });
+    expect(result.rewardBackfilledParticipantIds).toEqual(['sp-1']);
+    expect(insertedSeasonRewardGrantedAt(prisma)).toEqual([
+      '2026-05-20T00:00:00.000Z',
+      '2026-05-20T00:00:00.000Z',
+    ]);
   });
 
   it('fails when no participant has both finalRank and finalTier', async () => {
@@ -374,7 +581,7 @@ describe('RewardGrantJobService', () => {
     expect(response.error.code).toBe('BAD_REQUEST');
   });
 
-  it('does not create payment/badge/trophy/reward rows or unrelated business rows', async () => {
+  it('does not create payment/provider/trading rows or unrelated business rows', async () => {
     const { service, prisma } = createService();
     mockSeason(prisma, SeasonStatus.settled);
     mockParticipants(prisma, [participant('sp-1', 'user-1', 1, 'master')]);
@@ -409,10 +616,8 @@ describe('RewardGrantJobService', () => {
     expect(prisma.seasonRanking.update).not.toHaveBeenCalled();
     expect(prisma.seasonRanking.upsert).not.toHaveBeenCalled();
     expect(prisma.seasonRanking.deleteMany).not.toHaveBeenCalled();
-    expect(prisma.reward.create).not.toHaveBeenCalled();
     expect(prisma.payment.create).not.toHaveBeenCalled();
-    expect(prisma.badge.create).not.toHaveBeenCalled();
-    expect(prisma.trophy.create).not.toHaveBeenCalled();
+    expect(prisma.pointTransaction.create).not.toHaveBeenCalled();
   });
 
   it('updates only rewardGrantedAt and never updates finalRank/finalTier', async () => {
@@ -477,7 +682,50 @@ function createService() {
 }
 
 function createPrismaMock() {
+  const rawState = {
+    existingSeasonRewardRows: [] as Array<{
+      seasonParticipantId: string;
+      rewardCode: string;
+    }>,
+    existingUserBadgeRows: [] as Array<{
+      userId: string;
+      seasonId: string;
+      badgeCode: string;
+    }>,
+    badgeSequence: 0,
+    userBadgeSequence: 0,
+    seasonRewardSequence: 0,
+  };
+  const queryRaw = jest.fn(async (query) => {
+    const text = queryText(query);
+
+    if (text.includes('FROM "season_rewards"')) {
+      return rawState.existingSeasonRewardRows;
+    }
+
+    if (text.includes('FROM "user_badges"')) {
+      return rawState.existingUserBadgeRows;
+    }
+
+    if (text.includes('INSERT INTO "badges"')) {
+      rawState.badgeSequence += 1;
+      return [{ id: `badge-${rawState.badgeSequence}` }];
+    }
+
+    if (text.includes('INSERT INTO "user_badges"')) {
+      rawState.userBadgeSequence += 1;
+      return [{ id: `user-badge-${rawState.userBadgeSequence}` }];
+    }
+
+    if (text.includes('INSERT INTO "season_rewards"')) {
+      rawState.seasonRewardSequence += 1;
+      return [{ id: `season-reward-${rawState.seasonRewardSequence}` }];
+    }
+
+    return [];
+  });
   const tx = {
+    $queryRaw: queryRaw,
     seasonParticipant: {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
@@ -485,6 +733,8 @@ function createPrismaMock() {
 
   return {
     __tx: tx,
+    __rawState: rawState,
+    $queryRaw: queryRaw,
     $transaction: jest.fn(async (callback) => callback(tx)),
     season: {
       findUnique: jest.fn(),
@@ -545,16 +795,13 @@ function createPrismaMock() {
     equitySnapshot: {
       create: jest.fn(),
     },
-    reward: {
-      create: jest.fn(),
-    },
     payment: {
       create: jest.fn(),
     },
     badge: {
       create: jest.fn(),
     },
-    trophy: {
+    pointTransaction: {
       create: jest.fn(),
     },
   };
@@ -670,4 +917,88 @@ function updateTimestamps(prisma: PrismaMock) {
   return prisma.__tx.seasonParticipant.updateMany.mock.calls.map(([input]) =>
     input.data.rewardGrantedAt.toISOString(),
   );
+}
+
+function mockExistingRewardRows(
+  prisma: PrismaMock,
+  rewards: Array<ReturnType<typeof existingReward>>,
+) {
+  prisma.__rawState.existingSeasonRewardRows = rewards.map((reward) => ({
+    seasonParticipantId: reward.seasonParticipantId,
+    rewardCode: reward.rewardCode,
+  }));
+  prisma.__rawState.existingUserBadgeRows = rewards.map((reward) => ({
+    userId: reward.userId,
+    seasonId: 'season-1',
+    badgeCode: reward.rewardCode,
+  }));
+}
+
+function existingReward(
+  seasonParticipantId: string,
+  userId: string,
+  rewardCode: string,
+) {
+  return {
+    seasonParticipantId,
+    userId,
+    rewardCode,
+  };
+}
+
+function queryText(query: unknown) {
+  if (
+    query &&
+    typeof query === 'object' &&
+    'strings' in query &&
+    Array.isArray((query as { strings: unknown }).strings)
+  ) {
+    return (query as { strings: string[] }).strings.join('');
+  }
+
+  if (Array.isArray(query)) {
+    return query.join('');
+  }
+
+  return String(query);
+}
+
+function queryValues(query: unknown) {
+  if (
+    query &&
+    typeof query === 'object' &&
+    'values' in query &&
+    Array.isArray((query as { values: unknown }).values)
+  ) {
+    return (query as { values: unknown[] }).values;
+  }
+
+  return [];
+}
+
+function rawCalls(prisma: PrismaMock, text: string) {
+  return prisma.$queryRaw.mock.calls.filter(([query]) =>
+    queryText(query).includes(text),
+  );
+}
+
+function insertedBadgeCodes(prisma: PrismaMock) {
+  return rawCalls(prisma, 'INSERT INTO "badges"').map(([query]) => {
+    const values = queryValues(query);
+    return values[2];
+  });
+}
+
+function insertedSeasonRewardCodes(prisma: PrismaMock) {
+  return rawCalls(prisma, 'INSERT INTO "season_rewards"').map(([query]) => {
+    const values = queryValues(query);
+    return values[5];
+  });
+}
+
+function insertedSeasonRewardGrantedAt(prisma: PrismaMock) {
+  return rawCalls(prisma, 'INSERT INTO "season_rewards"').map(([query]) => {
+    const values = queryValues(query);
+    return (values[7] as Date).toISOString();
+  });
 }

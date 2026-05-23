@@ -15,12 +15,13 @@ Use this directory in this order:
    - `docs/wallets-api-contract.md`
    - `docs/positions-api-contract.md`
    - `docs/records-api-contract.md`
+   - `docs/rewards-api-contract.md`
 5. Provider/freshness/crypto policy:
    - `docs/crypto-usd-settlement-policy-update.md`
    - `docs/provider-final-selection-readiness-recheck.md`
    - `docs/asset-price-freshness-policy.md`
    - `docs/provider-evidence-capture.md`
-6. Batch foundation and operator-run daily snapshot/ranking/cycle/settlement/final-tier/reward-grant marker jobs:
+6. Batch foundation and operator-run daily snapshot/ranking/cycle/settlement/final-tier/reward-grant internal foundation jobs:
    - `docs/batch-job-foundation.md`
 
 `docs/archive/` contains historical STOP/review/preimplementation/plan documents. Archived files are not current source of truth and must not be used to override the current documents above.

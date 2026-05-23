@@ -19,7 +19,7 @@ export type RewardGrantJobRequestPayload = {
 };
 
 export type RewardGrantPolicySummary = {
-  source: 'reward_marker_mvp';
+  source: 'internal_reward_foundation_mvp';
   description: string;
   rewardPolicyJsonAvailable: boolean;
 };
@@ -42,6 +42,31 @@ export type RewardGrantTopGranted = {
   rewardGrantedAt: string;
 };
 
+export type RewardGrantTopReward = {
+  seasonParticipantId: string;
+  userId: string;
+  finalRank: number;
+  finalTier: string;
+  rewardType: 'badge' | 'trophy';
+  rewardCode: string;
+  rewardName: string;
+  grantedAt: string;
+};
+
+export type RewardGrantRowSummary = {
+  wouldCreate: number;
+  created: number;
+  existing: number;
+};
+
+export type RewardGrantRowsSummary = {
+  total: RewardGrantRowSummary;
+  tierBadge: RewardGrantRowSummary;
+  trophy: RewardGrantRowSummary;
+};
+
+export type RewardGrantUserBadgeSummary = RewardGrantRowSummary;
+
 export type RewardGrantError = {
   code: string;
   message: string;
@@ -54,8 +79,12 @@ export type RewardGrantJobResult = {
   grantDate: string | null;
   policy: RewardGrantPolicySummary;
   participants: RewardGrantParticipantSummary;
+  rewardRows: RewardGrantRowsSummary;
+  userBadges: RewardGrantUserBadgeSummary;
   grantedParticipantIds: string[];
+  rewardBackfilledParticipantIds: string[];
   topGranted: RewardGrantTopGranted[];
+  topRewards: RewardGrantTopReward[];
   errors: RewardGrantError[];
   reason?: string;
   message?: string;

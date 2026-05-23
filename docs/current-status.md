@@ -31,6 +31,8 @@
 - `GET /api/v1/ranking` read-only MVP
 - `GET /api/v1/wallets` read-only MVP
 - `GET /api/v1/records` read-only MVP
+- `GET /api/v1/rewards/me` read-only MVP
+- `GET /api/v1/badges/me` read-only MVP
 - `GET /api/v1/orders` read-only MVP
 - `POST /api/v1/orders/quote` read-only MVP
 - `POST /api/v1/orders` submitted order create MVP
@@ -104,8 +106,8 @@
   - Auth refresh/logout route: missing/malformed refresh token 거절, valid refresh rotation, old refresh token reuse 실패, logout idempotent success 검증.
   - Auth logout-all route: missing token, `x-user-id` only `UNAUTHORIZED`, valid token success 검증.
   - optional auth route: `GET /api/v1/seasons/current` anonymous/valid token/invalid token/malformed Authorization/`x-user-id` only 회귀 검증.
-  - protected read-only route: `GET /api/v1/me`, `/home`, `/ranking`, `/wallets`, `/records`, `/orders` missing token 및 `x-user-id` only `UNAUTHORIZED` 검증.
-  - protected read-only route valid token smoke: `GET /api/v1/me`, `/home`, `/ranking`, `/wallets`, `/records`, `/orders`가 guard를 통과해 service-level 정상 응답 또는 known unavailable/not_joined 계약으로 진입하는지 검증.
+  - protected read-only route: `GET /api/v1/me`, `/home`, `/ranking`, `/wallets`, `/records`, `/rewards/me`, `/badges/me`, `/orders` missing token 및 `x-user-id` only `UNAUTHORIZED` 검증.
+  - protected read-only route valid token smoke: `GET /api/v1/me`, `/home`, `/ranking`, `/wallets`, `/records`, `/rewards/me`, `/badges/me`, `/orders`가 guard를 통과해 service-level 정상 응답 또는 known unavailable/not_joined 계약으로 진입하는지 검증.
   - protected write-path route: `POST /api/v1/seasons/:seasonId/join`, `/fx/quote`, `/fx/execute`, `/orders/quote`, `/orders`, `/orders/:orderId/cancel`, `/orders/:orderId/execute` missing token, `x-user-id` only, invalid bearer token, malformed Authorization 차단 검증.
   - protected write-path route valid token smoke: 위 write API들이 guard를 통과해 service-level success 또는 known domain error(`SEASON_NOT_JOINED`, `ORDER_NOT_FOUND`)까지 진입하는지 검증.
   - write-path API의 full mutation 검증은 service/unit/opt-in DB integration spec이 담당하며, HTTP e2e는 guard routing, `request.user` 주입, controller/service 진입 회귀를 담당.
@@ -129,6 +131,9 @@
 - `orders`
 - `daily_portfolio_snapshots`
 - `season_rankings`
+- `badges`
+- `user_badges`
+- `season_rewards`
 - `refresh_token_sessions`
 - `batch_job_runs`
 
@@ -194,19 +199,24 @@ near-term ledger/FX foundation:
   - `rewardGrantedAt`은 업데이트하지 않고 reward/payment/badge/trophy row도 만들지 않음.
   - provider ingestion/API 호출, cron scheduler 등록, price/FX/wallet/order/position/snapshot/ranking row 생성/수정/삭제, HTTP batch 실행 API를 수행하지 않음.
   - Home settled final-result read model은 배정된 `finalTier`를 read-only로 available 표시할 수 있음. 없으면 `FINAL_TIER_UNAVAILABLE` 유지.
-  - `reward-grant`는 operator-run reward marker MVP job이며 cron scheduler가 아님.
-  - `reward-grant`는 settled season에서 `finalRank`와 `finalTier`가 모두 배정되고 `rewardGrantedAt`이 null인 participant만 `SeasonParticipant.rewardGrantedAt`으로 marker 처리.
+  - `reward-grant`는 operator-run internal reward foundation MVP job이며 cron scheduler가 아님.
+  - `reward-grant`는 settled season에서 `finalRank`와 `finalTier`가 모두 배정된 participant를 기준으로 `SeasonParticipant.rewardGrantedAt` marker와 내부 `badges`/`user_badges`/`season_rewards` row를 보장함.
   - `reward-grant` idempotencyKey 기본값은 `reward-grant:<season-id>`이며, `--grant-date <YYYY-MM-DD>`를 사용하면 `reward-grant:<season-id>:<YYYY-MM-DD>`. 명시 key도 허용.
   - `grantDate`가 있으면 marker timestamp는 `<YYYY-MM-DD>T00:00:00.000Z`, 없으면 batch run `startedAt`.
-  - `reward-grant` dry-run은 grant 가능 대상, existing, ineligible/skipped, `topGranted` preview만 반환하고 DB write를 하지 않음.
-  - 이미 `rewardGrantedAt`이 있으면 existing/skipped로 보고 overwrite하지 않음.
+  - 기본 내부 보상 정책은 finalTier별 tier badge 1개(`TIER_MASTER`, `TIER_DIAMOND`, `TIER_PLATINUM`, `TIER_GOLD`, `TIER_SILVER`, `TIER_BRONZE`)와 `finalRank <= 10` participant의 `TROPHY_TOP10` 1개.
+  - `reward-grant` dry-run은 marker grant 가능 대상, existing, ineligible/skipped, 내부 reward/user badge row would-create/existing count, `topGranted`/`topRewards` preview를 반환하고 DB write를 하지 않음.
+  - 이미 `rewardGrantedAt`이 있으면 timestamp를 overwrite하지 않음.
+  - 기존 marker가 있는 participant의 내부 reward/user badge row가 없으면 기존 marker timestamp를 `grantedAt`/`awardedAt`으로 사용해 idempotent backfill 가능.
+  - `Badge` row는 `code`, `UserBadge` row는 `userId + badgeId + seasonId`, `SeasonReward` row는 `seasonParticipantId + rewardCode` 기준으로 idempotent하게 보장함.
   - `finalRank` 또는 `finalTier`가 없으면 ineligible/skipped. 아무도 둘 다 없으면 `FINAL_TIER_ASSIGNMENT_REQUIRED` job-level failure.
   - `ended` season은 `SETTLEMENT_REQUIRED`, `active`/`upcoming` season은 `SEASON_STATUS_NOT_ALLOWED`.
-  - non-dry-run participant reward marker update는 Prisma transaction 안에서 처리.
-  - reward amount 계산, 실제 payment/point/badge/trophy 지급, reward/payment/badge/trophy row 생성은 하지 않음.
+  - non-dry-run marker update와 내부 reward/badge/trophy foundation row write는 Prisma transaction 안에서 처리.
+  - `Season.rewardPolicyJson`의 reward amount/payment/point/badge/trophy fulfillment 설정은 해석하지 않음.
+  - reward amount 계산, 실제 payment/point/배송/외부 fulfillment는 구현하지 않음.
   - provider ingestion/API 호출, cron scheduler 등록, price/FX/wallet/order/position/snapshot/ranking/finalTier row 생성/수정/삭제, HTTP batch 실행 API를 수행하지 않음.
   - Home settled final-result read model은 `rewardGrantedAt`이 있으면 `finalResult.reward.state=granted`를 read-only로 표시할 수 있음. 없으면 `REWARD_NOT_GRANTED` 유지.
-  - 실제 cron scheduler, provider ingestion, actual reward/payment/point/badge/trophy fulfillment는 아직 없음.
+  - `GET /api/v1/rewards/me`와 `GET /api/v1/badges/me`는 내부 reward/badge history를 read-only로 조회함.
+  - 실제 cron scheduler, provider ingestion, actual reward/payment/point/delivery/external fulfillment는 아직 없음.
   - admin 권한 모델이 없으므로 batch 실행 HTTP API는 만들지 않음.
 - Auth refresh session foundation 반영 완료: `RefreshTokenSessionStatus`, `refresh_token_sessions`.
 - Auth refresh session migration 생성 완료: `20260519090000_add_refresh_token_sessions`.
@@ -290,12 +300,14 @@ near-term ledger/FX foundation:
   - season ranking 수동 생성 CLI: `scripts/admin-generate-season-ranking.ts`.
   - daily season cycle batch job: `src/batch/daily-season-cycle-job.service.ts`, `scripts/admin-run-batch-job.ts --job daily-season-cycle`.
   - season settlement MVP batch job: `src/batch/season-settlement-job.service.ts`, `scripts/admin-run-batch-job.ts --job season-settlement`.
+  - final tier assignment MVP batch job: `src/batch/final-tier-assignment-job.service.ts`, `scripts/admin-run-batch-job.ts --job final-tier-assignment`.
+  - internal reward foundation MVP batch job: `src/batch/reward-grant-job.service.ts`, `scripts/admin-run-batch-job.ts --job reward-grant`.
   - CLI는 dry-run/non-dry-run을 지원하며 seed/fake/static/sample business data를 생성하지 않음.
 
 ## 6. 현재 미도입 DB 상태
 
-- Prisma schema/migration 기준 현재 문서화된 핵심 DB foundation 추가 미도입 테이블 없음.
-- Batch job run/lock 기록 foundation과 operator-run daily portfolio snapshot/season ranking/daily season cycle/season settlement/final tier assignment/reward grant marker MVP job은 구현 완료. 단, 실제 cron scheduler, provider ingestion job, ranking overwrite/regeneration job, actual reward/payment/point/badge/trophy fulfillment job은 아직 미구현.
+- Prisma schema/migration 기준 현재 문서화된 내부 reward/badge/trophy 조회 foundation 테이블은 구현됨.
+- Batch job run/lock 기록 foundation과 operator-run daily portfolio snapshot/season ranking/daily season cycle/season settlement/final tier assignment/reward grant internal foundation MVP job은 구현 완료. 단, 실제 cron scheduler, provider ingestion job, ranking overwrite/regeneration job, actual reward/payment/point/delivery/external fulfillment job은 아직 미구현.
 - order execution full-fill MVP와 position mutation 1차 write path는 구현 완료. 단, exact replay, durable quote, partial fill, matching engine, provider price ingestion, settlement API, scheduler 기반 자동 daily valuation/ranking 생성 경로는 아직 미구현.
 
 ## 7. 완료된 문서/설계 상태
@@ -304,6 +316,7 @@ near-term ledger/FX foundation:
 - Gate decision source of truth: `docs/backend-gate-roadmap.md`.
 - Test coverage source of truth: `docs/backend-test-coverage-matrix.md`.
 - Docs navigation/inventory: `docs/README.md`, `docs/docs-inventory.md`.
+- Rewards API contract: `docs/rewards-api-contract.md`.
 - API contracts:
   - `docs/auth-api-contract.md`
   - `docs/fx-api-contract.md`
@@ -693,6 +706,31 @@ near-term ledger/FX foundation:
 - `/records` 호출은 exchange/wallet/order row를 생성/수정/삭제하지 않음.
 - 아직 미구현:
   - full records filters/export/detail views.
+
+### `/rewards` and `/badges`
+
+- `GET /api/v1/rewards/me` read-only MVP 구현 완료.
+- `GET /api/v1/badges/me` read-only MVP 구현 완료.
+- Bearer access token Auth MVP 이후 API는 전역 guard가 주입한 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
+- rewards source:
+  - `season_rewards`
+  - `seasons`
+  - `season_participants`
+- badges source:
+  - `user_badges`
+  - `badges`
+  - `seasons`
+- 상태:
+  - row가 있으면 `state = available`.
+  - row가 없으면 `state = empty`.
+- 정렬:
+  - rewards: `grantedAt desc`, `createdAt desc`, `seasonId asc`, `rewardCode asc`.
+  - badges: `awardedAt desc`, `createdAt desc`, `seasonId asc`, `code asc`.
+- query parameter:
+  - `limit` optional, default 50, max 100 clamp.
+  - `offset` optional, default 0.
+- `/rewards/me`와 `/badges/me` 호출은 reward/badge/season/participant row를 생성/수정/삭제하지 않음.
+- actual payment/point/delivery/external fulfillment는 구현하지 않음.
 
 ### `/orders`
 

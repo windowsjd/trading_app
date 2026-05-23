@@ -12,6 +12,7 @@ import { PositionsModule } from './positions/positions.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RankingModule } from './ranking/ranking.module';
 import { RecordsModule } from './records/records.module';
+import { RewardsModule } from './rewards/rewards.module';
 import { SeasonsModule } from './seasons/seasons.module';
 import { WalletsModule } from './wallets/wallets.module';
 
@@ -31,6 +32,7 @@ import { WalletsModule } from './wallets/wallets.module';
     PrismaModule,
     RankingModule,
     RecordsModule,
+    RewardsModule,
     SeasonsModule,
     WalletsModule,
   ],
