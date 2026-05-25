@@ -169,6 +169,7 @@ type PrismaMock = {
     updateMany: jest.Mock;
   };
   position: {
+    count: jest.Mock;
     create: jest.Mock;
     findFirst: jest.Mock;
     findMany: jest.Mock;
@@ -186,7 +187,9 @@ type PrismaMock = {
     findUnique: jest.Mock;
   };
   seasonParticipant: {
+    count: jest.Mock;
     create: jest.Mock;
+    findMany: jest.Mock;
     findUnique: jest.Mock;
   };
   seasonRanking: {
@@ -338,6 +341,7 @@ describe('AppController (e2e)', () => {
         updateMany: jest.fn(),
       },
       position: {
+        count: jest.fn(),
         create: jest.fn(),
         findFirst: jest.fn(),
         findMany: jest.fn(),
@@ -355,7 +359,9 @@ describe('AppController (e2e)', () => {
         findUnique: jest.fn(),
       },
       seasonParticipant: {
+        count: jest.fn(),
         create: jest.fn(),
+        findMany: jest.fn(),
         findUnique: jest.fn(),
       },
       seasonRanking: {
@@ -491,6 +497,8 @@ describe('AppController (e2e)', () => {
     expect(prisma.user.findUnique).not.toHaveBeenCalled();
     expect(prisma.season.findFirst).not.toHaveBeenCalled();
     expect(prisma.season.findUnique).not.toHaveBeenCalled();
+    expect(prisma.seasonParticipant.count).not.toHaveBeenCalled();
+    expect(prisma.seasonParticipant.findMany).not.toHaveBeenCalled();
     expect(prisma.seasonParticipant.findUnique).not.toHaveBeenCalled();
     expect(prisma.cashWallet.findMany).not.toHaveBeenCalled();
     expect(prisma.cashWallet.findUnique).not.toHaveBeenCalled();
@@ -509,6 +517,7 @@ describe('AppController (e2e)', () => {
     expect(prisma.order.findFirst).not.toHaveBeenCalled();
     expect(prisma.order.findMany).not.toHaveBeenCalled();
     expect(prisma.order.findUnique).not.toHaveBeenCalled();
+    expect(prisma.position.count).not.toHaveBeenCalled();
     expect(prisma.position.findFirst).not.toHaveBeenCalled();
     expect(prisma.position.findMany).not.toHaveBeenCalled();
     expect(prisma.position.findUnique).not.toHaveBeenCalled();
@@ -1251,6 +1260,27 @@ describe('AppController (e2e)', () => {
     ['GET /api/v1/assets', 'get', '/api/v1/assets'],
     ['GET /api/v1/positions', 'get', '/api/v1/positions'],
     ['GET /api/v1/records', 'get', '/api/v1/records'],
+    ['GET /api/v1/records/me/seasons', 'get', '/api/v1/records/me/seasons'],
+    [
+      'GET /api/v1/records/me/seasons/:seasonId',
+      'get',
+      '/api/v1/records/me/seasons/season-1',
+    ],
+    [
+      'GET /api/v1/records/me/seasons/:seasonId/orders',
+      'get',
+      '/api/v1/records/me/seasons/season-1/orders',
+    ],
+    [
+      'GET /api/v1/records/me/seasons/:seasonId/exchanges',
+      'get',
+      '/api/v1/records/me/seasons/season-1/exchanges',
+    ],
+    [
+      'GET /api/v1/users/:userId/records/:seasonId',
+      'get',
+      '/api/v1/users/user-2/records/season-1',
+    ],
     ['GET /api/v1/rewards/me', 'get', '/api/v1/rewards/me'],
     ['GET /api/v1/badges/me', 'get', '/api/v1/badges/me'],
     ['GET /api/v1/orders', 'get', '/api/v1/orders'],
@@ -1460,6 +1490,111 @@ describe('AppController (e2e)', () => {
         expect(prisma.exchangeTransaction.count).toHaveBeenCalled();
         expect(prisma.walletTransaction.count).toHaveBeenCalled();
         expect(prisma.order.count).toHaveBeenCalled();
+      },
+    ],
+    [
+      'GET /api/v1/records/me/seasons',
+      '/api/v1/records/me/seasons',
+      () => {
+        mockActiveUser();
+        prisma.seasonParticipant.count.mockResolvedValueOnce(0);
+      },
+      (body: Record<string, unknown>) => {
+        expect(body).toMatchObject({
+          success: true,
+          data: {
+            state: 'empty',
+            seasons: [],
+          },
+        });
+        expect(prisma.seasonParticipant.count).toHaveBeenCalled();
+      },
+    ],
+    [
+      'GET /api/v1/records/me/seasons/:seasonId',
+      '/api/v1/records/me/seasons/season-1',
+      () => {
+        mockActiveUser();
+        prisma.season.findUnique.mockResolvedValueOnce(season);
+        prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
+      },
+      (body: Record<string, unknown>) => {
+        expect(body).toMatchObject({
+          success: true,
+          data: {
+            state: 'not_joined',
+            participant: null,
+          },
+        });
+        expect(prisma.season.findUnique).toHaveBeenCalled();
+      },
+    ],
+    [
+      'GET /api/v1/records/me/seasons/:seasonId/orders',
+      '/api/v1/records/me/seasons/season-1/orders',
+      () => {
+        mockActiveUser();
+        prisma.season.findUnique.mockResolvedValueOnce(season);
+        prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
+      },
+      (body: Record<string, unknown>) => {
+        expect(body).toMatchObject({
+          success: true,
+          data: {
+            state: 'not_joined',
+            orders: [],
+          },
+        });
+        expect(prisma.order.findMany).not.toHaveBeenCalled();
+      },
+    ],
+    [
+      'GET /api/v1/records/me/seasons/:seasonId/exchanges',
+      '/api/v1/records/me/seasons/season-1/exchanges',
+      () => {
+        mockActiveUser();
+        prisma.season.findUnique.mockResolvedValueOnce(season);
+        prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
+      },
+      (body: Record<string, unknown>) => {
+        expect(body).toMatchObject({
+          success: true,
+          data: {
+            state: 'not_joined',
+            exchanges: [],
+          },
+        });
+        expect(prisma.exchangeTransaction.findMany).not.toHaveBeenCalled();
+      },
+    ],
+    [
+      'GET /api/v1/users/:userId/records/:seasonId',
+      '/api/v1/users/user-2/records/season-1',
+      () => {
+        prisma.user.findUnique
+          .mockResolvedValueOnce({
+            ...user,
+            status: 'active',
+          })
+          .mockResolvedValueOnce({
+            id: 'user-2',
+            nickname: 'traderLee',
+            profileImageUrl: null,
+          });
+        prisma.season.findUnique.mockResolvedValueOnce(season);
+        prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
+      },
+      (body: Record<string, unknown>) => {
+        expect(body).toMatchObject({
+          success: true,
+          data: {
+            state: 'not_joined',
+            user: {
+              id: 'user-2',
+            },
+          },
+        });
+        expect(prisma.user.findUnique).toHaveBeenCalledTimes(2);
       },
     ],
     [

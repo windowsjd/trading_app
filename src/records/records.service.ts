@@ -1,11 +1,13 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import {
   CurrencyCode,
+  AssetType,
   OrderSide,
   OrderStatus,
   OrderType,
   ParticipantStatus,
   Prisma,
+  SeasonRankingType,
   SeasonStatus,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -18,9 +20,33 @@ export type RecordsQuery = {
   currencyCode?: string;
 };
 
+export type MySeasonRecordsQuery = {
+  limit?: string;
+  offset?: string;
+  seasonStatus?: string;
+};
+
+export type MySeasonOrdersQuery = {
+  status?: string;
+  side?: string;
+  assetId?: string;
+  limit?: string;
+  offset?: string;
+};
+
+export type MySeasonExchangesQuery = {
+  fromCurrency?: string;
+  toCurrency?: string;
+  limit?: string;
+  offset?: string;
+};
+
 type RecordsType = 'all' | 'exchanges' | 'wallets' | 'orders';
 type RecordsState = 'available' | 'not_joined' | 'unavailable';
+type SeasonHistoryState = 'available' | 'empty';
+type SeasonRecordDetailState = 'available' | 'not_joined';
 type SectionState = 'available' | 'unavailable';
+type PerformanceState = 'available' | 'unavailable';
 
 type RecordsSeason = {
   id: string;
@@ -44,11 +70,45 @@ type ParsedRecordsQuery = {
   currencyCode?: CurrencyCode;
 };
 
+type ParsedMySeasonRecordsQuery = {
+  seasonStatus?: SeasonStatus;
+  limit: number;
+  offset: number;
+};
+
+type ParsedMySeasonOrdersQuery = {
+  status?: OrderStatus;
+  side?: OrderSide;
+  assetId?: string;
+  limit: number;
+  offset: number;
+};
+
+type ParsedMySeasonExchangesQuery = {
+  fromCurrency?: CurrencyCode;
+  toCurrency?: CurrencyCode;
+  limit: number;
+  offset: number;
+};
+
 type SectionPagination = {
   limit: number;
   offset: number;
   total: number;
   returned: number;
+};
+
+type ListPagination = {
+  limit: number;
+  offset: number;
+  returned: number;
+};
+
+type SeasonRecordMetric = {
+  totalAssetKrw: Prisma.Decimal;
+  returnRate: Prisma.Decimal;
+  metricDate: Date;
+  capturedAt: Date;
 };
 
 type RecordsResponse = {
@@ -129,6 +189,174 @@ type RecordsResponse = {
   };
 };
 
+type MySeasonRecordsResponse = {
+  success: true;
+  data: {
+    state: SeasonHistoryState;
+    seasons: Array<{
+      seasonId: string;
+      seasonName: string;
+      seasonStatus: SeasonStatus;
+      joinedAt: string;
+      participantStatus: ParticipantStatus;
+      initialCapitalKrw: string;
+      finalRank: number | null;
+      finalTier: string | null;
+      rewardGrantedAt: string | null;
+      latestTotalAssetKrw: string | null;
+      latestReturnRate: string | null;
+      orderCount: number;
+      exchangeCount: number;
+      walletTransactionCount: number;
+    }>;
+    pagination: ListPagination;
+    filters: {
+      seasonStatus: SeasonStatus | null;
+    };
+  };
+};
+
+type MySeasonRecordDetailResponse = {
+  success: true;
+  data: {
+    state: SeasonRecordDetailState;
+    season: ReturnType<RecordsService['formatSeason']>;
+    participant: {
+      id: string;
+      joinedAt: string;
+      participantStatus: ParticipantStatus;
+      initialCapitalKrw: string;
+      finalRank: number | null;
+      finalTier: string | null;
+      rewardGrantedAt: string | null;
+    } | null;
+    performance: {
+      state: PerformanceState;
+      totalAssetKrw: string | null;
+      returnRate: string | null;
+      snapshotDate: string | null;
+      capturedAt: string | null;
+      reason?: string;
+      message?: string;
+    };
+    activitySummary: {
+      orders: {
+        total: number;
+        submitted: number;
+        executed: number;
+        canceled: number;
+        rejected: number;
+      };
+      exchanges: {
+        total: number;
+      };
+      walletTransactions: {
+        total: number;
+      };
+      positions: {
+        open: number;
+      };
+    };
+    reason?: string;
+    message?: string;
+  };
+};
+
+type MySeasonOrdersResponse = {
+  success: true;
+  data: {
+    state: SeasonRecordDetailState;
+    seasonId: string;
+    filters: {
+      status: OrderStatus | null;
+      side: OrderSide | null;
+      assetId: string | null;
+    };
+    orders: Array<{
+      orderId: string;
+      assetId: string;
+      symbol: string;
+      name: string;
+      market: string;
+      assetType: AssetType;
+      side: OrderSide;
+      orderType: OrderType;
+      status: OrderStatus;
+      quantity: string;
+      limitPrice: string | null;
+      executedPrice: string | null;
+      currencyCode: CurrencyCode;
+      grossAmount: string | null;
+      feeAmount: string | null;
+      netAmount: string | null;
+      submittedAt: string;
+      executedAt: string | null;
+      canceledAt: string | null;
+      rejectedAt: string | null;
+      rejectReason: string | null;
+    }>;
+    pagination: ListPagination;
+    reason?: string;
+    message?: string;
+  };
+};
+
+type MySeasonExchangesResponse = {
+  success: true;
+  data: {
+    state: SeasonRecordDetailState;
+    seasonId: string;
+    filters: {
+      fromCurrency: CurrencyCode | null;
+      toCurrency: CurrencyCode | null;
+    };
+    exchanges: Array<{
+      exchangeId: string;
+      fromCurrency: CurrencyCode;
+      toCurrency: CurrencyCode;
+      sourceAmount: string;
+      grossTargetAmount: string;
+      feeRate: string;
+      feeAmount: string;
+      feeCurrency: CurrencyCode;
+      appliedRate: string;
+      netTargetAmount: string;
+      executedAt: string;
+    }>;
+    pagination: ListPagination;
+    reason?: string;
+    message?: string;
+  };
+};
+
+type UserSeasonRecordSummaryResponse = {
+  success: true;
+  data: {
+    state: SeasonRecordDetailState;
+    user: {
+      id: string;
+      nickname: string;
+      profileImageUrl: string | null;
+    };
+    season: {
+      id: string;
+      name: string;
+      status: SeasonStatus;
+    };
+    summary: {
+      finalRank: number | null;
+      finalTier: string | null;
+      rewardGranted: boolean;
+      totalAssetKrw: string | null;
+      returnRate: string | null;
+      orderCount: number;
+      exchangeCount: number;
+    } | null;
+    reason?: string;
+    message?: string;
+  };
+};
+
 const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
   SeasonStatus.active,
   SeasonStatus.upcoming,
@@ -147,7 +375,11 @@ export class RecordsService {
     query: RecordsQuery = {},
   ): Promise<RecordsResponse> {
     if (!userId) {
-      this.throwApiError(HttpStatus.UNAUTHORIZED, 'UNAUTHORIZED', 'Unauthorized');
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
     }
 
     const parsedQuery = this.parseQuery(query);
@@ -217,6 +449,536 @@ export class RecordsService {
         ...(exchanges ? { exchanges } : {}),
         ...(walletTransactions ? { walletTransactions } : {}),
         ...(orders ? { orders } : {}),
+      },
+    };
+  }
+
+  async getMySeasonRecords(
+    userId: string | undefined,
+    query: MySeasonRecordsQuery = {},
+  ): Promise<MySeasonRecordsResponse> {
+    this.assertAuthenticated(userId);
+
+    const parsedQuery = this.parseMySeasonRecordsQuery(query);
+    const where = {
+      userId,
+      ...(parsedQuery.seasonStatus
+        ? { season: { status: parsedQuery.seasonStatus } }
+        : {}),
+    };
+    const total = await this.prisma.seasonParticipant.count({ where });
+
+    if (total === 0) {
+      return {
+        success: true,
+        data: {
+          state: 'empty',
+          seasons: [],
+          pagination: this.listPagination(parsedQuery, 0),
+          filters: {
+            seasonStatus: parsedQuery.seasonStatus ?? null,
+          },
+        },
+      };
+    }
+
+    const participants = await this.prisma.seasonParticipant.findMany({
+      where,
+      orderBy: [
+        { season: { startAt: 'desc' } },
+        { season: { endAt: 'desc' } },
+        { joinedAt: 'desc' },
+        { seasonId: 'asc' },
+      ],
+      skip: parsedQuery.offset,
+      take: parsedQuery.limit,
+      select: {
+        seasonId: true,
+        joinedAt: true,
+        participantStatus: true,
+        initialCapitalKrw: true,
+        finalRank: true,
+        finalTier: true,
+        rewardGrantedAt: true,
+        season: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+          },
+        },
+        seasonRankings: {
+          where: {
+            rankType: SeasonRankingType.final,
+          },
+          orderBy: [
+            { rankingDate: 'desc' },
+            { capturedAt: 'desc' },
+            { createdAt: 'desc' },
+          ],
+          take: 1,
+          select: {
+            totalAssetKrw: true,
+            returnRate: true,
+            rankingDate: true,
+            capturedAt: true,
+          },
+        },
+        dailyPortfolioSnapshots: {
+          orderBy: [
+            { snapshotDate: 'desc' },
+            { capturedAt: 'desc' },
+            { createdAt: 'desc' },
+          ],
+          take: 1,
+          select: {
+            totalAssetKrw: true,
+            returnRate: true,
+            snapshotDate: true,
+            capturedAt: true,
+          },
+        },
+        _count: {
+          select: {
+            orders: true,
+            exchangeTransactions: true,
+            walletTransactions: true,
+          },
+        },
+      },
+    });
+
+    return {
+      success: true,
+      data: {
+        state: 'available',
+        seasons: participants.map((participant) => {
+          const metric = this.selectBestMetric(
+            participant.seasonRankings[0],
+            participant.dailyPortfolioSnapshots[0],
+          );
+
+          return {
+            seasonId: participant.season.id,
+            seasonName: participant.season.name,
+            seasonStatus: participant.season.status,
+            joinedAt: participant.joinedAt.toISOString(),
+            participantStatus: participant.participantStatus,
+            initialCapitalKrw: this.formatDecimal(
+              participant.initialCapitalKrw,
+              8,
+            ),
+            finalRank: participant.finalRank,
+            finalTier: participant.finalTier,
+            rewardGrantedAt: this.formatNullableDate(
+              participant.rewardGrantedAt,
+            ),
+            latestTotalAssetKrw: metric
+              ? this.formatDecimal(metric.totalAssetKrw, 8)
+              : null,
+            latestReturnRate: metric
+              ? this.formatDecimal(metric.returnRate, 8)
+              : null,
+            orderCount: participant._count.orders,
+            exchangeCount: participant._count.exchangeTransactions,
+            walletTransactionCount: participant._count.walletTransactions,
+          };
+        }),
+        pagination: this.listPagination(parsedQuery, participants.length),
+        filters: {
+          seasonStatus: parsedQuery.seasonStatus ?? null,
+        },
+      },
+    };
+  }
+
+  async getMySeasonRecordDetail(
+    userId: string | undefined,
+    seasonId: string | undefined,
+  ): Promise<MySeasonRecordDetailResponse> {
+    this.assertAuthenticated(userId);
+
+    const parsedSeasonId = this.parseRequiredText(
+      seasonId,
+      'INVALID_SEASON_ID',
+      'seasonId',
+    );
+    const season = await this.findSeasonByIdOrThrow(parsedSeasonId);
+    const participant = await this.findDetailedParticipant(season.id, userId);
+
+    if (!participant) {
+      return {
+        success: true,
+        data: {
+          state: 'not_joined',
+          season: this.formatSeason(season),
+          participant: null,
+          performance: this.unavailablePerformance(),
+          activitySummary: this.emptyActivitySummary(),
+          reason: 'SEASON_NOT_JOINED',
+          message: 'Season records are available after joining the season.',
+        },
+      };
+    }
+
+    const [
+      submittedOrders,
+      executedOrders,
+      canceledOrders,
+      rejectedOrders,
+      openPositions,
+    ] = await Promise.all([
+      this.countOrders(participant.id, OrderStatus.submitted),
+      this.countOrders(participant.id, OrderStatus.executed),
+      this.countOrders(participant.id, OrderStatus.canceled),
+      this.countOrders(participant.id, OrderStatus.rejected),
+      this.prisma.position.count({
+        where: {
+          seasonParticipantId: participant.id,
+          quantity: {
+            gt: 0,
+          },
+        },
+      }),
+    ]);
+
+    return {
+      success: true,
+      data: {
+        state: 'available',
+        season: this.formatSeason(season),
+        participant: this.formatDetailedParticipant(participant),
+        performance: this.formatPerformance(
+          participant.dailyPortfolioSnapshots[0],
+          participant.seasonRankings[0],
+        ),
+        activitySummary: {
+          orders: {
+            total: participant._count.orders,
+            submitted: submittedOrders,
+            executed: executedOrders,
+            canceled: canceledOrders,
+            rejected: rejectedOrders,
+          },
+          exchanges: {
+            total: participant._count.exchangeTransactions,
+          },
+          walletTransactions: {
+            total: participant._count.walletTransactions,
+          },
+          positions: {
+            open: openPositions,
+          },
+        },
+      },
+    };
+  }
+
+  async getMySeasonOrders(
+    userId: string | undefined,
+    seasonId: string | undefined,
+    query: MySeasonOrdersQuery = {},
+  ): Promise<MySeasonOrdersResponse> {
+    this.assertAuthenticated(userId);
+
+    const parsedSeasonId = this.parseRequiredText(
+      seasonId,
+      'INVALID_SEASON_ID',
+      'seasonId',
+    );
+    const parsedQuery = this.parseMySeasonOrdersQuery(query);
+    await this.findSeasonByIdOrThrow(parsedSeasonId);
+    const participant = await this.findParticipant(parsedSeasonId, userId);
+
+    if (!participant) {
+      return {
+        success: true,
+        data: {
+          state: 'not_joined',
+          seasonId: parsedSeasonId,
+          filters: {
+            status: parsedQuery.status ?? null,
+            side: parsedQuery.side ?? null,
+            assetId: parsedQuery.assetId ?? null,
+          },
+          orders: [],
+          pagination: this.listPagination(parsedQuery, 0),
+          reason: 'SEASON_NOT_JOINED',
+          message: 'Order records are available after joining the season.',
+        },
+      };
+    }
+
+    const where = {
+      seasonParticipantId: participant.id,
+      ...(parsedQuery.status ? { status: parsedQuery.status } : {}),
+      ...(parsedQuery.side ? { side: parsedQuery.side } : {}),
+      ...(parsedQuery.assetId ? { assetId: parsedQuery.assetId } : {}),
+    };
+    const orders = await this.prisma.order.findMany({
+      where,
+      orderBy: [{ submittedAt: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
+      skip: parsedQuery.offset,
+      take: parsedQuery.limit,
+      select: {
+        id: true,
+        assetId: true,
+        side: true,
+        orderType: true,
+        status: true,
+        quantity: true,
+        limitPrice: true,
+        executedPrice: true,
+        currencyCode: true,
+        grossAmount: true,
+        feeAmount: true,
+        netAmount: true,
+        submittedAt: true,
+        executedAt: true,
+        canceledAt: true,
+        rejectedAt: true,
+        rejectReason: true,
+        asset: {
+          select: {
+            symbol: true,
+            name: true,
+            market: true,
+            assetType: true,
+          },
+        },
+      },
+    });
+
+    return {
+      success: true,
+      data: {
+        state: 'available',
+        seasonId: parsedSeasonId,
+        filters: {
+          status: parsedQuery.status ?? null,
+          side: parsedQuery.side ?? null,
+          assetId: parsedQuery.assetId ?? null,
+        },
+        orders: orders.map((order) => ({
+          orderId: order.id,
+          assetId: order.assetId,
+          symbol: order.asset.symbol,
+          name: order.asset.name,
+          market: order.asset.market,
+          assetType: order.asset.assetType,
+          side: order.side,
+          orderType: order.orderType,
+          status: order.status,
+          quantity: this.formatDecimal(order.quantity, 8),
+          limitPrice: this.formatNullableDecimal(order.limitPrice, 8),
+          executedPrice: this.formatNullableDecimal(order.executedPrice, 8),
+          currencyCode: order.currencyCode,
+          grossAmount: this.formatNullableDecimal(order.grossAmount, 8),
+          feeAmount: this.formatNullableDecimal(order.feeAmount, 8),
+          netAmount: this.formatNullableDecimal(order.netAmount, 8),
+          submittedAt: order.submittedAt.toISOString(),
+          executedAt: this.formatNullableDate(order.executedAt),
+          canceledAt: this.formatNullableDate(order.canceledAt),
+          rejectedAt: this.formatNullableDate(order.rejectedAt),
+          rejectReason: order.rejectReason,
+        })),
+        pagination: this.listPagination(parsedQuery, orders.length),
+      },
+    };
+  }
+
+  async getMySeasonExchanges(
+    userId: string | undefined,
+    seasonId: string | undefined,
+    query: MySeasonExchangesQuery = {},
+  ): Promise<MySeasonExchangesResponse> {
+    this.assertAuthenticated(userId);
+
+    const parsedSeasonId = this.parseRequiredText(
+      seasonId,
+      'INVALID_SEASON_ID',
+      'seasonId',
+    );
+    const parsedQuery = this.parseMySeasonExchangesQuery(query);
+    await this.findSeasonByIdOrThrow(parsedSeasonId);
+    const participant = await this.findParticipant(parsedSeasonId, userId);
+
+    if (!participant) {
+      return {
+        success: true,
+        data: {
+          state: 'not_joined',
+          seasonId: parsedSeasonId,
+          filters: {
+            fromCurrency: parsedQuery.fromCurrency ?? null,
+            toCurrency: parsedQuery.toCurrency ?? null,
+          },
+          exchanges: [],
+          pagination: this.listPagination(parsedQuery, 0),
+          reason: 'SEASON_NOT_JOINED',
+          message: 'Exchange records are available after joining the season.',
+        },
+      };
+    }
+
+    const where = {
+      seasonParticipantId: participant.id,
+      ...(parsedQuery.fromCurrency
+        ? { fromCurrency: parsedQuery.fromCurrency }
+        : {}),
+      ...(parsedQuery.toCurrency ? { toCurrency: parsedQuery.toCurrency } : {}),
+    };
+    const exchanges = await this.prisma.exchangeTransaction.findMany({
+      where,
+      orderBy: [{ executedAt: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
+      skip: parsedQuery.offset,
+      take: parsedQuery.limit,
+      select: {
+        id: true,
+        fromCurrency: true,
+        toCurrency: true,
+        sourceAmount: true,
+        grossTargetAmount: true,
+        feeRate: true,
+        feeAmount: true,
+        feeCurrency: true,
+        appliedRate: true,
+        netTargetAmount: true,
+        executedAt: true,
+      },
+    });
+
+    return {
+      success: true,
+      data: {
+        state: 'available',
+        seasonId: parsedSeasonId,
+        filters: {
+          fromCurrency: parsedQuery.fromCurrency ?? null,
+          toCurrency: parsedQuery.toCurrency ?? null,
+        },
+        exchanges: exchanges.map((exchange) => ({
+          exchangeId: exchange.id,
+          fromCurrency: exchange.fromCurrency,
+          toCurrency: exchange.toCurrency,
+          sourceAmount: this.formatDecimal(exchange.sourceAmount, 8),
+          grossTargetAmount: this.formatDecimal(exchange.grossTargetAmount, 8),
+          feeRate: this.formatDecimal(exchange.feeRate, 6),
+          feeAmount: this.formatDecimal(exchange.feeAmount, 8),
+          feeCurrency: exchange.feeCurrency,
+          appliedRate: this.formatDecimal(exchange.appliedRate, 8),
+          netTargetAmount: this.formatDecimal(exchange.netTargetAmount, 8),
+          executedAt: exchange.executedAt.toISOString(),
+        })),
+        pagination: this.listPagination(parsedQuery, exchanges.length),
+      },
+    };
+  }
+
+  async getUserSeasonRecordSummary(
+    authUserId: string | undefined,
+    targetUserId: string | undefined,
+    seasonId: string | undefined,
+  ): Promise<UserSeasonRecordSummaryResponse> {
+    this.assertAuthenticated(authUserId);
+
+    const parsedTargetUserId = this.parseRequiredText(
+      targetUserId,
+      'INVALID_USER_ID',
+      'userId',
+    );
+    const parsedSeasonId = this.parseRequiredText(
+      seasonId,
+      'INVALID_SEASON_ID',
+      'seasonId',
+    );
+    const [targetUser, season] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: {
+          id: parsedTargetUserId,
+        },
+        select: {
+          id: true,
+          nickname: true,
+          profileImageUrl: true,
+        },
+      }),
+      this.findSeasonById(parsedSeasonId),
+    ]);
+
+    if (!targetUser) {
+      this.throwApiError(
+        HttpStatus.NOT_FOUND,
+        'USER_NOT_FOUND',
+        'User not found.',
+      );
+    }
+    if (!season) {
+      this.throwApiError(
+        HttpStatus.NOT_FOUND,
+        'SEASON_NOT_FOUND',
+        'Season not found.',
+      );
+    }
+
+    const participant = await this.findDetailedParticipant(
+      season.id,
+      parsedTargetUserId,
+    );
+    const publicSeason = {
+      id: season.id,
+      name: season.name,
+      status: season.status,
+    };
+
+    if (!participant) {
+      return {
+        success: true,
+        data: {
+          state: 'not_joined',
+          user: targetUser,
+          season: publicSeason,
+          summary: null,
+          reason: 'SEASON_NOT_JOINED',
+          message: 'The user has not joined this season.',
+        },
+      };
+    }
+
+    const [orderCount, exchangeCount] = await Promise.all([
+      this.prisma.order.count({
+        where: {
+          seasonParticipantId: participant.id,
+        },
+      }),
+      this.prisma.exchangeTransaction.count({
+        where: {
+          seasonParticipantId: participant.id,
+        },
+      }),
+    ]);
+    const metric = this.selectBestMetric(
+      participant.seasonRankings[0],
+      participant.dailyPortfolioSnapshots[0],
+    );
+
+    return {
+      success: true,
+      data: {
+        state: 'available',
+        user: targetUser,
+        season: publicSeason,
+        summary: {
+          finalRank: participant.finalRank,
+          finalTier: participant.finalTier,
+          rewardGranted: participant.rewardGrantedAt !== null,
+          totalAssetKrw: metric
+            ? this.formatDecimal(metric.totalAssetKrw, 8)
+            : null,
+          returnRate: metric ? this.formatDecimal(metric.returnRate, 8) : null,
+          orderCount,
+          exchangeCount,
+        },
       },
     };
   }
@@ -416,6 +1178,47 @@ export class RecordsService {
     };
   }
 
+  private parseMySeasonRecordsQuery(
+    query: MySeasonRecordsQuery,
+  ): ParsedMySeasonRecordsQuery {
+    return {
+      seasonStatus: this.parseSeasonStatus(query.seasonStatus),
+      limit: this.parseLimit(query.limit),
+      offset: this.parseOffset(query.offset),
+    };
+  }
+
+  private parseMySeasonOrdersQuery(
+    query: MySeasonOrdersQuery,
+  ): ParsedMySeasonOrdersQuery {
+    return {
+      status: this.parseOrderStatus(query.status),
+      side: this.parseOrderSide(query.side),
+      assetId: this.parseOptionalText(query.assetId),
+      limit: this.parseLimit(query.limit),
+      offset: this.parseOffset(query.offset),
+    };
+  }
+
+  private parseMySeasonExchangesQuery(
+    query: MySeasonExchangesQuery,
+  ): ParsedMySeasonExchangesQuery {
+    return {
+      fromCurrency: this.parseCurrencyFilter(
+        query.fromCurrency,
+        'INVALID_FROM_CURRENCY',
+        'fromCurrency',
+      ),
+      toCurrency: this.parseCurrencyFilter(
+        query.toCurrency,
+        'INVALID_TO_CURRENCY',
+        'toCurrency',
+      ),
+      limit: this.parseLimit(query.limit),
+      offset: this.parseOffset(query.offset),
+    };
+  }
+
   private parseType(value: string | undefined): RecordsType {
     const text = value?.trim() || 'all';
     if (
@@ -434,7 +1237,72 @@ export class RecordsService {
     );
   }
 
-  private parseCurrencyCode(value: string | undefined): CurrencyCode | undefined {
+  private parseSeasonStatus(
+    value: string | undefined,
+  ): SeasonStatus | undefined {
+    const text = this.parseOptionalText(value);
+    if (!text) {
+      return undefined;
+    }
+
+    if (
+      text === SeasonStatus.upcoming ||
+      text === SeasonStatus.active ||
+      text === SeasonStatus.ended ||
+      text === SeasonStatus.settled
+    ) {
+      return text;
+    }
+
+    this.throwApiError(
+      HttpStatus.BAD_REQUEST,
+      'INVALID_SEASON_STATUS',
+      'Invalid seasonStatus.',
+    );
+  }
+
+  private parseOrderStatus(value: string | undefined): OrderStatus | undefined {
+    const text = this.parseOptionalText(value);
+    if (!text) {
+      return undefined;
+    }
+
+    if (
+      text === OrderStatus.submitted ||
+      text === OrderStatus.executed ||
+      text === OrderStatus.canceled ||
+      text === OrderStatus.rejected
+    ) {
+      return text;
+    }
+
+    this.throwApiError(
+      HttpStatus.BAD_REQUEST,
+      'INVALID_ORDER_STATUS',
+      'Invalid order status.',
+    );
+  }
+
+  private parseOrderSide(value: string | undefined): OrderSide | undefined {
+    const text = this.parseOptionalText(value);
+    if (!text) {
+      return undefined;
+    }
+
+    if (text === OrderSide.buy || text === OrderSide.sell) {
+      return text;
+    }
+
+    this.throwApiError(
+      HttpStatus.BAD_REQUEST,
+      'INVALID_ORDER_SIDE',
+      'Invalid order side.',
+    );
+  }
+
+  private parseCurrencyCode(
+    value: string | undefined,
+  ): CurrencyCode | undefined {
     const text = this.parseOptionalText(value);
     if (!text) {
       return undefined;
@@ -449,6 +1317,23 @@ export class RecordsService {
       'INVALID_CURRENCY_CODE',
       'Invalid currencyCode.',
     );
+  }
+
+  private parseCurrencyFilter(
+    value: string | undefined,
+    code: string,
+    fieldName: string,
+  ): CurrencyCode | undefined {
+    const text = this.parseOptionalText(value);
+    if (!text) {
+      return undefined;
+    }
+
+    if (text === CurrencyCode.KRW || text === CurrencyCode.USD) {
+      return text;
+    }
+
+    this.throwApiError(HttpStatus.BAD_REQUEST, code, `Invalid ${fieldName}.`);
   }
 
   private parseLimit(value: string | undefined): number {
@@ -510,6 +1395,23 @@ export class RecordsService {
     return trimmed === '' ? undefined : trimmed;
   }
 
+  private parseRequiredText(
+    value: string | undefined,
+    code: string,
+    fieldName: string,
+  ): string {
+    const text = this.parseOptionalText(value);
+    if (!text) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        code,
+        `${fieldName} must be a non-empty string.`,
+      );
+    }
+
+    return text;
+  }
+
   private async findCurrentSeason(): Promise<RecordsSeason | null> {
     for (const status of CURRENT_SEASON_STATUS_PRIORITY) {
       const season = await this.prisma.season.findFirst({
@@ -534,7 +1436,9 @@ export class RecordsService {
     return null;
   }
 
-  private async findSeasonById(seasonId: string): Promise<RecordsSeason | null> {
+  private async findSeasonById(
+    seasonId: string,
+  ): Promise<RecordsSeason | null> {
     return this.prisma.season.findUnique({
       where: {
         id: seasonId,
@@ -547,6 +1451,21 @@ export class RecordsService {
         endAt: true,
       },
     });
+  }
+
+  private async findSeasonByIdOrThrow(
+    seasonId: string,
+  ): Promise<RecordsSeason> {
+    const season = await this.findSeasonById(seasonId);
+    if (!season) {
+      this.throwApiError(
+        HttpStatus.NOT_FOUND,
+        'SEASON_NOT_FOUND',
+        'Season not found.',
+      );
+    }
+
+    return season;
   }
 
   private getSeasonOrderBy(
@@ -579,6 +1498,76 @@ export class RecordsService {
         id: true,
         participantStatus: true,
         joinedAt: true,
+      },
+    });
+  }
+
+  private async findDetailedParticipant(seasonId: string, userId: string) {
+    return this.prisma.seasonParticipant.findUnique({
+      where: {
+        seasonId_userId: {
+          seasonId,
+          userId,
+        },
+      },
+      select: {
+        id: true,
+        participantStatus: true,
+        joinedAt: true,
+        initialCapitalKrw: true,
+        finalRank: true,
+        finalTier: true,
+        rewardGrantedAt: true,
+        seasonRankings: {
+          where: {
+            rankType: SeasonRankingType.final,
+          },
+          orderBy: [
+            { rankingDate: 'desc' },
+            { capturedAt: 'desc' },
+            { createdAt: 'desc' },
+          ],
+          take: 1,
+          select: {
+            totalAssetKrw: true,
+            returnRate: true,
+            rankingDate: true,
+            capturedAt: true,
+          },
+        },
+        dailyPortfolioSnapshots: {
+          orderBy: [
+            { snapshotDate: 'desc' },
+            { capturedAt: 'desc' },
+            { createdAt: 'desc' },
+          ],
+          take: 1,
+          select: {
+            totalAssetKrw: true,
+            returnRate: true,
+            snapshotDate: true,
+            capturedAt: true,
+          },
+        },
+        _count: {
+          select: {
+            orders: true,
+            exchangeTransactions: true,
+            walletTransactions: true,
+          },
+        },
+      },
+    });
+  }
+
+  private countOrders(
+    seasonParticipantId: string,
+    status: OrderStatus,
+  ): Promise<number> {
+    return this.prisma.order.count({
+      where: {
+        seasonParticipantId,
+        status,
       },
     });
   }
@@ -644,6 +1633,53 @@ export class RecordsService {
     };
   }
 
+  private listPagination(
+    query:
+      | ParsedMySeasonRecordsQuery
+      | ParsedMySeasonOrdersQuery
+      | ParsedMySeasonExchangesQuery,
+    returned: number,
+  ): ListPagination {
+    return {
+      limit: query.limit,
+      offset: query.offset,
+      returned,
+    };
+  }
+
+  private emptyActivitySummary(): MySeasonRecordDetailResponse['data']['activitySummary'] {
+    return {
+      orders: {
+        total: 0,
+        submitted: 0,
+        executed: 0,
+        canceled: 0,
+        rejected: 0,
+      },
+      exchanges: {
+        total: 0,
+      },
+      walletTransactions: {
+        total: 0,
+      },
+      positions: {
+        open: 0,
+      },
+    };
+  }
+
+  private unavailablePerformance(): MySeasonRecordDetailResponse['data']['performance'] {
+    return {
+      state: 'unavailable',
+      totalAssetKrw: null,
+      returnRate: null,
+      snapshotDate: null,
+      capturedAt: null,
+      reason: 'PERFORMANCE_UNAVAILABLE',
+      message: 'Performance data is unavailable for this season.',
+    };
+  }
+
   private formatSeason(season: RecordsSeason) {
     return {
       id: season.id,
@@ -662,6 +1698,106 @@ export class RecordsService {
     };
   }
 
+  private formatDetailedParticipant(participant: {
+    id: string;
+    joinedAt: Date;
+    participantStatus: ParticipantStatus;
+    initialCapitalKrw: Prisma.Decimal;
+    finalRank: number | null;
+    finalTier: string | null;
+    rewardGrantedAt: Date | null;
+  }): NonNullable<MySeasonRecordDetailResponse['data']['participant']> {
+    return {
+      id: participant.id,
+      joinedAt: participant.joinedAt.toISOString(),
+      participantStatus: participant.participantStatus,
+      initialCapitalKrw: this.formatDecimal(participant.initialCapitalKrw, 8),
+      finalRank: participant.finalRank,
+      finalTier: participant.finalTier,
+      rewardGrantedAt: this.formatNullableDate(participant.rewardGrantedAt),
+    };
+  }
+
+  private formatPerformance(
+    snapshot:
+      | {
+          totalAssetKrw: Prisma.Decimal;
+          returnRate: Prisma.Decimal;
+          snapshotDate: Date;
+          capturedAt: Date;
+        }
+      | undefined,
+    finalRanking:
+      | {
+          totalAssetKrw: Prisma.Decimal;
+          returnRate: Prisma.Decimal;
+          rankingDate: Date;
+          capturedAt: Date;
+        }
+      | undefined,
+  ): MySeasonRecordDetailResponse['data']['performance'] {
+    if (snapshot) {
+      return {
+        state: 'available',
+        totalAssetKrw: this.formatDecimal(snapshot.totalAssetKrw, 8),
+        returnRate: this.formatDecimal(snapshot.returnRate, 8),
+        snapshotDate: this.formatDateOnly(snapshot.snapshotDate),
+        capturedAt: snapshot.capturedAt.toISOString(),
+      };
+    }
+
+    if (finalRanking) {
+      return {
+        state: 'available',
+        totalAssetKrw: this.formatDecimal(finalRanking.totalAssetKrw, 8),
+        returnRate: this.formatDecimal(finalRanking.returnRate, 8),
+        snapshotDate: this.formatDateOnly(finalRanking.rankingDate),
+        capturedAt: finalRanking.capturedAt.toISOString(),
+      };
+    }
+
+    return this.unavailablePerformance();
+  }
+
+  private selectBestMetric(
+    finalRanking:
+      | {
+          totalAssetKrw: Prisma.Decimal;
+          returnRate: Prisma.Decimal;
+          rankingDate: Date;
+          capturedAt: Date;
+        }
+      | undefined,
+    snapshot:
+      | {
+          totalAssetKrw: Prisma.Decimal;
+          returnRate: Prisma.Decimal;
+          snapshotDate: Date;
+          capturedAt: Date;
+        }
+      | undefined,
+  ): SeasonRecordMetric | null {
+    if (finalRanking) {
+      return {
+        totalAssetKrw: finalRanking.totalAssetKrw,
+        returnRate: finalRanking.returnRate,
+        metricDate: finalRanking.rankingDate,
+        capturedAt: finalRanking.capturedAt,
+      };
+    }
+
+    if (snapshot) {
+      return {
+        totalAssetKrw: snapshot.totalAssetKrw,
+        returnRate: snapshot.returnRate,
+        metricDate: snapshot.snapshotDate,
+        capturedAt: snapshot.capturedAt,
+      };
+    }
+
+    return null;
+  }
+
   private formatDecimal(value: Prisma.Decimal, scale: number) {
     return value.toFixed(scale);
   }
@@ -674,6 +1810,22 @@ export class RecordsService {
     return value ? value.toISOString() : null;
   }
 
+  private formatDateOnly(value: Date) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  private assertAuthenticated(
+    userId: string | undefined,
+  ): asserts userId is string {
+    if (!userId) {
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
+    }
+  }
+
   private createErrorBody(code: string, message: string) {
     return {
       success: false,
@@ -684,7 +1836,11 @@ export class RecordsService {
     };
   }
 
-  private throwApiError(status: HttpStatus, code: string, message: string): never {
+  private throwApiError(
+    status: HttpStatus,
+    code: string,
+    message: string,
+  ): never {
     throw new HttpException(this.createErrorBody(code, message), status);
   }
 }

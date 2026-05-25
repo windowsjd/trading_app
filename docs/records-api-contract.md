@@ -2,171 +2,49 @@
 
 ## Status
 
-- `GET /api/v1/records` read-only MVP is implemented.
-- Legacy item shapes for future per-resource records APIs remain documented below.
-- The MVP reads existing `exchange_transactions`, `wallet_transactions`, and `orders` rows only.
-- Order records are backed by the `orders` DB foundation.
-- Submitted orders created by `POST /api/v1/orders` are visible in the orders section.
-- Order records can include `status = submitted`, `status = executed`, `status = canceled`, or `status = rejected`.
-- Canceled orders from `POST /api/v1/orders/:orderId/cancel` are visible in the orders section.
-- Executed orders from `POST /api/v1/orders/:orderId/execute` are visible in the orders section with execution price/amount fields.
-- Order execute wallet transactions are visible in the wallet transaction section as `order_buy` or `order_sell` rows with `referenceType = order`.
-- Do not add fake data, Prisma schema changes, migrations, or seed changes from this document.
+- `GET /api/v1/records` read-only MVP is implemented for the current unified exchange, wallet transaction, and order history view.
+- Season history APIs are implemented for authenticated user season lists, season detail, season orders, season exchanges, and protected public user season summaries.
+- Records APIs read existing rows only. They do not create, update, delete, synthesize, or seed records.
+- Provider ingestion, scheduler jobs, admin HTTP batch execution, and reward external fulfillment are not implemented here.
 
 ## Source Rules
 
-- Amount values are strings.
+- Protected route identity is always `request.user.userId`; there is no `x-user-id` fallback.
+- Amount and Decimal values are returned as strings.
 - Timestamps are UTC ISO strings.
-- Keep the existing `success/data` response direction.
-- Field names in this document are fixed for frontend mapping.
-- User identity is `request.user.userId`; there is no `x-user-id` fallback.
-- MVP crypto is Binance-based USD-settled crypto.
-- Crypto order and wallet transaction records use `currencyCode = USD` because crypto trades use the USD Wallet.
-- Upbit/Bithumb and KRW crypto trading are excluded from MVP records.
+- Date-only snapshot/ranking dates are `YYYY-MM-DD`.
+- Performance values come from existing `daily_portfolio_snapshots` or `season_rankings`; the API does not calculate or fake performance.
+- Private ledgers, wallet balances, individual orders, and individual exchanges are exposed only through `/api/v1/records/me/**` for the authenticated user.
+- `GET /api/v1/users/:userId/records/:seasonId` is protected but returns only a public summary shape.
+
+## Common Query Rules
+
+- `limit` optional, default `50`, max `100`.
+- `offset` optional, default `0`.
+- `limit` must be a positive integer.
+- `offset` must be a non-negative integer.
+- Invalid query values return the standard `success=false` error envelope.
 
 ## GET /api/v1/records
 
+Unified read-only records MVP.
+
 ### Query Parameters
 
-- `seasonId` optional.
-  - If omitted, current season selection uses the same priority as `/home` and `/ranking`: active, upcoming, ended, settled.
-- `type` optional.
-  - Default: `all`.
-  - Allowed: `all`, `exchanges`, `wallets`, `orders`.
-- `limit` optional.
-  - Default: `50`.
-  - Must be a positive integer.
-  - Values greater than `100` are clamped to `100`.
-- `offset` optional.
-  - Default: `0`.
-  - Must be a non-negative integer.
-- `currencyCode` optional.
-  - Allowed: `KRW`, `USD`.
-  - For exchange records, matches either `fromCurrency` or `toCurrency`.
-  - For wallet transaction records, matches `currencyCode`.
-
-### Available Response
-
-```json
-{
-  "success": true,
-  "data": {
-    "state": "available",
-    "season": {
-      "id": "<string>",
-      "name": "<string>",
-      "status": "active | upcoming | ended | settled",
-      "startAt": "<UTC ISO string>",
-      "endAt": "<UTC ISO string>"
-    },
-    "participant": {
-      "id": "<string>",
-      "status": "<string>",
-      "joinedAt": "<UTC ISO string>"
-    },
-    "type": "all | exchanges | wallets | orders",
-    "filters": {
-      "currencyCode": "KRW | USD | null"
-    },
-    "exchanges": {
-      "state": "available",
-      "pagination": {
-        "limit": 50,
-        "offset": 0,
-        "total": 1,
-        "returned": 1
-      },
-      "records": [
-        {
-          "exchangeId": "<string>",
-          "executedAt": "<UTC ISO string>",
-          "fromCurrency": "KRW | USD",
-          "toCurrency": "KRW | USD",
-          "sourceAmount": "<amount string>",
-          "grossTargetAmount": "<amount string>",
-          "feeRate": "<decimal string>",
-          "feeAmount": "<amount string>",
-          "feeCurrency": "KRW | USD",
-          "appliedRate": "<decimal string>",
-          "netTargetAmount": "<amount string>",
-          "fxRateSnapshotId": "<string | null>",
-          "createdAt": "<UTC ISO string>"
-        }
-      ]
-    },
-    "walletTransactions": {
-      "state": "available",
-      "pagination": {
-        "limit": 50,
-        "offset": 0,
-        "total": 1,
-        "returned": 1
-      },
-      "records": [
-        {
-          "walletTransactionId": "<string>",
-          "walletId": "<string>",
-          "currencyCode": "KRW | USD",
-          "direction": "credit | debit",
-          "transactionType": "<string>",
-          "amount": "<amount string>",
-          "balanceAfter": "<amount string>",
-          "referenceType": "<string>",
-          "referenceId": "<string | null>",
-          "occurredAt": "<UTC ISO string>",
-          "createdAt": "<UTC ISO string>"
-        }
-      ]
-    },
-    "orders": {
-      "state": "available",
-      "pagination": {
-        "limit": 50,
-        "offset": 0,
-        "total": 1,
-        "returned": 1
-      },
-      "records": [
-        {
-          "orderId": "<string>",
-          "submittedAt": "<UTC ISO string>",
-          "executedAt": "<UTC ISO string | null>",
-          "canceledAt": "<UTC ISO string | null>",
-          "rejectedAt": "<UTC ISO string | null>",
-          "assetId": "<string>",
-          "symbol": "<string>",
-          "name": "<string>",
-          "side": "buy | sell",
-          "orderType": "market | limit",
-          "status": "submitted | executed | canceled | rejected",
-          "quantity": "<decimal string>",
-          "limitPrice": "<amount string | null>",
-          "executedPrice": "<amount string | null>",
-          "currencyCode": "KRW | USD",
-          "grossAmount": "<amount string | null>",
-          "feeAmount": "<amount string | null>",
-          "netAmount": "<amount string | null>",
-          "assetPriceSnapshotId": "<string | null>",
-          "fxRateSnapshotId": "<string | null>",
-          "createdAt": "<UTC ISO string>"
-        }
-      ]
-    }
-  }
-}
-```
+- `seasonId` optional. If omitted, current season selection uses active, upcoming, ended, settled priority.
+- `type` optional. Default `all`. Allowed: `all`, `exchanges`, `wallets`, `orders`.
+- `currencyCode` optional. Allowed: `KRW`, `USD`.
+  - Exchange records match either `fromCurrency` or `toCurrency`.
+  - Wallet transaction records match `currencyCode`.
+  - Order records match `currencyCode`.
+- `limit`, `offset` follow common query rules.
 
 ### State Rules
 
-- If the user has not joined the selected season, `data.state` is `not_joined` and record arrays are empty.
-- If no current season or selected season exists, `data.state` is `unavailable`.
-- `type=orders` returns `data.state = available` for joined participants and reads actual `orders` rows.
-- `type=orders` can return submitted orders before execution.
-- `type=orders` can return executed orders, including `executedAt`, `executedPrice`, `grossAmount`, `feeAmount`, `netAmount`, `assetPriceSnapshotId`, and `fxRateSnapshotId`.
-- `type=orders` can return canceled orders, including `canceledAt`.
-- `type=wallets` can return order ledger rows with `transactionType = order_buy | order_sell` and `referenceType = order`.
-- The API does not synthesize or fake order records.
-- The API does not mutate DB rows.
+- Joined selected season: `state = available`.
+- Existing selected season but not joined: `state = not_joined`, requested record arrays are empty.
+- Missing current/selected season: `state = unavailable`.
+- Rows are read from `exchange_transactions`, `wallet_transactions`, and `orders`.
 
 ### Error Codes
 
@@ -176,101 +54,334 @@
 - `INVALID_OFFSET`
 - `INVALID_CURRENCY_CODE`
 
-## GET /api/v1/records/me/seasons/{seasonId}/orders
+## GET /api/v1/records/me/seasons
 
-### Item Shape
+Authenticated user's season participation history.
 
-```json
-{
-  "orderId": "<string>",
-  "submittedAt": "<UTC ISO string>",
-  "executedAt": "<UTC ISO string | null>",
-  "canceledAt": "<UTC ISO string | null>",
-  "rejectedAt": "<UTC ISO string | null>",
-  "assetId": "<string>",
-  "symbol": "<string>",
-  "name": "<string>",
-  "side": "buy | sell",
-  "orderType": "market | limit",
-  "status": "submitted | executed | canceled | rejected",
-  "quantity": "<decimal string>",
-  "limitPrice": "<amount string | null>",
-  "executedPrice": "<amount string | null>",
-  "currencyCode": "KRW | USD",
-  "grossAmount": "<amount string | null>",
-  "feeAmount": "<amount string | null>",
-  "netAmount": "<amount string | null>",
-  "assetPriceSnapshotId": "<string | null>",
-  "fxRateSnapshotId": "<string | null>",
-  "createdAt": "<UTC ISO string>"
-}
-```
+### Query Parameters
 
-### Fixed Fields
+- `seasonStatus` optional. Allowed: `upcoming`, `active`, `ended`, `settled`.
+- `limit`, `offset` follow common query rules.
 
-- `orderId`
-- `submittedAt`
-- `executedAt`
-- `canceledAt`
-- `rejectedAt`
-- `assetId`
-- `symbol`
-- `name`
-- `side`
-- `orderType`
-- `status`
-- `quantity`
-- `limitPrice`
-- `executedPrice`
-- `currencyCode`
-- `grossAmount`
-- `feeAmount`
-- `netAmount`
-- `assetPriceSnapshotId`
-- `fxRateSnapshotId`
-- `createdAt`
-
-### Notes
-
-- `submittedAt` must be a UTC ISO timestamp.
-- lifecycle timestamps are UTC ISO strings or null.
-- `quantity`, price, and amount fields must be strings when present.
-- `currencyCode` is the currency used for price and amount fields.
-- This document fixes the item response shape only. Pagination, filters, sorting, and full list envelope are not changed here.
-
-## GET /api/v1/records/me/seasons/{seasonId}/exchanges
-
-### Item Shape
+### Response
 
 ```json
 {
-  "exchangeId": "<string>",
-  "executedAt": "<UTC ISO string>",
-  "fromCurrency": "<string>",
-  "toCurrency": "<string>",
-  "sourceAmount": "<amount string>",
-  "rate": "<decimal string>",
-  "feeAmount": "<amount string>",
-  "feeCurrency": "<string>",
-  "netTargetAmount": "<amount string>"
+  "success": true,
+  "data": {
+    "state": "available",
+    "seasons": [
+      {
+        "seasonId": "season-1",
+        "seasonName": "Season 1",
+        "seasonStatus": "settled",
+        "joinedAt": "2026-05-01T00:00:00.000Z",
+        "participantStatus": "finished",
+        "initialCapitalKrw": "10000000.00000000",
+        "finalRank": 1,
+        "finalTier": "master",
+        "rewardGrantedAt": "2026-05-31T00:00:00.000Z",
+        "latestTotalAssetKrw": "12000000.00000000",
+        "latestReturnRate": "0.20000000",
+        "orderCount": 10,
+        "exchangeCount": 2,
+        "walletTransactionCount": 13
+      }
+    ],
+    "pagination": {
+      "limit": 50,
+      "offset": 0,
+      "returned": 1
+    },
+    "filters": {
+      "seasonStatus": null
+    }
+  }
 }
 ```
 
-### Fixed Fields
+### State Rules
 
-- `exchangeId`
-- `executedAt`
-- `fromCurrency`
-- `toCurrency`
-- `sourceAmount`
-- `rate`
-- `feeAmount`
-- `feeCurrency`
-- `netTargetAmount`
+- At least one matching participant: `state = available`.
+- No matching participant: `state = empty`.
 
-### Notes
+### Sorting
 
-- `executedAt` must be a UTC ISO timestamp.
-- `sourceAmount`, `rate`, `feeAmount`, and `netTargetAmount` must be strings.
-- `feeCurrency` is fixed as a frontend mapping field.
-- This document fixes the item response shape only. Pagination, filters, sorting, and full list envelope are not changed here.
+- `season.startAt desc`
+- `season.endAt desc`
+- `participant.joinedAt desc`
+- `seasonId asc`
+
+### Error Codes
+
+- `UNAUTHORIZED`
+- `INVALID_SEASON_STATUS`
+- `INVALID_LIMIT`
+- `INVALID_OFFSET`
+
+## GET /api/v1/records/me/seasons/:seasonId
+
+Authenticated user's detail summary for one season.
+
+### State Rules
+
+- Existing season and joined: `state = available`.
+- Existing season and not joined: `state = not_joined`.
+- Missing season: `404 SEASON_NOT_FOUND`.
+
+### Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "state": "available",
+    "season": {
+      "id": "season-1",
+      "name": "Season 1",
+      "status": "settled",
+      "startAt": "2026-05-01T00:00:00.000Z",
+      "endAt": "2026-05-31T00:00:00.000Z"
+    },
+    "participant": {
+      "id": "participant-1",
+      "joinedAt": "2026-05-01T00:00:00.000Z",
+      "participantStatus": "finished",
+      "initialCapitalKrw": "10000000.00000000",
+      "finalRank": 1,
+      "finalTier": "master",
+      "rewardGrantedAt": "2026-05-31T00:00:00.000Z"
+    },
+    "performance": {
+      "state": "available",
+      "totalAssetKrw": "12000000.00000000",
+      "returnRate": "0.20000000",
+      "snapshotDate": "2026-05-31",
+      "capturedAt": "2026-05-31T00:00:30.000Z"
+    },
+    "activitySummary": {
+      "orders": {
+        "total": 10,
+        "submitted": 0,
+        "executed": 8,
+        "canceled": 2,
+        "rejected": 0
+      },
+      "exchanges": {
+        "total": 2
+      },
+      "walletTransactions": {
+        "total": 13
+      },
+      "positions": {
+        "open": 3
+      }
+    }
+  }
+}
+```
+
+If no snapshot or final ranking row exists, `performance.state = unavailable` and performance values are `null`.
+
+### Error Codes
+
+- `UNAUTHORIZED`
+- `INVALID_SEASON_ID`
+- `SEASON_NOT_FOUND`
+
+## GET /api/v1/records/me/seasons/:seasonId/orders
+
+Authenticated user's order history for one season.
+
+### Query Parameters
+
+- `status` optional. Allowed: `submitted`, `executed`, `canceled`, `rejected`.
+- `side` optional. Allowed: `buy`, `sell`.
+- `assetId` optional non-empty string.
+- `limit`, `offset` follow common query rules.
+
+### State Rules
+
+- Existing season and joined: `state = available`.
+- Existing season and not joined: `state = not_joined`, `orders = []`.
+- Missing season: `404 SEASON_NOT_FOUND`.
+
+### Sorting
+
+- `submittedAt desc`
+- `createdAt desc`
+- `id asc`
+
+### Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "state": "available",
+    "seasonId": "season-1",
+    "filters": {
+      "status": null,
+      "side": null,
+      "assetId": null
+    },
+    "orders": [
+      {
+        "orderId": "order-1",
+        "assetId": "asset-1",
+        "symbol": "AAPL",
+        "name": "Apple Inc.",
+        "market": "NASDAQ",
+        "assetType": "us_stock",
+        "side": "buy",
+        "orderType": "market",
+        "status": "executed",
+        "quantity": "1.00000000",
+        "limitPrice": null,
+        "executedPrice": "190.00000000",
+        "currencyCode": "USD",
+        "grossAmount": "190.00000000",
+        "feeAmount": "0.19000000",
+        "netAmount": "190.19000000",
+        "submittedAt": "2026-05-23T00:00:00.000Z",
+        "executedAt": "2026-05-23T00:00:01.000Z",
+        "canceledAt": null,
+        "rejectedAt": null,
+        "rejectReason": null
+      }
+    ],
+    "pagination": {
+      "limit": 50,
+      "offset": 0,
+      "returned": 1
+    }
+  }
+}
+```
+
+### Error Codes
+
+- `UNAUTHORIZED`
+- `INVALID_SEASON_ID`
+- `SEASON_NOT_FOUND`
+- `INVALID_ORDER_STATUS`
+- `INVALID_ORDER_SIDE`
+- `INVALID_LIMIT`
+- `INVALID_OFFSET`
+
+## GET /api/v1/records/me/seasons/:seasonId/exchanges
+
+Authenticated user's exchange history for one season.
+
+### Query Parameters
+
+- `fromCurrency` optional. Allowed: `KRW`, `USD`.
+- `toCurrency` optional. Allowed: `KRW`, `USD`.
+- `limit`, `offset` follow common query rules.
+
+### State Rules
+
+- Existing season and joined: `state = available`.
+- Existing season and not joined: `state = not_joined`, `exchanges = []`.
+- Missing season: `404 SEASON_NOT_FOUND`.
+
+### Sorting
+
+- `executedAt desc`
+- `createdAt desc`
+- `id asc`
+
+### Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "state": "available",
+    "seasonId": "season-1",
+    "filters": {
+      "fromCurrency": null,
+      "toCurrency": null
+    },
+    "exchanges": [
+      {
+        "exchangeId": "exchange-1",
+        "fromCurrency": "KRW",
+        "toCurrency": "USD",
+        "sourceAmount": "145000.00000000",
+        "grossTargetAmount": "100.00000000",
+        "feeRate": "0.001000",
+        "feeAmount": "0.10000000",
+        "feeCurrency": "USD",
+        "appliedRate": "1450.00000000",
+        "netTargetAmount": "99.90000000",
+        "executedAt": "2026-05-23T00:00:00.000Z"
+      }
+    ],
+    "pagination": {
+      "limit": 50,
+      "offset": 0,
+      "returned": 1
+    }
+  }
+}
+```
+
+### Error Codes
+
+- `UNAUTHORIZED`
+- `INVALID_SEASON_ID`
+- `SEASON_NOT_FOUND`
+- `INVALID_FROM_CURRENCY`
+- `INVALID_TO_CURRENCY`
+- `INVALID_LIMIT`
+- `INVALID_OFFSET`
+
+## GET /api/v1/users/:userId/records/:seasonId
+
+Protected public summary for a target user's season result. This endpoint does not expose private ledgers, wallet balances, individual orders, or individual exchanges.
+
+### State Rules
+
+- Existing user, existing season, joined: `state = available`.
+- Existing user, existing season, not joined: `state = not_joined`.
+- Missing user: `404 USER_NOT_FOUND`.
+- Missing season: `404 SEASON_NOT_FOUND`.
+
+### Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "state": "available",
+    "user": {
+      "id": "user-2",
+      "nickname": "traderLee",
+      "profileImageUrl": null
+    },
+    "season": {
+      "id": "season-1",
+      "name": "Season 1",
+      "status": "settled"
+    },
+    "summary": {
+      "finalRank": 3,
+      "finalTier": "diamond",
+      "rewardGranted": true,
+      "totalAssetKrw": "11500000.00000000",
+      "returnRate": "0.15000000",
+      "orderCount": 8,
+      "exchangeCount": 2
+    }
+  }
+}
+```
+
+### Error Codes
+
+- `UNAUTHORIZED`
+- `INVALID_USER_ID`
+- `INVALID_SEASON_ID`
+- `USER_NOT_FOUND`
+- `SEASON_NOT_FOUND`

@@ -2,6 +2,11 @@ jest.mock('../generated/prisma/client', () => {
   const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
 
   return {
+    AssetType: {
+      domestic_stock: 'domestic_stock',
+      us_stock: 'us_stock',
+      crypto: 'crypto',
+    },
     CurrencyCode: {
       KRW: 'KRW',
       USD: 'USD',
@@ -36,6 +41,10 @@ jest.mock('../generated/prisma/client', () => {
       ended: 'ended',
       settled: 'settled',
     },
+    SeasonRankingType: {
+      daily: 'daily',
+      final: 'final',
+    },
     WalletTransactionDirection: {
       credit: 'credit',
       debit: 'debit',
@@ -62,12 +71,14 @@ jest.mock('../generated/prisma/client', () => {
 
 import { HttpException } from '@nestjs/common';
 import {
+  AssetType,
   CurrencyCode,
   OrderSide,
   OrderStatus,
   OrderType,
   ParticipantStatus,
   Prisma,
+  SeasonRankingType,
   SeasonStatus,
   WalletTransactionDirection,
   WalletTransactionReferenceType,
@@ -82,6 +93,8 @@ describe('RecordsService', () => {
   const occurredAt = new Date('2026-05-07T00:01:00.000Z');
   const canceledAt = new Date('2026-05-07T00:03:00.000Z');
   const createdAt = new Date('2026-05-07T00:01:01.000Z');
+  const snapshotDate = new Date('2026-05-31T00:00:00.000Z');
+  const capturedAt = new Date('2026-05-31T00:00:30.000Z');
 
   const season = {
     id: 'season-1',
@@ -97,6 +110,36 @@ describe('RecordsService', () => {
     joinedAt,
   };
 
+  const detailedParticipant = {
+    ...participant,
+    participantStatus: ParticipantStatus.finished,
+    initialCapitalKrw: new Prisma.Decimal('10000000.00000000'),
+    finalRank: 1,
+    finalTier: 'master',
+    rewardGrantedAt: new Date('2026-05-31T00:00:00.000Z'),
+    seasonRankings: [
+      {
+        totalAssetKrw: new Prisma.Decimal('12000000.00000000'),
+        returnRate: new Prisma.Decimal('0.20000000'),
+        rankingDate: snapshotDate,
+        capturedAt,
+      },
+    ],
+    dailyPortfolioSnapshots: [
+      {
+        totalAssetKrw: new Prisma.Decimal('11900000.00000000'),
+        returnRate: new Prisma.Decimal('0.19000000'),
+        snapshotDate,
+        capturedAt,
+      },
+    ],
+    _count: {
+      orders: 10,
+      exchangeTransactions: 2,
+      walletTransactions: 13,
+    },
+  };
+
   const createPrisma = () => ({
     season: {
       findFirst: jest.fn(),
@@ -107,9 +150,19 @@ describe('RecordsService', () => {
       delete: jest.fn(),
     },
     seasonParticipant: {
+      count: jest.fn(),
+      findMany: jest.fn(),
       findUnique: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      upsert: jest.fn(),
+      delete: jest.fn(),
+    },
+    position: {
+      count: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
       upsert: jest.fn(),
       delete: jest.fn(),
     },
@@ -151,6 +204,13 @@ describe('RecordsService', () => {
     equitySnapshot: {
       create: jest.fn(),
     },
+    user: {
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      upsert: jest.fn(),
+      delete: jest.fn(),
+    },
     $transaction: jest.fn(),
   });
 
@@ -167,6 +227,27 @@ describe('RecordsService', () => {
 
   const mockJoined = (prisma: ReturnType<typeof createPrisma>) => {
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
+  };
+
+  const mockDetailedParticipant = (prisma: ReturnType<typeof createPrisma>) => {
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+      detailedParticipant,
+    );
+  };
+
+  const mockSeasonHistory = (prisma: ReturnType<typeof createPrisma>) => {
+    prisma.seasonParticipant.count.mockResolvedValueOnce(1);
+    prisma.seasonParticipant.findMany.mockResolvedValueOnce([
+      {
+        ...detailedParticipant,
+        seasonId: season.id,
+        season: {
+          id: season.id,
+          name: season.name,
+          status: SeasonStatus.settled,
+        },
+      },
+    ]);
   };
 
   const mockExchangeRecords = (prisma: ReturnType<typeof createPrisma>) => {
@@ -209,9 +290,7 @@ describe('RecordsService', () => {
     ]);
   };
 
-  const mockOrderWalletRecords = (
-    prisma: ReturnType<typeof createPrisma>,
-  ) => {
+  const mockOrderWalletRecords = (prisma: ReturnType<typeof createPrisma>) => {
     prisma.walletTransaction.count.mockResolvedValueOnce(1);
     prisma.walletTransaction.findMany.mockResolvedValueOnce([
       {
@@ -239,6 +318,7 @@ describe('RecordsService', () => {
         executedAt: null,
         canceledAt: null,
         rejectedAt: null,
+        rejectReason: null,
         side: OrderSide.buy,
         orderType: OrderType.limit,
         status: OrderStatus.submitted,
@@ -256,6 +336,8 @@ describe('RecordsService', () => {
           id: 'asset-1',
           symbol: 'AAPL',
           name: 'Apple Inc.',
+          market: 'NASDAQ',
+          assetType: AssetType.us_stock,
         },
       },
     ]);
@@ -294,6 +376,56 @@ describe('RecordsService', () => {
     ]);
   };
 
+  const mockSeasonOrderRecords = (prisma: ReturnType<typeof createPrisma>) => {
+    prisma.order.findMany.mockResolvedValueOnce([
+      {
+        id: 'order-1',
+        assetId: 'asset-1',
+        submittedAt: occurredAt,
+        executedAt: new Date('2026-05-07T00:02:00.000Z'),
+        canceledAt: null,
+        rejectedAt: null,
+        rejectReason: null,
+        side: OrderSide.buy,
+        orderType: OrderType.market,
+        status: OrderStatus.executed,
+        quantity: new Prisma.Decimal('1.00000000'),
+        limitPrice: null,
+        executedPrice: new Prisma.Decimal('190.00000000'),
+        currencyCode: CurrencyCode.USD,
+        grossAmount: new Prisma.Decimal('190.00000000'),
+        feeAmount: new Prisma.Decimal('0.19000000'),
+        netAmount: new Prisma.Decimal('190.19000000'),
+        asset: {
+          symbol: 'AAPL',
+          name: 'Apple Inc.',
+          market: 'NASDAQ',
+          assetType: AssetType.us_stock,
+        },
+      },
+    ]);
+  };
+
+  const mockSeasonExchangeRecords = (
+    prisma: ReturnType<typeof createPrisma>,
+  ) => {
+    prisma.exchangeTransaction.findMany.mockResolvedValueOnce([
+      {
+        id: 'ex-1',
+        fromCurrency: CurrencyCode.KRW,
+        toCurrency: CurrencyCode.USD,
+        sourceAmount: new Prisma.Decimal('145000.00000000'),
+        grossTargetAmount: new Prisma.Decimal('100.00000000'),
+        feeRate: new Prisma.Decimal('0.001000'),
+        feeAmount: new Prisma.Decimal('0.10000000'),
+        feeCurrency: CurrencyCode.USD,
+        appliedRate: new Prisma.Decimal('1450.00000000'),
+        netTargetAmount: new Prisma.Decimal('99.90000000'),
+        executedAt: occurredAt,
+      },
+    ]);
+  };
+
   const expectNoRecordWrites = (prisma: ReturnType<typeof createPrisma>) => {
     for (const model of [
       prisma.season,
@@ -301,7 +433,9 @@ describe('RecordsService', () => {
       prisma.exchangeTransaction,
       prisma.walletTransaction,
       prisma.order,
+      prisma.position,
       prisma.cashWallet,
+      prisma.user,
     ]) {
       expect(model.create).not.toHaveBeenCalled();
       expect(model.update).not.toHaveBeenCalled();
@@ -652,11 +786,416 @@ describe('RecordsService', () => {
     expectNoRecordWrites(prisma);
   });
 
+  it('returns authenticated user season history records', async () => {
+    const { prisma, service } = createService();
+    mockSeasonHistory(prisma);
+
+    const response = await service.getMySeasonRecords('user-1', {});
+
+    expect(response.data).toMatchObject({
+      state: 'available',
+      seasons: [
+        {
+          seasonId: 'season-1',
+          seasonName: 'Season 1',
+          seasonStatus: SeasonStatus.settled,
+          participantStatus: ParticipantStatus.finished,
+          initialCapitalKrw: '10000000.00000000',
+          finalRank: 1,
+          finalTier: 'master',
+          latestTotalAssetKrw: '12000000.00000000',
+          latestReturnRate: '0.20000000',
+          orderCount: 10,
+          exchangeCount: 2,
+          walletTransactionCount: 13,
+        },
+      ],
+      pagination: {
+        limit: 50,
+        offset: 0,
+        returned: 1,
+      },
+    });
+    expect(prisma.seasonParticipant.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          userId: 'user-1',
+        },
+      }),
+    );
+    expectNoRecordWrites(prisma);
+  });
+
+  it('returns empty state when authenticated user has no season history', async () => {
+    const { prisma, service } = createService();
+    prisma.seasonParticipant.count.mockResolvedValueOnce(0);
+
+    const response = await service.getMySeasonRecords('user-1', {});
+
+    expect(response.data).toMatchObject({
+      state: 'empty',
+      seasons: [],
+      pagination: {
+        returned: 0,
+      },
+    });
+    expect(prisma.seasonParticipant.findMany).not.toHaveBeenCalled();
+    expectNoRecordWrites(prisma);
+  });
+
+  it('applies seasonStatus filter for season history records', async () => {
+    const { prisma, service } = createService();
+    mockSeasonHistory(prisma);
+
+    await service.getMySeasonRecords('user-1', {
+      seasonStatus: 'settled',
+    });
+
+    expect(prisma.seasonParticipant.count).toHaveBeenCalledWith({
+      where: {
+        userId: 'user-1',
+        season: {
+          status: SeasonStatus.settled,
+        },
+      },
+    });
+    expect(prisma.seasonParticipant.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          userId: 'user-1',
+          season: {
+            status: SeasonStatus.settled,
+          },
+        },
+      }),
+    );
+    expectNoRecordWrites(prisma);
+  });
+
+  it('validates and clamps season history limit and offset', async () => {
+    const { prisma, service } = createService();
+
+    await expect(
+      service.getMySeasonRecords('user-1', { limit: '0' }),
+    ).rejects.toBeInstanceOf(HttpException);
+    await expect(
+      service.getMySeasonRecords('user-1', { offset: '-1' }),
+    ).rejects.toBeInstanceOf(HttpException);
+    await expect(
+      service.getMySeasonRecords('user-1', { seasonStatus: 'paused' }),
+    ).rejects.toBeInstanceOf(HttpException);
+
+    prisma.seasonParticipant.count.mockResolvedValueOnce(1);
+    prisma.seasonParticipant.findMany.mockResolvedValueOnce([]);
+
+    const response = await service.getMySeasonRecords('user-1', {
+      limit: '200',
+      offset: '5',
+    });
+
+    expect(response.data.pagination).toEqual({
+      limit: 100,
+      offset: 5,
+      returned: 0,
+    });
+    expect(prisma.seasonParticipant.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 5,
+        take: 100,
+      }),
+    );
+    expectNoRecordWrites(prisma);
+  });
+
+  it('returns authenticated user season record detail', async () => {
+    const { prisma, service } = createService();
+    prisma.season.findUnique.mockResolvedValueOnce(season);
+    mockDetailedParticipant(prisma);
+    prisma.order.count
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(8)
+      .mockResolvedValueOnce(2)
+      .mockResolvedValueOnce(0);
+    prisma.position.count.mockResolvedValueOnce(3);
+
+    const response = await service.getMySeasonRecordDetail(
+      'user-1',
+      'season-1',
+    );
+
+    expect(response.data).toMatchObject({
+      state: 'available',
+      season: {
+        id: 'season-1',
+      },
+      participant: {
+        id: 'sp-1',
+        finalRank: 1,
+        finalTier: 'master',
+      },
+      performance: {
+        state: 'available',
+        totalAssetKrw: '11900000.00000000',
+        returnRate: '0.19000000',
+        snapshotDate: '2026-05-31',
+      },
+      activitySummary: {
+        orders: {
+          total: 10,
+          submitted: 0,
+          executed: 8,
+          canceled: 2,
+          rejected: 0,
+        },
+        exchanges: {
+          total: 2,
+        },
+        walletTransactions: {
+          total: 13,
+        },
+        positions: {
+          open: 3,
+        },
+      },
+    });
+    expectNoRecordWrites(prisma);
+  });
+
+  it('throws SEASON_NOT_FOUND for missing season detail', async () => {
+    const { prisma, service } = createService();
+    prisma.season.findUnique.mockResolvedValueOnce(null);
+
+    await expect(
+      service.getMySeasonRecordDetail('user-1', 'missing-season'),
+    ).rejects.toBeInstanceOf(HttpException);
+    expect(prisma.seasonParticipant.findUnique).not.toHaveBeenCalled();
+    expectNoRecordWrites(prisma);
+  });
+
+  it('returns not_joined for existing season detail without participant', async () => {
+    const { prisma, service } = createService();
+    prisma.season.findUnique.mockResolvedValueOnce(season);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
+
+    const response = await service.getMySeasonRecordDetail(
+      'user-1',
+      'season-1',
+    );
+
+    expect(response.data).toMatchObject({
+      state: 'not_joined',
+      participant: null,
+      performance: {
+        state: 'unavailable',
+      },
+      activitySummary: {
+        orders: {
+          total: 0,
+        },
+      },
+    });
+    expect(prisma.order.count).not.toHaveBeenCalled();
+    expect(prisma.position.count).not.toHaveBeenCalled();
+    expectNoRecordWrites(prisma);
+  });
+
+  it('returns unavailable performance without fake fallback when snapshots and rankings are missing', async () => {
+    const { prisma, service } = createService();
+    prisma.season.findUnique.mockResolvedValueOnce(season);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+      ...detailedParticipant,
+      seasonRankings: [],
+      dailyPortfolioSnapshots: [],
+      _count: {
+        orders: 0,
+        exchangeTransactions: 0,
+        walletTransactions: 0,
+      },
+    });
+    prisma.order.count
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0);
+    prisma.position.count.mockResolvedValueOnce(0);
+
+    const response = await service.getMySeasonRecordDetail(
+      'user-1',
+      'season-1',
+    );
+
+    expect(response.data.performance).toMatchObject({
+      state: 'unavailable',
+      totalAssetKrw: null,
+      returnRate: null,
+      reason: 'PERFORMANCE_UNAVAILABLE',
+    });
+    expectNoRecordWrites(prisma);
+  });
+
+  it('returns only authenticated user participant orders and applies filters', async () => {
+    const { prisma, service } = createService();
+    prisma.season.findUnique.mockResolvedValueOnce(season);
+    mockJoined(prisma);
+    mockSeasonOrderRecords(prisma);
+
+    const response = await service.getMySeasonOrders('user-1', 'season-1', {
+      status: 'executed',
+      side: 'buy',
+      assetId: 'asset-1',
+    });
+
+    expect(response.data).toMatchObject({
+      state: 'available',
+      seasonId: 'season-1',
+      orders: [
+        {
+          orderId: 'order-1',
+          assetId: 'asset-1',
+          symbol: 'AAPL',
+          market: 'NASDAQ',
+          assetType: AssetType.us_stock,
+          status: OrderStatus.executed,
+          side: OrderSide.buy,
+          grossAmount: '190.00000000',
+        },
+      ],
+    });
+    expect(prisma.order.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          seasonParticipantId: 'sp-1',
+          status: OrderStatus.executed,
+          side: OrderSide.buy,
+          assetId: 'asset-1',
+        },
+      }),
+    );
+    expectNoRecordWrites(prisma);
+  });
+
+  it('returns not_joined with empty order records for an unjoined season', async () => {
+    const { prisma, service } = createService();
+    prisma.season.findUnique.mockResolvedValueOnce(season);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
+
+    const response = await service.getMySeasonOrders('user-1', 'season-1', {});
+
+    expect(response.data).toMatchObject({
+      state: 'not_joined',
+      orders: [],
+    });
+    expect(prisma.order.findMany).not.toHaveBeenCalled();
+    expectNoRecordWrites(prisma);
+  });
+
+  it('returns only authenticated user participant exchanges and applies currency filters', async () => {
+    const { prisma, service } = createService();
+    prisma.season.findUnique.mockResolvedValueOnce(season);
+    mockJoined(prisma);
+    mockSeasonExchangeRecords(prisma);
+
+    const response = await service.getMySeasonExchanges('user-1', 'season-1', {
+      fromCurrency: 'KRW',
+      toCurrency: 'USD',
+    });
+
+    expect(response.data).toMatchObject({
+      state: 'available',
+      seasonId: 'season-1',
+      exchanges: [
+        {
+          exchangeId: 'ex-1',
+          fromCurrency: CurrencyCode.KRW,
+          toCurrency: CurrencyCode.USD,
+          sourceAmount: '145000.00000000',
+          netTargetAmount: '99.90000000',
+        },
+      ],
+    });
+    expect(prisma.exchangeTransaction.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          seasonParticipantId: 'sp-1',
+          fromCurrency: CurrencyCode.KRW,
+          toCurrency: CurrencyCode.USD,
+        },
+      }),
+    );
+    expectNoRecordWrites(prisma);
+  });
+
+  it('rejects invalid order and exchange filters', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.getMySeasonOrders('user-1', 'season-1', { status: 'filled' }),
+    ).rejects.toBeInstanceOf(HttpException);
+    await expect(
+      service.getMySeasonOrders('user-1', 'season-1', { side: 'hold' }),
+    ).rejects.toBeInstanceOf(HttpException);
+    await expect(
+      service.getMySeasonExchanges('user-1', 'season-1', {
+        fromCurrency: 'EUR',
+      }),
+    ).rejects.toBeInstanceOf(HttpException);
+  });
+
+  it('returns protected public user season summary without private ledgers', async () => {
+    const { prisma, service } = createService();
+    prisma.user.findUnique.mockResolvedValueOnce({
+      id: 'user-2',
+      nickname: 'traderLee',
+      profileImageUrl: null,
+    });
+    prisma.season.findUnique.mockResolvedValueOnce({
+      ...season,
+      status: SeasonStatus.settled,
+    });
+    mockDetailedParticipant(prisma);
+    prisma.order.count.mockResolvedValueOnce(8);
+    prisma.exchangeTransaction.count.mockResolvedValueOnce(2);
+
+    const response = await service.getUserSeasonRecordSummary(
+      'user-1',
+      'user-2',
+      'season-1',
+    );
+
+    expect(response.data).toMatchObject({
+      state: 'available',
+      user: {
+        id: 'user-2',
+        nickname: 'traderLee',
+      },
+      season: {
+        id: 'season-1',
+        status: SeasonStatus.settled,
+      },
+      summary: {
+        finalRank: 1,
+        finalTier: 'master',
+        rewardGranted: true,
+        totalAssetKrw: '12000000.00000000',
+        returnRate: '0.20000000',
+        orderCount: 8,
+        exchangeCount: 2,
+      },
+    });
+    expect(response.data).not.toHaveProperty('orders');
+    expect(response.data).not.toHaveProperty('exchanges');
+    expect(JSON.stringify(response.data)).not.toContain('walletId');
+    expectNoRecordWrites(prisma);
+  });
+
   it('rejects missing authenticated user', async () => {
     const { service } = createService();
 
     await expect(service.getRecords(undefined, {})).rejects.toBeInstanceOf(
       HttpException,
     );
+    await expect(
+      service.getMySeasonRecords(undefined, {}),
+    ).rejects.toBeInstanceOf(HttpException);
   });
 });

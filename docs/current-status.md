@@ -31,6 +31,11 @@
 - `GET /api/v1/ranking` read-only MVP
 - `GET /api/v1/wallets` read-only MVP
 - `GET /api/v1/records` read-only MVP
+- `GET /api/v1/records/me/seasons` read-only season history MVP
+- `GET /api/v1/records/me/seasons/:seasonId` read-only season history detail MVP
+- `GET /api/v1/records/me/seasons/:seasonId/orders` read-only season order history MVP
+- `GET /api/v1/records/me/seasons/:seasonId/exchanges` read-only season exchange history MVP
+- `GET /api/v1/users/:userId/records/:seasonId` protected public-summary season record MVP
 - `GET /api/v1/rewards/me` read-only MVP
 - `GET /api/v1/badges/me` read-only MVP
 - `GET /api/v1/orders` read-only MVP
@@ -106,8 +111,8 @@
   - Auth refresh/logout route: missing/malformed refresh token 거절, valid refresh rotation, old refresh token reuse 실패, logout idempotent success 검증.
   - Auth logout-all route: missing token, `x-user-id` only `UNAUTHORIZED`, valid token success 검증.
   - optional auth route: `GET /api/v1/seasons/current` anonymous/valid token/invalid token/malformed Authorization/`x-user-id` only 회귀 검증.
-  - protected read-only route: `GET /api/v1/me`, `/home`, `/ranking`, `/wallets`, `/records`, `/rewards/me`, `/badges/me`, `/orders` missing token 및 `x-user-id` only `UNAUTHORIZED` 검증.
-  - protected read-only route valid token smoke: `GET /api/v1/me`, `/home`, `/ranking`, `/wallets`, `/records`, `/rewards/me`, `/badges/me`, `/orders`가 guard를 통과해 service-level 정상 응답 또는 known unavailable/not_joined 계약으로 진입하는지 검증.
+  - protected read-only route: `GET /api/v1/me`, `/home`, `/ranking`, `/wallets`, `/records`, `/records/me/seasons`, `/records/me/seasons/:seasonId`, `/records/me/seasons/:seasonId/orders`, `/records/me/seasons/:seasonId/exchanges`, `/users/:userId/records/:seasonId`, `/rewards/me`, `/badges/me`, `/orders` missing token 및 `x-user-id` only `UNAUTHORIZED` 검증.
+  - protected read-only route valid token smoke: `GET /api/v1/me`, `/home`, `/ranking`, `/wallets`, `/records`, `/records/me/seasons`, `/records/me/seasons/:seasonId`, `/records/me/seasons/:seasonId/orders`, `/records/me/seasons/:seasonId/exchanges`, `/users/:userId/records/:seasonId`, `/rewards/me`, `/badges/me`, `/orders`가 guard를 통과해 service-level 정상 응답 또는 known unavailable/not_joined/empty 계약으로 진입하는지 검증.
   - protected write-path route: `POST /api/v1/seasons/:seasonId/join`, `/fx/quote`, `/fx/execute`, `/orders/quote`, `/orders`, `/orders/:orderId/cancel`, `/orders/:orderId/execute` missing token, `x-user-id` only, invalid bearer token, malformed Authorization 차단 검증.
   - protected write-path route valid token smoke: 위 write API들이 guard를 통과해 service-level success 또는 known domain error(`SEASON_NOT_JOINED`, `ORDER_NOT_FOUND`)까지 진입하는지 검증.
   - write-path API의 full mutation 검증은 service/unit/opt-in DB integration spec이 담당하며, HTTP e2e는 guard routing, `request.user` 주입, controller/service 진입 회귀를 담당.
@@ -680,21 +685,41 @@ near-term ledger/FX foundation:
 
 ### `/records`
 
-- `GET /api/v1/records` read-only MVP 구현 완료.
+- `GET /api/v1/records` unified read-only MVP 구현 완료.
+- `GET /api/v1/records/me/seasons` season history list read-only MVP 구현 완료.
+- `GET /api/v1/records/me/seasons/:seasonId` season history detail read-only MVP 구현 완료.
+- `GET /api/v1/records/me/seasons/:seasonId/orders` season order history read-only MVP 구현 완료.
+- `GET /api/v1/records/me/seasons/:seasonId/exchanges` season exchange history read-only MVP 구현 완료.
+- `GET /api/v1/users/:userId/records/:seasonId` protected public-summary season record read-only MVP 구현 완료.
 - Bearer access token Auth MVP 이후 API는 전역 guard가 주입한 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
-- query parameter:
+- `GET /api/v1/records` query parameter:
   - `seasonId` optional.
   - `type` optional, default `all`, allowed `all`/`exchanges`/`wallets`/`orders`.
   - `limit` optional, default 50, max 100 clamp.
   - `offset` optional, default 0.
   - `currencyCode` optional, allowed `KRW`/`USD`.
+- Season history query parameter:
+  - `/records/me/seasons`: `seasonStatus` optional, allowed `upcoming`/`active`/`ended`/`settled`, plus `limit`/`offset`.
+  - `/records/me/seasons/:seasonId/orders`: `status`, `side`, `assetId`, `limit`, `offset`.
+  - `/records/me/seasons/:seasonId/exchanges`: `fromCurrency`, `toCurrency`, `limit`, `offset`.
 - records source:
+  - `season_participants`
+  - `seasons`
+  - `season_rankings`
+  - `daily_portfolio_snapshots`
   - `exchange_transactions`
   - `wallet_transactions`
   - `orders`
+  - `positions` count
 - access control:
   - 로그인 사용자의 `season_participants` 기준으로만 조회.
+  - `/records/me/**`는 로그인 사용자의 participant만 조회.
   - 미참가면 records 배열을 비우고 `state = not_joined`.
+  - `/users/:userId/records/:seasonId`는 protected route이지만 target user의 public summary만 반환하며 private ledger, wallet balance, individual order/exchange detail은 노출하지 않음.
+- season history:
+  - 참가 시즌이 있으면 `state = available`.
+  - 참가 시즌이 없으면 `state = empty`.
+  - performance는 기존 `daily_portfolio_snapshots` 또는 final `season_rankings`를 읽고, 없으면 fake fallback 없이 `unavailable`/`null` 처리.
 - order records:
   - `orders` table 기반 read-only 조회로 연결 완료.
   - order row가 없으면 fake 없이 `orders.state = available`, empty records.
@@ -703,9 +728,10 @@ near-term ledger/FX foundation:
   - `POST /api/v1/orders/:orderId/execute`로 executed 처리된 order 조회 가능.
 - wallet transaction records:
   - order execute가 생성한 `order_buy`/`order_sell` wallet transaction 조회 가능.
-- `/records` 호출은 exchange/wallet/order row를 생성/수정/삭제하지 않음.
+- `/records` 계열 호출은 season/participant/snapshot/ranking/exchange/wallet/order/position/reward row를 생성/수정/삭제하지 않음.
 - 아직 미구현:
-  - full records filters/export/detail views.
+  - records export.
+  - provider event records.
 
 ### `/rewards` and `/badges`
 
@@ -810,7 +836,7 @@ near-term ledger/FX foundation:
   - Binance ingestion implementation은 fixture가 있어도 effectiveAt mapping, sourceType eligibility, price-field decision, terms approval, USDT-to-USD owner decision 전까지 `STOP`.
   - OANDA/Twelve Data ingestion implementation은 credentialed fixture, mapping, terms, sourceType tests 전까지 `STOP/BLOCKED`.
   - KRX domestic stock remains STOP.
-  - Batch job run foundation과 operator-run snapshot/ranking/cycle/settlement/final-tier/reward-grant marker MVP job은 구현됨. 실제 cron scheduler와 provider ingestion/actual reward fulfillment job은 STOP 유지.
+  - Batch job run foundation과 operator-run snapshot/ranking/cycle/settlement/final-tier/reward-grant internal foundation MVP job은 구현됨. 실제 cron scheduler와 provider ingestion/actual reward fulfillment job은 STOP 유지.
   - settlement extension/actual reward fulfillment는 Gate H/I/J 전까지 구현 STOP 유지.
 - Gate B Provider final selection readiness re-check 및 Asset Price Freshness Policy 문서화 완료.
   - 상세 결과: `docs/provider-final-selection-readiness-recheck.md`, `docs/asset-price-freshness-policy.md`.
@@ -825,7 +851,7 @@ near-term ledger/FX foundation:
   - full financial write-path 검증은 현재 service/unit 및 opt-in PostgreSQL integration spec이 담당.
 - 테스트 커버리지 상세는 `docs/backend-test-coverage-matrix.md` 기준.
 - provider ingestion은 여전히 미구현이며 live fixture와 owner decision 수락 전 구현 `BLOCKED` 유지.
-- Batch job run foundation과 operator-run snapshot/ranking/cycle/settlement/final-tier/reward-grant marker MVP job은 구현됨. 실제 cron scheduler와 provider ingestion/actual reward fulfillment job은 STOP 유지.
+- Batch job run foundation과 operator-run snapshot/ranking/cycle/settlement/final-tier/reward-grant internal foundation MVP job은 구현됨. 실제 cron scheduler와 provider ingestion/actual reward fulfillment job은 STOP 유지.
 - settlement extension/actual reward fulfillment는 Gate H/I/J 전까지 구현 STOP 유지.
 - asset price freshness 정책 요약:
   - FX USD/KRW quote/execute는 현행 60초 `effectiveAt` freshness 유지.
@@ -854,7 +880,7 @@ near-term ledger/FX foundation:
   - durable quote, order exact execute replay, partial fill, matching engine.
   - FX stale pending/unknown outcome recovery.
   - deployment/operations readiness.
-- Settlement extension/actual reward fulfillment handoff beyond Home final-result read model, final tier assignment MVP, and reward grant marker MVP
+- Settlement extension/actual reward fulfillment handoff beyond Home final-result read model, final tier assignment MVP, and reward grant internal foundation MVP
 - access token blacklist/revocation
 - cookie/session auth
 - refresh token reuse detection 시 user active sessions 전체 revoke 정책

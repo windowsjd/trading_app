@@ -1,12 +1,12 @@
 # Batch Job Foundation
 
-Status: implemented foundation with operator-run daily portfolio snapshot, season ranking, daily season cycle, season settlement MVP, final tier assignment MVP, and reward grant marker MVP jobs, no cron scheduler.
+Status: implemented foundation with operator-run daily portfolio snapshot, season ranking, daily season cycle, season settlement MVP, final tier assignment MVP, and reward grant internal reward foundation MVP jobs, no cron scheduler.
 
 ## Scope
 
 The batch foundation is a common job execution envelope for operator-run work and possible future scheduler-run work. It records job start, finish, result, failure, dry-run mode, request payload, and idempotency state in `batch_job_runs`.
 
-This is not provider ingestion, cron scheduling, daily snapshot automation, or actual reward/payment fulfillment. Settlement, final tier assignment, and reward grant are limited to the operator-run MVP jobs described below.
+This is not provider ingestion, cron scheduling, daily snapshot automation, or actual reward/payment/point/delivery/external fulfillment. Settlement, final tier assignment, and reward grant are limited to the operator-run MVP jobs described below.
 
 ## Current Components
 
@@ -56,7 +56,7 @@ Supported jobs now:
 - `daily-season-cycle`: runs daily portfolio snapshot, then season ranking, for one season/date.
 - `season-settlement`: creates final `season_rankings` from existing `daily_portfolio_snapshots` for one ended season/date and transitions the season to `settled`.
 - `final-tier-assignment`: assigns `SeasonParticipant.finalRank` and `SeasonParticipant.finalTier` from existing final `season_rankings` for one settled season/date.
-- `reward-grant`: marks final-assigned settled participants as reward granted by setting `SeasonParticipant.rewardGrantedAt`.
+- `reward-grant`: ensures `SeasonParticipant.rewardGrantedAt` plus internal tier badge/TOP10 trophy rows in `badges`, `user_badges`, and `season_rewards` for final-assigned settled participants.
 
 Example:
 
@@ -69,7 +69,7 @@ pnpm tsx scripts/admin-run-batch-job.ts \
   --payload-json '{"purpose":"batch-foundation-check"}'
 ```
 
-The script requires `DATABASE_URL`. `noop` and `health-check` create only `batch_job_runs` rows. `daily-portfolio-snapshot` additionally creates `daily_portfolio_snapshots` only when `--dry-run` is not set and participant valuation is available. `season-ranking` additionally creates daily `season_rankings` only when `--dry-run` is not set and ranking rows do not already exist. `daily-season-cycle` creates its own cycle `batch_job_runs` row and child batch runs for daily snapshot and season ranking. `season-settlement` additionally creates final `season_rankings` and updates the season status to `settled` only when `--dry-run` is not set and settlement prerequisites pass. `final-tier-assignment` updates only `season_participants.final_rank` and `season_participants.final_tier` when `--dry-run` is not set and assignment prerequisites pass. `reward-grant` updates only `season_participants.reward_granted_at` when `--dry-run` is not set and reward marker prerequisites pass. None of these jobs create provider, FX, asset price, wallet, order, position, payment, badge, or trophy rows outside their stated scope.
+The script requires `DATABASE_URL`. `noop` and `health-check` create only `batch_job_runs` rows. `daily-portfolio-snapshot` additionally creates `daily_portfolio_snapshots` only when `--dry-run` is not set and participant valuation is available. `season-ranking` additionally creates daily `season_rankings` only when `--dry-run` is not set and ranking rows do not already exist. `daily-season-cycle` creates its own cycle `batch_job_runs` row and child batch runs for daily snapshot and season ranking. `season-settlement` additionally creates final `season_rankings` and updates the season status to `settled` only when `--dry-run` is not set and settlement prerequisites pass. `final-tier-assignment` updates only `season_participants.final_rank` and `season_participants.final_tier` when `--dry-run` is not set and assignment prerequisites pass. `reward-grant` writes the reward marker and internal reward/badge/trophy foundation rows when `--dry-run` is not set and prerequisites pass. None of these jobs create provider, FX, asset price, wallet, order, position, payment, point, delivery, or external fulfillment rows outside their stated scope.
 
 Daily snapshot example:
 
@@ -204,7 +204,7 @@ Final tier assignment policy:
 - `--dry-run` returns the assignment plan, policy source, participant counts, and up to 10 `topAssignments` without updating participants.
 - Non-dry-run updates only participants where both `finalRank` and `finalTier` are null. If either field is already present, the participant is classified as `existing`/`skipped` and is not overwritten.
 - Non-dry-run writes run in a Prisma transaction for the participant updates to avoid partial assignment.
-- The job never updates `rewardGrantedAt` and never creates reward/payment/badge/trophy rows. Reward handoff remains a separate gate.
+- The job never updates `rewardGrantedAt` and never creates reward, payment, point, delivery, or external fulfillment rows. It also does not create internal badge/trophy foundation rows; `reward-grant` handles that.
 - The job does not call providers, create price/FX rows, register a scheduler, expose an HTTP batch execution API, mutate wallets/orders/positions/snapshots/rankings, or change the settlement final ranking policy.
 - Current final rankings use deterministic unique sequential ranks because `season_rankings` has a unique `(seasonId, rankType, rankingDate, rank)` constraint. True competition tie rank remains a separate schema/migration gate.
 - Settled joined `GET /api/v1/home` reads `season_participants.finalTier`; after this job assigns it, `finalResult.tier` becomes available. Missing `finalTier` remains `FINAL_TIER_UNAVAILABLE`.
@@ -230,7 +230,7 @@ pnpm tsx scripts/admin-run-batch-job.ts \
   --requested-by local-operator
 ```
 
-Reward grant marker policy:
+Reward grant internal foundation policy:
 
 - If `--idempotency-key` is omitted, it is generated as `reward-grant:<season-id>`. If `--grant-date` is provided, it is generated as `reward-grant:<season-id>:<YYYY-MM-DD>`.
 - `--grant-date` is optional. When present, it must be `YYYY-MM-DD` and the stored `rewardGrantedAt` marker uses `<YYYY-MM-DD>T00:00:00.000Z`. When omitted, the batch run `startedAt` timestamp is used.
@@ -238,13 +238,25 @@ Reward grant marker policy:
 - Source of truth is settled `SeasonParticipant` rows that already have both `finalRank` and `finalTier`.
 - Participants missing `finalRank` or `finalTier` are `ineligible`/`skipped`.
 - If no participant has both `finalRank` and `finalTier`, the job fails with `FINAL_TIER_ASSIGNMENT_REQUIRED`.
-- `--dry-run` returns participant counts, would-grant count, existing count, and up to 10 `topGranted` preview rows without updating participants.
-- Non-dry-run updates only participants where `rewardGrantedAt` is null. Participants that already have `rewardGrantedAt` are `existing`/`skipped` and are never overwritten.
-- Non-dry-run marker writes run in a Prisma transaction for participant updates.
-- The job does not calculate or return reward amounts and does not create reward/payment/point/badge/trophy rows. Actual fulfillment remains a separate gate.
+- The default internal reward policy grants one tier badge per final tier:
+  - `master`: `TIER_MASTER`
+  - `diamond`: `TIER_DIAMOND`
+  - `platinum`: `TIER_PLATINUM`
+  - `gold`: `TIER_GOLD`
+  - `silver`: `TIER_SILVER`
+  - `bronze`: `TIER_BRONZE`
+- If `finalRank <= 10`, the job also grants `TROPHY_TOP10`.
+- `Badge` rows are idempotent by `code`.
+- `UserBadge` rows are idempotent by `userId + badgeId + seasonId`.
+- `SeasonReward` rows are idempotent by `seasonParticipantId + rewardCode`.
+- `--dry-run` returns participant counts, marker would-grant/existing counts, internal reward row would-create/existing counts, and preview rows without writing the database.
+- Non-dry-run updates only participants where `rewardGrantedAt` is null. Participants that already have `rewardGrantedAt` keep their existing marker timestamp.
+- If a participant already has `rewardGrantedAt` but is missing internal reward rows, the existing marker timestamp is used as `grantedAt`/`awardedAt` for idempotent backfill.
+- Non-dry-run marker updates and internal reward/badge/trophy row writes run in a Prisma transaction.
+- The job does not calculate reward amounts and does not perform payment, point, delivery, transfer, or external fulfillment. Actual fulfillment remains a separate gate.
 - The job does not call providers, create price/FX rows, register a scheduler, expose an HTTP batch execution API, mutate wallets/orders/positions/snapshots/rankings, or change settlement/final-tier policy.
 - Settled joined `GET /api/v1/home` reads `season_participants.rewardGrantedAt`; after this job sets it, `finalResult.reward.state` becomes `granted`. Missing `rewardGrantedAt` remains `REWARD_NOT_GRANTED`.
 
 ## Future Work
 
-Cron scheduling, provider ingestion, daily snapshot automation, ranking overwrite/regeneration, settlement extensions beyond final tier assignment, true competition tie rank, reward amount policy, and actual payment/point/badge/trophy fulfillment remain separate gates.
+Cron scheduling, provider ingestion, daily snapshot automation, ranking overwrite/regeneration, settlement extensions beyond final tier assignment, true competition tie rank, reward amount policy, and actual payment/point/delivery/external fulfillment remain separate gates.
