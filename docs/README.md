@@ -17,6 +17,7 @@ Use this directory in this order:
    - `docs/records-api-contract.md`
    - `docs/rewards-api-contract.md`
 5. Provider/freshness/crypto policy:
+   - `docs/provider-ingestion-foundation.md`
    - `docs/crypto-usd-settlement-policy-update.md`
    - `docs/provider-final-selection-readiness-recheck.md`
    - `docs/asset-price-freshness-policy.md`

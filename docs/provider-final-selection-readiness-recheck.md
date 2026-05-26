@@ -2,9 +2,15 @@
 
 ## 1. Purpose
 
-This document re-checks provider readiness before any `provider_api` ingestion, scheduler, settlement, or reward implementation.
+This document re-checks provider readiness before provider_api source eligibility, scheduler, settlement, or reward implementation.
 
-Scope is documentation and policy only. It does not authorize OANDA/Twelve Data API clients, provider ingestion, scheduler/batch jobs, settlement, rewards, schema changes, migrations, package changes, seed changes, or fake/static/sample business price data.
+Scope is readiness and policy. Provider ingestion foundation is now tracked separately in `docs/provider-ingestion-foundation.md`; this document does not authorize scheduler/batch jobs, settlement, rewards, schema changes, migrations, package changes, seed changes, provider_api source eligibility, or fake/static/sample business price data.
+
+2026-05-26 implementation update:
+
+- Provider ingestion foundation is implemented for ExchangeRate-API USD/KRW and Binance public REST crypto price snapshots.
+- KIS is implemented only as a market data skeleton: config parsing, redaction, watchlist policy, token response parsing, approval key response parsing, and explicit-path low-level client foundation.
+- KIS quote ingestion, KIS WebSocket ingestion, Binance WebSocket ingestion, cron scheduling, admin HTTP ingestion API, and provider_api source eligibility are not implemented.
 
 Crypto policy update on 2026-05-14:
 
@@ -12,7 +18,7 @@ Crypto policy update on 2026-05-14:
 - MVP crypto is USD-settled and uses the USD Wallet.
 - Upbit/Bithumb are excluded from the MVP provider stack.
 - Twelve Data remains a conditional US stock/FX candidate, not the MVP crypto provider.
-- `CurrencyCode.USDT` must not be added. Binance USDT quote pairs such as `BTCUSDT` require a fixture/evidence owner decision for USD-equivalent normalization, or Binance USD quote pair evidence.
+- `CurrencyCode.USDT` must not be added. Provider ingestion foundation treats Binance USDT quote pairs such as `BTCUSDT` as USD-equivalent for stored provider_api snapshots, while source eligibility and depeg risk remain a later gate.
 
 ## 2. Current Project Requirements
 
@@ -25,7 +31,7 @@ Crypto policy update on 2026-05-14:
 - Trading and FX exchange must be blocked after season end.
 - Missing or stale prices must produce explicit errors or unavailable states, not fake data.
 - `admin_manual` is an approved bootstrap/manual correction path, not a long-running production provider.
-- `provider_api`, `official_batch`, scheduler/batch, settlement, and reward are currently not implemented.
+- `provider_api` row insertion foundation exists for ExchangeRate-API and Binance. Provider_api source eligibility, `official_batch` ingestion, scheduler/batch automation, settlement, and reward are not implemented by this document.
 
 ## 3. Current Internal Source Policy
 
@@ -254,25 +260,25 @@ Twelve Data:
 - Primary FX provider: OANDA, CONDITIONAL. Use only after trial/API response proves USD/KRW, timestamp, rate fields, and contract/polling approval.
 - Secondary FX provider: Twelve Data, CONDITIONAL. Use only after live-key USD/KRW response and timestamp freshness measurements.
 - Primary US stock provider: Twelve Data, CONDITIONAL. Candidate endpoint is `/quote` or WebSocket with timestamp evidence, not `/price` alone.
-- Primary crypto provider: Binance, CONDITIONAL for fixture capture and STOP for ingestion implementation. Requires Binance BTCUSDT ticker/orderbook fixtures, timestamp freshness proof, terms approval, and USDT-to-USD-equivalent owner decision or Binance USD quote pair evidence.
+- Primary crypto provider: Binance, GO for REST ticker row insertion foundation and STOP for financial source eligibility. Requires timestamp freshness proof, terms approval, and source eligibility before quote/execute/valuation use.
 - KRX domestic stock provider: BLOCKED/UNVERIFIED for quote/execute. Twelve Data may be an EOD/reference candidate only if product accepts delayed/EOD use.
 - Manual fallback: `admin_manual`, explicit operator action only.
 - Official batch role: reference, reconciliation, daily snapshot, and settlement candidate only; not real-time order execute.
-- Provider implementation GO/STOP: implementation remains separate Gate C/D. This document is readiness policy, not implementation approval.
+- Provider implementation GO/STOP: row insertion foundation is implemented for ExchangeRate-API and Binance; financial source eligibility remains a separate gate.
 
 ## 17. STOP / GO Decision
 
 | Area | Decision | Reason |
 |---|---|---|
 | Gate B Provider final selection readiness | CONDITIONAL GO | Official docs were rechecked and provider roles are now clear enough to proceed to evidence collection and narrow Gate C/D prompts |
-| FX provider ingestion | CONDITIONAL GO, not implementation GO | OANDA is primary candidate, but trial/API response mapping and contract approval are still required before code |
-| Asset price provider ingestion | CONDITIONAL GO for US stock and Binance crypto fixture capture, BLOCKED for KRX quote/execute | Twelve Data is a candidate for US stock; Binance is the MVP crypto target but ingestion waits for fixtures and USDT-to-USD decision; KRX real-time remains unverified and checked official coverage indicates EOD delay |
+| FX provider ingestion foundation | GO for ExchangeRate-API USD/KRW row insertion | Source eligibility and final provider selection remain separate gates |
+| Asset price provider ingestion foundation | GO for Binance public crypto row insertion, BLOCKED for KRX quote/execute | Binance MVP crypto row insertion exists; Twelve Data US stock and KRX real-time remain later gates |
 | Scheduler/batch foundation | CONDITIONAL GO for preimplementation audit only | Polling/credit/failure rules are clearer, but scheduler implementation still needs provider decisions and tests |
 | Settlement preimplementation audit | CONDITIONAL GO for docs-only audit, STOP for implementation | Freshness/source policy is clearer, but final official/reference source remains a settlement gate decision |
 
 ## 18. Required Evidence Before Implementation
 
-Before FX provider ingestion:
+Before FX provider_api source eligibility:
 
 - OANDA trial response for USD/KRW.
 - Exact OANDA endpoint path, params, auth header/query, response fields.
@@ -284,7 +290,7 @@ Before FX provider ingestion:
 - SourceType/sourceName values accepted.
 - Rate limit/backoff and outage behavior accepted.
 
-Before asset price provider ingestion:
+Before asset price provider_api source eligibility:
 
 - Twelve Data symbol mapping for each supported market/asset.
 - US stock `/quote` or WebSocket response fixture with timestamp.
@@ -298,11 +304,11 @@ Before asset price provider ingestion:
 
 Recommended next prompt title:
 
-- `Gate C Binance Crypto Fixture Capture + OANDA/Twelve Data Fixture Capture`
+- `Provider API Source Eligibility Gate - Quote Valuation and Execute Allowlist`
 
 Allowed scope for that prompt:
 
-- Docs-only or trial-response evidence capture.
-- Record raw provider response fixtures if approved, without adding clients or ingestion code.
-- Capture Binance BTCUSDT ticker/orderbook public fixtures in the next fixture task only; no private key and no provider ingestion implementation.
+- Source eligibility policy and tests.
+- Live smoke evidence where credentials and terms permit.
+- Keep Binance private key, KIS order/account/balance APIs, cron scheduler, and WebSocket ingestion out of scope unless separately approved.
 - No scheduler, settlement, reward, schema, migration, package, seed, or business logic changes.

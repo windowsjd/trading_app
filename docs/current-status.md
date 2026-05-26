@@ -15,7 +15,11 @@
   - Crypto KRW valuation remains required for `totalAssetKrw`, ranking, home summary, snapshots, and final evaluation.
   - No schema migration is needed because the current `currencyCode`-driven model supports `AssetType.crypto`, `CurrencyCode.USD`, `Asset.market = BINANCE`, USD orders/positions, and USD/KRW FX conversion.
   - Upbit/Bithumb are removed from the MVP provider stack.
-  - Binance `BTCUSDT` public ticker/orderbook fixtures were captured in Gate C prep; provider ingestion remains STOP.
+  - Binance `BTCUSDT` public ticker/orderbook fixtures were captured in Gate C prep.
+  - Provider ingestion foundation is now implemented for explicit operator-run ExchangeRate-API USD/KRW and Binance public crypto price snapshot insertion.
+  - Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage; USDT depeg risk is not modeled.
+  - Provider_api source eligibility for quote, execute, valuation, daily snapshot, ranking, and settlement remains a separate gate.
+  - KIS is limited to market data config, redaction, watchlist policy, token/approval parsing, and low-level explicit-path skeleton. KIS quote ingestion and WebSocket ingestion remain unimplemented.
   - KRX domestic stock remains STOP.
 
 ## 2. 구현 완료 API
@@ -159,6 +163,16 @@ near-term ledger/FX foundation:
   - `daily-portfolio-snapshot`은 operator-run job이며 cron scheduler가 아님.
   - `daily-portfolio-snapshot`은 기존 DB의 approved fresh `admin_manual` USD/KRW 및 latest eligible `admin_manual` asset price만 사용.
   - `daily-portfolio-snapshot`은 `daily_portfolio_snapshots`만 생성하며 ranking, settlement, reward, provider ingestion을 수행하지 않음.
+- Provider ingestion foundation 추가 완료:
+  - `ProvidersModule` 등록 완료.
+  - Provider config parsing, fail-closed validation, secret redaction, raw payload truncation, low-level HTTP client foundation 구현 완료.
+  - `scripts/provider-ingest-fx-rate.ts`는 ExchangeRate-API USD/KRW를 fetch/parse하고 `fx_rate_snapshots`에 `sourceType=provider_api`, `sourceName=exchange_rate_api` row를 생성할 수 있음.
+  - `scripts/provider-ingest-binance-prices.ts`는 Binance public REST 24hr ticker를 fetch/parse하고 기존 active `BINANCE` crypto asset mapping이 명확한 경우 `asset_price_snapshots`에 `sourceType=provider_api`, `sourceName=binance_public_rest_24hr_ticker`, `currencyCode=USD` row를 생성할 수 있음.
+  - 두 provider ingestion script는 `--dry-run`, `--requested-by`를 지원하며 cron scheduler가 아님.
+  - Binance API key/secret, user data stream, order/account/balance API는 구현하지 않음.
+  - KIS는 appkey/appsecret redaction, token response parsing, approval_key parsing, watchlist 41개 제한, explicit-path low-level market data client skeleton까지만 구현됨.
+  - `KIS_REST_BASE_URL` 또는 `KIS_WS_BASE_URL`이 없으면 KIS live call은 skip 가능 상태이며 전체 provider 작업 실패로 처리하지 않음.
+  - 실제 production secret 값은 코드/문서/test fixture에 없음.
   - missing/stale FX 또는 missing price evidence는 fake fallback 없이 participant-level failure로 기록하고 해당 snapshot row를 생성하지 않음.
   - 동일 participant + snapshotDate snapshot이 이미 있으면 overwrite하지 않고 `existing`으로 분류.
   - `season-ranking`은 operator-run job이며 cron scheduler가 아님.
@@ -832,26 +846,26 @@ near-term ledger/FX foundation:
   - Twelve Data AAPL quote fixture 상태: `BLOCKED`, `TWELVE_DATA_API_KEY` unavailable, `/quote`는 공식 mapping 후보만 유지.
   - Binance `BTCUSDT` ticker fixture 상태: `GO` for fixture capture, `CONDITIONAL GO` for mapping. Public `/api/v3/ticker/24hr` returned HTTP 200 and includes `lastPrice`, `bidPrice`, `askPrice`, `openTime`, `closeTime`.
   - Binance `BTCUSDT` orderbook fixture 상태: `CONDITIONAL GO`. Public `/api/v3/depth` returned HTTP 200 and includes bid/ask levels, but no source timestamp.
-  - Crypto fixture blocker: `BTCUSDT` 같은 USDT quote를 USD-equivalent로 정규화할지, Binance USD quote pair만 허용할지 owner decision 필요.
-  - Binance ingestion implementation은 fixture가 있어도 effectiveAt mapping, sourceType eligibility, price-field decision, terms approval, USDT-to-USD owner decision 전까지 `STOP`.
+  - Crypto provider ingestion foundation은 `BTCUSDT` 같은 USDT quote를 MVP USD-equivalent provider_api snapshot으로 저장할 수 있음. USDT depeg risk는 별도 반영하지 않음.
+  - Binance provider_api source eligibility는 effectiveAt/freshness policy, sourceType eligibility, price-field decision, terms approval 전까지 `STOP`.
   - OANDA/Twelve Data ingestion implementation은 credentialed fixture, mapping, terms, sourceType tests 전까지 `STOP/BLOCKED`.
   - KRX domestic stock remains STOP.
-  - Batch job run foundation과 operator-run snapshot/ranking/cycle/settlement/final-tier/reward-grant internal foundation MVP job은 구현됨. 실제 cron scheduler와 provider ingestion/actual reward fulfillment job은 STOP 유지.
+  - Batch job run foundation과 operator-run snapshot/ranking/cycle/settlement/final-tier/reward-grant internal foundation MVP job은 구현됨. 실제 cron scheduler와 provider-backed batch/actual reward fulfillment job은 STOP 유지.
   - settlement extension/actual reward fulfillment는 Gate H/I/J 전까지 구현 STOP 유지.
 - Gate B Provider final selection readiness re-check 및 Asset Price Freshness Policy 문서화 완료.
   - 상세 결과: `docs/provider-final-selection-readiness-recheck.md`, `docs/asset-price-freshness-policy.md`.
   - Gate B 판단은 `CONDITIONAL GO`.
   - 이것은 evidence capture와 다음 구현 프롬프트를 열기 위한 조건부 판단이며, provider ingestion 구현 GO가 아님.
-- 다음 recommended gate: Gate C/D Provider Mapping Decision - Binance USDT-to-USD Policy and SourceType Eligibility.
+- 다음 recommended gate: Provider API Source Eligibility Gate - Quote Valuation and Execute Allowlist.
   - credential이 확보되면 별도 후속으로 Gate C OANDA/Twelve Data Live Fixture Completion을 진행.
-  - 구현 착수 전 OANDA trial/API USD/KRW 응답, timestamp/effectiveAt mapping, bid/ask/mid 또는 rate basis, Twelve Data USD/KRW/US stock fixtures, Binance USDT-to-USD owner decision, Binance price/effectiveAt mapping, symbol mapping, plan/terms, sourceType/sourceName 우선순위, polling/rate-limit 정책을 확인해야 함.
+  - source eligibility 착수 전 provider timestamp/effectiveAt mapping, Binance price/effectiveAt mapping, symbol mapping, plan/terms, sourceType/sourceName 우선순위, polling/rate-limit 정책을 확인해야 함.
 - Gate A Protected API HTTP e2e baseline은 완료 상태로 본다.
   - 완료 범위: public/optional/protected guard baseline, missing token/`x-user-id` 차단, valid-token read-only smoke, selected quote smoke.
   - 남은 gap: 모든 protected route별 invalid-token HTTP e2e exhaustive coverage와 valid-token full write-path HTTP e2e는 아직 없음.
   - full financial write-path 검증은 현재 service/unit 및 opt-in PostgreSQL integration spec이 담당.
 - 테스트 커버리지 상세는 `docs/backend-test-coverage-matrix.md` 기준.
-- provider ingestion은 여전히 미구현이며 live fixture와 owner decision 수락 전 구현 `BLOCKED` 유지.
-- Batch job run foundation과 operator-run snapshot/ranking/cycle/settlement/final-tier/reward-grant internal foundation MVP job은 구현됨. 실제 cron scheduler와 provider ingestion/actual reward fulfillment job은 STOP 유지.
+- provider ingestion foundation은 구현됨. provider_api source eligibility와 provider-backed scheduler/settlement 사용은 live fixture와 owner decision 수락 전 `BLOCKED` 유지.
+- Batch job run foundation과 operator-run snapshot/ranking/cycle/settlement/final-tier/reward-grant internal foundation MVP job은 구현됨. 실제 cron scheduler와 provider-backed batch/actual reward fulfillment job은 STOP 유지.
 - settlement extension/actual reward fulfillment는 Gate H/I/J 전까지 구현 STOP 유지.
 - asset price freshness 정책 요약:
   - FX USD/KRW quote/execute는 현행 60초 `effectiveAt` freshness 유지.

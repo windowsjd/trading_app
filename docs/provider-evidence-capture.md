@@ -2,19 +2,19 @@
 
 ## 1. Purpose
 
-This document records Gate C/D provider evidence capture before any provider ingestion implementation.
+This document records Gate C/D provider evidence capture and the boundary after provider ingestion foundation.
 
 The goal is to determine whether OANDA USD/KRW, Twelve Data USD/KRW/US stock, and Binance crypto responses can be mapped safely to the current internal FX and asset price snapshot models.
 
 Evidence capture result as of 2026-05-14: Binance public `BTCUSDT` ticker and orderbook fixtures were captured successfully without credentials. OANDA and Twelve Data live fixtures remain `BLOCKED` because credentials were unavailable in the local environment.
 
-Implementation readiness: not ready for provider ingestion implementation. Binance fixture evidence now proves public response shapes, but Binance USDT-to-USD policy, executable price-field decision, standalone `effectiveAt` mapping, sourceType eligibility tests, and owner terms decisions are still missing. OANDA/Twelve Data still need credentialed live response fixtures.
+Implementation readiness update on 2026-05-26: provider ingestion foundation is implemented for explicit operator-run ExchangeRate-API USD/KRW and Binance public REST crypto price snapshot insertion. This does not open provider_api source eligibility for quote, execute, valuation, daily snapshot, ranking, or settlement. Binance WebSocket, KIS quote ingestion, KIS WebSocket ingestion, cron scheduling, and admin HTTP ingestion API remain unimplemented.
 
-Remaining blockers: provider credentials where required, live response fixtures, exact timestamp freshness measurement, rate/price field confirmation, OANDA rate basis decision, Binance USDT-to-USD-equivalent owner decision or Binance USD quote pair evidence, commercial/business terms approval, and sourceType eligibility implementation policy.
+Remaining blockers: provider_api eligibility policy, live smoke evidence where credentials are required, exact timestamp freshness measurement, provider outage policy, source priority, commercial/business terms approval, KIS official quote endpoint mapping, WebSocket ingestion design, and settlement evidence policy.
 
 Required owner decisions: provider account/plan, commercial/external display terms, OANDA bid/ask/mid policy, Twelve Data endpoint choice for US stock, Binance USDT-to-USD-equivalent policy, KRX scope, and whether delayed data is acceptable anywhere in the product.
 
-Recommended next prompt title: `Gate C/D Provider Mapping Decision - Binance USDT-to-USD Policy and SourceType Eligibility`.
+Recommended next prompt title: `Provider API Source Eligibility Gate - Quote Valuation and Execute Allowlist`.
 
 Crypto policy update on 2026-05-14: MVP crypto provider is Binance, crypto is USD-settled, crypto uses the USD Wallet, Upbit/Bithumb are excluded from MVP, and `CurrencyCode.USDT` must not be added.
 
@@ -32,7 +32,7 @@ Scope:
 Non-goals:
 
 - No provider client implementation.
-- No provider ingestion implementation.
+- No provider_api source eligibility implementation.
 - No scheduler/batch implementation.
 - No DB write.
 - No schema, migration, seed, package, source, or test changes.
@@ -46,7 +46,7 @@ Current internal source policy:
 
 - FX source types: `admin_manual`, `provider_api`, `official_batch`.
 - Asset price source types: `admin_manual`, `provider_api`, `official_batch`.
-- `provider_api` schema enum exists but provider ingestion is not implemented.
+- `provider_api` schema enum exists and row insertion foundation is implemented for ExchangeRate-API and Binance.
 - `official_batch` schema enum exists but batch ingestion is not implemented.
 - `admin_manual` remains bootstrap/manual correction/emergency fallback, not silent long-running production primary.
 
@@ -119,7 +119,7 @@ Checked date: 2026-05-14.
 | Twelve Data | https://twelvedata.com/pricing-business                                                                                       | Business/external display positioning and business credits                                                                | Current as checked on 2026-05-13; commercial/external display approval still required                                                                             |
 | Twelve Data | https://support.twelvedata.com/en/articles/5615854-credits                                                                    | API credit reset, 429 behavior, response headers for credits used/left                                                    | Current as checked on 2026-05-13                                                                                                                                  |
 | Twelve Data | https://twelvedata.com/stocks                                                                                                 | US/global coverage; South Korea EOD delay                                                                                 | KRX quote/execute remains blocked                                                                                                                                 |
-| Binance     | `https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT` and `https://api.binance.com/api/v3/depth?symbol=BTCUSDT&limit=5` | Public spot-market ticker and orderbook response shape for `BTCUSDT`                                                      | HTTP 200 fixtures captured without auth; ingestion remains STOP pending USDT-to-USD policy, effectiveAt mapping, sourceType eligibility tests, and terms approval |
+| Binance     | `https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT` and `https://api.binance.com/api/v3/depth?symbol=BTCUSDT&limit=5` | Public spot-market ticker and orderbook response shape for `BTCUSDT`                                                      | HTTP 200 fixtures captured without auth; REST ticker row insertion foundation exists; source eligibility remains STOP pending freshness/sourceType tests and terms approval |
 | Twelve Data | https://twelvedata.com/markets/938314/forex/usd-krw                                                                           | Official USD/KRW market page                                                                                              | Supports pair existence as a market page; API response still unverified                                                                                           |
 
 ## 6. OANDA USD/KRW Evidence
@@ -336,7 +336,7 @@ Current decision:
 
 - Binance BTCUSDT ticker fixture: GO for fixture capture; CONDITIONAL GO for mapping.
 - Binance BTCUSDT orderbook fixture: CONDITIONAL GO because response has bid/ask evidence but no timestamp.
-- Binance crypto provider implementation: STOP until fixture evidence, timestamp/effectiveAt mapping, sourceType eligibility tests, USDT-to-USD owner decision or Binance USD pair evidence, and terms decision exist.
+- Binance crypto provider_api source eligibility: STOP until timestamp/freshness policy, sourceType eligibility tests, price-field decision, and terms decision exist.
 
 ## 10. Error / Rate Limit / Outage Evidence
 
@@ -467,7 +467,7 @@ Binance public success fixture JSON files were added. OANDA/Twelve Data fixture 
 | OANDA       | Exact Exchange Rates API endpoint unverified | `fx_rate_snapshots`     | `oanda`                     | Unverified bid/ask/midpoint                          | Unverified UTC timestamp                                            | Provider timestamp if captured and accepted          | Server receipt time | Not proven                                                  | `BLOCKED`                                                               |
 | Twelve Data | `/exchange_rate?symbol=USD/KRW`              | `fx_rate_snapshots`     | `twelve_data_exchange_rate` | `rate` candidate                                     | `timestamp` candidate                                               | Unix seconds -> UTC DateTime                         | Server receipt time | Not proven                                                  | `BLOCKED`                                                               |
 | Twelve Data | `/quote?symbol=AAPL`                         | `asset_price_snapshots` | `twelve_data_quote`         | `close` candidate                                    | `last_quote_at` preferred candidate; `timestamp` fallback candidate | Selected Unix seconds -> UTC DateTime                | Server receipt time | Not proven                                                  | `BLOCKED`                                                               |
-| Binance     | `/api/v3/ticker/24hr?symbol=BTCUSDT`         | `asset_price_snapshots` | `binance_ticker`            | `lastPrice` candidate; `bidPrice`/`askPrice` present | `closeTime` candidate, Unix milliseconds                            | Conditional: `closeTime` -> UTC DateTime if accepted | Server receipt time | Not proven; requires age measurement and semantics decision | `CONDITIONAL GO for mapping; STOP for ingestion`                        |
+| Binance     | `/api/v3/ticker/24hr?symbol=BTCUSDT`         | `asset_price_snapshots` | `binance_public_rest_24hr_ticker` | `lastPrice` candidate; `bidPrice`/`askPrice` present | `closeTime` candidate, Unix milliseconds                            | Conditional: `closeTime` -> UTC DateTime if accepted | Server receipt time | Not proven for financial paths; requires age measurement and semantics decision | `GO for row insertion foundation; STOP for source eligibility`           |
 | Binance     | `/api/v3/depth?symbol=BTCUSDT&limit=5`       | `asset_price_snapshots` | `binance_orderbook`         | best bid/ask or midpoint candidate                   | none; `lastUpdateId` is not a timestamp                             | Blocked standalone                                   | Server receipt time | Not proven                                                  | `STOP standalone ingestion; possible only with paired timestamp policy` |
 
 ## Secret Redaction Review
@@ -517,9 +517,9 @@ If future fixtures are captured, each fixture must confirm:
 | Binance BTCUSDT orderbook fixture             | CONDITIONAL GO                                                     | Public depth returned HTTP 200 and exposes bid/ask levels, but no source timestamp exists in the response                                                                                        |
 | Binance effectiveAt mapping                   | STOP                                                               | Ticker `closeTime` requires owner acceptance; orderbook standalone mapping is blocked                                                                                                            |
 | Binance USDT-to-USD policy                    | OWNER_DECISION_REQUIRED                                            | Internal `CurrencyCode` remains USD and `CurrencyCode.USDT` must not be added                                                                                                                    |
-| Binance provider ingestion implementation     | STOP                                                               | Fixture exists, but sourceType eligibility tests, effectiveAt mapping, price-field decision, USDT-to-USD decision, and terms approval are missing                                                |
-| FX provider ingestion implementation          | BLOCKED                                                            | Live fixture, timestamp mapping, sourceType eligibility, rate basis, and terms/account decisions are missing                                                                                     |
-| Asset price provider ingestion implementation | BLOCKED                                                            | Live US stock fixtures, Binance mapping decisions, symbol/currency mapping, timestamp decision, USDT-to-USD decision, and terms/account decisions are missing; KRX quote/execute remains blocked |
+| Binance provider ingestion foundation         | GO                                                                 | Public REST ticker can create provider_api USD-equivalent snapshot rows for existing mapped BINANCE crypto assets                                                                                |
+| FX provider_api source eligibility            | BLOCKED                                                            | Live fixture, timestamp mapping, sourceType eligibility, rate basis, and terms/account decisions are missing                                                                                     |
+| Asset price provider_api source eligibility   | BLOCKED                                                            | Live US stock fixtures, source eligibility, symbol/currency mapping, timestamp decision, and terms/account decisions are missing; KRX quote/execute remains blocked                              |
 | Scheduler/batch foundation                    | CONDITIONAL GO for docs-only Gate E audit; STOP for implementation | Scheduler design can be audited, but provider polling jobs cannot be implemented without accepted provider evidence                                                                              |
 | Settlement preimplementation audit            | CONDITIONAL GO for docs-only audit; STOP for implementation        | Settlement audit can discuss final evidence source, but implementation remains blocked until final valuation source and scheduler/provider path are accepted                                     |
 
@@ -581,7 +581,7 @@ Additional evidence tests before implementation GO:
 
 Recommended next prompt title:
 
-- `Gate C/D Provider Mapping Decision - Binance USDT-to-USD Policy and SourceType Eligibility`
+- `Provider API Source Eligibility Gate - Quote Valuation and Execute Allowlist`
 
 Recommended scope:
 
@@ -589,7 +589,7 @@ Recommended scope:
 - Decide whether Binance `BTCUSDT` USDT quote can be treated as USD-equivalent internally, or require true Binance USD quote pair evidence.
 - Decide canonical crypto price evidence: ticker `lastPrice`, ticker bid/ask, orderbook best bid/ask, midpoint, or a paired source.
 - Decide whether ticker `closeTime` is acceptable as `effectiveAt`; if not, identify a timestamped Binance endpoint or pair orderbook data with accepted timestamp evidence.
-- Define sourceType/sourceName eligibility tests before any provider ingestion implementation.
+- Define sourceType/sourceName eligibility tests before any provider_api financial read/write use.
 - Keep OANDA/Twelve Data fixture completion blocked until credentials are available.
 - Do not implement provider clients, ingestion, scheduler, DB writes, schema changes, seed changes, package changes, source code, or tests.
 
@@ -602,7 +602,7 @@ Implementation gates remain closed until live fixtures and owner decisions are a
 | OANDA       | FX          | Exchange Rates API exact endpoint unverified | USD/KRW          | No                | Yes                  | UTC timestamp field unverified            | bid/ask/midpoint unverified                             | n/a               | Plan docs: Lite 100,000 quotes/month; trial key                                            | BLOCKED                                                       |
 | Twelve Data | FX          | `/exchange_rate`                             | `USD/KRW`        | No                | Yes                  | `timestamp`                               | `rate`                                                  | n/a               | Credits reset per minute; 429 on credit exhaustion                                         | BLOCKED                                                       |
 | Twelve Data | US stock    | `/quote`                                     | `AAPL` or `MSFT` | No                | Yes                  | `timestamp`, `last_quote_at`              | `close` candidate                                       | `is_market_open`  | Credits reset per minute; endpoint cost documented in docs                                 | BLOCKED                                                       |
-| Binance     | Crypto      | `/api/v3/ticker/24hr`                        | `BTCUSDT`        | Yes               | No private key       | `openTime`, `closeTime` Unix milliseconds | `lastPrice`, `bidPrice`, `askPrice`, `weightedAvgPrice` | 24/7 spot market  | Public response headers include Binance weight headers; no rate-limit triggering attempted | GO for fixture capture; STOP for ingestion                    |
+| Binance     | Crypto      | `/api/v3/ticker/24hr`                        | `BTCUSDT`        | Yes               | No private key       | `openTime`, `closeTime` Unix milliseconds | `lastPrice`, `bidPrice`, `askPrice`, `weightedAvgPrice` | 24/7 spot market  | Public response headers include Binance weight headers; no rate-limit triggering attempted | GO for row insertion foundation; STOP for source eligibility  |
 | Binance     | Crypto      | `/api/v3/depth`                              | `BTCUSDT`        | Yes               | No private key       | none; `lastUpdateId` is not a timestamp   | best bid, best ask, calculable midpoint                 | 24/7 spot market  | Public response headers include Binance weight headers; no rate-limit triggering attempted | CONDITIONAL GO for fixture capture; STOP standalone ingestion |
 
 ## Internal Snapshot Mapping Candidate
@@ -612,7 +612,7 @@ Implementation gates remain closed until live fixtures and owner decisions are a
 | OANDA       | FX          | `fx_rate_snapshots`     | `provider_api` | `oanda`                     | bid/ask/midpoint after owner decision       | base `USD`, quote `KRW`           | OANDA timestamp field unverified                                                  | same as source timestamp if confirmed                     | local receipt time | sanitized raw response if terms allow | credentials, endpoint, fields, rate basis, terms                                            |
 | Twelve Data | FX          | `fx_rate_snapshots`     | `provider_api` | `twelve_data_exchange_rate` | `/exchange_rate.rate`                       | symbol base/quote `USD/KRW`       | `/exchange_rate.timestamp`                                                        | Unix seconds -> UTC DateTime                              | local receipt time | sanitized raw response if terms allow | credentials, live fixture, timestamp freshness, terms                                       |
 | Twelve Data | US stock    | `asset_price_snapshots` | `provider_api` | `twelve_data_quote`         | `/quote.close` candidate                    | `/quote.currency` expected `USD`  | `/quote.last_quote_at` preferred candidate, `/quote.timestamp` fallback candidate | selected source timestamp -> UTC DateTime                 | local receipt time | sanitized raw response if terms allow | credentials, field semantics, market closed behavior, terms                                 |
-| Binance     | Crypto      | `asset_price_snapshots` | `provider_api` | `binance_ticker`            | `lastPrice` candidate; bid/ask also present | internal `USD`; do not add `USDT` | ticker `closeTime` candidate                                                      | `closeTime` Unix milliseconds -> UTC DateTime if accepted | local receipt time | sanitized raw response if terms allow | USDT-to-USD decision or USD pair evidence, price-field decision, closeTime semantics, terms |
+| Binance     | Crypto      | `asset_price_snapshots` | `provider_api` | `binance_public_rest_24hr_ticker` | `lastPrice` candidate; bid/ask also present | internal `USD`; do not add `USDT` | ticker `closeTime` candidate                                                      | `closeTime` Unix milliseconds -> UTC DateTime if accepted | local receipt time | sanitized raw response if terms allow | source eligibility, price-field decision, closeTime semantics, terms |
 | Binance     | Crypto      | `asset_price_snapshots` | `provider_api` | `binance_orderbook`         | best bid/ask or midpoint candidate          | internal `USD`; do not add `USDT` | none in standalone response                                                       | blocked standalone                                        | local receipt time | sanitized raw response if terms allow | paired timestamp policy, USDT-to-USD decision, bid/ask/mid decision, terms                  |
 
 ## Implementation Readiness Matrix
@@ -624,7 +624,7 @@ Implementation gates remain closed until live fixtures and owner decisions are a
 | Twelve Data US stock fixture capture          | No live fixture                  | No local credentials; plan/terms not approved           | Official `timestamp`/`last_quote_at` candidates | Not measured                        | `/quote` mapping, market-open behavior                           | BLOCKED                                                       | Cannot capture without API key                                |
 | Binance BTCUSDT ticker fixture capture        | Captured HTTP 200 public fixture | Public endpoint; terms/raw-payload storage not approved | `closeTime` candidate captured                  | Not measured for production cadence | ticker mapping, USDT-to-USD decision, exchange/symbol mapping    | GO for fixture capture; CONDITIONAL GO for mapping            | Response shape captured, but owner decisions remain           |
 | Binance BTCUSDT orderbook fixture capture     | Captured HTTP 200 public fixture | Public endpoint; terms/raw-payload storage not approved | No source timestamp in response                 | Not measurable standalone           | orderbook mapping, paired timestamp policy, USDT-to-USD decision | CONDITIONAL GO for fixture capture; STOP standalone ingestion | Bid/ask evidence exists, but no effectiveAt source timestamp  |
-| FX provider ingestion implementation          | Official docs only               | No owner approval                                       | Not live-proven                                 | Not live-proven                     | full provider ingestion test matrix                              | BLOCKED                                                       | Live fixture is required before implementation GO             |
-| Asset price provider ingestion implementation | Official docs/policy only        | No owner approval                                       | Not live-proven                                 | Not live-proven                     | US/Binance crypto provider test matrix                           | BLOCKED                                                       | Live fixtures, USDT-to-USD decision, and KRX decision missing |
+| FX provider_api source eligibility            | Row insertion foundation exists  | No owner approval                                       | Not live-proven for financial paths             | Not live-proven                     | source eligibility test matrix                                   | BLOCKED                                                       | Live fixture and source policy are required before financial use |
+| Asset price provider_api source eligibility   | Binance row insertion foundation exists | No owner approval                                  | Not live-proven for financial paths             | Not live-proven                     | US/Binance crypto source eligibility test matrix                 | BLOCKED                                                       | Live fixtures, source priority, and KRX decision missing        |
 | Scheduler/batch foundation                    | Docs policy exists               | Provider account path missing                           | Provider timestamp not live-proven              | Provider polling not live-proven    | lock/idempotency/retry/outage tests                              | CONDITIONAL GO for audit only                                 | Scheduler implementation must wait                            |
 | Settlement preimplementation audit            | Docs policy exists               | Final evidence source undecided                         | Settlement timestamp source undecided           | Finality source undecided           | settlement audit test matrix                                     | CONDITIONAL GO for docs audit only                            | Implementation remains STOP                                   |

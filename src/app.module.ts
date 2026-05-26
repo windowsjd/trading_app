@@ -10,6 +10,7 @@ import { HomeModule } from './home/home.module';
 import { OrdersModule } from './orders/orders.module';
 import { PositionsModule } from './positions/positions.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { ProvidersModule } from './providers/providers.module';
 import { RankingModule } from './ranking/ranking.module';
 import { RecordsModule } from './records/records.module';
 import { RewardsModule } from './rewards/rewards.module';
@@ -20,7 +21,7 @@ import { WalletsModule } from './wallets/wallets.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['.env.development', '.env'],
+      envFilePath: ['.env.local', '.env.development', '.env'],
     }),
     AssetsModule,
     AuthModule,
@@ -30,6 +31,7 @@ import { WalletsModule } from './wallets/wallets.module';
     OrdersModule,
     PositionsModule,
     PrismaModule,
+    ProvidersModule,
     RankingModule,
     RecordsModule,
     RewardsModule,

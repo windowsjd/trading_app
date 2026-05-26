@@ -4,7 +4,13 @@
 
 This document fixes the near-term freshness and source policy for FX and asset price snapshots before provider ingestion, scheduler/batch, ranking automation, settlement, or reward implementation.
 
-This is a docs-only policy. It does not authorize source code, test, package, Prisma schema, migration, seed, provider API client, scheduler, settlement, reward, durable quote, order replay, partial fill, or matching-engine changes.
+This policy records freshness and source boundaries after provider ingestion foundation. It does not authorize package, Prisma schema, migration, seed, scheduler, settlement, reward, durable quote, order replay, partial fill, matching-engine changes, or provider_api source eligibility changes in financial read/write paths.
+
+2026-05-26 update:
+
+- Provider ingestion foundation can insert `provider_api` rows for ExchangeRate-API USD/KRW and Binance public crypto prices.
+- Existing quote, execute, asset list/detail, portfolio valuation, daily snapshot, ranking, and settlement eligibility remains unchanged unless a later gate explicitly opens provider_api sources.
+- KIS remains skeleton-only for this gate.
 
 ## 2. Current Price Storage Model
 
@@ -260,7 +266,7 @@ Future implementation should codify before code:
 
 ## 17. Required Tests for Future Implementation
 
-FX provider ingestion implementation tests:
+FX provider_api source eligibility tests:
 
 - provider response mapping unit test,
 - provider timestamp -> `effectiveAt` mapping,
@@ -273,7 +279,7 @@ FX provider ingestion implementation tests:
 - rate limit/backoff behavior,
 - quote/execute only allowed sourceType check.
 
-Asset price provider ingestion implementation tests:
+Asset price provider_api source eligibility tests:
 
 - asset symbol mapping,
 - market/currency match,
@@ -315,7 +321,8 @@ Settlement implementation tests:
 | FX USD/KRW current 60-second policy | GO for current `admin_manual` behavior | Existing code and tests already use the 60-second threshold |
 | FX provider freshness | CONDITIONAL GO | Requires OANDA/Twelve Data live response timestamp evidence before ingestion code |
 | US stock freshness | CONDITIONAL GO | Twelve Data is a candidate, but live fixtures, symbol mapping, plan, and terms are required |
-| Crypto freshness | CONDITIONAL GO | Binance is the MVP crypto provider target, but fixture/effectiveAt mapping, price-field decision, USDT-to-USD owner decision, and terms approval are required |
+| Crypto provider_api row insertion | GO for foundation | Binance public REST ticker can create USD-equivalent provider_api snapshot rows for existing mapped BINANCE crypto assets |
+| Crypto provider_api source eligibility | STOP | Quote/execute/valuation usage still requires freshness, source priority, terms, and owner acceptance |
 | KRX quote/execute freshness | BLOCKED | Real-time KRX provider evidence is not verified; checked Twelve Data coverage indicates Korea exchanges are EOD delay |
 | Scheduler/batch foundation | CONDITIONAL GO for audit only | Freshness requirements are clearer, but scheduler implementation needs its own gate |
 | Settlement implementation | STOP | Final evidence source and reproducibility policy belong to Gate H/I |
@@ -337,7 +344,7 @@ Settlement implementation tests:
 | sourceType | Intended use | Allowed for quote | Allowed for execute | Allowed for home live valuation | Allowed for daily snapshot | Allowed for ranking | Allowed for settlement | Conditions | Current implementation status |
 |---|---|---|---|---|---|---|---|---|---|
 | `admin_manual` | Bootstrap, manual correction, emergency/provider outage fallback | Yes, current/fallback | Yes, current/fallback | Yes, current/fallback | Yes, current manual CLI input | Indirectly through generated snapshots/rankings | Conditional only if Gate H approves emergency evidence | Explicit operator action, meaningful `effectiveAt`, no fake/static/sample data, freshness rules still apply where defined | Implemented for FX, asset price, order/valuation consumers, and manual CLIs |
-| `provider_api` | Future real-time or near-real-time provider source | Conditional after Gate C/D | Conditional after Gate C/D | Conditional after Gate C/D | Conditional after Gate F job policy | Indirectly through snapshots/rankings | Not accepted as sole final source | Provider timestamp required, sourceName required, stale/missing/outage rejected, tests required | Schema enum exists; ingestion not implemented; not currently allowed by execute/order selection |
+| `provider_api` | Future real-time or near-real-time provider source | Conditional after source eligibility gate | Conditional after source eligibility gate | Conditional after source eligibility gate | Conditional after provider-backed job policy | Indirectly through snapshots/rankings | Not accepted as sole final source | Provider timestamp required, sourceName required, stale/missing/outage rejected, tests required | Row insertion foundation exists for ExchangeRate-API and Binance; not currently allowed by execute/order/valuation selection |
 | `official_batch` | Future official/reference/reconciliation source | No | No | No for live valuation | Conditional after Gate F/H | Conditional through batch-backed snapshots | Conditional primary candidate after Gate H | Reference date/close evidence, reproducible batch, no real-time execute use | Schema enum exists; ingestion not implemented |
 
 ## Market Freshness Matrix
@@ -347,7 +354,7 @@ Settlement implementation tests:
 | FX USD/KRW | approved `admin_manual`; OANDA/Twelve Data candidates | 60 seconds by `effectiveAt` | 60 seconds by `effectiveAt` | 60 seconds when live valuation needs USD/KRW | Current manual CLI valuation still depends on fresh FX when USD conversion is needed; future batch/reference policy pending | Inherited from snapshot source | Gate H decision; likely official/reference snapshot | GO for current 60-second policy; CONDITIONAL GO for provider | OANDA endpoint/field/rate basis, contract, trial response |
 | Domestic stock KRX | `admin_manual` only | BLOCKED for provider market-open quote; target would be max 60 seconds if real-time source is verified | BLOCKED for provider market-open execute; target would be max 60 seconds if real-time source is verified | Conditional read-only valuation using explicit manual/EOD/reference evidence | Conditional EOD/reference after batch/source gate | Inherited from daily snapshots | Gate H decision | BLOCKED for KRX quote/execute provider_api | Real-time KRX source, delayed/EOD product acceptance, official close source |
 | US stock | `admin_manual` only; Twelve Data candidate | Target max 60 seconds during market hours | Target max 60 seconds during market hours | Target max 15 minutes during market hours, latest regular close when clearly closed | Official close/EOD or provider snapshot near scheduled capture, Gate F decision | Inherited from daily snapshots | Gate H decision | CONDITIONAL GO | Twelve Data live fixture, plan/terms, delayed data acceptance |
-| Crypto | `admin_manual` only; Binance MVP provider target | Target max 30 seconds | Target max 30 seconds | Target max 60 seconds | Target max 5 minutes near scheduled capture | Inherited from daily snapshots | Gate H decision | CONDITIONAL GO for fixture capture, STOP for ingestion | Binance BTCUSDT fixture, USDT-to-USD policy, provider timestamp, volatility tolerance |
+| Crypto | `admin_manual` for financial paths; Binance provider_api row insertion foundation exists | Target max 30 seconds | Target max 30 seconds | Target max 60 seconds | Target max 5 minutes near scheduled capture | Inherited from daily snapshots | Gate H decision | GO for row insertion foundation, STOP for source eligibility | Binance provider timestamp, source priority, terms, volatility tolerance |
 
 ## Stale Behavior Matrix
 

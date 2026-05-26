@@ -22,7 +22,8 @@ This document records the 2026-05-14 policy update that fixes MVP crypto as Bina
 - KRW crypto trading is excluded from MVP.
 - Binance symbol/pair is finalized in fixture/evidence work, with `BTCUSDT` and `ETHUSDT` as initial spot-market candidates.
 - `CurrencyCode.USDT` must not be added. Internal currency remains USD only.
-- The USDT-to-USD-equivalent mapping decision, or an owner decision to require Binance USD quote pairs only, remains a Gate C/D fixture/evidence blocker.
+- MVP provider ingestion foundation treats Binance USDT quote pairs such as `BTCUSDT` and `ETHUSDT` as USD-equivalent for internal `asset_price_snapshots.currencyCode=USD` storage.
+- USDT depeg risk is not modeled in this MVP foundation and must be handled by a later risk/source eligibility gate if product requires it.
 - `cryptoValueKrw`, `totalAssetKrw`, and `returnRate` remain KRW-denominated fields.
 
 ## 4. Code Audit Summary
@@ -91,8 +92,8 @@ Required code/test change:
 - Binance is the MVP crypto provider.
 - Twelve Data is no longer the MVP crypto provider target.
 - Upbit/Bithumb are excluded from MVP provider stack.
-- Provider ingestion remains unimplemented and blocked.
-- `provider_api` rows are not opened for crypto until fixture/evidence, timestamp/effectiveAt mapping, sourceType eligibility, and owner decisions are complete.
+- Provider ingestion foundation is implemented for Binance public REST crypto price snapshot insertion.
+- `provider_api` rows are not opened for crypto quote/execute/valuation eligibility until a later source eligibility gate accepts timestamp/freshness/source priority behavior.
 
 ## 9. Fixture Impact
 
@@ -107,11 +108,11 @@ Next crypto fixture targets:
   - Public market data.
   - No private key.
 
-No live fixture is created in this task. Fixture capture is deferred to Gate C/D.
+Provider ingestion foundation can fetch Binance public REST ticker data through explicit operator commands. WebSocket fixture capture remains deferred.
 
-Open fixture blocker:
+Open source eligibility blocker:
 
-- Decide whether `BTCUSDT` is normalized as USD-equivalent internally, or whether only true Binance USD quote pairs are allowed.
+- Decide whether and when Binance USD-equivalent provider_api rows can power order quote, order execute, home live valuation, daily snapshot, and final settlement workflows.
 
 ## 10. Documentation Changes Required
 
@@ -165,14 +166,13 @@ Added or updated tests:
 | Orders code change | NOT REQUIRED | Orders are already `currencyCode` driven |
 | Portfolio valuation code change | REQUIRED | Needed explicit `cryptoValueKrw` asset-type breakdown |
 | Binance fixture capture | CONDITIONAL GO | Public fixture capture may proceed in Gate C/D without private key, but no live call in this task |
-| Binance provider ingestion implementation | STOP | Wait for fixture/effectiveAt/sourceType eligibility tests and USDT-to-USD owner decision |
+| Binance provider ingestion foundation | GO | Public REST ticker can create provider_api USD-equivalent snapshot rows for existing mapped BINANCE crypto assets |
+| Binance provider_api source eligibility | STOP | Quote/execute/valuation read paths still require a separate source eligibility gate |
 | KRX provider implementation | STOP | Domestic stock provider remains blocked/unverified |
 | Settlement implementation | STOP | Final evidence source remains Gate H/I |
 
 ## 14. Open Questions
 
-- Should Binance `BTCUSDT` be normalized internally as USD-equivalent for MVP, or should only Binance USD quote pairs be allowed?
-- If USDT quote pairs are accepted, what fixture/evidence proves the USD-equivalent policy and where is it recorded?
 - Which Binance ticker/orderbook timestamp maps to internal `effectiveAt`?
 - What crypto quote/execute freshness threshold is accepted for Binance public market data after fixture capture?
 - Can sanitized Binance raw payloads be stored in `rawPayloadJson`, and under what retention policy?
