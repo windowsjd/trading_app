@@ -189,6 +189,7 @@ export class FxService {
         where: {
           baseCurrency: CurrencyCode.USD,
           quoteCurrency: CurrencyCode.KRW,
+          sourceType: FxRateSourceType.admin_manual,
           effectiveAt: {
             lte: now,
           },
@@ -634,7 +635,8 @@ export class FxService {
               body: input.body,
               context: {
                 userId: input.normalizedRequest.userId,
-                seasonParticipantId: input.normalizedRequest.seasonParticipantId,
+                seasonParticipantId:
+                  input.normalizedRequest.seasonParticipantId,
               },
               existingCommand,
               sourceWallet: null,

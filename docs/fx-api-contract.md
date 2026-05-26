@@ -19,10 +19,11 @@
 - Quote and execute are allowed only when the user has joined an active season.
 - Upcoming, ended, and settled seasons block quote and execute.
 - Fake FX rates and temporary FX rates are forbidden.
-- `/fx quote` requires an eligible USD/KRW `fx_rate_snapshots` row.
+- `/fx quote` requires an eligible `admin_manual` USD/KRW `fx_rate_snapshots` row.
 - `/fx quote` blocks selected snapshots whose `effectiveAt` is older than 60 seconds.
+- Near-term `/fx quote` uses `admin_manual` snapshots only as allowed sourceType.
 - Near-term `/fx execute` uses approved fresh `admin_manual` snapshots only as allowed sourceType.
-- Provider final selection is not confirmed, and `provider_api`/`official_batch` ingestion is not implemented.
+- Provider ingestion foundation can create `provider_api` rows, but `provider_api`/`official_batch` source eligibility is not opened for quote or execute.
 - USD/KRW snapshots are also the KRW conversion evidence for USD-settled crypto valuation.
 - MVP crypto uses Binance-based USD settlement and the USD Wallet; no `USDT` wallet/currency is introduced.
 
@@ -94,7 +95,7 @@ Return a KRW/USD exchange quote without changing wallet balances or writing exch
 - `quoteId` is fixed to `null` for the current implementation.
 - `expiresAt` is fixed to `null` for the current implementation.
 - `rateCapturedAt` and `rateEffectiveAt` are returned for rate timing transparency.
-- `appliedRate` source is `fx_rate_snapshots`.
+- `appliedRate` source is `admin_manual` USD/KRW `fx_rate_snapshots`.
 - Missing eligible snapshot returns `FX_RATE_UNAVAILABLE`.
 - Selected snapshot older than 60 seconds by `effectiveAt` returns `FX_RATE_STALE`.
 - `/fx execute` remains a separate STOP and must not be inferred from quote readiness.

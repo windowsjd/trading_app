@@ -53,6 +53,8 @@
 - `GET /api/v1/seasons/current`
 - `POST /api/v1/seasons/{seasonId}/join`
 - `POST /api/v1/fx/quote`
+  - 현재 quote source는 `admin_manual` USD/KRW snapshot only.
+  - ExchangeRate-API provider_api USD/KRW row가 생성되어도 `/fx quote` source eligibility는 아직 열지 않음.
 - `POST /api/v1/fx/execute` 1차 구현 완료
   - write path는 구현됨.
   - 실제 PostgreSQL/Prisma DB integration spec 통과.

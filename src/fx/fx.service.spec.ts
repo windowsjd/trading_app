@@ -116,7 +116,9 @@ describe('FxService', () => {
       },
     };
 
-    prisma.$transaction.mockImplementation(async (callback) => callback(prisma));
+    prisma.$transaction.mockImplementation(async (callback) =>
+      callback(prisma),
+    );
 
     return prisma;
   };
@@ -188,9 +190,7 @@ describe('FxService', () => {
     expect(prisma.fxRateSnapshot.findMany).not.toHaveBeenCalled();
   };
 
-  const expectExecutePlanReads = (
-    prisma: ReturnType<typeof createPrisma>,
-  ) => {
+  const expectExecutePlanReads = (prisma: ReturnType<typeof createPrisma>) => {
     expect(prisma.fxExecuteRequest.findUnique).toHaveBeenCalledTimes(1);
     expect(prisma.cashWallet.findUnique).toHaveBeenCalledTimes(2);
     expect(prisma.fxRateSnapshot.findMany).toHaveBeenCalledTimes(1);
@@ -359,6 +359,7 @@ describe('FxService', () => {
       where: {
         baseCurrency: CurrencyCode.USD,
         quoteCurrency: CurrencyCode.KRW,
+        sourceType: FxRateSourceType.admin_manual,
         effectiveAt: {
           lte: expect.any(Date),
         },
@@ -377,6 +378,58 @@ describe('FxService', () => {
     expect(
       prisma.fxRateSnapshot.findFirst.mock.calls[0][0].where.effectiveAt.lte,
     ).toEqual(now);
+  });
+
+  it('uses admin_manual for quote even when provider_api could be newer', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    mockJoinedParticipant(prisma);
+    prisma.fxRateSnapshot.findFirst.mockImplementationOnce(async (args) => {
+      expect(args.where).toMatchObject({
+        baseCurrency: CurrencyCode.USD,
+        quoteCurrency: CurrencyCode.KRW,
+        sourceType: FxRateSourceType.admin_manual,
+      });
+
+      return {
+        rate: new Prisma.Decimal('1350.00000000'),
+        capturedAt,
+        effectiveAt: thresholdEffectiveAt,
+      };
+    });
+
+    await expect(
+      service.quote('user-1', {
+        fromCurrency: 'KRW',
+        toCurrency: 'USD',
+        sourceAmount: '135000',
+      }),
+    ).resolves.toMatchObject({
+      success: true,
+      data: {
+        appliedRate: '1350.00000000',
+        rateEffectiveAt: thresholdEffectiveAt.toISOString(),
+      },
+    });
+  });
+
+  it('rejects quote when only provider_api USD/KRW is available', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    mockJoinedParticipant(prisma);
+    prisma.fxRateSnapshot.findFirst.mockImplementationOnce(async (args) => {
+      expect(args.where.sourceType).toBe(FxRateSourceType.admin_manual);
+      return null;
+    });
+
+    await expectErrorCode(
+      service.quote('user-1', {
+        fromCurrency: 'KRW',
+        toCurrency: 'USD',
+        sourceAmount: '1000',
+      }),
+      'FX_RATE_UNAVAILABLE',
+    );
   });
 
   it('rejects when selected rate snapshot is stale', async () => {
@@ -872,11 +925,13 @@ describe('FxService', () => {
 
     it('returns SEASON_NOT_ACTIVE when current season is not active', async () => {
       const { prisma, service } = createService();
-      prisma.season.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({
-        id: 'season-1',
-        status: SeasonStatus.upcoming,
-        fxFeeRate: new Prisma.Decimal('0.001000'),
-      });
+      prisma.season.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          id: 'season-1',
+          status: SeasonStatus.upcoming,
+          fxFeeRate: new Prisma.Decimal('0.001000'),
+        });
 
       await expectExecuteErrorCode(
         service.execute('user-1', validExecuteBody),
@@ -985,16 +1040,19 @@ describe('FxService', () => {
       mockActiveSeason(prisma);
       mockJoinedParticipant(prisma);
       mockExecuteReadCandidates(prisma, {
-        existingCommand: buildExistingCommand(FxExecuteRequestStatus.succeeded, {
-          completedAt: capturedAt,
-          responsePayloadJson: storedSucceededPayload,
-          exchangeTransactionId: 'exchange-1',
-        }),
+        existingCommand: buildExistingCommand(
+          FxExecuteRequestStatus.succeeded,
+          {
+            completedAt: capturedAt,
+            responsePayloadJson: storedSucceededPayload,
+            exchangeTransactionId: 'exchange-1',
+          },
+        ),
       });
 
-      await expect(
-        service.execute('user-1', validExecuteBody),
-      ).resolves.toBe(storedSucceededPayload);
+      await expect(service.execute('user-1', validExecuteBody)).resolves.toBe(
+        storedSucceededPayload,
+      );
       expect(prisma.fxExecuteRequest.findUnique).toHaveBeenCalledTimes(1);
       expectNoExecutePlanReads(prisma);
       expectNoExecuteWrites(prisma);
@@ -1005,10 +1063,13 @@ describe('FxService', () => {
       mockActiveSeason(prisma);
       mockJoinedParticipant(prisma);
       mockExecuteReadCandidates(prisma, {
-        existingCommand: buildExistingCommand(FxExecuteRequestStatus.succeeded, {
-          completedAt: capturedAt,
-          exchangeTransactionId: 'exchange-1',
-        }),
+        existingCommand: buildExistingCommand(
+          FxExecuteRequestStatus.succeeded,
+          {
+            completedAt: capturedAt,
+            exchangeTransactionId: 'exchange-1',
+          },
+        ),
       });
 
       await expectExecuteErrorCode(
@@ -1234,9 +1295,9 @@ describe('FxService', () => {
         }),
       );
 
-      await expect(
-        service.execute('user-1', validExecuteBody),
-      ).resolves.toBe(storedSucceededPayload);
+      await expect(service.execute('user-1', validExecuteBody)).resolves.toBe(
+        storedSucceededPayload,
+      );
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
       expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
       expect(prisma.exchangeTransaction.create).not.toHaveBeenCalled();
@@ -1425,14 +1486,7 @@ describe('FxService', () => {
       expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
     });
 
-    it.each<
-      [
-        string,
-        AtomicFailureStep,
-        string,
-        string[],
-      ]
-    >([
+    it.each<[string, AtomicFailureStep, string, string[]]>([
       [
         'source debit classification fails',
         'source-debit',

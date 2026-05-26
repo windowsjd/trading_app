@@ -97,6 +97,7 @@ Both scripts are explicit operator commands. No cron scheduler or admin HTTP ing
 
 - `provider_api` snapshot rows can now be inserted by explicit provider ingestion services.
 - Existing quote, execute, asset list/detail, portfolio valuation, daily snapshot, ranking, settlement, and reward behavior is not switched to provider_api eligibility in this gate.
+- ExchangeRate-API can create provider_api USD/KRW rows, but `/fx quote` remains `admin_manual` only. A newer provider_api FX row must not power quote until the source eligibility gate opens it.
 - `admin_manual` source eligibility in the existing financial paths remains unchanged.
 - Provider outages, parse errors, missing mappings, and rate limits must not create fake rows.
 - WebSocket ingestion remains a future gate.

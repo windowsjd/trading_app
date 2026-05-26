@@ -10,6 +10,7 @@ This policy records freshness and source boundaries after provider ingestion fou
 
 - Provider ingestion foundation can insert `provider_api` rows for ExchangeRate-API USD/KRW and Binance public crypto prices.
 - Existing quote, execute, asset list/detail, portfolio valuation, daily snapshot, ranking, and settlement eligibility remains unchanged unless a later gate explicitly opens provider_api sources.
+- `/fx quote` is explicitly isolated to `admin_manual` USD/KRW snapshots, matching `/fx execute`; provider_api FX rows do not power quotes yet.
 - KIS remains skeleton-only for this gate.
 
 ## 2. Current Price Storage Model
@@ -30,7 +31,7 @@ Current schema stores market evidence in two snapshot tables:
 
 Current code behavior:
 
-- `/fx quote` reads the latest eligible USD/KRW snapshot by `effectiveAt`, `capturedAt`, then `createdAt`; it currently does not filter `sourceType`; it applies a 60-second FX freshness threshold.
+- `/fx quote` reads the latest eligible `admin_manual` USD/KRW snapshot by `effectiveAt`, `capturedAt`, then `createdAt`; it applies a 60-second FX freshness threshold.
 - `/fx execute` allows only approved fresh `admin_manual` USD/KRW snapshots and applies the same 60-second threshold.
 - Order quote/create/execute currently allow only `admin_manual` asset price snapshots. USD assets also require approved fresh `admin_manual` USD/KRW.
 - Portfolio valuation/home live valuation currently use `admin_manual` asset prices and approved fresh `admin_manual` USD/KRW when USD conversion is needed.
@@ -74,6 +75,7 @@ Current confirmed policy:
 - `/fx quote`: USD/KRW snapshot must be at most 60 seconds old by `effectiveAt` at quote time.
 - `/fx execute`: USD/KRW snapshot must be at most 60 seconds old by `effectiveAt` at execute time.
 - Exactly 60 seconds is accepted; older than 60 seconds is stale.
+- Current quote source is `admin_manual` only.
 - Current execute source is approved `admin_manual` only.
 
 Future provider policy:
@@ -81,7 +83,7 @@ Future provider policy:
 - OANDA is the conditional primary FX provider candidate.
 - Twelve Data is the conditional secondary FX provider candidate.
 - `provider_api` USD/KRW requires provider timestamp -> `effectiveAt`, server receipt -> `capturedAt`, fixed rate basis, sourceType/sourceName correctness, stale response rejection, and no fake/static fallback.
-- `/fx quote` sourceType selection must be tightened before mixed `admin_manual` and `provider_api` rows are introduced, because current quote code is sourceType-agnostic.
+- `/fx quote` remains `admin_manual` only after provider ingestion foundation. Provider_api quote eligibility is a separate source eligibility gate.
 
 ## 6. Domestic Stock Freshness Policy
 
@@ -344,7 +346,7 @@ Settlement implementation tests:
 | sourceType | Intended use | Allowed for quote | Allowed for execute | Allowed for home live valuation | Allowed for daily snapshot | Allowed for ranking | Allowed for settlement | Conditions | Current implementation status |
 |---|---|---|---|---|---|---|---|---|---|
 | `admin_manual` | Bootstrap, manual correction, emergency/provider outage fallback | Yes, current/fallback | Yes, current/fallback | Yes, current/fallback | Yes, current manual CLI input | Indirectly through generated snapshots/rankings | Conditional only if Gate H approves emergency evidence | Explicit operator action, meaningful `effectiveAt`, no fake/static/sample data, freshness rules still apply where defined | Implemented for FX, asset price, order/valuation consumers, and manual CLIs |
-| `provider_api` | Future real-time or near-real-time provider source | Conditional after source eligibility gate | Conditional after source eligibility gate | Conditional after source eligibility gate | Conditional after provider-backed job policy | Indirectly through snapshots/rankings | Not accepted as sole final source | Provider timestamp required, sourceName required, stale/missing/outage rejected, tests required | Row insertion foundation exists for ExchangeRate-API and Binance; not currently allowed by execute/order/valuation selection |
+| `provider_api` | Future real-time or near-real-time provider source | Conditional after source eligibility gate | Conditional after source eligibility gate | Conditional after source eligibility gate | Conditional after provider-backed job policy | Indirectly through snapshots/rankings | Not accepted as sole final source | Provider timestamp required, sourceName required, stale/missing/outage rejected, tests required | Row insertion foundation exists for ExchangeRate-API and Binance; not currently allowed by quote/execute/order/valuation selection |
 | `official_batch` | Future official/reference/reconciliation source | No | No | No for live valuation | Conditional after Gate F/H | Conditional through batch-backed snapshots | Conditional primary candidate after Gate H | Reference date/close evidence, reproducible batch, no real-time execute use | Schema enum exists; ingestion not implemented |
 
 ## Market Freshness Matrix
