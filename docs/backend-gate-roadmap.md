@@ -11,6 +11,7 @@
 - Provider-key-free `MVP_FLOW_DB_SMOKE=1` real PostgreSQL smoke is available as a service-composed opt-in check for the implemented Auth -> season join -> wallets/assets -> FX -> orders -> positions/records/home/ranking flow using isolated test-only `admin_manual` fixtures. It is not provider ingestion, scheduler, settlement, reward, seed, or sample business data.
 - Batch job execution foundation is implemented with `BatchJobRun`/`BatchJobStatus`, `BatchService`, an operator-only noop/health-check script, operator-run `daily-portfolio-snapshot` and `season-ranking` jobs, an operator-run `daily-season-cycle` orchestration job, an operator-run `season-settlement` MVP job, an operator-run `final-tier-assignment` MVP job, and an operator-run `reward-grant` internal reward foundation MVP job. It is not a cron scheduler, provider ingestion, or actual external fulfillment implementation.
 - Provider ingestion foundation is implemented for explicit operator-run ExchangeRate-API USD/KRW, Binance public crypto market data snapshot insertion, and KIS WebSocket trade price snapshot insertion. It is not a cron scheduler, admin HTTP API, KIS REST current-price ingestion, KIS orderbook/hoga ingestion, provider_api source eligibility, or any real trading/account/balance integration.
+- Provider live smoke evidence gate on 2026-05-28 KST is PARTIAL GO: ExchangeRate-API and Binance public REST live smoke inserted local `provider_api` rows successfully; KIS WebSocket live smoke is BLOCKED by missing required KIS REST/WS base URL and watchlist/policy env values. Financial read/write source eligibility remains `admin_manual` only.
 - Home settled final-result read model is implemented from existing `rankType=final` `season_rankings`; final tier assignment and reward grant internal foundation now have operator-run MVP jobs. Actual payment/point/delivery/external fulfillment remains a separate gate.
 - `docs/current-status.md` remains the short status summary. This document is the detailed backend gate roadmap.
 
@@ -459,7 +460,33 @@ Still blocked:
 
 Recommended next Codex prompt title:
 
-- `Provider API Source Eligibility Gate - Quote Valuation and Execute Allowlist`
+- `KIS WebSocket Live Smoke Env Completion Gate`
+
+## Provider Live Smoke Evidence Gate Result (2026-05-28 KST)
+
+Provider live smoke evidence is documented in `docs/provider-evidence-capture.md`.
+
+| Area | Decision | Roadmap effect | Required before source eligibility |
+| --- | --- | --- | --- |
+| `.env.local` security precheck | PASS | `.env.local` is ignored/untracked; secret values were not printed or documented | Continue to keep env files out of git |
+| Smoke asset mappings | GO | Local DB has active mappings for `KRX:005930`, `NAS:AAPL`, `BINANCE:BTCUSDT`, and `BINANCE:ETHUSDT`; no seed/schema change | Final 41-asset app universe remains separate |
+| ExchangeRate-API live smoke | GO for row insertion; STOP for source eligibility | Dry-run/non-dry-run succeeded and inserted one local `provider_api` USD/KRW row | Source priority, freshness, outage policy, and contract/terms acceptance |
+| Binance public REST live smoke | GO for row insertion; STOP for source eligibility | Dry-run/non-dry-run succeeded for `BTCUSDT`/`ETHUSDT` and inserted two local `provider_api` USD crypto price rows | Source priority, freshness, USDT-as-USD risk decision, outage policy, and terms acceptance |
+| KIS approval_key | BLOCKED | Not requested because `KIS_REST_BASE_URL` was missing | Add required KIS REST base URL and rerun opt-in smoke |
+| KIS WebSocket connect | BLOCKED | Not attempted because `KIS_WS_BASE_URL` was missing | Add required KIS WS base URL and rerun opt-in smoke |
+| KIS domestic `H0STCNT0` tick | BLOCKED | No domestic frame evidence yet | Complete KIS env and capture approval/connect/ack/tick evidence |
+| KIS US `HDFSCNT0` tick | BLOCKED | No US frame evidence yet | Complete KIS env and capture approval/connect/ack/tick evidence; keep Hong Kong/Vietnam/China/Japan delayed markets skipped |
+| Read path isolation | PASS | `/fx`, orders, portfolio, home, positions, and daily snapshot paths remain `admin_manual` only for price/FX evidence | Add source eligibility tests before any provider_api consumer change |
+
+Decision:
+
+- Overall result is PARTIAL GO for provider row insertion evidence.
+- Provider_api source eligibility remains BLOCKED for quote, execute, valuation, home, positions, assets, daily snapshot, ranking, settlement, and reward paths.
+- No KIS order/account/balance/fill/deposit/withdrawal API, Binance authenticated API, schema/migration/package/seed change, or fake/static/sample business price was introduced.
+
+Next recommended Codex prompt title:
+
+- `KIS WebSocket Live Smoke Env Completion Gate`
 
 ## Gate C/D Live Fixture Capture Result (2026-05-13)
 

@@ -2,6 +2,14 @@
 
 Status: implemented foundation for explicit operator-run provider ingestion, no cron scheduler.
 
+Live smoke evidence status as of 2026-05-28 KST:
+
+- ExchangeRate-API dry-run and non-dry-run live smoke succeeded and created one local `fx_rate_snapshots` row with `sourceType=provider_api`, `sourceName=exchange_rate_api`, `USD/KRW`, and positive decimal rate evidence.
+- Binance public REST dry-run and non-dry-run live smoke succeeded for `BTCUSDT` and `ETHUSDT`, mapped to existing active `BINANCE` crypto USD assets, and created two local `asset_price_snapshots` rows with `sourceType=provider_api`, `sourceName=binance_public_rest_24hr_ticker`, and `currencyCode=USD`.
+- KIS WebSocket live smoke was not executed because required live smoke env was incomplete: `KIS_REST_BASE_URL`, `KIS_WS_BASE_URL`, KIS watchlist values, and explicit KIS WebSocket policy env values were missing. KIS approval_key, WebSocket connect, subscribe ack, domestic `H0STCNT0` tick, US `HDFSCNT0` tick, and KIS DB row insertion remain `BLOCKED`.
+- No secret values, approval keys, `.env.local` contents, `DATABASE_URL`, or full raw WebSocket frames were printed or documented.
+- This evidence does not open `provider_api` source eligibility for quote, execute, valuation, home, positions, assets, daily snapshot, ranking, settlement, or reward paths.
+
 ## Scope
 
 This foundation supports market data provider configuration, secret redaction, raw payload truncation, ExchangeRate-API USD/KRW snapshot ingestion, Binance public crypto price snapshot ingestion, and KIS WebSocket trade price snapshot ingestion foundation.
@@ -141,6 +149,6 @@ All scripts are explicit operator commands. No cron scheduler or admin HTTP inge
 
 ## Next Gate
 
-Recommended next gate: provider_api source eligibility decision and tests.
+Recommended next gate: KIS WebSocket live smoke env completion and evidence capture for approval_key, WebSocket connect, subscribe ack, domestic `H0STCNT0` tick, US `HDFSCNT0` tick, and DB insertion. After that, run the provider_api source eligibility decision and tests gate.
 
 That gate should decide which provider_api rows can power quote, execute, live valuation, daily snapshots, and final settlement. It should also define stale thresholds, source priority, provider outage behavior, live smoke evidence requirements, and whether delayed/free KIS rows are acceptable for any product workflow.

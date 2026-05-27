@@ -10,11 +10,13 @@ Evidence capture result as of 2026-05-14: Binance public `BTCUSDT` ticker and or
 
 Implementation readiness update on 2026-05-27: provider ingestion foundation is implemented for explicit operator-run ExchangeRate-API USD/KRW, Binance public REST crypto price snapshot insertion, and KIS WebSocket trade price snapshot insertion for domestic KRX `H0STCNT0` and US delayed/free `HDFSCNT0` feeds. This does not open provider_api source eligibility for quote, execute, valuation, daily snapshot, ranking, or settlement. Binance WebSocket, KIS REST current-price ingestion, KIS orderbook/hoga WebSocket ingestion, cron scheduling, and admin HTTP ingestion API remain unimplemented.
 
+Live smoke evidence update on 2026-05-28 KST: ExchangeRate-API and Binance public REST live smoke succeeded and inserted `provider_api` rows in the local DB. KIS live smoke was not executed because required KIS REST/WS base URL and watchlist env values were missing, even though KIS market data and credential presence checks were enabled/present. Provider_api source eligibility remains closed for quote, execute, valuation, home, positions, assets, daily snapshot, ranking, settlement, and reward paths.
+
 Remaining blockers: provider_api eligibility policy, KIS live smoke evidence with credentials, exact timestamp freshness measurement, provider outage policy, source priority, commercial/business terms approval, KIS REST quote endpoint mapping if ever needed, orderbook policy if ever needed, and settlement evidence policy.
 
 Required owner decisions: provider account/plan, commercial/external display terms, OANDA bid/ask/mid policy, Twelve Data endpoint choice for US stock, Binance USDT-to-USD-equivalent policy, KRX scope, and whether delayed data is acceptable anywhere in the product.
 
-Recommended next prompt title: `Provider API Source Eligibility Gate - Quote Valuation and Execute Allowlist`.
+Recommended next prompt title: `KIS WebSocket Live Smoke Env Completion Gate`. After KIS approval/connect/tick evidence is captured, use `Provider API Source Eligibility Gate - Quote Valuation and Execute Allowlist`.
 
 Crypto policy update on 2026-05-14: MVP crypto provider is Binance, crypto is USD-settled, crypto uses the USD Wallet, Upbit/Bithumb are excluded from MVP, and `CurrencyCode.USDT` must not be added.
 
@@ -52,13 +54,13 @@ Current internal source policy:
 
 Current code behavior:
 
-- `/fx quote` reads latest USD/KRW by `effectiveAt`, `capturedAt`, then `createdAt`; it currently does not filter `sourceType`; it applies 60-second freshness.
+- `/fx quote` reads latest eligible `admin_manual` USD/KRW by `effectiveAt`, `capturedAt`, then `createdAt`; it applies 60-second freshness.
 - `/fx execute` allows only approved fresh `admin_manual` USD/KRW snapshots and applies the same 60-second freshness rule.
 - Order quote/create/execute asset prices use `admin_manual` only.
 - USD stock and USD-settled crypto orders use the USD wallet and still require a fresh approved `admin_manual` USD/KRW snapshot for audit consistency.
 - Portfolio valuation uses `admin_manual` asset prices and approved fresh `admin_manual` USD/KRW.
 - Ranking reads existing `season_rankings`; it does not fetch prices.
-- Scheduler/batch, provider ingestion, settlement, and reward remain unimplemented.
+- Cron scheduling and provider_api consumer eligibility remain unimplemented. Provider ingestion exists only as explicit operator-run scripts, while settlement and reward remain existing-snapshot/internal-foundation gates.
 
 Current timestamp policy:
 
@@ -67,6 +69,105 @@ Current timestamp policy:
 - `createdAt`: DB row creation time; tie-breaker only.
 
 ## 4. Environment / Credentials Status
+
+### 2026-05-28 Provider Live Smoke Env Gate
+
+Checked date: 2026-05-28 KST (`2026-05-27T16:06:58.799Z` UTC).
+
+Security precheck:
+
+- `.env.local` is ignored by `.gitignore` and appears as `!! .env.local` in `git status --short --ignored`.
+- `git ls-files --stage -- .env.local` returned no rows.
+- `.env.local` was not tracked or staged.
+- Env and DB checks printed only presence/boolean status, never secret values.
+
+Required env status:
+
+| Area | Env result | Live smoke decision |
+| --- | --- | --- |
+| Common | `PROVIDER_INGESTION_ENABLED=true`, `ENABLE_PROVIDER_LIVE_SMOKE=1`, and `DATABASE_URL` present | GO for providers with complete provider-specific env |
+| ExchangeRate-API | `EXCHANGE_RATE_API_ENABLED=true`, key present, base URL present | GO |
+| Binance | `BINANCE_PUBLIC_MARKET_DATA_ENABLED=true`, REST base URL present, symbols present | GO |
+| KIS | `KIS_MARKET_DATA_ENABLED=true`, app key present, app secret present, but `KIS_REST_BASE_URL`, `KIS_WS_BASE_URL`, `KIS_DOMESTIC_SYMBOLS`, `KIS_US_SYMBOLS`, `KIS_WS_CUSTTYPE`, `KIS_WS_DOMESTIC_TR_ID`, `KIS_WS_OVERSEAS_DELAYED_TR_ID`, `KIS_WS_SNAPSHOT_THROTTLE_MS`, `KIS_WS_MAX_RUNTIME_MS`, and `KIS_WS_ALLOW_US_DELAYED` missing | BLOCKED; no KIS approval_key or WebSocket call attempted |
+
+Smoke asset mapping preparation:
+
+- Existing active asset mappings were missing for `KRX:005930`, `NAS:AAPL`, `BINANCE:BTCUSDT`, and `BINANCE:ETHUSDT`.
+- The local DB was prepared with `scripts/admin-upsert-asset.ts` for:
+  - `005930` Samsung Electronics, `market=KRX`, `currencyCode=KRW`, `assetType=domestic_stock`.
+  - `AAPL` Apple Inc., `market=NAS`, `currencyCode=USD`, `assetType=us_stock`.
+  - `BTCUSDT` Bitcoin / Tether USD, `market=BINANCE`, `currencyCode=USD`, `assetType=crypto`.
+  - `ETHUSDT` Ethereum / Tether USD, `market=BINANCE`, `currencyCode=USD`, `assetType=crypto`.
+- This was DB data preparation only. No schema, migration, seed, or package file changed.
+
+ExchangeRate-API live smoke:
+
+```bash
+pnpm tsx scripts/provider-ingest-fx-rate.ts --dry-run --base USD --requested-by live-smoke
+pnpm tsx scripts/provider-ingest-fx-rate.ts --base USD --requested-by live-smoke
+```
+
+Result:
+
+- Dry-run: `success=true`, `provider=exchange_rate_api`, `fromCurrency=USD`, `toCurrency=KRW`, `rate=1506.20470000`, `effectiveAt=2026-05-27T00:00:01.000Z`, `wouldCreate=1`.
+- Non-dry-run: `success=true`, `created=1`, `skipped=0`.
+- DB evidence: one local `fx_rate_snapshots` row was created with `sourceType=provider_api`, `sourceName=exchange_rate_api`, `baseCurrency=USD`, `quoteCurrency=KRW`, `rate=1506.20470000`, `effectiveAt=2026-05-27T00:00:01.000Z`.
+- Secret check: API key was not printed in command output, DB evidence output, or raw payload secret scan.
+- Source eligibility check: `/fx quote` and `/fx execute` remain `admin_manual` only.
+
+Binance public REST live smoke:
+
+```bash
+pnpm tsx scripts/provider-ingest-binance-prices.ts --dry-run --symbols BTCUSDT,ETHUSDT --requested-by live-smoke
+pnpm tsx scripts/provider-ingest-binance-prices.ts --symbols BTCUSDT,ETHUSDT --requested-by live-smoke
+```
+
+Result:
+
+- Dry-run: `success=true`, `wouldCreate=2`; `BTCUSDT` and `ETHUSDT` mapped to existing active `BINANCE` crypto USD assets.
+- Non-dry-run: `success=true`, `created=2`, `failed=0`.
+- DB evidence:
+  - `BTCUSDT`: `sourceType=provider_api`, `sourceName=binance_public_rest_24hr_ticker`, `currencyCode=USD`, `price=75158.00000000`, `effectiveAt=2026-05-27T16:17:31.008Z`.
+  - `ETHUSDT`: `sourceType=provider_api`, `sourceName=binance_public_rest_24hr_ticker`, `currencyCode=USD`, `price=2064.39000000`, `effectiveAt=2026-05-27T16:17:30.999Z`.
+- Binance public REST used no API key, secret, account endpoint, order endpoint, or user data stream.
+- Source eligibility check: provider_api Binance rows remain ineligible for orders, valuation, daily snapshot, ranking, settlement, and reward paths.
+
+KIS WebSocket live smoke:
+
+```bash
+pnpm tsx scripts/provider-ingest-kis-websocket-prices.ts --dry-run --duration-ms 30000 --domestic-symbols 005930 --us-symbols NAS:AAPL --max-snapshots 5 --requested-by live-smoke
+pnpm tsx scripts/provider-ingest-kis-websocket-prices.ts --duration-ms 30000 --domestic-symbols 005930 --us-symbols NAS:AAPL --max-snapshots 5 --requested-by live-smoke
+```
+
+Result:
+
+- Not executed. Required KIS live smoke env was incomplete.
+- Approval key: BLOCKED before request because `KIS_REST_BASE_URL` was missing.
+- WebSocket connect: BLOCKED because `KIS_WS_BASE_URL` was missing.
+- Subscribe ack: BLOCKED because WebSocket was not opened.
+- Domestic `H0STCNT0` tick: BLOCKED because WebSocket was not opened.
+- US `HDFSCNT0` tick: BLOCKED because WebSocket was not opened.
+- DB insertion: BLOCKED; no KIS provider_api rows were created in this live smoke.
+- Secret check: no KIS app key, app secret, approval key, or raw WebSocket frame was printed or documented.
+
+Read path isolation after provider row insertion:
+
+- Code review confirmed `/fx quote`, `/fx execute`, orders quote/create/execute, portfolio valuation, home live valuation/top positions, positions valuation, and daily portfolio snapshot generation still query only `admin_manual` FX/asset price evidence where price/FX evidence is required.
+- Ranking, settlement, final tier assignment, and reward grant jobs read existing ranking/snapshot/participant/reward rows and do not call provider ingestion or select provider_api prices.
+- No read path source eligibility change was made.
+
+Secret scan:
+
+- DB raw payload scan for provider rows created since `2026-05-27T16:06:58.799Z` found `provider_api` rows for `exchange_rate_api` and `binance_public_rest_24hr_ticker`.
+- The scan compared raw payload JSON with known local secret values in memory and reported `rawPayloadContainsKnownSecret=false`.
+- Actual secret values, `.env.local` contents, `DATABASE_URL`, KIS credentials, approval keys, and full raw WebSocket frames are not stored in this document.
+
+Decision:
+
+- ExchangeRate-API: GO for provider_api row insertion evidence; STOP for source eligibility.
+- Binance public REST: GO for provider_api row insertion evidence; STOP for source eligibility.
+- KIS WebSocket: BLOCKED by missing required live smoke env before approval/connect.
+- Overall: PARTIAL GO for provider ingestion live smoke evidence, with KIS evidence blocked. Provider_api source eligibility remains closed.
 
 Checked date: 2026-05-14.
 
@@ -417,8 +518,8 @@ Rate/price conclusion:
 
 Implementation note:
 
-- Current code does not yet allow `provider_api` in execute/order/valuation source selection.
-- `/fx quote` is currently sourceType-agnostic and must be tightened before provider rows are introduced.
+- Current code does not allow `provider_api` in FX quote, FX execute, order, position, home live valuation, portfolio valuation, or daily snapshot source selection.
+- `/fx quote` is now explicitly isolated to `admin_manual` USD/KRW snapshots, so provider_api FX rows inserted by this evidence gate do not power quote.
 - `official_batch` remains excluded from real-time quote/execute source candidates.
 
 ## 14. Freshness Compatibility

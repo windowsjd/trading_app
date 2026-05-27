@@ -17,6 +17,12 @@
   - Upbit/Bithumb are removed from the MVP provider stack.
   - Binance `BTCUSDT` public ticker/orderbook fixtures were captured in Gate C prep.
   - Provider ingestion foundation is now implemented for explicit operator-run ExchangeRate-API USD/KRW, Binance public crypto price snapshot insertion, and KIS WebSocket trade price snapshot insertion.
+  - Provider live smoke evidence gate on 2026-05-28 KST:
+    - `.env.local` was ignored and untracked; no secret values were printed.
+    - ExchangeRate-API dry-run/non-dry-run succeeded and created one local `provider_api` USD/KRW row.
+    - Binance public REST dry-run/non-dry-run succeeded for `BTCUSDT` and `ETHUSDT` and created two local `provider_api` USD asset price rows.
+    - KIS WebSocket live smoke was blocked before approval_key because required KIS REST/WS base URL and watchlist/policy env values were missing.
+    - `provider_api` source eligibility remains closed for quote, execute, valuation, home, positions, assets, daily snapshot, ranking, settlement, and reward paths.
   - Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage; USDT depeg risk is not modeled.
   - Provider_api source eligibility for quote, execute, valuation, daily snapshot, ranking, and settlement remains a separate gate.
   - KIS supports WebSocket approval_key retrieval, domestic KRX real-time trade price `H0STCNT0`, and overseas/US delayed trade price `HDFSCNT0` ingestion foundation into `asset_price_snapshots` provider_api rows.
