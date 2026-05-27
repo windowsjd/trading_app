@@ -6,6 +6,8 @@ import { ExchangeRateClient } from './exchange-rate/exchange-rate.client';
 import { ExchangeRateIngestionService } from './exchange-rate/exchange-rate.ingestion.service';
 import { KisAuthClient } from './kis/kis-auth.client';
 import { KisQuoteClient } from './kis/kis-quote.client';
+import { KisWebSocketClient } from './kis/kis-websocket.client';
+import { KisWebSocketIngestionService } from './kis/kis-websocket.ingestion.service';
 import { ProviderConfigService } from './provider-config.service';
 import { ProviderHttpClient } from './provider-http.client';
 
@@ -20,6 +22,8 @@ import { ProviderHttpClient } from './provider-http.client';
     BinancePriceIngestionService,
     KisAuthClient,
     KisQuoteClient,
+    KisWebSocketIngestionService,
+    KisWebSocketClient,
   ],
   exports: [
     ProviderConfigService,
@@ -27,6 +31,8 @@ import { ProviderHttpClient } from './provider-http.client';
     BinancePriceIngestionService,
     KisAuthClient,
     KisQuoteClient,
+    KisWebSocketIngestionService,
+    KisWebSocketClient,
   ],
 })
 export class ProvidersModule {}

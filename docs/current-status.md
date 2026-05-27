@@ -16,11 +16,12 @@
   - No schema migration is needed because the current `currencyCode`-driven model supports `AssetType.crypto`, `CurrencyCode.USD`, `Asset.market = BINANCE`, USD orders/positions, and USD/KRW FX conversion.
   - Upbit/Bithumb are removed from the MVP provider stack.
   - Binance `BTCUSDT` public ticker/orderbook fixtures were captured in Gate C prep.
-  - Provider ingestion foundation is now implemented for explicit operator-run ExchangeRate-API USD/KRW and Binance public crypto price snapshot insertion.
+  - Provider ingestion foundation is now implemented for explicit operator-run ExchangeRate-API USD/KRW, Binance public crypto price snapshot insertion, and KIS WebSocket trade price snapshot insertion.
   - Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage; USDT depeg risk is not modeled.
   - Provider_api source eligibility for quote, execute, valuation, daily snapshot, ranking, and settlement remains a separate gate.
-  - KIS is limited to market data config, redaction, watchlist policy, token/approval parsing, and low-level explicit-path skeleton. KIS quote ingestion and WebSocket ingestion remain unimplemented.
-  - KRX domestic stock remains STOP.
+  - KIS supports WebSocket approval_key retrieval, domestic KRX real-time trade price `H0STCNT0`, and overseas/US delayed trade price `HDFSCNT0` ingestion foundation into `asset_price_snapshots` provider_api rows.
+  - KIS REST current-price quote ingestion, KIS orderbook/hoga WebSocket ingestion, KIS order/account/balance/fill/deposit/withdrawal APIs, and provider_api source eligibility remain unimplemented.
+  - KRX domestic stock provider_api source eligibility remains STOP.
 
 ## 2. 구현 완료 API
 
@@ -172,8 +173,13 @@ near-term ledger/FX foundation:
   - `scripts/provider-ingest-binance-prices.ts`는 Binance public REST 24hr ticker를 fetch/parse하고 기존 active `BINANCE` crypto asset mapping이 명확한 경우 `asset_price_snapshots`에 `sourceType=provider_api`, `sourceName=binance_public_rest_24hr_ticker`, `currencyCode=USD` row를 생성할 수 있음.
   - 두 provider ingestion script는 `--dry-run`, `--requested-by`를 지원하며 cron scheduler가 아님.
   - Binance API key/secret, user data stream, order/account/balance API는 구현하지 않음.
-  - KIS는 appkey/appsecret redaction, token response parsing, approval_key parsing, watchlist 41개 제한, explicit-path low-level market data client skeleton까지만 구현됨.
-  - `KIS_REST_BASE_URL` 또는 `KIS_WS_BASE_URL`이 없으면 KIS live call은 skip 가능 상태이며 전체 provider 작업 실패로 처리하지 않음.
+  - KIS는 appkey/appsecret redaction, token response parsing, approval_key parsing, watchlist 41개 제한, explicit-path low-level market data client skeleton에 더해 WebSocket trade price ingestion foundation이 구현됨.
+  - KIS WebSocket approval_key는 `/oauth2/Approval`로 발급하며 메모리 캐시만 사용하고 DB에 저장하지 않음.
+  - KIS 국내 KRX 실시간체결가 `H0STCNT0`는 기존 active `domestic_stock`/KRW/KRX 계열 asset에만 `sourceName=kis_krx_realtime_trade` provider_api price row를 저장할 수 있음.
+  - KIS 해외/미국 실시간지연체결가 `HDFSCNT0`는 MVP에서 NAS/NYS/AMS 미국 market만 허용하며 기존 active `us_stock`/USD asset에만 `sourceName=kis_us_delayed_trade` provider_api price row를 저장할 수 있음. 문서상 미국 무료시세는 0분 지연이며 홍콩/베트남/중국/일본 15분 지연 market은 이번 MVP에서 skip.
+  - KIS WebSocket 저장은 source timestamp 파싱, raw payload redaction/truncation, duplicate skip, per-asset throttle, dry-run을 지원함.
+  - `KIS_REST_BASE_URL` 또는 `KIS_WS_BASE_URL`이 없으면 KIS live call은 failed/skipped result로 보고 가능하며 secret 값을 출력하지 않음.
+  - KIS 주식 REST 현재가 ingestion, 호가/orderbook WebSocket, 주문/계좌/잔고/실매매 API는 구현하지 않음.
   - 실제 production secret 값은 코드/문서/test fixture에 없음.
   - missing/stale FX 또는 missing price evidence는 fake fallback 없이 participant-level failure로 기록하고 해당 snapshot row를 생성하지 않음.
   - 동일 participant + snapshotDate snapshot이 이미 있으면 overwrite하지 않고 `existing`으로 분류.

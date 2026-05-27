@@ -37,6 +37,12 @@ export type KisMarketDataConfig = {
   appSecret?: string;
   restBaseUrl?: string;
   wsBaseUrl?: string;
+  wsCustType: string;
+  wsDomesticTrId: string;
+  wsOverseasDelayedTrId: string;
+  wsSnapshotThrottleMs: number;
+  wsMaxRuntimeMs: number;
+  wsAllowUsDelayed: boolean;
   maxWatchlistSize: number;
   domesticSymbols: string[];
   usSymbols: string[];
@@ -68,7 +74,9 @@ export class ProviderConfigService {
     return buildProviderConfig(env).exchangeRateApi;
   }
 
-  getBinanceConfig(env: ProviderEnv = process.env): BinancePublicMarketDataConfig {
+  getBinanceConfig(
+    env: ProviderEnv = process.env,
+  ): BinancePublicMarketDataConfig {
     return buildProviderConfig(env).binance;
   }
 
@@ -140,7 +148,8 @@ export function buildProviderConfig(env: ProviderEnv): ProviderConfig {
     wsMarketDataBaseUrl:
       readOptionalTrimmedEnv(env, 'BINANCE_WS_MARKET_DATA_BASE_URL') ??
       'wss://data-stream.binance.vision',
-    symbols: binanceSymbols.length > 0 ? binanceSymbols : ['BTCUSDT', 'ETHUSDT'],
+    symbols:
+      binanceSymbols.length > 0 ? binanceSymbols : ['BTCUSDT', 'ETHUSDT'],
     usdtAsUsdEquivalent: readBooleanEnv(
       env,
       'BINANCE_CRYPTO_USDT_AS_USD_EQUIVALENT',
@@ -186,6 +195,30 @@ export function buildProviderConfig(env: ProviderEnv): ProviderConfig {
       : readOptionalTrimmedEnv(env, 'KIS_APP_SECRET'),
     restBaseUrl: kisRestBaseUrl,
     wsBaseUrl: kisWsBaseUrl,
+    wsCustType: readOptionalTrimmedEnv(env, 'KIS_WS_CUSTTYPE') ?? 'P',
+    wsDomesticTrId:
+      readOptionalTrimmedEnv(env, 'KIS_WS_DOMESTIC_TR_ID') ?? 'H0STCNT0',
+    wsOverseasDelayedTrId:
+      readOptionalTrimmedEnv(env, 'KIS_WS_OVERSEAS_DELAYED_TR_ID') ??
+      'HDFSCNT0',
+    wsSnapshotThrottleMs: readPositiveIntegerEnv(
+      env,
+      'KIS_WS_SNAPSHOT_THROTTLE_MS',
+      5000,
+      'kis',
+    ),
+    wsMaxRuntimeMs: readPositiveIntegerEnv(
+      env,
+      'KIS_WS_MAX_RUNTIME_MS',
+      30000,
+      'kis',
+    ),
+    wsAllowUsDelayed: readBooleanEnv(
+      env,
+      'KIS_WS_ALLOW_US_DELAYED',
+      true,
+      'kis',
+    ),
     maxWatchlistSize,
     domesticSymbols: watchlist.domesticSymbols,
     usSymbols: watchlist.usSymbols,

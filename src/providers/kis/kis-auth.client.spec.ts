@@ -35,6 +35,37 @@ describe('KIS auth client skeleton', () => {
     });
   });
 
+  it('requests WebSocket approval_key with the documented body fields', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ approval_key: 'approval-secret' }),
+    } as Response);
+    const client = new KisAuthClient(
+      configServiceFor({
+        restBaseUrl: 'https://kis.example.test',
+        appKey: 'kis-app-key',
+        appSecret: 'kis-app-secret',
+      }),
+    );
+
+    const result = await client.requestConfiguredWebSocketApprovalKey();
+
+    expect(result.state).toBe('available');
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://kis.example.test/oauth2/Approval',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          grant_type: 'client_credentials',
+          appkey: 'kis-app-key',
+          secretkey: 'kis-app-secret',
+        }),
+      }),
+    );
+    fetchSpy.mockRestore();
+  });
+
   it('redacts KIS app key, app secret, token, and approval_key fields', () => {
     const redacted = redactJsonValue(
       {
@@ -112,3 +143,50 @@ describe('KIS auth client skeleton', () => {
     );
   });
 });
+
+function configServiceFor(input: {
+  restBaseUrl?: string;
+  wsBaseUrl?: string;
+  appKey?: string;
+  appSecret?: string;
+}): ProviderConfigService {
+  return {
+    getConfig: () => ({
+      common: {
+        providerIngestionEnabled: true,
+        httpTimeoutMs: 5000,
+        rawPayloadMaxBytes: 12000,
+      },
+      exchangeRateApi: {
+        enabled: false,
+        baseUrl: 'https://example.test',
+      },
+      binance: {
+        enabled: false,
+        restBaseUrl: 'https://example.test',
+        wsMarketDataBaseUrl: 'wss://example.test',
+        symbols: [],
+        usdtAsUsdEquivalent: true,
+      },
+      kis: {
+        enabled: true,
+        appKey: input.appKey ?? 'kis-app-key',
+        appSecret: input.appSecret ?? 'kis-app-secret',
+        restBaseUrl: input.restBaseUrl,
+        wsBaseUrl: input.wsBaseUrl,
+        wsCustType: 'P',
+        wsDomesticTrId: 'H0STCNT0',
+        wsOverseasDelayedTrId: 'HDFSCNT0',
+        wsSnapshotThrottleMs: 5000,
+        wsMaxRuntimeMs: 30000,
+        wsAllowUsDelayed: true,
+        maxWatchlistSize: 41,
+        domesticSymbols: [],
+        usSymbols: [],
+        allSymbols: [],
+        canCallRestLive: Boolean(input.restBaseUrl),
+        canCallWebSocketLive: Boolean(input.wsBaseUrl),
+      },
+    }),
+  } as unknown as ProviderConfigService;
+}

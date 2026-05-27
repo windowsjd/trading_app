@@ -58,6 +58,24 @@ describe('provider config', () => {
     expect(config.kis.canCallWebSocketLive).toBe(false);
   });
 
+  it('parses KIS WebSocket env defaults and overrides', () => {
+    const config = buildProviderConfig({
+      KIS_WS_CUSTTYPE: 'P',
+      KIS_WS_DOMESTIC_TR_ID: 'H0STCNT0',
+      KIS_WS_OVERSEAS_DELAYED_TR_ID: 'HDFSCNT0',
+      KIS_WS_SNAPSHOT_THROTTLE_MS: '2500',
+      KIS_WS_MAX_RUNTIME_MS: '15000',
+      KIS_WS_ALLOW_US_DELAYED: 'false',
+    });
+
+    expect(config.kis.wsCustType).toBe('P');
+    expect(config.kis.wsDomesticTrId).toBe('H0STCNT0');
+    expect(config.kis.wsOverseasDelayedTrId).toBe('HDFSCNT0');
+    expect(config.kis.wsSnapshotThrottleMs).toBe(2500);
+    expect(config.kis.wsMaxRuntimeMs).toBe(15000);
+    expect(config.kis.wsAllowUsDelayed).toBe(false);
+  });
+
   it('parses Binance symbols as uppercase unique values', () => {
     const config = buildProviderConfig({
       BINANCE_CRYPTO_SYMBOLS: 'btcusdt, ETHUSDT,btcusdt,, ',
