@@ -189,19 +189,6 @@ export class KisWebSocketClient {
 
     await waitForSocketOpen(socket, Math.min(input.durationMs, 10000));
 
-    const subscribeRequests = input.targets.map((target) =>
-      buildKisWebSocketSubscriptionRequest({
-        approvalKey: input.approvalKey,
-        custType: input.custType,
-        action: 'subscribe',
-        trId: target.trId,
-        trKey: target.trKey,
-      }),
-    );
-    for (const request of subscribeRequests) {
-      socket.send(JSON.stringify(request));
-    }
-
     const messageListener = (event: unknown) => {
       const promise = this.handleSocketMessage({
         event,
@@ -240,6 +227,19 @@ export class KisWebSocketClient {
       pendingMessages.add(promise);
     };
     socket.addEventListener('message', messageListener);
+
+    const subscribeRequests = input.targets.map((target) =>
+      buildKisWebSocketSubscriptionRequest({
+        approvalKey: input.approvalKey,
+        custType: input.custType,
+        action: 'subscribe',
+        trId: target.trId,
+        trKey: target.trKey,
+      }),
+    );
+    for (const request of subscribeRequests) {
+      socket.send(JSON.stringify(request));
+    }
 
     await Promise.race([sleep(input.durationMs), closePromise]);
 
@@ -446,7 +446,12 @@ function closeSocket(socket: NativeWebSocket): void {
 }
 
 function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise((resolve) => {
+    const timeout = setTimeout(resolve, ms) as ReturnType<typeof setTimeout> & {
+      unref?: () => void;
+    };
+    timeout.unref?.();
+  });
 }
 
 function emptyRunResult(input: {
