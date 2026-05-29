@@ -1,6 +1,6 @@
 # Backend Test Coverage Matrix
 
-Status: documentation/code-audit matrix, updated 2026-05-28 for provider live smoke evidence. ExchangeRate-API and Binance public REST opt-in live smoke inserted local `provider_api` rows successfully; KIS WebSocket live smoke remains env-blocked before approval_key/connect. Provider_api source eligibility remains closed.
+Status: documentation/code-audit matrix, updated 2026-05-30 for fixed KIS stock universe and live-smoke readiness. The fixed KIS stock watchlist validates to 40 symbols within the 41-symbol limit. After local DB startup, all fixed 40 stock assets were upserted, DB mapping counts passed at domestic 15/15 and US 25/25, and ExchangeRate/Binance dry-run rechecks succeeded. KIS WebSocket live smoke remains blocked by missing KIS REST/WS endpoint plus WebSocket policy env values. Provider_api source eligibility remains closed.
 
 This document records the current backend test surface before starting the next large backend gates such as provider_api source eligibility, WebSocket ingestion, cron scheduling, ranking overwrite/regeneration automation, settlement extensions beyond final tier assignment, actual reward fulfillment, or further auth hardening.
 
@@ -14,6 +14,7 @@ Crypto policy update:
 - Upbit/Bithumb and KRW crypto trading are excluded from MVP.
 - Provider ingestion foundation exists for explicit operator-run ExchangeRate-API USD/KRW, Binance public REST crypto price snapshot insertion, and KIS WebSocket domestic/US trade price snapshot insertion.
 - Provider live smoke evidence exists for ExchangeRate-API USD/KRW row insertion and Binance `BTCUSDT`/`ETHUSDT` public REST row insertion. KIS approval_key/connect/tick live smoke evidence remains blocked by missing KIS REST/WS base URL and watchlist/policy env.
+- Fixed asset universe coverage exists for watchlist construction and local DB mapping evidence: 15 domestic KRX symbols plus 25 US NAS/NYS symbols validate to a 40-symbol KIS watchlist under the 41-symbol limit, and active DB mapping counts passed at 15/15 domestic and 25/25 US after local DB startup.
 - Provider_api source eligibility for quote, execute, valuation, daily snapshot, ranking, and settlement remains a separate gate.
 
 ## Audit Basis
@@ -114,7 +115,7 @@ Crypto policy update:
 | Future gate                     | Missing tests that should be planned before implementation GO                                                                                                                                                                |
 | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Provider_api source eligibility | Source priority, stale thresholds by workflow, quote/execute/read-path allowlists, mixed admin_manual/provider_api regression tests, provider outage behavior, no fake/static fallback, duplicate snapshot handling          |
-| WebSocket ingestion             | Binance combined ticker/kline stream handling, reconnect/backoff hardening, no user data stream, KIS approval_key/connect/subscribe ack/domestic `H0STCNT0`/US `HDFSCNT0` live smoke after required env is present, provider outage/reconnect policy, and real DB script smoke for KIS provider rows |
+| WebSocket ingestion             | Binance combined ticker/kline stream handling, reconnect/backoff hardening, no user data stream, KIS approval_key/connect/subscribe ack/domestic `H0STCNT0`/US `HDFSCNT0` live smoke after required KIS endpoint/policy env is present, provider outage/reconnect policy, and real DB script smoke for KIS provider rows |
 | Scheduler / batch               | Real DB script smoke, cron/deployment ownership, job-specific partial failure policy, provider outage behavior, manual override coexistence                                                                                  |
 | Settlement extensions           | Provider-backed final evidence if introduced, true tie-rank schema policy, recovery/rerun behavior, advanced tier/reward/ranking side-effect boundaries                                                                      |
 | Reward external fulfillment     | Reward amount policy, payment/point/delivery/external fulfillment schema, duplicate fulfillment prevention, rollback on fulfillment failure, read model consistency                                                          |

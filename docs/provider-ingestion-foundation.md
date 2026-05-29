@@ -2,6 +2,19 @@
 
 Status: implemented foundation for explicit operator-run provider ingestion, no cron scheduler.
 
+Fixed KIS stock universe status as of 2026-05-30 KST:
+
+- KIS stock watchlist is fixed at 40 symbols: 15 domestic KRX stocks and 25 US stocks.
+- The universe is a fixed high-liquidity watchlist candidate selected by project decision. It is not a new Codex stock investigation and does not claim official YTD rank verification.
+- `KIS_DOMESTIC_SYMBOLS=005930,000660,034020,010140,042660,005380,000270,035420,035720,068270,051910,066570,086520,247540,028300`
+- `KIS_US_SYMBOLS=NAS:NVDA,NAS:TSLA,NAS:AMD,NAS:AAPL,NAS:AMZN,NAS:MSFT,NAS:GOOGL,NAS:META,NAS:PLTR,NAS:INTC,NAS:SOFI,NAS:RIVN,NAS:MARA,NAS:WBD,NAS:CSCO,NAS:MU,NAS:QCOM,NAS:PYPL,NAS:MSTR,NAS:SMCI,NYS:F,NYS:BAC,NYS:PFE,NYS:T,NYS:UBER`
+- Local watchlist policy validation returned domestic 15, US 25, total 40, max 41, within limit.
+- Binance `BTCUSDT` and `ETHUSDT` remain separate crypto assets and are not included in the KIS stock watchlist.
+- After the local DB was started on 2026-05-30, all fixed 40 stock assets were upserted successfully and DB mapping counts passed: domestic 15/15, US 25/25, KIS total 40/41.
+- ExchangeRate and Binance dry-runs succeeded after DB restart; Binance `BTCUSDT` and `ETHUSDT` mapped to existing active `BINANCE` USD crypto assets.
+- KIS live smoke remained blocked on 2026-05-30 because KIS REST/WS endpoint and explicit WebSocket policy env values were missing in the loaded env.
+- `provider_api` source eligibility remains closed.
+
 Live smoke evidence status as of 2026-05-28 KST:
 
 - ExchangeRate-API dry-run and non-dry-run live smoke succeeded and created one local `fx_rate_snapshots` row with `sourceType=provider_api`, `sourceName=exchange_rate_api`, `USD/KRW`, and positive decimal rate evidence.

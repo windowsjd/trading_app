@@ -12,6 +12,25 @@ Implementation readiness update on 2026-05-27: provider ingestion foundation is 
 
 Live smoke evidence update on 2026-05-28 KST: ExchangeRate-API and Binance public REST live smoke succeeded and inserted `provider_api` rows in the local DB. KIS live smoke was not executed because required KIS REST/WS base URL and watchlist env values were missing, even though KIS market data and credential presence checks were enabled/present. Provider_api source eligibility remains closed for quote, execute, valuation, home, positions, assets, daily snapshot, ranking, settlement, and reward paths.
 
+Fixed asset universe update on 2026-05-30 KST: the KIS stock watchlist universe is fixed as 15 domestic KRX stocks and 25 US stocks, total 40 symbols. This is a fixed high-liquidity watchlist candidate selected by project decision, not a new Codex stock investigation and not an official YTD rank verification claim. The fixed universe is documented in `docs/asset-universe-2026-ytd-volume-selection.md`.
+
+2026-05-30 local evidence capture result after DB restart:
+
+- Security precheck passed: `.env.local` is ignored by `.gitignore`, `git ls-files --stage -- .env.local` returned no rows, and `.env.local` appeared only as ignored in `git status --short --ignored`.
+- KIS watchlist construction passed with domestic 15, US 25, total 40, and max size 41.
+- All fixed 40 stock assets were upserted with `scripts/admin-upsert-asset.ts`.
+- DB mapping counts passed:
+  - active `domestic_stock` / KRW / market `KRX` / fixed symbols: 15/15.
+  - active `us_stock` / USD / markets `NAS,NYS` / fixed symbols: 25/25, with NAS 20 and NYS 5.
+  - KIS stock watchlist target total: 40, within the 41-symbol limit.
+  - active `BINANCE` USD crypto mappings for `BTCUSDT` and `ETHUSDT`: 2/2, separate from the KIS stock watchlist.
+- ExchangeRate-API dry-run succeeded for USD/KRW with `success=true`, rate `1498.36950000`, `effectiveAt=2026-05-29T00:00:01.000Z`, and `wouldCreate=1`.
+- Binance dry-run succeeded for `BTCUSDT` and `ETHUSDT` with `success=true`, `wouldCreate=2`, `failed=0`, and existing active `BINANCE` crypto USD asset mappings.
+- KIS env completion check found `ENABLE_PROVIDER_LIVE_SMOKE`, `PROVIDER_INGESTION_ENABLED`, `KIS_MARKET_DATA_ENABLED`, `KIS_APP_KEY`, and `KIS_APP_SECRET` present, but `KIS_REST_BASE_URL`, `KIS_WS_BASE_URL`, `KIS_WS_CUSTTYPE`, `KIS_WS_DOMESTIC_TR_ID`, `KIS_WS_OVERSEAS_DELAYED_TR_ID`, `KIS_WS_SNAPSHOT_THROTTLE_MS`, `KIS_WS_MAX_RUNTIME_MS`, and `KIS_WS_ALLOW_US_DELAYED` missing in the loaded env.
+- KIS live smoke was not executed on 2026-05-30 because required endpoint and policy env values were incomplete. Approval key, WebSocket connect, subscribe ack, domestic `H0STCNT0` tick, US `HDFSCNT0` tick, and KIS DB insertion remain `BLOCKED`.
+- No secret values, `.env.local` contents, `DATABASE_URL`, approval keys, or full raw WebSocket frames were printed or documented.
+- Provider_api source eligibility remains closed.
+
 Remaining blockers: provider_api eligibility policy, KIS live smoke evidence with credentials, exact timestamp freshness measurement, provider outage policy, source priority, commercial/business terms approval, KIS REST quote endpoint mapping if ever needed, orderbook policy if ever needed, and settlement evidence policy.
 
 Required owner decisions: provider account/plan, commercial/external display terms, OANDA bid/ask/mid policy, Twelve Data endpoint choice for US stock, Binance USDT-to-USD-equivalent policy, KRX scope, and whether delayed data is acceptable anywhere in the product.

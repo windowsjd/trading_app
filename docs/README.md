@@ -22,6 +22,7 @@ Use this directory in this order:
    - `docs/provider-final-selection-readiness-recheck.md`
    - `docs/asset-price-freshness-policy.md`
    - `docs/provider-evidence-capture.md`
+   - `docs/asset-universe-2026-ytd-volume-selection.md`
 6. Batch foundation and operator-run daily snapshot/ranking/cycle/settlement/final-tier/reward-grant internal foundation jobs:
    - `docs/batch-job-foundation.md`
 
