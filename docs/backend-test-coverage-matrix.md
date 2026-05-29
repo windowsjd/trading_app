@@ -1,6 +1,6 @@
 # Backend Test Coverage Matrix
 
-Status: documentation/code-audit matrix, updated 2026-05-30 for fixed KIS stock universe and live-smoke readiness. The fixed KIS stock watchlist validates to 40 symbols within the 41-symbol limit. After local DB startup, all fixed 40 stock assets were upserted, DB mapping counts passed at domestic 15/15 and US 25/25, and ExchangeRate/Binance dry-run rechecks succeeded. KIS WebSocket live smoke remains blocked by missing KIS REST/WS endpoint plus WebSocket policy env values. Provider_api source eligibility remains closed.
+Status: documentation/code-audit matrix, updated 2026-05-30 for fixed KIS stock universe, KIS env-completion recheck, and provider source eligibility pre-gate. The fixed KIS stock watchlist validates to 40 symbols within the 41-symbol limit. After local DB startup, all fixed 40 stock assets were upserted, DB mapping counts passed at domestic 15/15 and US 25/25, and ExchangeRate/Binance dry-run rechecks succeeded. KIS WebSocket live smoke remains blocked by missing `KIS_REST_BASE_URL` and `KIS_WS_BASE_URL`; KIS policy env values have code defaults, but approval_key/connect/tick were not attempted without required endpoints. `docs/provider-source-eligibility-pre-gate.md` is docs-only policy coverage for the next gate. Provider_api source eligibility remains closed.
 
 This document records the current backend test surface before starting the next large backend gates such as provider_api source eligibility, WebSocket ingestion, cron scheduling, ranking overwrite/regeneration automation, settlement extensions beyond final tier assignment, actual reward fulfillment, or further auth hardening.
 
@@ -13,8 +13,9 @@ Crypto policy update:
 - Crypto KRW valuation is USD crypto value converted by USD/KRW.
 - Upbit/Bithumb and KRW crypto trading are excluded from MVP.
 - Provider ingestion foundation exists for explicit operator-run ExchangeRate-API USD/KRW, Binance public REST crypto price snapshot insertion, and KIS WebSocket domestic/US trade price snapshot insertion.
-- Provider live smoke evidence exists for ExchangeRate-API USD/KRW row insertion and Binance `BTCUSDT`/`ETHUSDT` public REST row insertion. KIS approval_key/connect/tick live smoke evidence remains blocked by missing KIS REST/WS base URL and watchlist/policy env.
+- Provider live smoke evidence exists for ExchangeRate-API USD/KRW row insertion and Binance `BTCUSDT`/`ETHUSDT` public REST row insertion. KIS approval_key/connect/tick live smoke evidence remains blocked by missing KIS REST/WS base URL env.
 - Fixed asset universe coverage exists for watchlist construction and local DB mapping evidence: 15 domestic KRX symbols plus 25 US NAS/NYS symbols validate to a 40-symbol KIS watchlist under the 41-symbol limit, and active DB mapping counts passed at 15/15 domestic and 25/25 US after local DB startup.
+- Provider source eligibility pre-gate coverage now documents candidate source names, workflow-level eligibility draft, freshness threshold draft, source priority options, delayed/free data policy, financial write-path safety conditions, and required next-gate tests. It does not open source eligibility.
 - Provider_api source eligibility for quote, execute, valuation, daily snapshot, ranking, and settlement remains a separate gate.
 
 ## Audit Basis
@@ -39,6 +40,7 @@ Crypto policy update:
   - `docs/provider-final-selection-readiness-recheck.md`
   - `docs/asset-price-freshness-policy.md`
   - `docs/provider-evidence-capture.md`
+  - `docs/provider-source-eligibility-pre-gate.md`
 - Historical safety/preimplementation documents are archived in `docs/archive/` and are not current source of truth.
 - Code/test files inspected:
   - `src/auth/**`

@@ -12,14 +12,24 @@ Fixed KIS stock universe status as of 2026-05-30 KST:
 - Binance `BTCUSDT` and `ETHUSDT` remain separate crypto assets and are not included in the KIS stock watchlist.
 - After the local DB was started on 2026-05-30, all fixed 40 stock assets were upserted successfully and DB mapping counts passed: domestic 15/15, US 25/25, KIS total 40/41.
 - ExchangeRate and Binance dry-runs succeeded after DB restart; Binance `BTCUSDT` and `ETHUSDT` mapped to existing active `BINANCE` USD crypto assets.
-- KIS live smoke remained blocked on 2026-05-30 because KIS REST/WS endpoint and explicit WebSocket policy env values were missing in the loaded env.
+- KIS live smoke remained blocked on 2026-05-30 because KIS REST/WS endpoint env values were missing in the loaded env. Explicit WebSocket policy env values were also absent, but code defaults are defined.
 - `provider_api` source eligibility remains closed.
+
+KIS env completion pre-gate update as of 2026-05-30 KST:
+
+- Required KIS live smoke env is still incomplete because `KIS_REST_BASE_URL` and `KIS_WS_BASE_URL` are missing in the loaded env.
+- KIS policy env values are not present but have explicit code defaults: custtype `P`, domestic TR `H0STCNT0`, overseas delayed TR `HDFSCNT0`, snapshot throttle `5000`, max runtime `30000`, and US delayed enabled `true`.
+- The fixed CLI watchlist remains domestic 15 plus US 25, total 40 within the max 41 limit.
+- DB mapping recheck passed for domestic 15/15, US 25/25, and separate Binance crypto 2/2.
+- ExchangeRate-API and Binance public REST regression dry-runs succeeded.
+- KIS approval_key, WebSocket connect, subscribe ack, domestic tick, US tick, and KIS DB insertion remain `BLOCKED` before request because the required endpoints are absent.
+- `docs/provider-source-eligibility-pre-gate.md` documents the next source eligibility policy draft. No read path has been changed.
 
 Live smoke evidence status as of 2026-05-28 KST:
 
 - ExchangeRate-API dry-run and non-dry-run live smoke succeeded and created one local `fx_rate_snapshots` row with `sourceType=provider_api`, `sourceName=exchange_rate_api`, `USD/KRW`, and positive decimal rate evidence.
 - Binance public REST dry-run and non-dry-run live smoke succeeded for `BTCUSDT` and `ETHUSDT`, mapped to existing active `BINANCE` crypto USD assets, and created two local `asset_price_snapshots` rows with `sourceType=provider_api`, `sourceName=binance_public_rest_24hr_ticker`, and `currencyCode=USD`.
-- KIS WebSocket live smoke was not executed because required live smoke env was incomplete: `KIS_REST_BASE_URL`, `KIS_WS_BASE_URL`, KIS watchlist values, and explicit KIS WebSocket policy env values were missing. KIS approval_key, WebSocket connect, subscribe ack, domestic `H0STCNT0` tick, US `HDFSCNT0` tick, and KIS DB row insertion remain `BLOCKED`.
+- KIS WebSocket live smoke was not executed because required endpoint env was incomplete: `KIS_REST_BASE_URL` and `KIS_WS_BASE_URL` were missing. KIS approval_key, WebSocket connect, subscribe ack, domestic `H0STCNT0` tick, US `HDFSCNT0` tick, and KIS DB row insertion remain `BLOCKED`.
 - No secret values, approval keys, `.env.local` contents, `DATABASE_URL`, or full raw WebSocket frames were printed or documented.
 - This evidence does not open `provider_api` source eligibility for quote, execute, valuation, home, positions, assets, daily snapshot, ranking, settlement, or reward paths.
 
@@ -162,6 +172,6 @@ All scripts are explicit operator commands. No cron scheduler or admin HTTP inge
 
 ## Next Gate
 
-Recommended next gate: KIS WebSocket live smoke env completion and evidence capture for approval_key, WebSocket connect, subscribe ack, domestic `H0STCNT0` tick, US `HDFSCNT0` tick, and DB insertion. After that, run the provider_api source eligibility decision and tests gate.
+Recommended next gate: KIS WebSocket endpoint env completion and evidence capture for approval_key, WebSocket connect, subscribe ack, domestic `H0STCNT0` tick, US `HDFSCNT0` tick, and DB insertion. After that, run the Provider API Source Eligibility Implementation Gate using `docs/provider-source-eligibility-pre-gate.md`.
 
 That gate should decide which provider_api rows can power quote, execute, live valuation, daily snapshots, and final settlement. It should also define stale thresholds, source priority, provider outage behavior, live smoke evidence requirements, and whether delayed/free KIS rows are acceptable for any product workflow.

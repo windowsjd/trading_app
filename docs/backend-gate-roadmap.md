@@ -12,8 +12,11 @@
 - Batch job execution foundation is implemented with `BatchJobRun`/`BatchJobStatus`, `BatchService`, an operator-only noop/health-check script, operator-run `daily-portfolio-snapshot` and `season-ranking` jobs, an operator-run `daily-season-cycle` orchestration job, an operator-run `season-settlement` MVP job, an operator-run `final-tier-assignment` MVP job, and an operator-run `reward-grant` internal reward foundation MVP job. It is not a cron scheduler, provider ingestion, or actual external fulfillment implementation.
 - Provider ingestion foundation is implemented for explicit operator-run ExchangeRate-API USD/KRW, Binance public crypto market data snapshot insertion, and KIS WebSocket trade price snapshot insertion. It is not a cron scheduler, admin HTTP API, KIS REST current-price ingestion, KIS orderbook/hoga ingestion, provider_api source eligibility, or any real trading/account/balance integration.
 - Provider live smoke evidence gate on 2026-05-28 KST is PARTIAL GO: ExchangeRate-API and Binance public REST live smoke inserted local `provider_api` rows successfully; KIS WebSocket live smoke is BLOCKED by missing required KIS REST/WS base URL and watchlist/policy env values. Financial read/write source eligibility remains `admin_manual` only.
-- Asset Universe / KIS watchlist gate on 2026-05-30 KST is PARTIAL GO / KIS BLOCKED: the fixed 40-stock KIS watchlist is documented, all 40 stock assets were upserted after DB startup, DB mapping counts passed at domestic 15/15 and US 25/25, and ExchangeRate/Binance dry-run rechecks succeeded. KIS live smoke remains blocked by missing KIS REST/WS endpoint plus WebSocket policy env values.
-- Next Provider Ingestion gate remains KIS env completion: provide KIS REST/WS endpoint and explicit WebSocket policy env values, then run KIS WebSocket live smoke for approval_key, connect, subscribe ack, domestic `H0STCNT0`, US `HDFSCNT0`, and provider_api row insertion evidence.
+- Asset Universe / KIS watchlist gate on 2026-05-30 KST is PARTIAL GO / KIS BLOCKED: the fixed 40-stock KIS watchlist is documented, all 40 stock assets were upserted after DB startup, DB mapping counts passed at domestic 15/15 and US 25/25, and ExchangeRate/Binance dry-run rechecks succeeded.
+- KIS env completion pre-gate on 2026-05-30 KST remains KIS BLOCKED because `KIS_REST_BASE_URL` and `KIS_WS_BASE_URL` are missing in the loaded env. KIS policy env values have explicit code defaults, but approval_key/connect/subscribe/tick/DB insertion were not attempted without required endpoints.
+- Provider API Source Eligibility Pre-Gate on 2026-05-30 KST is docs-only GO: `docs/provider-source-eligibility-pre-gate.md` records eligible source candidates, workflow policy, freshness drafts, source priority options, delayed/free data policy, and financial write-path safety rules. No source eligibility implementation was opened.
+- Next Provider Ingestion gate remains KIS endpoint env completion: provide KIS REST/WS endpoint env values, then run KIS WebSocket live smoke for approval_key, connect, subscribe ack, domestic `H0STCNT0`, US `HDFSCNT0`, and provider_api row insertion evidence.
+- Next implementation gate after KIS smoke is Provider API Source Eligibility Implementation Gate.
 - Home settled final-result read model is implemented from existing `rankType=final` `season_rankings`; final tier assignment and reward grant internal foundation now have operator-run MVP jobs. Actual payment/point/delivery/external fulfillment remains a separate gate.
 - `docs/current-status.md` remains the short status summary. This document is the detailed backend gate roadmap.
 
@@ -40,6 +43,7 @@ Current source-of-truth and active reference documents:
 - `docs/provider-final-selection-readiness-recheck.md`
 - `docs/asset-price-freshness-policy.md`
 - `docs/provider-evidence-capture.md`
+- `docs/provider-source-eligibility-pre-gate.md`
 - `docs/docs-inventory.md`
 - `README.md`
 

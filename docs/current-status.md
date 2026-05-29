@@ -32,8 +32,14 @@
     - DB mapping verification passed: active domestic KRX/KRW `domestic_stock` 15/15, active US NAS/NYS USD `us_stock` 25/25, KIS watchlist total 40/41.
     - Active `BINANCE` USD crypto mappings for `BTCUSDT` and `ETHUSDT` remain present as separate crypto assets.
     - ExchangeRate dry-run succeeded for USD/KRW with `wouldCreate=1`; Binance dry-run succeeded for `BTCUSDT,ETHUSDT` with `wouldCreate=2`.
-    - KIS live smoke remains blocked because loaded env is missing KIS REST/WS endpoint and explicit WebSocket policy values; no approval_key or WebSocket call was attempted.
+    - KIS live smoke remains blocked because loaded env is missing KIS REST/WS endpoint values; no approval_key or WebSocket call was attempted.
     - `provider_api` source eligibility remains STOP/closed for all financial read/write paths.
+  - KIS env completion pre-gate on 2026-05-30 KST:
+    - Required KIS live smoke env was rechecked after DB startup. `ENABLE_PROVIDER_LIVE_SMOKE`, `PROVIDER_INGESTION_ENABLED`, `KIS_MARKET_DATA_ENABLED`, `DATABASE_URL`, `KIS_APP_KEY`, and `KIS_APP_SECRET` are present, but `KIS_REST_BASE_URL` and `KIS_WS_BASE_URL` are still missing.
+    - KIS policy env values are absent but have explicit code defaults. The fixed 40-symbol CLI watchlist remains documented and DB-mapped.
+    - KIS live smoke was not executed because required endpoint env is missing; approval_key, WebSocket connect, subscribe ack, domestic tick, US tick, and KIS provider_api insertion remain `BLOCKED`.
+    - ExchangeRate-API and Binance public REST dry-run regressions succeeded.
+    - `docs/provider-source-eligibility-pre-gate.md` was added as a policy draft for the next implementation gate. No source eligibility code was opened.
   - Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage; USDT depeg risk is not modeled.
   - Provider_api source eligibility for quote, execute, valuation, daily snapshot, ranking, and settlement remains a separate gate.
   - KIS supports WebSocket approval_key retrieval, domestic KRX real-time trade price `H0STCNT0`, and overseas/US delayed trade price `HDFSCNT0` ingestion foundation into `asset_price_snapshots` provider_api rows.

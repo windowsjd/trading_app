@@ -31,11 +31,25 @@ Fixed asset universe update on 2026-05-30 KST: the KIS stock watchlist universe 
 - No secret values, `.env.local` contents, `DATABASE_URL`, approval keys, or full raw WebSocket frames were printed or documented.
 - Provider_api source eligibility remains closed.
 
-Remaining blockers: provider_api eligibility policy, KIS live smoke evidence with credentials, exact timestamp freshness measurement, provider outage policy, source priority, commercial/business terms approval, KIS REST quote endpoint mapping if ever needed, orderbook policy if ever needed, and settlement evidence policy.
+2026-05-30 KIS env completion pre-gate result:
+
+- Security precheck remained clean: `.env.local` is ignored, `git ls-files --stage -- .env.local` returned no rows, and no `.env.local` content was printed.
+- KIS required env presence check found `ENABLE_PROVIDER_LIVE_SMOKE`, `PROVIDER_INGESTION_ENABLED`, `KIS_MARKET_DATA_ENABLED`, `DATABASE_URL`, `KIS_APP_KEY`, and `KIS_APP_SECRET` present.
+- KIS required endpoint env remained incomplete: `KIS_REST_BASE_URL` and `KIS_WS_BASE_URL` were missing, so KIS live smoke was not executed.
+- KIS WebSocket policy env values were missing but code defaults are explicit and known: `KIS_WS_CUSTTYPE=P`, `KIS_WS_DOMESTIC_TR_ID=H0STCNT0`, `KIS_WS_OVERSEAS_DELAYED_TR_ID=HDFSCNT0`, `KIS_WS_SNAPSHOT_THROTTLE_MS=5000`, `KIS_WS_MAX_RUNTIME_MS=30000`, and `KIS_WS_ALLOW_US_DELAYED=true`.
+- `KIS_DOMESTIC_SYMBOLS` and `KIS_US_SYMBOLS` env values were missing, but the fixed 40-symbol CLI watchlist for this gate is documented and DB-mapped.
+- DB mapping recheck passed: domestic fixed assets 15/15, US fixed assets 25/25 with NAS 20 and NYS 5, KIS stock watchlist 40/41, and separate Binance crypto assets 2/2.
+- ExchangeRate-API regression dry-run succeeded for USD/KRW with `success=true` and `wouldCreate=1`.
+- Binance public REST regression dry-run succeeded for `BTCUSDT` and `ETHUSDT` with `success=true`, `wouldCreate=2`, and `failed=0`.
+- KIS approval_key, WebSocket connect, subscribe ack, domestic `H0STCNT0` tick, US `HDFSCNT0` tick, and KIS provider_api DB insertion remain `BLOCKED` before request because required endpoint env is missing.
+- `docs/provider-source-eligibility-pre-gate.md` now records the policy draft for a later implementation gate. No source eligibility code was opened.
+- No secret values, `.env.local` contents, `DATABASE_URL`, KIS credentials, approval keys, or full raw WebSocket frames were printed or documented.
+
+Remaining blockers: provider_api source eligibility implementation, KIS live smoke evidence with complete endpoint env, exact timestamp freshness measurement, provider outage policy, source priority, commercial/business terms approval, KIS REST quote endpoint mapping if ever needed, orderbook policy if ever needed, and settlement evidence policy.
 
 Required owner decisions: provider account/plan, commercial/external display terms, OANDA bid/ask/mid policy, Twelve Data endpoint choice for US stock, Binance USDT-to-USD-equivalent policy, KRX scope, and whether delayed data is acceptable anywhere in the product.
 
-Recommended next prompt title: `KIS WebSocket Live Smoke Env Completion Gate`. After KIS approval/connect/tick evidence is captured, use `Provider API Source Eligibility Gate - Quote Valuation and Execute Allowlist`.
+Recommended next prompt title: `KIS WebSocket Endpoint Env Completion Gate`. After KIS approval/connect/tick evidence is captured, use `Provider API Source Eligibility Implementation Gate`.
 
 Crypto policy update on 2026-05-14: MVP crypto provider is Binance, crypto is USD-settled, crypto uses the USD Wallet, Upbit/Bithumb are excluded from MVP, and `CurrencyCode.USDT` must not be added.
 
