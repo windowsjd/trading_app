@@ -24,6 +24,8 @@ Use this directory in this order:
    - `docs/provider-evidence-capture.md`
    - `docs/asset-universe-2026-ytd-volume-selection.md`
    - `docs/provider-source-eligibility-pre-gate.md`
+
+Provider evidence currently has ExchangeRate-API and Binance row insertion evidence, KIS domestic `H0STCNT0` row insertion evidence, and KIS US `HDFSCNT0` subscription ack without US tick/DB insertion evidence. Provider_api source eligibility remains closed until a later implementation gate.
 6. Batch foundation and operator-run daily snapshot/ranking/cycle/settlement/final-tier/reward-grant internal foundation jobs:
    - `docs/batch-job-foundation.md`
 

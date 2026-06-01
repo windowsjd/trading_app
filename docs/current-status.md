@@ -59,6 +59,20 @@
     - ExchangeRate-API and Binance public REST dry-run regressions succeeded.
     - `provider_api` source eligibility remains STOP/closed for all quote, execute, valuation, assets, positions, home, daily snapshot, ranking, settlement, and reward paths.
     - Next evidence gate should capture US `HDFSCNT0` tick and DB insertion during an appropriate US market-data window, unless the owner explicitly scopes US live evidence separately.
+  - KIS US `HDFSCNT0` Tick and DB Insertion Retry Gate on 2026-06-01 KST:
+    - Retry ran around 2026-06-01 11:14-11:21 KST, which is 2026-05-31 22:14-22:21 EDT and outside the US regular market window.
+    - Security precheck stayed clean: `.env.local` is ignored and untracked, and `git ls-files --stage -- .env.local` returned no rows. `.env.local` was not modified in this retry.
+    - Required KIS env and policy env were present. Fixed CLI watchlist values were used because `KIS_DOMESTIC_SYMBOLS` and `KIS_US_SYMBOLS` env values remain absent.
+    - DB mapping verification passed again: domestic 15/15, US 25/25 with NAS 20 and NYS 5, KIS watchlist total 40/41, and separate Binance crypto 2/2.
+    - US-focused dry-run with one domestic symbol sent 26 subscriptions and received 26 acknowledgement count, but domestic `H0STCNT0` ticks quickly reached the max snapshot cap; no US tick was observed in that short effective window.
+    - US-only dry-run sent 25 US subscriptions, received aggregate acknowledgement count 30, received 30 frames, produced `wouldCreate=0`, `created=0`, `failed=0`, and no snapshots.
+    - Approval key and WebSocket connect succeeded by inference from successful WebSocket subscription acknowledgements. The approval key value was not printed or documented.
+    - US `HDFSCNT0` tick remains unobserved and `kis_us_delayed_trade` provider_api DB row count remains 0. This is classified as `SUBSCRIBE_ACK_BUT_NO_US_TICK` / `MARKET_CLOSED_OR_NO_TICK`, without guessing a deeper cause.
+    - KIS non-dry-run was not executed because dry-run did not produce US tick evidence. Existing domestic `kis_krx_realtime_trade` provider_api rows remain 12; this retry created no KIS DB rows.
+    - ExchangeRate-API and Binance public REST dry-run regressions succeeded.
+    - Read path isolation remained clean: `/fx`, orders, assets, portfolio, home, positions, and daily snapshot source selection still uses `admin_manual` price/FX evidence only.
+    - `provider_api` source eligibility remains STOP/closed for all quote, execute, valuation, assets, positions, home, daily snapshot, ranking, settlement, and reward paths.
+    - Next evidence gate is a US market-data-window retry or explicit owner scope acceptance for missing US tick/DB insertion evidence.
   - Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage; USDT depeg risk is not modeled.
   - Provider_api source eligibility for quote, execute, valuation, daily snapshot, ranking, and settlement remains a separate gate.
   - KIS supports WebSocket approval_key retrieval, domestic KRX real-time trade price `H0STCNT0`, and overseas/US delayed trade price `HDFSCNT0` ingestion foundation into `asset_price_snapshots` provider_api rows.
@@ -906,7 +920,7 @@ near-term ledger/FX foundation:
   - 상세 결과: `docs/provider-final-selection-readiness-recheck.md`, `docs/asset-price-freshness-policy.md`.
   - Gate B 판단은 `CONDITIONAL GO`.
   - 이것은 evidence capture와 다음 구현 프롬프트를 열기 위한 조건부 판단이며, provider ingestion 구현 GO가 아님.
-- 다음 recommended gate: KIS US HDFSCNT0 Tick and DB Insertion Retry Gate.
+- 다음 recommended gate: KIS US HDFSCNT0 Market-Data Window Retry Gate 또는 US Evidence Scope Acceptance Decision.
   - US tick/DB insertion evidence 확보 또는 owner의 명시적 scope acceptance 이후 Provider API Source Eligibility Implementation Gate로 진행한다.
   - source eligibility 착수 전 provider timestamp/effectiveAt mapping, KIS/Binance price/effectiveAt mapping, symbol mapping, plan/terms, sourceType/sourceName 우선순위, polling/rate-limit 정책을 확인해야 함.
 - Gate A Protected API HTTP e2e baseline은 완료 상태로 본다.

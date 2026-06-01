@@ -17,7 +17,8 @@
 - Provider API Source Eligibility Pre-Gate on 2026-05-30 KST is docs-only GO: `docs/provider-source-eligibility-pre-gate.md` records eligible source candidates, workflow policy, freshness drafts, source priority options, delayed/free data policy, and financial write-path safety rules. No source eligibility implementation was opened.
 - KIS WebSocket Endpoint Env Completion Gate on 2026-05-30 KST remains KIS BLOCKED because `KIS_REST_BASE_URL` and `KIS_WS_BASE_URL` are still missing in the loaded env. KIS dry-run/non-dry-run were not executed.
 - KIS WebSocket Endpoint Env Completion Gate retry on 2026-06-01 KST is PARTIAL GO: `.env.local` stayed ignored/untracked and was updated only with non-secret KIS endpoint/policy env keys, required KIS env became present, KIS dry-run and non-dry-run connected successfully, all 40 subscriptions were sent and acknowledged, domestic `H0STCNT0` ticks were parsed, and 12 domestic `kis_krx_realtime_trade` provider_api asset price rows were inserted. US `HDFSCNT0` subscriptions were acknowledged but no US tick or `kis_us_delayed_trade` DB row was observed in the 30-second smoke window.
-- Next Provider Ingestion gate is US `HDFSCNT0` tick and DB insertion evidence capture during an appropriate US market-data window, unless the owner explicitly accepts the missing US tick evidence as separately scoped.
+- KIS US `HDFSCNT0` Tick and DB Insertion Retry Gate on 2026-06-01 KST is PARTIAL: the retry ran around 2026-06-01 11:14-11:21 KST / 2026-05-31 22:14-22:21 EDT, outside the US regular market window. Required KIS env and DB mapping stayed valid, US-only dry-run sent 25 US subscriptions and received aggregate acknowledgement count 30, but no US tick or `kis_us_delayed_trade` DB row was observed. Non-dry-run was skipped because dry-run produced no US tick evidence.
+- Next Provider Ingestion gate is US `HDFSCNT0` tick and DB insertion evidence capture during an appropriate US market-data window, or explicit owner scope acceptance for the missing US live tick/DB evidence.
 - Provider API Source Eligibility Implementation Gate must not start until KIS live evidence is complete for the intended workflows or explicitly accepted as scoped by owner decision.
 - Home settled final-result read model is implemented from existing `rankType=final` `season_rankings`; final tier assignment and reward grant internal foundation now have operator-run MVP jobs. Actual payment/point/delivery/external fulfillment remains a separate gate.
 - `docs/current-status.md` remains the short status summary. This document is the detailed backend gate roadmap.
@@ -468,7 +469,7 @@ Still blocked:
 
 Recommended next Codex prompt title:
 
-- `KIS US HDFSCNT0 Tick and DB Insertion Retry Gate`
+- `KIS US HDFSCNT0 Market-Data Window Retry Gate` or `US Evidence Scope Acceptance Decision`
 
 ## Provider Live Smoke Evidence Gate Result (2026-05-28 KST)
 
@@ -483,7 +484,7 @@ Provider live smoke evidence is documented in `docs/provider-evidence-capture.md
 | KIS approval_key | GO | Approval request success is evidenced by successful WebSocket connect and subscribe acknowledgements; value was not printed | Keep secret redaction and do not persist approval keys |
 | KIS WebSocket connect | GO | Dry-run and non-dry-run connected successfully | Add reconnect/outage policy only in a later gate |
 | KIS domestic `H0STCNT0` tick | GO | Domestic ticks parsed and 12 `kis_krx_realtime_trade` provider_api rows were inserted | Keep source eligibility closed until the implementation gate |
-| KIS US `HDFSCNT0` tick | PARTIAL / OPEN | Subscriptions were acknowledged, but no US tick or DB row was observed in the 30-second window | Retry during an appropriate US market-data window or explicitly scope US evidence separately |
+| KIS US `HDFSCNT0` tick | PARTIAL / OPEN | Subscriptions were acknowledged in both the 40-symbol smoke and a later US-only 60-second retry, but no US tick or DB row was observed. The retry was outside the US regular market window. | Retry during an appropriate US market-data window or explicitly scope US evidence separately |
 | Read path isolation | PASS | `/fx`, orders, portfolio, home, positions, and daily snapshot paths remain `admin_manual` only for price/FX evidence | Add source eligibility tests before any provider_api consumer change |
 
 Decision:
@@ -494,7 +495,7 @@ Decision:
 
 Next recommended Codex prompt title:
 
-- `KIS US HDFSCNT0 Tick and DB Insertion Retry Gate`
+- `KIS US HDFSCNT0 Market-Data Window Retry Gate` or `US Evidence Scope Acceptance Decision`
 
 ## Gate C/D Live Fixture Capture Result (2026-05-13)
 
@@ -561,13 +562,13 @@ Blocked reasons:
 
 Next recommended Codex prompt title:
 
-- `KIS US HDFSCNT0 Tick and DB Insertion Retry Gate`
+- `KIS US HDFSCNT0 Market-Data Window Retry Gate` or `US Evidence Scope Acceptance Decision`
 
 ## Next 5 Implementation Candidate Priority
 
 | Candidate                                             | MVP impact | Financial stability impact | Implementation risk | External dependency | Test difficulty | Current prerequisites met?                               | Start now?                    | Recommendation       | Reason                                                                                                                                                                                                             | Required prior decisions                                                              | Suggested next prompt scope                                                                     |
 | ----------------------------------------------------- | ---------- | -------------------------- | ------------------- | ------------------- | --------------- | -------------------------------------------------------- | ----------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| 1. Provider ingestion foundation                      | HIGH       | HIGH                       | MEDIUM              | HIGH                | MEDIUM          | Enough for ExchangeRate/Binance/KIS WebSocket foundation | Completed for foundation      | DONE FOR FOUNDATION  | Provider rows can be inserted for ExchangeRate-API USD/KRW, Binance public crypto, and KIS WebSocket domestic/US stock trade prices without changing financial read/write eligibility.                             | KIS US live evidence or explicit scope acceptance, source eligibility, cost/contract owner, polling/timestamp/freshness checklist | KIS US HDFSCNT0 retry, then Provider API Source Eligibility Implementation Gate |
+| 1. Provider ingestion foundation                      | HIGH       | HIGH                       | MEDIUM              | HIGH                | MEDIUM          | Enough for ExchangeRate/Binance/KIS WebSocket foundation | Completed for foundation      | DONE FOR FOUNDATION  | Provider rows can be inserted for ExchangeRate-API USD/KRW, Binance public crypto, and KIS WebSocket domestic/US stock trade prices without changing financial read/write eligibility.                             | KIS US live evidence or explicit scope acceptance, source eligibility, cost/contract owner, polling/timestamp/freshness checklist | US market-data-window retry or scope decision, then Provider API Source Eligibility Implementation Gate |
 | 2. Asset price freshness policy finalization          | HIGH       | HIGH                       | MEDIUM              | MEDIUM              | MEDIUM          | Partially                                                | Completed as docs-only policy | DONE, CONDITIONAL GO | SourceType roles, timestamp semantics, market freshness, and stale behavior are now documented for future Gate D/F/H work.                                                                                         | supported asset universe, live fixtures, market-hours acceptance, settlement evidence | Use policy in provider evidence capture and later implementation gates                          |
 | 3. Season settlement MVP                              | HIGH       | VERY HIGH                  | MEDIUM              | LOW                 | MEDIUM          | Enough for existing snapshots                            | Completed for MVP             | DONE FOR MVP         | Operator-run settlement can now finalize from existing daily snapshots without provider keys or cron; final tier assignment and reward grant internal foundation MVP can consume final rankings/final assignments. | True tie rank, advanced tier policy, and actual reward fulfillment remain separate    | Keep settlement/final-tier/reward foundation bounded; open separate extension/fulfillment gates |
 | 4. Scheduler/batch foundation preimplementation audit | HIGH       | HIGH                       | MEDIUM              | MEDIUM              | HIGH            | Mostly for envelope                                      | Completed for envelope        | DONE FOR ENVELOPE    | BatchJobRun and BatchService now provide idempotent run recording; cron and business jobs still depend on provider/freshness and ops model.                                                                        | job-specific partial failure, provider outage, cron/deployment ownership              | Add concrete snapshot/ranking job only under its own gate                                       |
@@ -575,7 +576,7 @@ Next recommended Codex prompt title:
 
 Recommended next task:
 
-- KIS US HDFSCNT0 Tick and DB Insertion Retry Gate.
+- KIS US HDFSCNT0 Market-Data Window Retry Gate or US Evidence Scope Acceptance Decision.
 - After US tick/DB insertion evidence is captured or explicitly scoped by owner decision, Provider API Source Eligibility Implementation Gate.
 
 ## STOP / GO Summary

@@ -99,13 +99,37 @@ Fixed asset universe update on 2026-05-30 KST: the KIS stock watchlist universe 
 - No secret values, `.env.local` contents, `DATABASE_URL`, KIS credentials, approval keys, access tokens, or full raw WebSocket frames were printed or documented.
 - Provider_api source eligibility remains closed.
 
-Remaining blockers: US `HDFSCNT0` tick and DB insertion evidence, provider_api source eligibility implementation, exact timestamp freshness measurement, provider outage policy, source priority, commercial/business terms approval, KIS REST quote endpoint mapping if ever needed, orderbook policy if ever needed, and settlement evidence policy.
+2026-06-01 KIS US `HDFSCNT0` tick and DB insertion retry result:
 
-Required owner decisions for current MVP provider gates: US `HDFSCNT0` live evidence retry or explicit scope acceptance, ExchangeRate/Binance/KIS commercial or display terms, Binance USDT-to-USD-equivalent policy, KIS delayed/free data acceptance for US stocks, KRX scope, freshness thresholds, and source priority.
+- Execution window: approximately 2026-06-01 11:14-11:21 KST, corresponding to 2026-05-31 22:14-22:21 EDT. This is outside the US regular market window.
+- Security precheck stayed clean: `.env.local` is ignored by `.gitignore`, `git ls-files --stage -- .env.local` returned no rows, and `.env.local` appeared only as ignored in `git status --short --ignored`.
+- `.env.local` was not modified in this retry. No `.env.local` content was printed.
+- Required KIS env was present: `ENABLE_PROVIDER_LIVE_SMOKE`, `PROVIDER_INGESTION_ENABLED`, `KIS_MARKET_DATA_ENABLED`, `DATABASE_URL`, `KIS_APP_KEY`, `KIS_APP_SECRET`, `KIS_REST_BASE_URL`, and `KIS_WS_BASE_URL`.
+- KIS WebSocket policy env was present: `KIS_WS_CUSTTYPE`, `KIS_WS_DOMESTIC_TR_ID`, `KIS_WS_OVERSEAS_DELAYED_TR_ID`, `KIS_WS_SNAPSHOT_THROTTLE_MS`, `KIS_WS_MAX_RUNTIME_MS`, and `KIS_WS_ALLOW_US_DELAYED`.
+- DB mapping recheck passed:
+  - active `us_stock` / USD / markets `NAS,NYS` / fixed symbols: 25/25, with NAS 20 and NYS 5.
+  - active `domestic_stock` / KRW / market `KRX` / fixed symbols: 15/15.
+  - active `BINANCE` USD crypto mappings for `BTCUSDT` and `ETHUSDT`: 2/2, separate from the KIS stock watchlist.
+- First US-focused dry-run used one domestic symbol plus the 25-symbol US watchlist. It sent 26 subscriptions, received acknowledgement count 26, received 35 frames, and produced 23 domestic `wouldCreate` summaries. The domestic tick stream reached the max snapshot cap before a useful US wait window completed.
+- Second dry-run used US-only subscriptions by passing an empty domestic symbol list. It sent 25 US subscriptions, received aggregate acknowledgement count 30, received 30 frames, and completed with `created=0`, `wouldCreate=0`, `failed=0`, and no snapshots.
+- Approval key and WebSocket connect succeeded by inference from successful WebSocket subscription acknowledgements. The approval key value was not printed or documented.
+- US `HDFSCNT0` subscriptions were acknowledged, but no US trade tick was observed in the US-only 60-second window.
+- KIS non-dry-run was not executed because dry-run did not produce US tick evidence.
+- DB evidence after the retry: `kis_us_delayed_trade` provider_api row count remains 0, while existing `kis_krx_realtime_trade` provider_api row count remains 12.
+- Failure classification: `SUBSCRIBE_ACK_BUT_NO_US_TICK` and `MARKET_CLOSED_OR_NO_TICK`. No deeper credential, parser, mapping, or network cause is inferred from this run.
+- ExchangeRate-API regression dry-run succeeded for USD/KRW with `success=true` and `wouldCreate=1`.
+- Binance public REST regression dry-run succeeded for `BTCUSDT` and `ETHUSDT` with `success=true`, `wouldCreate=2`, and `failed=0`.
+- Read path isolation remained clean: `/fx quote`, `/fx execute`, orders quote/create/execute, assets withPrice, portfolio/home/positions valuation, and daily snapshot valuation still use `admin_manual` price/FX eligibility only.
+- No secret values, `.env.local` contents, `DATABASE_URL`, KIS credentials, approval keys, access tokens, or full raw WebSocket frames were printed or documented.
+- Provider_api source eligibility remains closed.
+
+Remaining blockers: US `HDFSCNT0` tick and DB insertion evidence or explicit owner scope acceptance, provider_api source eligibility implementation, exact timestamp freshness measurement, provider outage policy, source priority, commercial/business terms approval, KIS REST quote endpoint mapping if ever needed, orderbook policy if ever needed, and settlement evidence policy.
+
+Required owner decisions for current MVP provider gates: US market-data-window retry or explicit scope acceptance for missing `HDFSCNT0` tick/DB insertion evidence, ExchangeRate/Binance/KIS commercial or display terms, Binance USDT-to-USD-equivalent policy, KIS delayed/free data acceptance for US stocks, KRX scope, freshness thresholds, and source priority.
 
 Historical/future-review decisions: OANDA bid/ask/mid policy and Twelve Data endpoint choice can be revisited only if the MVP provider stack changes.
 
-Recommended next prompt title: `KIS US HDFSCNT0 Tick and DB Insertion Retry Gate`. After complete intended KIS live evidence is captured or explicitly scoped, use `Provider API Source Eligibility Implementation Gate`.
+Recommended next prompt title: `KIS US HDFSCNT0 Market-Data Window Retry Gate` or `US Evidence Scope Acceptance Decision`. After complete intended KIS live evidence is captured or explicitly scoped, use `Provider API Source Eligibility Implementation Gate`.
 
 Crypto policy update on 2026-05-14: MVP crypto provider is Binance, crypto is USD-settled, crypto uses the USD Wallet, Upbit/Bithumb are excluded from MVP, and `CurrencyCode.USDT` must not be added.
 

@@ -22,7 +22,7 @@ Provider row insertion foundation exists for explicit operator-run ingestion:
 | FX USD/KRW | `exchange_rate_api` | Live smoke row insertion evidence exists. |
 | Crypto USD prices | `binance_public_rest_24hr_ticker` | Live smoke row insertion evidence exists for `BTCUSDT` and `ETHUSDT`. |
 | Domestic stock prices | `kis_krx_realtime_trade` | Live smoke evidence exists for approval/connect/subscribe ack, domestic tick parsing, and 12 local provider_api DB inserts. |
-| US stock prices | `kis_us_delayed_trade` | Subscription ack evidence exists, but no US tick or DB insertion was observed in the 2026-06-01 30-second smoke window. |
+| US stock prices | `kis_us_delayed_trade` | Subscription ack evidence exists, but no US tick or DB insertion was observed in the 2026-06-01 30-second smoke window or the later US-only 60-second retry outside the US regular market window. |
 
 The fixed KIS stock universe remains 40 symbols: 15 domestic KRX stocks and 25
 US NAS/NYS stocks. Binance `BTCUSDT` and `ETHUSDT` remain separate crypto
@@ -147,7 +147,8 @@ all existing financial read/write paths.
 
 Implementation sequencing:
 
-1. Capture KIS US `HDFSCNT0` tick and DB insertion evidence, or record an
-   explicit owner decision to scope US live evidence separately.
+1. Capture KIS US `HDFSCNT0` tick and DB insertion evidence during an
+   appropriate US market-data window, or record an explicit owner decision to
+   scope US live evidence separately.
 2. Start Provider API Source Eligibility Implementation Gate for only the
    workflows and source names with accepted live evidence.

@@ -47,6 +47,19 @@ KIS endpoint env completion retry as of 2026-06-01 KST:
 - ExchangeRate-API and Binance public REST regression dry-runs succeeded.
 - `provider_api` source eligibility remains closed.
 
+KIS US `HDFSCNT0` retry as of 2026-06-01 KST:
+
+- Retry ran around 2026-06-01 11:14-11:21 KST, which is 2026-05-31 22:14-22:21 EDT and outside the US regular market window.
+- `.env.local` stayed ignored/untracked and was not modified. No secret values or `.env.local` contents were printed or documented.
+- Required KIS env and WebSocket policy env were present. The fixed US CLI watchlist was supplied for the smoke command.
+- DB mapping recheck passed for US 25/25 with NAS 20 and NYS 5, domestic 15/15, and separate Binance crypto 2/2.
+- A first US-focused dry-run with one domestic symbol sent 26 subscriptions and received acknowledgement count 26, but domestic ticks reached the max snapshot cap before a useful US wait window completed.
+- A second US-only 60-second dry-run sent 25 US subscriptions, received aggregate acknowledgement count 30, received 30 frames, and completed with `created=0`, `wouldCreate=0`, `failed=0`, and no snapshots.
+- US `HDFSCNT0` tick remains unobserved and `kis_us_delayed_trade` provider_api DB row count remains 0. The result is classified as `SUBSCRIBE_ACK_BUT_NO_US_TICK` / `MARKET_CLOSED_OR_NO_TICK`.
+- Non-dry-run was skipped because dry-run did not produce US tick evidence. Existing domestic `kis_krx_realtime_trade` provider_api row count remains 12.
+- ExchangeRate-API and Binance public REST regression dry-runs succeeded.
+- `provider_api` source eligibility remains closed.
+
 Live smoke evidence status as of 2026-05-28 KST:
 
 - ExchangeRate-API dry-run and non-dry-run live smoke succeeded and created one local `fx_rate_snapshots` row with `sourceType=provider_api`, `sourceName=exchange_rate_api`, `USD/KRW`, and positive decimal rate evidence.
@@ -194,6 +207,6 @@ All scripts are explicit operator commands. No cron scheduler or admin HTTP inge
 
 ## Next Gate
 
-Recommended next gate: KIS US `HDFSCNT0` tick and DB insertion evidence retry during an appropriate US market-data window. After complete intended KIS live evidence is captured or explicitly scoped by owner decision, run the Provider API Source Eligibility Implementation Gate using `docs/provider-source-eligibility-pre-gate.md`.
+Recommended next gate: KIS US `HDFSCNT0` tick and DB insertion evidence retry during an appropriate US market-data window, or an explicit owner scope acceptance decision for the missing US live tick/DB evidence. After complete intended KIS live evidence is captured or explicitly scoped by owner decision, run the Provider API Source Eligibility Implementation Gate using `docs/provider-source-eligibility-pre-gate.md`.
 
 That gate should decide which provider_api rows can power quote, execute, live valuation, daily snapshots, and final settlement. It should also define stale thresholds, source priority, provider outage behavior, live smoke evidence requirements, and whether delayed/free KIS rows are acceptable for any product workflow.
