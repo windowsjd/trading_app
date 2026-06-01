@@ -18,6 +18,15 @@ export const UserStatus = {
 export type UserStatus = (typeof UserStatus)[keyof typeof UserStatus]
 
 
+export const UserRole = {
+  user: 'user',
+  operator: 'operator',
+  admin: 'admin'
+} as const
+
+export type UserRole = (typeof UserRole)[keyof typeof UserRole]
+
+
 export const RefreshTokenSessionStatus = {
   active: 'active',
   revoked: 'revoked'
@@ -177,3 +186,27 @@ export const BatchJobStatus = {
 } as const
 
 export type BatchJobStatus = (typeof BatchJobStatus)[keyof typeof BatchJobStatus]
+
+
+export const BadgeType = {
+  tier_badge: 'tier_badge',
+  ranker_trophy: 'ranker_trophy'
+} as const
+
+export type BadgeType = (typeof BadgeType)[keyof typeof BadgeType]
+
+
+export const SeasonRewardType = {
+  badge: 'badge',
+  trophy: 'trophy'
+} as const
+
+export type SeasonRewardType = (typeof SeasonRewardType)[keyof typeof SeasonRewardType]
+
+
+export const OperatorAuditResult = {
+  success: 'success',
+  failure: 'failure'
+} as const
+
+export type OperatorAuditResult = (typeof OperatorAuditResult)[keyof typeof OperatorAuditResult]

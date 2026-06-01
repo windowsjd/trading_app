@@ -40,6 +40,10 @@ jest.mock('../src/generated/prisma/client', () => {
       limit: 'limit',
       market: 'market',
     },
+    OperatorAuditResult: {
+      success: 'success',
+      failure: 'failure',
+    },
     ParticipantStatus: {
       active: 'active',
       registered: 'registered',
@@ -69,6 +73,11 @@ jest.mock('../src/generated/prisma/client', () => {
       active: 'active',
       suspended: 'suspended',
       deleted: 'deleted',
+    },
+    UserRole: {
+      user: 'user',
+      operator: 'operator',
+      admin: 'admin',
     },
     WalletTransactionDirection: {
       credit: 'credit',
@@ -225,6 +234,7 @@ describe('AppController (e2e)', () => {
     nickname: 'traderKim',
     profileImageUrl: null,
     status: 'active',
+    role: 'user',
     createdAt: now,
   };
   const season = {
@@ -432,10 +442,11 @@ describe('AppController (e2e)', () => {
       },
     );
 
-  const mockActiveUser = (userId = user.id) => {
+  const mockActiveUser = (userId = user.id, role = 'user') => {
     prisma.user.findUnique.mockResolvedValue({
       ...user,
       id: userId,
+      role,
       status: 'active',
     });
   };
@@ -726,6 +737,7 @@ describe('AppController (e2e)', () => {
             data: expect.objectContaining({
               email: user.email,
               passwordHash: 'hashed-password',
+              role: 'user',
             }),
           }),
         );
@@ -1049,6 +1061,162 @@ describe('AppController (e2e)', () => {
           },
         });
         expect(JSON.stringify(response.body)).not.toContain('passwordHash');
+      });
+  });
+
+  it('/api/v1/me (GET) allows an operator to use regular protected APIs with token identity', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      ...user,
+      role: 'operator',
+    });
+    const token = await createValidAccessToken(user.id);
+
+    return request(app.getHttpServer())
+      .get('/api/v1/me')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: true,
+          data: {
+            id: user.id,
+            email: user.email,
+          },
+        });
+        expect(prisma.user.findUnique).toHaveBeenCalledTimes(2);
+      });
+  });
+
+  it('/api/v1/operator/me (GET) rejects missing token', async () => {
+    await expectUnauthorizedWithoutToken('get', '/api/v1/operator/me');
+  });
+
+  it('/api/v1/operator/me (GET) rejects x-user-id only', async () => {
+    await expectUnauthorizedWithXUserId('get', '/api/v1/operator/me');
+  });
+
+  it('/api/v1/operator/me (GET) rejects invalid bearer tokens', async () => {
+    await expectUnauthorizedWithAuthorization(
+      'get',
+      '/api/v1/operator/me',
+      'Bearer invalid-token',
+    );
+  });
+
+  it('/api/v1/operator/me (GET) rejects regular users', async () => {
+    resetPrismaMocks();
+    mockActiveUser(user.id, 'user');
+    const token = await createValidAccessToken(user.id);
+
+    return request(app.getHttpServer())
+      .get('/api/v1/operator/me')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(403)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: false,
+          error: {
+            code: 'OPERATOR_FORBIDDEN',
+          },
+        });
+        expect(prisma.user.findUnique).toHaveBeenCalledTimes(1);
+        expectNoWriteMutationCalls();
+      });
+  });
+
+  it.each([
+    ['operator', 'operator'],
+    ['admin', 'admin'],
+  ])('/api/v1/operator/me (GET) allows %s role', async (_label, role) => {
+    resetPrismaMocks();
+    mockActiveUser(user.id, role);
+    const token = await createValidAccessToken(user.id);
+
+    return request(app.getHttpServer())
+      .get('/api/v1/operator/me')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+      .expect((response) => {
+        expect(response.body).toEqual({
+          success: true,
+          data: {
+            userId: user.id,
+            role,
+          },
+        });
+        expect(prisma.user.findUnique).toHaveBeenCalledTimes(1);
+        expectNoWriteMutationCalls();
+      });
+  });
+
+  it.each(['suspended', 'deleted'])(
+    '/api/v1/operator/me (GET) rejects %s users before operator guard success',
+    async (status) => {
+      resetPrismaMocks();
+      prisma.user.findUnique.mockResolvedValueOnce({
+        ...user,
+        role: 'operator',
+        status,
+      });
+      const token = await createValidAccessToken(user.id);
+
+      return request(app.getHttpServer())
+        .get('/api/v1/operator/me')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403)
+        .expect((response) => {
+          expect(response.body).toMatchObject({
+            success: false,
+            error: {
+              code: 'USER_NOT_ACTIVE',
+            },
+          });
+          expect(prisma.user.findUnique).toHaveBeenCalledTimes(1);
+          expectNoWriteMutationCalls();
+        });
+    },
+  );
+
+  it('/api/v1/operator/me (GET) uses the current DB role even with an existing token', async () => {
+    resetPrismaMocks();
+    const token = await createValidAccessToken(user.id);
+    prisma.user.findUnique.mockResolvedValueOnce({
+      ...user,
+      role: 'user',
+      status: 'active',
+    });
+
+    await request(app.getHttpServer())
+      .get('/api/v1/operator/me')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(403)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: false,
+          error: {
+            code: 'OPERATOR_FORBIDDEN',
+          },
+        });
+      });
+
+    prisma.user.findUnique.mockResolvedValueOnce({
+      ...user,
+      role: 'operator',
+      status: 'active',
+    });
+
+    await request(app.getHttpServer())
+      .get('/api/v1/operator/me')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+      .expect((response) => {
+        expect(response.body).toEqual({
+          success: true,
+          data: {
+            userId: user.id,
+            role: 'operator',
+          },
+        });
       });
   });
 

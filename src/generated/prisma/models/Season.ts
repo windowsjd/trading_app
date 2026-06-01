@@ -270,6 +270,8 @@ export type SeasonWhereInput = {
   updatedAt?: Prisma.DateTimeFilter<"Season"> | Date | string
   participants?: Prisma.SeasonParticipantListRelationFilter
   seasonRankings?: Prisma.SeasonRankingListRelationFilter
+  userBadges?: Prisma.UserBadgeListRelationFilter
+  seasonRewards?: Prisma.SeasonRewardListRelationFilter
 }
 
 export type SeasonOrderByWithRelationInput = {
@@ -286,6 +288,8 @@ export type SeasonOrderByWithRelationInput = {
   updatedAt?: Prisma.SortOrder
   participants?: Prisma.SeasonParticipantOrderByRelationAggregateInput
   seasonRankings?: Prisma.SeasonRankingOrderByRelationAggregateInput
+  userBadges?: Prisma.UserBadgeOrderByRelationAggregateInput
+  seasonRewards?: Prisma.SeasonRewardOrderByRelationAggregateInput
 }
 
 export type SeasonWhereUniqueInput = Prisma.AtLeast<{
@@ -305,6 +309,8 @@ export type SeasonWhereUniqueInput = Prisma.AtLeast<{
   updatedAt?: Prisma.DateTimeFilter<"Season"> | Date | string
   participants?: Prisma.SeasonParticipantListRelationFilter
   seasonRankings?: Prisma.SeasonRankingListRelationFilter
+  userBadges?: Prisma.UserBadgeListRelationFilter
+  seasonRewards?: Prisma.SeasonRewardListRelationFilter
 }, "id">
 
 export type SeasonOrderByWithAggregationInput = {
@@ -357,6 +363,8 @@ export type SeasonCreateInput = {
   updatedAt?: Date | string
   participants?: Prisma.SeasonParticipantCreateNestedManyWithoutSeasonInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutSeasonInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutSeasonInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutSeasonInput
 }
 
 export type SeasonUncheckedCreateInput = {
@@ -373,6 +381,8 @@ export type SeasonUncheckedCreateInput = {
   updatedAt?: Date | string
   participants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutSeasonInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutSeasonInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutSeasonInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutSeasonInput
 }
 
 export type SeasonUpdateInput = {
@@ -389,6 +399,8 @@ export type SeasonUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   participants?: Prisma.SeasonParticipantUpdateManyWithoutSeasonNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutSeasonNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutSeasonNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutSeasonNestedInput
 }
 
 export type SeasonUncheckedUpdateInput = {
@@ -405,6 +417,8 @@ export type SeasonUncheckedUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   participants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutSeasonNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutSeasonNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutSeasonNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutSeasonNestedInput
 }
 
 export type SeasonCreateManyInput = {
@@ -532,6 +546,34 @@ export type SeasonUpdateOneRequiredWithoutParticipantsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.SeasonUpdateToOneWithWhereWithoutParticipantsInput, Prisma.SeasonUpdateWithoutParticipantsInput>, Prisma.SeasonUncheckedUpdateWithoutParticipantsInput>
 }
 
+export type SeasonCreateNestedOneWithoutUserBadgesInput = {
+  create?: Prisma.XOR<Prisma.SeasonCreateWithoutUserBadgesInput, Prisma.SeasonUncheckedCreateWithoutUserBadgesInput>
+  connectOrCreate?: Prisma.SeasonCreateOrConnectWithoutUserBadgesInput
+  connect?: Prisma.SeasonWhereUniqueInput
+}
+
+export type SeasonUpdateOneRequiredWithoutUserBadgesNestedInput = {
+  create?: Prisma.XOR<Prisma.SeasonCreateWithoutUserBadgesInput, Prisma.SeasonUncheckedCreateWithoutUserBadgesInput>
+  connectOrCreate?: Prisma.SeasonCreateOrConnectWithoutUserBadgesInput
+  upsert?: Prisma.SeasonUpsertWithoutUserBadgesInput
+  connect?: Prisma.SeasonWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.SeasonUpdateToOneWithWhereWithoutUserBadgesInput, Prisma.SeasonUpdateWithoutUserBadgesInput>, Prisma.SeasonUncheckedUpdateWithoutUserBadgesInput>
+}
+
+export type SeasonCreateNestedOneWithoutSeasonRewardsInput = {
+  create?: Prisma.XOR<Prisma.SeasonCreateWithoutSeasonRewardsInput, Prisma.SeasonUncheckedCreateWithoutSeasonRewardsInput>
+  connectOrCreate?: Prisma.SeasonCreateOrConnectWithoutSeasonRewardsInput
+  connect?: Prisma.SeasonWhereUniqueInput
+}
+
+export type SeasonUpdateOneRequiredWithoutSeasonRewardsNestedInput = {
+  create?: Prisma.XOR<Prisma.SeasonCreateWithoutSeasonRewardsInput, Prisma.SeasonUncheckedCreateWithoutSeasonRewardsInput>
+  connectOrCreate?: Prisma.SeasonCreateOrConnectWithoutSeasonRewardsInput
+  upsert?: Prisma.SeasonUpsertWithoutSeasonRewardsInput
+  connect?: Prisma.SeasonWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.SeasonUpdateToOneWithWhereWithoutSeasonRewardsInput, Prisma.SeasonUpdateWithoutSeasonRewardsInput>, Prisma.SeasonUncheckedUpdateWithoutSeasonRewardsInput>
+}
+
 export type SeasonCreateNestedOneWithoutSeasonRankingsInput = {
   create?: Prisma.XOR<Prisma.SeasonCreateWithoutSeasonRankingsInput, Prisma.SeasonUncheckedCreateWithoutSeasonRankingsInput>
   connectOrCreate?: Prisma.SeasonCreateOrConnectWithoutSeasonRankingsInput
@@ -559,6 +601,8 @@ export type SeasonCreateWithoutParticipantsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutSeasonInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutSeasonInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutSeasonInput
 }
 
 export type SeasonUncheckedCreateWithoutParticipantsInput = {
@@ -574,6 +618,8 @@ export type SeasonUncheckedCreateWithoutParticipantsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutSeasonInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutSeasonInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutSeasonInput
 }
 
 export type SeasonCreateOrConnectWithoutParticipantsInput = {
@@ -605,6 +651,8 @@ export type SeasonUpdateWithoutParticipantsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutSeasonNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutSeasonNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutSeasonNestedInput
 }
 
 export type SeasonUncheckedUpdateWithoutParticipantsInput = {
@@ -620,6 +668,176 @@ export type SeasonUncheckedUpdateWithoutParticipantsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutSeasonNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutSeasonNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutSeasonNestedInput
+}
+
+export type SeasonCreateWithoutUserBadgesInput = {
+  id?: string
+  name: string
+  status: $Enums.SeasonStatus
+  startAt: Date | string
+  endAt: Date | string
+  initialCapitalKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  tradeFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  fxFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  participants?: Prisma.SeasonParticipantCreateNestedManyWithoutSeasonInput
+  seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutSeasonInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutSeasonInput
+}
+
+export type SeasonUncheckedCreateWithoutUserBadgesInput = {
+  id?: string
+  name: string
+  status: $Enums.SeasonStatus
+  startAt: Date | string
+  endAt: Date | string
+  initialCapitalKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  tradeFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  fxFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  participants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutSeasonInput
+  seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutSeasonInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutSeasonInput
+}
+
+export type SeasonCreateOrConnectWithoutUserBadgesInput = {
+  where: Prisma.SeasonWhereUniqueInput
+  create: Prisma.XOR<Prisma.SeasonCreateWithoutUserBadgesInput, Prisma.SeasonUncheckedCreateWithoutUserBadgesInput>
+}
+
+export type SeasonUpsertWithoutUserBadgesInput = {
+  update: Prisma.XOR<Prisma.SeasonUpdateWithoutUserBadgesInput, Prisma.SeasonUncheckedUpdateWithoutUserBadgesInput>
+  create: Prisma.XOR<Prisma.SeasonCreateWithoutUserBadgesInput, Prisma.SeasonUncheckedCreateWithoutUserBadgesInput>
+  where?: Prisma.SeasonWhereInput
+}
+
+export type SeasonUpdateToOneWithWhereWithoutUserBadgesInput = {
+  where?: Prisma.SeasonWhereInput
+  data: Prisma.XOR<Prisma.SeasonUpdateWithoutUserBadgesInput, Prisma.SeasonUncheckedUpdateWithoutUserBadgesInput>
+}
+
+export type SeasonUpdateWithoutUserBadgesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumSeasonStatusFieldUpdateOperationsInput | $Enums.SeasonStatus
+  startAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  initialCapitalKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  participants?: Prisma.SeasonParticipantUpdateManyWithoutSeasonNestedInput
+  seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutSeasonNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutSeasonNestedInput
+}
+
+export type SeasonUncheckedUpdateWithoutUserBadgesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumSeasonStatusFieldUpdateOperationsInput | $Enums.SeasonStatus
+  startAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  initialCapitalKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  participants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutSeasonNestedInput
+  seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutSeasonNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutSeasonNestedInput
+}
+
+export type SeasonCreateWithoutSeasonRewardsInput = {
+  id?: string
+  name: string
+  status: $Enums.SeasonStatus
+  startAt: Date | string
+  endAt: Date | string
+  initialCapitalKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  tradeFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  fxFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  participants?: Prisma.SeasonParticipantCreateNestedManyWithoutSeasonInput
+  seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutSeasonInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutSeasonInput
+}
+
+export type SeasonUncheckedCreateWithoutSeasonRewardsInput = {
+  id?: string
+  name: string
+  status: $Enums.SeasonStatus
+  startAt: Date | string
+  endAt: Date | string
+  initialCapitalKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  tradeFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  fxFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  participants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutSeasonInput
+  seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutSeasonInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutSeasonInput
+}
+
+export type SeasonCreateOrConnectWithoutSeasonRewardsInput = {
+  where: Prisma.SeasonWhereUniqueInput
+  create: Prisma.XOR<Prisma.SeasonCreateWithoutSeasonRewardsInput, Prisma.SeasonUncheckedCreateWithoutSeasonRewardsInput>
+}
+
+export type SeasonUpsertWithoutSeasonRewardsInput = {
+  update: Prisma.XOR<Prisma.SeasonUpdateWithoutSeasonRewardsInput, Prisma.SeasonUncheckedUpdateWithoutSeasonRewardsInput>
+  create: Prisma.XOR<Prisma.SeasonCreateWithoutSeasonRewardsInput, Prisma.SeasonUncheckedCreateWithoutSeasonRewardsInput>
+  where?: Prisma.SeasonWhereInput
+}
+
+export type SeasonUpdateToOneWithWhereWithoutSeasonRewardsInput = {
+  where?: Prisma.SeasonWhereInput
+  data: Prisma.XOR<Prisma.SeasonUpdateWithoutSeasonRewardsInput, Prisma.SeasonUncheckedUpdateWithoutSeasonRewardsInput>
+}
+
+export type SeasonUpdateWithoutSeasonRewardsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumSeasonStatusFieldUpdateOperationsInput | $Enums.SeasonStatus
+  startAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  initialCapitalKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  participants?: Prisma.SeasonParticipantUpdateManyWithoutSeasonNestedInput
+  seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutSeasonNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutSeasonNestedInput
+}
+
+export type SeasonUncheckedUpdateWithoutSeasonRewardsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumSeasonStatusFieldUpdateOperationsInput | $Enums.SeasonStatus
+  startAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  initialCapitalKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  participants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutSeasonNestedInput
+  seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutSeasonNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutSeasonNestedInput
 }
 
 export type SeasonCreateWithoutSeasonRankingsInput = {
@@ -635,6 +853,8 @@ export type SeasonCreateWithoutSeasonRankingsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   participants?: Prisma.SeasonParticipantCreateNestedManyWithoutSeasonInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutSeasonInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutSeasonInput
 }
 
 export type SeasonUncheckedCreateWithoutSeasonRankingsInput = {
@@ -650,6 +870,8 @@ export type SeasonUncheckedCreateWithoutSeasonRankingsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   participants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutSeasonInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutSeasonInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutSeasonInput
 }
 
 export type SeasonCreateOrConnectWithoutSeasonRankingsInput = {
@@ -681,6 +903,8 @@ export type SeasonUpdateWithoutSeasonRankingsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   participants?: Prisma.SeasonParticipantUpdateManyWithoutSeasonNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutSeasonNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutSeasonNestedInput
 }
 
 export type SeasonUncheckedUpdateWithoutSeasonRankingsInput = {
@@ -696,6 +920,8 @@ export type SeasonUncheckedUpdateWithoutSeasonRankingsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   participants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutSeasonNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutSeasonNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutSeasonNestedInput
 }
 
 
@@ -706,11 +932,15 @@ export type SeasonUncheckedUpdateWithoutSeasonRankingsInput = {
 export type SeasonCountOutputType = {
   participants: number
   seasonRankings: number
+  userBadges: number
+  seasonRewards: number
 }
 
 export type SeasonCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   participants?: boolean | SeasonCountOutputTypeCountParticipantsArgs
   seasonRankings?: boolean | SeasonCountOutputTypeCountSeasonRankingsArgs
+  userBadges?: boolean | SeasonCountOutputTypeCountUserBadgesArgs
+  seasonRewards?: boolean | SeasonCountOutputTypeCountSeasonRewardsArgs
 }
 
 /**
@@ -737,6 +967,20 @@ export type SeasonCountOutputTypeCountSeasonRankingsArgs<ExtArgs extends runtime
   where?: Prisma.SeasonRankingWhereInput
 }
 
+/**
+ * SeasonCountOutputType without action
+ */
+export type SeasonCountOutputTypeCountUserBadgesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.UserBadgeWhereInput
+}
+
+/**
+ * SeasonCountOutputType without action
+ */
+export type SeasonCountOutputTypeCountSeasonRewardsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.SeasonRewardWhereInput
+}
+
 
 export type SeasonSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -752,6 +996,8 @@ export type SeasonSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   updatedAt?: boolean
   participants?: boolean | Prisma.Season$participantsArgs<ExtArgs>
   seasonRankings?: boolean | Prisma.Season$seasonRankingsArgs<ExtArgs>
+  userBadges?: boolean | Prisma.Season$userBadgesArgs<ExtArgs>
+  seasonRewards?: boolean | Prisma.Season$seasonRewardsArgs<ExtArgs>
   _count?: boolean | Prisma.SeasonCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["season"]>
 
@@ -801,6 +1047,8 @@ export type SeasonOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
 export type SeasonInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   participants?: boolean | Prisma.Season$participantsArgs<ExtArgs>
   seasonRankings?: boolean | Prisma.Season$seasonRankingsArgs<ExtArgs>
+  userBadges?: boolean | Prisma.Season$userBadgesArgs<ExtArgs>
+  seasonRewards?: boolean | Prisma.Season$seasonRewardsArgs<ExtArgs>
   _count?: boolean | Prisma.SeasonCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type SeasonIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -811,6 +1059,8 @@ export type $SeasonPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs
   objects: {
     participants: Prisma.$SeasonParticipantPayload<ExtArgs>[]
     seasonRankings: Prisma.$SeasonRankingPayload<ExtArgs>[]
+    userBadges: Prisma.$UserBadgePayload<ExtArgs>[]
+    seasonRewards: Prisma.$SeasonRewardPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1220,6 +1470,8 @@ export interface Prisma__SeasonClient<T, Null = never, ExtArgs extends runtime.T
   readonly [Symbol.toStringTag]: "PrismaPromise"
   participants<T extends Prisma.Season$participantsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Season$participantsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SeasonParticipantPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   seasonRankings<T extends Prisma.Season$seasonRankingsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Season$seasonRankingsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SeasonRankingPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  userBadges<T extends Prisma.Season$userBadgesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Season$userBadgesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$UserBadgePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  seasonRewards<T extends Prisma.Season$seasonRewardsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Season$seasonRewardsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SeasonRewardPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1698,6 +1950,54 @@ export type Season$seasonRankingsArgs<ExtArgs extends runtime.Types.Extensions.I
   take?: number
   skip?: number
   distinct?: Prisma.SeasonRankingScalarFieldEnum | Prisma.SeasonRankingScalarFieldEnum[]
+}
+
+/**
+ * Season.userBadges
+ */
+export type Season$userBadgesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the UserBadge
+   */
+  select?: Prisma.UserBadgeSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the UserBadge
+   */
+  omit?: Prisma.UserBadgeOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.UserBadgeInclude<ExtArgs> | null
+  where?: Prisma.UserBadgeWhereInput
+  orderBy?: Prisma.UserBadgeOrderByWithRelationInput | Prisma.UserBadgeOrderByWithRelationInput[]
+  cursor?: Prisma.UserBadgeWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.UserBadgeScalarFieldEnum | Prisma.UserBadgeScalarFieldEnum[]
+}
+
+/**
+ * Season.seasonRewards
+ */
+export type Season$seasonRewardsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the SeasonReward
+   */
+  select?: Prisma.SeasonRewardSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the SeasonReward
+   */
+  omit?: Prisma.SeasonRewardOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.SeasonRewardInclude<ExtArgs> | null
+  where?: Prisma.SeasonRewardWhereInput
+  orderBy?: Prisma.SeasonRewardOrderByWithRelationInput | Prisma.SeasonRewardOrderByWithRelationInput[]
+  cursor?: Prisma.SeasonRewardWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.SeasonRewardScalarFieldEnum | Prisma.SeasonRewardScalarFieldEnum[]
 }
 
 /**

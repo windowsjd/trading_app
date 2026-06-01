@@ -14,12 +14,18 @@ jest.mock('../generated/prisma/client', () => ({
     suspended: 'suspended',
     deleted: 'deleted',
   },
+  UserRole: {
+    user: 'user',
+    operator: 'operator',
+    admin: 'admin',
+  },
 }));
 
 import { createHash } from 'node:crypto';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import {
   RefreshTokenSessionStatus,
+  UserRole,
   UserStatus,
 } from '../generated/prisma/client';
 import { AuthService } from './auth.service';
@@ -43,6 +49,7 @@ describe('AuthService', () => {
     passwordHash: 'hashed-password',
     nickname: 'traderKim',
     profileImageUrl: null,
+    role: UserRole.user,
     status: UserStatus.active,
     createdAt,
   };
@@ -181,6 +188,7 @@ describe('AuthService', () => {
           email: 'user@example.com',
           passwordHash: 'hashed-password',
           nickname: 'traderKim',
+          role: UserRole.user,
           status: UserStatus.active,
         },
       }),

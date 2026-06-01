@@ -12,11 +12,22 @@ Auth is an access token + opaque refresh token MVP.
   - `POST /api/v1/auth/logout-all`
   - `GET /api/v1/me`
 - Access tokens remain stateless Bearer JWTs verified by the global access token guard.
-- Protected API identity remains `request.user.userId`.
+- Protected API identity remains `request.user.userId`; the guard also attaches current DB `role` for operator/admin authorization.
 - `x-user-id` fallback is not supported.
 - Cookie/session auth is not part of this MVP.
 - Access token blacklist/revocation is not part of this MVP.
 - This contract is unrelated to provider/API key, trading, scheduler, settlement, or reward work.
+
+## User Role And Status
+
+- `UserStatus` is account lifecycle state: `active`, `suspended`, `deleted`.
+- `UserRole` is authorization scope: `user`, `operator`, `admin`.
+- New signup explicitly creates `role=user`.
+- `operator` and `admin` can use regular protected user APIs with their token-derived user id.
+- `operator` and `admin` can use operator-only APIs; `admin` includes operator permissions.
+- `user` cannot use operator-only APIs.
+- Admin/operator account management APIs are not implemented in this MVP.
+- Role decisions use the current DB user read by the access-token guard. A role-like JWT claim is not trusted.
 
 ## Environment
 
@@ -44,7 +55,7 @@ TTL values must be a positive number plus one allowed unit with no spaces.
 
 `POST /api/v1/auth/login` remains `200 OK`.
 
-Both responses include the existing user payload and token envelope:
+Both responses include the existing user payload and token envelope. The signup default role is `user`, but role is not added to this auth response envelope in this MVP:
 
 ```json
 {
@@ -117,3 +128,7 @@ It revokes all active refresh sessions for `request.user.userId`.
 - Missing access token: `401` + `UNAUTHORIZED`
 - `x-user-id` only: `401` + `UNAUTHORIZED`
 - Current access token remains valid until JWT expiry because access token blacklist is not implemented in this MVP.
+
+## Operator Boundary
+
+`GET /api/v1/operator/me` is documented separately in `docs/operator-api-contract.md`.

@@ -5,11 +5,16 @@ jest.mock('../generated/prisma/client', () => ({
     suspended: 'suspended',
     deleted: 'deleted',
   },
+  UserRole: {
+    user: 'user',
+    operator: 'operator',
+    admin: 'admin',
+  },
 }));
 
 import { ExecutionContext, HttpException, HttpStatus } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { UserStatus } from '../generated/prisma/client';
+import { UserRole, UserStatus } from '../generated/prisma/client';
 import { AccessTokenGuard } from './access-token.guard';
 import {
   IS_OPTIONAL_AUTH_ROUTE_KEY,
@@ -107,9 +112,9 @@ describe('AccessTokenGuard', () => {
     const { guard, jwtService, prisma, reflector } = createGuard();
     mockRouteMetadata(reflector, { public: true });
 
-    await expect(guard.canActivate(createContext(createRequest()))).resolves.toBe(
-      true,
-    );
+    await expect(
+      guard.canActivate(createContext(createRequest())),
+    ).resolves.toBe(true);
     expect(jwtService.verifyAsync).not.toHaveBeenCalled();
     expect(prisma.user.findUnique).not.toHaveBeenCalled();
   });
@@ -118,9 +123,9 @@ describe('AccessTokenGuard', () => {
     const { configService, guard, reflector } = createGuard({ secret: '' });
     mockRouteMetadata(reflector, { public: true });
 
-    await expect(guard.canActivate(createContext(createRequest()))).resolves.toBe(
-      true,
-    );
+    await expect(
+      guard.canActivate(createContext(createRequest())),
+    ).resolves.toBe(true);
     expect(configService.get).not.toHaveBeenCalled();
   });
 
@@ -133,6 +138,7 @@ describe('AccessTokenGuard', () => {
     jwtService.verifyAsync.mockResolvedValueOnce({ sub: 'user-1' });
     prisma.user.findUnique.mockResolvedValueOnce({
       id: 'user-1',
+      role: UserRole.user,
       status: UserStatus.active,
     });
 
@@ -143,6 +149,32 @@ describe('AccessTokenGuard', () => {
     });
     expect(request.user).toEqual({
       userId: 'user-1',
+      role: UserRole.user,
+    });
+    expect(request.user?.userId).toBe('user-1');
+  });
+
+  it('uses the current DB role instead of trusting a role-like JWT claim', async () => {
+    const { guard, jwtService, prisma, reflector } = createGuard();
+    mockRouteMetadata(reflector);
+    const request = createRequest({
+      authorization: 'Bearer valid-token',
+    });
+    jwtService.verifyAsync.mockResolvedValueOnce({
+      sub: 'user-1',
+      role: UserRole.admin,
+    });
+    prisma.user.findUnique.mockResolvedValueOnce({
+      id: 'user-1',
+      role: UserRole.operator,
+      status: UserStatus.active,
+    });
+
+    await expect(guard.canActivate(createContext(request))).resolves.toBe(true);
+
+    expect(request.user).toEqual({
+      userId: 'user-1',
+      role: UserRole.operator,
     });
   });
 
@@ -189,9 +221,9 @@ describe('AccessTokenGuard', () => {
     const { guard, jwtService, prisma, reflector } = createGuard();
     mockRouteMetadata(reflector, { optional: true });
 
-    await expect(guard.canActivate(createContext(createRequest()))).resolves.toBe(
-      true,
-    );
+    await expect(
+      guard.canActivate(createContext(createRequest())),
+    ).resolves.toBe(true);
     expect(jwtService.verifyAsync).not.toHaveBeenCalled();
     expect(prisma.user.findUnique).not.toHaveBeenCalled();
   });
@@ -217,6 +249,7 @@ describe('AccessTokenGuard', () => {
       jwtService.verifyAsync.mockResolvedValueOnce({ sub: 'user-1' });
       prisma.user.findUnique.mockResolvedValueOnce({
         id: 'user-1',
+        role: UserRole.operator,
         status,
       });
 

@@ -31,6 +31,7 @@ export type UserMinAggregateOutputType = {
   nickname: string | null
   profileImageUrl: string | null
   status: $Enums.UserStatus | null
+  role: $Enums.UserRole | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -42,6 +43,7 @@ export type UserMaxAggregateOutputType = {
   nickname: string | null
   profileImageUrl: string | null
   status: $Enums.UserStatus | null
+  role: $Enums.UserRole | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -53,6 +55,7 @@ export type UserCountAggregateOutputType = {
   nickname: number
   profileImageUrl: number
   status: number
+  role: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -66,6 +69,7 @@ export type UserMinAggregateInputType = {
   nickname?: true
   profileImageUrl?: true
   status?: true
+  role?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -77,6 +81,7 @@ export type UserMaxAggregateInputType = {
   nickname?: true
   profileImageUrl?: true
   status?: true
+  role?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -88,6 +93,7 @@ export type UserCountAggregateInputType = {
   nickname?: true
   profileImageUrl?: true
   status?: true
+  role?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -172,6 +178,7 @@ export type UserGroupByOutputType = {
   nickname: string
   profileImageUrl: string | null
   status: $Enums.UserStatus
+  role: $Enums.UserRole
   createdAt: Date
   updatedAt: Date
   _count: UserCountAggregateOutputType | null
@@ -204,11 +211,15 @@ export type UserWhereInput = {
   nickname?: Prisma.StringFilter<"User"> | string
   profileImageUrl?: Prisma.StringNullableFilter<"User"> | string | null
   status?: Prisma.EnumUserStatusFilter<"User"> | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFilter<"User"> | $Enums.UserRole
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
   seasonParticipants?: Prisma.SeasonParticipantListRelationFilter
   fxExecuteRequests?: Prisma.FxExecuteRequestListRelationFilter
   refreshTokenSessions?: Prisma.RefreshTokenSessionListRelationFilter
+  userBadges?: Prisma.UserBadgeListRelationFilter
+  seasonRewards?: Prisma.SeasonRewardListRelationFilter
+  operatorAuditLogs?: Prisma.OperatorAuditLogListRelationFilter
 }
 
 export type UserOrderByWithRelationInput = {
@@ -218,11 +229,15 @@ export type UserOrderByWithRelationInput = {
   nickname?: Prisma.SortOrder
   profileImageUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
+  role?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   seasonParticipants?: Prisma.SeasonParticipantOrderByRelationAggregateInput
   fxExecuteRequests?: Prisma.FxExecuteRequestOrderByRelationAggregateInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionOrderByRelationAggregateInput
+  userBadges?: Prisma.UserBadgeOrderByRelationAggregateInput
+  seasonRewards?: Prisma.SeasonRewardOrderByRelationAggregateInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogOrderByRelationAggregateInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -235,11 +250,15 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   passwordHash?: Prisma.StringFilter<"User"> | string
   profileImageUrl?: Prisma.StringNullableFilter<"User"> | string | null
   status?: Prisma.EnumUserStatusFilter<"User"> | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFilter<"User"> | $Enums.UserRole
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
   seasonParticipants?: Prisma.SeasonParticipantListRelationFilter
   fxExecuteRequests?: Prisma.FxExecuteRequestListRelationFilter
   refreshTokenSessions?: Prisma.RefreshTokenSessionListRelationFilter
+  userBadges?: Prisma.UserBadgeListRelationFilter
+  seasonRewards?: Prisma.SeasonRewardListRelationFilter
+  operatorAuditLogs?: Prisma.OperatorAuditLogListRelationFilter
 }, "id" | "email" | "nickname">
 
 export type UserOrderByWithAggregationInput = {
@@ -249,6 +268,7 @@ export type UserOrderByWithAggregationInput = {
   nickname?: Prisma.SortOrder
   profileImageUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
+  role?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.UserCountOrderByAggregateInput
@@ -266,6 +286,7 @@ export type UserScalarWhereWithAggregatesInput = {
   nickname?: Prisma.StringWithAggregatesFilter<"User"> | string
   profileImageUrl?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
   status?: Prisma.EnumUserStatusWithAggregatesFilter<"User"> | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleWithAggregatesFilter<"User"> | $Enums.UserRole
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"User"> | Date | string
 }
@@ -277,11 +298,15 @@ export type UserCreateInput = {
   nickname: string
   profileImageUrl?: string | null
   status?: $Enums.UserStatus
+  role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -291,11 +316,15 @@ export type UserUncheckedCreateInput = {
   nickname: string
   profileImageUrl?: string | null
   status?: $Enums.UserStatus
+  role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
 }
 
 export type UserUpdateInput = {
@@ -305,11 +334,15 @@ export type UserUpdateInput = {
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -319,11 +352,15 @@ export type UserUncheckedUpdateInput = {
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -333,6 +370,7 @@ export type UserCreateManyInput = {
   nickname: string
   profileImageUrl?: string | null
   status?: $Enums.UserStatus
+  role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -344,6 +382,7 @@ export type UserUpdateManyMutationInput = {
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -355,6 +394,7 @@ export type UserUncheckedUpdateManyInput = {
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -366,6 +406,7 @@ export type UserCountOrderByAggregateInput = {
   nickname?: Prisma.SortOrder
   profileImageUrl?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  role?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -377,6 +418,7 @@ export type UserMaxOrderByAggregateInput = {
   nickname?: Prisma.SortOrder
   profileImageUrl?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  role?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -388,6 +430,7 @@ export type UserMinOrderByAggregateInput = {
   nickname?: Prisma.SortOrder
   profileImageUrl?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  role?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -409,8 +452,26 @@ export type EnumUserStatusFieldUpdateOperationsInput = {
   set?: $Enums.UserStatus
 }
 
+export type EnumUserRoleFieldUpdateOperationsInput = {
+  set?: $Enums.UserRole
+}
+
 export type DateTimeFieldUpdateOperationsInput = {
   set?: Date | string
+}
+
+export type UserCreateNestedOneWithoutOperatorAuditLogsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutOperatorAuditLogsInput, Prisma.UserUncheckedCreateWithoutOperatorAuditLogsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutOperatorAuditLogsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutOperatorAuditLogsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutOperatorAuditLogsInput, Prisma.UserUncheckedCreateWithoutOperatorAuditLogsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutOperatorAuditLogsInput
+  upsert?: Prisma.UserUpsertWithoutOperatorAuditLogsInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutOperatorAuditLogsInput, Prisma.UserUpdateWithoutOperatorAuditLogsInput>, Prisma.UserUncheckedUpdateWithoutOperatorAuditLogsInput>
 }
 
 export type UserCreateNestedOneWithoutRefreshTokenSessionsInput = {
@@ -441,6 +502,34 @@ export type UserUpdateOneRequiredWithoutSeasonParticipantsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutSeasonParticipantsInput, Prisma.UserUpdateWithoutSeasonParticipantsInput>, Prisma.UserUncheckedUpdateWithoutSeasonParticipantsInput>
 }
 
+export type UserCreateNestedOneWithoutUserBadgesInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutUserBadgesInput, Prisma.UserUncheckedCreateWithoutUserBadgesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutUserBadgesInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutUserBadgesNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutUserBadgesInput, Prisma.UserUncheckedCreateWithoutUserBadgesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutUserBadgesInput
+  upsert?: Prisma.UserUpsertWithoutUserBadgesInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutUserBadgesInput, Prisma.UserUpdateWithoutUserBadgesInput>, Prisma.UserUncheckedUpdateWithoutUserBadgesInput>
+}
+
+export type UserCreateNestedOneWithoutSeasonRewardsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutSeasonRewardsInput, Prisma.UserUncheckedCreateWithoutSeasonRewardsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutSeasonRewardsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutSeasonRewardsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutSeasonRewardsInput, Prisma.UserUncheckedCreateWithoutSeasonRewardsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutSeasonRewardsInput
+  upsert?: Prisma.UserUpsertWithoutSeasonRewardsInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutSeasonRewardsInput, Prisma.UserUpdateWithoutSeasonRewardsInput>, Prisma.UserUncheckedUpdateWithoutSeasonRewardsInput>
+}
+
 export type UserCreateNestedOneWithoutFxExecuteRequestsInput = {
   create?: Prisma.XOR<Prisma.UserCreateWithoutFxExecuteRequestsInput, Prisma.UserUncheckedCreateWithoutFxExecuteRequestsInput>
   connectOrCreate?: Prisma.UserCreateOrConnectWithoutFxExecuteRequestsInput
@@ -455,6 +544,90 @@ export type UserUpdateOneRequiredWithoutFxExecuteRequestsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutFxExecuteRequestsInput, Prisma.UserUpdateWithoutFxExecuteRequestsInput>, Prisma.UserUncheckedUpdateWithoutFxExecuteRequestsInput>
 }
 
+export type UserCreateWithoutOperatorAuditLogsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  nickname: string
+  profileImageUrl?: string | null
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutOperatorAuditLogsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  nickname: string
+  profileImageUrl?: string | null
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutOperatorAuditLogsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutOperatorAuditLogsInput, Prisma.UserUncheckedCreateWithoutOperatorAuditLogsInput>
+}
+
+export type UserUpsertWithoutOperatorAuditLogsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutOperatorAuditLogsInput, Prisma.UserUncheckedUpdateWithoutOperatorAuditLogsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutOperatorAuditLogsInput, Prisma.UserUncheckedCreateWithoutOperatorAuditLogsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutOperatorAuditLogsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutOperatorAuditLogsInput, Prisma.UserUncheckedUpdateWithoutOperatorAuditLogsInput>
+}
+
+export type UserUpdateWithoutOperatorAuditLogsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutOperatorAuditLogsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+}
+
 export type UserCreateWithoutRefreshTokenSessionsInput = {
   id?: string
   email: string
@@ -462,10 +635,14 @@ export type UserCreateWithoutRefreshTokenSessionsInput = {
   nickname: string
   profileImageUrl?: string | null
   status?: $Enums.UserStatus
+  role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
 }
 
 export type UserUncheckedCreateWithoutRefreshTokenSessionsInput = {
@@ -475,10 +652,14 @@ export type UserUncheckedCreateWithoutRefreshTokenSessionsInput = {
   nickname: string
   profileImageUrl?: string | null
   status?: $Enums.UserStatus
+  role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
 }
 
 export type UserCreateOrConnectWithoutRefreshTokenSessionsInput = {
@@ -504,10 +685,14 @@ export type UserUpdateWithoutRefreshTokenSessionsInput = {
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
 }
 
 export type UserUncheckedUpdateWithoutRefreshTokenSessionsInput = {
@@ -517,10 +702,14 @@ export type UserUncheckedUpdateWithoutRefreshTokenSessionsInput = {
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
 }
 
 export type UserCreateWithoutSeasonParticipantsInput = {
@@ -530,10 +719,14 @@ export type UserCreateWithoutSeasonParticipantsInput = {
   nickname: string
   profileImageUrl?: string | null
   status?: $Enums.UserStatus
+  role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
 }
 
 export type UserUncheckedCreateWithoutSeasonParticipantsInput = {
@@ -543,10 +736,14 @@ export type UserUncheckedCreateWithoutSeasonParticipantsInput = {
   nickname: string
   profileImageUrl?: string | null
   status?: $Enums.UserStatus
+  role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
 }
 
 export type UserCreateOrConnectWithoutSeasonParticipantsInput = {
@@ -572,10 +769,14 @@ export type UserUpdateWithoutSeasonParticipantsInput = {
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSeasonParticipantsInput = {
@@ -585,10 +786,182 @@ export type UserUncheckedUpdateWithoutSeasonParticipantsInput = {
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+}
+
+export type UserCreateWithoutUserBadgesInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  nickname: string
+  profileImageUrl?: string | null
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+}
+
+export type UserUncheckedCreateWithoutUserBadgesInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  nickname: string
+  profileImageUrl?: string | null
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+}
+
+export type UserCreateOrConnectWithoutUserBadgesInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutUserBadgesInput, Prisma.UserUncheckedCreateWithoutUserBadgesInput>
+}
+
+export type UserUpsertWithoutUserBadgesInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutUserBadgesInput, Prisma.UserUncheckedUpdateWithoutUserBadgesInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutUserBadgesInput, Prisma.UserUncheckedCreateWithoutUserBadgesInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutUserBadgesInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutUserBadgesInput, Prisma.UserUncheckedUpdateWithoutUserBadgesInput>
+}
+
+export type UserUpdateWithoutUserBadgesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+}
+
+export type UserUncheckedUpdateWithoutUserBadgesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+}
+
+export type UserCreateWithoutSeasonRewardsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  nickname: string
+  profileImageUrl?: string | null
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+}
+
+export type UserUncheckedCreateWithoutSeasonRewardsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  nickname: string
+  profileImageUrl?: string | null
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+}
+
+export type UserCreateOrConnectWithoutSeasonRewardsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutSeasonRewardsInput, Prisma.UserUncheckedCreateWithoutSeasonRewardsInput>
+}
+
+export type UserUpsertWithoutSeasonRewardsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutSeasonRewardsInput, Prisma.UserUncheckedUpdateWithoutSeasonRewardsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutSeasonRewardsInput, Prisma.UserUncheckedCreateWithoutSeasonRewardsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutSeasonRewardsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutSeasonRewardsInput, Prisma.UserUncheckedUpdateWithoutSeasonRewardsInput>
+}
+
+export type UserUpdateWithoutSeasonRewardsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+}
+
+export type UserUncheckedUpdateWithoutSeasonRewardsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
 }
 
 export type UserCreateWithoutFxExecuteRequestsInput = {
@@ -598,10 +971,14 @@ export type UserCreateWithoutFxExecuteRequestsInput = {
   nickname: string
   profileImageUrl?: string | null
   status?: $Enums.UserStatus
+  role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
 }
 
 export type UserUncheckedCreateWithoutFxExecuteRequestsInput = {
@@ -611,10 +988,14 @@ export type UserUncheckedCreateWithoutFxExecuteRequestsInput = {
   nickname: string
   profileImageUrl?: string | null
   status?: $Enums.UserStatus
+  role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
 }
 
 export type UserCreateOrConnectWithoutFxExecuteRequestsInput = {
@@ -640,10 +1021,14 @@ export type UserUpdateWithoutFxExecuteRequestsInput = {
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
 }
 
 export type UserUncheckedUpdateWithoutFxExecuteRequestsInput = {
@@ -653,10 +1038,14 @@ export type UserUncheckedUpdateWithoutFxExecuteRequestsInput = {
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
 }
 
 
@@ -668,12 +1057,18 @@ export type UserCountOutputType = {
   seasonParticipants: number
   fxExecuteRequests: number
   refreshTokenSessions: number
+  userBadges: number
+  seasonRewards: number
+  operatorAuditLogs: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   seasonParticipants?: boolean | UserCountOutputTypeCountSeasonParticipantsArgs
   fxExecuteRequests?: boolean | UserCountOutputTypeCountFxExecuteRequestsArgs
   refreshTokenSessions?: boolean | UserCountOutputTypeCountRefreshTokenSessionsArgs
+  userBadges?: boolean | UserCountOutputTypeCountUserBadgesArgs
+  seasonRewards?: boolean | UserCountOutputTypeCountSeasonRewardsArgs
+  operatorAuditLogs?: boolean | UserCountOutputTypeCountOperatorAuditLogsArgs
 }
 
 /**
@@ -707,6 +1102,27 @@ export type UserCountOutputTypeCountRefreshTokenSessionsArgs<ExtArgs extends run
   where?: Prisma.RefreshTokenSessionWhereInput
 }
 
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountUserBadgesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.UserBadgeWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountSeasonRewardsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.SeasonRewardWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountOperatorAuditLogsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.OperatorAuditLogWhereInput
+}
+
 
 export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -715,11 +1131,15 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   nickname?: boolean
   profileImageUrl?: boolean
   status?: boolean
+  role?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   seasonParticipants?: boolean | Prisma.User$seasonParticipantsArgs<ExtArgs>
   fxExecuteRequests?: boolean | Prisma.User$fxExecuteRequestsArgs<ExtArgs>
   refreshTokenSessions?: boolean | Prisma.User$refreshTokenSessionsArgs<ExtArgs>
+  userBadges?: boolean | Prisma.User$userBadgesArgs<ExtArgs>
+  seasonRewards?: boolean | Prisma.User$seasonRewardsArgs<ExtArgs>
+  operatorAuditLogs?: boolean | Prisma.User$operatorAuditLogsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -730,6 +1150,7 @@ export type UserSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   nickname?: boolean
   profileImageUrl?: boolean
   status?: boolean
+  role?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }, ExtArgs["result"]["user"]>
@@ -741,6 +1162,7 @@ export type UserSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   nickname?: boolean
   profileImageUrl?: boolean
   status?: boolean
+  role?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }, ExtArgs["result"]["user"]>
@@ -752,15 +1174,19 @@ export type UserSelectScalar = {
   nickname?: boolean
   profileImageUrl?: boolean
   status?: boolean
+  role?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "email" | "passwordHash" | "nickname" | "profileImageUrl" | "status" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
+export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "email" | "passwordHash" | "nickname" | "profileImageUrl" | "status" | "role" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   seasonParticipants?: boolean | Prisma.User$seasonParticipantsArgs<ExtArgs>
   fxExecuteRequests?: boolean | Prisma.User$fxExecuteRequestsArgs<ExtArgs>
   refreshTokenSessions?: boolean | Prisma.User$refreshTokenSessionsArgs<ExtArgs>
+  userBadges?: boolean | Prisma.User$userBadgesArgs<ExtArgs>
+  seasonRewards?: boolean | Prisma.User$seasonRewardsArgs<ExtArgs>
+  operatorAuditLogs?: boolean | Prisma.User$operatorAuditLogsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -772,6 +1198,9 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     seasonParticipants: Prisma.$SeasonParticipantPayload<ExtArgs>[]
     fxExecuteRequests: Prisma.$FxExecuteRequestPayload<ExtArgs>[]
     refreshTokenSessions: Prisma.$RefreshTokenSessionPayload<ExtArgs>[]
+    userBadges: Prisma.$UserBadgePayload<ExtArgs>[]
+    seasonRewards: Prisma.$SeasonRewardPayload<ExtArgs>[]
+    operatorAuditLogs: Prisma.$OperatorAuditLogPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -780,6 +1209,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     nickname: string
     profileImageUrl: string | null
     status: $Enums.UserStatus
+    role: $Enums.UserRole
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["user"]>
@@ -1179,6 +1609,9 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   seasonParticipants<T extends Prisma.User$seasonParticipantsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$seasonParticipantsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SeasonParticipantPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   fxExecuteRequests<T extends Prisma.User$fxExecuteRequestsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$fxExecuteRequestsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FxExecuteRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   refreshTokenSessions<T extends Prisma.User$refreshTokenSessionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$refreshTokenSessionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RefreshTokenSessionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  userBadges<T extends Prisma.User$userBadgesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$userBadgesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$UserBadgePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  seasonRewards<T extends Prisma.User$seasonRewardsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$seasonRewardsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SeasonRewardPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  operatorAuditLogs<T extends Prisma.User$operatorAuditLogsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$operatorAuditLogsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OperatorAuditLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1214,6 +1647,7 @@ export interface UserFieldRefs {
   readonly nickname: Prisma.FieldRef<"User", 'String'>
   readonly profileImageUrl: Prisma.FieldRef<"User", 'String'>
   readonly status: Prisma.FieldRef<"User", 'UserStatus'>
+  readonly role: Prisma.FieldRef<"User", 'UserRole'>
   readonly createdAt: Prisma.FieldRef<"User", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"User", 'DateTime'>
 }
@@ -1678,6 +2112,78 @@ export type User$refreshTokenSessionsArgs<ExtArgs extends runtime.Types.Extensio
   take?: number
   skip?: number
   distinct?: Prisma.RefreshTokenSessionScalarFieldEnum | Prisma.RefreshTokenSessionScalarFieldEnum[]
+}
+
+/**
+ * User.userBadges
+ */
+export type User$userBadgesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the UserBadge
+   */
+  select?: Prisma.UserBadgeSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the UserBadge
+   */
+  omit?: Prisma.UserBadgeOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.UserBadgeInclude<ExtArgs> | null
+  where?: Prisma.UserBadgeWhereInput
+  orderBy?: Prisma.UserBadgeOrderByWithRelationInput | Prisma.UserBadgeOrderByWithRelationInput[]
+  cursor?: Prisma.UserBadgeWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.UserBadgeScalarFieldEnum | Prisma.UserBadgeScalarFieldEnum[]
+}
+
+/**
+ * User.seasonRewards
+ */
+export type User$seasonRewardsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the SeasonReward
+   */
+  select?: Prisma.SeasonRewardSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the SeasonReward
+   */
+  omit?: Prisma.SeasonRewardOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.SeasonRewardInclude<ExtArgs> | null
+  where?: Prisma.SeasonRewardWhereInput
+  orderBy?: Prisma.SeasonRewardOrderByWithRelationInput | Prisma.SeasonRewardOrderByWithRelationInput[]
+  cursor?: Prisma.SeasonRewardWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.SeasonRewardScalarFieldEnum | Prisma.SeasonRewardScalarFieldEnum[]
+}
+
+/**
+ * User.operatorAuditLogs
+ */
+export type User$operatorAuditLogsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the OperatorAuditLog
+   */
+  select?: Prisma.OperatorAuditLogSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the OperatorAuditLog
+   */
+  omit?: Prisma.OperatorAuditLogOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.OperatorAuditLogInclude<ExtArgs> | null
+  where?: Prisma.OperatorAuditLogWhereInput
+  orderBy?: Prisma.OperatorAuditLogOrderByWithRelationInput | Prisma.OperatorAuditLogOrderByWithRelationInput[]
+  cursor?: Prisma.OperatorAuditLogWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.OperatorAuditLogScalarFieldEnum | Prisma.OperatorAuditLogScalarFieldEnum[]
 }
 
 /**

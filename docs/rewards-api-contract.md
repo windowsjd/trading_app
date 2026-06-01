@@ -7,6 +7,7 @@
 - Reward rows are created by the operator-run `reward-grant` internal foundation job for settled seasons with `finalRank` and `finalTier`.
 - This contract covers in-app reward/badge/trophy history only.
 - Actual payment, points, delivery, and external fulfillment are not implemented.
+- No reward fulfillment trigger API exists. Admin/operator authorization foundation does not change reward read APIs or reward-grant job scope.
 
 ## Source Rules
 

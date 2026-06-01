@@ -1,8 +1,9 @@
 import { Request } from 'express';
-import { UserStatus } from '../generated/prisma/client';
+import { UserRole, UserStatus } from '../generated/prisma/client';
 
 export type AuthenticatedUser = {
   userId: string;
+  role: UserRole;
 };
 
 export type AuthenticatedRequest = Request & {

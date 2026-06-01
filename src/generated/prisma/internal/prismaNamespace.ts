@@ -385,9 +385,13 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 
 export const ModelName = {
   User: 'User',
+  OperatorAuditLog: 'OperatorAuditLog',
   RefreshTokenSession: 'RefreshTokenSession',
   Season: 'Season',
   SeasonParticipant: 'SeasonParticipant',
+  Badge: 'Badge',
+  UserBadge: 'UserBadge',
+  SeasonReward: 'SeasonReward',
   Asset: 'Asset',
   AssetPriceSnapshot: 'AssetPriceSnapshot',
   Position: 'Position',
@@ -416,7 +420,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "refreshTokenSession" | "season" | "seasonParticipant" | "asset" | "assetPriceSnapshot" | "position" | "order" | "cashWallet" | "walletTransaction" | "exchangeTransaction" | "fxRateSnapshot" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun"
+    modelProps: "user" | "operatorAuditLog" | "refreshTokenSession" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "asset" | "assetPriceSnapshot" | "position" | "order" | "cashWallet" | "walletTransaction" | "exchangeTransaction" | "fxRateSnapshot" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -491,6 +495,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.UserCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.UserCountAggregateOutputType> | number
+        }
+      }
+    }
+    OperatorAuditLog: {
+      payload: Prisma.$OperatorAuditLogPayload<ExtArgs>
+      fields: Prisma.OperatorAuditLogFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.OperatorAuditLogFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OperatorAuditLogPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.OperatorAuditLogFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OperatorAuditLogPayload>
+        }
+        findFirst: {
+          args: Prisma.OperatorAuditLogFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OperatorAuditLogPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.OperatorAuditLogFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OperatorAuditLogPayload>
+        }
+        findMany: {
+          args: Prisma.OperatorAuditLogFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OperatorAuditLogPayload>[]
+        }
+        create: {
+          args: Prisma.OperatorAuditLogCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OperatorAuditLogPayload>
+        }
+        createMany: {
+          args: Prisma.OperatorAuditLogCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.OperatorAuditLogCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OperatorAuditLogPayload>[]
+        }
+        delete: {
+          args: Prisma.OperatorAuditLogDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OperatorAuditLogPayload>
+        }
+        update: {
+          args: Prisma.OperatorAuditLogUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OperatorAuditLogPayload>
+        }
+        deleteMany: {
+          args: Prisma.OperatorAuditLogDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.OperatorAuditLogUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.OperatorAuditLogUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OperatorAuditLogPayload>[]
+        }
+        upsert: {
+          args: Prisma.OperatorAuditLogUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OperatorAuditLogPayload>
+        }
+        aggregate: {
+          args: Prisma.OperatorAuditLogAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateOperatorAuditLog>
+        }
+        groupBy: {
+          args: Prisma.OperatorAuditLogGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.OperatorAuditLogGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.OperatorAuditLogCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.OperatorAuditLogCountAggregateOutputType> | number
         }
       }
     }
@@ -713,6 +791,228 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.SeasonParticipantCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.SeasonParticipantCountAggregateOutputType> | number
+        }
+      }
+    }
+    Badge: {
+      payload: Prisma.$BadgePayload<ExtArgs>
+      fields: Prisma.BadgeFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.BadgeFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BadgePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.BadgeFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BadgePayload>
+        }
+        findFirst: {
+          args: Prisma.BadgeFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BadgePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.BadgeFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BadgePayload>
+        }
+        findMany: {
+          args: Prisma.BadgeFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BadgePayload>[]
+        }
+        create: {
+          args: Prisma.BadgeCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BadgePayload>
+        }
+        createMany: {
+          args: Prisma.BadgeCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.BadgeCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BadgePayload>[]
+        }
+        delete: {
+          args: Prisma.BadgeDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BadgePayload>
+        }
+        update: {
+          args: Prisma.BadgeUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BadgePayload>
+        }
+        deleteMany: {
+          args: Prisma.BadgeDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.BadgeUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.BadgeUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BadgePayload>[]
+        }
+        upsert: {
+          args: Prisma.BadgeUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BadgePayload>
+        }
+        aggregate: {
+          args: Prisma.BadgeAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateBadge>
+        }
+        groupBy: {
+          args: Prisma.BadgeGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.BadgeGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.BadgeCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.BadgeCountAggregateOutputType> | number
+        }
+      }
+    }
+    UserBadge: {
+      payload: Prisma.$UserBadgePayload<ExtArgs>
+      fields: Prisma.UserBadgeFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.UserBadgeFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserBadgePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.UserBadgeFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserBadgePayload>
+        }
+        findFirst: {
+          args: Prisma.UserBadgeFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserBadgePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.UserBadgeFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserBadgePayload>
+        }
+        findMany: {
+          args: Prisma.UserBadgeFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserBadgePayload>[]
+        }
+        create: {
+          args: Prisma.UserBadgeCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserBadgePayload>
+        }
+        createMany: {
+          args: Prisma.UserBadgeCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.UserBadgeCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserBadgePayload>[]
+        }
+        delete: {
+          args: Prisma.UserBadgeDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserBadgePayload>
+        }
+        update: {
+          args: Prisma.UserBadgeUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserBadgePayload>
+        }
+        deleteMany: {
+          args: Prisma.UserBadgeDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.UserBadgeUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.UserBadgeUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserBadgePayload>[]
+        }
+        upsert: {
+          args: Prisma.UserBadgeUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserBadgePayload>
+        }
+        aggregate: {
+          args: Prisma.UserBadgeAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateUserBadge>
+        }
+        groupBy: {
+          args: Prisma.UserBadgeGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.UserBadgeGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.UserBadgeCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.UserBadgeCountAggregateOutputType> | number
+        }
+      }
+    }
+    SeasonReward: {
+      payload: Prisma.$SeasonRewardPayload<ExtArgs>
+      fields: Prisma.SeasonRewardFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.SeasonRewardFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SeasonRewardPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.SeasonRewardFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SeasonRewardPayload>
+        }
+        findFirst: {
+          args: Prisma.SeasonRewardFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SeasonRewardPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.SeasonRewardFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SeasonRewardPayload>
+        }
+        findMany: {
+          args: Prisma.SeasonRewardFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SeasonRewardPayload>[]
+        }
+        create: {
+          args: Prisma.SeasonRewardCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SeasonRewardPayload>
+        }
+        createMany: {
+          args: Prisma.SeasonRewardCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.SeasonRewardCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SeasonRewardPayload>[]
+        }
+        delete: {
+          args: Prisma.SeasonRewardDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SeasonRewardPayload>
+        }
+        update: {
+          args: Prisma.SeasonRewardUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SeasonRewardPayload>
+        }
+        deleteMany: {
+          args: Prisma.SeasonRewardDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.SeasonRewardUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.SeasonRewardUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SeasonRewardPayload>[]
+        }
+        upsert: {
+          args: Prisma.SeasonRewardUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SeasonRewardPayload>
+        }
+        aggregate: {
+          args: Prisma.SeasonRewardAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateSeasonReward>
+        }
+        groupBy: {
+          args: Prisma.SeasonRewardGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SeasonRewardGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.SeasonRewardCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SeasonRewardCountAggregateOutputType> | number
         }
       }
     }
@@ -1724,11 +2024,31 @@ export const UserScalarFieldEnum = {
   nickname: 'nickname',
   profileImageUrl: 'profileImageUrl',
   status: 'status',
+  role: 'role',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
 
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+
+
+export const OperatorAuditLogScalarFieldEnum = {
+  id: 'id',
+  actorUserId: 'actorUserId',
+  actorRole: 'actorRole',
+  action: 'action',
+  targetType: 'targetType',
+  targetId: 'targetId',
+  requestId: 'requestId',
+  ipAddress: 'ipAddress',
+  userAgent: 'userAgent',
+  metadataJson: 'metadataJson',
+  result: 'result',
+  errorCode: 'errorCode',
+  createdAt: 'createdAt'
+} as const
+
+export type OperatorAuditLogScalarFieldEnum = (typeof OperatorAuditLogScalarFieldEnum)[keyof typeof OperatorAuditLogScalarFieldEnum]
 
 
 export const RefreshTokenSessionScalarFieldEnum = {
@@ -1785,6 +2105,48 @@ export const SeasonParticipantScalarFieldEnum = {
 } as const
 
 export type SeasonParticipantScalarFieldEnum = (typeof SeasonParticipantScalarFieldEnum)[keyof typeof SeasonParticipantScalarFieldEnum]
+
+
+export const BadgeScalarFieldEnum = {
+  id: 'id',
+  badgeType: 'badgeType',
+  code: 'code',
+  name: 'name',
+  description: 'description',
+  iconUrl: 'iconUrl',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type BadgeScalarFieldEnum = (typeof BadgeScalarFieldEnum)[keyof typeof BadgeScalarFieldEnum]
+
+
+export const UserBadgeScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  badgeId: 'badgeId',
+  seasonId: 'seasonId',
+  awardedAt: 'awardedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type UserBadgeScalarFieldEnum = (typeof UserBadgeScalarFieldEnum)[keyof typeof UserBadgeScalarFieldEnum]
+
+
+export const SeasonRewardScalarFieldEnum = {
+  id: 'id',
+  seasonId: 'seasonId',
+  seasonParticipantId: 'seasonParticipantId',
+  userId: 'userId',
+  rewardType: 'rewardType',
+  rewardCode: 'rewardCode',
+  rewardName: 'rewardName',
+  rewardValueJson: 'rewardValueJson',
+  grantedAt: 'grantedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type SeasonRewardScalarFieldEnum = (typeof SeasonRewardScalarFieldEnum)[keyof typeof SeasonRewardScalarFieldEnum]
 
 
 export const AssetScalarFieldEnum = {
@@ -2106,6 +2468,20 @@ export type ListEnumUserStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$P
 
 
 /**
+ * Reference to a field of type 'UserRole'
+ */
+export type EnumUserRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'UserRole'>
+
+
+
+/**
+ * Reference to a field of type 'UserRole[]'
+ */
+export type ListEnumUserRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'UserRole[]'>
+
+
+
+/**
  * Reference to a field of type 'DateTime'
  */
 export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime'>
@@ -2116,6 +2492,34 @@ export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel
  * Reference to a field of type 'DateTime[]'
  */
 export type ListDateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime[]'>
+
+
+
+/**
+ * Reference to a field of type 'Json'
+ */
+export type JsonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Json'>
+
+
+
+/**
+ * Reference to a field of type 'QueryMode'
+ */
+export type EnumQueryModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'QueryMode'>
+
+
+
+/**
+ * Reference to a field of type 'OperatorAuditResult'
+ */
+export type EnumOperatorAuditResultFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OperatorAuditResult'>
+
+
+
+/**
+ * Reference to a field of type 'OperatorAuditResult[]'
+ */
+export type ListEnumOperatorAuditResultFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OperatorAuditResult[]'>
 
 
 
@@ -2162,20 +2566,6 @@ export type ListDecimalFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaMo
 
 
 /**
- * Reference to a field of type 'Json'
- */
-export type JsonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Json'>
-
-
-
-/**
- * Reference to a field of type 'QueryMode'
- */
-export type EnumQueryModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'QueryMode'>
-
-
-
-/**
  * Reference to a field of type 'ParticipantStatus'
  */
 export type EnumParticipantStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ParticipantStatus'>
@@ -2200,6 +2590,34 @@ export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'In
  * Reference to a field of type 'Int[]'
  */
 export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
+
+
+
+/**
+ * Reference to a field of type 'BadgeType'
+ */
+export type EnumBadgeTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BadgeType'>
+
+
+
+/**
+ * Reference to a field of type 'BadgeType[]'
+ */
+export type ListEnumBadgeTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BadgeType[]'>
+
+
+
+/**
+ * Reference to a field of type 'SeasonRewardType'
+ */
+export type EnumSeasonRewardTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SeasonRewardType'>
+
+
+
+/**
+ * Reference to a field of type 'SeasonRewardType[]'
+ */
+export type ListEnumSeasonRewardTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SeasonRewardType[]'>
 
 
 
@@ -2515,9 +2933,13 @@ export type PrismaClientOptions = ({
 }
 export type GlobalOmitConfig = {
   user?: Prisma.UserOmit
+  operatorAuditLog?: Prisma.OperatorAuditLogOmit
   refreshTokenSession?: Prisma.RefreshTokenSessionOmit
   season?: Prisma.SeasonOmit
   seasonParticipant?: Prisma.SeasonParticipantOmit
+  badge?: Prisma.BadgeOmit
+  userBadge?: Prisma.UserBadgeOmit
+  seasonReward?: Prisma.SeasonRewardOmit
   asset?: Prisma.AssetOmit
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotOmit
   position?: Prisma.PositionOmit

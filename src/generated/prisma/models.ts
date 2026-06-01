@@ -9,9 +9,13 @@
  * 🟢 You can import this file directly.
  */
 export type * from './models/User.js'
+export type * from './models/OperatorAuditLog.js'
 export type * from './models/RefreshTokenSession.js'
 export type * from './models/Season.js'
 export type * from './models/SeasonParticipant.js'
+export type * from './models/Badge.js'
+export type * from './models/UserBadge.js'
+export type * from './models/SeasonReward.js'
 export type * from './models/Asset.js'
 export type * from './models/AssetPriceSnapshot.js'
 export type * from './models/Position.js'

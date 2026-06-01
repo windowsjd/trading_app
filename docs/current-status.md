@@ -10,6 +10,15 @@
 - 기존 migration/seed 임의 변경 금지.
 - fake 데이터 기반 계산 금지.
 - fake/static/temporary/sample/test business FX rate 금지.
+- Admin/operator authorization and audit foundation MVP 구현 완료:
+  - `UserRole` enum은 `user`, `operator`, `admin`.
+  - 신규 signup 기본 role은 `user`.
+  - `UserStatus`는 계정 상태(`active`, `suspended`, `deleted`)이고 `UserRole`은 권한이다.
+  - access token payload는 기존처럼 `sub` 중심이며, 전역 guard가 DB의 current `status`와 `role`을 조회해 `request.user = { userId, role }`를 주입한다.
+  - 기존 일반 API의 사용자 식별자는 계속 token-derived `request.user.userId` 기준이며 `x-user-id` fallback은 없다.
+  - `GET /api/v1/operator/me`는 `operator` 또는 `admin`만 접근 가능하고 `user`는 `403 OPERATOR_FORBIDDEN`.
+  - `OperatorAuditLog` / `operator_audit_logs` foundation과 secret-like metadata redaction service가 추가됨.
+  - Admin role management API, provider ingestion trigger API, batch run HTTP API, reward fulfillment trigger API, scheduler/cron은 구현하지 않음.
 - Crypto MVP policy changed to Binance-based USD-settled crypto.
   - Crypto uses USD Wallet like US stocks.
   - Crypto KRW valuation remains required for `totalAssetKrw`, ranking, home summary, snapshots, and final evaluation.
@@ -87,6 +96,7 @@
 - `POST /api/v1/auth/logout` refresh session revoke MVP
 - `POST /api/v1/auth/logout-all` user refresh sessions revoke MVP
 - `GET /api/v1/me` Bearer access token Auth MVP
+- `GET /api/v1/operator/me` operator/admin authorization smoke MVP
 - `GET /api/v1/home` read-only MVP
   - settled season joined read model은 `rankType=final` `season_rankings`를 authoritative final result로 읽음.
 - `GET /api/v1/ranking` read-only MVP
@@ -132,8 +142,11 @@
 - `POST /api/v1/auth/signup`은 명시적으로 `201 Created`.
 - `POST /api/v1/auth/login`은 명시적으로 `200 OK`.
 - `POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout`, `POST /api/v1/auth/logout-all`은 명시적으로 `200 OK`.
-- 전역 access token guard가 JWT를 검증하고 DB의 active user를 확인한 뒤 `request.user = { userId }`를 주입.
+- 전역 access token guard가 JWT를 검증하고 DB의 active user와 current role을 확인한 뒤 `request.user = { userId, role }`를 주입.
 - 보호 API에서 사용자 식별자는 계속 `request.user.userId` 기준.
+- `UserRole`은 `user`, `operator`, `admin`이고 신규 signup은 `role=user`를 명시적으로 생성.
+- `UserStatus`는 active/suspended/deleted 상태 관리이며 `UserRole`과 분리됨.
+- operator/admin 권한 판단은 JWT role claim이 아니라 DB current role을 기준으로 함.
 - `JWT_ACCESS_SECRET`이 없으면 앱은 fail closed.
 - `JWT_ACCESS_TTL`은 공백 없는 숫자+단위 문자열만 허용.
   - 허용 단위: `s`, `m`, `h`, `d`, `w`.
@@ -165,6 +178,8 @@
   - `POST /api/v1/auth/logout`.
 - protected Auth route:
   - `POST /api/v1/auth/logout-all`.
+- operator route:
+  - `GET /api/v1/operator/me`: `operator` 또는 `admin`만 접근 가능. `user`는 `403 OPERATOR_FORBIDDEN`, missing/invalid token은 `401 UNAUTHORIZED`.
 - inactive user:
   - missing/invalid/expired/forged token 또는 unknown user는 `UNAUTHORIZED`.
   - `User.status`가 `suspended` 또는 `deleted`이면 `FORBIDDEN` + `USER_NOT_ACTIVE`.
@@ -178,6 +193,7 @@
   - protected read-only route valid token smoke: `GET /api/v1/me`, `/home`, `/ranking`, `/wallets`, `/records`, `/records/me/seasons`, `/records/me/seasons/:seasonId`, `/records/me/seasons/:seasonId/orders`, `/records/me/seasons/:seasonId/exchanges`, `/users/:userId/records/:seasonId`, `/rewards/me`, `/badges/me`, `/orders`가 guard를 통과해 service-level 정상 응답 또는 known unavailable/not_joined/empty 계약으로 진입하는지 검증.
   - protected write-path route: `POST /api/v1/seasons/:seasonId/join`, `/fx/quote`, `/fx/execute`, `/orders/quote`, `/orders`, `/orders/:orderId/cancel`, `/orders/:orderId/execute` missing token, `x-user-id` only, invalid bearer token, malformed Authorization 차단 검증.
   - protected write-path route valid token smoke: 위 write API들이 guard를 통과해 service-level success 또는 known domain error(`SEASON_NOT_JOINED`, `ORDER_NOT_FOUND`)까지 진입하는지 검증.
+  - operator route: `GET /api/v1/operator/me` missing token, invalid bearer, `x-user-id` only, `role=user`, `role=operator`, `role=admin`, suspended/deleted, DB current role 변경 후 기존 token 권한 반영 회귀 검증.
   - write-path API의 full mutation 검증은 service/unit/opt-in DB integration spec이 담당하며, HTTP e2e는 guard routing, `request.user` 주입, controller/service 진입 회귀를 담당.
 
 ## 5. 현재 DB 상태
@@ -204,10 +220,14 @@
 - `season_rewards`
 - `refresh_token_sessions`
 - `batch_job_runs`
+- `operator_audit_logs`
 
 near-term ledger/FX foundation:
 
 - Batch job execution foundation 반영 완료: `BatchJobStatus`, `batch_job_runs`.
+- Operator authorization/audit foundation 반영 완료: `UserRole`, `OperatorAuditResult`, `users.role`, `operator_audit_logs`.
+- Operator audit log service는 success/failure, actor/action/target/request metadata를 기록할 수 있으며 metadata 내 secret-like key/API key/app secret/approval key/access token/refresh token/`DATABASE_URL`/raw provider payload 필드는 redaction 처리.
+- Operator authorization/audit migration 생성: `20260601090000_add_user_role_operator_audit_logs`.
 - Batch job run migration 생성 및 로컬 DB 적용 완료: `20260519095458_add_batch_job_runs`.
 - `BatchService` 구현 완료:
   - `(jobName, idempotencyKey)` unique 기반 중복 실행 방지.

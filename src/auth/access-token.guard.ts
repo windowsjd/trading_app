@@ -67,6 +67,7 @@ export class AccessTokenGuard implements CanActivate {
       },
       select: {
         id: true,
+        role: true,
         status: true,
       },
     });
@@ -81,6 +82,7 @@ export class AccessTokenGuard implements CanActivate {
 
     request.user = {
       userId: user.id,
+      role: user.role,
     };
 
     return true;

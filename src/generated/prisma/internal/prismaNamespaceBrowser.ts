@@ -52,9 +52,13 @@ export const AnyNull = runtime.AnyNull
 
 export const ModelName = {
   User: 'User',
+  OperatorAuditLog: 'OperatorAuditLog',
   RefreshTokenSession: 'RefreshTokenSession',
   Season: 'Season',
   SeasonParticipant: 'SeasonParticipant',
+  Badge: 'Badge',
+  UserBadge: 'UserBadge',
+  SeasonReward: 'SeasonReward',
   Asset: 'Asset',
   AssetPriceSnapshot: 'AssetPriceSnapshot',
   Position: 'Position',
@@ -93,11 +97,31 @@ export const UserScalarFieldEnum = {
   nickname: 'nickname',
   profileImageUrl: 'profileImageUrl',
   status: 'status',
+  role: 'role',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
 
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+
+
+export const OperatorAuditLogScalarFieldEnum = {
+  id: 'id',
+  actorUserId: 'actorUserId',
+  actorRole: 'actorRole',
+  action: 'action',
+  targetType: 'targetType',
+  targetId: 'targetId',
+  requestId: 'requestId',
+  ipAddress: 'ipAddress',
+  userAgent: 'userAgent',
+  metadataJson: 'metadataJson',
+  result: 'result',
+  errorCode: 'errorCode',
+  createdAt: 'createdAt'
+} as const
+
+export type OperatorAuditLogScalarFieldEnum = (typeof OperatorAuditLogScalarFieldEnum)[keyof typeof OperatorAuditLogScalarFieldEnum]
 
 
 export const RefreshTokenSessionScalarFieldEnum = {
@@ -154,6 +178,48 @@ export const SeasonParticipantScalarFieldEnum = {
 } as const
 
 export type SeasonParticipantScalarFieldEnum = (typeof SeasonParticipantScalarFieldEnum)[keyof typeof SeasonParticipantScalarFieldEnum]
+
+
+export const BadgeScalarFieldEnum = {
+  id: 'id',
+  badgeType: 'badgeType',
+  code: 'code',
+  name: 'name',
+  description: 'description',
+  iconUrl: 'iconUrl',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type BadgeScalarFieldEnum = (typeof BadgeScalarFieldEnum)[keyof typeof BadgeScalarFieldEnum]
+
+
+export const UserBadgeScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  badgeId: 'badgeId',
+  seasonId: 'seasonId',
+  awardedAt: 'awardedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type UserBadgeScalarFieldEnum = (typeof UserBadgeScalarFieldEnum)[keyof typeof UserBadgeScalarFieldEnum]
+
+
+export const SeasonRewardScalarFieldEnum = {
+  id: 'id',
+  seasonId: 'seasonId',
+  seasonParticipantId: 'seasonParticipantId',
+  userId: 'userId',
+  rewardType: 'rewardType',
+  rewardCode: 'rewardCode',
+  rewardName: 'rewardName',
+  rewardValueJson: 'rewardValueJson',
+  grantedAt: 'grantedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type SeasonRewardScalarFieldEnum = (typeof SeasonRewardScalarFieldEnum)[keyof typeof SeasonRewardScalarFieldEnum]
 
 
 export const AssetScalarFieldEnum = {

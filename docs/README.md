@@ -16,6 +16,7 @@ Use this directory in this order:
    - `docs/positions-api-contract.md`
    - `docs/records-api-contract.md`
    - `docs/rewards-api-contract.md`
+   - `docs/operator-api-contract.md`
 5. Provider/freshness/crypto policy:
    - `docs/provider-ingestion-foundation.md`
    - `docs/crypto-usd-settlement-policy-update.md`
@@ -25,8 +26,11 @@ Use this directory in this order:
    - `docs/asset-universe-2026-ytd-volume-selection.md`
    - `docs/provider-source-eligibility-pre-gate.md`
 
-Provider evidence currently has ExchangeRate-API and Binance row insertion evidence, KIS domestic `H0STCNT0` row insertion evidence, and KIS US `HDFSCNT0` subscription ack without US tick/DB insertion evidence. Provider_api source eligibility remains closed until a later implementation gate.
-6. Batch foundation and operator-run daily snapshot/ranking/cycle/settlement/final-tier/reward-grant internal foundation jobs:
+Provider evidence currently has ExchangeRate-API and Binance row insertion evidence, KIS domestic `H0STCNT0` row insertion evidence, and KIS US `HDFSCNT0` subscription ack without US tick/DB insertion evidence. Provider_api source eligibility remains closed until a later implementation gate. 6. Admin/operator authorization and audit foundation:
+
+- `docs/operator-api-contract.md`
+
+7. Batch foundation and operator-run daily snapshot/ranking/cycle/settlement/final-tier/reward-grant internal foundation jobs:
    - `docs/batch-job-foundation.md`
 
 `docs/archive/` contains historical STOP/review/preimplementation/plan documents. Archived files are not current source of truth and must not be used to override the current documents above.

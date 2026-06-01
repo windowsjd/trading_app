@@ -23,6 +23,11 @@ export * from './enums.js';
  */
 export type User = Prisma.UserModel
 /**
+ * Model OperatorAuditLog
+ *
+ */
+export type OperatorAuditLog = Prisma.OperatorAuditLogModel
+/**
  * Model RefreshTokenSession
  *
  */
@@ -37,6 +42,21 @@ export type Season = Prisma.SeasonModel
  *
  */
 export type SeasonParticipant = Prisma.SeasonParticipantModel
+/**
+ * Model Badge
+ *
+ */
+export type Badge = Prisma.BadgeModel
+/**
+ * Model UserBadge
+ *
+ */
+export type UserBadge = Prisma.UserBadgeModel
+/**
+ * Model SeasonReward
+ *
+ */
+export type SeasonReward = Prisma.SeasonRewardModel
 /**
  * Model Asset
  *

@@ -7,6 +7,7 @@ This service owns backend APIs, database access, financial calculations, and ser
 ## Current MVP Scope
 
 - Access token + refresh token auth: signup, login, refresh, logout, logout-all, and `GET /api/v1/me`.
+- Admin/operator authorization foundation: `UserRole`, DB-current-role access context, `GET /api/v1/operator/me`, and internal operator audit log service/model.
 - Current season lookup and season join.
 - Home as one aggregate API.
 - Home settled final-result read model from existing `rankType=final` `season_rankings`.
@@ -23,6 +24,7 @@ This service owns backend APIs, database access, financial calculations, and ser
 These are intentionally outside the current implementation and should not be added without a separate gate:
 
 - Provider ingestion for OANDA, Twelve Data, Binance, or any other market data provider.
+- Admin/operator account management APIs, provider ingestion trigger APIs, batch run HTTP APIs, scheduler/cron, and reward fulfillment trigger APIs.
 - Cron scheduler, provider ingestion jobs, scheduler-driven snapshot/ranking jobs, settlement extension jobs beyond final tier assignment, or actual reward fulfillment jobs.
 - Provider-backed settlement recalculation or reward automation.
 - Actual payment, point, badge, or trophy fulfillment beyond the `rewardGrantedAt` marker MVP.
@@ -133,7 +135,8 @@ Current source of truth order:
 3. `docs/backend-gate-roadmap.md`
 4. `docs/backend-test-coverage-matrix.md`
 5. `docs/auth-api-contract.md` and API contract docs under `docs/*-api-contract.md`
-6. `docs/batch-job-foundation.md`
+6. `docs/operator-api-contract.md`
+7. `docs/batch-job-foundation.md`
 
 `docs/archive/` is historical reference only and must not override the current documents above.
 
@@ -142,6 +145,7 @@ Current source of truth order:
 Possible now:
 
 - Auth, season join, wallet, records, ranking, home, FX, and order backend hardening.
+- Admin/operator authorization boundary checks and operator audit foundation tests.
 - Mocked HTTP e2e coverage for guard routing and controller/service entry.
 - Opt-in real PostgreSQL integration tests for implemented DB write paths.
 - Manual admin input paths using operator-approved real data.

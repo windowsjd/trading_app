@@ -23,7 +23,7 @@ This is not provider ingestion, cron scheduling, daily snapshot automation, or a
 - Module: `BatchModule`
 - Operator script: `scripts/admin-run-batch-job.ts`
 
-No batch write/run HTTP API exists. The project does not have an admin role model yet, so users cannot trigger batch jobs through an API.
+No batch write/run HTTP API exists. The project now has an admin/operator role foundation, but batch job HTTP execution remains a separate gate and users still cannot trigger batch jobs through an API.
 
 ## Idempotency Policy
 

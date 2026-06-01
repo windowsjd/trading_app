@@ -51,7 +51,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { HttpException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { RefreshTokenSessionStatus, UserStatus } from './src/generated/prisma/client';
+import { RefreshTokenSessionStatus, UserRole, UserStatus } from './src/generated/prisma/client';
 import { PrismaService } from './src/prisma/prisma.service';
 import { AuthService } from './src/auth/auth.service';
 import { AccessTokenGuard } from './src/auth/access-token.guard';
@@ -114,6 +114,7 @@ async function main() {
       where: { email: activeEmail },
     });
     assert.notEqual(activeUser.passwordHash, password);
+    assert.equal(activeUser.role, UserRole.user);
     assert.equal(await argon2.verify(activeUser.passwordHash, password), true);
     const signupRefreshSession = await prisma.refreshTokenSession.findUniqueOrThrow({
       where: {
@@ -224,7 +225,7 @@ async function main() {
       },
     };
     assert.equal(await guard.canActivate(context), true);
-    assert.deepEqual(request.user, { userId: activeUser.id });
+    assert.deepEqual(request.user, { userId: activeUser.id, role: UserRole.user });
 
     const meResponse = await authService.me(request.user.userId);
     assert.equal(meResponse.data.email, activeEmail);

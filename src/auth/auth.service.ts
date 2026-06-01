@@ -13,6 +13,7 @@ import * as argon2 from 'argon2';
 import { createHash, randomBytes } from 'node:crypto';
 import {
   RefreshTokenSessionStatus,
+  UserRole,
   UserStatus,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -105,6 +106,7 @@ export class AuthService implements OnModuleInit {
             email: request.email,
             passwordHash,
             nickname: request.nickname,
+            role: UserRole.user,
             status: UserStatus.active,
           },
           select: {

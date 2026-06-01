@@ -339,6 +339,7 @@ export type SeasonParticipantWhereInput = {
   orders?: Prisma.OrderListRelationFilter
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotListRelationFilter
   seasonRankings?: Prisma.SeasonRankingListRelationFilter
+  seasonRewards?: Prisma.SeasonRewardListRelationFilter
 }
 
 export type SeasonParticipantOrderByWithRelationInput = {
@@ -369,6 +370,7 @@ export type SeasonParticipantOrderByWithRelationInput = {
   orders?: Prisma.OrderOrderByRelationAggregateInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotOrderByRelationAggregateInput
   seasonRankings?: Prisma.SeasonRankingOrderByRelationAggregateInput
+  seasonRewards?: Prisma.SeasonRewardOrderByRelationAggregateInput
 }
 
 export type SeasonParticipantWhereUniqueInput = Prisma.AtLeast<{
@@ -403,6 +405,7 @@ export type SeasonParticipantWhereUniqueInput = Prisma.AtLeast<{
   orders?: Prisma.OrderListRelationFilter
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotListRelationFilter
   seasonRankings?: Prisma.SeasonRankingListRelationFilter
+  seasonRewards?: Prisma.SeasonRewardListRelationFilter
 }, "id" | "seasonId_userId">
 
 export type SeasonParticipantOrderByWithAggregationInput = {
@@ -477,6 +480,7 @@ export type SeasonParticipantCreateInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutSeasonParticipantInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutSeasonParticipantInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutSeasonParticipantInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutSeasonParticipantInput
 }
 
 export type SeasonParticipantUncheckedCreateInput = {
@@ -505,6 +509,7 @@ export type SeasonParticipantUncheckedCreateInput = {
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutSeasonParticipantInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutSeasonParticipantInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutSeasonParticipantInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutSeasonParticipantInput
 }
 
 export type SeasonParticipantUpdateInput = {
@@ -533,6 +538,7 @@ export type SeasonParticipantUpdateInput = {
   orders?: Prisma.OrderUpdateManyWithoutSeasonParticipantNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutSeasonParticipantNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutSeasonParticipantNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutSeasonParticipantNestedInput
 }
 
 export type SeasonParticipantUncheckedUpdateInput = {
@@ -561,6 +567,7 @@ export type SeasonParticipantUncheckedUpdateInput = {
   orders?: Prisma.OrderUncheckedUpdateManyWithoutSeasonParticipantNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutSeasonParticipantNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutSeasonParticipantNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutSeasonParticipantNestedInput
 }
 
 export type SeasonParticipantCreateManyInput = {
@@ -819,6 +826,20 @@ export type NullableIntFieldUpdateOperationsInput = {
   divide?: number
 }
 
+export type SeasonParticipantCreateNestedOneWithoutSeasonRewardsInput = {
+  create?: Prisma.XOR<Prisma.SeasonParticipantCreateWithoutSeasonRewardsInput, Prisma.SeasonParticipantUncheckedCreateWithoutSeasonRewardsInput>
+  connectOrCreate?: Prisma.SeasonParticipantCreateOrConnectWithoutSeasonRewardsInput
+  connect?: Prisma.SeasonParticipantWhereUniqueInput
+}
+
+export type SeasonParticipantUpdateOneRequiredWithoutSeasonRewardsNestedInput = {
+  create?: Prisma.XOR<Prisma.SeasonParticipantCreateWithoutSeasonRewardsInput, Prisma.SeasonParticipantUncheckedCreateWithoutSeasonRewardsInput>
+  connectOrCreate?: Prisma.SeasonParticipantCreateOrConnectWithoutSeasonRewardsInput
+  upsert?: Prisma.SeasonParticipantUpsertWithoutSeasonRewardsInput
+  connect?: Prisma.SeasonParticipantWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.SeasonParticipantUpdateToOneWithWhereWithoutSeasonRewardsInput, Prisma.SeasonParticipantUpdateWithoutSeasonRewardsInput>, Prisma.SeasonParticipantUncheckedUpdateWithoutSeasonRewardsInput>
+}
+
 export type SeasonParticipantCreateNestedOneWithoutPositionsInput = {
   create?: Prisma.XOR<Prisma.SeasonParticipantCreateWithoutPositionsInput, Prisma.SeasonParticipantUncheckedCreateWithoutPositionsInput>
   connectOrCreate?: Prisma.SeasonParticipantCreateOrConnectWithoutPositionsInput
@@ -970,6 +991,7 @@ export type SeasonParticipantCreateWithoutUserInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutSeasonParticipantInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutSeasonParticipantInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutSeasonParticipantInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutSeasonParticipantInput
 }
 
 export type SeasonParticipantUncheckedCreateWithoutUserInput = {
@@ -997,6 +1019,7 @@ export type SeasonParticipantUncheckedCreateWithoutUserInput = {
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutSeasonParticipantInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutSeasonParticipantInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutSeasonParticipantInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutSeasonParticipantInput
 }
 
 export type SeasonParticipantCreateOrConnectWithoutUserInput = {
@@ -1072,6 +1095,7 @@ export type SeasonParticipantCreateWithoutSeasonInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutSeasonParticipantInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutSeasonParticipantInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutSeasonParticipantInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutSeasonParticipantInput
 }
 
 export type SeasonParticipantUncheckedCreateWithoutSeasonInput = {
@@ -1099,6 +1123,7 @@ export type SeasonParticipantUncheckedCreateWithoutSeasonInput = {
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutSeasonParticipantInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutSeasonParticipantInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutSeasonParticipantInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutSeasonParticipantInput
 }
 
 export type SeasonParticipantCreateOrConnectWithoutSeasonInput = {
@@ -1127,6 +1152,134 @@ export type SeasonParticipantUpdateManyWithWhereWithoutSeasonInput = {
   data: Prisma.XOR<Prisma.SeasonParticipantUpdateManyMutationInput, Prisma.SeasonParticipantUncheckedUpdateManyWithoutSeasonInput>
 }
 
+export type SeasonParticipantCreateWithoutSeasonRewardsInput = {
+  id?: string
+  joinedAt: Date | string
+  participantStatus?: $Enums.ParticipantStatus
+  initialCapitalKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAssetKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalReturnRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  maxDrawdown: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalFillCount?: number
+  currentRank?: number | null
+  finalRank?: number | null
+  finalTier?: string | null
+  rewardGrantedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
+  user: Prisma.UserCreateNestedOneWithoutSeasonParticipantsInput
+  cashWallets?: Prisma.CashWalletCreateNestedManyWithoutSeasonParticipantInput
+  walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutSeasonParticipantInput
+  exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutSeasonParticipantInput
+  equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutSeasonParticipantInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutSeasonParticipantInput
+  positions?: Prisma.PositionCreateNestedManyWithoutSeasonParticipantInput
+  orders?: Prisma.OrderCreateNestedManyWithoutSeasonParticipantInput
+  dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutSeasonParticipantInput
+  seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutSeasonParticipantInput
+}
+
+export type SeasonParticipantUncheckedCreateWithoutSeasonRewardsInput = {
+  id?: string
+  seasonId: string
+  userId: string
+  joinedAt: Date | string
+  participantStatus?: $Enums.ParticipantStatus
+  initialCapitalKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAssetKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalReturnRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  maxDrawdown: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalFillCount?: number
+  currentRank?: number | null
+  finalRank?: number | null
+  finalTier?: string | null
+  rewardGrantedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
+  walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutSeasonParticipantInput
+  exchangeTransactions?: Prisma.ExchangeTransactionUncheckedCreateNestedManyWithoutSeasonParticipantInput
+  equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutSeasonParticipantInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutSeasonParticipantInput
+  positions?: Prisma.PositionUncheckedCreateNestedManyWithoutSeasonParticipantInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutSeasonParticipantInput
+  dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutSeasonParticipantInput
+  seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutSeasonParticipantInput
+}
+
+export type SeasonParticipantCreateOrConnectWithoutSeasonRewardsInput = {
+  where: Prisma.SeasonParticipantWhereUniqueInput
+  create: Prisma.XOR<Prisma.SeasonParticipantCreateWithoutSeasonRewardsInput, Prisma.SeasonParticipantUncheckedCreateWithoutSeasonRewardsInput>
+}
+
+export type SeasonParticipantUpsertWithoutSeasonRewardsInput = {
+  update: Prisma.XOR<Prisma.SeasonParticipantUpdateWithoutSeasonRewardsInput, Prisma.SeasonParticipantUncheckedUpdateWithoutSeasonRewardsInput>
+  create: Prisma.XOR<Prisma.SeasonParticipantCreateWithoutSeasonRewardsInput, Prisma.SeasonParticipantUncheckedCreateWithoutSeasonRewardsInput>
+  where?: Prisma.SeasonParticipantWhereInput
+}
+
+export type SeasonParticipantUpdateToOneWithWhereWithoutSeasonRewardsInput = {
+  where?: Prisma.SeasonParticipantWhereInput
+  data: Prisma.XOR<Prisma.SeasonParticipantUpdateWithoutSeasonRewardsInput, Prisma.SeasonParticipantUncheckedUpdateWithoutSeasonRewardsInput>
+}
+
+export type SeasonParticipantUpdateWithoutSeasonRewardsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  joinedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  participantStatus?: Prisma.EnumParticipantStatusFieldUpdateOperationsInput | $Enums.ParticipantStatus
+  initialCapitalKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAssetKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalReturnRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  maxDrawdown?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalFillCount?: Prisma.IntFieldUpdateOperationsInput | number
+  currentRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
+  user?: Prisma.UserUpdateOneRequiredWithoutSeasonParticipantsNestedInput
+  cashWallets?: Prisma.CashWalletUpdateManyWithoutSeasonParticipantNestedInput
+  walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutSeasonParticipantNestedInput
+  exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutSeasonParticipantNestedInput
+  equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutSeasonParticipantNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutSeasonParticipantNestedInput
+  positions?: Prisma.PositionUpdateManyWithoutSeasonParticipantNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutSeasonParticipantNestedInput
+  dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutSeasonParticipantNestedInput
+  seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutSeasonParticipantNestedInput
+}
+
+export type SeasonParticipantUncheckedUpdateWithoutSeasonRewardsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonId?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  joinedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  participantStatus?: Prisma.EnumParticipantStatusFieldUpdateOperationsInput | $Enums.ParticipantStatus
+  initialCapitalKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAssetKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalReturnRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  maxDrawdown?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalFillCount?: Prisma.IntFieldUpdateOperationsInput | number
+  currentRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
+  walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutSeasonParticipantNestedInput
+  exchangeTransactions?: Prisma.ExchangeTransactionUncheckedUpdateManyWithoutSeasonParticipantNestedInput
+  equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutSeasonParticipantNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutSeasonParticipantNestedInput
+  positions?: Prisma.PositionUncheckedUpdateManyWithoutSeasonParticipantNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutSeasonParticipantNestedInput
+  dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutSeasonParticipantNestedInput
+  seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutSeasonParticipantNestedInput
+}
+
 export type SeasonParticipantCreateWithoutPositionsInput = {
   id?: string
   joinedAt: Date | string
@@ -1152,6 +1305,7 @@ export type SeasonParticipantCreateWithoutPositionsInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutSeasonParticipantInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutSeasonParticipantInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutSeasonParticipantInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutSeasonParticipantInput
 }
 
 export type SeasonParticipantUncheckedCreateWithoutPositionsInput = {
@@ -1179,6 +1333,7 @@ export type SeasonParticipantUncheckedCreateWithoutPositionsInput = {
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutSeasonParticipantInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutSeasonParticipantInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutSeasonParticipantInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutSeasonParticipantInput
 }
 
 export type SeasonParticipantCreateOrConnectWithoutPositionsInput = {
@@ -1222,6 +1377,7 @@ export type SeasonParticipantUpdateWithoutPositionsInput = {
   orders?: Prisma.OrderUpdateManyWithoutSeasonParticipantNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutSeasonParticipantNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutSeasonParticipantNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutSeasonParticipantNestedInput
 }
 
 export type SeasonParticipantUncheckedUpdateWithoutPositionsInput = {
@@ -1249,6 +1405,7 @@ export type SeasonParticipantUncheckedUpdateWithoutPositionsInput = {
   orders?: Prisma.OrderUncheckedUpdateManyWithoutSeasonParticipantNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutSeasonParticipantNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutSeasonParticipantNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutSeasonParticipantNestedInput
 }
 
 export type SeasonParticipantCreateWithoutOrdersInput = {
@@ -1276,6 +1433,7 @@ export type SeasonParticipantCreateWithoutOrdersInput = {
   positions?: Prisma.PositionCreateNestedManyWithoutSeasonParticipantInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutSeasonParticipantInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutSeasonParticipantInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutSeasonParticipantInput
 }
 
 export type SeasonParticipantUncheckedCreateWithoutOrdersInput = {
@@ -1303,6 +1461,7 @@ export type SeasonParticipantUncheckedCreateWithoutOrdersInput = {
   positions?: Prisma.PositionUncheckedCreateNestedManyWithoutSeasonParticipantInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutSeasonParticipantInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutSeasonParticipantInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutSeasonParticipantInput
 }
 
 export type SeasonParticipantCreateOrConnectWithoutOrdersInput = {
@@ -1346,6 +1505,7 @@ export type SeasonParticipantUpdateWithoutOrdersInput = {
   positions?: Prisma.PositionUpdateManyWithoutSeasonParticipantNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutSeasonParticipantNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutSeasonParticipantNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutSeasonParticipantNestedInput
 }
 
 export type SeasonParticipantUncheckedUpdateWithoutOrdersInput = {
@@ -1373,6 +1533,7 @@ export type SeasonParticipantUncheckedUpdateWithoutOrdersInput = {
   positions?: Prisma.PositionUncheckedUpdateManyWithoutSeasonParticipantNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutSeasonParticipantNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutSeasonParticipantNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutSeasonParticipantNestedInput
 }
 
 export type SeasonParticipantCreateWithoutCashWalletsInput = {
@@ -1400,6 +1561,7 @@ export type SeasonParticipantCreateWithoutCashWalletsInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutSeasonParticipantInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutSeasonParticipantInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutSeasonParticipantInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutSeasonParticipantInput
 }
 
 export type SeasonParticipantUncheckedCreateWithoutCashWalletsInput = {
@@ -1427,6 +1589,7 @@ export type SeasonParticipantUncheckedCreateWithoutCashWalletsInput = {
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutSeasonParticipantInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutSeasonParticipantInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutSeasonParticipantInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutSeasonParticipantInput
 }
 
 export type SeasonParticipantCreateOrConnectWithoutCashWalletsInput = {
@@ -1470,6 +1633,7 @@ export type SeasonParticipantUpdateWithoutCashWalletsInput = {
   orders?: Prisma.OrderUpdateManyWithoutSeasonParticipantNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutSeasonParticipantNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutSeasonParticipantNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutSeasonParticipantNestedInput
 }
 
 export type SeasonParticipantUncheckedUpdateWithoutCashWalletsInput = {
@@ -1497,6 +1661,7 @@ export type SeasonParticipantUncheckedUpdateWithoutCashWalletsInput = {
   orders?: Prisma.OrderUncheckedUpdateManyWithoutSeasonParticipantNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutSeasonParticipantNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutSeasonParticipantNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutSeasonParticipantNestedInput
 }
 
 export type SeasonParticipantCreateWithoutWalletTransactionsInput = {
@@ -1524,6 +1689,7 @@ export type SeasonParticipantCreateWithoutWalletTransactionsInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutSeasonParticipantInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutSeasonParticipantInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutSeasonParticipantInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutSeasonParticipantInput
 }
 
 export type SeasonParticipantUncheckedCreateWithoutWalletTransactionsInput = {
@@ -1551,6 +1717,7 @@ export type SeasonParticipantUncheckedCreateWithoutWalletTransactionsInput = {
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutSeasonParticipantInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutSeasonParticipantInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutSeasonParticipantInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutSeasonParticipantInput
 }
 
 export type SeasonParticipantCreateOrConnectWithoutWalletTransactionsInput = {
@@ -1594,6 +1761,7 @@ export type SeasonParticipantUpdateWithoutWalletTransactionsInput = {
   orders?: Prisma.OrderUpdateManyWithoutSeasonParticipantNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutSeasonParticipantNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutSeasonParticipantNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutSeasonParticipantNestedInput
 }
 
 export type SeasonParticipantUncheckedUpdateWithoutWalletTransactionsInput = {
@@ -1621,6 +1789,7 @@ export type SeasonParticipantUncheckedUpdateWithoutWalletTransactionsInput = {
   orders?: Prisma.OrderUncheckedUpdateManyWithoutSeasonParticipantNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutSeasonParticipantNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutSeasonParticipantNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutSeasonParticipantNestedInput
 }
 
 export type SeasonParticipantCreateWithoutExchangeTransactionsInput = {
@@ -1648,6 +1817,7 @@ export type SeasonParticipantCreateWithoutExchangeTransactionsInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutSeasonParticipantInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutSeasonParticipantInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutSeasonParticipantInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutSeasonParticipantInput
 }
 
 export type SeasonParticipantUncheckedCreateWithoutExchangeTransactionsInput = {
@@ -1675,6 +1845,7 @@ export type SeasonParticipantUncheckedCreateWithoutExchangeTransactionsInput = {
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutSeasonParticipantInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutSeasonParticipantInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutSeasonParticipantInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutSeasonParticipantInput
 }
 
 export type SeasonParticipantCreateOrConnectWithoutExchangeTransactionsInput = {
@@ -1718,6 +1889,7 @@ export type SeasonParticipantUpdateWithoutExchangeTransactionsInput = {
   orders?: Prisma.OrderUpdateManyWithoutSeasonParticipantNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutSeasonParticipantNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutSeasonParticipantNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutSeasonParticipantNestedInput
 }
 
 export type SeasonParticipantUncheckedUpdateWithoutExchangeTransactionsInput = {
@@ -1745,6 +1917,7 @@ export type SeasonParticipantUncheckedUpdateWithoutExchangeTransactionsInput = {
   orders?: Prisma.OrderUncheckedUpdateManyWithoutSeasonParticipantNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutSeasonParticipantNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutSeasonParticipantNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutSeasonParticipantNestedInput
 }
 
 export type SeasonParticipantCreateWithoutFxExecuteRequestsInput = {
@@ -1772,6 +1945,7 @@ export type SeasonParticipantCreateWithoutFxExecuteRequestsInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutSeasonParticipantInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutSeasonParticipantInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutSeasonParticipantInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutSeasonParticipantInput
 }
 
 export type SeasonParticipantUncheckedCreateWithoutFxExecuteRequestsInput = {
@@ -1799,6 +1973,7 @@ export type SeasonParticipantUncheckedCreateWithoutFxExecuteRequestsInput = {
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutSeasonParticipantInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutSeasonParticipantInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutSeasonParticipantInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutSeasonParticipantInput
 }
 
 export type SeasonParticipantCreateOrConnectWithoutFxExecuteRequestsInput = {
@@ -1842,6 +2017,7 @@ export type SeasonParticipantUpdateWithoutFxExecuteRequestsInput = {
   orders?: Prisma.OrderUpdateManyWithoutSeasonParticipantNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutSeasonParticipantNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutSeasonParticipantNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutSeasonParticipantNestedInput
 }
 
 export type SeasonParticipantUncheckedUpdateWithoutFxExecuteRequestsInput = {
@@ -1869,6 +2045,7 @@ export type SeasonParticipantUncheckedUpdateWithoutFxExecuteRequestsInput = {
   orders?: Prisma.OrderUncheckedUpdateManyWithoutSeasonParticipantNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutSeasonParticipantNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutSeasonParticipantNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutSeasonParticipantNestedInput
 }
 
 export type SeasonParticipantCreateWithoutEquitySnapshotsInput = {
@@ -1896,6 +2073,7 @@ export type SeasonParticipantCreateWithoutEquitySnapshotsInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutSeasonParticipantInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutSeasonParticipantInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutSeasonParticipantInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutSeasonParticipantInput
 }
 
 export type SeasonParticipantUncheckedCreateWithoutEquitySnapshotsInput = {
@@ -1923,6 +2101,7 @@ export type SeasonParticipantUncheckedCreateWithoutEquitySnapshotsInput = {
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutSeasonParticipantInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutSeasonParticipantInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutSeasonParticipantInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutSeasonParticipantInput
 }
 
 export type SeasonParticipantCreateOrConnectWithoutEquitySnapshotsInput = {
@@ -1966,6 +2145,7 @@ export type SeasonParticipantUpdateWithoutEquitySnapshotsInput = {
   orders?: Prisma.OrderUpdateManyWithoutSeasonParticipantNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutSeasonParticipantNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutSeasonParticipantNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutSeasonParticipantNestedInput
 }
 
 export type SeasonParticipantUncheckedUpdateWithoutEquitySnapshotsInput = {
@@ -1993,6 +2173,7 @@ export type SeasonParticipantUncheckedUpdateWithoutEquitySnapshotsInput = {
   orders?: Prisma.OrderUncheckedUpdateManyWithoutSeasonParticipantNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutSeasonParticipantNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutSeasonParticipantNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutSeasonParticipantNestedInput
 }
 
 export type SeasonParticipantCreateWithoutDailyPortfolioSnapshotsInput = {
@@ -2020,6 +2201,7 @@ export type SeasonParticipantCreateWithoutDailyPortfolioSnapshotsInput = {
   positions?: Prisma.PositionCreateNestedManyWithoutSeasonParticipantInput
   orders?: Prisma.OrderCreateNestedManyWithoutSeasonParticipantInput
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutSeasonParticipantInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutSeasonParticipantInput
 }
 
 export type SeasonParticipantUncheckedCreateWithoutDailyPortfolioSnapshotsInput = {
@@ -2047,6 +2229,7 @@ export type SeasonParticipantUncheckedCreateWithoutDailyPortfolioSnapshotsInput 
   positions?: Prisma.PositionUncheckedCreateNestedManyWithoutSeasonParticipantInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutSeasonParticipantInput
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutSeasonParticipantInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutSeasonParticipantInput
 }
 
 export type SeasonParticipantCreateOrConnectWithoutDailyPortfolioSnapshotsInput = {
@@ -2090,6 +2273,7 @@ export type SeasonParticipantUpdateWithoutDailyPortfolioSnapshotsInput = {
   positions?: Prisma.PositionUpdateManyWithoutSeasonParticipantNestedInput
   orders?: Prisma.OrderUpdateManyWithoutSeasonParticipantNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutSeasonParticipantNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutSeasonParticipantNestedInput
 }
 
 export type SeasonParticipantUncheckedUpdateWithoutDailyPortfolioSnapshotsInput = {
@@ -2117,6 +2301,7 @@ export type SeasonParticipantUncheckedUpdateWithoutDailyPortfolioSnapshotsInput 
   positions?: Prisma.PositionUncheckedUpdateManyWithoutSeasonParticipantNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutSeasonParticipantNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutSeasonParticipantNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutSeasonParticipantNestedInput
 }
 
 export type SeasonParticipantCreateWithoutSeasonRankingsInput = {
@@ -2144,6 +2329,7 @@ export type SeasonParticipantCreateWithoutSeasonRankingsInput = {
   positions?: Prisma.PositionCreateNestedManyWithoutSeasonParticipantInput
   orders?: Prisma.OrderCreateNestedManyWithoutSeasonParticipantInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutSeasonParticipantInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutSeasonParticipantInput
 }
 
 export type SeasonParticipantUncheckedCreateWithoutSeasonRankingsInput = {
@@ -2171,6 +2357,7 @@ export type SeasonParticipantUncheckedCreateWithoutSeasonRankingsInput = {
   positions?: Prisma.PositionUncheckedCreateNestedManyWithoutSeasonParticipantInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutSeasonParticipantInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutSeasonParticipantInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutSeasonParticipantInput
 }
 
 export type SeasonParticipantCreateOrConnectWithoutSeasonRankingsInput = {
@@ -2214,6 +2401,7 @@ export type SeasonParticipantUpdateWithoutSeasonRankingsInput = {
   positions?: Prisma.PositionUpdateManyWithoutSeasonParticipantNestedInput
   orders?: Prisma.OrderUpdateManyWithoutSeasonParticipantNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutSeasonParticipantNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutSeasonParticipantNestedInput
 }
 
 export type SeasonParticipantUncheckedUpdateWithoutSeasonRankingsInput = {
@@ -2241,6 +2429,7 @@ export type SeasonParticipantUncheckedUpdateWithoutSeasonRankingsInput = {
   positions?: Prisma.PositionUncheckedUpdateManyWithoutSeasonParticipantNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutSeasonParticipantNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutSeasonParticipantNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutSeasonParticipantNestedInput
 }
 
 export type SeasonParticipantCreateManyUserInput = {
@@ -2286,6 +2475,7 @@ export type SeasonParticipantUpdateWithoutUserInput = {
   orders?: Prisma.OrderUpdateManyWithoutSeasonParticipantNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutSeasonParticipantNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutSeasonParticipantNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutSeasonParticipantNestedInput
 }
 
 export type SeasonParticipantUncheckedUpdateWithoutUserInput = {
@@ -2313,6 +2503,7 @@ export type SeasonParticipantUncheckedUpdateWithoutUserInput = {
   orders?: Prisma.OrderUncheckedUpdateManyWithoutSeasonParticipantNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutSeasonParticipantNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutSeasonParticipantNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutSeasonParticipantNestedInput
 }
 
 export type SeasonParticipantUncheckedUpdateManyWithoutUserInput = {
@@ -2376,6 +2567,7 @@ export type SeasonParticipantUpdateWithoutSeasonInput = {
   orders?: Prisma.OrderUpdateManyWithoutSeasonParticipantNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutSeasonParticipantNestedInput
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutSeasonParticipantNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutSeasonParticipantNestedInput
 }
 
 export type SeasonParticipantUncheckedUpdateWithoutSeasonInput = {
@@ -2403,6 +2595,7 @@ export type SeasonParticipantUncheckedUpdateWithoutSeasonInput = {
   orders?: Prisma.OrderUncheckedUpdateManyWithoutSeasonParticipantNestedInput
   dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutSeasonParticipantNestedInput
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutSeasonParticipantNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutSeasonParticipantNestedInput
 }
 
 export type SeasonParticipantUncheckedUpdateManyWithoutSeasonInput = {
@@ -2438,6 +2631,7 @@ export type SeasonParticipantCountOutputType = {
   orders: number
   dailyPortfolioSnapshots: number
   seasonRankings: number
+  seasonRewards: number
 }
 
 export type SeasonParticipantCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2450,6 +2644,7 @@ export type SeasonParticipantCountOutputTypeSelect<ExtArgs extends runtime.Types
   orders?: boolean | SeasonParticipantCountOutputTypeCountOrdersArgs
   dailyPortfolioSnapshots?: boolean | SeasonParticipantCountOutputTypeCountDailyPortfolioSnapshotsArgs
   seasonRankings?: boolean | SeasonParticipantCountOutputTypeCountSeasonRankingsArgs
+  seasonRewards?: boolean | SeasonParticipantCountOutputTypeCountSeasonRewardsArgs
 }
 
 /**
@@ -2525,6 +2720,13 @@ export type SeasonParticipantCountOutputTypeCountSeasonRankingsArgs<ExtArgs exte
   where?: Prisma.SeasonRankingWhereInput
 }
 
+/**
+ * SeasonParticipantCountOutputType without action
+ */
+export type SeasonParticipantCountOutputTypeCountSeasonRewardsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.SeasonRewardWhereInput
+}
+
 
 export type SeasonParticipantSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -2554,6 +2756,7 @@ export type SeasonParticipantSelect<ExtArgs extends runtime.Types.Extensions.Int
   orders?: boolean | Prisma.SeasonParticipant$ordersArgs<ExtArgs>
   dailyPortfolioSnapshots?: boolean | Prisma.SeasonParticipant$dailyPortfolioSnapshotsArgs<ExtArgs>
   seasonRankings?: boolean | Prisma.SeasonParticipant$seasonRankingsArgs<ExtArgs>
+  seasonRewards?: boolean | Prisma.SeasonParticipant$seasonRewardsArgs<ExtArgs>
   _count?: boolean | Prisma.SeasonParticipantCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["seasonParticipant"]>
 
@@ -2631,6 +2834,7 @@ export type SeasonParticipantInclude<ExtArgs extends runtime.Types.Extensions.In
   orders?: boolean | Prisma.SeasonParticipant$ordersArgs<ExtArgs>
   dailyPortfolioSnapshots?: boolean | Prisma.SeasonParticipant$dailyPortfolioSnapshotsArgs<ExtArgs>
   seasonRankings?: boolean | Prisma.SeasonParticipant$seasonRankingsArgs<ExtArgs>
+  seasonRewards?: boolean | Prisma.SeasonParticipant$seasonRewardsArgs<ExtArgs>
   _count?: boolean | Prisma.SeasonParticipantCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type SeasonParticipantIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2656,6 +2860,7 @@ export type $SeasonParticipantPayload<ExtArgs extends runtime.Types.Extensions.I
     orders: Prisma.$OrderPayload<ExtArgs>[]
     dailyPortfolioSnapshots: Prisma.$DailyPortfolioSnapshotPayload<ExtArgs>[]
     seasonRankings: Prisma.$SeasonRankingPayload<ExtArgs>[]
+    seasonRewards: Prisma.$SeasonRewardPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -3079,6 +3284,7 @@ export interface Prisma__SeasonParticipantClient<T, Null = never, ExtArgs extend
   orders<T extends Prisma.SeasonParticipant$ordersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.SeasonParticipant$ordersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   dailyPortfolioSnapshots<T extends Prisma.SeasonParticipant$dailyPortfolioSnapshotsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.SeasonParticipant$dailyPortfolioSnapshotsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DailyPortfolioSnapshotPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   seasonRankings<T extends Prisma.SeasonParticipant$seasonRankingsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.SeasonParticipant$seasonRankingsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SeasonRankingPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  seasonRewards<T extends Prisma.SeasonParticipant$seasonRewardsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.SeasonParticipant$seasonRewardsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SeasonRewardPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -3738,6 +3944,30 @@ export type SeasonParticipant$seasonRankingsArgs<ExtArgs extends runtime.Types.E
   take?: number
   skip?: number
   distinct?: Prisma.SeasonRankingScalarFieldEnum | Prisma.SeasonRankingScalarFieldEnum[]
+}
+
+/**
+ * SeasonParticipant.seasonRewards
+ */
+export type SeasonParticipant$seasonRewardsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the SeasonReward
+   */
+  select?: Prisma.SeasonRewardSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the SeasonReward
+   */
+  omit?: Prisma.SeasonRewardOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.SeasonRewardInclude<ExtArgs> | null
+  where?: Prisma.SeasonRewardWhereInput
+  orderBy?: Prisma.SeasonRewardOrderByWithRelationInput | Prisma.SeasonRewardOrderByWithRelationInput[]
+  cursor?: Prisma.SeasonRewardWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.SeasonRewardScalarFieldEnum | Prisma.SeasonRewardScalarFieldEnum[]
 }
 
 /**
