@@ -40,6 +40,12 @@
     - KIS live smoke was not executed because required endpoint env is missing; approval_key, WebSocket connect, subscribe ack, domestic tick, US tick, and KIS provider_api insertion remain `BLOCKED`.
     - ExchangeRate-API and Binance public REST dry-run regressions succeeded.
     - `docs/provider-source-eligibility-pre-gate.md` was added as a policy draft for the next implementation gate. No source eligibility code was opened.
+  - KIS WebSocket Endpoint Env Completion Gate on 2026-05-30 KST:
+    - Required KIS endpoint env remains incomplete: `KIS_REST_BASE_URL` and `KIS_WS_BASE_URL` are missing in the loaded env.
+    - KIS dry-run/non-dry-run live smoke was not executed.
+    - DB mapping remains fixed and valid: domestic 15/15, US 25/25, KIS total 40/41, and separate Binance crypto 2/2.
+    - ExchangeRate-API and Binance public REST dry-run regressions succeeded.
+    - Provider API Source Eligibility Implementation Gate remains after KIS live evidence capture, not before it.
   - Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage; USDT depeg risk is not modeled.
   - Provider_api source eligibility for quote, execute, valuation, daily snapshot, ranking, and settlement remains a separate gate.
   - KIS supports WebSocket approval_key retrieval, domestic KRX real-time trade price `H0STCNT0`, and overseas/US delayed trade price `HDFSCNT0` ingestion foundation into `asset_price_snapshots` provider_api rows.
@@ -414,13 +420,13 @@ near-term ledger/FX foundation:
 - `admin_manual`은 bootstrap/fallback/manual correction 경로.
 - `/fx quote` smoke용 승인된 `admin_manual` snapshot 1건 입력 및 소비 검증 완료.
 - 입력한 manual snapshot은 smoke 당시 fresh였지만 60초 이후에는 정책상 stale이 되므로, 지속적인 quote 성공에는 별도 승인 snapshot 입력 또는 향후 ingestion 경로가 필요함.
-- provider_api/official_batch/scheduler 구현 없음.
+- provider_api source eligibility, official_batch ingestion, and scheduler implementation remain closed.
 - Gate B provider role은 `CONDITIONAL GO`로 정리됨.
-- OANDA는 conditional primary FX candidate, Twelve Data는 conditional secondary FX 및 US stock candidate.
+- Current MVP provider stack is ExchangeRate-API for FX, Binance public REST for crypto, and KIS WebSocket market data for domestic/US stocks. OANDA and Twelve Data are historical/fallback candidates only.
 - Crypto MVP provider는 Binance로 고정하며 USD-settled crypto로 처리한다.
 - Crypto 주문/정산은 미국주식과 동일하게 USD Wallet을 사용하고, KRW 평가는 USD crypto value를 USD/KRW로 환산한다.
 - KRX quote/execute provider는 real-time 공식 검증 부족으로 `BLOCKED`.
-- OANDA trial/API 계약 검증 전 provider implementation STOP.
+- Provider API Source Eligibility Implementation Gate remains after KIS live evidence capture and source policy acceptance.
 - 30초 polling은 후보이며 provider rate limit/terms 확인 후 확정.
 
 ### Asset/price input
@@ -887,9 +893,9 @@ near-term ledger/FX foundation:
   - 상세 결과: `docs/provider-final-selection-readiness-recheck.md`, `docs/asset-price-freshness-policy.md`.
   - Gate B 판단은 `CONDITIONAL GO`.
   - 이것은 evidence capture와 다음 구현 프롬프트를 열기 위한 조건부 판단이며, provider ingestion 구현 GO가 아님.
-- 다음 recommended gate: Provider API Source Eligibility Gate - Quote Valuation and Execute Allowlist.
-  - credential이 확보되면 별도 후속으로 Gate C OANDA/Twelve Data Live Fixture Completion을 진행.
-  - source eligibility 착수 전 provider timestamp/effectiveAt mapping, Binance price/effectiveAt mapping, symbol mapping, plan/terms, sourceType/sourceName 우선순위, polling/rate-limit 정책을 확인해야 함.
+- 다음 recommended gate: KIS WebSocket Endpoint Env Completion Gate.
+  - KIS approval/connect/ack/tick/DB insertion evidence 확보 이후 Provider API Source Eligibility Implementation Gate로 진행한다.
+  - source eligibility 착수 전 provider timestamp/effectiveAt mapping, KIS/Binance price/effectiveAt mapping, symbol mapping, plan/terms, sourceType/sourceName 우선순위, polling/rate-limit 정책을 확인해야 함.
 - Gate A Protected API HTTP e2e baseline은 완료 상태로 본다.
   - 완료 범위: public/optional/protected guard baseline, missing token/`x-user-id` 차단, valid-token read-only smoke, selected quote smoke.
   - 남은 gap: 모든 protected route별 invalid-token HTTP e2e exhaustive coverage와 valid-token full write-path HTTP e2e는 아직 없음.
@@ -906,7 +912,7 @@ near-term ledger/FX foundation:
   - Twelve Data는 US stock 후보이나 live fixture, symbol mapping, plan/terms 확인 전 `CONDITIONAL GO`.
   - Crypto는 Binance-based USD-settled crypto로 고정하며 Upbit/Bithumb은 MVP provider stack에서 제외.
   - `official_batch`는 reference/reconciliation/settlement 후보이며 real-time execute source가 아님.
-- OANDA trial/API 계약 검증 전 provider_api/official_batch/cron scheduler 구현 STOP 유지.
+- Provider API Source Eligibility Implementation Gate 전까지 provider_api/official_batch/cron scheduler 구현 STOP 유지.
 - `/fx execute` 남은 DB-level rollback/partial-write hardening 및 stale pending/unknown outcome recovery 설계.
 - `/orders/:orderId/execute` MVP 후속 gate:
   - exact execute response replay가 필요하면 schema/command table 별도 검토.
@@ -1034,7 +1040,7 @@ near-term ledger/FX foundation:
 
 ## 12. TODO
 
-- Gate C/D live provider fixture capture 및 OANDA/Twelve Data credential/account/terms 검증.
+- KIS WebSocket endpoint env completion and live evidence capture.
 - `/fx execute` 실제 DB transaction 내부 강제 실패 기반 rollback 검증 보강.
 - ledger insert/exchange row/finalization 실패 유도 integration hardening 검토.
 - 지속적인 `/fx quote` 성공을 위한 승인 snapshot 공급 운영 절차 또는 provider/batch ingestion 경로 검토.

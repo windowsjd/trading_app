@@ -2,11 +2,18 @@
 
 ## 1. Purpose
 
-This document records Gate C/D provider evidence capture and the boundary after provider ingestion foundation.
+This document records current MVP provider evidence capture and the boundary after provider ingestion foundation.
 
-The goal is to determine whether OANDA USD/KRW, Twelve Data USD/KRW/US stock, and Binance crypto responses can be mapped safely to the current internal FX and asset price snapshot models.
+Current MVP provider stack:
 
-Evidence capture result as of 2026-05-14: Binance public `BTCUSDT` ticker and orderbook fixtures were captured successfully without credentials. OANDA and Twelve Data live fixtures remain `BLOCKED` because credentials were unavailable in the local environment.
+- FX: ExchangeRate-API.
+- Crypto: Binance public REST.
+- Domestic stock: KIS WebSocket domestic KRX `H0STCNT0`.
+- US stock: KIS WebSocket overseas/US `HDFSCNT0`.
+
+OANDA and Twelve Data are historical/fallback research candidates only. They are not the current MVP core provider stack and are not blockers for the KIS endpoint env completion gate.
+
+Evidence capture result as of 2026-05-14: Binance public `BTCUSDT` ticker and orderbook fixtures were captured successfully without credentials. OANDA and Twelve Data evidence is retained as historical/fallback candidate context.
 
 Implementation readiness update on 2026-05-27: provider ingestion foundation is implemented for explicit operator-run ExchangeRate-API USD/KRW, Binance public REST crypto price snapshot insertion, and KIS WebSocket trade price snapshot insertion for domestic KRX `H0STCNT0` and US delayed/free `HDFSCNT0` feeds. This does not open provider_api source eligibility for quote, execute, valuation, daily snapshot, ranking, or settlement. Binance WebSocket, KIS REST current-price ingestion, KIS orderbook/hoga WebSocket ingestion, cron scheduling, and admin HTTP ingestion API remain unimplemented.
 
@@ -45,9 +52,24 @@ Fixed asset universe update on 2026-05-30 KST: the KIS stock watchlist universe 
 - `docs/provider-source-eligibility-pre-gate.md` now records the policy draft for a later implementation gate. No source eligibility code was opened.
 - No secret values, `.env.local` contents, `DATABASE_URL`, KIS credentials, approval keys, or full raw WebSocket frames were printed or documented.
 
-Remaining blockers: provider_api source eligibility implementation, KIS live smoke evidence with complete endpoint env, exact timestamp freshness measurement, provider outage policy, source priority, commercial/business terms approval, KIS REST quote endpoint mapping if ever needed, orderbook policy if ever needed, and settlement evidence policy.
+2026-05-30 KIS WebSocket endpoint env completion gate result:
 
-Required owner decisions: provider account/plan, commercial/external display terms, OANDA bid/ask/mid policy, Twelve Data endpoint choice for US stock, Binance USDT-to-USD-equivalent policy, KRX scope, and whether delayed data is acceptable anywhere in the product.
+- Security precheck remained clean: `.env.local` is ignored, `git ls-files --stage -- .env.local` returned no rows, and no `.env.local` content was printed.
+- Required KIS live smoke env remained incomplete: `KIS_REST_BASE_URL` and `KIS_WS_BASE_URL` were missing in the loaded env.
+- KIS policy env values were absent but code defaults remain explicit: `KIS_WS_CUSTTYPE=P`, `KIS_WS_DOMESTIC_TR_ID=H0STCNT0`, `KIS_WS_OVERSEAS_DELAYED_TR_ID=HDFSCNT0`, `KIS_WS_SNAPSHOT_THROTTLE_MS=5000`, `KIS_WS_MAX_RUNTIME_MS=30000`, and `KIS_WS_ALLOW_US_DELAYED=true`.
+- KIS fixed CLI watchlist remains domestic 15 plus US 25, total 40 within the max 41 limit.
+- DB mapping recheck passed: domestic fixed assets 15/15, US fixed assets 25/25 with NAS 20 and NYS 5, KIS stock watchlist 40/41, and separate Binance crypto assets 2/2.
+- ExchangeRate-API regression dry-run succeeded for USD/KRW with `success=true` and `wouldCreate=1`.
+- Binance public REST regression dry-run succeeded for `BTCUSDT` and `ETHUSDT` with `success=true`, `wouldCreate=2`, and `failed=0`.
+- KIS dry-run and non-dry-run live smoke were not executed because required endpoint env is missing.
+- KIS approval_key, WebSocket connect, subscribe ack, domestic `H0STCNT0` tick, US `HDFSCNT0` tick, and KIS provider_api DB insertion remain `BLOCKED` before request.
+- No secret values, `.env.local` contents, `DATABASE_URL`, KIS credentials, approval keys, or full raw WebSocket frames were printed or documented.
+
+Remaining blockers: KIS live smoke evidence with complete endpoint env, provider_api source eligibility implementation, exact timestamp freshness measurement, provider outage policy, source priority, commercial/business terms approval, KIS REST quote endpoint mapping if ever needed, orderbook policy if ever needed, and settlement evidence policy.
+
+Required owner decisions for current MVP provider gates: KIS endpoint env completion, KIS live evidence acceptance, ExchangeRate/Binance/KIS commercial or display terms, Binance USDT-to-USD-equivalent policy, KIS delayed/free data acceptance for US stocks, KRX scope, freshness thresholds, and source priority.
+
+Historical/future-review decisions: OANDA bid/ask/mid policy and Twelve Data endpoint choice can be revisited only if the MVP provider stack changes.
 
 Recommended next prompt title: `KIS WebSocket Endpoint Env Completion Gate`. After KIS approval/connect/tick evidence is captured, use `Provider API Source Eligibility Implementation Gate`.
 
@@ -713,19 +735,15 @@ Additional evidence tests before implementation GO:
 
 ## 20. Next Gate Recommendation
 
-Recommended next prompt title:
+Historical/future-review prompt title:
 
-- `Provider API Source Eligibility Gate - Quote Valuation and Execute Allowlist`
+- `OANDA/Twelve Data Fallback Provider Recheck`
 
 Recommended scope:
 
-- Docs/fixture-only.
-- Decide whether Binance `BTCUSDT` USDT quote can be treated as USD-equivalent internally, or require true Binance USD quote pair evidence.
-- Decide canonical crypto price evidence: ticker `lastPrice`, ticker bid/ask, orderbook best bid/ask, midpoint, or a paired source.
-- Decide whether ticker `closeTime` is acceptable as `effectiveAt`; if not, identify a timestamped Binance endpoint or pair orderbook data with accepted timestamp evidence.
-- Define sourceType/sourceName eligibility tests before any provider_api financial read/write use.
-- Keep OANDA/Twelve Data fixture completion blocked until credentials are available.
-- Do not implement provider clients, ingestion, scheduler, DB writes, schema changes, seed changes, package changes, source code, or tests.
+- Docs/fixture-only fallback-provider review if the MVP provider stack changes.
+- Keep OANDA/Twelve Data fixture completion out of the current KIS endpoint env completion path.
+- Do not implement provider clients, ingestion, scheduler, DB writes, schema changes, seed changes, package changes, source code, or tests from this historical/future-review context.
 
 Implementation gates remain closed until live fixtures and owner decisions are accepted.
 

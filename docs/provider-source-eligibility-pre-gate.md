@@ -144,3 +144,10 @@ Pre-gate policy draft is GO.
 Implementation remains STOP. `provider_api` source eligibility is still closed
 for quote, execute, valuation, daily snapshot, ranking, settlement, reward, and
 all existing financial read/write paths.
+
+Implementation sequencing:
+
+1. Complete KIS WebSocket Endpoint Env Completion Gate.
+2. Capture KIS approval/connect/ack/tick/DB insertion evidence, or record an
+   explicit owner decision to scope KIS live evidence separately.
+3. Start Provider API Source Eligibility Implementation Gate.

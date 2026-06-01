@@ -25,6 +25,14 @@ KIS env completion pre-gate update as of 2026-05-30 KST:
 - KIS approval_key, WebSocket connect, subscribe ack, domestic tick, US tick, and KIS DB insertion remain `BLOCKED` before request because the required endpoints are absent.
 - `docs/provider-source-eligibility-pre-gate.md` documents the next source eligibility policy draft. No read path has been changed.
 
+KIS endpoint env completion gate update as of 2026-05-30 KST:
+
+- Required endpoint env is still incomplete: `KIS_REST_BASE_URL` and `KIS_WS_BASE_URL` are missing in the loaded env.
+- KIS dry-run and non-dry-run live smoke were not executed.
+- DB mapping remains valid for domestic 15/15, US 25/25, KIS watchlist 40/41, and separate Binance crypto 2/2.
+- ExchangeRate-API and Binance public REST regression dry-runs succeeded.
+- Provider API Source Eligibility Implementation Gate remains after KIS live evidence capture.
+
 Live smoke evidence status as of 2026-05-28 KST:
 
 - ExchangeRate-API dry-run and non-dry-run live smoke succeeded and created one local `fx_rate_snapshots` row with `sourceType=provider_api`, `sourceName=exchange_rate_api`, `USD/KRW`, and positive decimal rate evidence.
@@ -172,6 +180,6 @@ All scripts are explicit operator commands. No cron scheduler or admin HTTP inge
 
 ## Next Gate
 
-Recommended next gate: KIS WebSocket endpoint env completion and evidence capture for approval_key, WebSocket connect, subscribe ack, domestic `H0STCNT0` tick, US `HDFSCNT0` tick, and DB insertion. After that, run the Provider API Source Eligibility Implementation Gate using `docs/provider-source-eligibility-pre-gate.md`.
+Recommended next gate: KIS WebSocket endpoint env completion and evidence capture for approval_key, WebSocket connect, subscribe ack, domestic `H0STCNT0` tick, US `HDFSCNT0` tick, and DB insertion. After KIS live evidence is captured or explicitly scoped by owner decision, run the Provider API Source Eligibility Implementation Gate using `docs/provider-source-eligibility-pre-gate.md`.
 
 That gate should decide which provider_api rows can power quote, execute, live valuation, daily snapshots, and final settlement. It should also define stale thresholds, source priority, provider outage behavior, live smoke evidence requirements, and whether delayed/free KIS rows are acceptable for any product workflow.

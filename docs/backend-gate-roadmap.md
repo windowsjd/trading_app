@@ -15,8 +15,9 @@
 - Asset Universe / KIS watchlist gate on 2026-05-30 KST is PARTIAL GO / KIS BLOCKED: the fixed 40-stock KIS watchlist is documented, all 40 stock assets were upserted after DB startup, DB mapping counts passed at domestic 15/15 and US 25/25, and ExchangeRate/Binance dry-run rechecks succeeded.
 - KIS env completion pre-gate on 2026-05-30 KST remains KIS BLOCKED because `KIS_REST_BASE_URL` and `KIS_WS_BASE_URL` are missing in the loaded env. KIS policy env values have explicit code defaults, but approval_key/connect/subscribe/tick/DB insertion were not attempted without required endpoints.
 - Provider API Source Eligibility Pre-Gate on 2026-05-30 KST is docs-only GO: `docs/provider-source-eligibility-pre-gate.md` records eligible source candidates, workflow policy, freshness drafts, source priority options, delayed/free data policy, and financial write-path safety rules. No source eligibility implementation was opened.
+- KIS WebSocket Endpoint Env Completion Gate on 2026-05-30 KST remains KIS BLOCKED because `KIS_REST_BASE_URL` and `KIS_WS_BASE_URL` are still missing in the loaded env. KIS dry-run/non-dry-run were not executed.
 - Next Provider Ingestion gate remains KIS endpoint env completion: provide KIS REST/WS endpoint env values, then run KIS WebSocket live smoke for approval_key, connect, subscribe ack, domestic `H0STCNT0`, US `HDFSCNT0`, and provider_api row insertion evidence.
-- Next implementation gate after KIS smoke is Provider API Source Eligibility Implementation Gate.
+- Provider API Source Eligibility Implementation Gate must not start until KIS live evidence is captured or explicitly accepted as out-of-scope by owner decision.
 - Home settled final-result read model is implemented from existing `rankType=final` `season_rankings`; final tier assignment and reward grant internal foundation now have operator-run MVP jobs. Actual payment/point/delivery/external fulfillment remains a separate gate.
 - `docs/current-status.md` remains the short status summary. This document is the detailed backend gate roadmap.
 
@@ -466,7 +467,7 @@ Still blocked:
 
 Recommended next Codex prompt title:
 
-- `KIS WebSocket Live Smoke Env Completion Gate`
+- `KIS WebSocket Endpoint Env Completion Gate`
 
 ## Provider Live Smoke Evidence Gate Result (2026-05-28 KST)
 
@@ -492,7 +493,7 @@ Decision:
 
 Next recommended Codex prompt title:
 
-- `KIS WebSocket Live Smoke Env Completion Gate`
+- `KIS WebSocket Endpoint Env Completion Gate`
 
 ## Gate C/D Live Fixture Capture Result (2026-05-13)
 
@@ -528,9 +529,9 @@ Gate transition effect:
 - Gate E batch foundation exists for operator-run jobs only; provider polling jobs and cron scheduler remain `STOP`.
 - Settlement extensions may proceed only as separate gated work; the current MVP stays existing-snapshot based.
 
-Next recommended Codex prompt title:
+Historical/future-review prompt title:
 
-- `Gate C Binance Crypto Fixture Capture + OANDA/Twelve Data Fixture Capture`
+- `OANDA/Twelve Data Fallback Provider Recheck`
 
 ## Gate C Provider Fixture Capture Prep Result (2026-05-14)
 
@@ -559,13 +560,13 @@ Blocked reasons:
 
 Next recommended Codex prompt title:
 
-- `Provider API Source Eligibility Gate - Quote Valuation and Execute Allowlist`
+- `KIS WebSocket Endpoint Env Completion Gate`
 
 ## Next 5 Implementation Candidate Priority
 
 | Candidate                                             | MVP impact | Financial stability impact | Implementation risk | External dependency | Test difficulty | Current prerequisites met?                               | Start now?                    | Recommendation       | Reason                                                                                                                                                                                                             | Required prior decisions                                                              | Suggested next prompt scope                                                                     |
 | ----------------------------------------------------- | ---------- | -------------------------- | ------------------- | ------------------- | --------------- | -------------------------------------------------------- | ----------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| 1. Provider ingestion foundation                      | HIGH       | HIGH                       | MEDIUM              | HIGH                | MEDIUM          | Enough for ExchangeRate/Binance/KIS WebSocket foundation | Completed for foundation      | DONE FOR FOUNDATION  | Provider rows can be inserted for ExchangeRate-API USD/KRW, Binance public crypto, and KIS WebSocket domestic/US stock trade prices without changing financial read/write eligibility.                             | source eligibility, cost/contract owner, polling/timestamp/freshness checklist        | Provider API Source Eligibility Gate                                                            |
+| 1. Provider ingestion foundation                      | HIGH       | HIGH                       | MEDIUM              | HIGH                | MEDIUM          | Enough for ExchangeRate/Binance/KIS WebSocket foundation | Completed for foundation      | DONE FOR FOUNDATION  | Provider rows can be inserted for ExchangeRate-API USD/KRW, Binance public crypto, and KIS WebSocket domestic/US stock trade prices without changing financial read/write eligibility.                             | KIS live evidence, source eligibility, cost/contract owner, polling/timestamp/freshness checklist | KIS WebSocket Endpoint Env Completion Gate, then Provider API Source Eligibility Implementation Gate |
 | 2. Asset price freshness policy finalization          | HIGH       | HIGH                       | MEDIUM              | MEDIUM              | MEDIUM          | Partially                                                | Completed as docs-only policy | DONE, CONDITIONAL GO | SourceType roles, timestamp semantics, market freshness, and stale behavior are now documented for future Gate D/F/H work.                                                                                         | supported asset universe, live fixtures, market-hours acceptance, settlement evidence | Use policy in provider evidence capture and later implementation gates                          |
 | 3. Season settlement MVP                              | HIGH       | VERY HIGH                  | MEDIUM              | LOW                 | MEDIUM          | Enough for existing snapshots                            | Completed for MVP             | DONE FOR MVP         | Operator-run settlement can now finalize from existing daily snapshots without provider keys or cron; final tier assignment and reward grant internal foundation MVP can consume final rankings/final assignments. | True tie rank, advanced tier policy, and actual reward fulfillment remain separate    | Keep settlement/final-tier/reward foundation bounded; open separate extension/fulfillment gates |
 | 4. Scheduler/batch foundation preimplementation audit | HIGH       | HIGH                       | MEDIUM              | MEDIUM              | HIGH            | Mostly for envelope                                      | Completed for envelope        | DONE FOR ENVELOPE    | BatchJobRun and BatchService now provide idempotent run recording; cron and business jobs still depend on provider/freshness and ops model.                                                                        | job-specific partial failure, provider outage, cron/deployment ownership              | Add concrete snapshot/ranking job only under its own gate                                       |
@@ -573,7 +574,8 @@ Next recommended Codex prompt title:
 
 Recommended next task:
 
-- Provider API Source Eligibility Gate - Quote Valuation and Execute Allowlist.
+- KIS WebSocket Endpoint Env Completion Gate.
+- After KIS approval/connect/ack/tick/DB insertion evidence is captured or explicitly scoped by owner decision, Provider API Source Eligibility Implementation Gate.
 
 ## STOP / GO Summary
 
