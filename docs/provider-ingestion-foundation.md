@@ -33,6 +33,20 @@ KIS endpoint env completion gate update as of 2026-05-30 KST:
 - ExchangeRate-API and Binance public REST regression dry-runs succeeded.
 - Provider API Source Eligibility Implementation Gate remains after KIS live evidence capture.
 
+KIS endpoint env completion retry as of 2026-06-01 KST:
+
+- `.env.local` was confirmed ignored/untracked before editing, then updated only with non-secret KIS endpoint/policy env keys. Secret values and `.env.local` contents were not printed or documented.
+- Expected endpoint env is present: `KIS_REST_BASE_URL=https://openapi.koreainvestment.com:9443` and `KIS_WS_BASE_URL=ws://ops.koreainvestment.com:21000`.
+- KIS policy env is present for custtype `P`, domestic TR `H0STCNT0`, overseas delayed TR `HDFSCNT0`, snapshot throttle `5000`, max runtime `30000`, and US delayed enabled `true`.
+- The fixed CLI watchlist remains domestic 15 plus US 25, total 40 within the max 41 limit.
+- DB mapping recheck passed for domestic 15/15, US 25/25 with NAS 20 and NYS 5, and separate Binance crypto 2/2.
+- KIS dry-run succeeded with 40 subscriptions sent, 40 subscribe acknowledgements, 47 received frames, domestic `H0STCNT0` tick evidence, 12 `wouldCreate`, and no DB writes.
+- KIS non-dry-run succeeded with 40 subscriptions sent, 40 subscribe acknowledgements, 62 received frames, 12 created domestic provider_api rows, 35 duplicate/throttle skips, and 0 failures.
+- DB evidence confirmed the 12 inserted KIS rows are `sourceType=provider_api`, `sourceName=kis_krx_realtime_trade`, `currencyCode=KRW`, mapped to active KRX domestic_stock assets.
+- US `HDFSCNT0` subscriptions were acknowledged, but no US tick or `kis_us_delayed_trade` DB row was observed in the 30-second smoke window. This remains an open evidence item.
+- ExchangeRate-API and Binance public REST regression dry-runs succeeded.
+- `provider_api` source eligibility remains closed.
+
 Live smoke evidence status as of 2026-05-28 KST:
 
 - ExchangeRate-API dry-run and non-dry-run live smoke succeeded and created one local `fx_rate_snapshots` row with `sourceType=provider_api`, `sourceName=exchange_rate_api`, `USD/KRW`, and positive decimal rate evidence.
@@ -180,6 +194,6 @@ All scripts are explicit operator commands. No cron scheduler or admin HTTP inge
 
 ## Next Gate
 
-Recommended next gate: KIS WebSocket endpoint env completion and evidence capture for approval_key, WebSocket connect, subscribe ack, domestic `H0STCNT0` tick, US `HDFSCNT0` tick, and DB insertion. After KIS live evidence is captured or explicitly scoped by owner decision, run the Provider API Source Eligibility Implementation Gate using `docs/provider-source-eligibility-pre-gate.md`.
+Recommended next gate: KIS US `HDFSCNT0` tick and DB insertion evidence retry during an appropriate US market-data window. After complete intended KIS live evidence is captured or explicitly scoped by owner decision, run the Provider API Source Eligibility Implementation Gate using `docs/provider-source-eligibility-pre-gate.md`.
 
 That gate should decide which provider_api rows can power quote, execute, live valuation, daily snapshots, and final settlement. It should also define stale thresholds, source priority, provider outage behavior, live smoke evidence requirements, and whether delayed/free KIS rows are acceptable for any product workflow.

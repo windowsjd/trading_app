@@ -16,8 +16,9 @@
 - KIS env completion pre-gate on 2026-05-30 KST remains KIS BLOCKED because `KIS_REST_BASE_URL` and `KIS_WS_BASE_URL` are missing in the loaded env. KIS policy env values have explicit code defaults, but approval_key/connect/subscribe/tick/DB insertion were not attempted without required endpoints.
 - Provider API Source Eligibility Pre-Gate on 2026-05-30 KST is docs-only GO: `docs/provider-source-eligibility-pre-gate.md` records eligible source candidates, workflow policy, freshness drafts, source priority options, delayed/free data policy, and financial write-path safety rules. No source eligibility implementation was opened.
 - KIS WebSocket Endpoint Env Completion Gate on 2026-05-30 KST remains KIS BLOCKED because `KIS_REST_BASE_URL` and `KIS_WS_BASE_URL` are still missing in the loaded env. KIS dry-run/non-dry-run were not executed.
-- Next Provider Ingestion gate remains KIS endpoint env completion: provide KIS REST/WS endpoint env values, then run KIS WebSocket live smoke for approval_key, connect, subscribe ack, domestic `H0STCNT0`, US `HDFSCNT0`, and provider_api row insertion evidence.
-- Provider API Source Eligibility Implementation Gate must not start until KIS live evidence is captured or explicitly accepted as out-of-scope by owner decision.
+- KIS WebSocket Endpoint Env Completion Gate retry on 2026-06-01 KST is PARTIAL GO: `.env.local` stayed ignored/untracked and was updated only with non-secret KIS endpoint/policy env keys, required KIS env became present, KIS dry-run and non-dry-run connected successfully, all 40 subscriptions were sent and acknowledged, domestic `H0STCNT0` ticks were parsed, and 12 domestic `kis_krx_realtime_trade` provider_api asset price rows were inserted. US `HDFSCNT0` subscriptions were acknowledged but no US tick or `kis_us_delayed_trade` DB row was observed in the 30-second smoke window.
+- Next Provider Ingestion gate is US `HDFSCNT0` tick and DB insertion evidence capture during an appropriate US market-data window, unless the owner explicitly accepts the missing US tick evidence as separately scoped.
+- Provider API Source Eligibility Implementation Gate must not start until KIS live evidence is complete for the intended workflows or explicitly accepted as scoped by owner decision.
 - Home settled final-result read model is implemented from existing `rankType=final` `season_rankings`; final tier assignment and reward grant internal foundation now have operator-run MVP jobs. Actual payment/point/delivery/external fulfillment remains a separate gate.
 - `docs/current-status.md` remains the short status summary. This document is the detailed backend gate roadmap.
 
@@ -467,7 +468,7 @@ Still blocked:
 
 Recommended next Codex prompt title:
 
-- `KIS WebSocket Endpoint Env Completion Gate`
+- `KIS US HDFSCNT0 Tick and DB Insertion Retry Gate`
 
 ## Provider Live Smoke Evidence Gate Result (2026-05-28 KST)
 
@@ -479,10 +480,10 @@ Provider live smoke evidence is documented in `docs/provider-evidence-capture.md
 | Smoke asset mappings | GO | Local DB has active mappings for `KRX:005930`, `NAS:AAPL`, `BINANCE:BTCUSDT`, and `BINANCE:ETHUSDT`; no seed/schema change | Final 41-asset app universe remains separate |
 | ExchangeRate-API live smoke | GO for row insertion; STOP for source eligibility | Dry-run/non-dry-run succeeded and inserted one local `provider_api` USD/KRW row | Source priority, freshness, outage policy, and contract/terms acceptance |
 | Binance public REST live smoke | GO for row insertion; STOP for source eligibility | Dry-run/non-dry-run succeeded for `BTCUSDT`/`ETHUSDT` and inserted two local `provider_api` USD crypto price rows | Source priority, freshness, USDT-as-USD risk decision, outage policy, and terms acceptance |
-| KIS approval_key | BLOCKED | Not requested because `KIS_REST_BASE_URL` was missing | Add required KIS REST base URL and rerun opt-in smoke |
-| KIS WebSocket connect | BLOCKED | Not attempted because `KIS_WS_BASE_URL` was missing | Add required KIS WS base URL and rerun opt-in smoke |
-| KIS domestic `H0STCNT0` tick | BLOCKED | No domestic frame evidence yet | Complete KIS env and capture approval/connect/ack/tick evidence |
-| KIS US `HDFSCNT0` tick | BLOCKED | No US frame evidence yet | Complete KIS env and capture approval/connect/ack/tick evidence; keep Hong Kong/Vietnam/China/Japan delayed markets skipped |
+| KIS approval_key | GO | Approval request success is evidenced by successful WebSocket connect and subscribe acknowledgements; value was not printed | Keep secret redaction and do not persist approval keys |
+| KIS WebSocket connect | GO | Dry-run and non-dry-run connected successfully | Add reconnect/outage policy only in a later gate |
+| KIS domestic `H0STCNT0` tick | GO | Domestic ticks parsed and 12 `kis_krx_realtime_trade` provider_api rows were inserted | Keep source eligibility closed until the implementation gate |
+| KIS US `HDFSCNT0` tick | PARTIAL / OPEN | Subscriptions were acknowledged, but no US tick or DB row was observed in the 30-second window | Retry during an appropriate US market-data window or explicitly scope US evidence separately |
 | Read path isolation | PASS | `/fx`, orders, portfolio, home, positions, and daily snapshot paths remain `admin_manual` only for price/FX evidence | Add source eligibility tests before any provider_api consumer change |
 
 Decision:
@@ -493,7 +494,7 @@ Decision:
 
 Next recommended Codex prompt title:
 
-- `KIS WebSocket Endpoint Env Completion Gate`
+- `KIS US HDFSCNT0 Tick and DB Insertion Retry Gate`
 
 ## Gate C/D Live Fixture Capture Result (2026-05-13)
 
@@ -519,7 +520,7 @@ Blocked reasons:
 - Twelve Data live timestamp freshness is unmeasured for USD/KRW and US stock.
 - Binance crypto timestamp freshness and USDT-to-USD-equivalent policy are unverified.
 - Production terms/account approval is still missing.
-- KRX provider_api quote/execute remains blocked due missing real-time evidence.
+- KRX provider_api quote/execute remains blocked until source eligibility, freshness, product, and terms decisions are accepted.
 
 Gate transition effect:
 
@@ -560,13 +561,13 @@ Blocked reasons:
 
 Next recommended Codex prompt title:
 
-- `KIS WebSocket Endpoint Env Completion Gate`
+- `KIS US HDFSCNT0 Tick and DB Insertion Retry Gate`
 
 ## Next 5 Implementation Candidate Priority
 
 | Candidate                                             | MVP impact | Financial stability impact | Implementation risk | External dependency | Test difficulty | Current prerequisites met?                               | Start now?                    | Recommendation       | Reason                                                                                                                                                                                                             | Required prior decisions                                                              | Suggested next prompt scope                                                                     |
 | ----------------------------------------------------- | ---------- | -------------------------- | ------------------- | ------------------- | --------------- | -------------------------------------------------------- | ----------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| 1. Provider ingestion foundation                      | HIGH       | HIGH                       | MEDIUM              | HIGH                | MEDIUM          | Enough for ExchangeRate/Binance/KIS WebSocket foundation | Completed for foundation      | DONE FOR FOUNDATION  | Provider rows can be inserted for ExchangeRate-API USD/KRW, Binance public crypto, and KIS WebSocket domestic/US stock trade prices without changing financial read/write eligibility.                             | KIS live evidence, source eligibility, cost/contract owner, polling/timestamp/freshness checklist | KIS WebSocket Endpoint Env Completion Gate, then Provider API Source Eligibility Implementation Gate |
+| 1. Provider ingestion foundation                      | HIGH       | HIGH                       | MEDIUM              | HIGH                | MEDIUM          | Enough for ExchangeRate/Binance/KIS WebSocket foundation | Completed for foundation      | DONE FOR FOUNDATION  | Provider rows can be inserted for ExchangeRate-API USD/KRW, Binance public crypto, and KIS WebSocket domestic/US stock trade prices without changing financial read/write eligibility.                             | KIS US live evidence or explicit scope acceptance, source eligibility, cost/contract owner, polling/timestamp/freshness checklist | KIS US HDFSCNT0 retry, then Provider API Source Eligibility Implementation Gate |
 | 2. Asset price freshness policy finalization          | HIGH       | HIGH                       | MEDIUM              | MEDIUM              | MEDIUM          | Partially                                                | Completed as docs-only policy | DONE, CONDITIONAL GO | SourceType roles, timestamp semantics, market freshness, and stale behavior are now documented for future Gate D/F/H work.                                                                                         | supported asset universe, live fixtures, market-hours acceptance, settlement evidence | Use policy in provider evidence capture and later implementation gates                          |
 | 3. Season settlement MVP                              | HIGH       | VERY HIGH                  | MEDIUM              | LOW                 | MEDIUM          | Enough for existing snapshots                            | Completed for MVP             | DONE FOR MVP         | Operator-run settlement can now finalize from existing daily snapshots without provider keys or cron; final tier assignment and reward grant internal foundation MVP can consume final rankings/final assignments. | True tie rank, advanced tier policy, and actual reward fulfillment remain separate    | Keep settlement/final-tier/reward foundation bounded; open separate extension/fulfillment gates |
 | 4. Scheduler/batch foundation preimplementation audit | HIGH       | HIGH                       | MEDIUM              | MEDIUM              | HIGH            | Mostly for envelope                                      | Completed for envelope        | DONE FOR ENVELOPE    | BatchJobRun and BatchService now provide idempotent run recording; cron and business jobs still depend on provider/freshness and ops model.                                                                        | job-specific partial failure, provider outage, cron/deployment ownership              | Add concrete snapshot/ranking job only under its own gate                                       |
@@ -574,8 +575,8 @@ Next recommended Codex prompt title:
 
 Recommended next task:
 
-- KIS WebSocket Endpoint Env Completion Gate.
-- After KIS approval/connect/ack/tick/DB insertion evidence is captured or explicitly scoped by owner decision, Provider API Source Eligibility Implementation Gate.
+- KIS US HDFSCNT0 Tick and DB Insertion Retry Gate.
+- After US tick/DB insertion evidence is captured or explicitly scoped by owner decision, Provider API Source Eligibility Implementation Gate.
 
 ## STOP / GO Summary
 

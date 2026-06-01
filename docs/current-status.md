@@ -46,6 +46,19 @@
     - DB mapping remains fixed and valid: domestic 15/15, US 25/25, KIS total 40/41, and separate Binance crypto 2/2.
     - ExchangeRate-API and Binance public REST dry-run regressions succeeded.
     - Provider API Source Eligibility Implementation Gate remains after KIS live evidence capture, not before it.
+  - KIS WebSocket Endpoint Env Completion Gate retry on 2026-06-01 KST:
+    - Security precheck passed before editing `.env.local`: `.env.local` is ignored and untracked, and `git ls-files --stage -- .env.local` returned no rows.
+    - `.env.local` was updated only with non-secret KIS endpoint/policy env keys. No KIS app key, app secret, approval key, access token, `DATABASE_URL`, or full `.env.local` content was printed or documented.
+    - Expected endpoint env is present: `KIS_REST_BASE_URL=https://openapi.koreainvestment.com:9443` and `KIS_WS_BASE_URL=ws://ops.koreainvestment.com:21000`.
+    - Required KIS live smoke env is present: `ENABLE_PROVIDER_LIVE_SMOKE`, `PROVIDER_INGESTION_ENABLED`, `KIS_MARKET_DATA_ENABLED`, `DATABASE_URL`, `KIS_APP_KEY`, `KIS_APP_SECRET`, `KIS_REST_BASE_URL`, and `KIS_WS_BASE_URL`.
+    - KIS policy env is present for custtype `P`, domestic TR `H0STCNT0`, overseas delayed TR `HDFSCNT0`, snapshot throttle `5000`, max runtime `30000`, and US delayed enabled `true`. Fixed CLI watchlist was used because `KIS_DOMESTIC_SYMBOLS` and `KIS_US_SYMBOLS` env values remain absent.
+    - DB mapping verification passed again: domestic 15/15, US 25/25 with NAS 20 and NYS 5, KIS watchlist total 40/41, and separate Binance crypto 2/2.
+    - KIS dry-run succeeded with approval_key request success inferred from WebSocket connection/subscription evidence, `subscriptions.sent=40`, `acknowledged=40`, `receivedFrames=47`, domestic `H0STCNT0` tick evidence, `wouldCreate=12`, and `failed=0`. Dry-run performed no DB writes.
+    - KIS non-dry-run succeeded with `subscriptions.sent=40`, `acknowledged=40`, `receivedFrames=62`, `created=12`, `skipped=35`, and `failed=0`. The created DB rows are `sourceType=provider_api`, `sourceName=kis_krx_realtime_trade`, `currencyCode=KRW`, mapped to active KRX domestic_stock assets.
+    - US `HDFSCNT0` subscription ack succeeded as part of the 40 acks, but no US trade tick or `kis_us_delayed_trade` DB row was observed in the 30-second smoke window. This is recorded as `MARKET_CLOSED_OR_NO_TICK` without guessing a deeper cause.
+    - ExchangeRate-API and Binance public REST dry-run regressions succeeded.
+    - `provider_api` source eligibility remains STOP/closed for all quote, execute, valuation, assets, positions, home, daily snapshot, ranking, settlement, and reward paths.
+    - Next evidence gate should capture US `HDFSCNT0` tick and DB insertion during an appropriate US market-data window, unless the owner explicitly scopes US live evidence separately.
   - Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage; USDT depeg risk is not modeled.
   - Provider_api source eligibility for quote, execute, valuation, daily snapshot, ranking, and settlement remains a separate gate.
   - KIS supports WebSocket approval_key retrieval, domestic KRX real-time trade price `H0STCNT0`, and overseas/US delayed trade price `HDFSCNT0` ingestion foundation into `asset_price_snapshots` provider_api rows.
@@ -893,8 +906,8 @@ near-term ledger/FX foundation:
   - 상세 결과: `docs/provider-final-selection-readiness-recheck.md`, `docs/asset-price-freshness-policy.md`.
   - Gate B 판단은 `CONDITIONAL GO`.
   - 이것은 evidence capture와 다음 구현 프롬프트를 열기 위한 조건부 판단이며, provider ingestion 구현 GO가 아님.
-- 다음 recommended gate: KIS WebSocket Endpoint Env Completion Gate.
-  - KIS approval/connect/ack/tick/DB insertion evidence 확보 이후 Provider API Source Eligibility Implementation Gate로 진행한다.
+- 다음 recommended gate: KIS US HDFSCNT0 Tick and DB Insertion Retry Gate.
+  - US tick/DB insertion evidence 확보 또는 owner의 명시적 scope acceptance 이후 Provider API Source Eligibility Implementation Gate로 진행한다.
   - source eligibility 착수 전 provider timestamp/effectiveAt mapping, KIS/Binance price/effectiveAt mapping, symbol mapping, plan/terms, sourceType/sourceName 우선순위, polling/rate-limit 정책을 확인해야 함.
 - Gate A Protected API HTTP e2e baseline은 완료 상태로 본다.
   - 완료 범위: public/optional/protected guard baseline, missing token/`x-user-id` 차단, valid-token read-only smoke, selected quote smoke.
@@ -1040,7 +1053,7 @@ near-term ledger/FX foundation:
 
 ## 12. TODO
 
-- KIS WebSocket endpoint env completion and live evidence capture.
+- KIS US HDFSCNT0 tick and DB insertion retry, or explicit owner scope acceptance for the missing US live evidence.
 - `/fx execute` 실제 DB transaction 내부 강제 실패 기반 rollback 검증 보강.
 - ledger insert/exchange row/finalization 실패 유도 integration hardening 검토.
 - 지속적인 `/fx quote` 성공을 위한 승인 snapshot 공급 운영 절차 또는 provider/batch ingestion 경로 검토.
