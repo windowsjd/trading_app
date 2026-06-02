@@ -9,6 +9,13 @@
 - No provider ingestion trigger, batch run trigger, scheduler/cron, reward fulfillment trigger, real trading/account/balance, deposit/withdrawal, or external order API exists.
 - `provider_api` source eligibility remains closed.
 
+## Migration / Runtime Requirement
+
+- Admin/operator authorization MVP requires schema migration `20260601090000_add_user_role_operator_audit_logs`.
+- Runtime DBs must have the `UserRole` enum, `users.role` column, `OperatorAuditResult` enum, and `operator_audit_logs` table applied before protected APIs are expected to run normally.
+- The access-token guard reads current DB `User.status` and `User.role` on every protected request. Role authorization does not trust a JWT role claim.
+- Existing protected APIs continue to depend on `request.user.userId`; `request.user.role` is additional authorization context and must not replace user identity.
+
 ## Role Model
 
 `UserRole` is an authorization role:

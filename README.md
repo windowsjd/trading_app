@@ -8,6 +8,7 @@ This service owns backend APIs, database access, financial calculations, and ser
 
 - Access token + refresh token auth: signup, login, refresh, logout, logout-all, and `GET /api/v1/me`.
 - Admin/operator authorization foundation: `UserRole`, DB-current-role access context, `GET /api/v1/operator/me`, and internal operator audit log service/model.
+- Admin/operator runtime DBs must have migration `20260601090000_add_user_role_operator_audit_logs` applied so `users.role` and `operator_audit_logs` exist.
 - Current season lookup and season join.
 - Home as one aggregate API.
 - Home settled final-result read model from existing `rankType=final` `season_rankings`.

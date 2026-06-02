@@ -60,6 +60,29 @@ KIS US `HDFSCNT0` retry as of 2026-06-01 KST:
 - ExchangeRate-API and Binance public REST regression dry-runs succeeded.
 - `provider_api` source eligibility remains closed.
 
+KIS US `HDFSCNT0` market-data window validation as of 2026-06-03 KST:
+
+- Retry ran around 2026-06-03 00:23 KST, which is 2026-06-02 11:23 EDT and within the US regular market window.
+- `.env.local` stayed ignored/untracked and was not modified. No secret values or `.env.local` contents were printed or documented.
+- Required KIS env and WebSocket policy env were present by presence-only check.
+- Local PostgreSQL was unreachable at `127.0.0.1:5432`; `pnpm exec prisma migrate dev`, `pnpm exec prisma migrate status`, and provider dry-runs could not complete DB-backed checks.
+- US-only KIS dry-run reached the US tick parsing/asset mapping path, then failed on DB mapping lookup with Prisma `P1001`. This gives partial US tick-path evidence but not clean dry-run counts or DB insertion evidence.
+- Non-dry-run was skipped because local DB insertion was unavailable.
+- ExchangeRate-API and Binance public REST regression dry-runs were also blocked by the same local DB unreachable condition.
+- `provider_api` source eligibility remains closed.
+
+KIS US `HDFSCNT0` DB-started rerun as of 2026-06-03 KST:
+
+- Docker Compose Postgres/Redis were healthy and pending existing migrations were applied without DB reset, seed, schema edit, or new migration creation.
+- Migration status reported DB schema up to date. Runtime schema checks passed for `UserRole`, `OperatorAuditResult`, `users.role`, and `operator_audit_logs`.
+- DB mapping passed for active US 25/25 with NAS 20 and NYS 5, domestic KRX 15/15, and separate BINANCE crypto 2/2.
+- US-only dry-run completed with 25 subscriptions sent, 25 acknowledgements, 50 received frames, 35 `wouldCreate`, and 0 failures.
+- US-only non-dry-run completed with 25 subscriptions sent, 25 acknowledgements, 86 received frames, 25 created, 53 skipped, and 0 failures.
+- DB evidence confirmed 25 inserted `kis_us_delayed_trade` rows are `sourceType=provider_api`, `currencyCode=USD`, mapped to active `us_stock` USD assets with NAS 20 / NYS 5 market distribution.
+- Existing domestic `kis_krx_realtime_trade` provider_api row count remained 12. This US-only rerun created no domestic side effect.
+- ExchangeRate-API and Binance public REST regression dry-runs succeeded.
+- `provider_api` source eligibility remains closed.
+
 Live smoke evidence status as of 2026-05-28 KST:
 
 - ExchangeRate-API dry-run and non-dry-run live smoke succeeded and created one local `fx_rate_snapshots` row with `sourceType=provider_api`, `sourceName=exchange_rate_api`, `USD/KRW`, and positive decimal rate evidence.
@@ -207,6 +230,6 @@ All scripts are explicit operator commands. No cron scheduler or admin HTTP inge
 
 ## Next Gate
 
-Recommended next gate: KIS US `HDFSCNT0` tick and DB insertion evidence retry during an appropriate US market-data window, or an explicit owner scope acceptance decision for the missing US live tick/DB evidence. After complete intended KIS live evidence is captured or explicitly scoped by owner decision, run the Provider API Source Eligibility Implementation Gate using `docs/provider-source-eligibility-pre-gate.md`.
+Recommended next gate: Provider API Source Eligibility Implementation Gate using `docs/provider-source-eligibility-pre-gate.md`.
 
 That gate should decide which provider_api rows can power quote, execute, live valuation, daily snapshots, and final settlement. It should also define stale thresholds, source priority, provider outage behavior, live smoke evidence requirements, and whether delayed/free KIS rows are acceptable for any product workflow.

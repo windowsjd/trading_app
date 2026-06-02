@@ -19,7 +19,9 @@
 - KIS WebSocket Endpoint Env Completion Gate on 2026-05-30 KST remains KIS BLOCKED because `KIS_REST_BASE_URL` and `KIS_WS_BASE_URL` are still missing in the loaded env. KIS dry-run/non-dry-run were not executed.
 - KIS WebSocket Endpoint Env Completion Gate retry on 2026-06-01 KST is PARTIAL GO: `.env.local` stayed ignored/untracked and was updated only with non-secret KIS endpoint/policy env keys, required KIS env became present, KIS dry-run and non-dry-run connected successfully, all 40 subscriptions were sent and acknowledged, domestic `H0STCNT0` ticks were parsed, and 12 domestic `kis_krx_realtime_trade` provider_api asset price rows were inserted. US `HDFSCNT0` subscriptions were acknowledged but no US tick or `kis_us_delayed_trade` DB row was observed in the 30-second smoke window.
 - KIS US `HDFSCNT0` Tick and DB Insertion Retry Gate on 2026-06-01 KST is PARTIAL: the retry ran around 2026-06-01 11:14-11:21 KST / 2026-05-31 22:14-22:21 EDT, outside the US regular market window. Required KIS env and DB mapping stayed valid, US-only dry-run sent 25 US subscriptions and received aggregate acknowledgement count 30, but no US tick or `kis_us_delayed_trade` DB row was observed. Non-dry-run was skipped because dry-run produced no US tick evidence.
-- Next Provider Ingestion gate is US `HDFSCNT0` tick and DB insertion evidence capture during an appropriate US market-data window, or explicit owner scope acceptance for the missing US live tick/DB evidence.
+- KIS US `HDFSCNT0` Market-Data Window Validation on 2026-06-03 KST / 2026-06-02 EDT is PARTIAL / DB BLOCKED: required KIS env was present and the US-only dry-run reached the US tick parsing/asset mapping path during the US regular market window, but local PostgreSQL was unreachable at `127.0.0.1:5432`. No dry-run summary JSON, DB mapping counts, or `kis_us_delayed_trade` DB insertion evidence could be completed. Non-dry-run was skipped because DB insertion would fail while local DB is unavailable.
+- KIS US `HDFSCNT0` DB-started rerun on 2026-06-03 KST / 2026-06-02 EDT is GO for row insertion evidence: DB migrations were applied, schema/mapping checks passed, US-only dry-run sent 25 subscriptions with 25 acknowledgements and `wouldCreate=35`, and non-dry-run created 25 `kis_us_delayed_trade` provider_api USD rows for active US stock assets with NAS 20 / NYS 5 mapping. ExchangeRate-API and Binance regression dry-runs also succeeded.
+- Next Provider Ingestion gate is Provider API Source Eligibility Implementation Gate, using `docs/provider-source-eligibility-pre-gate.md`; provider_api source eligibility remains closed until that gate is explicitly implemented and tested.
 - Provider API Source Eligibility Implementation Gate must not start until KIS live evidence is complete for the intended workflows or explicitly accepted as scoped by owner decision.
 - Home settled final-result read model is implemented from existing `rankType=final` `season_rankings`; final tier assignment and reward grant internal foundation now have operator-run MVP jobs. Actual payment/point/delivery/external fulfillment remains a separate gate.
 - `docs/current-status.md` remains the short status summary. This document is the detailed backend gate roadmap.
@@ -484,23 +486,23 @@ Still blocked:
 
 Recommended next Codex prompt title:
 
-- `KIS US HDFSCNT0 Market-Data Window Retry Gate` or `US Evidence Scope Acceptance Decision`
+- `Provider API Source Eligibility Implementation Gate`
 
 ## Provider Live Smoke Evidence Gate Result (2026-05-28 KST)
 
 Provider live smoke evidence is documented in `docs/provider-evidence-capture.md`.
 
-| Area                           | Decision                                          | Roadmap effect                                                                                                                                                                              | Required before source eligibility                                                           |
-| ------------------------------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `.env.local` security precheck | PASS                                              | `.env.local` is ignored/untracked; secret values were not printed or documented                                                                                                             | Continue to keep env files out of git                                                        |
-| Smoke asset mappings           | GO                                                | Local DB has active mappings for `KRX:005930`, `NAS:AAPL`, `BINANCE:BTCUSDT`, and `BINANCE:ETHUSDT`; no seed/schema change                                                                  | Final 41-asset app universe remains separate                                                 |
-| ExchangeRate-API live smoke    | GO for row insertion; STOP for source eligibility | Dry-run/non-dry-run succeeded and inserted one local `provider_api` USD/KRW row                                                                                                             | Source priority, freshness, outage policy, and contract/terms acceptance                     |
-| Binance public REST live smoke | GO for row insertion; STOP for source eligibility | Dry-run/non-dry-run succeeded for `BTCUSDT`/`ETHUSDT` and inserted two local `provider_api` USD crypto price rows                                                                           | Source priority, freshness, USDT-as-USD risk decision, outage policy, and terms acceptance   |
-| KIS approval_key               | GO                                                | Approval request success is evidenced by successful WebSocket connect and subscribe acknowledgements; value was not printed                                                                 | Keep secret redaction and do not persist approval keys                                       |
-| KIS WebSocket connect          | GO                                                | Dry-run and non-dry-run connected successfully                                                                                                                                              | Add reconnect/outage policy only in a later gate                                             |
-| KIS domestic `H0STCNT0` tick   | GO                                                | Domestic ticks parsed and 12 `kis_krx_realtime_trade` provider_api rows were inserted                                                                                                       | Keep source eligibility closed until the implementation gate                                 |
-| KIS US `HDFSCNT0` tick         | PARTIAL / OPEN                                    | Subscriptions were acknowledged in both the 40-symbol smoke and a later US-only 60-second retry, but no US tick or DB row was observed. The retry was outside the US regular market window. | Retry during an appropriate US market-data window or explicitly scope US evidence separately |
-| Read path isolation            | PASS                                              | `/fx`, orders, portfolio, home, positions, and daily snapshot paths remain `admin_manual` only for price/FX evidence                                                                        | Add source eligibility tests before any provider_api consumer change                         |
+| Area                           | Decision                                          | Roadmap effect                                                                                                                                                            | Required before source eligibility                                                         |
+| ------------------------------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `.env.local` security precheck | PASS                                              | `.env.local` is ignored/untracked; secret values were not printed or documented                                                                                           | Continue to keep env files out of git                                                      |
+| Smoke asset mappings           | GO                                                | Local DB has active mappings for `KRX:005930`, `NAS:AAPL`, `BINANCE:BTCUSDT`, and `BINANCE:ETHUSDT`; no seed/schema change                                                | Final 41-asset app universe remains separate                                               |
+| ExchangeRate-API live smoke    | GO for row insertion; STOP for source eligibility | Dry-run/non-dry-run succeeded and inserted one local `provider_api` USD/KRW row                                                                                           | Source priority, freshness, outage policy, and contract/terms acceptance                   |
+| Binance public REST live smoke | GO for row insertion; STOP for source eligibility | Dry-run/non-dry-run succeeded for `BTCUSDT`/`ETHUSDT` and inserted two local `provider_api` USD crypto price rows                                                         | Source priority, freshness, USDT-as-USD risk decision, outage policy, and terms acceptance |
+| KIS approval_key               | GO                                                | Approval request success is evidenced by successful WebSocket connect and subscribe acknowledgements; value was not printed                                               | Keep secret redaction and do not persist approval keys                                     |
+| KIS WebSocket connect          | GO                                                | Dry-run and non-dry-run connected successfully                                                                                                                            | Add reconnect/outage policy only in a later gate                                           |
+| KIS domestic `H0STCNT0` tick   | GO                                                | Domestic ticks parsed and 12 `kis_krx_realtime_trade` provider_api rows were inserted                                                                                     | Keep source eligibility closed until the implementation gate                               |
+| KIS US `HDFSCNT0` tick         | GO for row insertion evidence                     | DB-started market-window rerun sent 25 US subscriptions, acknowledged 25, produced dry-run `wouldCreate=35`, and created 25 `kis_us_delayed_trade` provider_api USD rows. | Keep source eligibility closed until the implementation gate                               |
+| Read path isolation            | PASS                                              | `/fx`, orders, portfolio, home, positions, and daily snapshot paths remain `admin_manual` only for price/FX evidence                                                      | Add source eligibility tests before any provider_api consumer change                       |
 
 Decision:
 
@@ -510,7 +512,7 @@ Decision:
 
 Next recommended Codex prompt title:
 
-- `KIS US HDFSCNT0 Market-Data Window Retry Gate` or `US Evidence Scope Acceptance Decision`
+- `Provider API Source Eligibility Implementation Gate`
 
 ## Gate C/D Live Fixture Capture Result (2026-05-13)
 
@@ -536,7 +538,7 @@ Blocked reasons:
 - Twelve Data live timestamp freshness is unmeasured for USD/KRW and US stock.
 - Binance crypto timestamp freshness and USDT-to-USD-equivalent policy are unverified.
 - Production terms/account approval is still missing.
-- KRX provider_api quote/execute remains blocked until source eligibility, freshness, product, and terms decisions are accepted.
+- Domestic KRX provider_api row insertion evidence exists, but KRX provider_api quote/execute remains blocked until source eligibility, freshness, source priority, workflow scope, and implementation tests are accepted.
 
 Gate transition effect:
 
@@ -573,11 +575,11 @@ Blocked reasons:
 - Binance orderbook provides bid/ask levels but no source timestamp.
 - OANDA/Twelve Data credentials are not present, so credentialed fixtures remain blocked.
 - Production terms/account/raw-payload storage approval is still missing.
-- KRX provider_api quote/execute remains blocked due missing real-time evidence.
+- Domestic KRX provider_api row insertion evidence exists, but KRX provider_api quote/execute remains blocked until source eligibility, freshness, source priority, workflow scope, and implementation tests are accepted.
 
 Next recommended Codex prompt title:
 
-- `KIS US HDFSCNT0 Market-Data Window Retry Gate` or `US Evidence Scope Acceptance Decision`
+- `Provider API Source Eligibility Implementation Gate`
 
 ## Next 5 Implementation Candidate Priority
 
@@ -591,8 +593,7 @@ Next recommended Codex prompt title:
 
 Recommended next task:
 
-- KIS US HDFSCNT0 Market-Data Window Retry Gate or US Evidence Scope Acceptance Decision.
-- After US tick/DB insertion evidence is captured or explicitly scoped by owner decision, Provider API Source Eligibility Implementation Gate.
+- Provider API Source Eligibility Implementation Gate.
 
 ## STOP / GO Summary
 
@@ -605,7 +606,7 @@ GO or completed:
 STOP:
 
 - Provider_api source eligibility until live evidence, freshness, source priority, and implementation scope are accepted.
-- KRX provider_api quote/execute until real-time KRX source evidence exists.
+- Domestic KRX provider_api row insertion evidence exists, but KRX provider_api quote/execute remains blocked until source eligibility, freshness, source priority, workflow scope, and implementation tests are accepted.
 - Cron scheduler implementation until Gate E.
 - Settlement extensions until Gate H then Gate I.
 - Actual reward/payment/badge/trophy fulfillment until Gate J after reward policy/schema approval.

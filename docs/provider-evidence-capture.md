@@ -123,13 +123,53 @@ Fixed asset universe update on 2026-05-30 KST: the KIS stock watchlist universe 
 - No secret values, `.env.local` contents, `DATABASE_URL`, KIS credentials, approval keys, access tokens, or full raw WebSocket frames were printed or documented.
 - Provider_api source eligibility remains closed.
 
-Remaining blockers: US `HDFSCNT0` tick and DB insertion evidence or explicit owner scope acceptance, provider_api source eligibility implementation, exact timestamp freshness measurement, provider outage policy, source priority, commercial/business terms approval, KIS REST quote endpoint mapping if ever needed, orderbook policy if ever needed, and settlement evidence policy.
+2026-06-03 KIS US `HDFSCNT0` market-data window validation result:
 
-Required owner decisions for current MVP provider gates: US market-data-window retry or explicit scope acceptance for missing `HDFSCNT0` tick/DB insertion evidence, ExchangeRate/Binance/KIS commercial or display terms, Binance USDT-to-USD-equivalent policy, KIS delayed/free data acceptance for US stocks, KRX scope, freshness thresholds, and source priority.
+- Execution window: approximately 2026-06-03 00:23 KST, corresponding to 2026-06-02 11:23 EDT. This is within the NYSE regular trading hours window and June 2, 2026 is not listed as a 2026 NYSE holiday.
+- Security precheck stayed clean: `.env.local` is ignored by `.gitignore`, `git ls-files --stage -- .env.local` returned no rows, and `.env.local` appeared only as ignored in `git status --short --ignored`.
+- `.env.local` was not modified. No `.env.local` content was printed.
+- Required KIS env was present by presence-only check: `ENABLE_PROVIDER_LIVE_SMOKE`, `PROVIDER_INGESTION_ENABLED`, `KIS_MARKET_DATA_ENABLED`, `DATABASE_URL`, `KIS_APP_KEY`, `KIS_APP_SECRET`, `KIS_REST_BASE_URL`, and `KIS_WS_BASE_URL`.
+- KIS WebSocket policy env was present by presence-only check: `KIS_WS_CUSTTYPE`, `KIS_WS_DOMESTIC_TR_ID`, `KIS_WS_OVERSEAS_DELAYED_TR_ID`, `KIS_WS_SNAPSHOT_THROTTLE_MS`, `KIS_WS_MAX_RUNTIME_MS`, and `KIS_WS_ALLOW_US_DELAYED`.
+- Local DB availability was blocked: `pnpm exec prisma migrate dev`, `pnpm exec prisma migrate status`, and provider dry-runs could not reach PostgreSQL at `127.0.0.1:5432`. Docker Desktop WSL integration was unavailable in this shell, so the local DB could not be started here.
+- US-only KIS dry-run was attempted with the fixed 25-symbol US watchlist and empty domestic symbols. The process reached the US tick parsing/asset mapping path for `kis_us_delayed_trade`, then failed on the DB mapping lookup with Prisma `P1001` because local PostgreSQL was unreachable.
+- Because the KIS process terminated before returning its summary JSON, subscription sent/ack counts, `receivedFrames`, `wouldCreate`, `created`, `skipped`, and `failed` counts are not available for this run.
+- KIS approval_key request and WebSocket connection are inferred as successful from the fact that the run reached WebSocket message handling and US trade mapping. The approval key value was not printed or documented.
+- KIS non-dry-run was not executed because dry-run did not complete DB mapping and local DB insertion was unavailable.
+- US `HDFSCNT0` tick evidence is PARTIAL by code path inference, but `kis_us_delayed_trade` provider_api DB row insertion evidence remains BLOCKED by local DB unavailability.
+- Failure classification: `DB_INSERTION_FAILED` / `ASSET_MAPPING_FAILED` due local DB unreachable. This run is not classified as `SUBSCRIBE_ACK_BUT_NO_US_TICK`.
+- ExchangeRate-API and Binance public REST regression dry-runs were attempted and both failed before completion on the same local DB unreachable condition.
+- Read path isolation remained clean by code review: `/fx quote`, `/fx execute`, orders quote/create/execute, assets withPrice, portfolio/home/positions valuation, and daily snapshot valuation still use `admin_manual` price/FX eligibility only.
+- No secret values, `.env.local` contents, `DATABASE_URL`, KIS credentials, approval keys, access tokens, or full raw WebSocket frames were printed or documented.
+- Provider_api source eligibility remains closed.
+
+2026-06-03 KIS US `HDFSCNT0` DB-started rerun result:
+
+- DB startup was confirmed with Docker Compose healthy Postgres/Redis. `pnpm exec prisma migrate dev` applied pending existing migrations `20260523090000_add_reward_badge_trophy_foundation` and `20260601090000_add_user_role_operator_audit_logs`; no DB reset, seed, schema edit, or new migration creation occurred.
+- Migration status then reported the database schema is up to date.
+- Runtime schema checks passed for `UserRole`, `OperatorAuditResult`, `users.role`, and `operator_audit_logs`.
+- DB mapping verification passed:
+  - active `us_stock` / USD / markets `NAS,NYS` / fixed symbols: 25/25, with NAS 20 and NYS 5.
+  - active `domestic_stock` / KRW / market `KRX` / fixed symbols: 15/15.
+  - active `BINANCE` USD crypto mappings for `BTCUSDT` and `ETHUSDT`: 2/2, separate from the KIS stock watchlist.
+- Execution window: approximately 2026-06-03 01:37-01:39 KST, corresponding to 2026-06-02 12:37-12:39 EDT, within the US regular market window.
+- US-only dry-run used the fixed 25-symbol US watchlist and empty domestic symbols. It completed with `success=true`, `subscriptions.sent=25`, `acknowledged=25`, `receivedFrames=50`, `wouldCreate=35`, `created=0`, `skipped=0`, and `failed=0`.
+- US-only non-dry-run completed with `success=true`, `subscriptions.sent=25`, `acknowledged=25`, `receivedFrames=86`, `created=25`, `skipped=53`, `wouldCreate=0`, and `failed=0`.
+- DB evidence confirmed 25 rows with `sourceType=provider_api`, `sourceName=kis_us_delayed_trade`, `currencyCode=USD`, mapped to active `us_stock` USD assets with market distribution NAS 20 / NYS 5.
+- Existing domestic `kis_krx_realtime_trade` provider_api row count remained 12; this US-only rerun created no domestic side effect.
+- Skip reasons in the non-dry-run were explicit duplicate/throttle reasons: `THROTTLED_PROVIDER_SNAPSHOT` and `DUPLICATE_PROVIDER_SNAPSHOT`.
+- Raw payload known-secret scan over KIS provider rows reported `rawPayloadContainsKnownSecret=false`.
+- ExchangeRate-API regression dry-run succeeded for USD/KRW with `success=true` and `wouldCreate=1`.
+- Binance public REST regression dry-run succeeded for `BTCUSDT` and `ETHUSDT` with `success=true`, `wouldCreate=2`, and `failed=0`.
+- No secret values, `.env.local` contents, `DATABASE_URL`, KIS credentials, approval keys, access tokens, or full raw WebSocket frames were printed or documented.
+- Provider_api source eligibility remains closed.
+
+Remaining blockers: provider_api source eligibility implementation, exact timestamp freshness measurement, provider outage policy, source priority, commercial/business terms approval, KIS REST quote endpoint mapping if ever needed, orderbook policy if ever needed, and settlement evidence policy.
+
+Required owner decisions for current MVP provider gates: ExchangeRate/Binance/KIS commercial or display terms, Binance USDT-to-USD-equivalent policy, KIS delayed/free data acceptance for US stocks, KRX scope, freshness thresholds, source priority, and workflow-specific provider_api source eligibility.
 
 Historical/future-review decisions: OANDA bid/ask/mid policy and Twelve Data endpoint choice can be revisited only if the MVP provider stack changes.
 
-Recommended next prompt title: `KIS US HDFSCNT0 Market-Data Window Retry Gate` or `US Evidence Scope Acceptance Decision`. After complete intended KIS live evidence is captured or explicitly scoped, use `Provider API Source Eligibility Implementation Gate`.
+Recommended next prompt title: `Provider API Source Eligibility Implementation Gate`.
 
 Crypto policy update on 2026-05-14: MVP crypto provider is Binance, crypto is USD-settled, crypto uses the USD Wallet, Upbit/Bithumb are excluded from MVP, and `CurrencyCode.USDT` must not be added.
 
@@ -196,12 +236,12 @@ Security precheck:
 
 Required env status:
 
-| Area | Env result | Live smoke decision |
-| --- | --- | --- |
-| Common | `PROVIDER_INGESTION_ENABLED=true`, `ENABLE_PROVIDER_LIVE_SMOKE=1`, and `DATABASE_URL` present | GO for providers with complete provider-specific env |
-| ExchangeRate-API | `EXCHANGE_RATE_API_ENABLED=true`, key present, base URL present | GO |
-| Binance | `BINANCE_PUBLIC_MARKET_DATA_ENABLED=true`, REST base URL present, symbols present | GO |
-| KIS | `KIS_MARKET_DATA_ENABLED=true`, app key present, app secret present, but `KIS_REST_BASE_URL`, `KIS_WS_BASE_URL`, `KIS_DOMESTIC_SYMBOLS`, `KIS_US_SYMBOLS`, `KIS_WS_CUSTTYPE`, `KIS_WS_DOMESTIC_TR_ID`, `KIS_WS_OVERSEAS_DELAYED_TR_ID`, `KIS_WS_SNAPSHOT_THROTTLE_MS`, `KIS_WS_MAX_RUNTIME_MS`, and `KIS_WS_ALLOW_US_DELAYED` missing | BLOCKED; no KIS approval_key or WebSocket call attempted |
+| Area             | Env result                                                                                                                                                                                                                                                                                                                            | Live smoke decision                                      |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Common           | `PROVIDER_INGESTION_ENABLED=true`, `ENABLE_PROVIDER_LIVE_SMOKE=1`, and `DATABASE_URL` present                                                                                                                                                                                                                                         | GO for providers with complete provider-specific env     |
+| ExchangeRate-API | `EXCHANGE_RATE_API_ENABLED=true`, key present, base URL present                                                                                                                                                                                                                                                                       | GO                                                       |
+| Binance          | `BINANCE_PUBLIC_MARKET_DATA_ENABLED=true`, REST base URL present, symbols present                                                                                                                                                                                                                                                     | GO                                                       |
+| KIS              | `KIS_MARKET_DATA_ENABLED=true`, app key present, app secret present, but `KIS_REST_BASE_URL`, `KIS_WS_BASE_URL`, `KIS_DOMESTIC_SYMBOLS`, `KIS_US_SYMBOLS`, `KIS_WS_CUSTTYPE`, `KIS_WS_DOMESTIC_TR_ID`, `KIS_WS_OVERSEAS_DELAYED_TR_ID`, `KIS_WS_SNAPSHOT_THROTTLE_MS`, `KIS_WS_MAX_RUNTIME_MS`, and `KIS_WS_ALLOW_US_DELAYED` missing | BLOCKED; no KIS approval_key or WebSocket call attempted |
 
 Smoke asset mapping preparation:
 

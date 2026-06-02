@@ -18,6 +18,7 @@
   - 기존 일반 API의 사용자 식별자는 계속 token-derived `request.user.userId` 기준이며 `x-user-id` fallback은 없다.
   - `GET /api/v1/operator/me`는 `operator` 또는 `admin`만 접근 가능하고 `user`는 `403 OPERATOR_FORBIDDEN`.
   - `OperatorAuditLog` / `operator_audit_logs` foundation과 secret-like metadata redaction service가 추가됨.
+  - Admin/operator MVP는 schema migration `20260601090000_add_user_role_operator_audit_logs` 적용이 필요하다. Runtime DB에는 `UserRole`, `users.role`, `OperatorAuditResult`, `operator_audit_logs`가 존재해야 보호 API와 operator audit foundation이 정상 동작한다.
   - Admin role management API, provider ingestion trigger API, batch run HTTP API, reward fulfillment trigger API, scheduler/cron은 구현하지 않음.
 - Crypto MVP policy changed to Binance-based USD-settled crypto.
   - Crypto uses USD Wallet like US stocks.
@@ -81,7 +82,30 @@
     - ExchangeRate-API and Binance public REST dry-run regressions succeeded.
     - Read path isolation remained clean: `/fx`, orders, assets, portfolio, home, positions, and daily snapshot source selection still uses `admin_manual` price/FX evidence only.
     - `provider_api` source eligibility remains STOP/closed for all quote, execute, valuation, assets, positions, home, daily snapshot, ranking, settlement, and reward paths.
-    - Next evidence gate is a US market-data-window retry or explicit owner scope acceptance for missing US tick/DB insertion evidence.
+    - This historical next evidence gate was superseded by the 2026-06-03 KST DB-started US rerun, which captured US tick and DB insertion evidence.
+  - KIS US `HDFSCNT0` Market-Data Window Validation on 2026-06-03 KST:
+    - Execution started around 2026-06-03 00:23 KST / 2026-06-02 11:23 EDT, within the US regular market window by NYSE regular hours and not on the listed 2026 NYSE holiday dates.
+    - Security precheck stayed clean: `.env.local` is ignored and untracked, and `git ls-files --stage -- .env.local` returned no rows. `.env.local` was not modified.
+    - Required KIS env and WebSocket policy env were present by presence-only check. No values were printed.
+    - `pnpm exec prisma validate` and `pnpm exec prisma generate` succeeded.
+    - `pnpm exec prisma migrate dev` and `pnpm exec prisma migrate status` were blocked because local PostgreSQL was unreachable at `127.0.0.1:5432`; Docker Desktop WSL integration was not available in this shell. No DB reset, seed, or migration edit was attempted.
+    - US-only KIS dry-run reached `kis_us_delayed_trade` tick parsing and the active US asset mapping path, but failed at DB mapping lookup with Prisma `P1001` because local PostgreSQL was unreachable. Because the process terminated before summary JSON, subscription sent/ack counts were not available from this run.
+    - KIS non-dry-run was skipped because dry-run could not complete DB mapping and DB insertion would fail while local PostgreSQL is unavailable.
+    - ExchangeRate-API and Binance regression dry-runs were also blocked by the same local DB unreachable condition before duplicate/mapping checks could complete.
+    - Read path isolation remained clean by code review: `/fx`, orders, assets, portfolio/home/positions valuation, and daily snapshot valuation still use `admin_manual` price/FX eligibility only.
+    - `provider_api` source eligibility remains STOP/closed for all quote, execute, valuation, assets, positions, home, daily snapshot, ranking, settlement, and reward paths.
+  - KIS US `HDFSCNT0` DB-started rerun on 2026-06-03 KST:
+    - DB startup was confirmed with Docker Compose healthy Postgres/Redis. `pnpm exec prisma migrate status` first reported pending reward/operator migrations; `pnpm exec prisma migrate dev` applied `20260523090000_add_reward_badge_trophy_foundation` and `20260601090000_add_user_role_operator_audit_logs` without reset or new migration creation.
+    - Migration status then reported DB schema up to date. Runtime schema checks passed for `UserRole`, `OperatorAuditResult`, `users.role`, and `operator_audit_logs`.
+    - DB mapping verification passed: active US `us_stock` / USD / NAS,NYS fixed symbols 25/25 with NAS 20 and NYS 5; active domestic KRX/KRW fixed symbols 15/15; active BINANCE/USD crypto 2/2.
+    - Execution time was around 2026-06-03 01:37-01:39 KST / 2026-06-02 12:37-12:39 EDT, within the US regular market window.
+    - US-only KIS dry-run succeeded with `subscriptions.sent=25`, `acknowledged=25`, `receivedFrames=50`, `wouldCreate=35`, `created=0`, `failed=0`, and no DB writes.
+    - US-only KIS non-dry-run succeeded with `subscriptions.sent=25`, `acknowledged=25`, `receivedFrames=86`, `created=25`, `skipped=53`, and `failed=0`.
+    - DB evidence confirmed 25 `sourceType=provider_api`, `sourceName=kis_us_delayed_trade`, `currencyCode=USD` rows mapped to active `us_stock` USD assets, with markets NAS 20 and NYS 5.
+    - Existing domestic `kis_krx_realtime_trade` rows remained 12; this US-only rerun created no domestic side effect.
+    - Raw payload known-secret scan over KIS provider rows returned false. No secret values, `.env.local` contents, `DATABASE_URL`, KIS credentials, approval keys, access tokens, or full raw WebSocket frames were printed or documented.
+    - ExchangeRate-API regression dry-run succeeded with `wouldCreate=1`; Binance public REST regression dry-run succeeded for `BTCUSDT,ETHUSDT` with `wouldCreate=2`.
+    - `provider_api` source eligibility remains STOP/closed for all quote, execute, valuation, assets, positions, home, daily snapshot, ranking, settlement, and reward paths.
   - Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage; USDT depeg risk is not modeled.
   - Provider_api source eligibility for quote, execute, valuation, daily snapshot, ranking, and settlement remains a separate gate.
   - KIS supports WebSocket approval_key retrieval, domestic KRX real-time trade price `H0STCNT0`, and overseas/US delayed trade price `HDFSCNT0` ingestion foundation into `asset_price_snapshots` provider_api rows.
@@ -940,8 +964,8 @@ near-term ledger/FX foundation:
   - 상세 결과: `docs/provider-final-selection-readiness-recheck.md`, `docs/asset-price-freshness-policy.md`.
   - Gate B 판단은 `CONDITIONAL GO`.
   - 이것은 evidence capture와 다음 구현 프롬프트를 열기 위한 조건부 판단이며, provider ingestion 구현 GO가 아님.
-- 다음 recommended gate: KIS US HDFSCNT0 Market-Data Window Retry Gate 또는 US Evidence Scope Acceptance Decision.
-  - US tick/DB insertion evidence 확보 또는 owner의 명시적 scope acceptance 이후 Provider API Source Eligibility Implementation Gate로 진행한다.
+- 다음 recommended gate: Provider API Source Eligibility Implementation Gate.
+  - KIS US `HDFSCNT0` tick/DB insertion evidence는 2026-06-03 KST DB-started rerun에서 확보됨.
   - source eligibility 착수 전 provider timestamp/effectiveAt mapping, KIS/Binance price/effectiveAt mapping, symbol mapping, plan/terms, sourceType/sourceName 우선순위, polling/rate-limit 정책을 확인해야 함.
 - Gate A Protected API HTTP e2e baseline은 완료 상태로 본다.
   - 완료 범위: public/optional/protected guard baseline, missing token/`x-user-id` 차단, valid-token read-only smoke, selected quote smoke.
@@ -955,7 +979,7 @@ near-term ledger/FX foundation:
   - FX USD/KRW quote/execute는 현행 60초 `effectiveAt` freshness 유지.
   - `provider_api`는 provider timestamp를 `effectiveAt`으로 매핑할 수 있을 때만 허용 후보.
   - `capturedAt`은 서버 수신/admin 저장 시점이며, `createdAt`은 DB row tie-breaker 전용.
-  - KRX quote/execute provider는 real-time 공식 검증 부족으로 `BLOCKED`.
+  - KRX quote/execute provider는 domestic row insertion evidence가 있지만 source eligibility, freshness, source priority, workflow scope, implementation tests 수락 전까지 `BLOCKED`.
   - Twelve Data는 US stock 후보이나 live fixture, symbol mapping, plan/terms 확인 전 `CONDITIONAL GO`.
   - Crypto는 Binance-based USD-settled crypto로 고정하며 Upbit/Bithumb은 MVP provider stack에서 제외.
   - `official_batch`는 reference/reconciliation/settlement 후보이며 real-time execute source가 아님.
@@ -1087,7 +1111,7 @@ near-term ledger/FX foundation:
 
 ## 12. TODO
 
-- KIS US HDFSCNT0 tick and DB insertion retry, or explicit owner scope acceptance for the missing US live evidence.
+- Provider API Source Eligibility Implementation Gate 문서/합의/테스트 설계.
 - `/fx execute` 실제 DB transaction 내부 강제 실패 기반 rollback 검증 보강.
 - ledger insert/exchange row/finalization 실패 유도 integration hardening 검토.
 - 지속적인 `/fx quote` 성공을 위한 승인 snapshot 공급 운영 절차 또는 provider/batch ingestion 경로 검토.

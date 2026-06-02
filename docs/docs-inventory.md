@@ -58,3 +58,12 @@ This inventory separates current source-of-truth documents from historical plann
 ## DELETE_ONLY_IF_EMPTY_OR_DUPLICATE
 
 No docs were deleted. No empty or duplicate document was identified for deletion in this pass.
+
+2026-06-03 cleanup pass:
+
+- No current source-of-truth document was deleted or archived.
+- Existing `docs/archive/**` files remain historical reference only.
+- Provider, operator, batch, reward, and API contract documents remain current because they still define active contracts or gate policy.
+- `docs/README.md` navigation formatting was fixed so provider policy and Admin/operator sections are separate list items.
+- KRX stale wording in `docs/backend-gate-roadmap.md` was corrected to reflect existing domestic KRX provider_api row insertion evidence while keeping source eligibility closed.
+- DB-started KIS US `HDFSCNT0` evidence rerun results were reflected in current provider/status documents while keeping provider_api source eligibility closed.

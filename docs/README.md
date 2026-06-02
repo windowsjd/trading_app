@@ -26,7 +26,9 @@ Use this directory in this order:
    - `docs/asset-universe-2026-ytd-volume-selection.md`
    - `docs/provider-source-eligibility-pre-gate.md`
 
-Provider evidence currently has ExchangeRate-API and Binance row insertion evidence, KIS domestic `H0STCNT0` row insertion evidence, and KIS US `HDFSCNT0` subscription ack without US tick/DB insertion evidence. Provider_api source eligibility remains closed until a later implementation gate. 6. Admin/operator authorization and audit foundation:
+Provider evidence currently has ExchangeRate-API and Binance row insertion evidence, KIS domestic `H0STCNT0` row insertion evidence, and KIS US `HDFSCNT0` tick/DB insertion evidence. Provider_api source eligibility remains closed until a later implementation gate.
+
+6. Admin/operator authorization and audit foundation:
 
 - `docs/operator-api-contract.md`
 
