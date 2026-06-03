@@ -46,6 +46,7 @@ jest.mock('../generated/prisma/client', () => {
 
 import { HttpException } from '@nestjs/common';
 import {
+  AssetPriceSourceType,
   AssetType,
   CurrencyCode,
   FxRateSourceType,
@@ -122,6 +123,7 @@ describe('HomeService', () => {
         delete: jest.fn(),
       },
       assetPriceSnapshot: {
+        findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
@@ -129,6 +131,7 @@ describe('HomeService', () => {
         delete: jest.fn(),
       },
       fxRateSnapshot: {
+        findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
@@ -470,7 +473,11 @@ describe('HomeService', () => {
     });
     expect(
       valuationService.calculateSeasonParticipantValuation,
-    ).toHaveBeenCalledWith('participant-1');
+    ).toHaveBeenCalledWith(
+      'participant-1',
+      expect.any(Date),
+      'home_live_valuation',
+    );
     expect(
       valuationService.calculateSeasonParticipantValuation,
     ).toHaveBeenCalledTimes(1);
@@ -555,28 +562,48 @@ describe('HomeService', () => {
       position('position-fifth', 'asset-fifth', '4.00000000', '100.00000000'),
       position('position-sixth', 'asset-sixth', '2.00000000', '100.00000000'),
     ]);
-    prisma.assetPriceSnapshot.findFirst
-      .mockResolvedValueOnce(
-        priceSnapshot('price-small', '100.00000000', CurrencyCode.KRW),
-      )
-      .mockResolvedValueOnce(
-        priceSnapshot('price-large', '100.00000000', CurrencyCode.KRW),
-      )
-      .mockResolvedValueOnce(
-        priceSnapshot('price-usd', '100.00000000', CurrencyCode.USD),
-      )
-      .mockResolvedValueOnce(
-        priceSnapshot('price-mid', '100.00000000', CurrencyCode.KRW),
-      )
-      .mockResolvedValueOnce(
-        priceSnapshot('price-crypto', '50.00000000', CurrencyCode.USD),
-      )
-      .mockResolvedValueOnce(
-        priceSnapshot('price-fifth', '100.00000000', CurrencyCode.KRW),
-      )
-      .mockResolvedValueOnce(
-        priceSnapshot('price-sixth', '100.00000000', CurrencyCode.KRW),
-      );
+    prisma.assetPriceSnapshot.findFirst.mockImplementation((args) => {
+      const assetId = args.where.assetId;
+      const prices: Record<string, ReturnType<typeof priceSnapshot>> = {
+        'asset-small': priceSnapshot(
+          'price-small',
+          '100.00000000',
+          CurrencyCode.KRW,
+        ),
+        'asset-large': priceSnapshot(
+          'price-large',
+          '100.00000000',
+          CurrencyCode.KRW,
+        ),
+        'asset-usd': priceSnapshot(
+          'price-usd',
+          '100.00000000',
+          CurrencyCode.USD,
+        ),
+        'asset-mid': priceSnapshot(
+          'price-mid',
+          '100.00000000',
+          CurrencyCode.KRW,
+        ),
+        'asset-crypto': priceSnapshot(
+          'price-crypto',
+          '50.00000000',
+          CurrencyCode.USD,
+        ),
+        'asset-fifth': priceSnapshot(
+          'price-fifth',
+          '100.00000000',
+          CurrencyCode.KRW,
+        ),
+        'asset-sixth': priceSnapshot(
+          'price-sixth',
+          '100.00000000',
+          CurrencyCode.KRW,
+        ),
+      };
+
+      return Promise.resolve(prices[assetId] ?? null);
+    });
 
     const response = await service.getHome('user-1');
 
@@ -630,6 +657,53 @@ describe('HomeService', () => {
     expect(JSON.stringify(response.data.topPositions)).not.toContain(
       'asset-small',
     );
+    expectNoHomeWrites(prisma);
+  });
+
+  it('uses fresh provider_api asset price for home top positions live valuation', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
+    prisma.dailyPortfolioSnapshot.findFirst.mockResolvedValueOnce(
+      latestSnapshot,
+    );
+    prisma.seasonRanking.findFirst.mockResolvedValueOnce(null);
+    prisma.position.findMany.mockResolvedValueOnce([
+      position(
+        'position-provider',
+        'asset-provider',
+        '2.00000000',
+        '90.00000000',
+        CurrencyCode.KRW,
+        AssetType.domestic_stock,
+      ),
+    ]);
+    prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([
+      {
+        id: 'provider-price-home',
+        price: new Prisma.Decimal('110.00000000'),
+        currencyCode: CurrencyCode.KRW,
+        sourceType: AssetPriceSourceType.provider_api,
+        sourceName: 'kis_krx_realtime_trade',
+        effectiveAt: new Date(Date.now() - 1_000),
+        capturedAt: new Date(Date.now() - 1_000),
+      },
+    ]);
+
+    const response = await service.getHome('user-1');
+
+    expect(response.data.topPositions).toMatchObject({
+      state: 'available',
+      items: [
+        {
+          assetId: 'asset-provider',
+          currentPrice: '110.00000000',
+          assetPriceSnapshotId: 'provider-price-home',
+          positionValueKrw: '220.00000000',
+        },
+      ],
+    });
+    expect(prisma.assetPriceSnapshot.findFirst).not.toHaveBeenCalled();
     expectNoHomeWrites(prisma);
   });
 

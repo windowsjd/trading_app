@@ -25,7 +25,9 @@
 - MVP crypto is Binance-based USD-settled crypto.
 - Crypto orders use the USD Wallet like US stock orders.
 - Upbit/Bithumb and KRW crypto trading are out of MVP scope.
-- `CurrencyCode.USDT` is not introduced; Binance `BTCUSDT` fixture mapping must decide USD-equivalent normalization or require Binance USD pair evidence before provider ingestion.
+- `CurrencyCode.USDT` is not introduced; Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage.
+- Orders quote may use fresh eligible `provider_api` market data first.
+- Orders create and orders execute remain `admin_manual` only for this gate.
 
 ## Route
 
@@ -141,12 +143,14 @@
 - Asset must exist and be active.
 - `quantity` must be a positive decimal string fitting `Decimal(24, 8)`.
 - `limitPrice` is required for limit orders and must be positive.
-- Market orders use the latest eligible `admin_manual` `asset_price_snapshots` row with `effectiveAt <= quoteAt`.
+- Market orders use fresh eligible `provider_api` asset price first, then latest eligible `admin_manual` fallback with `effectiveAt <= quoteAt`.
 - Limit orders use `limitPrice`; no asset price snapshot is required.
-- Asset price source is `admin_manual` only.
-- No asset price stale threshold is applied yet.
+- Eligible provider source mapping is domestic KRX -> `kis_krx_realtime_trade`, US NAS/NYS -> `kis_us_delayed_trade`, and BINANCE USD crypto -> `binance_public_rest_24hr_ticker`.
+- Provider asset price freshness uses capturedAt age <= 60 seconds.
 - `currencyCode`, if provided, must match `asset.currencyCode`.
-- USD assets require approved fresh `admin_manual` USD/KRW FX. FX freshness uses the existing 60 second rule.
+- USD assets use fresh `provider_api` `exchange_rate_api` USD/KRW first, then approved fresh `admin_manual` fallback. Provider FX freshness uses capturedAt age <= 300 seconds; manual fallback uses the existing 60-second rule.
+- Missing, stale, future, non-positive, wrong-source, or ineligible provider rows fall back to the existing safe `admin_manual` quote logic.
+- Source decisions are internal. Response shape remains backward-compatible and existing snapshot id fields provide selected snapshot evidence.
 - USD-settled crypto assets follow the same USD asset rule: order currency is USD, buy/sell resource checks use the USD Wallet, and `krwGrossAmount`/`krwFeeAmount`/`krwNetAmount` are USD amounts converted through USD/KRW.
 - Buy quote validates cash wallet balance read-only.
 - Sell quote validates position quantity read-only.
@@ -233,6 +237,7 @@ Same body as `POST /api/v1/orders/quote`.
 - If stored response is missing, replay falls back to formatting the existing order row.
 - If an order was later canceled, duplicate create replay still prefers the original stored create response. This can show the original submitted create response rather than current canceled status; a stricter current-state command history would require a separate idempotency command table.
 - New create runs the same validation and quote calculation as `POST /api/v1/orders/quote`.
+- New create is closed to `provider_api`; it uses the existing `admin_manual` asset price and FX selection even if fresh provider rows exist.
 - Creates exactly one `orders` row with `status = submitted`.
 - Stores `idempotencyKey`, `requestHash`, and `responsePayloadJson` on that order row.
 - Does not execute the order.
@@ -336,6 +341,7 @@ Same body as `POST /api/v1/orders/quote`.
   - `executedPrice` is the selected snapshot price, not the submitted `limitPrice`.
 - USD orders debit or credit the USD wallet. FX is not used to convert wallet amounts.
 - USD orders still select an approved fresh `admin_manual` USD/KRW snapshot for audit consistency and store `fxRateSnapshotId`.
+- Execute is closed to `provider_api`; fresh provider rows must not power execute pricing or audit FX.
 - Binance crypto USD orders are USD orders for wallet/position/ledger purposes.
 - KRW orders store `fxRateSnapshotId = null`.
 - Buy execute:

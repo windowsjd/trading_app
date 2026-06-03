@@ -2,6 +2,7 @@ import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   AssetPriceSourceType,
+  AssetType,
   CurrencyCode,
   FxRateSourceType,
   OrderSide,
@@ -23,6 +24,13 @@ import {
 } from '../fx/fx-decimal-policy';
 import { isFxSnapshotStale } from '../fx/fx-execute-snapshot-policy';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  buildAdminManualFallbackDecision,
+  isPositiveDecimal,
+  resolveAssetProviderEligibility,
+  resolveFxProviderEligibility,
+  selectFreshProviderSnapshot,
+} from '../providers/source-eligibility.policy';
 
 export type OrdersQuery = {
   seasonId?: string;
@@ -68,6 +76,7 @@ type OrderAsset = {
   symbol: string;
   name: string;
   market: string;
+  assetType: AssetType;
   currencyCode: CurrencyCode;
   isActive: boolean;
 };
@@ -85,6 +94,8 @@ type OrderCreateIdempotency = {
   idempotencyKey: string;
   requestHash: string;
 };
+
+type OrderQuoteSourceWorkflow = 'orders_quote' | 'orders_create';
 
 type ParsedOrdersQuery = {
   seasonId?: string;
@@ -338,7 +349,12 @@ export class OrdersService {
     userId: string | undefined,
     body: OrderRequestBody = {},
   ): Promise<OrderQuoteResponse> {
-    const quote = await this.buildOrderQuote(userId, body, new Date());
+    const quote = await this.buildOrderQuote(
+      userId,
+      body,
+      new Date(),
+      'orders_quote',
+    );
 
     return {
       success: true,
@@ -377,6 +393,7 @@ export class OrdersService {
       participant,
       request,
       quoteAt,
+      sourceWorkflow: 'orders_create',
     });
     const orderId = randomUUID();
     const responsePayloadJson = this.buildCreateOrderResponse(
@@ -827,7 +844,11 @@ export class OrdersService {
     order: OrderExecutionRecord,
     executedAt: Date,
   ): Promise<OrderExecutionPlan> {
-    const priceContext = await this.resolveExecutionPrice(tx, order, executedAt);
+    const priceContext = await this.resolveExecutionPrice(
+      tx,
+      order,
+      executedAt,
+    );
     const tradeFeeRate = roundDecimalHalfUp(
       order.seasonParticipant.season.tradeFeeRate,
       feeRateScale,
@@ -1043,7 +1064,10 @@ export class OrdersService {
         referenceType: WalletTransactionReferenceType.order,
         referenceId: order.id,
         amount: netAmount,
-        balanceAfter: this.formatDecimal(postWallet.balanceAmount, monetaryScale),
+        balanceAfter: this.formatDecimal(
+          postWallet.balanceAmount,
+          monetaryScale,
+        ),
         occurredAt: plan.executedAt,
       },
       select: {
@@ -1176,7 +1200,10 @@ export class OrdersService {
         referenceType: WalletTransactionReferenceType.order,
         referenceId: order.id,
         amount: netAmount,
-        balanceAfter: this.formatDecimal(postWallet.balanceAmount, monetaryScale),
+        balanceAfter: this.formatDecimal(
+          postWallet.balanceAmount,
+          monetaryScale,
+        ),
         occurredAt: plan.executedAt,
       },
       select: {
@@ -1574,6 +1601,7 @@ export class OrdersService {
     userId: string | undefined,
     body: OrderRequestBody,
     quoteAt: Date,
+    sourceWorkflow: OrderQuoteSourceWorkflow,
   ): Promise<OrderQuoteCalculation> {
     if (!userId) {
       this.throwApiError(
@@ -1584,13 +1612,19 @@ export class OrdersService {
     }
 
     const request = this.parseOrderRequest(body);
-    return this.buildOrderQuoteFromParsedRequest(userId, request, quoteAt);
+    return this.buildOrderQuoteFromParsedRequest(
+      userId,
+      request,
+      quoteAt,
+      sourceWorkflow,
+    );
   }
 
   private async buildOrderQuoteFromParsedRequest(
     userId: string,
     request: ParsedOrderRequest,
     quoteAt: Date,
+    sourceWorkflow: OrderQuoteSourceWorkflow,
   ): Promise<OrderQuoteCalculation> {
     const season = await this.findActiveSeasonOrThrow();
     const participant = await this.findParticipantOrThrow(season.id, userId);
@@ -1600,6 +1634,7 @@ export class OrdersService {
       participant,
       request,
       quoteAt,
+      sourceWorkflow,
     });
   }
 
@@ -1608,8 +1643,9 @@ export class OrdersService {
     participant: OrdersParticipant;
     request: ParsedOrderRequest;
     quoteAt: Date;
+    sourceWorkflow: OrderQuoteSourceWorkflow;
   }): Promise<OrderQuoteCalculation> {
-    const { season, participant, request, quoteAt } = input;
+    const { season, participant, request, quoteAt, sourceWorkflow } = input;
     const asset = await this.findUsableAsset(request.assetId);
     if (request.currencyCode && request.currencyCode !== asset.currencyCode) {
       this.throwApiError(
@@ -1619,7 +1655,12 @@ export class OrdersService {
       );
     }
 
-    const priceContext = await this.resolveOrderPrice(request, asset, quoteAt);
+    const priceContext = await this.resolveOrderPrice(
+      request,
+      asset,
+      quoteAt,
+      sourceWorkflow,
+    );
     const grossAmount = roundDecimalHalfUp(
       request.quantity.mul(priceContext.price),
       monetaryScale,
@@ -1643,7 +1684,7 @@ export class OrdersService {
 
     const fxSnapshot =
       asset.currencyCode === CurrencyCode.USD
-        ? await this.findFreshUsdKrwSnapshot(quoteAt)
+        ? await this.findFreshUsdKrwSnapshot(quoteAt, sourceWorkflow)
         : null;
     const krwAmounts = this.calculateKrwAmounts(
       {
@@ -1987,6 +2028,7 @@ export class OrdersService {
         symbol: true,
         name: true,
         market: true,
+        assetType: true,
         currencyCode: true,
         isActive: true,
       },
@@ -2015,6 +2057,7 @@ export class OrdersService {
     request: ParsedOrderRequest,
     asset: OrderAsset,
     quoteAt: Date,
+    sourceWorkflow: OrderQuoteSourceWorkflow,
   ): Promise<{
     price: Prisma.Decimal;
     assetPriceSnapshotId: string | null;
@@ -2031,6 +2074,67 @@ export class OrdersService {
       return {
         price: roundDecimalHalfUp(request.limitPrice, monetaryScale),
         assetPriceSnapshotId: null,
+      };
+    }
+
+    const providerEligibility = resolveAssetProviderEligibility({
+      workflow: sourceWorkflow,
+      asset,
+    });
+    const providerCandidates = providerEligibility.eligible
+      ? ((await this.prisma.assetPriceSnapshot.findMany({
+          where: {
+            assetId: asset.id,
+            currencyCode: asset.currencyCode,
+            sourceType: AssetPriceSourceType.provider_api,
+          },
+          orderBy: [
+            { effectiveAt: 'desc' },
+            { capturedAt: 'desc' },
+            { createdAt: 'desc' },
+          ],
+          take: 10,
+          select: {
+            id: true,
+            price: true,
+            sourceType: true,
+            sourceName: true,
+            effectiveAt: true,
+            capturedAt: true,
+          },
+        })) ?? [])
+      : [];
+    const providerSelection = providerEligibility.eligible
+      ? selectFreshProviderSnapshot({
+          candidates: providerCandidates,
+          expectedSourceName: providerEligibility.sourceName,
+          now: quoteAt,
+          freshnessThresholdSeconds:
+            providerEligibility.freshnessThresholdSeconds,
+          isPositiveValue: (candidate) => isPositiveDecimal(candidate.price),
+        })
+      : {
+          state: 'not_selected' as const,
+          decision: {
+            selectedSourceType: null,
+            selectedSourceName: null,
+            selectedSnapshotId: null,
+            selectedEffectiveAt: null,
+            selectedCapturedAt: null,
+            fallbackUsed: true,
+            fallbackReason: providerEligibility.reason,
+            rejectedProviderReason: null,
+            freshnessAgeSeconds: null,
+          },
+        };
+
+    if (providerSelection.state === 'selected') {
+      return {
+        price: roundDecimalHalfUp(
+          providerSelection.snapshot.price,
+          monetaryScale,
+        ),
+        assetPriceSnapshotId: providerSelection.snapshot.id,
       };
     }
 
@@ -2054,6 +2158,9 @@ export class OrdersService {
       select: {
         id: true,
         price: true,
+        sourceName: true,
+        effectiveAt: true,
+        capturedAt: true,
       },
     });
 
@@ -2065,16 +2172,86 @@ export class OrdersService {
       );
     }
 
+    buildAdminManualFallbackDecision({
+      selectedSnapshotId: snapshot.id,
+      selectedSourceName: snapshot.sourceName,
+      selectedEffectiveAt: snapshot.effectiveAt,
+      selectedCapturedAt: snapshot.capturedAt,
+      providerDecision: providerSelection.decision,
+    });
+
     return {
       price: roundDecimalHalfUp(snapshot.price, monetaryScale),
       assetPriceSnapshotId: snapshot.id,
     };
   }
 
-  private async findFreshUsdKrwSnapshot(quoteAt: Date): Promise<{
+  private async findFreshUsdKrwSnapshot(
+    quoteAt: Date,
+    sourceWorkflow: OrderQuoteSourceWorkflow,
+  ): Promise<{
     id: string;
     rate: Prisma.Decimal;
   }> {
+    const providerEligibility = resolveFxProviderEligibility({
+      workflow: sourceWorkflow,
+      baseCurrency: CurrencyCode.USD,
+      quoteCurrency: CurrencyCode.KRW,
+    });
+    const providerCandidates = providerEligibility.eligible
+      ? ((await this.prisma.fxRateSnapshot.findMany({
+          where: {
+            baseCurrency: CurrencyCode.USD,
+            quoteCurrency: CurrencyCode.KRW,
+            sourceType: FxRateSourceType.provider_api,
+          },
+          orderBy: [
+            { effectiveAt: 'desc' },
+            { capturedAt: 'desc' },
+            { createdAt: 'desc' },
+          ],
+          take: 10,
+          select: {
+            id: true,
+            rate: true,
+            sourceType: true,
+            sourceName: true,
+            effectiveAt: true,
+            capturedAt: true,
+          },
+        })) ?? [])
+      : [];
+    const providerSelection = providerEligibility.eligible
+      ? selectFreshProviderSnapshot({
+          candidates: providerCandidates,
+          expectedSourceName: providerEligibility.sourceName,
+          now: quoteAt,
+          freshnessThresholdSeconds:
+            providerEligibility.freshnessThresholdSeconds,
+          isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
+        })
+      : {
+          state: 'not_selected' as const,
+          decision: {
+            selectedSourceType: null,
+            selectedSourceName: null,
+            selectedSnapshotId: null,
+            selectedEffectiveAt: null,
+            selectedCapturedAt: null,
+            fallbackUsed: true,
+            fallbackReason: providerEligibility.reason,
+            rejectedProviderReason: null,
+            freshnessAgeSeconds: null,
+          },
+        };
+
+    if (providerSelection.state === 'selected') {
+      return {
+        id: providerSelection.snapshot.id,
+        rate: providerSelection.snapshot.rate,
+      };
+    }
+
     const snapshot = await this.prisma.fxRateSnapshot.findFirst({
       where: {
         baseCurrency: CurrencyCode.USD,
@@ -2098,7 +2275,9 @@ export class OrdersService {
       select: {
         id: true,
         rate: true,
+        sourceName: true,
         effectiveAt: true,
+        capturedAt: true,
       },
     });
 
@@ -2117,6 +2296,14 @@ export class OrdersService {
         'FX rate is stale.',
       );
     }
+
+    buildAdminManualFallbackDecision({
+      selectedSnapshotId: snapshot.id,
+      selectedSourceName: snapshot.sourceName,
+      selectedEffectiveAt: snapshot.effectiveAt,
+      selectedCapturedAt: snapshot.capturedAt,
+      providerDecision: providerSelection.decision,
+    });
 
     return {
       id: snapshot.id,

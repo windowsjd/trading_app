@@ -4,7 +4,7 @@
 
 - `GET /api/v1/positions` read-only MVP is implemented.
 - The API is for the full holdings/positions screen. It is not a replacement for `/home` `topPositions`, which remains a top-5 summary section.
-- The API reads existing `positions`, `assets`, latest eligible `admin_manual` `asset_price_snapshots`, and fresh approved `admin_manual` USD/KRW `fx_rate_snapshots` when USD valuation is needed.
+- The API reads existing `positions`, `assets`, fresh eligible `provider_api` price/FX snapshots first, and existing safe `admin_manual` fallback snapshots when USD valuation is needed.
 - The API does not call providers, create provider clients, ingest provider data, generate snapshots/rankings, settle seasons, grant rewards, or mutate business rows.
 - Do not add fake/static/sample business price data, Prisma schema changes, migrations, package changes, lockfile changes, or seed changes from this contract.
 
@@ -17,6 +17,10 @@
 - MVP crypto is Binance-based USD-settled crypto and uses `CurrencyCode.USD`.
 - `CurrencyCode.USDT` is not part of the MVP.
 - Position valuation is best-effort per position. Missing market data must not fake values or fail the whole response.
+- Eligible provider source mapping is domestic KRX -> `kis_krx_realtime_trade`, US NAS/NYS -> `kis_us_delayed_trade`, and BINANCE USD crypto -> `binance_public_rest_24hr_ticker`.
+- Eligible USD/KRW provider is `exchange_rate_api`.
+- Provider asset price freshness uses capturedAt age <= 60 seconds; provider FX freshness uses capturedAt age <= 300 seconds.
+- Source decisions are internal; response shape remains backward-compatible and raw provider payloads are never exposed.
 
 ## Route
 
@@ -145,11 +149,11 @@ When required market data is missing, only that position's `valuation` becomes u
 - If the joined participant has no matching positions, `data.state = available`, `positions = []`, and summary counts are `0`.
 - `totalPositionValueKrw` sums only positions whose valuation is available.
 - KRW positions can be valued without USD/KRW FX.
-- USD positions require fresh approved `admin_manual` USD/KRW.
+- USD positions use fresh `provider_api` USD/KRW first, then fresh approved `admin_manual` USD/KRW fallback.
 - USD/KRW missing or stale makes only USD position valuations unavailable.
-- Asset price uses latest eligible `admin_manual` `asset_price_snapshots` only.
-- `provider_api` and `official_batch` are not newly allowed as valuation sources.
-- Asset price freshness threshold is not implemented yet; near-term behavior matches Home/topPositions: latest eligible `admin_manual` snapshot with `effectiveAt <= valuationAt`.
+- Asset price uses fresh eligible `provider_api` first, then latest eligible `admin_manual` fallback.
+- `official_batch` is not newly allowed as a valuation source.
+- Provider asset price freshness threshold is capturedAt age <= 60 seconds. Existing `admin_manual` fallback keeps the established latest eligible `effectiveAt <= valuationAt` behavior.
 
 ## Sorting
 
@@ -172,9 +176,8 @@ Pagination is applied after sorting.
 
 ## Not Implemented
 
-- Provider API ingestion.
-- Provider-backed source priority.
-- Automatic asset price freshness threshold.
+- Provider API ingestion trigger APIs.
+- Provider-backed execute/write, daily snapshot, ranking, settlement, or reward use.
 - Scheduler/batch snapshot or ranking generation.
 - Settlement/reward integration.
 - Position mutation.

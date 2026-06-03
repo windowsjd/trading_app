@@ -33,6 +33,13 @@ import {
   type NormalizedFxExecuteRequest,
   type FxExecuteRequestBodyLike,
 } from './fx-execute-request-policy';
+import {
+  buildAdminManualFallbackDecision,
+  isPositiveDecimal,
+  resolveFxProviderEligibility,
+  selectFreshProviderSnapshot,
+  type SourceDecision,
+} from '../providers/source-eligibility.policy';
 
 export type FxQuoteRequestBody = {
   fromCurrency?: unknown;
@@ -99,6 +106,16 @@ type ActiveSeasonRecord = {
   id: string;
   status: SeasonStatus;
   fxFeeRate: Prisma.Decimal;
+};
+
+type FxQuoteRateSnapshot = {
+  id: string;
+  rate: Prisma.Decimal;
+  sourceType: FxRateSourceType;
+  sourceName: string | null;
+  capturedAt: Date;
+  effectiveAt: Date;
+  sourceDecision: SourceDecision;
 };
 
 const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
@@ -185,26 +202,7 @@ export class FxService {
       }
 
       const now = new Date();
-      const rateSnapshot = await this.prisma.fxRateSnapshot.findFirst({
-        where: {
-          baseCurrency: CurrencyCode.USD,
-          quoteCurrency: CurrencyCode.KRW,
-          sourceType: FxRateSourceType.admin_manual,
-          effectiveAt: {
-            lte: now,
-          },
-        },
-        orderBy: [
-          { effectiveAt: 'desc' },
-          { capturedAt: 'desc' },
-          { createdAt: 'desc' },
-        ],
-        select: {
-          rate: true,
-          capturedAt: true,
-          effectiveAt: true,
-        },
-      });
+      const rateSnapshot = await this.findFxQuoteRateSnapshot(now);
 
       if (!rateSnapshot) {
         this.throwApiError(
@@ -215,8 +213,9 @@ export class FxService {
       }
 
       if (
+        rateSnapshot.sourceType !== FxRateSourceType.provider_api &&
         now.getTime() - rateSnapshot.effectiveAt.getTime() >
-        FX_RATE_STALE_THRESHOLD_MS
+          FX_RATE_STALE_THRESHOLD_MS
       ) {
         this.throwApiError(
           HttpStatus.SERVICE_UNAVAILABLE,
@@ -423,6 +422,112 @@ export class FxService {
       'SEASON_NOT_FOUND',
       'Season not found',
     );
+  }
+
+  private async findFxQuoteRateSnapshot(
+    quoteAt: Date,
+  ): Promise<FxQuoteRateSnapshot> {
+    const providerEligibility = resolveFxProviderEligibility({
+      workflow: 'fx_quote',
+      baseCurrency: CurrencyCode.USD,
+      quoteCurrency: CurrencyCode.KRW,
+    });
+    const providerCandidates = providerEligibility.eligible
+      ? ((await this.prisma.fxRateSnapshot.findMany({
+          where: {
+            baseCurrency: CurrencyCode.USD,
+            quoteCurrency: CurrencyCode.KRW,
+            sourceType: FxRateSourceType.provider_api,
+          },
+          orderBy: [
+            { effectiveAt: 'desc' },
+            { capturedAt: 'desc' },
+            { createdAt: 'desc' },
+          ],
+          take: 10,
+          select: {
+            id: true,
+            rate: true,
+            sourceType: true,
+            sourceName: true,
+            capturedAt: true,
+            effectiveAt: true,
+          },
+        })) ?? [])
+      : [];
+    const providerSelection = providerEligibility.eligible
+      ? selectFreshProviderSnapshot({
+          candidates: providerCandidates,
+          expectedSourceName: providerEligibility.sourceName,
+          now: quoteAt,
+          freshnessThresholdSeconds:
+            providerEligibility.freshnessThresholdSeconds,
+          isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
+        })
+      : {
+          state: 'not_selected' as const,
+          decision: {
+            selectedSourceType: null,
+            selectedSourceName: null,
+            selectedSnapshotId: null,
+            selectedEffectiveAt: null,
+            selectedCapturedAt: null,
+            fallbackUsed: true,
+            fallbackReason: providerEligibility.reason,
+            rejectedProviderReason: null,
+            freshnessAgeSeconds: null,
+          },
+        };
+
+    if (providerSelection.state === 'selected') {
+      return {
+        ...providerSelection.snapshot,
+        sourceDecision: providerSelection.decision,
+      };
+    }
+
+    const fallbackSnapshot = await this.prisma.fxRateSnapshot.findFirst({
+      where: {
+        baseCurrency: CurrencyCode.USD,
+        quoteCurrency: CurrencyCode.KRW,
+        sourceType: FxRateSourceType.admin_manual,
+        effectiveAt: {
+          lte: quoteAt,
+        },
+      },
+      orderBy: [
+        { effectiveAt: 'desc' },
+        { capturedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      select: {
+        id: true,
+        rate: true,
+        sourceType: true,
+        sourceName: true,
+        capturedAt: true,
+        effectiveAt: true,
+      },
+    });
+
+    if (!fallbackSnapshot) {
+      this.throwApiError(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'FX_RATE_UNAVAILABLE',
+        'FX rate is unavailable',
+      );
+    }
+
+    return {
+      ...fallbackSnapshot,
+      sourceDecision: buildAdminManualFallbackDecision({
+        selectedSnapshotId: fallbackSnapshot.id,
+        selectedSourceName: fallbackSnapshot.sourceName,
+        selectedEffectiveAt: fallbackSnapshot.effectiveAt,
+        selectedCapturedAt: fallbackSnapshot.capturedAt,
+        providerDecision: providerSelection.decision,
+      }),
+    };
   }
 
   private getOrderBy(

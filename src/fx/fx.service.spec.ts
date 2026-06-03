@@ -98,7 +98,7 @@ describe('FxService', () => {
       },
       fxRateSnapshot: {
         findFirst: jest.fn(),
-        findMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
       },
       exchangeTransaction: {
         create: jest.fn(),
@@ -355,68 +355,78 @@ describe('FxService', () => {
       sourceAmount: '135000',
     });
 
-    expect(prisma.fxRateSnapshot.findFirst).toHaveBeenCalledWith({
-      where: {
-        baseCurrency: CurrencyCode.USD,
-        quoteCurrency: CurrencyCode.KRW,
-        sourceType: FxRateSourceType.admin_manual,
-        effectiveAt: {
-          lte: expect.any(Date),
-        },
-      },
-      orderBy: [
-        { effectiveAt: 'desc' },
-        { capturedAt: 'desc' },
-        { createdAt: 'desc' },
-      ],
-      select: {
-        rate: true,
-        capturedAt: true,
-        effectiveAt: true,
-      },
-    });
+    expect(prisma.fxRateSnapshot.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          baseCurrency: CurrencyCode.USD,
+          quoteCurrency: CurrencyCode.KRW,
+          sourceType: FxRateSourceType.admin_manual,
+          effectiveAt: {
+            lte: now,
+          },
+        }),
+        orderBy: [
+          { effectiveAt: 'desc' },
+          { capturedAt: 'desc' },
+          { createdAt: 'desc' },
+        ],
+        select: expect.objectContaining({
+          rate: true,
+          capturedAt: true,
+          effectiveAt: true,
+        }),
+      }),
+    );
     expect(
       prisma.fxRateSnapshot.findFirst.mock.calls[0][0].where.effectiveAt.lte,
     ).toEqual(now);
   });
 
-  it('uses admin_manual for quote even when provider_api could be newer', async () => {
+  it('uses fresh provider_api exchange_rate_api for quote before admin_manual fallback', async () => {
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     mockJoinedParticipant(prisma);
-    prisma.fxRateSnapshot.findFirst.mockImplementationOnce(async (args) => {
-      expect(args.where).toMatchObject({
-        baseCurrency: CurrencyCode.USD,
-        quoteCurrency: CurrencyCode.KRW,
-        sourceType: FxRateSourceType.admin_manual,
-      });
-
-      return {
-        rate: new Prisma.Decimal('1350.00000000'),
+    prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
+      {
+        id: 'provider-fx-1',
+        rate: new Prisma.Decimal('1400.00000000'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'exchange_rate_api',
         capturedAt,
-        effectiveAt: thresholdEffectiveAt,
-      };
-    });
+        effectiveAt: staleEffectiveAt,
+      },
+    ]);
 
     await expect(
       service.quote('user-1', {
         fromCurrency: 'KRW',
         toCurrency: 'USD',
-        sourceAmount: '135000',
+        sourceAmount: '140000',
       }),
     ).resolves.toMatchObject({
       success: true,
       data: {
-        appliedRate: '1350.00000000',
-        rateEffectiveAt: thresholdEffectiveAt.toISOString(),
+        appliedRate: '1400.00000000',
+        rateEffectiveAt: staleEffectiveAt.toISOString(),
       },
     });
+    expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
   });
 
-  it('rejects quote when only provider_api USD/KRW is available', async () => {
+  it('rejects quote when provider_api is rejected and no admin_manual fallback exists', async () => {
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     mockJoinedParticipant(prisma);
+    prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
+      {
+        id: 'provider-fx-invalid',
+        rate: new Prisma.Decimal('1400.00000000'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'unexpected_provider',
+        capturedAt,
+        effectiveAt: freshEffectiveAt,
+      },
+    ]);
     prisma.fxRateSnapshot.findFirst.mockImplementationOnce(async (args) => {
       expect(args.where.sourceType).toBe(FxRateSourceType.admin_manual);
       return null;

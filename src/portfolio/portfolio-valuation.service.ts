@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   AssetPriceSourceType,
+  AssetType,
   CurrencyCode,
   FxRateSourceType,
 } from '../generated/prisma/client';
@@ -11,6 +12,24 @@ import {
   PortfolioValuationError,
   PortfolioValuationResult,
 } from './portfolio-valuation.policy';
+import {
+  buildAdminManualFallbackDecision,
+  isPositiveDecimal,
+  isProviderWorkflowAllowed,
+  resolveAssetProviderEligibility,
+  resolveFxProviderEligibility,
+  selectFreshProviderSnapshot,
+  type ProviderWorkflow,
+} from '../providers/source-eligibility.policy';
+
+type PortfolioSourceWorkflow = ProviderWorkflow;
+
+type PositionAssetForSourceSelection = {
+  id: string;
+  assetType: AssetType;
+  market: string;
+  currencyCode: CurrencyCode;
+};
 
 @Injectable()
 export class PortfolioValuationService {
@@ -19,6 +38,7 @@ export class PortfolioValuationService {
   async calculateSeasonParticipantValuation(
     seasonParticipantId: string,
     valuationAt = new Date(),
+    sourceEligibilityWorkflow: PortfolioSourceWorkflow = 'daily_portfolio_snapshot',
   ): Promise<PortfolioValuationResult> {
     const participant = await this.prisma.seasonParticipant.findUnique({
       where: {
@@ -42,7 +62,10 @@ export class PortfolioValuationService {
             realizedPnl: true,
             asset: {
               select: {
+                id: true,
                 assetType: true,
+                market: true,
+                currencyCode: true,
               },
             },
           },
@@ -66,8 +89,9 @@ export class PortfolioValuationService {
         currencyCode: position.currencyCode,
         realizedPnl: position.realizedPnl,
         latestPriceSnapshot: await this.findLatestEligibleAssetPriceSnapshot(
-          position.assetId,
+          position.asset,
           valuationAt,
+          sourceEligibilityWorkflow,
         ),
       })),
     );
@@ -85,7 +109,10 @@ export class PortfolioValuationService {
       );
 
     const usdKrwSnapshot = needsUsdConversion
-      ? await this.findLatestEligibleUsdKrwSnapshot(valuationAt)
+      ? await this.findLatestEligibleUsdKrwSnapshot(
+          valuationAt,
+          sourceEligibilityWorkflow,
+        )
       : null;
 
     return calculatePortfolioValuation({
@@ -95,16 +122,80 @@ export class PortfolioValuationService {
       positions,
       usdKrwSnapshot,
       valuationAt,
+      sourceEligibilityWorkflow: isProviderWorkflowAllowed(
+        sourceEligibilityWorkflow,
+      )
+        ? sourceEligibilityWorkflow
+        : undefined,
     });
   }
 
   private async findLatestEligibleAssetPriceSnapshot(
-    assetId: string,
+    asset: PositionAssetForSourceSelection,
     valuationAt: Date,
+    sourceEligibilityWorkflow: PortfolioSourceWorkflow,
   ): Promise<PortfolioAssetPriceSnapshotInput | null> {
-    return this.prisma.assetPriceSnapshot.findFirst({
+    const providerEligibility = resolveAssetProviderEligibility({
+      workflow: sourceEligibilityWorkflow,
+      asset,
+    });
+    const providerCandidates = providerEligibility.eligible
+      ? ((await this.prisma.assetPriceSnapshot.findMany({
+          where: {
+            assetId: asset.id,
+            currencyCode: asset.currencyCode,
+            sourceType: AssetPriceSourceType.provider_api,
+          },
+          orderBy: [
+            { effectiveAt: 'desc' },
+            { capturedAt: 'desc' },
+            { createdAt: 'desc' },
+          ],
+          take: 10,
+          select: {
+            id: true,
+            assetId: true,
+            price: true,
+            currencyCode: true,
+            sourceType: true,
+            sourceName: true,
+            effectiveAt: true,
+            capturedAt: true,
+            createdAt: true,
+          },
+        })) ?? [])
+      : [];
+    const providerSelection = providerEligibility.eligible
+      ? selectFreshProviderSnapshot({
+          candidates: providerCandidates,
+          expectedSourceName: providerEligibility.sourceName,
+          now: valuationAt,
+          freshnessThresholdSeconds:
+            providerEligibility.freshnessThresholdSeconds,
+          isPositiveValue: (candidate) => isPositiveDecimal(candidate.price),
+        })
+      : {
+          state: 'not_selected' as const,
+          decision: {
+            selectedSourceType: null,
+            selectedSourceName: null,
+            selectedSnapshotId: null,
+            selectedEffectiveAt: null,
+            selectedCapturedAt: null,
+            fallbackUsed: true,
+            fallbackReason: providerEligibility.reason,
+            rejectedProviderReason: null,
+            freshnessAgeSeconds: null,
+          },
+        };
+
+    if (providerSelection.state === 'selected') {
+      return providerSelection.snapshot;
+    }
+
+    const fallbackSnapshot = await this.prisma.assetPriceSnapshot.findFirst({
       where: {
-        assetId,
+        assetId: asset.id,
         sourceType: AssetPriceSourceType.admin_manual,
         effectiveAt: {
           lte: valuationAt,
@@ -117,18 +208,97 @@ export class PortfolioValuationService {
       ],
       select: {
         assetId: true,
+        id: true,
         price: true,
         currencyCode: true,
         sourceType: true,
+        sourceName: true,
         effectiveAt: true,
         capturedAt: true,
         createdAt: true,
       },
     });
+
+    if (!fallbackSnapshot) {
+      return null;
+    }
+
+    buildAdminManualFallbackDecision({
+      selectedSnapshotId: fallbackSnapshot.id,
+      selectedSourceName: fallbackSnapshot.sourceName,
+      selectedEffectiveAt: fallbackSnapshot.effectiveAt,
+      selectedCapturedAt: fallbackSnapshot.capturedAt,
+      providerDecision: providerSelection.decision,
+    });
+
+    return fallbackSnapshot;
   }
 
-  private async findLatestEligibleUsdKrwSnapshot(valuationAt: Date) {
-    return this.prisma.fxRateSnapshot.findFirst({
+  private async findLatestEligibleUsdKrwSnapshot(
+    valuationAt: Date,
+    sourceEligibilityWorkflow: PortfolioSourceWorkflow,
+  ) {
+    const providerEligibility = resolveFxProviderEligibility({
+      workflow: sourceEligibilityWorkflow,
+      baseCurrency: CurrencyCode.USD,
+      quoteCurrency: CurrencyCode.KRW,
+    });
+    const providerCandidates = providerEligibility.eligible
+      ? ((await this.prisma.fxRateSnapshot.findMany({
+          where: {
+            baseCurrency: CurrencyCode.USD,
+            quoteCurrency: CurrencyCode.KRW,
+            sourceType: FxRateSourceType.provider_api,
+          },
+          orderBy: [
+            { effectiveAt: 'desc' },
+            { capturedAt: 'desc' },
+            { createdAt: 'desc' },
+          ],
+          take: 10,
+          select: {
+            id: true,
+            baseCurrency: true,
+            quoteCurrency: true,
+            rate: true,
+            sourceType: true,
+            sourceName: true,
+            effectiveAt: true,
+            capturedAt: true,
+            createdAt: true,
+            approvedByUserId: true,
+          },
+        })) ?? [])
+      : [];
+    const providerSelection = providerEligibility.eligible
+      ? selectFreshProviderSnapshot({
+          candidates: providerCandidates,
+          expectedSourceName: providerEligibility.sourceName,
+          now: valuationAt,
+          freshnessThresholdSeconds:
+            providerEligibility.freshnessThresholdSeconds,
+          isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
+        })
+      : {
+          state: 'not_selected' as const,
+          decision: {
+            selectedSourceType: null,
+            selectedSourceName: null,
+            selectedSnapshotId: null,
+            selectedEffectiveAt: null,
+            selectedCapturedAt: null,
+            fallbackUsed: true,
+            fallbackReason: providerEligibility.reason,
+            rejectedProviderReason: null,
+            freshnessAgeSeconds: null,
+          },
+        };
+
+    if (providerSelection.state === 'selected') {
+      return providerSelection.snapshot;
+    }
+
+    const fallbackSnapshot = await this.prisma.fxRateSnapshot.findFirst({
       where: {
         baseCurrency: CurrencyCode.USD,
         quoteCurrency: CurrencyCode.KRW,
@@ -146,15 +316,29 @@ export class PortfolioValuationService {
         { createdAt: 'desc' },
       ],
       select: {
+        id: true,
         baseCurrency: true,
         quoteCurrency: true,
         rate: true,
         sourceType: true,
+        sourceName: true,
         effectiveAt: true,
         capturedAt: true,
         createdAt: true,
         approvedByUserId: true,
       },
     });
+
+    if (fallbackSnapshot) {
+      buildAdminManualFallbackDecision({
+        selectedSnapshotId: fallbackSnapshot.id,
+        selectedSourceName: fallbackSnapshot.sourceName,
+        selectedEffectiveAt: fallbackSnapshot.effectiveAt,
+        selectedCapturedAt: fallbackSnapshot.capturedAt,
+        providerDecision: providerSelection.decision,
+      });
+    }
+
+    return fallbackSnapshot;
   }
 }

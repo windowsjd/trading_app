@@ -7,7 +7,7 @@
 - `OperatorAuditLog` foundation is implemented as an internal service/model for future operator mutations.
 - No admin role-management API exists in this MVP.
 - No provider ingestion trigger, batch run trigger, scheduler/cron, reward fulfillment trigger, real trading/account/balance, deposit/withdrawal, or external order API exists.
-- `provider_api` source eligibility remains closed.
+- `provider_api` source eligibility is open only inside explicitly allowed read-only/quote services; no operator provider trigger or write/final workflow source eligibility is opened by this contract.
 
 ## Migration / Runtime Requirement
 
@@ -103,7 +103,7 @@ Audit metadata must not store secrets. The service redacts secret-like keys and 
 - Provider ingestion trigger API.
 - Reward fulfillment trigger API.
 - Scheduler/cron.
-- Provider_api source eligibility.
+- Provider ingestion trigger API or operator API for provider source eligibility changes.
 - Trading calculation, order, FX, portfolio, ranking, settlement, reward fulfillment, real account, real balance, real deposit/withdrawal, or external order API changes.
 
 ## Next Gate

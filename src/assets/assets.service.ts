@@ -8,6 +8,14 @@ import {
 } from '../generated/prisma/client';
 import { isFxSnapshotStaleForPortfolioValuation } from '../portfolio/portfolio-valuation.policy';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  buildAdminManualFallbackDecision,
+  isPositiveDecimal,
+  resolveAssetProviderEligibility,
+  resolveFxProviderEligibility,
+  selectFreshProviderSnapshot,
+  type SourceDecision,
+} from '../providers/source-eligibility.policy';
 
 export type AssetsQuery = {
   assetType?: string;
@@ -45,8 +53,11 @@ type AssetPriceSnapshotRecord = {
   id: string;
   price: Prisma.Decimal;
   currencyCode: CurrencyCode;
+  sourceType: AssetPriceSourceType;
+  sourceName: string | null;
   effectiveAt: Date;
   capturedAt: Date;
+  sourceDecision: SourceDecision;
 };
 
 type AssetPriceError = {
@@ -281,8 +292,7 @@ export class AssetsService {
     error?: AssetPriceError;
   }> {
     const snapshot = await this.findLatestEligibleAssetPriceSnapshot(
-      asset.id,
-      asset.currencyCode,
+      asset,
       valuationAt,
     );
 
@@ -357,14 +367,72 @@ export class AssetsService {
   }
 
   private async findLatestEligibleAssetPriceSnapshot(
-    assetId: string,
-    currencyCode: CurrencyCode,
+    asset: AssetRecord,
     valuationAt: Date,
   ): Promise<AssetPriceSnapshotRecord | null> {
-    return this.prisma.assetPriceSnapshot.findFirst({
+    const providerEligibility = resolveAssetProviderEligibility({
+      workflow: 'assets_with_price',
+      asset,
+    });
+    const providerCandidates = providerEligibility.eligible
+      ? ((await this.prisma.assetPriceSnapshot.findMany({
+          where: {
+            assetId: asset.id,
+            currencyCode: asset.currencyCode,
+            sourceType: AssetPriceSourceType.provider_api,
+          },
+          orderBy: [
+            { effectiveAt: 'desc' },
+            { capturedAt: 'desc' },
+            { createdAt: 'desc' },
+          ],
+          take: 10,
+          select: {
+            id: true,
+            price: true,
+            currencyCode: true,
+            sourceType: true,
+            sourceName: true,
+            effectiveAt: true,
+            capturedAt: true,
+          },
+        })) ?? [])
+      : [];
+    const providerSelection = providerEligibility.eligible
+      ? selectFreshProviderSnapshot({
+          candidates: providerCandidates,
+          expectedSourceName: providerEligibility.sourceName,
+          now: valuationAt,
+          freshnessThresholdSeconds:
+            providerEligibility.freshnessThresholdSeconds,
+          isPositiveValue: (candidate) => isPositiveDecimal(candidate.price),
+        })
+      : {
+          state: 'not_selected' as const,
+          decision: {
+            selectedSourceType: null,
+            selectedSourceName: null,
+            selectedSnapshotId: null,
+            selectedEffectiveAt: null,
+            selectedCapturedAt: null,
+            fallbackUsed: true,
+            fallbackReason: providerEligibility.reason,
+            rejectedProviderReason: null,
+            freshnessAgeSeconds: null,
+          },
+        };
+
+    if (providerSelection.state === 'selected') {
+      return {
+        ...providerSelection.snapshot,
+        sourceDecision: providerSelection.decision,
+      };
+    }
+
+    const fallbackSnapshot = await this.prisma.assetPriceSnapshot.findFirst({
       where: {
-        assetId,
-        currencyCode,
+        assetId: asset.id,
+        currencyCode: asset.currencyCode,
         sourceType: AssetPriceSourceType.admin_manual,
         effectiveAt: {
           lte: valuationAt,
@@ -382,15 +450,91 @@ export class AssetsService {
         id: true,
         price: true,
         currencyCode: true,
+        sourceType: true,
+        sourceName: true,
         effectiveAt: true,
         capturedAt: true,
       },
     });
+
+    if (!fallbackSnapshot) {
+      return null;
+    }
+
+    return {
+      ...fallbackSnapshot,
+      sourceDecision: buildAdminManualFallbackDecision({
+        selectedSnapshotId: fallbackSnapshot.id,
+        selectedSourceName: fallbackSnapshot.sourceName,
+        selectedEffectiveAt: fallbackSnapshot.effectiveAt,
+        selectedCapturedAt: fallbackSnapshot.capturedAt,
+        providerDecision: providerSelection.decision,
+      }),
+    };
   }
 
   private async findUsdKrwSelection(
     valuationAt: Date,
   ): Promise<UsdKrwSelection> {
+    const providerEligibility = resolveFxProviderEligibility({
+      workflow: 'assets_with_price',
+      baseCurrency: CurrencyCode.USD,
+      quoteCurrency: CurrencyCode.KRW,
+    });
+    const providerCandidates = providerEligibility.eligible
+      ? ((await this.prisma.fxRateSnapshot.findMany({
+          where: {
+            baseCurrency: CurrencyCode.USD,
+            quoteCurrency: CurrencyCode.KRW,
+            sourceType: FxRateSourceType.provider_api,
+          },
+          orderBy: [
+            { effectiveAt: 'desc' },
+            { capturedAt: 'desc' },
+            { createdAt: 'desc' },
+          ],
+          take: 10,
+          select: {
+            id: true,
+            rate: true,
+            sourceType: true,
+            sourceName: true,
+            effectiveAt: true,
+            capturedAt: true,
+          },
+        })) ?? [])
+      : [];
+    const providerSelection = providerEligibility.eligible
+      ? selectFreshProviderSnapshot({
+          candidates: providerCandidates,
+          expectedSourceName: providerEligibility.sourceName,
+          now: valuationAt,
+          freshnessThresholdSeconds:
+            providerEligibility.freshnessThresholdSeconds,
+          isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
+        })
+      : {
+          state: 'not_selected' as const,
+          decision: {
+            selectedSourceType: null,
+            selectedSourceName: null,
+            selectedSnapshotId: null,
+            selectedEffectiveAt: null,
+            selectedCapturedAt: null,
+            fallbackUsed: true,
+            fallbackReason: providerEligibility.reason,
+            rejectedProviderReason: null,
+            freshnessAgeSeconds: null,
+          },
+        };
+
+    if (providerSelection.state === 'selected') {
+      return {
+        state: 'available',
+        rate: providerSelection.snapshot.rate,
+      };
+    }
+
     const snapshot = await this.prisma.fxRateSnapshot.findFirst({
       where: {
         baseCurrency: CurrencyCode.USD,

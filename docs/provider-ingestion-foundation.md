@@ -1,6 +1,6 @@
 # Provider Ingestion Foundation
 
-Status: implemented foundation for explicit operator-run provider ingestion, no cron scheduler.
+Status: implemented foundation for explicit operator-run provider ingestion, no cron scheduler. Read-only/quote provider_api source eligibility is implemented separately for the allowed workflows only.
 
 Fixed KIS stock universe status as of 2026-05-30 KST:
 
@@ -13,7 +13,7 @@ Fixed KIS stock universe status as of 2026-05-30 KST:
 - After the local DB was started on 2026-05-30, all fixed 40 stock assets were upserted successfully and DB mapping counts passed: domestic 15/15, US 25/25, KIS total 40/41.
 - ExchangeRate and Binance dry-runs succeeded after DB restart; Binance `BTCUSDT` and `ETHUSDT` mapped to existing active `BINANCE` USD crypto assets.
 - KIS live smoke remained blocked on 2026-05-30 because KIS REST/WS endpoint env values were missing in the loaded env. Explicit WebSocket policy env values were also absent, but code defaults are defined.
-- `provider_api` source eligibility remains closed.
+- `provider_api` source eligibility is open only for the 2026-06-03 read-only/quote workflows. Execute/write, daily snapshot, ranking, settlement, reward, scheduler/cron, provider trigger APIs, and real trading/account surfaces remain closed.
 
 KIS env completion pre-gate update as of 2026-05-30 KST:
 
@@ -45,7 +45,7 @@ KIS endpoint env completion retry as of 2026-06-01 KST:
 - DB evidence confirmed the 12 inserted KIS rows are `sourceType=provider_api`, `sourceName=kis_krx_realtime_trade`, `currencyCode=KRW`, mapped to active KRX domestic_stock assets.
 - US `HDFSCNT0` subscriptions were acknowledged, but no US tick or `kis_us_delayed_trade` DB row was observed in the 30-second smoke window. This remains an open evidence item.
 - ExchangeRate-API and Binance public REST regression dry-runs succeeded.
-- `provider_api` source eligibility remains closed.
+- `provider_api` source eligibility remains closed outside the explicitly allowed read-only/quote workflows.
 
 KIS US `HDFSCNT0` retry as of 2026-06-01 KST:
 
@@ -58,7 +58,7 @@ KIS US `HDFSCNT0` retry as of 2026-06-01 KST:
 - US `HDFSCNT0` tick remains unobserved and `kis_us_delayed_trade` provider_api DB row count remains 0. The result is classified as `SUBSCRIBE_ACK_BUT_NO_US_TICK` / `MARKET_CLOSED_OR_NO_TICK`.
 - Non-dry-run was skipped because dry-run did not produce US tick evidence. Existing domestic `kis_krx_realtime_trade` provider_api row count remains 12.
 - ExchangeRate-API and Binance public REST regression dry-runs succeeded.
-- `provider_api` source eligibility remains closed.
+- `provider_api` source eligibility remains closed outside the explicitly allowed read-only/quote workflows.
 
 KIS US `HDFSCNT0` market-data window validation as of 2026-06-03 KST:
 
@@ -69,7 +69,7 @@ KIS US `HDFSCNT0` market-data window validation as of 2026-06-03 KST:
 - US-only KIS dry-run reached the US tick parsing/asset mapping path, then failed on DB mapping lookup with Prisma `P1001`. This gives partial US tick-path evidence but not clean dry-run counts or DB insertion evidence.
 - Non-dry-run was skipped because local DB insertion was unavailable.
 - ExchangeRate-API and Binance public REST regression dry-runs were also blocked by the same local DB unreachable condition.
-- `provider_api` source eligibility remains closed.
+- `provider_api` source eligibility remains closed outside the explicitly allowed read-only/quote workflows.
 
 KIS US `HDFSCNT0` DB-started rerun as of 2026-06-03 KST:
 
@@ -81,7 +81,7 @@ KIS US `HDFSCNT0` DB-started rerun as of 2026-06-03 KST:
 - DB evidence confirmed 25 inserted `kis_us_delayed_trade` rows are `sourceType=provider_api`, `currencyCode=USD`, mapped to active `us_stock` USD assets with NAS 20 / NYS 5 market distribution.
 - Existing domestic `kis_krx_realtime_trade` provider_api row count remained 12. This US-only rerun created no domestic side effect.
 - ExchangeRate-API and Binance public REST regression dry-runs succeeded.
-- `provider_api` source eligibility remains closed.
+- `provider_api` source eligibility remains closed outside the explicitly allowed read-only/quote workflows.
 
 Live smoke evidence status as of 2026-05-28 KST:
 
@@ -89,7 +89,7 @@ Live smoke evidence status as of 2026-05-28 KST:
 - Binance public REST dry-run and non-dry-run live smoke succeeded for `BTCUSDT` and `ETHUSDT`, mapped to existing active `BINANCE` crypto USD assets, and created two local `asset_price_snapshots` rows with `sourceType=provider_api`, `sourceName=binance_public_rest_24hr_ticker`, and `currencyCode=USD`.
 - KIS WebSocket live smoke was not executed because required endpoint env was incomplete: `KIS_REST_BASE_URL` and `KIS_WS_BASE_URL` were missing. KIS approval_key, WebSocket connect, subscribe ack, domestic `H0STCNT0` tick, US `HDFSCNT0` tick, and KIS DB row insertion remain `BLOCKED`.
 - No secret values, approval keys, `.env.local` contents, `DATABASE_URL`, or full raw WebSocket frames were printed or documented.
-- This evidence does not open `provider_api` source eligibility for quote, execute, valuation, home, positions, assets, daily snapshot, ranking, settlement, or reward paths.
+- This evidence is now accepted for the read-only/quote source eligibility gate. It still does not open execute, create, daily snapshot, ranking, settlement, reward, scheduler/cron, provider trigger, or real trading/account paths.
 
 ## Scope
 
@@ -217,11 +217,11 @@ All scripts are explicit operator commands. No cron scheduler or admin HTTP inge
 ## Boundaries
 
 - `provider_api` snapshot rows can now be inserted by explicit provider ingestion services.
-- Existing quote, execute, asset list/detail, portfolio valuation, daily snapshot, ranking, settlement, and reward behavior is not switched to provider_api eligibility in this gate.
-- ExchangeRate-API can create provider_api USD/KRW rows, but `/fx quote` remains `admin_manual` only. A newer provider_api FX row must not power quote until the source eligibility gate opens it.
-- `admin_manual` source eligibility in the existing financial paths remains unchanged.
+- Provider_api rows are eligible only for `/fx quote`, assets `withPrice`, orders quote, live portfolio valuation, home live valuation, and positions live valuation.
+- ExchangeRate-API can create provider_api USD/KRW rows, and fresh `exchange_rate_api` USD/KRW rows may power `/fx quote` and allowed read-only USD/KRW conversion with safe `admin_manual` fallback.
+- `admin_manual` fallback eligibility in the existing financial paths remains available where the workflow already allowed manual data.
 - Provider outages, parse errors, missing mappings, and rate limits must not create fake rows.
-- KIS WebSocket trade price ingestion can create provider_api rows, but source eligibility remains closed.
+- KIS WebSocket trade price ingestion can create provider_api rows, and fresh KRX/NAS/NYS rows may power allowed read-only/quote workflows only.
 - Binance user data streams are not used.
 - KIS REST current-price ingestion is not implemented.
 - KIS WebSocket orderbook/hoga ingestion is not implemented.
@@ -230,6 +230,6 @@ All scripts are explicit operator commands. No cron scheduler or admin HTTP inge
 
 ## Next Gate
 
-Recommended next gate: Provider API Source Eligibility Implementation Gate using `docs/provider-source-eligibility-pre-gate.md`.
+Provider API Source Eligibility Implementation Gate read-only/quote phase is implemented using `docs/provider-source-eligibility-pre-gate.md`.
 
-That gate should decide which provider_api rows can power quote, execute, live valuation, daily snapshots, and final settlement. It should also define stale thresholds, source priority, provider outage behavior, live smoke evidence requirements, and whether delayed/free KIS rows are acceptable for any product workflow.
+Next provider-related gates should remain narrower and explicit: execute/write eligibility, daily snapshot eligibility, settlement/final evidence policy, scheduler/deployment ownership, provider trigger APIs, KIS REST current-price ingestion, KIS orderbook/hoga, or real trading/account APIs each require separate approval.

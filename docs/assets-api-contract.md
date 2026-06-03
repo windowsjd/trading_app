@@ -5,7 +5,7 @@
 - `GET /api/v1/assets` read-only MVP is implemented.
 - `GET /api/v1/assets/:assetId` read-only MVP is implemented.
 - The API is for order-screen asset discovery, search, selection, and detail confirmation before calling order quote/create.
-- The API uses only existing `assets`, latest eligible `admin_manual` `asset_price_snapshots`, and fresh approved `admin_manual` USD/KRW `fx_rate_snapshots`.
+- With `withPrice=true`, the API reads existing `assets`, fresh eligible `provider_api` price/FX snapshots first, and existing safe `admin_manual` fallback snapshots.
 - The API does not call external providers, create provider clients, ingest provider data, generate snapshots/rankings, settle seasons, grant rewards, or mutate business rows.
 - Do not add fake/static/sample business price data, Prisma schema changes, migrations, package changes, lockfile changes, or seed changes from this contract.
 
@@ -18,7 +18,12 @@
 - MVP crypto is Binance-based USD-settled crypto and uses `CurrencyCode.USD`.
 - `CurrencyCode.USDT` is not part of the MVP.
 - Asset price is best-effort per asset. Missing market data must not fake values or hide the asset.
-- `provider_api` and `official_batch` are not newly allowed as list/detail price sources.
+- `provider_api` is allowed only for `withPrice=true` list/detail price and USD/KRW conversion in this read-only workflow.
+- Eligible asset providers are `kis_krx_realtime_trade` for KRX-family domestic stocks, `kis_us_delayed_trade` for NAS/NYS US stocks, and `binance_public_rest_24hr_ticker` for BINANCE USD crypto.
+- Eligible FX provider is `exchange_rate_api` for USD/KRW.
+- Provider asset freshness uses capturedAt age <= 60 seconds; provider FX freshness uses capturedAt age <= 300 seconds.
+- Missing, stale, future, non-positive, wrong-source, or ineligible provider rows fall back to existing `admin_manual` selection.
+- Source decisions are internal; response shape remains backward-compatible and raw provider payloads are never exposed.
 
 ## Role Compared With Other APIs
 
@@ -151,10 +156,10 @@ If a USD asset has an eligible asset price but USD/KRW is missing or stale, `pri
 - Empty asset rows are valid: `state = available`, `assets = []`.
 - Price data absence does not hide the asset.
 - KRW assets can return `priceKrw` without USD/KRW FX.
-- USD assets require fresh approved `admin_manual` USD/KRW for `priceKrw`.
+- USD assets use fresh `provider_api` ExchangeRate-API USD/KRW first, then fresh approved `admin_manual` USD/KRW fallback for `priceKrw`.
 - USD/KRW missing or stale makes only `priceKrwState = unavailable`.
-- Asset price uses latest eligible `admin_manual` `asset_price_snapshots` only.
-- Asset price freshness threshold is not implemented yet; near-term behavior matches Home/Positions: latest eligible `admin_manual` snapshot with `effectiveAt <= valuationAt`.
+- Asset price uses fresh eligible `provider_api` first, then latest eligible `admin_manual` fallback.
+- Provider asset price freshness threshold is capturedAt age <= 60 seconds. Existing `admin_manual` fallback keeps the established latest eligible `effectiveAt <= valuationAt` behavior.
 
 ### Sorting
 
@@ -218,9 +223,9 @@ Trading note policy:
 
 ## Not Implemented
 
-- External provider API calls.
-- Provider client implementation.
-- Provider API ingestion.
+- External provider API calls from the Assets API.
+- Provider client implementation from the Assets API.
+- Provider API ingestion trigger APIs.
 - Scheduler/batch generation.
 - Settlement/reward integration.
 - Matching engine, partial fill, or durable quote.

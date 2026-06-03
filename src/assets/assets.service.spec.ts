@@ -30,6 +30,7 @@ jest.mock('../generated/prisma/client', () => {
 
 import { HttpException } from '@nestjs/common';
 import {
+  AssetPriceSourceType,
   AssetType,
   CurrencyCode,
   FxRateSourceType,
@@ -57,10 +58,12 @@ describe('AssetsService', () => {
       ...createWritableModel(),
     },
     assetPriceSnapshot: {
+      findMany: jest.fn().mockResolvedValue([]),
       findFirst: jest.fn(),
       ...createWritableModel(),
     },
     fxRateSnapshot: {
+      findMany: jest.fn().mockResolvedValue([]),
       findFirst: jest.fn(),
       ...createWritableModel(),
     },
@@ -141,6 +144,22 @@ describe('AssetsService', () => {
     currencyCode,
     effectiveAt: priceAt,
     capturedAt: new Date('2026-05-07T00:00:10.000Z'),
+  });
+
+  const providerPriceSnapshot = (
+    id: string,
+    sourceName: string,
+    price: string,
+    currencyCode = CurrencyCode.KRW,
+    capturedAt = new Date(Date.now() - 1_000),
+  ) => ({
+    id,
+    price: new Prisma.Decimal(price),
+    currencyCode,
+    sourceType: AssetPriceSourceType.provider_api,
+    sourceName,
+    effectiveAt: priceAt,
+    capturedAt,
   });
 
   const freshUsdKrwSnapshot = () => ({
@@ -472,6 +491,104 @@ describe('AssetsService', () => {
     expectNoAssetWrites(prisma);
   });
 
+  it.each([
+    {
+      label: 'domestic KRX',
+      sourceName: 'kis_krx_realtime_trade',
+      fixture: asset({
+        id: 'asset-krx',
+        market: 'KRX',
+        assetType: AssetType.domestic_stock,
+        currencyCode: CurrencyCode.KRW,
+      }),
+      priceCurrency: CurrencyCode.KRW,
+    },
+    {
+      label: 'US NAS',
+      sourceName: 'kis_us_delayed_trade',
+      fixture: asset({
+        id: 'asset-us',
+        market: 'NAS',
+        assetType: AssetType.us_stock,
+        currencyCode: CurrencyCode.USD,
+      }),
+      priceCurrency: CurrencyCode.USD,
+    },
+    {
+      label: 'crypto BINANCE',
+      sourceName: 'binance_public_rest_24hr_ticker',
+      fixture: asset({
+        id: 'asset-btc',
+        market: 'BINANCE',
+        assetType: AssetType.crypto,
+        currencyCode: CurrencyCode.USD,
+      }),
+      priceCurrency: CurrencyCode.USD,
+    },
+  ])('uses fresh provider_api price first for $label assets', async (input) => {
+    const { prisma, service } = createService();
+    prisma.asset.count.mockResolvedValueOnce(1);
+    prisma.asset.findMany.mockResolvedValueOnce([input.fixture]);
+    prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([
+      providerPriceSnapshot(
+        'provider-price-1',
+        input.sourceName,
+        '123.00000000',
+        input.priceCurrency,
+      ),
+    ]);
+    if (input.priceCurrency === CurrencyCode.USD) {
+      prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([]);
+      prisma.fxRateSnapshot.findFirst.mockResolvedValueOnce(
+        freshUsdKrwSnapshot(),
+      );
+    }
+
+    const response = await service.getAssets('user-1');
+
+    expect(response.data.assets[0].price).toMatchObject({
+      state: 'available',
+      currentPrice: '123.00000000',
+      assetPriceSnapshotId: 'provider-price-1',
+    });
+    expect(prisma.assetPriceSnapshot.findFirst).not.toHaveBeenCalled();
+    expectNoAssetWrites(prisma);
+  });
+
+  it('falls back to admin_manual asset price when provider_api price is stale', async () => {
+    const { prisma, service } = createService();
+    prisma.asset.count.mockResolvedValueOnce(1);
+    prisma.asset.findMany.mockResolvedValueOnce([
+      asset({
+        id: 'asset-krx',
+        market: 'KRX',
+        assetType: AssetType.domestic_stock,
+        currencyCode: CurrencyCode.KRW,
+      }),
+    ]);
+    prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([
+      providerPriceSnapshot(
+        'provider-price-stale',
+        'kis_krx_realtime_trade',
+        '999.00000000',
+        CurrencyCode.KRW,
+        new Date(Date.now() - 61_000),
+      ),
+    ]);
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(
+      priceSnapshot('admin-price-1', '70000.00000000'),
+    );
+
+    const response = await service.getAssets('user-1');
+
+    expect(response.data.assets[0].price).toMatchObject({
+      state: 'available',
+      currentPrice: '70000.00000000',
+      assetPriceSnapshotId: 'admin-price-1',
+    });
+    expectNoAssetWrites(prisma);
+  });
+
   it('returns USD asset priceKrw using fresh approved admin_manual USD/KRW', async () => {
     const { prisma, service } = createService();
     prisma.asset.count.mockResolvedValueOnce(1);
@@ -501,6 +618,43 @@ describe('AssetsService', () => {
       priceKrw: '140000.00000000',
     });
     expect(response.data.priceErrors).toEqual([]);
+    expectNoAssetWrites(prisma);
+  });
+
+  it('uses fresh provider_api USD/KRW for USD asset KRW conversion', async () => {
+    const { prisma, service } = createService();
+    prisma.asset.count.mockResolvedValueOnce(1);
+    prisma.asset.findMany.mockResolvedValueOnce([
+      asset({
+        id: 'asset-usd',
+        market: 'NAS',
+        assetType: AssetType.us_stock,
+        currencyCode: CurrencyCode.USD,
+      }),
+    ]);
+    prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
+      {
+        id: 'provider-fx-1',
+        rate: new Prisma.Decimal('1500.00000000'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'exchange_rate_api',
+        effectiveAt: new Date('2026-05-07T00:00:00.000Z'),
+        capturedAt: new Date(Date.now() - 1_000),
+      },
+    ]);
+    prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([]);
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(
+      priceSnapshot('price-usd', '100.00000000', CurrencyCode.USD),
+    );
+
+    const response = await service.getAssets('user-1');
+
+    expect(response.data.assets[0].price).toMatchObject({
+      state: 'available',
+      priceKrwState: 'available',
+      priceKrw: '150000.00000000',
+    });
+    expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
     expectNoAssetWrites(prisma);
   });
 

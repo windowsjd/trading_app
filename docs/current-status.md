@@ -106,11 +106,18 @@
     - Raw payload known-secret scan over KIS provider rows returned false. No secret values, `.env.local` contents, `DATABASE_URL`, KIS credentials, approval keys, access tokens, or full raw WebSocket frames were printed or documented.
     - ExchangeRate-API regression dry-run succeeded with `wouldCreate=1`; Binance public REST regression dry-run succeeded for `BTCUSDT,ETHUSDT` with `wouldCreate=2`.
     - `provider_api` source eligibility remains STOP/closed for all quote, execute, valuation, assets, positions, home, daily snapshot, ranking, settlement, and reward paths.
+  - Provider API Source Eligibility Implementation Gate on 2026-06-03 KST:
+    - Source eligibility is now opened only for read-only/quote workflows: `/fx quote`, assets `withPrice`, orders quote, `live_portfolio_valuation`, home live valuation, and positions live valuation.
+    - Eligible provider source names are `exchange_rate_api` for USD/KRW, `binance_public_rest_24hr_ticker` for BINANCE USD crypto, `kis_krx_realtime_trade` for KRX-family domestic stocks, and `kis_us_delayed_trade` for NAS/NYS US stocks.
+    - Fresh provider rows are selected first. Missing, stale, future, non-positive, wrong-source, or ineligible provider rows fall back explicitly to existing safe `admin_manual` selection where the workflow already allowed manual data.
+    - Freshness thresholds are captured-at based for provider rows: 300 seconds for provider USD/KRW read-only/quote and 60 seconds for provider asset prices. Existing `admin_manual` FX fallback keeps the established 60-second effectiveAt stale check where applicable.
+    - API response shapes remain backward-compatible; source decisions are kept internally and existing snapshot/timing fields continue to provide safe evidence. Raw provider payloads and secrets are not exposed.
+    - `/fx execute`, orders create, orders execute, daily portfolio snapshot, ranking, settlement/final result, reward/final tier/fulfillment, scheduler/cron, batch HTTP APIs, provider ingestion trigger APIs, real trading/account/order/deposit/withdrawal APIs, KIS orderbook/hoga, and Binance authenticated APIs remain closed.
   - Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage; USDT depeg risk is not modeled.
-  - Provider_api source eligibility for quote, execute, valuation, daily snapshot, ranking, and settlement remains a separate gate.
+  - Provider_api source eligibility for execute/write, daily snapshot, ranking, settlement, reward, and automation remains a separate gate.
   - KIS supports WebSocket approval_key retrieval, domestic KRX real-time trade price `H0STCNT0`, and overseas/US delayed trade price `HDFSCNT0` ingestion foundation into `asset_price_snapshots` provider_api rows.
-  - KIS REST current-price quote ingestion, KIS orderbook/hoga WebSocket ingestion, KIS order/account/balance/fill/deposit/withdrawal APIs, and provider_api source eligibility remain unimplemented.
-  - KRX domestic stock provider_api source eligibility remains STOP.
+  - KIS REST current-price quote ingestion, KIS orderbook/hoga WebSocket ingestion, and KIS order/account/balance/fill/deposit/withdrawal APIs remain unimplemented.
+  - KRX domestic stock `provider_api` source eligibility is open only for the explicitly allowed read-only/quote workflows through `kis_krx_realtime_trade`.
 
 ## 2. 구현 완료 API
 
@@ -144,8 +151,8 @@
 - `GET /api/v1/seasons/current`
 - `POST /api/v1/seasons/{seasonId}/join`
 - `POST /api/v1/fx/quote`
-  - 현재 quote source는 `admin_manual` USD/KRW snapshot only.
-  - ExchangeRate-API provider_api USD/KRW row가 생성되어도 `/fx quote` source eligibility는 아직 열지 않음.
+  - 현재 quote source는 fresh `provider_api` `exchange_rate_api` USD/KRW first, then existing `admin_manual` fallback.
+  - Provider fallback remains explicit internally; stale/wrong-source provider rows are not used.
 - `POST /api/v1/fx/execute` 1차 구현 완료
   - write path는 구현됨.
   - 실제 PostgreSQL/Prisma DB integration spec 통과.
@@ -370,9 +377,9 @@ near-term ledger/FX foundation:
 - `/orders` read-only MVP 구현 완료: 기존 `orders` row만 조회하며 주문 생성/체결/wallet/position/settlement mutation 없음.
 - `/orders/quote` read-only MVP 구현 완료:
   - active season + joined participant만 허용.
-  - market order는 latest eligible `admin_manual` asset price snapshot 사용.
+  - market order는 eligible asset이면 fresh `provider_api` asset price first, 그 외 stale/missing/ineligible provider는 existing `admin_manual` fallback 사용.
   - limit order는 `limitPrice` 사용.
-  - USD 자산은 approved fresh `admin_manual` USD/KRW FX snapshot 필요.
+  - USD 자산의 KRW valuation은 fresh `provider_api` `exchange_rate_api` USD/KRW first, then approved fresh `admin_manual` fallback 사용.
   - buy는 cash wallet balance, sell은 position quantity를 read-only로 검증.
   - DB mutation 없음.
 - `POST /api/v1/orders` submitted order create MVP 구현 완료:
@@ -413,12 +420,12 @@ near-term ledger/FX foundation:
 - `/assets` read-only MVP 구현 완료:
   - 주문 전 asset 선택/검색/상세 확인용 API.
   - `GET /api/v1/assets`, `GET /api/v1/assets/:assetId`.
-  - 기존 `assets`와 latest eligible `admin_manual` `asset_price_snapshots`만 asset price source로 사용.
-  - USD asset의 `priceKrw` 계산에는 fresh approved `admin_manual` USD/KRW `fx_rate_snapshots`를 사용.
+  - `withPrice=true`는 eligible asset에 대해 fresh `provider_api` asset price first, then latest eligible `admin_manual` fallback을 사용.
+  - USD asset의 `priceKrw` 계산에는 fresh `provider_api` `exchange_rate_api` USD/KRW first, then fresh approved `admin_manual` fallback을 사용.
   - 가격 또는 FX 데이터가 없거나 stale이면 fake fallback 없이 asset별 price/priceKrw unavailable로 반환.
   - `withPrice=false`는 price/FX snapshot 조회 없이 asset metadata만 반환.
   - schema의 `assets.isActive`를 사용해 기본 목록은 active assets만 반환하고, `includeInactive=true`일 때 inactive assets도 포함.
-  - provider API key, provider client, provider ingestion, scheduler/batch 없이 동작.
+  - API response는 provider 호출 없이 기존 DB snapshot row만 읽으며 raw provider payload를 노출하지 않음.
   - asset/price/wallet/order/position/snapshot/ranking/ledger row를 생성/수정/삭제하지 않음.
 - valuation/ranking 수동 foundation 구현 완료:
   - portfolio valuation 계산 service/helper: `src/portfolio/portfolio-valuation.service.ts`, `src/portfolio/portfolio-valuation.policy.ts`.
@@ -491,13 +498,13 @@ near-term ledger/FX foundation:
 - `admin_manual`은 bootstrap/fallback/manual correction 경로.
 - `/fx quote` smoke용 승인된 `admin_manual` snapshot 1건 입력 및 소비 검증 완료.
 - 입력한 manual snapshot은 smoke 당시 fresh였지만 60초 이후에는 정책상 stale이 되므로, 지속적인 quote 성공에는 별도 승인 snapshot 입력 또는 향후 ingestion 경로가 필요함.
-- provider_api source eligibility, official_batch ingestion, and scheduler implementation remain closed.
+- `provider_api` source eligibility is open only for the read-only/quote workflows listed in the 2026-06-03 gate; `official_batch` ingestion and scheduler implementation remain closed.
 - Gate B provider role은 `CONDITIONAL GO`로 정리됨.
 - Current MVP provider stack is ExchangeRate-API for FX, Binance public REST for crypto, and KIS WebSocket market data for domestic/US stocks. OANDA and Twelve Data are historical/fallback candidates only.
 - Crypto MVP provider는 Binance로 고정하며 USD-settled crypto로 처리한다.
 - Crypto 주문/정산은 미국주식과 동일하게 USD Wallet을 사용하고, KRW 평가는 USD crypto value를 USD/KRW로 환산한다.
-- KRX quote/execute provider는 real-time 공식 검증 부족으로 `BLOCKED`.
-- Provider API Source Eligibility Implementation Gate remains after KIS live evidence capture and source policy acceptance.
+- KRX provider source eligibility is open only for read-only/quote workflows through `kis_krx_realtime_trade`; KRX execute/write provider use remains `BLOCKED`.
+- Provider API Source Eligibility Implementation Gate read-only/quote phase is implemented after KIS live evidence capture and source policy acceptance.
 - 30초 polling은 후보이며 provider rate limit/terms 확인 후 확정.
 
 ### Asset/price input
@@ -706,9 +713,10 @@ near-term ledger/FX foundation:
 - wallet/position/allocation/top positions/equity chart:
   - cash wallets와 positions/openPositions count만 read-only로 반환.
   - `allocation`은 live valuation 기반으로 KRW cash, USD cash KRW 환산, domestic stock, US stock, crypto 비중을 반환.
-  - `topPositions`는 기존 open positions와 최신 eligible `admin_manual` asset price, 필요한 경우 fresh approved `admin_manual` USD/KRW로 KRW 평가금액을 계산해 상위 5개를 반환.
+  - `topPositions`는 기존 open positions와 eligible asset이면 fresh `provider_api` asset price first, then latest eligible `admin_manual` fallback으로 KRW 평가금액을 계산해 상위 5개를 반환.
+  - USD 환산이 필요한 경우 fresh `provider_api` `exchange_rate_api` USD/KRW first, then fresh approved `admin_manual` fallback을 사용함.
   - `equityChart`는 기존 `daily_portfolio_snapshots` 최신 30개를 읽어 오래된 날짜순으로 반환.
-  - 필요한 admin_manual 가격 데이터가 없거나 USD/KRW FX 데이터가 없거나 stale이면 fake fallback 없이 해당 section을 `unavailable`로 반환.
+  - 필요한 provider/admin 가격 데이터가 없거나 USD/KRW FX 데이터가 없거나 stale이면 fake fallback 없이 해당 section을 `unavailable`로 반환.
 - `/home` 호출은 wallet/position/snapshot/ranking row를 생성/수정/삭제하지 않음.
 - full home implementation blocker:
   - provider price ingestion
@@ -769,12 +777,12 @@ near-term ledger/FX foundation:
   - `currencyCode` optional, allowed `KRW`/`USD`.
 - source:
   - 기존 `positions`와 `assets`.
-  - latest eligible `admin_manual` `asset_price_snapshots`.
-  - USD position KRW valuation에 필요한 fresh approved `admin_manual` USD/KRW `fx_rate_snapshots`.
+  - eligible asset이면 fresh `provider_api` asset price first, then latest eligible `admin_manual` asset price fallback.
+  - USD position KRW valuation에 필요한 fresh `provider_api` `exchange_rate_api` USD/KRW first, then fresh approved `admin_manual` USD/KRW fallback.
 - valuation data가 없으면 전체 API 실패나 fake fallback 없이 해당 position의 `valuation.state = unavailable`로 반환.
 - KRW position은 USD/KRW 없이 valuation 가능하고, USD position은 FX missing/stale이면 해당 valuation만 unavailable.
 - `totalPositionValueKrw`는 valuation available position만 합산.
-- provider_api/official_batch ingestion, scheduler/batch, settlement/reward 구현 없음.
+- provider-backed execute/write, daily snapshot, ranking, settlement/reward, scheduler/batch 구현 없음.
 - `/positions` 호출은 wallet/order/position/snapshot/ranking/ledger row를 생성/수정/삭제하지 않음.
 
 ### `/assets`
@@ -795,8 +803,8 @@ near-term ledger/FX foundation:
   - `offset` optional, default 0.
 - source:
   - 기존 `assets`.
-  - latest eligible `admin_manual` `asset_price_snapshots`.
-  - USD asset KRW 환산에 필요한 fresh approved `admin_manual` USD/KRW `fx_rate_snapshots`.
+  - `withPrice=true`는 eligible asset이면 fresh `provider_api` asset price first, then latest eligible `admin_manual` asset price fallback.
+  - USD asset KRW 환산은 fresh `provider_api` `exchange_rate_api` USD/KRW first, then fresh approved `admin_manual` fallback.
 - 가격 데이터가 없으면 asset을 숨기지 않고 해당 asset의 `price.state = unavailable`.
 - USD/KRW가 missing/stale이면 USD asset의 price 자체는 available일 수 있으나 `priceKrwState = unavailable`.
 - KRW asset은 USD/KRW 없이 `priceKrw` 계산 가능.
@@ -902,10 +910,10 @@ near-term ledger/FX foundation:
   - active season + joined participant만 허용.
   - asset 존재/isActive 확인.
   - quantity > 0, limit order는 limitPrice > 0 필요.
-  - market order는 latest eligible `admin_manual` asset price snapshot 사용.
+  - market order는 eligible asset이면 fresh `provider_api` asset price first, then latest eligible `admin_manual` fallback 사용.
   - limit order는 `limitPrice`를 quote price로 사용.
-  - asset price stale threshold는 아직 적용하지 않음.
-  - USD 자산은 approved fresh `admin_manual` USD/KRW FX snapshot 사용, freshness 60초.
+  - provider asset price freshness threshold는 capturedAt 기준 60초.
+  - USD 자산은 fresh `provider_api` `exchange_rate_api` USD/KRW first, then approved fresh `admin_manual` USD/KRW fallback 사용.
   - buy cash balance, sell position quantity를 read-only 검증.
   - DB mutation 없음.
 - create:
@@ -955,7 +963,7 @@ near-term ledger/FX foundation:
   - Binance `BTCUSDT` ticker fixture 상태: `GO` for fixture capture, `CONDITIONAL GO` for mapping. Public `/api/v3/ticker/24hr` returned HTTP 200 and includes `lastPrice`, `bidPrice`, `askPrice`, `openTime`, `closeTime`.
   - Binance `BTCUSDT` orderbook fixture 상태: `CONDITIONAL GO`. Public `/api/v3/depth` returned HTTP 200 and includes bid/ask levels, but no source timestamp.
   - Crypto provider ingestion foundation은 `BTCUSDT` 같은 USDT quote를 MVP USD-equivalent provider_api snapshot으로 저장할 수 있음. USDT depeg risk는 별도 반영하지 않음.
-  - Binance provider_api source eligibility는 effectiveAt/freshness policy, sourceType eligibility, price-field decision, terms approval 전까지 `STOP`.
+  - Binance provider_api source eligibility는 read-only/quote workflow에서 `binance_public_rest_24hr_ticker` fresh row만 허용하며 execute/write, scheduler, settlement, reward 사용은 `STOP`.
   - OANDA/Twelve Data ingestion implementation은 credentialed fixture, mapping, terms, sourceType tests 전까지 `STOP/BLOCKED`.
   - KRX domestic stock remains STOP.
   - Batch job run foundation과 operator-run snapshot/ranking/cycle/settlement/final-tier/reward-grant internal foundation MVP job은 구현됨. 실제 cron scheduler와 provider-backed batch/actual reward fulfillment job은 STOP 유지.
@@ -972,14 +980,16 @@ near-term ledger/FX foundation:
   - 남은 gap: 모든 protected route별 invalid-token HTTP e2e exhaustive coverage와 valid-token full write-path HTTP e2e는 아직 없음.
   - full financial write-path 검증은 현재 service/unit 및 opt-in PostgreSQL integration spec이 담당.
 - 테스트 커버리지 상세는 `docs/backend-test-coverage-matrix.md` 기준.
-- provider ingestion foundation은 구현됨. provider_api source eligibility와 provider-backed scheduler/settlement 사용은 live fixture와 owner decision 수락 전 `BLOCKED` 유지.
+- provider ingestion foundation은 구현됨. `provider_api` source eligibility는 read-only/quote workflow에만 열렸고 provider-backed scheduler/settlement 사용은 `BLOCKED` 유지.
 - Batch job run foundation과 operator-run snapshot/ranking/cycle/settlement/final-tier/reward-grant internal foundation MVP job은 구현됨. 실제 cron scheduler와 provider-backed batch/actual reward fulfillment job은 STOP 유지.
 - settlement extension/actual reward fulfillment는 Gate H/I/J 전까지 구현 STOP 유지.
 - asset price freshness 정책 요약:
   - FX USD/KRW quote/execute는 현행 60초 `effectiveAt` freshness 유지.
-  - `provider_api`는 provider timestamp를 `effectiveAt`으로 매핑할 수 있을 때만 허용 후보.
+  - `/fx quote` 및 read-only USD/KRW provider fallback은 capturedAt 기준 300초 provider freshness를 사용하고, execute는 기존 `admin_manual` 60초 `effectiveAt` freshness를 유지.
+  - asset provider price는 capturedAt 기준 60초 freshness를 사용.
+  - `provider_api`는 provider timestamp를 `effectiveAt`으로 매핑할 수 있고 `capturedAt <= now`, positive value, expected sourceName일 때만 허용 후보.
   - `capturedAt`은 서버 수신/admin 저장 시점이며, `createdAt`은 DB row tie-breaker 전용.
-  - KRX quote/execute provider는 domestic row insertion evidence가 있지만 source eligibility, freshness, source priority, workflow scope, implementation tests 수락 전까지 `BLOCKED`.
+  - KRX provider는 read-only/quote workflow에서만 `kis_krx_realtime_trade` fresh provider row를 허용하며 execute/write workflow는 `BLOCKED`.
   - Twelve Data는 US stock 후보이나 live fixture, symbol mapping, plan/terms 확인 전 `CONDITIONAL GO`.
   - Crypto는 Binance-based USD-settled crypto로 고정하며 Upbit/Bithumb은 MVP provider stack에서 제외.
   - `official_batch`는 reference/reconciliation/settlement 후보이며 real-time execute source가 아님.

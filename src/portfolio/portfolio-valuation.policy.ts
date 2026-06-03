@@ -11,6 +11,10 @@ import {
   returnRateScale,
 } from '../fx/fx-decimal-policy';
 import { fxExecuteSnapshotFreshnessThresholdMs } from '../fx/fx-execute-snapshot-policy';
+import {
+  isProviderWorkflowAllowed,
+  type ProviderEligibleWorkflow,
+} from '../providers/source-eligibility.policy';
 
 type DecimalInput = string | Prisma.Decimal;
 
@@ -30,20 +34,24 @@ export type PortfolioPositionInput = {
 };
 
 export type PortfolioAssetPriceSnapshotInput = {
+  id?: string;
   assetId: string;
   price: DecimalInput;
   currencyCode: CurrencyCode;
   sourceType: AssetPriceSourceType;
+  sourceName?: string | null;
   effectiveAt: Date;
   capturedAt: Date;
   createdAt: Date;
 };
 
 export type PortfolioFxRateSnapshotInput = {
+  id?: string;
   baseCurrency: CurrencyCode;
   quoteCurrency: CurrencyCode;
   rate: DecimalInput;
   sourceType: FxRateSourceType;
+  sourceName?: string | null;
   effectiveAt: Date;
   capturedAt: Date;
   createdAt: Date;
@@ -57,6 +65,7 @@ export type PortfolioValuationInput = {
   positions: readonly PortfolioPositionInput[];
   usdKrwSnapshot?: PortfolioFxRateSnapshotInput | null;
   valuationAt: Date;
+  sourceEligibilityWorkflow?: ProviderEligibleWorkflow;
 };
 
 export type PortfolioValuationResult = {
@@ -105,7 +114,11 @@ export function calculatePortfolioValuation(
   const needsUsdConversion =
     !usdCash.eq(0) || input.positions.some(positionNeedsUsdConversion);
   const usdKrwRate = needsUsdConversion
-    ? selectUsableUsdKrwRate(input.usdKrwSnapshot, input.valuationAt)
+    ? selectUsableUsdKrwRate(
+        input.usdKrwSnapshot,
+        input.valuationAt,
+        input.sourceEligibilityWorkflow,
+      )
     : null;
 
   let usdCashKrw = new Prisma.Decimal(0);
@@ -150,6 +163,7 @@ export function calculatePortfolioValuation(
       priceSnapshot,
       position,
       input.valuationAt,
+      input.sourceEligibilityWorkflow,
     );
 
     const currentPrice = toDecimal(priceSnapshot.price, 'assetPrice.price');
@@ -166,8 +180,7 @@ export function calculatePortfolioValuation(
     assetValueKrw = assetValueKrw.add(positionValueKrw);
     switch (position.assetType) {
       case AssetType.domestic_stock:
-        domesticStockValueKrw =
-          domesticStockValueKrw.add(positionValueKrw);
+        domesticStockValueKrw = domesticStockValueKrw.add(positionValueKrw);
         break;
       case AssetType.us_stock:
         usStockValueKrw = usStockValueKrw.add(positionValueKrw);
@@ -254,6 +267,7 @@ function positionNeedsUsdConversion(position: PortfolioPositionInput): boolean {
 function selectUsableUsdKrwRate(
   snapshot: PortfolioFxRateSnapshotInput | null | undefined,
   valuationAt: Date,
+  sourceEligibilityWorkflow?: ProviderEligibleWorkflow,
 ): Prisma.Decimal {
   if (!snapshot) {
     throw new PortfolioValuationError(
@@ -264,13 +278,38 @@ function selectUsableUsdKrwRate(
 
   if (
     snapshot.baseCurrency !== CurrencyCode.USD ||
-    snapshot.quoteCurrency !== CurrencyCode.KRW ||
-    snapshot.sourceType !== FxRateSourceType.admin_manual ||
-    !snapshot.approvedByUserId
+    snapshot.quoteCurrency !== CurrencyCode.KRW
   ) {
     throw new PortfolioValuationError(
       'FX_RATE_UNAVAILABLE',
-      'No approved admin_manual USD/KRW FX rate snapshot is available.',
+      'No eligible USD/KRW FX rate snapshot is available.',
+    );
+  }
+
+  if (snapshot.sourceType === FxRateSourceType.admin_manual) {
+    if (!snapshot.approvedByUserId) {
+      throw new PortfolioValuationError(
+        'FX_RATE_UNAVAILABLE',
+        'No approved admin_manual USD/KRW FX rate snapshot is available.',
+      );
+    }
+
+    if (
+      isFxSnapshotStaleForPortfolioValuation(snapshot.effectiveAt, valuationAt)
+    ) {
+      throw new PortfolioValuationError(
+        'FX_RATE_STALE',
+        'USD/KRW FX rate snapshot is stale.',
+      );
+    }
+  } else if (
+    snapshot.sourceType !== FxRateSourceType.provider_api ||
+    !sourceEligibilityWorkflow ||
+    !isProviderWorkflowAllowed(sourceEligibilityWorkflow)
+  ) {
+    throw new PortfolioValuationError(
+      'FX_RATE_UNAVAILABLE',
+      'No eligible USD/KRW FX rate snapshot is available.',
     );
   }
 
@@ -278,15 +317,6 @@ function selectUsableUsdKrwRate(
     throw new PortfolioValuationError(
       'FX_RATE_UNAVAILABLE',
       'USD/KRW FX rate snapshot is not yet effective.',
-    );
-  }
-
-  if (
-    isFxSnapshotStaleForPortfolioValuation(snapshot.effectiveAt, valuationAt)
-  ) {
-    throw new PortfolioValuationError(
-      'FX_RATE_STALE',
-      'USD/KRW FX rate snapshot is stale.',
     );
   }
 
@@ -305,6 +335,7 @@ function assertEligibleAssetPriceSnapshot(
   snapshot: PortfolioAssetPriceSnapshotInput,
   position: PortfolioPositionInput,
   valuationAt: Date,
+  sourceEligibilityWorkflow?: ProviderEligibleWorkflow,
 ) {
   if (snapshot.assetId !== position.assetId) {
     throw new PortfolioValuationError(
@@ -313,10 +344,15 @@ function assertEligibleAssetPriceSnapshot(
     );
   }
 
-  if (snapshot.sourceType !== AssetPriceSourceType.admin_manual) {
+  if (
+    snapshot.sourceType !== AssetPriceSourceType.admin_manual &&
+    (snapshot.sourceType !== AssetPriceSourceType.provider_api ||
+      !sourceEligibilityWorkflow ||
+      !isProviderWorkflowAllowed(sourceEligibilityWorkflow))
+  ) {
     throw new PortfolioValuationError(
       'ASSET_PRICE_UNAVAILABLE',
-      `Only admin_manual asset price snapshots are eligible for asset ${position.assetId}.`,
+      `Only eligible asset price snapshots are allowed for asset ${position.assetId}.`,
     );
   }
 

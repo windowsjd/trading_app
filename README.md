@@ -17,6 +17,8 @@ This service owns backend APIs, database access, financial calculations, and ser
 - Submitted order create, cancel, and full-fill execute MVP.
 - KRW and USD cash wallets. US stocks and USD-settled crypto use the USD wallet.
 - Final valuation policy is KRW total assets.
+- Provider ingestion foundation exists for operator-run ExchangeRate-API USD/KRW, Binance public REST crypto, and KIS WebSocket KRX/US stock market data row insertion.
+- Provider_api source eligibility is opened only for explicitly allowed read-only/quote workflows: `/fx quote`, assets `withPrice`, orders quote, and live portfolio/home/positions valuation.
 - Batch job execution foundation with idempotent `batch_job_runs` recording, operator-only noop/health-check script, operator-run daily portfolio snapshot generation, operator-run season ranking generation from existing daily snapshots, an operator-run daily season cycle orchestration job, an operator-run season settlement MVP job, and an operator-run reward grant marker MVP job.
 - Operator-run final tier assignment MVP job from existing final `season_rankings`.
 
@@ -24,10 +26,12 @@ This service owns backend APIs, database access, financial calculations, and ser
 
 These are intentionally outside the current implementation and should not be added without a separate gate:
 
-- Provider ingestion for OANDA, Twelve Data, Binance, or any other market data provider.
-- Admin/operator account management APIs, provider ingestion trigger APIs, batch run HTTP APIs, scheduler/cron, and reward fulfillment trigger APIs.
-- Cron scheduler, provider ingestion jobs, scheduler-driven snapshot/ranking jobs, settlement extension jobs beyond final tier assignment, or actual reward fulfillment jobs.
-- Provider-backed settlement recalculation or reward automation.
+- Provider ingestion trigger APIs, scheduler-driven provider ingestion, and provider-backed write/final workflows.
+- OANDA and Twelve Data are historical/fallback provider candidates only, not the current MVP core provider stack.
+- Admin/operator account management APIs, batch run HTTP APIs, scheduler/cron, and reward fulfillment trigger APIs.
+- Cron scheduler, scheduler-driven snapshot/ranking jobs, settlement extension jobs beyond final tier assignment, or actual reward fulfillment jobs.
+- Provider-backed FX execute, order create, order execute, daily snapshot, ranking, settlement recalculation, or reward automation.
+- KIS order/account/balance/fill/deposit/withdrawal APIs, KIS orderbook/hoga, Binance authenticated/order/account/user-data APIs, and real external trading/account integrations.
 - Actual payment, point, badge, or trophy fulfillment beyond the `rewardGrantedAt` marker MVP.
 - Access token blacklist/revocation, server-side session auth, and cookie auth.
 - Matching engine, partial fill, durable quote, or exact order execute replay.
@@ -61,7 +65,7 @@ docker compose up -d
 pnpm start:dev
 ```
 
-Do not add provider API keys for the current MVP hardening work. Provider-backed ingestion is still STOP.
+Do not print or commit provider API keys or local env contents. Provider row insertion foundation exists, but provider-backed execute, settlement, automation, and real account/order APIs remain STOP.
 
 ## Tests
 
@@ -157,13 +161,12 @@ Possible now:
 - Operator-run final tier assignment MVP jobs that assign final rank/tier from existing final `season_rankings`.
 - Operator-run reward grant marker MVP jobs that set `SeasonParticipant.rewardGrantedAt` after settlement and final tier assignment.
 - Settled joined Home final-result reads from existing `rankType=final` `season_rankings`; missing final rankings return unavailable without live valuation fallback.
+- Provider_api-backed `/fx quote`, assets `withPrice`, orders quote, and live portfolio/home/positions valuation with fresh provider-first selection and explicit admin_manual fallback.
 
-Not possible without a separate provider gate:
+Not possible without a separate provider/write or automation gate:
 
-- OANDA/Twelve Data/Binance ingestion.
-- Provider-backed FX, stock, or crypto price freshness claims.
 - Cron scheduler-driven snapshots/rankings.
-- Provider-backed settlement recalculation or reward automation.
+- Provider-backed FX execute, order create, order execute, daily snapshots, ranking, settlement, or reward automation.
 - Actual payment, point, badge, or trophy fulfillment.
 
 Never create fake/static/sample business prices to make a test or local flow pass.

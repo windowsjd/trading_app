@@ -42,6 +42,7 @@ jest.mock('../generated/prisma/client', () => {
 
 import { HttpException } from '@nestjs/common';
 import {
+  AssetPriceSourceType,
   AssetType,
   CurrencyCode,
   FxRateSourceType,
@@ -95,10 +96,12 @@ describe('PositionsService', () => {
       ...createWritableModel(),
     },
     assetPriceSnapshot: {
+      findMany: jest.fn().mockResolvedValue([]),
       findFirst: jest.fn(),
       ...createWritableModel(),
     },
     fxRateSnapshot: {
+      findMany: jest.fn().mockResolvedValue([]),
       findFirst: jest.fn(),
       ...createWritableModel(),
     },
@@ -612,6 +615,60 @@ describe('PositionsService', () => {
       },
     });
     expect(response.data.summary.totalPositionValueKrw).toBe('280000.00000000');
+    expectNoPositionWrites(prisma);
+  });
+
+  it('uses fresh provider_api asset price and USD/KRW for positions live valuation', async () => {
+    const { prisma, service } = createService();
+    mockCurrentSeason(prisma);
+    mockJoined(prisma);
+    prisma.position.findMany.mockResolvedValueOnce([
+      position({
+        id: 'position-usd',
+        assetId: 'asset-usd',
+        symbol: 'AAPL',
+        quantity: '2.00000000',
+        averageCost: '80.00000000',
+        currencyCode: CurrencyCode.USD,
+        assetType: AssetType.us_stock,
+      }),
+    ]);
+    prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
+      {
+        id: 'provider-fx-1',
+        rate: new Prisma.Decimal('1500.00000000'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'exchange_rate_api',
+        effectiveAt: new Date(Date.now() - 1_000),
+        capturedAt: new Date(Date.now() - 1_000),
+        approvedByUserId: null,
+      },
+    ]);
+    prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([
+      {
+        id: 'provider-price-usd',
+        price: new Prisma.Decimal('110.00000000'),
+        currencyCode: CurrencyCode.USD,
+        sourceType: AssetPriceSourceType.provider_api,
+        sourceName: 'kis_us_delayed_trade',
+        effectiveAt: new Date(Date.now() - 1_000),
+        capturedAt: new Date(Date.now() - 1_000),
+      },
+    ]);
+
+    const response = await service.getPositions('user-1');
+
+    expect(response.data.positions[0]).toMatchObject({
+      positionId: 'position-usd',
+      valuation: {
+        state: 'available',
+        currentPrice: '110.00000000',
+        assetPriceSnapshotId: 'provider-price-usd',
+        positionValueKrw: '330000.00000000',
+      },
+    });
+    expect(prisma.assetPriceSnapshot.findFirst).not.toHaveBeenCalled();
+    expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
     expectNoPositionWrites(prisma);
   });
 

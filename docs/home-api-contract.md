@@ -3,9 +3,9 @@
 ## Status
 
 - `GET /api/v1/home` read-only MVP is implemented.
-- The active joined dashboard now implements `summary`, `ranking`, `walletSummary`, `allocation`, `topPositions`, and `equityChart` when the required DB/admin_manual data exists.
+- The active joined dashboard now implements `summary`, `ranking`, `walletSummary`, `allocation`, `topPositions`, and `equityChart` when the required DB/provider-or-admin data exists.
 - Settled joined Home now implements an authoritative final-result read model from existing `rankType=final` `season_rankings`, with `daily_portfolio_snapshots` used only as supporting chart data.
-- The implemented MVP uses only existing DB rows, approved `admin_manual` market data, live valuation foundation, and existing `daily_portfolio_snapshots` when possible.
+- The implemented MVP uses only existing DB rows, fresh eligible `provider_api` read-only market data first where allowed, approved `admin_manual` fallback data, live valuation foundation, and existing `daily_portfolio_snapshots` when possible.
 - Provider ingestion, cron scheduler, automatic snapshot/ranking generation, settlement write-policy extensions beyond final tier assignment, and actual reward/payment/badge/trophy fulfillment remain STOP.
 - Do not add fake data, temporary runtime contracts, Prisma schema changes, migrations, or seed changes from this draft.
 
@@ -21,6 +21,10 @@
 - MVP crypto is Binance-based USD-settled crypto and uses the USD Wallet.
 - Crypto KRW valuation is crypto USD price x quantity x USD/KRW rate.
 - `cryptoValueKrw` means KRW-converted value of crypto positions; `totalAssetKrw` and `returnRate` remain KRW-based.
+- Active live valuation and `topPositions` may use fresh eligible `provider_api` rows first, then existing `admin_manual` fallback rows.
+- Provider asset price freshness uses capturedAt age <= 60 seconds; provider USD/KRW freshness uses capturedAt age <= 300 seconds.
+- Settled final result, ranking, rewards, equity chart snapshots, scheduler/cron, and daily snapshot generation do not use live provider rows.
+- Source decisions are internal; Home response shape remains backward-compatible and raw provider payloads are never exposed.
 
 ## Common Success Shape
 
@@ -163,8 +167,8 @@ Render the normal joined-season home dashboard. Trading and exchange entry point
 - `walletSummary.cashWallets`
 - `walletSummary.positionsCount`
 - `walletSummary.openPositionsCount`
-- `allocation` from live valuation based on existing wallets, positions, latest eligible `admin_manual` asset price snapshots, and fresh approved `admin_manual` USD/KRW when needed.
-- `topPositions` from existing open positions, latest eligible `admin_manual` asset price snapshots, and fresh approved `admin_manual` USD/KRW when needed.
+- `allocation` from live valuation based on existing wallets, positions, fresh eligible `provider_api` asset/FX snapshots first where allowed, and existing `admin_manual` fallback snapshots when needed.
+- `topPositions` from existing open positions, fresh eligible `provider_api` asset/FX snapshots first where allowed, and existing `admin_manual` fallback snapshots when needed.
 - `equityChart` from existing `daily_portfolio_snapshots`.
 
 ### Currently Not Implementable Fields
@@ -325,8 +329,8 @@ If daily snapshot and live valuation are both unavailable, `summary` is returned
 
 Read-only MVP is implemented for active joined `summary`, `ranking`, `walletSummary`, `allocation`, `topPositions`, and `equityChart`.
 
-- `allocation` uses live valuation and returns unavailable when required `admin_manual` asset price is missing/not eligible, or fresh approved `admin_manual` USD/KRW data is missing or stale. `percentage` is a 0-100 decimal string, and `rate` is the 0-1 decimal fraction.
-- `topPositions` excludes zero-quantity positions, uses latest eligible `admin_manual` asset prices, converts USD assets with fresh approved `admin_manual` USD/KRW, sorts by `positionValueKrw` descending, and limits to 5.
+- `allocation` uses live valuation and returns unavailable when required provider/admin asset price is missing/not eligible, or provider/admin USD/KRW data is missing or stale. `percentage` is a 0-100 decimal string, and `rate` is the 0-1 decimal fraction.
+- `topPositions` excludes zero-quantity positions, uses fresh eligible `provider_api` asset price first then `admin_manual` fallback, converts USD assets with fresh provider USD/KRW first then approved `admin_manual` fallback, sorts by `positionValueKrw` descending, and limits to 5.
 - `equityChart` reads the latest 30 existing `daily_portfolio_snapshots` and returns them in chronological order. It does not synthesize live valuation chart points and does not create snapshots.
 - Provider ingestion, scheduler/batch, settlement, reward, fake/static/sample business data, Prisma schema changes, migrations, and seed changes remain out of scope.
 
@@ -820,7 +824,7 @@ Render available sections and show section-level fallback states only for failed
 ### Currently Implementable Fields
 
 - Implemented section-level unavailable fallback for active joined `summary`, `allocation`, `topPositions`, `ranking`, and `equityChart`.
-- `summary`, `allocation`, and `topPositions` add section errors when required DB/admin_manual market data is missing or stale.
+- `summary`, `allocation`, and `topPositions` add section errors when required DB provider/admin market data is missing or stale.
 - Missing `season_rankings` or `daily_portfolio_snapshots` return section-level unavailable states without creating rows.
 
 ### Currently Not Implementable Fields
@@ -882,13 +886,13 @@ Only the common error shape direction is documented. No `/home` error implementa
 
 ## Current Full Implementation Blockers
 
-- provider price ingestion and provider-backed source evidence
+- provider price ingestion trigger APIs and provider-backed write/final evidence
 - scheduler/batch automatic daily portfolio snapshot generation
 - scheduler/batch automatic season ranking generation
 - actual reward/payment/badge/trophy fulfillment integration
 - richer `/ranking`, `/orders`, `/records`, `/settlement` APIs
 
-`allocation`, `topPositions`, and `equityChart` are no longer placeholder blockers for active joined Home. They remain dependent on existing wallets, positions, latest eligible `admin_manual` asset prices, fresh approved `admin_manual` USD/KRW where needed, and existing `daily_portfolio_snapshots`.
+`allocation`, `topPositions`, and `equityChart` are no longer placeholder blockers for active joined Home. They remain dependent on existing wallets, positions, fresh eligible provider rows or safe `admin_manual` fallback prices/FX where needed, and existing `daily_portfolio_snapshots`.
 
 ## Near-Term Required Tables
 

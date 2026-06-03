@@ -26,7 +26,9 @@ Use this directory in this order:
    - `docs/asset-universe-2026-ytd-volume-selection.md`
    - `docs/provider-source-eligibility-pre-gate.md`
 
-Provider evidence currently has ExchangeRate-API and Binance row insertion evidence, KIS domestic `H0STCNT0` row insertion evidence, and KIS US `HDFSCNT0` tick/DB insertion evidence. Provider_api source eligibility remains closed until a later implementation gate.
+Provider evidence currently has ExchangeRate-API and Binance row insertion evidence, KIS domestic `H0STCNT0` row insertion evidence, and KIS US `HDFSCNT0` tick/DB insertion evidence. Provider_api source eligibility is open only for the read-only/quote gate: `/fx quote`, assets `withPrice`, orders quote, and live portfolio/home/positions valuation.
+
+Provider_api remains closed for `/fx execute`, orders create/execute, daily portfolio snapshot, ranking, settlement/final result, reward/final tier/fulfillment, scheduler/cron, provider ingestion trigger APIs, and real trading/account/order/deposit/withdrawal APIs.
 
 6. Admin/operator authorization and audit foundation:
 
