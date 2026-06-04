@@ -26,7 +26,7 @@
 - Existing `admin_manual` quote fallback keeps the established 60-second `effectiveAt` stale check.
 - Near-term `/fx execute` uses approved fresh `admin_manual` snapshots only as allowed sourceType.
 - `provider_api` and `official_batch` source eligibility is not opened for `/fx execute`.
-- Source decisions are internal. The response shape remains backward-compatible and exposes only existing safe timing fields (`rateCapturedAt`, `rateEffectiveAt`), not raw provider payloads.
+- `/fx quote` exposes optional public-safe `rateSource` metadata for source/outage visibility. Raw provider payloads, `metadataJson`, and secrets are never exposed.
 - USD/KRW snapshots are also the KRW conversion evidence for USD-settled crypto valuation.
 - MVP crypto uses Binance-based USD settlement and the USD Wallet; no `USDT` wallet/currency is introduced.
 
@@ -78,7 +78,18 @@ Return a KRW/USD exchange quote without changing wallet balances or writing exch
     "netTargetAmount": "<amount string>",
     "expiresAt": null,
     "rateCapturedAt": "<UTC ISO string>",
-    "rateEffectiveAt": "<UTC ISO string>"
+    "rateEffectiveAt": "<UTC ISO string>",
+    "rateSource": {
+      "sourceType": "provider_api | admin_manual | null",
+      "sourceName": "<string | null>",
+      "snapshotId": "<string | null>",
+      "effectiveAt": "<UTC ISO string | null>",
+      "capturedAt": "<UTC ISO string | null>",
+      "fallbackUsed": false,
+      "fallbackReason": "provider_missing | provider_rejected | provider_not_selected | workflow_ineligible | asset_ineligible | fx_pair_ineligible | null",
+      "rejectedProviderReason": "source_type_mismatch | source_name_mismatch | non_positive_value | effective_at_in_future | captured_at_in_future | captured_at_stale | null",
+      "freshnessAgeSeconds": 12
+    }
   }
 }
 ```
@@ -102,6 +113,7 @@ Return a KRW/USD exchange quote without changing wallet balances or writing exch
 - `quoteId` is fixed to `null` for the current implementation.
 - `expiresAt` is fixed to `null` for the current implementation.
 - `rateCapturedAt` and `rateEffectiveAt` are returned for rate timing transparency.
+- Optional `rateSource` returns selected provider/admin source metadata and fallback/rejected-provider reason visibility.
 - `appliedRate` source is fresh `provider_api` `exchange_rate_api` USD/KRW first, then existing `admin_manual` fallback.
 - Missing eligible provider and manual snapshots return `FX_RATE_UNAVAILABLE`.
 - Selected provider snapshot older than 300 seconds by `capturedAt`, or selected manual snapshot older than 60 seconds by `effectiveAt`, returns `FX_RATE_STALE` only when no safe fallback is available.

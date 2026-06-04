@@ -190,7 +190,10 @@ export class PortfolioValuationService {
         };
 
     if (providerSelection.state === 'selected') {
-      return providerSelection.snapshot;
+      return {
+        ...providerSelection.snapshot,
+        sourceDecision: providerSelection.decision,
+      };
     }
 
     const fallbackSnapshot = await this.prisma.assetPriceSnapshot.findFirst({
@@ -223,7 +226,7 @@ export class PortfolioValuationService {
       return null;
     }
 
-    buildAdminManualFallbackDecision({
+    const sourceDecision = buildAdminManualFallbackDecision({
       selectedSnapshotId: fallbackSnapshot.id,
       selectedSourceName: fallbackSnapshot.sourceName,
       selectedEffectiveAt: fallbackSnapshot.effectiveAt,
@@ -231,7 +234,10 @@ export class PortfolioValuationService {
       providerDecision: providerSelection.decision,
     });
 
-    return fallbackSnapshot;
+    return {
+      ...fallbackSnapshot,
+      sourceDecision,
+    };
   }
 
   private async findLatestEligibleUsdKrwSnapshot(
@@ -295,7 +301,10 @@ export class PortfolioValuationService {
         };
 
     if (providerSelection.state === 'selected') {
-      return providerSelection.snapshot;
+      return {
+        ...providerSelection.snapshot,
+        sourceDecision: providerSelection.decision,
+      };
     }
 
     const fallbackSnapshot = await this.prisma.fxRateSnapshot.findFirst({
@@ -330,13 +339,16 @@ export class PortfolioValuationService {
     });
 
     if (fallbackSnapshot) {
-      buildAdminManualFallbackDecision({
-        selectedSnapshotId: fallbackSnapshot.id,
-        selectedSourceName: fallbackSnapshot.sourceName,
-        selectedEffectiveAt: fallbackSnapshot.effectiveAt,
-        selectedCapturedAt: fallbackSnapshot.capturedAt,
-        providerDecision: providerSelection.decision,
-      });
+      return {
+        ...fallbackSnapshot,
+        sourceDecision: buildAdminManualFallbackDecision({
+          selectedSnapshotId: fallbackSnapshot.id,
+          selectedSourceName: fallbackSnapshot.sourceName,
+          selectedEffectiveAt: fallbackSnapshot.effectiveAt,
+          selectedCapturedAt: fallbackSnapshot.capturedAt,
+          providerDecision: providerSelection.decision,
+        }),
+      };
     }
 
     return fallbackSnapshot;

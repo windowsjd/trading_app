@@ -24,7 +24,9 @@
 - Active live valuation and `topPositions` may use fresh eligible `provider_api` rows first, then existing `admin_manual` fallback rows.
 - Provider asset price freshness uses capturedAt age <= 60 seconds; provider USD/KRW freshness uses capturedAt age <= 300 seconds.
 - Settled final result, ranking, rewards, equity chart snapshots, scheduler/cron, and daily snapshot generation do not use live provider rows.
-- Source decisions are internal; Home response shape remains backward-compatible and raw provider payloads are never exposed.
+- Active live valuation sections may expose public-safe source metadata for outage visibility: `sourceSummary`, `priceSource`, and `fxRateSource`.
+- Daily snapshot summary, ranking, final result, rewards, and equity chart sections do not expose provider source metadata because they read existing snapshot/ranking/reward rows.
+- Raw provider payloads, `metadataJson`, and secrets are never exposed.
 
 ## Common Success Shape
 
@@ -221,6 +223,14 @@ The implemented MVP may return available summary/ranking sections or explicit un
       "unrealizedPnlKrw": "<amount string>",
       "valuationCapturedAt": "<UTC ISO string | only daily_snapshot>",
       "valuationAt": "<UTC ISO string | only live_valuation>",
+      "sourceSummary": {
+        "providerApiUsed": true,
+        "adminManualUsed": true,
+        "fallbackUsed": true,
+        "fallbackReasons": ["provider_rejected"],
+        "rejectedProviderReasons": ["captured_at_stale"]
+      },
+      "fxRateSource": "<source metadata object | null | only live_valuation>",
       "dataFreshness": {
         "status": "available",
         "asOf": "<UTC ISO string>"
@@ -254,6 +264,8 @@ The implemented MVP may return available summary/ranking sections or explicit un
       "allocationSource": "live_valuation",
       "totalAssetKrw": "<amount string>",
       "valuationAt": "<UTC ISO string>",
+      "sourceSummary": "<live valuation source summary>",
+      "fxRateSource": "<source metadata object | null>",
       "items": [
         {
           "category": "krw_cash | usd_cash | domestic_stock | us_stock | crypto",
@@ -287,7 +299,9 @@ The implemented MVP may return available summary/ranking sections or explicit un
           "returnRate": "<decimal string>",
           "assetPriceSnapshotId": "<string>",
           "priceEffectiveAt": "<UTC ISO string>",
-          "priceCapturedAt": "<UTC ISO string>"
+          "priceCapturedAt": "<UTC ISO string>",
+          "priceSource": "<source metadata object>",
+          "fxRateSource": "<source metadata object | optional for USD positions>"
         }
       ]
     },
@@ -331,6 +345,7 @@ Read-only MVP is implemented for active joined `summary`, `ranking`, `walletSumm
 
 - `allocation` uses live valuation and returns unavailable when required provider/admin asset price is missing/not eligible, or provider/admin USD/KRW data is missing or stale. `percentage` is a 0-100 decimal string, and `rate` is the 0-1 decimal fraction.
 - `topPositions` excludes zero-quantity positions, uses fresh eligible `provider_api` asset price first then `admin_manual` fallback, converts USD assets with fresh provider USD/KRW first then approved `admin_manual` fallback, sorts by `positionValueKrw` descending, and limits to 5.
+- Live valuation `sourceSummary` and top-position `priceSource`/`fxRateSource` are optional metadata additions for provider outage/fallback UX. `fallbackUsed=true` can be shown by the frontend as provider outage/stale/fallback context; final UX wording is a separate frontend gate.
 - `equityChart` reads the latest 30 existing `daily_portfolio_snapshots` and returns them in chronological order. It does not synthesize live valuation chart points and does not create snapshots.
 - Provider ingestion, scheduler/batch, settlement, reward, fake/static/sample business data, Prisma schema changes, migrations, and seed changes remain out of scope.
 

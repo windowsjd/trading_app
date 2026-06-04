@@ -16,7 +16,12 @@ import {
   resolveAssetProviderEligibility,
   resolveFxProviderEligibility,
   selectFreshProviderSnapshot,
+  type SourceDecision,
 } from '../providers/source-eligibility.policy';
+import {
+  presentSourceDecision,
+  type PublicSourceMetadata,
+} from '../providers/source-metadata.presenter';
 
 export type PositionsQuery = {
   seasonId?: string;
@@ -77,17 +82,20 @@ type AssetPriceSnapshotRecord = {
   sourceName: string | null;
   effectiveAt: Date;
   capturedAt: Date;
+  sourceDecision: SourceDecision;
 };
 
 type UsdKrwSelection =
   | {
       state: 'available';
       rate: Prisma.Decimal;
+      sourceDecision: SourceDecision;
     }
   | {
       state: 'unavailable';
       code: 'FX_RATE_UNAVAILABLE' | 'FX_RATE_STALE';
       message: string;
+      sourceDecision?: SourceDecision;
     };
 
 type PositionValuation =
@@ -101,6 +109,8 @@ type PositionValuation =
         assetPriceSnapshotId: string;
         priceEffectiveAt: string;
         priceCapturedAt: string;
+        priceSource: PublicSourceMetadata | null;
+        fxRateSource?: PublicSourceMetadata | null;
         positionValue: string;
         positionValueKrw: string;
         unrealizedPnl: string;
@@ -122,6 +132,7 @@ type PositionValuation =
         state: 'unavailable';
         reason: string;
         message: string;
+        fxRateSource?: PublicSourceMetadata | null;
       };
     };
 
@@ -183,6 +194,7 @@ class PositionValuationError extends Error {
       | 'FX_RATE_UNAVAILABLE'
       | 'FX_RATE_STALE',
     message: string,
+    readonly sourceDecision?: SourceDecision,
   ) {
     super(message);
   }
@@ -336,6 +348,7 @@ export class PositionsService {
         throw new PositionValuationError(
           usdKrwSelection.code,
           usdKrwSelection.message,
+          usdKrwSelection.sourceDecision,
         );
       }
 
@@ -368,6 +381,15 @@ export class PositionsService {
           assetPriceSnapshotId: priceSnapshot.id,
           priceEffectiveAt: priceSnapshot.effectiveAt.toISOString(),
           priceCapturedAt: priceSnapshot.capturedAt.toISOString(),
+          priceSource: presentSourceDecision(priceSnapshot.sourceDecision),
+          ...(position.currencyCode === CurrencyCode.USD &&
+          usdKrwSelection?.state === 'available'
+            ? {
+                fxRateSource: presentSourceDecision(
+                  usdKrwSelection.sourceDecision,
+                ),
+              }
+            : {}),
           positionValue: this.formatDecimal(positionValue, 8),
           positionValueKrw: this.formatDecimal(positionValueKrw, 8),
           unrealizedPnl: this.formatDecimal(unrealizedPnl, 8),
@@ -395,6 +417,13 @@ export class PositionsService {
           state: 'unavailable',
           reason: valuationError.code,
           message: valuationError.message,
+          ...(valuationError.sourceDecision
+            ? {
+                fxRateSource: presentSourceDecision(
+                  valuationError.sourceDecision,
+                ),
+              }
+            : {}),
         },
       };
     }
@@ -458,7 +487,10 @@ export class PositionsService {
         };
 
     if (providerSelection.state === 'selected') {
-      return providerSelection.snapshot;
+      return {
+        ...providerSelection.snapshot,
+        sourceDecision: providerSelection.decision,
+      };
     }
 
     const snapshot = await this.prisma.assetPriceSnapshot.findFirst({
@@ -496,7 +528,7 @@ export class PositionsService {
       );
     }
 
-    buildAdminManualFallbackDecision({
+    const sourceDecision = buildAdminManualFallbackDecision({
       selectedSnapshotId: snapshot.id,
       selectedSourceName: snapshot.sourceName,
       selectedEffectiveAt: snapshot.effectiveAt,
@@ -504,7 +536,10 @@ export class PositionsService {
       providerDecision: providerSelection.decision,
     });
 
-    return snapshot;
+    return {
+      ...snapshot,
+      sourceDecision,
+    };
   }
 
   private async findUsdKrwSelectionIfNeeded(
@@ -575,6 +610,7 @@ export class PositionsService {
       return {
         state: 'available',
         rate: providerSelection.snapshot.rate,
+        sourceDecision: providerSelection.decision,
       };
     }
 
@@ -614,8 +650,17 @@ export class PositionsService {
         state: 'unavailable',
         code: 'FX_RATE_UNAVAILABLE',
         message: 'USD/KRW FX rate snapshot is unavailable.',
+        sourceDecision: providerSelection.decision,
       };
     }
+
+    const sourceDecision = buildAdminManualFallbackDecision({
+      selectedSnapshotId: snapshot.id,
+      selectedSourceName: snapshot.sourceName,
+      selectedEffectiveAt: snapshot.effectiveAt,
+      selectedCapturedAt: snapshot.capturedAt,
+      providerDecision: providerSelection.decision,
+    });
 
     if (
       snapshot.sourceType !== FxRateSourceType.admin_manual ||
@@ -626,6 +671,7 @@ export class PositionsService {
         code: 'FX_RATE_UNAVAILABLE',
         message:
           'No approved admin_manual USD/KRW FX rate snapshot is available.',
+        sourceDecision,
       };
     }
 
@@ -636,12 +682,14 @@ export class PositionsService {
         state: 'unavailable',
         code: 'FX_RATE_STALE',
         message: 'USD/KRW FX rate snapshot is stale.',
+        sourceDecision,
       };
     }
 
     return {
       state: 'available',
       rate: snapshot.rate,
+      sourceDecision,
     };
   }
 

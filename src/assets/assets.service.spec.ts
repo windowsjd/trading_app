@@ -142,6 +142,8 @@ describe('AssetsService', () => {
     id,
     price: new Prisma.Decimal(price),
     currencyCode,
+    sourceType: AssetPriceSourceType.admin_manual,
+    sourceName: 'manual-price',
     effectiveAt: priceAt,
     capturedAt: new Date('2026-05-07T00:00:10.000Z'),
   });
@@ -163,9 +165,12 @@ describe('AssetsService', () => {
   });
 
   const freshUsdKrwSnapshot = () => ({
+    id: 'fx-admin-1',
     rate: new Prisma.Decimal('1400.00000000'),
     sourceType: FxRateSourceType.admin_manual,
+    sourceName: 'manual-fx',
     effectiveAt: new Date(Date.now() - 1_000),
+    capturedAt: new Date(Date.now() - 1_000),
     approvedByUserId: 'operator-1',
   });
 
@@ -550,6 +555,12 @@ describe('AssetsService', () => {
       state: 'available',
       currentPrice: '123.00000000',
       assetPriceSnapshotId: 'provider-price-1',
+      priceSource: {
+        sourceType: 'provider_api',
+        sourceName: input.sourceName,
+        snapshotId: 'provider-price-1',
+        fallbackUsed: false,
+      },
     });
     expect(prisma.assetPriceSnapshot.findFirst).not.toHaveBeenCalled();
     expectNoAssetWrites(prisma);
@@ -585,6 +596,14 @@ describe('AssetsService', () => {
       state: 'available',
       currentPrice: '70000.00000000',
       assetPriceSnapshotId: 'admin-price-1',
+      priceSource: {
+        sourceType: 'admin_manual',
+        sourceName: 'manual-price',
+        snapshotId: 'admin-price-1',
+        fallbackUsed: true,
+        fallbackReason: 'provider_rejected',
+        rejectedProviderReason: 'captured_at_stale',
+      },
     });
     expectNoAssetWrites(prisma);
   });
@@ -653,6 +672,12 @@ describe('AssetsService', () => {
       state: 'available',
       priceKrwState: 'available',
       priceKrw: '150000.00000000',
+      fxRateSource: {
+        sourceType: 'provider_api',
+        sourceName: 'exchange_rate_api',
+        snapshotId: 'provider-fx-1',
+        fallbackUsed: false,
+      },
     });
     expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
     expectNoAssetWrites(prisma);
@@ -680,6 +705,11 @@ describe('AssetsService', () => {
       state: 'available',
       priceKrwState: 'unavailable',
       priceKrwReason: 'FX_RATE_UNAVAILABLE',
+      fxRateSource: {
+        sourceType: null,
+        fallbackUsed: true,
+        fallbackReason: 'provider_missing',
+      },
     });
     expect(response.data.assets[0].price).not.toHaveProperty('priceKrw');
     expect(response.data.priceErrors).toEqual([

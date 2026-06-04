@@ -31,6 +31,11 @@ import {
   resolveFxProviderEligibility,
   selectFreshProviderSnapshot,
 } from '../providers/source-eligibility.policy';
+import {
+  presentLimitPriceSource,
+  presentSourceDecision,
+  type PublicSourceMetadata,
+} from '../providers/source-metadata.presenter';
 
 export type OrdersQuery = {
   seasonId?: string;
@@ -171,6 +176,8 @@ type OrderQuoteCalculation = {
   krwNetAmount: Prisma.Decimal;
   assetPriceSnapshotId: string | null;
   fxRateSnapshotId: string | null;
+  assetPriceSource: PublicSourceMetadata | null;
+  fxRateSource: PublicSourceMetadata | null;
   quoteAt: Date;
 };
 
@@ -1719,6 +1726,8 @@ export class OrdersService {
       krwNetAmount: krwAmounts.krwNetAmount,
       assetPriceSnapshotId: priceContext.assetPriceSnapshotId,
       fxRateSnapshotId: fxSnapshot?.id ?? null,
+      assetPriceSource: priceContext.assetPriceSource,
+      fxRateSource: fxSnapshot?.fxRateSource ?? null,
       quoteAt,
     };
   }
@@ -2061,6 +2070,7 @@ export class OrdersService {
   ): Promise<{
     price: Prisma.Decimal;
     assetPriceSnapshotId: string | null;
+    assetPriceSource: PublicSourceMetadata | null;
   }> {
     if (request.orderType === OrderType.limit) {
       if (!request.limitPrice) {
@@ -2074,6 +2084,7 @@ export class OrdersService {
       return {
         price: roundDecimalHalfUp(request.limitPrice, monetaryScale),
         assetPriceSnapshotId: null,
+        assetPriceSource: presentLimitPriceSource(),
       };
     }
 
@@ -2135,6 +2146,7 @@ export class OrdersService {
           monetaryScale,
         ),
         assetPriceSnapshotId: providerSelection.snapshot.id,
+        assetPriceSource: presentSourceDecision(providerSelection.decision),
       };
     }
 
@@ -2172,7 +2184,7 @@ export class OrdersService {
       );
     }
 
-    buildAdminManualFallbackDecision({
+    const sourceDecision = buildAdminManualFallbackDecision({
       selectedSnapshotId: snapshot.id,
       selectedSourceName: snapshot.sourceName,
       selectedEffectiveAt: snapshot.effectiveAt,
@@ -2183,6 +2195,7 @@ export class OrdersService {
     return {
       price: roundDecimalHalfUp(snapshot.price, monetaryScale),
       assetPriceSnapshotId: snapshot.id,
+      assetPriceSource: presentSourceDecision(sourceDecision),
     };
   }
 
@@ -2192,6 +2205,7 @@ export class OrdersService {
   ): Promise<{
     id: string;
     rate: Prisma.Decimal;
+    fxRateSource: PublicSourceMetadata | null;
   }> {
     const providerEligibility = resolveFxProviderEligibility({
       workflow: sourceWorkflow,
@@ -2249,6 +2263,7 @@ export class OrdersService {
       return {
         id: providerSelection.snapshot.id,
         rate: providerSelection.snapshot.rate,
+        fxRateSource: presentSourceDecision(providerSelection.decision),
       };
     }
 
@@ -2297,7 +2312,7 @@ export class OrdersService {
       );
     }
 
-    buildAdminManualFallbackDecision({
+    const sourceDecision = buildAdminManualFallbackDecision({
       selectedSnapshotId: snapshot.id,
       selectedSourceName: snapshot.sourceName,
       selectedEffectiveAt: snapshot.effectiveAt,
@@ -2308,6 +2323,7 @@ export class OrdersService {
     return {
       id: snapshot.id,
       rate: roundDecimalHalfUp(snapshot.rate, monetaryScale),
+      fxRateSource: presentSourceDecision(sourceDecision),
     };
   }
 
@@ -2637,6 +2653,8 @@ export class OrdersService {
       krwNetAmount: this.formatDecimal(quote.krwNetAmount, monetaryScale),
       assetPriceSnapshotId: quote.assetPriceSnapshotId,
       fxRateSnapshotId: quote.fxRateSnapshotId,
+      assetPriceSource: quote.assetPriceSource,
+      ...(quote.fxRateSource ? { fxRateSource: quote.fxRateSource } : {}),
       quoteId: null,
       expiresAt: null,
       quoteAt: quote.quoteAt.toISOString(),

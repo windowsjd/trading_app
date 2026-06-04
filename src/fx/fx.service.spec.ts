@@ -246,7 +246,10 @@ describe('FxService', () => {
     effectiveAt = freshEffectiveAt,
   ) => {
     prisma.fxRateSnapshot.findFirst.mockResolvedValueOnce({
+      id: 'fx-admin-1',
       rate: new Prisma.Decimal('1350.00000000'),
+      sourceType: FxRateSourceType.admin_manual,
+      sourceName: 'manual-approved',
       capturedAt,
       effectiveAt,
     });
@@ -408,9 +411,116 @@ describe('FxService', () => {
       data: {
         appliedRate: '1400.00000000',
         rateEffectiveAt: staleEffectiveAt.toISOString(),
+        rateSource: {
+          sourceType: 'provider_api',
+          sourceName: 'exchange_rate_api',
+          snapshotId: 'provider-fx-1',
+          fallbackUsed: false,
+          fallbackReason: null,
+          rejectedProviderReason: null,
+        },
       },
     });
     expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('returns admin_manual fallback metadata when quote provider is stale', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    mockJoinedParticipant(prisma);
+    prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
+      {
+        id: 'provider-fx-stale',
+        rate: new Prisma.Decimal('1400.00000000'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'exchange_rate_api',
+        capturedAt: new Date('2026-04-30T23:55:59.000Z'),
+        effectiveAt: new Date('2026-04-30T23:55:59.000Z'),
+      },
+    ]);
+    mockApprovedRateSnapshot(prisma);
+
+    await expect(
+      service.quote('user-1', {
+        fromCurrency: 'KRW',
+        toCurrency: 'USD',
+        sourceAmount: '135000',
+      }),
+    ).resolves.toMatchObject({
+      success: true,
+      data: {
+        appliedRate: '1350.00000000',
+        rateSource: {
+          sourceType: 'admin_manual',
+          sourceName: 'manual-approved',
+          snapshotId: 'fx-admin-1',
+          fallbackUsed: true,
+          fallbackReason: 'provider_rejected',
+          rejectedProviderReason: 'captured_at_stale',
+          freshnessAgeSeconds: 301,
+        },
+      },
+    });
+  });
+
+  it('returns admin_manual fallback metadata when quote provider is missing', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    mockJoinedParticipant(prisma);
+    mockApprovedRateSnapshot(prisma);
+
+    await expect(
+      service.quote('user-1', {
+        fromCurrency: 'KRW',
+        toCurrency: 'USD',
+        sourceAmount: '135000',
+      }),
+    ).resolves.toMatchObject({
+      success: true,
+      data: {
+        rateSource: {
+          sourceType: 'admin_manual',
+          fallbackUsed: true,
+          fallbackReason: 'provider_missing',
+          rejectedProviderReason: null,
+        },
+      },
+    });
+  });
+
+  it('returns wrong-source fallback metadata when quote provider sourceName is rejected', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    mockJoinedParticipant(prisma);
+    prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
+      {
+        id: 'provider-fx-wrong-source',
+        rate: new Prisma.Decimal('1400.00000000'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'unexpected_provider',
+        capturedAt,
+        effectiveAt: freshEffectiveAt,
+      },
+    ]);
+    mockApprovedRateSnapshot(prisma);
+
+    await expect(
+      service.quote('user-1', {
+        fromCurrency: 'KRW',
+        toCurrency: 'USD',
+        sourceAmount: '135000',
+      }),
+    ).resolves.toMatchObject({
+      success: true,
+      data: {
+        rateSource: {
+          sourceType: 'admin_manual',
+          fallbackUsed: true,
+          fallbackReason: 'provider_rejected',
+          rejectedProviderReason: 'source_name_mismatch',
+        },
+      },
+    });
   });
 
   it('rejects quote when provider_api is rejected and no admin_manual fallback exists', async () => {
@@ -510,6 +620,17 @@ describe('FxService', () => {
         expiresAt: null,
         rateCapturedAt: capturedAt.toISOString(),
         rateEffectiveAt: freshEffectiveAt.toISOString(),
+        rateSource: {
+          sourceType: 'admin_manual',
+          sourceName: 'manual-approved',
+          snapshotId: 'fx-admin-1',
+          effectiveAt: freshEffectiveAt.toISOString(),
+          capturedAt: capturedAt.toISOString(),
+          fallbackUsed: true,
+          fallbackReason: 'provider_missing',
+          rejectedProviderReason: null,
+          freshnessAgeSeconds: null,
+        },
       },
     });
   });

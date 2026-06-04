@@ -150,7 +150,9 @@
 - `currencyCode`, if provided, must match `asset.currencyCode`.
 - USD assets use fresh `provider_api` `exchange_rate_api` USD/KRW first, then approved fresh `admin_manual` fallback. Provider FX freshness uses capturedAt age <= 300 seconds; manual fallback uses the existing 60-second rule.
 - Missing, stale, future, non-positive, wrong-source, or ineligible provider rows fall back to the existing safe `admin_manual` quote logic.
-- Source decisions are internal. Response shape remains backward-compatible and existing snapshot id fields provide selected snapshot evidence.
+- `POST /api/v1/orders/quote` exposes optional public-safe `assetPriceSource` and `fxRateSource` metadata. Response shape remains backward-compatible and existing snapshot id fields are preserved.
+- Limit orders use `limitPrice`, so `assetPriceSource.sourceType` is `null` and `fallbackReason` is `limit_price_provided`.
+- Raw provider payloads, `metadataJson`, and secrets are never exposed.
 - USD-settled crypto assets follow the same USD asset rule: order currency is USD, buy/sell resource checks use the USD Wallet, and `krwGrossAmount`/`krwFeeAmount`/`krwNetAmount` are USD amounts converted through USD/KRW.
 - Buy quote validates cash wallet balance read-only.
 - Sell quote validates position quantity read-only.
@@ -186,6 +188,28 @@
     "krwNetAmount": "<amount string>",
     "assetPriceSnapshotId": "<string | null>",
     "fxRateSnapshotId": "<string | null>",
+    "assetPriceSource": {
+      "sourceType": "provider_api | admin_manual | null",
+      "sourceName": "<string | null>",
+      "snapshotId": "<string | null>",
+      "effectiveAt": "<UTC ISO string | null>",
+      "capturedAt": "<UTC ISO string | null>",
+      "fallbackUsed": false,
+      "fallbackReason": "limit_price_provided | provider_missing | provider_rejected | provider_not_selected | workflow_ineligible | asset_ineligible | fx_pair_ineligible | null",
+      "rejectedProviderReason": "<string | null>",
+      "freshnessAgeSeconds": 12
+    },
+    "fxRateSource": {
+      "sourceType": "provider_api | admin_manual | null",
+      "sourceName": "<string | null>",
+      "snapshotId": "<string | null>",
+      "effectiveAt": "<UTC ISO string | null>",
+      "capturedAt": "<UTC ISO string | null>",
+      "fallbackUsed": false,
+      "fallbackReason": "<string | null>",
+      "rejectedProviderReason": "<string | null>",
+      "freshnessAgeSeconds": 12
+    },
     "quoteId": null,
     "expiresAt": null,
     "quoteAt": "<UTC ISO string>"
@@ -238,6 +262,7 @@ Same body as `POST /api/v1/orders/quote`.
 - If an order was later canceled, duplicate create replay still prefers the original stored create response. This can show the original submitted create response rather than current canceled status; a stricter current-state command history would require a separate idempotency command table.
 - New create runs the same validation and quote calculation as `POST /api/v1/orders/quote`.
 - New create is closed to `provider_api`; it uses the existing `admin_manual` asset price and FX selection even if fresh provider rows exist.
+- Create response does not add quote source metadata; create remains a write path with provider_api closed.
 - Creates exactly one `orders` row with `status = submitted`.
 - Stores `idempotencyKey`, `requestHash`, and `responsePayloadJson` on that order row.
 - Does not execute the order.

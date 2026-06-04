@@ -40,6 +40,10 @@ import {
   selectFreshProviderSnapshot,
   type SourceDecision,
 } from '../providers/source-eligibility.policy';
+import {
+  presentSourceDecision,
+  type PublicSourceMetadata,
+} from '../providers/source-metadata.presenter';
 
 export type FxQuoteRequestBody = {
   fromCurrency?: unknown;
@@ -99,6 +103,7 @@ type FxQuoteResponse = {
     expiresAt: null;
     rateCapturedAt: string;
     rateEffectiveAt: string;
+    rateSource: PublicSourceMetadata | null;
   };
 };
 
@@ -252,6 +257,7 @@ export class FxService {
           expiresAt: null,
           rateCapturedAt: rateSnapshot.capturedAt.toISOString(),
           rateEffectiveAt: rateSnapshot.effectiveAt.toISOString(),
+          rateSource: presentSourceDecision(rateSnapshot.sourceDecision),
         },
       };
     } catch (error) {

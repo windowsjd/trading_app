@@ -14,6 +14,7 @@ import { fxExecuteSnapshotFreshnessThresholdMs } from '../fx/fx-execute-snapshot
 import {
   isProviderWorkflowAllowed,
   type ProviderEligibleWorkflow,
+  type SourceDecision,
 } from '../providers/source-eligibility.policy';
 
 type DecimalInput = string | Prisma.Decimal;
@@ -43,6 +44,7 @@ export type PortfolioAssetPriceSnapshotInput = {
   effectiveAt: Date;
   capturedAt: Date;
   createdAt: Date;
+  sourceDecision?: SourceDecision;
 };
 
 export type PortfolioFxRateSnapshotInput = {
@@ -56,6 +58,15 @@ export type PortfolioFxRateSnapshotInput = {
   capturedAt: Date;
   createdAt: Date;
   approvedByUserId?: string | null;
+  sourceDecision?: SourceDecision;
+};
+
+export type PortfolioSourceSummary = {
+  providerApiUsed: boolean;
+  adminManualUsed: boolean;
+  fallbackUsed: boolean;
+  fallbackReasons: string[];
+  rejectedProviderReasons: string[];
 };
 
 export type PortfolioValuationInput = {
@@ -81,6 +92,12 @@ export type PortfolioValuationResult = {
   realizedPnlKrw: string;
   unrealizedPnlKrw: string;
   valuationAt: Date;
+  sourceSummary: PortfolioSourceSummary;
+  assetPriceSourceDecisions: Array<{
+    assetId: string;
+    sourceDecision: SourceDecision;
+  }>;
+  fxRateSourceDecision: SourceDecision | null;
 };
 
 export class PortfolioValuationError extends Error {
@@ -132,6 +149,10 @@ export function calculatePortfolioValuation(
   let cryptoValueKrw = new Prisma.Decimal(0);
   let realizedPnlKrw = new Prisma.Decimal(0);
   let unrealizedPnlKrw = new Prisma.Decimal(0);
+  const assetPriceSourceDecisions: Array<{
+    assetId: string;
+    sourceDecision: SourceDecision;
+  }> = [];
 
   for (const position of input.positions) {
     const quantity = toDecimal(position.quantity, 'position.quantity');
@@ -165,6 +186,12 @@ export function calculatePortfolioValuation(
       input.valuationAt,
       input.sourceEligibilityWorkflow,
     );
+    if (priceSnapshot.sourceDecision) {
+      assetPriceSourceDecisions.push({
+        assetId: position.assetId,
+        sourceDecision: priceSnapshot.sourceDecision,
+      });
+    }
 
     const currentPrice = toDecimal(priceSnapshot.price, 'assetPrice.price');
     const positionValue = quantity.mul(currentPrice);
@@ -212,7 +239,41 @@ export function calculatePortfolioValuation(
     realizedPnlKrw: formatMoneyScale8(realizedPnlKrw),
     unrealizedPnlKrw: formatMoneyScale8(unrealizedPnlKrw),
     valuationAt: input.valuationAt,
+    sourceSummary: buildPortfolioSourceSummary([
+      ...assetPriceSourceDecisions.map((source) => source.sourceDecision),
+      ...(input.usdKrwSnapshot?.sourceDecision
+        ? [input.usdKrwSnapshot.sourceDecision]
+        : []),
+    ]),
+    assetPriceSourceDecisions,
+    fxRateSourceDecision: input.usdKrwSnapshot?.sourceDecision ?? null,
   };
+}
+
+function buildPortfolioSourceSummary(
+  decisions: readonly SourceDecision[],
+): PortfolioSourceSummary {
+  return {
+    providerApiUsed: decisions.some(
+      (decision) => decision.selectedSourceType === 'provider_api',
+    ),
+    adminManualUsed: decisions.some(
+      (decision) => decision.selectedSourceType === 'admin_manual',
+    ),
+    fallbackUsed: decisions.some((decision) => decision.fallbackUsed),
+    fallbackReasons: uniqueNonNull(
+      decisions.map((decision) => decision.fallbackReason),
+    ),
+    rejectedProviderReasons: uniqueNonNull(
+      decisions.map((decision) => decision.rejectedProviderReason),
+    ),
+  };
+}
+
+function uniqueNonNull(values: readonly (string | null)[]): string[] {
+  return [
+    ...new Set(values.filter((value): value is string => Boolean(value))),
+  ];
 }
 
 export function isFxSnapshotStaleForPortfolioValuation(

@@ -175,6 +175,25 @@ describe('HomeService', () => {
       realizedPnlKrw: '10000.00000000',
       unrealizedPnlKrw: '20000.00000000',
       valuationAt: new Date('2026-05-07T00:02:00.000Z'),
+      sourceSummary: {
+        providerApiUsed: false,
+        adminManualUsed: true,
+        fallbackUsed: true,
+        fallbackReasons: ['provider_missing'],
+        rejectedProviderReasons: [],
+      },
+      assetPriceSourceDecisions: [],
+      fxRateSourceDecision: {
+        selectedSourceType: 'admin_manual',
+        selectedSourceName: 'manual-fx',
+        selectedSnapshotId: 'fx-rate-snapshot-1',
+        selectedEffectiveAt: new Date('2026-05-07T00:01:30.000Z'),
+        selectedCapturedAt: new Date('2026-05-07T00:01:40.000Z'),
+        fallbackUsed: true,
+        fallbackReason: 'provider_missing',
+        rejectedProviderReason: null,
+        freshnessAgeSeconds: null,
+      },
     }),
   });
 
@@ -279,6 +298,7 @@ describe('HomeService', () => {
     id: 'fx-rate-snapshot-1',
     rate: new Prisma.Decimal('1400.00000000'),
     sourceType: FxRateSourceType.admin_manual,
+    sourceName: 'manual-fx',
     effectiveAt: new Date(Date.now() - 1_000),
     capturedAt: new Date(Date.now() - 1_000),
     approvedByUserId: 'operator-1',
@@ -292,6 +312,8 @@ describe('HomeService', () => {
     id,
     price: new Prisma.Decimal(price),
     currencyCode,
+    sourceType: AssetPriceSourceType.admin_manual,
+    sourceName: 'manual-price',
     effectiveAt: new Date('2026-05-07T00:00:00.000Z'),
     capturedAt: new Date('2026-05-07T00:00:10.000Z'),
   });
@@ -441,6 +463,25 @@ describe('HomeService', () => {
       realizedPnlKrw: '10000.00000000',
       unrealizedPnlKrw: '20000.00000000',
       valuationAt: new Date('2026-05-07T00:02:00.000Z'),
+      sourceSummary: {
+        providerApiUsed: true,
+        adminManualUsed: true,
+        fallbackUsed: true,
+        fallbackReasons: ['provider_rejected'],
+        rejectedProviderReasons: ['captured_at_stale'],
+      },
+      assetPriceSourceDecisions: [],
+      fxRateSourceDecision: {
+        selectedSourceType: 'admin_manual',
+        selectedSourceName: 'manual-fx',
+        selectedSnapshotId: 'fx-rate-snapshot-1',
+        selectedEffectiveAt: new Date('2026-05-07T00:01:30.000Z'),
+        selectedCapturedAt: new Date('2026-05-07T00:01:40.000Z'),
+        fallbackUsed: true,
+        fallbackReason: 'provider_rejected',
+        rejectedProviderReason: 'captured_at_stale',
+        freshnessAgeSeconds: 301,
+      },
     });
     prisma.seasonRanking.findFirst.mockResolvedValueOnce({
       rank: 3,
@@ -459,6 +500,19 @@ describe('HomeService', () => {
       valuationSource: 'live_valuation',
       valuationAt: '2026-05-07T00:02:00.000Z',
       totalAssetKrw: '1200000.00000000',
+      sourceSummary: {
+        providerApiUsed: true,
+        fallbackUsed: true,
+        rejectedProviderReasons: ['captured_at_stale'],
+      },
+      fxRateSource: {
+        sourceType: 'admin_manual',
+        sourceName: 'manual-fx',
+        snapshotId: 'fx-rate-snapshot-1',
+        fallbackUsed: true,
+        fallbackReason: 'provider_rejected',
+        rejectedProviderReason: 'captured_at_stale',
+      },
     });
     expect(response.data.ranking).toMatchObject({
       state: 'available',
@@ -470,6 +524,10 @@ describe('HomeService', () => {
     expect(response.data.allocation).toMatchObject({
       state: 'available',
       totalAssetKrw: '1200000.00000000',
+      sourceSummary: {
+        providerApiUsed: true,
+        fallbackUsed: true,
+      },
     });
     expect(
       valuationService.calculateSeasonParticipantValuation,
@@ -700,6 +758,12 @@ describe('HomeService', () => {
           currentPrice: '110.00000000',
           assetPriceSnapshotId: 'provider-price-home',
           positionValueKrw: '220.00000000',
+          priceSource: {
+            sourceType: 'provider_api',
+            sourceName: 'kis_krx_realtime_trade',
+            snapshotId: 'provider-price-home',
+            fallbackUsed: false,
+          },
         },
       ],
     });

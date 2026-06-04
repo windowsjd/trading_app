@@ -111,8 +111,14 @@
     - Eligible provider source names are `exchange_rate_api` for USD/KRW, `binance_public_rest_24hr_ticker` for BINANCE USD crypto, `kis_krx_realtime_trade` for KRX-family domestic stocks, and `kis_us_delayed_trade` for NAS/NYS US stocks.
     - Fresh provider rows are selected first. Missing, stale, future, non-positive, wrong-source, or ineligible provider rows fall back explicitly to existing safe `admin_manual` selection where the workflow already allowed manual data.
     - Freshness thresholds are captured-at based for provider rows: 300 seconds for provider USD/KRW read-only/quote and 60 seconds for provider asset prices. Existing `admin_manual` FX fallback keeps the established 60-second effectiveAt stale check where applicable.
-    - API response shapes remain backward-compatible; source decisions are kept internally and existing snapshot/timing fields continue to provide safe evidence. Raw provider payloads and secrets are not exposed.
+    - API response shapes remain backward-compatible; existing snapshot/timing fields continue to provide safe evidence, and the follow-up metadata gate exposes only public-safe source metadata. Raw provider payloads and secrets are not exposed.
     - `/fx execute`, orders create, orders execute, daily portfolio snapshot, ranking, settlement/final result, reward/final tier/fulfillment, scheduler/cron, batch HTTP APIs, provider ingestion trigger APIs, real trading/account/order/deposit/withdrawal APIs, KIS orderbook/hoga, and Binance authenticated APIs remain closed.
+  - Provider Source Metadata and Outage UX Gate on 2026-06-04 KST:
+    - Read-only/quote source decisions are now exposed through public-safe optional metadata fields: FX quote `rateSource`, assets `priceSource` and `fxRateSource`, orders quote `assetPriceSource` and `fxRateSource`, positions valuation `priceSource` and `fxRateSource`, and Home live valuation/top positions source summaries/metadata where applicable.
+    - Metadata includes only `sourceType`, `sourceName`, `snapshotId`, `effectiveAt`, `capturedAt`, `fallbackUsed`, `fallbackReason`, `rejectedProviderReason`, and `freshnessAgeSeconds`.
+    - Fallback/outage reasons distinguish provider missing, rejected, wrong source, stale capturedAt, future timestamps, non-positive values, workflow/asset/FX ineligibility, and limit-price quotes.
+    - Raw provider payloads, `metadataJson`, approval keys, access tokens, KIS keys/secrets, `DATABASE_URL`, and `.env.local` contents are not exposed.
+    - Provider eligibility scope did not expand: `/fx execute`, orders create/execute, daily snapshot, ranking, settlement/final result, reward/final tier/fulfillment, scheduler/cron, batch HTTP APIs, provider ingestion trigger APIs, and real trading/account/order/deposit/withdrawal APIs remain closed.
   - Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage; USDT depeg risk is not modeled.
   - Provider_api source eligibility for execute/write, daily snapshot, ranking, settlement, reward, and automation remains a separate gate.
   - KIS supports WebSocket approval_key retrieval, domestic KRX real-time trade price `H0STCNT0`, and overseas/US delayed trade price `HDFSCNT0` ingestion foundation into `asset_price_snapshots` provider_api rows.
@@ -152,7 +158,8 @@
 - `POST /api/v1/seasons/{seasonId}/join`
 - `POST /api/v1/fx/quote`
   - 현재 quote source는 fresh `provider_api` `exchange_rate_api` USD/KRW first, then existing `admin_manual` fallback.
-  - Provider fallback remains explicit internally; stale/wrong-source provider rows are not used.
+  - Provider fallback remains explicit; stale/wrong-source provider rows are not used.
+  - 응답은 optional `rateSource` metadata로 provider/admin source, fallback, rejection freshness 상태를 표시한다.
 - `POST /api/v1/fx/execute` 1차 구현 완료
   - write path는 구현됨.
   - 실제 PostgreSQL/Prisma DB integration spec 통과.

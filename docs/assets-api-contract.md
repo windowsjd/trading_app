@@ -23,7 +23,7 @@
 - Eligible FX provider is `exchange_rate_api` for USD/KRW.
 - Provider asset freshness uses capturedAt age <= 60 seconds; provider FX freshness uses capturedAt age <= 300 seconds.
 - Missing, stale, future, non-positive, wrong-source, or ineligible provider rows fall back to existing `admin_manual` selection.
-- Source decisions are internal; response shape remains backward-compatible and raw provider payloads are never exposed.
+- The price payload may include optional public-safe `priceSource` and `fxRateSource` metadata for source/outage visibility. Raw provider payloads, `metadataJson`, and secrets are never exposed.
 
 ## Role Compared With Other APIs
 
@@ -98,7 +98,29 @@
           "priceKrw": "<decimal string>",
           "assetPriceSnapshotId": "<string>",
           "priceEffectiveAt": "<UTC ISO string>",
-          "priceCapturedAt": "<UTC ISO string>"
+          "priceCapturedAt": "<UTC ISO string>",
+          "priceSource": {
+            "sourceType": "provider_api | admin_manual | null",
+            "sourceName": "<string | null>",
+            "snapshotId": "<string | null>",
+            "effectiveAt": "<UTC ISO string | null>",
+            "capturedAt": "<UTC ISO string | null>",
+            "fallbackUsed": false,
+            "fallbackReason": "<string | null>",
+            "rejectedProviderReason": "<string | null>",
+            "freshnessAgeSeconds": 12
+          },
+          "fxRateSource": {
+            "sourceType": "provider_api | admin_manual | null",
+            "sourceName": "<string | null>",
+            "snapshotId": "<string | null>",
+            "effectiveAt": "<UTC ISO string | null>",
+            "capturedAt": "<UTC ISO string | null>",
+            "fallbackUsed": false,
+            "fallbackReason": "<string | null>",
+            "rejectedProviderReason": "<string | null>",
+            "freshnessAgeSeconds": 12
+          }
         }
       }
     ],
@@ -136,7 +158,9 @@ If a USD asset has an eligible asset price but USD/KRW is missing or stale, `pri
     "priceKrwMessage": "<string>",
     "assetPriceSnapshotId": "<string>",
     "priceEffectiveAt": "<UTC ISO string>",
-    "priceCapturedAt": "<UTC ISO string>"
+    "priceCapturedAt": "<UTC ISO string>",
+    "priceSource": "<source metadata object>",
+    "fxRateSource": "<source metadata object | optional>"
   }
 }
 ```
@@ -159,6 +183,7 @@ If a USD asset has an eligible asset price but USD/KRW is missing or stale, `pri
 - USD assets use fresh `provider_api` ExchangeRate-API USD/KRW first, then fresh approved `admin_manual` USD/KRW fallback for `priceKrw`.
 - USD/KRW missing or stale makes only `priceKrwState = unavailable`.
 - Asset price uses fresh eligible `provider_api` first, then latest eligible `admin_manual` fallback.
+- `priceSource.fallbackUsed=true` means provider price was missing/rejected/ineligible and the displayed price used fallback metadata. `fxRateSource.fallbackUsed=true` has the same meaning for USD/KRW conversion.
 - Provider asset price freshness threshold is capturedAt age <= 60 seconds. Existing `admin_manual` fallback keeps the established latest eligible `effectiveAt <= valuationAt` behavior.
 
 ### Sorting

@@ -19,6 +19,7 @@ This service owns backend APIs, database access, financial calculations, and ser
 - Final valuation policy is KRW total assets.
 - Provider ingestion foundation exists for operator-run ExchangeRate-API USD/KRW, Binance public REST crypto, and KIS WebSocket KRX/US stock market data row insertion.
 - Provider_api source eligibility is opened only for explicitly allowed read-only/quote workflows: `/fx quote`, assets `withPrice`, orders quote, and live portfolio/home/positions valuation.
+- Read-only/quote responses expose backward-compatible optional source metadata for provider/admin visibility: `rateSource`, `priceSource`, `assetPriceSource`, `fxRateSource`, and live valuation source summaries where applicable.
 - Batch job execution foundation with idempotent `batch_job_runs` recording, operator-only noop/health-check script, operator-run daily portfolio snapshot generation, operator-run season ranking generation from existing daily snapshots, an operator-run daily season cycle orchestration job, an operator-run season settlement MVP job, and an operator-run reward grant marker MVP job.
 - Operator-run final tier assignment MVP job from existing final `season_rankings`.
 
@@ -162,6 +163,7 @@ Possible now:
 - Operator-run reward grant marker MVP jobs that set `SeasonParticipant.rewardGrantedAt` after settlement and final tier assignment.
 - Settled joined Home final-result reads from existing `rankType=final` `season_rankings`; missing final rankings return unavailable without live valuation fallback.
 - Provider_api-backed `/fx quote`, assets `withPrice`, orders quote, and live portfolio/home/positions valuation with fresh provider-first selection and explicit admin_manual fallback.
+- Source metadata/outage visibility for those read-only/quote responses without exposing raw provider payloads or secrets.
 
 Not possible without a separate provider/write or automation gate:
 

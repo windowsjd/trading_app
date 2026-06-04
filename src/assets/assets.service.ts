@@ -16,6 +16,10 @@ import {
   selectFreshProviderSnapshot,
   type SourceDecision,
 } from '../providers/source-eligibility.policy';
+import {
+  presentSourceDecision,
+  type PublicSourceMetadata,
+} from '../providers/source-metadata.presenter';
 
 export type AssetsQuery = {
   assetType?: string;
@@ -70,11 +74,13 @@ type UsdKrwSelection =
   | {
       state: 'available';
       rate: Prisma.Decimal;
+      sourceDecision: SourceDecision;
     }
   | {
       state: 'unavailable';
       code: 'FX_RATE_UNAVAILABLE' | 'FX_RATE_STALE';
       message: string;
+      sourceDecision?: SourceDecision;
     };
 
 type AssetPricePayload =
@@ -87,6 +93,8 @@ type AssetPricePayload =
       assetPriceSnapshotId: string;
       priceEffectiveAt: string;
       priceCapturedAt: string;
+      priceSource: PublicSourceMetadata | null;
+      fxRateSource?: PublicSourceMetadata | null;
     }
   | {
       state: 'available';
@@ -98,6 +106,8 @@ type AssetPricePayload =
       assetPriceSnapshotId: string;
       priceEffectiveAt: string;
       priceCapturedAt: string;
+      priceSource: PublicSourceMetadata | null;
+      fxRateSource?: PublicSourceMetadata | null;
     }
   | {
       state: 'unavailable';
@@ -320,6 +330,7 @@ export class AssetsService {
       assetPriceSnapshotId: snapshot.id,
       priceEffectiveAt: snapshot.effectiveAt.toISOString(),
       priceCapturedAt: snapshot.capturedAt.toISOString(),
+      priceSource: presentSourceDecision(snapshot.sourceDecision),
     };
 
     if (asset.currencyCode === CurrencyCode.KRW) {
@@ -341,6 +352,7 @@ export class AssetsService {
             snapshot.price.mul(usdKrwSelection.rate),
             8,
           ),
+          fxRateSource: presentSourceDecision(usdKrwSelection.sourceDecision),
         },
       };
     }
@@ -350,6 +362,10 @@ export class AssetsService {
       code: 'FX_RATE_UNAVAILABLE' as const,
       message: 'USD/KRW FX rate snapshot is unavailable.',
     };
+    const fxRateSource =
+      'sourceDecision' in error
+        ? presentSourceDecision(error.sourceDecision)
+        : null;
 
     return {
       payload: {
@@ -357,6 +373,7 @@ export class AssetsService {
         priceKrwState: 'unavailable',
         priceKrwReason: error.code,
         priceKrwMessage: error.message,
+        fxRateSource,
       },
       error: {
         assetId: asset.id,
@@ -532,6 +549,7 @@ export class AssetsService {
       return {
         state: 'available',
         rate: providerSelection.snapshot.rate,
+        sourceDecision: providerSelection.decision,
       };
     }
 
@@ -556,9 +574,12 @@ export class AssetsService {
         { createdAt: 'desc' },
       ],
       select: {
+        id: true,
         rate: true,
         sourceType: true,
+        sourceName: true,
         effectiveAt: true,
+        capturedAt: true,
         approvedByUserId: true,
       },
     });
@@ -568,8 +589,17 @@ export class AssetsService {
         state: 'unavailable',
         code: 'FX_RATE_UNAVAILABLE',
         message: 'USD/KRW FX rate snapshot is unavailable.',
+        sourceDecision: providerSelection.decision,
       };
     }
+
+    const sourceDecision = buildAdminManualFallbackDecision({
+      selectedSnapshotId: snapshot.id,
+      selectedSourceName: snapshot.sourceName,
+      selectedEffectiveAt: snapshot.effectiveAt,
+      selectedCapturedAt: snapshot.capturedAt,
+      providerDecision: providerSelection.decision,
+    });
 
     if (
       snapshot.sourceType !== FxRateSourceType.admin_manual ||
@@ -580,6 +610,7 @@ export class AssetsService {
         code: 'FX_RATE_UNAVAILABLE',
         message:
           'No approved admin_manual USD/KRW FX rate snapshot is available.',
+        sourceDecision,
       };
     }
 
@@ -590,12 +621,14 @@ export class AssetsService {
         state: 'unavailable',
         code: 'FX_RATE_STALE',
         message: 'USD/KRW FX rate snapshot is stale.',
+        sourceDecision,
       };
     }
 
     return {
       state: 'available',
       rate: snapshot.rate,
+      sourceDecision,
     };
   }
 

@@ -46,7 +46,9 @@ Fallback and metadata policy:
 
 - Read-only/quote workflows select fresh provider_api first, then explicitly fall back to existing safe `admin_manual` selection.
 - Stale, future, non-positive, wrong-source, or ineligible provider rows are rejected and must not be used.
-- Source decision metadata is kept internally and covered by service/policy tests. Existing API response shapes remain backward-compatible; raw provider payloads and secrets are not exposed.
+- Source decision metadata is now exposed only as public-safe optional fields for read-only/quote UX: `rateSource`, `priceSource`, `assetPriceSource`, `fxRateSource`, and live valuation source summaries where applicable.
+- Metadata fields are limited to `sourceType`, `sourceName`, `snapshotId`, `effectiveAt`, `capturedAt`, `fallbackUsed`, `fallbackReason`, `rejectedProviderReason`, and `freshnessAgeSeconds`.
+- Existing API response shapes remain backward-compatible; raw provider payloads, `metadataJson`, and secrets are not exposed.
 
 ## 1. Purpose
 

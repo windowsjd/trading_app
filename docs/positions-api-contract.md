@@ -20,7 +20,7 @@
 - Eligible provider source mapping is domestic KRX -> `kis_krx_realtime_trade`, US NAS/NYS -> `kis_us_delayed_trade`, and BINANCE USD crypto -> `binance_public_rest_24hr_ticker`.
 - Eligible USD/KRW provider is `exchange_rate_api`.
 - Provider asset price freshness uses capturedAt age <= 60 seconds; provider FX freshness uses capturedAt age <= 300 seconds.
-- Source decisions are internal; response shape remains backward-compatible and raw provider payloads are never exposed.
+- Per-position valuation may include optional public-safe `priceSource` and `fxRateSource` metadata for source/outage visibility. Raw provider payloads, `metadataJson`, and secrets are never exposed.
 
 ## Route
 
@@ -96,6 +96,18 @@
           "assetPriceSnapshotId": "<string>",
           "priceEffectiveAt": "<UTC ISO string>",
           "priceCapturedAt": "<UTC ISO string>",
+          "priceSource": {
+            "sourceType": "provider_api | admin_manual | null",
+            "sourceName": "<string | null>",
+            "snapshotId": "<string | null>",
+            "effectiveAt": "<UTC ISO string | null>",
+            "capturedAt": "<UTC ISO string | null>",
+            "fallbackUsed": false,
+            "fallbackReason": "<string | null>",
+            "rejectedProviderReason": "<string | null>",
+            "freshnessAgeSeconds": 12
+          },
+          "fxRateSource": "<source metadata object | optional for USD positions>",
           "positionValue": "<amount string>",
           "positionValueKrw": "<amount string>",
           "unrealizedPnl": "<amount string>",
@@ -125,7 +137,8 @@ When required market data is missing, only that position's `valuation` becomes u
   "valuation": {
     "state": "unavailable",
     "reason": "ASSET_PRICE_UNAVAILABLE | FX_RATE_UNAVAILABLE | FX_RATE_STALE",
-    "message": "<string>"
+    "message": "<string>",
+    "fxRateSource": "<source metadata object | optional when FX caused unavailability>"
   }
 }
 ```
@@ -152,6 +165,7 @@ When required market data is missing, only that position's `valuation` becomes u
 - USD positions use fresh `provider_api` USD/KRW first, then fresh approved `admin_manual` USD/KRW fallback.
 - USD/KRW missing or stale makes only USD position valuations unavailable.
 - Asset price uses fresh eligible `provider_api` first, then latest eligible `admin_manual` fallback.
+- `priceSource` and `fxRateSource` expose selected source and fallback/rejection reason metadata without changing financial values.
 - `official_batch` is not newly allowed as a valuation source.
 - Provider asset price freshness threshold is capturedAt age <= 60 seconds. Existing `admin_manual` fallback keeps the established latest eligible `effectiveAt <= valuationAt` behavior.
 

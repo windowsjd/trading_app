@@ -4,15 +4,14 @@
 
 This document fixes the near-term freshness and source policy for FX and asset price snapshots before provider ingestion, scheduler/batch, ranking automation, settlement, or reward implementation.
 
-This policy records freshness and source boundaries after provider ingestion foundation. It does not authorize package, Prisma schema, migration, seed, scheduler, settlement, reward, durable quote, order replay, partial fill, matching-engine changes, or provider_api source eligibility changes in financial read/write paths.
+This policy records freshness and source boundaries after provider ingestion foundation and the read-only/quote provider eligibility gate. It does not authorize package, Prisma schema, migration, seed, scheduler, settlement, reward, durable quote, order replay, partial fill, matching-engine changes, or provider_api source eligibility changes outside the approved read-only/quote workflows.
 
 2026-05-26 update:
 
 - Provider ingestion foundation can insert `provider_api` rows for ExchangeRate-API USD/KRW and Binance public crypto prices.
 - KIS WebSocket trade price ingestion foundation can insert `provider_api` asset price rows for domestic KRX `H0STCNT0` and US delayed/free `HDFSCNT0` trades when existing active asset mapping is unambiguous.
-- Existing quote, execute, asset list/detail, portfolio valuation, daily snapshot, ranking, and settlement eligibility remains unchanged unless a later gate explicitly opens provider_api sources.
-- `/fx quote` is explicitly isolated to `admin_manual` USD/KRW snapshots, matching `/fx execute`; provider_api FX rows do not power quotes yet.
-- KIS REST current-price ingestion, orderbook/hoga WebSocket ingestion, order/account/balance/real-trading APIs, and provider_api source eligibility remain closed.
+- Provider API Source Eligibility Implementation Gate later opened provider_api only for `/fx quote`, assets `withPrice`, orders quote, and live portfolio/home/positions valuation.
+- `/fx execute`, orders create/execute, daily snapshot, ranking, settlement/final result, reward/final tier/fulfillment, scheduler/cron, provider trigger APIs, KIS REST current-price ingestion, orderbook/hoga WebSocket ingestion, and order/account/balance/real-trading APIs remain closed.
 
 ## 2. Current Price Storage Model
 
@@ -32,10 +31,10 @@ Current schema stores market evidence in two snapshot tables:
 
 Current code behavior:
 
-- `/fx quote` reads the latest eligible `admin_manual` USD/KRW snapshot by `effectiveAt`, `capturedAt`, then `createdAt`; it applies a 60-second FX freshness threshold.
+- `/fx quote` reads fresh eligible `provider_api` `exchange_rate_api` USD/KRW first using capturedAt age <= 300 seconds, then existing safe `admin_manual` fallback with the established 60-second effectiveAt freshness rule.
 - `/fx execute` allows only approved fresh `admin_manual` USD/KRW snapshots and applies the same 60-second threshold.
-- Order quote/create/execute currently allow only `admin_manual` asset price snapshots. USD assets also require approved fresh `admin_manual` USD/KRW.
-- Portfolio valuation/home live valuation currently use `admin_manual` asset prices and approved fresh `admin_manual` USD/KRW when USD conversion is needed.
+- Orders quote can use fresh eligible `provider_api` asset price and USD/KRW rows first, then `admin_manual` fallback. Orders create/execute remain `admin_manual` only.
+- Assets `withPrice` and live portfolio/home/positions valuation can use fresh eligible `provider_api` asset price and USD/KRW rows first, then `admin_manual` fallback.
 - Ranking APIs read existing `season_rankings`; they do not fetch or calculate prices.
 - Daily snapshot and ranking generation exist only as manual CLI foundations.
 
@@ -73,10 +72,10 @@ Policy meanings:
 
 Current confirmed policy:
 
-- `/fx quote`: USD/KRW snapshot must be at most 60 seconds old by `effectiveAt` at quote time.
+- `/fx quote`: provider USD/KRW snapshot must be positive, not future-dated, sourceName `exchange_rate_api`, and at most 300 seconds old by `capturedAt`; admin_manual fallback must be at most 60 seconds old by `effectiveAt`.
 - `/fx execute`: USD/KRW snapshot must be at most 60 seconds old by `effectiveAt` at execute time.
 - Exactly 60 seconds is accepted; older than 60 seconds is stale.
-- Current quote source is `admin_manual` only.
+- Current quote source is fresh provider_api first, then explicit admin_manual fallback.
 - Current execute source is approved `admin_manual` only.
 
 Future provider policy:
@@ -92,7 +91,7 @@ Current implementation:
 
 - Domestic stock asset prices use `admin_manual` snapshots when present.
 - There is no implemented asset-price stale threshold.
-- KIS WebSocket `H0STCNT0` can insert `provider_api` KRX trade-price rows for existing active KRW domestic stock assets, but these rows are not eligible for quote, execute, valuation, daily snapshot, ranking, or settlement paths.
+- KIS WebSocket `H0STCNT0` can insert `provider_api` KRX trade-price rows for existing active KRW domestic stock assets. Fresh matching rows are eligible only for the approved read-only/quote workflows; execute/write, daily snapshot, ranking, settlement, and reward paths remain closed.
 
 Policy decision:
 
@@ -109,7 +108,7 @@ Current implementation:
 - There is no implemented asset-price stale threshold.
 - USD assets require fresh approved USD/KRW for KRW valuation/audit consistency.
 - KIS WebSocket `HDFSCNT0` can insert `provider_api` US trade-price rows for existing active USD US stock assets with NAS/NYS/AMS market mapping. KIS documents US free quotes as 0-minute delayed; Hong Kong, Vietnam, China, and Japan 15-minute delayed markets are skipped in this MVP foundation.
-- KIS US provider_api rows are not eligible for quote, execute, valuation, daily snapshot, ranking, or settlement paths until a separate source eligibility gate approves them.
+- KIS US provider_api rows are eligible only for the approved read-only/quote workflows after the 2026-06-03 source eligibility gate. Execute/write, daily snapshot, ranking, settlement, and reward paths remain closed.
 
 Target policy after provider ingestion:
 

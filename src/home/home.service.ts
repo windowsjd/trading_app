@@ -23,6 +23,7 @@ import {
   resolveFxProviderEligibility,
   selectFreshProviderSnapshot,
 } from '../providers/source-eligibility.policy';
+import { presentSourceDecision } from '../providers/source-metadata.presenter';
 
 type HomeSectionState = 'available' | 'blocked' | 'unavailable' | 'error';
 type HomeMode =
@@ -643,6 +644,8 @@ export class HomeService {
         assetValueKrw: valuation.assetValueKrw,
         realizedPnlKrw: valuation.realizedPnlKrw,
         unrealizedPnlKrw: valuation.unrealizedPnlKrw,
+        sourceSummary: valuation.sourceSummary ?? null,
+        fxRateSource: presentSourceDecision(valuation.fxRateSourceDecision),
         dataFreshness: {
           status: 'available',
           asOf: valuation.valuationAt.toISOString(),
@@ -699,6 +702,8 @@ export class HomeService {
         allocationSource: 'live_valuation',
         totalAssetKrw: valuation.totalAssetKrw,
         valuationAt: valuation.valuationAt.toISOString(),
+        sourceSummary: valuation.sourceSummary ?? null,
+        fxRateSource: presentSourceDecision(valuation.fxRateSourceDecision),
         items: [
           this.buildAllocationItem({
             category: 'krw_cash',
@@ -875,6 +880,14 @@ export class HomeService {
               assetPriceSnapshotId: priceSnapshot.id,
               priceEffectiveAt: priceSnapshot.effectiveAt.toISOString(),
               priceCapturedAt: priceSnapshot.capturedAt.toISOString(),
+              priceSource: presentSourceDecision(priceSnapshot.sourceDecision),
+              ...(position.currencyCode === CurrencyCode.USD && usdKrwSnapshot
+                ? {
+                    fxRateSource: presentSourceDecision(
+                      usdKrwSnapshot.sourceDecision,
+                    ),
+                  }
+                : {}),
             },
           };
         }),
@@ -1089,7 +1102,10 @@ export class HomeService {
         };
 
     if (providerSelection.state === 'selected') {
-      return providerSelection.snapshot;
+      return {
+        ...providerSelection.snapshot,
+        sourceDecision: providerSelection.decision,
+      };
     }
 
     const snapshot = await this.prisma.assetPriceSnapshot.findFirst({
@@ -1126,7 +1142,7 @@ export class HomeService {
       );
     }
 
-    buildAdminManualFallbackDecision({
+    const sourceDecision = buildAdminManualFallbackDecision({
       selectedSnapshotId: snapshot.id,
       selectedSourceName: snapshot.sourceName,
       selectedEffectiveAt: snapshot.effectiveAt,
@@ -1134,7 +1150,10 @@ export class HomeService {
       providerDecision: providerSelection.decision,
     });
 
-    return snapshot;
+    return {
+      ...snapshot,
+      sourceDecision,
+    };
   }
 
   private async findLatestEligibleUsdKrwSnapshot(valuationAt: Date) {
@@ -1192,7 +1211,10 @@ export class HomeService {
         };
 
     if (providerSelection.state === 'selected') {
-      return providerSelection.snapshot;
+      return {
+        ...providerSelection.snapshot,
+        sourceDecision: providerSelection.decision,
+      };
     }
 
     const snapshot = await this.prisma.fxRateSnapshot.findFirst({
@@ -1233,7 +1255,7 @@ export class HomeService {
       );
     }
 
-    buildAdminManualFallbackDecision({
+    const sourceDecision = buildAdminManualFallbackDecision({
       selectedSnapshotId: snapshot.id,
       selectedSourceName: snapshot.sourceName,
       selectedEffectiveAt: snapshot.effectiveAt,
@@ -1241,7 +1263,10 @@ export class HomeService {
       providerDecision: providerSelection.decision,
     });
 
-    return snapshot;
+    return {
+      ...snapshot,
+      sourceDecision,
+    };
   }
 
   private selectUsableUsdKrwRate(

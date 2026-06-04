@@ -67,3 +67,8 @@ No docs were deleted. No empty or duplicate document was identified for deletion
 - `docs/README.md` navigation formatting was fixed so provider policy and Admin/operator sections are separate list items.
 - KRX stale wording in `docs/backend-gate-roadmap.md` was corrected to reflect existing domestic KRX provider_api row insertion evidence and read-only/quote eligibility while keeping execute/write closed.
 - DB-started KIS US `HDFSCNT0` evidence rerun results were reflected in current provider/status documents, and provider_api source eligibility is now open only for read-only/quote workflows.
+
+2026-06-04 provider source metadata/outage visibility pass:
+
+- Current source-of-truth docs and API contracts were updated for backward-compatible optional source metadata fields: `rateSource`, `priceSource`, `assetPriceSource`, `fxRateSource`, and live valuation source summaries.
+- The update documents public-safe metadata fields, fallback/rejection reason visibility, raw provider payload/secret exclusion, and unchanged execute/write/final/scheduler/provider-trigger STOP boundaries.

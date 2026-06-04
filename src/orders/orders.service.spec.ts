@@ -268,6 +268,9 @@ describe('OrdersService', () => {
     prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce({
       id: 'aps-1',
       price: new Prisma.Decimal('100.00000000'),
+      sourceName: 'manual-price',
+      effectiveAt: new Date(Date.now()),
+      capturedAt: new Date(Date.now()),
     });
   };
 
@@ -275,7 +278,9 @@ describe('OrdersService', () => {
     prisma.fxRateSnapshot.findFirst.mockResolvedValueOnce({
       id: 'fx-1',
       rate: new Prisma.Decimal('1400.00000000'),
+      sourceName: 'manual-fx',
       effectiveAt: new Date(Date.now()),
+      capturedAt: new Date(Date.now()),
     });
   };
 
@@ -767,6 +772,18 @@ describe('OrdersService', () => {
       krwGrossAmount: '330000.00000000',
       assetPriceSnapshotId: 'provider-price-us',
       fxRateSnapshotId: 'provider-fx-usd-krw',
+      assetPriceSource: {
+        sourceType: 'provider_api',
+        sourceName: 'kis_us_delayed_trade',
+        snapshotId: 'provider-price-us',
+        fallbackUsed: false,
+      },
+      fxRateSource: {
+        sourceType: 'provider_api',
+        sourceName: 'exchange_rate_api',
+        snapshotId: 'provider-fx-usd-krw',
+        fallbackUsed: false,
+      },
     });
     expect(prisma.assetPriceSnapshot.findFirst).not.toHaveBeenCalled();
     expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
@@ -815,6 +832,14 @@ describe('OrdersService', () => {
     expect(response.data).toMatchObject({
       price: '100.00000000',
       assetPriceSnapshotId: 'admin-price-krx',
+      assetPriceSource: {
+        sourceType: 'admin_manual',
+        sourceName: 'manual-close',
+        snapshotId: 'admin-price-krx',
+        fallbackUsed: true,
+        fallbackReason: 'provider_rejected',
+        rejectedProviderReason: 'captured_at_stale',
+      },
     });
     expectNoOrderWrites(prisma);
   });
@@ -901,6 +926,17 @@ describe('OrdersService', () => {
       krwFeeAmount: '700.00000000',
       krwNetAmount: '699300.00000000',
       fxRateSnapshotId: 'fx-1',
+      assetPriceSource: {
+        sourceType: null,
+        fallbackReason: 'limit_price_provided',
+      },
+      fxRateSource: {
+        sourceType: 'admin_manual',
+        sourceName: 'manual-fx',
+        snapshotId: 'fx-1',
+        fallbackUsed: true,
+        fallbackReason: 'provider_missing',
+      },
     });
     expect(prisma.position.findUnique).toHaveBeenCalledWith({
       where: {
@@ -942,6 +978,13 @@ describe('OrdersService', () => {
       krwNetAmount: '150150.00000000',
       assetPriceSnapshotId: null,
       fxRateSnapshotId: null,
+      assetPriceSource: {
+        sourceType: null,
+        sourceName: null,
+        snapshotId: null,
+        fallbackUsed: false,
+        fallbackReason: 'limit_price_provided',
+      },
     });
     expect(prisma.assetPriceSnapshot.findFirst).not.toHaveBeenCalled();
     expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();

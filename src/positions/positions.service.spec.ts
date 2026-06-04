@@ -187,14 +187,19 @@ describe('PositionsService', () => {
     id,
     price: new Prisma.Decimal(price),
     currencyCode,
+    sourceType: AssetPriceSourceType.admin_manual,
+    sourceName: 'manual-price',
     effectiveAt: priceAt,
     capturedAt: new Date('2026-05-07T00:00:10.000Z'),
   });
 
   const freshUsdKrwSnapshot = () => ({
+    id: 'fx-admin-1',
     rate: new Prisma.Decimal('1400.00000000'),
     sourceType: FxRateSourceType.admin_manual,
+    sourceName: 'manual-fx',
     effectiveAt: new Date(Date.now() - 1_000),
+    capturedAt: new Date(Date.now() - 1_000),
     approvedByUserId: 'operator-1',
   });
 
@@ -573,6 +578,13 @@ describe('PositionsService', () => {
         unrealizedPnl: '20.00000000',
         unrealizedPnlKrw: '20.00000000',
         returnRate: '0.11111111',
+        priceSource: {
+          sourceType: 'admin_manual',
+          sourceName: 'manual-price',
+          snapshotId: 'price-krw',
+          fallbackUsed: true,
+          fallbackReason: 'provider_missing',
+        },
       },
     });
     expect(response.data.summary.totalPositionValueKrw).toBe('200.00000000');
@@ -665,6 +677,18 @@ describe('PositionsService', () => {
         currentPrice: '110.00000000',
         assetPriceSnapshotId: 'provider-price-usd',
         positionValueKrw: '330000.00000000',
+        priceSource: {
+          sourceType: 'provider_api',
+          sourceName: 'kis_us_delayed_trade',
+          snapshotId: 'provider-price-usd',
+          fallbackUsed: false,
+        },
+        fxRateSource: {
+          sourceType: 'provider_api',
+          sourceName: 'exchange_rate_api',
+          snapshotId: 'provider-fx-1',
+          fallbackUsed: false,
+        },
       },
     });
     expect(prisma.assetPriceSnapshot.findFirst).not.toHaveBeenCalled();
@@ -695,6 +719,11 @@ describe('PositionsService', () => {
     expect(response.data.positions[0].valuation).toMatchObject({
       state: 'unavailable',
       reason: 'FX_RATE_UNAVAILABLE',
+      fxRateSource: {
+        sourceType: null,
+        fallbackUsed: true,
+        fallbackReason: 'provider_missing',
+      },
     });
     expect(response.data.valuationErrors).toEqual([
       {
