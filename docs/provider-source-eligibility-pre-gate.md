@@ -1,6 +1,6 @@
 # Provider API Source Eligibility Pre-Gate
 
-Status: historical pre-gate draft; superseded by the 2026-06-03 KST read-only/quote implementation gate.
+Status: historical pre-gate draft; superseded by the 2026-06-03 KST read-only/quote implementation gate and the 2026-06-05 KST operator-run daily snapshot eligibility gate.
 
 Date: 2026-05-30 KST.
 
@@ -16,13 +16,13 @@ Opened provider_api workflows:
 - `live_portfolio_valuation`
 - `home_live_valuation`
 - `positions_live_valuation`
+- `daily_portfolio_snapshot` (operator-run daily snapshot valuation only)
 
 Closed workflows remain:
 
 - `fx_execute`
 - `orders_create`
 - `orders_execute`
-- `daily_portfolio_snapshot`
 - `season_ranking`
 - `season_settlement`
 - `reward_final_tier`
@@ -45,8 +45,10 @@ Freshness policy:
 Fallback and metadata policy:
 
 - Read-only/quote workflows select fresh provider_api first, then explicitly fall back to existing safe `admin_manual` selection.
+- Daily snapshot valuation selects fresh provider_api first, then explicitly falls back to existing safe `admin_manual` selection. If neither source is available, the participant keeps the existing participant-level failure behavior.
 - Stale, future, non-positive, wrong-source, or ineligible provider rows are rejected and must not be used.
 - Source decision metadata is now exposed only as public-safe optional fields for read-only/quote UX: `rateSource`, `priceSource`, `assetPriceSource`, `fxRateSource`, and live valuation source summaries where applicable.
+- Daily snapshot source decisions are exposed only as aggregate batch result `sourceSummary`/fallback information; `daily_portfolio_snapshots` row schema is unchanged.
 - Metadata fields are limited to `sourceType`, `sourceName`, `snapshotId`, `effectiveAt`, `capturedAt`, `fallbackUsed`, `fallbackReason`, `rejectedProviderReason`, and `freshnessAgeSeconds`.
 - Existing API response shapes remain backward-compatible; raw provider payloads, `metadataJson`, and secrets are not exposed.
 
@@ -187,10 +189,11 @@ The next gate should plan and test:
 
 Pre-gate policy draft was GO.
 
-Implementation is now GO only for the read-only/quote workflows listed in
-section 0. `provider_api` source eligibility remains closed for execute/write,
-daily snapshot, ranking, settlement, reward, automation, provider trigger, and
-real trading/account surfaces.
+Implementation is now GO only for the read-only/quote workflows and
+operator-run daily snapshot valuation workflow listed in section 0.
+`provider_api` source eligibility remains closed for execute/write, ranking,
+settlement, reward, automation, provider trigger, batch HTTP API, and real
+trading/account surfaces.
 
 Implementation sequencing:
 

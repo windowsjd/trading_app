@@ -40,6 +40,17 @@ export type DailyPortfolioSnapshotJobParticipantError = {
   message: string;
 };
 
+export type DailyPortfolioSnapshotJobSourceSummary = {
+  participantsUsingProviderApi: number;
+  participantsUsingAdminManual: number;
+  participantsUsingFallback: number;
+  fallbackReasons: string[];
+  rejectedProviderReasons: string[];
+  providerApiUsed: boolean;
+  adminManualUsed: boolean;
+  fallbackUsed: boolean;
+};
+
 export type DailyPortfolioSnapshotJobResult = {
   seasonId: string;
   snapshotDate: string;
@@ -47,6 +58,7 @@ export type DailyPortfolioSnapshotJobResult = {
   participants: DailyPortfolioSnapshotJobParticipantSummary;
   createdSnapshotIds: string[];
   errors: DailyPortfolioSnapshotJobParticipantError[];
+  sourceSummary?: DailyPortfolioSnapshotJobSourceSummary;
 };
 
 export type DailyPortfolioSnapshotJobRunResponse = BatchRunJobResponse;

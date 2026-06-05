@@ -16,6 +16,7 @@ import {
   DailyPortfolioSnapshotJobRequestPayload,
   DailyPortfolioSnapshotJobResult,
   DailyPortfolioSnapshotJobRunResponse,
+  DailyPortfolioSnapshotJobSourceSummary,
 } from './daily-portfolio-snapshot-job.types';
 
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -109,6 +110,7 @@ export class DailyPortfolioSnapshotJobService {
       },
       createdSnapshotIds: [],
       errors: [],
+      sourceSummary: this.emptySourceSummary(),
     };
 
     for (const participant of participants) {
@@ -135,6 +137,7 @@ export class DailyPortfolioSnapshotJobService {
           await this.portfolioValuationService.calculateSeasonParticipantValuation(
             participant.id,
             capturedAt,
+            'daily_portfolio_snapshot',
           );
       } catch (error) {
         this.recordParticipantError(result, participant, error);
@@ -143,6 +146,7 @@ export class DailyPortfolioSnapshotJobService {
 
       if (dryRun) {
         result.participants.wouldCreate += 1;
+        this.recordSourceSummary(result, valuation);
         continue;
       }
 
@@ -161,6 +165,7 @@ export class DailyPortfolioSnapshotJobService {
 
         result.participants.created += 1;
         result.createdSnapshotIds.push(snapshot.id);
+        this.recordSourceSummary(result, valuation);
       } catch (error) {
         if (this.isUniqueConstraintError(error)) {
           result.participants.existing += 1;
@@ -172,6 +177,60 @@ export class DailyPortfolioSnapshotJobService {
     }
 
     return result;
+  }
+
+  private emptySourceSummary(): DailyPortfolioSnapshotJobSourceSummary {
+    return {
+      participantsUsingProviderApi: 0,
+      participantsUsingAdminManual: 0,
+      participantsUsingFallback: 0,
+      fallbackReasons: [],
+      rejectedProviderReasons: [],
+      providerApiUsed: false,
+      adminManualUsed: false,
+      fallbackUsed: false,
+    };
+  }
+
+  private recordSourceSummary(
+    result: DailyPortfolioSnapshotJobResult,
+    valuation: PortfolioValuationResult,
+  ) {
+    const sourceSummary =
+      result.sourceSummary ??
+      (result.sourceSummary = this.emptySourceSummary());
+    const participantSummary = valuation.sourceSummary;
+
+    if (participantSummary.providerApiUsed) {
+      sourceSummary.participantsUsingProviderApi += 1;
+      sourceSummary.providerApiUsed = true;
+    }
+
+    if (participantSummary.adminManualUsed) {
+      sourceSummary.participantsUsingAdminManual += 1;
+      sourceSummary.adminManualUsed = true;
+    }
+
+    if (participantSummary.fallbackUsed) {
+      sourceSummary.participantsUsingFallback += 1;
+      sourceSummary.fallbackUsed = true;
+    }
+
+    sourceSummary.fallbackReasons = this.mergeReasons(
+      sourceSummary.fallbackReasons,
+      participantSummary.fallbackReasons,
+    );
+    sourceSummary.rejectedProviderReasons = this.mergeReasons(
+      sourceSummary.rejectedProviderReasons,
+      participantSummary.rejectedProviderReasons,
+    );
+  }
+
+  private mergeReasons(
+    existing: readonly string[],
+    incoming: readonly string[],
+  ): string[] {
+    return [...new Set([...existing, ...incoming])];
   }
 
   private assertSeasonStatusAllowed(status: SeasonStatus) {

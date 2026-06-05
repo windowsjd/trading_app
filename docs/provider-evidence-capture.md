@@ -19,6 +19,8 @@ Implementation readiness update on 2026-05-27: provider ingestion foundation is 
 
 Implementation update on 2026-06-03 KST: Provider API Source Eligibility Implementation Gate read-only/quote phase is implemented after ExchangeRate-API, Binance public REST, KIS domestic KRX, and KIS US row insertion evidence reached GO. `provider_api` rows are eligible only for `/fx quote`, assets `withPrice`, orders quote, live portfolio valuation, home live valuation, and positions live valuation. `/fx execute`, orders create, orders execute, daily portfolio snapshot, ranking, settlement/final result, reward/final tier/fulfillment, scheduler/cron, provider ingestion trigger APIs, batch HTTP APIs, real trading/account/order/deposit/withdrawal APIs, KIS orderbook/hoga, and Binance authenticated APIs remain closed.
 
+Implementation update on 2026-06-05 KST: Provider-backed Daily Snapshot Eligibility Gate is implemented for operator-run daily snapshot valuation only. `provider_api` rows are eligible for `daily_portfolio_snapshot` with the same sourceName allowlist and freshness thresholds as the read-only/quote gate. Daily snapshot batch results include aggregate sourceSummary/fallback information in `batch_job_runs.resultPayloadJson`; `daily_portfolio_snapshots` schema remains unchanged. `/fx execute`, orders create, orders execute, ranking, settlement/final result, reward/final tier/fulfillment, scheduler/cron, provider ingestion trigger APIs, batch HTTP APIs, real trading/account/order/deposit/withdrawal APIs, KIS orderbook/hoga, and Binance authenticated APIs remain closed.
+
 Live smoke evidence update on 2026-05-28 KST: ExchangeRate-API and Binance public REST live smoke succeeded and inserted `provider_api` rows in the local DB. KIS live smoke was not executed because required KIS REST/WS base URL and watchlist env values were missing, even though KIS market data and credential presence checks were enabled/present. Provider_api source eligibility remains closed for quote, execute, valuation, home, positions, assets, daily snapshot, ranking, settlement, and reward paths.
 
 Fixed asset universe update on 2026-05-30 KST: the KIS stock watchlist universe is fixed as 15 domestic KRX stocks and 25 US stocks, total 40 symbols. This is a fixed high-liquidity watchlist candidate selected by project decision, not a new Codex stock investigation and not an official YTD rank verification claim. The fixed universe is documented in `docs/asset-universe-2026-ytd-volume-selection.md`.
@@ -167,11 +169,11 @@ Fixed asset universe update on 2026-05-30 KST: the KIS stock watchlist universe 
 
 Remaining blockers: provider_api source eligibility for execute/write/final/automation workflows, broader provider outage policy, commercial/business terms approval, KIS REST quote endpoint mapping if ever needed, orderbook policy if ever needed, scheduler/deployment ownership, and settlement evidence policy.
 
-Required owner decisions for future provider gates: ExchangeRate/Binance/KIS commercial or display terms, any change to Binance USDT-to-USD-equivalent policy, KIS delayed/free data acceptance beyond the current read-only/quote gate, KRX scope expansion, execute/write source priority, provider outage behavior, and workflow-specific provider_api eligibility beyond read-only/quote.
+Required owner decisions for future provider gates: ExchangeRate/Binance/KIS commercial or display terms, any change to Binance USDT-to-USD-equivalent policy, KIS delayed/free data acceptance beyond the current read-only/quote and operator-run daily snapshot valuation gates, KRX scope expansion, execute/write source priority, provider outage behavior, and workflow-specific provider_api eligibility beyond read-only/quote/daily snapshot valuation.
 
 Historical/future-review decisions: OANDA bid/ask/mid policy and Twelve Data endpoint choice can be revisited only if the MVP provider stack changes.
 
-Recommended next prompt title: `Provider Execute/Write Eligibility Gate` or `Provider Daily Snapshot Eligibility Gate`, depending on owner priority.
+Recommended next prompt title: `Provider Execute/Write Eligibility Gate` or `Scheduler/Ops Foundation Gate`, depending on owner priority.
 
 Crypto policy update on 2026-05-14: MVP crypto provider is Binance, crypto is USD-settled, crypto uses the USD Wallet, Upbit/Bithumb are excluded from MVP, and `CurrencyCode.USDT` must not be added.
 
@@ -189,9 +191,9 @@ Scope:
 Non-goals:
 
 - No provider client implementation beyond the current explicit operator-run foundation.
-- No provider_api source eligibility implementation beyond the read-only/quote phase.
-- No scheduler/batch implementation.
-- No provider_api DB consumer change for execute/write, daily snapshot, ranking, settlement, reward, or automation.
+- No provider_api source eligibility implementation beyond the read-only/quote phase and operator-run daily snapshot valuation phase.
+- No scheduler/cron or provider ingestion job implementation.
+- No provider_api DB consumer change for execute/write, ranking, settlement, reward, or automation.
 - No schema, migration, seed, or package changes.
 - No durable quote, exact execute replay, partial fill, matching engine, settlement, reward, or Auth refresh/logout work in this provider-evidence capture scope. Current Auth status is tracked in `docs/current-status.md`.
 - No fake/static/sample business price data.
@@ -215,9 +217,9 @@ Current code behavior:
 - Orders create and orders execute remain `admin_manual` only.
 - USD stock and USD-settled crypto orders use the USD wallet; quote KRW valuation can use provider FX, while create/execute audit consistency remains `admin_manual`.
 - Live portfolio/home/positions valuation can use fresh eligible `provider_api` asset prices and provider USD/KRW first, then existing `admin_manual` fallback.
-- Daily portfolio snapshot valuation remains `admin_manual` only.
+- Daily portfolio snapshot valuation can use fresh eligible `provider_api` asset prices and provider USD/KRW first, then existing `admin_manual` fallback. Source decisions are summarized in batch job results and are not stored on snapshot rows.
 - Ranking reads existing `season_rankings`; it does not fetch prices.
-- Cron scheduling and provider_api consumer eligibility outside the allowed read-only/quote workflows remain unimplemented. Provider ingestion exists only as explicit operator-run scripts, while settlement and reward remain existing-snapshot/internal-foundation gates.
+- Cron scheduling and provider_api consumer eligibility outside the allowed read-only/quote plus operator-run daily snapshot valuation workflows remain unimplemented. Provider ingestion exists only as explicit operator-run scripts, while settlement and reward remain existing-snapshot/internal-foundation gates.
 
 Current timestamp policy:
 

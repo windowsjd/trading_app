@@ -50,19 +50,34 @@ describe('provider source eligibility policy', () => {
     expect(isProviderWorkflowAllowed('fx_quote')).toBe(true);
     expect(isProviderWorkflowAllowed('orders_quote')).toBe(true);
     expect(isProviderWorkflowAllowed('home_live_valuation')).toBe(true);
+    expect(isProviderWorkflowAllowed('daily_portfolio_snapshot')).toBe(true);
     expect(isProviderWorkflowDenied('fx_execute')).toBe(true);
     expect(isProviderWorkflowDenied('orders_create')).toBe(true);
     expect(isProviderWorkflowDenied('orders_execute')).toBe(true);
-    expect(isProviderWorkflowDenied('daily_portfolio_snapshot')).toBe(true);
     expect(isProviderWorkflowDenied('season_ranking')).toBe(true);
     expect(isProviderWorkflowDenied('season_settlement')).toBe(true);
     expect(isProviderWorkflowDenied('reward_final_tier')).toBe(true);
+    expect(isProviderWorkflowDenied('reward_fulfillment')).toBe(true);
   });
 
   it('resolves eligible provider source names by asset class and market family', () => {
     expect(
       resolveAssetProviderEligibility({
         workflow: 'orders_quote',
+        asset: {
+          assetType: AssetType.domestic_stock,
+          market: 'KRX',
+          currencyCode: CurrencyCode.KRW,
+        },
+      }),
+    ).toMatchObject({
+      eligible: true,
+      sourceName: PROVIDER_SOURCE_NAMES.domesticStockKrx,
+    });
+
+    expect(
+      resolveAssetProviderEligibility({
+        workflow: 'daily_portfolio_snapshot',
         asset: {
           assetType: AssetType.domestic_stock,
           market: 'KRX',
@@ -147,6 +162,17 @@ describe('provider source eligibility policy', () => {
 
     expect(
       resolveFxProviderEligibility({
+        workflow: 'daily_portfolio_snapshot',
+        baseCurrency: CurrencyCode.USD,
+        quoteCurrency: CurrencyCode.KRW,
+      }),
+    ).toMatchObject({
+      eligible: true,
+      sourceName: PROVIDER_SOURCE_NAMES.fxUsdKrw,
+    });
+
+    expect(
+      resolveFxProviderEligibility({
         workflow: 'fx_execute',
         baseCurrency: CurrencyCode.USD,
         quoteCurrency: CurrencyCode.KRW,
@@ -155,6 +181,42 @@ describe('provider source eligibility policy', () => {
       eligible: false,
       reason: 'workflow_ineligible',
     });
+  });
+
+  it('keeps closed financial workflows provider-ineligible', () => {
+    for (const workflow of [
+      'fx_execute',
+      'orders_create',
+      'orders_execute',
+      'season_ranking',
+      'season_settlement',
+      'reward_final_tier',
+      'reward_fulfillment',
+    ] as const) {
+      expect(
+        resolveFxProviderEligibility({
+          workflow,
+          baseCurrency: CurrencyCode.USD,
+          quoteCurrency: CurrencyCode.KRW,
+        }),
+      ).toEqual({
+        eligible: false,
+        reason: 'workflow_ineligible',
+      });
+      expect(
+        resolveAssetProviderEligibility({
+          workflow,
+          asset: {
+            assetType: AssetType.crypto,
+            market: 'BINANCE',
+            currencyCode: CurrencyCode.USD,
+          },
+        }),
+      ).toEqual({
+        eligible: false,
+        reason: 'workflow_ineligible',
+      });
+    }
   });
 
   it('selects a fresh matching provider candidate and records source decision metadata', () => {
@@ -237,5 +299,73 @@ describe('provider source eligibility policy', () => {
         rejectedProviderReason: 'source_name_mismatch',
       },
     });
+  });
+
+  it('rejects future, non-positive, and wrong sourceType provider candidates', () => {
+    const cases = [
+      {
+        candidate: {
+          id: 'future-effective',
+          sourceType: AssetPriceSourceType.provider_api,
+          sourceName: PROVIDER_SOURCE_NAMES.cryptoUsd,
+          effectiveAt: new Date('2026-06-03T00:00:01.000Z'),
+          capturedAt: new Date('2026-06-02T23:59:40.000Z'),
+          price: new Prisma.Decimal('100.00000000'),
+        },
+        reason: 'effective_at_in_future',
+      },
+      {
+        candidate: {
+          id: 'future-captured',
+          sourceType: AssetPriceSourceType.provider_api,
+          sourceName: PROVIDER_SOURCE_NAMES.cryptoUsd,
+          effectiveAt: new Date('2026-06-02T23:59:40.000Z'),
+          capturedAt: new Date('2026-06-03T00:00:01.000Z'),
+          price: new Prisma.Decimal('100.00000000'),
+        },
+        reason: 'captured_at_in_future',
+      },
+      {
+        candidate: {
+          id: 'non-positive',
+          sourceType: AssetPriceSourceType.provider_api,
+          sourceName: PROVIDER_SOURCE_NAMES.cryptoUsd,
+          effectiveAt: new Date('2026-06-02T23:59:40.000Z'),
+          capturedAt: new Date('2026-06-02T23:59:40.000Z'),
+          price: new Prisma.Decimal('0.00000000'),
+        },
+        reason: 'non_positive_value',
+      },
+      {
+        candidate: {
+          id: 'wrong-source-type',
+          sourceType: AssetPriceSourceType.admin_manual,
+          sourceName: PROVIDER_SOURCE_NAMES.cryptoUsd,
+          effectiveAt: new Date('2026-06-02T23:59:40.000Z'),
+          capturedAt: new Date('2026-06-02T23:59:40.000Z'),
+          price: new Prisma.Decimal('100.00000000'),
+        },
+        reason: 'source_type_mismatch',
+      },
+    ];
+
+    for (const testCase of cases) {
+      expect(
+        selectFreshProviderSnapshot({
+          candidates: [testCase.candidate],
+          expectedSourceName: PROVIDER_SOURCE_NAMES.cryptoUsd,
+          now,
+          freshnessThresholdSeconds: 60,
+          isPositiveValue: (candidate) => candidate.price.gt(0),
+        }),
+      ).toMatchObject({
+        state: 'not_selected',
+        decision: {
+          fallbackUsed: true,
+          fallbackReason: 'provider_rejected',
+          rejectedProviderReason: testCase.reason,
+        },
+      });
+    }
   });
 });

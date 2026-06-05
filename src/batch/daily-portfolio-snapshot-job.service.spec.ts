@@ -92,6 +92,9 @@ describe('DailyPortfolioSnapshotJobService', () => {
       requestedBy: 'operator',
     });
 
+    expect(
+      valuationService.calculateSeasonParticipantValuation,
+    ).toHaveBeenCalledWith('sp-1', startedAt, 'daily_portfolio_snapshot');
     expect(batchService.runJob).toHaveBeenCalledWith(
       expect.objectContaining({
         jobName: DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME,
@@ -129,6 +132,14 @@ describe('DailyPortfolioSnapshotJobService', () => {
         skipped: 0,
       },
       createdSnapshotIds: [],
+      sourceSummary: {
+        participantsUsingProviderApi: 0,
+        participantsUsingAdminManual: 0,
+        participantsUsingFallback: 0,
+        providerApiUsed: false,
+        adminManualUsed: false,
+        fallbackUsed: false,
+      },
     });
   });
 
@@ -172,6 +183,9 @@ describe('DailyPortfolioSnapshotJobService', () => {
     });
     expect(result.participants.created).toBe(1);
     expect(result.createdSnapshotIds).toEqual(['snap-1']);
+    expect(
+      valuationService.calculateSeasonParticipantValuation,
+    ).toHaveBeenCalledWith('sp-1', startedAt, 'daily_portfolio_snapshot');
   });
 
   it('classifies an existing snapshot without overwriting it', async () => {
@@ -448,74 +462,222 @@ describe('DailyPortfolioSnapshotJobService', () => {
     ]);
   });
 
-  it('does not allow provider_api or official_batch valuation sources', async () => {
+  it('uses provider_api valuation in dry-run and reports source summary', async () => {
     const { service, prisma } = createServiceWithRealValuation();
     mockSeason(prisma, SeasonStatus.active);
-    mockParticipants(prisma, [
-      { id: 'sp-provider', userId: 'user-provider' },
-      { id: 'sp-official', userId: 'user-official' },
-    ]);
+    mockParticipants(prisma, [{ id: 'sp-provider', userId: 'user-provider' }]);
     prisma.dailyPortfolioSnapshot.findUnique.mockResolvedValue(null);
-    prisma.seasonParticipant.findUnique
-      .mockResolvedValueOnce(
-        participantDetail({
-          id: 'sp-provider',
-          positions: [
-            positionDetail({
-              assetId: 'asset-provider',
-              assetType: AssetType.domestic_stock,
-              currencyCode: CurrencyCode.KRW,
-            }),
-          ],
-        }),
-      )
-      .mockResolvedValueOnce(
-        participantDetail({
-          id: 'sp-official',
-          positions: [
-            positionDetail({
-              assetId: 'asset-official',
-              assetType: AssetType.domestic_stock,
-              currencyCode: CurrencyCode.KRW,
-            }),
-          ],
-        }),
-      );
-    prisma.assetPriceSnapshot.findFirst
-      .mockResolvedValueOnce({
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+      participantDetail({
+        id: 'sp-provider',
+        positions: [
+          positionDetail({
+            assetId: 'asset-provider',
+            assetType: AssetType.domestic_stock,
+            currencyCode: CurrencyCode.KRW,
+          }),
+        ],
+      }),
+    );
+    prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([
+      {
+        id: 'provider-price-krx',
         assetId: 'asset-provider',
         price: new Prisma.Decimal('100.00000000'),
         currencyCode: CurrencyCode.KRW,
         sourceType: AssetPriceSourceType.provider_api,
+        sourceName: 'kis_krx_realtime_trade',
         effectiveAt: new Date('2026-05-20T00:00:00.000Z'),
         capturedAt: new Date('2026-05-20T00:00:00.000Z'),
         createdAt: new Date('2026-05-20T00:00:00.000Z'),
-      })
-      .mockResolvedValueOnce({
-        assetId: 'asset-official',
+      },
+    ]);
+
+    const result = await runAndGetResult(service, {
+      seasonId: 'season-1',
+      snapshotDate,
+      dryRun: true,
+    });
+
+    expect(prisma.dailyPortfolioSnapshot.create).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      participants: {
+        wouldCreate: 1,
+        failed: 0,
+      },
+      sourceSummary: {
+        participantsUsingProviderApi: 1,
+        participantsUsingAdminManual: 0,
+        participantsUsingFallback: 0,
+        providerApiUsed: true,
+        adminManualUsed: false,
+        fallbackUsed: false,
+      },
+    });
+  });
+
+  it('creates non-dry-run snapshots with provider_api valuation and source summary', async () => {
+    const { service, prisma } = createServiceWithRealValuation();
+    mockSeason(prisma, SeasonStatus.active);
+    mockParticipants(prisma, [{ id: 'sp-provider', userId: 'user-provider' }]);
+    prisma.dailyPortfolioSnapshot.findUnique.mockResolvedValue(null);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+      participantDetail({
+        id: 'sp-provider',
+        positions: [
+          positionDetail({
+            assetId: 'asset-provider',
+            assetType: AssetType.domestic_stock,
+            currencyCode: CurrencyCode.KRW,
+          }),
+        ],
+      }),
+    );
+    prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([
+      {
+        id: 'provider-price-krx',
+        assetId: 'asset-provider',
         price: new Prisma.Decimal('100.00000000'),
         currencyCode: CurrencyCode.KRW,
-        sourceType: AssetPriceSourceType.official_batch,
+        sourceType: AssetPriceSourceType.provider_api,
+        sourceName: 'kis_krx_realtime_trade',
         effectiveAt: new Date('2026-05-20T00:00:00.000Z'),
         capturedAt: new Date('2026-05-20T00:00:00.000Z'),
         createdAt: new Date('2026-05-20T00:00:00.000Z'),
-      });
+      },
+    ]);
+    prisma.dailyPortfolioSnapshot.create.mockResolvedValue({ id: 'snap-1' });
 
     const result = await runAndGetResult(service, {
       seasonId: 'season-1',
       snapshotDate,
     });
 
-    expect(prisma.assetPriceSnapshot.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          sourceType: AssetPriceSourceType.admin_manual,
-        }),
+    expect(prisma.dailyPortfolioSnapshot.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        seasonParticipantId: 'sp-provider',
+        totalAssetKrw: '1000100.00000000',
+        assetValueKrw: '100.00000000',
+      }),
+      select: {
+        id: true,
+      },
+    });
+    expect(result).toMatchObject({
+      participants: {
+        created: 1,
+        failed: 0,
+      },
+      createdSnapshotIds: ['snap-1'],
+      sourceSummary: {
+        participantsUsingProviderApi: 1,
+        providerApiUsed: true,
+        fallbackUsed: false,
+      },
+    });
+  });
+
+  it('succeeds with admin_manual fallback when provider_api is stale', async () => {
+    const { service, prisma } = createServiceWithRealValuation();
+    mockSeason(prisma, SeasonStatus.active);
+    mockParticipants(prisma, [{ id: 'sp-fallback', userId: 'user-fallback' }]);
+    prisma.dailyPortfolioSnapshot.findUnique.mockResolvedValue(null);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+      participantDetail({
+        id: 'sp-fallback',
+        positions: [
+          positionDetail({
+            assetId: 'asset-provider',
+            assetType: AssetType.domestic_stock,
+            currencyCode: CurrencyCode.KRW,
+          }),
+        ],
       }),
     );
-    expect(result.participants.failed).toBe(2);
+    prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([
+      {
+        id: 'provider-price-stale',
+        assetId: 'asset-provider',
+        price: new Prisma.Decimal('999.00000000'),
+        currencyCode: CurrencyCode.KRW,
+        sourceType: AssetPriceSourceType.provider_api,
+        sourceName: 'kis_krx_realtime_trade',
+        effectiveAt: new Date('2026-05-19T23:58:00.000Z'),
+        capturedAt: new Date('2026-05-19T23:59:29.000Z'),
+        createdAt: new Date('2026-05-19T23:59:29.000Z'),
+      },
+    ]);
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce({
+      id: 'admin-price-krx',
+      assetId: 'asset-provider',
+      price: new Prisma.Decimal('100.00000000'),
+      currencyCode: CurrencyCode.KRW,
+      sourceType: AssetPriceSourceType.admin_manual,
+      sourceName: 'manual-price',
+      effectiveAt: new Date('2026-05-20T00:00:00.000Z'),
+      capturedAt: new Date('2026-05-20T00:00:00.000Z'),
+      createdAt: new Date('2026-05-20T00:00:00.000Z'),
+    });
+
+    const result = await runAndGetResult(service, {
+      seasonId: 'season-1',
+      snapshotDate,
+      dryRun: true,
+    });
+
+    expect(result).toMatchObject({
+      participants: {
+        wouldCreate: 1,
+        failed: 0,
+      },
+      sourceSummary: {
+        participantsUsingProviderApi: 0,
+        participantsUsingAdminManual: 1,
+        participantsUsingFallback: 1,
+        providerApiUsed: false,
+        adminManualUsed: true,
+        fallbackUsed: true,
+        fallbackReasons: ['provider_rejected'],
+        rejectedProviderReasons: ['captured_at_stale'],
+      },
+    });
+  });
+
+  it('does not allow official_batch valuation sources', async () => {
+    const { service, prisma } = createServiceWithRealValuation();
+    mockSeason(prisma, SeasonStatus.active);
+    mockParticipants(prisma, [{ id: 'sp-official', userId: 'user-official' }]);
+    prisma.dailyPortfolioSnapshot.findUnique.mockResolvedValue(null);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+      participantDetail({
+        id: 'sp-official',
+        positions: [
+          positionDetail({
+            assetId: 'asset-official',
+            assetType: AssetType.domestic_stock,
+            currencyCode: CurrencyCode.KRW,
+          }),
+        ],
+      }),
+    );
+    prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([]);
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce({
+      assetId: 'asset-official',
+      price: new Prisma.Decimal('100.00000000'),
+      currencyCode: CurrencyCode.KRW,
+      sourceType: AssetPriceSourceType.official_batch,
+      effectiveAt: new Date('2026-05-20T00:00:00.000Z'),
+      capturedAt: new Date('2026-05-20T00:00:00.000Z'),
+      createdAt: new Date('2026-05-20T00:00:00.000Z'),
+    });
+
+    const result = await runAndGetResult(service, {
+      seasonId: 'season-1',
+      snapshotDate,
+    });
+
+    expect(result.participants.failed).toBe(1);
     expect(result.errors.map((error) => error.code)).toEqual([
-      'ASSET_PRICE_UNAVAILABLE',
       'ASSET_PRICE_UNAVAILABLE',
     ]);
     expect(prisma.dailyPortfolioSnapshot.create).not.toHaveBeenCalled();
@@ -613,9 +775,11 @@ function createPrismaMock() {
       create: jest.fn(),
     },
     assetPriceSnapshot: {
+      findMany: jest.fn().mockResolvedValue([]),
       findFirst: jest.fn(),
     },
     fxRateSnapshot: {
+      findMany: jest.fn().mockResolvedValue([]),
       findFirst: jest.fn(),
     },
   };
@@ -710,6 +874,15 @@ function baseValuationFixture() {
     realizedPnlKrw: '10000.00000000',
     unrealizedPnlKrw: '20000.00000000',
     valuationAt: new Date('2026-05-20T00:00:30.000Z'),
+    sourceSummary: {
+      providerApiUsed: false,
+      adminManualUsed: false,
+      fallbackUsed: false,
+      fallbackReasons: [],
+      rejectedProviderReasons: [],
+    },
+    assetPriceSourceDecisions: [],
+    fxRateSourceDecision: null,
   };
 }
 
@@ -748,7 +921,15 @@ function positionDetail(input: {
     currencyCode: input.currencyCode,
     realizedPnl: new Prisma.Decimal('0.00000000'),
     asset: {
+      id: input.assetId,
       assetType: input.assetType,
+      market:
+        input.assetType === AssetType.domestic_stock
+          ? 'KRX'
+          : input.assetType === AssetType.us_stock
+            ? 'NAS'
+            : 'BINANCE',
+      currencyCode: input.currencyCode,
     },
   };
 }

@@ -72,3 +72,9 @@ No docs were deleted. No empty or duplicate document was identified for deletion
 
 - Current source-of-truth docs and API contracts were updated for backward-compatible optional source metadata fields: `rateSource`, `priceSource`, `assetPriceSource`, `fxRateSource`, and live valuation source summaries.
 - The update documents public-safe metadata fields, fallback/rejection reason visibility, raw provider payload/secret exclusion, and unchanged execute/write/final/scheduler/provider-trigger STOP boundaries.
+
+2026-06-05 provider-backed daily snapshot eligibility pass:
+
+- Current source-of-truth docs were updated to reflect `daily_portfolio_snapshot` provider_api eligibility for operator-run daily snapshot valuation only.
+- Batch result `sourceSummary`/fallback information is documented as `batch_job_runs.resultPayloadJson` evidence; `daily_portfolio_snapshots` schema remains unchanged.
+- `/fx execute`, orders create/execute, ranking, settlement/final result, reward, scheduler/cron, provider trigger APIs, and batch HTTP APIs remain closed.

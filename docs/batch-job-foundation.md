@@ -51,7 +51,7 @@ Supported jobs now:
 
 - `noop`: records the batch run lifecycle only.
 - `health-check`: checks DB reachability only.
-- `daily-portfolio-snapshot`: creates `daily_portfolio_snapshots` for active participants of one season/date using existing DB `admin_manual` price/FX data only.
+- `daily-portfolio-snapshot`: creates `daily_portfolio_snapshots` for active participants of one season/date using existing fresh eligible `provider_api` price/FX data first, then existing safe `admin_manual` fallback.
 - `season-ranking`: creates `season_rankings` for one season/date from existing `daily_portfolio_snapshots` only.
 - `daily-season-cycle`: runs daily portfolio snapshot, then season ranking, for one season/date.
 - `season-settlement`: creates final `season_rankings` from existing `daily_portfolio_snapshots` for one ended season/date and transitions the season to `settled`.
@@ -85,12 +85,16 @@ pnpm tsx scripts/admin-run-batch-job.ts \
 Daily snapshot policy:
 
 - If `--idempotency-key` is omitted, it is generated as `daily-portfolio-snapshot:<season-id>:<YYYY-MM-DD>`.
-- `--dry-run` evaluates active participants and reports `wouldCreate`, `existing`, and `failed` counts without inserting `daily_portfolio_snapshots`.
+- `--dry-run` evaluates active participants and reports `wouldCreate`, `existing`, `failed`, and aggregate `sourceSummary` counts without inserting `daily_portfolio_snapshots`.
 - Non-dry-run creates snapshots only for participants whose valuation is available.
 - Existing `(seasonParticipantId, snapshotDate)` rows are classified as `existing` and are not overwritten.
-- Missing/stale USD/KRW FX or missing price evidence is participant-level failure with no fake fallback.
-- Only approved fresh `admin_manual` USD/KRW and latest eligible `admin_manual` asset prices are used. The job does not allow `provider_api` or `official_batch` sources.
-- The job does not generate rankings, settlement, rewards, provider rows, or scheduler registrations.
+- Fresh eligible `provider_api` rows are selected first for USD/KRW and asset prices. Provider USD/KRW freshness uses capturedAt age <= 300 seconds; provider asset price freshness uses capturedAt age <= 60 seconds.
+- Missing, stale, future, non-positive, wrong-source, wrong-type, or ineligible provider rows fall back to existing safe `admin_manual` selection where available.
+- Provider missing/rejected plus missing/stale admin_manual evidence is participant-level failure with no fake fallback.
+- `sourceSummary` records participant counts for provider_api/admin_manual/fallback use plus fallback and rejected-provider reasons in the batch result payload. Raw provider payloads and secrets are not included.
+- `daily_portfolio_snapshots` row schema is unchanged and does not store source metadata.
+- `official_batch` remains not allowed for the current daily snapshot valuation workflow.
+- The job does not generate rankings, settlement, rewards, provider rows, price/FX rows, or scheduler registrations.
 
 Season ranking example:
 
@@ -142,7 +146,7 @@ Daily season cycle policy:
 - If the season ranking child job has a job-level failure, the cycle fails.
 - Child deduplicated/skipped responses are copied into the cycle result summary and do not stop the next step.
 - Cycle-level validation covers required `seasonId` and `snapshotDate` format. Season existence and status validation are delegated to the child jobs, which currently allow active/ended seasons and reject upcoming/settled seasons.
-- The cycle does not call providers, create price/FX rows, register a scheduler, settle seasons, grant rewards, or expose an HTTP batch execution API.
+- The cycle does not call external providers, create provider/price/FX rows, register a scheduler, settle seasons, grant rewards, or expose an HTTP batch execution API. Its daily snapshot child may consume existing eligible provider_api DB rows through the daily snapshot valuation workflow.
 
 Season settlement example:
 

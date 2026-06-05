@@ -191,7 +191,7 @@ Pagination is applied after sorting.
 ## Not Implemented
 
 - Provider API ingestion trigger APIs.
-- Provider-backed execute/write, daily snapshot, ranking, settlement, or reward use.
+- Provider-backed execute/write, ranking, settlement, or reward use. Daily snapshot provider eligibility is limited to the separate operator-run batch valuation workflow.
 - Scheduler/batch snapshot or ranking generation.
 - Settlement/reward integration.
 - Position mutation.

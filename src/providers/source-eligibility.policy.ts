@@ -14,13 +14,13 @@ export type ProviderEligibleWorkflow =
   | 'orders_quote'
   | 'live_portfolio_valuation'
   | 'home_live_valuation'
-  | 'positions_live_valuation';
+  | 'positions_live_valuation'
+  | 'daily_portfolio_snapshot';
 
 export type ProviderDeniedWorkflow =
   | 'fx_execute'
   | 'orders_create'
   | 'orders_execute'
-  | 'daily_portfolio_snapshot'
   | 'season_ranking'
   | 'season_settlement'
   | 'reward_final_tier'
@@ -80,13 +80,13 @@ const ALLOWED_WORKFLOWS: ReadonlySet<ProviderEligibleWorkflow> = new Set([
   'live_portfolio_valuation',
   'home_live_valuation',
   'positions_live_valuation',
+  'daily_portfolio_snapshot',
 ]);
 
 const DENIED_WORKFLOWS: ReadonlySet<ProviderDeniedWorkflow> = new Set([
   'fx_execute',
   'orders_create',
   'orders_execute',
-  'daily_portfolio_snapshot',
   'season_ranking',
   'season_settlement',
   'reward_final_tier',

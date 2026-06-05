@@ -18,9 +18,10 @@ This service owns backend APIs, database access, financial calculations, and ser
 - KRW and USD cash wallets. US stocks and USD-settled crypto use the USD wallet.
 - Final valuation policy is KRW total assets.
 - Provider ingestion foundation exists for operator-run ExchangeRate-API USD/KRW, Binance public REST crypto, and KIS WebSocket KRX/US stock market data row insertion.
-- Provider_api source eligibility is opened only for explicitly allowed read-only/quote workflows: `/fx quote`, assets `withPrice`, orders quote, and live portfolio/home/positions valuation.
+- Provider_api source eligibility is opened only for explicitly allowed read-only/quote workflows and the operator-run daily portfolio snapshot valuation job: `/fx quote`, assets `withPrice`, orders quote, live portfolio/home/positions valuation, and daily snapshot valuation.
 - Read-only/quote responses expose backward-compatible optional source metadata for provider/admin visibility: `rateSource`, `priceSource`, `assetPriceSource`, `fxRateSource`, and live valuation source summaries where applicable.
 - Batch job execution foundation with idempotent `batch_job_runs` recording, operator-only noop/health-check script, operator-run daily portfolio snapshot generation, operator-run season ranking generation from existing daily snapshots, an operator-run daily season cycle orchestration job, an operator-run season settlement MVP job, and an operator-run reward grant marker MVP job.
+- Daily portfolio snapshot batch results include sourceSummary/fallback metadata in `batch_job_runs.resultPayloadJson`; `daily_portfolio_snapshots` row schema is unchanged.
 - Operator-run final tier assignment MVP job from existing final `season_rankings`.
 
 ## STOP / Not Implemented
@@ -31,7 +32,7 @@ These are intentionally outside the current implementation and should not be add
 - OANDA and Twelve Data are historical/fallback provider candidates only, not the current MVP core provider stack.
 - Admin/operator account management APIs, batch run HTTP APIs, scheduler/cron, and reward fulfillment trigger APIs.
 - Cron scheduler, scheduler-driven snapshot/ranking jobs, settlement extension jobs beyond final tier assignment, or actual reward fulfillment jobs.
-- Provider-backed FX execute, order create, order execute, daily snapshot, ranking, settlement recalculation, or reward automation.
+- Provider-backed FX execute, order create, order execute, ranking, settlement recalculation, or reward automation.
 - KIS order/account/balance/fill/deposit/withdrawal APIs, KIS orderbook/hoga, Binance authenticated/order/account/user-data APIs, and real external trading/account integrations.
 - Actual payment, point, badge, or trophy fulfillment beyond the `rewardGrantedAt` marker MVP.
 - Access token blacklist/revocation, server-side session auth, and cookie auth.
@@ -83,7 +84,7 @@ pnpm exec prisma validate
 # operator-only batch foundation smoke, no provider or trading business rows
 pnpm tsx scripts/admin-run-batch-job.ts --job noop --idempotency-key noop:local-check --dry-run --requested-by local-operator --payload-json '{"purpose":"batch-foundation-check"}'
 
-# operator-run daily portfolio snapshot dry-run, no provider calls
+# operator-run daily portfolio snapshot dry-run, no external provider calls
 pnpm tsx scripts/admin-run-batch-job.ts --job daily-portfolio-snapshot --season-id <SEASON_ID> --snapshot-date <YYYY-MM-DD> --dry-run --requested-by local-operator
 
 # operator-run season ranking dry-run from existing daily snapshots, no provider calls
@@ -105,7 +106,7 @@ pnpm tsx scripts/admin-run-batch-job.ts --job reward-grant --season-id <SEASON_I
 pnpm tsx scripts/admin-run-batch-job.ts --job reward-grant --season-id <SEASON_ID> --grant-date <YYYY-MM-DD> --dry-run --requested-by local-operator
 ```
 
-`daily-portfolio-snapshot` uses the idempotency key `daily-portfolio-snapshot:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. Dry-run reports `wouldCreate`, `existing`, and participant-level failures without inserting snapshots. Non-dry-run inserts only available participant snapshots, skips existing `(seasonParticipantId, snapshotDate)` rows without overwrite, and uses only existing approved fresh `admin_manual` USD/KRW plus latest eligible `admin_manual` asset price data. It does not call providers, schedule cron, generate rankings, settle seasons, or grant rewards.
+`daily-portfolio-snapshot` uses the idempotency key `daily-portfolio-snapshot:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. Dry-run reports `wouldCreate`, `existing`, participant-level failures, and `sourceSummary` without inserting snapshots. Non-dry-run inserts only available participant snapshots, skips existing `(seasonParticipantId, snapshotDate)` rows without overwrite, and uses fresh eligible `provider_api` rows first with explicit `admin_manual` fallback. It does not call external providers, create provider/price/FX rows, schedule cron, generate rankings, settle seasons, or grant rewards.
 
 `season-ranking` uses the idempotency key `season-ranking:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. Dry-run reads existing `daily_portfolio_snapshots` and reports planned rankings without inserting rows. Non-dry-run creates `season_rankings` only when no rows already exist for the same season/date/type; existing rankings are skipped without overwrite. It does not call providers, create daily snapshots, mutate wallets/orders/positions, settle seasons, or grant rewards. Ranking is `totalAssetKrw desc` with stable user/participant ordering; the current schema requires unique persisted ranks, so true same-rank competition ties need a future schema gate.
 
@@ -155,7 +156,7 @@ Possible now:
 - Mocked HTTP e2e coverage for guard routing and controller/service entry.
 - Opt-in real PostgreSQL integration tests for implemented DB write paths.
 - Manual admin input paths using operator-approved real data.
-- Operator-run daily portfolio snapshot batch jobs using existing `admin_manual` DB data.
+- Operator-run daily portfolio snapshot batch jobs using existing fresh eligible `provider_api` DB rows first, then existing `admin_manual` fallback data.
 - Operator-run season ranking batch jobs using existing `daily_portfolio_snapshots`.
 - Operator-run daily season cycle batch jobs that run daily snapshot and season ranking in order.
 - Operator-run season settlement MVP jobs that finalize from existing `daily_portfolio_snapshots`.
@@ -163,12 +164,12 @@ Possible now:
 - Operator-run reward grant marker MVP jobs that set `SeasonParticipant.rewardGrantedAt` after settlement and final tier assignment.
 - Settled joined Home final-result reads from existing `rankType=final` `season_rankings`; missing final rankings return unavailable without live valuation fallback.
 - Provider_api-backed `/fx quote`, assets `withPrice`, orders quote, and live portfolio/home/positions valuation with fresh provider-first selection and explicit admin_manual fallback.
-- Source metadata/outage visibility for those read-only/quote responses without exposing raw provider payloads or secrets.
+- Source metadata/outage visibility for those read-only/quote responses and daily snapshot batch results without exposing raw provider payloads or secrets.
 
 Not possible without a separate provider/write or automation gate:
 
 - Cron scheduler-driven snapshots/rankings.
-- Provider-backed FX execute, order create, order execute, daily snapshots, ranking, settlement, or reward automation.
+- Provider-backed FX execute, order create, order execute, ranking, settlement, or reward automation.
 - Actual payment, point, badge, or trophy fulfillment.
 
 Never create fake/static/sample business prices to make a test or local flow pass.
