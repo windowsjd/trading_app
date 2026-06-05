@@ -11,7 +11,7 @@
 - Admin/operator authorization and audit foundation MVP is implemented with `UserRole`, DB-current-role request context, `GET /api/v1/operator/me`, and `operator_audit_logs`. It does not add admin role management, provider ingestion triggers, batch execution HTTP APIs, scheduler/cron, or reward fulfillment triggers.
 - Provider-key-free `MVP_FLOW_DB_SMOKE=1` real PostgreSQL smoke is available as a service-composed opt-in check for the implemented Auth -> season join -> wallets/assets -> FX -> orders -> positions/records/home/ranking flow using isolated test-only `admin_manual` fixtures. It is not provider ingestion, scheduler, settlement, reward, seed, or sample business data.
 - Batch job execution foundation is implemented with `BatchJobRun`/`BatchJobStatus`, `BatchService`, an operator-only noop/health-check script, operator-run `daily-portfolio-snapshot` and `season-ranking` jobs, an operator-run `daily-season-cycle` orchestration job, an operator-run `season-settlement` MVP job, an operator-run `final-tier-assignment` MVP job, and an operator-run `reward-grant` internal reward foundation MVP job. It is not a cron scheduler, provider ingestion, or actual external fulfillment implementation.
-- Provider ingestion foundation is implemented for explicit operator-run ExchangeRate-API USD/KRW, Binance public crypto market data snapshot insertion, and KIS WebSocket trade price snapshot insertion. It is not a cron scheduler, admin HTTP API, KIS REST current-price ingestion, KIS orderbook/hoga ingestion, provider_api eligibility beyond the explicitly allowed read-only/quote workflows, or any real trading/account/balance integration.
+- Provider ingestion foundation is implemented for explicit operator-run ExchangeRate-API USD/KRW, Binance public crypto market data snapshot insertion, and KIS WebSocket trade price snapshot insertion. It is not a cron scheduler, admin HTTP API, KIS REST current-price ingestion, KIS orderbook/hoga ingestion, provider_api eligibility beyond the explicitly allowed read-only/quote workflows and operator-run daily snapshot valuation workflow, or any real trading/account/balance integration.
 - Provider live smoke evidence gate on 2026-05-28 KST was PARTIAL GO: ExchangeRate-API and Binance public REST live smoke inserted local `provider_api` rows successfully; KIS WebSocket live smoke was BLOCKED at that time by missing required KIS REST/WS base URL and watchlist/policy env values. Financial read/write source eligibility remained `admin_manual` only at that historical gate.
 - Asset Universe / KIS watchlist gate on 2026-05-30 KST is PARTIAL GO / KIS BLOCKED: the fixed 40-stock KIS watchlist is documented, all 40 stock assets were upserted after DB startup, DB mapping counts passed at domestic 15/15 and US 25/25, and ExchangeRate/Binance dry-run rechecks succeeded.
 - KIS env completion pre-gate on 2026-05-30 KST remains KIS BLOCKED because `KIS_REST_BASE_URL` and `KIS_WS_BASE_URL` are missing in the loaded env. KIS policy env values have explicit code defaults, but approval_key/connect/subscribe/tick/DB insertion were not attempted without required endpoints.
@@ -24,6 +24,7 @@
 - Provider API Source Eligibility Implementation Gate read-only/quote phase on 2026-06-03 KST is GO: fresh provider_api rows can power `/fx quote`, assets `withPrice`, orders quote, live portfolio valuation, home live valuation, and positions live valuation with existing safe `admin_manual` fallback.
 - Provider Source Metadata and Outage UX Gate on 2026-06-04 KST is GO in code/docs/tests: allowed read-only/quote responses now expose backward-compatible optional public-safe source metadata (`rateSource`, `priceSource`, `assetPriceSource`, `fxRateSource`, and live valuation source summaries) with fallback/rejection reasons. This did not open execute/write/final/provider-trigger workflows.
 - Provider-backed Daily Snapshot Eligibility Gate on 2026-06-05 KST is GO for operator-run daily snapshot valuation only: `daily_portfolio_snapshot` can consume fresh eligible provider_api rows first with explicit admin_manual fallback, and batch job results expose aggregate `sourceSummary` without changing `daily_portfolio_snapshots` schema.
+- Daily Snapshot Gate Verification and Realtime Execution Policy Foundation on 2026-06-05 KST is GO for policy/code foundation only: daily snapshot gate completion was verified, `docs/realtime-execution-policy.md` now defines quote-reference/execute-reprice/freshness/bps/error/audit policy, and `src/providers/realtime-execution-policy.ts` adds pure tested helpers without wiring them into current execute/write services.
 - Provider API Source Eligibility remains closed for `/fx execute`, orders create, orders execute, ranking, settlement/final result, reward/final tier/fulfillment, scheduler/cron, provider ingestion trigger APIs, batch HTTP APIs, and real trading/account/order/deposit/withdrawal APIs.
 - Home settled final-result read model is implemented from existing `rankType=final` `season_rankings`; final tier assignment and reward grant internal foundation now have operator-run MVP jobs. Actual payment/point/delivery/external fulfillment remains a separate gate.
 - `docs/current-status.md` remains the short status summary. This document is the detailed backend gate roadmap.
@@ -51,6 +52,7 @@ Current source-of-truth and active reference documents:
 - `docs/crypto-usd-settlement-policy-update.md`
 - `docs/provider-final-selection-readiness-recheck.md`
 - `docs/asset-price-freshness-policy.md`
+- `docs/realtime-execution-policy.md`
 - `docs/provider-evidence-capture.md`
 - `docs/provider-source-eligibility-pre-gate.md`
 - `docs/docs-inventory.md`
@@ -177,8 +179,8 @@ Consistency note:
 - Implemented files: `src/fx/fx.controller.ts`, `src/fx/fx.service.ts`, `src/fx/fx-decimal-policy.ts`, `scripts/admin-insert-fx-rate.ts`.
 - Source of truth: `docs/fx-api-contract.md`, `docs/current-status.md`.
 - Existing tests: `src/fx/fx.service.spec.ts`, `src/fx/fx-decimal-policy.spec.ts`, `src/fx/fx-rate-input.validation.spec.ts`, `test/app.e2e-spec.ts`.
-- Known limitations: quote is not durable; `quoteId` and `expiresAt` are `null`; sourceType priority is not finalized for mixed provider/manual rows; provider ingestion is absent.
-- Remaining work: provider final selection and sourceType priority before provider rows are introduced.
+- Known limitations: quote is not durable; `quoteId` and `expiresAt` are `null`; current quote is a reference quote, not a guaranteed execution price.
+- Remaining work: durable quote and execute-time provider repricing gate if provider-backed execute/write is opened.
 - Risk level: MEDIUM.
 - Recommended next action: Gate C/D provider evidence capture, not quote code changes.
 
@@ -188,8 +190,8 @@ Consistency note:
 - Implemented files: `src/fx/fx.service.ts`, `src/fx/fx-execute-*.ts`.
 - Source of truth: `docs/fx-api-contract.md`, `docs/current-status.md`.
 - Existing tests: `src/fx/fx.service.spec.ts`, `src/fx/fx.execute.integration.spec.ts`, FX execute policy specs under `src/fx/*spec.ts`, `test/app.e2e-spec.ts` auth baseline.
-- Known limitations: no durable quote; no provider_api/official_batch source; stale pending recovery tool/job absent; some DB-level failure injection remains hardening-only; responsePayloadJson-only storage failure remains hard to force with current schema.
-- Remaining work: recovery/hardening gate after provider/scheduler decisions, not before provider selection.
+- Known limitations: no durable quote; no provider_api/official_batch source; stale pending recovery tool/job absent; some DB-level failure injection remains hardening-only; responsePayloadJson-only storage failure remains hard to force with current schema. The realtime execution policy foundation exists but is not connected to current execute behavior.
+- Remaining work: provider-backed execute/write gate should use `docs/realtime-execution-policy.md` before any source expansion; recovery/hardening remains separate.
 - Risk level: HIGH.
 - Recommended next action: keep existing execute source as approved fresh `admin_manual`; do not expand allowed sourceType until provider gate completes.
 
@@ -221,8 +223,8 @@ Consistency note:
 - Implemented files: `src/orders/orders.controller.ts`, `src/orders/orders.service.ts`.
 - Source of truth: `docs/orders-api-contract.md`, `docs/current-status.md`.
 - Existing tests: `src/orders/orders.service.spec.ts`, `test/app.e2e-spec.ts`.
-- Known limitations: no durable quote, no quote expiry, no asset price stale threshold, no provider price source.
-- Remaining work: asset price freshness policy implementation and durable quote gate if required.
+- Known limitations: no durable quote, no quote expiry, and submitted quote values are reference estimates. Provider quote source exists, but provider-backed execute remains closed.
+- Remaining work: durable quote and realtime execute policy implementation if the provider-backed execute/write gate opens.
 - Risk level: MEDIUM.
 - Recommended next action: do not add durable quote in provider/scheduler gates.
 
@@ -481,7 +483,7 @@ Gate B was completed as a docs-only readiness re-check in `docs/provider-final-s
 Still blocked:
 
 - KRX and US stock provider_api execute/write until a separate eligibility, freshness, outage, and product/terms decision exists.
-- Provider_api source eligibility outside read-only/quote until separate source priority, fallback, freshness, and terms decisions are accepted.
+- Provider_api source eligibility outside explicitly allowed read-only/quote workflows and operator-run daily snapshot valuation until separate execute/write/final source priority, fallback, freshness, and terms decisions are accepted.
 - Cron scheduler implementation until Gate E defines lock/idempotency/retry/ops behavior.
 - Settlement extensions until Gate H/I fixes final price evidence, true tie rank, recovery behavior, advanced tier policy, or actual fulfillment handoff.
 - Actual reward/payment/badge/trophy fulfillment until reward policy/schema are approved.
@@ -608,7 +610,7 @@ GO or completed:
 
 STOP:
 
-- Provider_api source eligibility outside read-only/quote until live evidence, freshness, fallback, source priority, and implementation scope are accepted.
+- Provider_api source eligibility outside explicitly allowed read-only/quote workflows and operator-run daily snapshot valuation until live evidence, freshness, fallback, source priority, and implementation scope are accepted.
 - Domestic KRX provider_api read-only/quote eligibility is implemented; KRX execute/write remains blocked until a separate gate accepts source eligibility, freshness, workflow scope, and implementation tests.
 - Cron scheduler implementation until Gate E.
 - Settlement extensions until Gate H then Gate I.

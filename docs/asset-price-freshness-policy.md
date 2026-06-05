@@ -4,7 +4,7 @@
 
 This document fixes the near-term freshness and source policy for FX and asset price snapshots before provider ingestion, scheduler/batch, ranking automation, settlement, or reward implementation.
 
-This policy records freshness and source boundaries after provider ingestion foundation, the read-only/quote provider eligibility gate, and the operator-run daily snapshot eligibility gate. It does not authorize package, Prisma schema, migration, seed, scheduler, settlement, reward, durable quote, order replay, partial fill, matching-engine changes, or provider_api source eligibility changes outside the approved read-only/quote plus daily snapshot valuation workflows.
+This policy records freshness and source boundaries after provider ingestion foundation, the read-only/quote provider eligibility gate, the operator-run daily snapshot eligibility gate, and the realtime execution policy foundation. It does not authorize package, Prisma schema, migration, seed, scheduler, settlement, reward, durable quote, order replay, partial fill, matching-engine changes, or provider_api source eligibility changes outside the approved read-only/quote plus daily snapshot valuation workflows.
 
 2026-05-26 update:
 
@@ -12,6 +12,7 @@ This policy records freshness and source boundaries after provider ingestion fou
 - KIS WebSocket trade price ingestion foundation can insert `provider_api` asset price rows for domestic KRX `H0STCNT0` and US delayed/free `HDFSCNT0` trades when existing active asset mapping is unambiguous.
 - Provider API Source Eligibility Implementation Gate later opened provider_api only for `/fx quote`, assets `withPrice`, orders quote, and live portfolio/home/positions valuation.
 - Provider-backed Daily Snapshot Eligibility Gate later opened provider_api only for operator-run daily snapshot valuation, using the same provider sourceName allowlist and freshness thresholds.
+- `docs/realtime-execution-policy.md` now defines the stricter future execute/write freshness and quote-to-execute movement policy: KRX/US/BINANCE asset execute freshness <= 10 seconds by `capturedAt`, USD/KRW FX execute freshness <= 60 seconds by `capturedAt`, no default admin_manual execute fallback, and quote is only a reference quote.
 - `/fx execute`, orders create/execute, ranking, settlement/final result, reward/final tier/fulfillment, scheduler/cron, provider trigger APIs, KIS REST current-price ingestion, orderbook/hoga WebSocket ingestion, and order/account/balance/real-trading APIs remain closed.
 
 ## 2. Current Price Storage Model
@@ -51,7 +52,7 @@ Current source types are:
 Policy meanings:
 
 - `admin_manual`: bootstrap, manual correction, emergency fallback, and provider outage fallback through explicit operator action. It is not recommended as the long-running production real-time primary source.
-- `provider_api`: future real-time or near-real-time source for quote, execute, and live valuation only after provider selection, timestamp evidence, ingestion implementation, and tests are accepted.
+- `provider_api`: implemented source for approved read-only/quote, live valuation, and operator-run daily snapshot valuation workflows. Future execute/write use requires the separate realtime execution policy gate and must not silently fall back to admin_manual.
 - `official_batch`: future official/reference/reconciliation source for daily snapshots, ranking input, and settlement candidate evidence. It is not a real-time order execute source.
 
 ## 4. Timestamp Semantics
@@ -85,7 +86,7 @@ Future provider policy:
 - OANDA is the conditional primary FX provider candidate.
 - Twelve Data is the conditional secondary FX provider candidate.
 - `provider_api` USD/KRW requires provider timestamp -> `effectiveAt`, server receipt -> `capturedAt`, fixed rate basis, sourceType/sourceName correctness, stale response rejection, and no fake/static fallback.
-- `/fx quote` now uses fresh eligible provider_api first with admin_manual fallback after the read-only/quote eligibility gate. Execute remains admin_manual only.
+- `/fx quote` now uses fresh eligible provider_api first with admin_manual fallback after the read-only/quote eligibility gate. Execute remains admin_manual only until a separate realtime execution gate implements provider-required execute-time repricing and `RATE_CHANGED_REQUOTE_REQUIRED`.
 
 ## 6. Domestic Stock Freshness Policy
 
@@ -114,7 +115,7 @@ Current implementation:
 
 Target policy after provider ingestion:
 
-- During regular market hours, quote/execute should require a provider timestamp no older than 60 seconds.
+- During regular market hours, quote/read workflows use the current approved freshness rules. Future execute/write must use the stricter 10-second provider capturedAt threshold from `docs/realtime-execution-policy.md`.
 - Delayed data must not power market-open quote/execute unless product explicitly accepts delayed virtual trading behavior.
 - During market closed periods, the latest regular-session close may be allowed for read-only valuation and daily snapshots, but must not be mislabeled as live executable price.
 - Twelve Data is a conditional US stock provider candidate through `/quote` or WebSocket evidence with usable timestamp fields. `/price` alone is not sufficient because it lacks timestamp evidence in the checked official docs.
@@ -133,7 +134,7 @@ Target policy after provider ingestion:
 - MVP crypto is USD-settled and uses the USD Wallet.
 - Crypto KRW valuation is crypto USD value converted with USD/KRW.
 - Upbit/Bithumb are excluded from the MVP provider stack.
-- Quote/execute should require a provider timestamp no older than 30 seconds.
+- Quote/read workflows use the current approved freshness rules. Future execute/write must use the stricter 10-second provider capturedAt threshold from `docs/realtime-execution-policy.md`.
 - Home live valuation should require a provider timestamp no older than 60 seconds.
 - Daily snapshot capture should use a timestamp close to the scheduled capture time, with a maximum provider age of 5 minutes unless a later gate narrows it.
 - Binance `BTCUSDT` ticker/orderbook public fixtures were captured in Gate C prep; mapping remains conditional.
@@ -172,7 +173,8 @@ SourceType priority is workflow-specific:
 1. Quote/execute after provider implementation:
    - Prefer eligible fresh `provider_api`.
    - Do not silently prefer stale `admin_manual` over fresh `provider_api`.
-   - Allow `admin_manual` only as explicit operator fallback with sourceName, timestamp, approval evidence, and fresh threshold compliance.
+   - Quote/read fallbacks may use explicit eligible `admin_manual` where current policy allows.
+   - Execute must not use default `admin_manual` fallback; emergency manual override requires a separate operator override gate.
    - Reject `official_batch`.
 2. Home live valuation:
    - Prefer eligible fresh `provider_api`.

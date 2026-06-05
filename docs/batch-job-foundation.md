@@ -95,6 +95,7 @@ Daily snapshot policy:
 - `daily_portfolio_snapshots` row schema is unchanged and does not store source metadata.
 - `official_batch` remains not allowed for the current daily snapshot valuation workflow.
 - The job does not generate rankings, settlement, rewards, provider rows, price/FX rows, or scheduler registrations.
+- Verification on 2026-06-05 confirms `DailyPortfolioSnapshotJobService` passes the `daily_portfolio_snapshot` workflow explicitly, dry-run does not create snapshot rows, non-dry-run creates only available participant snapshot rows, and participant failures are reported without opening ranking/settlement/reward/provider-trigger paths.
 
 Season ranking example:
 

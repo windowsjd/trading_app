@@ -22,6 +22,7 @@ Use this directory in this order:
    - `docs/crypto-usd-settlement-policy-update.md`
    - `docs/provider-final-selection-readiness-recheck.md`
    - `docs/asset-price-freshness-policy.md`
+   - `docs/realtime-execution-policy.md`
    - `docs/provider-evidence-capture.md`
    - `docs/asset-universe-2026-ytd-volume-selection.md`
    - `docs/provider-source-eligibility-pre-gate.md`
@@ -31,6 +32,8 @@ Provider evidence currently has ExchangeRate-API and Binance row insertion evide
 Read-only/quote source metadata is exposed as backward-compatible optional fields such as `rateSource`, `priceSource`, `assetPriceSource`, `fxRateSource`, and live valuation `sourceSummary`. Daily snapshot batch results include public-safe aggregate `sourceSummary`/fallback information in `batch_job_runs.resultPayloadJson`. These fields contain public-safe source type/name/snapshot/timing/fallback reasons only; raw provider payloads and secrets remain excluded.
 
 Provider_api remains closed for `/fx execute`, orders create/execute, ranking, settlement/final result, reward/final tier/fulfillment, scheduler/cron, provider ingestion trigger APIs, batch HTTP APIs, and real trading/account/order/deposit/withdrawal APIs.
+
+`docs/realtime-execution-policy.md` records the next execute/write foundation: quote is only a reference quote, future provider-backed execute must reprice from fresh provider_api at execute time, enforce quote-to-execute bps thresholds, and forbid default `admin_manual` execute fallback. The policy is documented and pure-function tested, but not wired into current execute/write services.
 
 6. Admin/operator authorization and audit foundation:
 

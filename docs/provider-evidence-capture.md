@@ -15,13 +15,13 @@ OANDA and Twelve Data are historical/fallback research candidates only. They are
 
 Evidence capture result as of 2026-05-14: Binance public `BTCUSDT` ticker and orderbook fixtures were captured successfully without credentials. OANDA and Twelve Data evidence is retained as historical/fallback candidate context.
 
-Implementation readiness update on 2026-05-27: provider ingestion foundation is implemented for explicit operator-run ExchangeRate-API USD/KRW, Binance public REST crypto price snapshot insertion, and KIS WebSocket trade price snapshot insertion for domestic KRX `H0STCNT0` and US delayed/free `HDFSCNT0` feeds. This does not open provider_api source eligibility for quote, execute, valuation, daily snapshot, ranking, or settlement. Binance WebSocket, KIS REST current-price ingestion, KIS orderbook/hoga WebSocket ingestion, cron scheduling, and admin HTTP ingestion API remain unimplemented.
+Implementation readiness update on 2026-05-27: provider ingestion foundation is implemented for explicit operator-run ExchangeRate-API USD/KRW, Binance public REST crypto price snapshot insertion, and KIS WebSocket trade price snapshot insertion for domestic KRX `H0STCNT0` and US delayed/free `HDFSCNT0` feeds. At that historical point this did not open provider_api source eligibility for quote, execute, valuation, daily snapshot, ranking, or settlement. Current eligibility is opened only for explicitly allowed read-only/quote workflows and operator-run daily portfolio snapshot valuation. Binance WebSocket, KIS REST current-price ingestion, KIS orderbook/hoga WebSocket ingestion, cron scheduling, and admin HTTP ingestion API remain unimplemented.
 
-Implementation update on 2026-06-03 KST: Provider API Source Eligibility Implementation Gate read-only/quote phase is implemented after ExchangeRate-API, Binance public REST, KIS domestic KRX, and KIS US row insertion evidence reached GO. `provider_api` rows are eligible only for `/fx quote`, assets `withPrice`, orders quote, live portfolio valuation, home live valuation, and positions live valuation. `/fx execute`, orders create, orders execute, daily portfolio snapshot, ranking, settlement/final result, reward/final tier/fulfillment, scheduler/cron, provider ingestion trigger APIs, batch HTTP APIs, real trading/account/order/deposit/withdrawal APIs, KIS orderbook/hoga, and Binance authenticated APIs remain closed.
+Implementation update on 2026-06-03 KST: Provider API Source Eligibility Implementation Gate read-only/quote phase is implemented after ExchangeRate-API, Binance public REST, KIS domestic KRX, and KIS US row insertion evidence reached GO. `provider_api` rows are eligible only for `/fx quote`, assets `withPrice`, orders quote, live portfolio valuation, home live valuation, and positions live valuation. `/fx execute`, orders create, orders execute, ranking, settlement/final result, reward/final tier/fulfillment, scheduler/cron, provider ingestion trigger APIs, batch HTTP APIs, real trading/account/order/deposit/withdrawal APIs, KIS orderbook/hoga, and Binance authenticated APIs remain closed. Daily portfolio snapshot was opened later only for operator-run valuation.
 
 Implementation update on 2026-06-05 KST: Provider-backed Daily Snapshot Eligibility Gate is implemented for operator-run daily snapshot valuation only. `provider_api` rows are eligible for `daily_portfolio_snapshot` with the same sourceName allowlist and freshness thresholds as the read-only/quote gate. Daily snapshot batch results include aggregate sourceSummary/fallback information in `batch_job_runs.resultPayloadJson`; `daily_portfolio_snapshots` schema remains unchanged. `/fx execute`, orders create, orders execute, ranking, settlement/final result, reward/final tier/fulfillment, scheduler/cron, provider ingestion trigger APIs, batch HTTP APIs, real trading/account/order/deposit/withdrawal APIs, KIS orderbook/hoga, and Binance authenticated APIs remain closed.
 
-Live smoke evidence update on 2026-05-28 KST: ExchangeRate-API and Binance public REST live smoke succeeded and inserted `provider_api` rows in the local DB. KIS live smoke was not executed because required KIS REST/WS base URL and watchlist env values were missing, even though KIS market data and credential presence checks were enabled/present. Provider_api source eligibility remains closed for quote, execute, valuation, home, positions, assets, daily snapshot, ranking, settlement, and reward paths.
+Live smoke evidence update on 2026-05-28 KST: ExchangeRate-API and Binance public REST live smoke succeeded and inserted `provider_api` rows in the local DB. KIS live smoke was not executed because required KIS REST/WS base URL and watchlist env values were missing, even though KIS market data and credential presence checks were enabled/present. At that historical point provider_api source eligibility was closed for quote, execute, valuation, home, positions, assets, daily snapshot, ranking, settlement, and reward paths. Current eligibility is opened only for explicitly allowed read-only/quote workflows and operator-run daily portfolio snapshot valuation.
 
 Fixed asset universe update on 2026-05-30 KST: the KIS stock watchlist universe is fixed as 15 domestic KRX stocks and 25 US stocks, total 40 symbols. This is a fixed high-liquidity watchlist candidate selected by project decision, not a new Codex stock investigation and not an official YTD rank verification claim. The fixed universe is documented in `docs/asset-universe-2026-ytd-volume-selection.md`.
 
@@ -99,7 +99,7 @@ Fixed asset universe update on 2026-05-30 KST: the KIS stock watchlist universe 
   - No rows with `sourceName=kis_us_delayed_trade` were created because no US tick was observed in the smoke window.
 - ExchangeRate-API regression dry-run succeeded for USD/KRW with `success=true` and `wouldCreate=1`.
 - Binance public REST regression dry-run succeeded for `BTCUSDT` and `ETHUSDT` with `success=true`, `wouldCreate=2`, and `failed=0`.
-- Read path isolation recheck remained clean: `/fx quote`, `/fx execute`, orders quote/create/execute, assets withPrice, portfolio/home/positions valuation, and daily snapshot valuation still use `admin_manual` price/FX eligibility only.
+- At this historical retry, read path isolation recheck remained clean because `/fx quote`, `/fx execute`, orders quote/create/execute, assets withPrice, portfolio/home/positions valuation, and daily snapshot valuation still used `admin_manual` price/FX eligibility only. This was superseded by the later read-only/quote and operator-run daily snapshot eligibility gates.
 - No secret values, `.env.local` contents, `DATABASE_URL`, KIS credentials, approval keys, access tokens, or full raw WebSocket frames were printed or documented.
 - Provider_api source eligibility remains closed.
 
@@ -123,7 +123,7 @@ Fixed asset universe update on 2026-05-30 KST: the KIS stock watchlist universe 
 - Failure classification: `SUBSCRIBE_ACK_BUT_NO_US_TICK` and `MARKET_CLOSED_OR_NO_TICK`. No deeper credential, parser, mapping, or network cause is inferred from this run.
 - ExchangeRate-API regression dry-run succeeded for USD/KRW with `success=true` and `wouldCreate=1`.
 - Binance public REST regression dry-run succeeded for `BTCUSDT` and `ETHUSDT` with `success=true`, `wouldCreate=2`, and `failed=0`.
-- Read path isolation remained clean: `/fx quote`, `/fx execute`, orders quote/create/execute, assets withPrice, portfolio/home/positions valuation, and daily snapshot valuation still use `admin_manual` price/FX eligibility only.
+- At this historical retry, read path isolation remained clean because `/fx quote`, `/fx execute`, orders quote/create/execute, assets withPrice, portfolio/home/positions valuation, and daily snapshot valuation still used `admin_manual` price/FX eligibility only. This was superseded by the later read-only/quote and operator-run daily snapshot eligibility gates.
 - No secret values, `.env.local` contents, `DATABASE_URL`, KIS credentials, approval keys, access tokens, or full raw WebSocket frames were printed or documented.
 - Provider_api source eligibility remains closed.
 
@@ -142,7 +142,7 @@ Fixed asset universe update on 2026-05-30 KST: the KIS stock watchlist universe 
 - US `HDFSCNT0` tick evidence is PARTIAL by code path inference, but `kis_us_delayed_trade` provider_api DB row insertion evidence remains BLOCKED by local DB unavailability.
 - Failure classification: `DB_INSERTION_FAILED` / `ASSET_MAPPING_FAILED` due local DB unreachable. This run is not classified as `SUBSCRIBE_ACK_BUT_NO_US_TICK`.
 - ExchangeRate-API and Binance public REST regression dry-runs were attempted and both failed before completion on the same local DB unreachable condition.
-- Read path isolation remained clean by code review: `/fx quote`, `/fx execute`, orders quote/create/execute, assets withPrice, portfolio/home/positions valuation, and daily snapshot valuation still use `admin_manual` price/FX eligibility only.
+- At this historical validation, read path isolation remained clean by code review because `/fx quote`, `/fx execute`, orders quote/create/execute, assets withPrice, portfolio/home/positions valuation, and daily snapshot valuation still used `admin_manual` price/FX eligibility only. This was superseded by the later read-only/quote and operator-run daily snapshot eligibility gates.
 - No secret values, `.env.local` contents, `DATABASE_URL`, KIS credentials, approval keys, access tokens, or full raw WebSocket frames were printed or documented.
 - Provider_api source eligibility remains closed.
 
@@ -272,7 +272,7 @@ Result:
 - Non-dry-run: `success=true`, `created=1`, `skipped=0`.
 - DB evidence: one local `fx_rate_snapshots` row was created with `sourceType=provider_api`, `sourceName=exchange_rate_api`, `baseCurrency=USD`, `quoteCurrency=KRW`, `rate=1506.20470000`, `effectiveAt=2026-05-27T00:00:01.000Z`.
 - Secret check: API key was not printed in command output, DB evidence output, or raw payload secret scan.
-- Source eligibility check: `/fx quote` and `/fx execute` remain `admin_manual` only.
+- Historical source eligibility check at that time: `/fx quote` and `/fx execute` remained `admin_manual` only. Current `/fx quote` may use eligible provider_api first, while `/fx execute` remains provider_api closed.
 
 Binance public REST live smoke:
 
@@ -289,7 +289,7 @@ Result:
   - `BTCUSDT`: `sourceType=provider_api`, `sourceName=binance_public_rest_24hr_ticker`, `currencyCode=USD`, `price=75158.00000000`, `effectiveAt=2026-05-27T16:17:31.008Z`.
   - `ETHUSDT`: `sourceType=provider_api`, `sourceName=binance_public_rest_24hr_ticker`, `currencyCode=USD`, `price=2064.39000000`, `effectiveAt=2026-05-27T16:17:30.999Z`.
 - Binance public REST used no API key, secret, account endpoint, order endpoint, or user data stream.
-- Source eligibility check: provider_api Binance rows remain ineligible for orders, valuation, daily snapshot, ranking, settlement, and reward paths.
+- Historical source eligibility check at that time: provider_api Binance rows remained ineligible for orders, valuation, daily snapshot, ranking, settlement, and reward paths. Current Binance provider_api rows are eligible only for approved read-only/quote workflows and operator-run daily snapshot valuation; execute/write/final/reward/automation remain closed.
 
 KIS WebSocket live smoke:
 

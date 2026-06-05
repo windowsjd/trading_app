@@ -45,7 +45,7 @@ KIS endpoint env completion retry as of 2026-06-01 KST:
 - DB evidence confirmed the 12 inserted KIS rows are `sourceType=provider_api`, `sourceName=kis_krx_realtime_trade`, `currencyCode=KRW`, mapped to active KRX domestic_stock assets.
 - US `HDFSCNT0` subscriptions were acknowledged, but no US tick or `kis_us_delayed_trade` DB row was observed in the 30-second smoke window. This remains an open evidence item.
 - ExchangeRate-API and Binance public REST regression dry-runs succeeded.
-- `provider_api` source eligibility remains closed outside the explicitly allowed read-only/quote workflows.
+- `provider_api` source eligibility remains closed outside the explicitly allowed read-only/quote workflows and operator-run daily snapshot valuation workflow.
 
 KIS US `HDFSCNT0` retry as of 2026-06-01 KST:
 
@@ -58,7 +58,7 @@ KIS US `HDFSCNT0` retry as of 2026-06-01 KST:
 - US `HDFSCNT0` tick remains unobserved and `kis_us_delayed_trade` provider_api DB row count remains 0. The result is classified as `SUBSCRIBE_ACK_BUT_NO_US_TICK` / `MARKET_CLOSED_OR_NO_TICK`.
 - Non-dry-run was skipped because dry-run did not produce US tick evidence. Existing domestic `kis_krx_realtime_trade` provider_api row count remains 12.
 - ExchangeRate-API and Binance public REST regression dry-runs succeeded.
-- `provider_api` source eligibility remains closed outside the explicitly allowed read-only/quote workflows.
+- `provider_api` source eligibility remains closed outside the explicitly allowed read-only/quote workflows and operator-run daily snapshot valuation workflow.
 
 KIS US `HDFSCNT0` market-data window validation as of 2026-06-03 KST:
 
@@ -69,7 +69,7 @@ KIS US `HDFSCNT0` market-data window validation as of 2026-06-03 KST:
 - US-only KIS dry-run reached the US tick parsing/asset mapping path, then failed on DB mapping lookup with Prisma `P1001`. This gives partial US tick-path evidence but not clean dry-run counts or DB insertion evidence.
 - Non-dry-run was skipped because local DB insertion was unavailable.
 - ExchangeRate-API and Binance public REST regression dry-runs were also blocked by the same local DB unreachable condition.
-- `provider_api` source eligibility remains closed outside the explicitly allowed read-only/quote workflows.
+- `provider_api` source eligibility remains closed outside the explicitly allowed read-only/quote workflows and operator-run daily snapshot valuation workflow.
 
 KIS US `HDFSCNT0` DB-started rerun as of 2026-06-03 KST:
 
@@ -81,7 +81,7 @@ KIS US `HDFSCNT0` DB-started rerun as of 2026-06-03 KST:
 - DB evidence confirmed 25 inserted `kis_us_delayed_trade` rows are `sourceType=provider_api`, `currencyCode=USD`, mapped to active `us_stock` USD assets with NAS 20 / NYS 5 market distribution.
 - Existing domestic `kis_krx_realtime_trade` provider_api row count remained 12. This US-only rerun created no domestic side effect.
 - ExchangeRate-API and Binance public REST regression dry-runs succeeded.
-- `provider_api` source eligibility remains closed outside the explicitly allowed read-only/quote workflows.
+- `provider_api` source eligibility remains closed outside the explicitly allowed read-only/quote workflows and operator-run daily snapshot valuation workflow.
 
 Live smoke evidence status as of 2026-05-28 KST:
 
@@ -232,4 +232,4 @@ All scripts are explicit operator commands. No cron scheduler or admin HTTP inge
 
 Provider API Source Eligibility Implementation Gate read-only/quote phase and the operator-run daily snapshot eligibility gate are implemented using `docs/provider-source-eligibility-pre-gate.md`.
 
-Next provider-related gates should remain narrower and explicit: execute/write eligibility, settlement/final evidence policy, scheduler/deployment ownership, provider trigger APIs, KIS REST current-price ingestion, KIS orderbook/hoga, or real trading/account APIs each require separate approval.
+Next provider-related gates should remain narrower and explicit: execute/write eligibility using `docs/realtime-execution-policy.md`, settlement/final evidence policy, scheduler/deployment ownership, provider trigger APIs, KIS REST current-price ingestion, KIS orderbook/hoga, or real trading/account APIs each require separate approval.

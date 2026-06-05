@@ -5,6 +5,7 @@
 - This document records the implemented `/fx quote` contract and `/fx execute` MVP behavior.
 - `/fx quote` can use fresh `provider_api` ExchangeRate-API USD/KRW first, with existing safe `admin_manual` fallback.
 - `/fx execute` remains approved fresh `admin_manual` only.
+- `docs/realtime-execution-policy.md` defines the future provider-backed execute/write policy foundation. It is not wired into the current `/fx execute` service.
 - Do not add fake FX rates, temporary FX rates, Prisma schema changes, migrations, seed changes, package changes, scheduler/cron, provider ingestion trigger APIs, or real trading/account APIs from this document.
 
 ## Source Rules
@@ -12,6 +13,7 @@
 - Amount values are strings at the API boundary.
 - Timestamps are UTC ISO strings.
 - Exchange follows quote -> execute.
+- Current quote is a reference quote, not a guaranteed execution price.
 - MVP allows only KRW/USD pairs:
   - `KRW -> USD`
   - `USD -> KRW`
@@ -26,6 +28,7 @@
 - Existing `admin_manual` quote fallback keeps the established 60-second `effectiveAt` stale check.
 - Near-term `/fx execute` uses approved fresh `admin_manual` snapshots only as allowed sourceType.
 - `provider_api` and `official_batch` source eligibility is not opened for `/fx execute`.
+- Future provider-backed `/fx execute` must reprice at execute time from fresh provider_api USD/KRW, compare against the quote rate, reject threshold breaches with `RATE_CHANGED_REQUOTE_REQUIRED`, and forbid default `admin_manual` fallback.
 - `/fx quote` exposes optional public-safe `rateSource` metadata for source/outage visibility. Raw provider payloads, `metadataJson`, and secrets are never exposed.
 - USD/KRW snapshots are also the KRW conversion evidence for USD-settled crypto valuation.
 - MVP crypto uses Binance-based USD settlement and the USD Wallet; no `USDT` wallet/currency is introduced.
@@ -119,6 +122,7 @@ Return a KRW/USD exchange quote without changing wallet balances or writing exch
 - Selected provider snapshot older than 300 seconds by `capturedAt`, or selected manual snapshot older than 60 seconds by `effectiveAt`, returns `FX_RATE_STALE` only when no safe fallback is available.
 - `/fx execute` remains a separate STOP and must not be inferred from quote readiness.
 - Durable quote storage, non-null `quoteId`, and quote expiry are future enhancements only.
+- The future default quote TTL candidate is 10 seconds. Execute after durable quote expiry should return `QUOTE_EXPIRED`.
 
 ## POST /api/v1/fx/execute
 
@@ -159,6 +163,7 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 - Near-term MVP uses Candidate B, direct execute, for the implementation gate because durable quote storage does not exist.
 - Historical implementation-gate detail is archived in `docs/archive/fx-execute-final-implementation-gate.md`; current implementation status is tracked in `docs/current-status.md`.
 - If a durable quote table is introduced later, execute can move to Candidate A.
+- Future Candidate A must follow `docs/realtime-execution-policy.md`: quote mismatch returns `QUOTE_MISMATCH`, expired quote returns `QUOTE_EXPIRED`, and fresh provider_api is required at execute time.
 
 ### Execute-Time Snapshot Selection
 
@@ -170,6 +175,7 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
   - positive `rate`
 - Current allowed execute sourceType is approved fresh `admin_manual` only.
 - Current not-allowed execute sourceTypes are `provider_api` and `official_batch`.
+- Future provider-backed execute reverses this source rule: fresh `provider_api` is required, default `admin_manual` fallback is forbidden, and emergency manual override must be a separate operator override gate.
 - Selection ordering:
   1. `effectiveAt desc`
   2. `capturedAt desc`

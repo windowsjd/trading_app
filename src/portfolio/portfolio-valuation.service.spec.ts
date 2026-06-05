@@ -318,6 +318,21 @@ describe('PortfolioValuationService source eligibility', () => {
         },
       ],
     });
+    expect(prisma.assetPriceSnapshot.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          assetId: 'asset-krx',
+          currencyCode: CurrencyCode.KRW,
+          sourceType: AssetPriceSourceType.admin_manual,
+          effectiveAt: {
+            lte: valuationAt,
+          },
+          price: {
+            gt: 0,
+          },
+        }),
+      }),
+    );
   });
 
   it('falls back to admin_manual when daily snapshot provider USD/KRW is stale', async () => {

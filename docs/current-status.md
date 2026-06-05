@@ -32,7 +32,7 @@
     - ExchangeRate-API dry-run/non-dry-run succeeded and created one local `provider_api` USD/KRW row.
     - Binance public REST dry-run/non-dry-run succeeded for `BTCUSDT` and `ETHUSDT` and created two local `provider_api` USD asset price rows.
     - KIS WebSocket live smoke was blocked before approval_key because required KIS REST/WS base URL and watchlist/policy env values were missing.
-    - `provider_api` source eligibility remains closed for quote, execute, valuation, home, positions, assets, daily snapshot, ranking, settlement, and reward paths.
+    - At this historical gate, `provider_api` source eligibility was still closed for quote, execute, valuation, home, positions, assets, daily snapshot, ranking, settlement, and reward paths. Current eligibility is opened only for explicitly allowed read-only/quote workflows and operator-run daily portfolio snapshot valuation.
   - Fixed KIS stock universe gate on 2026-05-30 KST:
     - KIS stock watchlist is fixed to 40 symbols: 15 domestic KRX stocks and 25 US stocks.
     - The universe is a fixed high-liquidity watchlist candidate selected by project decision; no new Codex stock investigation or official YTD rank verification was performed in this gate.
@@ -67,7 +67,7 @@
     - KIS non-dry-run succeeded with `subscriptions.sent=40`, `acknowledged=40`, `receivedFrames=62`, `created=12`, `skipped=35`, and `failed=0`. The created DB rows are `sourceType=provider_api`, `sourceName=kis_krx_realtime_trade`, `currencyCode=KRW`, mapped to active KRX domestic_stock assets.
     - US `HDFSCNT0` subscription ack succeeded as part of the 40 acks, but no US trade tick or `kis_us_delayed_trade` DB row was observed in the 30-second smoke window. This is recorded as `MARKET_CLOSED_OR_NO_TICK` without guessing a deeper cause.
     - ExchangeRate-API and Binance public REST dry-run regressions succeeded.
-    - `provider_api` source eligibility remains STOP/closed for all quote, execute, valuation, assets, positions, home, daily snapshot, ranking, settlement, and reward paths.
+    - At this historical retry, `provider_api` source eligibility was still STOP/closed for all quote, execute, valuation, assets, positions, home, daily snapshot, ranking, settlement, and reward paths. Current eligibility is opened only for explicitly allowed read-only/quote workflows and operator-run daily portfolio snapshot valuation.
     - Next evidence gate should capture US `HDFSCNT0` tick and DB insertion during an appropriate US market-data window, unless the owner explicitly scopes US live evidence separately.
   - KIS US `HDFSCNT0` Tick and DB Insertion Retry Gate on 2026-06-01 KST:
     - Retry ran around 2026-06-01 11:14-11:21 KST, which is 2026-05-31 22:14-22:21 EDT and outside the US regular market window.
@@ -80,8 +80,8 @@
     - US `HDFSCNT0` tick remains unobserved and `kis_us_delayed_trade` provider_api DB row count remains 0. This is classified as `SUBSCRIBE_ACK_BUT_NO_US_TICK` / `MARKET_CLOSED_OR_NO_TICK`, without guessing a deeper cause.
     - KIS non-dry-run was not executed because dry-run did not produce US tick evidence. Existing domestic `kis_krx_realtime_trade` provider_api rows remain 12; this retry created no KIS DB rows.
     - ExchangeRate-API and Binance public REST dry-run regressions succeeded.
-    - Read path isolation remained clean: `/fx`, orders, assets, portfolio, home, positions, and daily snapshot source selection still uses `admin_manual` price/FX evidence only.
-    - `provider_api` source eligibility remains STOP/closed for all quote, execute, valuation, assets, positions, home, daily snapshot, ranking, settlement, and reward paths.
+    - At this historical retry, read path isolation remained clean because `/fx`, orders, assets, portfolio, home, positions, and daily snapshot source selection still used `admin_manual` price/FX evidence only. This was superseded by later read-only/quote and operator-run daily snapshot eligibility gates.
+    - At this historical retry, `provider_api` source eligibility was still STOP/closed for all quote, execute, valuation, assets, positions, home, daily snapshot, ranking, settlement, and reward paths. Current eligibility is opened only for explicitly allowed read-only/quote workflows and operator-run daily portfolio snapshot valuation.
     - This historical next evidence gate was superseded by the 2026-06-03 KST DB-started US rerun, which captured US tick and DB insertion evidence.
   - KIS US `HDFSCNT0` Market-Data Window Validation on 2026-06-03 KST:
     - Execution started around 2026-06-03 00:23 KST / 2026-06-02 11:23 EDT, within the US regular market window by NYSE regular hours and not on the listed 2026 NYSE holiday dates.
@@ -92,8 +92,8 @@
     - US-only KIS dry-run reached `kis_us_delayed_trade` tick parsing and the active US asset mapping path, but failed at DB mapping lookup with Prisma `P1001` because local PostgreSQL was unreachable. Because the process terminated before summary JSON, subscription sent/ack counts were not available from this run.
     - KIS non-dry-run was skipped because dry-run could not complete DB mapping and DB insertion would fail while local PostgreSQL is unavailable.
     - ExchangeRate-API and Binance regression dry-runs were also blocked by the same local DB unreachable condition before duplicate/mapping checks could complete.
-    - Read path isolation remained clean by code review: `/fx`, orders, assets, portfolio/home/positions valuation, and daily snapshot valuation still use `admin_manual` price/FX eligibility only.
-    - `provider_api` source eligibility remains STOP/closed for all quote, execute, valuation, assets, positions, home, daily snapshot, ranking, settlement, and reward paths.
+    - At this historical validation, read path isolation remained clean by code review because `/fx`, orders, assets, portfolio/home/positions valuation, and daily snapshot valuation still used `admin_manual` price/FX eligibility only. This was superseded by later read-only/quote and operator-run daily snapshot eligibility gates.
+    - At this historical validation, `provider_api` source eligibility was still STOP/closed for all quote, execute, valuation, assets, positions, home, daily snapshot, ranking, settlement, and reward paths. Current eligibility is opened only for explicitly allowed read-only/quote workflows and operator-run daily portfolio snapshot valuation.
   - KIS US `HDFSCNT0` DB-started rerun on 2026-06-03 KST:
     - DB startup was confirmed with Docker Compose healthy Postgres/Redis. `pnpm exec prisma migrate status` first reported pending reward/operator migrations; `pnpm exec prisma migrate dev` applied `20260523090000_add_reward_badge_trophy_foundation` and `20260601090000_add_user_role_operator_audit_logs` without reset or new migration creation.
     - Migration status then reported DB schema up to date. Runtime schema checks passed for `UserRole`, `OperatorAuditResult`, `users.role`, and `operator_audit_logs`.
@@ -105,20 +105,20 @@
     - Existing domestic `kis_krx_realtime_trade` rows remained 12; this US-only rerun created no domestic side effect.
     - Raw payload known-secret scan over KIS provider rows returned false. No secret values, `.env.local` contents, `DATABASE_URL`, KIS credentials, approval keys, access tokens, or full raw WebSocket frames were printed or documented.
     - ExchangeRate-API regression dry-run succeeded with `wouldCreate=1`; Binance public REST regression dry-run succeeded for `BTCUSDT,ETHUSDT` with `wouldCreate=2`.
-    - `provider_api` source eligibility remains STOP/closed for all quote, execute, valuation, assets, positions, home, daily snapshot, ranking, settlement, and reward paths.
+    - At this historical rerun, `provider_api` source eligibility was still STOP/closed for all quote, execute, valuation, assets, positions, home, daily snapshot, ranking, settlement, and reward paths. Current eligibility is opened only for explicitly allowed read-only/quote workflows and operator-run daily portfolio snapshot valuation.
   - Provider API Source Eligibility Implementation Gate on 2026-06-03 KST:
     - Source eligibility is now opened only for read-only/quote workflows: `/fx quote`, assets `withPrice`, orders quote, `live_portfolio_valuation`, home live valuation, and positions live valuation.
     - Eligible provider source names are `exchange_rate_api` for USD/KRW, `binance_public_rest_24hr_ticker` for BINANCE USD crypto, `kis_krx_realtime_trade` for KRX-family domestic stocks, and `kis_us_delayed_trade` for NAS/NYS US stocks.
     - Fresh provider rows are selected first. Missing, stale, future, non-positive, wrong-source, or ineligible provider rows fall back explicitly to existing safe `admin_manual` selection where the workflow already allowed manual data.
     - Freshness thresholds are captured-at based for provider rows: 300 seconds for provider USD/KRW read-only/quote and 60 seconds for provider asset prices. Existing `admin_manual` FX fallback keeps the established 60-second effectiveAt stale check where applicable.
     - API response shapes remain backward-compatible; existing snapshot/timing fields continue to provide safe evidence, and the follow-up metadata gate exposes only public-safe source metadata. Raw provider payloads and secrets are not exposed.
-    - `/fx execute`, orders create, orders execute, daily portfolio snapshot, ranking, settlement/final result, reward/final tier/fulfillment, scheduler/cron, batch HTTP APIs, provider ingestion trigger APIs, real trading/account/order/deposit/withdrawal APIs, KIS orderbook/hoga, and Binance authenticated APIs remain closed.
+    - `/fx execute`, orders create, orders execute, ranking, settlement/final result, reward/final tier/fulfillment, scheduler/cron, batch HTTP APIs, provider ingestion trigger APIs, real trading/account/order/deposit/withdrawal APIs, KIS orderbook/hoga, and Binance authenticated APIs remain closed. Daily portfolio snapshot was opened later only for operator-run valuation.
   - Provider Source Metadata and Outage UX Gate on 2026-06-04 KST:
     - Read-only/quote source decisions are now exposed through public-safe optional metadata fields: FX quote `rateSource`, assets `priceSource` and `fxRateSource`, orders quote `assetPriceSource` and `fxRateSource`, positions valuation `priceSource` and `fxRateSource`, and Home live valuation/top positions source summaries/metadata where applicable.
     - Metadata includes only `sourceType`, `sourceName`, `snapshotId`, `effectiveAt`, `capturedAt`, `fallbackUsed`, `fallbackReason`, `rejectedProviderReason`, and `freshnessAgeSeconds`.
     - Fallback/outage reasons distinguish provider missing, rejected, wrong source, stale capturedAt, future timestamps, non-positive values, workflow/asset/FX ineligibility, and limit-price quotes.
     - Raw provider payloads, `metadataJson`, approval keys, access tokens, KIS keys/secrets, `DATABASE_URL`, and `.env.local` contents are not exposed.
-    - Provider eligibility scope did not expand: `/fx execute`, orders create/execute, daily snapshot, ranking, settlement/final result, reward/final tier/fulfillment, scheduler/cron, batch HTTP APIs, provider ingestion trigger APIs, and real trading/account/order/deposit/withdrawal APIs remain closed.
+    - Provider eligibility scope did not expand in this gate: `/fx execute`, orders create/execute, ranking, settlement/final result, reward/final tier/fulfillment, scheduler/cron, batch HTTP APIs, provider ingestion trigger APIs, and real trading/account/order/deposit/withdrawal APIs remained closed. Daily snapshot was opened later only for operator-run valuation.
   - Provider-backed Daily Portfolio Snapshot Eligibility Gate on 2026-06-05 KST:
     - Source eligibility is now extended only to the operator-run `daily_portfolio_snapshot` valuation workflow.
     - Daily snapshot valuation uses fresh eligible `provider_api` first, then explicit existing safe `admin_manual` fallback.
@@ -128,11 +128,17 @@
     - Batch job results include public-safe aggregate `sourceSummary` fields for provider/admin/fallback use and rejected/fallback reasons.
     - `daily_portfolio_snapshots` table schema is unchanged; source metadata is not stored on snapshot rows.
     - `/fx execute`, orders create, orders execute, ranking generation, settlement/final result, reward/final tier/fulfillment, scheduler/cron, batch HTTP APIs, provider ingestion trigger APIs, and real trading/account/order/deposit/withdrawal APIs remain closed.
+  - Daily Snapshot Gate Verification and Realtime Execution Policy Foundation on 2026-06-05 KST:
+    - Verification confirms `daily_portfolio_snapshot` is provider_api allowed, while `fx_execute`, `orders_create`, `orders_execute`, `season_ranking`, `season_settlement`, `reward_final_tier`, and `reward_fulfillment` remain provider_api denied.
+    - `DailyPortfolioSnapshotJobService` passes `daily_portfolio_snapshot` explicitly, dry-run does not insert snapshot rows, non-dry-run inserts only available participant snapshots, and batch results include aggregate `sourceSummary`.
+    - Ranking/settlement/reward continue to consume existing snapshots/rankings and do not read provider_api rows directly.
+    - `docs/realtime-execution-policy.md` now records 준실시간 체결 정책 v1. Quote is a reference quote, future provider-backed execute must reprice at execute time using fresh provider_api data, reject excessive quote-to-execute movement, and forbid default admin_manual execute fallback.
+    - A pure policy foundation exists in `src/providers/realtime-execution-policy.ts`; it is not imported by current `/fx execute`, orders create, or orders execute paths, so provider-backed execute/write remains closed.
   - Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage; USDT depeg risk is not modeled.
   - Provider_api source eligibility for execute/write, ranking, settlement, reward, and automation remains a separate gate.
   - KIS supports WebSocket approval_key retrieval, domestic KRX real-time trade price `H0STCNT0`, and overseas/US delayed trade price `HDFSCNT0` ingestion foundation into `asset_price_snapshots` provider_api rows.
   - KIS REST current-price quote ingestion, KIS orderbook/hoga WebSocket ingestion, and KIS order/account/balance/fill/deposit/withdrawal APIs remain unimplemented.
-  - KRX domestic stock `provider_api` source eligibility is open only for the explicitly allowed read-only/quote workflows through `kis_krx_realtime_trade`.
+  - KRX domestic stock `provider_api` source eligibility is open only for the explicitly allowed read-only/quote workflows and operator-run daily snapshot valuation through `kis_krx_realtime_trade`.
 
 ## 2. 구현 완료 API
 

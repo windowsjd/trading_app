@@ -14,6 +14,7 @@
 - Quote/create/cancel/list APIs do not execute orders, debit or credit wallets, mutate positions, create wallet transactions, create equity snapshots, run settlement, or synthesize fake order data.
 - Stored gross/fee/net amounts on submitted orders are pre-execution quote estimates, not confirmed fill amounts.
 - Execute recalculates and stores actual `executedPrice`, `grossAmount`, `feeAmount`, and `netAmount` at execution time.
+- `docs/realtime-execution-policy.md` defines the future provider-backed execute/write policy foundation. It is not wired into current orders create or orders execute services.
 
 ## Source Rules
 
@@ -28,6 +29,7 @@
 - `CurrencyCode.USDT` is not introduced; Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage.
 - Orders quote may use fresh eligible `provider_api` market data first.
 - Orders create and orders execute remain `admin_manual` only for this gate.
+- Current quote is a reference estimate, not a guaranteed execution price. Future provider-backed execute must reprice at execute time from fresh provider_api data, compare against the quote price, and reject excessive movement.
 
 ## Route
 
@@ -151,6 +153,7 @@
 - USD assets use fresh `provider_api` `exchange_rate_api` USD/KRW first, then approved fresh `admin_manual` fallback. Provider FX freshness uses capturedAt age <= 300 seconds; manual fallback uses the existing 60-second rule.
 - Missing, stale, future, non-positive, wrong-source, or ineligible provider rows fall back to the existing safe `admin_manual` quote logic.
 - `POST /api/v1/orders/quote` exposes optional public-safe `assetPriceSource` and `fxRateSource` metadata. Response shape remains backward-compatible and existing snapshot id fields are preserved.
+- Future durable quotes should have a 10-second default TTL candidate; execute after expiry should return `QUOTE_EXPIRED`.
 - Limit orders use `limitPrice`, so `assetPriceSource.sourceType` is `null` and `fallbackReason` is `limit_price_provided`.
 - Raw provider payloads, `metadataJson`, and secrets are never exposed.
 - USD-settled crypto assets follow the same USD asset rule: order currency is USD, buy/sell resource checks use the USD Wallet, and `krwGrossAmount`/`krwFeeAmount`/`krwNetAmount` are USD amounts converted through USD/KRW.
@@ -263,6 +266,7 @@ Same body as `POST /api/v1/orders/quote`.
 - New create runs the same validation and quote calculation as `POST /api/v1/orders/quote`.
 - New create is closed to `provider_api`; it uses the existing `admin_manual` asset price and FX selection even if fresh provider rows exist.
 - Create response does not add quote source metadata; create remains a write path with provider_api closed.
+- Future provider-backed create/execute must not infer a fixed fill price from create-time quote values. Create-time financial values remain estimates unless a later durable quote schema explicitly changes this contract.
 - Creates exactly one `orders` row with `status = submitted`.
 - Stores `idempotencyKey`, `requestHash`, and `responsePayloadJson` on that order row.
 - Does not execute the order.
@@ -364,9 +368,11 @@ Same body as `POST /api/v1/orders/quote`.
   - buy executes only when selected price `<= limitPrice`.
   - sell executes only when selected price `>= limitPrice`.
   - `executedPrice` is the selected snapshot price, not the submitted `limitPrice`.
+- Future provider-backed limit execute keeps the same marketability rule but selects the execute-time provider price, not the quote price.
 - USD orders debit or credit the USD wallet. FX is not used to convert wallet amounts.
 - USD orders still select an approved fresh `admin_manual` USD/KRW snapshot for audit consistency and store `fxRateSnapshotId`.
 - Execute is closed to `provider_api`; fresh provider rows must not power execute pricing or audit FX.
+- Future provider-backed execute must use fresh provider_api at execute time, forbid default `admin_manual` fallback, and reject quote-to-execute movement beyond max bps with `PRICE_CHANGED_REQUOTE_REQUIRED`.
 - Binance crypto USD orders are USD orders for wallet/position/ledger purposes.
 - KRW orders store `fxRateSnapshotId = null`.
 - Buy execute:

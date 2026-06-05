@@ -199,9 +199,13 @@ export class PortfolioValuationService {
     const fallbackSnapshot = await this.prisma.assetPriceSnapshot.findFirst({
       where: {
         assetId: asset.id,
+        currencyCode: asset.currencyCode,
         sourceType: AssetPriceSourceType.admin_manual,
         effectiveAt: {
           lte: valuationAt,
+        },
+        price: {
+          gt: 0,
         },
       },
       orderBy: [

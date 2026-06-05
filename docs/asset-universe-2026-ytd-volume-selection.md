@@ -90,7 +90,7 @@ Binance `BTCUSDT` and `ETHUSDT` remain separate crypto assets under the Binance 
 
 ## Provider Boundary
 
-- `provider_api` source eligibility remains closed for quote, execute, valuation, home, positions, assets, daily snapshot, ranking, settlement, and reward paths.
+- At this historical universe gate, `provider_api` source eligibility was still closed for quote, execute, valuation, home, positions, assets, daily snapshot, ranking, settlement, and reward paths. Current eligibility is opened only for explicitly allowed read-only/quote workflows and operator-run daily portfolio snapshot valuation.
 - This universe document does not open provider_api read eligibility.
 - KIS market data is for external market-data collection verification only.
 - KIS order, account, balance, fill, deposit, withdrawal, real-trading, and orderbook/hoga APIs are not implemented by this document.

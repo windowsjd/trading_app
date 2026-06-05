@@ -168,7 +168,9 @@ Recommended draft:
 
 ## 9. Next Implementation Gate Candidates
 
-The next gate should plan and test:
+The read-only/quote and operator-run daily snapshot gates are now implemented.
+Future execute/write gates should use `docs/realtime-execution-policy.md` and
+plan/test:
 
 - Source selection policy file.
 - Freshness policy file.
@@ -178,8 +180,8 @@ The next gate should plan and test:
 - Service-level tests.
 - Integration tests where needed.
 - `/fx quote` source selection.
-- `/fx execute` source selection.
-- Orders quote/execute source selection.
+- `/fx execute` source selection with execute-time provider repricing.
+- Orders execute source selection with quote-to-execute bps protection.
 - Assets, positions, and home valuation source selection.
 - Daily snapshot source selection.
 - Audit payload and source evidence tests.
@@ -194,6 +196,11 @@ operator-run daily snapshot valuation workflow listed in section 0.
 `provider_api` source eligibility remains closed for execute/write, ranking,
 settlement, reward, automation, provider trigger, batch HTTP API, and real
 trading/account surfaces.
+
+The next execute/write gate has a separate policy foundation in
+`docs/realtime-execution-policy.md`. Quote is a reference quote, execute must
+reprice at execute time from fresh provider_api data, and default
+`admin_manual` execute fallback remains forbidden.
 
 Implementation sequencing:
 

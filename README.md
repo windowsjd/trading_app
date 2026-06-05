@@ -22,6 +22,7 @@ This service owns backend APIs, database access, financial calculations, and ser
 - Read-only/quote responses expose backward-compatible optional source metadata for provider/admin visibility: `rateSource`, `priceSource`, `assetPriceSource`, `fxRateSource`, and live valuation source summaries where applicable.
 - Batch job execution foundation with idempotent `batch_job_runs` recording, operator-only noop/health-check script, operator-run daily portfolio snapshot generation, operator-run season ranking generation from existing daily snapshots, an operator-run daily season cycle orchestration job, an operator-run season settlement MVP job, and an operator-run reward grant marker MVP job.
 - Daily portfolio snapshot batch results include sourceSummary/fallback metadata in `batch_job_runs.resultPayloadJson`; `daily_portfolio_snapshots` row schema is unchanged.
+- Realtime execution policy foundation is documented and pure-function tested for future provider-backed execute/write gates. Quote remains a reference quote; future execute must reprice from fresh provider_api, enforce quote-to-execute bps thresholds, and forbid default admin_manual execute fallback.
 - Operator-run final tier assignment MVP job from existing final `season_rankings`.
 
 ## STOP / Not Implemented
@@ -37,6 +38,7 @@ These are intentionally outside the current implementation and should not be add
 - Actual payment, point, badge, or trophy fulfillment beyond the `rewardGrantedAt` marker MVP.
 - Access token blacklist/revocation, server-side session auth, and cookie auth.
 - Matching engine, partial fill, durable quote, or exact order execute replay.
+- Provider-backed realtime execute/write behavior. The policy foundation exists, but current `/fx execute`, orders create, and orders execute remain provider_api closed.
 - Fake, static, sample, temporary, or fallback business price data.
 
 ## Environment Variables
@@ -142,8 +144,9 @@ Current source of truth order:
 3. `docs/backend-gate-roadmap.md`
 4. `docs/backend-test-coverage-matrix.md`
 5. `docs/auth-api-contract.md` and API contract docs under `docs/*-api-contract.md`
-6. `docs/operator-api-contract.md`
-7. `docs/batch-job-foundation.md`
+6. `docs/realtime-execution-policy.md`
+7. `docs/operator-api-contract.md`
+8. `docs/batch-job-foundation.md`
 
 `docs/archive/` is historical reference only and must not override the current documents above.
 
