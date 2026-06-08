@@ -16,6 +16,16 @@ jest.mock('../generated/prisma/client', () => {
       succeeded: 'succeeded',
       failed: 'failed',
     },
+    QuoteStatus: {
+      active: 'active',
+      consumed: 'consumed',
+      expired: 'expired',
+      canceled: 'canceled',
+    },
+    QuoteType: {
+      fx: 'fx',
+      order: 'order',
+    },
     WalletTransactionDirection: {
       credit: 'credit',
       debit: 'debit',
@@ -71,6 +81,7 @@ import {
   preflightFxExecuteRequest,
   type FxExecuteRequestBodyLike,
 } from './fx-execute-request-policy';
+import { computeFxQuoteRequestHash } from '../providers/durable-quote.policy';
 
 const now = new Date('2026-05-01T00:01:00.000Z');
 const capturedAt = new Date('2026-05-01T00:00:30.000Z');
@@ -110,6 +121,11 @@ describe('FxService', () => {
         findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+      },
+      quote: {
+        create: jest.fn().mockResolvedValue({ id: 'quote-fx-1' }),
+        findFirst: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       equitySnapshot: {
         create: jest.fn(),
@@ -180,18 +196,21 @@ describe('FxService', () => {
     expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
     expect(prisma.fxExecuteRequest.create).not.toHaveBeenCalled();
     expect(prisma.fxExecuteRequest.update).not.toHaveBeenCalled();
+    expect(prisma.quote.updateMany).not.toHaveBeenCalled();
     expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
   };
 
   const expectNoExecutePlanReads = (
     prisma: ReturnType<typeof createPrisma>,
   ) => {
+    expect(prisma.quote.findFirst).not.toHaveBeenCalled();
     expect(prisma.cashWallet.findUnique).not.toHaveBeenCalled();
     expect(prisma.fxRateSnapshot.findMany).not.toHaveBeenCalled();
   };
 
   const expectExecutePlanReads = (prisma: ReturnType<typeof createPrisma>) => {
     expect(prisma.fxExecuteRequest.findUnique).toHaveBeenCalledTimes(1);
+    expect(prisma.quote.findFirst).toHaveBeenCalledTimes(1);
     expect(prisma.cashWallet.findUnique).toHaveBeenCalledTimes(2);
     expect(prisma.fxRateSnapshot.findMany).toHaveBeenCalledTimes(1);
   };
@@ -383,6 +402,30 @@ describe('FxService', () => {
     expect(
       prisma.fxRateSnapshot.findFirst.mock.calls[0][0].where.effectiveAt.lte,
     ).toEqual(now);
+    expect(prisma.quote.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          quoteType: 'fx',
+          status: 'active',
+          userId: 'user-1',
+          seasonParticipantId: 'participant-1',
+          fromCurrency: CurrencyCode.KRW,
+          toCurrency: CurrencyCode.USD,
+          sourceAmount: '135000.00000000',
+          targetAmount: '99.90000000',
+          quotedRate: '1350.00000000',
+          fxRateSnapshotId: 'fx-admin-1',
+          maxChangeBps: '30.0000',
+          expiresAt: new Date('2026-05-01T00:01:10.000Z'),
+          requestHash: expect.any(String),
+          fxRateSourceJson: expect.objectContaining({
+            sourceType: 'admin_manual',
+            sourceName: 'manual-approved',
+            snapshotId: 'fx-admin-1',
+          }),
+        }),
+      }),
+    );
   });
 
   it('uses fresh provider_api exchange_rate_api for quote before admin_manual fallback', async () => {
@@ -607,7 +650,7 @@ describe('FxService', () => {
     ).resolves.toEqual({
       success: true,
       data: {
-        quoteId: null,
+        quoteId: 'quote-fx-1',
         fromCurrency: CurrencyCode.KRW,
         toCurrency: CurrencyCode.USD,
         sourceAmount: '135000.00000000',
@@ -617,7 +660,8 @@ describe('FxService', () => {
         feeAmount: '0.10000000',
         feeCurrency: CurrencyCode.USD,
         netTargetAmount: '99.90000000',
-        expiresAt: null,
+        expiresAt: '2026-05-01T00:01:10.000Z',
+        maxChangeBps: '30.0000',
         rateCapturedAt: capturedAt.toISOString(),
         rateEffectiveAt: freshEffectiveAt.toISOString(),
         rateSource: {
@@ -671,12 +715,14 @@ describe('FxService', () => {
       toCurrency: 'USD',
       sourceAmount: '1000',
       idempotencyKey: 'idempotency-key-1',
+      quoteId: 'quote-fx-1',
     };
     const executeSnapshot = {
       id: 'fx-snapshot-1',
       baseCurrency: CurrencyCode.USD,
       quoteCurrency: CurrencyCode.KRW,
-      sourceType: FxRateSourceType.admin_manual,
+      sourceType: FxRateSourceType.provider_api,
+      sourceName: 'exchange_rate_api',
       rate: new Prisma.Decimal('1350.00000000'),
       effectiveAt: freshEffectiveAt,
       capturedAt,
@@ -709,11 +755,30 @@ describe('FxService', () => {
       ...targetWallet,
       balanceAmount: new Prisma.Decimal('0.74000000'),
     };
+    const activeFxQuote = {
+      id: 'quote-fx-1',
+      seasonParticipantId: 'participant-1',
+      status: 'active',
+      fromCurrency: CurrencyCode.KRW,
+      toCurrency: CurrencyCode.USD,
+      sourceAmount: new Prisma.Decimal('1000.00000000'),
+      quotedRate: new Prisma.Decimal('1350.00000000'),
+      maxChangeBps: new Prisma.Decimal('30.0000'),
+      expiresAt: new Date('2026-05-01T00:01:10.000Z'),
+      requestHash: computeFxQuoteRequestHash({
+        userId: 'user-1',
+        seasonParticipantId: 'participant-1',
+        fromCurrency: CurrencyCode.KRW,
+        toCurrency: CurrencyCode.USD,
+        sourceAmount: '1000.00000000',
+      }),
+    };
 
     const mockExecuteReadCandidates = (
       prisma: ReturnType<typeof createPrisma>,
       overrides: {
         existingCommand?: unknown;
+        quote?: unknown;
         sourceWallet?: unknown;
         targetWallet?: unknown;
         snapshots?: unknown[];
@@ -724,6 +789,9 @@ describe('FxService', () => {
 
       prisma.fxExecuteRequest.findUnique.mockResolvedValueOnce(
         hasOverride('existingCommand') ? overrides.existingCommand : null,
+      );
+      prisma.quote.findFirst.mockResolvedValueOnce(
+        hasOverride('quote') ? overrides.quote : activeFxQuote,
       );
       prisma.cashWallet.findUnique
         .mockResolvedValueOnce(
@@ -760,6 +828,7 @@ describe('FxService', () => {
       prisma.fxExecuteRequest.create.mockResolvedValueOnce({
         id: 'command-1',
       });
+      prisma.quote.updateMany.mockResolvedValueOnce({ count: 1 });
       prisma.cashWallet.updateMany
         .mockResolvedValueOnce({ count: 1 })
         .mockResolvedValueOnce({ count: 1 });
@@ -820,6 +889,13 @@ describe('FxService', () => {
               failIf('finalization');
               stage('fxExecuteRequest.update:succeeded');
               return { id: 'command-1' };
+            }),
+          },
+          quote: {
+            ...prisma.quote,
+            updateMany: jest.fn(async () => {
+              stage('quote.updateMany:consume');
+              return { count: 1 };
             }),
           },
           cashWallet: {
@@ -910,6 +986,16 @@ describe('FxService', () => {
         },
         select: {
           id: true,
+        },
+      });
+      expect(prisma.quote.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'quote-fx-1',
+          status: 'active',
+        },
+        data: {
+          status: 'consumed',
+          consumedAt: now,
         },
       });
       expect(prisma.cashWallet.updateMany).toHaveBeenNthCalledWith(1, {
@@ -1261,7 +1347,7 @@ describe('FxService', () => {
       expectNoExecuteWrites(prisma);
     });
 
-    it('returns FX_RATE_UNAVAILABLE when there is no eligible admin_manual snapshot', async () => {
+    it('returns PROVIDER_RATE_UNAVAILABLE when there is no eligible provider snapshot', async () => {
       const { prisma, service } = createService();
       mockActiveSeason(prisma);
       mockJoinedParticipant(prisma);
@@ -1271,13 +1357,13 @@ describe('FxService', () => {
 
       await expectExecuteErrorCode(
         service.execute('user-1', validExecuteBody),
-        'FX_RATE_UNAVAILABLE',
+        'PROVIDER_RATE_UNAVAILABLE',
       );
       expectExecutePlanReads(prisma);
       expectNoExecuteWrites(prisma);
     });
 
-    it('returns FX_RATE_STALE when the selected admin_manual snapshot is stale', async () => {
+    it('returns PROVIDER_RATE_STALE when the selected provider snapshot is stale', async () => {
       const { prisma, service } = createService();
       mockActiveSeason(prisma);
       mockJoinedParticipant(prisma);
@@ -1286,13 +1372,14 @@ describe('FxService', () => {
           {
             ...executeSnapshot,
             effectiveAt: staleEffectiveAt,
+            capturedAt: new Date('2026-04-30T23:59:59.000Z'),
           },
         ],
       });
 
       await expectExecuteErrorCode(
         service.execute('user-1', validExecuteBody),
-        'FX_RATE_STALE',
+        'PROVIDER_RATE_STALE',
       );
       expectExecutePlanReads(prisma);
       expectNoExecuteWrites(prisma);
@@ -1339,6 +1426,22 @@ describe('FxService', () => {
           feeAmount: '0.00074074',
           feeCurrency: CurrencyCode.USD,
           appliedRate: '1350.00000000',
+          quoteId: 'quote-fx-1',
+          quotedRate: '1350.00000000',
+          executeRate: '1350.00000000',
+          rateChangeBps: '0.0000',
+          rateSource: {
+            sourceType: 'provider_api',
+            sourceName: 'exchange_rate_api',
+            snapshotId: 'fx-snapshot-1',
+            effectiveAt: freshEffectiveAt.toISOString(),
+            capturedAt: capturedAt.toISOString(),
+            fallbackUsed: false,
+            fallbackReason: null,
+            rejectedProviderReason: null,
+            freshnessAgeSeconds: 30,
+          },
+          idempotencyKey: 'idempotency-key-1',
           netTargetAmount: '0.74000000',
           sourceWalletId: 'source-wallet-1',
           targetWalletId: 'target-wallet-1',
@@ -1622,7 +1725,7 @@ describe('FxService', () => {
         'source debit classification fails',
         'source-debit',
         'INSUFFICIENT_BALANCE',
-        ['fxExecuteRequest.create:pending'],
+        ['fxExecuteRequest.create:pending', 'quote.updateMany:consume'],
       ],
       [
         'target credit fails after source debit',
@@ -1630,6 +1733,7 @@ describe('FxService', () => {
         'EXECUTE_TRANSACTION_FAILED',
         [
           'fxExecuteRequest.create:pending',
+          'quote.updateMany:consume',
           'cashWallet.updateMany:source-debit',
         ],
       ],
@@ -1639,6 +1743,7 @@ describe('FxService', () => {
         'EXECUTE_TRANSACTION_FAILED',
         [
           'fxExecuteRequest.create:pending',
+          'quote.updateMany:consume',
           'cashWallet.updateMany:source-debit',
           'cashWallet.updateMany:target-credit',
         ],
@@ -1649,6 +1754,7 @@ describe('FxService', () => {
         'EXECUTE_TRANSACTION_FAILED',
         [
           'fxExecuteRequest.create:pending',
+          'quote.updateMany:consume',
           'cashWallet.updateMany:source-debit',
           'cashWallet.updateMany:target-credit',
           'exchangeTransaction.create',
@@ -1660,6 +1766,7 @@ describe('FxService', () => {
         'EXECUTE_TRANSACTION_FAILED',
         [
           'fxExecuteRequest.create:pending',
+          'quote.updateMany:consume',
           'cashWallet.updateMany:source-debit',
           'cashWallet.updateMany:target-credit',
           'exchangeTransaction.create',
@@ -1672,6 +1779,7 @@ describe('FxService', () => {
         'EXECUTE_TRANSACTION_FAILED',
         [
           'fxExecuteRequest.create:pending',
+          'quote.updateMany:consume',
           'cashWallet.updateMany:source-debit',
           'cashWallet.updateMany:target-credit',
           'exchangeTransaction.create',
@@ -1708,6 +1816,7 @@ describe('FxService', () => {
         toCurrency: ' usd ',
         sourceAmount: '1000.0',
         idempotencyKey: '  idempotency-key-1  ',
+        quoteId: ' quote-fx-1 ',
       };
       mockActiveSeason(prisma);
       mockJoinedParticipant(prisma);
@@ -1717,7 +1826,7 @@ describe('FxService', () => {
 
       await expectExecuteErrorCode(
         service.execute('user-1', body),
-        'FX_RATE_UNAVAILABLE',
+        'PROVIDER_RATE_UNAVAILABLE',
       );
 
       expect(prisma.fxExecuteRequest.findUnique).toHaveBeenCalledWith({
@@ -1772,10 +1881,7 @@ describe('FxService', () => {
         where: {
           baseCurrency: CurrencyCode.USD,
           quoteCurrency: CurrencyCode.KRW,
-          sourceType: FxRateSourceType.admin_manual,
-          effectiveAt: {
-            lte: now,
-          },
+          sourceType: FxRateSourceType.provider_api,
         },
         orderBy: [
           { effectiveAt: 'desc' },
@@ -1785,13 +1891,11 @@ describe('FxService', () => {
         take: 5,
         select: {
           id: true,
-          baseCurrency: true,
-          quoteCurrency: true,
           sourceType: true,
+          sourceName: true,
           rate: true,
           effectiveAt: true,
           capturedAt: true,
-          createdAt: true,
         },
       });
       expectNoExecuteWrites(prisma);

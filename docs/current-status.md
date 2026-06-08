@@ -132,13 +132,22 @@
     - Verification confirms `daily_portfolio_snapshot` is provider_api allowed, while `fx_execute`, `orders_create`, `orders_execute`, `season_ranking`, `season_settlement`, `reward_final_tier`, and `reward_fulfillment` remain provider_api denied.
     - `DailyPortfolioSnapshotJobService` passes `daily_portfolio_snapshot` explicitly, dry-run does not insert snapshot rows, non-dry-run inserts only available participant snapshots, and batch results include aggregate `sourceSummary`.
     - Ranking/settlement/reward continue to consume existing snapshots/rankings and do not read provider_api rows directly.
-    - `docs/realtime-execution-policy.md` now records 준실시간 체결 정책 v1. Quote is a reference quote, future provider-backed execute must reprice at execute time using fresh provider_api data, reject excessive quote-to-execute movement, and forbid default admin_manual execute fallback.
-    - A pure policy foundation exists in `src/providers/realtime-execution-policy.ts`; it is not imported by current `/fx execute`, orders create, or orders execute paths, so provider-backed execute/write remains closed.
+    - At that gate, `docs/realtime-execution-policy.md` recorded 준실시간 체결 정책 v1 as a future provider-backed execute policy: quote is a reference quote, execute must reprice at execute time using fresh provider_api data, reject excessive quote-to-execute movement, and forbid default admin_manual execute fallback.
+    - At that gate, the pure policy foundation in `src/providers/realtime-execution-policy.ts` was not imported by `/fx execute`, orders create, or orders execute paths, so provider-backed execute/write remained closed until the 2026-06-08 Durable Quote Provider Execute Gate.
+  - Durable Quote Provider Execute Gate on 2026-06-08 KST:
+    - Durable Quote storage is implemented with `QuoteType` (`fx`, `order`), `QuoteStatus` (`active`, `consumed`, `expired`, `canceled`), `quotes` indexes, and nullable `orders.quoteId` relation.
+    - `/fx quote` and `POST /api/v1/orders/quote` now persist active durable quotes and return backward-compatible `quoteId`, `expiresAt`, and `maxChangeBps` fields.
+    - Quote `requestHash` uses canonical SHA-256 JSON over normalized execute-relevant fields; it stores no raw provider payloads or secrets.
+    - `/fx execute` now requires a durable FX quote for new mutations, preserves idempotency replay before quote validation, reprices with fresh `provider_api` `exchange_rate_api` USD/KRW rows at execute time, rejects missing/stale provider rows, rejects quote movement beyond 30 bps, and consumes the quote atomically with wallet/exchange/ledger writes.
+    - Orders create accepts and binds an active durable order quote in `orders.quoteId`, creates only a submitted order, and does not mutate wallets/positions/settlement.
+    - Orders execute loads `order.quote`, requires the quote to be active/unexpired/matching, reprices from fresh provider asset rows (`kis_krx_realtime_trade`, `kis_us_delayed_trade`, or `binance_public_rest_24hr_ticker`) with capturedAt age <= 10 seconds, uses fresh provider USD/KRW FX for USD assets with capturedAt age <= 60 seconds, applies market movement and limit marketability guards, and consumes the quote atomically with wallet/position/order/ledger writes.
+    - Execute paths forbid default `admin_manual` fallback. Provider missing/stale/unavailable fails instead of executing.
+    - Ranking/settlement/reward, scheduler/cron, provider ingestion trigger APIs, batch HTTP APIs, KIS order/account/balance/fill/deposit/withdrawal APIs, Binance authenticated/order/account/user-data APIs, and real external trading/account integrations remain closed.
   - Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage; USDT depeg risk is not modeled.
-  - Provider_api source eligibility for execute/write, ranking, settlement, reward, and automation remains a separate gate.
+  - Provider_api source eligibility for ranking, settlement, reward, and automation remains a separate gate.
   - KIS supports WebSocket approval_key retrieval, domestic KRX real-time trade price `H0STCNT0`, and overseas/US delayed trade price `HDFSCNT0` ingestion foundation into `asset_price_snapshots` provider_api rows.
   - KIS REST current-price quote ingestion, KIS orderbook/hoga WebSocket ingestion, and KIS order/account/balance/fill/deposit/withdrawal APIs remain unimplemented.
-  - KRX domestic stock `provider_api` source eligibility is open only for the explicitly allowed read-only/quote workflows and operator-run daily snapshot valuation through `kis_krx_realtime_trade`.
+  - KRX domestic stock `provider_api` source eligibility is open only for the explicitly allowed read-only/quote workflows, orders execute, and operator-run daily snapshot valuation through `kis_krx_realtime_trade`.
 
 ## 2. 구현 완료 API
 
@@ -162,8 +171,8 @@
 - `GET /api/v1/rewards/me` read-only MVP
 - `GET /api/v1/badges/me` read-only MVP
 - `GET /api/v1/orders` read-only MVP
-- `POST /api/v1/orders/quote` read-only MVP
-- `POST /api/v1/orders` submitted order create MVP
+- `POST /api/v1/orders/quote` durable quote MVP
+- `POST /api/v1/orders` durable quote-bound submitted order create MVP
 - `POST /api/v1/orders` create idempotency MVP
 - `POST /api/v1/orders/:orderId/cancel` submitted order cancel MVP
 - `POST /api/v1/orders/:orderId/execute` full-fill MVP
@@ -174,9 +183,12 @@
 - `POST /api/v1/fx/quote`
   - 현재 quote source는 fresh `provider_api` `exchange_rate_api` USD/KRW first, then existing `admin_manual` fallback.
   - Provider fallback remains explicit; stale/wrong-source provider rows are not used.
-  - 응답은 optional `rateSource` metadata로 provider/admin source, fallback, rejection freshness 상태를 표시한다.
-- `POST /api/v1/fx/execute` 1차 구현 완료
-  - write path는 구현됨.
+  - 응답은 optional `rateSource` metadata와 durable quote `quoteId`, `expiresAt`, `maxChangeBps`를 표시한다.
+- `POST /api/v1/fx/execute` Durable Quote provider-backed write path 구현 완료
+  - 신규 mutation은 `quoteId`와 `idempotencyKey`가 필요하다.
+  - execute 시점 fresh `provider_api` USD/KRW rate를 사용하며 default `admin_manual` fallback은 금지된다.
+  - quote 대비 30 bps 초과 시 `RATE_CHANGED_REQUOTE_REQUIRED`.
+  - quote consume은 wallet/fx transaction writes와 같은 transaction에서 처리된다.
   - 실제 PostgreSQL/Prisma DB integration spec 통과.
   - 실제 PostgreSQL transaction 내부 DB-level failure injection 기반 rollback proof 일부 보강 완료.
   - `responsePayloadJson` storage 단독 DB-level failure injection 등 일부 hardening은 남아 있음.
@@ -499,20 +511,20 @@ near-term ledger/FX foundation:
 
 ### `/fx quote`
 
-- `POST /api/v1/fx/quote` read-only 구현 완료.
-- `/fx quote`는 USD/KRW `fx_rate_snapshots`를 읽음.
+- `POST /api/v1/fx/quote` durable quote 구현 완료.
+- `/fx quote`는 USD/KRW `fx_rate_snapshots`를 읽고 active `quotes` row를 생성함.
 - `/fx quote`는 wallet mutation 없음.
 - `/fx quote`는 `exchange_transactions`, `wallet_transactions`, `fx_execute_requests`, `equity_snapshots` 생성을 하지 않음.
 - snapshot 없음이면 `FX_RATE_UNAVAILABLE`.
-- selected snapshot `effectiveAt`이 quote 시점 기준 60초 초과 stale이면 `FX_RATE_STALE`.
-- quote response는 `quoteId = null`, `expiresAt = null`, `rateCapturedAt`, `rateEffectiveAt` 포함.
-- 승인된 `admin_manual` USD/KRW snapshot 기준 `/fx quote` 통합 smoke 검증 통과.
+- provider quote freshness는 capturedAt 300초 기준이며, eligible provider가 없으면 기존 safe `admin_manual` fallback을 사용함.
+- quote response는 `quoteId`, `expiresAt`, `maxChangeBps`, `rateCapturedAt`, `rateEffectiveAt` 포함.
+- 아래 승인된 `admin_manual` USD/KRW snapshot 기준 smoke는 durable quote 이전 historical evidence임.
   - CLI dry-run 후 non-dry-run snapshot 입력 성공.
   - 입력 snapshot: rate `1450.00000000`, sourceType/sourceName `admin_manual`, approvedByUserId `usr_dev_001`, effectiveAt/capturedAt `2026-05-07T10:01:53.000Z`.
   - smoke 당시 fresh 조건 통과: `ageMsAtCheck = 41822`로 60초 이내.
   - Bearer access token Auth MVP 이전 smoke였으므로 HTTP 대신 실제 Prisma/PostgreSQL을 사용하는 `FxService.quote(userId, body)` 직접 호출 검증.
   - KRW -> USD, USD -> KRW 양방향 quote 성공.
-  - quote 응답의 `quoteId = null`, `expiresAt = null`, `rateCapturedAt`, `rateEffectiveAt` 확인.
+  - 당시 quote 응답의 `quoteId = null`, `expiresAt = null`, `rateCapturedAt`, `rateEffectiveAt` 확인. 현재 구현은 non-null durable quote fields를 반환함.
   - quote 전후 mutation 없음 확인: `exchange_transactions 0 -> 0`, `wallet_transactions 1 -> 1`, `fx_execute_requests 0 -> 0`, `equity_snapshots 0 -> 0`.
 
 ### FX rate input/provider

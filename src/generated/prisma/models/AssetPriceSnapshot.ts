@@ -270,6 +270,7 @@ export type AssetPriceSnapshotWhereInput = {
   note?: Prisma.StringNullableFilter<"AssetPriceSnapshot"> | string | null
   asset?: Prisma.XOR<Prisma.AssetScalarRelationFilter, Prisma.AssetWhereInput>
   orders?: Prisma.OrderListRelationFilter
+  quotes?: Prisma.QuoteListRelationFilter
 }
 
 export type AssetPriceSnapshotOrderByWithRelationInput = {
@@ -287,6 +288,7 @@ export type AssetPriceSnapshotOrderByWithRelationInput = {
   note?: Prisma.SortOrderInput | Prisma.SortOrder
   asset?: Prisma.AssetOrderByWithRelationInput
   orders?: Prisma.OrderOrderByRelationAggregateInput
+  quotes?: Prisma.QuoteOrderByRelationAggregateInput
 }
 
 export type AssetPriceSnapshotWhereUniqueInput = Prisma.AtLeast<{
@@ -307,6 +309,7 @@ export type AssetPriceSnapshotWhereUniqueInput = Prisma.AtLeast<{
   note?: Prisma.StringNullableFilter<"AssetPriceSnapshot"> | string | null
   asset?: Prisma.XOR<Prisma.AssetScalarRelationFilter, Prisma.AssetWhereInput>
   orders?: Prisma.OrderListRelationFilter
+  quotes?: Prisma.QuoteListRelationFilter
 }, "id">
 
 export type AssetPriceSnapshotOrderByWithAggregationInput = {
@@ -361,6 +364,7 @@ export type AssetPriceSnapshotCreateInput = {
   note?: string | null
   asset: Prisma.AssetCreateNestedOneWithoutPriceSnapshotsInput
   orders?: Prisma.OrderCreateNestedManyWithoutAssetPriceSnapshotInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutAssetPriceSnapshotInput
 }
 
 export type AssetPriceSnapshotUncheckedCreateInput = {
@@ -377,6 +381,7 @@ export type AssetPriceSnapshotUncheckedCreateInput = {
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: string | null
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
 }
 
 export type AssetPriceSnapshotUpdateInput = {
@@ -393,6 +398,7 @@ export type AssetPriceSnapshotUpdateInput = {
   note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   asset?: Prisma.AssetUpdateOneRequiredWithoutPriceSnapshotsNestedInput
   orders?: Prisma.OrderUpdateManyWithoutAssetPriceSnapshotNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutAssetPriceSnapshotNestedInput
 }
 
 export type AssetPriceSnapshotUncheckedUpdateInput = {
@@ -409,6 +415,7 @@ export type AssetPriceSnapshotUncheckedUpdateInput = {
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
 }
 
 export type AssetPriceSnapshotCreateManyInput = {
@@ -583,6 +590,22 @@ export type AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.AssetPriceSnapshotUpdateToOneWithWhereWithoutOrdersInput, Prisma.AssetPriceSnapshotUpdateWithoutOrdersInput>, Prisma.AssetPriceSnapshotUncheckedUpdateWithoutOrdersInput>
 }
 
+export type AssetPriceSnapshotCreateNestedOneWithoutQuotesInput = {
+  create?: Prisma.XOR<Prisma.AssetPriceSnapshotCreateWithoutQuotesInput, Prisma.AssetPriceSnapshotUncheckedCreateWithoutQuotesInput>
+  connectOrCreate?: Prisma.AssetPriceSnapshotCreateOrConnectWithoutQuotesInput
+  connect?: Prisma.AssetPriceSnapshotWhereUniqueInput
+}
+
+export type AssetPriceSnapshotUpdateOneWithoutQuotesNestedInput = {
+  create?: Prisma.XOR<Prisma.AssetPriceSnapshotCreateWithoutQuotesInput, Prisma.AssetPriceSnapshotUncheckedCreateWithoutQuotesInput>
+  connectOrCreate?: Prisma.AssetPriceSnapshotCreateOrConnectWithoutQuotesInput
+  upsert?: Prisma.AssetPriceSnapshotUpsertWithoutQuotesInput
+  disconnect?: Prisma.AssetPriceSnapshotWhereInput | boolean
+  delete?: Prisma.AssetPriceSnapshotWhereInput | boolean
+  connect?: Prisma.AssetPriceSnapshotWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.AssetPriceSnapshotUpdateToOneWithWhereWithoutQuotesInput, Prisma.AssetPriceSnapshotUpdateWithoutQuotesInput>, Prisma.AssetPriceSnapshotUncheckedUpdateWithoutQuotesInput>
+}
+
 export type AssetPriceSnapshotCreateWithoutAssetInput = {
   id?: string
   price: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -596,6 +619,7 @@ export type AssetPriceSnapshotCreateWithoutAssetInput = {
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: string | null
   orders?: Prisma.OrderCreateNestedManyWithoutAssetPriceSnapshotInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutAssetPriceSnapshotInput
 }
 
 export type AssetPriceSnapshotUncheckedCreateWithoutAssetInput = {
@@ -611,6 +635,7 @@ export type AssetPriceSnapshotUncheckedCreateWithoutAssetInput = {
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: string | null
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
 }
 
 export type AssetPriceSnapshotCreateOrConnectWithoutAssetInput = {
@@ -670,6 +695,7 @@ export type AssetPriceSnapshotCreateWithoutOrdersInput = {
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: string | null
   asset: Prisma.AssetCreateNestedOneWithoutPriceSnapshotsInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutAssetPriceSnapshotInput
 }
 
 export type AssetPriceSnapshotUncheckedCreateWithoutOrdersInput = {
@@ -685,6 +711,7 @@ export type AssetPriceSnapshotUncheckedCreateWithoutOrdersInput = {
   createdAt?: Date | string
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: string | null
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
 }
 
 export type AssetPriceSnapshotCreateOrConnectWithoutOrdersInput = {
@@ -716,6 +743,7 @@ export type AssetPriceSnapshotUpdateWithoutOrdersInput = {
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   asset?: Prisma.AssetUpdateOneRequiredWithoutPriceSnapshotsNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutAssetPriceSnapshotNestedInput
 }
 
 export type AssetPriceSnapshotUncheckedUpdateWithoutOrdersInput = {
@@ -731,6 +759,87 @@ export type AssetPriceSnapshotUncheckedUpdateWithoutOrdersInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
+}
+
+export type AssetPriceSnapshotCreateWithoutQuotesInput = {
+  id?: string
+  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currencyCode: $Enums.CurrencyCode
+  sourceType: $Enums.AssetPriceSourceType
+  sourceName?: string | null
+  sourceTimestamp?: Date | string | null
+  effectiveAt: Date | string
+  capturedAt: Date | string
+  createdAt?: Date | string
+  rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  note?: string | null
+  asset: Prisma.AssetCreateNestedOneWithoutPriceSnapshotsInput
+  orders?: Prisma.OrderCreateNestedManyWithoutAssetPriceSnapshotInput
+}
+
+export type AssetPriceSnapshotUncheckedCreateWithoutQuotesInput = {
+  id?: string
+  assetId: string
+  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currencyCode: $Enums.CurrencyCode
+  sourceType: $Enums.AssetPriceSourceType
+  sourceName?: string | null
+  sourceTimestamp?: Date | string | null
+  effectiveAt: Date | string
+  capturedAt: Date | string
+  createdAt?: Date | string
+  rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  note?: string | null
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
+}
+
+export type AssetPriceSnapshotCreateOrConnectWithoutQuotesInput = {
+  where: Prisma.AssetPriceSnapshotWhereUniqueInput
+  create: Prisma.XOR<Prisma.AssetPriceSnapshotCreateWithoutQuotesInput, Prisma.AssetPriceSnapshotUncheckedCreateWithoutQuotesInput>
+}
+
+export type AssetPriceSnapshotUpsertWithoutQuotesInput = {
+  update: Prisma.XOR<Prisma.AssetPriceSnapshotUpdateWithoutQuotesInput, Prisma.AssetPriceSnapshotUncheckedUpdateWithoutQuotesInput>
+  create: Prisma.XOR<Prisma.AssetPriceSnapshotCreateWithoutQuotesInput, Prisma.AssetPriceSnapshotUncheckedCreateWithoutQuotesInput>
+  where?: Prisma.AssetPriceSnapshotWhereInput
+}
+
+export type AssetPriceSnapshotUpdateToOneWithWhereWithoutQuotesInput = {
+  where?: Prisma.AssetPriceSnapshotWhereInput
+  data: Prisma.XOR<Prisma.AssetPriceSnapshotUpdateWithoutQuotesInput, Prisma.AssetPriceSnapshotUncheckedUpdateWithoutQuotesInput>
+}
+
+export type AssetPriceSnapshotUpdateWithoutQuotesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  sourceType?: Prisma.EnumAssetPriceSourceTypeFieldUpdateOperationsInput | $Enums.AssetPriceSourceType
+  sourceName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceTimestamp?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  effectiveAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  asset?: Prisma.AssetUpdateOneRequiredWithoutPriceSnapshotsNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutAssetPriceSnapshotNestedInput
+}
+
+export type AssetPriceSnapshotUncheckedUpdateWithoutQuotesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  assetId?: Prisma.StringFieldUpdateOperationsInput | string
+  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  sourceType?: Prisma.EnumAssetPriceSourceTypeFieldUpdateOperationsInput | $Enums.AssetPriceSourceType
+  sourceName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceTimestamp?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  effectiveAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
 }
 
 export type AssetPriceSnapshotCreateManyAssetInput = {
@@ -760,6 +869,7 @@ export type AssetPriceSnapshotUpdateWithoutAssetInput = {
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   orders?: Prisma.OrderUpdateManyWithoutAssetPriceSnapshotNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutAssetPriceSnapshotNestedInput
 }
 
 export type AssetPriceSnapshotUncheckedUpdateWithoutAssetInput = {
@@ -775,6 +885,7 @@ export type AssetPriceSnapshotUncheckedUpdateWithoutAssetInput = {
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
 }
 
 export type AssetPriceSnapshotUncheckedUpdateManyWithoutAssetInput = {
@@ -798,10 +909,12 @@ export type AssetPriceSnapshotUncheckedUpdateManyWithoutAssetInput = {
 
 export type AssetPriceSnapshotCountOutputType = {
   orders: number
+  quotes: number
 }
 
 export type AssetPriceSnapshotCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   orders?: boolean | AssetPriceSnapshotCountOutputTypeCountOrdersArgs
+  quotes?: boolean | AssetPriceSnapshotCountOutputTypeCountQuotesArgs
 }
 
 /**
@@ -821,6 +934,13 @@ export type AssetPriceSnapshotCountOutputTypeCountOrdersArgs<ExtArgs extends run
   where?: Prisma.OrderWhereInput
 }
 
+/**
+ * AssetPriceSnapshotCountOutputType without action
+ */
+export type AssetPriceSnapshotCountOutputTypeCountQuotesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.QuoteWhereInput
+}
+
 
 export type AssetPriceSnapshotSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -837,6 +957,7 @@ export type AssetPriceSnapshotSelect<ExtArgs extends runtime.Types.Extensions.In
   note?: boolean
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   orders?: boolean | Prisma.AssetPriceSnapshot$ordersArgs<ExtArgs>
+  quotes?: boolean | Prisma.AssetPriceSnapshot$quotesArgs<ExtArgs>
   _count?: boolean | Prisma.AssetPriceSnapshotCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["assetPriceSnapshot"]>
 
@@ -891,6 +1012,7 @@ export type AssetPriceSnapshotOmit<ExtArgs extends runtime.Types.Extensions.Inte
 export type AssetPriceSnapshotInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   orders?: boolean | Prisma.AssetPriceSnapshot$ordersArgs<ExtArgs>
+  quotes?: boolean | Prisma.AssetPriceSnapshot$quotesArgs<ExtArgs>
   _count?: boolean | Prisma.AssetPriceSnapshotCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type AssetPriceSnapshotIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -905,6 +1027,7 @@ export type $AssetPriceSnapshotPayload<ExtArgs extends runtime.Types.Extensions.
   objects: {
     asset: Prisma.$AssetPayload<ExtArgs>
     orders: Prisma.$OrderPayload<ExtArgs>[]
+    quotes: Prisma.$QuotePayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1315,6 +1438,7 @@ export interface Prisma__AssetPriceSnapshotClient<T, Null = never, ExtArgs exten
   readonly [Symbol.toStringTag]: "PrismaPromise"
   asset<T extends Prisma.AssetDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AssetDefaultArgs<ExtArgs>>): Prisma.Prisma__AssetClient<runtime.Types.Result.GetResult<Prisma.$AssetPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   orders<T extends Prisma.AssetPriceSnapshot$ordersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AssetPriceSnapshot$ordersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  quotes<T extends Prisma.AssetPriceSnapshot$quotesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AssetPriceSnapshot$quotesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$QuotePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1778,6 +1902,30 @@ export type AssetPriceSnapshot$ordersArgs<ExtArgs extends runtime.Types.Extensio
   take?: number
   skip?: number
   distinct?: Prisma.OrderScalarFieldEnum | Prisma.OrderScalarFieldEnum[]
+}
+
+/**
+ * AssetPriceSnapshot.quotes
+ */
+export type AssetPriceSnapshot$quotesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Quote
+   */
+  select?: Prisma.QuoteSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Quote
+   */
+  omit?: Prisma.QuoteOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.QuoteInclude<ExtArgs> | null
+  where?: Prisma.QuoteWhereInput
+  orderBy?: Prisma.QuoteOrderByWithRelationInput | Prisma.QuoteOrderByWithRelationInput[]
+  cursor?: Prisma.QuoteWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.QuoteScalarFieldEnum | Prisma.QuoteScalarFieldEnum[]
 }
 
 /**

@@ -25,7 +25,8 @@
 - Provider Source Metadata and Outage UX Gate on 2026-06-04 KST is GO in code/docs/tests: allowed read-only/quote responses now expose backward-compatible optional public-safe source metadata (`rateSource`, `priceSource`, `assetPriceSource`, `fxRateSource`, and live valuation source summaries) with fallback/rejection reasons. This did not open execute/write/final/provider-trigger workflows.
 - Provider-backed Daily Snapshot Eligibility Gate on 2026-06-05 KST is GO for operator-run daily snapshot valuation only: `daily_portfolio_snapshot` can consume fresh eligible provider_api rows first with explicit admin_manual fallback, and batch job results expose aggregate `sourceSummary` without changing `daily_portfolio_snapshots` schema.
 - Daily Snapshot Gate Verification and Realtime Execution Policy Foundation on 2026-06-05 KST is GO for policy/code foundation only: daily snapshot gate completion was verified, `docs/realtime-execution-policy.md` now defines quote-reference/execute-reprice/freshness/bps/error/audit policy, and `src/providers/realtime-execution-policy.ts` adds pure tested helpers without wiring them into current execute/write services.
-- Provider API Source Eligibility remains closed for `/fx execute`, orders create, orders execute, ranking, settlement/final result, reward/final tier/fulfillment, scheduler/cron, provider ingestion trigger APIs, batch HTTP APIs, and real trading/account/order/deposit/withdrawal APIs.
+- Durable Quote Provider Execute Gate on 2026-06-08 KST is GO for `/fx execute` and orders execute: quotes are durable, quote responses return `quoteId`/`expiresAt`/`maxChangeBps`, orders create binds `Order.quoteId`, execute paths reprice from fresh provider_api rows, movement guards fail closed, default `admin_manual` execute fallback is forbidden, and quote consume is in the write transaction.
+- Provider API Source Eligibility remains closed for orders create source selection, ranking, settlement/final result, reward/final tier/fulfillment, scheduler/cron, provider ingestion trigger APIs, batch HTTP APIs, and real trading/account/order/deposit/withdrawal APIs.
 - Home settled final-result read model is implemented from existing `rankType=final` `season_rankings`; final tier assignment and reward grant internal foundation now have operator-run MVP jobs. Actual payment/point/delivery/external fulfillment remains a separate gate.
 - `docs/current-status.md` remains the short status summary. This document is the detailed backend gate roadmap.
 
@@ -175,25 +176,25 @@ Consistency note:
 
 ### FX Quote
 
-- Current status: `POST /api/v1/fx/quote` read-only MVP implemented; KRW/USD only; uses latest eligible USD/KRW snapshot and 60-second freshness.
+- Current status: `POST /api/v1/fx/quote` durable quote MVP implemented; KRW/USD only; uses fresh provider_api first with admin_manual fallback and stores active `Quote` rows with 10-second TTL.
 - Implemented files: `src/fx/fx.controller.ts`, `src/fx/fx.service.ts`, `src/fx/fx-decimal-policy.ts`, `scripts/admin-insert-fx-rate.ts`.
 - Source of truth: `docs/fx-api-contract.md`, `docs/current-status.md`.
 - Existing tests: `src/fx/fx.service.spec.ts`, `src/fx/fx-decimal-policy.spec.ts`, `src/fx/fx-rate-input.validation.spec.ts`, `test/app.e2e-spec.ts`.
-- Known limitations: quote is not durable; `quoteId` and `expiresAt` are `null`; current quote is a reference quote, not a guaranteed execution price.
-- Remaining work: durable quote and execute-time provider repricing gate if provider-backed execute/write is opened.
+- Known limitations: current quote is a reference quote, not a guaranteed execution price.
+- Remaining work: broader quote recovery/cleanup policy if quote table retention becomes operationally important.
 - Risk level: MEDIUM.
-- Recommended next action: Gate C/D provider evidence capture, not quote code changes.
+- Recommended next action: keep quote persistence/hash/source metadata tests green; do not add provider trigger APIs.
 
 ### FX Execute
 
-- Current status: `POST /api/v1/fx/execute` first write path implemented with direct execute, durable idempotency via `fx_execute_requests`, guarded source debit, target credit, exchange row, two wallet ledger rows, succeeded response replay, and no equity snapshot.
+- Current status: `POST /api/v1/fx/execute` Durable Quote provider-backed write path implemented with durable idempotency via `fx_execute_requests`, quote validation, execute-time provider USD/KRW repricing, guarded source debit, target credit, exchange row, two wallet ledger rows, succeeded response replay, quote consume, and no equity snapshot.
 - Implemented files: `src/fx/fx.service.ts`, `src/fx/fx-execute-*.ts`.
 - Source of truth: `docs/fx-api-contract.md`, `docs/current-status.md`.
 - Existing tests: `src/fx/fx.service.spec.ts`, `src/fx/fx.execute.integration.spec.ts`, FX execute policy specs under `src/fx/*spec.ts`, `test/app.e2e-spec.ts` auth baseline.
-- Known limitations: no durable quote; no provider_api/official_batch source; stale pending recovery tool/job absent; some DB-level failure injection remains hardening-only; responsePayloadJson-only storage failure remains hard to force with current schema. The realtime execution policy foundation exists but is not connected to current execute behavior.
-- Remaining work: provider-backed execute/write gate should use `docs/realtime-execution-policy.md` before any source expansion; recovery/hardening remains separate.
+- Known limitations: stale pending recovery tool/job absent; some DB-level failure injection remains hardening-only; responsePayloadJson-only storage failure remains hard to force with current schema.
+- Remaining work: recovery/hardening remains separate; broader DB smoke for provider-backed quote/execute can be added if launch critical.
 - Risk level: HIGH.
-- Recommended next action: keep existing execute source as approved fresh `admin_manual`; do not expand allowed sourceType until provider gate completes.
+- Recommended next action: keep provider-only execute source and quote consume atomicity tests green; do not add emergency manual override without a separate operator gate.
 
 ### Assets / Price Input
 
@@ -219,25 +220,25 @@ Consistency note:
 
 ### Orders Quote
 
-- Current status: `POST /api/v1/orders/quote` read-only MVP implemented; active season + joined participant; market can use fresh eligible `provider_api` asset price first with `admin_manual` fallback; limit uses limitPrice; USD assets can use provider USD/KRW first with fresh approved admin_manual fallback; buy/sell resource checks are read-only.
+- Current status: `POST /api/v1/orders/quote` durable quote MVP implemented; active season + joined participant; market can use fresh eligible `provider_api` asset price first with `admin_manual` fallback; limit uses limitPrice; USD assets can use provider USD/KRW first with fresh approved admin_manual fallback; buy/sell resource checks are read-only; active `Quote` rows are stored with 10-second TTL.
 - Implemented files: `src/orders/orders.controller.ts`, `src/orders/orders.service.ts`.
 - Source of truth: `docs/orders-api-contract.md`, `docs/current-status.md`.
 - Existing tests: `src/orders/orders.service.spec.ts`, `test/app.e2e-spec.ts`.
-- Known limitations: no durable quote, no quote expiry, and submitted quote values are reference estimates. Provider quote source exists, but provider-backed execute remains closed.
-- Remaining work: durable quote and realtime execute policy implementation if the provider-backed execute/write gate opens.
+- Known limitations: submitted quote values are reference estimates, not guaranteed fills.
+- Remaining work: retention/cleanup policy for old quotes if operationally needed.
 - Risk level: MEDIUM.
-- Recommended next action: do not add durable quote in provider/scheduler gates.
+- Recommended next action: keep durable quote hash/source metadata tests green.
 
 ### Orders Create
 
-- Current status: submitted order create MVP implemented; creates one `orders` row, stores create idempotency key/hash/response payload, and performs no wallet/position/settlement mutation.
+- Current status: durable quote-bound submitted order create MVP implemented; validates and stores `orders.quoteId`, creates one `orders` row, stores create idempotency key/hash/response payload, and performs no wallet/position/settlement mutation.
 - Implemented files: `src/orders/orders.service.ts`, `src/orders/orders.controller.ts`, `prisma/schema.prisma` order idempotency fields.
 - Source of truth: `docs/orders-api-contract.md`, `docs/current-status.md`.
 - Existing tests: `src/orders/orders.service.spec.ts`, `test/app.e2e-spec.ts` auth baseline.
-- Known limitations: no DB integration for create idempotency races beyond mocked P2002; duplicate replay after cancellation returns original create response by design.
+- Known limitations: no DB integration for create idempotency races beyond mocked P2002; duplicate replay after cancellation returns original create response by design. Orders create does not directly read provider rows.
 - Remaining work: add real DB idempotency race coverage if create path becomes a launch blocker.
 - Risk level: MEDIUM.
-- Recommended next action: no code change; keep command semantics documented.
+- Recommended next action: keep quote binding and idempotency replay ordering documented and tested.
 
 ### Orders Cancel
 
@@ -252,11 +253,11 @@ Consistency note:
 
 ### Orders Execute
 
-- Current status: full-fill execute MVP implemented. Buy debits cash wallet, creates/updates position, creates one `order_buy` ledger row, and finalizes order. Sell decrements position, credits cash wallet, creates one `order_sell` ledger row, and finalizes order. All financial writes run in one Prisma transaction.
+- Current status: Durable Quote provider-backed full-fill execute MVP implemented. Buy debits cash wallet, creates/updates position, creates one `order_buy` ledger row, and finalizes order. Sell decrements position, credits cash wallet, creates one `order_sell` ledger row, and finalizes order. Execute validates/consumes `order.quote`, reprices with fresh provider_api asset/FX evidence, and all financial writes run in one Prisma transaction.
 - Implemented files: `src/orders/orders.service.ts`, `src/orders/orders.controller.ts`.
 - Source of truth: `docs/orders-api-contract.md`, `docs/current-status.md`.
 - Existing tests: `src/orders/orders.service.spec.ts`, `src/orders/orders.execute.integration.spec.ts`, `test/app.e2e-spec.ts` auth baseline.
-- Known limitations: no exact execute response replay, no execute-specific command table, no partial fill, no matching engine, no provider price ingestion, no settlement side effect, no automatic snapshots/rankings.
+- Known limitations: no exact execute response replay, no execute-specific command table, no partial fill, no matching engine, no settlement side effect, no automatic snapshots/rankings.
 - Remaining work: exact replay/partial fill/matching/settlement each require separate gate.
 - Risk level: HIGH.
 - Recommended next action: keep full-fill MVP stable; do not expand matching/settlement before provider/scheduler/settlement audits.

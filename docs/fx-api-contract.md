@@ -4,8 +4,9 @@
 
 - This document records the implemented `/fx quote` contract and `/fx execute` MVP behavior.
 - `/fx quote` can use fresh `provider_api` ExchangeRate-API USD/KRW first, with existing safe `admin_manual` fallback.
-- `/fx execute` remains approved fresh `admin_manual` only.
-- `docs/realtime-execution-policy.md` defines the future provider-backed execute/write policy foundation. It is not wired into the current `/fx execute` service.
+- `/fx quote` stores an active durable quote and returns `quoteId`, `expiresAt`, and `maxChangeBps`.
+- `/fx execute` requires a durable quote for new mutations, reprices at execute time from fresh `provider_api` `exchange_rate_api` USD/KRW, enforces quote movement threshold, and forbids default `admin_manual` fallback.
+- `docs/realtime-execution-policy.md` defines the active provider-backed execute/write policy.
 - Do not add fake FX rates, temporary FX rates, Prisma schema changes, migrations, seed changes, package changes, scheduler/cron, provider ingestion trigger APIs, or real trading/account APIs from this document.
 
 ## Source Rules
@@ -26,9 +27,7 @@
 - `/fx quote` provider freshness uses `capturedAt <= now`, `effectiveAt <= now`, positive rate, and capturedAt age <= 300 seconds.
 - If the provider row is missing, stale, future, non-positive, wrong-source, or otherwise ineligible, `/fx quote` falls back to the existing `admin_manual` selection.
 - Existing `admin_manual` quote fallback keeps the established 60-second `effectiveAt` stale check.
-- Near-term `/fx execute` uses approved fresh `admin_manual` snapshots only as allowed sourceType.
-- `provider_api` and `official_batch` source eligibility is not opened for `/fx execute`.
-- Future provider-backed `/fx execute` must reprice at execute time from fresh provider_api USD/KRW, compare against the quote rate, reject threshold breaches with `RATE_CHANGED_REQUOTE_REQUIRED`, and forbid default `admin_manual` fallback.
+- `/fx execute` uses execute-time fresh provider_api USD/KRW rows only. It compares executeRate against the durable quote quotedRate, rejects threshold breaches with `RATE_CHANGED_REQUOTE_REQUIRED`, and forbids default `admin_manual` fallback.
 - `/fx quote` exposes optional public-safe `rateSource` metadata for source/outage visibility. Raw provider payloads, `metadataJson`, and secrets are never exposed.
 - USD/KRW snapshots are also the KRW conversion evidence for USD-settled crypto valuation.
 - MVP crypto uses Binance-based USD settlement and the USD Wallet; no `USDT` wallet/currency is introduced.
@@ -69,7 +68,7 @@ Return a KRW/USD exchange quote without changing wallet balances or writing exch
 {
   "success": true,
   "data": {
-    "quoteId": null,
+    "quoteId": "<string>",
     "fromCurrency": "KRW",
     "toCurrency": "USD",
     "sourceAmount": "<amount string>",
@@ -79,7 +78,8 @@ Return a KRW/USD exchange quote without changing wallet balances or writing exch
     "feeAmount": "<amount string>",
     "feeCurrency": "USD",
     "netTargetAmount": "<amount string>",
-    "expiresAt": null,
+    "expiresAt": "<UTC ISO string>",
+    "maxChangeBps": "<bps string>",
     "rateCapturedAt": "<UTC ISO string>",
     "rateEffectiveAt": "<UTC ISO string>",
     "rateSource": {
@@ -109,20 +109,18 @@ Return a KRW/USD exchange quote without changing wallet balances or writing exch
 - USD -> KRW uses `feeCurrency = KRW`.
 - Current quote returns decimal strings with implemented API formatting; broader execute, settlement, and valuation rounding policy remains a STOP item.
 
-### Quote STOP Decisions
+### Quote Persistence
 
-- Current schema has no durable quote table.
-- `/fx quote` is implemented as stateless/read-only.
-- `quoteId` is fixed to `null` for the current implementation.
-- `expiresAt` is fixed to `null` for the current implementation.
+- `/fx quote` creates a `Quote` row with `quoteType=fx`, `status=active`, `sourceAmount`, `targetAmount`, `quotedRate`, `fxRateSnapshotId`, public-safe `fxRateSourceJson`, `maxChangeBps=30.0000`, `expiresAt=quoteAt+10s`, and canonical SHA-256 `requestHash`.
+- `quoteId` is non-null when quote creation succeeds.
+- `expiresAt` is non-null and defaults to 10 seconds after quote time.
 - `rateCapturedAt` and `rateEffectiveAt` are returned for rate timing transparency.
 - Optional `rateSource` returns selected provider/admin source metadata and fallback/rejected-provider reason visibility.
 - `appliedRate` source is fresh `provider_api` `exchange_rate_api` USD/KRW first, then existing `admin_manual` fallback.
 - Missing eligible provider and manual snapshots return `FX_RATE_UNAVAILABLE`.
 - Selected provider snapshot older than 300 seconds by `capturedAt`, or selected manual snapshot older than 60 seconds by `effectiveAt`, returns `FX_RATE_STALE` only when no safe fallback is available.
-- `/fx execute` remains a separate STOP and must not be inferred from quote readiness.
-- Durable quote storage, non-null `quoteId`, and quote expiry are future enhancements only.
-- The future default quote TTL candidate is 10 seconds. Execute after durable quote expiry should return `QUOTE_EXPIRED`.
+- Quote metadata stores only public-safe source decision fields; raw provider payloads and secrets are not stored in quote metadata.
+- Execute after durable quote expiry returns `QUOTE_EXPIRED`.
 
 ## POST /api/v1/fx/execute
 
@@ -130,19 +128,11 @@ Return a KRW/USD exchange quote without changing wallet balances or writing exch
 
 Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, and create source/target `wallet_transactions` rows according to this API contract and the current implementation summary in `docs/current-status.md`.
 
-### Request Shape Candidate A: Quote-Based Execute
+### Request Shape
 
 ```json
 {
   "quoteId": "<string>",
-  "idempotencyKey": "<string>"
-}
-```
-
-### Request Shape Candidate B: Direct Execute
-
-```json
-{
   "fromCurrency": "KRW | USD",
   "toCurrency": "USD | KRW",
   "sourceAmount": "<amount string>",
@@ -150,42 +140,34 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 }
 ```
 
-### Candidate Comparison
-
-- Candidate A gives stronger quote/execute consistency, but requires durable quote storage or a command/request table.
-- Candidate A can support quote expiry and exact replay of quoted values.
-- Candidate B is simpler for near-term MVP because it does not require a quote table.
-- Candidate B still must recompute using a legitimate `appliedRate` source at execution time.
-- Candidate B uses the reflected `fx_execute_requests` durable idempotency foundation.
-
-### Recommended Candidate
-
-- Near-term MVP uses Candidate B, direct execute, for the implementation gate because durable quote storage does not exist.
+- `quoteId` and `idempotencyKey` are required for new mutations.
+- Existing idempotency replay is checked before quote validation, so a duplicate completed command can return the stored response without consuming a quote again.
+- `fromCurrency`, `toCurrency`, and `sourceAmount` must match the stored quote requestHash and fields.
 - Historical implementation-gate detail is archived in `docs/archive/fx-execute-final-implementation-gate.md`; current implementation status is tracked in `docs/current-status.md`.
-- If a durable quote table is introduced later, execute can move to Candidate A.
-- Future Candidate A must follow `docs/realtime-execution-policy.md`: quote mismatch returns `QUOTE_MISMATCH`, expired quote returns `QUOTE_EXPIRED`, and fresh provider_api is required at execute time.
 
 ### Execute-Time Snapshot Selection
 
-- Direct execute selects the FX snapshot at execute time.
+- Execute selects the FX snapshot at execute time.
 - Selection target:
   - pair USD/KRW
-  - allowed sourceType only
+  - `sourceType = provider_api`
+  - `sourceName = exchange_rate_api`
+  - `capturedAt <= executeNow`
   - `effectiveAt <= executeNow`
+  - `executeNow - capturedAt <= 60_000ms`
   - positive `rate`
-- Current allowed execute sourceType is approved fresh `admin_manual` only.
-- Current not-allowed execute sourceTypes are `provider_api` and `official_batch`.
-- Future provider-backed execute reverses this source rule: fresh `provider_api` is required, default `admin_manual` fallback is forbidden, and emergency manual override must be a separate operator override gate.
+- Default `admin_manual` fallback is forbidden, and emergency manual override must be a separate operator override gate.
 - Selection ordering:
   1. `effectiveAt desc`
   2. `capturedAt desc`
   3. `createdAt desc`
-- No eligible snapshot returns `FX_RATE_UNAVAILABLE`.
-- Selected snapshot with `executeNow - effectiveAt > 60_000ms` returns `FX_RATE_STALE`.
+- No eligible provider snapshot returns `PROVIDER_RATE_UNAVAILABLE`.
+- Selected/rejected provider snapshot with `executeNow - capturedAt > 60_000ms` returns `PROVIDER_RATE_STALE`.
 - Exactly `60_000ms` is accepted.
 - Future `effectiveAt` snapshots are ignored.
 - Selected snapshot id maps to `exchange_transactions.fxRateSnapshotId`, and selected `rate` is stored as `appliedRate`.
 - Snapshot selection/freshness failure must happen before wallet mutation.
+- If `abs(executeRate - quotedRate) / quotedRate * 10000 > quote.maxChangeBps`, execute returns `RATE_CHANGED_REQUOTE_REQUIRED`.
 
 ### Success Response Shape Candidate
 
@@ -203,6 +185,20 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
     "feeRate": "<decimal string>",
     "feeAmount": "<amount string>",
     "feeCurrency": "USD",
+    "appliedRate": "<decimal string>",
+    "quoteId": "<string>",
+    "quotedRate": "<decimal string>",
+    "executeRate": "<decimal string>",
+    "rateChangeBps": "<bps string>",
+    "rateSource": {
+      "sourceType": "provider_api",
+      "sourceName": "exchange_rate_api",
+      "snapshotId": "<string>",
+      "effectiveAt": "<UTC ISO string>",
+      "capturedAt": "<UTC ISO string>",
+      "fallbackUsed": false
+    },
+    "idempotencyKey": "<string>",
     "netTargetAmount": "<amount string>",
     "rateCapturedAt": "<UTC ISO string>",
     "rateEffectiveAt": "<UTC ISO string>",
@@ -232,6 +228,16 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 - `SEASON_NOT_JOINED`
 - `INVALID_CURRENCY_PAIR`
 - `INVALID_AMOUNT`
+- `QUOTE_REQUIRED`
+- `QUOTE_NOT_FOUND`
+- `QUOTE_NOT_ACTIVE`
+- `QUOTE_EXPIRED`
+- `QUOTE_MISMATCH`
+- `PROVIDER_RATE_UNAVAILABLE`
+- `PROVIDER_RATE_STALE`
+- `RATE_CHANGED_REQUOTE_REQUIRED`
+- `EXECUTION_SOURCE_INELIGIBLE`
+- `EXECUTION_PROVIDER_REQUIRED`
 - `INSUFFICIENT_BALANCE`
 - `FX_RATE_UNAVAILABLE`
 - `FX_RATE_STALE`
@@ -254,7 +260,7 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 - `fx_execute_requests` exists as the command/request table foundation.
 - `fx_execute_requests` has `unique(userId, idempotencyKey)` for execute retry deduplication.
 - `wallet_transactions` has `[referenceType, referenceId]` index only, not an idempotency unique key.
-- `/fx execute` lifecycle code is not implemented yet.
+- `/fx execute` lifecycle code is implemented.
 - Historical lifecycle planning is archived in `docs/archive/fx-idempotency-lifecycle-policy.md`; current behavior is tracked in `docs/current-status.md`.
 
 ### Candidate A: Add `exchange_transactions.idempotencyKey`
@@ -270,7 +276,7 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 - Pros: can store request hash, status, response payload, failure reason, and linked `exchangeTransactionId`.
 - Pros: provides `unique(userId, idempotencyKey)`.
 - Pros: clearer boundary for idempotent retries and conflicts.
-- Cons: lifecycle implementation and tests are still future implementation work.
+- Cons: command recovery tooling for stale pending rows remains future hardening work.
 
 ### Candidate C: API Layer Durable Store
 
@@ -291,7 +297,7 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 - Use the reflected `fx_execute_requests` command table.
 - Keep `exchange_transactions.idempotencyKey` absent unless a later schema review deliberately changes ownership.
 - Use accepted requestHash conflict handling, pending/succeeded/failed lifecycle, and response replay policy.
-- Do not implement execute in this documentation task.
+- This is the implemented approach.
 
 ## Wallet Concurrency And Overspend Prevention
 
@@ -364,14 +370,14 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 
 - Quote status:
   - `/fx quote` implementation is complete.
-  - `/fx quote` is stateless/read-only.
-  - `quoteId` and `expiresAt` are fixed to `null`.
+  - `/fx quote` persists durable quotes.
+  - `quoteId`, `expiresAt`, and `maxChangeBps` are returned.
   - `rateCapturedAt` and `rateEffectiveAt` are included.
   - `FX_RATE_UNAVAILABLE` and `FX_RATE_STALE` are distinguished.
 - Execute implementation gate:
-  - `/fx execute` direct execute MVP is implemented and remains `admin_manual` only.
+  - `/fx execute` Durable Quote provider-backed MVP is implemented.
   - Historical implementation-gate detail is archived in `docs/archive/fx-execute-final-implementation-gate.md`.
   - Wallet safety proof must be verified with tests.
-  - Provider-backed execute remains separate and pending.
-  - `provider_api` and `official_batch` are not near-term execute sources.
+  - `provider_api` is the required execute source.
+  - `admin_manual` and `official_batch` are not default execute sources.
 - `/home` live valuation has a separate read-only provider eligibility rule; settled/final result still does not use live provider rows.

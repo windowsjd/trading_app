@@ -11,6 +11,7 @@ import {
 export type FxExecuteCurrency = 'KRW' | 'USD';
 
 export type FxExecuteRequestBodyLike = {
+  quoteId?: unknown;
   fromCurrency?: unknown;
   toCurrency?: unknown;
   sourceAmount?: unknown;

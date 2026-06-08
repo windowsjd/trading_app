@@ -122,6 +122,18 @@ enum OrderStatus {
   rejected
 }
 
+enum QuoteType {
+  fx
+  order
+}
+
+enum QuoteStatus {
+  active
+  consumed
+  expired
+  canceled
+}
+
 enum BatchJobStatus {
   pending
   running
@@ -162,6 +174,7 @@ model User {
   userBadges           UserBadge[]
   seasonRewards        SeasonReward[]
   operatorAuditLogs    OperatorAuditLog[]
+  quotes               Quote[]
 
   @@map("users")
 }
@@ -260,6 +273,7 @@ model SeasonParticipant {
   fxExecuteRequests       FxExecuteRequest[]
   positions               Position[]
   orders                  Order[]
+  quotes                  Quote[]
   dailyPortfolioSnapshots DailyPortfolioSnapshot[]
   seasonRankings          SeasonRanking[]
   seasonRewards           SeasonReward[]
@@ -342,6 +356,7 @@ model Asset {
   priceSnapshots AssetPriceSnapshot[]
   positions      Position[]
   orders         Order[]
+  quotes         Quote[]
 
   @@unique([market, symbol])
   @@index([assetType, market])
@@ -365,6 +380,7 @@ model AssetPriceSnapshot {
 
   asset  Asset   @relation(fields: [assetId], references: [id], onDelete: Restrict)
   orders Order[]
+  quotes Quote[]
 
   @@index([assetId, effectiveAt])
   @@index([assetId, capturedAt])
@@ -396,6 +412,7 @@ model Order {
   id                   String       @id @default(uuid())
   seasonParticipantId  String       @map("season_participant_id")
   assetId              String       @map("asset_id")
+  quoteId              String?      @unique @map("quote_id")
   side                 OrderSide
   orderType            OrderType    @map("order_type")
   status               OrderStatus  @default(submitted)
@@ -421,6 +438,7 @@ model Order {
 
   seasonParticipant  SeasonParticipant   @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
   asset              Asset               @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  quote              Quote?              @relation(fields: [quoteId], references: [id], onDelete: Restrict)
   assetPriceSnapshot AssetPriceSnapshot? @relation(fields: [assetPriceSnapshotId], references: [id], onDelete: Restrict)
   fxRateSnapshot     FxRateSnapshot?     @relation(fields: [fxRateSnapshotId], references: [id], onDelete: Restrict)
 
@@ -428,6 +446,7 @@ model Order {
   @@index([seasonParticipantId, submittedAt])
   @@index([seasonParticipantId, status])
   @@index([assetId])
+  @@index([quoteId])
   @@index([assetPriceSnapshotId])
   @@index([fxRateSnapshotId])
   @@index([submittedAt])
@@ -517,11 +536,58 @@ model FxRateSnapshot {
 
   exchangeTransactions ExchangeTransaction[]
   orders               Order[]
+  quotes               Quote[]
 
   @@index([baseCurrency, quoteCurrency, effectiveAt])
   @@index([baseCurrency, quoteCurrency, capturedAt])
   @@index([sourceType, effectiveAt])
   @@map("fx_rate_snapshots")
+}
+
+model Quote {
+  id                   String       @id @default(uuid())
+  userId               String       @map("user_id")
+  seasonParticipantId  String?      @map("season_participant_id")
+  quoteType            QuoteType    @map("quote_type")
+  status               QuoteStatus  @default(active)
+  assetId              String?      @map("asset_id")
+  side                 OrderSide?
+  orderType            OrderType?   @map("order_type")
+  quantity             Decimal?     @db.Decimal(24, 8)
+  limitPrice           Decimal?     @map("limit_price") @db.Decimal(24, 8)
+  fromCurrency         CurrencyCode? @map("from_currency")
+  toCurrency           CurrencyCode? @map("to_currency")
+  sourceAmount         Decimal?     @map("source_amount") @db.Decimal(24, 8)
+  targetAmount         Decimal?     @map("target_amount") @db.Decimal(24, 8)
+  currencyCode         CurrencyCode? @map("currency_code")
+  quotedPrice          Decimal?     @map("quoted_price") @db.Decimal(24, 8)
+  quotedRate           Decimal?     @map("quoted_rate") @db.Decimal(18, 8)
+  assetPriceSnapshotId String?      @map("asset_price_snapshot_id")
+  fxRateSnapshotId     String?      @map("fx_rate_snapshot_id")
+  assetPriceSourceJson Json?        @map("asset_price_source_json")
+  fxRateSourceJson     Json?        @map("fx_rate_source_json")
+  maxChangeBps         Decimal      @map("max_change_bps") @db.Decimal(10, 4)
+  expiresAt            DateTime     @map("expires_at")
+  requestHash          String       @map("request_hash")
+  consumedAt           DateTime?    @map("consumed_at")
+  createdAt            DateTime     @default(now()) @map("created_at")
+  updatedAt            DateTime     @updatedAt @map("updated_at")
+
+  user               User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  seasonParticipant  SeasonParticipant? @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
+  asset              Asset?             @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  assetPriceSnapshot AssetPriceSnapshot? @relation(fields: [assetPriceSnapshotId], references: [id], onDelete: Restrict)
+  fxRateSnapshot     FxRateSnapshot?    @relation(fields: [fxRateSnapshotId], references: [id], onDelete: Restrict)
+  orders             Order[]
+
+  @@index([userId, createdAt])
+  @@index([seasonParticipantId, createdAt])
+  @@index([quoteType, status, expiresAt])
+  @@index([requestHash])
+  @@index([assetId, createdAt])
+  @@index([fxRateSnapshotId])
+  @@index([assetPriceSnapshotId])
+  @@map("quotes")
 }
 
 model FxExecuteRequest {

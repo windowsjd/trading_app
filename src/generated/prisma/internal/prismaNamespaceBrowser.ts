@@ -67,6 +67,7 @@ export const ModelName = {
   WalletTransaction: 'WalletTransaction',
   ExchangeTransaction: 'ExchangeTransaction',
   FxRateSnapshot: 'FxRateSnapshot',
+  Quote: 'Quote',
   FxExecuteRequest: 'FxExecuteRequest',
   EquitySnapshot: 'EquitySnapshot',
   DailyPortfolioSnapshot: 'DailyPortfolioSnapshot',
@@ -274,6 +275,7 @@ export const OrderScalarFieldEnum = {
   id: 'id',
   seasonParticipantId: 'seasonParticipantId',
   assetId: 'assetId',
+  quoteId: 'quoteId',
   side: 'side',
   orderType: 'orderType',
   status: 'status',
@@ -368,6 +370,39 @@ export const FxRateSnapshotScalarFieldEnum = {
 } as const
 
 export type FxRateSnapshotScalarFieldEnum = (typeof FxRateSnapshotScalarFieldEnum)[keyof typeof FxRateSnapshotScalarFieldEnum]
+
+
+export const QuoteScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  seasonParticipantId: 'seasonParticipantId',
+  quoteType: 'quoteType',
+  status: 'status',
+  assetId: 'assetId',
+  side: 'side',
+  orderType: 'orderType',
+  quantity: 'quantity',
+  limitPrice: 'limitPrice',
+  fromCurrency: 'fromCurrency',
+  toCurrency: 'toCurrency',
+  sourceAmount: 'sourceAmount',
+  targetAmount: 'targetAmount',
+  currencyCode: 'currencyCode',
+  quotedPrice: 'quotedPrice',
+  quotedRate: 'quotedRate',
+  assetPriceSnapshotId: 'assetPriceSnapshotId',
+  fxRateSnapshotId: 'fxRateSnapshotId',
+  assetPriceSourceJson: 'assetPriceSourceJson',
+  fxRateSourceJson: 'fxRateSourceJson',
+  maxChangeBps: 'maxChangeBps',
+  expiresAt: 'expiresAt',
+  requestHash: 'requestHash',
+  consumedAt: 'consumedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type QuoteScalarFieldEnum = (typeof QuoteScalarFieldEnum)[keyof typeof QuoteScalarFieldEnum]
 
 
 export const FxExecuteRequestScalarFieldEnum = {

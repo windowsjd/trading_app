@@ -46,14 +46,14 @@ import {
 describe('provider source eligibility policy', () => {
   const now = new Date('2026-06-03T00:00:00.000Z');
 
-  it('keeps read-only and quote workflows open while write/final workflows stay denied', () => {
+  it('keeps read/quote/execute workflows open while closed financial workflows stay denied', () => {
     expect(isProviderWorkflowAllowed('fx_quote')).toBe(true);
+    expect(isProviderWorkflowAllowed('fx_execute')).toBe(true);
     expect(isProviderWorkflowAllowed('orders_quote')).toBe(true);
+    expect(isProviderWorkflowAllowed('orders_execute')).toBe(true);
     expect(isProviderWorkflowAllowed('home_live_valuation')).toBe(true);
     expect(isProviderWorkflowAllowed('daily_portfolio_snapshot')).toBe(true);
-    expect(isProviderWorkflowDenied('fx_execute')).toBe(true);
     expect(isProviderWorkflowDenied('orders_create')).toBe(true);
-    expect(isProviderWorkflowDenied('orders_execute')).toBe(true);
     expect(isProviderWorkflowDenied('season_ranking')).toBe(true);
     expect(isProviderWorkflowDenied('season_settlement')).toBe(true);
     expect(isProviderWorkflowDenied('reward_final_tier')).toBe(true);
@@ -116,6 +116,21 @@ describe('provider source eligibility policy', () => {
       eligible: true,
       sourceName: PROVIDER_SOURCE_NAMES.cryptoUsd,
     });
+
+    expect(
+      resolveAssetProviderEligibility({
+        workflow: 'orders_execute',
+        asset: {
+          assetType: AssetType.crypto,
+          market: 'BINANCE',
+          currencyCode: CurrencyCode.USD,
+        },
+      }),
+    ).toMatchObject({
+      eligible: true,
+      sourceName: PROVIDER_SOURCE_NAMES.cryptoUsd,
+      freshnessThresholdSeconds: 10,
+    });
   });
 
   it('rejects ineligible asset market/source combinations and denied workflows', () => {
@@ -135,7 +150,7 @@ describe('provider source eligibility policy', () => {
 
     expect(
       resolveAssetProviderEligibility({
-        workflow: 'orders_execute',
+        workflow: 'orders_create',
         asset: {
           assetType: AssetType.crypto,
           market: 'BINANCE',
@@ -177,17 +192,16 @@ describe('provider source eligibility policy', () => {
         baseCurrency: CurrencyCode.USD,
         quoteCurrency: CurrencyCode.KRW,
       }),
-    ).toEqual({
-      eligible: false,
-      reason: 'workflow_ineligible',
+    ).toMatchObject({
+      eligible: true,
+      sourceName: PROVIDER_SOURCE_NAMES.fxUsdKrw,
+      freshnessThresholdSeconds: 60,
     });
   });
 
   it('keeps closed financial workflows provider-ineligible', () => {
     for (const workflow of [
-      'fx_execute',
       'orders_create',
-      'orders_execute',
       'season_ranking',
       'season_settlement',
       'reward_final_tier',

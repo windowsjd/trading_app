@@ -3,7 +3,7 @@
 ## Status
 
 - `GET /api/v1/orders` read-only MVP is implemented.
-- `POST /api/v1/orders/quote` read-only MVP is implemented.
+- `POST /api/v1/orders/quote` durable quote MVP is implemented.
 - `POST /api/v1/orders` submitted order create MVP is implemented.
 - `POST /api/v1/orders` create idempotency MVP is implemented.
 - `POST /api/v1/orders/:orderId/cancel` submitted order cancel MVP is implemented.
@@ -11,10 +11,12 @@
 - `POST /api/v1/orders` creates one `orders` row with `status = submitted`.
 - `POST /api/v1/orders/:orderId/cancel` updates an owned submitted order row to `status = canceled`.
 - `POST /api/v1/orders/:orderId/execute` executes owned submitted orders as a full fill, debits or credits the cash wallet, mutates the position, creates one order wallet transaction, and finalizes the order to `executed`.
-- Quote/create/cancel/list APIs do not execute orders, debit or credit wallets, mutate positions, create wallet transactions, create equity snapshots, run settlement, or synthesize fake order data.
+- Quote creates a durable quote row. Create/cancel/list APIs do not execute orders, debit or credit wallets, mutate positions, create wallet transactions, create equity snapshots, run settlement, or synthesize fake order data.
 - Stored gross/fee/net amounts on submitted orders are pre-execution quote estimates, not confirmed fill amounts.
 - Execute recalculates and stores actual `executedPrice`, `grossAmount`, `feeAmount`, and `netAmount` at execution time.
-- `docs/realtime-execution-policy.md` defines the future provider-backed execute/write policy foundation. It is not wired into current orders create or orders execute services.
+- Orders create binds an active durable quote in `orders.quoteId`.
+- Orders execute uses execute-time fresh provider_api asset price and USD/KRW FX evidence, consumes the durable quote atomically with writes, and forbids default `admin_manual` execute fallback.
+- `docs/realtime-execution-policy.md` defines the active provider-backed execute/write policy.
 
 ## Source Rules
 
@@ -28,8 +30,9 @@
 - Upbit/Bithumb and KRW crypto trading are out of MVP scope.
 - `CurrencyCode.USDT` is not introduced; Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage.
 - Orders quote may use fresh eligible `provider_api` market data first.
-- Orders create and orders execute remain `admin_manual` only for this gate.
-- Current quote is a reference estimate, not a guaranteed execution price. Future provider-backed execute must reprice at execute time from fresh provider_api data, compare against the quote price, and reject excessive movement.
+- Orders create uses the durable quote values to submit the order and does not read provider rows directly.
+- Orders execute requires fresh eligible `provider_api` market data at execute time.
+- Current quote is a reference estimate, not a guaranteed execution price. Provider-backed execute reprices at execute time from fresh provider_api data, compares against the quote price/rate, and rejects excessive movement.
 
 ## Route
 
@@ -153,13 +156,13 @@
 - USD assets use fresh `provider_api` `exchange_rate_api` USD/KRW first, then approved fresh `admin_manual` fallback. Provider FX freshness uses capturedAt age <= 300 seconds; manual fallback uses the existing 60-second rule.
 - Missing, stale, future, non-positive, wrong-source, or ineligible provider rows fall back to the existing safe `admin_manual` quote logic.
 - `POST /api/v1/orders/quote` exposes optional public-safe `assetPriceSource` and `fxRateSource` metadata. Response shape remains backward-compatible and existing snapshot id fields are preserved.
-- Future durable quotes should have a 10-second default TTL candidate; execute after expiry should return `QUOTE_EXPIRED`.
+- Durable quotes have a 10-second default TTL; execute after expiry returns `QUOTE_EXPIRED`.
 - Limit orders use `limitPrice`, so `assetPriceSource.sourceType` is `null` and `fallbackReason` is `limit_price_provided`.
 - Raw provider payloads, `metadataJson`, and secrets are never exposed.
 - USD-settled crypto assets follow the same USD asset rule: order currency is USD, buy/sell resource checks use the USD Wallet, and `krwGrossAmount`/`krwFeeAmount`/`krwNetAmount` are USD amounts converted through USD/KRW.
 - Buy quote validates cash wallet balance read-only.
 - Sell quote validates position quantity read-only.
-- No DB rows are created or mutated.
+- Creates one active `Quote` row with public-safe source metadata and no raw provider payloads or secrets.
 
 ### Response
 
@@ -213,8 +216,9 @@
       "rejectedProviderReason": "<string | null>",
       "freshnessAgeSeconds": 12
     },
-    "quoteId": null,
-    "expiresAt": null,
+    "quoteId": "<string>",
+    "expiresAt": "<UTC ISO string>",
+    "maxChangeBps": "<bps string>",
     "quoteAt": "<UTC ISO string>"
   }
 }
@@ -236,6 +240,7 @@ Same body as `POST /api/v1/orders/quote`.
   "quantity": "<decimal string>",
   "limitPrice": "<amount string, required for limit>",
   "currencyCode": "KRW | USD optional",
+  "quoteId": "<string>",
   "idempotencyKey": "<non-empty string>"
 }
 ```
@@ -243,8 +248,9 @@ Same body as `POST /api/v1/orders/quote`.
 ### Behavior
 
 - Validates `idempotencyKey` after auth and order body parsing.
+- New create requires `quoteId` after idempotency replay checks.
 - Idempotency applies only to `POST /api/v1/orders` create.
-- `POST /api/v1/orders/quote` is read-only and does not require or store an idempotency key.
+- `POST /api/v1/orders/quote` creates a durable quote row but does not require or store an idempotency key.
 - `POST /api/v1/orders/:orderId/cancel` does not require or store an idempotency key in this MVP.
 - The request hash is SHA-256 over canonical JSON for:
   - `assetId`
@@ -254,6 +260,7 @@ Same body as `POST /api/v1/orders/quote`.
   - `limitPrice`
   - `currencyCode`
 - `idempotencyKey` is excluded from the request hash.
+- `quoteId` is excluded from the create idempotency request hash. Quote/request integrity is enforced through the stored quote requestHash.
 - Same `seasonParticipantId + idempotencyKey` and same request hash replays the stored create response without creating a second order.
 - Same `seasonParticipantId + idempotencyKey` and different request hash returns `ORDER_IDEMPOTENCY_CONFLICT`.
 - DB unique constraint `(season_participant_id, idempotency_key)` prevents duplicate submitted order rows under races.
@@ -263,10 +270,10 @@ Same body as `POST /api/v1/orders/quote`.
 - Replay prefers stored `orders.response_payload_json`.
 - If stored response is missing, replay falls back to formatting the existing order row.
 - If an order was later canceled, duplicate create replay still prefers the original stored create response. This can show the original submitted create response rather than current canceled status; a stricter current-state command history would require a separate idempotency command table.
-- New create runs the same validation and quote calculation as `POST /api/v1/orders/quote`.
-- New create is closed to `provider_api`; it uses the existing `admin_manual` asset price and FX selection even if fresh provider rows exist.
-- Create response does not add quote source metadata; create remains a write path with provider_api closed.
-- Future provider-backed create/execute must not infer a fixed fill price from create-time quote values. Create-time financial values remain estimates unless a later durable quote schema explicitly changes this contract.
+- New create validates the active durable quote by id, user, participant, asset, side, orderType, quantity, limitPrice, currencyCode, expiry, status, and quote requestHash.
+- New create is closed to direct provider source selection; it uses the durable quote persisted by `POST /api/v1/orders/quote`.
+- Create response includes `order.quoteId` through the standard order item.
+- Create-time financial values remain estimates. Execute-time provider repricing determines the actual fill values.
 - Creates exactly one `orders` row with `status = submitted`.
 - Stores `idempotencyKey`, `requestHash`, and `responsePayloadJson` on that order row.
 - Does not execute the order.
@@ -357,22 +364,27 @@ Same body as `POST /api/v1/orders/quote`.
   - `orders.responsePayloadJson`
 - Already executed duplicate response is not an exact original execute replay. It is a current-state order response from the current row.
 - Submitted order gross/fee/net values are estimates only. Execute recalculates actual values and stores them on the order.
-- Market orders select the latest eligible `admin_manual` asset price snapshot:
+- Execute requires `order.quoteId` and active matching `order.quote`.
+- Expired quotes return `QUOTE_EXPIRED`; consumed/non-active quotes return `QUOTE_NOT_ACTIVE`; mismatched quotes return `QUOTE_MISMATCH`.
+- Market orders select a fresh eligible provider_api asset price snapshot:
   - same asset.
   - same currency.
-  - `sourceType = admin_manual`.
+  - `sourceType = provider_api`.
+  - expected sourceName by asset class/market.
   - `price > 0`.
+  - `capturedAt <= executedAt`.
   - `effectiveAt <= executedAt`.
+  - `executedAt - capturedAt <= 10_000ms`.
   - ordered by `effectiveAt desc`, `capturedAt desc`, `createdAt desc`.
 - Limit orders use the same latest eligible market snapshot at execution time:
   - buy executes only when selected price `<= limitPrice`.
   - sell executes only when selected price `>= limitPrice`.
   - `executedPrice` is the selected snapshot price, not the submitted `limitPrice`.
-- Future provider-backed limit execute keeps the same marketability rule but selects the execute-time provider price, not the quote price.
+- Market orders compare quote `quotedPrice` against execute price using `quote.maxChangeBps`; excessive movement returns `PRICE_CHANGED_REQUOTE_REQUIRED`.
 - USD orders debit or credit the USD wallet. FX is not used to convert wallet amounts.
-- USD orders still select an approved fresh `admin_manual` USD/KRW snapshot for audit consistency and store `fxRateSnapshotId`.
-- Execute is closed to `provider_api`; fresh provider rows must not power execute pricing or audit FX.
-- Future provider-backed execute must use fresh provider_api at execute time, forbid default `admin_manual` fallback, and reject quote-to-execute movement beyond max bps with `PRICE_CHANGED_REQUOTE_REQUIRED`.
+- USD orders select a fresh eligible provider_api USD/KRW snapshot for audit/KRW evidence and store `fxRateSnapshotId`.
+- If quote had `quotedRate`, USD FX movement beyond 30 bps returns `RATE_CHANGED_REQUOTE_REQUIRED`.
+- Execute forbids default `admin_manual` fallback. Provider missing/stale/unavailable returns provider error before wallet/position mutation.
 - Binance crypto USD orders are USD orders for wallet/position/ledger purposes.
 - KRW orders store `fxRateSnapshotId = null`.
 - Buy execute:
@@ -388,6 +400,7 @@ Same body as `POST /api/v1/orders/quote`.
   - creates one `wallet_transactions` row with `direction = credit`, `txType = order_sell`, `referenceType = order`.
   - finalizes order to `executed` with actual execution fields.
 - Wallet mutation, position mutation, wallet transaction creation, and order finalization run in one Prisma transaction.
+- Quote consume runs in the same Prisma transaction before wallet/position/order mutation; if consume fails, the transaction rolls back and returns `QUOTE_NOT_ACTIVE`.
 - Guarded order finalization uses `id + seasonParticipantId + status = submitted`.
 - If finalization affects zero rows after prior writes inside the transaction, execute returns `ORDER_EXECUTION_CONFLICT` and rolls back all prior writes.
 - Execute creates no `equity_snapshots`, no `daily_portfolio_snapshots`, no `season_rankings`, no settlement rows, no scheduler/provider calls, and no separate fee wallet transaction row.
@@ -405,7 +418,16 @@ Same body as `POST /api/v1/orders/quote`.
     "execution": {
       "state": "executed",
       "executedAt": "<UTC ISO string>",
-      "priceSource": "admin_manual",
+      "priceSource": "provider_api",
+      "quoteId": "<string>",
+      "quotedPrice": "<amount string>",
+      "executePrice": "<amount string>",
+      "priceChangeBps": "<bps string | null>",
+      "quotedRate": "<amount string | null>",
+      "executeRate": "<amount string | null>",
+      "rateChangeBps": "<bps string | null>",
+      "assetPriceSource": "<public-safe source metadata | null>",
+      "fxRateSource": "<public-safe source metadata | null>",
       "assetPriceSnapshotId": "<string>",
       "fxRateSnapshotId": "<string | null>",
       "walletTransactionId": "<string>",
@@ -427,7 +449,16 @@ Same body as `POST /api/v1/orders/quote`.
     "execution": {
       "state": "already_executed",
       "executedAt": "<UTC ISO string | null>",
-      "priceSource": "admin_manual",
+      "priceSource": "provider_api",
+      "quoteId": "<string | null>",
+      "quotedPrice": "<amount string | null>",
+      "executePrice": "<amount string | null>",
+      "priceChangeBps": null,
+      "quotedRate": "<amount string | null>",
+      "executeRate": null,
+      "rateChangeBps": null,
+      "assetPriceSource": null,
+      "fxRateSource": null,
       "assetPriceSnapshotId": "<string | null>",
       "fxRateSnapshotId": "<string | null>",
       "walletTransactionId": null,
@@ -449,6 +480,19 @@ Same body as `POST /api/v1/orders/quote`.
 - `ORDER_NOT_EXECUTABLE`
 - `ORDER_EXECUTION_CONFLICT`
 - `ORDER_PRICE_UNAVAILABLE`
+- `PROVIDER_PRICE_UNAVAILABLE`
+- `PROVIDER_PRICE_STALE`
+- `PROVIDER_RATE_UNAVAILABLE`
+- `PROVIDER_RATE_STALE`
+- `PRICE_CHANGED_REQUOTE_REQUIRED`
+- `RATE_CHANGED_REQUOTE_REQUIRED`
+- `EXECUTION_SOURCE_INELIGIBLE`
+- `EXECUTION_PROVIDER_REQUIRED`
+- `QUOTE_REQUIRED`
+- `QUOTE_NOT_FOUND`
+- `QUOTE_NOT_ACTIVE`
+- `QUOTE_EXPIRED`
+- `QUOTE_MISMATCH`
 - `ORDER_LIMIT_NOT_MARKETABLE`
 - `ORDER_CASH_WALLET_NOT_FOUND`
 - `ORDER_POSITION_NOT_FOUND`
@@ -479,11 +523,9 @@ Same body as `POST /api/v1/orders/quote`.
 
 ## Not Implemented
 
-- Durable order quote.
 - Partial fills.
 - Matching engine.
 - Execute-specific exact response replay.
-- Provider price ingestion.
 - Scheduler/batch.
 - Settlement.
 - Equity snapshot creation from order execution.

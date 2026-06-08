@@ -1,8 +1,40 @@
 # Provider API Source Eligibility Pre-Gate
 
-Status: historical pre-gate draft; superseded by the 2026-06-03 KST read-only/quote implementation gate and the 2026-06-05 KST operator-run daily snapshot eligibility gate.
+Status: historical pre-gate draft; superseded by the 2026-06-03 KST read-only/quote implementation gate, the 2026-06-05 KST operator-run daily snapshot eligibility gate, and the 2026-06-08 KST Durable Quote provider execute gate.
 
 Date: 2026-05-30 KST.
+
+## 0.1 Implementation Update On 2026-06-08 KST
+
+The Durable Quote provider execute gate is implemented.
+
+Additional opened provider_api workflows:
+
+- `fx_execute`
+- `orders_execute`
+
+Still closed workflows/surfaces:
+
+- `orders_create` provider source selection. Orders create binds an active durable quote and creates a submitted order only.
+- `season_ranking`
+- `season_settlement`
+- `reward_final_tier`
+- `reward_fulfillment`
+- scheduler/cron, provider ingestion trigger APIs, batch HTTP APIs, and real trading/account/order/deposit/withdrawal APIs
+
+Execute provider freshness:
+
+- KRX domestic stock, NAS/NYS US stock, and BINANCE USD crypto execute prices require `capturedAt` age <= 10 seconds.
+- USD/KRW execute FX requires `capturedAt` age <= 60 seconds.
+- Execute requires `sourceType=provider_api`, the expected `sourceName`, positive value, `effectiveAt <= executeNow`, and `capturedAt <= executeNow`.
+- Default `admin_manual` execute fallback is forbidden.
+
+Durable Quote behavior:
+
+- `/fx quote` and orders quote persist active `Quote` rows and return `quoteId`, `expiresAt`, and `maxChangeBps`.
+- `/fx execute` and orders execute validate quote ownership, active status, expiry, requestHash, and request field match before repricing.
+- Successful execute consumes the quote atomically with wallet/order/position/ledger writes.
+- Missing/stale provider rows, quote mismatch/expired/consumed, and movement beyond threshold fail closed.
 
 ## 0. Implementation Update On 2026-06-03 KST
 
@@ -193,9 +225,10 @@ Pre-gate policy draft was GO.
 
 Implementation is now GO only for the read-only/quote workflows and
 operator-run daily snapshot valuation workflow listed in section 0.
-`provider_api` source eligibility remains closed for execute/write, ranking,
-settlement, reward, automation, provider trigger, batch HTTP API, and real
-trading/account surfaces.
+`provider_api` source eligibility remains closed for orders create source
+selection, ranking, settlement, reward, automation, provider trigger, batch
+HTTP API, and real trading/account surfaces. `/fx execute` and orders execute
+are now open only through the 2026-06-08 Durable Quote provider execute gate.
 
 The next execute/write gate has a separate policy foundation in
 `docs/realtime-execution-policy.md`. Quote is a reference quote, execute must

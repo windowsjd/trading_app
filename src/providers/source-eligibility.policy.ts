@@ -10,17 +10,17 @@ export const PROVIDER_SOURCE_NAMES = {
 
 export type ProviderEligibleWorkflow =
   | 'fx_quote'
+  | 'fx_execute'
   | 'assets_with_price'
   | 'orders_quote'
+  | 'orders_execute'
   | 'live_portfolio_valuation'
   | 'home_live_valuation'
   | 'positions_live_valuation'
   | 'daily_portfolio_snapshot';
 
 export type ProviderDeniedWorkflow =
-  | 'fx_execute'
   | 'orders_create'
-  | 'orders_execute'
   | 'season_ranking'
   | 'season_settlement'
   | 'reward_final_tier'
@@ -75,8 +75,10 @@ export type ProviderAssetCandidate = {
 
 const ALLOWED_WORKFLOWS: ReadonlySet<ProviderEligibleWorkflow> = new Set([
   'fx_quote',
+  'fx_execute',
   'assets_with_price',
   'orders_quote',
+  'orders_execute',
   'live_portfolio_valuation',
   'home_live_valuation',
   'positions_live_valuation',
@@ -84,9 +86,7 @@ const ALLOWED_WORKFLOWS: ReadonlySet<ProviderEligibleWorkflow> = new Set([
 ]);
 
 const DENIED_WORKFLOWS: ReadonlySet<ProviderDeniedWorkflow> = new Set([
-  'fx_execute',
   'orders_create',
-  'orders_execute',
   'season_ranking',
   'season_settlement',
   'reward_final_tier',
@@ -95,7 +95,9 @@ const DENIED_WORKFLOWS: ReadonlySet<ProviderDeniedWorkflow> = new Set([
 
 export const PROVIDER_FRESHNESS_THRESHOLDS_SECONDS = {
   fxUsdKrw: 300,
+  fxUsdKrwExecute: 60,
   assetPrice: 60,
+  assetPriceExecute: 10,
 } as const;
 
 export function isProviderWorkflowAllowed(
@@ -135,7 +137,10 @@ export function resolveFxProviderEligibility(input: {
   return {
     eligible: true,
     sourceName: PROVIDER_SOURCE_NAMES.fxUsdKrw,
-    freshnessThresholdSeconds: PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.fxUsdKrw,
+    freshnessThresholdSeconds:
+      input.workflow === 'fx_execute' || input.workflow === 'orders_execute'
+        ? PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.fxUsdKrwExecute
+        : PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.fxUsdKrw,
   };
 }
 
@@ -163,7 +168,9 @@ export function resolveAssetProviderEligibility(input: {
       eligible: true,
       sourceName: PROVIDER_SOURCE_NAMES.domesticStockKrx,
       freshnessThresholdSeconds:
-        PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.assetPrice,
+        input.workflow === 'orders_execute'
+          ? PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.assetPriceExecute
+          : PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.assetPrice,
     };
   }
 
@@ -176,7 +183,9 @@ export function resolveAssetProviderEligibility(input: {
       eligible: true,
       sourceName: PROVIDER_SOURCE_NAMES.usStock,
       freshnessThresholdSeconds:
-        PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.assetPrice,
+        input.workflow === 'orders_execute'
+          ? PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.assetPriceExecute
+          : PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.assetPrice,
     };
   }
 
@@ -189,7 +198,9 @@ export function resolveAssetProviderEligibility(input: {
       eligible: true,
       sourceName: PROVIDER_SOURCE_NAMES.cryptoUsd,
       freshnessThresholdSeconds:
-        PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.assetPrice,
+        input.workflow === 'orders_execute'
+          ? PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.assetPriceExecute
+          : PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.assetPrice,
     };
   }
 

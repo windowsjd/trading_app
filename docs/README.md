@@ -27,13 +27,13 @@ Use this directory in this order:
    - `docs/asset-universe-2026-ytd-volume-selection.md`
    - `docs/provider-source-eligibility-pre-gate.md`
 
-Provider evidence currently has ExchangeRate-API and Binance row insertion evidence, KIS domestic `H0STCNT0` row insertion evidence, and KIS US `HDFSCNT0` tick/DB insertion evidence. Provider_api source eligibility is open only for the read-only/quote gate plus operator-run daily portfolio snapshot valuation: `/fx quote`, assets `withPrice`, orders quote, live portfolio/home/positions valuation, and daily snapshot valuation.
+Provider evidence currently has ExchangeRate-API and Binance row insertion evidence, KIS domestic `H0STCNT0` row insertion evidence, and KIS US `HDFSCNT0` tick/DB insertion evidence. Provider_api source eligibility is open only for explicitly allowed workflows: `/fx quote`, `/fx execute`, assets `withPrice`, orders quote, orders execute, live portfolio/home/positions valuation, and operator-run daily portfolio snapshot valuation. Orders create binds a durable quote and does not read provider rows directly.
 
 Read-only/quote source metadata is exposed as backward-compatible optional fields such as `rateSource`, `priceSource`, `assetPriceSource`, `fxRateSource`, and live valuation `sourceSummary`. Daily snapshot batch results include public-safe aggregate `sourceSummary`/fallback information in `batch_job_runs.resultPayloadJson`. These fields contain public-safe source type/name/snapshot/timing/fallback reasons only; raw provider payloads and secrets remain excluded.
 
-Provider_api remains closed for `/fx execute`, orders create/execute, ranking, settlement/final result, reward/final tier/fulfillment, scheduler/cron, provider ingestion trigger APIs, batch HTTP APIs, and real trading/account/order/deposit/withdrawal APIs.
+Provider_api remains closed for orders create source selection, ranking, settlement/final result, reward/final tier/fulfillment, scheduler/cron, provider ingestion trigger APIs, batch HTTP APIs, and real trading/account/order/deposit/withdrawal APIs.
 
-`docs/realtime-execution-policy.md` records the next execute/write foundation: quote is only a reference quote, future provider-backed execute must reprice from fresh provider_api at execute time, enforce quote-to-execute bps thresholds, and forbid default `admin_manual` execute fallback. The policy is documented and pure-function tested, but not wired into current execute/write services.
+`docs/realtime-execution-policy.md` records the active Durable Quote provider execute policy: quote is only a reference quote, `/fx execute` and orders execute reprice from fresh provider_api at execute time, enforce quote-to-execute bps thresholds, consume quotes atomically with writes, and forbid default `admin_manual` execute fallback.
 
 6. Admin/operator authorization and audit foundation:
 

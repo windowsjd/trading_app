@@ -4,7 +4,7 @@
 
 This document fixes the near-term freshness and source policy for FX and asset price snapshots before provider ingestion, scheduler/batch, ranking automation, settlement, or reward implementation.
 
-This policy records freshness and source boundaries after provider ingestion foundation, the read-only/quote provider eligibility gate, the operator-run daily snapshot eligibility gate, and the realtime execution policy foundation. It does not authorize package, Prisma schema, migration, seed, scheduler, settlement, reward, durable quote, order replay, partial fill, matching-engine changes, or provider_api source eligibility changes outside the approved read-only/quote plus daily snapshot valuation workflows.
+This policy records freshness and source boundaries after provider ingestion foundation, the read-only/quote provider eligibility gate, the operator-run daily snapshot eligibility gate, and the 2026-06-08 Durable Quote provider execute gate. It does not authorize package, seed, scheduler, settlement, reward, order replay, partial fill, matching-engine changes, or provider_api source eligibility changes outside the explicitly approved workflows.
 
 2026-05-26 update:
 
@@ -12,8 +12,8 @@ This policy records freshness and source boundaries after provider ingestion fou
 - KIS WebSocket trade price ingestion foundation can insert `provider_api` asset price rows for domestic KRX `H0STCNT0` and US delayed/free `HDFSCNT0` trades when existing active asset mapping is unambiguous.
 - Provider API Source Eligibility Implementation Gate later opened provider_api only for `/fx quote`, assets `withPrice`, orders quote, and live portfolio/home/positions valuation.
 - Provider-backed Daily Snapshot Eligibility Gate later opened provider_api only for operator-run daily snapshot valuation, using the same provider sourceName allowlist and freshness thresholds.
-- `docs/realtime-execution-policy.md` now defines the stricter future execute/write freshness and quote-to-execute movement policy: KRX/US/BINANCE asset execute freshness <= 10 seconds by `capturedAt`, USD/KRW FX execute freshness <= 60 seconds by `capturedAt`, no default admin_manual execute fallback, and quote is only a reference quote.
-- `/fx execute`, orders create/execute, ranking, settlement/final result, reward/final tier/fulfillment, scheduler/cron, provider trigger APIs, KIS REST current-price ingestion, orderbook/hoga WebSocket ingestion, and order/account/balance/real-trading APIs remain closed.
+- `docs/realtime-execution-policy.md` now defines and the services implement the stricter execute/write freshness and quote-to-execute movement policy for `/fx execute` and orders execute: KRX/US/BINANCE asset execute freshness <= 10 seconds by `capturedAt`, USD/KRW FX execute freshness <= 60 seconds by `capturedAt`, no default admin_manual execute fallback, and quote is only a reference quote.
+- Orders create source selection, ranking, settlement/final result, reward/final tier/fulfillment, scheduler/cron, provider trigger APIs, KIS REST current-price ingestion, orderbook/hoga WebSocket ingestion, and order/account/balance/real-trading APIs remain closed.
 
 ## 2. Current Price Storage Model
 
@@ -34,8 +34,8 @@ Current schema stores market evidence in two snapshot tables:
 Current code behavior:
 
 - `/fx quote` reads fresh eligible `provider_api` `exchange_rate_api` USD/KRW first using capturedAt age <= 300 seconds, then existing safe `admin_manual` fallback with the established 60-second effectiveAt freshness rule.
-- `/fx execute` allows only approved fresh `admin_manual` USD/KRW snapshots and applies the same 60-second threshold.
-- Orders quote can use fresh eligible `provider_api` asset price and USD/KRW rows first, then `admin_manual` fallback. Orders create/execute remain `admin_manual` only.
+- `/fx execute` requires a matching active durable FX quote and a fresh eligible `provider_api` `exchange_rate_api` USD/KRW row with capturedAt age <= 60 seconds. Default `admin_manual` fallback is forbidden.
+- Orders quote can use fresh eligible `provider_api` asset price and USD/KRW rows first, then `admin_manual` fallback. Orders create binds an active durable quote but does not read provider rows directly. Orders execute requires fresh eligible provider asset rows with capturedAt age <= 10 seconds and fresh provider USD/KRW rows for USD assets with capturedAt age <= 60 seconds; default `admin_manual` fallback is forbidden.
 - Assets `withPrice`, live portfolio/home/positions valuation, and operator-run daily snapshot valuation can use fresh eligible `provider_api` asset price and USD/KRW rows first, then `admin_manual` fallback.
 - Daily snapshot valuation stores source evidence in the batch job result `sourceSummary`; `daily_portfolio_snapshots` row schema is unchanged.
 - Ranking APIs read existing `season_rankings`; they do not fetch or calculate prices.
@@ -76,17 +76,17 @@ Policy meanings:
 Current confirmed policy:
 
 - `/fx quote`: provider USD/KRW snapshot must be positive, not future-dated, sourceName `exchange_rate_api`, and at most 300 seconds old by `capturedAt`; admin_manual fallback must be at most 60 seconds old by `effectiveAt`.
-- `/fx execute`: USD/KRW snapshot must be at most 60 seconds old by `effectiveAt` at execute time.
+- `/fx execute`: provider USD/KRW snapshot must be at most 60 seconds old by `capturedAt` at execute time.
 - Exactly 60 seconds is accepted; older than 60 seconds is stale.
 - Current quote source is fresh provider_api first, then explicit admin_manual fallback.
-- Current execute source is approved `admin_manual` only.
+- Current execute source is fresh eligible `provider_api` only; default `admin_manual` fallback is forbidden.
 
 Future provider policy:
 
 - OANDA is the conditional primary FX provider candidate.
 - Twelve Data is the conditional secondary FX provider candidate.
 - `provider_api` USD/KRW requires provider timestamp -> `effectiveAt`, server receipt -> `capturedAt`, fixed rate basis, sourceType/sourceName correctness, stale response rejection, and no fake/static fallback.
-- `/fx quote` now uses fresh eligible provider_api first with admin_manual fallback after the read-only/quote eligibility gate. Execute remains admin_manual only until a separate realtime execution gate implements provider-required execute-time repricing and `RATE_CHANGED_REQUOTE_REQUIRED`.
+- `/fx quote` uses fresh eligible provider_api first with admin_manual fallback after the read-only/quote eligibility gate. `/fx execute` now implements provider-required execute-time repricing and `RATE_CHANGED_REQUOTE_REQUIRED`.
 
 ## 6. Domestic Stock Freshness Policy
 
@@ -94,11 +94,11 @@ Current implementation:
 
 - Domestic stock asset prices use `admin_manual` snapshots when present.
 - There is no implemented asset-price stale threshold.
-- KIS WebSocket `H0STCNT0` can insert `provider_api` KRX trade-price rows for existing active KRW domestic stock assets. Fresh matching rows are eligible only for the approved read-only/quote workflows and operator-run daily snapshot valuation; execute/write, ranking, settlement, and reward paths remain closed.
+- KIS WebSocket `H0STCNT0` can insert `provider_api` KRX trade-price rows for existing active KRW domestic stock assets. Fresh matching rows are eligible for approved read-only/quote workflows, orders execute, and operator-run daily snapshot valuation; ranking, settlement, and reward paths remain closed.
 
 Policy decision:
 
-- KRX market-open quote/execute remains BLOCKED for `provider_api` until source eligibility, freshness thresholds, live smoke evidence, and product/legal acceptance are approved.
+- KRX market-open quote and orders execute are open only through explicit provider eligibility and durable quote gates. Other write/final uses remain BLOCKED until separately approved.
 - Twelve Data is not accepted as KRX quote/execute provider in the current re-check because checked official coverage identifies Korea Stock Exchange and KOSDAQ as EOD delay, not real-time quote/execute-grade coverage.
 - Delayed/EOD domestic data may be considered for daily/reference valuation only if product and settlement policy accept that behavior in a later gate.
 - `official_batch` may be a domestic close/reference candidate after a batch/source gate, not a market-open execute source.
@@ -111,11 +111,11 @@ Current implementation:
 - There is no implemented asset-price stale threshold.
 - USD assets require fresh approved USD/KRW for KRW valuation/audit consistency.
 - KIS WebSocket `HDFSCNT0` can insert `provider_api` US trade-price rows for existing active USD US stock assets with NAS/NYS/AMS market mapping. KIS documents US free quotes as 0-minute delayed; Hong Kong, Vietnam, China, and Japan 15-minute delayed markets are skipped in this MVP foundation.
-- KIS US provider_api rows are eligible only for the approved read-only/quote workflows after the 2026-06-03 source eligibility gate and operator-run daily snapshot valuation after the 2026-06-05 gate. Execute/write, ranking, settlement, and reward paths remain closed.
+- KIS US provider_api rows are eligible only for the approved read-only/quote workflows after the 2026-06-03 source eligibility gate, operator-run daily snapshot valuation after the 2026-06-05 gate, and orders execute after the 2026-06-08 Durable Quote provider execute gate. Ranking, settlement, and reward paths remain closed.
 
 Target policy after provider ingestion:
 
-- During regular market hours, quote/read workflows use the current approved freshness rules. Future execute/write must use the stricter 10-second provider capturedAt threshold from `docs/realtime-execution-policy.md`.
+- During regular market hours, quote/read workflows use the current approved freshness rules. Orders execute uses the stricter 10-second provider capturedAt threshold from `docs/realtime-execution-policy.md`.
 - Delayed data must not power market-open quote/execute unless product explicitly accepts delayed virtual trading behavior.
 - During market closed periods, the latest regular-session close may be allowed for read-only valuation and daily snapshots, but must not be mislabeled as live executable price.
 - Twelve Data is a conditional US stock provider candidate through `/quote` or WebSocket evidence with usable timestamp fields. `/price` alone is not sufficient because it lacks timestamp evidence in the checked official docs.
@@ -134,7 +134,7 @@ Target policy after provider ingestion:
 - MVP crypto is USD-settled and uses the USD Wallet.
 - Crypto KRW valuation is crypto USD value converted with USD/KRW.
 - Upbit/Bithumb are excluded from the MVP provider stack.
-- Quote/read workflows use the current approved freshness rules. Future execute/write must use the stricter 10-second provider capturedAt threshold from `docs/realtime-execution-policy.md`.
+- Quote/read workflows use the current approved freshness rules. Orders execute uses the stricter 10-second provider capturedAt threshold from `docs/realtime-execution-policy.md`.
 - Home live valuation should require a provider timestamp no older than 60 seconds.
 - Daily snapshot capture should use a timestamp close to the scheduled capture time, with a maximum provider age of 5 minutes unless a later gate narrows it.
 - Binance `BTCUSDT` ticker/orderbook public fixtures were captured in Gate C prep; mapping remains conditional.

@@ -13,32 +13,31 @@ This service owns backend APIs, database access, financial calculations, and ser
 - Home as one aggregate API.
 - Home settled final-result read model from existing `rankType=final` `season_rankings`.
 - Wallets, records, ranking, and orders read APIs.
-- FX quote and execute for KRW/USD using approved `admin_manual` FX snapshots.
-- Submitted order create, cancel, and full-fill execute MVP.
+- FX quote stores durable quotes; FX execute consumes durable quotes and reprices at execute time from fresh `provider_api` ExchangeRate-API USD/KRW rows.
+- Orders quote stores durable quotes; submitted order create binds an active durable quote; full-fill order execute consumes the quote and reprices at execute time from fresh `provider_api` asset/FX rows.
 - KRW and USD cash wallets. US stocks and USD-settled crypto use the USD wallet.
 - Final valuation policy is KRW total assets.
 - Provider ingestion foundation exists for operator-run ExchangeRate-API USD/KRW, Binance public REST crypto, and KIS WebSocket KRX/US stock market data row insertion.
-- Provider_api source eligibility is opened only for explicitly allowed read-only/quote workflows and the operator-run daily portfolio snapshot valuation job: `/fx quote`, assets `withPrice`, orders quote, live portfolio/home/positions valuation, and daily snapshot valuation.
+- Provider_api source eligibility is opened only for explicitly allowed workflows: `/fx quote`, `/fx execute`, assets `withPrice`, orders quote, orders execute, live portfolio/home/positions valuation, and the operator-run daily portfolio snapshot valuation job. Orders create binds durable quotes but does not read provider rows directly.
 - Read-only/quote responses expose backward-compatible optional source metadata for provider/admin visibility: `rateSource`, `priceSource`, `assetPriceSource`, `fxRateSource`, and live valuation source summaries where applicable.
 - Batch job execution foundation with idempotent `batch_job_runs` recording, operator-only noop/health-check script, operator-run daily portfolio snapshot generation, operator-run season ranking generation from existing daily snapshots, an operator-run daily season cycle orchestration job, an operator-run season settlement MVP job, and an operator-run reward grant marker MVP job.
 - Daily portfolio snapshot batch results include sourceSummary/fallback metadata in `batch_job_runs.resultPayloadJson`; `daily_portfolio_snapshots` row schema is unchanged.
-- Realtime execution policy foundation is documented and pure-function tested for future provider-backed execute/write gates. Quote remains a reference quote; future execute must reprice from fresh provider_api, enforce quote-to-execute bps thresholds, and forbid default admin_manual execute fallback.
+- Durable Quote plus realtime provider execute is implemented for `/fx execute` and orders execute. Quote remains a reference quote; execute reprices from fresh provider_api rows, enforces quote-to-execute bps thresholds, and forbids default admin_manual execute fallback.
 - Operator-run final tier assignment MVP job from existing final `season_rankings`.
 
 ## STOP / Not Implemented
 
 These are intentionally outside the current implementation and should not be added without a separate gate:
 
-- Provider ingestion trigger APIs, scheduler-driven provider ingestion, and provider-backed write/final workflows.
+- Provider ingestion trigger APIs, scheduler-driven provider ingestion, and provider-backed final/ranking/reward workflows.
 - OANDA and Twelve Data are historical/fallback provider candidates only, not the current MVP core provider stack.
 - Admin/operator account management APIs, batch run HTTP APIs, scheduler/cron, and reward fulfillment trigger APIs.
 - Cron scheduler, scheduler-driven snapshot/ranking jobs, settlement extension jobs beyond final tier assignment, or actual reward fulfillment jobs.
-- Provider-backed FX execute, order create, order execute, ranking, settlement recalculation, or reward automation.
+- Provider-backed ranking, settlement recalculation, or reward automation.
 - KIS order/account/balance/fill/deposit/withdrawal APIs, KIS orderbook/hoga, Binance authenticated/order/account/user-data APIs, and real external trading/account integrations.
 - Actual payment, point, badge, or trophy fulfillment beyond the `rewardGrantedAt` marker MVP.
 - Access token blacklist/revocation, server-side session auth, and cookie auth.
-- Matching engine, partial fill, durable quote, or exact order execute replay.
-- Provider-backed realtime execute/write behavior. The policy foundation exists, but current `/fx execute`, orders create, and orders execute remain provider_api closed.
+- Matching engine, partial fill, or exact order execute replay.
 - Fake, static, sample, temporary, or fallback business price data.
 
 ## Environment Variables
@@ -69,7 +68,7 @@ docker compose up -d
 pnpm start:dev
 ```
 
-Do not print or commit provider API keys or local env contents. Provider row insertion foundation exists, but provider-backed execute, settlement, automation, and real account/order APIs remain STOP.
+Do not print or commit provider API keys or local env contents. Provider row insertion foundation exists, and provider-backed execute is open only through durable quote gates; settlement, automation, and real account/order APIs remain STOP.
 
 ## Tests
 
@@ -166,13 +165,13 @@ Possible now:
 - Operator-run final tier assignment MVP jobs that assign final rank/tier from existing final `season_rankings`.
 - Operator-run reward grant marker MVP jobs that set `SeasonParticipant.rewardGrantedAt` after settlement and final tier assignment.
 - Settled joined Home final-result reads from existing `rankType=final` `season_rankings`; missing final rankings return unavailable without live valuation fallback.
-- Provider_api-backed `/fx quote`, assets `withPrice`, orders quote, and live portfolio/home/positions valuation with fresh provider-first selection and explicit admin_manual fallback.
+- Durable Quote-backed `/fx quote`, `/fx execute`, orders quote/create/execute, plus provider_api-backed assets `withPrice` and live portfolio/home/positions valuation. Quote/read paths can use explicit admin_manual fallback; execute paths require fresh provider_api and reject default admin_manual fallback.
 - Source metadata/outage visibility for those read-only/quote responses and daily snapshot batch results without exposing raw provider payloads or secrets.
 
 Not possible without a separate provider/write or automation gate:
 
 - Cron scheduler-driven snapshots/rankings.
-- Provider-backed FX execute, order create, order execute, ranking, settlement, or reward automation.
+- Provider-backed ranking, settlement, or reward automation.
 - Actual payment, point, badge, or trophy fulfillment.
 
 Never create fake/static/sample business prices to make a test or local flow pass.

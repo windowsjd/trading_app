@@ -4,6 +4,8 @@ import {
   FxExecuteRequestStatus,
   FxRateSourceType,
   Prisma,
+  QuoteStatus,
+  QuoteType,
   SeasonStatus,
   WalletTransactionDirection,
   WalletTransactionReferenceType,
@@ -36,6 +38,7 @@ import {
 import {
   buildAdminManualFallbackDecision,
   isPositiveDecimal,
+  PROVIDER_SOURCE_NAMES,
   resolveFxProviderEligibility,
   selectFreshProviderSnapshot,
   type SourceDecision,
@@ -44,6 +47,14 @@ import {
   presentSourceDecision,
   type PublicSourceMetadata,
 } from '../providers/source-metadata.presenter';
+import {
+  buildQuoteExpiresAt,
+  computeFxQuoteRequestHash,
+} from '../providers/durable-quote.policy';
+import {
+  calculateChangeBps,
+  resolveDefaultMaxChangeBps,
+} from '../providers/realtime-execution-policy';
 
 export type FxQuoteRequestBody = {
   fromCurrency?: unknown;
@@ -68,6 +79,12 @@ export type FxExecuteSuccessResponse = {
     feeAmount: string;
     feeCurrency: CurrencyCode;
     appliedRate: string;
+    quoteId: string;
+    quotedRate: string;
+    executeRate: string;
+    rateChangeBps: string;
+    rateSource: PublicSourceMetadata | null;
+    idempotencyKey: string;
     netTargetAmount: string;
     sourceWalletId: string;
     targetWalletId: string;
@@ -90,7 +107,7 @@ type ErrorBody = {
 type FxQuoteResponse = {
   success: true;
   data: {
-    quoteId: null;
+    quoteId: string | null;
     fromCurrency: CurrencyCode;
     toCurrency: CurrencyCode;
     sourceAmount: string;
@@ -100,7 +117,8 @@ type FxQuoteResponse = {
     feeAmount: string;
     feeCurrency: CurrencyCode;
     netTargetAmount: string;
-    expiresAt: null;
+    expiresAt: string | null;
+    maxChangeBps: string | null;
     rateCapturedAt: string;
     rateEffectiveAt: string;
     rateSource: PublicSourceMetadata | null;
@@ -114,6 +132,16 @@ type ActiveSeasonRecord = {
 };
 
 type FxQuoteRateSnapshot = {
+  id: string;
+  rate: Prisma.Decimal;
+  sourceType: FxRateSourceType;
+  sourceName: string | null;
+  capturedAt: Date;
+  effectiveAt: Date;
+  sourceDecision: SourceDecision;
+};
+
+type FxExecuteRateSnapshot = {
   id: string;
   rate: Prisma.Decimal;
   sourceType: FxRateSourceType;
@@ -141,6 +169,28 @@ type FxExecutePostUpdateWallet = {
   seasonParticipantId: string;
   currencyCode: CurrencyCode;
   balanceAmount: Prisma.Decimal;
+};
+
+type ProviderFxExecutePlan = FxExecutePlan & {
+  quoteId: string;
+  quotedRate: string;
+  executeRate: string;
+  rateChangeBps: string;
+  rateSource: PublicSourceMetadata | null;
+  quoteRequestHash: string;
+};
+
+type FxExecuteQuoteRecord = {
+  id: string;
+  seasonParticipantId: string | null;
+  status: QuoteStatus;
+  fromCurrency: CurrencyCode | null;
+  toCurrency: CurrencyCode | null;
+  sourceAmount: Prisma.Decimal | null;
+  quotedRate: Prisma.Decimal | null;
+  maxChangeBps: Prisma.Decimal;
+  expiresAt: Date;
+  requestHash: string;
 };
 
 export function mapFxExecuteOrchestrationDecisionToSkeletonResponse(
@@ -240,11 +290,46 @@ export class FxService {
         request.fromCurrency === CurrencyCode.KRW
           ? CurrencyCode.USD
           : CurrencyCode.KRW;
+      const expiresAt = buildQuoteExpiresAt(now);
+      const maxChangeBps = resolveDefaultMaxChangeBps({
+        quoteType: 'fx',
+        baseCurrency: CurrencyCode.USD,
+        quoteCurrency: CurrencyCode.KRW,
+      });
+      const rateSource = presentSourceDecision(rateSnapshot.sourceDecision);
+      const requestHash = computeFxQuoteRequestHash({
+        userId,
+        seasonParticipantId: participant.id,
+        fromCurrency: request.fromCurrency,
+        toCurrency: request.toCurrency,
+        sourceAmount: request.sourceAmount,
+      });
+      const durableQuote = await this.prisma.quote.create({
+        data: {
+          userId,
+          seasonParticipantId: participant.id,
+          quoteType: QuoteType.fx,
+          status: QuoteStatus.active,
+          fromCurrency: request.fromCurrency,
+          toCurrency: request.toCurrency,
+          sourceAmount: this.formatDecimal(request.sourceAmount, 8),
+          targetAmount: this.formatDecimal(netTargetAmount, 8),
+          quotedRate: this.formatDecimal(appliedRate, 8),
+          fxRateSnapshotId: rateSnapshot.id,
+          fxRateSourceJson: rateSource as unknown as Prisma.InputJsonValue,
+          maxChangeBps: maxChangeBps.toFixed(4),
+          expiresAt,
+          requestHash,
+        },
+        select: {
+          id: true,
+        },
+      });
 
       return {
         success: true,
         data: {
-          quoteId: null,
+          quoteId: durableQuote.id,
           fromCurrency: request.fromCurrency,
           toCurrency: request.toCurrency,
           sourceAmount: this.formatDecimal(request.sourceAmount, 8),
@@ -254,10 +339,11 @@ export class FxService {
           feeAmount: this.formatDecimal(feeAmount, 8),
           feeCurrency,
           netTargetAmount: this.formatDecimal(netTargetAmount, 8),
-          expiresAt: null,
+          expiresAt: expiresAt.toISOString(),
+          maxChangeBps: maxChangeBps.toFixed(4),
           rateCapturedAt: rateSnapshot.capturedAt.toISOString(),
           rateEffectiveAt: rateSnapshot.effectiveAt.toISOString(),
-          rateSource: presentSourceDecision(rateSnapshot.sourceDecision),
+          rateSource,
         },
       };
     } catch (error) {
@@ -349,7 +435,16 @@ export class FxService {
         return this.returnFxExecuteSkeletonResponseOrThrow(response);
       }
 
-      const [sourceWallet, targetWallet, snapshots] = await Promise.all([
+      const quoteId = this.parseQuoteId(body.quoteId);
+      const quote = await this.findActiveFxQuoteOrThrow({
+        quoteId,
+        userId,
+        seasonParticipantId: participant.id,
+        normalizedRequest,
+        executeNow,
+      });
+
+      const [sourceWallet, targetWallet, providerSnapshot] = await Promise.all([
         this.findFxExecuteWalletCandidate(
           participant.id,
           normalizedRequest.fromCurrency,
@@ -358,33 +453,23 @@ export class FxService {
           participant.id,
           normalizedRequest.toCurrency,
         ),
-        this.findFxExecuteSnapshotCandidates(executeNow),
+        this.findProviderFxExecuteSnapshot(executeNow),
       ]);
 
-      const decision = orchestrateFxExecutePreMutation({
-        body,
-        context: {
-          userId,
-          seasonParticipantId: participant.id,
-        },
-        existingCommand,
+      const plan = this.buildProviderFxExecutePlan({
+        normalizedRequest,
+        quote,
         sourceWallet,
         targetWallet,
-        snapshots,
         fxFeeRate: this.formatDecimal(season.fxFeeRate, 6),
+        providerSnapshot,
         executeNow,
       });
-
-      if (decision.action !== 'create_pending_and_execute') {
-        return this.returnFxExecuteSkeletonResponseOrThrow(
-          mapFxExecuteOrchestrationDecisionToSkeletonResponse(decision),
-        );
-      }
 
       return await this.executeFxWritePath({
         body,
         normalizedRequest,
-        plan: decision.plan,
+        plan,
         executeNow,
       });
     } catch (error) {
@@ -536,6 +621,221 @@ export class FxService {
     };
   }
 
+  private async findActiveFxQuoteOrThrow(input: {
+    quoteId: string;
+    userId: string;
+    seasonParticipantId: string;
+    normalizedRequest: NormalizedFxExecuteRequest;
+    executeNow: Date;
+  }): Promise<FxExecuteQuoteRecord> {
+    const quote = await this.prisma.quote.findFirst({
+      where: {
+        id: input.quoteId,
+        userId: input.userId,
+        quoteType: QuoteType.fx,
+      },
+      select: {
+        id: true,
+        seasonParticipantId: true,
+        status: true,
+        fromCurrency: true,
+        toCurrency: true,
+        sourceAmount: true,
+        quotedRate: true,
+        maxChangeBps: true,
+        expiresAt: true,
+        requestHash: true,
+      },
+    });
+
+    if (!quote) {
+      this.throwFxExecuteError(fxExecuteErrorCodes.QUOTE_NOT_FOUND);
+    }
+
+    if (quote.status !== QuoteStatus.active) {
+      this.throwFxExecuteError(fxExecuteErrorCodes.QUOTE_NOT_ACTIVE);
+    }
+
+    if (input.executeNow.getTime() > quote.expiresAt.getTime()) {
+      await this.prisma.quote.updateMany({
+        where: {
+          id: quote.id,
+          status: QuoteStatus.active,
+        },
+        data: {
+          status: QuoteStatus.expired,
+        },
+      });
+      this.throwFxExecuteError(fxExecuteErrorCodes.QUOTE_EXPIRED);
+    }
+
+    const requestHash = computeFxQuoteRequestHash({
+      userId: input.userId,
+      seasonParticipantId: input.seasonParticipantId,
+      fromCurrency: input.normalizedRequest.fromCurrency,
+      toCurrency: input.normalizedRequest.toCurrency,
+      sourceAmount: input.normalizedRequest.sourceAmount,
+    });
+
+    if (
+      quote.seasonParticipantId !== input.seasonParticipantId ||
+      quote.fromCurrency !== input.normalizedRequest.fromCurrency ||
+      quote.toCurrency !== input.normalizedRequest.toCurrency ||
+      !quote.sourceAmount ||
+      this.formatDecimal(quote.sourceAmount, 8) !==
+        input.normalizedRequest.sourceAmount ||
+      quote.requestHash !== requestHash ||
+      !quote.quotedRate
+    ) {
+      this.throwFxExecuteError(fxExecuteErrorCodes.QUOTE_MISMATCH);
+    }
+
+    return quote;
+  }
+
+  private async findProviderFxExecuteSnapshot(
+    executeNow: Date,
+  ): Promise<FxExecuteRateSnapshot> {
+    const candidates = await this.prisma.fxRateSnapshot.findMany({
+      where: {
+        baseCurrency: CurrencyCode.USD,
+        quoteCurrency: CurrencyCode.KRW,
+        sourceType: FxRateSourceType.provider_api,
+      },
+      orderBy: [
+        { effectiveAt: 'desc' },
+        { capturedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      take: FX_EXECUTE_SNAPSHOT_CANDIDATE_LIMIT,
+      select: {
+        id: true,
+        rate: true,
+        sourceType: true,
+        sourceName: true,
+        effectiveAt: true,
+        capturedAt: true,
+      },
+    });
+    const selection = selectFreshProviderSnapshot({
+      candidates,
+      expectedSourceName: PROVIDER_SOURCE_NAMES.fxUsdKrw,
+      now: executeNow,
+      freshnessThresholdSeconds: 60,
+      isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
+    });
+
+    if (selection.state === 'selected') {
+      return {
+        ...selection.snapshot,
+        sourceDecision: selection.decision,
+      };
+    }
+
+    if (selection.decision.rejectedProviderReason === 'captured_at_stale') {
+      this.throwFxExecuteError(fxExecuteErrorCodes.PROVIDER_RATE_STALE);
+    }
+
+    this.throwFxExecuteError(fxExecuteErrorCodes.PROVIDER_RATE_UNAVAILABLE);
+  }
+
+  private buildProviderFxExecutePlan(input: {
+    normalizedRequest: NormalizedFxExecuteRequest;
+    quote: FxExecuteQuoteRecord;
+    sourceWallet: FxExecuteWalletCandidate | null;
+    targetWallet: FxExecuteWalletCandidate | null;
+    fxFeeRate: string;
+    providerSnapshot: FxExecuteRateSnapshot;
+    executeNow: Date;
+  }): ProviderFxExecutePlan {
+    const {
+      normalizedRequest,
+      quote,
+      sourceWallet,
+      targetWallet,
+      fxFeeRate,
+      providerSnapshot,
+    } = input;
+
+    if (
+      !sourceWallet ||
+      sourceWallet.seasonParticipantId !== normalizedRequest.seasonParticipantId ||
+      sourceWallet.currencyCode !== normalizedRequest.fromCurrency
+    ) {
+      this.throwFxExecuteError(fxExecuteErrorCodes.SOURCE_WALLET_NOT_FOUND);
+    }
+
+    if (
+      !targetWallet ||
+      targetWallet.seasonParticipantId !== normalizedRequest.seasonParticipantId ||
+      targetWallet.currencyCode !== normalizedRequest.toCurrency
+    ) {
+      this.throwFxExecuteError(fxExecuteErrorCodes.TARGET_WALLET_NOT_FOUND);
+    }
+
+    if (providerSnapshot.sourceType !== FxRateSourceType.provider_api) {
+      this.throwFxExecuteError(fxExecuteErrorCodes.EXECUTION_PROVIDER_REQUIRED);
+    }
+
+    const quotedRate = quote.quotedRate;
+    if (!quotedRate) {
+      this.throwFxExecuteError(fxExecuteErrorCodes.QUOTE_MISMATCH);
+    }
+
+    const executeRate = providerSnapshot.rate;
+    const rateChangeBps = calculateChangeBps(quotedRate, executeRate);
+    if (rateChangeBps.gt(quote.maxChangeBps)) {
+      this.throwFxExecuteError(
+        fxExecuteErrorCodes.RATE_CHANGED_REQUOTE_REQUIRED,
+      );
+    }
+
+    const sourceAmount = new Prisma.Decimal(normalizedRequest.sourceAmount);
+    const sourceWalletBalance = this.toDecimal(sourceWallet.balanceAmount);
+    if (sourceWalletBalance.lt(sourceAmount)) {
+      this.throwFxExecuteError(fxExecuteErrorCodes.INSUFFICIENT_BALANCE);
+    }
+
+    const grossTargetAmount =
+      normalizedRequest.fromCurrency === CurrencyCode.KRW
+        ? sourceAmount.div(executeRate)
+        : sourceAmount.mul(executeRate);
+    const feeRate = new Prisma.Decimal(fxFeeRate);
+    const feeAmount = grossTargetAmount.mul(feeRate);
+    const netTargetAmount = grossTargetAmount.sub(feeAmount);
+    const feeCurrency = normalizedRequest.toCurrency;
+    const rateSource = presentSourceDecision(providerSnapshot.sourceDecision);
+
+    return {
+      userId: normalizedRequest.userId,
+      seasonParticipantId: normalizedRequest.seasonParticipantId,
+      fromCurrency: normalizedRequest.fromCurrency,
+      toCurrency: normalizedRequest.toCurrency,
+      sourceWalletId: sourceWallet.id,
+      targetWalletId: targetWallet.id,
+      sourceAmount: this.formatDecimal(sourceAmount, 8),
+      grossTargetAmount: this.formatDecimal(grossTargetAmount, 8),
+      feeRate: this.formatDecimal(feeRate, 6),
+      feeAmount: this.formatDecimal(feeAmount, 8),
+      feeCurrency,
+      appliedRate: this.formatDecimal(executeRate, 8),
+      netTargetAmount: this.formatDecimal(netTargetAmount, 8),
+      targetCreditAmount: this.formatDecimal(netTargetAmount, 8),
+      sourceDebitAmount: this.formatDecimal(sourceAmount, 8),
+      fxRateSnapshotId: providerSnapshot.id,
+      rateCapturedAt: providerSnapshot.capturedAt,
+      rateEffectiveAt: providerSnapshot.effectiveAt,
+      requestHash: normalizedRequest.requestHash,
+      idempotencyKey: normalizedRequest.idempotencyKey,
+      quoteId: quote.id,
+      quotedRate: this.formatDecimal(quotedRate, 8),
+      executeRate: this.formatDecimal(executeRate, 8),
+      rateChangeBps: this.formatDecimal(rateChangeBps, 4),
+      rateSource,
+      quoteRequestHash: quote.requestHash,
+    };
+  }
+
   private getOrderBy(
     status: SeasonStatus,
   ): Prisma.SeasonFindFirstArgs['orderBy'] {
@@ -578,6 +878,14 @@ export class FxService {
     }
 
     return null;
+  }
+
+  private parseQuoteId(value: unknown): string {
+    if (typeof value !== 'string' || value.trim() === '') {
+      this.throwFxExecuteError(fxExecuteErrorCodes.QUOTE_REQUIRED);
+    }
+
+    return value.trim();
   }
 
   private parsePositiveDecimal(value: unknown): Prisma.Decimal {
@@ -722,7 +1030,7 @@ export class FxService {
   private async executeFxWritePath(input: {
     body: FxExecuteRequestBody;
     normalizedRequest: NormalizedFxExecuteRequest;
-    plan: FxExecutePlan;
+    plan: ProviderFxExecutePlan;
     executeNow: Date;
   }): Promise<FxExecuteSuccessResponse> {
     try {
@@ -772,7 +1080,7 @@ export class FxService {
     tx: FxExecuteTransactionClient,
     input: {
       normalizedRequest: NormalizedFxExecuteRequest;
-      plan: FxExecutePlan;
+      plan: ProviderFxExecutePlan;
       executeNow: Date;
     },
   ): Promise<FxExecuteSuccessResponse> {
@@ -794,6 +1102,21 @@ export class FxService {
         id: true,
       },
     });
+
+    const quoteConsumeResult = await tx.quote.updateMany({
+      where: {
+        id: plan.quoteId,
+        status: QuoteStatus.active,
+      },
+      data: {
+        status: QuoteStatus.consumed,
+        consumedAt: executeNow,
+      },
+    });
+
+    if (quoteConsumeResult.count !== 1) {
+      this.throwFxExecuteError(fxExecuteErrorCodes.QUOTE_NOT_ACTIVE);
+    }
 
     const sourceWallet = await this.debitSourceWalletOrThrow(tx, plan);
     const targetWallet = await this.creditTargetWalletOrThrow(tx, plan);
@@ -1004,7 +1327,7 @@ export class FxService {
   private buildFxExecuteSuccessResponse(input: {
     exchangeId: string;
     executedAt: Date;
-    plan: FxExecutePlan;
+    plan: ProviderFxExecutePlan;
     sourceWallet: FxExecutePostUpdateWallet;
     targetWallet: FxExecutePostUpdateWallet;
   }): FxExecuteSuccessResponse {
@@ -1021,6 +1344,12 @@ export class FxService {
         feeAmount: input.plan.feeAmount,
         feeCurrency: input.plan.feeCurrency,
         appliedRate: input.plan.appliedRate,
+        quoteId: input.plan.quoteId,
+        quotedRate: input.plan.quotedRate,
+        executeRate: input.plan.executeRate,
+        rateChangeBps: input.plan.rateChangeBps,
+        rateSource: input.plan.rateSource,
+        idempotencyKey: input.plan.idempotencyKey,
         netTargetAmount: input.plan.netTargetAmount,
         sourceWalletId: input.plan.sourceWalletId,
         targetWalletId: input.plan.targetWalletId,

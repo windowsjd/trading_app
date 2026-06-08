@@ -613,6 +613,91 @@ export type EnumFxRateSourceTypeWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedEnumFxRateSourceTypeFilter<$PrismaModel>
 }
 
+export type EnumQuoteTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.QuoteType | Prisma.EnumQuoteTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.QuoteType[] | Prisma.ListEnumQuoteTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.QuoteType[] | Prisma.ListEnumQuoteTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumQuoteTypeFilter<$PrismaModel> | $Enums.QuoteType
+}
+
+export type EnumQuoteStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.QuoteStatus | Prisma.EnumQuoteStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.QuoteStatus[] | Prisma.ListEnumQuoteStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.QuoteStatus[] | Prisma.ListEnumQuoteStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumQuoteStatusFilter<$PrismaModel> | $Enums.QuoteStatus
+}
+
+export type EnumOrderSideNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.OrderSide | Prisma.EnumOrderSideFieldRefInput<$PrismaModel> | null
+  in?: $Enums.OrderSide[] | Prisma.ListEnumOrderSideFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.OrderSide[] | Prisma.ListEnumOrderSideFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumOrderSideNullableFilter<$PrismaModel> | $Enums.OrderSide | null
+}
+
+export type EnumOrderTypeNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.OrderType | Prisma.EnumOrderTypeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.OrderType[] | Prisma.ListEnumOrderTypeFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.OrderType[] | Prisma.ListEnumOrderTypeFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumOrderTypeNullableFilter<$PrismaModel> | $Enums.OrderType | null
+}
+
+export type EnumCurrencyCodeNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.CurrencyCode | Prisma.EnumCurrencyCodeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.CurrencyCode[] | Prisma.ListEnumCurrencyCodeFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.CurrencyCode[] | Prisma.ListEnumCurrencyCodeFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumCurrencyCodeNullableFilter<$PrismaModel> | $Enums.CurrencyCode | null
+}
+
+export type EnumQuoteTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.QuoteType | Prisma.EnumQuoteTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.QuoteType[] | Prisma.ListEnumQuoteTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.QuoteType[] | Prisma.ListEnumQuoteTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumQuoteTypeWithAggregatesFilter<$PrismaModel> | $Enums.QuoteType
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumQuoteTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumQuoteTypeFilter<$PrismaModel>
+}
+
+export type EnumQuoteStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.QuoteStatus | Prisma.EnumQuoteStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.QuoteStatus[] | Prisma.ListEnumQuoteStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.QuoteStatus[] | Prisma.ListEnumQuoteStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumQuoteStatusWithAggregatesFilter<$PrismaModel> | $Enums.QuoteStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumQuoteStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumQuoteStatusFilter<$PrismaModel>
+}
+
+export type EnumOrderSideNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.OrderSide | Prisma.EnumOrderSideFieldRefInput<$PrismaModel> | null
+  in?: $Enums.OrderSide[] | Prisma.ListEnumOrderSideFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.OrderSide[] | Prisma.ListEnumOrderSideFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumOrderSideNullableWithAggregatesFilter<$PrismaModel> | $Enums.OrderSide | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumOrderSideNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumOrderSideNullableFilter<$PrismaModel>
+}
+
+export type EnumOrderTypeNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.OrderType | Prisma.EnumOrderTypeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.OrderType[] | Prisma.ListEnumOrderTypeFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.OrderType[] | Prisma.ListEnumOrderTypeFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumOrderTypeNullableWithAggregatesFilter<$PrismaModel> | $Enums.OrderType | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumOrderTypeNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumOrderTypeNullableFilter<$PrismaModel>
+}
+
+export type EnumCurrencyCodeNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.CurrencyCode | Prisma.EnumCurrencyCodeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.CurrencyCode[] | Prisma.ListEnumCurrencyCodeFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.CurrencyCode[] | Prisma.ListEnumCurrencyCodeFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumCurrencyCodeNullableWithAggregatesFilter<$PrismaModel> | $Enums.CurrencyCode | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumCurrencyCodeNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumCurrencyCodeNullableFilter<$PrismaModel>
+}
+
 export type EnumFxExecuteRequestStatusFilter<$PrismaModel = never> = {
   equals?: $Enums.FxExecuteRequestStatus | Prisma.EnumFxExecuteRequestStatusFieldRefInput<$PrismaModel>
   in?: $Enums.FxExecuteRequestStatus[] | Prisma.ListEnumFxExecuteRequestStatusFieldRefInput<$PrismaModel>
@@ -1264,6 +1349,91 @@ export type NestedEnumFxRateSourceTypeWithAggregatesFilter<$PrismaModel = never>
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumFxRateSourceTypeFilter<$PrismaModel>
   _max?: Prisma.NestedEnumFxRateSourceTypeFilter<$PrismaModel>
+}
+
+export type NestedEnumQuoteTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.QuoteType | Prisma.EnumQuoteTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.QuoteType[] | Prisma.ListEnumQuoteTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.QuoteType[] | Prisma.ListEnumQuoteTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumQuoteTypeFilter<$PrismaModel> | $Enums.QuoteType
+}
+
+export type NestedEnumQuoteStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.QuoteStatus | Prisma.EnumQuoteStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.QuoteStatus[] | Prisma.ListEnumQuoteStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.QuoteStatus[] | Prisma.ListEnumQuoteStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumQuoteStatusFilter<$PrismaModel> | $Enums.QuoteStatus
+}
+
+export type NestedEnumOrderSideNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.OrderSide | Prisma.EnumOrderSideFieldRefInput<$PrismaModel> | null
+  in?: $Enums.OrderSide[] | Prisma.ListEnumOrderSideFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.OrderSide[] | Prisma.ListEnumOrderSideFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumOrderSideNullableFilter<$PrismaModel> | $Enums.OrderSide | null
+}
+
+export type NestedEnumOrderTypeNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.OrderType | Prisma.EnumOrderTypeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.OrderType[] | Prisma.ListEnumOrderTypeFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.OrderType[] | Prisma.ListEnumOrderTypeFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumOrderTypeNullableFilter<$PrismaModel> | $Enums.OrderType | null
+}
+
+export type NestedEnumCurrencyCodeNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.CurrencyCode | Prisma.EnumCurrencyCodeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.CurrencyCode[] | Prisma.ListEnumCurrencyCodeFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.CurrencyCode[] | Prisma.ListEnumCurrencyCodeFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumCurrencyCodeNullableFilter<$PrismaModel> | $Enums.CurrencyCode | null
+}
+
+export type NestedEnumQuoteTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.QuoteType | Prisma.EnumQuoteTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.QuoteType[] | Prisma.ListEnumQuoteTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.QuoteType[] | Prisma.ListEnumQuoteTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumQuoteTypeWithAggregatesFilter<$PrismaModel> | $Enums.QuoteType
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumQuoteTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumQuoteTypeFilter<$PrismaModel>
+}
+
+export type NestedEnumQuoteStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.QuoteStatus | Prisma.EnumQuoteStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.QuoteStatus[] | Prisma.ListEnumQuoteStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.QuoteStatus[] | Prisma.ListEnumQuoteStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumQuoteStatusWithAggregatesFilter<$PrismaModel> | $Enums.QuoteStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumQuoteStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumQuoteStatusFilter<$PrismaModel>
+}
+
+export type NestedEnumOrderSideNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.OrderSide | Prisma.EnumOrderSideFieldRefInput<$PrismaModel> | null
+  in?: $Enums.OrderSide[] | Prisma.ListEnumOrderSideFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.OrderSide[] | Prisma.ListEnumOrderSideFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumOrderSideNullableWithAggregatesFilter<$PrismaModel> | $Enums.OrderSide | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumOrderSideNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumOrderSideNullableFilter<$PrismaModel>
+}
+
+export type NestedEnumOrderTypeNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.OrderType | Prisma.EnumOrderTypeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.OrderType[] | Prisma.ListEnumOrderTypeFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.OrderType[] | Prisma.ListEnumOrderTypeFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumOrderTypeNullableWithAggregatesFilter<$PrismaModel> | $Enums.OrderType | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumOrderTypeNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumOrderTypeNullableFilter<$PrismaModel>
+}
+
+export type NestedEnumCurrencyCodeNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.CurrencyCode | Prisma.EnumCurrencyCodeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.CurrencyCode[] | Prisma.ListEnumCurrencyCodeFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.CurrencyCode[] | Prisma.ListEnumCurrencyCodeFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumCurrencyCodeNullableWithAggregatesFilter<$PrismaModel> | $Enums.CurrencyCode | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumCurrencyCodeNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumCurrencyCodeNullableFilter<$PrismaModel>
 }
 
 export type NestedEnumFxExecuteRequestStatusFilter<$PrismaModel = never> = {

@@ -2,9 +2,9 @@
 
 ## 1. 목적
 
-이 문서는 provider-backed execute/write를 열기 전 체결 기준 가격 정책을 확정하기 위한 설계/정책 foundation이다.
+이 문서는 Durable Quote 기반 provider-backed execute/write 체결 기준 가격 정책의 현재 source of truth다.
 
-이번 gate에서는 실제 execute/write 구현을 열지 않는다. `/fx execute`, orders create, orders execute는 계속 provider_api closed 상태이며, 지갑/포지션/주문 상태를 provider_api 기준으로 변경하지 않는다.
+2026-06-08 gate에서 `/fx execute`와 orders execute는 durable quote 기반 provider-backed execute로 열렸다. Orders create는 durable quote를 검증/바인딩해 submitted order를 만들지만 지갑/포지션/체결 상태 변경은 orders execute에서만 수행한다.
 
 ## 2. 핵심 원칙
 
@@ -19,7 +19,8 @@
 
 - 기본 TTL은 10초다.
 - `expiresAt` 이후 execute 요청은 `QUOTE_EXPIRED`로 거부한다.
-- 현재 구현의 quote 응답은 아직 durable quote가 아니며 `quoteId = null`, `expiresAt = null`이다. 이 문서는 다음 gate의 정책 기준이다.
+- `/fx quote`와 orders quote는 durable quote를 저장하고 `quoteId`, `expiresAt`, `maxChangeBps`를 응답한다.
+- 성공한 execute는 quote를 같은 transaction 안에서 `consumed`로 전환한다. Execute 전 validation failure는 quote를 active로 남기며, 만료 감지는 `expired` 전환을 시도한 뒤 `QUOTE_EXPIRED`를 반환한다.
 
 ## 4. Execute Freshness
 
@@ -73,17 +74,18 @@ abs(executeValue - quotedValue) / quotedValue * 10000
 - FX에는 가격이 아니라 환율 변동이므로 `RATE_CHANGED_REQUOTE_REQUIRED`를 사용한다.
 - Provider USD/KRW가 missing/stale/unavailable이면 `PROVIDER_RATE_UNAVAILABLE` 또는 `PROVIDER_RATE_STALE` 계열 오류로 실패해야 한다.
 
-## 9. Required Future Durable Quote Model
+## 9. Durable Quote Model
 
-이번 작업에서는 schema/migration을 만들지 않는다. 다음 execute/write gate에서 durable quote가 필요하면 별도 schema gate로 다룬다.
+현재 schema는 `Quote` 모델과 `QuoteType`, `QuoteStatus` enum을 가진다. `Order.quoteId`는 nullable relation으로 submitted order를 quote에 바인딩한다.
 
-후보 필드:
+주요 필드:
 
 - `id`
 - `userId`
 - `seasonParticipantId`
 - `assetId` nullable for FX quote
 - `quoteType`: `order` / `fx`
+- `status`: `active` / `consumed` / `expired` / `canceled`
 - `side`
 - `orderType`
 - `quantity`
@@ -100,9 +102,16 @@ abs(executeValue - quotedValue) / quotedValue * 10000
 - `expiresAt`
 - `requestHash`
 - `createdAt`
+- `consumedAt`
+- `updatedAt`
 
-## 10. Required Future Error Codes
+Quote requestHash는 SHA-256 canonical JSON이다. Order quote hash fields는 `userId`, `seasonParticipantId`, `assetId`, `side`, `orderType`, `quantity`, `limitPrice`, `currencyCode`이고, FX quote hash fields는 `userId`, `seasonParticipantId`, `fromCurrency`, `toCurrency`, `sourceAmount`다. Decimal strings are normalized before hashing. Raw provider payloads and secrets are excluded.
 
+## 10. Error Codes
+
+- `QUOTE_REQUIRED`
+- `QUOTE_NOT_FOUND`
+- `QUOTE_NOT_ACTIVE`
 - `QUOTE_EXPIRED`
 - `QUOTE_MISMATCH`
 - `PROVIDER_PRICE_UNAVAILABLE`
@@ -127,9 +136,9 @@ Quote/request mismatch 대상:
 - FX `toCurrency`
 - FX `sourceAmount`
 
-## 11. Required Future Audit Fields
+## 11. Execute Audit/Response Fields
 
-Future execute result 또는 execute audit에는 다음 public-safe source evidence가 남아야 한다.
+Execute result 또는 execute audit에는 다음 public-safe source evidence가 남아야 한다.
 
 - `quoteId`
 - `quotedPrice` / `quotedRate`
@@ -147,21 +156,19 @@ Raw provider payload, `metadataJson`, provider credentials, approval_key, access
 
 ## 12. Explicitly Not Implemented In This Gate
 
-- No `/fx execute` provider_api.
-- No orders create provider_api.
-- No orders execute provider_api.
-- No durable quote table.
-- No schema/migration.
+- No orders create provider source selection; create binds a durable quote and submits only.
 - No package or lockfile change.
 - No scheduler/cron.
 - No provider trigger API.
 - No batch HTTP API.
 - No real trading/account/deposit/withdrawal API.
 - No emergency operator override.
+- No ranking/settlement/reward direct provider_api reads.
+- No real external trading/account/deposit/withdrawal API.
 
-## 13. Policy Foundation Code
+## 13. Policy Code
 
-`src/providers/realtime-execution-policy.ts` contains pure functions for the next gate:
+`src/providers/realtime-execution-policy.ts` contains pure policy helpers used by the provider execute gate:
 
 - `calculateChangeBps`
 - `isWithinMaxChangeBps`
@@ -172,4 +179,4 @@ Raw provider payload, `metadataJson`, provider credentials, approval_key, access
 - `validateQuoteExpiry`
 - `validateExecutionProviderSource`
 
-This file is intentionally not connected to current `/fx execute`, orders create, or orders execute service paths.
+The service paths implement the same policy values. Source eligibility and freshness selection live in `src/providers/source-eligibility.policy.ts`; durable quote hashing lives in `src/providers/durable-quote.policy.ts`.

@@ -177,6 +177,24 @@ export const OrderStatus = {
 export type OrderStatus = (typeof OrderStatus)[keyof typeof OrderStatus]
 
 
+export const QuoteType = {
+  fx: 'fx',
+  order: 'order'
+} as const
+
+export type QuoteType = (typeof QuoteType)[keyof typeof QuoteType]
+
+
+export const QuoteStatus = {
+  active: 'active',
+  consumed: 'consumed',
+  expired: 'expired',
+  canceled: 'canceled'
+} as const
+
+export type QuoteStatus = (typeof QuoteStatus)[keyof typeof QuoteStatus]
+
+
 export const BatchJobStatus = {
   pending: 'pending',
   running: 'running',
