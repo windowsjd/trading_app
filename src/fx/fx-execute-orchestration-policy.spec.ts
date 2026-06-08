@@ -42,6 +42,7 @@ describe('fx execute pre-mutation orchestration policy', () => {
     seasonParticipantId: 'participant-1',
   };
   const validBody: FxExecuteRequestBodyLike = {
+    quoteId: 'quote-fx-1',
     fromCurrency: 'KRW',
     toCurrency: 'USD',
     sourceAmount: '135000',

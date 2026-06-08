@@ -157,6 +157,30 @@ enum OperatorAuditResult {
   failure
 }
 
+enum OpsJobName {
+  provider_fx_ingest
+  provider_binance_ingest
+  daily_portfolio_snapshot
+  season_ranking_generation
+  season_settlement
+  reward_marker
+}
+
+enum OpsJobRunStatus {
+  running
+  succeeded
+  failed
+  skipped
+  locked
+}
+
+enum OpsJobTrigger {
+  scheduler
+  operator
+  manual_script
+  test
+}
+
 model User {
   id              String     @id @default(uuid())
   email           String     @unique
@@ -706,4 +730,49 @@ model BatchJobRun {
   @@index([jobName, createdAt])
   @@index([status, createdAt])
   @@map("batch_job_runs")
+}
+
+model OpsJobRun {
+  id             String          @id @default(uuid())
+  jobName        OpsJobName      @map("job_name")
+  status         OpsJobRunStatus
+  trigger        OpsJobTrigger
+  requestedBy    String?         @map("requested_by")
+  startedAt      DateTime        @map("started_at")
+  finishedAt     DateTime?       @map("finished_at")
+  durationMs     Int?            @map("duration_ms")
+  lockKey        String?         @map("lock_key")
+  idempotencyKey String?         @map("idempotency_key")
+  dryRun         Boolean         @default(false) @map("dry_run")
+  attempt        Int             @default(1)
+  maxAttempts    Int             @default(1) @map("max_attempts")
+  errorCode      String?         @map("error_code")
+  errorMessage   String?         @map("error_message")
+  resultJson     Json?           @map("result_json")
+  metadataJson   Json?           @map("metadata_json")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  @@unique([jobName, idempotencyKey])
+  @@index([jobName, startedAt])
+  @@index([status, startedAt])
+  @@index([trigger, startedAt])
+  @@index([lockKey])
+  @@map("ops_job_runs")
+}
+
+model OpsJobLock {
+  id         String     @id @default(uuid())
+  lockKey    String     @unique @map("lock_key")
+  jobName    OpsJobName @map("job_name")
+  ownerId    String     @map("owner_id")
+  acquiredAt DateTime   @map("acquired_at")
+  expiresAt  DateTime   @map("expires_at")
+  releasedAt DateTime?  @map("released_at")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  @@index([jobName, expiresAt])
+  @@index([expiresAt])
+  @@map("ops_job_locks")
 }

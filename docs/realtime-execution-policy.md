@@ -26,12 +26,12 @@
 
 Execute 시점 source freshness 기준:
 
-| 대상 | 기준 |
-| --- | --- |
+| 대상               | 기준                   |
+| ------------------ | ---------------------- |
 | KRX domestic stock | `capturedAt` 10초 이내 |
-| US NAS/NYS stock | `capturedAt` 10초 이내 |
-| BINANCE crypto | `capturedAt` 10초 이내 |
-| USD/KRW FX | `capturedAt` 60초 이내 |
+| US NAS/NYS stock   | `capturedAt` 10초 이내 |
+| BINANCE crypto     | `capturedAt` 10초 이내 |
+| USD/KRW FX         | `capturedAt` 60초 이내 |
 
 Provider row가 missing, stale, unavailable, future-dated, non-positive, wrong sourceName/sourceType, or ineligible이면 execute는 실패해야 한다. 기본 admin_manual fallback으로 진행하지 않는다.
 
@@ -39,12 +39,12 @@ Provider row가 missing, stale, unavailable, future-dated, non-positive, wrong s
 
 Quote 대비 execute 시점 허용 변동폭:
 
-| 대상 | Max change |
-| --- | --- |
+| 대상               | Max change     |
+| ------------------ | -------------- |
 | KRX domestic stock | 30 bps = 0.30% |
-| US NAS/NYS stock | 50 bps = 0.50% |
-| BINANCE crypto | 50 bps = 0.50% |
-| USD/KRW FX | 30 bps = 0.30% |
+| US NAS/NYS stock   | 50 bps = 0.50% |
+| BINANCE crypto     | 50 bps = 0.50% |
+| USD/KRW FX         | 30 bps = 0.30% |
 
 Change bps 계산식:
 
@@ -105,7 +105,7 @@ abs(executeValue - quotedValue) / quotedValue * 10000
 - `consumedAt`
 - `updatedAt`
 
-Quote requestHash는 SHA-256 canonical JSON이다. Order quote hash fields는 `userId`, `seasonParticipantId`, `assetId`, `side`, `orderType`, `quantity`, `limitPrice`, `currencyCode`이고, FX quote hash fields는 `userId`, `seasonParticipantId`, `fromCurrency`, `toCurrency`, `sourceAmount`다. Decimal strings are normalized before hashing. Raw provider payloads and secrets are excluded.
+Quote requestHash는 SHA-256 canonical JSON이다. Order quote hash fields는 `userId`, `seasonParticipantId`, `assetId`, `side`, `orderType`, `quantity`, `limitPrice`, `currencyCode`이고, FX quote hash fields는 `userId`, `seasonParticipantId`, `fromCurrency`, `toCurrency`, `sourceAmount`다. FX execute idempotency hash는 trimmed `quoteId`를 포함하며, orders create idempotency hash도 `quoteId`를 포함한다. Decimal strings are normalized before hashing. Raw provider payloads and secrets are excluded.
 
 ## 10. Error Codes
 
@@ -158,7 +158,7 @@ Raw provider payload, `metadataJson`, provider credentials, approval_key, access
 
 - No orders create provider source selection; create binds a durable quote and submits only.
 - No package or lockfile change.
-- No scheduler/cron.
+- Scheduler/Ops foundation exists separately and is disabled by default; no production cron business automation is opened by this policy.
 - No provider trigger API.
 - No batch HTTP API.
 - No real trading/account/deposit/withdrawal API.

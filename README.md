@@ -15,12 +15,14 @@ This service owns backend APIs, database access, financial calculations, and ser
 - Wallets, records, ranking, and orders read APIs.
 - FX quote stores durable quotes; FX execute consumes durable quotes and reprices at execute time from fresh `provider_api` ExchangeRate-API USD/KRW rows.
 - Orders quote stores durable quotes; submitted order create binds an active durable quote; full-fill order execute consumes the quote and reprices at execute time from fresh `provider_api` asset/FX rows.
+- FX execute and orders create idempotency request hashes include `quoteId`, so the same idempotency key with a different quote conflicts instead of replaying an old result.
 - KRW and USD cash wallets. US stocks and USD-settled crypto use the USD wallet.
 - Final valuation policy is KRW total assets.
 - Provider ingestion foundation exists for operator-run ExchangeRate-API USD/KRW, Binance public REST crypto, and KIS WebSocket KRX/US stock market data row insertion.
 - Provider_api source eligibility is opened only for explicitly allowed workflows: `/fx quote`, `/fx execute`, assets `withPrice`, orders quote, orders execute, live portfolio/home/positions valuation, and the operator-run daily portfolio snapshot valuation job. Orders create binds durable quotes but does not read provider rows directly.
 - Read-only/quote responses expose backward-compatible optional source metadata for provider/admin visibility: `rateSource`, `priceSource`, `assetPriceSource`, `fxRateSource`, and live valuation source summaries where applicable.
 - Batch job execution foundation with idempotent `batch_job_runs` recording, operator-only noop/health-check script, operator-run daily portfolio snapshot generation, operator-run season ranking generation from existing daily snapshots, an operator-run daily season cycle orchestration job, an operator-run season settlement MVP job, and an operator-run reward grant marker MVP job.
+- Scheduler/Ops foundation with disabled-by-default scheduler config, `ops_job_runs` audit rows, `ops_job_locks`, internal runner services, and `GET /readiness`. Placeholder scheduler jobs are recorded as skipped/not implemented and are not completed business automation.
 - Daily portfolio snapshot batch results include sourceSummary/fallback metadata in `batch_job_runs.resultPayloadJson`; `daily_portfolio_snapshots` row schema is unchanged.
 - Durable Quote plus realtime provider execute is implemented for `/fx execute` and orders execute. Quote remains a reference quote; execute reprices from fresh provider_api rows, enforces quote-to-execute bps thresholds, and forbids default admin_manual execute fallback.
 - Operator-run final tier assignment MVP job from existing final `season_rankings`.
@@ -29,10 +31,10 @@ This service owns backend APIs, database access, financial calculations, and ser
 
 These are intentionally outside the current implementation and should not be added without a separate gate:
 
-- Provider ingestion trigger APIs, scheduler-driven provider ingestion, and provider-backed final/ranking/reward workflows.
+- Provider ingestion trigger APIs, scheduler-driven provider ingestion implementation, and provider-backed final/ranking/reward workflows.
 - OANDA and Twelve Data are historical/fallback provider candidates only, not the current MVP core provider stack.
-- Admin/operator account management APIs, batch run HTTP APIs, scheduler/cron, and reward fulfillment trigger APIs.
-- Cron scheduler, scheduler-driven snapshot/ranking jobs, settlement extension jobs beyond final tier assignment, or actual reward fulfillment jobs.
+- Admin/operator account management APIs, batch run HTTP APIs, scheduler HTTP APIs, and reward fulfillment trigger APIs.
+- Production cron job implementation beyond the disabled-by-default foundation, scheduler-driven provider ingestion, scheduler-driven ranking/settlement/reward automation, settlement extension jobs beyond final tier assignment, or actual reward fulfillment jobs.
 - Provider-backed ranking, settlement recalculation, or reward automation.
 - KIS order/account/balance/fill/deposit/withdrawal APIs, KIS orderbook/hoga, Binance authenticated/order/account/user-data APIs, and real external trading/account integrations.
 - Actual payment, point, badge, or trophy fulfillment beyond the `rewardGrantedAt` marker MVP.
@@ -59,6 +61,8 @@ Required for local application work:
 - Rejected: `900`, `15 m`, `15 d`, `500ms`, `1y`, empty string
 
 Refresh tokens are opaque random tokens. The raw token is returned to the client and never stored in PostgreSQL; only a SHA-256 hash is stored in `refresh_token_sessions`. Refresh uses token rotation. Logout revokes refresh sessions. Access tokens remain stateless Bearer JWTs and are not blacklisted in this MVP.
+
+Scheduler/Ops env is non-secret and disabled by default. `SCHEDULER_ENABLED=false` prevents interval registration; each `SCHEDULER_*_ENABLED=false` flag keeps its job from running automatically. `SCHEDULER_LOCK_TTL_SECONDS` defaults to `600`, and `SCHEDULER_MAX_ATTEMPTS` defaults to `1`.
 
 ## Local Commands
 
@@ -144,8 +148,9 @@ Current source of truth order:
 4. `docs/backend-test-coverage-matrix.md`
 5. `docs/auth-api-contract.md` and API contract docs under `docs/*-api-contract.md`
 6. `docs/realtime-execution-policy.md`
-7. `docs/operator-api-contract.md`
-8. `docs/batch-job-foundation.md`
+7. `docs/scheduler-ops-foundation.md`
+8. `docs/operator-api-contract.md`
+9. `docs/batch-job-foundation.md`
 
 `docs/archive/` is historical reference only and must not override the current documents above.
 

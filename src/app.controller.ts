@@ -16,4 +16,9 @@ export class AppController {
   getDbHealth() {
     return this.appService.getDbHealth();
   }
+
+  @Get('readiness')
+  getReadiness() {
+    return this.appService.getReadiness();
+  }
 }

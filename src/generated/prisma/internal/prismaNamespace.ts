@@ -405,7 +405,9 @@ export const ModelName = {
   EquitySnapshot: 'EquitySnapshot',
   DailyPortfolioSnapshot: 'DailyPortfolioSnapshot',
   SeasonRanking: 'SeasonRanking',
-  BatchJobRun: 'BatchJobRun'
+  BatchJobRun: 'BatchJobRun',
+  OpsJobRun: 'OpsJobRun',
+  OpsJobLock: 'OpsJobLock'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -421,7 +423,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "operatorAuditLog" | "refreshTokenSession" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "asset" | "assetPriceSnapshot" | "position" | "order" | "cashWallet" | "walletTransaction" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun"
+    modelProps: "user" | "operatorAuditLog" | "refreshTokenSession" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "asset" | "assetPriceSnapshot" | "position" | "order" | "cashWallet" | "walletTransaction" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -2053,6 +2055,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    OpsJobRun: {
+      payload: Prisma.$OpsJobRunPayload<ExtArgs>
+      fields: Prisma.OpsJobRunFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.OpsJobRunFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OpsJobRunPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.OpsJobRunFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OpsJobRunPayload>
+        }
+        findFirst: {
+          args: Prisma.OpsJobRunFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OpsJobRunPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.OpsJobRunFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OpsJobRunPayload>
+        }
+        findMany: {
+          args: Prisma.OpsJobRunFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OpsJobRunPayload>[]
+        }
+        create: {
+          args: Prisma.OpsJobRunCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OpsJobRunPayload>
+        }
+        createMany: {
+          args: Prisma.OpsJobRunCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.OpsJobRunCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OpsJobRunPayload>[]
+        }
+        delete: {
+          args: Prisma.OpsJobRunDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OpsJobRunPayload>
+        }
+        update: {
+          args: Prisma.OpsJobRunUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OpsJobRunPayload>
+        }
+        deleteMany: {
+          args: Prisma.OpsJobRunDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.OpsJobRunUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.OpsJobRunUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OpsJobRunPayload>[]
+        }
+        upsert: {
+          args: Prisma.OpsJobRunUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OpsJobRunPayload>
+        }
+        aggregate: {
+          args: Prisma.OpsJobRunAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateOpsJobRun>
+        }
+        groupBy: {
+          args: Prisma.OpsJobRunGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.OpsJobRunGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.OpsJobRunCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.OpsJobRunCountAggregateOutputType> | number
+        }
+      }
+    }
+    OpsJobLock: {
+      payload: Prisma.$OpsJobLockPayload<ExtArgs>
+      fields: Prisma.OpsJobLockFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.OpsJobLockFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OpsJobLockPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.OpsJobLockFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OpsJobLockPayload>
+        }
+        findFirst: {
+          args: Prisma.OpsJobLockFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OpsJobLockPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.OpsJobLockFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OpsJobLockPayload>
+        }
+        findMany: {
+          args: Prisma.OpsJobLockFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OpsJobLockPayload>[]
+        }
+        create: {
+          args: Prisma.OpsJobLockCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OpsJobLockPayload>
+        }
+        createMany: {
+          args: Prisma.OpsJobLockCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.OpsJobLockCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OpsJobLockPayload>[]
+        }
+        delete: {
+          args: Prisma.OpsJobLockDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OpsJobLockPayload>
+        }
+        update: {
+          args: Prisma.OpsJobLockUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OpsJobLockPayload>
+        }
+        deleteMany: {
+          args: Prisma.OpsJobLockDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.OpsJobLockUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.OpsJobLockUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OpsJobLockPayload>[]
+        }
+        upsert: {
+          args: Prisma.OpsJobLockUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OpsJobLockPayload>
+        }
+        aggregate: {
+          args: Prisma.OpsJobLockAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateOpsJobLock>
+        }
+        groupBy: {
+          args: Prisma.OpsJobLockGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.OpsJobLockGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.OpsJobLockCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.OpsJobLockCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -2499,6 +2649,46 @@ export const BatchJobRunScalarFieldEnum = {
 } as const
 
 export type BatchJobRunScalarFieldEnum = (typeof BatchJobRunScalarFieldEnum)[keyof typeof BatchJobRunScalarFieldEnum]
+
+
+export const OpsJobRunScalarFieldEnum = {
+  id: 'id',
+  jobName: 'jobName',
+  status: 'status',
+  trigger: 'trigger',
+  requestedBy: 'requestedBy',
+  startedAt: 'startedAt',
+  finishedAt: 'finishedAt',
+  durationMs: 'durationMs',
+  lockKey: 'lockKey',
+  idempotencyKey: 'idempotencyKey',
+  dryRun: 'dryRun',
+  attempt: 'attempt',
+  maxAttempts: 'maxAttempts',
+  errorCode: 'errorCode',
+  errorMessage: 'errorMessage',
+  resultJson: 'resultJson',
+  metadataJson: 'metadataJson',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type OpsJobRunScalarFieldEnum = (typeof OpsJobRunScalarFieldEnum)[keyof typeof OpsJobRunScalarFieldEnum]
+
+
+export const OpsJobLockScalarFieldEnum = {
+  id: 'id',
+  lockKey: 'lockKey',
+  jobName: 'jobName',
+  ownerId: 'ownerId',
+  acquiredAt: 'acquiredAt',
+  expiresAt: 'expiresAt',
+  releasedAt: 'releasedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type OpsJobLockScalarFieldEnum = (typeof OpsJobLockScalarFieldEnum)[keyof typeof OpsJobLockScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -2962,6 +3152,48 @@ export type ListEnumBatchJobStatusFieldRefInput<$PrismaModel> = FieldRefInputTyp
 
 
 /**
+ * Reference to a field of type 'OpsJobName'
+ */
+export type EnumOpsJobNameFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OpsJobName'>
+
+
+
+/**
+ * Reference to a field of type 'OpsJobName[]'
+ */
+export type ListEnumOpsJobNameFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OpsJobName[]'>
+
+
+
+/**
+ * Reference to a field of type 'OpsJobRunStatus'
+ */
+export type EnumOpsJobRunStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OpsJobRunStatus'>
+
+
+
+/**
+ * Reference to a field of type 'OpsJobRunStatus[]'
+ */
+export type ListEnumOpsJobRunStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OpsJobRunStatus[]'>
+
+
+
+/**
+ * Reference to a field of type 'OpsJobTrigger'
+ */
+export type EnumOpsJobTriggerFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OpsJobTrigger'>
+
+
+
+/**
+ * Reference to a field of type 'OpsJobTrigger[]'
+ */
+export type ListEnumOpsJobTriggerFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OpsJobTrigger[]'>
+
+
+
+/**
  * Reference to a field of type 'Float'
  */
 export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
@@ -3091,6 +3323,8 @@ export type GlobalOmitConfig = {
   dailyPortfolioSnapshot?: Prisma.DailyPortfolioSnapshotOmit
   seasonRanking?: Prisma.SeasonRankingOmit
   batchJobRun?: Prisma.BatchJobRunOmit
+  opsJobRun?: Prisma.OpsJobRunOmit
+  opsJobLock?: Prisma.OpsJobLockOmit
 }
 
 /* Types for Logging */

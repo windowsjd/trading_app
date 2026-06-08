@@ -228,3 +228,36 @@ export const OperatorAuditResult = {
 } as const
 
 export type OperatorAuditResult = (typeof OperatorAuditResult)[keyof typeof OperatorAuditResult]
+
+
+export const OpsJobName = {
+  provider_fx_ingest: 'provider_fx_ingest',
+  provider_binance_ingest: 'provider_binance_ingest',
+  daily_portfolio_snapshot: 'daily_portfolio_snapshot',
+  season_ranking_generation: 'season_ranking_generation',
+  season_settlement: 'season_settlement',
+  reward_marker: 'reward_marker'
+} as const
+
+export type OpsJobName = (typeof OpsJobName)[keyof typeof OpsJobName]
+
+
+export const OpsJobRunStatus = {
+  running: 'running',
+  succeeded: 'succeeded',
+  failed: 'failed',
+  skipped: 'skipped',
+  locked: 'locked'
+} as const
+
+export type OpsJobRunStatus = (typeof OpsJobRunStatus)[keyof typeof OpsJobRunStatus]
+
+
+export const OpsJobTrigger = {
+  scheduler: 'scheduler',
+  operator: 'operator',
+  manual_script: 'manual_script',
+  test: 'test'
+} as const
+
+export type OpsJobTrigger = (typeof OpsJobTrigger)[keyof typeof OpsJobTrigger]

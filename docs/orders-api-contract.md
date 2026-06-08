@@ -247,22 +247,23 @@ Same body as `POST /api/v1/orders/quote`.
 
 ### Behavior
 
-- Validates `idempotencyKey` after auth and order body parsing.
-- New create requires `quoteId` after idempotency replay checks.
+- Validates `quoteId` and `idempotencyKey` after auth and order body parsing.
+- New create requires `quoteId`.
 - Idempotency applies only to `POST /api/v1/orders` create.
 - `POST /api/v1/orders/quote` creates a durable quote row but does not require or store an idempotency key.
 - `POST /api/v1/orders/:orderId/cancel` does not require or store an idempotency key in this MVP.
 - The request hash is SHA-256 over canonical JSON for:
   - `assetId`
+  - `quoteId`
   - `side`
   - `orderType`
   - `quantity`
   - `limitPrice`
   - `currencyCode`
 - `idempotencyKey` is excluded from the request hash.
-- `quoteId` is excluded from the create idempotency request hash. Quote/request integrity is enforced through the stored quote requestHash.
+- `quoteId` is included in the create idempotency request hash.
 - Same `seasonParticipantId + idempotencyKey` and same request hash replays the stored create response without creating a second order.
-- Same `seasonParticipantId + idempotencyKey` and different request hash returns `ORDER_IDEMPOTENCY_CONFLICT`.
+- Same `seasonParticipantId + idempotencyKey` and different request hash, including a different `quoteId`, returns `ORDER_IDEMPOTENCY_CONFLICT`.
 - DB unique constraint `(season_participant_id, idempotency_key)` prevents duplicate submitted order rows under races.
 - If create hits a unique race (`P2002`), the service rereads the existing order:
   - same request hash: replay.
@@ -293,8 +294,8 @@ Same body as `POST /api/v1/orders/quote`.
     "order": "<GET /api/v1/orders order item>",
     "execution": {
       "state": "not_executed",
-      "reason": "ORDER_EXECUTION_NOT_IMPLEMENTED",
-      "message": "Order execution is not implemented in this MVP."
+      "reason": "ORDER_SUBMITTED_NOT_EXECUTED",
+      "message": "Order was submitted and can be executed through the execute endpoint."
     }
   }
 }

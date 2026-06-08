@@ -1,12 +1,12 @@
 # Batch Job Foundation
 
-Status: implemented foundation with operator-run daily portfolio snapshot, season ranking, daily season cycle, season settlement MVP, final tier assignment MVP, and reward grant internal reward foundation MVP jobs, no cron scheduler.
+Status: implemented foundation with operator-run daily portfolio snapshot, season ranking, daily season cycle, season settlement MVP, final tier assignment MVP, and reward grant internal reward foundation MVP jobs. Scheduler/Ops foundation now exists separately and is disabled by default.
 
 ## Scope
 
 The batch foundation is a common job execution envelope for operator-run work and possible future scheduler-run work. It records job start, finish, result, failure, dry-run mode, request payload, and idempotency state in `batch_job_runs`.
 
-This is not provider ingestion, cron scheduling, daily snapshot automation, or actual reward/payment/point/delivery/external fulfillment. Settlement, final tier assignment, and reward grant are limited to the operator-run MVP jobs described below.
+This is not provider ingestion, provider trigger HTTP API, batch HTTP API, production cron business automation, or actual reward/payment/point/delivery/external fulfillment. Settlement, final tier assignment, and reward grant are limited to the operator-run MVP jobs described below.
 
 ## Current Components
 
@@ -24,6 +24,8 @@ This is not provider ingestion, cron scheduling, daily snapshot automation, or a
 - Operator script: `scripts/admin-run-batch-job.ts`
 
 No batch write/run HTTP API exists. The project now has an admin/operator role foundation, but batch job HTTP execution remains a separate gate and users still cannot trigger batch jobs through an API.
+
+Scheduler/Ops foundation is documented in `docs/scheduler-ops-foundation.md`. Its internal daily snapshot runner can call `DailyPortfolioSnapshotJobService` with a job lock and ops audit, but automatic scheduler flags are disabled by default and placeholder jobs are recorded as skipped/not implemented.
 
 ## Idempotency Policy
 

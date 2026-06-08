@@ -2043,6 +2043,7 @@ describe('FxService', () => {
       expect(
         service.executePreMutationSkeleton({
           body: {
+            quoteId: 'quote-fx-1',
             fromCurrency: 'KRW',
             toCurrency: 'USD',
             sourceAmount: '1000',

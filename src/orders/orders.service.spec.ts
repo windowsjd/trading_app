@@ -360,11 +360,13 @@ describe('OrdersService', () => {
     quantity: string;
     limitPrice?: string;
     currencyCode?: CurrencyCode;
+    quoteId?: string;
   }) =>
     createHash('sha256')
       .update(
         JSON.stringify({
           apiVersion: 'order-create:v1',
+          quoteId: body.quoteId ?? 'quote-order-create-1',
           assetId: body.assetId,
           side: body.side,
           orderType: body.orderType,
@@ -389,9 +391,7 @@ describe('OrdersService', () => {
     idempotencyKey: 'order-create-key-duplicate',
   };
 
-  const buildOrderQuoteRecord = (
-    overrides: Record<string, unknown> = {},
-  ) => {
+  const buildOrderQuoteRecord = (overrides: Record<string, unknown> = {}) => {
     type QuoteAssetFixture = {
       id: string;
       symbol: string;
@@ -401,34 +401,33 @@ describe('OrdersService', () => {
       currencyCode: CurrencyCode;
       isActive: boolean;
     };
-    const asset =
-      (overrides.asset as QuoteAssetFixture | undefined) ?? {
-        id: (overrides.assetId as string | undefined) ?? 'asset-1',
-        symbol:
-          (overrides.currencyCode as CurrencyCode | undefined) ===
-          CurrencyCode.USD
-            ? 'AAPL'
-            : '005930',
-        name:
-          (overrides.currencyCode as CurrencyCode | undefined) ===
-          CurrencyCode.USD
-            ? 'Apple Inc.'
-            : 'Samsung',
-        market:
-          (overrides.currencyCode as CurrencyCode | undefined) ===
-          CurrencyCode.USD
-            ? 'NASDAQ'
-            : 'KRX',
-        assetType:
-          (overrides.currencyCode as CurrencyCode | undefined) ===
-          CurrencyCode.USD
-            ? AssetType.us_stock
-            : AssetType.domestic_stock,
-        currencyCode:
-          (overrides.currencyCode as CurrencyCode | undefined) ??
-          CurrencyCode.KRW,
-        isActive: true,
-      };
+    const asset = (overrides.asset as QuoteAssetFixture | undefined) ?? {
+      id: (overrides.assetId as string | undefined) ?? 'asset-1',
+      symbol:
+        (overrides.currencyCode as CurrencyCode | undefined) ===
+        CurrencyCode.USD
+          ? 'AAPL'
+          : '005930',
+      name:
+        (overrides.currencyCode as CurrencyCode | undefined) ===
+        CurrencyCode.USD
+          ? 'Apple Inc.'
+          : 'Samsung',
+      market:
+        (overrides.currencyCode as CurrencyCode | undefined) ===
+        CurrencyCode.USD
+          ? 'NASDAQ'
+          : 'KRX',
+      assetType:
+        (overrides.currencyCode as CurrencyCode | undefined) ===
+        CurrencyCode.USD
+          ? AssetType.us_stock
+          : AssetType.domestic_stock,
+      currencyCode:
+        (overrides.currencyCode as CurrencyCode | undefined) ??
+        CurrencyCode.KRW,
+      isActive: true,
+    };
     const assetId = (overrides.assetId as string | undefined) ?? asset.id;
     const side = (overrides.side as OrderSide | undefined) ?? OrderSide.buy;
     const orderType =
@@ -523,8 +522,9 @@ describe('OrdersService', () => {
         },
         execution: {
           state: 'not_executed',
-          reason: 'ORDER_EXECUTION_NOT_IMPLEMENTED',
-          message: 'Order execution is not implemented in this MVP.',
+          reason: 'ORDER_SUBMITTED_NOT_EXECUTED',
+          message:
+            'Order was submitted and can be executed through the execute endpoint.',
         },
       },
     },
@@ -570,31 +570,29 @@ describe('OrdersService', () => {
         ? new Prisma.Decimal('100.00000000')
         : null);
     const currencyCode =
-      (overrides.currencyCode as CurrencyCode | undefined) ??
-      CurrencyCode.KRW;
-    const asset =
-      (overrides.asset as
-        | {
-            id: string;
-            symbol: string;
-            name: string;
-            market: string;
-            assetType?: AssetType;
-            currencyCode: CurrencyCode;
-            isActive?: boolean;
-          }
-        | undefined) ?? {
-        id: assetId,
-        symbol: currencyCode === CurrencyCode.USD ? 'AAPL' : '005930',
-        name: currencyCode === CurrencyCode.USD ? 'Apple Inc.' : 'Samsung',
-        market: currencyCode === CurrencyCode.USD ? 'NASDAQ' : 'KRX',
-        assetType:
-          currencyCode === CurrencyCode.USD
-            ? AssetType.us_stock
-            : AssetType.domestic_stock,
-        currencyCode,
-        isActive: true,
-      };
+      (overrides.currencyCode as CurrencyCode | undefined) ?? CurrencyCode.KRW;
+    const asset = (overrides.asset as
+      | {
+          id: string;
+          symbol: string;
+          name: string;
+          market: string;
+          assetType?: AssetType;
+          currencyCode: CurrencyCode;
+          isActive?: boolean;
+        }
+      | undefined) ?? {
+      id: assetId,
+      symbol: currencyCode === CurrencyCode.USD ? 'AAPL' : '005930',
+      name: currencyCode === CurrencyCode.USD ? 'Apple Inc.' : 'Samsung',
+      market: currencyCode === CurrencyCode.USD ? 'NASDAQ' : 'KRX',
+      assetType:
+        currencyCode === CurrencyCode.USD
+          ? AssetType.us_stock
+          : AssetType.domestic_stock,
+      currencyCode,
+      isActive: true,
+    };
     const quote = Object.prototype.hasOwnProperty.call(overrides, 'quote')
       ? (overrides.quote as ReturnType<typeof buildOrderQuoteRecord> | null)
       : buildOrderQuoteRecord({
@@ -1482,7 +1480,9 @@ describe('OrdersService', () => {
       },
       execution: {
         state: 'not_executed',
-        reason: 'ORDER_EXECUTION_NOT_IMPLEMENTED',
+        reason: 'ORDER_SUBMITTED_NOT_EXECUTED',
+        message:
+          'Order was submitted and can be executed through the execute endpoint.',
       },
     });
     expect(prisma.order.create).toHaveBeenCalledWith(
@@ -1726,6 +1726,7 @@ describe('OrdersService', () => {
         orderType: 'limit',
         quantity: '1.00000000',
         limitPrice: '50000.00000000',
+        quoteId: 'quote-order-create-1',
       }),
     ).rejects.toBeInstanceOf(HttpException);
     expectNoOrderWrites(prisma);
@@ -1741,7 +1742,24 @@ describe('OrdersService', () => {
         orderType: 'limit',
         quantity: '1.00000000',
         limitPrice: '50000.00000000',
+        quoteId: 'quote-order-create-1',
         idempotencyKey: '   ',
+      }),
+    ).rejects.toBeInstanceOf(HttpException);
+    expectNoOrderWrites(prisma);
+  });
+
+  it('rejects create without quoteId', async () => {
+    const { prisma, service } = createService();
+
+    await expect(
+      service.createOrder('user-1', {
+        assetId: 'asset-1',
+        side: 'buy',
+        orderType: 'limit',
+        quantity: '1.00000000',
+        limitPrice: '50000.00000000',
+        idempotencyKey: 'order-create-key-1',
       }),
     ).rejects.toBeInstanceOf(HttpException);
     expectNoOrderWrites(prisma);
@@ -1776,6 +1794,27 @@ describe('OrdersService', () => {
 
     await expect(
       service.createOrder('user-1', orderCreateBody),
+    ).rejects.toBeInstanceOf(HttpException);
+    expect(prisma.order.create).not.toHaveBeenCalled();
+    expectNoOrderWrites(prisma);
+  });
+
+  it('conflicts duplicate create with same idempotencyKey and different quoteId', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    mockJoined(prisma);
+    mockAsset(prisma, CurrencyCode.KRW);
+    mockCashWallet(prisma, '1000000.00000000');
+    const existingHash = hashOrderCreateRequest(orderCreateBody);
+    prisma.order.findFirst.mockResolvedValueOnce(
+      idempotentOrderRecord(existingHash),
+    );
+
+    await expect(
+      service.createOrder('user-1', {
+        ...orderCreateBody,
+        quoteId: 'quote-order-create-2',
+      }),
     ).rejects.toBeInstanceOf(HttpException);
     expect(prisma.order.create).not.toHaveBeenCalled();
     expectNoOrderWrites(prisma);

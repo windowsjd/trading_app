@@ -19,7 +19,7 @@
   - `GET /api/v1/operator/me`는 `operator` 또는 `admin`만 접근 가능하고 `user`는 `403 OPERATOR_FORBIDDEN`.
   - `OperatorAuditLog` / `operator_audit_logs` foundation과 secret-like metadata redaction service가 추가됨.
   - Admin/operator MVP는 schema migration `20260601090000_add_user_role_operator_audit_logs` 적용이 필요하다. Runtime DB에는 `UserRole`, `users.role`, `OperatorAuditResult`, `operator_audit_logs`가 존재해야 보호 API와 operator audit foundation이 정상 동작한다.
-  - Admin role management API, provider ingestion trigger API, batch run HTTP API, reward fulfillment trigger API, scheduler/cron은 구현하지 않음.
+  - Admin role management API, provider ingestion trigger API, batch run HTTP API, reward fulfillment trigger API는 구현하지 않음. Scheduler/Ops foundation은 disabled-by-default 내부 기반만 존재하며 production cron 자동화는 열지 않음.
 - Crypto MVP policy changed to Binance-based USD-settled crypto.
   - Crypto uses USD Wallet like US stocks.
   - Crypto KRW valuation remains required for `totalAssetKrw`, ranking, home summary, snapshots, and final evaluation.
@@ -143,6 +143,14 @@
     - Orders execute loads `order.quote`, requires the quote to be active/unexpired/matching, reprices from fresh provider asset rows (`kis_krx_realtime_trade`, `kis_us_delayed_trade`, or `binance_public_rest_24hr_ticker`) with capturedAt age <= 10 seconds, uses fresh provider USD/KRW FX for USD assets with capturedAt age <= 60 seconds, applies market movement and limit marketability guards, and consumes the quote atomically with wallet/position/order/ledger writes.
     - Execute paths forbid default `admin_manual` fallback. Provider missing/stale/unavailable fails instead of executing.
     - Ranking/settlement/reward, scheduler/cron, provider ingestion trigger APIs, batch HTTP APIs, KIS order/account/balance/fill/deposit/withdrawal APIs, Binance authenticated/order/account/user-data APIs, and real external trading/account integrations remain closed.
+  - Durable Quote hardening and Scheduler/Ops Foundation Gate on 2026-06-08 KST:
+    - FX execute idempotency requestHash now includes trimmed `quoteId`; same `userId + idempotencyKey` with a different `quoteId` returns `IDEMPOTENCY_CONFLICT` and does not replay the previous response.
+    - Orders create idempotency requestHash now includes trimmed `quoteId`; same `seasonParticipantId + idempotencyKey` with a different `quoteId` returns `ORDER_IDEMPOTENCY_CONFLICT` and does not replay the submitted order.
+    - Orders create response wording now uses `ORDER_SUBMITTED_NOT_EXECUTED` and states that the submitted order can be executed through the execute endpoint.
+    - Scheduler/Ops foundation is implemented with `OpsJobName`, `OpsJobRunStatus`, `OpsJobTrigger`, `ops_job_runs`, `ops_job_locks`, internal lock/run/runner/scheduler services, and public-safe `/readiness`.
+    - Scheduler env defaults are disabled: `SCHEDULER_ENABLED=false` and all individual `SCHEDULER_*_ENABLED=false` flags. No secret scheduler env was added.
+    - Internal daily snapshot ops runner can call `DailyPortfolioSnapshotJobService` with lock/audit/dryRun support. Provider FX/Binance ingestion, ranking generation, settlement, and reward marker scheduler runners remain explicit `skipped/NOT_IMPLEMENTED` placeholders.
+    - Provider ingestion HTTP trigger APIs, batch HTTP APIs, admin role management APIs, reward fulfillment, KIS order/account APIs, Binance authenticated APIs, and real trading/account integrations remain closed.
   - Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage; USDT depeg risk is not modeled.
   - Provider_api source eligibility for ranking, settlement, reward, and automation remains a separate gate.
   - KIS supports WebSocket approval_key retrieval, domestic KRX real-time trade price `H0STCNT0`, and overseas/US delayed trade price `HDFSCNT0` ingestion foundation into `asset_price_snapshots` provider_api rows.
@@ -158,6 +166,8 @@
 - `POST /api/v1/auth/logout-all` user refresh sessions revoke MVP
 - `GET /api/v1/me` Bearer access token Auth MVP
 - `GET /api/v1/operator/me` operator/admin authorization smoke MVP
+- `GET /readiness` public readiness MVP
+  - DB lightweight query와 disabled-by-default scheduler config 상태만 노출하며 외부 provider API를 호출하지 않음.
 - `GET /api/v1/home` read-only MVP
   - settled season joined read model은 `rankType=final` `season_rankings`를 authoritative final result로 읽음.
 - `GET /api/v1/ranking` read-only MVP
@@ -817,7 +827,7 @@ near-term ledger/FX foundation:
 - valuation data가 없으면 전체 API 실패나 fake fallback 없이 해당 position의 `valuation.state = unavailable`로 반환.
 - KRW position은 USD/KRW 없이 valuation 가능하고, USD position은 FX missing/stale이면 해당 valuation만 unavailable.
 - `totalPositionValueKrw`는 valuation available position만 합산.
-- provider-backed execute/write, ranking, settlement/reward, scheduler/cron 구현 없음. Daily snapshot은 operator-run batch valuation workflow에 한해 provider_api fresh-first가 허용됨.
+- ranking, settlement/reward provider_api 직접 사용과 production scheduler/cron 자동화 구현 없음. Provider-backed execute/write는 Durable Quote gate로 열렸고, daily snapshot은 operator-run batch valuation workflow에 한해 provider_api fresh-first가 허용됨.
 - `/positions` 호출은 wallet/order/position/snapshot/ranking/ledger row를 생성/수정/삭제하지 않음.
 
 ### `/assets`

@@ -1,5 +1,8 @@
 import { createHash } from 'node:crypto';
-import { formatMoneyScale8, parsePositiveDecimalString } from './fx-decimal-policy';
+import {
+  formatMoneyScale8,
+  parsePositiveDecimalString,
+} from './fx-decimal-policy';
 
 export const fxExecuteRequestHashApiVersion = 'fx-execute:v1' as const;
 
@@ -7,6 +10,7 @@ export type FxExecuteCanonicalPayload = {
   apiVersion: typeof fxExecuteRequestHashApiVersion;
   userId: string;
   seasonParticipantId: string;
+  quoteId: string;
   fromCurrency: string;
   toCurrency: string;
   sourceAmount: string;
@@ -15,6 +19,7 @@ export type FxExecuteCanonicalPayload = {
 export type BuildFxExecuteCanonicalPayloadInput = {
   userId: string;
   seasonParticipantId: string;
+  quoteId: string;
   fromCurrency: string;
   toCurrency: string;
   sourceAmount: string;
@@ -31,6 +36,7 @@ export function buildFxExecuteCanonicalPayload(
       input.seasonParticipantId,
       'seasonParticipantId',
     ),
+    quoteId: normalizeRequiredString(input.quoteId, 'quoteId'),
     fromCurrency: normalizeCurrency(input.fromCurrency, 'fromCurrency'),
     toCurrency: normalizeCurrency(input.toCurrency, 'toCurrency'),
     sourceAmount: formatMoneyScale8(

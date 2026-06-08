@@ -22,6 +22,7 @@ describe('fx execute idempotency policy', () => {
   const baseInput = {
     userId: 'user-1',
     seasonParticipantId: 'participant-1',
+    quoteId: 'quote-fx-1',
     fromCurrency: 'KRW',
     toCurrency: 'USD',
     sourceAmount: '1000',
@@ -85,15 +86,20 @@ describe('fx execute idempotency policy', () => {
         seasonParticipantId: 'participant-2',
       }),
     ).not.toBe(originalHash);
+    expect(
+      computeFxExecuteRequestHash({
+        ...baseInput,
+        quoteId: 'quote-fx-2',
+      }),
+    ).not.toBe(originalHash);
   });
 
-  it('excludes timestamp, rate, wallet balance, quote, and idempotency key fields', () => {
+  it('excludes timestamp, rate, wallet balance, and idempotency key fields', () => {
     const originalHash = computeFxExecuteRequestHash(baseInput);
     const extraFieldsHash = computeFxExecuteRequestHash({
       ...baseInput,
       idempotencyKey: 'idempotency-key-1',
       requestedAt: '2026-05-01T00:00:00.000Z',
-      quoteId: 'quote-1',
       expiresAt: '2026-05-01T00:01:00.000Z',
       fxRateSnapshotId: 'snapshot-1',
       appliedRate: '1350.00000000',
@@ -108,7 +114,7 @@ describe('fx execute idempotency policy', () => {
     const canonicalPayload = buildFxExecuteCanonicalPayload(baseInput);
 
     expect(serializeFxExecuteCanonicalPayload(canonicalPayload)).toBe(
-      '{"apiVersion":"fx-execute:v1","userId":"user-1","seasonParticipantId":"participant-1","fromCurrency":"KRW","toCurrency":"USD","sourceAmount":"1000.00000000"}',
+      '{"apiVersion":"fx-execute:v1","userId":"user-1","seasonParticipantId":"participant-1","quoteId":"quote-fx-1","fromCurrency":"KRW","toCurrency":"USD","sourceAmount":"1000.00000000"}',
     );
   });
 

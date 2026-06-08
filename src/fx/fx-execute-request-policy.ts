@@ -1,4 +1,7 @@
-import { formatMoneyScale8, parsePositiveDecimalString } from './fx-decimal-policy';
+import {
+  formatMoneyScale8,
+  parsePositiveDecimalString,
+} from './fx-decimal-policy';
 import {
   computeFxExecuteRequestHash,
   type BuildFxExecuteCanonicalPayloadInput,
@@ -26,6 +29,7 @@ export type FxExecuteRequestContextLike = {
 export type NormalizedFxExecuteRequest = {
   userId: string;
   seasonParticipantId: string;
+  quoteId: string;
   fromCurrency: FxExecuteCurrency;
   toCurrency: FxExecuteCurrency;
   sourceAmount: string;
@@ -53,6 +57,12 @@ export function preflightFxExecuteRequest(
     return { ok: false, errorCode: fxExecuteErrorCodes.IDEMPOTENCY_REQUIRED };
   }
 
+  const quoteId = parseQuoteId(body.quoteId);
+
+  if (!quoteId) {
+    return { ok: false, errorCode: fxExecuteErrorCodes.QUOTE_REQUIRED };
+  }
+
   const currencyPair = parseExecuteCurrencyPair(
     body.fromCurrency,
     body.toCurrency,
@@ -71,6 +81,7 @@ export function preflightFxExecuteRequest(
   const hashInput: BuildFxExecuteCanonicalPayloadInput = {
     userId,
     seasonParticipantId,
+    quoteId,
     fromCurrency: currencyPair.fromCurrency,
     toCurrency: currencyPair.toCurrency,
     sourceAmount,
@@ -83,6 +94,7 @@ export function preflightFxExecuteRequest(
     value: {
       userId,
       seasonParticipantId,
+      quoteId,
       fromCurrency: currencyPair.fromCurrency,
       toCurrency: currencyPair.toCurrency,
       sourceAmount,
@@ -101,6 +113,16 @@ function assertRequiredContextString(value: string, fieldName: string): string {
 }
 
 function parseIdempotencyKey(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  return trimmed === '' ? null : trimmed;
+}
+
+function parseQuoteId(value: unknown): string | null {
   if (typeof value !== 'string') {
     return null;
   }

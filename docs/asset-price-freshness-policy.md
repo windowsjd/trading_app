@@ -13,7 +13,7 @@ This policy records freshness and source boundaries after provider ingestion fou
 - Provider API Source Eligibility Implementation Gate later opened provider_api only for `/fx quote`, assets `withPrice`, orders quote, and live portfolio/home/positions valuation.
 - Provider-backed Daily Snapshot Eligibility Gate later opened provider_api only for operator-run daily snapshot valuation, using the same provider sourceName allowlist and freshness thresholds.
 - `docs/realtime-execution-policy.md` now defines and the services implement the stricter execute/write freshness and quote-to-execute movement policy for `/fx execute` and orders execute: KRX/US/BINANCE asset execute freshness <= 10 seconds by `capturedAt`, USD/KRW FX execute freshness <= 60 seconds by `capturedAt`, no default admin_manual execute fallback, and quote is only a reference quote.
-- Orders create source selection, ranking, settlement/final result, reward/final tier/fulfillment, scheduler/cron, provider trigger APIs, KIS REST current-price ingestion, orderbook/hoga WebSocket ingestion, and order/account/balance/real-trading APIs remain closed.
+- Orders create source selection, ranking, settlement/final result, reward/final tier/fulfillment, provider trigger APIs, production scheduler automation, KIS REST current-price ingestion, orderbook/hoga WebSocket ingestion, and order/account/balance/real-trading APIs remain closed.
 
 ## 2. Current Price Storage Model
 

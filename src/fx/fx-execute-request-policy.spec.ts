@@ -26,6 +26,7 @@ describe('fx execute request policy', () => {
   };
 
   const validKrwUsdBody: FxExecuteRequestBodyLike = {
+    quoteId: 'quote-fx-1',
     fromCurrency: 'KRW',
     toCurrency: 'USD',
     sourceAmount: '1000',
@@ -50,6 +51,7 @@ describe('fx execute request policy', () => {
       value: {
         userId: 'user-1',
         seasonParticipantId: 'participant-1',
+        quoteId: 'quote-fx-1',
         fromCurrency: 'KRW',
         toCurrency: 'USD',
         sourceAmount: '1000.00000000',
@@ -62,6 +64,7 @@ describe('fx execute request policy', () => {
   it('canonicalizes a valid USD to KRW request', () => {
     const result = preflightFxExecuteRequest(
       {
+        quoteId: 'quote-fx-1',
         fromCurrency: 'USD',
         toCurrency: 'KRW',
         sourceAmount: '100',
@@ -141,6 +144,7 @@ describe('fx execute request policy', () => {
     const expectedHash = computeFxExecuteRequestHash({
       userId: 'user-1',
       seasonParticipantId: 'participant-1',
+      quoteId: 'quote-fx-1',
       fromCurrency: 'KRW',
       toCurrency: 'USD',
       sourceAmount: '1000.00000000',
@@ -170,6 +174,35 @@ describe('fx execute request policy', () => {
     if (first.ok && second.ok) {
       expect(first.value.requestHash).toBe(second.value.requestHash);
       expect(first.value.idempotencyKey).not.toBe(second.value.idempotencyKey);
+    }
+  });
+
+  it('includes normalized quoteId in requestHash', () => {
+    const first = preflightFxExecuteRequest(
+      {
+        ...validKrwUsdBody,
+        quoteId: ' quote-fx-1 ',
+      },
+      context,
+    );
+    const second = preflightFxExecuteRequest(
+      {
+        ...validKrwUsdBody,
+        quoteId: 'quote-fx-2',
+      },
+      context,
+    );
+
+    expect(first).toMatchObject({
+      ok: true,
+      value: {
+        quoteId: 'quote-fx-1',
+      },
+    });
+    expect(second).toMatchObject({ ok: true });
+
+    if (first.ok && second.ok) {
+      expect(first.value.requestHash).not.toBe(second.value.requestHash);
     }
   });
 
@@ -203,6 +236,21 @@ describe('fx execute request policy', () => {
         sourceAmount,
       },
       'INVALID_AMOUNT',
+    );
+  });
+
+  it.each([
+    ['missing quoteId', undefined],
+    ['empty quoteId', ''],
+    ['whitespace-only quoteId', '   '],
+    ['non-string quoteId', 123],
+  ])('returns QUOTE_REQUIRED for %s', (_label, quoteId) => {
+    expectErrorCode(
+      {
+        ...validKrwUsdBody,
+        quoteId,
+      },
+      'QUOTE_REQUIRED',
     );
   });
 
@@ -260,7 +308,6 @@ describe('fx execute request policy', () => {
   it('does not include execute-time or wallet fields in the normalized result', () => {
     const bodyWithIgnoredFields = {
       ...validKrwUsdBody,
-      quoteId: 'quote-1',
       appliedRate: '1350.00000000',
       walletId: 'wallet-1',
       balance: '100000.00000000',
@@ -275,13 +322,13 @@ describe('fx execute request policy', () => {
       expect(Object.keys(result.value).sort()).toEqual([
         'fromCurrency',
         'idempotencyKey',
+        'quoteId',
         'requestHash',
         'seasonParticipantId',
         'sourceAmount',
         'toCurrency',
         'userId',
       ]);
-      expect(result.value).not.toHaveProperty('quoteId');
       expect(result.value).not.toHaveProperty('appliedRate');
       expect(result.value).not.toHaveProperty('walletId');
       expect(result.value).not.toHaveProperty('balance');

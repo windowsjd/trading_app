@@ -141,7 +141,9 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 ```
 
 - `quoteId` and `idempotencyKey` are required for new mutations.
+- FX execute idempotency `requestHash` includes the trimmed `quoteId` together with user, participant, currency pair, and normalized `sourceAmount`.
 - Existing idempotency replay is checked before quote validation, so a duplicate completed command can return the stored response without consuming a quote again.
+- Same `userId + idempotencyKey + quoteId + request fields` can replay a stored successful response. Same `userId + idempotencyKey` with a different `quoteId` returns `IDEMPOTENCY_CONFLICT` and must not replay the previous response.
 - `fromCurrency`, `toCurrency`, and `sourceAmount` must match the stored quote requestHash and fields.
 - Historical implementation-gate detail is archived in `docs/archive/fx-execute-final-implementation-gate.md`; current implementation status is tracked in `docs/current-status.md`.
 

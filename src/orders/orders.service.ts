@@ -228,7 +228,7 @@ type CreateOrderResponse = {
     order: NonNullable<OrdersResponse['data']['orders']>[number];
     execution: {
       state: 'not_executed';
-      reason: 'ORDER_EXECUTION_NOT_IMPLEMENTED';
+      reason: 'ORDER_SUBMITTED_NOT_EXECUTED';
       message: string;
     };
   };
@@ -475,7 +475,12 @@ export class OrdersService {
     }
 
     const request = this.parseOrderRequest(body);
-    const idempotency = this.buildOrderCreateIdempotency(body, request);
+    const quoteId = this.parseQuoteId(body.quoteId);
+    const idempotency = this.buildOrderCreateIdempotency({
+      body,
+      request,
+      quoteId,
+    });
     const submittedAt = new Date();
     const season = await this.findActiveSeasonOrThrow();
     const participant = await this.findParticipantOrThrow(season.id, userId);
@@ -488,7 +493,6 @@ export class OrdersService {
       return this.replayIdempotentCreateOrder(existingOrder, idempotency);
     }
 
-    const quoteId = this.parseQuoteId(body.quoteId);
     const quote = await this.findActiveOrderQuoteForCreateOrThrow({
       quoteId,
       userId,
@@ -528,9 +532,7 @@ export class OrdersService {
         status: OrderStatus.submitted,
         quantity: request.quantity,
         limitPrice:
-          request.orderType === OrderType.limit
-            ? request.limitPrice
-            : null,
+          request.orderType === OrderType.limit ? request.limitPrice : null,
         executedPrice: null,
         currencyCode: quote.asset.currencyCode,
         grossAmount,
@@ -568,10 +570,7 @@ export class OrdersService {
           quantity: this.formatDecimal(request.quantity, monetaryScale),
           limitPrice:
             request.orderType === OrderType.limit
-              ? this.formatNullableDecimal(
-                  request.limitPrice,
-                  monetaryScale,
-                )
+              ? this.formatNullableDecimal(request.limitPrice, monetaryScale)
               : null,
           executedPrice: null,
           currencyCode: quote.asset.currencyCode,
@@ -1038,9 +1037,11 @@ export class OrdersService {
     tx: OrderExecuteTransactionClient,
     order: OrderExecutionRecord,
     executedAt: Date,
-  ): Promise<NonNullable<OrderExecutionRecord['quote']> & {
-    quotedPrice: Prisma.Decimal;
-  }> {
+  ): Promise<
+    NonNullable<OrderExecutionRecord['quote']> & {
+      quotedPrice: Prisma.Decimal;
+    }
+  > {
     const quote = order.quote;
     if (!order.quoteId || !quote) {
       this.throwApiError(
@@ -1068,7 +1069,11 @@ export class OrdersService {
           status: QuoteStatus.expired,
         },
       });
-      this.throwApiError(HttpStatus.CONFLICT, 'QUOTE_EXPIRED', 'Quote has expired.');
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'QUOTE_EXPIRED',
+        'Quote has expired.',
+      );
     }
 
     const expectedHash = computeOrderQuoteRequestHash({
@@ -1078,8 +1083,7 @@ export class OrdersService {
       side: order.side,
       orderType: order.orderType,
       quantity: order.quantity,
-      limitPrice:
-        order.orderType === OrderType.limit ? order.limitPrice : null,
+      limitPrice: order.orderType === OrderType.limit ? order.limitPrice : null,
       currencyCode: order.currencyCode,
     });
 
@@ -1919,7 +1923,10 @@ export class OrdersService {
           executedAt: result.plan.executedAt.toISOString(),
           priceSource: 'provider_api',
           quoteId: result.order.quoteId,
-          quotedPrice: this.formatDecimal(result.plan.quotedPrice, monetaryScale),
+          quotedPrice: this.formatDecimal(
+            result.plan.quotedPrice,
+            monetaryScale,
+          ),
           executePrice: this.formatDecimal(
             result.plan.executedPrice,
             monetaryScale,
@@ -2240,7 +2247,11 @@ export class OrdersService {
     });
 
     if (!quote) {
-      this.throwApiError(HttpStatus.NOT_FOUND, 'QUOTE_NOT_FOUND', 'Quote not found.');
+      this.throwApiError(
+        HttpStatus.NOT_FOUND,
+        'QUOTE_NOT_FOUND',
+        'Quote not found.',
+      );
     }
 
     if (quote.status !== QuoteStatus.active) {
@@ -2261,7 +2272,11 @@ export class OrdersService {
           status: QuoteStatus.expired,
         },
       });
-      this.throwApiError(HttpStatus.CONFLICT, 'QUOTE_EXPIRED', 'Quote has expired.');
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'QUOTE_EXPIRED',
+        'Quote has expired.',
+      );
     }
 
     if (!quote.asset) {
@@ -2346,13 +2361,16 @@ export class OrdersService {
     return participant;
   }
 
-  private buildOrderCreateIdempotency(
-    body: OrderRequestBody,
-    request: ParsedOrderRequest,
-  ): OrderCreateIdempotency {
+  private buildOrderCreateIdempotency(input: {
+    body: OrderRequestBody;
+    request: ParsedOrderRequest;
+    quoteId: string;
+  }): OrderCreateIdempotency {
+    const { body, request, quoteId } = input;
     const idempotencyKey = this.parseIdempotencyKey(body.idempotencyKey);
     const canonicalPayload = {
       apiVersion: ORDER_CREATE_REQUEST_HASH_API_VERSION,
+      quoteId,
       assetId: request.assetId,
       side: request.side,
       orderType: request.orderType,
@@ -2515,8 +2533,9 @@ export class OrdersService {
         order,
         execution: {
           state: 'not_executed',
-          reason: 'ORDER_EXECUTION_NOT_IMPLEMENTED',
-          message: 'Order execution is not implemented in this MVP.',
+          reason: 'ORDER_SUBMITTED_NOT_EXECUTED',
+          message:
+            'Order was submitted and can be executed through the execute endpoint.',
         },
       },
     };
@@ -3255,9 +3274,7 @@ export class OrdersService {
       ...(quote.fxRateSource ? { fxRateSource: quote.fxRateSource } : {}),
       quoteId: quote.quoteId,
       expiresAt: quote.expiresAt ? quote.expiresAt.toISOString() : null,
-      maxChangeBps: quote.maxChangeBps
-        ? quote.maxChangeBps.toFixed(4)
-        : null,
+      maxChangeBps: quote.maxChangeBps ? quote.maxChangeBps.toFixed(4) : null,
       quoteAt: quote.quoteAt.toISOString(),
     };
   }

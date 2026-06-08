@@ -23,7 +23,7 @@
 - `cryptoValueKrw` means KRW-converted value of crypto positions; `totalAssetKrw` and `returnRate` remain KRW-based.
 - Active live valuation and `topPositions` may use fresh eligible `provider_api` rows first, then existing `admin_manual` fallback rows.
 - Provider asset price freshness uses capturedAt age <= 60 seconds; provider USD/KRW freshness uses capturedAt age <= 300 seconds.
-- Settled final result, ranking, rewards, equity chart reads, and scheduler/cron do not use live provider rows. Operator-run daily snapshot generation may consume existing fresh eligible provider_api DB rows first with admin_manual fallback, but Home still reads the generated snapshot rows and does not query provider rows for daily snapshot sections.
+- Settled final result, ranking, rewards, equity chart reads, and scheduler/ops status do not use live provider rows. Operator-run daily snapshot generation may consume existing fresh eligible provider_api DB rows first with admin_manual fallback, but Home still reads the generated snapshot rows and does not query provider rows for daily snapshot sections.
 - Active live valuation sections may expose public-safe source metadata for outage visibility: `sourceSummary`, `priceSource`, and `fxRateSource`.
 - Daily snapshot summary, ranking, final result, rewards, and equity chart sections do not expose provider source metadata because they read existing snapshot/ranking/reward rows.
 - Raw provider payloads, `metadataJson`, and secrets are never exposed.

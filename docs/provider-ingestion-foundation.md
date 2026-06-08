@@ -13,7 +13,7 @@ Fixed KIS stock universe status as of 2026-05-30 KST:
 - After the local DB was started on 2026-05-30, all fixed 40 stock assets were upserted successfully and DB mapping counts passed: domestic 15/15, US 25/25, KIS total 40/41.
 - ExchangeRate and Binance dry-runs succeeded after DB restart; Binance `BTCUSDT` and `ETHUSDT` mapped to existing active `BINANCE` USD crypto assets.
 - KIS live smoke remained blocked on 2026-05-30 because KIS REST/WS endpoint env values were missing in the loaded env. Explicit WebSocket policy env values were also absent, but code defaults are defined.
-- `provider_api` source eligibility is open only for the 2026-06-03 read-only/quote workflows and the 2026-06-05 operator-run daily snapshot valuation workflow. Execute/write, ranking, settlement, reward, scheduler/cron, provider trigger APIs, batch HTTP APIs, and real trading/account surfaces remain closed.
+- `provider_api` source eligibility is open only for the explicit read-only/quote workflows, `/fx execute`, orders execute, and the operator-run daily snapshot valuation workflow. Ranking, settlement, reward, provider trigger APIs, batch HTTP APIs, production scheduler automation, and real trading/account surfaces remain closed.
 
 KIS env completion pre-gate update as of 2026-05-30 KST:
 
@@ -89,7 +89,7 @@ Live smoke evidence status as of 2026-05-28 KST:
 - Binance public REST dry-run and non-dry-run live smoke succeeded for `BTCUSDT` and `ETHUSDT`, mapped to existing active `BINANCE` crypto USD assets, and created two local `asset_price_snapshots` rows with `sourceType=provider_api`, `sourceName=binance_public_rest_24hr_ticker`, and `currencyCode=USD`.
 - KIS WebSocket live smoke was not executed because required endpoint env was incomplete: `KIS_REST_BASE_URL` and `KIS_WS_BASE_URL` were missing. KIS approval_key, WebSocket connect, subscribe ack, domestic `H0STCNT0` tick, US `HDFSCNT0` tick, and KIS DB row insertion remain `BLOCKED`.
 - No secret values, approval keys, `.env.local` contents, `DATABASE_URL`, or full raw WebSocket frames were printed or documented.
-- This evidence is now accepted for the read-only/quote source eligibility gate and the operator-run daily snapshot valuation gate. It still does not open execute, create, ranking, settlement, reward, scheduler/cron, provider trigger, batch HTTP API, or real trading/account paths.
+- This evidence is now accepted for the read-only/quote source eligibility gate, Durable Quote provider execute gate, and the operator-run daily snapshot valuation gate. It still does not open orders create source selection, ranking, settlement, reward, provider trigger, batch HTTP API, production scheduler automation, or real trading/account paths.
 
 ## Scope
 

@@ -8,6 +8,7 @@ import { BatchModule } from './batch/batch.module';
 import { FxModule } from './fx/fx.module';
 import { HomeModule } from './home/home.module';
 import { OperatorModule } from './operator/operator.module';
+import { OpsModule } from './ops/ops.module';
 import { OrdersModule } from './orders/orders.module';
 import { PositionsModule } from './positions/positions.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -30,6 +31,7 @@ import { WalletsModule } from './wallets/wallets.module';
     FxModule,
     HomeModule,
     OperatorModule,
+    OpsModule,
     OrdersModule,
     PositionsModule,
     PrismaModule,

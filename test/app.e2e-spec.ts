@@ -44,6 +44,27 @@ jest.mock('../src/generated/prisma/client', () => {
       success: 'success',
       failure: 'failure',
     },
+    OpsJobName: {
+      provider_fx_ingest: 'provider_fx_ingest',
+      provider_binance_ingest: 'provider_binance_ingest',
+      daily_portfolio_snapshot: 'daily_portfolio_snapshot',
+      season_ranking_generation: 'season_ranking_generation',
+      season_settlement: 'season_settlement',
+      reward_marker: 'reward_marker',
+    },
+    OpsJobRunStatus: {
+      running: 'running',
+      succeeded: 'succeeded',
+      failed: 'failed',
+      skipped: 'skipped',
+      locked: 'locked',
+    },
+    OpsJobTrigger: {
+      scheduler: 'scheduler',
+      operator: 'operator',
+      manual_script: 'manual_script',
+      test: 'test',
+    },
     ParticipantStatus: {
       active: 'active',
       registered: 'registered',
@@ -226,6 +247,7 @@ describe('AppController (e2e)', () => {
   const originalJwtAccessSecret = process.env.JWT_ACCESS_SECRET;
   const originalJwtAccessTtl = process.env.JWT_ACCESS_TTL;
   const originalRefreshTokenTtl = process.env.REFRESH_TOKEN_TTL;
+  const originalSchedulerEnabled = process.env.SCHEDULER_ENABLED;
   const now = new Date('2026-05-09T00:00:00.000Z');
   const user = {
     id: 'user-1',
@@ -276,6 +298,7 @@ describe('AppController (e2e)', () => {
     process.env.JWT_ACCESS_SECRET = 'test-secret';
     process.env.JWT_ACCESS_TTL = '15m';
     process.env.REFRESH_TOKEN_TTL = '7d';
+    process.env.SCHEDULER_ENABLED = 'false';
   });
 
   afterAll(() => {
@@ -295,6 +318,12 @@ describe('AppController (e2e)', () => {
       delete process.env.REFRESH_TOKEN_TTL;
     } else {
       process.env.REFRESH_TOKEN_TTL = originalRefreshTokenTtl;
+    }
+
+    if (originalSchedulerEnabled === undefined) {
+      delete process.env.SCHEDULER_ENABLED;
+    } else {
+      process.env.SCHEDULER_ENABLED = originalSchedulerEnabled;
     }
   });
 
@@ -623,6 +652,7 @@ describe('AppController (e2e)', () => {
       method: 'post',
       path: '/api/v1/fx/execute',
       body: {
+        quoteId: 'quote-fx-e2e-1',
         idempotencyKey: 'e2e-fx-exec-1',
         fromCurrency: 'KRW',
         toCurrency: 'USD',
@@ -650,6 +680,7 @@ describe('AppController (e2e)', () => {
         side: 'buy',
         orderType: 'market',
         quantity: '1',
+        quoteId: 'quote-order-e2e-1',
         idempotencyKey: 'e2e-order-create-1',
       },
     },
@@ -691,6 +722,35 @@ describe('AppController (e2e)', () => {
       })
       .expect(() => {
         expect(prisma.user.findUnique).not.toHaveBeenCalled();
+      });
+  });
+
+  it('/readiness (GET) reports database and scheduler readiness without secrets', () => {
+    prisma.$queryRaw.mockResolvedValueOnce([{ result: 1 }]);
+
+    return request(app.getHttpServer())
+      .get('/readiness')
+      .expect(200)
+      .expect((response) => {
+        expect(response.body).toEqual({
+          success: true,
+          data: {
+            app: 'ok',
+            database: 'ok',
+            scheduler: {
+              enabled: false,
+              timezone: 'Asia/Seoul',
+              jobs: expect.objectContaining({
+                daily_portfolio_snapshot: false,
+                provider_fx_ingest: false,
+              }),
+            },
+            currentTime: expect.any(String),
+          },
+        });
+        expect(JSON.stringify(response.body)).not.toMatch(
+          /DATABASE_URL|KIS_APP_SECRET|approval_key|access_token/i,
+        );
       });
   });
 
@@ -1966,6 +2026,7 @@ describe('AppController (e2e)', () => {
       label: 'POST /api/v1/fx/execute',
       path: '/api/v1/fx/execute',
       body: {
+        quoteId: 'quote-fx-e2e-1',
         idempotencyKey: 'e2e-fx-exec-1',
         fromCurrency: 'KRW',
         toCurrency: 'USD',
@@ -2025,6 +2086,7 @@ describe('AppController (e2e)', () => {
         side: 'buy',
         orderType: 'market',
         quantity: '1',
+        quoteId: 'quote-order-e2e-1',
         idempotencyKey: 'e2e-order-create-1',
       },
       expectedStatus: 403,

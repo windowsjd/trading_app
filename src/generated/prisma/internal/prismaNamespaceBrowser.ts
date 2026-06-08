@@ -72,7 +72,9 @@ export const ModelName = {
   EquitySnapshot: 'EquitySnapshot',
   DailyPortfolioSnapshot: 'DailyPortfolioSnapshot',
   SeasonRanking: 'SeasonRanking',
-  BatchJobRun: 'BatchJobRun'
+  BatchJobRun: 'BatchJobRun',
+  OpsJobRun: 'OpsJobRun',
+  OpsJobLock: 'OpsJobLock'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -498,6 +500,46 @@ export const BatchJobRunScalarFieldEnum = {
 } as const
 
 export type BatchJobRunScalarFieldEnum = (typeof BatchJobRunScalarFieldEnum)[keyof typeof BatchJobRunScalarFieldEnum]
+
+
+export const OpsJobRunScalarFieldEnum = {
+  id: 'id',
+  jobName: 'jobName',
+  status: 'status',
+  trigger: 'trigger',
+  requestedBy: 'requestedBy',
+  startedAt: 'startedAt',
+  finishedAt: 'finishedAt',
+  durationMs: 'durationMs',
+  lockKey: 'lockKey',
+  idempotencyKey: 'idempotencyKey',
+  dryRun: 'dryRun',
+  attempt: 'attempt',
+  maxAttempts: 'maxAttempts',
+  errorCode: 'errorCode',
+  errorMessage: 'errorMessage',
+  resultJson: 'resultJson',
+  metadataJson: 'metadataJson',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type OpsJobRunScalarFieldEnum = (typeof OpsJobRunScalarFieldEnum)[keyof typeof OpsJobRunScalarFieldEnum]
+
+
+export const OpsJobLockScalarFieldEnum = {
+  id: 'id',
+  lockKey: 'lockKey',
+  jobName: 'jobName',
+  ownerId: 'ownerId',
+  acquiredAt: 'acquiredAt',
+  expiresAt: 'expiresAt',
+  releasedAt: 'releasedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type OpsJobLockScalarFieldEnum = (typeof OpsJobLockScalarFieldEnum)[keyof typeof OpsJobLockScalarFieldEnum]
 
 
 export const SortOrder = {

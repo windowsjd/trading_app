@@ -149,3 +149,13 @@ export type SeasonRanking = Prisma.SeasonRankingModel
  *
  */
 export type BatchJobRun = Prisma.BatchJobRunModel
+/**
+ * Model OpsJobRun
+ *
+ */
+export type OpsJobRun = Prisma.OpsJobRunModel
+/**
+ * Model OpsJobLock
+ *
+ */
+export type OpsJobLock = Prisma.OpsJobLockModel
