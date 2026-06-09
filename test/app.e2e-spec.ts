@@ -44,6 +44,13 @@ jest.mock('../src/generated/prisma/client', () => {
       success: 'success',
       failure: 'failure',
     },
+    RewardFulfillmentStatus: {
+      pending: 'pending',
+      processing: 'processing',
+      fulfilled: 'fulfilled',
+      failed: 'failed',
+      canceled: 'canceled',
+    },
     OpsJobName: {
       provider_fx_ingest: 'provider_fx_ingest',
       provider_binance_ingest: 'provider_binance_ingest',
@@ -89,6 +96,11 @@ jest.mock('../src/generated/prisma/client', () => {
     SeasonRankingType: {
       daily: 'daily',
       final: 'final',
+    },
+    SeasonRewardType: {
+      internal: 'internal',
+      badge: 'badge',
+      trophy: 'trophy',
     },
     UserStatus: {
       active: 'active',
@@ -149,7 +161,7 @@ import { createHash } from 'node:crypto';
 
 const mockedArgon2 = jest.mocked(argon2);
 
-type HttpMethod = 'get' | 'post';
+type HttpMethod = 'get' | 'patch' | 'post';
 
 type PrismaMock = {
   $connect: jest.Mock;
@@ -212,6 +224,14 @@ type PrismaMock = {
     findUnique: jest.Mock;
     updateMany: jest.Mock;
   };
+  rewardFulfillmentRequest: {
+    count: jest.Mock;
+    create: jest.Mock;
+    findMany: jest.Mock;
+    findUnique: jest.Mock;
+    update: jest.Mock;
+    updateMany: jest.Mock;
+  };
   operatorAuditLog: {
     create: jest.Mock;
   };
@@ -229,6 +249,10 @@ type PrismaMock = {
     count: jest.Mock;
     findFirst: jest.Mock;
     findMany: jest.Mock;
+    findUnique: jest.Mock;
+  };
+  seasonReward: {
+    create: jest.Mock;
     findUnique: jest.Mock;
   };
   user: {
@@ -399,6 +423,14 @@ describe('AppController (e2e)', () => {
         findUnique: jest.fn(),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
+      rewardFulfillmentRequest: {
+        count: jest.fn(),
+        create: jest.fn(),
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+      },
       operatorAuditLog: {
         create: jest.fn().mockResolvedValue({
           id: 'audit-1',
@@ -419,6 +451,10 @@ describe('AppController (e2e)', () => {
         count: jest.fn(),
         findFirst: jest.fn(),
         findMany: jest.fn(),
+        findUnique: jest.fn(),
+      },
+      seasonReward: {
+        create: jest.fn(),
         findUnique: jest.fn(),
       },
       user: {
@@ -513,7 +549,15 @@ describe('AppController (e2e)', () => {
 
   const buildRequest = (method: HttpMethod, path: string) => {
     const http = request(app.getHttpServer());
-    return method === 'get' ? http.get(path) : http.post(path);
+    if (method === 'get') {
+      return http.get(path);
+    }
+
+    if (method === 'patch') {
+      return http.patch(path);
+    }
+
+    return http.post(path);
   };
 
   const expectUnauthorizedBody = (body: unknown) => {
@@ -546,6 +590,10 @@ describe('AppController (e2e)', () => {
     expect(prisma.position.updateMany).not.toHaveBeenCalled();
     expect(prisma.refreshTokenSession.create).not.toHaveBeenCalled();
     expect(prisma.refreshTokenSession.updateMany).not.toHaveBeenCalled();
+    expect(prisma.rewardFulfillmentRequest.create).not.toHaveBeenCalled();
+    expect(prisma.rewardFulfillmentRequest.update).not.toHaveBeenCalled();
+    expect(prisma.rewardFulfillmentRequest.updateMany).not.toHaveBeenCalled();
+    expect(prisma.seasonReward.create).not.toHaveBeenCalled();
     expect(prisma.user.update).not.toHaveBeenCalled();
     expect(prisma.operatorAuditLog.create).not.toHaveBeenCalled();
   };
@@ -579,6 +627,10 @@ describe('AppController (e2e)', () => {
     expect(prisma.position.findMany).not.toHaveBeenCalled();
     expect(prisma.position.findUnique).not.toHaveBeenCalled();
     expect(prisma.refreshTokenSession.findUnique).not.toHaveBeenCalled();
+    expect(prisma.rewardFulfillmentRequest.count).not.toHaveBeenCalled();
+    expect(prisma.rewardFulfillmentRequest.findMany).not.toHaveBeenCalled();
+    expect(prisma.rewardFulfillmentRequest.findUnique).not.toHaveBeenCalled();
+    expect(prisma.seasonReward.findUnique).not.toHaveBeenCalled();
     expect(prisma.user.count).not.toHaveBeenCalled();
     expect(prisma.user.findMany).not.toHaveBeenCalled();
     expect(prisma.user.update).not.toHaveBeenCalled();
@@ -1305,6 +1357,37 @@ describe('AppController (e2e)', () => {
     await expectUnauthorizedWithoutToken('get', '/api/v1/operator/users');
   });
 
+  it('/api/v1/operator/users/:userId/status (PATCH) rejects missing token and x-user-id only', async () => {
+    const body = {
+      status: 'suspended',
+      reason: 'risk review',
+    };
+
+    await expectUnauthorizedWithoutToken(
+      'patch',
+      '/api/v1/operator/users/managed-user-1/status',
+      body,
+    );
+    await expectUnauthorizedWithXUserId(
+      'patch',
+      '/api/v1/operator/users/managed-user-1/status',
+      body,
+    );
+  });
+
+  it('/api/v1/operator/users/:userId/restore (POST) rejects missing token and x-user-id only', async () => {
+    await expectUnauthorizedWithoutToken(
+      'post',
+      '/api/v1/operator/users/managed-user-1/restore',
+      { reason: 'appeal approved' },
+    );
+    await expectUnauthorizedWithXUserId(
+      'post',
+      '/api/v1/operator/users/managed-user-1/restore',
+      { reason: 'appeal approved' },
+    );
+  });
+
   it.each([
     ['user', 'user'],
     ['operator', 'operator'],
@@ -1561,6 +1644,357 @@ describe('AppController (e2e)', () => {
                 actorUserId: user.id,
                 reason: 'support coverage',
               }),
+            }),
+          }),
+        );
+      });
+  });
+
+  it.each([
+    ['user', 'user'],
+    ['operator', 'operator'],
+  ])(
+    '/api/v1/operator/users/:userId/status (PATCH) rejects %s role and audits failure',
+    async (_label, role) => {
+      resetPrismaMocks();
+      mockActiveUser(user.id, role);
+      const token = await createValidAccessToken(user.id);
+
+      return request(app.getHttpServer())
+        .patch('/api/v1/operator/users/managed-user-1/status')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          status: 'suspended',
+          reason: 'not allowed',
+        })
+        .expect(403)
+        .expect((response) => {
+          expect(response.body).toMatchObject({
+            success: false,
+            error: {
+              code: 'ADMIN_REQUIRED',
+            },
+          });
+          expect(prisma.user.update).not.toHaveBeenCalled();
+          expect(prisma.operatorAuditLog.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+              data: expect.objectContaining({
+                action: 'operator.user_status.update.failed',
+                actorRole: role,
+                result: 'failure',
+                errorCode: 'ADMIN_REQUIRED',
+              }),
+            }),
+          );
+        });
+    },
+  );
+
+  it('/api/v1/operator/users/:userId/status (PATCH) lets admin suspend a user and revoke sessions', async () => {
+    resetPrismaMocks();
+    prisma.user.findUnique
+      .mockResolvedValueOnce({
+        ...user,
+        role: 'admin',
+        status: 'active',
+      })
+      .mockResolvedValueOnce({
+        id: 'managed-user-1',
+        email: 'managed@example.com',
+        nickname: 'managed',
+        status: 'active',
+        role: 'user',
+        createdAt: now,
+        updatedAt: now,
+      });
+    prisma.refreshTokenSession.updateMany.mockResolvedValueOnce({ count: 1 });
+    prisma.user.update.mockResolvedValueOnce({
+      id: 'managed-user-1',
+      email: 'managed@example.com',
+      nickname: 'managed',
+      status: 'suspended',
+      role: 'user',
+      createdAt: now,
+      updatedAt: new Date('2026-05-09T00:02:00.000Z'),
+    });
+    const token = await createValidAccessToken(user.id);
+
+    return request(app.getHttpServer())
+      .patch('/api/v1/operator/users/managed-user-1/status')
+      .set('Authorization', `Bearer ${token}`)
+      .set('x-request-id', 'request-status-1')
+      .send({
+        status: 'suspended',
+        reason: 'risk review',
+      })
+      .expect(200)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: true,
+          data: {
+            user: {
+              id: 'managed-user-1',
+              status: 'suspended',
+              role: 'user',
+            },
+            statusChange: {
+              beforeStatus: 'active',
+              afterStatus: 'suspended',
+              beforeRole: 'user',
+              afterRole: 'user',
+              revokedRefreshSessionCount: 1,
+            },
+          },
+        });
+        expect(JSON.stringify(response.body)).not.toMatch(
+          /passwordHash|refreshToken|accessToken|tokenHash/i,
+        );
+        expect(prisma.refreshTokenSession.updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: {
+              userId: 'managed-user-1',
+              status: 'active',
+            },
+            data: expect.objectContaining({
+              status: 'revoked',
+            }),
+          }),
+        );
+        expect(prisma.operatorAuditLog.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              action: 'operator.user_status.update',
+              requestId: 'request-status-1',
+              result: 'success',
+            }),
+          }),
+        );
+      });
+  });
+
+  it('/api/v1/operator/users/:userId/restore (POST) restores deleted user as role=user', async () => {
+    resetPrismaMocks();
+    prisma.user.findUnique
+      .mockResolvedValueOnce({
+        ...user,
+        role: 'admin',
+        status: 'active',
+      })
+      .mockResolvedValueOnce({
+        id: 'managed-user-1',
+        email: 'managed@example.com',
+        nickname: 'managed',
+        status: 'deleted',
+        role: 'admin',
+        createdAt: now,
+        updatedAt: now,
+      });
+    prisma.user.update.mockResolvedValueOnce({
+      id: 'managed-user-1',
+      email: 'managed@example.com',
+      nickname: 'managed',
+      status: 'active',
+      role: 'user',
+      createdAt: now,
+      updatedAt: new Date('2026-05-09T00:03:00.000Z'),
+    });
+    const token = await createValidAccessToken(user.id);
+
+    return request(app.getHttpServer())
+      .post('/api/v1/operator/users/managed-user-1/restore')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        reason: 'appeal approved',
+      })
+      .expect(200)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: true,
+          data: {
+            user: {
+              id: 'managed-user-1',
+              status: 'active',
+              role: 'user',
+            },
+            restore: {
+              beforeStatus: 'deleted',
+              afterStatus: 'active',
+              beforeRole: 'admin',
+              afterRole: 'user',
+            },
+          },
+        });
+        expect(prisma.refreshTokenSession.updateMany).not.toHaveBeenCalled();
+        expect(prisma.operatorAuditLog.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              action: 'operator.user_restore',
+              result: 'success',
+              metadataJson: expect.objectContaining({
+                beforeRole: 'admin',
+                afterRole: 'user',
+              }),
+            }),
+          }),
+        );
+      });
+  });
+
+  it('/api/v1/operator/reward-fulfillments rejects missing token for list and create', async () => {
+    await expectUnauthorizedWithoutToken(
+      'get',
+      '/api/v1/operator/reward-fulfillments',
+    );
+    await expectUnauthorizedWithoutToken(
+      'post',
+      '/api/v1/operator/reward-fulfillments',
+      {
+        seasonId: 'season-1',
+        seasonParticipantId: 'participant-1',
+        rewardType: 'internal',
+        rewardCode: 'manual_reward_2026_001',
+        rewardName: '시즌 보상',
+        idempotencyKey: 'idem-1',
+      },
+    );
+  });
+
+  it('/api/v1/operator/reward-fulfillments (POST) rejects user role and audits failure', async () => {
+    resetPrismaMocks();
+    mockActiveUser(user.id, 'user');
+    const token = await createValidAccessToken(user.id);
+
+    return request(app.getHttpServer())
+      .post('/api/v1/operator/reward-fulfillments')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        seasonId: 'season-1',
+        seasonParticipantId: 'participant-1',
+        rewardType: 'internal',
+        rewardCode: 'manual_reward_2026_001',
+        rewardName: '시즌 보상',
+        idempotencyKey: 'idem-1',
+      })
+      .expect(403)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: false,
+          error: {
+            code: 'OPERATOR_REQUIRED',
+          },
+        });
+        expect(prisma.rewardFulfillmentRequest.create).not.toHaveBeenCalled();
+        expect(prisma.operatorAuditLog.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              action: 'operator.reward_fulfillment.create.failed',
+              result: 'failure',
+              errorCode: 'OPERATOR_REQUIRED',
+            }),
+          }),
+        );
+      });
+  });
+
+  it('/api/v1/operator/reward-fulfillments (POST) lets operator create pending internal fulfillment', async () => {
+    resetPrismaMocks();
+    mockActiveUser(user.id, 'operator');
+    prisma.rewardFulfillmentRequest.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    prisma.season.findUnique.mockResolvedValueOnce({
+      id: 'season-1',
+      status: 'settled',
+    });
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+      id: 'participant-1',
+      seasonId: 'season-1',
+      userId: 'target-user-1',
+      user: {
+        id: 'target-user-1',
+        status: 'active',
+      },
+    });
+    prisma.seasonReward.findUnique.mockResolvedValueOnce(null);
+    prisma.rewardFulfillmentRequest.create.mockResolvedValueOnce({
+      id: 'fulfillment-1',
+      seasonId: 'season-1',
+      seasonParticipantId: 'participant-1',
+      userId: 'target-user-1',
+      rewardType: 'internal',
+      rewardCode: 'manual_reward_2026_001',
+      rewardName: '시즌 보상',
+      rewardValueJson: {
+        kind: 'internal',
+        accessToken: '[REDACTED]',
+      },
+      status: 'pending',
+      seasonRewardId: null,
+      idempotencyKey: 'idem-1',
+      requestHash: 'hash-1',
+      requestedByUserId: user.id,
+      processedByUserId: null,
+      canceledByUserId: null,
+      requestedAt: now,
+      processingStartedAt: null,
+      fulfilledAt: null,
+      failedAt: null,
+      canceledAt: null,
+      errorCode: null,
+      errorMessage: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+    const token = await createValidAccessToken(user.id);
+
+    return request(app.getHttpServer())
+      .post('/api/v1/operator/reward-fulfillments')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        seasonId: 'season-1',
+        seasonParticipantId: 'participant-1',
+        rewardType: 'internal',
+        rewardCode: 'manual_reward_2026_001',
+        rewardName: '시즌 보상',
+        rewardValueJson: {
+          kind: 'internal',
+          accessToken: 'should-redact',
+        },
+        idempotencyKey: 'idem-1',
+        reason: 'manual internal reward',
+      })
+      .expect(200)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: true,
+          data: {
+            fulfillment: {
+              id: 'fulfillment-1',
+              rewardType: 'internal',
+              rewardCode: 'manual_reward_2026_001',
+              status: 'pending',
+              seasonRewardId: null,
+            },
+            replayed: false,
+          },
+        });
+        expect(JSON.stringify(response.body)).not.toMatch(
+          /should-redact|passwordHash|refreshToken|accessToken":"should/i,
+        );
+        expect(prisma.rewardFulfillmentRequest.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              rewardValueJson: expect.objectContaining({
+                accessToken: '[REDACTED]',
+              }),
+            }),
+          }),
+        );
+        expect(prisma.operatorAuditLog.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              action: 'operator.reward_fulfillment.create',
+              result: 'success',
             }),
           }),
         );

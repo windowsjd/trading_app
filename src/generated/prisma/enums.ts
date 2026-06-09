@@ -215,11 +215,23 @@ export type BadgeType = (typeof BadgeType)[keyof typeof BadgeType]
 
 
 export const SeasonRewardType = {
+  internal: 'internal',
   badge: 'badge',
   trophy: 'trophy'
 } as const
 
 export type SeasonRewardType = (typeof SeasonRewardType)[keyof typeof SeasonRewardType]
+
+
+export const RewardFulfillmentStatus = {
+  pending: 'pending',
+  processing: 'processing',
+  fulfilled: 'fulfilled',
+  failed: 'failed',
+  canceled: 'canceled'
+} as const
+
+export type RewardFulfillmentStatus = (typeof RewardFulfillmentStatus)[keyof typeof RewardFulfillmentStatus]
 
 
 export const OperatorAuditResult = {

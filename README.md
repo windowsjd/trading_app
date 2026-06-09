@@ -7,7 +7,8 @@ This service owns backend APIs, database access, financial calculations, and ser
 ## Current MVP Scope
 
 - Access token + refresh token auth: signup, login, refresh, logout, logout-all, and `GET /api/v1/me`.
-- Admin/operator authorization and account management: `UserRole`, DB-current-role access context, `GET /api/v1/operator/me`, admin-only user list/get, admin-only role change, and internal operator audit log service/model.
+- Admin/operator authorization and account management: `UserRole`, DB-current-role access context, `GET /api/v1/operator/me`, admin-only user list/get, admin-only role change, admin-only user status/restore, and internal operator audit log service/model.
+- Internal reward fulfillment foundation: operator/admin managed request queue/status APIs, idempotent internal reward requests, fulfillment into `SeasonReward`, and fulfilled-only user reward visibility. This does not call or implement external cash, point, coupon, gifticon, payment, or delivery APIs.
 - Admin/operator runtime DBs must have migration `20260601090000_add_user_role_operator_audit_logs` applied so `users.role` and `operator_audit_logs` exist.
 - Current season lookup and season join.
 - Home as one aggregate API.
@@ -33,11 +34,11 @@ These are intentionally outside the current implementation and should not be add
 
 - Provider ingestion trigger APIs, scheduler-driven provider ingestion implementation, and provider-backed final/ranking/reward workflows.
 - OANDA and Twelve Data are historical/fallback provider candidates only, not the current MVP core provider stack.
-- Admin user restore/status management APIs, batch run HTTP APIs, scheduler HTTP APIs, and reward fulfillment trigger APIs.
-- Production cron job implementation beyond the disabled-by-default foundation, scheduler-driven provider ingestion, scheduler-driven ranking/settlement/reward automation, settlement extension jobs beyond final tier assignment, or actual reward fulfillment jobs.
+- Batch run HTTP APIs, scheduler HTTP APIs, external reward fulfillment APIs, and reward policy/catalog APIs.
+- Production cron job implementation beyond the disabled-by-default foundation, scheduler-driven provider ingestion, scheduler-driven ranking/settlement/reward automation, settlement extension jobs beyond final tier assignment, or external reward fulfillment jobs.
 - Provider-backed ranking, settlement recalculation, or reward automation.
 - KIS order/account/balance/fill/deposit/withdrawal APIs, KIS orderbook/hoga, Binance authenticated/order/account/user-data APIs, and real external trading/account integrations.
-- Actual payment, point, badge, or trophy fulfillment beyond the `rewardGrantedAt` marker MVP.
+- External payment, point, coupon, gifticon, delivery, cash-out, or provider-backed reward fulfillment. App-internal operator/admin reward fulfillment creates `SeasonReward` rows only when fulfilled.
 - Access token blacklist/revocation, server-side session auth, and cookie auth.
 - Matching engine, partial fill, or exact order execute replay.
 - Fake, static, sample, temporary, or fallback business price data.
@@ -162,6 +163,7 @@ Possible now:
 
 - Auth, season join, wallet, records, ranking, home, FX, and order backend hardening.
 - Admin/operator authorization boundary checks and operator audit foundation tests.
+- Admin-only user status/restore and operator/admin internal reward fulfillment tests.
 - Mocked HTTP e2e coverage for guard routing and controller/service entry.
 - Opt-in real PostgreSQL integration tests for implemented DB write paths.
 - Manual admin input paths using operator-approved real data.
@@ -179,6 +181,6 @@ Not possible without a separate provider/write or automation gate:
 
 - Cron scheduler-driven snapshots/rankings.
 - Provider-backed ranking, settlement, or reward automation.
-- Actual payment, point, badge, or trophy fulfillment.
+- External payment, point, coupon, gifticon, delivery, or cash-out fulfillment.
 
 Never create fake/static/sample business prices to make a test or local flow pass.

@@ -392,6 +392,7 @@ export const ModelName = {
   Badge: 'Badge',
   UserBadge: 'UserBadge',
   SeasonReward: 'SeasonReward',
+  RewardFulfillmentRequest: 'RewardFulfillmentRequest',
   Asset: 'Asset',
   AssetPriceSnapshot: 'AssetPriceSnapshot',
   Position: 'Position',
@@ -423,7 +424,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "operatorAuditLog" | "refreshTokenSession" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "asset" | "assetPriceSnapshot" | "position" | "order" | "cashWallet" | "walletTransaction" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock"
+    modelProps: "user" | "operatorAuditLog" | "refreshTokenSession" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "position" | "order" | "cashWallet" | "walletTransaction" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1016,6 +1017,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.SeasonRewardCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.SeasonRewardCountAggregateOutputType> | number
+        }
+      }
+    }
+    RewardFulfillmentRequest: {
+      payload: Prisma.$RewardFulfillmentRequestPayload<ExtArgs>
+      fields: Prisma.RewardFulfillmentRequestFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.RewardFulfillmentRequestFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RewardFulfillmentRequestPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.RewardFulfillmentRequestFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RewardFulfillmentRequestPayload>
+        }
+        findFirst: {
+          args: Prisma.RewardFulfillmentRequestFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RewardFulfillmentRequestPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.RewardFulfillmentRequestFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RewardFulfillmentRequestPayload>
+        }
+        findMany: {
+          args: Prisma.RewardFulfillmentRequestFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RewardFulfillmentRequestPayload>[]
+        }
+        create: {
+          args: Prisma.RewardFulfillmentRequestCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RewardFulfillmentRequestPayload>
+        }
+        createMany: {
+          args: Prisma.RewardFulfillmentRequestCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.RewardFulfillmentRequestCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RewardFulfillmentRequestPayload>[]
+        }
+        delete: {
+          args: Prisma.RewardFulfillmentRequestDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RewardFulfillmentRequestPayload>
+        }
+        update: {
+          args: Prisma.RewardFulfillmentRequestUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RewardFulfillmentRequestPayload>
+        }
+        deleteMany: {
+          args: Prisma.RewardFulfillmentRequestDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.RewardFulfillmentRequestUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.RewardFulfillmentRequestUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RewardFulfillmentRequestPayload>[]
+        }
+        upsert: {
+          args: Prisma.RewardFulfillmentRequestUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RewardFulfillmentRequestPayload>
+        }
+        aggregate: {
+          args: Prisma.RewardFulfillmentRequestAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateRewardFulfillmentRequest>
+        }
+        groupBy: {
+          args: Prisma.RewardFulfillmentRequestGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.RewardFulfillmentRequestGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.RewardFulfillmentRequestCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.RewardFulfillmentRequestCountAggregateOutputType> | number
         }
       }
     }
@@ -2367,11 +2442,42 @@ export const SeasonRewardScalarFieldEnum = {
   rewardCode: 'rewardCode',
   rewardName: 'rewardName',
   rewardValueJson: 'rewardValueJson',
+  fulfillmentRequestId: 'fulfillmentRequestId',
   grantedAt: 'grantedAt',
   createdAt: 'createdAt'
 } as const
 
 export type SeasonRewardScalarFieldEnum = (typeof SeasonRewardScalarFieldEnum)[keyof typeof SeasonRewardScalarFieldEnum]
+
+
+export const RewardFulfillmentRequestScalarFieldEnum = {
+  id: 'id',
+  seasonId: 'seasonId',
+  seasonParticipantId: 'seasonParticipantId',
+  userId: 'userId',
+  rewardType: 'rewardType',
+  rewardCode: 'rewardCode',
+  rewardName: 'rewardName',
+  rewardValueJson: 'rewardValueJson',
+  status: 'status',
+  seasonRewardId: 'seasonRewardId',
+  idempotencyKey: 'idempotencyKey',
+  requestHash: 'requestHash',
+  requestedByUserId: 'requestedByUserId',
+  processedByUserId: 'processedByUserId',
+  canceledByUserId: 'canceledByUserId',
+  requestedAt: 'requestedAt',
+  processingStartedAt: 'processingStartedAt',
+  fulfilledAt: 'fulfilledAt',
+  failedAt: 'failedAt',
+  canceledAt: 'canceledAt',
+  errorCode: 'errorCode',
+  errorMessage: 'errorMessage',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type RewardFulfillmentRequestScalarFieldEnum = (typeof RewardFulfillmentRequestScalarFieldEnum)[keyof typeof RewardFulfillmentRequestScalarFieldEnum]
 
 
 export const AssetScalarFieldEnum = {
@@ -2921,6 +3027,20 @@ export type ListEnumSeasonRewardTypeFieldRefInput<$PrismaModel> = FieldRefInputT
 
 
 /**
+ * Reference to a field of type 'RewardFulfillmentStatus'
+ */
+export type EnumRewardFulfillmentStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'RewardFulfillmentStatus'>
+
+
+
+/**
+ * Reference to a field of type 'RewardFulfillmentStatus[]'
+ */
+export type ListEnumRewardFulfillmentStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'RewardFulfillmentStatus[]'>
+
+
+
+/**
  * Reference to a field of type 'CurrencyCode'
  */
 export type EnumCurrencyCodeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CurrencyCode'>
@@ -3309,6 +3429,7 @@ export type GlobalOmitConfig = {
   badge?: Prisma.BadgeOmit
   userBadge?: Prisma.UserBadgeOmit
   seasonReward?: Prisma.SeasonRewardOmit
+  rewardFulfillmentRequest?: Prisma.RewardFulfillmentRequestOmit
   asset?: Prisma.AssetOmit
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotOmit
   position?: Prisma.PositionOmit

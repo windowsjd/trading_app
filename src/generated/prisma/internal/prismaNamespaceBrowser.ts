@@ -59,6 +59,7 @@ export const ModelName = {
   Badge: 'Badge',
   UserBadge: 'UserBadge',
   SeasonReward: 'SeasonReward',
+  RewardFulfillmentRequest: 'RewardFulfillmentRequest',
   Asset: 'Asset',
   AssetPriceSnapshot: 'AssetPriceSnapshot',
   Position: 'Position',
@@ -218,11 +219,42 @@ export const SeasonRewardScalarFieldEnum = {
   rewardCode: 'rewardCode',
   rewardName: 'rewardName',
   rewardValueJson: 'rewardValueJson',
+  fulfillmentRequestId: 'fulfillmentRequestId',
   grantedAt: 'grantedAt',
   createdAt: 'createdAt'
 } as const
 
 export type SeasonRewardScalarFieldEnum = (typeof SeasonRewardScalarFieldEnum)[keyof typeof SeasonRewardScalarFieldEnum]
+
+
+export const RewardFulfillmentRequestScalarFieldEnum = {
+  id: 'id',
+  seasonId: 'seasonId',
+  seasonParticipantId: 'seasonParticipantId',
+  userId: 'userId',
+  rewardType: 'rewardType',
+  rewardCode: 'rewardCode',
+  rewardName: 'rewardName',
+  rewardValueJson: 'rewardValueJson',
+  status: 'status',
+  seasonRewardId: 'seasonRewardId',
+  idempotencyKey: 'idempotencyKey',
+  requestHash: 'requestHash',
+  requestedByUserId: 'requestedByUserId',
+  processedByUserId: 'processedByUserId',
+  canceledByUserId: 'canceledByUserId',
+  requestedAt: 'requestedAt',
+  processingStartedAt: 'processingStartedAt',
+  fulfilledAt: 'fulfilledAt',
+  failedAt: 'failedAt',
+  canceledAt: 'canceledAt',
+  errorCode: 'errorCode',
+  errorMessage: 'errorMessage',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type RewardFulfillmentRequestScalarFieldEnum = (typeof RewardFulfillmentRequestScalarFieldEnum)[keyof typeof RewardFulfillmentRequestScalarFieldEnum]
 
 
 export const AssetScalarFieldEnum = {

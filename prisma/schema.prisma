@@ -148,8 +148,17 @@ enum BadgeType {
 }
 
 enum SeasonRewardType {
+  internal
   badge
   trophy
+}
+
+enum RewardFulfillmentStatus {
+  pending
+  processing
+  fulfilled
+  failed
+  canceled
 }
 
 enum OperatorAuditResult {
@@ -199,6 +208,10 @@ model User {
   seasonRewards        SeasonReward[]
   operatorAuditLogs    OperatorAuditLog[]
   quotes               Quote[]
+  rewardFulfillmentTargets RewardFulfillmentRequest[] @relation("RewardFulfillmentTargetUser")
+  rewardFulfillmentsRequested RewardFulfillmentRequest[] @relation("RewardFulfillmentRequestedBy")
+  rewardFulfillmentsProcessed RewardFulfillmentRequest[] @relation("RewardFulfillmentProcessedBy")
+  rewardFulfillmentsCanceled RewardFulfillmentRequest[] @relation("RewardFulfillmentCanceledBy")
 
   @@map("users")
 }
@@ -266,6 +279,7 @@ model Season {
   seasonRankings SeasonRanking[]
   userBadges     UserBadge[]
   seasonRewards  SeasonReward[]
+  rewardFulfillmentRequests RewardFulfillmentRequest[]
 
   @@map("seasons")
 }
@@ -301,6 +315,7 @@ model SeasonParticipant {
   dailyPortfolioSnapshots DailyPortfolioSnapshot[]
   seasonRankings          SeasonRanking[]
   seasonRewards           SeasonReward[]
+  rewardFulfillmentRequests RewardFulfillmentRequest[]
 
   @@unique([seasonId, userId])
   @@index([seasonId])
@@ -352,18 +367,67 @@ model SeasonReward {
   rewardCode          String           @map("reward_code")
   rewardName          String           @map("reward_name")
   rewardValueJson     Json?            @map("reward_value_json")
+  fulfillmentRequestId String?          @unique @map("fulfillment_request_id")
   grantedAt           DateTime         @map("granted_at")
   createdAt           DateTime         @default(now()) @map("created_at")
 
   season            Season            @relation(fields: [seasonId], references: [id], onDelete: Restrict)
   seasonParticipant SeasonParticipant @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
   user              User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  fulfillmentRequest RewardFulfillmentRequest? @relation("SeasonRewardFulfillmentRequest", fields: [fulfillmentRequestId], references: [id], onDelete: SetNull)
+  rewardFulfillmentRequests RewardFulfillmentRequest[] @relation("RewardFulfillmentRequestSeasonReward")
 
   @@unique([seasonParticipantId, rewardCode])
   @@index([seasonId, grantedAt])
   @@index([userId, grantedAt])
   @@index([rewardType, rewardCode])
+  @@index([fulfillmentRequestId])
   @@map("season_rewards")
+}
+
+model RewardFulfillmentRequest {
+  id                  String                  @id @default(uuid())
+  seasonId            String                  @map("season_id")
+  seasonParticipantId String                  @map("season_participant_id")
+  userId              String                  @map("user_id")
+  rewardType          SeasonRewardType        @map("reward_type")
+  rewardCode          String                  @map("reward_code")
+  rewardName          String                  @map("reward_name")
+  rewardValueJson     Json?                   @map("reward_value_json")
+  status              RewardFulfillmentStatus @default(pending)
+  seasonRewardId      String?                 @map("season_reward_id")
+  idempotencyKey      String                  @map("idempotency_key")
+  requestHash         String                  @map("request_hash")
+  requestedByUserId   String                  @map("requested_by_user_id")
+  processedByUserId   String?                 @map("processed_by_user_id")
+  canceledByUserId    String?                 @map("canceled_by_user_id")
+  requestedAt         DateTime                @default(now()) @map("requested_at")
+  processingStartedAt DateTime?               @map("processing_started_at")
+  fulfilledAt         DateTime?               @map("fulfilled_at")
+  failedAt            DateTime?               @map("failed_at")
+  canceledAt          DateTime?               @map("canceled_at")
+  errorCode           String?                 @map("error_code")
+  errorMessage        String?                 @map("error_message")
+  createdAt           DateTime                @default(now()) @map("created_at")
+  updatedAt           DateTime                @updatedAt @map("updated_at")
+
+  season            Season            @relation(fields: [seasonId], references: [id], onDelete: Restrict)
+  seasonParticipant SeasonParticipant @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
+  user              User              @relation("RewardFulfillmentTargetUser", fields: [userId], references: [id], onDelete: Restrict)
+  seasonReward      SeasonReward?     @relation("RewardFulfillmentRequestSeasonReward", fields: [seasonRewardId], references: [id], onDelete: SetNull)
+  requestedBy       User              @relation("RewardFulfillmentRequestedBy", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+  processedBy       User?             @relation("RewardFulfillmentProcessedBy", fields: [processedByUserId], references: [id], onDelete: SetNull)
+  canceledBy        User?             @relation("RewardFulfillmentCanceledBy", fields: [canceledByUserId], references: [id], onDelete: SetNull)
+  seasonRewards     SeasonReward[]    @relation("SeasonRewardFulfillmentRequest")
+
+  @@unique([requestedByUserId, idempotencyKey])
+  @@unique([seasonParticipantId, rewardCode])
+  @@index([seasonId, status])
+  @@index([userId, status])
+  @@index([status, createdAt])
+  @@index([seasonRewardId])
+  @@index([requestedByUserId, requestedAt])
+  @@map("reward_fulfillment_requests")
 }
 
 model Asset {

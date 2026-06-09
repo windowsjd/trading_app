@@ -80,6 +80,11 @@ export type UserBadge = Prisma.UserBadgeModel
  */
 export type SeasonReward = Prisma.SeasonRewardModel
 /**
+ * Model RewardFulfillmentRequest
+ *
+ */
+export type RewardFulfillmentRequest = Prisma.RewardFulfillmentRequestModel
+/**
  * Model Asset
  *
  */

@@ -221,6 +221,10 @@ export type UserWhereInput = {
   seasonRewards?: Prisma.SeasonRewardListRelationFilter
   operatorAuditLogs?: Prisma.OperatorAuditLogListRelationFilter
   quotes?: Prisma.QuoteListRelationFilter
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestListRelationFilter
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestListRelationFilter
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestListRelationFilter
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestListRelationFilter
 }
 
 export type UserOrderByWithRelationInput = {
@@ -240,6 +244,10 @@ export type UserOrderByWithRelationInput = {
   seasonRewards?: Prisma.SeasonRewardOrderByRelationAggregateInput
   operatorAuditLogs?: Prisma.OperatorAuditLogOrderByRelationAggregateInput
   quotes?: Prisma.QuoteOrderByRelationAggregateInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestOrderByRelationAggregateInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestOrderByRelationAggregateInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestOrderByRelationAggregateInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestOrderByRelationAggregateInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -262,6 +270,10 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   seasonRewards?: Prisma.SeasonRewardListRelationFilter
   operatorAuditLogs?: Prisma.OperatorAuditLogListRelationFilter
   quotes?: Prisma.QuoteListRelationFilter
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestListRelationFilter
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestListRelationFilter
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestListRelationFilter
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestListRelationFilter
 }, "id" | "email" | "nickname">
 
 export type UserOrderByWithAggregationInput = {
@@ -311,6 +323,10 @@ export type UserCreateInput = {
   seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
   operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -330,6 +346,10 @@ export type UserUncheckedCreateInput = {
   seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
 }
 
 export type UserUpdateInput = {
@@ -349,6 +369,10 @@ export type UserUpdateInput = {
   seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -368,6 +392,10 @@ export type UserUncheckedUpdateInput = {
   seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -445,6 +473,11 @@ export type UserMinOrderByAggregateInput = {
 export type UserScalarRelationFilter = {
   is?: Prisma.UserWhereInput
   isNot?: Prisma.UserWhereInput
+}
+
+export type UserNullableScalarRelationFilter = {
+  is?: Prisma.UserWhereInput | null
+  isNot?: Prisma.UserWhereInput | null
 }
 
 export type StringFieldUpdateOperationsInput = {
@@ -537,6 +570,66 @@ export type UserUpdateOneRequiredWithoutSeasonRewardsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutSeasonRewardsInput, Prisma.UserUpdateWithoutSeasonRewardsInput>, Prisma.UserUncheckedUpdateWithoutSeasonRewardsInput>
 }
 
+export type UserCreateNestedOneWithoutRewardFulfillmentTargetsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutRewardFulfillmentTargetsInput, Prisma.UserUncheckedCreateWithoutRewardFulfillmentTargetsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutRewardFulfillmentTargetsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserCreateNestedOneWithoutRewardFulfillmentsRequestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutRewardFulfillmentsRequestedInput, Prisma.UserUncheckedCreateWithoutRewardFulfillmentsRequestedInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutRewardFulfillmentsRequestedInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserCreateNestedOneWithoutRewardFulfillmentsProcessedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutRewardFulfillmentsProcessedInput, Prisma.UserUncheckedCreateWithoutRewardFulfillmentsProcessedInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutRewardFulfillmentsProcessedInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserCreateNestedOneWithoutRewardFulfillmentsCanceledInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutRewardFulfillmentsCanceledInput, Prisma.UserUncheckedCreateWithoutRewardFulfillmentsCanceledInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutRewardFulfillmentsCanceledInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutRewardFulfillmentTargetsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutRewardFulfillmentTargetsInput, Prisma.UserUncheckedCreateWithoutRewardFulfillmentTargetsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutRewardFulfillmentTargetsInput
+  upsert?: Prisma.UserUpsertWithoutRewardFulfillmentTargetsInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutRewardFulfillmentTargetsInput, Prisma.UserUpdateWithoutRewardFulfillmentTargetsInput>, Prisma.UserUncheckedUpdateWithoutRewardFulfillmentTargetsInput>
+}
+
+export type UserUpdateOneRequiredWithoutRewardFulfillmentsRequestedNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutRewardFulfillmentsRequestedInput, Prisma.UserUncheckedCreateWithoutRewardFulfillmentsRequestedInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutRewardFulfillmentsRequestedInput
+  upsert?: Prisma.UserUpsertWithoutRewardFulfillmentsRequestedInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutRewardFulfillmentsRequestedInput, Prisma.UserUpdateWithoutRewardFulfillmentsRequestedInput>, Prisma.UserUncheckedUpdateWithoutRewardFulfillmentsRequestedInput>
+}
+
+export type UserUpdateOneWithoutRewardFulfillmentsProcessedNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutRewardFulfillmentsProcessedInput, Prisma.UserUncheckedCreateWithoutRewardFulfillmentsProcessedInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutRewardFulfillmentsProcessedInput
+  upsert?: Prisma.UserUpsertWithoutRewardFulfillmentsProcessedInput
+  disconnect?: Prisma.UserWhereInput | boolean
+  delete?: Prisma.UserWhereInput | boolean
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutRewardFulfillmentsProcessedInput, Prisma.UserUpdateWithoutRewardFulfillmentsProcessedInput>, Prisma.UserUncheckedUpdateWithoutRewardFulfillmentsProcessedInput>
+}
+
+export type UserUpdateOneWithoutRewardFulfillmentsCanceledNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutRewardFulfillmentsCanceledInput, Prisma.UserUncheckedCreateWithoutRewardFulfillmentsCanceledInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutRewardFulfillmentsCanceledInput
+  upsert?: Prisma.UserUpsertWithoutRewardFulfillmentsCanceledInput
+  disconnect?: Prisma.UserWhereInput | boolean
+  delete?: Prisma.UserWhereInput | boolean
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutRewardFulfillmentsCanceledInput, Prisma.UserUpdateWithoutRewardFulfillmentsCanceledInput>, Prisma.UserUncheckedUpdateWithoutRewardFulfillmentsCanceledInput>
+}
+
 export type UserCreateNestedOneWithoutQuotesInput = {
   create?: Prisma.XOR<Prisma.UserCreateWithoutQuotesInput, Prisma.UserUncheckedCreateWithoutQuotesInput>
   connectOrCreate?: Prisma.UserCreateOrConnectWithoutQuotesInput
@@ -581,6 +674,10 @@ export type UserCreateWithoutOperatorAuditLogsInput = {
   userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
   seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
 }
 
 export type UserUncheckedCreateWithoutOperatorAuditLogsInput = {
@@ -599,6 +696,10 @@ export type UserUncheckedCreateWithoutOperatorAuditLogsInput = {
   userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
   seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
 }
 
 export type UserCreateOrConnectWithoutOperatorAuditLogsInput = {
@@ -633,6 +734,10 @@ export type UserUpdateWithoutOperatorAuditLogsInput = {
   userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
   seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
 }
 
 export type UserUncheckedUpdateWithoutOperatorAuditLogsInput = {
@@ -651,6 +756,10 @@ export type UserUncheckedUpdateWithoutOperatorAuditLogsInput = {
   userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
   seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
 }
 
 export type UserCreateWithoutRefreshTokenSessionsInput = {
@@ -669,6 +778,10 @@ export type UserCreateWithoutRefreshTokenSessionsInput = {
   seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
   operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
 }
 
 export type UserUncheckedCreateWithoutRefreshTokenSessionsInput = {
@@ -687,6 +800,10 @@ export type UserUncheckedCreateWithoutRefreshTokenSessionsInput = {
   seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
 }
 
 export type UserCreateOrConnectWithoutRefreshTokenSessionsInput = {
@@ -721,6 +838,10 @@ export type UserUpdateWithoutRefreshTokenSessionsInput = {
   seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
 }
 
 export type UserUncheckedUpdateWithoutRefreshTokenSessionsInput = {
@@ -739,6 +860,10 @@ export type UserUncheckedUpdateWithoutRefreshTokenSessionsInput = {
   seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
 }
 
 export type UserCreateWithoutSeasonParticipantsInput = {
@@ -757,6 +882,10 @@ export type UserCreateWithoutSeasonParticipantsInput = {
   seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
   operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
 }
 
 export type UserUncheckedCreateWithoutSeasonParticipantsInput = {
@@ -775,6 +904,10 @@ export type UserUncheckedCreateWithoutSeasonParticipantsInput = {
   seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
 }
 
 export type UserCreateOrConnectWithoutSeasonParticipantsInput = {
@@ -809,6 +942,10 @@ export type UserUpdateWithoutSeasonParticipantsInput = {
   seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSeasonParticipantsInput = {
@@ -827,6 +964,10 @@ export type UserUncheckedUpdateWithoutSeasonParticipantsInput = {
   seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
 }
 
 export type UserCreateWithoutUserBadgesInput = {
@@ -845,6 +986,10 @@ export type UserCreateWithoutUserBadgesInput = {
   seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
   operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
 }
 
 export type UserUncheckedCreateWithoutUserBadgesInput = {
@@ -863,6 +1008,10 @@ export type UserUncheckedCreateWithoutUserBadgesInput = {
   seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
 }
 
 export type UserCreateOrConnectWithoutUserBadgesInput = {
@@ -897,6 +1046,10 @@ export type UserUpdateWithoutUserBadgesInput = {
   seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
 }
 
 export type UserUncheckedUpdateWithoutUserBadgesInput = {
@@ -915,6 +1068,10 @@ export type UserUncheckedUpdateWithoutUserBadgesInput = {
   seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
 }
 
 export type UserCreateWithoutSeasonRewardsInput = {
@@ -933,6 +1090,10 @@ export type UserCreateWithoutSeasonRewardsInput = {
   userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
   operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
 }
 
 export type UserUncheckedCreateWithoutSeasonRewardsInput = {
@@ -951,6 +1112,10 @@ export type UserUncheckedCreateWithoutSeasonRewardsInput = {
   userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
 }
 
 export type UserCreateOrConnectWithoutSeasonRewardsInput = {
@@ -985,6 +1150,10 @@ export type UserUpdateWithoutSeasonRewardsInput = {
   userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSeasonRewardsInput = {
@@ -1003,6 +1172,426 @@ export type UserUncheckedUpdateWithoutSeasonRewardsInput = {
   userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
+}
+
+export type UserCreateWithoutRewardFulfillmentTargetsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  nickname: string
+  profileImageUrl?: string | null
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
+}
+
+export type UserUncheckedCreateWithoutRewardFulfillmentTargetsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  nickname: string
+  profileImageUrl?: string | null
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
+}
+
+export type UserCreateOrConnectWithoutRewardFulfillmentTargetsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutRewardFulfillmentTargetsInput, Prisma.UserUncheckedCreateWithoutRewardFulfillmentTargetsInput>
+}
+
+export type UserCreateWithoutRewardFulfillmentsRequestedInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  nickname: string
+  profileImageUrl?: string | null
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
+}
+
+export type UserUncheckedCreateWithoutRewardFulfillmentsRequestedInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  nickname: string
+  profileImageUrl?: string | null
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
+}
+
+export type UserCreateOrConnectWithoutRewardFulfillmentsRequestedInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutRewardFulfillmentsRequestedInput, Prisma.UserUncheckedCreateWithoutRewardFulfillmentsRequestedInput>
+}
+
+export type UserCreateWithoutRewardFulfillmentsProcessedInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  nickname: string
+  profileImageUrl?: string | null
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
+}
+
+export type UserUncheckedCreateWithoutRewardFulfillmentsProcessedInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  nickname: string
+  profileImageUrl?: string | null
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
+}
+
+export type UserCreateOrConnectWithoutRewardFulfillmentsProcessedInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutRewardFulfillmentsProcessedInput, Prisma.UserUncheckedCreateWithoutRewardFulfillmentsProcessedInput>
+}
+
+export type UserCreateWithoutRewardFulfillmentsCanceledInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  nickname: string
+  profileImageUrl?: string | null
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+}
+
+export type UserUncheckedCreateWithoutRewardFulfillmentsCanceledInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  nickname: string
+  profileImageUrl?: string | null
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+}
+
+export type UserCreateOrConnectWithoutRewardFulfillmentsCanceledInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutRewardFulfillmentsCanceledInput, Prisma.UserUncheckedCreateWithoutRewardFulfillmentsCanceledInput>
+}
+
+export type UserUpsertWithoutRewardFulfillmentTargetsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutRewardFulfillmentTargetsInput, Prisma.UserUncheckedUpdateWithoutRewardFulfillmentTargetsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutRewardFulfillmentTargetsInput, Prisma.UserUncheckedCreateWithoutRewardFulfillmentTargetsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutRewardFulfillmentTargetsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutRewardFulfillmentTargetsInput, Prisma.UserUncheckedUpdateWithoutRewardFulfillmentTargetsInput>
+}
+
+export type UserUpdateWithoutRewardFulfillmentTargetsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
+}
+
+export type UserUncheckedUpdateWithoutRewardFulfillmentTargetsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
+}
+
+export type UserUpsertWithoutRewardFulfillmentsRequestedInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutRewardFulfillmentsRequestedInput, Prisma.UserUncheckedUpdateWithoutRewardFulfillmentsRequestedInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutRewardFulfillmentsRequestedInput, Prisma.UserUncheckedCreateWithoutRewardFulfillmentsRequestedInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutRewardFulfillmentsRequestedInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutRewardFulfillmentsRequestedInput, Prisma.UserUncheckedUpdateWithoutRewardFulfillmentsRequestedInput>
+}
+
+export type UserUpdateWithoutRewardFulfillmentsRequestedInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
+}
+
+export type UserUncheckedUpdateWithoutRewardFulfillmentsRequestedInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
+}
+
+export type UserUpsertWithoutRewardFulfillmentsProcessedInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutRewardFulfillmentsProcessedInput, Prisma.UserUncheckedUpdateWithoutRewardFulfillmentsProcessedInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutRewardFulfillmentsProcessedInput, Prisma.UserUncheckedCreateWithoutRewardFulfillmentsProcessedInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutRewardFulfillmentsProcessedInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutRewardFulfillmentsProcessedInput, Prisma.UserUncheckedUpdateWithoutRewardFulfillmentsProcessedInput>
+}
+
+export type UserUpdateWithoutRewardFulfillmentsProcessedInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
+}
+
+export type UserUncheckedUpdateWithoutRewardFulfillmentsProcessedInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
+}
+
+export type UserUpsertWithoutRewardFulfillmentsCanceledInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutRewardFulfillmentsCanceledInput, Prisma.UserUncheckedUpdateWithoutRewardFulfillmentsCanceledInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutRewardFulfillmentsCanceledInput, Prisma.UserUncheckedCreateWithoutRewardFulfillmentsCanceledInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutRewardFulfillmentsCanceledInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutRewardFulfillmentsCanceledInput, Prisma.UserUncheckedUpdateWithoutRewardFulfillmentsCanceledInput>
+}
+
+export type UserUpdateWithoutRewardFulfillmentsCanceledInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+}
+
+export type UserUncheckedUpdateWithoutRewardFulfillmentsCanceledInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
 }
 
 export type UserCreateWithoutQuotesInput = {
@@ -1021,6 +1610,10 @@ export type UserCreateWithoutQuotesInput = {
   userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
   seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
   operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
 }
 
 export type UserUncheckedCreateWithoutQuotesInput = {
@@ -1039,6 +1632,10 @@ export type UserUncheckedCreateWithoutQuotesInput = {
   userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
   seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
 }
 
 export type UserCreateOrConnectWithoutQuotesInput = {
@@ -1073,6 +1670,10 @@ export type UserUpdateWithoutQuotesInput = {
   userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
   seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
 }
 
 export type UserUncheckedUpdateWithoutQuotesInput = {
@@ -1091,6 +1692,10 @@ export type UserUncheckedUpdateWithoutQuotesInput = {
   userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
   seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
 }
 
 export type UserCreateWithoutFxExecuteRequestsInput = {
@@ -1109,6 +1714,10 @@ export type UserCreateWithoutFxExecuteRequestsInput = {
   seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
   operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
 }
 
 export type UserUncheckedCreateWithoutFxExecuteRequestsInput = {
@@ -1127,6 +1736,10 @@ export type UserUncheckedCreateWithoutFxExecuteRequestsInput = {
   seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
 }
 
 export type UserCreateOrConnectWithoutFxExecuteRequestsInput = {
@@ -1161,6 +1774,10 @@ export type UserUpdateWithoutFxExecuteRequestsInput = {
   seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
 }
 
 export type UserUncheckedUpdateWithoutFxExecuteRequestsInput = {
@@ -1179,6 +1796,10 @@ export type UserUncheckedUpdateWithoutFxExecuteRequestsInput = {
   seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
 }
 
 
@@ -1194,6 +1815,10 @@ export type UserCountOutputType = {
   seasonRewards: number
   operatorAuditLogs: number
   quotes: number
+  rewardFulfillmentTargets: number
+  rewardFulfillmentsRequested: number
+  rewardFulfillmentsProcessed: number
+  rewardFulfillmentsCanceled: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1204,6 +1829,10 @@ export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   seasonRewards?: boolean | UserCountOutputTypeCountSeasonRewardsArgs
   operatorAuditLogs?: boolean | UserCountOutputTypeCountOperatorAuditLogsArgs
   quotes?: boolean | UserCountOutputTypeCountQuotesArgs
+  rewardFulfillmentTargets?: boolean | UserCountOutputTypeCountRewardFulfillmentTargetsArgs
+  rewardFulfillmentsRequested?: boolean | UserCountOutputTypeCountRewardFulfillmentsRequestedArgs
+  rewardFulfillmentsProcessed?: boolean | UserCountOutputTypeCountRewardFulfillmentsProcessedArgs
+  rewardFulfillmentsCanceled?: boolean | UserCountOutputTypeCountRewardFulfillmentsCanceledArgs
 }
 
 /**
@@ -1265,6 +1894,34 @@ export type UserCountOutputTypeCountQuotesArgs<ExtArgs extends runtime.Types.Ext
   where?: Prisma.QuoteWhereInput
 }
 
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountRewardFulfillmentTargetsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.RewardFulfillmentRequestWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountRewardFulfillmentsRequestedArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.RewardFulfillmentRequestWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountRewardFulfillmentsProcessedArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.RewardFulfillmentRequestWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountRewardFulfillmentsCanceledArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.RewardFulfillmentRequestWhereInput
+}
+
 
 export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -1283,6 +1940,10 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   seasonRewards?: boolean | Prisma.User$seasonRewardsArgs<ExtArgs>
   operatorAuditLogs?: boolean | Prisma.User$operatorAuditLogsArgs<ExtArgs>
   quotes?: boolean | Prisma.User$quotesArgs<ExtArgs>
+  rewardFulfillmentTargets?: boolean | Prisma.User$rewardFulfillmentTargetsArgs<ExtArgs>
+  rewardFulfillmentsRequested?: boolean | Prisma.User$rewardFulfillmentsRequestedArgs<ExtArgs>
+  rewardFulfillmentsProcessed?: boolean | Prisma.User$rewardFulfillmentsProcessedArgs<ExtArgs>
+  rewardFulfillmentsCanceled?: boolean | Prisma.User$rewardFulfillmentsCanceledArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -1331,6 +1992,10 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   seasonRewards?: boolean | Prisma.User$seasonRewardsArgs<ExtArgs>
   operatorAuditLogs?: boolean | Prisma.User$operatorAuditLogsArgs<ExtArgs>
   quotes?: boolean | Prisma.User$quotesArgs<ExtArgs>
+  rewardFulfillmentTargets?: boolean | Prisma.User$rewardFulfillmentTargetsArgs<ExtArgs>
+  rewardFulfillmentsRequested?: boolean | Prisma.User$rewardFulfillmentsRequestedArgs<ExtArgs>
+  rewardFulfillmentsProcessed?: boolean | Prisma.User$rewardFulfillmentsProcessedArgs<ExtArgs>
+  rewardFulfillmentsCanceled?: boolean | Prisma.User$rewardFulfillmentsCanceledArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -1346,6 +2011,10 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     seasonRewards: Prisma.$SeasonRewardPayload<ExtArgs>[]
     operatorAuditLogs: Prisma.$OperatorAuditLogPayload<ExtArgs>[]
     quotes: Prisma.$QuotePayload<ExtArgs>[]
+    rewardFulfillmentTargets: Prisma.$RewardFulfillmentRequestPayload<ExtArgs>[]
+    rewardFulfillmentsRequested: Prisma.$RewardFulfillmentRequestPayload<ExtArgs>[]
+    rewardFulfillmentsProcessed: Prisma.$RewardFulfillmentRequestPayload<ExtArgs>[]
+    rewardFulfillmentsCanceled: Prisma.$RewardFulfillmentRequestPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1758,6 +2427,10 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   seasonRewards<T extends Prisma.User$seasonRewardsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$seasonRewardsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SeasonRewardPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   operatorAuditLogs<T extends Prisma.User$operatorAuditLogsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$operatorAuditLogsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OperatorAuditLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   quotes<T extends Prisma.User$quotesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$quotesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$QuotePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  rewardFulfillmentTargets<T extends Prisma.User$rewardFulfillmentTargetsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$rewardFulfillmentTargetsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RewardFulfillmentRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  rewardFulfillmentsRequested<T extends Prisma.User$rewardFulfillmentsRequestedArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$rewardFulfillmentsRequestedArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RewardFulfillmentRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  rewardFulfillmentsProcessed<T extends Prisma.User$rewardFulfillmentsProcessedArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$rewardFulfillmentsProcessedArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RewardFulfillmentRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  rewardFulfillmentsCanceled<T extends Prisma.User$rewardFulfillmentsCanceledArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$rewardFulfillmentsCanceledArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RewardFulfillmentRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2354,6 +3027,102 @@ export type User$quotesArgs<ExtArgs extends runtime.Types.Extensions.InternalArg
   take?: number
   skip?: number
   distinct?: Prisma.QuoteScalarFieldEnum | Prisma.QuoteScalarFieldEnum[]
+}
+
+/**
+ * User.rewardFulfillmentTargets
+ */
+export type User$rewardFulfillmentTargetsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the RewardFulfillmentRequest
+   */
+  select?: Prisma.RewardFulfillmentRequestSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the RewardFulfillmentRequest
+   */
+  omit?: Prisma.RewardFulfillmentRequestOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.RewardFulfillmentRequestInclude<ExtArgs> | null
+  where?: Prisma.RewardFulfillmentRequestWhereInput
+  orderBy?: Prisma.RewardFulfillmentRequestOrderByWithRelationInput | Prisma.RewardFulfillmentRequestOrderByWithRelationInput[]
+  cursor?: Prisma.RewardFulfillmentRequestWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.RewardFulfillmentRequestScalarFieldEnum | Prisma.RewardFulfillmentRequestScalarFieldEnum[]
+}
+
+/**
+ * User.rewardFulfillmentsRequested
+ */
+export type User$rewardFulfillmentsRequestedArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the RewardFulfillmentRequest
+   */
+  select?: Prisma.RewardFulfillmentRequestSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the RewardFulfillmentRequest
+   */
+  omit?: Prisma.RewardFulfillmentRequestOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.RewardFulfillmentRequestInclude<ExtArgs> | null
+  where?: Prisma.RewardFulfillmentRequestWhereInput
+  orderBy?: Prisma.RewardFulfillmentRequestOrderByWithRelationInput | Prisma.RewardFulfillmentRequestOrderByWithRelationInput[]
+  cursor?: Prisma.RewardFulfillmentRequestWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.RewardFulfillmentRequestScalarFieldEnum | Prisma.RewardFulfillmentRequestScalarFieldEnum[]
+}
+
+/**
+ * User.rewardFulfillmentsProcessed
+ */
+export type User$rewardFulfillmentsProcessedArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the RewardFulfillmentRequest
+   */
+  select?: Prisma.RewardFulfillmentRequestSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the RewardFulfillmentRequest
+   */
+  omit?: Prisma.RewardFulfillmentRequestOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.RewardFulfillmentRequestInclude<ExtArgs> | null
+  where?: Prisma.RewardFulfillmentRequestWhereInput
+  orderBy?: Prisma.RewardFulfillmentRequestOrderByWithRelationInput | Prisma.RewardFulfillmentRequestOrderByWithRelationInput[]
+  cursor?: Prisma.RewardFulfillmentRequestWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.RewardFulfillmentRequestScalarFieldEnum | Prisma.RewardFulfillmentRequestScalarFieldEnum[]
+}
+
+/**
+ * User.rewardFulfillmentsCanceled
+ */
+export type User$rewardFulfillmentsCanceledArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the RewardFulfillmentRequest
+   */
+  select?: Prisma.RewardFulfillmentRequestSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the RewardFulfillmentRequest
+   */
+  omit?: Prisma.RewardFulfillmentRequestOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.RewardFulfillmentRequestInclude<ExtArgs> | null
+  where?: Prisma.RewardFulfillmentRequestWhereInput
+  orderBy?: Prisma.RewardFulfillmentRequestOrderByWithRelationInput | Prisma.RewardFulfillmentRequestOrderByWithRelationInput[]
+  cursor?: Prisma.RewardFulfillmentRequestWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.RewardFulfillmentRequestScalarFieldEnum | Prisma.RewardFulfillmentRequestScalarFieldEnum[]
 }
 
 /**

@@ -73,6 +73,38 @@ describe('RewardsService', () => {
     });
   });
 
+  it('returns fulfilled internal SeasonReward rows through user rewards API', async () => {
+    const { service, prisma } = createService();
+    prisma.$queryRaw.mockResolvedValueOnce([
+      {
+        seasonId: 'season-1',
+        seasonName: 'Season 1',
+        rewardType: 'internal',
+        rewardCode: 'manual_reward_2026_001',
+        rewardName: '시즌 보상',
+        grantedAt: new Date('2026-06-09T00:00:00.000Z'),
+        finalRank: 1,
+        finalTier: 'master',
+        createdAt: new Date('2026-06-09T00:00:01.000Z'),
+      },
+    ]);
+
+    const response = await service.getMyRewards('user-1');
+
+    expect(response.data.items).toEqual([
+      {
+        seasonId: 'season-1',
+        seasonName: 'Season 1',
+        rewardType: 'internal',
+        rewardCode: 'manual_reward_2026_001',
+        rewardName: '시즌 보상',
+        grantedAt: '2026-06-09T00:00:00.000Z',
+        finalRank: 1,
+        finalTier: 'master',
+      },
+    ]);
+  });
+
   it('returns only authenticated user badges', async () => {
     const { service, prisma } = createService();
     prisma.$queryRaw.mockResolvedValueOnce([

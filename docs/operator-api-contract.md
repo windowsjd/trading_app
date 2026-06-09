@@ -5,13 +5,15 @@
 - Admin/operator authorization foundation MVP is implemented.
 - `GET /api/v1/operator/me` is implemented as the minimal operator smoke endpoint.
 - `OperatorAuditLog` foundation is implemented as an internal service/model for future operator mutations.
-- Admin/operator Account Management Gate is implemented for admin-only user list/get and explicit role changes.
-- No provider ingestion trigger, batch run trigger, scheduler HTTP API, reward fulfillment trigger, real trading/account/balance, deposit/withdrawal, or external order API exists. Scheduler/Ops foundation exists internally and is disabled by default.
+- Admin/operator Account Management Gate is implemented for admin-only user list/get, explicit role changes, status changes, and deleted user restore.
+- Internal reward fulfillment operator/admin APIs are documented in `docs/rewards-api-contract.md`.
+- No provider ingestion trigger, batch run trigger, scheduler HTTP API, external reward provider API, real trading/account/balance, deposit/withdrawal, or external order API exists. Scheduler/Ops foundation exists internally and is disabled by default.
 - `provider_api` source eligibility is open only inside explicitly allowed services: read-only/quote services, `/fx execute`, orders execute, and the separate operator-run daily snapshot valuation job. No operator provider trigger, batch HTTP API, ranking/settlement/reward final workflow source eligibility, or real trading/account API is opened by this contract.
 
 ## Migration / Runtime Requirement
 
 - Admin/operator authorization MVP requires schema migration `20260601090000_add_user_role_operator_audit_logs`.
+- Admin status/restore and internal reward fulfillment require schema migration `20260609120000_add_user_status_restore_internal_reward_fulfillment`.
 - Runtime DBs must have the `UserRole` enum, `users.role` column, `OperatorAuditResult` enum, and `operator_audit_logs` table applied before protected APIs are expected to run normally.
 - The access-token guard reads current DB `User.status` and `User.role` on every protected request. Role authorization does not trust a JWT role claim.
 - Existing protected APIs continue to depend on `request.user.userId`; `request.user.role` is additional authorization context and must not replace user identity.
@@ -79,9 +81,9 @@ All routes in this section require a valid Bearer access token. The access-token
 
 Admin-only policy:
 
-- `admin` can list users, get one user, and change a target user's role.
-- `operator` cannot list users and cannot change roles.
-- `user` cannot list users and cannot change roles.
+- `admin` can list users, get one user, change a target user's role, change a target user's status, and restore deleted users.
+- `operator` cannot list users, change roles, change status, or restore users.
+- `user` cannot list users, change roles, change status, or restore users.
 - Missing, invalid, expired, or malformed bearer token returns `401 UNAUTHORIZED`.
 - Suspended or deleted actors are blocked before management logic with the existing `403 USER_NOT_ACTIVE`.
 
@@ -204,16 +206,113 @@ Validation:
 
 Role update and success audit are written in the same transaction. If the success audit insert fails, the role update rolls back and the API returns `OPERATOR_ROLE_CHANGE_FAILED`. Failure audits are best-effort and must not mask the original error.
 
-## Deleted User Restore Policy v1
+### PATCH /api/v1/operator/users/:userId/status
 
-- Deleted user role changes are forbidden in the role management API.
-- Deleted user restore is a separate future Admin User Status / Restore Gate.
-- Restore must not silently restore elevated privileges.
-- On restore, role should default to `user`.
-- If `operator` or `admin` role is needed after restore, admin must submit a separate explicit role-change request.
-- Restore event and role promotion event must be audited separately.
-- Deleted users are excluded from active-admin count.
-- Last-admin protection counts only active admin users.
+Purpose: admin-only explicit user status change.
+
+Body:
+
+```json
+{
+  "status": "active | suspended | deleted",
+  "reason": "optional string"
+}
+```
+
+Success:
+
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": "user-id",
+      "email": "user@example.com",
+      "nickname": "traderKim",
+      "status": "suspended",
+      "role": "user",
+      "createdAt": "2026-06-09T00:00:00.000Z",
+      "updatedAt": "2026-06-09T00:00:01.000Z"
+    },
+    "statusChange": {
+      "beforeStatus": "active",
+      "afterStatus": "suspended",
+      "beforeRole": "user",
+      "afterRole": "user",
+      "reason": "optional string or null",
+      "revokedRefreshSessionCount": 1
+    }
+  }
+}
+```
+
+Validation:
+
+- Only `admin` can change status; non-admin active actors receive `ADMIN_REQUIRED`.
+- Invalid status returns `INVALID_USER_STATUS`.
+- Target not found returns `TARGET_USER_NOT_FOUND`.
+- Admin cannot change their own status: `CANNOT_CHANGE_OWN_STATUS`.
+- Last active admin cannot be suspended or deleted: `LAST_ADMIN_STATUS_CHANGE_FORBIDDEN`.
+- Last-admin protection counts only `status=active AND role=admin`.
+- Same-status request returns `USER_STATUS_ALREADY_ASSIGNED`.
+- Deleted users cannot be restored through status patch: `USE_RESTORE_ENDPOINT`.
+- `active -> suspended`, `suspended -> active`, and `active/suspended -> deleted` are allowed.
+- Delete forces target `role=user`.
+- Suspend preserves role.
+- Suspend/delete revoke active refresh token sessions.
+- Restore does not happen in this endpoint.
+
+Status update and success audit are written in the same transaction. If success audit insert fails, the status update rolls back and the API returns `USER_STATUS_CHANGE_FAILED`. Failure audits are best-effort and must not mask the original error.
+
+### POST /api/v1/operator/users/:userId/restore
+
+Purpose: admin-only deleted user restore.
+
+Body:
+
+```json
+{
+  "reason": "optional string"
+}
+```
+
+Success:
+
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": "user-id",
+      "email": "user@example.com",
+      "nickname": "traderKim",
+      "status": "active",
+      "role": "user",
+      "createdAt": "2026-06-09T00:00:00.000Z",
+      "updatedAt": "2026-06-09T00:00:01.000Z"
+    },
+    "restore": {
+      "beforeStatus": "deleted",
+      "afterStatus": "active",
+      "beforeRole": "admin",
+      "afterRole": "user",
+      "reason": "optional string or null"
+    }
+  }
+}
+```
+
+Validation:
+
+- Only `admin` can restore users; non-admin active actors receive `ADMIN_REQUIRED`.
+- Target not found returns `TARGET_USER_NOT_FOUND`.
+- Admin cannot restore their own user id: `CANNOT_CHANGE_OWN_STATUS`.
+- Target must be deleted, otherwise `USER_RESTORE_NOT_ALLOWED`.
+- Restore always sets `status=active` and `role=user`.
+- Restore never performs role promotion. If `operator` or `admin` role is needed after restore, admin must submit a separate role-change request, producing a separate audit event.
+- Restore does not reactivate revoked refresh token sessions.
+
+Restore update and success audit are written in the same transaction. If success audit insert fails, the restore update rolls back and the API returns `USER_RESTORE_FAILED`. Failure audits are best-effort and must not mask the original error.
 
 ## Operator Audit Log Foundation
 
@@ -244,19 +343,24 @@ Admin account-management actions:
 - `operator.users.get`
 - `operator.user_role.update`
 - `operator.user_role.update.failed`
+- `operator.user_status.update`
+- `operator.user_status.update.failed`
+- `operator.user_restore`
+- `operator.user_restore.failed`
 
 Role-change success metadata contains only safe fields such as `targetUserId`, `actorUserId`, `beforeRole`, `afterRole`, `reason`, and `requestId`. Role-change failure metadata contains only safe fields such as `targetUserId`, `actorUserId`, `requestedRole`, `reason`, `failureCode`, and `requestId`. Raw request body, `passwordHash`, refresh token, access token, raw provider payload, env, and secret values must not be stored.
 
+Status/restore success metadata contains only safe fields such as `targetUserId`, `actorUserId`, `beforeStatus`, `afterStatus`, `beforeRole`, `afterRole`, `reason`, `requestId`, and `revokedRefreshSessionCount`. Status/restore failure metadata contains only safe fields such as `targetUserId`, `actorUserId`, `requestedStatus`, `reason`, `failureCode`, and `requestId`. Raw request body, `passwordHash`, refresh token, access token, raw provider payload, env, and secret values must not be stored.
+
 ## Not Implemented In This MVP
 
-- Admin user restore/status management API.
 - HTTP batch execution API.
 - Provider ingestion trigger API.
-- Reward fulfillment trigger API.
+- External reward fulfillment provider API.
 - Scheduler HTTP API or production cron business automation beyond the disabled-by-default internal foundation.
 - Provider ingestion trigger API or operator API for provider source eligibility changes.
-- Trading calculation, order, FX, portfolio, ranking, settlement, reward fulfillment, real account, real balance, real deposit/withdrawal, or external order API changes.
+- Trading calculation, order, FX, portfolio, ranking, settlement, external reward fulfillment, real account, real balance, real deposit/withdrawal, or external order API changes.
 
 ## Next Gate
 
-Recommended next gate: Admin User Status / Restore Gate, Scheduler Production Ownership Gate, or Reward Fulfillment Backend Gate. This is separate from Provider API Source Eligibility Implementation Gate.
+Recommended next gate: Reward Policy / Reward Catalog Gate, Production Scheduler Ownership Gate, or Backend Release / Operations Runbook Gate. This is separate from Provider API Source Eligibility Implementation Gate.

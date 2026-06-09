@@ -21,8 +21,8 @@ Not implemented:
 - KIS order/account/balance/fill/deposit/withdrawal APIs
 - Binance authenticated/order/account/user-data APIs
 - Real external trading/account/deposit/withdrawal API
-- Admin user restore/status management API
-- Reward fulfillment or external payment/point/badge/trophy delivery
+- Scheduler-driven reward marker fulfillment or automatic reward payment/delivery
+- External payment/point/coupon/gifticon/cash reward delivery
 
 ## Job Names
 
@@ -131,11 +131,11 @@ The scheduler foundation does not open provider_api source eligibility for ranki
 
 The scheduler foundation does not expose HTTP trigger APIs. Internal runner methods are for service-level wiring and future gates only.
 
-The scheduler foundation does not create provider ingestion HTTP trigger APIs, batch HTTP APIs, reward fulfillment APIs, real trading/account APIs, KIS order/account/balance/fill/deposit/withdrawal APIs, or Binance authenticated order/account/user-data APIs.
+The scheduler foundation does not create provider ingestion HTTP trigger APIs, batch HTTP APIs, scheduler reward automation, external reward APIs, real trading/account APIs, KIS order/account/balance/fill/deposit/withdrawal APIs, or Binance authenticated order/account/user-data APIs.
 
 ## Next Gates
 
 - Scheduler job implementation hardening for currently skipped placeholders
 - Scheduler Production Ownership Gate
-- Reward Fulfillment Backend Gate
+- Reward Policy / Reward Catalog Gate
 - Deployment/ops runbook and production scheduler ownership gate

@@ -24,10 +24,30 @@
     - 자기 자신의 role 변경, 마지막 active admin 강등, deleted target role 변경, suspended user의 operator/admin 승격, 같은 role 재지정은 차단된다.
     - suspended operator/admin의 `user` 강등은 허용된다.
     - role 변경 성공/실패는 `OperatorAuditLog`에 safe metadata만 기록한다.
-    - deleted user restore/status management API는 구현하지 않았고 별도 Admin User Status / Restore Gate로 분리한다.
+    - Admin User Status / Restore Gate 구현 완료:
+      - `PATCH /api/v1/operator/users/:userId/status`는 admin 전용 status 변경 API다.
+      - `POST /api/v1/operator/users/:userId/restore`는 admin 전용 deleted user restore API다.
+      - `operator`와 `user`는 status 변경/restore를 할 수 없다.
+      - 자기 자신의 status 변경, 마지막 active admin의 suspended/deleted 전환, 같은 status 재지정은 차단된다.
+      - deleted -> active는 status patch가 아니라 restore endpoint만 허용한다.
+      - restore는 `status=active`, `role=user`를 강제하며 role promotion은 별도 role-change API로 분리된다.
+      - delete는 target role을 `user`로 강제하고, suspend/delete는 active refresh token sessions를 revoked 처리한다.
+      - restore는 기존 refresh token sessions를 되살리지 않는다.
+      - status/restore 성공/실패는 `OperatorAuditLog`에 safe metadata만 기록한다.
   - `OperatorAuditLog` / `operator_audit_logs` foundation과 secret-like metadata redaction service가 추가됨.
-  - Admin/operator MVP는 schema migration `20260601090000_add_user_role_operator_audit_logs` 적용이 필요하다. Runtime DB에는 `UserRole`, `users.role`, `OperatorAuditResult`, `operator_audit_logs`가 존재해야 보호 API와 operator audit foundation이 정상 동작한다.
-  - Admin user restore/status management API, provider ingestion trigger API, batch run HTTP API, reward fulfillment trigger API는 구현하지 않음. Scheduler/Ops foundation은 disabled-by-default/dry-run-by-default 내부 기반만 존재하며 production cron 자동화와 scheduler 자동 write는 열지 않음.
+  - Admin/operator MVP는 schema migration `20260601090000_add_user_role_operator_audit_logs`와 `20260609120000_add_user_status_restore_internal_reward_fulfillment` 적용이 필요하다.
+  - Internal Reward Fulfillment Backend Gate 구현 완료:
+    - `SeasonRewardType.internal`, `RewardFulfillmentStatus`, `reward_fulfillment_requests` queue/status foundation이 추가됨.
+    - `GET /api/v1/operator/reward-fulfillments`, `GET /api/v1/operator/reward-fulfillments/:fulfillmentId`, `POST /api/v1/operator/reward-fulfillments`, `POST /api/v1/operator/reward-fulfillments/:fulfillmentId/fulfill`, `POST /api/v1/operator/reward-fulfillments/:fulfillmentId/cancel`은 operator/admin 전용이다.
+    - 생성은 `idempotencyKey` 필수이며 같은 actor+key+requestHash는 replay, 같은 actor+key+다른 requestHash는 conflict다.
+    - `seasonParticipantId + rewardCode` 중복 request/지급은 차단된다.
+    - settled season과 active target user만 create/fulfill 가능하다.
+    - pending/failed request만 fulfill 가능하고 fulfilled 시 `SeasonReward`를 생성하며 `seasonRewardId`와 `fulfilledAt`를 기록한다.
+    - pending/failed request만 cancel 가능하며 fulfilled/canceled request는 되돌리지 않는다.
+    - 사용자 `GET /api/v1/rewards/me`는 fulfilled되어 `SeasonReward`로 생성된 내부 reward만 노출한다.
+    - 외부 현금/포인트/쿠폰/기프티콘/결제/배송/provider API는 구현하지 않는다.
+    - reward catalog/policy 확정, 외부 지급, scheduler reward 자동화는 future gate다.
+  - Provider ingestion trigger API, batch run HTTP API는 구현하지 않음. Scheduler/Ops foundation은 disabled-by-default/dry-run-by-default 내부 기반만 존재하며 production cron 자동화와 scheduler 자동 write는 열지 않음.
 - Crypto MVP policy changed to Binance-based USD-settled crypto.
   - Crypto uses USD Wallet like US stocks.
   - Crypto KRW valuation remains required for `totalAssetKrw`, ranking, home summary, snapshots, and final evaluation.
@@ -159,7 +179,7 @@
     - Scheduler env defaults are disabled: `SCHEDULER_ENABLED=false`, all individual `SCHEDULER_*_ENABLED=false` flags, and `SCHEDULER_TICK_INTERVAL_MS=60000`. No secret scheduler env was added.
     - Internal daily snapshot ops runner can call `DailyPortfolioSnapshotJobService` with lock/audit/dryRun support. Scheduler calls remain dry-run-by-default; real automatic writes require a future Production Scheduler Ownership Gate.
     - Provider FX/Binance ingestion, ranking generation, settlement, and reward marker scheduler runners remain explicit `skipped/NOT_IMPLEMENTED` placeholders. These skipped rows are not completed business automation or fake success.
-    - Provider ingestion HTTP trigger APIs, batch HTTP APIs, admin user restore/status APIs, reward fulfillment, KIS order/account APIs, Binance authenticated APIs, and real trading/account integrations remain closed.
+    - Provider ingestion HTTP trigger APIs, batch HTTP APIs, KIS order/account APIs, Binance authenticated APIs, external reward fulfillment APIs, and real trading/account integrations remain closed. Admin user restore/status and internal DB reward fulfillment were opened later in the 2026-06-09 gate.
   - Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage; USDT depeg risk is not modeled.
   - Provider_api source eligibility for ranking, settlement, reward, and automation remains a separate gate.
   - KIS supports WebSocket approval_key retrieval, domestic KRX real-time trade price `H0STCNT0`, and overseas/US delayed trade price `HDFSCNT0` ingestion foundation into `asset_price_snapshots` provider_api rows.
@@ -178,6 +198,13 @@
 - `GET /api/v1/operator/users` admin-only user list MVP
 - `GET /api/v1/operator/users/:userId` admin-only user detail MVP
 - `PATCH /api/v1/operator/users/:userId/role` admin-only audited role change MVP
+- `PATCH /api/v1/operator/users/:userId/status` admin-only audited status change MVP
+- `POST /api/v1/operator/users/:userId/restore` admin-only audited deleted user restore MVP
+- `GET /api/v1/operator/reward-fulfillments` operator/admin internal reward fulfillment list MVP
+- `GET /api/v1/operator/reward-fulfillments/:fulfillmentId` operator/admin internal reward fulfillment detail MVP
+- `POST /api/v1/operator/reward-fulfillments` operator/admin internal reward fulfillment request create MVP
+- `POST /api/v1/operator/reward-fulfillments/:fulfillmentId/fulfill` operator/admin internal reward fulfillment execute MVP
+- `POST /api/v1/operator/reward-fulfillments/:fulfillmentId/cancel` operator/admin internal reward fulfillment cancel MVP
 - `GET /readiness` public readiness MVP
   - DB lightweight query와 disabled-by-default scheduler config 상태만 노출하며 외부 provider API를 호출하지 않음.
 - `GET /api/v1/home` read-only MVP
@@ -268,10 +295,16 @@
 - operator route:
   - `GET /api/v1/operator/me`: `operator` 또는 `admin`만 접근 가능. `user`는 `403 OPERATOR_FORBIDDEN`, missing/invalid token은 `401 UNAUTHORIZED`.
 - admin management route:
-  - `GET /api/v1/operator/users`, `GET /api/v1/operator/users/:userId`, `PATCH /api/v1/operator/users/:userId/role`: `admin`만 접근 가능. `user`와 `operator`는 `403 ADMIN_REQUIRED`, missing/invalid token은 `401 UNAUTHORIZED`.
+  - `GET /api/v1/operator/users`, `GET /api/v1/operator/users/:userId`, `PATCH /api/v1/operator/users/:userId/role`, `PATCH /api/v1/operator/users/:userId/status`, `POST /api/v1/operator/users/:userId/restore`: `admin`만 접근 가능. `user`와 `operator`는 `403 ADMIN_REQUIRED`, missing/invalid token은 `401 UNAUTHORIZED`.
   - role 변경 validation: invalid role `INVALID_USER_ROLE`, same role `ROLE_ALREADY_ASSIGNED`, self change `CANNOT_CHANGE_OWN_ROLE`, last active admin demotion `LAST_ADMIN_ROLE_CHANGE_FORBIDDEN`, deleted target `TARGET_USER_DELETED`, suspended promotion `TARGET_USER_SUSPENDED_PROMOTION_FORBIDDEN`.
   - role 변경 성공/실패 audit metadata는 `beforeRole`, `afterRole`, `requestedRole`, `targetUserId`, `actorUserId`, `reason`, `requestId`, `failureCode` 등 safe field만 저장하고 passwordHash/token/env/raw provider payload는 저장하지 않음.
-  - deleted user restore는 이번 gate에서 구현하지 않음. future restore는 role을 `user`로 복구하고 operator/admin 승격은 별도 role-change API와 별도 audit event로 처리해야 함.
+  - status 변경 validation: invalid status `INVALID_USER_STATUS`, same status `USER_STATUS_ALREADY_ASSIGNED`, self status change `CANNOT_CHANGE_OWN_STATUS`, last active admin suspend/delete `LAST_ADMIN_STATUS_CHANGE_FORBIDDEN`, deleted target status patch restore 시도 `USE_RESTORE_ENDPOINT`.
+  - restore validation: target이 deleted가 아니면 `USER_RESTORE_NOT_ALLOWED`; restore는 `status=active`, `role=user`를 강제하고 role promotion은 수행하지 않음.
+  - suspend/delete는 active refresh token sessions를 revoked 처리하고 restore는 기존 refresh token session을 되살리지 않음.
+  - status/restore 성공/실패 audit metadata는 `beforeStatus`, `afterStatus`, `beforeRole`, `afterRole`, `targetUserId`, `actorUserId`, `reason`, `requestId`, `revokedRefreshSessionCount`, `failureCode` 등 safe field만 저장하고 passwordHash/token/env/raw provider payload는 저장하지 않음.
+- operator reward fulfillment route:
+  - `/api/v1/operator/reward-fulfillments*`는 `operator` 또는 `admin`만 접근 가능. `user`는 `403 OPERATOR_REQUIRED`, missing/invalid token은 `401 UNAUTHORIZED`.
+  - create/list/get/fulfill/cancel은 internal DB reward fulfillment request만 관리하며 외부 reward provider API를 호출하지 않음.
 - inactive user:
   - missing/invalid/expired/forged token 또는 unknown user는 `UNAUTHORIZED`.
   - `User.status`가 `suspended` 또는 `deleted`이면 `FORBIDDEN` + `USER_NOT_ACTIVE`.
@@ -503,9 +536,9 @@ near-term ledger/FX foundation:
 
 ## 6. 현재 미도입 DB 상태
 
-- Prisma schema/migration 기준 현재 문서화된 내부 reward/badge/trophy 조회 foundation 테이블은 구현됨.
-- Batch job run/lock 기록 foundation과 operator-run daily portfolio snapshot/season ranking/daily season cycle/season settlement/final tier assignment/reward grant internal foundation MVP job은 구현 완료. 단, 실제 cron scheduler, provider ingestion job, ranking overwrite/regeneration job, actual reward/payment/point/delivery/external fulfillment job은 아직 미구현.
-- order execution full-fill MVP와 position mutation 1차 write path는 구현 완료. 단, exact replay, durable quote, partial fill, matching engine, provider price ingestion, settlement API, scheduler 기반 자동 daily valuation/ranking 생성 경로는 아직 미구현.
+- Prisma schema/migration 기준 현재 문서화된 내부 reward/badge/trophy 조회 foundation 테이블과 internal reward fulfillment request queue/status 테이블은 구현됨.
+- Batch job run/lock 기록 foundation과 operator-run daily portfolio snapshot/season ranking/daily season cycle/season settlement/final tier assignment/reward grant internal foundation MVP job은 구현 완료. 단, 실제 cron scheduler, provider ingestion job, ranking overwrite/regeneration job, external reward/payment/point/coupon/gifticon/delivery fulfillment job은 아직 미구현.
+- order execution full-fill MVP와 position mutation 1차 write path, durable quote-bound quote/create/execute path는 구현 완료. 단, exact replay, partial fill, matching engine, provider ingestion scheduler/job, settlement extension API, scheduler 기반 자동 daily valuation/ranking 생성 경로는 아직 미구현.
 
 ## 7. 완료된 문서/설계 상태
 
@@ -736,7 +769,7 @@ near-term ledger/FX foundation:
 - near-term execute는 `equity_snapshots`를 생성하지 않음.
 - MVP execute는 별도 fee wallet transaction row를 만들지 않음.
 - target wallet credit은 `netTargetAmount`.
-- provider_api ingestion, official_batch ingestion, scheduler, provider final selection, stale pending recovery tool/job, durable quote, FX execute settlement side effect는 여전히 미구현. Season settlement MVP는 별도 operator-run batch job으로 분리됨.
+- 이 historical FX execute gate 시점에는 provider_api ingestion, official_batch ingestion, scheduler, provider final selection, stale pending recovery tool/job, durable quote, FX execute settlement side effect가 미구현이었다. 현재 durable quote/provider-backed execute 상태는 이 문서 상단과 `docs/fx-api-contract.md`, `docs/backend-test-coverage-matrix.md`를 기준으로 판단한다. Season settlement MVP는 별도 operator-run batch job으로 분리됨.
 - DB integration 검증은 Docker compose의 기존 Postgres/Redis 컨테이너로 수행됨.
 - DB 연결 확인과 migration status 확인 성공.
 - `pnpm test`, `pnpm build`, `FX_EXECUTE_DB_INTEGRATION=1 pnpm test -- fx.execute.integration.spec.ts` 통과.
@@ -935,6 +968,7 @@ near-term ledger/FX foundation:
   - `season_rewards`
   - `seasons`
   - `season_participants`
+  - `reward_fulfillment_requests`는 사용자 API source가 아니며 operator/admin 관리 상태만 보관한다.
 - badges source:
   - `user_badges`
   - `badges`
@@ -949,7 +983,9 @@ near-term ledger/FX foundation:
   - `limit` optional, default 50, max 100 clamp.
   - `offset` optional, default 0.
 - `/rewards/me`와 `/badges/me` 호출은 reward/badge/season/participant row를 생성/수정/삭제하지 않음.
-- actual payment/point/delivery/external fulfillment는 구현하지 않음.
+- `SeasonRewardType.internal` row는 fulfilled된 내부 reward로 사용자 rewards API에 노출 가능하다.
+- pending/processing/failed/canceled reward fulfillment request는 `SeasonReward`가 아니므로 사용자 rewards API에 노출되지 않는다.
+- actual payment/point/coupon/gifticon/delivery/external fulfillment는 구현하지 않음.
 
 ### `/orders`
 
@@ -1029,13 +1065,13 @@ near-term ledger/FX foundation:
   - Binance provider_api source eligibility는 read-only/quote workflow와 operator-run daily snapshot valuation workflow에서 `binance_public_rest_24hr_ticker` fresh row만 허용하며 execute/write, scheduler, settlement, reward 사용은 `STOP`.
   - OANDA/Twelve Data ingestion implementation은 credentialed fixture, mapping, terms, sourceType tests 전까지 `STOP/BLOCKED`.
   - KRX execute/write remains STOP. KIS KRX `provider_api` evidence is limited to read-only/quote and operator-run daily snapshot valuation workflows where eligible.
-  - Batch job run foundation과 operator-run daily snapshot(provider-backed valuation only)/ranking/cycle/settlement/final-tier/reward-grant internal foundation MVP job은 구현됨. 실제 cron scheduler와 actual reward fulfillment job은 STOP 유지.
-  - settlement extension/actual reward fulfillment는 Gate H/I/J 전까지 구현 STOP 유지.
+  - Batch job run foundation과 operator-run daily snapshot(provider-backed valuation only)/ranking/cycle/settlement/final-tier/reward-grant internal foundation MVP job은 구현됨. 실제 cron scheduler, scheduler reward 자동 지급, 외부 reward fulfillment job은 STOP 유지.
+  - settlement extension, reward policy/catalog, 외부 reward fulfillment는 별도 gate 전까지 구현 STOP 유지.
 - Gate B Provider final selection readiness re-check 및 Asset Price Freshness Policy 문서화 완료.
   - 상세 결과: `docs/provider-final-selection-readiness-recheck.md`, `docs/asset-price-freshness-policy.md`.
   - Gate B 판단은 `CONDITIONAL GO`.
   - 이것은 evidence capture와 다음 구현 프롬프트를 열기 위한 조건부 판단이며, provider ingestion 구현 GO가 아님.
-- 다음 recommended gate: Provider Execute/Write Eligibility Gate 또는 Scheduler/Ops Foundation Gate.
+- 다음 recommended gate: Reward Policy / Reward Catalog Gate, Production Scheduler Ownership Gate, 또는 Backend Release / Operations Runbook Gate.
   - KIS US `HDFSCNT0` tick/DB insertion evidence는 2026-06-03 KST DB-started rerun에서 확보됨.
   - execute/write eligibility 착수 전 provider timestamp/effectiveAt mapping, KIS/Binance price/effectiveAt mapping, symbol mapping, plan/terms, sourceType/sourceName 우선순위, outage/fallback 정책을 다시 확인해야 함.
 - Gate A Protected API HTTP e2e baseline은 완료 상태로 본다.
@@ -1044,8 +1080,8 @@ near-term ledger/FX foundation:
   - full financial write-path 검증은 현재 service/unit 및 opt-in PostgreSQL integration spec이 담당.
 - 테스트 커버리지 상세는 `docs/backend-test-coverage-matrix.md` 기준.
 - provider ingestion foundation은 구현됨. `provider_api` source eligibility는 read-only/quote workflow와 operator-run daily snapshot valuation workflow에만 열렸고 provider-backed scheduler/settlement 사용은 `BLOCKED` 유지.
-- Batch job run foundation과 operator-run daily snapshot(provider-backed valuation only)/ranking/cycle/settlement/final-tier/reward-grant internal foundation MVP job은 구현됨. 실제 cron scheduler와 actual reward fulfillment job은 STOP 유지.
-- settlement extension/actual reward fulfillment는 Gate H/I/J 전까지 구현 STOP 유지.
+- Batch job run foundation과 operator-run daily snapshot(provider-backed valuation only)/ranking/cycle/settlement/final-tier/reward-grant internal foundation MVP job은 구현됨. 실제 cron scheduler, scheduler reward 자동 지급, 외부 reward fulfillment job은 STOP 유지.
+- settlement extension, reward policy/catalog, 외부 reward fulfillment는 별도 gate 전까지 구현 STOP 유지.
 - asset price freshness 정책 요약:
   - FX USD/KRW quote/execute는 현행 60초 `effectiveAt` freshness 유지.
   - `/fx quote` 및 read-only USD/KRW provider fallback은 capturedAt 기준 300초 provider freshness를 사용하고, execute는 기존 `admin_manual` 60초 `effectiveAt` freshness를 유지.
@@ -1070,12 +1106,12 @@ near-term ledger/FX foundation:
   - provider credentials 확보, live fixture capture, provider ingestion.
   - asset price freshness/source policy 구현 반영 및 고위험 테스트.
   - cron scheduler 및 automatic daily snapshot/ranking job.
-  - settlement extension/actual reward/payment/badge/trophy fulfillment.
+  - settlement extension, Reward Policy / Reward Catalog, external reward/payment/point/delivery fulfillment.
   - access token blacklist/revocation, cookie/session auth, refresh token reuse theft-response hardening.
-  - durable quote, order exact execute replay, partial fill, matching engine.
+  - order exact execute replay, partial fill, matching engine.
   - FX stale pending/unknown outcome recovery.
   - deployment/operations readiness.
-- Settlement extension/actual reward fulfillment handoff beyond Home final-result read model, final tier assignment MVP, and reward grant internal foundation MVP
+- Settlement extension, Reward Policy / Reward Catalog, or external reward fulfillment beyond Home final-result read model, final tier assignment MVP, reward grant internal foundation MVP, and internal reward fulfillment MVP
 - access token blacklist/revocation
 - cookie/session auth
 - refresh token reuse detection 시 user active sessions 전체 revoke 정책

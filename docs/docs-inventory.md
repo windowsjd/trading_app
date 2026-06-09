@@ -111,3 +111,10 @@ No docs were deleted. No empty or duplicate document was identified for deletion
 - Role changes are audited on success/failure, self role change and last active admin demotion are blocked, deleted target role changes are forbidden, suspended promotion is forbidden, suspended demotion to user is allowed, and same-role requests return `ROLE_ALREADY_ASSIGNED`.
 - Deleted user restore/status management remains a future Admin User Status / Restore Gate and must not silently restore elevated privileges.
 - Provider ingestion HTTP triggers, batch HTTP APIs, restore/status APIs, reward fulfillment, and external real trading/account APIs remain closed.
+
+2026-06-09 Admin User Status / Restore and Internal Reward Fulfillment Backend Gate:
+
+- Admin-only user status patch and restore APIs are implemented and documented; restore forces `role=user`, status patch cannot restore deleted users, suspend/delete revoke active refresh token sessions, self status change and last active admin suspend/delete are blocked, and success/failure audit metadata is safe.
+- Internal reward fulfillment APIs are implemented for operator/admin create/list/get/fulfill/cancel. The queue is separate from `SeasonReward`; pending/processing/failed/canceled requests are not visible to user rewards, and fulfilled requests create `SeasonReward` rows.
+- `SeasonRewardType.internal`, `RewardFulfillmentStatus`, and `reward_fulfillment_requests` schema are documented. Existing `SeasonReward` rows remain backward-compatible legacy/manual fulfilled rewards.
+- External cash, point, coupon, gifticon, payment, delivery, provider ingestion trigger, batch HTTP API, scheduler automatic reward, and real trading/account APIs remain closed.

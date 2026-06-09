@@ -26,8 +26,10 @@ Auth is an access token + opaque refresh token MVP.
 - `operator` and `admin` can use regular protected user APIs with their token-derived user id.
 - `operator` and `admin` can use operator-only APIs; `admin` includes operator permissions.
 - `user` cannot use operator-only APIs.
-- Admin-only account management APIs exist under `GET /api/v1/operator/users`, `GET /api/v1/operator/users/:userId`, and `PATCH /api/v1/operator/users/:userId/role`. `operator` and `user` cannot use them.
-- Role decisions use the current DB user read by the access-token guard. A role-like JWT claim is not trusted.
+- Admin-only account management APIs exist under `GET /api/v1/operator/users`, `GET /api/v1/operator/users/:userId`, `PATCH /api/v1/operator/users/:userId/role`, `PATCH /api/v1/operator/users/:userId/status`, and `POST /api/v1/operator/users/:userId/restore`. `operator` and `user` cannot use them.
+- Role and status decisions use the current DB user read by the access-token guard. A role-like JWT claim is not trusted.
+- Admin suspend/delete status changes revoke active refresh token sessions for the target user.
+- Deleted user restore does not reactivate revoked refresh token sessions and always restores `role=user`.
 
 ## Environment
 

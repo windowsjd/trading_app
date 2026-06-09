@@ -7,7 +7,7 @@ export type RewardsQuery = {
 };
 
 type RewardsState = 'available' | 'empty';
-type RewardType = 'badge' | 'trophy';
+type RewardType = 'internal' | 'badge' | 'trophy';
 type BadgeType = 'tier_badge' | 'ranker_trophy';
 
 type ParsedRewardsQuery = {

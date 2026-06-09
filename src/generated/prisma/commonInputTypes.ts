@@ -403,6 +403,23 @@ export type EnumSeasonRewardTypeWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedEnumSeasonRewardTypeFilter<$PrismaModel>
 }
 
+export type EnumRewardFulfillmentStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.RewardFulfillmentStatus | Prisma.EnumRewardFulfillmentStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.RewardFulfillmentStatus[] | Prisma.ListEnumRewardFulfillmentStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.RewardFulfillmentStatus[] | Prisma.ListEnumRewardFulfillmentStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumRewardFulfillmentStatusFilter<$PrismaModel> | $Enums.RewardFulfillmentStatus
+}
+
+export type EnumRewardFulfillmentStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.RewardFulfillmentStatus | Prisma.EnumRewardFulfillmentStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.RewardFulfillmentStatus[] | Prisma.ListEnumRewardFulfillmentStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.RewardFulfillmentStatus[] | Prisma.ListEnumRewardFulfillmentStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumRewardFulfillmentStatusWithAggregatesFilter<$PrismaModel> | $Enums.RewardFulfillmentStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumRewardFulfillmentStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumRewardFulfillmentStatusFilter<$PrismaModel>
+}
+
 export type EnumCurrencyCodeFilter<$PrismaModel = never> = {
   equals?: $Enums.CurrencyCode | Prisma.EnumCurrencyCodeFieldRefInput<$PrismaModel>
   in?: $Enums.CurrencyCode[] | Prisma.ListEnumCurrencyCodeFieldRefInput<$PrismaModel>
@@ -1190,6 +1207,23 @@ export type NestedEnumSeasonRewardTypeWithAggregatesFilter<$PrismaModel = never>
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumSeasonRewardTypeFilter<$PrismaModel>
   _max?: Prisma.NestedEnumSeasonRewardTypeFilter<$PrismaModel>
+}
+
+export type NestedEnumRewardFulfillmentStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.RewardFulfillmentStatus | Prisma.EnumRewardFulfillmentStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.RewardFulfillmentStatus[] | Prisma.ListEnumRewardFulfillmentStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.RewardFulfillmentStatus[] | Prisma.ListEnumRewardFulfillmentStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumRewardFulfillmentStatusFilter<$PrismaModel> | $Enums.RewardFulfillmentStatus
+}
+
+export type NestedEnumRewardFulfillmentStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.RewardFulfillmentStatus | Prisma.EnumRewardFulfillmentStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.RewardFulfillmentStatus[] | Prisma.ListEnumRewardFulfillmentStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.RewardFulfillmentStatus[] | Prisma.ListEnumRewardFulfillmentStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumRewardFulfillmentStatusWithAggregatesFilter<$PrismaModel> | $Enums.RewardFulfillmentStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumRewardFulfillmentStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumRewardFulfillmentStatusFilter<$PrismaModel>
 }
 
 export type NestedEnumCurrencyCodeFilter<$PrismaModel = never> = {

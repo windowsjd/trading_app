@@ -32,13 +32,15 @@ Provider evidence currently has ExchangeRate-API and Binance row insertion evide
 
 Read-only/quote source metadata is exposed as backward-compatible optional fields such as `rateSource`, `priceSource`, `assetPriceSource`, `fxRateSource`, and live valuation `sourceSummary`. Daily snapshot batch results include public-safe aggregate `sourceSummary`/fallback information in `batch_job_runs.resultPayloadJson`. These fields contain public-safe source type/name/snapshot/timing/fallback reasons only; raw provider payloads and secrets remain excluded.
 
-Provider_api remains closed for orders create source selection, ranking, settlement/final result, reward/final tier/fulfillment, provider ingestion trigger APIs, batch HTTP APIs, and real trading/account/order/deposit/withdrawal APIs. Scheduler/Ops foundation exists but is disabled by default and does not open those workflows.
+Provider_api remains closed for orders create source selection, ranking, settlement/final result, reward/final tier provider reads, reward fulfillment provider reads, provider ingestion trigger APIs, batch HTTP APIs, and real trading/account/order/deposit/withdrawal APIs. Scheduler/Ops foundation exists but is disabled by default and does not open those workflows.
 
 `docs/realtime-execution-policy.md` records the active Durable Quote provider execute policy: quote is only a reference quote, `/fx execute` and orders execute reprice from fresh provider_api at execute time, enforce quote-to-execute bps thresholds, consume quotes atomically with writes, and forbid default `admin_manual` execute fallback.
 
 6. Admin/operator authorization, account management, and audit foundation:
 
 - `docs/operator-api-contract.md`
+
+Admin-only user status/restore APIs and operator/admin internal reward fulfillment APIs are now documented in the operator and rewards contracts. Restore forces `role=user`, suspend/delete revoke refresh sessions, and internal reward fulfillment creates `SeasonReward` rows only at fulfilled time. External reward/payment/point/coupon/gifticon APIs remain out of scope.
 
 7. Batch foundation and operator-run daily snapshot/ranking/cycle/settlement/final-tier/reward-grant internal foundation jobs:
    - `docs/batch-job-foundation.md`
