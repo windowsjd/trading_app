@@ -26,7 +26,7 @@ Auth is an access token + opaque refresh token MVP.
 - `operator` and `admin` can use regular protected user APIs with their token-derived user id.
 - `operator` and `admin` can use operator-only APIs; `admin` includes operator permissions.
 - `user` cannot use operator-only APIs.
-- Admin/operator account management APIs are not implemented in this MVP.
+- Admin-only account management APIs exist under `GET /api/v1/operator/users`, `GET /api/v1/operator/users/:userId`, and `PATCH /api/v1/operator/users/:userId/role`. `operator` and `user` cannot use them.
 - Role decisions use the current DB user read by the access-token guard. A role-like JWT claim is not trusted.
 
 ## Environment

@@ -84,6 +84,16 @@ describe('OpsSchedulerService', () => {
     expect(results).toHaveLength(2);
     expect(runner.runProviderFxIngestJob).toHaveBeenCalledTimes(1);
     expect(runner.runSeasonRankingGenerationJob).toHaveBeenCalledTimes(1);
+    expect(runner.runProviderFxIngestJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dryRun: true,
+      }),
+    );
+    expect(runner.runSeasonRankingGenerationJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dryRun: true,
+      }),
+    );
     expect(runner.runDailyPortfolioSnapshotJob).not.toHaveBeenCalled();
   });
 
@@ -97,6 +107,7 @@ describe('OpsSchedulerService', () => {
 
     expect(runner.runDailyPortfolioSnapshotJob).toHaveBeenCalledWith(
       expect.objectContaining({
+        dryRun: true,
         seasonId: 'season-1',
         snapshotDate: '2026-06-08',
       }),

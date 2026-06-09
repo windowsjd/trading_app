@@ -102,3 +102,12 @@ No docs were deleted. No empty or duplicate document was identified for deletion
 - Orders create response wording now uses `ORDER_SUBMITTED_NOT_EXECUTED`.
 - `OpsJobRun` and `OpsJobLock` foundation plus disabled-by-default scheduler env/config/service shell were added.
 - Scheduler/Ops does not add provider ingestion HTTP triggers, batch HTTP APIs, real trading/account APIs, reward fulfillment, or admin role management APIs.
+
+2026-06-09 Scheduler/Ops hardening and Admin/operator Account Management Gate:
+
+- Scheduler docs/env/tests now include `SCHEDULER_TICK_INTERVAL_MS=60000`, disabled-by-default interval registration, dry-run-by-default scheduler execution, real automatic writes closed, and placeholder jobs as skipped/`NOT_IMPLEMENTED` rather than fake success.
+- `OPS_JOB_LOCK_DB_SMOKE=1` opt-in real PostgreSQL lock smoke covers same-key concurrency, active lock blocking, expired takeover, release, and reacquire.
+- Admin-only user list/get and explicit role-change APIs are implemented under `docs/operator-api-contract.md`; operator/user access is forbidden.
+- Role changes are audited on success/failure, self role change and last active admin demotion are blocked, deleted target role changes are forbidden, suspended promotion is forbidden, suspended demotion to user is allowed, and same-role requests return `ROLE_ALREADY_ASSIGNED`.
+- Deleted user restore/status management remains a future Admin User Status / Restore Gate and must not silently restore elevated privileges.
+- Provider ingestion HTTP triggers, batch HTTP APIs, restore/status APIs, reward fulfillment, and external real trading/account APIs remain closed.

@@ -212,6 +212,9 @@ type PrismaMock = {
     findUnique: jest.Mock;
     updateMany: jest.Mock;
   };
+  operatorAuditLog: {
+    create: jest.Mock;
+  };
   season: {
     findFirst: jest.Mock;
     findUnique: jest.Mock;
@@ -229,8 +232,11 @@ type PrismaMock = {
     findUnique: jest.Mock;
   };
   user: {
+    count: jest.Mock;
     create: jest.Mock;
+    findMany: jest.Mock;
     findUnique: jest.Mock;
+    update: jest.Mock;
   };
   walletTransaction: {
     count: jest.Mock;
@@ -393,6 +399,12 @@ describe('AppController (e2e)', () => {
         findUnique: jest.fn(),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
+      operatorAuditLog: {
+        create: jest.fn().mockResolvedValue({
+          id: 'audit-1',
+          createdAt: now,
+        }),
+      },
       season: {
         findFirst: jest.fn(),
         findUnique: jest.fn(),
@@ -410,8 +422,11 @@ describe('AppController (e2e)', () => {
         findUnique: jest.fn(),
       },
       user: {
+        count: jest.fn(),
         create: jest.fn(),
+        findMany: jest.fn(),
         findUnique: jest.fn(),
+        update: jest.fn(),
       },
       walletTransaction: {
         count: jest.fn(),
@@ -531,6 +546,8 @@ describe('AppController (e2e)', () => {
     expect(prisma.position.updateMany).not.toHaveBeenCalled();
     expect(prisma.refreshTokenSession.create).not.toHaveBeenCalled();
     expect(prisma.refreshTokenSession.updateMany).not.toHaveBeenCalled();
+    expect(prisma.user.update).not.toHaveBeenCalled();
+    expect(prisma.operatorAuditLog.create).not.toHaveBeenCalled();
   };
 
   const expectNoServiceDatabaseCalls = () => {
@@ -562,6 +579,10 @@ describe('AppController (e2e)', () => {
     expect(prisma.position.findMany).not.toHaveBeenCalled();
     expect(prisma.position.findUnique).not.toHaveBeenCalled();
     expect(prisma.refreshTokenSession.findUnique).not.toHaveBeenCalled();
+    expect(prisma.user.count).not.toHaveBeenCalled();
+    expect(prisma.user.findMany).not.toHaveBeenCalled();
+    expect(prisma.user.update).not.toHaveBeenCalled();
+    expect(prisma.operatorAuditLog.create).not.toHaveBeenCalled();
     expect(prisma.$queryRaw).not.toHaveBeenCalled();
     expect(prisma.seasonRanking.findFirst).not.toHaveBeenCalled();
     expect(prisma.seasonRanking.findMany).not.toHaveBeenCalled();
@@ -1279,6 +1300,300 @@ describe('AppController (e2e)', () => {
         });
       });
   });
+
+  it('/api/v1/operator/users (GET) rejects missing token', async () => {
+    await expectUnauthorizedWithoutToken('get', '/api/v1/operator/users');
+  });
+
+  it.each([
+    ['user', 'user'],
+    ['operator', 'operator'],
+  ])('/api/v1/operator/users (GET) rejects %s role', async (_label, role) => {
+    resetPrismaMocks();
+    mockActiveUser(user.id, role);
+    const token = await createValidAccessToken(user.id);
+
+    return request(app.getHttpServer())
+      .get('/api/v1/operator/users')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(403)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: false,
+          error: {
+            code: 'ADMIN_REQUIRED',
+          },
+        });
+        expect(prisma.user.count).not.toHaveBeenCalled();
+        expect(prisma.user.findMany).not.toHaveBeenCalled();
+        expect(prisma.operatorAuditLog.create).not.toHaveBeenCalled();
+      });
+  });
+
+  it('/api/v1/operator/users (GET) lets admin list users without secret fields', async () => {
+    resetPrismaMocks();
+    mockActiveUser(user.id, 'admin');
+    prisma.user.count.mockResolvedValueOnce(1);
+    prisma.user.findMany.mockResolvedValueOnce([
+      {
+        id: 'managed-user-1',
+        email: 'managed@example.com',
+        nickname: 'managed',
+        status: 'active',
+        role: 'operator',
+        createdAt: now,
+        updatedAt: now,
+      },
+    ]);
+    const token = await createValidAccessToken(user.id);
+
+    return request(app.getHttpServer())
+      .get(
+        '/api/v1/operator/users?role=operator&status=active&search=managed&limit=150',
+      )
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+      .expect((response) => {
+        expect(response.body).toEqual({
+          success: true,
+          data: {
+            users: [
+              {
+                id: 'managed-user-1',
+                email: 'managed@example.com',
+                nickname: 'managed',
+                status: 'active',
+                role: 'operator',
+                createdAt: now.toISOString(),
+                updatedAt: now.toISOString(),
+              },
+            ],
+            pagination: {
+              limit: 100,
+              offset: 0,
+              total: 1,
+              returned: 1,
+              nextOffset: null,
+            },
+          },
+        });
+        expect(JSON.stringify(response.body)).not.toMatch(
+          /passwordHash|refreshToken|accessToken/i,
+        );
+        expect(prisma.user.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              role: 'operator',
+              status: 'active',
+              OR: expect.any(Array),
+            }),
+            take: 100,
+          }),
+        );
+        expect(prisma.operatorAuditLog.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              action: 'operator.users.list',
+              result: 'success',
+            }),
+          }),
+        );
+      });
+  });
+
+  it('/api/v1/operator/users/:userId (GET) lets admin get one user', async () => {
+    resetPrismaMocks();
+    prisma.user.findUnique
+      .mockResolvedValueOnce({
+        ...user,
+        role: 'admin',
+        status: 'active',
+      })
+      .mockResolvedValueOnce({
+        id: 'managed-user-1',
+        email: 'managed@example.com',
+        nickname: 'managed',
+        status: 'active',
+        role: 'user',
+        createdAt: now,
+        updatedAt: now,
+      });
+    const token = await createValidAccessToken(user.id);
+
+    return request(app.getHttpServer())
+      .get('/api/v1/operator/users/managed-user-1')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: true,
+          data: {
+            user: {
+              id: 'managed-user-1',
+              email: 'managed@example.com',
+              role: 'user',
+            },
+          },
+        });
+        expect(JSON.stringify(response.body)).not.toMatch(
+          /passwordHash|refreshToken|accessToken/i,
+        );
+      });
+  });
+
+  it.each([
+    ['user', 'user'],
+    ['operator', 'operator'],
+  ])(
+    '/api/v1/operator/users/:userId/role (PATCH) rejects %s role and audits failure',
+    async (_label, role) => {
+      resetPrismaMocks();
+      mockActiveUser(user.id, role);
+      const token = await createValidAccessToken(user.id);
+
+      return request(app.getHttpServer())
+        .patch('/api/v1/operator/users/managed-user-1/role')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          role: 'admin',
+          reason: 'not allowed',
+        })
+        .expect(403)
+        .expect((response) => {
+          expect(response.body).toMatchObject({
+            success: false,
+            error: {
+              code: 'ADMIN_REQUIRED',
+            },
+          });
+          expect(prisma.user.update).not.toHaveBeenCalled();
+          expect(prisma.operatorAuditLog.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+              data: expect.objectContaining({
+                action: 'operator.user_role.update.failed',
+                actorRole: role,
+                result: 'failure',
+                errorCode: 'ADMIN_REQUIRED',
+              }),
+            }),
+          );
+        });
+    },
+  );
+
+  it('/api/v1/operator/users/:userId/role (PATCH) lets admin change role and audits success', async () => {
+    resetPrismaMocks();
+    prisma.user.findUnique
+      .mockResolvedValueOnce({
+        ...user,
+        role: 'admin',
+        status: 'active',
+      })
+      .mockResolvedValueOnce({
+        id: 'managed-user-1',
+        email: 'managed@example.com',
+        nickname: 'managed',
+        status: 'active',
+        role: 'user',
+        createdAt: now,
+        updatedAt: now,
+      });
+    prisma.user.update.mockResolvedValueOnce({
+      id: 'managed-user-1',
+      email: 'managed@example.com',
+      nickname: 'managed',
+      status: 'active',
+      role: 'operator',
+      createdAt: now,
+      updatedAt: new Date('2026-05-09T00:01:00.000Z'),
+    });
+    const token = await createValidAccessToken(user.id);
+
+    return request(app.getHttpServer())
+      .patch('/api/v1/operator/users/managed-user-1/role')
+      .set('Authorization', `Bearer ${token}`)
+      .set('x-request-id', 'request-1')
+      .send({
+        role: 'operator',
+        reason: 'support coverage',
+      })
+      .expect(200)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: true,
+          data: {
+            user: {
+              id: 'managed-user-1',
+              role: 'operator',
+            },
+            roleChange: {
+              beforeRole: 'user',
+              afterRole: 'operator',
+              reason: 'support coverage',
+            },
+          },
+        });
+        expect(JSON.stringify(response.body)).not.toMatch(
+          /passwordHash|refreshToken|accessToken/i,
+        );
+        expect(prisma.user.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: {
+              id: 'managed-user-1',
+            },
+            data: {
+              role: 'operator',
+            },
+          }),
+        );
+        expect(prisma.operatorAuditLog.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              action: 'operator.user_role.update',
+              actorRole: 'admin',
+              targetId: 'managed-user-1',
+              requestId: 'request-1',
+              result: 'success',
+              metadataJson: expect.objectContaining({
+                beforeRole: 'user',
+                afterRole: 'operator',
+                targetUserId: 'managed-user-1',
+                actorUserId: user.id,
+                reason: 'support coverage',
+              }),
+            }),
+          }),
+        );
+      });
+  });
+
+  it.each(['suspended', 'deleted'])(
+    '/api/v1/operator/users (GET) rejects %s admin actor before management service work',
+    async (status) => {
+      resetPrismaMocks();
+      prisma.user.findUnique.mockResolvedValueOnce({
+        ...user,
+        role: 'admin',
+        status,
+      });
+      const token = await createValidAccessToken(user.id);
+
+      return request(app.getHttpServer())
+        .get('/api/v1/operator/users')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403)
+        .expect((response) => {
+          expect(response.body).toMatchObject({
+            success: false,
+            error: {
+              code: 'USER_NOT_ACTIVE',
+            },
+          });
+          expect(prisma.user.count).not.toHaveBeenCalled();
+          expect(prisma.operatorAuditLog.create).not.toHaveBeenCalled();
+        });
+    },
+  );
 
   it('/api/v1/home (GET) rejects unauthenticated requests before service work', () => {
     return request(app.getHttpServer())

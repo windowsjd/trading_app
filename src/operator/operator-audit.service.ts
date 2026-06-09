@@ -49,29 +49,43 @@ export type OperatorAuditLogInput = {
   errorCode?: string | null;
 };
 
+type OperatorAuditClient = Pick<PrismaService, 'operatorAuditLog'>;
+
 @Injectable()
 export class OperatorAuditService {
   constructor(private readonly prisma: PrismaService) {}
 
-  recordSuccess(input: Omit<OperatorAuditLogInput, 'result' | 'errorCode'>) {
-    return this.record({
-      ...input,
-      result: OperatorAuditResult.success,
-      errorCode: null,
-    });
+  recordSuccess(
+    input: Omit<OperatorAuditLogInput, 'result' | 'errorCode'>,
+    client?: OperatorAuditClient,
+  ) {
+    return this.record(
+      {
+        ...input,
+        result: OperatorAuditResult.success,
+        errorCode: null,
+      },
+      client,
+    );
   }
 
   recordFailure(
     input: Omit<OperatorAuditLogInput, 'result'> & { errorCode: string },
+    client?: OperatorAuditClient,
   ) {
-    return this.record({
-      ...input,
-      result: OperatorAuditResult.failure,
-    });
+    return this.record(
+      {
+        ...input,
+        result: OperatorAuditResult.failure,
+      },
+      client,
+    );
   }
 
-  async record(input: OperatorAuditLogInput) {
-    return this.prisma.operatorAuditLog.create({
+  async record(input: OperatorAuditLogInput, client?: OperatorAuditClient) {
+    const auditClient = client ?? this.prisma;
+
+    return auditClient.operatorAuditLog.create({
       data: {
         actorUserId: this.requireNonEmpty(input.actorUserId, 'actorUserId'),
         actorRole: input.actorRole,

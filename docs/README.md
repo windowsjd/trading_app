@@ -36,14 +36,14 @@ Provider_api remains closed for orders create source selection, ranking, settlem
 
 `docs/realtime-execution-policy.md` records the active Durable Quote provider execute policy: quote is only a reference quote, `/fx execute` and orders execute reprice from fresh provider_api at execute time, enforce quote-to-execute bps thresholds, consume quotes atomically with writes, and forbid default `admin_manual` execute fallback.
 
-6. Admin/operator authorization and audit foundation:
+6. Admin/operator authorization, account management, and audit foundation:
 
 - `docs/operator-api-contract.md`
 
 7. Batch foundation and operator-run daily snapshot/ranking/cycle/settlement/final-tier/reward-grant internal foundation jobs:
    - `docs/batch-job-foundation.md`
 
-8. Scheduler/Ops disabled-by-default foundation:
+8. Scheduler/Ops disabled-by-default and dry-run-by-default foundation:
    - `docs/scheduler-ops-foundation.md`
 
 `docs/archive/` contains historical STOP/review/preimplementation/plan documents. Archived files are not current source of truth and must not be used to override the current documents above.

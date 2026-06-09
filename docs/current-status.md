@@ -17,9 +17,17 @@
   - access token payload는 기존처럼 `sub` 중심이며, 전역 guard가 DB의 current `status`와 `role`을 조회해 `request.user = { userId, role }`를 주입한다.
   - 기존 일반 API의 사용자 식별자는 계속 token-derived `request.user.userId` 기준이며 `x-user-id` fallback은 없다.
   - `GET /api/v1/operator/me`는 `operator` 또는 `admin`만 접근 가능하고 `user`는 `403 OPERATOR_FORBIDDEN`.
+  - Admin/operator Account Management Gate 구현 완료:
+    - `GET /api/v1/operator/users`와 `GET /api/v1/operator/users/:userId`는 admin 전용 user 운영 조회 API다.
+    - `PATCH /api/v1/operator/users/:userId/role`은 admin 전용 role 변경 API다.
+    - `operator`와 `user`는 user 목록 조회와 role 변경을 할 수 없다.
+    - 자기 자신의 role 변경, 마지막 active admin 강등, deleted target role 변경, suspended user의 operator/admin 승격, 같은 role 재지정은 차단된다.
+    - suspended operator/admin의 `user` 강등은 허용된다.
+    - role 변경 성공/실패는 `OperatorAuditLog`에 safe metadata만 기록한다.
+    - deleted user restore/status management API는 구현하지 않았고 별도 Admin User Status / Restore Gate로 분리한다.
   - `OperatorAuditLog` / `operator_audit_logs` foundation과 secret-like metadata redaction service가 추가됨.
   - Admin/operator MVP는 schema migration `20260601090000_add_user_role_operator_audit_logs` 적용이 필요하다. Runtime DB에는 `UserRole`, `users.role`, `OperatorAuditResult`, `operator_audit_logs`가 존재해야 보호 API와 operator audit foundation이 정상 동작한다.
-  - Admin role management API, provider ingestion trigger API, batch run HTTP API, reward fulfillment trigger API는 구현하지 않음. Scheduler/Ops foundation은 disabled-by-default 내부 기반만 존재하며 production cron 자동화는 열지 않음.
+  - Admin user restore/status management API, provider ingestion trigger API, batch run HTTP API, reward fulfillment trigger API는 구현하지 않음. Scheduler/Ops foundation은 disabled-by-default/dry-run-by-default 내부 기반만 존재하며 production cron 자동화와 scheduler 자동 write는 열지 않음.
 - Crypto MVP policy changed to Binance-based USD-settled crypto.
   - Crypto uses USD Wallet like US stocks.
   - Crypto KRW valuation remains required for `totalAssetKrw`, ranking, home summary, snapshots, and final evaluation.
@@ -148,9 +156,10 @@
     - Orders create idempotency requestHash now includes trimmed `quoteId`; same `seasonParticipantId + idempotencyKey` with a different `quoteId` returns `ORDER_IDEMPOTENCY_CONFLICT` and does not replay the submitted order.
     - Orders create response wording now uses `ORDER_SUBMITTED_NOT_EXECUTED` and states that the submitted order can be executed through the execute endpoint.
     - Scheduler/Ops foundation is implemented with `OpsJobName`, `OpsJobRunStatus`, `OpsJobTrigger`, `ops_job_runs`, `ops_job_locks`, internal lock/run/runner/scheduler services, and public-safe `/readiness`.
-    - Scheduler env defaults are disabled: `SCHEDULER_ENABLED=false` and all individual `SCHEDULER_*_ENABLED=false` flags. No secret scheduler env was added.
-    - Internal daily snapshot ops runner can call `DailyPortfolioSnapshotJobService` with lock/audit/dryRun support. Provider FX/Binance ingestion, ranking generation, settlement, and reward marker scheduler runners remain explicit `skipped/NOT_IMPLEMENTED` placeholders.
-    - Provider ingestion HTTP trigger APIs, batch HTTP APIs, admin role management APIs, reward fulfillment, KIS order/account APIs, Binance authenticated APIs, and real trading/account integrations remain closed.
+    - Scheduler env defaults are disabled: `SCHEDULER_ENABLED=false`, all individual `SCHEDULER_*_ENABLED=false` flags, and `SCHEDULER_TICK_INTERVAL_MS=60000`. No secret scheduler env was added.
+    - Internal daily snapshot ops runner can call `DailyPortfolioSnapshotJobService` with lock/audit/dryRun support. Scheduler calls remain dry-run-by-default; real automatic writes require a future Production Scheduler Ownership Gate.
+    - Provider FX/Binance ingestion, ranking generation, settlement, and reward marker scheduler runners remain explicit `skipped/NOT_IMPLEMENTED` placeholders. These skipped rows are not completed business automation or fake success.
+    - Provider ingestion HTTP trigger APIs, batch HTTP APIs, admin user restore/status APIs, reward fulfillment, KIS order/account APIs, Binance authenticated APIs, and real trading/account integrations remain closed.
   - Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage; USDT depeg risk is not modeled.
   - Provider_api source eligibility for ranking, settlement, reward, and automation remains a separate gate.
   - KIS supports WebSocket approval_key retrieval, domestic KRX real-time trade price `H0STCNT0`, and overseas/US delayed trade price `HDFSCNT0` ingestion foundation into `asset_price_snapshots` provider_api rows.
@@ -166,6 +175,9 @@
 - `POST /api/v1/auth/logout-all` user refresh sessions revoke MVP
 - `GET /api/v1/me` Bearer access token Auth MVP
 - `GET /api/v1/operator/me` operator/admin authorization smoke MVP
+- `GET /api/v1/operator/users` admin-only user list MVP
+- `GET /api/v1/operator/users/:userId` admin-only user detail MVP
+- `PATCH /api/v1/operator/users/:userId/role` admin-only audited role change MVP
 - `GET /readiness` public readiness MVP
   - DB lightweight query와 disabled-by-default scheduler config 상태만 노출하며 외부 provider API를 호출하지 않음.
 - `GET /api/v1/home` read-only MVP
@@ -255,6 +267,11 @@
   - `POST /api/v1/auth/logout-all`.
 - operator route:
   - `GET /api/v1/operator/me`: `operator` 또는 `admin`만 접근 가능. `user`는 `403 OPERATOR_FORBIDDEN`, missing/invalid token은 `401 UNAUTHORIZED`.
+- admin management route:
+  - `GET /api/v1/operator/users`, `GET /api/v1/operator/users/:userId`, `PATCH /api/v1/operator/users/:userId/role`: `admin`만 접근 가능. `user`와 `operator`는 `403 ADMIN_REQUIRED`, missing/invalid token은 `401 UNAUTHORIZED`.
+  - role 변경 validation: invalid role `INVALID_USER_ROLE`, same role `ROLE_ALREADY_ASSIGNED`, self change `CANNOT_CHANGE_OWN_ROLE`, last active admin demotion `LAST_ADMIN_ROLE_CHANGE_FORBIDDEN`, deleted target `TARGET_USER_DELETED`, suspended promotion `TARGET_USER_SUSPENDED_PROMOTION_FORBIDDEN`.
+  - role 변경 성공/실패 audit metadata는 `beforeRole`, `afterRole`, `requestedRole`, `targetUserId`, `actorUserId`, `reason`, `requestId`, `failureCode` 등 safe field만 저장하고 passwordHash/token/env/raw provider payload는 저장하지 않음.
+  - deleted user restore는 이번 gate에서 구현하지 않음. future restore는 role을 `user`로 복구하고 operator/admin 승격은 별도 role-change API와 별도 audit event로 처리해야 함.
 - inactive user:
   - missing/invalid/expired/forged token 또는 unknown user는 `UNAUTHORIZED`.
   - `User.status`가 `suspended` 또는 `deleted`이면 `FORBIDDEN` + `USER_NOT_ACTIVE`.
@@ -269,6 +286,7 @@
   - protected write-path route: `POST /api/v1/seasons/:seasonId/join`, `/fx/quote`, `/fx/execute`, `/orders/quote`, `/orders`, `/orders/:orderId/cancel`, `/orders/:orderId/execute` missing token, `x-user-id` only, invalid bearer token, malformed Authorization 차단 검증.
   - protected write-path route valid token smoke: 위 write API들이 guard를 통과해 service-level success 또는 known domain error(`SEASON_NOT_JOINED`, `ORDER_NOT_FOUND`)까지 진입하는지 검증.
   - operator route: `GET /api/v1/operator/me` missing token, invalid bearer, `x-user-id` only, `role=user`, `role=operator`, `role=admin`, suspended/deleted, DB current role 변경 후 기존 token 권한 반영 회귀 검증.
+  - admin management route: user/operator list 및 role 변경 차단, admin list/get/role 변경 성공, suspended/deleted actor 차단, role 변경 success/failure audit 기록 회귀 검증.
   - write-path API의 full mutation 검증은 service/unit/opt-in DB integration spec이 담당하며, HTTP e2e는 guard routing, `request.user` 주입, controller/service 진입 회귀를 담당.
 
 ## 5. 현재 DB 상태

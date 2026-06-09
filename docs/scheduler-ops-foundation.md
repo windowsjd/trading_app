@@ -21,7 +21,7 @@ Not implemented:
 - KIS order/account/balance/fill/deposit/withdrawal APIs
 - Binance authenticated/order/account/user-data APIs
 - Real external trading/account/deposit/withdrawal API
-- Admin role management API
+- Admin user restore/status management API
 - Reward fulfillment or external payment/point/badge/trophy delivery
 
 ## Job Names
@@ -36,6 +36,8 @@ Not implemented:
 - `reward_marker`
 
 `provider_fx_ingest`, `provider_binance_ingest`, `season_ranking_generation`, `season_settlement`, and `reward_marker` are recorded as `skipped` with `NOT_IMPLEMENTED` by the internal runner in this gate. This must not be interpreted as completed business automation.
+
+Skipped placeholder results are operational evidence only. They are not fake success and must not be interpreted as completed provider ingestion, ranking generation, settlement, or reward business automation.
 
 `daily_portfolio_snapshot` can call the existing `DailyPortfolioSnapshotJobService` through the internal runner. It supports `dryRun`, job lock, and ops audit. The existing batch service still owns actual snapshot creation rules and idempotency.
 
@@ -91,13 +93,31 @@ SCHEDULER_DAILY_SNAPSHOT_ENABLED=false
 SCHEDULER_RANKING_ENABLED=false
 SCHEDULER_SETTLEMENT_ENABLED=false
 SCHEDULER_REWARD_MARKER_ENABLED=false
+SCHEDULER_TICK_INTERVAL_MS=60000
 SCHEDULER_LOCK_TTL_SECONDS=600
 SCHEDULER_MAX_ATTEMPTS=1
 ```
 
 No secret scheduler env is introduced.
 
+`SCHEDULER_TICK_INTERVAL_MS` is non-secret and defaults to `60000`.
+
 When `SCHEDULER_ENABLED=false`, no interval is registered and no automatic job runs. When enabled, individual job flags decide which internal runner methods are called. The foundation uses an internal `setInterval` shell without adding package dependencies.
+
+Even when `SCHEDULER_ENABLED=true`, this foundation scheduler calls jobs with `dryRun=true`. Real automatic writes are not opened here. Automatic daily snapshot writes, ranking generation writes, settlement writes, reward marker writes, and provider ingestion writes require a separate Production Scheduler Ownership Gate.
+
+## Real DB Lock Smoke
+
+`OPS_JOB_LOCK_DB_SMOKE=1 pnpm test -- ops-job-lock.integration.spec.ts` runs an opt-in PostgreSQL smoke for `OpsJobLockService`.
+
+Coverage:
+
+- Same `lockKey` concurrent acquire attempts produce exactly one `acquired=true`.
+- An active unexpired lock blocks a second acquire.
+- An expired lock can be taken over.
+- Release by `lockKey + ownerId` allows reacquire.
+
+The smoke is disabled by default because it must run only against an explicit test database. Default `pnpm test` records the disabled reason and does not touch a real DB.
 
 ## Readiness
 
@@ -111,9 +131,11 @@ The scheduler foundation does not open provider_api source eligibility for ranki
 
 The scheduler foundation does not expose HTTP trigger APIs. Internal runner methods are for service-level wiring and future gates only.
 
+The scheduler foundation does not create provider ingestion HTTP trigger APIs, batch HTTP APIs, reward fulfillment APIs, real trading/account APIs, KIS order/account/balance/fill/deposit/withdrawal APIs, or Binance authenticated order/account/user-data APIs.
+
 ## Next Gates
 
 - Scheduler job implementation hardening for currently skipped placeholders
-- Admin/operator Account Management Gate
+- Scheduler Production Ownership Gate
 - Reward Fulfillment Backend Gate
 - Deployment/ops runbook and production scheduler ownership gate

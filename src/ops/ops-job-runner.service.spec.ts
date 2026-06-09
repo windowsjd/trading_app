@@ -124,6 +124,73 @@ describe('OpsJobRunnerService', () => {
     );
   });
 
+  it.each([
+    [
+      OpsJobName.provider_fx_ingest,
+      (service: OpsJobRunnerService) => service.runProviderFxIngestJob,
+    ],
+    [
+      OpsJobName.provider_binance_ingest,
+      (service: OpsJobRunnerService) => service.runProviderBinanceIngestJob,
+    ],
+    [
+      OpsJobName.season_ranking_generation,
+      (service: OpsJobRunnerService) => service.runSeasonRankingGenerationJob,
+    ],
+    [
+      OpsJobName.season_settlement,
+      (service: OpsJobRunnerService) => service.runSeasonSettlementJob,
+    ],
+    [
+      OpsJobName.reward_marker,
+      (service: OpsJobRunnerService) => service.runRewardMarkerJob,
+    ],
+  ])(
+    'keeps %s as skipped/NOT_IMPLEMENTED instead of fake success',
+    async (jobName, selectRunner) => {
+      const { dailyPortfolioSnapshotJobService, runService, service } =
+        createService();
+      runService.recordSkipped.mockResolvedValueOnce({
+        serialized: serializedRun({
+          jobName,
+          status: OpsJobRunStatus.skipped,
+          resultJson: {
+            reason: 'NOT_IMPLEMENTED',
+          },
+        }),
+      });
+
+      const response = await selectRunner(service).call(service, {
+        trigger: OpsJobTrigger.test,
+        dryRun: true,
+      });
+
+      expect(response).toMatchObject({
+        success: true,
+        data: {
+          skipped: true,
+          run: {
+            status: OpsJobRunStatus.skipped,
+            resultJson: {
+              reason: 'NOT_IMPLEMENTED',
+            },
+          },
+        },
+      });
+      expect(runService.recordSkipped).toHaveBeenCalledWith(
+        expect.objectContaining({
+          jobName,
+          dryRun: true,
+          resultJson: expect.objectContaining({
+            reason: 'NOT_IMPLEMENTED',
+          }),
+        }),
+      );
+      expect(runService.createRunning).not.toHaveBeenCalled();
+      expect(dailyPortfolioSnapshotJobService.run).not.toHaveBeenCalled();
+    },
+  );
+
   it('runs daily snapshot through the existing batch service and releases lock', async () => {
     const {
       dailyPortfolioSnapshotJobService,

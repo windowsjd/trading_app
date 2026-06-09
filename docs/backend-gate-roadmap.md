@@ -8,7 +8,7 @@
 - Crypto MVP policy changed on 2026-05-14 to Binance-based USD-settled crypto using the USD Wallet. Upbit/Bithumb are excluded from MVP, and Binance BTCUSDT public ticker/orderbook fixtures have been captured.
 - Gate C provider fixture capture prep on 2026-05-14 captured Binance public `BTCUSDT` ticker/orderbook fixtures and fixed residual crypto freshness wording; OANDA/Twelve Data fixtures remain credential-blocked.
 - Auth refresh-token/logout/revocation MVP is now implemented by the current codebase. This document does not authorize provider, scheduler, settlement extensions, actual reward fulfillment, package, seed, or unrelated schema changes.
-- Admin/operator authorization and audit foundation MVP is implemented with `UserRole`, DB-current-role request context, `GET /api/v1/operator/me`, and `operator_audit_logs`. It does not add admin role management, provider ingestion triggers, batch execution HTTP APIs, scheduler HTTP APIs, or reward fulfillment triggers.
+- Admin/operator authorization, account management, and audit MVP is implemented with `UserRole`, DB-current-role request context, `GET /api/v1/operator/me`, admin-only user list/get, admin-only audited role change, and `operator_audit_logs`. It does not add admin user restore/status management, provider ingestion triggers, batch execution HTTP APIs, scheduler HTTP APIs, or reward fulfillment triggers.
 - Provider-key-free `MVP_FLOW_DB_SMOKE=1` real PostgreSQL smoke is available as a service-composed opt-in check for the implemented Auth -> season join -> wallets/assets -> FX -> orders -> positions/records/home/ranking flow using isolated test-only `admin_manual` fixtures. It is not provider ingestion, scheduler, settlement, reward, seed, or sample business data.
 - Batch job execution foundation is implemented with `BatchJobRun`/`BatchJobStatus`, `BatchService`, an operator-only noop/health-check script, operator-run `daily-portfolio-snapshot` and `season-ranking` jobs, an operator-run `daily-season-cycle` orchestration job, an operator-run `season-settlement` MVP job, an operator-run `final-tier-assignment` MVP job, and an operator-run `reward-grant` internal reward foundation MVP job. It is not provider ingestion, batch HTTP API, or actual external fulfillment implementation.
 - Provider ingestion foundation is implemented for explicit operator-run ExchangeRate-API USD/KRW, Binance public crypto market data snapshot insertion, and KIS WebSocket trade price snapshot insertion. It is not production cron automation, admin HTTP API, KIS REST current-price ingestion, KIS orderbook/hoga ingestion, provider_api eligibility beyond the explicitly allowed read-only/quote workflows and operator-run daily snapshot valuation workflow, or any real trading/account/balance integration.
@@ -27,6 +27,7 @@
 - Daily Snapshot Gate Verification and Realtime Execution Policy Foundation on 2026-06-05 KST is GO for policy/code foundation only: daily snapshot gate completion was verified, `docs/realtime-execution-policy.md` now defines quote-reference/execute-reprice/freshness/bps/error/audit policy, and `src/providers/realtime-execution-policy.ts` adds pure tested helpers without wiring them into current execute/write services.
 - Durable Quote Provider Execute Gate on 2026-06-08 KST is GO for `/fx execute` and orders execute: quotes are durable, quote responses return `quoteId`/`expiresAt`/`maxChangeBps`, orders create binds `Order.quoteId`, execute paths reprice from fresh provider_api rows, movement guards fail closed, default `admin_manual` execute fallback is forbidden, and quote consume is in the write transaction.
 - Durable Quote hardening and Scheduler/Ops Foundation Gate on 2026-06-08 KST is GO for requestHash hardening and disabled-by-default ops foundation: FX execute and orders create idempotency hashes include `quoteId`; `OpsJobRun`/`OpsJobLock` plus internal scheduler/runner services and `/readiness` exist. Provider ingestion HTTP triggers, batch HTTP APIs, real trading/account APIs, reward fulfillment, and admin role management remain closed.
+- Scheduler/Ops hardening and Admin/operator Account Management Gate on 2026-06-09 KST is GO in code/docs/tests: `SCHEDULER_TICK_INTERVAL_MS=60000` is documented/tested, scheduler remains disabled-by-default and dry-run-by-default, placeholder jobs remain skipped/`NOT_IMPLEMENTED`, opt-in real DB lock smoke exists, and admin-only user list/get/role-change APIs with success/failure audit are implemented. Admin user restore/status management, production scheduler automatic writes, provider ingestion HTTP triggers, batch HTTP APIs, reward fulfillment, and real trading/account APIs remain closed.
 - Provider API Source Eligibility remains closed for orders create source selection, ranking, settlement/final result, reward/final tier/fulfillment, provider ingestion trigger APIs, batch HTTP APIs, and real trading/account/order/deposit/withdrawal APIs. Scheduler/Ops foundation exists but does not open those workflows.
 - Home settled final-result read model is implemented from existing `rankType=final` `season_rankings`; final tier assignment and reward grant internal foundation now have operator-run MVP jobs. Actual payment/point/delivery/external fulfillment remains a separate gate.
 - `docs/current-status.md` remains the short status summary. This document is the detailed backend gate roadmap.
@@ -106,7 +107,7 @@ Consistency note:
 - Implemented files: `prisma/schema.prisma`, migrations under `prisma/migrations/*`.
 - Source of truth: `docs/current-status.md`, `docs/backend-gate-roadmap.md`.
 - Existing tests: `pnpm exec prisma validate` history in `docs/current-status.md`; integration specs use real Prisma/PostgreSQL when env flags are enabled.
-- Known limitations: no admin account/role management API, no settlement/reward schema beyond existing participant reward fields, no order fill/execute request table, no provider ingestion metadata table beyond snapshot raw payload fields.
+- Known limitations: no admin user restore/status management API, no settlement/reward schema beyond existing participant reward fields, no order fill/execute request table, no provider ingestion metadata table beyond snapshot raw payload fields.
 - Remaining work: schema gates only when settlement, reward, exact order execute replay, provider-specific needs, or future access-token blacklist/cookie-session needs are approved.
 - Risk level: MEDIUM.
 - Recommended next action: no schema changes in planning gates; validate schema before any later implementation gate.
@@ -124,14 +125,14 @@ Consistency note:
 
 ### Scheduler / Ops Foundation
 
-- Current status: disabled-by-default scheduler/ops foundation is implemented with `OpsJobRun`, `OpsJobLock`, internal run/lock/runner/scheduler services, non-secret scheduler env defaults, and public `/readiness`.
+- Current status: disabled-by-default and dry-run-by-default scheduler/ops foundation is implemented with `OpsJobRun`, `OpsJobLock`, internal run/lock/runner/scheduler services, non-secret scheduler env defaults including `SCHEDULER_TICK_INTERVAL_MS=60000`, opt-in real DB lock smoke coverage, and public `/readiness`.
 - Implemented files: `src/ops/*`, `src/app.service.ts`, `src/app.controller.ts`, `src/app.module.ts`, `prisma/schema.prisma`, migration `20260608120000_add_ops_scheduler_foundation`.
 - Source of truth: `docs/scheduler-ops-foundation.md`, `docs/current-status.md`, `docs/backend-gate-roadmap.md`.
 - Existing tests: `src/ops/*.spec.ts`, `test/app.e2e-spec.ts`.
 - Known limitations: provider FX/Binance ingestion, season ranking generation, season settlement, and reward marker scheduler runners are explicit skipped/not-implemented placeholders. The daily snapshot ops runner can call existing `DailyPortfolioSnapshotJobService` with lock/audit/dryRun support, but production scheduler ownership and non-dry-run automation remain separate gates.
 - Remaining work: deployment ownership, cron timing, job-specific retry/backoff hardening, production scheduler enablement, provider ingestion service runner implementation, and reward fulfillment remain separate gates.
 - Risk level: MEDIUM.
-- Recommended next action: keep `SCHEDULER_ENABLED=false` by default; use ops service tests and dry-run internal runner calls until a production scheduler hardening gate opens.
+- Recommended next action: keep `SCHEDULER_ENABLED=false` and scheduler `dryRun=true` by default; use ops service tests and dry-run internal runner calls until a Production Scheduler Ownership Gate opens real automatic writes.
 
 ### Auth
 
@@ -144,14 +145,14 @@ Consistency note:
 - Risk level: MEDIUM.
 - Recommended next action: keep protected API HTTP e2e baseline and refresh rotation/logout tests green.
 
-### Operator/Admin Authorization
+### Operator/Admin Authorization And Account Management
 
-- Current status: `UserRole` enum and `users.role` are implemented with `user`, `operator`, and `admin`. `GET /api/v1/operator/me` is implemented as the minimal operator-only smoke endpoint. `OperatorAuditLog` / `operator_audit_logs` and `OperatorAuditService` are implemented as the audit foundation for future operator mutations.
+- Current status: `UserRole` enum and `users.role` are implemented with `user`, `operator`, and `admin`. `GET /api/v1/operator/me` is implemented as the minimal operator-only smoke endpoint. Admin-only user list/get and explicit role-change APIs are implemented. Role changes are audited on success/failure.
 - Implemented files: `src/operator/*`, `src/auth/access-token.guard.ts`, `src/auth/auth.types.ts`, `src/auth/auth.service.ts`, `src/app.module.ts`, `prisma/schema.prisma`, migration `20260601090000_add_user_role_operator_audit_logs`.
 - Source of truth: `docs/operator-api-contract.md`, `docs/auth-api-contract.md`, `docs/current-status.md`.
 - Existing tests: `src/operator/operator.guard.spec.ts`, `src/operator/operator-audit.service.spec.ts`, `src/auth/access-token.guard.spec.ts`, `src/auth/auth.service.spec.ts`, `test/app.e2e-spec.ts`.
-- Known limitations: no admin account/role management API, no provider ingestion trigger API, no batch run HTTP API, no reward fulfillment trigger API, and no scheduler HTTP API. `GET /api/v1/operator/me` is read-only and does not write audit rows.
-- Remaining work: Operator/Admin Account Management Gate, Scheduler job hardening gate, or Reward Fulfillment Backend Gate. This remains separate from provider_api source eligibility.
+- Known limitations: no admin user restore/status management API, no provider ingestion trigger API, no batch run HTTP API, no reward fulfillment trigger API, and no scheduler HTTP API. `GET /api/v1/operator/me` remains read-only and does not write audit rows.
+- Remaining work: Admin User Status / Restore Gate, Scheduler Production Ownership Gate, or Reward Fulfillment Backend Gate. This remains separate from provider_api source eligibility.
 - Risk level: MEDIUM.
 - Recommended next action: keep operator boundary tests green and avoid adding executable ops mutations until a dedicated gate defines authorization and audit semantics.
 

@@ -7,7 +7,7 @@ This service owns backend APIs, database access, financial calculations, and ser
 ## Current MVP Scope
 
 - Access token + refresh token auth: signup, login, refresh, logout, logout-all, and `GET /api/v1/me`.
-- Admin/operator authorization foundation: `UserRole`, DB-current-role access context, `GET /api/v1/operator/me`, and internal operator audit log service/model.
+- Admin/operator authorization and account management: `UserRole`, DB-current-role access context, `GET /api/v1/operator/me`, admin-only user list/get, admin-only role change, and internal operator audit log service/model.
 - Admin/operator runtime DBs must have migration `20260601090000_add_user_role_operator_audit_logs` applied so `users.role` and `operator_audit_logs` exist.
 - Current season lookup and season join.
 - Home as one aggregate API.
@@ -33,7 +33,7 @@ These are intentionally outside the current implementation and should not be add
 
 - Provider ingestion trigger APIs, scheduler-driven provider ingestion implementation, and provider-backed final/ranking/reward workflows.
 - OANDA and Twelve Data are historical/fallback provider candidates only, not the current MVP core provider stack.
-- Admin/operator account management APIs, batch run HTTP APIs, scheduler HTTP APIs, and reward fulfillment trigger APIs.
+- Admin user restore/status management APIs, batch run HTTP APIs, scheduler HTTP APIs, and reward fulfillment trigger APIs.
 - Production cron job implementation beyond the disabled-by-default foundation, scheduler-driven provider ingestion, scheduler-driven ranking/settlement/reward automation, settlement extension jobs beyond final tier assignment, or actual reward fulfillment jobs.
 - Provider-backed ranking, settlement recalculation, or reward automation.
 - KIS order/account/balance/fill/deposit/withdrawal APIs, KIS orderbook/hoga, Binance authenticated/order/account/user-data APIs, and real external trading/account integrations.
@@ -62,7 +62,7 @@ Required for local application work:
 
 Refresh tokens are opaque random tokens. The raw token is returned to the client and never stored in PostgreSQL; only a SHA-256 hash is stored in `refresh_token_sessions`. Refresh uses token rotation. Logout revokes refresh sessions. Access tokens remain stateless Bearer JWTs and are not blacklisted in this MVP.
 
-Scheduler/Ops env is non-secret and disabled by default. `SCHEDULER_ENABLED=false` prevents interval registration; each `SCHEDULER_*_ENABLED=false` flag keeps its job from running automatically. `SCHEDULER_LOCK_TTL_SECONDS` defaults to `600`, and `SCHEDULER_MAX_ATTEMPTS` defaults to `1`.
+Scheduler/Ops env is non-secret and disabled by default. `SCHEDULER_ENABLED=false` prevents interval registration; each `SCHEDULER_*_ENABLED=false` flag keeps its job from running automatically. `SCHEDULER_TICK_INTERVAL_MS` defaults to `60000`, `SCHEDULER_LOCK_TTL_SECONDS` defaults to `600`, and `SCHEDULER_MAX_ATTEMPTS` defaults to `1`. Even when enabled, the foundation scheduler calls jobs with `dryRun=true`; automatic writes require a future Production Scheduler Ownership Gate.
 
 ## Local Commands
 
@@ -131,10 +131,12 @@ SEASON_JOIN_DB_INTEGRATION=1 pnpm test -- seasons.join.integration.spec.ts
 FX_EXECUTE_DB_INTEGRATION=1 pnpm test -- fx.execute.integration.spec.ts
 ORDER_EXECUTE_DB_INTEGRATION=1 pnpm test -- orders.execute.integration.spec.ts
 MVP_FLOW_DB_SMOKE=1 pnpm test -- mvp-flow.integration.spec.ts
+OPS_JOB_LOCK_DB_SMOKE=1 pnpm test -- ops-job-lock.integration.spec.ts
 ```
 
 These tests create isolated rows and clean them up. They do not call external providers.
 `MVP_FLOW_DB_SMOKE=1` is a service-composed real PostgreSQL smoke for the current MVP user flow: Auth signup/login/refresh, season join, wallets, admin_manual FX/asset/price test fixtures, assets, FX quote/execute, orders quote/create/execute, positions, records, home, ranking unavailable, and logout-all. It uses test-only fixture rows and is not provider ingestion, scheduler, settlement, reward, seed, or sample business data.
+`OPS_JOB_LOCK_DB_SMOKE=1` verifies real PostgreSQL `OpsJobLock` concurrency, active-lock blocking, expired takeover, and release/reacquire semantics against an explicit test DB. It is disabled by default.
 
 ## Docs Entry Point
 
