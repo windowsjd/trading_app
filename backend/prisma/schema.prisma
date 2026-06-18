@@ -759,6 +759,9 @@ model SeasonRanking {
   rank                Int
   totalAssetKrw       Decimal           @map("total_asset_krw") @db.Decimal(24, 8)
   returnRate          Decimal           @map("return_rate") @db.Decimal(12, 8)
+  maxDrawdown         Decimal           @default(0) @map("max_drawdown") @db.Decimal(12, 8)
+  totalFillCount      Int               @default(0) @map("total_fill_count")
+  reachedReturnAt     DateTime?         @map("reached_return_at")
   rankingDate         DateTime          @map("ranking_date") @db.Date
   capturedAt          DateTime          @map("captured_at")
   createdAt           DateTime          @default(now()) @map("created_at")

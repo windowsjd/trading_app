@@ -65,8 +65,12 @@ describe('snapshot and ranking generation dry-run behavior', () => {
         {
           rank: 1,
           seasonParticipantId: 'sp-1',
+          userId: 'user-1',
           totalAssetKrw: '1000.00000000',
           returnRate: '0.00000000',
+          maxDrawdown: '0.00000000',
+          totalFillCount: 0,
+          reachedReturnAt: new Date('2026-05-07T00:00:01.000Z'),
         },
       ],
       dryRun: true,
@@ -77,8 +81,12 @@ describe('snapshot and ranking generation dry-run behavior', () => {
       {
         rank: 1,
         seasonParticipantId: 'sp-1',
+        userId: 'user-1',
         totalAssetKrw: '1000.00000000',
         returnRate: '0.00000000',
+        maxDrawdown: '0.00000000',
+        totalFillCount: 0,
+        reachedReturnAt: new Date('2026-05-07T00:00:01.000Z'),
         dryRun: true,
       },
     ]);

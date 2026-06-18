@@ -13,6 +13,12 @@ jest.mock('../generated/prisma/client', () => {
       KRW: 'KRW',
       USD: 'USD',
     },
+    OrderStatus: {
+      submitted: 'submitted',
+      executed: 'executed',
+      canceled: 'canceled',
+      rejected: 'rejected',
+    },
     ParticipantStatus: {
       registered: 'registered',
       active: 'active',
@@ -204,6 +210,9 @@ describe('SeasonSettlementJobService', () => {
         rank: 1,
         totalAssetKrw: '2000.00000000',
         returnRate: '10.00000000',
+        maxDrawdown: '0.00000000',
+        totalFillCount: 0,
+        reachedReturnAt: new Date('2026-05-21T00:00:10.000Z'),
         rankingDate: settlementDateValue,
         capturedAt: BATCH_STARTED_AT,
       },
@@ -416,7 +425,7 @@ describe('SeasonSettlementJobService', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it('ranks by totalAssetKrw desc, then userId asc, then seasonParticipantId asc', async () => {
+  it('ranks by returnRate desc, then userId asc, then seasonParticipantId asc', async () => {
     const { service, prisma } = createService();
     mockSeason(prisma, SeasonStatus.ended);
     mockParticipants(prisma, [
@@ -427,10 +436,10 @@ describe('SeasonSettlementJobService', () => {
     ]);
     mockExistingRankings(prisma, []);
     mockSnapshots(prisma, [
-      snapshot('sp-c', 'user-c', '1000.00000000'),
-      snapshot('sp-a2', 'user-a', '1000.00000000'),
-      snapshot('sp-a1', 'user-a', '1000.00000000'),
-      snapshot('sp-high', 'user-high', '2000.00000000'),
+      snapshot('sp-c', 'user-c', '1000.00000000', '1.00000000'),
+      snapshot('sp-a2', 'user-a', '1000.00000000', '1.00000000'),
+      snapshot('sp-a1', 'user-a', '1000.00000000', '1.00000000'),
+      snapshot('sp-high', 'user-high', '2000.00000000', '2.00000000'),
     ]);
 
     const result = await runAndGetResult(service, {
@@ -623,6 +632,7 @@ function createPrismaMock() {
       create: jest.fn(),
     },
     order: {
+      findMany: jest.fn().mockResolvedValue([]),
       create: jest.fn(),
       update: jest.fn(),
     },
@@ -739,11 +749,15 @@ function snapshot(
   userId: string,
   totalAssetKrw: string,
   returnRate = '0.00000000',
+  capturedAt = new Date('2026-05-21T00:00:10.000Z'),
 ) {
   return {
     seasonParticipantId,
+    snapshotDate: new Date('2026-05-21T00:00:00.000Z'),
     totalAssetKrw: new Prisma.Decimal(totalAssetKrw),
     returnRate: new Prisma.Decimal(returnRate),
+    capturedAt,
+    createdAt: capturedAt,
     seasonParticipant: {
       userId,
     },
@@ -762,6 +776,9 @@ function existingRanking(
     rank,
     totalAssetKrw: new Prisma.Decimal('1000.00000000'),
     returnRate: new Prisma.Decimal('0.00000000'),
+    maxDrawdown: new Prisma.Decimal('0.00000000'),
+    totalFillCount: 0,
+    reachedReturnAt: null,
     seasonParticipant: {
       userId,
     },

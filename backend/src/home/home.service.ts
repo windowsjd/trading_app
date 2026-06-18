@@ -24,6 +24,10 @@ import {
   selectFreshProviderSnapshot,
 } from '../providers/source-eligibility.policy';
 import { presentSourceDecision } from '../providers/source-metadata.presenter';
+import {
+  getEffectiveSeasonMode,
+  type SeasonLifecycleMode,
+} from '../seasons/season-lifecycle.policy';
 
 type HomeSectionState = 'available' | 'blocked' | 'unavailable' | 'error';
 type HomeMode =
@@ -127,8 +131,9 @@ export class HomeService {
       };
     }
 
-    if (season.status !== SeasonStatus.active) {
-      return this.buildNonActiveSeasonHome(season, userId);
+    const effectiveMode = getEffectiveSeasonMode(season, new Date());
+    if (effectiveMode !== 'active') {
+      return this.buildNonActiveSeasonHome(season, userId, effectiveMode);
     }
 
     const participant = await this.prisma.seasonParticipant.findUnique({
@@ -258,13 +263,14 @@ export class HomeService {
   private async buildNonActiveSeasonHome(
     season: CurrentSeasonRecord,
     userId: string,
+    effectiveMode: Exclude<SeasonLifecycleMode, 'active'>,
   ): Promise<HomeResponse> {
     const base = {
       season: this.formatSeason(season),
       sectionErrors: [],
     };
 
-    if (season.status === SeasonStatus.upcoming) {
+    if (effectiveMode === 'upcoming') {
       return {
         success: true,
         data: {
@@ -284,7 +290,7 @@ export class HomeService {
       };
     }
 
-    if (season.status === SeasonStatus.ended) {
+    if (effectiveMode === 'ended') {
       return {
         success: true,
         data: {
@@ -460,6 +466,9 @@ export class HomeService {
       totalParticipants,
       totalAssetKrw: this.formatDecimal(ranking.totalAssetKrw, 8),
       returnRate: this.formatDecimal(ranking.returnRate, 8),
+      maxDrawdown: this.formatDecimal(ranking.maxDrawdown, 8),
+      totalFillCount: ranking.totalFillCount,
+      reachedReturnAt: ranking.reachedReturnAt?.toISOString() ?? null,
       rankingDate: this.formatDateOnly(ranking.rankingDate),
       capturedAt: ranking.capturedAt.toISOString(),
       tier,
@@ -486,6 +495,9 @@ export class HomeService {
         rank: true,
         totalAssetKrw: true,
         returnRate: true,
+        maxDrawdown: true,
+        totalFillCount: true,
+        reachedReturnAt: true,
         rankingDate: true,
         capturedAt: true,
       },
@@ -858,7 +870,7 @@ export class HomeService {
           );
           const returnRate = averageCost.eq(0)
             ? new Prisma.Decimal(0)
-            : currentPrice.sub(averageCost).div(averageCost);
+            : currentPrice.sub(averageCost).div(averageCost).mul(100);
 
           return {
             sortValueKrw: positionValueKrw,
@@ -988,6 +1000,9 @@ export class HomeService {
         rankingDate: true,
         totalAssetKrw: true,
         returnRate: true,
+        maxDrawdown: true,
+        totalFillCount: true,
+        reachedReturnAt: true,
         capturedAt: true,
       },
     });
@@ -1021,6 +1036,9 @@ export class HomeService {
       rankingDate: this.formatDateOnly(ranking.rankingDate),
       totalAssetKrw: this.formatDecimal(ranking.totalAssetKrw, 8),
       returnRate: this.formatDecimal(ranking.returnRate, 8),
+      maxDrawdown: this.formatDecimal(ranking.maxDrawdown, 8),
+      totalFillCount: ranking.totalFillCount,
+      reachedReturnAt: ranking.reachedReturnAt?.toISOString() ?? null,
       capturedAt: ranking.capturedAt.toISOString(),
     };
   }

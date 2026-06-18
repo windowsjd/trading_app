@@ -54,6 +54,9 @@ type RankingResponse = {
       profileImageUrl: string | null;
       totalAssetKrw: string;
       returnRate: string;
+      maxDrawdown: string;
+      totalFillCount: number;
+      reachedReturnAt: string | null;
       capturedAt: string;
     }>;
     myRanking:
@@ -63,6 +66,9 @@ type RankingResponse = {
           seasonParticipantId: string;
           totalAssetKrw: string;
           returnRate: string;
+          maxDrawdown: string;
+          totalFillCount: number;
+          reachedReturnAt: string | null;
           rankingDate: string;
           capturedAt: string;
         }
@@ -94,7 +100,11 @@ export class RankingService {
     query: RankingQuery = {},
   ): Promise<RankingResponse> {
     if (!userId) {
-      this.throwApiError(HttpStatus.UNAUTHORIZED, 'UNAUTHORIZED', 'Unauthorized');
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
     }
 
     const parsedQuery = this.parseQuery(query);
@@ -170,6 +180,9 @@ export class RankingService {
           seasonParticipantId: true,
           totalAssetKrw: true,
           returnRate: true,
+          maxDrawdown: true,
+          totalFillCount: true,
+          reachedReturnAt: true,
           capturedAt: true,
           seasonParticipant: {
             select: {
@@ -199,6 +212,9 @@ export class RankingService {
               seasonParticipantId: true,
               totalAssetKrw: true,
               returnRate: true,
+              maxDrawdown: true,
+              totalFillCount: true,
+              reachedReturnAt: true,
               capturedAt: true,
             },
           })
@@ -227,6 +243,9 @@ export class RankingService {
           profileImageUrl: row.seasonParticipant.user.profileImageUrl,
           totalAssetKrw: this.formatDecimal(row.totalAssetKrw, 8),
           returnRate: this.formatDecimal(row.returnRate, 8),
+          maxDrawdown: this.formatDecimal(row.maxDrawdown, 8),
+          totalFillCount: row.totalFillCount,
+          reachedReturnAt: row.reachedReturnAt?.toISOString() ?? null,
           capturedAt: row.capturedAt.toISOString(),
         })),
         myRanking: participant
@@ -372,7 +391,9 @@ export class RankingService {
     return null;
   }
 
-  private async findSeasonById(seasonId: string): Promise<RankingSeason | null> {
+  private async findSeasonById(
+    seasonId: string,
+  ): Promise<RankingSeason | null> {
     return this.prisma.season.findUnique({
       where: {
         id: seasonId,
@@ -496,6 +517,9 @@ export class RankingService {
       seasonParticipantId: string;
       totalAssetKrw: Prisma.Decimal;
       returnRate: Prisma.Decimal;
+      maxDrawdown: Prisma.Decimal;
+      totalFillCount: number;
+      reachedReturnAt: Date | null;
       capturedAt: Date;
     } | null,
     rankingDate: string,
@@ -513,6 +537,9 @@ export class RankingService {
       seasonParticipantId: ranking.seasonParticipantId,
       totalAssetKrw: this.formatDecimal(ranking.totalAssetKrw, 8),
       returnRate: this.formatDecimal(ranking.returnRate, 8),
+      maxDrawdown: this.formatDecimal(ranking.maxDrawdown, 8),
+      totalFillCount: ranking.totalFillCount,
+      reachedReturnAt: ranking.reachedReturnAt?.toISOString() ?? null,
       rankingDate,
       capturedAt: ranking.capturedAt.toISOString(),
     };
@@ -565,7 +592,11 @@ export class RankingService {
     };
   }
 
-  private throwApiError(status: HttpStatus, code: string, message: string): never {
+  private throwApiError(
+    status: HttpStatus,
+    code: string,
+    message: string,
+  ): never {
     throw new HttpException(this.createErrorBody(code, message), status);
   }
 }

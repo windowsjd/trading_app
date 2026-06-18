@@ -2,6 +2,7 @@ import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import {
   ParticipantStatus,
   Prisma,
+  OrderStatus,
   SeasonRankingType,
   SeasonStatus,
 } from '../generated/prisma/client';
@@ -11,6 +12,10 @@ import {
   returnRateScale,
 } from '../fx/fx-decimal-policy';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  buildRankingRowsForSnapshots,
+  RankingCalculatedRow,
+} from '../ranking/ranking-calculation.policy';
 import { BatchService } from './batch.service';
 import {
   SEASON_RANKING_JOB_NAME,
@@ -29,13 +34,6 @@ const RANKABLE_PARTICIPANT_STATUSES: readonly ParticipantStatus[] = [
   ParticipantStatus.finished,
   ParticipantStatus.rewarded,
 ];
-
-type SnapshotRankingInput = {
-  seasonParticipantId: string;
-  userId: string;
-  totalAssetKrw: Prisma.Decimal;
-  returnRate: Prisma.Decimal;
-};
 
 @Injectable()
 export class SeasonRankingJobService {
@@ -125,8 +123,11 @@ export class SeasonRankingJobService {
       },
       select: {
         seasonParticipantId: true,
+        snapshotDate: true,
         totalAssetKrw: true,
         returnRate: true,
+        capturedAt: true,
+        createdAt: true,
         seasonParticipant: {
           select: {
             userId: true,
@@ -149,36 +150,46 @@ export class SeasonRankingJobService {
     if (existingRows.length > 0) {
       result.rankings.existing = existingRows.length;
       result.rankings.skipped = existingRows.length;
-      result.topRanks = existingRows.slice(0, TOP_RANKS_LIMIT).map((row) => ({
-        seasonParticipantId: row.seasonParticipantId,
-        userId: row.seasonParticipant.userId,
-        rank: row.rank,
-        totalAssetKrw: formatMoneyScale8(row.totalAssetKrw),
-        returnRate: formatDecimalScale(row.returnRate, returnRateScale),
-      }));
+      result.topRanks = existingRows
+        .slice(0, TOP_RANKS_LIMIT)
+        .map((row) => this.formatExistingRankingRow(row));
       result.message =
         'Season rankings already exist for this season and snapshotDate; overwrite is skipped.';
 
       return result;
     }
 
-    const rows = this.buildRankingRows(
-      snapshots.map((snapshot) => ({
-        seasonParticipantId: snapshot.seasonParticipantId,
-        userId: snapshot.seasonParticipant.userId,
-        totalAssetKrw: snapshot.totalAssetKrw,
-        returnRate: snapshot.returnRate,
-      })),
-    );
-    result.topRanks = rows.slice(0, TOP_RANKS_LIMIT);
-
-    if (rows.length === 0) {
+    if (snapshots.length === 0) {
       result.reason = 'NO_SNAPSHOTS_AVAILABLE';
       result.message =
         'No daily portfolio snapshots are available for this season and snapshotDate.';
 
       return result;
     }
+
+    const [historicalSnapshots, executedOrders] = await Promise.all([
+      this.findHistoricalSnapshots(seasonId, snapshotDate),
+      this.findExecutedOrdersThroughLatestSnapshot(
+        seasonId,
+        snapshots.map((snapshot) => snapshot.capturedAt),
+      ),
+    ]);
+    const rows = buildRankingRowsForSnapshots({
+      rankingSnapshots: snapshots.map((snapshot) => ({
+        seasonParticipantId: snapshot.seasonParticipantId,
+        userId: snapshot.seasonParticipant.userId,
+        snapshotDate: snapshot.snapshotDate,
+        totalAssetKrw: snapshot.totalAssetKrw,
+        returnRate: snapshot.returnRate,
+        capturedAt: snapshot.capturedAt,
+        createdAt: snapshot.createdAt,
+      })),
+      historicalSnapshots,
+      executedOrders,
+    });
+    result.topRanks = rows
+      .slice(0, TOP_RANKS_LIMIT)
+      .map((row) => this.formatCalculatedRankingRow(row));
 
     result.rankings.wouldCreate = rows.length;
 
@@ -199,13 +210,7 @@ export class SeasonRankingJobService {
       result.rankings.skipped = writeResult.existingRows.length;
       result.topRanks = writeResult.existingRows
         .slice(0, TOP_RANKS_LIMIT)
-        .map((row) => ({
-          seasonParticipantId: row.seasonParticipantId,
-          userId: row.seasonParticipant.userId,
-          rank: row.rank,
-          totalAssetKrw: formatMoneyScale8(row.totalAssetKrw),
-          returnRate: formatDecimalScale(row.returnRate, returnRateScale),
-        }));
+        .map((row) => this.formatExistingRankingRow(row));
       result.message =
         'Season rankings already exist for this season and snapshotDate; overwrite is skipped.';
 
@@ -222,7 +227,7 @@ export class SeasonRankingJobService {
     seasonId: string;
     rankingDate: Date;
     capturedAt: Date;
-    rows: readonly SeasonRankingJobTopRank[];
+    rows: readonly RankingCalculatedRow[];
   }): Promise<{
     createdRankingIds: string[];
     existingRows: Awaited<
@@ -243,6 +248,9 @@ export class SeasonRankingJobService {
           rank: true,
           totalAssetKrw: true,
           returnRate: true,
+          maxDrawdown: true,
+          totalFillCount: true,
+          reachedReturnAt: true,
           seasonParticipant: {
             select: {
               userId: true,
@@ -268,6 +276,9 @@ export class SeasonRankingJobService {
             rank: row.rank,
             totalAssetKrw: row.totalAssetKrw,
             returnRate: row.returnRate,
+            maxDrawdown: row.maxDrawdown,
+            totalFillCount: row.totalFillCount,
+            reachedReturnAt: row.reachedReturnAt,
             rankingDate: input.rankingDate,
             capturedAt: input.capturedAt,
           },
@@ -299,6 +310,9 @@ export class SeasonRankingJobService {
         rank: true,
         totalAssetKrw: true,
         returnRate: true,
+        maxDrawdown: true,
+        totalFillCount: true,
+        reachedReturnAt: true,
         seasonParticipant: {
           select: {
             userId: true,
@@ -308,28 +322,98 @@ export class SeasonRankingJobService {
     });
   }
 
-  private buildRankingRows(
-    snapshots: readonly SnapshotRankingInput[],
-  ): SeasonRankingJobTopRank[] {
-    return snapshots
-      .toSorted((left, right) => {
-        const totalAssetDiff = right.totalAssetKrw.cmp(left.totalAssetKrw);
-        if (totalAssetDiff !== 0) {
-          return totalAssetDiff;
-        }
+  private async findHistoricalSnapshots(seasonId: string, rankingDate: Date) {
+    return this.prisma.dailyPortfolioSnapshot.findMany({
+      where: {
+        snapshotDate: {
+          lte: rankingDate,
+        },
+        seasonParticipant: {
+          seasonId,
+          participantStatus: {
+            in: [...RANKABLE_PARTICIPANT_STATUSES],
+          },
+        },
+      },
+      select: {
+        seasonParticipantId: true,
+        snapshotDate: true,
+        totalAssetKrw: true,
+        returnRate: true,
+        capturedAt: true,
+        createdAt: true,
+      },
+    });
+  }
 
-        return (
-          left.userId.localeCompare(right.userId) ||
-          left.seasonParticipantId.localeCompare(right.seasonParticipantId)
-        );
-      })
-      .map((snapshot, index) => ({
-        seasonParticipantId: snapshot.seasonParticipantId,
-        userId: snapshot.userId,
-        rank: index + 1,
-        totalAssetKrw: formatMoneyScale8(snapshot.totalAssetKrw),
-        returnRate: formatDecimalScale(snapshot.returnRate, returnRateScale),
-      }));
+  private async findExecutedOrdersThroughLatestSnapshot(
+    seasonId: string,
+    capturedAtValues: readonly Date[],
+  ) {
+    const latestCapturedAt = capturedAtValues.reduce<Date | null>(
+      (latest, capturedAt) =>
+        latest === null || capturedAt.getTime() > latest.getTime()
+          ? capturedAt
+          : latest,
+      null,
+    );
+
+    if (!latestCapturedAt) {
+      return [];
+    }
+
+    return this.prisma.order.findMany({
+      where: {
+        status: OrderStatus.executed,
+        executedAt: {
+          not: null,
+          lte: latestCapturedAt,
+        },
+        seasonParticipant: {
+          seasonId,
+          participantStatus: {
+            in: [...RANKABLE_PARTICIPANT_STATUSES],
+          },
+        },
+      },
+      select: {
+        seasonParticipantId: true,
+        executedAt: true,
+      },
+    });
+  }
+
+  private formatCalculatedRankingRow(
+    row: RankingCalculatedRow,
+  ): SeasonRankingJobTopRank {
+    return {
+      ...row,
+      reachedReturnAt: row.reachedReturnAt.toISOString(),
+    };
+  }
+
+  private formatExistingRankingRow(input: {
+    seasonParticipantId: string;
+    rank: number;
+    totalAssetKrw: Prisma.Decimal;
+    returnRate: Prisma.Decimal;
+    maxDrawdown: Prisma.Decimal;
+    totalFillCount: number;
+    reachedReturnAt: Date | null;
+    seasonParticipant: {
+      userId: string;
+    };
+  }): SeasonRankingJobTopRank {
+    return {
+      seasonParticipantId: input.seasonParticipantId,
+      userId: input.seasonParticipant.userId,
+      rank: input.rank,
+      totalAssetKrw: formatMoneyScale8(input.totalAssetKrw),
+      returnRate: formatDecimalScale(input.returnRate, returnRateScale),
+      maxDrawdown: formatDecimalScale(input.maxDrawdown, returnRateScale),
+      totalFillCount: input.totalFillCount,
+      reachedReturnAt: input.reachedReturnAt?.toISOString() ?? null,
+    };
   }
 
   private createBaseResult(input: {

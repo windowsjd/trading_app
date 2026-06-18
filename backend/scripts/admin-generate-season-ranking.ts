@@ -2,10 +2,11 @@ import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import {
   PrismaClient,
+  OrderStatus,
   SeasonRankingType,
 } from '../src/generated/prisma/client';
-import { buildSeasonRankingRows } from '../src/portfolio/portfolio-ranking.policy';
 import { writeSeasonRankings } from '../src/portfolio/season-ranking-generation';
+import { buildRankingRowsForSnapshots } from '../src/ranking/ranking-calculation.policy';
 
 type SeasonRankingCliArgs = {
   seasonId?: string;
@@ -88,9 +89,16 @@ export async function runAdminGenerateSeasonRanking(argv: string[]) {
       },
       select: {
         seasonParticipantId: true,
+        snapshotDate: true,
         totalAssetKrw: true,
         returnRate: true,
         capturedAt: true,
+        createdAt: true,
+        seasonParticipant: {
+          select: {
+            userId: true,
+          },
+        },
       },
     });
 
@@ -98,7 +106,62 @@ export async function runAdminGenerateSeasonRanking(argv: string[]) {
       throw new Error('No daily portfolio snapshots found for rankingDate.');
     }
 
-    const rows = buildSeasonRankingRows(snapshots);
+    const latestCapturedAt = snapshots.reduce<Date | null>(
+      (latest, snapshot) =>
+        latest === null || snapshot.capturedAt.getTime() > latest.getTime()
+          ? snapshot.capturedAt
+          : latest,
+      null,
+    );
+    const [historicalSnapshots, executedOrders] = await Promise.all([
+      prisma.dailyPortfolioSnapshot.findMany({
+        where: {
+          snapshotDate: {
+            lte: rankingDate,
+          },
+          seasonParticipant: {
+            seasonId,
+          },
+        },
+        select: {
+          seasonParticipantId: true,
+          snapshotDate: true,
+          totalAssetKrw: true,
+          returnRate: true,
+          capturedAt: true,
+          createdAt: true,
+        },
+      }),
+      prisma.order.findMany({
+        where: {
+          status: OrderStatus.executed,
+          executedAt: {
+            not: null,
+            lte: latestCapturedAt ?? capturedAt,
+          },
+          seasonParticipant: {
+            seasonId,
+          },
+        },
+        select: {
+          seasonParticipantId: true,
+          executedAt: true,
+        },
+      }),
+    ]);
+    const rows = buildRankingRowsForSnapshots({
+      rankingSnapshots: snapshots.map((snapshot) => ({
+        seasonParticipantId: snapshot.seasonParticipantId,
+        userId: snapshot.seasonParticipant.userId,
+        snapshotDate: snapshot.snapshotDate,
+        totalAssetKrw: snapshot.totalAssetKrw,
+        returnRate: snapshot.returnRate,
+        capturedAt: snapshot.capturedAt,
+        createdAt: snapshot.createdAt,
+      })),
+      historicalSnapshots,
+      executedOrders,
+    });
     const writeResult = await writeSeasonRankings(prisma, {
       seasonId,
       rankType,

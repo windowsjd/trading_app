@@ -4,7 +4,8 @@
 - `GET /api/v1/ranking` read-only MVP is implemented.
 - The API reads existing `season_rankings` rows only.
 - The API does not calculate rankings, generate rankings, read daily snapshots for ad hoc ranking, or run scheduler/batch behavior.
-- Do not add fake ranking data, Prisma schema changes, migrations, or seed changes from this contract.
+- Do not add fake ranking data or seed changes from this read API contract; persisted schema changes must go through explicit migrations.
+- Ranking rows now persist and expose tie-breaker evidence: `maxDrawdown`, `totalFillCount`, and `reachedReturnAt`.
 
 ## Source Rules
 - Ranking source of truth is `season_rankings`.
@@ -14,8 +15,29 @@
 - Responses keep the existing `success/data` or `success/error` structure.
 - `season_participants.currentRank` is not used as source of truth.
 - Ranking values remain KRW-based.
+- `returnRate` and `maxDrawdown` are percent values formatted to scale 8. Example: 4.5% is `"4.50000000"`.
 - MVP crypto is Binance-based USD-settled crypto; crypto positions must be converted from USD value to KRW using USD/KRW before contributing to `totalAssetKrw` and `returnRate`.
 - Upbit/Bithumb and KRW crypto trading are not MVP ranking inputs.
+- Existing rows created before the tie-breaker migration may have `reachedReturnAt = null`; clients must treat it as nullable.
+
+## Stored Ranking Policy
+
+Operator-run daily ranking and final settlement ranking use the same persisted policy:
+
+1. `returnRate` descending.
+2. `maxDrawdown` ascending.
+3. `totalFillCount` ascending.
+4. `reachedReturnAt` ascending.
+5. `userId` ascending.
+6. `seasonParticipantId` ascending deterministic fallback.
+
+`maxDrawdown` is calculated from the participant's `daily_portfolio_snapshots` time series through the ranking snapshot date:
+
+`(runningPeakTotalAssetKrw - currentTotalAssetKrw) / runningPeakTotalAssetKrw * 100`
+
+`totalFillCount` counts only `orders.status = executed` through the ranking snapshot `capturedAt`; submitted, canceled, rejected orders and FX exchanges are excluded.
+
+`reachedReturnAt` is the first daily snapshot `capturedAt` where the participant's snapshot `returnRate` is greater than or equal to the ranking row's `returnRate`; if no snapshot matches, the ranking snapshot `capturedAt` is used when generating new rows.
 
 ## Route
 
@@ -70,6 +92,9 @@
         "profileImageUrl": "<string | null>",
         "totalAssetKrw": "<amount string>",
         "returnRate": "<decimal string>",
+        "maxDrawdown": "<decimal string>",
+        "totalFillCount": 0,
+        "reachedReturnAt": "<UTC ISO string | null>",
         "capturedAt": "<UTC ISO string>"
       }
     ],
@@ -79,6 +104,9 @@
       "seasonParticipantId": "<string>",
       "totalAssetKrw": "<amount string>",
       "returnRate": "<decimal string>",
+      "maxDrawdown": "<decimal string>",
+      "totalFillCount": 0,
+      "reachedReturnAt": "<UTC ISO string | null>",
       "rankingDate": "<YYYY-MM-DD>",
       "capturedAt": "<UTC ISO string>"
     }

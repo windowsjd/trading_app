@@ -128,6 +128,10 @@ describe('RankingService', () => {
     seasonParticipantId,
     totalAssetKrw: new Prisma.Decimal(`${1000000 - rank}.00000000`),
     returnRate: new Prisma.Decimal('10.00000000'),
+    maxDrawdown: new Prisma.Decimal('2.50000000'),
+    totalFillCount: rank,
+    reachedReturnAt:
+      rank === 2 ? null : new Date(`2026-05-0${rank}T00:10:00.000Z`),
     capturedAt,
     seasonParticipant: {
       userId: `user-${rank}`,
@@ -156,6 +160,9 @@ describe('RankingService', () => {
       seasonParticipantId: 'sp-2',
       totalAssetKrw: new Prisma.Decimal('999998.00000000'),
       returnRate: new Prisma.Decimal('9.00000000'),
+      maxDrawdown: new Prisma.Decimal('3.00000000'),
+      totalFillCount: 4,
+      reachedReturnAt: null,
       capturedAt,
     });
   };
@@ -187,6 +194,9 @@ describe('RankingService', () => {
           profileImageUrl: 'https://example.com/p.png',
           totalAssetKrw: '999999.00000000',
           returnRate: '10.00000000',
+          maxDrawdown: '2.50000000',
+          totalFillCount: 1,
+          reachedReturnAt: '2026-05-01T00:10:00.000Z',
         },
         {
           rank: 2,
@@ -202,6 +212,9 @@ describe('RankingService', () => {
         seasonParticipantId: 'sp-2',
         totalAssetKrw: '999998.00000000',
         returnRate: '9.00000000',
+        maxDrawdown: '3.00000000',
+        totalFillCount: 4,
+        reachedReturnAt: null,
         rankingDate: '2026-05-07',
       },
     });

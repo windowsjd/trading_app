@@ -291,6 +291,8 @@
 - `GET /api/v1/seasons/current`는 optional auth:
   - Authorization header가 없으면 anonymous 허용.
   - Authorization header가 있으면 반드시 검증하며 invalid/expired/malformed token은 anonymous downgrade 없이 `UNAUTHORIZED`.
+  - 응답은 DB `status`를 유지하면서 `effectiveStatus`/`effectiveMode`를 추가로 반환한다.
+  - effective 값은 `season-lifecycle.policy.ts`의 `startAt`/`endAt` 기준 계산을 사용한다.
 - public route:
   - AppController health route.
   - `POST /api/v1/auth/signup`.
@@ -396,11 +398,12 @@ near-term ledger/FX foundation:
   - missing/stale FX 또는 missing price evidence는 fake fallback 없이 participant-level failure로 기록하고 해당 snapshot row를 생성하지 않음.
   - 동일 participant + snapshotDate snapshot이 이미 있으면 overwrite하지 않고 `existing`으로 분류.
   - `season-ranking`은 operator-run job이며 cron scheduler가 아님.
-  - `season-ranking`은 특정 seasonId + snapshotDate의 기존 `daily_portfolio_snapshots`만 읽어 `season_rankings`를 생성.
+  - `season-ranking`은 특정 seasonId + snapshotDate의 기존 `daily_portfolio_snapshots`, rankingDate까지의 participant snapshot 시계열, executed order count만 읽어 `season_rankings`를 생성.
   - `season-ranking`은 daily snapshot 생성, provider ingestion/API 호출, asset/FX price 생성, wallet/order/position/snapshot mutation, settlement, reward를 수행하지 않음.
   - 동일 seasonId + `rankType=daily` + snapshotDate ranking row가 이미 있으면 overwrite/delete/recreate 없이 `existing`/`skipped`로 분류.
   - no snapshots는 job-level success + `reason=NO_SNAPSHOTS_AVAILABLE` + created=0으로 처리하고 fake ranking을 만들지 않음.
-  - current `season_rankings` schema의 `(seasonId, rankType, rankingDate, rank)` unique 제약 때문에 persisted rank는 `totalAssetKrw desc`, `userId asc`, `seasonParticipantId asc` 기반 deterministic unique sequential rank. true competition tie rank(`1,2,2,4`)는 별도 schema/migration gate 필요.
+  - persisted rank는 `returnRate desc`, `maxDrawdown asc`, `totalFillCount asc`, `reachedReturnAt asc`, `userId asc`, `seasonParticipantId asc` 기반 deterministic unique sequential rank.
+  - current `season_rankings` schema의 `(seasonId, rankType, rankingDate, rank)` unique 제약 때문에 true competition tie rank(`1,2,2,4`)는 별도 schema/migration gate 필요.
   - `daily-season-cycle`은 operator-run orchestration job이며 cron scheduler가 아님.
   - `daily-season-cycle`은 기존 `DailyPortfolioSnapshotJobService.run()`을 먼저 호출하고, 이어서 `SeasonRankingJobService.run()`을 호출.
   - `daily-season-cycle`은 valuation/ranking 계산을 중복 구현하지 않고 child job result를 cycle `resultPayloadJson`에 요약.
@@ -412,7 +415,7 @@ near-term ledger/FX foundation:
   - cycle child idempotencyKey는 `<cycle-idempotency-key>:daily-portfolio-snapshot`, `<cycle-idempotency-key>:season-ranking` 형식으로 생성해 standalone child job key와 분리.
   - `daily-season-cycle`은 provider ingestion/API 호출, cron scheduler 등록, settlement, reward, HTTP batch 실행 API를 수행하지 않음.
   - `season-settlement`은 operator-run settlement MVP job이며 cron scheduler가 아님.
-  - `season-settlement`은 특정 ended seasonId + settlementDate의 기존 `daily_portfolio_snapshots`만 읽어 `rankType=final` `season_rankings`를 생성하고 season status를 `settled`로 전환.
+  - `season-settlement`은 특정 ended seasonId + settlementDate의 기존 `daily_portfolio_snapshots`, settlementDate까지의 participant snapshot 시계열, executed order count만 읽어 `rankType=final` `season_rankings`를 생성하고 season status를 `settled`로 전환.
   - `season-settlement`은 BatchService.runJob envelope을 사용해 `batch_job_runs`에 request/result/error, dryRun, idempotency 상태를 기록.
   - `season-settlement` idempotencyKey 기본값은 `season-settlement:<season-id>:<YYYY-MM-DD>`이며 명시 key도 허용.
   - `season-settlement` dry-run은 settle 가능 여부와 final ranking 계획만 반환하고 final ranking/season status DB write를 하지 않음.
@@ -422,7 +425,7 @@ near-term ledger/FX foundation:
   - final ranking이 없고 settlementDate snapshot이 없으면 `NO_FINAL_SNAPSHOTS_AVAILABLE` job-level failure.
   - eligible participant(`active`, `finished`, `rewarded`) 중 settlementDate snapshot 누락이 있으면 `MISSING_FINAL_SNAPSHOTS` job-level failure.
   - final ranking write와 season status transition은 단일 Prisma transaction으로 처리.
-  - final ranking은 `totalAssetKrw desc`, `userId asc`, `seasonParticipantId asc` 기반 deterministic sequential rank를 사용. current `season_rankings` unique rank 제약 때문에 true competition tie rank는 별도 schema/migration gate 필요.
+  - final ranking은 daily ranking과 같은 `returnRate desc`, `maxDrawdown asc`, `totalFillCount asc`, `reachedReturnAt asc`, `userId asc`, `seasonParticipantId asc` 기반 deterministic sequential rank를 사용. current `season_rankings` unique rank 제약 때문에 true competition tie rank는 별도 schema/migration gate 필요.
   - `season-settlement`은 provider ingestion/API 호출, cron scheduler 등록, price/FX/wallet/order/position/snapshot 재계산/변경, reward/payment/badge/trophy 지급, HTTP batch 실행 API를 수행하지 않음.
   - Home settled final-result read model은 생성된 final ranking을 읽을 수 있음.
   - `final-tier-assignment`는 operator-run final tier assignment MVP job이며 cron scheduler가 아님.
@@ -641,7 +644,7 @@ near-term ledger/FX foundation:
   - JS number 금액 계산 금지, `Prisma.Decimal` 기반 계산.
   - monetary scale 8, returnRate scale 8 기준 formatting.
   - `totalAssetKrw = krwCash + usdCashKrw + assetValueKrw`.
-  - `returnRate = (totalAssetKrw - initialCapitalKrw) / initialCapitalKrw`.
+  - `returnRate = (totalAssetKrw - initialCapitalKrw) / initialCapitalKrw * 100`.
   - `realizedPnlKrw`는 positions.realizedPnl 합산 후 USD 자산은 USD/KRW 환산.
   - `unrealizedPnlKrw`는 `(currentPrice - averageCost) * quantity` 후 USD 자산은 USD/KRW 환산.
   - initialCapitalKrw가 0 이하이면 error.
@@ -654,8 +657,10 @@ near-term ledger/FX foundation:
   - season 전체 모드는 active participants별 실패를 보고하고 성공 가능한 participant만 처리.
 - Season ranking 수동 생성 CLI 구현 완료: `scripts/admin-generate-season-ranking.ts`.
   - 옵션: `--season-id`, `--ranking-date`, `--rank-type`, `--dry-run`.
-  - rankingDate의 `daily_portfolio_snapshots`만 읽음.
-  - 정렬 기준: `totalAssetKrw desc`, `returnRate desc`, `capturedAt asc`, `seasonParticipantId asc`.
+  - rankingDate의 기존 `daily_portfolio_snapshots`, 참가자별 rankingDate까지의 snapshot 시계열, executed order count만 읽음.
+  - provider row를 직접 읽거나 valuation을 새로 계산하지 않음.
+  - 정렬 기준: `returnRate desc`, `maxDrawdown asc`, `totalFillCount asc`, `reachedReturnAt asc`, `userId asc`, `seasonParticipantId asc`.
+  - `maxDrawdown`은 snapshot 시계열 기준 percent 단위, `totalFillCount`는 executed order count, `reachedReturnAt`은 ranking row의 returnRate 이상을 최초 달성한 snapshot `capturedAt`.
   - rank는 1부터 순차 부여.
   - 기존 ranking row는 transaction 안에서 임시 음수 rank로 이동한 뒤 `(seasonId, rankType, rankingDate, seasonParticipantId)` unique 기준 upsert하여 rank unique 충돌을 피함.
 - Season ranking batch job 구현 완료: `src/batch/season-ranking-job.service.ts`, `scripts/admin-run-batch-job.ts --job season-ranking`.
@@ -666,11 +671,12 @@ near-term ledger/FX foundation:
   - active/ended season만 허용하고 upcoming/settled는 job-level error.
   - active/finished/rewarded participant 중 snapshot이 있는 participant만 ranking 대상.
   - snapshot이 없는 participant는 ranking 대상에서 제외하고 `missingSnapshots`에 반영.
+  - daily ranking row에는 `maxDrawdown`, `totalFillCount`, `reachedReturnAt` tie-breaker 근거를 저장.
   - dry-run은 생성 계획과 topRanks만 반환하고 `season_rankings`를 생성하지 않음.
   - non-dry-run은 ranking row가 없을 때만 transaction 안에서 `season_rankings`를 생성.
   - 기존 ranking row가 있으면 overwrite/delete/recreate 없이 existing/skipped로 성공 종료.
   - daily snapshot 생성, provider ingestion/API 호출, settlement/reward 없음.
-  - current schema의 rank unique 제약으로 competition tie rank는 미구현이며, 같은 `totalAssetKrw`는 `userId`, `seasonParticipantId` 순서로 deterministic sequential rank 저장.
+  - current schema의 rank unique 제약으로 competition tie rank는 미구현이며, 동률이어도 deterministic sequential rank 저장.
 - Daily season cycle batch job 구현 완료: `src/batch/daily-season-cycle-job.service.ts`, `scripts/admin-run-batch-job.ts --job daily-season-cycle`.
   - 옵션: `--season-id`, `--snapshot-date`, `--idempotency-key`, `--dry-run`, `--requested-by`.
   - idempotencyKey 기본값: `daily-season-cycle:<season-id>:<YYYY-MM-DD>`.
@@ -687,6 +693,8 @@ near-term ledger/FX foundation:
   - 옵션: `--season-id`, `--settlement-date`, `--idempotency-key`, `--dry-run`, `--requested-by`.
   - idempotencyKey 기본값: `season-settlement:<season-id>:<YYYY-MM-DD>`.
   - 기존 settlementDate `daily_portfolio_snapshots`만 읽어 `rankType=final` ranking row를 만들고 ended season을 `settled`로 전환.
+  - final ranking도 daily ranking과 동일한 `returnRate desc`, `maxDrawdown asc`, `totalFillCount asc`, `reachedReturnAt asc`, `userId asc`, `seasonParticipantId asc` policy를 사용.
+  - final ranking row에도 `maxDrawdown`, `totalFillCount`, `reachedReturnAt`을 저장.
   - no/missing final snapshot은 job-level failure이며 fake final result를 만들지 않음.
   - existing final ranking은 overwrite/delete/recreate하지 않고 existing/skipped로 처리.
   - provider ingestion/API 호출, cron scheduler, HTTP batch run API, reward 지급 없음.
@@ -798,6 +806,10 @@ near-term ledger/FX foundation:
   - `settled_joined`
   - `settled_not_joined`
   - `no_current_season`
+- mode 분기는 DB `status`만 보지 않고 `season-lifecycle.policy.ts`의 effective mode를 사용함.
+  - DB `active`라도 `now < startAt`이면 `upcoming`.
+  - DB `active`라도 `now >= endAt`이면 `ended`.
+  - DB `settled`이면 `settled`.
 - active joined summary source:
   - 최신 `daily_portfolio_snapshots` 우선.
   - daily snapshot이 없으면 `PortfolioValuationService.calculateSeasonParticipantValuation()` 기반 live valuation 시도.
@@ -819,6 +831,7 @@ near-term ledger/FX foundation:
   - cash wallets와 positions/openPositions count만 read-only로 반환.
   - `allocation`은 live valuation 기반으로 KRW cash, USD cash KRW 환산, domestic stock, US stock, crypto 비중을 반환.
   - `topPositions`는 기존 open positions와 eligible asset이면 fresh `provider_api` asset price first, then latest eligible `admin_manual` fallback으로 KRW 평가금액을 계산해 상위 5개를 반환.
+  - `topPositions.returnRate`는 percent 단위이며 평균단가 100, 현재가 110이면 `"10.00000000"`.
   - USD 환산이 필요한 경우 fresh `provider_api` `exchange_rate_api` USD/KRW first, then fresh approved `admin_manual` fallback을 사용함.
   - `equityChart`는 기존 `daily_portfolio_snapshots` 최신 30개를 읽어 오래된 날짜순으로 반환.
   - 필요한 provider/admin 가격 데이터가 없거나 USD/KRW FX 데이터가 없거나 stale이면 fake fallback 없이 해당 section을 `unavailable`로 반환.
@@ -847,6 +860,11 @@ near-term ledger/FX foundation:
   - `season_rankings`만 read-only로 조회.
   - `daily_portfolio_snapshots` 기반 즉석 ranking 계산 없음.
   - `season_participants.currentRank`를 source of truth로 사용하지 않음.
+- ranking row는 저장된 tie-breaker 근거를 함께 반환함.
+  - `maxDrawdown`: daily snapshot 시계열 기준 최대 낙폭 percent.
+  - `totalFillCount`: ranking snapshot `capturedAt`까지의 executed order count only.
+  - `reachedReturnAt`: ranking row `returnRate` 이상을 최초 달성한 daily snapshot `capturedAt`.
+  - migration 이전 old row는 `reachedReturnAt`이 null일 수 있으며 API는 null-safe로 반환.
 - ranking row가 없으면 fake rank 없이 `data.state = unavailable`.
 - `myRanking`은 로그인 사용자의 `season_participants` 기준:
   - 미참가면 `state = not_joined`.

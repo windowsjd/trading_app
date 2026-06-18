@@ -2729,6 +2729,9 @@ export const SeasonRankingScalarFieldEnum = {
   rank: 'rank',
   totalAssetKrw: 'totalAssetKrw',
   returnRate: 'returnRate',
+  maxDrawdown: 'maxDrawdown',
+  totalFillCount: 'totalFillCount',
+  reachedReturnAt: 'reachedReturnAt',
   rankingDate: 'rankingDate',
   capturedAt: 'capturedAt',
   createdAt: 'createdAt'

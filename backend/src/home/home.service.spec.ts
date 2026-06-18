@@ -59,8 +59,8 @@ import { PortfolioValuationError } from '../portfolio/portfolio-valuation.policy
 import { HomeService } from './home.service';
 
 describe('HomeService', () => {
-  const startAt = new Date('2026-05-01T00:00:00.000Z');
-  const endAt = new Date('2026-05-31T00:00:00.000Z');
+  const startAt = new Date(Date.now() - 86_400_000);
+  const endAt = new Date(Date.now() + 86_400_000);
   const joinedAt = new Date('2026-05-02T00:00:00.000Z');
 
   const createPrisma = () => {
@@ -267,6 +267,9 @@ describe('HomeService', () => {
     rank: 12,
     totalAssetKrw: new Prisma.Decimal('11230000.00000000'),
     returnRate: new Prisma.Decimal('12.30000000'),
+    maxDrawdown: new Prisma.Decimal('4.00000000'),
+    totalFillCount: 7,
+    reachedReturnAt: new Date('2026-05-20T00:01:00.000Z'),
     rankingDate: new Date('2026-05-21T00:00:00.000Z'),
     capturedAt: new Date('2026-05-21T00:00:30.000Z'),
   };
@@ -489,6 +492,9 @@ describe('HomeService', () => {
       rankingDate: new Date('2026-05-07T00:00:00.000Z'),
       totalAssetKrw: new Prisma.Decimal('1200000.00000000'),
       returnRate: new Prisma.Decimal('20.00000000'),
+      maxDrawdown: new Prisma.Decimal('1.50000000'),
+      totalFillCount: 3,
+      reachedReturnAt: new Date('2026-05-07T00:03:00.000Z'),
       capturedAt: new Date('2026-05-07T00:03:00.000Z'),
     });
     prisma.seasonRanking.count.mockResolvedValueOnce(10);
@@ -520,6 +526,9 @@ describe('HomeService', () => {
       currentRank: 3,
       totalParticipants: 10,
       rankingDate: '2026-05-07',
+      maxDrawdown: '1.50000000',
+      totalFillCount: 3,
+      reachedReturnAt: '2026-05-07T00:03:00.000Z',
     });
     expect(response.data.allocation).toMatchObject({
       state: 'available',
@@ -684,6 +693,7 @@ describe('HomeService', () => {
           assetType: AssetType.us_stock,
           currencyCode: CurrencyCode.USD,
           positionValueKrw: '280000.00000000',
+          returnRate: '25.00000000',
         },
         {
           assetId: 'asset-crypto',
@@ -758,6 +768,7 @@ describe('HomeService', () => {
           currentPrice: '110.00000000',
           assetPriceSnapshotId: 'provider-price-home',
           positionValueKrw: '220.00000000',
+          returnRate: '22.22222222',
           priceSource: {
             sourceType: 'provider_api',
             sourceName: 'kis_krx_realtime_trade',
@@ -974,6 +985,54 @@ describe('HomeService', () => {
     expectNoHomeWrites(prisma);
   });
 
+  it('uses upcoming mode when DB status is active before startAt', async () => {
+    const { prisma, service } = createService();
+    prisma.season.findFirst.mockResolvedValueOnce({
+      ...activeSeason,
+      startAt: new Date(Date.now() + 86_400_000),
+      endAt: new Date(Date.now() + 172_800_000),
+    });
+
+    const response = await service.getHome('user-1');
+
+    expect(response.data).toMatchObject({
+      mode: 'upcoming',
+      season: {
+        status: SeasonStatus.active,
+      },
+      guide: {
+        state: 'blocked',
+        reason: 'SEASON_UPCOMING',
+      },
+    });
+    expect(prisma.seasonParticipant.findUnique).not.toHaveBeenCalled();
+    expectNoHomeWrites(prisma);
+  });
+
+  it('uses ended mode when DB status is active after endAt', async () => {
+    const { prisma, service } = createService();
+    prisma.season.findFirst.mockResolvedValueOnce({
+      ...activeSeason,
+      startAt: new Date(Date.now() - 172_800_000),
+      endAt: new Date(Date.now() - 86_400_000),
+    });
+
+    const response = await service.getHome('user-1');
+
+    expect(response.data).toMatchObject({
+      mode: 'ended',
+      season: {
+        status: SeasonStatus.active,
+      },
+      guide: {
+        state: 'blocked',
+        reason: 'SEASON_ENDED_SETTLEMENT_PENDING',
+      },
+    });
+    expect(prisma.seasonParticipant.findUnique).not.toHaveBeenCalled();
+    expectNoHomeWrites(prisma);
+  });
+
   it('returns no current season state when no season exists', async () => {
     const { prisma, service } = createService();
     prisma.season.findFirst.mockResolvedValue(null);
@@ -1093,6 +1152,9 @@ describe('HomeService', () => {
         rank: true,
         totalAssetKrw: true,
         returnRate: true,
+        maxDrawdown: true,
+        totalFillCount: true,
+        reachedReturnAt: true,
         rankingDate: true,
         capturedAt: true,
       },
@@ -1122,6 +1184,9 @@ describe('HomeService', () => {
         totalParticipants: 100,
         totalAssetKrw: '11230000.00000000',
         returnRate: '12.30000000',
+        maxDrawdown: '4.00000000',
+        totalFillCount: 7,
+        reachedReturnAt: '2026-05-20T00:01:00.000Z',
         rankingDate: '2026-05-21',
         capturedAt: '2026-05-21T00:00:30.000Z',
         tier: {

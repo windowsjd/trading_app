@@ -1,16 +1,16 @@
 import { SeasonRankingType } from '../generated/prisma/client';
-import { SeasonRankingRow } from './portfolio-ranking.policy';
+import { RankingCalculatedRow } from '../ranking/ranking-calculation.policy';
 
 export type SeasonRankingWriteInput = {
   seasonId: string;
   rankType: SeasonRankingType;
   rankingDate: Date;
   capturedAt: Date;
-  rows: readonly SeasonRankingRow[];
+  rows: readonly RankingCalculatedRow[];
   dryRun: boolean;
 };
 
-export type SeasonRankingWriteResult = SeasonRankingRow & {
+export type SeasonRankingWriteResult = RankingCalculatedRow & {
   dryRun: boolean;
 };
 
@@ -75,6 +75,9 @@ export async function writeSeasonRankings(
           rank: row.rank,
           totalAssetKrw: row.totalAssetKrw,
           returnRate: row.returnRate,
+          maxDrawdown: row.maxDrawdown,
+          totalFillCount: row.totalFillCount,
+          reachedReturnAt: row.reachedReturnAt,
           rankingDate: input.rankingDate,
           capturedAt: input.capturedAt,
         },
@@ -82,6 +85,9 @@ export async function writeSeasonRankings(
           rank: row.rank,
           totalAssetKrw: row.totalAssetKrw,
           returnRate: row.returnRate,
+          maxDrawdown: row.maxDrawdown,
+          totalFillCount: row.totalFillCount,
+          reachedReturnAt: row.reachedReturnAt,
           capturedAt: input.capturedAt,
         },
       });

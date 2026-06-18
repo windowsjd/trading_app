@@ -159,10 +159,10 @@ Consistency note:
 
 ### Seasons
 
-- Current status: current season read with optional auth and season join write path implemented.
+- Current status: current season read with optional auth and season join write path implemented. `GET /api/v1/seasons/current` preserves DB `status` and also returns `effectiveStatus`/`effectiveMode` based on `startAt`/`endAt` via `season-lifecycle.policy.ts`.
 - Implemented files: `src/seasons/seasons.controller.ts`, `src/seasons/seasons.service.ts`.
 - Source of truth: `docs/codex-rulepack.md`, `docs/current-status.md`.
-- Existing tests: `src/seasons/seasons.controller.spec.ts`, `src/seasons/seasons.join.integration.spec.ts`, `test/app.e2e-spec.ts` auth/write-path baseline.
+- Existing tests: `src/seasons/seasons.controller.spec.ts`, `src/seasons/seasons.service.spec.ts`, `src/seasons/seasons.join.integration.spec.ts`, `test/app.e2e-spec.ts` auth/write-path baseline.
 - Known limitations: no service unit spec dedicated to `joinSeason` transaction behavior; real HTTP join backed by PostgreSQL is not covered.
 - Remaining work: keep opt-in join integration green; add real HTTP DB join coverage only if needed before launch.
 - Risk level: MEDIUM.
@@ -302,18 +302,18 @@ Consistency note:
 
 ### Ranking
 
-- Current status: `GET /api/v1/ranking` read-only MVP implemented; manual ranking generation helper/CLI and operator-run season ranking batch job implemented; API reads `season_rankings` only. The `daily-season-cycle` orchestration job can run ranking after daily snapshots.
-- Implemented files: `src/ranking/ranking.controller.ts`, `src/ranking/ranking.service.ts`, `scripts/admin-generate-season-ranking.ts`, `src/portfolio/portfolio-ranking.policy.ts`, `src/portfolio/season-ranking-generation.ts`, `src/batch/season-ranking-job.service.ts`.
+- Current status: `GET /api/v1/ranking` read-only MVP implemented; manual ranking generation helper/CLI, operator-run season ranking batch job, and season settlement final ranking now share the revised persisted ranking policy. API reads `season_rankings` only and exposes stored `maxDrawdown`, `totalFillCount`, and `reachedReturnAt` tie-breaker evidence. The `daily-season-cycle` orchestration job can run ranking after daily snapshots.
+- Implemented files: `src/ranking/ranking.controller.ts`, `src/ranking/ranking.service.ts`, `src/ranking/ranking-calculation.policy.ts`, `scripts/admin-generate-season-ranking.ts`, `src/portfolio/season-ranking-generation.ts`, `src/batch/season-ranking-job.service.ts`, `src/batch/season-settlement-job.service.ts`.
 - Source of truth: `docs/ranking-api-contract.md`, `docs/current-status.md`.
-- Existing tests: `src/ranking/ranking.service.spec.ts`, `src/portfolio/portfolio-ranking.policy.spec.ts`, `src/portfolio/snapshot-ranking-generation.spec.ts`, `src/batch/season-ranking-job.service.spec.ts`, `test/app.e2e-spec.ts`.
-- Known limitations: no cron-driven automatic season ranking generation, no final settlement extension or external reward fulfillment integration, no real DB ranking generator test. Current schema enforces unique persisted rank per season/date/type, so true same-rank competition ties require a separate schema gate.
+- Existing tests: `src/ranking/ranking.service.spec.ts`, `src/ranking/ranking-calculation.policy.spec.ts`, `src/portfolio/snapshot-ranking-generation.spec.ts`, `src/batch/season-ranking-job.service.spec.ts`, `src/batch/season-settlement-job.service.spec.ts`, `test/app.e2e-spec.ts`.
+- Known limitations: no cron-driven automatic season ranking generation, no external reward fulfillment integration, and no real DB ranking generator test. Current schema enforces unique persisted rank per season/date/type, so true same-rank competition ties require a separate schema gate. Rows created before migration `20260618090000_add_season_ranking_tiebreakers` can have `reachedReturnAt = null`; `maxDrawdown` and `totalFillCount` are default-backfilled to zero.
 - Remaining work: scheduler-driven ranking automation only after scheduler/deployment ownership is defined.
 - Risk level: MEDIUM.
 - Recommended next action: Gate G only after Gate E and F.
 
 ### Home
 
-- Current status: `GET /api/v1/home` aggregate read-only MVP implemented. Supports active_joined, active_not_joined, upcoming, ended, settled_joined, settled_not_joined, no_current_season. Active joined uses latest daily snapshot first, then live valuation if possible. Settled joined uses existing `rankType=final` `season_rankings` as the authoritative final result source and existing `daily_portfolio_snapshots` as supporting equity chart data.
+- Current status: `GET /api/v1/home` aggregate read-only MVP implemented. Supports active_joined, active_not_joined, upcoming, ended, settled_joined, settled_not_joined, no_current_season using effective season mode from `season-lifecycle.policy.ts`. Active joined uses latest daily snapshot first, then live valuation if possible. Settled joined uses existing `rankType=final` `season_rankings` as the authoritative final result source and existing `daily_portfolio_snapshots` as supporting equity chart data. `topPositions.returnRate` is percent-scale.
 - Implemented files: `src/home/home.controller.ts`, `src/home/home.service.ts`.
 - Source of truth: `docs/home-api-contract.md`, `docs/current-status.md`.
 - Existing tests: `src/home/home.service.spec.ts`, `test/app.e2e-spec.ts`.

@@ -12,7 +12,9 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import {
   assertSeasonJoinable,
+  getEffectiveSeasonMode,
   SeasonLifecycleError,
+  type SeasonLifecycleMode,
   type SeasonLifecycleSeason,
 } from './season-lifecycle.policy';
 
@@ -22,6 +24,8 @@ type CurrentSeasonResponse = {
     id: string;
     name: string;
     status: SeasonStatus;
+    effectiveStatus: SeasonStatus;
+    effectiveMode: SeasonLifecycleMode;
     startAt: string;
     endAt: string;
     initialCapitalKrw: string;
@@ -83,6 +87,7 @@ export class SeasonsService {
           },
         })
       : null;
+    const effectiveMode = getEffectiveSeasonMode(season, new Date());
 
     return {
       success: true,
@@ -90,6 +95,8 @@ export class SeasonsService {
         id: season.id,
         name: season.name,
         status: season.status,
+        effectiveStatus: this.toSeasonStatus(effectiveMode),
+        effectiveMode,
         startAt: season.startAt.toISOString(),
         endAt: season.endAt.toISOString(),
         initialCapitalKrw: this.formatDecimal(season.initialCapitalKrw, 8),
@@ -106,7 +113,11 @@ export class SeasonsService {
     userId?: string,
   ): Promise<JoinSeasonResponse> {
     if (!userId) {
-      this.throwApiError(HttpStatus.UNAUTHORIZED, 'UNAUTHORIZED', 'Unauthorized');
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
     }
 
     try {
@@ -125,7 +136,11 @@ export class SeasonsService {
         });
 
         if (!season) {
-          this.throwApiError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Season not found');
+          this.throwApiError(
+            HttpStatus.NOT_FOUND,
+            'NOT_FOUND',
+            'Season not found',
+          );
         }
 
         this.assertSeasonJoinable(season, new Date());
@@ -168,7 +183,10 @@ export class SeasonsService {
         }
 
         const joinedAt = new Date();
-        const initialCapitalKrw = this.formatDecimal(season.initialCapitalKrw, 8);
+        const initialCapitalKrw = this.formatDecimal(
+          season.initialCapitalKrw,
+          8,
+        );
 
         const participant = await tx.seasonParticipant.create({
           data: {
@@ -295,6 +313,20 @@ export class SeasonsService {
     return value.toFixed(scale);
   }
 
+  private toSeasonStatus(mode: SeasonLifecycleMode): SeasonStatus {
+    switch (mode) {
+      case 'active':
+        return SeasonStatus.active;
+      case 'ended':
+        return SeasonStatus.ended;
+      case 'settled':
+        return SeasonStatus.settled;
+      case 'upcoming':
+      default:
+        return SeasonStatus.upcoming;
+    }
+  }
+
   private assertSeasonJoinable(season: SeasonLifecycleSeason, now: Date) {
     try {
       assertSeasonJoinable(season, now);
@@ -317,7 +349,11 @@ export class SeasonsService {
     };
   }
 
-  private throwApiError(status: HttpStatus, code: string, message: string): never {
+  private throwApiError(
+    status: HttpStatus,
+    code: string,
+    message: string,
+  ): never {
     throw new HttpException(this.createErrorBody(code, message), status);
   }
 }

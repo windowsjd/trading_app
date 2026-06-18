@@ -36,6 +36,9 @@ export type SeasonRankingJobTopRank = {
   rank: number;
   totalAssetKrw: string;
   returnRate: string;
+  maxDrawdown: string;
+  totalFillCount: number;
+  reachedReturnAt: string | null;
 };
 
 export type SeasonRankingJobError = {
