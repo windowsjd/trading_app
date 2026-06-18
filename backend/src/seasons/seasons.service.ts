@@ -138,7 +138,7 @@ export class SeasonsService {
         if (!season) {
           this.throwApiError(
             HttpStatus.NOT_FOUND,
-            'NOT_FOUND',
+            'SEASON_NOT_FOUND',
             'Season not found',
           );
         }
@@ -289,7 +289,7 @@ export class SeasonsService {
     }
 
     throw new HttpException(
-      this.createErrorBody('NOT_FOUND', 'Current season not found'),
+      this.createErrorBody('SEASON_NOT_FOUND', 'Current season not found'),
       HttpStatus.NOT_FOUND,
     );
   }

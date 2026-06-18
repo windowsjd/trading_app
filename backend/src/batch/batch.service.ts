@@ -4,6 +4,7 @@ import {
   BatchJobStatus,
   Prisma,
 } from '../generated/prisma/client';
+import { buildPagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   BatchGetJobRunResponse,
@@ -167,12 +168,12 @@ export class BatchService {
       success: true,
       data: {
         jobRuns: runs.map((run) => this.serializeRun(run)),
-        pagination: {
+        pagination: buildPagination({
           limit: parsedQuery.limit,
           offset: parsedQuery.offset,
           total,
           returned: runs.length,
-        },
+        }),
       },
     };
   }

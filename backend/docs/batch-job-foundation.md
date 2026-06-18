@@ -199,15 +199,16 @@ Final tier assignment policy:
 - If no final rows exist for the requested date, the job fails with `FINAL_RANKING_UNAVAILABLE`.
 - Final ranking rows may cover only a subset of participants; this job assigns only participants present in the selected final ranking rows and does not re-check settlement snapshot completeness.
 - `finalRank` is copied from `season_rankings.rank`.
-- `finalTier` uses this default MVP policy when no clear `Season.rewardPolicyJson.tierPolicy.tiers` exists:
-  - rank 1: `master`
-  - rank 2-3: `diamond`
-  - rank 4-10: `platinum`
-  - `rank / totalParticipants <= 0.30`: `gold`
-  - `rank / totalParticipants <= 0.60`: `silver`
-  - fallback: `bronze`
+- `finalTier` uses the fixed cumulative cutoff policy:
+  - `master`: top 4%
+  - `diamond`: top 11%
+  - `platinum`: top 23%
+  - `gold`: top 40%
+  - `silver`: top 70%
+  - `bronze`: top 100%
+- Cutoff is `ceil(totalParticipants * cumulativeRatio)` and tiers are assigned from the top tier downward. Example: 100 participants produce master ranks 1-4, diamond 5-11, platinum 12-23, gold 24-40, silver 41-70, bronze 71-100. Ten participants produce master 1, diamond 2, platinum 3, gold 4, silver 5-7, bronze 8-10. One participant is master.
 - Tier strings are lowercase: `master`, `diamond`, `platinum`, `gold`, `silver`, `bronze`.
-- A clear season reward tier policy may be read from `rewardPolicyJson.tierPolicy.tiers` when entries use only tier assignment rules such as exact rank, max rank, max percent, and fallback. Reward amounts, badges, trophies, and payment fields are ignored. Ambiguous or complex policy JSON falls back to `default_mvp`; custom policy parsing beyond this MVP is a separate gate.
+- `Season.rewardPolicyJson` and reward policy/catalog values do not override final tier cutoffs in this MVP. Reward amounts, badges, trophies, and payment fields are ignored by `final-tier-assignment`.
 - `--dry-run` returns the assignment plan, policy source, participant counts, and up to 10 `topAssignments` without updating participants.
 - Non-dry-run updates only participants where both `finalRank` and `finalTier` are null. If either field is already present, the participant is classified as `existing`/`skipped` and is not overwritten.
 - Non-dry-run writes run in a Prisma transaction for the participant updates to avoid partial assignment.

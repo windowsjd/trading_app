@@ -789,6 +789,10 @@ describe('FxService', () => {
       data: {
         exchangeId: 'exchange-1',
         rate: '1350.00000000',
+        wallets: {
+          KRW: '0.00000000',
+          USD: '0.74000000',
+        },
       },
     };
     const sourceWalletAfterDebit = {
@@ -1393,7 +1397,7 @@ describe('FxService', () => {
       expectNoExecuteWrites(prisma);
     });
 
-    it('returns SOURCE_WALLET_NOT_FOUND when the source wallet candidate is missing', async () => {
+    it('returns INSUFFICIENT_BALANCE when the source wallet candidate is missing', async () => {
       const { prisma, service } = createService();
       mockActiveSeason(prisma);
       mockJoinedParticipant(prisma);
@@ -1403,13 +1407,13 @@ describe('FxService', () => {
 
       await expectExecuteErrorCode(
         service.execute('user-1', validExecuteBody),
-        'SOURCE_WALLET_NOT_FOUND',
+        'INSUFFICIENT_BALANCE',
       );
       expectExecutePlanReads(prisma);
       expectNoExecuteWrites(prisma);
     });
 
-    it('returns TARGET_WALLET_NOT_FOUND when the target wallet candidate is missing', async () => {
+    it('returns INSUFFICIENT_BALANCE when the target wallet candidate is missing', async () => {
       const { prisma, service } = createService();
       mockActiveSeason(prisma);
       mockJoinedParticipant(prisma);
@@ -1419,7 +1423,7 @@ describe('FxService', () => {
 
       await expectExecuteErrorCode(
         service.execute('user-1', validExecuteBody),
-        'TARGET_WALLET_NOT_FOUND',
+        'INSUFFICIENT_BALANCE',
       );
       expectExecutePlanReads(prisma);
       expectNoExecuteWrites(prisma);
@@ -1525,6 +1529,10 @@ describe('FxService', () => {
           targetWalletId: 'target-wallet-1',
           sourceWalletBalanceAfter: '0.00000000',
           targetWalletBalanceAfter: '0.74000000',
+          wallets: {
+            KRW: '0.00000000',
+            USD: '0.74000000',
+          },
           fxRateSnapshotId: 'fx-snapshot-1',
           rateCapturedAt: capturedAt.toISOString(),
           rateEffectiveAt: freshEffectiveAt.toISOString(),
@@ -1629,7 +1637,7 @@ describe('FxService', () => {
 
       await expectExecuteErrorCode(
         service.execute('user-1', validExecuteBody),
-        'SOURCE_WALLET_NOT_FOUND',
+        'INSUFFICIENT_BALANCE',
       );
       expectExecutePlanReads(prisma);
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
@@ -1660,7 +1668,7 @@ describe('FxService', () => {
       expectNoCommittedSuccess(prisma);
     });
 
-    it('classifies guarded source debit failure as a concurrent wallet update when reread is sufficient', async () => {
+    it('returns CONFLICT for concurrent wallet update when reread is sufficient', async () => {
       const { prisma, service } = createService();
       mockActiveSeason(prisma);
       mockJoinedParticipant(prisma);
@@ -1673,7 +1681,7 @@ describe('FxService', () => {
 
       await expectExecuteErrorCode(
         service.execute('user-1', validExecuteBody),
-        'CONCURRENT_WALLET_UPDATE',
+        'CONFLICT',
       );
       expect(prisma.cashWallet.updateMany).toHaveBeenCalledTimes(1);
       expect(prisma.exchangeTransaction.create).not.toHaveBeenCalled();
@@ -2075,8 +2083,8 @@ describe('FxService', () => {
       ).toEqual({
         success: false,
         error: {
-          code: 'SOURCE_WALLET_NOT_FOUND',
-          message: 'Source wallet not found',
+          code: 'INSUFFICIENT_BALANCE',
+          message: 'Insufficient balance',
         },
       });
     });
@@ -2141,8 +2149,8 @@ describe('FxService', () => {
       ).toEqual({
         success: false,
         error: {
-          code: 'SOURCE_WALLET_NOT_FOUND',
-          message: 'Source wallet not found',
+          code: 'INSUFFICIENT_BALANCE',
+          message: 'Insufficient balance',
         },
       });
       expectNoExecuteWrites(prisma);

@@ -182,7 +182,6 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
     "fromCurrency": "KRW",
     "toCurrency": "USD",
     "sourceAmount": "<amount string>",
-    "rate": "<decimal string>",
     "grossTargetAmount": "<amount string>",
     "feeRate": "<decimal string>",
     "feeAmount": "<amount string>",
@@ -202,6 +201,10 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
     },
     "idempotencyKey": "<string>",
     "netTargetAmount": "<amount string>",
+    "sourceWalletId": "<string>",
+    "targetWalletId": "<string>",
+    "sourceWalletBalanceAfter": "<amount string>",
+    "targetWalletBalanceAfter": "<amount string>",
     "rateCapturedAt": "<UTC ISO string>",
     "rateEffectiveAt": "<UTC ISO string>",
     "wallets": {
@@ -215,10 +218,13 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 ### Response Mapping
 
 - DB stores `exchange_transactions.appliedRate`.
-- `/fx execute` response exposes that value as `rate`.
-- This matches records exchanges mapping where `appliedRate -> rate`.
+- `/fx execute` response exposes that value as `appliedRate`, `quotedRate`, and `executeRate` according to the quote/execute context.
+- Records exchanges mapping keeps `appliedRate`.
 - `exchangeId` maps to `exchange_transactions.id`.
 - `wallets.KRW` and `wallets.USD` are post-execute wallet balances.
+- Existing compatibility fields `sourceWalletId`, `targetWalletId`, `sourceWalletBalanceAfter`, and `targetWalletBalanceAfter` remain present.
+- `wallets.KRW` and `wallets.USD` are returned for both KRW -> USD and USD -> KRW success responses, including idempotency replay of stored successful responses.
+- Failed or rolled-back execute responses do not return success-shaped `wallets`.
 - `rateCapturedAt` maps to the selected snapshot `capturedAt`.
 - `rateEffectiveAt` maps to the selected snapshot `effectiveAt`.
 
@@ -238,16 +244,12 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 - `PROVIDER_RATE_UNAVAILABLE`
 - `PROVIDER_RATE_STALE`
 - `RATE_CHANGED_REQUOTE_REQUIRED`
-- `EXECUTION_SOURCE_INELIGIBLE`
-- `EXECUTION_PROVIDER_REQUIRED`
 - `INSUFFICIENT_BALANCE`
 - `FX_RATE_UNAVAILABLE`
 - `FX_RATE_STALE`
 - `IDEMPOTENCY_REQUIRED`
 - `IDEMPOTENCY_CONFLICT`
-- `CONCURRENT_WALLET_UPDATE`
-- `SOURCE_WALLET_NOT_FOUND`
-- `TARGET_WALLET_NOT_FOUND`
+- `CONFLICT`
 - `IDEMPOTENCY_PENDING`
 - `IDEMPOTENCY_PENDING_STALE`
 - `IDEMPOTENCY_FAILED`
@@ -320,7 +322,7 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 
 - Update the source wallet only where `balanceAmount >= sourceAmount`.
 - Require exactly one affected row.
-- Treat zero affected rows as `INSUFFICIENT_BALANCE` or `CONCURRENT_WALLET_UPDATE` depending on the observed state.
+- Treat zero affected rows as `INSUFFICIENT_BALANCE` or public `CONFLICT` depending on the observed state.
 - Pros: good MVP fit and avoids stale read checks.
 - Cons: may need raw SQL or careful Prisma support for Decimal comparisons and affected row checks.
 

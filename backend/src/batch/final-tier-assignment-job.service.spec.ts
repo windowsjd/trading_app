@@ -143,7 +143,7 @@ describe('FinalTierAssignmentJobService', () => {
       {
         seasonParticipantId: 'sp-2',
         finalRank: 2,
-        finalTier: 'diamond',
+        finalTier: 'silver',
       },
     ]);
   });
@@ -151,7 +151,7 @@ describe('FinalTierAssignmentJobService', () => {
   it('updates finalRank/finalTier for settled season final rankings in one transaction', async () => {
     const { service, prisma } = createService();
     mockSeason(prisma, SeasonStatus.settled);
-    mockFinalRankings(prisma, [finalRanking('sp-7', 'user-7', 7)]);
+    mockFinalRankings(prisma, [finalRanking('sp-1', 'user-1', 1)]);
 
     const result = await runAndGetResult(service, {
       seasonId: 'season-1',
@@ -171,14 +171,14 @@ describe('FinalTierAssignmentJobService', () => {
     expect(prisma.seasonParticipant.updateMany).not.toHaveBeenCalled();
     expect(prisma.__tx.seasonParticipant.updateMany).toHaveBeenCalledWith({
       where: {
-        id: 'sp-7',
+        id: 'sp-1',
         seasonId: 'season-1',
         finalRank: null,
         finalTier: null,
       },
       data: {
-        finalRank: 7,
-        finalTier: 'platinum',
+        finalRank: 1,
+        finalTier: 'master',
       },
     });
     expect(result.participants).toEqual({
@@ -188,15 +188,15 @@ describe('FinalTierAssignmentJobService', () => {
       existing: 0,
       skipped: 0,
     });
-    expect(result.assignedParticipantIds).toEqual(['sp-7']);
+    expect(result.assignedParticipantIds).toEqual(['sp-1']);
   });
 
-  it('reflects final ranking rank as finalRank and applies the default MVP tier policy', async () => {
+  it('uses fixed cumulative cutoff tiers for 100 participants', async () => {
     const { service, prisma } = createService();
     mockSeason(prisma, SeasonStatus.settled);
     mockFinalRankings(
       prisma,
-      Array.from({ length: 40 }, (_, index) =>
+      Array.from({ length: 100 }, (_, index) =>
         finalRanking(`sp-${index + 1}`, `user-${index + 1}`, index + 1),
       ),
     );
@@ -212,52 +212,128 @@ describe('FinalTierAssignmentJobService', () => {
         finalTier: 'master',
       },
     });
-    expect(updateFor(prisma, 'sp-2')).toMatchObject({
-      data: {
-        finalRank: 2,
-        finalTier: 'diamond',
-      },
-    });
-    expect(updateFor(prisma, 'sp-3')).toMatchObject({
-      data: {
-        finalRank: 3,
-        finalTier: 'diamond',
-      },
-    });
     expect(updateFor(prisma, 'sp-4')).toMatchObject({
       data: {
         finalRank: 4,
-        finalTier: 'platinum',
+        finalTier: 'master',
       },
     });
-    expect(updateFor(prisma, 'sp-10')).toMatchObject({
+    expect(updateFor(prisma, 'sp-5')).toMatchObject({
       data: {
-        finalRank: 10,
-        finalTier: 'platinum',
+        finalRank: 5,
+        finalTier: 'diamond',
       },
     });
     expect(updateFor(prisma, 'sp-11')).toMatchObject({
       data: {
         finalRank: 11,
+        finalTier: 'diamond',
+      },
+    });
+    expect(updateFor(prisma, 'sp-12')).toMatchObject({
+      data: {
+        finalRank: 12,
+        finalTier: 'platinum',
+      },
+    });
+    expect(updateFor(prisma, 'sp-23')).toMatchObject({
+      data: {
+        finalRank: 23,
+        finalTier: 'platinum',
+      },
+    });
+    expect(updateFor(prisma, 'sp-24')).toMatchObject({
+      data: {
+        finalRank: 24,
         finalTier: 'gold',
       },
     });
-    expect(updateFor(prisma, 'sp-20')).toMatchObject({
+    expect(updateFor(prisma, 'sp-40')).toMatchObject({
       data: {
-        finalRank: 20,
+        finalRank: 40,
+        finalTier: 'gold',
+      },
+    });
+    expect(updateFor(prisma, 'sp-41')).toMatchObject({
+      data: {
+        finalRank: 41,
         finalTier: 'silver',
       },
     });
-    expect(updateFor(prisma, 'sp-30')).toMatchObject({
+    expect(updateFor(prisma, 'sp-70')).toMatchObject({
       data: {
-        finalRank: 30,
+        finalRank: 70,
+        finalTier: 'silver',
+      },
+    });
+    expect(updateFor(prisma, 'sp-71')).toMatchObject({
+      data: {
+        finalRank: 71,
         finalTier: 'bronze',
       },
     });
-    expect(result.participants.assigned).toBe(40);
+    expect(result.participants.assigned).toBe(100);
+    expect(result.policy.tiers).toMatchObject([
+      { tier: 'master', cumulativeRatio: 0.04 },
+      { tier: 'diamond', cumulativeRatio: 0.11 },
+      { tier: 'platinum', cumulativeRatio: 0.23 },
+      { tier: 'gold', cumulativeRatio: 0.4 },
+      { tier: 'silver', cumulativeRatio: 0.7 },
+      { tier: 'bronze', cumulativeRatio: 1 },
+    ]);
   });
 
-  it('uses a clear season.rewardPolicyJson tier policy and ignores reward amounts', async () => {
+  it('uses fixed cumulative cutoff tiers for 10 participants', async () => {
+    const { service, prisma } = createService();
+    mockSeason(prisma, SeasonStatus.settled);
+    mockFinalRankings(
+      prisma,
+      Array.from({ length: 10 }, (_, index) =>
+        finalRanking(`sp-${index + 1}`, `user-${index + 1}`, index + 1),
+      ),
+    );
+
+    const result = await runAndGetResult(service, {
+      seasonId: 'season-1',
+      rankingDate,
+      dryRun: true,
+    });
+
+    expect(result.topAssignments).toMatchObject([
+      { finalRank: 1, finalTier: 'master' },
+      { finalRank: 2, finalTier: 'diamond' },
+      { finalRank: 3, finalTier: 'platinum' },
+      { finalRank: 4, finalTier: 'gold' },
+      { finalRank: 5, finalTier: 'silver' },
+      { finalRank: 6, finalTier: 'silver' },
+      { finalRank: 7, finalTier: 'silver' },
+      { finalRank: 8, finalTier: 'bronze' },
+      { finalRank: 9, finalTier: 'bronze' },
+      { finalRank: 10, finalTier: 'bronze' },
+    ]);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('assigns master for a single final-ranked participant', async () => {
+    const { service, prisma } = createService();
+    mockSeason(prisma, SeasonStatus.settled);
+    mockFinalRankings(prisma, [finalRanking('sp-1', 'user-1', 1)]);
+
+    const result = await runAndGetResult(service, {
+      seasonId: 'season-1',
+      rankingDate,
+      dryRun: true,
+    });
+
+    expect(result.topAssignments).toMatchObject([
+      {
+        finalRank: 1,
+        finalTier: 'master',
+      },
+    ]);
+  });
+
+  it('ignores season.rewardPolicyJson tier cutoff overrides', async () => {
     const { service, prisma } = createService();
     mockSeason(prisma, SeasonStatus.settled, {
       tierPolicy: {
@@ -281,7 +357,7 @@ describe('FinalTierAssignmentJobService', () => {
       dryRun: true,
     });
 
-    expect(result.policy.source).toBe('season_reward_policy');
+    expect(result.policy.source).toBe('default_mvp');
     expect(result.topAssignments).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -294,7 +370,7 @@ describe('FinalTierAssignmentJobService', () => {
         }),
         expect.objectContaining({
           finalRank: 3,
-          finalTier: 'bronze',
+          finalTier: 'silver',
         }),
       ]),
     );

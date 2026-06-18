@@ -18,12 +18,11 @@ export type FinalTierAssignmentJobRequestPayload = {
   idempotencyKey: string;
 };
 
-export type FinalTierAssignmentPolicySource =
-  | 'default_mvp'
-  | 'season_reward_policy';
+export type FinalTierAssignmentPolicySource = 'default_mvp';
 
 export type FinalTierAssignmentPolicyTier = {
   tier: string;
+  cumulativeRatio: number;
   rule: string;
 };
 

@@ -94,6 +94,10 @@ export type FxExecuteSuccessResponse = {
     targetWalletId: string;
     sourceWalletBalanceAfter: string;
     targetWalletBalanceAfter: string;
+    wallets: {
+      KRW: string;
+      USD: string;
+    };
     fxRateSnapshotId: string;
     rateCapturedAt: string;
     rateEffectiveAt: string;
@@ -1359,6 +1363,19 @@ export class FxService {
     sourceWallet: FxExecutePostUpdateWallet;
     targetWallet: FxExecutePostUpdateWallet;
   }): FxExecuteSuccessResponse {
+    const sourceWalletBalanceAfter = this.formatDecimal(
+      input.sourceWallet.balanceAmount,
+      8,
+    );
+    const targetWalletBalanceAfter = this.formatDecimal(
+      input.targetWallet.balanceAmount,
+      8,
+    );
+    const walletBalances = {
+      [input.sourceWallet.currencyCode]: sourceWalletBalanceAfter,
+      [input.targetWallet.currencyCode]: targetWalletBalanceAfter,
+    } as Record<CurrencyCode, string>;
+
     return {
       success: true,
       data: {
@@ -1381,14 +1398,12 @@ export class FxService {
         netTargetAmount: input.plan.netTargetAmount,
         sourceWalletId: input.plan.sourceWalletId,
         targetWalletId: input.plan.targetWalletId,
-        sourceWalletBalanceAfter: this.formatDecimal(
-          input.sourceWallet.balanceAmount,
-          8,
-        ),
-        targetWalletBalanceAfter: this.formatDecimal(
-          input.targetWallet.balanceAmount,
-          8,
-        ),
+        sourceWalletBalanceAfter,
+        targetWalletBalanceAfter,
+        wallets: {
+          KRW: walletBalances.KRW,
+          USD: walletBalances.USD,
+        },
         fxRateSnapshotId: input.plan.fxRateSnapshotId,
         rateCapturedAt: input.plan.rateCapturedAt.toISOString(),
         rateEffectiveAt: input.plan.rateEffectiveAt.toISOString(),

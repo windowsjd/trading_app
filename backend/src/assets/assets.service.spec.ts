@@ -257,6 +257,7 @@ describe('AssetsService', () => {
           offset: 0,
           total: 0,
           returned: 0,
+          nextOffset: null,
         },
         assets: [],
         priceErrors: [],

@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, UserRole, UserStatus } from '../generated/prisma/client';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { buildPagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { OperatorAuditService } from './operator-audit.service';
 
@@ -87,16 +88,12 @@ export class OperatorAccountManagementService {
       success: true,
       data: {
         users: users.map((user) => this.serializeUser(user)),
-        pagination: {
+        pagination: buildPagination({
           limit: parsed.limit,
           offset: parsed.offset,
           total,
           returned: users.length,
-          nextOffset:
-            parsed.offset + users.length < total
-              ? parsed.offset + users.length
-              : null,
-        },
+        }),
       },
     };
   }

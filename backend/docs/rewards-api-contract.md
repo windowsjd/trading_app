@@ -254,7 +254,9 @@ Create/fulfill/cancel success audit rows are written in the same transaction as 
     "pagination": {
       "limit": 50,
       "offset": 0,
-      "returned": 1
+      "total": 1,
+      "returned": 1,
+      "nextOffset": null
     }
   }
 }
@@ -273,7 +275,9 @@ Create/fulfill/cancel success audit rows are written in the same transaction as 
     "pagination": {
       "limit": 50,
       "offset": 0,
-      "returned": 0
+      "total": 0,
+      "returned": 0,
+      "nextOffset": null
     }
   }
 }
@@ -326,7 +330,9 @@ Create/fulfill/cancel success audit rows are written in the same transaction as 
     "pagination": {
       "limit": 50,
       "offset": 0,
-      "returned": 1
+      "total": 1,
+      "returned": 1,
+      "nextOffset": null
     }
   }
 }
@@ -343,7 +349,9 @@ Create/fulfill/cancel success audit rows are written in the same transaction as 
     "pagination": {
       "limit": 50,
       "offset": 0,
-      "returned": 0
+      "total": 0,
+      "returned": 0,
+      "nextOffset": null
     }
   }
 }

@@ -332,6 +332,7 @@ describe('BatchService', () => {
       offset: 2,
       total: 1,
       returned: 1,
+      nextOffset: null,
     });
   });
 

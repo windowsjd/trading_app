@@ -71,6 +71,7 @@ export type BatchListJobRunsResponse = {
       offset: number;
       total: number;
       returned: number;
+      nextOffset: number | null;
     };
   };
 };

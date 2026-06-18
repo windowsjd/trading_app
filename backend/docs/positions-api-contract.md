@@ -75,7 +75,8 @@
       "limit": 50,
       "offset": 0,
       "total": 0,
-      "returned": 0
+      "returned": 0,
+      "nextOffset": null
     },
     "positions": [
       {

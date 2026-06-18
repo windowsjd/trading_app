@@ -188,7 +188,7 @@ async function testConcurrentBuyOverspend() {
     assert.equal(successes.length, 1);
     assert.equal(failures.length, 1);
     assert.ok(
-      ['INSUFFICIENT_CASH_BALANCE', 'CONCURRENT_WALLET_UPDATE'].includes(
+      ['INSUFFICIENT_BALANCE', 'CONFLICT'].includes(
         getErrorCode(failures[0].reason),
       ),
     );
@@ -235,7 +235,7 @@ async function testConcurrentSellOversell() {
     assert.equal(successes.length, 1);
     assert.equal(failures.length, 1);
     assert.ok(
-      ['INSUFFICIENT_POSITION_QUANTITY', 'CONCURRENT_POSITION_UPDATE'].includes(
+      ['INSUFFICIENT_QUANTITY', 'CONFLICT'].includes(
         getErrorCode(failures[0].reason),
       ),
     );

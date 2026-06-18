@@ -2041,6 +2041,7 @@ describe('OrdersService', () => {
         offset: 0,
         total: 1,
         returned: 1,
+        nextOffset: null,
       },
       orders: [
         {
@@ -3048,7 +3049,7 @@ describe('OrdersService', () => {
 
       await expectErrorCode(
         service.executeOrder('user-1', 'order-execute-1'),
-        'PROVIDER_PRICE_UNAVAILABLE',
+        'ASSET_PRICE_UNAVAILABLE',
       );
       expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
       expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
@@ -3196,7 +3197,7 @@ describe('OrdersService', () => {
 
       await expectErrorCode(
         service.executeOrder('user-1', 'order-execute-1'),
-        'INSUFFICIENT_CASH_BALANCE',
+        'INSUFFICIENT_BALANCE',
       );
       expect(prisma.position.create).not.toHaveBeenCalled();
       expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
@@ -3213,7 +3214,7 @@ describe('OrdersService', () => {
 
       await expectErrorCode(
         missing.service.executeOrder('user-1', 'order-execute-1'),
-        'ORDER_POSITION_NOT_FOUND',
+        'INSUFFICIENT_QUANTITY',
       );
 
       const insufficient = createService();
@@ -3236,7 +3237,7 @@ describe('OrdersService', () => {
 
       await expectErrorCode(
         insufficient.service.executeOrder('user-1', 'order-execute-1'),
-        'INSUFFICIENT_POSITION_QUANTITY',
+        'INSUFFICIENT_QUANTITY',
       );
       expect(missing.prisma.cashWallet.updateMany).not.toHaveBeenCalled();
       expect(insufficient.prisma.cashWallet.updateMany).not.toHaveBeenCalled();

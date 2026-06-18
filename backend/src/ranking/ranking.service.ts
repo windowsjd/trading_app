@@ -4,6 +4,7 @@ import {
   SeasonRankingType,
   SeasonStatus,
 } from '../generated/prisma/client';
+import { buildPagination, type Pagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 
 export type RankingQuery = {
@@ -40,12 +41,7 @@ type RankingResponse = {
     rankType: SeasonRankingType;
     rankingDate: string | null;
     capturedAt: string | null;
-    pagination: {
-      limit: number;
-      offset: number;
-      total: number;
-      returned: number;
-    };
+    pagination: Pagination;
     rankings: Array<{
       rank: number;
       seasonParticipantId: string;
@@ -229,12 +225,12 @@ export class RankingService {
         rankType: parsedQuery.rankType,
         rankingDate: this.formatDateOnly(selectedRanking.rankingDate),
         capturedAt: selectedRanking.capturedAt.toISOString(),
-        pagination: {
+        pagination: buildPagination({
           limit: parsedQuery.limit,
           offset: parsedQuery.offset,
           total,
           returned: rankingRows.length,
-        },
+        }),
         rankings: rankingRows.map((row) => ({
           rank: row.rank,
           seasonParticipantId: row.seasonParticipantId,
@@ -497,12 +493,12 @@ export class RankingService {
           ? this.formatDateOnly(input.rankingDate)
           : null,
         capturedAt: null,
-        pagination: {
+        pagination: buildPagination({
           limit: input.limit,
           offset: input.offset,
           total: 0,
           returned: 0,
-        },
+        }),
         rankings: [],
         myRanking: input.myRanking,
         reason: input.reason,

@@ -10,6 +10,7 @@ type PrismaMock = ReturnType<typeof createPrismaMock>;
 describe('RewardsService', () => {
   it('returns empty state when no rewards exist', async () => {
     const { service, prisma } = createService();
+    prisma.$queryRaw.mockResolvedValueOnce([{ count: 0 }]);
     prisma.$queryRaw.mockResolvedValueOnce([]);
 
     const response = await service.getMyRewards('user-1');
@@ -22,7 +23,9 @@ describe('RewardsService', () => {
         pagination: {
           limit: 50,
           offset: 0,
+          total: 0,
           returned: 0,
+          nextOffset: null,
         },
       },
     });
@@ -31,6 +34,7 @@ describe('RewardsService', () => {
 
   it('returns only authenticated user rewards', async () => {
     const { service, prisma } = createService();
+    prisma.$queryRaw.mockResolvedValueOnce([{ count: 5 }]);
     prisma.$queryRaw.mockResolvedValueOnce([
       {
         seasonId: 'season-1',
@@ -68,13 +72,16 @@ describe('RewardsService', () => {
       pagination: {
         limit: 100,
         offset: 3,
+        total: 5,
         returned: 1,
+        nextOffset: 4,
       },
     });
   });
 
   it('returns fulfilled internal SeasonReward rows through user rewards API', async () => {
     const { service, prisma } = createService();
+    prisma.$queryRaw.mockResolvedValueOnce([{ count: 1 }]);
     prisma.$queryRaw.mockResolvedValueOnce([
       {
         seasonId: 'season-1',
@@ -107,6 +114,7 @@ describe('RewardsService', () => {
 
   it('returns only authenticated user badges', async () => {
     const { service, prisma } = createService();
+    prisma.$queryRaw.mockResolvedValueOnce([{ count: 1 }]);
     prisma.$queryRaw.mockResolvedValueOnce([
       {
         badgeId: 'badge-1',
@@ -143,7 +151,9 @@ describe('RewardsService', () => {
       pagination: {
         limit: 50,
         offset: 0,
+        total: 1,
         returned: 1,
+        nextOffset: null,
       },
     });
   });

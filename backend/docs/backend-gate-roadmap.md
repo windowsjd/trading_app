@@ -306,7 +306,7 @@ Consistency note:
 - Implemented files: `src/ranking/ranking.controller.ts`, `src/ranking/ranking.service.ts`, `src/ranking/ranking-calculation.policy.ts`, `scripts/admin-generate-season-ranking.ts`, `src/portfolio/season-ranking-generation.ts`, `src/batch/season-ranking-job.service.ts`, `src/batch/season-settlement-job.service.ts`.
 - Source of truth: `docs/ranking-api-contract.md`, `docs/current-status.md`.
 - Existing tests: `src/ranking/ranking.service.spec.ts`, `src/ranking/ranking-calculation.policy.spec.ts`, `src/portfolio/snapshot-ranking-generation.spec.ts`, `src/batch/season-ranking-job.service.spec.ts`, `src/batch/season-settlement-job.service.spec.ts`, `test/app.e2e-spec.ts`.
-- Known limitations: no cron-driven automatic season ranking generation, no external reward fulfillment integration, and no real DB ranking generator test. Current schema enforces unique persisted rank per season/date/type, so true same-rank competition ties require a separate schema gate. Rows created before migration `20260618090000_add_season_ranking_tiebreakers` can have `reachedReturnAt = null`; `maxDrawdown` and `totalFillCount` are default-backfilled to zero.
+- Known limitations: no cron-driven automatic season ranking generation, no external reward fulfillment integration, and no real DB ranking generator test. Current schema enforces unique persisted rank per season/date/type, so true same-rank competition ties require a separate schema gate. Rows created before migration `20260618090000_add_season_ranking_tiebreakers` can have `reachedReturnAt = null`; `maxDrawdown` and `totalFillCount` are default-backfilled to zero. Migration deployment and old-row backfill decisions are documented in `docs/ranking-backfill-runbook.md`.
 - Remaining work: scheduler-driven ranking automation only after scheduler/deployment ownership is defined.
 - Risk level: MEDIUM.
 - Recommended next action: Gate G only after Gate E and F.
@@ -383,8 +383,9 @@ Consistency note:
 - Implemented files: `src/batch/final-tier-assignment-job.service.ts`, `src/batch/final-tier-assignment-job.types.ts`, `src/batch/batch-admin-runner.ts`, `scripts/admin-run-batch-job.ts`.
 - Source of truth: `docs/current-status.md`, `docs/home-api-contract.md`, `docs/batch-job-foundation.md`.
 - Existing tests: `src/batch/final-tier-assignment-job.service.spec.ts`, `src/batch/batch-admin-runner.spec.ts`, `src/home/home.service.spec.ts`.
-- Known limitations: no reward policy/catalog, external reward/payment/point/delivery fulfillment, provider ingestion, cron scheduler, HTTP batch execution API, ranking regeneration, or true competition tie rank because the current final ranking source persists deterministic unique sequential rank.
-- Remaining work: reward policy/catalog, external fulfillment handoff, and true tie-rank schema policy remain separate gates. Complex custom reward/tier policy parsing beyond clear tier rules is also a separate gate.
+- Implemented behavior: final tier policy is fixed at cumulative cutoffs `master` 4%, `diamond` 11%, `platinum` 23%, `gold` 40%, `silver` 70%, `bronze` 100%, with cutoff `ceil(totalParticipants * cumulativeRatio)` from final ranking rank. `Season.rewardPolicyJson` and reward policy/catalog do not override final tier cutoffs.
+- Known limitations: no reward policy/catalog, external reward/payment/point/delivery fulfillment, provider ingestion, cron scheduler, HTTP batch execution API, ranking regeneration, reward-policy-driven tier override, or true competition tie rank because the current final ranking source persists deterministic unique sequential rank.
+- Remaining work: reward policy/catalog, external fulfillment handoff, and true tie-rank schema policy remain separate gates.
 - Risk level: MEDIUM.
 - Recommended next action: run this after `season-settlement` for settled seasons that have final rankings, then run the separate `reward-grant` marker job when final assignments are ready.
 

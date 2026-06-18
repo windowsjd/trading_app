@@ -51,6 +51,7 @@ import {
   assertSeasonTradable,
   SeasonLifecycleError,
 } from '../seasons/season-lifecycle.policy';
+import { buildPagination, type Pagination } from '../common/pagination';
 import {
   assertAssetTradable,
   MarketHoursError,
@@ -142,12 +143,7 @@ type OrdersResponse = {
       side: OrderSide | null;
       assetId: string | null;
     };
-    pagination: {
-      limit: number;
-      offset: number;
-      total: number;
-      returned: number;
-    };
+    pagination: Pagination;
     orders: Array<{
       orderId: string;
       quoteId: string | null;
@@ -1187,14 +1183,14 @@ export class OrdersService {
       if (selection.decision.rejectedProviderReason === 'captured_at_stale') {
         this.throwApiError(
           HttpStatus.SERVICE_UNAVAILABLE,
-          'PROVIDER_PRICE_STALE',
+          'PRICE_STALE',
           'Provider asset price is stale.',
         );
       }
 
       this.throwApiError(
         HttpStatus.SERVICE_UNAVAILABLE,
-        'PROVIDER_PRICE_UNAVAILABLE',
+        'ASSET_PRICE_UNAVAILABLE',
         'Provider asset price is unavailable.',
       );
     }
@@ -1207,7 +1203,7 @@ export class OrdersService {
       if (priceChangeBps.gt(quote.maxChangeBps)) {
         this.throwApiError(
           HttpStatus.CONFLICT,
-          'PRICE_CHANGED_REQUOTE_REQUIRED',
+          'RATE_CHANGED_REQUOTE_REQUIRED',
           'Order price changed; requote is required.',
         );
       }
@@ -1445,7 +1441,7 @@ export class OrdersService {
     if (!position) {
       this.throwApiError(
         HttpStatus.CONFLICT,
-        'ORDER_POSITION_NOT_FOUND',
+        'INSUFFICIENT_QUANTITY',
         'Order position was not found.',
       );
     }
@@ -1614,7 +1610,7 @@ export class OrdersService {
     if (!wallet) {
       this.throwApiError(
         HttpStatus.CONFLICT,
-        'ORDER_CASH_WALLET_NOT_FOUND',
+        'INSUFFICIENT_BALANCE',
         'Order cash wallet was not found.',
       );
     }
@@ -1647,7 +1643,7 @@ export class OrdersService {
     if (!wallet) {
       this.throwApiError(
         HttpStatus.CONFLICT,
-        'ORDER_CASH_WALLET_NOT_FOUND',
+        'INSUFFICIENT_BALANCE',
         'Order cash wallet was not found.',
       );
     }
@@ -1678,7 +1674,7 @@ export class OrdersService {
     if (!wallet) {
       this.throwApiError(
         HttpStatus.CONFLICT,
-        'ORDER_CASH_WALLET_NOT_FOUND',
+        'INSUFFICIENT_BALANCE',
         'Order cash wallet was not found.',
       );
     }
@@ -1686,14 +1682,14 @@ export class OrdersService {
     if (wallet.balanceAmount.lt(input.amount)) {
       this.throwApiError(
         HttpStatus.CONFLICT,
-        'INSUFFICIENT_CASH_BALANCE',
+        'INSUFFICIENT_BALANCE',
         'Cash wallet balance is insufficient.',
       );
     }
 
     this.throwApiError(
       HttpStatus.CONFLICT,
-      'CONCURRENT_WALLET_UPDATE',
+      'CONFLICT',
       'Cash wallet was updated concurrently.',
     );
   }
@@ -1720,14 +1716,14 @@ export class OrdersService {
     if (!wallet) {
       this.throwApiError(
         HttpStatus.CONFLICT,
-        'ORDER_CASH_WALLET_NOT_FOUND',
+        'INSUFFICIENT_BALANCE',
         'Order cash wallet was not found.',
       );
     }
 
     this.throwApiError(
       HttpStatus.CONFLICT,
-      'CONCURRENT_WALLET_UPDATE',
+      'CONFLICT',
       'Cash wallet was updated concurrently.',
     );
   }
@@ -1808,7 +1804,7 @@ export class OrdersService {
     if (updateResult.count !== 1) {
       this.throwApiError(
         HttpStatus.CONFLICT,
-        'CONCURRENT_POSITION_UPDATE',
+        'CONFLICT',
         'Position was updated concurrently.',
       );
     }
@@ -1851,7 +1847,7 @@ export class OrdersService {
     if (!position) {
       this.throwApiError(
         HttpStatus.CONFLICT,
-        'ORDER_POSITION_NOT_FOUND',
+        'INSUFFICIENT_QUANTITY',
         'Order position was not found.',
       );
     }
@@ -1859,14 +1855,14 @@ export class OrdersService {
     if (position.quantity.lt(input.quantity)) {
       this.throwApiError(
         HttpStatus.CONFLICT,
-        'INSUFFICIENT_POSITION_QUANTITY',
+        'INSUFFICIENT_QUANTITY',
         'Position quantity is insufficient.',
       );
     }
 
     this.throwApiError(
       HttpStatus.CONFLICT,
-      'CONCURRENT_POSITION_UPDATE',
+      'CONFLICT',
       'Position was updated concurrently.',
     );
   }
@@ -3020,7 +3016,7 @@ export class OrdersService {
       if (!wallet || wallet.balanceAmount.lt(input.netAmount)) {
         this.throwApiError(
           HttpStatus.CONFLICT,
-          'INSUFFICIENT_CASH_BALANCE',
+          'INSUFFICIENT_BALANCE',
           'Cash wallet balance is insufficient.',
         );
       }
@@ -3043,7 +3039,7 @@ export class OrdersService {
     if (!position || position.quantity.lt(input.quantity)) {
       this.throwApiError(
         HttpStatus.CONFLICT,
-        'INSUFFICIENT_POSITION_QUANTITY',
+        'INSUFFICIENT_QUANTITY',
         'Position quantity is insufficient.',
       );
     }
@@ -3362,12 +3358,12 @@ export class OrdersService {
     total: number,
     returned: number,
   ) {
-    return {
+    return buildPagination({
       limit: query.limit,
       offset: query.offset,
       total,
       returned,
-    };
+    });
   }
 
   private formatSeason(season: OrdersSeason) {

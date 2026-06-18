@@ -882,6 +882,7 @@ describe('PositionsService', () => {
       offset: 1,
       total: 4,
       returned: 2,
+      nextOffset: 3,
     });
     expect(response.data.positions.map((item) => item.positionId)).toEqual([
       'position-d',

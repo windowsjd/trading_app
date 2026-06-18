@@ -83,7 +83,8 @@
       "limit": 50,
       "offset": 0,
       "total": 0,
-      "returned": 0
+      "returned": 0,
+      "nextOffset": null
     },
     "orders": [
       {
@@ -381,7 +382,7 @@ Same body as `POST /api/v1/orders/quote`.
   - buy executes only when selected price `<= limitPrice`.
   - sell executes only when selected price `>= limitPrice`.
   - `executedPrice` is the selected snapshot price, not the submitted `limitPrice`.
-- Market orders compare quote `quotedPrice` against execute price using `quote.maxChangeBps`; excessive movement returns `PRICE_CHANGED_REQUOTE_REQUIRED`.
+- Market orders compare quote `quotedPrice` against execute price using `quote.maxChangeBps`; excessive movement returns `RATE_CHANGED_REQUOTE_REQUIRED`.
 - USD orders debit or credit the USD wallet. FX is not used to convert wallet amounts.
 - USD orders select a fresh eligible provider_api USD/KRW snapshot for audit/KRW evidence and store `fxRateSnapshotId`.
 - If quote had `quotedRate`, USD FX movement beyond 30 bps returns `RATE_CHANGED_REQUOTE_REQUIRED`.
@@ -481,24 +482,18 @@ Same body as `POST /api/v1/orders/quote`.
 - `ORDER_NOT_EXECUTABLE`
 - `ORDER_EXECUTION_CONFLICT`
 - `ORDER_PRICE_UNAVAILABLE`
-- `PROVIDER_PRICE_UNAVAILABLE`
-- `PROVIDER_PRICE_STALE`
+- `ASSET_PRICE_UNAVAILABLE`
+- `PRICE_STALE`
 - `PROVIDER_RATE_UNAVAILABLE`
 - `PROVIDER_RATE_STALE`
-- `PRICE_CHANGED_REQUOTE_REQUIRED`
 - `RATE_CHANGED_REQUOTE_REQUIRED`
-- `EXECUTION_SOURCE_INELIGIBLE`
-- `EXECUTION_PROVIDER_REQUIRED`
+- `CONFLICT`
 - `QUOTE_REQUIRED`
 - `QUOTE_NOT_FOUND`
 - `QUOTE_NOT_ACTIVE`
 - `QUOTE_EXPIRED`
 - `QUOTE_MISMATCH`
 - `ORDER_LIMIT_NOT_MARKETABLE`
-- `ORDER_CASH_WALLET_NOT_FOUND`
-- `ORDER_POSITION_NOT_FOUND`
-- `CONCURRENT_WALLET_UPDATE`
-- `CONCURRENT_POSITION_UPDATE`
 - `ORDER_EXECUTION_TRANSACTION_FAILED`
 - `INVALID_IDEMPOTENCY_KEY`
 - `ORDER_IDEMPOTENCY_CONFLICT`
@@ -517,8 +512,8 @@ Same body as `POST /api/v1/orders/quote`.
 - `ASSET_PRICE_UNAVAILABLE`
 - `FX_RATE_UNAVAILABLE`
 - `FX_RATE_STALE`
-- `INSUFFICIENT_CASH_BALANCE`
-- `INSUFFICIENT_POSITION_QUANTITY`
+- `INSUFFICIENT_BALANCE`
+- `INSUFFICIENT_QUANTITY`
 - `INVALID_LIMIT`
 - `INVALID_OFFSET`
 

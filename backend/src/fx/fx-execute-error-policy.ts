@@ -47,6 +47,7 @@ export const fxExecuteErrorCodes = {
   RATE_CHANGED_REQUOTE_REQUIRED: 'RATE_CHANGED_REQUOTE_REQUIRED',
   EXECUTION_SOURCE_INELIGIBLE: 'EXECUTION_SOURCE_INELIGIBLE',
   EXECUTION_PROVIDER_REQUIRED: 'EXECUTION_PROVIDER_REQUIRED',
+  CONFLICT: 'CONFLICT',
   CONCURRENT_WALLET_UPDATE: 'CONCURRENT_WALLET_UPDATE',
   EXECUTE_TRANSACTION_FAILED: 'EXECUTE_TRANSACTION_FAILED',
   EXECUTE_WRITE_PATH_NOT_IMPLEMENTED: 'EXECUTE_WRITE_PATH_NOT_IMPLEMENTED',
@@ -237,6 +238,12 @@ export const fxExecuteErrorMetadata: Record<
     walletMutationAllowed: fxExecuteWalletMutationPolicy.no,
     defaultMessage: 'Provider execution source is required',
   },
+  CONFLICT: {
+    httpStatus: 409,
+    retryability: fxExecuteRetryability.retryable_only_with_idempotency_proof,
+    walletMutationAllowed: fxExecuteWalletMutationPolicy.no_new_mutation,
+    defaultMessage: 'Conflict',
+  },
   CONCURRENT_WALLET_UPDATE: {
     httpStatus: 409,
     retryability: fxExecuteRetryability.retryable_only_with_idempotency_proof,
@@ -280,13 +287,32 @@ export function getFxExecuteErrorMetadata(
 
 export function buildFxExecuteErrorEnvelope(
   code: FxExecuteErrorCode,
-  message = fxExecuteErrorMetadata[code].defaultMessage,
+  message?: string,
 ): FxExecuteErrorEnvelope {
+  const publicCode = mapFxExecutePublicErrorCode(code);
+
   return {
     success: false,
     error: {
-      code,
-      message,
+      code: publicCode,
+      message: message ?? fxExecuteErrorMetadata[publicCode].defaultMessage,
     },
   };
+}
+
+export function mapFxExecutePublicErrorCode(
+  code: FxExecuteErrorCode,
+): FxExecuteErrorCode {
+  switch (code) {
+    case fxExecuteErrorCodes.SOURCE_WALLET_NOT_FOUND:
+    case fxExecuteErrorCodes.TARGET_WALLET_NOT_FOUND:
+      return fxExecuteErrorCodes.INSUFFICIENT_BALANCE;
+    case fxExecuteErrorCodes.EXECUTION_SOURCE_INELIGIBLE:
+    case fxExecuteErrorCodes.EXECUTION_PROVIDER_REQUIRED:
+      return fxExecuteErrorCodes.PROVIDER_RATE_UNAVAILABLE;
+    case fxExecuteErrorCodes.CONCURRENT_WALLET_UPDATE:
+      return fxExecuteErrorCodes.CONFLICT;
+    default:
+      return code;
+  }
 }

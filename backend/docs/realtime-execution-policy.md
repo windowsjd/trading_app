@@ -57,7 +57,7 @@ abs(executeValue - quotedValue) / quotedValue * 10000
 ## 6. Market Order Policy
 
 - Market order는 execute 시점 provider price로 체결한다.
-- Quote 대비 max bps를 초과하면 `PRICE_CHANGED_REQUOTE_REQUIRED`로 거부한다.
+- Quote 대비 max bps를 초과하면 API 응답은 `RATE_CHANGED_REQUOTE_REQUIRED`로 거부한다.
 - 허용범위 이내면 quote price가 아니라 execute price를 저장한다.
 
 ## 7. Limit Order Policy
@@ -114,15 +114,13 @@ Quote requestHash는 SHA-256 canonical JSON이다. Order quote hash fields는 `u
 - `QUOTE_NOT_ACTIVE`
 - `QUOTE_EXPIRED`
 - `QUOTE_MISMATCH`
-- `PROVIDER_PRICE_UNAVAILABLE`
-- `PROVIDER_PRICE_STALE`
+- `ASSET_PRICE_UNAVAILABLE`
+- `PRICE_STALE`
 - `PROVIDER_RATE_UNAVAILABLE`
 - `PROVIDER_RATE_STALE`
-- `PRICE_CHANGED_REQUOTE_REQUIRED`
 - `RATE_CHANGED_REQUOTE_REQUIRED`
 - `ORDER_LIMIT_NOT_MARKETABLE`
-- `EXECUTION_SOURCE_INELIGIBLE`
-- `EXECUTION_PROVIDER_REQUIRED`
+- `CONFLICT`
 
 Quote/request mismatch 대상:
 

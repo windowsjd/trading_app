@@ -184,6 +184,7 @@ describe('RankingService', () => {
         offset: 0,
         total: 2,
         returned: 2,
+        nextOffset: null,
       },
       rankings: [
         {
@@ -302,6 +303,7 @@ describe('RankingService', () => {
       pagination: {
         total: 0,
         returned: 0,
+        nextOffset: null,
       },
       myRanking: {
         state: 'unavailable',

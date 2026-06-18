@@ -48,6 +48,11 @@
     - 외부 현금/포인트/쿠폰/기프티콘/결제/배송/provider API는 구현하지 않는다.
     - reward catalog/policy 확정, 외부 지급, scheduler reward 자동화는 future gate다.
   - Provider ingestion trigger API, batch run HTTP API는 구현하지 않음. Scheduler/Ops foundation은 disabled-by-default/dry-run-by-default 내부 기반만 존재하며 production cron 자동화와 scheduler 자동 write는 열지 않음.
+- API response alignment:
+  - 모든 목록 pagination response는 기존 `limit`, `offset`, `total`, `returned`를 유지하고 `nextOffset`을 추가한다.
+  - `nextOffset = offset + returned` when `offset + returned < total`; otherwise `null`.
+  - `/fx execute` 성공 응답은 기존 `sourceWalletBalanceAfter`/`targetWalletBalanceAfter`와 함께 `wallets.KRW`/`wallets.USD` post-balance를 항상 반환한다. failed/rollback 응답은 성공 응답처럼 `wallets`를 반환하지 않는다.
+  - 사용자 앱에 내려가는 주요 외부 error code는 revised API 기준으로 정리됨: cash 부족은 `INSUFFICIENT_BALANCE`, position 수량 부족은 `INSUFFICIENT_QUANTITY`, quote 대비 가격/환율 변화는 `RATE_CHANGED_REQUOTE_REQUIRED`, season missing은 `SEASON_NOT_FOUND`.
 - Crypto MVP policy changed to Binance-based USD-settled crypto.
   - Crypto uses USD Wallet like US stocks.
   - Crypto KRW valuation remains required for `totalAssetKrw`, ranking, home summary, snapshots, and final evaluation.
@@ -434,8 +439,10 @@ near-term ledger/FX foundation:
   - `final-tier-assignment` dry-run은 배정 계획과 `topAssignments`만 반환하고 DB write를 하지 않음.
   - final ranking이 없으면 fake fallback 없이 `FINAL_RANKING_UNAVAILABLE` job-level failure.
   - `ended` season은 `SETTLEMENT_REQUIRED`, `active`/`upcoming` season은 `SEASON_STATUS_NOT_ALLOWED`.
-  - 기본 MVP tier policy는 rank 1 `master`, 2-3 `diamond`, 4-10 `platinum`, top 30% `gold`, top 60% `silver`, 나머지 `bronze`.
-  - 명확한 `Season.rewardPolicyJson.tierPolicy.tiers`가 있으면 tier rule만 읽을 수 있고, 복잡하거나 불명확하면 `default_mvp` policy 사용. reward amount/badge/trophy/payment는 무시.
+  - 기본 MVP tier policy는 고정 누적 비율이다: `master` top 4%, `diamond` top 11%, `platinum` top 23%, `gold` top 40%, `silver` top 70%, `bronze` top 100%.
+  - tier cutoff는 `ceil(totalParticipants * cumulativeRatio)`로 계산하고 final ranking rank 기준으로 상위 tier부터 순차 배정한다. 예: 100명은 master 1-4, diamond 5-11, platinum 12-23, gold 24-40, silver 41-70, bronze 71-100.
+  - 참가자 수가 적어도 같은 cutoff 공식을 사용한다. 예: 10명은 master 1, diamond 2, platinum 3, gold 4, silver 5-7, bronze 8-10이고 1명은 master.
+  - `Season.rewardPolicyJson` 또는 reward policy/catalog 값은 final tier cutoff override로 사용하지 않는다. reward amount/badge/trophy/payment는 final-tier-assignment 범위에서 무시.
   - 이미 `finalRank` 또는 `finalTier` 중 하나라도 있으면 existing/skipped로 보고 overwrite하지 않음.
   - non-dry-run participant finalRank/finalTier update는 Prisma transaction 안에서 처리.
   - `rewardGrantedAt`은 업데이트하지 않고 reward/payment/badge/trophy row도 만들지 않음.
@@ -467,6 +474,10 @@ near-term ledger/FX foundation:
   - `SEASON_JOIN_DB_INTEGRATION=1` opt-in PostgreSQL integration spec가 active join participant/KRW wallet/USD wallet/initial_grant ledger 생성, duplicate/race conflict, inactive rejection, failure-injection rollback을 검증.
 - `exchange_transactions`: Prisma schema 반영, migration 생성/DB 적용 완료, `/fx execute` 1차 write path에서 생성.
 - `equity_snapshots`: Prisma schema 반영, migration 생성/DB 적용 완료, API/write path 미구현.
+- `season_rankings` tie-breaker migration `20260618090000_add_season_ranking_tiebreakers`는 `maxDrawdown`, `totalFillCount`, `reachedReturnAt`을 추가한다.
+  - 운영 적용은 `pnpm exec prisma migrate status`, `pnpm exec prisma validate`, `pnpm build`, 테스트 확인 후 배포 시 `pnpm exec prisma migrate deploy` 순서로 수행한다.
+  - 기존 row는 `maxDrawdown=0`, `totalFillCount=0`, `reachedReturnAt=null`일 수 있으며 API는 null-safe다. 과거 row의 정확한 tie-breaker 근거가 필요하면 운영 승인 후 ranking/settlement job 재실행 여부를 별도 절차로 결정하고 운영 DB 수동 update/delete는 금지한다.
+  - 자세한 절차와 리스크는 `docs/ranking-backfill-runbook.md`를 기준으로 한다.
 - `/fx` DB foundation 반영 완료: `fx_rate_snapshots`, `fx_execute_requests`, `exchange_transactions.fxRateSnapshotId`.
 - `/fx` migration 생성 및 로컬 DB 적용 완료: `20260501212120_add_fx_rate_and_execute_safety_tables`.
 - asset/price/position foundation 반영 완료: `assets`, `asset_price_snapshots`, `positions`.
@@ -702,6 +713,8 @@ near-term ledger/FX foundation:
   - 옵션: `--season-id`, `--ranking-date`, `--idempotency-key`, `--dry-run`, `--requested-by`.
   - idempotencyKey 기본값: `final-tier-assignment:<season-id>:<YYYY-MM-DD>`.
   - settled season + selected final rankingDate의 `rankType=final` `season_rankings`만 읽어 `SeasonParticipant.finalRank/finalTier`를 배정.
+  - tier policy는 고정 누적 비율이다: master 4%, diamond 11%, platinum 23%, gold 40%, silver 70%, bronze 100%; cutoff는 `ceil(totalParticipants * cumulativeRatio)`.
+  - `Season.rewardPolicyJson`은 final tier cutoff override로 읽지 않는다.
   - `dry-run`은 update 없이 `wouldAssign`, `existing`, policy source, `topAssignments`를 반환.
   - existing `finalRank`/`finalTier`는 overwrite하지 않고, 둘 중 하나라도 있으면 existing/skipped로 처리.
   - reward 지급, `rewardGrantedAt` 업데이트, provider ingestion/API 호출, cron scheduler, HTTP batch run API 없음.

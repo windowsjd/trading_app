@@ -20,6 +20,7 @@ import {
   presentSourceDecision,
   type PublicSourceMetadata,
 } from '../providers/source-metadata.presenter';
+import { buildPagination, type Pagination } from '../common/pagination';
 
 export type AssetsQuery = {
   assetType?: string;
@@ -124,12 +125,7 @@ type AssetsListResponse = {
   data: {
     state: 'available';
     filters: ReturnType<AssetsService['formatFilters']>;
-    pagination: {
-      limit: number;
-      offset: number;
-      total: number;
-      returned: number;
-    };
+    pagination: Pagination;
     assets: AssetListItem[];
     priceErrors: AssetPriceError[];
   };
@@ -837,12 +833,12 @@ export class AssetsService {
     total: number,
     returned: number,
   ) {
-    return {
+    return buildPagination({
       limit: query.limit,
       offset: query.offset,
       total,
       returned,
-    };
+    });
   }
 
   private formatFilters(query: ParsedAssetsQuery) {

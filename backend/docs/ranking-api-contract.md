@@ -6,6 +6,7 @@
 - The API does not calculate rankings, generate rankings, read daily snapshots for ad hoc ranking, or run scheduler/batch behavior.
 - Do not add fake ranking data or seed changes from this read API contract; persisted schema changes must go through explicit migrations.
 - Ranking rows now persist and expose tie-breaker evidence: `maxDrawdown`, `totalFillCount`, and `reachedReturnAt`.
+- Migration/backfill operations for existing tie-breaker rows are documented in `docs/ranking-backfill-runbook.md`.
 
 ## Source Rules
 - Ranking source of truth is `season_rankings`.
@@ -81,7 +82,8 @@ Operator-run daily ranking and final settlement ranking use the same persisted p
       "limit": 50,
       "offset": 0,
       "total": 100,
-      "returned": 50
+      "returned": 50,
+      "nextOffset": 50
     },
     "rankings": [
       {
@@ -131,7 +133,8 @@ When no current season exists, the selected season does not exist, or no ranking
       "limit": 50,
       "offset": 0,
       "total": 0,
-      "returned": 0
+      "returned": 0,
+      "nextOffset": null
     },
     "rankings": [],
     "myRanking": {

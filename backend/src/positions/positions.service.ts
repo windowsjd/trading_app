@@ -22,6 +22,7 @@ import {
   presentSourceDecision,
   type PublicSourceMetadata,
 } from '../providers/source-metadata.presenter';
+import { buildPagination, type Pagination } from '../common/pagination';
 
 export type PositionsQuery = {
   seasonId?: string;
@@ -158,12 +159,7 @@ type PositionsResponse = {
     season: ReturnType<PositionsService['formatSeason']> | null;
     participant: ReturnType<PositionsService['formatParticipant']> | null;
     filters: ReturnType<PositionsService['formatFilters']>;
-    pagination: {
-      limit: number;
-      offset: number;
-      total: number;
-      returned: number;
-    };
+    pagination: Pagination;
     positions: Array<
       Omit<PositionItemWithSort, 'quantitySortValue' | 'valuation'> & {
         valuation: PositionValuation['payload'];
@@ -1103,12 +1099,12 @@ export class PositionsService {
     total: number,
     returned: number,
   ) {
-    return {
+    return buildPagination({
       limit: query.limit,
       offset: query.offset,
       total,
       returned,
-    };
+    });
   }
 
   private formatSeason(season: PositionsSeason) {

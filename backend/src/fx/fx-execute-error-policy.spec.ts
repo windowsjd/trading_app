@@ -36,6 +36,7 @@ describe('fx execute error policy', () => {
     RATE_CHANGED_REQUOTE_REQUIRED: 409,
     EXECUTION_SOURCE_INELIGIBLE: 503,
     EXECUTION_PROVIDER_REQUIRED: 503,
+    CONFLICT: 409,
     CONCURRENT_WALLET_UPDATE: 409,
     EXECUTE_TRANSACTION_FAILED: 500,
     EXECUTE_WRITE_PATH_NOT_IMPLEMENTED: 501,
@@ -81,6 +82,7 @@ describe('fx execute error policy', () => {
       'RATE_CHANGED_REQUOTE_REQUIRED',
       'EXECUTION_SOURCE_INELIGIBLE',
       'EXECUTION_PROVIDER_REQUIRED',
+      'CONFLICT',
       'SOURCE_WALLET_NOT_FOUND',
       'TARGET_WALLET_NOT_FOUND',
       'INSUFFICIENT_BALANCE',
@@ -119,6 +121,31 @@ describe('fx execute error policy', () => {
       error: {
         code: 'FX_RATE_STALE',
         message: 'Custom stale message',
+      },
+    });
+  });
+
+  it('maps internal wallet and execution source errors to public API codes', () => {
+    expect(buildFxExecuteErrorEnvelope('SOURCE_WALLET_NOT_FOUND')).toEqual({
+      success: false,
+      error: {
+        code: 'INSUFFICIENT_BALANCE',
+        message: fxExecuteErrorMetadata.INSUFFICIENT_BALANCE.defaultMessage,
+      },
+    });
+    expect(buildFxExecuteErrorEnvelope('EXECUTION_PROVIDER_REQUIRED')).toEqual({
+      success: false,
+      error: {
+        code: 'PROVIDER_RATE_UNAVAILABLE',
+        message:
+          fxExecuteErrorMetadata.PROVIDER_RATE_UNAVAILABLE.defaultMessage,
+      },
+    });
+    expect(buildFxExecuteErrorEnvelope('CONCURRENT_WALLET_UPDATE')).toEqual({
+      success: false,
+      error: {
+        code: 'CONFLICT',
+        message: fxExecuteErrorMetadata.CONFLICT.defaultMessage,
       },
     });
   });

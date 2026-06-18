@@ -10,6 +10,7 @@ import {
   SeasonRankingType,
   SeasonStatus,
 } from '../generated/prisma/client';
+import { buildPagination, type Pagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 
 export type RecordsQuery = {
@@ -91,18 +92,8 @@ type ParsedMySeasonExchangesQuery = {
   offset: number;
 };
 
-type SectionPagination = {
-  limit: number;
-  offset: number;
-  total: number;
-  returned: number;
-};
-
-type ListPagination = {
-  limit: number;
-  offset: number;
-  returned: number;
-};
+type SectionPagination = Pagination;
+type ListPagination = Pagination;
 
 type SeasonRecordMetric = {
   totalAssetKrw: Prisma.Decimal;
@@ -474,7 +465,7 @@ export class RecordsService {
         data: {
           state: 'empty',
           seasons: [],
-          pagination: this.listPagination(parsedQuery, 0),
+          pagination: this.listPagination(parsedQuery, 0, 0),
           filters: {
             seasonStatus: parsedQuery.seasonStatus ?? null,
           },
@@ -584,7 +575,7 @@ export class RecordsService {
             walletTransactionCount: participant._count.walletTransactions,
           };
         }),
-        pagination: this.listPagination(parsedQuery, participants.length),
+        pagination: this.listPagination(parsedQuery, total, participants.length),
         filters: {
           seasonStatus: parsedQuery.seasonStatus ?? null,
         },
@@ -702,7 +693,7 @@ export class RecordsService {
             assetId: parsedQuery.assetId ?? null,
           },
           orders: [],
-          pagination: this.listPagination(parsedQuery, 0),
+          pagination: this.listPagination(parsedQuery, 0, 0),
           reason: 'SEASON_NOT_JOINED',
           message: 'Order records are available after joining the season.',
         },
@@ -715,39 +706,46 @@ export class RecordsService {
       ...(parsedQuery.side ? { side: parsedQuery.side } : {}),
       ...(parsedQuery.assetId ? { assetId: parsedQuery.assetId } : {}),
     };
-    const orders = await this.prisma.order.findMany({
-      where,
-      orderBy: [{ submittedAt: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
-      skip: parsedQuery.offset,
-      take: parsedQuery.limit,
-      select: {
-        id: true,
-        assetId: true,
-        side: true,
-        orderType: true,
-        status: true,
-        quantity: true,
-        limitPrice: true,
-        executedPrice: true,
-        currencyCode: true,
-        grossAmount: true,
-        feeAmount: true,
-        netAmount: true,
-        submittedAt: true,
-        executedAt: true,
-        canceledAt: true,
-        rejectedAt: true,
-        rejectReason: true,
-        asset: {
-          select: {
-            symbol: true,
-            name: true,
-            market: true,
-            assetType: true,
+    const [total, orders] = await Promise.all([
+      this.prisma.order.count({ where }),
+      this.prisma.order.findMany({
+        where,
+        orderBy: [
+          { submittedAt: 'desc' },
+          { createdAt: 'desc' },
+          { id: 'asc' },
+        ],
+        skip: parsedQuery.offset,
+        take: parsedQuery.limit,
+        select: {
+          id: true,
+          assetId: true,
+          side: true,
+          orderType: true,
+          status: true,
+          quantity: true,
+          limitPrice: true,
+          executedPrice: true,
+          currencyCode: true,
+          grossAmount: true,
+          feeAmount: true,
+          netAmount: true,
+          submittedAt: true,
+          executedAt: true,
+          canceledAt: true,
+          rejectedAt: true,
+          rejectReason: true,
+          asset: {
+            select: {
+              symbol: true,
+              name: true,
+              market: true,
+              assetType: true,
+            },
           },
         },
-      },
-    });
+      }),
+    ]);
 
     return {
       success: true,
@@ -782,7 +780,7 @@ export class RecordsService {
           rejectedAt: this.formatNullableDate(order.rejectedAt),
           rejectReason: order.rejectReason,
         })),
-        pagination: this.listPagination(parsedQuery, orders.length),
+        pagination: this.listPagination(parsedQuery, total, orders.length),
       },
     };
   }
@@ -814,7 +812,7 @@ export class RecordsService {
             toCurrency: parsedQuery.toCurrency ?? null,
           },
           exchanges: [],
-          pagination: this.listPagination(parsedQuery, 0),
+          pagination: this.listPagination(parsedQuery, 0, 0),
           reason: 'SEASON_NOT_JOINED',
           message: 'Exchange records are available after joining the season.',
         },
@@ -828,25 +826,32 @@ export class RecordsService {
         : {}),
       ...(parsedQuery.toCurrency ? { toCurrency: parsedQuery.toCurrency } : {}),
     };
-    const exchanges = await this.prisma.exchangeTransaction.findMany({
-      where,
-      orderBy: [{ executedAt: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
-      skip: parsedQuery.offset,
-      take: parsedQuery.limit,
-      select: {
-        id: true,
-        fromCurrency: true,
-        toCurrency: true,
-        sourceAmount: true,
-        grossTargetAmount: true,
-        feeRate: true,
-        feeAmount: true,
-        feeCurrency: true,
-        appliedRate: true,
-        netTargetAmount: true,
-        executedAt: true,
-      },
-    });
+    const [total, exchanges] = await Promise.all([
+      this.prisma.exchangeTransaction.count({ where }),
+      this.prisma.exchangeTransaction.findMany({
+        where,
+        orderBy: [
+          { executedAt: 'desc' },
+          { createdAt: 'desc' },
+          { id: 'asc' },
+        ],
+        skip: parsedQuery.offset,
+        take: parsedQuery.limit,
+        select: {
+          id: true,
+          fromCurrency: true,
+          toCurrency: true,
+          sourceAmount: true,
+          grossTargetAmount: true,
+          feeRate: true,
+          feeAmount: true,
+          feeCurrency: true,
+          appliedRate: true,
+          netTargetAmount: true,
+          executedAt: true,
+        },
+      }),
+    ]);
 
     return {
       success: true,
@@ -870,7 +875,7 @@ export class RecordsService {
           netTargetAmount: this.formatDecimal(exchange.netTargetAmount, 8),
           executedAt: exchange.executedAt.toISOString(),
         })),
-        pagination: this.listPagination(parsedQuery, exchanges.length),
+        pagination: this.listPagination(parsedQuery, total, exchanges.length),
       },
     };
   }
@@ -1625,12 +1630,12 @@ export class RecordsService {
     total: number,
     returned: number,
   ): SectionPagination {
-    return {
+    return buildPagination({
       limit: query.limit,
       offset: query.offset,
       total,
       returned,
-    };
+    });
   }
 
   private listPagination(
@@ -1638,13 +1643,15 @@ export class RecordsService {
       | ParsedMySeasonRecordsQuery
       | ParsedMySeasonOrdersQuery
       | ParsedMySeasonExchangesQuery,
+    total: number,
     returned: number,
   ): ListPagination {
-    return {
+    return buildPagination({
       limit: query.limit,
       offset: query.offset,
+      total,
       returned,
-    };
+    });
   }
 
   private emptyActivitySummary(): MySeasonRecordDetailResponse['data']['activitySummary'] {

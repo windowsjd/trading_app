@@ -377,6 +377,7 @@ describe('RecordsService', () => {
   };
 
   const mockSeasonOrderRecords = (prisma: ReturnType<typeof createPrisma>) => {
+    prisma.order.count.mockResolvedValueOnce(1);
     prisma.order.findMany.mockResolvedValueOnce([
       {
         id: 'order-1',
@@ -409,6 +410,7 @@ describe('RecordsService', () => {
   const mockSeasonExchangeRecords = (
     prisma: ReturnType<typeof createPrisma>,
   ) => {
+    prisma.exchangeTransaction.count.mockResolvedValueOnce(1);
     prisma.exchangeTransaction.findMany.mockResolvedValueOnce([
       {
         id: 'ex-1',
@@ -813,7 +815,9 @@ describe('RecordsService', () => {
       pagination: {
         limit: 50,
         offset: 0,
+        total: 1,
         returned: 1,
+        nextOffset: null,
       },
     });
     expect(prisma.seasonParticipant.findMany).toHaveBeenCalledWith(
@@ -896,7 +900,9 @@ describe('RecordsService', () => {
     expect(response.data.pagination).toEqual({
       limit: 100,
       offset: 5,
+      total: 1,
       returned: 0,
+      nextOffset: null,
     });
     expect(prisma.seasonParticipant.findMany).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -61,6 +61,7 @@ async function main() {
 
   try {
     await runCase('success write path', testSuccessWritePath);
+    await runCase('usd to krw success wallets field', testUsdToKrwSuccess);
     await runCase('succeeded duplicate replay', testSucceededDuplicateReplay);
     await runCase(
       'concurrent same idempotency key replay',
@@ -116,6 +117,7 @@ async function testSuccessWritePath() {
         targetWalletId: response.data.targetWalletId,
         sourceWalletBalanceAfter: response.data.sourceWalletBalanceAfter,
         targetWalletBalanceAfter: response.data.targetWalletBalanceAfter,
+        wallets: response.data.wallets,
         fxRateSnapshotId: response.data.fxRateSnapshotId,
       },
       {
@@ -132,6 +134,10 @@ async function testSuccessWritePath() {
         targetWalletId: scenario.targetWalletId,
         sourceWalletBalanceAfter: '1000.00000000',
         targetWalletBalanceAfter: '0.99900000',
+        wallets: {
+          KRW: '1000.00000000',
+          USD: '0.99900000',
+        },
         fxRateSnapshotId: scenario.snapshotId,
       },
     );
@@ -210,6 +216,31 @@ async function testSuccessWritePath() {
       false,
     );
     await expectNoEquitySnapshot(scenario);
+  } finally {
+    await cleanupScenario(scenario);
+  }
+}
+
+async function testUsdToKrwSuccess() {
+  const scenario = await createScenario('usd-to-krw-success', {
+    sourceCurrency: CurrencyCode.USD,
+    targetCurrency: CurrencyCode.KRW,
+    sourceBalance: '2.00000000',
+    targetBalance: '1000.00000000',
+  });
+
+  try {
+    const response = await executeSuccess(
+      scenario.userId,
+      buildUsdToKrwBody('usd-to-krw-success-key'),
+    );
+
+    assert.deepEqual(response.data.wallets, {
+      KRW: '1999.00000000',
+      USD: '1.00000000',
+    });
+    assert.equal(response.data.sourceWalletBalanceAfter, '1.00000000');
+    assert.equal(response.data.targetWalletBalanceAfter, '1999.00000000');
   } finally {
     await cleanupScenario(scenario);
   }
@@ -373,7 +404,7 @@ async function testConcurrentOverspend() {
     assert.equal(successes.length, 1);
     assert.equal(failures.length, 1);
     assert.ok(
-      ['INSUFFICIENT_BALANCE', 'CONCURRENT_WALLET_UPDATE'].includes(
+      ['INSUFFICIENT_BALANCE', 'CONFLICT'].includes(
         getErrorCode(failures[0].reason),
       ),
     );
@@ -396,7 +427,7 @@ async function testDbTransactionRollbackFailureInjection() {
     {
       label: 'source debit wallet missing after pending command',
       idempotencyKey: 'rollback-source-debit-wallet-missing-key',
-      expectedCode: 'SOURCE_WALLET_NOT_FOUND',
+      expectedCode: 'INSUFFICIENT_BALANCE',
       mode: 'source-debit-wallet-missing',
     },
     {
@@ -601,6 +632,15 @@ function buildKrwToUsdBody(idempotencyKey) {
     fromCurrency: CurrencyCode.KRW,
     toCurrency: CurrencyCode.USD,
     sourceAmount: '1000.00000000',
+    idempotencyKey,
+  };
+}
+
+function buildUsdToKrwBody(idempotencyKey) {
+  return {
+    fromCurrency: CurrencyCode.USD,
+    toCurrency: CurrencyCode.KRW,
+    sourceAmount: '1.00000000',
     idempotencyKey,
   };
 }

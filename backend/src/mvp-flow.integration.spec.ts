@@ -530,6 +530,10 @@ async function executeFxFlow() {
   assert.equal(executeResponse.success, true);
   assert.equal(executeResponse.data.sourceWalletBalanceAfter, '9000000.00000000');
   assert.equal(executeResponse.data.targetWalletBalanceAfter, '999.00000000');
+  assert.deepEqual(executeResponse.data.wallets, {
+    KRW: '9000000.00000000',
+    USD: '999.00000000',
+  });
   scenario.exchangeId = executeResponse.data.exchangeId;
 }
 

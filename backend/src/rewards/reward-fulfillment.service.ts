@@ -15,6 +15,7 @@ import {
   UserStatus,
 } from '../generated/prisma/client';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { buildPagination } from '../common/pagination';
 import { OperatorAuditService } from '../operator/operator-audit.service';
 import type { OperatorRequestContext } from '../operator/operator-account-management.service';
 import { hasOperatorRole } from '../operator/operator.guard';
@@ -187,16 +188,12 @@ export class RewardFulfillmentService {
       success: true,
       data: {
         items: items.map((item) => this.serializeFulfillment(item)),
-        pagination: {
+        pagination: buildPagination({
           limit: parsed.limit,
           offset: parsed.offset,
           total,
           returned: items.length,
-          nextOffset:
-            parsed.offset + items.length < total
-              ? parsed.offset + items.length
-              : null,
-        },
+        }),
       },
     };
   }

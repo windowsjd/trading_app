@@ -91,7 +91,9 @@ Authenticated user's season participation history.
     "pagination": {
       "limit": 50,
       "offset": 0,
-      "returned": 1
+      "total": 1,
+      "returned": 1,
+      "nextOffset": null
     },
     "filters": {
       "seasonStatus": null
@@ -253,7 +255,9 @@ Authenticated user's order history for one season.
     "pagination": {
       "limit": 50,
       "offset": 0,
-      "returned": 1
+      "total": 1,
+      "returned": 1,
+      "nextOffset": null
     }
   }
 }
@@ -321,7 +325,9 @@ Authenticated user's exchange history for one season.
     "pagination": {
       "limit": 50,
       "offset": 0,
-      "returned": 1
+      "total": 1,
+      "returned": 1,
+      "nextOffset": null
     }
   }
 }

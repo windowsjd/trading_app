@@ -2582,6 +2582,7 @@ describe('AppController (e2e)', () => {
       '/api/v1/rewards/me',
       () => {
         mockActiveUser();
+        prisma.$queryRaw.mockResolvedValueOnce([{ count: 0 }]);
         prisma.$queryRaw.mockResolvedValueOnce([]);
       },
       (body: Record<string, unknown>) => {
@@ -2590,6 +2591,11 @@ describe('AppController (e2e)', () => {
           data: {
             state: 'empty',
             items: [],
+            pagination: {
+              total: 0,
+              returned: 0,
+              nextOffset: null,
+            },
           },
         });
         expect(prisma.$queryRaw).toHaveBeenCalled();
@@ -2600,6 +2606,7 @@ describe('AppController (e2e)', () => {
       '/api/v1/badges/me',
       () => {
         mockActiveUser();
+        prisma.$queryRaw.mockResolvedValueOnce([{ count: 0 }]);
         prisma.$queryRaw.mockResolvedValueOnce([]);
       },
       (body: Record<string, unknown>) => {
@@ -2608,6 +2615,11 @@ describe('AppController (e2e)', () => {
           data: {
             state: 'empty',
             items: [],
+            pagination: {
+              total: 0,
+              returned: 0,
+              nextOffset: null,
+            },
           },
         });
         expect(prisma.$queryRaw).toHaveBeenCalled();

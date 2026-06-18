@@ -1,4 +1,5 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { buildPagination, type Pagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 
 export type RewardsQuery = {
@@ -40,6 +41,10 @@ type UserBadgeRow = {
   createdAt: Date;
 };
 
+type CountRow = {
+  count: number | bigint;
+};
+
 type RewardsResponse = {
   success: true;
   data: {
@@ -54,11 +59,7 @@ type RewardsResponse = {
       finalRank: number | null;
       finalTier: string | null;
     }>;
-    pagination: {
-      limit: number;
-      offset: number;
-      returned: number;
-    };
+    pagination: Pagination;
   };
 };
 
@@ -77,11 +78,7 @@ type BadgesResponse = {
       seasonName: string;
       awardedAt: string;
     }>;
-    pagination: {
-      limit: number;
-      offset: number;
-      returned: number;
-    };
+    pagination: Pagination;
   };
 };
 
@@ -105,29 +102,37 @@ export class RewardsService {
     }
 
     const parsedQuery = this.parseQuery(query);
-    const rows = await this.prisma.$queryRaw<RewardRow[]>`
-      SELECT
-        sr."season_id" AS "seasonId",
-        s."name" AS "seasonName",
-        sr."reward_type" AS "rewardType",
-        sr."reward_code" AS "rewardCode",
-        sr."reward_name" AS "rewardName",
-        sr."granted_at" AS "grantedAt",
-        sp."final_rank" AS "finalRank",
-        sp."final_tier" AS "finalTier",
-        sr."created_at" AS "createdAt"
-      FROM "season_rewards" sr
-      INNER JOIN "seasons" s ON s."id" = sr."season_id"
-      INNER JOIN "season_participants" sp ON sp."id" = sr."season_participant_id"
-      WHERE sr."user_id" = ${userId}
-      ORDER BY
-        sr."granted_at" DESC,
-        sr."created_at" DESC,
-        sr."season_id" ASC,
-        sr."reward_code" ASC
-      LIMIT ${parsedQuery.limit}
-      OFFSET ${parsedQuery.offset}
-    `;
+    const [countRows, rows] = await Promise.all([
+      this.prisma.$queryRaw<CountRow[]>`
+        SELECT COUNT(*)::int AS "count"
+        FROM "season_rewards" sr
+        WHERE sr."user_id" = ${userId}
+      `,
+      this.prisma.$queryRaw<RewardRow[]>`
+        SELECT
+          sr."season_id" AS "seasonId",
+          s."name" AS "seasonName",
+          sr."reward_type" AS "rewardType",
+          sr."reward_code" AS "rewardCode",
+          sr."reward_name" AS "rewardName",
+          sr."granted_at" AS "grantedAt",
+          sp."final_rank" AS "finalRank",
+          sp."final_tier" AS "finalTier",
+          sr."created_at" AS "createdAt"
+        FROM "season_rewards" sr
+        INNER JOIN "seasons" s ON s."id" = sr."season_id"
+        INNER JOIN "season_participants" sp ON sp."id" = sr."season_participant_id"
+        WHERE sr."user_id" = ${userId}
+        ORDER BY
+          sr."granted_at" DESC,
+          sr."created_at" DESC,
+          sr."season_id" ASC,
+          sr."reward_code" ASC
+        LIMIT ${parsedQuery.limit}
+        OFFSET ${parsedQuery.offset}
+      `,
+    ]);
+    const total = this.parseCount(countRows);
 
     return {
       success: true,
@@ -143,11 +148,12 @@ export class RewardsService {
           finalRank: row.finalRank,
           finalTier: row.finalTier,
         })),
-        pagination: {
+        pagination: buildPagination({
           limit: parsedQuery.limit,
           offset: parsedQuery.offset,
+          total,
           returned: rows.length,
-        },
+        }),
       },
     };
   }
@@ -165,30 +171,38 @@ export class RewardsService {
     }
 
     const parsedQuery = this.parseQuery(query);
-    const rows = await this.prisma.$queryRaw<UserBadgeRow[]>`
-      SELECT
-        b."id" AS "badgeId",
-        b."badge_type" AS "badgeType",
-        b."code" AS "code",
-        b."name" AS "name",
-        b."description" AS "description",
-        b."icon_url" AS "iconUrl",
-        ub."season_id" AS "seasonId",
-        s."name" AS "seasonName",
-        ub."awarded_at" AS "awardedAt",
-        ub."created_at" AS "createdAt"
-      FROM "user_badges" ub
-      INNER JOIN "badges" b ON b."id" = ub."badge_id"
-      INNER JOIN "seasons" s ON s."id" = ub."season_id"
-      WHERE ub."user_id" = ${userId}
-      ORDER BY
-        ub."awarded_at" DESC,
-        ub."created_at" DESC,
-        ub."season_id" ASC,
-        b."code" ASC
-      LIMIT ${parsedQuery.limit}
-      OFFSET ${parsedQuery.offset}
-    `;
+    const [countRows, rows] = await Promise.all([
+      this.prisma.$queryRaw<CountRow[]>`
+        SELECT COUNT(*)::int AS "count"
+        FROM "user_badges" ub
+        WHERE ub."user_id" = ${userId}
+      `,
+      this.prisma.$queryRaw<UserBadgeRow[]>`
+        SELECT
+          b."id" AS "badgeId",
+          b."badge_type" AS "badgeType",
+          b."code" AS "code",
+          b."name" AS "name",
+          b."description" AS "description",
+          b."icon_url" AS "iconUrl",
+          ub."season_id" AS "seasonId",
+          s."name" AS "seasonName",
+          ub."awarded_at" AS "awardedAt",
+          ub."created_at" AS "createdAt"
+        FROM "user_badges" ub
+        INNER JOIN "badges" b ON b."id" = ub."badge_id"
+        INNER JOIN "seasons" s ON s."id" = ub."season_id"
+        WHERE ub."user_id" = ${userId}
+        ORDER BY
+          ub."awarded_at" DESC,
+          ub."created_at" DESC,
+          ub."season_id" ASC,
+          b."code" ASC
+        LIMIT ${parsedQuery.limit}
+        OFFSET ${parsedQuery.offset}
+      `,
+    ]);
+    const total = this.parseCount(countRows);
 
     return {
       success: true,
@@ -205,11 +219,12 @@ export class RewardsService {
           seasonName: row.seasonName,
           awardedAt: row.awardedAt.toISOString(),
         })),
-        pagination: {
+        pagination: buildPagination({
           limit: parsedQuery.limit,
           offset: parsedQuery.offset,
+          total,
           returned: rows.length,
-        },
+        }),
       },
     };
   }
@@ -269,6 +284,10 @@ export class RewardsService {
     }
 
     return offset;
+  }
+
+  private parseCount(rows: readonly CountRow[]): number {
+    return Number(rows[0]?.count ?? 0);
   }
 
   private throwApiError(

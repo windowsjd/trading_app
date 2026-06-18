@@ -33,13 +33,19 @@ const ALLOWED_TIERS = [
   'silver',
   'bronze',
 ] as const;
+const FINAL_TIER_CUTOFF_RULES = [
+  { tier: 'master', cumulativeRatio: 0.04 },
+  { tier: 'diamond', cumulativeRatio: 0.11 },
+  { tier: 'platinum', cumulativeRatio: 0.23 },
+  { tier: 'gold', cumulativeRatio: 0.4 },
+  { tier: 'silver', cumulativeRatio: 0.7 },
+  { tier: 'bronze', cumulativeRatio: 1 },
+] as const satisfies readonly FinalTierCutoffRule[];
 
 type FinalTier = (typeof ALLOWED_TIERS)[number];
-type JsonRecord = Record<string, unknown>;
-type TierPolicyRule = {
+type FinalTierCutoffRule = {
   tier: FinalTier;
-  rule: string;
-  matches: (rank: number, totalParticipants: number) => boolean;
+  cumulativeRatio: number;
 };
 type ResolvedTierPolicy = {
   summary: FinalTierAssignmentPolicySummary;
@@ -107,7 +113,6 @@ export class FinalTierAssignmentJobService {
       select: {
         id: true,
         status: true,
-        rewardPolicyJson: true,
       },
     });
 
@@ -121,7 +126,7 @@ export class FinalTierAssignmentJobService {
 
     this.assertSeasonStatusAllowed(season.status);
 
-    const policy = this.resolveTierPolicy(season.rewardPolicyJson);
+    const policy = this.resolveTierPolicy();
     const rows = await this.findFinalRankingRows(seasonId, rankingDate);
     const result = this.createBaseResult({
       seasonId,
@@ -287,203 +292,34 @@ export class FinalTierAssignmentJobService {
     };
   }
 
-  private resolveTierPolicy(
-    rewardPolicyJson: Prisma.JsonValue | null,
-  ): ResolvedTierPolicy {
-    const customRules = this.parseSeasonRewardTierPolicy(rewardPolicyJson);
-
-    if (customRules) {
-      return {
-        summary: {
-          source: 'season_reward_policy',
-          tiers: customRules.map((rule) => ({
-            tier: rule.tier,
-            rule: rule.rule,
-          })),
-        },
-        assignTier: (rank, totalParticipants) =>
-          this.assignTierFromRules(customRules, rank, totalParticipants),
-      };
-    }
-
-    const defaultTiers: FinalTierAssignmentPolicyTier[] = [
-      { tier: 'master', rule: 'rank == 1' },
-      { tier: 'diamond', rule: 'rank <= 3' },
-      { tier: 'platinum', rule: 'rank <= 10' },
-      { tier: 'gold', rule: 'rank / totalParticipants <= 0.30' },
-      { tier: 'silver', rule: 'rank / totalParticipants <= 0.60' },
-      { tier: 'bronze', rule: 'fallback' },
-    ];
-
+  private resolveTierPolicy(): ResolvedTierPolicy {
     return {
       summary: {
         source: 'default_mvp',
-        tiers: defaultTiers,
+        tiers: FINAL_TIER_CUTOFF_RULES.map((rule) => ({
+          tier: rule.tier,
+          cumulativeRatio: rule.cumulativeRatio,
+          rule: `rank <= ceil(totalParticipants * ${rule.cumulativeRatio})`,
+        })),
       },
       assignTier: (rank, totalParticipants) => {
-        if (rank === 1) {
-          return 'master';
-        }
-
-        if (rank <= 3) {
-          return 'diamond';
-        }
-
-        if (rank <= 10) {
-          return 'platinum';
-        }
-
-        const percentage = rank / totalParticipants;
-        if (percentage <= 0.3) {
-          return 'gold';
-        }
-
-        if (percentage <= 0.6) {
-          return 'silver';
-        }
-
-        return 'bronze';
+        return this.assignTierFromCumulativeCutoffs(rank, totalParticipants);
       },
     };
   }
 
-  private parseSeasonRewardTierPolicy(
-    rewardPolicyJson: Prisma.JsonValue | null,
-  ): TierPolicyRule[] | null {
-    const root = this.asRecord(rewardPolicyJson);
-    if (!root) {
-      return null;
-    }
-
-    const policy = this.asRecord(root.tierPolicy) ?? root;
-    const tiers = Array.isArray(policy.tiers) ? policy.tiers : null;
-    if (!tiers || tiers.length === 0) {
-      return null;
-    }
-
-    const rules: TierPolicyRule[] = [];
-    let hasFallback = false;
-
-    for (const entry of tiers) {
-      const record = this.asRecord(entry);
-      const tier = this.parseTier(record?.tier);
-      if (!record || !tier) {
-        return null;
-      }
-
-      const rankEquals = this.parsePositiveInteger(
-        record.rank ?? record.rankEquals ?? record.exactRank,
-      );
-      const maxRank = this.parsePositiveInteger(
-        record.maxRank ?? record.rankMax,
-      );
-      const maxPercent = this.parsePositiveFraction(
-        record.maxPercent ?? record.percentMax ?? record.maxPercentile,
-      );
-      const fallback = record.fallback === true || record.rule === 'fallback';
-      const activeRules = [
-        rankEquals !== null,
-        maxRank !== null,
-        maxPercent !== null,
-        fallback,
-      ].filter(Boolean).length;
-
-      if (activeRules !== 1) {
-        return null;
-      }
-
-      if (rankEquals !== null) {
-        rules.push({
-          tier,
-          rule: `rank == ${rankEquals}`,
-          matches: (rank) => rank === rankEquals,
-        });
-        continue;
-      }
-
-      if (maxRank !== null) {
-        rules.push({
-          tier,
-          rule: `rank <= ${maxRank}`,
-          matches: (rank) => rank <= maxRank,
-        });
-        continue;
-      }
-
-      if (maxPercent !== null) {
-        rules.push({
-          tier,
-          rule: `rank / totalParticipants <= ${maxPercent.toFixed(2)}`,
-          matches: (rank, totalParticipants) =>
-            rank / totalParticipants <= maxPercent,
-        });
-        continue;
-      }
-
-      hasFallback = true;
-      rules.push({
-        tier,
-        rule: 'fallback',
-        matches: () => true,
-      });
-    }
-
-    return hasFallback ? rules : null;
-  }
-
-  private assignTierFromRules(
-    rules: readonly TierPolicyRule[],
+  private assignTierFromCumulativeCutoffs(
     rank: number,
     totalParticipants: number,
   ): FinalTier {
-    return (
-      rules.find((rule) => rule.matches(rank, totalParticipants))?.tier ??
-      'bronze'
-    );
-  }
-
-  private parseTier(value: unknown): FinalTier | null {
-    if (typeof value !== 'string') {
-      return null;
+    for (const rule of FINAL_TIER_CUTOFF_RULES) {
+      const cutoff = Math.ceil(totalParticipants * rule.cumulativeRatio);
+      if (rank <= cutoff) {
+        return rule.tier;
+      }
     }
 
-    const tier = value.trim().toLowerCase();
-    return this.isFinalTier(tier) ? tier : null;
-  }
-
-  private isFinalTier(value: string): value is FinalTier {
-    return ALLOWED_TIERS.some((tier) => tier === value);
-  }
-
-  private asRecord(value: unknown): JsonRecord | null {
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-      return null;
-    }
-
-    return value as JsonRecord;
-  }
-
-  private parsePositiveInteger(value: unknown): number | null {
-    if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {
-      return null;
-    }
-
-    return value;
-  }
-
-  private parsePositiveFraction(value: unknown): number | null {
-    const parsed =
-      typeof value === 'number'
-        ? value
-        : typeof value === 'string'
-          ? Number(value)
-          : Number.NaN;
-
-    if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 1) {
-      return null;
-    }
-
-    return parsed;
+    return 'bronze';
   }
 
   private assertSeasonStatusAllowed(status: SeasonStatus) {
