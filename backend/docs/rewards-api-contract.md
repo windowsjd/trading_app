@@ -4,7 +4,7 @@
 
 - `GET /api/v1/rewards/me` read-only MVP is implemented.
 - `GET /api/v1/badges/me` read-only MVP is implemented.
-- Reward rows are created by the operator-run `reward-grant` internal foundation job for settled seasons with `finalRank` and `finalTier`.
+- The operator-run `reward-grant` job is disabled until a Reward Policy / Catalog gate opens. It fails closed with `REWARD_POLICY_GATE_CLOSED` and does not create reward rows, badge rows, user badge rows, or participant reward markers.
 - Internal reward fulfillment operator/admin APIs are implemented. Fulfillment requests are queued separately from `SeasonReward` and create a `SeasonReward` only when fulfilled.
 - This contract covers in-app reward/badge/trophy history only.
 - Actual payment, points, coupon, gifticon, delivery, cash-out, and external fulfillment APIs are not implemented.
@@ -363,15 +363,9 @@ Create/fulfill/cancel success audit rows are written in the same transaction as 
 - `INVALID_LIMIT`
 - `INVALID_OFFSET`
 
-## Current Internal Reward Policy
+## Reward Policy Status
 
-- Tier badge, one per final-assigned participant:
-  - `master` -> `TIER_MASTER` / `마스터 뱃지`
-  - `diamond` -> `TIER_DIAMOND` / `다이아 뱃지`
-  - `platinum` -> `TIER_PLATINUM` / `플래티넘 뱃지`
-  - `gold` -> `TIER_GOLD` / `골드 뱃지`
-  - `silver` -> `TIER_SILVER` / `실버 뱃지`
-  - `bronze` -> `TIER_BRONZE` / `브론즈 뱃지`
-- TOP10 trophy:
-  - `finalRank <= 10` -> `TROPHY_TOP10` / `TOP 10 트로피`
-- TOP1/TOP3 trophy variants are not implemented.
+- No automatic reward-grant catalog is active.
+- `reward-grant` fails closed with `REWARD_POLICY_GATE_CLOSED` until Reward Policy / Catalog is defined.
+- Hardcoded tier reward, badge, and trophy writes are not part of the current backend.
+- Operator/admin internal fulfillment can still create explicit `SeasonReward` rows when a fulfillment request is fulfilled.

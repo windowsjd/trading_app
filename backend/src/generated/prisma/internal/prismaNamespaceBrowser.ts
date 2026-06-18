@@ -298,6 +298,7 @@ export const PositionScalarFieldEnum = {
   averageCost: 'averageCost',
   currencyCode: 'currencyCode',
   realizedPnl: 'realizedPnl',
+  realizedPnlKrw: 'realizedPnlKrw',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -616,4 +617,3 @@ export const JsonNullValueFilter = {
 } as const
 
 export type JsonNullValueFilter = (typeof JsonNullValueFilter)[keyof typeof JsonNullValueFilter]
-

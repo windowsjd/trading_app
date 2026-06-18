@@ -44,6 +44,11 @@ export type FinalTierAssignmentTopAssignment = {
   userId: string;
   finalRank: number;
   finalTier: string;
+  existingFinalRank: number | null;
+  existingFinalTier: string | null;
+  computedFinalTier: string;
+  willAssign: boolean;
+  skipReason: 'FINAL_RESULT_ALREADY_EXISTS' | null;
   totalAssetKrw: string;
   returnRate: string;
 };

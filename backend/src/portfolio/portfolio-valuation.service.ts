@@ -60,6 +60,7 @@ export class PortfolioValuationService {
             averageCost: true,
             currencyCode: true,
             realizedPnl: true,
+            realizedPnlKrw: true,
             asset: {
               select: {
                 id: true,
@@ -88,6 +89,7 @@ export class PortfolioValuationService {
         averageCost: position.averageCost,
         currencyCode: position.currencyCode,
         realizedPnl: position.realizedPnl,
+        realizedPnlKrw: position.realizedPnlKrw,
         latestPriceSnapshot: await this.findLatestEligibleAssetPriceSnapshot(
           position.asset,
           valuationAt,
@@ -105,7 +107,7 @@ export class PortfolioValuationService {
       participant.positions.some(
         (position) =>
           position.currencyCode === CurrencyCode.USD &&
-          (!position.quantity.eq(0) || !position.realizedPnl.eq(0)),
+          !position.quantity.eq(0),
       );
 
     const usdKrwSnapshot = needsUsdConversion

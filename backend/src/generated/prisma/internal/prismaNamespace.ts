@@ -2521,6 +2521,7 @@ export const PositionScalarFieldEnum = {
   averageCost: 'averageCost',
   currencyCode: 'currencyCode',
   realizedPnl: 'realizedPnl',
+  realizedPnlKrw: 'realizedPnlKrw',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const

@@ -1,6 +1,9 @@
 import type { BatchRunJobResponse } from './batch.types';
 
 export const REWARD_GRANT_JOB_NAME = 'reward-grant';
+export const REWARD_POLICY_GATE_CLOSED = 'REWARD_POLICY_GATE_CLOSED';
+export const REWARD_POLICY_GATE_CLOSED_MESSAGE =
+  'Reward policy/catalog gate is not implemented yet; reward-grant is disabled to prevent hardcoded reward creation.';
 
 export type RewardGrantJobInput = {
   seasonId?: string;
@@ -19,7 +22,7 @@ export type RewardGrantJobRequestPayload = {
 };
 
 export type RewardGrantPolicySummary = {
-  source: 'internal_reward_foundation_mvp';
+  source: 'reward_policy_catalog_gate_closed';
   description: string;
   rewardPolicyJsonAvailable: boolean;
 };
@@ -73,7 +76,7 @@ export type RewardGrantError = {
 };
 
 export type RewardGrantJobResult = {
-  seasonId: string;
+  seasonId: string | null;
   dryRun: boolean;
   grantTimestamp: string;
   grantDate: string | null;

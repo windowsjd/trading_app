@@ -183,7 +183,7 @@
     - Scheduler/Ops foundation is implemented with `OpsJobName`, `OpsJobRunStatus`, `OpsJobTrigger`, `ops_job_runs`, `ops_job_locks`, internal lock/run/runner/scheduler services, and public-safe `/readiness`.
     - Scheduler env defaults are disabled: `SCHEDULER_ENABLED=false`, all individual `SCHEDULER_*_ENABLED=false` flags, and `SCHEDULER_TICK_INTERVAL_MS=60000`. No secret scheduler env was added.
     - Internal daily snapshot ops runner can call `DailyPortfolioSnapshotJobService` with lock/audit/dryRun support. Scheduler calls remain dry-run-by-default; real automatic writes require a future Production Scheduler Ownership Gate.
-    - Provider FX/Binance ingestion, ranking generation, settlement, and reward marker scheduler runners remain explicit `skipped/NOT_IMPLEMENTED` placeholders. These skipped rows are not completed business automation or fake success.
+    - Provider FX/Binance ingestion, ranking generation, settlement, and reward-grant scheduler runners remain explicit `skipped/NOT_IMPLEMENTED` placeholders. These skipped rows are not completed business automation or fake success.
     - Provider ingestion HTTP trigger APIs, batch HTTP APIs, KIS order/account APIs, Binance authenticated APIs, external reward fulfillment APIs, and real trading/account integrations remain closed. Admin user restore/status and internal DB reward fulfillment were opened later in the 2026-06-09 gate.
   - Backend P0 return-rate, season lifecycle, and market-hours gate on 2026-06-18 KST:
     - Return-rate values are percentage values everywhere while the DB column name remains unchanged. Formula is `(totalAssetKrw - initialCapitalKrw) / initialCapitalKrw * 100`; existing ratio-scale persisted rows require an explicit operator backfill outside this code gate.
@@ -437,6 +437,7 @@ near-term ledger/FX foundation:
   - `final-tier-assignment`는 settled season의 특정 `rankingDate` `rankType=final` `season_rankings`를 source of truth로 읽어 `SeasonParticipant.finalRank`와 `finalTier`만 배정.
   - `final-tier-assignment` idempotencyKey 기본값은 `final-tier-assignment:<season-id>:<YYYY-MM-DD>`이며 명시 key도 허용.
   - `final-tier-assignment` dry-run은 배정 계획과 `topAssignments`만 반환하고 DB write를 하지 않음.
+  - `topAssignments`는 `existingFinalRank`, `existingFinalTier`, `computedFinalTier`, `willAssign`, `skipReason`을 포함하며, 기존 final result field가 하나라도 있으면 `skipReason=FINAL_RESULT_ALREADY_EXISTS`.
   - final ranking이 없으면 fake fallback 없이 `FINAL_RANKING_UNAVAILABLE` job-level failure.
   - `ended` season은 `SETTLEMENT_REQUIRED`, `active`/`upcoming` season은 `SEASON_STATUS_NOT_ALLOWED`.
   - 기본 MVP tier policy는 고정 누적 비율이다: `master` top 4%, `diamond` top 11%, `platinum` top 23%, `gold` top 40%, `silver` top 70%, `bronze` top 100%.
@@ -448,22 +449,16 @@ near-term ledger/FX foundation:
   - `rewardGrantedAt`은 업데이트하지 않고 reward/payment/badge/trophy row도 만들지 않음.
   - provider ingestion/API 호출, cron scheduler 등록, price/FX/wallet/order/position/snapshot/ranking row 생성/수정/삭제, HTTP batch 실행 API를 수행하지 않음.
   - Home settled final-result read model은 배정된 `finalTier`를 read-only로 available 표시할 수 있음. 없으면 `FINAL_TIER_UNAVAILABLE` 유지.
-  - `reward-grant`는 operator-run internal reward foundation MVP job이며 cron scheduler가 아님.
-  - `reward-grant`는 settled season에서 `finalRank`와 `finalTier`가 모두 배정된 participant를 기준으로 `SeasonParticipant.rewardGrantedAt` marker와 내부 `badges`/`user_badges`/`season_rewards` row를 보장함.
+  - `reward-grant`는 operator-run gate-closed job이며 cron scheduler가 아님.
+  - `reward-grant`는 Reward Policy / Catalog gate가 정의되기 전까지 dry-run/non-dry-run 모두 `REWARD_POLICY_GATE_CLOSED`로 fail closed 처리.
   - `reward-grant` idempotencyKey 기본값은 `reward-grant:<season-id>`이며, `--grant-date <YYYY-MM-DD>`를 사용하면 `reward-grant:<season-id>:<YYYY-MM-DD>`. 명시 key도 허용.
-  - `grantDate`가 있으면 marker timestamp는 `<YYYY-MM-DD>T00:00:00.000Z`, 없으면 batch run `startedAt`.
-  - 기본 내부 보상 정책은 finalTier별 tier badge 1개(`TIER_MASTER`, `TIER_DIAMOND`, `TIER_PLATINUM`, `TIER_GOLD`, `TIER_SILVER`, `TIER_BRONZE`)와 `finalRank <= 10` participant의 `TROPHY_TOP10` 1개.
-  - `reward-grant` dry-run은 marker grant 가능 대상, existing, ineligible/skipped, 내부 reward/user badge row would-create/existing count, `topGranted`/`topRewards` preview를 반환하고 DB write를 하지 않음.
-  - 이미 `rewardGrantedAt`이 있으면 timestamp를 overwrite하지 않음.
-  - 기존 marker가 있는 participant의 내부 reward/user badge row가 없으면 기존 marker timestamp를 `grantedAt`/`awardedAt`으로 사용해 idempotent backfill 가능.
-  - `Badge` row는 `code`, `UserBadge` row는 `userId + badgeId + seasonId`, `SeasonReward` row는 `seasonParticipantId + rewardCode` 기준으로 idempotent하게 보장함.
-  - `finalRank` 또는 `finalTier`가 없으면 ineligible/skipped. 아무도 둘 다 없으면 `FINAL_TIER_ASSIGNMENT_REQUIRED` job-level failure.
-  - `ended` season은 `SETTLEMENT_REQUIRED`, `active`/`upcoming` season은 `SEASON_STATUS_NOT_ALLOWED`.
-  - non-dry-run marker update와 내부 reward/badge/trophy foundation row write는 Prisma transaction 안에서 처리.
-  - `Season.rewardPolicyJson`의 reward amount/payment/point/badge/trophy fulfillment 설정은 해석하지 않음.
+  - failure payload는 `policy.source=reward_policy_catalog_gate_closed`, zero participant/reward/userBadge count, empty preview arrays, `errors[]`의 `REWARD_POLICY_GATE_CLOSED`를 포함.
+  - `reward-grant`는 settled participant eligibility를 읽지 않고 `Season.rewardPolicyJson`도 해석하지 않음.
+  - `SeasonParticipant.rewardGrantedAt`, `badges`, `user_badges`, `season_rewards`를 생성/수정/backfill하지 않음.
+  - hardcoded reward/badge/trophy catalog write policy는 제거됨.
   - reward amount 계산, 실제 payment/point/배송/외부 fulfillment는 구현하지 않음.
   - provider ingestion/API 호출, cron scheduler 등록, price/FX/wallet/order/position/snapshot/ranking/finalTier row 생성/수정/삭제, HTTP batch 실행 API를 수행하지 않음.
-  - Home settled final-result read model은 `rewardGrantedAt`이 있으면 `finalResult.reward.state=granted`를 read-only로 표시할 수 있음. 없으면 `REWARD_NOT_GRANTED` 유지.
+  - Home settled final-result read model은 기존 `rewardGrantedAt` 값이 있으면 `finalResult.reward.state=granted`를 read-only로 표시할 수 있음. 없으면 `REWARD_NOT_GRANTED` 유지.
   - `GET /api/v1/rewards/me`와 `GET /api/v1/badges/me`는 내부 reward/badge history를 read-only로 조회함.
   - 실제 cron scheduler, provider ingestion, actual reward/payment/point/delivery/external fulfillment는 아직 없음.
   - admin 권한 모델이 없으므로 batch 실행 HTTP API는 만들지 않음.
@@ -478,6 +473,9 @@ near-term ledger/FX foundation:
   - 운영 적용은 `pnpm exec prisma migrate status`, `pnpm exec prisma validate`, `pnpm build`, 테스트 확인 후 배포 시 `pnpm exec prisma migrate deploy` 순서로 수행한다.
   - 기존 row는 `maxDrawdown=0`, `totalFillCount=0`, `reachedReturnAt=null`일 수 있으며 API는 null-safe다. 과거 row의 정확한 tie-breaker 근거가 필요하면 운영 승인 후 ranking/settlement job 재실행 여부를 별도 절차로 결정하고 운영 DB 수동 update/delete는 금지한다.
   - 자세한 절차와 리스크는 `docs/ranking-backfill-runbook.md`를 기준으로 한다.
+- `positions.realized_pnl_krw` migration `20260618120000_add_position_realized_pnl_krw`는 `positions`에 stored KRW realized PnL column을 추가한다.
+  - 새 sell execute는 KRW 자산의 realized PnL delta를 그대로, USD 자산의 realized PnL delta를 execution USD/KRW rate로 환산해 `positions.realizedPnlKrw`에 누적한다.
+  - 기존 row는 DB default `0`이며 자동 historical backfill은 수행하지 않는다. 과거 USD sell의 execution FX 근거가 필요하면 별도 운영 승인/backfill 설계가 필요하다.
 - `/fx` DB foundation 반영 완료: `fx_rate_snapshots`, `fx_execute_requests`, `exchange_transactions.fxRateSnapshotId`.
 - `/fx` migration 생성 및 로컬 DB 적용 완료: `20260501212120_add_fx_rate_and_execute_safety_tables`.
 - asset/price/position foundation 반영 완료: `assets`, `asset_price_snapshots`, `positions`.
@@ -526,7 +524,7 @@ near-term ledger/FX foundation:
   - USD order는 USD wallet debit/credit을 사용하고, audit consistency용 approved fresh `admin_manual` USD/KRW snapshot id를 저장.
   - KRW order는 `fxRateSnapshotId = null`.
   - buy는 guarded cash wallet debit, position create/update, `order_buy` wallet transaction, guarded executed finalization 수행.
-  - sell은 guarded position decrement, realizedPnl update, cash wallet credit, `order_sell` wallet transaction, guarded executed finalization 수행.
+  - sell은 guarded position decrement, realizedPnl/realizedPnlKrw update, cash wallet credit, `order_sell` wallet transaction, guarded executed finalization 수행.
   - wallet mutation, position mutation, wallet transaction create, order finalization은 단일 Prisma transaction 안에서 처리.
   - create idempotency용 `responsePayloadJson`은 execute replay에 사용하지 않음.
   - exact execute response replay, partial fill, matching engine, settlement, provider/scheduler, separate fee wallet transaction row 없음.
@@ -554,13 +552,13 @@ near-term ledger/FX foundation:
   - daily season cycle batch job: `src/batch/daily-season-cycle-job.service.ts`, `scripts/admin-run-batch-job.ts --job daily-season-cycle`.
   - season settlement MVP batch job: `src/batch/season-settlement-job.service.ts`, `scripts/admin-run-batch-job.ts --job season-settlement`.
   - final tier assignment MVP batch job: `src/batch/final-tier-assignment-job.service.ts`, `scripts/admin-run-batch-job.ts --job final-tier-assignment`.
-  - internal reward foundation MVP batch job: `src/batch/reward-grant-job.service.ts`, `scripts/admin-run-batch-job.ts --job reward-grant`.
+  - reward-grant gate-closed batch job: `src/batch/reward-grant-job.service.ts`, `scripts/admin-run-batch-job.ts --job reward-grant`.
   - CLI는 dry-run/non-dry-run을 지원하며 seed/fake/static/sample business data를 생성하지 않음.
 
 ## 6. 현재 미도입 DB 상태
 
 - Prisma schema/migration 기준 현재 문서화된 내부 reward/badge/trophy 조회 foundation 테이블과 internal reward fulfillment request queue/status 테이블은 구현됨.
-- Batch job run/lock 기록 foundation과 operator-run daily portfolio snapshot/season ranking/daily season cycle/season settlement/final tier assignment/reward grant internal foundation MVP job은 구현 완료. 단, 실제 cron scheduler, provider ingestion job, ranking overwrite/regeneration job, external reward/payment/point/coupon/gifticon/delivery fulfillment job은 아직 미구현.
+- Batch job run/lock 기록 foundation과 operator-run daily portfolio snapshot/season ranking/daily season cycle/season settlement/final tier assignment/reward-grant gate-closed job은 구현 완료. 단, 실제 cron scheduler, provider ingestion job, ranking overwrite/regeneration job, Reward Policy / Catalog 기반 reward-grant write path, external reward/payment/point/coupon/gifticon/delivery fulfillment job은 아직 미구현.
 - order execution full-fill MVP와 position mutation 1차 write path, durable quote-bound quote/create/execute path는 구현 완료. 단, exact replay, partial fill, matching engine, provider ingestion scheduler/job, settlement extension API, scheduler 기반 자동 daily valuation/ranking 생성 경로는 아직 미구현.
 
 ## 7. 완료된 문서/설계 상태
@@ -656,7 +654,7 @@ near-term ledger/FX foundation:
   - monetary scale 8, returnRate scale 8 기준 formatting.
   - `totalAssetKrw = krwCash + usdCashKrw + assetValueKrw`.
   - `returnRate = (totalAssetKrw - initialCapitalKrw) / initialCapitalKrw * 100`.
-  - `realizedPnlKrw`는 positions.realizedPnl 합산 후 USD 자산은 USD/KRW 환산.
+  - `realizedPnlKrw`는 stored `positions.realizedPnlKrw` 합산값이며 sell execution 시점 FX로 고정된다. 현재 valuation FX로 재환산하지 않는다.
   - `unrealizedPnlKrw`는 `(currentPrice - averageCost) * quantity` 후 USD 자산은 USD/KRW 환산.
   - initialCapitalKrw가 0 이하이면 error.
   - price snapshot이 없으면 fake price 없이 error.
@@ -716,6 +714,7 @@ near-term ledger/FX foundation:
   - tier policy는 고정 누적 비율이다: master 4%, diamond 11%, platinum 23%, gold 40%, silver 70%, bronze 100%; cutoff는 `ceil(totalParticipants * cumulativeRatio)`.
   - `Season.rewardPolicyJson`은 final tier cutoff override로 읽지 않는다.
   - `dry-run`은 update 없이 `wouldAssign`, `existing`, policy source, `topAssignments`를 반환.
+  - `topAssignments`는 기존 final result field와 computed tier, assign 여부, skip reason을 함께 반환한다.
   - existing `finalRank`/`finalTier`는 overwrite하지 않고, 둘 중 하나라도 있으면 existing/skipped로 처리.
   - reward 지급, `rewardGrantedAt` 업데이트, provider ingestion/API 호출, cron scheduler, HTTP batch run API 없음.
 - 이 작업은 `/home` settled final-result read model과 `/ranking` 구현 준비를 진전시켰지만, 자동 데이터 생성/외부 시세 공급/API 응답은 아직 없음.
@@ -918,6 +917,8 @@ near-term ledger/FX foundation:
 - valuation data가 없으면 전체 API 실패나 fake fallback 없이 해당 position의 `valuation.state = unavailable`로 반환.
 - KRW position은 USD/KRW 없이 valuation 가능하고, USD position은 FX missing/stale이면 해당 valuation만 unavailable.
 - `totalPositionValueKrw`는 valuation available position만 합산.
+- response는 local `realizedPnl`와 stored `realizedPnlKrw`를 함께 반환한다.
+- `includeClosed=false` 기본 목록은 `quantity > 0` position만 반환하고, `includeClosed=true`는 retained quantity `0` position까지 포함한다.
 - ranking, settlement/reward provider_api 직접 사용과 production scheduler/cron 자동화 구현 없음. Provider-backed execute/write는 Durable Quote gate로 열렸고, daily snapshot은 operator-run batch valuation workflow에 한해 provider_api fresh-first가 허용됨.
 - `/positions` 호출은 wallet/order/position/snapshot/ranking/ledger row를 생성/수정/삭제하지 않음.
 
@@ -977,11 +978,15 @@ near-term ledger/FX foundation:
   - `wallet_transactions`
   - `orders`
   - `positions` count
+  - season detail `profitAnalysis`는 retained `positions`, fresh eligible asset price/FX snapshot, stored `positions.realizedPnlKrw`를 읽음.
+  - public summary `publicPortfolioSummary`는 open positions와 cash wallets를 내부 valuation에만 사용하고, 응답에는 public-safe allocation/top holdings만 노출.
 - access control:
   - 로그인 사용자의 `season_participants` 기준으로만 조회.
   - `/records/me/**`는 로그인 사용자의 participant만 조회.
   - 미참가면 records 배열을 비우고 `state = not_joined`.
-  - `/users/:userId/records/:seasonId`는 protected route이지만 target user의 public summary만 반환하며 private ledger, wallet balance, individual order/exchange detail은 노출하지 않음.
+  - `/records/me/seasons/:seasonId`는 `profitAnalysis`에서 realized/unrealized/total PnL KRW, best/worst asset, per-asset partial valuation errors를 반환함.
+  - `/users/:userId/records/:seasonId`는 protected route이지만 target user의 public summary만 반환하며 private ledger, wallet balance, position quantity, average cost, individual order/exchange detail은 노출하지 않음.
+  - public summary `topHoldings`는 KRW 평가액 기준 최대 5개 public holding만 반환.
 - season history:
   - 참가 시즌이 있으면 `state = available`.
   - 참가 시즌이 없으면 `state = empty`.
@@ -1083,7 +1088,7 @@ near-term ledger/FX foundation:
   - market/limit execution price는 execution 시점 latest eligible `admin_manual` asset price snapshot 기준.
   - limit order는 selected market price crossing 조건을 만족해야 하며, selected price를 `executedPrice`로 저장.
   - buy는 cash wallet debit, position create/update, `order_buy` wallet transaction 생성.
-  - sell은 position decrement/realizedPnl update, cash wallet credit, `order_sell` wallet transaction 생성.
+  - sell은 position decrement/realizedPnl/realizedPnlKrw update, cash wallet credit, `order_sell` wallet transaction 생성.
   - order finalization은 `id + seasonParticipantId + status = submitted` guarded update.
   - 모든 financial write는 단일 Prisma transaction 안에서 처리.
   - equity snapshot, daily snapshot, ranking, settlement side effect, provider/scheduler, partial fill 없음.
@@ -1105,7 +1110,7 @@ near-term ledger/FX foundation:
   - Binance provider_api source eligibility는 read-only/quote workflow와 operator-run daily snapshot valuation workflow에서 `binance_public_rest_24hr_ticker` fresh row만 허용하며 execute/write, scheduler, settlement, reward 사용은 `STOP`.
   - OANDA/Twelve Data ingestion implementation은 credentialed fixture, mapping, terms, sourceType tests 전까지 `STOP/BLOCKED`.
   - KRX execute/write remains STOP. KIS KRX `provider_api` evidence is limited to read-only/quote and operator-run daily snapshot valuation workflows where eligible.
-  - Batch job run foundation과 operator-run daily snapshot(provider-backed valuation only)/ranking/cycle/settlement/final-tier/reward-grant internal foundation/season-lifecycle-transition MVP job은 구현됨. 실제 cron scheduler, scheduler reward 자동 지급, 외부 reward fulfillment job은 STOP 유지.
+  - Batch job run foundation과 operator-run daily snapshot(provider-backed valuation only)/ranking/cycle/settlement/final-tier/reward-grant gate-closed/season-lifecycle-transition MVP job은 구현됨. Reward Policy / Catalog 기반 reward-grant write path, 실제 cron scheduler, scheduler reward 자동 지급, 외부 reward fulfillment job은 STOP 유지.
   - settlement extension, reward policy/catalog, 외부 reward fulfillment는 별도 gate 전까지 구현 STOP 유지.
 - Gate B Provider final selection readiness re-check 및 Asset Price Freshness Policy 문서화 완료.
   - 상세 결과: `docs/provider-final-selection-readiness-recheck.md`, `docs/asset-price-freshness-policy.md`.
@@ -1120,7 +1125,7 @@ near-term ledger/FX foundation:
   - full financial write-path 검증은 현재 service/unit 및 opt-in PostgreSQL integration spec이 담당.
 - 테스트 커버리지 상세는 `docs/backend-test-coverage-matrix.md` 기준.
 - provider ingestion foundation은 구현됨. `provider_api` source eligibility는 read-only/quote workflow와 operator-run daily snapshot valuation workflow에만 열렸고 provider-backed scheduler/settlement 사용은 `BLOCKED` 유지.
-- Batch job run foundation과 operator-run daily snapshot(provider-backed valuation only)/ranking/cycle/settlement/final-tier/reward-grant internal foundation/season-lifecycle-transition MVP job은 구현됨. 실제 cron scheduler, scheduler reward 자동 지급, 외부 reward fulfillment job은 STOP 유지.
+- Batch job run foundation과 operator-run daily snapshot(provider-backed valuation only)/ranking/cycle/settlement/final-tier/reward-grant gate-closed/season-lifecycle-transition MVP job은 구현됨. Reward Policy / Catalog 기반 reward-grant write path, 실제 cron scheduler, scheduler reward 자동 지급, 외부 reward fulfillment job은 STOP 유지.
 - settlement extension, reward policy/catalog, 외부 reward fulfillment는 별도 gate 전까지 구현 STOP 유지.
 - asset price freshness 정책 요약:
   - FX USD/KRW quote/execute는 현행 60초 `effectiveAt` freshness 유지.
@@ -1151,7 +1156,7 @@ near-term ledger/FX foundation:
   - order exact execute replay, partial fill, matching engine.
   - FX stale pending/unknown outcome recovery.
   - deployment/operations readiness.
-- Settlement extension, Reward Policy / Reward Catalog, or external reward fulfillment beyond Home final-result read model, final tier assignment MVP, reward grant internal foundation MVP, and internal reward fulfillment MVP
+- Settlement extension, Reward Policy / Reward Catalog, reward-grant write path, or external reward fulfillment beyond Home final-result read model, final tier assignment MVP, and internal reward fulfillment MVP
 - access token blacklist/revocation
 - cookie/session auth
 - refresh token reuse detection 시 user active sessions 전체 revoke 정책

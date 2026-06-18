@@ -2,6 +2,11 @@ jest.mock('../generated/prisma/client', () => {
   const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
 
   return {
+    AssetPriceSourceType: {
+      admin_manual: 'admin_manual',
+      official_batch: 'official_batch',
+      provider_api: 'provider_api',
+    },
     AssetType: {
       domestic_stock: 'domestic_stock',
       us_stock: 'us_stock',
@@ -24,6 +29,11 @@ jest.mock('../generated/prisma/client', () => {
     OrderType: {
       market: 'market',
       limit: 'limit',
+    },
+    FxRateSourceType: {
+      admin_manual: 'admin_manual',
+      official_batch: 'official_batch',
+      provider_api: 'provider_api',
     },
     ParticipantStatus: {
       registered: 'registered',
@@ -71,8 +81,10 @@ jest.mock('../generated/prisma/client', () => {
 
 import { HttpException } from '@nestjs/common';
 import {
+  AssetPriceSourceType,
   AssetType,
   CurrencyCode,
+  FxRateSourceType,
   OrderSide,
   OrderStatus,
   OrderType,
@@ -114,6 +126,8 @@ describe('RecordsService', () => {
     ...participant,
     participantStatus: ParticipantStatus.finished,
     initialCapitalKrw: new Prisma.Decimal('10000000.00000000'),
+    maxDrawdown: new Prisma.Decimal('3.00000000'),
+    currentRank: 2,
     finalRank: 1,
     finalTier: 'master',
     rewardGrantedAt: new Date('2026-05-31T00:00:00.000Z'),
@@ -160,6 +174,7 @@ describe('RecordsService', () => {
     },
     position: {
       count: jest.fn(),
+      findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
@@ -192,6 +207,30 @@ describe('RecordsService', () => {
       delete: jest.fn(),
     },
     cashWallet: {
+      findMany: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      upsert: jest.fn(),
+      delete: jest.fn(),
+    },
+    assetPriceSnapshot: {
+      findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      upsert: jest.fn(),
+      delete: jest.fn(),
+    },
+    fxRateSnapshot: {
+      findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      upsert: jest.fn(),
+      delete: jest.fn(),
+    },
+    dailyPortfolioSnapshot: {
+      findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       upsert: jest.fn(),
@@ -428,6 +467,89 @@ describe('RecordsService', () => {
     ]);
   };
 
+  const profitPosition = (input: {
+    assetId: string;
+    symbol: string;
+    quantity: string;
+    averageCost: string;
+    realizedPnl?: string;
+    realizedPnlKrw?: string;
+    currencyCode?: CurrencyCode;
+    assetType?: AssetType;
+    market?: string;
+  }) => {
+    const currencyCode = input.currencyCode ?? CurrencyCode.KRW;
+    const assetType = input.assetType ?? AssetType.domestic_stock;
+
+    return {
+      id: `position-${input.assetId}`,
+      assetId: input.assetId,
+      quantity: new Prisma.Decimal(input.quantity),
+      averageCost: new Prisma.Decimal(input.averageCost),
+      currencyCode,
+      realizedPnl: new Prisma.Decimal(input.realizedPnl ?? '0.00000000'),
+      realizedPnlKrw: new Prisma.Decimal(
+        input.realizedPnlKrw ?? input.realizedPnl ?? '0.00000000',
+      ),
+      asset: {
+        id: input.assetId,
+        symbol: input.symbol,
+        name: `${input.symbol} Name`,
+        market:
+          input.market ??
+          (currencyCode === CurrencyCode.USD ? 'NASDAQ' : 'KRX'),
+        assetType,
+        currencyCode,
+      },
+    };
+  };
+
+  const priceSnapshot = (
+    id: string,
+    price: string,
+    currencyCode = CurrencyCode.KRW,
+  ) => ({
+    id,
+    price: new Prisma.Decimal(price),
+    currencyCode,
+    sourceType: AssetPriceSourceType.admin_manual,
+    sourceName: 'manual-price',
+    effectiveAt: new Date(Date.now() - 1_000),
+    capturedAt: new Date(Date.now() - 1_000),
+  });
+
+  const freshUsdKrwSnapshot = () => ({
+    id: 'fx-admin-1',
+    rate: new Prisma.Decimal('1400.00000000'),
+    sourceType: FxRateSourceType.admin_manual,
+    sourceName: 'manual-fx',
+    effectiveAt: new Date(Date.now() - 1_000),
+    capturedAt: new Date(Date.now() - 1_000),
+    approvedByUserId: 'operator-1',
+  });
+
+  const mockEmptyProfitInputs = (prisma: ReturnType<typeof createPrisma>) => {
+    prisma.dailyPortfolioSnapshot.findMany.mockResolvedValueOnce([]);
+    prisma.position.findMany.mockResolvedValueOnce([]);
+  };
+
+  const mockPublicPortfolioInputs = (
+    prisma: ReturnType<typeof createPrisma>,
+    positions: ReturnType<typeof profitPosition>[],
+  ) => {
+    prisma.position.findMany.mockResolvedValueOnce(positions);
+    prisma.cashWallet.findMany.mockResolvedValueOnce([
+      {
+        currencyCode: CurrencyCode.KRW,
+        balanceAmount: new Prisma.Decimal('1000000.00000000'),
+      },
+      {
+        currencyCode: CurrencyCode.USD,
+        balanceAmount: new Prisma.Decimal('0.00000000'),
+      },
+    ]);
+  };
+
   const expectNoRecordWrites = (prisma: ReturnType<typeof createPrisma>) => {
     for (const model of [
       prisma.season,
@@ -437,6 +559,9 @@ describe('RecordsService', () => {
       prisma.order,
       prisma.position,
       prisma.cashWallet,
+      prisma.assetPriceSnapshot,
+      prisma.fxRateSnapshot,
+      prisma.dailyPortfolioSnapshot,
       prisma.user,
     ]) {
       expect(model.create).not.toHaveBeenCalled();
@@ -923,6 +1048,45 @@ describe('RecordsService', () => {
       .mockResolvedValueOnce(2)
       .mockResolvedValueOnce(0);
     prisma.position.count.mockResolvedValueOnce(3);
+    prisma.dailyPortfolioSnapshot.findMany.mockResolvedValueOnce([
+      {
+        seasonParticipantId: 'sp-1',
+        snapshotDate: new Date('2026-05-01T00:00:00.000Z'),
+        totalAssetKrw: new Prisma.Decimal('10000000.00000000'),
+        returnRate: new Prisma.Decimal('0.00000000'),
+        capturedAt: new Date('2026-05-01T00:00:01.000Z'),
+        createdAt: new Date('2026-05-01T00:00:01.000Z'),
+      },
+      {
+        seasonParticipantId: 'sp-1',
+        snapshotDate: new Date('2026-05-02T00:00:00.000Z'),
+        totalAssetKrw: new Prisma.Decimal('9500000.00000000'),
+        returnRate: new Prisma.Decimal('-5.00000000'),
+        capturedAt: new Date('2026-05-02T00:00:01.000Z'),
+        createdAt: new Date('2026-05-02T00:00:01.000Z'),
+      },
+    ]);
+    prisma.position.findMany.mockResolvedValueOnce([
+      profitPosition({
+        assetId: 'asset-open',
+        symbol: 'OPEN',
+        quantity: '2.00000000',
+        averageCost: '100.00000000',
+        realizedPnl: '1000.00000000',
+        realizedPnlKrw: '1000.00000000',
+      }),
+      profitPosition({
+        assetId: 'asset-sold',
+        symbol: 'SOLD',
+        quantity: '0.00000000',
+        averageCost: '100.00000000',
+        realizedPnl: '5000.00000000',
+        realizedPnlKrw: '5000.00000000',
+      }),
+    ]);
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(
+      priceSnapshot('price-open', '130.00000000'),
+    );
 
     const response = await service.getMySeasonRecordDetail(
       'user-1',
@@ -943,6 +1107,7 @@ describe('RecordsService', () => {
         state: 'available',
         totalAssetKrw: '11900000.00000000',
         returnRate: '19.00000000',
+        maxDrawdown: '5.00000000',
         snapshotDate: '2026-05-31',
       },
       activitySummary: {
@@ -961,6 +1126,22 @@ describe('RecordsService', () => {
         },
         positions: {
           open: 3,
+        },
+      },
+      profitAnalysis: {
+        state: 'available',
+        totalRealizedPnlKrw: '6000.00000000',
+        totalUnrealizedPnlKrw: '60.00000000',
+        totalPnlKrw: '6060.00000000',
+        bestAsset: {
+          assetId: 'asset-sold',
+          totalPnlKrw: '5000.00000000',
+          positionState: 'fully_sold',
+        },
+        worstAsset: {
+          assetId: 'asset-open',
+          totalPnlKrw: '1060.00000000',
+          positionState: 'open',
         },
       },
     });
@@ -1024,6 +1205,7 @@ describe('RecordsService', () => {
       .mockResolvedValueOnce(0)
       .mockResolvedValueOnce(0);
     prisma.position.count.mockResolvedValueOnce(0);
+    mockEmptyProfitInputs(prisma);
 
     const response = await service.getMySeasonRecordDetail(
       'user-1',
@@ -1161,6 +1343,56 @@ describe('RecordsService', () => {
     mockDetailedParticipant(prisma);
     prisma.order.count.mockResolvedValueOnce(8);
     prisma.exchangeTransaction.count.mockResolvedValueOnce(2);
+    mockPublicPortfolioInputs(prisma, [
+      profitPosition({
+        assetId: 'asset-1',
+        symbol: 'AAA',
+        quantity: '1.00000000',
+        averageCost: '100.00000000',
+      }),
+      profitPosition({
+        assetId: 'asset-2',
+        symbol: 'BBB',
+        quantity: '2.00000000',
+        averageCost: '100.00000000',
+      }),
+      profitPosition({
+        assetId: 'asset-3',
+        symbol: 'CCC',
+        quantity: '3.00000000',
+        averageCost: '100.00000000',
+      }),
+      profitPosition({
+        assetId: 'asset-4',
+        symbol: 'DDD',
+        quantity: '4.00000000',
+        averageCost: '100.00000000',
+      }),
+      profitPosition({
+        assetId: 'asset-5',
+        symbol: 'EEE',
+        quantity: '5.00000000',
+        averageCost: '100.00000000',
+      }),
+      profitPosition({
+        assetId: 'asset-6',
+        symbol: 'FFF',
+        quantity: '6.00000000',
+        averageCost: '100.00000000',
+      }),
+    ]);
+    for (const [id, price] of [
+      ['price-1', '100.00000000'],
+      ['price-2', '100.00000000'],
+      ['price-3', '100.00000000'],
+      ['price-4', '100.00000000'],
+      ['price-5', '100.00000000'],
+      ['price-6', '100.00000000'],
+    ] as const) {
+      prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(
+        priceSnapshot(id, price),
+      );
+    }
 
     const response = await service.getUserSeasonRecordSummary(
       'user-1',
@@ -1187,10 +1419,74 @@ describe('RecordsService', () => {
         orderCount: 8,
         exchangeCount: 2,
       },
+      publicPortfolioSummary: {
+        state: 'available',
+        topHoldings: [
+          { symbol: 'FFF' },
+          { symbol: 'EEE' },
+          { symbol: 'DDD' },
+          { symbol: 'CCC' },
+          { symbol: 'BBB' },
+        ],
+      },
     });
+    expect(response.data.publicPortfolioSummary.topHoldings).toHaveLength(5);
     expect(response.data).not.toHaveProperty('orders');
     expect(response.data).not.toHaveProperty('exchanges');
-    expect(JSON.stringify(response.data)).not.toContain('walletId');
+    const serialized = JSON.stringify(response.data);
+    expect(serialized).not.toContain('walletId');
+    expect(serialized).not.toContain('quantity');
+    expect(serialized).not.toContain('averageCost');
+    expect(serialized).not.toContain('balanceAmount');
+    expect(serialized).not.toContain('assetId');
+    expectNoRecordWrites(prisma);
+  });
+
+  it('redacts raw ids from public portfolio valuation errors', async () => {
+    const { prisma, service } = createService();
+    prisma.user.findUnique.mockResolvedValueOnce({
+      id: 'user-2',
+      nickname: 'traderLee',
+      profileImageUrl: null,
+    });
+    prisma.season.findUnique.mockResolvedValueOnce({
+      ...season,
+      status: SeasonStatus.settled,
+    });
+    mockDetailedParticipant(prisma);
+    prisma.order.count.mockResolvedValueOnce(8);
+    prisma.exchangeTransaction.count.mockResolvedValueOnce(2);
+    mockPublicPortfolioInputs(prisma, [
+      profitPosition({
+        assetId: 'asset-private-1',
+        symbol: 'AAA',
+        quantity: '1.00000000',
+        averageCost: '100.00000000',
+      }),
+    ]);
+
+    const response = await service.getUserSeasonRecordSummary(
+      'user-1',
+      'user-2',
+      'season-1',
+    );
+
+    expect(response.data.publicPortfolioSummary).toMatchObject({
+      state: 'partial_unavailable',
+      valuationErrors: [
+        {
+          symbol: 'AAA',
+          name: 'AAA Name',
+          market: 'KRX',
+          assetType: AssetType.domestic_stock,
+          code: 'ASSET_PRICE_UNAVAILABLE',
+          message: 'Asset price snapshot is unavailable.',
+        },
+      ],
+    });
+    expect(JSON.stringify(response.data.publicPortfolioSummary)).not.toContain(
+      'asset-private-1',
+    );
     expectNoRecordWrites(prisma);
   });
 

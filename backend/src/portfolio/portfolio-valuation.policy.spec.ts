@@ -156,6 +156,7 @@ describe('portfolio valuation policy', () => {
             averageCost: '10000.00000000',
             currencyCode: CurrencyCode.KRW,
             realizedPnl: '5000.00000000',
+            realizedPnlKrw: '5000.00000000',
             latestPriceSnapshot: price(
               'asset-krw',
               '12000.00000000',
@@ -188,6 +189,7 @@ describe('portfolio valuation policy', () => {
             averageCost: '100.00000000',
             currencyCode: CurrencyCode.USD,
             realizedPnl: '10.00000000',
+            realizedPnlKrw: '12500.00000000',
             latestPriceSnapshot: price(
               'asset-usd',
               '150.00000000',
@@ -203,7 +205,7 @@ describe('portfolio valuation policy', () => {
       returnRate: '-58.00000000',
       assetValueKrw: '420000.00000000',
       usStockValueKrw: '420000.00000000',
-      realizedPnlKrw: '14000.00000000',
+      realizedPnlKrw: '12500.00000000',
       unrealizedPnlKrw: '140000.00000000',
     });
   });
@@ -222,6 +224,7 @@ describe('portfolio valuation policy', () => {
             averageCost: '40000.00000000',
             currencyCode: CurrencyCode.USD,
             realizedPnl: '0.00000000',
+            realizedPnlKrw: '0.00000000',
             latestPriceSnapshot: price(
               'asset-btc',
               '50000.00000000',
@@ -255,6 +258,7 @@ describe('portfolio valuation policy', () => {
             averageCost: '10000.00000000',
             currencyCode: CurrencyCode.KRW,
             realizedPnl: '0.00000000',
+            realizedPnlKrw: '0.00000000',
             latestPriceSnapshot: null,
           },
         ],
@@ -277,6 +281,7 @@ describe('portfolio valuation policy', () => {
             averageCost: '10000.00000000',
             currencyCode: CurrencyCode.KRW,
             realizedPnl: '1234.00000000',
+            realizedPnlKrw: '1234.00000000',
             latestPriceSnapshot: null,
           },
         ],

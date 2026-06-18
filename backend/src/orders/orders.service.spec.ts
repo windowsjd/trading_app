@@ -2594,6 +2594,7 @@ describe('OrdersService', () => {
           averageCost: '100.10000000',
           currencyCode: CurrencyCode.KRW,
           realizedPnl: '0.00000000',
+          realizedPnlKrw: '0.00000000',
         },
         select: {
           id: true,
@@ -2722,6 +2723,7 @@ describe('OrdersService', () => {
           averageCost: '50050.00000000',
           currencyCode: CurrencyCode.USD,
           realizedPnl: '0.00000000',
+          realizedPnlKrw: '0.00000000',
         },
         select: {
           id: true,
@@ -2790,6 +2792,8 @@ describe('OrdersService', () => {
       prisma.order.findFirst.mockResolvedValueOnce(
         orderExecutionRecord({
           side: OrderSide.sell,
+          orderType: OrderType.limit,
+          limitPrice: new Prisma.Decimal('69.00000000'),
         }),
       );
       mockExecutionPrice(prisma);
@@ -2832,6 +2836,9 @@ describe('OrdersService', () => {
           realizedPnl: {
             increment: '39.80000000',
           },
+          realizedPnlKrw: {
+            increment: '39.80000000',
+          },
         },
       });
       expect(prisma.cashWallet.updateMany).toHaveBeenCalledWith({
@@ -2853,6 +2860,55 @@ describe('OrdersService', () => {
             txType: WalletTransactionType.order_sell,
             amount: '199.80000000',
             balanceAfter: '299.80000000',
+          }),
+        }),
+      );
+      expectNoForbiddenExecuteSideEffects(prisma);
+    });
+
+    it('records negative realizedPnlKrw for loss sells', async () => {
+      const { prisma, service } = createService();
+      prisma.order.findFirst.mockResolvedValueOnce(
+        orderExecutionRecord({
+          side: OrderSide.sell,
+          orderType: OrderType.limit,
+          limitPrice: new Prisma.Decimal('69.00000000'),
+        }),
+      );
+      mockExecutionPrice(prisma, '70.00000000');
+      prisma.position.findUnique.mockResolvedValueOnce({
+        id: 'position-1',
+        quantity: new Prisma.Decimal('5.00000000'),
+        averageCost: new Prisma.Decimal('80.00000000'),
+        currencyCode: CurrencyCode.KRW,
+      });
+      prisma.position.updateMany.mockResolvedValueOnce({ count: 1 });
+      mockExecutionWallet(prisma, '100.00000000', '239.86000000');
+      prisma.walletTransaction.create.mockResolvedValueOnce({
+        id: 'wallet-tx-sell-loss-1',
+      });
+      mockOrderFinalization(
+        prisma,
+        executedOrderExecutionRecord({
+          side: OrderSide.sell,
+          executedPrice: new Prisma.Decimal('70.00000000'),
+          grossAmount: new Prisma.Decimal('140.00000000'),
+          feeAmount: new Prisma.Decimal('0.14000000'),
+          netAmount: new Prisma.Decimal('139.86000000'),
+        }),
+      );
+
+      await service.executeOrder('user-1', 'order-execute-1');
+
+      expect(prisma.position.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            realizedPnl: {
+              decrement: '20.14000000',
+            },
+            realizedPnlKrw: {
+              decrement: '20.14000000',
+            },
           }),
         }),
       );
@@ -2939,6 +2995,9 @@ describe('OrdersService', () => {
           },
           realizedPnl: {
             increment: '99.50000000',
+          },
+          realizedPnlKrw: {
+            increment: '139300.00000000',
           },
         },
       });

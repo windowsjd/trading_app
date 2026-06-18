@@ -398,6 +398,7 @@ Same body as `POST /api/v1/orders/quote`.
 - Sell execute:
   - guarded conditional position decrement by `quantity >= sell quantity`.
   - realized PnL delta is `netAmount - oldAverageCost * sellQuantity`.
+  - `positions.realizedPnlKrw` is incremented by the realized PnL delta in KRW assets, or by the USD realized PnL delta converted with the execution USD/KRW rate for USD assets. It is not recalculated from later FX snapshots.
   - credits cash wallet by `netAmount`.
   - creates one `wallet_transactions` row with `direction = credit`, `txType = order_sell`, `referenceType = order`.
   - finalizes order to `executed` with actual execution fields.

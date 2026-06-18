@@ -157,6 +157,7 @@ describe('PositionsService', () => {
     currencyCode?: CurrencyCode;
     assetType?: AssetType;
     realizedPnl?: string;
+    realizedPnlKrw?: string;
   }) => {
     const currencyCode = input.currencyCode ?? CurrencyCode.KRW;
     const assetId = input.assetId ?? `asset-${input.id}`;
@@ -168,6 +169,7 @@ describe('PositionsService', () => {
       averageCost: new Prisma.Decimal(input.averageCost),
       currencyCode,
       realizedPnl: new Prisma.Decimal(input.realizedPnl ?? '0.00000000'),
+      realizedPnlKrw: new Prisma.Decimal(input.realizedPnlKrw ?? '0.00000000'),
       asset: {
         id: assetId,
         symbol: input.symbol ?? assetId.toUpperCase(),
@@ -550,6 +552,8 @@ describe('PositionsService', () => {
         symbol: 'KRWSTK',
         quantity: '2.00000000',
         averageCost: '90.00000000',
+        realizedPnl: '5.00000000',
+        realizedPnlKrw: '5.00000000',
       }),
     ]);
     prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(
@@ -570,6 +574,8 @@ describe('PositionsService', () => {
     expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
     expect(response.data.positions[0]).toMatchObject({
       positionId: 'position-krw',
+      realizedPnl: '5.00000000',
+      realizedPnlKrw: '5.00000000',
       valuation: {
         state: 'available',
         currentPrice: '100.00000000',

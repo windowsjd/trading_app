@@ -65,6 +65,7 @@ type PositionRecord = {
   averageCost: Prisma.Decimal;
   currencyCode: CurrencyCode;
   realizedPnl: Prisma.Decimal;
+  realizedPnlKrw: Prisma.Decimal;
   asset: {
     id: string;
     symbol: string;
@@ -148,6 +149,7 @@ type PositionItemWithSort = {
   quantity: string;
   averageCost: string;
   realizedPnl: string;
+  realizedPnlKrw: string;
   quantitySortValue: Prisma.Decimal;
   valuation: PositionValuation;
 };
@@ -313,6 +315,7 @@ export class PositionsService {
       quantity: this.formatDecimal(position.quantity, 8),
       averageCost: this.formatDecimal(position.averageCost, 8),
       realizedPnl: this.formatDecimal(position.realizedPnl, 8),
+      realizedPnlKrw: this.formatDecimal(position.realizedPnlKrw, 8),
       quantitySortValue: position.quantity,
       valuation,
     };
@@ -799,6 +802,7 @@ export class PositionsService {
       quantity: item.quantity,
       averageCost: item.averageCost,
       realizedPnl: item.realizedPnl,
+      realizedPnlKrw: item.realizedPnlKrw,
       valuation: item.valuation.payload,
     };
   }
@@ -837,6 +841,7 @@ export class PositionsService {
         averageCost: true,
         currencyCode: true,
         realizedPnl: true,
+        realizedPnlKrw: true,
         asset: {
           select: {
             id: true,

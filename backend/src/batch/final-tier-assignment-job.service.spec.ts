@@ -139,11 +139,21 @@ describe('FinalTierAssignmentJobService', () => {
         seasonParticipantId: 'sp-1',
         finalRank: 1,
         finalTier: 'master',
+        existingFinalRank: null,
+        existingFinalTier: null,
+        computedFinalTier: 'master',
+        willAssign: true,
+        skipReason: null,
       },
       {
         seasonParticipantId: 'sp-2',
         finalRank: 2,
         finalTier: 'silver',
+        existingFinalRank: 2,
+        existingFinalTier: 'diamond',
+        computedFinalTier: 'silver',
+        willAssign: false,
+        skipReason: 'FINAL_RESULT_ALREADY_EXISTS',
       },
     ]);
   });
@@ -406,6 +416,25 @@ describe('FinalTierAssignmentJobService', () => {
       existing: 2,
       skipped: 2,
     });
+    expect(result.topAssignments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          seasonParticipantId: 'sp-final-rank',
+          existingFinalRank: 99,
+          existingFinalTier: null,
+          willAssign: false,
+          skipReason: 'FINAL_RESULT_ALREADY_EXISTS',
+        }),
+        expect.objectContaining({
+          seasonParticipantId: 'sp-final-tier',
+          existingFinalRank: null,
+          existingFinalTier: 'gold',
+          computedFinalTier: 'gold',
+          willAssign: false,
+          skipReason: 'FINAL_RESULT_ALREADY_EXISTS',
+        }),
+      ]),
+    );
     expect(result.assignedParticipantIds).toEqual(['sp-new']);
   });
 

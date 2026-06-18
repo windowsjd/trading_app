@@ -31,6 +31,7 @@ export type PortfolioPositionInput = {
   averageCost: DecimalInput;
   currencyCode: CurrencyCode;
   realizedPnl: DecimalInput;
+  realizedPnlKrw?: DecimalInput;
   latestPriceSnapshot?: PortfolioAssetPriceSnapshotInput | null;
 };
 
@@ -157,16 +158,17 @@ export function calculatePortfolioValuation(
   for (const position of input.positions) {
     const quantity = toDecimal(position.quantity, 'position.quantity');
     const averageCost = toDecimal(position.averageCost, 'position.averageCost');
-    const realizedPnl = toDecimal(position.realizedPnl, 'position.realizedPnl');
+    const realizedPnlKrwDelta = toDecimal(
+      position.realizedPnlKrw ?? '0',
+      'position.realizedPnlKrw',
+    );
     const hasOpenQuantity = !quantity.eq(0);
 
-    if (!hasOpenQuantity && realizedPnl.eq(0)) {
+    if (!hasOpenQuantity && realizedPnlKrwDelta.eq(0)) {
       continue;
     }
 
-    realizedPnlKrw = realizedPnlKrw.add(
-      convertToKrw(realizedPnl, position.currencyCode, usdKrwRate),
-    );
+    realizedPnlKrw = realizedPnlKrw.add(realizedPnlKrwDelta);
 
     if (!hasOpenQuantity) {
       continue;
@@ -318,12 +320,8 @@ function sumWallets(
 
 function positionNeedsUsdConversion(position: PortfolioPositionInput): boolean {
   const quantity = toDecimal(position.quantity, 'position.quantity');
-  const realizedPnl = toDecimal(position.realizedPnl, 'position.realizedPnl');
 
-  return (
-    position.currencyCode === CurrencyCode.USD &&
-    (!quantity.eq(0) || !realizedPnl.eq(0))
-  );
+  return position.currencyCode === CurrencyCode.USD && !quantity.eq(0);
 }
 
 function selectUsableUsdKrwRate(

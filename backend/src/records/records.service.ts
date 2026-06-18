@@ -1,7 +1,9 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import {
+  AssetPriceSourceType,
   CurrencyCode,
   AssetType,
+  FxRateSourceType,
   OrderSide,
   OrderStatus,
   OrderType,
@@ -11,7 +13,18 @@ import {
   SeasonStatus,
 } from '../generated/prisma/client';
 import { buildPagination, type Pagination } from '../common/pagination';
+import { isFxSnapshotStaleForPortfolioValuation } from '../portfolio/portfolio-valuation.policy';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  calculateMaxDrawdownPercent,
+  type RankingHistoricalSnapshotInput,
+} from '../ranking/ranking-calculation.policy';
+import {
+  isPositiveDecimal,
+  resolveAssetProviderEligibility,
+  resolveFxProviderEligibility,
+  selectFreshProviderSnapshot,
+} from '../providers/source-eligibility.policy';
 
 export type RecordsQuery = {
   seasonId?: string;
@@ -48,6 +61,17 @@ type SeasonHistoryState = 'available' | 'empty';
 type SeasonRecordDetailState = 'available' | 'not_joined';
 type SectionState = 'available' | 'unavailable';
 type PerformanceState = 'available' | 'unavailable';
+type ProfitAnalysisState = 'available' | 'unavailable' | 'partial_unavailable';
+type PublicPortfolioSummaryState =
+  | 'available'
+  | 'unavailable'
+  | 'not_joined'
+  | 'partial_unavailable';
+type ValuationErrorCode =
+  | 'ASSET_PRICE_UNAVAILABLE'
+  | 'PRICE_STALE'
+  | 'FX_RATE_UNAVAILABLE'
+  | 'FX_RATE_STALE';
 
 type RecordsSeason = {
   id: string;
@@ -100,6 +124,108 @@ type SeasonRecordMetric = {
   returnRate: Prisma.Decimal;
   metricDate: Date;
   capturedAt: Date;
+};
+
+type ProfitPositionRecord = {
+  id: string;
+  assetId: string;
+  quantity: Prisma.Decimal;
+  averageCost: Prisma.Decimal;
+  currencyCode: CurrencyCode;
+  realizedPnl: Prisma.Decimal;
+  realizedPnlKrw: Prisma.Decimal;
+  asset: {
+    id: string;
+    symbol: string;
+    name: string;
+    market: string;
+    assetType: AssetType;
+    currencyCode: CurrencyCode;
+  };
+};
+
+type AssetPriceForRecords = {
+  id: string;
+  price: Prisma.Decimal;
+  currencyCode: CurrencyCode;
+  sourceType: AssetPriceSourceType;
+  sourceName: string | null;
+  effectiveAt: Date;
+  capturedAt: Date;
+};
+
+type UsdKrwForRecords =
+  | {
+      state: 'available';
+      rate: Prisma.Decimal;
+    }
+  | {
+      state: 'unavailable';
+      code: 'FX_RATE_UNAVAILABLE' | 'FX_RATE_STALE';
+      message: string;
+    };
+
+type ProfitAnalysisItem = {
+  assetId: string;
+  symbol: string;
+  name: string;
+  market: string;
+  assetType: AssetType;
+  currencyCode: CurrencyCode;
+  realizedPnlLocal: string;
+  realizedPnlKrw: string;
+  unrealizedPnlLocal: string;
+  unrealizedPnlKrw: string;
+  totalPnlKrw: string;
+  returnRate: string | null;
+  returnRateState: 'available' | 'unavailable';
+  positionState: 'open' | 'fully_sold';
+  valuationState: 'available' | 'unavailable';
+};
+
+type ProfitAnalysis = {
+  state: ProfitAnalysisState;
+  totalRealizedPnlKrw: string;
+  totalUnrealizedPnlKrw: string;
+  totalPnlKrw: string;
+  bestAsset: ProfitAnalysisItem | null;
+  worstAsset: ProfitAnalysisItem | null;
+  items: ProfitAnalysisItem[];
+  valuationErrors: Array<{
+    assetId: string;
+    code: ValuationErrorCode;
+    message: string;
+  }>;
+};
+
+type PublicPortfolioSummary = {
+  state: PublicPortfolioSummaryState;
+  totalAssetKrw: string | null;
+  returnRate: string | null;
+  allocation: {
+    domesticStockRate: string;
+    usStockRate: string;
+    cryptoRate: string;
+    cashRate: string;
+  };
+  topHoldings: Array<{
+    symbol: string;
+    name: string;
+    market: string;
+    assetType: AssetType;
+    weightRate: string;
+    returnRate: string | null;
+    returnRateState: 'available' | 'unavailable';
+    valuationState: 'available' | 'unavailable';
+  }>;
+  valuationErrors: Array<{
+    symbol: string;
+    name: string;
+    market: string;
+    assetType: AssetType | null;
+    code: ValuationErrorCode;
+    message: string;
+  }>;
 };
 
 type RecordsResponse = {
@@ -225,6 +351,7 @@ type MySeasonRecordDetailResponse = {
       state: PerformanceState;
       totalAssetKrw: string | null;
       returnRate: string | null;
+      maxDrawdown: string | null;
       snapshotDate: string | null;
       capturedAt: string | null;
       reason?: string;
@@ -248,6 +375,7 @@ type MySeasonRecordDetailResponse = {
         open: number;
       };
     };
+    profitAnalysis: ProfitAnalysis;
     reason?: string;
     message?: string;
   };
@@ -335,6 +463,8 @@ type UserSeasonRecordSummaryResponse = {
       status: SeasonStatus;
     };
     summary: {
+      currentRank: number | null;
+      currentTier: string | null;
       finalRank: number | null;
       finalTier: string | null;
       rewardGranted: boolean;
@@ -343,6 +473,7 @@ type UserSeasonRecordSummaryResponse = {
       orderCount: number;
       exchangeCount: number;
     } | null;
+    publicPortfolioSummary: PublicPortfolioSummary;
     reason?: string;
     message?: string;
   };
@@ -356,6 +487,15 @@ const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
 ];
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
+
+class RecordsValuationError extends Error {
+  constructor(
+    readonly code: ValuationErrorCode,
+    message: string,
+  ) {
+    super(message);
+  }
+}
 
 @Injectable()
 export class RecordsService {
@@ -488,6 +628,8 @@ export class RecordsService {
         joinedAt: true,
         participantStatus: true,
         initialCapitalKrw: true,
+        maxDrawdown: true,
+        currentRank: true,
         finalRank: true,
         finalTier: true,
         rewardGrantedAt: true,
@@ -575,7 +717,11 @@ export class RecordsService {
             walletTransactionCount: participant._count.walletTransactions,
           };
         }),
-        pagination: this.listPagination(parsedQuery, total, participants.length),
+        pagination: this.listPagination(
+          parsedQuery,
+          total,
+          participants.length,
+        ),
         filters: {
           seasonStatus: parsedQuery.seasonStatus ?? null,
         },
@@ -606,6 +752,7 @@ export class RecordsService {
           participant: null,
           performance: this.unavailablePerformance(),
           activitySummary: this.emptyActivitySummary(),
+          profitAnalysis: this.unavailableProfitAnalysis(),
           reason: 'SEASON_NOT_JOINED',
           message: 'Season records are available after joining the season.',
         },
@@ -618,6 +765,8 @@ export class RecordsService {
       canceledOrders,
       rejectedOrders,
       openPositions,
+      snapshotHistory,
+      profitAnalysis,
     ] = await Promise.all([
       this.countOrders(participant.id, OrderStatus.submitted),
       this.countOrders(participant.id, OrderStatus.executed),
@@ -631,6 +780,8 @@ export class RecordsService {
           },
         },
       }),
+      this.findSnapshotHistory(participant.id),
+      this.buildProfitAnalysis(participant.id, new Date()),
     ]);
 
     return {
@@ -642,6 +793,7 @@ export class RecordsService {
         performance: this.formatPerformance(
           participant.dailyPortfolioSnapshots[0],
           participant.seasonRankings[0],
+          this.calculateMdd(participant.maxDrawdown, snapshotHistory),
         ),
         activitySummary: {
           orders: {
@@ -661,6 +813,7 @@ export class RecordsService {
             open: openPositions,
           },
         },
+        profitAnalysis,
       },
     };
   }
@@ -830,11 +983,7 @@ export class RecordsService {
       this.prisma.exchangeTransaction.count({ where }),
       this.prisma.exchangeTransaction.findMany({
         where,
-        orderBy: [
-          { executedAt: 'desc' },
-          { createdAt: 'desc' },
-          { id: 'asc' },
-        ],
+        orderBy: [{ executedAt: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
         skip: parsedQuery.offset,
         take: parsedQuery.limit,
         select: {
@@ -944,24 +1093,27 @@ export class RecordsService {
           user: targetUser,
           season: publicSeason,
           summary: null,
+          publicPortfolioSummary: this.notJoinedPublicPortfolioSummary(),
           reason: 'SEASON_NOT_JOINED',
           message: 'The user has not joined this season.',
         },
       };
     }
 
-    const [orderCount, exchangeCount] = await Promise.all([
-      this.prisma.order.count({
-        where: {
-          seasonParticipantId: participant.id,
-        },
-      }),
-      this.prisma.exchangeTransaction.count({
-        where: {
-          seasonParticipantId: participant.id,
-        },
-      }),
-    ]);
+    const [orderCount, exchangeCount, publicPortfolioSummary] =
+      await Promise.all([
+        this.prisma.order.count({
+          where: {
+            seasonParticipantId: participant.id,
+          },
+        }),
+        this.prisma.exchangeTransaction.count({
+          where: {
+            seasonParticipantId: participant.id,
+          },
+        }),
+        this.buildPublicPortfolioSummary(participant.id, new Date()),
+      ]);
     const metric = this.selectBestMetric(
       participant.seasonRankings[0],
       participant.dailyPortfolioSnapshots[0],
@@ -974,6 +1126,8 @@ export class RecordsService {
         user: targetUser,
         season: publicSeason,
         summary: {
+          currentRank: participant.currentRank,
+          currentTier: null,
           finalRank: participant.finalRank,
           finalTier: participant.finalTier,
           rewardGranted: participant.rewardGrantedAt !== null,
@@ -984,8 +1138,726 @@ export class RecordsService {
           orderCount,
           exchangeCount,
         },
+        publicPortfolioSummary: {
+          ...publicPortfolioSummary,
+          totalAssetKrw:
+            publicPortfolioSummary.totalAssetKrw ??
+            (metric ? this.formatDecimal(metric.totalAssetKrw, 8) : null),
+          returnRate:
+            publicPortfolioSummary.returnRate ??
+            (metric ? this.formatDecimal(metric.returnRate, 8) : null),
+        },
       },
     };
+  }
+
+  private async buildProfitAnalysis(
+    seasonParticipantId: string,
+    valuationAt: Date,
+  ): Promise<ProfitAnalysis> {
+    const positions = await this.findProfitPositions(seasonParticipantId);
+
+    if (positions.length === 0) {
+      return {
+        state: 'available',
+        totalRealizedPnlKrw: this.formatDecimal(new Prisma.Decimal(0), 8),
+        totalUnrealizedPnlKrw: this.formatDecimal(new Prisma.Decimal(0), 8),
+        totalPnlKrw: this.formatDecimal(new Prisma.Decimal(0), 8),
+        bestAsset: null,
+        worstAsset: null,
+        items: [],
+        valuationErrors: [],
+      };
+    }
+
+    const usdKrwSelection = await this.findUsdKrwSelectionForRecords(
+      positions.some(
+        (position) =>
+          position.currencyCode === CurrencyCode.USD &&
+          !position.quantity.eq(0),
+      ),
+      valuationAt,
+    );
+    const valuationErrors: ProfitAnalysis['valuationErrors'] = [];
+    const itemRows = await Promise.all(
+      positions.map(async (position) => {
+        const result = await this.buildProfitAnalysisItem(
+          position,
+          valuationAt,
+          usdKrwSelection,
+        );
+        if (result.error) {
+          valuationErrors.push({
+            assetId: position.assetId,
+            code: result.error.code,
+            message: result.error.message,
+          });
+        }
+
+        return result;
+      }),
+    );
+    const totalRealizedPnlKrw = positions.reduce(
+      (sum, position) => sum.add(position.realizedPnlKrw),
+      new Prisma.Decimal(0),
+    );
+    const totalUnrealizedPnlKrw = itemRows.reduce(
+      (sum, row) => sum.add(row.unrealizedPnlKrw),
+      new Prisma.Decimal(0),
+    );
+    const totalPnlKrw = totalRealizedPnlKrw.add(totalUnrealizedPnlKrw);
+    const sortedByTotalPnl = itemRows.toSorted((left, right) => {
+      const totalDiff = right.totalPnlKrw.cmp(left.totalPnlKrw);
+      if (totalDiff !== 0) {
+        return totalDiff;
+      }
+
+      return left.item.assetId.localeCompare(right.item.assetId);
+    });
+
+    return {
+      state: valuationErrors.length === 0 ? 'available' : 'partial_unavailable',
+      totalRealizedPnlKrw: this.formatDecimal(totalRealizedPnlKrw, 8),
+      totalUnrealizedPnlKrw: this.formatDecimal(totalUnrealizedPnlKrw, 8),
+      totalPnlKrw: this.formatDecimal(totalPnlKrw, 8),
+      bestAsset: sortedByTotalPnl[0]?.item ?? null,
+      worstAsset:
+        sortedByTotalPnl.length > 0
+          ? sortedByTotalPnl[sortedByTotalPnl.length - 1].item
+          : null,
+      items: itemRows
+        .toSorted((left, right) => {
+          const symbolDiff = left.item.symbol.localeCompare(right.item.symbol);
+          if (symbolDiff !== 0) {
+            return symbolDiff;
+          }
+
+          return left.item.assetId.localeCompare(right.item.assetId);
+        })
+        .map((row) => row.item),
+      valuationErrors,
+    };
+  }
+
+  private async buildProfitAnalysisItem(
+    position: ProfitPositionRecord,
+    valuationAt: Date,
+    usdKrwSelection: UsdKrwForRecords | null,
+  ): Promise<{
+    item: ProfitAnalysisItem;
+    unrealizedPnlKrw: Prisma.Decimal;
+    totalPnlKrw: Prisma.Decimal;
+    error: { code: ValuationErrorCode; message: string } | null;
+  }> {
+    let unrealizedPnlLocal = new Prisma.Decimal(0);
+    let unrealizedPnlKrw = new Prisma.Decimal(0);
+    let returnRate: Prisma.Decimal | null = null;
+    let valuationState: ProfitAnalysisItem['valuationState'] = 'available';
+    let error: { code: ValuationErrorCode; message: string } | null = null;
+
+    if (!position.quantity.eq(0)) {
+      try {
+        if (position.asset.currencyCode !== position.currencyCode) {
+          throw new RecordsValuationError(
+            'ASSET_PRICE_UNAVAILABLE',
+            `Position currency mismatch for asset ${position.assetId}.`,
+          );
+        }
+
+        if (
+          position.currencyCode === CurrencyCode.USD &&
+          usdKrwSelection?.state === 'unavailable'
+        ) {
+          throw new RecordsValuationError(
+            usdKrwSelection.code,
+            usdKrwSelection.message,
+          );
+        }
+
+        const priceSnapshot = await this.findLatestEligibleAssetPriceSnapshot(
+          position.asset,
+          position.currencyCode,
+          valuationAt,
+        );
+        const currentPrice = priceSnapshot.price;
+        unrealizedPnlLocal = currentPrice
+          .sub(position.averageCost)
+          .mul(position.quantity);
+        unrealizedPnlKrw = this.convertToKrwForRecords(
+          unrealizedPnlLocal,
+          position.currencyCode,
+          usdKrwSelection,
+        );
+        if (!position.averageCost.eq(0)) {
+          returnRate = currentPrice
+            .sub(position.averageCost)
+            .div(position.averageCost)
+            .mul(100);
+        }
+      } catch (caught) {
+        const valuationError =
+          caught instanceof RecordsValuationError
+            ? caught
+            : new RecordsValuationError(
+                'ASSET_PRICE_UNAVAILABLE',
+                `Asset valuation is unavailable for asset ${position.assetId}.`,
+              );
+        valuationState = 'unavailable';
+        error = {
+          code: valuationError.code,
+          message: valuationError.message,
+        };
+      }
+    }
+
+    const totalPnlKrw = position.realizedPnlKrw.add(unrealizedPnlKrw);
+    const item: ProfitAnalysisItem = {
+      assetId: position.assetId,
+      symbol: position.asset.symbol,
+      name: position.asset.name,
+      market: position.asset.market,
+      assetType: position.asset.assetType,
+      currencyCode: position.currencyCode,
+      realizedPnlLocal: this.formatDecimal(position.realizedPnl, 8),
+      realizedPnlKrw: this.formatDecimal(position.realizedPnlKrw, 8),
+      unrealizedPnlLocal: this.formatDecimal(unrealizedPnlLocal, 8),
+      unrealizedPnlKrw: this.formatDecimal(unrealizedPnlKrw, 8),
+      totalPnlKrw: this.formatDecimal(totalPnlKrw, 8),
+      returnRate: returnRate ? this.formatDecimal(returnRate, 8) : null,
+      returnRateState: returnRate ? 'available' : 'unavailable',
+      positionState: position.quantity.eq(0) ? 'fully_sold' : 'open',
+      valuationState,
+    };
+
+    return {
+      item,
+      unrealizedPnlKrw,
+      totalPnlKrw,
+      error,
+    };
+  }
+
+  private async buildPublicPortfolioSummary(
+    seasonParticipantId: string,
+    valuationAt: Date,
+  ): Promise<PublicPortfolioSummary> {
+    const [positions, cashWallets] = await Promise.all([
+      this.findProfitPositions(seasonParticipantId),
+      this.prisma.cashWallet.findMany({
+        where: {
+          seasonParticipantId,
+        },
+        select: {
+          currencyCode: true,
+          balanceAmount: true,
+        },
+      }),
+    ]);
+    const openPositions = positions.filter(
+      (position) => !position.quantity.eq(0),
+    );
+    const needsUsdKrw =
+      openPositions.some(
+        (position) => position.currencyCode === CurrencyCode.USD,
+      ) ||
+      cashWallets.some(
+        (wallet) =>
+          wallet.currencyCode === CurrencyCode.USD &&
+          !wallet.balanceAmount.eq(0),
+      );
+    const usdKrwSelection = await this.findUsdKrwSelectionForRecords(
+      needsUsdKrw,
+      valuationAt,
+    );
+    const valuationErrors: PublicPortfolioSummary['valuationErrors'] = [];
+    let cashKrw = new Prisma.Decimal(0);
+
+    for (const wallet of cashWallets) {
+      if (wallet.currencyCode === CurrencyCode.KRW) {
+        cashKrw = cashKrw.add(wallet.balanceAmount);
+        continue;
+      }
+
+      if (wallet.balanceAmount.eq(0)) {
+        continue;
+      }
+
+      if (usdKrwSelection?.state !== 'available') {
+        valuationErrors.push({
+          symbol: 'USD',
+          name: 'USD Cash',
+          market: 'cash',
+          assetType: null,
+          code: usdKrwSelection?.code ?? 'FX_RATE_UNAVAILABLE',
+          message:
+            usdKrwSelection?.message ??
+            'USD/KRW FX rate snapshot is unavailable.',
+        });
+        continue;
+      }
+
+      cashKrw = cashKrw.add(wallet.balanceAmount.mul(usdKrwSelection.rate));
+    }
+
+    const holdings = await Promise.all(
+      openPositions.map(async (position) => {
+        try {
+          if (
+            position.currencyCode === CurrencyCode.USD &&
+            usdKrwSelection?.state === 'unavailable'
+          ) {
+            throw new RecordsValuationError(
+              usdKrwSelection.code,
+              usdKrwSelection.message,
+            );
+          }
+
+          const priceSnapshot = await this.findLatestEligibleAssetPriceSnapshot(
+            position.asset,
+            position.currencyCode,
+            valuationAt,
+          );
+          const positionValue = position.quantity.mul(priceSnapshot.price);
+          const positionValueKrw = this.convertToKrwForRecords(
+            positionValue,
+            position.currencyCode,
+            usdKrwSelection,
+          );
+          const returnRate = position.averageCost.eq(0)
+            ? null
+            : priceSnapshot.price
+                .sub(position.averageCost)
+                .div(position.averageCost)
+                .mul(100);
+
+          return {
+            position,
+            positionValueKrw,
+            returnRate,
+            error: null,
+          };
+        } catch (caught) {
+          const valuationError =
+            caught instanceof RecordsValuationError
+              ? caught
+              : new RecordsValuationError(
+                  'ASSET_PRICE_UNAVAILABLE',
+                  `Asset valuation is unavailable for asset ${position.assetId}.`,
+                );
+          valuationErrors.push({
+            symbol: position.asset.symbol,
+            name: position.asset.name,
+            market: position.asset.market,
+            assetType: position.asset.assetType,
+            code: valuationError.code,
+            message: this.publicValuationErrorMessage(valuationError.code),
+          });
+
+          return {
+            position,
+            positionValueKrw: new Prisma.Decimal(0),
+            returnRate: null,
+            error: valuationError,
+          };
+        }
+      }),
+    );
+    const availableHoldings = holdings.filter((holding) => !holding.error);
+    const domesticStockValueKrw = availableHoldings
+      .filter(
+        (holding) =>
+          holding.position.asset.assetType === AssetType.domestic_stock,
+      )
+      .reduce(
+        (sum, holding) => sum.add(holding.positionValueKrw),
+        new Prisma.Decimal(0),
+      );
+    const usStockValueKrw = availableHoldings
+      .filter(
+        (holding) => holding.position.asset.assetType === AssetType.us_stock,
+      )
+      .reduce(
+        (sum, holding) => sum.add(holding.positionValueKrw),
+        new Prisma.Decimal(0),
+      );
+    const cryptoValueKrw = availableHoldings
+      .filter(
+        (holding) => holding.position.asset.assetType === AssetType.crypto,
+      )
+      .reduce(
+        (sum, holding) => sum.add(holding.positionValueKrw),
+        new Prisma.Decimal(0),
+      );
+    const totalAssetKrw = cashKrw
+      .add(domesticStockValueKrw)
+      .add(usStockValueKrw)
+      .add(cryptoValueKrw);
+    const denominator = totalAssetKrw.eq(0) ? null : totalAssetKrw;
+
+    return {
+      state: valuationErrors.length === 0 ? 'available' : 'partial_unavailable',
+      totalAssetKrw: this.formatDecimal(totalAssetKrw, 8),
+      returnRate: null,
+      allocation: {
+        domesticStockRate: this.formatRateFromPart(
+          domesticStockValueKrw,
+          denominator,
+        ),
+        usStockRate: this.formatRateFromPart(usStockValueKrw, denominator),
+        cryptoRate: this.formatRateFromPart(cryptoValueKrw, denominator),
+        cashRate: this.formatRateFromPart(cashKrw, denominator),
+      },
+      topHoldings: availableHoldings
+        .toSorted((left, right) => {
+          const valueDiff = right.positionValueKrw.cmp(left.positionValueKrw);
+          if (valueDiff !== 0) {
+            return valueDiff;
+          }
+
+          return left.position.assetId.localeCompare(right.position.assetId);
+        })
+        .slice(0, 5)
+        .map((holding) => ({
+          symbol: holding.position.asset.symbol,
+          name: holding.position.asset.name,
+          market: holding.position.asset.market,
+          assetType: holding.position.asset.assetType,
+          weightRate: this.formatRateFromPart(
+            holding.positionValueKrw,
+            denominator,
+          ),
+          returnRate: holding.returnRate
+            ? this.formatDecimal(holding.returnRate, 8)
+            : null,
+          returnRateState: holding.returnRate ? 'available' : 'unavailable',
+          valuationState: 'available' as const,
+        })),
+      valuationErrors,
+    };
+  }
+
+  private async findProfitPositions(
+    seasonParticipantId: string,
+  ): Promise<ProfitPositionRecord[]> {
+    return this.prisma.position.findMany({
+      where: {
+        seasonParticipantId,
+      },
+      select: {
+        id: true,
+        assetId: true,
+        quantity: true,
+        averageCost: true,
+        currencyCode: true,
+        realizedPnl: true,
+        realizedPnlKrw: true,
+        asset: {
+          select: {
+            id: true,
+            symbol: true,
+            name: true,
+            market: true,
+            assetType: true,
+            currencyCode: true,
+          },
+        },
+      },
+    });
+  }
+
+  private async findLatestEligibleAssetPriceSnapshot(
+    asset: ProfitPositionRecord['asset'],
+    currencyCode: CurrencyCode,
+    valuationAt: Date,
+  ): Promise<AssetPriceForRecords> {
+    const providerEligibility = resolveAssetProviderEligibility({
+      workflow: 'positions_live_valuation',
+      asset,
+    });
+    const providerCandidates = providerEligibility.eligible
+      ? await this.prisma.assetPriceSnapshot.findMany({
+          where: {
+            assetId: asset.id,
+            currencyCode,
+            sourceType: AssetPriceSourceType.provider_api,
+          },
+          orderBy: [
+            { effectiveAt: 'desc' },
+            { capturedAt: 'desc' },
+            { createdAt: 'desc' },
+          ],
+          take: 10,
+          select: {
+            id: true,
+            price: true,
+            currencyCode: true,
+            sourceType: true,
+            sourceName: true,
+            effectiveAt: true,
+            capturedAt: true,
+          },
+        })
+      : [];
+    const providerSelection = providerEligibility.eligible
+      ? selectFreshProviderSnapshot({
+          candidates: providerCandidates,
+          expectedSourceName: providerEligibility.sourceName,
+          now: valuationAt,
+          freshnessThresholdSeconds:
+            providerEligibility.freshnessThresholdSeconds,
+          isPositiveValue: (candidate) => isPositiveDecimal(candidate.price),
+        })
+      : null;
+
+    if (providerSelection?.state === 'selected') {
+      return providerSelection.snapshot;
+    }
+
+    const fallbackSnapshot = await this.prisma.assetPriceSnapshot.findFirst({
+      where: {
+        assetId: asset.id,
+        currencyCode,
+        sourceType: AssetPriceSourceType.admin_manual,
+        effectiveAt: {
+          lte: valuationAt,
+        },
+        price: {
+          gt: 0,
+        },
+      },
+      orderBy: [
+        { effectiveAt: 'desc' },
+        { capturedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      select: {
+        id: true,
+        price: true,
+        currencyCode: true,
+        sourceType: true,
+        sourceName: true,
+        effectiveAt: true,
+        capturedAt: true,
+      },
+    });
+
+    if (fallbackSnapshot) {
+      return fallbackSnapshot;
+    }
+
+    if (
+      providerSelection?.decision.rejectedProviderReason === 'captured_at_stale'
+    ) {
+      throw new RecordsValuationError(
+        'PRICE_STALE',
+        `Provider asset price is stale for asset ${asset.id}.`,
+      );
+    }
+
+    throw new RecordsValuationError(
+      'ASSET_PRICE_UNAVAILABLE',
+      `Asset price snapshot is unavailable for asset ${asset.id}.`,
+    );
+  }
+
+  private async findUsdKrwSelectionForRecords(
+    needed: boolean,
+    valuationAt: Date,
+  ): Promise<UsdKrwForRecords | null> {
+    if (!needed) {
+      return null;
+    }
+
+    const providerEligibility = resolveFxProviderEligibility({
+      workflow: 'positions_live_valuation',
+      baseCurrency: CurrencyCode.USD,
+      quoteCurrency: CurrencyCode.KRW,
+    });
+    const providerCandidates = providerEligibility.eligible
+      ? await this.prisma.fxRateSnapshot.findMany({
+          where: {
+            baseCurrency: CurrencyCode.USD,
+            quoteCurrency: CurrencyCode.KRW,
+            sourceType: FxRateSourceType.provider_api,
+          },
+          orderBy: [
+            { effectiveAt: 'desc' },
+            { capturedAt: 'desc' },
+            { createdAt: 'desc' },
+          ],
+          take: 10,
+          select: {
+            id: true,
+            rate: true,
+            sourceType: true,
+            sourceName: true,
+            effectiveAt: true,
+            capturedAt: true,
+          },
+        })
+      : [];
+    const providerSelection = providerEligibility.eligible
+      ? selectFreshProviderSnapshot({
+          candidates: providerCandidates,
+          expectedSourceName: providerEligibility.sourceName,
+          now: valuationAt,
+          freshnessThresholdSeconds:
+            providerEligibility.freshnessThresholdSeconds,
+          isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
+        })
+      : null;
+
+    if (providerSelection?.state === 'selected') {
+      return {
+        state: 'available',
+        rate: providerSelection.snapshot.rate,
+      };
+    }
+
+    const fallbackSnapshot = await this.prisma.fxRateSnapshot.findFirst({
+      where: {
+        baseCurrency: CurrencyCode.USD,
+        quoteCurrency: CurrencyCode.KRW,
+        sourceType: FxRateSourceType.admin_manual,
+        approvedByUserId: {
+          not: null,
+        },
+        effectiveAt: {
+          lte: valuationAt,
+        },
+        rate: {
+          gt: 0,
+        },
+      },
+      orderBy: [
+        { effectiveAt: 'desc' },
+        { capturedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      select: {
+        id: true,
+        rate: true,
+        sourceType: true,
+        sourceName: true,
+        effectiveAt: true,
+        capturedAt: true,
+        approvedByUserId: true,
+      },
+    });
+
+    if (!fallbackSnapshot) {
+      return {
+        state: 'unavailable',
+        code:
+          providerSelection?.decision.rejectedProviderReason ===
+          'captured_at_stale'
+            ? 'FX_RATE_STALE'
+            : 'FX_RATE_UNAVAILABLE',
+        message:
+          providerSelection?.decision.rejectedProviderReason ===
+          'captured_at_stale'
+            ? 'USD/KRW FX rate snapshot is stale.'
+            : 'USD/KRW FX rate snapshot is unavailable.',
+      };
+    }
+
+    if (
+      isFxSnapshotStaleForPortfolioValuation(
+        fallbackSnapshot.effectiveAt,
+        valuationAt,
+      )
+    ) {
+      return {
+        state: 'unavailable',
+        code: 'FX_RATE_STALE',
+        message: 'USD/KRW FX rate snapshot is stale.',
+      };
+    }
+
+    return {
+      state: 'available',
+      rate: fallbackSnapshot.rate,
+    };
+  }
+
+  private convertToKrwForRecords(
+    amount: Prisma.Decimal,
+    currencyCode: CurrencyCode,
+    usdKrwSelection: UsdKrwForRecords | null,
+  ): Prisma.Decimal {
+    if (currencyCode === CurrencyCode.KRW) {
+      return amount;
+    }
+
+    if (usdKrwSelection?.state !== 'available') {
+      throw new RecordsValuationError(
+        'FX_RATE_UNAVAILABLE',
+        'USD/KRW FX rate snapshot is required for USD conversion.',
+      );
+    }
+
+    return amount.mul(usdKrwSelection.rate);
+  }
+
+  private formatRateFromPart(
+    part: Prisma.Decimal,
+    denominator: Prisma.Decimal | null,
+  ): string {
+    if (!denominator || denominator.eq(0)) {
+      return this.formatDecimal(new Prisma.Decimal(0), 8);
+    }
+
+    return this.formatDecimal(part.div(denominator).mul(100), 8);
+  }
+
+  private unavailableProfitAnalysis(): ProfitAnalysis {
+    return {
+      state: 'unavailable',
+      totalRealizedPnlKrw: this.formatDecimal(new Prisma.Decimal(0), 8),
+      totalUnrealizedPnlKrw: this.formatDecimal(new Prisma.Decimal(0), 8),
+      totalPnlKrw: this.formatDecimal(new Prisma.Decimal(0), 8),
+      bestAsset: null,
+      worstAsset: null,
+      items: [],
+      valuationErrors: [],
+    };
+  }
+
+  private notJoinedPublicPortfolioSummary(): PublicPortfolioSummary {
+    return {
+      ...this.emptyPublicPortfolioSummary(),
+      state: 'not_joined',
+    };
+  }
+
+  private emptyPublicPortfolioSummary(): PublicPortfolioSummary {
+    return {
+      state: 'unavailable',
+      totalAssetKrw: null,
+      returnRate: null,
+      allocation: {
+        domesticStockRate: this.formatDecimal(new Prisma.Decimal(0), 8),
+        usStockRate: this.formatDecimal(new Prisma.Decimal(0), 8),
+        cryptoRate: this.formatDecimal(new Prisma.Decimal(0), 8),
+        cashRate: this.formatDecimal(new Prisma.Decimal(0), 8),
+      },
+      topHoldings: [],
+      valuationErrors: [],
+    };
+  }
+
+  private publicValuationErrorMessage(code: ValuationErrorCode): string {
+    switch (code) {
+      case 'PRICE_STALE':
+        return 'Asset price snapshot is stale.';
+      case 'FX_RATE_UNAVAILABLE':
+        return 'USD/KRW FX rate snapshot is unavailable.';
+      case 'FX_RATE_STALE':
+        return 'USD/KRW FX rate snapshot is stale.';
+      case 'ASSET_PRICE_UNAVAILABLE':
+      default:
+        return 'Asset price snapshot is unavailable.';
+    }
   }
 
   private async buildExchangeSection(
@@ -1520,6 +2392,8 @@ export class RecordsService {
         participantStatus: true,
         joinedAt: true,
         initialCapitalKrw: true,
+        maxDrawdown: true,
+        currentRank: true,
         finalRank: true,
         finalTier: true,
         rewardGrantedAt: true,
@@ -1575,6 +2449,40 @@ export class RecordsService {
         status,
       },
     });
+  }
+
+  private async findSnapshotHistory(
+    seasonParticipantId: string,
+  ): Promise<RankingHistoricalSnapshotInput[]> {
+    return this.prisma.dailyPortfolioSnapshot.findMany({
+      where: {
+        seasonParticipantId,
+      },
+      orderBy: [
+        { snapshotDate: 'asc' },
+        { capturedAt: 'asc' },
+        { createdAt: 'asc' },
+      ],
+      select: {
+        seasonParticipantId: true,
+        snapshotDate: true,
+        totalAssetKrw: true,
+        returnRate: true,
+        capturedAt: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  private calculateMdd(
+    fallbackMaxDrawdown: Prisma.Decimal,
+    snapshots: readonly RankingHistoricalSnapshotInput[],
+  ): Prisma.Decimal {
+    if (snapshots.length > 0) {
+      return calculateMaxDrawdownPercent(snapshots);
+    }
+
+    return fallbackMaxDrawdown;
   }
 
   private unavailableResponse(input: {
@@ -1680,6 +2588,7 @@ export class RecordsService {
       state: 'unavailable',
       totalAssetKrw: null,
       returnRate: null,
+      maxDrawdown: null,
       snapshotDate: null,
       capturedAt: null,
       reason: 'PERFORMANCE_UNAVAILABLE',
@@ -1742,12 +2651,14 @@ export class RecordsService {
           capturedAt: Date;
         }
       | undefined,
+    maxDrawdown: Prisma.Decimal,
   ): MySeasonRecordDetailResponse['data']['performance'] {
     if (snapshot) {
       return {
         state: 'available',
         totalAssetKrw: this.formatDecimal(snapshot.totalAssetKrw, 8),
         returnRate: this.formatDecimal(snapshot.returnRate, 8),
+        maxDrawdown: this.formatDecimal(maxDrawdown, 8),
         snapshotDate: this.formatDateOnly(snapshot.snapshotDate),
         capturedAt: snapshot.capturedAt.toISOString(),
       };
@@ -1758,6 +2669,7 @@ export class RecordsService {
         state: 'available',
         totalAssetKrw: this.formatDecimal(finalRanking.totalAssetKrw, 8),
         returnRate: this.formatDecimal(finalRanking.returnRate, 8),
+        maxDrawdown: this.formatDecimal(maxDrawdown, 8),
         snapshotDate: this.formatDateOnly(finalRanking.rankingDate),
         capturedAt: finalRanking.capturedAt.toISOString(),
       };

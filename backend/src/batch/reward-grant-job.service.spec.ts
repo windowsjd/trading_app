@@ -8,50 +8,35 @@ jest.mock('../generated/prisma/client', () => ({
   },
   Prisma: {
     JsonNull: null,
-    join: (values: unknown[]) => ({
-      values,
-    }),
-    sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({
-      strings: Array.from(strings),
-      values,
-    }),
   },
   PrismaClient: class PrismaClient {},
-  SeasonStatus: {
-    upcoming: 'upcoming',
-    active: 'active',
-    ended: 'ended',
-    settled: 'settled',
-  },
 }));
 
 import { HttpException, HttpStatus } from '@nestjs/common';
-import { SeasonStatus } from '../generated/prisma/client';
 import { RewardGrantJobService } from './reward-grant-job.service';
 import {
   REWARD_GRANT_JOB_NAME,
-  RewardGrantJobResult,
+  REWARD_POLICY_GATE_CLOSED,
+  REWARD_POLICY_GATE_CLOSED_MESSAGE,
 } from './reward-grant-job.types';
 
 type BatchServiceMock = {
   runJob: jest.Mock;
 };
 
-type PrismaMock = ReturnType<typeof createPrismaMock>;
-
 const BATCH_STARTED_AT = new Date('2026-05-22T01:02:03.000Z');
 
 describe('RewardGrantJobService', () => {
   it('uses BatchService.runJob with the fixed jobName and generated idempotencyKey', async () => {
-    const { service, batchService, prisma } = createService();
-    mockSeason(prisma, SeasonStatus.settled);
-    mockParticipants(prisma, [participant('sp-1', 'user-1', 1, 'master')]);
+    const { service, batchService } = createService();
 
-    await service.run({
-      seasonId: 'season-1',
-      dryRun: true,
-      requestedBy: 'operator',
-    });
+    await expect(
+      service.run({
+        seasonId: 'season-1',
+        dryRun: true,
+        requestedBy: 'operator',
+      }),
+    ).rejects.toBeInstanceOf(HttpException);
 
     expect(batchService.runJob).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -71,15 +56,15 @@ describe('RewardGrantJobService', () => {
   });
 
   it('uses grantDate in the generated idempotencyKey when provided', async () => {
-    const { service, batchService, prisma } = createService();
-    mockSeason(prisma, SeasonStatus.settled);
-    mockParticipants(prisma, [participant('sp-1', 'user-1', 1, 'master')]);
+    const { service, batchService } = createService();
 
-    await service.run({
-      seasonId: 'season-1',
-      grantDate: '2026-05-22',
-      dryRun: true,
-    });
+    await expect(
+      service.run({
+        seasonId: 'season-1',
+        grantDate: '2026-05-22',
+        dryRun: true,
+      }),
+    ).rejects.toBeInstanceOf(HttpException);
 
     expect(batchService.runJob).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -93,15 +78,15 @@ describe('RewardGrantJobService', () => {
   });
 
   it('keeps an explicit idempotencyKey when provided', async () => {
-    const { service, batchService, prisma } = createService();
-    mockSeason(prisma, SeasonStatus.settled);
-    mockParticipants(prisma, [participant('sp-1', 'user-1', 1, 'master')]);
+    const { service, batchService } = createService();
 
-    await service.run({
-      seasonId: 'season-1',
-      dryRun: true,
-      idempotencyKey: 'manual-key',
-    });
+    await expect(
+      service.run({
+        seasonId: 'season-1',
+        dryRun: true,
+        idempotencyKey: 'manual-key',
+      }),
+    ).rejects.toBeInstanceOf(HttpException);
 
     expect(batchService.runJob).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -110,560 +95,57 @@ describe('RewardGrantJobService', () => {
     );
   });
 
-  it('returns wouldGrant in dry-run without updating rewardGrantedAt', async () => {
-    const { service, prisma } = createService();
-    mockSeason(prisma, SeasonStatus.settled, { summary: 'tier only' });
-    mockParticipants(prisma, [
-      participant('sp-1', 'user-1', 1, 'master'),
-      participant('sp-existing', 'user-2', 2, 'diamond', {
-        rewardGrantedAt: new Date('2026-05-21T00:00:00.000Z'),
-      }),
-      participant('sp-no-rank', 'user-3', null, 'gold'),
-      participant('sp-no-tier', 'user-4', 4, null),
-    ]);
-
-    const result = await runAndGetResult(service, {
-      seasonId: 'season-1',
-      dryRun: true,
-    });
-
-    expect(prisma.$transaction).not.toHaveBeenCalled();
-    expect(prisma.__tx.seasonParticipant.updateMany).not.toHaveBeenCalled();
-    expect(rawCalls(prisma, 'INSERT INTO "badges"')).toHaveLength(0);
-    expect(rawCalls(prisma, 'INSERT INTO "user_badges"')).toHaveLength(0);
-    expect(rawCalls(prisma, 'INSERT INTO "season_rewards"')).toHaveLength(0);
-    expect(result).toMatchObject({
-      seasonId: 'season-1',
-      dryRun: true,
-      grantTimestamp: '2026-05-22T01:02:03.000Z',
-      grantDate: null,
-      policy: {
-        source: 'internal_reward_foundation_mvp',
-        rewardPolicyJsonAvailable: true,
-      },
-      participants: {
-        total: 4,
-        eligible: 1,
-        wouldGrant: 1,
-        granted: 0,
-        existing: 1,
-        ineligible: 2,
-        skipped: 3,
-      },
-      grantedParticipantIds: [],
-      rewardRows: {
-        total: {
-          wouldCreate: 4,
-          created: 0,
-          existing: 0,
-        },
-        tierBadge: {
-          wouldCreate: 2,
-          created: 0,
-          existing: 0,
-        },
-        trophy: {
-          wouldCreate: 2,
-          created: 0,
-          existing: 0,
-        },
-      },
-      userBadges: {
-        wouldCreate: 4,
-        created: 0,
-        existing: 0,
-      },
-    });
-    expect(result.topGranted).toEqual([
-      {
-        seasonParticipantId: 'sp-1',
-        userId: 'user-1',
-        finalRank: 1,
-        finalTier: 'master',
-        rewardGrantedAt: '2026-05-22T01:02:03.000Z',
-      },
-    ]);
-  });
-
-  it('updates eligible settled participants with one rewardGrantedAt timestamp in a transaction', async () => {
-    const { service, prisma } = createService();
-    mockSeason(prisma, SeasonStatus.settled);
-    mockParticipants(prisma, [
-      participant('sp-2', 'user-2', 2, 'diamond'),
-      participant('sp-1', 'user-1', 1, 'master'),
-    ]);
-
-    const result = await runAndGetResult(service, {
-      seasonId: 'season-1',
-      grantDate: '2026-05-22',
-    });
-
-    const grantTimestamp = new Date('2026-05-22T00:00:00.000Z');
-    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-    expect(prisma.seasonParticipant.updateMany).not.toHaveBeenCalled();
-    expect(prisma.__tx.seasonParticipant.updateMany).toHaveBeenCalledTimes(2);
-    expect(prisma.__tx.seasonParticipant.updateMany).toHaveBeenNthCalledWith(
-      1,
-      {
-        where: {
-          id: 'sp-1',
+  it.each([true, false])(
+    'returns REWARD_POLICY_GATE_CLOSED for dryRun=%s without reward writes',
+    async (dryRun) => {
+      const { service, prisma } = createService();
+      const response = await captureHttpExceptionResponse(
+        service.run({
           seasonId: 'season-1',
-          finalRank: 1,
-          finalTier: 'master',
-          rewardGrantedAt: null,
-        },
-        data: {
-          rewardGrantedAt: grantTimestamp,
-        },
-      },
-    );
-    expect(prisma.__tx.seasonParticipant.updateMany).toHaveBeenNthCalledWith(
-      2,
-      {
-        where: {
-          id: 'sp-2',
-          seasonId: 'season-1',
-          finalRank: 2,
-          finalTier: 'diamond',
-          rewardGrantedAt: null,
-        },
-        data: {
-          rewardGrantedAt: grantTimestamp,
-        },
-      },
-    );
-    expect(result).toMatchObject({
-      grantTimestamp: '2026-05-22T00:00:00.000Z',
-      grantDate: '2026-05-22',
-      participants: {
-        eligible: 2,
-        wouldGrant: 2,
-        granted: 2,
-      },
-      rewardRows: {
-        total: {
-          wouldCreate: 4,
-          created: 4,
-          existing: 0,
-        },
-        tierBadge: {
-          wouldCreate: 2,
-          created: 2,
-          existing: 0,
-        },
-        trophy: {
-          wouldCreate: 2,
-          created: 2,
-          existing: 0,
-        },
-      },
-      userBadges: {
-        wouldCreate: 4,
-        created: 4,
-        existing: 0,
-      },
-      grantedParticipantIds: ['sp-1', 'sp-2'],
-    });
-    expect(rawCalls(prisma, 'INSERT INTO "badges"')).toHaveLength(4);
-    expect(rawCalls(prisma, 'INSERT INTO "user_badges"')).toHaveLength(4);
-    expect(rawCalls(prisma, 'INSERT INTO "season_rewards"')).toHaveLength(4);
-    expect(new Set(updateTimestamps(prisma))).toEqual(
-      new Set(['2026-05-22T00:00:00.000Z']),
-    );
-  });
-
-  it('creates tier badge reward rows for finalTier', async () => {
-    const { service, prisma } = createService();
-    mockSeason(prisma, SeasonStatus.settled);
-    mockParticipants(prisma, [participant('sp-1', 'user-1', 11, 'gold')]);
-
-    const result = await runAndGetResult(service, {
-      seasonId: 'season-1',
-    });
-
-    expect(result.rewardRows).toMatchObject({
-      total: {
-        created: 1,
-      },
-      tierBadge: {
-        created: 1,
-      },
-      trophy: {
-        created: 0,
-      },
-    });
-    expect(insertedSeasonRewardCodes(prisma)).toEqual(['TIER_GOLD']);
-    expect(insertedBadgeCodes(prisma)).toEqual(['TIER_GOLD']);
-  });
-
-  it('creates TOP10 trophy reward rows for finalRank <= 10', async () => {
-    const { service, prisma } = createService();
-    mockSeason(prisma, SeasonStatus.settled);
-    mockParticipants(prisma, [participant('sp-1', 'user-1', 10, 'platinum')]);
-
-    const result = await runAndGetResult(service, {
-      seasonId: 'season-1',
-    });
-
-    expect(result.rewardRows).toMatchObject({
-      total: {
-        created: 2,
-      },
-      tierBadge: {
-        created: 1,
-      },
-      trophy: {
-        created: 1,
-      },
-    });
-    expect(insertedSeasonRewardCodes(prisma)).toEqual([
-      'TIER_PLATINUM',
-      'TROPHY_TOP10',
-    ]);
-    expect(insertedBadgeCodes(prisma)).toEqual([
-      'TIER_PLATINUM',
-      'TROPHY_TOP10',
-    ]);
-  });
-
-  it('does not create TOP10 trophy reward rows for finalRank > 10', async () => {
-    const { service, prisma } = createService();
-    mockSeason(prisma, SeasonStatus.settled);
-    mockParticipants(prisma, [participant('sp-1', 'user-1', 11, 'gold')]);
-
-    await runAndGetResult(service, {
-      seasonId: 'season-1',
-    });
-
-    expect(insertedSeasonRewardCodes(prisma)).toEqual(['TIER_GOLD']);
-    expect(insertedSeasonRewardCodes(prisma)).not.toContain('TROPHY_TOP10');
-  });
-
-  it('classifies finalRank/finalTier missing participants as ineligible and skipped', async () => {
-    const { service, prisma } = createService();
-    mockSeason(prisma, SeasonStatus.settled);
-    mockParticipants(prisma, [
-      participant('sp-final', 'user-1', 1, 'master'),
-      participant('sp-no-rank', 'user-2', null, 'gold'),
-      participant('sp-no-tier', 'user-3', 3, null),
-    ]);
-
-    const result = await runAndGetResult(service, {
-      seasonId: 'season-1',
-      dryRun: true,
-    });
-
-    expect(result.participants).toMatchObject({
-      total: 3,
-      eligible: 1,
-      existing: 0,
-      ineligible: 2,
-      skipped: 2,
-    });
-  });
-
-  it('treats existing rewardGrantedAt as existing/skipped and does not overwrite it', async () => {
-    const { service, prisma } = createService();
-    mockSeason(prisma, SeasonStatus.settled);
-    mockParticipants(prisma, [
-      participant('sp-existing', 'user-1', 1, 'master', {
-        rewardGrantedAt: new Date('2026-05-20T00:00:00.000Z'),
-      }),
-      participant('sp-new', 'user-2', 2, 'diamond'),
-    ]);
-
-    const result = await runAndGetResult(service, {
-      seasonId: 'season-1',
-    });
-
-    expect(prisma.__tx.seasonParticipant.updateMany).toHaveBeenCalledTimes(1);
-    expect(prisma.__tx.seasonParticipant.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          id: 'sp-new',
+          dryRun,
         }),
-      }),
-    );
-    expect(result.participants).toEqual({
-      total: 2,
-      eligible: 1,
-      wouldGrant: 1,
-      granted: 1,
-      existing: 1,
-      ineligible: 0,
-      skipped: 1,
-    });
-    expect(result.grantedParticipantIds).toEqual(['sp-new']);
-  });
+      );
 
-  it('succeeds when all final-assigned participants are already granted', async () => {
-    const { service, prisma } = createService();
-    mockSeason(prisma, SeasonStatus.settled);
-    const participants = [
-      participant('sp-1', 'user-1', 1, 'master', {
-        rewardGrantedAt: new Date('2026-05-20T00:00:00.000Z'),
-      }),
-      participant('sp-2', 'user-2', 2, 'diamond', {
-        rewardGrantedAt: new Date('2026-05-20T00:00:00.000Z'),
-      }),
-    ];
-    mockParticipants(prisma, participants);
-    mockExistingRewardRows(prisma, [
-      existingReward('sp-1', 'user-1', 'TIER_MASTER'),
-      existingReward('sp-1', 'user-1', 'TROPHY_TOP10'),
-      existingReward('sp-2', 'user-2', 'TIER_DIAMOND'),
-      existingReward('sp-2', 'user-2', 'TROPHY_TOP10'),
-    ]);
-
-    const result = await runAndGetResult(service, {
-      seasonId: 'season-1',
-    });
-
-    expect(prisma.$transaction).not.toHaveBeenCalled();
-    expect(result.participants).toEqual({
-      total: 2,
-      eligible: 0,
-      wouldGrant: 0,
-      granted: 0,
-      existing: 2,
-      ineligible: 0,
-      skipped: 2,
-    });
-    expect(result.rewardRows.total).toEqual({
-      wouldCreate: 0,
-      created: 0,
-      existing: 4,
-    });
-    expect(result.userBadges).toEqual({
-      wouldCreate: 0,
-      created: 0,
-      existing: 4,
-    });
-    expect(result.grantedParticipantIds).toEqual([]);
-    expect(result.topGranted).toEqual([]);
-  });
-
-  it('is idempotent and does not duplicate Badge/UserBadge/SeasonReward rows', async () => {
-    const { service, prisma } = createService();
-    mockSeason(prisma, SeasonStatus.settled);
-    mockParticipants(prisma, [
-      participant('sp-1', 'user-1', 1, 'master', {
-        rewardGrantedAt: new Date('2026-05-20T00:00:00.000Z'),
-      }),
-    ]);
-    mockExistingRewardRows(prisma, [
-      existingReward('sp-1', 'user-1', 'TIER_MASTER'),
-      existingReward('sp-1', 'user-1', 'TROPHY_TOP10'),
-    ]);
-
-    const result = await runAndGetResult(service, {
-      seasonId: 'season-1',
-    });
-
-    expect(prisma.$transaction).not.toHaveBeenCalled();
-    expect(rawCalls(prisma, 'INSERT INTO "badges"')).toHaveLength(0);
-    expect(rawCalls(prisma, 'INSERT INTO "user_badges"')).toHaveLength(0);
-    expect(rawCalls(prisma, 'INSERT INTO "season_rewards"')).toHaveLength(0);
-    expect(result.rewardRows.total).toEqual({
-      wouldCreate: 0,
-      created: 0,
-      existing: 2,
-    });
-    expect(result.userBadges).toEqual({
-      wouldCreate: 0,
-      created: 0,
-      existing: 2,
-    });
-  });
-
-  it('can backfill missing reward rows when rewardGrantedAt already exists', async () => {
-    const { service, prisma } = createService();
-    mockSeason(prisma, SeasonStatus.settled);
-    mockParticipants(prisma, [
-      participant('sp-1', 'user-1', 1, 'master', {
-        rewardGrantedAt: new Date('2026-05-20T00:00:00.000Z'),
-      }),
-    ]);
-
-    const result = await runAndGetResult(service, {
-      seasonId: 'season-1',
-      grantDate: '2026-05-22',
-    });
-
-    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-    expect(prisma.__tx.seasonParticipant.updateMany).not.toHaveBeenCalled();
-    expect(result.participants).toMatchObject({
-      eligible: 0,
-      granted: 0,
-      existing: 1,
-    });
-    expect(result.rewardRows.total).toMatchObject({
-      wouldCreate: 2,
-      created: 2,
-      existing: 0,
-    });
-    expect(result.rewardBackfilledParticipantIds).toEqual(['sp-1']);
-    expect(insertedSeasonRewardGrantedAt(prisma)).toEqual([
-      '2026-05-20T00:00:00.000Z',
-      '2026-05-20T00:00:00.000Z',
-    ]);
-  });
-
-  it('fails when no participant has both finalRank and finalTier', async () => {
-    const { service, prisma } = createService();
-    mockSeason(prisma, SeasonStatus.settled);
-    mockParticipants(prisma, [
-      participant('sp-no-rank', 'user-1', null, 'gold'),
-      participant('sp-no-tier', 'user-2', 2, null),
-    ]);
-
-    const response = await captureHttpExceptionResponse(
-      service.run({
+      expect(response.error).toEqual({
+        code: REWARD_POLICY_GATE_CLOSED,
+        message: REWARD_POLICY_GATE_CLOSED_MESSAGE,
+      });
+      expect(response.data.resultPayloadJson).toMatchObject({
         seasonId: 'season-1',
-      }),
-    );
-
-    expect(response.error.code).toBe('FINAL_TIER_ASSIGNMENT_REQUIRED');
-    expect(response.data.resultPayloadJson).toMatchObject({
-      reason: 'FINAL_TIER_ASSIGNMENT_REQUIRED',
-      participants: {
-        total: 2,
-        eligible: 0,
-        ineligible: 2,
-        skipped: 2,
-      },
-    });
-    expect(prisma.$transaction).not.toHaveBeenCalled();
-  });
-
-  it('treats missing season as a job-level error inside the batch envelope', async () => {
-    const { service, batchService, prisma } = createService();
-    prisma.season.findUnique.mockResolvedValue(null);
-
-    await expect(
-      service.run({
-        seasonId: 'missing-season',
-      }),
-    ).rejects.toMatchObject({
-      status: HttpStatus.NOT_FOUND,
-    });
-    expect(batchService.runJob).toHaveBeenCalled();
-  });
-
-  it.each([
-    [SeasonStatus.active, 'SEASON_STATUS_NOT_ALLOWED'],
-    [SeasonStatus.upcoming, 'SEASON_STATUS_NOT_ALLOWED'],
-    [SeasonStatus.ended, 'SETTLEMENT_REQUIRED'],
-  ])('rejects %s seasons at job level', async (status, code) => {
-    const { service, prisma } = createService();
-    mockSeason(prisma, status);
-
-    const response = await captureHttpExceptionResponse(
-      service.run({
-        seasonId: 'season-1',
-      }),
-    );
-
-    expect(response.error.code).toBe(code);
-    expect(prisma.seasonParticipant.findMany).not.toHaveBeenCalled();
-  });
-
-  it('rejects invalid grantDate as BAD_REQUEST', async () => {
-    const { service } = createService();
-
-    const response = await captureHttpExceptionResponse(
-      service.run({
-        seasonId: 'season-1',
-        grantDate: '2026-02-31',
-      }),
-    );
-
-    expect(response.error.code).toBe('BAD_REQUEST');
-  });
-
-  it('does not create payment/provider/trading rows or unrelated business rows', async () => {
-    const { service, prisma } = createService();
-    mockSeason(prisma, SeasonStatus.settled);
-    mockParticipants(prisma, [participant('sp-1', 'user-1', 1, 'master')]);
-
-    await service.run({
-      seasonId: 'season-1',
-    });
-
-    expect(prisma.season.update).not.toHaveBeenCalled();
-    expect(prisma.season.updateMany).not.toHaveBeenCalled();
-    expect(prisma.asset.create).not.toHaveBeenCalled();
-    expect(prisma.asset.update).not.toHaveBeenCalled();
-    expect(prisma.assetPriceSnapshot.create).not.toHaveBeenCalled();
-    expect(prisma.assetPriceSnapshot.update).not.toHaveBeenCalled();
-    expect(prisma.fxRateSnapshot.create).not.toHaveBeenCalled();
-    expect(prisma.fxRateSnapshot.update).not.toHaveBeenCalled();
-    expect(prisma.cashWallet.create).not.toHaveBeenCalled();
-    expect(prisma.cashWallet.update).not.toHaveBeenCalled();
-    expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
-    expect(prisma.exchangeTransaction.create).not.toHaveBeenCalled();
-    expect(prisma.exchangeTransaction.update).not.toHaveBeenCalled();
-    expect(prisma.order.create).not.toHaveBeenCalled();
-    expect(prisma.order.update).not.toHaveBeenCalled();
-    expect(prisma.position.create).not.toHaveBeenCalled();
-    expect(prisma.position.update).not.toHaveBeenCalled();
-    expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
-    expect(prisma.dailyPortfolioSnapshot.create).not.toHaveBeenCalled();
-    expect(prisma.dailyPortfolioSnapshot.update).not.toHaveBeenCalled();
-    expect(prisma.dailyPortfolioSnapshot.upsert).not.toHaveBeenCalled();
-    expect(prisma.dailyPortfolioSnapshot.deleteMany).not.toHaveBeenCalled();
-    expect(prisma.seasonRanking.create).not.toHaveBeenCalled();
-    expect(prisma.seasonRanking.update).not.toHaveBeenCalled();
-    expect(prisma.seasonRanking.upsert).not.toHaveBeenCalled();
-    expect(prisma.seasonRanking.deleteMany).not.toHaveBeenCalled();
-    expect(prisma.payment.create).not.toHaveBeenCalled();
-    expect(prisma.pointTransaction.create).not.toHaveBeenCalled();
-  });
-
-  it('updates only rewardGrantedAt and never updates finalRank/finalTier', async () => {
-    const { service, prisma } = createService();
-    mockSeason(prisma, SeasonStatus.settled);
-    mockParticipants(prisma, [participant('sp-1', 'user-1', 1, 'master')]);
-
-    await service.run({
-      seasonId: 'season-1',
-    });
-
-    expect(
-      prisma.__tx.seasonParticipant.updateMany.mock.calls[0][0].data,
-    ).toEqual({
-      rewardGrantedAt: BATCH_STARTED_AT,
-    });
-    expect(
-      prisma.__tx.seasonParticipant.updateMany.mock.calls[0][0].data,
-    ).not.toHaveProperty('finalRank');
-    expect(
-      prisma.__tx.seasonParticipant.updateMany.mock.calls[0][0].data,
-    ).not.toHaveProperty('finalTier');
-  });
-
-  it('caps topGranted at 10 rows', async () => {
-    const { service, prisma } = createService();
-    mockSeason(prisma, SeasonStatus.settled);
-    mockParticipants(
-      prisma,
-      Array.from({ length: 12 }, (_, index) =>
-        participant(
-          `sp-${index + 1}`,
-          `user-${index + 1}`,
-          index + 1,
-          'bronze',
-        ),
-      ),
-    );
-
-    const result = await runAndGetResult(service, {
-      seasonId: 'season-1',
-      dryRun: true,
-    });
-
-    expect(result.topGranted).toHaveLength(10);
-  });
+        dryRun,
+        reason: REWARD_POLICY_GATE_CLOSED,
+        message: REWARD_POLICY_GATE_CLOSED_MESSAGE,
+        participants: {
+          total: 0,
+          eligible: 0,
+          wouldGrant: 0,
+          granted: 0,
+        },
+        rewardRows: {
+          total: {
+            wouldCreate: 0,
+            created: 0,
+          },
+        },
+        userBadges: {
+          wouldCreate: 0,
+          created: 0,
+        },
+        topGranted: [],
+        topRewards: [],
+        errors: [
+          {
+            code: REWARD_POLICY_GATE_CLOSED,
+            message: REWARD_POLICY_GATE_CLOSED_MESSAGE,
+          },
+        ],
+      });
+      expect(response.data.resultPayloadJson.grantTimestamp).toBe(
+        BATCH_STARTED_AT.toISOString(),
+      );
+      expectNoRewardWrites(prisma);
+    },
+  );
 });
 
 function createService() {
@@ -682,126 +164,25 @@ function createService() {
 }
 
 function createPrismaMock() {
-  const rawState = {
-    existingSeasonRewardRows: [] as Array<{
-      seasonParticipantId: string;
-      rewardCode: string;
-    }>,
-    existingUserBadgeRows: [] as Array<{
-      userId: string;
-      seasonId: string;
-      badgeCode: string;
-    }>,
-    badgeSequence: 0,
-    userBadgeSequence: 0,
-    seasonRewardSequence: 0,
-  };
-  const queryRaw = jest.fn(async (query) => {
-    const text = queryText(query);
-
-    if (text.includes('FROM "season_rewards"')) {
-      return rawState.existingSeasonRewardRows;
-    }
-
-    if (text.includes('FROM "user_badges"')) {
-      return rawState.existingUserBadgeRows;
-    }
-
-    if (text.includes('INSERT INTO "badges"')) {
-      rawState.badgeSequence += 1;
-      return [{ id: `badge-${rawState.badgeSequence}` }];
-    }
-
-    if (text.includes('INSERT INTO "user_badges"')) {
-      rawState.userBadgeSequence += 1;
-      return [{ id: `user-badge-${rawState.userBadgeSequence}` }];
-    }
-
-    if (text.includes('INSERT INTO "season_rewards"')) {
-      rawState.seasonRewardSequence += 1;
-      return [{ id: `season-reward-${rawState.seasonRewardSequence}` }];
-    }
-
-    return [];
-  });
-  const tx = {
-    $queryRaw: queryRaw,
-    seasonParticipant: {
-      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-    },
-  };
-
   return {
-    __tx: tx,
-    __rawState: rawState,
-    $queryRaw: queryRaw,
-    $transaction: jest.fn(async (callback) => callback(tx)),
+    $queryRaw: jest.fn(),
+    $transaction: jest.fn(),
     season: {
       findUnique: jest.fn(),
-      update: jest.fn(),
-      updateMany: jest.fn(),
     },
     seasonParticipant: {
       findMany: jest.fn(),
       updateMany: jest.fn(),
-      update: jest.fn(),
-      create: jest.fn(),
-      upsert: jest.fn(),
-      deleteMany: jest.fn(),
-    },
-    dailyPortfolioSnapshot: {
-      create: jest.fn(),
-      update: jest.fn(),
-      upsert: jest.fn(),
-      deleteMany: jest.fn(),
-    },
-    seasonRanking: {
-      create: jest.fn(),
-      update: jest.fn(),
-      upsert: jest.fn(),
-      deleteMany: jest.fn(),
-    },
-    asset: {
-      create: jest.fn(),
-      update: jest.fn(),
-    },
-    assetPriceSnapshot: {
-      create: jest.fn(),
-      update: jest.fn(),
-    },
-    fxRateSnapshot: {
-      create: jest.fn(),
-      update: jest.fn(),
-    },
-    cashWallet: {
-      create: jest.fn(),
-      update: jest.fn(),
-    },
-    walletTransaction: {
-      create: jest.fn(),
-    },
-    exchangeTransaction: {
-      create: jest.fn(),
-      update: jest.fn(),
-    },
-    order: {
-      create: jest.fn(),
-      update: jest.fn(),
-    },
-    position: {
-      create: jest.fn(),
-      update: jest.fn(),
-    },
-    equitySnapshot: {
-      create: jest.fn(),
-    },
-    payment: {
-      create: jest.fn(),
     },
     badge: {
       create: jest.fn(),
+      update: jest.fn(),
+      upsert: jest.fn(),
     },
-    pointTransaction: {
+    userBadge: {
+      create: jest.fn(),
+    },
+    seasonReward: {
       create: jest.fn(),
     },
   };
@@ -809,196 +190,48 @@ function createPrismaMock() {
 
 function createBatchServiceMock(startedAt: Date): BatchServiceMock {
   return {
-    runJob: jest.fn(async (params) => {
-      const result = await params.handler({
-        runId: 'run-1',
+    runJob: jest.fn(async (params) =>
+      params.handler({
+        runId: 'batch-run-1',
         jobName: params.jobName,
         idempotencyKey: params.idempotencyKey,
-        dryRun: params.dryRun === true,
+        dryRun: params.dryRun,
         startedAt,
-      });
-
-      return {
-        success: true,
-        data: {
-          run: {
-            id: 'run-1',
-            jobName: params.jobName,
-            idempotencyKey: params.idempotencyKey,
-            status: 'succeeded',
-            dryRun: params.dryRun === true,
-            startedAt: startedAt.toISOString(),
-            finishedAt: startedAt.toISOString(),
-            requestedBy: params.requestedBy ?? null,
-            requestPayloadJson: params.requestPayload ?? null,
-            resultPayloadJson: result,
-            errorCode: null,
-            errorMessage: null,
-            createdAt: startedAt.toISOString(),
-            updatedAt: startedAt.toISOString(),
-          },
-          deduplicated: false,
-          skipped: false,
-        },
-      };
-    }),
+      }),
+    ),
   };
-}
-
-async function runAndGetResult(
-  service: RewardGrantJobService,
-  input: Parameters<RewardGrantJobService['run']>[0],
-): Promise<RewardGrantJobResult> {
-  const response = await service.run(input);
-
-  return response.data.run.resultPayloadJson as unknown as RewardGrantJobResult;
 }
 
 async function captureHttpExceptionResponse(promise: Promise<unknown>) {
   try {
     await promise;
+    throw new Error('Expected promise to reject.');
   } catch (error) {
-    if (error instanceof HttpException) {
-      return error.getResponse() as {
-        error: {
-          code: string;
-          message: string;
-        };
-        data: {
-          resultPayloadJson: RewardGrantJobResult;
-        };
+    expect(error).toBeInstanceOf(HttpException);
+    const httpError = error as HttpException;
+    expect(httpError.getStatus()).toBe(HttpStatus.CONFLICT);
+
+    return httpError.getResponse() as {
+      error: {
+        code: string;
+        message: string;
       };
-    }
-
-    throw error;
+      data: {
+        resultPayloadJson: Record<string, unknown>;
+      };
+    };
   }
-
-  throw new Error('Expected HttpException.');
 }
 
-function mockSeason(
-  prisma: PrismaMock,
-  status: SeasonStatus,
-  rewardPolicyJson: unknown = null,
-) {
-  prisma.season.findUnique.mockResolvedValue({
-    id: 'season-1',
-    status,
-    rewardPolicyJson,
-  });
-}
-
-function mockParticipants(
-  prisma: PrismaMock,
-  participants: ReturnType<typeof participant>[],
-) {
-  prisma.seasonParticipant.findMany.mockResolvedValue(participants);
-}
-
-function participant(
-  id: string,
-  userId: string,
-  finalRank: number | null,
-  finalTier: string | null,
-  options: {
-    rewardGrantedAt?: Date | null;
-  } = {},
-) {
-  return {
-    id,
-    userId,
-    finalRank,
-    finalTier,
-    rewardGrantedAt: options.rewardGrantedAt ?? null,
-  };
-}
-
-function updateTimestamps(prisma: PrismaMock) {
-  return prisma.__tx.seasonParticipant.updateMany.mock.calls.map(([input]) =>
-    input.data.rewardGrantedAt.toISOString(),
-  );
-}
-
-function mockExistingRewardRows(
-  prisma: PrismaMock,
-  rewards: Array<ReturnType<typeof existingReward>>,
-) {
-  prisma.__rawState.existingSeasonRewardRows = rewards.map((reward) => ({
-    seasonParticipantId: reward.seasonParticipantId,
-    rewardCode: reward.rewardCode,
-  }));
-  prisma.__rawState.existingUserBadgeRows = rewards.map((reward) => ({
-    userId: reward.userId,
-    seasonId: 'season-1',
-    badgeCode: reward.rewardCode,
-  }));
-}
-
-function existingReward(
-  seasonParticipantId: string,
-  userId: string,
-  rewardCode: string,
-) {
-  return {
-    seasonParticipantId,
-    userId,
-    rewardCode,
-  };
-}
-
-function queryText(query: unknown) {
-  if (
-    query &&
-    typeof query === 'object' &&
-    'strings' in query &&
-    Array.isArray((query as { strings: unknown }).strings)
-  ) {
-    return (query as { strings: string[] }).strings.join('');
-  }
-
-  if (Array.isArray(query)) {
-    return query.join('');
-  }
-
-  return String(query);
-}
-
-function queryValues(query: unknown) {
-  if (
-    query &&
-    typeof query === 'object' &&
-    'values' in query &&
-    Array.isArray((query as { values: unknown }).values)
-  ) {
-    return (query as { values: unknown[] }).values;
-  }
-
-  return [];
-}
-
-function rawCalls(prisma: PrismaMock, text: string) {
-  return prisma.$queryRaw.mock.calls.filter(([query]) =>
-    queryText(query).includes(text),
-  );
-}
-
-function insertedBadgeCodes(prisma: PrismaMock) {
-  return rawCalls(prisma, 'INSERT INTO "badges"').map(([query]) => {
-    const values = queryValues(query);
-    return values[2];
-  });
-}
-
-function insertedSeasonRewardCodes(prisma: PrismaMock) {
-  return rawCalls(prisma, 'INSERT INTO "season_rewards"').map(([query]) => {
-    const values = queryValues(query);
-    return values[5];
-  });
-}
-
-function insertedSeasonRewardGrantedAt(prisma: PrismaMock) {
-  return rawCalls(prisma, 'INSERT INTO "season_rewards"').map(([query]) => {
-    const values = queryValues(query);
-    return (values[7] as Date).toISOString();
-  });
+function expectNoRewardWrites(prisma: ReturnType<typeof createPrismaMock>) {
+  expect(prisma.$queryRaw).not.toHaveBeenCalled();
+  expect(prisma.$transaction).not.toHaveBeenCalled();
+  expect(prisma.season.findUnique).not.toHaveBeenCalled();
+  expect(prisma.seasonParticipant.findMany).not.toHaveBeenCalled();
+  expect(prisma.seasonParticipant.updateMany).not.toHaveBeenCalled();
+  expect(prisma.badge.create).not.toHaveBeenCalled();
+  expect(prisma.badge.update).not.toHaveBeenCalled();
+  expect(prisma.badge.upsert).not.toHaveBeenCalled();
+  expect(prisma.userBadge.create).not.toHaveBeenCalled();
+  expect(prisma.seasonReward.create).not.toHaveBeenCalled();
 }

@@ -63,6 +63,7 @@ describe('PortfolioValuationService source eligibility', () => {
           averageCost: new Prisma.Decimal('80.00000000'),
           currencyCode: CurrencyCode.USD,
           realizedPnl: new Prisma.Decimal('0.00000000'),
+          realizedPnlKrw: new Prisma.Decimal('0.00000000'),
           asset: {
             id: 'asset-us',
             assetType: AssetType.us_stock,
@@ -161,6 +162,7 @@ describe('PortfolioValuationService source eligibility', () => {
           averageCost: new Prisma.Decimal('80.00000000'),
           currencyCode: CurrencyCode.USD,
           realizedPnl: new Prisma.Decimal('0.00000000'),
+          realizedPnlKrw: new Prisma.Decimal('0.00000000'),
           asset: {
             id: 'asset-us',
             assetType: AssetType.us_stock,
@@ -256,6 +258,7 @@ describe('PortfolioValuationService source eligibility', () => {
           averageCost: new Prisma.Decimal('100.00000000'),
           currencyCode: CurrencyCode.KRW,
           realizedPnl: new Prisma.Decimal('0.00000000'),
+          realizedPnlKrw: new Prisma.Decimal('0.00000000'),
           asset: {
             id: 'asset-krx',
             assetType: AssetType.domestic_stock,
@@ -426,6 +429,7 @@ describe('PortfolioValuationService source eligibility', () => {
           averageCost: new Prisma.Decimal('100.00000000'),
           currencyCode: CurrencyCode.KRW,
           realizedPnl: new Prisma.Decimal('0.00000000'),
+          realizedPnlKrw: new Prisma.Decimal('0.00000000'),
           asset: {
             id: 'asset-krx',
             assetType: AssetType.domestic_stock,

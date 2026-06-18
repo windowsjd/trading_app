@@ -920,6 +920,7 @@ function positionDetail(input: {
     averageCost: new Prisma.Decimal('100.00000000'),
     currencyCode: input.currencyCode,
     realizedPnl: new Prisma.Decimal('0.00000000'),
+    realizedPnlKrw: new Prisma.Decimal('0.00000000'),
     asset: {
       id: input.assetId,
       assetType: input.assetType,

@@ -484,6 +484,7 @@ model Position {
   averageCost         Decimal      @map("average_cost") @db.Decimal(24, 8)
   currencyCode        CurrencyCode @map("currency_code")
   realizedPnl         Decimal      @default(0) @map("realized_pnl") @db.Decimal(24, 8)
+  realizedPnlKrw      Decimal      @default(0) @map("realized_pnl_krw") @db.Decimal(24, 8)
   createdAt           DateTime     @default(now()) @map("created_at")
   updatedAt           DateTime     @updatedAt @map("updated_at")
 

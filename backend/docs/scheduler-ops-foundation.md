@@ -21,7 +21,7 @@ Not implemented:
 - KIS order/account/balance/fill/deposit/withdrawal APIs
 - Binance authenticated/order/account/user-data APIs
 - Real external trading/account/deposit/withdrawal API
-- Scheduler-driven reward marker fulfillment or automatic reward payment/delivery
+- Scheduler-driven reward-grant writes or automatic reward payment/delivery
 - External payment/point/coupon/gifticon/cash reward delivery
 
 ## Job Names
@@ -104,7 +104,7 @@ No secret scheduler env is introduced.
 
 When `SCHEDULER_ENABLED=false`, no interval is registered and no automatic job runs. When enabled, individual job flags decide which internal runner methods are called. The foundation uses an internal `setInterval` shell without adding package dependencies.
 
-Even when `SCHEDULER_ENABLED=true`, this foundation scheduler calls jobs with `dryRun=true`. Real automatic writes are not opened here. Automatic daily snapshot writes, ranking generation writes, settlement writes, reward marker writes, and provider ingestion writes require a separate Production Scheduler Ownership Gate.
+Even when `SCHEDULER_ENABLED=true`, this foundation scheduler calls jobs with `dryRun=true`. Real automatic writes are not opened here. Automatic daily snapshot writes, ranking generation writes, settlement writes, reward-grant writes, and provider ingestion writes require a separate Production Scheduler Ownership Gate plus any job-specific business gate such as Reward Policy / Catalog.
 
 ## Real DB Lock Smoke
 

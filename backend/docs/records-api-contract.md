@@ -14,8 +14,10 @@
 - Timestamps are UTC ISO strings.
 - Date-only snapshot/ranking dates are `YYYY-MM-DD`.
 - Performance values come from existing `daily_portfolio_snapshots` or `season_rankings`; the API does not calculate or fake performance.
+- Season detail `profitAnalysis` reads retained positions, including quantity `0` fully sold positions. Stored `positions.realized_pnl_krw` is the source for realized KRW PnL and is not revalued by current FX.
+- Open-position unrealized PnL uses fresh eligible provider price/FX first, then safe `admin_manual` fallback where allowed. Missing valuation data makes profit analysis partially unavailable for affected positions, not fake.
 - Private ledgers, wallet balances, individual orders, and individual exchanges are exposed only through `/api/v1/records/me/**` for the authenticated user.
-- `GET /api/v1/users/:userId/records/:seasonId` is protected but returns only a public summary shape.
+- `GET /api/v1/users/:userId/records/:seasonId` is protected but returns only a public summary shape. Public portfolio summary excludes position quantity, average cost, wallet balances, individual orders, individual exchanges, and raw internal row ids.
 
 ## Common Query Rules
 
@@ -158,6 +160,7 @@ Authenticated user's detail summary for one season.
       "state": "available",
       "totalAssetKrw": "12000000.00000000",
       "returnRate": "0.20000000",
+      "maxDrawdown": "5.00000000",
       "snapshotDate": "2026-05-31",
       "capturedAt": "2026-05-31T00:00:30.000Z"
     },
@@ -178,12 +181,38 @@ Authenticated user's detail summary for one season.
       "positions": {
         "open": 3
       }
+    },
+    "profitAnalysis": {
+      "state": "available | partial_unavailable | unavailable",
+      "totalRealizedPnlKrw": "120000.00000000",
+      "totalUnrealizedPnlKrw": "80000.00000000",
+      "totalPnlKrw": "200000.00000000",
+      "bestAsset": {
+        "assetId": "asset-1",
+        "symbol": "AAPL",
+        "name": "Apple Inc.",
+        "market": "NASDAQ",
+        "assetType": "us_stock",
+        "currencyCode": "USD",
+        "realizedPnlLocal": "10.00000000",
+        "realizedPnlKrw": "14000.00000000",
+        "unrealizedPnlLocal": "2.00000000",
+        "unrealizedPnlKrw": "2800.00000000",
+        "totalPnlKrw": "16800.00000000",
+        "returnRate": "1.00000000",
+        "returnRateState": "available",
+        "positionState": "open | fully_sold",
+        "valuationState": "available | unavailable"
+      },
+      "worstAsset": null,
+      "items": [],
+      "valuationErrors": []
     }
   }
 }
 ```
 
-If no snapshot or final ranking row exists, `performance.state = unavailable` and performance values are `null`.
+If no snapshot or final ranking row exists, `performance.state = unavailable` and performance values are `null`. `profitAnalysis.bestAsset` and `profitAnalysis.worstAsset` are selected by `totalPnlKrw`. Fully sold quantity `0` positions have `unrealizedPnl* = 0` and can still appear through realized PnL.
 
 ### Error Codes
 
@@ -372,6 +401,8 @@ Protected public summary for a target user's season result. This endpoint does n
       "status": "settled"
     },
     "summary": {
+      "currentRank": 7,
+      "currentTier": null,
       "finalRank": 3,
       "finalTier": "diamond",
       "rewardGranted": true,
@@ -379,10 +410,36 @@ Protected public summary for a target user's season result. This endpoint does n
       "returnRate": "0.15000000",
       "orderCount": 8,
       "exchangeCount": 2
+    },
+    "publicPortfolioSummary": {
+      "state": "available | partial_unavailable | unavailable | not_joined",
+      "totalAssetKrw": "11500000.00000000",
+      "returnRate": "0.15000000",
+      "allocation": {
+        "domesticStockRate": "20.00000000",
+        "usStockRate": "35.00000000",
+        "cryptoRate": "15.00000000",
+        "cashRate": "30.00000000"
+      },
+      "topHoldings": [
+        {
+          "symbol": "AAPL",
+          "name": "Apple Inc.",
+          "market": "NASDAQ",
+          "assetType": "us_stock",
+          "weightRate": "12.00000000",
+          "returnRate": "3.00000000",
+          "returnRateState": "available",
+          "valuationState": "available"
+        }
+      ],
+      "valuationErrors": []
     }
   }
 }
 ```
+
+`publicPortfolioSummary.topHoldings` is capped at 5 holdings sorted by KRW value. It exposes public asset metadata, weight, return state, and valuation state only. It does not expose raw row ids.
 
 ### Error Codes
 

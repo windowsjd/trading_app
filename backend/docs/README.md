@@ -42,7 +42,7 @@ Provider_api remains closed for orders create source selection, ranking, settlem
 
 Admin-only user status/restore APIs and operator/admin internal reward fulfillment APIs are now documented in the operator and rewards contracts. Restore forces `role=user`, suspend/delete revoke refresh sessions, and internal reward fulfillment creates `SeasonReward` rows only at fulfilled time. External reward/payment/point/coupon/gifticon APIs remain out of scope.
 
-7. Batch foundation and operator-run daily snapshot/ranking/cycle/settlement/final-tier/reward-grant internal foundation jobs:
+7. Batch foundation and operator-run daily snapshot/ranking/cycle/settlement/final-tier plus reward-grant gate-closed job:
    - `docs/batch-job-foundation.md`
 
 8. Scheduler/Ops disabled-by-default and dry-run-by-default foundation:

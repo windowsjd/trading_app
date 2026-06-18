@@ -6,7 +6,7 @@
 - The API is for the full holdings/positions screen. It is not a replacement for `/home` `topPositions`, which remains a top-5 summary section.
 - The API reads existing `positions`, `assets`, fresh eligible `provider_api` price/FX snapshots first, and existing safe `admin_manual` fallback snapshots when USD valuation is needed.
 - The API does not call providers, create provider clients, ingest provider data, generate snapshots/rankings, settle seasons, grant rewards, or mutate business rows.
-- Do not add fake/static/sample business price data, Prisma schema changes, migrations, package changes, lockfile changes, or seed changes from this contract.
+- Do not add fake/static/sample business price data, unrelated Prisma schema changes, package changes, lockfile changes, or seed changes from this contract.
 
 ## Source Rules
 
@@ -21,6 +21,10 @@
 - Eligible USD/KRW provider is `exchange_rate_api`.
 - Provider asset price freshness uses capturedAt age <= 60 seconds; provider FX freshness uses capturedAt age <= 300 seconds.
 - Per-position valuation may include optional public-safe `priceSource` and `fxRateSource` metadata for source/outage visibility. Raw provider payloads, `metadataJson`, and secrets are never exposed.
+- `realizedPnl` is stored in the asset/order currency.
+- `realizedPnlKrw` is stored on `positions.realized_pnl_krw` and is fixed at sell execution time. KRW assets use the local realized PnL delta; USD assets use the local realized PnL delta multiplied by the execution USD/KRW rate. Current valuation FX must not revalue stored realized KRW PnL.
+- Existing rows created before `realized_pnl_krw` have the DB default `0`; no automatic historical backfill is part of this contract.
+- Quantity `0` position rows are retained for records/profit analysis. Default position listing hides them; `includeClosed=true` includes them.
 
 ## Route
 
@@ -90,6 +94,7 @@
         "quantity": "<decimal string>",
         "averageCost": "<decimal string>",
         "realizedPnl": "<decimal string>",
+        "realizedPnlKrw": "<decimal string>",
         "valuation": {
           "state": "available",
           "currentPrice": "<decimal string>",
@@ -161,6 +166,7 @@ When required market data is missing, only that position's `valuation` becomes u
 - If a requested `seasonId` does not exist, `data.state = unavailable`, `reason = SEASON_NOT_FOUND`.
 - If the user has not joined the selected season, `data.state = not_joined`, `reason = SEASON_NOT_JOINED`, and `positions = []`.
 - If the joined participant has no matching positions, `data.state = available`, `positions = []`, and summary counts are `0`.
+- Default `includeClosed=false` filters to `quantity > 0`; `includeClosed=true` includes retained quantity `0` rows.
 - `totalPositionValueKrw` sums only positions whose valuation is available.
 - KRW positions can be valued without USD/KRW FX.
 - USD positions use fresh `provider_api` USD/KRW first, then fresh approved `admin_manual` USD/KRW fallback.

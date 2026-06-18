@@ -250,11 +250,19 @@ export class FinalTierAssignmentJobService {
     totalParticipants: number,
     policy: ResolvedTierPolicy,
   ): FinalTierAssignmentTopAssignment {
+    const computedFinalTier = policy.assignTier(row.rank, totalParticipants);
+    const willAssign = !this.hasExistingFinalResult(row);
+
     return {
       seasonParticipantId: row.seasonParticipantId,
       userId: row.seasonParticipant.userId,
       finalRank: row.rank,
-      finalTier: policy.assignTier(row.rank, totalParticipants),
+      finalTier: computedFinalTier,
+      existingFinalRank: row.seasonParticipant.finalRank,
+      existingFinalTier: row.seasonParticipant.finalTier,
+      computedFinalTier,
+      willAssign,
+      skipReason: willAssign ? null : 'FINAL_RESULT_ALREADY_EXISTS',
       totalAssetKrw: formatMoneyScale8(row.totalAssetKrw),
       returnRate: formatDecimalScale(row.returnRate, returnRateScale),
     };

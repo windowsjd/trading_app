@@ -52,10 +52,7 @@ import {
   SeasonLifecycleError,
 } from '../seasons/season-lifecycle.policy';
 import { buildPagination, type Pagination } from '../common/pagination';
-import {
-  assertAssetTradable,
-  MarketHoursError,
-} from './market-hours.policy';
+import { assertAssetTradable, MarketHoursError } from './market-hours.policy';
 
 export type OrdersQuery = {
   seasonId?: string;
@@ -1462,6 +1459,11 @@ export class OrdersService {
       plan.netAmount.sub(costBasis),
       monetaryScale,
     );
+    const realizedPnlKrwDelta = this.calculateRealizedPnlKrwDeltaForExecution(
+      realizedPnlDelta,
+      order.currencyCode,
+      plan,
+    );
     const positionUpdateResult = await tx.position.updateMany({
       where: {
         id: position.id,
@@ -1476,6 +1478,7 @@ export class OrdersService {
           decrement: this.formatDecimal(order.quantity, monetaryScale),
         },
         realizedPnl: this.buildDecimalDeltaUpdate(realizedPnlDelta),
+        realizedPnlKrw: this.buildDecimalDeltaUpdate(realizedPnlKrwDelta),
       },
     });
 
@@ -1761,6 +1764,7 @@ export class OrdersService {
           averageCost: this.formatDecimal(averageCost, monetaryScale),
           currencyCode: order.currencyCode,
           realizedPnl: ZERO_MONEY,
+          realizedPnlKrw: ZERO_MONEY,
         },
         select: {
           id: true,
@@ -1810,6 +1814,29 @@ export class OrdersService {
     }
 
     return position.id;
+  }
+
+  private calculateRealizedPnlKrwDeltaForExecution(
+    realizedPnlDelta: Prisma.Decimal,
+    currencyCode: CurrencyCode,
+    plan: OrderExecutionPlan,
+  ): Prisma.Decimal {
+    if (currencyCode === CurrencyCode.KRW) {
+      return realizedPnlDelta;
+    }
+
+    if (!plan.executeRate) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'ORDER_EXECUTION_TRANSACTION_FAILED',
+        'USD/KRW execution rate is required for realizedPnlKrw.',
+      );
+    }
+
+    return roundDecimalHalfUp(
+      realizedPnlDelta.mul(plan.executeRate),
+      monetaryScale,
+    );
   }
 
   private buildDecimalDeltaUpdate(delta: Prisma.Decimal) {
