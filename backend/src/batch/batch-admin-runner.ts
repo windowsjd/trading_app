@@ -16,6 +16,8 @@ import { SeasonRankingJobService } from './season-ranking-job.service';
 import { SEASON_RANKING_JOB_NAME } from './season-ranking-job.types';
 import { SeasonSettlementJobService } from './season-settlement-job.service';
 import { SEASON_SETTLEMENT_JOB_NAME } from './season-settlement-job.types';
+import { SeasonLifecycleTransitionJobService } from './season-lifecycle-transition-job.service';
+import { SEASON_LIFECYCLE_TRANSITION_JOB_NAME } from './season-lifecycle-transition-job.types';
 
 type SupportedAdminBatchJob =
   | 'noop'
@@ -23,6 +25,7 @@ type SupportedAdminBatchJob =
   | typeof DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME
   | typeof SEASON_RANKING_JOB_NAME
   | typeof DAILY_SEASON_CYCLE_JOB_NAME
+  | typeof SEASON_LIFECYCLE_TRANSITION_JOB_NAME
   | typeof SEASON_SETTLEMENT_JOB_NAME
   | typeof FINAL_TIER_ASSIGNMENT_JOB_NAME
   | typeof REWARD_GRANT_JOB_NAME;
@@ -38,6 +41,7 @@ export type AdminRunBatchJobArgs = {
   settlementDate?: string;
   rankingDate?: string;
   grantDate?: string;
+  now?: string;
 };
 
 type CliValueOptionName = Exclude<keyof AdminRunBatchJobArgs, 'dryRun'>;
@@ -52,6 +56,7 @@ const VALUE_OPTIONS: Record<string, CliValueOptionName> = {
   '--settlement-date': 'settlementDate',
   '--ranking-date': 'rankingDate',
   '--grant-date': 'grantDate',
+  '--now': 'now',
 };
 
 const BOOLEAN_OPTIONS: Record<string, 'dryRun'> = {
@@ -118,6 +123,14 @@ export function parseAdminRunBatchJobArgs(
       (parsed.grantDate
         ? `${parsed.job}:${parsed.seasonId}:${parsed.grantDate}`
         : `${parsed.job}:${parsed.seasonId}`);
+  } else if (parsed.job === SEASON_LIFECYCLE_TRANSITION_JOB_NAME) {
+    parsed.now =
+      parseOptionalText(parsed.now) === undefined
+        ? undefined
+        : parseDateTimeText(parsed.now, 'now');
+    parsed.idempotencyKey =
+      parseOptionalText(parsed.idempotencyKey) ??
+      `${parsed.job}:${parsed.now ?? 'auto-now'}`;
   } else if (isSeasonDateJob(parsed.job)) {
     parsed.seasonId = parseRequiredText(parsed.seasonId, 'season-id');
     parsed.snapshotDate = parseDateOnlyText(
@@ -179,10 +192,22 @@ export async function runAdminRunBatchJob(argv: string[]) {
     batchService,
     prisma as unknown as PrismaService,
   );
+  const seasonLifecycleTransitionJobService =
+    new SeasonLifecycleTransitionJobService(
+      batchService,
+      prisma as unknown as PrismaService,
+    );
 
   try {
     let response;
-    if (args.job === REWARD_GRANT_JOB_NAME) {
+    if (args.job === SEASON_LIFECYCLE_TRANSITION_JOB_NAME) {
+      response = await seasonLifecycleTransitionJobService.run({
+        now: args.now,
+        idempotencyKey: args.idempotencyKey,
+        dryRun: args.dryRun === true,
+        requestedBy: args.requestedBy,
+      });
+    } else if (args.job === REWARD_GRANT_JOB_NAME) {
       response = await rewardGrantJobService.run({
         seasonId: args.seasonId,
         grantDate: args.grantDate,
@@ -292,6 +317,7 @@ function parseJob(value: string | undefined): SupportedAdminBatchJob {
     text === DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME ||
     text === SEASON_RANKING_JOB_NAME ||
     text === DAILY_SEASON_CYCLE_JOB_NAME ||
+    text === SEASON_LIFECYCLE_TRANSITION_JOB_NAME ||
     text === SEASON_SETTLEMENT_JOB_NAME ||
     text === FINAL_TIER_ASSIGNMENT_JOB_NAME ||
     text === REWARD_GRANT_JOB_NAME
@@ -329,6 +355,19 @@ function parseDateOnlyText(
   }
 
   return text;
+}
+
+function parseDateTimeText(
+  value: string | undefined,
+  fieldName: string,
+): string {
+  const text = parseRequiredText(value, fieldName);
+  const date = new Date(text);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Invalid --${fieldName}: must be an ISO date-time.`);
+  }
+
+  return date.toISOString();
 }
 
 function parseRequiredText(

@@ -224,7 +224,8 @@ export function calculatePortfolioValuation(
   const totalAssetKrw = krwCash.add(usdCashKrw).add(assetValueKrw);
   const returnRate = totalAssetKrw
     .sub(initialCapitalKrw)
-    .div(initialCapitalKrw);
+    .div(initialCapitalKrw)
+    .mul(100);
 
   return {
     seasonParticipantId: input.seasonParticipantId,

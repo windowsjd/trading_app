@@ -114,6 +114,8 @@ describe('OrdersService', () => {
   const canceledAt = new Date('2026-05-07T00:03:00.000Z');
   const createdAt = new Date('2026-05-07T00:01:01.000Z');
   const updatedAt = new Date('2026-05-07T00:02:01.000Z');
+  const usMarketOpenAt = new Date('2026-05-07T14:00:00.000Z');
+  const krxMarketOpenAt = new Date('2026-05-07T00:02:00.000Z');
 
   const season = {
     id: 'season-1',
@@ -236,6 +238,18 @@ describe('OrdersService', () => {
     const service = new OrdersService(prisma as never);
 
     return { prisma, service };
+  };
+
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(usMarketOpenAt);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  const useKrxMarketOpenTime = () => {
+    jest.setSystemTime(krxMarketOpenAt);
   };
 
   const mockCurrentSeason = (prisma: ReturnType<typeof createPrisma>) => {
@@ -682,14 +696,15 @@ describe('OrdersService', () => {
     snapshotId = 'aps-exec-1',
     sourceName = 'kis_krx_realtime_trade',
   ) => {
+    const providerNow = new Date(Date.now());
     prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([
       {
         id: snapshotId,
         price: new Prisma.Decimal(price),
         sourceType: AssetPriceSourceType.provider_api,
         sourceName,
-        effectiveAt: executedAt,
-        capturedAt: executedAt,
+        effectiveAt: providerNow,
+        capturedAt: providerNow,
       },
     ]);
   };
@@ -699,14 +714,15 @@ describe('OrdersService', () => {
     rate = '1400.00000000',
     snapshotId = 'fx-exec-1',
   ) => {
+    const providerNow = new Date(Date.now());
     prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
       {
         id: snapshotId,
         rate: new Prisma.Decimal(rate),
         sourceType: FxRateSourceType.provider_api,
         sourceName: 'exchange_rate_api',
-        effectiveAt: executedAt,
-        capturedAt: executedAt,
+        effectiveAt: providerNow,
+        capturedAt: providerNow,
       },
     ]);
   };
@@ -1103,6 +1119,7 @@ describe('OrdersService', () => {
   });
 
   it('falls back to admin_manual price when orders quote provider price is stale', async () => {
+    useKrxMarketOpenTime();
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     mockJoined(prisma);
@@ -1265,6 +1282,7 @@ describe('OrdersService', () => {
   });
 
   it('quotes limit buy orders using limitPrice', async () => {
+    useKrxMarketOpenTime();
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     mockJoined(prisma);
@@ -1304,6 +1322,7 @@ describe('OrdersService', () => {
   });
 
   it('quotes sell orders after checking position quantity', async () => {
+    useKrxMarketOpenTime();
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     mockJoined(prisma);
@@ -1339,6 +1358,7 @@ describe('OrdersService', () => {
   });
 
   it('rejects quote when market price is unavailable', async () => {
+    useKrxMarketOpenTime();
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     mockJoined(prisma);
@@ -1353,6 +1373,63 @@ describe('OrdersService', () => {
         quantity: '1.00000000',
       }),
     ).rejects.toBeInstanceOf(HttpException);
+    expectNoOrderWrites(prisma);
+  });
+
+  it('rejects order quote before the season starts or after it ends', async () => {
+    const beforeStart = createService();
+    beforeStart.prisma.season.findFirst.mockResolvedValueOnce({
+      ...activeSeason,
+      startAt: new Date('2026-05-08T00:00:00.000Z'),
+    });
+
+    await expectErrorCode(
+      beforeStart.service.quoteOrder('user-1', {
+        assetId: 'asset-1',
+        side: 'buy',
+        orderType: 'market',
+        quantity: '1.00000000',
+      }),
+      'SEASON_NOT_STARTED',
+    );
+
+    const afterEnd = createService();
+    afterEnd.prisma.season.findFirst.mockResolvedValueOnce({
+      ...activeSeason,
+      endAt: new Date('2026-05-06T00:00:00.000Z'),
+    });
+
+    await expectErrorCode(
+      afterEnd.service.quoteOrder('user-1', {
+        assetId: 'asset-1',
+        side: 'buy',
+        orderType: 'market',
+        quantity: '1.00000000',
+      }),
+      'SEASON_ENDED',
+    );
+    expectNoOrderWrites(beforeStart.prisma);
+    expectNoOrderWrites(afterEnd.prisma);
+  });
+
+  it('rejects order quote when the stock market is closed before provider reads', async () => {
+    jest.setSystemTime(new Date('2026-05-06T23:59:59.000Z'));
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    mockJoined(prisma);
+    mockAsset(prisma, CurrencyCode.KRW);
+
+    await expectErrorCode(
+      service.quoteOrder('user-1', {
+        assetId: 'asset-1',
+        side: 'buy',
+        orderType: 'market',
+        quantity: '1.00000000',
+      }),
+      'MARKET_CLOSED',
+    );
+    expect(prisma.assetPriceSnapshot.findMany).not.toHaveBeenCalled();
+    expect(prisma.assetPriceSnapshot.findFirst).not.toHaveBeenCalled();
     expectNoOrderWrites(prisma);
   });
 
@@ -1397,6 +1474,7 @@ describe('OrdersService', () => {
   });
 
   it('rejects quote when buy cash balance is insufficient', async () => {
+    useKrxMarketOpenTime();
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     mockJoined(prisma);
@@ -1644,6 +1722,7 @@ describe('OrdersService', () => {
   });
 
   it('creates submitted limit order with limitPrice', async () => {
+    useKrxMarketOpenTime();
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     mockJoined(prisma);
@@ -1714,6 +1793,59 @@ describe('OrdersService', () => {
       }),
     );
     expectOnlyOrderCreateWrite(prisma);
+  });
+
+  it('rejects order create after season end even if status is active', async () => {
+    const { prisma, service } = createService();
+    prisma.season.findFirst.mockResolvedValueOnce({
+      ...activeSeason,
+      endAt: new Date('2026-05-06T00:00:00.000Z'),
+    });
+
+    await expectErrorCode(
+      service.createOrder('user-1', {
+        assetId: 'asset-1',
+        side: 'buy',
+        orderType: 'limit',
+        quantity: '1.00000000',
+        limitPrice: '50000.00000000',
+        quoteId: 'quote-order-create-1',
+        idempotencyKey: 'order-create-ended',
+      }),
+      'SEASON_ENDED',
+    );
+    expect(prisma.quote.findFirst).not.toHaveBeenCalled();
+    expectNoOrderWrites(prisma);
+  });
+
+  it('rejects order create when the stock market is closed', async () => {
+    jest.setSystemTime(new Date('2026-05-07T06:30:00.000Z'));
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    mockJoined(prisma);
+    mockOrderQuoteForCreate(prisma, {
+      orderType: OrderType.limit,
+      quantity: new Prisma.Decimal('1.00000000'),
+      limitPrice: new Prisma.Decimal('50000.00000000'),
+      quotedPrice: new Prisma.Decimal('50000.00000000'),
+      assetPriceSnapshotId: null,
+      fxRateSnapshotId: null,
+    });
+
+    await expectErrorCode(
+      service.createOrder('user-1', {
+        assetId: 'asset-1',
+        side: 'buy',
+        orderType: 'limit',
+        quantity: '1.00000000',
+        limitPrice: '50000.00000000',
+        quoteId: 'quote-order-create-1',
+        idempotencyKey: 'order-create-market-closed',
+      }),
+      'MARKET_CLOSED',
+    );
+    expect(prisma.order.create).not.toHaveBeenCalled();
+    expectNoOrderWrites(prisma);
   });
 
   it('rejects create without idempotencyKey', async () => {
@@ -1821,6 +1953,7 @@ describe('OrdersService', () => {
   });
 
   it('replays existing order after a unique idempotency race with same payload', async () => {
+    useKrxMarketOpenTime();
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     mockJoined(prisma);
@@ -1857,6 +1990,7 @@ describe('OrdersService', () => {
   });
 
   it('conflicts after a unique idempotency race with different payload', async () => {
+    useKrxMarketOpenTime();
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     mockJoined(prisma);
@@ -2021,6 +2155,7 @@ describe('OrdersService', () => {
         canceledAt: expect.any(Date),
       },
     });
+    expect(prisma.season.findFirst).not.toHaveBeenCalled();
     expectOnlyOrderCancelWrite(prisma);
   });
 
@@ -2919,6 +3054,43 @@ describe('OrdersService', () => {
       expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
     });
 
+    it('rejects execute after season end even when status is still active', async () => {
+      const { prisma, service } = createService();
+      prisma.order.findFirst.mockResolvedValueOnce(
+        orderExecutionRecord({
+          seasonParticipant: {
+            ...participant,
+            season: {
+              ...activeSeason,
+              endAt: new Date('2026-05-06T00:00:00.000Z'),
+            },
+          },
+        }),
+      );
+
+      await expectErrorCode(
+        service.executeOrder('user-1', 'order-execute-1'),
+        'SEASON_ENDED',
+      );
+      expect(prisma.assetPriceSnapshot.findMany).not.toHaveBeenCalled();
+      expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
+      expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects execute when the market closed after quote/create', async () => {
+      jest.setSystemTime(new Date('2026-05-07T06:30:00.000Z'));
+      const { prisma, service } = createService();
+      prisma.order.findFirst.mockResolvedValueOnce(orderExecutionRecord());
+
+      await expectErrorCode(
+        service.executeOrder('user-1', 'order-execute-1'),
+        'MARKET_CLOSED',
+      );
+      expect(prisma.assetPriceSnapshot.findMany).not.toHaveBeenCalled();
+      expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
+      expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+    });
+
     it('rejects non-marketable buy and sell limit orders', async () => {
       const buy = createService();
       buy.prisma.order.findFirst.mockResolvedValueOnce(
@@ -2953,6 +3125,7 @@ describe('OrdersService', () => {
     });
 
     it('rejects USD execute when FX is unavailable or stale', async () => {
+      jest.setSystemTime(usMarketOpenAt);
       const usdOrder = orderExecutionRecord({
         currencyCode: CurrencyCode.USD,
         asset: {
@@ -2993,8 +3166,8 @@ describe('OrdersService', () => {
           rate: new Prisma.Decimal('1400.00000000'),
           sourceType: FxRateSourceType.provider_api,
           sourceName: 'exchange_rate_api',
-          effectiveAt: new Date(executedAt.getTime() - 61_000),
-          capturedAt: new Date(executedAt.getTime() - 61_000),
+          effectiveAt: new Date(usMarketOpenAt.getTime() - 61_000),
+          capturedAt: new Date(usMarketOpenAt.getTime() - 61_000),
         },
       ]);
 

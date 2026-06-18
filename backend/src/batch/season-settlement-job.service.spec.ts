@@ -168,7 +168,7 @@ describe('SeasonSettlementJobService', () => {
     mockExistingRankings(prisma, []);
     mockSnapshots(prisma, [
       snapshot('sp-1', 'user-1', '1000.00000000', '0.00000000'),
-      snapshot('sp-2', 'user-2', '2000.00000000', '0.10000000'),
+      snapshot('sp-2', 'user-2', '2000.00000000', '10.00000000'),
     ]);
     prisma.__tx.seasonRanking.findMany.mockResolvedValue([]);
     prisma.__tx.seasonRanking.create
@@ -203,7 +203,7 @@ describe('SeasonSettlementJobService', () => {
         rankType: SeasonRankingType.final,
         rank: 1,
         totalAssetKrw: '2000.00000000',
-        returnRate: '0.10000000',
+        returnRate: '10.00000000',
         rankingDate: settlementDateValue,
         capturedAt: BATCH_STARTED_AT,
       },

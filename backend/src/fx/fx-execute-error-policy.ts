@@ -29,6 +29,8 @@ export const fxExecuteErrorCodes = {
   IDEMPOTENCY_FAILED: 'IDEMPOTENCY_FAILED',
   SEASON_NOT_FOUND: 'SEASON_NOT_FOUND',
   SEASON_NOT_ACTIVE: 'SEASON_NOT_ACTIVE',
+  SEASON_NOT_STARTED: 'SEASON_NOT_STARTED',
+  SEASON_ENDED: 'SEASON_ENDED',
   SEASON_NOT_JOINED: 'SEASON_NOT_JOINED',
   SOURCE_WALLET_NOT_FOUND: 'SOURCE_WALLET_NOT_FOUND',
   TARGET_WALLET_NOT_FOUND: 'TARGET_WALLET_NOT_FOUND',
@@ -126,6 +128,18 @@ export const fxExecuteErrorMetadata: Record<
     retryability: fxExecuteRetryability.non_retryable,
     walletMutationAllowed: fxExecuteWalletMutationPolicy.no,
     defaultMessage: 'Season is not active',
+  },
+  SEASON_NOT_STARTED: {
+    httpStatus: 409,
+    retryability: fxExecuteRetryability.non_retryable,
+    walletMutationAllowed: fxExecuteWalletMutationPolicy.no,
+    defaultMessage: 'Season has not started',
+  },
+  SEASON_ENDED: {
+    httpStatus: 409,
+    retryability: fxExecuteRetryability.non_retryable,
+    walletMutationAllowed: fxExecuteWalletMutationPolicy.no,
+    defaultMessage: 'Season has ended',
   },
   SEASON_NOT_JOINED: {
     httpStatus: 403,

@@ -139,6 +139,27 @@ describe('parseAdminRunBatchJobArgs', () => {
     });
   });
 
+  it('parses season lifecycle transition job options and generates idempotency key', () => {
+    expect(
+      parseAdminRunBatchJobArgs([
+        '--job',
+        'season-lifecycle-transition',
+        '--now',
+        '2026-06-08T00:00:00.000Z',
+        '--dry-run',
+        '--requested-by',
+        'operator',
+      ]),
+    ).toMatchObject({
+      job: 'season-lifecycle-transition',
+      now: '2026-06-08T00:00:00.000Z',
+      idempotencyKey:
+        'season-lifecycle-transition:2026-06-08T00:00:00.000Z',
+      dryRun: true,
+      requestedBy: 'operator',
+    });
+  });
+
   it('parses season settlement job options and generates idempotency key', () => {
     expect(
       parseAdminRunBatchJobArgs([

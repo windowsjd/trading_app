@@ -120,7 +120,7 @@ describe('RecordsService', () => {
     seasonRankings: [
       {
         totalAssetKrw: new Prisma.Decimal('12000000.00000000'),
-        returnRate: new Prisma.Decimal('0.20000000'),
+        returnRate: new Prisma.Decimal('20.00000000'),
         rankingDate: snapshotDate,
         capturedAt,
       },
@@ -128,7 +128,7 @@ describe('RecordsService', () => {
     dailyPortfolioSnapshots: [
       {
         totalAssetKrw: new Prisma.Decimal('11900000.00000000'),
-        returnRate: new Prisma.Decimal('0.19000000'),
+        returnRate: new Prisma.Decimal('19.00000000'),
         snapshotDate,
         capturedAt,
       },
@@ -804,7 +804,7 @@ describe('RecordsService', () => {
           finalRank: 1,
           finalTier: 'master',
           latestTotalAssetKrw: '12000000.00000000',
-          latestReturnRate: '0.20000000',
+          latestReturnRate: '20.00000000',
           orderCount: 10,
           exchangeCount: 2,
           walletTransactionCount: 13,
@@ -936,7 +936,7 @@ describe('RecordsService', () => {
       performance: {
         state: 'available',
         totalAssetKrw: '11900000.00000000',
-        returnRate: '0.19000000',
+        returnRate: '19.00000000',
         snapshotDate: '2026-05-31',
       },
       activitySummary: {
@@ -1177,7 +1177,7 @@ describe('RecordsService', () => {
         finalTier: 'master',
         rewardGranted: true,
         totalAssetKrw: '12000000.00000000',
-        returnRate: '0.20000000',
+        returnRate: '20.00000000',
         orderCount: 8,
         exchangeCount: 2,
       },

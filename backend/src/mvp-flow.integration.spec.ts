@@ -280,8 +280,8 @@ async function createSeasonAndAdminManualFixtures() {
     data: {
       name: scenario.seasonName,
       status: SeasonStatus.active,
-      startAt: new Date('2999-01-01T00:00:00.000Z'),
-      endAt: new Date('2999-12-31T23:59:59.000Z'),
+      startAt: new Date(now.getTime() - 60_000),
+      endAt: new Date(now.getTime() + 86_400_000),
       initialCapitalKrw,
       tradeFeeRate: '0.001000',
       fxFeeRate: '0.001000',

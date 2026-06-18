@@ -84,6 +84,8 @@ import {
 import { computeFxQuoteRequestHash } from '../providers/durable-quote.policy';
 
 const now = new Date('2026-05-01T00:01:00.000Z');
+const seasonStartAt = new Date('2026-04-28T00:00:00.000Z');
+const seasonEndAt = new Date('2026-05-31T14:59:00.000Z');
 const capturedAt = new Date('2026-05-01T00:00:30.000Z');
 const freshEffectiveAt = new Date('2026-05-01T00:00:30.000Z');
 const thresholdEffectiveAt = new Date('2026-05-01T00:00:00.000Z');
@@ -226,6 +228,8 @@ describe('FxService', () => {
     prisma.season.findFirst.mockResolvedValueOnce({
       id: 'season-1',
       status: SeasonStatus.active,
+      startAt: seasonStartAt,
+      endAt: seasonEndAt,
       fxFeeRate: new Prisma.Decimal('0.001000'),
     });
   };
@@ -332,6 +336,46 @@ describe('FxService', () => {
       }),
       'SEASON_NOT_ACTIVE',
     );
+  });
+
+  it('rejects quote before startAt or after endAt even when status is active', async () => {
+    const beforeStart = createService();
+    beforeStart.prisma.season.findFirst.mockResolvedValueOnce({
+      id: 'season-1',
+      status: SeasonStatus.active,
+      startAt: new Date('2026-05-02T00:00:00.000Z'),
+      endAt: seasonEndAt,
+      fxFeeRate: new Prisma.Decimal('0.001000'),
+    });
+
+    await expectErrorCode(
+      beforeStart.service.quote('user-1', {
+        fromCurrency: 'KRW',
+        toCurrency: 'USD',
+        sourceAmount: '1000',
+      }),
+      'SEASON_NOT_STARTED',
+    );
+
+    const afterEnd = createService();
+    afterEnd.prisma.season.findFirst.mockResolvedValueOnce({
+      id: 'season-1',
+      status: SeasonStatus.active,
+      startAt: seasonStartAt,
+      endAt: new Date('2026-04-30T00:00:00.000Z'),
+      fxFeeRate: new Prisma.Decimal('0.001000'),
+    });
+
+    await expectErrorCode(
+      afterEnd.service.quote('user-1', {
+        fromCurrency: 'KRW',
+        toCurrency: 'USD',
+        sourceAmount: '1000',
+      }),
+      'SEASON_ENDED',
+    );
+    expect(beforeStart.prisma.seasonParticipant.findUnique).not.toHaveBeenCalled();
+    expect(afterEnd.prisma.seasonParticipant.findUnique).not.toHaveBeenCalled();
   });
 
   it('rejects when user has not joined the active season', async () => {
@@ -1159,6 +1203,40 @@ describe('FxService', () => {
       expect(prisma.fxExecuteRequest.findUnique).not.toHaveBeenCalled();
       expect(prisma.cashWallet.findUnique).not.toHaveBeenCalled();
       expect(prisma.fxRateSnapshot.findMany).not.toHaveBeenCalled();
+    });
+
+    it('returns lifecycle time errors before FX execute planning', async () => {
+      const beforeStart = createService();
+      beforeStart.prisma.season.findFirst.mockResolvedValueOnce({
+        id: 'season-1',
+        status: SeasonStatus.active,
+        startAt: new Date('2026-05-02T00:00:00.000Z'),
+        endAt: seasonEndAt,
+        fxFeeRate: new Prisma.Decimal('0.001000'),
+      });
+
+      await expectExecuteErrorCode(
+        beforeStart.service.execute('user-1', validExecuteBody),
+        'SEASON_NOT_STARTED',
+      );
+
+      const afterEnd = createService();
+      afterEnd.prisma.season.findFirst.mockResolvedValueOnce({
+        id: 'season-1',
+        status: SeasonStatus.active,
+        startAt: seasonStartAt,
+        endAt: new Date('2026-04-30T00:00:00.000Z'),
+        fxFeeRate: new Prisma.Decimal('0.001000'),
+      });
+
+      await expectExecuteErrorCode(
+        afterEnd.service.execute('user-1', validExecuteBody),
+        'SEASON_ENDED',
+      );
+      expectNoExecuteWrites(beforeStart.prisma);
+      expectNoExecuteWrites(afterEnd.prisma);
+      expectNoExecutePlanReads(beforeStart.prisma);
+      expectNoExecutePlanReads(afterEnd.prisma);
     });
 
     it('returns SEASON_NOT_JOINED when active season participant is missing', async () => {

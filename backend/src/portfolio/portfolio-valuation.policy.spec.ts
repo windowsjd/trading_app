@@ -94,6 +94,36 @@ describe('portfolio valuation policy', () => {
     });
   });
 
+  it('returns percent returnRate for gains', () => {
+    expect(
+      calculatePortfolioValuation({
+        seasonParticipantId: 'sp-1',
+        initialCapitalKrw: '10000000.00000000',
+        cashWallets: wallets('10450000.00000000'),
+        positions: [],
+        valuationAt,
+      }),
+    ).toMatchObject({
+      totalAssetKrw: '10450000.00000000',
+      returnRate: '4.50000000',
+    });
+  });
+
+  it('returns percent returnRate for losses', () => {
+    expect(
+      calculatePortfolioValuation({
+        seasonParticipantId: 'sp-1',
+        initialCapitalKrw: '10000000.00000000',
+        cashWallets: wallets('9500000.00000000'),
+        positions: [],
+        valuationAt,
+      }),
+    ).toMatchObject({
+      totalAssetKrw: '9500000.00000000',
+      returnRate: '-5.00000000',
+    });
+  });
+
   it('converts USD cash to KRW with approved fresh USD/KRW rate', () => {
     expect(
       calculatePortfolioValuation({
@@ -106,7 +136,7 @@ describe('portfolio valuation policy', () => {
       }),
     ).toMatchObject({
       totalAssetKrw: '1040000.00000000',
-      returnRate: '0.04000000',
+      returnRate: '4.00000000',
       krwCash: '900000.00000000',
       usdCashKrw: '140000.00000000',
     });
@@ -137,7 +167,7 @@ describe('portfolio valuation policy', () => {
       }),
     ).toMatchObject({
       totalAssetKrw: '1020000.00000000',
-      returnRate: '0.02000000',
+      returnRate: '2.00000000',
       assetValueKrw: '120000.00000000',
       realizedPnlKrw: '5000.00000000',
       unrealizedPnlKrw: '20000.00000000',
@@ -170,7 +200,7 @@ describe('portfolio valuation policy', () => {
       }),
     ).toMatchObject({
       totalAssetKrw: '420000.00000000',
-      returnRate: '-0.58000000',
+      returnRate: '-58.00000000',
       assetValueKrw: '420000.00000000',
       usStockValueKrw: '420000.00000000',
       realizedPnlKrw: '14000.00000000',

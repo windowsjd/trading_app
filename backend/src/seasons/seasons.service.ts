@@ -4,11 +4,17 @@ import {
   ParticipantStatus,
   Prisma,
   SeasonStatus,
+  UserStatus,
   WalletTransactionDirection,
   WalletTransactionReferenceType,
   WalletTransactionType,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  assertSeasonJoinable,
+  SeasonLifecycleError,
+  type SeasonLifecycleSeason,
+} from './season-lifecycle.policy';
 
 type CurrentSeasonResponse = {
   success: true;
@@ -112,6 +118,8 @@ export class SeasonsService {
           select: {
             id: true,
             status: true,
+            startAt: true,
+            endAt: true,
             initialCapitalKrw: true,
           },
         });
@@ -120,11 +128,22 @@ export class SeasonsService {
           this.throwApiError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Season not found');
         }
 
-        if (season.status !== SeasonStatus.active) {
+        this.assertSeasonJoinable(season, new Date());
+
+        const user = await tx.user.findUnique({
+          where: {
+            id: userId,
+          },
+          select: {
+            status: true,
+          },
+        });
+
+        if (user && user.status !== UserStatus.active) {
           this.throwApiError(
-            HttpStatus.CONFLICT,
-            'SEASON_NOT_ACTIVE',
-            'Season is not active',
+            HttpStatus.FORBIDDEN,
+            'USER_NOT_ACTIVE',
+            'User is not active',
           );
         }
 
@@ -274,6 +293,18 @@ export class SeasonsService {
 
   private formatDecimal(value: Prisma.Decimal, scale: number) {
     return value.toFixed(scale);
+  }
+
+  private assertSeasonJoinable(season: SeasonLifecycleSeason, now: Date) {
+    try {
+      assertSeasonJoinable(season, now);
+    } catch (error) {
+      if (error instanceof SeasonLifecycleError) {
+        this.throwApiError(HttpStatus.CONFLICT, error.code, error.message);
+      }
+
+      throw error;
+    }
   }
 
   private createErrorBody(code: string, message: string) {

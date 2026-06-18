@@ -127,7 +127,7 @@ describe('RankingService', () => {
     rank,
     seasonParticipantId,
     totalAssetKrw: new Prisma.Decimal(`${1000000 - rank}.00000000`),
-    returnRate: new Prisma.Decimal('0.10000000'),
+    returnRate: new Prisma.Decimal('10.00000000'),
     capturedAt,
     seasonParticipant: {
       userId: `user-${rank}`,
@@ -155,7 +155,7 @@ describe('RankingService', () => {
       rank: 2,
       seasonParticipantId: 'sp-2',
       totalAssetKrw: new Prisma.Decimal('999998.00000000'),
-      returnRate: new Prisma.Decimal('0.09000000'),
+      returnRate: new Prisma.Decimal('9.00000000'),
       capturedAt,
     });
   };
@@ -186,7 +186,7 @@ describe('RankingService', () => {
           nickname: 'trader-1',
           profileImageUrl: 'https://example.com/p.png',
           totalAssetKrw: '999999.00000000',
-          returnRate: '0.10000000',
+          returnRate: '10.00000000',
         },
         {
           rank: 2,
@@ -201,7 +201,7 @@ describe('RankingService', () => {
         rank: 2,
         seasonParticipantId: 'sp-2',
         totalAssetKrw: '999998.00000000',
-        returnRate: '0.09000000',
+        returnRate: '9.00000000',
         rankingDate: '2026-05-07',
       },
     });

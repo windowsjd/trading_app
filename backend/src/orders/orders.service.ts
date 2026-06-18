@@ -47,6 +47,14 @@ import {
   calculateChangeBps,
   resolveDefaultMaxChangeBps,
 } from '../providers/realtime-execution-policy';
+import {
+  assertSeasonTradable,
+  SeasonLifecycleError,
+} from '../seasons/season-lifecycle.policy';
+import {
+  assertAssetTradable,
+  MarketHoursError,
+} from './market-hours.policy';
 
 export type OrdersQuery = {
   seasonId?: string;
@@ -483,6 +491,7 @@ export class OrdersService {
     });
     const submittedAt = new Date();
     const season = await this.findActiveSeasonOrThrow();
+    this.assertSeasonTradable(season, submittedAt);
     const participant = await this.findParticipantOrThrow(season.id, userId);
     const existingOrder = await this.findIdempotentCreateOrder(
       participant.id,
@@ -500,6 +509,7 @@ export class OrdersService {
       request,
       now: submittedAt,
     });
+    this.assertOrderAssetTradable(quote.asset, submittedAt);
     const price = roundDecimalHalfUp(quote.quotedPrice, monetaryScale);
     const grossAmount = roundDecimalHalfUp(
       request.quantity.mul(price),
@@ -661,6 +671,7 @@ export class OrdersService {
       );
     }
 
+    // Submitted-order cancel is a cleanup path and remains allowed after season end.
     const canceledAt = new Date();
     const updateResult = await this.prisma.order.updateMany({
       where: {
@@ -772,7 +783,7 @@ export class OrdersService {
           );
         }
 
-        this.assertExecutableSeasonAndAsset(order);
+        this.assertExecutableSeasonAndAsset(order, executedAt);
 
         if (order.status === OrderStatus.executed) {
           return this.buildAlreadyExecutedOrderResponse(order);
@@ -947,14 +958,12 @@ export class OrdersService {
     return order as OrderExecutionRecord | null;
   }
 
-  private assertExecutableSeasonAndAsset(order: OrderExecutionRecord) {
-    if (order.seasonParticipant.season.status !== SeasonStatus.active) {
-      this.throwApiError(
-        HttpStatus.CONFLICT,
-        'SEASON_NOT_ACTIVE',
-        'Season is not active.',
-      );
-    }
+  private assertExecutableSeasonAndAsset(
+    order: OrderExecutionRecord,
+    executedAt: Date,
+  ) {
+    this.assertSeasonTradable(order.seasonParticipant.season, executedAt);
+    this.assertOrderAssetTradable(order.asset, executedAt);
 
     if (order.asset.currencyCode !== order.currencyCode) {
       this.throwApiError(
@@ -2024,6 +2033,7 @@ export class OrdersService {
     sourceWorkflow: OrderQuoteSourceWorkflow,
   ): Promise<OrderQuoteCalculation> {
     const season = await this.findActiveSeasonOrThrow();
+    this.assertSeasonTradable(season, quoteAt);
     const participant = await this.findParticipantOrThrow(season.id, userId);
 
     return this.buildOrderQuoteForContext({
@@ -2051,6 +2061,7 @@ export class OrdersService {
         'currencyCode must match asset currencyCode.',
       );
     }
+    this.assertOrderAssetTradable(asset, quoteAt);
 
     const priceContext = await this.resolveOrderPrice(
       request,
@@ -2671,7 +2682,7 @@ export class OrdersService {
     if (!asset.isActive) {
       this.throwApiError(
         HttpStatus.BAD_REQUEST,
-        'ASSET_INACTIVE',
+        'ASSET_NOT_TRADABLE',
         'Asset is inactive.',
       );
     }
@@ -3387,6 +3398,39 @@ export class OrdersService {
 
   private formatNullableDate(value: Date | null) {
     return value ? value.toISOString() : null;
+  }
+
+  private assertSeasonTradable(season: ActiveOrderSeason, now: Date) {
+    try {
+      assertSeasonTradable(season, now);
+    } catch (error) {
+      if (error instanceof SeasonLifecycleError) {
+        this.throwApiError(HttpStatus.CONFLICT, error.code, error.message);
+      }
+
+      throw error;
+    }
+  }
+
+  private assertOrderAssetTradable(
+    asset: Pick<OrderAsset, 'assetType' | 'market'>,
+    now: Date,
+  ) {
+    try {
+      assertAssetTradable(asset, now);
+    } catch (error) {
+      if (error instanceof MarketHoursError) {
+        this.throwApiError(
+          error.code === 'MARKET_CLOSED'
+            ? HttpStatus.CONFLICT
+            : HttpStatus.BAD_REQUEST,
+          error.code,
+          error.message,
+        );
+      }
+
+      throw error;
+    }
   }
 
   private createErrorBody(code: string, message: string) {

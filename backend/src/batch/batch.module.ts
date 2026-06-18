@@ -8,6 +8,7 @@ import { FinalTierAssignmentJobService } from './final-tier-assignment-job.servi
 import { RewardGrantJobService } from './reward-grant-job.service';
 import { SeasonRankingJobService } from './season-ranking-job.service';
 import { SeasonSettlementJobService } from './season-settlement-job.service';
+import { SeasonLifecycleTransitionJobService } from './season-lifecycle-transition-job.service';
 
 @Module({
   imports: [PrismaModule],
@@ -19,6 +20,7 @@ import { SeasonSettlementJobService } from './season-settlement-job.service';
     RewardGrantJobService,
     SeasonRankingJobService,
     SeasonSettlementJobService,
+    SeasonLifecycleTransitionJobService,
     PortfolioValuationService,
   ],
   exports: [
@@ -29,6 +31,7 @@ import { SeasonSettlementJobService } from './season-settlement-job.service';
     RewardGrantJobService,
     SeasonRankingJobService,
     SeasonSettlementJobService,
+    SeasonLifecycleTransitionJobService,
   ],
 })
 export class BatchModule {}

@@ -180,6 +180,13 @@
     - Internal daily snapshot ops runner can call `DailyPortfolioSnapshotJobService` with lock/audit/dryRun support. Scheduler calls remain dry-run-by-default; real automatic writes require a future Production Scheduler Ownership Gate.
     - Provider FX/Binance ingestion, ranking generation, settlement, and reward marker scheduler runners remain explicit `skipped/NOT_IMPLEMENTED` placeholders. These skipped rows are not completed business automation or fake success.
     - Provider ingestion HTTP trigger APIs, batch HTTP APIs, KIS order/account APIs, Binance authenticated APIs, external reward fulfillment APIs, and real trading/account integrations remain closed. Admin user restore/status and internal DB reward fulfillment were opened later in the 2026-06-09 gate.
+  - Backend P0 return-rate, season lifecycle, and market-hours gate on 2026-06-18 KST:
+    - Return-rate values are percentage values everywhere while the DB column name remains unchanged. Formula is `(totalAssetKrw - initialCapitalKrw) / initialCapitalKrw * 100`; existing ratio-scale persisted rows require an explicit operator backfill outside this code gate.
+    - Season write paths now require effective active season state: `status=active` and `startAt <= now < endAt` for season join, `/fx quote`, `/fx execute`, orders quote, orders create, and orders execute.
+    - Submitted-order cancel remains a cleanup path and is allowed after season end when the order is still cancelable.
+    - Operator-run `season-lifecycle-transition` batch job can transition due `upcoming -> active` and expired `active -> ended`, with duplicate-active guardrails. It is not an HTTP batch API, scheduler cron, provider ingestion, settlement, or reward automation.
+    - Stock order quote/create/execute enforce regular market hours: KRX weekdays `09:00 <= KST < 15:30`, US weekdays `09:30 <= America/New_York < 16:00` with runtime timezone/DST handling, plus fixture holiday closures. Closed market returns `MARKET_CLOSED`; inactive/unsupported assets return `ASSET_NOT_TRADABLE`.
+    - Crypto orders do not receive a market-hours block in this gate. FX quote/execute do not receive a market-hours block, but still require effective active season state.
   - Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage; USDT depeg risk is not modeled.
   - Provider_api source eligibility for ranking, settlement, reward, and automation remains a separate gate.
   - KIS supports WebSocket approval_key retrieval, domestic KRX real-time trade price `H0STCNT0`, and overseas/US delayed trade price `HDFSCNT0` ingestion foundation into `asset_price_snapshots` provider_api rows.
@@ -364,11 +371,13 @@ near-term ledger/FX foundation:
   - `failed` key retry는 새 `idempotencyKey` 필요.
   - service 자체는 provider/FX/order/wallet/position/ledger/snapshot/ranking business row를 생성하지 않음.
 - Batch operator script 추가 완료: `scripts/admin-run-batch-job.ts`.
-  - 현재 지원 job은 `noop`, `health-check`, `daily-portfolio-snapshot`, `season-ranking`, `daily-season-cycle`, `season-settlement`, `final-tier-assignment`, `reward-grant`.
+  - 현재 지원 job은 `noop`, `health-check`, `daily-portfolio-snapshot`, `season-ranking`, `daily-season-cycle`, `season-settlement`, `final-tier-assignment`, `reward-grant`, `season-lifecycle-transition`.
   - `daily-portfolio-snapshot`은 operator-run job이며 cron scheduler가 아님.
   - `daily-portfolio-snapshot`은 기존 DB의 approved fresh `admin_manual` USD/KRW 및 latest eligible `admin_manual` asset price만 사용.
   - `daily-portfolio-snapshot`은 fresh provider_api first + admin_manual fallback valuation으로 `daily_portfolio_snapshots`만 생성하며 ranking, settlement, reward, provider ingestion을 수행하지 않음.
   - `daily-portfolio-snapshot` batch result에는 sourceSummary/fallback/rejected-provider summary가 포함됨. Snapshot row schema 자체는 변경하지 않음.
+  - `season-lifecycle-transition`은 operator-run job이며 cron scheduler/HTTP API가 아님. `--now <ISO>`를 기준으로 due `upcoming` season을 `active`로, expired `active` season을 `ended`로 전환하고 duplicate active season 상황은 실패 처리한다.
+  - `season-lifecycle-transition` dry-run은 전환 예정 season id/count를 반환하고 DB write를 하지 않음.
 - Provider ingestion foundation 추가 완료:
   - `ProvidersModule` 등록 완료.
   - Provider config parsing, fail-closed validation, secret redaction, raw payload truncation, low-level HTTP client foundation 구현 완료.
@@ -1065,7 +1074,7 @@ near-term ledger/FX foundation:
   - Binance provider_api source eligibility는 read-only/quote workflow와 operator-run daily snapshot valuation workflow에서 `binance_public_rest_24hr_ticker` fresh row만 허용하며 execute/write, scheduler, settlement, reward 사용은 `STOP`.
   - OANDA/Twelve Data ingestion implementation은 credentialed fixture, mapping, terms, sourceType tests 전까지 `STOP/BLOCKED`.
   - KRX execute/write remains STOP. KIS KRX `provider_api` evidence is limited to read-only/quote and operator-run daily snapshot valuation workflows where eligible.
-  - Batch job run foundation과 operator-run daily snapshot(provider-backed valuation only)/ranking/cycle/settlement/final-tier/reward-grant internal foundation MVP job은 구현됨. 실제 cron scheduler, scheduler reward 자동 지급, 외부 reward fulfillment job은 STOP 유지.
+  - Batch job run foundation과 operator-run daily snapshot(provider-backed valuation only)/ranking/cycle/settlement/final-tier/reward-grant internal foundation/season-lifecycle-transition MVP job은 구현됨. 실제 cron scheduler, scheduler reward 자동 지급, 외부 reward fulfillment job은 STOP 유지.
   - settlement extension, reward policy/catalog, 외부 reward fulfillment는 별도 gate 전까지 구현 STOP 유지.
 - Gate B Provider final selection readiness re-check 및 Asset Price Freshness Policy 문서화 완료.
   - 상세 결과: `docs/provider-final-selection-readiness-recheck.md`, `docs/asset-price-freshness-policy.md`.
@@ -1080,7 +1089,7 @@ near-term ledger/FX foundation:
   - full financial write-path 검증은 현재 service/unit 및 opt-in PostgreSQL integration spec이 담당.
 - 테스트 커버리지 상세는 `docs/backend-test-coverage-matrix.md` 기준.
 - provider ingestion foundation은 구현됨. `provider_api` source eligibility는 read-only/quote workflow와 operator-run daily snapshot valuation workflow에만 열렸고 provider-backed scheduler/settlement 사용은 `BLOCKED` 유지.
-- Batch job run foundation과 operator-run daily snapshot(provider-backed valuation only)/ranking/cycle/settlement/final-tier/reward-grant internal foundation MVP job은 구현됨. 실제 cron scheduler, scheduler reward 자동 지급, 외부 reward fulfillment job은 STOP 유지.
+- Batch job run foundation과 operator-run daily snapshot(provider-backed valuation only)/ranking/cycle/settlement/final-tier/reward-grant internal foundation/season-lifecycle-transition MVP job은 구현됨. 실제 cron scheduler, scheduler reward 자동 지급, 외부 reward fulfillment job은 STOP 유지.
 - settlement extension, reward policy/catalog, 외부 reward fulfillment는 별도 gate 전까지 구현 STOP 유지.
 - asset price freshness 정책 요약:
   - FX USD/KRW quote/execute는 현행 60초 `effectiveAt` freshness 유지.

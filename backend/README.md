@@ -11,18 +11,21 @@ This service owns backend APIs, database access, financial calculations, and ser
 - Internal reward fulfillment foundation: operator/admin managed request queue/status APIs, idempotent internal reward requests, fulfillment into `SeasonReward`, and fulfilled-only user reward visibility. This does not call or implement external cash, point, coupon, gifticon, payment, or delivery APIs.
 - Admin/operator runtime DBs must have migration `20260601090000_add_user_role_operator_audit_logs` applied so `users.role` and `operator_audit_logs` exist.
 - Current season lookup and season join.
+- Season write paths require effective active season state: `status=active` and `startAt <= now < endAt` for join, FX quote/execute, and orders quote/create/execute. Submitted-order cancel remains allowed after season end when still cancelable.
 - Home as one aggregate API.
 - Home settled final-result read model from existing `rankType=final` `season_rankings`.
 - Wallets, records, ranking, and orders read APIs.
+- Return-rate values are percentages everywhere; the schema column name is unchanged.
 - FX quote stores durable quotes; FX execute consumes durable quotes and reprices at execute time from fresh `provider_api` ExchangeRate-API USD/KRW rows.
 - Orders quote stores durable quotes; submitted order create binds an active durable quote; full-fill order execute consumes the quote and reprices at execute time from fresh `provider_api` asset/FX rows.
+- Stock order quote/create/execute enforce regular market hours. Crypto orders and FX quote/execute do not receive a market-hours block in this gate.
 - FX execute and orders create idempotency request hashes include `quoteId`, so the same idempotency key with a different quote conflicts instead of replaying an old result.
 - KRW and USD cash wallets. US stocks and USD-settled crypto use the USD wallet.
 - Final valuation policy is KRW total assets.
 - Provider ingestion foundation exists for operator-run ExchangeRate-API USD/KRW, Binance public REST crypto, and KIS WebSocket KRX/US stock market data row insertion.
 - Provider_api source eligibility is opened only for explicitly allowed workflows: `/fx quote`, `/fx execute`, assets `withPrice`, orders quote, orders execute, live portfolio/home/positions valuation, and the operator-run daily portfolio snapshot valuation job. Orders create binds durable quotes but does not read provider rows directly.
 - Read-only/quote responses expose backward-compatible optional source metadata for provider/admin visibility: `rateSource`, `priceSource`, `assetPriceSource`, `fxRateSource`, and live valuation source summaries where applicable.
-- Batch job execution foundation with idempotent `batch_job_runs` recording, operator-only noop/health-check script, operator-run daily portfolio snapshot generation, operator-run season ranking generation from existing daily snapshots, an operator-run daily season cycle orchestration job, an operator-run season settlement MVP job, and an operator-run reward grant marker MVP job.
+- Batch job execution foundation with idempotent `batch_job_runs` recording, operator-only noop/health-check script, operator-run daily portfolio snapshot generation, operator-run season ranking generation from existing daily snapshots, an operator-run daily season cycle orchestration job, an operator-run season settlement MVP job, an operator-run reward grant marker MVP job, and an operator-run season lifecycle transition job.
 - Scheduler/Ops foundation with disabled-by-default scheduler config, `ops_job_runs` audit rows, `ops_job_locks`, internal runner services, and `GET /readiness`. Placeholder scheduler jobs are recorded as skipped/not implemented and are not completed business automation.
 - Daily portfolio snapshot batch results include sourceSummary/fallback metadata in `batch_job_runs.resultPayloadJson`; `daily_portfolio_snapshots` row schema is unchanged.
 - Durable Quote plus realtime provider execute is implemented for `/fx execute` and orders execute. Quote remains a reference quote; execute reprices from fresh provider_api rows, enforces quote-to-execute bps thresholds, and forbids default admin_manual execute fallback.
@@ -110,6 +113,9 @@ pnpm tsx scripts/admin-run-batch-job.ts --job reward-grant --season-id <SEASON_I
 
 # operator-run reward grant marker dry-run with explicit marker date
 pnpm tsx scripts/admin-run-batch-job.ts --job reward-grant --season-id <SEASON_ID> --grant-date <YYYY-MM-DD> --dry-run --requested-by local-operator
+
+# operator-run season lifecycle transition dry-run, no scheduler/HTTP batch API
+pnpm tsx scripts/admin-run-batch-job.ts --job season-lifecycle-transition --now <ISO_TIMESTAMP> --dry-run --requested-by local-operator
 ```
 
 `daily-portfolio-snapshot` uses the idempotency key `daily-portfolio-snapshot:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. Dry-run reports `wouldCreate`, `existing`, participant-level failures, and `sourceSummary` without inserting snapshots. Non-dry-run inserts only available participant snapshots, skips existing `(seasonParticipantId, snapshotDate)` rows without overwrite, and uses fresh eligible `provider_api` rows first with explicit `admin_manual` fallback. It does not call external providers, create provider/price/FX rows, schedule cron, generate rankings, settle seasons, or grant rewards.
@@ -123,6 +129,8 @@ pnpm tsx scripts/admin-run-batch-job.ts --job reward-grant --season-id <SEASON_I
 `final-tier-assignment` uses the idempotency key `final-tier-assignment:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. Dry-run reads existing `rankType=final` `season_rankings` for the requested `--ranking-date` and returns the assignment plan without writing. Non-dry-run requires a `settled` season and updates only `SeasonParticipant.finalRank` and `finalTier` for participants with both fields still null. Existing `finalRank` or `finalTier` is treated as existing/skipped and is not overwritten. Missing final rankings fail with `FINAL_RANKING_UNAVAILABLE`. The default MVP tier policy is rank 1 `master`, rank 2-3 `diamond`, rank 4-10 `platinum`, top 30% `gold`, top 60% `silver`, and fallback `bronze`; clear `Season.rewardPolicyJson.tierPolicy.tiers` rules may override tier assignment only. The job does not update `rewardGrantedAt`, grant rewards, call providers, run cron, expose an HTTP batch API, or mutate price/FX/wallet/order/position/snapshot/ranking rows. Settled joined Home reads the assigned `finalTier` read-only.
 
 `reward-grant` uses the idempotency key `reward-grant:<season-id>` when `--idempotency-key` is omitted. If `--grant-date <YYYY-MM-DD>` is provided, the generated key is `reward-grant:<season-id>:<YYYY-MM-DD>` and the marker timestamp is `<YYYY-MM-DD>T00:00:00.000Z`; otherwise the batch run start timestamp is used. Dry-run reports grantable, existing, ineligible, skipped, and `topGranted` preview counts without writing. Non-dry-run requires a `settled` season and updates only `SeasonParticipant.rewardGrantedAt` for participants that already have both `finalRank` and `finalTier` and still have null `rewardGrantedAt`. Existing `rewardGrantedAt` is treated as existing/skipped and is not overwritten. If no participant has both `finalRank` and `finalTier`, the job fails with `FINAL_TIER_ASSIGNMENT_REQUIRED`. The job does not calculate reward amounts, create payment/point/badge/trophy rows, call providers, run cron, expose an HTTP batch API, mutate price/FX/wallet/order/position/snapshot/ranking rows, or change settlement/final-tier policy. Settled joined Home reads `rewardGrantedAt` read-only and returns `finalResult.reward.state = granted` when present.
+
+`season-lifecycle-transition` uses the idempotency key `season-lifecycle-transition:<now-or-auto-now>` when `--idempotency-key` is omitted. Dry-run reports due `upcoming -> active` and expired `active -> ended` season ids without writing. Non-dry-run performs those transitions in one transaction and fails duplicate active-season situations with `DUPLICATE_ACTIVE_SEASON`. It does not run scheduler cron, expose an HTTP batch API, call providers, settle seasons, grant rewards, or mutate user/wallet/order/position rows.
 
 Opt-in real PostgreSQL integration tests require a reachable `DATABASE_URL` and an explicit env flag:
 
@@ -173,6 +181,7 @@ Possible now:
 - Operator-run season settlement MVP jobs that finalize from existing `daily_portfolio_snapshots`.
 - Operator-run final tier assignment MVP jobs that assign final rank/tier from existing final `season_rankings`.
 - Operator-run reward grant marker MVP jobs that set `SeasonParticipant.rewardGrantedAt` after settlement and final tier assignment.
+- Operator-run season lifecycle transition jobs that move seasons between `upcoming`, `active`, and `ended` according to `startAt`/`endAt`.
 - Settled joined Home final-result reads from existing `rankType=final` `season_rankings`; missing final rankings return unavailable without live valuation fallback.
 - Durable Quote-backed `/fx quote`, `/fx execute`, orders quote/create/execute, plus provider_api-backed assets `withPrice` and live portfolio/home/positions valuation. Quote/read paths can use explicit admin_manual fallback; execute paths require fresh provider_api and reject default admin_manual fallback.
 - Source metadata/outage visibility for those read-only/quote responses and daily snapshot batch results without exposing raw provider payloads or secrets.

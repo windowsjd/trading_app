@@ -61,6 +61,7 @@ async function main() {
     await runCase('duplicate join is conflict without duplicate side effects', testDuplicateJoinConflict);
     await runCase('concurrent duplicate join does not double wallet or ledger rows', testConcurrentDuplicateJoinRace);
     await runCase('inactive seasons reject join without partial writes', testInactiveSeasonRejection);
+    await runCase('active status outside start/end rejects join', testActiveStatusOutsideSeasonWindowRejection);
     await runCase('transaction failure injection rolls back participant wallet and ledger writes', testFailureInjectionRollback);
     console.log('season join db integration ok');
   } finally {
@@ -194,6 +195,43 @@ async function testInactiveSeasonRejection() {
   }
 }
 
+async function testActiveStatusOutsideSeasonWindowRejection() {
+  const cases = [
+    {
+      label: 'before-start',
+      startAt: new Date(Date.now() + 86_400_000),
+      endAt: new Date(Date.now() + 172_800_000),
+      code: 'SEASON_NOT_STARTED',
+    },
+    {
+      label: 'after-end',
+      startAt: new Date(Date.now() - 172_800_000),
+      endAt: new Date(Date.now() - 86_400_000),
+      code: 'SEASON_ENDED',
+    },
+  ];
+
+  for (const testCase of cases) {
+    const scenario = await createScenario('active-window-' + testCase.label, {
+      startAt: testCase.startAt,
+      endAt: testCase.endAt,
+    });
+
+    try {
+      const before = await readJoinState(scenario);
+      await expectJoinError(
+        service.joinSeason(scenario.seasonId, scenario.userId),
+        409,
+        testCase.code,
+      );
+      const after = await readJoinState(scenario);
+      assert.deepEqual(after, before);
+    } finally {
+      await cleanupScenario(scenario);
+    }
+  }
+}
+
 async function testFailureInjectionRollback() {
   const failureCases = [
     {
@@ -235,6 +273,7 @@ async function testFailureInjectionRollback() {
 async function createScenario(label, options = {}) {
   const suffix = String(Date.now()) + '-' + Math.random().toString(16).slice(2);
   const initialCapitalKrw = options.initialCapitalKrw ?? '10000000.00000000';
+  const now = Date.now();
 
   const user = await prisma.user.create({
     data: {
@@ -249,8 +288,8 @@ async function createScenario(label, options = {}) {
     data: {
       name: TEST_PREFIX + '-' + label + '-' + suffix,
       status: options.status ?? SeasonStatus.active,
-      startAt: new Date('2099-01-01T00:00:00.000Z'),
-      endAt: new Date('2100-01-01T00:00:00.000Z'),
+      startAt: options.startAt ?? new Date(now - 60_000),
+      endAt: options.endAt ?? new Date(now + 86_400_000),
       initialCapitalKrw,
       tradeFeeRate: '0.001000',
       fxFeeRate: '0.001000',

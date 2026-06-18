@@ -55,6 +55,10 @@ import {
   calculateChangeBps,
   resolveDefaultMaxChangeBps,
 } from '../providers/realtime-execution-policy';
+import {
+  assertSeasonExchangeable,
+  SeasonLifecycleError,
+} from '../seasons/season-lifecycle.policy';
 
 export type FxQuoteRequestBody = {
   fromCurrency?: unknown;
@@ -128,6 +132,8 @@ type FxQuoteResponse = {
 type ActiveSeasonRecord = {
   id: string;
   status: SeasonStatus;
+  startAt: Date;
+  endAt: Date;
   fxFeeRate: Prisma.Decimal;
 };
 
@@ -227,14 +233,8 @@ export class FxService {
 
       const request = this.validateQuoteRequest(body);
       const season = await this.findCurrentSeason();
-
-      if (season.status !== SeasonStatus.active) {
-        this.throwApiError(
-          HttpStatus.CONFLICT,
-          'SEASON_NOT_ACTIVE',
-          'Season is not active',
-        );
-      }
+      const now = new Date();
+      this.assertSeasonExchangeableForQuote(season, now);
 
       const participant = await this.prisma.seasonParticipant.findUnique({
         where: {
@@ -256,7 +256,6 @@ export class FxService {
         );
       }
 
-      const now = new Date();
       const rateSnapshot = await this.findFxQuoteRateSnapshot(now);
 
       if (!rateSnapshot) {
@@ -378,10 +377,8 @@ export class FxService {
       }
 
       const season = await this.findCurrentSeason();
-
-      if (season.status !== SeasonStatus.active) {
-        this.throwFxExecuteError(fxExecuteErrorCodes.SEASON_NOT_ACTIVE);
-      }
+      const executeNow = new Date();
+      this.assertSeasonExchangeableForExecute(season, executeNow);
 
       const participant = await this.prisma.seasonParticipant.findUnique({
         where: {
@@ -409,7 +406,6 @@ export class FxService {
       }
 
       const normalizedRequest = preflightResult.value;
-      const executeNow = new Date();
       const existingCommand = await this.findFxExecuteCommandCandidate(
         userId,
         normalizedRequest.idempotencyKey,
@@ -498,6 +494,8 @@ export class FxService {
         select: {
           id: true,
           status: true,
+          startAt: true,
+          endAt: true,
           fxFeeRate: true,
         },
         orderBy: this.getOrderBy(status),
@@ -924,6 +922,36 @@ export class FxService {
 
   private formatDecimal(value: Prisma.Decimal, scale: number) {
     return value.toFixed(scale);
+  }
+
+  private assertSeasonExchangeableForQuote(
+    season: ActiveSeasonRecord,
+    now: Date,
+  ) {
+    try {
+      assertSeasonExchangeable(season, now);
+    } catch (error) {
+      if (error instanceof SeasonLifecycleError) {
+        this.throwApiError(HttpStatus.CONFLICT, error.code, error.message);
+      }
+
+      throw error;
+    }
+  }
+
+  private assertSeasonExchangeableForExecute(
+    season: ActiveSeasonRecord,
+    now: Date,
+  ) {
+    try {
+      assertSeasonExchangeable(season, now);
+    } catch (error) {
+      if (error instanceof SeasonLifecycleError) {
+        this.throwFxExecuteError(error.code as FxExecuteErrorCode);
+      }
+
+      throw error;
+    }
   }
 
   private async findFxExecuteCommandCandidate(

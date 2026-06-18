@@ -174,7 +174,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
         krwCash: '900000.00000000',
         usdCashKrw: '140000.00000000',
         assetValueKrw: '160000.00000000',
-        returnRate: '0.20000000',
+        returnRate: '20.00000000',
         capturedAt: startedAt,
       }),
       select: {
@@ -696,7 +696,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
         assetValueKrw: '0.00000000',
         realizedPnlKrw: '12.34000000',
         unrealizedPnlKrw: '-56.78000000',
-        returnRate: '0.23456789',
+        returnRate: '23.45678900',
       }),
     );
     prisma.dailyPortfolioSnapshot.create.mockResolvedValue({ id: 'snap-1' });
@@ -714,7 +714,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
         assetValueKrw: '0.00000000',
         realizedPnlKrw: '12.34000000',
         unrealizedPnlKrw: '-56.78000000',
-        returnRate: '0.23456789',
+        returnRate: '23.45678900',
       }),
       select: {
         id: true,
@@ -864,7 +864,7 @@ function baseValuationFixture() {
   return {
     seasonParticipantId: 'sp-1',
     totalAssetKrw: '1200000.00000000',
-    returnRate: '0.20000000',
+    returnRate: '20.00000000',
     krwCash: '900000.00000000',
     usdCashKrw: '140000.00000000',
     assetValueKrw: '160000.00000000',

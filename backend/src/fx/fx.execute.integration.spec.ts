@@ -485,8 +485,8 @@ async function createScenario(label, options = {}) {
     data: {
       name: TEST_PREFIX + '-' + label + '-' + suffix,
       status: SeasonStatus.active,
-      startAt: new Date('2099-01-01T00:00:00.000Z'),
-      endAt: new Date('2100-01-01T00:00:00.000Z'),
+      startAt: new Date(now.getTime() - 60_000),
+      endAt: new Date(now.getTime() + 86_400_000),
       initialCapitalKrw: '10000000.00000000',
       tradeFeeRate: '0.001000',
       fxFeeRate: options.fxFeeRate ?? '0.001000',

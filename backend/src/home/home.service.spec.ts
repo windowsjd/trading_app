@@ -165,7 +165,7 @@ describe('HomeService', () => {
     calculateSeasonParticipantValuation: jest.fn().mockResolvedValue({
       seasonParticipantId: 'participant-1',
       totalAssetKrw: '1200000.00000000',
-      returnRate: '0.20000000',
+      returnRate: '20.00000000',
       krwCash: '900000.00000000',
       usdCashKrw: '140000.00000000',
       assetValueKrw: '160000.00000000',
@@ -285,7 +285,7 @@ describe('HomeService', () => {
   const latestSnapshot = {
     snapshotDate: new Date('2026-05-07T00:00:00.000Z'),
     totalAssetKrw: new Prisma.Decimal('1100000.00000000'),
-    returnRate: new Prisma.Decimal('0.10000000'),
+    returnRate: new Prisma.Decimal('10.00000000'),
     krwCash: new Prisma.Decimal('900000.00000000'),
     usdCashKrw: new Prisma.Decimal('140000.00000000'),
     assetValueKrw: new Prisma.Decimal('60000.00000000'),
@@ -391,7 +391,7 @@ describe('HomeService', () => {
       valuationSource: 'daily_snapshot',
       snapshotDate: '2026-05-07',
       totalAssetKrw: '1100000.00000000',
-      returnRate: '0.10000000',
+      returnRate: '10.00000000',
     });
     expect(response.data.ranking).toMatchObject({
       state: 'unavailable',
@@ -453,7 +453,7 @@ describe('HomeService', () => {
     valuationService.calculateSeasonParticipantValuation.mockResolvedValueOnce({
       seasonParticipantId: 'participant-1',
       totalAssetKrw: '1200000.00000000',
-      returnRate: '0.20000000',
+      returnRate: '20.00000000',
       krwCash: '900000.00000000',
       usdCashKrw: '140000.00000000',
       assetValueKrw: '160000.00000000',
@@ -488,7 +488,7 @@ describe('HomeService', () => {
       rankType: SeasonRankingType.daily,
       rankingDate: new Date('2026-05-07T00:00:00.000Z'),
       totalAssetKrw: new Prisma.Decimal('1200000.00000000'),
-      returnRate: new Prisma.Decimal('0.20000000'),
+      returnRate: new Prisma.Decimal('20.00000000'),
       capturedAt: new Date('2026-05-07T00:03:00.000Z'),
     });
     prisma.seasonRanking.count.mockResolvedValueOnce(10);
@@ -889,13 +889,13 @@ describe('HomeService', () => {
       {
         snapshotDate: new Date('2026-05-08T00:00:00.000Z'),
         totalAssetKrw: new Prisma.Decimal('1210000.00000000'),
-        returnRate: new Prisma.Decimal('0.21000000'),
+        returnRate: new Prisma.Decimal('21.00000000'),
         capturedAt: new Date('2026-05-08T00:01:00.000Z'),
       },
       {
         snapshotDate: new Date('2026-05-07T00:00:00.000Z'),
         totalAssetKrw: new Prisma.Decimal('1200000.00000000'),
-        returnRate: new Prisma.Decimal('0.20000000'),
+        returnRate: new Prisma.Decimal('20.00000000'),
         capturedAt: new Date('2026-05-07T00:01:00.000Z'),
       },
     ]);
@@ -918,13 +918,13 @@ describe('HomeService', () => {
         {
           snapshotDate: '2026-05-07',
           totalAssetKrw: '1200000.00000000',
-          returnRate: '0.20000000',
+          returnRate: '20.00000000',
           capturedAt: '2026-05-07T00:01:00.000Z',
         },
         {
           snapshotDate: '2026-05-08',
           totalAssetKrw: '1210000.00000000',
-          returnRate: '0.21000000',
+          returnRate: '21.00000000',
           capturedAt: '2026-05-08T00:01:00.000Z',
         },
       ],

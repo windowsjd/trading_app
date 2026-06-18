@@ -16,13 +16,13 @@ describe('portfolio ranking policy', () => {
       {
         seasonParticipantId: 'sp-3',
         totalAssetKrw: '1000.00000000',
-        returnRate: '0.01000000',
+        returnRate: '1.00000000',
         capturedAt: new Date('2026-05-07T00:00:03.000Z'),
       },
       {
         seasonParticipantId: 'sp-2',
         totalAssetKrw: '1000.00000000',
-        returnRate: '0.02000000',
+        returnRate: '2.00000000',
         capturedAt: new Date('2026-05-07T00:00:02.000Z'),
       },
       {
@@ -34,7 +34,7 @@ describe('portfolio ranking policy', () => {
       {
         seasonParticipantId: 'sp-0',
         totalAssetKrw: '1000.00000000',
-        returnRate: '0.01000000',
+        returnRate: '1.00000000',
         capturedAt: new Date('2026-05-07T00:00:03.000Z'),
       },
     ]);
@@ -50,19 +50,19 @@ describe('portfolio ranking policy', () => {
         rank: 2,
         seasonParticipantId: 'sp-2',
         totalAssetKrw: '1000.00000000',
-        returnRate: '0.02000000',
+        returnRate: '2.00000000',
       },
       {
         rank: 3,
         seasonParticipantId: 'sp-0',
         totalAssetKrw: '1000.00000000',
-        returnRate: '0.01000000',
+        returnRate: '1.00000000',
       },
       {
         rank: 4,
         seasonParticipantId: 'sp-3',
         totalAssetKrw: '1000.00000000',
-        returnRate: '0.01000000',
+        returnRate: '1.00000000',
       },
     ]);
   });

@@ -369,7 +369,7 @@ export class PositionsService {
       );
       const returnRate = averageCost.eq(0)
         ? new Prisma.Decimal(0)
-        : currentPrice.sub(averageCost).div(averageCost);
+        : currentPrice.sub(averageCost).div(averageCost).mul(100);
 
       return {
         state: 'available',

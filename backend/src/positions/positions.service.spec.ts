@@ -577,7 +577,7 @@ describe('PositionsService', () => {
         positionValueKrw: '200.00000000',
         unrealizedPnl: '20.00000000',
         unrealizedPnlKrw: '20.00000000',
-        returnRate: '0.11111111',
+        returnRate: '11.11111111',
         priceSource: {
           sourceType: 'admin_manual',
           sourceName: 'manual-price',

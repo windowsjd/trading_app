@@ -111,7 +111,7 @@ describe('PortfolioValuationService source eligibility', () => {
       totalAssetKrw: '330000.00000000',
       assetValueKrw: '330000.00000000',
       usStockValueKrw: '330000.00000000',
-      returnRate: '-0.67000000',
+      returnRate: '-67.00000000',
       sourceSummary: {
         providerApiUsed: true,
         adminManualUsed: false,
