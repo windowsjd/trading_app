@@ -31,6 +31,12 @@ export type PositionAvgAggregateOutputType = {
   averageCost: runtime.Decimal | null
   realizedPnl: runtime.Decimal | null
   realizedPnlKrw: runtime.Decimal | null
+  currentPriceLocal: runtime.Decimal | null
+  currentPriceKrw: runtime.Decimal | null
+  marketValueLocal: runtime.Decimal | null
+  marketValueKrw: runtime.Decimal | null
+  unrealizedPnlLocal: runtime.Decimal | null
+  unrealizedPnlKrw: runtime.Decimal | null
 }
 
 export type PositionSumAggregateOutputType = {
@@ -38,6 +44,12 @@ export type PositionSumAggregateOutputType = {
   averageCost: runtime.Decimal | null
   realizedPnl: runtime.Decimal | null
   realizedPnlKrw: runtime.Decimal | null
+  currentPriceLocal: runtime.Decimal | null
+  currentPriceKrw: runtime.Decimal | null
+  marketValueLocal: runtime.Decimal | null
+  marketValueKrw: runtime.Decimal | null
+  unrealizedPnlLocal: runtime.Decimal | null
+  unrealizedPnlKrw: runtime.Decimal | null
 }
 
 export type PositionMinAggregateOutputType = {
@@ -49,6 +61,12 @@ export type PositionMinAggregateOutputType = {
   currencyCode: $Enums.CurrencyCode | null
   realizedPnl: runtime.Decimal | null
   realizedPnlKrw: runtime.Decimal | null
+  currentPriceLocal: runtime.Decimal | null
+  currentPriceKrw: runtime.Decimal | null
+  marketValueLocal: runtime.Decimal | null
+  marketValueKrw: runtime.Decimal | null
+  unrealizedPnlLocal: runtime.Decimal | null
+  unrealizedPnlKrw: runtime.Decimal | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -62,6 +80,12 @@ export type PositionMaxAggregateOutputType = {
   currencyCode: $Enums.CurrencyCode | null
   realizedPnl: runtime.Decimal | null
   realizedPnlKrw: runtime.Decimal | null
+  currentPriceLocal: runtime.Decimal | null
+  currentPriceKrw: runtime.Decimal | null
+  marketValueLocal: runtime.Decimal | null
+  marketValueKrw: runtime.Decimal | null
+  unrealizedPnlLocal: runtime.Decimal | null
+  unrealizedPnlKrw: runtime.Decimal | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -75,6 +99,12 @@ export type PositionCountAggregateOutputType = {
   currencyCode: number
   realizedPnl: number
   realizedPnlKrw: number
+  currentPriceLocal: number
+  currentPriceKrw: number
+  marketValueLocal: number
+  marketValueKrw: number
+  unrealizedPnlLocal: number
+  unrealizedPnlKrw: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -86,6 +116,12 @@ export type PositionAvgAggregateInputType = {
   averageCost?: true
   realizedPnl?: true
   realizedPnlKrw?: true
+  currentPriceLocal?: true
+  currentPriceKrw?: true
+  marketValueLocal?: true
+  marketValueKrw?: true
+  unrealizedPnlLocal?: true
+  unrealizedPnlKrw?: true
 }
 
 export type PositionSumAggregateInputType = {
@@ -93,6 +129,12 @@ export type PositionSumAggregateInputType = {
   averageCost?: true
   realizedPnl?: true
   realizedPnlKrw?: true
+  currentPriceLocal?: true
+  currentPriceKrw?: true
+  marketValueLocal?: true
+  marketValueKrw?: true
+  unrealizedPnlLocal?: true
+  unrealizedPnlKrw?: true
 }
 
 export type PositionMinAggregateInputType = {
@@ -104,6 +146,12 @@ export type PositionMinAggregateInputType = {
   currencyCode?: true
   realizedPnl?: true
   realizedPnlKrw?: true
+  currentPriceLocal?: true
+  currentPriceKrw?: true
+  marketValueLocal?: true
+  marketValueKrw?: true
+  unrealizedPnlLocal?: true
+  unrealizedPnlKrw?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -117,6 +165,12 @@ export type PositionMaxAggregateInputType = {
   currencyCode?: true
   realizedPnl?: true
   realizedPnlKrw?: true
+  currentPriceLocal?: true
+  currentPriceKrw?: true
+  marketValueLocal?: true
+  marketValueKrw?: true
+  unrealizedPnlLocal?: true
+  unrealizedPnlKrw?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -130,6 +184,12 @@ export type PositionCountAggregateInputType = {
   currencyCode?: true
   realizedPnl?: true
   realizedPnlKrw?: true
+  currentPriceLocal?: true
+  currentPriceKrw?: true
+  marketValueLocal?: true
+  marketValueKrw?: true
+  unrealizedPnlLocal?: true
+  unrealizedPnlKrw?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -230,6 +290,12 @@ export type PositionGroupByOutputType = {
   currencyCode: $Enums.CurrencyCode
   realizedPnl: runtime.Decimal
   realizedPnlKrw: runtime.Decimal
+  currentPriceLocal: runtime.Decimal | null
+  currentPriceKrw: runtime.Decimal | null
+  marketValueLocal: runtime.Decimal | null
+  marketValueKrw: runtime.Decimal | null
+  unrealizedPnlLocal: runtime.Decimal | null
+  unrealizedPnlKrw: runtime.Decimal | null
   createdAt: Date
   updatedAt: Date
   _count: PositionCountAggregateOutputType | null
@@ -266,6 +332,12 @@ export type PositionWhereInput = {
   currencyCode?: Prisma.EnumCurrencyCodeFilter<"Position"> | $Enums.CurrencyCode
   realizedPnl?: Prisma.DecimalFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentPriceLocal?: Prisma.DecimalNullableFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currentPriceKrw?: Prisma.DecimalNullableFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueLocal?: Prisma.DecimalNullableFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueKrw?: Prisma.DecimalNullableFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlLocal?: Prisma.DecimalNullableFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlKrw?: Prisma.DecimalNullableFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFilter<"Position"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Position"> | Date | string
   seasonParticipant?: Prisma.XOR<Prisma.SeasonParticipantScalarRelationFilter, Prisma.SeasonParticipantWhereInput>
@@ -281,6 +353,12 @@ export type PositionOrderByWithRelationInput = {
   currencyCode?: Prisma.SortOrder
   realizedPnl?: Prisma.SortOrder
   realizedPnlKrw?: Prisma.SortOrder
+  currentPriceLocal?: Prisma.SortOrderInput | Prisma.SortOrder
+  currentPriceKrw?: Prisma.SortOrderInput | Prisma.SortOrder
+  marketValueLocal?: Prisma.SortOrderInput | Prisma.SortOrder
+  marketValueKrw?: Prisma.SortOrderInput | Prisma.SortOrder
+  unrealizedPnlLocal?: Prisma.SortOrderInput | Prisma.SortOrder
+  unrealizedPnlKrw?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   seasonParticipant?: Prisma.SeasonParticipantOrderByWithRelationInput
@@ -300,6 +378,12 @@ export type PositionWhereUniqueInput = Prisma.AtLeast<{
   currencyCode?: Prisma.EnumCurrencyCodeFilter<"Position"> | $Enums.CurrencyCode
   realizedPnl?: Prisma.DecimalFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentPriceLocal?: Prisma.DecimalNullableFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currentPriceKrw?: Prisma.DecimalNullableFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueLocal?: Prisma.DecimalNullableFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueKrw?: Prisma.DecimalNullableFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlLocal?: Prisma.DecimalNullableFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlKrw?: Prisma.DecimalNullableFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFilter<"Position"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Position"> | Date | string
   seasonParticipant?: Prisma.XOR<Prisma.SeasonParticipantScalarRelationFilter, Prisma.SeasonParticipantWhereInput>
@@ -315,6 +399,12 @@ export type PositionOrderByWithAggregationInput = {
   currencyCode?: Prisma.SortOrder
   realizedPnl?: Prisma.SortOrder
   realizedPnlKrw?: Prisma.SortOrder
+  currentPriceLocal?: Prisma.SortOrderInput | Prisma.SortOrder
+  currentPriceKrw?: Prisma.SortOrderInput | Prisma.SortOrder
+  marketValueLocal?: Prisma.SortOrderInput | Prisma.SortOrder
+  marketValueKrw?: Prisma.SortOrderInput | Prisma.SortOrder
+  unrealizedPnlLocal?: Prisma.SortOrderInput | Prisma.SortOrder
+  unrealizedPnlKrw?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.PositionCountOrderByAggregateInput
@@ -336,6 +426,12 @@ export type PositionScalarWhereWithAggregatesInput = {
   currencyCode?: Prisma.EnumCurrencyCodeWithAggregatesFilter<"Position"> | $Enums.CurrencyCode
   realizedPnl?: Prisma.DecimalWithAggregatesFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalWithAggregatesFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentPriceLocal?: Prisma.DecimalNullableWithAggregatesFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currentPriceKrw?: Prisma.DecimalNullableWithAggregatesFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueLocal?: Prisma.DecimalNullableWithAggregatesFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueKrw?: Prisma.DecimalNullableWithAggregatesFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlLocal?: Prisma.DecimalNullableWithAggregatesFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlKrw?: Prisma.DecimalNullableWithAggregatesFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Position"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Position"> | Date | string
 }
@@ -347,6 +443,12 @@ export type PositionCreateInput = {
   currencyCode: $Enums.CurrencyCode
   realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentPriceLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currentPriceKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipant: Prisma.SeasonParticipantCreateNestedOneWithoutPositionsInput
@@ -362,6 +464,12 @@ export type PositionUncheckedCreateInput = {
   currencyCode: $Enums.CurrencyCode
   realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentPriceLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currentPriceKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -373,6 +481,12 @@ export type PositionUpdateInput = {
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   realizedPnl?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentPriceLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currentPriceKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneRequiredWithoutPositionsNestedInput
@@ -388,6 +502,12 @@ export type PositionUncheckedUpdateInput = {
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   realizedPnl?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentPriceLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currentPriceKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -401,6 +521,12 @@ export type PositionCreateManyInput = {
   currencyCode: $Enums.CurrencyCode
   realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentPriceLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currentPriceKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -412,6 +538,12 @@ export type PositionUpdateManyMutationInput = {
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   realizedPnl?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentPriceLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currentPriceKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -425,6 +557,12 @@ export type PositionUncheckedUpdateManyInput = {
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   realizedPnl?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentPriceLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currentPriceKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -453,6 +591,12 @@ export type PositionCountOrderByAggregateInput = {
   currencyCode?: Prisma.SortOrder
   realizedPnl?: Prisma.SortOrder
   realizedPnlKrw?: Prisma.SortOrder
+  currentPriceLocal?: Prisma.SortOrder
+  currentPriceKrw?: Prisma.SortOrder
+  marketValueLocal?: Prisma.SortOrder
+  marketValueKrw?: Prisma.SortOrder
+  unrealizedPnlLocal?: Prisma.SortOrder
+  unrealizedPnlKrw?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -462,6 +606,12 @@ export type PositionAvgOrderByAggregateInput = {
   averageCost?: Prisma.SortOrder
   realizedPnl?: Prisma.SortOrder
   realizedPnlKrw?: Prisma.SortOrder
+  currentPriceLocal?: Prisma.SortOrder
+  currentPriceKrw?: Prisma.SortOrder
+  marketValueLocal?: Prisma.SortOrder
+  marketValueKrw?: Prisma.SortOrder
+  unrealizedPnlLocal?: Prisma.SortOrder
+  unrealizedPnlKrw?: Prisma.SortOrder
 }
 
 export type PositionMaxOrderByAggregateInput = {
@@ -473,6 +623,12 @@ export type PositionMaxOrderByAggregateInput = {
   currencyCode?: Prisma.SortOrder
   realizedPnl?: Prisma.SortOrder
   realizedPnlKrw?: Prisma.SortOrder
+  currentPriceLocal?: Prisma.SortOrder
+  currentPriceKrw?: Prisma.SortOrder
+  marketValueLocal?: Prisma.SortOrder
+  marketValueKrw?: Prisma.SortOrder
+  unrealizedPnlLocal?: Prisma.SortOrder
+  unrealizedPnlKrw?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -486,6 +642,12 @@ export type PositionMinOrderByAggregateInput = {
   currencyCode?: Prisma.SortOrder
   realizedPnl?: Prisma.SortOrder
   realizedPnlKrw?: Prisma.SortOrder
+  currentPriceLocal?: Prisma.SortOrder
+  currentPriceKrw?: Prisma.SortOrder
+  marketValueLocal?: Prisma.SortOrder
+  marketValueKrw?: Prisma.SortOrder
+  unrealizedPnlLocal?: Prisma.SortOrder
+  unrealizedPnlKrw?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -495,6 +657,12 @@ export type PositionSumOrderByAggregateInput = {
   averageCost?: Prisma.SortOrder
   realizedPnl?: Prisma.SortOrder
   realizedPnlKrw?: Prisma.SortOrder
+  currentPriceLocal?: Prisma.SortOrder
+  currentPriceKrw?: Prisma.SortOrder
+  marketValueLocal?: Prisma.SortOrder
+  marketValueKrw?: Prisma.SortOrder
+  unrealizedPnlLocal?: Prisma.SortOrder
+  unrealizedPnlKrw?: Prisma.SortOrder
 }
 
 export type PositionCreateNestedManyWithoutSeasonParticipantInput = {
@@ -588,6 +756,12 @@ export type PositionCreateWithoutSeasonParticipantInput = {
   currencyCode: $Enums.CurrencyCode
   realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentPriceLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currentPriceKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   asset: Prisma.AssetCreateNestedOneWithoutPositionsInput
@@ -601,6 +775,12 @@ export type PositionUncheckedCreateWithoutSeasonParticipantInput = {
   currencyCode: $Enums.CurrencyCode
   realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentPriceLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currentPriceKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -643,6 +823,12 @@ export type PositionScalarWhereInput = {
   currencyCode?: Prisma.EnumCurrencyCodeFilter<"Position"> | $Enums.CurrencyCode
   realizedPnl?: Prisma.DecimalFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentPriceLocal?: Prisma.DecimalNullableFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currentPriceKrw?: Prisma.DecimalNullableFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueLocal?: Prisma.DecimalNullableFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueKrw?: Prisma.DecimalNullableFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlLocal?: Prisma.DecimalNullableFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlKrw?: Prisma.DecimalNullableFilter<"Position"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFilter<"Position"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Position"> | Date | string
 }
@@ -654,6 +840,12 @@ export type PositionCreateWithoutAssetInput = {
   currencyCode: $Enums.CurrencyCode
   realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentPriceLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currentPriceKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipant: Prisma.SeasonParticipantCreateNestedOneWithoutPositionsInput
@@ -667,6 +859,12 @@ export type PositionUncheckedCreateWithoutAssetInput = {
   currencyCode: $Enums.CurrencyCode
   realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentPriceLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currentPriceKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -705,6 +903,12 @@ export type PositionCreateManySeasonParticipantInput = {
   currencyCode: $Enums.CurrencyCode
   realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentPriceLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currentPriceKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -716,6 +920,12 @@ export type PositionUpdateWithoutSeasonParticipantInput = {
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   realizedPnl?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentPriceLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currentPriceKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   asset?: Prisma.AssetUpdateOneRequiredWithoutPositionsNestedInput
@@ -729,6 +939,12 @@ export type PositionUncheckedUpdateWithoutSeasonParticipantInput = {
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   realizedPnl?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentPriceLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currentPriceKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -741,6 +957,12 @@ export type PositionUncheckedUpdateManyWithoutSeasonParticipantInput = {
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   realizedPnl?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentPriceLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currentPriceKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -753,6 +975,12 @@ export type PositionCreateManyAssetInput = {
   currencyCode: $Enums.CurrencyCode
   realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentPriceLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currentPriceKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -764,6 +992,12 @@ export type PositionUpdateWithoutAssetInput = {
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   realizedPnl?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentPriceLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currentPriceKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneRequiredWithoutPositionsNestedInput
@@ -777,6 +1011,12 @@ export type PositionUncheckedUpdateWithoutAssetInput = {
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   realizedPnl?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentPriceLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currentPriceKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -789,6 +1029,12 @@ export type PositionUncheckedUpdateManyWithoutAssetInput = {
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   realizedPnl?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentPriceLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currentPriceKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -804,6 +1050,12 @@ export type PositionSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs
   currencyCode?: boolean
   realizedPnl?: boolean
   realizedPnlKrw?: boolean
+  currentPriceLocal?: boolean
+  currentPriceKrw?: boolean
+  marketValueLocal?: boolean
+  marketValueKrw?: boolean
+  unrealizedPnlLocal?: boolean
+  unrealizedPnlKrw?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
@@ -819,6 +1071,12 @@ export type PositionSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exte
   currencyCode?: boolean
   realizedPnl?: boolean
   realizedPnlKrw?: boolean
+  currentPriceLocal?: boolean
+  currentPriceKrw?: boolean
+  marketValueLocal?: boolean
+  marketValueKrw?: boolean
+  unrealizedPnlLocal?: boolean
+  unrealizedPnlKrw?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
@@ -834,6 +1092,12 @@ export type PositionSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exte
   currencyCode?: boolean
   realizedPnl?: boolean
   realizedPnlKrw?: boolean
+  currentPriceLocal?: boolean
+  currentPriceKrw?: boolean
+  marketValueLocal?: boolean
+  marketValueKrw?: boolean
+  unrealizedPnlLocal?: boolean
+  unrealizedPnlKrw?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
@@ -849,11 +1113,17 @@ export type PositionSelectScalar = {
   currencyCode?: boolean
   realizedPnl?: boolean
   realizedPnlKrw?: boolean
+  currentPriceLocal?: boolean
+  currentPriceKrw?: boolean
+  marketValueLocal?: boolean
+  marketValueKrw?: boolean
+  unrealizedPnlLocal?: boolean
+  unrealizedPnlKrw?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type PositionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "seasonParticipantId" | "assetId" | "quantity" | "averageCost" | "currencyCode" | "realizedPnl" | "realizedPnlKrw" | "createdAt" | "updatedAt", ExtArgs["result"]["position"]>
+export type PositionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "seasonParticipantId" | "assetId" | "quantity" | "averageCost" | "currencyCode" | "realizedPnl" | "realizedPnlKrw" | "currentPriceLocal" | "currentPriceKrw" | "marketValueLocal" | "marketValueKrw" | "unrealizedPnlLocal" | "unrealizedPnlKrw" | "createdAt" | "updatedAt", ExtArgs["result"]["position"]>
 export type PositionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
@@ -882,6 +1152,12 @@ export type $PositionPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
     currencyCode: $Enums.CurrencyCode
     realizedPnl: runtime.Decimal
     realizedPnlKrw: runtime.Decimal
+    currentPriceLocal: runtime.Decimal | null
+    currentPriceKrw: runtime.Decimal | null
+    marketValueLocal: runtime.Decimal | null
+    marketValueKrw: runtime.Decimal | null
+    unrealizedPnlLocal: runtime.Decimal | null
+    unrealizedPnlKrw: runtime.Decimal | null
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["position"]>
@@ -1317,6 +1593,12 @@ export interface PositionFieldRefs {
   readonly currencyCode: Prisma.FieldRef<"Position", 'CurrencyCode'>
   readonly realizedPnl: Prisma.FieldRef<"Position", 'Decimal'>
   readonly realizedPnlKrw: Prisma.FieldRef<"Position", 'Decimal'>
+  readonly currentPriceLocal: Prisma.FieldRef<"Position", 'Decimal'>
+  readonly currentPriceKrw: Prisma.FieldRef<"Position", 'Decimal'>
+  readonly marketValueLocal: Prisma.FieldRef<"Position", 'Decimal'>
+  readonly marketValueKrw: Prisma.FieldRef<"Position", 'Decimal'>
+  readonly unrealizedPnlLocal: Prisma.FieldRef<"Position", 'Decimal'>
+  readonly unrealizedPnlKrw: Prisma.FieldRef<"Position", 'Decimal'>
   readonly createdAt: Prisma.FieldRef<"Position", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Position", 'DateTime'>
 }

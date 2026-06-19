@@ -14,6 +14,7 @@ import { PositionsModule } from './positions/positions.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProvidersModule } from './providers/providers.module';
 import { RankingModule } from './ranking/ranking.module';
+import { RealtimeModule } from './realtime/realtime.module';
 import { RecordsModule } from './records/records.module';
 import { RewardsModule } from './rewards/rewards.module';
 import { SeasonsModule } from './seasons/seasons.module';
@@ -37,6 +38,7 @@ import { WalletsModule } from './wallets/wallets.module';
     PrismaModule,
     ProvidersModule,
     RankingModule,
+    RealtimeModule,
     RecordsModule,
     RewardsModule,
     SeasonsModule,

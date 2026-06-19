@@ -294,10 +294,13 @@ describe('OrdersService', () => {
     });
   };
 
-  const mockAssetPrice = (prisma: ReturnType<typeof createPrisma>) => {
+  const mockAssetPrice = (
+    prisma: ReturnType<typeof createPrisma>,
+    price = '100.00000000',
+  ) => {
     prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce({
       id: 'aps-1',
-      price: new Prisma.Decimal('100.00000000'),
+      price: new Prisma.Decimal(price),
       sourceName: 'manual-price',
       effectiveAt: new Date(Date.now()),
       capturedAt: new Date(Date.now()),
@@ -384,11 +387,8 @@ describe('OrdersService', () => {
           assetId: body.assetId,
           side: body.side,
           orderType: body.orderType,
-          quantity: new Prisma.Decimal(body.quantity).toFixed(8),
-          limitPrice:
-            body.orderType === OrderType.limit
-              ? new Prisma.Decimal(body.limitPrice ?? '0').toFixed(8)
-              : null,
+          quantity: new Prisma.Decimal(body.quantity).toFixed(6),
+          limitPrice: null,
           currencyCode: body.currencyCode ?? null,
         }),
         'utf8',
@@ -398,9 +398,8 @@ describe('OrdersService', () => {
   const orderCreateBody = {
     assetId: 'asset-1',
     side: OrderSide.buy,
-    orderType: OrderType.limit,
-    quantity: '1.00000000',
-    limitPrice: '50000.00000000',
+    orderType: OrderType.market,
+    quantity: '1.000000',
     quoteId: 'quote-order-create-1',
     idempotencyKey: 'order-create-key-duplicate',
   };
@@ -627,9 +626,10 @@ describe('OrdersService', () => {
           limitPrice,
           currencyCode,
           quotedPrice:
-            orderType === OrderType.limit && limitPrice
+            (overrides.quotedPrice as Prisma.Decimal | undefined) ??
+            (orderType === OrderType.limit && limitPrice
               ? limitPrice
-              : new Prisma.Decimal('100.00000000'),
+              : new Prisma.Decimal('100.00000000')),
           assetPriceSnapshotId: orderType === OrderType.market ? 'aps-1' : null,
           fxRateSnapshotId: currencyCode === CurrencyCode.USD ? 'fx-1' : null,
         });
@@ -852,7 +852,10 @@ describe('OrdersService', () => {
     expect(prisma.seasonRanking.create).not.toHaveBeenCalled();
   };
 
-  const expectNoOrderWrites = (prisma: ReturnType<typeof createPrisma>) => {
+  const expectNoOrderWrites = (
+    prisma: ReturnType<typeof createPrisma>,
+    options: { allowTransaction?: boolean } = {},
+  ) => {
     for (const model of [
       prisma.season,
       prisma.seasonParticipant,
@@ -879,7 +882,9 @@ describe('OrdersService', () => {
     expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
     expect(prisma.dailyPortfolioSnapshot.create).not.toHaveBeenCalled();
     expect(prisma.seasonRanking.create).not.toHaveBeenCalled();
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+    if (!options.allowTransaction) {
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    }
   };
 
   const expectOnlyOrderCreateWrite = (
@@ -967,7 +972,7 @@ describe('OrdersService', () => {
       assetId: 'asset-1',
       side: 'buy',
       orderType: 'market',
-      quantity: '2.00000000',
+      quantity: '2.000000',
     });
 
     expect(response.data).toMatchObject({
@@ -978,7 +983,7 @@ describe('OrdersService', () => {
       },
       side: OrderSide.buy,
       orderType: OrderType.market,
-      quantity: '2.00000000',
+      quantity: '2.000000',
       price: '100.00000000',
       grossAmount: '200.00000000',
       feeRate: '0.001000',
@@ -1007,7 +1012,7 @@ describe('OrdersService', () => {
           assetId: 'asset-1',
           side: OrderSide.buy,
           orderType: OrderType.market,
-          quantity: '2.00000000',
+          quantity: '2.000000',
           limitPrice: null,
           currencyCode: CurrencyCode.USD,
           quotedPrice: '100.00000000',
@@ -1049,7 +1054,8 @@ describe('OrdersService', () => {
       /rawPayload|approval_key|access_token|KIS_APP_SECRET|DATABASE_URL/i,
     );
     expect(prisma.order.create).not.toHaveBeenCalled();
-    expectNoOrderWrites(prisma);
+    expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+    expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
   });
 
   it('uses fresh provider_api asset price and FX for orders quote only', async () => {
@@ -1229,15 +1235,15 @@ describe('OrdersService', () => {
     mockActiveSeason(prisma);
     mockJoined(prisma);
     mockBinanceCryptoAsset(prisma);
+    mockAssetPrice(prisma, '50000.00000000');
     mockFreshFx(prisma);
     mockPosition(prisma, '0.02000000');
 
     const response = await service.quoteOrder('user-1', {
       assetId: 'asset-btc',
       side: 'sell',
-      orderType: 'limit',
-      quantity: '0.01000000',
-      limitPrice: '50000.00000000',
+      orderType: 'market',
+      quantity: '0.010000',
     });
 
     expect(response.data).toMatchObject({
@@ -1256,8 +1262,11 @@ describe('OrdersService', () => {
       krwNetAmount: '699300.00000000',
       fxRateSnapshotId: 'fx-1',
       assetPriceSource: {
-        sourceType: null,
-        fallbackReason: 'limit_price_provided',
+        sourceType: 'admin_manual',
+        sourceName: 'manual-price',
+        snapshotId: 'aps-1',
+        fallbackUsed: true,
+        fallbackReason: 'provider_missing',
       },
       fxRateSource: {
         sourceType: 'admin_manual',
@@ -1281,43 +1290,24 @@ describe('OrdersService', () => {
     expectNoOrderWrites(prisma);
   });
 
-  it('quotes limit buy orders using limitPrice', async () => {
+  it('rejects limit quote orders', async () => {
     useKrxMarketOpenTime();
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     mockJoined(prisma);
     mockAsset(prisma, CurrencyCode.KRW);
-    mockCashWallet(prisma, '1000000.00000000');
 
-    const response = await service.quoteOrder('user-1', {
-      assetId: 'asset-1',
-      side: 'buy',
-      orderType: 'limit',
-      quantity: '3.00000000',
-      limitPrice: '50000.00000000',
-      currencyCode: CurrencyCode.KRW,
-    });
-
-    expect(response.data).toMatchObject({
-      orderType: OrderType.limit,
-      price: '50000.00000000',
-      currencyCode: CurrencyCode.KRW,
-      grossAmount: '150000.00000000',
-      feeAmount: '150.00000000',
-      netAmount: '150150.00000000',
-      krwNetAmount: '150150.00000000',
-      assetPriceSnapshotId: null,
-      fxRateSnapshotId: null,
-      assetPriceSource: {
-        sourceType: null,
-        sourceName: null,
-        snapshotId: null,
-        fallbackUsed: false,
-        fallbackReason: 'limit_price_provided',
-      },
-    });
-    expect(prisma.assetPriceSnapshot.findFirst).not.toHaveBeenCalled();
-    expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
+    await expectErrorCode(
+      service.quoteOrder('user-1', {
+        assetId: 'asset-1',
+        side: 'buy',
+        orderType: 'limit',
+        quantity: '3.000000',
+        limitPrice: '50000.00000000',
+        currencyCode: CurrencyCode.KRW,
+      }),
+      'ORDER_TYPE_NOT_SUPPORTED',
+    );
     expectNoOrderWrites(prisma);
   });
 
@@ -1327,14 +1317,14 @@ describe('OrdersService', () => {
     mockActiveSeason(prisma);
     mockJoined(prisma);
     mockAsset(prisma, CurrencyCode.KRW);
+    mockAssetPrice(prisma, '10000.00000000');
     mockPosition(prisma, '5.00000000');
 
     const response = await service.quoteOrder('user-1', {
       assetId: 'asset-1',
       side: 'sell',
-      orderType: 'limit',
-      quantity: '2.00000000',
-      limitPrice: '10000.00000000',
+      orderType: 'market',
+      quantity: '2.000000',
     });
 
     expect(response.data).toMatchObject({
@@ -1493,74 +1483,74 @@ describe('OrdersService', () => {
     expectNoOrderWrites(prisma);
   });
 
-  it('creates submitted market order without wallet, position, or settlement writes', async () => {
+  it('creates and immediately executes market buy orders from durable quotes', async () => {
+    useKrxMarketOpenTime();
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     mockJoined(prisma);
-    mockAsset(prisma, CurrencyCode.USD);
-    mockAssetPrice(prisma);
-    mockFreshFx(prisma);
-    mockCashWallet(prisma);
     mockOrderQuoteForCreate(prisma, {
-      currencyCode: CurrencyCode.USD,
-      quantity: new Prisma.Decimal('2.00000000'),
+      quantity: new Prisma.Decimal('2.000000'),
       quotedPrice: new Prisma.Decimal('100.00000000'),
-    });
-    prisma.order.create.mockResolvedValueOnce({
-      id: 'order-submitted-1',
-      side: OrderSide.buy,
-      orderType: OrderType.market,
-      status: OrderStatus.submitted,
-      quantity: new Prisma.Decimal('2.00000000'),
-      limitPrice: null,
-      executedPrice: null,
-      currencyCode: CurrencyCode.USD,
-      grossAmount: new Prisma.Decimal('200.00000000'),
-      feeAmount: new Prisma.Decimal('0.20000000'),
-      netAmount: new Prisma.Decimal('200.20000000'),
       assetPriceSnapshotId: 'aps-1',
-      fxRateSnapshotId: 'fx-1',
-      submittedAt,
-      executedAt: null,
-      canceledAt: null,
-      rejectedAt: null,
-      rejectReason: null,
-      createdAt,
-      updatedAt,
-      asset: {
-        id: 'asset-1',
-        symbol: 'AAPL',
-        name: 'Apple Inc.',
-        market: 'NASDAQ',
-        currencyCode: CurrencyCode.USD,
-      },
+      fxRateSnapshotId: null,
     });
+    prisma.order.create.mockResolvedValueOnce({ id: 'order-created-1' });
+    prisma.order.findUnique.mockResolvedValueOnce(
+      orderExecutionRecord({
+        id: 'order-created-1',
+        quote: buildOrderQuoteRecord({
+          id: 'quote-order-create-1',
+          quantity: new Prisma.Decimal('2.000000'),
+          quotedPrice: new Prisma.Decimal('100.00000000'),
+          assetPriceSnapshotId: 'aps-1',
+          fxRateSnapshotId: null,
+        }),
+      }),
+    );
+    mockExecutionPrice(prisma);
+    mockExecutionWallet(prisma, '1000.00000000', '799.80000000');
+    prisma.position.findUnique.mockResolvedValueOnce(null);
+    prisma.position.create.mockResolvedValueOnce({ id: 'position-1' });
+    prisma.walletTransaction.create.mockResolvedValueOnce({
+      id: 'wallet-tx-create-buy-1',
+    });
+    mockOrderFinalization(
+      prisma,
+      executedOrderExecutionRecord({
+        id: 'order-created-1',
+        quoteId: 'quote-order-create-1',
+      }),
+    );
+    prisma.order.update.mockResolvedValueOnce({ id: 'order-created-1' });
 
     const response = await service.createOrder('user-1', {
       assetId: 'asset-1',
       side: 'buy',
       orderType: 'market',
-      quantity: '2.00000000',
+      quantity: '2.000000',
       quoteId: 'quote-order-create-1',
       idempotencyKey: 'order-create-key-1',
     });
 
     expect(response.data).toMatchObject({
       order: {
-        orderId: expect.any(String),
-        status: OrderStatus.submitted,
-        executedAt: null,
+        orderId: 'order-created-1',
+        status: OrderStatus.executed,
+        executedPrice: '100.00000000',
         grossAmount: '200.00000000',
         feeAmount: '0.20000000',
         netAmount: '200.20000000',
-        assetPriceSnapshotId: 'aps-1',
-        fxRateSnapshotId: 'fx-1',
+        assetPriceSnapshotId: 'aps-exec-1',
       },
       execution: {
-        state: 'not_executed',
-        reason: 'ORDER_SUBMITTED_NOT_EXECUTED',
-        message:
-          'Order was submitted and can be executed through the execute endpoint.',
+        state: 'executed',
+        quoteId: 'quote-order-create-1',
+        quotedPrice: '100.00000000',
+        executePrice: '100.00000000',
+        priceChangeBps: '0.0000',
+        walletTransactionId: 'wallet-tx-create-buy-1',
+        positionId: 'position-1',
+        duplicate: false,
       },
     });
     expect(prisma.order.create).toHaveBeenCalledWith(
@@ -1569,230 +1559,229 @@ describe('OrdersService', () => {
           seasonParticipantId: 'sp-1',
           assetId: 'asset-1',
           status: OrderStatus.submitted,
-          quantity: '2.00000000',
+          quantity: '2.000000',
           quoteId: 'quote-order-create-1',
           limitPrice: null,
           executedPrice: null,
-          grossAmount: '200.00000000',
-          feeAmount: '0.20000000',
-          netAmount: '200.20000000',
-          assetPriceSnapshotId: 'aps-1',
-          fxRateSnapshotId: 'fx-1',
           idempotencyKey: 'order-create-key-1',
           requestHash: expect.any(String),
-          responsePayloadJson: {
-            success: true,
-            data: expect.objectContaining({
-              order: expect.objectContaining({
-                orderId: expect.any(String),
-                status: OrderStatus.submitted,
-              }),
-            }),
-          },
           executedAt: null,
-          canceledAt: null,
-          rejectedAt: null,
         }),
       }),
     );
-    expectOnlyOrderCreateWrite(prisma);
-  });
-
-  it('keeps order create on admin_manual sources even when provider_api rows exist', async () => {
-    const { prisma, service } = createService();
-    mockActiveSeason(prisma);
-    mockJoined(prisma);
-    mockAsset(prisma, CurrencyCode.USD);
-    prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([
-      {
-        id: 'provider-price-create',
-        price: new Prisma.Decimal('999.00000000'),
-        sourceType: AssetPriceSourceType.provider_api,
-        sourceName: 'kis_us_delayed_trade',
-        effectiveAt: new Date(Date.now() - 1_000),
-        capturedAt: new Date(Date.now() - 1_000),
-      },
-    ]);
-    mockAssetPrice(prisma);
-    mockFreshFx(prisma);
-    mockCashWallet(prisma);
-    mockOrderQuoteForCreate(prisma, {
-      currencyCode: CurrencyCode.USD,
-      quantity: new Prisma.Decimal('2.00000000'),
-      quotedPrice: new Prisma.Decimal('100.00000000'),
-    });
-    prisma.order.create.mockResolvedValueOnce({ id: 'order-submitted-1' });
-
-    const response = await service.createOrder('user-1', {
-      assetId: 'asset-1',
-      side: 'buy',
-      orderType: 'market',
-      quantity: '2.00000000',
-      quoteId: 'quote-order-create-1',
-      idempotencyKey: 'order-create-provider-closed',
-    });
-
-    expect(response.data.order).toMatchObject({
-      assetPriceSnapshotId: 'aps-1',
-      fxRateSnapshotId: 'fx-1',
-    });
-    expect(prisma.assetPriceSnapshot.findMany).not.toHaveBeenCalled();
-    expect(prisma.fxRateSnapshot.findMany).not.toHaveBeenCalled();
-    expectOnlyOrderCreateWrite(prisma);
-  });
-
-  it('creates submitted Binance crypto USD market orders with USD currency and FX audit snapshot', async () => {
-    const { prisma, service } = createService();
-    mockActiveSeason(prisma);
-    mockJoined(prisma);
-    mockBinanceCryptoAsset(prisma);
-    prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce({
-      id: 'aps-btc-1',
-      price: new Prisma.Decimal('50000.00000000'),
-    });
-    mockFreshFx(prisma);
-    mockCashWallet(prisma, '1000.00000000');
-    mockOrderQuoteForCreate(prisma, {
-      assetId: 'asset-btc',
-      asset: {
-        id: 'asset-btc',
-        symbol: 'BTCUSDT',
-        name: 'Bitcoin',
-        market: 'BINANCE',
-        assetType: AssetType.crypto,
-        currencyCode: CurrencyCode.USD,
-        isActive: true,
-      },
-      currencyCode: CurrencyCode.USD,
-      quantity: new Prisma.Decimal('0.01000000'),
-      quotedPrice: new Prisma.Decimal('50000.00000000'),
-      assetPriceSnapshotId: 'aps-btc-1',
-      fxRateSnapshotId: 'fx-1',
-    });
-    prisma.order.create.mockResolvedValueOnce({ id: 'order-btc-1' });
-
-    const response = await service.createOrder('user-1', {
-      assetId: 'asset-btc',
-      side: 'buy',
-      orderType: 'market',
-      quantity: '0.01000000',
-      quoteId: 'quote-order-create-1',
-      idempotencyKey: 'order-create-key-btc',
-    });
-
-    expect(response.data.order).toMatchObject({
-      status: OrderStatus.submitted,
-      asset: {
-        symbol: 'BTCUSDT',
-        market: 'BINANCE',
-        currencyCode: CurrencyCode.USD,
-      },
-      currencyCode: CurrencyCode.USD,
-      grossAmount: '500.00000000',
-      feeAmount: '0.50000000',
-      netAmount: '500.50000000',
-      assetPriceSnapshotId: 'aps-btc-1',
-      fxRateSnapshotId: 'fx-1',
-    });
-    expect(prisma.cashWallet.findUnique).toHaveBeenCalledWith({
+    expect(prisma.quote.updateMany).toHaveBeenCalledWith({
       where: {
-        seasonParticipantId_currencyCode: {
-          seasonParticipantId: 'sp-1',
-          currencyCode: CurrencyCode.USD,
-        },
+        id: 'quote-order-create-1',
+        status: 'active',
+      },
+      data: {
+        status: 'consumed',
+        consumedAt: krxMarketOpenAt,
+      },
+    });
+    expect(prisma.order.update).toHaveBeenCalledWith({
+      where: {
+        id: 'order-created-1',
+      },
+      data: {
+        responsePayloadJson: expect.objectContaining({
+          success: true,
+          data: expect.objectContaining({
+            order: expect.objectContaining({
+              status: OrderStatus.executed,
+            }),
+            execution: expect.objectContaining({
+              state: 'executed',
+            }),
+          }),
+        }),
       },
       select: {
-        balanceAmount: true,
+        id: true,
       },
     });
-    expect(prisma.order.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          assetId: 'asset-btc',
-          currencyCode: CurrencyCode.USD,
-          grossAmount: '500.00000000',
-          feeAmount: '0.50000000',
-          netAmount: '500.50000000',
-          assetPriceSnapshotId: 'aps-btc-1',
-          fxRateSnapshotId: 'fx-1',
-        }),
-      }),
-    );
-    expectOnlyOrderCreateWrite(prisma);
+    expect(prisma.cashWallet.updateMany).toHaveBeenCalled();
+    expect(prisma.position.create).toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 
-  it('creates submitted limit order with limitPrice', async () => {
+  it('requires a requote when provider price changes too much during create execution', async () => {
     useKrxMarketOpenTime();
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     mockJoined(prisma);
-    mockAsset(prisma, CurrencyCode.KRW);
-    mockCashWallet(prisma, '1000000.00000000');
     mockOrderQuoteForCreate(prisma, {
-      orderType: OrderType.limit,
-      quantity: new Prisma.Decimal('1.00000000'),
-      limitPrice: new Prisma.Decimal('50000.00000000'),
-      quotedPrice: new Prisma.Decimal('50000.00000000'),
-      assetPriceSnapshotId: null,
+      quantity: new Prisma.Decimal('2.000000'),
+      quotedPrice: new Prisma.Decimal('100.00000000'),
+      assetPriceSnapshotId: 'aps-1',
       fxRateSnapshotId: null,
     });
-    prisma.order.create.mockResolvedValueOnce({
-      id: 'order-submitted-2',
-      side: OrderSide.buy,
-      orderType: OrderType.limit,
-      status: OrderStatus.submitted,
-      quantity: new Prisma.Decimal('1.00000000'),
-      limitPrice: new Prisma.Decimal('50000.00000000'),
-      executedPrice: null,
-      currencyCode: CurrencyCode.KRW,
-      grossAmount: new Prisma.Decimal('50000.00000000'),
-      feeAmount: new Prisma.Decimal('50.00000000'),
-      netAmount: new Prisma.Decimal('50050.00000000'),
-      assetPriceSnapshotId: null,
-      fxRateSnapshotId: null,
-      submittedAt,
-      executedAt: null,
-      canceledAt: null,
-      rejectedAt: null,
-      rejectReason: null,
-      createdAt,
-      updatedAt,
-      asset: {
-        id: 'asset-1',
-        symbol: '005930',
-        name: 'Samsung',
-        market: 'KRX',
-        currencyCode: CurrencyCode.KRW,
-      },
-    });
-
-    const response = await service.createOrder('user-1', {
-      assetId: 'asset-1',
-      side: 'buy',
-      orderType: 'limit',
-      quantity: '1.00000000',
-      limitPrice: '50000.00000000',
-      quoteId: 'quote-order-create-1',
-      idempotencyKey: 'order-create-key-2',
-    });
-
-    expect(response.data.order).toMatchObject({
-      orderId: expect.any(String),
-      status: OrderStatus.submitted,
-      limitPrice: '50000.00000000',
-      assetPriceSnapshotId: null,
-    });
-    expect(prisma.order.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          limitPrice: '50000.00000000',
-          quoteId: 'quote-order-create-1',
-          assetPriceSnapshotId: null,
+    prisma.order.create.mockResolvedValueOnce({ id: 'order-created-1' });
+    prisma.order.findUnique.mockResolvedValueOnce(
+      orderExecutionRecord({
+        id: 'order-created-1',
+        quote: buildOrderQuoteRecord({
+          id: 'quote-order-create-1',
+          quantity: new Prisma.Decimal('2.000000'),
+          quotedPrice: new Prisma.Decimal('100.00000000'),
+          assetPriceSnapshotId: 'aps-1',
           fxRateSnapshotId: null,
         }),
       }),
     );
-    expectOnlyOrderCreateWrite(prisma);
+    mockExecutionPrice(prisma, '101.00000000');
+
+    await expectErrorCode(
+      service.createOrder('user-1', {
+        assetId: 'asset-1',
+        side: 'buy',
+        orderType: 'market',
+        quantity: '2.000000',
+        quoteId: 'quote-order-create-1',
+        idempotencyKey: 'order-create-price-changed',
+      }),
+      'RATE_CHANGED_REQUOTE_REQUIRED',
+    );
+    expect(prisma.order.create).toHaveBeenCalledTimes(1);
+    expect(prisma.quote.updateMany).not.toHaveBeenCalled();
+    expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
+    expect(prisma.position.create).not.toHaveBeenCalled();
+    expect(prisma.order.update).not.toHaveBeenCalled();
+  });
+
+  it('creates and immediately executes Binance crypto USD market orders', async () => {
+    const { prisma, service } = createService();
+    const asset = {
+      id: 'asset-btc',
+      symbol: 'BTCUSDT',
+      name: 'Bitcoin',
+      market: 'BINANCE',
+      assetType: AssetType.crypto,
+      currencyCode: CurrencyCode.USD,
+      isActive: true,
+    };
+    const quote = buildOrderQuoteRecord({
+      id: 'quote-order-create-1',
+      assetId: 'asset-btc',
+      asset,
+      currencyCode: CurrencyCode.USD,
+      quantity: new Prisma.Decimal('0.010000'),
+      quotedPrice: new Prisma.Decimal('50000.00000000'),
+      assetPriceSnapshotId: 'aps-btc-1',
+      fxRateSnapshotId: 'fx-1',
+    });
+    mockActiveSeason(prisma);
+    mockJoined(prisma);
+    mockOrderQuoteForCreate(prisma, {
+      assetId: 'asset-btc',
+      asset,
+      currencyCode: CurrencyCode.USD,
+      quantity: new Prisma.Decimal('0.010000'),
+      quotedPrice: new Prisma.Decimal('50000.00000000'),
+      assetPriceSnapshotId: 'aps-btc-1',
+      fxRateSnapshotId: 'fx-1',
+    });
+    prisma.order.create.mockResolvedValueOnce({ id: 'order-btc-create-1' });
+    prisma.order.findUnique.mockResolvedValueOnce(
+      cryptoUsdOrderExecutionRecord({
+        id: 'order-btc-create-1',
+        quote,
+      }),
+    );
+    mockExecutionPrice(
+      prisma,
+      '50000.00000000',
+      'aps-btc-exec-1',
+      'binance_public_rest_24hr_ticker',
+    );
+    mockExecutionFx(prisma);
+    mockExecutionWallet(
+      prisma,
+      '1000.00000000',
+      '499.50000000',
+      CurrencyCode.USD,
+    );
+    prisma.position.findUnique.mockResolvedValueOnce(null);
+    prisma.position.create.mockResolvedValueOnce({ id: 'position-btc-1' });
+    prisma.walletTransaction.create.mockResolvedValueOnce({
+      id: 'wallet-tx-btc-create-buy-1',
+    });
+    mockOrderFinalization(
+      prisma,
+      executedCryptoUsdOrderExecutionRecord({
+        id: 'order-btc-create-1',
+        quoteId: 'quote-order-create-1',
+      }),
+    );
+    prisma.order.update.mockResolvedValueOnce({ id: 'order-btc-create-1' });
+
+    const response = await service.createOrder('user-1', {
+      assetId: 'asset-btc',
+      side: 'buy',
+      orderType: 'market',
+      quantity: '0.010000',
+      quoteId: 'quote-order-create-1',
+      idempotencyKey: 'order-create-key-btc',
+    });
+
+    expect(response.data).toMatchObject({
+      order: {
+        orderId: 'order-btc-create-1',
+        status: OrderStatus.executed,
+        asset: {
+          symbol: 'BTCUSDT',
+          market: 'BINANCE',
+          currencyCode: CurrencyCode.USD,
+        },
+        currencyCode: CurrencyCode.USD,
+        grossAmount: '500.00000000',
+        feeAmount: '0.50000000',
+        netAmount: '500.50000000',
+        assetPriceSnapshotId: 'aps-btc-exec-1',
+        fxRateSnapshotId: 'fx-exec-1',
+      },
+      execution: {
+        state: 'executed',
+        quotedRate: '1400.00000000',
+        executeRate: '1400.00000000',
+        fxRateSnapshotId: 'fx-exec-1',
+        walletTransactionId: 'wallet-tx-btc-create-buy-1',
+        positionId: 'position-btc-1',
+      },
+    });
+    expect(prisma.cashWallet.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'wallet-1',
+        seasonParticipantId: 'sp-1',
+        currencyCode: CurrencyCode.USD,
+        balanceAmount: {
+          gte: '500.50000000',
+        },
+      },
+      data: {
+        balanceAmount: {
+          decrement: '500.50000000',
+        },
+      },
+    });
+  });
+
+  it('rejects limit order create requests', async () => {
+    const { prisma, service } = createService();
+
+    await expectErrorCode(
+      service.createOrder('user-1', {
+        assetId: 'asset-1',
+        side: 'buy',
+        orderType: 'limit',
+        quantity: '1.000000',
+        limitPrice: '50000.00000000',
+        quoteId: 'quote-order-create-1',
+        idempotencyKey: 'order-create-limit',
+      }),
+      'ORDER_TYPE_NOT_SUPPORTED',
+    );
+    expectNoOrderWrites(prisma);
   });
 
   it('rejects order create after season end even if status is active', async () => {
@@ -1806,9 +1795,8 @@ describe('OrdersService', () => {
       service.createOrder('user-1', {
         assetId: 'asset-1',
         side: 'buy',
-        orderType: 'limit',
-        quantity: '1.00000000',
-        limitPrice: '50000.00000000',
+        orderType: 'market',
+        quantity: '1.000000',
         quoteId: 'quote-order-create-1',
         idempotencyKey: 'order-create-ended',
       }),
@@ -1824,11 +1812,10 @@ describe('OrdersService', () => {
     mockActiveSeason(prisma);
     mockJoined(prisma);
     mockOrderQuoteForCreate(prisma, {
-      orderType: OrderType.limit,
-      quantity: new Prisma.Decimal('1.00000000'),
-      limitPrice: new Prisma.Decimal('50000.00000000'),
-      quotedPrice: new Prisma.Decimal('50000.00000000'),
-      assetPriceSnapshotId: null,
+      orderType: OrderType.market,
+      quantity: new Prisma.Decimal('1.000000'),
+      quotedPrice: new Prisma.Decimal('100.00000000'),
+      assetPriceSnapshotId: 'aps-1',
       fxRateSnapshotId: null,
     });
 
@@ -1836,16 +1823,16 @@ describe('OrdersService', () => {
       service.createOrder('user-1', {
         assetId: 'asset-1',
         side: 'buy',
-        orderType: 'limit',
-        quantity: '1.00000000',
-        limitPrice: '50000.00000000',
+        orderType: 'market',
+        quantity: '1.000000',
         quoteId: 'quote-order-create-1',
         idempotencyKey: 'order-create-market-closed',
       }),
       'MARKET_CLOSED',
     );
     expect(prisma.order.create).not.toHaveBeenCalled();
-    expectNoOrderWrites(prisma);
+    expectNoOrderWrites(prisma, { allowTransaction: true });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 
   it('rejects create without idempotencyKey', async () => {
@@ -1957,14 +1944,11 @@ describe('OrdersService', () => {
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     mockJoined(prisma);
-    mockAsset(prisma, CurrencyCode.KRW);
-    mockCashWallet(prisma, '1000000.00000000');
     mockOrderQuoteForCreate(prisma, {
-      orderType: OrderType.limit,
-      quantity: new Prisma.Decimal('1.00000000'),
-      limitPrice: new Prisma.Decimal('50000.00000000'),
-      quotedPrice: new Prisma.Decimal('50000.00000000'),
-      assetPriceSnapshotId: null,
+      orderType: OrderType.market,
+      quantity: new Prisma.Decimal('1.000000'),
+      quotedPrice: new Prisma.Decimal('100.00000000'),
+      assetPriceSnapshotId: 'aps-1',
       fxRateSnapshotId: null,
     });
     let racedRequestHash = '';
@@ -1986,7 +1970,13 @@ describe('OrdersService', () => {
 
     expect(response).toBe(existingOrder.responsePayloadJson);
     expect(prisma.order.create).toHaveBeenCalledTimes(1);
-    expectOnlyOrderCreateWrite(prisma);
+    expect(prisma.order.findUnique).not.toHaveBeenCalled();
+    expect(prisma.quote.updateMany).not.toHaveBeenCalled();
+    expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
+    expect(prisma.position.create).not.toHaveBeenCalled();
+    expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+    expect(prisma.order.update).not.toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 
   it('conflicts after a unique idempotency race with different payload', async () => {
@@ -1994,14 +1984,11 @@ describe('OrdersService', () => {
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     mockJoined(prisma);
-    mockAsset(prisma, CurrencyCode.KRW);
-    mockCashWallet(prisma, '1000000.00000000');
     mockOrderQuoteForCreate(prisma, {
-      orderType: OrderType.limit,
-      quantity: new Prisma.Decimal('1.00000000'),
-      limitPrice: new Prisma.Decimal('50000.00000000'),
-      quotedPrice: new Prisma.Decimal('50000.00000000'),
-      assetPriceSnapshotId: null,
+      orderType: OrderType.market,
+      quantity: new Prisma.Decimal('1.000000'),
+      quotedPrice: new Prisma.Decimal('100.00000000'),
+      assetPriceSnapshotId: 'aps-1',
       fxRateSnapshotId: null,
     });
     prisma.order.findFirst.mockResolvedValueOnce(null);
@@ -2014,7 +2001,13 @@ describe('OrdersService', () => {
       service.createOrder('user-1', orderCreateBody),
     ).rejects.toBeInstanceOf(HttpException);
     expect(prisma.order.create).toHaveBeenCalledTimes(1);
-    expectOnlyOrderCreateWrite(prisma);
+    expect(prisma.order.findUnique).not.toHaveBeenCalled();
+    expect(prisma.quote.updateMany).not.toHaveBeenCalled();
+    expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
+    expect(prisma.position.create).not.toHaveBeenCalled();
+    expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+    expect(prisma.order.update).not.toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 
   it('returns order rows for the authenticated participant', async () => {
@@ -2054,7 +2047,7 @@ describe('OrdersService', () => {
           side: OrderSide.buy,
           orderType: OrderType.market,
           status: OrderStatus.executed,
-          quantity: '3.00000000',
+          quantity: '3.000000',
           limitPrice: null,
           executedPrice: '101.25000000',
           currencyCode: CurrencyCode.USD,
@@ -2079,85 +2072,15 @@ describe('OrdersService', () => {
     expectNoOrderWrites(prisma);
   });
 
-  it('cancels submitted orders with a guarded status update', async () => {
+  it('rejects cancel orders as unsupported', async () => {
     const { prisma, service } = createService();
-    prisma.order.findFirst.mockResolvedValueOnce({
-      id: 'order-submitted-1',
-      seasonParticipantId: 'sp-1',
-      status: OrderStatus.submitted,
-    });
-    prisma.order.updateMany.mockResolvedValueOnce({ count: 1 });
-    prisma.order.findUnique.mockResolvedValueOnce({
-      id: 'order-submitted-1',
-      side: OrderSide.buy,
-      orderType: OrderType.limit,
-      status: OrderStatus.canceled,
-      quantity: new Prisma.Decimal('1.00000000'),
-      limitPrice: new Prisma.Decimal('50000.00000000'),
-      executedPrice: null,
-      currencyCode: CurrencyCode.KRW,
-      grossAmount: new Prisma.Decimal('50000.00000000'),
-      feeAmount: new Prisma.Decimal('50.00000000'),
-      netAmount: new Prisma.Decimal('50050.00000000'),
-      assetPriceSnapshotId: null,
-      fxRateSnapshotId: null,
-      submittedAt,
-      executedAt: null,
-      canceledAt,
-      rejectedAt: null,
-      rejectReason: null,
-      createdAt,
-      updatedAt,
-      asset: {
-        id: 'asset-1',
-        symbol: '005930',
-        name: 'Samsung',
-        market: 'KRX',
-        currencyCode: CurrencyCode.KRW,
-      },
-    });
 
-    const response = await service.cancelOrder('user-1', ' order-submitted-1 ');
-
-    expect(response.data).toMatchObject({
-      order: {
-        orderId: 'order-submitted-1',
-        status: OrderStatus.canceled,
-        canceledAt: '2026-05-07T00:03:00.000Z',
-        executedAt: null,
-        rejectedAt: null,
-      },
-      execution: {
-        state: 'not_executed',
-        reason: 'ORDER_CANCELED_BEFORE_EXECUTION',
-      },
-    });
-    expect(prisma.order.findFirst).toHaveBeenCalledWith({
-      where: {
-        id: 'order-submitted-1',
-        seasonParticipant: {
-          userId: 'user-1',
-        },
-      },
-      select: {
-        id: true,
-        seasonParticipantId: true,
-        status: true,
-      },
-    });
-    expect(prisma.order.updateMany).toHaveBeenCalledWith({
-      where: {
-        id: 'order-submitted-1',
-        seasonParticipantId: 'sp-1',
-        status: OrderStatus.submitted,
-      },
-      data: {
-        status: OrderStatus.canceled,
-        canceledAt: expect.any(Date),
-      },
-    });
-    expect(prisma.season.findFirst).not.toHaveBeenCalled();
-    expectOnlyOrderCancelWrite(prisma);
+    await expectErrorCode(
+      service.cancelOrder('user-1', 'order-submitted-1'),
+      'ORDER_CANCEL_NOT_SUPPORTED',
+    );
+    expect(prisma.order.findFirst).not.toHaveBeenCalled();
+    expect(prisma.order.updateMany).not.toHaveBeenCalled();
   });
 
   it('reads canceled orders with status filter', async () => {
@@ -2431,22 +2354,6 @@ describe('OrdersService', () => {
       expectNoOrderWrites(prisma);
     },
   );
-
-  it('returns conflict when guarded cancel update affects no rows', async () => {
-    const { prisma, service } = createService();
-    prisma.order.findFirst.mockResolvedValueOnce({
-      id: 'order-1',
-      seasonParticipantId: 'sp-1',
-      status: OrderStatus.submitted,
-    });
-    prisma.order.updateMany.mockResolvedValueOnce({ count: 0 });
-
-    await expect(
-      service.cancelOrder('user-1', 'order-1'),
-    ).rejects.toBeInstanceOf(HttpException);
-    expect(prisma.order.findUnique).not.toHaveBeenCalled();
-    expectOnlyOrderCancelWrite(prisma);
-  });
 
   it('rejects create when user has not joined the active season', async () => {
     const { prisma, service } = createService();
@@ -2792,8 +2699,8 @@ describe('OrdersService', () => {
       prisma.order.findFirst.mockResolvedValueOnce(
         orderExecutionRecord({
           side: OrderSide.sell,
-          orderType: OrderType.limit,
-          limitPrice: new Prisma.Decimal('69.00000000'),
+          orderType: OrderType.market,
+          limitPrice: null,
         }),
       );
       mockExecutionPrice(prisma);
@@ -2871,8 +2778,9 @@ describe('OrdersService', () => {
       prisma.order.findFirst.mockResolvedValueOnce(
         orderExecutionRecord({
           side: OrderSide.sell,
-          orderType: OrderType.limit,
-          limitPrice: new Prisma.Decimal('69.00000000'),
+          orderType: OrderType.market,
+          limitPrice: null,
+          quotedPrice: new Prisma.Decimal('70.00000000'),
         }),
       );
       mockExecutionPrice(prisma, '70.00000000');
@@ -3151,7 +3059,7 @@ describe('OrdersService', () => {
       expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
     });
 
-    it('rejects non-marketable buy and sell limit orders', async () => {
+    it('rejects limit execute orders as unsupported', async () => {
       const buy = createService();
       buy.prisma.order.findFirst.mockResolvedValueOnce(
         orderExecutionRecord({
@@ -3163,7 +3071,7 @@ describe('OrdersService', () => {
 
       await expectErrorCode(
         buy.service.executeOrder('user-1', 'order-execute-1'),
-        'ORDER_LIMIT_NOT_MARKETABLE',
+        'ORDER_TYPE_NOT_SUPPORTED',
       );
 
       const sell = createService();
@@ -3178,7 +3086,7 @@ describe('OrdersService', () => {
 
       await expectErrorCode(
         sell.service.executeOrder('user-1', 'order-execute-1'),
-        'ORDER_LIMIT_NOT_MARKETABLE',
+        'ORDER_TYPE_NOT_SUPPORTED',
       );
       expect(buy.prisma.cashWallet.updateMany).not.toHaveBeenCalled();
       expect(sell.prisma.cashWallet.updateMany).not.toHaveBeenCalled();

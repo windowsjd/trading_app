@@ -1,6 +1,11 @@
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient, Prisma } from '../src/generated/prisma/client';
+import {
+  CurrencyCode,
+  FxRateSourceType,
+  PrismaClient,
+  Prisma,
+} from '../src/generated/prisma/client';
 import {
   AdminAssetPriceInputArgs,
   AdminAssetPriceSnapshotPayload,
@@ -86,19 +91,23 @@ export async function runAdminInsertAssetPrice(argv: string[]) {
   try {
     const asset = await findAssetOrThrow(prisma, preliminaryPayload);
     const payload = buildAdminAssetPriceSnapshotPayload(args, asset, now);
+    const priceKrw = await buildPriceKrw(prisma, payload);
 
     if (args.dryRun) {
       console.log('admin_manual asset price input dry-run passed');
-      console.log(JSON.stringify(toPrintablePayload(payload, asset), null, 2));
+      console.log(
+        JSON.stringify(toPrintablePayload(payload, asset, priceKrw), null, 2),
+      );
       return;
     }
 
     const snapshot = await prisma.assetPriceSnapshot.create({
-      data: toCreateData(payload, asset.id),
+      data: toCreateData(payload, asset.id, priceKrw),
       select: {
         id: true,
         assetId: true,
         price: true,
+        priceKrw: true,
         currencyCode: true,
         sourceType: true,
         effectiveAt: true,
@@ -121,6 +130,7 @@ export async function runAdminInsertAssetPrice(argv: string[]) {
           market: snapshot.asset.market,
           symbol: snapshot.asset.symbol,
           price: snapshot.price.toFixed(8),
+          priceKrw: snapshot.priceKrw?.toFixed(8) ?? null,
           currencyCode: snapshot.currencyCode,
           sourceType: snapshot.sourceType,
           effectiveAt: snapshot.effectiveAt.toISOString(),
@@ -149,6 +159,7 @@ async function findAssetOrThrow(
           symbol: true,
           market: true,
           currencyCode: true,
+          priceCurrency: true,
           isActive: true,
         },
       })
@@ -164,6 +175,7 @@ async function findAssetOrThrow(
           symbol: true,
           market: true,
           currencyCode: true,
+          priceCurrency: true,
           isActive: true,
         },
       });
@@ -178,10 +190,12 @@ async function findAssetOrThrow(
 function toCreateData(
   payload: AdminAssetPriceSnapshotPayload,
   assetId: string,
+  priceKrw: string | null,
 ) {
   return {
     assetId,
     price: payload.price,
+    priceKrw,
     currencyCode: payload.currencyCode,
     sourceType: payload.sourceType,
     sourceName: payload.sourceName,
@@ -198,12 +212,14 @@ function toCreateData(
 function toPrintablePayload(
   payload: AdminAssetPriceSnapshotPayload,
   asset: Awaited<ReturnType<typeof findAssetOrThrow>>,
+  priceKrw: string | null,
 ) {
   return {
     assetId: asset.id,
     market: asset.market,
     symbol: asset.symbol,
     price: payload.price,
+    priceKrw,
     currencyCode: payload.currencyCode,
     sourceType: payload.sourceType,
     sourceName: payload.sourceName,
@@ -213,6 +229,50 @@ function toPrintablePayload(
     rawPayloadJson: payload.rawPayloadJson,
     note: payload.note,
   };
+}
+
+async function buildPriceKrw(
+  prisma: PrismaClient,
+  payload: AdminAssetPriceSnapshotPayload,
+): Promise<string | null> {
+  const price = new Prisma.Decimal(payload.price);
+  if (payload.currencyCode === CurrencyCode.KRW) {
+    return price.toFixed(8);
+  }
+
+  const fxRate = await prisma.fxRateSnapshot.findFirst({
+    where: {
+      baseCurrency: CurrencyCode.USD,
+      quoteCurrency: CurrencyCode.KRW,
+      rate: {
+        gt: 0,
+      },
+      effectiveAt: {
+        lte: payload.effectiveAt,
+      },
+      OR: [
+        {
+          sourceType: FxRateSourceType.provider_api,
+        },
+        {
+          sourceType: FxRateSourceType.admin_manual,
+          approvedByUserId: {
+            not: null,
+          },
+        },
+      ],
+    },
+    orderBy: [
+      { effectiveAt: 'desc' },
+      { capturedAt: 'desc' },
+      { createdAt: 'desc' },
+    ],
+    select: {
+      rate: true,
+    },
+  });
+
+  return fxRate ? price.mul(fxRate.rate).toFixed(8) : null;
 }
 
 if (require.main === module) {

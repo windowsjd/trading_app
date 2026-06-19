@@ -39,6 +39,7 @@ export type PortfolioAssetPriceSnapshotInput = {
   id?: string;
   assetId: string;
   price: DecimalInput;
+  priceKrw?: DecimalInput | null;
   currencyCode: CurrencyCode;
   sourceType: AssetPriceSourceType;
   sourceName?: string | null;
@@ -200,11 +201,13 @@ export function calculatePortfolioValuation(
     const unrealizedPnl = currentPrice.sub(averageCost).mul(quantity);
     const conversionRate =
       priceSnapshot.currencyCode === CurrencyCode.USD ? usdKrwRate : null;
-    const positionValueKrw = convertToKrw(
-      positionValue,
-      priceSnapshot.currencyCode,
-      conversionRate,
-    );
+    const positionValueKrw = priceSnapshot.priceKrw
+      ? quantity.mul(toDecimal(priceSnapshot.priceKrw, 'assetPrice.priceKrw'))
+      : convertToKrw(
+          positionValue,
+          priceSnapshot.currencyCode,
+          conversionRate,
+        );
 
     assetValueKrw = assetValueKrw.add(positionValueKrw);
     switch (position.assetType) {

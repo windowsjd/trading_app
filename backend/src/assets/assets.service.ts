@@ -51,12 +51,15 @@ type AssetRecord = {
   market: string;
   assetType: AssetType;
   currencyCode: CurrencyCode;
+  priceCurrency: CurrencyCode;
+  settlementCurrency: CurrencyCode;
   isActive: boolean;
 };
 
 type AssetPriceSnapshotRecord = {
   id: string;
   price: Prisma.Decimal;
+  priceKrw: Prisma.Decimal | null;
   currencyCode: CurrencyCode;
   sourceType: AssetPriceSourceType;
   sourceName: string | null;
@@ -259,7 +262,7 @@ export class AssetsService {
 
     const valuationAt = new Date();
     const usdKrwSelection = assets.some(
-      (asset) => asset.currencyCode === CurrencyCode.USD,
+      (asset) => this.getAssetPriceCurrency(asset) === CurrencyCode.USD,
     )
       ? await this.findUsdKrwSelection(valuationAt)
       : null;
@@ -329,12 +332,22 @@ export class AssetsService {
       priceSource: presentSourceDecision(snapshot.sourceDecision),
     };
 
-    if (asset.currencyCode === CurrencyCode.KRW) {
+    if (this.getAssetPriceCurrency(asset) === CurrencyCode.KRW) {
       return {
         payload: {
           ...basePayload,
           priceKrwState: 'available',
-          priceKrw: this.formatDecimal(snapshot.price, 8),
+          priceKrw: this.formatDecimal(snapshot.priceKrw ?? snapshot.price, 8),
+        },
+      };
+    }
+
+    if (snapshot.priceKrw) {
+      return {
+        payload: {
+          ...basePayload,
+          priceKrwState: 'available',
+          priceKrw: this.formatDecimal(snapshot.priceKrw, 8),
         },
       };
     }
@@ -385,13 +398,18 @@ export class AssetsService {
   ): Promise<AssetPriceSnapshotRecord | null> {
     const providerEligibility = resolveAssetProviderEligibility({
       workflow: 'assets_with_price',
-      asset,
+      asset: {
+        id: asset.id,
+        assetType: asset.assetType,
+        market: asset.market,
+        currencyCode: this.getAssetPriceCurrency(asset),
+      },
     });
     const providerCandidates = providerEligibility.eligible
       ? ((await this.prisma.assetPriceSnapshot.findMany({
           where: {
             assetId: asset.id,
-            currencyCode: asset.currencyCode,
+            currencyCode: this.getAssetPriceCurrency(asset),
             sourceType: AssetPriceSourceType.provider_api,
           },
           orderBy: [
@@ -403,6 +421,7 @@ export class AssetsService {
           select: {
             id: true,
             price: true,
+            priceKrw: true,
             currencyCode: true,
             sourceType: true,
             sourceName: true,
@@ -445,7 +464,7 @@ export class AssetsService {
     const fallbackSnapshot = await this.prisma.assetPriceSnapshot.findFirst({
       where: {
         assetId: asset.id,
-        currencyCode: asset.currencyCode,
+        currencyCode: this.getAssetPriceCurrency(asset),
         sourceType: AssetPriceSourceType.admin_manual,
         effectiveAt: {
           lte: valuationAt,
@@ -462,6 +481,7 @@ export class AssetsService {
       select: {
         id: true,
         price: true,
+        priceKrw: true,
         currencyCode: true,
         sourceType: true,
         sourceName: true,
@@ -824,6 +844,8 @@ export class AssetsService {
       market: true,
       assetType: true,
       currencyCode: true,
+      priceCurrency: true,
+      settlementCurrency: true,
       isActive: true,
     } as const;
   }
@@ -860,6 +882,8 @@ export class AssetsService {
       market: asset.market,
       assetType: asset.assetType,
       currencyCode: asset.currencyCode,
+      priceCurrency: this.getAssetPriceCurrency(asset),
+      settlementCurrency: this.getAssetSettlementCurrency(asset),
       isActive: asset.isActive,
     };
   }
@@ -867,26 +891,42 @@ export class AssetsService {
   private buildTradingNote(asset: AssetRecord) {
     if (asset.assetType === AssetType.domestic_stock) {
       return {
-        walletCurrency: CurrencyCode.KRW,
-        settlementCurrency: CurrencyCode.KRW,
+        walletCurrency: this.getAssetSettlementCurrency(asset),
+        settlementCurrency: this.getAssetSettlementCurrency(asset),
         message: 'Domestic stock orders use the KRW wallet.',
       };
     }
 
     if (asset.assetType === AssetType.crypto) {
       return {
-        walletCurrency: CurrencyCode.USD,
-        settlementCurrency: CurrencyCode.USD,
+        walletCurrency: this.getAssetSettlementCurrency(asset),
+        settlementCurrency: this.getAssetSettlementCurrency(asset),
         message:
           'Crypto is USD-settled and uses the USD wallet under the current MVP policy.',
       };
     }
 
     return {
-      walletCurrency: CurrencyCode.USD,
-      settlementCurrency: CurrencyCode.USD,
+      walletCurrency: this.getAssetSettlementCurrency(asset),
+      settlementCurrency: this.getAssetSettlementCurrency(asset),
       message: 'US stock orders use the USD wallet.',
     };
+  }
+
+  private getAssetPriceCurrency(
+    asset: Pick<AssetRecord, 'currencyCode'> & {
+      priceCurrency?: CurrencyCode | null;
+    },
+  ): CurrencyCode {
+    return asset.priceCurrency ?? asset.currencyCode;
+  }
+
+  private getAssetSettlementCurrency(
+    asset: Pick<AssetRecord, 'currencyCode'> & {
+      settlementCurrency?: CurrencyCode | null;
+    },
+  ): CurrencyCode {
+    return asset.settlementCurrency ?? asset.currencyCode;
   }
 
   private formatDecimal(value: Prisma.Decimal, scale: number) {

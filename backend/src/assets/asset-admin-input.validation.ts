@@ -20,6 +20,8 @@ export type AdminAssetUpsertPayload = {
   name: string;
   market: string;
   currencyCode: CurrencyCode;
+  priceCurrency: CurrencyCode;
+  settlementCurrency: CurrencyCode;
   assetType: AssetType;
   isActive: boolean;
 };
@@ -45,6 +47,7 @@ export type AdminAssetPriceAssetCandidate = {
   symbol: string;
   market: string;
   currencyCode: CurrencyCode;
+  priceCurrency: CurrencyCode;
   isActive: boolean;
 };
 
@@ -96,6 +99,8 @@ export function buildAdminAssetUpsertPayload(
     name,
     market,
     currencyCode,
+    priceCurrency: currencyCode,
+    settlementCurrency: currencyCode,
     assetType,
     isActive,
   };
@@ -166,9 +171,10 @@ export function assertUsableAssetForPriceInput(
     throw new Error('Asset is inactive.');
   }
 
-  if (asset.currencyCode !== priceCurrencyCode) {
+  const assetPriceCurrency = asset.priceCurrency ?? asset.currencyCode;
+  if (assetPriceCurrency !== priceCurrencyCode) {
     throw new Error(
-      `Asset currency ${asset.currencyCode} does not match price currency ${priceCurrencyCode}.`,
+      `Asset price currency ${assetPriceCurrency} does not match price currency ${priceCurrencyCode}.`,
     );
   }
 }

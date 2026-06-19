@@ -66,6 +66,12 @@ type PositionRecord = {
   currencyCode: CurrencyCode;
   realizedPnl: Prisma.Decimal;
   realizedPnlKrw: Prisma.Decimal;
+  currentPriceLocal: Prisma.Decimal | null;
+  currentPriceKrw: Prisma.Decimal | null;
+  marketValueLocal: Prisma.Decimal | null;
+  marketValueKrw: Prisma.Decimal | null;
+  unrealizedPnlLocal: Prisma.Decimal | null;
+  unrealizedPnlKrw: Prisma.Decimal | null;
   asset: {
     id: string;
     symbol: string;
@@ -73,12 +79,15 @@ type PositionRecord = {
     market: string;
     assetType: AssetType;
     currencyCode: CurrencyCode;
+    priceCurrency: CurrencyCode;
+    settlementCurrency: CurrencyCode;
   };
 };
 
 type AssetPriceSnapshotRecord = {
   id: string;
   price: Prisma.Decimal;
+  priceKrw: Prisma.Decimal | null;
   currencyCode: CurrencyCode;
   sourceType: AssetPriceSourceType;
   sourceName: string | null;
@@ -327,7 +336,7 @@ export class PositionsService {
     usdKrwSelection: UsdKrwSelection | null,
   ): Promise<PositionValuation> {
     try {
-      if (position.asset.currencyCode !== position.currencyCode) {
+      if (this.getAssetSettlementCurrency(position.asset) !== position.currencyCode) {
         throw new PositionValuationError(
           'ASSET_PRICE_UNAVAILABLE',
           `Position currency mismatch for asset ${position.assetId}.`,
@@ -336,7 +345,7 @@ export class PositionsService {
 
       const priceSnapshot = await this.findLatestEligibleAssetPriceSnapshot(
         position.asset,
-        position.currencyCode,
+        this.getAssetPriceCurrency(position.asset),
         valuationAt,
       );
 
@@ -355,11 +364,13 @@ export class PositionsService {
       const averageCost = position.averageCost;
       const currentPrice = priceSnapshot.price;
       const positionValue = quantity.mul(currentPrice);
-      const positionValueKrw = this.convertToKrw(
-        positionValue,
-        position.currencyCode,
-        usdKrwSelection,
-      );
+      const positionValueKrw = priceSnapshot.priceKrw
+        ? quantity.mul(priceSnapshot.priceKrw)
+        : this.convertToKrw(
+            positionValue,
+            position.currencyCode,
+            usdKrwSelection,
+          );
       const unrealizedPnl = currentPrice.sub(averageCost).mul(quantity);
       const unrealizedPnlKrw = this.convertToKrw(
         unrealizedPnl,
@@ -404,6 +415,10 @@ export class PositionsService {
               'ASSET_PRICE_UNAVAILABLE',
               'Position valuation is unavailable.',
             );
+      const cachedValuation = this.buildCachedValuation(position);
+      if (cachedValuation) {
+        return cachedValuation;
+      }
 
       return {
         state: 'unavailable',
@@ -428,6 +443,47 @@ export class PositionsService {
     }
   }
 
+  private buildCachedValuation(
+    position: PositionRecord,
+  ): PositionValuation | null {
+    if (
+      !position.currentPriceLocal ||
+      !position.currentPriceKrw ||
+      !position.marketValueLocal ||
+      !position.marketValueKrw ||
+      !position.unrealizedPnlLocal ||
+      !position.unrealizedPnlKrw
+    ) {
+      return null;
+    }
+
+    const returnRate = position.averageCost.eq(0)
+      ? new Prisma.Decimal(0)
+      : position.currentPriceLocal
+          .sub(position.averageCost)
+          .div(position.averageCost)
+          .mul(100);
+
+    return {
+      state: 'available',
+      sortValueKrw: position.marketValueKrw,
+      payload: {
+        state: 'available',
+        currentPrice: this.formatDecimal(position.currentPriceLocal, 8),
+        priceCurrency: this.getAssetPriceCurrency(position.asset),
+        assetPriceSnapshotId: '',
+        priceEffectiveAt: '',
+        priceCapturedAt: '',
+        priceSource: null,
+        positionValue: this.formatDecimal(position.marketValueLocal, 8),
+        positionValueKrw: this.formatDecimal(position.marketValueKrw, 8),
+        unrealizedPnl: this.formatDecimal(position.unrealizedPnlLocal, 8),
+        unrealizedPnlKrw: this.formatDecimal(position.unrealizedPnlKrw, 8),
+        returnRate: this.formatDecimal(returnRate, 8),
+      },
+    };
+  }
+
   private async findLatestEligibleAssetPriceSnapshot(
     asset: PositionRecord['asset'],
     currencyCode: CurrencyCode,
@@ -435,7 +491,12 @@ export class PositionsService {
   ): Promise<AssetPriceSnapshotRecord> {
     const providerEligibility = resolveAssetProviderEligibility({
       workflow: 'positions_live_valuation',
-      asset,
+      asset: {
+        id: asset.id,
+        assetType: asset.assetType,
+        market: asset.market,
+        currencyCode: this.getAssetPriceCurrency(asset),
+      },
     });
     const providerCandidates = providerEligibility.eligible
       ? ((await this.prisma.assetPriceSnapshot.findMany({
@@ -453,6 +514,7 @@ export class PositionsService {
           select: {
             id: true,
             price: true,
+            priceKrw: true,
             currencyCode: true,
             sourceType: true,
             sourceName: true,
@@ -512,6 +574,7 @@ export class PositionsService {
       select: {
         id: true,
         price: true,
+        priceKrw: true,
         currencyCode: true,
         sourceType: true,
         sourceName: true,
@@ -842,6 +905,12 @@ export class PositionsService {
         currencyCode: true,
         realizedPnl: true,
         realizedPnlKrw: true,
+        currentPriceLocal: true,
+        currentPriceKrw: true,
+        marketValueLocal: true,
+        marketValueKrw: true,
+        unrealizedPnlLocal: true,
+        unrealizedPnlKrw: true,
         asset: {
           select: {
             id: true,
@@ -850,6 +919,8 @@ export class PositionsService {
             market: true,
             assetType: true,
             currencyCode: true,
+            priceCurrency: true,
+            settlementCurrency: true,
           },
         },
       },
@@ -1136,6 +1207,22 @@ export class PositionsService {
       assetType: query.assetType ?? null,
       currencyCode: query.currencyCode ?? null,
     };
+  }
+
+  private getAssetPriceCurrency(
+    asset: Pick<PositionRecord['asset'], 'currencyCode'> & {
+      priceCurrency?: CurrencyCode | null;
+    },
+  ): CurrencyCode {
+    return asset.priceCurrency ?? asset.currencyCode;
+  }
+
+  private getAssetSettlementCurrency(
+    asset: Pick<PositionRecord['asset'], 'currencyCode'> & {
+      settlementCurrency?: CurrencyCode | null;
+    },
+  ): CurrencyCode {
+    return asset.settlementCurrency ?? asset.currencyCode;
   }
 
   private formatDecimal(value: Prisma.Decimal, scale: number) {

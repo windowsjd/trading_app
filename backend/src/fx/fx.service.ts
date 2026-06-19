@@ -7,6 +7,7 @@ import {
   QuoteStatus,
   QuoteType,
   SeasonStatus,
+  SnapshotReason,
   WalletTransactionDirection,
   WalletTransactionReferenceType,
   WalletTransactionType,
@@ -1209,6 +1210,8 @@ export class FxService {
       },
     });
 
+    await this.recordExchangeExecutedPortfolioSnapshot(tx, plan, executeNow);
+
     const responsePayloadJson = this.buildFxExecuteSuccessResponse({
       exchangeId: exchangeTransaction.id,
       executedAt: executeNow,
@@ -1233,6 +1236,185 @@ export class FxService {
     });
 
     return responsePayloadJson;
+  }
+
+  private async recordExchangeExecutedPortfolioSnapshot(
+    tx: FxExecuteTransactionClient,
+    plan: ProviderFxExecutePlan,
+    capturedAt: Date,
+  ): Promise<void> {
+    try {
+      const valuation = await this.calculateParticipantValuationInTransaction(
+        tx,
+        plan.seasonParticipantId,
+        new Prisma.Decimal(plan.appliedRate),
+      );
+
+      await tx.seasonParticipant.update({
+        where: {
+          id: plan.seasonParticipantId,
+        },
+        data: {
+          totalAssetKrw: valuation.totalAssetKrw,
+          totalReturnRate: valuation.returnRate,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      await tx.equitySnapshot.create({
+        data: {
+          seasonParticipantId: plan.seasonParticipantId,
+          totalAssetKrw: valuation.totalAssetKrw,
+          returnRate: valuation.returnRate,
+          krwCash: valuation.krwCash,
+          usdCashKrw: valuation.usdCashKrw,
+          domesticStockValueKrw: valuation.domesticStockValueKrw,
+          usStockValueKrw: valuation.usStockValueKrw,
+          cryptoValueKrw: valuation.cryptoValueKrw,
+          snapshotReason: SnapshotReason.exchange_executed,
+          capturedAt,
+        },
+        select: {
+          id: true,
+        },
+      });
+    } catch {
+      return;
+    }
+  }
+
+  private async calculateParticipantValuationInTransaction(
+    tx: FxExecuteTransactionClient,
+    seasonParticipantId: string,
+    usdKrwRate: Prisma.Decimal,
+  ): Promise<{
+    totalAssetKrw: string;
+    returnRate: string;
+    krwCash: string;
+    usdCashKrw: string;
+    domesticStockValueKrw: string;
+    usStockValueKrw: string;
+    cryptoValueKrw: string;
+  }> {
+    const participant = await tx.seasonParticipant.findUnique({
+      where: {
+        id: seasonParticipantId,
+      },
+      select: {
+        initialCapitalKrw: true,
+        cashWallets: {
+          select: {
+            currencyCode: true,
+            balanceAmount: true,
+          },
+        },
+        positions: {
+          where: {
+            quantity: {
+              gt: '0.00000000',
+            },
+          },
+          select: {
+            assetId: true,
+            quantity: true,
+            asset: {
+              select: {
+                assetType: true,
+                priceCurrency: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!participant) {
+      throw new Error('Season participant not found.');
+    }
+
+    const krwCash = participant.cashWallets
+      .filter((wallet) => wallet.currencyCode === CurrencyCode.KRW)
+      .reduce(
+        (sum, wallet) => sum.add(wallet.balanceAmount),
+        new Prisma.Decimal(0),
+      );
+    const usdCash = participant.cashWallets
+      .filter((wallet) => wallet.currencyCode === CurrencyCode.USD)
+      .reduce(
+        (sum, wallet) => sum.add(wallet.balanceAmount),
+        new Prisma.Decimal(0),
+      );
+    const usdCashKrw = usdCash.mul(usdKrwRate);
+    let domesticStockValueKrw = new Prisma.Decimal(0);
+    let usStockValueKrw = new Prisma.Decimal(0);
+    let cryptoValueKrw = new Prisma.Decimal(0);
+
+    for (const position of participant.positions) {
+      const latestPrice = await tx.assetPriceSnapshot.findFirst({
+        where: {
+          assetId: position.assetId,
+          currencyCode: position.asset.priceCurrency,
+          price: {
+            gt: 0,
+          },
+        },
+        orderBy: [
+          { effectiveAt: 'desc' },
+          { capturedAt: 'desc' },
+          { createdAt: 'desc' },
+        ],
+        select: {
+          price: true,
+          priceKrw: true,
+          currencyCode: true,
+        },
+      });
+
+      if (!latestPrice) {
+        throw new Error('Asset price unavailable.');
+      }
+
+      const priceKrw =
+        latestPrice.priceKrw ??
+        (latestPrice.currencyCode === CurrencyCode.KRW
+          ? latestPrice.price
+          : latestPrice.price.mul(usdKrwRate));
+      const marketValueKrw = position.quantity.mul(priceKrw);
+
+      switch (position.asset.assetType) {
+        case 'domestic_stock':
+          domesticStockValueKrw = domesticStockValueKrw.add(marketValueKrw);
+          break;
+        case 'us_stock':
+          usStockValueKrw = usStockValueKrw.add(marketValueKrw);
+          break;
+        case 'crypto':
+          cryptoValueKrw = cryptoValueKrw.add(marketValueKrw);
+          break;
+      }
+    }
+
+    const totalAssetKrw = krwCash
+      .add(usdCashKrw)
+      .add(domesticStockValueKrw)
+      .add(usStockValueKrw)
+      .add(cryptoValueKrw);
+    const returnRate = totalAssetKrw
+      .sub(participant.initialCapitalKrw)
+      .div(participant.initialCapitalKrw)
+      .mul(100);
+
+    return {
+      totalAssetKrw: this.formatDecimal(totalAssetKrw, 8),
+      returnRate: this.formatDecimal(returnRate, 8),
+      krwCash: this.formatDecimal(krwCash, 8),
+      usdCashKrw: this.formatDecimal(usdCashKrw, 8),
+      domesticStockValueKrw: this.formatDecimal(domesticStockValueKrw, 8),
+      usStockValueKrw: this.formatDecimal(usStockValueKrw, 8),
+      cryptoValueKrw: this.formatDecimal(cryptoValueKrw, 8),
+    };
   }
 
   private async debitSourceWalletOrThrow(

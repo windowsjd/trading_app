@@ -28,16 +28,19 @@ export type AggregateAssetPriceSnapshot = {
 
 export type AssetPriceSnapshotAvgAggregateOutputType = {
   price: runtime.Decimal | null
+  priceKrw: runtime.Decimal | null
 }
 
 export type AssetPriceSnapshotSumAggregateOutputType = {
   price: runtime.Decimal | null
+  priceKrw: runtime.Decimal | null
 }
 
 export type AssetPriceSnapshotMinAggregateOutputType = {
   id: string | null
   assetId: string | null
   price: runtime.Decimal | null
+  priceKrw: runtime.Decimal | null
   currencyCode: $Enums.CurrencyCode | null
   sourceType: $Enums.AssetPriceSourceType | null
   sourceName: string | null
@@ -52,6 +55,7 @@ export type AssetPriceSnapshotMaxAggregateOutputType = {
   id: string | null
   assetId: string | null
   price: runtime.Decimal | null
+  priceKrw: runtime.Decimal | null
   currencyCode: $Enums.CurrencyCode | null
   sourceType: $Enums.AssetPriceSourceType | null
   sourceName: string | null
@@ -66,6 +70,7 @@ export type AssetPriceSnapshotCountAggregateOutputType = {
   id: number
   assetId: number
   price: number
+  priceKrw: number
   currencyCode: number
   sourceType: number
   sourceName: number
@@ -81,16 +86,19 @@ export type AssetPriceSnapshotCountAggregateOutputType = {
 
 export type AssetPriceSnapshotAvgAggregateInputType = {
   price?: true
+  priceKrw?: true
 }
 
 export type AssetPriceSnapshotSumAggregateInputType = {
   price?: true
+  priceKrw?: true
 }
 
 export type AssetPriceSnapshotMinAggregateInputType = {
   id?: true
   assetId?: true
   price?: true
+  priceKrw?: true
   currencyCode?: true
   sourceType?: true
   sourceName?: true
@@ -105,6 +113,7 @@ export type AssetPriceSnapshotMaxAggregateInputType = {
   id?: true
   assetId?: true
   price?: true
+  priceKrw?: true
   currencyCode?: true
   sourceType?: true
   sourceName?: true
@@ -119,6 +128,7 @@ export type AssetPriceSnapshotCountAggregateInputType = {
   id?: true
   assetId?: true
   price?: true
+  priceKrw?: true
   currencyCode?: true
   sourceType?: true
   sourceName?: true
@@ -221,6 +231,7 @@ export type AssetPriceSnapshotGroupByOutputType = {
   id: string
   assetId: string
   price: runtime.Decimal
+  priceKrw: runtime.Decimal | null
   currencyCode: $Enums.CurrencyCode
   sourceType: $Enums.AssetPriceSourceType
   sourceName: string | null
@@ -259,6 +270,7 @@ export type AssetPriceSnapshotWhereInput = {
   id?: Prisma.StringFilter<"AssetPriceSnapshot"> | string
   assetId?: Prisma.StringFilter<"AssetPriceSnapshot"> | string
   price?: Prisma.DecimalFilter<"AssetPriceSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: Prisma.DecimalNullableFilter<"AssetPriceSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFilter<"AssetPriceSnapshot"> | $Enums.CurrencyCode
   sourceType?: Prisma.EnumAssetPriceSourceTypeFilter<"AssetPriceSnapshot"> | $Enums.AssetPriceSourceType
   sourceName?: Prisma.StringNullableFilter<"AssetPriceSnapshot"> | string | null
@@ -277,6 +289,7 @@ export type AssetPriceSnapshotOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   assetId?: Prisma.SortOrder
   price?: Prisma.SortOrder
+  priceKrw?: Prisma.SortOrderInput | Prisma.SortOrder
   currencyCode?: Prisma.SortOrder
   sourceType?: Prisma.SortOrder
   sourceName?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -298,6 +311,7 @@ export type AssetPriceSnapshotWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.AssetPriceSnapshotWhereInput | Prisma.AssetPriceSnapshotWhereInput[]
   assetId?: Prisma.StringFilter<"AssetPriceSnapshot"> | string
   price?: Prisma.DecimalFilter<"AssetPriceSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: Prisma.DecimalNullableFilter<"AssetPriceSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFilter<"AssetPriceSnapshot"> | $Enums.CurrencyCode
   sourceType?: Prisma.EnumAssetPriceSourceTypeFilter<"AssetPriceSnapshot"> | $Enums.AssetPriceSourceType
   sourceName?: Prisma.StringNullableFilter<"AssetPriceSnapshot"> | string | null
@@ -316,6 +330,7 @@ export type AssetPriceSnapshotOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   assetId?: Prisma.SortOrder
   price?: Prisma.SortOrder
+  priceKrw?: Prisma.SortOrderInput | Prisma.SortOrder
   currencyCode?: Prisma.SortOrder
   sourceType?: Prisma.SortOrder
   sourceName?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -339,6 +354,7 @@ export type AssetPriceSnapshotScalarWhereWithAggregatesInput = {
   id?: Prisma.StringWithAggregatesFilter<"AssetPriceSnapshot"> | string
   assetId?: Prisma.StringWithAggregatesFilter<"AssetPriceSnapshot"> | string
   price?: Prisma.DecimalWithAggregatesFilter<"AssetPriceSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: Prisma.DecimalNullableWithAggregatesFilter<"AssetPriceSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeWithAggregatesFilter<"AssetPriceSnapshot"> | $Enums.CurrencyCode
   sourceType?: Prisma.EnumAssetPriceSourceTypeWithAggregatesFilter<"AssetPriceSnapshot"> | $Enums.AssetPriceSourceType
   sourceName?: Prisma.StringNullableWithAggregatesFilter<"AssetPriceSnapshot"> | string | null
@@ -353,6 +369,7 @@ export type AssetPriceSnapshotScalarWhereWithAggregatesInput = {
 export type AssetPriceSnapshotCreateInput = {
   id?: string
   price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
   sourceType: $Enums.AssetPriceSourceType
   sourceName?: string | null
@@ -371,6 +388,7 @@ export type AssetPriceSnapshotUncheckedCreateInput = {
   id?: string
   assetId: string
   price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
   sourceType: $Enums.AssetPriceSourceType
   sourceName?: string | null
@@ -387,6 +405,7 @@ export type AssetPriceSnapshotUncheckedCreateInput = {
 export type AssetPriceSnapshotUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   sourceType?: Prisma.EnumAssetPriceSourceTypeFieldUpdateOperationsInput | $Enums.AssetPriceSourceType
   sourceName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -405,6 +424,7 @@ export type AssetPriceSnapshotUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   sourceType?: Prisma.EnumAssetPriceSourceTypeFieldUpdateOperationsInput | $Enums.AssetPriceSourceType
   sourceName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -422,6 +442,7 @@ export type AssetPriceSnapshotCreateManyInput = {
   id?: string
   assetId: string
   price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
   sourceType: $Enums.AssetPriceSourceType
   sourceName?: string | null
@@ -436,6 +457,7 @@ export type AssetPriceSnapshotCreateManyInput = {
 export type AssetPriceSnapshotUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   sourceType?: Prisma.EnumAssetPriceSourceTypeFieldUpdateOperationsInput | $Enums.AssetPriceSourceType
   sourceName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -451,6 +473,7 @@ export type AssetPriceSnapshotUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   sourceType?: Prisma.EnumAssetPriceSourceTypeFieldUpdateOperationsInput | $Enums.AssetPriceSourceType
   sourceName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -476,6 +499,7 @@ export type AssetPriceSnapshotCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   assetId?: Prisma.SortOrder
   price?: Prisma.SortOrder
+  priceKrw?: Prisma.SortOrder
   currencyCode?: Prisma.SortOrder
   sourceType?: Prisma.SortOrder
   sourceName?: Prisma.SortOrder
@@ -489,12 +513,14 @@ export type AssetPriceSnapshotCountOrderByAggregateInput = {
 
 export type AssetPriceSnapshotAvgOrderByAggregateInput = {
   price?: Prisma.SortOrder
+  priceKrw?: Prisma.SortOrder
 }
 
 export type AssetPriceSnapshotMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   assetId?: Prisma.SortOrder
   price?: Prisma.SortOrder
+  priceKrw?: Prisma.SortOrder
   currencyCode?: Prisma.SortOrder
   sourceType?: Prisma.SortOrder
   sourceName?: Prisma.SortOrder
@@ -509,6 +535,7 @@ export type AssetPriceSnapshotMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   assetId?: Prisma.SortOrder
   price?: Prisma.SortOrder
+  priceKrw?: Prisma.SortOrder
   currencyCode?: Prisma.SortOrder
   sourceType?: Prisma.SortOrder
   sourceName?: Prisma.SortOrder
@@ -521,6 +548,7 @@ export type AssetPriceSnapshotMinOrderByAggregateInput = {
 
 export type AssetPriceSnapshotSumOrderByAggregateInput = {
   price?: Prisma.SortOrder
+  priceKrw?: Prisma.SortOrder
 }
 
 export type AssetPriceSnapshotNullableScalarRelationFilter = {
@@ -570,6 +598,14 @@ export type AssetPriceSnapshotUncheckedUpdateManyWithoutAssetNestedInput = {
   deleteMany?: Prisma.AssetPriceSnapshotScalarWhereInput | Prisma.AssetPriceSnapshotScalarWhereInput[]
 }
 
+export type NullableDecimalFieldUpdateOperationsInput = {
+  set?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  increment?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  decrement?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  multiply?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  divide?: runtime.Decimal | runtime.DecimalJsLike | number | string
+}
+
 export type EnumAssetPriceSourceTypeFieldUpdateOperationsInput = {
   set?: $Enums.AssetPriceSourceType
 }
@@ -609,6 +645,7 @@ export type AssetPriceSnapshotUpdateOneWithoutQuotesNestedInput = {
 export type AssetPriceSnapshotCreateWithoutAssetInput = {
   id?: string
   price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
   sourceType: $Enums.AssetPriceSourceType
   sourceName?: string | null
@@ -625,6 +662,7 @@ export type AssetPriceSnapshotCreateWithoutAssetInput = {
 export type AssetPriceSnapshotUncheckedCreateWithoutAssetInput = {
   id?: string
   price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
   sourceType: $Enums.AssetPriceSourceType
   sourceName?: string | null
@@ -671,6 +709,7 @@ export type AssetPriceSnapshotScalarWhereInput = {
   id?: Prisma.StringFilter<"AssetPriceSnapshot"> | string
   assetId?: Prisma.StringFilter<"AssetPriceSnapshot"> | string
   price?: Prisma.DecimalFilter<"AssetPriceSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: Prisma.DecimalNullableFilter<"AssetPriceSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFilter<"AssetPriceSnapshot"> | $Enums.CurrencyCode
   sourceType?: Prisma.EnumAssetPriceSourceTypeFilter<"AssetPriceSnapshot"> | $Enums.AssetPriceSourceType
   sourceName?: Prisma.StringNullableFilter<"AssetPriceSnapshot"> | string | null
@@ -685,6 +724,7 @@ export type AssetPriceSnapshotScalarWhereInput = {
 export type AssetPriceSnapshotCreateWithoutOrdersInput = {
   id?: string
   price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
   sourceType: $Enums.AssetPriceSourceType
   sourceName?: string | null
@@ -702,6 +742,7 @@ export type AssetPriceSnapshotUncheckedCreateWithoutOrdersInput = {
   id?: string
   assetId: string
   price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
   sourceType: $Enums.AssetPriceSourceType
   sourceName?: string | null
@@ -733,6 +774,7 @@ export type AssetPriceSnapshotUpdateToOneWithWhereWithoutOrdersInput = {
 export type AssetPriceSnapshotUpdateWithoutOrdersInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   sourceType?: Prisma.EnumAssetPriceSourceTypeFieldUpdateOperationsInput | $Enums.AssetPriceSourceType
   sourceName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -750,6 +792,7 @@ export type AssetPriceSnapshotUncheckedUpdateWithoutOrdersInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   sourceType?: Prisma.EnumAssetPriceSourceTypeFieldUpdateOperationsInput | $Enums.AssetPriceSourceType
   sourceName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -765,6 +808,7 @@ export type AssetPriceSnapshotUncheckedUpdateWithoutOrdersInput = {
 export type AssetPriceSnapshotCreateWithoutQuotesInput = {
   id?: string
   price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
   sourceType: $Enums.AssetPriceSourceType
   sourceName?: string | null
@@ -782,6 +826,7 @@ export type AssetPriceSnapshotUncheckedCreateWithoutQuotesInput = {
   id?: string
   assetId: string
   price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
   sourceType: $Enums.AssetPriceSourceType
   sourceName?: string | null
@@ -813,6 +858,7 @@ export type AssetPriceSnapshotUpdateToOneWithWhereWithoutQuotesInput = {
 export type AssetPriceSnapshotUpdateWithoutQuotesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   sourceType?: Prisma.EnumAssetPriceSourceTypeFieldUpdateOperationsInput | $Enums.AssetPriceSourceType
   sourceName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -830,6 +876,7 @@ export type AssetPriceSnapshotUncheckedUpdateWithoutQuotesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   sourceType?: Prisma.EnumAssetPriceSourceTypeFieldUpdateOperationsInput | $Enums.AssetPriceSourceType
   sourceName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -845,6 +892,7 @@ export type AssetPriceSnapshotUncheckedUpdateWithoutQuotesInput = {
 export type AssetPriceSnapshotCreateManyAssetInput = {
   id?: string
   price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode: $Enums.CurrencyCode
   sourceType: $Enums.AssetPriceSourceType
   sourceName?: string | null
@@ -859,6 +907,7 @@ export type AssetPriceSnapshotCreateManyAssetInput = {
 export type AssetPriceSnapshotUpdateWithoutAssetInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   sourceType?: Prisma.EnumAssetPriceSourceTypeFieldUpdateOperationsInput | $Enums.AssetPriceSourceType
   sourceName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -875,6 +924,7 @@ export type AssetPriceSnapshotUpdateWithoutAssetInput = {
 export type AssetPriceSnapshotUncheckedUpdateWithoutAssetInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   sourceType?: Prisma.EnumAssetPriceSourceTypeFieldUpdateOperationsInput | $Enums.AssetPriceSourceType
   sourceName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -891,6 +941,7 @@ export type AssetPriceSnapshotUncheckedUpdateWithoutAssetInput = {
 export type AssetPriceSnapshotUncheckedUpdateManyWithoutAssetInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   sourceType?: Prisma.EnumAssetPriceSourceTypeFieldUpdateOperationsInput | $Enums.AssetPriceSourceType
   sourceName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -946,6 +997,7 @@ export type AssetPriceSnapshotSelect<ExtArgs extends runtime.Types.Extensions.In
   id?: boolean
   assetId?: boolean
   price?: boolean
+  priceKrw?: boolean
   currencyCode?: boolean
   sourceType?: boolean
   sourceName?: boolean
@@ -965,6 +1017,7 @@ export type AssetPriceSnapshotSelectCreateManyAndReturn<ExtArgs extends runtime.
   id?: boolean
   assetId?: boolean
   price?: boolean
+  priceKrw?: boolean
   currencyCode?: boolean
   sourceType?: boolean
   sourceName?: boolean
@@ -981,6 +1034,7 @@ export type AssetPriceSnapshotSelectUpdateManyAndReturn<ExtArgs extends runtime.
   id?: boolean
   assetId?: boolean
   price?: boolean
+  priceKrw?: boolean
   currencyCode?: boolean
   sourceType?: boolean
   sourceName?: boolean
@@ -997,6 +1051,7 @@ export type AssetPriceSnapshotSelectScalar = {
   id?: boolean
   assetId?: boolean
   price?: boolean
+  priceKrw?: boolean
   currencyCode?: boolean
   sourceType?: boolean
   sourceName?: boolean
@@ -1008,7 +1063,7 @@ export type AssetPriceSnapshotSelectScalar = {
   note?: boolean
 }
 
-export type AssetPriceSnapshotOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "assetId" | "price" | "currencyCode" | "sourceType" | "sourceName" | "sourceTimestamp" | "effectiveAt" | "capturedAt" | "createdAt" | "rawPayloadJson" | "note", ExtArgs["result"]["assetPriceSnapshot"]>
+export type AssetPriceSnapshotOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "assetId" | "price" | "priceKrw" | "currencyCode" | "sourceType" | "sourceName" | "sourceTimestamp" | "effectiveAt" | "capturedAt" | "createdAt" | "rawPayloadJson" | "note", ExtArgs["result"]["assetPriceSnapshot"]>
 export type AssetPriceSnapshotInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   orders?: boolean | Prisma.AssetPriceSnapshot$ordersArgs<ExtArgs>
@@ -1033,6 +1088,7 @@ export type $AssetPriceSnapshotPayload<ExtArgs extends runtime.Types.Extensions.
     id: string
     assetId: string
     price: runtime.Decimal
+    priceKrw: runtime.Decimal | null
     currencyCode: $Enums.CurrencyCode
     sourceType: $Enums.AssetPriceSourceType
     sourceName: string | null
@@ -1471,6 +1527,7 @@ export interface AssetPriceSnapshotFieldRefs {
   readonly id: Prisma.FieldRef<"AssetPriceSnapshot", 'String'>
   readonly assetId: Prisma.FieldRef<"AssetPriceSnapshot", 'String'>
   readonly price: Prisma.FieldRef<"AssetPriceSnapshot", 'Decimal'>
+  readonly priceKrw: Prisma.FieldRef<"AssetPriceSnapshot", 'Decimal'>
   readonly currencyCode: Prisma.FieldRef<"AssetPriceSnapshot", 'CurrencyCode'>
   readonly sourceType: Prisma.FieldRef<"AssetPriceSnapshot", 'AssetPriceSourceType'>
   readonly sourceName: Prisma.FieldRef<"AssetPriceSnapshot", 'String'>

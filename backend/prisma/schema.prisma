@@ -431,15 +431,17 @@ model RewardFulfillmentRequest {
 }
 
 model Asset {
-  id           String       @id @default(uuid())
-  symbol       String
-  name         String
-  market       String
-  currencyCode CurrencyCode @map("currency_code")
-  assetType    AssetType    @map("asset_type")
-  isActive     Boolean      @default(true) @map("is_active")
-  createdAt    DateTime     @default(now()) @map("created_at")
-  updatedAt    DateTime     @updatedAt @map("updated_at")
+  id                 String       @id @default(uuid())
+  symbol             String
+  name               String
+  market             String
+  currencyCode       CurrencyCode @map("currency_code")
+  priceCurrency      CurrencyCode @default(KRW) @map("price_currency")
+  settlementCurrency CurrencyCode @default(KRW) @map("settlement_currency")
+  assetType          AssetType    @map("asset_type")
+  isActive           Boolean      @default(true) @map("is_active")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
 
   priceSnapshots AssetPriceSnapshot[]
   positions      Position[]
@@ -456,6 +458,7 @@ model AssetPriceSnapshot {
   id              String               @id @default(uuid())
   assetId         String               @map("asset_id")
   price           Decimal              @db.Decimal(24, 8)
+  priceKrw        Decimal?             @map("price_krw") @db.Decimal(24, 8)
   currencyCode    CurrencyCode         @map("currency_code")
   sourceType      AssetPriceSourceType @map("source_type")
   sourceName      String?              @map("source_name")
@@ -485,6 +488,12 @@ model Position {
   currencyCode        CurrencyCode @map("currency_code")
   realizedPnl         Decimal      @default(0) @map("realized_pnl") @db.Decimal(24, 8)
   realizedPnlKrw      Decimal      @default(0) @map("realized_pnl_krw") @db.Decimal(24, 8)
+  currentPriceLocal   Decimal?     @map("current_price_local") @db.Decimal(24, 8)
+  currentPriceKrw     Decimal?     @map("current_price_krw") @db.Decimal(24, 8)
+  marketValueLocal    Decimal?     @map("market_value_local") @db.Decimal(24, 8)
+  marketValueKrw      Decimal?     @map("market_value_krw") @db.Decimal(24, 8)
+  unrealizedPnlLocal  Decimal?     @map("unrealized_pnl_local") @db.Decimal(24, 8)
+  unrealizedPnlKrw    Decimal?     @map("unrealized_pnl_krw") @db.Decimal(24, 8)
   createdAt           DateTime     @default(now()) @map("created_at")
   updatedAt           DateTime     @updatedAt @map("updated_at")
 

@@ -13,6 +13,7 @@ import {
   QuoteStatus,
   QuoteType,
   SeasonStatus,
+  SnapshotReason,
   WalletTransactionDirection,
   WalletTransactionReferenceType,
   WalletTransactionType,
@@ -35,7 +36,6 @@ import {
   type SourceDecision,
 } from '../providers/source-eligibility.policy';
 import {
-  presentLimitPriceSource,
   presentSourceDecision,
   type PublicSourceMetadata,
 } from '../providers/source-metadata.presenter';
@@ -101,6 +101,8 @@ type OrderAsset = {
   market: string;
   assetType: AssetType;
   currencyCode: CurrencyCode;
+  priceCurrency: CurrencyCode;
+  settlementCurrency: CurrencyCode;
   isActive: boolean;
 };
 
@@ -228,9 +230,25 @@ type CreateOrderResponse = {
   data: {
     order: NonNullable<OrdersResponse['data']['orders']>[number];
     execution: {
-      state: 'not_executed';
-      reason: 'ORDER_SUBMITTED_NOT_EXECUTED';
-      message: string;
+      state: 'executed' | 'already_executed';
+      executedAt: string | null;
+      priceSource: 'provider_api' | 'admin_manual';
+      quoteId: string | null;
+      quotedPrice?: string | null;
+      executePrice?: string | null;
+      priceChangeBps?: string | null;
+      quotedRate?: string | null;
+      executeRate?: string | null;
+      rateChangeBps?: string | null;
+      assetPriceSource?: PublicSourceMetadata | null;
+      fxRateSource?: PublicSourceMetadata | null;
+      assetPriceSnapshotId: string | null;
+      fxRateSnapshotId: string | null;
+      walletTransactionId: string | null;
+      walletBalanceAfter: string | null;
+      positionId: string | null;
+      equitySnapshotId?: string | null;
+      duplicate: boolean;
     };
   };
 };
@@ -269,6 +287,7 @@ type ExecuteOrderResponse = {
       walletTransactionId: string | null;
       walletBalanceAfter: string | null;
       positionId: string | null;
+      equitySnapshotId: string | null;
       duplicate: boolean;
     };
   };
@@ -305,6 +324,8 @@ type OrderExecutionRecord = {
     market: string;
     assetType: AssetType;
     currencyCode: CurrencyCode;
+    priceCurrency: CurrencyCode;
+    settlementCurrency: CurrencyCode;
   };
   quote: {
     id: string;
@@ -353,6 +374,7 @@ type OrderExecutionTransactionResult = {
   walletTransactionId: string;
   walletBalanceAfter: string;
   positionId: string | null;
+  equitySnapshotId: string | null;
   plan: OrderExecutionPlan;
 };
 
@@ -369,6 +391,7 @@ const MAX_LIMIT = 100;
 const MAX_DECIMAL_24_8 = new Prisma.Decimal('9999999999999999.99999999');
 const ORDER_CREATE_REQUEST_HASH_API_VERSION = 'order-create:v1';
 const ZERO_MONEY = '0.00000000';
+const quantityScale = 6;
 const ORDER_EXECUTION_SELECT = {
   id: true,
   seasonParticipantId: true,
@@ -401,6 +424,8 @@ const ORDER_EXECUTION_SELECT = {
       market: true,
       assetType: true,
       currencyCode: true,
+      priceCurrency: true,
+      settlementCurrency: true,
     },
   },
   quote: {
@@ -495,110 +520,116 @@ export class OrdersService {
       return this.replayIdempotentCreateOrder(existingOrder, idempotency);
     }
 
-    const quote = await this.findActiveOrderQuoteForCreateOrThrow({
-      quoteId,
-      userId,
-      seasonParticipantId: participant.id,
-      request,
-      now: submittedAt,
-    });
-    this.assertOrderAssetTradable(quote.asset, submittedAt);
-    const price = roundDecimalHalfUp(quote.quotedPrice, monetaryScale);
-    const grossAmount = roundDecimalHalfUp(
-      request.quantity.mul(price),
-      monetaryScale,
-    );
-    const feeAmount = roundDecimalHalfUp(
-      grossAmount.mul(season.tradeFeeRate),
-      monetaryScale,
-    );
-    const netAmount =
-      request.side === OrderSide.buy
-        ? roundDecimalHalfUp(grossAmount.add(feeAmount), monetaryScale)
-        : roundDecimalHalfUp(grossAmount.sub(feeAmount), monetaryScale);
-
-    await this.assertOrderResourcesAvailable({
-      participantId: participant.id,
-      assetId: quote.asset.id,
-      side: request.side,
-      currencyCode: quote.asset.currencyCode,
-      quantity: request.quantity,
-      netAmount,
-    });
-    const orderId = randomUUID();
-    const responsePayloadJson = this.buildCreateOrderResponse(
-      this.formatOrder({
-        id: orderId,
-        quoteId: quote.id,
-        side: request.side,
-        orderType: request.orderType,
-        status: OrderStatus.submitted,
-        quantity: request.quantity,
-        limitPrice:
-          request.orderType === OrderType.limit ? request.limitPrice : null,
-        executedPrice: null,
-        currencyCode: quote.asset.currencyCode,
-        grossAmount,
-        feeAmount,
-        netAmount,
-        assetPriceSnapshotId: quote.assetPriceSnapshotId,
-        fxRateSnapshotId: quote.fxRateSnapshotId,
-        submittedAt,
-        executedAt: null,
-        canceledAt: null,
-        rejectedAt: null,
-        rejectReason: null,
-        createdAt: submittedAt,
-        updatedAt: submittedAt,
-        asset: {
-          id: quote.asset.id,
-          symbol: quote.asset.symbol,
-          name: quote.asset.name,
-          market: quote.asset.market,
-          currencyCode: quote.asset.currencyCode,
-        },
-      }),
-    );
-
     try {
-      await this.prisma.order.create({
-        data: {
-          id: orderId,
+      return await this.prisma.$transaction(async (tx) => {
+        const quote = await this.findActiveOrderQuoteForCreateOrThrow(tx, {
+          quoteId,
+          userId,
           seasonParticipantId: participant.id,
-          assetId: quote.asset.id,
-          quoteId: quote.id,
-          side: request.side,
-          orderType: request.orderType,
-          status: OrderStatus.submitted,
-          quantity: this.formatDecimal(request.quantity, monetaryScale),
-          limitPrice:
-            request.orderType === OrderType.limit
-              ? this.formatNullableDecimal(request.limitPrice, monetaryScale)
-              : null,
-          executedPrice: null,
-          currencyCode: quote.asset.currencyCode,
-          grossAmount: this.formatDecimal(grossAmount, monetaryScale),
-          feeAmount: this.formatDecimal(feeAmount, monetaryScale),
-          netAmount: this.formatDecimal(netAmount, monetaryScale),
-          assetPriceSnapshotId: quote.assetPriceSnapshotId,
-          fxRateSnapshotId: quote.fxRateSnapshotId,
-          idempotencyKey: idempotency.idempotencyKey,
-          requestHash: idempotency.requestHash,
-          responsePayloadJson,
-          submittedAt,
-          executedAt: null,
-          canceledAt: null,
-          rejectedAt: null,
-          rejectReason: null,
-          createdAt: submittedAt,
-          updatedAt: submittedAt,
-        },
-        select: {
-          id: true,
-        },
-      });
+          request,
+          now: submittedAt,
+        });
+        this.assertOrderAssetTradable(quote.asset, submittedAt);
 
-      return responsePayloadJson;
+        const price = roundDecimalHalfUp(quote.quotedPrice, monetaryScale);
+        const grossAmount = roundDecimalHalfUp(
+          request.quantity.mul(price),
+          monetaryScale,
+        );
+        const feeAmount = roundDecimalHalfUp(
+          grossAmount.mul(season.tradeFeeRate),
+          monetaryScale,
+        );
+        const netAmount =
+          request.side === OrderSide.buy
+            ? roundDecimalHalfUp(grossAmount.add(feeAmount), monetaryScale)
+            : roundDecimalHalfUp(grossAmount.sub(feeAmount), monetaryScale);
+        const orderId = randomUUID();
+
+        await tx.order.create({
+          data: {
+            id: orderId,
+            seasonParticipantId: participant.id,
+            assetId: quote.asset.id,
+            quoteId: quote.id,
+            side: request.side,
+            orderType: OrderType.market,
+            status: OrderStatus.submitted,
+            quantity: this.formatDecimal(request.quantity, quantityScale),
+            limitPrice: null,
+            executedPrice: null,
+            currencyCode: this.getAssetSettlementCurrency(quote.asset),
+            grossAmount: this.formatDecimal(grossAmount, monetaryScale),
+            feeAmount: this.formatDecimal(feeAmount, monetaryScale),
+            netAmount: this.formatDecimal(netAmount, monetaryScale),
+            assetPriceSnapshotId: quote.assetPriceSnapshotId,
+            fxRateSnapshotId: quote.fxRateSnapshotId,
+            idempotencyKey: idempotency.idempotencyKey,
+            requestHash: idempotency.requestHash,
+            submittedAt,
+            executedAt: null,
+            canceledAt: null,
+            rejectedAt: null,
+            rejectReason: null,
+            createdAt: submittedAt,
+            updatedAt: submittedAt,
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        const order = await tx.order.findUnique({
+          where: {
+            id: orderId,
+          },
+          select: ORDER_EXECUTION_SELECT,
+        });
+
+        if (!order) {
+          this.throwApiError(
+            HttpStatus.CONFLICT,
+            'ORDER_EXECUTION_CONFLICT',
+            'Created order could not be read back.',
+          );
+        }
+
+        const executionOrder = order as OrderExecutionRecord;
+        this.assertExecutableSeasonAndAsset(executionOrder, submittedAt);
+        const plan = await this.buildOrderExecutionPlan(
+          tx,
+          executionOrder,
+          submittedAt,
+        );
+        const result =
+          executionOrder.side === OrderSide.buy
+            ? await this.executeBuyOrderInTransaction(
+                tx,
+                executionOrder,
+                plan,
+              )
+            : await this.executeSellOrderInTransaction(
+                tx,
+                executionOrder,
+                plan,
+              );
+        const responsePayloadJson = this.buildExecutedOrderResponse(result);
+
+        await tx.order.update({
+          where: {
+            id: result.order.orderId,
+          },
+          data: {
+            responsePayloadJson:
+              responsePayloadJson as unknown as Prisma.InputJsonValue,
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        return responsePayloadJson;
+      });
     } catch (error) {
       if (!this.isUniqueConstraintError(error)) {
         throw error;
@@ -633,116 +664,12 @@ export class OrdersService {
       );
     }
 
-    const parsedOrderId = this.parseCancelOrderId(orderId);
-    const existingOrder = await this.prisma.order.findFirst({
-      where: {
-        id: parsedOrderId,
-        seasonParticipant: {
-          userId,
-        },
-      },
-      select: {
-        id: true,
-        seasonParticipantId: true,
-        status: true,
-      },
-    });
-
-    if (!existingOrder) {
-      this.throwApiError(
-        HttpStatus.NOT_FOUND,
-        'ORDER_NOT_FOUND',
-        'Order not found.',
-      );
-    }
-
-    if (existingOrder.status !== OrderStatus.submitted) {
-      this.throwApiError(
-        HttpStatus.CONFLICT,
-        'ORDER_NOT_CANCELABLE',
-        'Only submitted orders can be canceled.',
-      );
-    }
-
-    // Submitted-order cancel is a cleanup path and remains allowed after season end.
-    const canceledAt = new Date();
-    const updateResult = await this.prisma.order.updateMany({
-      where: {
-        id: existingOrder.id,
-        seasonParticipantId: existingOrder.seasonParticipantId,
-        status: OrderStatus.submitted,
-      },
-      data: {
-        status: OrderStatus.canceled,
-        canceledAt,
-      },
-    });
-
-    if (updateResult.count !== 1) {
-      this.throwApiError(
-        HttpStatus.CONFLICT,
-        'ORDER_CANCEL_CONFLICT',
-        'Order cancel conflicted with another state change.',
-      );
-    }
-
-    const canceledOrder = await this.prisma.order.findUnique({
-      where: {
-        id: existingOrder.id,
-      },
-      select: {
-        id: true,
-        quoteId: true,
-        side: true,
-        orderType: true,
-        status: true,
-        quantity: true,
-        limitPrice: true,
-        executedPrice: true,
-        currencyCode: true,
-        grossAmount: true,
-        feeAmount: true,
-        netAmount: true,
-        assetPriceSnapshotId: true,
-        fxRateSnapshotId: true,
-        submittedAt: true,
-        executedAt: true,
-        canceledAt: true,
-        rejectedAt: true,
-        rejectReason: true,
-        createdAt: true,
-        updatedAt: true,
-        asset: {
-          select: {
-            id: true,
-            symbol: true,
-            name: true,
-            market: true,
-            currencyCode: true,
-          },
-        },
-      },
-    });
-
-    if (!canceledOrder) {
-      this.throwApiError(
-        HttpStatus.CONFLICT,
-        'ORDER_CANCEL_CONFLICT',
-        'Canceled order could not be read back.',
-      );
-    }
-
-    return {
-      success: true,
-      data: {
-        order: this.formatOrder(canceledOrder),
-        execution: {
-          state: 'not_executed',
-          reason: 'ORDER_CANCELED_BEFORE_EXECUTION',
-          message: 'Order was canceled before execution.',
-        },
-      },
-    };
+    void orderId;
+    this.throwApiError(
+      HttpStatus.GONE,
+      'ORDER_CANCEL_NOT_SUPPORTED',
+      'Order cancel is not supported for MVP market orders.',
+    );
   }
 
   async executeOrder(
@@ -958,11 +885,27 @@ export class OrdersService {
     this.assertSeasonTradable(order.seasonParticipant.season, executedAt);
     this.assertOrderAssetTradable(order.asset, executedAt);
 
-    if (order.asset.currencyCode !== order.currencyCode) {
+    if (order.orderType !== OrderType.market) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'ORDER_TYPE_NOT_SUPPORTED',
+        'Only market orders are supported.',
+      );
+    }
+
+    if (this.getAssetSettlementCurrency(order.asset) !== order.currencyCode) {
       this.throwApiError(
         HttpStatus.INTERNAL_SERVER_ERROR,
         'ORDER_EXECUTION_TRANSACTION_FAILED',
-        'Order asset currency does not match order currency.',
+        'Order settlement currency does not match order currency.',
+      );
+    }
+
+    if (this.getAssetPriceCurrency(order.asset) !== order.currencyCode) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'ORDER_PRICE_SETTLEMENT_CURRENCY_NOT_SUPPORTED',
+        'Separate price and settlement currencies are not supported for order execution yet.',
       );
     }
   }
@@ -1135,7 +1078,7 @@ export class OrdersService {
         id: order.assetId,
         assetType: order.asset.assetType,
         market: order.asset.market,
-        currencyCode: order.currencyCode,
+        currencyCode: this.getAssetPriceCurrency(order.asset),
       },
     });
 
@@ -1150,7 +1093,7 @@ export class OrdersService {
     const candidates = await tx.assetPriceSnapshot.findMany({
       where: {
         assetId: order.assetId,
-        currencyCode: order.currencyCode,
+        currencyCode: this.getAssetPriceCurrency(order.asset),
         sourceType: AssetPriceSourceType.provider_api,
       },
       orderBy: [
@@ -1202,30 +1145,6 @@ export class OrdersService {
           HttpStatus.CONFLICT,
           'RATE_CHANGED_REQUOTE_REQUIRED',
           'Order price changed; requote is required.',
-        );
-      }
-    }
-
-    if (order.orderType === OrderType.limit) {
-      if (!order.limitPrice) {
-        this.throwApiError(
-          HttpStatus.INTERNAL_SERVER_ERROR,
-          'ORDER_EXECUTION_TRANSACTION_FAILED',
-          'Limit order is missing limitPrice.',
-        );
-      }
-
-      const limitPrice = roundDecimalHalfUp(order.limitPrice, monetaryScale);
-      const isMarketable =
-        order.side === OrderSide.buy
-          ? price.lte(limitPrice)
-          : price.gte(limitPrice);
-
-      if (!isMarketable) {
-        this.throwApiError(
-          HttpStatus.CONFLICT,
-          'ORDER_LIMIT_NOT_MARKETABLE',
-          'Limit order is not marketable at the selected execution price.',
         );
       }
     }
@@ -1401,6 +1320,11 @@ export class OrdersService {
       },
     });
     const finalizedOrder = await this.finalizeExecutedOrder(tx, order, plan);
+    const equitySnapshotId = await this.recordOrderExecutedPortfolioSnapshot(
+      tx,
+      order.seasonParticipantId,
+      plan.executedAt,
+    );
 
     return {
       order: this.formatOrder(finalizedOrder),
@@ -1410,6 +1334,7 @@ export class OrdersService {
         monetaryScale,
       ),
       positionId,
+      equitySnapshotId,
       plan,
     };
   }
@@ -1544,6 +1469,11 @@ export class OrdersService {
       },
     });
     const finalizedOrder = await this.finalizeExecutedOrder(tx, order, plan);
+    const equitySnapshotId = await this.recordOrderExecutedPortfolioSnapshot(
+      tx,
+      order.seasonParticipantId,
+      plan.executedAt,
+    );
 
     return {
       order: this.formatOrder(finalizedOrder),
@@ -1553,6 +1483,7 @@ export class OrdersService {
         monetaryScale,
       ),
       positionId: position.id,
+      equitySnapshotId,
       plan,
     };
   }
@@ -1816,6 +1747,372 @@ export class OrdersService {
     return position.id;
   }
 
+  private async recordOrderExecutedPortfolioSnapshot(
+    tx: OrderExecuteTransactionClient,
+    seasonParticipantId: string,
+    capturedAt: Date,
+  ): Promise<string | null> {
+    let valuation: Awaited<
+      ReturnType<OrdersService['calculateParticipantValuationInTransaction']>
+    >;
+    try {
+      valuation = await this.calculateParticipantValuationInTransaction(
+        tx,
+        seasonParticipantId,
+        capturedAt,
+      );
+    } catch (error) {
+      if (
+        error instanceof HttpException &&
+        this.getHttpErrorCode(error) === 'SEASON_PARTICIPANT_NOT_FOUND'
+      ) {
+        return null;
+      }
+
+      throw error;
+    }
+
+    await tx.seasonParticipant.update({
+      where: {
+        id: seasonParticipantId,
+      },
+      data: {
+        totalAssetKrw: valuation.totalAssetKrw,
+        totalReturnRate: valuation.returnRate,
+        totalFillCount: {
+          increment: 1,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const snapshot = await tx.equitySnapshot.create({
+      data: {
+        seasonParticipantId,
+        totalAssetKrw: valuation.totalAssetKrw,
+        returnRate: valuation.returnRate,
+        krwCash: valuation.krwCash,
+        usdCashKrw: valuation.usdCashKrw,
+        domesticStockValueKrw: valuation.domesticStockValueKrw,
+        usStockValueKrw: valuation.usStockValueKrw,
+        cryptoValueKrw: valuation.cryptoValueKrw,
+        snapshotReason: SnapshotReason.order_executed,
+        capturedAt,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    return snapshot.id;
+  }
+
+  private async calculateParticipantValuationInTransaction(
+    tx: OrderExecuteTransactionClient,
+    seasonParticipantId: string,
+    valuationAt: Date,
+  ): Promise<{
+    totalAssetKrw: string;
+    returnRate: string;
+    krwCash: string;
+    usdCashKrw: string;
+    domesticStockValueKrw: string;
+    usStockValueKrw: string;
+    cryptoValueKrw: string;
+  }> {
+    const participant = await tx.seasonParticipant.findUnique({
+      where: {
+        id: seasonParticipantId,
+      },
+      select: {
+        initialCapitalKrw: true,
+        cashWallets: {
+          select: {
+            currencyCode: true,
+            balanceAmount: true,
+          },
+        },
+        positions: {
+          where: {
+            quantity: {
+              gt: ZERO_MONEY,
+            },
+          },
+          select: {
+            id: true,
+            assetId: true,
+            quantity: true,
+            averageCost: true,
+            currencyCode: true,
+            asset: {
+              select: {
+                id: true,
+                assetType: true,
+                currencyCode: true,
+                priceCurrency: true,
+                settlementCurrency: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!participant) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'SEASON_PARTICIPANT_NOT_FOUND',
+        'Season participant not found.',
+      );
+    }
+
+    const usdKrwRate =
+      participant.cashWallets.some(
+        (wallet) =>
+          wallet.currencyCode === CurrencyCode.USD &&
+          !wallet.balanceAmount.eq(0),
+      ) ||
+      participant.positions.some(
+        (position) => position.currencyCode === CurrencyCode.USD,
+      )
+        ? await this.findLatestUsdKrwRateForPortfolio(tx, valuationAt)
+        : null;
+    const krwCash = participant.cashWallets
+      .filter((wallet) => wallet.currencyCode === CurrencyCode.KRW)
+      .reduce(
+        (sum, wallet) => sum.add(wallet.balanceAmount),
+        new Prisma.Decimal(0),
+      );
+    const usdCash = participant.cashWallets
+      .filter((wallet) => wallet.currencyCode === CurrencyCode.USD)
+      .reduce(
+        (sum, wallet) => sum.add(wallet.balanceAmount),
+        new Prisma.Decimal(0),
+      );
+    const usdCashKrw = usdCash.eq(0)
+      ? new Prisma.Decimal(0)
+      : this.convertToKrwForPortfolio(usdCash, CurrencyCode.USD, usdKrwRate);
+    let domesticStockValueKrw = new Prisma.Decimal(0);
+    let usStockValueKrw = new Prisma.Decimal(0);
+    let cryptoValueKrw = new Prisma.Decimal(0);
+
+    for (const position of participant.positions) {
+      if (
+        this.getAssetPriceCurrency(position.asset) !==
+        this.getAssetSettlementCurrency(position.asset)
+      ) {
+        this.throwApiError(
+          HttpStatus.BAD_REQUEST,
+          'ORDER_PRICE_SETTLEMENT_CURRENCY_NOT_SUPPORTED',
+          'Separate price and settlement currencies are not supported for portfolio valuation yet.',
+        );
+      }
+
+      const priceSnapshot = await this.findLatestAssetPriceForPortfolio(
+        tx,
+        {
+          assetId: position.assetId,
+          currencyCode: this.getAssetPriceCurrency(position.asset),
+        },
+        valuationAt,
+      );
+      const marketValueLocal = roundDecimalHalfUp(
+        position.quantity.mul(priceSnapshot.price),
+        monetaryScale,
+      );
+      const priceKrw =
+        priceSnapshot.priceKrw ??
+        this.convertToKrwForPortfolio(
+          priceSnapshot.price,
+          priceSnapshot.currencyCode,
+          usdKrwRate,
+        );
+      const marketValueKrw = roundDecimalHalfUp(
+        position.quantity.mul(priceKrw),
+        monetaryScale,
+      );
+      const unrealizedPnlLocal = roundDecimalHalfUp(
+        priceSnapshot.price.sub(position.averageCost).mul(position.quantity),
+        monetaryScale,
+      );
+      const unrealizedPnlKrw = this.convertToKrwForPortfolio(
+        unrealizedPnlLocal,
+        position.currencyCode,
+        usdKrwRate,
+      );
+
+      await tx.position.update({
+        where: {
+          id: position.id,
+        },
+        data: {
+          currentPriceLocal: this.formatDecimal(
+            priceSnapshot.price,
+            monetaryScale,
+          ),
+          currentPriceKrw: this.formatDecimal(priceKrw, monetaryScale),
+          marketValueLocal: this.formatDecimal(
+            marketValueLocal,
+            monetaryScale,
+          ),
+          marketValueKrw: this.formatDecimal(marketValueKrw, monetaryScale),
+          unrealizedPnlLocal: this.formatDecimal(
+            unrealizedPnlLocal,
+            monetaryScale,
+          ),
+          unrealizedPnlKrw: this.formatDecimal(
+            unrealizedPnlKrw,
+            monetaryScale,
+          ),
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      switch (position.asset.assetType) {
+        case AssetType.domestic_stock:
+          domesticStockValueKrw = domesticStockValueKrw.add(marketValueKrw);
+          break;
+        case AssetType.us_stock:
+          usStockValueKrw = usStockValueKrw.add(marketValueKrw);
+          break;
+        case AssetType.crypto:
+          cryptoValueKrw = cryptoValueKrw.add(marketValueKrw);
+          break;
+      }
+    }
+
+    const totalAssetKrw = krwCash
+      .add(usdCashKrw)
+      .add(domesticStockValueKrw)
+      .add(usStockValueKrw)
+      .add(cryptoValueKrw);
+    const returnRate = totalAssetKrw
+      .sub(participant.initialCapitalKrw)
+      .div(participant.initialCapitalKrw)
+      .mul(100);
+
+    return {
+      totalAssetKrw: this.formatDecimal(totalAssetKrw, monetaryScale),
+      returnRate: this.formatDecimal(returnRate, 8),
+      krwCash: this.formatDecimal(krwCash, monetaryScale),
+      usdCashKrw: this.formatDecimal(usdCashKrw, monetaryScale),
+      domesticStockValueKrw: this.formatDecimal(
+        domesticStockValueKrw,
+        monetaryScale,
+      ),
+      usStockValueKrw: this.formatDecimal(usStockValueKrw, monetaryScale),
+      cryptoValueKrw: this.formatDecimal(cryptoValueKrw, monetaryScale),
+    };
+  }
+
+  private async findLatestUsdKrwRateForPortfolio(
+    tx: OrderExecuteTransactionClient,
+    valuationAt: Date,
+  ): Promise<Prisma.Decimal> {
+    const snapshot = await tx.fxRateSnapshot.findFirst({
+      where: {
+        baseCurrency: CurrencyCode.USD,
+        quoteCurrency: CurrencyCode.KRW,
+        rate: {
+          gt: 0,
+        },
+        effectiveAt: {
+          lte: valuationAt,
+        },
+      },
+      orderBy: [
+        { sourceType: 'desc' },
+        { effectiveAt: 'desc' },
+        { capturedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      select: {
+        rate: true,
+      },
+    });
+
+    if (!snapshot) {
+      this.throwApiError(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'FX_RATE_UNAVAILABLE',
+        'USD/KRW FX rate snapshot is unavailable.',
+      );
+    }
+
+    return snapshot.rate;
+  }
+
+  private async findLatestAssetPriceForPortfolio(
+    tx: OrderExecuteTransactionClient,
+    input: {
+      assetId: string;
+      currencyCode: CurrencyCode;
+    },
+    valuationAt: Date,
+  ): Promise<{
+    price: Prisma.Decimal;
+    priceKrw: Prisma.Decimal | null;
+    currencyCode: CurrencyCode;
+  }> {
+    const snapshot = await tx.assetPriceSnapshot.findFirst({
+      where: {
+        assetId: input.assetId,
+        currencyCode: input.currencyCode,
+        price: {
+          gt: 0,
+        },
+        effectiveAt: {
+          lte: valuationAt,
+        },
+      },
+      orderBy: [
+        { sourceType: 'desc' },
+        { effectiveAt: 'desc' },
+        { capturedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      select: {
+        price: true,
+        priceKrw: true,
+        currencyCode: true,
+      },
+    });
+
+    if (!snapshot) {
+      this.throwApiError(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'ASSET_PRICE_UNAVAILABLE',
+        'Asset price snapshot is unavailable.',
+      );
+    }
+
+    return snapshot;
+  }
+
+  private convertToKrwForPortfolio(
+    amount: Prisma.Decimal,
+    currencyCode: CurrencyCode,
+    usdKrwRate: Prisma.Decimal | null,
+  ): Prisma.Decimal {
+    if (currencyCode === CurrencyCode.KRW) {
+      return roundDecimalHalfUp(amount, monetaryScale);
+    }
+
+    if (!usdKrwRate) {
+      this.throwApiError(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'FX_RATE_UNAVAILABLE',
+        'USD/KRW FX rate snapshot is unavailable.',
+      );
+    }
+
+    return roundDecimalHalfUp(amount.mul(usdKrwRate), monetaryScale);
+  }
+
   private calculateRealizedPnlKrwDeltaForExecution(
     realizedPnlDelta: Prisma.Decimal,
     currencyCode: CurrencyCode,
@@ -1982,6 +2279,7 @@ export class OrdersService {
           walletTransactionId: result.walletTransactionId,
           walletBalanceAfter: result.walletBalanceAfter,
           positionId: result.positionId,
+          equitySnapshotId: result.equitySnapshotId,
           duplicate: false,
         },
       },
@@ -2020,6 +2318,7 @@ export class OrdersService {
           walletTransactionId: null,
           walletBalanceAfter: null,
           positionId: null,
+          equitySnapshotId: null,
           duplicate: true,
         },
       },
@@ -2077,11 +2376,23 @@ export class OrdersService {
   }): Promise<OrderQuoteCalculation> {
     const { season, participant, request, quoteAt, sourceWorkflow } = input;
     const asset = await this.findUsableAsset(request.assetId);
-    if (request.currencyCode && request.currencyCode !== asset.currencyCode) {
+    if (
+      request.currencyCode &&
+      request.currencyCode !== this.getAssetSettlementCurrency(asset)
+    ) {
       this.throwApiError(
         HttpStatus.BAD_REQUEST,
         'ASSET_CURRENCY_MISMATCH',
-        'currencyCode must match asset currencyCode.',
+        'currencyCode must match asset settlementCurrency.',
+      );
+    }
+    if (
+      this.getAssetPriceCurrency(asset) !== this.getAssetSettlementCurrency(asset)
+    ) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'ORDER_PRICE_SETTLEMENT_CURRENCY_NOT_SUPPORTED',
+        'Separate price and settlement currencies are not supported for order execution yet.',
       );
     }
     this.assertOrderAssetTradable(asset, quoteAt);
@@ -2114,7 +2425,7 @@ export class OrdersService {
     }
 
     const fxSnapshot =
-      asset.currencyCode === CurrencyCode.USD
+      this.getAssetSettlementCurrency(asset) === CurrencyCode.USD
         ? await this.findFreshUsdKrwSnapshot(quoteAt, sourceWorkflow)
         : null;
     const krwAmounts = this.calculateKrwAmounts(
@@ -2123,7 +2434,7 @@ export class OrdersService {
         feeAmount,
         netAmount,
       },
-      asset.currencyCode,
+      this.getAssetSettlementCurrency(asset),
       fxSnapshot?.rate ?? null,
     );
 
@@ -2131,7 +2442,7 @@ export class OrdersService {
       participantId: participant.id,
       assetId: asset.id,
       side: request.side,
-      currencyCode: asset.currencyCode,
+      currencyCode: this.getAssetSettlementCurrency(asset),
       quantity: request.quantity,
       netAmount,
     });
@@ -2188,11 +2499,8 @@ export class OrdersService {
       side: quote.request.side,
       orderType: quote.request.orderType,
       quantity: quote.request.quantity,
-      limitPrice:
-        quote.request.orderType === OrderType.limit
-          ? quote.request.limitPrice
-          : null,
-      currencyCode: quote.asset.currencyCode,
+      limitPrice: null,
+      currencyCode: this.getAssetSettlementCurrency(quote.asset),
     });
     const durableQuote = await this.prisma.quote.create({
       data: {
@@ -2202,16 +2510,10 @@ export class OrdersService {
         status: QuoteStatus.active,
         assetId: quote.asset.id,
         side: quote.request.side,
-        orderType: quote.request.orderType,
-        quantity: this.formatDecimal(quote.request.quantity, monetaryScale),
-        limitPrice:
-          quote.request.orderType === OrderType.limit
-            ? this.formatNullableDecimal(
-                quote.request.limitPrice,
-                monetaryScale,
-              )
-            : null,
-        currencyCode: quote.asset.currencyCode,
+        orderType: OrderType.market,
+        quantity: this.formatDecimal(quote.request.quantity, quantityScale),
+        limitPrice: null,
+        currencyCode: this.getAssetSettlementCurrency(quote.asset),
         quotedPrice: this.formatDecimal(quote.price, monetaryScale),
         quotedRate: quote.fxRate ? this.formatDecimal(quote.fxRate, 8) : null,
         assetPriceSnapshotId: quote.assetPriceSnapshotId,
@@ -2238,14 +2540,17 @@ export class OrdersService {
     };
   }
 
-  private async findActiveOrderQuoteForCreateOrThrow(input: {
-    quoteId: string;
-    userId: string;
-    seasonParticipantId: string;
-    request: ParsedOrderRequest;
-    now: Date;
-  }): Promise<DurableOrderQuoteForCreate> {
-    const quote = await this.prisma.quote.findFirst({
+  private async findActiveOrderQuoteForCreateOrThrow(
+    tx: OrderExecuteTransactionClient,
+    input: {
+      quoteId: string;
+      userId: string;
+      seasonParticipantId: string;
+      request: ParsedOrderRequest;
+      now: Date;
+    },
+  ): Promise<DurableOrderQuoteForCreate> {
+    const quote = await tx.quote.findFirst({
       where: {
         id: input.quoteId,
         userId: input.userId,
@@ -2274,6 +2579,8 @@ export class OrdersService {
             market: true,
             assetType: true,
             currencyCode: true,
+            priceCurrency: true,
+            settlementCurrency: true,
             isActive: true,
           },
         },
@@ -2297,7 +2604,7 @@ export class OrdersService {
     }
 
     if (input.now.getTime() > quote.expiresAt.getTime()) {
-      await this.prisma.quote.updateMany({
+      await tx.quote.updateMany({
         where: {
           id: quote.id,
           status: QuoteStatus.active,
@@ -2328,11 +2635,8 @@ export class OrdersService {
       side: input.request.side,
       orderType: input.request.orderType,
       quantity: input.request.quantity,
-      limitPrice:
-        input.request.orderType === OrderType.limit
-          ? input.request.limitPrice
-          : null,
-      currencyCode: quote.asset.currencyCode,
+      limitPrice: null,
+      currencyCode: this.getAssetSettlementCurrency(quote.asset),
     });
 
     if (
@@ -2341,13 +2645,10 @@ export class OrdersService {
       quote.side !== input.request.side ||
       quote.orderType !== input.request.orderType ||
       !quote.quantity ||
-      this.formatDecimal(quote.quantity, monetaryScale) !==
-        this.formatDecimal(input.request.quantity, monetaryScale) ||
-      this.formatNullableDecimal(quote.limitPrice, monetaryScale) !==
-        (input.request.orderType === OrderType.limit
-          ? this.formatNullableDecimal(input.request.limitPrice, monetaryScale)
-          : null) ||
-      quote.currencyCode !== quote.asset.currencyCode ||
+      this.formatDecimal(quote.quantity, quantityScale) !==
+        this.formatDecimal(input.request.quantity, quantityScale) ||
+      quote.limitPrice !== null ||
+      quote.currencyCode !== this.getAssetSettlementCurrency(quote.asset) ||
       quote.requestHash !== expectedRequestHash ||
       !quote.quotedPrice ||
       !quote.asset.isActive
@@ -2408,11 +2709,8 @@ export class OrdersService {
       assetId: request.assetId,
       side: request.side,
       orderType: request.orderType,
-      quantity: this.formatDecimal(request.quantity, monetaryScale),
-      limitPrice:
-        request.orderType === OrderType.limit
-          ? this.formatNullableDecimal(request.limitPrice, monetaryScale)
-          : null,
+      quantity: this.formatDecimal(request.quantity, quantityScale),
+      limitPrice: null,
       currencyCode: request.currencyCode ?? null,
     };
     const canonicalJson = JSON.stringify(canonicalPayload);
@@ -2436,23 +2734,22 @@ export class OrdersService {
     }
 
     const orderType = this.parseOrderType(body.orderType);
-    const limitPrice =
-      orderType === OrderType.limit
-        ? this.parsePositiveDecimalField(body.limitPrice, 'limitPrice')
-        : null;
+    if (this.hasProvidedValue(body.limitPrice)) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'ORDER_TYPE_NOT_SUPPORTED',
+        'Only market orders are supported.',
+      );
+    }
 
     return {
       assetId: this.parseRequiredText(body.assetId, 'assetId'),
       side: this.parseRequiredSide(body.side),
       orderType,
-      quantity: this.parsePositiveDecimalField(body.quantity, 'quantity'),
-      limitPrice,
+      quantity: this.parsePositiveQuantityField(body.quantity),
+      limitPrice: null,
       currencyCode: this.parseOptionalCurrencyCode(body.currencyCode),
     };
-  }
-
-  private parseCancelOrderId(orderId: string | undefined): string {
-    return this.parseOrderId(orderId);
   }
 
   private parseOrderId(orderId: string | undefined): string {
@@ -2555,30 +2852,58 @@ export class OrdersService {
       return order.responsePayloadJson as unknown as CreateOrderResponse;
     }
 
-    return this.buildCreateOrderResponse(this.formatOrder(order));
-  }
-
-  private buildCreateOrderResponse(
-    order: NonNullable<OrdersResponse['data']['orders']>[number],
-  ): CreateOrderResponse {
+    const formattedOrder = this.formatOrder(order);
     return {
       success: true,
       data: {
-        order,
+        order: formattedOrder,
         execution: {
-          state: 'not_executed',
-          reason: 'ORDER_SUBMITTED_NOT_EXECUTED',
-          message:
-            'Order was submitted and can be executed through the execute endpoint.',
+          state:
+            order.status === OrderStatus.executed
+              ? 'already_executed'
+              : 'executed',
+          executedAt: this.formatNullableDate(order.executedAt),
+          priceSource: 'provider_api',
+          quoteId: order.quoteId,
+          quotedPrice: null,
+          executePrice: this.formatNullableDecimal(
+            order.executedPrice,
+            monetaryScale,
+          ),
+          priceChangeBps: null,
+          quotedRate: null,
+          executeRate: null,
+          rateChangeBps: null,
+          assetPriceSource: null,
+          fxRateSource: null,
+          assetPriceSnapshotId: order.assetPriceSnapshotId,
+          fxRateSnapshotId: order.fxRateSnapshotId,
+          walletTransactionId: null,
+          walletBalanceAfter: null,
+          positionId: null,
+          equitySnapshotId: null,
+          duplicate: true,
         },
       },
     };
   }
 
   private parseOrderType(value: unknown): OrderType {
+    if (!this.hasProvidedValue(value)) {
+      return OrderType.market;
+    }
+
     const text = this.parseRequiredText(value, 'orderType');
-    if (text === OrderType.market || text === OrderType.limit) {
-      return text;
+    if (text === OrderType.market) {
+      return OrderType.market;
+    }
+
+    if (text === OrderType.limit) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'ORDER_TYPE_NOT_SUPPORTED',
+        'Only market orders are supported.',
+      );
     }
 
     this.throwApiError(
@@ -2604,11 +2929,12 @@ export class OrdersService {
   private parsePositiveDecimalField(
     value: unknown,
     fieldName: string,
+    scale: number = monetaryScale,
   ): Prisma.Decimal {
     try {
       const decimal = parsePositiveDecimalString(value);
-      if (decimal.decimalPlaces() > monetaryScale) {
-        throw new Error(`${fieldName} must fit Decimal(24, 8) scale.`);
+      if (decimal.decimalPlaces() > scale) {
+        throw new Error(`${fieldName} must fit Decimal(24, ${scale}) scale.`);
       }
 
       if (decimal.gt(MAX_DECIMAL_24_8)) {
@@ -2627,6 +2953,14 @@ export class OrdersService {
         message,
       );
     }
+  }
+
+  private parsePositiveQuantityField(value: unknown): Prisma.Decimal {
+    return this.parsePositiveDecimalField(value, 'quantity', quantityScale);
+  }
+
+  private hasProvidedValue(value: unknown): boolean {
+    return !(value === undefined || value === null || value === '');
   }
 
   private parseRequiredText(value: unknown, fieldName: string): string {
@@ -2690,6 +3024,8 @@ export class OrdersService {
         market: true,
         assetType: true,
         currencyCode: true,
+        priceCurrency: true,
+        settlementCurrency: true,
         isActive: true,
       },
     });
@@ -2723,31 +3059,22 @@ export class OrdersService {
     assetPriceSnapshotId: string | null;
     assetPriceSource: PublicSourceMetadata | null;
   }> {
-    if (request.orderType === OrderType.limit) {
-      if (!request.limitPrice) {
-        this.throwApiError(
-          HttpStatus.BAD_REQUEST,
-          'INVALID_LIMIT_PRICE',
-          'limitPrice is required for limit orders.',
-        );
-      }
-
-      return {
-        price: roundDecimalHalfUp(request.limitPrice, monetaryScale),
-        assetPriceSnapshotId: null,
-        assetPriceSource: presentLimitPriceSource(),
-      };
-    }
+    void request;
 
     const providerEligibility = resolveAssetProviderEligibility({
       workflow: sourceWorkflow,
-      asset,
+      asset: {
+        id: asset.id,
+        assetType: asset.assetType,
+        market: asset.market,
+        currencyCode: this.getAssetPriceCurrency(asset),
+      },
     });
     const providerCandidates = providerEligibility.eligible
       ? ((await this.prisma.assetPriceSnapshot.findMany({
           where: {
             assetId: asset.id,
-            currencyCode: asset.currencyCode,
+            currencyCode: this.getAssetPriceCurrency(asset),
             sourceType: AssetPriceSourceType.provider_api,
           },
           orderBy: [
@@ -2804,7 +3131,7 @@ export class OrdersService {
     const snapshot = await this.prisma.assetPriceSnapshot.findFirst({
       where: {
         assetId: asset.id,
-        currencyCode: asset.currencyCode,
+        currencyCode: this.getAssetPriceCurrency(asset),
         sourceType: AssetPriceSourceType.admin_manual,
         effectiveAt: {
           lte: quoteAt,
@@ -3289,12 +3616,14 @@ export class OrdersService {
         name: quote.asset.name,
         market: quote.asset.market,
         currencyCode: quote.asset.currencyCode,
+        priceCurrency: this.getAssetPriceCurrency(quote.asset),
+        settlementCurrency: this.getAssetSettlementCurrency(quote.asset),
       },
       side: quote.request.side,
       orderType: quote.request.orderType,
-      quantity: this.formatDecimal(quote.request.quantity, monetaryScale),
+      quantity: this.formatDecimal(quote.request.quantity, quantityScale),
       price: this.formatDecimal(quote.price, monetaryScale),
-      currencyCode: quote.asset.currencyCode,
+      currencyCode: this.getAssetSettlementCurrency(quote.asset),
       grossAmount: this.formatDecimal(quote.grossAmount, monetaryScale),
       feeRate: formatDecimalScale(quote.season.tradeFeeRate, feeRateScale),
       feeAmount: this.formatDecimal(quote.feeAmount, monetaryScale),
@@ -3350,7 +3679,7 @@ export class OrdersService {
       side: order.side,
       orderType: order.orderType,
       status: order.status,
-      quantity: this.formatDecimal(order.quantity, monetaryScale),
+      quantity: this.formatDecimal(order.quantity, quantityScale),
       limitPrice: this.formatNullableDecimal(order.limitPrice, monetaryScale),
       executedPrice: this.formatNullableDecimal(
         order.executedPrice,
@@ -3423,6 +3752,22 @@ export class OrdersService {
     return value ? value.toISOString() : null;
   }
 
+  private getAssetPriceCurrency(
+    asset: Pick<OrderAsset, 'currencyCode'> & {
+      priceCurrency?: CurrencyCode | null;
+    },
+  ): CurrencyCode {
+    return asset.priceCurrency ?? asset.currencyCode;
+  }
+
+  private getAssetSettlementCurrency(
+    asset: Pick<OrderAsset, 'currencyCode'> & {
+      settlementCurrency?: CurrencyCode | null;
+    },
+  ): CurrencyCode {
+    return asset.settlementCurrency ?? asset.currencyCode;
+  }
+
   private assertSeasonTradable(season: ActiveOrderSeason, now: Date) {
     try {
       assertSeasonTradable(season, now);
@@ -3472,6 +3817,20 @@ export class OrdersService {
     message: string,
   ): never {
     throw new HttpException(this.createErrorBody(code, message), status);
+  }
+
+  private getHttpErrorCode(error: HttpException): string | null {
+    const response = error.getResponse();
+    if (
+      typeof response === 'object' &&
+      response !== null &&
+      'error' in response
+    ) {
+      const errorBody = (response as { error?: { code?: unknown } }).error;
+      return typeof errorBody?.code === 'string' ? errorBody.code : null;
+    }
+
+    return null;
   }
 
   private isUniqueConstraintError(error: unknown): boolean {

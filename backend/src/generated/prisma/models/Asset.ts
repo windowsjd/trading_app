@@ -30,6 +30,8 @@ export type AssetMinAggregateOutputType = {
   name: string | null
   market: string | null
   currencyCode: $Enums.CurrencyCode | null
+  priceCurrency: $Enums.CurrencyCode | null
+  settlementCurrency: $Enums.CurrencyCode | null
   assetType: $Enums.AssetType | null
   isActive: boolean | null
   createdAt: Date | null
@@ -42,6 +44,8 @@ export type AssetMaxAggregateOutputType = {
   name: string | null
   market: string | null
   currencyCode: $Enums.CurrencyCode | null
+  priceCurrency: $Enums.CurrencyCode | null
+  settlementCurrency: $Enums.CurrencyCode | null
   assetType: $Enums.AssetType | null
   isActive: boolean | null
   createdAt: Date | null
@@ -54,6 +58,8 @@ export type AssetCountAggregateOutputType = {
   name: number
   market: number
   currencyCode: number
+  priceCurrency: number
+  settlementCurrency: number
   assetType: number
   isActive: number
   createdAt: number
@@ -68,6 +74,8 @@ export type AssetMinAggregateInputType = {
   name?: true
   market?: true
   currencyCode?: true
+  priceCurrency?: true
+  settlementCurrency?: true
   assetType?: true
   isActive?: true
   createdAt?: true
@@ -80,6 +88,8 @@ export type AssetMaxAggregateInputType = {
   name?: true
   market?: true
   currencyCode?: true
+  priceCurrency?: true
+  settlementCurrency?: true
   assetType?: true
   isActive?: true
   createdAt?: true
@@ -92,6 +102,8 @@ export type AssetCountAggregateInputType = {
   name?: true
   market?: true
   currencyCode?: true
+  priceCurrency?: true
+  settlementCurrency?: true
   assetType?: true
   isActive?: true
   createdAt?: true
@@ -177,6 +189,8 @@ export type AssetGroupByOutputType = {
   name: string
   market: string
   currencyCode: $Enums.CurrencyCode
+  priceCurrency: $Enums.CurrencyCode
+  settlementCurrency: $Enums.CurrencyCode
   assetType: $Enums.AssetType
   isActive: boolean
   createdAt: Date
@@ -210,6 +224,8 @@ export type AssetWhereInput = {
   name?: Prisma.StringFilter<"Asset"> | string
   market?: Prisma.StringFilter<"Asset"> | string
   currencyCode?: Prisma.EnumCurrencyCodeFilter<"Asset"> | $Enums.CurrencyCode
+  priceCurrency?: Prisma.EnumCurrencyCodeFilter<"Asset"> | $Enums.CurrencyCode
+  settlementCurrency?: Prisma.EnumCurrencyCodeFilter<"Asset"> | $Enums.CurrencyCode
   assetType?: Prisma.EnumAssetTypeFilter<"Asset"> | $Enums.AssetType
   isActive?: Prisma.BoolFilter<"Asset"> | boolean
   createdAt?: Prisma.DateTimeFilter<"Asset"> | Date | string
@@ -226,6 +242,8 @@ export type AssetOrderByWithRelationInput = {
   name?: Prisma.SortOrder
   market?: Prisma.SortOrder
   currencyCode?: Prisma.SortOrder
+  priceCurrency?: Prisma.SortOrder
+  settlementCurrency?: Prisma.SortOrder
   assetType?: Prisma.SortOrder
   isActive?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -246,6 +264,8 @@ export type AssetWhereUniqueInput = Prisma.AtLeast<{
   name?: Prisma.StringFilter<"Asset"> | string
   market?: Prisma.StringFilter<"Asset"> | string
   currencyCode?: Prisma.EnumCurrencyCodeFilter<"Asset"> | $Enums.CurrencyCode
+  priceCurrency?: Prisma.EnumCurrencyCodeFilter<"Asset"> | $Enums.CurrencyCode
+  settlementCurrency?: Prisma.EnumCurrencyCodeFilter<"Asset"> | $Enums.CurrencyCode
   assetType?: Prisma.EnumAssetTypeFilter<"Asset"> | $Enums.AssetType
   isActive?: Prisma.BoolFilter<"Asset"> | boolean
   createdAt?: Prisma.DateTimeFilter<"Asset"> | Date | string
@@ -262,6 +282,8 @@ export type AssetOrderByWithAggregationInput = {
   name?: Prisma.SortOrder
   market?: Prisma.SortOrder
   currencyCode?: Prisma.SortOrder
+  priceCurrency?: Prisma.SortOrder
+  settlementCurrency?: Prisma.SortOrder
   assetType?: Prisma.SortOrder
   isActive?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -280,6 +302,8 @@ export type AssetScalarWhereWithAggregatesInput = {
   name?: Prisma.StringWithAggregatesFilter<"Asset"> | string
   market?: Prisma.StringWithAggregatesFilter<"Asset"> | string
   currencyCode?: Prisma.EnumCurrencyCodeWithAggregatesFilter<"Asset"> | $Enums.CurrencyCode
+  priceCurrency?: Prisma.EnumCurrencyCodeWithAggregatesFilter<"Asset"> | $Enums.CurrencyCode
+  settlementCurrency?: Prisma.EnumCurrencyCodeWithAggregatesFilter<"Asset"> | $Enums.CurrencyCode
   assetType?: Prisma.EnumAssetTypeWithAggregatesFilter<"Asset"> | $Enums.AssetType
   isActive?: Prisma.BoolWithAggregatesFilter<"Asset"> | boolean
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Asset"> | Date | string
@@ -292,6 +316,8 @@ export type AssetCreateInput = {
   name: string
   market: string
   currencyCode: $Enums.CurrencyCode
+  priceCurrency?: $Enums.CurrencyCode
+  settlementCurrency?: $Enums.CurrencyCode
   assetType: $Enums.AssetType
   isActive?: boolean
   createdAt?: Date | string
@@ -308,6 +334,8 @@ export type AssetUncheckedCreateInput = {
   name: string
   market: string
   currencyCode: $Enums.CurrencyCode
+  priceCurrency?: $Enums.CurrencyCode
+  settlementCurrency?: $Enums.CurrencyCode
   assetType: $Enums.AssetType
   isActive?: boolean
   createdAt?: Date | string
@@ -324,6 +352,8 @@ export type AssetUpdateInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   market?: Prisma.StringFieldUpdateOperationsInput | string
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  priceCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   assetType?: Prisma.EnumAssetTypeFieldUpdateOperationsInput | $Enums.AssetType
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -340,6 +370,8 @@ export type AssetUncheckedUpdateInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   market?: Prisma.StringFieldUpdateOperationsInput | string
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  priceCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   assetType?: Prisma.EnumAssetTypeFieldUpdateOperationsInput | $Enums.AssetType
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -356,6 +388,8 @@ export type AssetCreateManyInput = {
   name: string
   market: string
   currencyCode: $Enums.CurrencyCode
+  priceCurrency?: $Enums.CurrencyCode
+  settlementCurrency?: $Enums.CurrencyCode
   assetType: $Enums.AssetType
   isActive?: boolean
   createdAt?: Date | string
@@ -368,6 +402,8 @@ export type AssetUpdateManyMutationInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   market?: Prisma.StringFieldUpdateOperationsInput | string
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  priceCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   assetType?: Prisma.EnumAssetTypeFieldUpdateOperationsInput | $Enums.AssetType
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -380,6 +416,8 @@ export type AssetUncheckedUpdateManyInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   market?: Prisma.StringFieldUpdateOperationsInput | string
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  priceCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   assetType?: Prisma.EnumAssetTypeFieldUpdateOperationsInput | $Enums.AssetType
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -397,6 +435,8 @@ export type AssetCountOrderByAggregateInput = {
   name?: Prisma.SortOrder
   market?: Prisma.SortOrder
   currencyCode?: Prisma.SortOrder
+  priceCurrency?: Prisma.SortOrder
+  settlementCurrency?: Prisma.SortOrder
   assetType?: Prisma.SortOrder
   isActive?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -409,6 +449,8 @@ export type AssetMaxOrderByAggregateInput = {
   name?: Prisma.SortOrder
   market?: Prisma.SortOrder
   currencyCode?: Prisma.SortOrder
+  priceCurrency?: Prisma.SortOrder
+  settlementCurrency?: Prisma.SortOrder
   assetType?: Prisma.SortOrder
   isActive?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -421,6 +463,8 @@ export type AssetMinOrderByAggregateInput = {
   name?: Prisma.SortOrder
   market?: Prisma.SortOrder
   currencyCode?: Prisma.SortOrder
+  priceCurrency?: Prisma.SortOrder
+  settlementCurrency?: Prisma.SortOrder
   assetType?: Prisma.SortOrder
   isActive?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -513,6 +557,8 @@ export type AssetCreateWithoutPriceSnapshotsInput = {
   name: string
   market: string
   currencyCode: $Enums.CurrencyCode
+  priceCurrency?: $Enums.CurrencyCode
+  settlementCurrency?: $Enums.CurrencyCode
   assetType: $Enums.AssetType
   isActive?: boolean
   createdAt?: Date | string
@@ -528,6 +574,8 @@ export type AssetUncheckedCreateWithoutPriceSnapshotsInput = {
   name: string
   market: string
   currencyCode: $Enums.CurrencyCode
+  priceCurrency?: $Enums.CurrencyCode
+  settlementCurrency?: $Enums.CurrencyCode
   assetType: $Enums.AssetType
   isActive?: boolean
   createdAt?: Date | string
@@ -559,6 +607,8 @@ export type AssetUpdateWithoutPriceSnapshotsInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   market?: Prisma.StringFieldUpdateOperationsInput | string
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  priceCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   assetType?: Prisma.EnumAssetTypeFieldUpdateOperationsInput | $Enums.AssetType
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -574,6 +624,8 @@ export type AssetUncheckedUpdateWithoutPriceSnapshotsInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   market?: Prisma.StringFieldUpdateOperationsInput | string
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  priceCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   assetType?: Prisma.EnumAssetTypeFieldUpdateOperationsInput | $Enums.AssetType
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -589,6 +641,8 @@ export type AssetCreateWithoutPositionsInput = {
   name: string
   market: string
   currencyCode: $Enums.CurrencyCode
+  priceCurrency?: $Enums.CurrencyCode
+  settlementCurrency?: $Enums.CurrencyCode
   assetType: $Enums.AssetType
   isActive?: boolean
   createdAt?: Date | string
@@ -604,6 +658,8 @@ export type AssetUncheckedCreateWithoutPositionsInput = {
   name: string
   market: string
   currencyCode: $Enums.CurrencyCode
+  priceCurrency?: $Enums.CurrencyCode
+  settlementCurrency?: $Enums.CurrencyCode
   assetType: $Enums.AssetType
   isActive?: boolean
   createdAt?: Date | string
@@ -635,6 +691,8 @@ export type AssetUpdateWithoutPositionsInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   market?: Prisma.StringFieldUpdateOperationsInput | string
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  priceCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   assetType?: Prisma.EnumAssetTypeFieldUpdateOperationsInput | $Enums.AssetType
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -650,6 +708,8 @@ export type AssetUncheckedUpdateWithoutPositionsInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   market?: Prisma.StringFieldUpdateOperationsInput | string
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  priceCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   assetType?: Prisma.EnumAssetTypeFieldUpdateOperationsInput | $Enums.AssetType
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -665,6 +725,8 @@ export type AssetCreateWithoutOrdersInput = {
   name: string
   market: string
   currencyCode: $Enums.CurrencyCode
+  priceCurrency?: $Enums.CurrencyCode
+  settlementCurrency?: $Enums.CurrencyCode
   assetType: $Enums.AssetType
   isActive?: boolean
   createdAt?: Date | string
@@ -680,6 +742,8 @@ export type AssetUncheckedCreateWithoutOrdersInput = {
   name: string
   market: string
   currencyCode: $Enums.CurrencyCode
+  priceCurrency?: $Enums.CurrencyCode
+  settlementCurrency?: $Enums.CurrencyCode
   assetType: $Enums.AssetType
   isActive?: boolean
   createdAt?: Date | string
@@ -711,6 +775,8 @@ export type AssetUpdateWithoutOrdersInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   market?: Prisma.StringFieldUpdateOperationsInput | string
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  priceCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   assetType?: Prisma.EnumAssetTypeFieldUpdateOperationsInput | $Enums.AssetType
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -726,6 +792,8 @@ export type AssetUncheckedUpdateWithoutOrdersInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   market?: Prisma.StringFieldUpdateOperationsInput | string
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  priceCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   assetType?: Prisma.EnumAssetTypeFieldUpdateOperationsInput | $Enums.AssetType
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -741,6 +809,8 @@ export type AssetCreateWithoutQuotesInput = {
   name: string
   market: string
   currencyCode: $Enums.CurrencyCode
+  priceCurrency?: $Enums.CurrencyCode
+  settlementCurrency?: $Enums.CurrencyCode
   assetType: $Enums.AssetType
   isActive?: boolean
   createdAt?: Date | string
@@ -756,6 +826,8 @@ export type AssetUncheckedCreateWithoutQuotesInput = {
   name: string
   market: string
   currencyCode: $Enums.CurrencyCode
+  priceCurrency?: $Enums.CurrencyCode
+  settlementCurrency?: $Enums.CurrencyCode
   assetType: $Enums.AssetType
   isActive?: boolean
   createdAt?: Date | string
@@ -787,6 +859,8 @@ export type AssetUpdateWithoutQuotesInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   market?: Prisma.StringFieldUpdateOperationsInput | string
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  priceCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   assetType?: Prisma.EnumAssetTypeFieldUpdateOperationsInput | $Enums.AssetType
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -802,6 +876,8 @@ export type AssetUncheckedUpdateWithoutQuotesInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   market?: Prisma.StringFieldUpdateOperationsInput | string
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  priceCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   assetType?: Prisma.EnumAssetTypeFieldUpdateOperationsInput | $Enums.AssetType
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -875,6 +951,8 @@ export type AssetSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   name?: boolean
   market?: boolean
   currencyCode?: boolean
+  priceCurrency?: boolean
+  settlementCurrency?: boolean
   assetType?: boolean
   isActive?: boolean
   createdAt?: boolean
@@ -892,6 +970,8 @@ export type AssetSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   name?: boolean
   market?: boolean
   currencyCode?: boolean
+  priceCurrency?: boolean
+  settlementCurrency?: boolean
   assetType?: boolean
   isActive?: boolean
   createdAt?: boolean
@@ -904,6 +984,8 @@ export type AssetSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   name?: boolean
   market?: boolean
   currencyCode?: boolean
+  priceCurrency?: boolean
+  settlementCurrency?: boolean
   assetType?: boolean
   isActive?: boolean
   createdAt?: boolean
@@ -916,13 +998,15 @@ export type AssetSelectScalar = {
   name?: boolean
   market?: boolean
   currencyCode?: boolean
+  priceCurrency?: boolean
+  settlementCurrency?: boolean
   assetType?: boolean
   isActive?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type AssetOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "symbol" | "name" | "market" | "currencyCode" | "assetType" | "isActive" | "createdAt" | "updatedAt", ExtArgs["result"]["asset"]>
+export type AssetOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "symbol" | "name" | "market" | "currencyCode" | "priceCurrency" | "settlementCurrency" | "assetType" | "isActive" | "createdAt" | "updatedAt", ExtArgs["result"]["asset"]>
 export type AssetInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   priceSnapshots?: boolean | Prisma.Asset$priceSnapshotsArgs<ExtArgs>
   positions?: boolean | Prisma.Asset$positionsArgs<ExtArgs>
@@ -947,6 +1031,8 @@ export type $AssetPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     name: string
     market: string
     currencyCode: $Enums.CurrencyCode
+    priceCurrency: $Enums.CurrencyCode
+    settlementCurrency: $Enums.CurrencyCode
     assetType: $Enums.AssetType
     isActive: boolean
     createdAt: Date
@@ -1383,6 +1469,8 @@ export interface AssetFieldRefs {
   readonly name: Prisma.FieldRef<"Asset", 'String'>
   readonly market: Prisma.FieldRef<"Asset", 'String'>
   readonly currencyCode: Prisma.FieldRef<"Asset", 'CurrencyCode'>
+  readonly priceCurrency: Prisma.FieldRef<"Asset", 'CurrencyCode'>
+  readonly settlementCurrency: Prisma.FieldRef<"Asset", 'CurrencyCode'>
   readonly assetType: Prisma.FieldRef<"Asset", 'AssetType'>
   readonly isActive: Prisma.FieldRef<"Asset", 'Boolean'>
   readonly createdAt: Prisma.FieldRef<"Asset", 'DateTime'>

@@ -3,6 +3,7 @@ import {
   AssetPriceSourceType,
   AssetType,
   CurrencyCode,
+  FxRateSourceType,
   Prisma,
 } from '../../generated/prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -204,6 +205,7 @@ export class BinancePriceIngestionService {
         data: {
           assetId: mapping.assetId,
           price: parsed.price,
+          priceKrw: await this.buildPriceKrw(parsed.price, parsed.effectiveAt),
           currencyCode: CurrencyCode.USD,
           sourceType: AssetPriceSourceType.provider_api,
           sourceName: BINANCE_SOURCE_NAME,
@@ -242,6 +244,49 @@ export class BinancePriceIngestionService {
 
       throw error;
     }
+  }
+
+  private async buildPriceKrw(
+    price: string,
+    effectiveAt: Date,
+  ): Promise<string | null> {
+    if (!this.prisma.fxRateSnapshot) {
+      return null;
+    }
+
+    const fxRate = await this.prisma.fxRateSnapshot.findFirst({
+      where: {
+        baseCurrency: CurrencyCode.USD,
+        quoteCurrency: CurrencyCode.KRW,
+        rate: {
+          gt: 0,
+        },
+        effectiveAt: {
+          lte: effectiveAt,
+        },
+        OR: [
+          {
+            sourceType: FxRateSourceType.provider_api,
+          },
+          {
+            sourceType: FxRateSourceType.admin_manual,
+            approvedByUserId: {
+              not: null,
+            },
+          },
+        ],
+      },
+      orderBy: [
+        { effectiveAt: 'desc' },
+        { capturedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      select: {
+        rate: true,
+      },
+    });
+
+    return fxRate ? new Prisma.Decimal(price).mul(fxRate.rate).toFixed(8) : null;
   }
 
   private async findMappedAsset(input: {

@@ -3,6 +3,7 @@ import {
   AssetPriceSourceType,
   AssetType,
   CurrencyCode,
+  FxRateSourceType,
   Prisma,
 } from '../../generated/prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -368,14 +369,20 @@ export class KisWebSocketIngestionService {
       ].filter((secret): secret is string => Boolean(secret)),
     });
 
+    const currencyCode =
+      input.trade.kind === 'domestic_krx_realtime_trade'
+        ? CurrencyCode.KRW
+        : CurrencyCode.USD;
     await this.prisma.assetPriceSnapshot.create({
       data: {
         assetId: mapping.assetId,
         price: input.trade.price,
-        currencyCode:
-          input.trade.kind === 'domestic_krx_realtime_trade'
-            ? CurrencyCode.KRW
-            : CurrencyCode.USD,
+        priceKrw: await this.buildPriceKrw(
+          input.trade.price,
+          currencyCode,
+          effectiveAt,
+        ),
+        currencyCode,
         sourceType: AssetPriceSourceType.provider_api,
         sourceName,
         sourceTimestamp: input.trade.sourceTimestamp,
@@ -397,6 +404,55 @@ export class KisWebSocketIngestionService {
       price: input.trade.price,
       effectiveAt: effectiveAt.toISOString(),
     };
+  }
+
+  private async buildPriceKrw(
+    price: string,
+    currencyCode: CurrencyCode,
+    effectiveAt: Date,
+  ): Promise<string | null> {
+    const decimalPrice = new Prisma.Decimal(price);
+    if (currencyCode === CurrencyCode.KRW) {
+      return decimalPrice.toFixed(8);
+    }
+
+    if (!this.prisma.fxRateSnapshot) {
+      return null;
+    }
+
+    const fxRate = await this.prisma.fxRateSnapshot.findFirst({
+      where: {
+        baseCurrency: CurrencyCode.USD,
+        quoteCurrency: CurrencyCode.KRW,
+        rate: {
+          gt: 0,
+        },
+        effectiveAt: {
+          lte: effectiveAt,
+        },
+        OR: [
+          {
+            sourceType: FxRateSourceType.provider_api,
+          },
+          {
+            sourceType: FxRateSourceType.admin_manual,
+            approvedByUserId: {
+              not: null,
+            },
+          },
+        ],
+      },
+      orderBy: [
+        { effectiveAt: 'desc' },
+        { capturedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      select: {
+        rate: true,
+      },
+    });
+
+    return fxRate ? decimalPrice.mul(fxRate.rate).toFixed(8) : null;
   }
 
   private async findMappedAsset(

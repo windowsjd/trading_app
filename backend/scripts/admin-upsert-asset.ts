@@ -88,6 +88,8 @@ export async function runAdminUpsertAsset(argv: string[]) {
       update: {
         name: payload.name,
         currencyCode: payload.currencyCode,
+        priceCurrency: payload.priceCurrency,
+        settlementCurrency: payload.settlementCurrency,
         assetType: payload.assetType,
         isActive: payload.isActive,
       },
@@ -98,6 +100,8 @@ export async function runAdminUpsertAsset(argv: string[]) {
         name: true,
         assetType: true,
         currencyCode: true,
+        priceCurrency: true,
+        settlementCurrency: true,
         isActive: true,
       },
     });
@@ -115,6 +119,8 @@ function toUpsertData(payload: AdminAssetUpsertPayload) {
     name: payload.name,
     market: payload.market,
     currencyCode: payload.currencyCode,
+    priceCurrency: payload.priceCurrency,
+    settlementCurrency: payload.settlementCurrency,
     assetType: payload.assetType,
     isActive: payload.isActive,
   };

@@ -48,6 +48,8 @@ describe('buildAdminAssetUpsertPayload', () => {
       name: 'Apple Inc.',
       market: 'NASDAQ',
       currencyCode: CurrencyCode.USD,
+      priceCurrency: CurrencyCode.USD,
+      settlementCurrency: CurrencyCode.USD,
       assetType: AssetType.us_stock,
       isActive: true,
     });
@@ -80,6 +82,8 @@ describe('buildAdminAssetUpsertPayload', () => {
       name: 'Bitcoin',
       market: 'BINANCE',
       currencyCode: CurrencyCode.USD,
+      priceCurrency: CurrencyCode.USD,
+      settlementCurrency: CurrencyCode.USD,
       assetType: AssetType.crypto,
       isActive: true,
     });

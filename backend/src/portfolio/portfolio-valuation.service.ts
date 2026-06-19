@@ -29,6 +29,7 @@ type PositionAssetForSourceSelection = {
   assetType: AssetType;
   market: string;
   currencyCode: CurrencyCode;
+  priceCurrency: CurrencyCode;
 };
 
 @Injectable()
@@ -67,6 +68,7 @@ export class PortfolioValuationService {
                 assetType: true,
                 market: true,
                 currencyCode: true,
+                priceCurrency: true,
               },
             },
           },
@@ -139,13 +141,18 @@ export class PortfolioValuationService {
   ): Promise<PortfolioAssetPriceSnapshotInput | null> {
     const providerEligibility = resolveAssetProviderEligibility({
       workflow: sourceEligibilityWorkflow,
-      asset,
+      asset: {
+        id: asset.id,
+        assetType: asset.assetType,
+        market: asset.market,
+        currencyCode: this.getAssetPriceCurrency(asset),
+      },
     });
     const providerCandidates = providerEligibility.eligible
       ? ((await this.prisma.assetPriceSnapshot.findMany({
           where: {
             assetId: asset.id,
-            currencyCode: asset.currencyCode,
+            currencyCode: this.getAssetPriceCurrency(asset),
             sourceType: AssetPriceSourceType.provider_api,
           },
           orderBy: [
@@ -158,6 +165,7 @@ export class PortfolioValuationService {
             id: true,
             assetId: true,
             price: true,
+            priceKrw: true,
             currencyCode: true,
             sourceType: true,
             sourceName: true,
@@ -201,7 +209,7 @@ export class PortfolioValuationService {
     const fallbackSnapshot = await this.prisma.assetPriceSnapshot.findFirst({
       where: {
         assetId: asset.id,
-        currencyCode: asset.currencyCode,
+        currencyCode: this.getAssetPriceCurrency(asset),
         sourceType: AssetPriceSourceType.admin_manual,
         effectiveAt: {
           lte: valuationAt,
@@ -219,6 +227,7 @@ export class PortfolioValuationService {
         assetId: true,
         id: true,
         price: true,
+        priceKrw: true,
         currencyCode: true,
         sourceType: true,
         sourceName: true,
@@ -358,5 +367,13 @@ export class PortfolioValuationService {
     }
 
     return fallbackSnapshot;
+  }
+
+  private getAssetPriceCurrency(
+    asset: Pick<PositionAssetForSourceSelection, 'currencyCode'> & {
+      priceCurrency?: CurrencyCode | null;
+    },
+  ): CurrencyCode {
+    return asset.priceCurrency ?? asset.currencyCode;
   }
 }
