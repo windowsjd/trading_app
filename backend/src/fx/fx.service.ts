@@ -60,6 +60,10 @@ import {
   assertSeasonExchangeable,
   SeasonLifecycleError,
 } from '../seasons/season-lifecycle.policy';
+import {
+  calculateMaxDrawdown,
+  RankingRefreshService,
+} from '../ranking/ranking-refresh.service';
 
 export type FxQuoteRequestBody = {
   fromCurrency?: unknown;
@@ -221,7 +225,10 @@ export function mapFxExecuteOrchestrationDecisionToSkeletonResponse(
 
 @Injectable()
 export class FxService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly rankingRefreshService?: RankingRefreshService,
+  ) {}
 
   async quote(
     userId: string | undefined,
@@ -472,6 +479,7 @@ export class FxService {
         normalizedRequest,
         plan,
         executeNow,
+        seasonId: season.id,
       });
     } catch (error) {
       if (error instanceof HttpException) {
@@ -762,7 +770,8 @@ export class FxService {
 
     if (
       !sourceWallet ||
-      sourceWallet.seasonParticipantId !== normalizedRequest.seasonParticipantId ||
+      sourceWallet.seasonParticipantId !==
+        normalizedRequest.seasonParticipantId ||
       sourceWallet.currencyCode !== normalizedRequest.fromCurrency
     ) {
       this.throwFxExecuteError(fxExecuteErrorCodes.SOURCE_WALLET_NOT_FOUND);
@@ -770,7 +779,8 @@ export class FxService {
 
     if (
       !targetWallet ||
-      targetWallet.seasonParticipantId !== normalizedRequest.seasonParticipantId ||
+      targetWallet.seasonParticipantId !==
+        normalizedRequest.seasonParticipantId ||
       targetWallet.currencyCode !== normalizedRequest.toCurrency
     ) {
       this.throwFxExecuteError(fxExecuteErrorCodes.TARGET_WALLET_NOT_FOUND);
@@ -1065,11 +1075,19 @@ export class FxService {
     normalizedRequest: NormalizedFxExecuteRequest;
     plan: ProviderFxExecutePlan;
     executeNow: Date;
+    seasonId: string;
   }): Promise<FxExecuteSuccessResponse> {
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const response = await this.prisma.$transaction(async (tx) => {
         return this.executeFxWritePathInTransaction(tx, input);
       });
+
+      this.refreshRankingAfterParticipantChange(
+        input.seasonId,
+        input.normalizedRequest.seasonParticipantId,
+      );
+
+      return response;
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -1243,52 +1261,57 @@ export class FxService {
     plan: ProviderFxExecutePlan,
     capturedAt: Date,
   ): Promise<void> {
-    try {
-      const valuation = await this.calculateParticipantValuationInTransaction(
+    const valuation = await this.calculateParticipantValuationInTransaction(
+      tx,
+      plan.seasonParticipantId,
+      new Prisma.Decimal(plan.appliedRate),
+      capturedAt,
+    );
+
+    await tx.equitySnapshot.create({
+      data: {
+        seasonParticipantId: plan.seasonParticipantId,
+        totalAssetKrw: valuation.totalAssetKrw,
+        returnRate: valuation.returnRate,
+        krwCash: valuation.krwCash,
+        usdCashKrw: valuation.usdCashKrw,
+        domesticStockValueKrw: valuation.domesticStockValueKrw,
+        usStockValueKrw: valuation.usStockValueKrw,
+        cryptoValueKrw: valuation.cryptoValueKrw,
+        snapshotReason: SnapshotReason.exchange_executed,
+        capturedAt,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const maxDrawdown =
+      await this.calculateParticipantMaxDrawdownFromEquitySnapshots(
         tx,
         plan.seasonParticipantId,
-        new Prisma.Decimal(plan.appliedRate),
       );
 
-      await tx.seasonParticipant.update({
-        where: {
-          id: plan.seasonParticipantId,
-        },
-        data: {
-          totalAssetKrw: valuation.totalAssetKrw,
-          totalReturnRate: valuation.returnRate,
-        },
-        select: {
-          id: true,
-        },
-      });
-
-      await tx.equitySnapshot.create({
-        data: {
-          seasonParticipantId: plan.seasonParticipantId,
-          totalAssetKrw: valuation.totalAssetKrw,
-          returnRate: valuation.returnRate,
-          krwCash: valuation.krwCash,
-          usdCashKrw: valuation.usdCashKrw,
-          domesticStockValueKrw: valuation.domesticStockValueKrw,
-          usStockValueKrw: valuation.usStockValueKrw,
-          cryptoValueKrw: valuation.cryptoValueKrw,
-          snapshotReason: SnapshotReason.exchange_executed,
-          capturedAt,
-        },
-        select: {
-          id: true,
-        },
-      });
-    } catch {
-      return;
-    }
+    await tx.seasonParticipant.update({
+      where: {
+        id: plan.seasonParticipantId,
+      },
+      data: {
+        totalAssetKrw: valuation.totalAssetKrw,
+        totalReturnRate: valuation.returnRate,
+        maxDrawdown,
+      },
+      select: {
+        id: true,
+      },
+    });
   }
 
   private async calculateParticipantValuationInTransaction(
     tx: FxExecuteTransactionClient,
     seasonParticipantId: string,
     usdKrwRate: Prisma.Decimal,
+    valuationAt: Date,
   ): Promise<{
     totalAssetKrw: string;
     returnRate: string;
@@ -1359,6 +1382,9 @@ export class FxService {
           price: {
             gt: 0,
           },
+          effectiveAt: {
+            lte: valuationAt,
+          },
         },
         orderBy: [
           { effectiveAt: 'desc' },
@@ -1415,6 +1441,24 @@ export class FxService {
       usStockValueKrw: this.formatDecimal(usStockValueKrw, 8),
       cryptoValueKrw: this.formatDecimal(cryptoValueKrw, 8),
     };
+  }
+
+  private async calculateParticipantMaxDrawdownFromEquitySnapshots(
+    tx: FxExecuteTransactionClient,
+    seasonParticipantId: string,
+  ) {
+    const snapshots = await tx.equitySnapshot.findMany({
+      where: {
+        seasonParticipantId,
+      },
+      orderBy: [{ capturedAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+      select: {
+        totalAssetKrw: true,
+        capturedAt: true,
+      },
+    });
+
+    return this.formatDecimal(calculateMaxDrawdown(snapshots), 8);
   }
 
   private async debitSourceWalletOrThrow(
@@ -1668,5 +1712,26 @@ export class FxService {
       buildFxExecuteErrorEnvelope(code),
       metadata.httpStatus,
     );
+  }
+
+  private refreshRankingAfterParticipantChange(
+    seasonId: string,
+    seasonParticipantId: string,
+  ) {
+    if (!this.rankingRefreshService) {
+      return;
+    }
+
+    void this.rankingRefreshService
+      .refreshCurrentRankingAfterParticipantChange(
+        seasonId,
+        seasonParticipantId,
+      )
+      .catch((error) => {
+        console.error(
+          'Current ranking refresh after FX execution failed.',
+          error,
+        );
+      });
   }
 }

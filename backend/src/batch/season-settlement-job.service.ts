@@ -2,20 +2,25 @@ import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import {
   ParticipantStatus,
   Prisma,
-  OrderStatus,
   SeasonRankingType,
   SeasonStatus,
+  SnapshotReason,
 } from '../generated/prisma/client';
 import {
   formatDecimalScale,
   formatMoneyScale8,
   returnRateScale,
 } from '../fx/fx-decimal-policy';
+import { PortfolioValuationService } from '../portfolio/portfolio-valuation.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
-  buildRankingRowsForSnapshots,
-  RankingCalculatedRow,
+  assignSequentialRanks,
+  compareRankingRows,
 } from '../ranking/ranking-calculation.policy';
+import {
+  calculateMaxDrawdown,
+  calculateReachedReturnAt,
+} from '../ranking/ranking-refresh.service';
 import { BatchService } from './batch.service';
 import {
   SEASON_SETTLEMENT_JOB_NAME,
@@ -34,12 +39,74 @@ const SETTLEMENT_PARTICIPANT_STATUSES: readonly ParticipantStatus[] = [
   ParticipantStatus.finished,
   ParticipantStatus.rewarded,
 ];
+const FINAL_TIER_CUTOFF_RULES = [
+  { tier: 'master', cumulativeRatio: 0.04 },
+  { tier: 'diamond', cumulativeRatio: 0.11 },
+  { tier: 'platinum', cumulativeRatio: 0.23 },
+  { tier: 'gold', cumulativeRatio: 0.4 },
+  { tier: 'silver', cumulativeRatio: 0.7 },
+  { tier: 'bronze', cumulativeRatio: 1 },
+] as const;
+
+type SettlementParticipant = {
+  id: string;
+  userId: string;
+  totalFillCount: number;
+};
+
+type SettlementSeason = {
+  id: string;
+  status: SeasonStatus;
+  endAt: Date;
+};
+
+type EquityHistoryPoint = {
+  totalAssetKrw: Prisma.Decimal;
+  returnRate: Prisma.Decimal;
+  capturedAt: Date;
+  createdAt?: Date | null;
+};
+
+type FinalValuation = {
+  seasonParticipantId: string;
+  userId: string;
+  totalAssetKrw: string;
+  returnRate: string;
+  krwCash: string;
+  usdCashKrw: string;
+  domesticStockValueKrw: string;
+  usStockValueKrw: string;
+  cryptoValueKrw: string;
+  maxDrawdown: string;
+  totalFillCount: number;
+  reachedReturnAt: Date;
+};
+
+type FinalRankingRow = FinalValuation & {
+  rank: number;
+  finalTier: string;
+};
+
+type ExistingFinalRankingRow = {
+  id: string;
+  seasonParticipantId: string;
+  rank: number;
+  totalAssetKrw: Prisma.Decimal;
+  returnRate: Prisma.Decimal;
+  maxDrawdown: Prisma.Decimal;
+  totalFillCount: number;
+  reachedReturnAt: Date | null;
+  seasonParticipant: {
+    userId: string;
+  };
+};
 
 @Injectable()
 export class SeasonSettlementJobService {
   constructor(
     private readonly batchService: BatchService,
     private readonly prisma: PrismaService,
+    private readonly portfolioValuationService?: PortfolioValuationService,
   ) {}
 
   async run(
@@ -78,6 +145,121 @@ export class SeasonSettlementJobService {
     const seasonId = this.parseRequiredText(input.seasonId, 'seasonId');
     const { text: settlementDateText, date: settlementDate } =
       this.parseSettlementDate(input.settlementDate);
+    const season = await this.findSeasonOrThrow(seasonId);
+
+    this.assertSeasonStatusAllowed(season.status);
+
+    const participants = await this.findEligibleParticipants(seasonId);
+    const result = this.createBaseResult({
+      seasonId,
+      settlementDate: settlementDateText,
+      dryRun,
+      previousStatus: season.status,
+      participantsTotal: participants.length,
+      snapshotted: 0,
+      missingSnapshots: participants.length,
+    });
+
+    if (participants.length === 0) {
+      this.failWithResult(
+        HttpStatus.BAD_REQUEST,
+        'NO_SETTLEMENT_PARTICIPANTS',
+        'No eligible participants are available for settlement.',
+        result,
+      );
+    }
+
+    const existingFinalRankings = await this.findExistingFinalRankingRows(
+      this.prisma,
+      seasonId,
+      settlementDate,
+    );
+
+    if (existingFinalRankings.length > 0) {
+      return this.handleExistingFinalRankings({
+        season,
+        settlementDate,
+        settlementDateText,
+        participants,
+        existingFinalRankings,
+        dryRun,
+        result,
+      });
+    }
+
+    const finalValuations = await this.calculateFinalValuations({
+      participants,
+      settlementAt: season.endAt,
+      settlementDate,
+    }).catch((error) => {
+      this.failWithResult(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'FINAL_VALUATION_FAILED',
+        error instanceof Error
+          ? error.message
+          : 'Final valuation failed before settlement.',
+        result,
+      );
+    });
+
+    const finalRows = this.buildFinalRankingRows(finalValuations);
+    result.participants.snapshotted = finalValuations.length;
+    result.participants.missingSnapshots = Math.max(
+      participants.length - finalValuations.length,
+      0,
+    );
+    result.finalRankings.wouldCreate = finalRows.length;
+    result.finalSnapshots.wouldCreate = finalValuations.length;
+    result.finalTiers.wouldAssign = finalRows.length;
+    result.topRanks = finalRows
+      .slice(0, TOP_RANKS_LIMIT)
+      .map((row) => this.formatFinalRankingRow(row));
+
+    if (result.participants.missingSnapshots > 0) {
+      const code = this.portfolioValuationService
+        ? 'MISSING_FINAL_VALUATIONS'
+        : finalValuations.length === 0
+          ? 'NO_FINAL_SNAPSHOTS_AVAILABLE'
+          : 'MISSING_FINAL_SNAPSHOTS';
+      this.failWithResult(
+        HttpStatus.BAD_REQUEST,
+        code,
+        this.portfolioValuationService
+          ? 'Some eligible participants do not have final valuations.'
+          : 'Some eligible participants do not have daily portfolio snapshots for settlementDate.',
+        result,
+      );
+    }
+
+    if (dryRun) {
+      return result;
+    }
+
+    const writeResult = await this.createFinalSettlementAtomically({
+      seasonId,
+      settlementDate,
+      capturedAt,
+      finalRows,
+    });
+
+    result.finalSnapshots.created = writeResult.createdFinalSnapshotIds.length;
+    result.finalSnapshots.updated = writeResult.updatedFinalSnapshotIds.length;
+    result.finalRankings.created = writeResult.createdFinalRankingIds.length;
+    result.finalTiers.assigned =
+      writeResult.assignedFinalTierParticipantIds.length;
+    result.createdFinalSnapshotIds = writeResult.createdFinalSnapshotIds;
+    result.updatedFinalSnapshotIds = writeResult.updatedFinalSnapshotIds;
+    result.createdFinalRankingIds = writeResult.createdFinalRankingIds;
+    result.assignedFinalTierParticipantIds =
+      writeResult.assignedFinalTierParticipantIds;
+    result.season.updated = writeResult.seasonUpdated;
+    result.message =
+      'Season settlement completed through final ranking and final tier assignment. Rewards remain pending.';
+
+    return result;
+  }
+
+  private async findSeasonOrThrow(seasonId: string): Promise<SettlementSeason> {
     const season = await this.prisma.season.findUnique({
       where: {
         id: seasonId,
@@ -85,6 +267,7 @@ export class SeasonSettlementJobService {
       select: {
         id: true,
         status: true,
+        endAt: true,
       },
     });
 
@@ -96,157 +279,32 @@ export class SeasonSettlementJobService {
       );
     }
 
-    if (season.status === SeasonStatus.upcoming) {
-      this.throwJobError(
-        HttpStatus.BAD_REQUEST,
-        'SEASON_STATUS_NOT_ALLOWED',
-        'Season settlement job does not support upcoming seasons.',
-      );
-    }
-
-    if (season.status === SeasonStatus.active) {
-      this.throwJobError(
-        HttpStatus.BAD_REQUEST,
-        'SEASON_STATUS_NOT_ALLOWED',
-        'Season settlement job does not support active seasons.',
-      );
-    }
-
-    const participants = await this.findEligibleParticipants(seasonId);
-    const existingFinalRankings = await this.findExistingFinalRankingRows(
-      this.prisma,
-      seasonId,
-      settlementDate,
-    );
-    const existingResult = this.resultFromExistingFinalRankings({
-      seasonId,
-      settlementDate: settlementDateText,
-      dryRun,
-      previousStatus: season.status,
-      participantsTotal: participants.length,
-      existingRows: existingFinalRankings,
-    });
-
-    if (season.status === SeasonStatus.settled) {
-      existingResult.message =
-        existingFinalRankings.length > 0
-          ? 'Season is already settled; existing final rankings are returned without overwrite.'
-          : 'Season is already settled, but no final ranking rows exist for this settlementDate.';
-
-      return existingResult;
-    }
-
-    if (existingFinalRankings.length > 0) {
-      if (dryRun) {
-        existingResult.message =
-          'Final rankings already exist; dry-run would only transition the ended season to settled.';
-
-        return existingResult;
-      }
-
-      const writeResult = await this.settleExistingFinalRankingsAtomically({
-        seasonId,
-        settlementDate,
-      });
-
-      existingResult.season.updated = writeResult.seasonUpdated;
-      existingResult.message =
-        'Final rankings already exist; existing rows were not overwritten and the season status was settled.';
-
-      return existingResult;
-    }
-
-    const snapshots = await this.findSettlementSnapshots(
-      seasonId,
-      settlementDate,
-    );
-    const result = this.createBaseResult({
-      seasonId,
-      settlementDate: settlementDateText,
-      dryRun,
-      previousStatus: season.status,
-      participantsTotal: participants.length,
-      snapshotted: snapshots.length,
-      missingSnapshots: Math.max(participants.length - snapshots.length, 0),
-    });
-
-    if (snapshots.length === 0) {
-      this.failWithResult(
-        HttpStatus.BAD_REQUEST,
-        'NO_FINAL_SNAPSHOTS_AVAILABLE',
-        'No daily portfolio snapshots are available for settlementDate.',
-        result,
-      );
-    }
-
-    if (result.participants.missingSnapshots > 0) {
-      this.failWithResult(
-        HttpStatus.BAD_REQUEST,
-        'MISSING_FINAL_SNAPSHOTS',
-        'Some eligible participants do not have daily portfolio snapshots for settlementDate.',
-        result,
-      );
-    }
-
-    const [historicalSnapshots, executedOrders] = await Promise.all([
-      this.findHistoricalSnapshots(seasonId, settlementDate),
-      this.findExecutedOrdersThroughLatestSnapshot(
-        seasonId,
-        snapshots.map((snapshot) => snapshot.capturedAt),
-      ),
-    ]);
-    const rows = buildRankingRowsForSnapshots({
-      rankingSnapshots: snapshots.map((snapshot) => ({
-        seasonParticipantId: snapshot.seasonParticipantId,
-        userId: snapshot.seasonParticipant.userId,
-        snapshotDate: snapshot.snapshotDate,
-        totalAssetKrw: snapshot.totalAssetKrw,
-        returnRate: snapshot.returnRate,
-        capturedAt: snapshot.capturedAt,
-        createdAt: snapshot.createdAt,
-      })),
-      historicalSnapshots,
-      executedOrders,
-    });
-    result.topRanks = rows
-      .slice(0, TOP_RANKS_LIMIT)
-      .map((row) => this.formatCalculatedRankingRow(row));
-    result.finalRankings.wouldCreate = rows.length;
-
-    if (dryRun) {
-      return result;
-    }
-
-    const writeResult = await this.createFinalRankingsAtomically({
-      seasonId,
-      settlementDate,
-      capturedAt,
-      rows,
-    });
-
-    if (writeResult.existingRows.length > 0) {
-      result.finalRankings.wouldCreate = 0;
-      result.finalRankings.existing = writeResult.existingRows.length;
-      result.finalRankings.skipped = writeResult.existingRows.length;
-      result.topRanks = writeResult.existingRows
-        .slice(0, TOP_RANKS_LIMIT)
-        .map((row) => this.formatExistingRankingRow(row));
-      result.message =
-        'Final rankings already exist; existing rows were not overwritten.';
-
-      return result;
-    }
-
-    result.season.updated = writeResult.seasonUpdated;
-    result.finalRankings.created = writeResult.createdFinalRankingIds.length;
-    result.createdFinalRankingIds = writeResult.createdFinalRankingIds;
-    result.message =
-      'Season settlement completed. Reward handoff remains a separate gate.';
-
-    return result;
+    return season;
   }
 
-  private async findEligibleParticipants(seasonId: string) {
+  private assertSeasonStatusAllowed(status: SeasonStatus) {
+    if (status === SeasonStatus.ended || status === SeasonStatus.settled) {
+      return;
+    }
+
+    if (status === SeasonStatus.active) {
+      this.throwJobError(
+        HttpStatus.BAD_REQUEST,
+        'SEASON_STATUS_NOT_ALLOWED',
+        'Season settlement job requires an ended season.',
+      );
+    }
+
+    this.throwJobError(
+      HttpStatus.BAD_REQUEST,
+      'SEASON_STATUS_NOT_ALLOWED',
+      `Season settlement job does not support ${status} seasons.`,
+    );
+  }
+
+  private async findEligibleParticipants(
+    seasonId: string,
+  ): Promise<SettlementParticipant[]> {
     return this.prisma.seasonParticipant.findMany({
       where: {
         seasonId,
@@ -258,29 +316,86 @@ export class SeasonSettlementJobService {
       select: {
         id: true,
         userId: true,
+        totalFillCount: true,
       },
     });
   }
 
-  private async findSettlementSnapshots(
-    seasonId: string,
-    settlementDate: Date,
-  ) {
-    return this.prisma.dailyPortfolioSnapshot.findMany({
+  private async calculateFinalValuations(input: {
+    participants: readonly SettlementParticipant[];
+    settlementAt: Date;
+    settlementDate: Date;
+  }): Promise<FinalValuation[]> {
+    if (!this.portfolioValuationService) {
+      return this.calculateFinalValuationsFromDailySnapshots(input);
+    }
+
+    const finalValuations: FinalValuation[] = [];
+
+    for (const participant of input.participants) {
+      const valuation =
+        await this.portfolioValuationService.calculateSeasonParticipantValuation(
+          participant.id,
+          input.settlementAt,
+          'live_portfolio_valuation',
+        );
+      const history = await this.findEquityHistory(participant.id);
+      const currentPoint = {
+        totalAssetKrw: new Prisma.Decimal(valuation.totalAssetKrw),
+        returnRate: new Prisma.Decimal(valuation.returnRate),
+        capturedAt: input.settlementAt,
+        createdAt: input.settlementAt,
+      };
+      const mergedHistory = appendCurrentPoint(history, currentPoint);
+      const returnRate = new Prisma.Decimal(valuation.returnRate);
+
+      finalValuations.push({
+        seasonParticipantId: participant.id,
+        userId: participant.userId,
+        totalAssetKrw: valuation.totalAssetKrw,
+        returnRate: valuation.returnRate,
+        krwCash: valuation.krwCash,
+        usdCashKrw: valuation.usdCashKrw,
+        domesticStockValueKrw: valuation.domesticStockValueKrw,
+        usStockValueKrw: valuation.usStockValueKrw,
+        cryptoValueKrw: valuation.cryptoValueKrw,
+        maxDrawdown: formatDecimalScale(
+          calculateMaxDrawdown(mergedHistory),
+          returnRateScale,
+        ),
+        totalFillCount: participant.totalFillCount,
+        reachedReturnAt: calculateReachedReturnAt(
+          mergedHistory,
+          returnRate,
+          input.settlementAt,
+        ),
+      });
+    }
+
+    return finalValuations;
+  }
+
+  private async calculateFinalValuationsFromDailySnapshots(input: {
+    participants: readonly SettlementParticipant[];
+    settlementAt: Date;
+    settlementDate: Date;
+  }): Promise<FinalValuation[]> {
+    const snapshots = await this.prisma.dailyPortfolioSnapshot.findMany({
       where: {
-        snapshotDate: settlementDate,
+        snapshotDate: input.settlementDate,
         seasonParticipant: {
-          seasonId,
-          participantStatus: {
-            in: [...SETTLEMENT_PARTICIPANT_STATUSES],
+          id: {
+            in: input.participants.map((participant) => participant.id),
           },
         },
       },
       select: {
         seasonParticipantId: true,
-        snapshotDate: true,
         totalAssetKrw: true,
         returnRate: true,
+        krwCash: true,
+        usdCashKrw: true,
+        assetValueKrw: true,
         capturedAt: true,
         createdAt: true,
         seasonParticipant: {
@@ -290,13 +405,293 @@ export class SeasonSettlementJobService {
         },
       },
     });
+    const fillCountByParticipant = new Map(
+      input.participants.map((participant) => [
+        participant.id,
+        participant.totalFillCount,
+      ]),
+    );
+
+    return snapshots.map((snapshot) => {
+      const point = {
+        totalAssetKrw: snapshot.totalAssetKrw,
+        returnRate: snapshot.returnRate,
+        capturedAt: snapshot.capturedAt,
+        createdAt: snapshot.createdAt,
+      };
+
+      return {
+        seasonParticipantId: snapshot.seasonParticipantId,
+        userId: snapshot.seasonParticipant.userId,
+        totalAssetKrw: formatMoneyScale8(snapshot.totalAssetKrw),
+        returnRate: formatDecimalScale(snapshot.returnRate, returnRateScale),
+        krwCash: formatMoneyScale8(snapshot.krwCash ?? '0'),
+        usdCashKrw: formatMoneyScale8(snapshot.usdCashKrw ?? '0'),
+        domesticStockValueKrw: formatMoneyScale8(snapshot.assetValueKrw ?? '0'),
+        usStockValueKrw: '0.00000000',
+        cryptoValueKrw: '0.00000000',
+        maxDrawdown: formatDecimalScale(calculateMaxDrawdown([point]), 8),
+        totalFillCount:
+          fillCountByParticipant.get(snapshot.seasonParticipantId) ?? 0,
+        reachedReturnAt: snapshot.capturedAt ?? input.settlementAt,
+      };
+    });
+  }
+
+  private async findEquityHistory(
+    seasonParticipantId: string,
+  ): Promise<EquityHistoryPoint[]> {
+    return this.prisma.equitySnapshot.findMany({
+      where: {
+        seasonParticipantId,
+      },
+      orderBy: [{ capturedAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+      select: {
+        totalAssetKrw: true,
+        returnRate: true,
+        capturedAt: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  private buildFinalRankingRows(
+    finalValuations: readonly FinalValuation[],
+  ): FinalRankingRow[] {
+    const ranked = assignSequentialRanks(
+      finalValuations
+        .map((valuation) => ({
+          ...valuation,
+          reachedReturnAt: valuation.reachedReturnAt,
+        }))
+        .toSorted(compareRankingRows),
+    );
+
+    return ranked.map((row) => ({
+      ...row,
+      finalTier: this.assignFinalTier(row.rank, ranked.length),
+    }));
+  }
+
+  private async createFinalSettlementAtomically(input: {
+    seasonId: string;
+    settlementDate: Date;
+    capturedAt: Date;
+    finalRows: readonly FinalRankingRow[];
+  }): Promise<{
+    createdFinalSnapshotIds: string[];
+    updatedFinalSnapshotIds: string[];
+    createdFinalRankingIds: string[];
+    assignedFinalTierParticipantIds: string[];
+    seasonUpdated: boolean;
+  }> {
+    return this.prisma.$transaction(async (tx) => {
+      const existingRows = await this.findExistingFinalRankingRows(
+        tx,
+        input.seasonId,
+        input.settlementDate,
+      );
+
+      if (existingRows.length > 0) {
+        const assigned = await this.assignFinalResultsForExistingRows(
+          tx,
+          input.seasonId,
+          existingRows,
+        );
+        const seasonUpdated = await this.transitionSeasonToSettledIfReady(tx, {
+          seasonId: input.seasonId,
+          settlementDate: input.settlementDate,
+          expectedParticipants: existingRows.length,
+        });
+
+        return {
+          createdFinalSnapshotIds: [],
+          updatedFinalSnapshotIds: [],
+          createdFinalRankingIds: [],
+          assignedFinalTierParticipantIds: assigned,
+          seasonUpdated,
+        };
+      }
+
+      if (input.finalRows.length === 0) {
+        this.throwJobError(
+          HttpStatus.CONFLICT,
+          'FINAL_RANKINGS_NOT_FOUND',
+          'Final rankings disappeared before settlement status update.',
+        );
+      }
+
+      const createdFinalSnapshotIds: string[] = [];
+      const updatedFinalSnapshotIds: string[] = [];
+      const createdFinalRankingIds: string[] = [];
+      const assignedFinalTierParticipantIds: string[] = [];
+
+      for (const row of input.finalRows) {
+        const existingSnapshot = await tx.equitySnapshot.findFirst({
+          where: {
+            seasonParticipantId: row.seasonParticipantId,
+            snapshotReason: SnapshotReason.settlement,
+          },
+          orderBy: [
+            { capturedAt: 'desc' },
+            { createdAt: 'desc' },
+            { id: 'asc' },
+          ],
+          select: {
+            id: true,
+          },
+        });
+        const snapshotData = {
+          totalAssetKrw: row.totalAssetKrw,
+          returnRate: row.returnRate,
+          krwCash: row.krwCash,
+          usdCashKrw: row.usdCashKrw,
+          domesticStockValueKrw: row.domesticStockValueKrw,
+          usStockValueKrw: row.usStockValueKrw,
+          cryptoValueKrw: row.cryptoValueKrw,
+          capturedAt: input.capturedAt,
+        };
+
+        if (existingSnapshot) {
+          await tx.equitySnapshot.update({
+            where: {
+              id: existingSnapshot.id,
+            },
+            data: snapshotData,
+            select: {
+              id: true,
+            },
+          });
+          updatedFinalSnapshotIds.push(existingSnapshot.id);
+        } else {
+          const createdSnapshot = await tx.equitySnapshot.create({
+            data: {
+              seasonParticipantId: row.seasonParticipantId,
+              ...snapshotData,
+              snapshotReason: SnapshotReason.settlement,
+            },
+            select: {
+              id: true,
+            },
+          });
+          createdFinalSnapshotIds.push(createdSnapshot.id);
+        }
+
+        await tx.seasonParticipant.update({
+          where: {
+            id: row.seasonParticipantId,
+          },
+          data: {
+            totalAssetKrw: row.totalAssetKrw,
+            totalReturnRate: row.returnRate,
+            maxDrawdown: row.maxDrawdown,
+            finalRank: row.rank,
+            finalTier: row.finalTier,
+            currentRank: row.rank,
+          },
+          select: {
+            id: true,
+          },
+        });
+        assignedFinalTierParticipantIds.push(row.seasonParticipantId);
+
+        const createdRanking = await tx.seasonRanking.create({
+          data: {
+            seasonId: input.seasonId,
+            seasonParticipantId: row.seasonParticipantId,
+            rankType: FINAL_RANK_TYPE,
+            rank: row.rank,
+            totalAssetKrw: row.totalAssetKrw,
+            returnRate: row.returnRate,
+            maxDrawdown: row.maxDrawdown,
+            totalFillCount: row.totalFillCount,
+            reachedReturnAt: row.reachedReturnAt,
+            rankingDate: input.settlementDate,
+            capturedAt: input.capturedAt,
+          },
+          select: {
+            id: true,
+          },
+        });
+        createdFinalRankingIds.push(createdRanking.id);
+      }
+
+      const seasonUpdated = await this.transitionSeasonToSettledIfReady(tx, {
+        seasonId: input.seasonId,
+        settlementDate: input.settlementDate,
+        expectedParticipants: input.finalRows.length,
+      });
+
+      return {
+        createdFinalSnapshotIds,
+        updatedFinalSnapshotIds,
+        createdFinalRankingIds,
+        assignedFinalTierParticipantIds,
+        seasonUpdated,
+      };
+    });
+  }
+
+  private async handleExistingFinalRankings(input: {
+    season: SettlementSeason;
+    settlementDate: Date;
+    settlementDateText: string;
+    participants: readonly SettlementParticipant[];
+    existingFinalRankings: readonly ExistingFinalRankingRow[];
+    dryRun: boolean;
+    result: SeasonSettlementJobResult;
+  }): Promise<SeasonSettlementJobResult> {
+    input.result.participants.snapshotted = input.existingFinalRankings.length;
+    input.result.participants.missingSnapshots = Math.max(
+      input.participants.length - input.existingFinalRankings.length,
+      0,
+    );
+    input.result.finalRankings.existing = input.existingFinalRankings.length;
+    input.result.finalRankings.skipped = input.existingFinalRankings.length;
+    input.result.topRanks = input.existingFinalRankings
+      .slice(0, TOP_RANKS_LIMIT)
+      .map((row) => this.formatExistingRankingRow(row));
+
+    if (input.result.participants.missingSnapshots > 0) {
+      this.failWithResult(
+        HttpStatus.BAD_REQUEST,
+        'MISSING_FINAL_RANKINGS',
+        'Some eligible participants do not have final ranking rows.',
+        input.result,
+      );
+    }
+
+    if (input.dryRun) {
+      input.result.message =
+        'Final rankings already exist; dry-run did not assign tiers or update season status.';
+      return input.result;
+    }
+
+    const writeResult = await this.createFinalSettlementAtomically({
+      seasonId: input.season.id,
+      settlementDate: input.settlementDate,
+      capturedAt: new Date(),
+      finalRows: [],
+    });
+
+    input.result.finalTiers.assigned =
+      writeResult.assignedFinalTierParticipantIds.length;
+    input.result.assignedFinalTierParticipantIds =
+      writeResult.assignedFinalTierParticipantIds;
+    input.result.season.updated = writeResult.seasonUpdated;
+    input.result.message =
+      input.season.status === SeasonStatus.settled
+        ? 'Season is already settled; existing final rankings and tiers are preserved.'
+        : 'Existing final rankings were reused; final tiers were assigned before settling.';
+
+    return input.result;
   }
 
   private async findExistingFinalRankingRows(
     client: PrismaService | Prisma.TransactionClient,
     seasonId: string,
     settlementDate: Date,
-  ) {
+  ): Promise<ExistingFinalRankingRow[]> {
     return client.seasonRanking.findMany({
       where: {
         seasonId,
@@ -322,234 +717,113 @@ export class SeasonSettlementJobService {
     });
   }
 
-  private async settleExistingFinalRankingsAtomically(input: {
-    seasonId: string;
-    settlementDate: Date;
-  }): Promise<{ seasonUpdated: boolean }> {
-    return this.prisma.$transaction(async (tx) => {
-      const existingRows = await this.findExistingFinalRankingRows(
-        tx,
-        input.seasonId,
-        input.settlementDate,
-      );
-
-      if (existingRows.length === 0) {
-        this.throwJobError(
-          HttpStatus.CONFLICT,
-          'FINAL_RANKINGS_NOT_FOUND',
-          'Final rankings disappeared before settlement status update.',
-        );
-      }
-
-      const updated = await tx.season.updateMany({
-        where: {
-          id: input.seasonId,
-          status: SeasonStatus.ended,
-        },
-        data: {
-          status: SeasonStatus.settled,
-        },
-      });
-
-      return {
-        seasonUpdated: updated.count === 1,
-      };
-    });
-  }
-
-  private async createFinalRankingsAtomically(input: {
-    seasonId: string;
-    settlementDate: Date;
-    capturedAt: Date;
-    rows: readonly RankingCalculatedRow[];
-  }): Promise<{
-    createdFinalRankingIds: string[];
-    existingRows: Awaited<
-      ReturnType<SeasonSettlementJobService['findExistingFinalRankingRows']>
-    >;
-    seasonUpdated: boolean;
-  }> {
-    return this.prisma.$transaction(async (tx) => {
-      const existingRows = await this.findExistingFinalRankingRows(
-        tx,
-        input.seasonId,
-        input.settlementDate,
-      );
-
-      if (existingRows.length > 0) {
-        return {
-          createdFinalRankingIds: [],
-          existingRows,
-          seasonUpdated: false,
-        };
-      }
-
-      const createdFinalRankingIds: string[] = [];
-      for (const row of input.rows) {
-        const created = await tx.seasonRanking.create({
-          data: {
-            seasonId: input.seasonId,
-            seasonParticipantId: row.seasonParticipantId,
-            rankType: FINAL_RANK_TYPE,
-            rank: row.rank,
-            totalAssetKrw: row.totalAssetKrw,
-            returnRate: row.returnRate,
-            maxDrawdown: row.maxDrawdown,
-            totalFillCount: row.totalFillCount,
-            reachedReturnAt: row.reachedReturnAt,
-            rankingDate: input.settlementDate,
-            capturedAt: input.capturedAt,
-          },
-          select: {
-            id: true,
-          },
-        });
-        createdFinalRankingIds.push(created.id);
-      }
-
-      const updated = await tx.season.updateMany({
-        where: {
-          id: input.seasonId,
-          status: SeasonStatus.ended,
-        },
-        data: {
-          status: SeasonStatus.settled,
-        },
-      });
-
-      if (updated.count !== 1) {
-        this.throwJobError(
-          HttpStatus.CONFLICT,
-          'SEASON_STATUS_CHANGED',
-          'Season status changed before settlement could complete.',
-        );
-      }
-
-      return {
-        createdFinalRankingIds,
-        existingRows: [],
-        seasonUpdated: true,
-      };
-    });
-  }
-
-  private async findHistoricalSnapshots(
+  private async assignFinalResultsForExistingRows(
+    tx: Prisma.TransactionClient,
     seasonId: string,
-    settlementDate: Date,
-  ) {
-    return this.prisma.dailyPortfolioSnapshot.findMany({
-      where: {
-        snapshotDate: {
-          lte: settlementDate,
-        },
-        seasonParticipant: {
+    existingRows: readonly ExistingFinalRankingRow[],
+  ): Promise<string[]> {
+    const assignedParticipantIds: string[] = [];
+
+    for (const row of existingRows) {
+      const finalTier = this.assignFinalTier(row.rank, existingRows.length);
+      await tx.seasonParticipant.updateMany({
+        where: {
+          id: row.seasonParticipantId,
           seasonId,
-          participantStatus: {
-            in: [...SETTLEMENT_PARTICIPANT_STATUSES],
-          },
         },
-      },
-      select: {
-        seasonParticipantId: true,
-        snapshotDate: true,
-        totalAssetKrw: true,
-        returnRate: true,
-        capturedAt: true,
-        createdAt: true,
-      },
-    });
-  }
-
-  private async findExecutedOrdersThroughLatestSnapshot(
-    seasonId: string,
-    capturedAtValues: readonly Date[],
-  ) {
-    const latestCapturedAt = capturedAtValues.reduce<Date | null>(
-      (latest, capturedAt) =>
-        latest === null || capturedAt.getTime() > latest.getTime()
-          ? capturedAt
-          : latest,
-      null,
-    );
-
-    if (!latestCapturedAt) {
-      return [];
+        data: {
+          finalRank: row.rank,
+          finalTier,
+          currentRank: row.rank,
+        },
+      });
+      assignedParticipantIds.push(row.seasonParticipantId);
     }
 
-    return this.prisma.order.findMany({
-      where: {
-        status: OrderStatus.executed,
-        executedAt: {
-          not: null,
-          lte: latestCapturedAt,
+    return assignedParticipantIds;
+  }
+
+  private async transitionSeasonToSettledIfReady(
+    tx: Prisma.TransactionClient,
+    input: {
+      seasonId: string;
+      settlementDate: Date;
+      expectedParticipants: number;
+    },
+  ): Promise<boolean> {
+    const [finalRankingCount, missingFinalResultCount] = await Promise.all([
+      tx.seasonRanking.count({
+        where: {
+          seasonId: input.seasonId,
+          rankType: FINAL_RANK_TYPE,
+          rankingDate: input.settlementDate,
         },
-        seasonParticipant: {
-          seasonId,
+      }),
+      tx.seasonParticipant.count({
+        where: {
+          seasonId: input.seasonId,
           participantStatus: {
             in: [...SETTLEMENT_PARTICIPANT_STATUSES],
           },
+          OR: [{ finalRank: null }, { finalTier: null }],
+        },
+      }),
+    ]);
+
+    if (
+      finalRankingCount !== input.expectedParticipants ||
+      missingFinalResultCount !== 0
+    ) {
+      this.throwJobError(
+        HttpStatus.CONFLICT,
+        'FINAL_RESULTS_NOT_READY',
+        'Final rankings and final tiers must be ready before settled status.',
+      );
+    }
+
+    const updated = await tx.season.updateMany({
+      where: {
+        id: input.seasonId,
+        status: {
+          in: [SeasonStatus.ended, SeasonStatus.settled],
         },
       },
-      select: {
-        seasonParticipantId: true,
-        executedAt: true,
+      data: {
+        status: SeasonStatus.settled,
       },
     });
+
+    return updated.count === 1;
   }
 
-  private formatCalculatedRankingRow(
-    row: RankingCalculatedRow,
+  private assignFinalTier(rank: number, totalParticipants: number): string {
+    for (const rule of FINAL_TIER_CUTOFF_RULES) {
+      if (rank <= Math.ceil(totalParticipants * rule.cumulativeRatio)) {
+        return rule.tier;
+      }
+    }
+
+    return 'bronze';
+  }
+
+  private formatFinalRankingRow(
+    row: FinalRankingRow,
   ): SeasonSettlementJobTopRank {
     return {
-      ...row,
+      seasonParticipantId: row.seasonParticipantId,
+      userId: row.userId,
+      rank: row.rank,
+      totalAssetKrw: row.totalAssetKrw,
+      returnRate: row.returnRate,
+      maxDrawdown: row.maxDrawdown,
+      totalFillCount: row.totalFillCount,
       reachedReturnAt: row.reachedReturnAt.toISOString(),
     };
   }
 
-  private resultFromExistingFinalRankings(input: {
-    seasonId: string;
-    settlementDate: string;
-    dryRun: boolean;
-    previousStatus: SeasonStatus;
-    participantsTotal: number;
-    existingRows: Awaited<
-      ReturnType<SeasonSettlementJobService['findExistingFinalRankingRows']>
-    >;
-  }): SeasonSettlementJobResult {
-    const result = this.createBaseResult({
-      seasonId: input.seasonId,
-      settlementDate: input.settlementDate,
-      dryRun: input.dryRun,
-      previousStatus: input.previousStatus,
-      participantsTotal: input.participantsTotal,
-      snapshotted: input.existingRows.length,
-      missingSnapshots: Math.max(
-        input.participantsTotal - input.existingRows.length,
-        0,
-      ),
-    });
-
-    result.finalRankings.existing = input.existingRows.length;
-    result.finalRankings.skipped = input.existingRows.length;
-    result.topRanks = input.existingRows
-      .slice(0, TOP_RANKS_LIMIT)
-      .map((row) => this.formatExistingRankingRow(row));
-
-    return result;
-  }
-
-  private formatExistingRankingRow(input: {
-    seasonParticipantId: string;
-    rank: number;
-    totalAssetKrw: Prisma.Decimal;
-    returnRate: Prisma.Decimal;
-    maxDrawdown: Prisma.Decimal;
-    totalFillCount: number;
-    reachedReturnAt: Date | null;
-    seasonParticipant: {
-      userId: string;
-    };
-  }): SeasonSettlementJobTopRank {
+  private formatExistingRankingRow(
+    input: ExistingFinalRankingRow,
+  ): SeasonSettlementJobTopRank {
     return {
       seasonParticipantId: input.seasonParticipantId,
       userId: input.seasonParticipant.userId,
@@ -585,13 +859,28 @@ export class SeasonSettlementJobService {
         snapshotted: input.snapshotted,
         missingSnapshots: input.missingSnapshots,
       },
+      finalSnapshots: {
+        wouldCreate: 0,
+        created: 0,
+        updated: 0,
+        existing: 0,
+      },
       finalRankings: {
         wouldCreate: 0,
         created: 0,
         existing: 0,
         skipped: 0,
       },
+      finalTiers: {
+        wouldAssign: 0,
+        assigned: 0,
+        existing: 0,
+        skipped: 0,
+      },
+      createdFinalSnapshotIds: [],
+      updatedFinalSnapshotIds: [],
       createdFinalRankingIds: [],
+      assignedFinalTierParticipantIds: [],
       topRanks: [],
       errors: [],
     };
@@ -606,7 +895,10 @@ export class SeasonSettlementJobService {
     return `${SEASON_SETTLEMENT_JOB_NAME}:${this.toBusinessKeySegment(
       input.seasonId,
       'missing-season-id',
-    )}:${this.toBusinessKeySegment(input.settlementDate, 'missing-settlement-date')}`;
+    )}:${this.toBusinessKeySegment(
+      input.settlementDate,
+      'missing-settlement-date',
+    )}`;
   }
 
   private parseSettlementDate(value: string | undefined): {
@@ -710,4 +1002,16 @@ export class SeasonSettlementJobService {
       status,
     );
   }
+}
+
+function appendCurrentPoint(
+  history: readonly EquityHistoryPoint[],
+  currentPoint: EquityHistoryPoint,
+): EquityHistoryPoint[] {
+  const withoutExistingFinalAtSameTime = history.filter(
+    (snapshot) =>
+      snapshot.capturedAt.getTime() !== currentPoint.capturedAt.getTime(),
+  );
+
+  return [...withoutExistingFinalAtSameTime, currentPoint];
 }

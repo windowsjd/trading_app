@@ -25,6 +25,7 @@ describe('market hours policy', () => {
     ['2026-06-20T01:00:00.000Z', false],
     ['2026-06-21T01:00:00.000Z', false],
     ['2026-01-01T01:00:00.000Z', false],
+    ['2026-02-17T01:00:00.000Z', false],
   ])('checks KRX regular session at %s', (iso, tradable) => {
     expect(getAssetTradingStatus(krxAsset, new Date(iso)).tradable).toBe(
       tradable,
@@ -42,6 +43,7 @@ describe('market hours policy', () => {
     ['2026-06-18T20:00:00.000Z', false],
     ['2026-06-20T14:00:00.000Z', false],
     ['2026-01-01T15:00:00.000Z', false],
+    ['2026-07-03T14:00:00.000Z', false],
   ])('checks US regular session with DST at %s', (iso, tradable) => {
     expect(getAssetTradingStatus(nasAsset, new Date(iso)).tradable).toBe(
       tradable,

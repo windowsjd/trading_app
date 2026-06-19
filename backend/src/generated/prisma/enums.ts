@@ -247,6 +247,7 @@ export const OpsJobName = {
   provider_binance_ingest: 'provider_binance_ingest',
   daily_portfolio_snapshot: 'daily_portfolio_snapshot',
   season_ranking_generation: 'season_ranking_generation',
+  season_lifecycle_transition: 'season_lifecycle_transition',
   season_settlement: 'season_settlement',
   reward_marker: 'reward_marker'
 } as const

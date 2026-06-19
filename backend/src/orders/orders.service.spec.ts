@@ -45,6 +45,17 @@ jest.mock('../generated/prisma/client', () => {
       fx: 'fx',
       order: 'order',
     },
+    SeasonRankingType: {
+      daily: 'daily',
+      final: 'final',
+    },
+    SnapshotReason: {
+      season_join: 'season_join',
+      exchange_executed: 'exchange_executed',
+      order_executed: 'order_executed',
+      scheduled: 'scheduled',
+      settlement: 'settlement',
+    },
     ParticipantStatus: {
       registered: 'registered',
       active: 'active',

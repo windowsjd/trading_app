@@ -13,6 +13,21 @@ jest.mock('../generated/prisma/client', () => {
       KRW: 'KRW',
       USD: 'USD',
     },
+    AssetPriceSourceType: {
+      official_batch: 'official_batch',
+      provider_api: 'provider_api',
+      admin_manual: 'admin_manual',
+    },
+    AssetType: {
+      domestic_stock: 'domestic_stock',
+      us_stock: 'us_stock',
+      crypto: 'crypto',
+    },
+    FxRateSourceType: {
+      official_batch: 'official_batch',
+      provider_api: 'provider_api',
+      admin_manual: 'admin_manual',
+    },
     OrderStatus: {
       submitted: 'submitted',
       executed: 'executed',
@@ -33,6 +48,13 @@ jest.mock('../generated/prisma/client', () => {
     SeasonRankingType: {
       daily: 'daily',
       final: 'final',
+    },
+    SnapshotReason: {
+      season_join: 'season_join',
+      exchange_executed: 'exchange_executed',
+      order_executed: 'order_executed',
+      scheduled: 'scheduled',
+      settlement: 'settlement',
     },
     SeasonStatus: {
       upcoming: 'upcoming',
@@ -223,7 +245,9 @@ describe('SeasonSettlementJobService', () => {
     expect(prisma.__tx.season.updateMany).toHaveBeenCalledWith({
       where: {
         id: 'season-1',
-        status: SeasonStatus.ended,
+        status: {
+          in: [SeasonStatus.ended, SeasonStatus.settled],
+        },
       },
       data: {
         status: SeasonStatus.settled,
@@ -312,11 +336,11 @@ describe('SeasonSettlementJobService', () => {
       settlementDate,
     });
 
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(result.season).toEqual({
       previousStatus: SeasonStatus.settled,
       nextStatus: SeasonStatus.settled,
-      updated: false,
+      updated: true,
     });
     expect(result.finalRankings).toEqual({
       wouldCreate: 0,
@@ -324,6 +348,7 @@ describe('SeasonSettlementJobService', () => {
       existing: 1,
       skipped: 1,
     });
+    expect(result.finalTiers.assigned).toBe(1);
   });
 
   it('treats missing season as a job-level error inside the batch envelope', async () => {
@@ -575,11 +600,22 @@ function createService() {
 function createPrismaMock() {
   const tx = {
     season: {
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+    seasonParticipant: {
+      update: jest.fn(),
       updateMany: jest.fn(),
+      count: jest.fn(),
+    },
+    equitySnapshot: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      create: jest.fn(async () => ({ id: 'final-snapshot' })),
+      update: jest.fn(async () => ({ id: 'final-snapshot' })),
     },
     seasonRanking: {
       findMany: jest.fn(),
       create: jest.fn(),
+      count: jest.fn(),
     },
   };
 
@@ -720,6 +756,7 @@ function mockSeason(prisma: PrismaMock, status: SeasonStatus) {
   prisma.season.findUnique.mockResolvedValue({
     id: 'season-1',
     status,
+    endAt: new Date('2026-05-21T00:00:00.000Z'),
   });
 }
 
@@ -727,7 +764,12 @@ function mockParticipants(
   prisma: PrismaMock,
   participants: Array<{ id: string; userId: string }>,
 ) {
-  prisma.seasonParticipant.findMany.mockResolvedValue(participants);
+  prisma.seasonParticipant.findMany.mockResolvedValue(
+    participants.map((participant) => ({
+      totalFillCount: 0,
+      ...participant,
+    })),
+  );
 }
 
 function mockSnapshots(
@@ -742,6 +784,14 @@ function mockExistingRankings(
   rankings: ReturnType<typeof existingRanking>[],
 ) {
   prisma.seasonRanking.findMany.mockResolvedValue(rankings);
+  prisma.__tx.seasonRanking.findMany.mockResolvedValue(rankings);
+  prisma.__tx.seasonRanking.count.mockImplementation(
+    async () =>
+      rankings.length + prisma.__tx.seasonRanking.create.mock.calls.length,
+  );
+  prisma.__tx.seasonParticipant.count.mockResolvedValue(0);
+  prisma.__tx.seasonParticipant.update.mockResolvedValue({ id: 'sp-updated' });
+  prisma.__tx.seasonParticipant.updateMany.mockResolvedValue({ count: 1 });
 }
 
 function snapshot(

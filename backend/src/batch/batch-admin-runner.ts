@@ -183,6 +183,7 @@ export async function runAdminRunBatchJob(argv: string[]) {
   const seasonSettlementJobService = new SeasonSettlementJobService(
     batchService,
     prisma as unknown as PrismaService,
+    portfolioValuationService,
   );
   const finalTierAssignmentJobService = new FinalTierAssignmentJobService(
     batchService,

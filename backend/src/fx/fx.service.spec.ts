@@ -2,6 +2,16 @@ jest.mock('../generated/prisma/client', () => {
   const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
 
   return {
+    AssetPriceSourceType: {
+      official_batch: 'official_batch',
+      provider_api: 'provider_api',
+      admin_manual: 'admin_manual',
+    },
+    AssetType: {
+      domestic_stock: 'domestic_stock',
+      us_stock: 'us_stock',
+      crypto: 'crypto',
+    },
     CurrencyCode: {
       KRW: 'KRW',
       USD: 'USD',
@@ -25,6 +35,23 @@ jest.mock('../generated/prisma/client', () => {
     QuoteType: {
       fx: 'fx',
       order: 'order',
+    },
+    ParticipantStatus: {
+      registered: 'registered',
+      active: 'active',
+      finished: 'finished',
+      rewarded: 'rewarded',
+    },
+    SeasonRankingType: {
+      daily: 'daily',
+      final: 'final',
+    },
+    SnapshotReason: {
+      season_join: 'season_join',
+      exchange_executed: 'exchange_executed',
+      order_executed: 'order_executed',
+      scheduled: 'scheduled',
+      settlement: 'settlement',
     },
     WalletTransactionDirection: {
       credit: 'credit',
@@ -102,6 +129,7 @@ describe('FxService', () => {
       },
       seasonParticipant: {
         findUnique: jest.fn(),
+        update: jest.fn(),
       },
       cashWallet: {
         findUnique: jest.fn(),
@@ -131,6 +159,7 @@ describe('FxService', () => {
       },
       equitySnapshot: {
         create: jest.fn(),
+        findMany: jest.fn(),
       },
     };
 
@@ -374,7 +403,9 @@ describe('FxService', () => {
       }),
       'SEASON_ENDED',
     );
-    expect(beforeStart.prisma.seasonParticipant.findUnique).not.toHaveBeenCalled();
+    expect(
+      beforeStart.prisma.seasonParticipant.findUnique,
+    ).not.toHaveBeenCalled();
     expect(afterEnd.prisma.seasonParticipant.findUnique).not.toHaveBeenCalled();
   });
 
@@ -889,6 +920,21 @@ describe('FxService', () => {
       prisma.walletTransaction.create
         .mockResolvedValueOnce({ id: 'wallet-tx-source' })
         .mockResolvedValueOnce({ id: 'wallet-tx-target' });
+      prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+        initialCapitalKrw: new Prisma.Decimal('1000.00000000'),
+        cashWallets: [sourceWalletAfterDebit, targetWalletAfterCredit],
+        positions: [],
+      });
+      prisma.equitySnapshot.create.mockResolvedValueOnce({ id: 'equity-1' });
+      prisma.equitySnapshot.findMany.mockResolvedValueOnce([
+        {
+          totalAssetKrw: new Prisma.Decimal('999.00000000'),
+          capturedAt: now,
+        },
+      ]);
+      prisma.seasonParticipant.update.mockResolvedValueOnce({
+        id: 'participant-1',
+      });
       prisma.fxExecuteRequest.update.mockResolvedValueOnce({
         id: 'command-1',
       });
@@ -1598,7 +1644,14 @@ describe('FxService', () => {
           id: true,
         },
       });
-      expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
+      expect(prisma.equitySnapshot.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            seasonParticipantId: 'participant-1',
+            snapshotReason: 'exchange_executed',
+          }),
+        }),
+      );
     });
 
     it('replays a command created by a unique-race without wallet mutation', async () => {
@@ -1803,7 +1856,7 @@ describe('FxService', () => {
         'EXECUTE_TRANSACTION_FAILED',
       );
       expect(prisma.fxExecuteRequest.update).toHaveBeenCalledTimes(1);
-      expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
+      expect(prisma.equitySnapshot.create).toHaveBeenCalledTimes(1);
     });
 
     it.each<[string, AtomicFailureStep, string, string[]]>([

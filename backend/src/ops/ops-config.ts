@@ -17,8 +17,26 @@ const DEFAULT_TIMEZONE = 'Asia/Seoul';
 export function getOpsSchedulerConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): OpsSchedulerConfig {
+  const rankingEnabled = parseBooleanEnv(
+    env.SCHEDULER_RANKING_ENABLED ?? env.ENABLE_RANKING_SCHEDULER,
+    false,
+  );
+  const lifecycleEnabled = parseBooleanEnv(
+    env.SCHEDULER_SEASON_LIFECYCLE_ENABLED ??
+      env.ENABLE_SEASON_LIFECYCLE_SCHEDULER,
+    false,
+  );
+  const settlementEnabled = parseBooleanEnv(
+    env.SCHEDULER_SETTLEMENT_ENABLED ?? env.ENABLE_SEASON_SETTLEMENT_SCHEDULER,
+    false,
+  );
+
   return {
-    enabled: parseBooleanEnv(env.SCHEDULER_ENABLED, false),
+    enabled:
+      parseBooleanEnv(env.SCHEDULER_ENABLED, false) ||
+      rankingEnabled ||
+      lifecycleEnabled ||
+      settlementEnabled,
     timezone: parseTextEnv(env.SCHEDULER_TIMEZONE, DEFAULT_TIMEZONE),
     lockTtlSeconds: parsePositiveIntegerEnv(
       env.SCHEDULER_LOCK_TTL_SECONDS,
@@ -28,10 +46,7 @@ export function getOpsSchedulerConfig(
       env.SCHEDULER_MAX_ATTEMPTS,
       DEFAULT_MAX_ATTEMPTS,
     ),
-    tickIntervalMs: parsePositiveIntegerEnv(
-      env.SCHEDULER_TICK_INTERVAL_MS,
-      DEFAULT_TICK_INTERVAL_MS,
-    ),
+    tickIntervalMs: resolveTickIntervalMs(env),
     jobs: {
       [OpsJobName.provider_fx_ingest]: parseBooleanEnv(
         env.SCHEDULER_PROVIDER_FX_ENABLED,
@@ -45,20 +60,31 @@ export function getOpsSchedulerConfig(
         env.SCHEDULER_DAILY_SNAPSHOT_ENABLED,
         false,
       ),
-      [OpsJobName.season_ranking_generation]: parseBooleanEnv(
-        env.SCHEDULER_RANKING_ENABLED,
-        false,
-      ),
-      [OpsJobName.season_settlement]: parseBooleanEnv(
-        env.SCHEDULER_SETTLEMENT_ENABLED,
-        false,
-      ),
+      [OpsJobName.season_ranking_generation]: rankingEnabled,
+      [OpsJobName.season_lifecycle_transition]: lifecycleEnabled,
+      [OpsJobName.season_settlement]: settlementEnabled,
       [OpsJobName.reward_marker]: parseBooleanEnv(
         env.SCHEDULER_REWARD_MARKER_ENABLED,
         false,
       ),
     },
   };
+}
+
+function resolveTickIntervalMs(env: NodeJS.ProcessEnv) {
+  const explicitMs = parseOptionalPositiveIntegerEnv(
+    env.SCHEDULER_TICK_INTERVAL_MS,
+  );
+  if (explicitMs) {
+    return explicitMs;
+  }
+
+  const intervalSeconds = parseOptionalPositiveIntegerEnv(
+    env.RANKING_REFRESH_INTERVAL_SECONDS ??
+      env.SEASON_SETTLEMENT_INTERVAL_SECONDS,
+  );
+
+  return intervalSeconds ? intervalSeconds * 1000 : DEFAULT_TICK_INTERVAL_MS;
 }
 
 export function getSchedulerBusinessDate(now: Date, timezone: string): string {
@@ -97,13 +123,17 @@ function parseTextEnv(value: string | undefined, fallback: string) {
 }
 
 function parsePositiveIntegerEnv(value: string | undefined, fallback: number) {
+  return parseOptionalPositiveIntegerEnv(value) ?? fallback;
+}
+
+function parseOptionalPositiveIntegerEnv(value: string | undefined) {
   if (value === undefined || value.trim() === '') {
-    return fallback;
+    return undefined;
   }
 
   const parsed = Number(value.trim());
   if (!Number.isSafeInteger(parsed) || parsed < 1) {
-    return fallback;
+    return undefined;
   }
 
   return parsed;

@@ -52,6 +52,10 @@ import {
   SeasonLifecycleError,
 } from '../seasons/season-lifecycle.policy';
 import { buildPagination, type Pagination } from '../common/pagination';
+import {
+  calculateMaxDrawdown,
+  RankingRefreshService,
+} from '../ranking/ranking-refresh.service';
 import { assertAssetTradable, MarketHoursError } from './market-hours.policy';
 
 export type OrdersQuery = {
@@ -370,6 +374,8 @@ type OrderExecutionPlan = {
 };
 
 type OrderExecutionTransactionResult = {
+  seasonId: string;
+  seasonParticipantId: string;
   order: NonNullable<OrdersResponse['data']['orders']>[number];
   walletTransactionId: string;
   walletBalanceAfter: string;
@@ -468,7 +474,10 @@ const ORDER_EXECUTION_SELECT = {
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly rankingRefreshService?: RankingRefreshService,
+  ) {}
 
   async quoteOrder(
     userId: string | undefined,
@@ -521,7 +530,7 @@ export class OrdersService {
     }
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const response = await this.prisma.$transaction(async (tx) => {
         const quote = await this.findActiveOrderQuoteForCreateOrThrow(tx, {
           quoteId,
           userId,
@@ -603,11 +612,7 @@ export class OrdersService {
         );
         const result =
           executionOrder.side === OrderSide.buy
-            ? await this.executeBuyOrderInTransaction(
-                tx,
-                executionOrder,
-                plan,
-              )
+            ? await this.executeBuyOrderInTransaction(tx, executionOrder, plan)
             : await this.executeSellOrderInTransaction(
                 tx,
                 executionOrder,
@@ -630,6 +635,10 @@ export class OrdersService {
 
         return responsePayloadJson;
       });
+
+      this.refreshRankingAfterParticipantChange(season.id, participant.id);
+
+      return response;
     } catch (error) {
       if (!this.isUniqueConstraintError(error)) {
         throw error;
@@ -735,9 +744,13 @@ export class OrdersService {
         return result as ExecuteOrderResponse;
       }
 
-      return this.buildExecutedOrderResponse(
-        result as OrderExecutionTransactionResult,
+      const executionResult = result as OrderExecutionTransactionResult;
+      this.refreshRankingAfterParticipantChange(
+        executionResult.seasonId,
+        executionResult.seasonParticipantId,
       );
+
+      return this.buildExecutedOrderResponse(executionResult);
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -1327,6 +1340,8 @@ export class OrdersService {
     );
 
     return {
+      seasonId: order.seasonParticipant.season.id,
+      seasonParticipantId: order.seasonParticipantId,
       order: this.formatOrder(finalizedOrder),
       walletTransactionId: walletTransaction.id,
       walletBalanceAfter: this.formatDecimal(
@@ -1476,6 +1491,8 @@ export class OrdersService {
     );
 
     return {
+      seasonId: order.seasonParticipant.season.id,
+      seasonParticipantId: order.seasonParticipantId,
       order: this.formatOrder(finalizedOrder),
       walletTransactionId: walletTransaction.id,
       walletBalanceAfter: this.formatDecimal(
@@ -1772,22 +1789,6 @@ export class OrdersService {
       throw error;
     }
 
-    await tx.seasonParticipant.update({
-      where: {
-        id: seasonParticipantId,
-      },
-      data: {
-        totalAssetKrw: valuation.totalAssetKrw,
-        totalReturnRate: valuation.returnRate,
-        totalFillCount: {
-          increment: 1,
-        },
-      },
-      select: {
-        id: true,
-      },
-    });
-
     const snapshot = await tx.equitySnapshot.create({
       data: {
         seasonParticipantId,
@@ -1805,8 +1806,48 @@ export class OrdersService {
         id: true,
       },
     });
+    const maxDrawdown =
+      await this.calculateParticipantMaxDrawdownFromEquitySnapshots(
+        tx,
+        seasonParticipantId,
+      );
+
+    await tx.seasonParticipant.update({
+      where: {
+        id: seasonParticipantId,
+      },
+      data: {
+        totalAssetKrw: valuation.totalAssetKrw,
+        totalReturnRate: valuation.returnRate,
+        maxDrawdown,
+        totalFillCount: {
+          increment: 1,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
 
     return snapshot.id;
+  }
+
+  private async calculateParticipantMaxDrawdownFromEquitySnapshots(
+    tx: OrderExecuteTransactionClient,
+    seasonParticipantId: string,
+  ) {
+    const snapshots = await tx.equitySnapshot.findMany({
+      where: {
+        seasonParticipantId,
+      },
+      orderBy: [{ capturedAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+      select: {
+        totalAssetKrw: true,
+        capturedAt: true,
+      },
+    });
+
+    return this.formatDecimal(calculateMaxDrawdown(snapshots), 8);
   }
 
   private async calculateParticipantValuationInTransaction(
@@ -1953,19 +1994,13 @@ export class OrdersService {
             monetaryScale,
           ),
           currentPriceKrw: this.formatDecimal(priceKrw, monetaryScale),
-          marketValueLocal: this.formatDecimal(
-            marketValueLocal,
-            monetaryScale,
-          ),
+          marketValueLocal: this.formatDecimal(marketValueLocal, monetaryScale),
           marketValueKrw: this.formatDecimal(marketValueKrw, monetaryScale),
           unrealizedPnlLocal: this.formatDecimal(
             unrealizedPnlLocal,
             monetaryScale,
           ),
-          unrealizedPnlKrw: this.formatDecimal(
-            unrealizedPnlKrw,
-            monetaryScale,
-          ),
+          unrealizedPnlKrw: this.formatDecimal(unrealizedPnlKrw, monetaryScale),
         },
         select: {
           id: true,
@@ -2387,7 +2422,8 @@ export class OrdersService {
       );
     }
     if (
-      this.getAssetPriceCurrency(asset) !== this.getAssetSettlementCurrency(asset)
+      this.getAssetPriceCurrency(asset) !==
+      this.getAssetSettlementCurrency(asset)
     ) {
       this.throwApiError(
         HttpStatus.BAD_REQUEST,
@@ -3817,6 +3853,24 @@ export class OrdersService {
     message: string,
   ): never {
     throw new HttpException(this.createErrorBody(code, message), status);
+  }
+
+  private refreshRankingAfterParticipantChange(
+    seasonId: string,
+    seasonParticipantId: string,
+  ) {
+    if (!this.rankingRefreshService) {
+      return;
+    }
+
+    void this.rankingRefreshService
+      .refreshCurrentRankingAfterParticipantChange(
+        seasonId,
+        seasonParticipantId,
+      )
+      .catch((error) => {
+        console.error('Current ranking refresh after order failed.', error);
+      });
   }
 
   private getHttpErrorCode(error: HttpException): string | null {

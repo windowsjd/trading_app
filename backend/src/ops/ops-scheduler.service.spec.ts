@@ -5,6 +5,7 @@ jest.mock('../generated/prisma/client', () => ({
     provider_binance_ingest: 'provider_binance_ingest',
     daily_portfolio_snapshot: 'daily_portfolio_snapshot',
     season_ranking_generation: 'season_ranking_generation',
+    season_lifecycle_transition: 'season_lifecycle_transition',
     season_settlement: 'season_settlement',
     reward_marker: 'reward_marker',
   },
@@ -18,6 +19,15 @@ jest.mock('../generated/prisma/client', () => ({
 
 jest.mock('../batch/daily-portfolio-snapshot-job.service', () => ({
   DailyPortfolioSnapshotJobService: class DailyPortfolioSnapshotJobService {},
+}));
+jest.mock('../batch/season-lifecycle-transition-job.service', () => ({
+  SeasonLifecycleTransitionJobService: class SeasonLifecycleTransitionJobService {},
+}));
+jest.mock('../batch/season-settlement-job.service', () => ({
+  SeasonSettlementJobService: class SeasonSettlementJobService {},
+}));
+jest.mock('../ranking/ranking-refresh.service', () => ({
+  RankingRefreshService: class RankingRefreshService {},
 }));
 
 import { OpsJobName } from '../generated/prisma/client';
@@ -37,6 +47,9 @@ describe('OpsSchedulerService', () => {
         .fn()
         .mockResolvedValue({ success: true }),
       runSeasonRankingGenerationJob: jest
+        .fn()
+        .mockResolvedValue({ success: true }),
+      runSeasonLifecycleTransitionJob: jest
         .fn()
         .mockResolvedValue({ success: true }),
       runSeasonSettlementJob: jest.fn().mockResolvedValue({ success: true }),
@@ -86,12 +99,12 @@ describe('OpsSchedulerService', () => {
     expect(runner.runSeasonRankingGenerationJob).toHaveBeenCalledTimes(1);
     expect(runner.runProviderFxIngestJob).toHaveBeenCalledWith(
       expect.objectContaining({
-        dryRun: true,
+        dryRun: false,
       }),
     );
     expect(runner.runSeasonRankingGenerationJob).toHaveBeenCalledWith(
       expect.objectContaining({
-        dryRun: true,
+        dryRun: false,
       }),
     );
     expect(runner.runDailyPortfolioSnapshotJob).not.toHaveBeenCalled();
@@ -107,7 +120,7 @@ describe('OpsSchedulerService', () => {
 
     expect(runner.runDailyPortfolioSnapshotJob).toHaveBeenCalledWith(
       expect.objectContaining({
-        dryRun: true,
+        dryRun: false,
         seasonId: 'season-1',
         snapshotDate: '2026-06-08',
       }),

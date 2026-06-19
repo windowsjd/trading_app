@@ -1,4 +1,5 @@
 import { AssetType } from '../generated/prisma/client';
+import { findMarketHoliday } from './market-holidays.config';
 
 export type MarketTradingStatus =
   | { tradable: true }
@@ -31,9 +32,6 @@ const US_CLOSE_SECONDS = 16 * 60 * 60;
 const WEEKEND_DAYS = new Set(['Sat', 'Sun']);
 const KRX_MARKETS = new Set(['KRX', 'KOSPI', 'KOSDAQ', 'KONEX']);
 const US_MARKETS = new Set(['NAS', 'NASDAQ', 'NYS', 'NYSE']);
-const DEFAULT_KRX_HOLIDAYS = new Set(['2026-01-01']);
-const DEFAULT_US_HOLIDAYS = new Set(['2026-01-01']);
-
 export function getAssetTradingStatus(
   asset: MarketHoursAsset,
   now: Date,
@@ -48,7 +46,7 @@ export function getAssetTradingStatus(
       timeZone: KRX_TIME_ZONE,
       openSeconds: KRX_OPEN_SECONDS,
       closeSeconds: KRX_CLOSE_SECONDS,
-      holidays: DEFAULT_KRX_HOLIDAYS,
+      holidayMarket: 'KRX',
       marketName: 'KRX',
     });
   }
@@ -59,7 +57,7 @@ export function getAssetTradingStatus(
       timeZone: US_EASTERN_TIME_ZONE,
       openSeconds: US_OPEN_SECONDS,
       closeSeconds: US_CLOSE_SECONDS,
-      holidays: DEFAULT_US_HOLIDAYS,
+      holidayMarket: 'US',
       marketName: 'US regular session',
     });
   }
@@ -71,10 +69,7 @@ export function getAssetTradingStatus(
   };
 }
 
-export function assertAssetTradable(
-  asset: MarketHoursAsset,
-  now: Date,
-): void {
+export function assertAssetTradable(asset: MarketHoursAsset, now: Date): void {
   const status = getAssetTradingStatus(asset, now);
   if (!status.tradable) {
     throw new MarketHoursError(status.reason, status.message);
@@ -86,17 +81,20 @@ function getSessionTradingStatus(input: {
   timeZone: string;
   openSeconds: number;
   closeSeconds: number;
-  holidays: ReadonlySet<string>;
+  holidayMarket: 'KRX' | 'US';
   marketName: string;
 }): MarketTradingStatus {
   const parts = getZonedDateTimeParts(input.now, input.timeZone);
   const dateOnly = formatDateOnly(parts);
+  const holiday = findMarketHoliday(input.holidayMarket, dateOnly);
 
-  if (WEEKEND_DAYS.has(parts.weekday) || input.holidays.has(dateOnly)) {
+  if (WEEKEND_DAYS.has(parts.weekday) || holiday) {
     return {
       tradable: false,
       reason: 'MARKET_CLOSED',
-      message: `${input.marketName} market is closed.`,
+      message: holiday
+        ? `${input.marketName} market is closed for ${holiday.name}.`
+        : `${input.marketName} market is closed.`,
     };
   }
 

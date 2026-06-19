@@ -5,6 +5,7 @@ jest.mock('../generated/prisma/client', () => ({
     provider_binance_ingest: 'provider_binance_ingest',
     daily_portfolio_snapshot: 'daily_portfolio_snapshot',
     season_ranking_generation: 'season_ranking_generation',
+    season_lifecycle_transition: 'season_lifecycle_transition',
     season_settlement: 'season_settlement',
     reward_marker: 'reward_marker',
   },
@@ -25,6 +26,15 @@ jest.mock('../generated/prisma/client', () => ({
 
 jest.mock('../batch/daily-portfolio-snapshot-job.service', () => ({
   DailyPortfolioSnapshotJobService: class DailyPortfolioSnapshotJobService {},
+}));
+jest.mock('../batch/season-lifecycle-transition-job.service', () => ({
+  SeasonLifecycleTransitionJobService: class SeasonLifecycleTransitionJobService {},
+}));
+jest.mock('../batch/season-settlement-job.service', () => ({
+  SeasonSettlementJobService: class SeasonSettlementJobService {},
+}));
+jest.mock('../ranking/ranking-refresh.service', () => ({
+  RankingRefreshService: class RankingRefreshService {},
 }));
 
 import {
@@ -69,6 +79,20 @@ describe('OpsJobRunnerService', () => {
     const dailyPortfolioSnapshotJobService = {
       run: jest.fn(),
     };
+    const seasonLifecycleTransitionJobService = {
+      run: jest.fn(),
+    };
+    const seasonSettlementJobService = {
+      run: jest.fn(),
+    };
+    const rankingRefreshService = {
+      refreshCurrentRankingsForActiveSeasons: jest.fn(),
+    };
+    const prisma = {
+      season: {
+        findMany: jest.fn(),
+      },
+    };
     const lockService = {
       acquireLock: jest.fn(),
       releaseLock: jest.fn(),
@@ -86,8 +110,16 @@ describe('OpsJobRunnerService', () => {
       dailyPortfolioSnapshotJobService,
       lockService,
       runService,
+      seasonLifecycleTransitionJobService,
+      seasonSettlementJobService,
+      rankingRefreshService,
+      prisma,
       service: new OpsJobRunnerService(
         dailyPortfolioSnapshotJobService as never,
+        seasonLifecycleTransitionJobService as never,
+        seasonSettlementJobService as never,
+        rankingRefreshService as never,
+        prisma as never,
         lockService as never,
         runService as never,
       ),
@@ -132,14 +164,6 @@ describe('OpsJobRunnerService', () => {
     [
       OpsJobName.provider_binance_ingest,
       (service: OpsJobRunnerService) => service.runProviderBinanceIngestJob,
-    ],
-    [
-      OpsJobName.season_ranking_generation,
-      (service: OpsJobRunnerService) => service.runSeasonRankingGenerationJob,
-    ],
-    [
-      OpsJobName.season_settlement,
-      (service: OpsJobRunnerService) => service.runSeasonSettlementJob,
     ],
     [
       OpsJobName.reward_marker,

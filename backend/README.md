@@ -26,20 +26,22 @@ This service owns backend APIs, database access, financial calculations, and ser
 - Provider_api source eligibility is opened only for explicitly allowed workflows: `/fx quote`, `/fx execute`, assets `withPrice`, orders quote, orders execute, live portfolio/home/positions valuation, and the operator-run daily portfolio snapshot valuation job. Orders create binds durable quotes but does not read provider rows directly.
 - Read-only/quote responses expose backward-compatible optional source metadata for provider/admin visibility: `rateSource`, `priceSource`, `assetPriceSource`, `fxRateSource`, and live valuation source summaries where applicable.
 - Batch job execution foundation with idempotent `batch_job_runs` recording, operator-only noop/health-check script, operator-run daily portfolio snapshot generation, operator-run season ranking generation from existing daily snapshots, an operator-run daily season cycle orchestration job, an operator-run season settlement MVP job, an operator-run reward grant marker MVP job, and an operator-run season lifecycle transition job.
-- Scheduler/Ops foundation with disabled-by-default scheduler config, `ops_job_runs` audit rows, `ops_job_locks`, internal runner services, and `GET /readiness`. Placeholder scheduler jobs are recorded as skipped/not implemented and are not completed business automation.
+- Scheduler/Ops foundation with disabled-by-default scheduler config, `ops_job_runs` audit rows, `ops_job_locks`, internal runner services, and `GET /readiness`. Enabled ranking, season lifecycle, and settlement scheduler jobs perform real backend automation behind locks.
 - Daily portfolio snapshot batch results include sourceSummary/fallback metadata in `batch_job_runs.resultPayloadJson`; `daily_portfolio_snapshots` row schema is unchanged.
 - Durable Quote plus realtime provider execute is implemented for `/fx execute` and orders execute. Quote remains a reference quote; execute reprices from fresh provider_api rows, enforces quote-to-execute bps thresholds, and forbids default admin_manual execute fallback.
-- Operator-run final tier assignment MVP job from existing final `season_rankings`.
+- Current ranking refresh updates live participant valuations, equity snapshots for scheduled refreshes, `season_rankings` with `rankType=daily`, and `SeasonParticipant.currentRank`.
+- Season settlement freezes valuation at `Season.endAt`, writes final `equity_snapshots`, creates `rankType=final` rankings, assigns final tiers, and changes the season to `settled` only after final rank and tier readiness checks pass. Reward payout remains pending/unimplemented.
+- Market holidays are configured in `src/orders/market-holidays.config.ts`; domestic/US stock quote/create/execute return `MARKET_CLOSED` on configured holidays, while crypto orders and FX are not holiday-blocked.
 
 ## STOP / Not Implemented
 
 These are intentionally outside the current implementation and should not be added without a separate gate:
 
-- Provider ingestion trigger APIs, scheduler-driven provider ingestion implementation, and provider-backed final/ranking/reward workflows.
+- Provider ingestion trigger APIs, scheduler-driven provider ingestion implementation, and provider-backed reward workflows.
 - OANDA and Twelve Data are historical/fallback provider candidates only, not the current MVP core provider stack.
 - Batch run HTTP APIs, scheduler HTTP APIs, external reward fulfillment APIs, and reward policy/catalog APIs.
-- Production cron job implementation beyond the disabled-by-default foundation, scheduler-driven provider ingestion, scheduler-driven ranking/settlement/reward automation, settlement extension jobs beyond final tier assignment, or external reward fulfillment jobs.
-- Provider-backed ranking, settlement recalculation, or reward automation.
+- Production cron job implementation beyond the disabled-by-default foundation, scheduler-driven provider ingestion, scheduler-driven reward automation, or external reward fulfillment jobs.
+- Provider-backed reward automation.
 - KIS order/account/balance/fill/deposit/withdrawal APIs, KIS orderbook/hoga, Binance authenticated/order/account/user-data APIs, and real external trading/account integrations.
 - External payment, point, coupon, gifticon, delivery, cash-out, or provider-backed reward fulfillment. App-internal operator/admin reward fulfillment creates `SeasonReward` rows only when fulfilled.
 - Access token blacklist/revocation, server-side session auth, and cookie auth.
@@ -66,7 +68,7 @@ Required for local application work:
 
 Refresh tokens are opaque random tokens. The raw token is returned to the client and never stored in PostgreSQL; only a SHA-256 hash is stored in `refresh_token_sessions`. Refresh uses token rotation. Logout revokes refresh sessions. Access tokens remain stateless Bearer JWTs and are not blacklisted in this MVP.
 
-Scheduler/Ops env is non-secret and disabled by default. `SCHEDULER_ENABLED=false` prevents interval registration; each `SCHEDULER_*_ENABLED=false` flag keeps its job from running automatically. `SCHEDULER_TICK_INTERVAL_MS` defaults to `60000`, `SCHEDULER_LOCK_TTL_SECONDS` defaults to `600`, and `SCHEDULER_MAX_ATTEMPTS` defaults to `1`. Even when enabled, the foundation scheduler calls jobs with `dryRun=true`; automatic writes require a future Production Scheduler Ownership Gate.
+Scheduler/Ops env is non-secret and disabled by default. `SCHEDULER_ENABLED=false` prevents interval registration unless one of the explicit aliases is enabled. Each `SCHEDULER_*_ENABLED=false` flag keeps its job from running automatically. `SCHEDULER_RANKING_ENABLED` or `ENABLE_RANKING_SCHEDULER` enables current ranking refresh, `SCHEDULER_SEASON_LIFECYCLE_ENABLED` or `ENABLE_SEASON_LIFECYCLE_SCHEDULER` enables `active -> ended` lifecycle transitions, and `SCHEDULER_SETTLEMENT_ENABLED` or `ENABLE_SEASON_SETTLEMENT_SCHEDULER` enables ended-season settlement. `SCHEDULER_TICK_INTERVAL_MS` defaults to `60000`; `RANKING_REFRESH_INTERVAL_SECONDS` and `SEASON_SETTLEMENT_INTERVAL_SECONDS` are accepted second-based aliases when the tick interval is not set. `SCHEDULER_LOCK_TTL_SECONDS` defaults to `600`, and `SCHEDULER_MAX_ATTEMPTS` defaults to `1`.
 
 ## Local Commands
 
@@ -102,7 +104,7 @@ pnpm tsx scripts/admin-run-batch-job.ts --job season-ranking --season-id <SEASON
 # operator-run daily season cycle dry-run: daily snapshot, then ranking
 pnpm tsx scripts/admin-run-batch-job.ts --job daily-season-cycle --season-id <SEASON_ID> --snapshot-date <YYYY-MM-DD> --dry-run --requested-by local-operator
 
-# operator-run season settlement dry-run from existing daily snapshots, no provider calls
+# operator-run season settlement dry-run; freezes final valuation, ranking, and tier plan
 pnpm tsx scripts/admin-run-batch-job.ts --job season-settlement --season-id <SEASON_ID> --settlement-date <YYYY-MM-DD> --dry-run --requested-by local-operator
 
 # operator-run final tier assignment dry-run from existing final rankings, no provider calls
@@ -124,7 +126,7 @@ pnpm tsx scripts/admin-run-batch-job.ts --job season-lifecycle-transition --now 
 
 `daily-season-cycle` uses the idempotency key `daily-season-cycle:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. It runs `daily-portfolio-snapshot` first and `season-ranking` second through their existing services. Dry-run is passed to both child jobs. A daily snapshot job-level failure stops ranking and fails the cycle; participant-level snapshot failures are summarized but ranking still runs against existing snapshots. A season ranking job-level failure fails the cycle. It is not cron scheduling, provider ingestion, settlement, or reward.
 
-`season-settlement` uses the idempotency key `season-settlement:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. Dry-run validates settleability and planned final rankings without writing. Non-dry-run requires an `ended` season, uses existing settlement-date `daily_portfolio_snapshots`, creates `rankType=final` `season_rankings`, and transitions the season to `settled` in one transaction. Existing final rankings are never overwritten; an `ended` season with existing final rows only has its status settled. Already `settled` seasons return idempotent existing/skipped success. No settlement-date snapshots fail with `NO_FINAL_SNAPSHOTS_AVAILABLE`, and missing eligible participant snapshots fail with `MISSING_FINAL_SNAPSHOTS`. The job does not call providers, recalculate prices/FX/wallets/orders/positions/snapshots, run cron, expose an HTTP batch API, or grant rewards. `GET /api/v1/ranking?rankType=final` and settled joined `GET /api/v1/home` can read generated final rankings.
+`season-settlement` uses the idempotency key `season-settlement:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. Dry-run validates settleability and planned final valuation/ranking/tier assignment without writing. Non-dry-run requires an `ended` season, evaluates participants at `Season.endAt` using the latest valid price and USD/KRW rows, writes or updates final `equity_snapshots` with `snapshotReason=settlement`, creates `rankType=final` `season_rankings`, assigns `SeasonParticipant.finalRank` and `finalTier`, verifies final rows and tiers, and only then transitions the season to `settled`. Existing final rankings are reused and final tiers are filled idempotently. The job does not grant rewards, call external order/account APIs, expose an HTTP batch API, or create payment/point/badge/trophy rows. `GET /api/v1/ranking?rankType=final`, settled joined `GET /api/v1/home`, and records APIs can read generated final rankings and tiers while rewards remain pending.
 
 `final-tier-assignment` uses the idempotency key `final-tier-assignment:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. Dry-run reads existing `rankType=final` `season_rankings` for the requested `--ranking-date` and returns the assignment plan without writing. Non-dry-run requires a `settled` season and updates only `SeasonParticipant.finalRank` and `finalTier` for participants with both fields still null. Existing `finalRank` or `finalTier` is treated as existing/skipped and is not overwritten. Missing final rankings fail with `FINAL_RANKING_UNAVAILABLE`. The default MVP tier policy is rank 1 `master`, rank 2-3 `diamond`, rank 4-10 `platinum`, top 30% `gold`, top 60% `silver`, and fallback `bronze`; clear `Season.rewardPolicyJson.tierPolicy.tiers` rules may override tier assignment only. The job does not update `rewardGrantedAt`, grant rewards, call providers, run cron, expose an HTTP batch API, or mutate price/FX/wallet/order/position/snapshot/ranking rows. Settled joined Home reads the assigned `finalTier` read-only.
 
@@ -178,18 +180,19 @@ Possible now:
 - Operator-run daily portfolio snapshot batch jobs using existing fresh eligible `provider_api` DB rows first, then existing `admin_manual` fallback data.
 - Operator-run season ranking batch jobs using existing `daily_portfolio_snapshots`.
 - Operator-run daily season cycle batch jobs that run daily snapshot and season ranking in order.
-- Operator-run season settlement MVP jobs that finalize from existing `daily_portfolio_snapshots`.
+- Operator-run season settlement MVP jobs that freeze final valuation, final rankings, and final tiers.
 - Operator-run final tier assignment MVP jobs that assign final rank/tier from existing final `season_rankings`.
 - Operator-run reward grant marker MVP jobs that set `SeasonParticipant.rewardGrantedAt` after settlement and final tier assignment.
 - Operator-run season lifecycle transition jobs that move seasons between `upcoming`, `active`, and `ended` according to `startAt`/`endAt`.
+- Disabled-by-default scheduler execution for current ranking refresh, season lifecycle transition, and ended-season settlement when the corresponding env flags are enabled.
 - Settled joined Home final-result reads from existing `rankType=final` `season_rankings`; missing final rankings return unavailable without live valuation fallback.
 - Durable Quote-backed `/fx quote`, `/fx execute`, orders quote/create/execute, plus provider_api-backed assets `withPrice` and live portfolio/home/positions valuation. Quote/read paths can use explicit admin_manual fallback; execute paths require fresh provider_api and reject default admin_manual fallback.
 - Source metadata/outage visibility for those read-only/quote responses and daily snapshot batch results without exposing raw provider payloads or secrets.
 
 Not possible without a separate provider/write or automation gate:
 
-- Cron scheduler-driven snapshots/rankings.
-- Provider-backed ranking, settlement, or reward automation.
+- Scheduler-driven provider ingestion and reward automation.
+- Provider-backed reward automation.
 - External payment, point, coupon, gifticon, delivery, or cash-out fulfillment.
 
 Never create fake/static/sample business prices to make a test or local flow pass.

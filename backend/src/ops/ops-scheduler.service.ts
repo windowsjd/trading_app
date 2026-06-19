@@ -50,7 +50,7 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
     const baseInput = {
       trigger: OpsJobTrigger.scheduler,
       requestedBy: 'scheduler',
-      dryRun: true,
+      dryRun: false,
       lockTtlSeconds: config.lockTtlSeconds,
       maxAttempts: config.maxAttempts,
     };
@@ -73,12 +73,31 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
       );
     }
 
+    if (config.jobs[OpsJobName.season_lifecycle_transition]) {
+      results.push(
+        await this.runner.runSeasonLifecycleTransitionJob({
+          ...baseInput,
+          now: now.toISOString(),
+        }),
+      );
+    }
+
     if (config.jobs[OpsJobName.season_ranking_generation]) {
-      results.push(await this.runner.runSeasonRankingGenerationJob(baseInput));
+      results.push(
+        await this.runner.runSeasonRankingGenerationJob({
+          ...baseInput,
+          now: now.toISOString(),
+        }),
+      );
     }
 
     if (config.jobs[OpsJobName.season_settlement]) {
-      results.push(await this.runner.runSeasonSettlementJob(baseInput));
+      results.push(
+        await this.runner.runSeasonSettlementJob({
+          ...baseInput,
+          now: now.toISOString(),
+        }),
+      );
     }
 
     if (config.jobs[OpsJobName.reward_marker]) {

@@ -3,8 +3,14 @@ import {
   OpsJobName,
   OpsJobRun,
   OpsJobTrigger,
+  SeasonStatus,
 } from '../generated/prisma/client';
 import { DailyPortfolioSnapshotJobService } from '../batch/daily-portfolio-snapshot-job.service';
+import { SeasonLifecycleTransitionJobService } from '../batch/season-lifecycle-transition-job.service';
+import { SeasonSettlementJobService } from '../batch/season-settlement-job.service';
+import { SEASON_SETTLEMENT_JOB_NAME } from '../batch/season-settlement-job.types';
+import { RankingRefreshService } from '../ranking/ranking-refresh.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { getOpsSchedulerConfig } from './ops-config';
 import { OpsJobLockService } from './ops-job-lock.service';
 import { OpsJobRunService, SerializedOpsJobRun } from './ops-job-run.service';
@@ -44,10 +50,18 @@ export type DailySnapshotOpsJobInput = OpsJobRunnerInput & {
   snapshotDate?: string | null;
 };
 
+export type TimedOpsJobInput = OpsJobRunnerInput & {
+  now?: string | null;
+};
+
 @Injectable()
 export class OpsJobRunnerService {
   constructor(
     private readonly dailyPortfolioSnapshotJobService: DailyPortfolioSnapshotJobService,
+    private readonly seasonLifecycleTransitionJobService: SeasonLifecycleTransitionJobService,
+    private readonly seasonSettlementJobService: SeasonSettlementJobService,
+    private readonly rankingRefreshService: RankingRefreshService,
+    private readonly prisma: PrismaService,
     private readonly lockService: OpsJobLockService,
     private readonly runService: OpsJobRunService,
   ) {}
@@ -68,19 +82,84 @@ export class OpsJobRunnerService {
     );
   }
 
-  runSeasonRankingGenerationJob(input: OpsJobRunnerInput = {}) {
-    return this.recordNotImplemented(
+  runSeasonRankingGenerationJob(input: TimedOpsJobInput = {}) {
+    const now = this.parseOptionalDate(input.now) ?? new Date();
+
+    return this.runLockedOpsJob(
       OpsJobName.season_ranking_generation,
       input,
-      'Scheduler-driven ranking generation is not implemented in this gate.',
+      'season_ranking_generation:current',
+      async () =>
+        this.rankingRefreshService.refreshCurrentRankingsForActiveSeasons(now),
     );
   }
 
-  runSeasonSettlementJob(input: OpsJobRunnerInput = {}) {
-    return this.recordNotImplemented(
+  runSeasonLifecycleTransitionJob(input: TimedOpsJobInput = {}) {
+    const now = this.parseOptionalDate(input.now) ?? new Date();
+
+    return this.runLockedOpsJob(
+      OpsJobName.season_lifecycle_transition,
+      input,
+      'season_lifecycle_transition:current',
+      async () =>
+        this.seasonLifecycleTransitionJobService.run({
+          now: now.toISOString(),
+          dryRun: input.dryRun === true,
+          requestedBy: input.requestedBy ?? undefined,
+          idempotencyKey:
+            input.idempotencyKey ??
+            `season-lifecycle-transition:${now.toISOString()}`,
+        }),
+    );
+  }
+
+  runSeasonSettlementJob(input: TimedOpsJobInput = {}) {
+    const now = this.parseOptionalDate(input.now) ?? new Date();
+
+    return this.runLockedOpsJob(
       OpsJobName.season_settlement,
       input,
-      'Scheduler-driven settlement is not implemented in this gate.',
+      'season_settlement:ended',
+      async () => {
+        const seasons = await this.prisma.season.findMany({
+          where: {
+            status: SeasonStatus.ended,
+          },
+          orderBy: [{ endAt: 'asc' }, { id: 'asc' }],
+          select: {
+            id: true,
+            endAt: true,
+          },
+        });
+        const settled: Array<{
+          seasonId: string;
+          settlementDate: string;
+          batchRunId: string;
+          batchStatus: string;
+        }> = [];
+
+        for (const season of seasons) {
+          const settlementDate = this.formatDateOnly(season.endAt);
+          const batchResponse = await this.seasonSettlementJobService.run({
+            seasonId: season.id,
+            settlementDate,
+            dryRun: input.dryRun === true,
+            requestedBy: input.requestedBy ?? undefined,
+            idempotencyKey: `${SEASON_SETTLEMENT_JOB_NAME}:${season.id}:${settlementDate}:${now.toISOString()}`,
+          });
+          settled.push({
+            seasonId: season.id,
+            settlementDate,
+            batchRunId: batchResponse.data.run.id,
+            batchStatus: batchResponse.data.run.status,
+          });
+        }
+
+        return {
+          seasonsProcessed: seasons.length,
+          settled,
+        };
+      },
     );
   }
 
@@ -207,6 +286,89 @@ export class OpsJobRunnerService {
     return `daily_portfolio_snapshot:${seasonId}:${snapshotDate}`;
   }
 
+  private async runLockedOpsJob(
+    jobName: OpsJobName,
+    input: OpsJobRunnerInput,
+    lockKey: string,
+    handler: () => Promise<unknown>,
+  ): Promise<OpsJobRunnerResponse> {
+    const trigger = input.trigger ?? OpsJobTrigger.manual_script;
+    const dryRun = input.dryRun === true;
+    const lock = await this.lockService.acquireLock({
+      jobName,
+      lockKey,
+      ttlSeconds: input.lockTtlSeconds ?? this.defaultLockTtlSeconds(),
+    });
+
+    if (!lock.acquired) {
+      const locked = await this.runService.recordLocked({
+        jobName,
+        trigger,
+        requestedBy: input.requestedBy,
+        lockKey,
+        dryRun,
+        idempotencyKey: input.idempotencyKey,
+        maxAttempts: input.maxAttempts ?? this.defaultMaxAttempts(),
+        metadataJson: input.metadataJson,
+        resultJson: {
+          reason: 'LOCKED',
+          activeOwnerId: lock.activeOwnerId,
+          expiresAt: lock.expiresAt?.toISOString() ?? null,
+        },
+      });
+
+      return this.successResponse(locked, { locked: true, skipped: true });
+    }
+
+    const run = await this.runService.createRunning({
+      jobName,
+      trigger,
+      requestedBy: input.requestedBy,
+      lockKey,
+      dryRun,
+      idempotencyKey: input.idempotencyKey,
+      maxAttempts: input.maxAttempts ?? this.defaultMaxAttempts(),
+      metadataJson: input.metadataJson,
+    });
+
+    try {
+      const resultJson = dryRun
+        ? {
+            dryRun: true,
+            message: `${jobName} would run when dryRun is false.`,
+          }
+        : await handler();
+      const succeeded = await this.runService.recordSucceeded(run, {
+        resultJson,
+      });
+
+      return this.successResponse(succeeded);
+    } catch (error) {
+      const failure = this.extractFailure(error);
+      const failed = await this.runService.recordFailed(run, {
+        errorCode: failure.code,
+        errorMessage: failure.message,
+        resultJson: failure.resultJson,
+      });
+
+      return {
+        success: false,
+        error: {
+          code: failure.code,
+          message: failure.message,
+        },
+        data: {
+          run: this.runService.serializeRun(failed),
+        },
+      };
+    } finally {
+      await this.lockService.releaseLock({
+        lockKey,
+        ownerId: lock.ownerId,
+      });
+    }
+  }
+
   private async recordNotImplemented(
     jobName: OpsJobName,
     input: OpsJobRunnerInput,
@@ -322,5 +484,19 @@ export class OpsJobRunnerService {
 
   private defaultMaxAttempts() {
     return getOpsSchedulerConfig().maxAttempts;
+  }
+
+  private parseOptionalDate(value: string | null | undefined) {
+    const text = this.optionalString(value);
+    if (!text) {
+      return undefined;
+    }
+
+    const date = new Date(text);
+    return Number.isNaN(date.getTime()) ? undefined : date;
+  }
+
+  private formatDateOnly(date: Date) {
+    return date.toISOString().slice(0, 10);
   }
 }

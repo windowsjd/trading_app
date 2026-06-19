@@ -38,6 +38,20 @@ export type SeasonSettlementJobFinalRankingSummary = {
   skipped: number;
 };
 
+export type SeasonSettlementJobFinalSnapshotSummary = {
+  wouldCreate: number;
+  created: number;
+  updated: number;
+  existing: number;
+};
+
+export type SeasonSettlementJobFinalTierSummary = {
+  wouldAssign: number;
+  assigned: number;
+  existing: number;
+  skipped: number;
+};
+
 export type SeasonSettlementJobTopRank = {
   seasonParticipantId: string;
   userId: string;
@@ -60,8 +74,13 @@ export type SeasonSettlementJobResult = {
   dryRun: boolean;
   season: SeasonSettlementJobSeasonSummary;
   participants: SeasonSettlementJobParticipantSummary;
+  finalSnapshots: SeasonSettlementJobFinalSnapshotSummary;
   finalRankings: SeasonSettlementJobFinalRankingSummary;
+  finalTiers: SeasonSettlementJobFinalTierSummary;
+  createdFinalSnapshotIds: string[];
+  updatedFinalSnapshotIds: string[];
   createdFinalRankingIds: string[];
+  assignedFinalTierParticipantIds: string[];
   topRanks: SeasonSettlementJobTopRank[];
   errors: SeasonSettlementJobError[];
   reason?: string;
