@@ -5,6 +5,7 @@ import {
   CurrencyCode,
   FxRateSourceType,
   Prisma,
+  SeasonStatus,
 } from '../generated/prisma/client';
 import { isFxSnapshotStaleForPortfolioValuation } from '../portfolio/portfolio-valuation.policy';
 import { PrismaService } from '../prisma/prisma.service';
@@ -21,6 +22,8 @@ import {
   type PublicSourceMetadata,
 } from '../providers/source-metadata.presenter';
 import { buildPagination, type Pagination } from '../common/pagination';
+import { isSeasonCurrentlyActive } from '../seasons/season-lifecycle.policy';
+import { getAssetTradingStatus } from '../orders/market-hours.policy';
 
 export type AssetsQuery = {
   assetType?: string;
@@ -56,6 +59,13 @@ type AssetRecord = {
   isActive: boolean;
 };
 
+type AssetSeason = {
+  id: string;
+  status: SeasonStatus;
+  startAt: Date;
+  endAt: Date;
+};
+
 type AssetPriceSnapshotRecord = {
   id: string;
   price: Prisma.Decimal;
@@ -72,6 +82,31 @@ type AssetPriceError = {
   assetId: string;
   code: 'ASSET_PRICE_UNAVAILABLE' | 'FX_RATE_UNAVAILABLE' | 'FX_RATE_STALE';
   message: string;
+};
+
+type MarketStatus = 'open' | 'closed' | 'always_open' | 'unknown';
+
+type TradeBlockedReason =
+  | 'ASSET_INACTIVE'
+  | 'MARKET_CLOSED'
+  | 'PRICE_UNAVAILABLE'
+  | 'PRICE_STALE'
+  | 'SEASON_NOT_ACTIVE'
+  | 'SEASON_NOT_JOINED'
+  | 'UNKNOWN';
+
+type AssetTradingUx = {
+  id: string;
+  changeRate: string | null;
+  marketStatus: MarketStatus;
+  tradable: boolean;
+  tradeBlockedReason: TradeBlockedReason | null;
+};
+
+type AssetTradingContext = {
+  now: Date;
+  season: AssetSeason | null;
+  joined: boolean;
 };
 
 type UsdKrwSelection =
@@ -194,6 +229,12 @@ type AssetPriceResponse = {
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
+const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
+  SeasonStatus.active,
+  SeasonStatus.upcoming,
+  SeasonStatus.ended,
+  SeasonStatus.settled,
+];
 
 @Injectable()
 export class AssetsService {
@@ -223,10 +264,19 @@ export class AssetsService {
         select: this.assetSelect(),
       }),
     ]);
+    const tradingContext =
+      assets.length > 0
+        ? await this.buildAssetTradingContext(userId, new Date())
+        : null;
     const pricedAssets = parsedQuery.withPrice
-      ? await this.buildAssetsWithPrices(assets)
+      ? await this.buildAssetsWithPrices(assets, tradingContext)
       : {
-          assets: assets.map((asset) => this.formatAssetMetadata(asset)),
+          assets: assets.map((asset) =>
+            this.formatAssetMetadata(
+              asset,
+              this.buildTradingUx(asset, undefined, tradingContext),
+            ),
+          ),
           priceErrors: [],
         };
 
@@ -270,7 +320,14 @@ export class AssetsService {
       );
     }
 
-    const pricedAssets = await this.buildAssetsWithPrices([asset]);
+    const tradingContext = await this.buildAssetTradingContext(
+      userId,
+      new Date(),
+    );
+    const pricedAssets = await this.buildAssetsWithPrices(
+      [asset],
+      tradingContext,
+    );
     const pricedAsset = pricedAssets.assets[0];
 
     if (!pricedAsset?.price) {
@@ -323,7 +380,7 @@ export class AssetsService {
       );
     }
 
-    const pricedAssets = await this.buildAssetsWithPrices([asset]);
+    const pricedAssets = await this.buildAssetsWithPrices([asset], null);
     const price = pricedAssets.assets[0]?.price;
     if (!price || price.state === 'unavailable') {
       return {
@@ -387,7 +444,10 @@ export class AssetsService {
     };
   }
 
-  private async buildAssetsWithPrices(assets: readonly AssetRecord[]): Promise<{
+  private async buildAssetsWithPrices(
+    assets: readonly AssetRecord[],
+    tradingContext: AssetTradingContext | null,
+  ): Promise<{
     assets: AssetListItem[];
     priceErrors: AssetPriceError[];
   }> {
@@ -414,7 +474,10 @@ export class AssetsService {
 
         return {
           asset: {
-            ...this.formatAssetMetadata(asset),
+            ...this.formatAssetMetadata(
+              asset,
+              this.buildTradingUx(asset, price.payload, tradingContext),
+            ),
             price: price.payload,
           },
           error: price.error,
@@ -428,6 +491,70 @@ export class AssetsService {
         .map((result) => result.error)
         .filter((error): error is AssetPriceError => Boolean(error)),
     };
+  }
+
+  private async buildAssetTradingContext(
+    userId: string,
+    now: Date,
+  ): Promise<AssetTradingContext> {
+    const season = await this.findCurrentSeason();
+    const participant = season
+      ? await this.prisma.seasonParticipant.findUnique({
+          where: {
+            seasonId_userId: {
+              seasonId: season.id,
+              userId,
+            },
+          },
+          select: {
+            id: true,
+          },
+        })
+      : null;
+
+    return {
+      now,
+      season,
+      joined: Boolean(participant),
+    };
+  }
+
+  private async findCurrentSeason(): Promise<AssetSeason | null> {
+    for (const status of CURRENT_SEASON_STATUS_PRIORITY) {
+      const season = await this.prisma.season.findFirst({
+        where: {
+          status,
+        },
+        select: {
+          id: true,
+          status: true,
+          startAt: true,
+          endAt: true,
+        },
+        orderBy: this.getSeasonOrderBy(status),
+      });
+
+      if (season) {
+        return season;
+      }
+    }
+
+    return null;
+  }
+
+  private getSeasonOrderBy(
+    status: SeasonStatus,
+  ): Prisma.SeasonFindFirstArgs['orderBy'] {
+    switch (status) {
+      case SeasonStatus.upcoming:
+        return [{ startAt: 'asc' }, { createdAt: 'asc' }];
+      case SeasonStatus.ended:
+      case SeasonStatus.settled:
+        return [{ endAt: 'desc' }, { createdAt: 'desc' }];
+      case SeasonStatus.active:
+      default:
+        return [{ startAt: 'desc' }, { createdAt: 'desc' }];
+    }
   }
 
   private async buildAssetPrice(
@@ -1012,9 +1139,10 @@ export class AssetsService {
     };
   }
 
-  private formatAssetMetadata(asset: AssetRecord) {
+  private formatAssetMetadata(asset: AssetRecord, tradingUx: AssetTradingUx) {
     return {
       assetId: asset.id,
+      id: tradingUx.id,
       symbol: asset.symbol,
       name: asset.name,
       market: asset.market,
@@ -1023,7 +1151,113 @@ export class AssetsService {
       priceCurrency: this.getAssetPriceCurrency(asset),
       settlementCurrency: this.getAssetSettlementCurrency(asset),
       isActive: asset.isActive,
+      changeRate: tradingUx.changeRate,
+      marketStatus: tradingUx.marketStatus,
+      tradable: tradingUx.tradable,
+      tradeBlockedReason: tradingUx.tradeBlockedReason,
     };
+  }
+
+  private buildTradingUx(
+    asset: AssetRecord,
+    price: AssetPricePayload | undefined,
+    context: AssetTradingContext | null,
+  ): AssetTradingUx {
+    const marketStatus = this.resolveMarketStatus(asset, context?.now);
+    const blockedReason = this.resolveTradeBlockedReason(
+      asset,
+      price,
+      marketStatus,
+      context,
+    );
+
+    return {
+      id: asset.id,
+      changeRate: null,
+      marketStatus,
+      tradable: blockedReason === null,
+      tradeBlockedReason: blockedReason,
+    };
+  }
+
+  private resolveTradeBlockedReason(
+    asset: AssetRecord,
+    price: AssetPricePayload | undefined,
+    marketStatus: MarketStatus,
+    context: AssetTradingContext | null,
+  ): TradeBlockedReason | null {
+    if (!asset.isActive) {
+      return 'ASSET_INACTIVE';
+    }
+
+    if (
+      !context?.season ||
+      !isSeasonCurrentlyActive(context.season, context.now)
+    ) {
+      return 'SEASON_NOT_ACTIVE';
+    }
+
+    if (!context.joined) {
+      return 'SEASON_NOT_JOINED';
+    }
+
+    if (marketStatus === 'closed') {
+      return 'MARKET_CLOSED';
+    }
+
+    if (marketStatus === 'unknown') {
+      return 'UNKNOWN';
+    }
+
+    return this.resolvePriceBlockedReason(price);
+  }
+
+  private resolvePriceBlockedReason(
+    price: AssetPricePayload | undefined,
+  ): TradeBlockedReason | null {
+    if (!price) {
+      return null;
+    }
+
+    if (price.state === 'unavailable') {
+      return 'PRICE_UNAVAILABLE';
+    }
+
+    if (price.priceSource?.rejectedProviderReason === 'captured_at_stale') {
+      return 'PRICE_STALE';
+    }
+
+    if (price.priceKrwState === 'unavailable') {
+      return price.priceKrwReason === 'FX_RATE_STALE'
+        ? 'PRICE_STALE'
+        : 'PRICE_UNAVAILABLE';
+    }
+
+    return null;
+  }
+
+  private resolveMarketStatus(
+    asset: AssetRecord,
+    now: Date | undefined,
+  ): MarketStatus {
+    if (asset.assetType === AssetType.crypto) {
+      return 'always_open';
+    }
+
+    if (!now) {
+      return 'unknown';
+    }
+
+    const tradingStatus = getAssetTradingStatus(asset, now);
+    if (tradingStatus.tradable) {
+      return 'open';
+    }
+
+    if (tradingStatus.reason === 'MARKET_CLOSED') {
+      return 'closed';
+    }
+
+    return 'unknown';
   }
 
   private buildTradingNote(asset: AssetRecord) {

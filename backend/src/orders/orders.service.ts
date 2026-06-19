@@ -212,6 +212,10 @@ type OrderQuoteCalculation = {
   fxRate: Prisma.Decimal | null;
   assetPriceSource: PublicSourceMetadata | null;
   fxRateSource: PublicSourceMetadata | null;
+  walletBalanceBefore: Prisma.Decimal;
+  estimatedWalletBalanceAfter: Prisma.Decimal;
+  positionQuantityBefore: Prisma.Decimal;
+  estimatedPositionQuantityAfter: Prisma.Decimal;
   quoteAt: Date;
   quoteId: string | null;
   expiresAt: Date | null;
@@ -2549,7 +2553,7 @@ export class OrdersService {
       fxSnapshot?.rate ?? null,
     );
 
-    await this.assertOrderResourcesAvailable({
+    const previewBalances = await this.assertOrderResourcesAvailable({
       participantId: participant.id,
       assetId: asset.id,
       side: request.side,
@@ -2557,6 +2561,14 @@ export class OrdersService {
       quantity: request.quantity,
       netAmount,
     });
+    const estimatedWalletBalanceAfter =
+      request.side === OrderSide.buy
+        ? previewBalances.walletBalanceBefore.sub(netAmount)
+        : previewBalances.walletBalanceBefore.add(netAmount);
+    const estimatedPositionQuantityAfter =
+      request.side === OrderSide.buy
+        ? previewBalances.positionQuantityBefore.add(request.quantity)
+        : previewBalances.positionQuantityBefore.sub(request.quantity);
 
     return {
       season,
@@ -2575,6 +2587,10 @@ export class OrdersService {
       fxRate: fxSnapshot?.rate ?? null,
       assetPriceSource: priceContext.assetPriceSource,
       fxRateSource: fxSnapshot?.fxRateSource ?? null,
+      walletBalanceBefore: previewBalances.walletBalanceBefore,
+      estimatedWalletBalanceAfter,
+      positionQuantityBefore: previewBalances.positionQuantityBefore,
+      estimatedPositionQuantityAfter,
       quoteAt,
       quoteId: null,
       expiresAt: null,
@@ -3464,7 +3480,10 @@ export class OrdersService {
     currencyCode: CurrencyCode;
     quantity: Prisma.Decimal;
     netAmount: Prisma.Decimal;
-  }) {
+  }): Promise<{
+    walletBalanceBefore: Prisma.Decimal;
+    positionQuantityBefore: Prisma.Decimal;
+  }> {
     if (input.side === OrderSide.buy) {
       const wallet = await this.prisma.cashWallet.findUnique({
         where: {
@@ -3486,7 +3505,22 @@ export class OrdersService {
         );
       }
 
-      return;
+      const position = await this.prisma.position.findUnique({
+        where: {
+          seasonParticipantId_assetId: {
+            seasonParticipantId: input.participantId,
+            assetId: input.assetId,
+          },
+        },
+        select: {
+          quantity: true,
+        },
+      });
+
+      return {
+        walletBalanceBefore: wallet.balanceAmount,
+        positionQuantityBefore: position?.quantity ?? new Prisma.Decimal(0),
+      };
     }
 
     const position = await this.prisma.position.findUnique({
@@ -3508,6 +3542,23 @@ export class OrdersService {
         'Position quantity is insufficient.',
       );
     }
+
+    const wallet = await this.prisma.cashWallet.findUnique({
+      where: {
+        seasonParticipantId_currencyCode: {
+          seasonParticipantId: input.participantId,
+          currencyCode: input.currencyCode,
+        },
+      },
+      select: {
+        balanceAmount: true,
+      },
+    });
+
+    return {
+      walletBalanceBefore: wallet?.balanceAmount ?? new Prisma.Decimal(0),
+      positionQuantityBefore: position.quantity,
+    };
   }
 
   private parseQuery(query: OrdersQuery): ParsedOrdersQuery {
@@ -3742,6 +3793,22 @@ export class OrdersService {
       krwGrossAmount: this.formatDecimal(quote.krwGrossAmount, monetaryScale),
       krwFeeAmount: this.formatDecimal(quote.krwFeeAmount, monetaryScale),
       krwNetAmount: this.formatDecimal(quote.krwNetAmount, monetaryScale),
+      walletBalanceBefore: this.formatDecimal(
+        quote.walletBalanceBefore,
+        monetaryScale,
+      ),
+      estimatedWalletBalanceAfter: this.formatDecimal(
+        quote.estimatedWalletBalanceAfter,
+        monetaryScale,
+      ),
+      positionQuantityBefore: this.formatDecimal(
+        quote.positionQuantityBefore,
+        monetaryScale,
+      ),
+      estimatedPositionQuantityAfter: this.formatDecimal(
+        quote.estimatedPositionQuantityAfter,
+        monetaryScale,
+      ),
       assetPriceSnapshotId: quote.assetPriceSnapshotId,
       fxRateSnapshotId: quote.fxRateSnapshotId,
       assetPriceSource: quote.assetPriceSource,

@@ -31,6 +31,7 @@ export type PositionsQuery = {
   offset?: string;
   assetType?: string;
   currencyCode?: string;
+  assetId?: string;
 };
 
 type PositionsState = 'available' | 'not_joined' | 'unavailable';
@@ -56,6 +57,7 @@ type ParsedPositionsQuery = {
   offset: number;
   assetType?: AssetType;
   currencyCode?: CurrencyCode;
+  assetId?: string;
 };
 
 type PositionRecord = {
@@ -336,7 +338,10 @@ export class PositionsService {
     usdKrwSelection: UsdKrwSelection | null,
   ): Promise<PositionValuation> {
     try {
-      if (this.getAssetSettlementCurrency(position.asset) !== position.currencyCode) {
+      if (
+        this.getAssetSettlementCurrency(position.asset) !==
+        position.currencyCode
+      ) {
         throw new PositionValuationError(
           'ASSET_PRICE_UNAVAILABLE',
           `Position currency mismatch for asset ${position.assetId}.`,
@@ -884,6 +889,7 @@ export class PositionsService {
             },
           }),
       ...(query.currencyCode ? { currencyCode: query.currencyCode } : {}),
+      ...(query.assetId ? { assetId: query.assetId } : {}),
       ...(query.assetType
         ? {
             asset: {
@@ -935,6 +941,7 @@ export class PositionsService {
       offset: this.parseOffset(query.offset),
       assetType: this.parseAssetType(query.assetType),
       currencyCode: this.parseCurrencyCode(query.currencyCode),
+      assetId: this.parseOptionalText(query.assetId),
     };
   }
 
@@ -1206,6 +1213,7 @@ export class PositionsService {
       includeClosed: query.includeClosed,
       assetType: query.assetType ?? null,
       currencyCode: query.currencyCode ?? null,
+      assetId: query.assetId ?? null,
     };
   }
 

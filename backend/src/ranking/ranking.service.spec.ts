@@ -123,24 +123,29 @@ describe('RankingService', () => {
     prisma.season.findFirst.mockResolvedValueOnce(season);
   };
 
-  const rankingRow = (rank: number, seasonParticipantId = `sp-${rank}`) => ({
-    rank,
-    seasonParticipantId,
-    totalAssetKrw: new Prisma.Decimal(`${1000000 - rank}.00000000`),
-    returnRate: new Prisma.Decimal('10.00000000'),
-    maxDrawdown: new Prisma.Decimal('2.50000000'),
-    totalFillCount: rank,
-    reachedReturnAt:
-      rank === 2 ? null : new Date(`2026-05-0${rank}T00:10:00.000Z`),
-    capturedAt,
-    seasonParticipant: {
-      userId: `user-${rank}`,
-      user: {
-        nickname: `trader-${rank}`,
-        profileImageUrl: rank === 1 ? 'https://example.com/p.png' : null,
+  const rankingRow = (rank: number, seasonParticipantId = `sp-${rank}`) => {
+    const day = Math.min(rank, 9).toString().padStart(2, '0');
+
+    return {
+      rank,
+      seasonParticipantId,
+      totalAssetKrw: new Prisma.Decimal(`${1000000 - rank}.00000000`),
+      returnRate: new Prisma.Decimal('10.00000000'),
+      maxDrawdown: new Prisma.Decimal('2.50000000'),
+      totalFillCount: rank,
+      reachedReturnAt:
+        rank === 2 ? null : new Date(`2026-05-${day}T00:10:00.000Z`),
+      capturedAt,
+      seasonParticipant: {
+        userId: `user-${rank}`,
+        finalTier: null,
+        user: {
+          nickname: `trader-${rank}`,
+          profileImageUrl: rank === 1 ? 'https://example.com/p.png' : null,
+        },
       },
-    },
-  });
+    };
+  };
 
   const mockAvailableRanking = (prisma: ReturnType<typeof createPrisma>) => {
     prisma.seasonRanking.findFirst.mockResolvedValueOnce({
@@ -164,6 +169,9 @@ describe('RankingService', () => {
       totalFillCount: 4,
       reachedReturnAt: null,
       capturedAt,
+      seasonParticipant: {
+        finalTier: null,
+      },
     });
   };
 
@@ -198,6 +206,9 @@ describe('RankingService', () => {
           maxDrawdown: '2.50000000',
           totalFillCount: 1,
           reachedReturnAt: '2026-05-01T00:10:00.000Z',
+          percentile: '50.00000000',
+          provisionalTier: 'master',
+          finalTier: null,
         },
         {
           rank: 2,
@@ -205,6 +216,9 @@ describe('RankingService', () => {
           userId: 'user-2',
           nickname: 'trader-2',
           profileImageUrl: null,
+          percentile: '100.00000000',
+          provisionalTier: 'silver',
+          finalTier: null,
         },
       ],
       myRanking: {
@@ -217,6 +231,9 @@ describe('RankingService', () => {
         totalFillCount: 4,
         reachedReturnAt: null,
         rankingDate: '2026-05-07',
+        percentile: '100.00000000',
+        provisionalTier: 'silver',
+        finalTier: null,
       },
     });
     expectNoRankingWrites(prisma);
@@ -285,6 +302,168 @@ describe('RankingService', () => {
     expectNoRankingWrites(prisma);
   });
 
+  it('limits scope=top10 to the first ten ranking rows', async () => {
+    const { prisma, service } = createService();
+    mockCurrentSeason(prisma);
+    prisma.seasonRanking.findFirst.mockResolvedValueOnce({
+      rankingDate,
+      capturedAt,
+    });
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+      id: 'sp-15',
+    });
+    prisma.seasonRanking.count.mockResolvedValueOnce(25);
+    prisma.seasonRanking.findUnique.mockResolvedValueOnce({
+      rank: 15,
+      seasonParticipantId: 'sp-15',
+      totalAssetKrw: new Prisma.Decimal('999985.00000000'),
+      returnRate: new Prisma.Decimal('5.00000000'),
+      maxDrawdown: new Prisma.Decimal('4.00000000'),
+      totalFillCount: 7,
+      reachedReturnAt: null,
+      capturedAt,
+      seasonParticipant: {
+        finalTier: null,
+      },
+    });
+    prisma.seasonRanking.findMany.mockResolvedValueOnce(
+      Array.from({ length: 10 }, (_, index) => rankingRow(index + 1)),
+    );
+
+    const response = await service.getRanking('user-15', {
+      scope: 'top10',
+      limit: '50',
+    });
+
+    expect(response.data.pagination).toMatchObject({
+      limit: 10,
+      offset: 0,
+      total: 10,
+      returned: 10,
+      nextOffset: null,
+    });
+    expect(response.data.rankings).toHaveLength(10);
+    expect(response.data.rankings[9].rank).toBe(10);
+    expect(prisma.seasonRanking.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          rank: {
+            lte: 10,
+          },
+        }),
+        skip: 0,
+        take: 10,
+      }),
+    );
+    expectNoRankingWrites(prisma);
+  });
+
+  it('returns a scope=near_me window around my ranking', async () => {
+    const { prisma, service } = createService();
+    mockCurrentSeason(prisma);
+    prisma.seasonRanking.findFirst.mockResolvedValueOnce({
+      rankingDate,
+      capturedAt,
+    });
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+      id: 'sp-50',
+    });
+    prisma.seasonRanking.count.mockResolvedValueOnce(100);
+    prisma.seasonRanking.findUnique.mockResolvedValueOnce({
+      rank: 50,
+      seasonParticipantId: 'sp-50',
+      totalAssetKrw: new Prisma.Decimal('999950.00000000'),
+      returnRate: new Prisma.Decimal('5.00000000'),
+      maxDrawdown: new Prisma.Decimal('4.00000000'),
+      totalFillCount: 8,
+      reachedReturnAt: null,
+      capturedAt,
+      seasonParticipant: {
+        finalTier: null,
+      },
+    });
+    prisma.seasonRanking.findMany.mockResolvedValueOnce(
+      Array.from({ length: 10 }, (_, index) => rankingRow(index + 45)),
+    );
+
+    const response = await service.getRanking('user-50', {
+      scope: 'near_me',
+      limit: '10',
+    });
+
+    expect(response.data.pagination).toMatchObject({
+      limit: 10,
+      offset: 44,
+      total: 100,
+      returned: 10,
+      nextOffset: 54,
+    });
+    expect(response.data.rankings.map((row) => row.rank)).toEqual([
+      45, 46, 47, 48, 49, 50, 51, 52, 53, 54,
+    ]);
+    expect(prisma.seasonRanking.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 44,
+        take: 10,
+      }),
+    );
+    expectNoRankingWrites(prisma);
+  });
+
+  it('returns finalTier for final rankings without mutating participants', async () => {
+    const { prisma, service } = createService();
+    mockCurrentSeason(prisma);
+    prisma.seasonRanking.findFirst.mockResolvedValueOnce({
+      rankingDate,
+      capturedAt,
+    });
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+      id: 'sp-11',
+    });
+    prisma.seasonRanking.count.mockResolvedValueOnce(100);
+    prisma.seasonRanking.findUnique.mockResolvedValueOnce({
+      rank: 11,
+      seasonParticipantId: 'sp-11',
+      totalAssetKrw: new Prisma.Decimal('999989.00000000'),
+      returnRate: new Prisma.Decimal('8.00000000'),
+      maxDrawdown: new Prisma.Decimal('2.00000000'),
+      totalFillCount: 11,
+      reachedReturnAt: null,
+      capturedAt,
+      seasonParticipant: {
+        finalTier: 'diamond',
+      },
+    });
+    prisma.seasonRanking.findMany.mockResolvedValueOnce([
+      {
+        ...rankingRow(11, 'sp-11'),
+        seasonParticipant: {
+          ...rankingRow(11, 'sp-11').seasonParticipant,
+          finalTier: 'diamond',
+        },
+      },
+    ]);
+
+    const response = await service.getRanking('user-11', {
+      rankType: 'final',
+    });
+
+    expect(response.data.rankings[0]).toMatchObject({
+      rank: 11,
+      percentile: '11.00000000',
+      provisionalTier: null,
+      finalTier: 'diamond',
+    });
+    expect(response.data.myRanking).toMatchObject({
+      state: 'available',
+      rank: 11,
+      percentile: '11.00000000',
+      provisionalTier: null,
+      finalTier: 'diamond',
+    });
+    expectNoRankingWrites(prisma);
+  });
+
   it('returns unavailable when ranking rows do not exist', async () => {
     const { prisma, service } = createService();
     mockCurrentSeason(prisma);
@@ -343,6 +522,14 @@ describe('RankingService', () => {
 
     await expect(
       service.getRanking('user-1', { rankingDate: '2026-02-31' }),
+    ).rejects.toBeInstanceOf(HttpException);
+  });
+
+  it('rejects invalid scope', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.getRanking('user-1', { scope: 'friends' }),
     ).rejects.toBeInstanceOf(HttpException);
   });
 

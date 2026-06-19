@@ -13,9 +13,18 @@ export type RankingQuery = {
   rankType?: string;
   limit?: string;
   offset?: string;
+  scope?: string;
 };
 
 type RankingSectionState = 'available' | 'unavailable' | 'not_joined';
+type RankingScope = 'all' | 'near_me' | 'top10';
+type RankingTier =
+  | 'master'
+  | 'diamond'
+  | 'platinum'
+  | 'gold'
+  | 'silver'
+  | 'bronze';
 
 type RankingSeason = {
   id: string;
@@ -31,6 +40,40 @@ type ParsedRankingQuery = {
   rankType: SeasonRankingType;
   limit: number;
   offset: number;
+  scope: RankingScope;
+};
+
+type RankingRow = {
+  rank: number;
+  seasonParticipantId: string;
+  totalAssetKrw: Prisma.Decimal;
+  returnRate: Prisma.Decimal;
+  maxDrawdown: Prisma.Decimal;
+  totalFillCount: number;
+  reachedReturnAt: Date | null;
+  capturedAt: Date;
+  seasonParticipant: {
+    userId: string;
+    finalTier: string | null;
+    user: {
+      nickname: string;
+      profileImageUrl: string | null;
+    };
+  };
+};
+
+type MyRankingRow = {
+  rank: number;
+  seasonParticipantId: string;
+  totalAssetKrw: Prisma.Decimal;
+  returnRate: Prisma.Decimal;
+  maxDrawdown: Prisma.Decimal;
+  totalFillCount: number;
+  reachedReturnAt: Date | null;
+  capturedAt: Date;
+  seasonParticipant: {
+    finalTier: string | null;
+  };
 };
 
 type RankingResponse = {
@@ -54,6 +97,9 @@ type RankingResponse = {
       totalFillCount: number;
       reachedReturnAt: string | null;
       capturedAt: string;
+      percentile: string;
+      provisionalTier: RankingTier | null;
+      finalTier: string | null;
     }>;
     myRanking:
       | {
@@ -67,6 +113,9 @@ type RankingResponse = {
           reachedReturnAt: string | null;
           rankingDate: string;
           capturedAt: string;
+          percentile: string;
+          provisionalTier: RankingTier | null;
+          finalTier: string | null;
         }
       | {
           state: 'not_joined' | 'unavailable';
@@ -86,6 +135,18 @@ const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
 ];
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
+const TOP10_LIMIT = 10;
+const TIER_CUTOFF_RULES = [
+  { tier: 'master', cumulativeRatio: 0.04 },
+  { tier: 'diamond', cumulativeRatio: 0.11 },
+  { tier: 'platinum', cumulativeRatio: 0.23 },
+  { tier: 'gold', cumulativeRatio: 0.4 },
+  { tier: 'silver', cumulativeRatio: 0.7 },
+  { tier: 'bronze', cumulativeRatio: 1 },
+] as const satisfies readonly {
+  tier: RankingTier;
+  cumulativeRatio: number;
+}[];
 
 @Injectable()
 export class RankingService {
@@ -164,35 +225,8 @@ export class RankingService {
       rankType: parsedQuery.rankType,
       rankingDate: selectedRanking.rankingDate,
     };
-    const [total, rankingRows, myRankingRow] = await Promise.all([
+    const [totalParticipants, myRankingRow] = await Promise.all([
       this.prisma.seasonRanking.count({ where }),
-      this.prisma.seasonRanking.findMany({
-        where,
-        orderBy: [{ rank: 'asc' }, { seasonParticipantId: 'asc' }],
-        skip: parsedQuery.offset,
-        take: parsedQuery.limit,
-        select: {
-          rank: true,
-          seasonParticipantId: true,
-          totalAssetKrw: true,
-          returnRate: true,
-          maxDrawdown: true,
-          totalFillCount: true,
-          reachedReturnAt: true,
-          capturedAt: true,
-          seasonParticipant: {
-            select: {
-              userId: true,
-              user: {
-                select: {
-                  nickname: true,
-                  profileImageUrl: true,
-                },
-              },
-            },
-          },
-        },
-      }),
       participant
         ? this.prisma.seasonRanking.findUnique({
             where: {
@@ -212,10 +246,51 @@ export class RankingService {
               totalFillCount: true,
               reachedReturnAt: true,
               capturedAt: true,
+              seasonParticipant: {
+                select: {
+                  finalTier: true,
+                },
+              },
             },
           })
         : Promise.resolve(null),
     ]);
+    const window = this.resolveRankingWindow({
+      query: parsedQuery,
+      totalParticipants,
+      myRank: myRankingRow?.rank ?? null,
+    });
+    const rankingRows = await this.prisma.seasonRanking.findMany({
+      where: {
+        ...where,
+        ...(window.maxRank ? { rank: { lte: window.maxRank } } : {}),
+      },
+      orderBy: [{ rank: 'asc' }, { seasonParticipantId: 'asc' }],
+      skip: window.offset,
+      take: window.limit,
+      select: {
+        rank: true,
+        seasonParticipantId: true,
+        totalAssetKrw: true,
+        returnRate: true,
+        maxDrawdown: true,
+        totalFillCount: true,
+        reachedReturnAt: true,
+        capturedAt: true,
+        seasonParticipant: {
+          select: {
+            userId: true,
+            finalTier: true,
+            user: {
+              select: {
+                nickname: true,
+                profileImageUrl: true,
+              },
+            },
+          },
+        },
+      },
+    });
 
     return {
       success: true,
@@ -226,28 +301,20 @@ export class RankingService {
         rankingDate: this.formatDateOnly(selectedRanking.rankingDate),
         capturedAt: selectedRanking.capturedAt.toISOString(),
         pagination: buildPagination({
-          limit: parsedQuery.limit,
-          offset: parsedQuery.offset,
-          total,
+          limit: window.limit,
+          offset: window.offset,
+          total: window.paginationTotal,
           returned: rankingRows.length,
         }),
-        rankings: rankingRows.map((row) => ({
-          rank: row.rank,
-          seasonParticipantId: row.seasonParticipantId,
-          userId: row.seasonParticipant.userId,
-          nickname: row.seasonParticipant.user.nickname,
-          profileImageUrl: row.seasonParticipant.user.profileImageUrl,
-          totalAssetKrw: this.formatDecimal(row.totalAssetKrw, 8),
-          returnRate: this.formatDecimal(row.returnRate, 8),
-          maxDrawdown: this.formatDecimal(row.maxDrawdown, 8),
-          totalFillCount: row.totalFillCount,
-          reachedReturnAt: row.reachedReturnAt?.toISOString() ?? null,
-          capturedAt: row.capturedAt.toISOString(),
-        })),
+        rankings: rankingRows.map((row) =>
+          this.formatRankingRow(row, parsedQuery.rankType, totalParticipants),
+        ),
         myRanking: participant
           ? this.formatMyRanking(
               myRankingRow,
               this.formatDateOnly(selectedRanking.rankingDate),
+              parsedQuery.rankType,
+              totalParticipants,
             )
           : this.notJoinedMyRanking(),
       },
@@ -261,7 +328,22 @@ export class RankingService {
       rankType: this.parseRankType(query.rankType),
       limit: this.parseLimit(query.limit),
       offset: this.parseOffset(query.offset),
+      scope: this.parseScope(query.scope),
     };
+  }
+
+  private parseScope(value: string | undefined): RankingScope {
+    const text = this.parseOptionalText(value) ?? 'all';
+
+    if (text === 'all' || text === 'near_me' || text === 'top10') {
+      return text;
+    }
+
+    this.throwApiError(
+      HttpStatus.BAD_REQUEST,
+      'INVALID_RANKING_SCOPE',
+      'Invalid ranking scope.',
+    );
   }
 
   private parseRankType(value: string | undefined): SeasonRankingType {
@@ -507,18 +589,84 @@ export class RankingService {
     };
   }
 
+  private resolveRankingWindow(input: {
+    query: ParsedRankingQuery;
+    totalParticipants: number;
+    myRank: number | null;
+  }) {
+    if (input.query.scope === 'top10') {
+      const paginationTotal = Math.min(input.totalParticipants, TOP10_LIMIT);
+      const offset = Math.min(input.query.offset, paginationTotal);
+
+      return {
+        limit: Math.min(input.query.limit, TOP10_LIMIT),
+        offset,
+        paginationTotal,
+        maxRank: TOP10_LIMIT,
+      };
+    }
+
+    if (input.query.scope === 'near_me' && input.myRank !== null) {
+      const maxOffset = Math.max(
+        input.totalParticipants - input.query.limit,
+        0,
+      );
+      const centeredOffset = Math.max(
+        input.myRank - 1 - Math.floor(input.query.limit / 2),
+        0,
+      );
+
+      return {
+        limit: input.query.limit,
+        offset: Math.min(centeredOffset, maxOffset),
+        paginationTotal: input.totalParticipants,
+        maxRank: null,
+      };
+    }
+
+    return {
+      limit: input.query.limit,
+      offset: input.query.offset,
+      paginationTotal: input.totalParticipants,
+      maxRank: null,
+    };
+  }
+
+  private formatRankingRow(
+    row: RankingRow,
+    rankType: SeasonRankingType,
+    totalParticipants: number,
+  ) {
+    return {
+      rank: row.rank,
+      seasonParticipantId: row.seasonParticipantId,
+      userId: row.seasonParticipant.userId,
+      nickname: row.seasonParticipant.user.nickname,
+      profileImageUrl: row.seasonParticipant.user.profileImageUrl,
+      totalAssetKrw: this.formatDecimal(row.totalAssetKrw, 8),
+      returnRate: this.formatDecimal(row.returnRate, 8),
+      maxDrawdown: this.formatDecimal(row.maxDrawdown, 8),
+      totalFillCount: row.totalFillCount,
+      reachedReturnAt: row.reachedReturnAt?.toISOString() ?? null,
+      capturedAt: row.capturedAt.toISOString(),
+      percentile: this.calculatePercentile(row.rank, totalParticipants),
+      provisionalTier:
+        rankType === SeasonRankingType.daily
+          ? this.assignTier(row.rank, totalParticipants)
+          : null,
+      finalTier:
+        rankType === SeasonRankingType.final
+          ? (row.seasonParticipant.finalTier ??
+            this.assignTier(row.rank, totalParticipants))
+          : null,
+    };
+  }
+
   private formatMyRanking(
-    ranking: {
-      rank: number;
-      seasonParticipantId: string;
-      totalAssetKrw: Prisma.Decimal;
-      returnRate: Prisma.Decimal;
-      maxDrawdown: Prisma.Decimal;
-      totalFillCount: number;
-      reachedReturnAt: Date | null;
-      capturedAt: Date;
-    } | null,
+    ranking: MyRankingRow | null,
     rankingDate: string,
+    rankType: SeasonRankingType,
+    totalParticipants: number,
   ): RankingResponse['data']['myRanking'] {
     if (!ranking) {
       return this.unavailableMyRanking(
@@ -538,6 +686,16 @@ export class RankingService {
       reachedReturnAt: ranking.reachedReturnAt?.toISOString() ?? null,
       rankingDate,
       capturedAt: ranking.capturedAt.toISOString(),
+      percentile: this.calculatePercentile(ranking.rank, totalParticipants),
+      provisionalTier:
+        rankType === SeasonRankingType.daily
+          ? this.assignTier(ranking.rank, totalParticipants)
+          : null,
+      finalTier:
+        rankType === SeasonRankingType.final
+          ? (ranking.seasonParticipant.finalTier ??
+            this.assignTier(ranking.rank, totalParticipants))
+          : null,
     };
   }
 
@@ -558,6 +716,35 @@ export class RankingService {
       reason,
       message,
     };
+  }
+
+  private calculatePercentile(rank: number, totalParticipants: number) {
+    if (totalParticipants <= 0) {
+      return this.formatDecimal(new Prisma.Decimal(0), 8);
+    }
+
+    return this.formatDecimal(
+      new Prisma.Decimal(rank).div(totalParticipants).mul(100),
+      8,
+    );
+  }
+
+  private assignTier(rank: number, totalParticipants: number): RankingTier {
+    if (totalParticipants <= 0) {
+      return 'bronze';
+    }
+
+    for (const rule of TIER_CUTOFF_RULES) {
+      const cutoff = Math.max(
+        1,
+        Math.ceil(totalParticipants * rule.cumulativeRatio),
+      );
+      if (rank <= cutoff) {
+        return rule.tier;
+      }
+    }
+
+    return 'bronze';
   }
 
   private formatSeason(season: RankingSeason) {

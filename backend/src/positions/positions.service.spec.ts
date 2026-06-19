@@ -453,6 +453,75 @@ describe('PositionsService', () => {
     expectNoPositionWrites(prisma);
   });
 
+  it('filters positions by assetId within the authenticated participant scope', async () => {
+    const { prisma, service } = createService();
+    mockCurrentSeason(prisma);
+    mockJoined(prisma);
+    prisma.position.findMany.mockResolvedValueOnce([
+      position({
+        id: 'position-filtered',
+        assetId: 'asset-filtered',
+        quantity: '3.00000000',
+        averageCost: '100.00000000',
+      }),
+    ]);
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(
+      priceSnapshot('price-filtered', '110.00000000'),
+    );
+
+    const response = await service.getPositions('user-1', {
+      assetId: 'asset-filtered',
+    });
+
+    expect(prisma.position.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          seasonParticipantId: 'sp-1',
+          assetId: 'asset-filtered',
+        }),
+      }),
+    );
+    expect(response.data.filters.assetId).toBe('asset-filtered');
+    expect(response.data.positions).toHaveLength(1);
+    expect(response.data.positions[0]).toMatchObject({
+      assetId: 'asset-filtered',
+    });
+    expectNoPositionWrites(prisma);
+  });
+
+  it('returns an empty positions response for an unowned assetId', async () => {
+    const { prisma, service } = createService();
+    mockCurrentSeason(prisma);
+    mockJoined(prisma);
+    prisma.position.findMany.mockResolvedValueOnce([]);
+
+    const response = await service.getPositions('user-1', {
+      assetId: 'asset-unowned',
+    });
+
+    expect(prisma.position.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          seasonParticipantId: 'sp-1',
+          assetId: 'asset-unowned',
+        }),
+      }),
+    );
+    expect(response.data).toMatchObject({
+      state: 'available',
+      filters: {
+        assetId: 'asset-unowned',
+      },
+      positions: [],
+      pagination: {
+        total: 0,
+        returned: 0,
+        nextOffset: null,
+      },
+    });
+    expectNoPositionWrites(prisma);
+  });
+
   it('rejects invalid query with BAD_REQUEST', async () => {
     const { service } = createService();
 

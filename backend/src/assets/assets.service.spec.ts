@@ -25,6 +25,12 @@ jest.mock('../generated/prisma/client', () => {
       Decimal,
     },
     PrismaClient: class PrismaClient {},
+    SeasonStatus: {
+      upcoming: 'upcoming',
+      active: 'active',
+      ended: 'ended',
+      settled: 'settled',
+    },
   };
 });
 
@@ -35,11 +41,18 @@ import {
   CurrencyCode,
   FxRateSourceType,
   Prisma,
+  SeasonStatus,
 } from '../generated/prisma/client';
 import { AssetsService } from './assets.service';
 
 describe('AssetsService', () => {
   const priceAt = new Date('2026-05-07T00:00:00.000Z');
+  const activeSeason = {
+    id: 'season-1',
+    status: SeasonStatus.active,
+    startAt: new Date(Date.now() - 86_400_000),
+    endAt: new Date(Date.now() + 86_400_000),
+  };
 
   const createWritableModel = () => ({
     create: jest.fn(),
@@ -54,6 +67,15 @@ describe('AssetsService', () => {
     asset: {
       count: jest.fn(),
       findMany: jest.fn(),
+      findUnique: jest.fn(),
+      ...createWritableModel(),
+    },
+    season: {
+      findFirst: jest.fn(),
+      findUnique: jest.fn(),
+      ...createWritableModel(),
+    },
+    seasonParticipant: {
       findUnique: jest.fn(),
       ...createWritableModel(),
     },
@@ -103,6 +125,13 @@ describe('AssetsService', () => {
     const service = new AssetsService(prisma as never);
 
     return { prisma, service };
+  };
+
+  const mockTradableSeason = (prisma: ReturnType<typeof createPrisma>) => {
+    prisma.season.findFirst.mockResolvedValueOnce(activeSeason);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+      id: 'sp-1',
+    });
   };
 
   const asset = (input: {
@@ -206,6 +235,8 @@ describe('AssetsService', () => {
   const expectNoAssetWrites = (prisma: ReturnType<typeof createPrisma>) => {
     for (const model of [
       prisma.asset,
+      prisma.season,
+      prisma.seasonParticipant,
       prisma.assetPriceSnapshot,
       prisma.fxRateSnapshot,
       prisma.cashWallet,
@@ -497,6 +528,108 @@ describe('AssetsService', () => {
       },
     });
     expect(response.data.priceErrors).toEqual([]);
+    expectNoAssetWrites(prisma);
+  });
+
+  it('adds trading UX fields to asset list items without removing existing fields', async () => {
+    const { prisma, service } = createService();
+    prisma.asset.count.mockResolvedValueOnce(1);
+    prisma.asset.findMany.mockResolvedValueOnce([
+      asset({
+        id: 'asset-btc',
+        symbol: 'BTCUSDT',
+        assetType: AssetType.crypto,
+        currencyCode: CurrencyCode.USD,
+      }),
+    ]);
+    mockTradableSeason(prisma);
+    prisma.fxRateSnapshot.findFirst.mockResolvedValueOnce(
+      freshUsdKrwSnapshot(),
+    );
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(
+      priceSnapshot('price-btc', '100.00000000', CurrencyCode.USD),
+    );
+
+    const response = await service.getAssets('user-1');
+
+    expect(response.data.assets[0]).toMatchObject({
+      assetId: 'asset-btc',
+      id: 'asset-btc',
+      settlementCurrency: CurrencyCode.USD,
+      changeRate: null,
+      marketStatus: 'always_open',
+      tradable: true,
+      tradeBlockedReason: null,
+      price: {
+        state: 'available',
+        currentPrice: '100.00000000',
+      },
+    });
+    expectNoAssetWrites(prisma);
+  });
+
+  it('marks assets without a price as not tradable with a safe reason', async () => {
+    const { prisma, service } = createService();
+    prisma.asset.count.mockResolvedValueOnce(1);
+    prisma.asset.findMany.mockResolvedValueOnce([
+      asset({
+        id: 'asset-missing-price',
+        assetType: AssetType.crypto,
+        currencyCode: CurrencyCode.USD,
+      }),
+    ]);
+    mockTradableSeason(prisma);
+    prisma.fxRateSnapshot.findFirst.mockResolvedValueOnce(
+      freshUsdKrwSnapshot(),
+    );
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(null);
+
+    const response = await service.getAssets('user-1');
+
+    expect(response.data.assets[0]).toMatchObject({
+      assetId: 'asset-missing-price',
+      id: 'asset-missing-price',
+      tradable: false,
+      tradeBlockedReason: 'PRICE_UNAVAILABLE',
+      price: {
+        state: 'unavailable',
+        reason: 'ASSET_PRICE_UNAVAILABLE',
+      },
+    });
+    expectNoAssetWrites(prisma);
+  });
+
+  it('marks stale USD conversion evidence as not tradable with PRICE_STALE', async () => {
+    const { prisma, service } = createService();
+    prisma.asset.count.mockResolvedValueOnce(1);
+    prisma.asset.findMany.mockResolvedValueOnce([
+      asset({
+        id: 'asset-stale-fx',
+        assetType: AssetType.crypto,
+        currencyCode: CurrencyCode.USD,
+      }),
+    ]);
+    mockTradableSeason(prisma);
+    prisma.fxRateSnapshot.findFirst.mockResolvedValueOnce(
+      staleUsdKrwSnapshot(),
+    );
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(
+      priceSnapshot('price-stale-fx', '100.00000000', CurrencyCode.USD),
+    );
+
+    const response = await service.getAssets('user-1');
+
+    expect(response.data.assets[0]).toMatchObject({
+      assetId: 'asset-stale-fx',
+      marketStatus: 'always_open',
+      tradable: false,
+      tradeBlockedReason: 'PRICE_STALE',
+      price: {
+        state: 'available',
+        priceKrwState: 'unavailable',
+        priceKrwReason: 'FX_RATE_STALE',
+      },
+    });
     expectNoAssetWrites(prisma);
   });
 
@@ -879,6 +1012,7 @@ describe('AssetsService', () => {
         currencyCode: CurrencyCode.USD,
       }),
     );
+    mockTradableSeason(prisma);
     prisma.fxRateSnapshot.findFirst.mockResolvedValueOnce(
       freshUsdKrwSnapshot(),
     );
@@ -892,11 +1026,16 @@ describe('AssetsService', () => {
       state: 'available',
       asset: {
         assetId: 'asset-btc',
+        id: 'asset-btc',
         symbol: 'BTCUSDT',
         name: 'Bitcoin',
         market: 'BINANCE',
         assetType: AssetType.crypto,
         currencyCode: CurrencyCode.USD,
+        changeRate: null,
+        marketStatus: 'always_open',
+        tradable: true,
+        tradeBlockedReason: null,
         price: {
           state: 'available',
           currentPrice: '100.00000000',
@@ -912,6 +1051,42 @@ describe('AssetsService', () => {
     expect(response.data.asset.tradingNote.message).toContain(
       'Crypto is USD-settled',
     );
+    expectNoAssetWrites(prisma);
+  });
+
+  it('returns detail trading UX fields for not joined users', async () => {
+    const { prisma, service } = createService();
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({
+        id: 'asset-btc',
+        assetType: AssetType.crypto,
+        currencyCode: CurrencyCode.USD,
+      }),
+    );
+    prisma.season.findFirst.mockResolvedValueOnce(activeSeason);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
+    prisma.fxRateSnapshot.findFirst.mockResolvedValueOnce(
+      freshUsdKrwSnapshot(),
+    );
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(
+      priceSnapshot('price-btc', '100.00000000', CurrencyCode.USD),
+    );
+
+    const response = await service.getAsset('user-1', 'asset-btc');
+
+    expect(response.data.asset).toMatchObject({
+      assetId: 'asset-btc',
+      id: 'asset-btc',
+      marketStatus: 'always_open',
+      tradable: false,
+      tradeBlockedReason: 'SEASON_NOT_JOINED',
+      price: {
+        state: 'available',
+      },
+      tradingNote: {
+        settlementCurrency: CurrencyCode.USD,
+      },
+    });
     expectNoAssetWrites(prisma);
   });
 

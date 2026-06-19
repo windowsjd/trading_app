@@ -978,6 +978,7 @@ describe('OrdersService', () => {
     mockAssetPrice(prisma);
     mockFreshFx(prisma);
     mockCashWallet(prisma);
+    mockPosition(prisma, '3.50000000');
 
     const response = await service.quoteOrder('user-1', {
       assetId: 'asset-1',
@@ -1003,6 +1004,10 @@ describe('OrdersService', () => {
       krwGrossAmount: '280000.00000000',
       krwFeeAmount: '280.00000000',
       krwNetAmount: '280280.00000000',
+      walletBalanceBefore: '1000.00000000',
+      estimatedWalletBalanceAfter: '799.80000000',
+      positionQuantityBefore: '3.50000000',
+      estimatedPositionQuantityAfter: '5.50000000',
       assetPriceSnapshotId: 'aps-1',
       fxRateSnapshotId: 'fx-1',
       quoteId: 'quote-order-1',
@@ -1223,6 +1228,10 @@ describe('OrdersService', () => {
       krwGrossAmount: '700000.00000000',
       krwFeeAmount: '700.00000000',
       krwNetAmount: '700700.00000000',
+      walletBalanceBefore: '1000.00000000',
+      estimatedWalletBalanceAfter: '499.50000000',
+      positionQuantityBefore: '0.00000000',
+      estimatedPositionQuantityAfter: '0.01000000',
       assetPriceSnapshotId: 'aps-btc-1',
       fxRateSnapshotId: 'fx-1',
     });
@@ -1249,6 +1258,7 @@ describe('OrdersService', () => {
     mockAssetPrice(prisma, '50000.00000000');
     mockFreshFx(prisma);
     mockPosition(prisma, '0.02000000');
+    mockCashWallet(prisma, '25.00000000');
 
     const response = await service.quoteOrder('user-1', {
       assetId: 'asset-btc',
@@ -1271,6 +1281,10 @@ describe('OrdersService', () => {
       krwGrossAmount: '700000.00000000',
       krwFeeAmount: '700.00000000',
       krwNetAmount: '699300.00000000',
+      walletBalanceBefore: '25.00000000',
+      estimatedWalletBalanceAfter: '524.50000000',
+      positionQuantityBefore: '0.02000000',
+      estimatedPositionQuantityAfter: '0.01000000',
       fxRateSnapshotId: 'fx-1',
       assetPriceSource: {
         sourceType: 'admin_manual',
