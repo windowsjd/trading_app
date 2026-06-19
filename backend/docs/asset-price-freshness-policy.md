@@ -4,7 +4,7 @@
 
 This document fixes the near-term freshness and source policy for FX and asset price snapshots before provider ingestion, scheduler/batch, ranking automation, settlement, or reward implementation.
 
-This policy records freshness and source boundaries after provider ingestion foundation, the read-only/quote provider eligibility gate, the operator-run daily snapshot eligibility gate, and the 2026-06-08 Durable Quote provider execute gate. It does not authorize package, seed, scheduler, settlement, reward, order replay, partial fill, matching-engine changes, or provider_api source eligibility changes outside the explicitly approved workflows.
+This policy records freshness and source boundaries after provider ingestion foundation, the read-only/quote provider eligibility gate, the operator-run daily snapshot eligibility gate, the 2026-06-08 Durable Quote provider execute gate, and the season settlement valuation follow-up. It does not authorize package, seed, reward, order replay, partial fill, matching-engine changes, real external trading APIs, or provider_api source eligibility changes outside the explicitly approved workflows.
 
 2026-05-26 update:
 
@@ -13,7 +13,7 @@ This policy records freshness and source boundaries after provider ingestion fou
 - Provider API Source Eligibility Implementation Gate later opened provider_api only for `/fx quote`, assets `withPrice`, orders quote, and live portfolio/home/positions valuation.
 - Provider-backed Daily Snapshot Eligibility Gate later opened provider_api only for operator-run daily snapshot valuation, using the same provider sourceName allowlist and freshness thresholds.
 - `docs/realtime-execution-policy.md` now defines and the services implement the stricter execute/write freshness and quote-to-execute movement policy for `/fx execute` and orders execute: KRX/US/BINANCE asset execute freshness <= 10 seconds by `capturedAt`, USD/KRW FX execute freshness <= 60 seconds by `capturedAt`, no default admin_manual execute fallback, and quote is only a reference quote.
-- Orders create source selection, ranking, settlement/final result, reward/final tier/fulfillment, provider trigger APIs, production scheduler automation, KIS REST current-price ingestion, orderbook/hoga WebSocket ingestion, and order/account/balance/real-trading APIs remain closed.
+- Orders create uses a durable quote and immediate market execution. Ranking, reward/final tier/fulfillment, provider trigger APIs, KIS REST current-price ingestion, orderbook/hoga WebSocket ingestion, and order/account/balance/real-trading APIs remain closed unless separately opened.
 
 ## 2. Current Price Storage Model
 
@@ -37,6 +37,7 @@ Current code behavior:
 - `/fx execute` requires a matching active durable FX quote and a fresh eligible `provider_api` `exchange_rate_api` USD/KRW row with capturedAt age <= 60 seconds. Default `admin_manual` fallback is forbidden.
 - Orders quote can use fresh eligible `provider_api` asset price and USD/KRW rows first, then `admin_manual` fallback. Orders create binds an active durable quote but does not read provider rows directly. Orders execute requires fresh eligible provider asset rows with capturedAt age <= 10 seconds and fresh provider USD/KRW rows for USD assets with capturedAt age <= 60 seconds; default `admin_manual` fallback is forbidden.
 - Assets `withPrice`, live portfolio/home/positions valuation, and operator-run daily snapshot valuation can use fresh eligible `provider_api` asset price and USD/KRW rows first, then `admin_manual` fallback.
+- Season settlement valuation uses `Season.endAt` as the valuation time and selects the latest valid asset price and USD/KRW rows with `effectiveAt <= Season.endAt`; it does not enforce quote/execute capturedAt freshness windows.
 - Daily snapshot valuation stores source evidence in the batch job result `sourceSummary`; `daily_portfolio_snapshots` row schema is unchanged.
 - Ranking APIs read existing `season_rankings`; they do not fetch or calculate prices.
 - Daily snapshot and ranking generation exist only as manual CLI foundations.
@@ -94,7 +95,7 @@ Current implementation:
 
 - Domestic stock asset prices use `admin_manual` snapshots when present.
 - There is no implemented asset-price stale threshold.
-- KIS WebSocket `H0STCNT0` can insert `provider_api` KRX trade-price rows for existing active KRW domestic stock assets. Fresh matching rows are eligible for approved read-only/quote workflows, orders execute, and operator-run daily snapshot valuation; ranking, settlement, and reward paths remain closed.
+- KIS WebSocket `H0STCNT0` can insert `provider_api` KRX trade-price rows for existing active KRW domestic stock assets. Fresh matching rows are eligible for approved read-only/quote workflows, orders execute, and operator-run daily snapshot valuation; season settlement valuation can use the latest valid stored row at or before `Season.endAt`. Ranking and reward paths remain closed.
 
 Policy decision:
 
@@ -111,7 +112,7 @@ Current implementation:
 - There is no implemented asset-price stale threshold.
 - USD assets require fresh approved USD/KRW for KRW valuation/audit consistency.
 - KIS WebSocket `HDFSCNT0` can insert `provider_api` US trade-price rows for existing active USD US stock assets with NAS/NYS/AMS market mapping. KIS documents US free quotes as 0-minute delayed; Hong Kong, Vietnam, China, and Japan 15-minute delayed markets are skipped in this MVP foundation.
-- KIS US provider_api rows are eligible only for the approved read-only/quote workflows after the 2026-06-03 source eligibility gate, operator-run daily snapshot valuation after the 2026-06-05 gate, and orders execute after the 2026-06-08 Durable Quote provider execute gate. Ranking, settlement, and reward paths remain closed.
+- KIS US provider_api rows are eligible only for the approved read-only/quote workflows after the 2026-06-03 source eligibility gate, operator-run daily snapshot valuation after the 2026-06-05 gate, orders execute after the 2026-06-08 Durable Quote provider execute gate, and season settlement valuation after the settlement follow-up. Ranking and reward paths remain closed.
 
 Target policy after provider ingestion:
 
@@ -163,8 +164,9 @@ Target policy after provider ingestion:
   - Ranking should inherit the source policy of the daily/final snapshots it consumes.
 - Settlement
   - Finality and reproducibility are more important than real-time display freshness.
-  - Final settlement source remains a Gate H decision.
-  - `provider_api` real-time price alone is not accepted as final settlement evidence in this policy.
+  - The implemented MVP settlement job evaluates at `Season.endAt`.
+  - It selects the latest valid stored asset price and USD/KRW row with `effectiveAt <= Season.endAt`.
+  - It does not enforce quote/execute capturedAt freshness windows because stock markets may be closed at the documented Sunday 23:59 KST season end.
 
 ## 10. SourceType Priority
 
@@ -185,8 +187,9 @@ SourceType priority is workflow-specific:
    - Ranking reads existing snapshots only and does not directly select provider rows.
    - `official_batch` may outrank `provider_api` for future official daily/reference workflows only after a separate Gate F/H approval.
 4. Settlement:
-   - Source priority must be fixed in Gate H.
-   - `official_batch` or a frozen reference snapshot is the likely candidate, not live `provider_api`.
+   - Use the latest valid stored provider row at or before `Season.endAt` when available, with explicit `admin_manual` fallback.
+   - Do not use quote/execute freshness windows.
+   - Future `official_batch` or frozen reference snapshot priority can still be introduced by a separate gate.
 
 ## 11. Manual Fallback Policy
 
@@ -247,15 +250,15 @@ Stale data must produce explicit workflow behavior:
 - home live valuation: return unavailable state for affected summary fields.
 - daily snapshot: fail or skip the participant with explicit error depending on job mode.
 - ranking: do not synthesize rankings without source snapshots.
-- settlement: abort or require operator recovery; do not partially settle.
+- settlement: use latest valid rows at or before `Season.endAt`; abort or require operator recovery if required price/FX rows are unavailable, and do not partially settle.
 
 ## 15. Market Hours and Closed-Market Behavior
 
-- FX: treat USD/KRW as quote/execute fresh only by the 60-second `effectiveAt` threshold until a market-hours policy says otherwise.
-- Domestic stocks: market-open quote/execute is blocked until real-time KRX provider evidence exists. Closed-market close/reference use remains conditional.
+- FX: execute requires fresh eligible provider USD/KRW by the active realtime execution policy; quote/read workflows use their separate freshness windows.
+- Domestic stocks: market-open quote/execute is open only through the approved KIS KRX provider evidence and durable quote gates. Closed-market settlement uses latest valid rows at or before `Season.endAt`.
 - US stocks: market-open quote/execute requires fresh non-delayed data or explicit product approval for delayed simulation. Closed-market read-only valuation may use latest regular close when clearly identified.
 - Crypto: treat as 24/7; no closed-market relaxation.
-- Settlement: market-hours behavior must be frozen by Gate H and must not rely on ambiguous live price drift.
+- Settlement: use `Season.endAt` as the as-of time and select latest valid rows at or before that time; do not require the market to be open or the row to satisfy quote/execute freshness.
 
 ## 16. Error Codes / Failure Behavior
 
@@ -333,10 +336,10 @@ Settlement implementation tests:
 | FX provider freshness                  | CONDITIONAL GO                         | Requires OANDA/Twelve Data live response timestamp evidence before ingestion code                                                                      |
 | US stock freshness                     | CONDITIONAL GO                         | Twelve Data is a candidate, but live fixtures, symbol mapping, plan, and terms are required                                                            |
 | Crypto provider_api row insertion      | GO for foundation                      | Binance public REST ticker can create USD-equivalent provider_api snapshot rows for existing mapped BINANCE crypto assets                              |
-| Crypto provider_api source eligibility | PARTIAL GO                             | Binance provider_api rows may power approved read-only/quote and operator-run daily snapshot valuation workflows only; execute/write/final remain STOP |
-| KRX quote/execute freshness            | BLOCKED                                | Real-time KRX provider evidence is not verified; checked Twelve Data coverage indicates Korea exchanges are EOD delay                                  |
+| Crypto provider_api source eligibility | PARTIAL GO                             | Binance provider_api rows may power approved read-only/quote, durable quote execution, operator-run daily snapshot valuation, and season settlement valuation workflows only |
+| KRX quote/execute freshness            | PARTIAL GO                             | KIS KRX provider rows may power approved read-only/quote and durable quote execution workflows; Twelve Data Korea exchange EOD delay remains rejected for realtime execute |
 | Scheduler/batch foundation             | CONDITIONAL GO for audit only          | Freshness requirements are clearer, but scheduler implementation needs its own gate                                                                    |
-| Settlement implementation              | STOP                                   | Final evidence source and reproducibility policy belong to Gate H/I                                                                                    |
+| Settlement implementation              | PARTIAL GO                             | MVP settlement uses latest valid stored price/FX rows at or before `Season.endAt`; reward payout and future official batch priority remain separate gates |
 
 ## 19. Open Questions
 

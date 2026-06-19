@@ -19,6 +19,7 @@ import {
   resolveAssetProviderEligibility,
   resolveFxProviderEligibility,
   selectFreshProviderSnapshot,
+  selectProviderSnapshotAtOrBefore,
   type ProviderWorkflow,
 } from '../providers/source-eligibility.policy';
 
@@ -41,6 +42,8 @@ export class PortfolioValuationService {
     valuationAt = new Date(),
     sourceEligibilityWorkflow: PortfolioSourceWorkflow = 'daily_portfolio_snapshot',
   ): Promise<PortfolioValuationResult> {
+    const useSettlementPricePolicy =
+      sourceEligibilityWorkflow === 'season_settlement';
     const participant = await this.prisma.seasonParticipant.findUnique({
       where: {
         id: seasonParticipantId,
@@ -96,6 +99,7 @@ export class PortfolioValuationService {
           position.asset,
           valuationAt,
           sourceEligibilityWorkflow,
+          useSettlementPricePolicy,
         ),
       })),
     );
@@ -116,6 +120,7 @@ export class PortfolioValuationService {
       ? await this.findLatestEligibleUsdKrwSnapshot(
           valuationAt,
           sourceEligibilityWorkflow,
+          useSettlementPricePolicy,
         )
       : null;
 
@@ -131,6 +136,7 @@ export class PortfolioValuationService {
       )
         ? sourceEligibilityWorkflow
         : undefined,
+      enforceAdminManualFxFreshness: !useSettlementPricePolicy,
     });
   }
 
@@ -138,6 +144,7 @@ export class PortfolioValuationService {
     asset: PositionAssetForSourceSelection,
     valuationAt: Date,
     sourceEligibilityWorkflow: PortfolioSourceWorkflow,
+    useSettlementPricePolicy: boolean,
   ): Promise<PortfolioAssetPriceSnapshotInput | null> {
     const providerEligibility = resolveAssetProviderEligibility({
       workflow: sourceEligibilityWorkflow,
@@ -154,13 +161,24 @@ export class PortfolioValuationService {
             assetId: asset.id,
             currencyCode: this.getAssetPriceCurrency(asset),
             sourceType: AssetPriceSourceType.provider_api,
+            ...(useSettlementPricePolicy
+              ? {
+                  sourceName: providerEligibility.sourceName,
+                  effectiveAt: {
+                    lte: valuationAt,
+                  },
+                  price: {
+                    gt: 0,
+                  },
+                }
+              : {}),
           },
           orderBy: [
             { effectiveAt: 'desc' },
             { capturedAt: 'desc' },
             { createdAt: 'desc' },
           ],
-          take: 10,
+          take: useSettlementPricePolicy ? 1 : 10,
           select: {
             id: true,
             assetId: true,
@@ -176,14 +194,21 @@ export class PortfolioValuationService {
         })) ?? [])
       : [];
     const providerSelection = providerEligibility.eligible
-      ? selectFreshProviderSnapshot({
-          candidates: providerCandidates,
-          expectedSourceName: providerEligibility.sourceName,
-          now: valuationAt,
-          freshnessThresholdSeconds:
-            providerEligibility.freshnessThresholdSeconds,
-          isPositiveValue: (candidate) => isPositiveDecimal(candidate.price),
-        })
+      ? useSettlementPricePolicy
+        ? selectProviderSnapshotAtOrBefore({
+            candidates: providerCandidates,
+            expectedSourceName: providerEligibility.sourceName,
+            valuationAt,
+            isPositiveValue: (candidate) => isPositiveDecimal(candidate.price),
+          })
+        : selectFreshProviderSnapshot({
+            candidates: providerCandidates,
+            expectedSourceName: providerEligibility.sourceName,
+            now: valuationAt,
+            freshnessThresholdSeconds:
+              providerEligibility.freshnessThresholdSeconds,
+            isPositiveValue: (candidate) => isPositiveDecimal(candidate.price),
+          })
       : {
           state: 'not_selected' as const,
           decision: {
@@ -258,6 +283,7 @@ export class PortfolioValuationService {
   private async findLatestEligibleUsdKrwSnapshot(
     valuationAt: Date,
     sourceEligibilityWorkflow: PortfolioSourceWorkflow,
+    useSettlementPricePolicy: boolean,
   ) {
     const providerEligibility = resolveFxProviderEligibility({
       workflow: sourceEligibilityWorkflow,
@@ -270,13 +296,24 @@ export class PortfolioValuationService {
             baseCurrency: CurrencyCode.USD,
             quoteCurrency: CurrencyCode.KRW,
             sourceType: FxRateSourceType.provider_api,
+            ...(useSettlementPricePolicy
+              ? {
+                  sourceName: providerEligibility.sourceName,
+                  effectiveAt: {
+                    lte: valuationAt,
+                  },
+                  rate: {
+                    gt: 0,
+                  },
+                }
+              : {}),
           },
           orderBy: [
             { effectiveAt: 'desc' },
             { capturedAt: 'desc' },
             { createdAt: 'desc' },
           ],
-          take: 10,
+          take: useSettlementPricePolicy ? 1 : 10,
           select: {
             id: true,
             baseCurrency: true,
@@ -292,14 +329,21 @@ export class PortfolioValuationService {
         })) ?? [])
       : [];
     const providerSelection = providerEligibility.eligible
-      ? selectFreshProviderSnapshot({
-          candidates: providerCandidates,
-          expectedSourceName: providerEligibility.sourceName,
-          now: valuationAt,
-          freshnessThresholdSeconds:
-            providerEligibility.freshnessThresholdSeconds,
-          isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
-        })
+      ? useSettlementPricePolicy
+        ? selectProviderSnapshotAtOrBefore({
+            candidates: providerCandidates,
+            expectedSourceName: providerEligibility.sourceName,
+            valuationAt,
+            isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
+          })
+        : selectFreshProviderSnapshot({
+            candidates: providerCandidates,
+            expectedSourceName: providerEligibility.sourceName,
+            now: valuationAt,
+            freshnessThresholdSeconds:
+              providerEligibility.freshnessThresholdSeconds,
+            isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
+          })
       : {
           state: 'not_selected' as const,
           decision: {
@@ -333,6 +377,13 @@ export class PortfolioValuationService {
         effectiveAt: {
           lte: valuationAt,
         },
+        ...(useSettlementPricePolicy
+          ? {
+              rate: {
+                gt: 0,
+              },
+            }
+          : {}),
       },
       orderBy: [
         { effectiveAt: 'desc' },

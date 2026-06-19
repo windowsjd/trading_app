@@ -322,6 +322,26 @@ describe('portfolio valuation policy', () => {
     ).toThrow('USD/KRW FX rate snapshot is stale.');
   });
 
+  it('allows older approved USD/KRW rate when settlement disables FX freshness', () => {
+    expect(
+      calculatePortfolioValuation({
+        seasonParticipantId: 'sp-1',
+        initialCapitalKrw: '1000000.00000000',
+        cashWallets: wallets('1000000.00000000', '1.00000000'),
+        positions: [],
+        usdKrwSnapshot: {
+          ...freshUsdKrwSnapshot,
+          effectiveAt: new Date('2026-05-06T00:00:00.000Z'),
+        },
+        valuationAt,
+        enforceAdminManualFxFreshness: false,
+      }),
+    ).toMatchObject({
+      totalAssetKrw: '1001400.00000000',
+      usdCashKrw: '1400.00000000',
+    });
+  });
+
   it('rejects non-positive initial capital', () => {
     expect(() =>
       calculatePortfolioValuation({

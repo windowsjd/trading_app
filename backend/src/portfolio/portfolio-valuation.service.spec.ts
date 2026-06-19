@@ -453,6 +453,133 @@ describe('PortfolioValuationService source eligibility', () => {
       code: 'ASSET_PRICE_UNAVAILABLE',
     } satisfies Partial<PortfolioValuationError>);
   });
+
+  it('uses latest provider_api rows at or before Season.endAt for settlement without capturedAt freshness', async () => {
+    const prisma = createPrismaMock();
+    const settlementAt = new Date('2026-06-07T14:59:00.000Z');
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+      id: 'sp-1',
+      initialCapitalKrw: new Prisma.Decimal('1000000.00000000'),
+      cashWallets: [
+        {
+          currencyCode: CurrencyCode.KRW,
+          balanceAmount: new Prisma.Decimal('0.00000000'),
+        },
+        {
+          currencyCode: CurrencyCode.USD,
+          balanceAmount: new Prisma.Decimal('0.00000000'),
+        },
+      ],
+      positions: [
+        {
+          assetId: 'asset-us',
+          quantity: new Prisma.Decimal('2.00000000'),
+          averageCost: new Prisma.Decimal('80.00000000'),
+          currencyCode: CurrencyCode.USD,
+          realizedPnl: new Prisma.Decimal('0.00000000'),
+          realizedPnlKrw: new Prisma.Decimal('0.00000000'),
+          asset: {
+            id: 'asset-us',
+            assetType: AssetType.us_stock,
+            market: 'NAS',
+            currencyCode: CurrencyCode.USD,
+          },
+        },
+      ],
+    });
+    prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([
+      {
+        id: 'settlement-provider-price-us',
+        assetId: 'asset-us',
+        price: new Prisma.Decimal('110.00000000'),
+        currencyCode: CurrencyCode.USD,
+        sourceType: AssetPriceSourceType.provider_api,
+        sourceName: 'kis_us_delayed_trade',
+        effectiveAt: new Date('2026-06-05T20:00:00.000Z'),
+        capturedAt: new Date('2026-06-05T20:00:05.000Z'),
+        createdAt: new Date('2026-06-05T20:00:06.000Z'),
+      },
+    ]);
+    prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
+      {
+        id: 'settlement-provider-fx-1',
+        baseCurrency: CurrencyCode.USD,
+        quoteCurrency: CurrencyCode.KRW,
+        rate: new Prisma.Decimal('1500.00000000'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'exchange_rate_api',
+        effectiveAt: new Date('2026-06-05T20:00:00.000Z'),
+        capturedAt: new Date('2026-06-05T20:00:05.000Z'),
+        createdAt: new Date('2026-06-05T20:00:06.000Z'),
+        approvedByUserId: null,
+      },
+    ]);
+    const service = new PortfolioValuationService(prisma as never);
+
+    const result = await service.calculateSeasonParticipantValuation(
+      'sp-1',
+      settlementAt,
+      'season_settlement',
+    );
+
+    expect(result).toMatchObject({
+      totalAssetKrw: '330000.00000000',
+      assetValueKrw: '330000.00000000',
+      sourceSummary: {
+        providerApiUsed: true,
+        adminManualUsed: false,
+        fallbackUsed: false,
+      },
+      assetPriceSourceDecisions: [
+        {
+          assetId: 'asset-us',
+          sourceDecision: {
+            selectedSourceType: 'provider_api',
+            selectedSnapshotId: 'settlement-provider-price-us',
+            freshnessAgeSeconds: null,
+          },
+        },
+      ],
+      fxRateSourceDecision: {
+        selectedSourceType: 'provider_api',
+        selectedSnapshotId: 'settlement-provider-fx-1',
+        freshnessAgeSeconds: null,
+      },
+    });
+    expect(prisma.assetPriceSnapshot.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          assetId: 'asset-us',
+          sourceType: AssetPriceSourceType.provider_api,
+          sourceName: 'kis_us_delayed_trade',
+          effectiveAt: {
+            lte: settlementAt,
+          },
+          price: {
+            gt: 0,
+          },
+        }),
+        take: 1,
+      }),
+    );
+    expect(prisma.fxRateSnapshot.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          sourceType: FxRateSourceType.provider_api,
+          sourceName: 'exchange_rate_api',
+          effectiveAt: {
+            lte: settlementAt,
+          },
+          rate: {
+            gt: 0,
+          },
+        }),
+        take: 1,
+      }),
+    );
+    expect(prisma.assetPriceSnapshot.findFirst).not.toHaveBeenCalled();
+    expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
+  });
 });
 
 function createPrismaMock() {

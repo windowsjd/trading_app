@@ -17,12 +17,12 @@ export type ProviderEligibleWorkflow =
   | 'live_portfolio_valuation'
   | 'home_live_valuation'
   | 'positions_live_valuation'
-  | 'daily_portfolio_snapshot';
+  | 'daily_portfolio_snapshot'
+  | 'season_settlement';
 
 export type ProviderDeniedWorkflow =
   | 'orders_create'
   | 'season_ranking'
-  | 'season_settlement'
   | 'reward_final_tier'
   | 'reward_fulfillment';
 
@@ -83,12 +83,12 @@ const ALLOWED_WORKFLOWS: ReadonlySet<ProviderEligibleWorkflow> = new Set([
   'home_live_valuation',
   'positions_live_valuation',
   'daily_portfolio_snapshot',
+  'season_settlement',
 ]);
 
 const DENIED_WORKFLOWS: ReadonlySet<ProviderDeniedWorkflow> = new Set([
   'orders_create',
   'season_ranking',
-  'season_settlement',
   'reward_final_tier',
   'reward_fulfillment',
 ]);
@@ -272,6 +272,66 @@ export function selectFreshProviderSnapshot<
   };
 }
 
+export function selectProviderSnapshotAtOrBefore<
+  T extends ProviderSnapshotCandidate,
+>(input: {
+  candidates: readonly T[];
+  expectedSourceName: string;
+  valuationAt: Date;
+  isPositiveValue: (candidate: T) => boolean;
+}): ProviderSnapshotSelection<T> {
+  if (input.candidates.length === 0) {
+    return {
+      state: 'not_selected',
+      decision: buildEmptyDecision({
+        fallbackUsed: true,
+        fallbackReason: 'provider_missing',
+        rejectedProviderReason: null,
+      }),
+    };
+  }
+
+  let rejectedProviderReason: string | null = null;
+
+  for (const candidate of input.candidates) {
+    const evaluation = evaluateProviderSnapshotAtOrBefore({
+      candidate,
+      expectedSourceName: input.expectedSourceName,
+      valuationAt: input.valuationAt,
+      isPositiveValue: () => input.isPositiveValue(candidate),
+    });
+
+    if (evaluation.eligible) {
+      return {
+        state: 'selected',
+        snapshot: candidate,
+        decision: {
+          selectedSourceType: 'provider_api',
+          selectedSourceName: candidate.sourceName,
+          selectedSnapshotId: candidate.id,
+          selectedEffectiveAt: candidate.effectiveAt,
+          selectedCapturedAt: candidate.capturedAt,
+          fallbackUsed: false,
+          fallbackReason: null,
+          rejectedProviderReason: null,
+          freshnessAgeSeconds: null,
+        },
+      };
+    }
+
+    rejectedProviderReason ??= evaluation.reason;
+  }
+
+  return {
+    state: 'not_selected',
+    decision: buildEmptyDecision({
+      fallbackUsed: true,
+      fallbackReason: 'provider_rejected',
+      rejectedProviderReason,
+    }),
+  };
+}
+
 export function buildAdminManualFallbackDecision(input: {
   selectedSnapshotId: string;
   selectedSourceName?: string | null;
@@ -295,6 +355,56 @@ export function buildAdminManualFallbackDecision(input: {
 
 export function isPositiveDecimal(value: Prisma.Decimal): boolean {
   return value.gt(0);
+}
+
+function evaluateProviderSnapshotAtOrBefore<
+  T extends ProviderSnapshotCandidate,
+>(input: {
+  candidate: T;
+  expectedSourceName: string;
+  valuationAt: Date;
+  isPositiveValue: () => boolean;
+}):
+  | {
+      eligible: true;
+    }
+  | {
+      eligible: false;
+      reason: string;
+    } {
+  const candidate = input.candidate;
+
+  if (candidate.sourceType !== 'provider_api') {
+    return {
+      eligible: false,
+      reason: 'source_type_mismatch',
+    };
+  }
+
+  if (candidate.sourceName !== input.expectedSourceName) {
+    return {
+      eligible: false,
+      reason: 'source_name_mismatch',
+    };
+  }
+
+  if (!input.isPositiveValue()) {
+    return {
+      eligible: false,
+      reason: 'non_positive_value',
+    };
+  }
+
+  if (candidate.effectiveAt.getTime() > input.valuationAt.getTime()) {
+    return {
+      eligible: false,
+      reason: 'effective_at_in_future',
+    };
+  }
+
+  return {
+    eligible: true,
+  };
 }
 
 function evaluateProviderSnapshot<T extends ProviderSnapshotCandidate>(input: {

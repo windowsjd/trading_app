@@ -4,18 +4,14 @@
 
 - `GET /api/v1/orders` read-only MVP is implemented.
 - `POST /api/v1/orders/quote` durable quote MVP is implemented.
-- `POST /api/v1/orders` submitted order create MVP is implemented.
+- `POST /api/v1/orders` durable quote-bound immediate market execution MVP is implemented.
 - `POST /api/v1/orders` create idempotency MVP is implemented.
-- `POST /api/v1/orders/:orderId/cancel` submitted order cancel MVP is implemented.
-- `POST /api/v1/orders/:orderId/execute` full-fill MVP is implemented.
-- `POST /api/v1/orders` creates one `orders` row with `status = submitted`.
-- `POST /api/v1/orders/:orderId/cancel` updates an owned submitted order row to `status = canceled`.
-- `POST /api/v1/orders/:orderId/execute` executes owned submitted orders as a full fill, debits or credits the cash wallet, mutates the position, creates one order wallet transaction, and finalizes the order to `executed`.
-- Quote creates a durable quote row. Create/cancel/list APIs do not execute orders, debit or credit wallets, mutate positions, create wallet transactions, create equity snapshots, run settlement, or synthesize fake order data.
-- Stored gross/fee/net amounts on submitted orders are pre-execution quote estimates, not confirmed fill amounts.
-- Execute recalculates and stores actual `executedPrice`, `grossAmount`, `feeAmount`, and `netAmount` at execution time.
-- Orders create binds an active durable quote in `orders.quoteId`.
-- Orders execute uses execute-time fresh provider_api asset price and USD/KRW FX evidence, consumes the durable quote atomically with writes, and forbids default `admin_manual` execute fallback.
+- `POST /api/v1/orders/:orderId/cancel` public route exists but returns `ORDER_CANCEL_NOT_SUPPORTED`.
+- `POST /api/v1/orders/:orderId/execute` remains as an internal compatibility/deprecation full-fill path.
+- `POST /api/v1/orders` requires `quoteId` and `idempotencyKey`, creates the market order, consumes the quote, reprices from fresh provider_api evidence, mutates wallet/position/ledger state, and returns the executed order response in one flow.
+- Quote creates a durable quote row. List APIs do not execute orders, debit or credit wallets, mutate positions, create wallet transactions, create equity snapshots, run settlement, or synthesize fake order data.
+- Order execution recalculates and stores actual `executedPrice`, `grossAmount`, `feeAmount`, and `netAmount` at execution time.
+- Execute paths use execute-time fresh provider_api asset price and USD/KRW FX evidence, consume the durable quote atomically with writes, and forbid default `admin_manual` execute fallback.
 - `docs/realtime-execution-policy.md` defines the active provider-backed execute/write policy.
 
 ## Source Rules
@@ -30,8 +26,8 @@
 - Upbit/Bithumb and KRW crypto trading are out of MVP scope.
 - `CurrencyCode.USDT` is not introduced; Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage.
 - Orders quote may use fresh eligible `provider_api` market data first.
-- Orders create uses the durable quote values to submit the order and does not read provider rows directly.
-- Orders execute requires fresh eligible `provider_api` market data at execute time.
+- Orders create uses the durable quote to start immediate market execution and requires fresh eligible `provider_api` market data at execution time.
+- `POST /api/v1/orders/:orderId/execute` is not the required public user flow; it is retained for internal compatibility/deprecation.
 - Current quote is a reference estimate, not a guaranteed execution price. Provider-backed execute reprices at execute time from fresh provider_api data, compares against the quote price/rate, and rejects excessive movement.
 
 ## Route
@@ -136,9 +132,9 @@
 {
   "assetId": "<string>",
   "side": "buy | sell",
-  "orderType": "market | limit",
+  "orderType": "market optional; limit is not supported",
   "quantity": "<decimal string>",
-  "limitPrice": "<amount string, required for limit>",
+  "limitPrice": "not supported",
   "currencyCode": "KRW | USD optional"
 }
 ```
@@ -148,9 +144,8 @@
 - Active season and joined participant are required.
 - Asset must exist and be active.
 - `quantity` must be a positive decimal string fitting `Decimal(24, 8)`.
-- `limitPrice` is required for limit orders and must be positive.
+- Only market orders are supported. `orderType=limit` or any provided `limitPrice` returns `ORDER_TYPE_NOT_SUPPORTED`.
 - Market orders use fresh eligible `provider_api` asset price first, then latest eligible `admin_manual` fallback with `effectiveAt <= quoteAt`.
-- Limit orders use `limitPrice`; no asset price snapshot is required.
 - Eligible provider source mapping is domestic KRX -> `kis_krx_realtime_trade`, US NAS/NYS -> `kis_us_delayed_trade`, and BINANCE USD crypto -> `binance_public_rest_24hr_ticker`.
 - Provider asset price freshness uses capturedAt age <= 60 seconds.
 - `currencyCode`, if provided, must match `asset.currencyCode`.
@@ -158,7 +153,6 @@
 - Missing, stale, future, non-positive, wrong-source, or ineligible provider rows fall back to the existing safe `admin_manual` quote logic.
 - `POST /api/v1/orders/quote` exposes optional public-safe `assetPriceSource` and `fxRateSource` metadata. Response shape remains backward-compatible and existing snapshot id fields are preserved.
 - Durable quotes have a 10-second default TTL; execute after expiry returns `QUOTE_EXPIRED`.
-- Limit orders use `limitPrice`, so `assetPriceSource.sourceType` is `null` and `fallbackReason` is `limit_price_provided`.
 - Raw provider payloads, `metadataJson`, and secrets are never exposed.
 - USD-settled crypto assets follow the same USD asset rule: order currency is USD, buy/sell resource checks use the USD Wallet, and `krwGrossAmount`/`krwFeeAmount`/`krwNetAmount` are USD amounts converted through USD/KRW.
 - Buy quote validates cash wallet balance read-only.
@@ -237,9 +231,9 @@ Same body as `POST /api/v1/orders/quote`.
 {
   "assetId": "<string>",
   "side": "buy | sell",
-  "orderType": "market | limit",
+  "orderType": "market optional; limit is not supported",
   "quantity": "<decimal string>",
-  "limitPrice": "<amount string, required for limit>",
+  "limitPrice": "not supported",
   "currencyCode": "KRW | USD optional",
   "quoteId": "<string>",
   "idempotencyKey": "<non-empty string>"
@@ -249,10 +243,9 @@ Same body as `POST /api/v1/orders/quote`.
 ### Behavior
 
 - Validates `quoteId` and `idempotencyKey` after auth and order body parsing.
-- New create requires `quoteId`.
+- New create requires `quoteId` and market order input.
 - Idempotency applies only to `POST /api/v1/orders` create.
 - `POST /api/v1/orders/quote` creates a durable quote row but does not require or store an idempotency key.
-- `POST /api/v1/orders/:orderId/cancel` does not require or store an idempotency key in this MVP.
 - The request hash is SHA-256 over canonical JSON for:
   - `assetId`
   - `quoteId`
@@ -265,26 +258,25 @@ Same body as `POST /api/v1/orders/quote`.
 - `quoteId` is included in the create idempotency request hash.
 - Same `seasonParticipantId + idempotencyKey` and same request hash replays the stored create response without creating a second order.
 - Same `seasonParticipantId + idempotencyKey` and different request hash, including a different `quoteId`, returns `ORDER_IDEMPOTENCY_CONFLICT`.
-- DB unique constraint `(season_participant_id, idempotency_key)` prevents duplicate submitted order rows under races.
+- DB unique constraint `(season_participant_id, idempotency_key)` prevents duplicate order rows under races.
 - If create hits a unique race (`P2002`), the service rereads the existing order:
   - same request hash: replay.
   - different request hash: `ORDER_IDEMPOTENCY_CONFLICT`.
 - Replay prefers stored `orders.response_payload_json`.
 - If stored response is missing, replay falls back to formatting the existing order row.
-- If an order was later canceled, duplicate create replay still prefers the original stored create response. This can show the original submitted create response rather than current canceled status; a stricter current-state command history would require a separate idempotency command table.
 - New create validates the active durable quote by id, user, participant, asset, side, orderType, quantity, limitPrice, currencyCode, expiry, status, and quote requestHash.
-- New create is closed to direct provider source selection; it uses the durable quote persisted by `POST /api/v1/orders/quote`.
+- New create uses the durable quote persisted by `POST /api/v1/orders/quote`, then reprices at execution time from fresh provider_api rows.
 - Create response includes `order.quoteId` through the standard order item.
-- Create-time financial values remain estimates. Execute-time provider repricing determines the actual fill values.
-- Creates exactly one `orders` row with `status = submitted`.
+- Execute-time provider repricing determines the actual fill values.
+- Creates exactly one `orders` row and finalizes it to `status = executed` on success.
 - Stores `idempotencyKey`, `requestHash`, and `responsePayloadJson` on that order row.
-- Does not execute the order.
-- Does not debit or credit wallets.
-- Does not create `wallet_transactions`.
-- Does not mutate `positions`.
+- Consumes the quote in the same Prisma transaction as wallet/position/order/ledger writes.
+- Debits or credits wallets.
+- Creates one `wallet_transactions` row.
+- Mutates `positions`.
 - Does not create `equity_snapshots`.
 - Does not run settlement or scheduler behavior.
-- Created submitted orders are visible from `GET /api/v1/orders` and `GET /api/v1/records?type=orders`.
+- Executed orders are visible from `GET /api/v1/orders` and `GET /api/v1/records?type=orders`.
 
 ### Response
 
@@ -292,57 +284,43 @@ Same body as `POST /api/v1/orders/quote`.
 {
   "success": true,
   "data": {
-    "order": "<GET /api/v1/orders order item>",
-    "execution": {
-      "state": "not_executed",
-      "reason": "ORDER_SUBMITTED_NOT_EXECUTED",
-      "message": "Order was submitted and can be executed through the execute endpoint."
-    }
+    "order": "<GET /api/v1/orders order item with status=executed>",
+    "execution": "<executed response payload, same shape as order execution success>"
   }
 }
 ```
 
 ## POST /api/v1/orders/:orderId/cancel
 
+This route is retained for compatibility, but public user cancel is not supported.
+
 ### Request
 
 - `orderId` path parameter is required.
 - Request body is optional and ignored in this MVP.
-- Cancel reason is not stored because the current schema has no cancel reason field.
 
 ### Behavior
 
-- Uses `request.user.userId`; no `x-user-id` fallback.
-- The order must belong to one of the authenticated user's season participants.
-- Missing or unowned orders return `ORDER_NOT_FOUND` without revealing ownership.
-- Only `status = submitted` orders can be canceled.
-- `executed`, `canceled`, and `rejected` orders are not cancelable.
-- Cancel uses a guarded `orders` update with `id + seasonParticipantId + status = submitted`.
-- Successful cancel updates only:
-  - `status = canceled`
-  - `canceledAt = <cancel time>`
-  - `updatedAt` through Prisma `@updatedAt`
-- `executedAt`, `rejectedAt`, and `rejectReason` are not changed.
-- No wallet, position, wallet transaction, equity snapshot, settlement, execution, scheduler, or provider behavior runs.
-- Canceled orders are visible from `GET /api/v1/orders` and `GET /api/v1/records?type=orders`.
+- Missing auth returns `UNAUTHORIZED`.
+- Authenticated requests return `ORDER_CANCEL_NOT_SUPPORTED`.
+- No order lookup or ownership detail is exposed.
+- No wallet, position, wallet transaction, equity snapshot, settlement, execution, scheduler, provider behavior, or order row mutation runs.
 
-### Response
+### Error Response
 
 ```json
 {
-  "success": true,
-  "data": {
-    "order": "<GET /api/v1/orders order item with status=canceled>",
-    "execution": {
-      "state": "not_executed",
-      "reason": "ORDER_CANCELED_BEFORE_EXECUTION",
-      "message": "Order was canceled before execution."
-    }
+  "success": false,
+  "error": {
+    "code": "ORDER_CANCEL_NOT_SUPPORTED",
+    "message": "Order cancel is not supported for MVP market orders."
   }
 }
 ```
 
 ## POST /api/v1/orders/:orderId/execute
+
+This endpoint is retained as an internal compatibility/deprecation path. The required public user flow is `POST /api/v1/orders` with a durable `quoteId` and `idempotencyKey`, which immediately executes market orders.
 
 ### Request
 
@@ -357,6 +335,7 @@ Same body as `POST /api/v1/orders/quote`.
 - Empty `orderId` returns `INVALID_ORDER_ID`.
 - Missing or unowned orders return `ORDER_NOT_FOUND`.
 - The order's season must be active; ended/settled/upcoming seasons cannot execute.
+- Only market orders are supported; limit orders return `ORDER_TYPE_NOT_SUPPORTED`.
 - Only `status = submitted` can create a new execution.
 - `status = executed` returns a duplicate current-state response without wallet, position, ledger, or order mutation.
 - `status = canceled` and `status = rejected` return `ORDER_NOT_EXECUTABLE`.
@@ -378,10 +357,6 @@ Same body as `POST /api/v1/orders/quote`.
   - `effectiveAt <= executedAt`.
   - `executedAt - capturedAt <= 10_000ms`.
   - ordered by `effectiveAt desc`, `capturedAt desc`, `createdAt desc`.
-- Limit orders use the same latest eligible market snapshot at execution time:
-  - buy executes only when selected price `<= limitPrice`.
-  - sell executes only when selected price `>= limitPrice`.
-  - `executedPrice` is the selected snapshot price, not the submitted `limitPrice`.
 - Market orders compare quote `quotedPrice` against execute price using `quote.maxChangeBps`; excessive movement returns `RATE_CHANGED_REQUOTE_REQUIRED`.
 - USD orders debit or credit the USD wallet. FX is not used to convert wallet amounts.
 - USD orders select a fresh eligible provider_api USD/KRW snapshot for audit/KRW evidence and store `fxRateSnapshotId`.
@@ -478,6 +453,7 @@ Same body as `POST /api/v1/orders/quote`.
 - `UNAUTHORIZED`
 - `INVALID_ORDER_ID`
 - `ORDER_NOT_FOUND`
+- `ORDER_CANCEL_NOT_SUPPORTED`
 - `ORDER_NOT_CANCELABLE`
 - `ORDER_CANCEL_CONFLICT`
 - `ORDER_NOT_EXECUTABLE`

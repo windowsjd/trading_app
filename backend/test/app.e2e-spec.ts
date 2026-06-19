@@ -57,6 +57,7 @@ jest.mock('../src/generated/prisma/client', () => {
       daily_portfolio_snapshot: 'daily_portfolio_snapshot',
       season_ranking_generation: 'season_ranking_generation',
       season_settlement: 'season_settlement',
+      season_lifecycle_transition: 'season_lifecycle_transition',
       reward_marker: 'reward_marker',
     },
     OpsJobRunStatus: {
@@ -148,6 +149,7 @@ jest.mock('../src/prisma/prisma.service', () => ({
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { WsAdapter } from '@nestjs/platform-ws';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
@@ -175,6 +177,7 @@ type PrismaMock = {
   };
   assetPriceSnapshot: {
     findFirst: jest.Mock;
+    findMany: jest.Mock;
   };
   cashWallet: {
     create: jest.Mock;
@@ -374,6 +377,7 @@ describe('AppController (e2e)', () => {
       },
       assetPriceSnapshot: {
         findFirst: jest.fn(),
+        findMany: jest.fn(),
       },
       cashWallet: {
         create: jest.fn(),
@@ -481,6 +485,7 @@ describe('AppController (e2e)', () => {
 
     jwtService = moduleFixture.get(JwtService);
     app = moduleFixture.createNestApplication();
+    app.useWebSocketAdapter(new WsAdapter(app));
     await app.init();
   });
 

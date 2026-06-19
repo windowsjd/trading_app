@@ -337,7 +337,7 @@ export class SeasonSettlementJobService {
         await this.portfolioValuationService.calculateSeasonParticipantValuation(
           participant.id,
           input.settlementAt,
-          'live_portfolio_valuation',
+          'season_settlement',
         );
       const history = await this.findEquityHistory(participant.id);
       const currentPoint = {

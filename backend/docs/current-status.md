@@ -162,7 +162,7 @@
     - `daily_portfolio_snapshots` table schema is unchanged; source metadata is not stored on snapshot rows.
     - `/fx execute`, orders create, orders execute, ranking generation, settlement/final result, reward/final tier/fulfillment, scheduler/cron, batch HTTP APIs, provider ingestion trigger APIs, and real trading/account/order/deposit/withdrawal APIs remain closed.
   - Daily Snapshot Gate Verification and Realtime Execution Policy Foundation on 2026-06-05 KST:
-    - Verification confirms `daily_portfolio_snapshot` is provider_api allowed, while `fx_execute`, `orders_create`, `orders_execute`, `season_ranking`, `season_settlement`, `reward_final_tier`, and `reward_fulfillment` remain provider_api denied.
+    - At that historical gate, verification confirmed `daily_portfolio_snapshot` was provider_api allowed, while `fx_execute`, `orders_create`, `orders_execute`, `season_ranking`, `season_settlement`, `reward_final_tier`, and `reward_fulfillment` remained provider_api denied. Current settlement valuation policy is superseded by the latest section above.
     - `DailyPortfolioSnapshotJobService` passes `daily_portfolio_snapshot` explicitly, dry-run does not insert snapshot rows, non-dry-run inserts only available participant snapshots, and batch results include aggregate `sourceSummary`.
     - Ranking/settlement/reward continue to consume existing snapshots/rankings and do not read provider_api rows directly.
     - At that gate, `docs/realtime-execution-policy.md` recorded 준실시간 체결 정책 v1 as a future provider-backed execute policy: quote is a reference quote, execute must reprice at execute time using fresh provider_api data, reject excessive quote-to-execute movement, and forbid default admin_manual execute fallback.
@@ -179,7 +179,7 @@
   - Durable Quote hardening and Scheduler/Ops Foundation Gate on 2026-06-08 KST:
     - FX execute idempotency requestHash now includes trimmed `quoteId`; same `userId + idempotencyKey` with a different `quoteId` returns `IDEMPOTENCY_CONFLICT` and does not replay the previous response.
     - Orders create idempotency requestHash now includes trimmed `quoteId`; same `seasonParticipantId + idempotencyKey` with a different `quoteId` returns `ORDER_IDEMPOTENCY_CONFLICT` and does not replay the submitted order.
-    - Orders create response wording now uses `ORDER_SUBMITTED_NOT_EXECUTED` and states that the submitted order can be executed through the execute endpoint.
+    - At that historical gate, orders create response wording used `ORDER_SUBMITTED_NOT_EXECUTED` and stated that the submitted order could be executed through the execute endpoint. This was superseded by the current immediate market execution flow in `POST /api/v1/orders`.
     - Scheduler/Ops foundation is implemented with `OpsJobName`, `OpsJobRunStatus`, `OpsJobTrigger`, `ops_job_runs`, `ops_job_locks`, internal lock/run/runner/scheduler services, and public-safe `/readiness`.
     - Scheduler env defaults are disabled: `SCHEDULER_ENABLED=false`, all individual `SCHEDULER_*_ENABLED=false` flags, and `SCHEDULER_TICK_INTERVAL_MS=60000`. No secret scheduler env was added.
     - Internal daily snapshot ops runner can call `DailyPortfolioSnapshotJobService` with lock/audit/dryRun support. Scheduler calls remain dry-run-by-default; real automatic writes require a future Production Scheduler Ownership Gate.
@@ -240,10 +240,10 @@
 - `GET /api/v1/badges/me` read-only MVP
 - `GET /api/v1/orders` read-only MVP
 - `POST /api/v1/orders/quote` durable quote MVP
-- `POST /api/v1/orders` durable quote-bound submitted order create MVP
+- `POST /api/v1/orders` durable quote-bound immediate market execution MVP
 - `POST /api/v1/orders` create idempotency MVP
-- `POST /api/v1/orders/:orderId/cancel` submitted order cancel MVP
-- `POST /api/v1/orders/:orderId/execute` full-fill MVP
+- `POST /api/v1/orders/:orderId/cancel` public route exists but returns `ORDER_CANCEL_NOT_SUPPORTED`
+- `POST /api/v1/orders/:orderId/execute` internal compatibility/deprecation full-fill path
 - `GET /api/v1/assets` read-only MVP
 - `GET /api/v1/assets/:assetId` read-only MVP
 - `GET /api/v1/seasons/current`
@@ -505,37 +505,32 @@ near-term ledger/FX foundation:
   - limit order는 `limitPrice` 사용.
   - USD 자산의 KRW valuation은 fresh `provider_api` `exchange_rate_api` USD/KRW first, then approved fresh `admin_manual` fallback 사용.
   - buy는 cash wallet balance, sell은 position quantity를 read-only로 검증.
-  - DB mutation 없음.
-- `POST /api/v1/orders` submitted order create MVP 구현 완료:
-  - quote와 동일 계산/검증 후 `orders` row 1건만 `submitted`로 생성.
-  - body `idempotencyKey` required.
+  - Durable quote row를 생성한다. Wallet/position/order execution/settlement mutation은 없음.
+- `POST /api/v1/orders` durable quote-bound immediate market execution MVP 구현 완료:
+  - body `quoteId`와 `idempotencyKey` required.
+  - active durable order quote를 검증한 뒤 `orders` row를 만들고 같은 transaction에서 시장가 full-fill 체결까지 수행.
   - 동일 participant + 동일 `idempotencyKey` + 동일 canonical requestHash는 stored `responsePayloadJson` replay.
   - 동일 participant + 동일 `idempotencyKey` + 다른 requestHash는 `ORDER_IDEMPOTENCY_CONFLICT`.
   - `(seasonParticipantId, idempotencyKey)` unique constraint와 P2002 reread로 duplicate order create 방지.
+  - create flow가 fresh provider_api asset/FX rows로 repricing하고 quote movement guard를 통과해야 wallet/position/order/ledger를 mutate.
+  - default `admin_manual` execute fallback은 금지.
+  - equity snapshot과 ranking refresh는 ledger transaction 밖에서 후속 처리하며, settlement는 수행하지 않음.
+- `POST /api/v1/orders/:orderId/cancel` public route는 `ORDER_CANCEL_NOT_SUPPORTED`로 차단:
+  - 공개 사용자 cancel 기능은 현재 지원하지 않음.
   - wallet debit/credit, wallet_transactions, position mutation, equity snapshot, settlement 없음.
-  - 저장된 gross/fee/net amount는 체결 확정 금액이 아니라 제출 시점 quote estimate.
-- `POST /api/v1/orders/:orderId/cancel` submitted order cancel MVP 구현 완료:
-  - 로그인 사용자의 season participant 소유 order만 cancel 가능.
-  - `submitted` 상태만 `canceled`로 변경 가능.
-  - guarded update 조건: `id + seasonParticipantId + status = submitted`.
-  - order row의 `status`, `canceledAt`, `updatedAt`만 변경.
-  - wallet debit/credit, wallet_transactions, position mutation, equity snapshot, settlement 없음.
-- `POST /api/v1/orders/:orderId/execute` full-fill MVP 구현 완료:
-  - 로그인 사용자의 season participant 소유 active-season order만 execute 가능.
-  - `submitted` order만 buy/sell full-fill execute.
+- `POST /api/v1/orders/:orderId/execute` internal compatibility/deprecation full-fill path 구현 완료:
+  - 일반 사용자 필수 흐름은 `POST /api/v1/orders` 즉시 체결이며, 이 endpoint는 내부 호환/폐기 예정 성격.
+  - 로그인 사용자의 season participant 소유 active-season submitted order만 execute 가능.
   - `executed` order는 새 mutation 없이 current-state duplicate response 반환.
   - `canceled`/`rejected` order는 `ORDER_NOT_EXECUTABLE`.
-  - market/limit 모두 execution 시점 latest eligible `admin_manual` asset price snapshot 사용.
-  - limit buy는 selected price `<= limitPrice`, limit sell은 selected price `>= limitPrice`일 때만 execute.
-  - actual `executedPrice`는 selected snapshot price이며 submitted estimate/limitPrice를 그대로 쓰지 않음.
-  - USD order는 USD wallet debit/credit을 사용하고, audit consistency용 approved fresh `admin_manual` USD/KRW snapshot id를 저장.
+  - execution 시점 fresh eligible `provider_api` asset price snapshot 사용.
+  - USD order는 USD wallet debit/credit을 사용하고, fresh eligible `provider_api` USD/KRW snapshot id를 저장.
   - KRW order는 `fxRateSnapshotId = null`.
   - buy는 guarded cash wallet debit, position create/update, `order_buy` wallet transaction, guarded executed finalization 수행.
   - sell은 guarded position decrement, realizedPnl/realizedPnlKrw update, cash wallet credit, `order_sell` wallet transaction, guarded executed finalization 수행.
   - wallet mutation, position mutation, wallet transaction create, order finalization은 단일 Prisma transaction 안에서 처리.
   - create idempotency용 `responsePayloadJson`은 execute replay에 사용하지 않음.
-  - exact execute response replay, partial fill, matching engine, settlement, provider/scheduler, separate fee wallet transaction row 없음.
-  - equity_snapshots, daily_portfolio_snapshots, season_rankings 자동 생성 없음.
+  - exact execute response replay, partial fill, matching engine, settlement, scheduler, separate fee wallet transaction row 없음.
 - `/records` orders section은 `orders` table 기반 read-only 조회로 연결 완료.
 - `admin_manual` asset/price bootstrap CLI 구현 완료:
   - `scripts/admin-upsert-asset.ts`
@@ -566,7 +561,7 @@ near-term ledger/FX foundation:
 
 - Prisma schema/migration 기준 현재 문서화된 내부 reward/badge/trophy 조회 foundation 테이블과 internal reward fulfillment request queue/status 테이블은 구현됨.
 - Batch job run/lock 기록 foundation과 operator-run daily portfolio snapshot/season ranking/daily season cycle/season settlement/final tier assignment/reward-grant gate-closed job은 구현 완료. 단, 실제 cron scheduler, provider ingestion job, ranking overwrite/regeneration job, Reward Policy / Catalog 기반 reward-grant write path, external reward/payment/point/coupon/gifticon/delivery fulfillment job은 아직 미구현.
-- order execution full-fill MVP와 position mutation 1차 write path, durable quote-bound quote/create/execute path는 구현 완료. 단, exact replay, partial fill, matching engine, provider ingestion scheduler/job, settlement extension API, scheduler 기반 자동 daily valuation/ranking 생성 경로는 아직 미구현.
+- durable quote-bound order quote/create immediate execution path, internal-compatible execute path, and position mutation write path는 구현 완료. 단, exact replay, partial fill, matching engine, provider ingestion scheduler/job, settlement extension API, scheduler 기반 자동 daily valuation/ranking 생성 경로는 아직 미구현.
 
 ## 7. 완료된 문서/설계 상태
 
@@ -726,7 +721,7 @@ near-term ledger/FX foundation:
   - reward 지급, `rewardGrantedAt` 업데이트, provider ingestion/API 호출, cron scheduler, HTTP batch run API 없음.
 - 이 작업은 `/home` settled final-result read model과 `/ranking` 구현 준비를 진전시켰지만, 자동 데이터 생성/외부 시세 공급/API 응답은 아직 없음.
 - cron scheduler/provider ingestion/settlement extension 구현 없음.
-- order quote/create/cancel/execute full-fill MVP 구현 완료.
+- order quote/create immediate market execution MVP 구현 완료. Public cancel은 `ORDER_CANCEL_NOT_SUPPORTED`로 차단되고 `/:orderId/execute`는 internal compatibility/deprecation path로 유지.
 - order execution safety plan/preimplementation readiness audit 기준 full-fill MVP 범위는 코드에 반영됨.
 - order execution exact replay/partial fill/matching engine/settlement/provider ingestion은 별도 gate로 남음.
 
@@ -1043,10 +1038,10 @@ near-term ledger/FX foundation:
 
 - `GET /api/v1/orders` read-only MVP 구현 완료.
 - `POST /api/v1/orders/quote` read-only MVP 구현 완료.
-- `POST /api/v1/orders` submitted order create MVP 구현 완료.
+- `POST /api/v1/orders` durable quote-bound immediate market execution MVP 구현 완료.
 - `POST /api/v1/orders` create idempotency MVP 구현 완료.
-- `POST /api/v1/orders/:orderId/cancel` submitted order cancel MVP 구현 완료.
-- `POST /api/v1/orders/:orderId/execute` full-fill MVP 구현 완료.
+- `POST /api/v1/orders/:orderId/cancel` public route exists but returns `ORDER_CANCEL_NOT_SUPPORTED`.
+- `POST /api/v1/orders/:orderId/execute` internal compatibility/deprecation full-fill path 구현 완료.
 - Bearer access token Auth MVP 이후 API는 전역 guard가 주입한 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
 - query parameter:
   - `seasonId` optional.
@@ -1066,39 +1061,36 @@ near-term ledger/FX foundation:
   - provider asset price freshness threshold는 capturedAt 기준 60초.
   - USD 자산은 fresh `provider_api` `exchange_rate_api` USD/KRW first, then approved fresh `admin_manual` USD/KRW fallback 사용.
   - buy cash balance, sell position quantity를 read-only 검증.
-  - DB mutation 없음.
+  - Durable quote row를 생성한다. Wallet/position/order execution/settlement mutation은 없음.
 - create:
-  - quote와 동일 validation/calculation 후 `orders` row만 `submitted`로 생성.
-  - `idempotencyKey` required.
-  - requestHash는 `assetId`, `side`, `orderType`, `quantity`, `limitPrice`, `currencyCode` canonical JSON + SHA-256.
+  - `quoteId`와 `idempotencyKey` required.
+  - active durable order quote를 검증하고 `orders` row를 만든 뒤 같은 transaction에서 시장가 full-fill 체결까지 수행.
+  - requestHash는 `assetId`, `quoteId`, `side`, `orderType`, `quantity`, `limitPrice`, `currencyCode` canonical JSON + SHA-256.
   - `idempotencyKey` 자체는 requestHash 대상에서 제외.
   - 동일 participant + 동일 key + 동일 hash는 stored `responsePayloadJson` replay.
   - 동일 participant + 동일 key + 다른 hash는 `ORDER_IDEMPOTENCY_CONFLICT`.
   - P2002 unique race 발생 시 기존 order를 reread 후 replay 또는 conflict.
-  - cancel 이후 같은 idempotencyKey 재호출도 create command replay 정책상 stored create response를 우선 반환할 수 있음.
-  - wallet 차감/증가, wallet transaction, position mutation, equity snapshot, settlement 없음.
+  - fresh provider_api asset/FX rows로 execute-time repricing, quote movement guard, wallet/position/order/ledger mutation을 수행.
+  - default `admin_manual` execute fallback은 금지.
+  - equity snapshot과 ranking refresh는 ledger transaction 밖에서 후속 처리하며, settlement 없음.
 - cancel:
   - path `orderId` required.
-  - 소유자가 아니거나 없는 order는 `ORDER_NOT_FOUND`.
-  - `submitted` order만 cancel 가능.
-  - `executed`/`canceled`/`rejected` order는 `ORDER_NOT_CANCELABLE`.
-  - race로 guarded update가 실패하면 `ORDER_CANCEL_CONFLICT`.
-  - order row 상태만 `canceled`로 변경하고 `canceledAt` 기록.
+  - 공개 사용자 cancel 기능은 현재 지원하지 않으며 `ORDER_CANCEL_NOT_SUPPORTED`를 반환.
   - wallet 차감/증가, wallet transaction, position mutation, equity snapshot, settlement 없음.
 - execute:
   - path `orderId` required, body optional.
+  - 일반 사용자 필수 흐름이 아니라 내부 호환/폐기 예정 path.
   - execute idempotencyKey는 받지 않음.
   - 소유자가 아니거나 없는 order는 `ORDER_NOT_FOUND`.
   - active season의 `submitted` order만 full-fill execute 가능.
   - `executed` order는 새 mutation 없이 current-state duplicate response 반환.
   - exact execute response replay는 현재 schema 제한으로 제공하지 않음.
-  - market/limit execution price는 execution 시점 latest eligible `admin_manual` asset price snapshot 기준.
-  - limit order는 selected market price crossing 조건을 만족해야 하며, selected price를 `executedPrice`로 저장.
+  - execution price는 execution 시점 fresh eligible `provider_api` asset price snapshot 기준.
   - buy는 cash wallet debit, position create/update, `order_buy` wallet transaction 생성.
   - sell은 position decrement/realizedPnl/realizedPnlKrw update, cash wallet credit, `order_sell` wallet transaction 생성.
   - order finalization은 `id + seasonParticipantId + status = submitted` guarded update.
   - 모든 financial write는 단일 Prisma transaction 안에서 처리.
-  - equity snapshot, daily snapshot, ranking, settlement side effect, provider/scheduler, partial fill 없음.
+  - equity snapshot, daily snapshot, settlement side effect, scheduler, partial fill 없음.
 - settlement는 operator-run `season-settlement` MVP job으로만 가능하며 order execute side effect가 아님.
 
 ## 9. 다음 gate
@@ -1114,9 +1106,9 @@ near-term ledger/FX foundation:
   - Binance `BTCUSDT` ticker fixture 상태: `GO` for fixture capture, `CONDITIONAL GO` for mapping. Public `/api/v3/ticker/24hr` returned HTTP 200 and includes `lastPrice`, `bidPrice`, `askPrice`, `openTime`, `closeTime`.
   - Binance `BTCUSDT` orderbook fixture 상태: `CONDITIONAL GO`. Public `/api/v3/depth` returned HTTP 200 and includes bid/ask levels, but no source timestamp.
   - Crypto provider ingestion foundation은 `BTCUSDT` 같은 USDT quote를 MVP USD-equivalent provider_api snapshot으로 저장할 수 있음. USDT depeg risk는 별도 반영하지 않음.
-  - Binance provider_api source eligibility는 read-only/quote workflow와 operator-run daily snapshot valuation workflow에서 `binance_public_rest_24hr_ticker` fresh row만 허용하며 execute/write, scheduler, settlement, reward 사용은 `STOP`.
+  - Binance provider_api source eligibility는 read-only/quote workflow, order execution, operator-run daily snapshot valuation workflow, and season settlement valuation에서 허용된다. Order execution은 fresh row를 요구하고, season settlement는 `effectiveAt <= Season.endAt`인 latest valid row를 사용한다. Scheduler provider ingestion과 reward 사용은 `STOP`.
   - OANDA/Twelve Data ingestion implementation은 credentialed fixture, mapping, terms, sourceType tests 전까지 `STOP/BLOCKED`.
-  - KRX execute/write remains STOP. KIS KRX `provider_api` evidence is limited to read-only/quote and operator-run daily snapshot valuation workflows where eligible.
+  - KRX order execution is open only through the durable quote provider-backed order execution path with fresh `kis_krx_realtime_trade` rows. KIS order/account/balance APIs and scheduler provider ingestion remain STOP.
   - Batch job run foundation과 operator-run daily snapshot(provider-backed valuation only)/ranking/cycle/settlement/final-tier/reward-grant gate-closed/season-lifecycle-transition MVP job은 구현됨. Reward Policy / Catalog 기반 reward-grant write path, 실제 cron scheduler, scheduler reward 자동 지급, 외부 reward fulfillment job은 STOP 유지.
   - settlement extension, reward policy/catalog, 외부 reward fulfillment는 별도 gate 전까지 구현 STOP 유지.
 - Gate B Provider final selection readiness re-check 및 Asset Price Freshness Policy 문서화 완료.
@@ -1131,20 +1123,21 @@ near-term ledger/FX foundation:
   - 남은 gap: 모든 protected route별 invalid-token HTTP e2e exhaustive coverage와 valid-token full write-path HTTP e2e는 아직 없음.
   - full financial write-path 검증은 현재 service/unit 및 opt-in PostgreSQL integration spec이 담당.
 - 테스트 커버리지 상세는 `docs/backend-test-coverage-matrix.md` 기준.
-- provider ingestion foundation은 구현됨. `provider_api` source eligibility는 read-only/quote workflow와 operator-run daily snapshot valuation workflow에만 열렸고 provider-backed scheduler/settlement 사용은 `BLOCKED` 유지.
+- provider ingestion foundation은 구현됨. `provider_api` source eligibility는 read-only/quote workflow, durable quote execute workflow, operator-run daily snapshot valuation, and season settlement valuation에 열려 있다. Scheduler-driven provider ingestion과 reward 사용은 `BLOCKED` 유지.
 - Batch job run foundation과 operator-run daily snapshot(provider-backed valuation only)/ranking/cycle/settlement/final-tier/reward-grant gate-closed/season-lifecycle-transition MVP job은 구현됨. Reward Policy / Catalog 기반 reward-grant write path, 실제 cron scheduler, scheduler reward 자동 지급, 외부 reward fulfillment job은 STOP 유지.
 - settlement extension, reward policy/catalog, 외부 reward fulfillment는 별도 gate 전까지 구현 STOP 유지.
 - asset price freshness 정책 요약:
-  - FX USD/KRW quote/execute는 현행 60초 `effectiveAt` freshness 유지.
-  - `/fx quote` 및 read-only USD/KRW provider fallback은 capturedAt 기준 300초 provider freshness를 사용하고, execute는 기존 `admin_manual` 60초 `effectiveAt` freshness를 유지.
-  - asset provider price는 capturedAt 기준 60초 freshness를 사용.
+  - FX/order execute provider freshness는 완화하지 않는다. `/fx execute`와 order execution은 fresh provider rows를 요구하고 default `admin_manual` fallback을 금지한다.
+  - `/fx quote` 및 read-only USD/KRW provider fallback은 capturedAt 기준 300초 provider freshness를 사용한다.
+  - Quote/read asset provider price는 capturedAt 기준 60초 freshness를 사용한다.
+  - Season settlement valuation은 quote/execute freshness window를 적용하지 않고 `Season.endAt` 이하의 latest valid asset price와 USD/KRW row를 사용한다.
   - `provider_api`는 provider timestamp를 `effectiveAt`으로 매핑할 수 있고 `capturedAt <= now`, positive value, expected sourceName일 때만 허용 후보.
   - `capturedAt`은 서버 수신/admin 저장 시점이며, `createdAt`은 DB row tie-breaker 전용.
-  - KRX provider는 read-only/quote workflow에서만 `kis_krx_realtime_trade` fresh provider row를 허용하며 execute/write workflow는 `BLOCKED`.
+  - KRX provider는 read-only/quote workflow, order execution, operator-run daily snapshot valuation, and season settlement valuation에서만 `kis_krx_realtime_trade` provider row를 허용한다. Order execution은 fresh row를 요구하고 settlement는 latest valid `effectiveAt <= Season.endAt` row를 사용한다.
   - Twelve Data는 US stock 후보이나 live fixture, symbol mapping, plan/terms 확인 전 `CONDITIONAL GO`.
   - Crypto는 Binance-based USD-settled crypto로 고정하며 Upbit/Bithumb은 MVP provider stack에서 제외.
   - `official_batch`는 reference/reconciliation/settlement 후보이며 real-time execute source가 아님.
-- Provider API Source Eligibility Implementation Gate 후에도 execute/write/ranking/settlement/reward/official_batch/cron scheduler 구현 STOP 유지.
+- Provider API source eligibility after current gates: execute/write is open only through durable quote gates, season settlement valuation can read latest valid stored provider/admin rows at `Season.endAt`, and ranking/reward/official_batch/provider-ingestion scheduler remain separate gates.
 - `/fx execute` 남은 DB-level rollback/partial-write hardening 및 stale pending/unknown outcome recovery 설계.
 - `/orders/:orderId/execute` MVP 후속 gate:
   - exact execute response replay가 필요하면 schema/command table 별도 검토.

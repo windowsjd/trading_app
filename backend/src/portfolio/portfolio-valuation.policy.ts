@@ -79,6 +79,7 @@ export type PortfolioValuationInput = {
   usdKrwSnapshot?: PortfolioFxRateSnapshotInput | null;
   valuationAt: Date;
   sourceEligibilityWorkflow?: ProviderEligibleWorkflow;
+  enforceAdminManualFxFreshness?: boolean;
 };
 
 export type PortfolioValuationResult = {
@@ -137,6 +138,7 @@ export function calculatePortfolioValuation(
         input.usdKrwSnapshot,
         input.valuationAt,
         input.sourceEligibilityWorkflow,
+        input.enforceAdminManualFxFreshness,
       )
     : null;
 
@@ -331,6 +333,7 @@ function selectUsableUsdKrwRate(
   snapshot: PortfolioFxRateSnapshotInput | null | undefined,
   valuationAt: Date,
   sourceEligibilityWorkflow?: ProviderEligibleWorkflow,
+  enforceAdminManualFxFreshness = true,
 ): Prisma.Decimal {
   if (!snapshot) {
     throw new PortfolioValuationError(
@@ -358,6 +361,7 @@ function selectUsableUsdKrwRate(
     }
 
     if (
+      enforceAdminManualFxFreshness &&
       isFxSnapshotStaleForPortfolioValuation(snapshot.effectiveAt, valuationAt)
     ) {
       throw new PortfolioValuationError(

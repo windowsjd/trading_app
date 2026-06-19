@@ -323,6 +323,47 @@ describe('SeasonSettlementJobService', () => {
     });
   });
 
+  it('uses Season.endAt and the season settlement valuation workflow when valuation service is available', async () => {
+    const valuationService = {
+      calculateSeasonParticipantValuation: jest.fn().mockResolvedValue({
+        totalAssetKrw: '1000.00000000',
+        returnRate: '0.00000000',
+        krwCash: '1000.00000000',
+        usdCashKrw: '0.00000000',
+        domesticStockValueKrw: '0.00000000',
+        usStockValueKrw: '0.00000000',
+        cryptoValueKrw: '0.00000000',
+      }),
+    };
+    const { service, prisma } = createService(valuationService);
+    const seasonEndAt = new Date('2026-05-21T00:00:00.000Z');
+    mockSeason(prisma, SeasonStatus.ended);
+    mockParticipants(prisma, [{ id: 'sp-1', userId: 'user-1' }]);
+    mockExistingRankings(prisma, []);
+    prisma.equitySnapshot.findMany.mockResolvedValue([]);
+
+    const result = await runAndGetResult(service, {
+      seasonId: 'season-1',
+      settlementDate,
+      dryRun: true,
+    });
+
+    expect(
+      valuationService.calculateSeasonParticipantValuation,
+    ).toHaveBeenCalledWith('sp-1', seasonEndAt, 'season_settlement');
+    expect(prisma.dailyPortfolioSnapshot.findMany).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      participants: {
+        total: 1,
+        snapshotted: 1,
+        missingSnapshots: 0,
+      },
+      finalRankings: {
+        wouldCreate: 1,
+      },
+    });
+  });
+
   it('returns an idempotent existing/skipped result for already settled seasons', async () => {
     const { service, prisma } = createService();
     mockSeason(prisma, SeasonStatus.settled);
@@ -582,12 +623,17 @@ describe('SeasonSettlementJobService', () => {
   });
 });
 
-function createService() {
+function createService(
+  portfolioValuationService?: {
+    calculateSeasonParticipantValuation: jest.Mock;
+  },
+) {
   const prisma = createPrismaMock();
   const batchService = createBatchServiceMock(BATCH_STARTED_AT);
   const service = new SeasonSettlementJobService(
     batchService as never,
     prisma as never,
+    portfolioValuationService as never,
   );
 
   return {
@@ -677,6 +723,7 @@ function createPrismaMock() {
       update: jest.fn(),
     },
     equitySnapshot: {
+      findMany: jest.fn().mockResolvedValue([]),
       create: jest.fn(),
     },
   };

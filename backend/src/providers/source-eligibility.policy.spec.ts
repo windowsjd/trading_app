@@ -41,21 +41,22 @@ import {
   resolveAssetProviderEligibility,
   resolveFxProviderEligibility,
   selectFreshProviderSnapshot,
+  selectProviderSnapshotAtOrBefore,
 } from './source-eligibility.policy';
 
 describe('provider source eligibility policy', () => {
   const now = new Date('2026-06-03T00:00:00.000Z');
 
-  it('keeps read/quote/execute workflows open while closed financial workflows stay denied', () => {
+  it('keeps approved provider workflows open while closed workflows stay denied', () => {
     expect(isProviderWorkflowAllowed('fx_quote')).toBe(true);
     expect(isProviderWorkflowAllowed('fx_execute')).toBe(true);
     expect(isProviderWorkflowAllowed('orders_quote')).toBe(true);
     expect(isProviderWorkflowAllowed('orders_execute')).toBe(true);
     expect(isProviderWorkflowAllowed('home_live_valuation')).toBe(true);
     expect(isProviderWorkflowAllowed('daily_portfolio_snapshot')).toBe(true);
+    expect(isProviderWorkflowAllowed('season_settlement')).toBe(true);
     expect(isProviderWorkflowDenied('orders_create')).toBe(true);
     expect(isProviderWorkflowDenied('season_ranking')).toBe(true);
-    expect(isProviderWorkflowDenied('season_settlement')).toBe(true);
     expect(isProviderWorkflowDenied('reward_final_tier')).toBe(true);
     expect(isProviderWorkflowDenied('reward_fulfillment')).toBe(true);
   });
@@ -87,6 +88,21 @@ describe('provider source eligibility policy', () => {
     ).toMatchObject({
       eligible: true,
       sourceName: PROVIDER_SOURCE_NAMES.domesticStockKrx,
+    });
+
+    expect(
+      resolveAssetProviderEligibility({
+        workflow: 'season_settlement',
+        asset: {
+          assetType: AssetType.domestic_stock,
+          market: 'KRX',
+          currencyCode: CurrencyCode.KRW,
+        },
+      }),
+    ).toMatchObject({
+      eligible: true,
+      sourceName: PROVIDER_SOURCE_NAMES.domesticStockKrx,
+      freshnessThresholdSeconds: 60,
     });
 
     expect(
@@ -188,6 +204,18 @@ describe('provider source eligibility policy', () => {
 
     expect(
       resolveFxProviderEligibility({
+        workflow: 'season_settlement',
+        baseCurrency: CurrencyCode.USD,
+        quoteCurrency: CurrencyCode.KRW,
+      }),
+    ).toMatchObject({
+      eligible: true,
+      sourceName: PROVIDER_SOURCE_NAMES.fxUsdKrw,
+      freshnessThresholdSeconds: 300,
+    });
+
+    expect(
+      resolveFxProviderEligibility({
         workflow: 'fx_execute',
         baseCurrency: CurrencyCode.USD,
         quoteCurrency: CurrencyCode.KRW,
@@ -203,7 +231,6 @@ describe('provider source eligibility policy', () => {
     for (const workflow of [
       'orders_create',
       'season_ranking',
-      'season_settlement',
       'reward_final_tier',
       'reward_fulfillment',
     ] as const) {
@@ -381,5 +408,55 @@ describe('provider source eligibility policy', () => {
         },
       });
     }
+  });
+
+  it('selects settlement provider candidates by effectiveAt without capturedAt freshness', () => {
+    const selected = selectProviderSnapshotAtOrBefore({
+      candidates: [
+        {
+          id: 'settlement-provider',
+          sourceType: AssetPriceSourceType.provider_api,
+          sourceName: PROVIDER_SOURCE_NAMES.cryptoUsd,
+          effectiveAt: new Date('2026-06-01T00:00:00.000Z'),
+          capturedAt: new Date('2026-06-01T00:00:05.000Z'),
+          price: new Prisma.Decimal('100.00000000'),
+        },
+      ],
+      expectedSourceName: PROVIDER_SOURCE_NAMES.cryptoUsd,
+      valuationAt: now,
+      isPositiveValue: (candidate) => candidate.price.gt(0),
+    });
+
+    expect(selected).toMatchObject({
+      state: 'selected',
+      decision: {
+        selectedSourceType: 'provider_api',
+        selectedSnapshotId: 'settlement-provider',
+        freshnessAgeSeconds: null,
+      },
+    });
+
+    expect(
+      selectProviderSnapshotAtOrBefore({
+        candidates: [
+          {
+            id: 'future-effective',
+            sourceType: AssetPriceSourceType.provider_api,
+            sourceName: PROVIDER_SOURCE_NAMES.cryptoUsd,
+            effectiveAt: new Date('2026-06-03T00:00:01.000Z'),
+            capturedAt: new Date('2026-06-02T23:59:59.000Z'),
+            price: new Prisma.Decimal('100.00000000'),
+          },
+        ],
+        expectedSourceName: PROVIDER_SOURCE_NAMES.cryptoUsd,
+        valuationAt: now,
+        isPositiveValue: (candidate) => candidate.price.gt(0),
+      }),
+    ).toMatchObject({
+      state: 'not_selected',
+      decision: {
+        rejectedProviderReason: 'effective_at_in_future',
+      },
+    });
   });
 });
