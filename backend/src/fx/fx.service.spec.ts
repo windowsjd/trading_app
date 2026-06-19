@@ -246,9 +246,14 @@ describe('FxService', () => {
     expect(prisma.fxRateSnapshot.findMany).toHaveBeenCalledTimes(1);
   };
 
-  const createService = () => {
+  const createService = (koreaEximIngestionService?: {
+    ensureFreshUsdKrwSnapshot: jest.Mock;
+  }) => {
     const prisma = createPrisma();
-    const service = new FxService(prisma as never);
+    const service = new FxService(
+      prisma as never,
+      koreaEximIngestionService as never,
+    );
 
     return { prisma, service };
   };
@@ -306,6 +311,83 @@ describe('FxService', () => {
       effectiveAt,
     });
   };
+
+  it('returns the current USD/KRW provider rate with Korea EXIM priority metadata', async () => {
+    const { prisma, service } = createService();
+    prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
+      {
+        id: 'fx-korea-exim-1',
+        rate: new Prisma.Decimal('1389.50000000'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'korea_exim_exchange_rate',
+        capturedAt,
+        effectiveAt: freshEffectiveAt,
+      },
+    ]);
+
+    await expect(service.currentRate({})).resolves.toEqual({
+      success: true,
+      data: {
+        state: 'available',
+        pair: 'USD/KRW',
+        baseCurrency: CurrencyCode.USD,
+        quoteCurrency: CurrencyCode.KRW,
+        rate: '1389.50000000',
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'korea_exim_exchange_rate',
+        effectiveAt: freshEffectiveAt.toISOString(),
+        capturedAt: capturedAt.toISOString(),
+        freshnessAgeSeconds: 30,
+        providerPriority: 1,
+        fallbackUsed: false,
+      },
+    });
+    expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('does not call provider refresh when current rate refresh=false', async () => {
+    const koreaEximIngestionService = {
+      ensureFreshUsdKrwSnapshot: jest.fn(),
+    };
+    const { prisma, service } = createService(koreaEximIngestionService);
+    prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
+      {
+        id: 'fx-exchange-rate-api-1',
+        rate: new Prisma.Decimal('1400.00000000'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'exchange_rate_api',
+        capturedAt,
+        effectiveAt: freshEffectiveAt,
+      },
+    ]);
+
+    await expect(
+      service.currentRate({ refresh: 'false' }),
+    ).resolves.toMatchObject({
+      success: true,
+      data: {
+        sourceName: 'exchange_rate_api',
+        providerPriority: 2,
+        fallbackUsed: true,
+      },
+    });
+    expect(
+      koreaEximIngestionService.ensureFreshUsdKrwSnapshot,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('rejects current rate requests for unsupported pairs', async () => {
+    const { prisma, service } = createService();
+
+    await expectErrorCode(
+      service.currentRate({
+        baseCurrency: 'EUR',
+        quoteCurrency: 'KRW',
+      }),
+      'UNSUPPORTED_FX_PAIR',
+    );
+    expect(prisma.fxRateSnapshot.findMany).not.toHaveBeenCalled();
+  });
 
   it('rejects invalid currency pair', async () => {
     const { prisma, service } = createService();
@@ -536,6 +618,51 @@ describe('FxService', () => {
           fallbackUsed: false,
           fallbackReason: null,
           rejectedProviderReason: null,
+        },
+      },
+    });
+    expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('uses fresh provider_api korea_exim_exchange_rate for quote before exchange_rate_api fallback', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    mockJoinedParticipant(prisma);
+    prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
+      {
+        id: 'provider-fx-exchange',
+        rate: new Prisma.Decimal('1401.00000000'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'exchange_rate_api',
+        capturedAt,
+        effectiveAt: freshEffectiveAt,
+      },
+      {
+        id: 'provider-fx-korea-exim',
+        rate: new Prisma.Decimal('1400.00000000'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'korea_exim_exchange_rate',
+        capturedAt,
+        effectiveAt: staleEffectiveAt,
+      },
+    ]);
+
+    await expect(
+      service.quote('user-1', {
+        fromCurrency: 'KRW',
+        toCurrency: 'USD',
+        sourceAmount: '140000',
+      }),
+    ).resolves.toMatchObject({
+      success: true,
+      data: {
+        appliedRate: '1400.00000000',
+        rateEffectiveAt: staleEffectiveAt.toISOString(),
+        rateSource: {
+          sourceType: 'provider_api',
+          sourceName: 'korea_exim_exchange_rate',
+          snapshotId: 'provider-fx-korea-exim',
+          fallbackUsed: false,
         },
       },
     });
@@ -1652,6 +1779,37 @@ describe('FxService', () => {
           }),
         }),
       );
+    });
+
+    it('executes with a fresh korea_exim_exchange_rate provider snapshot', async () => {
+      const { prisma, service } = createService();
+      mockActiveSeason(prisma);
+      mockJoinedParticipant(prisma);
+      mockExecuteReadCandidates(prisma, {
+        snapshots: [
+          {
+            ...executeSnapshot,
+            id: 'fx-korea-exim-execute',
+            sourceName: 'korea_exim_exchange_rate',
+          },
+        ],
+      });
+      mockSuccessfulWritePath(prisma);
+
+      await expect(
+        service.execute('user-1', validExecuteBody),
+      ).resolves.toMatchObject({
+        success: true,
+        data: {
+          fxRateSnapshotId: 'fx-korea-exim-execute',
+          rateSource: {
+            sourceType: 'provider_api',
+            sourceName: 'korea_exim_exchange_rate',
+            snapshotId: 'fx-korea-exim-execute',
+            fallbackUsed: false,
+          },
+        },
+      });
     });
 
     it('replays a command created by a unique-race without wallet mutation', async () => {

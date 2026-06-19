@@ -1,4 +1,9 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Optional,
+} from '@nestjs/common';
 import {
   CurrencyCode,
   FxExecuteRequestStatus,
@@ -37,11 +42,13 @@ import {
   type FxExecuteRequestBodyLike,
 } from './fx-execute-request-policy';
 import {
+  FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
+  PROVIDER_FRESHNESS_THRESHOLDS_SECONDS,
   buildAdminManualFallbackDecision,
   isPositiveDecimal,
-  PROVIDER_SOURCE_NAMES,
   resolveFxProviderEligibility,
   selectFreshProviderSnapshot,
+  selectFreshProviderSnapshotBySourcePriority,
   type SourceDecision,
 } from '../providers/source-eligibility.policy';
 import {
@@ -64,6 +71,12 @@ import {
   calculateMaxDrawdown,
   RankingRefreshService,
 } from '../ranking/ranking-refresh.service';
+import { KoreaEximExchangeIngestionService } from '../providers/korea-exim/korea-exim-exchange.ingestion.service';
+import { KOREA_EXIM_EXCHANGE_SOURCE_NAME } from '../providers/korea-exim/korea-exim-exchange.types';
+import {
+  ProviderConfigError,
+  ProviderHttpError,
+} from '../providers/provider.types';
 
 export type FxQuoteRequestBody = {
   fromCurrency?: unknown;
@@ -72,6 +85,12 @@ export type FxQuoteRequestBody = {
 };
 
 export type FxExecuteRequestBody = FxExecuteRequestBodyLike;
+
+export type FxCurrentRateQuery = {
+  baseCurrency?: unknown;
+  quoteCurrency?: unknown;
+  refresh?: unknown;
+};
 
 export type FxExecuteSkeletonResponse = FxExecuteErrorEnvelope | unknown;
 
@@ -138,6 +157,24 @@ type FxQuoteResponse = {
   };
 };
 
+type FxCurrentRateResponse = {
+  success: true;
+  data: {
+    state: 'available';
+    pair: 'USD/KRW';
+    baseCurrency: CurrencyCode;
+    quoteCurrency: CurrencyCode;
+    rate: string;
+    sourceType: FxRateSourceType;
+    sourceName: string | null;
+    effectiveAt: string;
+    capturedAt: string;
+    freshnessAgeSeconds: number;
+    providerPriority: number | null;
+    fallbackUsed: boolean;
+  };
+};
+
 type ActiveSeasonRecord = {
   id: string;
   status: SeasonStatus;
@@ -164,6 +201,15 @@ type FxExecuteRateSnapshot = {
   capturedAt: Date;
   effectiveAt: Date;
   sourceDecision: SourceDecision;
+};
+
+type FxProviderRateSnapshot = {
+  id: string;
+  rate: Prisma.Decimal;
+  sourceType: FxRateSourceType;
+  sourceName: string | null;
+  capturedAt: Date;
+  effectiveAt: Date;
 };
 
 const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
@@ -227,8 +273,59 @@ export function mapFxExecuteOrchestrationDecisionToSkeletonResponse(
 export class FxService {
   constructor(
     private readonly prisma: PrismaService,
+    @Optional()
+    private readonly koreaEximExchangeIngestionService?: KoreaEximExchangeIngestionService,
+    @Optional()
     private readonly rankingRefreshService?: RankingRefreshService,
   ) {}
+
+  async currentRate(
+    query: FxCurrentRateQuery = {},
+  ): Promise<FxCurrentRateResponse> {
+    const request = this.validateCurrentRateQuery(query);
+    const now = new Date();
+
+    if (request.refresh) {
+      await this.tryEnsureFreshKoreaEximUsdKrwSnapshot({
+        now,
+        maxAgeSeconds: PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.fxUsdKrw,
+      });
+    }
+
+    const snapshot = await this.findCurrentUsdKrwRateSnapshot(now);
+    if (!snapshot) {
+      this.throwApiError(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'FX_RATE_UNAVAILABLE',
+        'FX rate is unavailable',
+      );
+    }
+
+    const providerPriority = this.resolveProviderPriority(snapshot.sourceName);
+
+    return {
+      success: true,
+      data: {
+        state: 'available',
+        pair: 'USD/KRW',
+        baseCurrency: request.baseCurrency,
+        quoteCurrency: request.quoteCurrency,
+        rate: this.formatDecimal(snapshot.rate, 8),
+        sourceType: snapshot.sourceType,
+        sourceName: snapshot.sourceName,
+        effectiveAt: snapshot.effectiveAt.toISOString(),
+        capturedAt: snapshot.capturedAt.toISOString(),
+        freshnessAgeSeconds: Math.max(
+          0,
+          Math.floor((now.getTime() - snapshot.capturedAt.getTime()) / 1000),
+        ),
+        providerPriority,
+        fallbackUsed:
+          snapshot.sourceType !== FxRateSourceType.provider_api ||
+          providerPriority !== 1,
+      },
+    };
+  }
 
   async quote(
     userId: string | undefined,
@@ -534,37 +631,13 @@ export class FxService {
       baseCurrency: CurrencyCode.USD,
       quoteCurrency: CurrencyCode.KRW,
     });
-    const providerCandidates = providerEligibility.eligible
-      ? ((await this.prisma.fxRateSnapshot.findMany({
-          where: {
-            baseCurrency: CurrencyCode.USD,
-            quoteCurrency: CurrencyCode.KRW,
-            sourceType: FxRateSourceType.provider_api,
-          },
-          orderBy: [
-            { effectiveAt: 'desc' },
-            { capturedAt: 'desc' },
-            { createdAt: 'desc' },
-          ],
-          take: 10,
-          select: {
-            id: true,
-            rate: true,
-            sourceType: true,
-            sourceName: true,
-            capturedAt: true,
-            effectiveAt: true,
-          },
-        })) ?? [])
-      : [];
     const providerSelection = providerEligibility.eligible
-      ? selectFreshProviderSnapshot({
-          candidates: providerCandidates,
-          expectedSourceName: providerEligibility.sourceName,
+      ? await this.selectFreshProviderUsdKrwSnapshot({
           now: quoteAt,
           freshnessThresholdSeconds:
             providerEligibility.freshnessThresholdSeconds,
-          isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
+          expectedSourceNames: providerEligibility.sourceNames,
+          take: 10,
         })
       : {
           state: 'not_selected' as const,
@@ -707,33 +780,11 @@ export class FxService {
   private async findProviderFxExecuteSnapshot(
     executeNow: Date,
   ): Promise<FxExecuteRateSnapshot> {
-    const candidates = await this.prisma.fxRateSnapshot.findMany({
-      where: {
-        baseCurrency: CurrencyCode.USD,
-        quoteCurrency: CurrencyCode.KRW,
-        sourceType: FxRateSourceType.provider_api,
-      },
-      orderBy: [
-        { effectiveAt: 'desc' },
-        { capturedAt: 'desc' },
-        { createdAt: 'desc' },
-      ],
-      take: FX_EXECUTE_SNAPSHOT_CANDIDATE_LIMIT,
-      select: {
-        id: true,
-        rate: true,
-        sourceType: true,
-        sourceName: true,
-        effectiveAt: true,
-        capturedAt: true,
-      },
-    });
-    const selection = selectFreshProviderSnapshot({
-      candidates,
-      expectedSourceName: PROVIDER_SOURCE_NAMES.fxUsdKrw,
+    const selection = await this.selectFreshProviderUsdKrwSnapshot({
       now: executeNow,
       freshnessThresholdSeconds: 60,
-      isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
+      expectedSourceNames: FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
+      take: FX_EXECUTE_SNAPSHOT_CANDIDATE_LIMIT,
     });
 
     if (selection.state === 'selected') {
@@ -748,6 +799,164 @@ export class FxService {
     }
 
     this.throwFxExecuteError(fxExecuteErrorCodes.PROVIDER_RATE_UNAVAILABLE);
+  }
+
+  private async selectFreshProviderUsdKrwSnapshot(input: {
+    now: Date;
+    freshnessThresholdSeconds: number;
+    expectedSourceNames: readonly string[];
+    take: number;
+  }) {
+    let candidates = await this.findProviderUsdKrwSnapshotCandidates(
+      input.take,
+    );
+    const primarySelection = selectFreshProviderSnapshot({
+      candidates,
+      expectedSourceName: KOREA_EXIM_EXCHANGE_SOURCE_NAME,
+      now: input.now,
+      freshnessThresholdSeconds: input.freshnessThresholdSeconds,
+      isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
+    });
+
+    if (primarySelection.state !== 'selected') {
+      const refreshed = await this.tryEnsureFreshKoreaEximUsdKrwSnapshot({
+        now: input.now,
+        maxAgeSeconds: input.freshnessThresholdSeconds,
+      });
+
+      if (refreshed) {
+        candidates = await this.findProviderUsdKrwSnapshotCandidates(
+          input.take,
+        );
+      }
+    }
+
+    return selectFreshProviderSnapshotBySourcePriority({
+      candidates,
+      expectedSourceNames: input.expectedSourceNames,
+      now: input.now,
+      freshnessThresholdSeconds: input.freshnessThresholdSeconds,
+      isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
+    });
+  }
+
+  private findProviderUsdKrwSnapshotCandidates(take: number) {
+    return this.prisma.fxRateSnapshot.findMany({
+      where: {
+        baseCurrency: CurrencyCode.USD,
+        quoteCurrency: CurrencyCode.KRW,
+        sourceType: FxRateSourceType.provider_api,
+      },
+      orderBy: [
+        { effectiveAt: 'desc' },
+        { capturedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      take,
+      select: {
+        id: true,
+        rate: true,
+        sourceType: true,
+        sourceName: true,
+        effectiveAt: true,
+        capturedAt: true,
+      },
+    });
+  }
+
+  private async tryEnsureFreshKoreaEximUsdKrwSnapshot(input: {
+    now: Date;
+    maxAgeSeconds: number;
+  }): Promise<boolean> {
+    if (!this.koreaEximExchangeIngestionService) {
+      return false;
+    }
+
+    try {
+      await this.koreaEximExchangeIngestionService.ensureFreshUsdKrwSnapshot({
+        now: input.now,
+        maxAgeSeconds: input.maxAgeSeconds,
+      });
+      return true;
+    } catch (error) {
+      if (
+        error instanceof ProviderConfigError ||
+        error instanceof ProviderHttpError
+      ) {
+        return false;
+      }
+
+      throw error;
+    }
+  }
+
+  private async findCurrentUsdKrwRateSnapshot(
+    now: Date,
+  ): Promise<FxProviderRateSnapshot | null> {
+    const providerCandidates =
+      await this.findProviderUsdKrwSnapshotCandidates(20);
+    const providerSnapshot = this.selectLatestProviderUsdKrwSnapshot({
+      candidates: providerCandidates,
+      now,
+    });
+
+    if (providerSnapshot) {
+      return providerSnapshot;
+    }
+
+    return this.prisma.fxRateSnapshot.findFirst({
+      where: {
+        baseCurrency: CurrencyCode.USD,
+        quoteCurrency: CurrencyCode.KRW,
+        sourceType: FxRateSourceType.admin_manual,
+        effectiveAt: {
+          lte: now,
+        },
+      },
+      orderBy: [
+        { effectiveAt: 'desc' },
+        { capturedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      select: {
+        id: true,
+        rate: true,
+        sourceType: true,
+        sourceName: true,
+        effectiveAt: true,
+        capturedAt: true,
+      },
+    });
+  }
+
+  private selectLatestProviderUsdKrwSnapshot(input: {
+    candidates: readonly FxProviderRateSnapshot[];
+    now: Date;
+  }): FxProviderRateSnapshot | null {
+    for (const sourceName of FX_USD_KRW_PROVIDER_SOURCE_PRIORITY) {
+      const snapshot = input.candidates.find(
+        (candidate) =>
+          candidate.sourceName === sourceName &&
+          candidate.sourceType === FxRateSourceType.provider_api &&
+          candidate.effectiveAt.getTime() <= input.now.getTime() &&
+          candidate.capturedAt.getTime() <= input.now.getTime() &&
+          isPositiveDecimal(candidate.rate),
+      );
+
+      if (snapshot) {
+        return snapshot;
+      }
+    }
+
+    return null;
+  }
+
+  private resolveProviderPriority(sourceName: string | null): number | null {
+    const priorityIndex = FX_USD_KRW_PROVIDER_SOURCE_PRIORITY.findIndex(
+      (item) => item === sourceName,
+    );
+
+    return priorityIndex === -1 ? null : priorityIndex + 1;
   }
 
   private buildProviderFxExecutePlan(input: {
@@ -862,6 +1071,78 @@ export class FxService {
       default:
         return [{ startAt: 'desc' }, { createdAt: 'desc' }];
     }
+  }
+
+  private validateCurrentRateQuery(query: FxCurrentRateQuery) {
+    const baseCurrency = this.parseCurrentRateCurrency(
+      query.baseCurrency,
+      CurrencyCode.USD,
+    );
+    const quoteCurrency = this.parseCurrentRateCurrency(
+      query.quoteCurrency,
+      CurrencyCode.KRW,
+    );
+
+    if (
+      baseCurrency !== CurrencyCode.USD ||
+      quoteCurrency !== CurrencyCode.KRW
+    ) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'UNSUPPORTED_FX_PAIR',
+        'Only USD/KRW is supported.',
+      );
+    }
+
+    return {
+      baseCurrency,
+      quoteCurrency,
+      refresh: this.parseRefreshQuery(query.refresh),
+    };
+  }
+
+  private parseCurrentRateCurrency(
+    value: unknown,
+    defaultValue: CurrencyCode,
+  ): CurrencyCode | null {
+    if (value === undefined || value === null || value === '') {
+      return defaultValue;
+    }
+
+    if (typeof value !== 'string') {
+      return null;
+    }
+
+    const normalized = value.trim().toUpperCase();
+    if (normalized === CurrencyCode.USD) {
+      return CurrencyCode.USD;
+    }
+
+    if (normalized === CurrencyCode.KRW) {
+      return CurrencyCode.KRW;
+    }
+
+    return null;
+  }
+
+  private parseRefreshQuery(value: unknown): boolean {
+    if (value === undefined || value === null || value === '') {
+      return true;
+    }
+
+    if (value === true || value === 'true' || value === '1') {
+      return true;
+    }
+
+    if (value === false || value === 'false' || value === '0') {
+      return false;
+    }
+
+    this.throwApiError(
+      HttpStatus.BAD_REQUEST,
+      'INVALID_REFRESH',
+      'refresh must be true or false',
+    );
   }
 
   private validateQuoteRequest(body: FxQuoteRequestBody) {

@@ -3,9 +3,9 @@
 ## Status
 
 - This document records the implemented `/fx quote` contract and `/fx execute` MVP behavior.
-- `/fx quote` can use fresh `provider_api` ExchangeRate-API USD/KRW first, with existing safe `admin_manual` fallback.
+- `/fx quote` can use fresh `provider_api` USD/KRW first, preferring Korea EXIM exchange (`korea_exim_exchange_rate`) and falling back to ExchangeRate-API (`exchange_rate_api`), with existing safe `admin_manual` fallback.
 - `/fx quote` stores an active durable quote and returns `quoteId`, `expiresAt`, and `maxChangeBps`.
-- `/fx execute` requires a durable quote for new mutations, reprices at execute time from fresh `provider_api` `exchange_rate_api` USD/KRW, enforces quote movement threshold, and forbids default `admin_manual` fallback.
+- `/fx execute` requires a durable quote for new mutations, reprices at execute time from fresh `provider_api` USD/KRW, enforces quote movement threshold, and forbids default `admin_manual` fallback.
 - `docs/realtime-execution-policy.md` defines the active provider-backed execute/write policy.
 - Do not add fake FX rates, temporary FX rates, Prisma schema changes, migrations, seed changes, package changes, scheduler/cron, provider ingestion trigger APIs, or real trading/account APIs from this document.
 
@@ -23,14 +23,15 @@
 - Quote and execute are allowed only when the user has joined an active season.
 - Upcoming, ended, and settled seasons block quote and execute.
 - Fake FX rates and temporary FX rates are forbidden.
-- `/fx quote` first tries an eligible `provider_api` USD/KRW `fx_rate_snapshots` row with `sourceName=exchange_rate_api`.
+- `/fx quote` first tries an eligible `provider_api` USD/KRW `fx_rate_snapshots` row by source priority: `korea_exim_exchange_rate`, then `exchange_rate_api`.
 - `/fx quote` provider freshness uses `capturedAt <= now`, `effectiveAt <= now`, positive rate, and capturedAt age <= 300 seconds.
 - If the provider row is missing, stale, future, non-positive, wrong-source, or otherwise ineligible, `/fx quote` falls back to the existing `admin_manual` selection.
 - Existing `admin_manual` quote fallback keeps the established 60-second `effectiveAt` stale check.
-- `/fx execute` uses execute-time fresh provider_api USD/KRW rows only. It compares executeRate against the durable quote quotedRate, rejects threshold breaches with `RATE_CHANGED_REQUOTE_REQUIRED`, and forbids default `admin_manual` fallback.
+- `/fx execute` uses execute-time fresh provider_api USD/KRW rows only, by source priority `korea_exim_exchange_rate` then `exchange_rate_api`. It compares executeRate against the durable quote quotedRate, rejects threshold breaches with `RATE_CHANGED_REQUOTE_REQUIRED`, and forbids default `admin_manual` fallback.
 - `/fx quote` exposes optional public-safe `rateSource` metadata for source/outage visibility. Raw provider payloads, `metadataJson`, and secrets are never exposed.
 - USD/KRW snapshots are also the KRW conversion evidence for USD-settled crypto valuation.
 - MVP crypto uses Binance-based USD settlement and the USD Wallet; no `USDT` wallet/currency is introduced.
+- Korea EXIM exchange request URL is `https://oapi.koreaexim.go.kr/site/program/financial/exchangeJSON` with `authkey`, `searchdate` formatted as KST `YYYYMMDD`, and `data=AP01`. USD/KRW uses the USD row's `DEAL_BAS_R` after comma removal, stored at 8 decimal places. Actual auth keys must stay only in `.env.local`; raw provider payloads, auth keys, and full request URLs are not exposed.
 
 ## Common Error Envelope
 
@@ -45,6 +46,46 @@ All `/fx` errors should use the common error envelope.
   }
 }
 ```
+
+## GET /api/v1/fx/rates/current
+
+### Purpose
+
+Return the current USD/KRW rate without changing wallets, quotes, or exchange rows.
+
+### Query
+
+- `baseCurrency`: optional, defaults to `USD`.
+- `quoteCurrency`: optional, defaults to `KRW`.
+- `refresh`: optional boolean, defaults to `true`.
+
+Only `USD/KRW` is supported. Other pairs return `UNSUPPORTED_FX_PAIR`.
+
+When `refresh=true`, the backend may refresh Korea EXIM exchange data if provider env is enabled. When `refresh=false`, it reads DB rows only and does not call external provider APIs.
+
+### Success Response Shape
+
+```json
+{
+  "success": true,
+  "data": {
+    "state": "available",
+    "pair": "USD/KRW",
+    "baseCurrency": "USD",
+    "quoteCurrency": "KRW",
+    "rate": "1389.50000000",
+    "sourceType": "provider_api",
+    "sourceName": "korea_exim_exchange_rate",
+    "effectiveAt": "2026-06-18T15:00:00.000Z",
+    "capturedAt": "2026-06-19T08:00:00.000Z",
+    "freshnessAgeSeconds": 120,
+    "providerPriority": 1,
+    "fallbackUsed": false
+  }
+}
+```
+
+No available DB row returns HTTP 503 with `FX_RATE_UNAVAILABLE`. The response never includes auth keys, raw provider payloads, or full provider request URLs.
 
 ## POST /api/v1/fx/quote
 
@@ -116,7 +157,7 @@ Return a KRW/USD exchange quote without changing wallet balances or writing exch
 - `expiresAt` is non-null and defaults to 10 seconds after quote time.
 - `rateCapturedAt` and `rateEffectiveAt` are returned for rate timing transparency.
 - Optional `rateSource` returns selected provider/admin source metadata and fallback/rejected-provider reason visibility.
-- `appliedRate` source is fresh `provider_api` `exchange_rate_api` USD/KRW first, then existing `admin_manual` fallback.
+- `appliedRate` source is fresh `provider_api` USD/KRW first by `korea_exim_exchange_rate`, then `exchange_rate_api`; quote can still use the existing `admin_manual` fallback when provider rows are unavailable or stale.
 - Missing eligible provider and manual snapshots return `FX_RATE_UNAVAILABLE`.
 - Selected provider snapshot older than 300 seconds by `capturedAt`, or selected manual snapshot older than 60 seconds by `effectiveAt`, returns `FX_RATE_STALE` only when no safe fallback is available.
 - Quote metadata stores only public-safe source decision fields; raw provider payloads and secrets are not stored in quote metadata.
@@ -153,7 +194,7 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 - Selection target:
   - pair USD/KRW
   - `sourceType = provider_api`
-  - `sourceName = exchange_rate_api`
+  - `sourceName = korea_exim_exchange_rate` first, then `exchange_rate_api`
   - `capturedAt <= executeNow`
   - `effectiveAt <= executeNow`
   - `executeNow - capturedAt <= 60_000ms`
@@ -193,7 +234,7 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
     "rateChangeBps": "<bps string>",
     "rateSource": {
       "sourceType": "provider_api",
-      "sourceName": "exchange_rate_api",
+      "sourceName": "korea_exim_exchange_rate",
       "snapshotId": "<string>",
       "effectiveAt": "<UTC ISO string>",
       "capturedAt": "<UTC ISO string>",
@@ -350,10 +391,10 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 
 ## Provider / SourceType Policy For Execute
 
-- Provider API Source Eligibility Implementation Gate read-only/quote phase does not open execute.
-- ExchangeRate-API is the current MVP FX provider for read-only `/fx quote`; OANDA and Twelve Data are historical/fallback research candidates only.
-- `provider_api`, `official_batch`, and scheduler ingestion are not execute sources.
-- `admin_manual` is bootstrap/fallback/manual correction.
+- Durable Quote provider execute is open only for fresh `provider_api` USD/KRW rows.
+- Korea EXIM exchange is the preferred MVP FX provider; ExchangeRate-API remains the fallback provider. OANDA and Twelve Data are historical research candidates only.
+- `official_batch`, scheduler ingestion, and default `admin_manual` fallback are not execute sources.
+- `admin_manual` remains bootstrap/fallback/manual correction for quote/read paths only.
 - `official_batch` is not a real-time execute source; it remains settlement/reference/reconciliation candidate.
 - Near-term execute uses explicit allowed sourceType eligibility, not implicit priority.
 - Current allowed execute sourceType: `admin_manual` only.

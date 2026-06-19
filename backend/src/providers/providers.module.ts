@@ -4,6 +4,8 @@ import { BinancePublicClient } from './binance/binance-public.client';
 import { BinancePriceIngestionService } from './binance/binance-price.ingestion.service';
 import { ExchangeRateClient } from './exchange-rate/exchange-rate.client';
 import { ExchangeRateIngestionService } from './exchange-rate/exchange-rate.ingestion.service';
+import { KoreaEximExchangeClient } from './korea-exim/korea-exim-exchange.client';
+import { KoreaEximExchangeIngestionService } from './korea-exim/korea-exim-exchange.ingestion.service';
 import { KisAuthClient } from './kis/kis-auth.client';
 import { KisQuoteClient } from './kis/kis-quote.client';
 import { KisWebSocketClient } from './kis/kis-websocket.client';
@@ -18,6 +20,8 @@ import { ProviderHttpClient } from './provider-http.client';
     ProviderHttpClient,
     ExchangeRateClient,
     ExchangeRateIngestionService,
+    KoreaEximExchangeClient,
+    KoreaEximExchangeIngestionService,
     BinancePublicClient,
     BinancePriceIngestionService,
     KisAuthClient,
@@ -28,6 +32,8 @@ import { ProviderHttpClient } from './provider-http.client';
   exports: [
     ProviderConfigService,
     ExchangeRateIngestionService,
+    KoreaEximExchangeClient,
+    KoreaEximExchangeIngestionService,
     BinancePriceIngestionService,
     KisAuthClient,
     KisQuoteClient,

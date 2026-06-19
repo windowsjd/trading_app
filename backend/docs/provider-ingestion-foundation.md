@@ -93,11 +93,24 @@ Live smoke evidence status as of 2026-05-28 KST:
 
 ## Scope
 
-This foundation supports market data provider configuration, secret redaction, raw payload truncation, ExchangeRate-API USD/KRW snapshot ingestion, Binance public crypto price snapshot ingestion, and KIS WebSocket trade price snapshot ingestion foundation.
+This foundation supports market data provider configuration, secret redaction, raw payload truncation, Korea EXIM exchange USD/KRW snapshot ingestion, ExchangeRate-API USD/KRW snapshot ingestion, Binance public crypto price snapshot ingestion, and KIS WebSocket trade price snapshot ingestion foundation.
 
 This project remains a virtual trading app. External provider APIs are used only for market data evidence. Real orders, account linkage, balances, deposits, withdrawals, fills, and trading endpoints are not implemented.
 
 ## Implemented Providers
+
+### Korea EXIM Exchange
+
+- Source name is `korea_exim_exchange_rate`.
+- Uses `GET https://oapi.koreaexim.go.kr/site/program/financial/exchangeJSON`.
+- Sends `authkey`, KST `YYYYMMDD` `searchdate`, and `data=AP01`.
+- Reads the USD row by `CUR_UNIT`/`cur_unit` with case-insensitive `USD` prefix matching.
+- Parses `DEAL_BAS_R`/`deal_bas_r` as KRW per 1 USD after removing commas, then stores it at 8 decimal places.
+- Looks back from the current KST date through `KOREA_EXIM_EXCHANGE_LOOKBACK_DAYS` to tolerate weekends, holidays, or no-data dates.
+- Inserts `fx_rate_snapshots` rows with `sourceType=provider_api`, `sourceName=korea_exim_exchange_rate`, `baseCurrency=USD`, `quoteCurrency=KRW`, `effectiveAt=<searchDate KST 00:00 converted to UTC>`, and `capturedAt=<provider receive time>`.
+- Stores only safe metadata such as provider, searchDate, curUnit, curName, and dealBasR. It does not store the full raw provider payload.
+- Actual auth keys must live only in `.env.local`; `.env.example` keeps `KOREA_EXIM_EXCHANGE_AUTH_KEY=` blank. Error messages and responses must not expose auth keys or full request URLs.
+- `/fx quote`, `/fx execute`, and `GET /api/v1/fx/rates/current` prefer this provider when fresh/available.
 
 ### ExchangeRate-API
 
@@ -152,6 +165,14 @@ ExchangeRate-API:
 - `EXCHANGE_RATE_API_ENABLED`
 - `EXCHANGE_RATE_API_KEY`
 - `EXCHANGE_RATE_API_BASE_URL`
+
+Korea EXIM exchange:
+
+- `KOREA_EXIM_EXCHANGE_ENABLED`
+- `KOREA_EXIM_EXCHANGE_AUTH_KEY`
+- `KOREA_EXIM_EXCHANGE_BASE_URL`
+- `KOREA_EXIM_EXCHANGE_DATA`
+- `KOREA_EXIM_EXCHANGE_LOOKBACK_DAYS`
 
 Binance:
 
@@ -216,9 +237,10 @@ All scripts are explicit operator commands. No cron scheduler or admin HTTP inge
 
 ## Boundaries
 
-- `provider_api` snapshot rows can now be inserted by explicit provider ingestion services.
+- `provider_api` snapshot rows can now be inserted by explicit provider ingestion services and by the Korea EXIM refresh path used when `/fx` needs a current USD/KRW provider row.
 - Provider_api rows are eligible only for `/fx quote`, assets `withPrice`, orders quote, live portfolio valuation, home live valuation, positions live valuation, and operator-run daily snapshot valuation.
-- ExchangeRate-API can create provider_api USD/KRW rows, and fresh `exchange_rate_api` USD/KRW rows may power `/fx quote` and allowed read-only USD/KRW conversion with safe `admin_manual` fallback.
+- Korea EXIM exchange and ExchangeRate-API can create provider_api USD/KRW rows. Fresh `korea_exim_exchange_rate` rows are preferred, fresh `exchange_rate_api` rows remain fallback, and `/fx quote`/allowed read-only USD/KRW conversion keep safe `admin_manual` fallback.
+- `/fx execute` requires fresh provider_api USD/KRW and does not open default `admin_manual` fallback.
 - `admin_manual` fallback eligibility in the existing financial paths remains available where the workflow already allowed manual data.
 - Provider outages, parse errors, missing mappings, and rate limits must not create fake rows.
 - KIS WebSocket trade price ingestion can create provider_api rows, and fresh KRX/NAS/NYS rows may power allowed read-only/quote workflows plus operator-run daily snapshot valuation only.

@@ -12,12 +12,16 @@ export function collectProviderSecretsFromEnv(
 ): string[] {
   return [
     env.EXCHANGE_RATE_API_KEY,
+    env.KOREA_EXIM_EXCHANGE_AUTH_KEY,
     env.KIS_APP_KEY,
     env.KIS_APP_SECRET,
   ].filter((value): value is string => Boolean(value && value.trim()));
 }
 
-export function redactText(text: string, options: RedactionOptions = {}): string {
+export function redactText(
+  text: string,
+  options: RedactionOptions = {},
+): string {
   let result = text;
 
   for (const secret of normalizeSecrets(options.secrets)) {
@@ -27,11 +31,17 @@ export function redactText(text: string, options: RedactionOptions = {}): string
   return result;
 }
 
-export function redactJsonValue<T>(value: T, options: RedactionOptions = {}): T {
+export function redactJsonValue<T>(
+  value: T,
+  options: RedactionOptions = {},
+): T {
   return redactJsonValueInternal(value, normalizeSecrets(options.secrets)) as T;
 }
 
-function redactJsonValueInternal(value: unknown, secrets: readonly string[]): unknown {
+function redactJsonValueInternal(
+  value: unknown,
+  secrets: readonly string[],
+): unknown {
   if (typeof value === 'string') {
     return redactText(value, { secrets });
   }

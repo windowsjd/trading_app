@@ -617,9 +617,21 @@ near-term ledger/FX foundation:
 - `admin_manual`은 bootstrap/fallback/manual correction 경로.
 - `/fx quote` smoke용 승인된 `admin_manual` snapshot 1건 입력 및 소비 검증 완료.
 - 입력한 manual snapshot은 smoke 당시 fresh였지만 60초 이후에는 정책상 stale이 되므로, 지속적인 quote 성공에는 별도 승인 snapshot 입력 또는 향후 ingestion 경로가 필요함.
+- 한국수출입은행 환율 OpenAPI provider 구현 완료:
+  - sourceName은 `korea_exim_exchange_rate`.
+  - 요청 URL은 `https://oapi.koreaexim.go.kr/site/program/financial/exchangeJSON`.
+  - 요청 파라미터는 `authkey`, KST `YYYYMMDD` `searchdate`, `data=AP01`.
+  - USD/KRW rate는 USD row의 `DEAL_BAS_R`/`deal_bas_r`를 사용하고 쉼표 제거 후 Decimal 8자리로 저장.
+  - 주말/휴일/no-data 대응으로 KST 오늘부터 `KOREA_EXIM_EXCHANGE_LOOKBACK_DAYS`만큼 lookback.
+  - `fx_rate_snapshots` 저장값은 `sourceType=provider_api`, `sourceName=korea_exim_exchange_rate`, `baseCurrency=USD`, `quoteCurrency=KRW`, `effectiveAt=searchDate KST 00:00 UTC 변환`, `capturedAt=provider receive time`.
+  - raw provider payload 전체와 auth key는 저장/응답/문서에 노출하지 않음. 실제 auth key는 `.env.local`에만 두고 `.env.example`에는 빈 값만 둠.
+- `GET /api/v1/fx/rates/current` 구현 완료. 기본 pair는 USD/KRW, `refresh=true`이면 provider env enabled 상태에서 한국수출입은행 refresh를 시도하고, `refresh=false`이면 외부 API 호출 없이 DB row만 조회함. 미지원 pair는 `UNSUPPORTED_FX_PAIR`, row 없음은 `FX_RATE_UNAVAILABLE`.
+- USD/KRW provider priority는 `korea_exim_exchange_rate` first, `exchange_rate_api` fallback. 기존 ExchangeRate-API provider는 제거하지 않음.
+- `/fx quote` durable quote 구조(`quoteId`, `requestHash`, `maxChangeBps`)는 변경하지 않았고, 기존 `admin_manual` quote fallback은 유지함.
+- `/fx execute`는 fresh provider_api USD/KRW만 허용하며 default `admin_manual` fallback은 여전히 금지됨.
 - `provider_api` source eligibility is open only for the read-only/quote workflows listed in the 2026-06-03 gate plus the 2026-06-05 operator-run daily snapshot valuation workflow; `official_batch` ingestion and scheduler implementation remain closed.
 - Gate B provider role은 `CONDITIONAL GO`로 정리됨.
-- Current MVP provider stack is ExchangeRate-API for FX, Binance public REST for crypto, and KIS WebSocket market data for domestic/US stocks. OANDA and Twelve Data are historical/fallback candidates only.
+- Current MVP provider stack is Korea EXIM exchange first and ExchangeRate-API fallback for FX, Binance public REST for crypto, and KIS WebSocket market data for domestic/US stocks. OANDA and Twelve Data are historical candidates only.
 - Crypto MVP provider는 Binance로 고정하며 USD-settled crypto로 처리한다.
 - Crypto 주문/정산은 미국주식과 동일하게 USD Wallet을 사용하고, KRW 평가는 USD crypto value를 USD/KRW로 환산한다.
 - KRX provider source eligibility is open only for read-only/quote workflows through `kis_krx_realtime_trade`; KRX execute/write provider use remains `BLOCKED`.

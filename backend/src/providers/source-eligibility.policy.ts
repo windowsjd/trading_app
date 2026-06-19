@@ -3,10 +3,17 @@ import type { AssetType } from '../generated/prisma/client';
 
 export const PROVIDER_SOURCE_NAMES = {
   fxUsdKrw: 'exchange_rate_api',
+  fxUsdKrwKoreaExim: 'korea_exim_exchange_rate',
+  fxUsdKrwExchangeRateApi: 'exchange_rate_api',
   cryptoUsd: 'binance_public_rest_24hr_ticker',
   domesticStockKrx: 'kis_krx_realtime_trade',
   usStock: 'kis_us_delayed_trade',
 } as const;
+
+export const FX_USD_KRW_PROVIDER_SOURCE_PRIORITY = [
+  PROVIDER_SOURCE_NAMES.fxUsdKrwKoreaExim,
+  PROVIDER_SOURCE_NAMES.fxUsdKrwExchangeRateApi,
+] as const;
 
 export type ProviderEligibleWorkflow =
   | 'fx_quote'
@@ -120,6 +127,7 @@ export function resolveFxProviderEligibility(input: {
   | {
       eligible: true;
       sourceName: typeof PROVIDER_SOURCE_NAMES.fxUsdKrw;
+      sourceNames: typeof FX_USD_KRW_PROVIDER_SOURCE_PRIORITY;
       freshnessThresholdSeconds: number;
     }
   | { eligible: false; reason: string } {
@@ -137,6 +145,7 @@ export function resolveFxProviderEligibility(input: {
   return {
     eligible: true,
     sourceName: PROVIDER_SOURCE_NAMES.fxUsdKrw,
+    sourceNames: FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
     freshnessThresholdSeconds:
       input.workflow === 'fx_execute' || input.workflow === 'orders_execute'
         ? PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.fxUsdKrwExecute
@@ -267,6 +276,86 @@ export function selectFreshProviderSnapshot<
       fallbackUsed: true,
       fallbackReason: 'provider_rejected',
       rejectedProviderReason,
+      freshnessAgeSeconds,
+    }),
+  };
+}
+
+export function selectFreshProviderSnapshotBySourcePriority<
+  T extends ProviderSnapshotCandidate,
+>(input: {
+  candidates: readonly T[];
+  expectedSourceNames: readonly string[];
+  now: Date;
+  freshnessThresholdSeconds: number;
+  isPositiveValue: (candidate: T) => boolean;
+}): ProviderSnapshotSelection<T> {
+  if (input.candidates.length === 0) {
+    return {
+      state: 'not_selected',
+      decision: buildEmptyDecision({
+        fallbackUsed: true,
+        fallbackReason: 'provider_missing',
+        rejectedProviderReason: null,
+      }),
+    };
+  }
+
+  let rejectedProviderReason: string | null = null;
+  let freshnessAgeSeconds: number | null = null;
+  let sawPrioritizedSource = false;
+
+  for (const expectedSourceName of input.expectedSourceNames) {
+    const sourceCandidates = input.candidates.filter(
+      (candidate) => candidate.sourceName === expectedSourceName,
+    );
+
+    if (sourceCandidates.length === 0) {
+      continue;
+    }
+
+    sawPrioritizedSource = true;
+
+    for (const candidate of sourceCandidates) {
+      const evaluation = evaluateProviderSnapshot({
+        candidate,
+        expectedSourceName,
+        now: input.now,
+        freshnessThresholdSeconds: input.freshnessThresholdSeconds,
+        isPositiveValue: () => input.isPositiveValue(candidate),
+      });
+
+      if (evaluation.eligible) {
+        return {
+          state: 'selected',
+          snapshot: candidate,
+          decision: {
+            selectedSourceType: 'provider_api',
+            selectedSourceName: candidate.sourceName,
+            selectedSnapshotId: candidate.id,
+            selectedEffectiveAt: candidate.effectiveAt,
+            selectedCapturedAt: candidate.capturedAt,
+            fallbackUsed: false,
+            fallbackReason: null,
+            rejectedProviderReason: null,
+            freshnessAgeSeconds: evaluation.freshnessAgeSeconds,
+          },
+        };
+      }
+
+      rejectedProviderReason ??= evaluation.reason;
+      freshnessAgeSeconds ??= evaluation.freshnessAgeSeconds;
+    }
+  }
+
+  return {
+    state: 'not_selected',
+    decision: buildEmptyDecision({
+      fallbackUsed: true,
+      fallbackReason: 'provider_rejected',
+      rejectedProviderReason: sawPrioritizedSource
+        ? rejectedProviderReason
+        : 'source_name_mismatch',
       freshnessAgeSeconds,
     }),
   };

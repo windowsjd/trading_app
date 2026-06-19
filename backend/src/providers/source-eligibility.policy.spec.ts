@@ -35,12 +35,14 @@ import {
   Prisma,
 } from '../generated/prisma/client';
 import {
+  FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
   isProviderWorkflowAllowed,
   isProviderWorkflowDenied,
   PROVIDER_SOURCE_NAMES,
   resolveAssetProviderEligibility,
   resolveFxProviderEligibility,
   selectFreshProviderSnapshot,
+  selectFreshProviderSnapshotBySourcePriority,
   selectProviderSnapshotAtOrBefore,
 } from './source-eligibility.policy';
 
@@ -179,7 +181,7 @@ describe('provider source eligibility policy', () => {
     });
   });
 
-  it('allows only USD/KRW ExchangeRate provider FX for eligible workflows', () => {
+  it('allows only USD/KRW provider FX for eligible workflows with source priority', () => {
     expect(
       resolveFxProviderEligibility({
         workflow: 'fx_quote',
@@ -189,6 +191,7 @@ describe('provider source eligibility policy', () => {
     ).toMatchObject({
       eligible: true,
       sourceName: PROVIDER_SOURCE_NAMES.fxUsdKrw,
+      sourceNames: FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
     });
 
     expect(
@@ -200,6 +203,7 @@ describe('provider source eligibility policy', () => {
     ).toMatchObject({
       eligible: true,
       sourceName: PROVIDER_SOURCE_NAMES.fxUsdKrw,
+      sourceNames: FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
     });
 
     expect(
@@ -211,6 +215,7 @@ describe('provider source eligibility policy', () => {
     ).toMatchObject({
       eligible: true,
       sourceName: PROVIDER_SOURCE_NAMES.fxUsdKrw,
+      sourceNames: FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
       freshnessThresholdSeconds: 300,
     });
 
@@ -223,6 +228,7 @@ describe('provider source eligibility policy', () => {
     ).toMatchObject({
       eligible: true,
       sourceName: PROVIDER_SOURCE_NAMES.fxUsdKrw,
+      sourceNames: FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
       freshnessThresholdSeconds: 60,
     });
   });
@@ -338,6 +344,79 @@ describe('provider source eligibility policy', () => {
       state: 'not_selected',
       decision: {
         rejectedProviderReason: 'source_name_mismatch',
+      },
+    });
+  });
+
+  it('selects fresh USD/KRW provider candidates by Korea EXIM then ExchangeRate priority', () => {
+    const selectedPrimary = selectFreshProviderSnapshotBySourcePriority({
+      candidates: [
+        {
+          id: 'exchange-fx-1',
+          sourceType: FxRateSourceType.provider_api,
+          sourceName: PROVIDER_SOURCE_NAMES.fxUsdKrwExchangeRateApi,
+          effectiveAt: new Date('2026-06-02T23:59:30.000Z'),
+          capturedAt: new Date('2026-06-02T23:59:40.000Z'),
+          rate: new Prisma.Decimal('1401.00000000'),
+        },
+        {
+          id: 'korea-exim-fx-1',
+          sourceType: FxRateSourceType.provider_api,
+          sourceName: PROVIDER_SOURCE_NAMES.fxUsdKrwKoreaExim,
+          effectiveAt: new Date('2026-06-02T23:58:30.000Z'),
+          capturedAt: new Date('2026-06-02T23:59:30.000Z'),
+          rate: new Prisma.Decimal('1400.00000000'),
+        },
+      ],
+      expectedSourceNames: FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
+      now,
+      freshnessThresholdSeconds: 60,
+      isPositiveValue: (candidate) => candidate.rate.gt(0),
+    });
+
+    expect(selectedPrimary).toMatchObject({
+      state: 'selected',
+      snapshot: {
+        id: 'korea-exim-fx-1',
+      },
+      decision: {
+        selectedSourceName: PROVIDER_SOURCE_NAMES.fxUsdKrwKoreaExim,
+        fallbackUsed: false,
+      },
+    });
+
+    const selectedFallback = selectFreshProviderSnapshotBySourcePriority({
+      candidates: [
+        {
+          id: 'korea-exim-stale',
+          sourceType: FxRateSourceType.provider_api,
+          sourceName: PROVIDER_SOURCE_NAMES.fxUsdKrwKoreaExim,
+          effectiveAt: new Date('2026-06-02T23:50:00.000Z'),
+          capturedAt: new Date('2026-06-02T23:54:59.000Z'),
+          rate: new Prisma.Decimal('1399.00000000'),
+        },
+        {
+          id: 'exchange-fx-2',
+          sourceType: FxRateSourceType.provider_api,
+          sourceName: PROVIDER_SOURCE_NAMES.fxUsdKrwExchangeRateApi,
+          effectiveAt: new Date('2026-06-02T23:59:30.000Z'),
+          capturedAt: new Date('2026-06-02T23:59:40.000Z'),
+          rate: new Prisma.Decimal('1401.00000000'),
+        },
+      ],
+      expectedSourceNames: FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
+      now,
+      freshnessThresholdSeconds: 60,
+      isPositiveValue: (candidate) => candidate.rate.gt(0),
+    });
+
+    expect(selectedFallback).toMatchObject({
+      state: 'selected',
+      snapshot: {
+        id: 'exchange-fx-2',
+      },
+      decision: {
+        selectedSourceName: PROVIDER_SOURCE_NAMES.fxUsdKrwExchangeRateApi,
       },
     });
   });

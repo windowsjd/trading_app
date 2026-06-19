@@ -23,6 +23,14 @@ export type ExchangeRateApiConfig = {
   baseUrl: string;
 };
 
+export type KoreaEximExchangeConfig = {
+  enabled: boolean;
+  authKey?: string;
+  baseUrl: string;
+  data: string;
+  lookbackDays: number;
+};
+
 export type BinancePublicMarketDataConfig = {
   enabled: boolean;
   restBaseUrl: string;
@@ -54,6 +62,7 @@ export type KisMarketDataConfig = {
 export type ProviderConfig = {
   common: CommonProviderConfig;
   exchangeRateApi: ExchangeRateApiConfig;
+  koreaEximExchange: KoreaEximExchangeConfig;
   binance: BinancePublicMarketDataConfig;
   kis: KisMarketDataConfig;
 };
@@ -72,6 +81,12 @@ export class ProviderConfigService {
     env: ProviderEnv = process.env,
   ): ExchangeRateApiConfig {
     return buildProviderConfig(env).exchangeRateApi;
+  }
+
+  getKoreaEximExchangeConfig(
+    env: ProviderEnv = process.env,
+  ): KoreaEximExchangeConfig {
+    return buildProviderConfig(env).koreaEximExchange;
   }
 
   getBinanceConfig(
@@ -128,6 +143,43 @@ export function buildProviderConfig(env: ProviderEnv): ProviderConfig {
       'exchange_rate_api',
       'REQUIRED_ENV_MISSING',
       'EXCHANGE_RATE_API_BASE_URL is required when exchange_rate_api is enabled.',
+    );
+  }
+
+  const koreaEximExchangeEnabled = readBooleanEnv(
+    env,
+    'KOREA_EXIM_EXCHANGE_ENABLED',
+    false,
+    'korea_exim_exchange_rate',
+  );
+  const koreaEximExchangeBaseUrl = readOptionalTrimmedEnv(
+    env,
+    'KOREA_EXIM_EXCHANGE_BASE_URL',
+  );
+  const koreaEximExchange: KoreaEximExchangeConfig = {
+    enabled: koreaEximExchangeEnabled,
+    authKey: koreaEximExchangeEnabled
+      ? readRequiredKoreaEximAuthKey(env)
+      : readOptionalTrimmedEnv(env, 'KOREA_EXIM_EXCHANGE_AUTH_KEY'),
+    baseUrl: koreaEximExchangeBaseUrl ?? 'https://oapi.koreaexim.go.kr',
+    data: readOptionalTrimmedEnv(env, 'KOREA_EXIM_EXCHANGE_DATA') ?? 'AP01',
+    lookbackDays: readPositiveIntegerEnv(
+      env,
+      'KOREA_EXIM_EXCHANGE_LOOKBACK_DAYS',
+      7,
+      'korea_exim_exchange_rate',
+    ),
+  };
+
+  if (
+    koreaEximExchangeEnabled &&
+    env.KOREA_EXIM_EXCHANGE_BASE_URL !== undefined &&
+    koreaEximExchangeBaseUrl === undefined
+  ) {
+    throw new ProviderConfigError(
+      'korea_exim_exchange_rate',
+      'REQUIRED_ENV_MISSING',
+      'KOREA_EXIM_EXCHANGE_BASE_URL is required when korea_exim_exchange_rate is enabled.',
     );
   }
 
@@ -230,7 +282,21 @@ export function buildProviderConfig(env: ProviderEnv): ProviderConfig {
   return {
     common,
     exchangeRateApi,
+    koreaEximExchange,
     binance,
     kis,
   };
+}
+
+function readRequiredKoreaEximAuthKey(env: ProviderEnv): string {
+  const value = readOptionalTrimmedEnv(env, 'KOREA_EXIM_EXCHANGE_AUTH_KEY');
+  if (value === undefined) {
+    throw new ProviderConfigError(
+      'korea_exim_exchange_rate',
+      'KOREA_EXIM_AUTH_KEY_MISSING',
+      'KOREA_EXIM_EXCHANGE_AUTH_KEY is required when korea_exim_exchange_rate is enabled.',
+    );
+  }
+
+  return value;
 }

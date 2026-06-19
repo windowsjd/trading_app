@@ -2880,19 +2880,18 @@ describe('AppController (e2e)', () => {
       label: 'POST /api/v1/orders/:orderId/cancel',
       path: '/api/v1/orders/order-1/cancel',
       body: undefined,
-      expectedStatus: 404,
+      expectedStatus: 410,
       setup: () => {
         mockActiveUser();
-        prisma.order.findFirst.mockResolvedValueOnce(null);
       },
       assertBody: (body: Record<string, unknown>) => {
         expect(body).toMatchObject({
           success: false,
           error: {
-            code: 'ORDER_NOT_FOUND',
+            code: 'ORDER_CANCEL_NOT_SUPPORTED',
           },
         });
-        expect(prisma.order.findFirst).toHaveBeenCalled();
+        expect(prisma.order.findFirst).not.toHaveBeenCalled();
         expectNoWriteMutationCalls();
       },
     },

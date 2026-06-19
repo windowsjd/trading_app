@@ -1,4 +1,8 @@
-export type ProviderId = 'exchange_rate_api' | 'binance' | 'kis';
+export type ProviderId =
+  | 'exchange_rate_api'
+  | 'korea_exim_exchange_rate'
+  | 'binance'
+  | 'kis';
 
 export type ProviderCurrencyPair = {
   fromCurrency: 'USD';

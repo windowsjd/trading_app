@@ -7,6 +7,12 @@ describe('provider config', () => {
 
     expect(config.common.providerIngestionEnabled).toBe(false);
     expect(config.exchangeRateApi.enabled).toBe(false);
+    expect(config.koreaEximExchange).toMatchObject({
+      enabled: false,
+      baseUrl: 'https://oapi.koreaexim.go.kr',
+      data: 'AP01',
+      lookbackDays: 7,
+    });
     expect(config.binance.enabled).toBe(false);
     expect(config.kis.enabled).toBe(false);
   });
@@ -28,6 +34,43 @@ describe('provider config', () => {
         code: 'REQUIRED_ENV_MISSING',
       });
     }
+  });
+
+  it('fails closed when Korea EXIM exchange is enabled without its auth key', () => {
+    expect(() =>
+      buildProviderConfig({
+        KOREA_EXIM_EXCHANGE_ENABLED: 'true',
+      }),
+    ).toThrow(ProviderConfigError);
+
+    try {
+      buildProviderConfig({
+        KOREA_EXIM_EXCHANGE_ENABLED: 'true',
+      });
+    } catch (error) {
+      expect(error).toMatchObject({
+        provider: 'korea_exim_exchange_rate',
+        code: 'KOREA_EXIM_AUTH_KEY_MISSING',
+      });
+    }
+  });
+
+  it('parses Korea EXIM exchange env defaults and overrides', () => {
+    const config = buildProviderConfig({
+      KOREA_EXIM_EXCHANGE_ENABLED: 'true',
+      KOREA_EXIM_EXCHANGE_AUTH_KEY: 'test-auth-key',
+      KOREA_EXIM_EXCHANGE_BASE_URL: 'https://example.test',
+      KOREA_EXIM_EXCHANGE_DATA: 'AP01',
+      KOREA_EXIM_EXCHANGE_LOOKBACK_DAYS: '3',
+    });
+
+    expect(config.koreaEximExchange).toEqual({
+      enabled: true,
+      authKey: 'test-auth-key',
+      baseUrl: 'https://example.test',
+      data: 'AP01',
+      lookbackDays: 3,
+    });
   });
 
   it('allows KIS disabled with empty app keys and base URLs', () => {
