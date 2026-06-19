@@ -895,13 +895,16 @@ export class FxService {
   ): Promise<FxProviderRateSnapshot | null> {
     const providerCandidates =
       await this.findProviderUsdKrwSnapshotCandidates(20);
-    const providerSnapshot = this.selectLatestProviderUsdKrwSnapshot({
+    const providerSelection = selectFreshProviderSnapshotBySourcePriority({
       candidates: providerCandidates,
+      expectedSourceNames: FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
       now,
+      freshnessThresholdSeconds: PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.fxUsdKrw,
+      isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
     });
 
-    if (providerSnapshot) {
-      return providerSnapshot;
+    if (providerSelection.state === 'selected') {
+      return providerSelection.snapshot;
     }
 
     return this.prisma.fxRateSnapshot.findFirst({
@@ -927,28 +930,6 @@ export class FxService {
         capturedAt: true,
       },
     });
-  }
-
-  private selectLatestProviderUsdKrwSnapshot(input: {
-    candidates: readonly FxProviderRateSnapshot[];
-    now: Date;
-  }): FxProviderRateSnapshot | null {
-    for (const sourceName of FX_USD_KRW_PROVIDER_SOURCE_PRIORITY) {
-      const snapshot = input.candidates.find(
-        (candidate) =>
-          candidate.sourceName === sourceName &&
-          candidate.sourceType === FxRateSourceType.provider_api &&
-          candidate.effectiveAt.getTime() <= input.now.getTime() &&
-          candidate.capturedAt.getTime() <= input.now.getTime() &&
-          isPositiveDecimal(candidate.rate),
-      );
-
-      if (snapshot) {
-        return snapshot;
-      }
-    }
-
-    return null;
   }
 
   private resolveProviderPriority(sourceName: string | null): number | null {

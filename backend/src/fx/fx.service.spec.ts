@@ -109,6 +109,7 @@ import {
   type FxExecuteRequestBodyLike,
 } from './fx-execute-request-policy';
 import { computeFxQuoteRequestHash } from '../providers/durable-quote.policy';
+import { ProviderConfigError } from '../providers/provider.types';
 
 const now = new Date('2026-05-01T00:01:00.000Z');
 const seasonStartAt = new Date('2026-04-28T00:00:00.000Z');
@@ -343,6 +344,138 @@ describe('FxService', () => {
       },
     });
     expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('returns fresh ExchangeRate-API when Korea EXIM current rate row is stale', async () => {
+    const { prisma, service } = createService();
+    prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
+      {
+        id: 'fx-korea-exim-stale',
+        rate: new Prisma.Decimal('1389.50000000'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'korea_exim_exchange_rate',
+        capturedAt: new Date('2026-04-30T23:55:59.000Z'),
+        effectiveAt: new Date('2026-04-30T23:55:59.000Z'),
+      },
+      {
+        id: 'fx-exchange-rate-api-fresh',
+        rate: new Prisma.Decimal('1401.25000000'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'exchange_rate_api',
+        capturedAt,
+        effectiveAt: freshEffectiveAt,
+      },
+    ]);
+
+    await expect(service.currentRate({})).resolves.toMatchObject({
+      success: true,
+      data: {
+        rate: '1401.25000000',
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'exchange_rate_api',
+        providerPriority: 2,
+        fallbackUsed: true,
+      },
+    });
+    expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('returns admin_manual current rate fallback when provider rows are stale', async () => {
+    const { prisma, service } = createService();
+    prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
+      {
+        id: 'fx-korea-exim-stale',
+        rate: new Prisma.Decimal('1389.50000000'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'korea_exim_exchange_rate',
+        capturedAt: new Date('2026-04-30T23:55:59.000Z'),
+        effectiveAt: new Date('2026-04-30T23:55:59.000Z'),
+      },
+      {
+        id: 'fx-exchange-rate-api-stale',
+        rate: new Prisma.Decimal('1401.25000000'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'exchange_rate_api',
+        capturedAt: new Date('2026-04-30T23:55:58.000Z'),
+        effectiveAt: new Date('2026-04-30T23:55:58.000Z'),
+      },
+    ]);
+    mockApprovedRateSnapshot(prisma);
+
+    await expect(service.currentRate({})).resolves.toMatchObject({
+      success: true,
+      data: {
+        rate: '1350.00000000',
+        sourceType: FxRateSourceType.admin_manual,
+        sourceName: 'manual-approved',
+        providerPriority: null,
+        fallbackUsed: true,
+      },
+    });
+  });
+
+  it('returns FX_RATE_UNAVAILABLE when current rate provider rows are stale and admin fallback is missing', async () => {
+    const { prisma, service } = createService();
+    prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
+      {
+        id: 'fx-korea-exim-stale',
+        rate: new Prisma.Decimal('1389.50000000'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'korea_exim_exchange_rate',
+        capturedAt: new Date('2026-04-30T23:55:59.000Z'),
+        effectiveAt: new Date('2026-04-30T23:55:59.000Z'),
+      },
+      {
+        id: 'fx-exchange-rate-api-stale',
+        rate: new Prisma.Decimal('1401.25000000'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'exchange_rate_api',
+        capturedAt: new Date('2026-04-30T23:55:58.000Z'),
+        effectiveAt: new Date('2026-04-30T23:55:58.000Z'),
+      },
+    ]);
+    prisma.fxRateSnapshot.findFirst.mockResolvedValueOnce(null);
+
+    await expectErrorCode(service.currentRate({}), 'FX_RATE_UNAVAILABLE');
+  });
+
+  it('falls back to existing DB rows when Korea EXIM current rate refresh is config-disabled', async () => {
+    const koreaEximIngestionService = {
+      ensureFreshUsdKrwSnapshot: jest
+        .fn()
+        .mockRejectedValueOnce(
+          new ProviderConfigError(
+            'korea_exim_exchange_rate',
+            'PROVIDER_DISABLED',
+            'provider disabled',
+          ),
+        ),
+    };
+    const { prisma, service } = createService(koreaEximIngestionService);
+    prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
+      {
+        id: 'fx-exchange-rate-api-1',
+        rate: new Prisma.Decimal('1400.00000000'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'exchange_rate_api',
+        capturedAt,
+        effectiveAt: freshEffectiveAt,
+      },
+    ]);
+
+    await expect(
+      service.currentRate({ refresh: 'true' }),
+    ).resolves.toMatchObject({
+      success: true,
+      data: {
+        rate: '1400.00000000',
+        sourceName: 'exchange_rate_api',
+        providerPriority: 2,
+      },
+    });
+    expect(
+      koreaEximIngestionService.ensureFreshUsdKrwSnapshot,
+    ).toHaveBeenCalledTimes(1);
   });
 
   it('does not call provider refresh when current rate refresh=false', async () => {

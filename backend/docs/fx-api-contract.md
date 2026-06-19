@@ -4,6 +4,7 @@
 
 - This document records the implemented `/fx quote` contract and `/fx execute` MVP behavior.
 - `/fx quote` can use fresh `provider_api` USD/KRW first, preferring Korea EXIM exchange (`korea_exim_exchange_rate`) and falling back to ExchangeRate-API (`exchange_rate_api`), with existing safe `admin_manual` fallback.
+- `GET /api/v1/fx/rates/current` uses the same fresh provider source priority for DB rows: fresh Korea EXIM first, then fresh ExchangeRate-API, then existing `admin_manual` fallback. A stale Korea EXIM row must not outrank a fresh ExchangeRate-API row.
 - `/fx quote` stores an active durable quote and returns `quoteId`, `expiresAt`, and `maxChangeBps`.
 - `/fx execute` requires a durable quote for new mutations, reprices at execute time from fresh `provider_api` USD/KRW, enforces quote movement threshold, and forbids default `admin_manual` fallback.
 - `docs/realtime-execution-policy.md` defines the active provider-backed execute/write policy.
@@ -25,6 +26,7 @@
 - Fake FX rates and temporary FX rates are forbidden.
 - `/fx quote` first tries an eligible `provider_api` USD/KRW `fx_rate_snapshots` row by source priority: `korea_exim_exchange_rate`, then `exchange_rate_api`.
 - `/fx quote` provider freshness uses `capturedAt <= now`, `effectiveAt <= now`, positive rate, and capturedAt age <= 300 seconds.
+- `GET /api/v1/fx/rates/current` also selects fresh provider rows by the same source priority and 300-second provider freshness threshold. Stale provider rows are not returned ahead of fresh fallback providers; if all provider rows are stale, it uses the existing `admin_manual` fallback or returns `FX_RATE_UNAVAILABLE`.
 - If the provider row is missing, stale, future, non-positive, wrong-source, or otherwise ineligible, `/fx quote` falls back to the existing `admin_manual` selection.
 - Existing `admin_manual` quote fallback keeps the established 60-second `effectiveAt` stale check.
 - `/fx execute` uses execute-time fresh provider_api USD/KRW rows only, by source priority `korea_exim_exchange_rate` then `exchange_rate_api`. It compares executeRate against the durable quote quotedRate, rejects threshold breaches with `RATE_CHANGED_REQUOTE_REQUIRED`, and forbids default `admin_manual` fallback.
@@ -61,7 +63,14 @@ Return the current USD/KRW rate without changing wallets, quotes, or exchange ro
 
 Only `USD/KRW` is supported. Other pairs return `UNSUPPORTED_FX_PAIR`.
 
-When `refresh=true`, the backend may refresh Korea EXIM exchange data if provider env is enabled. When `refresh=false`, it reads DB rows only and does not call external provider APIs.
+When `refresh=true`, the backend may refresh Korea EXIM exchange data only when both `PROVIDER_INGESTION_ENABLED=true` and `KOREA_EXIM_EXCHANGE_ENABLED=true`. If either flag is disabled or the provider refresh fails with a provider config/HTTP error, the endpoint still attempts existing DB snapshot fallback and returns `FX_RATE_UNAVAILABLE` only when no usable DB row exists. When `refresh=false`, it reads DB rows only and does not call external provider APIs.
+
+Current-rate DB selection order:
+
+1. Fresh `provider_api` `korea_exim_exchange_rate`.
+2. Fresh `provider_api` `exchange_rate_api`.
+3. Existing `admin_manual` fallback.
+4. `FX_RATE_UNAVAILABLE` when no usable DB row exists.
 
 ### Success Response Shape
 

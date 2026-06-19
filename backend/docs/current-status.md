@@ -141,7 +141,7 @@
     - At this historical rerun, `provider_api` source eligibility was still STOP/closed for all quote, execute, valuation, assets, positions, home, daily snapshot, ranking, settlement, and reward paths. Current eligibility is opened only for explicitly allowed read-only/quote workflows and operator-run daily portfolio snapshot valuation.
   - Provider API Source Eligibility Implementation Gate on 2026-06-03 KST:
     - Source eligibility is now opened only for read-only/quote workflows: `/fx quote`, assets `withPrice`, orders quote, `live_portfolio_valuation`, home live valuation, and positions live valuation.
-    - Eligible provider source names are `exchange_rate_api` for USD/KRW, `binance_public_rest_24hr_ticker` for BINANCE USD crypto, `kis_krx_realtime_trade` for KRX-family domestic stocks, and `kis_us_delayed_trade` for NAS/NYS US stocks.
+    - Eligible FX USD/KRW provider source names are `korea_exim_exchange_rate` first and `exchange_rate_api` fallback. Other eligible source names are `binance_public_rest_24hr_ticker` for BINANCE USD crypto, `kis_krx_realtime_trade` for KRX-family domestic stocks, and `kis_us_delayed_trade` for NAS/NYS US stocks.
     - Fresh provider rows are selected first. Missing, stale, future, non-positive, wrong-source, or ineligible provider rows fall back explicitly to existing safe `admin_manual` selection where the workflow already allowed manual data.
     - Freshness thresholds are captured-at based for provider rows: 300 seconds for provider USD/KRW read-only/quote and 60 seconds for provider asset prices. Existing `admin_manual` FX fallback keeps the established 60-second effectiveAt stale check where applicable.
     - API response shapes remain backward-compatible; existing snapshot/timing fields continue to provide safe evidence, and the follow-up metadata gate exposes only public-safe source metadata. Raw provider payloads and secrets are not exposed.
@@ -171,7 +171,7 @@
     - Durable Quote storage is implemented with `QuoteType` (`fx`, `order`), `QuoteStatus` (`active`, `consumed`, `expired`, `canceled`), `quotes` indexes, and nullable `orders.quoteId` relation.
     - `/fx quote` and `POST /api/v1/orders/quote` now persist active durable quotes and return backward-compatible `quoteId`, `expiresAt`, and `maxChangeBps` fields.
     - Quote `requestHash` uses canonical SHA-256 JSON over normalized execute-relevant fields; it stores no raw provider payloads or secrets.
-    - `/fx execute` now requires a durable FX quote for new mutations, preserves idempotency replay before quote validation, reprices with fresh `provider_api` `exchange_rate_api` USD/KRW rows at execute time, rejects missing/stale provider rows, rejects quote movement beyond 30 bps, and consumes the quote atomically with wallet/exchange/ledger writes.
+    - `/fx execute` now requires a durable FX quote for new mutations, preserves idempotency replay before quote validation, reprices with fresh `provider_api` USD/KRW rows by source priority (`korea_exim_exchange_rate`, then `exchange_rate_api`) at execute time, rejects missing/stale provider rows, rejects quote movement beyond 30 bps, and consumes the quote atomically with wallet/exchange/ledger writes.
     - Orders create accepts and binds an active durable order quote in `orders.quoteId`, creates only a submitted order, and does not mutate wallets/positions/settlement.
     - Orders execute loads `order.quote`, requires the quote to be active/unexpired/matching, reprices from fresh provider asset rows (`kis_krx_realtime_trade`, `kis_us_delayed_trade`, or `binance_public_rest_24hr_ticker`) with capturedAt age <= 10 seconds, uses fresh provider USD/KRW FX for USD assets with capturedAt age <= 60 seconds, applies market movement and limit marketability guards, and consumes the quote atomically with wallet/position/order/ledger writes.
     - Execute paths forbid default `admin_manual` fallback. Provider missing/stale/unavailable fails instead of executing.
@@ -200,7 +200,9 @@
     - Settled now means final rank and final tier are ready. Reward payout remains pending/not implemented and does not block settlement.
     - Market holidays are configured in `src/orders/market-holidays.config.ts`; configured KRX/US full-day holidays block domestic/US stock order quote/create/execute with `MARKET_CLOSED`. Crypto orders and FX are not holiday-blocked.
   - Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage; USDT depeg risk is not modeled.
-  - Provider_api source eligibility for ranking, settlement, reward, and automation remains a separate gate.
+  - FX USD/KRW provider_api source eligibility is open for explicitly allowed FX workflows through `korea_exim_exchange_rate` first and `exchange_rate_api` fallback.
+  - Season settlement valuation uses its dedicated `season_settlement` provider workflow.
+  - Reward automation and provider-backed reward workflows remain separate gates.
   - KIS supports WebSocket approval_key retrieval, domestic KRX real-time trade price `H0STCNT0`, and overseas/US delayed trade price `HDFSCNT0` ingestion foundation into `asset_price_snapshots` provider_api rows.
   - KIS REST current-price quote ingestion, KIS orderbook/hoga WebSocket ingestion, and KIS order/account/balance/fill/deposit/withdrawal APIs remain unimplemented.
   - KRX domestic stock `provider_api` source eligibility is open only for the explicitly allowed read-only/quote workflows, orders execute, and operator-run daily snapshot valuation through `kis_krx_realtime_trade`.
@@ -249,9 +251,15 @@
 - `GET /api/v1/seasons/current`
 - `POST /api/v1/seasons/{seasonId}/join`
 - `POST /api/v1/fx/quote`
-  - 현재 quote source는 fresh `provider_api` `exchange_rate_api` USD/KRW first, then existing `admin_manual` fallback.
+  - 현재 quote source는 fresh `provider_api` USD/KRW first by `korea_exim_exchange_rate`, then `exchange_rate_api`, then existing `admin_manual` fallback.
   - Provider fallback remains explicit; stale/wrong-source provider rows are not used.
   - 응답은 optional `rateSource` metadata와 durable quote `quoteId`, `expiresAt`, `maxChangeBps`를 표시한다.
+- `GET /api/v1/fx/rates/current` read-only current USD/KRW rate MVP
+  - `refresh=true` may attempt Korea EXIM refresh when `PROVIDER_INGESTION_ENABLED=true` and `KOREA_EXIM_EXCHANGE_ENABLED=true`.
+  - `refresh=false` reads DB snapshots only.
+  - DB selection uses fresh provider rows first by `korea_exim_exchange_rate`, then `exchange_rate_api`; stale Korea EXIM does not outrank fresh ExchangeRate-API.
+  - If no fresh provider row exists, the endpoint uses existing `admin_manual` fallback or returns `FX_RATE_UNAVAILABLE`.
+  - Actual auth keys must stay only in `.env.local`.
 - `POST /api/v1/fx/execute` Durable Quote provider-backed write path 구현 완료
   - 신규 mutation은 `quoteId`와 `idempotencyKey`가 필요하다.
   - execute 시점 fresh `provider_api` USD/KRW rate를 사용하며 default `admin_manual` fallback은 금지된다.
@@ -503,7 +511,7 @@ near-term ledger/FX foundation:
   - active season + joined participant만 허용.
   - market order는 eligible asset이면 fresh `provider_api` asset price first, 그 외 stale/missing/ineligible provider는 existing `admin_manual` fallback 사용.
   - limit order는 `limitPrice` 사용.
-  - USD 자산의 KRW valuation은 fresh `provider_api` `exchange_rate_api` USD/KRW first, then approved fresh `admin_manual` fallback 사용.
+  - USD 자산의 KRW valuation은 fresh `provider_api` USD/KRW first by `korea_exim_exchange_rate`, then `exchange_rate_api`, then approved fresh `admin_manual` fallback 사용.
   - buy는 cash wallet balance, sell은 position quantity를 read-only로 검증.
   - Durable quote row를 생성한다. Wallet/position/order execution/settlement mutation은 없음.
 - `POST /api/v1/orders` durable quote-bound immediate market execution MVP 구현 완료:
@@ -540,7 +548,7 @@ near-term ledger/FX foundation:
   - 주문 전 asset 선택/검색/상세 확인용 API.
   - `GET /api/v1/assets`, `GET /api/v1/assets/:assetId`.
   - `withPrice=true`는 eligible asset에 대해 fresh `provider_api` asset price first, then latest eligible `admin_manual` fallback을 사용.
-  - USD asset의 `priceKrw` 계산에는 fresh `provider_api` `exchange_rate_api` USD/KRW first, then fresh approved `admin_manual` fallback을 사용.
+  - USD asset의 `priceKrw` 계산에는 fresh `provider_api` USD/KRW first by `korea_exim_exchange_rate`, then `exchange_rate_api`, then fresh approved `admin_manual` fallback을 사용.
   - 가격 또는 FX 데이터가 없거나 stale이면 fake fallback 없이 asset별 price/priceKrw unavailable로 반환.
   - `withPrice=false`는 price/FX snapshot 조회 없이 asset metadata만 반환.
   - schema의 `assets.isActive`를 사용해 기본 목록은 active assets만 반환하고, `includeInactive=true`일 때 inactive assets도 포함.
@@ -625,11 +633,14 @@ near-term ledger/FX foundation:
   - 주말/휴일/no-data 대응으로 KST 오늘부터 `KOREA_EXIM_EXCHANGE_LOOKBACK_DAYS`만큼 lookback.
   - `fx_rate_snapshots` 저장값은 `sourceType=provider_api`, `sourceName=korea_exim_exchange_rate`, `baseCurrency=USD`, `quoteCurrency=KRW`, `effectiveAt=searchDate KST 00:00 UTC 변환`, `capturedAt=provider receive time`.
   - raw provider payload 전체와 auth key는 저장/응답/문서에 노출하지 않음. 실제 auth key는 `.env.local`에만 두고 `.env.example`에는 빈 값만 둠.
-- `GET /api/v1/fx/rates/current` 구현 완료. 기본 pair는 USD/KRW, `refresh=true`이면 provider env enabled 상태에서 한국수출입은행 refresh를 시도하고, `refresh=false`이면 외부 API 호출 없이 DB row만 조회함. 미지원 pair는 `UNSUPPORTED_FX_PAIR`, row 없음은 `FX_RATE_UNAVAILABLE`.
-- USD/KRW provider priority는 `korea_exim_exchange_rate` first, `exchange_rate_api` fallback. 기존 ExchangeRate-API provider는 제거하지 않음.
+- `GET /api/v1/fx/rates/current` 구현 완료. 기본 pair는 USD/KRW, `refresh=true`이면 `PROVIDER_INGESTION_ENABLED=true`와 `KOREA_EXIM_EXCHANGE_ENABLED=true`가 모두 켜진 경우에만 한국수출입은행 refresh를 시도하고, `refresh=false`이면 외부 API 호출 없이 DB row만 조회함. 미지원 pair는 `UNSUPPORTED_FX_PAIR`, row 없음은 `FX_RATE_UNAVAILABLE`.
+- USD/KRW provider priority는 fresh `korea_exim_exchange_rate` first, fresh `exchange_rate_api` fallback. stale `korea_exim_exchange_rate`는 fresh `exchange_rate_api`보다 우선되지 않으며, fresh provider row가 없으면 existing `admin_manual` fallback 또는 `FX_RATE_UNAVAILABLE`로 처리함. 기존 ExchangeRate-API provider는 제거하지 않음.
 - `/fx quote` durable quote 구조(`quoteId`, `requestHash`, `maxChangeBps`)는 변경하지 않았고, 기존 `admin_manual` quote fallback은 유지함.
 - `/fx execute`는 fresh provider_api USD/KRW만 허용하며 default `admin_manual` fallback은 여전히 금지됨.
-- `provider_api` source eligibility is open only for the read-only/quote workflows listed in the 2026-06-03 gate plus the 2026-06-05 operator-run daily snapshot valuation workflow; `official_batch` ingestion and scheduler implementation remain closed.
+- FX USD/KRW provider_api source eligibility is open for explicitly allowed FX workflows through `korea_exim_exchange_rate` first and `exchange_rate_api` fallback.
+- Season settlement valuation uses its dedicated `season_settlement` provider workflow.
+- Reward automation and provider-backed reward workflows remain separate gates.
+- `official_batch` ingestion and scheduler implementation remain closed.
 - Gate B provider role은 `CONDITIONAL GO`로 정리됨.
 - Current MVP provider stack is Korea EXIM exchange first and ExchangeRate-API fallback for FX, Binance public REST for crypto, and KIS WebSocket market data for domestic/US stocks. OANDA and Twelve Data are historical candidates only.
 - Crypto MVP provider는 Binance로 고정하며 USD-settled crypto로 처리한다.
@@ -858,7 +869,7 @@ near-term ledger/FX foundation:
   - `allocation`은 live valuation 기반으로 KRW cash, USD cash KRW 환산, domestic stock, US stock, crypto 비중을 반환.
   - `topPositions`는 기존 open positions와 eligible asset이면 fresh `provider_api` asset price first, then latest eligible `admin_manual` fallback으로 KRW 평가금액을 계산해 상위 5개를 반환.
   - `topPositions.returnRate`는 percent 단위이며 평균단가 100, 현재가 110이면 `"10.00000000"`.
-  - USD 환산이 필요한 경우 fresh `provider_api` `exchange_rate_api` USD/KRW first, then fresh approved `admin_manual` fallback을 사용함.
+  - USD 환산이 필요한 경우 fresh `provider_api` USD/KRW first by `korea_exim_exchange_rate`, then `exchange_rate_api`, then fresh approved `admin_manual` fallback을 사용함.
   - `equityChart`는 기존 `daily_portfolio_snapshots` 최신 30개를 읽어 오래된 날짜순으로 반환.
   - 필요한 provider/admin 가격 데이터가 없거나 USD/KRW FX 데이터가 없거나 stale이면 fake fallback 없이 해당 section을 `unavailable`로 반환.
 - `/home` 호출은 wallet/position/snapshot/ranking row를 생성/수정/삭제하지 않음.
@@ -927,7 +938,7 @@ near-term ledger/FX foundation:
 - source:
   - 기존 `positions`와 `assets`.
   - eligible asset이면 fresh `provider_api` asset price first, then latest eligible `admin_manual` asset price fallback.
-  - USD position KRW valuation에 필요한 fresh `provider_api` `exchange_rate_api` USD/KRW first, then fresh approved `admin_manual` USD/KRW fallback.
+  - USD position KRW valuation에 필요한 fresh `provider_api` USD/KRW first by `korea_exim_exchange_rate`, then `exchange_rate_api`, then fresh approved `admin_manual` USD/KRW fallback.
 - valuation data가 없으면 전체 API 실패나 fake fallback 없이 해당 position의 `valuation.state = unavailable`로 반환.
 - KRW position은 USD/KRW 없이 valuation 가능하고, USD position은 FX missing/stale이면 해당 valuation만 unavailable.
 - `totalPositionValueKrw`는 valuation available position만 합산.
@@ -955,7 +966,7 @@ near-term ledger/FX foundation:
 - source:
   - 기존 `assets`.
   - `withPrice=true`는 eligible asset이면 fresh `provider_api` asset price first, then latest eligible `admin_manual` asset price fallback.
-  - USD asset KRW 환산은 fresh `provider_api` `exchange_rate_api` USD/KRW first, then fresh approved `admin_manual` fallback.
+  - USD asset KRW 환산은 fresh `provider_api` USD/KRW first by `korea_exim_exchange_rate`, then `exchange_rate_api`, then fresh approved `admin_manual` fallback.
 - 가격 데이터가 없으면 asset을 숨기지 않고 해당 asset의 `price.state = unavailable`.
 - USD/KRW가 missing/stale이면 USD asset의 price 자체는 available일 수 있으나 `priceKrwState = unavailable`.
 - KRW asset은 USD/KRW 없이 `priceKrw` 계산 가능.
@@ -1071,7 +1082,7 @@ near-term ledger/FX foundation:
   - market order는 eligible asset이면 fresh `provider_api` asset price first, then latest eligible `admin_manual` fallback 사용.
   - limit order는 `limitPrice`를 quote price로 사용.
   - provider asset price freshness threshold는 capturedAt 기준 60초.
-  - USD 자산은 fresh `provider_api` `exchange_rate_api` USD/KRW first, then approved fresh `admin_manual` USD/KRW fallback 사용.
+  - USD 자산은 fresh `provider_api` USD/KRW first by `korea_exim_exchange_rate`, then `exchange_rate_api`, then approved fresh `admin_manual` USD/KRW fallback 사용.
   - buy cash balance, sell position quantity를 read-only 검증.
   - Durable quote row를 생성한다. Wallet/position/order execution/settlement mutation은 없음.
 - create:
