@@ -1,0 +1,10 @@
+{
+  "android": {
+    "package": "com.anonymous.leagueoftrading"
+  },
+  "extra": {
+    "eas": {
+      "projectId": "b2aaa0f4-0f48-460b-a159-c890858c03da"
+    }
+  }
+}
