@@ -3,6 +3,7 @@ import { Request } from 'express';
 import { FxService } from './fx.service';
 import type {
   FxCurrentRateQuery,
+  FxExchangesQuery,
   FxExecuteRequestBody,
   FxQuoteRequestBody,
 } from './fx.service';
@@ -20,6 +21,14 @@ export class FxController {
   @Get('rates/current')
   currentRate(@Query() query: FxCurrentRateQuery) {
     return this.fxService.currentRate(query);
+  }
+
+  @Get('exchanges')
+  exchanges(
+    @Query() query: FxExchangesQuery,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.fxService.getExchanges(this.extractUserId(request), query);
   }
 
   @Post('quote')

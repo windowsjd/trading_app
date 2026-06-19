@@ -1,7 +1,8 @@
-import { Controller, Get, Param, Post, Req } from '@nestjs/common';
+import { Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
 import { Request } from 'express';
 import { OptionalAuth } from '../auth/auth.decorators';
 import { SeasonsService } from './seasons.service';
+import type { SeasonsListQuery } from './seasons.service';
 
 type AuthenticatedRequest = Request & {
   user?: {
@@ -12,6 +13,11 @@ type AuthenticatedRequest = Request & {
 @Controller('api/v1/seasons')
 export class SeasonsController {
   constructor(private readonly seasonsService: SeasonsService) {}
+
+  @Get()
+  getSeasons(@Query() query: SeasonsListQuery) {
+    return this.seasonsService.getSeasons(query);
+  }
 
   @OptionalAuth()
   @Get('current')

@@ -36,6 +36,17 @@ export class AssetsController {
     );
   }
 
+  @Get(':assetId/price')
+  getAssetPrice(
+    @Req() request: AuthenticatedRequest,
+    @Param('assetId') assetId: string,
+  ) {
+    return this.assetsService.getAssetPrice(
+      this.extractUserId(request),
+      assetId,
+    );
+  }
+
   @Get(':assetId')
   getAsset(
     @Req() request: AuthenticatedRequest,

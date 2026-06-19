@@ -84,7 +84,6 @@ import {
   AssetPriceSourceType,
   AssetType,
   CurrencyCode,
-  FxRateSourceType,
   OrderSide,
   OrderStatus,
   OrderType,
@@ -127,6 +126,7 @@ describe('RecordsService', () => {
     participantStatus: ParticipantStatus.finished,
     initialCapitalKrw: new Prisma.Decimal('10000000.00000000'),
     maxDrawdown: new Prisma.Decimal('3.00000000'),
+    totalFillCount: 41,
     currentRank: 2,
     finalRank: 1,
     finalTier: 'master',
@@ -236,6 +236,10 @@ describe('RecordsService', () => {
       upsert: jest.fn(),
       delete: jest.fn(),
     },
+    seasonRanking: {
+      count: jest.fn(),
+      findFirst: jest.fn(),
+    },
     fxExecuteRequest: {
       create: jest.fn(),
       update: jest.fn(),
@@ -253,9 +257,14 @@ describe('RecordsService', () => {
     $transaction: jest.fn(),
   });
 
-  const createService = () => {
+  const createService = (portfolioValuationService?: {
+    calculateSeasonParticipantValuation: jest.Mock;
+  }) => {
     const prisma = createPrisma();
-    const service = new RecordsService(prisma as never);
+    const service = new RecordsService(
+      prisma as never,
+      portfolioValuationService as never,
+    );
 
     return { prisma, service };
   };
@@ -516,16 +525,6 @@ describe('RecordsService', () => {
     sourceName: 'manual-price',
     effectiveAt: new Date(Date.now() - 1_000),
     capturedAt: new Date(Date.now() - 1_000),
-  });
-
-  const freshUsdKrwSnapshot = () => ({
-    id: 'fx-admin-1',
-    rate: new Prisma.Decimal('1400.00000000'),
-    sourceType: FxRateSourceType.admin_manual,
-    sourceName: 'manual-fx',
-    effectiveAt: new Date(Date.now() - 1_000),
-    capturedAt: new Date(Date.now() - 1_000),
-    approvedByUserId: 'operator-1',
   });
 
   const mockEmptyProfitInputs = (prisma: ReturnType<typeof createPrisma>) => {
@@ -1329,6 +1328,149 @@ describe('RecordsService', () => {
     ).rejects.toBeInstanceOf(HttpException);
   });
 
+  it('returns current public user season summary without private activity data', async () => {
+    const portfolioValuationService = {
+      calculateSeasonParticipantValuation: jest.fn().mockResolvedValue({
+        totalAssetKrw: '13812590.00000000',
+        returnRate: '38.12590000',
+        krwCash: '1000000.00000000',
+        usdCashKrw: '1000000.00000000',
+        assetValueKrw: '11812590.00000000',
+        domesticStockValueKrw: '3000000.00000000',
+        usStockValueKrw: '4000000.00000000',
+        cryptoValueKrw: '4812590.00000000',
+        realizedPnlKrw: '0.00000000',
+        unrealizedPnlKrw: '3812590.00000000',
+        valuationAt: capturedAt,
+        sourceSummary: {
+          providerApiUsed: false,
+          adminManualUsed: true,
+          fallbackUsed: false,
+          fallbackReasons: [],
+          rejectedProviderReasons: [],
+        },
+        assetPriceSourceDecisions: [],
+        fxRateSourceDecision: null,
+      }),
+    };
+    const { prisma, service } = createService(portfolioValuationService);
+    prisma.user.findUnique.mockResolvedValueOnce({
+      id: 'user-2',
+      nickname: 'legendTrader',
+    });
+    mockCurrentSeason(prisma);
+    mockDetailedParticipant(prisma);
+    prisma.seasonRanking.findFirst.mockResolvedValueOnce({
+      rankType: SeasonRankingType.daily,
+      rank: 1,
+      rankingDate: snapshotDate,
+      totalAssetKrw: new Prisma.Decimal('13812590.00000000'),
+      returnRate: new Prisma.Decimal('38.12590000'),
+      totalFillCount: 41,
+    });
+    prisma.seasonRanking.count.mockResolvedValueOnce(300);
+    prisma.position.findMany.mockResolvedValueOnce([
+      {
+        assetId: 'asset-nvda',
+        marketValueKrw: new Prisma.Decimal('4436261.39000000'),
+        asset: {
+          symbol: 'NVDA',
+        },
+      },
+      {
+        assetId: 'asset-btc',
+        marketValueKrw: new Prisma.Decimal('2000000.00000000'),
+        asset: {
+          symbol: 'BTCUSDT',
+        },
+      },
+    ]);
+
+    const response = await service.getUserCurrentSeasonSummary(
+      'viewer-1',
+      'user-2',
+    );
+
+    expect(
+      portfolioValuationService.calculateSeasonParticipantValuation,
+    ).toHaveBeenCalledWith('sp-1', expect.any(Date), 'home_live_valuation');
+    expect(response.data).toMatchObject({
+      state: 'available',
+      user: {
+        id: 'user-2',
+        nickname: 'legendTrader',
+      },
+      season: {
+        id: 'season-1',
+        status: SeasonStatus.active,
+        rank: 1,
+        provisionalTier: null,
+        finalTier: 'master',
+        percentile: '0.33333333',
+        returnRate: '38.12590000',
+        totalAssetKrw: '13812590.00000000',
+        totalFillCount: 41,
+      },
+      allocation: {
+        cashKrwValue: '2000000.00000000',
+        domesticStockValueKrw: '3000000.00000000',
+        usStockValueKrw: '4000000.00000000',
+        cryptoValueKrw: '4812590.00000000',
+      },
+    });
+    expect(response.data.topPositions[0]).toMatchObject({
+      assetId: 'asset-nvda',
+      symbol: 'NVDA',
+      weight: '32.11752025',
+    });
+    expect(response.data.topPositions).toHaveLength(2);
+    expect(prisma.order.findMany).not.toHaveBeenCalled();
+    expect(prisma.exchangeTransaction.findMany).not.toHaveBeenCalled();
+    expect(prisma.walletTransaction.findMany).not.toHaveBeenCalled();
+    const serialized = JSON.stringify(response.data);
+    expect(serialized).not.toContain('orderId');
+    expect(serialized).not.toContain('walletId');
+    expect(serialized).not.toContain('balanceAfter');
+    expect(serialized).not.toContain('averageCost');
+    expect(serialized).not.toContain('quantity');
+    expectNoRecordWrites(prisma);
+  });
+
+  it('returns not_joined for current public user season summary', async () => {
+    const portfolioValuationService = {
+      calculateSeasonParticipantValuation: jest.fn(),
+    };
+    const { prisma, service } = createService(portfolioValuationService);
+    prisma.user.findUnique.mockResolvedValueOnce({
+      id: 'user-2',
+      nickname: 'legendTrader',
+    });
+    mockCurrentSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
+
+    const response = await service.getUserCurrentSeasonSummary(
+      'viewer-1',
+      'user-2',
+    );
+
+    expect(response.data).toMatchObject({
+      state: 'not_joined',
+      season: {
+        id: 'season-1',
+        rank: null,
+      },
+      allocation: {
+        cashKrwValue: '0.00000000',
+      },
+      topPositions: [],
+      reason: 'SEASON_NOT_JOINED',
+    });
+    expect(
+      portfolioValuationService.calculateSeasonParticipantValuation,
+    ).not.toHaveBeenCalled();
+    expectNoRecordWrites(prisma);
+  });
+
   it('returns protected public user season summary without private ledgers', async () => {
     const { prisma, service } = createService();
     prisma.user.findUnique.mockResolvedValueOnce({
@@ -1498,6 +1640,9 @@ describe('RecordsService', () => {
     );
     await expect(
       service.getMySeasonRecords(undefined, {}),
+    ).rejects.toBeInstanceOf(HttpException);
+    await expect(
+      service.getUserCurrentSeasonSummary(undefined, 'user-2'),
     ).rejects.toBeInstanceOf(HttpException);
   });
 });

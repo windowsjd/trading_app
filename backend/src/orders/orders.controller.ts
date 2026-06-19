@@ -18,6 +18,14 @@ export class OrdersController {
     return this.ordersService.getOrders(this.extractUserId(request), query);
   }
 
+  @Get(':orderId')
+  getOrder(
+    @Req() request: AuthenticatedRequest,
+    @Param('orderId') orderId: string,
+  ) {
+    return this.ordersService.getOrder(this.extractUserId(request), orderId);
+  }
+
   @Post('quote')
   quoteOrder(
     @Req() request: AuthenticatedRequest,
@@ -47,7 +55,10 @@ export class OrdersController {
     @Req() request: AuthenticatedRequest,
     @Param('orderId') orderId: string,
   ) {
-    return this.ordersService.executeOrder(this.extractUserId(request), orderId);
+    return this.ordersService.executeOrder(
+      this.extractUserId(request),
+      orderId,
+    );
   }
 
   private extractUserId(request: AuthenticatedRequest) {

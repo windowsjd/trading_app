@@ -65,6 +65,7 @@ describe('AuthService', () => {
       user: {
         findUnique: jest.fn(),
         create: jest.fn(),
+        update: jest.fn(),
       },
     };
 
@@ -257,6 +258,67 @@ describe('AuthService', () => {
     );
     expect(prisma.user.create).not.toHaveBeenCalled();
     expect(prisma.refreshTokenSession.create).not.toHaveBeenCalled();
+  });
+
+  it('updates my public profile fields and ignores internal body fields', async () => {
+    const { prisma, service } = createService();
+    prisma.user.findUnique
+      .mockResolvedValueOnce(activeUser)
+      .mockResolvedValueOnce(null);
+    prisma.user.update.mockResolvedValueOnce({
+      ...activeUser,
+      nickname: 'newNickname',
+      profileImageUrl: null,
+    });
+
+    const response = await service.updateMe('user-1', {
+      nickname: ' newNickname ',
+      profileImageUrl: null,
+      email: 'attacker@example.com',
+      status: UserStatus.deleted,
+      passwordHash: 'leaked',
+    } as never);
+
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: 'user-1',
+        },
+        data: {
+          nickname: 'newNickname',
+          profileImageUrl: null,
+        },
+      }),
+    );
+    expect(
+      JSON.stringify(prisma.user.update.mock.calls[0][0].data),
+    ).not.toContain('passwordHash');
+    expect(response).toMatchObject({
+      success: true,
+      data: {
+        id: 'user-1',
+        email: activeUser.email,
+        nickname: 'newNickname',
+        profileImageUrl: null,
+        status: UserStatus.active,
+      },
+    });
+  });
+
+  it('rejects duplicate nickname when updating my profile', async () => {
+    const { prisma, service } = createService();
+    prisma.user.findUnique
+      .mockResolvedValueOnce(activeUser)
+      .mockResolvedValueOnce({ id: 'user-2' });
+
+    await expectHttpError(
+      service.updateMe('user-1', {
+        nickname: 'takenNickname',
+      }),
+      HttpStatus.CONFLICT,
+      'NICKNAME_ALREADY_EXISTS',
+    );
+    expect(prisma.user.update).not.toHaveBeenCalled();
   });
 
   it('logs in and issues access and refresh tokens', async () => {

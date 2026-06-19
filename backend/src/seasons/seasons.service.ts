@@ -9,6 +9,7 @@ import {
   WalletTransactionReferenceType,
   WalletTransactionType,
 } from '../generated/prisma/client';
+import { buildPagination, type Pagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   assertSeasonJoinable,
@@ -33,6 +34,38 @@ type CurrentSeasonResponse = {
     fxFeeRate: string;
     joined: boolean;
     joinedAt: string | null;
+  };
+};
+
+export type SeasonsListQuery = {
+  status?: string;
+  limit?: string;
+  offset?: string;
+};
+
+type ParsedSeasonsListQuery = {
+  status?: SeasonStatus;
+  limit: number;
+  offset: number;
+};
+
+type SeasonsListResponse = {
+  success: true;
+  data: {
+    state: 'available';
+    seasons: Array<{
+      id: string;
+      name: string;
+      status: SeasonStatus;
+      effectiveStatus: SeasonStatus;
+      effectiveMode: SeasonLifecycleMode;
+      startAt: string;
+      endAt: string;
+      initialCapitalKrw: string;
+      tradeFeeRate: string;
+      fxFeeRate: string;
+    }>;
+    pagination: Pagination;
   };
 };
 
@@ -66,11 +99,71 @@ const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
   SeasonStatus.ended,
   SeasonStatus.settled,
 ];
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 100;
 const ZERO_AMOUNT = '0.00000000';
 
 @Injectable()
 export class SeasonsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async getSeasons(query: SeasonsListQuery = {}): Promise<SeasonsListResponse> {
+    const parsedQuery = this.parseSeasonsListQuery(query);
+    const where: Prisma.SeasonWhereInput = parsedQuery.status
+      ? {
+          status: parsedQuery.status,
+        }
+      : {};
+    const [total, seasons] = await Promise.all([
+      this.prisma.season.count({ where }),
+      this.prisma.season.findMany({
+        where,
+        orderBy: [{ startAt: 'desc' }, { createdAt: 'desc' }],
+        skip: parsedQuery.offset,
+        take: parsedQuery.limit,
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          startAt: true,
+          endAt: true,
+          initialCapitalKrw: true,
+          tradeFeeRate: true,
+          fxFeeRate: true,
+        },
+      }),
+    ]);
+    const now = new Date();
+
+    return {
+      success: true,
+      data: {
+        state: 'available',
+        seasons: seasons.map((season) => {
+          const effectiveMode = getEffectiveSeasonMode(season, now);
+
+          return {
+            id: season.id,
+            name: season.name,
+            status: season.status,
+            effectiveStatus: this.toSeasonStatus(effectiveMode),
+            effectiveMode,
+            startAt: season.startAt.toISOString(),
+            endAt: season.endAt.toISOString(),
+            initialCapitalKrw: this.formatDecimal(season.initialCapitalKrw, 8),
+            tradeFeeRate: this.formatDecimal(season.tradeFeeRate, 6),
+            fxFeeRate: this.formatDecimal(season.fxFeeRate, 6),
+          };
+        }),
+        pagination: buildPagination({
+          limit: parsedQuery.limit,
+          offset: parsedQuery.offset,
+          total,
+          returned: seasons.length,
+        }),
+      },
+    };
+  }
 
   async getCurrentSeason(userId?: string): Promise<CurrentSeasonResponse> {
     const season = await this.findCurrentSeason();
@@ -311,6 +404,99 @@ export class SeasonsService {
 
   private formatDecimal(value: Prisma.Decimal, scale: number) {
     return value.toFixed(scale);
+  }
+
+  private parseSeasonsListQuery(
+    query: SeasonsListQuery,
+  ): ParsedSeasonsListQuery {
+    return {
+      status: this.parseSeasonStatus(query.status),
+      limit: this.parseLimit(query.limit),
+      offset: this.parseOffset(query.offset),
+    };
+  }
+
+  private parseSeasonStatus(
+    value: string | undefined,
+  ): SeasonStatus | undefined {
+    const text = this.parseOptionalText(value);
+    if (!text) {
+      return undefined;
+    }
+
+    if (
+      text === SeasonStatus.upcoming ||
+      text === SeasonStatus.active ||
+      text === SeasonStatus.ended ||
+      text === SeasonStatus.settled
+    ) {
+      return text;
+    }
+
+    this.throwApiError(
+      HttpStatus.BAD_REQUEST,
+      'INVALID_SEASON_STATUS',
+      'Invalid season status.',
+    );
+  }
+
+  private parseLimit(value: string | undefined): number {
+    if (value === undefined) {
+      return DEFAULT_LIMIT;
+    }
+
+    const limit = this.parseNonNegativeInteger(value, 'INVALID_LIMIT', 'limit');
+    if (limit < 1) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'INVALID_LIMIT',
+        'limit must be greater than 0.',
+      );
+    }
+
+    return Math.min(limit, MAX_LIMIT);
+  }
+
+  private parseOffset(value: string | undefined): number {
+    if (value === undefined) {
+      return 0;
+    }
+
+    return this.parseNonNegativeInteger(value, 'INVALID_OFFSET', 'offset');
+  }
+
+  private parseNonNegativeInteger(
+    value: string,
+    code: string,
+    fieldName: string,
+  ): number {
+    if (!/^\d+$/.test(value.trim())) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        code,
+        `${fieldName} must be a non-negative integer.`,
+      );
+    }
+
+    const parsed = Number(value);
+    if (!Number.isSafeInteger(parsed)) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        code,
+        `${fieldName} must be a safe integer.`,
+      );
+    }
+
+    return parsed;
+  }
+
+  private parseOptionalText(value: string | undefined): string | undefined {
+    if (typeof value !== 'string') {
+      return undefined;
+    }
+
+    const trimmed = value.trim();
+    return trimmed === '' ? undefined : trimmed;
   }
 
   private toSeasonStatus(mode: SeasonLifecycleMode): SeasonStatus {

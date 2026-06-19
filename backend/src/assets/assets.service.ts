@@ -146,6 +146,52 @@ type AssetDetailResponse = {
   };
 };
 
+type AssetPriceResponse = {
+  success: true;
+  data:
+    | {
+        state: 'available';
+        assetId: string;
+        symbol: string;
+        name: string;
+        assetType: AssetType;
+        market: string;
+        currentPrice: string;
+        priceCurrency: CurrencyCode;
+        priceKrwState: 'available' | 'unavailable';
+        priceKrw: string | null;
+        priceKrwReason?: 'FX_RATE_UNAVAILABLE' | 'FX_RATE_STALE';
+        priceKrwMessage?: string;
+        changeRate: null;
+        assetPriceSnapshotId: string;
+        priceEffectiveAt: string;
+        priceCapturedAt: string;
+        freshnessAgeSeconds: number;
+        priceSource: PublicSourceMetadata | null;
+        fxRateSource?: PublicSourceMetadata | null;
+      }
+    | {
+        state: 'unavailable';
+        assetId: string;
+        symbol: string;
+        name: string;
+        assetType: AssetType;
+        market: string;
+        priceCurrency: CurrencyCode;
+        currentPrice: null;
+        priceKrwState: 'unavailable';
+        priceKrw: null;
+        changeRate: null;
+        assetPriceSnapshotId: null;
+        priceEffectiveAt: null;
+        priceCapturedAt: null;
+        freshnessAgeSeconds: null;
+        priceSource: null;
+        reason: 'ASSET_PRICE_UNAVAILABLE';
+        message: string;
+      };
+};
+
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 
@@ -245,6 +291,98 @@ export class AssetsService {
           tradingNote: this.buildTradingNote(asset),
         },
         priceErrors: pricedAssets.priceErrors,
+      },
+    };
+  }
+
+  async getAssetPrice(
+    userId: string | undefined,
+    assetId: string | undefined,
+  ): Promise<AssetPriceResponse> {
+    if (!userId) {
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
+    }
+
+    const parsedAssetId = this.parseAssetId(assetId);
+    const asset = await this.prisma.asset.findUnique({
+      where: {
+        id: parsedAssetId,
+      },
+      select: this.assetSelect(),
+    });
+
+    if (!asset) {
+      this.throwApiError(
+        HttpStatus.NOT_FOUND,
+        'ASSET_NOT_FOUND',
+        'Asset not found.',
+      );
+    }
+
+    const pricedAssets = await this.buildAssetsWithPrices([asset]);
+    const price = pricedAssets.assets[0]?.price;
+    if (!price || price.state === 'unavailable') {
+      return {
+        success: true,
+        data: {
+          state: 'unavailable',
+          assetId: asset.id,
+          symbol: asset.symbol,
+          name: asset.name,
+          assetType: asset.assetType,
+          market: asset.market,
+          priceCurrency: this.getAssetPriceCurrency(asset),
+          currentPrice: null,
+          priceKrwState: 'unavailable',
+          priceKrw: null,
+          changeRate: null,
+          assetPriceSnapshotId: null,
+          priceEffectiveAt: null,
+          priceCapturedAt: null,
+          freshnessAgeSeconds: null,
+          priceSource: null,
+          reason: price?.reason ?? 'ASSET_PRICE_UNAVAILABLE',
+          message:
+            price?.message ??
+            `Asset price snapshot is unavailable for asset ${asset.id}.`,
+        },
+      };
+    }
+
+    const priceKrwAvailable = price.priceKrwState === 'available';
+
+    return {
+      success: true,
+      data: {
+        state: 'available',
+        assetId: asset.id,
+        symbol: asset.symbol,
+        name: asset.name,
+        assetType: asset.assetType,
+        market: asset.market,
+        currentPrice: price.currentPrice,
+        priceCurrency: price.priceCurrency,
+        priceKrwState: price.priceKrwState,
+        priceKrw: priceKrwAvailable ? price.priceKrw : null,
+        ...(priceKrwAvailable
+          ? {}
+          : {
+              priceKrwReason: price.priceKrwReason,
+              priceKrwMessage: price.priceKrwMessage,
+            }),
+        changeRate: null,
+        assetPriceSnapshotId: price.assetPriceSnapshotId,
+        priceEffectiveAt: price.priceEffectiveAt,
+        priceCapturedAt: price.priceCapturedAt,
+        freshnessAgeSeconds: this.calculateFreshnessAgeSeconds(
+          price.priceCapturedAt,
+        ),
+        priceSource: price.priceSource,
+        ...(price.fxRateSource ? { fxRateSource: price.fxRateSource } : {}),
       },
     };
   }
@@ -931,6 +1069,15 @@ export class AssetsService {
 
   private formatDecimal(value: Prisma.Decimal, scale: number) {
     return value.toFixed(scale);
+  }
+
+  private calculateFreshnessAgeSeconds(capturedAt: string): number {
+    const capturedAtTime = Date.parse(capturedAt);
+    if (Number.isNaN(capturedAtTime)) {
+      return 0;
+    }
+
+    return Math.max(0, Math.floor((Date.now() - capturedAtTime) / 1000));
   }
 
   private createErrorBody(code: string, message: string) {

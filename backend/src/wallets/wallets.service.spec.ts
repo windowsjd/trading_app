@@ -77,6 +77,8 @@ describe('WalletsService', () => {
       delete: jest.fn(),
     },
     walletTransaction: {
+      count: jest.fn(),
+      findMany: jest.fn(),
       create: jest.fn(),
     },
     exchangeTransaction: {
@@ -202,12 +204,10 @@ describe('WalletsService', () => {
 
   it('returns wallets for joined participant in non-active season', async () => {
     const { prisma, service } = createService();
-    prisma.season.findFirst
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({
-        ...season,
-        status: SeasonStatus.upcoming,
-      });
+    prisma.season.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({
+      ...season,
+      status: SeasonStatus.upcoming,
+    });
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
     prisma.cashWallet.findMany.mockResolvedValueOnce([]);
 
@@ -232,5 +232,86 @@ describe('WalletsService', () => {
     await expect(service.getWallets(undefined)).rejects.toBeInstanceOf(
       HttpException,
     );
+  });
+
+  it('returns my wallet transactions with currency filter and pagination', async () => {
+    const { prisma, service } = createService();
+    mockCurrentSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
+    prisma.walletTransaction.count.mockResolvedValueOnce(3);
+    prisma.walletTransaction.findMany.mockResolvedValueOnce([
+      {
+        id: 'wtx-1',
+        currencyCode: CurrencyCode.KRW,
+        direction: 'credit',
+        txType: 'initial_grant',
+        referenceType: 'season_join',
+        referenceId: 'sp-1',
+        amount: new Prisma.Decimal('10000000.00000000'),
+        balanceAfter: new Prisma.Decimal('10000000.00000000'),
+        occurredAt: joinedAt,
+        createdAt: joinedAt,
+      },
+    ]);
+
+    const response = await service.getWalletTransactions('user-1', {
+      currency: 'KRW',
+      limit: '1',
+      offset: '1',
+    });
+
+    expect(prisma.walletTransaction.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          seasonParticipantId: 'sp-1',
+          currencyCode: CurrencyCode.KRW,
+        },
+        skip: 1,
+        take: 1,
+      }),
+    );
+    expect(response.data).toMatchObject({
+      state: 'available',
+      transactions: [
+        {
+          id: 'wtx-1',
+          amount: '10000000.00000000',
+          balanceAfter: '10000000.00000000',
+        },
+      ],
+      pagination: {
+        limit: 1,
+        offset: 1,
+        total: 3,
+        returned: 1,
+        nextOffset: 2,
+      },
+    });
+    expect(JSON.stringify(response.data)).not.toContain('walletId');
+    expectNoWalletWrites(prisma);
+  });
+
+  it('returns not_joined for wallet transactions without reading private ledgers', async () => {
+    const { prisma, service } = createService();
+    mockCurrentSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
+
+    const response = await service.getWalletTransactions('user-1');
+
+    expect(response.data).toMatchObject({
+      state: 'not_joined',
+      transactions: [],
+      reason: 'SEASON_NOT_JOINED',
+    });
+    expect(prisma.walletTransaction.findMany).not.toHaveBeenCalled();
+    expectNoWalletWrites(prisma);
+  });
+
+  it('rejects missing authenticated user for wallet transactions', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.getWalletTransactions(undefined),
+    ).rejects.toBeInstanceOf(HttpException);
   });
 });

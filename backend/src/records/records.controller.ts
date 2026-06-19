@@ -87,6 +87,17 @@ export class RecordsController {
     );
   }
 
+  @Get('users/:userId/season-summary')
+  getUserCurrentSeasonSummary(
+    @Req() request: AuthenticatedRequest,
+    @Param('userId') userId: string,
+  ) {
+    return this.recordsService.getUserCurrentSeasonSummary(
+      this.extractUserId(request),
+      userId,
+    );
+  }
+
   private extractUserId(request: AuthenticatedRequest) {
     return request.user?.userId;
   }

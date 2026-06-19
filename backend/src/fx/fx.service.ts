@@ -8,6 +8,7 @@ import {
   CurrencyCode,
   FxExecuteRequestStatus,
   FxRateSourceType,
+  ParticipantStatus,
   Prisma,
   QuoteStatus,
   QuoteType,
@@ -17,6 +18,7 @@ import {
   WalletTransactionReferenceType,
   WalletTransactionType,
 } from '../generated/prisma/client';
+import { buildPagination, type Pagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   buildFxExecuteErrorEnvelope,
@@ -92,7 +94,12 @@ export type FxCurrentRateQuery = {
   refresh?: unknown;
 };
 
-export type FxExecuteSkeletonResponse = FxExecuteErrorEnvelope | unknown;
+export type FxExchangesQuery = {
+  limit?: string;
+  offset?: string;
+};
+
+export type FxExecuteSkeletonResponse = unknown;
 
 export type FxExecuteSuccessResponse = {
   success: true;
@@ -175,12 +182,50 @@ type FxCurrentRateResponse = {
   };
 };
 
+type ParsedFxExchangesQuery = {
+  limit: number;
+  offset: number;
+};
+
+type FxExchangesResponse = {
+  success: true;
+  data: {
+    state: 'available' | 'not_joined' | 'unavailable';
+    season: ReturnType<FxService['formatSeason']> | null;
+    participant: ReturnType<FxService['formatParticipant']> | null;
+    exchanges: Array<{
+      exchangeId: string;
+      fromCurrency: CurrencyCode;
+      toCurrency: CurrencyCode;
+      sourceAmount: string;
+      grossTargetAmount: string;
+      feeRate: string;
+      feeAmount: string;
+      feeCurrency: CurrencyCode;
+      appliedRate: string;
+      netTargetAmount: string;
+      executedAt: string;
+      rateSource: PublicSourceMetadata | null;
+    }>;
+    pagination: Pagination;
+    reason?: string;
+    message?: string;
+  };
+};
+
 type ActiveSeasonRecord = {
   id: string;
+  name: string;
   status: SeasonStatus;
   startAt: Date;
   endAt: Date;
   fxFeeRate: Prisma.Decimal;
+};
+
+type FxParticipantRecord = {
+  id: string;
+  participantStatus: ParticipantStatus;
+  joinedAt: Date;
 };
 
 type FxQuoteRateSnapshot = {
@@ -218,6 +263,8 @@ const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
   SeasonStatus.ended,
   SeasonStatus.settled,
 ];
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 100;
 const FX_RATE_STALE_THRESHOLD_MS = 60_000;
 const EXECUTE_SKELETON_PARTICIPANT_CONTEXT =
   'execute-skeleton-participant-context-not-loaded';
@@ -323,6 +370,116 @@ export class FxService {
         fallbackUsed:
           snapshot.sourceType !== FxRateSourceType.provider_api ||
           providerPriority !== 1,
+      },
+    };
+  }
+
+  async getExchanges(
+    userId: string | undefined,
+    query: FxExchangesQuery = {},
+  ): Promise<FxExchangesResponse> {
+    if (!userId) {
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
+    }
+
+    const parsedQuery = this.parseFxExchangesQuery(query);
+    const season = await this.findCurrentSeasonOrNull();
+    if (!season) {
+      return this.emptyExchangesResponse({
+        state: 'unavailable',
+        season: null,
+        participant: null,
+        query: parsedQuery,
+        reason: 'CURRENT_SEASON_NOT_FOUND',
+        message: 'Current season is not configured.',
+      });
+    }
+
+    const participant = await this.prisma.seasonParticipant.findUnique({
+      where: {
+        seasonId_userId: {
+          seasonId: season.id,
+          userId,
+        },
+      },
+      select: {
+        id: true,
+        participantStatus: true,
+        joinedAt: true,
+      },
+    });
+
+    if (!participant) {
+      return this.emptyExchangesResponse({
+        state: 'not_joined',
+        season,
+        participant: null,
+        query: parsedQuery,
+        reason: 'SEASON_NOT_JOINED',
+        message: 'Exchange history is available after joining the season.',
+      });
+    }
+
+    const where = {
+      seasonParticipantId: participant.id,
+    };
+    const [total, exchanges] = await Promise.all([
+      this.prisma.exchangeTransaction.count({ where }),
+      this.prisma.exchangeTransaction.findMany({
+        where,
+        orderBy: [{ executedAt: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
+        skip: parsedQuery.offset,
+        take: parsedQuery.limit,
+        select: {
+          id: true,
+          fromCurrency: true,
+          toCurrency: true,
+          sourceAmount: true,
+          grossTargetAmount: true,
+          feeRate: true,
+          feeAmount: true,
+          feeCurrency: true,
+          appliedRate: true,
+          netTargetAmount: true,
+          executedAt: true,
+          fxRateSnapshot: {
+            select: {
+              id: true,
+              sourceType: true,
+              sourceName: true,
+              effectiveAt: true,
+              capturedAt: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      success: true,
+      data: {
+        state: 'available',
+        season: this.formatSeason(season),
+        participant: this.formatParticipant(participant),
+        exchanges: exchanges.map((exchange) => ({
+          exchangeId: exchange.id,
+          fromCurrency: exchange.fromCurrency,
+          toCurrency: exchange.toCurrency,
+          sourceAmount: this.formatDecimal(exchange.sourceAmount, 8),
+          grossTargetAmount: this.formatDecimal(exchange.grossTargetAmount, 8),
+          feeRate: this.formatDecimal(exchange.feeRate, 6),
+          feeAmount: this.formatDecimal(exchange.feeAmount, 8),
+          feeCurrency: exchange.feeCurrency,
+          appliedRate: this.formatDecimal(exchange.appliedRate, 8),
+          netTargetAmount: this.formatDecimal(exchange.netTargetAmount, 8),
+          executedAt: exchange.executedAt.toISOString(),
+          rateSource: this.formatSnapshotSource(exchange.fxRateSnapshot),
+        })),
+        pagination: this.pagination(parsedQuery, total, exchanges.length),
       },
     };
   }
@@ -596,6 +753,19 @@ export class FxService {
   }
 
   private async findCurrentSeason(): Promise<ActiveSeasonRecord> {
+    const season = await this.findCurrentSeasonOrNull();
+    if (season) {
+      return season;
+    }
+
+    this.throwApiError(
+      HttpStatus.NOT_FOUND,
+      'SEASON_NOT_FOUND',
+      'Season not found',
+    );
+  }
+
+  private async findCurrentSeasonOrNull(): Promise<ActiveSeasonRecord | null> {
     for (const status of CURRENT_SEASON_STATUS_PRIORITY) {
       const season = await this.prisma.season.findFirst({
         where: {
@@ -603,6 +773,7 @@ export class FxService {
         },
         select: {
           id: true,
+          name: true,
           status: true,
           startAt: true,
           endAt: true,
@@ -616,11 +787,7 @@ export class FxService {
       }
     }
 
-    this.throwApiError(
-      HttpStatus.NOT_FOUND,
-      'SEASON_NOT_FOUND',
-      'Season not found',
-    );
+    return null;
   }
 
   private async findFxQuoteRateSnapshot(
@@ -1201,6 +1368,150 @@ export class FxService {
     return value.toFixed(scale);
   }
 
+  private parseFxExchangesQuery(
+    query: FxExchangesQuery,
+  ): ParsedFxExchangesQuery {
+    return {
+      limit: this.parseLimit(query.limit),
+      offset: this.parseOffset(query.offset),
+    };
+  }
+
+  private parseLimit(value: string | undefined): number {
+    if (value === undefined) {
+      return DEFAULT_LIMIT;
+    }
+
+    const limit = this.parseNonNegativeInteger(value, 'INVALID_LIMIT', 'limit');
+    if (limit < 1) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'INVALID_LIMIT',
+        'limit must be greater than 0.',
+      );
+    }
+
+    return Math.min(limit, MAX_LIMIT);
+  }
+
+  private parseOffset(value: string | undefined): number {
+    if (value === undefined) {
+      return 0;
+    }
+
+    return this.parseNonNegativeInteger(value, 'INVALID_OFFSET', 'offset');
+  }
+
+  private parseNonNegativeInteger(
+    value: string,
+    code: string,
+    fieldName: string,
+  ): number {
+    if (!/^\d+$/.test(value.trim())) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        code,
+        `${fieldName} must be a non-negative integer.`,
+      );
+    }
+
+    const parsed = Number(value);
+    if (!Number.isSafeInteger(parsed)) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        code,
+        `${fieldName} must be a safe integer.`,
+      );
+    }
+
+    return parsed;
+  }
+
+  private emptyExchangesResponse(input: {
+    state: FxExchangesResponse['data']['state'];
+    season: ActiveSeasonRecord | null;
+    participant: FxParticipantRecord | null;
+    query: ParsedFxExchangesQuery;
+    reason: string;
+    message: string;
+  }): FxExchangesResponse {
+    return {
+      success: true,
+      data: {
+        state: input.state,
+        season: input.season ? this.formatSeason(input.season) : null,
+        participant: input.participant
+          ? this.formatParticipant(input.participant)
+          : null,
+        exchanges: [],
+        pagination: this.pagination(input.query, 0, 0),
+        reason: input.reason,
+        message: input.message,
+      },
+    };
+  }
+
+  private formatSeason(season: ActiveSeasonRecord) {
+    return {
+      id: season.id,
+      name: season.name,
+      status: season.status,
+      startAt: season.startAt.toISOString(),
+      endAt: season.endAt.toISOString(),
+    };
+  }
+
+  private formatParticipant(participant: FxParticipantRecord) {
+    return {
+      id: participant.id,
+      status: participant.participantStatus,
+      joinedAt: participant.joinedAt.toISOString(),
+    };
+  }
+
+  private pagination(
+    query: ParsedFxExchangesQuery,
+    total: number,
+    returned: number,
+  ) {
+    return buildPagination({
+      limit: query.limit,
+      offset: query.offset,
+      total,
+      returned,
+    });
+  }
+
+  private formatSnapshotSource(
+    snapshot: {
+      id: string;
+      sourceType: FxRateSourceType;
+      sourceName: string | null;
+      effectiveAt: Date;
+      capturedAt: Date;
+    } | null,
+  ): PublicSourceMetadata | null {
+    if (!snapshot) {
+      return null;
+    }
+
+    return {
+      sourceType:
+        snapshot.sourceType === FxRateSourceType.provider_api ||
+        snapshot.sourceType === FxRateSourceType.admin_manual
+          ? snapshot.sourceType
+          : null,
+      sourceName: snapshot.sourceName,
+      snapshotId: snapshot.id,
+      effectiveAt: snapshot.effectiveAt.toISOString(),
+      capturedAt: snapshot.capturedAt.toISOString(),
+      fallbackUsed: false,
+      fallbackReason: null,
+      rejectedProviderReason: null,
+      freshnessAgeSeconds: null,
+    };
+  }
+
   private assertSeasonExchangeableForQuote(
     season: ActiveSeasonRecord,
     now: Date,
@@ -1267,7 +1578,7 @@ export class FxService {
   }
 
   private toFxExecuteCommandStatus(
-    status: FxExecuteRequestStatus | string,
+    status: string,
   ): FxExecuteCommandCandidate['status'] {
     switch (status) {
       case FxExecuteRequestStatus.pending:

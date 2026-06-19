@@ -130,6 +130,8 @@ describe('AssetsService', () => {
             : 'KRX'),
       assetType,
       currencyCode,
+      priceCurrency: currencyCode,
+      settlementCurrency: currencyCode,
       isActive: input.isActive ?? true,
     };
   };
@@ -141,6 +143,7 @@ describe('AssetsService', () => {
   ) => ({
     id,
     price: new Prisma.Decimal(price),
+    priceKrw: null,
     currencyCode,
     sourceType: AssetPriceSourceType.admin_manual,
     sourceName: 'manual-price',
@@ -910,6 +913,75 @@ describe('AssetsService', () => {
       'Crypto is USD-settled',
     );
     expectNoAssetWrites(prisma);
+  });
+
+  it('returns single asset price for polling fallback without raw payload', async () => {
+    const { prisma, service } = createService();
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({
+        id: 'asset-krw',
+        symbol: '005930',
+        name: 'Samsung',
+      }),
+    );
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(
+      priceSnapshot('price-krw', '70000.00000000', CurrencyCode.KRW),
+    );
+
+    const response = await service.getAssetPrice('user-1', 'asset-krw');
+
+    expect(response.data).toMatchObject({
+      state: 'available',
+      assetId: 'asset-krw',
+      symbol: '005930',
+      currentPrice: '70000.00000000',
+      priceCurrency: CurrencyCode.KRW,
+      priceKrwState: 'available',
+      priceKrw: '70000.00000000',
+      changeRate: null,
+      assetPriceSnapshotId: 'price-krw',
+      priceSource: {
+        sourceName: 'manual-price',
+      },
+    });
+    expect(response.data.freshnessAgeSeconds).toEqual(expect.any(Number));
+    expect(
+      prisma.assetPriceSnapshot.findFirst.mock.calls[0][0].select,
+    ).not.toHaveProperty('rawPayloadJson');
+    expect(JSON.stringify(response.data)).not.toContain('rawPayloadJson');
+    expectNoAssetWrites(prisma);
+  });
+
+  it('returns unavailable single asset price when no snapshot exists', async () => {
+    const { prisma, service } = createService();
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({
+        id: 'asset-krw',
+        symbol: '005930',
+      }),
+    );
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(null);
+
+    const response = await service.getAssetPrice('user-1', 'asset-krw');
+
+    expect(response.data).toMatchObject({
+      state: 'unavailable',
+      assetId: 'asset-krw',
+      currentPrice: null,
+      priceKrwState: 'unavailable',
+      reason: 'ASSET_PRICE_UNAVAILABLE',
+    });
+    expectNoAssetWrites(prisma);
+  });
+
+  it('rejects single asset price without authenticated user', async () => {
+    const { service } = createService();
+
+    await expectApiError(
+      service.getAssetPrice(undefined, 'asset-krw'),
+      401,
+      'UNAUTHORIZED',
+    );
   });
 
   it('does not perform write mutations while reading assets with prices', async () => {

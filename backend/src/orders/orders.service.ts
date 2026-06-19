@@ -33,7 +33,6 @@ import {
   resolveAssetProviderEligibility,
   resolveFxProviderEligibility,
   selectFreshProviderSnapshot,
-  type SourceDecision,
 } from '../providers/source-eligibility.policy';
 import {
   presentSourceDecision,
@@ -179,6 +178,20 @@ type OrdersResponse = {
     }>;
     reason?: string;
     message?: string;
+  };
+};
+
+type OrderDetailResponse = {
+  success: true;
+  data: {
+    order: NonNullable<OrdersResponse['data']['orders']>[number];
+    execution: {
+      state: OrderStatus;
+      priceSource: 'provider_api' | 'admin_manual' | null;
+      quoteId: string | null;
+      assetPriceSnapshotId: string | null;
+      fxRateSnapshotId: string | null;
+    };
   };
 };
 
@@ -665,6 +678,8 @@ export class OrdersService {
     userId: string | undefined,
     orderId: string | undefined,
   ): Promise<CancelOrderResponse> {
+    await Promise.resolve();
+
     if (!userId) {
       this.throwApiError(
         HttpStatus.UNAUTHORIZED,
@@ -741,7 +756,7 @@ export class OrdersService {
         result.data !== null &&
         'execution' in result.data
       ) {
-        return result as ExecuteOrderResponse;
+        return result;
       }
 
       const executionResult = result as OrderExecutionTransactionResult;
@@ -869,6 +884,66 @@ export class OrdersService {
         filters: this.formatFilters(parsedQuery),
         pagination: this.pagination(parsedQuery, total, orders.length),
         orders: orders.map((order) => this.formatOrder(order)),
+      },
+    };
+  }
+
+  async getOrder(
+    userId: string | undefined,
+    orderId: string | undefined,
+  ): Promise<OrderDetailResponse> {
+    if (!userId) {
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
+    }
+
+    const parsedOrderId = this.parseOrderId(orderId);
+    const order = await this.prisma.order.findFirst({
+      where: {
+        id: parsedOrderId,
+        seasonParticipant: {
+          userId,
+        },
+      },
+      select: {
+        ...ORDER_EXECUTION_SELECT,
+        assetPriceSnapshot: {
+          select: {
+            sourceType: true,
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      this.throwApiError(
+        HttpStatus.NOT_FOUND,
+        'ORDER_NOT_FOUND',
+        'Order not found.',
+      );
+    }
+
+    const priceSource =
+      order.assetPriceSnapshot?.sourceType ===
+        AssetPriceSourceType.provider_api ||
+      order.assetPriceSnapshot?.sourceType === AssetPriceSourceType.admin_manual
+        ? order.assetPriceSnapshot.sourceType
+        : null;
+
+    return {
+      success: true,
+      data: {
+        order: this.formatOrder(order),
+        execution: {
+          state: order.status,
+          priceSource,
+          quoteId: order.quoteId,
+          assetPriceSnapshotId: order.assetPriceSnapshotId,
+          fxRateSnapshotId: order.fxRateSnapshotId,
+        },
       },
     };
   }

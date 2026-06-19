@@ -47,6 +47,8 @@ import { SeasonsService } from './seasons.service';
 describe('SeasonsService', () => {
   const createPrisma = () => ({
     season: {
+      count: jest.fn(),
+      findMany: jest.fn(),
       findFirst: jest.fn(),
       findUnique: jest.fn(),
     },
@@ -150,5 +152,77 @@ describe('SeasonsService', () => {
       effectiveStatus: SeasonStatus.ended,
       effectiveMode: 'ended',
     });
+  });
+
+  it('lists seasons with status filter and offset pagination', async () => {
+    const { prisma, service } = createService();
+    prisma.season.count.mockResolvedValueOnce(3);
+    prisma.season.findMany.mockResolvedValueOnce([
+      season({
+        status: SeasonStatus.settled,
+        startAt: new Date('2026-03-01T00:00:00.000Z'),
+        endAt: new Date('2026-03-31T00:00:00.000Z'),
+      }),
+      {
+        ...season({
+          status: SeasonStatus.settled,
+          startAt: new Date('2026-02-01T00:00:00.000Z'),
+          endAt: new Date('2026-02-28T00:00:00.000Z'),
+        }),
+        id: 'season-2',
+      },
+    ]);
+
+    const response = await service.getSeasons({
+      status: 'settled',
+      limit: '2',
+      offset: '1',
+    });
+
+    expect(prisma.season.count).toHaveBeenCalledWith({
+      where: {
+        status: SeasonStatus.settled,
+      },
+    });
+    expect(prisma.season.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          status: SeasonStatus.settled,
+        },
+        skip: 1,
+        take: 2,
+      }),
+    );
+    expect(response.data).toMatchObject({
+      state: 'available',
+      pagination: {
+        limit: 2,
+        offset: 1,
+        total: 3,
+        returned: 2,
+        nextOffset: null,
+      },
+      seasons: [
+        {
+          id: 'season-1',
+          status: SeasonStatus.settled,
+          effectiveMode: 'settled',
+          initialCapitalKrw: '1000000.00000000',
+          tradeFeeRate: '0.001000',
+          fxFeeRate: '0.002000',
+        },
+        {
+          id: 'season-2',
+        },
+      ],
+    });
+  });
+
+  it('rejects invalid season list status', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.getSeasons({ status: 'archived' }),
+    ).rejects.toBeInstanceOf(Error);
   });
 });

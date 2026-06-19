@@ -12,6 +12,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import { createHash, randomBytes } from 'node:crypto';
 import {
+  Prisma,
   RefreshTokenSessionStatus,
   UserRole,
   UserStatus,
@@ -26,6 +27,7 @@ import type {
   RefreshTokenRequestBody,
   RequestAuthMetadata,
   SignupRequestBody,
+  UpdateProfileRequestBody,
 } from './auth.types';
 
 type JwtTtlUnit = 's' | 'm' | 'h' | 'd' | 'w';
@@ -40,6 +42,15 @@ type ParsedSignupRequest = {
 type ParsedLoginRequest = {
   email: string;
   password: string;
+};
+
+type PublicUserRecord = {
+  id: string;
+  email: string;
+  nickname: string;
+  profileImageUrl: string | null;
+  status: UserStatus;
+  createdAt: Date;
 };
 
 type RefreshTokenArtifacts = {
@@ -337,6 +348,106 @@ export class AuthService implements OnModuleInit {
       this.throwUserNotActive();
     }
 
+    return this.buildCurrentUserResponse(user);
+  }
+
+  async updateMe(
+    userId: string | undefined,
+    body: UpdateProfileRequestBody = {},
+  ): Promise<CurrentUserResponse> {
+    if (!userId) {
+      this.throwUnauthorized();
+    }
+
+    const currentUser = await this.prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+      select: {
+        id: true,
+        email: true,
+        nickname: true,
+        profileImageUrl: true,
+        status: true,
+        createdAt: true,
+      },
+    });
+
+    if (!currentUser) {
+      this.throwUnauthorized();
+    }
+
+    if (currentUser.status !== UserStatus.active) {
+      this.throwUserNotActive();
+    }
+
+    const data: Prisma.UserUpdateInput = {};
+    if (this.hasOwn(body, 'nickname')) {
+      const nickname = this.parseNickname(body.nickname);
+      if (nickname !== currentUser.nickname) {
+        const existingNickname = await this.prisma.user.findUnique({
+          where: {
+            nickname,
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        if (existingNickname && existingNickname.id !== userId) {
+          this.throwConflict(
+            'NICKNAME_ALREADY_EXISTS',
+            'Nickname already exists.',
+          );
+        }
+      }
+
+      data.nickname = nickname;
+    }
+
+    if (this.hasOwn(body, 'profileImageUrl')) {
+      data.profileImageUrl = this.parseProfileImageUrl(body.profileImageUrl);
+    }
+
+    if (Object.keys(data).length === 0) {
+      return this.buildCurrentUserResponse(currentUser);
+    }
+
+    try {
+      const updatedUser = await this.prisma.user.update({
+        where: {
+          id: userId,
+        },
+        data,
+        select: {
+          id: true,
+          email: true,
+          nickname: true,
+          profileImageUrl: true,
+          status: true,
+          createdAt: true,
+        },
+      });
+
+      return this.buildCurrentUserResponse(updatedUser);
+    } catch (error) {
+      if (this.isUniqueConstraintError(error)) {
+        const targets = this.getUniqueConstraintTargets(error);
+        if (targets.includes('nickname')) {
+          this.throwConflict(
+            'NICKNAME_ALREADY_EXISTS',
+            'Nickname already exists.',
+          );
+        }
+      }
+
+      throw error;
+    }
+  }
+
+  private buildCurrentUserResponse(
+    user: PublicUserRecord,
+  ): CurrentUserResponse {
     return {
       success: true,
       data: {
@@ -404,6 +515,25 @@ export class AuthService implements OnModuleInit {
     }
 
     return nickname;
+  }
+
+  private parseProfileImageUrl(value: unknown): string | null {
+    if (value === null) {
+      return null;
+    }
+
+    if (typeof value !== 'string') {
+      this.throwBadRequest(
+        'INVALID_PROFILE_IMAGE_URL',
+        'profileImageUrl must be a string or null.',
+      );
+    }
+
+    return value.trim();
+  }
+
+  private hasOwn<T extends object>(value: T, key: PropertyKey): boolean {
+    return Object.hasOwn(value, key);
   }
 
   private async verifyPassword(passwordHash: string, password: string) {

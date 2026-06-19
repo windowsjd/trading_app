@@ -466,7 +466,7 @@ describe('OrdersService', () => {
         : null;
     const currencyCode =
       (overrides.currencyCode as CurrencyCode | undefined) ??
-      (asset.currencyCode as CurrencyCode);
+      asset.currencyCode;
     const quotedPrice =
       (overrides.quotedPrice as Prisma.Decimal | undefined) ??
       (orderType === OrderType.limit && limitPrice
@@ -2083,6 +2083,106 @@ describe('OrdersService', () => {
     expectNoOrderWrites(prisma);
   });
 
+  it('returns a single owned order detail with public execution metadata', async () => {
+    const { prisma, service } = createService();
+    prisma.order.findFirst.mockResolvedValueOnce({
+      id: 'order-1',
+      seasonParticipantId: 'sp-1',
+      assetId: 'asset-1',
+      quoteId: 'quote-order-1',
+      side: OrderSide.buy,
+      orderType: OrderType.market,
+      status: OrderStatus.executed,
+      quantity: new Prisma.Decimal('3.00000000'),
+      limitPrice: null,
+      executedPrice: new Prisma.Decimal('101.25000000'),
+      currencyCode: CurrencyCode.USD,
+      grossAmount: new Prisma.Decimal('303.75000000'),
+      feeAmount: new Prisma.Decimal('0.30375000'),
+      netAmount: new Prisma.Decimal('304.05375000'),
+      assetPriceSnapshotId: 'aps-1',
+      fxRateSnapshotId: 'fx-1',
+      submittedAt,
+      executedAt,
+      canceledAt: null,
+      rejectedAt: null,
+      rejectReason: null,
+      createdAt,
+      updatedAt,
+      asset: {
+        id: 'asset-1',
+        symbol: 'AAPL',
+        name: 'Apple Inc.',
+        market: 'NASDAQ',
+        assetType: AssetType.us_stock,
+        currencyCode: CurrencyCode.USD,
+        priceCurrency: CurrencyCode.USD,
+        settlementCurrency: CurrencyCode.USD,
+      },
+      quote: null,
+      seasonParticipant: {
+        id: 'sp-1',
+        participantStatus: ParticipantStatus.active,
+        joinedAt,
+        season: activeSeason,
+      },
+      assetPriceSnapshot: {
+        sourceType: AssetPriceSourceType.provider_api,
+      },
+    });
+
+    const response = await service.getOrder('user-1', 'order-1');
+
+    expect(prisma.order.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: 'order-1',
+          seasonParticipant: {
+            userId: 'user-1',
+          },
+        },
+      }),
+    );
+    expect(response.data).toMatchObject({
+      order: {
+        orderId: 'order-1',
+        quoteId: 'quote-order-1',
+        status: OrderStatus.executed,
+        executedPrice: '101.25000000',
+      },
+      execution: {
+        state: OrderStatus.executed,
+        priceSource: AssetPriceSourceType.provider_api,
+        quoteId: 'quote-order-1',
+        assetPriceSnapshotId: 'aps-1',
+        fxRateSnapshotId: 'fx-1',
+      },
+    });
+    expect(JSON.stringify(response.data)).not.toContain('responsePayloadJson');
+    expectNoOrderWrites(prisma);
+  });
+
+  it('returns not found for missing or unowned order detail', async () => {
+    const { prisma, service } = createService();
+    prisma.order.findFirst.mockResolvedValueOnce(null);
+
+    await expectErrorCode(
+      service.getOrder('user-1', 'order-other-user'),
+      'ORDER_NOT_FOUND',
+    );
+    expect(prisma.order.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: 'order-other-user',
+          seasonParticipant: {
+            userId: 'user-1',
+          },
+        },
+      }),
+    );
+    expectNoOrderWrites(prisma);
+  });
+
   it('rejects cancel orders as unsupported', async () => {
     const { prisma, service } = createService();
 
@@ -2298,6 +2398,9 @@ describe('OrdersService', () => {
     const { service } = createService();
 
     await expect(service.getOrders(undefined, {})).rejects.toBeInstanceOf(
+      HttpException,
+    );
+    await expect(service.getOrder(undefined, 'order-1')).rejects.toBeInstanceOf(
       HttpException,
     );
   });

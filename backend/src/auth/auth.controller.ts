@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Patch,
   Post,
   Req,
 } from '@nestjs/common';
@@ -16,6 +17,7 @@ import type {
   RefreshTokenRequestBody,
   RequestAuthMetadata,
   SignupRequestBody,
+  UpdateProfileRequestBody,
 } from './auth.types';
 
 @Controller('api/v1')
@@ -59,6 +61,14 @@ export class AuthController {
   @Get('me')
   me(@Req() request: AuthenticatedRequest) {
     return this.authService.me(request.user?.userId);
+  }
+
+  @Patch('me')
+  updateMe(
+    @Body() body: UpdateProfileRequestBody,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.authService.updateMe(request.user?.userId, body);
   }
 
   private getRequestAuthMetadata(request: Request): RequestAuthMetadata {

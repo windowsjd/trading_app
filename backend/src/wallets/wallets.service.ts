@@ -5,7 +5,14 @@ import {
   Prisma,
   SeasonStatus,
 } from '../generated/prisma/client';
+import { buildPagination, type Pagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
+
+export type WalletTransactionsQuery = {
+  currency?: string;
+  limit?: string;
+  offset?: string;
+};
 
 type WalletsState = 'available' | 'not_joined' | 'unavailable';
 
@@ -44,20 +51,155 @@ type WalletsResponse = {
   };
 };
 
+type ParsedWalletTransactionsQuery = {
+  currency?: CurrencyCode;
+  limit: number;
+  offset: number;
+};
+
+type WalletTransactionsResponse = {
+  success: true;
+  data: {
+    state: WalletsState;
+    season: ReturnType<WalletsService['formatSeason']> | null;
+    participant: ReturnType<WalletsService['formatParticipant']> | null;
+    transactions: Array<{
+      id: string;
+      currencyCode: CurrencyCode;
+      direction: string;
+      txType: string;
+      referenceType: string;
+      referenceId: string | null;
+      amount: string;
+      balanceAfter: string;
+      occurredAt: string;
+      createdAt: string;
+    }>;
+    pagination: Pagination;
+    reason?: string;
+    message?: string;
+  };
+};
+
 const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
   SeasonStatus.active,
   SeasonStatus.upcoming,
   SeasonStatus.ended,
   SeasonStatus.settled,
 ];
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 100;
 
 @Injectable()
 export class WalletsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async getWalletTransactions(
+    userId: string | undefined,
+    query: WalletTransactionsQuery = {},
+  ): Promise<WalletTransactionsResponse> {
+    if (!userId) {
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
+    }
+
+    const parsedQuery = this.parseWalletTransactionsQuery(query);
+    const season = await this.findCurrentSeason();
+    if (!season) {
+      return this.emptyTransactionsResponse({
+        state: 'unavailable',
+        season: null,
+        participant: null,
+        query: parsedQuery,
+        reason: 'CURRENT_SEASON_NOT_FOUND',
+        message: 'Current season is not configured.',
+      });
+    }
+
+    const participant = await this.prisma.seasonParticipant.findUnique({
+      where: {
+        seasonId_userId: {
+          seasonId: season.id,
+          userId,
+        },
+      },
+      select: {
+        id: true,
+        participantStatus: true,
+        joinedAt: true,
+      },
+    });
+
+    if (!participant) {
+      return this.emptyTransactionsResponse({
+        state: 'not_joined',
+        season,
+        participant: null,
+        query: parsedQuery,
+        reason: 'SEASON_NOT_JOINED',
+        message: 'Wallet transactions are available after joining the season.',
+      });
+    }
+
+    const where = {
+      seasonParticipantId: participant.id,
+      ...(parsedQuery.currency ? { currencyCode: parsedQuery.currency } : {}),
+    };
+    const [total, transactions] = await Promise.all([
+      this.prisma.walletTransaction.count({ where }),
+      this.prisma.walletTransaction.findMany({
+        where,
+        orderBy: [{ occurredAt: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
+        skip: parsedQuery.offset,
+        take: parsedQuery.limit,
+        select: {
+          id: true,
+          currencyCode: true,
+          direction: true,
+          txType: true,
+          referenceType: true,
+          referenceId: true,
+          amount: true,
+          balanceAfter: true,
+          occurredAt: true,
+          createdAt: true,
+        },
+      }),
+    ]);
+
+    return {
+      success: true,
+      data: {
+        state: 'available',
+        season: this.formatSeason(season),
+        participant: this.formatParticipant(participant),
+        transactions: transactions.map((transaction) => ({
+          id: transaction.id,
+          currencyCode: transaction.currencyCode,
+          direction: transaction.direction,
+          txType: transaction.txType,
+          referenceType: transaction.referenceType,
+          referenceId: transaction.referenceId,
+          amount: this.formatDecimal(transaction.amount, 8),
+          balanceAfter: this.formatDecimal(transaction.balanceAfter, 8),
+          occurredAt: transaction.occurredAt.toISOString(),
+          createdAt: transaction.createdAt.toISOString(),
+        })),
+        pagination: this.pagination(parsedQuery, total, transactions.length),
+      },
+    };
+  }
+
   async getWallets(userId?: string): Promise<WalletsResponse> {
     if (!userId) {
-      this.throwApiError(HttpStatus.UNAUTHORIZED, 'UNAUTHORIZED', 'Unauthorized');
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
     }
 
     const season = await this.findCurrentSeason();
@@ -163,6 +305,30 @@ export class WalletsService {
     };
   }
 
+  private emptyTransactionsResponse(input: {
+    state: WalletsState;
+    season: WalletsSeason | null;
+    participant: WalletsParticipant | null;
+    query: ParsedWalletTransactionsQuery;
+    reason: string;
+    message: string;
+  }): WalletTransactionsResponse {
+    return {
+      success: true,
+      data: {
+        state: input.state,
+        season: input.season ? this.formatSeason(input.season) : null,
+        participant: input.participant
+          ? this.formatParticipant(input.participant)
+          : null,
+        transactions: [],
+        pagination: this.pagination(input.query, 0, 0),
+        reason: input.reason,
+        message: input.message,
+      },
+    };
+  }
+
   private async findCurrentSeason(): Promise<WalletsSeason | null> {
     for (const status of CURRENT_SEASON_STATUS_PRIORITY) {
       const season = await this.prisma.season.findFirst({
@@ -224,6 +390,105 @@ export class WalletsService {
     return value.toFixed(scale);
   }
 
+  private parseWalletTransactionsQuery(
+    query: WalletTransactionsQuery,
+  ): ParsedWalletTransactionsQuery {
+    return {
+      currency: this.parseCurrency(query.currency),
+      limit: this.parseLimit(query.limit),
+      offset: this.parseOffset(query.offset),
+    };
+  }
+
+  private parseCurrency(value: string | undefined): CurrencyCode | undefined {
+    const text = this.parseOptionalText(value);
+    if (!text) {
+      return undefined;
+    }
+
+    if (text === CurrencyCode.KRW || text === CurrencyCode.USD) {
+      return text;
+    }
+
+    this.throwApiError(
+      HttpStatus.BAD_REQUEST,
+      'INVALID_CURRENCY',
+      'Invalid currency.',
+    );
+  }
+
+  private parseLimit(value: string | undefined): number {
+    if (value === undefined) {
+      return DEFAULT_LIMIT;
+    }
+
+    const limit = this.parseNonNegativeInteger(value, 'INVALID_LIMIT', 'limit');
+    if (limit < 1) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'INVALID_LIMIT',
+        'limit must be greater than 0.',
+      );
+    }
+
+    return Math.min(limit, MAX_LIMIT);
+  }
+
+  private parseOffset(value: string | undefined): number {
+    if (value === undefined) {
+      return 0;
+    }
+
+    return this.parseNonNegativeInteger(value, 'INVALID_OFFSET', 'offset');
+  }
+
+  private parseNonNegativeInteger(
+    value: string,
+    code: string,
+    fieldName: string,
+  ): number {
+    if (!/^\d+$/.test(value.trim())) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        code,
+        `${fieldName} must be a non-negative integer.`,
+      );
+    }
+
+    const parsed = Number(value);
+    if (!Number.isSafeInteger(parsed)) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        code,
+        `${fieldName} must be a safe integer.`,
+      );
+    }
+
+    return parsed;
+  }
+
+  private parseOptionalText(value: string | undefined): string | undefined {
+    if (typeof value !== 'string') {
+      return undefined;
+    }
+
+    const trimmed = value.trim();
+    return trimmed === '' ? undefined : trimmed;
+  }
+
+  private pagination(
+    query: ParsedWalletTransactionsQuery,
+    total: number,
+    returned: number,
+  ) {
+    return buildPagination({
+      limit: query.limit,
+      offset: query.offset,
+      total,
+      returned,
+    });
+  }
+
   private createErrorBody(code: string, message: string) {
     return {
       success: false,
@@ -234,7 +499,11 @@ export class WalletsService {
     };
   }
 
-  private throwApiError(status: HttpStatus, code: string, message: string): never {
+  private throwApiError(
+    status: HttpStatus,
+    code: string,
+    message: string,
+  ): never {
     throw new HttpException(this.createErrorBody(code, message), status);
   }
 }

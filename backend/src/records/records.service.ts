@@ -1,4 +1,9 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Optional,
+} from '@nestjs/common';
 import {
   AssetPriceSourceType,
   CurrencyCode,
@@ -14,6 +19,11 @@ import {
 } from '../generated/prisma/client';
 import { buildPagination, type Pagination } from '../common/pagination';
 import { isFxSnapshotStaleForPortfolioValuation } from '../portfolio/portfolio-valuation.policy';
+import {
+  PortfolioValuationError,
+  type PortfolioValuationResult,
+} from '../portfolio/portfolio-valuation.policy';
+import { PortfolioValuationService } from '../portfolio/portfolio-valuation.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   calculateMaxDrawdownPercent,
@@ -479,6 +489,41 @@ type UserSeasonRecordSummaryResponse = {
   };
 };
 
+type UserCurrentSeasonSummaryResponse = {
+  success: true;
+  data: {
+    state: 'available' | 'not_joined' | 'unavailable';
+    user: {
+      id: string;
+      nickname: string;
+    };
+    season: {
+      id: string;
+      status: SeasonStatus;
+      rank: number | null;
+      provisionalTier: string | null;
+      finalTier: string | null;
+      percentile: string | null;
+      returnRate: string | null;
+      totalAssetKrw: string | null;
+      totalFillCount: number;
+    } | null;
+    allocation: {
+      cashKrwValue: string;
+      domesticStockValueKrw: string;
+      usStockValueKrw: string;
+      cryptoValueKrw: string;
+    };
+    topPositions: Array<{
+      assetId: string;
+      symbol: string;
+      weight: string;
+    }>;
+    reason?: string;
+    message?: string;
+  };
+};
+
 const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
   SeasonStatus.active,
   SeasonStatus.upcoming,
@@ -499,7 +544,11 @@ class RecordsValuationError extends Error {
 
 @Injectable()
 export class RecordsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional()
+    private readonly portfolioValuationService?: PortfolioValuationService,
+  ) {}
 
   async getRecords(
     userId: string | undefined,
@@ -629,6 +678,7 @@ export class RecordsService {
         participantStatus: true,
         initialCapitalKrw: true,
         maxDrawdown: true,
+        totalFillCount: true,
         currentRank: true,
         finalRank: true,
         finalTier: true,
@@ -1151,6 +1201,133 @@ export class RecordsService {
     };
   }
 
+  async getUserCurrentSeasonSummary(
+    authUserId: string | undefined,
+    targetUserId: string | undefined,
+  ): Promise<UserCurrentSeasonSummaryResponse> {
+    this.assertAuthenticated(authUserId);
+
+    const parsedTargetUserId = this.parseRequiredText(
+      targetUserId,
+      'INVALID_USER_ID',
+      'userId',
+    );
+    const [targetUser, season] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: {
+          id: parsedTargetUserId,
+        },
+        select: {
+          id: true,
+          nickname: true,
+        },
+      }),
+      this.findCurrentSeason(),
+    ]);
+
+    if (!targetUser) {
+      this.throwApiError(
+        HttpStatus.NOT_FOUND,
+        'USER_NOT_FOUND',
+        'User not found.',
+      );
+    }
+
+    if (!season) {
+      return {
+        success: true,
+        data: {
+          state: 'unavailable',
+          user: targetUser,
+          season: null,
+          allocation: this.emptyPublicValueAllocation(),
+          topPositions: [],
+          reason: 'CURRENT_SEASON_NOT_FOUND',
+          message: 'Current season is not configured.',
+        },
+      };
+    }
+
+    const participant = await this.findDetailedParticipant(
+      season.id,
+      parsedTargetUserId,
+    );
+    if (!participant) {
+      return {
+        success: true,
+        data: {
+          state: 'not_joined',
+          user: targetUser,
+          season: {
+            id: season.id,
+            status: season.status,
+            rank: null,
+            provisionalTier: null,
+            finalTier: null,
+            percentile: null,
+            returnRate: null,
+            totalAssetKrw: null,
+            totalFillCount: 0,
+          },
+          allocation: this.emptyPublicValueAllocation(),
+          topPositions: [],
+          reason: 'SEASON_NOT_JOINED',
+          message: 'The user has not joined the current season.',
+        },
+      };
+    }
+
+    const [ranking, portfolio] = await Promise.all([
+      this.findLatestPublicRanking(season.id, participant.id, season.status),
+      this.buildPublicSeasonSummaryPortfolio(participant.id, new Date()),
+    ]);
+    const metric =
+      ranking ??
+      this.selectBestMetric(
+        participant.seasonRankings[0],
+        participant.dailyPortfolioSnapshots[0],
+      );
+    const rankingTotal = ranking
+      ? await this.prisma.seasonRanking.count({
+          where: {
+            seasonId: season.id,
+            rankType: ranking.rankType,
+            rankingDate: ranking.rankingDate,
+          },
+        })
+      : 0;
+
+    return {
+      success: true,
+      data: {
+        state: 'available',
+        user: targetUser,
+        season: {
+          id: season.id,
+          status: season.status,
+          rank:
+            ranking?.rank ?? participant.currentRank ?? participant.finalRank,
+          provisionalTier: null,
+          finalTier: participant.finalTier,
+          percentile:
+            ranking && rankingTotal > 0
+              ? this.formatDecimal(
+                  new Prisma.Decimal(ranking.rank).div(rankingTotal).mul(100),
+                  8,
+                )
+              : null,
+          returnRate: metric ? this.formatDecimal(metric.returnRate, 8) : null,
+          totalAssetKrw: metric
+            ? this.formatDecimal(metric.totalAssetKrw, 8)
+            : null,
+          totalFillCount: ranking?.totalFillCount ?? participant.totalFillCount,
+        },
+        allocation: portfolio.allocation,
+        topPositions: portfolio.topPositions,
+      },
+    };
+  }
+
   private async buildProfitAnalysis(
     seasonParticipantId: string,
     valuationAt: Date,
@@ -1533,6 +1710,183 @@ export class RecordsService {
           valuationState: 'available' as const,
         })),
       valuationErrors,
+    };
+  }
+
+  private async findLatestPublicRanking(
+    seasonId: string,
+    seasonParticipantId: string,
+    seasonStatus: SeasonStatus,
+  ) {
+    const preferredRankType =
+      seasonStatus === SeasonStatus.settled
+        ? SeasonRankingType.final
+        : SeasonRankingType.daily;
+    const preferredRanking = await this.findLatestRankingByType(
+      seasonId,
+      seasonParticipantId,
+      preferredRankType,
+    );
+
+    if (preferredRanking) {
+      return preferredRanking;
+    }
+
+    return preferredRankType === SeasonRankingType.final
+      ? this.findLatestRankingByType(
+          seasonId,
+          seasonParticipantId,
+          SeasonRankingType.daily,
+        )
+      : this.findLatestRankingByType(
+          seasonId,
+          seasonParticipantId,
+          SeasonRankingType.final,
+        );
+  }
+
+  private async findLatestRankingByType(
+    seasonId: string,
+    seasonParticipantId: string,
+    rankType: SeasonRankingType,
+  ) {
+    return this.prisma.seasonRanking.findFirst({
+      where: {
+        seasonId,
+        seasonParticipantId,
+        rankType,
+      },
+      orderBy: [
+        { rankingDate: 'desc' },
+        { capturedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      select: {
+        rankType: true,
+        rank: true,
+        rankingDate: true,
+        totalAssetKrw: true,
+        returnRate: true,
+        totalFillCount: true,
+      },
+    });
+  }
+
+  private async buildPublicSeasonSummaryPortfolio(
+    seasonParticipantId: string,
+    valuationAt: Date,
+  ): Promise<{
+    allocation: UserCurrentSeasonSummaryResponse['data']['allocation'];
+    topPositions: UserCurrentSeasonSummaryResponse['data']['topPositions'];
+  }> {
+    if (!this.portfolioValuationService) {
+      return {
+        allocation: this.emptyPublicValueAllocation(),
+        topPositions: [],
+      };
+    }
+
+    try {
+      const valuation =
+        await this.portfolioValuationService.calculateSeasonParticipantValuation(
+          seasonParticipantId,
+          valuationAt,
+          'home_live_valuation',
+        );
+
+      return {
+        allocation: this.publicValueAllocationFromValuation(valuation),
+        topPositions: await this.buildPublicTopPositions(
+          seasonParticipantId,
+          valuation.totalAssetKrw,
+        ),
+      };
+    } catch (error) {
+      if (!(error instanceof PortfolioValuationError)) {
+        throw error;
+      }
+
+      return {
+        allocation: this.emptyPublicValueAllocation(),
+        topPositions: [],
+      };
+    }
+  }
+
+  private publicValueAllocationFromValuation(
+    valuation: PortfolioValuationResult,
+  ): UserCurrentSeasonSummaryResponse['data']['allocation'] {
+    return {
+      cashKrwValue: new Prisma.Decimal(valuation.krwCash)
+        .add(valuation.usdCashKrw)
+        .toFixed(8),
+      domesticStockValueKrw: valuation.domesticStockValueKrw,
+      usStockValueKrw: valuation.usStockValueKrw,
+      cryptoValueKrw: valuation.cryptoValueKrw,
+    };
+  }
+
+  private async buildPublicTopPositions(
+    seasonParticipantId: string,
+    totalAssetKrw: string,
+  ): Promise<UserCurrentSeasonSummaryResponse['data']['topPositions']> {
+    const denominator = new Prisma.Decimal(totalAssetKrw);
+    if (denominator.eq(0)) {
+      return [];
+    }
+
+    const positions = await this.prisma.position.findMany({
+      where: {
+        seasonParticipantId,
+        quantity: {
+          gt: 0,
+        },
+        marketValueKrw: {
+          not: null,
+        },
+      },
+      select: {
+        assetId: true,
+        marketValueKrw: true,
+        asset: {
+          select: {
+            symbol: true,
+          },
+        },
+      },
+    });
+
+    return positions
+      .filter((position) => position.marketValueKrw !== null)
+      .toSorted((left, right) => {
+        const leftValue = left.marketValueKrw ?? new Prisma.Decimal(0);
+        const rightValue = right.marketValueKrw ?? new Prisma.Decimal(0);
+        const valueDiff = rightValue.cmp(leftValue);
+        if (valueDiff !== 0) {
+          return valueDiff;
+        }
+
+        return left.assetId.localeCompare(right.assetId);
+      })
+      .slice(0, 5)
+      .map((position) => ({
+        assetId: position.assetId,
+        symbol: position.asset.symbol,
+        weight: this.formatDecimal(
+          (position.marketValueKrw ?? new Prisma.Decimal(0))
+            .div(denominator)
+            .mul(100),
+          8,
+        ),
+      }));
+  }
+
+  private emptyPublicValueAllocation(): UserCurrentSeasonSummaryResponse['data']['allocation'] {
+    return {
+      cashKrwValue: this.formatDecimal(new Prisma.Decimal(0), 8),
+      domesticStockValueKrw: this.formatDecimal(new Prisma.Decimal(0), 8),
+      usStockValueKrw: this.formatDecimal(new Prisma.Decimal(0), 8),
+      cryptoValueKrw: this.formatDecimal(new Prisma.Decimal(0), 8),
     };
   }
 
@@ -2393,6 +2747,7 @@ export class RecordsService {
         joinedAt: true,
         initialCapitalKrw: true,
         maxDrawdown: true,
+        totalFillCount: true,
         currentRank: true,
         finalRank: true,
         finalTier: true,

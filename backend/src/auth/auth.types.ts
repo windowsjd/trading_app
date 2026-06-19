@@ -29,6 +29,11 @@ export type RefreshTokenRequestBody = {
   refreshToken?: unknown;
 };
 
+export type UpdateProfileRequestBody = {
+  nickname?: unknown;
+  profileImageUrl?: unknown;
+};
+
 export type RequestAuthMetadata = {
   userAgent?: string;
   ipAddress?: string;

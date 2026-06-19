@@ -11,6 +11,7 @@ import { OperatorModule } from './operator/operator.module';
 import { OpsModule } from './ops/ops.module';
 import { OrdersModule } from './orders/orders.module';
 import { PositionsModule } from './positions/positions.module';
+import { PortfolioModule } from './portfolio/portfolio.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProvidersModule } from './providers/providers.module';
 import { RankingModule } from './ranking/ranking.module';
@@ -35,6 +36,7 @@ import { WalletsModule } from './wallets/wallets.module';
     OpsModule,
     OrdersModule,
     PositionsModule,
+    PortfolioModule,
     PrismaModule,
     ProvidersModule,
     RankingModule,

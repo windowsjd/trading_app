@@ -143,6 +143,8 @@ describe('FxService', () => {
         findMany: jest.fn().mockResolvedValue([]),
       },
       exchangeTransaction: {
+        count: jest.fn(),
+        findMany: jest.fn(),
         create: jest.fn(),
       },
       walletTransaction: {
@@ -262,6 +264,7 @@ describe('FxService', () => {
   const mockActiveSeason = (prisma: ReturnType<typeof createPrisma>) => {
     prisma.season.findFirst.mockResolvedValueOnce({
       id: 'season-1',
+      name: 'Season 1',
       status: SeasonStatus.active,
       startAt: seasonStartAt,
       endAt: seasonEndAt,
@@ -272,6 +275,8 @@ describe('FxService', () => {
   const mockJoinedParticipant = (prisma: ReturnType<typeof createPrisma>) => {
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
       id: 'participant-1',
+      participantStatus: 'active',
+      joinedAt: new Date('2026-04-28T01:00:00.000Z'),
     });
   };
 
@@ -520,6 +525,95 @@ describe('FxService', () => {
       'UNSUPPORTED_FX_PAIR',
     );
     expect(prisma.fxRateSnapshot.findMany).not.toHaveBeenCalled();
+  });
+
+  it('returns my direct exchange history with pagination', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    mockJoinedParticipant(prisma);
+    prisma.exchangeTransaction.count.mockResolvedValueOnce(3);
+    prisma.exchangeTransaction.findMany.mockResolvedValueOnce([
+      {
+        id: 'fx-transaction-1',
+        fromCurrency: CurrencyCode.KRW,
+        toCurrency: CurrencyCode.USD,
+        sourceAmount: new Prisma.Decimal('1000000.00000000'),
+        grossTargetAmount: new Prisma.Decimal('740.74074074'),
+        feeRate: new Prisma.Decimal('0.001000'),
+        feeAmount: new Prisma.Decimal('0.74074074'),
+        feeCurrency: CurrencyCode.USD,
+        appliedRate: new Prisma.Decimal('1350.00000000'),
+        netTargetAmount: new Prisma.Decimal('740.00000000'),
+        executedAt: now,
+        fxRateSnapshot: {
+          id: 'fxs-1',
+          sourceType: FxRateSourceType.admin_manual,
+          sourceName: 'manual-approved',
+          effectiveAt: freshEffectiveAt,
+          capturedAt,
+        },
+      },
+    ]);
+
+    const response = await service.getExchanges('user-1', {
+      limit: '1',
+      offset: '1',
+    });
+
+    expect(prisma.exchangeTransaction.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          seasonParticipantId: 'participant-1',
+        },
+        skip: 1,
+        take: 1,
+      }),
+    );
+    expect(response.data).toMatchObject({
+      state: 'available',
+      exchanges: [
+        {
+          exchangeId: 'fx-transaction-1',
+          sourceAmount: '1000000.00000000',
+          feeRate: '0.001000',
+          rateSource: {
+            snapshotId: 'fxs-1',
+            sourceName: 'manual-approved',
+          },
+        },
+      ],
+      pagination: {
+        limit: 1,
+        offset: 1,
+        total: 3,
+        returned: 1,
+        nextOffset: 2,
+      },
+    });
+    expect(JSON.stringify(response.data)).not.toContain('rawPayloadJson');
+  });
+
+  it('returns not_joined exchange history without reading exchange rows', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
+
+    const response = await service.getExchanges('user-1');
+
+    expect(response.data).toMatchObject({
+      state: 'not_joined',
+      exchanges: [],
+      reason: 'SEASON_NOT_JOINED',
+    });
+    expect(prisma.exchangeTransaction.findMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects direct exchange history without authenticated user', async () => {
+    const { service } = createService();
+
+    await expect(service.getExchanges(undefined)).rejects.toBeInstanceOf(
+      HttpException,
+    );
   });
 
   it('rejects invalid currency pair', async () => {
