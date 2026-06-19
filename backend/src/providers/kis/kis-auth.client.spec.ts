@@ -39,7 +39,8 @@ describe('KIS auth client skeleton', () => {
     const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValueOnce({
       ok: true,
       status: 200,
-      text: async () => JSON.stringify({ approval_key: 'approval-secret' }),
+      text: () =>
+        Promise.resolve(JSON.stringify({ approval_key: 'approval-secret' })),
     } as Response);
     const client = new KisAuthClient(
       configServiceFor({
@@ -60,6 +61,44 @@ describe('KIS auth client skeleton', () => {
           grant_type: 'client_credentials',
           appkey: 'kis-app-key',
           secretkey: 'kis-app-secret',
+        }),
+      }),
+    );
+    fetchSpy.mockRestore();
+  });
+
+  it('requests REST access token with the configured KIS app credentials', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({
+            access_token: 'rest-token',
+            token_type: 'Bearer',
+            expires_in: '86400',
+          }),
+        ),
+    } as Response);
+    const client = new KisAuthClient(
+      configServiceFor({
+        restBaseUrl: 'https://kis.example.test',
+        appKey: 'kis-app-key',
+        appSecret: 'kis-app-secret',
+      }),
+    );
+
+    const result = await client.requestConfiguredRestToken();
+
+    expect(result.state).toBe('available');
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://kis.example.test/oauth2/tokenP',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          grant_type: 'client_credentials',
+          appkey: 'kis-app-key',
+          appsecret: 'kis-app-secret',
         }),
       }),
     );

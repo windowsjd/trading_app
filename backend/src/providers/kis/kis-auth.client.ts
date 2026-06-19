@@ -72,6 +72,36 @@ export class KisAuthClient {
     };
   }
 
+  async requestConfiguredRestToken(): Promise<
+    KisLowLevelCallResult<ParsedKisTokenResponse>
+  > {
+    const config = this.configService.getConfig();
+    if (!config.kis.enabled) {
+      throw new ProviderConfigError(
+        'kis',
+        'PROVIDER_DISABLED',
+        'KIS market data provider is disabled.',
+      );
+    }
+
+    if (!config.kis.appKey || !config.kis.appSecret) {
+      throw new ProviderConfigError(
+        'kis',
+        'REQUIRED_ENV_MISSING',
+        'KIS_APP_KEY and KIS_APP_SECRET are required.',
+      );
+    }
+
+    return this.requestRestToken({
+      path: '/oauth2/tokenP',
+      body: {
+        grant_type: 'client_credentials',
+        appkey: config.kis.appKey,
+        appsecret: config.kis.appSecret,
+      },
+    });
+  }
+
   async requestConfiguredWebSocketApprovalKey(): Promise<
     KisLowLevelCallResult<ParsedKisApprovalKeyResponse>
   > {
