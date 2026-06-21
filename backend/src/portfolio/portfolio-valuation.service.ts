@@ -19,7 +19,9 @@ import {
   resolveAssetProviderEligibility,
   resolveFxProviderEligibility,
   selectFreshProviderSnapshot,
+  selectFreshProviderSnapshotBySourcePriority,
   selectProviderSnapshotAtOrBefore,
+  selectProviderSnapshotAtOrBeforeBySourcePriority,
   type ProviderWorkflow,
 } from '../providers/source-eligibility.policy';
 
@@ -298,7 +300,9 @@ export class PortfolioValuationService {
             sourceType: FxRateSourceType.provider_api,
             ...(useSettlementPricePolicy
               ? {
-                  sourceName: providerEligibility.sourceName,
+                  sourceName: {
+                    in: [...providerEligibility.sourceNames],
+                  },
                   effectiveAt: {
                     lte: valuationAt,
                   },
@@ -313,7 +317,9 @@ export class PortfolioValuationService {
             { capturedAt: 'desc' },
             { createdAt: 'desc' },
           ],
-          take: useSettlementPricePolicy ? 1 : 10,
+          take: useSettlementPricePolicy
+            ? providerEligibility.sourceNames.length * 10
+            : 10,
           select: {
             id: true,
             baseCurrency: true,
@@ -330,15 +336,15 @@ export class PortfolioValuationService {
       : [];
     const providerSelection = providerEligibility.eligible
       ? useSettlementPricePolicy
-        ? selectProviderSnapshotAtOrBefore({
+        ? selectProviderSnapshotAtOrBeforeBySourcePriority({
             candidates: providerCandidates,
-            expectedSourceName: providerEligibility.sourceName,
+            expectedSourceNames: providerEligibility.sourceNames,
             valuationAt,
             isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
           })
-        : selectFreshProviderSnapshot({
+        : selectFreshProviderSnapshotBySourcePriority({
             candidates: providerCandidates,
-            expectedSourceName: providerEligibility.sourceName,
+            expectedSourceNames: providerEligibility.sourceNames,
             now: valuationAt,
             freshnessThresholdSeconds:
               providerEligibility.freshnessThresholdSeconds,

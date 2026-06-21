@@ -148,7 +148,7 @@ describe('realtime execution policy', () => {
         assetType: AssetType.us_stock,
         market: 'NYS',
       }),
-    ).toBe(50);
+    ).toBe(30);
     expect(
       resolveExecuteFreshnessThresholdSeconds({
         quoteType: 'order',
@@ -163,7 +163,7 @@ describe('realtime execution policy', () => {
         assetType: AssetType.crypto,
         market: 'BINANCE',
       }),
-    ).toBe(50);
+    ).toBe(30);
     expect(
       resolveExecuteFreshnessThresholdSeconds({
         quoteType: 'order',

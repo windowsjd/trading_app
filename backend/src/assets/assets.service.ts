@@ -15,6 +15,7 @@ import {
   resolveAssetProviderEligibility,
   resolveFxProviderEligibility,
   selectFreshProviderSnapshot,
+  selectFreshProviderSnapshotBySourcePriority,
   type SourceDecision,
 } from '../providers/source-eligibility.policy';
 import {
@@ -853,9 +854,9 @@ export class AssetsService {
         })) ?? [])
       : [];
     const providerSelection = providerEligibility.eligible
-      ? selectFreshProviderSnapshot({
+      ? selectFreshProviderSnapshotBySourcePriority({
           candidates: providerCandidates,
-          expectedSourceName: providerEligibility.sourceName,
+          expectedSourceNames: providerEligibility.sourceNames,
           now: valuationAt,
           freshnessThresholdSeconds:
             providerEligibility.freshnessThresholdSeconds,

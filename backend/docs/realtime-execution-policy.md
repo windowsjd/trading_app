@@ -42,8 +42,8 @@ Quote 대비 execute 시점 허용 변동폭:
 | 대상               | Max change     |
 | ------------------ | -------------- |
 | KRX domestic stock | 30 bps = 0.30% |
-| US NAS/NYS stock   | 50 bps = 0.50% |
-| BINANCE crypto     | 50 bps = 0.50% |
+| US NAS/NYS stock   | 30 bps = 0.30% |
+| BINANCE crypto     | 30 bps = 0.30% |
 | USD/KRW FX         | 30 bps = 0.30% |
 
 Change bps 계산식:

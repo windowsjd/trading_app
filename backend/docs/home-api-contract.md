@@ -163,8 +163,8 @@ Render the normal joined-season home dashboard. Trading and exchange entry point
 - `participant.status`
 - `participant.joinedAt`
 - `participant.initialCapitalKrw`
-- `summary` from latest `daily_portfolio_snapshots` when present.
-- `summary` from `PortfolioValuationService.calculateSeasonParticipantValuation()` when snapshot is absent and required price/FX data exists.
+- `summary` from `PortfolioValuationService.calculateSeasonParticipantValuation()` live valuation when required price/FX data exists.
+- `summary.state = unavailable` when live valuation fails; `daily_portfolio_snapshots` remain chart/history evidence.
 - `ranking` from latest `season_rankings` when present.
 - `walletSummary.cashWallets`
 - `walletSummary.positionsCount`
@@ -324,7 +324,7 @@ The implemented MVP may return available summary/ranking sections or explicit un
 }
 ```
 
-If daily snapshot and live valuation are both unavailable, `summary` is returned as:
+If live valuation is unavailable, `summary` is returned as:
 
 ```json
 {

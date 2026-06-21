@@ -38,6 +38,7 @@ import {
   resolveAssetProviderEligibility,
   resolveFxProviderEligibility,
   selectFreshProviderSnapshot,
+  selectFreshProviderSnapshotBySourcePriority,
 } from '../providers/source-eligibility.policy';
 
 export type RecordsQuery = {
@@ -2066,9 +2067,9 @@ export class RecordsService {
         })
       : [];
     const providerSelection = providerEligibility.eligible
-      ? selectFreshProviderSnapshot({
+      ? selectFreshProviderSnapshotBySourcePriority({
           candidates: providerCandidates,
-          expectedSourceName: providerEligibility.sourceName,
+          expectedSourceNames: providerEligibility.sourceNames,
           now: valuationAt,
           freshnessThresholdSeconds:
             providerEligibility.freshnessThresholdSeconds,

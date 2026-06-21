@@ -99,11 +99,11 @@ export function resolveDefaultMaxChangeBps(
   }
 
   if (subject.assetType === AssetType.us_stock && isUsNasNysMarket(market)) {
-    return 50;
+    return 30;
   }
 
   if (subject.assetType === AssetType.crypto && market === 'BINANCE') {
-    return 50;
+    return 30;
   }
 
   throw new RealtimeExecutionPolicyError(

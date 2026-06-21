@@ -421,6 +421,81 @@ export function selectProviderSnapshotAtOrBefore<
   };
 }
 
+export function selectProviderSnapshotAtOrBeforeBySourcePriority<
+  T extends ProviderSnapshotCandidate,
+>(input: {
+  candidates: readonly T[];
+  expectedSourceNames: readonly string[];
+  valuationAt: Date;
+  isPositiveValue: (candidate: T) => boolean;
+}): ProviderSnapshotSelection<T> {
+  if (input.candidates.length === 0) {
+    return {
+      state: 'not_selected',
+      decision: buildEmptyDecision({
+        fallbackUsed: true,
+        fallbackReason: 'provider_missing',
+        rejectedProviderReason: null,
+      }),
+    };
+  }
+
+  let rejectedProviderReason: string | null = null;
+  let sawPrioritizedSource = false;
+
+  for (const expectedSourceName of input.expectedSourceNames) {
+    const sourceCandidates = input.candidates.filter(
+      (candidate) => candidate.sourceName === expectedSourceName,
+    );
+
+    if (sourceCandidates.length === 0) {
+      continue;
+    }
+
+    sawPrioritizedSource = true;
+
+    for (const candidate of sourceCandidates) {
+      const evaluation = evaluateProviderSnapshotAtOrBefore({
+        candidate,
+        expectedSourceName,
+        valuationAt: input.valuationAt,
+        isPositiveValue: () => input.isPositiveValue(candidate),
+      });
+
+      if (evaluation.eligible) {
+        return {
+          state: 'selected',
+          snapshot: candidate,
+          decision: {
+            selectedSourceType: 'provider_api',
+            selectedSourceName: candidate.sourceName,
+            selectedSnapshotId: candidate.id,
+            selectedEffectiveAt: candidate.effectiveAt,
+            selectedCapturedAt: candidate.capturedAt,
+            fallbackUsed: false,
+            fallbackReason: null,
+            rejectedProviderReason: null,
+            freshnessAgeSeconds: null,
+          },
+        };
+      }
+
+      rejectedProviderReason ??= evaluation.reason;
+    }
+  }
+
+  return {
+    state: 'not_selected',
+    decision: buildEmptyDecision({
+      fallbackUsed: true,
+      fallbackReason: 'provider_rejected',
+      rejectedProviderReason: sawPrioritizedSource
+        ? rejectedProviderReason
+        : 'source_name_mismatch',
+    }),
+  };
+}
+
 export function buildAdminManualFallbackDecision(input: {
   selectedSnapshotId: string;
   selectedSourceName?: string | null;

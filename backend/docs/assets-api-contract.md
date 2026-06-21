@@ -21,7 +21,7 @@
 - Asset price is best-effort per asset. Missing market data must not fake values or hide the asset.
 - `provider_api` is allowed only for `withPrice=true` list/detail price and USD/KRW conversion in this read-only workflow.
 - Eligible asset providers are `kis_krx_realtime_trade` for KRX-family domestic stocks, `kis_us_delayed_trade` for NAS/NYS US stocks, and `binance_public_rest_24hr_ticker` for BINANCE USD crypto.
-- Eligible FX provider is `exchange_rate_api` for USD/KRW.
+- Eligible USD/KRW FX provider priority is `korea_exim_exchange_rate`, then `exchange_rate_api`.
 - Provider asset freshness uses capturedAt age <= 60 seconds; provider FX freshness uses capturedAt age <= 300 seconds.
 - Missing, stale, future, non-positive, wrong-source, or ineligible provider rows fall back to existing `admin_manual` selection.
 - The price payload may include optional public-safe `priceSource` and `fxRateSource` metadata for source/outage visibility. Raw provider payloads, `metadataJson`, and secrets are never exposed.

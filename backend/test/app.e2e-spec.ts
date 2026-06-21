@@ -2341,17 +2341,6 @@ describe('AppController (e2e)', () => {
         mockActiveUser();
         mockActiveSeason();
         mockJoinedParticipant();
-        prisma.dailyPortfolioSnapshot.findFirst.mockResolvedValueOnce({
-          snapshotDate: now,
-          totalAssetKrw: new Prisma.Decimal('10000000.00000000'),
-          returnRate: new Prisma.Decimal('0.00000000'),
-          krwCash: new Prisma.Decimal('10000000.00000000'),
-          usdCashKrw: new Prisma.Decimal('0.00000000'),
-          assetValueKrw: new Prisma.Decimal('0.00000000'),
-          realizedPnlKrw: new Prisma.Decimal('0.00000000'),
-          unrealizedPnlKrw: new Prisma.Decimal('0.00000000'),
-          capturedAt: now,
-        });
         prisma.dailyPortfolioSnapshot.findMany.mockResolvedValueOnce([]);
         prisma.position.findMany.mockResolvedValueOnce([]);
         prisma.seasonRanking.findFirst.mockResolvedValueOnce(null);
@@ -2363,7 +2352,6 @@ describe('AppController (e2e)', () => {
             mode: 'active_joined',
           },
         });
-        expect(prisma.dailyPortfolioSnapshot.findFirst).toHaveBeenCalled();
         expect(prisma.dailyPortfolioSnapshot.findMany).toHaveBeenCalled();
         expect(prisma.position.findMany).toHaveBeenCalled();
       },

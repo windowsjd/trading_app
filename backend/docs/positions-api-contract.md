@@ -18,7 +18,7 @@
 - `CurrencyCode.USDT` is not part of the MVP.
 - Position valuation is best-effort per position. Missing market data must not fake values or fail the whole response.
 - Eligible provider source mapping is domestic KRX -> `kis_krx_realtime_trade`, US NAS/NYS -> `kis_us_delayed_trade`, and BINANCE USD crypto -> `binance_public_rest_24hr_ticker`.
-- Eligible USD/KRW provider is `exchange_rate_api`.
+- Eligible USD/KRW provider priority is `korea_exim_exchange_rate`, then `exchange_rate_api`.
 - Provider asset price freshness uses capturedAt age <= 60 seconds; provider FX freshness uses capturedAt age <= 300 seconds.
 - Per-position valuation may include optional public-safe `priceSource` and `fxRateSource` metadata for source/outage visibility. Raw provider payloads, `metadataJson`, and secrets are never exposed.
 - `realizedPnl` is stored in the asset/order currency.

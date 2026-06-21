@@ -33,8 +33,8 @@ Current schema stores market evidence in two snapshot tables:
 
 Current code behavior:
 
-- `/fx quote` reads fresh eligible `provider_api` `exchange_rate_api` USD/KRW first using capturedAt age <= 300 seconds, then existing safe `admin_manual` fallback with the established 60-second effectiveAt freshness rule.
-- `/fx execute` requires a matching active durable FX quote and a fresh eligible `provider_api` `exchange_rate_api` USD/KRW row with capturedAt age <= 60 seconds. Default `admin_manual` fallback is forbidden.
+- `/fx quote` reads fresh eligible `provider_api` USD/KRW first by source priority (`korea_exim_exchange_rate`, then `exchange_rate_api`) using capturedAt age <= 300 seconds, then existing safe `admin_manual` fallback with the established 60-second effectiveAt freshness rule.
+- `/fx execute` requires a matching active durable FX quote and a fresh eligible `provider_api` USD/KRW row by source priority (`korea_exim_exchange_rate`, then `exchange_rate_api`) with capturedAt age <= 60 seconds. Default `admin_manual` fallback is forbidden.
 - Orders quote can use fresh eligible `provider_api` asset price and USD/KRW rows first, then `admin_manual` fallback. Orders create binds an active durable quote but does not read provider rows directly. Orders execute requires fresh eligible provider asset rows with capturedAt age <= 10 seconds and fresh provider USD/KRW rows for USD assets with capturedAt age <= 60 seconds; default `admin_manual` fallback is forbidden.
 - Assets `withPrice`, live portfolio/home/positions valuation, and operator-run daily snapshot valuation can use fresh eligible `provider_api` asset price and USD/KRW rows first, then `admin_manual` fallback.
 - Season settlement valuation uses `Season.endAt` as the valuation time and selects the latest valid asset price and USD/KRW rows with `effectiveAt <= Season.endAt`; it does not enforce quote/execute capturedAt freshness windows.
@@ -76,7 +76,7 @@ Policy meanings:
 
 Current confirmed policy:
 
-- `/fx quote`: provider USD/KRW snapshot must be positive, not future-dated, sourceName `exchange_rate_api`, and at most 300 seconds old by `capturedAt`; admin_manual fallback must be at most 60 seconds old by `effectiveAt`.
+- `/fx quote`: provider USD/KRW snapshot must be positive, not future-dated, sourceName `korea_exim_exchange_rate` or `exchange_rate_api` in that priority order, and at most 300 seconds old by `capturedAt`; admin_manual fallback must be at most 60 seconds old by `effectiveAt`.
 - `/fx execute`: provider USD/KRW snapshot must be at most 60 seconds old by `capturedAt` at execute time.
 - Exactly 60 seconds is accepted; older than 60 seconds is stale.
 - Current quote source is fresh provider_api first, then explicit admin_manual fallback.

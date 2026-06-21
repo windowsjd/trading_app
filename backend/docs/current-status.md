@@ -859,8 +859,8 @@ near-term ledger/FX foundation:
   - DB `active`라도 `now >= endAt`이면 `ended`.
   - DB `settled`이면 `settled`.
 - active joined summary source:
-  - 최신 `daily_portfolio_snapshots` 우선.
-  - daily snapshot이 없으면 `PortfolioValuationService.calculateSeasonParticipantValuation()` 기반 live valuation 시도.
+  - `PortfolioValuationService.calculateSeasonParticipantValuation()` 기반 live valuation 우선.
+  - daily snapshot은 summary 기준값이 아니라 chart/history evidence로 유지.
   - valuation에 필요한 asset price 또는 FX snapshot이 없으면 fake 값 없이 `summary.state = unavailable`.
 - ranking source:
   - 최신 `season_rankings`를 read-only로 조회.

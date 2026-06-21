@@ -22,6 +22,7 @@ import {
   resolveAssetProviderEligibility,
   resolveFxProviderEligibility,
   selectFreshProviderSnapshot,
+  selectFreshProviderSnapshotBySourcePriority,
 } from '../providers/source-eligibility.policy';
 import { presentSourceDecision } from '../providers/source-metadata.presenter';
 import {
@@ -177,13 +178,17 @@ export class HomeService {
     participant: JoinedParticipant,
   ): Promise<HomeResponse> {
     const sectionErrors: SectionError[] = [];
-    const getLiveValuation = this.createLiveValuationLoader(participant.id);
+    const valuationAt = new Date();
+    const getLiveValuation = this.createLiveValuationLoader(
+      participant.id,
+      valuationAt,
+    );
     const [summary, ranking, allocation, topPositions, equityChart] =
       await Promise.all([
-        this.buildSummary(participant, sectionErrors, getLiveValuation),
+        this.buildSummary(sectionErrors, getLiveValuation),
         this.buildRanking(season.id, participant.id),
         this.buildAllocation(sectionErrors, getLiveValuation),
-        this.buildTopPositions(participant.id, sectionErrors),
+        this.buildTopPositions(participant.id, sectionErrors, valuationAt),
         this.buildEquityChart(participant.id),
       ]);
 
@@ -580,14 +585,17 @@ export class HomeService {
     return equityChart;
   }
 
-  private createLiveValuationLoader(seasonParticipantId: string) {
+  private createLiveValuationLoader(
+    seasonParticipantId: string,
+    valuationAt: Date,
+  ) {
     let valuationPromise: Promise<PortfolioValuationResult> | null = null;
 
     return () => {
       valuationPromise ??=
         this.portfolioValuationService.calculateSeasonParticipantValuation(
           seasonParticipantId,
-          new Date(),
+          valuationAt,
           'home_live_valuation',
         );
 
@@ -596,52 +604,9 @@ export class HomeService {
   }
 
   private async buildSummary(
-    participant: JoinedParticipant,
     sectionErrors: SectionError[],
     getLiveValuation: () => Promise<PortfolioValuationResult>,
   ) {
-    const snapshot = await this.prisma.dailyPortfolioSnapshot.findFirst({
-      where: {
-        seasonParticipantId: participant.id,
-      },
-      orderBy: [
-        { snapshotDate: 'desc' },
-        { capturedAt: 'desc' },
-        { createdAt: 'desc' },
-      ],
-      select: {
-        snapshotDate: true,
-        totalAssetKrw: true,
-        returnRate: true,
-        krwCash: true,
-        usdCashKrw: true,
-        assetValueKrw: true,
-        realizedPnlKrw: true,
-        unrealizedPnlKrw: true,
-        capturedAt: true,
-      },
-    });
-
-    if (snapshot) {
-      return {
-        state: 'available',
-        valuationSource: 'daily_snapshot',
-        snapshotDate: this.formatDateOnly(snapshot.snapshotDate),
-        valuationCapturedAt: snapshot.capturedAt.toISOString(),
-        totalAssetKrw: this.formatDecimal(snapshot.totalAssetKrw, 8),
-        returnRate: this.formatDecimal(snapshot.returnRate, 8),
-        krwCash: this.formatDecimal(snapshot.krwCash, 8),
-        usdCashKrw: this.formatDecimal(snapshot.usdCashKrw, 8),
-        assetValueKrw: this.formatDecimal(snapshot.assetValueKrw, 8),
-        realizedPnlKrw: this.formatDecimal(snapshot.realizedPnlKrw, 8),
-        unrealizedPnlKrw: this.formatDecimal(snapshot.unrealizedPnlKrw, 8),
-        dataFreshness: {
-          status: 'available',
-          asOf: snapshot.capturedAt.toISOString(),
-        },
-      };
-    }
-
     try {
       const valuation = await getLiveValuation();
 
@@ -781,9 +746,8 @@ export class HomeService {
   private async buildTopPositions(
     seasonParticipantId: string,
     sectionErrors: SectionError[],
+    valuationAt: Date,
   ) {
-    const valuationAt = new Date();
-
     try {
       const positions = await this.prisma.position.findMany({
         where: {
@@ -1205,9 +1169,9 @@ export class HomeService {
         })) ?? [])
       : [];
     const providerSelection = providerEligibility.eligible
-      ? selectFreshProviderSnapshot({
+      ? selectFreshProviderSnapshotBySourcePriority({
           candidates: providerCandidates,
-          expectedSourceName: providerEligibility.sourceName,
+          expectedSourceNames: providerEligibility.sourceNames,
           now: valuationAt,
           freshnessThresholdSeconds:
             providerEligibility.freshnessThresholdSeconds,

@@ -149,7 +149,7 @@
 - Eligible provider source mapping is domestic KRX -> `kis_krx_realtime_trade`, US NAS/NYS -> `kis_us_delayed_trade`, and BINANCE USD crypto -> `binance_public_rest_24hr_ticker`.
 - Provider asset price freshness uses capturedAt age <= 60 seconds.
 - `currencyCode`, if provided, must match `asset.currencyCode`.
-- USD assets use fresh `provider_api` `exchange_rate_api` USD/KRW first, then approved fresh `admin_manual` fallback. Provider FX freshness uses capturedAt age <= 300 seconds; manual fallback uses the existing 60-second rule.
+- USD assets use fresh `provider_api` USD/KRW first by provider priority (`korea_exim_exchange_rate`, then `exchange_rate_api`), then approved fresh `admin_manual` fallback. Provider FX freshness uses capturedAt age <= 300 seconds; manual fallback uses the existing 60-second rule.
 - Missing, stale, future, non-positive, wrong-source, or ineligible provider rows fall back to the existing safe `admin_manual` quote logic.
 - `POST /api/v1/orders/quote` exposes optional public-safe `assetPriceSource` and `fxRateSource` metadata. Response shape remains backward-compatible and existing snapshot id fields are preserved.
 - Durable quotes have a 10-second default TTL; execute after expiry returns `QUOTE_EXPIRED`.

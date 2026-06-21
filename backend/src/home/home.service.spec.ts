@@ -377,13 +377,13 @@ describe('HomeService', () => {
     expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
   };
 
-  it('returns active joined home using the latest daily snapshot first', async () => {
+  it('returns active joined home summary from live valuation even when a daily snapshot exists', async () => {
     const { prisma, valuationService, service } = createService();
     mockActiveSeason(prisma);
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
-    prisma.dailyPortfolioSnapshot.findFirst.mockResolvedValueOnce(
+    prisma.dailyPortfolioSnapshot.findMany.mockResolvedValueOnce([
       latestSnapshot,
-    );
+    ]);
     prisma.seasonRanking.findFirst.mockResolvedValueOnce(null);
 
     const response = await service.getHome('user-1');
@@ -391,10 +391,10 @@ describe('HomeService', () => {
     expect(response.data.mode).toBe('active_joined');
     expect(response.data.summary).toMatchObject({
       state: 'available',
-      valuationSource: 'daily_snapshot',
-      snapshotDate: '2026-05-07',
-      totalAssetKrw: '1100000.00000000',
-      returnRate: '10.00000000',
+      valuationSource: 'live_valuation',
+      valuationAt: '2026-05-07T00:02:00.000Z',
+      totalAssetKrw: '1200000.00000000',
+      returnRate: '20.00000000',
     });
     expect(response.data.ranking).toMatchObject({
       state: 'unavailable',
@@ -438,9 +438,15 @@ describe('HomeService', () => {
       items: [],
     });
     expect(response.data.equityChart).toMatchObject({
-      state: 'unavailable',
-      reason: 'EQUITY_CHART_UNAVAILABLE',
-      items: [],
+      state: 'available',
+      chartSource: 'daily_portfolio_snapshots',
+      items: [
+        {
+          snapshotDate: '2026-05-07',
+          totalAssetKrw: '1100000.00000000',
+          returnRate: '10.00000000',
+        },
+      ],
     });
     expect(
       valuationService.calculateSeasonParticipantValuation,
@@ -814,8 +820,9 @@ describe('HomeService', () => {
     const response = await service.getHome('user-1');
 
     expect(response.data.summary).toMatchObject({
-      state: 'available',
-      valuationSource: 'daily_snapshot',
+      state: 'unavailable',
+      reason: 'FX_RATE_STALE',
+      valuationSource: 'unavailable',
     });
     expect(response.data.allocation).toMatchObject({
       state: 'unavailable',
@@ -828,6 +835,11 @@ describe('HomeService', () => {
     expect(response.data.sectionErrors).toEqual(
       expect.arrayContaining([
         {
+          section: 'summary',
+          code: 'FX_RATE_STALE',
+          message: 'USD/KRW FX rate snapshot is stale.',
+        },
+        {
           section: 'allocation',
           code: 'FX_RATE_STALE',
           message: 'USD/KRW FX rate snapshot is stale.',
@@ -839,7 +851,7 @@ describe('HomeService', () => {
         },
       ]),
     );
-    expect(response.data.sectionErrors).toHaveLength(2);
+    expect(response.data.sectionErrors).toHaveLength(3);
     expect(prisma.assetPriceSnapshot.findFirst).not.toHaveBeenCalled();
     expectNoHomeWrites(prisma);
   });
@@ -865,6 +877,11 @@ describe('HomeService', () => {
 
     const response = await service.getHome('user-1');
 
+    expect(response.data.summary).toMatchObject({
+      state: 'unavailable',
+      reason: 'FX_RATE_UNAVAILABLE',
+      valuationSource: 'unavailable',
+    });
     expect(response.data.allocation).toMatchObject({
       state: 'unavailable',
       reason: 'FX_RATE_UNAVAILABLE',
@@ -875,6 +892,11 @@ describe('HomeService', () => {
     });
     expect(response.data.sectionErrors).toEqual(
       expect.arrayContaining([
+        {
+          section: 'summary',
+          code: 'FX_RATE_UNAVAILABLE',
+          message: 'USD/KRW FX rate snapshot is unavailable.',
+        },
         {
           section: 'allocation',
           code: 'FX_RATE_UNAVAILABLE',
@@ -887,7 +909,7 @@ describe('HomeService', () => {
         },
       ]),
     );
-    expect(response.data.sectionErrors).toHaveLength(2);
+    expect(response.data.sectionErrors).toHaveLength(3);
     expectNoHomeWrites(prisma);
   });
 

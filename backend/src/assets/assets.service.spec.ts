@@ -777,7 +777,7 @@ describe('AssetsService', () => {
     expectNoAssetWrites(prisma);
   });
 
-  it('uses fresh provider_api USD/KRW for USD asset KRW conversion', async () => {
+  it('uses fresh Korea EXIM provider_api USD/KRW before ExchangeRate-API for USD asset KRW conversion', async () => {
     const { prisma, service } = createService();
     prisma.asset.count.mockResolvedValueOnce(1);
     prisma.asset.findMany.mockResolvedValueOnce([
@@ -790,7 +790,66 @@ describe('AssetsService', () => {
     ]);
     prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
       {
-        id: 'provider-fx-1',
+        id: 'provider-fx-exchange',
+        rate: new Prisma.Decimal('1500.00000000'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'exchange_rate_api',
+        effectiveAt: new Date('2026-05-07T00:00:00.000Z'),
+        capturedAt: new Date(Date.now() - 1_000),
+      },
+      {
+        id: 'provider-fx-korea-exim',
+        rate: new Prisma.Decimal('1490.00000000'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'korea_exim_exchange_rate',
+        effectiveAt: new Date('2026-05-07T00:00:00.000Z'),
+        capturedAt: new Date(Date.now() - 1_000),
+      },
+    ]);
+    prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([]);
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(
+      priceSnapshot('price-usd', '100.00000000', CurrencyCode.USD),
+    );
+
+    const response = await service.getAssets('user-1');
+
+    expect(response.data.assets[0].price).toMatchObject({
+      state: 'available',
+      priceKrwState: 'available',
+      priceKrw: '149000.00000000',
+      fxRateSource: {
+        sourceType: 'provider_api',
+        sourceName: 'korea_exim_exchange_rate',
+        snapshotId: 'provider-fx-korea-exim',
+        fallbackUsed: false,
+      },
+    });
+    expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
+    expectNoAssetWrites(prisma);
+  });
+
+  it('uses fresh ExchangeRate-API USD/KRW when Korea EXIM provider_api is stale for USD asset KRW conversion', async () => {
+    const { prisma, service } = createService();
+    prisma.asset.count.mockResolvedValueOnce(1);
+    prisma.asset.findMany.mockResolvedValueOnce([
+      asset({
+        id: 'asset-usd',
+        market: 'NAS',
+        assetType: AssetType.us_stock,
+        currencyCode: CurrencyCode.USD,
+      }),
+    ]);
+    prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
+      {
+        id: 'provider-fx-korea-exim-stale',
+        rate: new Prisma.Decimal('1490.00000000'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'korea_exim_exchange_rate',
+        effectiveAt: new Date('2026-05-07T00:00:00.000Z'),
+        capturedAt: new Date(Date.now() - 301_000),
+      },
+      {
+        id: 'provider-fx-exchange',
         rate: new Prisma.Decimal('1500.00000000'),
         sourceType: FxRateSourceType.provider_api,
         sourceName: 'exchange_rate_api',
@@ -812,7 +871,7 @@ describe('AssetsService', () => {
       fxRateSource: {
         sourceType: 'provider_api',
         sourceName: 'exchange_rate_api',
-        snapshotId: 'provider-fx-1',
+        snapshotId: 'provider-fx-exchange',
         fallbackUsed: false,
       },
     });

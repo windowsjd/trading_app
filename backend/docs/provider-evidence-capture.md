@@ -211,7 +211,7 @@ Current internal source policy:
 
 Current code behavior:
 
-- `/fx quote` reads fresh eligible `provider_api` `exchange_rate_api` USD/KRW first, then existing `admin_manual` fallback.
+- `/fx quote` reads fresh eligible `provider_api` USD/KRW first by source priority (`korea_exim_exchange_rate`, then `exchange_rate_api`), then existing `admin_manual` fallback.
 - `/fx execute` allows only approved fresh `admin_manual` USD/KRW snapshots and applies the same 60-second freshness rule.
 - Orders quote can use fresh eligible `provider_api` asset prices and provider USD/KRW first, then existing `admin_manual` fallback.
 - Orders create and orders execute remain `admin_manual` only.

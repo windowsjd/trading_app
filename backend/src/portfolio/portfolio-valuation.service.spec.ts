@@ -88,7 +88,7 @@ describe('PortfolioValuationService source eligibility', () => {
     ]);
     prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
       {
-        id: 'provider-fx-1',
+        id: 'provider-fx-exchange',
         baseCurrency: CurrencyCode.USD,
         quoteCurrency: CurrencyCode.KRW,
         rate: new Prisma.Decimal('1500.00000000'),
@@ -97,6 +97,18 @@ describe('PortfolioValuationService source eligibility', () => {
         effectiveAt: new Date('2026-06-02T23:59:30.000Z'),
         capturedAt: new Date('2026-06-02T23:59:40.000Z'),
         createdAt: new Date('2026-06-02T23:59:41.000Z'),
+        approvedByUserId: null,
+      },
+      {
+        id: 'provider-fx-korea-exim',
+        baseCurrency: CurrencyCode.USD,
+        quoteCurrency: CurrencyCode.KRW,
+        rate: new Prisma.Decimal('1490.00000000'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'korea_exim_exchange_rate',
+        effectiveAt: new Date('2026-06-02T23:59:20.000Z'),
+        capturedAt: new Date('2026-06-02T23:59:35.000Z'),
+        createdAt: new Date('2026-06-02T23:59:36.000Z'),
         approvedByUserId: null,
       },
     ]);
@@ -109,10 +121,10 @@ describe('PortfolioValuationService source eligibility', () => {
     );
 
     expect(result).toMatchObject({
-      totalAssetKrw: '330000.00000000',
-      assetValueKrw: '330000.00000000',
-      usStockValueKrw: '330000.00000000',
-      returnRate: '-67.00000000',
+      totalAssetKrw: '327800.00000000',
+      assetValueKrw: '327800.00000000',
+      usStockValueKrw: '327800.00000000',
+      returnRate: '-67.22000000',
       sourceSummary: {
         providerApiUsed: true,
         adminManualUsed: false,
@@ -132,8 +144,8 @@ describe('PortfolioValuationService source eligibility', () => {
       ],
       fxRateSourceDecision: {
         selectedSourceType: 'provider_api',
-        selectedSourceName: 'exchange_rate_api',
-        selectedSnapshotId: 'provider-fx-1',
+        selectedSourceName: 'korea_exim_exchange_rate',
+        selectedSnapshotId: 'provider-fx-korea-exim',
       },
     });
     expect(prisma.assetPriceSnapshot.findFirst).not.toHaveBeenCalled();
@@ -502,7 +514,7 @@ describe('PortfolioValuationService source eligibility', () => {
     ]);
     prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
       {
-        id: 'settlement-provider-fx-1',
+        id: 'settlement-provider-fx-exchange',
         baseCurrency: CurrencyCode.USD,
         quoteCurrency: CurrencyCode.KRW,
         rate: new Prisma.Decimal('1500.00000000'),
@@ -511,6 +523,18 @@ describe('PortfolioValuationService source eligibility', () => {
         effectiveAt: new Date('2026-06-05T20:00:00.000Z'),
         capturedAt: new Date('2026-06-05T20:00:05.000Z'),
         createdAt: new Date('2026-06-05T20:00:06.000Z'),
+        approvedByUserId: null,
+      },
+      {
+        id: 'settlement-provider-fx-korea-exim',
+        baseCurrency: CurrencyCode.USD,
+        quoteCurrency: CurrencyCode.KRW,
+        rate: new Prisma.Decimal('1490.00000000'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'korea_exim_exchange_rate',
+        effectiveAt: new Date('2026-06-04T00:00:00.000Z'),
+        capturedAt: new Date('2026-06-04T00:00:05.000Z'),
+        createdAt: new Date('2026-06-04T00:00:06.000Z'),
         approvedByUserId: null,
       },
     ]);
@@ -523,8 +547,8 @@ describe('PortfolioValuationService source eligibility', () => {
     );
 
     expect(result).toMatchObject({
-      totalAssetKrw: '330000.00000000',
-      assetValueKrw: '330000.00000000',
+      totalAssetKrw: '327800.00000000',
+      assetValueKrw: '327800.00000000',
       sourceSummary: {
         providerApiUsed: true,
         adminManualUsed: false,
@@ -542,7 +566,8 @@ describe('PortfolioValuationService source eligibility', () => {
       ],
       fxRateSourceDecision: {
         selectedSourceType: 'provider_api',
-        selectedSnapshotId: 'settlement-provider-fx-1',
+        selectedSourceName: 'korea_exim_exchange_rate',
+        selectedSnapshotId: 'settlement-provider-fx-korea-exim',
         freshnessAgeSeconds: null,
       },
     });
@@ -566,7 +591,9 @@ describe('PortfolioValuationService source eligibility', () => {
       expect.objectContaining({
         where: expect.objectContaining({
           sourceType: FxRateSourceType.provider_api,
-          sourceName: 'exchange_rate_api',
+          sourceName: {
+            in: ['korea_exim_exchange_rate', 'exchange_rate_api'],
+          },
           effectiveAt: {
             lte: settlementAt,
           },
@@ -574,7 +601,7 @@ describe('PortfolioValuationService source eligibility', () => {
             gt: 0,
           },
         }),
-        take: 1,
+        take: 20,
       }),
     );
     expect(prisma.assetPriceSnapshot.findFirst).not.toHaveBeenCalled();

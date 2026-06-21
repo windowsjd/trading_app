@@ -496,7 +496,7 @@ describe('OrdersService', () => {
       quotedRate,
       maxChangeBps:
         (overrides.maxChangeBps as Prisma.Decimal | undefined) ??
-        new Prisma.Decimal('50.0000'),
+        new Prisma.Decimal('30.0000'),
       assetPriceSnapshotId:
         (overrides.assetPriceSnapshotId as string | null | undefined) ??
         (orderType === OrderType.market ? 'aps-1' : null),
@@ -1012,7 +1012,7 @@ describe('OrdersService', () => {
       fxRateSnapshotId: 'fx-1',
       quoteId: 'quote-order-1',
       expiresAt: expect.any(String),
-      maxChangeBps: '50.0000',
+      maxChangeBps: '30.0000',
     });
     expect(
       new Date(response.data.expiresAt ?? '').getTime() -
@@ -1034,7 +1034,7 @@ describe('OrdersService', () => {
           quotedPrice: '100.00000000',
           assetPriceSnapshotId: 'aps-1',
           fxRateSnapshotId: 'fx-1',
-          maxChangeBps: '50.0000',
+          maxChangeBps: '30.0000',
           expiresAt: expect.any(Date),
           requestHash: expect.any(String),
           assetPriceSourceJson: expect.objectContaining({
@@ -1099,10 +1099,18 @@ describe('OrdersService', () => {
     ]);
     prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
       {
-        id: 'provider-fx-usd-krw',
+        id: 'provider-fx-exchange',
         rate: new Prisma.Decimal('1500.00000000'),
         sourceType: FxRateSourceType.provider_api,
         sourceName: 'exchange_rate_api',
+        effectiveAt: new Date(Date.now() - 1_000),
+        capturedAt: new Date(Date.now() - 1_000),
+      },
+      {
+        id: 'provider-fx-korea-exim',
+        rate: new Prisma.Decimal('1490.00000000'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'korea_exim_exchange_rate',
         effectiveAt: new Date(Date.now() - 1_000),
         capturedAt: new Date(Date.now() - 1_000),
       },
@@ -1119,9 +1127,9 @@ describe('OrdersService', () => {
     expect(response.data).toMatchObject({
       price: '110.00000000',
       grossAmount: '220.00000000',
-      krwGrossAmount: '330000.00000000',
+      krwGrossAmount: '327800.00000000',
       assetPriceSnapshotId: 'provider-price-us',
-      fxRateSnapshotId: 'provider-fx-usd-krw',
+      fxRateSnapshotId: 'provider-fx-korea-exim',
       assetPriceSource: {
         sourceType: 'provider_api',
         sourceName: 'kis_us_delayed_trade',
@@ -1130,8 +1138,8 @@ describe('OrdersService', () => {
       },
       fxRateSource: {
         sourceType: 'provider_api',
-        sourceName: 'exchange_rate_api',
-        snapshotId: 'provider-fx-usd-krw',
+        sourceName: 'korea_exim_exchange_rate',
+        snapshotId: 'provider-fx-korea-exim',
         fallbackUsed: false,
       },
     });
@@ -1234,6 +1242,7 @@ describe('OrdersService', () => {
       estimatedPositionQuantityAfter: '0.01000000',
       assetPriceSnapshotId: 'aps-btc-1',
       fxRateSnapshotId: 'fx-1',
+      maxChangeBps: '30.0000',
     });
     expect(prisma.cashWallet.findUnique).toHaveBeenCalledWith({
       where: {
@@ -1357,6 +1366,7 @@ describe('OrdersService', () => {
       grossAmount: '20000.00000000',
       feeAmount: '20.00000000',
       netAmount: '19980.00000000',
+      maxChangeBps: '30.0000',
     });
     expect(prisma.position.findUnique).toHaveBeenCalledWith({
       where: {
@@ -2684,7 +2694,24 @@ describe('OrdersService', () => {
         'aps-btc-exec-1',
         'binance_public_rest_24hr_ticker',
       );
-      mockExecutionFx(prisma);
+      prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
+        {
+          id: 'fx-exec-exchange',
+          rate: new Prisma.Decimal('1400.00000000'),
+          sourceType: FxRateSourceType.provider_api,
+          sourceName: 'exchange_rate_api',
+          effectiveAt: new Date(Date.now()),
+          capturedAt: new Date(Date.now()),
+        },
+        {
+          id: 'fx-exec-korea-exim',
+          rate: new Prisma.Decimal('1399.00000000'),
+          sourceType: FxRateSourceType.provider_api,
+          sourceName: 'korea_exim_exchange_rate',
+          effectiveAt: new Date(Date.now()),
+          capturedAt: new Date(Date.now()),
+        },
+      ]);
       mockExecutionWallet(
         prisma,
         '1000.00000000',
@@ -2696,7 +2723,12 @@ describe('OrdersService', () => {
       prisma.walletTransaction.create.mockResolvedValueOnce({
         id: 'wallet-tx-btc-buy-1',
       });
-      mockOrderFinalization(prisma, executedCryptoUsdOrderExecutionRecord());
+      mockOrderFinalization(
+        prisma,
+        executedCryptoUsdOrderExecutionRecord({
+          fxRateSnapshotId: 'fx-exec-korea-exim',
+        }),
+      );
 
       const response = await service.executeOrder(
         'user-1',
@@ -2717,7 +2749,7 @@ describe('OrdersService', () => {
           feeAmount: '0.50000000',
           netAmount: '500.50000000',
           assetPriceSnapshotId: 'aps-btc-exec-1',
-          fxRateSnapshotId: 'fx-exec-1',
+          fxRateSnapshotId: 'fx-exec-korea-exim',
         },
         execution: {
           state: 'executed',
@@ -2727,9 +2759,9 @@ describe('OrdersService', () => {
           executePrice: '50000.00000000',
           priceChangeBps: '0.0000',
           quotedRate: '1400.00000000',
-          executeRate: '1400.00000000',
-          rateChangeBps: '0.0000',
-          fxRateSnapshotId: 'fx-exec-1',
+          executeRate: '1399.00000000',
+          rateChangeBps: '7.1429',
+          fxRateSnapshotId: 'fx-exec-korea-exim',
           walletTransactionId: 'wallet-tx-btc-buy-1',
           walletBalanceAfter: '499.50000000',
           positionId: 'position-btc-1',
@@ -2779,11 +2811,68 @@ describe('OrdersService', () => {
       expect(prisma.order.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            fxRateSnapshotId: 'fx-exec-1',
+            fxRateSnapshotId: 'fx-exec-korea-exim',
           }),
         }),
       );
       expectNoForbiddenExecuteSideEffects(prisma);
+    });
+
+    it('rejects US stock executes when provider price changes by more than 30 bps', async () => {
+      jest.setSystemTime(usMarketOpenAt);
+      const { prisma, service } = createService();
+      prisma.order.findFirst.mockResolvedValueOnce(
+        orderExecutionRecord({
+          currencyCode: CurrencyCode.USD,
+          asset: {
+            id: 'asset-1',
+            symbol: 'AAPL',
+            name: 'Apple Inc.',
+            market: 'NASDAQ',
+            assetType: AssetType.us_stock,
+            currencyCode: CurrencyCode.USD,
+            isActive: true,
+          },
+          quotedPrice: new Prisma.Decimal('100.00000000'),
+        }),
+      );
+      mockExecutionPrice(
+        prisma,
+        '100.31000000',
+        'aps-us-price-changed',
+        'kis_us_delayed_trade',
+      );
+
+      await expectErrorCode(
+        service.executeOrder('user-1', 'order-execute-1'),
+        'RATE_CHANGED_REQUOTE_REQUIRED',
+      );
+      expect(prisma.fxRateSnapshot.findMany).not.toHaveBeenCalled();
+      expect(prisma.quote.updateMany).not.toHaveBeenCalled();
+      expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
+      expect(prisma.position.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects crypto executes when provider price changes by more than 30 bps', async () => {
+      const { prisma, service } = createService();
+      prisma.order.findFirst.mockResolvedValueOnce(
+        cryptoUsdOrderExecutionRecord(),
+      );
+      mockExecutionPrice(
+        prisma,
+        '50155.00000000',
+        'aps-btc-price-changed',
+        'binance_public_rest_24hr_ticker',
+      );
+
+      await expectErrorCode(
+        service.executeOrder('user-1', 'order-btc-execute-1'),
+        'RATE_CHANGED_REQUOTE_REQUIRED',
+      );
+      expect(prisma.fxRateSnapshot.findMany).not.toHaveBeenCalled();
+      expect(prisma.quote.updateMany).not.toHaveBeenCalled();
+      expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
+      expect(prisma.position.create).not.toHaveBeenCalled();
     });
 
     it('executes buy orders and updates weighted average for an existing position', async () => {
