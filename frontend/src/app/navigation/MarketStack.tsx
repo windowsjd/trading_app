@@ -11,7 +11,7 @@ const Stack = createNativeStackNavigator<MarketStackParamList>();
 
 export default function MarketStack() {
   return (
-    <Stack.Navigator>
+    <Stack.Navigator id="MarketStack">
       <Stack.Screen
         name="Market"
         component={MarketScreen}

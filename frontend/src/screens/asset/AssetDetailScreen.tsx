@@ -16,6 +16,7 @@ import { getCurrentSeason } from '../../features/season/api';
 import { useAssetTicker } from '../../features/asset/useAssetTicker';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
+import { buildWsUrl } from '../../constants/env';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -26,11 +27,10 @@ import CTAButton from '../../components/common/CTAButton';
 
 type Props = AssetDetailScreenProps;
 
-const WS_BASE_URL = 'wss://your-domain.example.com';
-
 export default function AssetDetailScreen({ route, navigation }: Props) {
   const rootNavigation = useRootNavigation();
   const { assetId } = route.params;
+  const assetTickerWsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
 
   const seasonQuery = useQuery({
     queryKey: QUERY_KEYS.season.current,
@@ -49,8 +49,8 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
 
   const { latestTicker, showReconnectBanner } = useAssetTicker({
     assetId,
-    wsUrl: `${WS_BASE_URL}/api/v1/ws`,
-    enabled: true,
+    wsUrl: assetTickerWsUrl ?? '',
+    enabled: !!assetTickerWsUrl,
   });
 
   const viewState = useMemo(() => {

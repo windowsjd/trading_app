@@ -1,16 +1,21 @@
 import { apiClient } from '../../services/api/client';
 import type { ApiSuccessResponse } from '../../models/dto/common';
+import type { UserStatus } from '../../models/dto/user';
 
 export interface AuthUserDto {
   id: string;
   email: string;
   nickname: string;
-  status: 'active' | 'blocked';
+  status: UserStatus;
 }
 
 export interface AuthTokensDto {
   accessToken: string;
   refreshToken: string;
+}
+
+export interface LogoutResponseDto {
+  revoked: boolean;
 }
 
 export interface LoginRequestDto {
@@ -47,6 +52,23 @@ export async function signup(payload: SignupRequestDto) {
   const response = await apiClient.post<ApiSuccessResponse<SignupResponseDto>>(
     '/auth/signup',
     payload,
+  );
+
+  return response.data.data;
+}
+
+export async function logout(refreshToken?: string | null) {
+  const response = await apiClient.post<ApiSuccessResponse<LogoutResponseDto>>(
+    '/auth/logout',
+    refreshToken ? { refreshToken } : {},
+  );
+
+  return response.data.data;
+}
+
+export async function logoutAll() {
+  const response = await apiClient.post<ApiSuccessResponse<LogoutResponseDto>>(
+    '/auth/logout-all',
   );
 
   return response.data.data;

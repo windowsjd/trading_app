@@ -23,5 +23,7 @@
   },
   "name": "LeagueOfTrading",
   "version": "1.0.0",
-  "scripts": {}
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
 }

@@ -1,7 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { getAccessToken, getRefreshToken, saveTokens, clearTokens } from '../storage/tokenStorage';
-
-const API_BASE_URL = '/api/v1';
+import { API_BASE_URL } from '../../constants/env';
 
 type RefreshResponse = {
   success: true;

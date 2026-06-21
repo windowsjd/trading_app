@@ -9,7 +9,7 @@ const Stack = createNativeStackNavigator<RankingStackParamList>();
 
 export default function RankingStack() {
   return (
-    <Stack.Navigator>
+    <Stack.Navigator id="RankingStack">
       <Stack.Screen
         name="Ranking"
         component={RankingScreen}

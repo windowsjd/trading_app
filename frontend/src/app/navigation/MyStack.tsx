@@ -10,7 +10,7 @@ const Stack = createNativeStackNavigator<MyStackParamList>();
 
 export default function MyStack() {
   return (
-    <Stack.Navigator>
+    <Stack.Navigator id="MyStack">
       <Stack.Screen
         name="My"
         component={MyScreen}

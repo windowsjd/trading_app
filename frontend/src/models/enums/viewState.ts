@@ -11,7 +11,9 @@ export type SeasonDomainState =
   | 'season_active_joined'
   | 'season_active_not_joined'
   | 'season_ended_unsettled'
-  | 'season_settled';
+  | 'season_settled_joined'
+  | 'season_settled_not_joined'
+  | 'season_not_configured';
 
 export type AuthViewState =
   | 'auth_idle'
@@ -24,10 +26,12 @@ export type SeasonJoinViewState =
   | 'season_info_loading'
   | 'season_upcoming_view'
   | 'season_active_not_joined_view'
+  | 'season_ended_unsettled_view'
   | 'season_join_submitting'
   | 'season_join_failed'
   | 'season_join_success'
-  | 'season_settled_view';
+  | 'season_settled_view'
+  | 'season_not_configured_view';
 
 export type HomeViewState =
   | 'home_loading'

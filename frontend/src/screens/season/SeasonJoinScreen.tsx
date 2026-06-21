@@ -10,8 +10,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { SeasonJoinScreenProps } from '../../app/navigation/types';
 import { getCurrentSeason, joinSeason } from '../../features/season/api';
+import {
+  toSeasonJoinViewState,
+} from '../../features/season/mapper';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
+import {
+  getApiErrorCode,
+  getErrorMessageFromCode,
+  isAuthUserInactiveError,
+} from '../../services/api/errorMapper';
+import { ERROR_CODE } from '../../models/enums/errorCode';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -54,27 +63,51 @@ export default function SeasonJoinScreen({ navigation }: Props) {
 
   const viewState = useMemo(() => {
     if (seasonQuery.isLoading) return 'season_info_loading';
-    if (!seasonQuery.data) return 'season_join_failed';
+    if (seasonQuery.isError) {
+      const code = getApiErrorCode(seasonQuery.error);
+
+      if (code === ERROR_CODE.SEASON_NOT_FOUND) {
+        return 'season_not_configured_view';
+      }
+
+      return 'season_join_failed';
+    }
+    if (!seasonQuery.data) return 'season_not_configured_view';
     if (joinMutation.isPending) return 'season_join_submitting';
-    if (seasonQuery.data.status === 'upcoming') return 'season_upcoming_view';
-    if (seasonQuery.data.status === 'active' && !seasonQuery.data.joined) {
-      return 'season_active_not_joined_view';
-    }
-    if (seasonQuery.data.status === 'active' && seasonQuery.data.joined) {
-      return 'season_join_success';
-    }
-    return 'season_settled_view';
-  }, [seasonQuery.isLoading, seasonQuery.data, joinMutation.isPending]);
+    return toSeasonJoinViewState(seasonQuery.data);
+  }, [
+    seasonQuery.isLoading,
+    seasonQuery.isError,
+    seasonQuery.error,
+    seasonQuery.data,
+    joinMutation.isPending,
+  ]);
 
   if (viewState === 'season_info_loading') {
     return <FullPageLoading message="현재 시즌 정보를 불러오는 중입니다." />;
   }
 
-  if (viewState === 'season_join_failed' || !seasonQuery.data) {
+  if (viewState === 'season_not_configured_view') {
     return (
       <ErrorState
-        title="시즌 정보를 불러오지 못했습니다."
-        message="잠시 후 다시 시도해주세요."
+        title="현재 시즌이 설정되지 않았습니다."
+        message="시즌이 열리면 참가할 수 있습니다."
+        onRetry={() => seasonQuery.refetch()}
+      />
+    );
+  }
+
+  if (viewState === 'season_join_failed' || !seasonQuery.data) {
+    const code = getApiErrorCode(seasonQuery.error);
+
+    return (
+      <ErrorState
+        title={
+          isAuthUserInactiveError(code)
+            ? '계정을 사용할 수 없습니다.'
+            : '시즌 정보를 불러오지 못했습니다.'
+        }
+        message={getErrorMessageFromCode(code)}
         onRetry={() => seasonQuery.refetch()}
       />
     );
@@ -87,6 +120,30 @@ export default function SeasonJoinScreen({ navigation }: Props) {
       <BlockedState
         title={season.name}
         message="시즌 시작 전입니다. 시작 시점이 되면 거래가 열립니다."
+        actionLabel="홈으로 이동"
+        onAction={() =>
+          navigation.reset({
+            index: 0,
+            routes: [
+              {
+                name: 'MainTabs',
+                params: {
+                  screen: 'HomeTab',
+                  params: { screen: 'Home' },
+                },
+              },
+            ],
+          })
+        }
+      />
+    );
+  }
+
+  if (viewState === 'season_ended_unsettled_view') {
+    return (
+      <BlockedState
+        title={season.name}
+        message="현재 시즌은 정산 중입니다. 홈에서 결과를 확인해주세요."
         actionLabel="홈으로 이동"
         onAction={() =>
           navigation.reset({

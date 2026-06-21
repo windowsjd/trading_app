@@ -10,7 +10,7 @@ const Stack = createNativeStackNavigator<HomeStackParamList>();
 
 export default function HomeStack() {
   return (
-    <Stack.Navigator>
+    <Stack.Navigator id="HomeStack">
       <Stack.Screen
         name="Home"
         component={HomeScreen}

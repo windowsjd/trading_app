@@ -1,30 +1,16 @@
 import { apiClient } from '../../services/api/client';
 import type { ApiSuccessResponse } from '../../models/dto/common';
+import type {
+  CurrentSeasonDto,
+  JoinSeasonDto,
+} from '../../models/dto/season';
 
-export type SeasonStatus = 'upcoming' | 'active' | 'ended' | 'settled';
-
-export interface CurrentSeasonDto {
-  id: string;
-  name: string;
-  status: SeasonStatus;
-  startAt: string;
-  endAt: string;
-  initialCapitalKrw: string;
-  tradeFeeRate: string;
-  fxFeeRate: string;
-  joined: boolean;
-  joinedAt: string | null;
-}
-
-export interface JoinSeasonDto {
-  seasonParticipantId: string;
-  seasonId: string;
-  joinedAt: string;
-  wallets: {
-    KRW: string;
-    USD: string;
-  };
-}
+export type {
+  CurrentSeasonDto,
+  JoinSeasonDto,
+  SeasonEffectiveMode,
+  SeasonStatus,
+} from '../../models/dto/season';
 
 export async function getCurrentSeason() {
   const response = await apiClient.get<ApiSuccessResponse<CurrentSeasonDto>>(

@@ -11,11 +11,20 @@ import { useMutation } from '@tanstack/react-query';
 
 import type { SignupScreenProps } from '../../app/navigation/types';
 import { useRootNavigation } from '../../app/navigation/navigationHooks';
+import {
+  resetToSeasonEntry,
+  resetToSeasonJoin,
+} from '../../app/navigation/seasonRouting';
 import { signup } from '../../features/auth/api';
 import { getCurrentSeason } from '../../features/season/api';
-import { saveTokens } from '../../services/storage/tokenStorage';
-import { getErrorMessageFromCode } from '../../services/api/errorMapper';
+import { clearTokens, saveTokens } from '../../services/storage/tokenStorage';
+import {
+  getApiErrorCode,
+  getErrorMessageFromCode,
+  isAuthUserInactiveError,
+} from '../../services/api/errorMapper';
 import { TEST_IDS } from '../../constants/testIds';
+import { ERROR_CODE } from '../../models/enums/errorCode';
 
 function isValidEmail(value: string) {
   return /\S+@\S+\.\S+/.test(value);
@@ -42,56 +51,33 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
         result.tokens.refreshToken,
       );
 
-      const season = await getCurrentSeason();
-
-      if (season.status === 'active' && season.joined) {
-        rootNavigation.reset({
-          index: 0,
-          routes: [
-            {
-              name: 'MainTabs',
-              params: {
-                screen: 'HomeTab',
-                params: { screen: 'Home' },
-              },
-            },
-          ],
-        });
+      if (result.user.status !== 'active') {
+        await clearTokens();
+        setSubmitError(getErrorMessageFromCode(ERROR_CODE.USER_NOT_ACTIVE));
         return;
       }
 
-      if (season.status === 'active' && !season.joined) {
-        rootNavigation.reset({
-          index: 0,
-          routes: [{ name: 'SeasonJoin' }],
-        });
-        return;
-      }
+      try {
+        const season = await getCurrentSeason();
+        resetToSeasonEntry(rootNavigation, season);
+      } catch (error) {
+        const code = getApiErrorCode(error);
 
-      if (season.status === 'upcoming') {
-        rootNavigation.reset({
-          index: 0,
-          routes: [{ name: 'SeasonJoin' }],
-        });
-        return;
-      }
+        if (isAuthUserInactiveError(code)) {
+          await clearTokens();
+        }
 
-      rootNavigation.reset({
-        index: 0,
-        routes: [
-          {
-            name: 'MainTabs',
-            params: {
-              screen: 'HomeTab',
-              params: { screen: 'Home' },
-            },
-          },
-        ],
-      });
+        if (code === ERROR_CODE.SEASON_NOT_FOUND) {
+          resetToSeasonJoin(rootNavigation);
+          return;
+        }
+
+        setSubmitError(getErrorMessageFromCode(code));
+      }
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       setSubmitError(
-        getErrorMessageFromCode(error?.response?.data?.error?.code) ||
+        getErrorMessageFromCode(getApiErrorCode(error)) ||
           '회원가입에 실패했습니다.',
       );
     },

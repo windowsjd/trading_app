@@ -1,12 +1,13 @@
 import { apiClient } from '../../services/api/client';
 import type { ApiSuccessResponse } from '../../models/dto/common';
+import type { UserStatus } from '../../models/dto/user';
 
 export interface MeDto {
   id: string;
   email: string;
   nickname: string;
   profileImageUrl: string | null;
-  status: 'active' | 'blocked';
+  status: UserStatus;
   createdAt: string;
 }
 

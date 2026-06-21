@@ -11,7 +11,7 @@ const Stack = createNativeStackNavigator<RecordStackParamList>();
 
 export default function RecordStack() {
   return (
-    <Stack.Navigator>
+    <Stack.Navigator id="RecordStack">
       <Stack.Screen
         name="RecordSeasonList"
         component={RecordSeasonListScreen}

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,24 @@ import {
 } from 'react-native';
 
 import type { SplashScreenProps } from '../../app/navigation/types';
-import { getAccessToken } from '../../services/storage/tokenStorage';
+import {
+  resetToLogin,
+  resetToSeasonEntry,
+  resetToSeasonJoin,
+} from '../../app/navigation/seasonRouting';
+import { getAccessToken, clearTokens } from '../../services/storage/tokenStorage';
 import { getCurrentSeason } from '../../features/season/api';
+import ErrorState from '../../components/states/ErrorState';
+import {
+  getApiErrorCode,
+  getErrorMessageFromCode,
+  isAuthUserInactiveError,
+} from '../../services/api/errorMapper';
+import { ERROR_CODE } from '../../models/enums/errorCode';
 
 export default function SplashScreen({ navigation }: SplashScreenProps) {
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+
   useEffect(() => {
     let mounted = true;
 
@@ -22,15 +36,7 @@ export default function SplashScreen({ navigation }: SplashScreenProps) {
         if (!accessToken) {
           if (!mounted) return;
 
-          navigation.reset({
-            index: 0,
-            routes: [
-              {
-                name: 'AuthStack',
-                params: { screen: 'Login' },
-              },
-            ],
-          });
+          resetToLogin(navigation);
           return;
         }
 
@@ -38,62 +44,24 @@ export default function SplashScreen({ navigation }: SplashScreenProps) {
 
         if (!mounted) return;
 
-        if (season.status === 'active' && season.joined) {
-          navigation.reset({
-            index: 0,
-            routes: [
-              {
-                name: 'MainTabs',
-                params: {
-                  screen: 'HomeTab',
-                  params: { screen: 'Home' },
-                },
-              },
-            ],
-          });
-          return;
-        }
-
-        if (season.status === 'active' && !season.joined) {
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'SeasonJoin' }],
-          });
-          return;
-        }
-
-        if (season.status === 'upcoming') {
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'SeasonJoin' }],
-          });
-          return;
-        }
-
-        navigation.reset({
-          index: 0,
-          routes: [
-            {
-              name: 'MainTabs',
-              params: {
-                screen: 'HomeTab',
-                params: { screen: 'Home' },
-              },
-            },
-          ],
-        });
-      } catch {
+        resetToSeasonEntry(navigation, season);
+      } catch (error) {
         if (!mounted) return;
 
-        navigation.reset({
-          index: 0,
-          routes: [
-            {
-              name: 'AuthStack',
-              params: { screen: 'Login' },
-            },
-          ],
-        });
+        const code = getApiErrorCode(error);
+
+        if (isAuthUserInactiveError(code)) {
+          await clearTokens();
+          setBootstrapError(getErrorMessageFromCode(code));
+          return;
+        }
+
+        if (code === ERROR_CODE.SEASON_NOT_FOUND) {
+          resetToSeasonJoin(navigation);
+          return;
+        }
+
+        resetToLogin(navigation);
       }
     }
 
@@ -103,6 +71,15 @@ export default function SplashScreen({ navigation }: SplashScreenProps) {
       mounted = false;
     };
   }, [navigation]);
+
+  if (bootstrapError) {
+    return (
+      <ErrorState
+        title="계정을 사용할 수 없습니다."
+        message={bootstrapError}
+      />
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>

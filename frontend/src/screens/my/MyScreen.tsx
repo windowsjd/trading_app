@@ -14,9 +14,10 @@ import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 
 import { getMe } from '../../features/me/api';
+import { logout as logoutSession } from '../../features/auth/api';
 import { getHomeDashboard } from '../../features/home/api';
 import { getMySeasonRecords } from '../../features/record/api';
-import { clearTokens } from '../../services/storage/tokenStorage';
+import { clearTokens, getRefreshToken } from '../../services/storage/tokenStorage';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -59,7 +60,15 @@ export default function MyScreen({ navigation }: Props) {
   ]);
 
   const onLogout = async () => {
-    await clearTokens();
+    const refreshToken = await getRefreshToken();
+
+    try {
+      await logoutSession(refreshToken);
+    } catch {
+      // Local logout should still complete if the server cannot be reached.
+    } finally {
+      await clearTokens();
+    }
 
     rootNavigation.reset({
       index: 0,

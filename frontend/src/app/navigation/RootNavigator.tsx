@@ -14,6 +14,7 @@ export default function RootNavigator() {
   return (
     <NavigationContainer>
       <Stack.Navigator
+        id="RootStack"
         initialRouteName="Splash"
         screenOptions={{ headerShown: false }}
       >
