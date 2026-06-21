@@ -522,6 +522,12 @@ export class FxService {
         );
       }
 
+      await this.assertQuoteSourceWalletBalance({
+        seasonParticipantId: participant.id,
+        fromCurrency: request.fromCurrency,
+        sourceAmount: request.sourceAmount,
+      });
+
       const rateSnapshot = await this.findFxQuoteRateSnapshot(now);
 
       if (!rateSnapshot) {
@@ -945,6 +951,35 @@ export class FxService {
     }
 
     return quote;
+  }
+
+  private async assertQuoteSourceWalletBalance(input: {
+    seasonParticipantId: string;
+    fromCurrency: CurrencyCode;
+    sourceAmount: Prisma.Decimal;
+  }): Promise<void> {
+    const wallet = await this.prisma.cashWallet.findUnique({
+      where: {
+        seasonParticipantId_currencyCode: {
+          seasonParticipantId: input.seasonParticipantId,
+          currencyCode: input.fromCurrency,
+        },
+      },
+      select: {
+        balanceAmount: true,
+      },
+    });
+
+    if (
+      !wallet ||
+      this.toDecimal(wallet.balanceAmount).lt(input.sourceAmount)
+    ) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'INSUFFICIENT_BALANCE',
+        'Cash wallet balance is insufficient.',
+      );
+    }
   }
 
   private async findProviderFxExecuteSnapshot(

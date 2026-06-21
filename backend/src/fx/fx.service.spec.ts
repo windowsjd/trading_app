@@ -280,6 +280,18 @@ describe('FxService', () => {
     });
   };
 
+  const mockQuoteSourceWallet = (
+    prisma: ReturnType<typeof createPrisma>,
+    currencyCode: CurrencyCode,
+    balanceAmount: string,
+  ) => {
+    prisma.cashWallet.findUnique.mockResolvedValueOnce({
+      balanceAmount: new Prisma.Decimal(balanceAmount),
+      currencyCode,
+      seasonParticipantId: 'participant-1',
+    });
+  };
+
   const getExecuteRequestHash = (
     body: FxExecuteRequestBodyLike,
     seasonParticipantId = 'participant-1',
@@ -764,6 +776,7 @@ describe('FxService', () => {
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     mockJoinedParticipant(prisma);
+    mockQuoteSourceWallet(prisma, CurrencyCode.KRW, '1000.00000000');
     prisma.fxRateSnapshot.findFirst.mockResolvedValueOnce(null);
 
     await expectErrorCode(
@@ -776,10 +789,101 @@ describe('FxService', () => {
     );
   });
 
+  it('rejects KRW to USD quote before durable quote creation when KRW wallet balance is insufficient', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    mockJoinedParticipant(prisma);
+    mockQuoteSourceWallet(prisma, CurrencyCode.KRW, '999.99999999');
+
+    await expect(
+      service.quote('user-1', {
+        fromCurrency: 'KRW',
+        toCurrency: 'USD',
+        sourceAmount: '1000',
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        success: false,
+        error: {
+          code: 'INSUFFICIENT_BALANCE',
+          message: 'Cash wallet balance is insufficient.',
+        },
+      },
+      status: 409,
+    });
+    expect(prisma.fxRateSnapshot.findMany).not.toHaveBeenCalled();
+    expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
+    expect(prisma.quote.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects USD to KRW quote before durable quote creation when USD wallet balance is insufficient', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    mockJoinedParticipant(prisma);
+    mockQuoteSourceWallet(prisma, CurrencyCode.USD, '99.99999999');
+
+    await expect(
+      service.quote('user-1', {
+        fromCurrency: 'USD',
+        toCurrency: 'KRW',
+        sourceAmount: '100',
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        success: false,
+        error: {
+          code: 'INSUFFICIENT_BALANCE',
+          message: 'Cash wallet balance is insufficient.',
+        },
+      },
+      status: 409,
+    });
+    expect(prisma.fxRateSnapshot.findMany).not.toHaveBeenCalled();
+    expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
+    expect(prisma.quote.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects quote safely when the source wallet is missing', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    mockJoinedParticipant(prisma);
+    prisma.cashWallet.findUnique.mockResolvedValueOnce(null);
+
+    try {
+      await service.quote('user-1', {
+        fromCurrency: 'KRW',
+        toCurrency: 'USD',
+        sourceAmount: '1000',
+      });
+      throw new Error('Expected quote to fail');
+    } catch (error) {
+      expect(error).toBeInstanceOf(HttpException);
+      expect(getErrorResponse(error)).toEqual({
+        success: false,
+        error: {
+          code: 'INSUFFICIENT_BALANCE',
+          message: 'Cash wallet balance is insufficient.',
+        },
+      });
+      expect(JSON.stringify(getErrorResponse(error))).not.toContain(
+        'balanceAmount',
+      );
+      expect(JSON.stringify(getErrorResponse(error))).not.toContain('walletId');
+      expect(JSON.stringify(getErrorResponse(error))).not.toContain(
+        'participant-1',
+      );
+      expect(JSON.stringify(getErrorResponse(error))).not.toContain('ledger');
+    }
+    expect(prisma.fxRateSnapshot.findMany).not.toHaveBeenCalled();
+    expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
+    expect(prisma.quote.create).not.toHaveBeenCalled();
+  });
+
   it('selects the latest eligible USD/KRW rate snapshot', async () => {
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     mockJoinedParticipant(prisma);
+    mockQuoteSourceWallet(prisma, CurrencyCode.KRW, '135000.00000000');
     mockApprovedRateSnapshot(prisma);
 
     await service.quote('user-1', {
@@ -843,6 +947,7 @@ describe('FxService', () => {
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     mockJoinedParticipant(prisma);
+    mockQuoteSourceWallet(prisma, CurrencyCode.KRW, '140000.00000000');
     prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
       {
         id: 'provider-fx-1',
@@ -882,6 +987,7 @@ describe('FxService', () => {
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     mockJoinedParticipant(prisma);
+    mockQuoteSourceWallet(prisma, CurrencyCode.KRW, '140000.00000000');
     prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
       {
         id: 'provider-fx-exchange',
@@ -927,6 +1033,7 @@ describe('FxService', () => {
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     mockJoinedParticipant(prisma);
+    mockQuoteSourceWallet(prisma, CurrencyCode.KRW, '135000.00000000');
     prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
       {
         id: 'provider-fx-stale',
@@ -966,6 +1073,7 @@ describe('FxService', () => {
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     mockJoinedParticipant(prisma);
+    mockQuoteSourceWallet(prisma, CurrencyCode.KRW, '135000.00000000');
     mockApprovedRateSnapshot(prisma);
 
     await expect(
@@ -991,6 +1099,7 @@ describe('FxService', () => {
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     mockJoinedParticipant(prisma);
+    mockQuoteSourceWallet(prisma, CurrencyCode.KRW, '135000.00000000');
     prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
       {
         id: 'provider-fx-wrong-source',
@@ -1026,6 +1135,7 @@ describe('FxService', () => {
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     mockJoinedParticipant(prisma);
+    mockQuoteSourceWallet(prisma, CurrencyCode.KRW, '1000.00000000');
     prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
       {
         id: 'provider-fx-invalid',
@@ -1056,6 +1166,7 @@ describe('FxService', () => {
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     mockJoinedParticipant(prisma);
+    mockQuoteSourceWallet(prisma, CurrencyCode.KRW, '135000.00000000');
     mockApprovedRateSnapshot(prisma, staleEffectiveAt);
 
     await expectErrorCode(
@@ -1076,6 +1187,7 @@ describe('FxService', () => {
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     mockJoinedParticipant(prisma);
+    mockQuoteSourceWallet(prisma, CurrencyCode.KRW, '135000.00000000');
     mockApprovedRateSnapshot(prisma, thresholdEffectiveAt);
 
     await expect(
@@ -1096,6 +1208,7 @@ describe('FxService', () => {
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     mockJoinedParticipant(prisma);
+    mockQuoteSourceWallet(prisma, CurrencyCode.KRW, '135000.00000000');
     mockApprovedRateSnapshot(prisma);
 
     await expect(
@@ -1134,12 +1247,24 @@ describe('FxService', () => {
         },
       },
     });
+    expect(prisma.cashWallet.findUnique).toHaveBeenCalledWith({
+      where: {
+        seasonParticipantId_currencyCode: {
+          seasonParticipantId: 'participant-1',
+          currencyCode: CurrencyCode.KRW,
+        },
+      },
+      select: {
+        balanceAmount: true,
+      },
+    });
   });
 
   it('calculates USD to KRW quote', async () => {
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
     mockJoinedParticipant(prisma);
+    mockQuoteSourceWallet(prisma, CurrencyCode.USD, '100.00000000');
     mockApprovedRateSnapshot(prisma);
 
     await expect(
@@ -1162,6 +1287,17 @@ describe('FxService', () => {
         netTargetAmount: '134865.00000000',
         rateCapturedAt: capturedAt.toISOString(),
         rateEffectiveAt: freshEffectiveAt.toISOString(),
+      },
+    });
+    expect(prisma.cashWallet.findUnique).toHaveBeenCalledWith({
+      where: {
+        seasonParticipantId_currencyCode: {
+          seasonParticipantId: 'participant-1',
+          currencyCode: CurrencyCode.USD,
+        },
+      },
+      select: {
+        balanceAmount: true,
       },
     });
   });

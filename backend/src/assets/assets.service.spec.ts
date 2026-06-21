@@ -1215,6 +1215,82 @@ describe('AssetsService', () => {
     expectNoAssetWrites(prisma);
   });
 
+  it('returns null changeRate when no previous positive price snapshot exists for list, detail, and price endpoints', async () => {
+    const { prisma, service } = createService();
+    const current = priceSnapshot(
+      'price-current',
+      '125.00000000',
+      CurrencyCode.KRW,
+    );
+
+    prisma.asset.count.mockResolvedValueOnce(1);
+    prisma.asset.findMany.mockResolvedValueOnce([
+      asset({
+        id: 'asset-krw',
+        symbol: '005930',
+        name: 'Samsung',
+      }),
+    ]);
+    prisma.assetPriceSnapshot.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(current);
+
+    const listResponse = await service.getAssets('user-1');
+
+    expect(listResponse.data.assets[0]).toMatchObject({
+      changeRate: null,
+      price: {
+        currentPrice: '125.00000000',
+        changeRate: null,
+      },
+    });
+
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({
+        id: 'asset-krw',
+        symbol: '005930',
+        name: 'Samsung',
+      }),
+    );
+    prisma.season.findFirst.mockResolvedValueOnce(null);
+    prisma.assetPriceSnapshot.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(current);
+
+    const detailResponse = await service.getAsset('user-1', 'asset-krw');
+
+    expect(detailResponse.data.asset).toMatchObject({
+      changeRate: null,
+      price: {
+        changeRate: null,
+      },
+    });
+
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({
+        id: 'asset-krw',
+        symbol: '005930',
+        name: 'Samsung',
+      }),
+    );
+    prisma.assetPriceSnapshot.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(current);
+
+    const priceResponse = await service.getAssetPrice('user-1', 'asset-krw');
+
+    expect(priceResponse.data).toMatchObject({
+      state: 'available',
+      currentPrice: '125.00000000',
+      changeRate: null,
+    });
+    expect(JSON.stringify(priceResponse.data)).not.toContain('rawPayloadJson');
+    expectNoAssetWrites(prisma);
+  });
+
   it('returns unavailable single asset price when no snapshot exists', async () => {
     const { prisma, service } = createService();
     prisma.asset.findUnique.mockResolvedValueOnce(

@@ -184,7 +184,9 @@ If a USD asset has an eligible asset price but USD/KRW is missing or stale, `pri
 
 - Empty asset rows are valid: `state = available`, `assets = []`.
 - Price data absence does not hide the asset.
-- `changeRate` is a percent string when the backend can calculate `(currentPrice - basePrice) / basePrice * 100` from provider/price history; it remains `null` when no positive base price exists.
+- `changeRate` is a percent string calculated from the immediately previous positive `asset_price_snapshots.price` row for the same asset and price currency: `(currentPrice - previousPrice) / previousPrice * 100`. It remains `null` when no previous positive price snapshot exists or the base price is zero or negative.
+- Provider-specific ticker change fields are not part of the API contract. WebSocket/ticker-ingested price rows use the same previous-positive-snapshot rule, so `changeRate` may be `null` until enough snapshot history exists.
+- Asset list/detail/price responses must not expose raw provider payloads, tokens, secrets, or private ledger data.
 - KRW assets can return `priceKrw` without USD/KRW FX.
 - USD assets use fresh `provider_api` ExchangeRate-API USD/KRW first, then fresh approved `admin_manual` USD/KRW fallback for `priceKrw`.
 - USD/KRW missing or stale makes only `priceKrwState = unavailable`.

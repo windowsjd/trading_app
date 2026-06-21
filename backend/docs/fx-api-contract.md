@@ -23,6 +23,7 @@
 - `sourceAmount` must be greater than 0.
 - Quote and execute are allowed only when the user has joined an active season.
 - Upcoming, ended, and settled seasons block quote and execute.
+- `/fx quote` verifies the joined participant's source cash wallet before rate selection and durable quote creation. `KRW -> USD` checks the KRW wallet; `USD -> KRW` checks the USD wallet. Missing source wallet or `balanceAmount < sourceAmount` returns `INSUFFICIENT_BALANCE` without creating a quote.
 - Fake FX rates and temporary FX rates are forbidden.
 - `/fx quote` first tries an eligible `provider_api` USD/KRW `fx_rate_snapshots` row by source priority: `korea_exim_exchange_rate`, then `exchange_rate_api`.
 - `/fx quote` provider freshness uses `capturedAt <= now`, `effectiveAt <= now`, positive rate, and capturedAt age <= 300 seconds.
@@ -162,6 +163,7 @@ Return a KRW/USD exchange quote without changing wallet balances or writing exch
 
 ### Quote Persistence
 
+- `/fx quote` performs source wallet balance preflight after participant validation and before FX rate selection or durable quote persistence. This preflight does not replace execute-time guarded balance validation.
 - `/fx quote` creates a `Quote` row with `quoteType=fx`, `status=active`, `sourceAmount`, `targetAmount`, `quotedRate`, `fxRateSnapshotId`, public-safe `fxRateSourceJson`, `maxChangeBps=30.0000`, `expiresAt=quoteAt+10s`, and canonical SHA-256 `requestHash`.
 - `quoteId` is non-null when quote creation succeeds.
 - `expiresAt` is non-null and defaults to 10 seconds after quote time.
@@ -172,6 +174,20 @@ Return a KRW/USD exchange quote without changing wallet balances or writing exch
 - Selected provider snapshot older than 300 seconds by `capturedAt`, or selected manual snapshot older than 60 seconds by `effectiveAt`, returns `FX_RATE_STALE` only when no safe fallback is available.
 - Quote metadata stores only public-safe source decision fields; raw provider payloads and secrets are not stored in quote metadata.
 - Execute after durable quote expiry returns `QUOTE_EXPIRED`.
+
+### Quote Balance Error
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "INSUFFICIENT_BALANCE",
+    "message": "Cash wallet balance is insufficient."
+  }
+}
+```
+
+The response does not expose wallet ids, balances, private ledger rows, tokens, secrets, or raw provider payloads.
 
 ## POST /api/v1/fx/execute
 

@@ -643,11 +643,11 @@ near-term ledger/FX foundation:
   - raw provider payload 전체와 auth key는 저장/응답/문서에 노출하지 않음. 실제 auth key는 `.env.local`에만 두고 `.env.example`에는 빈 값만 둠.
 - `GET /api/v1/fx/rates/current` 구현 완료. 기본 pair는 USD/KRW, `refresh=true`이면 `PROVIDER_INGESTION_ENABLED=true`와 `KOREA_EXIM_EXCHANGE_ENABLED=true`가 모두 켜진 경우에만 한국수출입은행 refresh를 시도하고, `refresh=false`이면 외부 API 호출 없이 DB row만 조회함. 미지원 pair는 `UNSUPPORTED_FX_PAIR`, row 없음은 `FX_RATE_UNAVAILABLE`.
 - USD/KRW provider priority는 fresh `korea_exim_exchange_rate` first, fresh `exchange_rate_api` fallback. stale `korea_exim_exchange_rate`는 fresh `exchange_rate_api`보다 우선되지 않으며, fresh provider row가 없으면 existing `admin_manual` fallback 또는 `FX_RATE_UNAVAILABLE`로 처리함. 기존 ExchangeRate-API provider는 제거하지 않음.
-- `/fx quote` durable quote 구조(`quoteId`, `requestHash`, `maxChangeBps`)는 변경하지 않았고, 기존 `admin_manual` quote fallback은 유지함.
+- `/fx quote` durable quote 구조(`quoteId`, `requestHash`, `maxChangeBps`)는 유지하며, participant 확인 후 source cash wallet preflight를 수행한다. KRW->USD는 KRW wallet, USD->KRW는 USD wallet의 `balanceAmount`가 `sourceAmount` 이상이어야 하며, 부족하거나 wallet이 없으면 `INSUFFICIENT_BALANCE`로 quote row를 생성하지 않는다. 기존 `admin_manual` quote fallback은 유지함.
 - `/fx execute`는 fresh provider_api USD/KRW만 허용하며 default `admin_manual` fallback은 여전히 금지됨.
 - FX USD/KRW provider_api source eligibility is open for explicitly allowed FX workflows through `korea_exim_exchange_rate` first and `exchange_rate_api` fallback.
 - FX current-rate and quote fallback ignore unapproved `admin_manual` rows and only use rows with `approvedByUserId` set; execute remains fresh provider-only.
-- Asset list/detail/price `changeRate` now returns a percent string when a positive provider/price-history base is available and remains null when no valid base exists.
+- Asset list/detail/price `changeRate` uses the immediately previous positive `asset_price_snapshots.price` row for the same asset and price currency: `(currentPrice - previousPrice) / previousPrice * 100`. It remains `null` when no previous positive snapshot exists or the base price is zero or negative. Provider raw payloads and provider-specific ticker change fields are not exposed; WebSocket/ticker-ingested rows follow the same snapshot-history rule.
 - Season join writes an initial `snapshotReason=season_join` equity snapshot in the same transaction as participant, wallets, and initial grant ledger creation.
 - Season settlement valuation uses its dedicated `season_settlement` provider workflow.
 - Reward automation and provider-backed reward workflows remain separate gates.
