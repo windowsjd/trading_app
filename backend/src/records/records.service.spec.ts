@@ -1367,6 +1367,7 @@ describe('RecordsService', () => {
       totalAssetKrw: new Prisma.Decimal('13812590.00000000'),
       returnRate: new Prisma.Decimal('38.12590000'),
       totalFillCount: 41,
+      capturedAt,
     });
     prisma.seasonRanking.count.mockResolvedValueOnce(300);
     prisma.position.findMany.mockResolvedValueOnce([
@@ -1404,8 +1405,8 @@ describe('RecordsService', () => {
         id: 'season-1',
         status: SeasonStatus.active,
         rank: 1,
-        provisionalTier: null,
-        finalTier: 'master',
+        provisionalTier: 'master',
+        finalTier: null,
         percentile: '0.33333333',
         returnRate: '38.12590000',
         totalAssetKrw: '13812590.00000000',

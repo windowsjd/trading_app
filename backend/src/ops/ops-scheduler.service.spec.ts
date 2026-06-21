@@ -105,9 +105,33 @@ describe('OpsSchedulerService', () => {
     expect(runner.runSeasonRankingGenerationJob).toHaveBeenCalledWith(
       expect.objectContaining({
         dryRun: false,
+        createEquitySnapshots: true,
       }),
     );
     expect(runner.runDailyPortfolioSnapshotJob).not.toHaveBeenCalled();
+  });
+
+  it('runs ranking every minute but enables scheduled equity snapshots only on five-minute buckets', async () => {
+    process.env.SCHEDULER_RANKING_ENABLED = 'true';
+    const { runner, service } = createService();
+
+    await service.runEnabledJobs(new Date('2026-06-08T00:01:00.000Z'));
+    await service.runEnabledJobs(new Date('2026-06-08T00:05:00.000Z'));
+
+    expect(runner.runSeasonRankingGenerationJob).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        now: '2026-06-08T00:01:00.000Z',
+        createEquitySnapshots: false,
+      }),
+    );
+    expect(runner.runSeasonRankingGenerationJob).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        now: '2026-06-08T00:05:00.000Z',
+        createEquitySnapshots: true,
+      }),
+    );
   });
 
   it('passes Asia/Seoul business date to daily snapshot scheduler runner', async () => {

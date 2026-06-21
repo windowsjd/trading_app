@@ -194,14 +194,16 @@
     - Crypto orders do not receive a market-hours block in this gate. FX quote/execute do not receive a market-hours block, but still require effective active season state.
   - Ranking, settlement, and holiday automation alignment gate on 2026-06-19 KST:
     - Order execute and FX execute now create/update participant equity state and then trigger current ranking refresh outside the ledger transaction. Ranking refresh failure is logged and does not roll back the successful order/FX ledger.
-    - Current ranking refresh recalculates active season participant valuations, max drawdown, reached-return time, `currentRank`, and `rankType=daily` `season_rankings`; scheduled refreshes also create `snapshotReason=scheduled` equity snapshots. Existing final rankings are not overwritten.
+    - Current ranking refresh recalculates active season participant valuations, max drawdown, reached-return time, `currentRank`, and `rankType=daily` `season_rankings`; the enabled scheduler runs current ranking refresh every 1 minute and creates `snapshotReason=scheduled` equity snapshots only on 5-minute buckets with duplicate-bucket protection. Existing final rankings are not overwritten.
     - Scheduler aliases are supported: `ENABLE_RANKING_SCHEDULER`, `RANKING_REFRESH_INTERVAL_SECONDS`, `ENABLE_SEASON_LIFECYCLE_SCHEDULER`, `ENABLE_SEASON_SETTLEMENT_SCHEDULER`, and `SEASON_SETTLEMENT_INTERVAL_SECONDS`. Scheduler jobs use ops locks to avoid overlapping ranking/lifecycle/settlement execution.
     - Season settlement evaluates participants at `Season.endAt` using latest valid price and USD/KRW data, writes/upserts final `snapshotReason=settlement` equity snapshots, creates final rankings, assigns final tiers, verifies all final rank/tier rows, and only then marks the season `settled`.
     - Settled now means final rank and final tier are ready. Reward payout remains pending/not implemented and does not block settlement.
     - Market holidays are configured in `src/orders/market-holidays.config.ts`; configured KRX/US full-day holidays block domestic/US stock order quote/create/execute with `MARKET_CLOSED`. Crypto orders and FX are not holiday-blocked.
   - Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage; USDT depeg risk is not modeled.
   - `GET /api/v1/assets/:assetId/candles` now supports crypto chart candles through Binance Spot `GET /api/v3/klines` using `BINANCE_REST_BASE_URL` (default `https://api.binance.com`).
-    - Supported crypto intervals are exactly `5m`, `15m`, `30m`, `1h`, `4h`, `1d`, and `1w`; unsupported crypto intervals return `ASSET_CANDLES_INVALID_INTERVAL`.
+    - 지원 candle interval은 5m, 15m, 30m, 1h, 4h, 1d, 1w만 허용한다.
+    - 그 외 interval은 validation error로 처리한다.
+    - 필요 시 서버가 더 짧은 원천 candle을 집계해 상위 interval candle을 생성한다.
     - Crypto candle symbol normalization maps base symbols such as `BTC`/`ETH` and `BTC/USD`, `BTC-USD`, `BTC_USD` to USDT quote symbols such as `BTCUSDT`.
     - Binance kline rows are normalized to the existing candle DTO using open time, OHLC, base volume, and quote asset volume as `amount`; raw rows and secrets are not exposed.
     - Crypto candles are chart display only: no DB persistence, no `asset_price_snapshots`/`fx_rate_snapshots` writes, no order/quote/valuation/settlement/ranking/scheduler integration, no Binance Futures `/fapi/v1/klines`, and no authenticated Binance APIs.
@@ -644,6 +646,9 @@ near-term ledger/FX foundation:
 - `/fx quote` durable quote 구조(`quoteId`, `requestHash`, `maxChangeBps`)는 변경하지 않았고, 기존 `admin_manual` quote fallback은 유지함.
 - `/fx execute`는 fresh provider_api USD/KRW만 허용하며 default `admin_manual` fallback은 여전히 금지됨.
 - FX USD/KRW provider_api source eligibility is open for explicitly allowed FX workflows through `korea_exim_exchange_rate` first and `exchange_rate_api` fallback.
+- FX current-rate and quote fallback ignore unapproved `admin_manual` rows and only use rows with `approvedByUserId` set; execute remains fresh provider-only.
+- Asset list/detail/price `changeRate` now returns a percent string when a positive provider/price-history base is available and remains null when no valid base exists.
+- Season join writes an initial `snapshotReason=season_join` equity snapshot in the same transaction as participant, wallets, and initial grant ledger creation.
 - Season settlement valuation uses its dedicated `season_settlement` provider workflow.
 - Reward automation and provider-backed reward workflows remain separate gates.
 - `official_batch` ingestion and scheduler implementation remain closed.

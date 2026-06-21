@@ -184,7 +184,10 @@ export class RankingRefreshService {
     }
   }
 
-  async refreshCurrentRankingsForActiveSeasons(capturedAt = new Date()) {
+  async refreshCurrentRankingsForActiveSeasons(
+    capturedAt = new Date(),
+    options: { createEquitySnapshots?: boolean } = {},
+  ) {
     const seasons = await this.prisma.season.findMany({
       where: {
         status: SeasonStatus.active,
@@ -206,7 +209,7 @@ export class RankingRefreshService {
       results.push(
         await this.refreshCurrentRankingForSeason(season.id, {
           capturedAt,
-          createEquitySnapshots: true,
+          createEquitySnapshots: options.createEquitySnapshots === true,
           lockKey: `scheduled:${season.id}`,
         }),
       );
@@ -279,7 +282,26 @@ export class RankingRefreshService {
 
     await this.prisma.$transaction(async (tx) => {
       if (input.createEquitySnapshots) {
+        const bucketStart = floorToFiveMinuteBucket(input.capturedAt);
+        const bucketEnd = new Date(bucketStart.getTime() + 5 * 60_000);
         for (const valuation of input.valuations) {
+          const existing = await tx.equitySnapshot.findFirst({
+            where: {
+              seasonParticipantId: valuation.participant.id,
+              snapshotReason: SnapshotReason.scheduled,
+              capturedAt: {
+                gte: bucketStart,
+                lt: bucketEnd,
+              },
+            },
+            select: {
+              id: true,
+            },
+          });
+          if (existing) {
+            continue;
+          }
+
           await tx.equitySnapshot.create({
             data: {
               seasonParticipantId: valuation.participant.id,
@@ -430,4 +452,8 @@ function appendCurrentPoint(
 
 function formatDecimal(value: Prisma.Decimal, scale: number) {
   return value.toFixed(scale);
+}
+
+function floorToFiveMinuteBucket(date: Date): Date {
+  return new Date(Math.floor(date.getTime() / (5 * 60_000)) * 5 * 60_000);
 }

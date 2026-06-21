@@ -104,7 +104,7 @@ No secret scheduler env is introduced.
 
 When `SCHEDULER_ENABLED=false`, no interval is registered and no automatic job runs. When enabled, individual job flags decide which internal runner methods are called. The foundation uses an internal `setInterval` shell without adding package dependencies.
 
-Even when `SCHEDULER_ENABLED=true`, this foundation scheduler calls jobs with `dryRun=true`. Real automatic writes are not opened here. Automatic daily snapshot writes, ranking generation writes, settlement writes, reward-grant writes, and provider ingestion writes require a separate Production Scheduler Ownership Gate plus any job-specific business gate such as Reward Policy / Catalog.
+Enabled scheduler calls use ops locks and `dryRun=false` for jobs whose backend automation is implemented. Current ranking refresh runs every `SCHEDULER_TICK_INTERVAL_MS` tick, which defaults to 1 minute, and scheduled equity snapshots are created only on 5-minute buckets with duplicate-bucket protection. Provider ingestion and reward marker jobs remain skipped/not implemented unless a later gate opens them.
 
 ## Real DB Lock Smoke
 

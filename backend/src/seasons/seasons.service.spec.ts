@@ -23,6 +23,13 @@ jest.mock('../generated/prisma/client', () => {
       settled: 'settled',
       upcoming: 'upcoming',
     },
+    SnapshotReason: {
+      season_join: 'season_join',
+      exchange_executed: 'exchange_executed',
+      order_executed: 'order_executed',
+      scheduled: 'scheduled',
+      settlement: 'settlement',
+    },
     UserStatus: {
       active: 'active',
       suspended: 'suspended',
@@ -63,6 +70,9 @@ describe('SeasonsService', () => {
       create: jest.fn(),
     },
     walletTransaction: {
+      create: jest.fn(),
+    },
+    equitySnapshot: {
       create: jest.fn(),
     },
     $transaction: jest.fn(),
@@ -224,5 +234,57 @@ describe('SeasonsService', () => {
     await expect(
       service.getSeasons({ status: 'archived' }),
     ).rejects.toBeInstanceOf(Error);
+  });
+
+  it('creates initial season_join equity snapshot inside season join transaction', async () => {
+    const { prisma, service } = createService();
+    prisma.$transaction.mockImplementation(async (callback) =>
+      callback(prisma),
+    );
+    prisma.season.findUnique.mockResolvedValueOnce(
+      season({
+        status: SeasonStatus.active,
+        startAt: new Date(Date.now() - 86_400_000),
+        endAt: new Date(Date.now() + 86_400_000),
+      }),
+    );
+    prisma.user.findUnique.mockResolvedValueOnce({
+      status: 'active',
+    });
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
+    prisma.seasonParticipant.create.mockResolvedValueOnce({
+      id: 'sp-1',
+    });
+    prisma.cashWallet.create
+      .mockResolvedValueOnce({
+        id: 'wallet-krw-1',
+      })
+      .mockResolvedValueOnce({
+        id: 'wallet-usd-1',
+      });
+
+    const response = await service.joinSeason('season-1', 'user-1');
+
+    expect(response.data).toMatchObject({
+      seasonParticipantId: 'sp-1',
+      wallets: {
+        KRW: '1000000.00000000',
+        USD: '0.00000000',
+      },
+    });
+    expect(prisma.equitySnapshot.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        seasonParticipantId: 'sp-1',
+        totalAssetKrw: '1000000.00000000',
+        returnRate: '0.00000000',
+        krwCash: '1000000.00000000',
+        usdCashKrw: '0.00000000',
+        domesticStockValueKrw: '0.00000000',
+        usStockValueKrw: '0.00000000',
+        cryptoValueKrw: '0.00000000',
+        snapshotReason: 'season_join',
+        capturedAt: expect.any(Date),
+      }),
+    });
   });
 });

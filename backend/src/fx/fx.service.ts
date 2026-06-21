@@ -833,6 +833,9 @@ export class FxService {
         baseCurrency: CurrencyCode.USD,
         quoteCurrency: CurrencyCode.KRW,
         sourceType: FxRateSourceType.admin_manual,
+        approvedByUserId: {
+          not: null,
+        },
         effectiveAt: {
           lte: quoteAt,
         },
@@ -1079,6 +1082,9 @@ export class FxService {
         baseCurrency: CurrencyCode.USD,
         quoteCurrency: CurrencyCode.KRW,
         sourceType: FxRateSourceType.admin_manual,
+        approvedByUserId: {
+          not: null,
+        },
         effectiveAt: {
           lte: now,
         },

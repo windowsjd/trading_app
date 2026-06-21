@@ -103,6 +103,13 @@ jest.mock('../src/generated/prisma/client', () => {
       badge: 'badge',
       trophy: 'trophy',
     },
+    SnapshotReason: {
+      season_join: 'season_join',
+      exchange_executed: 'exchange_executed',
+      order_executed: 'order_executed',
+      scheduled: 'scheduled',
+      settlement: 'settlement',
+    },
     UserStatus: {
       active: 'active',
       suspended: 'suspended',
@@ -269,6 +276,9 @@ type PrismaMock = {
     count: jest.Mock;
     create: jest.Mock;
     findMany: jest.Mock;
+  };
+  equitySnapshot: {
+    create: jest.Mock;
   };
 };
 
@@ -472,6 +482,9 @@ describe('AppController (e2e)', () => {
         count: jest.fn(),
         create: jest.fn(),
         findMany: jest.fn(),
+      },
+      equitySnapshot: {
+        create: jest.fn(),
       },
     };
     mockTransactionPassthrough();
@@ -2746,6 +2759,9 @@ describe('AppController (e2e)', () => {
         prisma.walletTransaction.create.mockResolvedValueOnce({
           id: 'wallet-transaction-1',
         });
+        prisma.equitySnapshot.create.mockResolvedValueOnce({
+          id: 'equity-snapshot-1',
+        });
       },
       assertBody: (body: Record<string, unknown>) => {
         expect(body).toMatchObject({
@@ -2763,6 +2779,15 @@ describe('AppController (e2e)', () => {
         expect(prisma.seasonParticipant.create).toHaveBeenCalled();
         expect(prisma.cashWallet.create).toHaveBeenCalledTimes(2);
         expect(prisma.walletTransaction.create).toHaveBeenCalledTimes(1);
+        expect(prisma.equitySnapshot.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({
+            seasonParticipantId: participant.id,
+            totalAssetKrw: '10000000.00000000',
+            returnRate: '0.00000000',
+            krwCash: '10000000.00000000',
+            snapshotReason: 'season_join',
+          }),
+        });
       },
     },
     {

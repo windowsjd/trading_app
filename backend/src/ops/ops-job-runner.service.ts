@@ -52,6 +52,7 @@ export type DailySnapshotOpsJobInput = OpsJobRunnerInput & {
 
 export type TimedOpsJobInput = OpsJobRunnerInput & {
   now?: string | null;
+  createEquitySnapshots?: boolean;
 };
 
 @Injectable()
@@ -90,7 +91,9 @@ export class OpsJobRunnerService {
       input,
       'season_ranking_generation:current',
       async () =>
-        this.rankingRefreshService.refreshCurrentRankingsForActiveSeasons(now),
+        this.rankingRefreshService.refreshCurrentRankingsForActiveSeasons(now, {
+          createEquitySnapshots: input.createEquitySnapshots === true,
+        }),
     );
   }
 

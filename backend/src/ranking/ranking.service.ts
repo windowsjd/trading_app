@@ -6,11 +6,17 @@ import {
 } from '../generated/prisma/client';
 import { buildPagination, type Pagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  assignRankingTier,
+  calculateRankingPercentile,
+  type RankingTier,
+} from './ranking-tier.policy';
 
 export type RankingQuery = {
   seasonId?: string;
   rankingDate?: string;
   rankType?: string;
+  capturedAt?: string;
   limit?: string;
   offset?: string;
   scope?: string;
@@ -18,13 +24,6 @@ export type RankingQuery = {
 
 type RankingSectionState = 'available' | 'unavailable' | 'not_joined';
 type RankingScope = 'all' | 'near_me' | 'top10';
-type RankingTier =
-  | 'master'
-  | 'diamond'
-  | 'platinum'
-  | 'gold'
-  | 'silver'
-  | 'bronze';
 
 type RankingSeason = {
   id: string;
@@ -38,6 +37,7 @@ type ParsedRankingQuery = {
   seasonId?: string;
   rankingDate?: Date;
   rankType: SeasonRankingType;
+  capturedAt?: Date;
   limit: number;
   offset: number;
   scope: RankingScope;
@@ -136,17 +136,6 @@ const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 const TOP10_LIMIT = 10;
-const TIER_CUTOFF_RULES = [
-  { tier: 'master', cumulativeRatio: 0.04 },
-  { tier: 'diamond', cumulativeRatio: 0.11 },
-  { tier: 'platinum', cumulativeRatio: 0.23 },
-  { tier: 'gold', cumulativeRatio: 0.4 },
-  { tier: 'silver', cumulativeRatio: 0.7 },
-  { tier: 'bronze', cumulativeRatio: 1 },
-] as const satisfies readonly {
-  tier: RankingTier;
-  cumulativeRatio: number;
-}[];
 
 @Injectable()
 export class RankingService {
@@ -199,6 +188,10 @@ export class RankingService {
           season.id,
           parsedQuery.rankType,
         );
+    this.assertCapturedAtMatchesSelectedSnapshot(
+      parsedQuery.capturedAt,
+      selectedRanking,
+    );
 
     const participant = await this.findParticipant(season.id, userId);
 
@@ -224,6 +217,7 @@ export class RankingService {
       seasonId: season.id,
       rankType: parsedQuery.rankType,
       rankingDate: selectedRanking.rankingDate,
+      capturedAt: selectedRanking.capturedAt,
     };
     const [totalParticipants, myRankingRow] = await Promise.all([
       this.prisma.seasonRanking.count({ where }),
@@ -326,6 +320,7 @@ export class RankingService {
       seasonId: this.parseOptionalText(query.seasonId),
       rankingDate: this.parseOptionalDate(query.rankingDate),
       rankType: this.parseRankType(query.rankType),
+      capturedAt: this.parseOptionalCapturedAt(query.capturedAt),
       limit: this.parseLimit(query.limit),
       offset: this.parseOffset(query.offset),
       scope: this.parseScope(query.scope),
@@ -380,6 +375,32 @@ export class RankingService {
         HttpStatus.BAD_REQUEST,
         'INVALID_RANKING_DATE',
         'rankingDate must be YYYY-MM-DD.',
+      );
+    }
+
+    return date;
+  }
+
+  private parseOptionalCapturedAt(value: string | undefined): Date | undefined {
+    const text = this.parseOptionalText(value);
+    if (!text) {
+      return undefined;
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u.test(text)) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'INVALID_RANKING_CAPTURED_AT',
+        'capturedAt must be a UTC ISO 8601 timestamp.',
+      );
+    }
+
+    const date = new Date(text);
+    if (Number.isNaN(date.getTime())) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'INVALID_RANKING_CAPTURED_AT',
+        'capturedAt must be a UTC ISO 8601 timestamp.',
       );
     }
 
@@ -555,6 +576,27 @@ export class RankingService {
     });
   }
 
+  private assertCapturedAtMatchesSelectedSnapshot(
+    requestedCapturedAt: Date | undefined,
+    selectedRanking: { capturedAt: Date } | null,
+  ): void {
+    if (!requestedCapturedAt || !selectedRanking) {
+      return;
+    }
+
+    if (
+      requestedCapturedAt.getTime() === selectedRanking.capturedAt.getTime()
+    ) {
+      return;
+    }
+
+    this.throwApiError(
+      HttpStatus.CONFLICT,
+      'RANKING_SNAPSHOT_CHANGED',
+      'Ranking snapshot changed. Please reload from the first page.',
+    );
+  }
+
   private unavailableResponse(input: {
     season: RankingSeason | null;
     rankType: SeasonRankingType;
@@ -652,12 +694,12 @@ export class RankingService {
       percentile: this.calculatePercentile(row.rank, totalParticipants),
       provisionalTier:
         rankType === SeasonRankingType.daily
-          ? this.assignTier(row.rank, totalParticipants)
+          ? assignRankingTier(row.rank, totalParticipants)
           : null,
       finalTier:
         rankType === SeasonRankingType.final
           ? (row.seasonParticipant.finalTier ??
-            this.assignTier(row.rank, totalParticipants))
+            assignRankingTier(row.rank, totalParticipants))
           : null,
     };
   }
@@ -689,12 +731,12 @@ export class RankingService {
       percentile: this.calculatePercentile(ranking.rank, totalParticipants),
       provisionalTier:
         rankType === SeasonRankingType.daily
-          ? this.assignTier(ranking.rank, totalParticipants)
+          ? assignRankingTier(ranking.rank, totalParticipants)
           : null,
       finalTier:
         rankType === SeasonRankingType.final
           ? (ranking.seasonParticipant.finalTier ??
-            this.assignTier(ranking.rank, totalParticipants))
+            assignRankingTier(ranking.rank, totalParticipants))
           : null,
     };
   }
@@ -724,27 +766,9 @@ export class RankingService {
     }
 
     return this.formatDecimal(
-      new Prisma.Decimal(rank).div(totalParticipants).mul(100),
+      calculateRankingPercentile(rank, totalParticipants),
       8,
     );
-  }
-
-  private assignTier(rank: number, totalParticipants: number): RankingTier {
-    if (totalParticipants <= 0) {
-      return 'bronze';
-    }
-
-    for (const rule of TIER_CUTOFF_RULES) {
-      const cutoff = Math.max(
-        1,
-        Math.ceil(totalParticipants * rule.cumulativeRatio),
-      );
-      if (rank <= cutoff) {
-        return rule.tier;
-      }
-    }
-
-    return 'bronze';
   }
 
   private formatSeason(season: RankingSeason) {

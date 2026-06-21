@@ -315,6 +315,7 @@ describe('FxService', () => {
       sourceName: 'manual-approved',
       capturedAt,
       effectiveAt,
+      approvedByUserId: 'operator-1',
     });
   };
 
@@ -417,6 +418,32 @@ describe('FxService', () => {
         fallbackUsed: true,
       },
     });
+    expect(prisma.fxRateSnapshot.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          sourceType: FxRateSourceType.admin_manual,
+          approvedByUserId: {
+            not: null,
+          },
+        }),
+      }),
+    );
+  });
+
+  it('ignores unapproved admin_manual current rate fallback rows', async () => {
+    const { prisma, service } = createService();
+    prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([]);
+    prisma.fxRateSnapshot.findFirst.mockImplementationOnce(async (args) => {
+      expect(args.where).toMatchObject({
+        sourceType: FxRateSourceType.admin_manual,
+        approvedByUserId: {
+          not: null,
+        },
+      });
+      return null;
+    });
+
+    await expectErrorCode(service.currentRate({}), 'FX_RATE_UNAVAILABLE');
   });
 
   it('returns FX_RATE_UNAVAILABLE when current rate provider rows are stale and admin fallback is missing', async () => {
@@ -1011,6 +1038,7 @@ describe('FxService', () => {
     ]);
     prisma.fxRateSnapshot.findFirst.mockImplementationOnce(async (args) => {
       expect(args.where.sourceType).toBe(FxRateSourceType.admin_manual);
+      expect(args.where.approvedByUserId).toEqual({ not: null });
       return null;
     });
 

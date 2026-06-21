@@ -41,6 +41,7 @@ import {
   CurrencyCode,
   ParticipantStatus,
   SeasonStatus,
+  SnapshotReason,
   WalletTransactionDirection,
   WalletTransactionReferenceType,
   WalletTransactionType,
@@ -111,6 +112,15 @@ async function testActiveJoinWritePath() {
     assert.equal(state.usdWalletBalance, ZERO_AMOUNT);
     assert.equal(state.ledgerCount, 1);
     assert.equal(state.initialGrantLedgerCount, 1);
+    assert.equal(state.equitySnapshotCount, 1);
+    assert.equal(state.seasonJoinSnapshotCount, 1);
+    assert.equal(state.seasonJoinSnapshotTotalAssetKrw, scenario.initialCapitalKrw);
+    assert.equal(state.seasonJoinSnapshotReturnRate, ZERO_AMOUNT);
+    assert.equal(state.seasonJoinSnapshotKrwCash, scenario.initialCapitalKrw);
+    assert.equal(state.seasonJoinSnapshotUsdCashKrw, ZERO_AMOUNT);
+    assert.equal(state.seasonJoinSnapshotDomesticStockValueKrw, ZERO_AMOUNT);
+    assert.equal(state.seasonJoinSnapshotUsStockValueKrw, ZERO_AMOUNT);
+    assert.equal(state.seasonJoinSnapshotCryptoValueKrw, ZERO_AMOUNT);
     assert.equal(state.initialGrantDirection, WalletTransactionDirection.credit);
     assert.equal(state.initialGrantReferenceType, WalletTransactionReferenceType.season_join);
     assert.equal(state.initialGrantReferenceId, state.participantId);
@@ -167,6 +177,8 @@ async function testConcurrentDuplicateJoinRace() {
     assert.equal(state.usdWalletBalance, ZERO_AMOUNT);
     assert.equal(state.ledgerCount, 1);
     assert.equal(state.initialGrantLedgerCount, 1);
+    assert.equal(state.equitySnapshotCount, 1);
+    assert.equal(state.seasonJoinSnapshotCount, 1);
   } finally {
     await cleanupScenario(scenario);
   }
@@ -358,6 +370,27 @@ async function readJoinState(scenario) {
             balanceAfter: true,
           },
         });
+  const equitySnapshots =
+    participantIds.length === 0
+      ? []
+      : await prisma.equitySnapshot.findMany({
+          where: {
+            seasonParticipantId: {
+              in: participantIds,
+            },
+          },
+          orderBy: { createdAt: 'asc' },
+          select: {
+            snapshotReason: true,
+            totalAssetKrw: true,
+            returnRate: true,
+            krwCash: true,
+            usdCashKrw: true,
+            domesticStockValueKrw: true,
+            usStockValueKrw: true,
+            cryptoValueKrw: true,
+          },
+        });
   const participant = participants[0] ?? null;
   const krwWallets = wallets.filter(
     (wallet) => wallet.currencyCode === CurrencyCode.KRW,
@@ -369,6 +402,10 @@ async function readJoinState(scenario) {
     (ledger) => ledger.txType === WalletTransactionType.initial_grant,
   );
   const initialGrantLedger = initialGrantLedgers[0] ?? null;
+  const seasonJoinSnapshots = equitySnapshots.filter(
+    (snapshot) => snapshot.snapshotReason === SnapshotReason.season_join,
+  );
+  const seasonJoinSnapshot = seasonJoinSnapshots[0] ?? null;
 
   return {
     participantCount: participants.length,
@@ -394,6 +431,29 @@ async function readJoinState(scenario) {
       : null,
     ledgerCount: ledgers.length,
     initialGrantLedgerCount: initialGrantLedgers.length,
+    equitySnapshotCount: equitySnapshots.length,
+    seasonJoinSnapshotCount: seasonJoinSnapshots.length,
+    seasonJoinSnapshotTotalAssetKrw: seasonJoinSnapshot
+      ? formatScale8(seasonJoinSnapshot.totalAssetKrw)
+      : null,
+    seasonJoinSnapshotReturnRate: seasonJoinSnapshot
+      ? formatScale8(seasonJoinSnapshot.returnRate)
+      : null,
+    seasonJoinSnapshotKrwCash: seasonJoinSnapshot
+      ? formatScale8(seasonJoinSnapshot.krwCash)
+      : null,
+    seasonJoinSnapshotUsdCashKrw: seasonJoinSnapshot
+      ? formatScale8(seasonJoinSnapshot.usdCashKrw)
+      : null,
+    seasonJoinSnapshotDomesticStockValueKrw: seasonJoinSnapshot
+      ? formatScale8(seasonJoinSnapshot.domesticStockValueKrw)
+      : null,
+    seasonJoinSnapshotUsStockValueKrw: seasonJoinSnapshot
+      ? formatScale8(seasonJoinSnapshot.usStockValueKrw)
+      : null,
+    seasonJoinSnapshotCryptoValueKrw: seasonJoinSnapshot
+      ? formatScale8(seasonJoinSnapshot.cryptoValueKrw)
+      : null,
     initialGrantWalletId: initialGrantLedger?.walletId ?? null,
     initialGrantDirection: initialGrantLedger?.direction ?? null,
     initialGrantReferenceType: initialGrantLedger?.referenceType ?? null,

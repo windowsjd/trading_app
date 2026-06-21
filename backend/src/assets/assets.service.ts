@@ -126,6 +126,7 @@ type AssetPricePayload =
   | {
       state: 'available';
       currentPrice: string;
+      changeRate: string | null;
       priceCurrency: CurrencyCode;
       priceKrwState: 'available';
       priceKrw: string;
@@ -138,6 +139,7 @@ type AssetPricePayload =
   | {
       state: 'available';
       currentPrice: string;
+      changeRate: string | null;
       priceCurrency: CurrencyCode;
       priceKrwState: 'unavailable';
       priceKrwReason: 'FX_RATE_UNAVAILABLE' | 'FX_RATE_STALE';
@@ -197,7 +199,7 @@ type AssetPriceResponse = {
         priceKrw: string | null;
         priceKrwReason?: 'FX_RATE_UNAVAILABLE' | 'FX_RATE_STALE';
         priceKrwMessage?: string;
-        changeRate: null;
+        changeRate: string | null;
         assetPriceSnapshotId: string;
         priceEffectiveAt: string;
         priceCapturedAt: string;
@@ -431,7 +433,7 @@ export class AssetsService {
               priceKrwReason: price.priceKrwReason,
               priceKrwMessage: price.priceKrwMessage,
             }),
-        changeRate: null,
+        changeRate: price.changeRate,
         assetPriceSnapshotId: price.assetPriceSnapshotId,
         priceEffectiveAt: price.priceEffectiveAt,
         priceCapturedAt: price.priceCapturedAt,
@@ -590,6 +592,7 @@ export class AssetsService {
     const basePayload = {
       state: 'available' as const,
       currentPrice: this.formatDecimal(snapshot.price, 8),
+      changeRate: await this.calculateChangeRate(asset, snapshot),
       priceCurrency: snapshot.currencyCode,
       assetPriceSnapshotId: snapshot.id,
       priceEffectiveAt: snapshot.effectiveAt.toISOString(),
@@ -655,6 +658,53 @@ export class AssetsService {
         message: error.message,
       },
     };
+  }
+
+  private async calculateChangeRate(
+    asset: AssetRecord,
+    snapshot: AssetPriceSnapshotRecord,
+  ): Promise<string | null> {
+    const previousRows = await this.prisma.assetPriceSnapshot.findMany({
+      where: {
+        assetId: asset.id,
+        currencyCode: snapshot.currencyCode,
+        price: {
+          gt: 0,
+        },
+        OR: [
+          {
+            effectiveAt: {
+              lt: snapshot.effectiveAt,
+            },
+          },
+          {
+            effectiveAt: snapshot.effectiveAt,
+            capturedAt: {
+              lt: snapshot.capturedAt,
+            },
+          },
+        ],
+      },
+      orderBy: [
+        { effectiveAt: 'desc' },
+        { capturedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      take: 1,
+      select: {
+        price: true,
+      },
+    });
+    const previous = previousRows[0] ?? null;
+
+    if (!previous || previous.price.lte(0)) {
+      return null;
+    }
+
+    return this.formatDecimal(
+      snapshot.price.sub(previous.price).div(previous.price).mul(100),
+      8,
+    );
   }
 
   private async findLatestEligibleAssetPriceSnapshot(
@@ -1173,7 +1223,7 @@ export class AssetsService {
 
     return {
       id: asset.id,
-      changeRate: null,
+      changeRate: price?.state === 'available' ? price.changeRate : null,
       marketStatus,
       tradable: blockedReason === null,
       tradeBlockedReason: blockedReason,

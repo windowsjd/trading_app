@@ -435,7 +435,6 @@ describe('AssetCandlesService', () => {
       date: '2026-06-19',
       includePrevious: 'false',
       to: '2026-06-19T13:45:00.000Z',
-      market: 'KRX',
     });
 
     expect(response.data).toMatchObject({
@@ -644,7 +643,7 @@ describe('AssetCandlesService', () => {
   });
 
   it.each(['5m', '15m', '30m', '1h', '4h', '1d', '1w'])(
-    'allows crypto interval %s',
+    'allows canonical crypto interval %s',
     async (interval) => {
       const { prisma, binancePublicClient, service } = createService();
       prisma.asset.findUnique.mockResolvedValueOnce(
@@ -671,8 +670,55 @@ describe('AssetCandlesService', () => {
     },
   );
 
+  it.each(['5m', '15m', '30m', '1h', '4h', '1d', '1w'])(
+    'allows canonical stock interval %s',
+    async (interval) => {
+      const { prisma, kisQuoteClient, service } = createService();
+      prisma.asset.findUnique.mockResolvedValueOnce(
+        asset({
+          id: `asset-aapl-${interval}`,
+          symbol: 'AAPL',
+          market: 'NAS',
+          assetType: AssetType.us_stock,
+          currencyCode: CurrencyCode.USD,
+        }),
+      );
+      kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
+        state: 'available',
+        receivedAt: new Date('2026-06-19T13:30:01.000Z'),
+        response: {
+          rt_cd: '0',
+          output2: [],
+        },
+      });
+
+      const response = await service.getAssetCandles(
+        'user-1',
+        `asset-aapl-${interval}`,
+        {
+          interval,
+        },
+      );
+
+      expect(response.data.interval).toBe(interval);
+      expect(kisQuoteClient.getMarketDataByExplicitPath).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({
+            NMIN:
+              interval === '1h' ||
+              interval === '4h' ||
+              interval === '1d' ||
+              interval === '1w'
+                ? '30'
+                : String(Number.parseInt(interval, 10)),
+          }),
+        }),
+      );
+    },
+  );
+
   it.each(['1m', '3m', '2m', '10m', '1M'])(
-    'rejects unsupported crypto interval %s',
+    'rejects unsupported candle interval %s',
     async (interval) => {
       const { prisma, kisQuoteClient, binancePublicClient, service } =
         createService();
@@ -695,6 +741,31 @@ describe('AssetCandlesService', () => {
       );
       expect(kisQuoteClient.getMarketDataByExplicitPath).not.toHaveBeenCalled();
       expect(binancePublicClient.fetchKlines).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['1m', '2m', '3m', '10m'])(
+    'rejects unsupported stock interval %s before calling KIS',
+    async (interval) => {
+      const { prisma, kisQuoteClient, service } = createService();
+      prisma.asset.findUnique.mockResolvedValueOnce(
+        asset({
+          id: `asset-aapl-${interval}`,
+          symbol: 'AAPL',
+          market: 'NAS',
+          assetType: AssetType.us_stock,
+          currencyCode: CurrencyCode.USD,
+        }),
+      );
+
+      await expectApiError(
+        service.getAssetCandles('user-1', `asset-aapl-${interval}`, {
+          interval,
+        }),
+        400,
+        'ASSET_CANDLES_INVALID_INTERVAL',
+      );
+      expect(kisQuoteClient.getMarketDataByExplicitPath).not.toHaveBeenCalled();
     },
   );
 
@@ -820,7 +891,7 @@ describe('AssetCandlesService', () => {
         interval: '4m',
       }),
       400,
-      'INVALID_CANDLE_INTERVAL',
+      'ASSET_CANDLES_INVALID_INTERVAL',
     );
     await expectApiError(
       service.getAssetCandles('user-1', 'asset-aapl', {

@@ -4,6 +4,7 @@ import {
   ParticipantStatus,
   Prisma,
   SeasonStatus,
+  SnapshotReason,
   UserStatus,
   WalletTransactionDirection,
   WalletTransactionReferenceType,
@@ -325,6 +326,21 @@ export class SeasonsService {
             amount: initialCapitalKrw,
             balanceAfter: initialCapitalKrw,
             occurredAt: joinedAt,
+          },
+        });
+
+        await tx.equitySnapshot.create({
+          data: {
+            seasonParticipantId: participant.id,
+            totalAssetKrw: initialCapitalKrw,
+            returnRate: ZERO_AMOUNT,
+            krwCash: initialCapitalKrw,
+            usdCashKrw: ZERO_AMOUNT,
+            domesticStockValueKrw: ZERO_AMOUNT,
+            usStockValueKrw: ZERO_AMOUNT,
+            cryptoValueKrw: ZERO_AMOUNT,
+            snapshotReason: SnapshotReason.season_join,
+            capturedAt: joinedAt,
           },
         });
 

@@ -87,6 +87,7 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
         await this.runner.runSeasonRankingGenerationJob({
           ...baseInput,
           now: now.toISOString(),
+          createEquitySnapshots: isFiveMinuteBucketStart(now),
         }),
       );
     }
@@ -106,4 +107,8 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
 
     return results;
   }
+}
+
+function isFiveMinuteBucketStart(now: Date): boolean {
+  return now.getUTCMinutes() % 5 === 0;
 }

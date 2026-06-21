@@ -340,4 +340,45 @@ describe('OpsJobRunnerService', () => {
       }),
     );
   });
+
+  it('runs current ranking refresh with explicit scheduled equity snapshot flag', async () => {
+    const { lockService, rankingRefreshService, runService, service } =
+      createService();
+    lockService.acquireLock.mockResolvedValueOnce({
+      acquired: true,
+      lockKey: 'season_ranking_generation:current',
+      ownerId: 'owner-ranking',
+      expiresAt: new Date('2026-06-08T00:11:00.000Z'),
+    });
+    runService.createRunning.mockResolvedValueOnce({
+      id: 'run-ranking',
+      startedAt,
+    });
+    rankingRefreshService.refreshCurrentRankingsForActiveSeasons.mockResolvedValueOnce(
+      {
+        seasonsProcessed: 1,
+      },
+    );
+    runService.recordSucceeded.mockResolvedValueOnce({
+      serialized: serializedRun({
+        jobName: OpsJobName.season_ranking_generation,
+      }),
+    });
+
+    await service.runSeasonRankingGenerationJob({
+      trigger: OpsJobTrigger.scheduler,
+      now: '2026-06-08T00:05:00.000Z',
+      createEquitySnapshots: true,
+    });
+
+    expect(
+      rankingRefreshService.refreshCurrentRankingsForActiveSeasons,
+    ).toHaveBeenCalledWith(new Date('2026-06-08T00:05:00.000Z'), {
+      createEquitySnapshots: true,
+    });
+    expect(lockService.releaseLock).toHaveBeenCalledWith({
+      lockKey: 'season_ranking_generation:current',
+      ownerId: 'owner-ranking',
+    });
+  });
 });

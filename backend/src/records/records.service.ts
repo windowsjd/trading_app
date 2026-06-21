@@ -30,6 +30,10 @@ import {
   type RankingHistoricalSnapshotInput,
 } from '../ranking/ranking-calculation.policy';
 import {
+  assignRankingTier,
+  calculateRankingPercentile,
+} from '../ranking/ranking-tier.policy';
+import {
   isPositiveDecimal,
   resolveAssetProviderEligibility,
   resolveFxProviderEligibility,
@@ -1293,9 +1297,12 @@ export class RecordsService {
             seasonId: season.id,
             rankType: ranking.rankType,
             rankingDate: ranking.rankingDate,
+            capturedAt: ranking.capturedAt,
           },
         })
       : 0;
+    const isFinalRanking = ranking?.rankType === SeasonRankingType.final;
+    const isDailyRanking = ranking?.rankType === SeasonRankingType.daily;
 
     return {
       success: true,
@@ -1307,12 +1314,19 @@ export class RecordsService {
           status: season.status,
           rank:
             ranking?.rank ?? participant.currentRank ?? participant.finalRank,
-          provisionalTier: null,
-          finalTier: participant.finalTier,
+          provisionalTier:
+            isDailyRanking && rankingTotal > 0
+              ? assignRankingTier(ranking.rank, rankingTotal)
+              : null,
+          finalTier:
+            isFinalRanking && rankingTotal > 0
+              ? (participant.finalTier ??
+                assignRankingTier(ranking.rank, rankingTotal))
+              : null,
           percentile:
             ranking && rankingTotal > 0
               ? this.formatDecimal(
-                  new Prisma.Decimal(ranking.rank).div(rankingTotal).mul(100),
+                  calculateRankingPercentile(ranking.rank, rankingTotal),
                   8,
                 )
               : null,
@@ -1768,6 +1782,7 @@ export class RecordsService {
         totalAssetKrw: true,
         returnRate: true,
         totalFillCount: true,
+        capturedAt: true,
       },
     });
   }

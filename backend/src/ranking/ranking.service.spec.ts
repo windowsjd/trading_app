@@ -280,6 +280,74 @@ describe('RankingService', () => {
     expectNoRankingWrites(prisma);
   });
 
+  it('keeps subsequent offset pages pinned to the requested capturedAt snapshot', async () => {
+    const { prisma, service } = createService();
+    mockCurrentSeason(prisma);
+    mockAvailableRanking(prisma);
+
+    const response = await service.getRanking('user-2', {
+      rankingDate: '2026-05-07',
+      capturedAt: capturedAt.toISOString(),
+      limit: '1',
+      offset: '1',
+    });
+
+    expect(response.data.capturedAt).toBe(capturedAt.toISOString());
+    expect(prisma.seasonRanking.count).toHaveBeenCalledWith({
+      where: {
+        seasonId: 'season-1',
+        rankType: SeasonRankingType.daily,
+        rankingDate,
+        capturedAt,
+      },
+    });
+    expect(prisma.seasonRanking.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          capturedAt,
+        }),
+        skip: 1,
+        take: 1,
+      }),
+    );
+    expectNoRankingWrites(prisma);
+  });
+
+  it('returns RANKING_SNAPSHOT_CHANGED when requested capturedAt differs from the latest snapshot', async () => {
+    const { prisma, service } = createService();
+    mockCurrentSeason(prisma);
+    prisma.seasonRanking.findFirst.mockResolvedValueOnce({
+      rankingDate,
+      capturedAt,
+    });
+
+    await expect(
+      service.getRanking('user-2', {
+        rankingDate: '2026-05-07',
+        capturedAt: '2026-05-07T00:09:00.000Z',
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        error: {
+          code: 'RANKING_SNAPSHOT_CHANGED',
+        },
+      },
+      status: 409,
+    });
+    expect(prisma.seasonParticipant.findUnique).not.toHaveBeenCalled();
+    expectNoRankingWrites(prisma);
+  });
+
+  it('rejects non-UTC ranking capturedAt query values', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.getRanking('user-1', {
+        capturedAt: '2026-05-07T09:10:00+09:00',
+      }),
+    ).rejects.toBeInstanceOf(HttpException);
+  });
+
   it('returns myRanking not_joined when user has not joined', async () => {
     const { prisma, service } = createService();
     mockCurrentSeason(prisma);

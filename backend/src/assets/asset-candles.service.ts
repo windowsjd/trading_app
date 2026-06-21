@@ -17,12 +17,10 @@ export type AssetCandlesQuery = {
   date?: string;
   to?: string;
   includePrevious?: string;
-  market?: string;
 };
 
-type StockCandleInterval = '1m' | '2m' | '3m' | '5m' | '10m' | '15m' | '30m';
-type CryptoCandleInterval = '5m' | '15m' | '30m' | '1h' | '4h' | '1d' | '1w';
-type CandleInterval = StockCandleInterval | CryptoCandleInterval;
+type CandleInterval = '5m' | '15m' | '30m' | '1h' | '4h' | '1d' | '1w';
+type CryptoCandleInterval = CandleInterval;
 
 type AssetRecord = {
   id: string;
@@ -139,17 +137,17 @@ const US_EASTERN_TIME_ZONE = 'America/New_York';
 const UTC_TIME_ZONE = 'UTC';
 const BINANCE_KLINE_PATH = '/api/v3/klines';
 
-const STOCK_INTERVAL_MINUTES: Record<StockCandleInterval, number> = {
-  '1m': 1,
-  '2m': 2,
-  '3m': 3,
+const CANDLE_INTERVAL_MINUTES: Record<CandleInterval, number> = {
   '5m': 5,
-  '10m': 10,
   '15m': 15,
   '30m': 30,
+  '1h': 60,
+  '4h': 240,
+  '1d': 1440,
+  '1w': 10080,
 };
 
-const CRYPTO_INTERVALS: Record<CryptoCandleInterval, true> = {
+const CANDLE_INTERVALS: Record<CandleInterval, true> = {
   '5m': true,
   '15m': true,
   '30m': true,
@@ -300,9 +298,10 @@ export class AssetCandlesService {
       fallbackDate: query.requestedDate,
       timeZone: KOREA_TIME_ZONE,
     });
-    const bucketed = this.bucketDomesticCandles(
+    const bucketed = this.bucketStockCandles(
       normalized,
       query.intervalMinutes,
+      KOREA_TIME_ZONE,
     );
     const candles = this.sliceRecent(bucketed, query.limit).map((candle) =>
       this.formatCandle(candle),
@@ -323,7 +322,12 @@ export class AssetCandlesService {
       fallbackDate: query.requestedDate,
       timeZone: US_EASTERN_TIME_ZONE,
     });
-    const candles = this.sliceRecent(normalized, query.limit).map((candle) =>
+    const bucketed = this.bucketStockCandles(
+      normalized,
+      query.intervalMinutes,
+      US_EASTERN_TIME_ZONE,
+    );
+    const candles = this.sliceRecent(bucketed, query.limit).map((candle) =>
       this.formatCandle(candle),
     );
 
@@ -415,7 +419,7 @@ export class AssetCandlesService {
         AUTH: '',
         EXCD: marketCode,
         SYMB: this.normalizeUsSymbol(asset.symbol),
-        NMIN: String(query.intervalMinutes),
+        NMIN: String(this.resolveKisSourceIntervalMinutes(query)),
         PINC: query.includePrevious ? '1' : '0',
         NEXT: '',
         NREC: String(query.limit),
@@ -646,32 +650,34 @@ export class AssetCandlesService {
     return null;
   }
 
-  private bucketDomesticCandles(
+  private bucketStockCandles(
     candles: readonly NormalizedCandle[],
     intervalMinutes: number,
+    timeZone: string,
   ): NormalizedCandle[] {
-    if (intervalMinutes === 1) {
-      return this.sortCandles(candles);
-    }
-
     const buckets = new Map<string, NormalizedCandle>();
 
     for (const candle of this.sortCandles(candles)) {
-      const bucketSourceTime = this.bucketSourceTime(
-        candle.sourceTime,
+      const bucketSourceDate = this.bucketSourceDate(
+        candle.sourceDate,
         intervalMinutes,
       );
-      const bucketKey = `${candle.sourceDate}-${bucketSourceTime}`;
+      const bucketSourceTime =
+        intervalMinutes >= 1440
+          ? '000000'
+          : this.bucketSourceTime(candle.sourceTime, intervalMinutes);
+      const bucketKey = `${bucketSourceDate}-${bucketSourceTime}`;
       const existing = buckets.get(bucketKey);
 
       if (!existing) {
         buckets.set(bucketKey, {
           ...candle,
+          sourceDate: bucketSourceDate,
           sourceTime: bucketSourceTime,
           time: this.zonedDateTimeToUtc(
-            candle.sourceDate,
+            bucketSourceDate,
             bucketSourceTime,
-            KOREA_TIME_ZONE,
+            timeZone,
           ),
         });
         continue;
@@ -685,6 +691,28 @@ export class AssetCandlesService {
     }
 
     return this.sortCandles([...buckets.values()]);
+  }
+
+  private bucketSourceDate(
+    sourceDate: string,
+    intervalMinutes: number,
+  ): string {
+    if (intervalMinutes < 10080) {
+      return sourceDate;
+    }
+
+    const date = new Date(
+      Date.UTC(
+        Number(sourceDate.slice(0, 4)),
+        Number(sourceDate.slice(4, 6)) - 1,
+        Number(sourceDate.slice(6, 8)),
+      ),
+    );
+    const day = date.getUTCDay();
+    const daysSinceMonday = day === 0 ? 6 : day - 1;
+    date.setUTCDate(date.getUTCDate() - daysSinceMonday);
+
+    return date.toISOString().slice(0, 10).replace(/-/gu, '');
   }
 
   private bucketSourceTime(
@@ -804,7 +832,7 @@ export class AssetCandlesService {
 
     return {
       interval,
-      intervalMinutes: this.resolveStockIntervalMinutes(interval),
+      intervalMinutes: CANDLE_INTERVAL_MINUTES[interval],
       limit: this.parseLimit(query.limit, asset.assetType),
       requestedDate: this.parseDate(query.date, timeZone),
       toHHmmss: parsedTo.hhmmss,
@@ -817,31 +845,19 @@ export class AssetCandlesService {
 
   private parseInterval(
     value: string | undefined,
-    assetType: AssetType,
+    _assetType: AssetType,
   ): CandleInterval {
-    const defaultInterval = assetType === AssetType.crypto ? '5m' : '1m';
-    const text = this.parseOptionalText(value) ?? defaultInterval;
+    void _assetType;
+    const text = this.parseOptionalText(value) ?? '5m';
 
-    if (assetType === AssetType.crypto) {
-      if (this.isCryptoCandleInterval(text)) {
-        return text;
-      }
-
-      this.throwApiError(
-        HttpStatus.BAD_REQUEST,
-        'ASSET_CANDLES_INVALID_INTERVAL',
-        'interval must be one of 5m, 15m, 30m, 1h, 4h, 1d, or 1w for crypto candles.',
-      );
-    }
-
-    if (this.isStockCandleInterval(text)) {
+    if (this.isCandleInterval(text)) {
       return text;
     }
 
     this.throwApiError(
       HttpStatus.BAD_REQUEST,
-      'INVALID_CANDLE_INTERVAL',
-      'interval must be one of 1m, 2m, 3m, 5m, 10m, 15m, or 30m.',
+      'ASSET_CANDLES_INVALID_INTERVAL',
+      'interval must be one of 5m, 15m, 30m, 1h, 4h, 1d, or 1w.',
     );
   }
 
@@ -856,23 +872,23 @@ export class AssetCandlesService {
     return Math.min(limit, maxLimit);
   }
 
-  private resolveStockIntervalMinutes(interval: CandleInterval): number {
-    return this.isStockCandleInterval(interval)
-      ? STOCK_INTERVAL_MINUTES[interval]
-      : 0;
+  private resolveKisSourceIntervalMinutes(
+    query: ParsedAssetCandlesQuery,
+  ): number {
+    return Math.min(query.intervalMinutes, 30);
   }
 
   private requireCryptoInterval(
     interval: CandleInterval,
   ): CryptoCandleInterval {
-    if (this.isCryptoCandleInterval(interval)) {
+    if (this.isCandleInterval(interval)) {
       return interval;
     }
 
     this.throwApiError(
       HttpStatus.BAD_REQUEST,
       'ASSET_CANDLES_INVALID_INTERVAL',
-      'interval must be one of 5m, 15m, 30m, 1h, 4h, 1d, or 1w for crypto candles.',
+      'interval must be one of 5m, 15m, 30m, 1h, 4h, 1d, or 1w.',
     );
   }
 
@@ -1370,12 +1386,8 @@ export class AssetCandlesService {
     return String(value).padStart(2, '0');
   }
 
-  private isStockCandleInterval(value: string): value is StockCandleInterval {
-    return Object.hasOwn(STOCK_INTERVAL_MINUTES, value);
-  }
-
-  private isCryptoCandleInterval(value: string): value is CryptoCandleInterval {
-    return Object.hasOwn(CRYPTO_INTERVALS, value);
+  private isCandleInterval(value: string): value is CandleInterval {
+    return Object.hasOwn(CANDLE_INTERVALS, value);
   }
 
   private isRecord(value: unknown): value is Record<string, unknown> {

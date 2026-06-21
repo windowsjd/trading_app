@@ -1,6 +1,7 @@
 # GET /api/v1/ranking API Contract
 
 ## Status
+
 - `GET /api/v1/ranking` read-only MVP is implemented.
 - The API reads existing `season_rankings` rows only.
 - The API does not calculate rankings, generate rankings, read daily snapshots for ad hoc ranking, or run scheduler/batch behavior.
@@ -9,6 +10,7 @@
 - Migration/backfill operations for existing tie-breaker rows are documented in `docs/ranking-backfill-runbook.md`.
 
 ## Source Rules
+
 - Ranking source of truth is `season_rankings`.
 - Amount values are strings.
 - Timestamps are UTC ISO strings.
@@ -53,6 +55,10 @@ Operator-run daily ranking and final settlement ranking use the same persisted p
 - `rankType` optional.
   - Default: `daily`.
   - Allowed: `daily`, `final`.
+- `capturedAt` optional, UTC ISO 8601 timestamp.
+  - First-page requests may omit it; the backend selects the latest snapshot for the selected season, rankType, and rankingDate.
+  - Follow-up offset pages should send the `rankingDate`, `rankType`, and `capturedAt` returned by the first page.
+  - If the latest available snapshot for the same season, rankType, and rankingDate has a different `capturedAt`, the API returns `RANKING_SNAPSHOT_CHANGED` and clients should reload from the first page.
 - `limit` optional.
   - Default: `50`.
   - Must be a positive integer.
@@ -115,6 +121,20 @@ Operator-run daily ranking and final settlement ranking use the same persisted p
   }
 }
 ```
+
+## Snapshot Changed Error
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "RANKING_SNAPSHOT_CHANGED",
+    "message": "Ranking snapshot changed. Please reload from the first page."
+  }
+}
+```
+
+Recommended HTTP status: `409 CONFLICT`.
 
 ## Unavailable Response
 
@@ -185,6 +205,7 @@ Invalid query or missing authentication uses the existing error envelope:
 ```
 
 Implemented error codes:
+
 - `UNAUTHORIZED`
 - `INVALID_RANK_TYPE`
 - `INVALID_RANKING_DATE`
@@ -192,7 +213,8 @@ Implemented error codes:
 - `INVALID_OFFSET`
 
 ## Not Implemented
+
 - Ranking calculation in the API request path.
 - Ranking generation in the API request path.
-- Scheduler/batch automatic ranking generation.
+- Scheduler/batch execution inside this read API request path; automatic generation is handled by the ops scheduler.
 - Advanced ranking filters, periods, season history views, reward/settlement integration.

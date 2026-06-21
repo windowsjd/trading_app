@@ -92,9 +92,11 @@
         "assetType": "domestic_stock | us_stock | crypto",
         "currencyCode": "KRW | USD",
         "isActive": true,
+        "changeRate": "<decimal string | null>",
         "price": {
           "state": "available",
           "currentPrice": "<decimal string>",
+          "changeRate": "<decimal string | null>",
           "priceCurrency": "KRW | USD",
           "priceKrwState": "available",
           "priceKrw": "<decimal string>",
@@ -154,6 +156,7 @@ If a USD asset has an eligible asset price but USD/KRW is missing or stale, `pri
   "price": {
     "state": "available",
     "currentPrice": "<decimal string>",
+    "changeRate": "<decimal string | null>",
     "priceCurrency": "USD",
     "priceKrwState": "unavailable",
     "priceKrwReason": "FX_RATE_UNAVAILABLE | FX_RATE_STALE",
@@ -181,6 +184,7 @@ If a USD asset has an eligible asset price but USD/KRW is missing or stale, `pri
 
 - Empty asset rows are valid: `state = available`, `assets = []`.
 - Price data absence does not hide the asset.
+- `changeRate` is a percent string when the backend can calculate `(currentPrice - basePrice) / basePrice * 100` from provider/price history; it remains `null` when no positive base price exists.
 - KRW assets can return `priceKrw` without USD/KRW FX.
 - USD assets use fresh `provider_api` ExchangeRate-API USD/KRW first, then fresh approved `admin_manual` USD/KRW fallback for `priceKrw`.
 - USD/KRW missing or stale makes only `priceKrwState = unavailable`.
@@ -248,13 +252,15 @@ Trading note policy:
 - Crypto candles are display-only and are not used for orders, quotes, valuation, ranking, settlement, scheduler jobs, `asset_price_snapshots`, or `fx_rate_snapshots`.
 - Crypto symbol normalization uses the asset symbol: `BTC` -> `BTCUSDT`, `ETH` -> `ETHUSDT`, existing `BTCUSDT` stays unchanged, and `BTC/USD`, `BTC-USD`, or `BTC_USD` normalize to `BTCUSDT`.
 - Binance USDT quote pairs are treated as USD-equivalent market data under the current MVP policy.
+- 지원 candle interval은 5m, 15m, 30m, 1h, 4h, 1d, 1w만 허용한다.
+- 그 외 interval은 validation error로 처리한다.
+- 필요 시 서버가 더 짧은 원천 candle을 집계해 상위 interval candle을 생성한다.
 - Raw Binance rows, raw provider payloads, metadata JSON, and secrets are never exposed.
 
-### Crypto Query Parameters
+### Query Parameters
 
-- `interval` optional. Crypto default is `5m`.
-  - Allowed for crypto: `5m`, `15m`, `30m`, `1h`, `4h`, `1d`, `1w`.
-  - Rejected for crypto: `1s`, `1m`, `2m`, `3m`, `10m`, `1M`, and any other value.
+- `interval` optional. Default is `5m`.
+  - Allowed for all asset candle types: `5m`, `15m`, `30m`, `1h`, `4h`, `1d`, `1w`.
 - `limit` optional.
   - Default: `100`.
   - Must be a positive integer.
@@ -264,7 +270,7 @@ Trading note policy:
 - `to` optional `HHmmss` or ISO datetime.
   - When present for crypto, Binance receives UTC millisecond `endTime`.
 
-### Crypto Response
+### Response
 
 ```json
 {
@@ -306,7 +312,7 @@ Trading note policy:
 }
 ```
 
-`state` is `available` when crypto candles are returned and `empty` when Binance returns an empty row array.
+`state` is `available` when candles are returned and `empty` when Binance returns an empty crypto row array.
 
 ## Error Codes
 
