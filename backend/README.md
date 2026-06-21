@@ -73,6 +73,24 @@ Refresh tokens are opaque random tokens. The raw token is returned to the client
 
 Scheduler/Ops env is non-secret and disabled by default. `SCHEDULER_ENABLED=false` prevents interval registration unless one of the explicit aliases is enabled. Each `SCHEDULER_*_ENABLED=false` flag keeps its job from running automatically. `SCHEDULER_RANKING_ENABLED` or `ENABLE_RANKING_SCHEDULER` enables current ranking refresh, `SCHEDULER_SEASON_LIFECYCLE_ENABLED` or `ENABLE_SEASON_LIFECYCLE_SCHEDULER` enables `active -> ended` lifecycle transitions, and `SCHEDULER_SETTLEMENT_ENABLED` or `ENABLE_SEASON_SETTLEMENT_SCHEDULER` enables ended-season settlement. `SCHEDULER_TICK_INTERVAL_MS` defaults to `60000`; `RANKING_REFRESH_INTERVAL_SECONDS` and `SEASON_SETTLEMENT_INTERVAL_SECONDS` are accepted second-based aliases when the tick interval is not set. `SCHEDULER_LOCK_TTL_SECONDS` defaults to `600`, and `SCHEDULER_MAX_ATTEMPTS` defaults to `1`.
 
+Production ranking automation requires the deployment environment to enable the ranking scheduler. Without this, current ranking automatic refresh and 5-minute scheduled equity snapshot creation do not run. Recommended production example:
+
+```env
+SCHEDULER_ENABLED=true
+SCHEDULER_RANKING_ENABLED=true
+SCHEDULER_TICK_INTERVAL_MS=60000
+SCHEDULER_LOCK_TTL_SECONDS=600
+SCHEDULER_MAX_ATTEMPTS=1
+```
+
+The minimal ranking-only alias is also accepted:
+
+```env
+ENABLE_RANKING_SCHEDULER=true
+```
+
+When the ranking scheduler is enabled, current ranking refresh runs on each 1-minute scheduler tick and scheduled equity snapshots are created from that ranking tick only on 5-minute buckets. Provider ingestion scheduler flags and reward marker scheduler flags are separate gates and must not be confused with ranking automation. These settings do not change the `/api/v1` contract and do not introduce `/api/v2`.
+
 `PROVIDER_INGESTION_ENABLED=false` is the fail-closed default for provider refresh/ingestion calls. Korea EXIM on-demand refresh requires both `PROVIDER_INGESTION_ENABLED=true` and `KOREA_EXIM_EXCHANGE_ENABLED=true`. If either flag is disabled, `GET /api/v1/fx/rates/current` falls back to existing DB snapshots and returns `FX_RATE_UNAVAILABLE` only when no usable provider row or approved `admin_manual` row exists.
 
 Korea EXIM exchange provider env is `KOREA_EXIM_EXCHANGE_ENABLED`, `KOREA_EXIM_EXCHANGE_AUTH_KEY`, `KOREA_EXIM_EXCHANGE_BASE_URL`, `KOREA_EXIM_EXCHANGE_DATA`, and `KOREA_EXIM_EXCHANGE_LOOKBACK_DAYS`. The request URL is `https://oapi.koreaexim.go.kr/site/program/financial/exchangeJSON` with `authkey`, `searchdate`, and `data=AP01`; USD/KRW uses the USD row's `DEAL_BAS_R` value with commas removed. Real auth keys must live only in `.env.local`; `.env.example` keeps the auth key blank. ExchangeRate-API remains the fallback provider after Korea EXIM exchange.

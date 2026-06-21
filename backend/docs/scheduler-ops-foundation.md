@@ -91,6 +91,7 @@ SCHEDULER_PROVIDER_FX_ENABLED=false
 SCHEDULER_PROVIDER_BINANCE_ENABLED=false
 SCHEDULER_DAILY_SNAPSHOT_ENABLED=false
 SCHEDULER_RANKING_ENABLED=false
+SCHEDULER_SEASON_LIFECYCLE_ENABLED=false
 SCHEDULER_SETTLEMENT_ENABLED=false
 SCHEDULER_REWARD_MARKER_ENABLED=false
 SCHEDULER_TICK_INTERVAL_MS=60000
@@ -104,7 +105,27 @@ No secret scheduler env is introduced.
 
 When `SCHEDULER_ENABLED=false`, no interval is registered and no automatic job runs. When enabled, individual job flags decide which internal runner methods are called. The foundation uses an internal `setInterval` shell without adding package dependencies.
 
+To run current ranking automation in production, enable at least one ranking scheduler flag in the deployment environment. Recommended production example:
+
+```env
+SCHEDULER_ENABLED=true
+SCHEDULER_RANKING_ENABLED=true
+SCHEDULER_TICK_INTERVAL_MS=60000
+SCHEDULER_LOCK_TTL_SECONDS=600
+SCHEDULER_MAX_ATTEMPTS=1
+```
+
+The minimal accepted alias is:
+
+```env
+ENABLE_RANKING_SCHEDULER=true
+```
+
+If the ranking scheduler is not enabled, current ranking automatic refresh and 5-minute scheduled equity snapshot creation do not run. Ranking refresh runs every 1-minute scheduler tick when enabled, and scheduled equity snapshots are created from that ranking tick only on 5-minute buckets.
+
 Enabled scheduler calls use ops locks and `dryRun=false` for jobs whose backend automation is implemented. Current ranking refresh runs every `SCHEDULER_TICK_INTERVAL_MS` tick, which defaults to 1 minute, and scheduled equity snapshots are created only on 5-minute buckets with duplicate-bucket protection. Provider ingestion and reward marker jobs remain skipped/not implemented unless a later gate opens them.
+
+Provider ingestion scheduler flags and reward marker scheduler flags are separate gates and must not be confused with ranking automation. Scheduler env changes do not alter the `/api/v1` contract and do not add `/api/v2`.
 
 ## Real DB Lock Smoke
 
