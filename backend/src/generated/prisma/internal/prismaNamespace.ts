@@ -395,6 +395,7 @@ export const ModelName = {
   RewardFulfillmentRequest: 'RewardFulfillmentRequest',
   Asset: 'Asset',
   AssetPriceSnapshot: 'AssetPriceSnapshot',
+  AssetOrderbookSnapshot: 'AssetOrderbookSnapshot',
   Position: 'Position',
   Order: 'Order',
   CashWallet: 'CashWallet',
@@ -424,7 +425,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "operatorAuditLog" | "refreshTokenSession" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "position" | "order" | "cashWallet" | "walletTransaction" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock"
+    modelProps: "user" | "operatorAuditLog" | "refreshTokenSession" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "position" | "order" | "cashWallet" | "walletTransaction" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1239,6 +1240,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.AssetPriceSnapshotCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.AssetPriceSnapshotCountAggregateOutputType> | number
+        }
+      }
+    }
+    AssetOrderbookSnapshot: {
+      payload: Prisma.$AssetOrderbookSnapshotPayload<ExtArgs>
+      fields: Prisma.AssetOrderbookSnapshotFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.AssetOrderbookSnapshotFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AssetOrderbookSnapshotPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.AssetOrderbookSnapshotFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AssetOrderbookSnapshotPayload>
+        }
+        findFirst: {
+          args: Prisma.AssetOrderbookSnapshotFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AssetOrderbookSnapshotPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.AssetOrderbookSnapshotFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AssetOrderbookSnapshotPayload>
+        }
+        findMany: {
+          args: Prisma.AssetOrderbookSnapshotFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AssetOrderbookSnapshotPayload>[]
+        }
+        create: {
+          args: Prisma.AssetOrderbookSnapshotCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AssetOrderbookSnapshotPayload>
+        }
+        createMany: {
+          args: Prisma.AssetOrderbookSnapshotCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.AssetOrderbookSnapshotCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AssetOrderbookSnapshotPayload>[]
+        }
+        delete: {
+          args: Prisma.AssetOrderbookSnapshotDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AssetOrderbookSnapshotPayload>
+        }
+        update: {
+          args: Prisma.AssetOrderbookSnapshotUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AssetOrderbookSnapshotPayload>
+        }
+        deleteMany: {
+          args: Prisma.AssetOrderbookSnapshotDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.AssetOrderbookSnapshotUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.AssetOrderbookSnapshotUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AssetOrderbookSnapshotPayload>[]
+        }
+        upsert: {
+          args: Prisma.AssetOrderbookSnapshotUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AssetOrderbookSnapshotPayload>
+        }
+        aggregate: {
+          args: Prisma.AssetOrderbookSnapshotAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateAssetOrderbookSnapshot>
+        }
+        groupBy: {
+          args: Prisma.AssetOrderbookSnapshotGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AssetOrderbookSnapshotGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.AssetOrderbookSnapshotCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AssetOrderbookSnapshotCountAggregateOutputType> | number
         }
       }
     }
@@ -2525,6 +2600,26 @@ export const AssetPriceSnapshotScalarFieldEnum = {
 export type AssetPriceSnapshotScalarFieldEnum = (typeof AssetPriceSnapshotScalarFieldEnum)[keyof typeof AssetPriceSnapshotScalarFieldEnum]
 
 
+export const AssetOrderbookSnapshotScalarFieldEnum = {
+  id: 'id',
+  assetId: 'assetId',
+  sourceType: 'sourceType',
+  sourceName: 'sourceName',
+  bidPrice: 'bidPrice',
+  bidQuantity: 'bidQuantity',
+  askPrice: 'askPrice',
+  askQuantity: 'askQuantity',
+  spreadBps: 'spreadBps',
+  currencyCode: 'currencyCode',
+  effectiveAt: 'effectiveAt',
+  capturedAt: 'capturedAt',
+  rawPayloadJson: 'rawPayloadJson',
+  createdAt: 'createdAt'
+} as const
+
+export type AssetOrderbookSnapshotScalarFieldEnum = (typeof AssetOrderbookSnapshotScalarFieldEnum)[keyof typeof AssetOrderbookSnapshotScalarFieldEnum]
+
+
 export const PositionScalarFieldEnum = {
   id: 'id',
   seasonParticipantId: 'seasonParticipantId',
@@ -3454,6 +3549,7 @@ export type GlobalOmitConfig = {
   rewardFulfillmentRequest?: Prisma.RewardFulfillmentRequestOmit
   asset?: Prisma.AssetOmit
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotOmit
+  assetOrderbookSnapshot?: Prisma.AssetOrderbookSnapshotOmit
   position?: Prisma.PositionOmit
   order?: Prisma.OrderOmit
   cashWallet?: Prisma.CashWalletOmit

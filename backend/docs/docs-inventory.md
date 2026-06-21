@@ -79,7 +79,7 @@ No docs were deleted. No empty or duplicate document was identified for deletion
 
 - Current source-of-truth docs were updated to reflect `daily_portfolio_snapshot` provider_api eligibility for operator-run daily snapshot valuation only.
 - Batch result `sourceSummary`/fallback information is documented as `batch_job_runs.resultPayloadJson` evidence; `daily_portfolio_snapshots` schema remains unchanged.
-- `/fx execute`, orders create/execute, ranking, settlement/final result, reward, scheduler/cron, provider trigger APIs, and batch HTTP APIs remain closed.
+- `/fx execute`, orders create/execute, ranking, settlement/final result, reward, scheduler/cron, and batch HTTP APIs remained closed at this historical gate. Provider trigger APIs were opened later only as operator/admin market-data triggers.
 
 2026-06-05 daily snapshot verification and realtime execution policy foundation pass:
 
@@ -93,7 +93,7 @@ No docs were deleted. No empty or duplicate document was identified for deletion
 - `/fx quote` and orders quote now return `quoteId`, `expiresAt`, and `maxChangeBps`.
 - `/fx execute` and orders execute now require/consume durable quotes and use execute-time fresh provider_api rates/prices with quote movement guards and no default `admin_manual` execute fallback.
 - Orders create binds `Order.quoteId` to the durable quote but remains a submitted-order stage with no wallet/position mutation.
-- Ranking, settlement, reward business automation, provider trigger APIs, batch HTTP APIs, and real trading/account APIs remain closed. Scheduler/Ops foundation was added in the following hardening gate and remains disabled by default.
+- Ranking, settlement, reward business automation, batch HTTP APIs, and real trading/account APIs remain closed at this historical gate. Provider trigger APIs were opened later only as operator/admin market-data triggers. Scheduler/Ops foundation was added in the following hardening gate and remains disabled by default.
 
 2026-06-08 durable execute hardening and Scheduler/Ops foundation gate:
 

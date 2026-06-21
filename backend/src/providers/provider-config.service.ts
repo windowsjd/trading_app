@@ -44,6 +44,14 @@ export type KisMarketDataConfig = {
   appKey?: string;
   appSecret?: string;
   restBaseUrl?: string;
+  restDomesticCurrentPricePath: string;
+  restDomesticCurrentPriceTrId: string;
+  restUsCurrentPricePath: string;
+  restUsCurrentPriceTrId: string;
+  restDomesticHogaPath: string;
+  restDomesticHogaTrId: string;
+  restUsHogaPath: string;
+  restUsHogaTrId: string;
   wsBaseUrl?: string;
   wsCustType: string;
   wsDomesticTrId: string;
@@ -246,6 +254,29 @@ export function buildProviderConfig(env: ProviderEnv): ProviderConfig {
       ? requireEnv(env, 'KIS_APP_SECRET', 'kis')
       : readOptionalTrimmedEnv(env, 'KIS_APP_SECRET'),
     restBaseUrl: kisRestBaseUrl,
+    restDomesticCurrentPricePath:
+      readOptionalTrimmedEnv(env, 'KIS_REST_DOMESTIC_CURRENT_PRICE_PATH') ??
+      '/uapi/domestic-stock/v1/quotations/inquire-price',
+    restDomesticCurrentPriceTrId:
+      readOptionalTrimmedEnv(env, 'KIS_REST_DOMESTIC_CURRENT_PRICE_TR_ID') ??
+      'FHKST01010100',
+    restUsCurrentPricePath:
+      readOptionalTrimmedEnv(env, 'KIS_REST_US_CURRENT_PRICE_PATH') ??
+      '/uapi/overseas-price/v1/quotations/price',
+    restUsCurrentPriceTrId:
+      readOptionalTrimmedEnv(env, 'KIS_REST_US_CURRENT_PRICE_TR_ID') ??
+      'HHDFS00000300',
+    restDomesticHogaPath:
+      readOptionalTrimmedEnv(env, 'KIS_REST_DOMESTIC_HOGA_PATH') ??
+      '/uapi/domestic-stock/v1/quotations/inquire-asking-price-exp-ccn',
+    restDomesticHogaTrId:
+      readOptionalTrimmedEnv(env, 'KIS_REST_DOMESTIC_HOGA_TR_ID') ??
+      'FHKST01010200',
+    restUsHogaPath:
+      readOptionalTrimmedEnv(env, 'KIS_REST_US_HOGA_PATH') ??
+      '/uapi/overseas-price/v1/quotations/inquire-asking-price',
+    restUsHogaTrId:
+      readOptionalTrimmedEnv(env, 'KIS_REST_US_HOGA_TR_ID') ?? 'HHDFS76200100',
     wsBaseUrl: kisWsBaseUrl,
     wsCustType: readOptionalTrimmedEnv(env, 'KIS_WS_CUSTTYPE') ?? 'P',
     wsDomesticTrId:

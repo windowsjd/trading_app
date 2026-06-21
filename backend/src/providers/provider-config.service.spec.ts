@@ -119,6 +119,47 @@ describe('provider config', () => {
     expect(config.kis.wsAllowUsDelayed).toBe(false);
   });
 
+  it('parses KIS REST current-price and hoga path/TR_ID defaults and overrides', () => {
+    const defaults = buildProviderConfig({});
+
+    expect(defaults.kis.restDomesticCurrentPricePath).toBe(
+      '/uapi/domestic-stock/v1/quotations/inquire-price',
+    );
+    expect(defaults.kis.restDomesticCurrentPriceTrId).toBe('FHKST01010100');
+    expect(defaults.kis.restUsCurrentPricePath).toBe(
+      '/uapi/overseas-price/v1/quotations/price',
+    );
+    expect(defaults.kis.restUsCurrentPriceTrId).toBe('HHDFS00000300');
+    expect(defaults.kis.restDomesticHogaPath).toBe(
+      '/uapi/domestic-stock/v1/quotations/inquire-asking-price-exp-ccn',
+    );
+    expect(defaults.kis.restDomesticHogaTrId).toBe('FHKST01010200');
+    expect(defaults.kis.restUsHogaPath).toBe(
+      '/uapi/overseas-price/v1/quotations/inquire-asking-price',
+    );
+    expect(defaults.kis.restUsHogaTrId).toBe('HHDFS76200100');
+
+    const overrides = buildProviderConfig({
+      KIS_REST_DOMESTIC_CURRENT_PRICE_PATH: '/domestic-price',
+      KIS_REST_DOMESTIC_CURRENT_PRICE_TR_ID: 'DOMPRICE',
+      KIS_REST_US_CURRENT_PRICE_PATH: '/us-price',
+      KIS_REST_US_CURRENT_PRICE_TR_ID: 'USPRICE',
+      KIS_REST_DOMESTIC_HOGA_PATH: '/domestic-hoga',
+      KIS_REST_DOMESTIC_HOGA_TR_ID: 'DOMHOGA',
+      KIS_REST_US_HOGA_PATH: '/us-hoga',
+      KIS_REST_US_HOGA_TR_ID: 'USHOGA',
+    });
+
+    expect(overrides.kis.restDomesticCurrentPricePath).toBe('/domestic-price');
+    expect(overrides.kis.restDomesticCurrentPriceTrId).toBe('DOMPRICE');
+    expect(overrides.kis.restUsCurrentPricePath).toBe('/us-price');
+    expect(overrides.kis.restUsCurrentPriceTrId).toBe('USPRICE');
+    expect(overrides.kis.restDomesticHogaPath).toBe('/domestic-hoga');
+    expect(overrides.kis.restDomesticHogaTrId).toBe('DOMHOGA');
+    expect(overrides.kis.restUsHogaPath).toBe('/us-hoga');
+    expect(overrides.kis.restUsHogaTrId).toBe('USHOGA');
+  });
+
   it('parses Binance symbols as uppercase unique values', () => {
     const config = buildProviderConfig({
       BINANCE_CRYPTO_SYMBOLS: 'btcusdt, ETHUSDT,btcusdt,, ',

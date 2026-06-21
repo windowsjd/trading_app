@@ -199,7 +199,7 @@ Consistency note:
 - Known limitations: current quote is a reference quote, not a guaranteed execution price.
 - Remaining work: broader quote recovery/cleanup policy if quote table retention becomes operationally important.
 - Risk level: MEDIUM.
-- Recommended next action: keep quote persistence/hash/source metadata tests green; do not add provider trigger APIs.
+- Recommended next action: keep quote persistence/hash/source metadata tests green; provider ingestion triggers are handled only by the separate operator/admin market-data trigger contract.
 
 ### FX Execute
 

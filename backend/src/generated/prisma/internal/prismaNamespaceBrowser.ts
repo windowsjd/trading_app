@@ -62,6 +62,7 @@ export const ModelName = {
   RewardFulfillmentRequest: 'RewardFulfillmentRequest',
   Asset: 'Asset',
   AssetPriceSnapshot: 'AssetPriceSnapshot',
+  AssetOrderbookSnapshot: 'AssetOrderbookSnapshot',
   Position: 'Position',
   Order: 'Order',
   CashWallet: 'CashWallet',
@@ -300,6 +301,26 @@ export const AssetPriceSnapshotScalarFieldEnum = {
 } as const
 
 export type AssetPriceSnapshotScalarFieldEnum = (typeof AssetPriceSnapshotScalarFieldEnum)[keyof typeof AssetPriceSnapshotScalarFieldEnum]
+
+
+export const AssetOrderbookSnapshotScalarFieldEnum = {
+  id: 'id',
+  assetId: 'assetId',
+  sourceType: 'sourceType',
+  sourceName: 'sourceName',
+  bidPrice: 'bidPrice',
+  bidQuantity: 'bidQuantity',
+  askPrice: 'askPrice',
+  askQuantity: 'askQuantity',
+  spreadBps: 'spreadBps',
+  currencyCode: 'currencyCode',
+  effectiveAt: 'effectiveAt',
+  capturedAt: 'capturedAt',
+  rawPayloadJson: 'rawPayloadJson',
+  createdAt: 'createdAt'
+} as const
+
+export type AssetOrderbookSnapshotScalarFieldEnum = (typeof AssetOrderbookSnapshotScalarFieldEnum)[keyof typeof AssetOrderbookSnapshotScalarFieldEnum]
 
 
 export const PositionScalarFieldEnum = {

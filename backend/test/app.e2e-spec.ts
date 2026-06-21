@@ -184,8 +184,13 @@ type PrismaMock = {
     findUnique: jest.Mock;
   };
   assetPriceSnapshot: {
+    create: jest.Mock;
     findFirst: jest.Mock;
     findMany: jest.Mock;
+  };
+  assetOrderbookSnapshot: {
+    create: jest.Mock;
+    findFirst: jest.Mock;
   };
   cashWallet: {
     create: jest.Mock;
@@ -391,8 +396,13 @@ describe('AppController (e2e)', () => {
         findUnique: jest.fn(),
       },
       assetPriceSnapshot: {
+        create: jest.fn(),
         findFirst: jest.fn(),
         findMany: jest.fn(),
+      },
+      assetOrderbookSnapshot: {
+        create: jest.fn(),
+        findFirst: jest.fn(),
       },
       cashWallet: {
         create: jest.fn(),
@@ -615,6 +625,8 @@ describe('AppController (e2e)', () => {
     expect(prisma.position.create).not.toHaveBeenCalled();
     expect(prisma.position.update).not.toHaveBeenCalled();
     expect(prisma.position.updateMany).not.toHaveBeenCalled();
+    expect(prisma.assetPriceSnapshot.create).not.toHaveBeenCalled();
+    expect(prisma.assetOrderbookSnapshot.create).not.toHaveBeenCalled();
     expect(prisma.refreshTokenSession.create).not.toHaveBeenCalled();
     expect(prisma.refreshTokenSession.updateMany).not.toHaveBeenCalled();
     expect(prisma.rewardFulfillmentRequest.create).not.toHaveBeenCalled();
@@ -644,6 +656,7 @@ describe('AppController (e2e)', () => {
     expect(prisma.asset.count).not.toHaveBeenCalled();
     expect(prisma.asset.findMany).not.toHaveBeenCalled();
     expect(prisma.asset.findUnique).not.toHaveBeenCalled();
+    expect(prisma.assetOrderbookSnapshot.findFirst).not.toHaveBeenCalled();
     expect(prisma.assetPriceSnapshot.findFirst).not.toHaveBeenCalled();
     expect(prisma.order.count).not.toHaveBeenCalled();
     expect(prisma.order.findFirst).not.toHaveBeenCalled();
@@ -1382,6 +1395,104 @@ describe('AppController (e2e)', () => {
 
   it('/api/v1/operator/users (GET) rejects missing token', async () => {
     await expectUnauthorizedWithoutToken('get', '/api/v1/operator/users');
+  });
+
+  it('/api/v1/operator/provider-ingestions/:provider/run rejects missing token', async () => {
+    await expectUnauthorizedWithoutToken(
+      'post',
+      '/api/v1/operator/provider-ingestions/binance/run',
+      {
+        dryRun: true,
+      },
+    );
+  });
+
+  it('/api/v1/operator/provider-ingestions/:provider/run rejects user role', async () => {
+    resetPrismaMocks();
+    mockActiveUser(user.id, 'user');
+    const token = await createValidAccessToken(user.id);
+
+    return request(app.getHttpServer())
+      .post('/api/v1/operator/provider-ingestions/binance/run')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        dryRun: true,
+        symbols: ['BTCUSDT'],
+      })
+      .expect(403)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: false,
+          error: {
+            code: 'OPERATOR_FORBIDDEN',
+          },
+        });
+        expect(prisma.assetPriceSnapshot.create).not.toHaveBeenCalled();
+        expect(prisma.assetOrderbookSnapshot.create).not.toHaveBeenCalled();
+        expect(prisma.operatorAuditLog.create).not.toHaveBeenCalled();
+      });
+  });
+
+  it('/api/v1/operator/provider-ingestions/:provider/run returns skipped summary and audits when disabled', async () => {
+    const previousProviderIngestionEnabled =
+      process.env.PROVIDER_INGESTION_ENABLED;
+    process.env.PROVIDER_INGESTION_ENABLED = 'false';
+    resetPrismaMocks();
+    mockActiveUser(user.id, 'operator');
+    const token = await createValidAccessToken(user.id);
+
+    try {
+      return await request(app.getHttpServer())
+        .post('/api/v1/operator/provider-ingestions/binance/run')
+        .set('Authorization', `Bearer ${token}`)
+        .set('x-request-id', 'provider-ingestion-1')
+        .send({
+          dryRun: true,
+          symbols: ['BTCUSDT'],
+          reason: 'manual_smoke',
+        })
+        .expect(200)
+        .expect((response) => {
+          expect(response.body).toMatchObject({
+            success: true,
+            data: {
+              provider: 'binance',
+              dryRun: true,
+              state: 'skipped',
+              errorCode: 'PROVIDER_INGESTION_DISABLED',
+            },
+          });
+          expect(JSON.stringify(response.body)).not.toMatch(
+            /app_secret|approval_key|access_token|DATABASE_URL|rawPayload/i,
+          );
+          expect(prisma.assetPriceSnapshot.create).not.toHaveBeenCalled();
+          expect(prisma.assetOrderbookSnapshot.create).not.toHaveBeenCalled();
+          expect(prisma.operatorAuditLog.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+              data: expect.objectContaining({
+                action: 'operator.provider_ingestion.run',
+                actorRole: 'operator',
+                targetId: 'binance',
+                requestId: 'provider-ingestion-1',
+                result: 'success',
+                metadataJson: expect.objectContaining({
+                  dryRun: true,
+                  reason: 'manual_smoke',
+                  state: 'skipped',
+                  errorCode: 'PROVIDER_INGESTION_DISABLED',
+                }),
+              }),
+            }),
+          );
+        });
+    } finally {
+      if (previousProviderIngestionEnabled === undefined) {
+        delete process.env.PROVIDER_INGESTION_ENABLED;
+      } else {
+        process.env.PROVIDER_INGESTION_ENABLED =
+          previousProviderIngestionEnabled;
+      }
+    }
   });
 
   it('/api/v1/operator/seasons/:seasonId/participants/:seasonParticipantId/exclude rejects user role', async () => {

@@ -1,6 +1,6 @@
 # Provider Ingestion Foundation
 
-Status: implemented foundation for explicit operator-run provider ingestion, no cron scheduler. Read-only/quote and operator-run daily snapshot provider_api source eligibility are implemented separately for the allowed workflows only.
+Status: implemented foundation for explicit operator-run provider ingestion, including an operator/admin HTTP trigger. No cron scheduler is enabled. Read-only/quote and operator-run daily snapshot provider_api source eligibility are implemented separately for the allowed workflows only.
 
 Fixed KIS stock universe status as of 2026-05-30 KST:
 
@@ -13,7 +13,7 @@ Fixed KIS stock universe status as of 2026-05-30 KST:
 - After the local DB was started on 2026-05-30, all fixed 40 stock assets were upserted successfully and DB mapping counts passed: domestic 15/15, US 25/25, KIS total 40/41.
 - ExchangeRate and Binance dry-runs succeeded after DB restart; Binance `BTCUSDT` and `ETHUSDT` mapped to existing active `BINANCE` USD crypto assets.
 - KIS live smoke remained blocked on 2026-05-30 because KIS REST/WS endpoint env values were missing in the loaded env. Explicit WebSocket policy env values were also absent, but code defaults are defined.
-- `provider_api` source eligibility is open only for the explicit read-only/quote workflows, `/fx execute`, orders execute, and the operator-run daily snapshot valuation workflow. Ranking, settlement, reward, provider trigger APIs, batch HTTP APIs, production scheduler automation, and real trading/account surfaces remain closed.
+- `provider_api` source eligibility is open only for the explicit read-only/quote workflows, `/fx execute`, orders execute, and the operator-run daily snapshot valuation workflow. Ranking, reward workflows, batch HTTP APIs, production scheduler automation, and real trading/account surfaces remain closed.
 
 KIS env completion pre-gate update as of 2026-05-30 KST:
 
@@ -89,11 +89,11 @@ Live smoke evidence status as of 2026-05-28 KST:
 - Binance public REST dry-run and non-dry-run live smoke succeeded for `BTCUSDT` and `ETHUSDT`, mapped to existing active `BINANCE` crypto USD assets, and created two local `asset_price_snapshots` rows with `sourceType=provider_api`, `sourceName=binance_public_rest_24hr_ticker`, and `currencyCode=USD`.
 - KIS WebSocket live smoke was not executed because required endpoint env was incomplete: `KIS_REST_BASE_URL` and `KIS_WS_BASE_URL` were missing. KIS approval_key, WebSocket connect, subscribe ack, domestic `H0STCNT0` tick, US `HDFSCNT0` tick, and KIS DB row insertion remain `BLOCKED`.
 - No secret values, approval keys, `.env.local` contents, `DATABASE_URL`, or full raw WebSocket frames were printed or documented.
-- This evidence is now accepted for the read-only/quote source eligibility gate, Durable Quote provider execute gate, and the operator-run daily snapshot valuation gate. It still does not open orders create source selection, ranking, settlement, reward, provider trigger, batch HTTP API, production scheduler automation, or real trading/account paths.
+- This evidence is now accepted for the read-only/quote source eligibility gate, Durable Quote provider execute gate, the operator-run daily snapshot valuation gate, and explicit operator/admin provider ingestion trigger dry-runs/non-dry-runs. It still does not open ranking, reward, batch HTTP API, production scheduler automation, or real trading/account paths.
 
 ## Scope
 
-This foundation supports market data provider configuration, secret redaction, raw payload truncation, Korea EXIM exchange USD/KRW snapshot ingestion, ExchangeRate-API USD/KRW snapshot ingestion, Binance public crypto price snapshot ingestion, and KIS WebSocket trade price snapshot ingestion foundation.
+This foundation supports market data provider configuration, secret redaction, raw payload truncation, Korea EXIM exchange USD/KRW snapshot ingestion, ExchangeRate-API USD/KRW snapshot ingestion, Binance public crypto price snapshot ingestion, KIS WebSocket trade price snapshot ingestion, KIS REST current-price ingestion, KIS REST hoga/orderbook snapshot ingestion, and an operator/admin HTTP trigger for these market-data paths.
 
 This project remains a virtual trading app. External provider APIs are used only for market data evidence. Real orders, account linkage, balances, deposits, withdrawals, fills, and trading endpoints are not implemented.
 
@@ -139,18 +139,25 @@ This project remains a virtual trading app. External provider APIs are used only
 - Adds KIS WebSocket trade-price subscription builders and parsers for:
   - Domestic KRX real-time trade price `H0STCNT0`.
   - Overseas/US delayed trade price `HDFSCNT0`.
+- Adds KIS REST current-price ingestion for:
+  - Domestic KRX current price using configurable path/TR ID defaults `KIS_REST_DOMESTIC_CURRENT_PRICE_PATH=/uapi/domestic-stock/v1/quotations/inquire-price` and `KIS_REST_DOMESTIC_CURRENT_PRICE_TR_ID=FHKST01010100`.
+  - US current price using configurable path/TR ID defaults `KIS_REST_US_CURRENT_PRICE_PATH=/uapi/overseas-price/v1/quotations/price` and `KIS_REST_US_CURRENT_PRICE_TR_ID=HHDFS00000300`.
+- Adds KIS REST hoga/orderbook snapshot ingestion for:
+  - Domestic KRX hoga using configurable path/TR ID defaults `KIS_REST_DOMESTIC_HOGA_PATH=/uapi/domestic-stock/v1/quotations/inquire-asking-price-exp-ccn` and `KIS_REST_DOMESTIC_HOGA_TR_ID=FHKST01010200`.
+  - US hoga using configurable path/TR ID defaults `KIS_REST_US_HOGA_PATH=/uapi/overseas-price/v1/quotations/inquire-asking-price` and `KIS_REST_US_HOGA_TR_ID=HHDFS76200100`.
 - Inserts `asset_price_snapshots` rows with `sourceType=provider_api` only when an existing active asset mapping is unambiguous:
   - Domestic: `sourceName=kis_krx_realtime_trade`, `currencyCode=KRW`, `assetType=domestic_stock`, 6-digit symbol, KRX/KOSPI/KOSDAQ/KONEX market family.
   - US: `sourceName=kis_us_delayed_trade`, `currencyCode=USD`, `assetType=us_stock`, NAS/NASDAQ, NYS/NYSE, or AMS/AMEX market mapping.
+- REST current-price ingestion deliberately reuses the existing eligible trade source names above so quote/execute source eligibility remains aligned.
+- Hoga/orderbook ingestion inserts only `asset_orderbook_snapshots` rows with `sourceType=provider_api`, source names `kis_krx_realtime_hoga` or `kis_us_delayed_hoga`, bid/ask/quantity/spread_bps, currency, effective/captured timestamps, and redacted/truncated raw payload metadata. Hoga rows are not used for order quote/create/execute pricing.
 - Uses KIS source timestamps from `BSOP_DATE + STCK_CNTG_HOUR` or `KYMD + KHMS` as Asia/Seoul time converted to UTC. If parsing fails, server receive time is used while preserving sanitized raw payload.
 - Stores prices as decimal strings at 8-digit scale, applies per-asset snapshot throttle, skips exact duplicate snapshots, and supports dry-run without DB writes.
 - Adds watchlist policy: `KIS_DOMESTIC_SYMBOLS + KIS_US_SYMBOLS` unique normalized total must be at most `KIS_MAX_WATCHLIST_SIZE`, default 41.
 - `KIS_US_SYMBOLS` preferred format is `NAS:AAPL,NYS:IBM,AMS:SPY`. Bare symbols such as `AAPL` are resolved from existing active asset market mapping when unambiguous.
 - If `KIS_REST_BASE_URL` or `KIS_WS_BASE_URL` is empty, KIS live calls are skipped. This does not fail ExchangeRate-API or Binance ingestion.
 - US free delayed feed is allowed for MVP row insertion only; US is documented by KIS as 0-minute delayed/free data. Hong Kong, Vietnam, China, and Japan delayed markets are not allowed in this MVP and are skipped.
-- KIS REST current-price quote ingestion is not implemented in this gate.
 - KIS order, account, balance, fill, deposit, withdrawal, and real trading APIs are not implemented.
-- KIS orderbook/hoga WebSocket, best bid/ask execution, partial fills, and slippage are not implemented.
+- Best bid/ask execution, partial fills, slippage models, and use of hoga data for execution are not implemented.
 
 ## Env
 
@@ -189,6 +196,14 @@ KIS:
 - `KIS_APP_SECRET`
 - `KIS_REST_BASE_URL`
 - `KIS_WS_BASE_URL`
+- `KIS_REST_DOMESTIC_CURRENT_PRICE_PATH`
+- `KIS_REST_DOMESTIC_CURRENT_PRICE_TR_ID`
+- `KIS_REST_US_CURRENT_PRICE_PATH`
+- `KIS_REST_US_CURRENT_PRICE_TR_ID`
+- `KIS_REST_DOMESTIC_HOGA_PATH`
+- `KIS_REST_DOMESTIC_HOGA_TR_ID`
+- `KIS_REST_US_HOGA_PATH`
+- `KIS_REST_US_HOGA_TR_ID`
 - `KIS_MAX_WATCHLIST_SIZE`
 - `KIS_DOMESTIC_SYMBOLS`
 - `KIS_US_SYMBOLS`
@@ -233,7 +248,28 @@ KIS WebSocket trade prices:
 pnpm tsx scripts/provider-ingest-kis-websocket-prices.ts --dry-run --duration-ms 30000 --domestic-symbols 005930,000660 --us-symbols NAS:AAPL,NYS:IBM --requested-by local-operator
 ```
 
-All scripts are explicit operator commands. No cron scheduler or admin HTTP ingestion API is added.
+Operator/admin HTTP trigger:
+
+```http
+POST /api/v1/operator/provider-ingestions/binance/run
+POST /api/v1/operator/provider-ingestions/kis/run
+```
+
+Example body:
+
+```json
+{
+  "dryRun": true,
+  "symbols": ["005930", "NAS:AAPL"],
+  "maxSnapshots": 20,
+  "kisModes": ["rest_current_price", "rest_hoga"],
+  "reason": "manual_smoke"
+}
+```
+
+Supported provider path values are `exchange-rate`, `korea-exim`, `binance`, and `kis`. `dryRun` defaults to `true`; non-dry-run requires explicit `"dryRun": false`. The HTTP trigger writes safe `OperatorAuditLog` metadata and returns aggregate summaries only. Raw provider payloads, access tokens, approval keys, app keys/secrets, and `.env.local` contents are not returned.
+
+All scripts and HTTP triggers are explicit operator actions. No cron scheduler or batch HTTP API is added.
 
 ## Boundaries
 
@@ -245,8 +281,8 @@ All scripts are explicit operator commands. No cron scheduler or admin HTTP inge
 - Provider outages, parse errors, missing mappings, and rate limits must not create fake rows.
 - KIS WebSocket trade price ingestion can create provider_api rows, and fresh KRX/NAS/NYS rows may power allowed read-only/quote workflows plus operator-run daily snapshot valuation only.
 - Binance user data streams are not used.
-- KIS REST current-price ingestion is not implemented.
-- KIS WebSocket orderbook/hoga ingestion is not implemented.
+- KIS REST current-price ingestion can create provider_api stock price rows for mapped domestic/US assets.
+- KIS REST hoga/orderbook ingestion can create `asset_orderbook_snapshots` rows for mapped domestic/US assets.
 - KIS order, account, balance, fill, deposit, withdrawal, and real trading APIs are not implemented.
 - `CurrencyCode.USDT` is not added.
 
@@ -254,4 +290,4 @@ All scripts are explicit operator commands. No cron scheduler or admin HTTP inge
 
 Provider API Source Eligibility Implementation Gate read-only/quote phase and the operator-run daily snapshot eligibility gate are implemented using `docs/provider-source-eligibility-pre-gate.md`.
 
-Next provider-related gates should remain narrower and explicit: execute/write eligibility using `docs/realtime-execution-policy.md`, settlement/final evidence policy, scheduler/deployment ownership, provider trigger APIs, KIS REST current-price ingestion, KIS orderbook/hoga, or real trading/account APIs each require separate approval.
+Next provider-related gates should remain narrower and explicit: broader settlement/final evidence policy, scheduler/deployment ownership, batch HTTP APIs, hoga-based execution/slippage/matching, or real trading/account APIs each require separate approval.

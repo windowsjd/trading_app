@@ -69,9 +69,14 @@ export type RewardFulfillmentRequest = Prisma.RewardFulfillmentRequestModel
 export type Asset = Prisma.AssetModel
 /**
  * Model AssetPriceSnapshot
- * 
+ *
  */
 export type AssetPriceSnapshot = Prisma.AssetPriceSnapshotModel
+/**
+ * Model AssetOrderbookSnapshot
+ *
+ */
+export type AssetOrderbookSnapshot = Prisma.AssetOrderbookSnapshotModel
 /**
  * Model Position
  * 

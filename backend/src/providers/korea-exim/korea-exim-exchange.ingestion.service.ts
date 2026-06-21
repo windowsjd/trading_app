@@ -30,6 +30,28 @@ export type KoreaEximEnsureFreshResult = {
   reused: boolean;
 };
 
+export type KoreaEximExchangeIngestionOptions = {
+  dryRun?: boolean;
+  requestedBy?: string;
+  lookbackDays?: number;
+};
+
+export type KoreaEximExchangeIngestionResult = {
+  success: boolean;
+  provider: typeof KOREA_EXIM_EXCHANGE_SOURCE_NAME;
+  dryRun: boolean;
+  fromCurrency: CurrencyCode;
+  toCurrency: CurrencyCode;
+  rate: string | null;
+  effectiveAt: string | null;
+  searchDate: string | null;
+  created: number;
+  skipped: number;
+  wouldCreate: number;
+  errorCode?: string;
+  errorMessage?: string;
+};
+
 const DEFAULT_MAX_AGE_SECONDS = 300;
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
@@ -40,6 +62,125 @@ export class KoreaEximExchangeIngestionService {
     private readonly configService: ProviderConfigService,
     private readonly client: KoreaEximExchangeClient,
   ) {}
+
+  async ingestUsdKrw(
+    options: KoreaEximExchangeIngestionOptions = {},
+  ): Promise<KoreaEximExchangeIngestionResult> {
+    const dryRun = Boolean(options.dryRun);
+
+    try {
+      const config = this.configService.getConfig();
+      if (!config.common.providerIngestionEnabled) {
+        throw new ProviderConfigError(
+          'common',
+          'PROVIDER_INGESTION_DISABLED',
+          'Provider ingestion is disabled.',
+        );
+      }
+
+      if (!config.koreaEximExchange.enabled) {
+        throw new ProviderConfigError(
+          KOREA_EXIM_EXCHANGE_SOURCE_NAME,
+          'KOREA_EXIM_PROVIDER_DISABLED',
+          'Korea EXIM exchange provider is disabled.',
+        );
+      }
+
+      const lookbackDays = normalizeLookbackDays(
+        options.lookbackDays ?? config.koreaEximExchange.lookbackDays,
+      );
+      const now = new Date();
+
+      for (let offsetDays = 0; offsetDays < lookbackDays; offsetDays += 1) {
+        const searchDate = formatKstSearchDate(now, offsetDays);
+        const fetched = await this.client.fetchDailyExchangeRates({
+          searchDate,
+        });
+        const parsed = parseKoreaEximUsdKrwRate(fetched.rows, searchDate);
+
+        if (!parsed) {
+          continue;
+        }
+
+        const duplicate = await this.findDuplicateSnapshot(parsed);
+        if (duplicate) {
+          return this.ingestionResult({
+            parsed,
+            dryRun,
+            created: 0,
+            skipped: 1,
+            wouldCreate: 0,
+          });
+        }
+
+        if (dryRun) {
+          return this.ingestionResult({
+            parsed,
+            dryRun,
+            created: 0,
+            skipped: 0,
+            wouldCreate: 1,
+          });
+        }
+
+        await this.prisma.fxRateSnapshot.create({
+          data: {
+            baseCurrency: CurrencyCode.USD,
+            quoteCurrency: CurrencyCode.KRW,
+            rate: parsed.rate,
+            sourceType: FxRateSourceType.provider_api,
+            sourceName: KOREA_EXIM_EXCHANGE_SOURCE_NAME,
+            sourceTimestamp: parsed.effectiveAt,
+            effectiveAt: parsed.effectiveAt,
+            capturedAt: fetched.receivedAt,
+            approvedByUserId: null,
+            note: buildProviderNote(options.requestedBy),
+            rawPayloadJson: buildSafeRawPayloadMetadata(parsed),
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        return this.ingestionResult({
+          parsed,
+          dryRun,
+          created: 1,
+          skipped: 0,
+          wouldCreate: 0,
+        });
+      }
+
+      throw new ProviderHttpError(
+        KOREA_EXIM_EXCHANGE_SOURCE_NAME,
+        'KOREA_EXIM_USD_RATE_UNAVAILABLE',
+        'Korea EXIM exchange API did not return an available USD/KRW rate within the configured lookback window.',
+      );
+    } catch (error) {
+      if (
+        error instanceof ProviderConfigError ||
+        error instanceof ProviderHttpError
+      ) {
+        return {
+          success: false,
+          provider: KOREA_EXIM_EXCHANGE_SOURCE_NAME,
+          dryRun,
+          fromCurrency: CurrencyCode.USD,
+          toCurrency: CurrencyCode.KRW,
+          rate: null,
+          effectiveAt: null,
+          searchDate: null,
+          created: 0,
+          skipped: 0,
+          wouldCreate: 0,
+          errorCode: error.code,
+          errorMessage: error.message,
+        };
+      }
+
+      throw error;
+    }
+  }
 
   async ensureFreshUsdKrwSnapshot(
     options: KoreaEximEnsureFreshOptions = {},
@@ -205,6 +346,28 @@ export class KoreaEximExchangeIngestionService {
         capturedAt: true,
       },
     });
+  }
+
+  private ingestionResult(input: {
+    parsed: ParsedKoreaEximUsdKrwRate;
+    dryRun: boolean;
+    created: number;
+    skipped: number;
+    wouldCreate: number;
+  }): KoreaEximExchangeIngestionResult {
+    return {
+      success: true,
+      provider: KOREA_EXIM_EXCHANGE_SOURCE_NAME,
+      dryRun: input.dryRun,
+      fromCurrency: CurrencyCode.USD,
+      toCurrency: CurrencyCode.KRW,
+      rate: input.parsed.rate,
+      effectiveAt: input.parsed.effectiveAt.toISOString(),
+      searchDate: input.parsed.searchDate,
+      created: input.created,
+      skipped: input.skipped,
+      wouldCreate: input.wouldCreate,
+    };
   }
 }
 
@@ -384,6 +547,13 @@ function buildSafeRawPayloadMetadata(
     curName: parsed.curName,
     dealBasR: parsed.dealBasR,
   };
+}
+
+function buildProviderNote(requestedBy: string | undefined): string {
+  const operator = requestedBy?.trim();
+  return operator
+    ? `provider_api korea_exim_exchange_rate ingestion requested by ${operator}`
+    : 'provider_api korea_exim_exchange_rate ingestion';
 }
 
 function malformedResponseError(message: string): ProviderHttpError {

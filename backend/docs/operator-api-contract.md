@@ -6,16 +6,18 @@
 - `GET /api/v1/operator/me` is implemented as the minimal operator smoke endpoint.
 - `OperatorAuditLog` foundation is implemented as an internal service/model for future operator mutations.
 - Admin/operator Account Management Gate is implemented for admin-only user list/get, explicit role changes, status changes, and deleted user restore.
+- Provider ingestion trigger API is implemented for operator/admin market-data ingestion dry-runs and explicit non-dry-runs.
 - Season participant moderation APIs are implemented for operator/admin exclusion, ranking hide/unhide, and verified final result correction. Reward payout/revoke and reward fulfillment are outside this scope.
 - Internal reward fulfillment operator/admin APIs are documented in `docs/rewards-api-contract.md`.
-- No provider ingestion trigger, batch run trigger, scheduler HTTP API, external reward provider API, real trading/account/balance, deposit/withdrawal, or external order API exists. Scheduler/Ops foundation exists internally and is disabled by default.
-- `provider_api` source eligibility is open only inside explicitly allowed services: read-only/quote services, `/fx execute`, orders execute, and the separate operator-run daily snapshot valuation job. No operator provider trigger, batch HTTP API, ranking/settlement/reward final workflow source eligibility, or real trading/account API is opened by this contract.
+- No batch run trigger, scheduler HTTP API, external reward provider API, real trading/account/balance, deposit/withdrawal, or external order API exists. Scheduler/Ops foundation exists internally and is disabled by default.
+- `provider_api` source eligibility is open only inside explicitly allowed services: read-only/quote services, `/fx execute`, orders execute, the separate operator-run daily snapshot valuation job, and explicit operator/admin provider ingestion triggers. No batch HTTP API, ranking/reward workflow source eligibility, hoga-based execution, or real trading/account API is opened by this contract.
 
 ## Migration / Runtime Requirement
 
 - Admin/operator authorization MVP requires schema migration `20260601090000_add_user_role_operator_audit_logs`.
 - Admin status/restore and internal reward fulfillment require schema migration `20260609120000_add_user_status_restore_internal_reward_fulfillment`.
 - Season participant moderation requires schema migration `20260621120000_add_season_participant_moderation`.
+- KIS hoga/orderbook ingestion requires schema migration `20260621143000_add_asset_orderbook_snapshots`.
 - Runtime DBs must have the `UserRole` enum, `users.role` column, `OperatorAuditResult` enum, and `operator_audit_logs` table applied before protected APIs are expected to run normally.
 - The access-token guard reads current DB `User.status` and `User.role` on every protected request. Role authorization does not trust a JWT role claim.
 - Existing protected APIs continue to depend on `request.user.userId`; `request.user.role` is additional authorization context and must not replace user identity.
@@ -76,6 +78,107 @@
 ```
 
 This read-only smoke endpoint does not write an audit row.
+
+## Provider Ingestion Trigger
+
+All routes in this section require a valid Bearer access token and `role=operator` or `role=admin`.
+
+### POST /api/v1/operator/provider-ingestions/:provider/run
+
+Purpose: explicitly trigger or dry-run provider market-data ingestion.
+
+Supported `:provider` values:
+
+- `exchange-rate`
+- `korea-exim`
+- `binance`
+- `kis`
+
+Body:
+
+```json
+{
+  "dryRun": true,
+  "symbols": ["005930", "NAS:AAPL", "BTCUSDT"],
+  "maxSnapshots": 20,
+  "kisModes": ["rest_current_price", "rest_hoga"],
+  "durationMs": 30000,
+  "reason": "manual_smoke",
+  "note": "optional operator note"
+}
+```
+
+Policy:
+
+- `dryRun` defaults to `true`; non-dry-run requires explicit `"dryRun": false`.
+- `symbols` is optional and provider-specific. KIS accepts 6-digit domestic symbols and US symbols in `NAS:AAPL`/`NYS:IBM` form; Binance accepts public ticker symbols such as `BTCUSDT`.
+- `maxSnapshots` caps accepted `created`/`would_create` rows for KIS REST/WebSocket modes.
+- `kisModes` defaults to `["rest_current_price", "rest_hoga"]`; `websocket_trade` can be requested explicitly.
+- Disabled or missing provider env returns a handled `state="skipped"` or `state="failed"` summary instead of creating fake rows.
+- The trigger only writes provider market-data rows:
+  - FX providers write `fx_rate_snapshots`.
+  - Binance and KIS current-price/trade ingestion write `asset_price_snapshots`.
+  - KIS hoga ingestion writes `asset_orderbook_snapshots`.
+- It does not mutate orders, FX execute requests, wallets, positions, ledgers, rankings, settlement, rewards, or reward fulfillment rows.
+- Responses and audit metadata contain aggregate safe summaries only. Raw provider payloads, access tokens, approval keys, app keys/secrets, `.env.local`, `DATABASE_URL`, and private ledgers are not exposed.
+- Success and handled skipped/disabled outcomes write `OperatorAuditLog` with safe metadata.
+
+Example success:
+
+```json
+{
+  "success": true,
+  "data": {
+    "provider": "kis",
+    "dryRun": true,
+    "state": "completed",
+    "received": 2,
+    "created": 0,
+    "wouldCreate": 2,
+    "skipped": 0,
+    "failed": 0,
+    "snapshots": [
+      {
+        "symbol": "005930",
+        "sourceName": "kis_krx_realtime_trade",
+        "state": "would_create",
+        "assetId": "asset-id",
+        "price": "70123.00000000",
+        "effectiveAt": "2026-06-21T00:30:15.000Z"
+      }
+    ]
+  }
+}
+```
+
+Example disabled/skipped:
+
+```json
+{
+  "success": true,
+  "data": {
+    "provider": "binance",
+    "dryRun": true,
+    "state": "skipped",
+    "received": 0,
+    "created": 0,
+    "wouldCreate": 0,
+    "skipped": 0,
+    "failed": 1,
+    "snapshots": [],
+    "errorCode": "PROVIDER_INGESTION_DISABLED"
+  }
+}
+```
+
+Errors include:
+
+- `400 INVALID_PROVIDER`
+- `400 INVALID_SYMBOL`
+- `400 INVALID_MAX_SNAPSHOTS`
+- `400 INVALID_KIS_MODE`
+- `401 UNAUTHORIZED`
+- `403 OPERATOR_FORBIDDEN`
 
 ## Season Participant Moderation
 

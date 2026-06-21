@@ -183,7 +183,7 @@
     - Orders create accepts and binds an active durable order quote in `orders.quoteId`, creates only a submitted order, and does not mutate wallets/positions/settlement.
     - Orders execute loads `order.quote`, requires the quote to be active/unexpired/matching, reprices from fresh provider asset rows (`kis_krx_realtime_trade`, `kis_us_delayed_trade`, or `binance_public_rest_24hr_ticker`) with capturedAt age <= 10 seconds, uses fresh provider USD/KRW FX for USD assets with capturedAt age <= 60 seconds, applies market movement and limit marketability guards, and consumes the quote atomically with wallet/position/order/ledger writes.
     - Execute paths forbid default `admin_manual` fallback. Provider missing/stale/unavailable fails instead of executing.
-    - Ranking/settlement/reward, scheduler/cron, provider ingestion trigger APIs, batch HTTP APIs, KIS order/account/balance/fill/deposit/withdrawal APIs, Binance authenticated/order/account/user-data APIs, and real external trading/account integrations remain closed.
+    - Ranking/settlement/reward, scheduler/cron, batch HTTP APIs, KIS order/account/balance/fill/deposit/withdrawal APIs, Binance authenticated/order/account/user-data APIs, and real external trading/account integrations remain closed.
   - Durable Quote hardening and Scheduler/Ops Foundation Gate on 2026-06-08 KST:
     - FX execute idempotency requestHash now includes trimmed `quoteId`; same `userId + idempotencyKey` with a different `quoteId` returns `IDEMPOTENCY_CONFLICT` and does not replay the previous response.
     - Orders create idempotency requestHash now includes trimmed `quoteId`; same `seasonParticipantId + idempotencyKey` with a different `quoteId` returns `ORDER_IDEMPOTENCY_CONFLICT` and does not replay the submitted order.
@@ -192,7 +192,7 @@
     - Scheduler env defaults are disabled: `SCHEDULER_ENABLED=false`, all individual `SCHEDULER_*_ENABLED=false` flags, and `SCHEDULER_TICK_INTERVAL_MS=60000`. No secret scheduler env was added.
     - Internal daily snapshot ops runner can call `DailyPortfolioSnapshotJobService` with lock/audit/dryRun support. Scheduler calls remain dry-run-by-default; real automatic writes require a future Production Scheduler Ownership Gate.
     - Provider FX/Binance ingestion, ranking generation, settlement, and reward-grant scheduler runners remain explicit `skipped/NOT_IMPLEMENTED` placeholders. These skipped rows are not completed business automation or fake success.
-    - Provider ingestion HTTP trigger APIs, batch HTTP APIs, KIS order/account APIs, Binance authenticated APIs, external reward fulfillment APIs, and real trading/account integrations remain closed. Admin user restore/status and internal DB reward fulfillment were opened later in the 2026-06-09 gate.
+    - Batch HTTP APIs, KIS order/account APIs, Binance authenticated APIs, external reward fulfillment APIs, and real trading/account integrations remain closed. Admin user restore/status and internal DB reward fulfillment were opened later in the 2026-06-09 gate, and provider ingestion HTTP trigger APIs were opened later as operator/admin market-data triggers.
   - Backend P0 return-rate, season lifecycle, and market-hours gate on 2026-06-18 KST:
     - Return-rate values are percentage values everywhere while the DB column name remains unchanged. Formula is `(totalAssetKrw - initialCapitalKrw) / initialCapitalKrw * 100`; existing ratio-scale persisted rows require an explicit operator backfill outside this code gate.
     - Season write paths now require effective active season state: `status=active` and `startAt <= now < endAt` for season join, `/fx quote`, `/fx execute`, orders quote, orders create, and orders execute.
@@ -218,8 +218,11 @@
   - FX USD/KRW provider_api source eligibility is open for explicitly allowed FX workflows through `korea_exim_exchange_rate` first and `exchange_rate_api` fallback.
   - Season settlement valuation uses its dedicated `season_settlement` provider workflow.
   - Reward automation and provider-backed reward workflows remain separate gates.
+  - Provider ingestion HTTP trigger API is implemented as `POST /api/v1/operator/provider-ingestions/:provider/run` for operator/admin market-data ingestion dry-runs and explicit non-dry-runs. Supported providers are `exchange-rate`, `korea-exim`, `binance`, and `kis`; disabled providers return skipped/disabled summaries and safe audit metadata.
   - KIS supports WebSocket approval_key retrieval, domestic KRX real-time trade price `H0STCNT0`, and overseas/US delayed trade price `HDFSCNT0` ingestion foundation into `asset_price_snapshots` provider_api rows.
-  - KIS REST current-price quote ingestion, KIS orderbook/hoga WebSocket ingestion, and KIS order/account/balance/fill/deposit/withdrawal APIs remain unimplemented.
+  - KIS REST current-price ingestion is implemented for domestic KRX and US NAS/NYS/AMS watchlist assets, writing only `asset_price_snapshots` rows with existing eligible source names `kis_krx_realtime_trade` and `kis_us_delayed_trade`.
+  - KIS REST hoga/orderbook ingestion foundation is implemented for domestic KRX and US NAS/NYS/AMS watchlist assets, writing only `asset_orderbook_snapshots` rows with source names `kis_krx_realtime_hoga` and `kis_us_delayed_hoga`.
+  - KIS order/account/balance/fill/deposit/withdrawal APIs, best bid/ask execution, partial fills, slippage models, and real external trading integrations remain unimplemented.
   - KRX domestic stock `provider_api` source eligibility is open only for the explicitly allowed read-only/quote workflows, orders execute, and operator-run daily snapshot valuation through `kis_krx_realtime_trade`.
 
 ## 2. 구현 완료 API
@@ -231,6 +234,7 @@
 - `POST /api/v1/auth/logout-all` user refresh sessions revoke MVP
 - `GET /api/v1/me` Bearer access token Auth MVP
 - `GET /api/v1/operator/me` operator/admin authorization smoke MVP
+- `POST /api/v1/operator/provider-ingestions/:provider/run` operator/admin provider market-data ingestion trigger MVP
 - `GET /api/v1/operator/users` admin-only user list MVP
 - `GET /api/v1/operator/users/:userId` admin-only user detail MVP
 - `PATCH /api/v1/operator/users/:userId/role` admin-only audited role change MVP
@@ -428,8 +432,11 @@ near-term ledger/FX foundation:
   - KIS 국내 KRX 실시간체결가 `H0STCNT0`는 기존 active `domestic_stock`/KRW/KRX 계열 asset에만 `sourceName=kis_krx_realtime_trade` provider_api price row를 저장할 수 있음.
   - KIS 해외/미국 실시간지연체결가 `HDFSCNT0`는 MVP에서 NAS/NYS/AMS 미국 market만 허용하며 기존 active `us_stock`/USD asset에만 `sourceName=kis_us_delayed_trade` provider_api price row를 저장할 수 있음. 문서상 미국 무료시세는 0분 지연이며 홍콩/베트남/중국/일본 15분 지연 market은 이번 MVP에서 skip.
   - KIS WebSocket 저장은 source timestamp 파싱, raw payload redaction/truncation, duplicate skip, per-asset throttle, dry-run을 지원함.
+  - Provider ingestion HTTP trigger는 operator/admin 전용 `POST /api/v1/operator/provider-ingestions/:provider/run`으로 구현됨. 기본 `dryRun=true`, `dryRun=false` 명시 시에만 non-dry-run 실행, disabled provider는 skipped/disabled summary를 반환하고 safe `OperatorAuditLog`를 남김.
+  - KIS REST 현재가 ingestion은 국내/미국 watchlist에 대해 dry-run/non-dry-run을 지원하며 기존 active asset mapping이 명확할 때만 `asset_price_snapshots` provider_api row를 생성함. 국내는 `kis_krx_realtime_trade`, 미국은 `kis_us_delayed_trade` sourceName을 사용해 기존 source eligibility와 어긋나지 않게 함.
+  - KIS hoga/orderbook ingestion foundation은 REST hoga snapshot을 별도 `asset_orderbook_snapshots` 테이블에 저장하며 bid/ask/spread_bps, quantity, currency, effective/captured timestamp, redacted/truncated raw payload metadata를 기록함.
   - `KIS_REST_BASE_URL` 또는 `KIS_WS_BASE_URL`이 없으면 KIS live call은 failed/skipped result로 보고 가능하며 secret 값을 출력하지 않음.
-  - KIS 주식 REST 현재가 ingestion, 호가/orderbook WebSocket, 주문/계좌/잔고/실매매 API는 구현하지 않음.
+  - KIS 주문/계좌/잔고/실매매 API, Binance authenticated/order/account/user-data API, best bid/ask execution, partial fill, slippage model, provider scheduler/cron은 구현하지 않음.
   - 실제 production secret 값은 코드/문서/test fixture에 없음.
   - missing/stale FX 또는 missing price evidence는 fake fallback 없이 participant-level failure로 기록하고 해당 snapshot row를 생성하지 않음.
   - 동일 participant + snapshotDate snapshot이 이미 있으면 overwrite하지 않고 `existing`으로 분류.

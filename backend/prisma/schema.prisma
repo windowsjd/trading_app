@@ -457,6 +457,7 @@ model Asset {
   updatedAt          DateTime     @updatedAt @map("updated_at")
 
   priceSnapshots AssetPriceSnapshot[]
+  orderbookSnapshots AssetOrderbookSnapshot[]
   positions      Position[]
   orders         Order[]
   quotes         Quote[]
@@ -490,6 +491,30 @@ model AssetPriceSnapshot {
   @@index([assetId, capturedAt])
   @@index([sourceType, effectiveAt])
   @@map("asset_price_snapshots")
+}
+
+model AssetOrderbookSnapshot {
+  id             String               @id @default(uuid())
+  assetId        String               @map("asset_id")
+  sourceType     AssetPriceSourceType @map("source_type")
+  sourceName     String               @map("source_name")
+  bidPrice       Decimal              @map("bid_price") @db.Decimal(24, 8)
+  bidQuantity    Decimal?             @map("bid_quantity") @db.Decimal(24, 8)
+  askPrice       Decimal              @map("ask_price") @db.Decimal(24, 8)
+  askQuantity    Decimal?             @map("ask_quantity") @db.Decimal(24, 8)
+  spreadBps      Decimal?             @map("spread_bps") @db.Decimal(18, 8)
+  currencyCode   CurrencyCode         @map("currency_code")
+  effectiveAt    DateTime             @map("effective_at")
+  capturedAt     DateTime             @map("captured_at")
+  rawPayloadJson Json?                @map("raw_payload_json")
+  createdAt      DateTime             @default(now()) @map("created_at")
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@index([assetId, sourceName, effectiveAt])
+  @@index([assetId, capturedAt])
+  @@index([sourceType, effectiveAt])
+  @@map("asset_orderbook_snapshots")
 }
 
 model Position {

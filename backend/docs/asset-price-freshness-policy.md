@@ -13,7 +13,7 @@ This policy records freshness and source boundaries after provider ingestion fou
 - Provider API Source Eligibility Implementation Gate later opened provider_api only for `/fx quote`, assets `withPrice`, orders quote, and live portfolio/home/positions valuation.
 - Provider-backed Daily Snapshot Eligibility Gate later opened provider_api only for operator-run daily snapshot valuation, using the same provider sourceName allowlist and freshness thresholds.
 - `docs/realtime-execution-policy.md` now defines and the services implement the stricter execute/write freshness and quote-to-execute movement policy for `/fx execute` and orders execute: KRX/US/BINANCE asset execute freshness <= 10 seconds by `capturedAt`, USD/KRW FX execute freshness <= 60 seconds by `capturedAt`, no default admin_manual execute fallback, and quote is only a reference quote.
-- Orders create uses a durable quote and immediate market execution. Ranking, reward/final tier/fulfillment, provider trigger APIs, KIS REST current-price ingestion, orderbook/hoga WebSocket ingestion, and order/account/balance/real-trading APIs remain closed unless separately opened.
+- Orders create uses a durable quote and immediate market execution. Provider ingestion trigger APIs, KIS REST current-price ingestion, and KIS REST hoga/orderbook snapshot ingestion were opened later as explicit operator/admin market-data paths. Ranking, reward/final tier/fulfillment, hoga-based execution, and order/account/balance/real-trading APIs remain closed unless separately opened.
 
 ## 2. Current Price Storage Model
 
@@ -329,17 +329,17 @@ Settlement implementation tests:
 
 ## 18. STOP / GO Decision
 
-| Area                                   | Decision                               | Reason                                                                                                                                                 |
-| -------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Asset price freshness policy           | CONDITIONAL GO                         | Policy is now explicit enough for evidence capture and narrow provider implementation prompts, but code is unchanged                                   |
-| FX USD/KRW current 60-second policy    | GO for current `admin_manual` behavior | Existing code and tests already use the 60-second threshold                                                                                            |
-| FX provider freshness                  | CONDITIONAL GO                         | Requires OANDA/Twelve Data live response timestamp evidence before ingestion code                                                                      |
-| US stock freshness                     | CONDITIONAL GO                         | Twelve Data is a candidate, but live fixtures, symbol mapping, plan, and terms are required                                                            |
-| Crypto provider_api row insertion      | GO for foundation                      | Binance public REST ticker can create USD-equivalent provider_api snapshot rows for existing mapped BINANCE crypto assets                              |
+| Area                                   | Decision                               | Reason                                                                                                                                                                       |
+| -------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Asset price freshness policy           | CONDITIONAL GO                         | Policy is now explicit enough for evidence capture and narrow provider implementation prompts, but code is unchanged                                                         |
+| FX USD/KRW current 60-second policy    | GO for current `admin_manual` behavior | Existing code and tests already use the 60-second threshold                                                                                                                  |
+| FX provider freshness                  | CONDITIONAL GO                         | Requires OANDA/Twelve Data live response timestamp evidence before ingestion code                                                                                            |
+| US stock freshness                     | CONDITIONAL GO                         | Twelve Data is a candidate, but live fixtures, symbol mapping, plan, and terms are required                                                                                  |
+| Crypto provider_api row insertion      | GO for foundation                      | Binance public REST ticker can create USD-equivalent provider_api snapshot rows for existing mapped BINANCE crypto assets                                                    |
 | Crypto provider_api source eligibility | PARTIAL GO                             | Binance provider_api rows may power approved read-only/quote, durable quote execution, operator-run daily snapshot valuation, and season settlement valuation workflows only |
-| KRX quote/execute freshness            | PARTIAL GO                             | KIS KRX provider rows may power approved read-only/quote and durable quote execution workflows; Twelve Data Korea exchange EOD delay remains rejected for realtime execute |
-| Scheduler/batch foundation             | CONDITIONAL GO for audit only          | Freshness requirements are clearer, but scheduler implementation needs its own gate                                                                    |
-| Settlement implementation              | PARTIAL GO                             | MVP settlement uses latest valid stored price/FX rows at or before `Season.endAt`; reward payout and future official batch priority remain separate gates |
+| KRX quote/execute freshness            | PARTIAL GO                             | KIS KRX provider rows may power approved read-only/quote and durable quote execution workflows; Twelve Data Korea exchange EOD delay remains rejected for realtime execute   |
+| Scheduler/batch foundation             | CONDITIONAL GO for audit only          | Freshness requirements are clearer, but scheduler implementation needs its own gate                                                                                          |
+| Settlement implementation              | PARTIAL GO                             | MVP settlement uses latest valid stored price/FX rows at or before `Season.endAt`; reward payout and future official batch priority remain separate gates                    |
 
 ## 19. Open Questions
 
