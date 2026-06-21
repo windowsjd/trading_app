@@ -9,6 +9,10 @@ export type BinanceTicker24hrResponse = {
   [key: string]: unknown;
 };
 
+export type BinanceKlineRow = readonly unknown[];
+
+export type BinanceKlinesResponse = readonly unknown[];
+
 export type ParsedBinanceTickerPrice = {
   providerSymbol: string;
   internalCurrencyCode: CurrencyCode;

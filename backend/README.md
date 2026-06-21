@@ -24,6 +24,7 @@ This service owns backend APIs, database access, financial calculations, and ser
 - KRW and USD cash wallets. US stocks and USD-settled crypto use the USD wallet.
 - Final valuation policy is KRW total assets.
 - Provider ingestion foundation exists for Korea EXIM exchange and ExchangeRate-API USD/KRW, Binance public REST crypto, and KIS WebSocket KRX/US stock market data row insertion.
+- `GET /api/v1/assets/:assetId/candles` supports crypto chart candles through Binance Spot `GET /api/v3/klines`. Supported crypto intervals are exactly `5m`, `15m`, `30m`, `1h`, `4h`, `1d`, and `1w`; Binance Futures klines are not used. Crypto candles are display-only and are not stored or wired into orders, valuation, settlement, ranking, or scheduler flows.
 - Provider_api source eligibility is opened only for explicitly allowed workflows: `/fx quote`, `/fx execute`, assets `withPrice`, orders quote, order execution, live portfolio/home/positions valuation, the operator-run daily portfolio snapshot valuation job, and season settlement valuation. Orders create uses the durable quote and immediate execution path.
 - Read-only/quote responses expose backward-compatible optional source metadata for provider/admin visibility: `rateSource`, `priceSource`, `assetPriceSource`, `fxRateSource`, and live valuation source summaries where applicable.
 - Batch job execution foundation with idempotent `batch_job_runs` recording, operator-only noop/health-check script, operator-run daily portfolio snapshot generation, operator-run season ranking generation from existing daily snapshots, an operator-run daily season cycle orchestration job, an operator-run season settlement MVP job, an operator-run reward grant marker MVP job, and an operator-run season lifecycle transition job.
@@ -39,6 +40,7 @@ This service owns backend APIs, database access, financial calculations, and ser
 These are intentionally outside the current implementation and should not be added without a separate gate:
 
 - Provider ingestion trigger APIs, scheduler-driven provider ingestion implementation, and provider-backed reward workflows.
+- Crypto candle DB persistence, frontend chart integration, Binance Futures APIs, and Binance authenticated order/account/user-data APIs.
 - OANDA and Twelve Data are historical provider candidates only, not the current MVP core provider stack.
 - Batch run HTTP APIs, scheduler HTTP APIs, external reward fulfillment APIs, and reward policy/catalog APIs.
 - Production cron job implementation beyond the disabled-by-default foundation, scheduler-driven provider ingestion, scheduler-driven reward automation, or external reward fulfillment jobs.
@@ -74,6 +76,8 @@ Scheduler/Ops env is non-secret and disabled by default. `SCHEDULER_ENABLED=fals
 `PROVIDER_INGESTION_ENABLED=false` is the fail-closed default for provider refresh/ingestion calls. Korea EXIM on-demand refresh requires both `PROVIDER_INGESTION_ENABLED=true` and `KOREA_EXIM_EXCHANGE_ENABLED=true`. If either flag is disabled, `GET /api/v1/fx/rates/current` falls back to existing DB snapshots and returns `FX_RATE_UNAVAILABLE` only when no usable DB row exists.
 
 Korea EXIM exchange provider env is `KOREA_EXIM_EXCHANGE_ENABLED`, `KOREA_EXIM_EXCHANGE_AUTH_KEY`, `KOREA_EXIM_EXCHANGE_BASE_URL`, `KOREA_EXIM_EXCHANGE_DATA`, and `KOREA_EXIM_EXCHANGE_LOOKBACK_DAYS`. The request URL is `https://oapi.koreaexim.go.kr/site/program/financial/exchangeJSON` with `authkey`, `searchdate`, and `data=AP01`; USD/KRW uses the USD row's `DEAL_BAS_R` value with commas removed. Real auth keys must live only in `.env.local`; `.env.example` keeps the auth key blank. ExchangeRate-API remains the fallback provider after Korea EXIM exchange.
+
+Binance public market data uses `BINANCE_REST_BASE_URL`, defaulting to `https://api.binance.com` when unset. Crypto candles use only the public Spot `GET /api/v3/klines` endpoint with USDT quote symbols such as `BTCUSDT` and `ETHUSDT`; no Binance API key or secret is required for this candle path.
 
 ## Local Commands
 

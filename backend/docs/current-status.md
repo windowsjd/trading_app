@@ -200,6 +200,11 @@
     - Settled now means final rank and final tier are ready. Reward payout remains pending/not implemented and does not block settlement.
     - Market holidays are configured in `src/orders/market-holidays.config.ts`; configured KRX/US full-day holidays block domestic/US stock order quote/create/execute with `MARKET_CLOSED`. Crypto orders and FX are not holiday-blocked.
   - Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage; USDT depeg risk is not modeled.
+  - `GET /api/v1/assets/:assetId/candles` now supports crypto chart candles through Binance Spot `GET /api/v3/klines` using `BINANCE_REST_BASE_URL` (default `https://api.binance.com`).
+    - Supported crypto intervals are exactly `5m`, `15m`, `30m`, `1h`, `4h`, `1d`, and `1w`; unsupported crypto intervals return `ASSET_CANDLES_INVALID_INTERVAL`.
+    - Crypto candle symbol normalization maps base symbols such as `BTC`/`ETH` and `BTC/USD`, `BTC-USD`, `BTC_USD` to USDT quote symbols such as `BTCUSDT`.
+    - Binance kline rows are normalized to the existing candle DTO using open time, OHLC, base volume, and quote asset volume as `amount`; raw rows and secrets are not exposed.
+    - Crypto candles are chart display only: no DB persistence, no `asset_price_snapshots`/`fx_rate_snapshots` writes, no order/quote/valuation/settlement/ranking/scheduler integration, no Binance Futures `/fapi/v1/klines`, and no authenticated Binance APIs.
   - FX USD/KRW provider_api source eligibility is open for explicitly allowed FX workflows through `korea_exim_exchange_rate` first and `exchange_rate_api` fallback.
   - Season settlement valuation uses its dedicated `season_settlement` provider workflow.
   - Reward automation and provider-backed reward workflows remain separate gates.
@@ -248,6 +253,7 @@
 - `POST /api/v1/orders/:orderId/execute` internal compatibility/deprecation full-fill path
 - `GET /api/v1/assets` read-only MVP
 - `GET /api/v1/assets/:assetId` read-only MVP
+- `GET /api/v1/assets/:assetId/candles` chart candle MVP with KIS stock candles and Binance Spot crypto candles
 - `GET /api/v1/seasons/current`
 - `POST /api/v1/seasons/{seasonId}/join`
 - `POST /api/v1/fx/quote`

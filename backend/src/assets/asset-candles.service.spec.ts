@@ -93,17 +93,29 @@ describe('AssetCandlesService', () => {
     getMarketDataByExplicitPath: jest.fn(),
   });
 
+  const createBinancePublicClient = () => ({
+    fetchKlines: jest.fn(),
+  });
+
   const createService = () => {
     const prisma = createPrisma();
     const kisAuthClient = createKisAuthClient();
     const kisQuoteClient = createKisQuoteClient();
+    const binancePublicClient = createBinancePublicClient();
     const service = new AssetCandlesService(
       prisma as never,
       kisAuthClient as never,
       kisQuoteClient as never,
+      binancePublicClient as never,
     );
 
-    return { prisma, kisAuthClient, kisQuoteClient, service };
+    return {
+      prisma,
+      kisAuthClient,
+      kisQuoteClient,
+      binancePublicClient,
+      service,
+    };
   };
 
   const asset = (input: {
@@ -480,24 +492,315 @@ describe('AssetCandlesService', () => {
     });
   });
 
-  it('returns crypto as explicitly unsupported without calling KIS', async () => {
-    const { prisma, kisQuoteClient, service } = createService();
+  it('uses Binance Spot klines for crypto candles and normalizes rows for the chart DTO', async () => {
+    const { prisma, kisQuoteClient, binancePublicClient, service } =
+      createService();
     prisma.asset.findUnique.mockResolvedValueOnce(
       asset({
         id: 'asset-btc',
+        symbol: 'BTC',
+        name: 'Bitcoin',
+        market: 'BINANCE',
+        assetType: AssetType.crypto,
+        currencyCode: CurrencyCode.USD,
+      }),
+    );
+    binancePublicClient.fetchKlines.mockResolvedValueOnce({
+      receivedAt: new Date('2026-06-21T04:10:01.000Z'),
+      response: [
+        [
+          Date.parse('2026-06-21T04:05:00.000Z'),
+          '65050.00000000',
+          '65100.00000000',
+          '65000.00000000',
+          '65025.00000000',
+          '2.00000000',
+          Date.parse('2026-06-21T04:09:59.999Z'),
+          '130050.00000000',
+          10,
+          '1.00000000',
+          '65025.00000000',
+          '0',
+        ],
+        [
+          Date.parse('2026-06-21T04:00:00.000Z'),
+          '65000.00000000',
+          '65100.00000000',
+          '64900.00000000',
+          '65050.00000000',
+          '12.34567800',
+          Date.parse('2026-06-21T04:04:59.999Z'),
+          '802000.00000000',
+          120,
+          '6.00000000',
+          '390000.00000000',
+          '0',
+        ],
+      ],
+    });
+
+    const response = await service.getAssetCandles('user-1', 'asset-btc', {
+      interval: '5m',
+      limit: '1500',
+      date: '2026-06-21',
+      to: '2026-06-21T04:30:00.000Z',
+    });
+
+    expect(binancePublicClient.fetchKlines).toHaveBeenCalledWith({
+      symbol: 'BTCUSDT',
+      interval: '5m',
+      limit: 1000,
+      startTime: Date.parse('2026-06-21T00:00:00.000Z'),
+      endTime: Date.parse('2026-06-21T04:30:00.000Z'),
+    });
+    expect(kisQuoteClient.getMarketDataByExplicitPath).not.toHaveBeenCalled();
+    expect(response).toEqual({
+      success: true,
+      data: {
+        state: 'available',
+        asset: {
+          id: 'asset-btc',
+          symbol: 'BTC',
+          name: 'Bitcoin',
+          assetType: AssetType.crypto,
+          market: 'BINANCE',
+          priceCurrency: CurrencyCode.USD,
+        },
+        interval: '5m',
+        requestedDate: '2026-06-21',
+        candles: [
+          {
+            time: '2026-06-21T04:00:00.000Z',
+            open: '65000.00000000',
+            high: '65100.00000000',
+            low: '64900.00000000',
+            close: '65050.00000000',
+            volume: '12.34567800',
+            amount: '802000.00000000',
+            sourceDate: '2026-06-21',
+            sourceTime: '2026-06-21T04:00:00.000Z',
+          },
+          {
+            time: '2026-06-21T04:05:00.000Z',
+            open: '65050.00000000',
+            high: '65100.00000000',
+            low: '65000.00000000',
+            close: '65025.00000000',
+            volume: '2.00000000',
+            amount: '130050.00000000',
+            sourceDate: '2026-06-21',
+            sourceTime: '2026-06-21T04:05:00.000Z',
+          },
+        ],
+        source: {
+          provider: 'binance',
+          endpoint: '/api/v3/klines',
+          symbol: 'BTCUSDT',
+          interval: '5m',
+          requestedCount: 1000,
+          returnedCount: 2,
+        },
+      },
+    });
+    expect(JSON.stringify(response)).not.toContain('access_token');
+    expect(JSON.stringify(response)).not.toContain('ignore');
+    expectNoWrites(prisma);
+  });
+
+  it.each([
+    ['BTC', 'BTCUSDT'],
+    ['ETH', 'ETHUSDT'],
+    ['BTCUSDT', 'BTCUSDT'],
+    ['BTC/USD', 'BTCUSDT'],
+    ['BTC-USD', 'BTCUSDT'],
+    ['BTC_USD', 'BTCUSDT'],
+  ])('normalizes crypto symbol %s to %s', async (symbol, expectedSymbol) => {
+    const { prisma, binancePublicClient, service } = createService();
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({
+        id: `asset-${symbol}`,
+        symbol,
+        market: 'BINANCE',
+        assetType: AssetType.crypto,
+        currencyCode: CurrencyCode.USD,
+      }),
+    );
+    binancePublicClient.fetchKlines.mockResolvedValueOnce({
+      receivedAt: new Date('2026-06-21T04:10:01.000Z'),
+      response: [],
+    });
+
+    await service.getAssetCandles('user-1', `asset-${symbol}`, {
+      interval: '15m',
+    });
+
+    expect(binancePublicClient.fetchKlines).toHaveBeenCalledWith(
+      expect.objectContaining({
+        symbol: expectedSymbol,
+        interval: '15m',
+        limit: 100,
+      }),
+    );
+  });
+
+  it.each(['5m', '15m', '30m', '1h', '4h', '1d', '1w'])(
+    'allows crypto interval %s',
+    async (interval) => {
+      const { prisma, binancePublicClient, service } = createService();
+      prisma.asset.findUnique.mockResolvedValueOnce(
+        asset({
+          id: `asset-btc-${interval}`,
+          symbol: 'BTC',
+          market: 'BINANCE',
+          assetType: AssetType.crypto,
+          currencyCode: CurrencyCode.USD,
+        }),
+      );
+      binancePublicClient.fetchKlines.mockResolvedValueOnce({
+        receivedAt: new Date('2026-06-21T04:10:01.000Z'),
+        response: [],
+      });
+
+      await service.getAssetCandles('user-1', `asset-btc-${interval}`, {
+        interval,
+      });
+
+      expect(binancePublicClient.fetchKlines).toHaveBeenCalledWith(
+        expect.objectContaining({ interval }),
+      );
+    },
+  );
+
+  it.each(['1m', '3m', '2m', '10m', '1M'])(
+    'rejects unsupported crypto interval %s',
+    async (interval) => {
+      const { prisma, kisQuoteClient, binancePublicClient, service } =
+        createService();
+      prisma.asset.findUnique.mockResolvedValueOnce(
+        asset({
+          id: `asset-btc-${interval}`,
+          symbol: 'BTC',
+          market: 'BINANCE',
+          assetType: AssetType.crypto,
+          currencyCode: CurrencyCode.USD,
+        }),
+      );
+
+      await expectApiError(
+        service.getAssetCandles('user-1', `asset-btc-${interval}`, {
+          interval,
+        }),
+        400,
+        'ASSET_CANDLES_INVALID_INTERVAL',
+      );
+      expect(kisQuoteClient.getMarketDataByExplicitPath).not.toHaveBeenCalled();
+      expect(binancePublicClient.fetchKlines).not.toHaveBeenCalled();
+    },
+  );
+
+  it('returns empty state for empty Binance rows', async () => {
+    const { prisma, binancePublicClient, service } = createService();
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({
+        id: 'asset-btc-empty',
         symbol: 'BTCUSDT',
         market: 'BINANCE',
         assetType: AssetType.crypto,
         currencyCode: CurrencyCode.USD,
       }),
     );
+    binancePublicClient.fetchKlines.mockResolvedValueOnce({
+      receivedAt: new Date('2026-06-21T04:10:01.000Z'),
+      response: [],
+    });
+
+    const response = await service.getAssetCandles(
+      'user-1',
+      'asset-btc-empty',
+      { interval: '1h' },
+    );
+
+    expect(response.data).toMatchObject({
+      state: 'empty',
+      candles: [],
+      source: {
+        provider: 'binance',
+        endpoint: '/api/v3/klines',
+        symbol: 'BTCUSDT',
+        interval: '1h',
+        requestedCount: 100,
+        returnedCount: 0,
+      },
+    });
+    expectNoWrites(prisma);
+  });
+
+  it.each([
+    ['non-array response', { bad: true }],
+    ['malformed row', [[Date.parse('2026-06-21T04:00:00.000Z'), '65000']]],
+  ])('rejects Binance %s as malformed', async (_caseName, response) => {
+    const { prisma, binancePublicClient, service } = createService();
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({
+        id: 'asset-btc-malformed',
+        symbol: 'BTC',
+        market: 'BINANCE',
+        assetType: AssetType.crypto,
+        currencyCode: CurrencyCode.USD,
+      }),
+    );
+    binancePublicClient.fetchKlines.mockResolvedValueOnce({
+      receivedAt: new Date('2026-06-21T04:10:01.000Z'),
+      response,
+    });
 
     await expectApiError(
-      service.getAssetCandles('user-1', 'asset-btc'),
-      400,
-      'ASSET_CANDLES_UNSUPPORTED_ASSET_TYPE',
+      service.getAssetCandles('user-1', 'asset-btc-malformed', {
+        interval: '5m',
+      }),
+      502,
+      'ASSET_CANDLES_PROVIDER_MALFORMED_RESPONSE',
     );
-    expect(kisQuoteClient.getMarketDataByExplicitPath).not.toHaveBeenCalled();
+  });
+
+  it('sanitizes Binance provider failures', async () => {
+    const { prisma, binancePublicClient, service } = createService();
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({
+        id: 'asset-btc-provider-error',
+        symbol: 'BTC',
+        market: 'BINANCE',
+        assetType: AssetType.crypto,
+        currencyCode: CurrencyCode.USD,
+      }),
+    );
+    binancePublicClient.fetchKlines.mockRejectedValueOnce(
+      new ProviderHttpError(
+        'binance',
+        'PROVIDER_HTTP_ERROR',
+        'raw payload access_token secret',
+      ),
+    );
+
+    try {
+      await service.getAssetCandles('user-1', 'asset-btc-provider-error', {
+        interval: '5m',
+      });
+      throw new Error('Expected promise to reject.');
+    } catch (error) {
+      expect(error).toBeInstanceOf(HttpException);
+      const response = (error as HttpException).getResponse();
+
+      expect(response).toMatchObject({
+        success: false,
+        error: {
+          code: 'ASSET_CANDLES_PROVIDER_ERROR',
+          message: 'Binance candle provider is unavailable.',
+        },
+      });
+      expect(JSON.stringify(response)).not.toContain('access_token');
+      expect(JSON.stringify(response)).not.toContain('raw payload');
+    }
   });
 
   it('rejects invalid query values before calling KIS', async () => {

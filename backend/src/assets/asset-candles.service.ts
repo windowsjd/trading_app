@@ -1,5 +1,7 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { AssetType, CurrencyCode, Prisma } from '../generated/prisma/client';
+import { BinancePublicClient } from '../providers/binance/binance-public.client';
+import type { BinanceKlinesResponse } from '../providers/binance/binance.types';
 import { KisAuthClient } from '../providers/kis/kis-auth.client';
 import { KisQuoteClient } from '../providers/kis/kis-quote.client';
 import { normalizeKisUsMarketCode } from '../providers/kis/kis-websocket.subscription';
@@ -18,7 +20,9 @@ export type AssetCandlesQuery = {
   market?: string;
 };
 
-type CandleInterval = '1m' | '2m' | '3m' | '5m' | '10m' | '15m' | '30m';
+type StockCandleInterval = '1m' | '2m' | '3m' | '5m' | '10m' | '15m' | '30m';
+type CryptoCandleInterval = '5m' | '15m' | '30m' | '1h' | '4h' | '1d' | '1w';
+type CandleInterval = StockCandleInterval | CryptoCandleInterval;
 
 type AssetRecord = {
   id: string;
@@ -38,6 +42,9 @@ type ParsedAssetCandlesQuery = {
   limit: number;
   requestedDate: string;
   toHHmmss: string;
+  toInstant: Date | null;
+  dateProvided: boolean;
+  toProvided: boolean;
   includePrevious: boolean;
 };
 
@@ -81,10 +88,17 @@ type KisCallDescriptor = {
   requestedCount: number;
 };
 
+type BinanceCallDescriptor = {
+  endpoint: typeof BINANCE_KLINE_PATH;
+  symbol: string;
+  interval: CryptoCandleInterval;
+  requestedCount: number;
+};
+
 type AssetCandlesResponse = {
   success: true;
   data: {
-    state: 'available';
+    state: 'available' | 'empty';
     asset: {
       id: string;
       symbol: string;
@@ -96,24 +110,36 @@ type AssetCandlesResponse = {
     interval: CandleInterval;
     requestedDate: string;
     candles: CandlePayload[];
-    source: {
-      provider: 'kis';
-      trId: string;
-      path: string;
-      marketCode: string;
-      requestedCount: number;
-      returnedCount: number;
-    };
+    source:
+      | {
+          provider: 'kis';
+          trId: string;
+          path: string;
+          marketCode: string;
+          requestedCount: number;
+          returnedCount: number;
+        }
+      | {
+          provider: 'binance';
+          endpoint: typeof BINANCE_KLINE_PATH;
+          symbol: string;
+          interval: CryptoCandleInterval;
+          requestedCount: number;
+          returnedCount: number;
+        };
   };
 };
 
 const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 120;
+const CRYPTO_MAX_LIMIT = 1000;
 const DOMESTIC_TODAY_MAX_COUNT = 30;
 const KOREA_TIME_ZONE = 'Asia/Seoul';
 const US_EASTERN_TIME_ZONE = 'America/New_York';
+const UTC_TIME_ZONE = 'UTC';
+const BINANCE_KLINE_PATH = '/api/v3/klines';
 
-const INTERVAL_MINUTES: Record<CandleInterval, number> = {
+const STOCK_INTERVAL_MINUTES: Record<StockCandleInterval, number> = {
   '1m': 1,
   '2m': 2,
   '3m': 3,
@@ -121,6 +147,16 @@ const INTERVAL_MINUTES: Record<CandleInterval, number> = {
   '10m': 10,
   '15m': 15,
   '30m': 30,
+};
+
+const CRYPTO_INTERVALS: Record<CryptoCandleInterval, true> = {
+  '5m': true,
+  '15m': true,
+  '30m': true,
+  '1h': true,
+  '4h': true,
+  '1d': true,
+  '1w': true,
 };
 
 const DOMESTIC_TODAY_CANDLE_PATH =
@@ -169,6 +205,7 @@ export class AssetCandlesService {
     private readonly prisma: PrismaService,
     private readonly kisAuthClient: KisAuthClient,
     private readonly kisQuoteClient: KisQuoteClient,
+    private readonly binancePublicClient: BinancePublicClient,
   ) {}
 
   async getAssetCandles(
@@ -211,10 +248,14 @@ export class AssetCandlesService {
         return await this.getUsStockCandles(asset, parsedQuery);
       }
 
+      if (asset.assetType === AssetType.crypto) {
+        return await this.getCryptoCandles(asset, parsedQuery);
+      }
+
       this.throwApiError(
         HttpStatus.BAD_REQUEST,
         'ASSET_CANDLES_UNSUPPORTED_ASSET_TYPE',
-        'Crypto candles are unsupported in this API.',
+        'Asset type is unsupported for candles.',
       );
     } catch (error) {
       if (error instanceof HttpException) {
@@ -225,6 +266,14 @@ export class AssetCandlesService {
         error instanceof ProviderConfigError ||
         error instanceof ProviderHttpError
       ) {
+        if (error.provider === 'binance') {
+          this.throwApiError(
+            HttpStatus.BAD_GATEWAY,
+            'ASSET_CANDLES_PROVIDER_ERROR',
+            'Binance candle provider is unavailable.',
+          );
+        }
+
         this.throwApiError(
           HttpStatus.SERVICE_UNAVAILABLE,
           'ASSET_CANDLES_PROVIDER_UNAVAILABLE',
@@ -279,6 +328,32 @@ export class AssetCandlesService {
     );
 
     return this.buildResponse(asset, query, descriptor, candles);
+  }
+
+  private async getCryptoCandles(
+    asset: AssetRecord,
+    query: ParsedAssetCandlesQuery,
+  ): Promise<AssetCandlesResponse> {
+    const interval = this.requireCryptoInterval(query.interval);
+    const symbol = this.normalizeCryptoSymbol(asset);
+    const timeRange = this.buildCryptoTimeRange(query);
+    const descriptor: BinanceCallDescriptor = {
+      endpoint: BINANCE_KLINE_PATH,
+      symbol,
+      interval,
+      requestedCount: query.limit,
+    };
+    const result = await this.binancePublicClient.fetchKlines({
+      symbol,
+      interval,
+      limit: query.limit,
+      ...timeRange,
+    });
+    const candles = this.normalizeBinanceKlines(result.response).map((candle) =>
+      this.formatCandle(candle),
+    );
+
+    return this.buildCryptoResponse(asset, query, descriptor, candles);
   }
 
   private buildDomesticTodayCall(
@@ -493,6 +568,84 @@ export class AssetCandlesService {
     return this.sortCandles(candles);
   }
 
+  private normalizeBinanceKlines(
+    response: BinanceKlinesResponse,
+  ): NormalizedCandle[] {
+    if (!Array.isArray(response)) {
+      this.throwMalformedBinanceResponse();
+    }
+
+    if (response.length === 0) {
+      return [];
+    }
+
+    return this.sortCandles(
+      response.map((row) => this.normalizeBinanceKlineRow(row)),
+    );
+  }
+
+  private normalizeBinanceKlineRow(row: unknown): NormalizedCandle {
+    if (!Array.isArray(row)) {
+      this.throwMalformedBinanceResponse();
+    }
+
+    const openTime = this.parseBinanceOpenTime(row[0]);
+    const open = this.parseDecimal(this.readOptionalString(row[1]));
+    const high = this.parseDecimal(this.readOptionalString(row[2]));
+    const low = this.parseDecimal(this.readOptionalString(row[3]));
+    const close = this.parseDecimal(this.readOptionalString(row[4]));
+    const volume = this.parseDecimal(this.readOptionalString(row[5]));
+    const amount = this.parseDecimal(this.readOptionalString(row[7]));
+
+    if (
+      openTime === null ||
+      open === null ||
+      high === null ||
+      low === null ||
+      close === null ||
+      volume === null ||
+      amount === null ||
+      open.lte(0) ||
+      high.lte(0) ||
+      low.lte(0) ||
+      close.lte(0) ||
+      volume.lt(0) ||
+      amount.lt(0)
+    ) {
+      this.throwMalformedBinanceResponse();
+    }
+
+    const time = new Date(openTime);
+    if (Number.isNaN(time.getTime())) {
+      this.throwMalformedBinanceResponse();
+    }
+
+    return {
+      time,
+      open,
+      high,
+      low,
+      close,
+      volume,
+      amount,
+      sourceDate: time.toISOString().slice(0, 10),
+      sourceTime: time.toISOString(),
+    };
+  }
+
+  private parseBinanceOpenTime(value: unknown): number | null {
+    if (typeof value === 'number') {
+      return Number.isSafeInteger(value) && value >= 0 ? value : null;
+    }
+
+    if (typeof value === 'string' && /^\d+$/u.test(value.trim())) {
+      const parsed = Number(value.trim());
+      return Number.isSafeInteger(parsed) ? parsed : null;
+    }
+
+    return null;
+  }
+
   private bucketDomesticCandles(
     candles: readonly NormalizedCandle[],
     intervalMinutes: number,
@@ -589,6 +742,39 @@ export class AssetCandlesService {
     };
   }
 
+  private buildCryptoResponse(
+    asset: AssetRecord,
+    query: ParsedAssetCandlesQuery,
+    descriptor: BinanceCallDescriptor,
+    candles: CandlePayload[],
+  ): AssetCandlesResponse {
+    return {
+      success: true,
+      data: {
+        state: candles.length > 0 ? 'available' : 'empty',
+        asset: {
+          id: asset.id,
+          symbol: asset.symbol,
+          name: asset.name,
+          assetType: asset.assetType,
+          market: asset.market,
+          priceCurrency: asset.priceCurrency ?? asset.currencyCode,
+        },
+        interval: query.interval,
+        requestedDate: query.requestedDate,
+        candles,
+        source: {
+          provider: 'binance',
+          endpoint: descriptor.endpoint,
+          symbol: descriptor.symbol,
+          interval: descriptor.interval,
+          requestedCount: descriptor.requestedCount,
+          returnedCount: candles.length,
+        },
+      },
+    };
+  }
+
   private formatCandle(candle: NormalizedCandle): CandlePayload {
     return {
       time: candle.time.toISOString(),
@@ -610,22 +796,45 @@ export class AssetCandlesService {
     const timeZone =
       asset.assetType === AssetType.domestic_stock
         ? KOREA_TIME_ZONE
-        : US_EASTERN_TIME_ZONE;
-    const interval = this.parseInterval(query.interval);
+        : asset.assetType === AssetType.us_stock
+          ? US_EASTERN_TIME_ZONE
+          : UTC_TIME_ZONE;
+    const interval = this.parseInterval(query.interval, asset.assetType);
+    const parsedTo = this.parseTo(query.to, timeZone);
 
     return {
       interval,
-      intervalMinutes: INTERVAL_MINUTES[interval],
-      limit: this.parseLimit(query.limit),
+      intervalMinutes: this.resolveStockIntervalMinutes(interval),
+      limit: this.parseLimit(query.limit, asset.assetType),
       requestedDate: this.parseDate(query.date, timeZone),
-      toHHmmss: this.parseTo(query.to, timeZone),
+      toHHmmss: parsedTo.hhmmss,
+      toInstant: parsedTo.instant,
+      dateProvided: this.parseOptionalText(query.date) !== undefined,
+      toProvided: parsedTo.provided,
       includePrevious: this.parseBoolean(query.includePrevious, true),
     };
   }
 
-  private parseInterval(value: string | undefined): CandleInterval {
-    const text = this.parseOptionalText(value) ?? '1m';
-    if (this.isCandleInterval(text)) {
+  private parseInterval(
+    value: string | undefined,
+    assetType: AssetType,
+  ): CandleInterval {
+    const defaultInterval = assetType === AssetType.crypto ? '5m' : '1m';
+    const text = this.parseOptionalText(value) ?? defaultInterval;
+
+    if (assetType === AssetType.crypto) {
+      if (this.isCryptoCandleInterval(text)) {
+        return text;
+      }
+
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'ASSET_CANDLES_INVALID_INTERVAL',
+        'interval must be one of 5m, 15m, 30m, 1h, 4h, 1d, or 1w for crypto candles.',
+      );
+    }
+
+    if (this.isStockCandleInterval(text)) {
       return text;
     }
 
@@ -636,13 +845,64 @@ export class AssetCandlesService {
     );
   }
 
-  private parseLimit(value: string | undefined): number {
+  private parseLimit(value: string | undefined, assetType: AssetType): number {
     if (value === undefined) {
       return DEFAULT_LIMIT;
     }
 
     const limit = this.parsePositiveInteger(value, 'INVALID_CANDLE_LIMIT');
-    return Math.min(limit, MAX_LIMIT);
+    const maxLimit =
+      assetType === AssetType.crypto ? CRYPTO_MAX_LIMIT : MAX_LIMIT;
+    return Math.min(limit, maxLimit);
+  }
+
+  private resolveStockIntervalMinutes(interval: CandleInterval): number {
+    return this.isStockCandleInterval(interval)
+      ? STOCK_INTERVAL_MINUTES[interval]
+      : 0;
+  }
+
+  private requireCryptoInterval(
+    interval: CandleInterval,
+  ): CryptoCandleInterval {
+    if (this.isCryptoCandleInterval(interval)) {
+      return interval;
+    }
+
+    this.throwApiError(
+      HttpStatus.BAD_REQUEST,
+      'ASSET_CANDLES_INVALID_INTERVAL',
+      'interval must be one of 5m, 15m, 30m, 1h, 4h, 1d, or 1w for crypto candles.',
+    );
+  }
+
+  private buildCryptoTimeRange(query: ParsedAssetCandlesQuery): {
+    startTime?: number;
+    endTime?: number;
+  } {
+    const range: {
+      startTime?: number;
+      endTime?: number;
+    } = {};
+
+    if (query.dateProvided) {
+      range.startTime = Date.parse(`${query.requestedDate}T00:00:00.000Z`);
+    }
+
+    if (query.toProvided) {
+      range.endTime =
+        query.toInstant?.getTime() ??
+        Date.parse(
+          `${query.requestedDate}T${query.toHHmmss.slice(
+            0,
+            2,
+          )}:${query.toHHmmss.slice(2, 4)}:${query.toHHmmss.slice(4, 6)}.000Z`,
+        );
+    } else if (query.dateProvided) {
+      range.endTime = Date.parse(`${query.requestedDate}T23:59:59.999Z`);
+    }
+
+    return range;
   }
 
   private parseDate(value: string | undefined, timeZone: string): string {
@@ -674,15 +934,30 @@ export class AssetCandlesService {
     return text;
   }
 
-  private parseTo(value: string | undefined, timeZone: string): string {
+  private parseTo(
+    value: string | undefined,
+    timeZone: string,
+  ): {
+    hhmmss: string;
+    instant: Date | null;
+    provided: boolean;
+  } {
     const text = this.parseOptionalText(value);
     if (!text) {
-      return this.nowTimeInZone(timeZone);
+      return {
+        hhmmss: this.nowTimeInZone(timeZone),
+        instant: null,
+        provided: false,
+      };
     }
 
     const compactTime = text.replace(/:/gu, '');
     if (/^\d{6}$/u.test(compactTime)) {
-      return this.requireHHmmss(compactTime, 'INVALID_CANDLE_TO');
+      return {
+        hhmmss: this.requireHHmmss(compactTime, 'INVALID_CANDLE_TO'),
+        instant: null,
+        provided: true,
+      };
     }
 
     if (/^\d{4}-\d{2}-\d{2}$/u.test(text)) {
@@ -703,9 +978,13 @@ export class AssetCandlesService {
     }
 
     const parts = this.zonedParts(parsed, timeZone);
-    return `${this.pad2(parts.hour)}${this.pad2(parts.minute)}${this.pad2(
-      parts.second,
-    )}`;
+    return {
+      hhmmss: `${this.pad2(parts.hour)}${this.pad2(parts.minute)}${this.pad2(
+        parts.second,
+      )}`,
+      instant: parsed,
+      provided: true,
+    };
   }
 
   private parseBoolean(
@@ -829,6 +1108,50 @@ export class AssetCandlesService {
       HttpStatus.BAD_REQUEST,
       'ASSET_CANDLES_UNSUPPORTED_SYMBOL',
       'US stock candles require a KIS-compatible stock symbol.',
+    );
+  }
+
+  private normalizeCryptoSymbol(asset: AssetRecord): string {
+    const rawSymbol = this.parseOptionalText(asset.symbol)?.toUpperCase();
+    if (!rawSymbol) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'ASSET_CANDLES_UNSUPPORTED_SYMBOL',
+        'Crypto candles require a Binance-compatible symbol.',
+      );
+    }
+
+    const symbol = rawSymbol.replace(/\s+/gu, '');
+    if (/[\/_-]/u.test(symbol)) {
+      const pair = symbol.match(/^([A-Z0-9]{1,20})[\/_-](USDT|USD)$/u);
+      if (pair) {
+        return `${pair[1]}USDT`;
+      }
+
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'ASSET_CANDLES_UNSUPPORTED_SYMBOL',
+        'Crypto candles require a USDT quote Binance symbol.',
+      );
+    }
+
+    if (/^[A-Z0-9]{1,30}USDT$/u.test(symbol)) {
+      return symbol;
+    }
+
+    const usdPair = symbol.match(/^([A-Z0-9]{1,20})USD$/u);
+    if (usdPair) {
+      return `${usdPair[1]}USDT`;
+    }
+
+    if (/^[A-Z0-9]{1,20}$/u.test(symbol)) {
+      return `${symbol}USDT`;
+    }
+
+    this.throwApiError(
+      HttpStatus.BAD_REQUEST,
+      'ASSET_CANDLES_UNSUPPORTED_SYMBOL',
+      'Crypto candles require a Binance-compatible symbol.',
     );
   }
 
@@ -1047,8 +1370,12 @@ export class AssetCandlesService {
     return String(value).padStart(2, '0');
   }
 
-  private isCandleInterval(value: string): value is CandleInterval {
-    return Object.hasOwn(INTERVAL_MINUTES, value);
+  private isStockCandleInterval(value: string): value is StockCandleInterval {
+    return Object.hasOwn(STOCK_INTERVAL_MINUTES, value);
+  }
+
+  private isCryptoCandleInterval(value: string): value is CryptoCandleInterval {
+    return Object.hasOwn(CRYPTO_INTERVALS, value);
   }
 
   private isRecord(value: unknown): value is Record<string, unknown> {
@@ -1077,6 +1404,14 @@ export class AssetCandlesService {
         message,
       },
     };
+  }
+
+  private throwMalformedBinanceResponse(): never {
+    this.throwApiError(
+      HttpStatus.BAD_GATEWAY,
+      'ASSET_CANDLES_PROVIDER_MALFORMED_RESPONSE',
+      'Binance returned malformed candle data.',
+    );
   }
 
   private throwApiError(

@@ -4,9 +4,10 @@
 
 - `GET /api/v1/assets` read-only MVP is implemented.
 - `GET /api/v1/assets/:assetId` read-only MVP is implemented.
-- The API is for order-screen asset discovery, search, selection, and detail confirmation before calling order quote/create.
+- `GET /api/v1/assets/:assetId/candles` supports domestic/US stock candles through KIS and crypto chart candles through Binance Spot klines.
+- The list/detail API is for order-screen asset discovery, search, selection, and detail confirmation before calling order quote/create. The candles subresource is a chart-display read path.
 - With `withPrice=true`, the API reads existing `assets`, fresh eligible `provider_api` price/FX snapshots first, and existing safe `admin_manual` fallback snapshots.
-- The API does not call external providers, create provider clients, ingest provider data, generate snapshots/rankings, settle seasons, grant rewards, or mutate business rows.
+- List/detail price reads use existing DB snapshots and do not call external providers. The candles subresource may call KIS or Binance public market-data endpoints for chart display only. No Assets API path ingests provider data, generates snapshots/rankings, settles seasons, grants rewards, or mutates business rows.
 - Do not add fake/static/sample business price data, Prisma schema changes, migrations, package changes, lockfile changes, or seed changes from this contract.
 
 ## Source Rules
@@ -236,6 +237,77 @@ Trading note policy:
 - `us_stock` uses the USD wallet.
 - `crypto` is USD-settled and uses the USD wallet under the current MVP policy.
 
+## GET /api/v1/assets/:assetId/candles
+
+### Behavior
+
+- Returns chart-compatible candles for existing assets without mutating DB rows.
+- `domestic_stock` keeps the existing KIS domestic candle behavior.
+- `us_stock` keeps the existing KIS overseas candle behavior.
+- `crypto` uses Binance Spot `GET /api/v3/klines` only. Binance Futures `/fapi/v1/klines` and authenticated Binance APIs are not used.
+- Crypto candles are display-only and are not used for orders, quotes, valuation, ranking, settlement, scheduler jobs, `asset_price_snapshots`, or `fx_rate_snapshots`.
+- Crypto symbol normalization uses the asset symbol: `BTC` -> `BTCUSDT`, `ETH` -> `ETHUSDT`, existing `BTCUSDT` stays unchanged, and `BTC/USD`, `BTC-USD`, or `BTC_USD` normalize to `BTCUSDT`.
+- Binance USDT quote pairs are treated as USD-equivalent market data under the current MVP policy.
+- Raw Binance rows, raw provider payloads, metadata JSON, and secrets are never exposed.
+
+### Crypto Query Parameters
+
+- `interval` optional. Crypto default is `5m`.
+  - Allowed for crypto: `5m`, `15m`, `30m`, `1h`, `4h`, `1d`, `1w`.
+  - Rejected for crypto: `1s`, `1m`, `2m`, `3m`, `10m`, `1M`, and any other value.
+- `limit` optional.
+  - Default: `100`.
+  - Must be a positive integer.
+  - Crypto values greater than `1000` are clamped to `1000`.
+- `date` optional `YYYY-MM-DD`.
+  - When present for crypto, Binance receives UTC `startTime` at that date's start and `endTime` at that date's end unless `to` is provided.
+- `to` optional `HHmmss` or ISO datetime.
+  - When present for crypto, Binance receives UTC millisecond `endTime`.
+
+### Crypto Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "state": "available",
+    "asset": {
+      "id": "<asset id>",
+      "symbol": "BTC",
+      "name": "Bitcoin",
+      "assetType": "crypto",
+      "market": "BINANCE",
+      "priceCurrency": "USD"
+    },
+    "interval": "5m",
+    "requestedDate": "2026-06-21",
+    "candles": [
+      {
+        "time": "2026-06-21T04:00:00.000Z",
+        "open": "65000.00000000",
+        "high": "65100.00000000",
+        "low": "64900.00000000",
+        "close": "65050.00000000",
+        "volume": "12.34567800",
+        "amount": "802000.00000000",
+        "sourceDate": "2026-06-21",
+        "sourceTime": "2026-06-21T04:00:00.000Z"
+      }
+    ],
+    "source": {
+      "provider": "binance",
+      "endpoint": "/api/v3/klines",
+      "symbol": "BTCUSDT",
+      "interval": "5m",
+      "requestedCount": 100,
+      "returnedCount": 1
+    }
+  }
+}
+```
+
+`state` is `available` when crypto candles are returned and `empty` when Binance returns an empty row array.
+
 ## Error Codes
 
 - `UNAUTHORIZED`
@@ -246,13 +318,20 @@ Trading note policy:
 - `INVALID_WITH_PRICE`
 - `INVALID_LIMIT`
 - `INVALID_OFFSET`
+- `ASSET_CANDLES_INVALID_INTERVAL`
+- `ASSET_CANDLES_UNSUPPORTED_SYMBOL`
+- `ASSET_CANDLES_PROVIDER_ERROR`
+- `ASSET_CANDLES_PROVIDER_MALFORMED_RESPONSE`
 
 ## Not Implemented
 
-- External provider API calls from the Assets API.
-- Provider client implementation from the Assets API.
-- Provider API ingestion trigger APIs.
+- External provider API calls from list/detail asset price reads.
+- Provider ingestion trigger APIs from the Assets API.
 - Scheduler/batch generation.
 - Settlement/reward integration.
 - Matching engine, partial fill, or durable quote.
 - Fake/static/sample business price fallback.
+- Crypto candle frontend integration.
+- Crypto candle DB persistence.
+- Binance Futures API.
+- Binance authenticated API.

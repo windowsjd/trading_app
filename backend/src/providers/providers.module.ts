@@ -34,6 +34,7 @@ import { ProviderHttpClient } from './provider-http.client';
     ExchangeRateIngestionService,
     KoreaEximExchangeClient,
     KoreaEximExchangeIngestionService,
+    BinancePublicClient,
     BinancePriceIngestionService,
     KisAuthClient,
     KisQuoteClient,
