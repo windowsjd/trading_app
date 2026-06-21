@@ -19,6 +19,8 @@ export type AuthViewState =
   | 'auth_idle'
   | 'auth_submitting'
   | 'auth_invalid_input'
+  | 'auth_suspended'
+  | 'auth_deleted'
   | 'auth_failed'
   | 'auth_success';
 
@@ -28,6 +30,9 @@ export type SeasonJoinViewState =
   | 'season_active_not_joined_view'
   | 'season_ended_unsettled_view'
   | 'season_join_submitting'
+  | 'season_join_already_joined'
+  | 'season_join_closed'
+  | 'season_join_error'
   | 'season_join_failed'
   | 'season_join_success'
   | 'season_settled_view'
@@ -35,11 +40,13 @@ export type SeasonJoinViewState =
 
 export type HomeViewState =
   | 'home_loading'
+  | 'home_no_current_season'
   | 'home_active_joined'
   | 'home_active_not_joined'
   | 'home_upcoming'
   | 'home_ended_unsettled'
   | 'home_settled'
+  | 'home_settled_not_joined'
   | 'home_no_positions'
   | 'home_partial_error'
   | 'home_error';
@@ -48,6 +55,8 @@ export type WalletFxViewState =
   | 'wallet_loading'
   | 'wallet_ready'
   | 'wallet_empty_default'
+  | 'wallet_not_joined'
+  | 'wallet_unavailable'
   | 'fx_quote_loading'
   | 'fx_quote_ready'
   | 'fx_quote_invalid'

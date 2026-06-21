@@ -4,6 +4,12 @@ export type RateString = string;
 export type PercentString = string;
 export type BpsString = string;
 export type IsoDateTimeString = string;
+export type SectionState =
+  | 'available'
+  | 'empty'
+  | 'blocked'
+  | 'unavailable'
+  | 'error';
 
 export interface ApiSuccessResponse<T> {
   success: true;

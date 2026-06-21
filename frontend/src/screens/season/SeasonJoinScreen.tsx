@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -15,12 +15,14 @@ import {
 } from '../../features/season/mapper';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
+import { clearTokens } from '../../services/storage/tokenStorage';
 import {
   getApiErrorCode,
   getErrorMessageFromCode,
   isAuthUserInactiveError,
 } from '../../services/api/errorMapper';
 import { ERROR_CODE } from '../../models/enums/errorCode';
+import type { SeasonJoinViewState } from '../../models/enums/viewState';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -29,8 +31,38 @@ import CTAButton from '../../components/common/CTAButton';
 
 type Props = SeasonJoinScreenProps;
 
+function getJoinErrorViewState(
+  code?: string | null,
+): SeasonJoinViewState | null {
+  if (code === ERROR_CODE.SEASON_ALREADY_JOINED) {
+    return 'season_join_already_joined';
+  }
+  if (code === ERROR_CODE.SEASON_NOT_ACTIVE) return 'season_join_closed';
+  if (code === ERROR_CODE.SEASON_NOT_FOUND) {
+    return 'season_not_configured_view';
+  }
+  if (code) return 'season_join_error';
+  return null;
+}
+
 export default function SeasonJoinScreen({ navigation }: Props) {
   const queryClient = useQueryClient();
+  const [joinErrorCode, setJoinErrorCode] = useState<string | null>(null);
+
+  const resetToHome = () => {
+    navigation.reset({
+      index: 0,
+      routes: [
+        {
+          name: 'MainTabs',
+          params: {
+            screen: 'HomeTab',
+            params: { screen: 'Home' },
+          },
+        },
+      ],
+    });
+  };
 
   const seasonQuery = useQuery({
     queryKey: QUERY_KEYS.season.current,
@@ -40,24 +72,40 @@ export default function SeasonJoinScreen({ navigation }: Props) {
   const joinMutation = useMutation({
     mutationFn: (seasonId: string) => joinSeason(seasonId),
     onSuccess: async () => {
+      setJoinErrorCode(null);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.season.current }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.home.dashboard }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.wallet.balances }),
       ]);
 
-      navigation.reset({
-        index: 0,
-        routes: [
-          {
-            name: 'MainTabs',
-            params: {
-              screen: 'HomeTab',
-              params: { screen: 'Home' },
-            },
-          },
-        ],
-      });
+      resetToHome();
+    },
+    onError: async (error: unknown) => {
+      const code = getApiErrorCode(error);
+      setJoinErrorCode(code ?? 'UNKNOWN');
+
+      if (code === ERROR_CODE.USER_NOT_ACTIVE) {
+        await clearTokens();
+        return;
+      }
+
+      if (
+        code === ERROR_CODE.SEASON_ALREADY_JOINED ||
+        code === ERROR_CODE.SEASON_NOT_ACTIVE ||
+        code === ERROR_CODE.SEASON_NOT_FOUND
+      ) {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.season.current }),
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.home.dashboard }),
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.wallet.balances }),
+        ]);
+        await seasonQuery.refetch();
+      }
+
+      if (code === ERROR_CODE.SEASON_ALREADY_JOINED) {
+        resetToHome();
+      }
     },
   });
 
@@ -74,6 +122,8 @@ export default function SeasonJoinScreen({ navigation }: Props) {
     }
     if (!seasonQuery.data) return 'season_not_configured_view';
     if (joinMutation.isPending) return 'season_join_submitting';
+    const joinErrorState = getJoinErrorViewState(joinErrorCode);
+    if (joinErrorState) return joinErrorState;
     return toSeasonJoinViewState(seasonQuery.data);
   }, [
     seasonQuery.isLoading,
@@ -81,6 +131,7 @@ export default function SeasonJoinScreen({ navigation }: Props) {
     seasonQuery.error,
     seasonQuery.data,
     joinMutation.isPending,
+    joinErrorCode,
   ]);
 
   if (viewState === 'season_info_loading') {
@@ -121,20 +172,7 @@ export default function SeasonJoinScreen({ navigation }: Props) {
         title={season.name}
         message="시즌 시작 전입니다. 시작 시점이 되면 거래가 열립니다."
         actionLabel="홈으로 이동"
-        onAction={() =>
-          navigation.reset({
-            index: 0,
-            routes: [
-              {
-                name: 'MainTabs',
-                params: {
-                  screen: 'HomeTab',
-                  params: { screen: 'Home' },
-                },
-              },
-            ],
-          })
-        }
+        onAction={resetToHome}
       />
     );
   }
@@ -145,20 +183,7 @@ export default function SeasonJoinScreen({ navigation }: Props) {
         title={season.name}
         message="현재 시즌은 정산 중입니다. 홈에서 결과를 확인해주세요."
         actionLabel="홈으로 이동"
-        onAction={() =>
-          navigation.reset({
-            index: 0,
-            routes: [
-              {
-                name: 'MainTabs',
-                params: {
-                  screen: 'HomeTab',
-                  params: { screen: 'Home' },
-                },
-              },
-            ],
-          })
-        }
+        onAction={resetToHome}
       />
     );
   }
@@ -169,25 +194,50 @@ export default function SeasonJoinScreen({ navigation }: Props) {
         title={season.name}
         message="현재 시즌은 종료되었습니다. 홈으로 이동해주세요."
         actionLabel="홈으로 이동"
-        onAction={() =>
-          navigation.reset({
-            index: 0,
-            routes: [
-              {
-                name: 'MainTabs',
-                params: {
-                  screen: 'HomeTab',
-                  params: { screen: 'Home' },
-                },
-              },
-            ],
-          })
-        }
+        onAction={resetToHome}
       />
     );
   }
 
-  if (viewState === 'season_join_success') {
+  if (viewState === 'season_join_closed') {
+    return (
+      <BlockedState
+        title={season.name}
+        message="현재 시즌 참가가 마감되었거나 활성 상태가 아닙니다."
+        actionLabel="시즌 정보 다시 확인"
+        onAction={() => {
+          setJoinErrorCode(null);
+          seasonQuery.refetch();
+        }}
+      />
+    );
+  }
+
+  if (viewState === 'season_join_error') {
+    const message = isAuthUserInactiveError(joinErrorCode)
+      ? getErrorMessageFromCode(ERROR_CODE.USER_NOT_ACTIVE)
+      : getErrorMessageFromCode(joinErrorCode);
+
+    return (
+      <ErrorState
+        title={
+          isAuthUserInactiveError(joinErrorCode)
+            ? '계정을 사용할 수 없습니다.'
+            : '시즌 참가에 실패했습니다.'
+        }
+        message={message}
+        onRetry={() => {
+          setJoinErrorCode(null);
+          joinMutation.mutate(season.id);
+        }}
+      />
+    );
+  }
+
+  if (
+    viewState === 'season_join_success' ||
+    viewState === 'season_join_already_joined'
+  ) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.content}>
@@ -198,20 +248,7 @@ export default function SeasonJoinScreen({ navigation }: Props) {
 
           <CTAButton
             label="홈으로 이동"
-            onPress={() =>
-              navigation.reset({
-                index: 0,
-                routes: [
-                  {
-                    name: 'MainTabs',
-                    params: {
-                      screen: 'HomeTab',
-                      params: { screen: 'Home' },
-                    },
-                  },
-                ],
-              })
-            }
+            onPress={resetToHome}
           />
         </View>
       </SafeAreaView>
@@ -238,25 +275,15 @@ export default function SeasonJoinScreen({ navigation }: Props) {
         <CTAButton
           label={joinMutation.isPending ? '참가 처리 중...' : '시즌 참가하기'}
           state={joinMutation.isPending ? 'loading' : 'enabled'}
-          onPress={() => joinMutation.mutate(season.id)}
+          onPress={() => {
+            setJoinErrorCode(null);
+            joinMutation.mutate(season.id);
+          }}
         />
 
         <Pressable
           style={styles.secondaryButton}
-          onPress={() =>
-            navigation.reset({
-              index: 0,
-              routes: [
-                {
-                  name: 'MainTabs',
-                  params: {
-                    screen: 'HomeTab',
-                    params: { screen: 'Home' },
-                  },
-                },
-              ],
-            })
-          }
+          onPress={resetToHome}
         >
           <Text style={styles.secondaryButtonText}>지금은 둘러보기</Text>
         </Pressable>

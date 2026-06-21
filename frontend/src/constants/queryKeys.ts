@@ -12,7 +12,27 @@ export const QUERY_KEYS = {
   wallet: {
     all: ['wallet'] as const,
     balances: ['wallet', 'balances'] as const,
-    fxRate: (pair: string) => ['wallet', 'fx-rate', pair] as const,
+    fxRate: (
+      params:
+        | string
+        | {
+            baseCurrency?: string;
+            quoteCurrency?: string;
+            refresh?: boolean;
+          },
+    ) => {
+      if (typeof params === 'string') {
+        return ['wallet', 'fx-rate', params] as const;
+      }
+
+      return [
+        'wallet',
+        'fx-rate',
+        params.baseCurrency ?? 'USD',
+        params.quoteCurrency ?? 'KRW',
+        params.refresh ?? false,
+      ] as const;
+    },
     fxHistory: (cursor?: string | null) =>
       ['wallet', 'fx-history', cursor ?? null] as const,
   },

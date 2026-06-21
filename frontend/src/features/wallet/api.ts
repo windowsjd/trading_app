@@ -1,25 +1,69 @@
 import { apiClient } from '../../services/api/client';
-import type { ApiSuccessResponse } from '../../models/dto/common';
+import type {
+  ApiSuccessResponse,
+  IsoDateTimeString,
+  MoneyString,
+  RateString,
+  SectionState,
+} from '../../models/dto/common';
 
 export type WalletCurrency = 'KRW' | 'USD';
+export type WalletState = SectionState;
 
 export interface WalletBalanceDto {
-  currency: WalletCurrency;
-  balance: string;
-  balanceKrw?: string;
+  currencyCode: WalletCurrency;
+  balanceAmount: MoneyString;
+  updatedAt?: IsoDateTimeString;
+  // Legacy fallback fields until all wallet consumers are on v2.
+  currency?: WalletCurrency;
+  balance?: MoneyString;
+}
+
+export interface WalletSeasonDto {
+  id?: string;
+  name?: string;
+  status?: string;
+  startAt?: IsoDateTimeString;
+  endAt?: IsoDateTimeString;
+}
+
+export interface WalletParticipantDto {
+  id?: string;
+  seasonId?: string;
+  joinedAt?: IsoDateTimeString | null;
+}
+
+export interface WalletSummaryDto {
+  totalKrw?: MoneyString;
+  krwCash?: MoneyString;
+  usdCash?: MoneyString;
+  usdCashKrw?: MoneyString;
 }
 
 export interface WalletsDto {
+  state: WalletState;
+  season?: WalletSeasonDto | null;
+  participant?: WalletParticipantDto | null;
   wallets: WalletBalanceDto[];
+  summary?: WalletSummaryDto | null;
 }
 
 export interface FxRateDto {
-  pair: string;
-  rate: string;
-  feeRate: string;
-  capturedAt: string;
+  state: SectionState;
+  pair?: string;
+  baseCurrency: WalletCurrency;
+  quoteCurrency: WalletCurrency;
+  rate: RateString;
+  sourceType?: string;
+  sourceName?: string;
+  effectiveAt?: IsoDateTimeString;
+  capturedAt?: IsoDateTimeString;
+  freshnessAgeSeconds?: number;
+  providerPriority?: number;
+  fallbackUsed?: boolean;
 }
 
+// TODO: Migrate FX quote payloads to the v2 sourceAmount contract in the FX task.
 export interface FxQuoteRequestDto {
   fromCurrency: WalletCurrency;
   toCurrency: WalletCurrency;
@@ -36,6 +80,7 @@ export interface FxQuoteDto {
   expiresAt: string;
 }
 
+// TODO: Migrate FX execute to /fx/execute with idempotency in the FX task.
 export interface FxExecuteRequestDto {
   fromCurrency: WalletCurrency;
   toCurrency: WalletCurrency;
@@ -64,9 +109,20 @@ export async function getWallets() {
   return response.data.data;
 }
 
-export async function getCurrentFxRate(pair: string) {
+export async function getCurrentFxRate(
+  baseCurrency: WalletCurrency = 'USD',
+  quoteCurrency: WalletCurrency = 'KRW',
+  refresh = false,
+) {
   const response = await apiClient.get<ApiSuccessResponse<FxRateDto>>(
-    `/fx/rates/current?pair=${pair}`,
+    '/fx/rates/current',
+    {
+      params: {
+        baseCurrency,
+        quoteCurrency,
+        refresh,
+      },
+    },
   );
 
   return response.data.data;

@@ -107,11 +107,13 @@ export function toHomeViewState(
 ): HomeViewState {
   const seasonState = toSeasonDomainState(season, now);
 
-  if (seasonState === 'season_not_configured') return 'home_error';
+  if (seasonState === 'season_not_configured') return 'home_no_current_season';
   if (seasonState === 'season_upcoming') return 'home_upcoming';
   if (seasonState === 'season_ended_unsettled') return 'home_ended_unsettled';
   if (seasonState === 'season_settled_joined') return 'home_settled';
-  if (seasonState === 'season_settled_not_joined') return 'home_settled';
+  if (seasonState === 'season_settled_not_joined') {
+    return 'home_settled_not_joined';
+  }
   if (seasonState === 'season_active_not_joined') return 'home_active_not_joined';
   if (seasonState === 'season_active_joined' && !hasPositions) {
     return 'home_no_positions';

@@ -25,9 +25,27 @@ import {
 } from '../../services/api/errorMapper';
 import { TEST_IDS } from '../../constants/testIds';
 import { ERROR_CODE } from '../../models/enums/errorCode';
+import type { AuthViewState } from '../../models/enums/viewState';
+import type { UserStatus } from '../../models/dto/user';
 
 function isValidEmail(value: string) {
   return /\S+@\S+\.\S+/.test(value);
+}
+
+function getBlockedAuthState(status: UserStatus): AuthViewState | null {
+  if (status === 'suspended') return 'auth_suspended';
+  if (status === 'deleted') return 'auth_deleted';
+  return null;
+}
+
+function getBlockedAuthMessage(state: AuthViewState | null) {
+  if (state === 'auth_suspended') {
+    return '정지된 계정입니다. 고객센터에 문의해주세요.';
+  }
+  if (state === 'auth_deleted') {
+    return '삭제된 계정입니다. 고객센터에 문의해주세요.';
+  }
+  return getErrorMessageFromCode(ERROR_CODE.USER_NOT_ACTIVE);
 }
 
 export default function LoginScreen({ navigation }: LoginScreenProps) {
@@ -38,11 +56,14 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
 
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [blockedAuthState, setBlockedAuthState] =
+    useState<AuthViewState | null>(null);
 
   const loginMutation = useMutation({
     mutationFn: login,
     onSuccess: async (result) => {
       setSubmitError(null);
+      setBlockedAuthState(null);
 
       await saveTokens(
         result.tokens.accessToken,
@@ -51,7 +72,9 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
 
       if (result.user.status !== 'active') {
         await clearTokens();
-        setSubmitError(getErrorMessageFromCode(ERROR_CODE.USER_NOT_ACTIVE));
+        const nextBlockedState = getBlockedAuthState(result.user.status);
+        setBlockedAuthState(nextBlockedState);
+        setSubmitError(getBlockedAuthMessage(nextBlockedState));
         return;
       }
 
@@ -63,6 +86,8 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
 
         if (isAuthUserInactiveError(code)) {
           await clearTokens();
+          setSubmitError(getBlockedAuthMessage(null));
+          return;
         }
 
         if (code === ERROR_CODE.SEASON_NOT_FOUND) {
@@ -74,23 +99,28 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
       }
     },
     onError: (error: unknown) => {
+      const code = getApiErrorCode(error);
+      setBlockedAuthState(null);
       setSubmitError(
-        getErrorMessageFromCode(getApiErrorCode(error)) ||
-          '이메일 또는 비밀번호를 확인해주세요.',
+        isAuthUserInactiveError(code)
+          ? getBlockedAuthMessage(null)
+          : getErrorMessageFromCode(code) || '이메일 또는 비밀번호를 확인해주세요.',
       );
     },
   });
 
-  const authState = useMemo(() => {
+  const authState: AuthViewState = useMemo(() => {
     if (loginMutation.isPending) return 'auth_submitting';
     if (fieldError) return 'auth_invalid_input';
+    if (blockedAuthState) return blockedAuthState;
     if (submitError) return 'auth_failed';
     return 'auth_idle';
-  }, [loginMutation.isPending, fieldError, submitError]);
+  }, [loginMutation.isPending, fieldError, blockedAuthState, submitError]);
 
   const onSubmit = () => {
     setFieldError(null);
     setSubmitError(null);
+    setBlockedAuthState(null);
 
     if (!isValidEmail(email)) {
       setFieldError('이메일 형식을 확인해주세요.');
@@ -136,7 +166,10 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           <Text style={styles.errorText}>{fieldError}</Text>
         ) : null}
 
-        {authState === 'auth_failed' && submitError ? (
+        {(authState === 'auth_failed' ||
+          authState === 'auth_suspended' ||
+          authState === 'auth_deleted') &&
+        submitError ? (
           <Text style={styles.errorText}>{submitError}</Text>
         ) : null}
 

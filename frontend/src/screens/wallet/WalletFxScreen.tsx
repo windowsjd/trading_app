@@ -11,6 +11,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { WalletFxScreenProps } from '../../app/navigation/types';
+import { useRootNavigation } from '../../app/navigation/navigationHooks';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 import {
@@ -20,6 +21,11 @@ import {
   quoteFx,
 } from '../../features/wallet/api';
 import {
+  calculateUsdBalanceKrw,
+  getWalletBalanceAmount,
+  getWalletViewState,
+} from '../../features/wallet/mapper';
+import {
   getErrorMessageFromCode,
   mapFxErrorCodeToBlockedReason,
   BLOCKED_REASON_MESSAGE,
@@ -27,6 +33,7 @@ import {
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
+import BlockedState from '../../components/states/BlockedState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import CTAButton from '../../components/common/CTAButton';
 import FxSuccessBottomSheet from './FxSuccessBottomSheet';
@@ -34,12 +41,24 @@ import FxSuccessBottomSheet from './FxSuccessBottomSheet';
 type Props = WalletFxScreenProps;
 type Currency = 'KRW' | 'USD';
 
+const FX_RATE_PARAMS = {
+  baseCurrency: 'USD' as const,
+  quoteCurrency: 'KRW' as const,
+  refresh: false,
+};
+
 function extractErrorCode(error: unknown): string | null {
   return (error as any)?.response?.data?.error?.code ?? null;
 }
 
+function displayValue(value?: string | number | boolean | null) {
+  if (value === null || value === undefined || value === '') return '-';
+  return String(value);
+}
+
 export default function WalletFxScreen({ navigation }: Props) {
   const queryClient = useQueryClient();
+  const rootNavigation = useRootNavigation();
 
   const [fromCurrency, setFromCurrency] = useState<Currency>('KRW');
   const [amount, setAmount] = useState('');
@@ -60,10 +79,16 @@ export default function WalletFxScreen({ navigation }: Props) {
   });
 
   const rateQuery = useQuery({
-    queryKey: QUERY_KEYS.wallet.fxRate('USDKRW'),
-    queryFn: () => getCurrentFxRate('USDKRW'),
+    queryKey: QUERY_KEYS.wallet.fxRate(FX_RATE_PARAMS),
+    queryFn: () =>
+      getCurrentFxRate(
+        FX_RATE_PARAMS.baseCurrency,
+        FX_RATE_PARAMS.quoteCurrency,
+        FX_RATE_PARAMS.refresh,
+      ),
   });
 
+  // TODO: FX quote/execute still use the v1 action contract; migrate in task 4.
   const quoteMutation = useMutation({
     mutationFn: quoteFx,
     onSuccess: () => {
@@ -95,7 +120,9 @@ export default function WalletFxScreen({ navigation }: Props) {
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.wallet.balances }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.wallet.fxRate('USDKRW') }),
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.wallet.fxRate(FX_RATE_PARAMS),
+        }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.home.dashboard }),
       ]);
     },
@@ -119,9 +146,28 @@ export default function WalletFxScreen({ navigation }: Props) {
     return null;
   }, [amount]);
 
+  const walletLookupState = useMemo(
+    () =>
+      getWalletViewState(walletsQuery.data, rateQuery.data, {
+        isLoading: walletsQuery.isLoading || rateQuery.isLoading,
+        isError: walletsQuery.isError || rateQuery.isError,
+        walletError: walletsQuery.error,
+        rateError: rateQuery.error,
+      }),
+    [
+      walletsQuery.data,
+      walletsQuery.isLoading,
+      walletsQuery.isError,
+      walletsQuery.error,
+      rateQuery.data,
+      rateQuery.isLoading,
+      rateQuery.isError,
+      rateQuery.error,
+    ],
+  );
+
   const viewState = useMemo(() => {
-    if (walletsQuery.isLoading || rateQuery.isLoading) return 'wallet_loading';
-    if (!walletsQuery.data || !rateQuery.data) return 'wallet_error';
+    if (walletLookupState !== 'wallet_ready') return walletLookupState;
     if (executeMutation.isPending) return 'fx_execute_submitting';
     if (quoteMutation.isPending) return 'fx_quote_loading';
     if (successData) return 'fx_execute_success';
@@ -129,19 +175,46 @@ export default function WalletFxScreen({ navigation }: Props) {
     if (quoteMutation.data) return 'fx_quote_ready';
     return 'wallet_ready';
   }, [
-    walletsQuery.isLoading,
-    rateQuery.isLoading,
-    walletsQuery.data,
-    rateQuery.data,
+    walletLookupState,
     executeMutation.isPending,
     quoteMutation.isPending,
+    quoteMutation.data,
     successData,
     inputInvalidReason,
-    quoteMutation.data,
   ]);
+
+  const retryWalletLookup = () => {
+    walletsQuery.refetch();
+    rateQuery.refetch();
+  };
 
   if (viewState === 'wallet_loading') {
     return <FullPageLoading message="지갑 정보를 불러오는 중입니다." />;
+  }
+
+  if (viewState === 'wallet_not_joined') {
+    return (
+      <BlockedState
+        title="시즌 참가가 필요합니다."
+        message="시즌에 참가해야 지갑과 환전 기능을 사용할 수 있습니다."
+        actionLabel="시즌 참가하기"
+        onAction={() => rootNavigation.navigate('SeasonJoin')}
+      />
+    );
+  }
+
+  if (viewState === 'wallet_unavailable') {
+    return (
+      <ErrorState
+        title="지갑 정보를 사용할 수 없습니다."
+        message={
+          rateQuery.data?.state && rateQuery.data.state !== 'available'
+            ? '현재 환율 정보를 사용할 수 없습니다. 잠시 후 다시 시도해주세요.'
+            : '지갑 또는 환율 정보가 아직 준비되지 않았습니다.'
+        }
+        onRetry={retryWalletLookup}
+      />
+    );
   }
 
   if (viewState === 'wallet_error' || !walletsQuery.data || !rateQuery.data) {
@@ -149,20 +222,14 @@ export default function WalletFxScreen({ navigation }: Props) {
       <ErrorState
         title="지갑 정보를 불러오지 못했습니다."
         message="지갑 또는 환율 조회에 실패했습니다."
-        onRetry={() => {
-          walletsQuery.refetch();
-          rateQuery.refetch();
-        }}
+        onRetry={retryWalletLookup}
       />
     );
   }
 
-  const krwWallet =
-    walletsQuery.data.wallets.find((item) => item.currency === 'KRW')?.balance ?? '0';
-  const usdWallet =
-    walletsQuery.data.wallets.find((item) => item.currency === 'USD')?.balance ?? '0';
-  const usdBalanceKrw =
-    walletsQuery.data.wallets.find((item) => item.currency === 'USD')?.balanceKrw ?? '0';
+  const krwWallet = getWalletBalanceAmount(walletsQuery.data, 'KRW');
+  const usdWallet = getWalletBalanceAmount(walletsQuery.data, 'USD');
+  const usdBalanceKrw = calculateUsdBalanceKrw(usdWallet, rateQuery.data);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -176,7 +243,18 @@ export default function WalletFxScreen({ navigation }: Props) {
           <Text style={styles.value}>USD Wallet {usdWallet}</Text>
           <Text style={styles.helper}>USD 환산 KRW {usdBalanceKrw}</Text>
           <Text style={styles.helper}>환율 {rateQuery.data.rate}</Text>
-          <Text style={styles.helper}>수수료율 {rateQuery.data.feeRate}</Text>
+          <Text style={styles.helper}>
+            기준 시각 {displayValue(rateQuery.data.effectiveAt)}
+          </Text>
+          <Text style={styles.helper}>
+            수집 시각 {displayValue(rateQuery.data.capturedAt)}
+          </Text>
+          <Text style={styles.helper}>
+            최신성 {displayValue(rateQuery.data.freshnessAgeSeconds)}초
+          </Text>
+          {rateQuery.data.fallbackUsed ? (
+            <Text style={styles.helper}>대체 환율 소스가 적용되었습니다.</Text>
+          ) : null}
         </View>
 
         <View style={styles.card}>

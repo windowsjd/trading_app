@@ -16,6 +16,7 @@ import { TEST_IDS } from '../../constants/testIds';
 import { getMe } from '../../features/me/api';
 import { logout as logoutSession } from '../../features/auth/api';
 import { getHomeDashboard } from '../../features/home/api';
+import { getHomeRankingDisplay } from '../../features/home/mapper';
 import { getMySeasonRecords } from '../../features/record/api';
 import { clearTokens, getRefreshToken } from '../../services/storage/tokenStorage';
 
@@ -101,6 +102,7 @@ export default function MyScreen({ navigation }: Props) {
 
   const me = meQuery.data;
   const home = homeQuery.data;
+  const ranking = getHomeRankingDisplay(home.ranking);
   const seasonCount = recordsQuery.data.items.length;
 
   return (
@@ -109,8 +111,10 @@ export default function MyScreen({ navigation }: Props) {
         <View style={styles.card}>
           <Text style={styles.title}>{me.nickname}</Text>
           <Text style={styles.helper}>이메일 {me.email}</Text>
-          <Text style={styles.helper}>현재 등급 {home.ranking.tier}</Text>
-          <Text style={styles.helper}>현재 순위 #{home.ranking.rank}</Text>
+          <Text style={styles.helper}>현재 등급 {ranking.tier}</Text>
+          <Text style={styles.helper}>
+            현재 순위 {ranking.rank === '-' ? '-' : `#${ranking.rank}`}
+          </Text>
           <Text style={styles.helper}>참여 시즌 수 {seasonCount}</Text>
         </View>
 

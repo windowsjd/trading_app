@@ -11,8 +11,21 @@ import { useQuery } from '@tanstack/react-query';
 
 import type { HomeScreenProps } from '../../app/navigation/types';
 import { useRootNavigation } from '../../app/navigation/navigationHooks';
-import { getHomeDashboard } from '../../features/home/api';
-import { getCurrentSeason } from '../../features/season/api';
+import {
+  getHomeDashboard,
+  type HomeAllocationSectionDto,
+  type HomeSummarySectionDto,
+  type HomeWalletSummarySectionDto,
+} from '../../features/home/api';
+import {
+  getHomeEquityPoints,
+  getHomeRankingDisplay,
+  getHomeTopPositions,
+  getHomeViewState,
+  isSectionAvailable,
+  isSectionEmpty,
+  isSectionUnavailable,
+} from '../../features/home/mapper';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 
@@ -24,42 +37,123 @@ import SectionSkeleton from '../../components/states/SectionSkeleton';
 import CTAButton from '../../components/common/CTAButton';
 
 type Props = HomeScreenProps;
+type CurrencyCode = 'KRW' | 'USD';
+
+function displayValue(value?: string | number | null) {
+  if (value === null || value === undefined || value === '') return '-';
+  return String(value);
+}
+
+function parseMoney(value?: string | null) {
+  if (!value) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getTotalAssetKrw(summary?: HomeSummarySectionDto | null) {
+  if (!summary || !isSectionAvailable(summary)) return '-';
+  if (summary.totalAssetKrw) return summary.totalAssetKrw;
+
+  const parts = [
+    parseMoney(summary.krwCash ?? null),
+    parseMoney(summary.usdCashKrw ?? null),
+    parseMoney(summary.assetValueKrw ?? null),
+  ];
+
+  if (parts.some((item) => item === null)) return '-';
+
+  return String(parts.reduce((total, item) => total + (item ?? 0), 0));
+}
+
+function getWalletSummaryAmount(
+  walletSummary: HomeWalletSummarySectionDto | null | undefined,
+  currencyCode: CurrencyCode,
+) {
+  if (
+    !walletSummary ||
+    isSectionUnavailable(walletSummary) ||
+    isSectionEmpty(walletSummary)
+  ) {
+    return '-';
+  }
+
+  const direct = walletSummary[currencyCode];
+  if (typeof direct === 'string') return direct;
+  if (direct && typeof direct === 'object') {
+    return displayValue(direct.balanceAmount);
+  }
+
+  const wallet = walletSummary.wallets?.find(
+    (item) => item.currencyCode === currencyCode,
+  );
+
+  return displayValue(wallet?.balanceAmount);
+}
+
+function getAllocationRows(section?: HomeAllocationSectionDto | null) {
+  if (!section || isSectionUnavailable(section) || isSectionEmpty(section)) {
+    return [];
+  }
+
+  const items = section.items ?? section.allocations ?? [];
+
+  if (items.length > 0) {
+    return items.map((item, index) => ({
+      key: item.assetType ?? item.label ?? String(index),
+      label: item.label ?? item.assetType ?? '기타',
+      value: displayValue(item.marketValueKrw ?? item.valueKrw),
+    }));
+  }
+
+  return [
+    { key: 'cash', label: '현금', value: section.cashKrwValue },
+    { key: 'domestic', label: '국내', value: section.domesticStockValueKrw },
+    { key: 'us', label: '미국', value: section.usStockValueKrw },
+    { key: 'crypto', label: '암호화폐', value: section.cryptoValueKrw },
+  ]
+    .filter((item) => item.value)
+    .map((item) => ({ ...item, value: displayValue(item.value) }));
+}
 
 export default function HomeScreen({ navigation }: Props) {
   const rootNavigation = useRootNavigation();
 
-  const seasonQuery = useQuery({
-    queryKey: QUERY_KEYS.season.current,
-    queryFn: getCurrentSeason,
-  });
-
   const homeQuery = useQuery({
     queryKey: QUERY_KEYS.home.dashboard,
     queryFn: getHomeDashboard,
-    enabled: !!seasonQuery.data,
   });
 
-  const season = seasonQuery.data;
   const home = homeQuery.data;
 
-  const viewState = useMemo(() => {
-    if (seasonQuery.isLoading || homeQuery.isLoading) return 'home_loading';
-    if (!season) return 'home_error';
+  const viewState = useMemo(
+    () =>
+      getHomeViewState(home, {
+        isLoading: homeQuery.isLoading,
+        isError: homeQuery.isError,
+      }),
+    [home, homeQuery.isLoading, homeQuery.isError],
+  );
 
-    if (season.status === 'active' && !season.joined) return 'home_active_not_joined';
-    if (season.status === 'upcoming') return 'home_upcoming';
-    if (season.status === 'ended') return 'home_ended_unsettled';
-    if (season.status === 'settled') return 'home_settled';
-    if (!home) return 'home_error';
-    if (!home.topPositions.length) return 'home_no_positions';
+  const ranking = useMemo(
+    () => getHomeRankingDisplay(home?.ranking),
+    [home?.ranking],
+  );
+  const topPositions = useMemo(
+    () => getHomeTopPositions(home?.topPositions),
+    [home?.topPositions],
+  );
+  const equityPoints = useMemo(
+    () => getHomeEquityPoints(home?.equityChart),
+    [home?.equityChart],
+  );
+  const allocationRows = useMemo(
+    () => getAllocationRows(home?.allocation),
+    [home?.allocation],
+  );
 
-    return 'home_active_joined';
-  }, [seasonQuery.isLoading, homeQuery.isLoading, season, home]);
-
-  const chartSectionError =
-    viewState === 'home_active_joined' &&
-    !!home &&
-    !Array.isArray(home.equityChart);
+  const retryHome = () => {
+    homeQuery.refetch();
+  };
 
   if (viewState === 'home_loading') {
     return <FullPageLoading message="홈 정보를 불러오는 중입니다." />;
@@ -70,10 +164,18 @@ export default function HomeScreen({ navigation }: Props) {
       <ErrorState
         title="홈 정보를 불러오지 못했습니다."
         message="네트워크 또는 일시적 서버 오류일 수 있습니다."
-        onRetry={() => {
-          seasonQuery.refetch();
-          homeQuery.refetch();
-        }}
+        onRetry={retryHome}
+      />
+    );
+  }
+
+  if (viewState === 'home_no_current_season') {
+    return (
+      <BlockedState
+        title="현재 진행 중인 시즌이 없습니다."
+        message="시즌이 열리면 홈에서 참가와 거래 상태를 확인할 수 있습니다."
+        actionLabel="다시 확인"
+        onAction={retryHome}
       />
     );
   }
@@ -109,7 +211,72 @@ export default function HomeScreen({ navigation }: Props) {
     );
   }
 
+  if (viewState === 'home_settled_not_joined') {
+    return (
+      <BlockedState
+        title="시즌이 종료되었습니다."
+        message="참가 기록이 없어 최종 결과가 없습니다. 다음 시즌을 기다려주세요."
+      />
+    );
+  }
+
   if (!home) return null;
+
+  if (viewState === 'home_settled') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScrollView
+          testID={TEST_IDS.home.screen}
+          contentContainerStyle={styles.content}
+        >
+          <View testID={TEST_IDS.home.summaryCard} style={styles.card}>
+            <Text style={styles.label}>최종 결과</Text>
+            {isSectionAvailable(home.summary) ? (
+              <>
+                <Text style={styles.big}>
+                  {getTotalAssetKrw(home.summary)} KRW
+                </Text>
+                <Text style={styles.helper}>
+                  수익률 {displayValue(home.summary?.returnRate)}%
+                </Text>
+                <Text style={styles.helper}>
+                  실현 손익 {displayValue(home.summary?.realizedPnlKrw)}
+                </Text>
+                <Text style={styles.helper}>
+                  평가 손익 {displayValue(home.summary?.unrealizedPnlKrw)}
+                </Text>
+              </>
+            ) : (
+              <InlineEmptyState message="최종 자산 정보를 집계 중입니다." />
+            )}
+          </View>
+
+          <View style={styles.row}>
+            <View style={[styles.card, styles.flex]}>
+              <Text style={styles.label}>최종 순위</Text>
+              <Text style={styles.medium}>
+                {ranking.rank === '-' ? '-' : `#${ranking.rank}`}
+              </Text>
+            </View>
+            <View style={[styles.card, styles.flex]}>
+              <Text style={styles.label}>최종 등급</Text>
+              <Text style={styles.medium}>{ranking.tier}</Text>
+            </View>
+          </View>
+
+          <CTAButton
+            label="보상 확인"
+            onPress={() =>
+              rootNavigation.navigate('MainTabs', {
+                screen: 'MyTab',
+                params: { screen: 'Reward' },
+              })
+            }
+          />
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -117,46 +284,124 @@ export default function HomeScreen({ navigation }: Props) {
         testID={TEST_IDS.home.screen}
         contentContainerStyle={styles.content}
       >
+        {viewState === 'home_partial_error' ? (
+          <View style={styles.card}>
+            <Text style={styles.label}>일부 정보 지연</Text>
+            <Text style={styles.helper}>
+              가능한 홈 정보만 먼저 표시합니다. 누락된 섹션은 다시 시도할 수 있습니다.
+            </Text>
+          </View>
+        ) : null}
+
         <View testID={TEST_IDS.home.summaryCard} style={styles.card}>
           <Text style={styles.label}>총 자산</Text>
-          <Text style={styles.big}>{home.summary.totalAssetKrw} KRW</Text>
-          <Text style={styles.helper}>수익률 {home.summary.returnRate}%</Text>
-          <Text style={styles.helper}>KRW 잔액 {home.summary.krwBalance}</Text>
-          <Text style={styles.helper}>USD 잔액 {home.summary.usdBalance}</Text>
+          {isSectionAvailable(home.summary) ? (
+            <>
+              <Text style={styles.big}>{getTotalAssetKrw(home.summary)} KRW</Text>
+              <Text style={styles.helper}>
+                수익률 {displayValue(home.summary?.returnRate)}%
+              </Text>
+              <Text style={styles.helper}>
+                KRW 현금 {displayValue(home.summary?.krwCash ?? home.summary?.krwBalance)}
+              </Text>
+              <Text style={styles.helper}>
+                USD 환산 {displayValue(home.summary?.usdCashKrw)}
+              </Text>
+              <Text style={styles.helper}>
+                보유자산 {displayValue(home.summary?.assetValueKrw)}
+              </Text>
+            </>
+          ) : (
+            <>
+              <SectionSkeleton lines={3} />
+              <Pressable style={styles.retryButton} onPress={retryHome}>
+                <Text style={styles.retryText}>요약 다시 시도</Text>
+              </Pressable>
+            </>
+          )}
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.label}>지갑 요약</Text>
+          {isSectionAvailable(home.walletSummary) ? (
+            <>
+              <Text style={styles.helper}>
+                KRW {getWalletSummaryAmount(home.walletSummary, 'KRW')}
+              </Text>
+              <Text style={styles.helper}>
+                USD {getWalletSummaryAmount(home.walletSummary, 'USD')}
+              </Text>
+            </>
+          ) : (
+            <InlineEmptyState message="지갑 요약을 불러오는 중입니다." />
+          )}
         </View>
 
         <View style={styles.row}>
           <View style={[styles.card, styles.flex]}>
             <Text style={styles.label}>순위</Text>
-            <Text style={styles.medium}>#{home.ranking.rank}</Text>
+            {isSectionAvailable(home.ranking) ? (
+              <Text style={styles.medium}>
+                {ranking.rank === '-' ? '-' : `#${ranking.rank}`}
+              </Text>
+            ) : (
+              <Text style={styles.medium}>-</Text>
+            )}
           </View>
           <View style={[styles.card, styles.flex]}>
             <Text style={styles.label}>등급</Text>
-            <Text style={styles.medium}>{home.ranking.tier}</Text>
+            <Text style={styles.medium}>
+              {isSectionAvailable(home.ranking) ? ranking.tier : '-'}
+            </Text>
           </View>
         </View>
 
+        {isSectionUnavailable(home.ranking) ? (
+          <View style={styles.card}>
+            <InlineEmptyState message="랭킹 정보가 아직 준비되지 않았습니다." />
+            <Pressable style={styles.retryButton} onPress={retryHome}>
+              <Text style={styles.retryText}>랭킹 다시 시도</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         <View style={styles.card}>
           <Text style={styles.label}>자산 배분</Text>
-          <Text style={styles.helper}>현금 {home.allocation.cashKrwValue}</Text>
-          <Text style={styles.helper}>국내 {home.allocation.domesticStockValueKrw}</Text>
-          <Text style={styles.helper}>미국 {home.allocation.usStockValueKrw}</Text>
-          <Text style={styles.helper}>암호화폐 {home.allocation.cryptoValueKrw}</Text>
+          {allocationRows.length > 0 ? (
+            allocationRows.map((item) => (
+              <Text key={item.key} style={styles.helper}>
+                {item.label} {item.value}
+              </Text>
+            ))
+          ) : (
+            <>
+              <InlineEmptyState message="자산 배분 정보를 표시할 수 없습니다." />
+              {isSectionUnavailable(home.allocation) ? (
+                <Pressable style={styles.retryButton} onPress={retryHome}>
+                  <Text style={styles.retryText}>배분 다시 시도</Text>
+                </Pressable>
+              ) : null}
+            </>
+          )}
         </View>
 
         <View style={styles.card}>
           <Text style={styles.label}>자산 추이</Text>
-          {chartSectionError ? (
+          {isSectionUnavailable(home.equityChart) ? (
             <>
               <SectionSkeleton lines={4} />
-              <Pressable style={styles.retryButton} onPress={() => homeQuery.refetch()}>
+              <Pressable style={styles.retryButton} onPress={retryHome}>
                 <Text style={styles.retryText}>차트 다시 시도</Text>
               </Pressable>
             </>
-          ) : home.equityChart?.length ? (
-            home.equityChart.slice(0, 8).map((point) => (
-              <Text key={point.time} style={styles.helper}>
-                {point.time} · {point.totalAssetKrw}
+          ) : equityPoints.length > 0 ? (
+            equityPoints.slice(0, 8).map((point, index) => (
+              <Text
+                key={point.time ?? point.timestamp ?? point.label ?? String(index)}
+                style={styles.helper}
+              >
+                {displayValue(point.label ?? point.time ?? point.timestamp)} ·{' '}
+                {displayValue(point.totalAssetKrw ?? point.equityKrw)}
               </Text>
             ))
           ) : (
@@ -166,37 +411,60 @@ export default function HomeScreen({ navigation }: Props) {
 
         <View style={styles.card}>
           <Text style={styles.label}>보유 포지션</Text>
-          {viewState === 'home_no_positions' ? (
+          {isSectionUnavailable(home.topPositions) ? (
+            <>
+              <InlineEmptyState message="보유 포지션 정보를 불러오지 못했습니다." />
+              <Pressable style={styles.retryButton} onPress={retryHome}>
+                <Text style={styles.retryText}>포지션 다시 시도</Text>
+              </Pressable>
+            </>
+          ) : topPositions.length === 0 ? (
             <InlineEmptyState
               title="보유 포지션이 없습니다."
               message="현재는 현금 비중만 보유 중입니다."
             />
           ) : (
-            home.topPositions.map((item) => (
-              <Pressable
-                key={item.assetId}
-                testID={TEST_IDS.home.positionItem(item.assetId)}
-                style={styles.itemRow}
-                onPress={() =>
-                  rootNavigation.navigate('MainTabs', {
-                    screen: 'MarketTab',
-                    params: {
-                      screen: 'AssetDetail',
-                      params: { assetId: item.assetId },
-                    },
-                  })
-                }
-              >
-                <View>
-                  <Text style={styles.itemTitle}>{item.symbol}</Text>
-                  <Text style={styles.helper}>{item.name}</Text>
-                </View>
-                <View style={styles.alignEnd}>
-                  <Text style={styles.itemTitle}>{item.marketValueKrw}</Text>
-                  <Text style={styles.helper}>{item.returnRate}%</Text>
-                </View>
-              </Pressable>
-            ))
+            topPositions.map((item, index) => {
+              const assetId = item.assetId ?? null;
+              const rowKey = assetId ?? item.symbol ?? String(index);
+
+              return (
+                <Pressable
+                  key={rowKey}
+                  testID={TEST_IDS.home.positionItem(rowKey)}
+                  style={styles.itemRow}
+                  onPress={
+                    assetId
+                      ? () =>
+                          rootNavigation.navigate('MainTabs', {
+                            screen: 'MarketTab',
+                            params: {
+                              screen: 'AssetDetail',
+                              params: { assetId },
+                            },
+                          })
+                      : undefined
+                  }
+                >
+                  <View>
+                    <Text style={styles.itemTitle}>
+                      {displayValue(item.symbol)}
+                    </Text>
+                    <Text style={styles.helper}>
+                      {displayValue(item.name ?? item.assetName ?? item.assetType)}
+                    </Text>
+                  </View>
+                  <View style={styles.alignEnd}>
+                    <Text style={styles.itemTitle}>
+                      {displayValue(item.marketValueKrw)}
+                    </Text>
+                    <Text style={styles.helper}>
+                      {displayValue(item.returnRate)}%
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })
           )}
         </View>
 
