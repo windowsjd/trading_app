@@ -61,6 +61,15 @@ export type SeasonParticipantMinAggregateOutputType = {
   finalRank: number | null
   finalTier: string | null
   rewardGrantedAt: Date | null
+  excludedAt: Date | null
+  excludedReason: string | null
+  excludedByUserId: string | null
+  rankingHiddenAt: Date | null
+  rankingHiddenReason: string | null
+  rankingHiddenByUserId: string | null
+  resultCorrectedAt: Date | null
+  resultCorrectedReason: string | null
+  resultCorrectedByUserId: string | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -80,6 +89,15 @@ export type SeasonParticipantMaxAggregateOutputType = {
   finalRank: number | null
   finalTier: string | null
   rewardGrantedAt: Date | null
+  excludedAt: Date | null
+  excludedReason: string | null
+  excludedByUserId: string | null
+  rankingHiddenAt: Date | null
+  rankingHiddenReason: string | null
+  rankingHiddenByUserId: string | null
+  resultCorrectedAt: Date | null
+  resultCorrectedReason: string | null
+  resultCorrectedByUserId: string | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -99,6 +117,15 @@ export type SeasonParticipantCountAggregateOutputType = {
   finalRank: number
   finalTier: number
   rewardGrantedAt: number
+  excludedAt: number
+  excludedReason: number
+  excludedByUserId: number
+  rankingHiddenAt: number
+  rankingHiddenReason: number
+  rankingHiddenByUserId: number
+  resultCorrectedAt: number
+  resultCorrectedReason: number
+  resultCorrectedByUserId: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -140,6 +167,15 @@ export type SeasonParticipantMinAggregateInputType = {
   finalRank?: true
   finalTier?: true
   rewardGrantedAt?: true
+  excludedAt?: true
+  excludedReason?: true
+  excludedByUserId?: true
+  rankingHiddenAt?: true
+  rankingHiddenReason?: true
+  rankingHiddenByUserId?: true
+  resultCorrectedAt?: true
+  resultCorrectedReason?: true
+  resultCorrectedByUserId?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -159,6 +195,15 @@ export type SeasonParticipantMaxAggregateInputType = {
   finalRank?: true
   finalTier?: true
   rewardGrantedAt?: true
+  excludedAt?: true
+  excludedReason?: true
+  excludedByUserId?: true
+  rankingHiddenAt?: true
+  rankingHiddenReason?: true
+  rankingHiddenByUserId?: true
+  resultCorrectedAt?: true
+  resultCorrectedReason?: true
+  resultCorrectedByUserId?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -178,6 +223,15 @@ export type SeasonParticipantCountAggregateInputType = {
   finalRank?: true
   finalTier?: true
   rewardGrantedAt?: true
+  excludedAt?: true
+  excludedReason?: true
+  excludedByUserId?: true
+  rankingHiddenAt?: true
+  rankingHiddenReason?: true
+  rankingHiddenByUserId?: true
+  resultCorrectedAt?: true
+  resultCorrectedReason?: true
+  resultCorrectedByUserId?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -284,6 +338,15 @@ export type SeasonParticipantGroupByOutputType = {
   finalRank: number | null
   finalTier: string | null
   rewardGrantedAt: Date | null
+  excludedAt: Date | null
+  excludedReason: string | null
+  excludedByUserId: string | null
+  rankingHiddenAt: Date | null
+  rankingHiddenReason: string | null
+  rankingHiddenByUserId: string | null
+  resultCorrectedAt: Date | null
+  resultCorrectedReason: string | null
+  resultCorrectedByUserId: string | null
   createdAt: Date
   updatedAt: Date
   _count: SeasonParticipantCountAggregateOutputType | null
@@ -326,6 +389,15 @@ export type SeasonParticipantWhereInput = {
   finalRank?: Prisma.IntNullableFilter<"SeasonParticipant"> | number | null
   finalTier?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
   rewardGrantedAt?: Prisma.DateTimeNullableFilter<"SeasonParticipant"> | Date | string | null
+  excludedAt?: Prisma.DateTimeNullableFilter<"SeasonParticipant"> | Date | string | null
+  excludedReason?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
+  excludedByUserId?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
+  rankingHiddenAt?: Prisma.DateTimeNullableFilter<"SeasonParticipant"> | Date | string | null
+  rankingHiddenReason?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
+  rankingHiddenByUserId?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
+  resultCorrectedAt?: Prisma.DateTimeNullableFilter<"SeasonParticipant"> | Date | string | null
+  resultCorrectedReason?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
+  resultCorrectedByUserId?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
   createdAt?: Prisma.DateTimeFilter<"SeasonParticipant"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"SeasonParticipant"> | Date | string
   season?: Prisma.XOR<Prisma.SeasonScalarRelationFilter, Prisma.SeasonWhereInput>
@@ -359,6 +431,15 @@ export type SeasonParticipantOrderByWithRelationInput = {
   finalRank?: Prisma.SortOrderInput | Prisma.SortOrder
   finalTier?: Prisma.SortOrderInput | Prisma.SortOrder
   rewardGrantedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  excludedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  excludedReason?: Prisma.SortOrderInput | Prisma.SortOrder
+  excludedByUserId?: Prisma.SortOrderInput | Prisma.SortOrder
+  rankingHiddenAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  rankingHiddenReason?: Prisma.SortOrderInput | Prisma.SortOrder
+  rankingHiddenByUserId?: Prisma.SortOrderInput | Prisma.SortOrder
+  resultCorrectedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  resultCorrectedReason?: Prisma.SortOrderInput | Prisma.SortOrder
+  resultCorrectedByUserId?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   season?: Prisma.SeasonOrderByWithRelationInput
@@ -396,6 +477,15 @@ export type SeasonParticipantWhereUniqueInput = Prisma.AtLeast<{
   finalRank?: Prisma.IntNullableFilter<"SeasonParticipant"> | number | null
   finalTier?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
   rewardGrantedAt?: Prisma.DateTimeNullableFilter<"SeasonParticipant"> | Date | string | null
+  excludedAt?: Prisma.DateTimeNullableFilter<"SeasonParticipant"> | Date | string | null
+  excludedReason?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
+  excludedByUserId?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
+  rankingHiddenAt?: Prisma.DateTimeNullableFilter<"SeasonParticipant"> | Date | string | null
+  rankingHiddenReason?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
+  rankingHiddenByUserId?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
+  resultCorrectedAt?: Prisma.DateTimeNullableFilter<"SeasonParticipant"> | Date | string | null
+  resultCorrectedReason?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
+  resultCorrectedByUserId?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
   createdAt?: Prisma.DateTimeFilter<"SeasonParticipant"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"SeasonParticipant"> | Date | string
   season?: Prisma.XOR<Prisma.SeasonScalarRelationFilter, Prisma.SeasonWhereInput>
@@ -429,6 +519,15 @@ export type SeasonParticipantOrderByWithAggregationInput = {
   finalRank?: Prisma.SortOrderInput | Prisma.SortOrder
   finalTier?: Prisma.SortOrderInput | Prisma.SortOrder
   rewardGrantedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  excludedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  excludedReason?: Prisma.SortOrderInput | Prisma.SortOrder
+  excludedByUserId?: Prisma.SortOrderInput | Prisma.SortOrder
+  rankingHiddenAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  rankingHiddenReason?: Prisma.SortOrderInput | Prisma.SortOrder
+  rankingHiddenByUserId?: Prisma.SortOrderInput | Prisma.SortOrder
+  resultCorrectedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  resultCorrectedReason?: Prisma.SortOrderInput | Prisma.SortOrder
+  resultCorrectedByUserId?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.SeasonParticipantCountOrderByAggregateInput
@@ -456,6 +555,15 @@ export type SeasonParticipantScalarWhereWithAggregatesInput = {
   finalRank?: Prisma.IntNullableWithAggregatesFilter<"SeasonParticipant"> | number | null
   finalTier?: Prisma.StringNullableWithAggregatesFilter<"SeasonParticipant"> | string | null
   rewardGrantedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"SeasonParticipant"> | Date | string | null
+  excludedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"SeasonParticipant"> | Date | string | null
+  excludedReason?: Prisma.StringNullableWithAggregatesFilter<"SeasonParticipant"> | string | null
+  excludedByUserId?: Prisma.StringNullableWithAggregatesFilter<"SeasonParticipant"> | string | null
+  rankingHiddenAt?: Prisma.DateTimeNullableWithAggregatesFilter<"SeasonParticipant"> | Date | string | null
+  rankingHiddenReason?: Prisma.StringNullableWithAggregatesFilter<"SeasonParticipant"> | string | null
+  rankingHiddenByUserId?: Prisma.StringNullableWithAggregatesFilter<"SeasonParticipant"> | string | null
+  resultCorrectedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"SeasonParticipant"> | Date | string | null
+  resultCorrectedReason?: Prisma.StringNullableWithAggregatesFilter<"SeasonParticipant"> | string | null
+  resultCorrectedByUserId?: Prisma.StringNullableWithAggregatesFilter<"SeasonParticipant"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"SeasonParticipant"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"SeasonParticipant"> | Date | string
 }
@@ -473,6 +581,15 @@ export type SeasonParticipantCreateInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
@@ -506,6 +623,15 @@ export type SeasonParticipantUncheckedCreateInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -535,6 +661,15 @@ export type SeasonParticipantUpdateInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
@@ -568,6 +703,15 @@ export type SeasonParticipantUncheckedUpdateInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -599,6 +743,15 @@ export type SeasonParticipantCreateManyInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -616,6 +769,15 @@ export type SeasonParticipantUpdateManyMutationInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -635,6 +797,15 @@ export type SeasonParticipantUncheckedUpdateManyInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -669,6 +840,15 @@ export type SeasonParticipantCountOrderByAggregateInput = {
   finalRank?: Prisma.SortOrder
   finalTier?: Prisma.SortOrder
   rewardGrantedAt?: Prisma.SortOrder
+  excludedAt?: Prisma.SortOrder
+  excludedReason?: Prisma.SortOrder
+  excludedByUserId?: Prisma.SortOrder
+  rankingHiddenAt?: Prisma.SortOrder
+  rankingHiddenReason?: Prisma.SortOrder
+  rankingHiddenByUserId?: Prisma.SortOrder
+  resultCorrectedAt?: Prisma.SortOrder
+  resultCorrectedReason?: Prisma.SortOrder
+  resultCorrectedByUserId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -698,6 +878,15 @@ export type SeasonParticipantMaxOrderByAggregateInput = {
   finalRank?: Prisma.SortOrder
   finalTier?: Prisma.SortOrder
   rewardGrantedAt?: Prisma.SortOrder
+  excludedAt?: Prisma.SortOrder
+  excludedReason?: Prisma.SortOrder
+  excludedByUserId?: Prisma.SortOrder
+  rankingHiddenAt?: Prisma.SortOrder
+  rankingHiddenReason?: Prisma.SortOrder
+  rankingHiddenByUserId?: Prisma.SortOrder
+  resultCorrectedAt?: Prisma.SortOrder
+  resultCorrectedReason?: Prisma.SortOrder
+  resultCorrectedByUserId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -717,6 +906,15 @@ export type SeasonParticipantMinOrderByAggregateInput = {
   finalRank?: Prisma.SortOrder
   finalTier?: Prisma.SortOrder
   rewardGrantedAt?: Prisma.SortOrder
+  excludedAt?: Prisma.SortOrder
+  excludedReason?: Prisma.SortOrder
+  excludedByUserId?: Prisma.SortOrder
+  rankingHiddenAt?: Prisma.SortOrder
+  rankingHiddenReason?: Prisma.SortOrder
+  rankingHiddenByUserId?: Prisma.SortOrder
+  resultCorrectedAt?: Prisma.SortOrder
+  resultCorrectedReason?: Prisma.SortOrder
+  resultCorrectedByUserId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -1028,6 +1226,15 @@ export type SeasonParticipantCreateWithoutUserInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
@@ -1059,6 +1266,15 @@ export type SeasonParticipantUncheckedCreateWithoutUserInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -1119,6 +1335,15 @@ export type SeasonParticipantScalarWhereInput = {
   finalRank?: Prisma.IntNullableFilter<"SeasonParticipant"> | number | null
   finalTier?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
   rewardGrantedAt?: Prisma.DateTimeNullableFilter<"SeasonParticipant"> | Date | string | null
+  excludedAt?: Prisma.DateTimeNullableFilter<"SeasonParticipant"> | Date | string | null
+  excludedReason?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
+  excludedByUserId?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
+  rankingHiddenAt?: Prisma.DateTimeNullableFilter<"SeasonParticipant"> | Date | string | null
+  rankingHiddenReason?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
+  rankingHiddenByUserId?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
+  resultCorrectedAt?: Prisma.DateTimeNullableFilter<"SeasonParticipant"> | Date | string | null
+  resultCorrectedReason?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
+  resultCorrectedByUserId?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
   createdAt?: Prisma.DateTimeFilter<"SeasonParticipant"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"SeasonParticipant"> | Date | string
 }
@@ -1136,6 +1361,15 @@ export type SeasonParticipantCreateWithoutSeasonInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   user: Prisma.UserCreateNestedOneWithoutSeasonParticipantsInput
@@ -1167,6 +1401,15 @@ export type SeasonParticipantUncheckedCreateWithoutSeasonInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -1222,6 +1465,15 @@ export type SeasonParticipantCreateWithoutSeasonRewardsInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
@@ -1254,6 +1506,15 @@ export type SeasonParticipantUncheckedCreateWithoutSeasonRewardsInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -1298,6 +1559,15 @@ export type SeasonParticipantUpdateWithoutSeasonRewardsInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
@@ -1330,6 +1600,15 @@ export type SeasonParticipantUncheckedUpdateWithoutSeasonRewardsInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -1358,6 +1637,15 @@ export type SeasonParticipantCreateWithoutRewardFulfillmentRequestsInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
@@ -1390,6 +1678,15 @@ export type SeasonParticipantUncheckedCreateWithoutRewardFulfillmentRequestsInpu
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -1434,6 +1731,15 @@ export type SeasonParticipantUpdateWithoutRewardFulfillmentRequestsInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
@@ -1466,6 +1772,15 @@ export type SeasonParticipantUncheckedUpdateWithoutRewardFulfillmentRequestsInpu
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -1494,6 +1809,15 @@ export type SeasonParticipantCreateWithoutPositionsInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
@@ -1526,6 +1850,15 @@ export type SeasonParticipantUncheckedCreateWithoutPositionsInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -1570,6 +1903,15 @@ export type SeasonParticipantUpdateWithoutPositionsInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
@@ -1602,6 +1944,15 @@ export type SeasonParticipantUncheckedUpdateWithoutPositionsInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -1630,6 +1981,15 @@ export type SeasonParticipantCreateWithoutOrdersInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
@@ -1662,6 +2022,15 @@ export type SeasonParticipantUncheckedCreateWithoutOrdersInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -1706,6 +2075,15 @@ export type SeasonParticipantUpdateWithoutOrdersInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
@@ -1738,6 +2116,15 @@ export type SeasonParticipantUncheckedUpdateWithoutOrdersInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -1766,6 +2153,15 @@ export type SeasonParticipantCreateWithoutCashWalletsInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
@@ -1798,6 +2194,15 @@ export type SeasonParticipantUncheckedCreateWithoutCashWalletsInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -1842,6 +2247,15 @@ export type SeasonParticipantUpdateWithoutCashWalletsInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
@@ -1874,6 +2288,15 @@ export type SeasonParticipantUncheckedUpdateWithoutCashWalletsInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -1902,6 +2325,15 @@ export type SeasonParticipantCreateWithoutWalletTransactionsInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
@@ -1934,6 +2366,15 @@ export type SeasonParticipantUncheckedCreateWithoutWalletTransactionsInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -1978,6 +2419,15 @@ export type SeasonParticipantUpdateWithoutWalletTransactionsInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
@@ -2010,6 +2460,15 @@ export type SeasonParticipantUncheckedUpdateWithoutWalletTransactionsInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -2038,6 +2497,15 @@ export type SeasonParticipantCreateWithoutExchangeTransactionsInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
@@ -2070,6 +2538,15 @@ export type SeasonParticipantUncheckedCreateWithoutExchangeTransactionsInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -2114,6 +2591,15 @@ export type SeasonParticipantUpdateWithoutExchangeTransactionsInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
@@ -2146,6 +2632,15 @@ export type SeasonParticipantUncheckedUpdateWithoutExchangeTransactionsInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -2174,6 +2669,15 @@ export type SeasonParticipantCreateWithoutQuotesInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
@@ -2206,6 +2710,15 @@ export type SeasonParticipantUncheckedCreateWithoutQuotesInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -2250,6 +2763,15 @@ export type SeasonParticipantUpdateWithoutQuotesInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
@@ -2282,6 +2804,15 @@ export type SeasonParticipantUncheckedUpdateWithoutQuotesInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -2310,6 +2841,15 @@ export type SeasonParticipantCreateWithoutFxExecuteRequestsInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
@@ -2342,6 +2882,15 @@ export type SeasonParticipantUncheckedCreateWithoutFxExecuteRequestsInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -2386,6 +2935,15 @@ export type SeasonParticipantUpdateWithoutFxExecuteRequestsInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
@@ -2418,6 +2976,15 @@ export type SeasonParticipantUncheckedUpdateWithoutFxExecuteRequestsInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -2446,6 +3013,15 @@ export type SeasonParticipantCreateWithoutEquitySnapshotsInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
@@ -2478,6 +3054,15 @@ export type SeasonParticipantUncheckedCreateWithoutEquitySnapshotsInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -2522,6 +3107,15 @@ export type SeasonParticipantUpdateWithoutEquitySnapshotsInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
@@ -2554,6 +3148,15 @@ export type SeasonParticipantUncheckedUpdateWithoutEquitySnapshotsInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -2582,6 +3185,15 @@ export type SeasonParticipantCreateWithoutDailyPortfolioSnapshotsInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
@@ -2614,6 +3226,15 @@ export type SeasonParticipantUncheckedCreateWithoutDailyPortfolioSnapshotsInput 
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -2658,6 +3279,15 @@ export type SeasonParticipantUpdateWithoutDailyPortfolioSnapshotsInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
@@ -2690,6 +3320,15 @@ export type SeasonParticipantUncheckedUpdateWithoutDailyPortfolioSnapshotsInput 
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -2718,6 +3357,15 @@ export type SeasonParticipantCreateWithoutSeasonRankingsInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
@@ -2750,6 +3398,15 @@ export type SeasonParticipantUncheckedCreateWithoutSeasonRankingsInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -2794,6 +3451,15 @@ export type SeasonParticipantUpdateWithoutSeasonRankingsInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
@@ -2826,6 +3492,15 @@ export type SeasonParticipantUncheckedUpdateWithoutSeasonRankingsInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -2855,6 +3530,15 @@ export type SeasonParticipantCreateManyUserInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -2872,6 +3556,15 @@ export type SeasonParticipantUpdateWithoutUserInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
@@ -2903,6 +3596,15 @@ export type SeasonParticipantUncheckedUpdateWithoutUserInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -2933,6 +3635,15 @@ export type SeasonParticipantUncheckedUpdateManyWithoutUserInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -2951,6 +3662,15 @@ export type SeasonParticipantCreateManySeasonInput = {
   finalRank?: number | null
   finalTier?: string | null
   rewardGrantedAt?: Date | string | null
+  excludedAt?: Date | string | null
+  excludedReason?: string | null
+  excludedByUserId?: string | null
+  rankingHiddenAt?: Date | string | null
+  rankingHiddenReason?: string | null
+  rankingHiddenByUserId?: string | null
+  resultCorrectedAt?: Date | string | null
+  resultCorrectedReason?: string | null
+  resultCorrectedByUserId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -2968,6 +3688,15 @@ export type SeasonParticipantUpdateWithoutSeasonInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   user?: Prisma.UserUpdateOneRequiredWithoutSeasonParticipantsNestedInput
@@ -2999,6 +3728,15 @@ export type SeasonParticipantUncheckedUpdateWithoutSeasonInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -3029,6 +3767,15 @@ export type SeasonParticipantUncheckedUpdateManyWithoutSeasonInput = {
   finalRank?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   finalTier?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   rewardGrantedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  excludedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  excludedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rankingHiddenReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rankingHiddenByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -3178,6 +3925,15 @@ export type SeasonParticipantSelect<ExtArgs extends runtime.Types.Extensions.Int
   finalRank?: boolean
   finalTier?: boolean
   rewardGrantedAt?: boolean
+  excludedAt?: boolean
+  excludedReason?: boolean
+  excludedByUserId?: boolean
+  rankingHiddenAt?: boolean
+  rankingHiddenReason?: boolean
+  rankingHiddenByUserId?: boolean
+  resultCorrectedAt?: boolean
+  resultCorrectedReason?: boolean
+  resultCorrectedByUserId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   season?: boolean | Prisma.SeasonDefaultArgs<ExtArgs>
@@ -3212,6 +3968,15 @@ export type SeasonParticipantSelectCreateManyAndReturn<ExtArgs extends runtime.T
   finalRank?: boolean
   finalTier?: boolean
   rewardGrantedAt?: boolean
+  excludedAt?: boolean
+  excludedReason?: boolean
+  excludedByUserId?: boolean
+  rankingHiddenAt?: boolean
+  rankingHiddenReason?: boolean
+  rankingHiddenByUserId?: boolean
+  resultCorrectedAt?: boolean
+  resultCorrectedReason?: boolean
+  resultCorrectedByUserId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   season?: boolean | Prisma.SeasonDefaultArgs<ExtArgs>
@@ -3233,6 +3998,15 @@ export type SeasonParticipantSelectUpdateManyAndReturn<ExtArgs extends runtime.T
   finalRank?: boolean
   finalTier?: boolean
   rewardGrantedAt?: boolean
+  excludedAt?: boolean
+  excludedReason?: boolean
+  excludedByUserId?: boolean
+  rankingHiddenAt?: boolean
+  rankingHiddenReason?: boolean
+  rankingHiddenByUserId?: boolean
+  resultCorrectedAt?: boolean
+  resultCorrectedReason?: boolean
+  resultCorrectedByUserId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   season?: boolean | Prisma.SeasonDefaultArgs<ExtArgs>
@@ -3254,11 +4028,20 @@ export type SeasonParticipantSelectScalar = {
   finalRank?: boolean
   finalTier?: boolean
   rewardGrantedAt?: boolean
+  excludedAt?: boolean
+  excludedReason?: boolean
+  excludedByUserId?: boolean
+  rankingHiddenAt?: boolean
+  rankingHiddenReason?: boolean
+  rankingHiddenByUserId?: boolean
+  resultCorrectedAt?: boolean
+  resultCorrectedReason?: boolean
+  resultCorrectedByUserId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type SeasonParticipantOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "seasonId" | "userId" | "joinedAt" | "participantStatus" | "initialCapitalKrw" | "totalAssetKrw" | "totalReturnRate" | "maxDrawdown" | "totalFillCount" | "currentRank" | "finalRank" | "finalTier" | "rewardGrantedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["seasonParticipant"]>
+export type SeasonParticipantOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "seasonId" | "userId" | "joinedAt" | "participantStatus" | "initialCapitalKrw" | "totalAssetKrw" | "totalReturnRate" | "maxDrawdown" | "totalFillCount" | "currentRank" | "finalRank" | "finalTier" | "rewardGrantedAt" | "excludedAt" | "excludedReason" | "excludedByUserId" | "rankingHiddenAt" | "rankingHiddenReason" | "rankingHiddenByUserId" | "resultCorrectedAt" | "resultCorrectedReason" | "resultCorrectedByUserId" | "createdAt" | "updatedAt", ExtArgs["result"]["seasonParticipant"]>
 export type SeasonParticipantInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   season?: boolean | Prisma.SeasonDefaultArgs<ExtArgs>
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -3318,6 +4101,15 @@ export type $SeasonParticipantPayload<ExtArgs extends runtime.Types.Extensions.I
     finalRank: number | null
     finalTier: string | null
     rewardGrantedAt: Date | null
+    excludedAt: Date | null
+    excludedReason: string | null
+    excludedByUserId: string | null
+    rankingHiddenAt: Date | null
+    rankingHiddenReason: string | null
+    rankingHiddenByUserId: string | null
+    resultCorrectedAt: Date | null
+    resultCorrectedReason: string | null
+    resultCorrectedByUserId: string | null
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["seasonParticipant"]>
@@ -3771,6 +4563,15 @@ export interface SeasonParticipantFieldRefs {
   readonly finalRank: Prisma.FieldRef<"SeasonParticipant", 'Int'>
   readonly finalTier: Prisma.FieldRef<"SeasonParticipant", 'String'>
   readonly rewardGrantedAt: Prisma.FieldRef<"SeasonParticipant", 'DateTime'>
+  readonly excludedAt: Prisma.FieldRef<"SeasonParticipant", 'DateTime'>
+  readonly excludedReason: Prisma.FieldRef<"SeasonParticipant", 'String'>
+  readonly excludedByUserId: Prisma.FieldRef<"SeasonParticipant", 'String'>
+  readonly rankingHiddenAt: Prisma.FieldRef<"SeasonParticipant", 'DateTime'>
+  readonly rankingHiddenReason: Prisma.FieldRef<"SeasonParticipant", 'String'>
+  readonly rankingHiddenByUserId: Prisma.FieldRef<"SeasonParticipant", 'String'>
+  readonly resultCorrectedAt: Prisma.FieldRef<"SeasonParticipant", 'DateTime'>
+  readonly resultCorrectedReason: Prisma.FieldRef<"SeasonParticipant", 'String'>
+  readonly resultCorrectedByUserId: Prisma.FieldRef<"SeasonParticipant", 'String'>
   readonly createdAt: Prisma.FieldRef<"SeasonParticipant", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"SeasonParticipant", 'DateTime'>
 }

@@ -49,7 +49,8 @@ export const ParticipantStatus = {
   registered: 'registered',
   active: 'active',
   finished: 'finished',
-  rewarded: 'rewarded'
+  rewarded: 'rewarded',
+  excluded: 'excluded'
 } as const
 
 export type ParticipantStatus = (typeof ParticipantStatus)[keyof typeof ParticipantStatus]

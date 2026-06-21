@@ -41,6 +41,7 @@ jest.mock('../generated/prisma/client', () => {
       active: 'active',
       finished: 'finished',
       rewarded: 'rewarded',
+      excluded: 'excluded',
     },
     SeasonRankingType: {
       daily: 'daily',
@@ -92,6 +93,7 @@ import {
   CurrencyCode,
   FxExecuteRequestStatus,
   FxRateSourceType,
+  ParticipantStatus,
   Prisma,
   SeasonStatus,
   WalletTransactionDirection,
@@ -772,6 +774,28 @@ describe('FxService', () => {
     );
   });
 
+  it('rejects quote for excluded season participants before wallet or quote writes', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+      id: 'participant-1',
+      participantStatus: ParticipantStatus.excluded,
+      joinedAt: new Date('2026-04-28T01:00:00.000Z'),
+    });
+
+    await expectErrorCode(
+      service.quote('user-1', {
+        fromCurrency: 'KRW',
+        toCurrency: 'USD',
+        sourceAmount: '1000',
+      }),
+      'PARTICIPANT_EXCLUDED',
+    );
+    expect(prisma.cashWallet.findUnique).not.toHaveBeenCalled();
+    expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
+    expect(prisma.quote.create).not.toHaveBeenCalled();
+  });
+
   it('rejects when no approved rate snapshot is available', async () => {
     const { prisma, service } = createService();
     mockActiveSeason(prisma);
@@ -931,7 +955,7 @@ describe('FxService', () => {
           quotedRate: '1350.00000000',
           fxRateSnapshotId: 'fx-admin-1',
           maxChangeBps: '30.0000',
-          expiresAt: new Date('2026-05-01T00:01:10.000Z'),
+          expiresAt: new Date('2026-05-01T00:01:15.000Z'),
           requestHash: expect.any(String),
           fxRateSourceJson: expect.objectContaining({
             sourceType: 'admin_manual',
@@ -1230,7 +1254,7 @@ describe('FxService', () => {
         feeAmount: '0.10000000',
         feeCurrency: CurrencyCode.USD,
         netTargetAmount: '99.90000000',
-        expiresAt: '2026-05-01T00:01:10.000Z',
+        expiresAt: '2026-05-01T00:01:15.000Z',
         maxChangeBps: '30.0000',
         rateCapturedAt: capturedAt.toISOString(),
         rateEffectiveAt: freshEffectiveAt.toISOString(),
@@ -1361,7 +1385,7 @@ describe('FxService', () => {
       sourceAmount: new Prisma.Decimal('1000.00000000'),
       quotedRate: new Prisma.Decimal('1350.00000000'),
       maxChangeBps: new Prisma.Decimal('30.0000'),
-      expiresAt: new Date('2026-05-01T00:01:10.000Z'),
+      expiresAt: new Date('2026-05-01T00:01:15.000Z'),
       requestHash: computeFxQuoteRequestHash({
         userId: 'user-1',
         seasonParticipantId: 'participant-1',

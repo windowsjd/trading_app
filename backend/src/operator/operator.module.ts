@@ -6,6 +6,8 @@ import { OperatorAccountManagementService } from './operator-account-management.
 import { OperatorAuditService } from './operator-audit.service';
 import { OperatorController } from './operator.controller';
 import { AdminGuard, OperatorGuard } from './operator.guard';
+import { OperatorSeasonModerationController } from './operator-season-moderation.controller';
+import { OperatorSeasonModerationService } from './operator-season-moderation.service';
 import { OperatorService } from './operator.service';
 import { OperatorUserStatusService } from './operator-user-status.service';
 
@@ -15,12 +17,14 @@ import { OperatorUserStatusService } from './operator-user-status.service';
     AdminUserManagementController,
     AdminUserStatusController,
     OperatorController,
+    OperatorSeasonModerationController,
   ],
   providers: [
     AdminGuard,
     OperatorAccountManagementService,
     OperatorAuditService,
     OperatorGuard,
+    OperatorSeasonModerationService,
     OperatorService,
     OperatorUserStatusService,
   ],

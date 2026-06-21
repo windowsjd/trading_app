@@ -511,6 +511,7 @@ export class FxService {
         },
         select: {
           id: true,
+          participantStatus: true,
         },
       });
 
@@ -521,6 +522,7 @@ export class FxService {
           'Season is not joined',
         );
       }
+      this.assertParticipantExchangeableForQuote(participant);
 
       await this.assertQuoteSourceWalletBalance({
         seasonParticipantId: participant.id,
@@ -661,12 +663,14 @@ export class FxService {
         },
         select: {
           id: true,
+          participantStatus: true,
         },
       });
 
       if (!participant) {
         this.throwFxExecuteError(fxExecuteErrorCodes.SEASON_NOT_JOINED);
       }
+      this.assertParticipantExchangeableForExecute(participant);
 
       const preflightResult = preflightFxExecuteRequest(body, {
         userId,
@@ -1580,6 +1584,38 @@ export class FxService {
       }
 
       throw error;
+    }
+  }
+
+  private assertParticipantExchangeableForQuote(
+    participant: Pick<FxParticipantRecord, 'participantStatus'>,
+  ) {
+    if (participant.participantStatus === ParticipantStatus.excluded) {
+      this.throwApiError(
+        HttpStatus.FORBIDDEN,
+        'PARTICIPANT_EXCLUDED',
+        'Season participant is excluded from FX.',
+      );
+    }
+
+    if (participant.participantStatus !== ParticipantStatus.active) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'PARTICIPANT_NOT_ACTIVE',
+        'Season participant is not active.',
+      );
+    }
+  }
+
+  private assertParticipantExchangeableForExecute(
+    participant: Pick<FxParticipantRecord, 'participantStatus'>,
+  ) {
+    if (participant.participantStatus === ParticipantStatus.excluded) {
+      this.throwFxExecuteError(fxExecuteErrorCodes.PARTICIPANT_EXCLUDED);
+    }
+
+    if (participant.participantStatus !== ParticipantStatus.active) {
+      this.throwFxExecuteError(fxExecuteErrorCodes.PARTICIPANT_NOT_ACTIVE);
     }
   }
 

@@ -1,6 +1,6 @@
 import { AssetType, Prisma } from '../generated/prisma/client';
 
-export const DEFAULT_QUOTE_TTL_SECONDS = 10;
+export const DEFAULT_QUOTE_TTL_SECONDS = 15;
 
 export const REALTIME_EXECUTION_ERROR_CODES = {
   QUOTE_EXPIRED: 'QUOTE_EXPIRED',

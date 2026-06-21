@@ -17,7 +17,7 @@
 
 ## 3. Quote TTL
 
-- 기본 TTL은 10초다.
+- 기본 TTL은 15초다.
 - `expiresAt` 이후 execute 요청은 `QUOTE_EXPIRED`로 거부한다.
 - `/fx quote`와 orders quote는 durable quote를 저장하고 `quoteId`, `expiresAt`, `maxChangeBps`를 응답한다.
 - 성공한 execute는 quote를 같은 transaction 안에서 `consumed`로 전환한다. Execute 전 validation failure는 quote를 active로 남기며, 만료 감지는 `expired` 전환을 시도한 뒤 `QUOTE_EXPIRED`를 반환한다.

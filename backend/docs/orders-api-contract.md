@@ -152,7 +152,7 @@
 - USD assets use fresh `provider_api` USD/KRW first by provider priority (`korea_exim_exchange_rate`, then `exchange_rate_api`), then approved fresh `admin_manual` fallback. Provider FX freshness uses capturedAt age <= 300 seconds; manual fallback uses the existing 60-second rule.
 - Missing, stale, future, non-positive, wrong-source, or ineligible provider rows fall back to the existing safe `admin_manual` quote logic.
 - `POST /api/v1/orders/quote` exposes optional public-safe `assetPriceSource` and `fxRateSource` metadata. Response shape remains backward-compatible and existing snapshot id fields are preserved.
-- Durable quotes have a 10-second default TTL; execute after expiry returns `QUOTE_EXPIRED`.
+- Durable quotes have a 15-second default TTL; execute after expiry returns `QUOTE_EXPIRED`.
 - Raw provider payloads, `metadataJson`, and secrets are never exposed.
 - USD-settled crypto assets follow the same USD asset rule: order currency is USD, buy/sell resource checks use the USD Wallet, and `krwGrossAmount`/`krwFeeAmount`/`krwNetAmount` are USD amounts converted through USD/KRW.
 - Buy quote validates cash wallet balance read-only.

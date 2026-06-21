@@ -2400,6 +2400,15 @@ export const SeasonParticipantScalarFieldEnum = {
   finalRank: 'finalRank',
   finalTier: 'finalTier',
   rewardGrantedAt: 'rewardGrantedAt',
+  excludedAt: 'excludedAt',
+  excludedReason: 'excludedReason',
+  excludedByUserId: 'excludedByUserId',
+  rankingHiddenAt: 'rankingHiddenAt',
+  rankingHiddenReason: 'rankingHiddenReason',
+  rankingHiddenByUserId: 'rankingHiddenByUserId',
+  resultCorrectedAt: 'resultCorrectedAt',
+  resultCorrectedReason: 'resultCorrectedReason',
+  resultCorrectedByUserId: 'resultCorrectedByUserId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const

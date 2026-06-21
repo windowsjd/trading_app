@@ -32,6 +32,8 @@ export const fxExecuteErrorCodes = {
   SEASON_NOT_STARTED: 'SEASON_NOT_STARTED',
   SEASON_ENDED: 'SEASON_ENDED',
   SEASON_NOT_JOINED: 'SEASON_NOT_JOINED',
+  PARTICIPANT_EXCLUDED: 'PARTICIPANT_EXCLUDED',
+  PARTICIPANT_NOT_ACTIVE: 'PARTICIPANT_NOT_ACTIVE',
   SOURCE_WALLET_NOT_FOUND: 'SOURCE_WALLET_NOT_FOUND',
   TARGET_WALLET_NOT_FOUND: 'TARGET_WALLET_NOT_FOUND',
   INSUFFICIENT_BALANCE: 'INSUFFICIENT_BALANCE',
@@ -147,6 +149,18 @@ export const fxExecuteErrorMetadata: Record<
     retryability: fxExecuteRetryability.non_retryable,
     walletMutationAllowed: fxExecuteWalletMutationPolicy.no,
     defaultMessage: 'Season is not joined',
+  },
+  PARTICIPANT_EXCLUDED: {
+    httpStatus: 403,
+    retryability: fxExecuteRetryability.non_retryable,
+    walletMutationAllowed: fxExecuteWalletMutationPolicy.no,
+    defaultMessage: 'Season participant is excluded',
+  },
+  PARTICIPANT_NOT_ACTIVE: {
+    httpStatus: 409,
+    retryability: fxExecuteRetryability.non_retryable,
+    walletMutationAllowed: fxExecuteWalletMutationPolicy.no,
+    defaultMessage: 'Season participant is not active',
   },
   SOURCE_WALLET_NOT_FOUND: {
     httpStatus: 409,

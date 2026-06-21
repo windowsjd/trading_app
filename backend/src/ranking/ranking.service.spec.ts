@@ -5,6 +5,13 @@ jest.mock('../generated/prisma/client', () => {
     Prisma: {
       Decimal,
     },
+    ParticipantStatus: {
+      registered: 'registered',
+      active: 'active',
+      finished: 'finished',
+      rewarded: 'rewarded',
+      excluded: 'excluded',
+    },
     PrismaClient: class PrismaClient {},
     SeasonRankingType: {
       daily: 'daily',
@@ -21,6 +28,7 @@ jest.mock('../generated/prisma/client', () => {
 
 import { HttpException } from '@nestjs/common';
 import {
+  ParticipantStatus,
   Prisma,
   SeasonRankingType,
   SeasonStatus,
@@ -154,6 +162,8 @@ describe('RankingService', () => {
     });
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
       id: 'sp-2',
+      participantStatus: ParticipantStatus.active,
+      rankingHiddenAt: null,
     });
     prisma.seasonRanking.count.mockResolvedValueOnce(2);
     prisma.seasonRanking.findMany.mockResolvedValueOnce([
@@ -239,6 +249,32 @@ describe('RankingService', () => {
     expectNoRankingWrites(prisma);
   });
 
+  it('hides myRanking when the joined participant is ranking hidden', async () => {
+    const { prisma, service } = createService();
+    mockCurrentSeason(prisma);
+    prisma.seasonRanking.findFirst.mockResolvedValueOnce({
+      rankingDate,
+      capturedAt,
+    });
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+      id: 'sp-2',
+      participantStatus: ParticipantStatus.active,
+      rankingHiddenAt: new Date('2026-05-07T00:20:00.000Z'),
+    });
+    prisma.seasonRanking.count.mockResolvedValueOnce(1);
+    prisma.seasonRanking.findMany.mockResolvedValueOnce([rankingRow(1)]);
+
+    const response = await service.getRanking('user-2', {});
+
+    expect(response.data.rankings).toHaveLength(1);
+    expect(response.data.myRanking).toMatchObject({
+      state: 'unavailable',
+      reason: 'RANKING_HIDDEN',
+    });
+    expect(prisma.seasonRanking.findUnique).not.toHaveBeenCalled();
+    expectNoRankingWrites(prisma);
+  });
+
   it('uses explicit seasonId and rankingDate', async () => {
     const { prisma, service } = createService();
     prisma.season.findUnique.mockResolvedValueOnce(season);
@@ -299,6 +335,12 @@ describe('RankingService', () => {
         rankType: SeasonRankingType.daily,
         rankingDate,
         capturedAt,
+        seasonParticipant: {
+          participantStatus: {
+            not: ParticipantStatus.excluded,
+          },
+          rankingHiddenAt: null,
+        },
       },
     });
     expect(prisma.seasonRanking.findMany).toHaveBeenCalledWith(
@@ -379,6 +421,8 @@ describe('RankingService', () => {
     });
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
       id: 'sp-15',
+      participantStatus: ParticipantStatus.active,
+      rankingHiddenAt: null,
     });
     prisma.seasonRanking.count.mockResolvedValueOnce(25);
     prisma.seasonRanking.findUnique.mockResolvedValueOnce({
@@ -435,6 +479,8 @@ describe('RankingService', () => {
     });
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
       id: 'sp-50',
+      participantStatus: ParticipantStatus.active,
+      rankingHiddenAt: null,
     });
     prisma.seasonRanking.count.mockResolvedValueOnce(100);
     prisma.seasonRanking.findUnique.mockResolvedValueOnce({
@@ -487,6 +533,8 @@ describe('RankingService', () => {
     });
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
       id: 'sp-11',
+      participantStatus: ParticipantStatus.active,
+      rankingHiddenAt: null,
     });
     prisma.seasonRanking.count.mockResolvedValueOnce(100);
     prisma.seasonRanking.findUnique.mockResolvedValueOnce({
@@ -538,6 +586,8 @@ describe('RankingService', () => {
     prisma.seasonRanking.findFirst.mockResolvedValueOnce(null);
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
       id: 'sp-1',
+      participantStatus: ParticipantStatus.active,
+      rankingHiddenAt: null,
     });
 
     const response = await service.getRanking('user-1', {});

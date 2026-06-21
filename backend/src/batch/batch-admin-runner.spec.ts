@@ -14,6 +14,7 @@ jest.mock('../generated/prisma/client', () => ({
     active: 'active',
     finished: 'finished',
     rewarded: 'rewarded',
+    excluded: 'excluded',
   },
   Prisma: {
     Decimal: jest.fn(),

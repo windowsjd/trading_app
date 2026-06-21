@@ -39,6 +39,7 @@ jest.mock('../generated/prisma/client', () => {
       active: 'active',
       finished: 'finished',
       rewarded: 'rewarded',
+      excluded: 'excluded',
     },
     Prisma: {
       Decimal,
@@ -223,6 +224,10 @@ describe('SeasonSettlementJobService', () => {
         },
       }),
     );
+    expect(
+      prisma.seasonParticipant.findMany.mock.calls[0][0].where
+        .participantStatus.in,
+    ).not.toContain(ParticipantStatus.excluded);
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(prisma.__tx.seasonRanking.create).toHaveBeenCalledWith({
       data: {

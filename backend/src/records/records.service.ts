@@ -102,6 +102,11 @@ type RecordsParticipant = {
   joinedAt: Date;
 };
 
+type ParticipantPublicVisibility = {
+  participantStatus: ParticipantStatus;
+  rankingHiddenAt: Date | null;
+};
+
 type ParsedRecordsQuery = {
   seasonId?: string;
   type: RecordsType;
@@ -1155,6 +1160,23 @@ export class RecordsService {
       };
     }
 
+    if (!this.isParticipantPubliclyVisible(participant)) {
+      const hiddenReason = this.publicVisibilityReason(participant);
+
+      return {
+        success: true,
+        data: {
+          state: 'available',
+          user: targetUser,
+          season: publicSeason,
+          summary: null,
+          publicPortfolioSummary: this.emptyPublicPortfolioSummary(),
+          reason: hiddenReason.reason,
+          message: hiddenReason.message,
+        },
+      };
+    }
+
     const [orderCount, exchangeCount, publicPortfolioSummary] =
       await Promise.all([
         this.prisma.order.count({
@@ -1282,6 +1304,33 @@ export class RecordsService {
       };
     }
 
+    if (!this.isParticipantPubliclyVisible(participant)) {
+      const hiddenReason = this.publicVisibilityReason(participant);
+
+      return {
+        success: true,
+        data: {
+          state: 'unavailable',
+          user: targetUser,
+          season: {
+            id: season.id,
+            status: season.status,
+            rank: null,
+            provisionalTier: null,
+            finalTier: null,
+            percentile: null,
+            returnRate: null,
+            totalAssetKrw: null,
+            totalFillCount: 0,
+          },
+          allocation: this.emptyPublicValueAllocation(),
+          topPositions: [],
+          reason: hiddenReason.reason,
+          message: hiddenReason.message,
+        },
+      };
+    }
+
     const [ranking, portfolio] = await Promise.all([
       this.findLatestPublicRanking(season.id, participant.id, season.status),
       this.buildPublicSeasonSummaryPortfolio(participant.id, new Date()),
@@ -1299,6 +1348,7 @@ export class RecordsService {
             rankType: ranking.rankType,
             rankingDate: ranking.rankingDate,
             capturedAt: ranking.capturedAt,
+            seasonParticipant: this.publicRankingParticipantWhere(),
           },
         })
       : 0;
@@ -1770,6 +1820,7 @@ export class RecordsService {
         seasonId,
         seasonParticipantId,
         rankType,
+        seasonParticipant: this.publicRankingParticipantWhere(),
       },
       orderBy: [
         { rankingDate: 'desc' },
@@ -2745,6 +2796,7 @@ export class RecordsService {
         id: true,
         participantStatus: true,
         joinedAt: true,
+        rankingHiddenAt: true,
       },
     });
   }
@@ -2761,6 +2813,7 @@ export class RecordsService {
         id: true,
         participantStatus: true,
         joinedAt: true,
+        rankingHiddenAt: true,
         initialCapitalKrw: true,
         maxDrawdown: true,
         totalFillCount: true,
@@ -3002,6 +3055,38 @@ export class RecordsService {
       finalRank: participant.finalRank,
       finalTier: participant.finalTier,
       rewardGrantedAt: this.formatNullableDate(participant.rewardGrantedAt),
+    };
+  }
+
+  private isParticipantPubliclyVisible(
+    participant: ParticipantPublicVisibility,
+  ) {
+    return (
+      participant.participantStatus !== ParticipantStatus.excluded &&
+      participant.rankingHiddenAt === null
+    );
+  }
+
+  private publicVisibilityReason(participant: ParticipantPublicVisibility) {
+    if (participant.participantStatus === ParticipantStatus.excluded) {
+      return {
+        reason: 'PARTICIPANT_EXCLUDED',
+        message: 'Season participant summary is unavailable.',
+      };
+    }
+
+    return {
+      reason: 'RANKING_HIDDEN',
+      message: 'Season participant summary is hidden.',
+    };
+  }
+
+  private publicRankingParticipantWhere(): Prisma.SeasonParticipantWhereInput {
+    return {
+      participantStatus: {
+        not: ParticipantStatus.excluded,
+      },
+      rankingHiddenAt: null,
     };
   }
 

@@ -164,9 +164,9 @@ Return a KRW/USD exchange quote without changing wallet balances or writing exch
 ### Quote Persistence
 
 - `/fx quote` performs source wallet balance preflight after participant validation and before FX rate selection or durable quote persistence. This preflight does not replace execute-time guarded balance validation.
-- `/fx quote` creates a `Quote` row with `quoteType=fx`, `status=active`, `sourceAmount`, `targetAmount`, `quotedRate`, `fxRateSnapshotId`, public-safe `fxRateSourceJson`, `maxChangeBps=30.0000`, `expiresAt=quoteAt+10s`, and canonical SHA-256 `requestHash`.
+- `/fx quote` creates a `Quote` row with `quoteType=fx`, `status=active`, `sourceAmount`, `targetAmount`, `quotedRate`, `fxRateSnapshotId`, public-safe `fxRateSourceJson`, `maxChangeBps=30.0000`, `expiresAt=quoteAt+15s`, and canonical SHA-256 `requestHash`.
 - `quoteId` is non-null when quote creation succeeds.
-- `expiresAt` is non-null and defaults to 10 seconds after quote time.
+- `expiresAt` is non-null and defaults to 15 seconds after quote time.
 - `rateCapturedAt` and `rateEffectiveAt` are returned for rate timing transparency.
 - Optional `rateSource` returns selected provider/admin source metadata and fallback/rejected-provider reason visibility.
 - `appliedRate` source is fresh `provider_api` USD/KRW first by `korea_exim_exchange_rate`, then `exchange_rate_api`; quote can still use the existing `admin_manual` fallback when provider rows are unavailable or stale.

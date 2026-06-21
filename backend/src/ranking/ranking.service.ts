@@ -1,5 +1,6 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import {
+  ParticipantStatus,
   Prisma,
   SeasonRankingType,
   SeasonStatus,
@@ -76,6 +77,12 @@ type MyRankingRow = {
   };
 };
 
+type RankingParticipantVisibility = {
+  id: string;
+  participantStatus: ParticipantStatus;
+  rankingHiddenAt: Date | null;
+};
+
 type RankingResponse = {
   success: true;
   data: {
@@ -136,6 +143,12 @@ const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 const TOP10_LIMIT = 10;
+const PUBLIC_RANKING_PARTICIPANT_WHERE = {
+  participantStatus: {
+    not: ParticipantStatus.excluded,
+  },
+  rankingHiddenAt: null,
+} satisfies Prisma.SeasonParticipantWhereInput;
 
 @Injectable()
 export class RankingService {
@@ -218,10 +231,14 @@ export class RankingService {
       rankType: parsedQuery.rankType,
       rankingDate: selectedRanking.rankingDate,
       capturedAt: selectedRanking.capturedAt,
+      seasonParticipant: PUBLIC_RANKING_PARTICIPANT_WHERE,
     };
+    const participantRankingVisible = participant
+      ? this.isParticipantRankingVisible(participant)
+      : false;
     const [totalParticipants, myRankingRow] = await Promise.all([
       this.prisma.seasonRanking.count({ where }),
-      participant
+      participant && participantRankingVisible
         ? this.prisma.seasonRanking.findUnique({
             where: {
               seasonId_rankType_rankingDate_seasonParticipantId: {
@@ -304,12 +321,14 @@ export class RankingService {
           this.formatRankingRow(row, parsedQuery.rankType, totalParticipants),
         ),
         myRanking: participant
-          ? this.formatMyRanking(
-              myRankingRow,
-              this.formatDateOnly(selectedRanking.rankingDate),
-              parsedQuery.rankType,
-              totalParticipants,
-            )
+          ? participantRankingVisible
+            ? this.formatMyRanking(
+                myRankingRow,
+                this.formatDateOnly(selectedRanking.rankingDate),
+                parsedQuery.rankType,
+                totalParticipants,
+              )
+            : this.hiddenMyRanking(participant)
           : this.notJoinedMyRanking(),
       },
     };
@@ -572,8 +591,19 @@ export class RankingService {
       },
       select: {
         id: true,
+        participantStatus: true,
+        rankingHiddenAt: true,
       },
     });
+  }
+
+  private isParticipantRankingVisible(
+    participant: RankingParticipantVisibility,
+  ) {
+    return (
+      participant.participantStatus !== ParticipantStatus.excluded &&
+      participant.rankingHiddenAt === null
+    );
   }
 
   private assertCapturedAtMatchesSelectedSnapshot(
@@ -758,6 +788,19 @@ export class RankingService {
       reason,
       message,
     };
+  }
+
+  private hiddenMyRanking(
+    participant: RankingParticipantVisibility,
+  ): RankingResponse['data']['myRanking'] {
+    return this.unavailableMyRanking(
+      participant.participantStatus === ParticipantStatus.excluded
+        ? 'PARTICIPANT_EXCLUDED'
+        : 'RANKING_HIDDEN',
+      participant.participantStatus === ParticipantStatus.excluded
+        ? 'My ranking is unavailable because the season participant is excluded.'
+        : 'My ranking is hidden.',
+    );
   }
 
   private calculatePercentile(rank: number, totalParticipants: number) {

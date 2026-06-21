@@ -78,6 +78,7 @@ jest.mock('../src/generated/prisma/client', () => {
       registered: 'registered',
       finished: 'finished',
       rewarded: 'rewarded',
+      excluded: 'excluded',
     },
     Prisma: {
       Decimal,
@@ -254,12 +255,16 @@ type PrismaMock = {
     create: jest.Mock;
     findMany: jest.Mock;
     findUnique: jest.Mock;
+    findFirst: jest.Mock;
+    update: jest.Mock;
   };
   seasonRanking: {
     count: jest.Mock;
+    create: jest.Mock;
     findFirst: jest.Mock;
     findMany: jest.Mock;
     findUnique: jest.Mock;
+    update: jest.Mock;
   };
   seasonReward: {
     create: jest.Mock;
@@ -460,12 +465,16 @@ describe('AppController (e2e)', () => {
         create: jest.fn(),
         findMany: jest.fn(),
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
+        update: jest.fn(),
       },
       seasonRanking: {
         count: jest.fn(),
+        create: jest.fn(),
         findFirst: jest.fn(),
         findMany: jest.fn(),
         findUnique: jest.fn(),
+        update: jest.fn(),
       },
       seasonReward: {
         create: jest.fn(),
@@ -1373,6 +1382,175 @@ describe('AppController (e2e)', () => {
 
   it('/api/v1/operator/users (GET) rejects missing token', async () => {
     await expectUnauthorizedWithoutToken('get', '/api/v1/operator/users');
+  });
+
+  it('/api/v1/operator/seasons/:seasonId/participants/:seasonParticipantId/exclude rejects user role', async () => {
+    resetPrismaMocks();
+    mockActiveUser(user.id, 'user');
+    const token = await createValidAccessToken(user.id);
+
+    return request(app.getHttpServer())
+      .post('/api/v1/operator/seasons/season-1/participants/sp-1/exclude')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        reason: 'not_allowed',
+      })
+      .expect(403)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: false,
+          error: {
+            code: 'OPERATOR_FORBIDDEN',
+          },
+        });
+        expect(prisma.seasonParticipant.findFirst).not.toHaveBeenCalled();
+        expect(prisma.operatorAuditLog.create).not.toHaveBeenCalled();
+      });
+  });
+
+  it.each([
+    [
+      'hide-ranking',
+      'post',
+      '/api/v1/operator/seasons/season-1/participants/sp-1/hide-ranking',
+      {
+        hidden: true,
+        reason: 'not_allowed',
+      },
+    ],
+    [
+      'final-result',
+      'patch',
+      '/api/v1/operator/seasons/season-1/participants/sp-1/final-result',
+      {
+        finalRank: 2,
+        reason: 'not_allowed',
+      },
+    ],
+  ])(
+    '/api/v1/operator/seasons/:seasonId/participants/:seasonParticipantId/%s rejects user role',
+    async (_label, method, path, body) => {
+      resetPrismaMocks();
+      mockActiveUser(user.id, 'user');
+      const token = await createValidAccessToken(user.id);
+
+      return request(app.getHttpServer())
+        [method as 'post' | 'patch'](path)
+        .set('Authorization', `Bearer ${token}`)
+        .send(body)
+        .expect(403)
+        .expect((response) => {
+          expect(response.body).toMatchObject({
+            success: false,
+            error: {
+              code: 'OPERATOR_FORBIDDEN',
+            },
+          });
+          expect(prisma.seasonParticipant.findFirst).not.toHaveBeenCalled();
+          expect(prisma.operatorAuditLog.create).not.toHaveBeenCalled();
+        });
+    },
+  );
+
+  it('/api/v1/operator/seasons/:seasonId/participants/:seasonParticipantId/exclude lets operator exclude and audits success', async () => {
+    resetPrismaMocks();
+    mockActiveUser(user.id, 'operator');
+    const excludedAt = new Date('2026-05-09T00:05:00.000Z');
+    const moderatedParticipant = {
+      id: 'sp-1',
+      seasonId: 'season-1',
+      userId: 'managed-user-1',
+      participantStatus: 'active',
+      totalAssetKrw: new Prisma.Decimal('10100000.00000000'),
+      totalReturnRate: new Prisma.Decimal('1.00000000'),
+      maxDrawdown: new Prisma.Decimal('0.50000000'),
+      totalFillCount: 3,
+      currentRank: 3,
+      finalRank: null,
+      finalTier: null,
+      excludedAt: null,
+      excludedReason: null,
+      excludedByUserId: null,
+      rankingHiddenAt: null,
+      rankingHiddenReason: null,
+      rankingHiddenByUserId: null,
+      resultCorrectedAt: null,
+      resultCorrectedReason: null,
+      resultCorrectedByUserId: null,
+      updatedAt: now,
+      season: {
+        id: 'season-1',
+        status: 'active',
+        endAt: now,
+      },
+    };
+    prisma.seasonParticipant.findFirst.mockResolvedValueOnce(
+      moderatedParticipant,
+    );
+    prisma.seasonParticipant.update.mockResolvedValueOnce({
+      ...moderatedParticipant,
+      participantStatus: 'excluded',
+      excludedAt,
+      excludedReason: 'abuse_detected',
+      excludedByUserId: user.id,
+      currentRank: null,
+      updatedAt: excludedAt,
+    });
+    const token = await createValidAccessToken(user.id);
+
+    return request(app.getHttpServer())
+      .post('/api/v1/operator/seasons/season-1/participants/sp-1/exclude')
+      .set('Authorization', `Bearer ${token}`)
+      .set('x-request-id', 'season-moderation-1')
+      .send({
+        reason: 'abuse_detected',
+        note: 'Detected automation abuse',
+      })
+      .expect(200)
+      .expect((response) => {
+        expect(response.body).toEqual({
+          success: true,
+          data: {
+            seasonId: 'season-1',
+            seasonParticipantId: 'sp-1',
+            status: 'excluded',
+            excludedAt: excludedAt.toISOString(),
+            reason: 'abuse_detected',
+          },
+        });
+        expect(JSON.stringify(response.body)).not.toMatch(
+          /passwordHash|refreshToken|accessToken|tokenHash|rawPayload/i,
+        );
+        expect(prisma.seasonParticipant.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: {
+              id: 'sp-1',
+            },
+            data: expect.objectContaining({
+              participantStatus: 'excluded',
+              excludedReason: 'abuse_detected',
+              excludedByUserId: user.id,
+              currentRank: null,
+            }),
+          }),
+        );
+        expect(prisma.operatorAuditLog.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              action: 'operator.season_participant.exclude',
+              actorRole: 'operator',
+              targetId: 'sp-1',
+              requestId: 'season-moderation-1',
+              result: 'success',
+              metadataJson: expect.objectContaining({
+                beforeStatus: 'active',
+                afterStatus: 'excluded',
+                reason: 'abuse_detected',
+              }),
+            }),
+          }),
+        );
+      });
   });
 
   it('/api/v1/operator/users/:userId/status (PATCH) rejects missing token and x-user-id only', async () => {

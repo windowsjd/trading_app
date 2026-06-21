@@ -40,6 +40,7 @@ jest.mock('../generated/prisma/client', () => {
       active: 'active',
       finished: 'finished',
       rewarded: 'rewarded',
+      excluded: 'excluded',
     },
     Prisma: {
       Decimal,
@@ -119,6 +120,7 @@ describe('RecordsService', () => {
     id: 'sp-1',
     participantStatus: ParticipantStatus.active,
     joinedAt,
+    rankingHiddenAt: null,
   };
 
   const detailedParticipant = {
@@ -1437,6 +1439,48 @@ describe('RecordsService', () => {
     expectNoRecordWrites(prisma);
   });
 
+  it('hides current public user season summary for ranking-hidden participants', async () => {
+    const portfolioValuationService = {
+      calculateSeasonParticipantValuation: jest.fn(),
+    };
+    const { prisma, service } = createService(portfolioValuationService);
+    prisma.user.findUnique.mockResolvedValueOnce({
+      id: 'user-2',
+      nickname: 'legendTrader',
+    });
+    mockCurrentSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+      ...detailedParticipant,
+      rankingHiddenAt: new Date('2026-05-07T00:20:00.000Z'),
+    });
+
+    const response = await service.getUserCurrentSeasonSummary(
+      'viewer-1',
+      'user-2',
+    );
+
+    expect(response.data).toMatchObject({
+      state: 'unavailable',
+      reason: 'RANKING_HIDDEN',
+      season: {
+        id: 'season-1',
+        rank: null,
+        provisionalTier: null,
+        finalTier: null,
+        percentile: null,
+        returnRate: null,
+        totalAssetKrw: null,
+        totalFillCount: 0,
+      },
+      topPositions: [],
+    });
+    expect(prisma.seasonRanking.findFirst).not.toHaveBeenCalled();
+    expect(
+      portfolioValuationService.calculateSeasonParticipantValuation,
+    ).not.toHaveBeenCalled();
+    expectNoRecordWrites(prisma);
+  });
+
   it('returns not_joined for current public user season summary', async () => {
     const portfolioValuationService = {
       calculateSeasonParticipantValuation: jest.fn(),
@@ -1582,6 +1626,42 @@ describe('RecordsService', () => {
     expect(serialized).not.toContain('averageCost');
     expect(serialized).not.toContain('balanceAmount');
     expect(serialized).not.toContain('assetId');
+    expectNoRecordWrites(prisma);
+  });
+
+  it('hides protected public records summary for ranking-hidden participants', async () => {
+    const { prisma, service } = createService();
+    prisma.user.findUnique.mockResolvedValueOnce({
+      id: 'user-2',
+      nickname: 'traderLee',
+      profileImageUrl: null,
+    });
+    prisma.season.findUnique.mockResolvedValueOnce(season);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+      ...detailedParticipant,
+      rankingHiddenAt: new Date('2026-05-07T00:20:00.000Z'),
+    });
+
+    const response = await service.getUserSeasonRecordSummary(
+      'user-1',
+      'user-2',
+      'season-1',
+    );
+
+    expect(response.data).toMatchObject({
+      state: 'available',
+      summary: null,
+      publicPortfolioSummary: {
+        state: 'unavailable',
+        totalAssetKrw: null,
+        returnRate: null,
+        topHoldings: [],
+      },
+      reason: 'RANKING_HIDDEN',
+    });
+    expect(prisma.order.count).not.toHaveBeenCalled();
+    expect(prisma.exchangeTransaction.count).not.toHaveBeenCalled();
+    expect(prisma.position.findMany).not.toHaveBeenCalled();
     expectNoRecordWrites(prisma);
   });
 

@@ -61,6 +61,7 @@ jest.mock('../generated/prisma/client', () => {
       active: 'active',
       finished: 'finished',
       rewarded: 'rewarded',
+      excluded: 'excluded',
     },
     Prisma: {
       Decimal,
@@ -1017,7 +1018,7 @@ describe('OrdersService', () => {
     expect(
       new Date(response.data.expiresAt ?? '').getTime() -
         new Date(response.data.quoteAt).getTime(),
-    ).toBe(10_000);
+    ).toBe(15_000);
     expect(prisma.quote.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -1072,6 +1073,29 @@ describe('OrdersService', () => {
     expect(prisma.order.create).not.toHaveBeenCalled();
     expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
     expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects order quote for excluded season participants before quote persistence', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+      ...participant,
+      participantStatus: ParticipantStatus.excluded,
+    });
+
+    await expectErrorCode(
+      service.quoteOrder('user-1', {
+        assetId: 'asset-1',
+        side: 'buy',
+        orderType: 'market',
+        quantity: '2.000000',
+      }),
+      'PARTICIPANT_EXCLUDED',
+    );
+    expect(prisma.asset.findUnique).not.toHaveBeenCalled();
+    expect(prisma.quote.create).not.toHaveBeenCalled();
+    expect(prisma.order.create).not.toHaveBeenCalled();
+    expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
   });
 
   it('uses fresh provider_api asset price and FX for orders quote only', async () => {

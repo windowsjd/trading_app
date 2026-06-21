@@ -37,6 +37,7 @@ enum ParticipantStatus {
   active
   finished
   rewarded
+  excluded
 }
 
 enum CurrencyCode {
@@ -286,40 +287,51 @@ model Season {
 }
 
 model SeasonParticipant {
-  id                String            @id @default(uuid())
-  seasonId          String            @map("season_id")
-  userId            String            @map("user_id")
-  joinedAt          DateTime          @map("joined_at")
-  participantStatus ParticipantStatus @default(registered) @map("participant_status")
-  initialCapitalKrw Decimal           @map("initial_capital_krw") @db.Decimal(24, 8)
-  totalAssetKrw     Decimal           @map("total_asset_krw") @db.Decimal(24, 8)
-  totalReturnRate   Decimal           @map("total_return_rate") @db.Decimal(12, 8)
-  maxDrawdown       Decimal           @map("max_drawdown") @db.Decimal(12, 8)
-  totalFillCount    Int               @default(0) @map("total_fill_count")
-  currentRank       Int?              @map("current_rank")
-  finalRank         Int?              @map("final_rank")
-  finalTier         String?           @map("final_tier")
-  rewardGrantedAt   DateTime?         @map("reward_granted_at")
-  createdAt         DateTime          @default(now()) @map("created_at")
-  updatedAt         DateTime          @updatedAt @map("updated_at")
+  id                      String            @id @default(uuid())
+  seasonId                String            @map("season_id")
+  userId                  String            @map("user_id")
+  joinedAt                DateTime          @map("joined_at")
+  participantStatus       ParticipantStatus @default(registered) @map("participant_status")
+  initialCapitalKrw       Decimal           @map("initial_capital_krw") @db.Decimal(24, 8)
+  totalAssetKrw           Decimal           @map("total_asset_krw") @db.Decimal(24, 8)
+  totalReturnRate         Decimal           @map("total_return_rate") @db.Decimal(12, 8)
+  maxDrawdown             Decimal           @map("max_drawdown") @db.Decimal(12, 8)
+  totalFillCount          Int               @default(0) @map("total_fill_count")
+  currentRank             Int?              @map("current_rank")
+  finalRank               Int?              @map("final_rank")
+  finalTier               String?           @map("final_tier")
+  rewardGrantedAt         DateTime?         @map("reward_granted_at")
+  excludedAt              DateTime?         @map("excluded_at")
+  excludedReason          String?           @map("excluded_reason")
+  excludedByUserId        String?           @map("excluded_by_user_id")
+  rankingHiddenAt         DateTime?         @map("ranking_hidden_at")
+  rankingHiddenReason     String?           @map("ranking_hidden_reason")
+  rankingHiddenByUserId   String?           @map("ranking_hidden_by_user_id")
+  resultCorrectedAt       DateTime?         @map("result_corrected_at")
+  resultCorrectedReason   String?           @map("result_corrected_reason")
+  resultCorrectedByUserId String?           @map("result_corrected_by_user_id")
+  createdAt               DateTime          @default(now()) @map("created_at")
+  updatedAt               DateTime          @updatedAt @map("updated_at")
 
-  season                  Season                   @relation(fields: [seasonId], references: [id], onDelete: Cascade)
-  user                    User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  cashWallets             CashWallet[]
-  walletTransactions      WalletTransaction[]
-  exchangeTransactions    ExchangeTransaction[]
-  equitySnapshots         EquitySnapshot[]
-  fxExecuteRequests       FxExecuteRequest[]
-  positions               Position[]
-  orders                  Order[]
-  quotes                  Quote[]
-  dailyPortfolioSnapshots DailyPortfolioSnapshot[]
-  seasonRankings          SeasonRanking[]
-  seasonRewards           SeasonReward[]
+  season                    Season                     @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  user                      User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cashWallets               CashWallet[]
+  walletTransactions        WalletTransaction[]
+  exchangeTransactions      ExchangeTransaction[]
+  equitySnapshots           EquitySnapshot[]
+  fxExecuteRequests         FxExecuteRequest[]
+  positions                 Position[]
+  orders                    Order[]
+  quotes                    Quote[]
+  dailyPortfolioSnapshots   DailyPortfolioSnapshot[]
+  seasonRankings            SeasonRanking[]
+  seasonRewards             SeasonReward[]
   rewardFulfillmentRequests RewardFulfillmentRequest[]
 
   @@unique([seasonId, userId])
   @@index([seasonId])
+  @@index([seasonId, participantStatus])
+  @@index([seasonId, rankingHiddenAt])
   @@index([userId])
   @@map("season_participants")
 }

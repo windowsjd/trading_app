@@ -976,6 +976,7 @@ export class OrdersService {
     executedAt: Date,
   ) {
     this.assertSeasonTradable(order.seasonParticipant.season, executedAt);
+    this.assertParticipantTradable(order.seasonParticipant.participantStatus);
     this.assertOrderAssetTradable(order.asset, executedAt);
 
     if (order.orderType !== OrderType.market) {
@@ -2821,6 +2822,8 @@ export class OrdersService {
       );
     }
 
+    this.assertParticipantTradable(participant.participantStatus);
+
     return participant;
   }
 
@@ -3929,6 +3932,24 @@ export class OrdersService {
 
   private formatNullableDate(value: Date | null) {
     return value ? value.toISOString() : null;
+  }
+
+  private assertParticipantTradable(status: ParticipantStatus) {
+    if (status === ParticipantStatus.excluded) {
+      this.throwApiError(
+        HttpStatus.FORBIDDEN,
+        'PARTICIPANT_EXCLUDED',
+        'Season participant is excluded from trading.',
+      );
+    }
+
+    if (status !== ParticipantStatus.active) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'PARTICIPANT_NOT_ACTIVE',
+        'Season participant is not active.',
+      );
+    }
   }
 
   private getAssetPriceCurrency(

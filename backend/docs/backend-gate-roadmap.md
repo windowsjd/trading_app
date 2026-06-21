@@ -192,7 +192,7 @@ Consistency note:
 
 ### FX Quote
 
-- Current status: `POST /api/v1/fx/quote` durable quote MVP implemented; KRW/USD only; uses fresh provider_api first with admin_manual fallback and stores active `Quote` rows with 10-second TTL.
+- Current status: `POST /api/v1/fx/quote` durable quote MVP implemented; KRW/USD only; uses fresh provider_api first with admin_manual fallback and stores active `Quote` rows with 15-second TTL.
 - Implemented files: `src/fx/fx.controller.ts`, `src/fx/fx.service.ts`, `src/fx/fx-decimal-policy.ts`, `scripts/admin-insert-fx-rate.ts`.
 - Source of truth: `docs/fx-api-contract.md`, `docs/current-status.md`.
 - Existing tests: `src/fx/fx.service.spec.ts`, `src/fx/fx-decimal-policy.spec.ts`, `src/fx/fx-rate-input.validation.spec.ts`, `test/app.e2e-spec.ts`.
@@ -236,7 +236,7 @@ Consistency note:
 
 ### Orders Quote
 
-- Current status: `POST /api/v1/orders/quote` durable quote MVP implemented; active season + joined participant; market can use fresh eligible `provider_api` asset price first with `admin_manual` fallback; limit uses limitPrice; USD assets can use provider USD/KRW first with fresh approved admin_manual fallback; buy/sell resource checks are read-only; active `Quote` rows are stored with 10-second TTL.
+- Current status: `POST /api/v1/orders/quote` durable quote MVP implemented; active season + joined participant; market can use fresh eligible `provider_api` asset price first with `admin_manual` fallback; limit uses limitPrice; USD assets can use provider USD/KRW first with fresh approved admin_manual fallback; buy/sell resource checks are read-only; active `Quote` rows are stored with 15-second TTL.
 - Implemented files: `src/orders/orders.controller.ts`, `src/orders/orders.service.ts`.
 - Source of truth: `docs/orders-api-contract.md`, `docs/current-status.md`.
 - Existing tests: `src/orders/orders.service.spec.ts`, `test/app.e2e-spec.ts`.

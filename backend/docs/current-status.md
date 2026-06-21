@@ -34,8 +34,15 @@
       - delete는 target role을 `user`로 강제하고, suspend/delete는 active refresh token sessions를 revoked 처리한다.
       - restore는 기존 refresh token sessions를 되살리지 않는다.
       - status/restore 성공/실패는 `OperatorAuditLog`에 safe metadata만 기록한다.
+    - Season Participant Moderation Gate 구현 완료:
+      - `POST /api/v1/operator/seasons/:seasonId/participants/:seasonParticipantId/exclude`는 operator/admin 전용이며 `active`/`ended` season participant를 `excluded` 상태로 전환하고 `currentRank`를 비운다.
+      - `POST /api/v1/operator/seasons/:seasonId/participants/:seasonParticipantId/hide-ranking`은 `hidden=true/false`로 public ranking 노출을 숨기거나 복구한다. 원본 `season_rankings` row는 삭제하지 않는다.
+      - `PATCH /api/v1/operator/seasons/:seasonId/participants/:seasonParticipantId/final-result`는 `ended`/`settled` season의 `finalRank`/`finalTier`와 필요한 final ranking row rank를 수정한다. rank conflict는 `FINAL_RANK_CONFLICT`.
+      - 모든 변경은 `OperatorAuditLog`에 safe metadata로 기록하며 private ledger, raw provider payload, token/secret/password hash는 응답/audit에 노출하지 않는다.
+      - 제외된 participant는 신규 order quote/create/execute, FX quote/execute, ranking refresh, ranking job, settlement 대상에서 제외된다. public ranking/user summary는 excluded/hidden participant ranking summary를 노출하지 않는다.
+      - 보상 지급/회수/reward fulfillment mutation은 이번 gate 범위가 아니다.
   - `OperatorAuditLog` / `operator_audit_logs` foundation과 secret-like metadata redaction service가 추가됨.
-  - Admin/operator MVP는 schema migration `20260601090000_add_user_role_operator_audit_logs`와 `20260609120000_add_user_status_restore_internal_reward_fulfillment` 적용이 필요하다.
+  - Admin/operator MVP는 schema migration `20260601090000_add_user_role_operator_audit_logs`, `20260609120000_add_user_status_restore_internal_reward_fulfillment`, `20260621120000_add_season_participant_moderation` 적용이 필요하다.
   - Internal Reward Fulfillment Backend Gate 구현 완료:
     - `SeasonRewardType.internal`, `RewardFulfillmentStatus`, `reward_fulfillment_requests` queue/status foundation이 추가됨.
     - `GET /api/v1/operator/reward-fulfillments`, `GET /api/v1/operator/reward-fulfillments/:fulfillmentId`, `POST /api/v1/operator/reward-fulfillments`, `POST /api/v1/operator/reward-fulfillments/:fulfillmentId/fulfill`, `POST /api/v1/operator/reward-fulfillments/:fulfillmentId/cancel`은 operator/admin 전용이다.
@@ -170,6 +177,7 @@
   - Durable Quote Provider Execute Gate on 2026-06-08 KST:
     - Durable Quote storage is implemented with `QuoteType` (`fx`, `order`), `QuoteStatus` (`active`, `consumed`, `expired`, `canceled`), `quotes` indexes, and nullable `orders.quoteId` relation.
     - `/fx quote` and `POST /api/v1/orders/quote` now persist active durable quotes and return backward-compatible `quoteId`, `expiresAt`, and `maxChangeBps` fields.
+    - Durable quote default TTL is 15 seconds for both FX and order quotes; execute after `expiresAt` returns `QUOTE_EXPIRED`.
     - Quote `requestHash` uses canonical SHA-256 JSON over normalized execute-relevant fields; it stores no raw provider payloads or secrets.
     - `/fx execute` now requires a durable FX quote for new mutations, preserves idempotency replay before quote validation, reprices with fresh `provider_api` USD/KRW rows by source priority (`korea_exim_exchange_rate`, then `exchange_rate_api`) at execute time, rejects missing/stale provider rows, rejects quote movement beyond 30 bps, and consumes the quote atomically with wallet/exchange/ledger writes.
     - Orders create accepts and binds an active durable order quote in `orders.quoteId`, creates only a submitted order, and does not mutate wallets/positions/settlement.
