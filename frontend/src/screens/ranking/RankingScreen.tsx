@@ -61,11 +61,17 @@ export default function RankingScreen({ navigation }: Props) {
   const rootNavigation = useRootNavigation();
   const queryClient = useQueryClient();
   const [selectedTab, setSelectedTab] = React.useState<RankingScope>('all');
-  const rankingQueryKey = QUERY_KEYS.ranking.list({
-    scope: selectedTab,
-    limit: selectedTab === 'top10' ? 10 : 50,
-    offset: 0,
-  });
+  const snapshotResetAttemptRef = React.useRef(0);
+  const rankingLimit = selectedTab === 'top10' ? 10 : 50;
+  const rankingQueryKey = useMemo(
+    () =>
+      QUERY_KEYS.ranking.list({
+        scope: selectedTab,
+        limit: rankingLimit,
+        offset: 0,
+      }),
+    [rankingLimit, selectedTab],
+  );
 
   const seasonQuery = useQuery({
     queryKey: QUERY_KEYS.season.current,
@@ -77,7 +83,7 @@ export default function RankingScreen({ navigation }: Props) {
     queryFn: ({ pageParam }) =>
       getRankings({
         scope: selectedTab,
-        limit: selectedTab === 'top10' ? 10 : 50,
+        limit: rankingLimit,
         offset: pageParam.offset,
         rankType: pageParam.rankType,
         rankingDate: pageParam.rankingDate,
@@ -100,6 +106,18 @@ export default function RankingScreen({ navigation }: Props) {
       rankingDate: null as string | null,
       capturedAt: null as string | null,
     },
+    refetchInterval: (query) => {
+      const data = query.state.data as
+        | { pages?: Array<{ rankType?: RankingRankType }> }
+        | undefined;
+      const polledRankType = data?.pages?.[0]?.rankType;
+
+      if (polledRankType === 'final' || seasonQuery.data?.status === 'settled') {
+        return false;
+      }
+
+      return 60_000;
+    },
   });
 
   const firstPage = rankingQuery.data?.pages[0];
@@ -120,13 +138,40 @@ export default function RankingScreen({ navigation }: Props) {
   const myRanking = firstPage?.myRanking ?? null;
   const rankingErrorCode = getApiErrorCode(rankingQuery.error);
 
+  React.useEffect(() => {
+    snapshotResetAttemptRef.current = 0;
+  }, [selectedTab]);
+
+  React.useEffect(() => {
+    if (rankingQuery.isSuccess) {
+      snapshotResetAttemptRef.current = 0;
+    }
+  }, [
+    rankingQuery.isSuccess,
+    firstPage?.rankingDate,
+    firstPage?.capturedAt,
+    rankType,
+  ]);
+
+  React.useEffect(() => {
+    if (rankingErrorCode !== ERROR_CODE.RANKING_SNAPSHOT_CHANGED) return;
+    if (snapshotResetAttemptRef.current > 0) return;
+
+    snapshotResetAttemptRef.current += 1;
+    void queryClient
+      .resetQueries({ queryKey: rankingQueryKey, exact: true })
+      .then(() => rankingQuery.refetch());
+  }, [queryClient, rankingErrorCode, rankingQuery.refetch, rankingQueryKey]);
+
   const viewState = useMemo(() => {
     if (seasonQuery.isLoading || rankingQuery.isLoading) {
       return 'ranking_loading';
     }
 
     if (rankingErrorCode === ERROR_CODE.RANKING_SNAPSHOT_CHANGED) {
-      return 'ranking_snapshot_changed';
+      return snapshotResetAttemptRef.current > 0
+        ? 'ranking_snapshot_changed'
+        : 'ranking_loading';
     }
 
     if (seasonQuery.isError || !seasonQuery.data || rankingQuery.isError) {
@@ -167,7 +212,11 @@ export default function RankingScreen({ navigation }: Props) {
       <ErrorState
         title="랭킹이 갱신되었습니다."
         message="최신 스냅샷 기준으로 다시 불러와주세요."
-        onRetry={() => queryClient.resetQueries({ queryKey: rankingQueryKey })}
+        onRetry={() => {
+          void queryClient
+            .resetQueries({ queryKey: rankingQueryKey, exact: true })
+            .then(() => rankingQuery.refetch());
+        }}
       />
     );
   }

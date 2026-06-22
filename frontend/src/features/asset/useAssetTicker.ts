@@ -11,6 +11,7 @@ interface UseAssetTickerParams {
 export type AssetTickerConnectionState =
   | 'connecting'
   | 'connected'
+  | 'subscribing'
   | 'subscribed'
   | 'unsubscribed'
   | 'reconnecting'
@@ -195,6 +196,7 @@ export function useAssetTicker({
         reconnectAttemptRef.current = 0;
         setConnectionState('connected');
         setShowReconnectBanner(false);
+        setConnectionState('subscribing');
         sendSubscription(ws, 'subscribe');
       };
 

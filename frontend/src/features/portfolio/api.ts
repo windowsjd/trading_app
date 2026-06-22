@@ -1,5 +1,8 @@
 import { apiClient } from '../../services/api/client';
-import type { ApiSuccessResponse } from '../../models/dto/common';
+import type {
+  ApiSuccessResponse,
+  OffsetPagination,
+} from '../../models/dto/common';
 import { getPositions } from '../position/api';
 
 export type PortfolioAssetType = 'domestic_stock' | 'us_stock' | 'crypto';
@@ -33,6 +36,13 @@ export interface PortfolioPositionItemDto {
 
 export interface PortfolioPositionsDto {
   items: PortfolioPositionItemDto[];
+  pagination: OffsetPagination;
+}
+
+export interface GetPortfolioPositionsParams {
+  assetType: PortfolioAssetType;
+  limit?: number;
+  offset?: number;
 }
 
 export interface PortfolioEquityDto {
@@ -51,8 +61,12 @@ export async function getPortfolioOverview() {
   return response.data.data;
 }
 
-export async function getPortfolioPositions(assetType: PortfolioAssetType) {
-  const response = await getPositions({ assetType, limit: 20, offset: 0 });
+export async function getPortfolioPositions({
+  assetType,
+  limit = 20,
+  offset = 0,
+}: GetPortfolioPositionsParams) {
+  const response = await getPositions({ assetType, limit, offset });
 
   return {
     items: response.positions.map((position) => ({
@@ -64,6 +78,7 @@ export async function getPortfolioPositions(assetType: PortfolioAssetType) {
       unrealizedPnlKrw: position.unrealizedPnlKrw ?? '0',
       returnRate: position.returnRate ?? '0',
     })),
+    pagination: response.pagination,
   };
 }
 

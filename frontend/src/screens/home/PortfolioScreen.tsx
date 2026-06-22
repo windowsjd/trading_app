@@ -6,18 +6,21 @@ import {
   SafeAreaView,
   Pressable,
   FlatList,
+  ActivityIndicator,
 } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 import type { PortfolioScreenProps } from '../../app/navigation/types';
 import { useRootNavigation } from '../../app/navigation/navigationHooks';
 import { TEST_IDS } from '../../constants/testIds';
 import { QUERY_KEYS } from '../../constants/queryKeys';
+import type { PortfolioViewState } from '../../models/enums/viewState';
 import {
   getPortfolioOverview,
   getPortfolioPositions,
   getPortfolioEquity,
   type PortfolioAssetType,
+  type PortfolioPositionItemDto,
   type PortfolioRange,
 } from '../../features/portfolio/api';
 
@@ -41,6 +44,8 @@ const RANGE_TABS: Array<{ key: PortfolioRange; label: string }> = [
   { key: 'season', label: '시즌' },
 ];
 
+const POSITIONS_PAGE_SIZE = 20;
+
 export default function PortfolioScreen({ navigation }: Props) {
   const rootNavigation = useRootNavigation();
   const [assetType, setAssetType] =
@@ -52,9 +57,21 @@ export default function PortfolioScreen({ navigation }: Props) {
     queryFn: getPortfolioOverview,
   });
 
-  const positionsQuery = useQuery({
-    queryKey: QUERY_KEYS.portfolio.positions(assetType),
-    queryFn: () => getPortfolioPositions(assetType),
+  const positionsQuery = useInfiniteQuery({
+    queryKey: QUERY_KEYS.portfolio.positions({
+      assetType,
+      limit: POSITIONS_PAGE_SIZE,
+      offset: 0,
+    }),
+    queryFn: ({ pageParam }) =>
+      getPortfolioPositions({
+        assetType,
+        limit: POSITIONS_PAGE_SIZE,
+        offset: pageParam,
+      }),
+    getNextPageParam: (lastPage) =>
+      lastPage.pagination.nextOffset ?? undefined,
+    initialPageParam: 0,
   });
 
   const equityQuery = useQuery({
@@ -62,46 +79,64 @@ export default function PortfolioScreen({ navigation }: Props) {
     queryFn: () => getPortfolioEquity(range),
   });
 
-  const viewState = useMemo(() => {
-    if (overviewQuery.isLoading || positionsQuery.isLoading || equityQuery.isLoading) {
+  const positions = useMemo(() => {
+    const byAssetId = new Map<string, PortfolioPositionItemDto>();
+
+    positionsQuery.data?.pages.forEach((page) => {
+      page.items.forEach((item) => {
+        byAssetId.set(item.assetId, item);
+      });
+    });
+
+    return Array.from(byAssetId.values());
+  }, [positionsQuery.data]);
+
+  const viewState = useMemo<PortfolioViewState>(() => {
+    if (overviewQuery.isLoading) {
       return 'portfolio_loading';
     }
 
-    if (!overviewQuery.data || !positionsQuery.data || !equityQuery.data) {
+    if (overviewQuery.isError || !overviewQuery.data) {
       return 'portfolio_error';
+    }
+
+    if (positionsQuery.isSuccess && !positions.length) {
+      return 'portfolio_no_positions';
+    }
+
+    if (positionsQuery.isError || equityQuery.isError) {
+      return 'portfolio_partial_unavailable';
     }
 
     return 'portfolio_ready';
   }, [
     overviewQuery.isLoading,
-    positionsQuery.isLoading,
-    equityQuery.isLoading,
+    overviewQuery.isError,
     overviewQuery.data,
-    positionsQuery.data,
-    equityQuery.data,
+    positionsQuery.isError,
+    positionsQuery.isSuccess,
+    positions.length,
+    equityQuery.isError,
   ]);
 
   if (viewState === 'portfolio_loading') {
     return <FullPageLoading message="포트폴리오를 불러오는 중입니다." />;
   }
 
-  if (viewState === 'portfolio_error' || !overviewQuery.data || !positionsQuery.data || !equityQuery.data) {
+  if (viewState === 'portfolio_error' || !overviewQuery.data) {
     return (
       <ErrorState
         title="포트폴리오를 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
         onRetry={() => {
           overviewQuery.refetch();
-          positionsQuery.refetch();
-          equityQuery.refetch();
         }}
       />
     );
   }
 
   const overview = overviewQuery.data;
-  const positions = positionsQuery.data.items;
-  const equity = equityQuery.data.points;
+  const equity = equityQuery.data?.points ?? [];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -110,6 +145,12 @@ export default function PortfolioScreen({ navigation }: Props) {
         data={positions}
         keyExtractor={(item) => item.assetId}
         contentContainerStyle={styles.content}
+        onEndReached={() => {
+          if (positionsQuery.hasNextPage && !positionsQuery.isFetchingNextPage) {
+            positionsQuery.fetchNextPage();
+          }
+        }}
+        onEndReachedThreshold={0.4}
         ListHeaderComponent={
           <>
             <View style={styles.card}>
@@ -128,6 +169,14 @@ export default function PortfolioScreen({ navigation }: Props) {
               <Text style={styles.helper}>미국 {overview.allocation.usStockValueKrw}</Text>
               <Text style={styles.helper}>암호화폐 {overview.allocation.cryptoValueKrw}</Text>
             </View>
+
+            {viewState === 'portfolio_partial_unavailable' ? (
+              <View style={styles.inlineWarning}>
+                <Text style={styles.inlineWarningText}>
+                  일부 포트폴리오 정보를 불러오지 못했습니다.
+                </Text>
+              </View>
+            ) : null}
 
             <View style={styles.card}>
               <Text style={styles.label}>자산 추이</Text>
@@ -150,8 +199,19 @@ export default function PortfolioScreen({ navigation }: Props) {
                 })}
               </View>
 
-              {equityQuery.isFetching ? (
+              {equityQuery.isLoading ? (
                 <SectionSkeleton lines={5} />
+              ) : equityQuery.isError ? (
+                <View style={styles.sectionFallback}>
+                  <InlineEmptyState
+                    title="자산 추이를 불러오지 못했습니다."
+                    message="잠시 후 다시 시도해주세요."
+                  />
+                  <CTAButton
+                    label="자산 추이 다시 불러오기"
+                    onPress={() => equityQuery.refetch()}
+                  />
+                </View>
               ) : equity.length ? (
                 equity.slice(0, 8).map((point) => (
                   <Text key={point.time} style={styles.helper}>
@@ -187,10 +247,25 @@ export default function PortfolioScreen({ navigation }: Props) {
           </>
         }
         ListEmptyComponent={
-          <InlineEmptyState
-            title="보유 포지션이 없습니다."
-            message="해당 자산군의 보유 포지션이 없습니다."
-          />
+          positionsQuery.isLoading ? (
+            <SectionSkeleton lines={4} />
+          ) : positionsQuery.isError ? (
+            <View style={styles.sectionFallback}>
+              <InlineEmptyState
+                title="보유 포지션을 불러오지 못했습니다."
+                message="잠시 후 다시 시도해주세요."
+              />
+              <CTAButton
+                label="포지션 다시 불러오기"
+                onPress={() => positionsQuery.refetch()}
+              />
+            </View>
+          ) : viewState === 'portfolio_no_positions' ? (
+            <InlineEmptyState
+              title="보유 포지션이 없습니다."
+              message="해당 자산군의 보유 포지션이 없습니다."
+            />
+          ) : null
         }
         renderItem={({ item }) => (
           <Pressable
@@ -221,6 +296,11 @@ export default function PortfolioScreen({ navigation }: Props) {
         )}
         ListFooterComponent={
           <View style={styles.footerActions}>
+            {positionsQuery.isFetchingNextPage ? (
+              <View style={styles.footerLoader}>
+                <ActivityIndicator />
+              </View>
+            ) : null}
             <CTAButton
               label="마켓으로 이동"
               onPress={() =>
@@ -257,6 +337,16 @@ const styles = StyleSheet.create({
   label: { fontSize: 13, color: '#666' },
   big: { fontSize: 24, fontWeight: '700' },
   helper: { fontSize: 14, color: '#444' },
+  inlineWarning: {
+    borderWidth: 1,
+    borderColor: '#f2d4a8',
+    borderRadius: 12,
+    padding: 12,
+    backgroundColor: '#fff8ed',
+    marginBottom: 12,
+  },
+  inlineWarningText: { color: '#7a4b00', fontWeight: '600' },
+  sectionFallback: { gap: 10 },
   chip: {
     borderWidth: 1,
     borderColor: '#ddd',
@@ -283,5 +373,6 @@ const styles = StyleSheet.create({
   },
   itemTitle: { fontSize: 15, fontWeight: '700' },
   alignEnd: { alignItems: 'flex-end' },
+  footerLoader: { paddingVertical: 16 },
   footerActions: { marginTop: 12, gap: 10 },
 });

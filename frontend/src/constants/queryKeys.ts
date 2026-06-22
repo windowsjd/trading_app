@@ -90,8 +90,18 @@ export const QUERY_KEYS = {
   portfolio: {
     all: ['portfolio'] as const,
     overview: ['portfolio', 'overview'] as const,
-    positions: (assetType?: string) =>
-      ['portfolio', 'positions', assetType ?? 'all'] as const,
+    positions: (params?: {
+      assetType?: string;
+      limit?: number;
+      offset?: number;
+    }) =>
+      [
+        'portfolio',
+        'positions',
+        params?.assetType ?? 'all',
+        params?.limit ?? null,
+        params?.offset ?? 0,
+      ] as const,
     equity: (range: string) => ['portfolio', 'equity', range] as const,
   },
 

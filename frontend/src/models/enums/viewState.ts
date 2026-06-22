@@ -96,6 +96,13 @@ export type AssetDetailViewState =
   | 'asset_chart_error'
   | 'asset_error';
 
+export type PortfolioViewState =
+  | 'portfolio_loading'
+  | 'portfolio_ready'
+  | 'portfolio_no_positions'
+  | 'portfolio_partial_unavailable'
+  | 'portfolio_error';
+
 export type OrderFlowState =
   | 'order_input_idle'
   | 'order_input_invalid'
