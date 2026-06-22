@@ -1,7 +1,8 @@
 import { apiClient } from '../../services/api/client';
 import type { ApiSuccessResponse } from '../../models/dto/common';
+import { getPositions } from '../position/api';
 
-export type PortfolioAssetClass = 'domestic_stock' | 'us_stock' | 'crypto';
+export type PortfolioAssetType = 'domestic_stock' | 'us_stock' | 'crypto';
 export type PortfolioRange = '1d' | '7d' | 'season';
 
 export interface PortfolioOverviewDto {
@@ -50,12 +51,20 @@ export async function getPortfolioOverview() {
   return response.data.data;
 }
 
-export async function getPortfolioPositions(assetClass: PortfolioAssetClass) {
-  const response = await apiClient.get<ApiSuccessResponse<PortfolioPositionsDto>>(
-    `/portfolio/positions?assetClass=${assetClass}`,
-  );
+export async function getPortfolioPositions(assetType: PortfolioAssetType) {
+  const response = await getPositions({ assetType, limit: 20, offset: 0 });
 
-  return response.data.data;
+  return {
+    items: response.positions.map((position) => ({
+      assetId: position.assetId,
+      symbol: position.symbol ?? position.asset?.symbol ?? position.assetId,
+      name: position.name ?? position.asset?.name ?? '-',
+      quantity: position.quantity,
+      marketValueKrw: position.marketValueKrw ?? '0',
+      unrealizedPnlKrw: position.unrealizedPnlKrw ?? '0',
+      returnRate: position.returnRate ?? '0',
+    })),
+  };
 }
 
 export async function getPortfolioEquity(range: PortfolioRange) {

@@ -74,6 +74,7 @@ export type MarketViewState =
   | 'market_ready'
   | 'market_empty_search'
   | 'market_paginating'
+  | 'market_partial_price_unavailable'
   | 'market_error';
 
 export type AssetDetailViewState =
@@ -83,6 +84,9 @@ export type AssetDetailViewState =
   | 'asset_market_closed'
   | 'asset_season_blocked'
   | 'asset_price_stale'
+  | 'asset_price_unavailable'
+  | 'asset_position_unavailable'
+  | 'asset_chart_unavailable'
   | 'asset_chart_error'
   | 'asset_error';
 
@@ -91,9 +95,12 @@ export type OrderFlowState =
   | 'order_input_invalid'
   | 'order_quote_loading'
   | 'order_quote_ready'
+  | 'order_quote_expired'
   | 'order_quote_rejected'
   | 'order_submitting'
   | 'order_success'
+  | 'order_requote_required'
+  | 'order_idempotency_conflict'
   | 'order_failed';
 
 export type RankingViewState =

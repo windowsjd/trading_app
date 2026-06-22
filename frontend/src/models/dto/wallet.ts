@@ -49,7 +49,7 @@ export interface FxQuoteDto {
   maxChangeBps: BpsString | number;
   rateCapturedAt: IsoDateTimeString;
   rateEffectiveAt: IsoDateTimeString;
-  rateSource: string;
+  rateSource: string | null;
 }
 
 export interface FxExecuteRequestDto {
@@ -79,6 +79,13 @@ export interface FxExecuteDto {
   netTargetAmount: MoneyString;
   sourceWalletBalanceAfter: MoneyString;
   targetWalletBalanceAfter: MoneyString;
-  wallets?: unknown;
-  rateSource: string;
+  wallets?: Partial<
+    Record<'KRW' | 'USD', MoneyString>
+  > | Array<{
+    currencyCode?: 'KRW' | 'USD';
+    currency?: 'KRW' | 'USD';
+    balanceAmount?: MoneyString;
+    balance?: MoneyString;
+  }> | null;
+  rateSource: string | null;
 }

@@ -39,26 +39,60 @@ export const QUERY_KEYS = {
 
   market: {
     assets: (params: {
-      assetClass: string;
-      query?: string;
-      cursor?: string | null;
+      assetType?: string;
+      search?: string;
+      market?: string;
+      currencyCode?: string;
+      withPrice?: boolean;
+      limit?: number;
+      offset?: number;
       sort?: string;
     }) =>
       [
         'market',
         'assets',
-        params.assetClass,
-        params.query ?? '',
+        params.assetType ?? 'all',
+        params.search ?? '',
+        params.market ?? '',
+        params.currencyCode ?? '',
+        params.withPrice ?? false,
+        params.limit ?? null,
+        params.offset ?? 0,
         params.sort ?? '',
-        params.cursor ?? null,
       ] as const,
   },
 
   asset: {
     detail: (assetId: string) => ['asset', 'detail', assetId] as const,
-    candles: (assetId: string, interval: string) =>
-      ['asset', 'candles', assetId, interval] as const,
+    candles: (assetId: string, range: string, interval?: string) =>
+      ['asset', 'candles', assetId, range, interval ?? null] as const,
     price: (assetId: string) => ['asset', 'price', assetId] as const,
+  },
+
+  position: {
+    all: ['positions'] as const,
+    list: (params?: {
+      assetType?: string;
+      assetId?: string;
+      limit?: number;
+      offset?: number;
+    }) =>
+      [
+        'positions',
+        'list',
+        params?.assetType ?? 'all',
+        params?.assetId ?? null,
+        params?.limit ?? null,
+        params?.offset ?? 0,
+      ] as const,
+  },
+
+  portfolio: {
+    all: ['portfolio'] as const,
+    overview: ['portfolio', 'overview'] as const,
+    positions: (assetType?: string) =>
+      ['portfolio', 'positions', assetType ?? 'all'] as const,
+    equity: (range: string) => ['portfolio', 'equity', range] as const,
   },
 
   order: {

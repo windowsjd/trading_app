@@ -91,7 +91,7 @@ export interface FxQuoteDto {
   maxChangeBps: BpsString | number;
   rateCapturedAt: IsoDateTimeString;
   rateEffectiveAt: IsoDateTimeString;
-  rateSource: string;
+  rateSource: string | null;
 }
 
 export interface FxExecuteRequestDto {
@@ -121,8 +121,8 @@ export interface FxExecuteDto {
   netTargetAmount: MoneyString;
   sourceWalletBalanceAfter: MoneyString;
   targetWalletBalanceAfter: MoneyString;
-  wallets?: unknown;
-  rateSource: string;
+  wallets?: Partial<Record<WalletCurrency, MoneyString>> | WalletBalanceDto[] | null;
+  rateSource: string | null;
 }
 
 export async function getWallets() {

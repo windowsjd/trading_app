@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -11,8 +11,19 @@ import { useQuery } from '@tanstack/react-query';
 
 import type { AssetDetailScreenProps } from '../../app/navigation/types';
 import { useRootNavigation } from '../../app/navigation/navigationHooks';
-import { getAssetDetail, getAssetCandles } from '../../features/asset/api';
+import {
+  ASSET_CHART_RANGES,
+  getAssetCandles,
+  getAssetDetail,
+  type AssetCandleRange,
+  type AssetDetailPriceDto,
+} from '../../features/asset/api';
+import {
+  getPositionForAsset,
+  getPositions,
+} from '../../features/position/api';
 import { getCurrentSeason } from '../../features/season/api';
+import { toSeasonDomainState } from '../../features/season/mapper';
 import { useAssetTicker } from '../../features/asset/useAssetTicker';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
@@ -20,16 +31,30 @@ import { buildWsUrl } from '../../constants/env';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
-import BlockedState from '../../components/states/BlockedState';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import CTAButton from '../../components/common/CTAButton';
 
 type Props = AssetDetailScreenProps;
 
+function displayValue(value?: string | number | boolean | null) {
+  if (value === null || value === undefined || value === '') return '-';
+  return String(value);
+}
+
+function isOpenMarket(status?: string | null) {
+  return status?.toLowerCase() === 'open';
+}
+
+function isPriceAvailable(price?: AssetDetailPriceDto | null) {
+  return price?.state === 'available' && !!price.currentPrice;
+}
+
 export default function AssetDetailScreen({ route, navigation }: Props) {
   const rootNavigation = useRootNavigation();
   const { assetId } = route.params;
+  const [selectedRange, setSelectedRange] =
+    useState<AssetCandleRange>('1d');
   const assetTickerWsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
 
   const seasonQuery = useQuery({
@@ -42,9 +67,14 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
     queryFn: () => getAssetDetail(assetId),
   });
 
+  const positionQuery = useQuery({
+    queryKey: QUERY_KEYS.position.list({ assetId, limit: 20, offset: 0 }),
+    queryFn: () => getPositions({ assetId, limit: 20, offset: 0 }),
+  });
+
   const candlesQuery = useQuery({
-    queryKey: QUERY_KEYS.asset.candles(assetId, '1m'),
-    queryFn: () => getAssetCandles(assetId, '1m'),
+    queryKey: QUERY_KEYS.asset.candles(assetId, selectedRange),
+    queryFn: () => getAssetCandles(assetId, { range: selectedRange, limit: 100 }),
   });
 
   const { latestTicker, showReconnectBanner } = useAssetTicker({
@@ -53,86 +83,71 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
     enabled: !!assetTickerWsUrl,
   });
 
-  const viewState = useMemo(() => {
-    if (detailQuery.isLoading || seasonQuery.isLoading) return 'asset_loading';
-    if (!detailQuery.data || !seasonQuery.data) return 'asset_error';
-
-    const season = seasonQuery.data;
-    const detail = detailQuery.data;
-    const hasPosition = !!detail.position && Number(detail.position.quantity) > 0;
-
-    if (season.status !== 'active' || !season.joined) return 'asset_season_blocked';
-    if (detail.asset.marketStatus !== 'open') return 'asset_market_closed';
-    if (detail.price.isStale) return 'asset_price_stale';
-    if (!hasPosition) return 'asset_ready_not_holding';
-
-    return 'asset_ready_tradable';
-  }, [detailQuery.isLoading, seasonQuery.isLoading, detailQuery.data, seasonQuery.data]);
-
-  if (viewState === 'asset_loading') {
+  if (detailQuery.isLoading) {
     return <FullPageLoading message="종목 정보를 불러오는 중입니다." />;
   }
 
-  if (viewState === 'asset_error' || !detailQuery.data || !seasonQuery.data) {
+  if (detailQuery.isError || !detailQuery.data) {
     return (
       <ErrorState
         title="종목 정보를 불러오지 못했습니다."
         message="잠시 후 다시 시도해주세요."
-        onRetry={() => {
-          detailQuery.refetch();
-          seasonQuery.refetch();
-        }}
+        onRetry={() => detailQuery.refetch()}
       />
     );
   }
 
-  const { asset, price, position } = detailQuery.data;
-  const hasPosition = !!position && Number(position.quantity) > 0;
+  const { asset } = detailQuery.data;
+  const price = asset.price;
+  const position = getPositionForAsset(positionQuery.data, assetId);
+  const hasPosition = Number(position?.quantity ?? '0') > 0;
+  const seasonState = seasonQuery.data
+    ? toSeasonDomainState(seasonQuery.data)
+    : null;
+  const canTradeSeason = seasonState === 'season_active_joined';
+  const priceAvailable = isPriceAvailable(price);
 
-  const displayPriceLocal = latestTicker?.priceLocal ?? price.priceLocal;
-  const displayPriceKrw = latestTicker?.priceKrw ?? price.priceKrw;
-  const displayChangeRate = latestTicker?.changeRate ?? price.changeRate;
+  const displayPriceLocal =
+    latestTicker?.priceLocal ??
+    (priceAvailable ? price?.currentPrice : null);
+  const displayPriceKrw =
+    latestTicker?.priceKrw ??
+    (price?.priceKrwState === 'available' ? price?.priceKrw : null);
+  const displayChangeRate = latestTicker?.changeRate ?? price?.changeRate;
+  const displayCapturedAt = latestTicker?.capturedAt ?? price?.priceCapturedAt;
 
-  if (viewState === 'asset_season_blocked') {
-    return (
-      <BlockedState
-        title="현재 거래할 수 없습니다."
-        message={
-          seasonQuery.data.status === 'ended'
-            ? '정산 중에는 거래할 수 없습니다.'
-            : '시즌에 참가해야 거래할 수 있습니다.'
-        }
-        actionLabel={
-          seasonQuery.data.status === 'active' && !seasonQuery.data.joined
-            ? '시즌 참가하기'
-            : undefined
-        }
-        onAction={
-          seasonQuery.data.status === 'active' && !seasonQuery.data.joined
-            ? () => rootNavigation.navigate('SeasonJoin')
-            : undefined
-        }
-      />
-    );
-  }
+  const seasonBlockedReason =
+    seasonQuery.isLoading
+      ? '시즌 상태를 확인하는 중입니다.'
+      : seasonQuery.isError || !seasonQuery.data
+      ? '시즌 상태를 확인할 수 없어 주문을 잠시 막았습니다.'
+      : seasonState === 'season_active_not_joined'
+      ? '시즌에 참가해야 거래할 수 있습니다.'
+      : seasonState === 'season_ended_unsettled'
+      ? '정산 중에는 거래할 수 없습니다.'
+      : !canTradeSeason
+      ? '현재 거래 가능한 시즌이 아닙니다.'
+      : null;
 
-  if (viewState === 'asset_market_closed') {
-    return (
-      <BlockedState
-        title="장 마감으로 거래할 수 없습니다."
-        message="현재가는 볼 수 있지만 매수/매도는 차단됩니다."
-      />
-    );
-  }
+  const assetBlockedReason =
+    !asset.isActive
+      ? '비활성 자산입니다.'
+      : !asset.tradable
+      ? asset.tradeBlockedReason ?? '현재 거래할 수 없는 자산입니다.'
+      : !isOpenMarket(asset.marketStatus)
+      ? '장 마감으로 주문할 수 없습니다.'
+      : !priceAvailable
+      ? '시세를 확인할 수 없어 주문할 수 없습니다.'
+      : null;
 
-  if (viewState === 'asset_price_stale') {
-    return (
-      <BlockedState
-        title="가격 갱신 대기 중입니다."
-        message="최신 가격을 확인할 수 없어 주문을 진행할 수 없습니다."
-      />
-    );
-  }
+  const buyBlockedReason = seasonBlockedReason ?? assetBlockedReason;
+  const sellBlockedReason =
+    buyBlockedReason ??
+    (positionQuery.isError
+      ? '보유 수량을 확인할 수 없어 매도할 수 없습니다.'
+      : !hasPosition
+      ? '보유 수량이 없어 매도할 수 없습니다.'
+      : null);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -144,11 +159,48 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
           <Text style={styles.title}>{asset.symbol}</Text>
           <Text style={styles.helper}>{asset.name}</Text>
           <Text style={styles.value}>
-            {displayPriceLocal} {price.priceCurrency}
+            {priceAvailable
+              ? `${displayValue(displayPriceLocal)} ${asset.priceCurrency}`
+              : '시세 준비 중'}
           </Text>
-          <Text style={styles.helper}>KRW 환산 {displayPriceKrw}</Text>
-          <Text style={styles.helper}>등락률 {displayChangeRate}%</Text>
+          <Text style={styles.helper}>KRW 환산 {displayValue(displayPriceKrw)}</Text>
+          <Text style={styles.helper}>등락률 {displayValue(displayChangeRate)}%</Text>
+          <Text style={styles.helper}>시장 {asset.market}</Text>
           <Text style={styles.helper}>시장 상태 {asset.marketStatus}</Text>
+          <Text style={styles.helper}>
+            거래 상태 {asset.tradable ? '거래 가능' : '거래 제한'}
+          </Text>
+          <Text style={styles.helper}>
+            가격 통화 {asset.priceCurrency} · 결제 통화 {asset.settlementCurrency}
+          </Text>
+          {asset.settlementCurrency === 'USD' ? (
+            <Text style={styles.helper}>USD Wallet으로 결제됩니다.</Text>
+          ) : null}
+          <Text style={styles.helper}>가격 수집 {displayValue(displayCapturedAt)}</Text>
+          <Text style={styles.helper}>
+            가격 기준 {displayValue(price?.priceEffectiveAt)}
+          </Text>
+          <Text style={styles.helper}>가격 소스 {displayValue(price?.priceSource)}</Text>
+
+          {asset.tradeBlockedReason ? (
+            <Text style={styles.errorText}>{asset.tradeBlockedReason}</Text>
+          ) : null}
+          {asset.tradingNote ? (
+            <Text style={styles.helper}>{asset.tradingNote}</Text>
+          ) : null}
+          {buyBlockedReason ? (
+            <View style={styles.inlineWarning}>
+              <Text style={styles.inlineWarningText}>{buyBlockedReason}</Text>
+              {seasonState === 'season_active_not_joined' ? (
+                <Pressable
+                  style={styles.retryButton}
+                  onPress={() => rootNavigation.navigate('SeasonJoin')}
+                >
+                  <Text style={styles.retryText}>시즌 참가하기</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
 
           {showReconnectBanner ? (
             <View testID={TEST_IDS.assetDetail.reconnectBanner} style={styles.banner}>
@@ -161,12 +213,34 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
 
         <View style={styles.card}>
           <Text style={styles.label}>내 포지션</Text>
-          {hasPosition ? (
+          {positionQuery.isLoading ? (
+            <SectionSkeleton lines={4} />
+          ) : positionQuery.isError ? (
+            <>
+              <InlineEmptyState
+                title="포지션을 불러오지 못했습니다."
+                message="자산 정보는 계속 볼 수 있습니다."
+              />
+              <Pressable
+                style={styles.retryButton}
+                onPress={() => positionQuery.refetch()}
+              >
+                <Text style={styles.retryText}>포지션 다시 시도</Text>
+              </Pressable>
+            </>
+          ) : hasPosition && position ? (
             <>
               <Text style={styles.helper}>수량 {position.quantity}</Text>
-              <Text style={styles.helper}>평균단가 {position.avgEntryPriceLocal}</Text>
-              <Text style={styles.helper}>평가금액 {position.marketValueKrw}</Text>
-              <Text style={styles.helper}>평가손익 {position.unrealizedPnlKrw}</Text>
+              <Text style={styles.helper}>
+                평균단가 {displayValue(position.avgEntryPriceLocal ?? position.avgEntryPrice)}
+              </Text>
+              <Text style={styles.helper}>
+                평가금액 {displayValue(position.marketValueKrw)}
+              </Text>
+              <Text style={styles.helper}>
+                평가손익 {displayValue(position.unrealizedPnlKrw)}
+              </Text>
+              <Text style={styles.helper}>수익률 {displayValue(position.returnRate)}%</Text>
             </>
           ) : (
             <InlineEmptyState
@@ -178,6 +252,23 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
 
         <View style={styles.card}>
           <Text style={styles.label}>차트</Text>
+          <View style={styles.row}>
+            {ASSET_CHART_RANGES.map((tab) => {
+              const active = tab.range === selectedRange;
+              return (
+                <Pressable
+                  key={tab.range}
+                  style={[styles.chip, active && styles.chipActive]}
+                  onPress={() => setSelectedRange(tab.range)}
+                >
+                  <Text style={active ? styles.chipTextActive : styles.chipText}>
+                    {tab.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
           {candlesQuery.isLoading ? (
             <SectionSkeleton lines={5} />
           ) : candlesQuery.isError ? (
@@ -206,18 +297,22 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
           <CTAButton
             testID={TEST_IDS.assetDetail.buyButton}
             label="매수"
-            state="enabled"
+            state={buyBlockedReason ? 'blocked' : 'enabled'}
             style={styles.flex}
             onPress={() => navigation.navigate('Order', { assetId, side: 'buy' })}
           />
           <CTAButton
             testID={TEST_IDS.assetDetail.sellButton}
             label="매도"
-            state={hasPosition ? 'enabled' : 'blocked'}
+            state={sellBlockedReason ? 'blocked' : 'enabled'}
             style={styles.flex}
             onPress={() => navigation.navigate('Order', { assetId, side: 'sell' })}
           />
         </View>
+
+        {sellBlockedReason && !buyBlockedReason ? (
+          <Text style={styles.errorText}>{sellBlockedReason}</Text>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -226,7 +321,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   content: { padding: 16, gap: 12, paddingBottom: 24 },
-  row: { flexDirection: 'row', gap: 10 },
+  row: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
   flex: { flex: 1 },
   card: {
     borderWidth: 1,
@@ -240,6 +335,21 @@ const styles = StyleSheet.create({
   label: { fontSize: 13, color: '#666' },
   value: { fontSize: 20, fontWeight: '700' },
   helper: { fontSize: 14, color: '#444' },
+  errorText: { fontSize: 14, color: '#c62828' },
+  chip: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#fff',
+  },
+  chipActive: {
+    backgroundColor: '#111',
+    borderColor: '#111',
+  },
+  chipText: { color: '#111', fontWeight: '600' },
+  chipTextActive: { color: '#fff', fontWeight: '600' },
   retryButton: {
     marginTop: 8,
     alignSelf: 'flex-start',
@@ -251,6 +361,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   retryText: { color: '#111', fontWeight: '600' },
+  inlineWarning: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#F2D48B',
+    borderRadius: 10,
+    padding: 10,
+    backgroundColor: '#FFF8E1',
+    gap: 8,
+  },
+  inlineWarningText: { color: '#725400', fontSize: 13 },
   banner: {
     marginTop: 8,
     padding: 10,

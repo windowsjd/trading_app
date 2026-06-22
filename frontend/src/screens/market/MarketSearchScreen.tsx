@@ -15,57 +15,101 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { MarketStackParamList } from '../../app/navigation/types';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
-import { getAssets, type AssetClass } from '../../features/market/api';
+import {
+  getAssets,
+  type AssetType,
+  type MarketAssetItemDto,
+} from '../../features/market/api';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import EmptyState from '../../components/states/EmptyState';
 
 type Props = NativeStackScreenProps<MarketStackParamList, 'MarketSearch'>;
+type SearchScope = AssetType | 'all';
 
-const SEARCH_SCOPE: Array<{ key: AssetClass; label: string }> = [
+const SEARCH_SCOPE: Array<{ key: SearchScope; label: string }> = [
+  { key: 'all', label: '전체' },
   { key: 'domestic_stock', label: '국내' },
   { key: 'us_stock', label: '미국' },
   { key: 'crypto', label: '암호화폐' },
 ];
 
+function getPriceText(item: MarketAssetItemDto) {
+  if (item.price?.state !== 'available' || !item.price.currentPrice) {
+    return '시세 준비 중';
+  }
+
+  return `${item.price.currentPrice} ${item.price.priceCurrency}`;
+}
+
+function getChangeRateText(item: MarketAssetItemDto) {
+  if (item.price?.state !== 'available' || !item.price.changeRate) {
+    return item.tradeBlockedReason ?? item.marketStatus;
+  }
+
+  return `${item.price.changeRate}%`;
+}
+
 export default function MarketSearchScreen({ navigation }: Props) {
-  const [assetClass, setAssetClass] = useState<AssetClass>('domestic_stock');
+  const [assetType, setAssetType] = useState<SearchScope>('all');
   const [searchText, setSearchText] = useState('');
+  const trimmedSearchText = searchText.trim();
 
   const searchQuery = useInfiniteQuery({
     queryKey: QUERY_KEYS.market.assets({
-      assetClass,
-      query: searchText,
+      assetType: assetType === 'all' ? undefined : assetType,
+      search: trimmedSearchText,
       sort: 'volume',
-      cursor: null,
+      withPrice: true,
+      limit: 20,
+      offset: 0,
     }),
     queryFn: ({ pageParam }) =>
       getAssets({
-        assetClass,
-        query: searchText || undefined,
+        assetType: assetType === 'all' ? undefined : assetType,
+        search: trimmedSearchText || undefined,
         sort: 'volume',
-        cursor: pageParam ?? null,
+        withPrice: true,
+        offset: pageParam,
         limit: 20,
       }),
-    getNextPageParam: (lastPage) =>
-      lastPage.pageInfo.hasNext ? lastPage.pageInfo.nextCursor : undefined,
-    initialPageParam: null as string | null,
-    enabled: searchText.trim().length > 0,
+    getNextPageParam: (lastPage) => lastPage.pagination.nextOffset ?? undefined,
+    initialPageParam: 0,
+    enabled: trimmedSearchText.length > 0,
   });
 
-  const items = useMemo(
-    () => searchQuery.data?.pages.flatMap((page) => page.items) ?? [],
+  const items = useMemo(() => {
+    const byId = new Map<string, MarketAssetItemDto>();
+
+    searchQuery.data?.pages.forEach((page) => {
+      page.assets.forEach((item) => {
+        byId.set(item.id, item);
+      });
+    });
+
+    return Array.from(byId.values());
+  }, [searchQuery.data]);
+
+  const hasPriceErrors = useMemo(
+    () =>
+      searchQuery.data?.pages.some((page) => (page.priceErrors?.length ?? 0) > 0) ??
+      false,
     [searchQuery.data],
   );
 
   const viewState = useMemo(() => {
-    if (!searchText.trim()) return 'market_search_idle';
+    if (!trimmedSearchText) return 'market_search_idle';
     if (searchQuery.isLoading) return 'market_search_loading';
     if (searchQuery.isError) return 'market_search_error';
     if (!items.length) return 'market_search_empty';
     return 'market_search_ready';
-  }, [searchText, searchQuery.isLoading, searchQuery.isError, items.length]);
+  }, [
+    trimmedSearchText,
+    searchQuery.isLoading,
+    searchQuery.isError,
+    items.length,
+  ]);
 
   if (viewState === 'market_search_loading') {
     return <FullPageLoading message="검색 결과를 불러오는 중입니다." />;
@@ -106,12 +150,12 @@ export default function MarketSearchScreen({ navigation }: Props) {
 
             <View style={styles.scopeRow}>
               {SEARCH_SCOPE.map((scope) => {
-                const active = scope.key === assetClass;
+                const active = scope.key === assetType;
                 return (
                   <Pressable
                     key={scope.key}
                     style={[styles.scopeChip, active && styles.scopeChipActive]}
-                    onPress={() => setAssetClass(scope.key)}
+                    onPress={() => setAssetType(scope.key)}
                   >
                     <Text
                       style={active ? styles.scopeChipTextActive : styles.scopeChipText}
@@ -122,6 +166,14 @@ export default function MarketSearchScreen({ navigation }: Props) {
                 );
               })}
             </View>
+
+            {hasPriceErrors ? (
+              <View style={styles.inlineWarning}>
+                <Text style={styles.inlineWarningText}>
+                  일부 검색 결과의 시세를 아직 불러오지 못했습니다.
+                </Text>
+              </View>
+            ) : null}
           </View>
         }
         ListEmptyComponent={
@@ -153,10 +205,11 @@ export default function MarketSearchScreen({ navigation }: Props) {
             </View>
 
             <View style={styles.alignEnd}>
-              <Text style={styles.itemPrice}>
-                {item.currentPrice} {item.priceCurrency}
+              <Text style={styles.itemPrice}>{getPriceText(item)}</Text>
+              <Text style={styles.helper}>{getChangeRateText(item)}</Text>
+              <Text style={styles.helper}>
+                {item.marketStatus} · {item.tradable ? '거래 가능' : '거래 제한'}
               </Text>
-              <Text style={styles.helper}>{item.changeRate}%</Text>
             </View>
           </Pressable>
         )}
@@ -211,5 +264,14 @@ const styles = StyleSheet.create({
   itemPrice: { fontSize: 15, fontWeight: '600' },
   alignEnd: { alignItems: 'flex-end' },
   helper: { fontSize: 14, color: '#444' },
+  inlineWarning: {
+    borderWidth: 1,
+    borderColor: '#F2D48B',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#FFF8E1',
+  },
+  inlineWarningText: { fontSize: 13, color: '#725400' },
   footerLoader: { paddingVertical: 16 },
 });

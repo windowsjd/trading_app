@@ -13,7 +13,11 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import type { MarketScreenProps } from '../../app/navigation/types';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
-import { getAssets, type AssetClass } from '../../features/market/api';
+import {
+  getAssets,
+  type AssetType,
+  type MarketAssetItemDto,
+} from '../../features/market/api';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -21,35 +25,67 @@ import EmptyState from '../../components/states/EmptyState';
 
 type Props = MarketScreenProps;
 
-const TABS: Array<{ key: AssetClass; label: string }> = [
+const TABS: Array<{ key: AssetType; label: string }> = [
   { key: 'domestic_stock', label: '국내 주식' },
   { key: 'us_stock', label: '미국 주식' },
   { key: 'crypto', label: '암호화폐' },
 ];
 
+function getPriceText(item: MarketAssetItemDto) {
+  if (item.price?.state !== 'available' || !item.price.currentPrice) {
+    return '시세 준비 중';
+  }
+
+  return `${item.price.currentPrice} ${item.price.priceCurrency}`;
+}
+
+function getChangeRateText(item: MarketAssetItemDto) {
+  if (item.price?.state !== 'available' || !item.price.changeRate) {
+    return item.tradeBlockedReason ?? item.marketStatus;
+  }
+
+  return `${item.price.changeRate}%`;
+}
+
 export default function MarketScreen({ navigation }: Props) {
-  const [selectedTab, setSelectedTab] = useState<AssetClass>('domestic_stock');
+  const [selectedTab, setSelectedTab] = useState<AssetType>('domestic_stock');
 
   const marketQuery = useInfiniteQuery({
     queryKey: QUERY_KEYS.market.assets({
-      assetClass: selectedTab,
+      assetType: selectedTab,
       sort: 'volume',
-      cursor: null,
+      withPrice: true,
+      limit: 20,
+      offset: 0,
     }),
     queryFn: ({ pageParam }) =>
       getAssets({
-        assetClass: selectedTab,
+        assetType: selectedTab,
         sort: 'volume',
-        cursor: pageParam ?? null,
+        withPrice: true,
+        offset: pageParam,
         limit: 20,
       }),
-    getNextPageParam: (lastPage) =>
-      lastPage.pageInfo.hasNext ? lastPage.pageInfo.nextCursor : undefined,
-    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.pagination.nextOffset ?? undefined,
+    initialPageParam: 0,
   });
 
-  const items = useMemo(
-    () => marketQuery.data?.pages.flatMap((page) => page.items) ?? [],
+  const items = useMemo(() => {
+    const byId = new Map<string, MarketAssetItemDto>();
+
+    marketQuery.data?.pages.forEach((page) => {
+      page.assets.forEach((item) => {
+        byId.set(item.id, item);
+      });
+    });
+
+    return Array.from(byId.values());
+  }, [marketQuery.data]);
+
+  const hasPriceErrors = useMemo(
+    () =>
+      marketQuery.data?.pages.some((page) => (page.priceErrors?.length ?? 0) > 0) ??
+      false,
     [marketQuery.data],
   );
 
@@ -57,8 +93,9 @@ export default function MarketScreen({ navigation }: Props) {
     if (marketQuery.isLoading) return 'market_loading';
     if (marketQuery.isError) return 'market_error';
     if (!items.length) return 'market_empty';
+    if (hasPriceErrors) return 'market_partial_price_unavailable';
     return 'market_ready';
-  }, [marketQuery.isLoading, marketQuery.isError, items.length]);
+  }, [marketQuery.isLoading, marketQuery.isError, items.length, hasPriceErrors]);
 
   if (viewState === 'market_loading') {
     return <FullPageLoading message="종목 목록을 불러오는 중입니다." />;
@@ -120,6 +157,14 @@ export default function MarketScreen({ navigation }: Props) {
             >
               <Text style={styles.searchEntryText}>종목명 또는 심볼 검색</Text>
             </Pressable>
+
+            {viewState === 'market_partial_price_unavailable' ? (
+              <View style={styles.inlineWarning}>
+                <Text style={styles.inlineWarningText}>
+                  일부 종목 시세를 아직 불러오지 못했습니다.
+                </Text>
+              </View>
+            ) : null}
           </View>
         }
         ListEmptyComponent={
@@ -144,10 +189,11 @@ export default function MarketScreen({ navigation }: Props) {
             </View>
 
             <View style={styles.alignEnd}>
-              <Text style={styles.itemPrice}>
-                {item.currentPrice} {item.priceCurrency}
+              <Text style={styles.itemPrice}>{getPriceText(item)}</Text>
+              <Text style={styles.helper}>{getChangeRateText(item)}</Text>
+              <Text style={styles.helper}>
+                {item.marketStatus} · {item.tradable ? '거래 가능' : '거래 제한'}
               </Text>
-              <Text style={styles.helper}>{item.changeRate}%</Text>
             </View>
           </Pressable>
         )}
@@ -203,5 +249,14 @@ const styles = StyleSheet.create({
   itemPrice: { fontSize: 15, fontWeight: '600' },
   alignEnd: { alignItems: 'flex-end' },
   helper: { fontSize: 14, color: '#444' },
+  inlineWarning: {
+    borderWidth: 1,
+    borderColor: '#F2D48B',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#FFF8E1',
+  },
+  inlineWarningText: { fontSize: 13, color: '#725400' },
   footerLoader: { paddingVertical: 16 },
 });

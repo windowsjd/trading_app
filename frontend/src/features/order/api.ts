@@ -1,46 +1,122 @@
 import { apiClient } from '../../services/api/client';
-import type { ApiSuccessResponse } from '../../models/dto/common';
+import type {
+  ApiSuccessResponse,
+  BpsString,
+  IsoDateTimeString,
+  MoneyString,
+  QuantityString,
+  RateString,
+  SectionState,
+} from '../../models/dto/common';
+import type { AssetType, CurrencyCode } from '../market/api';
 
 export type OrderSide = 'buy' | 'sell';
 
 export interface OrderQuoteRequestDto {
   assetId: string;
   side: OrderSide;
-  quantity: string;
+  quantity: QuantityString;
+}
+
+export interface OrderQuoteAssetDto {
+  id: string;
+  assetType?: AssetType;
+  symbol?: string;
+  name?: string;
+  market?: string;
+  priceCurrency?: CurrencyCode;
+  settlementCurrency?: CurrencyCode;
 }
 
 export interface OrderQuoteDto {
-  assetId: string;
+  state: SectionState;
+  season?: Record<string, unknown> | null;
+  participant?: Record<string, unknown> | null;
+  asset: OrderQuoteAssetDto;
   side: OrderSide;
-  quantity: string;
-  fillPriceLocal: string;
-  fillCurrency: 'KRW' | 'USD';
-  feeAmountLocal: string;
-  netAmountLocal: string;
-  walletBalanceAfter: string;
-  expiresAt: string;
+  orderType: string;
+  quantity: QuantityString;
+  price: MoneyString;
+  currencyCode: CurrencyCode;
+  grossAmount: MoneyString;
+  feeRate: RateString;
+  feeAmount: MoneyString;
+  netAmount: MoneyString;
+  walletBalanceBefore: MoneyString;
+  estimatedWalletBalanceAfter: MoneyString;
+  positionQuantityBefore: QuantityString;
+  estimatedPositionQuantityAfter: QuantityString;
+  krwGrossAmount?: MoneyString | null;
+  krwFeeAmount?: MoneyString | null;
+  krwNetAmount?: MoneyString | null;
+  assetPriceSnapshotId?: string | null;
+  fxRateSnapshotId?: string | null;
+  assetPriceSource?: string | null;
+  fxRateSource?: string | null;
+  quoteId: string;
+  expiresAt: IsoDateTimeString;
+  maxChangeBps: BpsString | number;
+  quoteAt: IsoDateTimeString;
 }
 
 export interface CreateOrderRequestDto {
+  quoteId: string;
   assetId: string;
   side: OrderSide;
-  quantity: string;
+  quantity: QuantityString;
+  idempotencyKey: string;
+}
+
+export interface CreatedOrderDto {
+  id?: string;
+  orderId?: string;
+  quoteId?: string;
+  assetId?: string;
+  asset?: OrderQuoteAssetDto | null;
+  side?: OrderSide;
+  orderType?: string;
+  quantity?: QuantityString;
+  price?: MoneyString;
+  currencyCode?: CurrencyCode;
+  grossAmount?: MoneyString;
+  feeAmount?: MoneyString;
+  netAmount?: MoneyString;
+  submittedAt?: IsoDateTimeString;
+  createdAt?: IsoDateTimeString;
+}
+
+export type OrderExecutionState =
+  | 'executed'
+  | 'already_executed'
+  | (string & {});
+
+export interface OrderExecutionDto {
+  state: OrderExecutionState;
+  executionId?: string;
+  orderId?: string;
+  quoteId?: string;
+  assetId?: string;
+  side?: OrderSide;
+  quantity?: QuantityString;
+  executedPrice?: MoneyString;
+  quotedPrice?: MoneyString;
+  executePrice?: MoneyString;
+  priceChangeBps?: BpsString | number | null;
+  currencyCode?: CurrencyCode;
+  grossAmount?: MoneyString;
+  feeAmount?: MoneyString;
+  netAmount?: MoneyString;
+  submittedAt?: IsoDateTimeString;
+  executedAt?: IsoDateTimeString;
+  quotedRate?: RateString | null;
+  executeRate?: RateString | null;
+  rateChangeBps?: BpsString | number | null;
+  walletBalanceAfter?: MoneyString | null;
 }
 
 export interface CreateOrderDto {
-  orderId: string;
-  assetId: string;
-  side: OrderSide;
-  quantity: string;
-  fillPriceLocal: string;
-  fillCurrency: 'KRW' | 'USD';
-  feeAmountLocal: string;
-  netAmountLocal: string;
-  executedAt: string;
-  walletsAfter: {
-    KRW: string;
-    USD: string;
-  };
+  order: CreatedOrderDto;
+  execution: OrderExecutionDto;
 }
 
 export async function quoteOrder(payload: OrderQuoteRequestDto) {

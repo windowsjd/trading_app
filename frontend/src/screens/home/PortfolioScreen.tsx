@@ -12,11 +12,12 @@ import { useQuery } from '@tanstack/react-query';
 import type { PortfolioScreenProps } from '../../app/navigation/types';
 import { useRootNavigation } from '../../app/navigation/navigationHooks';
 import { TEST_IDS } from '../../constants/testIds';
+import { QUERY_KEYS } from '../../constants/queryKeys';
 import {
   getPortfolioOverview,
   getPortfolioPositions,
   getPortfolioEquity,
-  type PortfolioAssetClass,
+  type PortfolioAssetType,
   type PortfolioRange,
 } from '../../features/portfolio/api';
 
@@ -28,7 +29,7 @@ import CTAButton from '../../components/common/CTAButton';
 
 type Props = PortfolioScreenProps;
 
-const POSITION_TABS: Array<{ key: PortfolioAssetClass; label: string }> = [
+const POSITION_TABS: Array<{ key: PortfolioAssetType; label: string }> = [
   { key: 'domestic_stock', label: '국내 주식' },
   { key: 'us_stock', label: '미국 주식' },
   { key: 'crypto', label: '암호화폐' },
@@ -42,22 +43,22 @@ const RANGE_TABS: Array<{ key: PortfolioRange; label: string }> = [
 
 export default function PortfolioScreen({ navigation }: Props) {
   const rootNavigation = useRootNavigation();
-  const [assetClass, setAssetClass] =
-    useState<PortfolioAssetClass>('domestic_stock');
+  const [assetType, setAssetType] =
+    useState<PortfolioAssetType>('domestic_stock');
   const [range, setRange] = useState<PortfolioRange>('season');
 
   const overviewQuery = useQuery({
-    queryKey: ['portfolio', 'overview'],
+    queryKey: QUERY_KEYS.portfolio.overview,
     queryFn: getPortfolioOverview,
   });
 
   const positionsQuery = useQuery({
-    queryKey: ['portfolio', 'positions', assetClass],
-    queryFn: () => getPortfolioPositions(assetClass),
+    queryKey: QUERY_KEYS.portfolio.positions(assetType),
+    queryFn: () => getPortfolioPositions(assetType),
   });
 
   const equityQuery = useQuery({
-    queryKey: ['portfolio', 'equity', range],
+    queryKey: QUERY_KEYS.portfolio.equity(range),
     queryFn: () => getPortfolioEquity(range),
   });
 
@@ -167,13 +168,13 @@ export default function PortfolioScreen({ navigation }: Props) {
 
               <View style={styles.row}>
                 {POSITION_TABS.map((tab) => {
-                  const active = tab.key === assetClass;
+                  const active = tab.key === assetType;
                   return (
                     <Pressable
                       key={tab.key}
                       testID={TEST_IDS.portfolio.assetTab(tab.key)}
                       style={[styles.chip, active && styles.chipActive]}
-                      onPress={() => setAssetClass(tab.key)}
+                      onPress={() => setAssetType(tab.key)}
                     >
                       <Text style={active ? styles.chipTextActive : styles.chipText}>
                         {tab.label}

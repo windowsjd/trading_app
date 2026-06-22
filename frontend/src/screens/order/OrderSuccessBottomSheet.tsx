@@ -3,20 +3,15 @@ import { View, Text, StyleSheet } from 'react-native';
 
 import BottomSheetBackdrop from '../../components/common/BottomSheetBackdrop';
 import CTAButton from '../../components/common/CTAButton';
+import type { CreateOrderDto } from '../../features/order/api';
+import { getOrderSuccessDisplay } from '../../features/order/mapper';
 
 interface OrderSuccessBottomSheetProps {
   visible: boolean;
   onClose: () => void;
   onGoAssetDetail: () => void;
   onGoHome: () => void;
-  payload: {
-    symbol: string;
-    side: 'buy' | 'sell';
-    quantity: string;
-    fillPriceLocal: string;
-    fillCurrency: string;
-    executedAt: string;
-  } | null;
+  payload: CreateOrderDto | null;
 }
 
 export default function OrderSuccessBottomSheet({
@@ -26,6 +21,8 @@ export default function OrderSuccessBottomSheet({
   onGoHome,
   payload,
 }: OrderSuccessBottomSheetProps) {
+  const display = payload ? getOrderSuccessDisplay(payload) : null;
+
   return (
     <BottomSheetBackdrop visible={visible} onClose={onClose}>
       <View style={styles.iconCircle}>
@@ -34,16 +31,54 @@ export default function OrderSuccessBottomSheet({
 
       <Text style={styles.title}>주문이 완료되었습니다</Text>
 
-      {payload ? (
+      {display ? (
         <View style={styles.card}>
-          <Row label="종목명" value={payload.symbol} />
-          <Row label="주문 유형" value={payload.side === 'buy' ? '매수' : '매도'} />
-          <Row label="수량" value={payload.quantity} />
+          <Row label="주문 ID" value={display.orderId} />
+          <Row label="견적 ID" value={display.quoteId} />
+          <Row label="종목" value={display.assetLabel} />
           <Row
-            label="체결 가격"
-            value={`${payload.fillPriceLocal} ${payload.fillCurrency}`}
+            label="주문 유형"
+            value={
+              display.side === 'buy'
+                ? '매수'
+                : display.side === 'sell'
+                ? '매도'
+                : '-'
+            }
           />
-          <Row label="체결 시각" value={payload.executedAt} />
+          <Row label="수량" value={display.quantity} />
+          <Row label="체결 가격" value={display.executedPrice} />
+          <Row label="총 주문 금액" value={display.grossAmount} />
+          <Row label="수수료" value={display.feeAmount} />
+          <Row label="순금액" value={display.netAmount} />
+          <Row label="제출 시각" value={display.submittedAt} />
+          <Row label="체결 시각" value={display.executedAt} />
+          <Row label="견적 가격" value={display.quotedPrice} />
+          <Row label="실행 가격" value={display.executePrice} />
+          <Row
+            label="가격 변동"
+            value={
+              display.priceChangeBps === '-'
+                ? '-'
+                : `${display.priceChangeBps}bps`
+            }
+          />
+          <Row label="견적 환율" value={display.quotedRate} />
+          <Row label="실행 환율" value={display.executeRate} />
+          <Row
+            label="환율 변동"
+            value={
+              display.rateChangeBps === '-'
+                ? '-'
+                : `${display.rateChangeBps}bps`
+            }
+          />
+          <Row label="체결 후 잔액" value={display.walletBalanceAfter} />
+          {display.isAlreadyExecuted ? (
+            <Text style={styles.note}>
+              이미 처리된 요청입니다. 완료된 주문 정보를 다시 표시합니다.
+            </Text>
+          ) : null}
         </View>
       ) : null}
 
@@ -96,6 +131,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
+    alignItems: 'flex-start',
   },
   label: {
     fontSize: 14,
@@ -105,6 +141,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#111',
+    flex: 1,
+    textAlign: 'right',
+  },
+  note: {
+    fontSize: 13,
+    color: '#2e7d32',
   },
   buttonRow: {
     flexDirection: 'row',
