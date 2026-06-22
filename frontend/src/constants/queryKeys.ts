@@ -67,6 +67,7 @@ export const QUERY_KEYS = {
   },
 
   ranking: {
+    all: ['ranking'] as const,
     current: (scope: 'all' | 'top10', cursor?: string | null) =>
       ['ranking', 'current', scope, cursor ?? null] as const,
     nearMe: (size: number) => ['ranking', 'near-me', size] as const,

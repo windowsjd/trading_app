@@ -1,6 +1,7 @@
 import { apiClient } from '../../services/api/client';
 import type {
   ApiSuccessResponse,
+  BpsString,
   IsoDateTimeString,
   MoneyString,
   RateString,
@@ -46,6 +47,12 @@ export interface WalletsDto {
   participant?: WalletParticipantDto | null;
   wallets: WalletBalanceDto[];
   summary?: WalletSummaryDto | null;
+  blockedReason?: string | null;
+  error?: {
+    code?: string;
+    message?: string;
+  } | null;
+  message?: string | null;
 }
 
 export interface FxRateDto {
@@ -63,42 +70,59 @@ export interface FxRateDto {
   fallbackUsed?: boolean;
 }
 
-// TODO: Migrate FX quote payloads to the v2 sourceAmount contract in the FX task.
 export interface FxQuoteRequestDto {
   fromCurrency: WalletCurrency;
   toCurrency: WalletCurrency;
-  amount: string;
+  sourceAmount: MoneyString;
 }
 
 export interface FxQuoteDto {
+  quoteId: string;
   fromCurrency: WalletCurrency;
   toCurrency: WalletCurrency;
-  sourceAmount: string;
-  rate: string;
-  feeAmount: string;
-  netTargetAmount: string;
-  expiresAt: string;
+  sourceAmount: MoneyString;
+  appliedRate: RateString;
+  grossTargetAmount: MoneyString;
+  feeRate: RateString;
+  feeAmount: MoneyString;
+  feeCurrency: WalletCurrency;
+  netTargetAmount: MoneyString;
+  expiresAt: IsoDateTimeString;
+  maxChangeBps: BpsString | number;
+  rateCapturedAt: IsoDateTimeString;
+  rateEffectiveAt: IsoDateTimeString;
+  rateSource: string;
 }
 
-// TODO: Migrate FX execute to /fx/execute with idempotency in the FX task.
 export interface FxExecuteRequestDto {
+  quoteId: string;
   fromCurrency: WalletCurrency;
   toCurrency: WalletCurrency;
-  amount: string;
+  sourceAmount: MoneyString;
+  idempotencyKey: string;
 }
 
 export interface FxExecuteDto {
+  exchangeId: string;
+  executedAt: IsoDateTimeString;
   fromCurrency: WalletCurrency;
   toCurrency: WalletCurrency;
-  sourceAmount: string;
-  rate: string;
-  feeAmount: string;
-  netTargetAmount: string;
-  executedAt: string;
-  walletsAfter: {
-    KRW: string;
-    USD: string;
-  };
+  sourceAmount: MoneyString;
+  grossTargetAmount: MoneyString;
+  feeRate: RateString;
+  feeAmount: MoneyString;
+  feeCurrency: WalletCurrency;
+  appliedRate: RateString;
+  quoteId: string;
+  quotedRate: RateString;
+  executeRate: RateString;
+  rateChangeBps: BpsString | number;
+  idempotencyKey: string;
+  netTargetAmount: MoneyString;
+  sourceWalletBalanceAfter: MoneyString;
+  targetWalletBalanceAfter: MoneyString;
+  wallets?: unknown;
+  rateSource: string;
 }
 
 export async function getWallets() {
@@ -139,7 +163,7 @@ export async function quoteFx(payload: FxQuoteRequestDto) {
 
 export async function executeFx(payload: FxExecuteRequestDto) {
   const response = await apiClient.post<ApiSuccessResponse<FxExecuteDto>>(
-    '/fx/exchanges',
+    '/fx/execute',
     payload,
   );
 

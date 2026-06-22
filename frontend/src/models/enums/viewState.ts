@@ -54,16 +54,20 @@ export type HomeViewState =
 export type WalletFxViewState =
   | 'wallet_loading'
   | 'wallet_ready'
-  | 'wallet_empty_default'
   | 'wallet_not_joined'
   | 'wallet_unavailable'
+  | 'wallet_error'
+  | 'fx_input_idle'
+  | 'fx_input_invalid'
   | 'fx_quote_loading'
   | 'fx_quote_ready'
-  | 'fx_quote_invalid'
+  | 'fx_quote_expired'
+  | 'fx_quote_rejected'
   | 'fx_execute_submitting'
   | 'fx_execute_success'
+  | 'fx_execute_requote_required'
   | 'fx_execute_rejected'
-  | 'wallet_error';
+  | 'fx_idempotency_conflict';
 
 export type MarketViewState =
   | 'market_loading'

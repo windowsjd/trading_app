@@ -115,6 +115,16 @@ function getAllocationRows(section?: HomeAllocationSectionDto | null) {
     .map((item) => ({ ...item, value: displayValue(item.value) }));
 }
 
+function getSectionErrorMessage(
+  sectionErrors?: { message?: string; section?: string }[],
+) {
+  const firstError = sectionErrors?.find(
+    (item) => item.message || item.section,
+  );
+
+  return firstError?.message ?? '일부 홈 정보를 불러오지 못했습니다.';
+}
+
 export default function HomeScreen({ navigation }: Props) {
   const rootNavigation = useRootNavigation();
 
@@ -124,6 +134,7 @@ export default function HomeScreen({ navigation }: Props) {
   });
 
   const home = homeQuery.data;
+  const hasSectionErrors = (home?.sectionErrors?.length ?? 0) > 0;
 
   const viewState = useMemo(
     () =>
@@ -230,6 +241,15 @@ export default function HomeScreen({ navigation }: Props) {
           contentContainerStyle={styles.content}
         >
           <View testID={TEST_IDS.home.summaryCard} style={styles.card}>
+            {hasSectionErrors ? (
+              <View style={styles.warningBox}>
+                <Text style={styles.warningTitle}>일부 정보 지연</Text>
+                <Text style={styles.warningText}>
+                  {getSectionErrorMessage(home.sectionErrors)}
+                </Text>
+              </View>
+            ) : null}
+
             <Text style={styles.label}>최종 결과</Text>
             {isSectionAvailable(home.summary) ? (
               <>
@@ -245,6 +265,11 @@ export default function HomeScreen({ navigation }: Props) {
                 <Text style={styles.helper}>
                   평가 손익 {displayValue(home.summary?.unrealizedPnlKrw)}
                 </Text>
+                {home.summary?.valuationSource ? (
+                  <Text style={styles.helper}>
+                    평가 기준 {home.summary.valuationSource}
+                  </Text>
+                ) : null}
               </>
             ) : (
               <InlineEmptyState message="최종 자산 정보를 집계 중입니다." />
@@ -284,11 +309,13 @@ export default function HomeScreen({ navigation }: Props) {
         testID={TEST_IDS.home.screen}
         contentContainerStyle={styles.content}
       >
-        {viewState === 'home_partial_error' ? (
-          <View style={styles.card}>
-            <Text style={styles.label}>일부 정보 지연</Text>
-            <Text style={styles.helper}>
-              가능한 홈 정보만 먼저 표시합니다. 누락된 섹션은 다시 시도할 수 있습니다.
+        {viewState === 'home_partial_error' || hasSectionErrors ? (
+          <View style={styles.warningBox}>
+            <Text style={styles.warningTitle}>일부 정보 지연</Text>
+            <Text style={styles.warningText}>
+              {hasSectionErrors
+                ? getSectionErrorMessage(home.sectionErrors)
+                : '가능한 홈 정보만 먼저 표시합니다. 누락된 섹션은 다시 시도할 수 있습니다.'}
             </Text>
           </View>
         ) : null}
@@ -310,6 +337,11 @@ export default function HomeScreen({ navigation }: Props) {
               <Text style={styles.helper}>
                 보유자산 {displayValue(home.summary?.assetValueKrw)}
               </Text>
+              {home.summary?.valuationSource ? (
+                <Text style={styles.helper}>
+                  평가 기준 {home.summary.valuationSource}
+                </Text>
+              ) : null}
             </>
           ) : (
             <>
@@ -545,4 +577,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   retryText: { color: '#111', fontWeight: '600' },
+  warningBox: {
+    borderWidth: 1,
+    borderColor: '#f0d48a',
+    borderRadius: 10,
+    padding: 12,
+    backgroundColor: '#fff8e1',
+    gap: 4,
+  },
+  warningTitle: { fontSize: 13, color: '#7a5a00', fontWeight: '700' },
+  warningText: { fontSize: 13, color: '#6f5600' },
 });

@@ -166,7 +166,10 @@ export function mapFxErrorCodeToBlockedReason(
     case ERROR_CODE.INSUFFICIENT_BALANCE:
       return 'blocked_fx_insufficient_balance';
     case ERROR_CODE.FX_RATE_STALE:
+    case ERROR_CODE.FX_RATE_UNAVAILABLE:
       return 'blocked_fx_rate_stale';
+    case ERROR_CODE.SEASON_NOT_JOINED:
+      return 'blocked_season_not_joined';
     case ERROR_CODE.SEASON_NOT_ACTIVE:
       return 'blocked_fx_season_inactive';
     default:

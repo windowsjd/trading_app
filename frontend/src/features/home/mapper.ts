@@ -77,6 +77,8 @@ function hasUnavailableOrError(section: unknown) {
 }
 
 function hasPartialSectionError(home: HomeDashboardDto) {
+  if ((home.sectionErrors?.length ?? 0) > 0) return true;
+
   return [
     home.walletSummary,
     home.ranking,

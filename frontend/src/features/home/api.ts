@@ -20,6 +20,7 @@ export type HomeMode =
   | 'settled_joined';
 
 export interface HomeSectionErrorDto {
+  section?: string;
   code?: string;
   message?: string;
   retryable?: boolean;
@@ -49,6 +50,7 @@ export interface HomeSectionDto {
 export interface HomeSummarySectionDto extends HomeSectionDto {
   totalAssetKrw?: MoneyString;
   returnRate?: PercentString;
+  valuationSource?: string;
   krwCash?: MoneyString;
   usdCashKrw?: MoneyString;
   assetValueKrw?: MoneyString;
@@ -132,6 +134,7 @@ export interface HomeDashboardDto {
   mode: HomeMode;
   season?: HomeSeasonDto | null;
   participant?: HomeParticipantDto | null;
+  sectionErrors?: HomeSectionErrorDto[];
   summary?: HomeSummarySectionDto | null;
   walletSummary?: HomeWalletSummarySectionDto | null;
   ranking?: HomeRankingSectionDto | null;

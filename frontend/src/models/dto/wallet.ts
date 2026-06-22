@@ -1,4 +1,5 @@
 import type {
+  BpsString,
   IsoDateTimeString,
   MoneyString,
   RateString,
@@ -12,14 +13,16 @@ export interface WalletsDto {
     balanceKrw?: MoneyString;
   }>;
   fxRate: {
-    pair: 'USDKRW';
+    baseCurrency: 'USD';
+    quoteCurrency: 'KRW';
     rate: RateString;
     capturedAt: IsoDateTimeString;
   };
 }
 
 export interface CurrentFxRateDto {
-  pair: 'USDKRW';
+  baseCurrency: 'USD';
+  quoteCurrency: 'KRW';
   rate: RateString;
   feeRate: RateString;
   capturedAt: IsoDateTimeString;
@@ -28,27 +31,54 @@ export interface CurrentFxRateDto {
 export interface FxQuoteRequestDto {
   fromCurrency: 'KRW' | 'USD';
   toCurrency: 'KRW' | 'USD';
-  amount: MoneyString;
+  sourceAmount: MoneyString;
 }
 
 export interface FxQuoteDto {
+  quoteId: string;
   fromCurrency: 'KRW' | 'USD';
   toCurrency: 'KRW' | 'USD';
   sourceAmount: MoneyString;
-  rate: RateString;
+  appliedRate: RateString;
   grossTargetAmount: MoneyString;
   feeRate: RateString;
   feeAmount: MoneyString;
   feeCurrency: 'KRW' | 'USD';
   netTargetAmount: MoneyString;
   expiresAt: IsoDateTimeString;
+  maxChangeBps: BpsString | number;
+  rateCapturedAt: IsoDateTimeString;
+  rateEffectiveAt: IsoDateTimeString;
+  rateSource: string;
 }
 
-export interface FxExecuteDto extends FxQuoteDto {
+export interface FxExecuteRequestDto {
+  quoteId: string;
+  fromCurrency: 'KRW' | 'USD';
+  toCurrency: 'KRW' | 'USD';
+  sourceAmount: MoneyString;
+  idempotencyKey: string;
+}
+
+export interface FxExecuteDto {
   exchangeId: string;
   executedAt: IsoDateTimeString;
-  walletsAfter: {
-    KRW: MoneyString;
-    USD: MoneyString;
-  };
+  fromCurrency: 'KRW' | 'USD';
+  toCurrency: 'KRW' | 'USD';
+  sourceAmount: MoneyString;
+  grossTargetAmount: MoneyString;
+  feeRate: RateString;
+  feeAmount: MoneyString;
+  feeCurrency: 'KRW' | 'USD';
+  appliedRate: RateString;
+  quoteId: string;
+  quotedRate: RateString;
+  executeRate: RateString;
+  rateChangeBps: BpsString | number;
+  idempotencyKey: string;
+  netTargetAmount: MoneyString;
+  sourceWalletBalanceAfter: MoneyString;
+  targetWalletBalanceAfter: MoneyString;
+  wallets?: unknown;
+  rateSource: string;
 }

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -19,17 +19,28 @@ import {
   getCurrentFxRate,
   getWallets,
   quoteFx,
+  type FxExecuteDto,
+  type FxQuoteDto,
 } from '../../features/wallet/api';
 import {
   calculateUsdBalanceKrw,
+  getFxQuoteDisplay,
+  getFxQuoteExpiresInSeconds,
   getWalletBalanceAmount,
   getWalletViewState,
+  isFxIdempotencyConflictCode,
+  isFxQuoteExpired,
+  isFxRequoteRequiredCode,
 } from '../../features/wallet/mapper';
+import { ERROR_CODE } from '../../models/enums/errorCode';
+import type { WalletFxViewState } from '../../models/enums/viewState';
 import {
+  BLOCKED_REASON_MESSAGE,
+  getApiErrorCode,
   getErrorMessageFromCode,
   mapFxErrorCodeToBlockedReason,
-  BLOCKED_REASON_MESSAGE,
 } from '../../services/api/errorMapper';
+import { createIdempotencyKey } from '../../utils/idempotency';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -40,6 +51,13 @@ import FxSuccessBottomSheet from './FxSuccessBottomSheet';
 
 type Props = WalletFxScreenProps;
 type Currency = 'KRW' | 'USD';
+type FxDomainState = Extract<
+  WalletFxViewState,
+  | 'fx_quote_rejected'
+  | 'fx_execute_requote_required'
+  | 'fx_execute_rejected'
+  | 'fx_idempotency_conflict'
+>;
 
 const FX_RATE_PARAMS = {
   baseCurrency: 'USD' as const,
@@ -47,13 +65,22 @@ const FX_RATE_PARAMS = {
   refresh: false,
 };
 
-function extractErrorCode(error: unknown): string | null {
-  return (error as any)?.response?.data?.error?.code ?? null;
-}
+const QUOTE_EXPIRED_MESSAGE =
+  '견적 유효 시간이 지났습니다. 다시 견적을 받아주세요.';
+const REQUOTE_REQUIRED_MESSAGE = '환율이 변경되어 다시 견적이 필요합니다.';
+const IDEMPOTENCY_CONFLICT_MESSAGE =
+  '이미 다른 요청으로 처리 중입니다. 새 견적을 받아 다시 시도해주세요.';
 
 function displayValue(value?: string | number | boolean | null) {
   if (value === null || value === undefined || value === '') return '-';
   return String(value);
+}
+
+function getFxDomainErrorMessage(code?: string | null) {
+  const blockedReason = mapFxErrorCodeToBlockedReason(code);
+  return blockedReason
+    ? BLOCKED_REASON_MESSAGE[blockedReason]
+    : getErrorMessageFromCode(code);
 }
 
 export default function WalletFxScreen({ navigation }: Props) {
@@ -64,14 +91,20 @@ export default function WalletFxScreen({ navigation }: Props) {
   const [amount, setAmount] = useState('');
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [domainError, setDomainError] = useState<string | null>(null);
-  const [successData, setSuccessData] = useState<null | {
-    fromCurrency: Currency;
-    toCurrency: Currency;
-    sourceAmount: string;
-    rate: string;
-    feeAmount: string;
-    netTargetAmount: string;
-  }>(null);
+  const [quoteData, setQuoteData] = useState<FxQuoteDto | null>(null);
+  const [executeIdempotencyKey, setExecuteIdempotencyKey] = useState<
+    string | null
+  >(null);
+  const [fxDomainState, setFxDomainState] = useState<FxDomainState | null>(
+    null,
+  );
+  const [successData, setSuccessData] = useState<FxExecuteDto | null>(null);
+  const [quoteNow, setQuoteNow] = useState(() => Date.now());
+  const latestQuoteInputRef = useRef({
+    fromCurrency: 'KRW' as Currency,
+    toCurrency: 'USD' as Currency,
+    sourceAmount: '',
+  });
 
   const walletsQuery = useQuery({
     queryKey: QUERY_KEYS.wallet.balances,
@@ -88,35 +121,59 @@ export default function WalletFxScreen({ navigation }: Props) {
       ),
   });
 
-  // TODO: FX quote/execute still use the v1 action contract; migrate in task 4.
   const quoteMutation = useMutation({
     mutationFn: quoteFx,
-    onSuccess: () => {
+    retry: false,
+    onSuccess: (result, variables) => {
+      const latestInput = latestQuoteInputRef.current;
+      if (
+        variables.fromCurrency !== latestInput.fromCurrency ||
+        variables.toCurrency !== latestInput.toCurrency ||
+        variables.sourceAmount !== latestInput.sourceAmount
+      ) {
+        return;
+      }
+
+      setQuoteData(result);
+      setExecuteIdempotencyKey(createIdempotencyKey('fx'));
+      setFxDomainState(null);
       setFieldError(null);
       setDomainError(null);
+      setSuccessData(null);
     },
-    onError: (error) => {
-      const code = extractErrorCode(error);
-      const blockedReason = mapFxErrorCodeToBlockedReason(code);
+    onError: (error, variables) => {
+      const latestInput = latestQuoteInputRef.current;
+      if (
+        variables.fromCurrency !== latestInput.fromCurrency ||
+        variables.toCurrency !== latestInput.toCurrency ||
+        variables.sourceAmount !== latestInput.sourceAmount
+      ) {
+        return;
+      }
+
+      const code = getApiErrorCode(error);
+
+      setQuoteData(null);
+      setExecuteIdempotencyKey(null);
+      setFxDomainState('fx_quote_rejected');
       setDomainError(
-        blockedReason
-          ? BLOCKED_REASON_MESSAGE[blockedReason]
-          : getErrorMessageFromCode(code),
+        isFxRequoteRequiredCode(code)
+          ? REQUOTE_REQUIRED_MESSAGE
+          : getFxDomainErrorMessage(code),
       );
     },
   });
 
   const executeMutation = useMutation({
     mutationFn: executeFx,
+    retry: false,
     onSuccess: async (result) => {
-      setSuccessData({
-        fromCurrency: result.fromCurrency,
-        toCurrency: result.toCurrency,
-        sourceAmount: result.sourceAmount,
-        rate: result.rate,
-        feeAmount: result.feeAmount,
-        netTargetAmount: result.netTargetAmount,
-      });
+      setSuccessData(result);
+      setQuoteData(null);
+      setExecuteIdempotencyKey(null);
+      setFxDomainState(null);
+      setFieldError(null);
+      setDomainError(null);
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.wallet.balances }),
@@ -124,20 +181,46 @@ export default function WalletFxScreen({ navigation }: Props) {
           queryKey: QUERY_KEYS.wallet.fxRate(FX_RATE_PARAMS),
         }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.home.dashboard }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ranking.all }),
       ]);
     },
     onError: (error) => {
-      const code = extractErrorCode(error);
-      const blockedReason = mapFxErrorCodeToBlockedReason(code);
-      setDomainError(
-        blockedReason
-          ? BLOCKED_REASON_MESSAGE[blockedReason]
-          : getErrorMessageFromCode(code),
-      );
+      const code = getApiErrorCode(error);
+
+      if (isFxRequoteRequiredCode(code)) {
+        setQuoteData(null);
+        setExecuteIdempotencyKey(null);
+        setFxDomainState('fx_execute_requote_required');
+        setDomainError(
+          code === ERROR_CODE.QUOTE_EXPIRED
+            ? QUOTE_EXPIRED_MESSAGE
+            : REQUOTE_REQUIRED_MESSAGE,
+        );
+        return;
+      }
+
+      if (isFxIdempotencyConflictCode(code)) {
+        setQuoteData(null);
+        setExecuteIdempotencyKey(null);
+        setFxDomainState('fx_idempotency_conflict');
+        setDomainError(IDEMPOTENCY_CONFLICT_MESSAGE);
+        return;
+      }
+
+      setFxDomainState('fx_execute_rejected');
+      setDomainError(getFxDomainErrorMessage(code));
     },
   });
 
   const toCurrency: Currency = fromCurrency === 'KRW' ? 'USD' : 'KRW';
+
+  useEffect(() => {
+    latestQuoteInputRef.current = {
+      fromCurrency,
+      toCurrency,
+      sourceAmount: amount.trim(),
+    };
+  }, [fromCurrency, toCurrency, amount]);
 
   const inputInvalidReason = useMemo(() => {
     if (!amount.trim()) return '금액을 입력해주세요.';
@@ -166,26 +249,148 @@ export default function WalletFxScreen({ navigation }: Props) {
     ],
   );
 
-  const viewState = useMemo(() => {
+  useEffect(() => {
+    if (!quoteData) return undefined;
+
+    setQuoteNow(Date.now());
+    const intervalId = setInterval(() => {
+      setQuoteNow(Date.now());
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [quoteData]);
+
+  const quoteExpired = useMemo(
+    () => (quoteData ? isFxQuoteExpired(quoteData, quoteNow) : false),
+    [quoteData, quoteNow],
+  );
+
+  const quoteExpiresInSeconds = useMemo(
+    () =>
+      quoteData ? getFxQuoteExpiresInSeconds(quoteData, quoteNow) : 0,
+    [quoteData, quoteNow],
+  );
+
+  const quoteDisplay = useMemo(
+    () => (quoteData ? getFxQuoteDisplay(quoteData) : null),
+    [quoteData],
+  );
+
+  const viewState = useMemo<WalletFxViewState>(() => {
     if (walletLookupState !== 'wallet_ready') return walletLookupState;
     if (executeMutation.isPending) return 'fx_execute_submitting';
     if (quoteMutation.isPending) return 'fx_quote_loading';
     if (successData) return 'fx_execute_success';
-    if (inputInvalidReason) return 'fx_quote_invalid';
-    if (quoteMutation.data) return 'fx_quote_ready';
-    return 'wallet_ready';
+    if (
+      fxDomainState === 'fx_execute_requote_required' ||
+      fxDomainState === 'fx_idempotency_conflict' ||
+      fxDomainState === 'fx_quote_rejected'
+    ) {
+      return fxDomainState;
+    }
+    if (quoteData && quoteExpired) return 'fx_quote_expired';
+    if (fxDomainState === 'fx_execute_rejected') return fxDomainState;
+    if (quoteData) return 'fx_quote_ready';
+    if (inputInvalidReason) {
+      return amount.trim() || fieldError ? 'fx_input_invalid' : 'fx_input_idle';
+    }
+    return 'fx_input_idle';
   }, [
     walletLookupState,
     executeMutation.isPending,
     quoteMutation.isPending,
-    quoteMutation.data,
     successData,
+    fxDomainState,
+    quoteData,
+    quoteExpired,
     inputInvalidReason,
+    amount,
+    fieldError,
   ]);
+
+  const canExecute =
+    walletLookupState === 'wallet_ready' &&
+    !inputInvalidReason &&
+    !!quoteData &&
+    !quoteExpired &&
+    !!executeIdempotencyKey &&
+    fxDomainState !== 'fx_execute_requote_required' &&
+    fxDomainState !== 'fx_idempotency_conflict';
+
+  const inputErrorMessage =
+    fieldError ??
+    (viewState === 'fx_input_invalid' ? inputInvalidReason : null);
+
+  const resetFxActionState = () => {
+    setFieldError(null);
+    setDomainError(null);
+    setQuoteData(null);
+    setExecuteIdempotencyKey(null);
+    setFxDomainState(null);
+    setSuccessData(null);
+    quoteMutation.reset();
+    executeMutation.reset();
+  };
 
   const retryWalletLookup = () => {
     walletsQuery.refetch();
     rateQuery.refetch();
+  };
+
+  const requestQuote = () => {
+    if (inputInvalidReason) {
+      setFieldError(inputInvalidReason);
+      return;
+    }
+
+    setFieldError(null);
+    setDomainError(null);
+    setQuoteData(null);
+    setExecuteIdempotencyKey(null);
+    setFxDomainState(null);
+    setSuccessData(null);
+    executeMutation.reset();
+
+    quoteMutation.mutate({
+      fromCurrency,
+      toCurrency,
+      sourceAmount: amount.trim(),
+    });
+  };
+
+  const executeQuote = () => {
+    if (inputInvalidReason) {
+      setFieldError(inputInvalidReason);
+      return;
+    }
+
+    if (!quoteData) {
+      setDomainError('먼저 환전 미리보기를 확인해주세요.');
+      return;
+    }
+
+    if (quoteExpired) {
+      setDomainError(QUOTE_EXPIRED_MESSAGE);
+      return;
+    }
+
+    if (!executeIdempotencyKey) {
+      setFxDomainState('fx_execute_rejected');
+      setDomainError(getErrorMessageFromCode(ERROR_CODE.IDEMPOTENCY_REQUIRED));
+      return;
+    }
+
+    setFieldError(null);
+    setDomainError(null);
+    setFxDomainState(null);
+
+    executeMutation.mutate({
+      quoteId: quoteData.quoteId,
+      fromCurrency: quoteData.fromCurrency,
+      toCurrency: quoteData.toCurrency,
+      sourceAmount: quoteData.sourceAmount,
+      idempotencyKey: executeIdempotencyKey,
+    });
   };
 
   if (viewState === 'wallet_loading') {
@@ -269,9 +474,7 @@ export default function WalletFxScreen({ navigation }: Props) {
               ]}
               onPress={() => {
                 setFromCurrency('KRW');
-                setFieldError(null);
-                setDomainError(null);
-                setSuccessData(null);
+                resetFxActionState();
               }}
             >
               <Text
@@ -293,9 +496,7 @@ export default function WalletFxScreen({ navigation }: Props) {
               ]}
               onPress={() => {
                 setFromCurrency('USD');
-                setFieldError(null);
-                setDomainError(null);
-                setSuccessData(null);
+                resetFxActionState();
               }}
             >
               <Text
@@ -316,19 +517,15 @@ export default function WalletFxScreen({ navigation }: Props) {
             value={amount}
             onChangeText={(value) => {
               setAmount(value);
-              setFieldError(null);
-              setDomainError(null);
-              setSuccessData(null);
+              resetFxActionState();
             }}
             keyboardType="decimal-pad"
             placeholder="환전 금액"
           />
 
-          {viewState === 'fx_quote_invalid' && inputInvalidReason ? (
-            <Text style={styles.errorText}>{inputInvalidReason}</Text>
+          {inputErrorMessage ? (
+            <Text style={styles.errorText}>{inputErrorMessage}</Text>
           ) : null}
-
-          {fieldError ? <Text style={styles.errorText}>{fieldError}</Text> : null}
           {domainError ? <Text style={styles.errorText}>{domainError}</Text> : null}
         </View>
 
@@ -337,20 +534,47 @@ export default function WalletFxScreen({ navigation }: Props) {
 
           {viewState === 'fx_quote_loading' ? (
             <SectionSkeleton lines={5} />
-          ) : quoteMutation.data ? (
+          ) : quoteDisplay ? (
             <>
-              <Text style={styles.helper}>적용 환율 {quoteMutation.data.rate}</Text>
-              <Text style={styles.helper}>수수료 {quoteMutation.data.feeAmount}</Text>
+              <Text style={styles.helper}>견적 ID {quoteDisplay.quoteId}</Text>
+              <Text style={styles.helper}>환전 방향 {quoteDisplay.direction}</Text>
               <Text style={styles.helper}>
-                수령 예정 {quoteMutation.data.netTargetAmount}
+                환전 금액 {quoteDisplay.sourceAmount}
               </Text>
-              <Text style={styles.helper}>만료 시각 {quoteMutation.data.expiresAt}</Text>
+              <Text style={styles.helper}>
+                적용 환율 {quoteDisplay.appliedRate}
+              </Text>
+              <Text style={styles.helper}>
+                총 수령액 {quoteDisplay.grossTargetAmount}
+              </Text>
+              <Text style={styles.helper}>수수료율 {quoteDisplay.feeRate}</Text>
+              <Text style={styles.helper}>수수료 {quoteDisplay.feeAmount}</Text>
+              <Text style={styles.helper}>
+                수령 예정 {quoteDisplay.netTargetAmount}
+              </Text>
+              <Text style={styles.helper}>만료 시각 {quoteDisplay.expiresAt}</Text>
+              <Text style={styles.helper}>
+                허용 변동 {quoteDisplay.maxChangeBps}bps
+              </Text>
+              <Text style={styles.helper}>
+                남은 시간 {quoteExpiresInSeconds}초
+              </Text>
+              {quoteExpired ? (
+                <Text style={styles.errorText}>{QUOTE_EXPIRED_MESSAGE}</Text>
+              ) : null}
             </>
           ) : (
             <Text style={styles.helper}>
               환전 미리보기를 눌러 예상 수령 금액을 확인하세요.
             </Text>
           )}
+
+          {viewState === 'fx_execute_requote_required' ? (
+            <Text style={styles.errorText}>{REQUOTE_REQUIRED_MESSAGE}</Text>
+          ) : null}
+          {viewState === 'fx_idempotency_conflict' ? (
+            <Text style={styles.errorText}>{IDEMPOTENCY_CONFLICT_MESSAGE}</Text>
+          ) : null}
         </View>
 
         <View style={styles.row}>
@@ -359,25 +583,11 @@ export default function WalletFxScreen({ navigation }: Props) {
             state={
               viewState === 'fx_quote_loading'
                 ? 'loading'
-                : inputInvalidReason
+                : inputInvalidReason || viewState === 'fx_execute_submitting'
                 ? 'disabled'
                 : 'enabled'
             }
-            onPress={() => {
-              if (inputInvalidReason) {
-                setFieldError(inputInvalidReason);
-                return;
-              }
-
-              setFieldError(null);
-              setDomainError(null);
-
-              quoteMutation.mutate({
-                fromCurrency,
-                toCurrency,
-                amount,
-              });
-            }}
+            onPress={requestQuote}
             style={styles.flex}
           />
 
@@ -386,30 +596,11 @@ export default function WalletFxScreen({ navigation }: Props) {
             state={
               viewState === 'fx_execute_submitting'
                 ? 'loading'
-                : quoteMutation.data
+                : canExecute
                 ? 'enabled'
                 : 'disabled'
             }
-            onPress={() => {
-              if (inputInvalidReason) {
-                setFieldError(inputInvalidReason);
-                return;
-              }
-
-              if (!quoteMutation.data) {
-                setDomainError('먼저 환전 미리보기를 확인해주세요.');
-                return;
-              }
-
-              setFieldError(null);
-              setDomainError(null);
-
-              executeMutation.mutate({
-                fromCurrency,
-                toCurrency,
-                amount,
-              });
-            }}
+            onPress={executeQuote}
             style={styles.flex}
           />
         </View>

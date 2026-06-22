@@ -3,20 +3,15 @@ import { View, Text, StyleSheet } from 'react-native';
 
 import BottomSheetBackdrop from '../../components/common/BottomSheetBackdrop';
 import CTAButton from '../../components/common/CTAButton';
+import type { FxExecuteDto } from '../../features/wallet/api';
+import { getFxExecuteSuccessDisplay } from '../../features/wallet/mapper';
 
 interface FxSuccessBottomSheetProps {
   visible: boolean;
   onClose: () => void;
   onGoWallet: () => void;
   onGoHome: () => void;
-  payload: {
-    fromCurrency: 'KRW' | 'USD';
-    toCurrency: 'KRW' | 'USD';
-    sourceAmount: string;
-    rate: string;
-    feeAmount: string;
-    netTargetAmount: string;
-  } | null;
+  payload: FxExecuteDto | null;
 }
 
 export default function FxSuccessBottomSheet({
@@ -26,6 +21,8 @@ export default function FxSuccessBottomSheet({
   onGoHome,
   payload,
 }: FxSuccessBottomSheetProps) {
+  const display = payload ? getFxExecuteSuccessDisplay(payload) : null;
+
   return (
     <BottomSheetBackdrop visible={visible} onClose={onClose}>
       <View style={styles.iconCircle}>
@@ -34,16 +31,23 @@ export default function FxSuccessBottomSheet({
 
       <Text style={styles.title}>환전이 완료되었습니다</Text>
 
-      {payload ? (
+      {display ? (
         <View style={styles.card}>
-          <Row
-            label="환전 방향"
-            value={`${payload.fromCurrency} → ${payload.toCurrency}`}
-          />
-          <Row label="환전 금액" value={payload.sourceAmount} />
-          <Row label="적용 환율" value={payload.rate} />
-          <Row label="수수료" value={payload.feeAmount} />
-          <Row label="수령 금액" value={payload.netTargetAmount} />
+          <Row label="거래 ID" value={display.exchangeId} />
+          <Row label="환전 방향" value={display.direction} />
+          <Row label="환전 금액" value={display.sourceAmount} />
+          <Row label="수령 금액" value={display.netTargetAmount} />
+          <Row label="적용 환율" value={display.appliedRate} />
+          <Row label="실행 환율" value={display.executeRate} />
+          <Row label="견적 환율" value={display.quotedRate} />
+          <Row label="환율 변동" value={display.rateChangeBps} />
+          <Row label="수수료" value={display.fee} />
+          <Row label="실행 시각" value={display.executedAt} />
+          <Row label="출금 지갑 잔액" value={display.sourceWalletBalanceAfter} />
+          <Row label="입금 지갑 잔액" value={display.targetWalletBalanceAfter} />
+          {display.walletRows.map((item) => (
+            <Row key={item} label="지갑 잔액" value={item} />
+          ))}
         </View>
       ) : null}
 
@@ -96,15 +100,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
+    alignItems: 'flex-start',
   },
   label: {
     fontSize: 14,
     color: '#666',
+    flexShrink: 0,
   },
   value: {
     fontSize: 14,
     fontWeight: '600',
     color: '#111',
+    flex: 1,
+    textAlign: 'right',
   },
   buttonRow: {
     flexDirection: 'row',
