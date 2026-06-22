@@ -490,8 +490,6 @@ type UserSeasonRecordSummaryResponse = {
       rewardGranted: boolean;
       totalAssetKrw: string | null;
       returnRate: string | null;
-      orderCount: number;
-      exchangeCount: number;
     } | null;
     publicPortfolioSummary: PublicPortfolioSummary;
     reason?: string;
@@ -1177,20 +1175,10 @@ export class RecordsService {
       };
     }
 
-    const [orderCount, exchangeCount, publicPortfolioSummary] =
-      await Promise.all([
-        this.prisma.order.count({
-          where: {
-            seasonParticipantId: participant.id,
-          },
-        }),
-        this.prisma.exchangeTransaction.count({
-          where: {
-            seasonParticipantId: participant.id,
-          },
-        }),
-        this.buildPublicPortfolioSummary(participant.id, new Date()),
-      ]);
+    const publicPortfolioSummary = await this.buildPublicPortfolioSummary(
+      participant.id,
+      new Date(),
+    );
     const metric = this.selectBestMetric(
       participant.seasonRankings[0],
       participant.dailyPortfolioSnapshots[0],
@@ -1212,8 +1200,6 @@ export class RecordsService {
             ? this.formatDecimal(metric.totalAssetKrw, 8)
             : null,
           returnRate: metric ? this.formatDecimal(metric.returnRate, 8) : null,
-          orderCount,
-          exchangeCount,
         },
         publicPortfolioSummary: {
           ...publicPortfolioSummary,

@@ -123,7 +123,7 @@ type UsdKrwSelection =
       sourceDecision?: SourceDecision;
     };
 
-type AssetPricePayload =
+export type AssetPricePayload =
   | {
       state: 'available';
       currentPrice: string;
@@ -156,6 +156,18 @@ type AssetPricePayload =
       reason: 'ASSET_PRICE_UNAVAILABLE';
       message: string;
     };
+
+export type AssetTickerPriceSelection = {
+  asset: {
+    id: string;
+    symbol: string;
+    name: string;
+    assetType: AssetType;
+    market: string;
+    priceCurrency: CurrencyCode;
+  };
+  price: AssetPricePayload;
+};
 
 type AssetListItem = ReturnType<AssetsService['formatAssetMetadata']> & {
   price?: AssetPricePayload;
@@ -447,6 +459,46 @@ export class AssetsService {
     };
   }
 
+  async getAssetPriceForTicker(
+    assetId: string,
+    valuationAt = new Date(),
+  ): Promise<AssetTickerPriceSelection | null> {
+    const parsedAssetId = this.parseAssetId(assetId);
+    const asset = await this.prisma.asset.findFirst({
+      where: {
+        id: parsedAssetId,
+        isActive: true,
+      },
+      select: this.assetSelect(),
+    });
+
+    if (!asset) {
+      return null;
+    }
+
+    const usdKrwSelection =
+      this.getAssetPriceCurrency(asset) === CurrencyCode.USD
+        ? await this.findUsdKrwSelection(valuationAt)
+        : null;
+    const price = await this.buildAssetPrice(
+      asset,
+      valuationAt,
+      usdKrwSelection,
+    );
+
+    return {
+      asset: {
+        id: asset.id,
+        symbol: asset.symbol,
+        name: asset.name,
+        assetType: asset.assetType,
+        market: asset.market,
+        priceCurrency: this.getAssetPriceCurrency(asset),
+      },
+      price: price.payload,
+    };
+  }
+
   private async buildAssetsWithPrices(
     assets: readonly AssetRecord[],
     tradingContext: AssetTradingContext | null,
@@ -665,47 +717,9 @@ export class AssetsService {
     asset: AssetRecord,
     snapshot: AssetPriceSnapshotRecord,
   ): Promise<string | null> {
-    const previousRows = await this.prisma.assetPriceSnapshot.findMany({
-      where: {
-        assetId: asset.id,
-        currencyCode: snapshot.currencyCode,
-        price: {
-          gt: 0,
-        },
-        OR: [
-          {
-            effectiveAt: {
-              lt: snapshot.effectiveAt,
-            },
-          },
-          {
-            effectiveAt: snapshot.effectiveAt,
-            capturedAt: {
-              lt: snapshot.capturedAt,
-            },
-          },
-        ],
-      },
-      orderBy: [
-        { effectiveAt: 'desc' },
-        { capturedAt: 'desc' },
-        { createdAt: 'desc' },
-      ],
-      take: 1,
-      select: {
-        price: true,
-      },
-    });
-    const previous = previousRows[0] ?? null;
-
-    if (!previous || previous.price.lte(0)) {
-      return null;
-    }
-
-    return this.formatDecimal(
-      snapshot.price.sub(previous.price).div(previous.price).mul(100),
-      8,
-    );
+    void asset;
+    void snapshot;
+    return null;
   }
 
   private async findLatestEligibleAssetPriceSnapshot(

@@ -1603,8 +1603,6 @@ describe('RecordsService', () => {
         rewardGranted: true,
         totalAssetKrw: '12000000.00000000',
         returnRate: '20.00000000',
-        orderCount: 8,
-        exchangeCount: 2,
       },
       publicPortfolioSummary: {
         state: 'available',
@@ -1618,14 +1616,20 @@ describe('RecordsService', () => {
       },
     });
     expect(response.data.publicPortfolioSummary.topHoldings).toHaveLength(5);
+    expect(response.data.summary).not.toHaveProperty('orderCount');
+    expect(response.data.summary).not.toHaveProperty('exchangeCount');
     expect(response.data).not.toHaveProperty('orders');
     expect(response.data).not.toHaveProperty('exchanges');
     const serialized = JSON.stringify(response.data);
+    expect(serialized).not.toContain('orderCount');
+    expect(serialized).not.toContain('exchangeCount');
     expect(serialized).not.toContain('walletId');
     expect(serialized).not.toContain('quantity');
     expect(serialized).not.toContain('averageCost');
     expect(serialized).not.toContain('balanceAmount');
     expect(serialized).not.toContain('assetId');
+    expect(prisma.order.count).not.toHaveBeenCalled();
+    expect(prisma.exchangeTransaction.count).not.toHaveBeenCalled();
     expectNoRecordWrites(prisma);
   });
 
@@ -1677,8 +1681,6 @@ describe('RecordsService', () => {
       status: SeasonStatus.settled,
     });
     mockDetailedParticipant(prisma);
-    prisma.order.count.mockResolvedValueOnce(8);
-    prisma.exchangeTransaction.count.mockResolvedValueOnce(2);
     mockPublicPortfolioInputs(prisma, [
       profitPosition({
         assetId: 'asset-private-1',
@@ -1710,6 +1712,8 @@ describe('RecordsService', () => {
     expect(JSON.stringify(response.data.publicPortfolioSummary)).not.toContain(
       'asset-private-1',
     );
+    expect(prisma.order.count).not.toHaveBeenCalled();
+    expect(prisma.exchangeTransaction.count).not.toHaveBeenCalled();
     expectNoRecordWrites(prisma);
   });
 

@@ -38,6 +38,12 @@ import { SeasonsController } from './seasons.controller';
 describe('SeasonsController', () => {
   const createController = () => {
     const seasonsService = {
+      getSeasons: jest.fn().mockReturnValue({
+        success: true,
+        data: {
+          seasons: [],
+        },
+      }),
       getCurrentSeason: jest.fn().mockReturnValue({
         success: true,
         data: {
@@ -55,6 +61,25 @@ describe('SeasonsController', () => {
 
     return { controller, seasonsService };
   };
+
+  it('marks season list as optional auth', () => {
+    expect(
+      Reflect.getMetadata(
+        IS_OPTIONAL_AUTH_ROUTE_KEY,
+        SeasonsController.prototype.getSeasons,
+      ),
+    ).toBe(true);
+  });
+
+  it('passes season list query to service', () => {
+    const { controller, seasonsService } = createController();
+
+    controller.getSeasons({ status: 'active' });
+
+    expect(seasonsService.getSeasons).toHaveBeenCalledWith({
+      status: 'active',
+    });
+  });
 
   it('marks current season as optional auth', () => {
     expect(

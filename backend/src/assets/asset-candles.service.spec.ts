@@ -143,6 +143,31 @@ describe('AssetCandlesService', () => {
     isActive: true,
   });
 
+  function domesticRow(sourceDate: string, sourceTime: string, price: string) {
+    return {
+      stck_bsop_date: sourceDate,
+      stck_cntg_hour: sourceTime,
+      stck_oprc: price,
+      stck_hgpr: price,
+      stck_lwpr: price,
+      stck_prpr: price,
+      cntg_vol: '1',
+    };
+  }
+
+  function usRow(sourceDate: string, sourceTime: string, price: string) {
+    return {
+      xymd: sourceDate,
+      xhms: sourceTime,
+      open: price,
+      high: price,
+      low: price,
+      last: price,
+      evol: '1',
+      eamt: price,
+    };
+  }
+
   const expectApiError = async (
     promise: Promise<unknown>,
     status: number,
@@ -380,7 +405,7 @@ describe('AssetCandlesService', () => {
     expect(response.data.source).toMatchObject({
       trId: 'FHKST03010230',
       path: '/uapi/domestic-stock/v1/quotations/inquire-time-dailychartprice',
-      requestedCount: 120,
+      requestedCount: 100,
     });
     const kisCall = firstKisQuoteCall(kisQuoteClient);
     expect(kisCall.query).toMatchObject({
@@ -391,6 +416,193 @@ describe('AssetCandlesService', () => {
       tr_id: 'FHKST03010230',
     });
   });
+
+  it.each([
+    {
+      label: 'domestic 1d',
+      range: '1d',
+      fixture: asset({
+        id: 'asset-domestic-1d',
+        symbol: '005930',
+        market: 'KRX',
+        assetType: AssetType.domestic_stock,
+        currencyCode: CurrencyCode.KRW,
+      }),
+      rows: [
+        domesticRow('20260618', '115959', '10'),
+        domesticRow('20260619', '090000', '20'),
+        domesticRow('20260619', '120001', '30'),
+      ],
+      startAt: Date.parse('2026-06-18T03:00:00.000Z'),
+      endAt: Date.parse('2026-06-19T03:00:00.000Z'),
+    },
+    {
+      label: 'domestic 7d',
+      range: '7d',
+      fixture: asset({
+        id: 'asset-domestic-7d',
+        symbol: '005930',
+        market: 'KOSPI',
+        assetType: AssetType.domestic_stock,
+        currencyCode: CurrencyCode.KRW,
+      }),
+      rows: [
+        domesticRow('20260612', '115959', '10'),
+        domesticRow('20260613', '090000', '20'),
+        domesticRow('20260619', '120001', '30'),
+      ],
+      startAt: Date.parse('2026-06-12T03:00:00.000Z'),
+      endAt: Date.parse('2026-06-19T03:00:00.000Z'),
+    },
+    {
+      label: 'domestic 30d',
+      range: '30d',
+      fixture: asset({
+        id: 'asset-domestic-30d',
+        symbol: '005930',
+        market: 'KOSDAQ',
+        assetType: AssetType.domestic_stock,
+        currencyCode: CurrencyCode.KRW,
+      }),
+      rows: [
+        domesticRow('20260520', '115959', '10'),
+        domesticRow('20260601', '090000', '20'),
+        domesticRow('20260619', '120001', '30'),
+      ],
+      startAt: Date.parse('2026-05-20T03:00:00.000Z'),
+      endAt: Date.parse('2026-06-19T03:00:00.000Z'),
+    },
+    {
+      label: 'domestic season',
+      range: 'season',
+      season: {
+        startAt: new Date('2026-06-01T00:00:00.000Z'),
+        endAt: new Date('2026-06-30T00:00:00.000Z'),
+      },
+      fixture: asset({
+        id: 'asset-domestic-season',
+        symbol: '005930',
+        market: 'KRX',
+        assetType: AssetType.domestic_stock,
+        currencyCode: CurrencyCode.KRW,
+      }),
+      rows: [
+        domesticRow('20260601', '085959', '10'),
+        domesticRow('20260602', '090000', '20'),
+        domesticRow('20260619', '120001', '30'),
+      ],
+      startAt: Date.parse('2026-06-01T00:00:00.000Z'),
+      endAt: Date.parse('2026-06-19T03:00:00.000Z'),
+    },
+    {
+      label: 'US 1d',
+      range: '1d',
+      fixture: asset({
+        id: 'asset-us-1d',
+        symbol: 'AAPL',
+        market: 'NAS',
+        assetType: AssetType.us_stock,
+        currencyCode: CurrencyCode.USD,
+      }),
+      rows: [
+        usRow('20260617', '225959', '10'),
+        usRow('20260618', '093000', '20'),
+        usRow('20260618', '230001', '30'),
+      ],
+      startAt: Date.parse('2026-06-18T03:00:00.000Z'),
+      endAt: Date.parse('2026-06-19T03:00:00.000Z'),
+    },
+    {
+      label: 'US 7d',
+      range: '7d',
+      fixture: asset({
+        id: 'asset-us-7d',
+        symbol: 'AAPL',
+        market: 'NYSE',
+        assetType: AssetType.us_stock,
+        currencyCode: CurrencyCode.USD,
+      }),
+      rows: [
+        usRow('20260611', '225959', '10'),
+        usRow('20260612', '093000', '20'),
+        usRow('20260618', '230001', '30'),
+      ],
+      startAt: Date.parse('2026-06-12T03:00:00.000Z'),
+      endAt: Date.parse('2026-06-19T03:00:00.000Z'),
+    },
+    {
+      label: 'US 30d',
+      range: '30d',
+      fixture: asset({
+        id: 'asset-us-30d',
+        symbol: 'AAPL',
+        market: 'NASDAQ',
+        assetType: AssetType.us_stock,
+        currencyCode: CurrencyCode.USD,
+      }),
+      rows: [
+        usRow('20260519', '225959', '10'),
+        usRow('20260601', '093000', '20'),
+        usRow('20260618', '230001', '30'),
+      ],
+      startAt: Date.parse('2026-05-20T03:00:00.000Z'),
+      endAt: Date.parse('2026-06-19T03:00:00.000Z'),
+    },
+    {
+      label: 'US season',
+      range: 'season',
+      season: {
+        startAt: new Date('2026-06-01T00:00:00.000Z'),
+        endAt: new Date('2026-06-30T00:00:00.000Z'),
+      },
+      fixture: asset({
+        id: 'asset-us-season',
+        symbol: 'AAPL',
+        market: 'NAS',
+        assetType: AssetType.us_stock,
+        currencyCode: CurrencyCode.USD,
+      }),
+      rows: [
+        usRow('20260531', '195959', '10'),
+        usRow('20260601', '093000', '20'),
+        usRow('20260618', '230001', '30'),
+      ],
+      startAt: Date.parse('2026-06-01T00:00:00.000Z'),
+      endAt: Date.parse('2026-06-19T03:00:00.000Z'),
+    },
+  ])(
+    'filters $label stock candles to the resolved range window before returning',
+    async ({ fixture, range, rows, season, startAt, endAt }) => {
+      const { prisma, kisQuoteClient, service } = createService();
+      prisma.asset.findUnique.mockResolvedValueOnce(fixture);
+      if (season) {
+        prisma.season.findFirst.mockResolvedValueOnce(season);
+      }
+      kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
+        state: 'available',
+        receivedAt: new Date('2026-06-19T03:00:01.000Z'),
+        response: {
+          rt_cd: '0',
+          output2: rows,
+        },
+      });
+
+      const response = await service.getAssetCandles('user-1', fixture.id, {
+        range,
+        limit: '101',
+      });
+
+      expect(response.data.range).toBe(range);
+      expect(response.data.source.requestedCount).toBeLessThanOrEqual(100);
+      expect(response.data.candles.length).toBeGreaterThan(0);
+      expect(response.data.candles.length).toBeLessThanOrEqual(100);
+      for (const candle of response.data.candles) {
+        const candleTime = Date.parse(candle.time);
+        expect(candleTime).toBeGreaterThanOrEqual(startAt);
+        expect(candleTime).toBeLessThanOrEqual(endAt);
+      }
+    },
+  );
 
   it('passes overseas intervals through KIS NMIN and normalizes US market time', async () => {
     const { prisma, kisAuthClient, kisQuoteClient, service } = createService();
@@ -472,7 +684,7 @@ describe('AssetCandlesService', () => {
         trId: 'HHDFS76950200',
         path: '/uapi/overseas-price/v1/quotations/inquire-time-itemchartprice',
         marketCode: 'NAS',
-        requestedCount: 120,
+        requestedCount: 100,
         returnedCount: 1,
       },
     });
@@ -485,7 +697,7 @@ describe('AssetCandlesService', () => {
         NMIN: '15',
         PINC: '0',
         NEXT: '',
-        NREC: '120',
+        NREC: '100',
         FILL: 'Y',
         KEYB: '',
       },
@@ -554,7 +766,7 @@ describe('AssetCandlesService', () => {
     expect(binancePublicClient.fetchKlines).toHaveBeenCalledWith({
       symbol: 'BTCUSDT',
       interval: '5m',
-      limit: 1000,
+      limit: 100,
       startTime: Date.parse('2026-06-21T00:00:00.000Z'),
       endTime: Date.parse('2026-06-21T04:30:00.000Z'),
     });
@@ -603,7 +815,7 @@ describe('AssetCandlesService', () => {
           endpoint: '/api/v3/klines',
           symbol: 'BTCUSDT',
           interval: '5m',
-          requestedCount: 1000,
+          requestedCount: 100,
           returnedCount: 2,
         },
       },
@@ -640,7 +852,45 @@ describe('AssetCandlesService', () => {
       symbol: 'BTCUSDT',
       interval: '5m',
       limit: 100,
+      startTime: Date.parse('2026-06-18T03:00:00.000Z'),
+      endTime: Date.parse('2026-06-19T03:00:00.000Z'),
     });
+  });
+
+  it.each([
+    [undefined, 100],
+    ['100', 100],
+    ['101', 100],
+    ['1000', 100],
+  ])('clamps candle limit %s to %s', async (limit, expectedLimit) => {
+    const { prisma, binancePublicClient, service } = createService();
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({
+        id: `asset-btc-limit-${limit ?? 'default'}`,
+        symbol: 'BTC',
+        market: 'BINANCE',
+        assetType: AssetType.crypto,
+        currencyCode: CurrencyCode.USD,
+      }),
+    );
+    binancePublicClient.fetchKlines.mockResolvedValueOnce({
+      receivedAt: new Date('2026-06-19T03:00:01.000Z'),
+      response: [],
+    });
+
+    const response = await service.getAssetCandles(
+      'user-1',
+      `asset-btc-limit-${limit ?? 'default'}`,
+      limit === undefined ? {} : { limit },
+    );
+
+    expect(binancePublicClient.fetchKlines).toHaveBeenCalledWith(
+      expect.objectContaining({
+        limit: expectedLimit,
+      }),
+    );
+    expect(response.data.source.requestedCount).toBe(expectedLimit);
+    expect(response.data.candles.length).toBeLessThanOrEqual(expectedLimit);
   });
 
   it.each([

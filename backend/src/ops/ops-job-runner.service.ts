@@ -1,4 +1,4 @@
-import { HttpException, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import {
   OpsJobName,
   OpsJobRun,
@@ -9,6 +9,9 @@ import { DailyPortfolioSnapshotJobService } from '../batch/daily-portfolio-snaps
 import { SeasonLifecycleTransitionJobService } from '../batch/season-lifecycle-transition-job.service';
 import { SeasonSettlementJobService } from '../batch/season-settlement-job.service';
 import { SEASON_SETTLEMENT_JOB_NAME } from '../batch/season-settlement-job.types';
+import { BinancePriceIngestionService } from '../providers/binance/binance-price.ingestion.service';
+import { ExchangeRateIngestionService } from '../providers/exchange-rate/exchange-rate.ingestion.service';
+import { KoreaEximExchangeIngestionService } from '../providers/korea-exim/korea-exim-exchange.ingestion.service';
 import { RankingRefreshService } from '../ranking/ranking-refresh.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { getOpsSchedulerConfig } from './ops-config';
@@ -62,24 +65,83 @@ export class OpsJobRunnerService {
     private readonly seasonLifecycleTransitionJobService: SeasonLifecycleTransitionJobService,
     private readonly seasonSettlementJobService: SeasonSettlementJobService,
     private readonly rankingRefreshService: RankingRefreshService,
+    private readonly exchangeRateIngestionService: ExchangeRateIngestionService,
+    private readonly koreaEximExchangeIngestionService: KoreaEximExchangeIngestionService,
+    private readonly binancePriceIngestionService: BinancePriceIngestionService,
     private readonly prisma: PrismaService,
     private readonly lockService: OpsJobLockService,
     private readonly runService: OpsJobRunService,
   ) {}
 
   runProviderFxIngestJob(input: OpsJobRunnerInput = {}) {
-    return this.recordNotImplemented(
+    return this.runLockedOpsJob(
       OpsJobName.provider_fx_ingest,
       input,
-      'Provider FX ingestion remains script/operator-run only in this gate.',
+      'provider_fx_ingest:usd_krw',
+      async () => {
+        const koreaExim =
+          await this.koreaEximExchangeIngestionService.ingestUsdKrw({
+            dryRun: false,
+            requestedBy: input.requestedBy ?? undefined,
+          });
+        const exchangeRate =
+          await this.exchangeRateIngestionService.ingestUsdKrw({
+            dryRun: false,
+            requestedBy: input.requestedBy ?? undefined,
+          });
+
+        const result = {
+          state:
+            koreaExim.success || exchangeRate.success ? 'completed' : 'failed',
+          providers: [koreaExim, exchangeRate],
+          created: koreaExim.created + exchangeRate.created,
+          skipped: koreaExim.skipped + exchangeRate.skipped,
+          wouldCreate: koreaExim.wouldCreate + exchangeRate.wouldCreate,
+        };
+
+        if (result.state === 'failed') {
+          this.throwProviderJobFailed(
+            'PROVIDER_FX_INGEST_FAILED',
+            'Provider FX ingestion failed.',
+            result,
+          );
+        }
+
+        return result;
+      },
     );
   }
 
   runProviderBinanceIngestJob(input: OpsJobRunnerInput = {}) {
-    return this.recordNotImplemented(
+    return this.runLockedOpsJob(
       OpsJobName.provider_binance_ingest,
       input,
-      'Provider Binance ingestion remains script/operator-run only in this gate.',
+      'provider_binance_ingest:prices',
+      async () => {
+        const result = await this.binancePriceIngestionService.ingestPrices({
+          dryRun: false,
+          requestedBy: input.requestedBy ?? undefined,
+        });
+
+        const response = {
+          state: result.success ? 'completed' : 'failed',
+          provider: result,
+          created: result.created,
+          skipped: result.skipped,
+          wouldCreate: result.wouldCreate,
+          failed: result.failed,
+        };
+
+        if (response.state === 'failed') {
+          this.throwProviderJobFailed(
+            'PROVIDER_BINANCE_INGEST_FAILED',
+            'Provider Binance ingestion failed.',
+            response,
+          );
+        }
+
+        return response;
+      },
     );
   }
 
@@ -392,6 +454,26 @@ export class OpsJobRunnerService {
     });
 
     return this.successResponse(skipped, { skipped: true });
+  }
+
+  private throwProviderJobFailed(
+    code: string,
+    message: string,
+    resultPayloadJson: unknown,
+  ): never {
+    throw new HttpException(
+      {
+        success: false,
+        error: {
+          code,
+          message,
+        },
+        data: {
+          resultPayloadJson,
+        },
+      },
+      HttpStatus.SERVICE_UNAVAILABLE,
+    );
   }
 
   private successResponse(

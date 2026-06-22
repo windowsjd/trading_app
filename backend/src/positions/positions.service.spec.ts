@@ -159,9 +159,17 @@ describe('PositionsService', () => {
     assetType?: AssetType;
     realizedPnl?: string;
     realizedPnlKrw?: string;
+    currentPriceLocal?: string | null;
+    currentPriceKrw?: string | null;
+    marketValueLocal?: string | null;
+    marketValueKrw?: string | null;
+    unrealizedPnlLocal?: string | null;
+    unrealizedPnlKrw?: string | null;
   }) => {
     const currencyCode = input.currencyCode ?? CurrencyCode.KRW;
     const assetId = input.assetId ?? `asset-${input.id}`;
+    const nullableDecimal = (value: string | null | undefined) =>
+      value === undefined || value === null ? null : new Prisma.Decimal(value);
 
     return {
       id: input.id,
@@ -171,6 +179,12 @@ describe('PositionsService', () => {
       currencyCode,
       realizedPnl: new Prisma.Decimal(input.realizedPnl ?? '0.00000000'),
       realizedPnlKrw: new Prisma.Decimal(input.realizedPnlKrw ?? '0.00000000'),
+      currentPriceLocal: nullableDecimal(input.currentPriceLocal),
+      currentPriceKrw: nullableDecimal(input.currentPriceKrw),
+      marketValueLocal: nullableDecimal(input.marketValueLocal),
+      marketValueKrw: nullableDecimal(input.marketValueKrw),
+      unrealizedPnlLocal: nullableDecimal(input.unrealizedPnlLocal),
+      unrealizedPnlKrw: nullableDecimal(input.unrealizedPnlKrw),
       asset: {
         id: assetId,
         symbol: input.symbol ?? assetId.toUpperCase(),
@@ -817,6 +831,59 @@ describe('PositionsService', () => {
     expectNoPositionWrites(prisma);
   });
 
+  it('returns stale_cache with cached values when live valuation fails', async () => {
+    const { prisma, service } = createService();
+    mockCurrentSeason(prisma);
+    mockJoined(prisma);
+    prisma.position.findMany.mockResolvedValueOnce([
+      position({
+        id: 'position-cached',
+        assetId: 'asset-cached',
+        symbol: 'CACHED',
+        quantity: '2.00000000',
+        averageCost: '90.00000000',
+        currentPriceLocal: '125.00000000',
+        currentPriceKrw: '125.00000000',
+        marketValueLocal: '250.00000000',
+        marketValueKrw: '250.00000000',
+        unrealizedPnlLocal: '70.00000000',
+        unrealizedPnlKrw: '70.00000000',
+      }),
+    ]);
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(null);
+
+    const response = await service.getPositions('user-1');
+
+    expect(response.data.positions[0].valuation).toEqual({
+      state: 'stale_cache',
+      currentPrice: '125.00000000',
+      priceCurrency: CurrencyCode.KRW,
+      assetPriceSnapshotId: null,
+      priceEffectiveAt: null,
+      priceCapturedAt: null,
+      priceSource: null,
+      fxRateSource: null,
+      positionValue: '250.00000000',
+      positionValueKrw: '250.00000000',
+      unrealizedPnl: '70.00000000',
+      unrealizedPnlKrw: '70.00000000',
+      returnRate: '38.88888889',
+      reason: 'LIVE_VALUATION_UNAVAILABLE',
+      message:
+        'Live position valuation is unavailable; cached values are shown.',
+    });
+    expect(JSON.stringify(response.data.positions[0].valuation)).not.toContain(
+      '""',
+    );
+    expect(response.data.summary).toMatchObject({
+      valuedPositionsCount: 0,
+      unavailableValuationsCount: 0,
+      totalPositionValueKrw: '250.00000000',
+    });
+    expect(response.data.valuationErrors).toEqual([]);
+    expectNoPositionWrites(prisma);
+  });
+
   it('marks USD valuation unavailable when USD/KRW is stale', async () => {
     const { prisma, service } = createService();
     mockCurrentSeason(prisma);
@@ -846,6 +913,62 @@ describe('PositionsService', () => {
     expect(response.data.valuationErrors[0]).toMatchObject({
       code: 'FX_RATE_STALE',
       message: 'USD/KRW FX rate snapshot is stale.',
+    });
+    expectNoPositionWrites(prisma);
+  });
+
+  it('sorts stale_cache by cached value and keeps unavailable last', async () => {
+    const { prisma, service } = createService();
+    mockCurrentSeason(prisma);
+    mockJoined(prisma);
+    prisma.position.findMany.mockResolvedValueOnce([
+      position({
+        id: 'position-live',
+        assetId: 'asset-live',
+        symbol: 'LIVE',
+        quantity: '1.00000000',
+        averageCost: '90.00000000',
+      }),
+      position({
+        id: 'position-stale',
+        assetId: 'asset-stale',
+        symbol: 'STALE',
+        quantity: '1.00000000',
+        averageCost: '90.00000000',
+        currentPriceLocal: '300.00000000',
+        currentPriceKrw: '300.00000000',
+        marketValueLocal: '300.00000000',
+        marketValueKrw: '300.00000000',
+        unrealizedPnlLocal: '210.00000000',
+        unrealizedPnlKrw: '210.00000000',
+      }),
+      position({
+        id: 'position-missing',
+        assetId: 'asset-missing',
+        symbol: 'MISSING',
+        quantity: '1.00000000',
+        averageCost: '90.00000000',
+      }),
+    ]);
+    prisma.assetPriceSnapshot.findFirst
+      .mockResolvedValueOnce(priceSnapshot('price-live', '200.00000000'))
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+
+    const response = await service.getPositions('user-1');
+
+    expect(response.data.positions.map((item) => item.positionId)).toEqual([
+      'position-stale',
+      'position-live',
+      'position-missing',
+    ]);
+    expect(response.data.positions.map((item) => item.valuation.state)).toEqual(
+      ['stale_cache', 'available', 'unavailable'],
+    );
+    expect(response.data.summary).toMatchObject({
+      valuedPositionsCount: 1,
+      unavailableValuationsCount: 1,
+      totalPositionValueKrw: '500.00000000',
     });
     expectNoPositionWrites(prisma);
   });

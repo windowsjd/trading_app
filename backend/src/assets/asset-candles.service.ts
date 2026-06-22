@@ -141,8 +141,7 @@ type AssetCandlesResponse = {
 };
 
 const DEFAULT_LIMIT = 100;
-const MAX_LIMIT = 120;
-const CRYPTO_MAX_LIMIT = 1000;
+const MAX_LIMIT = 100;
 const DOMESTIC_TODAY_MAX_COUNT = 30;
 const DEFAULT_RANGE: CandleRange = '1d';
 const KOREA_TIME_ZONE = 'Asia/Seoul';
@@ -338,14 +337,16 @@ export class AssetCandlesService {
       fallbackDate: query.requestedDate,
       timeZone: KOREA_TIME_ZONE,
     });
+    const rangeFiltered = this.filterCandlesToRange(normalized, query);
     const bucketed = this.bucketStockCandles(
-      normalized,
+      rangeFiltered,
       query.intervalMinutes,
       KOREA_TIME_ZONE,
     );
-    const candles = this.sliceRecent(bucketed, query.limit).map((candle) =>
-      this.formatCandle(candle),
-    );
+    const candles = this.sliceRecent(
+      this.filterCandlesToRange(bucketed, query),
+      query.limit,
+    ).map((candle) => this.formatCandle(candle));
 
     return this.buildResponse(asset, query, descriptor, candles);
   }
@@ -362,14 +363,16 @@ export class AssetCandlesService {
       fallbackDate: query.requestedDate,
       timeZone: US_EASTERN_TIME_ZONE,
     });
+    const rangeFiltered = this.filterCandlesToRange(normalized, query);
     const bucketed = this.bucketStockCandles(
-      normalized,
+      rangeFiltered,
       query.intervalMinutes,
       US_EASTERN_TIME_ZONE,
     );
-    const candles = this.sliceRecent(bucketed, query.limit).map((candle) =>
-      this.formatCandle(candle),
-    );
+    const candles = this.sliceRecent(
+      this.filterCandlesToRange(bucketed, query),
+      query.limit,
+    ).map((candle) => this.formatCandle(candle));
 
     return this.buildResponse(asset, query, descriptor, candles);
   }
@@ -393,9 +396,13 @@ export class AssetCandlesService {
       limit: query.limit,
       ...timeRange,
     });
-    const candles = this.normalizeBinanceKlines(result.response).map((candle) =>
-      this.formatCandle(candle),
-    );
+    const candles = this.sliceRecent(
+      this.filterCandlesToRange(
+        this.normalizeBinanceKlines(result.response),
+        query,
+      ),
+      query.limit,
+    ).map((candle) => this.formatCandle(candle));
 
     return this.buildCryptoResponse(asset, query, descriptor, candles);
   }
@@ -777,6 +784,25 @@ export class AssetCandlesService {
     return this.sortCandles(candles).slice(-limit);
   }
 
+  private filterCandlesToRange(
+    candles: readonly NormalizedCandle[],
+    query: ParsedAssetCandlesQuery,
+  ): NormalizedCandle[] {
+    if (!query.rangeStartAt || !query.rangeEndAt) {
+      return this.sortCandles(candles);
+    }
+
+    const startTime = query.rangeStartAt.getTime();
+    const endTime = query.rangeEndAt.getTime();
+
+    return this.sortCandles(
+      candles.filter((candle) => {
+        const candleTime = candle.time.getTime();
+        return candleTime >= startTime && candleTime <= endTime;
+      }),
+    );
+  }
+
   private buildResponse(
     asset: AssetRecord,
     query: ParsedAssetCandlesQuery,
@@ -871,17 +897,25 @@ export class AssetCandlesService {
           : UTC_TIME_ZONE;
     const range = this.parseRange(query.range);
     const rangeProvided = this.parseOptionalText(query.range) !== undefined;
+    const legacyDateProvided =
+      this.parseOptionalText(query.date) !== undefined;
+    const legacyToProvided = this.parseOptionalText(query.to) !== undefined;
     const interval = this.parseInterval(query.interval, asset.assetType, range);
-    const parsedTo = this.parseTo(query.to, timeZone);
-    const rangeWindow = rangeProvided
+    const rangeWindow =
+      rangeProvided || (!legacyDateProvided && !legacyToProvided)
       ? await this.resolveRangeWindow(range, new Date())
       : null;
+    const parsedTo = rangeWindow
+      ? {
+          hhmmss: this.timeInZone(rangeWindow.endAt, timeZone),
+          instant: rangeWindow.endAt,
+          provided: true,
+        }
+      : this.parseTo(query.to, timeZone);
     const requestedDate = rangeWindow
       ? this.dateInZone(rangeWindow.endAt, timeZone)
       : this.parseDate(query.date, timeZone);
-    const toHHmmss = rangeWindow
-      ? this.timeInZone(rangeWindow.endAt, timeZone)
-      : parsedTo.hhmmss;
+    const toHHmmss = parsedTo.hhmmss;
 
     return {
       range,
@@ -890,13 +924,11 @@ export class AssetCandlesService {
       rangeEndAt: rangeWindow?.endAt ?? null,
       interval,
       intervalMinutes: CANDLE_INTERVAL_MINUTES[interval],
-      limit: this.parseLimit(query.limit, asset.assetType),
+      limit: this.parseLimit(query.limit),
       requestedDate,
       toHHmmss,
-      toInstant: rangeWindow?.endAt ?? parsedTo.instant,
-      dateProvided:
-        rangeWindow !== null ||
-        this.parseOptionalText(query.date) !== undefined,
+      toInstant: parsedTo.instant,
+      dateProvided: rangeWindow !== null || legacyDateProvided,
       toProvided: rangeWindow !== null || parsedTo.provided,
       includePrevious: this.parseBoolean(query.includePrevious, true),
     };
@@ -952,15 +984,13 @@ export class AssetCandlesService {
     );
   }
 
-  private parseLimit(value: string | undefined, assetType: AssetType): number {
+  private parseLimit(value: string | undefined): number {
     if (value === undefined) {
       return DEFAULT_LIMIT;
     }
 
     const limit = this.parsePositiveInteger(value, 'INVALID_CANDLE_LIMIT');
-    const maxLimit =
-      assetType === AssetType.crypto ? CRYPTO_MAX_LIMIT : MAX_LIMIT;
-    return Math.min(limit, maxLimit);
+    return Math.min(limit, MAX_LIMIT);
   }
 
   private resolveKisSourceIntervalMinutes(

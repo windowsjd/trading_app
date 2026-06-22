@@ -36,6 +36,19 @@ jest.mock('../batch/season-settlement-job.service', () => ({
 jest.mock('../ranking/ranking-refresh.service', () => ({
   RankingRefreshService: class RankingRefreshService {},
 }));
+jest.mock('../providers/binance/binance-price.ingestion.service', () => ({
+  BinancePriceIngestionService: class BinancePriceIngestionService {},
+}));
+jest.mock('../providers/exchange-rate/exchange-rate.ingestion.service', () => ({
+  ExchangeRateIngestionService: class ExchangeRateIngestionService {},
+}));
+jest.mock(
+  '../providers/korea-exim/korea-exim-exchange.ingestion.service',
+  () => ({
+    KoreaEximExchangeIngestionService:
+      class KoreaEximExchangeIngestionService {},
+  }),
+);
 
 import {
   OpsJobName,
@@ -88,6 +101,15 @@ describe('OpsJobRunnerService', () => {
     const rankingRefreshService = {
       refreshCurrentRankingsForActiveSeasons: jest.fn(),
     };
+    const exchangeRateIngestionService = {
+      ingestUsdKrw: jest.fn(),
+    };
+    const koreaEximExchangeIngestionService = {
+      ingestUsdKrw: jest.fn(),
+    };
+    const binancePriceIngestionService = {
+      ingestPrices: jest.fn(),
+    };
     const prisma = {
       season: {
         findMany: jest.fn(),
@@ -113,12 +135,18 @@ describe('OpsJobRunnerService', () => {
       seasonLifecycleTransitionJobService,
       seasonSettlementJobService,
       rankingRefreshService,
+      exchangeRateIngestionService,
+      koreaEximExchangeIngestionService,
+      binancePriceIngestionService,
       prisma,
       service: new OpsJobRunnerService(
         dailyPortfolioSnapshotJobService as never,
         seasonLifecycleTransitionJobService as never,
         seasonSettlementJobService as never,
         rankingRefreshService as never,
+        exchangeRateIngestionService as never,
+        koreaEximExchangeIngestionService as never,
+        binancePriceIngestionService as never,
         prisma as never,
         lockService as never,
         runService as never,
@@ -126,16 +154,164 @@ describe('OpsJobRunnerService', () => {
     };
   };
 
-  it('records provider ingestion as skipped/not implemented', async () => {
-    const { runService, service } = createService();
-    runService.recordSkipped.mockResolvedValueOnce({
+  it('runs provider FX ingestion through locked provider services', async () => {
+    const {
+      exchangeRateIngestionService,
+      koreaEximExchangeIngestionService,
+      lockService,
+      runService,
+      service,
+    } = createService();
+    lockService.acquireLock.mockResolvedValueOnce({
+      acquired: true,
+      lockKey: 'provider_fx_ingest:usd_krw',
+      ownerId: 'owner-fx',
+      expiresAt: new Date('2026-06-08T00:10:00.000Z'),
+    });
+    runService.createRunning.mockResolvedValueOnce({
+      id: 'run-fx',
+      startedAt,
+    });
+    koreaEximExchangeIngestionService.ingestUsdKrw.mockResolvedValueOnce({
+      success: true,
+      provider: 'korea_exim_exchange_rate',
+      dryRun: false,
+      created: 1,
+      skipped: 0,
+      wouldCreate: 0,
+    });
+    exchangeRateIngestionService.ingestUsdKrw.mockResolvedValueOnce({
+      success: true,
+      provider: 'exchange_rate_api',
+      dryRun: false,
+      created: 0,
+      skipped: 1,
+      wouldCreate: 0,
+    });
+    runService.recordSucceeded.mockResolvedValueOnce({
       serialized: serializedRun({
         jobName: OpsJobName.provider_fx_ingest,
-        status: OpsJobRunStatus.skipped,
       }),
     });
 
     const response = await service.runProviderFxIngestJob({
+      trigger: OpsJobTrigger.test,
+      requestedBy: 'scheduler',
+    });
+
+    expect(response).toMatchObject({
+      success: true,
+      data: {
+        locked: false,
+        skipped: false,
+      },
+    });
+    expect(koreaEximExchangeIngestionService.ingestUsdKrw).toHaveBeenCalledWith(
+      {
+        dryRun: false,
+        requestedBy: 'scheduler',
+      },
+    );
+    expect(exchangeRateIngestionService.ingestUsdKrw).toHaveBeenCalledWith({
+      dryRun: false,
+      requestedBy: 'scheduler',
+    });
+    expect(runService.recordSucceeded).toHaveBeenCalledWith(
+      {
+        id: 'run-fx',
+        startedAt,
+      },
+      expect.objectContaining({
+        resultJson: expect.objectContaining({
+          state: 'completed',
+          created: 1,
+          skipped: 1,
+        }),
+      }),
+    );
+    expect(lockService.releaseLock).toHaveBeenCalledWith({
+      lockKey: 'provider_fx_ingest:usd_krw',
+      ownerId: 'owner-fx',
+    });
+  });
+
+  it('runs provider Binance ingestion through the locked provider service', async () => {
+    const { binancePriceIngestionService, lockService, runService, service } =
+      createService();
+    lockService.acquireLock.mockResolvedValueOnce({
+      acquired: true,
+      lockKey: 'provider_binance_ingest:prices',
+      ownerId: 'owner-binance',
+      expiresAt: new Date('2026-06-08T00:10:00.000Z'),
+    });
+    runService.createRunning.mockResolvedValueOnce({
+      id: 'run-binance',
+      startedAt,
+    });
+    binancePriceIngestionService.ingestPrices.mockResolvedValueOnce({
+      success: true,
+      provider: 'binance',
+      dryRun: false,
+      created: 2,
+      skipped: 0,
+      wouldCreate: 0,
+      failed: 0,
+    });
+    runService.recordSucceeded.mockResolvedValueOnce({
+      serialized: serializedRun({
+        jobName: OpsJobName.provider_binance_ingest,
+      }),
+    });
+
+    const response = await service.runProviderBinanceIngestJob({
+      trigger: OpsJobTrigger.test,
+      requestedBy: 'scheduler',
+    });
+
+    expect(response).toMatchObject({
+      success: true,
+      data: {
+        locked: false,
+        skipped: false,
+      },
+    });
+    expect(binancePriceIngestionService.ingestPrices).toHaveBeenCalledWith({
+      dryRun: false,
+      requestedBy: 'scheduler',
+    });
+    expect(runService.recordSucceeded).toHaveBeenCalledWith(
+      {
+        id: 'run-binance',
+        startedAt,
+      },
+      expect.objectContaining({
+        resultJson: expect.objectContaining({
+          state: 'completed',
+          created: 2,
+          failed: 0,
+        }),
+      }),
+    );
+    expect(lockService.releaseLock).toHaveBeenCalledWith({
+      lockKey: 'provider_binance_ingest:prices',
+      ownerId: 'owner-binance',
+    });
+  });
+
+  it('keeps reward_marker as skipped/NOT_IMPLEMENTED instead of fake success', async () => {
+    const { dailyPortfolioSnapshotJobService, runService, service } =
+      createService();
+    runService.recordSkipped.mockResolvedValueOnce({
+      serialized: serializedRun({
+        jobName: OpsJobName.reward_marker,
+        status: OpsJobRunStatus.skipped,
+        resultJson: {
+          reason: 'NOT_IMPLEMENTED',
+        },
+      }),
+    });
+
+    const response = await service.runRewardMarkerJob({
       trigger: OpsJobTrigger.test,
       dryRun: true,
     });
@@ -144,76 +320,26 @@ describe('OpsJobRunnerService', () => {
       success: true,
       data: {
         skipped: true,
+        run: {
+          status: OpsJobRunStatus.skipped,
+          resultJson: {
+            reason: 'NOT_IMPLEMENTED',
+          },
+        },
       },
     });
     expect(runService.recordSkipped).toHaveBeenCalledWith(
       expect.objectContaining({
-        jobName: OpsJobName.provider_fx_ingest,
+        jobName: OpsJobName.reward_marker,
+        dryRun: true,
         resultJson: expect.objectContaining({
           reason: 'NOT_IMPLEMENTED',
         }),
       }),
     );
+    expect(runService.createRunning).not.toHaveBeenCalled();
+    expect(dailyPortfolioSnapshotJobService.run).not.toHaveBeenCalled();
   });
-
-  it.each([
-    [
-      OpsJobName.provider_fx_ingest,
-      (service: OpsJobRunnerService) => service.runProviderFxIngestJob,
-    ],
-    [
-      OpsJobName.provider_binance_ingest,
-      (service: OpsJobRunnerService) => service.runProviderBinanceIngestJob,
-    ],
-    [
-      OpsJobName.reward_marker,
-      (service: OpsJobRunnerService) => service.runRewardMarkerJob,
-    ],
-  ])(
-    'keeps %s as skipped/NOT_IMPLEMENTED instead of fake success',
-    async (jobName, selectRunner) => {
-      const { dailyPortfolioSnapshotJobService, runService, service } =
-        createService();
-      runService.recordSkipped.mockResolvedValueOnce({
-        serialized: serializedRun({
-          jobName,
-          status: OpsJobRunStatus.skipped,
-          resultJson: {
-            reason: 'NOT_IMPLEMENTED',
-          },
-        }),
-      });
-
-      const response = await selectRunner(service).call(service, {
-        trigger: OpsJobTrigger.test,
-        dryRun: true,
-      });
-
-      expect(response).toMatchObject({
-        success: true,
-        data: {
-          skipped: true,
-          run: {
-            status: OpsJobRunStatus.skipped,
-            resultJson: {
-              reason: 'NOT_IMPLEMENTED',
-            },
-          },
-        },
-      });
-      expect(runService.recordSkipped).toHaveBeenCalledWith(
-        expect.objectContaining({
-          jobName,
-          dryRun: true,
-          resultJson: expect.objectContaining({
-            reason: 'NOT_IMPLEMENTED',
-          }),
-        }),
-      );
-      expect(runService.createRunning).not.toHaveBeenCalled();
-      expect(dailyPortfolioSnapshotJobService.run).not.toHaveBeenCalled();
-    },
-  );
 
   it('runs daily snapshot through the existing batch service and releases lock', async () => {
     const {

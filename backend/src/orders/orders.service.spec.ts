@@ -110,6 +110,7 @@ import {
   ParticipantStatus,
   Prisma,
   SeasonStatus,
+  SnapshotReason,
   WalletTransactionDirection,
   WalletTransactionReferenceType,
   WalletTransactionType,
@@ -223,6 +224,7 @@ describe('OrdersService', () => {
     },
     equitySnapshot: {
       create: jest.fn(),
+      findMany: jest.fn(),
     },
     dailyPortfolioSnapshot: {
       create: jest.fn(),
@@ -766,6 +768,207 @@ describe('OrdersService', () => {
   ) => {
     prisma.order.updateMany.mockResolvedValueOnce({ count: 1 });
     prisma.order.findUnique.mockResolvedValueOnce(order);
+  };
+
+  const providerAssetSnapshot = (input: {
+    id: string;
+    price: string;
+    currencyCode?: CurrencyCode;
+    sourceName?: string | null;
+    effectiveAt?: Date;
+    capturedAt?: Date;
+    priceKrw?: string | null;
+  }) => ({
+    id: input.id,
+    price: new Prisma.Decimal(input.price),
+    priceKrw:
+      input.priceKrw === undefined || input.priceKrw === null
+        ? null
+        : new Prisma.Decimal(input.priceKrw),
+    currencyCode: input.currencyCode ?? CurrencyCode.KRW,
+    sourceType: AssetPriceSourceType.provider_api,
+    sourceName: input.sourceName ?? 'kis_krx_realtime_trade',
+    effectiveAt: input.effectiveAt ?? executedAt,
+    capturedAt: input.capturedAt ?? executedAt,
+  });
+
+  const providerFxSnapshot = (input: {
+    id: string;
+    rate: string;
+    sourceName?: string | null;
+    effectiveAt?: Date;
+    capturedAt?: Date;
+  }) => ({
+    id: input.id,
+    rate: new Prisma.Decimal(input.rate),
+    sourceType: FxRateSourceType.provider_api,
+    sourceName: input.sourceName ?? 'exchange_rate_api',
+    effectiveAt: input.effectiveAt ?? executedAt,
+    capturedAt: input.capturedAt ?? executedAt,
+  });
+
+  const adminFxSnapshot = (input: {
+    id: string;
+    rate: string;
+    approvedByUserId?: string | null;
+    effectiveAt?: Date;
+    capturedAt?: Date;
+  }) => ({
+    id: input.id,
+    rate: new Prisma.Decimal(input.rate),
+    sourceType: FxRateSourceType.admin_manual,
+    sourceName: 'manual-fx',
+    effectiveAt: input.effectiveAt ?? executedAt,
+    capturedAt: input.capturedAt ?? executedAt,
+    approvedByUserId: Object.prototype.hasOwnProperty.call(
+      input,
+      'approvedByUserId',
+    )
+      ? input.approvedByUserId
+      : 'operator-1',
+  });
+
+  const mockOrderExecutedPortfolioValuation = (
+    prisma: ReturnType<typeof createPrisma>,
+    input: {
+      positionId?: string;
+      assetId?: string;
+      assetType?: AssetType;
+      market?: string;
+      currencyCode?: CurrencyCode;
+      quantity?: string;
+      averageCost?: string;
+      krwCash?: string;
+      usdCash?: string;
+      initialCapitalKrw?: string;
+      assetProviderCandidates?: ReturnType<typeof providerAssetSnapshot>[];
+      assetAdminSnapshot?: {
+        id: string;
+        price: string;
+        currencyCode?: CurrencyCode;
+        effectiveAt?: Date;
+        capturedAt?: Date;
+      } | null;
+      fxProviderCandidates?: ReturnType<typeof providerFxSnapshot>[];
+      fxAdminSnapshot?: ReturnType<typeof adminFxSnapshot> | null;
+      equitySnapshotId?: string;
+      equityHistoryTotalAssetKrw?: string;
+    } = {},
+  ) => {
+    const currencyCode = input.currencyCode ?? CurrencyCode.KRW;
+    const assetId = input.assetId ?? 'asset-1';
+    const assetType =
+      input.assetType ??
+      (currencyCode === CurrencyCode.USD
+        ? AssetType.us_stock
+        : AssetType.domestic_stock);
+    const market =
+      input.market ??
+      (assetType === AssetType.crypto
+        ? 'BINANCE'
+        : currencyCode === CurrencyCode.USD
+          ? 'NASDAQ'
+          : 'KRX');
+
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+      initialCapitalKrw: new Prisma.Decimal(
+        input.initialCapitalKrw ?? '1000000.00000000',
+      ),
+      cashWallets: [
+        {
+          currencyCode: CurrencyCode.KRW,
+          balanceAmount: new Prisma.Decimal(input.krwCash ?? '0.00000000'),
+        },
+        {
+          currencyCode: CurrencyCode.USD,
+          balanceAmount: new Prisma.Decimal(input.usdCash ?? '0.00000000'),
+        },
+      ],
+      positions: [
+        {
+          id: input.positionId ?? 'position-1',
+          assetId,
+          quantity: new Prisma.Decimal(input.quantity ?? '1.00000000'),
+          averageCost: new Prisma.Decimal(
+            input.averageCost ?? '100.00000000',
+          ),
+          currencyCode,
+          asset: {
+            id: assetId,
+            assetType,
+            market,
+            currencyCode,
+            priceCurrency: currencyCode,
+            settlementCurrency: currencyCode,
+          },
+        },
+      ],
+    });
+
+    if (currencyCode === CurrencyCode.USD || input.usdCash) {
+      prisma.fxRateSnapshot.findMany.mockResolvedValueOnce(
+        input.fxProviderCandidates ?? [
+          providerFxSnapshot({
+            id: 'fx-portfolio-1',
+            rate: '1400.00000000',
+            sourceName: 'exchange_rate_api',
+          }),
+        ],
+      );
+      if (Object.prototype.hasOwnProperty.call(input, 'fxAdminSnapshot')) {
+        prisma.fxRateSnapshot.findFirst.mockResolvedValueOnce(
+          input.fxAdminSnapshot ?? null,
+        );
+      }
+    }
+
+    prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce(
+      input.assetProviderCandidates ?? [
+        providerAssetSnapshot({
+          id: 'aps-portfolio-1',
+          price: '100.00000000',
+          currencyCode,
+          sourceName:
+            assetType === AssetType.crypto
+              ? 'binance_public_rest_24hr_ticker'
+              : currencyCode === CurrencyCode.USD
+                ? 'kis_us_delayed_trade'
+                : 'kis_krx_realtime_trade',
+        }),
+      ],
+    );
+    if (Object.prototype.hasOwnProperty.call(input, 'assetAdminSnapshot')) {
+      const snapshot = input.assetAdminSnapshot;
+      prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(
+        snapshot
+          ? {
+              id: snapshot.id,
+              price: new Prisma.Decimal(snapshot.price),
+              priceKrw: null,
+              currencyCode: snapshot.currencyCode ?? currencyCode,
+              sourceName: 'manual-price',
+              effectiveAt: snapshot.effectiveAt ?? executedAt,
+              capturedAt: snapshot.capturedAt ?? executedAt,
+            }
+          : null,
+      );
+    }
+
+    prisma.position.update.mockResolvedValueOnce({
+      id: input.positionId ?? 'position-1',
+    });
+    prisma.equitySnapshot.create.mockResolvedValueOnce({
+      id: input.equitySnapshotId ?? 'equity-order-1',
+    });
+    prisma.equitySnapshot.findMany.mockResolvedValueOnce([
+      {
+        totalAssetKrw: new Prisma.Decimal(
+          input.equityHistoryTotalAssetKrw ?? '1000000.00000000',
+        ),
+        capturedAt: executedAt,
+      },
+    ]);
+    prisma.seasonParticipant.update.mockResolvedValueOnce({ id: 'sp-1' });
   };
 
   const cryptoUsdOrderExecutionRecord = (
@@ -2841,6 +3044,320 @@ describe('OrdersService', () => {
       );
       expectNoForbiddenExecuteSideEffects(prisma);
     });
+
+    it('records buy equity snapshots with fresh provider asset and FX valuation snapshots', async () => {
+      const { prisma, service } = createService();
+      prisma.order.findFirst.mockResolvedValueOnce(
+        cryptoUsdOrderExecutionRecord(),
+      );
+      mockExecutionPrice(
+        prisma,
+        '50000.00000000',
+        'aps-btc-exec-1',
+        'binance_public_rest_24hr_ticker',
+      );
+      mockExecutionFx(prisma);
+      mockExecutionWallet(
+        prisma,
+        '1000.00000000',
+        '499.50000000',
+        CurrencyCode.USD,
+      );
+      prisma.position.findUnique.mockResolvedValueOnce(null);
+      prisma.position.create.mockResolvedValueOnce({ id: 'position-btc-1' });
+      prisma.walletTransaction.create.mockResolvedValueOnce({
+        id: 'wallet-tx-btc-buy-1',
+      });
+      mockOrderFinalization(prisma, executedCryptoUsdOrderExecutionRecord());
+      mockOrderExecutedPortfolioValuation(prisma, {
+        positionId: 'position-btc-1',
+        assetId: 'asset-btc',
+        assetType: AssetType.crypto,
+        market: 'BINANCE',
+        currencyCode: CurrencyCode.USD,
+        quantity: '0.01000000',
+        averageCost: '50050.00000000',
+        usdCash: '499.50000000',
+        initialCapitalKrw: '1000000.00000000',
+        assetProviderCandidates: [
+          providerAssetSnapshot({
+            id: 'aps-btc-portfolio-1',
+            price: '50000.00000000',
+            currencyCode: CurrencyCode.USD,
+            sourceName: 'binance_public_rest_24hr_ticker',
+          }),
+        ],
+        fxProviderCandidates: [
+          providerFxSnapshot({
+            id: 'fx-portfolio-korea-exim',
+            rate: '1400.00000000',
+            sourceName: 'korea_exim_exchange_rate',
+          }),
+        ],
+        equitySnapshotId: 'equity-order-btc-1',
+        equityHistoryTotalAssetKrw: '1399300.00000000',
+      });
+
+      const response = await service.executeOrder(
+        'user-1',
+        'order-btc-execute-1',
+      );
+
+      expect(response.data.execution.equitySnapshotId).toBe(
+        'equity-order-btc-1',
+      );
+      expect(prisma.position.update).toHaveBeenCalledWith({
+        where: {
+          id: 'position-btc-1',
+        },
+        data: {
+          currentPriceLocal: '50000.00000000',
+          currentPriceKrw: '70000000.00000000',
+          marketValueLocal: '500.00000000',
+          marketValueKrw: '700000.00000000',
+          unrealizedPnlLocal: '-0.50000000',
+          unrealizedPnlKrw: '-700.00000000',
+        },
+        select: {
+          id: true,
+        },
+      });
+      expect(prisma.equitySnapshot.create).toHaveBeenCalledWith({
+        data: {
+          seasonParticipantId: 'sp-1',
+          totalAssetKrw: '1399300.00000000',
+          returnRate: '39.93000000',
+          krwCash: '0.00000000',
+          usdCashKrw: '699300.00000000',
+          domesticStockValueKrw: '0.00000000',
+          usStockValueKrw: '0.00000000',
+          cryptoValueKrw: '700000.00000000',
+          snapshotReason: SnapshotReason.order_executed,
+          capturedAt: executedAt,
+        },
+        select: {
+          id: true,
+        },
+      });
+      expect(prisma.seasonParticipant.update).toHaveBeenCalledWith({
+        where: {
+          id: 'sp-1',
+        },
+        data: {
+          totalAssetKrw: '1399300.00000000',
+          totalReturnRate: '39.93000000',
+          maxDrawdown: '0.00000000',
+          totalFillCount: {
+            increment: 1,
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+    });
+
+    it('records sell equity snapshots after position and realizedPnl updates', async () => {
+      const { prisma, service } = createService();
+      prisma.order.findFirst.mockResolvedValueOnce(
+        orderExecutionRecord({
+          side: OrderSide.sell,
+          orderType: OrderType.market,
+          limitPrice: null,
+        }),
+      );
+      mockExecutionPrice(prisma);
+      prisma.position.findUnique.mockResolvedValueOnce({
+        id: 'position-1',
+        quantity: new Prisma.Decimal('5.00000000'),
+        averageCost: new Prisma.Decimal('80.00000000'),
+        currencyCode: CurrencyCode.KRW,
+      });
+      prisma.position.updateMany.mockResolvedValueOnce({ count: 1 });
+      mockExecutionWallet(prisma, '100.00000000', '299.80000000');
+      prisma.walletTransaction.create.mockResolvedValueOnce({
+        id: 'wallet-tx-sell-1',
+      });
+      mockOrderFinalization(
+        prisma,
+        executedOrderExecutionRecord({
+          side: OrderSide.sell,
+          netAmount: new Prisma.Decimal('199.80000000'),
+          feeAmount: new Prisma.Decimal('0.20000000'),
+        }),
+      );
+      mockOrderExecutedPortfolioValuation(prisma, {
+        positionId: 'position-1',
+        quantity: '3.00000000',
+        averageCost: '80.00000000',
+        krwCash: '299.80000000',
+        initialCapitalKrw: '500.00000000',
+        assetProviderCandidates: [
+          providerAssetSnapshot({
+            id: 'aps-sell-portfolio-1',
+            price: '100.00000000',
+          }),
+        ],
+        equitySnapshotId: 'equity-order-sell-1',
+        equityHistoryTotalAssetKrw: '599.80000000',
+      });
+
+      const response = await service.executeOrder('user-1', 'order-execute-1');
+
+      expect(response.data.execution.equitySnapshotId).toBe(
+        'equity-order-sell-1',
+      );
+      expect(prisma.equitySnapshot.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            totalAssetKrw: '599.80000000',
+            returnRate: '19.96000000',
+            krwCash: '299.80000000',
+            domesticStockValueKrw: '300.00000000',
+            snapshotReason: SnapshotReason.order_executed,
+          }),
+        }),
+      );
+      expect(prisma.seasonParticipant.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            totalAssetKrw: '599.80000000',
+            totalReturnRate: '19.96000000',
+            totalFillCount: {
+              increment: 1,
+            },
+          }),
+        }),
+      );
+    });
+
+    it.each([
+      {
+        name: 'stale provider asset snapshot',
+        assetProviderCandidates: [
+          providerAssetSnapshot({
+            id: 'aps-portfolio-stale',
+            price: '100.00000000',
+            capturedAt: new Date(executedAt.getTime() - 61_000),
+            effectiveAt: new Date(executedAt.getTime() - 61_000),
+          }),
+        ],
+        expectedCode: 'PRICE_STALE',
+      },
+      {
+        name: 'wrong sourceName provider asset snapshot',
+        assetProviderCandidates: [
+          providerAssetSnapshot({
+            id: 'aps-portfolio-wrong-source',
+            price: '100.00000000',
+            sourceName: 'unexpected_provider',
+          }),
+        ],
+        expectedCode: 'ASSET_PRICE_UNAVAILABLE',
+      },
+    ])(
+      'rejects execute when post-execute valuation has $name',
+      async ({ assetProviderCandidates, expectedCode }) => {
+        const { prisma, service } = createService();
+        prisma.order.findFirst.mockResolvedValueOnce(orderExecutionRecord());
+        mockExecutionPrice(prisma);
+        mockExecutionWallet(prisma, '1000.00000000', '799.80000000');
+        prisma.position.findUnique.mockResolvedValueOnce(null);
+        prisma.position.create.mockResolvedValueOnce({ id: 'position-1' });
+        prisma.walletTransaction.create.mockResolvedValueOnce({
+          id: 'wallet-tx-buy-1',
+        });
+        mockOrderFinalization(prisma);
+        mockOrderExecutedPortfolioValuation(prisma, {
+          positionId: 'position-1',
+          quantity: '2.00000000',
+          averageCost: '100.10000000',
+          krwCash: '799.80000000',
+          assetProviderCandidates,
+          assetAdminSnapshot: null,
+        });
+
+        await expectErrorCode(
+          service.executeOrder('user-1', 'order-execute-1'),
+          expectedCode,
+        );
+        expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
+        expect(prisma.seasonParticipant.update).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([
+      {
+        name: 'stale provider FX snapshot',
+        fxProviderCandidates: [
+          providerFxSnapshot({
+            id: 'fx-portfolio-stale',
+            rate: '1400.00000000',
+            sourceName: 'exchange_rate_api',
+            capturedAt: new Date(executedAt.getTime() - 301_000),
+            effectiveAt: new Date(executedAt.getTime() - 301_000),
+          }),
+        ],
+        fxAdminSnapshot: null,
+        expectedCode: 'FX_RATE_STALE',
+      },
+      {
+        name: 'unapproved admin_manual FX snapshot',
+        fxProviderCandidates: [],
+        fxAdminSnapshot: adminFxSnapshot({
+          id: 'fx-admin-unapproved',
+          rate: '1400.00000000',
+          approvedByUserId: null,
+        }),
+        expectedCode: 'FX_RATE_UNAVAILABLE',
+      },
+    ])(
+      'rejects execute when post-execute valuation has $name',
+      async ({ fxProviderCandidates, fxAdminSnapshot, expectedCode }) => {
+        const { prisma, service } = createService();
+        prisma.order.findFirst.mockResolvedValueOnce(
+          cryptoUsdOrderExecutionRecord(),
+        );
+        mockExecutionPrice(
+          prisma,
+          '50000.00000000',
+          'aps-btc-exec-1',
+          'binance_public_rest_24hr_ticker',
+        );
+        mockExecutionFx(prisma);
+        mockExecutionWallet(
+          prisma,
+          '1000.00000000',
+          '499.50000000',
+          CurrencyCode.USD,
+        );
+        prisma.position.findUnique.mockResolvedValueOnce(null);
+        prisma.position.create.mockResolvedValueOnce({ id: 'position-btc-1' });
+        prisma.walletTransaction.create.mockResolvedValueOnce({
+          id: 'wallet-tx-btc-buy-1',
+        });
+        mockOrderFinalization(prisma, executedCryptoUsdOrderExecutionRecord());
+        mockOrderExecutedPortfolioValuation(prisma, {
+          positionId: 'position-btc-1',
+          assetId: 'asset-btc',
+          assetType: AssetType.crypto,
+          market: 'BINANCE',
+          currencyCode: CurrencyCode.USD,
+          quantity: '0.01000000',
+          averageCost: '50050.00000000',
+          usdCash: '499.50000000',
+          fxProviderCandidates,
+          fxAdminSnapshot,
+        });
+
+        await expectErrorCode(
+          service.executeOrder('user-1', 'order-btc-execute-1'),
+          expectedCode,
+        );
+        expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
+        expect(prisma.seasonParticipant.update).not.toHaveBeenCalled();
+      },
+    );
 
     it('rejects US stock executes when provider price changes by more than 30 bps', async () => {
       jest.setSystemTime(usMarketOpenAt);

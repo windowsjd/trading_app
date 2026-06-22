@@ -10,11 +10,8 @@ import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { IncomingMessage } from 'node:http';
 import { URL } from 'node:url';
 import { WebSocket, WebSocketServer as WsServer } from 'ws';
-import {
-  CurrencyCode,
-  Prisma,
-  UserStatus,
-} from '../generated/prisma/client';
+import { UserStatus } from '../generated/prisma/client';
+import { AssetsService } from '../assets/assets.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 type AccessTokenPayload = {
@@ -55,6 +52,7 @@ export class AssetTickerGateway
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly assetsService: AssetsService,
   ) {}
 
   onModuleInit() {
@@ -195,115 +193,60 @@ export class AssetTickerGateway
   }
 
   private async buildTickerMessage(assetId: string) {
-    const asset = await this.prisma.asset.findFirst({
-      where: {
-        id: assetId,
-        isActive: true,
-      },
-      select: {
-        id: true,
-        symbol: true,
-        name: true,
-        priceCurrency: true,
-        currencyCode: true,
-      },
-    });
-
-    if (!asset) {
+    const selection = await this.assetsService.getAssetPriceForTicker(assetId);
+    if (!selection) {
       return null;
     }
 
-    const priceCurrency = asset.priceCurrency ?? asset.currencyCode;
-    const snapshot = await this.prisma.assetPriceSnapshot.findFirst({
-      where: {
+    const { asset, price } = selection;
+    if (price.state === 'unavailable') {
+      return {
+        type: 'asset_ticker',
         assetId: asset.id,
-        currencyCode: priceCurrency,
-        price: {
-          gt: 0,
-        },
-      },
-      orderBy: [
-        { effectiveAt: 'desc' },
-        { capturedAt: 'desc' },
-        { createdAt: 'desc' },
-      ],
-      select: {
-        id: true,
-        price: true,
-        priceKrw: true,
-        effectiveAt: true,
-        capturedAt: true,
-      },
-    });
-
-    if (!snapshot) {
-      return null;
+        symbol: asset.symbol,
+        name: asset.name,
+        priceLocal: null,
+        priceCurrency: asset.priceCurrency,
+        priceKrw: null,
+        priceKrwState: 'unavailable',
+        changeRate: null,
+        assetPriceSnapshotId: null,
+        priceCapturedAt: null,
+        priceEffectiveAt: null,
+        freshnessAgeSeconds: null,
+        priceSource: null,
+        reason: price.reason,
+        message: price.message,
+      };
     }
 
-    const priceKrw = await this.resolvePriceKrw({
-      price: snapshot.price,
-      priceKrw: snapshot.priceKrw,
-      priceCurrency,
-      effectiveAt: snapshot.effectiveAt,
-    });
-    const now = new Date();
+    const priceKrwAvailable = price.priceKrwState === 'available';
 
     return {
       type: 'asset_ticker',
       assetId: asset.id,
       symbol: asset.symbol,
       name: asset.name,
-      priceLocal: snapshot.price.toFixed(8),
-      priceCurrency,
-      priceKrw: priceKrw ? priceKrw.toFixed(8) : null,
-      priceKrwState: priceKrw ? 'available' : 'unavailable',
-      changeRate: null,
-      assetPriceSnapshotId: snapshot.id,
-      priceCapturedAt: snapshot.capturedAt.toISOString(),
-      priceEffectiveAt: snapshot.effectiveAt.toISOString(),
-      freshnessAgeSeconds: Math.max(
-        0,
-        Math.floor((now.getTime() - snapshot.capturedAt.getTime()) / 1000),
+      priceLocal: price.currentPrice,
+      priceCurrency: price.priceCurrency,
+      priceKrw: priceKrwAvailable ? price.priceKrw : null,
+      priceKrwState: price.priceKrwState,
+      ...(priceKrwAvailable
+        ? {}
+        : {
+            priceKrwReason: price.priceKrwReason,
+            priceKrwMessage: price.priceKrwMessage,
+          }),
+      changeRate: price.changeRate,
+      assetPriceSnapshotId: price.assetPriceSnapshotId,
+      priceCapturedAt: price.priceCapturedAt,
+      priceEffectiveAt: price.priceEffectiveAt,
+      freshnessAgeSeconds: this.calculateFreshnessAgeSeconds(
+        price.priceCapturedAt,
       ),
+      priceSource: price.priceSource,
+      ...(price.fxRateSource ? { fxRateSource: price.fxRateSource } : {}),
     };
-  }
-
-  private async resolvePriceKrw(input: {
-    price: Prisma.Decimal;
-    priceKrw: Prisma.Decimal | null;
-    priceCurrency: CurrencyCode;
-    effectiveAt: Date;
-  }): Promise<Prisma.Decimal | null> {
-    if (input.priceKrw) {
-      return input.priceKrw;
-    }
-
-    if (input.priceCurrency === CurrencyCode.KRW) {
-      return input.price;
-    }
-
-    const fxRate = await this.prisma.fxRateSnapshot.findFirst({
-      where: {
-        baseCurrency: CurrencyCode.USD,
-        quoteCurrency: CurrencyCode.KRW,
-        rate: {
-          gt: 0,
-        },
-        effectiveAt: {
-          lte: input.effectiveAt,
-        },
-      },
-      orderBy: [
-        { effectiveAt: 'desc' },
-        { capturedAt: 'desc' },
-        { createdAt: 'desc' },
-      ],
-      select: {
-        rate: true,
-      },
-    });
-
-    return fxRate ? input.price.mul(fxRate.rate) : null;
   }
 
   private async authenticate(request: IncomingMessage): Promise<string | null> {
@@ -384,5 +327,14 @@ export class AssetTickerGateway
     }
 
     client.send(JSON.stringify(payload));
+  }
+
+  private calculateFreshnessAgeSeconds(capturedAt: string): number {
+    const capturedAtTime = Date.parse(capturedAt);
+    if (Number.isNaN(capturedAtTime)) {
+      return 0;
+    }
+
+    return Math.max(0, Math.floor((Date.now() - capturedAtTime) / 1000));
   }
 }

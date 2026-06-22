@@ -26,6 +26,7 @@ import {
   roundDecimalHalfUp,
 } from '../fx/fx-decimal-policy';
 import { isFxSnapshotStale } from '../fx/fx-execute-snapshot-policy';
+import { isFxSnapshotStaleForPortfolioValuation } from '../portfolio/portfolio-valuation.policy';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   buildAdminManualFallbackDecision,
@@ -1972,6 +1973,7 @@ export class OrdersService {
               select: {
                 id: true,
                 assetType: true,
+                market: true,
                 currencyCode: true,
                 priceCurrency: true,
                 settlementCurrency: true,
@@ -2036,6 +2038,8 @@ export class OrdersService {
         tx,
         {
           assetId: position.assetId,
+          assetType: position.asset.assetType,
+          market: position.asset.market,
           currencyCode: this.getAssetPriceCurrency(position.asset),
         },
         valuationAt,
@@ -2129,10 +2133,70 @@ export class OrdersService {
     tx: OrderExecuteTransactionClient,
     valuationAt: Date,
   ): Promise<Prisma.Decimal> {
+    const providerEligibility = resolveFxProviderEligibility({
+      workflow: 'live_portfolio_valuation',
+      baseCurrency: CurrencyCode.USD,
+      quoteCurrency: CurrencyCode.KRW,
+    });
+    const providerCandidates = providerEligibility.eligible
+      ? await tx.fxRateSnapshot.findMany({
+          where: {
+            baseCurrency: CurrencyCode.USD,
+            quoteCurrency: CurrencyCode.KRW,
+            sourceType: FxRateSourceType.provider_api,
+          },
+          orderBy: [
+            { effectiveAt: 'desc' },
+            { capturedAt: 'desc' },
+            { createdAt: 'desc' },
+          ],
+          take: 10,
+          select: {
+            id: true,
+            rate: true,
+            sourceType: true,
+            sourceName: true,
+            effectiveAt: true,
+            capturedAt: true,
+          },
+        })
+      : [];
+    const providerSelection = providerEligibility.eligible
+      ? selectFreshProviderSnapshotBySourcePriority({
+          candidates: providerCandidates,
+          expectedSourceNames: providerEligibility.sourceNames,
+          now: valuationAt,
+          freshnessThresholdSeconds:
+            providerEligibility.freshnessThresholdSeconds,
+          isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
+        })
+      : {
+          state: 'not_selected' as const,
+          decision: {
+            selectedSourceType: null,
+            selectedSourceName: null,
+            selectedSnapshotId: null,
+            selectedEffectiveAt: null,
+            selectedCapturedAt: null,
+            fallbackUsed: true,
+            fallbackReason: providerEligibility.reason,
+            rejectedProviderReason: null,
+            freshnessAgeSeconds: null,
+          },
+        };
+
+    if (providerSelection.state === 'selected') {
+      return providerSelection.snapshot.rate;
+    }
+
     const snapshot = await tx.fxRateSnapshot.findFirst({
       where: {
         baseCurrency: CurrencyCode.USD,
         quoteCurrency: CurrencyCode.KRW,
+        sourceType: FxRateSourceType.admin_manual,
+        approvedByUserId: {
+          not: null,
+        },
         rate: {
           gt: 0,
         },
@@ -2141,21 +2205,58 @@ export class OrdersService {
         },
       },
       orderBy: [
-        { sourceType: 'desc' },
         { effectiveAt: 'desc' },
         { capturedAt: 'desc' },
         { createdAt: 'desc' },
       ],
       select: {
+        id: true,
         rate: true,
+        sourceType: true,
+        sourceName: true,
+        effectiveAt: true,
+        capturedAt: true,
+        approvedByUserId: true,
       },
     });
 
     if (!snapshot) {
+      if (
+        providerSelection.decision.rejectedProviderReason ===
+        'captured_at_stale'
+      ) {
+        this.throwApiError(
+          HttpStatus.SERVICE_UNAVAILABLE,
+          'FX_RATE_STALE',
+          'USD/KRW FX rate snapshot is stale.',
+        );
+      }
+
       this.throwApiError(
         HttpStatus.SERVICE_UNAVAILABLE,
         'FX_RATE_UNAVAILABLE',
         'USD/KRW FX rate snapshot is unavailable.',
+      );
+    }
+
+    if (
+      snapshot.sourceType !== FxRateSourceType.admin_manual ||
+      !snapshot.approvedByUserId
+    ) {
+      this.throwApiError(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'FX_RATE_UNAVAILABLE',
+        'No approved admin_manual USD/KRW FX rate snapshot is available.',
+      );
+    }
+
+    if (
+      isFxSnapshotStaleForPortfolioValuation(snapshot.effectiveAt, valuationAt)
+    ) {
+      this.throwApiError(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'FX_RATE_STALE',
+        'USD/KRW FX rate snapshot is stale.',
       );
     }
 
@@ -2166,6 +2267,8 @@ export class OrdersService {
     tx: OrderExecuteTransactionClient,
     input: {
       assetId: string;
+      assetType: AssetType;
+      market: string;
       currencyCode: CurrencyCode;
     },
     valuationAt: Date,
@@ -2174,10 +2277,77 @@ export class OrdersService {
     priceKrw: Prisma.Decimal | null;
     currencyCode: CurrencyCode;
   }> {
+    const providerEligibility = resolveAssetProviderEligibility({
+      workflow: 'live_portfolio_valuation',
+      asset: {
+        id: input.assetId,
+        assetType: input.assetType,
+        market: input.market,
+        currencyCode: input.currencyCode,
+      },
+    });
+    const providerCandidates = providerEligibility.eligible
+      ? await tx.assetPriceSnapshot.findMany({
+          where: {
+            assetId: input.assetId,
+            currencyCode: input.currencyCode,
+            sourceType: AssetPriceSourceType.provider_api,
+          },
+          orderBy: [
+            { effectiveAt: 'desc' },
+            { capturedAt: 'desc' },
+            { createdAt: 'desc' },
+          ],
+          take: 10,
+          select: {
+            id: true,
+            price: true,
+            priceKrw: true,
+            currencyCode: true,
+            sourceType: true,
+            sourceName: true,
+            effectiveAt: true,
+            capturedAt: true,
+          },
+        })
+      : [];
+    const providerSelection = providerEligibility.eligible
+      ? selectFreshProviderSnapshot({
+          candidates: providerCandidates,
+          expectedSourceName: providerEligibility.sourceName,
+          now: valuationAt,
+          freshnessThresholdSeconds:
+            providerEligibility.freshnessThresholdSeconds,
+          isPositiveValue: (candidate) => isPositiveDecimal(candidate.price),
+        })
+      : {
+          state: 'not_selected' as const,
+          decision: {
+            selectedSourceType: null,
+            selectedSourceName: null,
+            selectedSnapshotId: null,
+            selectedEffectiveAt: null,
+            selectedCapturedAt: null,
+            fallbackUsed: true,
+            fallbackReason: providerEligibility.reason,
+            rejectedProviderReason: null,
+            freshnessAgeSeconds: null,
+          },
+        };
+
+    if (providerSelection.state === 'selected') {
+      return {
+        price: providerSelection.snapshot.price,
+        priceKrw: providerSelection.snapshot.priceKrw,
+        currencyCode: providerSelection.snapshot.currencyCode,
+      };
+    }
+
     const snapshot = await tx.assetPriceSnapshot.findFirst({
       where: {
         assetId: input.assetId,
         currencyCode: input.currencyCode,
+        sourceType: AssetPriceSourceType.admin_manual,
         price: {
           gt: 0,
         },
@@ -2186,19 +2356,33 @@ export class OrdersService {
         },
       },
       orderBy: [
-        { sourceType: 'desc' },
         { effectiveAt: 'desc' },
         { capturedAt: 'desc' },
         { createdAt: 'desc' },
       ],
       select: {
+        id: true,
         price: true,
         priceKrw: true,
         currencyCode: true,
+        sourceName: true,
+        effectiveAt: true,
+        capturedAt: true,
       },
     });
 
     if (!snapshot) {
+      if (
+        providerSelection.decision.rejectedProviderReason ===
+        'captured_at_stale'
+      ) {
+        this.throwApiError(
+          HttpStatus.SERVICE_UNAVAILABLE,
+          'PRICE_STALE',
+          'Asset price snapshot is stale.',
+        );
+      }
+
       this.throwApiError(
         HttpStatus.SERVICE_UNAVAILABLE,
         'ASSET_PRICE_UNAVAILABLE',
@@ -2206,7 +2390,11 @@ export class OrdersService {
       );
     }
 
-    return snapshot;
+    return {
+      price: snapshot.price,
+      priceKrw: snapshot.priceKrw,
+      currencyCode: snapshot.currencyCode,
+    };
   }
 
   private convertToKrwForPortfolio(

@@ -14,6 +14,7 @@ type AuthenticatedRequest = Request & {
 export class SeasonsController {
   constructor(private readonly seasonsService: SeasonsService) {}
 
+  @OptionalAuth()
   @Get()
   getSeasons(@Query() query: SeasonsListQuery) {
     return this.seasonsService.getSeasons(query);

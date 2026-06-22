@@ -133,6 +133,27 @@ type PositionValuation =
       };
     }
   | {
+      state: 'stale_cache';
+      sortValueKrw: Prisma.Decimal;
+      payload: {
+        state: 'stale_cache';
+        currentPrice: string;
+        priceCurrency: CurrencyCode;
+        assetPriceSnapshotId: null;
+        priceEffectiveAt: null;
+        priceCapturedAt: null;
+        priceSource: null;
+        fxRateSource: null;
+        positionValue: string;
+        positionValueKrw: string;
+        unrealizedPnl: string;
+        unrealizedPnlKrw: string;
+        returnRate: string;
+        reason: 'LIVE_VALUATION_UNAVAILABLE';
+        message: string;
+      };
+    }
+  | {
       state: 'unavailable';
       sortValueKrw: null;
       error: {
@@ -471,21 +492,25 @@ export class PositionsService {
           .mul(100);
 
     return {
-      state: 'available',
+      state: 'stale_cache',
       sortValueKrw: position.marketValueKrw,
       payload: {
-        state: 'available',
+        state: 'stale_cache',
         currentPrice: this.formatDecimal(position.currentPriceLocal, 8),
         priceCurrency: this.getAssetPriceCurrency(position.asset),
-        assetPriceSnapshotId: '',
-        priceEffectiveAt: '',
-        priceCapturedAt: '',
+        assetPriceSnapshotId: null,
+        priceEffectiveAt: null,
+        priceCapturedAt: null,
         priceSource: null,
+        fxRateSource: null,
         positionValue: this.formatDecimal(position.marketValueLocal, 8),
         positionValueKrw: this.formatDecimal(position.marketValueKrw, 8),
         unrealizedPnl: this.formatDecimal(position.unrealizedPnlLocal, 8),
         unrealizedPnlKrw: this.formatDecimal(position.unrealizedPnlKrw, 8),
         returnRate: this.formatDecimal(returnRate, 8),
+        reason: 'LIVE_VALUATION_UNAVAILABLE',
+        message:
+          'Live position valuation is unavailable; cached values are shown.',
       },
     };
   }
@@ -784,29 +809,23 @@ export class PositionsService {
     left: PositionItemWithSort,
     right: PositionItemWithSort,
   ) {
-    if (
-      left.valuation.state === 'available' &&
-      right.valuation.state !== 'available'
-    ) {
+    const leftSortable = left.valuation.sortValueKrw;
+    const rightSortable = right.valuation.sortValueKrw;
+
+    if (leftSortable && !rightSortable) {
       return -1;
     }
 
-    if (
-      left.valuation.state !== 'available' &&
-      right.valuation.state === 'available'
-    ) {
+    if (!leftSortable && rightSortable) {
       return 1;
     }
 
-    if (
-      left.valuation.state === 'available' &&
-      right.valuation.state === 'available'
-    ) {
-      if (right.valuation.sortValueKrw.gt(left.valuation.sortValueKrw)) {
+    if (leftSortable && rightSortable) {
+      if (rightSortable.gt(leftSortable)) {
         return 1;
       }
 
-      if (right.valuation.sortValueKrw.lt(left.valuation.sortValueKrw)) {
+      if (rightSortable.lt(leftSortable)) {
         return -1;
       }
     }
@@ -821,7 +840,7 @@ export class PositionsService {
 
   private buildSummary(items: readonly PositionItemWithSort[]) {
     const totalPositionValueKrw = items.reduce((sum, item) => {
-      if (item.valuation.state !== 'available') {
+      if (!item.valuation.sortValueKrw) {
         return sum;
       }
 
