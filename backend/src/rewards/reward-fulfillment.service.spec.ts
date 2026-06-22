@@ -1,4 +1,8 @@
 jest.mock('../generated/prisma/client', () => ({
+  BadgeType: {
+    tier_badge: 'tier_badge',
+    ranker_trophy: 'ranker_trophy',
+  },
   OperatorAuditResult: {
     success: 'success',
     failure: 'failure',
@@ -36,6 +40,7 @@ jest.mock('../generated/prisma/client', () => ({
 
 import { HttpException, HttpStatus } from '@nestjs/common';
 import {
+  BadgeType,
   OperatorAuditResult,
   RewardFulfillmentStatus,
   SeasonRewardType,
@@ -156,6 +161,12 @@ describe('RewardFulfillmentService', () => {
       seasonReward: {
         findUnique: jest.fn(),
         create: jest.fn(),
+      },
+      badge: {
+        upsert: jest.fn(),
+      },
+      userBadge: {
+        upsert: jest.fn(),
       },
       operatorAuditLog: {
         create: jest.fn().mockResolvedValue({
@@ -499,11 +510,130 @@ describe('RewardFulfillmentService', () => {
         rewardGrantedAt: expect.any(Date),
       },
     });
+    expect(prisma.badge.upsert).not.toHaveBeenCalled();
+    expect(prisma.userBadge.upsert).not.toHaveBeenCalled();
     expect(prisma.operatorAuditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           action: 'operator.reward_fulfillment.fulfill',
           result: OperatorAuditResult.success,
+        }),
+      }),
+    );
+  });
+
+  it('fulfills badge rewards by creating SeasonReward and UserBadge atomically', async () => {
+    const { prisma, service } = createService();
+    prisma.rewardFulfillmentRequest.findUnique.mockResolvedValueOnce(
+      fulfillmentRecord({
+        rewardType: SeasonRewardType.badge,
+        rewardCode: 'TIER_GOLD',
+        rewardName: 'Gold Badge',
+        rewardValueJson: null,
+      }),
+    );
+    prisma.season.findUnique.mockResolvedValueOnce({
+      id: 'season-1',
+      status: SeasonStatus.settled,
+    });
+    prisma.user.findUnique.mockResolvedValueOnce({
+      id: 'target-user-1',
+      status: UserStatus.active,
+    });
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+      id: 'participant-1',
+      seasonId: 'season-1',
+      userId: 'target-user-1',
+    });
+    prisma.seasonReward.findUnique.mockResolvedValueOnce(null);
+    prisma.rewardFulfillmentRequest.updateMany.mockResolvedValueOnce({
+      count: 1,
+    });
+    prisma.seasonReward.create.mockResolvedValueOnce({
+      id: 'season-reward-1',
+    });
+    prisma.seasonParticipant.updateMany.mockResolvedValueOnce({ count: 1 });
+    prisma.badge.upsert.mockResolvedValueOnce({
+      id: 'badge-gold',
+    });
+    prisma.userBadge.upsert.mockResolvedValueOnce({
+      id: 'user-badge-gold',
+    });
+    prisma.rewardFulfillmentRequest.update.mockResolvedValueOnce(
+      fulfillmentRecord({
+        rewardType: SeasonRewardType.badge,
+        rewardCode: 'TIER_GOLD',
+        rewardName: 'Gold Badge',
+        rewardValueJson: null,
+        status: RewardFulfillmentStatus.fulfilled,
+        seasonRewardId: 'season-reward-1',
+        fulfilledAt: new Date('2026-06-09T00:01:00.000Z'),
+        processedByUserId: operatorActor.userId,
+      }),
+    );
+
+    const response = await service.fulfill(operatorActor, 'fulfillment-1', {
+      reason: 'grant badge now',
+    });
+
+    expect(response.data.fulfillment.status).toBe(
+      RewardFulfillmentStatus.fulfilled,
+    );
+    expect(prisma.seasonReward.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          rewardType: SeasonRewardType.badge,
+          rewardCode: 'TIER_GOLD',
+          rewardName: 'Gold Badge',
+        }),
+      }),
+    );
+    expect(prisma.badge.upsert).toHaveBeenCalledWith({
+      where: {
+        code: 'TIER_GOLD',
+      },
+      create: {
+        badgeType: BadgeType.tier_badge,
+        code: 'TIER_GOLD',
+        name: 'Gold Badge',
+        description: null,
+        iconUrl: null,
+      },
+      update: {
+        badgeType: BadgeType.tier_badge,
+        name: 'Gold Badge',
+      },
+      select: {
+        id: true,
+      },
+    });
+    expect(prisma.userBadge.upsert).toHaveBeenCalledWith({
+      where: {
+        userId_badgeId_seasonId: {
+          userId: 'target-user-1',
+          badgeId: 'badge-gold',
+          seasonId: 'season-1',
+        },
+      },
+      create: {
+        userId: 'target-user-1',
+        badgeId: 'badge-gold',
+        seasonId: 'season-1',
+        awardedAt: expect.any(Date),
+      },
+      update: {
+        awardedAt: expect.any(Date),
+      },
+      select: {
+        id: true,
+      },
+    });
+    expect(prisma.operatorAuditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          metadataJson: expect.objectContaining({
+            userBadgeId: 'user-badge-gold',
+          }),
         }),
       }),
     );

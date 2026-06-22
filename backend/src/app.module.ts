@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_FILTER } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AssetsModule } from './assets/assets.module';
 import { AuthModule } from './auth/auth.module';
 import { BatchModule } from './batch/batch.module';
+import { GlobalHttpExceptionFilter } from './common/global-http-exception.filter';
 import { FxModule } from './fx/fx.module';
 import { HomeModule } from './home/home.module';
 import { OperatorModule } from './operator/operator.module';
@@ -47,6 +49,12 @@ import { WalletsModule } from './wallets/wallets.module';
     WalletsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_FILTER,
+      useClass: GlobalHttpExceptionFilter,
+    },
+  ],
 })
 export class AppModule {}

@@ -1008,8 +1008,21 @@ export class HomeService {
   }
 
   private buildWalletSummary(participant: JoinedParticipant) {
+    const walletByCurrency = new Map(
+      participant.cashWallets.map((wallet) => [wallet.currencyCode, wallet]),
+    );
+    const zeroAmount = new Prisma.Decimal(0);
+
     return {
       state: 'available',
+      KRW: this.formatDecimal(
+        walletByCurrency.get(CurrencyCode.KRW)?.balanceAmount ?? zeroAmount,
+        8,
+      ),
+      USD: this.formatDecimal(
+        walletByCurrency.get(CurrencyCode.USD)?.balanceAmount ?? zeroAmount,
+        8,
+      ),
       cashWallets: participant.cashWallets.map((wallet) => ({
         currencyCode: wallet.currencyCode,
         balanceAmount: this.formatDecimal(wallet.balanceAmount, 8),

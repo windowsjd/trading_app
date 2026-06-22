@@ -403,6 +403,8 @@ describe('HomeService', () => {
     });
     expect(response.data.walletSummary).toMatchObject({
       state: 'available',
+      KRW: '900000.00000000',
+      USD: '100.00000000',
       positionsCount: 2,
       openPositionsCount: 1,
     });
@@ -452,6 +454,37 @@ describe('HomeService', () => {
     expect(
       valuationService.calculateSeasonParticipantValuation,
     ).toHaveBeenCalledTimes(1);
+    expectNoHomeWrites(prisma);
+  });
+
+  it('returns KRW/USD walletSummary keys with zero fallback for missing wallet rows', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+      ...participant,
+      cashWallets: [
+        {
+          currencyCode: CurrencyCode.KRW,
+          balanceAmount: new Prisma.Decimal('2500000.00000000'),
+        },
+      ],
+    });
+    prisma.seasonRanking.findFirst.mockResolvedValueOnce(null);
+
+    const response = await service.getHome('user-1');
+
+    expect(response.data.mode).toBe('active_joined');
+    expect(response.data.walletSummary).toMatchObject({
+      state: 'available',
+      KRW: '2500000.00000000',
+      USD: '0.00000000',
+      cashWallets: [
+        {
+          currencyCode: CurrencyCode.KRW,
+          balanceAmount: '2500000.00000000',
+        },
+      ],
+    });
     expectNoHomeWrites(prisma);
   });
 

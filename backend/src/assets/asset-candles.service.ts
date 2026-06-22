@@ -1,5 +1,10 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { AssetType, CurrencyCode, Prisma } from '../generated/prisma/client';
+import {
+  AssetType,
+  CurrencyCode,
+  Prisma,
+  SeasonStatus,
+} from '../generated/prisma/client';
 import { BinancePublicClient } from '../providers/binance/binance-public.client';
 import type { BinanceKlinesResponse } from '../providers/binance/binance.types';
 import { KisAuthClient } from '../providers/kis/kis-auth.client';
@@ -12,6 +17,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 
 export type AssetCandlesQuery = {
+  range?: string;
   interval?: string;
   limit?: string;
   date?: string;
@@ -19,6 +25,7 @@ export type AssetCandlesQuery = {
   includePrevious?: string;
 };
 
+type CandleRange = '1d' | '7d' | '30d' | 'season';
 type CandleInterval = '5m' | '15m' | '30m' | '1h' | '4h' | '1d' | '1w';
 type CryptoCandleInterval = CandleInterval;
 
@@ -35,6 +42,10 @@ type AssetRecord = {
 };
 
 type ParsedAssetCandlesQuery = {
+  range: CandleRange;
+  rangeProvided: boolean;
+  rangeStartAt: Date | null;
+  rangeEndAt: Date | null;
   interval: CandleInterval;
   intervalMinutes: number;
   limit: number;
@@ -105,6 +116,7 @@ type AssetCandlesResponse = {
       market: string;
       priceCurrency: CurrencyCode;
     };
+    range: CandleRange;
     interval: CandleInterval;
     requestedDate: string;
     candles: CandlePayload[];
@@ -132,10 +144,18 @@ const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 120;
 const CRYPTO_MAX_LIMIT = 1000;
 const DOMESTIC_TODAY_MAX_COUNT = 30;
+const DEFAULT_RANGE: CandleRange = '1d';
 const KOREA_TIME_ZONE = 'Asia/Seoul';
 const US_EASTERN_TIME_ZONE = 'America/New_York';
 const UTC_TIME_ZONE = 'UTC';
 const BINANCE_KLINE_PATH = '/api/v3/klines';
+
+const DEFAULT_INTERVAL_BY_RANGE: Record<CandleRange, CandleInterval> = {
+  '1d': '5m',
+  '7d': '1h',
+  '30d': '1d',
+  season: '1d',
+};
 
 const CANDLE_INTERVAL_MINUTES: Record<CandleInterval, number> = {
   '5m': 5,
@@ -155,6 +175,23 @@ const CANDLE_INTERVALS: Record<CandleInterval, true> = {
   '4h': true,
   '1d': true,
   '1w': true,
+};
+
+const CANDLE_RANGES: Record<CandleRange, true> = {
+  '1d': true,
+  '7d': true,
+  '30d': true,
+  season: true,
+};
+
+const RANGE_INTERVALS: Record<
+  CandleRange,
+  Readonly<Record<CandleInterval, true>>
+> = {
+  '1d': CANDLE_INTERVALS,
+  '7d': CANDLE_INTERVALS,
+  '30d': CANDLE_INTERVALS,
+  season: CANDLE_INTERVALS,
 };
 
 const DOMESTIC_TODAY_CANDLE_PATH =
@@ -235,7 +272,7 @@ export class AssetCandlesService {
       );
     }
 
-    const parsedQuery = this.parseQuery(query, asset);
+    const parsedQuery = await this.parseQuery(query, asset);
 
     try {
       if (asset.assetType === AssetType.domestic_stock) {
@@ -288,8 +325,11 @@ export class AssetCandlesService {
     query: ParsedAssetCandlesQuery,
   ): Promise<AssetCandlesResponse> {
     const marketCode = this.resolveDomesticKisMarketCode(asset);
-    const isToday = query.requestedDate === this.todayInZone(KOREA_TIME_ZONE);
-    const descriptor = isToday
+    const usesTodayEndpoint =
+      query.range === '1d' &&
+      query.intervalMinutes < CANDLE_INTERVAL_MINUTES['1d'] &&
+      query.requestedDate === this.todayInZone(KOREA_TIME_ZONE);
+    const descriptor = usesTodayEndpoint
       ? this.buildDomesticTodayCall(asset, query, marketCode)
       : this.buildDomesticDailyCall(asset, query, marketCode);
     const response = await this.callKisCandles(descriptor);
@@ -755,6 +795,7 @@ export class AssetCandlesService {
           market: asset.market,
           priceCurrency: asset.priceCurrency ?? asset.currencyCode,
         },
+        range: query.range,
         interval: query.interval,
         requestedDate: query.requestedDate,
         candles,
@@ -788,6 +829,7 @@ export class AssetCandlesService {
           market: asset.market,
           priceCurrency: asset.priceCurrency ?? asset.currencyCode,
         },
+        range: query.range,
         interval: query.interval,
         requestedDate: query.requestedDate,
         candles,
@@ -817,40 +859,74 @@ export class AssetCandlesService {
     };
   }
 
-  private parseQuery(
+  private async parseQuery(
     query: AssetCandlesQuery,
     asset: AssetRecord,
-  ): ParsedAssetCandlesQuery {
+  ): Promise<ParsedAssetCandlesQuery> {
     const timeZone =
       asset.assetType === AssetType.domestic_stock
         ? KOREA_TIME_ZONE
         : asset.assetType === AssetType.us_stock
           ? US_EASTERN_TIME_ZONE
           : UTC_TIME_ZONE;
-    const interval = this.parseInterval(query.interval, asset.assetType);
+    const range = this.parseRange(query.range);
+    const rangeProvided = this.parseOptionalText(query.range) !== undefined;
+    const interval = this.parseInterval(query.interval, asset.assetType, range);
     const parsedTo = this.parseTo(query.to, timeZone);
+    const rangeWindow = rangeProvided
+      ? await this.resolveRangeWindow(range, new Date())
+      : null;
+    const requestedDate = rangeWindow
+      ? this.dateInZone(rangeWindow.endAt, timeZone)
+      : this.parseDate(query.date, timeZone);
+    const toHHmmss = rangeWindow
+      ? this.timeInZone(rangeWindow.endAt, timeZone)
+      : parsedTo.hhmmss;
 
     return {
+      range,
+      rangeProvided,
+      rangeStartAt: rangeWindow?.startAt ?? null,
+      rangeEndAt: rangeWindow?.endAt ?? null,
       interval,
       intervalMinutes: CANDLE_INTERVAL_MINUTES[interval],
       limit: this.parseLimit(query.limit, asset.assetType),
-      requestedDate: this.parseDate(query.date, timeZone),
-      toHHmmss: parsedTo.hhmmss,
-      toInstant: parsedTo.instant,
-      dateProvided: this.parseOptionalText(query.date) !== undefined,
-      toProvided: parsedTo.provided,
+      requestedDate,
+      toHHmmss,
+      toInstant: rangeWindow?.endAt ?? parsedTo.instant,
+      dateProvided:
+        rangeWindow !== null ||
+        this.parseOptionalText(query.date) !== undefined,
+      toProvided: rangeWindow !== null || parsedTo.provided,
       includePrevious: this.parseBoolean(query.includePrevious, true),
     };
+  }
+
+  private parseRange(value: string | undefined): CandleRange {
+    const text = this.parseOptionalText(value) ?? DEFAULT_RANGE;
+
+    if (this.isCandleRange(text)) {
+      return text;
+    }
+
+    this.throwApiError(
+      HttpStatus.BAD_REQUEST,
+      'ASSET_CANDLES_INVALID_RANGE',
+      'range must be one of 1d, 7d, 30d, or season.',
+    );
   }
 
   private parseInterval(
     value: string | undefined,
     _assetType: AssetType,
+    range: CandleRange,
   ): CandleInterval {
     void _assetType;
-    const text = this.parseOptionalText(value) ?? '5m';
+    const text =
+      this.parseOptionalText(value) ?? DEFAULT_INTERVAL_BY_RANGE[range];
 
     if (this.isCandleInterval(text)) {
+      this.assertRangeInterval(range, text);
       return text;
     }
 
@@ -858,6 +934,21 @@ export class AssetCandlesService {
       HttpStatus.BAD_REQUEST,
       'ASSET_CANDLES_INVALID_INTERVAL',
       'interval must be one of 5m, 15m, 30m, 1h, 4h, 1d, or 1w.',
+    );
+  }
+
+  private assertRangeInterval(
+    range: CandleRange,
+    interval: CandleInterval,
+  ): void {
+    if (RANGE_INTERVALS[range][interval]) {
+      return;
+    }
+
+    this.throwApiError(
+      HttpStatus.BAD_REQUEST,
+      'ASSET_CANDLES_INVALID_INTERVAL',
+      `interval ${interval} is not supported for range ${range}.`,
     );
   }
 
@@ -901,6 +992,13 @@ export class AssetCandlesService {
       endTime?: number;
     } = {};
 
+    if (query.rangeStartAt && query.rangeEndAt) {
+      return {
+        startTime: query.rangeStartAt.getTime(),
+        endTime: query.rangeEndAt.getTime(),
+      };
+    }
+
     if (query.dateProvided) {
       range.startTime = Date.parse(`${query.requestedDate}T00:00:00.000Z`);
     }
@@ -919,6 +1017,86 @@ export class AssetCandlesService {
     }
 
     return range;
+  }
+
+  private async resolveRangeWindow(
+    range: CandleRange,
+    now: Date,
+  ): Promise<{ startAt: Date; endAt: Date }> {
+    if (range === 'season') {
+      const season = await this.findCurrentSeasonForRange(now);
+      if (!season) {
+        this.throwApiError(
+          HttpStatus.CONFLICT,
+          'ASSET_CANDLES_SEASON_UNAVAILABLE',
+          'Current season is required for season candle range.',
+        );
+      }
+
+      const cappedEndAt =
+        season.endAt.getTime() < now.getTime() ? season.endAt : now;
+      const endAt =
+        cappedEndAt.getTime() < season.startAt.getTime()
+          ? season.startAt
+          : cappedEndAt;
+
+      return {
+        startAt: season.startAt,
+        endAt,
+      };
+    }
+
+    return {
+      startAt: new Date(now.getTime() - this.rangeDurationMs(range)),
+      endAt: now,
+    };
+  }
+
+  private async findCurrentSeasonForRange(now: Date) {
+    const select = {
+      startAt: true,
+      endAt: true,
+    } as const;
+    const currentByClock = await this.prisma.season.findFirst({
+      where: {
+        startAt: {
+          lte: now,
+        },
+        endAt: {
+          gte: now,
+        },
+      },
+      orderBy: {
+        startAt: 'desc',
+      },
+      select,
+    });
+
+    if (currentByClock) {
+      return currentByClock;
+    }
+
+    return this.prisma.season.findFirst({
+      where: {
+        status: SeasonStatus.active,
+      },
+      orderBy: {
+        startAt: 'desc',
+      },
+      select,
+    });
+  }
+
+  private rangeDurationMs(range: Exclude<CandleRange, 'season'>): number {
+    if (range === '1d') {
+      return 86_400_000;
+    }
+
+    if (range === '7d') {
+      return 7 * 86_400_000;
+    }
+
+    return 30 * 86_400_000;
   }
 
   private parseDate(value: string | undefined, timeZone: string): string {
@@ -1138,8 +1316,8 @@ export class AssetCandlesService {
     }
 
     const symbol = rawSymbol.replace(/\s+/gu, '');
-    if (/[\/_-]/u.test(symbol)) {
-      const pair = symbol.match(/^([A-Z0-9]{1,20})[\/_-](USDT|USD)$/u);
+    if (/[/_-]/u.test(symbol)) {
+      const pair = symbol.match(/^([A-Z0-9]{1,20})[/_-](USDT|USD)$/u);
       if (pair) {
         return `${pair[1]}USDT`;
       }
@@ -1298,12 +1476,20 @@ export class AssetCandlesService {
   }
 
   private todayInZone(timeZone: string): string {
-    const parts = this.zonedParts(new Date(), timeZone);
+    return this.dateInZone(new Date(), timeZone);
+  }
+
+  private dateInZone(date: Date, timeZone: string): string {
+    const parts = this.zonedParts(date, timeZone);
     return `${parts.year}-${this.pad2(parts.month)}-${this.pad2(parts.day)}`;
   }
 
   private nowTimeInZone(timeZone: string): string {
-    const parts = this.zonedParts(new Date(), timeZone);
+    return this.timeInZone(new Date(), timeZone);
+  }
+
+  private timeInZone(date: Date, timeZone: string): string {
+    const parts = this.zonedParts(date, timeZone);
     return `${this.pad2(parts.hour)}${this.pad2(parts.minute)}${this.pad2(
       parts.second,
     )}`;
@@ -1388,6 +1574,10 @@ export class AssetCandlesService {
 
   private isCandleInterval(value: string): value is CandleInterval {
     return Object.hasOwn(CANDLE_INTERVALS, value);
+  }
+
+  private isCandleRange(value: string): value is CandleRange {
+    return Object.hasOwn(CANDLE_RANGES, value);
   }
 
   private isRecord(value: unknown): value is Record<string, unknown> {

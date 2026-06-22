@@ -7,11 +7,11 @@ import {
 } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import {
+  BadgeType,
   Prisma,
   RewardFulfillmentStatus,
   SeasonRewardType,
   SeasonStatus,
-  UserRole,
   UserStatus,
 } from '../generated/prisma/client';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -282,8 +282,8 @@ export class RewardFulfillmentService {
 
       throw error;
     }
-    const existingByKey =
-      await this.prisma.rewardFulfillmentRequest.findUnique({
+    const existingByKey = await this.prisma.rewardFulfillmentRequest.findUnique(
+      {
         where: {
           requestedByUserId_idempotencyKey: {
             requestedByUserId: actor.userId,
@@ -291,7 +291,8 @@ export class RewardFulfillmentService {
           },
         },
         select: REWARD_FULFILLMENT_SELECT,
-      });
+      },
+    );
 
     if (existingByKey) {
       if (existingByKey.requestHash === parsed.requestHash) {
@@ -659,6 +660,7 @@ export class RewardFulfillmentService {
             rewardGrantedAt: now,
           },
         });
+        const userBadge = await this.grantUserBadgeIfNeeded(tx, request, now);
 
         const fulfilled = await tx.rewardFulfillmentRequest.update({
           where: {
@@ -696,6 +698,7 @@ export class RewardFulfillmentService {
               beforeStatus: request.status,
               afterStatus: fulfilled.status,
               seasonRewardId: seasonReward.id,
+              userBadgeId: userBadge?.id ?? null,
               reason,
               requestId: context.requestId ?? null,
             },
@@ -895,8 +898,8 @@ export class RewardFulfillmentService {
     code: string;
     message: string;
   } | null> {
-    const [season, targetUser, participant, existingReward] =
-      await Promise.all([
+    const [season, targetUser, participant, existingReward] = await Promise.all(
+      [
         this.prisma.season.findUnique({
           where: { id: request.seasonId },
           select: { id: true, status: true },
@@ -918,7 +921,8 @@ export class RewardFulfillmentService {
           },
           select: { id: true },
         }),
-      ]);
+      ],
+    );
 
     if (!season) {
       return {
@@ -1019,6 +1023,71 @@ export class RewardFulfillmentService {
         'Reward fulfillment already exists for this target and reward code.',
       );
     }
+  }
+
+  private async grantUserBadgeIfNeeded(
+    client: Pick<PrismaService, 'badge' | 'userBadge'>,
+    request: RewardFulfillmentRecord,
+    awardedAt: Date,
+  ): Promise<{ id: string } | null> {
+    const badgeType = this.resolveBadgeType(request.rewardType);
+    if (!badgeType) {
+      return null;
+    }
+
+    const badge = await client.badge.upsert({
+      where: {
+        code: request.rewardCode,
+      },
+      create: {
+        badgeType,
+        code: request.rewardCode,
+        name: request.rewardName,
+        description: null,
+        iconUrl: null,
+      },
+      update: {
+        badgeType,
+        name: request.rewardName,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    return client.userBadge.upsert({
+      where: {
+        userId_badgeId_seasonId: {
+          userId: request.userId,
+          badgeId: badge.id,
+          seasonId: request.seasonId,
+        },
+      },
+      create: {
+        userId: request.userId,
+        badgeId: badge.id,
+        seasonId: request.seasonId,
+        awardedAt,
+      },
+      update: {
+        awardedAt,
+      },
+      select: {
+        id: true,
+      },
+    });
+  }
+
+  private resolveBadgeType(rewardType: SeasonRewardType): BadgeType | null {
+    if (rewardType === SeasonRewardType.badge) {
+      return BadgeType.tier_badge;
+    }
+
+    if (rewardType === SeasonRewardType.trophy) {
+      return BadgeType.ranker_trophy;
+    }
+
+    return null;
   }
 
   private async markFulfillmentFailed(input: {
@@ -1438,7 +1507,9 @@ export class RewardFulfillmentService {
 
   private async tryRecordReadSuccess(
     actor: AuthenticatedUser,
-    action: 'operator.reward_fulfillment.list' | 'operator.reward_fulfillment.get',
+    action:
+      | 'operator.reward_fulfillment.list'
+      | 'operator.reward_fulfillment.get',
     input: OperatorRequestContext & {
       targetId?: string | null;
       metadataJson?: unknown;
@@ -1512,7 +1583,7 @@ export class RewardFulfillmentService {
   }
 
   private extractErrorCode(error: HttpException, fallback: string) {
-    const response = error.getResponse();
+    const response: unknown = error.getResponse();
     if (
       typeof response === 'object' &&
       response !== null &&
@@ -1529,7 +1600,7 @@ export class RewardFulfillmentService {
   }
 
   private extractErrorMessage(error: HttpException, fallback: string) {
-    const response = error.getResponse();
+    const response: unknown = error.getResponse();
     if (
       typeof response === 'object' &&
       response !== null &&

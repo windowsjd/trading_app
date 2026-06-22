@@ -12,6 +12,10 @@ jest.mock('../src/generated/prisma/client', () => {
       us_stock: 'us_stock',
       crypto: 'crypto',
     },
+    BadgeType: {
+      tier_badge: 'tier_badge',
+      ranker_trophy: 'ranker_trophy',
+    },
     CurrencyCode: {
       KRW: 'KRW',
       USD: 'USD',
@@ -796,16 +800,6 @@ describe('AppController (e2e)', () => {
         quoteId: 'quote-order-e2e-1',
         idempotencyKey: 'e2e-order-create-1',
       },
-    },
-    {
-      label: 'POST /api/v1/orders/:orderId/cancel',
-      method: 'post',
-      path: '/api/v1/orders/order-1/cancel',
-    },
-    {
-      label: 'POST /api/v1/orders/:orderId/execute',
-      method: 'post',
-      path: '/api/v1/orders/order-1/execute',
     },
   ];
 
@@ -3182,15 +3176,14 @@ describe('AppController (e2e)', () => {
       label: 'POST /api/v1/orders/:orderId/cancel',
       path: '/api/v1/orders/order-1/cancel',
       body: undefined,
-      expectedStatus: 410,
-      setup: () => {
-        mockActiveUser();
-      },
+      expectedStatus: 404,
+      authExpected: false,
+      setup: () => undefined,
       assertBody: (body: Record<string, unknown>) => {
         expect(body).toMatchObject({
           success: false,
           error: {
-            code: 'ORDER_CANCEL_NOT_SUPPORTED',
+            code: 'NOT_FOUND',
           },
         });
         expect(prisma.order.findFirst).not.toHaveBeenCalled();
@@ -3202,25 +3195,30 @@ describe('AppController (e2e)', () => {
       path: '/api/v1/orders/order-1/execute',
       body: undefined,
       expectedStatus: 404,
-      setup: () => {
-        mockActiveUser();
-        prisma.order.findFirst.mockResolvedValueOnce(null);
-      },
+      authExpected: false,
+      setup: () => undefined,
       assertBody: (body: Record<string, unknown>) => {
         expect(body).toMatchObject({
           success: false,
           error: {
-            code: 'ORDER_NOT_FOUND',
+            code: 'NOT_FOUND',
           },
         });
-        expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-        expect(prisma.order.findFirst).toHaveBeenCalled();
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(prisma.order.findFirst).not.toHaveBeenCalled();
         expectNoModelWriteMutationCalls();
       },
     },
   ])(
     '$label accepts a valid bearer token and reaches a service-level response',
-    async ({ path, body, expectedStatus, setup, assertBody }) => {
+    async ({
+      path,
+      body,
+      expectedStatus,
+      authExpected = true,
+      setup,
+      assertBody,
+    }) => {
       resetPrismaMocks();
       setup();
       const token = await createValidAccessToken();
@@ -3234,7 +3232,11 @@ describe('AppController (e2e)', () => {
 
       return testRequest.expect(expectedStatus).expect((response) => {
         expect(response.body.error?.code).not.toBe('UNAUTHORIZED');
-        expect(prisma.user.findUnique).toHaveBeenCalled();
+        if (authExpected) {
+          expect(prisma.user.findUnique).toHaveBeenCalled();
+        } else {
+          expect(prisma.user.findUnique).not.toHaveBeenCalled();
+        }
         assertBody(response.body);
       });
     },

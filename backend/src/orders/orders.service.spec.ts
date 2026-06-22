@@ -1897,33 +1897,33 @@ describe('OrdersService', () => {
   it('rejects create without idempotencyKey', async () => {
     const { prisma, service } = createService();
 
-    await expect(
+    await expectErrorCode(
       service.createOrder('user-1', {
         assetId: 'asset-1',
         side: 'buy',
-        orderType: 'limit',
+        orderType: 'market',
         quantity: '1.00000000',
-        limitPrice: '50000.00000000',
         quoteId: 'quote-order-create-1',
       }),
-    ).rejects.toBeInstanceOf(HttpException);
+      'IDEMPOTENCY_REQUIRED',
+    );
     expectNoOrderWrites(prisma);
   });
 
   it('rejects create with invalid idempotencyKey', async () => {
     const { prisma, service } = createService();
 
-    await expect(
+    await expectErrorCode(
       service.createOrder('user-1', {
         assetId: 'asset-1',
         side: 'buy',
-        orderType: 'limit',
+        orderType: 'market',
         quantity: '1.00000000',
-        limitPrice: '50000.00000000',
         quoteId: 'quote-order-create-1',
         idempotencyKey: '   ',
       }),
-    ).rejects.toBeInstanceOf(HttpException);
+      'IDEMPOTENCY_REQUIRED',
+    );
     expectNoOrderWrites(prisma);
   });
 

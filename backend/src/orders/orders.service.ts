@@ -2911,7 +2911,7 @@ export class OrdersService {
     if (typeof value !== 'string' || value.trim() === '') {
       this.throwApiError(
         HttpStatus.BAD_REQUEST,
-        'INVALID_IDEMPOTENCY_KEY',
+        'IDEMPOTENCY_REQUIRED',
         'idempotencyKey is required.',
       );
     }

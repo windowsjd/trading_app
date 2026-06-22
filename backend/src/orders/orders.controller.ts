@@ -42,25 +42,6 @@ export class OrdersController {
     return this.ordersService.createOrder(this.extractUserId(request), body);
   }
 
-  @Post(':orderId/cancel')
-  cancelOrder(
-    @Req() request: AuthenticatedRequest,
-    @Param('orderId') orderId: string,
-  ) {
-    return this.ordersService.cancelOrder(this.extractUserId(request), orderId);
-  }
-
-  @Post(':orderId/execute')
-  executeOrder(
-    @Req() request: AuthenticatedRequest,
-    @Param('orderId') orderId: string,
-  ) {
-    return this.ordersService.executeOrder(
-      this.extractUserId(request),
-      orderId,
-    );
-  }
-
   private extractUserId(request: AuthenticatedRequest) {
     return request.user?.userId;
   }

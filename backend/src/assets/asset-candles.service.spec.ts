@@ -55,6 +55,10 @@ describe('AssetCandlesService', () => {
       findUnique: jest.fn(),
       ...createWritableModel(),
     },
+    season: {
+      findFirst: jest.fn(),
+      ...createWritableModel(),
+    },
     assetPriceSnapshot: {
       ...createWritableModel(),
     },
@@ -163,6 +167,7 @@ describe('AssetCandlesService', () => {
   const expectNoWrites = (prisma: ReturnType<typeof createPrisma>) => {
     for (const model of [
       prisma.asset,
+      prisma.season,
       prisma.assetPriceSnapshot,
       prisma.fxRateSnapshot,
       prisma.order,
@@ -292,6 +297,7 @@ describe('AssetCandlesService', () => {
           market: 'KRX',
           priceCurrency: CurrencyCode.KRW,
         },
+        range: '1d',
         interval: '5m',
         requestedDate: '2026-06-19',
         candles: [
@@ -565,6 +571,7 @@ describe('AssetCandlesService', () => {
           market: 'BINANCE',
           priceCurrency: CurrencyCode.USD,
         },
+        range: '1d',
         interval: '5m',
         requestedDate: '2026-06-21',
         candles: [
@@ -604,6 +611,113 @@ describe('AssetCandlesService', () => {
     expect(JSON.stringify(response)).not.toContain('access_token');
     expect(JSON.stringify(response)).not.toContain('ignore');
     expectNoWrites(prisma);
+  });
+
+  it('defaults omitted range to 1d and omitted interval to 5m', async () => {
+    const { prisma, binancePublicClient, service } = createService();
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({
+        id: 'asset-btc-default-range',
+        symbol: 'BTC',
+        market: 'BINANCE',
+        assetType: AssetType.crypto,
+        currencyCode: CurrencyCode.USD,
+      }),
+    );
+    binancePublicClient.fetchKlines.mockResolvedValueOnce({
+      receivedAt: new Date('2026-06-19T03:00:01.000Z'),
+      response: [],
+    });
+
+    const response = await service.getAssetCandles(
+      'user-1',
+      'asset-btc-default-range',
+    );
+
+    expect(response.data.range).toBe('1d');
+    expect(response.data.interval).toBe('5m');
+    expect(binancePublicClient.fetchKlines).toHaveBeenCalledWith({
+      symbol: 'BTCUSDT',
+      interval: '5m',
+      limit: 100,
+    });
+  });
+
+  it.each([
+    ['1d', '5m', Date.parse('2026-06-18T03:00:00.000Z')],
+    ['7d', '1h', Date.parse('2026-06-12T03:00:00.000Z')],
+    ['30d', '1d', Date.parse('2026-05-20T03:00:00.000Z')],
+  ])(
+    'uses %s range default interval %s for crypto candles',
+    async (range, interval, startTime) => {
+      const { prisma, binancePublicClient, service } = createService();
+      prisma.asset.findUnique.mockResolvedValueOnce(
+        asset({
+          id: `asset-btc-${range}`,
+          symbol: 'BTC',
+          market: 'BINANCE',
+          assetType: AssetType.crypto,
+          currencyCode: CurrencyCode.USD,
+        }),
+      );
+      binancePublicClient.fetchKlines.mockResolvedValueOnce({
+        receivedAt: new Date('2026-06-19T03:00:01.000Z'),
+        response: [],
+      });
+
+      const response = await service.getAssetCandles(
+        'user-1',
+        `asset-btc-${range}`,
+        { range },
+      );
+
+      expect(response.data.range).toBe(range);
+      expect(response.data.interval).toBe(interval);
+      expect(binancePublicClient.fetchKlines).toHaveBeenCalledWith({
+        symbol: 'BTCUSDT',
+        interval,
+        limit: 100,
+        startTime,
+        endTime: Date.parse('2026-06-19T03:00:00.000Z'),
+      });
+    },
+  );
+
+  it('uses current season start and 1d default interval for season range', async () => {
+    const { prisma, binancePublicClient, service } = createService();
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({
+        id: 'asset-btc-season',
+        symbol: 'BTC',
+        market: 'BINANCE',
+        assetType: AssetType.crypto,
+        currencyCode: CurrencyCode.USD,
+      }),
+    );
+    prisma.season.findFirst.mockResolvedValueOnce({
+      startAt: new Date('2026-06-01T00:00:00.000Z'),
+      endAt: new Date('2026-06-30T00:00:00.000Z'),
+    });
+    binancePublicClient.fetchKlines.mockResolvedValueOnce({
+      receivedAt: new Date('2026-06-19T03:00:01.000Z'),
+      response: [],
+    });
+
+    const response = await service.getAssetCandles(
+      'user-1',
+      'asset-btc-season',
+      { range: 'season' },
+    );
+
+    expect(response.data.range).toBe('season');
+    expect(response.data.interval).toBe('1d');
+    expect(binancePublicClient.fetchKlines).toHaveBeenCalledWith({
+      symbol: 'BTCUSDT',
+      interval: '1d',
+      limit: 100,
+      startTime: Date.parse('2026-06-01T00:00:00.000Z'),
+      endTime: Date.parse('2026-06-19T03:00:00.000Z'),
+    });
   });
 
   it.each([
@@ -743,6 +857,30 @@ describe('AssetCandlesService', () => {
       expect(binancePublicClient.fetchKlines).not.toHaveBeenCalled();
     },
   );
+
+  it('rejects unsupported candle range before calling providers', async () => {
+    const { prisma, kisQuoteClient, binancePublicClient, service } =
+      createService();
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({
+        id: 'asset-btc-invalid-range',
+        symbol: 'BTC',
+        market: 'BINANCE',
+        assetType: AssetType.crypto,
+        currencyCode: CurrencyCode.USD,
+      }),
+    );
+
+    await expectApiError(
+      service.getAssetCandles('user-1', 'asset-btc-invalid-range', {
+        range: '90d',
+      }),
+      400,
+      'ASSET_CANDLES_INVALID_RANGE',
+    );
+    expect(kisQuoteClient.getMarketDataByExplicitPath).not.toHaveBeenCalled();
+    expect(binancePublicClient.fetchKlines).not.toHaveBeenCalled();
+  });
 
   it.each(['1m', '2m', '3m', '10m'])(
     'rejects unsupported stock interval %s before calling KIS',
