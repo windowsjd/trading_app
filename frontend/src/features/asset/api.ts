@@ -86,6 +86,14 @@ export async function getAssetDetail(assetId: string) {
   return response.data.data;
 }
 
+export async function getAssetPrice(assetId: string) {
+  const response = await apiClient.get<ApiSuccessResponse<AssetDetailPriceDto>>(
+    `/assets/${assetId}/price`,
+  );
+
+  return response.data.data;
+}
+
 export async function getAssetCandles(
   assetId: string,
   params: AssetCandleRange | GetAssetCandlesParams,

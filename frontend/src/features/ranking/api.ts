@@ -1,10 +1,17 @@
 import { apiClient } from '../../services/api/client';
 import type {
   ApiSuccessResponse,
-  CursorPageResponse,
+  IsoDateTimeString,
+  MoneyString,
+  OffsetPagination,
+  PercentString,
+  RateString,
+  SectionState,
 } from '../../models/dto/common';
 
 export type RankingScope = 'all' | 'near_me' | 'top10';
+export type RankingRankType = 'daily' | 'final';
+export type MyRankingState = 'available' | 'not_joined' | 'unavailable';
 
 export interface RankingUserDto {
   id: string;
@@ -12,20 +19,35 @@ export interface RankingUserDto {
 }
 
 export interface RankingItemDto {
+  seasonParticipantId?: string;
+  userId?: string;
   rank: number;
-  tier: string;
-  returnRate: string;
-  totalAssetKrw: string;
+  tier?: string | null;
+  provisionalTier?: string | null;
+  finalTier?: string | null;
+  returnRate: RateString;
+  percentile?: PercentString | null;
+  totalAssetKrw: MoneyString;
   user: RankingUserDto;
 }
 
-export interface CurrentRankingsResponseDto extends CursorPageResponse<RankingItemDto> {
-  myRank: RankingItemDto | null;
+export interface MyRankingDto extends Partial<RankingItemDto> {
+  state?: MyRankingState;
 }
 
-export interface NearMeRankingsResponseDto {
-  myRank: RankingItemDto | null;
-  items: RankingItemDto[];
+export interface RankingsResponseDto {
+  state: SectionState;
+  season?: {
+    id?: string;
+    name?: string;
+    status?: string;
+  } | null;
+  rankType: RankingRankType;
+  rankingDate?: string | null;
+  capturedAt?: IsoDateTimeString | null;
+  pagination: OffsetPagination;
+  rankings: RankingItemDto[];
+  myRanking?: MyRankingDto | null;
 }
 
 export interface UserSeasonSummaryDto {
@@ -34,16 +56,19 @@ export interface UserSeasonSummaryDto {
     nickname: string;
   };
   season: {
-    rank: number;
-    tier: string;
-    returnRate: string;
-    totalAssetKrw: string;
+    rank?: number | null;
+    tier?: string | null;
+    provisionalTier?: string | null;
+    finalTier?: string | null;
+    returnRate?: RateString | null;
+    percentile?: PercentString | null;
+    totalAssetKrw?: MoneyString | null;
   };
   allocation: {
-    cashKrwValue: string;
-    domesticStockValueKrw: string;
-    usStockValueKrw: string;
-    cryptoValueKrw: string;
+    cashKrwValue?: MoneyString | null;
+    domesticStockValueKrw?: MoneyString | null;
+    usStockValueKrw?: MoneyString | null;
+    cryptoValueKrw?: MoneyString | null;
   };
   topPositions: Array<{
     assetId: string;
@@ -52,31 +77,72 @@ export interface UserSeasonSummaryDto {
   }>;
 }
 
-interface GetCurrentRankingsParams {
-  scope: 'all' | 'top10';
-  cursor?: string | null;
+export interface GetRankingsParams {
+  scope: RankingScope;
+  rankType?: RankingRankType;
   limit?: number;
+  offset?: number;
+  rankingDate?: string | null;
+  capturedAt?: string | null;
 }
 
-export async function getCurrentRankings(params: GetCurrentRankingsParams) {
+function buildFallbackPagination(
+  limit: number,
+  offset: number,
+  returned: number,
+): OffsetPagination {
+  return {
+    limit,
+    offset,
+    total: offset + returned,
+    returned,
+    nextOffset: returned >= limit ? offset + returned : null,
+  };
+}
+
+export function getRankingTier(
+  item: Partial<RankingItemDto | MyRankingDto> | null | undefined,
+  rankType?: RankingRankType,
+) {
+  if (rankType === 'final') {
+    return item?.finalTier ?? item?.tier ?? '-';
+  }
+
+  return item?.provisionalTier ?? item?.tier ?? item?.finalTier ?? '-';
+}
+
+export async function getRankings(params: GetRankingsParams) {
+  const limit = params.limit ?? (params.scope === 'top10' ? 10 : 50);
+  const offset = params.offset ?? 0;
   const searchParams = new URLSearchParams();
+
   searchParams.set('scope', params.scope);
-  searchParams.set('limit', String(params.limit ?? (params.scope === 'top10' ? 10 : 50)));
-  if (params.cursor) searchParams.set('cursor', params.cursor);
+  searchParams.set('limit', String(limit));
+  searchParams.set('offset', String(offset));
+  if (params.rankType) searchParams.set('rankType', params.rankType);
+  if (params.rankingDate) searchParams.set('rankingDate', params.rankingDate);
+  if (params.capturedAt) searchParams.set('capturedAt', params.capturedAt);
 
   const response = await apiClient.get<
-    ApiSuccessResponse<CurrentRankingsResponseDto>
-  >(`/rankings/current?${searchParams.toString()}`);
+    ApiSuccessResponse<
+      RankingsResponseDto & {
+        items?: RankingItemDto[];
+        myRank?: MyRankingDto | null;
+      }
+    >
+  >(`/ranking?${searchParams.toString()}`);
 
-  return response.data.data;
-}
+  const data = response.data.data;
+  const rankings = data.rankings ?? data.items ?? [];
 
-export async function getNearMeRankings(size = 5) {
-  const response = await apiClient.get<
-    ApiSuccessResponse<NearMeRankingsResponseDto>
-  >(`/rankings/current/near-me?size=${size}`);
-
-  return response.data.data;
+  return {
+    ...data,
+    state: data.state ?? 'available',
+    rankings,
+    myRanking: data.myRanking ?? data.myRank ?? null,
+    pagination:
+      data.pagination ?? buildFallbackPagination(limit, offset, rankings.length),
+  };
 }
 
 export async function getUserSeasonSummary(userId: string) {

@@ -72,7 +72,13 @@ export type WalletFxViewState =
 export type MarketViewState =
   | 'market_loading'
   | 'market_ready'
+  | 'market_empty'
   | 'market_empty_search'
+  | 'market_search_idle'
+  | 'market_search_loading'
+  | 'market_search_ready'
+  | 'market_search_empty'
+  | 'market_search_error'
   | 'market_paginating'
   | 'market_partial_price_unavailable'
   | 'market_error';
@@ -109,12 +115,16 @@ export type RankingViewState =
   | 'ranking_empty'
   | 'ranking_partial_unjoined'
   | 'ranking_settled'
+  | 'ranking_unavailable'
+  | 'ranking_paginating'
+  | 'ranking_snapshot_changed'
   | 'ranking_error';
 
 export type RecordViewState =
   | 'record_list_loading'
   | 'record_list_ready'
   | 'record_list_empty'
+  | 'record_list_paginating'
   | 'record_list_error'
   | 'record_detail_loading'
   | 'record_detail_ready'
@@ -123,15 +133,18 @@ export type RecordViewState =
   | 'record_orders_loading'
   | 'record_orders_ready'
   | 'record_orders_empty'
+  | 'record_orders_paginating'
   | 'record_orders_error'
   | 'record_exchanges_loading'
   | 'record_exchanges_ready'
   | 'record_exchanges_empty'
+  | 'record_exchanges_paginating'
   | 'record_exchanges_error';
 
 export type RewardViewState =
   | 'reward_loading'
   | 'reward_ready'
   | 'reward_empty'
+  | 'reward_pending'
   | 'reward_pending_settlement'
   | 'reward_error';

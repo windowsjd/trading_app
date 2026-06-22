@@ -6,14 +6,18 @@ import {
   SafeAreaView,
   FlatList,
   Pressable,
+  ActivityIndicator,
 } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import type { RecordStackParamList } from '../../app/navigation/types';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
-import { getMySeasonOrders } from '../../features/record/api';
+import {
+  getMySeasonOrders,
+  getRecordOrderDisplay,
+} from '../../features/record/api';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -26,23 +30,43 @@ export default function RecordOrderListScreen({ route }: Props) {
   const { seasonId } = route.params;
   const [filter, setFilter] = useState<Filter>('all');
 
-  const ordersQuery = useQuery({
-    queryKey: QUERY_KEYS.record.seasonOrders(seasonId, null),
-    queryFn: () => getMySeasonOrders(seasonId, null, 50),
+  const side = filter === 'all' ? undefined : filter;
+
+  const ordersQuery = useInfiniteQuery({
+    queryKey: QUERY_KEYS.record.seasonOrders({
+      seasonId,
+      limit: 20,
+      offset: 0,
+      side,
+    }),
+    queryFn: ({ pageParam }) =>
+      getMySeasonOrders({
+        seasonId,
+        limit: 20,
+        offset: pageParam,
+        side,
+      }),
+    getNextPageParam: (lastPage) => lastPage.pagination.nextOffset ?? undefined,
+    initialPageParam: 0,
   });
 
-  const filteredItems = useMemo(() => {
-    const items = ordersQuery.data?.items ?? [];
-    if (filter === 'all') return items;
-    return items.filter((item) => item.side === filter);
-  }, [ordersQuery.data, filter]);
+  const items = useMemo(
+    () => ordersQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [ordersQuery.data],
+  );
 
   const viewState = useMemo(() => {
     if (ordersQuery.isLoading) return 'record_orders_loading';
     if (ordersQuery.isError) return 'record_orders_error';
-    if (!filteredItems.length) return 'record_orders_empty';
+    if (!items.length) return 'record_orders_empty';
+    if (ordersQuery.isFetchingNextPage) return 'record_orders_paginating';
     return 'record_orders_ready';
-  }, [ordersQuery.isLoading, ordersQuery.isError, filteredItems.length]);
+  }, [
+    ordersQuery.isLoading,
+    ordersQuery.isError,
+    ordersQuery.isFetchingNextPage,
+    items.length,
+  ]);
 
   if (viewState === 'record_orders_loading') {
     return <FullPageLoading message="거래 내역을 불러오는 중입니다." />;
@@ -62,9 +86,15 @@ export default function RecordOrderListScreen({ route }: Props) {
     <SafeAreaView style={styles.container}>
       <FlatList
         testID={TEST_IDS.record.orderListScreen}
-        data={filteredItems}
-        keyExtractor={(item) => item.orderId}
+        data={items}
+        keyExtractor={(item) => getRecordOrderDisplay(item).key}
         contentContainerStyle={styles.content}
+        onEndReached={() => {
+          if (ordersQuery.hasNextPage && !ordersQuery.isFetchingNextPage) {
+            ordersQuery.fetchNextPage();
+          }
+        }}
+        onEndReachedThreshold={0.4}
         ListHeaderComponent={
           <View style={styles.filterRow}>
             <FilterChip
@@ -93,27 +123,40 @@ export default function RecordOrderListScreen({ route }: Props) {
             message="해당 조건의 거래 내역이 없습니다."
           />
         }
-        renderItem={({ item }) => (
-          <Pressable
-            testID={TEST_IDS.record.orderItem(item.orderId)}
-            style={styles.rowCard}
-          >
-            <View>
-              <Text style={styles.itemTitle}>{item.symbol}</Text>
-              <Text style={styles.helper}>{item.name}</Text>
-              <Text style={styles.helper}>{item.executedAt}</Text>
-              <Text style={styles.helper}>{item.side === 'buy' ? '매수' : '매도'}</Text>
-            </View>
+        renderItem={({ item }) => {
+          const display = getRecordOrderDisplay(item);
 
-            <View style={styles.alignEnd}>
-              <Text style={styles.helper}>수량 {item.quantity}</Text>
-              <Text style={styles.helper}>
-                가격 {item.fillPriceLocal} {item.fillCurrency}
-              </Text>
-              <Text style={styles.itemTitle}>{item.netAmountLocal}</Text>
+          return (
+            <Pressable
+              testID={TEST_IDS.record.orderItem(display.key)}
+              style={styles.rowCard}
+            >
+              <View>
+                <Text style={styles.itemTitle}>{display.symbol}</Text>
+                <Text style={styles.helper}>{display.name}</Text>
+                <Text style={styles.helper}>{display.executedAt}</Text>
+                <Text style={styles.helper}>
+                  {display.side === 'buy' ? '매수' : '매도'}
+                </Text>
+              </View>
+
+              <View style={styles.alignEnd}>
+                <Text style={styles.helper}>수량 {display.quantity}</Text>
+                <Text style={styles.helper}>
+                  가격 {display.price} {display.currencyCode}
+                </Text>
+                <Text style={styles.itemTitle}>{display.netAmount}</Text>
+              </View>
+            </Pressable>
+          );
+        }}
+        ListFooterComponent={
+          ordersQuery.isFetchingNextPage ? (
+            <View style={styles.footerLoader}>
+              <ActivityIndicator />
             </View>
-          </Pressable>
-        )}
+          ) : null
+        }
       />
     </SafeAreaView>
   );
@@ -169,4 +212,5 @@ const styles = StyleSheet.create({
   itemTitle: { fontSize: 15, fontWeight: '700' },
   helper: { fontSize: 14, color: '#444' },
   alignEnd: { alignItems: 'flex-end' },
+  footerLoader: { paddingVertical: 16 },
 });

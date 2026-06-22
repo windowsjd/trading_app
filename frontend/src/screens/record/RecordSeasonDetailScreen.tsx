@@ -22,6 +22,11 @@ import InlineEmptyState from '../../components/states/InlineEmptyState';
 
 type Props = NativeStackScreenProps<RecordStackParamList, 'RecordSeasonDetail'>;
 
+function displayValue(value?: string | number | null) {
+  if (value === null || value === undefined || value === '') return '-';
+  return String(value);
+}
+
 export default function RecordSeasonDetailScreen({ route, navigation }: Props) {
   const { seasonId } = route.params;
 
@@ -65,7 +70,14 @@ export default function RecordSeasonDetailScreen({ route, navigation }: Props) {
     );
   }
 
-  const { season, summary, stats, equityChart } = detailQuery.data;
+  const { season, summary, equityChart } = detailQuery.data;
+  const stats = detailQuery.data.stats ?? {};
+  const finalRank = summary.finalRank ?? summary.rank;
+  const finalTier = summary.finalTier ?? summary.tier;
+  const finalReturnRate = summary.finalReturnRate ?? summary.returnRate;
+  const finalTotalAssetKrw = summary.finalTotalAssetKrw ?? summary.totalAssetKrw;
+  const maxDrawdown = summary.maxDrawdown ?? summary.mdd;
+  const totalFillCount = summary.totalFillCount ?? summary.fillCount;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -82,10 +94,12 @@ export default function RecordSeasonDetailScreen({ route, navigation }: Props) {
 
         <View style={styles.card}>
           <Text style={styles.label}>핵심 결과</Text>
-          <Text style={styles.helper}>최종 순위 #{summary.finalRank}</Text>
-          <Text style={styles.helper}>최종 등급 {summary.finalTier}</Text>
-          <Text style={styles.helper}>최종 수익률 {summary.finalReturnRate}%</Text>
-          <Text style={styles.helper}>최종 자산 {summary.finalTotalAssetKrw} KRW</Text>
+          <Text style={styles.helper}>
+            최종 순위 {finalRank ? `#${finalRank}` : '-'}
+          </Text>
+          <Text style={styles.helper}>최종 등급 {displayValue(finalTier)}</Text>
+          <Text style={styles.helper}>최종 수익률 {displayValue(finalReturnRate)}%</Text>
+          <Text style={styles.helper}>최종 자산 {displayValue(finalTotalAssetKrw)} KRW</Text>
         </View>
 
         <View style={styles.card}>
@@ -103,8 +117,8 @@ export default function RecordSeasonDetailScreen({ route, navigation }: Props) {
 
         <View style={styles.card}>
           <Text style={styles.label}>통계</Text>
-          <Text style={styles.helper}>총 거래 횟수 {summary.totalFillCount}</Text>
-          <Text style={styles.helper}>MDD {summary.maxDrawdown}%</Text>
+          <Text style={styles.helper}>총 거래 횟수 {displayValue(totalFillCount)}</Text>
+          <Text style={styles.helper}>MDD {displayValue(maxDrawdown)}%</Text>
           <Text style={styles.helper}>최고 수익 종목 {stats.bestAsset ?? '-'}</Text>
           <Text style={styles.helper}>최대 손실 종목 {stats.worstAsset ?? '-'}</Text>
         </View>

@@ -77,7 +77,12 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
     queryFn: () => getAssetCandles(assetId, { range: selectedRange, limit: 100 }),
   });
 
-  const { latestTicker, showReconnectBanner } = useAssetTicker({
+  const {
+    connectionState,
+    latestTicker,
+    showReconnectBanner,
+    isStale: isTickerStale,
+  } = useAssetTicker({
     assetId,
     wsUrl: assetTickerWsUrl ?? '',
     enabled: !!assetTickerWsUrl,
@@ -106,15 +111,25 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
     : null;
   const canTradeSeason = seasonState === 'season_active_joined';
   const priceAvailable = isPriceAvailable(price);
+  const livePriceAvailable = !!latestTicker?.priceLocal;
+  const orderPriceAvailable = priceAvailable || livePriceAvailable;
 
   const displayPriceLocal =
     latestTicker?.priceLocal ??
     (priceAvailable ? price?.currentPrice : null);
+  const displayPriceCurrency =
+    latestTicker?.priceCurrency ?? asset.priceCurrency;
   const displayPriceKrw =
     latestTicker?.priceKrw ??
     (price?.priceKrwState === 'available' ? price?.priceKrw : null);
   const displayChangeRate = latestTicker?.changeRate ?? price?.changeRate;
-  const displayCapturedAt = latestTicker?.capturedAt ?? price?.priceCapturedAt;
+  const displayCapturedAt =
+    latestTicker?.priceCapturedAt ??
+    latestTicker?.capturedAt ??
+    price?.priceCapturedAt;
+  const displayEffectiveAt =
+    latestTicker?.priceEffectiveAt ?? price?.priceEffectiveAt;
+  const displayFreshnessAgeSeconds = latestTicker?.freshnessAgeSeconds;
 
   const seasonBlockedReason =
     seasonQuery.isLoading
@@ -136,7 +151,9 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
       ? asset.tradeBlockedReason ?? '현재 거래할 수 없는 자산입니다.'
       : !isOpenMarket(asset.marketStatus)
       ? '장 마감으로 주문할 수 없습니다.'
-      : !priceAvailable
+      : isTickerStale
+      ? '실시간 시세가 오래되어 주문할 수 없습니다.'
+      : !orderPriceAvailable
       ? '시세를 확인할 수 없어 주문할 수 없습니다.'
       : null;
 
@@ -159,8 +176,8 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
           <Text style={styles.title}>{asset.symbol}</Text>
           <Text style={styles.helper}>{asset.name}</Text>
           <Text style={styles.value}>
-            {priceAvailable
-              ? `${displayValue(displayPriceLocal)} ${asset.priceCurrency}`
+            {orderPriceAvailable
+              ? `${displayValue(displayPriceLocal)} ${displayPriceCurrency}`
               : '시세 준비 중'}
           </Text>
           <Text style={styles.helper}>KRW 환산 {displayValue(displayPriceKrw)}</Text>
@@ -178,8 +195,12 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
           ) : null}
           <Text style={styles.helper}>가격 수집 {displayValue(displayCapturedAt)}</Text>
           <Text style={styles.helper}>
-            가격 기준 {displayValue(price?.priceEffectiveAt)}
+            가격 기준 {displayValue(displayEffectiveAt)}
           </Text>
+          <Text style={styles.helper}>
+            최신성 {displayValue(displayFreshnessAgeSeconds)}초
+          </Text>
+          <Text style={styles.helper}>실시간 연결 {connectionState}</Text>
           <Text style={styles.helper}>가격 소스 {displayValue(price?.priceSource)}</Text>
 
           {asset.tradeBlockedReason ? (
@@ -199,6 +220,13 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
                   <Text style={styles.retryText}>시즌 참가하기</Text>
                 </Pressable>
               ) : null}
+            </View>
+          ) : null}
+          {isTickerStale ? (
+            <View style={styles.inlineWarning}>
+              <Text style={styles.inlineWarningText}>
+                실시간 시세 최신성이 낮습니다. 최신 가격 확인 후 주문해주세요.
+              </Text>
             </View>
           ) : null}
 

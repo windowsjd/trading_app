@@ -11,19 +11,18 @@ import { useQuery } from '@tanstack/react-query';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 
-import { getCurrentSeason } from '../../features/season/api';
-import { getMyRewards, getMyBadges } from '../../features/reward/api';
+import {
+  getMyRewards,
+  getMyBadges,
+  getRewardItemDate,
+  isRewardResponsePending,
+} from '../../features/reward/api';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import EmptyState from '../../components/states/EmptyState';
 
 export default function RewardScreen() {
-  const seasonQuery = useQuery({
-    queryKey: QUERY_KEYS.season.current,
-    queryFn: getCurrentSeason,
-  });
-
   const rewardsQuery = useQuery({
     queryKey: QUERY_KEYS.reward.rewards,
     queryFn: getMyRewards,
@@ -35,35 +34,37 @@ export default function RewardScreen() {
   });
 
   const viewState = useMemo(() => {
-    if (seasonQuery.isLoading || rewardsQuery.isLoading || badgesQuery.isLoading) {
+    if (rewardsQuery.isLoading || badgesQuery.isLoading) {
       return 'reward_loading';
     }
 
-    if (!seasonQuery.data || !rewardsQuery.data || !badgesQuery.data) {
+    if (rewardsQuery.isError || badgesQuery.isError || !rewardsQuery.data || !badgesQuery.data) {
       return 'reward_error';
     }
 
     const hasAnyReward =
       rewardsQuery.data.items.length > 0 || badgesQuery.data.items.length > 0;
 
-    if (seasonQuery.data.status === 'ended' && !hasAnyReward) {
-      return 'reward_pending_settlement';
+    if (
+      isRewardResponsePending(rewardsQuery.data) ||
+      isRewardResponsePending(badgesQuery.data)
+    ) {
+      return 'reward_pending';
     }
 
     if (!hasAnyReward) return 'reward_empty';
 
     return 'reward_ready';
   }, [
-    seasonQuery.isLoading,
     rewardsQuery.isLoading,
     badgesQuery.isLoading,
-    seasonQuery.data,
+    rewardsQuery.isError,
+    badgesQuery.isError,
     rewardsQuery.data,
     badgesQuery.data,
   ]);
 
   const retryAll = () => {
-    seasonQuery.refetch();
     rewardsQuery.refetch();
     badgesQuery.refetch();
   };
@@ -82,11 +83,11 @@ export default function RewardScreen() {
     );
   }
 
-  if (viewState === 'reward_pending_settlement') {
+  if (viewState === 'reward_pending') {
     return (
       <EmptyState
-        title="정산 완료 후 보상이 지급됩니다."
-        message="현재 시즌 결과가 확정되면 보상을 확인할 수 있습니다."
+        title="보상 지급 대기 중입니다."
+        message="시즌 결과와 지급 상태가 확정되면 보상과 뱃지가 표시됩니다."
       />
     );
   }
@@ -131,7 +132,7 @@ export default function RewardScreen() {
                       <Text style={styles.itemTitle}>{badge.badgeName}</Text>
                       <Text style={styles.helper}>시즌 {badge.seasonId}</Text>
                     </View>
-                    <Text style={styles.helper}>{badge.awardedAt}</Text>
+                    <Text style={styles.helper}>{getRewardItemDate(badge)}</Text>
                   </View>
                 ))
               )}
@@ -152,7 +153,7 @@ export default function RewardScreen() {
               <Text style={styles.helper}>시즌 {item.seasonId}</Text>
               <Text style={styles.helper}>유형 {item.rewardType}</Text>
             </View>
-            <Text style={styles.helper}>{item.grantedAt}</Text>
+            <Text style={styles.helper}>{getRewardItemDate(item)}</Text>
           </View>
         )}
       />

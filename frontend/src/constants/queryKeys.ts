@@ -102,22 +102,68 @@ export const QUERY_KEYS = {
 
   ranking: {
     all: ['ranking'] as const,
-    current: (scope: 'all' | 'top10', cursor?: string | null) =>
-      ['ranking', 'current', scope, cursor ?? null] as const,
-    nearMe: (size: number) => ['ranking', 'near-me', size] as const,
+    list: (params: {
+      scope: string;
+      rankType?: string;
+      rankingDate?: string | null;
+      capturedAt?: string | null;
+      limit?: number;
+      offset?: number;
+    }) =>
+      [
+        'ranking',
+        'list',
+        params.scope,
+        params.rankType ?? 'auto',
+        params.rankingDate ?? null,
+        params.capturedAt ?? null,
+        params.limit ?? null,
+        params.offset ?? 0,
+      ] as const,
     userSeasonSummary: (userId: string) =>
       ['ranking', 'user-season-summary', userId] as const,
   },
 
   record: {
-    seasons: (cursor?: string | null) =>
-      ['record', 'seasons', cursor ?? null] as const,
+    seasons: (params?: { limit?: number; offset?: number }) =>
+      [
+        'record',
+        'seasons',
+        params?.limit ?? null,
+        params?.offset ?? 0,
+      ] as const,
     seasonDetail: (seasonId: string) =>
       ['record', 'season-detail', seasonId] as const,
-    seasonOrders: (seasonId: string, cursor?: string | null) =>
-      ['record', 'season-orders', seasonId, cursor ?? null] as const,
-    seasonExchanges: (seasonId: string, cursor?: string | null) =>
-      ['record', 'season-exchanges', seasonId, cursor ?? null] as const,
+    seasonOrders: (
+      params: {
+        seasonId: string;
+        limit?: number;
+        offset?: number;
+        side?: string;
+      },
+    ) =>
+      [
+        'record',
+        'season-orders',
+        params.seasonId,
+        params.side ?? 'all',
+        params.limit ?? null,
+        params.offset ?? 0,
+      ] as const,
+    seasonExchanges: (
+      params: {
+        seasonId: string;
+        limit?: number;
+        offset?: number;
+      },
+    ) =>
+      [
+        'record',
+        'season-exchanges',
+        params.seasonId,
+        params.limit ?? null,
+        params.offset ?? 0,
+      ] as const,
   },
 
   reward: {

@@ -39,8 +39,8 @@ export default function MyScreen({ navigation }: Props) {
   });
 
   const recordsQuery = useQuery({
-    queryKey: QUERY_KEYS.record.seasons(null),
-    queryFn: () => getMySeasonRecords(null, 20),
+    queryKey: QUERY_KEYS.record.seasons({ limit: 20, offset: 0 }),
+    queryFn: () => getMySeasonRecords({ limit: 20, offset: 0 }),
   });
 
   const viewState = useMemo(() => {

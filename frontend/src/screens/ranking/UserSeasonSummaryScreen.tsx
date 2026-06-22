@@ -11,13 +11,21 @@ import { useQuery } from '@tanstack/react-query';
 import type { UserSeasonSummaryScreenProps } from '../../app/navigation/types';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
-import { getUserSeasonSummary } from '../../features/ranking/api';
+import {
+  getRankingTier,
+  getUserSeasonSummary,
+} from '../../features/ranking/api';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 
 type Props = UserSeasonSummaryScreenProps;
+
+function displayValue(value?: string | number | null) {
+  if (value === null || value === undefined || value === '') return '-';
+  return String(value);
+}
 
 export default function UserSeasonSummaryScreen({ route }: Props) {
   const { userId } = route.params;
@@ -63,7 +71,8 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
     );
   }
 
-  const { user, season, allocation, topPositions } = summaryQuery.data;
+  const { user, season, allocation } = summaryQuery.data;
+  const topPositions = summaryQuery.data.topPositions ?? [];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -76,22 +85,31 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
           <>
             <View style={styles.card}>
               <Text style={styles.title}>{user.nickname}</Text>
-              <Text style={styles.helper}>현재 순위 #{season.rank}</Text>
-              <Text style={styles.helper}>등급 {season.tier}</Text>
+              <Text style={styles.helper}>
+                현재 순위 {season.rank ? `#${season.rank}` : '-'}
+              </Text>
+              <Text style={styles.helper}>등급 {getRankingTier(season)}</Text>
+              <Text style={styles.helper}>
+                임시 등급 {displayValue(season.provisionalTier)}
+              </Text>
+              <Text style={styles.helper}>
+                최종 등급 {displayValue(season.finalTier)}
+              </Text>
             </View>
 
             <View style={styles.card}>
               <Text style={styles.label}>현재 시즌 요약</Text>
-              <Text style={styles.helper}>수익률 {season.returnRate}%</Text>
-              <Text style={styles.helper}>총 자산 {season.totalAssetKrw} KRW</Text>
+              <Text style={styles.helper}>수익률 {displayValue(season.returnRate)}%</Text>
+              <Text style={styles.helper}>퍼센타일 {displayValue(season.percentile)}%</Text>
+              <Text style={styles.helper}>총 자산 {displayValue(season.totalAssetKrw)} KRW</Text>
             </View>
 
             <View style={styles.card}>
               <Text style={styles.label}>포트폴리오 비중</Text>
-              <Text style={styles.helper}>현금 {allocation.cashKrwValue}</Text>
-              <Text style={styles.helper}>국내 {allocation.domesticStockValueKrw}</Text>
-              <Text style={styles.helper}>미국 {allocation.usStockValueKrw}</Text>
-              <Text style={styles.helper}>암호화폐 {allocation.cryptoValueKrw}</Text>
+              <Text style={styles.helper}>현금 {displayValue(allocation.cashKrwValue)}</Text>
+              <Text style={styles.helper}>국내 {displayValue(allocation.domesticStockValueKrw)}</Text>
+              <Text style={styles.helper}>미국 {displayValue(allocation.usStockValueKrw)}</Text>
+              <Text style={styles.helper}>암호화폐 {displayValue(allocation.cryptoValueKrw)}</Text>
             </View>
 
             <View style={styles.card}>

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   FlatList,
   ActivityIndicator,
 } from 'react-native';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { RankingScreenProps } from '../../app/navigation/types';
 import { useRootNavigation } from '../../app/navigation/navigationHooks';
@@ -17,11 +17,15 @@ import { TEST_IDS } from '../../constants/testIds';
 
 import { getCurrentSeason } from '../../features/season/api';
 import {
-  getCurrentRankings,
-  getNearMeRankings,
-  type RankingScope,
+  getRankingTier,
+  getRankings,
+  type MyRankingDto,
   type RankingItemDto,
+  type RankingRankType,
+  type RankingScope,
 } from '../../features/ranking/api';
+import { ERROR_CODE } from '../../models/enums/errorCode';
+import { getApiErrorCode } from '../../services/api/errorMapper';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -36,9 +40,32 @@ const TABS: Array<{ key: RankingScope; label: string }> = [
   { key: 'top10', label: 'TOP10' },
 ];
 
+function displayValue(value?: string | number | null) {
+  if (value === null || value === undefined || value === '') return '-';
+  return String(value);
+}
+
+function getRankingItemKey(item: RankingItemDto) {
+  return (
+    item.seasonParticipantId ??
+    item.userId ??
+    `${item.user.id}-${item.rank}`
+  );
+}
+
+function getRankTypeLabel(rankType?: RankingRankType) {
+  return rankType === 'final' ? '최종 랭킹' : '일간 랭킹';
+}
+
 export default function RankingScreen({ navigation }: Props) {
   const rootNavigation = useRootNavigation();
-  const [selectedTab, setSelectedTab] = useState<RankingScope>('all');
+  const queryClient = useQueryClient();
+  const [selectedTab, setSelectedTab] = React.useState<RankingScope>('all');
+  const rankingQueryKey = QUERY_KEYS.ranking.list({
+    scope: selectedTab,
+    limit: selectedTab === 'top10' ? 10 : 50,
+    offset: 0,
+  });
 
   const seasonQuery = useQuery({
     queryKey: QUERY_KEYS.season.current,
@@ -46,78 +73,103 @@ export default function RankingScreen({ navigation }: Props) {
   });
 
   const rankingQuery = useInfiniteQuery({
-    queryKey: QUERY_KEYS.ranking.current(
-      selectedTab === 'top10' ? 'top10' : 'all',
-      null,
-    ),
+    queryKey: rankingQueryKey,
     queryFn: ({ pageParam }) =>
-      getCurrentRankings({
-        scope: selectedTab === 'top10' ? 'top10' : 'all',
-        cursor: pageParam ?? null,
+      getRankings({
+        scope: selectedTab,
         limit: selectedTab === 'top10' ? 10 : 50,
+        offset: pageParam.offset,
+        rankType: pageParam.rankType,
+        rankingDate: pageParam.rankingDate,
+        capturedAt: pageParam.capturedAt,
       }),
-    getNextPageParam: (lastPage) =>
-      lastPage.pageInfo.hasNext ? lastPage.pageInfo.nextCursor : undefined,
-    initialPageParam: null as string | null,
-    enabled: selectedTab !== 'near_me',
+    getNextPageParam: (lastPage) => {
+      const nextOffset = lastPage.pagination.nextOffset;
+      if (nextOffset === null || nextOffset === undefined) return undefined;
+
+      return {
+        offset: nextOffset,
+        rankType: lastPage.rankType,
+        rankingDate: lastPage.rankingDate ?? null,
+        capturedAt: lastPage.capturedAt ?? null,
+      };
+    },
+    initialPageParam: {
+      offset: 0,
+      rankType: undefined as RankingRankType | undefined,
+      rankingDate: null as string | null,
+      capturedAt: null as string | null,
+    },
   });
 
-  const nearMeQuery = useQuery({
-    queryKey: QUERY_KEYS.ranking.nearMe(5),
-    queryFn: () => getNearMeRankings(5),
-    enabled: selectedTab === 'near_me',
-  });
+  const firstPage = rankingQuery.data?.pages[0];
+  const rankType = firstPage?.rankType;
 
   const items = useMemo(() => {
-    if (selectedTab === 'near_me') {
-      return nearMeQuery.data?.items ?? [];
-    }
-    return rankingQuery.data?.pages.flatMap((page) => page.items) ?? [];
-  }, [selectedTab, nearMeQuery.data, rankingQuery.data]);
+    const byKey = new Map<string, RankingItemDto>();
 
-  const myRank = useMemo(() => {
-    if (selectedTab === 'near_me') return nearMeQuery.data?.myRank ?? null;
-    return rankingQuery.data?.pages[0]?.myRank ?? null;
-  }, [selectedTab, nearMeQuery.data, rankingQuery.data]);
+    rankingQuery.data?.pages.forEach((page) => {
+      page.rankings.forEach((item) => {
+        byKey.set(getRankingItemKey(item), item);
+      });
+    });
+
+    return Array.from(byKey.values());
+  }, [rankingQuery.data]);
+
+  const myRanking = firstPage?.myRanking ?? null;
+  const rankingErrorCode = getApiErrorCode(rankingQuery.error);
 
   const viewState = useMemo(() => {
-    const loading =
-      seasonQuery.isLoading ||
-      (selectedTab === 'near_me' ? nearMeQuery.isLoading : rankingQuery.isLoading);
+    if (seasonQuery.isLoading || rankingQuery.isLoading) {
+      return 'ranking_loading';
+    }
 
-    if (loading) return 'ranking_loading';
+    if (rankingErrorCode === ERROR_CODE.RANKING_SNAPSHOT_CHANGED) {
+      return 'ranking_snapshot_changed';
+    }
 
-    if (
-      !seasonQuery.data ||
-      (selectedTab === 'near_me'
-        ? nearMeQuery.isError || !nearMeQuery.data
-        : rankingQuery.isError || !rankingQuery.data)
-    ) {
+    if (seasonQuery.isError || !seasonQuery.data || rankingQuery.isError) {
       return 'ranking_error';
     }
 
+    if (firstPage?.state === 'unavailable') return 'ranking_unavailable';
     if (!items.length) return 'ranking_empty';
-    if (seasonQuery.data.status === 'settled') return 'ranking_settled';
-    if (seasonQuery.data.status === 'active' && !seasonQuery.data.joined) {
+    if (rankingQuery.isFetchingNextPage) return 'ranking_paginating';
+    if (rankType === 'final' || seasonQuery.data.status === 'settled') {
+      return 'ranking_settled';
+    }
+    if (myRanking?.state === 'not_joined' || !seasonQuery.data.joined) {
       return 'ranking_partial_unjoined';
     }
 
     return 'ranking_ready';
   }, [
     seasonQuery.isLoading,
+    seasonQuery.isError,
     seasonQuery.data,
-    selectedTab,
-    nearMeQuery.isLoading,
-    nearMeQuery.isError,
-    nearMeQuery.data,
     rankingQuery.isLoading,
     rankingQuery.isError,
-    rankingQuery.data,
+    rankingQuery.isFetchingNextPage,
+    rankingErrorCode,
+    firstPage?.state,
     items.length,
+    rankType,
+    myRanking?.state,
   ]);
 
   if (viewState === 'ranking_loading') {
     return <FullPageLoading message="랭킹을 불러오는 중입니다." />;
+  }
+
+  if (viewState === 'ranking_snapshot_changed') {
+    return (
+      <ErrorState
+        title="랭킹이 갱신되었습니다."
+        message="최신 스냅샷 기준으로 다시 불러와주세요."
+        onRetry={() => queryClient.resetQueries({ queryKey: rankingQueryKey })}
+      />
+    );
   }
 
   if (viewState === 'ranking_error') {
@@ -128,8 +180,16 @@ export default function RankingScreen({ navigation }: Props) {
         onRetry={() => {
           seasonQuery.refetch();
           rankingQuery.refetch();
-          nearMeQuery.refetch();
         }}
+      />
+    );
+  }
+
+  if (viewState === 'ranking_unavailable') {
+    return (
+      <EmptyState
+        title="랭킹 생성 대기 중입니다."
+        message="랭킹 스냅샷이 생성되면 이곳에 표시됩니다."
       />
     );
   }
@@ -150,44 +210,29 @@ export default function RankingScreen({ navigation }: Props) {
       <FlatList
         testID={TEST_IDS.ranking.screen}
         data={items}
-        keyExtractor={(item) => `${item.user.id}-${item.rank}`}
+        keyExtractor={getRankingItemKey}
         contentContainerStyle={styles.content}
         onEndReached={() => {
-          if (
-            selectedTab !== 'near_me' &&
-            rankingQuery.hasNextPage &&
-            !rankingQuery.isFetchingNextPage
-          ) {
+          if (rankingQuery.hasNextPage && !rankingQuery.isFetchingNextPage) {
             rankingQuery.fetchNextPage();
           }
         }}
         onEndReachedThreshold={0.4}
         ListHeaderComponent={
           <>
-            {viewState === 'ranking_partial_unjoined' ? (
-              <View style={styles.card}>
-                <Text style={styles.title}>아직 이번 시즌에 참가하지 않았습니다.</Text>
-                <Text style={styles.helper}>
-                  랭킹은 볼 수 있지만 내 순위는 참가 후 반영됩니다.
-                </Text>
+            <MyRankingCard
+              myRanking={myRanking}
+              rankType={rankType}
+              viewState={viewState}
+              onJoin={() => rootNavigation.navigate('SeasonJoin')}
+            />
 
-                <CTAButton
-                  label="시즌 참가하기"
-                  onPress={() => rootNavigation.navigate('SeasonJoin')}
-                />
-              </View>
-            ) : (
-              <View style={styles.card}>
-                <Text style={styles.label}>내 순위</Text>
-                <Text style={styles.big}>{myRank ? `#${myRank.rank}` : '-'}</Text>
-                <Text style={styles.helper}>
-                  등급 {myRank?.tier ?? '-'} · 수익률 {myRank?.returnRate ?? '-'}%
-                </Text>
-                {viewState === 'ranking_settled' ? (
-                  <Text style={styles.settledText}>최종 랭킹 확정</Text>
-                ) : null}
-              </View>
-            )}
+            <View style={styles.card}>
+              <Text style={styles.label}>{getRankTypeLabel(rankType)}</Text>
+              <Text style={styles.helper}>
+                기준일 {displayValue(firstPage?.rankingDate)} · 캡처 {displayValue(firstPage?.capturedAt)}
+              </Text>
+            </View>
 
             {selectedTab !== 'near_me' && top3.length > 0 ? (
               <View style={styles.card}>
@@ -195,7 +240,7 @@ export default function RankingScreen({ navigation }: Props) {
                 <View style={styles.topRow}>
                   {top3.map((item) => (
                     <Pressable
-                      key={item.user.id}
+                      key={getRankingItemKey(item)}
                       style={styles.topCard}
                       onPress={() =>
                         navigation.navigate('UserSeasonSummary', {
@@ -241,6 +286,7 @@ export default function RankingScreen({ navigation }: Props) {
         renderItem={({ item }) => (
           <RankingRow
             item={item}
+            rankType={rankType}
             onPress={() =>
               navigation.navigate('UserSeasonSummary', {
                 userId: item.user.id,
@@ -249,7 +295,7 @@ export default function RankingScreen({ navigation }: Props) {
           />
         )}
         ListFooterComponent={
-          selectedTab !== 'near_me' && rankingQuery.isFetchingNextPage ? (
+          rankingQuery.isFetchingNextPage ? (
             <View style={styles.footerLoader}>
               <ActivityIndicator />
             </View>
@@ -260,11 +306,63 @@ export default function RankingScreen({ navigation }: Props) {
   );
 }
 
+function MyRankingCard({
+  myRanking,
+  rankType,
+  viewState,
+  onJoin,
+}: {
+  myRanking: MyRankingDto | null;
+  rankType?: RankingRankType;
+  viewState: string;
+  onJoin: () => void;
+}) {
+  if (myRanking?.state === 'not_joined' || viewState === 'ranking_partial_unjoined') {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.title}>아직 이번 시즌에 참가하지 않았습니다.</Text>
+        <Text style={styles.helper}>
+          랭킹은 볼 수 있지만 내 순위는 참가 후 반영됩니다.
+        </Text>
+
+        <CTAButton label="시즌 참가하기" onPress={onJoin} />
+      </View>
+    );
+  }
+
+  if (myRanking?.state === 'unavailable') {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.label}>내 순위</Text>
+        <Text style={styles.helper}>내 랭킹 생성 대기 중입니다.</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.card}>
+      <Text style={styles.label}>내 순위</Text>
+      <Text style={styles.big}>
+        {myRanking?.rank ? `#${myRanking.rank}` : '-'}
+      </Text>
+      <Text style={styles.helper}>
+        등급 {getRankingTier(myRanking, rankType)} · 수익률 {displayValue(myRanking?.returnRate)}%
+      </Text>
+      <Text style={styles.helper}>퍼센타일 {displayValue(myRanking?.percentile)}%</Text>
+      {rankType === 'final' ? (
+        <Text style={styles.settledText}>최종 랭킹 확정</Text>
+      ) : null}
+    </View>
+  );
+}
+
 function RankingRow({
   item,
+  rankType,
   onPress,
 }: {
   item: RankingItemDto;
+  rankType?: RankingRankType;
   onPress: () => void;
 }) {
   return (
@@ -277,7 +375,8 @@ function RankingRow({
         <Text style={styles.rankNumber}>#{item.rank}</Text>
         <View>
           <Text style={styles.name}>{item.user.nickname}</Text>
-          <Text style={styles.helper}>등급 {item.tier}</Text>
+          <Text style={styles.helper}>등급 {getRankingTier(item, rankType)}</Text>
+          <Text style={styles.helper}>퍼센타일 {displayValue(item.percentile)}%</Text>
         </View>
       </View>
 

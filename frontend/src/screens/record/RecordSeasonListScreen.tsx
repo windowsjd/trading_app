@@ -24,6 +24,15 @@ import CTAButton from '../../components/common/CTAButton';
 
 type Props = RecordSeasonListScreenProps;
 
+function displayValue(value?: string | number | null) {
+  if (value === null || value === undefined || value === '') return '-';
+  return String(value);
+}
+
+function getReturnRate(item: { finalReturnRate?: string | null; returnRate?: string | null }) {
+  return item.finalReturnRate ?? item.returnRate ?? '-';
+}
+
 export default function RecordSeasonListScreen({ navigation }: Props) {
   const rootNavigation = useRootNavigation();
 
@@ -33,11 +42,11 @@ export default function RecordSeasonListScreen({ navigation }: Props) {
   });
 
   const recordsQuery = useInfiniteQuery({
-    queryKey: QUERY_KEYS.record.seasons(null),
-    queryFn: ({ pageParam }) => getMySeasonRecords(pageParam ?? null, 20),
-    getNextPageParam: (lastPage) =>
-      lastPage.pageInfo.hasNext ? lastPage.pageInfo.nextCursor : undefined,
-    initialPageParam: null as string | null,
+    queryKey: QUERY_KEYS.record.seasons({ limit: 20, offset: 0 }),
+    queryFn: ({ pageParam }) =>
+      getMySeasonRecords({ limit: 20, offset: pageParam }),
+    getNextPageParam: (lastPage) => lastPage.pagination.nextOffset ?? undefined,
+    initialPageParam: 0,
   });
 
   const items = useMemo(
@@ -55,17 +64,24 @@ export default function RecordSeasonListScreen({ navigation }: Props) {
       };
     }
 
-    const bestRank = Math.min(...items.map((item) => item.finalRank));
-    const bestReturn = Math.max(...items.map((item) => Number(item.finalReturnRate)));
+    const ranks = items
+      .map((item) => item.finalRank ?? item.rank)
+      .filter((rank): rank is number => typeof rank === 'number');
+    const returns = items
+      .map((item) => Number(getReturnRate(item)))
+      .filter((value) => Number.isFinite(value));
+    const bestRank = ranks.length ? Math.min(...ranks) : null;
+    const bestReturn = returns.length ? Math.max(...returns) : null;
     const avgReturn =
-      items.reduce((acc, item) => acc + Number(item.finalReturnRate), 0) /
-      items.length;
+      returns.length > 0
+        ? returns.reduce((acc, value) => acc + value, 0) / returns.length
+        : null;
 
     return {
       seasonCount: items.length,
-      bestRank: String(bestRank),
-      bestReturnRate: bestReturn.toFixed(2),
-      avgReturnRate: avgReturn.toFixed(2),
+      bestRank: displayValue(bestRank),
+      bestReturnRate: bestReturn === null ? '-' : bestReturn.toFixed(2),
+      avgReturnRate: avgReturn === null ? '-' : avgReturn.toFixed(2),
     };
   }, [items]);
 
@@ -73,8 +89,14 @@ export default function RecordSeasonListScreen({ navigation }: Props) {
     if (recordsQuery.isLoading) return 'record_list_loading';
     if (recordsQuery.isError) return 'record_list_error';
     if (!items.length) return 'record_list_empty';
+    if (recordsQuery.isFetchingNextPage) return 'record_list_paginating';
     return 'record_list_ready';
-  }, [recordsQuery.isLoading, recordsQuery.isError, items.length]);
+  }, [
+    recordsQuery.isLoading,
+    recordsQuery.isError,
+    recordsQuery.isFetchingNextPage,
+    items.length,
+  ]);
 
   if (viewState === 'record_list_loading') {
     return <FullPageLoading message="전적 목록을 불러오는 중입니다." />;
@@ -147,9 +169,11 @@ export default function RecordSeasonListScreen({ navigation }: Props) {
             </View>
 
             <View style={styles.alignEnd}>
-              <Text style={styles.helper}>#{item.finalRank}</Text>
-              <Text style={styles.helper}>{item.finalTier}</Text>
-              <Text style={styles.itemTitle}>{item.finalReturnRate}%</Text>
+              <Text style={styles.helper}>
+                {item.finalRank ?? item.rank ? `#${item.finalRank ?? item.rank}` : '-'}
+              </Text>
+              <Text style={styles.helper}>{displayValue(item.finalTier ?? item.tier)}</Text>
+              <Text style={styles.itemTitle}>{getReturnRate(item)}%</Text>
             </View>
           </Pressable>
         )}
