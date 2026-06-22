@@ -15,8 +15,10 @@ import {
   getMyRewards,
   getMyBadges,
   getRewardItemDate,
+  isRewardResponseFailed,
   isRewardResponsePending,
 } from '../../features/reward/api';
+import type { RewardViewState } from '../../models/enums/viewState';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -33,7 +35,7 @@ export default function RewardScreen() {
     queryFn: getMyBadges,
   });
 
-  const viewState = useMemo(() => {
+  const viewState = useMemo<RewardViewState>(() => {
     if (rewardsQuery.isLoading || badgesQuery.isLoading) {
       return 'reward_loading';
     }
@@ -44,6 +46,13 @@ export default function RewardScreen() {
 
     const hasAnyReward =
       rewardsQuery.data.items.length > 0 || badgesQuery.data.items.length > 0;
+
+    if (
+      isRewardResponseFailed(rewardsQuery.data) ||
+      isRewardResponseFailed(badgesQuery.data)
+    ) {
+      return 'reward_failed';
+    }
 
     if (
       isRewardResponsePending(rewardsQuery.data) ||
@@ -77,6 +86,16 @@ export default function RewardScreen() {
     return (
       <ErrorState
         title="보상 정보를 불러오지 못했습니다."
+        message="잠시 후 다시 시도해주세요."
+        onRetry={retryAll}
+      />
+    );
+  }
+
+  if (viewState === 'reward_failed') {
+    return (
+      <ErrorState
+        title="보상 지급 상태를 확인하지 못했습니다."
         message="잠시 후 다시 시도해주세요."
         onRetry={retryAll}
       />

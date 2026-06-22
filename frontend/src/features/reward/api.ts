@@ -5,7 +5,12 @@ import type {
   SectionState,
 } from '../../models/dto/common';
 
-export type RewardStatus = SectionState | 'pending' | 'ready' | 'granted';
+export type RewardStatus =
+  | SectionState
+  | 'pending'
+  | 'ready'
+  | 'granted'
+  | 'failed';
 
 export interface RewardItemDto {
   seasonId: string;
@@ -48,6 +53,12 @@ export function isRewardResponsePending(
     response?.state === 'pending' ||
     response?.rewardStatus === 'pending'
   );
+}
+
+export function isRewardResponseFailed(
+  response?: Pick<RewardsDto | BadgesDto, 'state' | 'rewardStatus'> | null,
+) {
+  return response?.state === 'failed' || response?.rewardStatus === 'failed';
 }
 
 export function getRewardItemDate(

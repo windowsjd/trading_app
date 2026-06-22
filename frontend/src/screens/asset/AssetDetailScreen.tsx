@@ -25,6 +25,10 @@ import {
 import { getCurrentSeason } from '../../features/season/api';
 import { toSeasonDomainState } from '../../features/season/mapper';
 import { useAssetTicker } from '../../features/asset/useAssetTicker';
+import {
+  formatTradingNote,
+  isTradableMarketStatus,
+} from '../../features/asset/mapper';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 import { buildWsUrl } from '../../constants/env';
@@ -42,12 +46,17 @@ function displayValue(value?: string | number | boolean | null) {
   return String(value);
 }
 
-function isOpenMarket(status?: string | null) {
-  return status?.toLowerCase() === 'open';
-}
-
 function isPriceAvailable(price?: AssetDetailPriceDto | null) {
   return price?.state === 'available' && !!price.currentPrice;
+}
+
+function getDisplayChangeRate(
+  tickerChangeRate?: string | null,
+  detailChangeRate?: string | null,
+) {
+  return typeof tickerChangeRate === 'string'
+    ? tickerChangeRate
+    : detailChangeRate ?? null;
 }
 
 export default function AssetDetailScreen({ route, navigation }: Props) {
@@ -122,7 +131,10 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
   const displayPriceKrw =
     latestTicker?.priceKrw ??
     (price?.priceKrwState === 'available' ? price?.priceKrw : null);
-  const displayChangeRate = latestTicker?.changeRate ?? price?.changeRate;
+  const displayChangeRate = getDisplayChangeRate(
+    latestTicker?.changeRate,
+    price?.changeRate,
+  );
   const displayCapturedAt =
     latestTicker?.priceCapturedAt ??
     latestTicker?.capturedAt ??
@@ -130,6 +142,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
   const displayEffectiveAt =
     latestTicker?.priceEffectiveAt ?? price?.priceEffectiveAt;
   const displayFreshnessAgeSeconds = latestTicker?.freshnessAgeSeconds;
+  const tradingNote = formatTradingNote(asset.tradingNote);
 
   const seasonBlockedReason =
     seasonQuery.isLoading
@@ -149,7 +162,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
       ? '비활성 자산입니다.'
       : !asset.tradable
       ? asset.tradeBlockedReason ?? '현재 거래할 수 없는 자산입니다.'
-      : !isOpenMarket(asset.marketStatus)
+      : !isTradableMarketStatus(asset.marketStatus)
       ? '장 마감으로 주문할 수 없습니다.'
       : isTickerStale
       ? '실시간 시세가 오래되어 주문할 수 없습니다.'
@@ -206,8 +219,8 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
           {asset.tradeBlockedReason ? (
             <Text style={styles.errorText}>{asset.tradeBlockedReason}</Text>
           ) : null}
-          {asset.tradingNote ? (
-            <Text style={styles.helper}>{asset.tradingNote}</Text>
+          {tradingNote ? (
+            <Text style={styles.helper}>{tradingNote}</Text>
           ) : null}
           {buyBlockedReason ? (
             <View style={styles.inlineWarning}>

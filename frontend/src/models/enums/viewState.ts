@@ -147,4 +147,5 @@ export type RewardViewState =
   | 'reward_empty'
   | 'reward_pending'
   | 'reward_pending_settlement'
+  | 'reward_failed'
   | 'reward_error';

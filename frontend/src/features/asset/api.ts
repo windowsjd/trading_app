@@ -37,7 +37,7 @@ export interface AssetDetailAssetDto {
   tradable: boolean;
   tradeBlockedReason?: string | null;
   metadata?: Record<string, unknown> | null;
-  tradingNote?: string | null;
+  tradingNote?: string | Record<string, unknown> | unknown[] | null;
   price?: AssetDetailPriceDto | null;
 }
 

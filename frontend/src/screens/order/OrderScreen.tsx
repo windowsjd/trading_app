@@ -22,6 +22,7 @@ import {
 import { getPositions, getPositionQuantity } from '../../features/position/api';
 import { getCurrentSeason } from '../../features/season/api';
 import { toSeasonDomainState } from '../../features/season/mapper';
+import { isTradableMarketStatus } from '../../features/asset/mapper';
 import {
   quoteOrder,
   createOrder,
@@ -71,10 +72,6 @@ const IDEMPOTENCY_CONFLICT_MESSAGE =
 function displayValue(value?: string | number | boolean | null) {
   if (value === null || value === undefined || value === '') return '-';
   return String(value);
-}
-
-function isOpenMarket(status?: string | null) {
-  return status?.toLowerCase() === 'open';
 }
 
 function isPriceAvailable(price?: AssetDetailPriceDto | null) {
@@ -317,7 +314,7 @@ export default function OrderScreen({ route, navigation }: Props) {
       ? '비활성 자산입니다.'
       : asset && !asset.tradable
       ? asset.tradeBlockedReason ?? '현재 거래할 수 없는 자산입니다.'
-      : asset && !isOpenMarket(asset.marketStatus)
+      : asset && !isTradableMarketStatus(asset.marketStatus)
       ? '장 마감으로 주문할 수 없습니다.'
       : asset && !isPriceAvailable(price)
       ? '시세를 확인할 수 없어 주문할 수 없습니다.'

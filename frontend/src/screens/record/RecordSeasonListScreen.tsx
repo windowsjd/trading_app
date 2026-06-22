@@ -15,6 +15,7 @@ import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 
 import { getCurrentSeason } from '../../features/season/api';
+import { toSeasonDomainState } from '../../features/season/mapper';
 import { getMySeasonRecords } from '../../features/record/api';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
@@ -98,6 +99,14 @@ export default function RecordSeasonListScreen({ navigation }: Props) {
     items.length,
   ]);
 
+  const shouldShowJoinSeasonCta = useMemo(() => {
+    if (seasonQuery.isLoading || seasonQuery.isError || !seasonQuery.data) {
+      return false;
+    }
+
+    return toSeasonDomainState(seasonQuery.data) === 'season_active_not_joined';
+  }, [seasonQuery.data, seasonQuery.isError, seasonQuery.isLoading]);
+
   if (viewState === 'record_list_loading') {
     return <FullPageLoading message="전적 목록을 불러오는 중입니다." />;
   }
@@ -118,12 +127,10 @@ export default function RecordSeasonListScreen({ navigation }: Props) {
         title="아직 참여한 시즌이 없습니다."
         message="현재 시즌에 참가하면 전적이 쌓이기 시작합니다."
         actionLabel={
-          seasonQuery.data?.status === 'active' && !seasonQuery.data?.joined
-            ? '현재 시즌 참가하기'
-            : undefined
+          shouldShowJoinSeasonCta ? '현재 시즌 참가하기' : undefined
         }
         onAction={
-          seasonQuery.data?.status === 'active' && !seasonQuery.data?.joined
+          shouldShowJoinSeasonCta
             ? () => rootNavigation.navigate('SeasonJoin')
             : undefined
         }

@@ -11,6 +11,8 @@ interface UseAssetTickerParams {
 export type AssetTickerConnectionState =
   | 'connecting'
   | 'connected'
+  | 'subscribed'
+  | 'unsubscribed'
   | 'reconnecting'
   | 'disconnected'
   | 'auth_failed'
@@ -25,7 +27,7 @@ export interface AssetTickerMessage {
   priceCurrency?: 'KRW' | 'USD';
   priceKrw: string;
   priceKrwState?: string;
-  changeRate: string;
+  changeRate?: string | null;
   assetPriceSnapshotId?: string | null;
   priceCapturedAt?: string | null;
   priceEffectiveAt?: string | null;
@@ -35,6 +37,8 @@ export interface AssetTickerMessage {
 
 type AssetTickerControlMessage = {
   type?: string;
+  channel?: string;
+  assetId?: string;
   code?: string;
   message?: string;
 };
@@ -66,6 +70,13 @@ function isTickerStale(payload: AssetTickerMessage | null) {
 
   // Server-driven freshness metadata is not yet exposed as a threshold.
   return freshnessAgeSeconds > STALE_FRESHNESS_THRESHOLD_SECONDS;
+}
+
+function isCurrentAssetTickerControlMessage(
+  payload: AssetTickerControlMessage,
+  assetId: string,
+) {
+  return payload.channel === 'asset_ticker' && payload.assetId === assetId;
 }
 
 export function useAssetTicker({
@@ -209,8 +220,26 @@ export function useAssetTicker({
           }
 
           if (payload.type === 'subscription_error') {
+            if (!isCurrentAssetTickerControlMessage(payload, assetId)) return;
+
             setConnectionState('subscription_error');
             setShowReconnectBanner(true);
+            return;
+          }
+
+          if (payload.type === 'subscribed') {
+            if (!isCurrentAssetTickerControlMessage(payload, assetId)) return;
+
+            setConnectionState('subscribed');
+            setShowReconnectBanner(false);
+            return;
+          }
+
+          if (payload.type === 'unsubscribed') {
+            if (!isCurrentAssetTickerControlMessage(payload, assetId)) return;
+
+            setConnectionState('unsubscribed');
+            setShowReconnectBanner(false);
           }
         } catch {
           // Ignore malformed messages.
