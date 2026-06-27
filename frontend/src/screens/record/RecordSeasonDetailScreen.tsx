@@ -70,14 +70,20 @@ export default function RecordSeasonDetailScreen({ route, navigation }: Props) {
     );
   }
 
-  const { season, summary, equityChart } = detailQuery.data;
-  const stats = detailQuery.data.stats ?? {};
-  const finalRank = summary.finalRank ?? summary.rank;
-  const finalTier = summary.finalTier ?? summary.tier;
-  const finalReturnRate = summary.finalReturnRate ?? summary.returnRate;
-  const finalTotalAssetKrw = summary.finalTotalAssetKrw ?? summary.totalAssetKrw;
-  const maxDrawdown = summary.maxDrawdown ?? summary.mdd;
-  const totalFillCount = summary.totalFillCount ?? summary.fillCount;
+  const detail = detailQuery.data;
+  const { season, participant, performance, activitySummary, profitAnalysis } =
+    detail;
+  const finalRank = participant?.finalRank;
+  const finalTier = participant?.finalTier;
+  const totalAssetKrw = performance.totalAssetKrw;
+  const returnRate = performance.returnRate;
+  const maxDrawdown = performance.maxDrawdown;
+  const totalOrders = activitySummary.orders.total;
+  const executedOrders = activitySummary.orders.executed;
+  const totalExchanges = activitySummary.exchanges.total;
+  const openPositions = activitySummary.positions.open;
+  const bestAsset = profitAnalysis.bestAsset;
+  const worstAsset = profitAnalysis.worstAsset;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -98,29 +104,65 @@ export default function RecordSeasonDetailScreen({ route, navigation }: Props) {
             최종 순위 {finalRank ? `#${finalRank}` : '-'}
           </Text>
           <Text style={styles.helper}>최종 등급 {displayValue(finalTier)}</Text>
-          <Text style={styles.helper}>최종 수익률 {displayValue(finalReturnRate)}%</Text>
-          <Text style={styles.helper}>최종 자산 {displayValue(finalTotalAssetKrw)} KRW</Text>
+          <Text style={styles.helper}>수익률 {displayValue(returnRate)}%</Text>
+          <Text style={styles.helper}>총자산 {displayValue(totalAssetKrw)} KRW</Text>
         </View>
 
         <View style={styles.card}>
           <Text style={styles.label}>시즌 자산 변화</Text>
-          {equityChart.length === 0 ? (
-            <InlineEmptyState message="표시할 차트 데이터가 없습니다." />
-          ) : (
-            equityChart.map((point) => (
-              <Text key={point.time} style={styles.helper}>
-                {point.time} · {point.totalAssetKrw}
-              </Text>
-            ))
-          )}
+          <Text style={styles.helper}>성과 상태 {performance.state}</Text>
+          <Text style={styles.helper}>
+            스냅샷 일자 {displayValue(performance.snapshotDate)}
+          </Text>
+          <Text style={styles.helper}>
+            수집 시각 {displayValue(performance.capturedAt)}
+          </Text>
+          {performance.state === 'unavailable' ? (
+            <InlineEmptyState
+              message={performance.message ?? '성과 데이터가 아직 없습니다.'}
+            />
+          ) : null}
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.label}>통계</Text>
-          <Text style={styles.helper}>총 거래 횟수 {displayValue(totalFillCount)}</Text>
+          <Text style={styles.label}>거래 활동</Text>
+          <Text style={styles.helper}>총 주문 {displayValue(totalOrders)}</Text>
+          <Text style={styles.helper}>체결 주문 {displayValue(executedOrders)}</Text>
+          <Text style={styles.helper}>총 환전 {displayValue(totalExchanges)}</Text>
+          <Text style={styles.helper}>오픈 포지션 {displayValue(openPositions)}</Text>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.label}>손익 요약</Text>
           <Text style={styles.helper}>MDD {displayValue(maxDrawdown)}%</Text>
-          <Text style={styles.helper}>최고 수익 종목 {stats.bestAsset ?? '-'}</Text>
-          <Text style={styles.helper}>최대 손실 종목 {stats.worstAsset ?? '-'}</Text>
+          <Text style={styles.helper}>
+            실현 손익 {displayValue(profitAnalysis.totalRealizedPnlKrw)} KRW
+          </Text>
+          <Text style={styles.helper}>
+            평가 손익 {displayValue(profitAnalysis.totalUnrealizedPnlKrw)} KRW
+          </Text>
+          <Text style={styles.helper}>
+            총 손익 {displayValue(profitAnalysis.totalPnlKrw)} KRW
+          </Text>
+          {profitAnalysis.state !== 'available' ? (
+            <Text style={styles.subtle}>손익 분석 상태 {profitAnalysis.state}</Text>
+          ) : null}
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.label}>대표 자산</Text>
+          {bestAsset || worstAsset ? (
+            <>
+              <Text style={styles.helper}>
+                최고 수익 {bestAsset ? `${bestAsset.symbol} · ${bestAsset.totalPnlKrw}` : '-'}
+              </Text>
+              <Text style={styles.helper}>
+                최대 손실 {worstAsset ? `${worstAsset.symbol} · ${worstAsset.totalPnlKrw}` : '-'}
+              </Text>
+            </>
+          ) : (
+            <InlineEmptyState message="표시할 대표 손익 자산이 없습니다." />
+          )}
         </View>
 
         <View style={styles.row}>
@@ -169,4 +211,5 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '700' },
   label: { fontSize: 13, color: '#666' },
   helper: { fontSize: 14, color: '#444' },
+  subtle: { fontSize: 13, color: '#777' },
 });

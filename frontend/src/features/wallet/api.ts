@@ -128,6 +128,19 @@ export interface FxExecuteDto {
 
 export type WalletTransactionDirection = 'credit' | 'debit';
 
+type BackendWalletTransactionDto = {
+  id: string;
+  currencyCode: WalletCurrency;
+  direction: string;
+  txType: string;
+  referenceType: string;
+  referenceId: string | null;
+  amount: MoneyString;
+  balanceAfter: MoneyString;
+  occurredAt: IsoDateTimeString;
+  createdAt: IsoDateTimeString;
+};
+
 export interface WalletTransactionDto {
   transactionId: string;
   walletId?: string;
@@ -143,16 +156,49 @@ export interface WalletTransactionDto {
 }
 
 export interface WalletTransactionsDto {
+  state: WalletState;
+  season: WalletSeasonDto | null;
+  participant: WalletParticipantDto | null;
   items: WalletTransactionDto[];
   pagination: OffsetPagination;
+  reason?: string;
+  message?: string;
 }
 
 export interface GetWalletTransactionsParams {
-  currencyCode?: WalletCurrency;
-  txType?: string;
-  direction?: WalletTransactionDirection;
+  currency?: WalletCurrency;
   limit?: number;
   offset?: number;
+  direction?: WalletTransactionDirection;
+  txType?: string;
+}
+
+type BackendWalletTransactionsResponseDto = {
+  state: WalletState;
+  season: WalletSeasonDto | null;
+  participant: WalletParticipantDto | null;
+  transactions: BackendWalletTransactionDto[];
+  pagination: OffsetPagination;
+  reason?: string;
+  message?: string;
+};
+
+function normalizeWalletTransaction(
+  item: BackendWalletTransactionDto | WalletTransactionDto,
+): WalletTransactionDto {
+  return {
+    transactionId: 'transactionId' in item ? item.transactionId : item.id,
+    walletId: 'walletId' in item ? item.walletId : undefined,
+    currencyCode: item.currencyCode,
+    direction: item.direction === 'credit' ? 'credit' : 'debit',
+    txType: item.txType,
+    referenceType: item.referenceType ?? null,
+    referenceId: item.referenceId ?? null,
+    amount: item.amount,
+    balanceAfter: item.balanceAfter,
+    occurredAt: item.occurredAt,
+    createdAt: item.createdAt,
+  };
 }
 
 function buildFallbackPagination(
@@ -170,18 +216,21 @@ function buildFallbackPagination(
 }
 
 function normalizeWalletTransactions(
-  data: WalletTransactionsDto & {
-    transactions?: WalletTransactionDto[];
-  },
+  data: BackendWalletTransactionsResponseDto,
   limit: number,
   offset: number,
 ): WalletTransactionsDto {
-  const items = data.items ?? data.transactions ?? [];
+  const items = data.transactions.map(normalizeWalletTransaction);
 
   return {
+    state: data.state,
+    season: data.season,
+    participant: data.participant,
     items,
     pagination:
       data.pagination ?? buildFallbackPagination(limit, offset, items.length),
+    reason: data.reason,
+    message: data.message,
   };
 }
 
@@ -237,20 +286,14 @@ export async function getWalletTransactions(
   const offset = params.offset ?? 0;
   const searchParams = new URLSearchParams();
 
-  if (params.currencyCode) {
-    searchParams.set('currencyCode', params.currencyCode);
+  if (params.currency) {
+    searchParams.set('currency', params.currency);
   }
-  if (params.txType) searchParams.set('txType', params.txType);
-  if (params.direction) searchParams.set('direction', params.direction);
   searchParams.set('limit', String(limit));
   searchParams.set('offset', String(offset));
 
   const response = await apiClient.get<
-    ApiSuccessResponse<
-      WalletTransactionsDto & {
-        transactions?: WalletTransactionDto[];
-      }
-    >
+    ApiSuccessResponse<BackendWalletTransactionsResponseDto>
   >(`/wallets/transactions?${searchParams.toString()}`);
 
   return normalizeWalletTransactions(response.data.data, limit, offset);

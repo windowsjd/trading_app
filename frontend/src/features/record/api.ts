@@ -4,7 +4,6 @@ import type {
   IsoDateTimeString,
   MoneyString,
   OffsetPagination,
-  PercentString,
   QuantityString,
   RateString,
 } from '../../models/dto/common';
@@ -23,35 +22,86 @@ export interface RecordSeasonListItemDto {
   totalAssetKrw?: MoneyString | null;
 }
 
+export interface ProfitAnalysisItemDto {
+  assetId: string;
+  symbol: string;
+  name: string;
+  market: string;
+  assetType: string;
+  currencyCode: 'KRW' | 'USD';
+  realizedPnlLocal: MoneyString;
+  realizedPnlKrw: MoneyString;
+  unrealizedPnlLocal: MoneyString;
+  unrealizedPnlKrw: MoneyString;
+  totalPnlKrw: MoneyString;
+  returnRate: RateString | null;
+  returnRateState: 'available' | 'unavailable';
+  positionState: 'open' | 'fully_sold';
+  valuationState: 'available' | 'unavailable';
+}
+
 export interface RecordSeasonDetailDto {
+  state: 'available' | 'not_joined';
   season: {
     id: string;
     name: string;
+    status: string;
     startAt: IsoDateTimeString;
     endAt: IsoDateTimeString;
   };
-  summary: {
-    finalRank?: number | null;
-    rank?: number | null;
-    finalTier?: string | null;
-    tier?: string | null;
-    finalReturnRate?: RateString | null;
-    returnRate?: RateString | null;
-    finalTotalAssetKrw?: MoneyString | null;
-    totalAssetKrw?: MoneyString | null;
-    maxDrawdown?: PercentString | null;
-    mdd?: PercentString | null;
-    totalFillCount?: number | null;
-    fillCount?: number | null;
-  };
-  stats?: {
-    bestAsset?: string | null;
-    worstAsset?: string | null;
+  participant: {
+    id: string;
+    joinedAt: IsoDateTimeString;
+    participantStatus: string;
+    initialCapitalKrw: MoneyString;
+    finalRank: number | null;
+    finalTier: string | null;
+    rewardGrantedAt: IsoDateTimeString | null;
   } | null;
-  equityChart: Array<{
-    time: IsoDateTimeString;
-    totalAssetKrw: MoneyString;
-  }>;
+  performance: {
+    state: 'available' | 'unavailable';
+    totalAssetKrw: MoneyString | null;
+    returnRate: RateString | null;
+    maxDrawdown: string | null;
+    snapshotDate: string | null;
+    capturedAt: IsoDateTimeString | null;
+    reason?: string;
+    message?: string;
+  };
+  activitySummary: {
+    orders: {
+      total: number;
+      submitted: number;
+      executed: number;
+      canceled: number;
+      rejected: number;
+    };
+    exchanges: {
+      total: number;
+    };
+    walletTransactions: {
+      total: number;
+    };
+    positions: {
+      open: number;
+    };
+  };
+  profitAnalysis: {
+    state: 'available' | 'unavailable' | 'partial_unavailable';
+    totalRealizedPnlKrw: MoneyString;
+    totalUnrealizedPnlKrw: MoneyString;
+    totalPnlKrw: MoneyString;
+    bestAsset: ProfitAnalysisItemDto | null;
+    worstAsset: ProfitAnalysisItemDto | null;
+    items: ProfitAnalysisItemDto[];
+    valuationErrors: Array<{
+      assetId: string;
+      code: string;
+      message: string;
+    }>;
+  };
+  reason?: string;
+  message?: string;
 }
 
 export interface RecordOrderItemDto {

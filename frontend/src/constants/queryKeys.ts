@@ -14,18 +14,14 @@ export const QUERY_KEYS = {
     balances: ['wallet', 'balances'] as const,
     transactionsAll: ['wallet', 'transactions'] as const,
     transactions: (params?: {
-      currencyCode?: string;
-      txType?: string;
-      direction?: string;
+      currency?: string;
       limit?: number;
       offset?: number;
     }) =>
       [
         'wallet',
         'transactions',
-        params?.currencyCode ?? 'all',
-        params?.txType ?? 'all',
-        params?.direction ?? 'all',
+        params?.currency ?? 'all',
         params?.limit ?? null,
         params?.offset ?? 0,
       ] as const,

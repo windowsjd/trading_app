@@ -58,10 +58,7 @@ const TX_TYPE_LABELS: Record<string, string> = {
 };
 
 function getTransactionKey(item: WalletTransactionDto) {
-  return (
-    item.transactionId ??
-    `${item.currencyCode}-${item.direction}-${item.amount}-${item.occurredAt}`
-  );
+  return item.transactionId;
 }
 
 function displayValue(value?: string | number | null) {
@@ -107,22 +104,17 @@ export default function WalletTransactionsScreen({ route }: Props) {
   const [directionFilter, setDirectionFilter] =
     useState<DirectionFilter>('all');
 
-  const currencyCode =
-    currencyFilter === 'all' ? undefined : currencyFilter;
-  const direction =
-    directionFilter === 'all' ? undefined : directionFilter;
+  const currency = currencyFilter === 'all' ? undefined : currencyFilter;
 
   const transactionsQuery = useInfiniteQuery({
     queryKey: QUERY_KEYS.wallet.transactions({
-      currencyCode,
-      direction,
+      currency,
       limit: PAGE_SIZE,
       offset: 0,
     }),
     queryFn: ({ pageParam }) =>
       getWalletTransactions({
-        currencyCode,
-        direction,
+        currency,
         limit: PAGE_SIZE,
         offset: pageParam,
       }),
@@ -131,7 +123,7 @@ export default function WalletTransactionsScreen({ route }: Props) {
     initialPageParam: 0,
   });
 
-  const items = useMemo(() => {
+  const rawItems = useMemo(() => {
     const byId = new Map<string, WalletTransactionDto>();
 
     transactionsQuery.data?.pages.forEach((page) => {
@@ -142,6 +134,14 @@ export default function WalletTransactionsScreen({ route }: Props) {
 
     return Array.from(byId.values());
   }, [transactionsQuery.data]);
+
+  const visibleItems = useMemo(
+    () =>
+      directionFilter === 'all'
+        ? rawItems
+        : rawItems.filter((item) => item.direction === directionFilter),
+    [directionFilter, rawItems],
+  );
 
   if (transactionsQuery.isLoading) {
     return <FullPageLoading message="지갑 원장을 불러오는 중입니다." />;
@@ -161,7 +161,7 @@ export default function WalletTransactionsScreen({ route }: Props) {
     <SafeAreaView style={styles.container}>
       <FlatList
         testID={TEST_IDS.walletTransactions.screen}
-        data={items}
+        data={visibleItems}
         keyExtractor={getTransactionKey}
         contentContainerStyle={styles.content}
         refreshing={
@@ -208,6 +208,9 @@ export default function WalletTransactionsScreen({ route }: Props) {
                   />
                 ))}
               </View>
+              <Text style={styles.filterHint}>
+                방향 필터는 현재 불러온 내역에서만 적용됩니다.
+              </Text>
             </View>
           </View>
         }
@@ -302,6 +305,7 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 24, fontWeight: '700' },
   label: { fontSize: 13, color: '#666' },
+  filterHint: { fontSize: 12, color: '#777' },
   filterGroup: { gap: 8 },
   filterRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   chip: {
