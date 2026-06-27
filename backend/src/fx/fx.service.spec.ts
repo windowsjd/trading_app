@@ -555,6 +555,82 @@ describe('FxService', () => {
     ).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['query is omitted', {}],
+    ['refresh is false', { refresh: false }],
+    ['refresh is "false"', { refresh: 'false' }],
+    ['refresh is "0"', { refresh: '0' }],
+  ])(
+    'does not call provider refresh when current rate %s',
+    async (_label, query) => {
+      const koreaEximIngestionService = {
+        ensureFreshUsdKrwSnapshot: jest.fn(),
+      };
+      const { prisma, service } = createService(koreaEximIngestionService);
+      prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
+        {
+          id: 'fx-exchange-rate-api-1',
+          rate: new Prisma.Decimal('1400.00000000'),
+          sourceType: FxRateSourceType.provider_api,
+          sourceName: 'exchange_rate_api',
+          capturedAt,
+          effectiveAt: freshEffectiveAt,
+        },
+      ]);
+
+      await expect(service.currentRate(query)).resolves.toMatchObject({
+        success: true,
+        data: {
+          sourceName: 'exchange_rate_api',
+        },
+      });
+      expect(
+        koreaEximIngestionService.ensureFreshUsdKrwSnapshot,
+      ).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ['refresh is true', { refresh: true }],
+    ['refresh is "true"', { refresh: 'true' }],
+    ['refresh is "1"', { refresh: '1' }],
+  ])('calls provider refresh when current rate %s', async (_label, query) => {
+    const koreaEximIngestionService = {
+      ensureFreshUsdKrwSnapshot: jest.fn().mockResolvedValueOnce(null),
+    };
+    const { prisma, service } = createService(koreaEximIngestionService);
+    prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
+      {
+        id: 'fx-exchange-rate-api-1',
+        rate: new Prisma.Decimal('1400.00000000'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'exchange_rate_api',
+        capturedAt,
+        effectiveAt: freshEffectiveAt,
+      },
+    ]);
+
+    await expect(service.currentRate(query)).resolves.toMatchObject({
+      success: true,
+      data: {
+        sourceName: 'exchange_rate_api',
+      },
+    });
+    expect(
+      koreaEximIngestionService.ensureFreshUsdKrwSnapshot,
+    ).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects invalid current rate refresh values', async () => {
+    const { prisma, service } = createService();
+
+    await expectErrorCode(
+      service.currentRate({ refresh: 'invalid' }),
+      'INVALID_REFRESH',
+    );
+    expect(prisma.fxRateSnapshot.findMany).not.toHaveBeenCalled();
+  });
+
   it('rejects current rate requests for unsupported pairs', async () => {
     const { prisma, service } = createService();
 

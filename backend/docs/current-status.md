@@ -54,6 +54,8 @@
     - 사용자 `GET /api/v1/rewards/me`는 fulfilled되어 `SeasonReward`로 생성된 내부 reward만 노출한다.
     - 외부 현금/포인트/쿠폰/기프티콘/결제/배송/provider API는 구현하지 않는다.
     - reward catalog/policy 확정, 외부 지급, scheduler reward 자동화는 future gate다.
+    - v2 backend contract alignment 기준에서 보상 지급 시스템은 구현률 범위 밖이다. 사용자 rewards/badges read API와 internal DB fulfillment foundation은 현재 상태로 유지하지만, 외부 provider/coupon/point/cash/shipping 자동 지급은 구현하지 않는다.
+    - `settled`는 final rank/final tier 확정을 의미하며 reward 지급 완료 여부는 settled 전환 조건이 아니다.
   - Provider ingestion trigger API, batch run HTTP API는 구현하지 않음. Scheduler/Ops foundation은 disabled-by-default/dry-run-by-default 내부 기반만 존재하며 production cron 자동화와 scheduler 자동 write는 열지 않음.
 - API response alignment:
   - 모든 목록 pagination response는 기존 `limit`, `offset`, `total`, `returned`를 유지하고 `nextOffset`을 추가한다.
@@ -223,7 +225,7 @@
   - KIS REST current-price ingestion is implemented for domestic KRX and US NAS/NYS/AMS watchlist assets, writing only `asset_price_snapshots` rows with existing eligible source names `kis_krx_realtime_trade` and `kis_us_delayed_trade`.
   - KIS REST hoga/orderbook ingestion foundation is implemented for domestic KRX and US NAS/NYS/AMS watchlist assets, writing only `asset_orderbook_snapshots` rows with source names `kis_krx_realtime_hoga` and `kis_us_delayed_hoga`.
   - KIS order/account/balance/fill/deposit/withdrawal APIs, best bid/ask execution, partial fills, slippage models, and real external trading integrations remain unimplemented.
-  - KRX domestic stock `provider_api` source eligibility is open only for the explicitly allowed read-only/quote workflows, orders execute, and operator-run daily snapshot valuation through `kis_krx_realtime_trade`.
+  - KRX domestic stock `provider_api` source eligibility is open only for the explicitly allowed read-only/quote workflows, orders execute, operator-run daily snapshot valuation, and season settlement valuation through `kis_krx_realtime_trade`.
 
 ## 2. 구현 완료 API
 
@@ -263,8 +265,8 @@
 - `POST /api/v1/orders/quote` durable quote MVP
 - `POST /api/v1/orders` durable quote-bound immediate market execution MVP
 - `POST /api/v1/orders` create idempotency MVP
-- `POST /api/v1/orders/:orderId/cancel` public route exists but returns `ORDER_CANCEL_NOT_SUPPORTED`
-- `POST /api/v1/orders/:orderId/execute` internal compatibility/deprecation full-fill path
+- `POST /api/v1/orders/:orderId/cancel` is not exposed by `OrdersController`; service-level compatibility method returns `ORDER_CANCEL_NOT_SUPPORTED` without financial mutation if invoked internally
+- `POST /api/v1/orders/:orderId/execute` is not exposed by `OrdersController`; service-level full-fill path remains internal compatibility/deprecation code only
 - `GET /api/v1/assets` read-only MVP
 - `GET /api/v1/assets/:assetId` read-only MVP
 - `GET /api/v1/assets/:assetId/candles` chart candle MVP with KIS stock candles and Binance Spot crypto candles
@@ -275,8 +277,9 @@
   - Provider fallback remains explicit; stale/wrong-source provider rows are not used.
   - 응답은 optional `rateSource` metadata와 durable quote `quoteId`, `expiresAt`, `maxChangeBps`를 표시한다.
 - `GET /api/v1/fx/rates/current` read-only current USD/KRW rate MVP
+  - query 생략 또는 `refresh=false`/`refresh=0`은 provider refresh 없이 DB snapshot만 읽는다.
   - `refresh=true` may attempt Korea EXIM refresh when `PROVIDER_INGESTION_ENABLED=true` and `KOREA_EXIM_EXCHANGE_ENABLED=true`.
-  - `refresh=false` reads DB snapshots only.
+  - invalid `refresh` 값은 `INVALID_REFRESH`.
   - DB selection uses fresh provider rows first by `korea_exim_exchange_rate`, then `exchange_rate_api`; stale Korea EXIM does not outrank fresh ExchangeRate-API.
   - If no fresh provider row exists, the endpoint uses existing `admin_manual` fallback or returns `FX_RATE_UNAVAILABLE`.
   - Actual auth keys must stay only in `.env.local`.
@@ -365,8 +368,9 @@
   - optional auth route: `GET /api/v1/seasons/current` anonymous/valid token/invalid token/malformed Authorization/`x-user-id` only 회귀 검증.
   - protected read-only route: `GET /api/v1/me`, `/home`, `/ranking`, `/wallets`, `/records`, `/records/me/seasons`, `/records/me/seasons/:seasonId`, `/records/me/seasons/:seasonId/orders`, `/records/me/seasons/:seasonId/exchanges`, `/users/:userId/records/:seasonId`, `/rewards/me`, `/badges/me`, `/orders` missing token 및 `x-user-id` only `UNAUTHORIZED` 검증.
   - protected read-only route valid token smoke: `GET /api/v1/me`, `/home`, `/ranking`, `/wallets`, `/records`, `/records/me/seasons`, `/records/me/seasons/:seasonId`, `/records/me/seasons/:seasonId/orders`, `/records/me/seasons/:seasonId/exchanges`, `/users/:userId/records/:seasonId`, `/rewards/me`, `/badges/me`, `/orders`가 guard를 통과해 service-level 정상 응답 또는 known unavailable/not_joined/empty 계약으로 진입하는지 검증.
-  - protected write-path route: `POST /api/v1/seasons/:seasonId/join`, `/fx/quote`, `/fx/execute`, `/orders/quote`, `/orders`, `/orders/:orderId/cancel`, `/orders/:orderId/execute` missing token, `x-user-id` only, invalid bearer token, malformed Authorization 차단 검증.
-  - protected write-path route valid token smoke: 위 write API들이 guard를 통과해 service-level success 또는 known domain error(`SEASON_NOT_JOINED`, `ORDER_NOT_FOUND`)까지 진입하는지 검증.
+  - protected write-path route: `POST /api/v1/seasons/:seasonId/join`, `/fx/quote`, `/fx/execute`, `/orders/quote`, `/orders` missing token, `x-user-id` only, invalid bearer token, malformed Authorization 차단 검증.
+  - unmounted compatibility path smoke: `/orders/:orderId/cancel`, `/orders/:orderId/execute`는 현재 controller route가 아니므로 HTTP 요청은 service 진입 없이 `NOT_FOUND`.
+  - protected write-path route valid token smoke: 위 mounted write API들이 guard를 통과해 service-level success 또는 known domain error(`SEASON_NOT_JOINED`)까지 진입하는지 검증.
   - operator route: `GET /api/v1/operator/me` missing token, invalid bearer, `x-user-id` only, `role=user`, `role=operator`, `role=admin`, suspended/deleted, DB current role 변경 후 기존 token 권한 반영 회귀 검증.
   - admin management route: user/operator list 및 role 변경 차단, admin list/get/role 변경 성공, suspended/deleted actor 차단, role 변경 success/failure audit 기록 회귀 검증.
   - write-path API의 full mutation 검증은 service/unit/opt-in DB integration spec이 담당하며, HTTP e2e는 guard routing, `request.user` 주입, controller/service 진입 회귀를 담당.
@@ -386,6 +390,7 @@
 - `fx_execute_requests`
 - `assets`
 - `asset_price_snapshots`
+- `asset_orderbook_snapshots`
 - `positions`
 - `orders`
 - `daily_portfolio_snapshots`
@@ -435,6 +440,7 @@ near-term ledger/FX foundation:
   - Provider ingestion HTTP trigger는 operator/admin 전용 `POST /api/v1/operator/provider-ingestions/:provider/run`으로 구현됨. 기본 `dryRun=true`, `dryRun=false` 명시 시에만 non-dry-run 실행, disabled provider는 skipped/disabled summary를 반환하고 safe `OperatorAuditLog`를 남김.
   - KIS REST 현재가 ingestion은 국내/미국 watchlist에 대해 dry-run/non-dry-run을 지원하며 기존 active asset mapping이 명확할 때만 `asset_price_snapshots` provider_api row를 생성함. 국내는 `kis_krx_realtime_trade`, 미국은 `kis_us_delayed_trade` sourceName을 사용해 기존 source eligibility와 어긋나지 않게 함.
   - KIS hoga/orderbook ingestion foundation은 REST hoga snapshot을 별도 `asset_orderbook_snapshots` 테이블에 저장하며 bid/ask/spread_bps, quantity, currency, effective/captured timestamp, redacted/truncated raw payload metadata를 기록함.
+  - `asset_orderbook_snapshots`는 provider ingestion foundation 확장 테이블이며 MVP 핵심 거래/평가/랭킹/정산 테이블이 아니다. 현재 order quote/create/execute pricing, portfolio valuation, ranking, settlement에는 사용하지 않는다.
   - `KIS_REST_BASE_URL` 또는 `KIS_WS_BASE_URL`이 없으면 KIS live call은 failed/skipped result로 보고 가능하며 secret 값을 출력하지 않음.
   - KIS 주문/계좌/잔고/실매매 API, Binance authenticated/order/account/user-data API, best bid/ask execution, partial fill, slippage model, provider scheduler/cron은 구현하지 않음.
   - 실제 production secret 값은 코드/문서/test fixture에 없음.
@@ -546,11 +552,12 @@ near-term ledger/FX foundation:
   - create flow가 fresh provider_api asset/FX rows로 repricing하고 quote movement guard를 통과해야 wallet/position/order/ledger를 mutate.
   - default `admin_manual` execute fallback은 금지.
   - equity snapshot과 ranking refresh는 ledger transaction 밖에서 후속 처리하며, settlement는 수행하지 않음.
-- `POST /api/v1/orders/:orderId/cancel` public route는 `ORDER_CANCEL_NOT_SUPPORTED`로 차단:
+- `POST /api/v1/orders/:orderId/cancel`은 현재 `OrdersController`에 노출되지 않음:
   - 공개 사용자 cancel 기능은 현재 지원하지 않음.
-  - wallet debit/credit, wallet_transactions, position mutation, equity snapshot, settlement 없음.
-- `POST /api/v1/orders/:orderId/execute` internal compatibility/deprecation full-fill path 구현 완료:
-  - 일반 사용자 필수 흐름은 `POST /api/v1/orders` 즉시 체결이며, 이 endpoint는 내부 호환/폐기 예정 성격.
+  - HTTP 요청은 service 진입 없이 `NOT_FOUND`.
+  - service-level compatibility method는 내부 호출 시 금융 mutation 없이 `ORDER_CANCEL_NOT_SUPPORTED`를 반환.
+- `POST /api/v1/orders/:orderId/execute`는 현재 `OrdersController`에 노출되지 않음:
+  - 일반 사용자 필수 흐름은 `POST /api/v1/orders` 즉시 체결이며, service method는 내부 호환/폐기 예정 성격.
   - 로그인 사용자의 season participant 소유 active-season submitted order만 execute 가능.
   - `executed` order는 새 mutation 없이 current-state duplicate response 반환.
   - `canceled`/`rejected` order는 `ORDER_NOT_EXECUTABLE`.
@@ -656,7 +663,7 @@ near-term ledger/FX foundation:
   - 주말/휴일/no-data 대응으로 KST 오늘부터 `KOREA_EXIM_EXCHANGE_LOOKBACK_DAYS`만큼 lookback.
   - `fx_rate_snapshots` 저장값은 `sourceType=provider_api`, `sourceName=korea_exim_exchange_rate`, `baseCurrency=USD`, `quoteCurrency=KRW`, `effectiveAt=searchDate KST 00:00 UTC 변환`, `capturedAt=provider receive time`.
   - raw provider payload 전체와 auth key는 저장/응답/문서에 노출하지 않음. 실제 auth key는 `.env.local`에만 두고 `.env.example`에는 빈 값만 둠.
-- `GET /api/v1/fx/rates/current` 구현 완료. 기본 pair는 USD/KRW, `refresh=true`이면 `PROVIDER_INGESTION_ENABLED=true`와 `KOREA_EXIM_EXCHANGE_ENABLED=true`가 모두 켜진 경우에만 한국수출입은행 refresh를 시도하고, `refresh=false`이면 외부 API 호출 없이 DB row만 조회함. 미지원 pair는 `UNSUPPORTED_FX_PAIR`, row 없음은 `FX_RATE_UNAVAILABLE`.
+- `GET /api/v1/fx/rates/current` 구현 완료. 기본 pair는 USD/KRW, query 생략/`refresh=false`/`refresh=0`은 외부 API 호출 없이 DB row만 조회하고, `refresh=true`/`refresh=1`이면 `PROVIDER_INGESTION_ENABLED=true`와 `KOREA_EXIM_EXCHANGE_ENABLED=true`가 모두 켜진 경우에만 한국수출입은행 refresh를 시도한다. 미지원 pair는 `UNSUPPORTED_FX_PAIR`, invalid refresh는 `INVALID_REFRESH`, row 없음은 `FX_RATE_UNAVAILABLE`.
 - USD/KRW provider priority는 fresh `korea_exim_exchange_rate` first, fresh `exchange_rate_api` fallback. stale `korea_exim_exchange_rate`는 fresh `exchange_rate_api`보다 우선되지 않으며, fresh provider row가 없으면 existing `admin_manual` fallback 또는 `FX_RATE_UNAVAILABLE`로 처리함. 기존 ExchangeRate-API provider는 제거하지 않음.
 - `/fx quote` durable quote 구조(`quoteId`, `requestHash`, `maxChangeBps`)는 유지하며, participant 확인 후 source cash wallet preflight를 수행한다. KRW->USD는 KRW wallet, USD->KRW는 USD wallet의 `balanceAmount`가 `sourceAmount` 이상이어야 하며, 부족하거나 wallet이 없으면 `INSUFFICIENT_BALANCE`로 quote row를 생성하지 않는다. 기존 `admin_manual` quote fallback은 유지함.
 - `/fx execute`는 fresh provider_api USD/KRW만 허용하며 default `admin_manual` fallback은 여전히 금지됨.
@@ -671,7 +678,7 @@ near-term ledger/FX foundation:
 - Current MVP provider stack is Korea EXIM exchange first and ExchangeRate-API fallback for FX, Binance public REST for crypto, and KIS WebSocket market data for domestic/US stocks. OANDA and Twelve Data are historical candidates only.
 - Crypto MVP provider는 Binance로 고정하며 USD-settled crypto로 처리한다.
 - Crypto 주문/정산은 미국주식과 동일하게 USD Wallet을 사용하고, KRW 평가는 USD crypto value를 USD/KRW로 환산한다.
-- KRX provider source eligibility is open only for read-only/quote workflows through `kis_krx_realtime_trade`; KRX execute/write provider use remains `BLOCKED`.
+- KRX provider source eligibility is open only for explicitly allowed workflows through `kis_krx_realtime_trade`: read-only/quote, orders execute with the stricter execute freshness window, operator-run daily snapshot valuation, and season settlement valuation. Hoga/orderbook rows are not eligible for execution.
 - Provider API Source Eligibility Implementation Gate read-only/quote phase is implemented after KIS live evidence capture and source policy acceptance.
 - 30초 polling은 후보이며 provider rate limit/terms 확인 후 확정.
 
@@ -770,7 +777,7 @@ near-term ledger/FX foundation:
   - reward 지급, `rewardGrantedAt` 업데이트, provider ingestion/API 호출, cron scheduler, HTTP batch run API 없음.
 - 이 작업은 `/home` settled final-result read model과 `/ranking` 구현 준비를 진전시켰지만, 자동 데이터 생성/외부 시세 공급/API 응답은 아직 없음.
 - cron scheduler/provider ingestion/settlement extension 구현 없음.
-- order quote/create immediate market execution MVP 구현 완료. Public cancel은 `ORDER_CANCEL_NOT_SUPPORTED`로 차단되고 `/:orderId/execute`는 internal compatibility/deprecation path로 유지.
+- order quote/create immediate market execution MVP 구현 완료. Public cancel HTTP route와 `/:orderId/execute` HTTP route는 현재 controller에 노출되지 않으며, 관련 service-level compatibility code만 내부용으로 유지.
 - order execution safety plan/preimplementation readiness audit 기준 full-fill MVP 범위는 코드에 반영됨.
 - order execution exact replay/partial fill/matching engine/settlement/provider ingestion은 별도 gate로 남음.
 
@@ -818,9 +825,9 @@ near-term ledger/FX foundation:
     - source wallet이 transaction 내부에서 사라지는 source `wallet_transactions` FK failure.
     - target wallet이 transaction 내부에서 사라지는 target `wallet_transactions` FK failure.
     - `exchange_transactions` row가 transaction 내부에서 사라지는 `fx_execute_requests` finalization FK failure.
+    - `response_payload_json` 저장이 transaction-local DB check constraint로 거부되는 finalization failure.
     - 각 실패 후 source/target wallet balance, `exchange_transactions`, `wallet_transactions`, succeeded finalization, `responsePayloadJson`, `equity_snapshots`, injected snapshot deletion의 partial commit 없음 검증.
   - 남은 DB-level hardening/리스크:
-    - `responsePayloadJson` storage 단독 실패는 현 schema/service 변경 없이 실제 DB 제약으로 안정적으로 유도하기 어려워 보류.
     - ledger insert 실패는 현재 schema상 `referenceId` FK가 없어서 wallet FK deletion 기반으로만 검증됨.
     - 더 많은 운영형 interleaving/장애 시나리오는 별도 recovery 설계 전까지 보류.
 - Decimal rounding mode와 scale/formatting 정책은 half-up 기준으로 구현 반영됨.
@@ -1046,8 +1053,8 @@ near-term ledger/FX foundation:
   - `orders` table 기반 read-only 조회로 연결 완료.
   - order row가 없으면 fake 없이 `orders.state = available`, empty records.
   - `POST /api/v1/orders`로 생성된 submitted order 조회 가능.
-  - `POST /api/v1/orders/:orderId/cancel`로 canceled 처리된 order 조회 가능.
-  - `POST /api/v1/orders/:orderId/execute`로 executed 처리된 order 조회 가능.
+  - 기존/내부 상태로 `canceled` 처리된 order 조회 가능.
+  - `POST /api/v1/orders` immediate execution 또는 내부 service-level execution으로 `executed` 처리된 order 조회 가능.
 - wallet transaction records:
   - order execute가 생성한 `order_buy`/`order_sell` wallet transaction 조회 가능.
 - `/records` 계열 호출은 season/participant/snapshot/ranking/exchange/wallet/order/position/reward row를 생성/수정/삭제하지 않음.
@@ -1089,8 +1096,8 @@ near-term ledger/FX foundation:
 - `POST /api/v1/orders/quote` read-only MVP 구현 완료.
 - `POST /api/v1/orders` durable quote-bound immediate market execution MVP 구현 완료.
 - `POST /api/v1/orders` create idempotency MVP 구현 완료.
-- `POST /api/v1/orders/:orderId/cancel` public route exists but returns `ORDER_CANCEL_NOT_SUPPORTED`.
-- `POST /api/v1/orders/:orderId/execute` internal compatibility/deprecation full-fill path 구현 완료.
+- `POST /api/v1/orders/:orderId/cancel` HTTP route는 현재 controller에 노출되지 않음. service-level compatibility method는 내부 호출 시 금융 mutation 없이 `ORDER_CANCEL_NOT_SUPPORTED`를 반환.
+- `POST /api/v1/orders/:orderId/execute` HTTP route는 현재 controller에 노출되지 않음. service-level full-fill path는 내부 호환/폐기 예정 코드로만 유지.
 - Bearer access token Auth MVP 이후 API는 전역 guard가 주입한 `request.user.userId`만 사용하며 `x-user-id` fallback 없음.
 - query parameter:
   - `seasonId` optional.
@@ -1124,11 +1131,12 @@ near-term ledger/FX foundation:
   - equity snapshot과 ranking refresh는 ledger transaction 밖에서 후속 처리하며, settlement 없음.
 - cancel:
   - path `orderId` required.
-  - 공개 사용자 cancel 기능은 현재 지원하지 않으며 `ORDER_CANCEL_NOT_SUPPORTED`를 반환.
+  - 공개 사용자 cancel HTTP route는 현재 제공하지 않음.
+  - service-level compatibility method는 내부 호출 시 `ORDER_CANCEL_NOT_SUPPORTED`를 반환.
   - wallet 차감/증가, wallet transaction, position mutation, equity snapshot, settlement 없음.
 - execute:
   - path `orderId` required, body optional.
-  - 일반 사용자 필수 흐름이 아니라 내부 호환/폐기 예정 path.
+  - HTTP route는 현재 제공하지 않으며, service-level method는 내부 호환/폐기 예정 path.
   - execute idempotencyKey는 받지 않음.
   - 소유자가 아니거나 없는 order는 `ORDER_NOT_FOUND`.
   - active season의 `submitted` order만 full-fill execute 가능.
@@ -1187,8 +1195,8 @@ near-term ledger/FX foundation:
   - Crypto는 Binance-based USD-settled crypto로 고정하며 Upbit/Bithumb은 MVP provider stack에서 제외.
   - `official_batch`는 reference/reconciliation/settlement 후보이며 real-time execute source가 아님.
 - Provider API source eligibility after current gates: execute/write is open only through durable quote gates, season settlement valuation can read latest valid stored provider/admin rows at `Season.endAt`, and ranking/reward/official_batch/provider-ingestion scheduler remain separate gates.
-- `/fx execute` 남은 DB-level rollback/partial-write hardening 및 stale pending/unknown outcome recovery 설계.
-- `/orders/:orderId/execute` MVP 후속 gate:
+- `/fx execute` DB-level rollback/partial-write hardening은 responsePayloadJson finalization failure까지 opt-in PostgreSQL failure injection으로 보강됨. stale pending/unknown outcome recovery 설계는 별도 후속 과제.
+- service-level `/orders/:orderId/execute` compatibility path 후속 gate:
   - exact execute response replay가 필요하면 schema/command table 별도 검토.
   - partial fill/matching engine/settlement/provider ingestion은 별도 설계 필요.
   - DB integration은 실제 PostgreSQL 환경에서 통과했으며, 향후 schema/transaction 변경 시 재검증 필요.
@@ -1304,7 +1312,7 @@ near-term ledger/FX foundation:
   - rollback failure injection.
   - executed order and wallet transaction read visibility.
 - sandbox 내부 `ORDER_EXECUTE_DB_INTEGRATION=1 pnpm test -- orders.execute.integration.spec.ts`는 `/tmp/tsx-1000/*.pipe` IPC `EPERM`으로 실패했으나, sandbox 밖 동일 명령 재실행으로 통과.
-- `POST /api/v1/orders/:orderId/cancel` unit tests 통과.
+- `OrdersService.cancelOrder` unsupported compatibility behavior unit tests 통과.
 - `POST /api/v1/orders` create idempotency unit tests 통과.
 - `pnpm exec prisma migrate dev --name add_order_create_idempotency`로 order create idempotency migration 적용 완료.
 - DB integration의 no eligible snapshot helper는 기존 eligible `admin_manual` snapshot 변경을 커밋하지 않도록 transaction rollback isolation 방식으로 개선됨.

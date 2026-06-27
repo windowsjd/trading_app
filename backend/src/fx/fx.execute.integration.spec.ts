@@ -43,6 +43,8 @@ import {
   FxRateSourceType,
   ParticipantStatus,
   Prisma,
+  QuoteStatus,
+  QuoteType,
   SeasonStatus,
   WalletTransactionDirection,
   WalletTransactionReferenceType,
@@ -50,6 +52,7 @@ import {
 } from './src/generated/prisma/client';
 import { PrismaService } from './src/prisma/prisma.service';
 import { FxService } from './src/fx/fx.service';
+import { computeFxQuoteRequestHash } from './src/providers/durable-quote.policy';
 
 const TEST_PREFIX = 'fx-execute-db-integration';
 const ZERO_AMOUNT = '0.00000000';
@@ -98,7 +101,7 @@ async function testSuccessWritePath() {
   try {
     const response = await executeSuccess(
       scenario.userId,
-      buildKrwToUsdBody('success-key'),
+      await buildKrwToUsdBody(scenario, 'success-key'),
     );
 
     assert.equal(response.success, true);
@@ -215,7 +218,7 @@ async function testSuccessWritePath() {
       ledgerRows.some((row) => row.txType === WalletTransactionType.fee),
       false,
     );
-    await expectNoEquitySnapshot(scenario);
+    await expectOneExchangeExecutedEquitySnapshot(scenario);
   } finally {
     await cleanupScenario(scenario);
   }
@@ -232,7 +235,7 @@ async function testUsdToKrwSuccess() {
   try {
     const response = await executeSuccess(
       scenario.userId,
-      buildUsdToKrwBody('usd-to-krw-success-key'),
+      await buildUsdToKrwBody(scenario, 'usd-to-krw-success-key'),
     );
 
     assert.deepEqual(response.data.wallets, {
@@ -250,7 +253,7 @@ async function testSucceededDuplicateReplay() {
   const scenario = await createScenario('replay');
 
   try {
-    const body = buildKrwToUsdBody('replay-key');
+    const body = await buildKrwToUsdBody(scenario, 'replay-key');
     const firstResponse = await executeSuccess(scenario.userId, body);
     const before = await readMutationState(scenario);
     const secondResponse = await executeSuccess(scenario.userId, body);
@@ -268,7 +271,7 @@ async function testConcurrentSameIdempotencyKeyReplay() {
   const scenario = await createScenario('same-key-race');
 
   try {
-    const body = buildKrwToUsdBody('same-key-race-key');
+    const body = await buildKrwToUsdBody(scenario, 'same-key-race-key');
     const results = await Promise.allSettled([
       service.execute(scenario.userId, body),
       service.execute(scenario.userId, body),
@@ -294,7 +297,7 @@ async function testConcurrentSameIdempotencyKeyReplay() {
     assert.equal(commandRows.length, 1);
     assert.equal(commandRows[0].status, FxExecuteRequestStatus.succeeded);
     assert.deepEqual(commandRows[0].responsePayloadJson, responses[0]);
-    await expectNoEquitySnapshot(scenario);
+    await expectOneExchangeExecutedEquitySnapshot(scenario);
   } finally {
     await cleanupScenario(scenario);
   }
@@ -304,7 +307,7 @@ async function testIdempotencyConflict() {
   const scenario = await createScenario('conflict');
 
   try {
-    const firstBody = buildKrwToUsdBody('conflict-key');
+    const firstBody = await buildKrwToUsdBody(scenario, 'conflict-key');
     await executeSuccess(scenario.userId, firstBody);
     const before = await readMutationState(scenario);
 
@@ -333,7 +336,10 @@ async function testInsufficientBalance() {
     const before = await readMutationState(scenario);
 
     await expectExecuteError(
-      service.execute(scenario.userId, buildKrwToUsdBody('insufficient-key')),
+      service.execute(
+        scenario.userId,
+        await buildKrwToUsdBody(scenario, 'insufficient-key'),
+      ),
       'INSUFFICIENT_BALANCE',
     );
 
@@ -351,13 +357,13 @@ async function testNoEligibleSnapshot() {
   try {
     const before = await readMutationState(scenario);
 
-    await withoutEligibleAdminManualSnapshots(async (isolatedService) => {
+    await withoutEligibleProviderSnapshots(async (isolatedService) => {
       await expectExecuteError(
         isolatedService.execute(
           scenario.userId,
-          buildKrwToUsdBody('no-rate-key'),
+          await buildKrwToUsdBody(scenario, 'no-rate-key'),
         ),
-        'FX_RATE_UNAVAILABLE',
+        'PROVIDER_RATE_UNAVAILABLE',
       );
     });
 
@@ -376,8 +382,11 @@ async function testStaleSnapshot() {
     const before = await readMutationState(scenario);
 
     await expectExecuteError(
-      service.execute(scenario.userId, buildKrwToUsdBody('stale-rate-key')),
-      'FX_RATE_STALE',
+      service.execute(
+        scenario.userId,
+        await buildKrwToUsdBody(scenario, 'stale-rate-key'),
+      ),
+      'PROVIDER_RATE_STALE',
     );
 
     const after = await readMutationState(scenario);
@@ -394,9 +403,11 @@ async function testConcurrentOverspend() {
   });
 
   try {
+    const firstBody = await buildKrwToUsdBody(scenario, 'concurrency-key-a');
+    const secondBody = await buildKrwToUsdBody(scenario, 'concurrency-key-b');
     const results = await Promise.allSettled([
-      service.execute(scenario.userId, buildKrwToUsdBody('concurrency-key-a')),
-      service.execute(scenario.userId, buildKrwToUsdBody('concurrency-key-b')),
+      service.execute(scenario.userId, firstBody),
+      service.execute(scenario.userId, secondBody),
     ]);
     const successes = results.filter((result) => result.status === 'fulfilled');
     const failures = results.filter((result) => result.status === 'rejected');
@@ -416,7 +427,7 @@ async function testConcurrentOverspend() {
     assert.equal(state.exchangeCount, 1);
     assert.equal(state.ledgerCount, 2);
     assert.equal(await countCommandsForUser(scenario.userId), 1);
-    await expectNoEquitySnapshot(scenario);
+    await expectOneExchangeExecutedEquitySnapshot(scenario);
   } finally {
     await cleanupScenario(scenario);
   }
@@ -463,6 +474,12 @@ async function testDbTransactionRollbackFailureInjection() {
       expectedCode: 'EXECUTE_TRANSACTION_FAILED',
       mode: 'finalization-exchange-fk',
     },
+    {
+      label: 'response payload JSON storage check failure after ledger rows',
+      idempotencyKey: 'rollback-response-payload-json-key',
+      expectedCode: 'EXECUTE_TRANSACTION_FAILED',
+      mode: 'response-payload-json-check',
+    },
   ];
 
   for (const failureCase of failureCases) {
@@ -472,16 +489,17 @@ async function testDbTransactionRollbackFailureInjection() {
     );
 
     try {
+      const body = await buildKrwToUsdBody(
+        scenario,
+        failureCase.idempotencyKey,
+      );
       const before = await readRollbackProofState(scenario);
       const injectedService = failureCase.mode
         ? createDbFailureInjectionService(failureCase.mode, scenario)
         : service;
 
       await expectExecuteError(
-        injectedService.execute(
-          scenario.userId,
-          buildKrwToUsdBody(failureCase.idempotencyKey),
-        ),
+        injectedService.execute(scenario.userId, body),
         failureCase.expectedCode,
       );
 
@@ -564,8 +582,8 @@ async function createScenario(label, options = {}) {
           data: {
             baseCurrency: CurrencyCode.USD,
             quoteCurrency: CurrencyCode.KRW,
-            sourceType: FxRateSourceType.admin_manual,
-            sourceName: TEST_PREFIX,
+            sourceType: FxRateSourceType.provider_api,
+            sourceName: 'exchange_rate_api',
             rate: options.rate ?? '1000.00000000',
             effectiveAt:
               options.snapshot === 'stale'
@@ -593,6 +611,9 @@ async function createScenario(label, options = {}) {
 
 async function cleanupScenario(scenario) {
   await prisma.fxExecuteRequest.deleteMany({
+    where: { userId: scenario.userId },
+  });
+  await prisma.quote.deleteMany({
     where: { userId: scenario.userId },
   });
   await prisma.walletTransaction.deleteMany({
@@ -627,22 +648,70 @@ async function executeSuccess(userId, body) {
   return response;
 }
 
-function buildKrwToUsdBody(idempotencyKey) {
+async function buildKrwToUsdBody(scenario, idempotencyKey) {
+  const quoteId = await createFxQuote(scenario, {
+    fromCurrency: CurrencyCode.KRW,
+    toCurrency: CurrencyCode.USD,
+    sourceAmount: '1000.00000000',
+  });
+
   return {
     fromCurrency: CurrencyCode.KRW,
     toCurrency: CurrencyCode.USD,
     sourceAmount: '1000.00000000',
+    quoteId,
     idempotencyKey,
   };
 }
 
-function buildUsdToKrwBody(idempotencyKey) {
+async function buildUsdToKrwBody(scenario, idempotencyKey) {
+  const quoteId = await createFxQuote(scenario, {
+    fromCurrency: CurrencyCode.USD,
+    toCurrency: CurrencyCode.KRW,
+    sourceAmount: '1.00000000',
+  });
+
   return {
     fromCurrency: CurrencyCode.USD,
     toCurrency: CurrencyCode.KRW,
     sourceAmount: '1.00000000',
+    quoteId,
     idempotencyKey,
   };
+}
+
+async function createFxQuote(
+  scenario,
+  { fromCurrency, toCurrency, sourceAmount },
+) {
+  const requestHash = computeFxQuoteRequestHash({
+    userId: scenario.userId,
+    seasonParticipantId: scenario.participantId,
+    fromCurrency,
+    toCurrency,
+    sourceAmount,
+  });
+  const quote = await prisma.quote.create({
+    data: {
+      userId: scenario.userId,
+      seasonParticipantId: scenario.participantId,
+      quoteType: QuoteType.fx,
+      status: QuoteStatus.active,
+      fromCurrency,
+      toCurrency,
+      sourceAmount,
+      targetAmount:
+        fromCurrency === CurrencyCode.KRW ? '0.99900000' : '999.00000000',
+      quotedRate: '1000.00000000',
+      fxRateSnapshotId: scenario.snapshotId,
+      maxChangeBps: '30.0000',
+      expiresAt: new Date(Date.now() + 15_000),
+      requestHash,
+    },
+    select: { id: true },
+  });
+
+  return quote.id;
 }
 
 async function expectExecuteError(promise, code) {
@@ -692,6 +761,12 @@ async function readRollbackProofState(scenario) {
   const equitySnapshotCount = await prisma.equitySnapshot.count({
     where: { seasonParticipantId: scenario.participantId },
   });
+  const quoteRows = await prisma.quote.findMany({
+    where: { userId: scenario.userId },
+    select: {
+      status: true,
+    },
+  });
   const snapshotCount = scenario.snapshotId
     ? await prisma.fxRateSnapshot.count({ where: { id: scenario.snapshotId } })
     : 0;
@@ -709,6 +784,13 @@ async function readRollbackProofState(scenario) {
       (row) => row.responsePayloadJson !== null,
     ).length,
     equitySnapshotCount,
+    quoteCount: quoteRows.length,
+    activeQuoteCount: quoteRows.filter(
+      (row) => row.status === QuoteStatus.active,
+    ).length,
+    consumedQuoteCount: quoteRows.filter(
+      (row) => row.status === QuoteStatus.consumed,
+    ).length,
     snapshotCount,
   };
 }
@@ -717,16 +799,17 @@ async function countCommandsForUser(userId) {
   return prisma.fxExecuteRequest.count({ where: { userId } });
 }
 
-async function expectNoEquitySnapshot(scenario) {
-  assert.equal(
-    await prisma.equitySnapshot.count({
-      where: { seasonParticipantId: scenario.participantId },
-    }),
-    0,
-  );
+async function expectOneExchangeExecutedEquitySnapshot(scenario) {
+  const snapshot = await prisma.equitySnapshot.findMany({
+    where: { seasonParticipantId: scenario.participantId },
+    select: { snapshotReason: true },
+  });
+
+  assert.equal(snapshot.length, 1);
+  assert.equal(snapshot[0].snapshotReason, 'exchange_executed');
 }
 
-async function withoutEligibleAdminManualSnapshots(fn) {
+async function withoutEligibleProviderSnapshots(fn) {
   const rollbackMessage = 'rollback snapshot isolation transaction';
 
   try {
@@ -735,7 +818,7 @@ async function withoutEligibleAdminManualSnapshots(fn) {
         where: {
           baseCurrency: CurrencyCode.USD,
           quoteCurrency: CurrencyCode.KRW,
-          sourceType: FxRateSourceType.admin_manual,
+          sourceType: FxRateSourceType.provider_api,
           effectiveAt: {
             lte: new Date(),
           },
@@ -841,6 +924,33 @@ function createDbFailureInjectionTransaction(tx, mode, scenario) {
                   await tx.exchangeTransaction.delete({
                     where: { id: args[0].data.exchangeTransactionId },
                   });
+                }
+
+                if (
+                  mode === 'response-payload-json-check' &&
+                  args[0]?.data?.responsePayloadJson
+                ) {
+                  const commandId = String(args[0].where.id).replaceAll(
+                    "'",
+                    "''",
+                  );
+                  const constraintName =
+                    'fx_exec_resp_payload_reject_' +
+                    String(scenario.participantId)
+                      .replace(/[^a-zA-Z0-9_]/g, '_')
+                      .slice(0, 24);
+                  const sqlQuote = String.fromCharCode(39);
+
+                  await tx.$executeRawUnsafe(
+                    'ALTER TABLE "fx_execute_requests" ' +
+                      'ADD CONSTRAINT "' +
+                      constraintName +
+                      '" CHECK ("id" <> ' +
+                      sqlQuote +
+                      commandId +
+                      sqlQuote +
+                      ' OR "response_payload_json" IS NULL)',
+                  );
                 }
 
                 return Reflect.apply(value, model, args);

@@ -61,11 +61,11 @@ Return the current USD/KRW rate without changing wallets, quotes, or exchange ro
 
 - `baseCurrency`: optional, defaults to `USD`.
 - `quoteCurrency`: optional, defaults to `KRW`.
-- `refresh`: optional boolean, defaults to `true`.
+- `refresh`: optional boolean, defaults to `false`.
 
 Only `USD/KRW` is supported. Other pairs return `UNSUPPORTED_FX_PAIR`.
 
-When `refresh=true`, the backend may refresh Korea EXIM exchange data only when both `PROVIDER_INGESTION_ENABLED=true` and `KOREA_EXIM_EXCHANGE_ENABLED=true`. If either flag is disabled or the provider refresh fails with a provider config/HTTP error, the endpoint still attempts existing DB snapshot fallback and returns `FX_RATE_UNAVAILABLE` only when no usable DB row exists. When `refresh=false`, it reads DB rows only and does not call external provider APIs.
+When `refresh=true` or `refresh=1`, the backend may refresh Korea EXIM exchange data only when both `PROVIDER_INGESTION_ENABLED=true` and `KOREA_EXIM_EXCHANGE_ENABLED=true`. If either flag is disabled or the provider refresh fails with a provider config/HTTP error, the endpoint still attempts existing DB snapshot fallback and returns `FX_RATE_UNAVAILABLE` only when no usable DB row exists. When `refresh=false`, `refresh=0`, or the query is omitted, it reads DB rows only and does not call external provider APIs. Invalid refresh values return `INVALID_REFRESH`.
 
 Current-rate DB selection order:
 
@@ -423,19 +423,16 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 - `admin_manual` remains bootstrap/fallback/manual correction for quote/read paths only.
 - `official_batch` is not a real-time execute source; it remains settlement/reference/reconciliation candidate.
 - Near-term execute uses explicit allowed sourceType eligibility, not implicit priority.
-- Current allowed execute sourceType: `admin_manual` only.
+- Current allowed execute sourceType: fresh eligible `provider_api` only.
 - Automatic fallback is forbidden for MVP.
-- Approved fresh `admin_manual` snapshots used for execute smoke must not be fake/static/temporary/sample/test business FX rate data.
+- Approved `admin_manual` snapshots used for quote/read smoke must not be fake/static/temporary/sample/test business FX rate data.
 
 ## Equity Snapshots
 
-- `/fx execute` should not create `equity_snapshots` yet.
+- `/fx execute` creates an `exchange_executed` `equity_snapshots` row inside the ledger transaction and triggers current ranking refresh after the ledger transaction.
 - Historical write-path planning is archived in `docs/archive/wallet-fx-write-path-plan.md`; current behavior is summarized in `docs/current-status.md`.
-- `fx_rate_snapshots` exists, but `positions` and `asset_price_snapshots` are still missing.
 - Authoritative total equity snapshots require positions, asset price snapshots, and FX snapshot evidence together.
-- `/fx execute` currently does not create `equity_snapshots`.
-- Cash-only snapshots could be mistaken as `/home`, ranking, settlement, or final evaluation evidence.
-- Revisit `equity_snapshots` write path after valuation source tables are designed.
+- Ranking refresh failure after `/fx execute` is logged and must not roll back the successful financial ledger transaction.
 
 ## Implementation Gate Checklist
 

@@ -8,6 +8,7 @@
 - Internal reward fulfillment operator/admin APIs are implemented. Fulfillment requests are queued separately from `SeasonReward` and create a `SeasonReward` only when fulfilled.
 - This contract covers in-app reward/badge/trophy history only.
 - Actual payment, points, coupon, gifticon, delivery, cash-out, and external fulfillment APIs are not implemented.
+- Reward payout completion is not a prerequisite for season `settled`; `settled` means final rank and final tier are fixed.
 - Reward type policy and reward catalog are future gates. `rewardCode`, `rewardName`, and `rewardValueJson` are the current extension bridge.
 
 ## Source Rules

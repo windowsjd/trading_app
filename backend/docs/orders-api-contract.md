@@ -6,8 +6,8 @@
 - `POST /api/v1/orders/quote` durable quote MVP is implemented.
 - `POST /api/v1/orders` durable quote-bound immediate market execution MVP is implemented.
 - `POST /api/v1/orders` create idempotency MVP is implemented.
-- `POST /api/v1/orders/:orderId/cancel` public route exists but returns `ORDER_CANCEL_NOT_SUPPORTED`.
-- `POST /api/v1/orders/:orderId/execute` remains as an internal compatibility/deprecation full-fill path.
+- `POST /api/v1/orders/:orderId/cancel` is not exposed by `OrdersController`; the service-level compatibility method returns `ORDER_CANCEL_NOT_SUPPORTED` without financial mutation if invoked internally.
+- `POST /api/v1/orders/:orderId/execute` is not exposed by `OrdersController`; the service-level full-fill path remains internal compatibility/deprecation code only.
 - `POST /api/v1/orders` requires `quoteId` and `idempotencyKey`, creates the market order, consumes the quote, reprices from fresh provider_api evidence, mutates wallet/position/ledger state, and returns the executed order response in one flow.
 - Quote creates a durable quote row. List APIs do not execute orders, debit or credit wallets, mutate positions, create wallet transactions, create equity snapshots, run settlement, or synthesize fake order data.
 - Order execution recalculates and stores actual `executedPrice`, `grossAmount`, `feeAmount`, and `netAmount` at execution time.
@@ -27,7 +27,7 @@
 - `CurrencyCode.USDT` is not introduced; Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage.
 - Orders quote may use fresh eligible `provider_api` market data first.
 - Orders create uses the durable quote to start immediate market execution and requires fresh eligible `provider_api` market data at execution time.
-- `POST /api/v1/orders/:orderId/execute` is not the required public user flow; it is retained for internal compatibility/deprecation.
+- `POST /api/v1/orders/:orderId/execute` is not the required public user flow and is not mounted in the controller; the service method is retained only for internal compatibility/deprecation.
 - Current quote is a reference estimate, not a guaranteed execution price. Provider-backed execute reprices at execute time from fresh provider_api data, compares against the quote price/rate, and rejects excessive movement.
 
 ## Route
@@ -292,7 +292,7 @@ Same body as `POST /api/v1/orders/quote`.
 
 ## POST /api/v1/orders/:orderId/cancel
 
-This route is retained for compatibility, but public user cancel is not supported.
+This route is not currently exposed by `OrdersController`. Public MVP market orders use `POST /api/v1/orders/quote` followed by `POST /api/v1/orders`.
 
 ### Request
 
@@ -301,8 +301,8 @@ This route is retained for compatibility, but public user cancel is not supporte
 
 ### Behavior
 
-- Missing auth returns `UNAUTHORIZED`.
-- Authenticated requests return `ORDER_CANCEL_NOT_SUPPORTED`.
+- HTTP requests to this path currently fall through as `NOT_FOUND`.
+- If the service-level compatibility method is invoked internally, authenticated requests return `ORDER_CANCEL_NOT_SUPPORTED`.
 - No order lookup or ownership detail is exposed.
 - No wallet, position, wallet transaction, equity snapshot, settlement, execution, scheduler, provider behavior, or order row mutation runs.
 
@@ -320,7 +320,7 @@ This route is retained for compatibility, but public user cancel is not supporte
 
 ## POST /api/v1/orders/:orderId/execute
 
-This endpoint is retained as an internal compatibility/deprecation path. The required public user flow is `POST /api/v1/orders` with a durable `quoteId` and `idempotencyKey`, which immediately executes market orders.
+This endpoint is not currently exposed by `OrdersController`. The retained service method is internal compatibility/deprecation code only. The required public user flow is `POST /api/v1/orders` with a durable `quoteId` and `idempotencyKey`, which immediately executes market orders.
 
 ### Request
 
