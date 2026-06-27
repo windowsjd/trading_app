@@ -12,6 +12,23 @@ export const QUERY_KEYS = {
   wallet: {
     all: ['wallet'] as const,
     balances: ['wallet', 'balances'] as const,
+    transactionsAll: ['wallet', 'transactions'] as const,
+    transactions: (params?: {
+      currencyCode?: string;
+      txType?: string;
+      direction?: string;
+      limit?: number;
+      offset?: number;
+    }) =>
+      [
+        'wallet',
+        'transactions',
+        params?.currencyCode ?? 'all',
+        params?.txType ?? 'all',
+        params?.direction ?? 'all',
+        params?.limit ?? null,
+        params?.offset ?? 0,
+      ] as const,
     fxRate: (
       params:
         | string

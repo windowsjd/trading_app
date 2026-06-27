@@ -38,6 +38,7 @@ import ErrorState from '../../components/states/ErrorState';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import CTAButton from '../../components/common/CTAButton';
+import { LineChart, type LineChartPoint } from '../../components/charts';
 
 type Props = AssetDetailScreenProps;
 
@@ -57,6 +58,20 @@ function getDisplayChangeRate(
   return typeof tickerChangeRate === 'string'
     ? tickerChangeRate
     : detailChangeRate ?? null;
+}
+
+function getCandleChartPoints(
+  candles: Array<{ time: string; close: string }>,
+): LineChartPoint[] {
+  return candles.map((candle) => ({
+    x: candle.time,
+    y: candle.close,
+    label: candle.time,
+  }));
+}
+
+function formatPriceChartValue(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
 export default function AssetDetailScreen({ route, navigation }: Props) {
@@ -143,6 +158,9 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
     latestTicker?.priceEffectiveAt ?? price?.priceEffectiveAt;
   const displayFreshnessAgeSeconds = latestTicker?.freshnessAgeSeconds;
   const tradingNote = formatTradingNote(asset.tradingNote);
+  const candleChartPoints = getCandleChartPoints(
+    candlesQuery.data?.candles ?? [],
+  );
 
   const seasonBlockedReason =
     seasonQuery.isLoading
@@ -162,12 +180,15 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
       ? '비활성 자산입니다.'
       : !asset.tradable
       ? asset.tradeBlockedReason ?? '현재 거래할 수 없는 자산입니다.'
-      : !isTradableMarketStatus(asset.marketStatus)
-      ? '장 마감으로 주문할 수 없습니다.'
+      : null;
+
+  const assetWarningReason =
+    !isTradableMarketStatus(asset.marketStatus)
+      ? '장 상태는 주문 견적에서 최종 확인됩니다.'
       : isTickerStale
-      ? '실시간 시세가 오래되어 주문할 수 없습니다.'
+      ? '실시간 시세 최신성이 낮습니다. 서버 견적 확인 후 주문해주세요.'
       : !orderPriceAvailable
-      ? '시세를 확인할 수 없어 주문할 수 없습니다.'
+      ? '현재 화면 시세가 없어도 서버 견적에서 최종 확인됩니다.'
       : null;
 
   const buyBlockedReason = seasonBlockedReason ?? assetBlockedReason;
@@ -235,11 +256,9 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
               ) : null}
             </View>
           ) : null}
-          {isTickerStale ? (
+          {assetWarningReason ? (
             <View style={styles.inlineWarning}>
-              <Text style={styles.inlineWarningText}>
-                실시간 시세 최신성이 낮습니다. 최신 가격 확인 후 주문해주세요.
-              </Text>
+              <Text style={styles.inlineWarningText}>{assetWarningReason}</Text>
             </View>
           ) : null}
 
@@ -324,11 +343,11 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
               </Pressable>
             </>
           ) : candlesQuery.data?.candles?.length ? (
-            candlesQuery.data.candles.slice(0, 6).map((candle) => (
-              <Text key={candle.time} style={styles.helper}>
-                {candle.time} · {candle.close}
-              </Text>
-            ))
+            <LineChart
+              points={candleChartPoints}
+              valueFormatter={formatPriceChartValue}
+              emptyMessage="가격 추이를 표시하려면 데이터가 더 필요합니다."
+            />
           ) : (
             <InlineEmptyState message="표시할 차트 데이터가 없습니다." />
           )}

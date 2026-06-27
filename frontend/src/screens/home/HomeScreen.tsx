@@ -35,6 +35,11 @@ import BlockedState from '../../components/states/BlockedState';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import CTAButton from '../../components/common/CTAButton';
+import {
+  DonutChart,
+  LineChart,
+  type LineChartPoint,
+} from '../../components/charts';
 
 type Props = HomeScreenProps;
 type CurrencyCode = 'KRW' | 'USD';
@@ -115,6 +120,27 @@ function getAllocationRows(section?: HomeAllocationSectionDto | null) {
     .map((item) => ({ ...item, value: displayValue(item.value) }));
 }
 
+function getEquityChartPoints(
+  points: ReturnType<typeof getHomeEquityPoints>,
+): LineChartPoint[] {
+  return points
+    .map<LineChartPoint | null>((point) => {
+      const value = point.totalAssetKrw ?? point.equityKrw;
+      if (!value) return null;
+
+      return {
+        x: point.time ?? point.timestamp ?? point.label,
+        y: value,
+        label: displayValue(point.label ?? point.time ?? point.timestamp),
+      };
+    })
+    .filter((point): point is LineChartPoint => point !== null);
+}
+
+function formatKrwChartValue(value: number) {
+  return `${value.toFixed(0)} KRW`;
+}
+
 function getSectionErrorMessage(
   sectionErrors?: { message?: string; section?: string }[],
 ) {
@@ -160,6 +186,10 @@ export default function HomeScreen({ navigation }: Props) {
   const allocationRows = useMemo(
     () => getAllocationRows(home?.allocation),
     [home?.allocation],
+  );
+  const equityChartPoints = useMemo(
+    () => getEquityChartPoints(equityPoints),
+    [equityPoints],
   );
 
   const retryHome = () => {
@@ -363,6 +393,12 @@ export default function HomeScreen({ navigation }: Props) {
               <Text style={styles.helper}>
                 USD {getWalletSummaryAmount(home.walletSummary, 'USD')}
               </Text>
+              <Pressable
+                style={styles.retryButton}
+                onPress={() => navigation.navigate('WalletTransactions')}
+              >
+                <Text style={styles.retryText}>원장 보기</Text>
+              </Pressable>
             </>
           ) : (
             <InlineEmptyState message="지갑 요약을 불러오는 중입니다." />
@@ -400,11 +436,11 @@ export default function HomeScreen({ navigation }: Props) {
         <View style={styles.card}>
           <Text style={styles.label}>자산 배분</Text>
           {allocationRows.length > 0 ? (
-            allocationRows.map((item) => (
-              <Text key={item.key} style={styles.helper}>
-                {item.label} {item.value}
-              </Text>
-            ))
+            <DonutChart
+              segments={allocationRows}
+              valueFormatter={formatKrwChartValue}
+              emptyMessage="자산 배분 정보를 표시할 수 없습니다."
+            />
           ) : (
             <>
               <InlineEmptyState message="자산 배분 정보를 표시할 수 없습니다." />
@@ -427,15 +463,11 @@ export default function HomeScreen({ navigation }: Props) {
               </Pressable>
             </>
           ) : equityPoints.length > 0 ? (
-            equityPoints.slice(0, 8).map((point, index) => (
-              <Text
-                key={point.time ?? point.timestamp ?? point.label ?? String(index)}
-                style={styles.helper}
-              >
-                {displayValue(point.label ?? point.time ?? point.timestamp)} ·{' '}
-                {displayValue(point.totalAssetKrw ?? point.equityKrw)}
-              </Text>
-            ))
+            <LineChart
+              points={equityChartPoints}
+              valueFormatter={formatKrwChartValue}
+              emptyMessage="수익 추이를 표시하려면 데이터가 더 필요합니다."
+            />
           ) : (
             <InlineEmptyState message="표시할 차트 데이터가 없습니다." />
           )}

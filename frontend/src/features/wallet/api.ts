@@ -4,6 +4,7 @@ import type {
   BpsString,
   IsoDateTimeString,
   MoneyString,
+  OffsetPagination,
   RateString,
   SectionState,
 } from '../../models/dto/common';
@@ -125,6 +126,65 @@ export interface FxExecuteDto {
   rateSource: string | null;
 }
 
+export type WalletTransactionDirection = 'credit' | 'debit';
+
+export interface WalletTransactionDto {
+  transactionId: string;
+  walletId?: string;
+  currencyCode: WalletCurrency;
+  direction: WalletTransactionDirection;
+  txType: string;
+  referenceType?: string | null;
+  referenceId?: string | null;
+  amount: MoneyString;
+  balanceAfter: MoneyString;
+  occurredAt: IsoDateTimeString;
+  createdAt?: IsoDateTimeString;
+}
+
+export interface WalletTransactionsDto {
+  items: WalletTransactionDto[];
+  pagination: OffsetPagination;
+}
+
+export interface GetWalletTransactionsParams {
+  currencyCode?: WalletCurrency;
+  txType?: string;
+  direction?: WalletTransactionDirection;
+  limit?: number;
+  offset?: number;
+}
+
+function buildFallbackPagination(
+  limit: number,
+  offset: number,
+  returned: number,
+): OffsetPagination {
+  return {
+    limit,
+    offset,
+    total: offset + returned,
+    returned,
+    nextOffset: returned >= limit ? offset + returned : null,
+  };
+}
+
+function normalizeWalletTransactions(
+  data: WalletTransactionsDto & {
+    transactions?: WalletTransactionDto[];
+  },
+  limit: number,
+  offset: number,
+): WalletTransactionsDto {
+  const items = data.items ?? data.transactions ?? [];
+
+  return {
+    items,
+    pagination:
+      data.pagination ?? buildFallbackPagination(limit, offset, items.length),
+  };
+}
+
 export async function getWallets() {
   const response = await apiClient.get<ApiSuccessResponse<WalletsDto>>(
     '/wallets',
@@ -168,4 +228,30 @@ export async function executeFx(payload: FxExecuteRequestDto) {
   );
 
   return response.data.data;
+}
+
+export async function getWalletTransactions(
+  params: GetWalletTransactionsParams = {},
+) {
+  const limit = params.limit ?? 20;
+  const offset = params.offset ?? 0;
+  const searchParams = new URLSearchParams();
+
+  if (params.currencyCode) {
+    searchParams.set('currencyCode', params.currencyCode);
+  }
+  if (params.txType) searchParams.set('txType', params.txType);
+  if (params.direction) searchParams.set('direction', params.direction);
+  searchParams.set('limit', String(limit));
+  searchParams.set('offset', String(offset));
+
+  const response = await apiClient.get<
+    ApiSuccessResponse<
+      WalletTransactionsDto & {
+        transactions?: WalletTransactionDto[];
+      }
+    >
+  >(`/wallets/transactions?${searchParams.toString()}`);
+
+  return normalizeWalletTransactions(response.data.data, limit, offset);
 }

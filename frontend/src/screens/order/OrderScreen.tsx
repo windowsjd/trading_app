@@ -30,6 +30,11 @@ import {
   type OrderQuoteDto,
 } from '../../features/order/api';
 import {
+  getWallets,
+  type WalletCurrency,
+} from '../../features/wallet/api';
+import { getWalletBalanceAmount } from '../../features/wallet/mapper';
+import {
   getOrderQuoteDisplay,
   getOrderQuoteExpiresInSeconds,
   isOrderIdempotencyConflictCode,
@@ -68,6 +73,8 @@ const REQUOTE_REQUIRED_MESSAGE =
   '가격 또는 환율이 변경되었습니다. 다시 견적을 받아주세요.';
 const IDEMPOTENCY_CONFLICT_MESSAGE =
   '이미 다른 내용으로 처리 중인 요청입니다. 새 견적을 받아 다시 시도해주세요.';
+const BUY_FEE_BUFFER = 0.002;
+const RATIO_BUTTONS = [0.25, 0.5, 0.75, 1] as const;
 
 function displayValue(value?: string | number | boolean | null) {
   if (value === null || value === undefined || value === '') return '-';
@@ -98,7 +105,28 @@ function validateQuantity(quantity: string) {
   return null;
 }
 
-// TODO: Add ratio buttons after buy-side wallet sizing is available without guessing conversion.
+function parsePositiveDecimal(value?: string | number | null) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function formatQuantityInput(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return null;
+
+  const roundedDown = Math.floor(value * 1_000_000) / 1_000_000;
+  if (roundedDown <= 0) return null;
+
+  return roundedDown.toFixed(6).replace(/\.?0+$/, '');
+}
+
+function isWalletCurrency(value?: string | null): value is WalletCurrency {
+  return value === 'KRW' || value === 'USD';
+}
+
+function getRatioLabel(ratio: (typeof RATIO_BUTTONS)[number]) {
+  return `${Math.round(ratio * 100)}%`;
+}
 
 export default function OrderScreen({ route, navigation }: Props) {
   const { assetId, side = 'buy' } = route.params;
@@ -135,6 +163,12 @@ export default function OrderScreen({ route, navigation }: Props) {
   const positionQuery = useQuery({
     queryKey: QUERY_KEYS.position.list({ assetId, limit: 20, offset: 0 }),
     queryFn: () => getPositions({ assetId, limit: 20, offset: 0 }),
+  });
+
+  const walletsQuery = useQuery({
+    queryKey: QUERY_KEYS.wallet.balances,
+    queryFn: getWallets,
+    enabled: side === 'buy',
   });
 
   useEffect(() => {
@@ -224,6 +258,9 @@ export default function OrderScreen({ route, navigation }: Props) {
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.position.all }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.home.dashboard }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.wallet.balances }),
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.wallet.transactionsAll,
+        }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ranking.all }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.portfolio.all }),
       ]);
@@ -314,10 +351,13 @@ export default function OrderScreen({ route, navigation }: Props) {
       ? '비활성 자산입니다.'
       : asset && !asset.tradable
       ? asset.tradeBlockedReason ?? '현재 거래할 수 없는 자산입니다.'
-      : asset && !isTradableMarketStatus(asset.marketStatus)
-      ? '장 마감으로 주문할 수 없습니다.'
+      : null;
+
+  const assetWarningReason =
+    asset && !isTradableMarketStatus(asset.marketStatus)
+      ? '장 상태는 서버 견적에서 최종 확인됩니다.'
       : asset && !isPriceAvailable(price)
-      ? '시세를 확인할 수 없어 주문할 수 없습니다.'
+      ? '현재 화면 시세가 없어 비율 수량 계산은 제한됩니다. 견적은 서버가 최종 판정합니다.'
       : null;
 
   const sellBlockedReason =
@@ -331,6 +371,50 @@ export default function OrderScreen({ route, navigation }: Props) {
 
   const preOrderBlockedReason =
     seasonBlockedReason ?? assetBlockedReason ?? sellBlockedReason;
+
+  const settlementCurrency = isWalletCurrency(asset?.settlementCurrency)
+    ? asset.settlementCurrency
+    : null;
+  const buyBalance =
+    side === 'buy' && settlementCurrency
+      ? getWalletBalanceAmount(walletsQuery.data, settlementCurrency)
+      : null;
+  const buyBalanceValue = parsePositiveDecimal(buyBalance);
+  const priceValue = parsePositiveDecimal(price?.currentPrice);
+  const positionQuantityValue = parsePositiveDecimal(positionQuantity);
+
+  const ratioDisabledReason = useMemo(() => {
+    if (preOrderBlockedReason) return preOrderBlockedReason;
+
+    if (side === 'sell') {
+      if (positionQuery.isLoading) return '보유 수량을 확인하는 중입니다.';
+      if (positionQuery.isError) return '보유 수량을 확인할 수 없습니다.';
+      if (!positionQuantityValue) return '보유 수량이 없습니다.';
+      return null;
+    }
+
+    if (!settlementCurrency) return '결제 통화를 확인할 수 없습니다.';
+    if (walletsQuery.isLoading) return '지갑 잔액을 확인하는 중입니다.';
+    if (walletsQuery.isError || !walletsQuery.data) {
+      return '지갑 잔액을 확인할 수 없습니다.';
+    }
+    if (!buyBalanceValue) return `${settlementCurrency} 잔액이 없습니다.`;
+    if (!priceValue) return '현재가가 없어 비율 수량을 계산할 수 없습니다.';
+
+    return null;
+  }, [
+    buyBalanceValue,
+    preOrderBlockedReason,
+    positionQuery.isError,
+    positionQuery.isLoading,
+    positionQuantityValue,
+    priceValue,
+    settlementCurrency,
+    side,
+    walletsQuery.data,
+    walletsQuery.isError,
+    walletsQuery.isLoading,
+  ]);
 
   const viewState = useMemo<OrderFlowState>(() => {
     if (createMutation.isPending) return 'order_submitting';
@@ -394,6 +478,29 @@ export default function OrderScreen({ route, navigation }: Props) {
       side,
       quantity: quantity.trim(),
     });
+  };
+
+  const applyQuantityRatio = (ratio: (typeof RATIO_BUTTONS)[number]) => {
+    if (ratioDisabledReason) {
+      setFieldError(ratioDisabledReason);
+      return;
+    }
+
+    const nextQuantity =
+      side === 'sell'
+        ? formatQuantityInput((positionQuantityValue ?? 0) * ratio)
+        : formatQuantityInput(
+            ((buyBalanceValue ?? 0) * ratio) /
+              ((priceValue ?? 0) * (1 + BUY_FEE_BUFFER)),
+          );
+
+    if (!nextQuantity) {
+      setFieldError('계산된 수량이 너무 작습니다.');
+      return;
+    }
+
+    setQuantity(nextQuantity);
+    resetOrderActionState();
   };
 
   const executeQuote = () => {
@@ -482,6 +589,14 @@ export default function OrderScreen({ route, navigation }: Props) {
           {preOrderBlockedReason ? (
             <Text style={styles.errorText}>{preOrderBlockedReason}</Text>
           ) : null}
+          {assetWarningReason ? (
+            <Text style={styles.warningText}>{assetWarningReason}</Text>
+          ) : null}
+          {side === 'buy' && settlementCurrency ? (
+            <Text style={styles.helper}>
+              비율 계산 기준 잔액 {settlementCurrency} {displayValue(buyBalance)}
+            </Text>
+          ) : null}
         </View>
 
         <View style={styles.card}>
@@ -498,6 +613,39 @@ export default function OrderScreen({ route, navigation }: Props) {
             keyboardType="decimal-pad"
             placeholder="수량 입력"
           />
+
+          <View style={styles.ratioRow}>
+            {RATIO_BUTTONS.map((ratio) => {
+              const disabled = !!ratioDisabledReason;
+
+              return (
+                <Pressable
+                  key={ratio}
+                  style={[
+                    styles.ratioButton,
+                    disabled && styles.ratioButtonDisabled,
+                  ]}
+                  disabled={disabled}
+                  onPress={() => applyQuantityRatio(ratio)}
+                >
+                  <Text
+                    style={[
+                      styles.ratioButtonText,
+                      disabled && styles.ratioButtonTextDisabled,
+                    ]}
+                  >
+                    {getRatioLabel(ratio)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Text style={styles.helper}>
+            {ratioDisabledReason
+              ? `비율 입력 제한: ${ratioDisabledReason}`
+              : '비율 버튼은 수량 입력 보조이며 서버 견적이 최종 판정합니다.'}
+          </Text>
 
           {inputErrorMessage ? (
             <Text style={styles.errorText}>{inputErrorMessage}</Text>
@@ -652,6 +800,7 @@ const styles = StyleSheet.create({
   label: { fontSize: 13, color: '#666' },
   helper: { fontSize: 14, color: '#444' },
   errorText: { fontSize: 14, color: '#c62828' },
+  warningText: { fontSize: 14, color: '#7a4b00' },
   input: {
     borderWidth: 1,
     borderColor: '#ddd',
@@ -672,4 +821,28 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   retryText: { color: '#111', fontWeight: '600' },
+  ratioRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  ratioButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#111',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  ratioButtonDisabled: {
+    borderColor: '#ddd',
+    backgroundColor: '#f4f4f4',
+  },
+  ratioButtonText: {
+    color: '#111',
+    fontWeight: '700',
+  },
+  ratioButtonTextDisabled: {
+    color: '#999',
+  },
 });

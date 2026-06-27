@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { RecordStackParamList } from './types';
 import RecordSeasonListScreen from '../../screens/record/RecordSeasonListScreen';
 import RecordSeasonDetailScreen from '../../screens/record/RecordSeasonDetailScreen';
+import RecordProfitAnalysisScreen from '../../screens/record/RecordProfitAnalysisScreen';
 import RecordOrderListScreen from '../../screens/record/RecordOrderListScreen';
 import RecordExchangeListScreen from '../../screens/record/RecordExchangeListScreen';
 
@@ -21,6 +22,11 @@ export default function RecordStack() {
         name="RecordSeasonDetail"
         component={RecordSeasonDetailScreen}
         options={{ title: '시즌 상세' }}
+      />
+      <Stack.Screen
+        name="RecordProfitAnalysis"
+        component={RecordProfitAnalysisScreen}
+        options={{ title: '수익 분석' }}
       />
       <Stack.Screen
         name="RecordOrderList"

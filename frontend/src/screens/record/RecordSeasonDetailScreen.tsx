@@ -125,11 +125,22 @@ export default function RecordSeasonDetailScreen({ route, navigation }: Props) {
 
         <View style={styles.row}>
           <CTAButton
+            testID={TEST_IDS.record.seasonDetailProfitAnalysisCta}
+            label="수익 분석"
+            onPress={() =>
+              navigation.navigate('RecordProfitAnalysis', { seasonId })
+            }
+            style={styles.flex}
+          />
+          <CTAButton
             testID={TEST_IDS.record.seasonDetailOrdersCta}
             label="거래 내역 보기"
             onPress={() => navigation.navigate('RecordOrderList', { seasonId })}
             style={styles.flex}
           />
+        </View>
+
+        <View style={styles.row}>
           <CTAButton
             testID={TEST_IDS.record.seasonDetailExchangesCta}
             label="환전 내역 보기"

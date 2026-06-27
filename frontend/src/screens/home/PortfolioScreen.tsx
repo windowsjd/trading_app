@@ -29,6 +29,12 @@ import ErrorState from '../../components/states/ErrorState';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import CTAButton from '../../components/common/CTAButton';
+import {
+  DonutChart,
+  LineChart,
+  type DonutChartSegment,
+  type LineChartPoint,
+} from '../../components/charts';
 
 type Props = PortfolioScreenProps;
 
@@ -45,6 +51,40 @@ const RANGE_TABS: Array<{ key: PortfolioRange; label: string }> = [
 ];
 
 const POSITIONS_PAGE_SIZE = 20;
+
+function formatKrwChartValue(value: number) {
+  return `${value.toFixed(0)} KRW`;
+}
+
+function getAllocationSegments(
+  allocation: {
+    cashKrwValue: string;
+    domesticStockValueKrw: string;
+    usStockValueKrw: string;
+    cryptoValueKrw: string;
+  },
+): DonutChartSegment[] {
+  return [
+    { key: 'cash', label: '현금', value: allocation.cashKrwValue },
+    {
+      key: 'domestic_stock',
+      label: '국내 주식',
+      value: allocation.domesticStockValueKrw,
+    },
+    { key: 'us_stock', label: '미국 주식', value: allocation.usStockValueKrw },
+    { key: 'crypto', label: '암호화폐', value: allocation.cryptoValueKrw },
+  ];
+}
+
+function getEquityChartPoints(
+  points: Array<{ time: string; totalAssetKrw: string }>,
+): LineChartPoint[] {
+  return points.map((point) => ({
+    x: point.time,
+    y: point.totalAssetKrw,
+    label: point.time,
+  }));
+}
 
 export default function PortfolioScreen({ navigation }: Props) {
   const rootNavigation = useRootNavigation();
@@ -137,6 +177,8 @@ export default function PortfolioScreen({ navigation }: Props) {
 
   const overview = overviewQuery.data;
   const equity = equityQuery.data?.points ?? [];
+  const allocationSegments = getAllocationSegments(overview.allocation);
+  const equityChartPoints = getEquityChartPoints(equity);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -164,10 +206,11 @@ export default function PortfolioScreen({ navigation }: Props) {
 
             <View style={styles.card}>
               <Text style={styles.label}>자산 비중</Text>
-              <Text style={styles.helper}>현금 {overview.allocation.cashKrwValue}</Text>
-              <Text style={styles.helper}>국내 {overview.allocation.domesticStockValueKrw}</Text>
-              <Text style={styles.helper}>미국 {overview.allocation.usStockValueKrw}</Text>
-              <Text style={styles.helper}>암호화폐 {overview.allocation.cryptoValueKrw}</Text>
+              <DonutChart
+                segments={allocationSegments}
+                valueFormatter={formatKrwChartValue}
+                emptyMessage="자산 비중 데이터가 없습니다."
+              />
             </View>
 
             {viewState === 'portfolio_partial_unavailable' ? (
@@ -213,11 +256,11 @@ export default function PortfolioScreen({ navigation }: Props) {
                   />
                 </View>
               ) : equity.length ? (
-                equity.slice(0, 8).map((point) => (
-                  <Text key={point.time} style={styles.helper}>
-                    {point.time} · {point.totalAssetKrw}
-                  </Text>
-                ))
+                <LineChart
+                  points={equityChartPoints}
+                  valueFormatter={formatKrwChartValue}
+                  emptyMessage="자산 추이를 표시하려면 데이터가 더 필요합니다."
+                />
               ) : (
                 <InlineEmptyState message="표시할 차트 데이터가 없습니다." />
               )}

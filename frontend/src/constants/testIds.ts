@@ -36,6 +36,11 @@ export const TEST_IDS = {
     directionUsdKrw: 'wallet-fx-direction-usd-krw',
   },
 
+  walletTransactions: {
+    screen: 'wallet-transactions-screen',
+    item: (key: string) => `wallet-transaction-item-${key}`,
+  },
+
   market: {
     screen: 'market-screen',
     tabDomestic: 'market-tab-domestic',
@@ -94,6 +99,8 @@ export const TEST_IDS = {
 
     seasonDetailScreen: 'record-season-detail-screen',
     seasonDetailRetry: 'record-season-detail-retry',
+    profitAnalysisScreen: 'record-profit-analysis-screen',
+    seasonDetailProfitAnalysisCta: 'record-season-detail-profit-analysis-cta',
     seasonDetailOrdersCta: 'record-season-detail-orders-cta',
     seasonDetailExchangesCta: 'record-season-detail-exchanges-cta',
 

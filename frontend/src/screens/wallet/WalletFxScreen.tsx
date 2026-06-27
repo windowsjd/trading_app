@@ -178,6 +178,9 @@ export default function WalletFxScreen({ navigation }: Props) {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.wallet.balances }),
         queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.wallet.transactionsAll,
+        }),
+        queryClient.invalidateQueries({
           queryKey: QUERY_KEYS.wallet.fxRate(FX_RATE_PARAMS),
         }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.home.dashboard }),
@@ -460,6 +463,14 @@ export default function WalletFxScreen({ navigation }: Props) {
           {rateQuery.data.fallbackUsed ? (
             <Text style={styles.helper}>대체 환율 소스가 적용되었습니다.</Text>
           ) : null}
+          <CTAButton
+            label="원장 보기"
+            onPress={() =>
+              navigation.navigate('WalletTransactions', {
+                currencyCode: fromCurrency,
+              })
+            }
+          />
         </View>
 
         <View style={styles.card}>

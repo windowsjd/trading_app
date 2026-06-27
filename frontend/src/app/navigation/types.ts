@@ -18,6 +18,7 @@ export type HomeStackParamList = {
   Home: undefined;
   Portfolio: undefined;
   WalletFx: undefined;
+  WalletTransactions: { currencyCode?: 'KRW' | 'USD' } | undefined;
 };
 
 export type MarketStackParamList = {
@@ -35,6 +36,7 @@ export type RankingStackParamList = {
 export type RecordStackParamList = {
   RecordSeasonList: undefined;
   RecordSeasonDetail: { seasonId: string };
+  RecordProfitAnalysis: { seasonId: string };
   RecordOrderList: { seasonId: string };
   RecordExchangeList: { seasonId: string };
 };
@@ -100,6 +102,11 @@ export type PortfolioScreenProps = CompositeScreenProps<
 
 export type WalletFxScreenProps = CompositeScreenProps<
   StackScreenProps<HomeStackParamList, 'WalletFx'>,
+  CompositeScreenProps<TabScreenProps<'HomeTab'>, RootScreenProps<'MainTabs'>>
+>;
+
+export type WalletTransactionsScreenProps = CompositeScreenProps<
+  StackScreenProps<HomeStackParamList, 'WalletTransactions'>,
   CompositeScreenProps<TabScreenProps<'HomeTab'>, RootScreenProps<'MainTabs'>>
 >;
 
