@@ -232,6 +232,7 @@ describe('RecordsService', () => {
       delete: jest.fn(),
     },
     dailyPortfolioSnapshot: {
+      count: jest.fn(),
       findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
@@ -474,6 +475,33 @@ describe('RecordsService', () => {
         appliedRate: new Prisma.Decimal('1450.00000000'),
         netTargetAmount: new Prisma.Decimal('99.90000000'),
         executedAt: occurredAt,
+      },
+    ]);
+  };
+
+  const mockEquitySnapshots = (prisma: ReturnType<typeof createPrisma>) => {
+    prisma.dailyPortfolioSnapshot.count.mockResolvedValueOnce(3);
+    prisma.dailyPortfolioSnapshot.findMany.mockResolvedValueOnce([
+      {
+        snapshotDate: new Date('2026-05-01T00:00:00.000Z'),
+        totalAssetKrw: new Prisma.Decimal('10000000.00000000'),
+        returnRate: new Prisma.Decimal('0.00000000'),
+        capturedAt: new Date('2026-05-01T00:00:01.000Z'),
+        createdAt: new Date('2026-05-01T00:00:01.000Z'),
+      },
+      {
+        snapshotDate: new Date('2026-05-02T00:00:00.000Z'),
+        totalAssetKrw: new Prisma.Decimal('10100000.00000000'),
+        returnRate: new Prisma.Decimal('1.00000000'),
+        capturedAt: new Date('2026-05-02T00:00:01.000Z'),
+        createdAt: new Date('2026-05-02T00:00:01.000Z'),
+      },
+      {
+        snapshotDate: new Date('2026-05-03T00:00:00.000Z'),
+        totalAssetKrw: new Prisma.Decimal('10200000.00000000'),
+        returnRate: null,
+        capturedAt: new Date('2026-05-03T00:00:01.000Z'),
+        createdAt: new Date('2026-05-03T00:00:01.000Z'),
       },
     ]);
   };
@@ -1219,6 +1247,178 @@ describe('RecordsService', () => {
       returnRate: null,
       reason: 'PERFORMANCE_UNAVAILABLE',
     });
+    expectNoRecordWrites(prisma);
+  });
+
+  it('getMySeasonEquity returns available with ordered daily_portfolio_snapshots', async () => {
+    const { prisma, service } = createService();
+    prisma.season.findUnique.mockResolvedValueOnce(season);
+    mockJoined(prisma);
+    mockEquitySnapshots(prisma);
+
+    const response = await service.getMySeasonEquity('user-1', 'season-1', {});
+
+    expect(response.data).toMatchObject({
+      state: 'available',
+      seasonId: 'season-1',
+      points: [
+        {
+          time: '2026-05-01',
+          totalAssetKrw: '10000000.00000000',
+          returnRate: '0.00000000',
+          capturedAt: '2026-05-01T00:00:01.000Z',
+        },
+        {
+          time: '2026-05-02',
+          totalAssetKrw: '10100000.00000000',
+          returnRate: '1.00000000',
+        },
+        {
+          time: '2026-05-03',
+          totalAssetKrw: '10200000.00000000',
+          returnRate: null,
+        },
+      ],
+      pagination: {
+        limit: 100,
+        offset: 0,
+        total: 3,
+        returned: 3,
+        nextOffset: null,
+      },
+    });
+    expect(prisma.dailyPortfolioSnapshot.findMany).toHaveBeenCalledWith({
+      where: {
+        seasonParticipantId: 'sp-1',
+      },
+      orderBy: [
+        { snapshotDate: 'asc' },
+        { capturedAt: 'asc' },
+        { createdAt: 'asc' },
+      ],
+      skip: 0,
+      take: 100,
+      select: {
+        snapshotDate: true,
+        totalAssetKrw: true,
+        returnRate: true,
+        capturedAt: true,
+      },
+    });
+    expectNoRecordWrites(prisma);
+  });
+
+  it('getMySeasonEquity returns empty when participant exists but no snapshots', async () => {
+    const { prisma, service } = createService();
+    prisma.season.findUnique.mockResolvedValueOnce(season);
+    mockJoined(prisma);
+    prisma.dailyPortfolioSnapshot.count.mockResolvedValueOnce(0);
+    prisma.dailyPortfolioSnapshot.findMany.mockResolvedValueOnce([]);
+
+    const response = await service.getMySeasonEquity('user-1', 'season-1', {});
+
+    expect(response.data).toMatchObject({
+      state: 'empty',
+      seasonId: 'season-1',
+      points: [],
+      pagination: {
+        returned: 0,
+      },
+      reason: 'EQUITY_HISTORY_EMPTY',
+      message: 'Season equity history is not available yet.',
+    });
+    expectNoRecordWrites(prisma);
+  });
+
+  it('getMySeasonEquity returns not_joined when season exists but user did not join', async () => {
+    const { prisma, service } = createService();
+    prisma.season.findUnique.mockResolvedValueOnce(season);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
+
+    const response = await service.getMySeasonEquity('user-1', 'season-1', {});
+
+    expect(response.data).toMatchObject({
+      state: 'not_joined',
+      seasonId: 'season-1',
+      points: [],
+      reason: 'SEASON_NOT_JOINED',
+      message: 'Season equity history is available after joining the season.',
+    });
+    expect(prisma.dailyPortfolioSnapshot.findMany).not.toHaveBeenCalled();
+    expectNoRecordWrites(prisma);
+  });
+
+  it('getMySeasonEquity rejects invalid seasonId', async () => {
+    const { prisma, service } = createService();
+
+    await expect(
+      service.getMySeasonEquity('user-1', '  ', {}),
+    ).rejects.toBeInstanceOf(HttpException);
+    expect(prisma.season.findUnique).not.toHaveBeenCalled();
+    expectNoRecordWrites(prisma);
+  });
+
+  it('getMySeasonEquity rejects invalid limit', async () => {
+    const { prisma, service } = createService();
+
+    await expect(
+      service.getMySeasonEquity('user-1', 'season-1', { limit: '0' }),
+    ).rejects.toBeInstanceOf(HttpException);
+    expect(prisma.season.findUnique).not.toHaveBeenCalled();
+    expectNoRecordWrites(prisma);
+  });
+
+  it('getMySeasonEquity rejects invalid offset', async () => {
+    const { prisma, service } = createService();
+
+    await expect(
+      service.getMySeasonEquity('user-1', 'season-1', { offset: '-1' }),
+    ).rejects.toBeInstanceOf(HttpException);
+    expect(prisma.season.findUnique).not.toHaveBeenCalled();
+    expectNoRecordWrites(prisma);
+  });
+
+  it('getMySeasonEquity paginates points with limit/offset', async () => {
+    const { prisma, service } = createService();
+    prisma.season.findUnique.mockResolvedValueOnce(season);
+    mockJoined(prisma);
+    prisma.dailyPortfolioSnapshot.count.mockResolvedValueOnce(3);
+    prisma.dailyPortfolioSnapshot.findMany.mockResolvedValueOnce([
+      {
+        snapshotDate: new Date('2026-05-02T00:00:00.000Z'),
+        totalAssetKrw: new Prisma.Decimal('10100000.00000000'),
+        returnRate: new Prisma.Decimal('1.00000000'),
+        capturedAt: new Date('2026-05-02T00:00:01.000Z'),
+      },
+    ]);
+
+    const response = await service.getMySeasonEquity('user-1', 'season-1', {
+      limit: '1',
+      offset: '1',
+    });
+
+    expect(response.data).toMatchObject({
+      state: 'available',
+      points: [
+        {
+          time: '2026-05-02',
+          totalAssetKrw: '10100000.00000000',
+        },
+      ],
+      pagination: {
+        limit: 1,
+        offset: 1,
+        total: 3,
+        returned: 1,
+        nextOffset: 2,
+      },
+    });
+    expect(prisma.dailyPortfolioSnapshot.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 1,
+        take: 1,
+      }),
+    );
     expectNoRecordWrites(prisma);
   });
 

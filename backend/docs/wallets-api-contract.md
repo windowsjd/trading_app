@@ -2,6 +2,7 @@
 
 ## Status
 - `GET /api/v1/wallets` read-only MVP is implemented.
+- `GET /api/v1/wallets/transactions` read-only ledger MVP is implemented with server-side `currency`, `direction`, and `txType` filters.
 - The API reads existing `cash_wallets` rows only.
 - The API does not create wallets, join seasons, perform FX conversion, calculate valuation, or mutate balances.
 - Do not add fake wallet data, Prisma schema changes, migrations, or seed changes from this contract.
@@ -18,6 +19,8 @@
 ## Route
 
 `GET /api/v1/wallets`
+
+`GET /api/v1/wallets/transactions`
 
 ## Current Season Selection
 
@@ -120,6 +123,55 @@ Missing authentication uses the existing error envelope:
   }
 }
 ```
+
+## GET /api/v1/wallets/transactions
+
+Authenticated user's current-season wallet transaction ledger.
+
+### Query Parameters
+
+- `currency` optional. Allowed: `KRW`, `USD`.
+- `direction` optional. Allowed: `credit`, `debit`.
+- `txType` optional non-empty string, max length `64`.
+- `limit` optional, default `50`, max `100`.
+- `offset` optional, default `0`.
+
+### Response
+
+`filters` echoes the server-side filters applied to the ledger query. It is present for available, not joined, and unavailable responses.
+
+```json
+{
+  "success": true,
+  "data": {
+    "state": "available",
+    "season": "<season object>",
+    "participant": "<participant object>",
+    "filters": {
+      "currency": "KRW",
+      "direction": "credit",
+      "txType": "initial_grant"
+    },
+    "transactions": [],
+    "pagination": {
+      "limit": 50,
+      "offset": 0,
+      "total": 0,
+      "returned": 0,
+      "nextOffset": null
+    }
+  }
+}
+```
+
+### Error Codes
+
+- `UNAUTHORIZED`
+- `INVALID_CURRENCY`
+- `INVALID_DIRECTION`
+- `INVALID_TX_TYPE`
+- `INVALID_LIMIT`
+- `INVALID_OFFSET`
 
 ## Not Implemented
 - Wallet creation.

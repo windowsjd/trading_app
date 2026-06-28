@@ -104,6 +104,22 @@ export interface RecordSeasonDetailDto {
   message?: string;
 }
 
+export interface RecordSeasonEquityPointDto {
+  time: string;
+  totalAssetKrw: string;
+  returnRate: string | null;
+  capturedAt: string;
+}
+
+export interface RecordSeasonEquityDto {
+  state: 'available' | 'empty' | 'not_joined';
+  seasonId: string;
+  points: RecordSeasonEquityPointDto[];
+  pagination: OffsetPagination;
+  reason?: string;
+  message?: string;
+}
+
 export interface RecordOrderItemDto {
   orderId?: string;
   id?: string;
@@ -151,6 +167,12 @@ export interface GetRecordPageParams {
 export interface GetRecordOrdersParams extends GetRecordPageParams {
   seasonId: string;
   side?: 'buy' | 'sell';
+}
+
+export interface GetRecordSeasonEquityParams {
+  seasonId: string;
+  limit?: number;
+  offset?: number;
 }
 
 function buildFallbackPagination(
@@ -236,6 +258,22 @@ export async function getMySeasonRecordDetail(seasonId: string) {
   const response = await apiClient.get<ApiSuccessResponse<RecordSeasonDetailDto>>(
     `/records/me/seasons/${seasonId}`,
   );
+  return response.data.data;
+}
+
+export async function getMySeasonEquity({
+  seasonId,
+  limit = 500,
+  offset = 0,
+}: GetRecordSeasonEquityParams) {
+  const searchParams = new URLSearchParams();
+  searchParams.set('limit', String(limit));
+  searchParams.set('offset', String(offset));
+
+  const response = await apiClient.get<ApiSuccessResponse<RecordSeasonEquityDto>>(
+    `/records/me/seasons/${seasonId}/equity?${searchParams.toString()}`,
+  );
+
   return response.data.data;
 }
 

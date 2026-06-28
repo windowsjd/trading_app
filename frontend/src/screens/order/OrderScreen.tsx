@@ -346,18 +346,19 @@ export default function OrderScreen({ route, navigation }: Props) {
       ? '현재 거래 가능한 시즌이 아닙니다.'
       : null;
 
-  const assetBlockedReason =
-    asset && !asset.isActive
-      ? '비활성 자산입니다.'
-      : asset && !asset.tradable
-      ? asset.tradeBlockedReason ?? '현재 거래할 수 없는 자산입니다.'
-      : null;
+  const assetHardBlockedReason =
+    asset && !asset.isActive ? '비활성 자산입니다.' : null;
 
   const assetWarningReason =
-    asset && !isTradableMarketStatus(asset.marketStatus)
+    asset && !asset.tradable
+      ? asset.tradeBlockedReason ??
+        '거래 제한 가능성이 있습니다. 서버 견적에서 최종 확인됩니다.'
+      : asset && !isTradableMarketStatus(asset.marketStatus)
       ? '장 상태는 서버 견적에서 최종 확인됩니다.'
       : asset && !isPriceAvailable(price)
       ? '현재 화면 시세가 없어 비율 수량 계산은 제한됩니다. 견적은 서버가 최종 판정합니다.'
+      : asset && price?.priceKrwState && price.priceKrwState !== 'available'
+      ? 'KRW 환산 시세를 사용할 수 없습니다. 견적은 서버가 최종 판정합니다.'
       : null;
 
   const sellBlockedReason =
@@ -370,7 +371,7 @@ export default function OrderScreen({ route, navigation }: Props) {
       : null;
 
   const preOrderBlockedReason =
-    seasonBlockedReason ?? assetBlockedReason ?? sellBlockedReason;
+    seasonBlockedReason ?? assetHardBlockedReason ?? sellBlockedReason;
 
   const settlementCurrency = isWalletCurrency(asset?.settlementCurrency)
     ? asset.settlementCurrency
@@ -583,9 +584,6 @@ export default function OrderScreen({ route, navigation }: Props) {
           <Text style={styles.helper}>
             거래 상태 {asset.tradable ? '거래 가능' : '거래 제한'}
           </Text>
-          {asset.tradeBlockedReason ? (
-            <Text style={styles.errorText}>{asset.tradeBlockedReason}</Text>
-          ) : null}
           {preOrderBlockedReason ? (
             <Text style={styles.errorText}>{preOrderBlockedReason}</Text>
           ) : null}

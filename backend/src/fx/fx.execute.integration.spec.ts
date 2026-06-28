@@ -7,12 +7,18 @@ describe('FxService.execute DB integration', () => {
   itDbIntegration(
     'verifies write path, rollback proof, replay, conflict, no-rate/stale-rate, and overspend safety against PostgreSQL',
     () => {
-      const result = spawnSync('pnpm', ['tsx', '-e', FX_EXECUTE_DB_RUNNER], {
-        cwd: process.cwd(),
-        env: process.env,
-        encoding: 'utf8',
-        timeout: 120_000,
-      });
+      runDbIntegrationPrepare();
+
+      const result = spawnSync(
+        getNpmCommand(),
+        ['exec', '--', 'tsx', '-e', FX_EXECUTE_DB_RUNNER],
+        {
+          cwd: process.cwd(),
+          env: process.env,
+          encoding: 'utf8',
+          timeout: 120_000,
+        },
+      );
 
       if (result.status !== 0) {
         throw new Error(
@@ -32,6 +38,36 @@ describe('FxService.execute DB integration', () => {
     130_000,
   );
 });
+
+function getNpmCommand() {
+  return process.platform === 'win32' ? 'npm.cmd' : 'npm';
+}
+
+function runDbIntegrationPrepare() {
+  const result = spawnSync(
+    getNpmCommand(),
+    ['run', '--silent', 'test:db:prepare'],
+    {
+      cwd: process.cwd(),
+      env: process.env,
+      encoding: 'utf8',
+      timeout: 60_000,
+    },
+  );
+
+  if (result.status !== 0) {
+    throw new Error(
+      [
+        'FX execute DB integration prepare failed.',
+        'The opt-in test applies existing Prisma migrations with `prisma migrate deploy` only; it does not reset, drop, or seed the database.',
+        'stdout:',
+        result.stdout,
+        'stderr:',
+        result.stderr,
+      ].join('\n'),
+    );
+  }
+}
 
 const FX_EXECUTE_DB_RUNNER = `
 import 'dotenv/config';

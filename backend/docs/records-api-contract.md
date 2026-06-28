@@ -3,7 +3,7 @@
 ## Status
 
 - `GET /api/v1/records` read-only MVP is implemented for the current unified exchange, wallet transaction, and order history view.
-- Season history APIs are implemented for authenticated user season lists, season detail, season orders, season exchanges, and protected public user season summaries.
+- Season history APIs are implemented for authenticated user season lists, season detail, season equity history, season orders, season exchanges, and protected public user season summaries.
 - Records APIs read existing rows only. They do not create, update, delete, synthesize, or seed records.
 - Provider ingestion, scheduler jobs, admin HTTP batch execution, and reward external fulfillment are not implemented here.
 
@@ -219,6 +219,63 @@ If no snapshot or final ranking row exists, `performance.state = unavailable` an
 - `UNAUTHORIZED`
 - `INVALID_SEASON_ID`
 - `SEASON_NOT_FOUND`
+
+## GET /api/v1/records/me/seasons/:seasonId/equity
+
+Authenticated user's season equity history for one season.
+
+### Query Parameters
+
+- `limit` optional, default `100`, max `500`.
+- `offset` optional, default `0`.
+
+### State Rules
+
+- Existing season and joined with snapshots: `state = available`.
+- Existing season and joined without snapshots: `state = empty`, `points = []`.
+- Existing season and not joined: `state = not_joined`, `points = []`.
+- Missing season: `404 SEASON_NOT_FOUND`.
+
+### Source and Sorting
+
+- Rows are read from `daily_portfolio_snapshots`.
+- `seasonParticipantId = participant.id`.
+- Sorted by `snapshotDate asc`, `capturedAt asc`, `createdAt asc`.
+
+### Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "state": "available",
+    "seasonId": "season-1",
+    "points": [
+      {
+        "time": "2026-05-01",
+        "totalAssetKrw": "10000000.00000000",
+        "returnRate": "0.00000000",
+        "capturedAt": "2026-05-01T00:00:01.000Z"
+      }
+    ],
+    "pagination": {
+      "limit": 100,
+      "offset": 0,
+      "total": 1,
+      "returned": 1,
+      "nextOffset": null
+    }
+  }
+}
+```
+
+### Error Codes
+
+- `UNAUTHORIZED`
+- `INVALID_SEASON_ID`
+- `SEASON_NOT_FOUND`
+- `INVALID_LIMIT`
+- `INVALID_OFFSET`
 
 ## GET /api/v1/records/me/seasons/:seasonId/orders
 

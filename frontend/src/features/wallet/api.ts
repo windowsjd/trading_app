@@ -159,6 +159,11 @@ export interface WalletTransactionsDto {
   state: WalletState;
   season: WalletSeasonDto | null;
   participant: WalletParticipantDto | null;
+  filters?: {
+    currency: WalletCurrency | null;
+    direction: WalletTransactionDirection | null;
+    txType: string | null;
+  };
   items: WalletTransactionDto[];
   pagination: OffsetPagination;
   reason?: string;
@@ -177,6 +182,11 @@ type BackendWalletTransactionsResponseDto = {
   state: WalletState;
   season: WalletSeasonDto | null;
   participant: WalletParticipantDto | null;
+  filters?: {
+    currency: WalletCurrency | null;
+    direction: WalletTransactionDirection | null;
+    txType: string | null;
+  };
   transactions: BackendWalletTransactionDto[];
   pagination: OffsetPagination;
   reason?: string;
@@ -226,6 +236,7 @@ function normalizeWalletTransactions(
     state: data.state,
     season: data.season,
     participant: data.participant,
+    filters: data.filters,
     items,
     pagination:
       data.pagination ?? buildFallbackPagination(limit, offset, items.length),
@@ -288,6 +299,12 @@ export async function getWalletTransactions(
 
   if (params.currency) {
     searchParams.set('currency', params.currency);
+  }
+  if (params.direction) {
+    searchParams.set('direction', params.direction);
+  }
+  if (params.txType) {
+    searchParams.set('txType', params.txType);
   }
   searchParams.set('limit', String(limit));
   searchParams.set('offset', String(offset));

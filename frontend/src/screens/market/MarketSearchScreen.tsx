@@ -60,7 +60,6 @@ export default function MarketSearchScreen({ navigation }: Props) {
     queryKey: QUERY_KEYS.market.assets({
       assetType: assetType === 'all' ? undefined : assetType,
       search: trimmedSearchText,
-      sort: 'volume',
       withPrice: true,
       limit: 20,
       offset: 0,
@@ -69,7 +68,6 @@ export default function MarketSearchScreen({ navigation }: Props) {
       getAssets({
         assetType: assetType === 'all' ? undefined : assetType,
         search: trimmedSearchText || undefined,
-        sort: 'volume',
         withPrice: true,
         offset: pageParam,
         limit: 20,

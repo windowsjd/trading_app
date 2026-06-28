@@ -23,6 +23,16 @@ jest.mock('../generated/prisma/client', () => {
       ended: 'ended',
       settled: 'settled',
     },
+    WalletTransactionType: {
+      initial_grant: 'initial_grant',
+      exchange_source: 'exchange_source',
+      exchange_target: 'exchange_target',
+      order_buy: 'order_buy',
+      order_sell: 'order_sell',
+      fee: 'fee',
+      adjustment: 'adjustment',
+      settlement: 'settlement',
+    },
   };
 });
 
@@ -32,6 +42,7 @@ import {
   ParticipantStatus,
   Prisma,
   SeasonStatus,
+  WalletTransactionType,
 } from '../generated/prisma/client';
 import { WalletsService } from './wallets.service';
 
@@ -125,6 +136,27 @@ describe('WalletsService', () => {
     expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
     expect(prisma.$transaction).not.toHaveBeenCalled();
   };
+
+  const walletTransaction = (
+    input: {
+      id?: string;
+      currencyCode?: CurrencyCode;
+      direction?: 'credit' | 'debit';
+      txType?: string;
+      referenceType?: string;
+    } = {},
+  ) => ({
+    id: input.id ?? 'wtx-1',
+    currencyCode: input.currencyCode ?? CurrencyCode.KRW,
+    direction: input.direction ?? 'credit',
+    txType: input.txType ?? WalletTransactionType.initial_grant,
+    referenceType: input.referenceType ?? 'season_join',
+    referenceId: 'sp-1',
+    amount: new Prisma.Decimal('10000000.00000000'),
+    balanceAfter: new Prisma.Decimal('10000000.00000000'),
+    occurredAt: joinedAt,
+    createdAt: joinedAt,
+  });
 
   it('returns active joined wallets', async () => {
     const { prisma, service } = createService();
@@ -273,6 +305,11 @@ describe('WalletsService', () => {
     );
     expect(response.data).toMatchObject({
       state: 'available',
+      filters: {
+        currency: CurrencyCode.KRW,
+        direction: null,
+        txType: null,
+      },
       transactions: [
         {
           id: 'wtx-1',
@@ -292,6 +329,163 @@ describe('WalletsService', () => {
     expectNoWalletWrites(prisma);
   });
 
+  it('filters by currency', async () => {
+    const { prisma, service } = createService();
+    mockCurrentSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
+    prisma.walletTransaction.count.mockResolvedValueOnce(1);
+    prisma.walletTransaction.findMany.mockResolvedValueOnce([
+      walletTransaction({ currencyCode: CurrencyCode.USD }),
+    ]);
+
+    await service.getWalletTransactions('user-1', {
+      currency: 'USD',
+    });
+
+    expect(prisma.walletTransaction.count).toHaveBeenCalledWith({
+      where: {
+        seasonParticipantId: 'sp-1',
+        currencyCode: CurrencyCode.USD,
+      },
+    });
+    expectNoWalletWrites(prisma);
+  });
+
+  it('filters by direction credit', async () => {
+    const { prisma, service } = createService();
+    mockCurrentSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
+    prisma.walletTransaction.count.mockResolvedValueOnce(1);
+    prisma.walletTransaction.findMany.mockResolvedValueOnce([
+      walletTransaction({ direction: 'credit' }),
+    ]);
+
+    const response = await service.getWalletTransactions('user-1', {
+      direction: 'credit',
+    });
+
+    expect(prisma.walletTransaction.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          seasonParticipantId: 'sp-1',
+          direction: 'credit',
+        },
+      }),
+    );
+    expect(response.data.filters).toEqual({
+      currency: null,
+      direction: 'credit',
+      txType: null,
+    });
+    expectNoWalletWrites(prisma);
+  });
+
+  it('filters by direction debit', async () => {
+    const { prisma, service } = createService();
+    mockCurrentSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
+    prisma.walletTransaction.count.mockResolvedValueOnce(1);
+    prisma.walletTransaction.findMany.mockResolvedValueOnce([
+      walletTransaction({ direction: 'debit' }),
+    ]);
+
+    await service.getWalletTransactions('user-1', {
+      direction: 'debit',
+    });
+
+    expect(prisma.walletTransaction.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          seasonParticipantId: 'sp-1',
+          direction: 'debit',
+        },
+      }),
+    );
+    expectNoWalletWrites(prisma);
+  });
+
+  it('filters by txType', async () => {
+    const { prisma, service } = createService();
+    mockCurrentSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
+    prisma.walletTransaction.count.mockResolvedValueOnce(1);
+    prisma.walletTransaction.findMany.mockResolvedValueOnce([
+      walletTransaction({ txType: WalletTransactionType.initial_grant }),
+    ]);
+
+    const response = await service.getWalletTransactions('user-1', {
+      txType: WalletTransactionType.initial_grant,
+    });
+
+    expect(prisma.walletTransaction.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          seasonParticipantId: 'sp-1',
+          txType: WalletTransactionType.initial_grant,
+        },
+      }),
+    );
+    expect(response.data.filters).toEqual({
+      currency: null,
+      direction: null,
+      txType: WalletTransactionType.initial_grant,
+    });
+    expectNoWalletWrites(prisma);
+  });
+
+  it('filters by currency + direction + txType together', async () => {
+    const { prisma, service } = createService();
+    mockCurrentSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
+    prisma.walletTransaction.count.mockResolvedValueOnce(1);
+    prisma.walletTransaction.findMany.mockResolvedValueOnce([
+      walletTransaction({
+        currencyCode: CurrencyCode.KRW,
+        direction: 'credit',
+        txType: WalletTransactionType.initial_grant,
+      }),
+    ]);
+
+    await service.getWalletTransactions('user-1', {
+      currency: 'KRW',
+      direction: 'credit',
+      txType: WalletTransactionType.initial_grant,
+    });
+
+    expect(prisma.walletTransaction.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          seasonParticipantId: 'sp-1',
+          currencyCode: CurrencyCode.KRW,
+          direction: 'credit',
+          txType: WalletTransactionType.initial_grant,
+        },
+      }),
+    );
+    expectNoWalletWrites(prisma);
+  });
+
+  it('returns filters object in available response', async () => {
+    const { prisma, service } = createService();
+    mockCurrentSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
+    prisma.walletTransaction.count.mockResolvedValueOnce(0);
+    prisma.walletTransaction.findMany.mockResolvedValueOnce([]);
+
+    const response = await service.getWalletTransactions('user-1', {
+      currency: 'KRW',
+      direction: 'credit',
+      txType: WalletTransactionType.initial_grant,
+    });
+
+    expect(response.data.filters).toEqual({
+      currency: CurrencyCode.KRW,
+      direction: 'credit',
+      txType: WalletTransactionType.initial_grant,
+    });
+    expectNoWalletWrites(prisma);
+  });
+
   it('returns not_joined for wallet transactions without reading private ledgers', async () => {
     const { prisma, service } = createService();
     mockCurrentSeason(prisma);
@@ -305,6 +499,50 @@ describe('WalletsService', () => {
       reason: 'SEASON_NOT_JOINED',
     });
     expect(prisma.walletTransaction.findMany).not.toHaveBeenCalled();
+    expectNoWalletWrites(prisma);
+  });
+
+  it('returns filters object in not_joined response', async () => {
+    const { prisma, service } = createService();
+    mockCurrentSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
+
+    const response = await service.getWalletTransactions('user-1', {
+      currency: 'KRW',
+      direction: 'debit',
+      txType: WalletTransactionType.fee,
+    });
+
+    expect(response.data).toMatchObject({
+      state: 'not_joined',
+      filters: {
+        currency: CurrencyCode.KRW,
+        direction: 'debit',
+        txType: WalletTransactionType.fee,
+      },
+      transactions: [],
+    });
+    expect(prisma.walletTransaction.findMany).not.toHaveBeenCalled();
+    expectNoWalletWrites(prisma);
+  });
+
+  it('returns INVALID_DIRECTION for invalid direction', async () => {
+    const { prisma, service } = createService();
+
+    await expect(
+      service.getWalletTransactions('user-1', { direction: 'in' }),
+    ).rejects.toBeInstanceOf(HttpException);
+    expect(prisma.season.findFirst).not.toHaveBeenCalled();
+    expectNoWalletWrites(prisma);
+  });
+
+  it('returns INVALID_TX_TYPE for too long txType', async () => {
+    const { prisma, service } = createService();
+
+    await expect(
+      service.getWalletTransactions('user-1', { txType: 'x'.repeat(65) }),
+    ).rejects.toBeInstanceOf(HttpException);
+    expect(prisma.season.findFirst).not.toHaveBeenCalled();
     expectNoWalletWrites(prisma);
   });
 

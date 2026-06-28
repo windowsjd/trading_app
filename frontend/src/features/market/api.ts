@@ -10,7 +10,6 @@ import type {
 
 export type AssetType = 'domestic_stock' | 'us_stock' | 'crypto';
 export type CurrencyCode = 'KRW' | 'USD';
-export type MarketAssetSort = 'volume' | 'name' | 'changeRate';
 
 export interface MarketAssetPriceDto {
   state: SectionState;
@@ -63,7 +62,6 @@ export interface GetAssetsParams {
   withPrice?: boolean;
   limit?: number;
   offset?: number;
-  sort?: MarketAssetSort;
 }
 
 function buildFallbackPagination(
@@ -95,7 +93,6 @@ export async function getAssets(params: GetAssetsParams) {
   if (params.withPrice !== undefined) {
     searchParams.set('withPrice', String(params.withPrice));
   }
-  if (params.sort) searchParams.set('sort', params.sort);
   searchParams.set('limit', String(limit));
   searchParams.set('offset', String(offset));
 

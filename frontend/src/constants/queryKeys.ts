@@ -15,6 +15,8 @@ export const QUERY_KEYS = {
     transactionsAll: ['wallet', 'transactions'] as const,
     transactions: (params?: {
       currency?: string;
+      direction?: string;
+      txType?: string;
       limit?: number;
       offset?: number;
     }) =>
@@ -22,6 +24,8 @@ export const QUERY_KEYS = {
         'wallet',
         'transactions',
         params?.currency ?? 'all',
+        params?.direction ?? 'all',
+        params?.txType ?? 'all',
         params?.limit ?? null,
         params?.offset ?? 0,
       ] as const,
@@ -59,7 +63,6 @@ export const QUERY_KEYS = {
       withPrice?: boolean;
       limit?: number;
       offset?: number;
-      sort?: string;
     }) =>
       [
         'market',
@@ -71,7 +74,6 @@ export const QUERY_KEYS = {
         params.withPrice ?? false,
         params.limit ?? null,
         params.offset ?? 0,
-        params.sort ?? '',
       ] as const,
   },
 
@@ -157,6 +159,18 @@ export const QUERY_KEYS = {
       ] as const,
     seasonDetail: (seasonId: string) =>
       ['record', 'season-detail', seasonId] as const,
+    seasonEquity: (params: {
+      seasonId: string;
+      limit?: number;
+      offset?: number;
+    }) =>
+      [
+        'record',
+        'season-equity',
+        params.seasonId,
+        params.limit ?? null,
+        params.offset ?? 0,
+      ] as const,
     seasonOrders: (
       params: {
         seasonId: string;

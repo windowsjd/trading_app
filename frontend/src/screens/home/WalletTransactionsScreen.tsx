@@ -27,6 +27,7 @@ import EmptyState from '../../components/states/EmptyState';
 type Props = WalletTransactionsScreenProps;
 type CurrencyFilter = 'all' | WalletCurrency;
 type DirectionFilter = 'all' | WalletTransactionDirection;
+type TxTypeFilter = 'all' | string;
 
 const PAGE_SIZE = 20;
 
@@ -40,6 +41,17 @@ const DIRECTION_FILTERS: Array<{ key: DirectionFilter; label: string }> = [
   { key: 'all', label: '전체' },
   { key: 'credit', label: '입금' },
   { key: 'debit', label: '출금' },
+];
+
+const TX_TYPE_FILTERS: Array<{ key: TxTypeFilter; label: string }> = [
+  { key: 'all', label: '전체' },
+  { key: 'season_join', label: '시즌 참가' },
+  { key: 'fx_execute', label: '환전' },
+  { key: 'exchange', label: '환전' },
+  { key: 'order', label: '주문' },
+  { key: 'order_fill', label: '주문 체결' },
+  { key: 'fee', label: '수수료' },
+  { key: 'adjustment', label: '조정' },
 ];
 
 const TX_TYPE_LABELS: Record<string, string> = {
@@ -103,18 +115,25 @@ export default function WalletTransactionsScreen({ route }: Props) {
   );
   const [directionFilter, setDirectionFilter] =
     useState<DirectionFilter>('all');
+  const [txTypeFilter, setTxTypeFilter] = useState<TxTypeFilter>('all');
 
   const currency = currencyFilter === 'all' ? undefined : currencyFilter;
+  const direction = directionFilter === 'all' ? undefined : directionFilter;
+  const txType = txTypeFilter === 'all' ? undefined : txTypeFilter;
 
   const transactionsQuery = useInfiniteQuery({
     queryKey: QUERY_KEYS.wallet.transactions({
       currency,
+      direction,
+      txType,
       limit: PAGE_SIZE,
       offset: 0,
     }),
     queryFn: ({ pageParam }) =>
       getWalletTransactions({
         currency,
+        direction,
+        txType,
         limit: PAGE_SIZE,
         offset: pageParam,
       }),
@@ -123,25 +142,17 @@ export default function WalletTransactionsScreen({ route }: Props) {
     initialPageParam: 0,
   });
 
-  const rawItems = useMemo(() => {
+  const items = useMemo(() => {
     const byId = new Map<string, WalletTransactionDto>();
 
     transactionsQuery.data?.pages.forEach((page) => {
       page.items.forEach((item) => {
-        byId.set(getTransactionKey(item), item);
+        byId.set(item.transactionId, item);
       });
     });
 
     return Array.from(byId.values());
   }, [transactionsQuery.data]);
-
-  const visibleItems = useMemo(
-    () =>
-      directionFilter === 'all'
-        ? rawItems
-        : rawItems.filter((item) => item.direction === directionFilter),
-    [directionFilter, rawItems],
-  );
 
   if (transactionsQuery.isLoading) {
     return <FullPageLoading message="지갑 원장을 불러오는 중입니다." />;
@@ -161,7 +172,7 @@ export default function WalletTransactionsScreen({ route }: Props) {
     <SafeAreaView style={styles.container}>
       <FlatList
         testID={TEST_IDS.walletTransactions.screen}
-        data={visibleItems}
+        data={items}
         keyExtractor={getTransactionKey}
         contentContainerStyle={styles.content}
         refreshing={
@@ -208,9 +219,20 @@ export default function WalletTransactionsScreen({ route }: Props) {
                   />
                 ))}
               </View>
-              <Text style={styles.filterHint}>
-                방향 필터는 현재 불러온 내역에서만 적용됩니다.
-              </Text>
+            </View>
+
+            <View style={styles.filterGroup}>
+              <Text style={styles.label}>유형</Text>
+              <View style={styles.filterRow}>
+                {TX_TYPE_FILTERS.map((filter) => (
+                  <FilterChip
+                    key={filter.key}
+                    active={txTypeFilter === filter.key}
+                    label={filter.label}
+                    onPress={() => setTxTypeFilter(filter.key)}
+                  />
+                ))}
+              </View>
             </View>
           </View>
         }

@@ -175,23 +175,25 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
       ? '현재 거래 가능한 시즌이 아닙니다.'
       : null;
 
-  const assetBlockedReason =
-    !asset.isActive
-      ? '비활성 자산입니다.'
-      : !asset.tradable
-      ? asset.tradeBlockedReason ?? '현재 거래할 수 없는 자산입니다.'
-      : null;
+  const assetHardBlockedReason = !asset.isActive
+    ? '비활성 자산입니다.'
+    : null;
 
   const assetWarningReason =
-    !isTradableMarketStatus(asset.marketStatus)
+    !asset.tradable
+      ? asset.tradeBlockedReason ??
+        '거래 제한 가능성이 있습니다. 서버 견적에서 최종 확인됩니다.'
+      : !isTradableMarketStatus(asset.marketStatus)
       ? '장 상태는 주문 견적에서 최종 확인됩니다.'
       : isTickerStale
-      ? '실시간 시세 최신성이 낮습니다. 서버 견적 확인 후 주문해주세요.'
+      ? '실시간 시세 최신성이 낮습니다. 서버 견적에서 최종 확인됩니다.'
       : !orderPriceAvailable
       ? '현재 화면 시세가 없어도 서버 견적에서 최종 확인됩니다.'
+      : price?.priceKrwState && price.priceKrwState !== 'available'
+      ? 'KRW 환산 시세를 사용할 수 없습니다. 서버 견적에서 최종 확인됩니다.'
       : null;
 
-  const buyBlockedReason = seasonBlockedReason ?? assetBlockedReason;
+  const buyBlockedReason = seasonBlockedReason ?? assetHardBlockedReason;
   const sellBlockedReason =
     buyBlockedReason ??
     (positionQuery.isError
@@ -237,9 +239,6 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
           <Text style={styles.helper}>실시간 연결 {connectionState}</Text>
           <Text style={styles.helper}>가격 소스 {displayValue(price?.priceSource)}</Text>
 
-          {asset.tradeBlockedReason ? (
-            <Text style={styles.errorText}>{asset.tradeBlockedReason}</Text>
-          ) : null}
           {tradingNote ? (
             <Text style={styles.helper}>{tradingNote}</Text>
           ) : null}

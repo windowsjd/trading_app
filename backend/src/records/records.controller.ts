@@ -2,6 +2,7 @@ import { Controller, Get, Param, Query, Req } from '@nestjs/common';
 import { Request } from 'express';
 import { RecordsService } from './records.service';
 import type {
+  MySeasonEquityQuery,
   MySeasonExchangesQuery,
   MySeasonOrdersQuery,
   MySeasonRecordsQuery,
@@ -45,6 +46,19 @@ export class RecordsController {
     return this.recordsService.getMySeasonRecordDetail(
       this.extractUserId(request),
       seasonId,
+    );
+  }
+
+  @Get('records/me/seasons/:seasonId/equity')
+  getMySeasonEquity(
+    @Req() request: AuthenticatedRequest,
+    @Param('seasonId') seasonId: string,
+    @Query() query: MySeasonEquityQuery,
+  ) {
+    return this.recordsService.getMySeasonEquity(
+      this.extractUserId(request),
+      seasonId,
+      query,
     );
   }
 

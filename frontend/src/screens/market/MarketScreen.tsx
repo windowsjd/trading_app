@@ -53,7 +53,6 @@ export default function MarketScreen({ navigation }: Props) {
   const marketQuery = useInfiniteQuery({
     queryKey: QUERY_KEYS.market.assets({
       assetType: selectedTab,
-      sort: 'volume',
       withPrice: true,
       limit: 20,
       offset: 0,
@@ -61,7 +60,6 @@ export default function MarketScreen({ navigation }: Props) {
     queryFn: ({ pageParam }) =>
       getAssets({
         assetType: selectedTab,
-        sort: 'volume',
         withPrice: true,
         offset: pageParam,
         limit: 20,

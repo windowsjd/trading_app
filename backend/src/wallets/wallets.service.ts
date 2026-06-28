@@ -4,12 +4,15 @@ import {
   ParticipantStatus,
   Prisma,
   SeasonStatus,
+  WalletTransactionType,
 } from '../generated/prisma/client';
 import { buildPagination, type Pagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 
 export type WalletTransactionsQuery = {
   currency?: string;
+  direction?: string;
+  txType?: string;
   limit?: string;
   offset?: string;
 };
@@ -53,6 +56,8 @@ type WalletsResponse = {
 
 type ParsedWalletTransactionsQuery = {
   currency?: CurrencyCode;
+  direction?: 'credit' | 'debit';
+  txType?: string;
   limit: number;
   offset: number;
 };
@@ -63,6 +68,11 @@ type WalletTransactionsResponse = {
     state: WalletsState;
     season: ReturnType<WalletsService['formatSeason']> | null;
     participant: ReturnType<WalletsService['formatParticipant']> | null;
+    filters: {
+      currency: CurrencyCode | null;
+      direction: 'credit' | 'debit' | null;
+      txType: string | null;
+    };
     transactions: Array<{
       id: string;
       currencyCode: CurrencyCode;
@@ -147,6 +157,8 @@ export class WalletsService {
     const where = {
       seasonParticipantId: participant.id,
       ...(parsedQuery.currency ? { currencyCode: parsedQuery.currency } : {}),
+      ...(parsedQuery.direction ? { direction: parsedQuery.direction } : {}),
+      ...this.walletTransactionTxTypeWhere(parsedQuery.txType),
     };
     const [total, transactions] = await Promise.all([
       this.prisma.walletTransaction.count({ where }),
@@ -176,6 +188,7 @@ export class WalletsService {
         state: 'available',
         season: this.formatSeason(season),
         participant: this.formatParticipant(participant),
+        filters: this.walletTransactionFilters(parsedQuery),
         transactions: transactions.map((transaction) => ({
           id: transaction.id,
           currencyCode: transaction.currencyCode,
@@ -321,6 +334,7 @@ export class WalletsService {
         participant: input.participant
           ? this.formatParticipant(input.participant)
           : null,
+        filters: this.walletTransactionFilters(input.query),
         transactions: [],
         pagination: this.pagination(input.query, 0, 0),
         reason: input.reason,
@@ -395,6 +409,8 @@ export class WalletsService {
   ): ParsedWalletTransactionsQuery {
     return {
       currency: this.parseCurrency(query.currency),
+      direction: this.parseDirection(query.direction),
+      txType: this.parseTxType(query.txType),
       limit: this.parseLimit(query.limit),
       offset: this.parseOffset(query.offset),
     };
@@ -415,6 +431,82 @@ export class WalletsService {
       'INVALID_CURRENCY',
       'Invalid currency.',
     );
+  }
+
+  private parseDirection(
+    value: string | undefined,
+  ): 'credit' | 'debit' | undefined {
+    const text = this.parseOptionalText(value);
+    if (!text) {
+      return undefined;
+    }
+
+    if (text === 'credit' || text === 'debit') {
+      return text;
+    }
+
+    this.throwApiError(
+      HttpStatus.BAD_REQUEST,
+      'INVALID_DIRECTION',
+      'Invalid direction.',
+    );
+  }
+
+  private parseTxType(value: string | undefined): string | undefined {
+    const text = this.parseOptionalText(value);
+    if (!text) {
+      return undefined;
+    }
+
+    if (text.length > 64) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'INVALID_TX_TYPE',
+        'Invalid txType.',
+      );
+    }
+
+    return text;
+  }
+
+  private walletTransactionFilters(query: ParsedWalletTransactionsQuery) {
+    return {
+      currency: query.currency ?? null,
+      direction: query.direction ?? null,
+      txType: query.txType ?? null,
+    };
+  }
+
+  private walletTransactionTxTypeWhere(
+    txType: string | undefined,
+  ): Prisma.WalletTransactionWhereInput {
+    if (!txType) {
+      return {};
+    }
+
+    switch (txType) {
+      case 'season_join':
+        return { txType: WalletTransactionType.initial_grant };
+      case 'fx_execute':
+      case 'exchange':
+        return {
+          txType: {
+            in: [
+              WalletTransactionType.exchange_source,
+              WalletTransactionType.exchange_target,
+            ],
+          },
+        };
+      case 'order':
+      case 'order_fill':
+        return {
+          txType: {
+            in: [WalletTransactionType.order_buy, WalletTransactionType.order_sell],
+          },
+        };
+      default:
+        return { txType: txType as WalletTransactionType };
+    }
   }
 
   private parseLimit(value: string | undefined): number {

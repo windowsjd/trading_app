@@ -70,10 +70,16 @@ export type MySeasonExchangesQuery = {
   offset?: string;
 };
 
+export type MySeasonEquityQuery = {
+  limit?: string;
+  offset?: string;
+};
+
 type RecordsType = 'all' | 'exchanges' | 'wallets' | 'orders';
 type RecordsState = 'available' | 'not_joined' | 'unavailable';
 type SeasonHistoryState = 'available' | 'empty';
 type SeasonRecordDetailState = 'available' | 'not_joined';
+type SeasonEquityState = 'available' | 'empty' | 'not_joined';
 type SectionState = 'available' | 'unavailable';
 type PerformanceState = 'available' | 'unavailable';
 type ProfitAnalysisState = 'available' | 'unavailable' | 'partial_unavailable';
@@ -132,6 +138,11 @@ type ParsedMySeasonOrdersQuery = {
 type ParsedMySeasonExchangesQuery = {
   fromCurrency?: CurrencyCode;
   toCurrency?: CurrencyCode;
+  limit: number;
+  offset: number;
+};
+
+type ParsedMySeasonEquityQuery = {
   limit: number;
   offset: number;
 };
@@ -468,6 +479,23 @@ type MySeasonExchangesResponse = {
   };
 };
 
+type MySeasonEquityResponse = {
+  success: true;
+  data: {
+    state: SeasonEquityState;
+    seasonId: string;
+    points: Array<{
+      time: string;
+      totalAssetKrw: string;
+      returnRate: string | null;
+      capturedAt: string;
+    }>;
+    pagination: ListPagination;
+    reason?: string;
+    message?: string;
+  };
+};
+
 type UserSeasonRecordSummaryResponse = {
   success: true;
   data: {
@@ -540,6 +568,8 @@ const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
 ];
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
+const DEFAULT_EQUITY_LIMIT = 100;
+const MAX_EQUITY_LIMIT = 500;
 
 class RecordsValuationError extends Error {
   constructor(
@@ -872,6 +902,90 @@ export class RecordsService {
           },
         },
         profitAnalysis,
+      },
+    };
+  }
+
+  async getMySeasonEquity(
+    userId: string | undefined,
+    seasonId: string | undefined,
+    query: MySeasonEquityQuery = {},
+  ): Promise<MySeasonEquityResponse> {
+    this.assertAuthenticated(userId);
+
+    const parsedSeasonId = this.parseRequiredText(
+      seasonId,
+      'INVALID_SEASON_ID',
+      'seasonId',
+    );
+    const parsedQuery = this.parseMySeasonEquityQuery(query);
+    await this.findSeasonByIdOrThrow(parsedSeasonId);
+    const participant = await this.findParticipant(parsedSeasonId, userId);
+
+    if (!participant) {
+      return {
+        success: true,
+        data: {
+          state: 'not_joined',
+          seasonId: parsedSeasonId,
+          points: [],
+          pagination: this.listPagination(parsedQuery, 0, 0),
+          reason: 'SEASON_NOT_JOINED',
+          message:
+            'Season equity history is available after joining the season.',
+        },
+      };
+    }
+
+    const where = {
+      seasonParticipantId: participant.id,
+    };
+    const [total, snapshots] = await Promise.all([
+      this.prisma.dailyPortfolioSnapshot.count({ where }),
+      this.prisma.dailyPortfolioSnapshot.findMany({
+        where,
+        orderBy: [
+          { snapshotDate: 'asc' },
+          { capturedAt: 'asc' },
+          { createdAt: 'asc' },
+        ],
+        skip: parsedQuery.offset,
+        take: parsedQuery.limit,
+        select: {
+          snapshotDate: true,
+          totalAssetKrw: true,
+          returnRate: true,
+          capturedAt: true,
+        },
+      }),
+    ]);
+
+    if (total === 0) {
+      return {
+        success: true,
+        data: {
+          state: 'empty',
+          seasonId: parsedSeasonId,
+          points: [],
+          pagination: this.listPagination(parsedQuery, 0, 0),
+          reason: 'EQUITY_HISTORY_EMPTY',
+          message: 'Season equity history is not available yet.',
+        },
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        state: 'available',
+        seasonId: parsedSeasonId,
+        points: snapshots.map((snapshot) => ({
+          time: this.formatDateOnly(snapshot.snapshotDate),
+          totalAssetKrw: this.formatDecimal(snapshot.totalAssetKrw, 8),
+          returnRate: this.formatNullableDecimal(snapshot.returnRate, 8),
+          capturedAt: snapshot.capturedAt.toISOString(),
+        })),
+        pagination: this.listPagination(parsedQuery, total, snapshots.length),
       },
     };
   }
@@ -2503,6 +2617,15 @@ export class RecordsService {
     };
   }
 
+  private parseMySeasonEquityQuery(
+    query: MySeasonEquityQuery,
+  ): ParsedMySeasonEquityQuery {
+    return {
+      limit: this.parseEquityLimit(query.limit),
+      offset: this.parseOffset(query.offset),
+    };
+  }
+
   private parseType(value: string | undefined): RecordsType {
     const text = value?.trim() || 'all';
     if (
@@ -2635,6 +2758,23 @@ export class RecordsService {
     }
 
     return Math.min(limit, MAX_LIMIT);
+  }
+
+  private parseEquityLimit(value: string | undefined): number {
+    if (value === undefined) {
+      return DEFAULT_EQUITY_LIMIT;
+    }
+
+    const limit = this.parseNonNegativeInteger(value, 'INVALID_LIMIT', 'limit');
+    if (limit < 1) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'INVALID_LIMIT',
+        'limit must be greater than 0.',
+      );
+    }
+
+    return Math.min(limit, MAX_EQUITY_LIMIT);
   }
 
   private parseOffset(value: string | undefined): number {
@@ -2960,7 +3100,8 @@ export class RecordsService {
     query:
       | ParsedMySeasonRecordsQuery
       | ParsedMySeasonOrdersQuery
-      | ParsedMySeasonExchangesQuery,
+      | ParsedMySeasonExchangesQuery
+      | ParsedMySeasonEquityQuery,
     total: number,
     returned: number,
   ): ListPagination {

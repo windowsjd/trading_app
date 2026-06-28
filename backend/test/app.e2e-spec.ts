@@ -204,6 +204,7 @@ type PrismaMock = {
     updateMany: jest.Mock;
   };
   dailyPortfolioSnapshot: {
+    count: jest.Mock;
     findFirst: jest.Mock;
     findMany: jest.Mock;
   };
@@ -416,6 +417,7 @@ describe('AppController (e2e)', () => {
         updateMany: jest.fn(),
       },
       dailyPortfolioSnapshot: {
+        count: jest.fn(),
         findFirst: jest.fn(),
         findMany: jest.fn(),
       },
@@ -2548,6 +2550,11 @@ describe('AppController (e2e)', () => {
       '/api/v1/records/me/seasons/season-1',
     ],
     [
+      'GET /api/v1/records/me/seasons/:seasonId/equity',
+      'get',
+      '/api/v1/records/me/seasons/season-1/equity',
+    ],
+    [
       'GET /api/v1/records/me/seasons/:seasonId/orders',
       'get',
       '/api/v1/records/me/seasons/season-1/orders',
@@ -2796,6 +2803,28 @@ describe('AppController (e2e)', () => {
           },
         });
         expect(prisma.season.findUnique).toHaveBeenCalled();
+      },
+    ],
+    [
+      'GET /api/v1/records/me/seasons/:seasonId/equity',
+      '/api/v1/records/me/seasons/season-1/equity',
+      () => {
+        mockActiveUser();
+        prisma.season.findUnique.mockResolvedValueOnce(season);
+        prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
+        prisma.dailyPortfolioSnapshot.count.mockResolvedValueOnce(0);
+        prisma.dailyPortfolioSnapshot.findMany.mockResolvedValueOnce([]);
+      },
+      (body: Record<string, unknown>) => {
+        expect(body).toMatchObject({
+          success: true,
+          data: {
+            state: 'empty',
+            seasonId: 'season-1',
+            points: [],
+          },
+        });
+        expect(prisma.dailyPortfolioSnapshot.findMany).toHaveBeenCalled();
       },
     ],
     [

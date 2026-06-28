@@ -14,13 +14,17 @@ import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 import {
   getMySeasonRecordDetail,
+  getMySeasonEquity,
   type ProfitAnalysisItemDto,
+  type RecordSeasonEquityPointDto,
 } from '../../features/record/api';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
+import SectionSkeleton from '../../components/states/SectionSkeleton';
 import CTAButton from '../../components/common/CTAButton';
+import { LineChart, type LineChartPoint } from '../../components/charts';
 
 type Props = NativeStackScreenProps<
   RecordStackParamList,
@@ -38,6 +42,20 @@ function displayRank(value?: number | null) {
 
 function displayPercent(value?: string | null) {
   return value ? `${value}%` : '-';
+}
+
+function getEquityChartPoints(
+  points: RecordSeasonEquityPointDto[],
+): LineChartPoint[] {
+  return points.map((point) => ({
+    x: point.time,
+    y: point.totalAssetKrw,
+    label: point.time,
+  }));
+}
+
+function formatKrwChartValue(value: number) {
+  return `${value.toFixed(0)} KRW`;
 }
 
 function ProfitAssetSummary({
@@ -78,6 +96,20 @@ export default function RecordProfitAnalysisScreen({
   const detailQuery = useQuery({
     queryKey: QUERY_KEYS.record.seasonDetail(seasonId),
     queryFn: () => getMySeasonRecordDetail(seasonId),
+  });
+
+  const equityQuery = useQuery({
+    queryKey: QUERY_KEYS.record.seasonEquity({
+      seasonId,
+      limit: 500,
+      offset: 0,
+    }),
+    queryFn: () =>
+      getMySeasonEquity({
+        seasonId,
+        limit: 500,
+        offset: 0,
+      }),
   });
 
   if (detailQuery.isLoading) {
@@ -249,7 +281,29 @@ export default function RecordProfitAnalysisScreen({
 
         <View style={styles.card}>
           <Text style={styles.label}>수익 추이 차트</Text>
-          <InlineEmptyState message="수익 추이 차트는 백엔드 equity history API 연결 후 표시됩니다." />
+          {equityQuery.isLoading ? (
+            <SectionSkeleton lines={5} />
+          ) : equityQuery.isError ? (
+            <View style={styles.chartState}>
+              <InlineEmptyState message="수익 추이를 불러오지 못했습니다." />
+              <CTAButton
+                label="다시 시도"
+                onPress={() => equityQuery.refetch()}
+              />
+            </View>
+          ) : equityQuery.data?.state === 'not_joined' ? (
+            <InlineEmptyState message="시즌 참가 기록이 없어 수익 추이를 표시할 수 없습니다." />
+          ) : equityQuery.data?.state === 'empty' ? (
+            <InlineEmptyState message="수익 추이 데이터가 아직 없습니다." />
+          ) : !equityQuery.data || equityQuery.data.points.length < 2 ? (
+            <InlineEmptyState message="수익 추이를 표시하려면 데이터가 더 필요합니다." />
+          ) : (
+            <LineChart
+              points={getEquityChartPoints(equityQuery.data.points)}
+              valueFormatter={formatKrwChartValue}
+              emptyMessage="수익 추이를 표시하려면 데이터가 더 필요합니다."
+            />
+          )}
         </View>
 
         <View style={styles.row}>
@@ -289,6 +343,7 @@ const styles = StyleSheet.create({
   itemTitle: { fontSize: 15, fontWeight: '700' },
   helper: { fontSize: 14, color: '#444' },
   warningText: { fontSize: 13, color: '#7a4b00' },
+  chartState: { gap: 8 },
   assetSummaryRow: {
     borderTopWidth: 1,
     borderTopColor: '#eee',

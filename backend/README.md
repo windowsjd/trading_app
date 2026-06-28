@@ -173,6 +173,11 @@ MVP_FLOW_DB_SMOKE=1 pnpm test -- mvp-flow.integration.spec.ts
 OPS_JOB_LOCK_DB_SMOKE=1 pnpm test -- ops-job-lock.integration.spec.ts
 ```
 
+The FX execute opt-in integration spec runs `npm run test:db:prepare`
+(`prisma migrate deploy`) before its DB-backed runner so an existing test
+database is brought up to the checked-in Prisma migrations without reset,
+drop, or seed.
+
 These tests create isolated rows and clean them up. They do not call external providers.
 `MVP_FLOW_DB_SMOKE=1` is a service-composed real PostgreSQL smoke for the current MVP user flow: Auth signup/login/refresh, season join, wallets, admin_manual FX/asset/price test fixtures, assets, FX quote/execute, orders quote/create/execute, positions, records, home, ranking unavailable, and logout-all. It uses test-only fixture rows and is not provider ingestion, scheduler, settlement, reward, seed, or sample business data.
 `OPS_JOB_LOCK_DB_SMOKE=1` verifies real PostgreSQL `OpsJobLock` concurrency, active-lock blocking, expired takeover, and release/reacquire semantics against an explicit test DB. It is disabled by default.
