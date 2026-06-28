@@ -1,5 +1,11 @@
 {
   "android": {
     "package": "com.anonymous.leagueoftrading"
-  }
+  },
+  "extra": {
+    "eas": {
+      "projectId": "ea6190e3-80cd-43df-a7b1-d2b780f05985"
+    }
+  },
+  "owner": "mycroft7947"
 }
