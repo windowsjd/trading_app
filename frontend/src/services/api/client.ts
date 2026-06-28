@@ -5,10 +5,31 @@ import { API_BASE_URL } from '../../constants/env';
 type RefreshResponse = {
   success: true;
   data: {
-    accessToken: string;
-    refreshToken: string;
+    user?: {
+      id: string;
+      email: string;
+      nickname: string;
+      status: 'active' | 'suspended' | 'deleted';
+    };
+    tokens?: {
+      accessToken: string;
+      refreshToken: string;
+      accessTokenExpiresIn?: string;
+      refreshTokenExpiresAt?: string;
+    };
+    accessToken?: string;
+    refreshToken?: string;
   };
 };
+
+function getRefreshTokens(data: RefreshResponse['data']) {
+  const accessToken = data.tokens?.accessToken ?? data.accessToken;
+  const refreshToken = data.tokens?.refreshToken ?? data.refreshToken;
+
+  if (!accessToken || !refreshToken) return null;
+
+  return { accessToken, refreshToken };
+}
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -40,12 +61,16 @@ async function refreshAccessToken(): Promise<string | null> {
         { timeout: 10000 },
       );
 
-      const nextAccessToken = response.data.data.accessToken;
-      const nextRefreshToken = response.data.data.refreshToken;
+      const tokens = getRefreshTokens(response.data.data);
 
-      await saveTokens(nextAccessToken, nextRefreshToken);
+      if (!tokens) {
+        await clearTokens();
+        return null;
+      }
 
-      return nextAccessToken;
+      await saveTokens(tokens.accessToken, tokens.refreshToken);
+
+      return tokens.accessToken;
     } catch {
       await clearTokens();
       return null;

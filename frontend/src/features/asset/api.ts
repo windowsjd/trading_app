@@ -5,6 +5,7 @@ import type {
   MoneyString,
   PercentString,
   SectionState,
+  SourceMetadata,
 } from '../../models/dto/common';
 import type { AssetPriceErrorDto, AssetType, CurrencyCode } from '../market/api';
 
@@ -21,7 +22,7 @@ export interface AssetDetailPriceDto {
   priceCapturedAt?: IsoDateTimeString | null;
   priceEffectiveAt?: IsoDateTimeString | null;
   assetPriceSnapshotId?: string | null;
-  priceSource?: string | null;
+  priceSource?: SourceMetadata;
 }
 
 export interface AssetDetailAssetDto {

@@ -3,6 +3,7 @@ import {
   isIdempotencyConflictError,
   isRequoteRequiredError,
 } from '../../services/api/errorMapper';
+import { formatSourceMetadata } from '../../models/dto/common';
 
 function parseTimestamp(value?: string | null) {
   if (!value) return null;
@@ -64,8 +65,8 @@ export function getOrderQuoteDisplay(quote: OrderQuoteDto) {
     expiresAt: displayValue(quote.expiresAt),
     maxChangeBps: displayValue(quote.maxChangeBps),
     quoteAt: displayValue(quote.quoteAt),
-    assetPriceSource: displayValue(quote.assetPriceSource),
-    fxRateSource: displayValue(quote.fxRateSource),
+    assetPriceSource: formatSourceMetadata(quote.assetPriceSource),
+    fxRateSource: formatSourceMetadata(quote.fxRateSource),
   };
 }
 
@@ -106,6 +107,8 @@ export function getOrderSuccessDisplay(result: CreateOrderDto) {
     quotedRate: displayValue(execution.quotedRate),
     executeRate: displayValue(execution.executeRate),
     rateChangeBps: displayValue(execution.rateChangeBps),
+    assetPriceSource: formatSourceMetadata(execution.assetPriceSource),
+    fxRateSource: formatSourceMetadata(execution.fxRateSource),
     walletBalanceAfter: displayValue(execution.walletBalanceAfter),
     isAlreadyExecuted: execution.state === 'already_executed',
   };

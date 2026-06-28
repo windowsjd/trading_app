@@ -40,6 +40,34 @@ export interface OffsetPageResponse<T> {
   pagination: OffsetPagination;
 }
 
+export type PublicSourceMetadata = {
+  sourceType?: 'provider_api' | 'admin_manual' | 'official_batch' | string;
+  sourceName?: string | null;
+  snapshotId?: string | null;
+  effectiveAt?: IsoDateTimeString | null;
+  capturedAt?: IsoDateTimeString | null;
+  fallbackUsed?: boolean;
+  fallbackReason?: string | null;
+  rejectedProviderReason?: string | null;
+  freshnessAgeSeconds?: number | null;
+};
+
+export type SourceMetadata = PublicSourceMetadata | string | null;
+
+export function formatSourceMetadata(source?: SourceMetadata) {
+  if (source === null || source === undefined || source === '') return '-';
+  if (typeof source === 'string') return source;
+
+  const label = source.sourceName ?? source.sourceType ?? '-';
+  const details = [
+    source.fallbackUsed ? 'fallback' : null,
+    source.fallbackReason,
+    source.rejectedProviderReason,
+  ].filter((value): value is string => !!value);
+
+  return details.length ? `${label} (${details.join(', ')})` : label;
+}
+
 // Legacy cursor pagination remains for screens that have not moved to v2 yet.
 export interface CursorPageInfo {
   nextCursor: string | null;

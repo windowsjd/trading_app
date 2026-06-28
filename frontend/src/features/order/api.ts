@@ -7,6 +7,7 @@ import type {
   QuantityString,
   RateString,
   SectionState,
+  SourceMetadata,
 } from '../../models/dto/common';
 import type { AssetType, CurrencyCode } from '../market/api';
 
@@ -51,8 +52,8 @@ export interface OrderQuoteDto {
   krwNetAmount?: MoneyString | null;
   assetPriceSnapshotId?: string | null;
   fxRateSnapshotId?: string | null;
-  assetPriceSource?: string | null;
-  fxRateSource?: string | null;
+  assetPriceSource?: SourceMetadata;
+  fxRateSource?: SourceMetadata;
   quoteId: string;
   expiresAt: IsoDateTimeString;
   maxChangeBps: BpsString | number;
@@ -111,6 +112,14 @@ export interface OrderExecutionDto {
   quotedRate?: RateString | null;
   executeRate?: RateString | null;
   rateChangeBps?: BpsString | number | null;
+  assetPriceSource?: SourceMetadata;
+  fxRateSource?: SourceMetadata;
+  assetPriceSnapshotId?: string | null;
+  fxRateSnapshotId?: string | null;
+  walletTransactionId?: string | null;
+  positionId?: string | null;
+  equitySnapshotId?: string | null;
+  duplicate?: boolean;
   walletBalanceAfter?: MoneyString | null;
 }
 

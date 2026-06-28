@@ -19,9 +19,11 @@ import {
   getPortfolioOverview,
   getPortfolioPositions,
   getPortfolioEquity,
+  type PortfolioAllocationDto,
   type PortfolioAssetType,
   type PortfolioPositionItemDto,
   type PortfolioRange,
+  type PortfolioSummaryDto,
 } from '../../features/portfolio/api';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
@@ -52,18 +54,16 @@ const RANGE_TABS: Array<{ key: PortfolioRange; label: string }> = [
 
 const POSITIONS_PAGE_SIZE = 20;
 
+function displayValue(value?: string | number | null) {
+  if (value === null || value === undefined || value === '') return '-';
+  return String(value);
+}
+
 function formatKrwChartValue(value: number) {
   return `${value.toFixed(0)} KRW`;
 }
 
-function getAllocationSegments(
-  allocation: {
-    cashKrwValue: string;
-    domesticStockValueKrw: string;
-    usStockValueKrw: string;
-    cryptoValueKrw: string;
-  },
-): DonutChartSegment[] {
+function getAllocationSegments(allocation: PortfolioAllocationDto): DonutChartSegment[] {
   return [
     { key: 'cash', label: '현금', value: allocation.cashKrwValue },
     {
@@ -86,6 +86,32 @@ function getEquityChartPoints(
   }));
 }
 
+function getPortfolioNotice(
+  state: string,
+  summary: PortfolioSummaryDto | null,
+  message?: string,
+) {
+  if (state === 'not_joined') {
+    return {
+      title: '시즌 참가가 필요합니다.',
+      message: message ?? '시즌에 참가하면 포트폴리오 현황을 확인할 수 있습니다.',
+      cta: true,
+    };
+  }
+
+  if (state === 'unavailable' || !summary) {
+    return {
+      title: '포트폴리오 데이터를 준비 중입니다.',
+      message:
+        message ??
+        '시세 또는 평가 데이터가 충분히 준비되면 포트폴리오가 표시됩니다.',
+      cta: false,
+    };
+  }
+
+  return null;
+}
+
 export default function PortfolioScreen({ navigation }: Props) {
   const rootNavigation = useRootNavigation();
   const [assetType, setAssetType] =
@@ -96,6 +122,9 @@ export default function PortfolioScreen({ navigation }: Props) {
     queryKey: QUERY_KEYS.portfolio.overview,
     queryFn: getPortfolioOverview,
   });
+
+  const isPortfolioAvailable =
+    overviewQuery.data?.state === 'available' && !!overviewQuery.data.summary;
 
   const positionsQuery = useInfiniteQuery({
     queryKey: QUERY_KEYS.portfolio.positions({
@@ -112,11 +141,13 @@ export default function PortfolioScreen({ navigation }: Props) {
     getNextPageParam: (lastPage) =>
       lastPage.pagination.nextOffset ?? undefined,
     initialPageParam: 0,
+    enabled: isPortfolioAvailable,
   });
 
   const equityQuery = useQuery({
     queryKey: QUERY_KEYS.portfolio.equity(range),
     queryFn: () => getPortfolioEquity(range),
+    enabled: isPortfolioAvailable,
   });
 
   const positions = useMemo(() => {
@@ -140,11 +171,11 @@ export default function PortfolioScreen({ navigation }: Props) {
       return 'portfolio_error';
     }
 
-    if (positionsQuery.isSuccess && !positions.length) {
+    if (isPortfolioAvailable && positionsQuery.isSuccess && !positions.length) {
       return 'portfolio_no_positions';
     }
 
-    if (positionsQuery.isError || equityQuery.isError) {
+    if (isPortfolioAvailable && (positionsQuery.isError || equityQuery.isError)) {
       return 'portfolio_partial_unavailable';
     }
 
@@ -153,6 +184,7 @@ export default function PortfolioScreen({ navigation }: Props) {
     overviewQuery.isLoading,
     overviewQuery.isError,
     overviewQuery.data,
+    isPortfolioAvailable,
     positionsQuery.isError,
     positionsQuery.isSuccess,
     positions.length,
@@ -176,6 +208,12 @@ export default function PortfolioScreen({ navigation }: Props) {
   }
 
   const overview = overviewQuery.data;
+  const summary = overview.summary;
+  const portfolioNotice = getPortfolioNotice(
+    overview.state,
+    summary,
+    overview.message,
+  );
   const equity = equityQuery.data?.points ?? [];
   const allocationSegments = getAllocationSegments(overview.allocation);
   const equityChartPoints = getEquityChartPoints(equity);
@@ -197,12 +235,28 @@ export default function PortfolioScreen({ navigation }: Props) {
           <>
             <View style={styles.card}>
               <Text style={styles.label}>총 자산</Text>
-              <Text style={styles.big}>{overview.summary.totalAssetKrw} KRW</Text>
-              <Text style={styles.helper}>수익률 {overview.summary.returnRate}%</Text>
-              <Text style={styles.helper}>KRW {overview.summary.krwBalance}</Text>
-              <Text style={styles.helper}>USD {overview.summary.usdBalance}</Text>
-              <Text style={styles.helper}>USD 환산 KRW {overview.summary.usdBalanceKrw}</Text>
+              <Text style={styles.big}>{displayValue(summary?.totalAssetKrw)} KRW</Text>
+              <Text style={styles.helper}>수익률 {displayValue(summary?.returnRate)}%</Text>
+              <Text style={styles.helper}>KRW 현금 {displayValue(summary?.krwCash)}</Text>
+              <Text style={styles.helper}>USD 잔액 -</Text>
+              <Text style={styles.helper}>USD 환산 KRW {displayValue(summary?.usdCashKrw)}</Text>
+              <Text style={styles.helper}>자산 평가 {displayValue(summary?.assetValueKrw)}</Text>
+              <Text style={styles.helper}>실현손익 {displayValue(summary?.realizedPnlKrw)}</Text>
+              <Text style={styles.helper}>평가손익 {displayValue(summary?.unrealizedPnlKrw)}</Text>
             </View>
+
+            {portfolioNotice ? (
+              <View style={styles.inlineWarning}>
+                <Text style={styles.inlineWarningText}>{portfolioNotice.title}</Text>
+                <Text style={styles.helper}>{portfolioNotice.message}</Text>
+                {portfolioNotice.cta ? (
+                  <CTAButton
+                    label="시즌 참가하기"
+                    onPress={() => rootNavigation.navigate('SeasonJoin')}
+                  />
+                ) : null}
+              </View>
+            ) : null}
 
             <View style={styles.card}>
               <Text style={styles.label}>자산 비중</Text>
@@ -221,7 +275,8 @@ export default function PortfolioScreen({ navigation }: Props) {
               </View>
             ) : null}
 
-            <View style={styles.card}>
+            {isPortfolioAvailable ? (
+              <View style={styles.card}>
               <Text style={styles.label}>자산 추이</Text>
 
               <View style={styles.row}>
@@ -264,9 +319,11 @@ export default function PortfolioScreen({ navigation }: Props) {
               ) : (
                 <InlineEmptyState message="표시할 차트 데이터가 없습니다." />
               )}
-            </View>
+              </View>
+            ) : null}
 
-            <View style={styles.card}>
+            {isPortfolioAvailable ? (
+              <View style={styles.card}>
               <Text style={styles.label}>보유 포지션</Text>
 
               <View style={styles.row}>
@@ -286,7 +343,8 @@ export default function PortfolioScreen({ navigation }: Props) {
                   );
                 })}
               </View>
-            </View>
+              </View>
+            ) : null}
           </>
         }
         ListEmptyComponent={

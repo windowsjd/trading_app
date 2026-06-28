@@ -32,6 +32,7 @@ import {
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 import { buildWsUrl } from '../../constants/env';
+import { formatSourceMetadata } from '../../models/dto/common';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -146,6 +147,8 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
   const displayPriceKrw =
     latestTicker?.priceKrw ??
     (price?.priceKrwState === 'available' ? price?.priceKrw : null);
+  const displayPriceKrwState =
+    latestTicker?.priceKrwState ?? price?.priceKrwState;
   const displayChangeRate = getDisplayChangeRate(
     latestTicker?.changeRate,
     price?.changeRate,
@@ -189,7 +192,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
       ? '실시간 시세 최신성이 낮습니다. 서버 견적에서 최종 확인됩니다.'
       : !orderPriceAvailable
       ? '현재 화면 시세가 없어도 서버 견적에서 최종 확인됩니다.'
-      : price?.priceKrwState && price.priceKrwState !== 'available'
+      : displayPriceKrwState && displayPriceKrwState !== 'available'
       ? 'KRW 환산 시세를 사용할 수 없습니다. 서버 견적에서 최종 확인됩니다.'
       : null;
 
@@ -237,7 +240,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
             최신성 {displayValue(displayFreshnessAgeSeconds)}초
           </Text>
           <Text style={styles.helper}>실시간 연결 {connectionState}</Text>
-          <Text style={styles.helper}>가격 소스 {displayValue(price?.priceSource)}</Text>
+          <Text style={styles.helper}>가격 소스 {formatSourceMetadata(price?.priceSource)}</Text>
 
           {tradingNote ? (
             <Text style={styles.helper}>{tradingNote}</Text>

@@ -25,6 +25,7 @@
   "name": "LeagueOfTrading",
   "version": "1.0.0",
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck"
   }
 }

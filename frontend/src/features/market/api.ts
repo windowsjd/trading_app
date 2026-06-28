@@ -6,6 +6,7 @@ import type {
   OffsetPagination,
   PercentString,
   SectionState,
+  SourceMetadata,
 } from '../../models/dto/common';
 
 export type AssetType = 'domestic_stock' | 'us_stock' | 'crypto';
@@ -21,7 +22,7 @@ export interface MarketAssetPriceDto {
   assetPriceSnapshotId?: string | null;
   priceEffectiveAt?: IsoDateTimeString | null;
   priceCapturedAt?: IsoDateTimeString | null;
-  priceSource?: string | null;
+  priceSource?: SourceMetadata;
 }
 
 export interface MarketAssetItemDto {

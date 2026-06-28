@@ -3,6 +3,7 @@ import type {
   IsoDateTimeString,
   MoneyString,
   RateString,
+  SourceMetadata,
 } from './common';
 
 export interface WalletsDto {
@@ -49,7 +50,7 @@ export interface FxQuoteDto {
   maxChangeBps: BpsString | number;
   rateCapturedAt: IsoDateTimeString;
   rateEffectiveAt: IsoDateTimeString;
-  rateSource: string | null;
+  rateSource: SourceMetadata;
 }
 
 export interface FxExecuteRequestDto {
@@ -87,5 +88,5 @@ export interface FxExecuteDto {
     balanceAmount?: MoneyString;
     balance?: MoneyString;
   }> | null;
-  rateSource: string | null;
+  rateSource: SourceMetadata;
 }

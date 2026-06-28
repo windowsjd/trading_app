@@ -1,4 +1,5 @@
 const API_BASE_PATH = '/api/v1';
+const WS_ENDPOINT_PATH = `${API_BASE_PATH}/ws`;
 
 declare const process:
   | {
@@ -47,5 +48,27 @@ export const WS_BASE_URL = configuredWsBaseUrl || toWsOrigin(apiOrigin);
 
 export function buildWsUrl(path: string) {
   if (!WS_BASE_URL) return null;
-  return `${WS_BASE_URL}${toPath(path)}`;
+
+  const baseUrl = trimTrailingSlash(WS_BASE_URL);
+  const requestPath = toPath(path);
+
+  if (baseUrl.endsWith(WS_ENDPOINT_PATH)) {
+    if (requestPath === WS_ENDPOINT_PATH || requestPath === '/ws') {
+      return baseUrl;
+    }
+
+    return `${baseUrl}${requestPath}`;
+  }
+
+  if (baseUrl.endsWith(API_BASE_PATH)) {
+    if (requestPath === API_BASE_PATH) {
+      return baseUrl;
+    }
+
+    if (requestPath.startsWith(`${API_BASE_PATH}/`)) {
+      return `${baseUrl}${requestPath.slice(API_BASE_PATH.length)}`;
+    }
+  }
+
+  return `${baseUrl}${requestPath}`;
 }

@@ -3,6 +3,14 @@ export const QUERY_KEYS = {
 
   season: {
     current: ['season', 'current'] as const,
+    list: (params?: { status?: string; limit?: number; offset?: number }) =>
+      [
+        'season',
+        'list',
+        params?.status ?? 'all',
+        params?.limit ?? null,
+        params?.offset ?? 0,
+      ] as const,
   },
 
   home: {

@@ -14,6 +14,7 @@ import {
   isQuoteExpiredError,
   isRequoteRequiredError,
 } from '../../services/api/errorMapper';
+import { formatSourceMetadata } from '../../models/dto/common';
 
 type WalletQueryState = {
   isLoading?: boolean;
@@ -121,7 +122,7 @@ export function getFxQuoteDisplay(quote: FxQuoteDto) {
     maxChangeBps: displayValue(quote.maxChangeBps),
     rateCapturedAt: displayValue(quote.rateCapturedAt),
     rateEffectiveAt: displayValue(quote.rateEffectiveAt),
-    rateSource: displayValue(quote.rateSource),
+    rateSource: formatSourceMetadata(quote.rateSource),
   };
 }
 
@@ -185,7 +186,7 @@ export function getFxExecuteSuccessDisplay(result: FxExecuteDto) {
     sourceWalletBalanceAfter: displayValue(result.sourceWalletBalanceAfter),
     targetWalletBalanceAfter: displayValue(result.targetWalletBalanceAfter),
     walletRows: getWalletRows(result.wallets),
-    rateSource: displayValue(result.rateSource),
+    rateSource: formatSourceMetadata(result.rateSource),
   };
 }
 

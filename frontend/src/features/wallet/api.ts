@@ -7,6 +7,7 @@ import type {
   OffsetPagination,
   RateString,
   SectionState,
+  SourceMetadata,
 } from '../../models/dto/common';
 
 export type WalletCurrency = 'KRW' | 'USD';
@@ -92,7 +93,7 @@ export interface FxQuoteDto {
   maxChangeBps: BpsString | number;
   rateCapturedAt: IsoDateTimeString;
   rateEffectiveAt: IsoDateTimeString;
-  rateSource: string | null;
+  rateSource: SourceMetadata;
 }
 
 export interface FxExecuteRequestDto {
@@ -123,7 +124,7 @@ export interface FxExecuteDto {
   sourceWalletBalanceAfter: MoneyString;
   targetWalletBalanceAfter: MoneyString;
   wallets?: Partial<Record<WalletCurrency, MoneyString>> | WalletBalanceDto[] | null;
-  rateSource: string | null;
+  rateSource: SourceMetadata;
 }
 
 export type WalletTransactionDirection = 'credit' | 'debit';

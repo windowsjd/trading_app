@@ -24,9 +24,9 @@ export interface AssetTickerMessage {
   assetId: string;
   symbol?: string;
   name?: string;
-  priceLocal: string;
+  priceLocal: string | null;
   priceCurrency?: 'KRW' | 'USD';
-  priceKrw: string;
+  priceKrw: string | null;
   priceKrwState?: string;
   changeRate?: string | null;
   assetPriceSnapshotId?: string | null;
@@ -34,6 +34,8 @@ export interface AssetTickerMessage {
   priceEffectiveAt?: string | null;
   capturedAt?: string | null;
   freshnessAgeSeconds?: number | null;
+  reason?: string;
+  message?: string;
 }
 
 type AssetTickerControlMessage = {
@@ -78,6 +80,19 @@ function isCurrentAssetTickerControlMessage(
   assetId: string,
 ) {
   return payload.channel === 'asset_ticker' && payload.assetId === assetId;
+}
+
+function isRelevantAssetTickerError(
+  payload: AssetTickerControlMessage,
+  assetId: string,
+) {
+  if (payload.channel && payload.channel !== 'asset_ticker') return false;
+  if (payload.assetId && payload.assetId !== assetId) return false;
+  return true;
+}
+
+function isUnavailableTicker(payload: AssetTickerMessage) {
+  return !!payload.priceKrwState && payload.priceKrwState !== 'available';
 }
 
 export function useAssetTicker({
@@ -138,7 +153,13 @@ export function useAssetTicker({
 
       const nextTimestamp = getTickerTimestamp(payload);
       const currentTimestamp = latestTimestampRef.current;
-      if (nextTimestamp === null && latestTickerRef.current) return;
+      if (
+        nextTimestamp === null &&
+        latestTickerRef.current &&
+        !isUnavailableTicker(payload)
+      ) {
+        return;
+      }
       if (
         nextTimestamp !== null &&
         currentTimestamp !== null &&
@@ -221,6 +242,27 @@ export function useAssetTicker({
             return;
           }
 
+          if (payload.type === 'error') {
+            if (payload.code === 'UNAUTHORIZED') {
+              shouldReconnectRef.current = false;
+              setConnectionState('auth_failed');
+              setShowReconnectBanner(true);
+              ws.close();
+              return;
+            }
+
+            if (
+              payload.code === 'INVALID_SUBSCRIPTION' ||
+              isRelevantAssetTickerError(payload, assetId)
+            ) {
+              if (!isRelevantAssetTickerError(payload, assetId)) return;
+
+              setConnectionState('subscription_error');
+              setShowReconnectBanner(true);
+              return;
+            }
+          }
+
           if (payload.type === 'subscription_error') {
             if (!isCurrentAssetTickerControlMessage(payload, assetId)) return;
 
@@ -262,6 +304,8 @@ export function useAssetTicker({
           setShowReconnectBanner(true);
           return;
         }
+
+        if (!shouldReconnectRef.current) return;
 
         setConnectionState('disconnected');
         scheduleReconnect();
