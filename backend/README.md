@@ -40,7 +40,7 @@ This service owns backend APIs, database access, financial calculations, and ser
 
 These are intentionally outside the current implementation and should not be added without a separate gate:
 
-- Provider ingestion trigger APIs, scheduler-driven provider ingestion implementation, and provider-backed reward workflows.
+- Scheduler-driven provider ingestion implementation and provider-backed reward workflows.
 - Crypto candle DB persistence, frontend chart integration, Binance Futures APIs, and Binance authenticated order/account/user-data APIs.
 - OANDA and Twelve Data are historical provider candidates only, not the current MVP core provider stack.
 - Batch run HTTP APIs, scheduler HTTP APIs, external reward fulfillment APIs, and reward policy/catalog APIs.
@@ -105,6 +105,39 @@ pnpm install
 docker compose up -d
 pnpm start:dev
 ```
+
+### Development Data Helpers
+
+Open the local development season as always active for app testing:
+
+```bash
+pnpm dev:open-season
+npm run dev:open-season
+```
+
+This upserts `sea_2026_s1` as `status=active`, `startAt=2000-01-01T00:00:00.000Z`, and `endAt=2099-12-31T23:59:59.000Z`. This is a temporary development/testing setting only.
+
+Run provider ingestion through the existing operator service and then inspect DB snapshot status:
+
+```bash
+pnpm dev:run-provider-ingestions -- --operator-email <operator@example.com>
+npm run dev:run-provider-ingestions -- --operator-email <operator@example.com>
+```
+
+The operator actor must be an existing user with `role=operator` or `role=admin`. You may pass `--operator-user-id <USER_ID>` instead, or set `LOCAL_OPERATOR_USER_ID` / `LOCAL_OPERATOR_EMAIL`. The script defaults to non-dry-run writes; pass `--dry-run` to check providers without inserting snapshots. Limit a run with `--provider binance`, `--provider kis`, `--provider korea-exim`, or `--provider exchange-rate`.
+
+When the app shows market data as preparing or unavailable, verify that the backend has rows in:
+
+```text
+asset_price_snapshots
+fx_rate_snapshots
+```
+
+Before production launch:
+
+- Remove the always-open development season and switch to the KST Monday 09:00 through next Friday 09:00 policy.
+- Move provider ingestion from manual scripts to scheduler/worker automation.
+- Deploy the API server on a public HTTPS/WSS domain.
 
 Do not print or commit provider API keys or local env contents. Provider row insertion foundation exists, provider-backed execute is open only through durable quote gates, and real account/order APIs remain STOP.
 
