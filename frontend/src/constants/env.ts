@@ -1,5 +1,9 @@
+import { NativeModules, Platform } from 'react-native';
+
 const API_BASE_PATH = '/api/v1';
 const WS_ENDPOINT_PATH = `${API_BASE_PATH}/ws`;
+const DEFAULT_API_PORT = '3000';
+const ANDROID_EMULATOR_HOST = '10.0.2.2';
 
 declare const process:
   | {
@@ -14,6 +18,52 @@ function getRuntimeEnvValue(key: string) {
 
 function trimTrailingSlash(value: string) {
   return value.replace(/\/+$/, '');
+}
+
+function getGlobalLocation() {
+  return (globalThis as {
+    location?: {
+      hostname?: string;
+      protocol?: string;
+    };
+  }).location;
+}
+
+function getNativeScriptHostname() {
+  const sourceCode = (NativeModules as {
+    SourceCode?: {
+      scriptURL?: string;
+    };
+  }).SourceCode;
+
+  const scriptUrl = sourceCode?.scriptURL;
+  if (!scriptUrl) return null;
+
+  const match = /^https?:\/\/([^/:]+)(?::\d+)?/.exec(scriptUrl);
+  return match?.[1] ?? null;
+}
+
+function getDefaultApiOrigin() {
+  const nativeScriptHostname = getNativeScriptHostname();
+
+  if (Platform.OS === 'android') {
+    if (nativeScriptHostname && nativeScriptHostname !== 'localhost') {
+      return `http://${nativeScriptHostname}:${DEFAULT_API_PORT}`;
+    }
+
+    return `http://${ANDROID_EMULATOR_HOST}:${DEFAULT_API_PORT}`;
+  }
+
+  if (Platform.OS === 'web') {
+    const hostname = getGlobalLocation()?.hostname || 'localhost';
+    return `http://${hostname}:${DEFAULT_API_PORT}`;
+  }
+
+  if (nativeScriptHostname) {
+    return `http://${nativeScriptHostname}:${DEFAULT_API_PORT}`;
+  }
+
+  return `http://localhost:${DEFAULT_API_PORT}`;
 }
 
 function toPath(value: string) {
@@ -33,7 +83,7 @@ function toWsOrigin(apiOrigin: string) {
 }
 
 const apiOrigin = trimTrailingSlash(
-  getRuntimeEnvValue('EXPO_PUBLIC_API_ORIGIN') ?? '',
+  getRuntimeEnvValue('EXPO_PUBLIC_API_ORIGIN') || getDefaultApiOrigin(),
 );
 
 const configuredWsBaseUrl = trimTrailingSlash(
