@@ -11,6 +11,7 @@ import { SeasonSettlementJobService } from '../batch/season-settlement-job.servi
 import { SEASON_SETTLEMENT_JOB_NAME } from '../batch/season-settlement-job.types';
 import { BinancePriceIngestionService } from '../providers/binance/binance-price.ingestion.service';
 import { ExchangeRateIngestionService } from '../providers/exchange-rate/exchange-rate.ingestion.service';
+import { KisRestCurrentPriceIngestionService } from '../providers/kis/kis-rest-current-price.ingestion.service';
 import { KoreaEximExchangeIngestionService } from '../providers/korea-exim/korea-exim-exchange.ingestion.service';
 import { RankingRefreshService } from '../ranking/ranking-refresh.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -46,6 +47,7 @@ export type OpsJobRunnerInput = {
   metadataJson?: unknown;
   lockTtlSeconds?: number;
   maxAttempts?: number;
+  maxSnapshots?: number;
 };
 
 export type DailySnapshotOpsJobInput = OpsJobRunnerInput & {
@@ -68,6 +70,7 @@ export class OpsJobRunnerService {
     private readonly exchangeRateIngestionService: ExchangeRateIngestionService,
     private readonly koreaEximExchangeIngestionService: KoreaEximExchangeIngestionService,
     private readonly binancePriceIngestionService: BinancePriceIngestionService,
+    private readonly kisRestCurrentPriceIngestionService: KisRestCurrentPriceIngestionService,
     private readonly prisma: PrismaService,
     private readonly lockService: OpsJobLockService,
     private readonly runService: OpsJobRunService,
@@ -136,6 +139,41 @@ export class OpsJobRunnerService {
           this.throwProviderJobFailed(
             'PROVIDER_BINANCE_INGEST_FAILED',
             'Provider Binance ingestion failed.',
+            response,
+          );
+        }
+
+        return response;
+      },
+    );
+  }
+
+  runProviderKisRestCurrentPriceIngestJob(input: OpsJobRunnerInput = {}) {
+    return this.runLockedOpsJob(
+      OpsJobName.provider_kis_ingest,
+      input,
+      'provider_kis_ingest:rest_current_price',
+      async () => {
+        const result =
+          await this.kisRestCurrentPriceIngestionService.ingestCurrentPrices({
+            dryRun: false,
+            requestedBy: input.requestedBy ?? undefined,
+            maxSnapshots: input.maxSnapshots,
+          });
+
+        const response = {
+          state: result.success ? 'completed' : 'failed',
+          provider: result,
+          created: result.created,
+          skipped: result.skipped,
+          wouldCreate: result.wouldCreate,
+          failed: result.failed,
+        };
+
+        if (response.state === 'failed') {
+          this.throwProviderJobFailed(
+            'PROVIDER_KIS_INGEST_FAILED',
+            'Provider KIS REST current price ingestion failed.',
             response,
           );
         }

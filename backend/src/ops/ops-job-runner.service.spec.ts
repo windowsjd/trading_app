@@ -3,6 +3,7 @@ jest.mock('../generated/prisma/client', () => ({
   OpsJobName: {
     provider_fx_ingest: 'provider_fx_ingest',
     provider_binance_ingest: 'provider_binance_ingest',
+    provider_kis_ingest: 'provider_kis_ingest',
     daily_portfolio_snapshot: 'daily_portfolio_snapshot',
     season_ranking_generation: 'season_ranking_generation',
     season_lifecycle_transition: 'season_lifecycle_transition',
@@ -39,14 +40,16 @@ jest.mock('../ranking/ranking-refresh.service', () => ({
 jest.mock('../providers/binance/binance-price.ingestion.service', () => ({
   BinancePriceIngestionService: class BinancePriceIngestionService {},
 }));
+jest.mock('../providers/kis/kis-rest-current-price.ingestion.service', () => ({
+  KisRestCurrentPriceIngestionService: class KisRestCurrentPriceIngestionService {},
+}));
 jest.mock('../providers/exchange-rate/exchange-rate.ingestion.service', () => ({
   ExchangeRateIngestionService: class ExchangeRateIngestionService {},
 }));
 jest.mock(
   '../providers/korea-exim/korea-exim-exchange.ingestion.service',
   () => ({
-    KoreaEximExchangeIngestionService:
-      class KoreaEximExchangeIngestionService {},
+    KoreaEximExchangeIngestionService: class KoreaEximExchangeIngestionService {},
   }),
 );
 
@@ -110,6 +113,9 @@ describe('OpsJobRunnerService', () => {
     const binancePriceIngestionService = {
       ingestPrices: jest.fn(),
     };
+    const kisRestCurrentPriceIngestionService = {
+      ingestCurrentPrices: jest.fn(),
+    };
     const prisma = {
       season: {
         findMany: jest.fn(),
@@ -138,6 +144,7 @@ describe('OpsJobRunnerService', () => {
       exchangeRateIngestionService,
       koreaEximExchangeIngestionService,
       binancePriceIngestionService,
+      kisRestCurrentPriceIngestionService,
       prisma,
       service: new OpsJobRunnerService(
         dailyPortfolioSnapshotJobService as never,
@@ -147,6 +154,7 @@ describe('OpsJobRunnerService', () => {
         exchangeRateIngestionService as never,
         koreaEximExchangeIngestionService as never,
         binancePriceIngestionService as never,
+        kisRestCurrentPriceIngestionService as never,
         prisma as never,
         lockService as never,
         runService as never,
@@ -295,6 +303,157 @@ describe('OpsJobRunnerService', () => {
     expect(lockService.releaseLock).toHaveBeenCalledWith({
       lockKey: 'provider_binance_ingest:prices',
       ownerId: 'owner-binance',
+    });
+  });
+
+  it('runs provider KIS REST current price ingestion with maxSnapshots through the locked provider service', async () => {
+    const {
+      kisRestCurrentPriceIngestionService,
+      lockService,
+      runService,
+      service,
+    } = createService();
+    lockService.acquireLock.mockResolvedValueOnce({
+      acquired: true,
+      lockKey: 'provider_kis_ingest:rest_current_price',
+      ownerId: 'owner-kis',
+      expiresAt: new Date('2026-06-08T00:10:00.000Z'),
+    });
+    runService.createRunning.mockResolvedValueOnce({
+      id: 'run-kis',
+      startedAt,
+    });
+    kisRestCurrentPriceIngestionService.ingestCurrentPrices.mockResolvedValueOnce(
+      {
+        success: true,
+        provider: 'kis',
+        ingestion: 'rest_current_price',
+        dryRun: false,
+        received: 3,
+        created: 2,
+        skipped: 1,
+        wouldCreate: 0,
+        failed: 0,
+        snapshots: [],
+      },
+    );
+    runService.recordSucceeded.mockResolvedValueOnce({
+      serialized: serializedRun({
+        jobName: OpsJobName.provider_kis_ingest,
+      }),
+    });
+
+    const response = await service.runProviderKisRestCurrentPriceIngestJob({
+      trigger: OpsJobTrigger.test,
+      requestedBy: 'scheduler',
+      maxSnapshots: 10,
+    });
+
+    expect(response).toMatchObject({
+      success: true,
+      data: {
+        locked: false,
+        skipped: false,
+      },
+    });
+    expect(
+      kisRestCurrentPriceIngestionService.ingestCurrentPrices,
+    ).toHaveBeenCalledWith({
+      dryRun: false,
+      requestedBy: 'scheduler',
+      maxSnapshots: 10,
+    });
+    expect(runService.recordSucceeded).toHaveBeenCalledWith(
+      {
+        id: 'run-kis',
+        startedAt,
+      },
+      expect.objectContaining({
+        resultJson: expect.objectContaining({
+          state: 'completed',
+          created: 2,
+          failed: 0,
+        }),
+      }),
+    );
+    expect(lockService.releaseLock).toHaveBeenCalledWith({
+      lockKey: 'provider_kis_ingest:rest_current_price',
+      ownerId: 'owner-kis',
+    });
+  });
+
+  it('records provider KIS failures as failed ops job runs', async () => {
+    const {
+      kisRestCurrentPriceIngestionService,
+      lockService,
+      runService,
+      service,
+    } = createService();
+    lockService.acquireLock.mockResolvedValueOnce({
+      acquired: true,
+      lockKey: 'provider_kis_ingest:rest_current_price',
+      ownerId: 'owner-kis',
+      expiresAt: new Date('2026-06-08T00:10:00.000Z'),
+    });
+    runService.createRunning.mockResolvedValueOnce({
+      id: 'run-kis',
+      startedAt,
+    });
+    kisRestCurrentPriceIngestionService.ingestCurrentPrices.mockResolvedValueOnce(
+      {
+        success: false,
+        provider: 'kis',
+        ingestion: 'rest_current_price',
+        dryRun: false,
+        received: 0,
+        created: 0,
+        skipped: 0,
+        wouldCreate: 0,
+        failed: 1,
+        snapshots: [],
+        errorCode: 'PROVIDER_DISABLED',
+        errorMessage: 'KIS provider is disabled.',
+      },
+    );
+    runService.recordFailed.mockResolvedValueOnce({
+      serialized: serializedRun({
+        jobName: OpsJobName.provider_kis_ingest,
+        status: OpsJobRunStatus.failed,
+      }),
+    });
+
+    const response = await service.runProviderKisRestCurrentPriceIngestJob({
+      trigger: OpsJobTrigger.test,
+    });
+
+    expect(response).toMatchObject({
+      success: false,
+      error: {
+        code: 'PROVIDER_KIS_INGEST_FAILED',
+      },
+      data: {
+        run: {
+          status: OpsJobRunStatus.failed,
+        },
+      },
+    });
+    expect(runService.recordFailed).toHaveBeenCalledWith(
+      {
+        id: 'run-kis',
+        startedAt,
+      },
+      expect.objectContaining({
+        errorCode: 'PROVIDER_KIS_INGEST_FAILED',
+        errorMessage: 'Provider KIS REST current price ingestion failed.',
+        resultJson: expect.objectContaining({
+          state: 'failed',
+          failed: 1,
+        }),
+      }),
+    );
+    expect(lockService.releaseLock).toHaveBeenCalledWith({
+      lockKey: 'provider_kis_ingest:rest_current_price',
+      ownerId: 'owner-kis',
     });
   });
 

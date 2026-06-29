@@ -3,6 +3,7 @@ jest.mock('../generated/prisma/client', () => ({
   OpsJobName: {
     provider_fx_ingest: 'provider_fx_ingest',
     provider_binance_ingest: 'provider_binance_ingest',
+    provider_kis_ingest: 'provider_kis_ingest',
     daily_portfolio_snapshot: 'daily_portfolio_snapshot',
     season_ranking_generation: 'season_ranking_generation',
     season_settlement: 'season_settlement',

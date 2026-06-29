@@ -1,5 +1,10 @@
 import { OpsJobName } from '../generated/prisma/client';
 
+export type ProviderOpsJobName =
+  | typeof OpsJobName.provider_fx_ingest
+  | typeof OpsJobName.provider_binance_ingest
+  | typeof OpsJobName.provider_kis_ingest;
+
 export type OpsSchedulerConfig = {
   enabled: boolean;
   timezone: string;
@@ -7,12 +12,19 @@ export type OpsSchedulerConfig = {
   maxAttempts: number;
   tickIntervalMs: number;
   jobs: Record<OpsJobName, boolean>;
+  providerIntervalsSeconds: Record<ProviderOpsJobName, number>;
+  providerIngestionRunOnStartup: boolean;
+  providerKisMaxSnapshots: number;
 };
 
 const DEFAULT_LOCK_TTL_SECONDS = 600;
 const DEFAULT_MAX_ATTEMPTS = 1;
 const DEFAULT_TICK_INTERVAL_MS = 60_000;
 const DEFAULT_TIMEZONE = 'Asia/Seoul';
+const DEFAULT_PROVIDER_FX_INTERVAL_SECONDS = 3600;
+const DEFAULT_PROVIDER_BINANCE_INTERVAL_SECONDS = 60;
+const DEFAULT_PROVIDER_KIS_INTERVAL_SECONDS = 60;
+const DEFAULT_PROVIDER_KIS_MAX_SNAPSHOTS = 500;
 
 export function getOpsSchedulerConfig(
   env: NodeJS.ProcessEnv = process.env,
@@ -30,13 +42,28 @@ export function getOpsSchedulerConfig(
     env.SCHEDULER_SETTLEMENT_ENABLED ?? env.ENABLE_SEASON_SETTLEMENT_SCHEDULER,
     false,
   );
+  const providerFxEnabled = parseBooleanEnv(
+    env.SCHEDULER_PROVIDER_FX_ENABLED,
+    false,
+  );
+  const providerBinanceEnabled = parseBooleanEnv(
+    env.SCHEDULER_PROVIDER_BINANCE_ENABLED,
+    false,
+  );
+  const providerKisEnabled = parseBooleanEnv(
+    env.SCHEDULER_PROVIDER_KIS_ENABLED ?? env.ENABLE_PROVIDER_KIS_SCHEDULER,
+    false,
+  );
 
   return {
     enabled:
       parseBooleanEnv(env.SCHEDULER_ENABLED, false) ||
       rankingEnabled ||
       lifecycleEnabled ||
-      settlementEnabled,
+      settlementEnabled ||
+      providerFxEnabled ||
+      providerBinanceEnabled ||
+      providerKisEnabled,
     timezone: parseTextEnv(env.SCHEDULER_TIMEZONE, DEFAULT_TIMEZONE),
     lockTtlSeconds: parsePositiveIntegerEnv(
       env.SCHEDULER_LOCK_TTL_SECONDS,
@@ -48,14 +75,9 @@ export function getOpsSchedulerConfig(
     ),
     tickIntervalMs: resolveTickIntervalMs(env),
     jobs: {
-      [OpsJobName.provider_fx_ingest]: parseBooleanEnv(
-        env.SCHEDULER_PROVIDER_FX_ENABLED,
-        false,
-      ),
-      [OpsJobName.provider_binance_ingest]: parseBooleanEnv(
-        env.SCHEDULER_PROVIDER_BINANCE_ENABLED,
-        false,
-      ),
+      [OpsJobName.provider_fx_ingest]: providerFxEnabled,
+      [OpsJobName.provider_binance_ingest]: providerBinanceEnabled,
+      [OpsJobName.provider_kis_ingest]: providerKisEnabled,
       [OpsJobName.daily_portfolio_snapshot]: parseBooleanEnv(
         env.SCHEDULER_DAILY_SNAPSHOT_ENABLED,
         false,
@@ -68,7 +90,34 @@ export function getOpsSchedulerConfig(
         false,
       ),
     },
+    providerIntervalsSeconds: {
+      [OpsJobName.provider_fx_ingest]: parsePositiveIntegerEnv(
+        env.SCHEDULER_PROVIDER_FX_INTERVAL_SECONDS,
+        DEFAULT_PROVIDER_FX_INTERVAL_SECONDS,
+      ),
+      [OpsJobName.provider_binance_ingest]: parsePositiveIntegerEnv(
+        env.SCHEDULER_PROVIDER_BINANCE_INTERVAL_SECONDS,
+        DEFAULT_PROVIDER_BINANCE_INTERVAL_SECONDS,
+      ),
+      [OpsJobName.provider_kis_ingest]: parsePositiveIntegerEnv(
+        env.SCHEDULER_PROVIDER_KIS_INTERVAL_SECONDS,
+        DEFAULT_PROVIDER_KIS_INTERVAL_SECONDS,
+      ),
+    },
+    providerIngestionRunOnStartup: parseBooleanEnv(
+      env.SCHEDULER_PROVIDER_INGESTION_RUN_ON_STARTUP,
+      false,
+    ),
+    providerKisMaxSnapshots: resolveProviderKisMaxSnapshots(env),
   };
+}
+
+function resolveProviderKisMaxSnapshots(env: NodeJS.ProcessEnv) {
+  return (
+    parseOptionalPositiveIntegerEnv(env.SCHEDULER_PROVIDER_KIS_MAX_SNAPSHOTS) ??
+    parseOptionalPositiveIntegerEnv(env.PROVIDER_INGESTION_MAX_SNAPSHOTS) ??
+    DEFAULT_PROVIDER_KIS_MAX_SNAPSHOTS
+  );
 }
 
 function resolveTickIntervalMs(env: NodeJS.ProcessEnv) {

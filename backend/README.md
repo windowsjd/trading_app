@@ -23,13 +23,13 @@ This service owns backend APIs, database access, financial calculations, and ser
 - FX execute and orders create idempotency request hashes include `quoteId`, so the same idempotency key with a different quote conflicts instead of replaying an old result.
 - KRW and USD cash wallets. US stocks and USD-settled crypto use the USD wallet.
 - Final valuation policy is KRW total assets.
-- Provider ingestion foundation exists for Korea EXIM exchange and ExchangeRate-API USD/KRW, Binance public REST crypto, and KIS WebSocket KRX/US stock market data row insertion.
+- Provider ingestion foundation exists for Korea EXIM exchange and ExchangeRate-API USD/KRW, Binance public REST crypto, KIS REST current-price snapshots, and KIS WebSocket KRX/US stock market data row insertion.
 - `GET /api/v1/assets/:assetId/candles` supports domestic/US stock candles through KIS and crypto chart candles through Binance Spot `GET /api/v3/klines`. 지원 candle interval은 5m, 15m, 30m, 1h, 4h, 1d, 1w만 허용한다. 그 외 interval은 validation error로 처리한다. 필요 시 서버가 더 짧은 원천 candle을 집계해 상위 interval candle을 생성한다.
 - Provider_api source eligibility is opened only for explicitly allowed workflows: `/fx quote`, `/fx execute`, assets `withPrice`, orders quote, order execution, live portfolio/home/positions valuation, the operator-run daily portfolio snapshot valuation job, and season settlement valuation. Orders create uses the durable quote and immediate execution path.
 - Asset list/detail/price `changeRate` is calculated from the immediately previous positive `asset_price_snapshots.price` row for the same asset and price currency; it is `null` when no valid previous positive snapshot exists. Provider raw payloads, provider-specific ticker change fields, tokens, secrets, and private ledger data are not exposed.
 - Read-only/quote responses expose backward-compatible optional source metadata for provider/admin visibility: `rateSource`, `priceSource`, `assetPriceSource`, `fxRateSource`, and live valuation source summaries where applicable.
 - Batch job execution foundation with idempotent `batch_job_runs` recording, operator-only noop/health-check script, operator-run daily portfolio snapshot generation, operator-run season ranking generation from existing daily snapshots, an operator-run daily season cycle orchestration job, an operator-run season settlement MVP job, an operator-run reward grant marker MVP job, and an operator-run season lifecycle transition job.
-- Scheduler/Ops foundation with disabled-by-default scheduler config, `ops_job_runs` audit rows, `ops_job_locks`, internal runner services, and `GET /readiness`. Enabled ranking, season lifecycle, and settlement scheduler jobs perform real backend automation behind locks.
+- Scheduler/Ops foundation with disabled-by-default scheduler config, `ops_job_runs` audit rows, `ops_job_locks`, internal runner services, and `GET /readiness`. Enabled provider ingestion, ranking, season lifecycle, and settlement scheduler jobs perform real backend automation behind locks.
 - Daily portfolio snapshot batch results include sourceSummary/fallback metadata in `batch_job_runs.resultPayloadJson`; `daily_portfolio_snapshots` row schema is unchanged.
 - Durable Quote plus realtime provider execute is implemented for `/fx execute` and the order execution path used by `POST /api/v1/orders`. Quote remains a reference quote; execute reprices from fresh provider_api rows, enforces quote-to-execute bps thresholds, and forbids default admin_manual execute fallback. `POST /api/v1/orders/:orderId/execute` remains as an internal compatibility/deprecation path, not the required public user flow.
 - Current ranking refresh runs through the enabled scheduler every 1 minute, updates live participant valuations, creates scheduled equity snapshots only on 5-minute buckets, writes `season_rankings` with `rankType=daily`, and updates `SeasonParticipant.currentRank`.
@@ -40,7 +40,7 @@ This service owns backend APIs, database access, financial calculations, and ser
 
 These are intentionally outside the current implementation and should not be added without a separate gate:
 
-- Scheduler-driven provider ingestion implementation and provider-backed reward workflows.
+- Provider-backed reward workflows.
 - Crypto candle DB persistence, frontend chart integration, Binance Futures APIs, and Binance authenticated order/account/user-data APIs.
 - OANDA and Twelve Data are historical provider candidates only, not the current MVP core provider stack.
 - Batch run HTTP APIs, scheduler HTTP APIs, external reward fulfillment APIs, and reward policy/catalog APIs.
@@ -72,7 +72,7 @@ Required for local application work:
 
 Refresh tokens are opaque random tokens. The raw token is returned to the client and never stored in PostgreSQL; only a SHA-256 hash is stored in `refresh_token_sessions`. Refresh uses token rotation. Logout revokes refresh sessions. Access tokens remain stateless Bearer JWTs and are not blacklisted in this MVP.
 
-Scheduler/Ops env is non-secret and disabled by default. `SCHEDULER_ENABLED=false` prevents interval registration unless one of the explicit aliases is enabled. Each `SCHEDULER_*_ENABLED=false` flag keeps its job from running automatically. `SCHEDULER_RANKING_ENABLED` or `ENABLE_RANKING_SCHEDULER` enables current ranking refresh, `SCHEDULER_SEASON_LIFECYCLE_ENABLED` or `ENABLE_SEASON_LIFECYCLE_SCHEDULER` enables `active -> ended` lifecycle transitions, and `SCHEDULER_SETTLEMENT_ENABLED` or `ENABLE_SEASON_SETTLEMENT_SCHEDULER` enables ended-season settlement. `SCHEDULER_TICK_INTERVAL_MS` defaults to `60000`; `RANKING_REFRESH_INTERVAL_SECONDS` and `SEASON_SETTLEMENT_INTERVAL_SECONDS` are accepted second-based aliases when the tick interval is not set. `SCHEDULER_LOCK_TTL_SECONDS` defaults to `600`, and `SCHEDULER_MAX_ATTEMPTS` defaults to `1`.
+Scheduler/Ops env is non-secret and disabled by default. `SCHEDULER_ENABLED=false` prevents interval registration unless one of the explicit scheduler aliases or provider job flags is enabled. Each `SCHEDULER_*_ENABLED=false` flag keeps its job from running automatically. `SCHEDULER_PROVIDER_FX_ENABLED`, `SCHEDULER_PROVIDER_BINANCE_ENABLED`, and `SCHEDULER_PROVIDER_KIS_ENABLED` enable provider ingestion jobs; KIS also accepts `ENABLE_PROVIDER_KIS_SCHEDULER`. `SCHEDULER_RANKING_ENABLED` or `ENABLE_RANKING_SCHEDULER` enables current ranking refresh, `SCHEDULER_SEASON_LIFECYCLE_ENABLED` or `ENABLE_SEASON_LIFECYCLE_SCHEDULER` enables `active -> ended` lifecycle transitions, and `SCHEDULER_SETTLEMENT_ENABLED` or `ENABLE_SEASON_SETTLEMENT_SCHEDULER` enables ended-season settlement. `SCHEDULER_TICK_INTERVAL_MS` defaults to `60000`; `RANKING_REFRESH_INTERVAL_SECONDS` and `SEASON_SETTLEMENT_INTERVAL_SECONDS` are accepted second-based aliases when the tick interval is not set. `SCHEDULER_LOCK_TTL_SECONDS` defaults to `600`, and `SCHEDULER_MAX_ATTEMPTS` defaults to `1`.
 
 Production ranking automation requires the deployment environment to enable the ranking scheduler. Without this, current ranking automatic refresh and 5-minute scheduled equity snapshot creation do not run. Recommended production example:
 
@@ -92,11 +92,34 @@ ENABLE_RANKING_SCHEDULER=true
 
 When the ranking scheduler is enabled, current ranking refresh runs on each 1-minute scheduler tick and scheduled equity snapshots are created from that ranking tick only on 5-minute buckets. Provider ingestion scheduler flags and reward marker scheduler flags are separate gates and must not be confused with ranking automation. These settings do not change the `/api/v1` contract and do not introduce `/api/v2`.
 
+Provider scheduler example:
+
+```env
+SCHEDULER_ENABLED=true
+SCHEDULER_PROVIDER_FX_ENABLED=true
+SCHEDULER_PROVIDER_BINANCE_ENABLED=true
+SCHEDULER_PROVIDER_KIS_ENABLED=true
+
+SCHEDULER_TICK_INTERVAL_MS=60000
+
+SCHEDULER_PROVIDER_FX_INTERVAL_SECONDS=3600
+SCHEDULER_PROVIDER_BINANCE_INTERVAL_SECONDS=60
+SCHEDULER_PROVIDER_KIS_INTERVAL_SECONDS=60
+
+SCHEDULER_PROVIDER_INGESTION_RUN_ON_STARTUP=true
+
+PROVIDER_INGESTION_ENABLED=true
+```
+
+Provider intervals are checked against the latest `ops_job_runs` row and do not create noisy skipped rows when a provider is not due. Defaults are FX 3600 seconds, Binance 60 seconds, and KIS 60 seconds. `SCHEDULER_PROVIDER_INGESTION_RUN_ON_STARTUP=true` queues one asynchronous startup run for enabled provider jobs only. KIS REST current price uses `SCHEDULER_PROVIDER_KIS_MAX_SNAPSHOTS`, then `PROVIDER_INGESTION_MAX_SNAPSHOTS`, then `500`.
+
 `PROVIDER_INGESTION_ENABLED=false` is the fail-closed default for provider refresh/ingestion calls. Korea EXIM on-demand refresh requires both `PROVIDER_INGESTION_ENABLED=true` and `KOREA_EXIM_EXCHANGE_ENABLED=true`. If either flag is disabled, `GET /api/v1/fx/rates/current` falls back to existing DB snapshots and returns `FX_RATE_UNAVAILABLE` only when no usable provider row or approved `admin_manual` row exists.
 
-Korea EXIM exchange provider env is `KOREA_EXIM_EXCHANGE_ENABLED`, `KOREA_EXIM_EXCHANGE_AUTH_KEY`, `KOREA_EXIM_EXCHANGE_BASE_URL`, `KOREA_EXIM_EXCHANGE_DATA`, and `KOREA_EXIM_EXCHANGE_LOOKBACK_DAYS`. The request URL is `https://oapi.koreaexim.go.kr/site/program/financial/exchangeJSON` with `authkey`, `searchdate`, and `data=AP01`; USD/KRW uses the USD row's `DEAL_BAS_R` value with commas removed. Real auth keys must live only in `.env.local`; `.env.example` keeps the auth key blank. ExchangeRate-API remains the fallback provider after Korea EXIM exchange.
+Korea EXIM exchange provider env is `KOREA_EXIM_EXCHANGE_ENABLED`, `KOREA_EXIM_EXCHANGE_AUTH_KEY`, `KOREA_EXIM_EXCHANGE_BASE_URL`, `KOREA_EXIM_EXCHANGE_DATA`, and `KOREA_EXIM_EXCHANGE_LOOKBACK_DAYS`. The request URL is `https://oapi.koreaexim.go.kr/site/program/financial/exchangeJSON` with `authkey`, `searchdate`, and `data=AP01`; USD/KRW uses the USD row's `DEAL_BAS_R` value with commas removed. ExchangeRate-API fallback env is `EXCHANGE_RATE_API_ENABLED`, `EXCHANGE_RATE_API_KEY`, and `EXCHANGE_RATE_API_BASE_URL`. Real auth keys must live only in `.env.local`; `.env.example` keeps the auth key blank. ExchangeRate-API remains the fallback provider after Korea EXIM exchange.
 
-Binance public market data uses `BINANCE_REST_BASE_URL`, defaulting to `https://api.binance.com` when unset. Crypto candles use only the public Spot `GET /api/v3/klines` endpoint with USDT quote symbols such as `BTCUSDT` and `ETHUSDT`; no Binance API key or secret is required for this candle path.
+Binance public market data uses `BINANCE_PUBLIC_MARKET_DATA_ENABLED`, `BINANCE_REST_BASE_URL`, `BINANCE_CRYPTO_SYMBOLS`, and `BINANCE_CRYPTO_USDT_AS_USD_EQUIVALENT`, with `BINANCE_REST_BASE_URL` defaulting to `https://api.binance.com` when unset. Crypto candles use only the public Spot `GET /api/v3/klines` endpoint with USDT quote symbols such as `BTCUSDT` and `ETHUSDT`; no Binance API key or secret is required for this candle path.
+
+KIS REST current price ingestion uses `KIS_MARKET_DATA_ENABLED`, `KIS_REST_BASE_URL`, `KIS_APP_KEY`, `KIS_APP_SECRET`, `KIS_DOMESTIC_SYMBOLS`, and `KIS_US_SYMBOLS`. Optional REST overrides are `KIS_REST_DOMESTIC_CURRENT_PRICE_PATH`, `KIS_REST_DOMESTIC_CURRENT_PRICE_TR_ID`, `KIS_REST_US_CURRENT_PRICE_PATH`, and `KIS_REST_US_CURRENT_PRICE_TR_ID`.
 
 ## Local Commands
 
@@ -136,7 +159,8 @@ fx_rate_snapshots
 Before production launch:
 
 - Remove the always-open development season and switch to the KST Monday 09:00 through next Friday 09:00 policy.
-- Move provider ingestion from manual scripts to scheduler/worker automation.
+- Decide whether provider ingestion stays in the API server scheduler or moves to a dedicated provider worker.
+- Confirm provider rate limits and connect provider failure alerting to Slack/Sentry or the production incident channel.
 - Deploy the API server on a public HTTPS/WSS domain.
 
 Do not print or commit provider API keys or local env contents. Provider row insertion foundation exists, provider-backed execute is open only through durable quote gates, and real account/order APIs remain STOP.
@@ -250,14 +274,13 @@ Possible now:
 - Operator-run final tier assignment MVP jobs that assign final rank/tier from existing final `season_rankings`.
 - Operator-run reward grant marker MVP jobs that set `SeasonParticipant.rewardGrantedAt` after settlement and final tier assignment.
 - Operator-run season lifecycle transition jobs that move seasons between `upcoming`, `active`, and `ended` according to `startAt`/`endAt`.
-- Disabled-by-default scheduler execution for current ranking refresh, season lifecycle transition, and ended-season settlement when the corresponding env flags are enabled.
+- Disabled-by-default scheduler execution for provider ingestion, current ranking refresh, season lifecycle transition, and ended-season settlement when the corresponding env flags are enabled.
 - Settled joined Home final-result reads from existing `rankType=final` `season_rankings`; missing final rankings return unavailable without live valuation fallback.
 - Durable Quote-backed `/fx quote`, `/fx execute`, orders quote/create immediate market execution, the internal-compatible order execute path, plus provider_api-backed assets `withPrice` and live portfolio/home/positions valuation. Quote/read paths can use explicit admin_manual fallback; execute paths require fresh provider_api and reject default admin_manual fallback.
 - Source metadata/outage visibility for those read-only/quote responses and daily snapshot batch results without exposing raw provider payloads or secrets.
 
-Not possible without a separate provider/write or automation gate:
+Not possible without a separate reward automation gate:
 
-- Scheduler-driven provider ingestion and reward automation.
 - Provider-backed reward automation.
 - External payment, point, coupon, gifticon, delivery, or cash-out fulfillment.
 

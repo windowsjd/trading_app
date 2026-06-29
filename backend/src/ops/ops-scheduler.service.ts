@@ -1,19 +1,40 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { OpsJobName, OpsJobTrigger } from '../generated/prisma/client';
-import { getOpsSchedulerConfig, getSchedulerBusinessDate } from './ops-config';
+import {
+  OpsJobName,
+  OpsJobRunStatus,
+  OpsJobTrigger,
+} from '../generated/prisma/client';
+import {
+  getOpsSchedulerConfig,
+  getSchedulerBusinessDate,
+  OpsSchedulerConfig,
+  ProviderOpsJobName,
+} from './ops-config';
 import {
   OpsJobRunnerResponse,
+  OpsJobRunnerInput,
   OpsJobRunnerService,
 } from './ops-job-runner.service';
+import { OpsJobRunService } from './ops-job-run.service';
 
 @Injectable()
 export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
   private interval: NodeJS.Timeout | null = null;
 
-  constructor(private readonly runner: OpsJobRunnerService) {}
+  constructor(
+    private readonly runner: OpsJobRunnerService,
+    private readonly runService: OpsJobRunService,
+  ) {}
 
   onModuleInit() {
     const config = getOpsSchedulerConfig();
+    if (config.providerIngestionRunOnStartup) {
+      const startupAt = new Date();
+      void Promise.resolve().then(() => {
+        void this.runStartupProviderJobs(startupAt);
+      });
+    }
+
     if (!config.enabled) {
       return;
     }
@@ -55,13 +76,11 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
       maxAttempts: config.maxAttempts,
     };
 
-    if (config.jobs[OpsJobName.provider_fx_ingest]) {
-      results.push(await this.runner.runProviderFxIngestJob(baseInput));
-    }
-
-    if (config.jobs[OpsJobName.provider_binance_ingest]) {
-      results.push(await this.runner.runProviderBinanceIngestJob(baseInput));
-    }
+    results.push(
+      ...(await this.runEnabledProviderJobs(now, baseInput, config, {
+        respectInterval: true,
+      })),
+    );
 
     if (config.jobs[OpsJobName.daily_portfolio_snapshot]) {
       results.push(
@@ -106,6 +125,124 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
     }
 
     return results;
+  }
+
+  async runStartupProviderJobs(
+    now = new Date(),
+  ): Promise<OpsJobRunnerResponse[]> {
+    const config = getOpsSchedulerConfig();
+    const baseInput = {
+      trigger: OpsJobTrigger.scheduler,
+      requestedBy: 'scheduler',
+      dryRun: false,
+      lockTtlSeconds: config.lockTtlSeconds,
+      maxAttempts: config.maxAttempts,
+    };
+
+    return this.runEnabledProviderJobs(now, baseInput, config, {
+      respectInterval: false,
+    });
+  }
+
+  private async runEnabledProviderJobs(
+    now: Date,
+    baseInput: OpsJobRunnerInput,
+    config: OpsSchedulerConfig,
+    options: { respectInterval: boolean },
+  ): Promise<OpsJobRunnerResponse[]> {
+    const results: OpsJobRunnerResponse[] = [];
+    const fxResult = await this.runProviderJobIfDue({
+      jobName: OpsJobName.provider_fx_ingest,
+      enabled: config.jobs[OpsJobName.provider_fx_ingest],
+      intervalSeconds:
+        config.providerIntervalsSeconds[OpsJobName.provider_fx_ingest],
+      now,
+      respectInterval: options.respectInterval,
+      run: () => this.runner.runProviderFxIngestJob(baseInput),
+    });
+    if (fxResult) {
+      results.push(fxResult);
+    }
+
+    const binanceResult = await this.runProviderJobIfDue({
+      jobName: OpsJobName.provider_binance_ingest,
+      enabled: config.jobs[OpsJobName.provider_binance_ingest],
+      intervalSeconds:
+        config.providerIntervalsSeconds[OpsJobName.provider_binance_ingest],
+      now,
+      respectInterval: options.respectInterval,
+      run: () => this.runner.runProviderBinanceIngestJob(baseInput),
+    });
+    if (binanceResult) {
+      results.push(binanceResult);
+    }
+
+    const kisResult = await this.runProviderJobIfDue({
+      jobName: OpsJobName.provider_kis_ingest,
+      enabled: config.jobs[OpsJobName.provider_kis_ingest],
+      intervalSeconds:
+        config.providerIntervalsSeconds[OpsJobName.provider_kis_ingest],
+      now,
+      respectInterval: options.respectInterval,
+      run: () =>
+        this.runner.runProviderKisRestCurrentPriceIngestJob({
+          ...baseInput,
+          maxSnapshots: config.providerKisMaxSnapshots,
+        }),
+    });
+    if (kisResult) {
+      results.push(kisResult);
+    }
+
+    return results;
+  }
+
+  private async runProviderJobIfDue(input: {
+    jobName: ProviderOpsJobName;
+    enabled: boolean;
+    intervalSeconds: number;
+    now: Date;
+    respectInterval: boolean;
+    run: () => Promise<OpsJobRunnerResponse>;
+  }): Promise<OpsJobRunnerResponse | undefined> {
+    if (!input.enabled) {
+      return undefined;
+    }
+
+    if (
+      input.respectInterval &&
+      !(await this.isProviderJobDue(
+        input.jobName,
+        input.intervalSeconds,
+        input.now,
+      ))
+    ) {
+      return undefined;
+    }
+
+    try {
+      return await input.run();
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async isProviderJobDue(
+    jobName: ProviderOpsJobName,
+    intervalSeconds: number,
+    now: Date,
+  ) {
+    const latestRun = await this.runService.findLatestRunForJob(jobName);
+    if (!latestRun) {
+      return true;
+    }
+
+    if (latestRun.status === OpsJobRunStatus.failed) {
+      return true;
+    }
+
+    const lastRunAt = latestRun.finishedAt ?? latestRun.startedAt;
+    return now.getTime() - lastRunAt.getTime() >= intervalSeconds * 1000;
   }
 }
 

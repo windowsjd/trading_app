@@ -133,6 +133,25 @@ export class OpsJobRunService {
     return this.createTerminalRun(OpsJobRunStatus.locked, input);
   }
 
+  findLatestRunForJob(jobName: OpsJobName) {
+    return this.prisma.opsJobRun.findFirst({
+      where: {
+        jobName,
+      },
+      orderBy: [
+        { startedAt: 'desc' },
+        { finishedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      select: {
+        jobName: true,
+        status: true,
+        startedAt: true,
+        finishedAt: true,
+      },
+    });
+  }
+
   serializeRun(run: OpsJobRun): SerializedOpsJobRun {
     return {
       id: run.id,

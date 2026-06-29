@@ -3,11 +3,19 @@ jest.mock('../generated/prisma/client', () => ({
   OpsJobName: {
     provider_fx_ingest: 'provider_fx_ingest',
     provider_binance_ingest: 'provider_binance_ingest',
+    provider_kis_ingest: 'provider_kis_ingest',
     daily_portfolio_snapshot: 'daily_portfolio_snapshot',
     season_ranking_generation: 'season_ranking_generation',
     season_lifecycle_transition: 'season_lifecycle_transition',
     season_settlement: 'season_settlement',
     reward_marker: 'reward_marker',
+  },
+  OpsJobRunStatus: {
+    running: 'running',
+    succeeded: 'succeeded',
+    failed: 'failed',
+    skipped: 'skipped',
+    locked: 'locked',
   },
   OpsJobTrigger: {
     scheduler: 'scheduler',
@@ -30,7 +38,7 @@ jest.mock('../ranking/ranking-refresh.service', () => ({
   RankingRefreshService: class RankingRefreshService {},
 }));
 
-import { OpsJobName } from '../generated/prisma/client';
+import { OpsJobName, OpsJobRunStatus } from '../generated/prisma/client';
 import { getOpsSchedulerConfig } from './ops-config';
 import { OpsSchedulerService } from './ops-scheduler.service';
 
@@ -41,6 +49,9 @@ describe('OpsSchedulerService', () => {
     const runner = {
       runProviderFxIngestJob: jest.fn().mockResolvedValue({ success: true }),
       runProviderBinanceIngestJob: jest
+        .fn()
+        .mockResolvedValue({ success: true }),
+      runProviderKisRestCurrentPriceIngestJob: jest
         .fn()
         .mockResolvedValue({ success: true }),
       runDailyPortfolioSnapshotJob: jest
@@ -55,10 +66,14 @@ describe('OpsSchedulerService', () => {
       runSeasonSettlementJob: jest.fn().mockResolvedValue({ success: true }),
       runRewardMarkerJob: jest.fn().mockResolvedValue({ success: true }),
     };
+    const runService = {
+      findLatestRunForJob: jest.fn().mockResolvedValue(null),
+    };
 
     return {
       runner,
-      service: new OpsSchedulerService(runner as never),
+      runService,
+      service: new OpsSchedulerService(runner as never, runService as never),
     };
   };
 
@@ -109,6 +124,121 @@ describe('OpsSchedulerService', () => {
       }),
     );
     expect(runner.runDailyPortfolioSnapshotJob).not.toHaveBeenCalled();
+  });
+
+  it('runs enabled provider jobs and passes KIS max snapshots', async () => {
+    process.env.SCHEDULER_ENABLED = 'true';
+    process.env.SCHEDULER_PROVIDER_BINANCE_ENABLED = 'true';
+    process.env.SCHEDULER_PROVIDER_KIS_ENABLED = 'true';
+    process.env.SCHEDULER_PROVIDER_KIS_MAX_SNAPSHOTS = '25';
+    const { runner, service } = createService();
+
+    const results = await service.runEnabledJobs(
+      new Date('2026-06-08T00:00:00.000Z'),
+    );
+
+    expect(results).toHaveLength(2);
+    expect(runner.runProviderFxIngestJob).not.toHaveBeenCalled();
+    expect(runner.runProviderBinanceIngestJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dryRun: false,
+      }),
+    );
+    expect(runner.runProviderKisRestCurrentPriceIngestJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dryRun: false,
+        maxSnapshots: 25,
+      }),
+    );
+  });
+
+  it('does not create provider job runs when interval is not due', async () => {
+    process.env.SCHEDULER_ENABLED = 'true';
+    process.env.SCHEDULER_PROVIDER_FX_ENABLED = 'true';
+    process.env.SCHEDULER_PROVIDER_FX_INTERVAL_SECONDS = '3600';
+    const { runner, runService, service } = createService();
+    runService.findLatestRunForJob.mockResolvedValueOnce({
+      jobName: OpsJobName.provider_fx_ingest,
+      status: OpsJobRunStatus.succeeded,
+      startedAt: new Date('2026-06-08T00:10:00.000Z'),
+      finishedAt: new Date('2026-06-08T00:10:05.000Z'),
+    });
+
+    const results = await service.runEnabledJobs(
+      new Date('2026-06-08T00:30:00.000Z'),
+    );
+
+    expect(results).toEqual([]);
+    expect(runner.runProviderFxIngestJob).not.toHaveBeenCalled();
+  });
+
+  it('allows provider retry on the next tick after a failed run', async () => {
+    process.env.SCHEDULER_ENABLED = 'true';
+    process.env.SCHEDULER_PROVIDER_FX_ENABLED = 'true';
+    const { runner, runService, service } = createService();
+    runService.findLatestRunForJob.mockResolvedValueOnce({
+      jobName: OpsJobName.provider_fx_ingest,
+      status: OpsJobRunStatus.failed,
+      startedAt: new Date('2026-06-08T00:29:00.000Z'),
+      finishedAt: new Date('2026-06-08T00:29:05.000Z'),
+    });
+
+    await service.runEnabledJobs(new Date('2026-06-08T00:30:00.000Z'));
+
+    expect(runner.runProviderFxIngestJob).toHaveBeenCalledTimes(1);
+  });
+
+  it('continues running other provider jobs when one provider runner throws', async () => {
+    process.env.SCHEDULER_ENABLED = 'true';
+    process.env.SCHEDULER_PROVIDER_FX_ENABLED = 'true';
+    process.env.SCHEDULER_PROVIDER_BINANCE_ENABLED = 'true';
+    const { runner, service } = createService();
+    runner.runProviderFxIngestJob.mockRejectedValueOnce(new Error('boom'));
+
+    const results = await service.runEnabledJobs(
+      new Date('2026-06-08T00:00:00.000Z'),
+    );
+
+    expect(results).toHaveLength(1);
+    expect(runner.runProviderBinanceIngestJob).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not run provider jobs on startup when the startup flag is false', async () => {
+    process.env.SCHEDULER_ENABLED = 'true';
+    process.env.SCHEDULER_PROVIDER_KIS_ENABLED = 'true';
+    process.env.SCHEDULER_PROVIDER_INGESTION_RUN_ON_STARTUP = 'false';
+    const { runner, service } = createService();
+
+    service.onModuleInit();
+    await Promise.resolve();
+
+    expect(
+      runner.runProviderKisRestCurrentPriceIngestJob,
+    ).not.toHaveBeenCalled();
+    service.clearInterval();
+  });
+
+  it('runs only provider jobs asynchronously on startup when enabled', async () => {
+    process.env.SCHEDULER_PROVIDER_KIS_ENABLED = 'true';
+    process.env.SCHEDULER_RANKING_ENABLED = 'true';
+    process.env.SCHEDULER_PROVIDER_INGESTION_RUN_ON_STARTUP = 'true';
+    const { runner, service } = createService();
+
+    service.onModuleInit();
+    expect(
+      runner.runProviderKisRestCurrentPriceIngestJob,
+    ).not.toHaveBeenCalled();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(runner.runProviderKisRestCurrentPriceIngestJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dryRun: false,
+      }),
+    );
+    expect(runner.runSeasonRankingGenerationJob).not.toHaveBeenCalled();
+    service.clearInterval();
   });
 
   it('runs ranking every minute but enables scheduled equity snapshots only on five-minute buckets', async () => {

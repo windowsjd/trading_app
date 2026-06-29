@@ -170,6 +170,7 @@ enum OperatorAuditResult {
 enum OpsJobName {
   provider_fx_ingest
   provider_binance_ingest
+  provider_kis_ingest
   daily_portfolio_snapshot
   season_ranking_generation
   season_lifecycle_transition
