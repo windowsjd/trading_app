@@ -20,6 +20,7 @@ import { clearTokens, saveTokens } from '../../services/storage/tokenStorage';
 import { getCurrentSeason } from '../../features/season/api';
 import {
   getApiErrorCode,
+  getApiErrorDisplayMessage,
   getErrorMessageFromCode,
   isAuthUserInactiveError,
 } from '../../services/api/errorMapper';
@@ -95,7 +96,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           return;
         }
 
-        setSubmitError(getErrorMessageFromCode(code));
+        setSubmitError(getApiErrorDisplayMessage(error));
       }
     },
     onError: (error: unknown) => {
@@ -104,7 +105,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
       setSubmitError(
         isAuthUserInactiveError(code)
           ? getBlockedAuthMessage(null)
-          : getErrorMessageFromCode(code) || '이메일 또는 비밀번호를 확인해주세요.',
+          : getApiErrorDisplayMessage(error),
       );
     },
   });

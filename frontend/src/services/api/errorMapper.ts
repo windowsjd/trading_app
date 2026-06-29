@@ -2,17 +2,161 @@ import { ERROR_CODE, type ErrorCode } from '../../models/enums/errorCode';
 
 type ApiErrorLike = {
   response?: {
+    status?: unknown;
     data?: {
       error?: {
         code?: unknown;
+        message?: unknown;
       };
     };
   };
+  request?: unknown;
+  code?: unknown;
+  message?: unknown;
+  isAxiosError?: unknown;
 };
 
+export type ApiErrorInfo = {
+  status: number | null;
+  serverCode: string | null;
+  serverMessage: string | null;
+  clientCode: string | null;
+  clientMessage: string | null;
+  hasResponse: boolean;
+  hasRequest: boolean;
+  isAxiosError: boolean;
+};
+
+const KNOWN_ERROR_CODES = new Set<string>(Object.values(ERROR_CODE));
+const SERVER_CODE_MAX_LENGTH = 80;
+const SERVER_MESSAGE_MAX_LENGTH = 160;
+const SENSITIVE_KEY_VALUE_PATTERN =
+  /\b(?:accessToken|refreshToken|password|authorization|secret|DATABASE_URL|api[_\s-]*key)\b\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;{}]+)/gi;
+const SENSITIVE_WORD_PATTERN =
+  /\b(?:accessToken|refreshToken|password|authorization|secret|DATABASE_URL|api[_\s-]*key)\b/gi;
+const BEARER_TOKEN_PATTERN = /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi;
+const NETWORK_ERROR_CODES = new Set([
+  'ERR_NETWORK',
+  'ENOTFOUND',
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'EAI_AGAIN',
+]);
+const TIMEOUT_ERROR_CODES = new Set(['ECONNABORTED', 'ETIMEDOUT']);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function toStringOrNull(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value : null;
+}
+
+function toStatusOrNull(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function sanitizeDisplayText(value: string, maxLength: number) {
+  const redacted = value
+    .replace(BEARER_TOKEN_PATTERN, 'Bearer [REDACTED]')
+    .replace(SENSITIVE_KEY_VALUE_PATTERN, '[REDACTED]')
+    .replace(SENSITIVE_WORD_PATTERN, '[REDACTED]')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (redacted.length <= maxLength) return redacted;
+  return `${redacted.slice(0, Math.max(0, maxLength - 3))}...`;
+}
+
+function getErrorMessageFromStatus(status?: number | null) {
+  switch (status) {
+    case 400:
+      return '입력값을 다시 확인해주세요.';
+    case 401:
+      return '로그인이 필요합니다.';
+    case 403:
+      return '이 작업을 수행할 권한이 없습니다.';
+    case 404:
+      return '요청한 정보를 찾을 수 없습니다.';
+    case 409:
+      return '이미 처리된 요청이거나 현재 상태와 충돌합니다.';
+    case 410:
+      return '요청한 리소스는 더 이상 사용할 수 없습니다.';
+    case 429:
+      return '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.';
+    default:
+      if (status && status >= 500) {
+        return '서버 내부 오류가 발생했습니다. 백엔드 로그를 확인해주세요.';
+      }
+      return null;
+  }
+}
+
+function isTimeoutError(info: ApiErrorInfo) {
+  if (info.hasResponse) return false;
+
+  const code = info.clientCode?.toUpperCase() ?? '';
+  const message = info.clientMessage?.toLowerCase() ?? '';
+
+  return (
+    TIMEOUT_ERROR_CODES.has(code) ||
+    message.includes('timeout') ||
+    message.includes('timed out')
+  );
+}
+
+function isNetworkErrorWithoutResponse(info: ApiErrorInfo) {
+  if (info.hasResponse) return false;
+
+  const code = info.clientCode?.toUpperCase() ?? '';
+  const message = info.clientMessage?.toLowerCase() ?? '';
+
+  return (
+    info.isAxiosError ||
+    info.hasRequest ||
+    NETWORK_ERROR_CODES.has(code) ||
+    message.includes('network error') ||
+    message.includes('network request failed') ||
+    message.includes('failed to fetch')
+  );
+}
+
+export function isKnownErrorCode(code?: string | null): code is ErrorCode {
+  return typeof code === 'string' && KNOWN_ERROR_CODES.has(code);
+}
+
+export function getApiErrorInfo(error: unknown): ApiErrorInfo {
+  const errorLike = isRecord(error) ? (error as ApiErrorLike) : undefined;
+  const response = errorLike?.response;
+  const serverError = response?.data?.error;
+
+  return {
+    status: toStatusOrNull(response?.status),
+    serverCode: toStringOrNull(serverError?.code),
+    serverMessage: toStringOrNull(serverError?.message),
+    clientCode: toStringOrNull(errorLike?.code),
+    clientMessage: toStringOrNull(errorLike?.message),
+    hasResponse: !!response,
+    hasRequest: !!errorLike?.request,
+    isAxiosError: errorLike?.isAxiosError === true,
+  };
+}
+
 export function getApiErrorCode(error: unknown) {
-  const code = (error as ApiErrorLike | undefined)?.response?.data?.error?.code;
-  return typeof code === 'string' ? code : null;
+  return getApiErrorInfo(error).serverCode;
+}
+
+export function getApiErrorServerMessage(error: unknown) {
+  return getApiErrorInfo(error).serverMessage;
+}
+
+export function getApiErrorStatus(error: unknown) {
+  return getApiErrorInfo(error).status;
 }
 
 export type BlockedReason =
@@ -40,12 +184,39 @@ export const BLOCKED_REASON_MESSAGE: Record<BlockedReason, string> = {
   blocked_fx_season_inactive: '현재 환전 가능한 시즌이 아닙니다.',
 };
 
-export function getErrorMessageFromCode(code?: string | null) {
+export function getErrorMessageFromCode(
+  code?: string | null,
+  options?: { fallbackToGeneric?: true },
+): string;
+export function getErrorMessageFromCode(
+  code: string | null | undefined,
+  options: { fallbackToGeneric: false },
+): string | null;
+export function getErrorMessageFromCode(
+  code?: string | null,
+  options?: { fallbackToGeneric?: boolean },
+) {
   switch (code as ErrorCode | undefined) {
     case ERROR_CODE.INVALID_CREDENTIALS:
       return '이메일 또는 비밀번호를 확인해주세요.';
     case ERROR_CODE.EMAIL_ALREADY_EXISTS:
       return '이미 가입된 이메일입니다.';
+    case ERROR_CODE.NICKNAME_ALREADY_EXISTS:
+      return '이미 사용 중인 닉네임입니다.';
+    case ERROR_CODE.INVALID_EMAIL:
+      return '이메일 형식이 올바르지 않습니다.';
+    case ERROR_CODE.INVALID_PASSWORD:
+      return '비밀번호 형식이 올바르지 않습니다. 비밀번호는 8자 이상이어야 합니다.';
+    case ERROR_CODE.INVALID_NICKNAME:
+      return '닉네임 형식이 올바르지 않습니다.';
+    case ERROR_CODE.INVALID_PROFILE_IMAGE_URL:
+      return '프로필 이미지 주소 형식이 올바르지 않습니다.';
+    case ERROR_CODE.INVALID_REFRESH_TOKEN:
+      return '로그인 세션이 만료되었거나 유효하지 않습니다. 다시 로그인해주세요.';
+    case ERROR_CODE.AUTH_SIGNUP_CONFLICT:
+      return '회원가입 처리 중 중복 데이터 충돌이 발생했습니다.';
+    case ERROR_CODE.AUTH_CONFIGURATION_ERROR:
+      return '서버 인증 설정 오류입니다. 백엔드 환경변수 설정을 확인해야 합니다.';
     case ERROR_CODE.USER_NOT_ACTIVE:
       return '정지되었거나 삭제된 계정입니다. 고객센터에 문의해주세요.';
     case ERROR_CODE.UNAUTHORIZED:
@@ -54,12 +225,19 @@ export function getErrorMessageFromCode(code?: string | null) {
       return '이 작업을 수행할 권한이 없습니다.';
     case ERROR_CODE.NOT_FOUND:
       return '요청한 정보를 찾을 수 없습니다.';
+    case ERROR_CODE.GONE:
+      return '요청한 리소스는 더 이상 사용할 수 없습니다.';
     case ERROR_CODE.VALIDATION_ERROR:
       return '입력값을 다시 확인해주세요.';
     case ERROR_CODE.CONFLICT:
       return '이미 처리된 요청이거나 현재 상태와 충돌합니다.';
     case ERROR_CODE.RATE_LIMITED:
+    case ERROR_CODE.TOO_MANY_REQUESTS:
       return '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.';
+    case ERROR_CODE.INTERNAL_SERVER_ERROR:
+      return '서버 내부 오류가 발생했습니다. 백엔드 로그를 확인해주세요.';
+    case ERROR_CODE.HTTP_ERROR:
+      return 'HTTP 요청 처리 중 오류가 발생했습니다.';
     case ERROR_CODE.SEASON_NOT_JOINED:
       return '시즌에 참가해야 이용할 수 있습니다.';
     case ERROR_CODE.SEASON_NOT_ACTIVE:
@@ -110,8 +288,46 @@ export function getErrorMessageFromCode(code?: string | null) {
     case ERROR_CODE.RANKING_SNAPSHOT_CHANGED:
       return '랭킹 정보가 갱신되었습니다. 다시 불러와주세요.';
     default:
-      return '잠시 후 다시 시도해주세요.';
+      return options?.fallbackToGeneric === false
+        ? null
+        : '잠시 후 다시 시도해주세요.';
   }
+}
+
+export function getApiErrorDisplayMessage(error: unknown) {
+  const info = getApiErrorInfo(error);
+  const codeMessage = getErrorMessageFromCode(info.serverCode, {
+    fallbackToGeneric: false,
+  });
+
+  if (codeMessage) return codeMessage;
+
+  if (info.serverCode) {
+    const safeCode = sanitizeDisplayText(
+      info.serverCode,
+      SERVER_CODE_MAX_LENGTH,
+    );
+    const safeMessage = info.serverMessage
+      ? sanitizeDisplayText(info.serverMessage, SERVER_MESSAGE_MAX_LENGTH)
+      : null;
+
+    return safeMessage
+      ? `알 수 없는 서버 오류입니다. code=${safeCode}, message=${safeMessage}`
+      : `알 수 없는 서버 오류입니다. code=${safeCode}`;
+  }
+
+  const statusMessage = getErrorMessageFromStatus(info.status);
+  if (statusMessage) return statusMessage;
+
+  if (isTimeoutError(info)) {
+    return '서버 응답 시간이 초과되었습니다. 백엔드 상태와 네트워크를 확인해주세요.';
+  }
+
+  if (isNetworkErrorWithoutResponse(info)) {
+    return '서버에 연결할 수 없습니다. 백엔드 실행 상태, API 주소, 네트워크를 확인해주세요.';
+  }
+
+  return '알 수 없는 오류가 발생했습니다. 콘솔 로그를 확인해주세요.';
 }
 
 export function isRequoteRequiredError(code?: string | null) {

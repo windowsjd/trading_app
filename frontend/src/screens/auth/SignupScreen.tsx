@@ -20,6 +20,7 @@ import { getCurrentSeason } from '../../features/season/api';
 import { clearTokens, saveTokens } from '../../services/storage/tokenStorage';
 import {
   getApiErrorCode,
+  getApiErrorDisplayMessage,
   getErrorMessageFromCode,
   isAuthUserInactiveError,
 } from '../../services/api/errorMapper';
@@ -97,7 +98,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
           return;
         }
 
-        setSubmitError(getErrorMessageFromCode(code));
+        setSubmitError(getApiErrorDisplayMessage(error));
       }
     },
     onError: (error: unknown) => {
@@ -106,7 +107,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
       setSubmitError(
         isAuthUserInactiveError(code)
           ? getBlockedAuthMessage(null)
-          : getErrorMessageFromCode(code) || '회원가입에 실패했습니다.',
+          : getApiErrorDisplayMessage(error),
       );
     },
   });
