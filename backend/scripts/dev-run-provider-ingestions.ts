@@ -47,6 +47,7 @@ type CliArgs = {
   failOnUnavailable: boolean;
   maxSnapshots: number;
   targetSource: ProviderTargetSource;
+  verbose: boolean;
 };
 
 type ProviderSummary = {
@@ -60,6 +61,15 @@ type ProviderSummary = {
   failed: number;
   errorCode?: string;
   errorMessage?: string;
+  verboseDetails: ProviderVerboseDetail[];
+};
+
+type ProviderVerboseDetail = {
+  kind: 'snapshot' | 'symbol';
+  symbol: string | null;
+  sourceName?: string | null;
+  state: string;
+  reason: string | null;
 };
 
 const DEFAULT_PROVIDERS: ProviderName[] = ['korea-exim', 'binance', 'kis'];
@@ -219,7 +229,7 @@ export async function runProviderIngestionCheck(
       maxSnapshots: args.maxSnapshots,
       targets,
     });
-    printProviderSummary(summaries);
+    printProviderSummary(summaries, { verbose: args.verbose });
 
     const health = await healthService.checkActiveAssetCoverage({
       targetSource: args.targetSource,
@@ -261,6 +271,7 @@ function parseCliArgs(argv: string[]): CliArgs {
     failOnUnavailable: true,
     maxSnapshots: DEFAULT_MAX_SNAPSHOTS,
     targetSource: 'merged',
+    verbose: false,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -275,6 +286,11 @@ function parseCliArgs(argv: string[]): CliArgs {
 
     if (option === '--dry-run') {
       args.dryRun = true;
+      continue;
+    }
+
+    if (option === '--verbose') {
+      args.verbose = true;
       continue;
     }
 
@@ -565,6 +581,7 @@ async function runOneProvider(input: {
       failed: 1,
       errorCode: safeError.errorCode,
       errorMessage: safeError.errorMessage,
+      verboseDetails: [],
     };
   }
 }
@@ -605,7 +622,8 @@ function normalizeProviderSummary(
     skipped,
     failed,
     errorCode,
-    errorMessage: readString(record.errorMessage),
+    errorMessage: sanitizeOutputText(readString(record.errorMessage)),
+    verboseDetails: readProviderVerboseDetails(provider, record),
   };
 }
 
@@ -624,7 +642,62 @@ function noTargetsSummary(
     failed: 0,
     errorCode: 'NO_PROVIDER_TARGET',
     errorMessage: 'No provider targets resolved for this provider.',
+    verboseDetails: [],
   };
+}
+
+function readProviderVerboseDetails(
+  provider: ProviderName,
+  record: Record<string, unknown>,
+): ProviderVerboseDetail[] {
+  if (provider === 'kis') {
+    return readFailedOrSkippedVerboseDetails({
+      kind: 'snapshot',
+      items: readArray(record.snapshots),
+      includeSourceName: true,
+    });
+  }
+
+  if (provider === 'binance') {
+    return readFailedOrSkippedVerboseDetails({
+      kind: 'symbol',
+      items: readArray(record.symbols),
+      includeSourceName: false,
+    });
+  }
+
+  return [];
+}
+
+function readFailedOrSkippedVerboseDetails(input: {
+  kind: ProviderVerboseDetail['kind'];
+  items: unknown[] | undefined;
+  includeSourceName: boolean;
+}): ProviderVerboseDetail[] {
+  const details: ProviderVerboseDetail[] = [];
+
+  for (const item of input.items ?? []) {
+    const record = readRecord(item);
+    const state = sanitizeOutputText(readString(record?.state));
+    if (state !== 'failed' && state !== 'skipped') {
+      continue;
+    }
+
+    details.push({
+      kind: input.kind,
+      symbol: sanitizeOutputText(readString(record?.symbol)) ?? null,
+      ...(input.includeSourceName
+        ? {
+            sourceName:
+              sanitizeOutputText(readString(record?.sourceName)) ?? null,
+          }
+        : {}),
+      state,
+      reason: sanitizeOutputText(readString(record?.reason)) ?? null,
+    });
+  }
+
+  return details;
 }
 
 function printHeader(title: string) {
@@ -651,7 +724,10 @@ function printProviderTargetSummary(targets: ProviderTargets) {
   }
 }
 
-function printProviderSummary(summaries: ProviderSummary[]) {
+function printProviderSummary(
+  summaries: ProviderSummary[],
+  options: { verbose?: boolean } = {},
+) {
   console.log('');
   console.log('Provider run summary');
   for (const summary of summaries) {
@@ -666,6 +742,26 @@ function printProviderSummary(summaries: ProviderSummary[]) {
     ].filter(Boolean);
 
     console.log(`- ${details.join(', ')}`);
+    if (options.verbose) {
+      printProviderVerboseDetails(summary);
+    }
+  }
+}
+
+function printProviderVerboseDetails(summary: ProviderSummary) {
+  if (summary.verboseDetails.length === 0) {
+    return;
+  }
+
+  for (const detail of summary.verboseDetails) {
+    const fields = [
+      `symbol=${detail.symbol ?? 'unknown'}`,
+      detail.sourceName ? `sourceName=${detail.sourceName}` : null,
+      `state=${detail.state}`,
+      detail.reason ? `reason=${detail.reason}` : null,
+    ].filter(Boolean);
+
+    console.log(`  - ${detail.kind}: ${fields.join(', ')}`);
   }
 }
 
@@ -734,6 +830,10 @@ function readSafeError(error: unknown) {
     errorCode: 'UNKNOWN_ERROR',
     errorMessage: 'Unknown provider ingestion error.',
   };
+}
+
+function sanitizeOutputText(value: string | undefined): string | undefined {
+  return value === undefined ? undefined : redactScriptErrorText(value);
 }
 
 export function printScriptFailure(prefix: string, error: unknown) {
