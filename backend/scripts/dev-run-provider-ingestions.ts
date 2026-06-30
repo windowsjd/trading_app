@@ -1,19 +1,36 @@
 import 'reflect-metadata';
+import {
+  Module,
+  type INestApplicationContext,
+  type Type,
+} from '@nestjs/common';
 import { config as loadDotenv } from 'dotenv';
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from '../src/app.module';
 import type { AuthenticatedUser } from '../src/auth/auth.types';
 import { UserRole } from '../src/generated/prisma/client';
+import { BinancePublicClient } from '../src/providers/binance/binance-public.client';
 import { BinancePriceIngestionService } from '../src/providers/binance/binance-price.ingestion.service';
+import { ExchangeRateClient } from '../src/providers/exchange-rate/exchange-rate.client';
 import { ExchangeRateIngestionService } from '../src/providers/exchange-rate/exchange-rate.ingestion.service';
+import { KisAuthClient } from '../src/providers/kis/kis-auth.client';
+import { KisQuoteClient } from '../src/providers/kis/kis-quote.client';
 import { KisRestCurrentPriceIngestionService } from '../src/providers/kis/kis-rest-current-price.ingestion.service';
+import { KoreaEximExchangeClient } from '../src/providers/korea-exim/korea-exim-exchange.client';
 import { KoreaEximExchangeIngestionService } from '../src/providers/korea-exim/korea-exim-exchange.ingestion.service';
 import { MarketSnapshotHealthService } from '../src/providers/market-snapshot-health.service';
+import { ProviderConfigService } from '../src/providers/provider-config.service';
+import { ProviderHttpClient } from '../src/providers/provider-http.client';
+import {
+  collectProviderSecretsFromEnv,
+  redactText,
+} from '../src/providers/provider-secret-redaction';
 import {
   ProviderTargetResolverService,
   type ProviderTargetSource,
   type ProviderTargets,
 } from '../src/providers/provider-target-resolver.service';
+import { ProvidersModule } from '../src/providers/providers.module';
+import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 loadDotenv({ path: '.env.local', quiet: true });
@@ -47,11 +64,120 @@ type ProviderSummary = {
 
 const DEFAULT_PROVIDERS: ProviderName[] = ['korea-exim', 'binance', 'kis'];
 const DEFAULT_MAX_SNAPSHOTS = 500;
+const SCRIPT_SECRET_ENV_KEY_PATTERN =
+  /(database_url|jwt.*secret|api[_-]?key|auth[_-]?key|app[_-]?key|app[_-]?secret|authorization|approval[_-]?key|access[_-]?token|refresh[_-]?token)/i;
 const OPERATOR_REQUIRED_MESSAGE = [
   'Operator user is required.',
   'Pass --operator-email <email> or --operator-user-id <id>, or set LOCAL_OPERATOR_EMAIL / LOCAL_OPERATOR_USER_ID.',
   'The user must have role=operator or role=admin.',
 ].join('\n');
+
+@Module({
+  imports: [PrismaModule, ProvidersModule],
+  providers: [
+    ProviderConfigService,
+    ProviderHttpClient,
+    {
+      provide: ProviderTargetResolverService,
+      inject: [PrismaService],
+      useFactory: (prisma: PrismaService) =>
+        new ProviderTargetResolverService(prisma),
+    },
+    {
+      provide: ExchangeRateClient,
+      inject: [ProviderConfigService, ProviderHttpClient],
+      useFactory: (
+        configService: ProviderConfigService,
+        httpClient: ProviderHttpClient,
+      ) => new ExchangeRateClient(configService, httpClient),
+    },
+    {
+      provide: ExchangeRateIngestionService,
+      inject: [PrismaService, ProviderConfigService, ExchangeRateClient],
+      useFactory: (
+        prisma: PrismaService,
+        configService: ProviderConfigService,
+        client: ExchangeRateClient,
+      ) => new ExchangeRateIngestionService(prisma, configService, client),
+    },
+    {
+      provide: KoreaEximExchangeClient,
+      inject: [ProviderConfigService, ProviderHttpClient],
+      useFactory: (
+        configService: ProviderConfigService,
+        httpClient: ProviderHttpClient,
+      ) => new KoreaEximExchangeClient(configService, httpClient),
+    },
+    {
+      provide: KoreaEximExchangeIngestionService,
+      inject: [PrismaService, ProviderConfigService, KoreaEximExchangeClient],
+      useFactory: (
+        prisma: PrismaService,
+        configService: ProviderConfigService,
+        client: KoreaEximExchangeClient,
+      ) => new KoreaEximExchangeIngestionService(prisma, configService, client),
+    },
+    {
+      provide: BinancePublicClient,
+      inject: [ProviderConfigService, ProviderHttpClient],
+      useFactory: (
+        configService: ProviderConfigService,
+        httpClient: ProviderHttpClient,
+      ) => new BinancePublicClient(configService, httpClient),
+    },
+    {
+      provide: BinancePriceIngestionService,
+      inject: [PrismaService, ProviderConfigService, BinancePublicClient],
+      useFactory: (
+        prisma: PrismaService,
+        configService: ProviderConfigService,
+        client: BinancePublicClient,
+      ) => new BinancePriceIngestionService(prisma, configService, client),
+    },
+    {
+      provide: KisAuthClient,
+      inject: [ProviderConfigService],
+      useFactory: (configService: ProviderConfigService) =>
+        new KisAuthClient(configService),
+    },
+    {
+      provide: KisQuoteClient,
+      inject: [ProviderConfigService],
+      useFactory: (configService: ProviderConfigService) =>
+        new KisQuoteClient(configService),
+    },
+    {
+      provide: KisRestCurrentPriceIngestionService,
+      inject: [
+        PrismaService,
+        ProviderConfigService,
+        KisAuthClient,
+        KisQuoteClient,
+      ],
+      useFactory: (
+        prisma: PrismaService,
+        configService: ProviderConfigService,
+        authClient: KisAuthClient,
+        quoteClient: KisQuoteClient,
+      ) =>
+        new KisRestCurrentPriceIngestionService(
+          prisma,
+          configService,
+          authClient,
+          quoteClient,
+        ),
+    },
+    {
+      provide: MarketSnapshotHealthService,
+      inject: [PrismaService, ProviderTargetResolverService],
+      useFactory: (
+        prisma: PrismaService,
+        providerTargetResolver: ProviderTargetResolverService,
+      ) => new MarketSnapshotHealthService(prisma, providerTargetResolver),
+    },
+  ],
+})
+class ProviderIngestionScriptModule {}
 
 export async function runProviderIngestionCheck(
   argv: string[],
@@ -59,15 +185,25 @@ export async function runProviderIngestionCheck(
 ) {
   requireDatabaseUrl();
   const args = parseCliArgs(argv);
-  const app = await NestFactory.createApplicationContext(AppModule, {
-    logger: ['error', 'warn'],
-  });
+  const app = await NestFactory.createApplicationContext(
+    ProviderIngestionScriptModule,
+    {
+      logger: ['error', 'warn'],
+    },
+  );
 
   try {
+    const scriptContext = app.select(ProviderIngestionScriptModule);
     const prisma = app.get(PrismaService);
     const actor = await findOperatorActor(prisma, args);
-    const targetResolver = app.get(ProviderTargetResolverService);
-    const healthService = app.get(MarketSnapshotHealthService);
+    const targetResolver = getScriptProvider(
+      scriptContext,
+      ProviderTargetResolverService,
+    );
+    const healthService = getScriptProvider(
+      scriptContext,
+      MarketSnapshotHealthService,
+    );
     const targets = await targetResolver.resolveProviderTargets({
       targetSource: args.targetSource,
     });
@@ -76,7 +212,7 @@ export async function runProviderIngestionCheck(
     printProviderTargetSummary(targets);
 
     const summaries = await runProviders({
-      app,
+      app: scriptContext,
       actor,
       providers: args.providers,
       dryRun: args.dryRun,
@@ -129,6 +265,10 @@ function parseCliArgs(argv: string[]): CliArgs {
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
+    if (arg === '--') {
+      continue;
+    }
+
     const [option, inlineValue] = arg.includes('=')
       ? (arg.split(/=(.*)/s, 2) as [string, string])
       : [arg, undefined];
@@ -298,7 +438,7 @@ function hasOperatorRole(role: UserRole) {
 }
 
 async function runProviders(input: {
-  app: Awaited<ReturnType<typeof NestFactory.createApplicationContext>>;
+  app: INestApplicationContext;
   actor: AuthenticatedUser;
   providers: ProviderName[];
   dryRun: boolean;
@@ -339,7 +479,7 @@ function orderProviders(providers: ProviderName[]) {
 }
 
 async function runOneProvider(input: {
-  app: Awaited<ReturnType<typeof NestFactory.createApplicationContext>>;
+  app: INestApplicationContext;
   actor: AuthenticatedUser;
   provider: ProviderName;
   dryRun: boolean;
@@ -352,7 +492,10 @@ async function runOneProvider(input: {
         return normalizeProviderSummary(
           input.provider,
           input.dryRun,
-          await input.app.get(ExchangeRateIngestionService).ingestUsdKrw({
+          await getScriptProvider(
+            input.app,
+            ExchangeRateIngestionService,
+          ).ingestUsdKrw({
             dryRun: input.dryRun,
             requestedBy: input.actor.userId,
           }),
@@ -361,7 +504,10 @@ async function runOneProvider(input: {
         return normalizeProviderSummary(
           input.provider,
           input.dryRun,
-          await input.app.get(KoreaEximExchangeIngestionService).ingestUsdKrw({
+          await getScriptProvider(
+            input.app,
+            KoreaEximExchangeIngestionService,
+          ).ingestUsdKrw({
             dryRun: input.dryRun,
             requestedBy: input.actor.userId,
           }),
@@ -374,7 +520,10 @@ async function runOneProvider(input: {
         return normalizeProviderSummary(
           input.provider,
           input.dryRun,
-          await input.app.get(BinancePriceIngestionService).ingestPrices({
+          await getScriptProvider(
+            input.app,
+            BinancePriceIngestionService,
+          ).ingestPrices({
             dryRun: input.dryRun,
             requestedBy: input.actor.userId,
             symbols: input.targets.binanceSymbols,
@@ -391,15 +540,16 @@ async function runOneProvider(input: {
         return normalizeProviderSummary(
           input.provider,
           input.dryRun,
-          await input.app
-            .get(KisRestCurrentPriceIngestionService)
-            .ingestCurrentPrices({
-              dryRun: input.dryRun,
-              requestedBy: input.actor.userId,
-              domesticSymbols: input.targets.kisDomesticSymbols,
-              usSymbols: input.targets.kisUsSymbols,
-              maxSnapshots: input.maxSnapshots,
-            }),
+          await getScriptProvider(
+            input.app,
+            KisRestCurrentPriceIngestionService,
+          ).ingestCurrentPrices({
+            dryRun: input.dryRun,
+            requestedBy: input.actor.userId,
+            domesticSymbols: input.targets.kisDomesticSymbols,
+            usSymbols: input.targets.kisUsSymbols,
+            maxSnapshots: input.maxSnapshots,
+          }),
         );
     }
   } catch (error) {
@@ -417,6 +567,10 @@ async function runOneProvider(input: {
       errorMessage: safeError.errorMessage,
     };
   }
+}
+
+function getScriptProvider<T>(app: INestApplicationContext, token: Type<T>): T {
+  return app.get(token, { strict: true });
 }
 
 function normalizeProviderSummary(
@@ -572,7 +726,7 @@ function readSafeError(error: unknown) {
   if (error instanceof Error) {
     return {
       errorCode: error.name || 'ERROR',
-      errorMessage: error.message,
+      errorMessage: redactScriptErrorText(error.message),
     };
   }
 
@@ -580,6 +734,52 @@ function readSafeError(error: unknown) {
     errorCode: 'UNKNOWN_ERROR',
     errorMessage: 'Unknown provider ingestion error.',
   };
+}
+
+export function printScriptFailure(prefix: string, error: unknown) {
+  console.error(`${prefix}: ${formatScriptError(error)}`);
+}
+
+function formatScriptError(error: unknown) {
+  if (error instanceof Error) {
+    return redactScriptErrorText(
+      error.stack ?? `${error.name || 'Error'}: ${error.message}`,
+    );
+  }
+
+  const record = readRecord(error);
+  const stack = readString(record?.stack);
+  const message = readString(record?.message);
+  if (stack || message) {
+    return redactScriptErrorText(stack ?? message ?? 'Unknown error.');
+  }
+
+  return 'Unknown non-Error thrown.';
+}
+
+function redactScriptErrorText(text: string) {
+  return redactText(text, {
+    secrets: collectScriptSecretsFromEnv(),
+  });
+}
+
+function collectScriptSecretsFromEnv(
+  env: Record<string, string | undefined> = process.env,
+) {
+  const secrets = collectProviderSecretsFromEnv(env);
+
+  for (const [key, value] of Object.entries(env)) {
+    const secret = value?.trim();
+    if (
+      secret &&
+      SCRIPT_SECRET_ENV_KEY_PATTERN.test(key) &&
+      !secrets.includes(secret)
+    ) {
+      secrets.push(secret);
+    }
+  }
+
+  return secrets;
 }
 
 function readRecord(value: unknown): Record<string, unknown> | undefined {
@@ -605,11 +805,6 @@ function readArray(value: unknown): unknown[] | undefined {
 if (require.main === module) {
   runProviderIngestionCheck(process.argv.slice(2)).catch((error: unknown) => {
     process.exitCode = 1;
-    if (error instanceof Error) {
-      console.error(`dev provider ingestion failed: ${error.message}`);
-      return;
-    }
-
-    console.error('dev provider ingestion failed.');
+    printScriptFailure('dev provider ingestion failed', error);
   });
 }

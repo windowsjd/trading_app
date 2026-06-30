@@ -19,7 +19,7 @@ Market snapshot readiness update:
 
 - Provider ingestion remains disabled by default through `PROVIDER_INGESTION_ENABLED=false`; real runs must enable common provider ingestion and the specific FX/Binance/KIS provider flags.
 - Provider runner targets can now be resolved from active DB assets with `SCHEDULER_PROVIDER_TARGET_SOURCE=active_assets`, from env watchlists with `env`, or from both with the default `merged`.
-- Active asset coverage, not provider run completion alone, is the local success criterion. `pnpm dev:ensure-market-snapshots -- --operator-email <operator@example.com>` runs FX first, then Binance/KIS, checks `asset_price_snapshots` and `fx_rate_snapshots`, and fails non-zero when active asset display coverage remains unavailable.
+- Active asset coverage, not provider run completion alone, is the local success criterion. `pnpm dev:ensure-market-snapshots --operator-email <operator@example.com>` runs FX first, then Binance/KIS, checks `asset_price_snapshots` and `fx_rate_snapshots`, and fails non-zero when active asset display coverage remains unavailable.
 - Display/read freshness is wider than execute freshness: asset display defaults to 300 seconds and USD/KRW display defaults to 7200 seconds. Quote defaults remain shorter, and order/FX execute freshness remains strict.
 - Fake asset price seed rows, fake FX seed rows, and generated fallback prices remain prohibited.
 

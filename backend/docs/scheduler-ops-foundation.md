@@ -202,7 +202,7 @@ To resolve local "market data preparing" states:
 ```bash
 cd backend
 pnpm dev:open-season
-pnpm dev:ensure-market-snapshots -- --operator-email <operator@example.com>
+pnpm dev:ensure-market-snapshots --operator-email <operator@example.com>
 ```
 
 ## Production TODO

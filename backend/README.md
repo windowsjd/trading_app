@@ -179,13 +179,13 @@ Resolve "market data preparing" locally by opening the dev season, running provi
 ```bash
 cd backend
 pnpm dev:open-season
-pnpm dev:ensure-market-snapshots -- --operator-email <operator@example.com>
+pnpm dev:ensure-market-snapshots --operator-email <operator@example.com>
 ```
 
 Run provider ingestion and inspect DB snapshot/coverage status without the shorter alias:
 
 ```bash
-pnpm dev:run-provider-ingestions -- --operator-email <operator@example.com>
+pnpm dev:run-provider-ingestions --operator-email <operator@example.com>
 npm run dev:run-provider-ingestions -- --operator-email <operator@example.com>
 ```
 
