@@ -10,10 +10,20 @@ import type {
   ParsedKisTokenResponse,
 } from './kis.types';
 
+const TOKEN_REFRESH_BUFFER_MS = 60_000;
+const APPROVAL_KEY_REFRESH_BUFFER_MS = 60_000;
+const DEFAULT_APPROVAL_KEY_TTL_MS = 60 * 60 * 1000;
+
 @Injectable()
 export class KisAuthClient {
   private tokenCache: ParsedKisTokenResponse | null = null;
   private approvalKeyCache: ParsedKisApprovalKeyResponse | null = null;
+  private tokenRefreshPromise: Promise<
+    KisLowLevelCallResult<ParsedKisTokenResponse>
+  > | null = null;
+  private approvalKeyRefreshPromise: Promise<
+    KisLowLevelCallResult<ParsedKisApprovalKeyResponse>
+  > | null = null;
 
   constructor(private readonly configService: ProviderConfigService) {}
 
@@ -38,7 +48,10 @@ export class KisAuthClient {
       return response;
     }
 
-    const parsed = parseKisTokenResponse(response.response);
+    const parsed = parseKisTokenResponse(
+      response.response,
+      response.receivedAt,
+    );
     this.tokenCache = parsed;
 
     return {
@@ -62,7 +75,10 @@ export class KisAuthClient {
       return response;
     }
 
-    const parsed = parseKisApprovalKeyResponse(response.response);
+    const parsed = parseKisApprovalKeyResponse(
+      response.response,
+      response.receivedAt,
+    );
     this.approvalKeyCache = parsed;
 
     return {
@@ -92,14 +108,46 @@ export class KisAuthClient {
       );
     }
 
-    return this.requestRestToken({
+    if (!config.kis.restBaseUrl) {
+      return {
+        state: 'skipped',
+        reason: 'KIS_REST_BASE_URL_MISSING',
+      };
+    }
+
+    const cached = this.tokenCache;
+    if (this.isTokenUsable(cached, new Date(), TOKEN_REFRESH_BUFFER_MS)) {
+      return availableCachedResult(cached);
+    }
+
+    if (this.tokenRefreshPromise) {
+      return this.tokenRefreshPromise;
+    }
+
+    this.tokenRefreshPromise = this.requestRestToken({
       path: '/oauth2/tokenP',
       body: {
         grant_type: 'client_credentials',
         appkey: config.kis.appKey,
         appsecret: config.kis.appSecret,
       },
-    });
+    })
+      .catch((error: unknown) => {
+        const fallback = this.tokenCache;
+        if (
+          isKisAuthRateLimitError(error) &&
+          this.isTokenUsable(fallback, new Date(), 0)
+        ) {
+          return availableCachedResult(fallback);
+        }
+
+        throw error;
+      })
+      .finally(() => {
+        this.tokenRefreshPromise = null;
+      });
+
+    return this.tokenRefreshPromise;
   }
 
   async requestConfiguredWebSocketApprovalKey(): Promise<
@@ -122,14 +170,76 @@ export class KisAuthClient {
       );
     }
 
-    return this.requestWebSocketApprovalKey({
+    if (!config.kis.restBaseUrl) {
+      return {
+        state: 'skipped',
+        reason: 'KIS_REST_BASE_URL_MISSING',
+      };
+    }
+
+    const cached = this.approvalKeyCache;
+    if (
+      this.isApprovalKeyUsable(
+        cached,
+        new Date(),
+        APPROVAL_KEY_REFRESH_BUFFER_MS,
+      )
+    ) {
+      return availableCachedResult(cached);
+    }
+
+    if (this.approvalKeyRefreshPromise) {
+      return this.approvalKeyRefreshPromise;
+    }
+
+    this.approvalKeyRefreshPromise = this.requestWebSocketApprovalKey({
       path: '/oauth2/Approval',
       body: {
         grant_type: 'client_credentials',
         appkey: config.kis.appKey,
         secretkey: config.kis.appSecret,
       },
-    });
+    })
+      .catch((error: unknown) => {
+        const fallback = this.approvalKeyCache;
+        if (
+          isKisAuthRateLimitError(error) &&
+          this.isApprovalKeyUsable(fallback, new Date(), 0)
+        ) {
+          return availableCachedResult(fallback);
+        }
+
+        throw error;
+      })
+      .finally(() => {
+        this.approvalKeyRefreshPromise = null;
+      });
+
+    return this.approvalKeyRefreshPromise;
+  }
+
+  private isTokenUsable(
+    cached: ParsedKisTokenResponse | null,
+    now: Date,
+    refreshBufferMs: number,
+  ): cached is ParsedKisTokenResponse {
+    const expiresAt = cached ? resolveTokenExpiresAt(cached) : null;
+    return (
+      expiresAt !== null &&
+      now.getTime() + refreshBufferMs < expiresAt.getTime()
+    );
+  }
+
+  private isApprovalKeyUsable(
+    cached: ParsedKisApprovalKeyResponse | null,
+    now: Date,
+    refreshBufferMs: number,
+  ): cached is ParsedKisApprovalKeyResponse {
+    const expiresAt = cached ? resolveApprovalKeyExpiresAt(cached) : null;
+    return (
+      expiresAt !== null &&
+      now.getTime() + refreshBufferMs < expiresAt.getTime()
+    );
   }
 
   async postRestJsonToExplicitPath<T>(
@@ -226,6 +336,7 @@ export class KisAuthClient {
 
 export function parseKisTokenResponse(
   response: KisTokenResponse,
+  receivedAt: Date | null = null,
 ): ParsedKisTokenResponse {
   if (!response.access_token || typeof response.access_token !== 'string') {
     throw new ProviderHttpError(
@@ -235,17 +346,26 @@ export function parseKisTokenResponse(
     );
   }
 
+  const expiresInSeconds = parseOptionalPositiveInteger(response.expires_in);
+  const expiresAt =
+    parseFirstOptionalDate([
+      response.access_token_token_expired,
+      response.expires_at,
+    ]) ?? buildExpiresAtFromTtl(receivedAt, expiresInSeconds);
+
   return {
     accessToken: response.access_token,
     tokenType:
       typeof response.token_type === 'string' ? response.token_type : null,
-    expiresInSeconds: parseOptionalPositiveInteger(response.expires_in),
-    expiresAt: parseOptionalDate(response.access_token_token_expired),
+    expiresInSeconds,
+    expiresAt,
+    receivedAt,
   };
 }
 
 export function parseKisApprovalKeyResponse(
   response: KisApprovalKeyResponse,
+  receivedAt: Date | null = null,
 ): ParsedKisApprovalKeyResponse {
   if (!response.approval_key || typeof response.approval_key !== 'string') {
     throw new ProviderHttpError(
@@ -255,8 +375,22 @@ export function parseKisApprovalKeyResponse(
     );
   }
 
+  const expiresInSeconds = parseOptionalPositiveInteger(response.expires_in);
+  const expiresAt =
+    parseFirstOptionalDate([
+      response.approval_key_expired,
+      response.approval_key_token_expired,
+      response.approval_key_token_expired_at,
+      response.expires_at,
+    ]) ??
+    buildExpiresAtFromTtl(receivedAt, expiresInSeconds) ??
+    buildDefaultApprovalKeyExpiresAt(receivedAt);
+
   return {
     approvalKey: response.approval_key,
+    expiresInSeconds,
+    expiresAt,
+    receivedAt,
   };
 }
 
@@ -282,6 +416,78 @@ function parseOptionalPositiveInteger(
 
   const parsed = typeof value === 'number' ? value : Number(value);
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function availableCachedResult<T extends { receivedAt: Date | null }>(
+  response: T,
+): KisLowLevelCallResult<T> {
+  return {
+    state: 'available',
+    response,
+    receivedAt: response.receivedAt ?? new Date(),
+  };
+}
+
+function isKisAuthRateLimitError(error: unknown): boolean {
+  if (!(error instanceof ProviderHttpError) || error.provider !== 'kis') {
+    return false;
+  }
+
+  const text = `${error.code} ${error.message}`.toLowerCase();
+  return (
+    text.includes('egw00133') ||
+    text.includes('rate limit') ||
+    text.includes('too many')
+  );
+}
+
+function resolveTokenExpiresAt(response: ParsedKisTokenResponse): Date | null {
+  return (
+    response.expiresAt ??
+    buildExpiresAtFromTtl(response.receivedAt, response.expiresInSeconds)
+  );
+}
+
+function resolveApprovalKeyExpiresAt(
+  response: ParsedKisApprovalKeyResponse,
+): Date | null {
+  return (
+    response.expiresAt ??
+    buildExpiresAtFromTtl(response.receivedAt, response.expiresInSeconds) ??
+    buildDefaultApprovalKeyExpiresAt(response.receivedAt)
+  );
+}
+
+function buildExpiresAtFromTtl(
+  receivedAt: Date | null,
+  expiresInSeconds: number | null,
+): Date | null {
+  if (!receivedAt || !expiresInSeconds) {
+    return null;
+  }
+
+  return new Date(receivedAt.getTime() + expiresInSeconds * 1000);
+}
+
+function buildDefaultApprovalKeyExpiresAt(
+  receivedAt: Date | null,
+): Date | null {
+  if (!receivedAt) {
+    return null;
+  }
+
+  return new Date(receivedAt.getTime() + DEFAULT_APPROVAL_KEY_TTL_MS);
+}
+
+function parseFirstOptionalDate(values: readonly unknown[]): Date | null {
+  for (const value of values) {
+    const parsed = parseOptionalDate(value);
+    if (parsed) {
+      return parsed;
+    }
+  }
+
+  return null;
 }
 
 function parseOptionalDate(value: unknown): Date | null {

@@ -9,6 +9,11 @@ import {
 } from './kis-auth.client';
 
 describe('KIS auth client skeleton', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
   it('parses token responses without persisting token to DB', () => {
     const parsed = parseKisTokenResponse({
       access_token: 'kis-access-token',
@@ -22,6 +27,28 @@ describe('KIS auth client skeleton', () => {
       tokenType: 'Bearer',
       expiresInSeconds: 86400,
       expiresAt: new Date('2026-05-27T00:00:00.000Z'),
+      receivedAt: null,
+    });
+  });
+
+  it('derives token expiry from expires_in and receivedAt', () => {
+    const receivedAt = new Date('2026-05-27T00:00:00.000Z');
+
+    expect(
+      parseKisTokenResponse(
+        {
+          access_token: 'kis-access-token',
+          token_type: 'Bearer',
+          expires_in: '120',
+        },
+        receivedAt,
+      ),
+    ).toEqual({
+      accessToken: 'kis-access-token',
+      tokenType: 'Bearer',
+      expiresInSeconds: 120,
+      expiresAt: new Date('2026-05-27T00:02:00.000Z'),
+      receivedAt,
     });
   });
 
@@ -32,6 +59,27 @@ describe('KIS auth client skeleton', () => {
       }),
     ).toEqual({
       approvalKey: 'kis-approval-key',
+      expiresInSeconds: null,
+      expiresAt: null,
+      receivedAt: null,
+    });
+  });
+
+  it('uses a conservative default TTL for approval_key responses without expiry fields', () => {
+    const receivedAt = new Date('2026-05-27T00:00:00.000Z');
+
+    expect(
+      parseKisApprovalKeyResponse(
+        {
+          approval_key: 'kis-approval-key',
+        },
+        receivedAt,
+      ),
+    ).toEqual({
+      approvalKey: 'kis-approval-key',
+      expiresInSeconds: null,
+      expiresAt: new Date('2026-05-27T01:00:00.000Z'),
+      receivedAt,
     });
   });
 
@@ -64,7 +112,6 @@ describe('KIS auth client skeleton', () => {
         }),
       }),
     );
-    fetchSpy.mockRestore();
   });
 
   it('requests REST access token with the configured KIS app credentials', async () => {
@@ -102,7 +149,232 @@ describe('KIS auth client skeleton', () => {
         }),
       }),
     );
-    fetchSpy.mockRestore();
+  });
+
+  it('reuses a valid configured REST access token cache', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-27T00:00:00.000Z'));
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    mockFetchJsonOnce(fetchSpy, {
+      access_token: 'rest-token',
+      token_type: 'Bearer',
+      expires_in: '3600',
+    });
+    const client = new KisAuthClient(
+      configServiceFor({
+        restBaseUrl: 'https://kis.example.test',
+      }),
+    );
+
+    const first = await client.requestConfiguredRestToken();
+    const second = await client.requestConfiguredRestToken();
+
+    expect(first.state).toBe('available');
+    expect(second).toEqual(first);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes a configured REST access token inside the refresh buffer', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-27T00:00:00.000Z'));
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    mockFetchJsonOnce(fetchSpy, {
+      access_token: 'rest-token-1',
+      token_type: 'Bearer',
+      expires_in: '120',
+    });
+    mockFetchJsonOnce(fetchSpy, {
+      access_token: 'rest-token-2',
+      token_type: 'Bearer',
+      expires_in: '3600',
+    });
+    const client = new KisAuthClient(
+      configServiceFor({
+        restBaseUrl: 'https://kis.example.test',
+      }),
+    );
+
+    await client.requestConfiguredRestToken();
+    jest.setSystemTime(new Date('2026-05-27T00:01:01.000Z'));
+    const refreshed = await client.requestConfiguredRestToken();
+
+    expect(refreshed.state).toBe('available');
+    if (refreshed.state === 'available') {
+      expect(refreshed.response.accessToken).toBe('rest-token-2');
+    }
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('shares one configured REST token refresh across concurrent callers', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-27T00:00:00.000Z'));
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    mockFetchJsonOnce(fetchSpy, {
+      access_token: 'rest-token',
+      token_type: 'Bearer',
+      expires_in: '3600',
+    });
+    const client = new KisAuthClient(
+      configServiceFor({
+        restBaseUrl: 'https://kis.example.test',
+      }),
+    );
+
+    const [first, second] = await Promise.all([
+      client.requestConfiguredRestToken(),
+      client.requestConfiguredRestToken(),
+    ]);
+
+    expect(first).toEqual(second);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to an unexpired REST access token when tokenP is rate limited', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-27T00:00:00.000Z'));
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    mockFetchJsonOnce(fetchSpy, {
+      access_token: 'rest-token-1',
+      token_type: 'Bearer',
+      expires_in: '70',
+    });
+    mockFetchKisRateLimitOnce(fetchSpy);
+    const client = new KisAuthClient(
+      configServiceFor({
+        restBaseUrl: 'https://kis.example.test',
+      }),
+    );
+
+    await client.requestConfiguredRestToken();
+    jest.setSystemTime(new Date('2026-05-27T00:00:20.000Z'));
+    const fallback = await client.requestConfiguredRestToken();
+
+    expect(fallback.state).toBe('available');
+    if (fallback.state === 'available') {
+      expect(fallback.response.accessToken).toBe('rest-token-1');
+    }
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the REST tokenP rate limit failure when no usable cache exists', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-27T00:00:00.000Z'));
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    mockFetchKisRateLimitOnce(fetchSpy);
+    const client = new KisAuthClient(
+      configServiceFor({
+        restBaseUrl: 'https://kis.example.test',
+      }),
+    );
+
+    await expect(client.requestConfiguredRestToken()).rejects.toMatchObject({
+      code: 'PROVIDER_HTTP_ERROR',
+      message: expect.stringContaining('EGW00133'),
+    });
+  });
+
+  it('reuses a valid configured WebSocket approval key cache', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-27T00:00:00.000Z'));
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    mockFetchJsonOnce(fetchSpy, {
+      approval_key: 'approval-secret',
+    });
+    const client = new KisAuthClient(
+      configServiceFor({
+        restBaseUrl: 'https://kis.example.test',
+      }),
+    );
+
+    const first = await client.requestConfiguredWebSocketApprovalKey();
+    const second = await client.requestConfiguredWebSocketApprovalKey();
+
+    expect(first.state).toBe('available');
+    expect(second).toEqual(first);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes a configured WebSocket approval key inside the default TTL buffer', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-27T00:00:00.000Z'));
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    mockFetchJsonOnce(fetchSpy, {
+      approval_key: 'approval-secret-1',
+    });
+    mockFetchJsonOnce(fetchSpy, {
+      approval_key: 'approval-secret-2',
+    });
+    const client = new KisAuthClient(
+      configServiceFor({
+        restBaseUrl: 'https://kis.example.test',
+      }),
+    );
+
+    await client.requestConfiguredWebSocketApprovalKey();
+    jest.setSystemTime(new Date('2026-05-27T00:59:01.000Z'));
+    const refreshed = await client.requestConfiguredWebSocketApprovalKey();
+
+    expect(refreshed.state).toBe('available');
+    if (refreshed.state === 'available') {
+      expect(refreshed.response.approvalKey).toBe('approval-secret-2');
+    }
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('shares one configured WebSocket approval key refresh across concurrent callers', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-27T00:00:00.000Z'));
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    mockFetchJsonOnce(fetchSpy, {
+      approval_key: 'approval-secret',
+    });
+    const client = new KisAuthClient(
+      configServiceFor({
+        restBaseUrl: 'https://kis.example.test',
+      }),
+    );
+
+    const [first, second] = await Promise.all([
+      client.requestConfiguredWebSocketApprovalKey(),
+      client.requestConfiguredWebSocketApprovalKey(),
+    ]);
+
+    expect(first).toEqual(second);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to an unexpired approval key when approval refresh is rate limited', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-27T00:00:00.000Z'));
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    mockFetchJsonOnce(fetchSpy, {
+      approval_key: 'approval-secret-1',
+    });
+    mockFetchKisRateLimitOnce(fetchSpy);
+    const client = new KisAuthClient(
+      configServiceFor({
+        restBaseUrl: 'https://kis.example.test',
+      }),
+    );
+
+    await client.requestConfiguredWebSocketApprovalKey();
+    jest.setSystemTime(new Date('2026-05-27T00:59:30.000Z'));
+    const fallback = await client.requestConfiguredWebSocketApprovalKey();
+
+    expect(fallback.state).toBe('available');
+    if (fallback.state === 'available') {
+      expect(fallback.response.approvalKey).toBe('approval-secret-1');
+    }
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the approval key rate limit failure when no usable cache exists', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-27T00:00:00.000Z'));
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    mockFetchKisRateLimitOnce(fetchSpy);
+    const client = new KisAuthClient(
+      configServiceFor({
+        restBaseUrl: 'https://kis.example.test',
+      }),
+    );
+
+    await expect(
+      client.requestConfiguredWebSocketApprovalKey(),
+    ).rejects.toMatchObject({
+      code: 'PROVIDER_HTTP_ERROR',
+      message: expect.stringContaining('EGW00133'),
+    });
   });
 
   it('redacts KIS app key, app secret, token, and approval_key fields', () => {
@@ -228,4 +500,29 @@ function configServiceFor(input: {
       },
     }),
   } as unknown as ProviderConfigService;
+}
+
+function mockFetchJsonOnce(
+  fetchSpy: jest.SpyInstance,
+  body: Record<string, unknown>,
+): void {
+  fetchSpy.mockResolvedValueOnce({
+    ok: true,
+    status: 200,
+    text: () => Promise.resolve(JSON.stringify(body)),
+  } as Response);
+}
+
+function mockFetchKisRateLimitOnce(fetchSpy: jest.SpyInstance): void {
+  fetchSpy.mockResolvedValueOnce({
+    ok: false,
+    status: 403,
+    text: () =>
+      Promise.resolve(
+        JSON.stringify({
+          error_code: 'EGW00133',
+          error_description: 'Token issuance rate limit exceeded.',
+        }),
+      ),
+  } as Response);
 }

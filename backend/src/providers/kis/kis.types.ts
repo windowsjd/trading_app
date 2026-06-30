@@ -3,6 +3,7 @@ export type KisTokenResponse = {
   token_type?: string;
   expires_in?: number | string;
   access_token_token_expired?: string;
+  expires_at?: string;
   [key: string]: unknown;
 };
 
@@ -11,15 +12,24 @@ export type ParsedKisTokenResponse = {
   tokenType: string | null;
   expiresInSeconds: number | null;
   expiresAt: Date | null;
+  receivedAt: Date | null;
 };
 
 export type KisApprovalKeyResponse = {
   approval_key?: string;
+  expires_in?: number | string;
+  expires_at?: string;
+  approval_key_expired?: string;
+  approval_key_token_expired?: string;
+  approval_key_token_expired_at?: string;
   [key: string]: unknown;
 };
 
 export type ParsedKisApprovalKeyResponse = {
   approvalKey: string;
+  expiresInSeconds: number | null;
+  expiresAt: Date | null;
+  receivedAt: Date | null;
 };
 
 export type KisLowLevelCallResult<T> =
