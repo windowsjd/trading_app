@@ -12,10 +12,11 @@ import { useQuery } from '@tanstack/react-query';
 import type { AssetDetailScreenProps } from '../../app/navigation/types';
 import { useRootNavigation } from '../../app/navigation/navigationHooks';
 import {
-  ASSET_CHART_RANGES,
+  ASSET_CHART_TIMEFRAMES,
+  DEFAULT_ASSET_CHART_TIMEFRAME,
   getAssetCandles,
   getAssetDetail,
-  type AssetCandleRange,
+  type AssetChartTimeframe,
   type AssetDetailPriceDto,
 } from '../../features/asset/api';
 import {
@@ -78,8 +79,8 @@ function formatPriceChartValue(value: number) {
 export default function AssetDetailScreen({ route, navigation }: Props) {
   const rootNavigation = useRootNavigation();
   const { assetId } = route.params;
-  const [selectedRange, setSelectedRange] =
-    useState<AssetCandleRange>('1d');
+  const [selectedTimeframe, setSelectedTimeframe] =
+    useState<AssetChartTimeframe>(DEFAULT_ASSET_CHART_TIMEFRAME);
   const assetTickerWsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
 
   const seasonQuery = useQuery({
@@ -98,8 +99,17 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
   });
 
   const candlesQuery = useQuery({
-    queryKey: QUERY_KEYS.asset.candles(assetId, selectedRange),
-    queryFn: () => getAssetCandles(assetId, { range: selectedRange, limit: 100 }),
+    queryKey: QUERY_KEYS.asset.candles(assetId, {
+      range: selectedTimeframe.range,
+      interval: selectedTimeframe.interval,
+      limit: selectedTimeframe.limit,
+    }),
+    queryFn: () =>
+      getAssetCandles(assetId, {
+        range: selectedTimeframe.range,
+        interval: selectedTimeframe.interval,
+        limit: selectedTimeframe.limit,
+      }),
   });
 
   const {
@@ -315,13 +325,13 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
         <View style={styles.card}>
           <Text style={styles.label}>차트</Text>
           <View style={styles.row}>
-            {ASSET_CHART_RANGES.map((tab) => {
-              const active = tab.range === selectedRange;
+            {ASSET_CHART_TIMEFRAMES.map((tab) => {
+              const active = tab.interval === selectedTimeframe.interval;
               return (
                 <Pressable
-                  key={tab.range}
+                  key={tab.interval}
                   style={[styles.chip, active && styles.chipActive]}
-                  onPress={() => setSelectedRange(tab.range)}
+                  onPress={() => setSelectedTimeframe(tab)}
                 >
                   <Text style={active ? styles.chipTextActive : styles.chipText}>
                     {tab.label}

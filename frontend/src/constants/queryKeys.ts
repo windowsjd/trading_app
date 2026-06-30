@@ -87,8 +87,18 @@ export const QUERY_KEYS = {
 
   asset: {
     detail: (assetId: string) => ['asset', 'detail', assetId] as const,
-    candles: (assetId: string, range: string, interval?: string) =>
-      ['asset', 'candles', assetId, range, interval ?? null] as const,
+    candles: (
+      assetId: string,
+      params: { range: string; interval: string; limit?: number },
+    ) =>
+      [
+        'asset',
+        'candles',
+        assetId,
+        params.range,
+        params.interval,
+        params.limit ?? null,
+      ] as const,
     price: (assetId: string) => ['asset', 'price', assetId] as const,
   },
 

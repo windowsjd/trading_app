@@ -26,7 +26,15 @@ export type AssetCandlesQuery = {
 };
 
 type CandleRange = '1d' | '7d' | '30d' | 'season';
-type CandleInterval = '5m' | '15m' | '30m' | '1h' | '4h' | '1d' | '1w';
+type CandleInterval =
+  | '1m'
+  | '5m'
+  | '15m'
+  | '30m'
+  | '1h'
+  | '4h'
+  | '1d'
+  | '1w';
 type CryptoCandleInterval = CandleInterval;
 
 type AssetRecord = {
@@ -148,6 +156,8 @@ const KOREA_TIME_ZONE = 'Asia/Seoul';
 const US_EASTERN_TIME_ZONE = 'America/New_York';
 const UTC_TIME_ZONE = 'UTC';
 const BINANCE_KLINE_PATH = '/api/v3/klines';
+const CANDLE_INTERVAL_ERROR_MESSAGE =
+  'interval must be one of 1m, 5m, 15m, 30m, 1h, 4h, 1d, or 1w.';
 
 const DEFAULT_INTERVAL_BY_RANGE: Record<CandleRange, CandleInterval> = {
   '1d': '5m',
@@ -157,6 +167,7 @@ const DEFAULT_INTERVAL_BY_RANGE: Record<CandleRange, CandleInterval> = {
 };
 
 const CANDLE_INTERVAL_MINUTES: Record<CandleInterval, number> = {
+  '1m': 1,
   '5m': 5,
   '15m': 15,
   '30m': 30,
@@ -167,6 +178,7 @@ const CANDLE_INTERVAL_MINUTES: Record<CandleInterval, number> = {
 };
 
 const CANDLE_INTERVALS: Record<CandleInterval, true> = {
+  '1m': true,
   '5m': true,
   '15m': true,
   '30m': true,
@@ -965,7 +977,7 @@ export class AssetCandlesService {
     this.throwApiError(
       HttpStatus.BAD_REQUEST,
       'ASSET_CANDLES_INVALID_INTERVAL',
-      'interval must be one of 5m, 15m, 30m, 1h, 4h, 1d, or 1w.',
+      CANDLE_INTERVAL_ERROR_MESSAGE,
     );
   }
 
@@ -1009,7 +1021,7 @@ export class AssetCandlesService {
     this.throwApiError(
       HttpStatus.BAD_REQUEST,
       'ASSET_CANDLES_INVALID_INTERVAL',
-      'interval must be one of 5m, 15m, 30m, 1h, 4h, 1d, or 1w.',
+      CANDLE_INTERVAL_ERROR_MESSAGE,
     );
   }
 

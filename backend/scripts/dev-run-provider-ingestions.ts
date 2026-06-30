@@ -1,11 +1,19 @@
 import 'reflect-metadata';
 import { config as loadDotenv } from 'dotenv';
-import { HttpException } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
 import type { AuthenticatedUser } from '../src/auth/auth.types';
-import { CurrencyCode, UserRole } from '../src/generated/prisma/client';
-import { OperatorProviderIngestionService } from '../src/operator/operator-provider-ingestion.service';
+import { UserRole } from '../src/generated/prisma/client';
+import { BinancePriceIngestionService } from '../src/providers/binance/binance-price.ingestion.service';
+import { ExchangeRateIngestionService } from '../src/providers/exchange-rate/exchange-rate.ingestion.service';
+import { KisRestCurrentPriceIngestionService } from '../src/providers/kis/kis-rest-current-price.ingestion.service';
+import { KoreaEximExchangeIngestionService } from '../src/providers/korea-exim/korea-exim-exchange.ingestion.service';
+import { MarketSnapshotHealthService } from '../src/providers/market-snapshot-health.service';
+import {
+  ProviderTargetResolverService,
+  type ProviderTargetSource,
+  type ProviderTargets,
+} from '../src/providers/provider-target-resolver.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 loadDotenv({ path: '.env.local', quiet: true });
@@ -19,11 +27,14 @@ type CliArgs = {
   operatorEmail?: string;
   providers: ProviderName[];
   dryRun: boolean;
+  failOnUnavailable: boolean;
+  maxSnapshots: number;
+  targetSource: ProviderTargetSource;
 };
 
 type ProviderSummary = {
   provider: ProviderName;
-  state: string;
+  state: 'completed' | 'partial' | 'failed' | 'no_targets';
   dryRun: boolean;
   received: number;
   created: number;
@@ -34,20 +45,72 @@ type ProviderSummary = {
   errorMessage?: string;
 };
 
-type SnapshotStatus = {
-  activeAssets: number;
-  assetPriceSnapshotsTotal: number;
-  assetPriceSnapshotsRecent24h: number;
-  fxRateSnapshotsTotal: number;
-  usdKrwFxRateSnapshotsRecent7d: number;
-};
-
 const DEFAULT_PROVIDERS: ProviderName[] = ['korea-exim', 'binance', 'kis'];
+const DEFAULT_MAX_SNAPSHOTS = 500;
 const OPERATOR_REQUIRED_MESSAGE = [
   'Operator user is required.',
   'Pass --operator-email <email> or --operator-user-id <id>, or set LOCAL_OPERATOR_EMAIL / LOCAL_OPERATOR_USER_ID.',
   'The user must have role=operator or role=admin.',
 ].join('\n');
+
+export async function runProviderIngestionCheck(
+  argv: string[],
+  options: { title?: string } = {},
+) {
+  requireDatabaseUrl();
+  const args = parseCliArgs(argv);
+  const app = await NestFactory.createApplicationContext(AppModule, {
+    logger: ['error', 'warn'],
+  });
+
+  try {
+    const prisma = app.get(PrismaService);
+    const actor = await findOperatorActor(prisma, args);
+    const targetResolver = app.get(ProviderTargetResolverService);
+    const healthService = app.get(MarketSnapshotHealthService);
+    const targets = await targetResolver.resolveProviderTargets({
+      targetSource: args.targetSource,
+    });
+
+    printHeader(options.title ?? 'Provider ingestion check result');
+    printProviderTargetSummary(targets);
+
+    const summaries = await runProviders({
+      app,
+      actor,
+      providers: args.providers,
+      dryRun: args.dryRun,
+      maxSnapshots: args.maxSnapshots,
+      targets,
+    });
+    printProviderSummary(summaries);
+
+    const health = await healthService.checkActiveAssetCoverage({
+      targetSource: args.targetSource,
+    });
+    printSnapshotStatus(health.snapshotCounts);
+    printCoverageSummary(health);
+    printUnavailableAssets(health.unavailableAssets);
+
+    const providerFailed = summaries.some(
+      (summary) => summary.state === 'failed',
+    );
+    if (providerFailed) {
+      process.exitCode = 1;
+    }
+
+    if (health.coverage.activeAssets === 0) {
+      console.warn('Failure: active assets count is 0.');
+      process.exitCode = 1;
+    }
+
+    if (args.failOnUnavailable && health.status === 'fail') {
+      process.exitCode = 1;
+    }
+  } finally {
+    await app.close();
+  }
+}
 
 function requireDatabaseUrl() {
   if (!process.env.DATABASE_URL) {
@@ -59,6 +122,9 @@ function parseCliArgs(argv: string[]): CliArgs {
   const args: CliArgs = {
     providers: [],
     dryRun: false,
+    failOnUnavailable: true,
+    maxSnapshots: DEFAULT_MAX_SNAPSHOTS,
+    targetSource: 'merged',
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -72,10 +138,22 @@ function parseCliArgs(argv: string[]): CliArgs {
       continue;
     }
 
+    if (option === '--fail-on-unavailable') {
+      args.failOnUnavailable = true;
+      continue;
+    }
+
+    if (option === '--no-fail-on-unavailable') {
+      args.failOnUnavailable = false;
+      continue;
+    }
+
     if (
       option !== '--operator-user-id' &&
       option !== '--operator-email' &&
-      option !== '--provider'
+      option !== '--provider' &&
+      option !== '--target-source' &&
+      option !== '--max-snapshots'
     ) {
       throw new Error(`Unknown option: ${option}`);
     }
@@ -89,8 +167,12 @@ function parseCliArgs(argv: string[]): CliArgs {
       args.operatorUserId = value.trim();
     } else if (option === '--operator-email') {
       args.operatorEmail = value.trim();
-    } else {
+    } else if (option === '--provider') {
       args.providers.push(...parseProviders(value));
+    } else if (option === '--target-source') {
+      args.targetSource = parseTargetSource(value);
+    } else {
+      args.maxSnapshots = parseMaxSnapshots(value);
     }
 
     if (inlineValue === undefined) {
@@ -109,10 +191,10 @@ function parseCliArgs(argv: string[]): CliArgs {
     : cliOperatorEmail || (!envOperatorUserId ? envOperatorEmail : undefined);
 
   return {
+    ...args,
     operatorUserId: operatorUserId || undefined,
     operatorEmail: operatorEmail || undefined,
     providers: args.providers.length > 0 ? args.providers : DEFAULT_PROVIDERS,
-    dryRun: args.dryRun,
   };
 }
 
@@ -143,6 +225,34 @@ function normalizeProvider(value: string): ProviderName {
         'Provider must be exchange-rate, korea-exim, binance, or kis.',
       );
   }
+}
+
+function parseTargetSource(value: string): ProviderTargetSource {
+  const normalized = value.trim().toLowerCase();
+  if (
+    normalized === 'active_assets' ||
+    normalized === 'env' ||
+    normalized === 'merged'
+  ) {
+    return normalized;
+  }
+
+  throw new Error('target-source must be active_assets, env, or merged.');
+}
+
+function parseMaxSnapshots(value: string): number {
+  const parsed = Number(value.trim());
+  if (
+    !Number.isSafeInteger(parsed) ||
+    parsed < 1 ||
+    parsed > DEFAULT_MAX_SNAPSHOTS
+  ) {
+    throw new Error(
+      `max-snapshots must be an integer between 1 and ${DEFAULT_MAX_SNAPSHOTS}.`,
+    );
+  }
+
+  return parsed;
 }
 
 async function findOperatorActor(
@@ -188,21 +298,23 @@ function hasOperatorRole(role: UserRole) {
 }
 
 async function runProviders(input: {
-  service: OperatorProviderIngestionService;
+  app: Awaited<ReturnType<typeof NestFactory.createApplicationContext>>;
   actor: AuthenticatedUser;
   providers: ProviderName[];
   dryRun: boolean;
+  maxSnapshots: number;
+  targets: ProviderTargets;
 }) {
   const summaries: ProviderSummary[] = [];
-  const requestedProviders = [...input.providers];
 
-  for (const provider of requestedProviders) {
-    summaries.push(await runOneProvider({ ...input, provider }));
+  for (const provider of orderProviders(input.providers)) {
+    const summary = await runOneProvider({ ...input, provider });
+    summaries.push(summary);
 
     if (
       provider === 'korea-exim' &&
       !input.providers.includes('exchange-rate') &&
-      shouldRunExchangeRateFallback(summaries[summaries.length - 1])
+      summary.state === 'failed'
     ) {
       summaries.push(
         await runOneProvider({
@@ -216,30 +328,82 @@ async function runProviders(input: {
   return summaries;
 }
 
+function orderProviders(providers: ProviderName[]) {
+  const priority: ProviderName[] = [
+    'korea-exim',
+    'exchange-rate',
+    'binance',
+    'kis',
+  ];
+  return priority.filter((provider) => providers.includes(provider));
+}
+
 async function runOneProvider(input: {
-  service: OperatorProviderIngestionService;
+  app: Awaited<ReturnType<typeof NestFactory.createApplicationContext>>;
   actor: AuthenticatedUser;
   provider: ProviderName;
   dryRun: boolean;
+  maxSnapshots: number;
+  targets: ProviderTargets;
 }): Promise<ProviderSummary> {
   try {
-    const result = await input.service.runProviderIngestion(
-      input.actor,
-      input.provider,
-      {
-        dryRun: input.dryRun,
-        kisModes: ['rest_current_price'],
-        reason: 'local-dev-provider-ingestion-check',
-      },
-      {
-        requestId: 'dev-run-provider-ingestions',
-        userAgent: 'dev-script',
-      },
-    );
+    switch (input.provider) {
+      case 'exchange-rate':
+        return normalizeProviderSummary(
+          input.provider,
+          input.dryRun,
+          await input.app.get(ExchangeRateIngestionService).ingestUsdKrw({
+            dryRun: input.dryRun,
+            requestedBy: input.actor.userId,
+          }),
+        );
+      case 'korea-exim':
+        return normalizeProviderSummary(
+          input.provider,
+          input.dryRun,
+          await input.app.get(KoreaEximExchangeIngestionService).ingestUsdKrw({
+            dryRun: input.dryRun,
+            requestedBy: input.actor.userId,
+          }),
+        );
+      case 'binance':
+        if (input.targets.binanceSymbols.length === 0) {
+          return noTargetsSummary(input.provider, input.dryRun);
+        }
 
-    return normalizeProviderSummary(input.provider, result);
+        return normalizeProviderSummary(
+          input.provider,
+          input.dryRun,
+          await input.app.get(BinancePriceIngestionService).ingestPrices({
+            dryRun: input.dryRun,
+            requestedBy: input.actor.userId,
+            symbols: input.targets.binanceSymbols,
+          }),
+        );
+      case 'kis':
+        if (
+          input.targets.kisDomesticSymbols.length === 0 &&
+          input.targets.kisUsSymbols.length === 0
+        ) {
+          return noTargetsSummary(input.provider, input.dryRun);
+        }
+
+        return normalizeProviderSummary(
+          input.provider,
+          input.dryRun,
+          await input.app
+            .get(KisRestCurrentPriceIngestionService)
+            .ingestCurrentPrices({
+              dryRun: input.dryRun,
+              requestedBy: input.actor.userId,
+              domesticSymbols: input.targets.kisDomesticSymbols,
+              usSymbols: input.targets.kisUsSymbols,
+              maxSnapshots: input.maxSnapshots,
+            }),
+        );
+    }
   } catch (error) {
-    const { errorCode, errorMessage } = readSafeError(error);
+    const safeError = readSafeError(error);
     return {
       provider: input.provider,
       state: 'failed',
@@ -249,162 +413,100 @@ async function runOneProvider(input: {
       wouldCreate: 0,
       skipped: 0,
       failed: 1,
-      errorCode,
-      errorMessage,
+      errorCode: safeError.errorCode,
+      errorMessage: safeError.errorMessage,
     };
   }
 }
 
-function shouldRunExchangeRateFallback(summary: ProviderSummary) {
-  return summary.state !== 'completed' && summary.state !== 'partial';
-}
-
 function normalizeProviderSummary(
   provider: ProviderName,
+  dryRun: boolean,
   result: unknown,
 ): ProviderSummary {
-  const data = readRecord(result)?.data;
-  const summary = readRecord(data) ?? {};
+  const record = readRecord(result) ?? {};
+  const failed =
+    readNumber(record.failed) ?? (record.success === false ? 1 : 0);
+  const created = readNumber(record.created) ?? 0;
+  const wouldCreate = readNumber(record.wouldCreate) ?? 0;
+  const skipped = readNumber(record.skipped) ?? 0;
+  const errorCode = readString(record.errorCode);
 
   return {
     provider,
-    state: readString(summary.state) ?? 'completed',
-    dryRun: readBoolean(summary.dryRun) ?? false,
-    received: readNumber(summary.received) ?? 0,
-    created: readNumber(summary.created) ?? 0,
-    wouldCreate: readNumber(summary.wouldCreate) ?? 0,
-    skipped: readNumber(summary.skipped) ?? 0,
-    failed: readNumber(summary.failed) ?? 0,
-    errorCode: readString(summary.errorCode),
-    errorMessage: readString(summary.errorMessage),
+    state:
+      failed > 0
+        ? created + wouldCreate + skipped > 0
+          ? 'partial'
+          : 'failed'
+        : 'completed',
+    dryRun,
+    received:
+      readNumber(record.received) ??
+      readNumber(record.symbolCount) ??
+      readArray(record.snapshots)?.length ??
+      0,
+    created,
+    wouldCreate,
+    skipped,
+    failed,
+    errorCode,
+    errorMessage: readString(record.errorMessage),
   };
 }
 
-async function readSnapshotStatus(
-  prisma: PrismaService,
-): Promise<SnapshotStatus> {
-  const now = Date.now();
-  const recent24h = new Date(now - 24 * 60 * 60 * 1000);
-  const recent7d = new Date(now - 7 * 24 * 60 * 60 * 1000);
-
-  const [
-    activeAssets,
-    assetPriceSnapshotsTotal,
-    assetPriceSnapshotsRecent24h,
-    fxRateSnapshotsTotal,
-    usdKrwFxRateSnapshotsRecent7d,
-  ] = await Promise.all([
-    prisma.asset.count({
-      where: {
-        isActive: true,
-      },
-    }),
-    prisma.assetPriceSnapshot.count(),
-    prisma.assetPriceSnapshot.count({
-      where: {
-        capturedAt: {
-          gte: recent24h,
-        },
-      },
-    }),
-    prisma.fxRateSnapshot.count(),
-    prisma.fxRateSnapshot.count({
-      where: {
-        baseCurrency: CurrencyCode.USD,
-        quoteCurrency: CurrencyCode.KRW,
-        capturedAt: {
-          gte: recent7d,
-        },
-      },
-    }),
-  ]);
-
+function noTargetsSummary(
+  provider: ProviderName,
+  dryRun: boolean,
+): ProviderSummary {
   return {
-    activeAssets,
-    assetPriceSnapshotsTotal,
-    assetPriceSnapshotsRecent24h,
-    fxRateSnapshotsTotal,
-    usdKrwFxRateSnapshotsRecent7d,
+    provider,
+    state: 'no_targets',
+    dryRun,
+    received: 0,
+    created: 0,
+    wouldCreate: 0,
+    skipped: 0,
+    failed: 0,
+    errorCode: 'NO_PROVIDER_TARGET',
+    errorMessage: 'No provider targets resolved for this provider.',
   };
 }
 
-async function printLatestSnapshots(prisma: PrismaService) {
-  const latestAssetSnapshots = await prisma.assetPriceSnapshot.findMany({
-    orderBy: {
-      capturedAt: 'desc',
-    },
-    take: 20,
-    select: {
-      price: true,
-      currencyCode: true,
-      sourceType: true,
-      sourceName: true,
-      capturedAt: true,
-      asset: {
-        select: {
-          symbol: true,
-          assetType: true,
-          market: true,
-        },
-      },
-    },
-  });
+function printHeader(title: string) {
+  console.log(title);
+}
 
+function printProviderTargetSummary(targets: ProviderTargets) {
   console.log('');
-  console.log('Latest asset snapshots');
-  if (latestAssetSnapshots.length === 0) {
-    console.log('- none');
-  }
-
-  for (const snapshot of latestAssetSnapshots) {
-    console.log(
-      `- ${snapshot.asset.symbol} / ${snapshot.asset.assetType} / ${snapshot.asset.market} / ${snapshot.currencyCode} / ${snapshot.price.toString()} / ${snapshot.sourceType} / ${snapshot.sourceName ?? 'unknown'} / capturedAt=${snapshot.capturedAt.toISOString()}`,
-    );
-  }
-
-  const latestFxSnapshots = await prisma.fxRateSnapshot.findMany({
-    where: {
-      baseCurrency: CurrencyCode.USD,
-      quoteCurrency: CurrencyCode.KRW,
-    },
-    orderBy: {
-      capturedAt: 'desc',
-    },
-    take: 10,
-    select: {
-      baseCurrency: true,
-      quoteCurrency: true,
-      rate: true,
-      sourceType: true,
-      sourceName: true,
-      capturedAt: true,
-    },
-  });
-
-  console.log('');
-  console.log('Latest FX snapshots');
-  if (latestFxSnapshots.length === 0) {
-    console.log('- none');
-  }
-
-  for (const snapshot of latestFxSnapshots) {
-    console.log(
-      `- ${snapshot.baseCurrency}/${snapshot.quoteCurrency} / ${snapshot.rate.toString()} / ${snapshot.sourceType} / ${snapshot.sourceName ?? 'unknown'} / capturedAt=${snapshot.capturedAt.toISOString()}`,
-    );
+  console.log('Provider target summary');
+  console.log(`- target source: ${targets.targetSource}`);
+  console.log(`- active assets: ${targets.activeAssetCount}`);
+  console.log(`- binance symbols: ${formatSymbols(targets.binanceSymbols)}`);
+  console.log(
+    `- kis domestic symbols: ${formatSymbols(targets.kisDomesticSymbols)}`,
+  );
+  console.log(`- kis us symbols: ${formatSymbols(targets.kisUsSymbols)}`);
+  if (targets.unsupportedAssets.length > 0) {
+    console.log('- unsupported active assets:');
+    for (const asset of targets.unsupportedAssets) {
+      console.log(
+        `  - assetId=${asset.assetId}, symbol=${asset.symbol}, assetType=${asset.assetType}, market=${asset.market}, reason=${asset.reason}`,
+      );
+    }
   }
 }
 
 function printProviderSummary(summaries: ProviderSummary[]) {
-  console.log('Provider ingestion summary');
+  console.log('');
+  console.log('Provider run summary');
   for (const summary of summaries) {
     const details = [
       `${summary.provider}: ${summary.state}`,
-      `dryRun=${summary.dryRun}`,
-      `received=${summary.received}`,
       `created=${summary.created}`,
-      `wouldCreate=${summary.wouldCreate}`,
       `skipped=${summary.skipped}`,
       `failed=${summary.failed}`,
+      `wouldCreate=${summary.wouldCreate}`,
       summary.errorCode ? `errorCode=${summary.errorCode}` : null,
       summary.errorMessage ? `errorMessage=${summary.errorMessage}` : null,
     ].filter(Boolean);
@@ -413,61 +515,60 @@ function printProviderSummary(summaries: ProviderSummary[]) {
   }
 }
 
-function printSnapshotStatus(status: SnapshotStatus) {
+function printSnapshotStatus(input: {
+  assetPriceSnapshotsTotal: number;
+  fxRateSnapshotsTotal: number;
+}) {
   console.log('');
   console.log('Snapshot status');
-  console.log(`- active assets: ${status.activeAssets}`);
   console.log(
-    `- asset_price_snapshots total: ${status.assetPriceSnapshotsTotal}`,
+    `- asset_price_snapshots total: ${input.assetPriceSnapshotsTotal}`,
+  );
+  console.log(`- fx_rate_snapshots total: ${input.fxRateSnapshotsTotal}`);
+}
+
+function printCoverageSummary(
+  health: Awaited<
+    ReturnType<MarketSnapshotHealthService['checkActiveAssetCoverage']>
+  >,
+) {
+  console.log('');
+  console.log('Coverage summary');
+  console.log(
+    `- price available: ${health.coverage.priceAvailable}/${health.coverage.activeAssets}`,
   );
   console.log(
-    `- asset_price_snapshots recent 24h: ${status.assetPriceSnapshotsRecent24h}`,
+    `- price unavailable: ${health.coverage.priceUnavailable}/${health.coverage.activeAssets}`,
   );
-  console.log(`- fx_rate_snapshots total: ${status.fxRateSnapshotsTotal}`);
   console.log(
-    `- USD/KRW fx_rate_snapshots recent 7d: ${status.usdKrwFxRateSnapshotsRecent7d}`,
+    `- USD/KRW FX: ${health.fxUsdKrw.state}${health.fxUsdKrw.reason ? ` reason=${health.fxUsdKrw.reason}` : ''}`,
   );
 }
 
-function warnOnVerificationGaps(input: {
-  summaries: ProviderSummary[];
-  status: SnapshotStatus;
-}) {
-  const completedOrSkipped = input.summaries.some((summary) =>
-    ['completed', 'partial', 'skipped'].includes(summary.state),
-  );
+function printUnavailableAssets(
+  unavailableAssets: Awaited<
+    ReturnType<MarketSnapshotHealthService['checkActiveAssetCoverage']>
+  >['unavailableAssets'],
+) {
+  console.log('');
+  console.log('Unavailable assets');
+  if (unavailableAssets.length === 0) {
+    console.log('- none');
+    return;
+  }
 
-  if (!completedOrSkipped) {
-    console.warn(
-      'Warning: provider execution failed for all attempted providers.',
+  for (const asset of unavailableAssets) {
+    console.log(
+      `- assetId=${asset.assetId}, symbol=${asset.symbol}, reason=${asset.reason ?? 'UNKNOWN'}`,
     );
-    process.exitCode = 1;
   }
+}
 
-  if (input.status.activeAssets === 0) {
-    console.warn('Warning: active assets count is 0.');
-  }
-
-  if (input.status.assetPriceSnapshotsTotal === 0) {
-    console.warn('Warning: asset_price_snapshots count is 0.');
-  }
-
-  if (input.status.fxRateSnapshotsTotal === 0) {
-    console.warn('Warning: fx_rate_snapshots count is 0.');
-  }
+function formatSymbols(symbols: string[]) {
+  return symbols.length > 0 ? symbols.join(', ') : 'none';
 }
 
 function readSafeError(error: unknown) {
-  if (error instanceof HttpException) {
-    const response = error.getResponse();
-    const record = readRecord(response);
-    const errorRecord = readRecord(record?.error);
-    return {
-      errorCode: readString(errorRecord?.code) ?? `HTTP_${error.getStatus()}`,
-      errorMessage: readString(errorRecord?.message) ?? error.message,
-    };
-  }
-
   if (error instanceof Error) {
     return {
       errorCode: error.name || 'ERROR',
@@ -491,46 +592,18 @@ function readString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
-function readBoolean(value: unknown): boolean | undefined {
-  return typeof value === 'boolean' ? value : undefined;
-}
-
 function readNumber(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value)
     ? value
     : undefined;
 }
 
-async function main() {
-  requireDatabaseUrl();
-  const args = parseCliArgs(process.argv.slice(2));
-  const app = await NestFactory.createApplicationContext(AppModule, {
-    logger: ['error', 'warn'],
-  });
-
-  try {
-    const prisma = app.get(PrismaService);
-    const service = app.get(OperatorProviderIngestionService);
-    const actor = await findOperatorActor(prisma, args);
-    const summaries = await runProviders({
-      service,
-      actor,
-      providers: args.providers,
-      dryRun: args.dryRun,
-    });
-    const status = await readSnapshotStatus(prisma);
-
-    printProviderSummary(summaries);
-    printSnapshotStatus(status);
-    await printLatestSnapshots(prisma);
-    warnOnVerificationGaps({ summaries, status });
-  } finally {
-    await app.close();
-  }
+function readArray(value: unknown): unknown[] | undefined {
+  return Array.isArray(value) ? value : undefined;
 }
 
 if (require.main === module) {
-  main().catch((error: unknown) => {
+  runProviderIngestionCheck(process.argv.slice(2)).catch((error: unknown) => {
     process.exitCode = 1;
     if (error instanceof Error) {
       console.error(`dev provider ingestion failed: ${error.message}`);

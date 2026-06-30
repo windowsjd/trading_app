@@ -101,11 +101,44 @@ const DENIED_WORKFLOWS: ReadonlySet<ProviderDeniedWorkflow> = new Set([
 ]);
 
 export const PROVIDER_FRESHNESS_THRESHOLDS_SECONDS = {
-  fxUsdKrw: 300,
+  fxUsdKrwDisplay: 7200,
+  fxUsdKrwQuote: 300,
   fxUsdKrwExecute: 60,
-  assetPrice: 60,
+  assetPriceDisplay: 300,
+  assetPriceQuote: 60,
   assetPriceExecute: 10,
 } as const;
+
+export type ProviderFreshnessThresholdsSeconds = Record<
+  keyof typeof PROVIDER_FRESHNESS_THRESHOLDS_SECONDS,
+  number
+>;
+
+type FreshnessEnv = Record<string, string | undefined>;
+
+export function getProviderFreshnessThresholdsSeconds(
+  env: FreshnessEnv = process.env,
+): ProviderFreshnessThresholdsSeconds {
+  return {
+    ...PROVIDER_FRESHNESS_THRESHOLDS_SECONDS,
+    fxUsdKrwDisplay: readFreshnessOverride(
+      env.PROVIDER_FX_RATE_DISPLAY_FRESHNESS_SECONDS,
+      PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.fxUsdKrwDisplay,
+    ),
+    fxUsdKrwQuote: readFreshnessOverride(
+      env.PROVIDER_FX_RATE_QUOTE_FRESHNESS_SECONDS,
+      PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.fxUsdKrwQuote,
+    ),
+    assetPriceDisplay: readFreshnessOverride(
+      env.PROVIDER_ASSET_PRICE_DISPLAY_FRESHNESS_SECONDS,
+      PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.assetPriceDisplay,
+    ),
+    assetPriceQuote: readFreshnessOverride(
+      env.PROVIDER_ASSET_PRICE_QUOTE_FRESHNESS_SECONDS,
+      PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.assetPriceQuote,
+    ),
+  };
+}
 
 export function isProviderWorkflowAllowed(
   workflow: string,
@@ -146,10 +179,9 @@ export function resolveFxProviderEligibility(input: {
     eligible: true,
     sourceName: PROVIDER_SOURCE_NAMES.fxUsdKrw,
     sourceNames: FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
-    freshnessThresholdSeconds:
-      input.workflow === 'fx_execute' || input.workflow === 'orders_execute'
-        ? PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.fxUsdKrwExecute
-        : PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.fxUsdKrw,
+    freshnessThresholdSeconds: resolveFxFreshnessThresholdSeconds(
+      input.workflow,
+    ),
   };
 }
 
@@ -176,10 +208,9 @@ export function resolveAssetProviderEligibility(input: {
     return {
       eligible: true,
       sourceName: PROVIDER_SOURCE_NAMES.domesticStockKrx,
-      freshnessThresholdSeconds:
-        input.workflow === 'orders_execute'
-          ? PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.assetPriceExecute
-          : PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.assetPrice,
+      freshnessThresholdSeconds: resolveAssetPriceFreshnessThresholdSeconds(
+        input.workflow,
+      ),
     };
   }
 
@@ -191,10 +222,9 @@ export function resolveAssetProviderEligibility(input: {
     return {
       eligible: true,
       sourceName: PROVIDER_SOURCE_NAMES.usStock,
-      freshnessThresholdSeconds:
-        input.workflow === 'orders_execute'
-          ? PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.assetPriceExecute
-          : PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.assetPrice,
+      freshnessThresholdSeconds: resolveAssetPriceFreshnessThresholdSeconds(
+        input.workflow,
+      ),
     };
   }
 
@@ -206,10 +236,9 @@ export function resolveAssetProviderEligibility(input: {
     return {
       eligible: true,
       sourceName: PROVIDER_SOURCE_NAMES.cryptoUsd,
-      freshnessThresholdSeconds:
-        input.workflow === 'orders_execute'
-          ? PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.assetPriceExecute
-          : PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.assetPrice,
+      freshnessThresholdSeconds: resolveAssetPriceFreshnessThresholdSeconds(
+        input.workflow,
+      ),
     };
   }
 
@@ -682,4 +711,65 @@ function isUsNasNysMarketFamily(market: string): boolean {
     market === 'NYS' ||
     market === 'NYSE'
   );
+}
+
+function resolveFxFreshnessThresholdSeconds(
+  workflow: ProviderEligibleWorkflow,
+): number {
+  const thresholds = getProviderFreshnessThresholdsSeconds();
+  if (workflow === 'fx_execute' || workflow === 'orders_execute') {
+    return thresholds.fxUsdKrwExecute;
+  }
+
+  if (workflow === 'fx_quote' || workflow === 'orders_quote') {
+    return thresholds.fxUsdKrwQuote;
+  }
+
+  if (isDisplayFreshnessWorkflow(workflow)) {
+    return thresholds.fxUsdKrwDisplay;
+  }
+
+  return thresholds.fxUsdKrwQuote;
+}
+
+function resolveAssetPriceFreshnessThresholdSeconds(
+  workflow: ProviderEligibleWorkflow,
+): number {
+  const thresholds = getProviderFreshnessThresholdsSeconds();
+  if (workflow === 'orders_execute') {
+    return thresholds.assetPriceExecute;
+  }
+
+  if (isDisplayFreshnessWorkflow(workflow)) {
+    return thresholds.assetPriceDisplay;
+  }
+
+  return thresholds.assetPriceQuote;
+}
+
+function isDisplayFreshnessWorkflow(
+  workflow: ProviderEligibleWorkflow,
+): boolean {
+  return (
+    workflow === 'assets_with_price' ||
+    workflow === 'home_live_valuation' ||
+    workflow === 'positions_live_valuation' ||
+    workflow === 'live_portfolio_valuation'
+  );
+}
+
+function readFreshnessOverride(
+  value: string | undefined,
+  fallback: number,
+): number {
+  if (value === undefined || value.trim() === '') {
+    return fallback;
+  }
+
+  const parsed = Number(value.trim());
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    return fallback;
+  }
+
+  return parsed;
 }

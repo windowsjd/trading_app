@@ -1,4 +1,9 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  OnModuleDestroy,
+  OnModuleInit,
+  Optional,
+} from '@nestjs/common';
 import {
   OpsJobName,
   OpsJobRunStatus,
@@ -16,6 +21,7 @@ import {
   OpsJobRunnerService,
 } from './ops-job-runner.service';
 import { OpsJobRunService } from './ops-job-run.service';
+import { MarketSnapshotHealthService } from '../providers/market-snapshot-health.service';
 
 @Injectable()
 export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
@@ -24,6 +30,8 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly runner: OpsJobRunnerService,
     private readonly runService: OpsJobRunService,
+    @Optional()
+    private readonly marketSnapshotHealthService?: MarketSnapshotHealthService,
   ) {}
 
   onModuleInit() {
@@ -139,9 +147,12 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
       maxAttempts: config.maxAttempts,
     };
 
-    return this.runEnabledProviderJobs(now, baseInput, config, {
+    const results = await this.runEnabledProviderJobs(now, baseInput, config, {
       respectInterval: false,
     });
+    await this.warnOnStartupMarketSnapshotHealth(results);
+
+    return results;
   }
 
   private async runEnabledProviderJobs(
@@ -243,6 +254,52 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
 
     const lastRunAt = latestRun.finishedAt ?? latestRun.startedAt;
     return now.getTime() - lastRunAt.getTime() >= intervalSeconds * 1000;
+  }
+
+  private async warnOnStartupMarketSnapshotHealth(
+    results: OpsJobRunnerResponse[],
+  ) {
+    if (!this.marketSnapshotHealthService || results.length === 0) {
+      return;
+    }
+
+    try {
+      const health =
+        await this.marketSnapshotHealthService.checkActiveAssetCoverage();
+      if (health.status === 'pass') {
+        return;
+      }
+
+      console.warn('Market snapshot health check failed after startup run.', {
+        status: health.status,
+        coverage: health.coverage,
+        fxUsdKrw: {
+          state: health.fxUsdKrw.state,
+          required: health.fxUsdKrw.required,
+          reason: health.fxUsdKrw.reason,
+        },
+        targetSummary: {
+          targetSource: health.targetSummary.targetSource,
+          activeAssetCount: health.targetSummary.activeAssetCount,
+          binanceSymbolCount: health.targetSummary.binanceSymbolCount,
+          kisDomesticSymbolCount: health.targetSummary.kisDomesticSymbolCount,
+          kisUsSymbolCount: health.targetSummary.kisUsSymbolCount,
+          unsupportedAssetCount: health.targetSummary.unsupportedAssets.length,
+        },
+        unavailableAssets: health.unavailableAssets.map((asset) => ({
+          assetId: asset.assetId,
+          symbol: asset.symbol,
+          reason: asset.reason,
+        })),
+      });
+    } catch (error) {
+      console.warn(
+        'Market snapshot health check failed to run after startup.',
+        {
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      );
+    }
   }
 }
 

@@ -12,8 +12,10 @@ import { KisRestCurrentPriceIngestionService } from './kis/kis-rest-current-pric
 import { KisRestHogaIngestionService } from './kis/kis-rest-hoga.ingestion.service';
 import { KisWebSocketClient } from './kis/kis-websocket.client';
 import { KisWebSocketIngestionService } from './kis/kis-websocket.ingestion.service';
+import { MarketSnapshotHealthService } from './market-snapshot-health.service';
 import { ProviderConfigService } from './provider-config.service';
 import { ProviderHttpClient } from './provider-http.client';
+import { ProviderTargetResolverService } from './provider-target-resolver.service';
 
 @Module({
   imports: [PrismaModule],
@@ -32,6 +34,8 @@ import { ProviderHttpClient } from './provider-http.client';
     KisRestHogaIngestionService,
     KisWebSocketIngestionService,
     KisWebSocketClient,
+    ProviderTargetResolverService,
+    MarketSnapshotHealthService,
   ],
   exports: [
     ProviderConfigService,
@@ -46,6 +50,8 @@ import { ProviderHttpClient } from './provider-http.client';
     KisRestHogaIngestionService,
     KisWebSocketIngestionService,
     KisWebSocketClient,
+    ProviderTargetResolverService,
+    MarketSnapshotHealthService,
   ],
 })
 export class ProvidersModule {}

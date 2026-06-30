@@ -6,14 +6,22 @@ This document records current MVP provider evidence capture and the boundary aft
 
 Current MVP provider stack:
 
-- FX: ExchangeRate-API.
+- FX: Korea EXIM exchange first, ExchangeRate-API fallback.
 - Crypto: Binance public REST.
-- Domestic stock: KIS WebSocket domestic KRX `H0STCNT0`.
-- US stock: KIS WebSocket overseas/US `HDFSCNT0`.
+- Domestic stock: KIS REST current price and KIS WebSocket domestic KRX `H0STCNT0`.
+- US stock: KIS REST current price and KIS WebSocket overseas/US `HDFSCNT0`.
 
 OANDA and Twelve Data are historical/fallback research candidates only. They are not the current MVP core provider stack and are not blockers for the KIS US retry or source eligibility sequencing.
 
 Evidence capture result as of 2026-05-14: Binance public `BTCUSDT` ticker and orderbook fixtures were captured successfully without credentials. OANDA and Twelve Data evidence is retained as historical/fallback candidate context.
+
+Market snapshot readiness update:
+
+- Provider ingestion remains disabled by default through `PROVIDER_INGESTION_ENABLED=false`; real runs must enable common provider ingestion and the specific FX/Binance/KIS provider flags.
+- Provider runner targets can now be resolved from active DB assets with `SCHEDULER_PROVIDER_TARGET_SOURCE=active_assets`, from env watchlists with `env`, or from both with the default `merged`.
+- Active asset coverage, not provider run completion alone, is the local success criterion. `pnpm dev:ensure-market-snapshots -- --operator-email <operator@example.com>` runs FX first, then Binance/KIS, checks `asset_price_snapshots` and `fx_rate_snapshots`, and fails non-zero when active asset display coverage remains unavailable.
+- Display/read freshness is wider than execute freshness: asset display defaults to 300 seconds and USD/KRW display defaults to 7200 seconds. Quote defaults remain shorter, and order/FX execute freshness remains strict.
+- Fake asset price seed rows, fake FX seed rows, and generated fallback prices remain prohibited.
 
 Implementation readiness update on 2026-05-27: provider ingestion foundation is implemented for explicit operator-run ExchangeRate-API USD/KRW, Binance public REST crypto price snapshot insertion, and KIS WebSocket trade price snapshot insertion for domestic KRX `H0STCNT0` and US delayed/free `HDFSCNT0` feeds. At that historical point this did not open provider_api source eligibility for quote, execute, valuation, daily snapshot, ranking, or settlement. Current eligibility is opened only for explicitly allowed read-only/quote workflows, `/fx execute`, orders execute, operator-run daily portfolio snapshot valuation, and explicit operator/admin market-data ingestion triggers. KIS REST current-price ingestion and KIS REST hoga/orderbook snapshot ingestion are now implemented. Binance WebSocket, production provider scheduling, batch HTTP APIs, hoga-based execution, and real trading/account APIs remain unimplemented.
 

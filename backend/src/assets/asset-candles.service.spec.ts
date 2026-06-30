@@ -186,6 +186,7 @@ describe('AssetCandlesService', () => {
           code,
         },
       });
+      return httpError.getResponse();
     }
   };
 
@@ -364,6 +365,55 @@ describe('AssetCandlesService', () => {
     });
     expect(kisAuthClient.requestConfiguredRestToken).not.toHaveBeenCalled();
     expectNoWrites(prisma);
+  });
+
+  it('allows a 1m domestic stock interval as 1-minute server-side buckets', async () => {
+    const { prisma, kisQuoteClient, service } = createService();
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({
+        id: 'asset-samsung-1m',
+        symbol: '005930',
+        name: 'Samsung Electronics',
+        market: 'KRX',
+        assetType: AssetType.domestic_stock,
+        currencyCode: CurrencyCode.KRW,
+      }),
+    );
+    kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
+      state: 'available',
+      receivedAt: new Date('2026-06-19T03:00:01.000Z'),
+      response: {
+        rt_cd: '0',
+        output2: [
+          domesticRow('20260619', '090100', '101'),
+          domesticRow('20260619', '090000', '100'),
+        ],
+      },
+    });
+
+    const response = await service.getAssetCandles(
+      'user-1',
+      'asset-samsung-1m',
+      {
+        interval: '1m',
+        date: '2026-06-19',
+        to: '100000',
+      },
+    );
+
+    expect(response.data.interval).toBe('1m');
+    expect(response.data.candles).toMatchObject([
+      {
+        sourceDate: '20260619',
+        sourceTime: '090000',
+        close: '100.00000000',
+      },
+      {
+        sourceDate: '20260619',
+        sourceTime: '090100',
+        close: '101.00000000',
+      },
+    ]);
   });
 
   it('uses the domestic daily minute endpoint for past dates', async () => {
@@ -757,7 +807,7 @@ describe('AssetCandlesService', () => {
     });
 
     const response = await service.getAssetCandles('user-1', 'asset-btc', {
-      interval: '5m',
+      interval: '1m',
       limit: '1500',
       date: '2026-06-21',
       to: '2026-06-21T04:30:00.000Z',
@@ -765,7 +815,7 @@ describe('AssetCandlesService', () => {
 
     expect(binancePublicClient.fetchKlines).toHaveBeenCalledWith({
       symbol: 'BTCUSDT',
-      interval: '5m',
+      interval: '1m',
       limit: 100,
       startTime: Date.parse('2026-06-21T00:00:00.000Z'),
       endTime: Date.parse('2026-06-21T04:30:00.000Z'),
@@ -784,7 +834,7 @@ describe('AssetCandlesService', () => {
           priceCurrency: CurrencyCode.USD,
         },
         range: '1d',
-        interval: '5m',
+        interval: '1m',
         requestedDate: '2026-06-21',
         candles: [
           {
@@ -814,7 +864,7 @@ describe('AssetCandlesService', () => {
           provider: 'binance',
           endpoint: '/api/v3/klines',
           symbol: 'BTCUSDT',
-          interval: '5m',
+          interval: '1m',
           requestedCount: 100,
           returnedCount: 2,
         },
@@ -1006,7 +1056,7 @@ describe('AssetCandlesService', () => {
     );
   });
 
-  it.each(['5m', '15m', '30m', '1h', '4h', '1d', '1w'])(
+  it.each(['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'])(
     'allows canonical crypto interval %s',
     async (interval) => {
       const { prisma, binancePublicClient, service } = createService();
@@ -1034,7 +1084,7 @@ describe('AssetCandlesService', () => {
     },
   );
 
-  it.each(['5m', '15m', '30m', '1h', '4h', '1d', '1w'])(
+  it.each(['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'])(
     'allows canonical stock interval %s',
     async (interval) => {
       const { prisma, kisQuoteClient, service } = createService();
@@ -1081,7 +1131,7 @@ describe('AssetCandlesService', () => {
     },
   );
 
-  it.each(['1m', '3m', '2m', '10m', '1M'])(
+  it.each(['3m', '2m', '10m', '1M'])(
     'rejects unsupported candle interval %s',
     async (interval) => {
       const { prisma, kisQuoteClient, binancePublicClient, service } =
@@ -1108,6 +1158,35 @@ describe('AssetCandlesService', () => {
     },
   );
 
+  it('includes 1m in the unsupported interval validation message', async () => {
+    const { prisma, service } = createService();
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({
+        id: 'asset-btc-invalid-interval-message',
+        symbol: 'BTC',
+        market: 'BINANCE',
+        assetType: AssetType.crypto,
+        currencyCode: CurrencyCode.USD,
+      }),
+    );
+
+    const response = await expectApiError(
+      service.getAssetCandles('user-1', 'asset-btc-invalid-interval-message', {
+        interval: '3m',
+      }),
+      400,
+      'ASSET_CANDLES_INVALID_INTERVAL',
+    );
+
+    expect(response).toMatchObject({
+      success: false,
+      error: {
+        message:
+          'interval must be one of 1m, 5m, 15m, 30m, 1h, 4h, 1d, or 1w.',
+      },
+    });
+  });
+
   it('rejects unsupported candle range before calling providers', async () => {
     const { prisma, kisQuoteClient, binancePublicClient, service } =
       createService();
@@ -1132,7 +1211,7 @@ describe('AssetCandlesService', () => {
     expect(binancePublicClient.fetchKlines).not.toHaveBeenCalled();
   });
 
-  it.each(['1m', '2m', '3m', '10m'])(
+  it.each(['2m', '3m', '10m'])(
     'rejects unsupported stock interval %s before calling KIS',
     async (interval) => {
       const { prisma, kisQuoteClient, service } = createService();

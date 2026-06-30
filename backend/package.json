@@ -17,6 +17,7 @@
     "test:db:prepare": "prisma migrate deploy",
     "dev:open-season": "tsx scripts/dev-open-season.ts",
     "dev:run-provider-ingestions": "tsx scripts/dev-run-provider-ingestions.ts",
+    "dev:ensure-market-snapshots": "tsx scripts/dev-ensure-market-snapshots.ts",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",

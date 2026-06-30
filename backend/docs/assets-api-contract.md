@@ -254,7 +254,8 @@ Trading note policy:
 - Crypto candles are display-only and are not used for orders, quotes, valuation, ranking, settlement, scheduler jobs, `asset_price_snapshots`, or `fx_rate_snapshots`.
 - Crypto symbol normalization uses the asset symbol: `BTC` -> `BTCUSDT`, `ETH` -> `ETHUSDT`, existing `BTCUSDT` stays unchanged, and `BTC/USD`, `BTC-USD`, or `BTC_USD` normalize to `BTCUSDT`.
 - Binance USDT quote pairs are treated as USD-equivalent market data under the current MVP policy.
-- 지원 candle interval은 5m, 15m, 30m, 1h, 4h, 1d, 1w만 허용한다.
+- `GET /api/v1/assets/:assetId/candles` supports interval values: `1m`, `5m`, `15m`, `30m`, `1h`, `4h`, `1d`, `1w`.
+- The frontend asset detail chart tabs use the same order: `1m`, `5m`, `15m`, `30m`, `1h`, `4h`, `1d`, `1w`.
 - 그 외 interval은 validation error로 처리한다.
 - 필요 시 서버가 더 짧은 원천 candle을 집계해 상위 interval candle을 생성한다.
 - Raw Binance rows, raw provider payloads, metadata JSON, and secrets are never exposed.
@@ -262,11 +263,11 @@ Trading note policy:
 ### Query Parameters
 
 - `interval` optional. Default is `5m`.
-  - Allowed for all asset candle types: `5m`, `15m`, `30m`, `1h`, `4h`, `1d`, `1w`.
+  - Allowed for all asset candle types: `1m`, `5m`, `15m`, `30m`, `1h`, `4h`, `1d`, `1w`.
 - `limit` optional.
   - Default: `100`.
   - Must be a positive integer.
-  - Crypto values greater than `1000` are clamped to `1000`.
+  - Values greater than `100` are clamped to `100`.
 - `date` optional `YYYY-MM-DD`.
   - When present for crypto, Binance receives UTC `startTime` at that date's start and `endTime` at that date's end unless `to` is provided.
 - `to` optional `HHmmss` or ISO datetime.

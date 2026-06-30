@@ -24,7 +24,7 @@ This service owns backend APIs, database access, financial calculations, and ser
 - KRW and USD cash wallets. US stocks and USD-settled crypto use the USD wallet.
 - Final valuation policy is KRW total assets.
 - Provider ingestion foundation exists for Korea EXIM exchange and ExchangeRate-API USD/KRW, Binance public REST crypto, KIS REST current-price snapshots, and KIS WebSocket KRX/US stock market data row insertion.
-- `GET /api/v1/assets/:assetId/candles` supports domestic/US stock candles through KIS and crypto chart candles through Binance Spot `GET /api/v3/klines`. 지원 candle interval은 5m, 15m, 30m, 1h, 4h, 1d, 1w만 허용한다. 그 외 interval은 validation error로 처리한다. 필요 시 서버가 더 짧은 원천 candle을 집계해 상위 interval candle을 생성한다.
+- `GET /api/v1/assets/:assetId/candles` supports domestic/US stock candles through KIS and crypto chart candles through Binance Spot `GET /api/v3/klines`. 지원 candle interval은 1m, 5m, 15m, 30m, 1h, 4h, 1d, 1w만 허용한다. 프론트 자산 상세 차트 탭도 1m, 5m, 15m, 30m, 1h, 4h, 1d, 1w 순서를 사용한다. 그 외 interval은 validation error로 처리한다. 필요 시 서버가 더 짧은 원천 candle을 집계해 상위 interval candle을 생성한다.
 - Provider_api source eligibility is opened only for explicitly allowed workflows: `/fx quote`, `/fx execute`, assets `withPrice`, orders quote, order execution, live portfolio/home/positions valuation, the operator-run daily portfolio snapshot valuation job, and season settlement valuation. Orders create uses the durable quote and immediate execution path.
 - Asset list/detail/price `changeRate` is calculated from the immediately previous positive `asset_price_snapshots.price` row for the same asset and price currency; it is `null` when no valid previous positive snapshot exists. Provider raw payloads, provider-specific ticker change fields, tokens, secrets, and private ledger data are not exposed.
 - Read-only/quote responses expose backward-compatible optional source metadata for provider/admin visibility: `rateSource`, `priceSource`, `assetPriceSource`, `fxRateSource`, and live valuation source summaries where applicable.
@@ -107,19 +107,53 @@ SCHEDULER_PROVIDER_BINANCE_INTERVAL_SECONDS=60
 SCHEDULER_PROVIDER_KIS_INTERVAL_SECONDS=60
 
 SCHEDULER_PROVIDER_INGESTION_RUN_ON_STARTUP=true
+SCHEDULER_PROVIDER_TARGET_SOURCE=merged
 
 PROVIDER_INGESTION_ENABLED=true
 ```
 
-Provider intervals are checked against the latest `ops_job_runs` row and do not create noisy skipped rows when a provider is not due. Defaults are FX 3600 seconds, Binance 60 seconds, and KIS 60 seconds. `SCHEDULER_PROVIDER_INGESTION_RUN_ON_STARTUP=true` queues one asynchronous startup run for enabled provider jobs only. KIS REST current price uses `SCHEDULER_PROVIDER_KIS_MAX_SNAPSHOTS`, then `PROVIDER_INGESTION_MAX_SNAPSHOTS`, then `500`.
+Provider intervals are checked against the latest `ops_job_runs` row and do not create noisy skipped rows when a provider is not due. Defaults are FX 3600 seconds, Binance 60 seconds, and KIS 60 seconds. `SCHEDULER_PROVIDER_INGESTION_RUN_ON_STARTUP=true` queues one asynchronous startup run for enabled provider jobs only and then emits a non-fatal market snapshot health warning when active asset coverage is still unavailable. KIS REST current price uses `SCHEDULER_PROVIDER_KIS_MAX_SNAPSHOTS`, then `PROVIDER_INGESTION_MAX_SNAPSHOTS`, then `500`.
+
+`SCHEDULER_PROVIDER_TARGET_SOURCE` controls provider price targets:
+
+- `active_assets`: build Binance/KIS targets only from active DB assets.
+- `env`: use provider env watchlists only.
+- `merged`: combine env watchlists and active DB assets without duplicates. This is the default and keeps existing env behavior while adding active assets automatically.
 
 `PROVIDER_INGESTION_ENABLED=false` is the fail-closed default for provider refresh/ingestion calls. Korea EXIM on-demand refresh requires both `PROVIDER_INGESTION_ENABLED=true` and `KOREA_EXIM_EXCHANGE_ENABLED=true`. If either flag is disabled, `GET /api/v1/fx/rates/current` falls back to existing DB snapshots and returns `FX_RATE_UNAVAILABLE` only when no usable provider row or approved `admin_manual` row exists.
 
 Korea EXIM exchange provider env is `KOREA_EXIM_EXCHANGE_ENABLED`, `KOREA_EXIM_EXCHANGE_AUTH_KEY`, `KOREA_EXIM_EXCHANGE_BASE_URL`, `KOREA_EXIM_EXCHANGE_DATA`, and `KOREA_EXIM_EXCHANGE_LOOKBACK_DAYS`. The request URL is `https://oapi.koreaexim.go.kr/site/program/financial/exchangeJSON` with `authkey`, `searchdate`, and `data=AP01`; USD/KRW uses the USD row's `DEAL_BAS_R` value with commas removed. ExchangeRate-API fallback env is `EXCHANGE_RATE_API_ENABLED`, `EXCHANGE_RATE_API_KEY`, and `EXCHANGE_RATE_API_BASE_URL`. Real auth keys must live only in `.env.local`; `.env.example` keeps the auth key blank. ExchangeRate-API remains the fallback provider after Korea EXIM exchange.
 
-Binance public market data uses `BINANCE_PUBLIC_MARKET_DATA_ENABLED`, `BINANCE_REST_BASE_URL`, `BINANCE_CRYPTO_SYMBOLS`, and `BINANCE_CRYPTO_USDT_AS_USD_EQUIVALENT`, with `BINANCE_REST_BASE_URL` defaulting to `https://api.binance.com` when unset. Crypto candles use only the public Spot `GET /api/v3/klines` endpoint with USDT quote symbols such as `BTCUSDT` and `ETHUSDT`; no Binance API key or secret is required for this candle path.
+Binance public market data uses `BINANCE_PUBLIC_MARKET_DATA_ENABLED`, `BINANCE_REST_BASE_URL`, `BINANCE_CRYPTO_SYMBOLS`, and `BINANCE_CRYPTO_USDT_AS_USD_EQUIVALENT`, with `BINANCE_REST_BASE_URL` defaulting to `https://api.binance.com` when unset. Crypto candles use only the public Spot `GET /api/v3/klines` endpoint with USDT quote symbols such as `BTCUSDT` and `ETHUSDT`; supported kline intervals are `1m`, `5m`, `15m`, `30m`, `1h`, `4h`, `1d`, and `1w`. No Binance API key or secret is required for this candle path.
 
 KIS REST current price ingestion uses `KIS_MARKET_DATA_ENABLED`, `KIS_REST_BASE_URL`, `KIS_APP_KEY`, `KIS_APP_SECRET`, `KIS_DOMESTIC_SYMBOLS`, and `KIS_US_SYMBOLS`. Optional REST overrides are `KIS_REST_DOMESTIC_CURRENT_PRICE_PATH`, `KIS_REST_DOMESTIC_CURRENT_PRICE_TR_ID`, `KIS_REST_US_CURRENT_PRICE_PATH`, and `KIS_REST_US_CURRENT_PRICE_TR_ID`.
+
+Market snapshot readiness requires provider ingestion and at least one USD/KRW FX provider:
+
+```env
+PROVIDER_INGESTION_ENABLED=true
+
+# FX, one of:
+KOREA_EXIM_EXCHANGE_ENABLED=true
+KOREA_EXIM_EXCHANGE_AUTH_KEY=...
+# or
+EXCHANGE_RATE_API_ENABLED=true
+EXCHANGE_RATE_API_KEY=...
+
+# Binance
+BINANCE_PUBLIC_MARKET_DATA_ENABLED=true
+BINANCE_CRYPTO_SYMBOLS=BTCUSDT,ETHUSDT
+
+# KIS
+KIS_MARKET_DATA_ENABLED=true
+KIS_REST_BASE_URL=...
+KIS_APP_KEY=...
+KIS_APP_SECRET=...
+KIS_DOMESTIC_SYMBOLS=005930,000660
+KIS_US_SYMBOLS=AAPL,TSLA
+```
+
+Display/read freshness is intentionally wider than execute freshness. Asset list/detail/price, Home, positions, and live portfolio valuation use display defaults of 300 seconds for asset prices and 7200 seconds for USD/KRW. Quote paths keep shorter quote defaults, and order/FX execute paths keep the strict existing execute defaults of 10 seconds for asset prices and 60 seconds for USD/KRW.
 
 ## Local Commands
 
@@ -140,14 +174,22 @@ npm run dev:open-season
 
 This upserts `sea_2026_s1` as `status=active`, `startAt=2000-01-01T00:00:00.000Z`, and `endAt=2099-12-31T23:59:59.000Z`. This is a temporary development/testing setting only.
 
-Run provider ingestion through the existing operator service and then inspect DB snapshot status:
+Resolve "market data preparing" locally by opening the dev season, running providers, and verifying active asset coverage:
+
+```bash
+cd backend
+pnpm dev:open-season
+pnpm dev:ensure-market-snapshots -- --operator-email <operator@example.com>
+```
+
+Run provider ingestion and inspect DB snapshot/coverage status without the shorter alias:
 
 ```bash
 pnpm dev:run-provider-ingestions -- --operator-email <operator@example.com>
 npm run dev:run-provider-ingestions -- --operator-email <operator@example.com>
 ```
 
-The operator actor must be an existing user with `role=operator` or `role=admin`. You may pass `--operator-user-id <USER_ID>` instead, or set `LOCAL_OPERATOR_USER_ID` / `LOCAL_OPERATOR_EMAIL`. The script defaults to non-dry-run writes; pass `--dry-run` to check providers without inserting snapshots. Limit a run with `--provider binance`, `--provider kis`, `--provider korea-exim`, or `--provider exchange-rate`.
+The operator actor must be an existing user with `role=operator` or `role=admin`. You may pass `--operator-user-id <USER_ID>` instead, or set `LOCAL_OPERATOR_USER_ID` / `LOCAL_OPERATOR_EMAIL`. The scripts default to non-dry-run writes, `--target-source merged`, `--max-snapshots 500`, and fail when active asset price coverage is unavailable. Pass `--dry-run` to check providers without inserting snapshots, `--target-source active_assets|env|merged` to control target resolution, `--no-fail-on-unavailable` for diagnostics only, or limit a run with `--provider binance`, `--provider kis`, `--provider korea-exim`, or `--provider exchange-rate`.
 
 When the app shows market data as preparing or unavailable, verify that the backend has rows in:
 

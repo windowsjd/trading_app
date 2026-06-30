@@ -116,6 +116,16 @@ describe('OpsJobRunnerService', () => {
     const kisRestCurrentPriceIngestionService = {
       ingestCurrentPrices: jest.fn(),
     };
+    const providerTargetResolver = {
+      resolveProviderTargets: jest.fn().mockResolvedValue({
+        targetSource: 'merged',
+        activeAssetCount: 3,
+        binanceSymbols: ['BTCUSDT', 'ETHUSDT'],
+        kisDomesticSymbols: ['005930'],
+        kisUsSymbols: ['AAPL'],
+        unsupportedAssets: [],
+      }),
+    };
     const prisma = {
       season: {
         findMany: jest.fn(),
@@ -145,6 +155,7 @@ describe('OpsJobRunnerService', () => {
       koreaEximExchangeIngestionService,
       binancePriceIngestionService,
       kisRestCurrentPriceIngestionService,
+      providerTargetResolver,
       prisma,
       service: new OpsJobRunnerService(
         dailyPortfolioSnapshotJobService as never,
@@ -155,6 +166,7 @@ describe('OpsJobRunnerService', () => {
         koreaEximExchangeIngestionService as never,
         binancePriceIngestionService as never,
         kisRestCurrentPriceIngestionService as never,
+        providerTargetResolver as never,
         prisma as never,
         lockService as never,
         runService as never,
@@ -286,6 +298,7 @@ describe('OpsJobRunnerService', () => {
     expect(binancePriceIngestionService.ingestPrices).toHaveBeenCalledWith({
       dryRun: false,
       requestedBy: 'scheduler',
+      symbols: ['BTCUSDT', 'ETHUSDT'],
     });
     expect(runService.recordSucceeded).toHaveBeenCalledWith(
       {
@@ -297,6 +310,10 @@ describe('OpsJobRunnerService', () => {
           state: 'completed',
           created: 2,
           failed: 0,
+          targetSummary: expect.objectContaining({
+            targetSource: 'merged',
+            binanceSymbolCount: 2,
+          }),
         }),
       }),
     );
@@ -304,6 +321,63 @@ describe('OpsJobRunnerService', () => {
       lockKey: 'provider_binance_ingest:prices',
       ownerId: 'owner-binance',
     });
+  });
+
+  it('records provider Binance job as succeeded with no_targets when no symbols resolve', async () => {
+    const {
+      binancePriceIngestionService,
+      lockService,
+      providerTargetResolver,
+      runService,
+      service,
+    } = createService();
+    providerTargetResolver.resolveProviderTargets.mockResolvedValueOnce({
+      targetSource: 'active_assets',
+      activeAssetCount: 0,
+      binanceSymbols: [],
+      kisDomesticSymbols: [],
+      kisUsSymbols: [],
+      unsupportedAssets: [],
+    });
+    lockService.acquireLock.mockResolvedValueOnce({
+      acquired: true,
+      lockKey: 'provider_binance_ingest:prices',
+      ownerId: 'owner-binance',
+      expiresAt: new Date('2026-06-08T00:10:00.000Z'),
+    });
+    runService.createRunning.mockResolvedValueOnce({
+      id: 'run-binance',
+      startedAt,
+    });
+    runService.recordSucceeded.mockResolvedValueOnce({
+      serialized: serializedRun({
+        jobName: OpsJobName.provider_binance_ingest,
+      }),
+    });
+
+    const response = await service.runProviderBinanceIngestJob({
+      trigger: OpsJobTrigger.test,
+      targetSource: 'active_assets',
+    });
+
+    expect(response.success).toBe(true);
+    expect(binancePriceIngestionService.ingestPrices).not.toHaveBeenCalled();
+    expect(runService.recordSucceeded).toHaveBeenCalledWith(
+      {
+        id: 'run-binance',
+        startedAt,
+      },
+      expect.objectContaining({
+        resultJson: expect.objectContaining({
+          state: 'no_targets',
+          reason: 'NO_PROVIDER_TARGET',
+          targetSummary: expect.objectContaining({
+            targetSource: 'active_assets',
+            binanceSymbolCount: 0,
+          }),
+        }),
+      }),
+    );
   });
 
   it('runs provider KIS REST current price ingestion with maxSnapshots through the locked provider service', async () => {
@@ -361,6 +435,8 @@ describe('OpsJobRunnerService', () => {
     ).toHaveBeenCalledWith({
       dryRun: false,
       requestedBy: 'scheduler',
+      domesticSymbols: ['005930'],
+      usSymbols: ['AAPL'],
       maxSnapshots: 10,
     });
     expect(runService.recordSucceeded).toHaveBeenCalledWith(
@@ -373,6 +449,10 @@ describe('OpsJobRunnerService', () => {
           state: 'completed',
           created: 2,
           failed: 0,
+          targetSummary: expect.objectContaining({
+            kisDomesticSymbolCount: 1,
+            kisUsSymbolCount: 1,
+          }),
         }),
       }),
     );

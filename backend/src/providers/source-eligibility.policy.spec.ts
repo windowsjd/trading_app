@@ -36,8 +36,10 @@ import {
 } from '../generated/prisma/client';
 import {
   FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
+  getProviderFreshnessThresholdsSeconds,
   isProviderWorkflowAllowed,
   isProviderWorkflowDenied,
+  PROVIDER_FRESHNESS_THRESHOLDS_SECONDS,
   PROVIDER_SOURCE_NAMES,
   resolveAssetProviderEligibility,
   resolveFxProviderEligibility,
@@ -149,6 +151,107 @@ describe('provider source eligibility policy', () => {
       eligible: true,
       sourceName: PROVIDER_SOURCE_NAMES.cryptoUsd,
       freshnessThresholdSeconds: 10,
+    });
+  });
+
+  it('uses wider display freshness while keeping execute freshness strict', () => {
+    const thresholds = getProviderFreshnessThresholdsSeconds({});
+
+    expect(thresholds.assetPriceDisplay).toBeGreaterThanOrEqual(300);
+    expect(thresholds.fxUsdKrwDisplay).toBeGreaterThanOrEqual(7200);
+    expect(thresholds.assetPriceExecute).toBe(10);
+    expect(thresholds.fxUsdKrwExecute).toBe(60);
+
+    expect(
+      resolveAssetProviderEligibility({
+        workflow: 'assets_with_price',
+        asset: {
+          assetType: AssetType.crypto,
+          market: 'BINANCE',
+          currencyCode: CurrencyCode.USD,
+        },
+      }),
+    ).toMatchObject({
+      eligible: true,
+      freshnessThresholdSeconds:
+        PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.assetPriceDisplay,
+    });
+
+    expect(
+      resolveAssetProviderEligibility({
+        workflow: 'orders_execute',
+        asset: {
+          assetType: AssetType.crypto,
+          market: 'BINANCE',
+          currencyCode: CurrencyCode.USD,
+        },
+      }),
+    ).toMatchObject({
+      eligible: true,
+      freshnessThresholdSeconds:
+        PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.assetPriceExecute,
+    });
+  });
+
+  it('allows a 120-second provider snapshot for display but not for orders_execute', () => {
+    const candidate = {
+      id: 'provider-120s',
+      sourceType: AssetPriceSourceType.provider_api,
+      sourceName: PROVIDER_SOURCE_NAMES.cryptoUsd,
+      effectiveAt: new Date('2026-06-02T23:57:59.000Z'),
+      capturedAt: new Date('2026-06-02T23:58:00.000Z'),
+      price: new Prisma.Decimal('100.00000000'),
+    };
+
+    const displayEligibility = resolveAssetProviderEligibility({
+      workflow: 'assets_with_price',
+      asset: {
+        assetType: AssetType.crypto,
+        market: 'BINANCE',
+        currencyCode: CurrencyCode.USD,
+      },
+    });
+    const executeEligibility = resolveAssetProviderEligibility({
+      workflow: 'orders_execute',
+      asset: {
+        assetType: AssetType.crypto,
+        market: 'BINANCE',
+        currencyCode: CurrencyCode.USD,
+      },
+    });
+
+    expect(displayEligibility.eligible).toBe(true);
+    expect(executeEligibility.eligible).toBe(true);
+
+    if (!displayEligibility.eligible || !executeEligibility.eligible) {
+      throw new Error('expected eligible workflows');
+    }
+
+    expect(
+      selectFreshProviderSnapshot({
+        candidates: [candidate],
+        expectedSourceName: PROVIDER_SOURCE_NAMES.cryptoUsd,
+        now,
+        freshnessThresholdSeconds: displayEligibility.freshnessThresholdSeconds,
+        isPositiveValue: (item) => item.price.gt(0),
+      }),
+    ).toMatchObject({
+      state: 'selected',
+    });
+
+    expect(
+      selectFreshProviderSnapshot({
+        candidates: [candidate],
+        expectedSourceName: PROVIDER_SOURCE_NAMES.cryptoUsd,
+        now,
+        freshnessThresholdSeconds: executeEligibility.freshnessThresholdSeconds,
+        isPositiveValue: (item) => item.price.gt(0),
+      }),
+    ).toMatchObject({
+      state: 'not_selected',
+      decision: {
+        rejectedProviderReason: 'captured_at_stale',
+      },
     });
   });
 

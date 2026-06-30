@@ -13,6 +13,11 @@ import { BinancePriceIngestionService } from '../providers/binance/binance-price
 import { ExchangeRateIngestionService } from '../providers/exchange-rate/exchange-rate.ingestion.service';
 import { KisRestCurrentPriceIngestionService } from '../providers/kis/kis-rest-current-price.ingestion.service';
 import { KoreaEximExchangeIngestionService } from '../providers/korea-exim/korea-exim-exchange.ingestion.service';
+import {
+  ProviderTargetResolverService,
+  type ProviderTargetSource,
+  type ProviderTargets,
+} from '../providers/provider-target-resolver.service';
 import { RankingRefreshService } from '../ranking/ranking-refresh.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { getOpsSchedulerConfig } from './ops-config';
@@ -48,6 +53,7 @@ export type OpsJobRunnerInput = {
   lockTtlSeconds?: number;
   maxAttempts?: number;
   maxSnapshots?: number;
+  targetSource?: ProviderTargetSource;
 };
 
 export type DailySnapshotOpsJobInput = OpsJobRunnerInput & {
@@ -71,6 +77,7 @@ export class OpsJobRunnerService {
     private readonly koreaEximExchangeIngestionService: KoreaEximExchangeIngestionService,
     private readonly binancePriceIngestionService: BinancePriceIngestionService,
     private readonly kisRestCurrentPriceIngestionService: KisRestCurrentPriceIngestionService,
+    private readonly providerTargetResolver: ProviderTargetResolverService,
     private readonly prisma: PrismaService,
     private readonly lockService: OpsJobLockService,
     private readonly runService: OpsJobRunService,
@@ -121,14 +128,33 @@ export class OpsJobRunnerService {
       input,
       'provider_binance_ingest:prices',
       async () => {
+        const targets =
+          await this.providerTargetResolver.resolveProviderTargets({
+            targetSource: input.targetSource,
+          });
+        if (targets.binanceSymbols.length === 0) {
+          return {
+            state: 'no_targets',
+            provider: 'binance',
+            targetSummary: this.buildTargetSummary(targets),
+            created: 0,
+            skipped: 0,
+            wouldCreate: 0,
+            failed: 0,
+            reason: 'NO_PROVIDER_TARGET',
+          };
+        }
+
         const result = await this.binancePriceIngestionService.ingestPrices({
           dryRun: false,
           requestedBy: input.requestedBy ?? undefined,
+          symbols: targets.binanceSymbols,
         });
 
         const response = {
           state: result.success ? 'completed' : 'failed',
           provider: result,
+          targetSummary: this.buildTargetSummary(targets),
           created: result.created,
           skipped: result.skipped,
           wouldCreate: result.wouldCreate,
@@ -154,16 +180,39 @@ export class OpsJobRunnerService {
       input,
       'provider_kis_ingest:rest_current_price',
       async () => {
+        const targets =
+          await this.providerTargetResolver.resolveProviderTargets({
+            targetSource: input.targetSource,
+          });
+        if (
+          targets.kisDomesticSymbols.length === 0 &&
+          targets.kisUsSymbols.length === 0
+        ) {
+          return {
+            state: 'no_targets',
+            provider: 'kis',
+            targetSummary: this.buildTargetSummary(targets),
+            created: 0,
+            skipped: 0,
+            wouldCreate: 0,
+            failed: 0,
+            reason: 'NO_PROVIDER_TARGET',
+          };
+        }
+
         const result =
           await this.kisRestCurrentPriceIngestionService.ingestCurrentPrices({
             dryRun: false,
             requestedBy: input.requestedBy ?? undefined,
+            domesticSymbols: targets.kisDomesticSymbols,
+            usSymbols: targets.kisUsSymbols,
             maxSnapshots: input.maxSnapshots,
           });
 
         const response = {
           state: result.success ? 'completed' : 'failed',
           provider: result,
+          targetSummary: this.buildTargetSummary(targets),
           created: result.created,
           skipped: result.skipped,
           wouldCreate: result.wouldCreate,
@@ -512,6 +561,17 @@ export class OpsJobRunnerService {
       },
       HttpStatus.SERVICE_UNAVAILABLE,
     );
+  }
+
+  private buildTargetSummary(targets: ProviderTargets) {
+    return {
+      targetSource: targets.targetSource,
+      activeAssetCount: targets.activeAssetCount,
+      binanceSymbolCount: targets.binanceSymbols.length,
+      kisDomesticSymbolCount: targets.kisDomesticSymbols.length,
+      kisUsSymbolCount: targets.kisUsSymbols.length,
+      unsupportedAssets: targets.unsupportedAssets,
+    };
   }
 
   private successResponse(

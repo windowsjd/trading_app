@@ -335,7 +335,7 @@ export class FxService {
     if (request.refresh) {
       await this.tryEnsureFreshKoreaEximUsdKrwSnapshot({
         now,
-        maxAgeSeconds: PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.fxUsdKrw,
+        maxAgeSeconds: PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.fxUsdKrwQuote,
       });
     }
 
@@ -1108,7 +1108,8 @@ export class FxService {
       candidates: providerCandidates,
       expectedSourceNames: FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
       now,
-      freshnessThresholdSeconds: PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.fxUsdKrw,
+      freshnessThresholdSeconds:
+        PROVIDER_FRESHNESS_THRESHOLDS_SECONDS.fxUsdKrwQuote,
       isPositiveValue: (candidate) => isPositiveDecimal(candidate.rate),
     });
 

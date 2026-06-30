@@ -211,7 +211,8 @@
     - Market holidays are configured in `src/orders/market-holidays.config.ts`; configured KRX/US full-day holidays block domestic/US stock order quote/create/execute with `MARKET_CLOSED`. Crypto orders and FX are not holiday-blocked.
   - Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage; USDT depeg risk is not modeled.
   - `GET /api/v1/assets/:assetId/candles` now supports crypto chart candles through Binance Spot `GET /api/v3/klines` using `BINANCE_REST_BASE_URL` (default `https://api.binance.com`).
-    - 지원 candle interval은 5m, 15m, 30m, 1h, 4h, 1d, 1w만 허용한다.
+    - 지원 candle interval은 1m, 5m, 15m, 30m, 1h, 4h, 1d, 1w만 허용한다.
+    - 프론트 자산 상세 차트 탭도 1m, 5m, 15m, 30m, 1h, 4h, 1d, 1w 순서를 사용한다.
     - 그 외 interval은 validation error로 처리한다.
     - 필요 시 서버가 더 짧은 원천 candle을 집계해 상위 interval candle을 생성한다.
     - Crypto candle symbol normalization maps base symbols such as `BTC`/`ETH` and `BTC/USD`, `BTC-USD`, `BTC_USD` to USDT quote symbols such as `BTCUSDT`.

@@ -102,6 +102,7 @@ SCHEDULER_PROVIDER_FX_INTERVAL_SECONDS=3600
 SCHEDULER_PROVIDER_BINANCE_INTERVAL_SECONDS=60
 SCHEDULER_PROVIDER_KIS_INTERVAL_SECONDS=60
 SCHEDULER_PROVIDER_INGESTION_RUN_ON_STARTUP=false
+SCHEDULER_PROVIDER_TARGET_SOURCE=merged
 SCHEDULER_PROVIDER_KIS_MAX_SNAPSHOTS=500
 SCHEDULER_LOCK_TTL_SECONDS=600
 SCHEDULER_MAX_ATTEMPTS=1
@@ -154,13 +155,26 @@ SCHEDULER_PROVIDER_BINANCE_INTERVAL_SECONDS=60
 SCHEDULER_PROVIDER_KIS_INTERVAL_SECONDS=60
 
 SCHEDULER_PROVIDER_INGESTION_RUN_ON_STARTUP=true
+SCHEDULER_PROVIDER_TARGET_SOURCE=merged
 
 PROVIDER_INGESTION_ENABLED=true
 ```
 
 Provider intervals are checked before each scheduler tick calls a provider runner. The due check uses the latest persisted `ops_job_runs` row for the provider job and does not create a skipped row when the interval is not due. A failed provider run is eligible to retry on the next tick. The defaults are FX every 3600 seconds, Binance every 60 seconds, and KIS every 60 seconds.
 
-`SCHEDULER_PROVIDER_INGESTION_RUN_ON_STARTUP=true` queues a one-time asynchronous startup run for enabled provider jobs only. It does not run season lifecycle, settlement, ranking, daily snapshot, or reward jobs. Provider ops locks still prevent duplicate execution.
+`SCHEDULER_PROVIDER_INGESTION_RUN_ON_STARTUP=true` queues a one-time asynchronous startup run for enabled provider jobs only. It does not run season lifecycle, settlement, ranking, daily snapshot, or reward jobs. Provider ops locks still prevent duplicate execution. After the startup provider jobs finish, the scheduler runs a non-fatal market snapshot health check and emits a public-safe console warning if active asset coverage is still unavailable.
+
+`SCHEDULER_PROVIDER_TARGET_SOURCE` controls provider price targets:
+
+- `active_assets`: only active DB assets are used.
+- `env`: only provider env watchlists are used.
+- `merged`: env watchlists plus active DB assets are combined without duplicates. This is the default.
+
+Active asset target rules:
+
+- Binance: active `crypto` assets with `market=BINANCE` and `currencyCode=USD`; `BTC` becomes `BTCUSDT`, while `BTCUSDT` stays `BTCUSDT`.
+- KIS domestic: active `domestic_stock` assets with `currencyCode=KRW` and market `KRX`, `KOSPI`, `KOSDAQ`, or `KONEX`; only 6-digit numeric symbols are sent.
+- KIS US: active `us_stock` assets with `currencyCode=USD` and market `NAS`, `NASDAQ`, `NYS`, or `NYSE`; symbols are sent without embedding secrets or account data.
 
 KIS scheduler enablement accepts either `SCHEDULER_PROVIDER_KIS_ENABLED=true` or `ENABLE_PROVIDER_KIS_SCHEDULER=true`. KIS REST current price runs with `maxSnapshots` from `SCHEDULER_PROVIDER_KIS_MAX_SNAPSHOTS`, then `PROVIDER_INGESTION_MAX_SNAPSHOTS`, then the safe default `500`.
 
@@ -171,6 +185,25 @@ Provider env required before real runs:
 - KIS: `KIS_MARKET_DATA_ENABLED`, `KIS_REST_BASE_URL`, `KIS_APP_KEY`, `KIS_APP_SECRET`, `KIS_DOMESTIC_SYMBOLS`, `KIS_US_SYMBOLS`, plus optional REST path/TR id overrides `KIS_REST_DOMESTIC_CURRENT_PRICE_PATH`, `KIS_REST_DOMESTIC_CURRENT_PRICE_TR_ID`, `KIS_REST_US_CURRENT_PRICE_PATH`, and `KIS_REST_US_CURRENT_PRICE_TR_ID`.
 
 Provider failures are recorded in `ops_job_runs` as `failed` by the runner where possible. One provider failure does not prevent the scheduler from attempting other enabled provider jobs in the same tick. Result and metadata JSON are sanitized before storage; provider tokens, app keys, app secrets, API keys, JWT secrets, database URLs, access tokens, and refresh tokens must not be logged or stored in ops audit JSON.
+
+Display/read APIs use a wider freshness window than execute paths so a 60-second scheduler interval does not immediately produce stale UI data. Defaults are:
+
+- Display asset price: `PROVIDER_ASSET_PRICE_DISPLAY_FRESHNESS_SECONDS=300`
+- Display USD/KRW FX: `PROVIDER_FX_RATE_DISPLAY_FRESHNESS_SECONDS=7200`
+- Quote asset price: `PROVIDER_ASSET_PRICE_QUOTE_FRESHNESS_SECONDS=60`
+- Quote USD/KRW FX: `PROVIDER_FX_RATE_QUOTE_FRESHNESS_SECONDS=300`
+- Execute asset price remains 10 seconds.
+- Execute USD/KRW FX remains 60 seconds.
+
+The display window applies to assets with price, Home, positions, and live portfolio valuation. Orders/FX execute still require fresh provider snapshots and do not fall back to relaxed display freshness.
+
+To resolve local "market data preparing" states:
+
+```bash
+cd backend
+pnpm dev:open-season
+pnpm dev:ensure-market-snapshots -- --operator-email <operator@example.com>
+```
 
 ## Production TODO
 
