@@ -10,6 +10,10 @@ import {
 } from './provider-env.validation';
 import { ProviderConfigError } from './provider.types';
 import { buildKisWatchlist } from './kis/kis-watchlist.policy';
+import {
+  KIS_FIXED_DOMESTIC_SYMBOLS,
+  KIS_FIXED_US_SYMBOLS,
+} from './kis/kis-fixed-asset-universe';
 
 export type CommonProviderConfig = {
   providerIngestionEnabled: boolean;
@@ -238,9 +242,14 @@ export function buildProviderConfig(env: ProviderEnv): ProviderConfig {
     41,
     'kis',
   );
+  const envDomesticSymbols = readCsvEnv(env, 'KIS_DOMESTIC_SYMBOLS');
+  const envUsSymbols = readCsvEnv(env, 'KIS_US_SYMBOLS');
   const watchlist = buildKisWatchlist({
-    domesticSymbols: readCsvEnv(env, 'KIS_DOMESTIC_SYMBOLS'),
-    usSymbols: readCsvEnv(env, 'KIS_US_SYMBOLS'),
+    domesticSymbols:
+      envDomesticSymbols.length > 0
+        ? envDomesticSymbols
+        : KIS_FIXED_DOMESTIC_SYMBOLS,
+    usSymbols: envUsSymbols.length > 0 ? envUsSymbols : KIS_FIXED_US_SYMBOLS,
     maxSize: maxWatchlistSize,
   });
   const kisRestBaseUrl = readOptionalTrimmedEnv(env, 'KIS_REST_BASE_URL');

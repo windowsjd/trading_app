@@ -1,11 +1,10 @@
 # Docs Guide
 
+This directory holds policy decisions, contracts, and operational guides that cannot be re-derived from the code. It does not hold implementation-status logs: `current-status.md`, `backend-gate-roadmap.md`, `backend-test-coverage-matrix.md`, `docs-inventory.md`, `v2-backend-contract-alignment-report.md`, `provider-source-eligibility-pre-gate.md`, `provider-evidence-capture.md`, and `docs/archive/` were removed because they were narrative snapshots of implementation progress. To check current implementation status, read the relevant controller/service source directly alongside the matching `docs/*-api-contract.md`.
+
 Use this directory in this order:
 
-1. `docs/current-status.md` - current implementation source of truth.
-2. `docs/backend-gate-roadmap.md` - gate decision and next-work source of truth.
-3. `docs/backend-test-coverage-matrix.md` - test coverage source of truth.
-4. API contracts:
+1. API contracts — the request/response contract for each surface:
    - `docs/auth-api-contract.md`
    - `docs/fx-api-contract.md`
    - `docs/orders-api-contract.md`
@@ -17,37 +16,13 @@ Use this directory in this order:
    - `docs/records-api-contract.md`
    - `docs/rewards-api-contract.md`
    - `docs/operator-api-contract.md`
-5. Provider/freshness/crypto policy:
-   - `docs/provider-ingestion-foundation.md`
-   - `docs/crypto-usd-settlement-policy-update.md`
-   - `docs/provider-final-selection-readiness-recheck.md`
-   - `docs/asset-price-freshness-policy.md`
-   - `docs/realtime-execution-policy.md`
-   - `docs/scheduler-ops-foundation.md`
-   - `docs/provider-evidence-capture.md`
-   - `docs/asset-universe-2026-ytd-volume-selection.md`
-   - `docs/provider-source-eligibility-pre-gate.md`
-
-Provider evidence currently has ExchangeRate-API and Binance row insertion evidence, KIS domestic `H0STCNT0` row insertion evidence, and KIS US `HDFSCNT0` tick/DB insertion evidence. Provider_api source eligibility is open only for explicitly allowed workflows: `/fx quote`, `/fx execute`, assets `withPrice`, orders quote, orders execute, live portfolio/home/positions valuation, and operator-run daily portfolio snapshot valuation. Orders create binds a durable quote and does not read provider rows directly.
+2. `docs/policy-decisions.md` — freshness thresholds, execute repricing/maxChangeBps, source-type priority, crypto USD settlement, and final provider selection, each with a one-line rationale. This is the policy source of truth; it replaces `realtime-execution-policy.md`, `asset-price-freshness-policy.md`, `crypto-usd-settlement-policy-update.md`, and `provider-final-selection-readiness-recheck.md`.
+3. `docs/provider-ingestion-foundation.md` — how provider ingestion is configured and operated (env vars, operator commands, per-provider request/response mapping). The fixed 40-symbol KIS watchlist now lives in code at `src/providers/kis/kis-fixed-asset-universe.ts` (seed with `pnpm tsx scripts/seed-kis-fixed-asset-universe.ts`), not in a doc.
+4. `docs/scheduler-ops-foundation.md` — scheduler/ops foundation (disabled-by-default, dry-run-by-default).
+5. `docs/batch-job-foundation.md` — batch job foundation for daily snapshot/ranking/cycle/settlement/final-tier/reward-grant jobs.
+6. `docs/ranking-backfill-runbook.md` — migration/backfill runbook for ranking tie-breakers.
+7. `docs/operator-api-contract.md` — admin/operator authorization, account management, and audit foundation.
+8. `docs/codex-rulepack.md` — coding rulepack for Codex/agent work in this repo.
+9. `docs/provider-fixtures/` — test fixtures referenced by provider tests.
 
 Read-only/quote source metadata is exposed as backward-compatible optional fields such as `rateSource`, `priceSource`, `assetPriceSource`, `fxRateSource`, and live valuation `sourceSummary`. Daily snapshot batch results include public-safe aggregate `sourceSummary`/fallback information in `batch_job_runs.resultPayloadJson`. These fields contain public-safe source type/name/snapshot/timing/fallback reasons only; raw provider payloads and secrets remain excluded.
-
-Provider_api remains closed for orders create source selection, ranking, settlement/final result, reward/final tier provider reads, reward fulfillment provider reads, provider ingestion trigger APIs, batch HTTP APIs, and real trading/account/order/deposit/withdrawal APIs. Scheduler/Ops foundation exists but is disabled by default and does not open those workflows.
-
-`docs/realtime-execution-policy.md` records the active Durable Quote provider execute policy: quote is only a reference quote, `/fx execute` and orders execute reprice from fresh provider_api at execute time, enforce quote-to-execute bps thresholds, consume quotes atomically with writes, and forbid default `admin_manual` execute fallback.
-
-6. Admin/operator authorization, account management, and audit foundation:
-
-- `docs/operator-api-contract.md`
-
-Admin-only user status/restore APIs and operator/admin internal reward fulfillment APIs are now documented in the operator and rewards contracts. Restore forces `role=user`, suspend/delete revoke refresh sessions, and internal reward fulfillment creates `SeasonReward` rows only at fulfilled time. External reward/payment/point/coupon/gifticon APIs remain out of scope.
-
-7. Batch foundation and operator-run daily snapshot/ranking/cycle/settlement/final-tier plus reward-grant gate-closed job:
-   - `docs/batch-job-foundation.md`
-
-8. Scheduler/Ops disabled-by-default and dry-run-by-default foundation:
-   - `docs/scheduler-ops-foundation.md`
-
-`docs/archive/` contains historical STOP/review/preimplementation/plan documents. Archived files are not current source of truth and must not be used to override the current documents above.
-
-`docs/docs-inventory.md` records the classification and archive action for each docs file.

@@ -283,21 +283,16 @@ These tests create isolated rows and clean them up. They do not call external pr
 
 ## Docs Entry Point
 
-Start with `docs/README.md`.
+Start with `docs/README.md`. Current implementation status is not tracked in a separate status doc; check the relevant controller/service source and the matching `docs/*-api-contract.md`.
 
-Current source of truth order:
+Docs of record:
 
 1. `docs/README.md`
-2. `docs/current-status.md`
-3. `docs/backend-gate-roadmap.md`
-4. `docs/backend-test-coverage-matrix.md`
-5. `docs/auth-api-contract.md` and API contract docs under `docs/*-api-contract.md`
-6. `docs/realtime-execution-policy.md`
-7. `docs/scheduler-ops-foundation.md`
-8. `docs/operator-api-contract.md`
-9. `docs/batch-job-foundation.md`
-
-`docs/archive/` is historical reference only and must not override the current documents above.
+2. `docs/auth-api-contract.md` and API contract docs under `docs/*-api-contract.md`
+3. `docs/policy-decisions.md`
+4. `docs/scheduler-ops-foundation.md`
+5. `docs/operator-api-contract.md`
+6. `docs/batch-job-foundation.md`
 
 ## Working Without Provider Keys
 

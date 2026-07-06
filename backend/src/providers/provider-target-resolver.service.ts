@@ -7,6 +7,10 @@ import {
   readOptionalTrimmedEnv,
   type ProviderEnv,
 } from './provider-env.validation';
+import {
+  KIS_FIXED_DOMESTIC_SYMBOLS,
+  KIS_FIXED_US_SYMBOLS,
+} from './kis/kis-fixed-asset-universe';
 
 export type ProviderTargetSource = 'active_assets' | 'env' | 'merged';
 
@@ -220,10 +224,23 @@ export function resolveEnvProviderTargets(
     activeAssetCount: 0,
     binanceSymbols:
       binanceSymbols.length > 0 ? binanceSymbols : DEFAULT_BINANCE_SYMBOLS,
-    kisDomesticSymbols: uniqueStrings(readCsvEnv(env, 'KIS_DOMESTIC_SYMBOLS')),
-    kisUsSymbols: uniqueStrings(readCsvEnv(env, 'KIS_US_SYMBOLS')),
+    kisDomesticSymbols: resolveWithDefault(
+      readCsvEnv(env, 'KIS_DOMESTIC_SYMBOLS'),
+      KIS_FIXED_DOMESTIC_SYMBOLS,
+    ),
+    kisUsSymbols: resolveWithDefault(
+      readCsvEnv(env, 'KIS_US_SYMBOLS'),
+      KIS_FIXED_US_SYMBOLS,
+    ),
     unsupportedAssets: [],
   };
+}
+
+function resolveWithDefault(
+  values: readonly string[],
+  defaults: readonly string[],
+): string[] {
+  return uniqueStrings(values.length > 0 ? values : defaults);
 }
 
 function emptyTargets(targetSource: ProviderTargetSource): ProviderTargets {

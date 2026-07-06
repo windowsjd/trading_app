@@ -12,7 +12,7 @@
 - Quote creates a durable quote row. List APIs do not execute orders, debit or credit wallets, mutate positions, create wallet transactions, create equity snapshots, run settlement, or synthesize fake order data.
 - Order execution recalculates and stores actual `executedPrice`, `grossAmount`, `feeAmount`, and `netAmount` at execution time.
 - Execute paths use execute-time fresh provider_api asset price and USD/KRW FX evidence, consume the durable quote atomically with writes, and forbid default `admin_manual` execute fallback.
-- `docs/realtime-execution-policy.md` defines the active provider-backed execute/write policy.
+- `docs/policy-decisions.md` records the active provider-backed execute/write policy decisions (freshness thresholds, maxChangeBps, quote TTL).
 
 ## Source Rules
 

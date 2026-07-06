@@ -1,95 +1,8 @@
 # Provider Ingestion Foundation
 
-Status: implemented foundation for explicit operator-run provider ingestion, including an operator/admin HTTP trigger. No cron scheduler is enabled. Read-only/quote and operator-run daily snapshot provider_api source eligibility are implemented separately for the allowed workflows only.
+Explicit operator-run provider ingestion foundation, including an operator/admin HTTP trigger. No cron scheduler is enabled. Read-only/quote and operator-run daily snapshot `provider_api` source eligibility are implemented separately for the allowed workflows only (see `docs/policy-decisions.md`).
 
-Fixed KIS stock universe status as of 2026-05-30 KST:
-
-- KIS stock watchlist is fixed at 40 symbols: 15 domestic KRX stocks and 25 US stocks.
-- The universe is a fixed high-liquidity watchlist candidate selected by project decision. It is not a new Codex stock investigation and does not claim official YTD rank verification.
-- `KIS_DOMESTIC_SYMBOLS=005930,000660,034020,010140,042660,005380,000270,035420,035720,068270,051910,066570,086520,247540,028300`
-- `KIS_US_SYMBOLS=NAS:NVDA,NAS:TSLA,NAS:AMD,NAS:AAPL,NAS:AMZN,NAS:MSFT,NAS:GOOGL,NAS:META,NAS:PLTR,NAS:INTC,NAS:SOFI,NAS:RIVN,NAS:MARA,NAS:WBD,NAS:CSCO,NAS:MU,NAS:QCOM,NAS:PYPL,NAS:MSTR,NAS:SMCI,NYS:F,NYS:BAC,NYS:PFE,NYS:T,NYS:UBER`
-- Local watchlist policy validation returned domestic 15, US 25, total 40, max 41, within limit.
-- Binance `BTCUSDT` and `ETHUSDT` remain separate crypto assets and are not included in the KIS stock watchlist.
-- After the local DB was started on 2026-05-30, all fixed 40 stock assets were upserted successfully and DB mapping counts passed: domestic 15/15, US 25/25, KIS total 40/41.
-- ExchangeRate and Binance dry-runs succeeded after DB restart; Binance `BTCUSDT` and `ETHUSDT` mapped to existing active `BINANCE` USD crypto assets.
-- KIS live smoke remained blocked on 2026-05-30 because KIS REST/WS endpoint env values were missing in the loaded env. Explicit WebSocket policy env values were also absent, but code defaults are defined.
-- `provider_api` source eligibility is open only for the explicit read-only/quote workflows, `/fx execute`, orders execute, and the operator-run daily snapshot valuation workflow. Ranking, reward workflows, batch HTTP APIs, production scheduler automation, and real trading/account surfaces remain closed.
-
-KIS env completion pre-gate update as of 2026-05-30 KST:
-
-- Required KIS live smoke env is still incomplete because `KIS_REST_BASE_URL` and `KIS_WS_BASE_URL` are missing in the loaded env.
-- KIS policy env values are not present but have explicit code defaults: custtype `P`, domestic TR `H0STCNT0`, overseas delayed TR `HDFSCNT0`, snapshot throttle `5000`, max runtime `30000`, and US delayed enabled `true`.
-- The fixed CLI watchlist remains domestic 15 plus US 25, total 40 within the max 41 limit.
-- DB mapping recheck passed for domestic 15/15, US 25/25, and separate Binance crypto 2/2.
-- ExchangeRate-API and Binance public REST regression dry-runs succeeded.
-- KIS approval_key, WebSocket connect, subscribe ack, domestic tick, US tick, and KIS DB insertion remain `BLOCKED` before request because the required endpoints are absent.
-- `docs/provider-source-eligibility-pre-gate.md` documents the next source eligibility policy draft. No read path has been changed.
-
-KIS endpoint env completion gate update as of 2026-05-30 KST:
-
-- Required endpoint env is still incomplete: `KIS_REST_BASE_URL` and `KIS_WS_BASE_URL` are missing in the loaded env.
-- KIS dry-run and non-dry-run live smoke were not executed.
-- DB mapping remains valid for domestic 15/15, US 25/25, KIS watchlist 40/41, and separate Binance crypto 2/2.
-- ExchangeRate-API and Binance public REST regression dry-runs succeeded.
-- Provider API Source Eligibility Implementation Gate remains after KIS live evidence capture.
-
-KIS endpoint env completion retry as of 2026-06-01 KST:
-
-- `.env.local` was confirmed ignored/untracked before editing, then updated only with non-secret KIS endpoint/policy env keys. Secret values and `.env.local` contents were not printed or documented.
-- Expected endpoint env is present: `KIS_REST_BASE_URL=https://openapi.koreainvestment.com:9443` and `KIS_WS_BASE_URL=ws://ops.koreainvestment.com:21000`.
-- KIS policy env is present for custtype `P`, domestic TR `H0STCNT0`, overseas delayed TR `HDFSCNT0`, snapshot throttle `5000`, max runtime `30000`, and US delayed enabled `true`.
-- The fixed CLI watchlist remains domestic 15 plus US 25, total 40 within the max 41 limit.
-- DB mapping recheck passed for domestic 15/15, US 25/25 with NAS 20 and NYS 5, and separate Binance crypto 2/2.
-- KIS dry-run succeeded with 40 subscriptions sent, 40 subscribe acknowledgements, 47 received frames, domestic `H0STCNT0` tick evidence, 12 `wouldCreate`, and no DB writes.
-- KIS non-dry-run succeeded with 40 subscriptions sent, 40 subscribe acknowledgements, 62 received frames, 12 created domestic provider_api rows, 35 duplicate/throttle skips, and 0 failures.
-- DB evidence confirmed the 12 inserted KIS rows are `sourceType=provider_api`, `sourceName=kis_krx_realtime_trade`, `currencyCode=KRW`, mapped to active KRX domestic_stock assets.
-- US `HDFSCNT0` subscriptions were acknowledged, but no US tick or `kis_us_delayed_trade` DB row was observed in the 30-second smoke window. This remains an open evidence item.
-- ExchangeRate-API and Binance public REST regression dry-runs succeeded.
-- `provider_api` source eligibility remains closed outside the explicitly allowed read-only/quote workflows and operator-run daily snapshot valuation workflow.
-
-KIS US `HDFSCNT0` retry as of 2026-06-01 KST:
-
-- Retry ran around 2026-06-01 11:14-11:21 KST, which is 2026-05-31 22:14-22:21 EDT and outside the US regular market window.
-- `.env.local` stayed ignored/untracked and was not modified. No secret values or `.env.local` contents were printed or documented.
-- Required KIS env and WebSocket policy env were present. The fixed US CLI watchlist was supplied for the smoke command.
-- DB mapping recheck passed for US 25/25 with NAS 20 and NYS 5, domestic 15/15, and separate Binance crypto 2/2.
-- A first US-focused dry-run with one domestic symbol sent 26 subscriptions and received acknowledgement count 26, but domestic ticks reached the max snapshot cap before a useful US wait window completed.
-- A second US-only 60-second dry-run sent 25 US subscriptions, received aggregate acknowledgement count 30, received 30 frames, and completed with `created=0`, `wouldCreate=0`, `failed=0`, and no snapshots.
-- US `HDFSCNT0` tick remains unobserved and `kis_us_delayed_trade` provider_api DB row count remains 0. The result is classified as `SUBSCRIBE_ACK_BUT_NO_US_TICK` / `MARKET_CLOSED_OR_NO_TICK`.
-- Non-dry-run was skipped because dry-run did not produce US tick evidence. Existing domestic `kis_krx_realtime_trade` provider_api row count remains 12.
-- ExchangeRate-API and Binance public REST regression dry-runs succeeded.
-- `provider_api` source eligibility remains closed outside the explicitly allowed read-only/quote workflows and operator-run daily snapshot valuation workflow.
-
-KIS US `HDFSCNT0` market-data window validation as of 2026-06-03 KST:
-
-- Retry ran around 2026-06-03 00:23 KST, which is 2026-06-02 11:23 EDT and within the US regular market window.
-- `.env.local` stayed ignored/untracked and was not modified. No secret values or `.env.local` contents were printed or documented.
-- Required KIS env and WebSocket policy env were present by presence-only check.
-- Local PostgreSQL was unreachable at `127.0.0.1:5432`; `pnpm exec prisma migrate dev`, `pnpm exec prisma migrate status`, and provider dry-runs could not complete DB-backed checks.
-- US-only KIS dry-run reached the US tick parsing/asset mapping path, then failed on DB mapping lookup with Prisma `P1001`. This gives partial US tick-path evidence but not clean dry-run counts or DB insertion evidence.
-- Non-dry-run was skipped because local DB insertion was unavailable.
-- ExchangeRate-API and Binance public REST regression dry-runs were also blocked by the same local DB unreachable condition.
-- `provider_api` source eligibility remains closed outside the explicitly allowed read-only/quote workflows and operator-run daily snapshot valuation workflow.
-
-KIS US `HDFSCNT0` DB-started rerun as of 2026-06-03 KST:
-
-- Docker Compose Postgres/Redis were healthy and pending existing migrations were applied without DB reset, seed, schema edit, or new migration creation.
-- Migration status reported DB schema up to date. Runtime schema checks passed for `UserRole`, `OperatorAuditResult`, `users.role`, and `operator_audit_logs`.
-- DB mapping passed for active US 25/25 with NAS 20 and NYS 5, domestic KRX 15/15, and separate BINANCE crypto 2/2.
-- US-only dry-run completed with 25 subscriptions sent, 25 acknowledgements, 50 received frames, 35 `wouldCreate`, and 0 failures.
-- US-only non-dry-run completed with 25 subscriptions sent, 25 acknowledgements, 86 received frames, 25 created, 53 skipped, and 0 failures.
-- DB evidence confirmed 25 inserted `kis_us_delayed_trade` rows are `sourceType=provider_api`, `currencyCode=USD`, mapped to active `us_stock` USD assets with NAS 20 / NYS 5 market distribution.
-- Existing domestic `kis_krx_realtime_trade` provider_api row count remained 12. This US-only rerun created no domestic side effect.
-- ExchangeRate-API and Binance public REST regression dry-runs succeeded.
-- `provider_api` source eligibility remains closed outside the explicitly allowed read-only/quote workflows and operator-run daily snapshot valuation workflow.
-
-Live smoke evidence status as of 2026-05-28 KST:
-
-- ExchangeRate-API dry-run and non-dry-run live smoke succeeded and created one local `fx_rate_snapshots` row with `sourceType=provider_api`, `sourceName=exchange_rate_api`, `USD/KRW`, and positive decimal rate evidence.
-- Binance public REST dry-run and non-dry-run live smoke succeeded for `BTCUSDT` and `ETHUSDT`, mapped to existing active `BINANCE` crypto USD assets, and created two local `asset_price_snapshots` rows with `sourceType=provider_api`, `sourceName=binance_public_rest_24hr_ticker`, and `currencyCode=USD`.
-- KIS WebSocket live smoke was not executed because required endpoint env was incomplete: `KIS_REST_BASE_URL` and `KIS_WS_BASE_URL` were missing. KIS approval_key, WebSocket connect, subscribe ack, domestic `H0STCNT0` tick, US `HDFSCNT0` tick, and KIS DB row insertion remain `BLOCKED`.
-- No secret values, approval keys, `.env.local` contents, `DATABASE_URL`, or full raw WebSocket frames were printed or documented.
-- This evidence is now accepted for the read-only/quote source eligibility gate, Durable Quote provider execute gate, the operator-run daily snapshot valuation gate, and explicit operator/admin provider ingestion trigger dry-runs/non-dry-runs. It still does not open ranking, reward, batch HTTP API, production scheduler automation, or real trading/account paths.
+The fixed 40-symbol KIS stock watchlist (15 domestic + 25 US) is defined in code at `src/providers/kis/kis-fixed-asset-universe.ts` and used as the default for `KIS_DOMESTIC_SYMBOLS`/`KIS_US_SYMBOLS` when those env vars are unset. Seed the corresponding assets with `pnpm tsx scripts/seed-kis-fixed-asset-universe.ts`.
 
 ## Scope
 
@@ -286,8 +199,3 @@ All scripts and HTTP triggers are explicit operator actions. No cron scheduler o
 - KIS order, account, balance, fill, deposit, withdrawal, and real trading APIs are not implemented.
 - `CurrencyCode.USDT` is not added.
 
-## Next Gate
-
-Provider API Source Eligibility Implementation Gate read-only/quote phase and the operator-run daily snapshot eligibility gate are implemented using `docs/provider-source-eligibility-pre-gate.md`.
-
-Next provider-related gates should remain narrower and explicit: broader settlement/final evidence policy, scheduler/deployment ownership, batch HTTP APIs, hoga-based execution/slippage/matching, or real trading/account APIs each require separate approval.

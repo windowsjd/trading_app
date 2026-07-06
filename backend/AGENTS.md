@@ -17,7 +17,7 @@
 
 ## Source of Truth
 1. docs/codex-rulepack.md
-2. docs/current-status.md
+2. docs/policy-decisions.md, docs/*-api-contract.md, and the current source code
 
 ## Change Policy
 - 문서 → 합의 → 코드

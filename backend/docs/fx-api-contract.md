@@ -7,7 +7,7 @@
 - `GET /api/v1/fx/rates/current` uses the same fresh provider source priority for DB rows: fresh Korea EXIM first, then fresh ExchangeRate-API, then approved `admin_manual` fallback only. A stale Korea EXIM row must not outrank a fresh ExchangeRate-API row.
 - `/fx quote` stores an active durable quote and returns `quoteId`, `expiresAt`, and `maxChangeBps`.
 - `/fx execute` requires a durable quote for new mutations, reprices at execute time from fresh `provider_api` USD/KRW, enforces quote movement threshold, and forbids default `admin_manual` fallback.
-- `docs/realtime-execution-policy.md` defines the active provider-backed execute/write policy.
+- `docs/policy-decisions.md` records the active provider-backed execute/write policy decisions (freshness thresholds, maxChangeBps, quote TTL).
 - Do not add fake FX rates, temporary FX rates, Prisma schema changes, migrations, seed changes, package changes, scheduler/cron, provider ingestion trigger APIs, or real trading/account APIs from this document.
 
 ## Source Rules
@@ -193,7 +193,7 @@ The response does not expose wallet ids, balances, private ledger rows, tokens, 
 
 ### Purpose
 
-Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, and create source/target `wallet_transactions` rows according to this API contract and the current implementation summary in `docs/current-status.md`.
+Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, and create source/target `wallet_transactions` rows according to this API contract.
 
 ### Request Shape
 
@@ -212,7 +212,6 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 - Existing idempotency replay is checked before quote validation, so a duplicate completed command can return the stored response without consuming a quote again.
 - Same `userId + idempotencyKey + quoteId + request fields` can replay a stored successful response. Same `userId + idempotencyKey` with a different `quoteId` returns `IDEMPOTENCY_CONFLICT` and must not replay the previous response.
 - `fromCurrency`, `toCurrency`, and `sourceAmount` must match the stored quote requestHash and fields.
-- Historical implementation-gate detail is archived in `docs/archive/fx-execute-final-implementation-gate.md`; current implementation status is tracked in `docs/current-status.md`.
 
 ### Execute-Time Snapshot Selection
 
@@ -332,7 +331,6 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 - `fx_execute_requests` has `unique(userId, idempotencyKey)` for execute retry deduplication.
 - `wallet_transactions` has `[referenceType, referenceId]` index only, not an idempotency unique key.
 - `/fx execute` lifecycle code is implemented.
-- Historical lifecycle planning is archived in `docs/archive/fx-idempotency-lifecycle-policy.md`; current behavior is tracked in `docs/current-status.md`.
 
 ### Candidate A: Add `exchange_transactions.idempotencyKey`
 
@@ -430,7 +428,6 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
 ## Equity Snapshots
 
 - `/fx execute` creates an `exchange_executed` `equity_snapshots` row inside the ledger transaction and triggers current ranking refresh after the ledger transaction.
-- Historical write-path planning is archived in `docs/archive/wallet-fx-write-path-plan.md`; current behavior is summarized in `docs/current-status.md`.
 - Authoritative total equity snapshots require positions, asset price snapshots, and FX snapshot evidence together.
 - Ranking refresh failure after `/fx execute` is logged and must not roll back the successful financial ledger transaction.
 
@@ -444,7 +441,6 @@ Execute KRW/USD exchange, update cash wallets, create `exchange_transactions`, a
   - `FX_RATE_UNAVAILABLE` and `FX_RATE_STALE` are distinguished.
 - Execute implementation gate:
   - `/fx execute` Durable Quote provider-backed MVP is implemented.
-  - Historical implementation-gate detail is archived in `docs/archive/fx-execute-final-implementation-gate.md`.
   - Wallet safety proof must be verified with tests.
   - `provider_api` is the required execute source.
   - `admin_manual` and `official_batch` are not default execute sources.
