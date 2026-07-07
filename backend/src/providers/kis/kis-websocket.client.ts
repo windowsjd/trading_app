@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { WebSocket as WsWebSocket } from 'ws';
 import {
   ProviderConfigService,
   type ProviderConfig,
@@ -71,9 +72,10 @@ export class KisWebSocketClient {
     options: KisWebSocketRunOptions = {},
   ): Promise<KisWebSocketRunResult> {
     const dryRun = Boolean(options.dryRun);
+    let durationMs = options.durationMs ?? 0;
     try {
       const config = this.configService.getConfig();
-      const durationMs = options.durationMs ?? config.kis.wsMaxRuntimeMs;
+      durationMs = options.durationMs ?? config.kis.wsMaxRuntimeMs;
       const gate = assertKisWebSocketRunGate(config, durationMs);
       if (gate) {
         return emptyRunResult({
@@ -144,7 +146,7 @@ export class KisWebSocketClient {
       ) {
         return emptyRunResult({
           dryRun,
-          durationMs: options.durationMs ?? 0,
+          durationMs,
           success: false,
           errorCode: error.code,
           errorMessage: error.message,
@@ -373,7 +375,7 @@ function buildUnsubscribeRequests(input: {
 function resolveNativeWebSocketConstructor(): NativeWebSocketConstructor | null {
   const constructor = (globalThis as { WebSocket?: NativeWebSocketConstructor })
     .WebSocket;
-  return constructor ?? null;
+  return constructor ?? (WsWebSocket as unknown as NativeWebSocketConstructor);
 }
 
 function waitForSocketOpen(

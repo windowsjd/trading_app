@@ -45,6 +45,7 @@ describe('getOpsSchedulerConfig', () => {
     ).toBe(60);
     expect(config.providerIngestionRunOnStartup).toBe(false);
     expect(config.providerKisMaxSnapshots).toBe(500);
+    expect(config.providerKisPriceIngestionMode).toBe('websocket_trade');
   });
 
   it('reads SCHEDULER_TICK_INTERVAL_MS and falls back on invalid values', () => {
@@ -129,6 +130,22 @@ describe('getOpsSchedulerConfig', () => {
     expect(fallbackConfig.providerKisMaxSnapshots).toBe(125);
   });
 
+  it('defaults KIS scheduler price ingestion to websocket_trade with REST fallback opt-in', () => {
+    expect(getOpsSchedulerConfig({}).providerKisPriceIngestionMode).toBe(
+      'websocket_trade',
+    );
+    expect(
+      getOpsSchedulerConfig({
+        KIS_PRICE_INGESTION_MODE: 'rest_current_price',
+      }).providerKisPriceIngestionMode,
+    ).toBe('rest_current_price');
+    expect(
+      getOpsSchedulerConfig({
+        KIS_PRICE_INGESTION_MODE: 'invalid',
+      }).providerKisPriceIngestionMode,
+    ).toBe('websocket_trade');
+  });
+
   it('.env.example documents the non-secret tick interval default', () => {
     const envExample = readFileSync(
       join(process.cwd(), '.env.example'),
@@ -137,6 +154,7 @@ describe('getOpsSchedulerConfig', () => {
 
     expect(envExample).toContain('SCHEDULER_TICK_INTERVAL_MS=60000');
     expect(envExample).toContain('SCHEDULER_PROVIDER_KIS_ENABLED=false');
+    expect(envExample).toContain('KIS_PRICE_INGESTION_MODE=websocket_trade');
     expect(envExample).toContain('SCHEDULER_PROVIDER_FX_INTERVAL_SECONDS=3600');
     expect(envExample).toContain(
       'SCHEDULER_PROVIDER_INGESTION_RUN_ON_STARTUP=false',

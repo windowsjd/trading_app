@@ -12,6 +12,7 @@ import { SEASON_SETTLEMENT_JOB_NAME } from '../batch/season-settlement-job.types
 import { BinancePriceIngestionService } from '../providers/binance/binance-price.ingestion.service';
 import { ExchangeRateIngestionService } from '../providers/exchange-rate/exchange-rate.ingestion.service';
 import { KisRestCurrentPriceIngestionService } from '../providers/kis/kis-rest-current-price.ingestion.service';
+import { KisWebSocketClient } from '../providers/kis/kis-websocket.client';
 import { KoreaEximExchangeIngestionService } from '../providers/korea-exim/korea-exim-exchange.ingestion.service';
 import {
   ProviderTargetResolverService,
@@ -20,7 +21,10 @@ import {
 } from '../providers/provider-target-resolver.service';
 import { RankingRefreshService } from '../ranking/ranking-refresh.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { getOpsSchedulerConfig } from './ops-config';
+import {
+  getOpsSchedulerConfig,
+  type KisPriceIngestionMode,
+} from './ops-config';
 import { OpsJobLockService } from './ops-job-lock.service';
 import { OpsJobRunService, SerializedOpsJobRun } from './ops-job-run.service';
 
@@ -54,6 +58,7 @@ export type OpsJobRunnerInput = {
   maxAttempts?: number;
   maxSnapshots?: number;
   targetSource?: ProviderTargetSource;
+  kisPriceIngestionMode?: KisPriceIngestionMode;
 };
 
 export type DailySnapshotOpsJobInput = OpsJobRunnerInput & {
@@ -77,6 +82,7 @@ export class OpsJobRunnerService {
     private readonly koreaEximExchangeIngestionService: KoreaEximExchangeIngestionService,
     private readonly binancePriceIngestionService: BinancePriceIngestionService,
     private readonly kisRestCurrentPriceIngestionService: KisRestCurrentPriceIngestionService,
+    private readonly kisWebSocketClient: KisWebSocketClient,
     private readonly providerTargetResolver: ProviderTargetResolverService,
     private readonly prisma: PrismaService,
     private readonly lockService: OpsJobLockService,
@@ -174,6 +180,16 @@ export class OpsJobRunnerService {
     );
   }
 
+  runProviderKisIngestJob(input: OpsJobRunnerInput = {}) {
+    const mode =
+      input.kisPriceIngestionMode ??
+      getOpsSchedulerConfig().providerKisPriceIngestionMode;
+
+    return mode === 'rest_current_price'
+      ? this.runProviderKisRestCurrentPriceIngestJob(input)
+      : this.runProviderKisWebSocketTradeIngestJob(input);
+  }
+
   runProviderKisRestCurrentPriceIngestJob(input: OpsJobRunnerInput = {}) {
     return this.runLockedOpsJob(
       OpsJobName.provider_kis_ingest,
@@ -223,6 +239,78 @@ export class OpsJobRunnerService {
           this.throwProviderJobFailed(
             'PROVIDER_KIS_INGEST_FAILED',
             'Provider KIS REST current price ingestion failed.',
+            response,
+          );
+        }
+
+        return response;
+      },
+    );
+  }
+
+  runProviderKisWebSocketTradeIngestJob(input: OpsJobRunnerInput = {}) {
+    return this.runLockedOpsJob(
+      OpsJobName.provider_kis_ingest,
+      input,
+      'provider_kis_ingest:websocket_trade',
+      async () => {
+        const targets =
+          await this.providerTargetResolver.resolveProviderTargets({
+            targetSource: input.targetSource,
+          });
+        if (
+          targets.kisDomesticSymbols.length === 0 &&
+          targets.kisUsSymbols.length === 0
+        ) {
+          return {
+            state: 'no_targets',
+            provider: 'kis',
+            ingestionMode: 'websocket_trade',
+            targetSummary: this.buildTargetSummary(targets),
+            created: 0,
+            skipped: 0,
+            wouldCreate: 0,
+            failed: 0,
+            reason: 'NO_PROVIDER_TARGET',
+          };
+        }
+
+        const result = await this.kisWebSocketClient.runTradePriceIngestion({
+          dryRun: false,
+          requestedBy: input.requestedBy ?? undefined,
+          domesticSymbols: targets.kisDomesticSymbols,
+          usSymbols: targets.kisUsSymbols,
+          maxSnapshots: input.maxSnapshots,
+        });
+
+        const response = {
+          state: result.success
+            ? result.receivedFrames === 0
+              ? 'no_data'
+              : 'completed'
+            : 'failed',
+          provider: result,
+          ingestionMode: 'websocket_trade',
+          targetSummary: this.buildTargetSummary(targets),
+          subscriptions: result.subscriptions,
+          receivedFrames: result.receivedFrames,
+          acknowledged: result.acknowledged,
+          created: result.created,
+          skipped: result.skipped,
+          wouldCreate: result.wouldCreate,
+          failed: result.failed,
+          reason:
+            result.success && result.receivedFrames === 0
+              ? 'NO_WEBSOCKET_FRAMES_RECEIVED'
+              : undefined,
+          errorCode: result.errorCode,
+          errorMessage: result.errorMessage,
+        };
+
+        if (response.state === 'failed') {
+          this.throwProviderJobFailed(
+            'PROVIDER_KIS_INGEST_FAILED',
+            'Provider KIS WebSocket trade ingestion failed.',
             response,
           );
         }

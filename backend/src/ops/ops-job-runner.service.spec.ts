@@ -43,6 +43,9 @@ jest.mock('../providers/binance/binance-price.ingestion.service', () => ({
 jest.mock('../providers/kis/kis-rest-current-price.ingestion.service', () => ({
   KisRestCurrentPriceIngestionService: class KisRestCurrentPriceIngestionService {},
 }));
+jest.mock('../providers/kis/kis-websocket.client', () => ({
+  KisWebSocketClient: class KisWebSocketClient {},
+}));
 jest.mock('../providers/exchange-rate/exchange-rate.ingestion.service', () => ({
   ExchangeRateIngestionService: class ExchangeRateIngestionService {},
 }));
@@ -116,6 +119,9 @@ describe('OpsJobRunnerService', () => {
     const kisRestCurrentPriceIngestionService = {
       ingestCurrentPrices: jest.fn(),
     };
+    const kisWebSocketClient = {
+      runTradePriceIngestion: jest.fn(),
+    };
     const providerTargetResolver = {
       resolveProviderTargets: jest.fn().mockResolvedValue({
         targetSource: 'merged',
@@ -155,6 +161,7 @@ describe('OpsJobRunnerService', () => {
       koreaEximExchangeIngestionService,
       binancePriceIngestionService,
       kisRestCurrentPriceIngestionService,
+      kisWebSocketClient,
       providerTargetResolver,
       prisma,
       service: new OpsJobRunnerService(
@@ -166,6 +173,7 @@ describe('OpsJobRunnerService', () => {
         koreaEximExchangeIngestionService as never,
         binancePriceIngestionService as never,
         kisRestCurrentPriceIngestionService as never,
+        kisWebSocketClient as never,
         providerTargetResolver as never,
         prisma as never,
         lockService as never,
@@ -460,6 +468,224 @@ describe('OpsJobRunnerService', () => {
       lockKey: 'provider_kis_ingest:rest_current_price',
       ownerId: 'owner-kis',
     });
+  });
+
+  it('runs provider KIS WebSocket trade ingestion by default through the locked provider service', async () => {
+    const {
+      kisRestCurrentPriceIngestionService,
+      kisWebSocketClient,
+      lockService,
+      runService,
+      service,
+    } = createService();
+    lockService.acquireLock.mockResolvedValueOnce({
+      acquired: true,
+      lockKey: 'provider_kis_ingest:websocket_trade',
+      ownerId: 'owner-kis-ws',
+      expiresAt: new Date('2026-06-08T00:10:00.000Z'),
+    });
+    runService.createRunning.mockResolvedValueOnce({
+      id: 'run-kis-ws',
+      startedAt,
+    });
+    kisWebSocketClient.runTradePriceIngestion.mockResolvedValueOnce({
+      success: true,
+      provider: 'kis',
+      dryRun: false,
+      durationMs: 30000,
+      subscriptions: {
+        requested: 2,
+        sent: 2,
+        skipped: [],
+      },
+      receivedFrames: 5,
+      acknowledged: 2,
+      created: 2,
+      skipped: 1,
+      wouldCreate: 0,
+      failed: 0,
+      snapshots: [],
+    });
+    runService.recordSucceeded.mockResolvedValueOnce({
+      serialized: serializedRun({
+        jobName: OpsJobName.provider_kis_ingest,
+      }),
+    });
+
+    const response = await service.runProviderKisIngestJob({
+      trigger: OpsJobTrigger.test,
+      requestedBy: 'scheduler',
+      maxSnapshots: 10,
+    });
+
+    expect(response).toMatchObject({
+      success: true,
+      data: {
+        locked: false,
+        skipped: false,
+      },
+    });
+    expect(
+      kisRestCurrentPriceIngestionService.ingestCurrentPrices,
+    ).not.toHaveBeenCalled();
+    expect(kisWebSocketClient.runTradePriceIngestion).toHaveBeenCalledWith({
+      dryRun: false,
+      requestedBy: 'scheduler',
+      domesticSymbols: ['005930'],
+      usSymbols: ['AAPL'],
+      maxSnapshots: 10,
+    });
+    expect(runService.recordSucceeded).toHaveBeenCalledWith(
+      {
+        id: 'run-kis-ws',
+        startedAt,
+      },
+      expect.objectContaining({
+        resultJson: expect.objectContaining({
+          state: 'completed',
+          ingestionMode: 'websocket_trade',
+          subscriptions: expect.objectContaining({
+            sent: 2,
+          }),
+          receivedFrames: 5,
+          created: 2,
+          failed: 0,
+          targetSummary: expect.objectContaining({
+            kisDomesticSymbolCount: 1,
+            kisUsSymbolCount: 1,
+          }),
+        }),
+      }),
+    );
+    expect(lockService.releaseLock).toHaveBeenCalledWith({
+      lockKey: 'provider_kis_ingest:websocket_trade',
+      ownerId: 'owner-kis-ws',
+    });
+  });
+
+  it('keeps provider KIS REST current price available through explicit ingestion mode', async () => {
+    const {
+      kisRestCurrentPriceIngestionService,
+      kisWebSocketClient,
+      lockService,
+      runService,
+      service,
+    } = createService();
+    lockService.acquireLock.mockResolvedValueOnce({
+      acquired: true,
+      lockKey: 'provider_kis_ingest:rest_current_price',
+      ownerId: 'owner-kis-rest',
+      expiresAt: new Date('2026-06-08T00:10:00.000Z'),
+    });
+    runService.createRunning.mockResolvedValueOnce({
+      id: 'run-kis-rest',
+      startedAt,
+    });
+    kisRestCurrentPriceIngestionService.ingestCurrentPrices.mockResolvedValueOnce(
+      {
+        success: true,
+        provider: 'kis',
+        ingestion: 'rest_current_price',
+        dryRun: false,
+        received: 1,
+        created: 1,
+        skipped: 0,
+        wouldCreate: 0,
+        failed: 0,
+        snapshots: [],
+      },
+    );
+    runService.recordSucceeded.mockResolvedValueOnce({
+      serialized: serializedRun({
+        jobName: OpsJobName.provider_kis_ingest,
+      }),
+    });
+
+    await service.runProviderKisIngestJob({
+      trigger: OpsJobTrigger.test,
+      requestedBy: 'scheduler',
+      kisPriceIngestionMode: 'rest_current_price',
+    });
+
+    expect(kisWebSocketClient.runTradePriceIngestion).not.toHaveBeenCalled();
+    expect(
+      kisRestCurrentPriceIngestionService.ingestCurrentPrices,
+    ).toHaveBeenCalledWith({
+      dryRun: false,
+      requestedBy: 'scheduler',
+      domesticSymbols: ['005930'],
+      usSymbols: ['AAPL'],
+      maxSnapshots: undefined,
+    });
+  });
+
+  it('records provider KIS WebSocket failures with provider error details', async () => {
+    const { kisWebSocketClient, lockService, runService, service } =
+      createService();
+    lockService.acquireLock.mockResolvedValueOnce({
+      acquired: true,
+      lockKey: 'provider_kis_ingest:websocket_trade',
+      ownerId: 'owner-kis-ws',
+      expiresAt: new Date('2026-06-08T00:10:00.000Z'),
+    });
+    runService.createRunning.mockResolvedValueOnce({
+      id: 'run-kis-ws',
+      startedAt,
+    });
+    kisWebSocketClient.runTradePriceIngestion.mockResolvedValueOnce({
+      success: false,
+      provider: 'kis',
+      dryRun: false,
+      durationMs: 30000,
+      subscriptions: {
+        requested: 0,
+        sent: 0,
+        skipped: [],
+      },
+      receivedFrames: 0,
+      acknowledged: 0,
+      created: 0,
+      skipped: 0,
+      wouldCreate: 0,
+      failed: 1,
+      snapshots: [],
+      errorCode: 'KIS_WS_BASE_URL_MISSING',
+      errorMessage: 'KIS_WS_BASE_URL is required for KIS WebSocket ingestion.',
+    });
+    runService.recordFailed.mockResolvedValueOnce({
+      serialized: serializedRun({
+        jobName: OpsJobName.provider_kis_ingest,
+        status: OpsJobRunStatus.failed,
+      }),
+    });
+
+    const response = await service.runProviderKisWebSocketTradeIngestJob({
+      trigger: OpsJobTrigger.test,
+      requestedBy: 'scheduler',
+    });
+
+    expect(response).toMatchObject({
+      success: false,
+      error: {
+        code: 'PROVIDER_KIS_INGEST_FAILED',
+      },
+    });
+    expect(runService.recordFailed).toHaveBeenCalledWith(
+      {
+        id: 'run-kis-ws',
+        startedAt,
+      },
+      expect.objectContaining({
+        errorCode: 'PROVIDER_KIS_INGEST_FAILED',
+        errorMessage: 'Provider KIS WebSocket trade ingestion failed.',
+        resultJson: expect.objectContaining({
+          state: 'failed',
+          ingestionMode: 'websocket_trade',
+          errorCode: 'KIS_WS_BASE_URL_MISSING',
+          failed: 1,
+        }),
+      }),
+    );
   });
 
   it('records provider KIS failures as failed ops job runs', async () => {

@@ -37,6 +37,9 @@ jest.mock('../batch/season-settlement-job.service', () => ({
 jest.mock('../ranking/ranking-refresh.service', () => ({
   RankingRefreshService: class RankingRefreshService {},
 }));
+jest.mock('../providers/market-snapshot-health.service', () => ({
+  MarketSnapshotHealthService: class MarketSnapshotHealthService {},
+}));
 
 import { OpsJobName, OpsJobRunStatus } from '../generated/prisma/client';
 import { getOpsSchedulerConfig } from './ops-config';
@@ -51,9 +54,7 @@ describe('OpsSchedulerService', () => {
       runProviderBinanceIngestJob: jest
         .fn()
         .mockResolvedValue({ success: true }),
-      runProviderKisRestCurrentPriceIngestJob: jest
-        .fn()
-        .mockResolvedValue({ success: true }),
+      runProviderKisIngestJob: jest.fn().mockResolvedValue({ success: true }),
       runDailyPortfolioSnapshotJob: jest
         .fn()
         .mockResolvedValue({ success: true }),
@@ -144,10 +145,11 @@ describe('OpsSchedulerService', () => {
         dryRun: false,
       }),
     );
-    expect(runner.runProviderKisRestCurrentPriceIngestJob).toHaveBeenCalledWith(
+    expect(runner.runProviderKisIngestJob).toHaveBeenCalledWith(
       expect.objectContaining({
         dryRun: false,
         maxSnapshots: 25,
+        kisPriceIngestionMode: 'websocket_trade',
       }),
     );
   });
@@ -212,9 +214,7 @@ describe('OpsSchedulerService', () => {
     service.onModuleInit();
     await Promise.resolve();
 
-    expect(
-      runner.runProviderKisRestCurrentPriceIngestJob,
-    ).not.toHaveBeenCalled();
+    expect(runner.runProviderKisIngestJob).not.toHaveBeenCalled();
     service.clearInterval();
   });
 
@@ -225,16 +225,15 @@ describe('OpsSchedulerService', () => {
     const { runner, service } = createService();
 
     service.onModuleInit();
-    expect(
-      runner.runProviderKisRestCurrentPriceIngestJob,
-    ).not.toHaveBeenCalled();
+    expect(runner.runProviderKisIngestJob).not.toHaveBeenCalled();
     await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(runner.runProviderKisRestCurrentPriceIngestJob).toHaveBeenCalledWith(
+    expect(runner.runProviderKisIngestJob).toHaveBeenCalledWith(
       expect.objectContaining({
         dryRun: false,
+        kisPriceIngestionMode: 'websocket_trade',
       }),
     );
     expect(runner.runSeasonRankingGenerationJob).not.toHaveBeenCalled();

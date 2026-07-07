@@ -196,9 +196,10 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
       now,
       respectInterval: options.respectInterval,
       run: () =>
-        this.runner.runProviderKisRestCurrentPriceIngestJob({
+        this.runner.runProviderKisIngestJob({
           ...baseInput,
           maxSnapshots: config.providerKisMaxSnapshots,
+          kisPriceIngestionMode: config.providerKisPriceIngestionMode,
         }),
     });
     if (kisResult) {

@@ -1,6 +1,6 @@
 # Provider Ingestion Foundation
 
-Explicit operator-run provider ingestion foundation, including an operator/admin HTTP trigger. No cron scheduler is enabled. Read-only/quote and operator-run daily snapshot `provider_api` source eligibility are implemented separately for the allowed workflows only (see `docs/policy-decisions.md`).
+Explicit operator-run provider ingestion foundation, including an operator/admin HTTP trigger. Scheduler/Ops integration is documented separately in `docs/scheduler-ops-foundation.md`; the scheduler KIS price path now defaults to WebSocket trade ingestion. Read-only/quote and operator-run daily snapshot `provider_api` source eligibility are implemented separately for the allowed workflows only (see `docs/policy-decisions.md`).
 
 The fixed 40-symbol KIS stock watchlist (15 domestic + 25 US) is defined in code at `src/providers/kis/kis-fixed-asset-universe.ts` and used as the default for `KIS_DOMESTIC_SYMBOLS`/`KIS_US_SYMBOLS` when those env vars are unset. Seed the corresponding assets with `pnpm tsx scripts/seed-kis-fixed-asset-universe.ts`.
 
@@ -182,7 +182,7 @@ Example body:
 
 Supported provider path values are `exchange-rate`, `korea-exim`, `binance`, and `kis`. `dryRun` defaults to `true`; non-dry-run requires explicit `"dryRun": false`. The HTTP trigger writes safe `OperatorAuditLog` metadata and returns aggregate summaries only. Raw provider payloads, access tokens, approval keys, app keys/secrets, and `.env.local` contents are not returned.
 
-All scripts and HTTP triggers are explicit operator actions. No cron scheduler or batch HTTP API is added.
+All scripts and HTTP triggers are explicit operator actions. Scheduler-owned provider ingestion is configured through the separate Scheduler/Ops foundation; no batch HTTP API is added here.
 
 ## Boundaries
 
@@ -198,4 +198,3 @@ All scripts and HTTP triggers are explicit operator actions. No cron scheduler o
 - KIS REST hoga/orderbook ingestion can create `asset_orderbook_snapshots` rows for mapped domestic/US assets.
 - KIS order, account, balance, fill, deposit, withdrawal, and real trading APIs are not implemented.
 - `CurrencyCode.USDT` is not added.
-

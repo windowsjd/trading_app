@@ -5,6 +5,8 @@ export type ProviderOpsJobName =
   | typeof OpsJobName.provider_binance_ingest
   | typeof OpsJobName.provider_kis_ingest;
 
+export type KisPriceIngestionMode = 'websocket_trade' | 'rest_current_price';
+
 export type OpsSchedulerConfig = {
   enabled: boolean;
   timezone: string;
@@ -15,6 +17,7 @@ export type OpsSchedulerConfig = {
   providerIntervalsSeconds: Record<ProviderOpsJobName, number>;
   providerIngestionRunOnStartup: boolean;
   providerKisMaxSnapshots: number;
+  providerKisPriceIngestionMode: KisPriceIngestionMode;
 };
 
 const DEFAULT_LOCK_TTL_SECONDS = 600;
@@ -25,6 +28,8 @@ const DEFAULT_PROVIDER_FX_INTERVAL_SECONDS = 3600;
 const DEFAULT_PROVIDER_BINANCE_INTERVAL_SECONDS = 60;
 const DEFAULT_PROVIDER_KIS_INTERVAL_SECONDS = 60;
 const DEFAULT_PROVIDER_KIS_MAX_SNAPSHOTS = 500;
+const DEFAULT_KIS_PRICE_INGESTION_MODE: KisPriceIngestionMode =
+  'websocket_trade';
 
 export function getOpsSchedulerConfig(
   env: NodeJS.ProcessEnv = process.env,
@@ -109,6 +114,7 @@ export function getOpsSchedulerConfig(
       false,
     ),
     providerKisMaxSnapshots: resolveProviderKisMaxSnapshots(env),
+    providerKisPriceIngestionMode: resolveKisPriceIngestionMode(env),
   };
 }
 
@@ -118,6 +124,21 @@ function resolveProviderKisMaxSnapshots(env: NodeJS.ProcessEnv) {
     parseOptionalPositiveIntegerEnv(env.PROVIDER_INGESTION_MAX_SNAPSHOTS) ??
     DEFAULT_PROVIDER_KIS_MAX_SNAPSHOTS
   );
+}
+
+function resolveKisPriceIngestionMode(
+  env: NodeJS.ProcessEnv,
+): KisPriceIngestionMode {
+  const value = parseTextEnv(
+    env.KIS_PRICE_INGESTION_MODE,
+    DEFAULT_KIS_PRICE_INGESTION_MODE,
+  )
+    .trim()
+    .toLowerCase();
+
+  return value === 'rest_current_price' || value === 'websocket_trade'
+    ? value
+    : DEFAULT_KIS_PRICE_INGESTION_MODE;
 }
 
 function resolveTickIntervalMs(env: NodeJS.ProcessEnv) {

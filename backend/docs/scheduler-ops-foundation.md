@@ -76,7 +76,8 @@ Default lock keys:
 
 - `provider_fx_ingest:usd_krw`
 - `provider_binance_ingest:prices`
-- `provider_kis_ingest:rest_current_price`
+- `provider_kis_ingest:websocket_trade` by default
+- `provider_kis_ingest:rest_current_price` when `KIS_PRICE_INGESTION_MODE=rest_current_price`
 - `daily_portfolio_snapshot:{seasonId}:{date}`
 - `season_ranking_generation:current`
 - `season_settlement:ended`
@@ -104,6 +105,7 @@ SCHEDULER_PROVIDER_KIS_INTERVAL_SECONDS=60
 SCHEDULER_PROVIDER_INGESTION_RUN_ON_STARTUP=false
 SCHEDULER_PROVIDER_TARGET_SOURCE=merged
 SCHEDULER_PROVIDER_KIS_MAX_SNAPSHOTS=500
+KIS_PRICE_INGESTION_MODE=websocket_trade
 SCHEDULER_LOCK_TTL_SECONDS=600
 SCHEDULER_MAX_ATTEMPTS=1
 ENABLE_PROVIDER_KIS_SCHEDULER=false
@@ -156,6 +158,7 @@ SCHEDULER_PROVIDER_KIS_INTERVAL_SECONDS=60
 
 SCHEDULER_PROVIDER_INGESTION_RUN_ON_STARTUP=true
 SCHEDULER_PROVIDER_TARGET_SOURCE=merged
+KIS_PRICE_INGESTION_MODE=websocket_trade
 
 PROVIDER_INGESTION_ENABLED=true
 ```
@@ -176,13 +179,14 @@ Active asset target rules:
 - KIS domestic: active `domestic_stock` assets with `currencyCode=KRW` and market `KRX`, `KOSPI`, `KOSDAQ`, or `KONEX`; only 6-digit numeric symbols are sent.
 - KIS US: active `us_stock` assets with `currencyCode=USD` and market `NAS`, `NASDAQ`, `NYS`, or `NYSE`; symbols are sent without embedding secrets or account data.
 
-KIS scheduler enablement accepts either `SCHEDULER_PROVIDER_KIS_ENABLED=true` or `ENABLE_PROVIDER_KIS_SCHEDULER=true`. KIS REST current price runs with `maxSnapshots` from `SCHEDULER_PROVIDER_KIS_MAX_SNAPSHOTS`, then `PROVIDER_INGESTION_MAX_SNAPSHOTS`, then the safe default `500`.
+KIS scheduler enablement accepts either `SCHEDULER_PROVIDER_KIS_ENABLED=true` or `ENABLE_PROVIDER_KIS_SCHEDULER=true`. `KIS_PRICE_INGESTION_MODE` controls the scheduler KIS price path. The default is `websocket_trade`, which runs `KisWebSocketClient.runTradePriceIngestion(...)` and writes `provider_api` trade price snapshots. `rest_current_price` remains available as an opt-in fallback/manual/debug mode and uses the existing KIS REST current-price ingestion. Both modes use `maxSnapshots` from `SCHEDULER_PROVIDER_KIS_MAX_SNAPSHOTS`, then `PROVIDER_INGESTION_MAX_SNAPSHOTS`, then the safe default `500`.
 
 Provider env required before real runs:
 
 - FX: `KOREA_EXIM_EXCHANGE_ENABLED`, `KOREA_EXIM_EXCHANGE_AUTH_KEY`, `KOREA_EXIM_EXCHANGE_BASE_URL`, `KOREA_EXIM_EXCHANGE_DATA`, `KOREA_EXIM_EXCHANGE_LOOKBACK_DAYS`, or ExchangeRate-API env `EXCHANGE_RATE_API_ENABLED`, `EXCHANGE_RATE_API_KEY`, `EXCHANGE_RATE_API_BASE_URL`.
 - Binance: `BINANCE_PUBLIC_MARKET_DATA_ENABLED`, `BINANCE_REST_BASE_URL`, `BINANCE_CRYPTO_SYMBOLS`, `BINANCE_CRYPTO_USDT_AS_USD_EQUIVALENT`.
-- KIS: `KIS_MARKET_DATA_ENABLED`, `KIS_REST_BASE_URL`, `KIS_APP_KEY`, `KIS_APP_SECRET`, `KIS_DOMESTIC_SYMBOLS`, `KIS_US_SYMBOLS`, plus optional REST path/TR id overrides `KIS_REST_DOMESTIC_CURRENT_PRICE_PATH`, `KIS_REST_DOMESTIC_CURRENT_PRICE_TR_ID`, `KIS_REST_US_CURRENT_PRICE_PATH`, and `KIS_REST_US_CURRENT_PRICE_TR_ID`.
+- KIS WebSocket trade mode: `PROVIDER_INGESTION_ENABLED`, `KIS_MARKET_DATA_ENABLED`, `KIS_APP_KEY`, `KIS_APP_SECRET`, `KIS_REST_BASE_URL` for `/oauth2/Approval`, `KIS_WS_BASE_URL` for the WebSocket connection, `KIS_DOMESTIC_SYMBOLS`, `KIS_US_SYMBOLS`, and optional `KIS_WS_CUSTTYPE`, `KIS_WS_DOMESTIC_TR_ID`, `KIS_WS_OVERSEAS_DELAYED_TR_ID`, `KIS_WS_MAX_RUNTIME_MS`, `KIS_WS_SNAPSHOT_THROTTLE_MS`, and `KIS_WS_ALLOW_US_DELAYED`.
+- KIS REST fallback mode: `KIS_MARKET_DATA_ENABLED`, `KIS_REST_BASE_URL`, `KIS_APP_KEY`, `KIS_APP_SECRET`, `KIS_DOMESTIC_SYMBOLS`, `KIS_US_SYMBOLS`, plus optional REST path/TR id overrides `KIS_REST_DOMESTIC_CURRENT_PRICE_PATH`, `KIS_REST_DOMESTIC_CURRENT_PRICE_TR_ID`, `KIS_REST_US_CURRENT_PRICE_PATH`, and `KIS_REST_US_CURRENT_PRICE_TR_ID`.
 
 Provider failures are recorded in `ops_job_runs` as `failed` by the runner where possible. One provider failure does not prevent the scheduler from attempting other enabled provider jobs in the same tick. Result and metadata JSON are sanitized before storage; provider tokens, app keys, app secrets, API keys, JWT secrets, database URLs, access tokens, and refresh tokens must not be logged or stored in ops audit JSON.
 

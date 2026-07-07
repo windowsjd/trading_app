@@ -79,9 +79,55 @@ describe('KIS WebSocket client', () => {
       events.indexOf('send:subscribe'),
     );
   });
+
+  it('falls back to the ws package when global WebSocket is unavailable', async () => {
+    globalThis.WebSocket = undefined as never;
+    const client = new KisWebSocketClient(
+      configServiceForTest({
+        wsBaseUrl: 'ws://127.0.0.1:1',
+      }),
+      {
+        requestConfiguredWebSocketApprovalKey: jest.fn().mockResolvedValue({
+          state: 'available',
+          response: {
+            approvalKey: 'approval-for-test',
+          },
+          receivedAt: new Date('2026-05-27T00:00:00.000Z'),
+        }),
+      } as unknown as KisAuthClient,
+      {
+        buildSubscriptionTargets: jest.fn().mockResolvedValue({
+          targets: [
+            {
+              kind: 'domestic_krx_realtime_trade',
+              trId: 'H0STCNT0',
+              trKey: '005930',
+              symbol: '005930',
+              marketCode: 'KRX',
+            },
+          ],
+          skipped: [],
+        }),
+      } as unknown as KisWebSocketIngestionService,
+    );
+
+    const result = await client.runTradePriceIngestion({
+      dryRun: true,
+      durationMs: 10,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.errorCode).not.toBe('WEBSOCKET_CLIENT_UNAVAILABLE');
+    expect([
+      'KIS_WEBSOCKET_CONNECT_FAILED',
+      'KIS_WEBSOCKET_CONNECT_TIMEOUT',
+    ]).toContain(result.errorCode);
+  });
 });
 
-function configServiceForTest(): ProviderConfigService {
+function configServiceForTest(
+  kisOverrides: Partial<{ wsBaseUrl: string }> = {},
+): ProviderConfigService {
   return {
     getConfig: () => ({
       common: {
@@ -105,7 +151,7 @@ function configServiceForTest(): ProviderConfigService {
         appKey: 'app-key-for-test',
         appSecret: 'app-secret-for-test',
         restBaseUrl: 'https://example.test',
-        wsBaseUrl: 'ws://example.test',
+        wsBaseUrl: kisOverrides.wsBaseUrl ?? 'ws://example.test',
         wsCustType: 'P',
         wsDomesticTrId: 'H0STCNT0',
         wsOverseasDelayedTrId: 'HDFSCNT0',
