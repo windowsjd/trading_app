@@ -106,6 +106,13 @@ Binance:
 - `BINANCE_WS_MARKET_DATA_BASE_URL`
 - `BINANCE_CRYPTO_SYMBOLS`
 - `BINANCE_CRYPTO_USDT_AS_USD_EQUIVALENT`
+- `BINANCE_WEBSOCKET_STREAMING_ENABLED`
+- `BINANCE_WEBSOCKET_STREAMING_RECONNECT_MIN_MS`
+- `BINANCE_WEBSOCKET_STREAMING_RECONNECT_MAX_MS`
+- `BINANCE_WEBSOCKET_STREAMING_HEARTBEAT_TIMEOUT_MS`
+- `BINANCE_WS_SNAPSHOT_THROTTLE_MS`
+
+Binance Spot WebSocket streaming is the real-time crypto price path. It uses public `<symbol>@ticker` market streams without Binance API keys, updates the in-memory latest-price cache on every tick, publishes `/api/v1/ws` `asset_ticker` events, and stores throttled `asset_price_snapshots` with `sourceName=binance_spot_ws_ticker`. The REST 24hr ticker ingestion path remains available for fallback/manual/debug use.
 
 KIS:
 

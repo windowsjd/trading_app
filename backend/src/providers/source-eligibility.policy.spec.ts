@@ -36,6 +36,7 @@ import {
 } from '../generated/prisma/client';
 import {
   FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
+  BINANCE_CRYPTO_USD_PROVIDER_SOURCE_PRIORITY,
   getProviderFreshnessThresholdsSeconds,
   isProviderWorkflowAllowed,
   isProviderWorkflowDenied,
@@ -135,7 +136,8 @@ describe('provider source eligibility policy', () => {
       }),
     ).toMatchObject({
       eligible: true,
-      sourceName: PROVIDER_SOURCE_NAMES.cryptoUsd,
+      sourceName: PROVIDER_SOURCE_NAMES.cryptoUsdWebSocket,
+      sourceNames: BINANCE_CRYPTO_USD_PROVIDER_SOURCE_PRIORITY,
     });
 
     expect(
@@ -149,7 +151,8 @@ describe('provider source eligibility policy', () => {
       }),
     ).toMatchObject({
       eligible: true,
-      sourceName: PROVIDER_SOURCE_NAMES.cryptoUsd,
+      sourceName: PROVIDER_SOURCE_NAMES.cryptoUsdWebSocket,
+      sourceNames: BINANCE_CRYPTO_USD_PROVIDER_SOURCE_PRIORITY,
       freshnessThresholdSeconds: 10,
     });
   });

@@ -21,7 +21,6 @@ import {
   isPositiveDecimal,
   resolveAssetProviderEligibility,
   resolveFxProviderEligibility,
-  selectFreshProviderSnapshot,
   selectFreshProviderSnapshotBySourcePriority,
 } from '../providers/source-eligibility.policy';
 import { presentSourceDecision } from '../providers/source-metadata.presenter';
@@ -1073,9 +1072,9 @@ export class HomeService {
         })) ?? [])
       : [];
     const providerSelection = providerEligibility.eligible
-      ? selectFreshProviderSnapshot({
+      ? selectFreshProviderSnapshotBySourcePriority({
           candidates: providerCandidates,
-          expectedSourceName: providerEligibility.sourceName,
+          expectedSourceNames: providerEligibility.sourceNames,
           now: valuationAt,
           freshnessThresholdSeconds:
             providerEligibility.freshnessThresholdSeconds,

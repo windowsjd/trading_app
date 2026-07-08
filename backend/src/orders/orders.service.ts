@@ -33,7 +33,6 @@ import {
   isPositiveDecimal,
   resolveAssetProviderEligibility,
   resolveFxProviderEligibility,
-  selectFreshProviderSnapshot,
   selectFreshProviderSnapshotBySourcePriority,
 } from '../providers/source-eligibility.policy';
 import {
@@ -1206,9 +1205,9 @@ export class OrdersService {
         capturedAt: true,
       },
     });
-    const selection = selectFreshProviderSnapshot({
+    const selection = selectFreshProviderSnapshotBySourcePriority({
       candidates,
-      expectedSourceName: providerEligibility.sourceName,
+      expectedSourceNames: providerEligibility.sourceNames,
       now: executedAt,
       freshnessThresholdSeconds: providerEligibility.freshnessThresholdSeconds,
       isPositiveValue: (candidate) => isPositiveDecimal(candidate.price),
@@ -2312,9 +2311,9 @@ export class OrdersService {
         })
       : [];
     const providerSelection = providerEligibility.eligible
-      ? selectFreshProviderSnapshot({
+      ? selectFreshProviderSnapshotBySourcePriority({
           candidates: providerCandidates,
-          expectedSourceName: providerEligibility.sourceName,
+          expectedSourceNames: providerEligibility.sourceNames,
           now: valuationAt,
           freshnessThresholdSeconds:
             providerEligibility.freshnessThresholdSeconds,
@@ -3413,9 +3412,9 @@ export class OrdersService {
         })) ?? [])
       : [];
     const providerSelection = providerEligibility.eligible
-      ? selectFreshProviderSnapshot({
+      ? selectFreshProviderSnapshotBySourcePriority({
           candidates: providerCandidates,
-          expectedSourceName: providerEligibility.sourceName,
+          expectedSourceNames: providerEligibility.sourceNames,
           now: quoteAt,
           freshnessThresholdSeconds:
             providerEligibility.freshnessThresholdSeconds,

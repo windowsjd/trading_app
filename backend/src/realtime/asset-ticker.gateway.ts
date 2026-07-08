@@ -14,6 +14,10 @@ import { UserStatus } from '../generated/prisma/client';
 import { AssetsService } from '../assets/assets.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  BinanceRealtimePriceEvent,
+  BinanceRealtimePriceEventBus,
+} from '../providers/binance/binance-realtime-price-event-bus.service';
+import {
   KisRealtimePriceEvent,
   KisRealtimePriceEventBus,
 } from '../providers/kis/kis-realtime-price-event-bus.service';
@@ -33,6 +37,8 @@ type SubscriptionMessage = {
   assetId?: unknown;
 };
 
+type RealtimePriceEvent = KisRealtimePriceEvent | BinanceRealtimePriceEvent;
+
 const TICKER_POLL_INTERVAL_MS = 3000;
 
 @Injectable()
@@ -51,7 +57,8 @@ export class AssetTickerGateway
 
   private readonly clients = new Map<WebSocket, ClientState>();
   private pollTimer: NodeJS.Timeout | null = null;
-  private unsubscribeRealtimePrices: (() => void) | null = null;
+  private unsubscribeKisRealtimePrices: (() => void) | null = null;
+  private unsubscribeBinanceRealtimePrices: (() => void) | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -59,15 +66,20 @@ export class AssetTickerGateway
     private readonly configService: ConfigService,
     private readonly assetsService: AssetsService,
     private readonly kisRealtimePriceEventBus: KisRealtimePriceEventBus,
+    private readonly binanceRealtimePriceEventBus: BinanceRealtimePriceEventBus,
   ) {}
 
   onModuleInit() {
     this.pollTimer = setInterval(() => {
       void this.pushChangedTickers();
     }, TICKER_POLL_INTERVAL_MS);
-    this.unsubscribeRealtimePrices = this.kisRealtimePriceEventBus.subscribe(
+    this.unsubscribeKisRealtimePrices = this.kisRealtimePriceEventBus.subscribe(
       (event) => this.pushRealtimePriceEvent(event),
     );
+    this.unsubscribeBinanceRealtimePrices =
+      this.binanceRealtimePriceEventBus.subscribe((event) =>
+        this.pushRealtimePriceEvent(event),
+      );
   }
 
   onModuleDestroy() {
@@ -75,8 +87,10 @@ export class AssetTickerGateway
       clearInterval(this.pollTimer);
       this.pollTimer = null;
     }
-    this.unsubscribeRealtimePrices?.();
-    this.unsubscribeRealtimePrices = null;
+    this.unsubscribeKisRealtimePrices?.();
+    this.unsubscribeKisRealtimePrices = null;
+    this.unsubscribeBinanceRealtimePrices?.();
+    this.unsubscribeBinanceRealtimePrices = null;
   }
 
   async handleConnection(client: WebSocket, request: IncomingMessage) {
@@ -203,7 +217,7 @@ export class AssetTickerGateway
     }
   }
 
-  private async pushRealtimePriceEvent(event: KisRealtimePriceEvent) {
+  private async pushRealtimePriceEvent(event: RealtimePriceEvent) {
     if (!event.assetId) {
       return;
     }
@@ -290,7 +304,7 @@ export class AssetTickerGateway
     };
   }
 
-  private async buildRealtimeTickerMessage(event: KisRealtimePriceEvent) {
+  private async buildRealtimeTickerMessage(event: RealtimePriceEvent) {
     if (!event.assetId) {
       return null;
     }
@@ -316,6 +330,9 @@ export class AssetTickerGateway
         sourceType: 'provider_api',
         sourceName: event.price.sourceName,
       },
+      ...('changeRate' in event.price
+        ? { changeRate: event.price.changeRate }
+        : {}),
     };
   }
 

@@ -889,9 +889,7 @@ describe('OrdersService', () => {
           id: input.positionId ?? 'position-1',
           assetId,
           quantity: new Prisma.Decimal(input.quantity ?? '1.00000000'),
-          averageCost: new Prisma.Decimal(
-            input.averageCost ?? '100.00000000',
-          ),
+          averageCost: new Prisma.Decimal(input.averageCost ?? '100.00000000'),
           currencyCode,
           asset: {
             id: assetId,
@@ -3238,8 +3236,8 @@ describe('OrdersService', () => {
           providerAssetSnapshot({
             id: 'aps-portfolio-stale',
             price: '100.00000000',
-            capturedAt: new Date(executedAt.getTime() - 61_000),
-            effectiveAt: new Date(executedAt.getTime() - 61_000),
+            capturedAt: new Date(executedAt.getTime() - 301_000),
+            effectiveAt: new Date(executedAt.getTime() - 301_000),
           }),
         ],
         expectedCode: 'PRICE_STALE',
@@ -3294,8 +3292,8 @@ describe('OrdersService', () => {
             id: 'fx-portfolio-stale',
             rate: '1400.00000000',
             sourceName: 'exchange_rate_api',
-            capturedAt: new Date(executedAt.getTime() - 301_000),
-            effectiveAt: new Date(executedAt.getTime() - 301_000),
+            capturedAt: new Date(executedAt.getTime() - 7_201_000),
+            effectiveAt: new Date(executedAt.getTime() - 7_201_000),
           }),
         ],
         fxAdminSnapshot: null,

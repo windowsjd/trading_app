@@ -22,6 +22,7 @@ import {
 } from './ops-job-runner.service';
 import { OpsJobRunService } from './ops-job-run.service';
 import { MarketSnapshotHealthService } from '../providers/market-snapshot-health.service';
+import { ProviderConfigService } from '../providers/provider-config.service';
 
 @Injectable()
 export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
@@ -32,6 +33,8 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
     private readonly runService: OpsJobRunService,
     @Optional()
     private readonly marketSnapshotHealthService?: MarketSnapshotHealthService,
+    @Optional()
+    private readonly providerConfigService?: ProviderConfigService,
   ) {}
 
   onModuleInit() {
@@ -175,9 +178,13 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
       results.push(fxResult);
     }
 
+    const binanceWebSocketStreamingEnabled =
+      this.isBinanceWebSocketStreamingEnabled();
     const binanceResult = await this.runProviderJobIfDue({
       jobName: OpsJobName.provider_binance_ingest,
-      enabled: config.jobs[OpsJobName.provider_binance_ingest],
+      enabled:
+        config.jobs[OpsJobName.provider_binance_ingest] &&
+        !binanceWebSocketStreamingEnabled,
       intervalSeconds:
         config.providerIntervalsSeconds[OpsJobName.provider_binance_ingest],
       now,
@@ -207,6 +214,16 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
     }
 
     return results;
+  }
+
+  private isBinanceWebSocketStreamingEnabled(): boolean {
+    try {
+      return Boolean(
+        this.providerConfigService?.getConfig().binance.wsStreamingEnabled,
+      );
+    } catch {
+      return false;
+    }
   }
 
   private async runProviderJobIfDue(input: {

@@ -47,8 +47,10 @@ type BinanceAssetMapping =
       reason: string;
     };
 
-const BINANCE_MARKET = 'BINANCE';
-const BINANCE_SOURCE_NAME = 'binance_public_rest_24hr_ticker';
+export const BINANCE_MARKET = 'BINANCE';
+export const BINANCE_REST_24HR_TICKER_SOURCE_NAME =
+  'binance_public_rest_24hr_ticker';
+export const BINANCE_SPOT_WS_TICKER_SOURCE_NAME = 'binance_spot_ws_ticker';
 
 @Injectable()
 export class BinancePriceIngestionService {
@@ -208,7 +210,7 @@ export class BinancePriceIngestionService {
           priceKrw: await this.buildPriceKrw(parsed.price, parsed.effectiveAt),
           currencyCode: CurrencyCode.USD,
           sourceType: AssetPriceSourceType.provider_api,
-          sourceName: BINANCE_SOURCE_NAME,
+          sourceName: BINANCE_REST_24HR_TICKER_SOURCE_NAME,
           sourceTimestamp: parsed.sourceTimestamp,
           effectiveAt: parsed.effectiveAt,
           capturedAt: fetched.receivedAt,
@@ -343,7 +345,7 @@ export class BinancePriceIngestionService {
         price: input.parsed.price,
         currencyCode: CurrencyCode.USD,
         sourceType: AssetPriceSourceType.provider_api,
-        sourceName: BINANCE_SOURCE_NAME,
+        sourceName: BINANCE_REST_24HR_TICKER_SOURCE_NAME,
         effectiveAt: input.parsed.effectiveAt,
       },
       select: {

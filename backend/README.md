@@ -23,7 +23,7 @@ This service owns backend APIs, database access, financial calculations, and ser
 - FX execute and orders create idempotency request hashes include `quoteId`, so the same idempotency key with a different quote conflicts instead of replaying an old result.
 - KRW and USD cash wallets. US stocks and USD-settled crypto use the USD wallet.
 - Final valuation policy is KRW total assets.
-- Provider ingestion foundation exists for Korea EXIM exchange and ExchangeRate-API USD/KRW, Binance public REST crypto, KIS REST current-price snapshots, and KIS WebSocket KRX/US stock market data row insertion.
+- Provider ingestion foundation exists for Korea EXIM exchange and ExchangeRate-API USD/KRW, Binance Spot WebSocket crypto streaming with REST fallback, KIS REST current-price snapshots, and KIS WebSocket KRX/US stock market data row insertion.
 - `GET /api/v1/assets/:assetId/candles` supports domestic/US stock candles through KIS and crypto chart candles through Binance Spot `GET /api/v3/klines`. 지원 candle interval은 1m, 5m, 15m, 30m, 1h, 4h, 1d, 1w만 허용한다. 프론트 자산 상세 차트 탭도 1m, 5m, 15m, 30m, 1h, 4h, 1d, 1w 순서를 사용한다. 그 외 interval은 validation error로 처리한다. 필요 시 서버가 더 짧은 원천 candle을 집계해 상위 interval candle을 생성한다.
 - Provider_api source eligibility is opened only for explicitly allowed workflows: `/fx quote`, `/fx execute`, assets `withPrice`, orders quote, order execution, live portfolio/home/positions valuation, the operator-run daily portfolio snapshot valuation job, and season settlement valuation. Orders create uses the durable quote and immediate execution path.
 - Asset list/detail/price `changeRate` is calculated from the immediately previous positive `asset_price_snapshots.price` row for the same asset and price currency; it is `null` when no valid previous positive snapshot exists. Provider raw payloads, provider-specific ticker change fields, tokens, secrets, and private ledger data are not exposed.
@@ -111,7 +111,7 @@ SCHEDULER_PROVIDER_TARGET_SOURCE=merged
 PROVIDER_INGESTION_ENABLED=true
 ```
 
-Provider intervals are checked against the latest `ops_job_runs` row and do not create noisy skipped rows when a provider is not due. Defaults are FX 3600 seconds, Binance 60 seconds, and KIS 60 seconds. `SCHEDULER_PROVIDER_INGESTION_RUN_ON_STARTUP=true` queues one asynchronous startup run for enabled provider jobs only and then emits a non-fatal market snapshot health warning when active asset coverage is still unavailable. KIS real-time prices are owned by the long-lived WebSocket streaming service below, not by the scheduler. `SCHEDULER_PROVIDER_KIS_ENABLED=true` remains available only for fallback/manual/debug one-shot ingestion jobs controlled by `KIS_PRICE_INGESTION_MODE`.
+Provider intervals are checked against the latest `ops_job_runs` row and do not create noisy skipped rows when a provider is not due. Defaults are FX 3600 seconds, Binance 60 seconds, and KIS 60 seconds. `SCHEDULER_PROVIDER_INGESTION_RUN_ON_STARTUP=true` queues one asynchronous startup run for enabled provider jobs only and then emits a non-fatal market snapshot health warning when active asset coverage is still unavailable. Binance and KIS real-time prices are owned by their long-lived WebSocket streaming services below, not by the scheduler. When `BINANCE_WEBSOCKET_STREAMING_ENABLED=true`, the scheduler protects against duplicate Binance REST polling by skipping `provider_binance_ingest`. `SCHEDULER_PROVIDER_BINANCE_ENABLED=true` and `SCHEDULER_PROVIDER_KIS_ENABLED=true` remain available only for fallback/manual/debug ingestion jobs.
 
 `SCHEDULER_PROVIDER_TARGET_SOURCE` controls provider price targets:
 
@@ -123,7 +123,24 @@ Provider intervals are checked against the latest `ops_job_runs` row and do not 
 
 Korea EXIM exchange provider env is `KOREA_EXIM_EXCHANGE_ENABLED`, `KOREA_EXIM_EXCHANGE_AUTH_KEY`, `KOREA_EXIM_EXCHANGE_BASE_URL`, `KOREA_EXIM_EXCHANGE_DATA`, and `KOREA_EXIM_EXCHANGE_LOOKBACK_DAYS`. The request URL is `https://oapi.koreaexim.go.kr/site/program/financial/exchangeJSON` with `authkey`, `searchdate`, and `data=AP01`; USD/KRW uses the USD row's `DEAL_BAS_R` value with commas removed. ExchangeRate-API fallback env is `EXCHANGE_RATE_API_ENABLED`, `EXCHANGE_RATE_API_KEY`, and `EXCHANGE_RATE_API_BASE_URL`. Real auth keys must live only in `.env.local`; `.env.example` keeps the auth key blank. ExchangeRate-API remains the fallback provider after Korea EXIM exchange.
 
-Binance public market data uses `BINANCE_PUBLIC_MARKET_DATA_ENABLED`, `BINANCE_REST_BASE_URL`, `BINANCE_CRYPTO_SYMBOLS`, and `BINANCE_CRYPTO_USDT_AS_USD_EQUIVALENT`, with `BINANCE_REST_BASE_URL` defaulting to `https://api.binance.com` when unset. Crypto candles use only the public Spot `GET /api/v3/klines` endpoint with USDT quote symbols such as `BTCUSDT` and `ETHUSDT`; supported kline intervals are `1m`, `5m`, `15m`, `30m`, `1h`, `4h`, `1d`, and `1w`. No Binance API key or secret is required for this candle path.
+Binance public market data uses `BINANCE_PUBLIC_MARKET_DATA_ENABLED`, `BINANCE_REST_BASE_URL`, `BINANCE_WS_MARKET_DATA_BASE_URL`, `BINANCE_CRYPTO_SYMBOLS`, and `BINANCE_CRYPTO_USDT_AS_USD_EQUIVALENT`, with `BINANCE_REST_BASE_URL` defaulting to `https://api.binance.com` and `BINANCE_WS_MARKET_DATA_BASE_URL` defaulting to `wss://stream.binance.com:9443` when unset. Crypto candles use only the public Spot `GET /api/v3/klines` endpoint with USDT quote symbols such as `BTCUSDT` and `ETHUSDT`; supported kline intervals are `1m`, `5m`, `15m`, `30m`, `1h`, `4h`, `1d`, and `1w`. No Binance API key or secret is required for public Spot candle or WebSocket market-data paths.
+
+Binance long-lived WebSocket streaming starts with the NestJS backend process when `BINANCE_WEBSOCKET_STREAMING_ENABLED=true` and the provider gates are satisfied:
+
+```env
+PROVIDER_INGESTION_ENABLED=true
+BINANCE_PUBLIC_MARKET_DATA_ENABLED=true
+BINANCE_WS_MARKET_DATA_BASE_URL=wss://stream.binance.com:9443
+BINANCE_CRYPTO_SYMBOLS=BTCUSDT,ETHUSDT
+BINANCE_WEBSOCKET_STREAMING_ENABLED=true
+BINANCE_WEBSOCKET_STREAMING_RECONNECT_MIN_MS=1000
+BINANCE_WEBSOCKET_STREAMING_RECONNECT_MAX_MS=30000
+BINANCE_WEBSOCKET_STREAMING_HEARTBEAT_TIMEOUT_MS=60000
+BINANCE_WS_SNAPSHOT_THROTTLE_MS=5000
+SCHEDULER_PROVIDER_BINANCE_ENABLED=false
+```
+
+The streaming service subscribes to public Spot `<symbol>@ticker` streams such as `btcusdt@ticker`, updates an in-memory latest-price cache on every tick, publishes `/api/v1/ws` `asset_ticker` updates for subscribed clients, and writes `asset_price_snapshots` only through `BINANCE_WS_SNAPSHOT_THROTTLE_MS`. It reconnects with backoff, reconnects before Binance's 24-hour connection limit, responds to ping frames with pong payloads, and resubscribes after reconnect. REST 24hr ticker ingestion remains available for fallback/manual/debug use with the scheduler or operator paths, but should not run as the default real-time crypto path while streaming is enabled.
 
 KIS long-lived WebSocket streaming starts with the NestJS backend process when `KIS_WEBSOCKET_STREAMING_ENABLED=true` and the provider gates are satisfied:
 

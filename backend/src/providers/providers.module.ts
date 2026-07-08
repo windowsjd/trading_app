@@ -2,6 +2,10 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { BinancePublicClient } from './binance/binance-public.client';
 import { BinancePriceIngestionService } from './binance/binance-price.ingestion.service';
+import { BinanceRealtimePriceCacheService } from './binance/binance-realtime-price-cache.service';
+import { BinanceRealtimePriceEventBus } from './binance/binance-realtime-price-event-bus.service';
+import { BinanceWebSocketIngestionService } from './binance/binance-websocket.ingestion.service';
+import { BinanceWebSocketStreamingService } from './binance/binance-websocket-streaming.service';
 import { ExchangeRateClient } from './exchange-rate/exchange-rate.client';
 import { ExchangeRateIngestionService } from './exchange-rate/exchange-rate.ingestion.service';
 import { KoreaEximExchangeClient } from './korea-exim/korea-exim-exchange.client';
@@ -31,6 +35,10 @@ import { ProviderTargetResolverService } from './provider-target-resolver.servic
     KoreaEximExchangeIngestionService,
     BinancePublicClient,
     BinancePriceIngestionService,
+    BinanceRealtimePriceCacheService,
+    BinanceRealtimePriceEventBus,
+    BinanceWebSocketIngestionService,
+    BinanceWebSocketStreamingService,
     KisAuthClient,
     KisQuoteClient,
     KisRestCurrentPriceIngestionService,
@@ -50,6 +58,10 @@ import { ProviderTargetResolverService } from './provider-target-resolver.servic
     KoreaEximExchangeIngestionService,
     BinancePublicClient,
     BinancePriceIngestionService,
+    BinanceRealtimePriceCacheService,
+    BinanceRealtimePriceEventBus,
+    BinanceWebSocketIngestionService,
+    BinanceWebSocketStreamingService,
     KisAuthClient,
     KisQuoteClient,
     KisRestCurrentPriceIngestionService,

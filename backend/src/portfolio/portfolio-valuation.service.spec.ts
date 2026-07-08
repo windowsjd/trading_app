@@ -576,7 +576,9 @@ describe('PortfolioValuationService source eligibility', () => {
         where: expect.objectContaining({
           assetId: 'asset-us',
           sourceType: AssetPriceSourceType.provider_api,
-          sourceName: 'kis_us_delayed_trade',
+          sourceName: {
+            in: ['kis_us_delayed_trade'],
+          },
           effectiveAt: {
             lte: settlementAt,
           },
@@ -584,7 +586,7 @@ describe('PortfolioValuationService source eligibility', () => {
             gt: 0,
           },
         }),
-        take: 1,
+        take: 10,
       }),
     );
     expect(prisma.fxRateSnapshot.findMany).toHaveBeenCalledWith(

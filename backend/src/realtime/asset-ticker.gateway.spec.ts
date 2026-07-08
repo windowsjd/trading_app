@@ -13,6 +13,7 @@ jest.mock('../assets/assets.service', () => ({
 }));
 
 import { CurrencyCode } from '../generated/prisma/client';
+import { BinanceRealtimePriceEventBus } from '../providers/binance/binance-realtime-price-event-bus.service';
 import { KisRealtimePriceEventBus } from '../providers/kis/kis-realtime-price-event-bus.service';
 import { AssetTickerGateway } from './asset-ticker.gateway';
 
@@ -51,15 +52,17 @@ describe('AssetTickerGateway', () => {
       getAssetPriceForTicker: jest.fn().mockResolvedValue(selection),
     };
     const eventBus = new KisRealtimePriceEventBus();
+    const binanceEventBus = new BinanceRealtimePriceEventBus();
     const gateway = new AssetTickerGateway(
       prisma as never,
       jwtService as never,
       configService as never,
       assetsService as never,
       eventBus,
+      binanceEventBus,
     );
 
-    return { assetsService, eventBus, gateway, prisma };
+    return { assetsService, eventBus, binanceEventBus, gateway, prisma };
   };
 
   const buildTickerMessage = (gateway: AssetTickerGateway, assetId: string) =>
@@ -251,6 +254,73 @@ describe('AssetTickerGateway', () => {
       priceSource: {
         sourceType: 'provider_api',
         sourceName: 'kis_krx_realtime_trade',
+      },
+    });
+  });
+
+  it('can overlay Binance realtime cache values on the existing ticker payload', async () => {
+    const { gateway } = createGateway({
+      asset: {
+        id: 'asset-btc',
+        symbol: 'BTC',
+        name: 'Bitcoin',
+        assetType: 'crypto',
+        market: 'BINANCE',
+        priceCurrency: CurrencyCode.USD,
+      },
+      price: {
+        state: 'available',
+        currentPrice: '100000.00000000',
+        changeRate: '1.50000000',
+        priceCurrency: CurrencyCode.USD,
+        priceKrwState: 'available',
+        priceKrw: '140000000.00000000',
+        assetPriceSnapshotId: 'price-provider-1',
+        priceEffectiveAt: '2026-06-19T03:00:00.000Z',
+        priceCapturedAt: '2026-06-19T03:00:10.000Z',
+        priceSource: {
+          sourceType: 'provider_api',
+          sourceName: 'binance_spot_ws_ticker',
+        },
+      },
+    });
+
+    const ticker = await buildRealtimeTickerMessage(gateway, {
+      type: 'binance_realtime_price',
+      assetId: 'asset-btc',
+      snapshotState: 'skipped',
+      snapshotReason: 'THROTTLED_PROVIDER_SNAPSHOT',
+      price: {
+        key: 'BTCUSDT',
+        providerSymbol: 'BTCUSDT',
+        streamName: 'btcusdt@ticker',
+        price: '100123.00000000',
+        changeRate: '1.75000000',
+        bidPrice: '100122.00000000',
+        askPrice: '100124.00000000',
+        currencyCode: CurrencyCode.USD,
+        sourceName: 'binance_spot_ws_ticker',
+        capturedAt: '2026-06-19T03:00:29.000Z',
+        effectiveAt: '2026-06-19T03:00:28.000Z',
+        updatedAt: '2026-06-19T03:00:29.000Z',
+      },
+    });
+
+    expect(ticker).toMatchObject({
+      type: 'asset_ticker',
+      assetId: 'asset-btc',
+      realtime: true,
+      snapshotState: 'skipped',
+      snapshotReason: 'THROTTLED_PROVIDER_SNAPSHOT',
+      priceLocal: '100123.00000000',
+      priceCurrency: CurrencyCode.USD,
+      priceCapturedAt: '2026-06-19T03:00:29.000Z',
+      priceEffectiveAt: '2026-06-19T03:00:28.000Z',
+      freshnessAgeSeconds: 1,
+      changeRate: '1.75000000',
+      priceSource: {
+        sourceType: 'provider_api',
+        sourceName: 'binance_spot_ws_ticker',
       },
     });
   });

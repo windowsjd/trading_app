@@ -48,7 +48,11 @@ import { OpsSchedulerService } from './ops-scheduler.service';
 describe('OpsSchedulerService', () => {
   const originalEnv = { ...process.env };
 
-  const createService = () => {
+  const createService = (
+    input: {
+      binanceWebSocketStreamingEnabled?: boolean;
+    } = {},
+  ) => {
     const runner = {
       runProviderFxIngestJob: jest.fn().mockResolvedValue({ success: true }),
       runProviderBinanceIngestJob: jest
@@ -70,11 +74,24 @@ describe('OpsSchedulerService', () => {
     const runService = {
       findLatestRunForJob: jest.fn().mockResolvedValue(null),
     };
+    const providerConfigService = {
+      getConfig: jest.fn().mockReturnValue({
+        binance: {
+          wsStreamingEnabled: input.binanceWebSocketStreamingEnabled ?? false,
+        },
+      }),
+    };
 
     return {
       runner,
       runService,
-      service: new OpsSchedulerService(runner as never, runService as never),
+      providerConfigService,
+      service: new OpsSchedulerService(
+        runner as never,
+        runService as never,
+        undefined,
+        providerConfigService as never,
+      ),
     };
   };
 
@@ -152,6 +169,21 @@ describe('OpsSchedulerService', () => {
         kisPriceIngestionMode: 'websocket_trade',
       }),
     );
+  });
+
+  it('skips the Binance REST scheduler job when Binance WebSocket streaming is enabled', async () => {
+    process.env.SCHEDULER_ENABLED = 'true';
+    process.env.SCHEDULER_PROVIDER_BINANCE_ENABLED = 'true';
+    const { runner, service } = createService({
+      binanceWebSocketStreamingEnabled: true,
+    });
+
+    const results = await service.runEnabledJobs(
+      new Date('2026-06-08T00:00:00.000Z'),
+    );
+
+    expect(results).toEqual([]);
+    expect(runner.runProviderBinanceIngestJob).not.toHaveBeenCalled();
   });
 
   it('does not create provider job runs when interval is not due', async () => {

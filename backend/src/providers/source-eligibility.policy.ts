@@ -6,6 +6,8 @@ export const PROVIDER_SOURCE_NAMES = {
   fxUsdKrwKoreaExim: 'korea_exim_exchange_rate',
   fxUsdKrwExchangeRateApi: 'exchange_rate_api',
   cryptoUsd: 'binance_public_rest_24hr_ticker',
+  cryptoUsdRest: 'binance_public_rest_24hr_ticker',
+  cryptoUsdWebSocket: 'binance_spot_ws_ticker',
   domesticStockKrx: 'kis_krx_realtime_trade',
   usStock: 'kis_us_delayed_trade',
 } as const;
@@ -13,6 +15,11 @@ export const PROVIDER_SOURCE_NAMES = {
 export const FX_USD_KRW_PROVIDER_SOURCE_PRIORITY = [
   PROVIDER_SOURCE_NAMES.fxUsdKrwKoreaExim,
   PROVIDER_SOURCE_NAMES.fxUsdKrwExchangeRateApi,
+] as const;
+
+export const BINANCE_CRYPTO_USD_PROVIDER_SOURCE_PRIORITY = [
+  PROVIDER_SOURCE_NAMES.cryptoUsdWebSocket,
+  PROVIDER_SOURCE_NAMES.cryptoUsdRest,
 ] as const;
 
 export type ProviderEligibleWorkflow =
@@ -192,6 +199,7 @@ export function resolveAssetProviderEligibility(input: {
   | {
       eligible: true;
       sourceName: ProviderSourceName;
+      sourceNames: readonly ProviderSourceName[];
       freshnessThresholdSeconds: number;
     }
   | { eligible: false; reason: string } {
@@ -208,6 +216,7 @@ export function resolveAssetProviderEligibility(input: {
     return {
       eligible: true,
       sourceName: PROVIDER_SOURCE_NAMES.domesticStockKrx,
+      sourceNames: [PROVIDER_SOURCE_NAMES.domesticStockKrx],
       freshnessThresholdSeconds: resolveAssetPriceFreshnessThresholdSeconds(
         input.workflow,
       ),
@@ -222,6 +231,7 @@ export function resolveAssetProviderEligibility(input: {
     return {
       eligible: true,
       sourceName: PROVIDER_SOURCE_NAMES.usStock,
+      sourceNames: [PROVIDER_SOURCE_NAMES.usStock],
       freshnessThresholdSeconds: resolveAssetPriceFreshnessThresholdSeconds(
         input.workflow,
       ),
@@ -235,7 +245,8 @@ export function resolveAssetProviderEligibility(input: {
   ) {
     return {
       eligible: true,
-      sourceName: PROVIDER_SOURCE_NAMES.cryptoUsd,
+      sourceName: PROVIDER_SOURCE_NAMES.cryptoUsdWebSocket,
+      sourceNames: BINANCE_CRYPTO_USD_PROVIDER_SOURCE_PRIORITY,
       freshnessThresholdSeconds: resolveAssetPriceFreshnessThresholdSeconds(
         input.workflow,
       ),

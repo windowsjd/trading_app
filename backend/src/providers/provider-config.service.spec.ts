@@ -185,4 +185,35 @@ describe('provider config', () => {
 
     expect(config.binance.symbols).toEqual(['BTCUSDT', 'ETHUSDT']);
   });
+
+  it('parses Binance WebSocket streaming env defaults and overrides', () => {
+    const defaults = buildProviderConfig({});
+
+    expect(defaults.binance.wsMarketDataBaseUrl).toBe(
+      'wss://stream.binance.com:9443',
+    );
+    expect(defaults.binance.wsStreamingEnabled).toBe(false);
+    expect(defaults.binance.wsStreamingReconnectMinMs).toBe(1000);
+    expect(defaults.binance.wsStreamingReconnectMaxMs).toBe(30000);
+    expect(defaults.binance.wsStreamingHeartbeatTimeoutMs).toBe(60000);
+    expect(defaults.binance.wsSnapshotThrottleMs).toBe(5000);
+
+    const config = buildProviderConfig({
+      BINANCE_WS_MARKET_DATA_BASE_URL: 'wss://stream.binance.com:443',
+      BINANCE_WEBSOCKET_STREAMING_ENABLED: 'true',
+      BINANCE_WEBSOCKET_STREAMING_RECONNECT_MIN_MS: '250',
+      BINANCE_WEBSOCKET_STREAMING_RECONNECT_MAX_MS: '5000',
+      BINANCE_WEBSOCKET_STREAMING_HEARTBEAT_TIMEOUT_MS: '45000',
+      BINANCE_WS_SNAPSHOT_THROTTLE_MS: '2000',
+    });
+
+    expect(config.binance.wsMarketDataBaseUrl).toBe(
+      'wss://stream.binance.com:443',
+    );
+    expect(config.binance.wsStreamingEnabled).toBe(true);
+    expect(config.binance.wsStreamingReconnectMinMs).toBe(250);
+    expect(config.binance.wsStreamingReconnectMaxMs).toBe(5000);
+    expect(config.binance.wsStreamingHeartbeatTimeoutMs).toBe(45000);
+    expect(config.binance.wsSnapshotThrottleMs).toBe(2000);
+  });
 });

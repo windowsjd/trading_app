@@ -41,6 +41,11 @@ export type BinancePublicMarketDataConfig = {
   wsMarketDataBaseUrl: string;
   symbols: string[];
   usdtAsUsdEquivalent: boolean;
+  wsStreamingEnabled: boolean;
+  wsStreamingReconnectMinMs: number;
+  wsStreamingReconnectMaxMs: number;
+  wsStreamingHeartbeatTimeoutMs: number;
+  wsSnapshotThrottleMs: number;
 };
 
 export type KisMarketDataConfig = {
@@ -215,13 +220,43 @@ export function buildProviderConfig(env: ProviderEnv): ProviderConfig {
       'https://api.binance.com',
     wsMarketDataBaseUrl:
       readOptionalTrimmedEnv(env, 'BINANCE_WS_MARKET_DATA_BASE_URL') ??
-      'wss://data-stream.binance.vision',
+      'wss://stream.binance.com:9443',
     symbols:
       binanceSymbols.length > 0 ? binanceSymbols : ['BTCUSDT', 'ETHUSDT'],
     usdtAsUsdEquivalent: readBooleanEnv(
       env,
       'BINANCE_CRYPTO_USDT_AS_USD_EQUIVALENT',
       true,
+      'binance',
+    ),
+    wsStreamingEnabled: readBooleanEnv(
+      env,
+      'BINANCE_WEBSOCKET_STREAMING_ENABLED',
+      false,
+      'binance',
+    ),
+    wsStreamingReconnectMinMs: readPositiveIntegerEnv(
+      env,
+      'BINANCE_WEBSOCKET_STREAMING_RECONNECT_MIN_MS',
+      1000,
+      'binance',
+    ),
+    wsStreamingReconnectMaxMs: readPositiveIntegerEnv(
+      env,
+      'BINANCE_WEBSOCKET_STREAMING_RECONNECT_MAX_MS',
+      30000,
+      'binance',
+    ),
+    wsStreamingHeartbeatTimeoutMs: readPositiveIntegerEnv(
+      env,
+      'BINANCE_WEBSOCKET_STREAMING_HEARTBEAT_TIMEOUT_MS',
+      60000,
+      'binance',
+    ),
+    wsSnapshotThrottleMs: readPositiveIntegerEnv(
+      env,
+      'BINANCE_WS_SNAPSHOT_THROTTLE_MS',
+      5000,
       'binance',
     ),
   };

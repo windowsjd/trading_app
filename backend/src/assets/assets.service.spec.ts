@@ -721,7 +721,7 @@ describe('AssetsService', () => {
         'kis_krx_realtime_trade',
         '999.00000000',
         CurrencyCode.KRW,
-        new Date(Date.now() - 61_000),
+        new Date(Date.now() - 301_000),
       ),
     ]);
     prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(
@@ -847,7 +847,7 @@ describe('AssetsService', () => {
         sourceType: FxRateSourceType.provider_api,
         sourceName: 'korea_exim_exchange_rate',
         effectiveAt: new Date('2026-05-07T00:00:00.000Z'),
-        capturedAt: new Date(Date.now() - 301_000),
+        capturedAt: new Date(Date.now() - 7_201_000),
       },
       {
         id: 'provider-fx-exchange',
@@ -1209,8 +1209,7 @@ describe('AssetsService', () => {
     prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([]);
     prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(current);
 
-    const tickerSelection =
-      await service.getAssetPriceForTicker('asset-krw');
+    const tickerSelection = await service.getAssetPriceForTicker('asset-krw');
 
     expect(tickerSelection).toMatchObject({
       asset: {
