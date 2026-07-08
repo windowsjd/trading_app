@@ -98,22 +98,20 @@ Provider scheduler example:
 SCHEDULER_ENABLED=true
 SCHEDULER_PROVIDER_FX_ENABLED=true
 SCHEDULER_PROVIDER_BINANCE_ENABLED=true
-SCHEDULER_PROVIDER_KIS_ENABLED=true
+SCHEDULER_PROVIDER_KIS_ENABLED=false
 
 SCHEDULER_TICK_INTERVAL_MS=60000
 
 SCHEDULER_PROVIDER_FX_INTERVAL_SECONDS=3600
 SCHEDULER_PROVIDER_BINANCE_INTERVAL_SECONDS=60
-SCHEDULER_PROVIDER_KIS_INTERVAL_SECONDS=60
 
 SCHEDULER_PROVIDER_INGESTION_RUN_ON_STARTUP=true
 SCHEDULER_PROVIDER_TARGET_SOURCE=merged
-KIS_PRICE_INGESTION_MODE=websocket_trade
 
 PROVIDER_INGESTION_ENABLED=true
 ```
 
-Provider intervals are checked against the latest `ops_job_runs` row and do not create noisy skipped rows when a provider is not due. Defaults are FX 3600 seconds, Binance 60 seconds, and KIS 60 seconds. `SCHEDULER_PROVIDER_INGESTION_RUN_ON_STARTUP=true` queues one asynchronous startup run for enabled provider jobs only and then emits a non-fatal market snapshot health warning when active asset coverage is still unavailable. KIS scheduler price ingestion defaults to `KIS_PRICE_INGESTION_MODE=websocket_trade`; set `KIS_PRICE_INGESTION_MODE=rest_current_price` only for fallback/manual/debug REST current-price polling. KIS scheduler modes use `SCHEDULER_PROVIDER_KIS_MAX_SNAPSHOTS`, then `PROVIDER_INGESTION_MAX_SNAPSHOTS`, then `500`.
+Provider intervals are checked against the latest `ops_job_runs` row and do not create noisy skipped rows when a provider is not due. Defaults are FX 3600 seconds, Binance 60 seconds, and KIS 60 seconds. `SCHEDULER_PROVIDER_INGESTION_RUN_ON_STARTUP=true` queues one asynchronous startup run for enabled provider jobs only and then emits a non-fatal market snapshot health warning when active asset coverage is still unavailable. KIS real-time prices are owned by the long-lived WebSocket streaming service below, not by the scheduler. `SCHEDULER_PROVIDER_KIS_ENABLED=true` remains available only for fallback/manual/debug one-shot ingestion jobs controlled by `KIS_PRICE_INGESTION_MODE`.
 
 `SCHEDULER_PROVIDER_TARGET_SOURCE` controls provider price targets:
 
@@ -127,7 +125,22 @@ Korea EXIM exchange provider env is `KOREA_EXIM_EXCHANGE_ENABLED`, `KOREA_EXIM_E
 
 Binance public market data uses `BINANCE_PUBLIC_MARKET_DATA_ENABLED`, `BINANCE_REST_BASE_URL`, `BINANCE_CRYPTO_SYMBOLS`, and `BINANCE_CRYPTO_USDT_AS_USD_EQUIVALENT`, with `BINANCE_REST_BASE_URL` defaulting to `https://api.binance.com` when unset. Crypto candles use only the public Spot `GET /api/v3/klines` endpoint with USDT quote symbols such as `BTCUSDT` and `ETHUSDT`; supported kline intervals are `1m`, `5m`, `15m`, `30m`, `1h`, `4h`, `1d`, and `1w`. No Binance API key or secret is required for this candle path.
 
-KIS scheduler WebSocket trade ingestion uses `KIS_MARKET_DATA_ENABLED`, `KIS_APP_KEY`, `KIS_APP_SECRET`, `KIS_REST_BASE_URL` for approval-key issuance, `KIS_WS_BASE_URL`, `KIS_DOMESTIC_SYMBOLS`, and `KIS_US_SYMBOLS`. Optional WebSocket overrides are `KIS_WS_CUSTTYPE`, `KIS_WS_DOMESTIC_TR_ID`, `KIS_WS_OVERSEAS_DELAYED_TR_ID`, `KIS_WS_SNAPSHOT_THROTTLE_MS`, `KIS_WS_MAX_RUNTIME_MS`, and `KIS_WS_ALLOW_US_DELAYED`. KIS REST current price ingestion remains available for fallback/manual/debug use with `KIS_REST_DOMESTIC_CURRENT_PRICE_PATH`, `KIS_REST_DOMESTIC_CURRENT_PRICE_TR_ID`, `KIS_REST_US_CURRENT_PRICE_PATH`, and `KIS_REST_US_CURRENT_PRICE_TR_ID`.
+KIS long-lived WebSocket streaming starts with the NestJS backend process when `KIS_WEBSOCKET_STREAMING_ENABLED=true` and the provider gates are satisfied:
+
+```env
+PROVIDER_INGESTION_ENABLED=true
+KIS_MARKET_DATA_ENABLED=true
+KIS_APP_KEY=...
+KIS_APP_SECRET=...
+KIS_REST_BASE_URL=...
+KIS_WS_BASE_URL=...
+KIS_WEBSOCKET_STREAMING_ENABLED=true
+KIS_WEBSOCKET_STREAMING_RECONNECT_MIN_MS=1000
+KIS_WEBSOCKET_STREAMING_RECONNECT_MAX_MS=30000
+KIS_WEBSOCKET_STREAMING_HEARTBEAT_TIMEOUT_MS=60000
+```
+
+The streaming service uses `KIS_REST_BASE_URL` only to issue/cache `/oauth2/Approval` approval keys through `KisAuthClient`; the cache is in-memory and is lost on process restart. It keeps the KIS WebSocket open, resubscribes after reconnect, updates an in-memory latest-price cache on every tick, and writes `asset_price_snapshots` only through the existing `KIS_WS_SNAPSHOT_THROTTLE_MS` DB throttle. `KIS_WS_MAX_RUNTIME_MS` is only for the one-shot WebSocket ingestion job. KIS REST current price ingestion remains available for fallback/manual/debug use with `KIS_PRICE_INGESTION_MODE=rest_current_price`.
 
 Market snapshot readiness requires provider ingestion and at least one USD/KRW FX provider:
 

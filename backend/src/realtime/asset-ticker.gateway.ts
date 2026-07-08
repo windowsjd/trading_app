@@ -13,6 +13,10 @@ import { WebSocket, WebSocketServer as WsServer } from 'ws';
 import { UserStatus } from '../generated/prisma/client';
 import { AssetsService } from '../assets/assets.service';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  KisRealtimePriceEvent,
+  KisRealtimePriceEventBus,
+} from '../providers/kis/kis-realtime-price-event-bus.service';
 
 type AccessTokenPayload = {
   sub?: unknown;
@@ -47,18 +51,23 @@ export class AssetTickerGateway
 
   private readonly clients = new Map<WebSocket, ClientState>();
   private pollTimer: NodeJS.Timeout | null = null;
+  private unsubscribeRealtimePrices: (() => void) | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly assetsService: AssetsService,
+    private readonly kisRealtimePriceEventBus: KisRealtimePriceEventBus,
   ) {}
 
   onModuleInit() {
     this.pollTimer = setInterval(() => {
       void this.pushChangedTickers();
     }, TICKER_POLL_INTERVAL_MS);
+    this.unsubscribeRealtimePrices = this.kisRealtimePriceEventBus.subscribe(
+      (event) => this.pushRealtimePriceEvent(event),
+    );
   }
 
   onModuleDestroy() {
@@ -66,6 +75,8 @@ export class AssetTickerGateway
       clearInterval(this.pollTimer);
       this.pollTimer = null;
     }
+    this.unsubscribeRealtimePrices?.();
+    this.unsubscribeRealtimePrices = null;
   }
 
   async handleConnection(client: WebSocket, request: IncomingMessage) {
@@ -192,6 +203,36 @@ export class AssetTickerGateway
     }
   }
 
+  private async pushRealtimePriceEvent(event: KisRealtimePriceEvent) {
+    if (!event.assetId) {
+      return;
+    }
+
+    const ticker = await this.buildRealtimeTickerMessage(event);
+    if (!ticker) {
+      return;
+    }
+
+    for (const [client, state] of this.clients.entries()) {
+      if (client.readyState !== WebSocket.OPEN) {
+        this.clients.delete(client);
+        continue;
+      }
+
+      if (!state.subscriptions.has(event.assetId)) {
+        continue;
+      }
+
+      this.sendJson(client, ticker);
+      if (event.snapshotState === 'created') {
+        state.subscriptions.set(
+          event.assetId,
+          ticker.assetPriceSnapshotId ?? null,
+        );
+      }
+    }
+  }
+
   private async buildTickerMessage(assetId: string) {
     const selection = await this.assetsService.getAssetPriceForTicker(assetId);
     if (!selection) {
@@ -246,6 +287,35 @@ export class AssetTickerGateway
       ),
       priceSource: price.priceSource,
       ...(price.fxRateSource ? { fxRateSource: price.fxRateSource } : {}),
+    };
+  }
+
+  private async buildRealtimeTickerMessage(event: KisRealtimePriceEvent) {
+    if (!event.assetId) {
+      return null;
+    }
+
+    const ticker = await this.buildTickerMessage(event.assetId);
+    if (!ticker) {
+      return null;
+    }
+
+    return {
+      ...ticker,
+      realtime: true,
+      snapshotState: event.snapshotState,
+      ...(event.snapshotReason ? { snapshotReason: event.snapshotReason } : {}),
+      priceLocal: event.price.price,
+      priceCurrency: event.price.currencyCode,
+      priceCapturedAt: event.price.capturedAt,
+      priceEffectiveAt: event.price.effectiveAt,
+      freshnessAgeSeconds: this.calculateFreshnessAgeSeconds(
+        event.price.capturedAt,
+      ),
+      priceSource: {
+        sourceType: 'provider_api',
+        sourceName: event.price.sourceName,
+      },
     };
   }
 

@@ -76,7 +76,7 @@ Default lock keys:
 
 - `provider_fx_ingest:usd_krw`
 - `provider_binance_ingest:prices`
-- `provider_kis_ingest:websocket_trade` by default
+- `provider_kis_ingest:websocket_trade` for one-shot/debug KIS WebSocket ingestion
 - `provider_kis_ingest:rest_current_price` when `KIS_PRICE_INGESTION_MODE=rest_current_price`
 - `daily_portfolio_snapshot:{seasonId}:{date}`
 - `season_ranking_generation:current`
@@ -148,17 +148,15 @@ Provider ingestion is disabled by default and can be enabled per provider:
 SCHEDULER_ENABLED=true
 SCHEDULER_PROVIDER_FX_ENABLED=true
 SCHEDULER_PROVIDER_BINANCE_ENABLED=true
-SCHEDULER_PROVIDER_KIS_ENABLED=true
+SCHEDULER_PROVIDER_KIS_ENABLED=false
 
 SCHEDULER_TICK_INTERVAL_MS=60000
 
 SCHEDULER_PROVIDER_FX_INTERVAL_SECONDS=3600
 SCHEDULER_PROVIDER_BINANCE_INTERVAL_SECONDS=60
-SCHEDULER_PROVIDER_KIS_INTERVAL_SECONDS=60
 
 SCHEDULER_PROVIDER_INGESTION_RUN_ON_STARTUP=true
 SCHEDULER_PROVIDER_TARGET_SOURCE=merged
-KIS_PRICE_INGESTION_MODE=websocket_trade
 
 PROVIDER_INGESTION_ENABLED=true
 ```
@@ -179,13 +177,14 @@ Active asset target rules:
 - KIS domestic: active `domestic_stock` assets with `currencyCode=KRW` and market `KRX`, `KOSPI`, `KOSDAQ`, or `KONEX`; only 6-digit numeric symbols are sent.
 - KIS US: active `us_stock` assets with `currencyCode=USD` and market `NAS`, `NASDAQ`, `NYS`, or `NYSE`; symbols are sent without embedding secrets or account data.
 
-KIS scheduler enablement accepts either `SCHEDULER_PROVIDER_KIS_ENABLED=true` or `ENABLE_PROVIDER_KIS_SCHEDULER=true`. `KIS_PRICE_INGESTION_MODE` controls the scheduler KIS price path. The default is `websocket_trade`, which runs `KisWebSocketClient.runTradePriceIngestion(...)` and writes `provider_api` trade price snapshots. `rest_current_price` remains available as an opt-in fallback/manual/debug mode and uses the existing KIS REST current-price ingestion. Both modes use `maxSnapshots` from `SCHEDULER_PROVIDER_KIS_MAX_SNAPSHOTS`, then `PROVIDER_INGESTION_MAX_SNAPSHOTS`, then the safe default `500`.
+KIS real-time prices are not owned by the scheduler. Enable `KIS_WEBSOCKET_STREAMING_ENABLED=true` for the long-lived stream service. KIS scheduler enablement (`SCHEDULER_PROVIDER_KIS_ENABLED=true` or `ENABLE_PROVIDER_KIS_SCHEDULER=true`) remains available for fallback/manual/debug one-shot ingestion only. `KIS_PRICE_INGESTION_MODE=websocket_trade` runs `KisWebSocketClient.runTradePriceIngestion(...)` for a bounded one-shot run; `rest_current_price` uses the existing KIS REST current-price ingestion. Both scheduler modes use `maxSnapshots` from `SCHEDULER_PROVIDER_KIS_MAX_SNAPSHOTS`, then `PROVIDER_INGESTION_MAX_SNAPSHOTS`, then the safe default `500`.
 
 Provider env required before real runs:
 
 - FX: `KOREA_EXIM_EXCHANGE_ENABLED`, `KOREA_EXIM_EXCHANGE_AUTH_KEY`, `KOREA_EXIM_EXCHANGE_BASE_URL`, `KOREA_EXIM_EXCHANGE_DATA`, `KOREA_EXIM_EXCHANGE_LOOKBACK_DAYS`, or ExchangeRate-API env `EXCHANGE_RATE_API_ENABLED`, `EXCHANGE_RATE_API_KEY`, `EXCHANGE_RATE_API_BASE_URL`.
 - Binance: `BINANCE_PUBLIC_MARKET_DATA_ENABLED`, `BINANCE_REST_BASE_URL`, `BINANCE_CRYPTO_SYMBOLS`, `BINANCE_CRYPTO_USDT_AS_USD_EQUIVALENT`.
-- KIS WebSocket trade mode: `PROVIDER_INGESTION_ENABLED`, `KIS_MARKET_DATA_ENABLED`, `KIS_APP_KEY`, `KIS_APP_SECRET`, `KIS_REST_BASE_URL` for `/oauth2/Approval`, `KIS_WS_BASE_URL` for the WebSocket connection, `KIS_DOMESTIC_SYMBOLS`, `KIS_US_SYMBOLS`, and optional `KIS_WS_CUSTTYPE`, `KIS_WS_DOMESTIC_TR_ID`, `KIS_WS_OVERSEAS_DELAYED_TR_ID`, `KIS_WS_MAX_RUNTIME_MS`, `KIS_WS_SNAPSHOT_THROTTLE_MS`, and `KIS_WS_ALLOW_US_DELAYED`.
+- KIS long-lived WebSocket streaming: `PROVIDER_INGESTION_ENABLED`, `KIS_MARKET_DATA_ENABLED`, `KIS_APP_KEY`, `KIS_APP_SECRET`, `KIS_REST_BASE_URL` for `/oauth2/Approval`, `KIS_WS_BASE_URL` for the WebSocket connection, `KIS_WEBSOCKET_STREAMING_ENABLED=true`, `KIS_DOMESTIC_SYMBOLS`, `KIS_US_SYMBOLS`, and optional `KIS_WS_CUSTTYPE`, `KIS_WS_DOMESTIC_TR_ID`, `KIS_WS_OVERSEAS_DELAYED_TR_ID`, `KIS_WS_SNAPSHOT_THROTTLE_MS`, `KIS_WEBSOCKET_STREAMING_RECONNECT_MIN_MS`, `KIS_WEBSOCKET_STREAMING_RECONNECT_MAX_MS`, `KIS_WEBSOCKET_STREAMING_HEARTBEAT_TIMEOUT_MS`, and `KIS_WS_ALLOW_US_DELAYED`.
+- KIS one-shot WebSocket scheduler/debug mode: same KIS WebSocket env plus `KIS_WS_MAX_RUNTIME_MS`.
 - KIS REST fallback mode: `KIS_MARKET_DATA_ENABLED`, `KIS_REST_BASE_URL`, `KIS_APP_KEY`, `KIS_APP_SECRET`, `KIS_DOMESTIC_SYMBOLS`, `KIS_US_SYMBOLS`, plus optional REST path/TR id overrides `KIS_REST_DOMESTIC_CURRENT_PRICE_PATH`, `KIS_REST_DOMESTIC_CURRENT_PRICE_TR_ID`, `KIS_REST_US_CURRENT_PRICE_PATH`, and `KIS_REST_US_CURRENT_PRICE_TR_ID`.
 
 Provider failures are recorded in `ops_job_runs` as `failed` by the runner where possible. One provider failure does not prevent the scheduler from attempting other enabled provider jobs in the same tick. Result and metadata JSON are sanitized before storage; provider tokens, app keys, app secrets, API keys, JWT secrets, database URLs, access tokens, and refresh tokens must not be logged or stored in ops audit JSON.

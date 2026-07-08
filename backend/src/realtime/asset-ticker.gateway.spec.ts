@@ -13,6 +13,7 @@ jest.mock('../assets/assets.service', () => ({
 }));
 
 import { CurrencyCode } from '../generated/prisma/client';
+import { KisRealtimePriceEventBus } from '../providers/kis/kis-realtime-price-event-bus.service';
 import { AssetTickerGateway } from './asset-ticker.gateway';
 
 describe('AssetTickerGateway', () => {
@@ -49,25 +50,36 @@ describe('AssetTickerGateway', () => {
     const assetsService = {
       getAssetPriceForTicker: jest.fn().mockResolvedValue(selection),
     };
+    const eventBus = new KisRealtimePriceEventBus();
     const gateway = new AssetTickerGateway(
       prisma as never,
       jwtService as never,
       configService as never,
       assetsService as never,
+      eventBus,
     );
 
-    return { assetsService, gateway, prisma };
+    return { assetsService, eventBus, gateway, prisma };
   };
 
-  const buildTickerMessage = (
-    gateway: AssetTickerGateway,
-    assetId: string,
-  ) =>
+  const buildTickerMessage = (gateway: AssetTickerGateway, assetId: string) =>
     (
       gateway as unknown as {
         buildTickerMessage(assetId: string): Promise<Record<string, unknown>>;
       }
     ).buildTickerMessage(assetId);
+
+  const buildRealtimeTickerMessage = (
+    gateway: AssetTickerGateway,
+    event: unknown,
+  ) =>
+    (
+      gateway as unknown as {
+        buildRealtimeTickerMessage(
+          event: unknown,
+        ): Promise<Record<string, unknown>>;
+      }
+    ).buildRealtimeTickerMessage(event);
 
   it('formats WS ticker from the REST asset price selection policy', async () => {
     const { assetsService, gateway, prisma } = createGateway({
@@ -181,5 +193,65 @@ describe('AssetTickerGateway', () => {
       reason: 'ASSET_PRICE_UNAVAILABLE',
     });
     expect(JSON.stringify(ticker)).not.toContain('rawPayloadJson');
+  });
+
+  it('can overlay KIS realtime cache values on the existing ticker payload', async () => {
+    const { gateway } = createGateway({
+      asset: {
+        id: 'asset-samsung',
+        symbol: '005930',
+        name: 'Samsung Electronics',
+        assetType: 'domestic_stock',
+        market: 'KRX',
+        priceCurrency: CurrencyCode.KRW,
+      },
+      price: {
+        state: 'available',
+        currentPrice: '70000.00000000',
+        changeRate: null,
+        priceCurrency: CurrencyCode.KRW,
+        priceKrwState: 'available',
+        priceKrw: '70000.00000000',
+        assetPriceSnapshotId: 'price-provider-1',
+        priceEffectiveAt: '2026-06-19T03:00:00.000Z',
+        priceCapturedAt: '2026-06-19T03:00:10.000Z',
+        priceSource: {
+          sourceType: 'provider_api',
+          sourceName: 'kis_krx_realtime_trade',
+        },
+      },
+    });
+
+    const ticker = await buildRealtimeTickerMessage(gateway, {
+      type: 'kis_realtime_price',
+      assetId: 'asset-samsung',
+      snapshotState: 'skipped',
+      snapshotReason: 'THROTTLED_PROVIDER_SNAPSHOT',
+      price: {
+        symbol: '005930',
+        price: '70123.00000000',
+        currencyCode: CurrencyCode.KRW,
+        sourceName: 'kis_krx_realtime_trade',
+        capturedAt: '2026-06-19T03:00:29.000Z',
+        effectiveAt: '2026-06-19T03:00:29.000Z',
+      },
+    });
+
+    expect(ticker).toMatchObject({
+      type: 'asset_ticker',
+      assetId: 'asset-samsung',
+      realtime: true,
+      snapshotState: 'skipped',
+      snapshotReason: 'THROTTLED_PROVIDER_SNAPSHOT',
+      priceLocal: '70123.00000000',
+      priceCurrency: CurrencyCode.KRW,
+      priceCapturedAt: '2026-06-19T03:00:29.000Z',
+      priceEffectiveAt: '2026-06-19T03:00:29.000Z',
+      freshnessAgeSeconds: 1,
+      priceSource: {
+        sourceType: 'provider_api',
+        sourceName: 'kis_krx_realtime_trade',
+      },
+    });
   });
 });

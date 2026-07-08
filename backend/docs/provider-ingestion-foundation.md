@@ -1,6 +1,6 @@
 # Provider Ingestion Foundation
 
-Explicit operator-run provider ingestion foundation, including an operator/admin HTTP trigger. Scheduler/Ops integration is documented separately in `docs/scheduler-ops-foundation.md`; the scheduler KIS price path now defaults to WebSocket trade ingestion. Read-only/quote and operator-run daily snapshot `provider_api` source eligibility are implemented separately for the allowed workflows only (see `docs/policy-decisions.md`).
+Explicit operator-run provider ingestion foundation, including an operator/admin HTTP trigger. Scheduler/Ops integration is documented separately in `docs/scheduler-ops-foundation.md`; KIS real-time price ingestion is owned by the long-lived WebSocket streaming service, while scheduler KIS jobs are fallback/manual/debug one-shot runs. Read-only/quote and operator-run daily snapshot `provider_api` source eligibility are implemented separately for the allowed workflows only (see `docs/policy-decisions.md`).
 
 The fixed 40-symbol KIS stock watchlist (15 domestic + 25 US) is defined in code at `src/providers/kis/kis-fixed-asset-universe.ts` and used as the default for `KIS_DOMESTIC_SYMBOLS`/`KIS_US_SYMBOLS` when those env vars are unset. Seed the corresponding assets with `pnpm tsx scripts/seed-kis-fixed-asset-universe.ts`.
 
@@ -52,6 +52,11 @@ This project remains a virtual trading app. External provider APIs are used only
 - Adds KIS WebSocket trade-price subscription builders and parsers for:
   - Domestic KRX real-time trade price `H0STCNT0`.
   - Overseas/US delayed trade price `HDFSCNT0`.
+- Adds a NestJS lifecycle-owned long-lived KIS WebSocket streaming service gated by `KIS_WEBSOCKET_STREAMING_ENABLED`.
+  - It uses the in-memory `KisAuthClient` approval-key cache. Process restart clears that cache; persistent approval-key cache can be considered later without a schema change in this foundation.
+  - It keeps the socket open, unsubscribes on backend shutdown, reconnects with backoff after disconnects, and resubscribes the watchlist after reconnect.
+  - It updates an in-memory latest-price cache on every tick and publishes safe internal latest-price events for `/api/v1/ws` integration.
+  - It still writes DB snapshots through the existing `KIS_WS_SNAPSHOT_THROTTLE_MS` throttle and existing redaction/source/currency rules.
 - Adds KIS REST current-price ingestion for:
   - Domestic KRX current price using configurable path/TR ID defaults `KIS_REST_DOMESTIC_CURRENT_PRICE_PATH=/uapi/domestic-stock/v1/quotations/inquire-price` and `KIS_REST_DOMESTIC_CURRENT_PRICE_TR_ID=FHKST01010100`.
   - US current price using configurable path/TR ID defaults `KIS_REST_US_CURRENT_PRICE_PATH=/uapi/overseas-price/v1/quotations/price` and `KIS_REST_US_CURRENT_PRICE_TR_ID=HHDFS00000300`.
@@ -126,6 +131,10 @@ KIS:
 - `KIS_WS_SNAPSHOT_THROTTLE_MS`
 - `KIS_WS_MAX_RUNTIME_MS`
 - `KIS_WS_ALLOW_US_DELAYED`
+- `KIS_WEBSOCKET_STREAMING_ENABLED`
+- `KIS_WEBSOCKET_STREAMING_RECONNECT_MIN_MS`
+- `KIS_WEBSOCKET_STREAMING_RECONNECT_MAX_MS`
+- `KIS_WEBSOCKET_STREAMING_HEARTBEAT_TIMEOUT_MS`
 
 KIS non-secret endpoint examples:
 

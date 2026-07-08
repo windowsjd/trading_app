@@ -117,6 +117,24 @@ describe('provider config', () => {
     expect(config.kis.wsSnapshotThrottleMs).toBe(2500);
     expect(config.kis.wsMaxRuntimeMs).toBe(15000);
     expect(config.kis.wsAllowUsDelayed).toBe(false);
+    expect(config.kis.wsStreamingEnabled).toBe(false);
+    expect(config.kis.wsStreamingReconnectMinMs).toBe(1000);
+    expect(config.kis.wsStreamingReconnectMaxMs).toBe(30000);
+    expect(config.kis.wsStreamingHeartbeatTimeoutMs).toBe(60000);
+  });
+
+  it('parses KIS long-lived WebSocket streaming env overrides', () => {
+    const config = buildProviderConfig({
+      KIS_WEBSOCKET_STREAMING_ENABLED: 'true',
+      KIS_WEBSOCKET_STREAMING_RECONNECT_MIN_MS: '250',
+      KIS_WEBSOCKET_STREAMING_RECONNECT_MAX_MS: '5000',
+      KIS_WEBSOCKET_STREAMING_HEARTBEAT_TIMEOUT_MS: '45000',
+    });
+
+    expect(config.kis.wsStreamingEnabled).toBe(true);
+    expect(config.kis.wsStreamingReconnectMinMs).toBe(250);
+    expect(config.kis.wsStreamingReconnectMaxMs).toBe(5000);
+    expect(config.kis.wsStreamingHeartbeatTimeoutMs).toBe(45000);
   });
 
   it('parses KIS REST current-price and hoga path/TR_ID defaults and overrides', () => {

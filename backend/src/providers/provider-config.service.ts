@@ -63,6 +63,10 @@ export type KisMarketDataConfig = {
   wsSnapshotThrottleMs: number;
   wsMaxRuntimeMs: number;
   wsAllowUsDelayed: boolean;
+  wsStreamingEnabled: boolean;
+  wsStreamingReconnectMinMs: number;
+  wsStreamingReconnectMaxMs: number;
+  wsStreamingHeartbeatTimeoutMs: number;
   maxWatchlistSize: number;
   domesticSymbols: string[];
   usSymbols: string[];
@@ -309,6 +313,30 @@ export function buildProviderConfig(env: ProviderEnv): ProviderConfig {
       env,
       'KIS_WS_ALLOW_US_DELAYED',
       true,
+      'kis',
+    ),
+    wsStreamingEnabled: readBooleanEnv(
+      env,
+      'KIS_WEBSOCKET_STREAMING_ENABLED',
+      false,
+      'kis',
+    ),
+    wsStreamingReconnectMinMs: readPositiveIntegerEnv(
+      env,
+      'KIS_WEBSOCKET_STREAMING_RECONNECT_MIN_MS',
+      1000,
+      'kis',
+    ),
+    wsStreamingReconnectMaxMs: readPositiveIntegerEnv(
+      env,
+      'KIS_WEBSOCKET_STREAMING_RECONNECT_MAX_MS',
+      30000,
+      'kis',
+    ),
+    wsStreamingHeartbeatTimeoutMs: readPositiveIntegerEnv(
+      env,
+      'KIS_WEBSOCKET_STREAMING_HEARTBEAT_TIMEOUT_MS',
+      60000,
       'kis',
     ),
     maxWatchlistSize,

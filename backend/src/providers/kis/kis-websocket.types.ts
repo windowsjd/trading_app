@@ -11,6 +11,8 @@ export type KisWebSocketParsedAck = {
   state: 'ack';
   trId: string | null;
   message: string | null;
+  code: string | null;
+  success: boolean | null;
   raw: unknown;
   receivedAt: Date;
 };

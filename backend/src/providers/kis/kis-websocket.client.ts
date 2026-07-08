@@ -48,9 +48,11 @@ export type KisWebSocketRunResult = {
   errorMessage?: string;
 };
 
-type NativeWebSocketConstructor = new (url: string) => NativeWebSocket;
+export type KisNativeWebSocketConstructor = new (
+  url: string,
+) => KisNativeWebSocket;
 
-type NativeWebSocket = {
+export type KisNativeWebSocket = {
   readyState: number;
   send(data: string): void;
   close(code?: number, reason?: string): void;
@@ -58,7 +60,7 @@ type NativeWebSocket = {
   removeEventListener(type: string, listener: (event: unknown) => void): void;
 };
 
-const WEB_SOCKET_OPEN = 1;
+export const KIS_WEB_SOCKET_OPEN = 1;
 
 @Injectable()
 export class KisWebSocketClient {
@@ -87,7 +89,7 @@ export class KisWebSocketClient {
         });
       }
 
-      const websocketConstructor = resolveNativeWebSocketConstructor();
+      const websocketConstructor = resolveKisNativeWebSocketConstructor();
       if (!websocketConstructor) {
         return emptyRunResult({
           dryRun,
@@ -158,7 +160,7 @@ export class KisWebSocketClient {
   }
 
   private async runSocket(input: {
-    websocketConstructor: NativeWebSocketConstructor;
+    websocketConstructor: KisNativeWebSocketConstructor;
     wsBaseUrl: string;
     approvalKey: string;
     custType: string;
@@ -189,7 +191,7 @@ export class KisWebSocketClient {
       socket.addEventListener('close', onClose);
     });
 
-    await waitForSocketOpen(socket, Math.min(input.durationMs, 10000));
+    await waitForKisSocketOpen(socket, Math.min(input.durationMs, 10000));
 
     const messageListener = (event: unknown) => {
       const promise = this.handleSocketMessage({
@@ -222,7 +224,7 @@ export class KisWebSocketClient {
         shouldClose: () =>
           input.maxSnapshots !== undefined &&
           created + wouldCreate >= input.maxSnapshots,
-        close: () => closeSocket(socket),
+        close: () => closeKisSocket(socket),
       }).finally(() => {
         pendingMessages.delete(promise);
       });
@@ -246,7 +248,7 @@ export class KisWebSocketClient {
     await Promise.race([sleep(input.durationMs), closePromise]);
 
     socket.removeEventListener('message', messageListener);
-    if (!closed && socket.readyState === WEB_SOCKET_OPEN) {
+    if (!closed && socket.readyState === KIS_WEB_SOCKET_OPEN) {
       for (const request of buildUnsubscribeRequests({
         approvalKey: input.approvalKey,
         custType: input.custType,
@@ -254,7 +256,7 @@ export class KisWebSocketClient {
       })) {
         socket.send(JSON.stringify(request));
       }
-      closeSocket(socket);
+      closeKisSocket(socket);
     }
 
     await Promise.race([closePromise, sleep(1000)]);
@@ -298,7 +300,7 @@ export class KisWebSocketClient {
     shouldClose: () => boolean;
     close: () => void;
   }): Promise<void> {
-    const text = socketEventToText(input.event);
+    const text = kisSocketEventToText(input.event);
     if (text === null) {
       input.counters.incrementFailed(1);
       return;
@@ -372,17 +374,22 @@ function buildUnsubscribeRequests(input: {
   );
 }
 
-function resolveNativeWebSocketConstructor(): NativeWebSocketConstructor | null {
-  const constructor = (globalThis as { WebSocket?: NativeWebSocketConstructor })
-    .WebSocket;
-  return constructor ?? (WsWebSocket as unknown as NativeWebSocketConstructor);
+export function resolveKisNativeWebSocketConstructor(): KisNativeWebSocketConstructor | null {
+  const constructor = (
+    globalThis as {
+      WebSocket?: KisNativeWebSocketConstructor;
+    }
+  ).WebSocket;
+  return (
+    constructor ?? (WsWebSocket as unknown as KisNativeWebSocketConstructor)
+  );
 }
 
-function waitForSocketOpen(
-  socket: NativeWebSocket,
+export function waitForKisSocketOpen(
+  socket: KisNativeWebSocket,
   timeoutMs: number,
 ): Promise<void> {
-  if (socket.readyState === WEB_SOCKET_OPEN) {
+  if (socket.readyState === KIS_WEB_SOCKET_OPEN) {
     return Promise.resolve();
   }
 
@@ -422,7 +429,7 @@ function waitForSocketOpen(
   });
 }
 
-function socketEventToText(event: unknown): string | null {
+export function kisSocketEventToText(event: unknown): string | null {
   const data = (event as { data?: unknown }).data;
   if (typeof data === 'string') {
     return data;
@@ -441,8 +448,8 @@ function socketEventToText(event: unknown): string | null {
   return null;
 }
 
-function closeSocket(socket: NativeWebSocket): void {
-  if (socket.readyState === WEB_SOCKET_OPEN) {
+export function closeKisSocket(socket: KisNativeWebSocket): void {
+  if (socket.readyState === KIS_WEB_SOCKET_OPEN) {
     socket.close(1000, 'finished');
   }
 }

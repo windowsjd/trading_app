@@ -1,10 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { getOpsSchedulerConfig } from './ops/ops-config';
 import { PrismaService } from './prisma/prisma.service';
+import { KisWebSocketStreamingService } from './providers/kis/kis-websocket-streaming.service';
 
 @Injectable()
 export class AppService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional()
+    private readonly kisWebSocketStreamingService?: KisWebSocketStreamingService,
+  ) {}
 
   getHealth() {
     return {
@@ -40,6 +45,8 @@ export class AppService {
           timezone: scheduler.timezone,
           jobs: scheduler.jobs,
         },
+        kisWebSocketStreaming:
+          this.kisWebSocketStreamingService?.getStatus() ?? null,
         currentTime: new Date().toISOString(),
       },
     };

@@ -207,16 +207,35 @@ function parseJsonAck(
   try {
     const raw = JSON.parse(frame) as {
       header?: { tr_id?: unknown };
-      body?: { msg1?: unknown };
+      body?: { msg1?: unknown; msg_cd?: unknown; rt_cd?: unknown };
     };
     const trId =
       typeof raw.header?.tr_id === 'string' ? raw.header.tr_id : null;
     const message = typeof raw.body?.msg1 === 'string' ? raw.body.msg1 : null;
+    const code =
+      typeof raw.body?.msg_cd === 'string'
+        ? raw.body.msg_cd
+        : typeof raw.body?.rt_cd === 'string'
+          ? raw.body.rt_cd
+          : null;
+    const success =
+      typeof raw.body?.rt_cd === 'string' ? raw.body.rt_cd === '0' : null;
+
+    if (success === false) {
+      return failed(
+        'KIS_SUBSCRIPTION_ACK_FAILED',
+        message ?? code ?? 'KIS WebSocket subscription ack failed.',
+        trId,
+        { frame, receivedAt },
+      );
+    }
 
     return {
       state: 'ack',
       trId,
       message,
+      code,
+      success,
       raw,
       receivedAt,
     };

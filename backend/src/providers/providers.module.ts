@@ -8,10 +8,13 @@ import { KoreaEximExchangeClient } from './korea-exim/korea-exim-exchange.client
 import { KoreaEximExchangeIngestionService } from './korea-exim/korea-exim-exchange.ingestion.service';
 import { KisAuthClient } from './kis/kis-auth.client';
 import { KisQuoteClient } from './kis/kis-quote.client';
+import { KisRealtimePriceCacheService } from './kis/kis-realtime-price-cache.service';
+import { KisRealtimePriceEventBus } from './kis/kis-realtime-price-event-bus.service';
 import { KisRestCurrentPriceIngestionService } from './kis/kis-rest-current-price.ingestion.service';
 import { KisRestHogaIngestionService } from './kis/kis-rest-hoga.ingestion.service';
 import { KisWebSocketClient } from './kis/kis-websocket.client';
 import { KisWebSocketIngestionService } from './kis/kis-websocket.ingestion.service';
+import { KisWebSocketStreamingService } from './kis/kis-websocket-streaming.service';
 import { MarketSnapshotHealthService } from './market-snapshot-health.service';
 import { ProviderConfigService } from './provider-config.service';
 import { ProviderHttpClient } from './provider-http.client';
@@ -32,8 +35,11 @@ import { ProviderTargetResolverService } from './provider-target-resolver.servic
     KisQuoteClient,
     KisRestCurrentPriceIngestionService,
     KisRestHogaIngestionService,
+    KisRealtimePriceCacheService,
+    KisRealtimePriceEventBus,
     KisWebSocketIngestionService,
     KisWebSocketClient,
+    KisWebSocketStreamingService,
     ProviderTargetResolverService,
     MarketSnapshotHealthService,
   ],
@@ -48,8 +54,11 @@ import { ProviderTargetResolverService } from './provider-target-resolver.servic
     KisQuoteClient,
     KisRestCurrentPriceIngestionService,
     KisRestHogaIngestionService,
+    KisRealtimePriceCacheService,
+    KisRealtimePriceEventBus,
     KisWebSocketIngestionService,
     KisWebSocketClient,
+    KisWebSocketStreamingService,
     ProviderTargetResolverService,
     MarketSnapshotHealthService,
   ],
