@@ -148,6 +148,14 @@ type AssetCandlesResponse = {
   };
 };
 
+// TODO(chart-range): provider-specific per-request maximums differ and should be
+// documented/tuned as a separate task. Reference limits:
+//   - KIS domestic same-day minute candles: max 30 rows, current day only.
+//   - KIS domestic daily/minute (historical): up to 120 rows, ~1yr retention.
+//   - KIS overseas minute candles: up to 120 rows, NEXT/KEYB continuation.
+//   - Binance spot klines (/api/v3/klines): up to 1000 rows, startTime/endTime.
+// The frontend chart tolerates a small returnedCount (right-aligns a sparse
+// series), so widening these ranges is an optional follow-up, not a blocker.
 const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 100;
 const DOMESTIC_TODAY_MAX_COUNT = 30;

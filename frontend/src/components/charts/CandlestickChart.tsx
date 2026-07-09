@@ -8,6 +8,11 @@ import {
 import Svg, { G, Line as SvgLine, Rect, Text as SvgText } from 'react-native-svg';
 
 import { formatCurrency, formatMoney } from '../../utils/format';
+import {
+  candleIndexForX,
+  candleXCenter,
+  computeCandleXLayout,
+} from './candlestickLayout';
 import ChartEmptyState from './ChartEmptyState';
 
 export type CandlestickChartCandle = {
@@ -140,8 +145,13 @@ export default function CandlestickChart({
     const chartWidth = Math.max(width, 160);
     const innerWidth = Math.max(chartWidth - PADDING.left - PADDING.right, 1);
     const innerHeight = Math.max(height - PADDING.top - PADDING.bottom, 1);
-    const slotWidth = innerWidth / parsed.length;
-    const bodyWidth = Math.max(Math.min(slotWidth * 0.62, 16), 1);
+    // Right-align a sparse candle series instead of over-spreading it; use full
+    // width once there are enough candles. See computeCandleXLayout.
+    const { slotWidth, bodyWidth, xStart } = computeCandleXLayout(
+      parsed.length,
+      innerWidth,
+      PADDING.left,
+    );
 
     const livePrice = toNumber(currentPrice ?? null);
     const lastCandle = parsed[parsed.length - 1];
@@ -166,7 +176,7 @@ export default function CandlestickChart({
     range = maxY - minY;
 
     const xForIndex = (index: number) =>
-      PADDING.left + (index + 0.5) * slotWidth;
+      candleXCenter(xStart, slotWidth, index);
     const yForPrice = (price: number) =>
       PADDING.top + (1 - (price - minY) / range) * innerHeight;
     const priceForY = (y: number) =>
@@ -178,6 +188,7 @@ export default function CandlestickChart({
       innerHeight,
       slotWidth,
       bodyWidth,
+      xStart,
       minY,
       maxY,
       range,
@@ -271,10 +282,13 @@ export default function CandlestickChart({
     timeLabel: string;
   } | null = null;
   if (pointer) {
-    const rawIndex = Math.round(
-      (pointer.x - PADDING.left) / geometry.slotWidth - 0.5,
+    // Snaps to the nearest candle; empty left area snaps to the first candle.
+    const index = candleIndexForX(
+      geometry.xStart,
+      geometry.slotWidth,
+      pointer.x,
+      parsed.length,
     );
-    const index = Math.max(0, Math.min(rawIndex, parsed.length - 1));
     crosshair = {
       x: xForIndex(index),
       y: pointer.y,

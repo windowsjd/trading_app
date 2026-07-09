@@ -164,6 +164,15 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
   const displayFreshnessAgeSeconds = latestTicker?.freshnessAgeSeconds;
   const tradingNote = formatTradingNote(asset.tradingNote);
   const assetNameDisplay = getAssetNameDisplay(asset);
+  // Dev-only chart diagnostics (never rendered in production builds): how many
+  // candles the API returned for the selected range/interval.
+  const isDevBuild = (globalThis as { __DEV__?: boolean }).__DEV__ === true;
+  const chartDebugInfo =
+    isDevBuild && candlesQuery.data
+      ? `dev · candles=${candlesQuery.data.candles.length} · returned=${
+          candlesQuery.data.source?.returnedCount ?? '-'
+        } · ${candlesQuery.data.range}/${candlesQuery.data.interval}`
+      : null;
 
   const seasonBlockedReason =
     seasonQuery.isLoading
@@ -360,6 +369,9 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
           ) : (
             <InlineEmptyState message="표시할 차트 데이터가 없습니다." />
           )}
+          {chartDebugInfo ? (
+            <Text style={styles.debug}>{chartDebugInfo}</Text>
+          ) : null}
         </View>
 
         <View style={styles.row}>
@@ -404,6 +416,7 @@ const styles = StyleSheet.create({
   label: { fontSize: 13, color: '#666' },
   value: { fontSize: 20, fontWeight: '700' },
   helper: { fontSize: 14, color: '#444' },
+  debug: { fontSize: 11, color: '#9aa0a6', marginTop: 6 },
   errorText: { fontSize: 14, color: '#c62828' },
   chip: {
     borderWidth: 1,

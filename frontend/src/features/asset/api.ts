@@ -71,10 +71,18 @@ export interface AssetCandleDto {
   volume: string;
 }
 
+export interface AssetCandlesSourceDto {
+  provider?: 'kis' | 'binance';
+  requestedCount?: number;
+  returnedCount?: number;
+}
+
 export interface AssetCandlesDto {
   range: AssetCandleRange;
   interval: AssetCandleInterval;
   candles: AssetCandleDto[];
+  // Present in the API response; typed as optional for dev diagnostics only.
+  source?: AssetCandlesSourceDto;
 }
 
 export interface GetAssetCandlesParams {
