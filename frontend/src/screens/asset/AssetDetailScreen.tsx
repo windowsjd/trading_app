@@ -165,13 +165,18 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
   const tradingNote = formatTradingNote(asset.tradingNote);
   const assetNameDisplay = getAssetNameDisplay(asset);
   // Dev-only chart diagnostics (never rendered in production builds): how many
-  // candles the API returned for the selected range/interval.
+  // candles the API returned vs requested for the selected range/interval, and
+  // whether the provider window was truncated (Binance single-call cap).
   const isDevBuild = (globalThis as { __DEV__?: boolean }).__DEV__ === true;
   const chartDebugInfo =
     isDevBuild && candlesQuery.data
-      ? `dev · candles=${candlesQuery.data.candles.length} · returned=${
-          candlesQuery.data.source?.returnedCount ?? '-'
-        } · ${candlesQuery.data.range}/${candlesQuery.data.interval}`
+      ? `dev · candles=${candlesQuery.data.candles.length} · req=${
+          candlesQuery.data.source?.requestedCount ?? '-'
+        } · ret=${candlesQuery.data.source?.returnedCount ?? '-'} · ${
+          candlesQuery.data.range
+        }/${candlesQuery.data.interval}${
+          candlesQuery.data.source?.truncated ? ' · truncated' : ''
+        }`
       : null;
 
   const seasonBlockedReason =

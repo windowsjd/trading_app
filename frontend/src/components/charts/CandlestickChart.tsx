@@ -44,7 +44,11 @@ type ParsedCandle = {
 };
 
 const DEFAULT_WIDTH = 320;
-const MAX_CANDLES = 120;
+// Render cap aligned with the largest single API page (Binance klines: 1000).
+// When more arrive we keep the most recent candles (last-N policy) — we never
+// synthesize or skip-sample candles. If profiling ever shows 1000 SVG nodes to
+// be too heavy on low-end devices, downsample here rather than lowering limits.
+const MAX_RENDERED_CANDLES = 1000;
 const PADDING = { top: 12, right: 66, bottom: 26, left: 8 };
 const GRID_LINES = 4;
 
@@ -119,7 +123,9 @@ function parseCandles(candles: CandlestickChartCandle[]): ParsedCandle[] {
     });
   }
   parsed.sort((a, b) => a.time - b.time);
-  return parsed.length > MAX_CANDLES ? parsed.slice(-MAX_CANDLES) : parsed;
+  return parsed.length > MAX_RENDERED_CANDLES
+    ? parsed.slice(-MAX_RENDERED_CANDLES)
+    : parsed;
 }
 
 export default function CandlestickChart({
@@ -200,6 +206,74 @@ export default function CandlestickChart({
     };
   }, [parsed, width, height, currentPrice]);
 
+  // Candle and grid SVG nodes are memoized so crosshair pointer moves (state
+  // updates on every move) don't rebuild up to MAX_RENDERED_CANDLES elements —
+  // React sees referentially-equal children and skips reconciling them.
+  const candleNodes = useMemo(() => {
+    if (!geometry) return null;
+    const { bodyWidth, xForIndex, yForPrice } = geometry;
+    return parsed.map((candle, index) => {
+      const x = xForIndex(index);
+      const color = candle.bullish ? UP_COLOR : DOWN_COLOR;
+      const highY = yForPrice(candle.high);
+      const lowY = yForPrice(candle.low);
+      const openY = yForPrice(candle.open);
+      const closeY = yForPrice(candle.close);
+      const bodyTop = Math.min(openY, closeY);
+      const bodyHeight = Math.max(Math.abs(openY - closeY), 1);
+      return (
+        <G key={`candle-${index}`}>
+          <SvgLine
+            x1={x}
+            y1={highY}
+            x2={x}
+            y2={lowY}
+            stroke={color}
+            strokeWidth={1}
+          />
+          <Rect
+            x={x - bodyWidth / 2}
+            y={bodyTop}
+            width={bodyWidth}
+            height={bodyHeight}
+            fill={color}
+            rx={0.5}
+          />
+        </G>
+      );
+    });
+  }, [parsed, geometry]);
+
+  const gridNodes = useMemo(() => {
+    if (!geometry) return null;
+    const { innerWidth, minY, range, yForPrice } = geometry;
+    const rightX = PADDING.left + innerWidth;
+    return Array.from({ length: GRID_LINES + 1 }, (_, index) => {
+      const value = minY + (range * index) / GRID_LINES;
+      const y = yForPrice(value);
+      return (
+        <G key={`grid-${index}`}>
+          <SvgLine
+            x1={PADDING.left}
+            y1={y}
+            x2={rightX}
+            y2={y}
+            stroke={GRID_COLOR}
+            strokeWidth={1}
+          />
+          <SvgText
+            x={rightX + 4}
+            y={y + 3}
+            fontSize={9}
+            fill={AXIS_TEXT_COLOR}
+          >
+            {formatCurrency(value, currencyCode)}
+          </SvgText>
+        </G>
+      );
+    });
+  }, [geometry, currencyCode]);
+
   const handlePointer = (x: number, y: number) => {
     if (!geometry) return;
     const clampedX = Math.max(
@@ -255,9 +329,6 @@ export default function CandlestickChart({
   const {
     innerWidth,
     innerHeight,
-    bodyWidth,
-    minY,
-    range,
     currentPriceValue,
     currentBullish,
     xForIndex,
@@ -269,10 +340,6 @@ export default function CandlestickChart({
   const bottomY = PADDING.top + innerHeight;
   const currentColor = currentBullish ? UP_COLOR : DOWN_COLOR;
   const currentPriceY = yForPrice(currentPriceValue);
-
-  const gridValues = Array.from({ length: GRID_LINES + 1 }, (_, i) =>
-    minY + (range * i) / GRID_LINES,
-  );
 
   // Crosshair: vertical snaps to the nearest candle; horizontal is free at the pointer.
   let crosshair: {
@@ -311,62 +378,11 @@ export default function CandlestickChart({
       {...webHoverProps}
     >
       <Svg width="100%" height={height}>
-        {/* Grid + right-axis price labels */}
-        {gridValues.map((value, index) => {
-          const y = yForPrice(value);
-          return (
-            <G key={`grid-${index}`}>
-              <SvgLine
-                x1={PADDING.left}
-                y1={y}
-                x2={rightEdgeX}
-                y2={y}
-                stroke={GRID_COLOR}
-                strokeWidth={1}
-              />
-              <SvgText
-                x={rightEdgeX + 4}
-                y={y + 3}
-                fontSize={9}
-                fill={AXIS_TEXT_COLOR}
-              >
-                {formatCurrency(value, currencyCode)}
-              </SvgText>
-            </G>
-          );
-        })}
+        {/* Grid + right-axis price labels (memoized) */}
+        {gridNodes}
 
-        {/* Candles */}
-        {parsed.map((candle, index) => {
-          const x = xForIndex(index);
-          const color = candle.bullish ? UP_COLOR : DOWN_COLOR;
-          const highY = yForPrice(candle.high);
-          const lowY = yForPrice(candle.low);
-          const openY = yForPrice(candle.open);
-          const closeY = yForPrice(candle.close);
-          const bodyTop = Math.min(openY, closeY);
-          const bodyHeight = Math.max(Math.abs(openY - closeY), 1);
-          return (
-            <G key={`candle-${index}`}>
-              <SvgLine
-                x1={x}
-                y1={highY}
-                x2={x}
-                y2={lowY}
-                stroke={color}
-                strokeWidth={1}
-              />
-              <Rect
-                x={x - bodyWidth / 2}
-                y={bodyTop}
-                width={bodyWidth}
-                height={bodyHeight}
-                fill={color}
-                rx={0.5}
-              />
-            </G>
-          );
-        })}
+        {/* Candles (memoized) */}
+        {candleNodes}
 
         {/* Current-price dashed line + colored label */}
         <SvgLine

@@ -9,22 +9,22 @@ import type {
 } from '../../models/dto/common';
 import type { AssetPriceErrorDto, AssetType, CurrencyCode } from '../market/api';
 
-export type AssetCandleRange = '1d' | '7d' | '30d' | 'season';
-export type AssetCandleInterval =
-  | '1m'
-  | '5m'
-  | '15m'
-  | '30m'
-  | '1h'
-  | '4h'
-  | '1d'
-  | '1w';
-export type AssetChartTimeframe = {
-  label: AssetCandleInterval;
-  interval: AssetCandleInterval;
-  range: AssetCandleRange;
-  limit: number;
-};
+import type {
+  AssetCandleInterval,
+  AssetCandleRange,
+} from './chartTimeframes';
+
+// Timeframe policy lives in ./chartTimeframes (pure, unit-testable module);
+// re-exported here so existing imports keep working.
+export {
+  ASSET_CHART_TIMEFRAMES,
+  DEFAULT_ASSET_CHART_TIMEFRAME,
+} from './chartTimeframes';
+export type {
+  AssetCandleInterval,
+  AssetCandleRange,
+  AssetChartTimeframe,
+} from './chartTimeframes';
 
 export interface AssetDetailPriceDto {
   state: SectionState;
@@ -75,6 +75,9 @@ export interface AssetCandlesSourceDto {
   provider?: 'kis' | 'binance';
   requestedCount?: number;
   returnedCount?: number;
+  // Binance only: true when the requested window exceeded one klines call and
+  // older candles were cut off.
+  truncated?: boolean;
 }
 
 export interface AssetCandlesDto {
@@ -90,18 +93,6 @@ export interface GetAssetCandlesParams {
   interval?: AssetCandleInterval;
   limit?: number;
 }
-
-export const ASSET_CHART_TIMEFRAMES: AssetChartTimeframe[] = [
-  { label: '1m', interval: '1m', range: '1d', limit: 100 },
-  { label: '5m', interval: '5m', range: '1d', limit: 100 },
-  { label: '15m', interval: '15m', range: '1d', limit: 100 },
-  { label: '30m', interval: '30m', range: '7d', limit: 100 },
-  { label: '1h', interval: '1h', range: '7d', limit: 100 },
-  { label: '4h', interval: '4h', range: '30d', limit: 100 },
-  { label: '1d', interval: '1d', range: 'season', limit: 100 },
-  { label: '1w', interval: '1w', range: 'season', limit: 100 },
-];
-export const DEFAULT_ASSET_CHART_TIMEFRAME = ASSET_CHART_TIMEFRAMES[1];
 
 export async function getAssetDetail(assetId: string) {
   const response = await apiClient.get<ApiSuccessResponse<AssetDetailDto>>(

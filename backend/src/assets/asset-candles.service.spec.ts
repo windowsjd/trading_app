@@ -455,12 +455,14 @@ describe('AssetCandlesService', () => {
     expect(response.data.source).toMatchObject({
       trId: 'FHKST03010230',
       path: '/uapi/domestic-stock/v1/quotations/inquire-time-dailychartprice',
-      requestedCount: 100,
+      requestedCount: 120,
     });
     const kisCall = firstKisQuoteCall(kisQuoteClient);
     expect(kisCall.query).toMatchObject({
       FID_INPUT_DATE_1: '20260618',
       FID_INPUT_HOUR_1: '153000',
+      // includePrevious defaults to true → rows may continue into prior days.
+      FID_PW_DATA_INCU_YN: 'Y',
     });
     expect(kisCall.headers).toMatchObject({
       tr_id: 'FHKST03010230',
@@ -620,6 +622,46 @@ describe('AssetCandlesService', () => {
       startAt: Date.parse('2026-06-01T00:00:00.000Z'),
       endAt: Date.parse('2026-06-19T03:00:00.000Z'),
     },
+    {
+      // Friday now (2026-06-19 12:00 KST) → previous trading day open is
+      // Thursday 2026-06-18 09:00 KST.
+      label: 'domestic prev_open',
+      range: 'prev_open',
+      fixture: asset({
+        id: 'asset-domestic-prev-open',
+        symbol: '005930',
+        market: 'KRX',
+        assetType: AssetType.domestic_stock,
+        currencyCode: CurrencyCode.KRW,
+      }),
+      rows: [
+        domesticRow('20260617', '153000', '10'),
+        domesticRow('20260618', '090000', '20'),
+        domesticRow('20260619', '100000', '30'),
+      ],
+      startAt: Date.parse('2026-06-18T00:00:00.000Z'),
+      endAt: Date.parse('2026-06-19T03:00:00.000Z'),
+    },
+    {
+      // "Today" in ET is still Thursday 2026-06-18 (23:00 EDT), so two trading
+      // days back is Tuesday 2026-06-16 09:30 ET.
+      label: 'US prev2_open',
+      range: 'prev2_open',
+      fixture: asset({
+        id: 'asset-us-prev2-open',
+        symbol: 'AAPL',
+        market: 'NAS',
+        assetType: AssetType.us_stock,
+        currencyCode: CurrencyCode.USD,
+      }),
+      rows: [
+        usRow('20260616', '092900', '10'),
+        usRow('20260616', '093000', '20'),
+        usRow('20260618', '150000', '30'),
+      ],
+      startAt: Date.parse('2026-06-16T13:30:00.000Z'),
+      endAt: Date.parse('2026-06-19T03:00:00.000Z'),
+    },
   ])(
     'filters $label stock candles to the resolved range window before returning',
     async ({ fixture, range, rows, season, startAt, endAt }) => {
@@ -643,9 +685,9 @@ describe('AssetCandlesService', () => {
       });
 
       expect(response.data.range).toBe(range);
-      expect(response.data.source.requestedCount).toBeLessThanOrEqual(100);
+      expect(response.data.source.requestedCount).toBeLessThanOrEqual(101);
       expect(response.data.candles.length).toBeGreaterThan(0);
-      expect(response.data.candles.length).toBeLessThanOrEqual(100);
+      expect(response.data.candles.length).toBeLessThanOrEqual(101);
       for (const candle of response.data.candles) {
         const candleTime = Date.parse(candle.time);
         expect(candleTime).toBeGreaterThanOrEqual(startAt);
@@ -734,7 +776,8 @@ describe('AssetCandlesService', () => {
         trId: 'HHDFS76950200',
         path: '/uapi/overseas-price/v1/quotations/inquire-time-itemchartprice',
         marketCode: 'NAS',
-        requestedCount: 100,
+        // limit 999 is clamped to the KIS overseas NREC cap (120).
+        requestedCount: 120,
         returnedCount: 1,
       },
     });
@@ -747,7 +790,7 @@ describe('AssetCandlesService', () => {
         NMIN: '15',
         PINC: '0',
         NEXT: '',
-        NREC: '100',
+        NREC: '120',
         FILL: 'Y',
         KEYB: '',
       },
@@ -816,7 +859,8 @@ describe('AssetCandlesService', () => {
     expect(binancePublicClient.fetchKlines).toHaveBeenCalledWith({
       symbol: 'BTCUSDT',
       interval: '1m',
-      limit: 100,
+      // limit 1500 is clamped to the Binance klines cap (1000), not to 100.
+      limit: 1000,
       startTime: Date.parse('2026-06-21T00:00:00.000Z'),
       endTime: Date.parse('2026-06-21T04:30:00.000Z'),
     });
@@ -865,7 +909,7 @@ describe('AssetCandlesService', () => {
           endpoint: '/api/v3/klines',
           symbol: 'BTCUSDT',
           interval: '1m',
-          requestedCount: 100,
+          requestedCount: 1000,
           returnedCount: 2,
         },
       },
@@ -910,8 +954,9 @@ describe('AssetCandlesService', () => {
   it.each([
     [undefined, 100],
     ['100', 100],
-    ['101', 100],
-    ['1000', 100],
+    ['101', 101],
+    ['1000', 1000],
+    ['1500', 1000],
   ])('clamps candle limit %s to %s', async (limit, expectedLimit) => {
     const { prisma, binancePublicClient, service } = createService();
     prisma.asset.findUnique.mockResolvedValueOnce(
@@ -947,6 +992,10 @@ describe('AssetCandlesService', () => {
     ['1d', '5m', Date.parse('2026-06-18T03:00:00.000Z')],
     ['7d', '1h', Date.parse('2026-06-12T03:00:00.000Z')],
     ['30d', '1d', Date.parse('2026-05-20T03:00:00.000Z')],
+    // Crypto trades 24/7: prev_open anchors to 09:00 KST calendar days back.
+    ['prev_open', '5m', Date.parse('2026-06-18T00:00:00.000Z')],
+    ['prev2_open', '30m', Date.parse('2026-06-17T00:00:00.000Z')],
+    ['1y', '1d', Date.parse('2025-06-19T03:00:00.000Z')],
   ])(
     'uses %s range default interval %s for crypto candles',
     async (range, interval, startTime) => {
@@ -1017,6 +1066,87 @@ describe('AssetCandlesService', () => {
       limit: 100,
       startTime: Date.parse('2026-06-01T00:00:00.000Z'),
       endTime: Date.parse('2026-06-19T03:00:00.000Z'),
+    });
+  });
+
+  it('anchors domestic prev_open across a weekend to the previous trading day', async () => {
+    // Monday 2026-06-22 12:00 KST → previous trading day open is Friday
+    // 2026-06-19 09:00 KST (2026-06-19T00:00:00.000Z), not Sunday.
+    jest.setSystemTime(new Date('2026-06-22T03:00:00.000Z'));
+
+    const { prisma, kisAuthClient, kisQuoteClient, service } = createService();
+    // The default cached token expires 2026-06-20; keep it valid for this now.
+    kisAuthClient.getCachedToken.mockReturnValue({
+      accessToken: 'cached-kis-token',
+      tokenType: 'Bearer',
+      expiresInSeconds: 86400,
+      expiresAt: new Date('2026-06-23T00:00:00.000Z'),
+    });
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({
+        id: 'asset-domestic-weekend',
+        symbol: '005930',
+        market: 'KRX',
+        assetType: AssetType.domestic_stock,
+        currencyCode: CurrencyCode.KRW,
+      }),
+    );
+    kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
+      state: 'available',
+      receivedAt: new Date('2026-06-22T03:00:01.000Z'),
+      response: {
+        rt_cd: '0',
+        output2: [
+          domesticRow('20260619', '085900', '10'),
+          domesticRow('20260619', '090000', '20'),
+          domesticRow('20260622', '100000', '30'),
+        ],
+      },
+    });
+
+    const response = await service.getAssetCandles(
+      'user-1',
+      'asset-domestic-weekend',
+      { range: 'prev_open' },
+    );
+
+    const anchor = Date.parse('2026-06-19T00:00:00.000Z');
+    expect(response.data.candles.length).toBeGreaterThan(0);
+    for (const candle of response.data.candles) {
+      expect(Date.parse(candle.time)).toBeGreaterThanOrEqual(anchor);
+    }
+  });
+
+  it('flags truncated Binance sources when the window needs more than one klines call', async () => {
+    const { prisma, binancePublicClient, service } = createService();
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({
+        id: 'asset-btc-truncated',
+        symbol: 'BTC',
+        market: 'BINANCE',
+        assetType: AssetType.crypto,
+        currencyCode: CurrencyCode.USD,
+      }),
+    );
+    binancePublicClient.fetchKlines.mockResolvedValueOnce({
+      receivedAt: new Date('2026-06-19T03:00:01.000Z'),
+      response: [],
+    });
+
+    // 1y of 5m candles ≈ 105k rows — far beyond one 1000-row klines call.
+    const response = await service.getAssetCandles(
+      'user-1',
+      'asset-btc-truncated',
+      { range: '1y', interval: '5m', limit: '1500' },
+    );
+
+    expect(binancePublicClient.fetchKlines).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 1000 }),
+    );
+    expect(response.data.source).toMatchObject({
+      provider: 'binance',
+      requestedCount: 1000,
+      truncated: true,
     });
   });
 

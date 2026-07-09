@@ -25,7 +25,17 @@ export type AssetCandlesQuery = {
   includePrevious?: string;
 };
 
-type CandleRange = '1d' | '7d' | '30d' | 'season';
+// 'prev_open'  = previous regular market open → now (weekends skipped for stocks)
+// 'prev2_open' = two market days back, regular open → now
+// '1y'         = rolling 365 days → now
+type CandleRange =
+  | '1d'
+  | '7d'
+  | '30d'
+  | 'prev_open'
+  | 'prev2_open'
+  | '1y'
+  | 'season';
 type CandleInterval =
   | '1m'
   | '5m'
@@ -144,21 +154,36 @@ type AssetCandlesResponse = {
           interval: CryptoCandleInterval;
           requestedCount: number;
           returnedCount: number;
+          // Present (true) only when the requested window needs more rows than
+          // one klines call can return, i.e. older candles were cut off.
+          truncated?: boolean;
         };
   };
 };
 
-// TODO(chart-range): provider-specific per-request maximums differ and should be
-// documented/tuned as a separate task. Reference limits:
-//   - KIS domestic same-day minute candles: max 30 rows, current day only.
-//   - KIS domestic daily/minute (historical): up to 120 rows, ~1yr retention.
-//   - KIS overseas minute candles: up to 120 rows, NEXT/KEYB continuation.
-//   - Binance spot klines (/api/v3/klines): up to 1000 rows, startTime/endTime.
-// The frontend chart tolerates a small returnedCount (right-aligns a sparse
-// series), so widening these ranges is an optional follow-up, not a blocker.
+// Provider-specific per-request row caps. Our request `limit` is clamped to
+// MAX_LIMIT up front, then clamped again per provider when the call is built,
+// so a large user limit can never exceed what a provider accepts.
+//   - Binance spot klines (/api/v3/klines): hard cap 1000 rows per call.
+//   - KIS 국내 주식당일분봉조회 (FHKST03010200): max 30 rows, current day only.
+//   - KIS 국내 주식일별분봉조회 (FHKST03010230): max 120 rows/call, ~1yr retention.
+//   - KIS 해외주식분봉조회 (HHDFS76950200): NREC max 120; NEXT/KEYB/tr_cont
+//     continuation exists but is not implemented here yet.
+// TODO(chart-range): KIS coverage beyond one page requires multi-call:
+//   - domestic: page the daily-minute endpoint backwards via FID_INPUT_DATE_1/
+//     FID_INPUT_HOUR_1 anchors (dedupe on sourceDate+sourceTime, bound pages,
+//     mind KIS TPS limits).
+//   - overseas: NEXT/KEYB/tr_cont continuation loop with a maxPages bound.
+//   - 1d/1w for KIS stocks should use the dedicated daily/weekly chart APIs
+//     (e.g. 국내 FHKST03010100 inquire-daily-itemchartprice) instead of bucketing
+//     minute rows; that provider integration does not exist in this project yet.
+const BINANCE_KLINE_MAX_LIMIT = 1000;
+const KIS_DOMESTIC_TODAY_MAX_COUNT = 30;
+const KIS_DOMESTIC_DAILY_MINUTE_MAX_COUNT = 120;
+const KIS_OVERSEAS_MINUTE_MAX_COUNT = 120;
 const DEFAULT_LIMIT = 100;
-const MAX_LIMIT = 100;
-const DOMESTIC_TODAY_MAX_COUNT = 30;
+// Request-level cap; per-provider caps above clamp lower where needed.
+const MAX_LIMIT = BINANCE_KLINE_MAX_LIMIT;
 const DEFAULT_RANGE: CandleRange = '1d';
 const KOREA_TIME_ZONE = 'Asia/Seoul';
 const US_EASTERN_TIME_ZONE = 'America/New_York';
@@ -171,6 +196,9 @@ const DEFAULT_INTERVAL_BY_RANGE: Record<CandleRange, CandleInterval> = {
   '1d': '5m',
   '7d': '1h',
   '30d': '1d',
+  prev_open: '5m',
+  prev2_open: '30m',
+  '1y': '1d',
   season: '1d',
 };
 
@@ -200,6 +228,9 @@ const CANDLE_RANGES: Record<CandleRange, true> = {
   '1d': true,
   '7d': true,
   '30d': true,
+  prev_open: true,
+  prev2_open: true,
+  '1y': true,
   season: true,
 };
 
@@ -210,6 +241,9 @@ const RANGE_INTERVALS: Record<
   '1d': CANDLE_INTERVALS,
   '7d': CANDLE_INTERVALS,
   '30d': CANDLE_INTERVALS,
+  prev_open: CANDLE_INTERVALS,
+  prev2_open: CANDLE_INTERVALS,
+  '1y': CANDLE_INTERVALS,
   season: CANDLE_INTERVALS,
 };
 
@@ -344,6 +378,9 @@ export class AssetCandlesService {
     query: ParsedAssetCandlesQuery,
   ): Promise<AssetCandlesResponse> {
     const marketCode = this.resolveDomesticKisMarketCode(asset);
+    // Same-day-only ranges may use the today endpoint (30 rows). Multi-day
+    // ranges (prev_open/prev2_open/7d/…) need the daily-minute endpoint, which
+    // returns up to 120 rows and can cross into prior days.
     const usesTodayEndpoint =
       query.range === '1d' &&
       query.intervalMinutes < CANDLE_INTERVAL_MINUTES['1d'] &&
@@ -404,16 +441,26 @@ export class AssetCandlesService {
     const interval = this.requireCryptoInterval(query.interval);
     const symbol = this.normalizeCryptoSymbol(asset);
     const timeRange = this.buildCryptoTimeRange(query);
+    const requestLimit = Math.min(query.limit, BINANCE_KLINE_MAX_LIMIT);
+    // With a known window we can tell whether one klines call covers it.
+    const expectedCount =
+      timeRange.startTime !== undefined && timeRange.endTime !== undefined
+        ? Math.ceil(
+            (timeRange.endTime - timeRange.startTime) /
+              (CANDLE_INTERVAL_MINUTES[interval] * 60_000),
+          )
+        : null;
+    const truncated = expectedCount !== null && expectedCount > requestLimit;
     const descriptor: BinanceCallDescriptor = {
       endpoint: BINANCE_KLINE_PATH,
       symbol,
       interval,
-      requestedCount: query.limit,
+      requestedCount: requestLimit,
     };
     const result = await this.binancePublicClient.fetchKlines({
       symbol,
       interval,
-      limit: query.limit,
+      limit: requestLimit,
       ...timeRange,
     });
     const candles = this.sliceRecent(
@@ -421,10 +468,10 @@ export class AssetCandlesService {
         this.normalizeBinanceKlines(result.response),
         query,
       ),
-      query.limit,
+      requestLimit,
     ).map((candle) => this.formatCandle(candle));
 
-    return this.buildCryptoResponse(asset, query, descriptor, candles);
+    return this.buildCryptoResponse(asset, query, descriptor, candles, truncated);
   }
 
   private buildDomesticTodayCall(
@@ -438,7 +485,7 @@ export class AssetCandlesService {
       path: DOMESTIC_TODAY_CANDLE_PATH,
       trId: DOMESTIC_TODAY_CANDLE_TR_ID,
       marketCode,
-      requestedCount: Math.min(query.limit, DOMESTIC_TODAY_MAX_COUNT),
+      requestedCount: Math.min(query.limit, KIS_DOMESTIC_TODAY_MAX_COUNT),
       query: {
         FID_COND_MRKT_DIV_CODE: marketCode,
         FID_INPUT_ISCD: symbol,
@@ -460,13 +507,19 @@ export class AssetCandlesService {
       path: DOMESTIC_DAILY_CANDLE_PATH,
       trId: DOMESTIC_DAILY_CANDLE_TR_ID,
       marketCode,
-      requestedCount: query.limit,
+      // KIS returns at most 120 rows per call regardless of how many we want.
+      requestedCount: Math.min(
+        query.limit,
+        KIS_DOMESTIC_DAILY_MINUTE_MAX_COUNT,
+      ),
       query: {
         FID_COND_MRKT_DIV_CODE: marketCode,
         FID_INPUT_ISCD: symbol,
         FID_INPUT_DATE_1: this.compactDate(query.requestedDate),
         FID_INPUT_HOUR_1: query.toHHmmss,
-        FID_PW_DATA_INCU_YN: 'N',
+        // 'Y' lets the 120 returned rows continue backwards into prior trading
+        // days, which multi-day ranges (prev_open/prev2_open/7d/…) need.
+        FID_PW_DATA_INCU_YN: query.includePrevious ? 'Y' : 'N',
         FID_FAKE_TICK_INCU_YN: 'N',
       },
     };
@@ -477,11 +530,15 @@ export class AssetCandlesService {
     query: ParsedAssetCandlesQuery,
     marketCode: string,
   ): KisCallDescriptor {
+    // Single-page call: NREC caps at 120. Fetching more requires the
+    // NEXT/KEYB/tr_cont continuation loop — see TODO(chart-range) above.
+    const requestedCount = Math.min(query.limit, KIS_OVERSEAS_MINUTE_MAX_COUNT);
+
     return {
       path: OVERSEAS_CANDLE_PATH,
       trId: OVERSEAS_CANDLE_TR_ID,
       marketCode,
-      requestedCount: query.limit,
+      requestedCount,
       query: {
         AUTH: '',
         EXCD: marketCode,
@@ -489,7 +546,7 @@ export class AssetCandlesService {
         NMIN: String(this.resolveKisSourceIntervalMinutes(query)),
         PINC: query.includePrevious ? '1' : '0',
         NEXT: '',
-        NREC: String(query.limit),
+        NREC: String(requestedCount),
         FILL: 'Y',
         KEYB: '',
       },
@@ -832,7 +889,7 @@ export class AssetCandlesService {
     return {
       success: true,
       data: {
-        state: 'available',
+        state: candles.length > 0 ? 'available' : 'empty',
         asset: {
           id: asset.id,
           symbol: asset.symbol,
@@ -862,6 +919,7 @@ export class AssetCandlesService {
     query: ParsedAssetCandlesQuery,
     descriptor: BinanceCallDescriptor,
     candles: CandlePayload[],
+    truncated = false,
   ): AssetCandlesResponse {
     return {
       success: true,
@@ -886,6 +944,9 @@ export class AssetCandlesService {
           interval: descriptor.interval,
           requestedCount: descriptor.requestedCount,
           returnedCount: candles.length,
+          // Additive metadata: only emitted when older data was cut off, so
+          // existing consumers/tests that match the exact shape keep working.
+          ...(truncated ? { truncated: true } : {}),
         },
       },
     };
@@ -923,7 +984,7 @@ export class AssetCandlesService {
     const interval = this.parseInterval(query.interval, asset.assetType, range);
     const rangeWindow =
       rangeProvided || (!legacyDateProvided && !legacyToProvided)
-      ? await this.resolveRangeWindow(range, new Date())
+      ? await this.resolveRangeWindow(range, new Date(), asset)
       : null;
     const parsedTo = rangeWindow
       ? {
@@ -964,7 +1025,7 @@ export class AssetCandlesService {
     this.throwApiError(
       HttpStatus.BAD_REQUEST,
       'ASSET_CANDLES_INVALID_RANGE',
-      'range must be one of 1d, 7d, 30d, or season.',
+      'range must be one of 1d, 7d, 30d, prev_open, prev2_open, 1y, or season.',
     );
   }
 
@@ -1072,6 +1133,7 @@ export class AssetCandlesService {
   private async resolveRangeWindow(
     range: CandleRange,
     now: Date,
+    asset: AssetRecord,
   ): Promise<{ startAt: Date; endAt: Date }> {
     if (range === 'season') {
       const season = await this.findCurrentSeasonForRange(now);
@@ -1096,10 +1158,59 @@ export class AssetCandlesService {
       };
     }
 
+    if (range === 'prev_open' || range === 'prev2_open') {
+      return {
+        startAt: this.resolveMarketOpenAnchor(
+          asset.assetType,
+          range === 'prev_open' ? 1 : 2,
+          now,
+        ),
+        endAt: now,
+      };
+    }
+
     return {
       startAt: new Date(now.getTime() - this.rangeDurationMs(range)),
       endAt: now,
     };
+  }
+
+  /**
+   * Start anchor for the market-open ranges: the regular-session open
+   * `daysBack` market days before "today" in the asset's market timezone.
+   *   - domestic_stock: KRX regular open 09:00 Asia/Seoul
+   *   - us_stock: US regular open 09:30 America/New_York
+   *   - crypto: trades 24/7 with no session open, so we anchor to 09:00
+   *     Asia/Seoul calendar days back to mirror the KRX-centric UX. Adjust here
+   *     if the project adopts a different crypto chart time policy.
+   * Weekends are skipped for stocks (previous *trading* day); market holidays
+   * are not modeled yet — see TODO(chart-range).
+   */
+  private resolveMarketOpenAnchor(
+    assetType: AssetType,
+    daysBack: number,
+    now: Date,
+  ): Date {
+    const usesUsSession = assetType === AssetType.us_stock;
+    const timeZone = usesUsSession ? US_EASTERN_TIME_ZONE : KOREA_TIME_ZONE;
+    const openTime = usesUsSession ? '093000' : '090000';
+    const skipWeekends = assetType !== AssetType.crypto;
+
+    const todayParts = this.zonedParts(now, timeZone);
+    const cursor = new Date(
+      Date.UTC(todayParts.year, todayParts.month - 1, todayParts.day),
+    );
+    let remaining = daysBack;
+    while (remaining > 0) {
+      cursor.setUTCDate(cursor.getUTCDate() - 1);
+      const weekday = cursor.getUTCDay();
+      if (!skipWeekends || (weekday !== 0 && weekday !== 6)) {
+        remaining -= 1;
+      }
+    }
+
+    const anchorDate = cursor.toISOString().slice(0, 10).replace(/-/gu, '');
+    return this.zonedDateTimeToUtc(anchorDate, openTime, timeZone);
   }
 
   private async findCurrentSeasonForRange(now: Date) {
@@ -1137,7 +1248,9 @@ export class AssetCandlesService {
     });
   }
 
-  private rangeDurationMs(range: Exclude<CandleRange, 'season'>): number {
+  private rangeDurationMs(
+    range: Exclude<CandleRange, 'season' | 'prev_open' | 'prev2_open'>,
+  ): number {
     if (range === '1d') {
       return 86_400_000;
     }
@@ -1146,7 +1259,11 @@ export class AssetCandlesService {
       return 7 * 86_400_000;
     }
 
-    return 30 * 86_400_000;
+    if (range === '30d') {
+      return 30 * 86_400_000;
+    }
+
+    return 365 * 86_400_000;
   }
 
   private parseDate(value: string | undefined, timeZone: string): string {
