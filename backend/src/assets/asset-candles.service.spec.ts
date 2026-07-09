@@ -155,6 +155,41 @@ describe('AssetCandlesService', () => {
     };
   }
 
+  function domesticPeriodRow(
+    sourceDate: string,
+    values: {
+      open?: string;
+      high?: string;
+      low?: string;
+      close?: string;
+      volume?: string;
+      amount?: string;
+    } = {},
+  ) {
+    return {
+      stck_bsop_date: sourceDate,
+      stck_oprc: values.open ?? '70000',
+      stck_hgpr: values.high ?? '71000',
+      stck_lwpr: values.low ?? '69000',
+      stck_clpr: values.close ?? '70500',
+      acml_vol: values.volume ?? '12345',
+      acml_tr_pbmn: values.amount ?? '870000000',
+    };
+  }
+
+  function compactDateDaysBefore(sourceDate: string, days: number): string {
+    const date = new Date(
+      Date.UTC(
+        Number(sourceDate.slice(0, 4)),
+        Number(sourceDate.slice(4, 6)) - 1,
+        Number(sourceDate.slice(6, 8)),
+      ),
+    );
+    date.setUTCDate(date.getUTCDate() - days);
+
+    return date.toISOString().slice(0, 10).replace(/-/gu, '');
+  }
+
   function usRow(sourceDate: string, sourceTime: string, price: string) {
     return {
       xymd: sourceDate,
@@ -217,15 +252,22 @@ describe('AssetCandlesService', () => {
     kisQuoteClient: ReturnType<typeof createKisQuoteClient>,
   ): KisQuoteCall => {
     expect(kisQuoteClient.getMarketDataByExplicitPath).toHaveBeenCalledTimes(1);
-    const calls = kisQuoteClient.getMarketDataByExplicitPath.mock
-      .calls as unknown as Array<[KisQuoteCall]>;
-    const call = calls[0]?.[0];
+    const call = kisQuoteCalls(kisQuoteClient)[0];
 
     if (!call) {
       throw new Error('Expected KIS quote client to be called.');
     }
 
     return call;
+  };
+
+  const kisQuoteCalls = (
+    kisQuoteClient: ReturnType<typeof createKisQuoteClient>,
+  ): KisQuoteCall[] => {
+    const calls = kisQuoteClient.getMarketDataByExplicitPath.mock
+      .calls as unknown as Array<[KisQuoteCall]>;
+
+    return calls.map(([call]) => call);
   };
 
   it('rejects missing authenticated user', async () => {
@@ -469,6 +511,318 @@ describe('AssetCandlesService', () => {
     });
   });
 
+  it('uses KIS domestic period daily API for domestic 1d candles and maps output2 rows', async () => {
+    const { prisma, kisQuoteClient, service } = createService();
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({
+        id: 'asset-samsung-period-daily',
+        symbol: '005930',
+        name: 'Samsung Electronics',
+        market: 'KRX',
+        assetType: AssetType.domestic_stock,
+        currencyCode: CurrencyCode.KRW,
+      }),
+    );
+    kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
+      state: 'available',
+      receivedAt: new Date('2026-06-19T03:00:01.000Z'),
+      response: {
+        rt_cd: '0',
+        output2: [
+          domesticPeriodRow('20260618', {
+            open: '70000',
+            high: '71300',
+            low: '69800',
+            close: '70500',
+            volume: '12345',
+            amount: '870322500',
+          }),
+          domesticPeriodRow('20260617', {
+            open: '69000',
+            high: '70100',
+            low: '68800',
+            close: '70000',
+            volume: '23456',
+            amount: '1641920000',
+          }),
+        ],
+      },
+    });
+
+    const response = await service.getAssetCandles(
+      'user-1',
+      'asset-samsung-period-daily',
+      {
+        range: '1y',
+        interval: '1d',
+        limit: '400',
+      },
+    );
+
+    expect(response).toEqual({
+      success: true,
+      data: {
+        state: 'available',
+        asset: {
+          id: 'asset-samsung-period-daily',
+          symbol: '005930',
+          name: 'Samsung Electronics',
+          assetType: AssetType.domestic_stock,
+          market: 'KRX',
+          priceCurrency: CurrencyCode.KRW,
+        },
+        range: '1y',
+        interval: '1d',
+        requestedDate: '2026-06-19',
+        candles: [
+          {
+            time: '2026-06-16T15:00:00.000Z',
+            open: '69000.00000000',
+            high: '70100.00000000',
+            low: '68800.00000000',
+            close: '70000.00000000',
+            volume: '23456.00000000',
+            amount: '1641920000.00000000',
+            sourceDate: '20260617',
+            sourceTime: '000000',
+          },
+          {
+            time: '2026-06-17T15:00:00.000Z',
+            open: '70000.00000000',
+            high: '71300.00000000',
+            low: '69800.00000000',
+            close: '70500.00000000',
+            volume: '12345.00000000',
+            amount: '870322500.00000000',
+            sourceDate: '20260618',
+            sourceTime: '000000',
+          },
+        ],
+        source: {
+          provider: 'kis',
+          trId: 'FHKST03010100',
+          path: '/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice',
+          marketCode: 'J',
+          requestedCount: 400,
+          returnedCount: 2,
+        },
+      },
+    });
+    const kisCall = firstKisQuoteCall(kisQuoteClient);
+    expect(kisCall.path).toBe(
+      '/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice',
+    );
+    expect(kisCall.query).toMatchObject({
+      FID_COND_MRKT_DIV_CODE: 'J',
+      FID_INPUT_ISCD: '005930',
+      FID_INPUT_DATE_1: '20250619',
+      FID_INPUT_DATE_2: '20260619',
+      FID_PERIOD_DIV_CODE: 'D',
+      FID_ORG_ADJ_PRC: '0',
+    });
+    expect(kisCall.headers).toMatchObject({
+      tr_id: 'FHKST03010100',
+    });
+  });
+
+  it('uses KIS domestic period weekly API for domestic 1w candles', async () => {
+    const { prisma, kisQuoteClient, service } = createService();
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({
+        id: 'asset-samsung-period-weekly',
+        symbol: '005930',
+        market: 'KOSPI',
+        assetType: AssetType.domestic_stock,
+        currencyCode: CurrencyCode.KRW,
+      }),
+    );
+    kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
+      state: 'available',
+      receivedAt: new Date('2026-06-19T03:00:01.000Z'),
+      response: {
+        rt_cd: '0',
+        output2: [domesticPeriodRow('20260613')],
+      },
+    });
+
+    const response = await service.getAssetCandles(
+      'user-1',
+      'asset-samsung-period-weekly',
+      {
+        range: '1y',
+        interval: '1w',
+        limit: '60',
+      },
+    );
+
+    expect(response.data).toMatchObject({
+      state: 'available',
+      range: '1y',
+      interval: '1w',
+      source: {
+        provider: 'kis',
+        trId: 'FHKST03010100',
+        path: '/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice',
+        requestedCount: 60,
+        returnedCount: 1,
+      },
+    });
+    const kisCall = firstKisQuoteCall(kisQuoteClient);
+    expect(kisCall.query).toMatchObject({
+      FID_PERIOD_DIV_CODE: 'W',
+      FID_INPUT_DATE_1: '20250619',
+      FID_INPUT_DATE_2: '20260619',
+    });
+  });
+
+  it('returns empty for empty KIS domestic period rows and clamps to the bounded provider cap', async () => {
+    const { prisma, kisQuoteClient, service } = createService();
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({
+        id: 'asset-samsung-period-empty',
+        symbol: '005930',
+        market: 'KRX',
+        assetType: AssetType.domestic_stock,
+        currencyCode: CurrencyCode.KRW,
+      }),
+    );
+    kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
+      state: 'available',
+      receivedAt: new Date('2026-06-19T03:00:01.000Z'),
+      response: {
+        rt_cd: '0',
+        output2: [],
+      },
+    });
+
+    const response = await service.getAssetCandles(
+      'user-1',
+      'asset-samsung-period-empty',
+      {
+        range: '1y',
+        interval: '1d',
+        limit: '999',
+      },
+    );
+
+    expect(response.data).toMatchObject({
+      state: 'empty',
+      candles: [],
+      source: {
+        provider: 'kis',
+        trId: 'FHKST03010100',
+        requestedCount: 500,
+        returnedCount: 0,
+      },
+    });
+  });
+
+  it('pages KIS domestic daily period rows backwards with a bounded multi-call window', async () => {
+    const { prisma, kisQuoteClient, service } = createService();
+    const firstPageRows = Array.from({ length: 100 }, (_, index) =>
+      domesticPeriodRow(compactDateDaysBefore('20260619', index)),
+    );
+    const oldestFirstPageDate = compactDateDaysBefore('20260619', 99);
+    const secondPageEndDate = compactDateDaysBefore(oldestFirstPageDate, 1);
+
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({
+        id: 'asset-samsung-period-paged',
+        symbol: '005930',
+        market: 'KRX',
+        assetType: AssetType.domestic_stock,
+        currencyCode: CurrencyCode.KRW,
+      }),
+    );
+    kisQuoteClient.getMarketDataByExplicitPath
+      .mockResolvedValueOnce({
+        state: 'available',
+        receivedAt: new Date('2026-06-19T03:00:01.000Z'),
+        response: {
+          rt_cd: '0',
+          output2: firstPageRows,
+        },
+      })
+      .mockResolvedValueOnce({
+        state: 'available',
+        receivedAt: new Date('2026-06-19T03:00:02.000Z'),
+        response: {
+          rt_cd: '0',
+          output2: [domesticPeriodRow(secondPageEndDate)],
+        },
+      });
+
+    const response = await service.getAssetCandles(
+      'user-1',
+      'asset-samsung-period-paged',
+      {
+        range: '1y',
+        interval: '1d',
+        limit: '400',
+      },
+    );
+
+    expect(response.data.source).toMatchObject({
+      trId: 'FHKST03010100',
+      requestedCount: 400,
+      returnedCount: 101,
+    });
+    const calls = kisQuoteCalls(kisQuoteClient);
+    expect(calls).toHaveLength(2);
+    expect(calls[0].query).toMatchObject({
+      FID_INPUT_DATE_1: '20250619',
+      FID_INPUT_DATE_2: '20260619',
+      FID_PERIOD_DIV_CODE: 'D',
+    });
+    expect(calls[1].query).toMatchObject({
+      FID_INPUT_DATE_1: '20250619',
+      FID_INPUT_DATE_2: secondPageEndDate,
+      FID_PERIOD_DIV_CODE: 'D',
+    });
+  });
+
+  it.each(['5m', '15m', '30m', '1h'] as const)(
+    'keeps domestic %s candles on the minute KIS APIs',
+    async (interval) => {
+      const { prisma, kisQuoteClient, service } = createService();
+      prisma.asset.findUnique.mockResolvedValueOnce(
+        asset({
+          id: `asset-samsung-minute-${interval}`,
+          symbol: '005930',
+          market: 'KRX',
+          assetType: AssetType.domestic_stock,
+          currencyCode: CurrencyCode.KRW,
+        }),
+      );
+      kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
+        state: 'available',
+        receivedAt: new Date('2026-06-19T03:00:01.000Z'),
+        response: {
+          rt_cd: '0',
+          output2: [],
+        },
+      });
+
+      await service.getAssetCandles(
+        'user-1',
+        `asset-samsung-minute-${interval}`,
+        {
+          interval,
+          date: '2026-06-19',
+          to: '100000',
+        },
+      );
+
+      const kisCall = firstKisQuoteCall(kisQuoteClient);
+      expect(kisCall.path).toBe(
+        '/uapi/domestic-stock/v1/quotations/inquire-time-itemchartprice',
+      );
+      expect(kisCall.headers).toMatchObject({
+        tr_id: 'FHKST03010200',
+      });
+    },
+  );
+
   it.each([
     {
       label: 'domestic 1d',
@@ -517,9 +871,9 @@ describe('AssetCandlesService', () => {
         currencyCode: CurrencyCode.KRW,
       }),
       rows: [
-        domesticRow('20260520', '115959', '10'),
-        domesticRow('20260601', '090000', '20'),
-        domesticRow('20260619', '120001', '30'),
+        domesticPeriodRow('20260520', { close: '10' }),
+        domesticPeriodRow('20260601', { close: '20' }),
+        domesticPeriodRow('20260619', { close: '30' }),
       ],
       startAt: Date.parse('2026-05-20T03:00:00.000Z'),
       endAt: Date.parse('2026-06-19T03:00:00.000Z'),
@@ -539,9 +893,9 @@ describe('AssetCandlesService', () => {
         currencyCode: CurrencyCode.KRW,
       }),
       rows: [
-        domesticRow('20260601', '085959', '10'),
-        domesticRow('20260602', '090000', '20'),
-        domesticRow('20260619', '120001', '30'),
+        domesticPeriodRow('20260601', { close: '10' }),
+        domesticPeriodRow('20260602', { close: '20' }),
+        domesticPeriodRow('20260619', { close: '30' }),
       ],
       startAt: Date.parse('2026-06-01T00:00:00.000Z'),
       endAt: Date.parse('2026-06-19T03:00:00.000Z'),
@@ -946,7 +1300,7 @@ describe('AssetCandlesService', () => {
       symbol: 'BTCUSDT',
       interval: '5m',
       limit: 100,
-      startTime: Date.parse('2026-06-18T03:00:00.000Z'),
+      startTime: Date.parse('2026-06-18T18:40:00.000Z'),
       endTime: Date.parse('2026-06-19T03:00:00.000Z'),
     });
   });
@@ -1017,7 +1371,7 @@ describe('AssetCandlesService', () => {
       const response = await service.getAssetCandles(
         'user-1',
         `asset-btc-${range}`,
-        { range },
+        { range, limit: '1000' },
       );
 
       expect(response.data.range).toBe(range);
@@ -1025,7 +1379,7 @@ describe('AssetCandlesService', () => {
       expect(binancePublicClient.fetchKlines).toHaveBeenCalledWith({
         symbol: 'BTCUSDT',
         interval,
-        limit: 100,
+        limit: 1000,
         startTime,
         endTime: Date.parse('2026-06-19T03:00:00.000Z'),
       });
@@ -1117,7 +1471,43 @@ describe('AssetCandlesService', () => {
     }
   });
 
-  it('flags truncated Binance sources when the window needs more than one klines call', async () => {
+  it('keeps Binance startTime unchanged when the expected candle count fits the request limit', async () => {
+    const { prisma, binancePublicClient, service } = createService();
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({
+        id: 'asset-btc-not-truncated',
+        symbol: 'BTC',
+        market: 'BINANCE',
+        assetType: AssetType.crypto,
+        currencyCode: CurrencyCode.USD,
+      }),
+    );
+    binancePublicClient.fetchKlines.mockResolvedValueOnce({
+      receivedAt: new Date('2026-06-19T03:00:01.000Z'),
+      response: [],
+    });
+
+    const response = await service.getAssetCandles(
+      'user-1',
+      'asset-btc-not-truncated',
+      { range: 'prev_open', interval: '5m', limit: '600' },
+    );
+
+    expect(binancePublicClient.fetchKlines).toHaveBeenCalledWith({
+      symbol: 'BTCUSDT',
+      interval: '5m',
+      limit: 600,
+      startTime: Date.parse('2026-06-18T00:00:00.000Z'),
+      endTime: Date.parse('2026-06-19T03:00:00.000Z'),
+    });
+    expect(response.data.source).toMatchObject({
+      provider: 'binance',
+      requestedCount: 600,
+    });
+    expect(response.data.source).not.toHaveProperty('truncated');
+  });
+
+  it('shifts truncated Binance startTime so the latest requestLimit candles are preserved', async () => {
     const { prisma, binancePublicClient, service } = createService();
     prisma.asset.findUnique.mockResolvedValueOnce(
       asset({
@@ -1140,9 +1530,13 @@ describe('AssetCandlesService', () => {
       { range: '1y', interval: '5m', limit: '1500' },
     );
 
-    expect(binancePublicClient.fetchKlines).toHaveBeenCalledWith(
-      expect.objectContaining({ limit: 1000 }),
-    );
+    expect(binancePublicClient.fetchKlines).toHaveBeenCalledWith({
+      symbol: 'BTCUSDT',
+      interval: '5m',
+      limit: 1000,
+      startTime: Date.parse('2026-06-15T15:40:00.000Z'),
+      endTime: Date.parse('2026-06-19T03:00:00.000Z'),
+    });
     expect(response.data.source).toMatchObject({
       provider: 'binance',
       requestedCount: 1000,

@@ -46,6 +46,7 @@ type CandleInterval =
   | '1d'
   | '1w';
 type CryptoCandleInterval = CandleInterval;
+type KisDomesticPeriodDivCode = 'D' | 'W';
 
 type AssetRecord = {
   id: string;
@@ -155,7 +156,8 @@ type AssetCandlesResponse = {
           requestedCount: number;
           returnedCount: number;
           // Present (true) only when the requested window needs more rows than
-          // one klines call can return, i.e. older candles were cut off.
+          // the effective single-call request can return, i.e. older candles
+          // were cut off and the latest candles were preserved.
           truncated?: boolean;
         };
   };
@@ -167,6 +169,7 @@ type AssetCandlesResponse = {
 //   - Binance spot klines (/api/v3/klines): hard cap 1000 rows per call.
 //   - KIS 국내 주식당일분봉조회 (FHKST03010200): max 30 rows, current day only.
 //   - KIS 국내 주식일별분봉조회 (FHKST03010230): max 120 rows/call, ~1yr retention.
+//   - KIS 국내 주식기간별시세 (FHKST03010100): max 100 rows/call, no tr_cont.
 //   - KIS 해외주식분봉조회 (HHDFS76950200): NREC max 120; NEXT/KEYB/tr_cont
 //     continuation exists but is not implemented here yet.
 // TODO(chart-range): KIS coverage beyond one page requires multi-call:
@@ -174,12 +177,12 @@ type AssetCandlesResponse = {
 //     FID_INPUT_HOUR_1 anchors (dedupe on sourceDate+sourceTime, bound pages,
 //     mind KIS TPS limits).
 //   - overseas: NEXT/KEYB/tr_cont continuation loop with a maxPages bound.
-//   - 1d/1w for KIS stocks should use the dedicated daily/weekly chart APIs
-//     (e.g. 국내 FHKST03010100 inquire-daily-itemchartprice) instead of bucketing
-//     minute rows; that provider integration does not exist in this project yet.
 const BINANCE_KLINE_MAX_LIMIT = 1000;
 const KIS_DOMESTIC_TODAY_MAX_COUNT = 30;
 const KIS_DOMESTIC_DAILY_MINUTE_MAX_COUNT = 120;
+const KIS_DOMESTIC_PERIOD_MAX_COUNT = 100;
+const KIS_DOMESTIC_DAILY_PERIOD_MAX_PAGES = 5;
+const KIS_DOMESTIC_WEEKLY_PERIOD_MAX_PAGES = 3;
 const KIS_OVERSEAS_MINUTE_MAX_COUNT = 120;
 const DEFAULT_LIMIT = 100;
 // Request-level cap; per-provider caps above clamp lower where needed.
@@ -251,11 +254,14 @@ const DOMESTIC_TODAY_CANDLE_PATH =
   '/uapi/domestic-stock/v1/quotations/inquire-time-itemchartprice';
 const DOMESTIC_DAILY_CANDLE_PATH =
   '/uapi/domestic-stock/v1/quotations/inquire-time-dailychartprice';
+const DOMESTIC_PERIOD_CANDLE_PATH =
+  '/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice';
 const OVERSEAS_CANDLE_PATH =
   '/uapi/overseas-price/v1/quotations/inquire-time-itemchartprice';
 
 const DOMESTIC_TODAY_CANDLE_TR_ID = 'FHKST03010200';
 const DOMESTIC_DAILY_CANDLE_TR_ID = 'FHKST03010230';
+const DOMESTIC_PERIOD_CANDLE_TR_ID = 'FHKST03010100';
 const OVERSEAS_CANDLE_TR_ID = 'HHDFS76950200';
 
 const DATE_FIELD_ALIASES = [
@@ -378,6 +384,11 @@ export class AssetCandlesService {
     query: ParsedAssetCandlesQuery,
   ): Promise<AssetCandlesResponse> {
     const marketCode = this.resolveDomesticKisMarketCode(asset);
+
+    if (query.interval === '1d' || query.interval === '1w') {
+      return this.getDomesticStockPeriodCandles(asset, query, marketCode);
+    }
+
     // Same-day-only ranges may use the today endpoint (30 rows). Multi-day
     // ranges (prev_open/prev2_open/7d/…) need the daily-minute endpoint, which
     // returns up to 120 rows and can cross into prior days.
@@ -406,6 +417,96 @@ export class AssetCandlesService {
     ).map((candle) => this.formatCandle(candle));
 
     return this.buildResponse(asset, query, descriptor, candles);
+  }
+
+  private async getDomesticStockPeriodCandles(
+    asset: AssetRecord,
+    query: ParsedAssetCandlesQuery,
+    marketCode: string,
+  ): Promise<AssetCandlesResponse> {
+    const periodCode: KisDomesticPeriodDivCode =
+      query.interval === '1w' ? 'W' : 'D';
+    const maxPages =
+      periodCode === 'D'
+        ? KIS_DOMESTIC_DAILY_PERIOD_MAX_PAGES
+        : KIS_DOMESTIC_WEEKLY_PERIOD_MAX_PAGES;
+    const requestedCount = Math.min(
+      query.limit,
+      KIS_DOMESTIC_PERIOD_MAX_COUNT * maxPages,
+    );
+    const dateRange = this.resolveDomesticPeriodDateRange(query);
+    const sourceDescriptor = this.buildDomesticPeriodCall({
+      asset,
+      marketCode,
+      periodCode,
+      startDate: dateRange.startDate,
+      endDate: dateRange.endDate,
+      requestedCount,
+    });
+    const candlesBySourceDate = new Map<string, NormalizedCandle>();
+    let cursorEndDate = dateRange.endDate;
+
+    for (
+      let page = 0;
+      page < maxPages && candlesBySourceDate.size < requestedCount;
+      page += 1
+    ) {
+      if (cursorEndDate < dateRange.startDate) {
+        break;
+      }
+
+      const descriptor = this.buildDomesticPeriodCall({
+        asset,
+        marketCode,
+        periodCode,
+        startDate: dateRange.startDate,
+        endDate: cursorEndDate,
+        requestedCount,
+      });
+      const response = await this.callKisCandles(descriptor);
+      const rows = this.extractRows(response);
+
+      if (rows.length === 0) {
+        break;
+      }
+
+      const normalized = this.normalizeDomesticPeriodRows(rows);
+      let oldestSourceDate: string | null = null;
+
+      for (const candle of normalized) {
+        if (
+          candle.sourceDate < dateRange.startDate ||
+          candle.sourceDate > dateRange.endDate
+        ) {
+          continue;
+        }
+
+        if (!candlesBySourceDate.has(candle.sourceDate)) {
+          candlesBySourceDate.set(candle.sourceDate, candle);
+        }
+
+        if (!oldestSourceDate || candle.sourceDate < oldestSourceDate) {
+          oldestSourceDate = candle.sourceDate;
+        }
+      }
+
+      if (
+        rows.length < KIS_DOMESTIC_PERIOD_MAX_COUNT ||
+        !oldestSourceDate ||
+        oldestSourceDate <= dateRange.startDate
+      ) {
+        break;
+      }
+
+      cursorEndDate = this.previousCompactDate(oldestSourceDate);
+    }
+
+    const candles = this.sliceRecent(
+      this.filterCandlesToRange([...candlesBySourceDate.values()], query),
+      requestedCount,
+    ).map((candle) => this.formatCandle(candle));
+
+    return this.buildResponse(asset, query, sourceDescriptor, candles);
   }
 
   private async getUsStockCandles(
@@ -442,15 +543,25 @@ export class AssetCandlesService {
     const symbol = this.normalizeCryptoSymbol(asset);
     const timeRange = this.buildCryptoTimeRange(query);
     const requestLimit = Math.min(query.limit, BINANCE_KLINE_MAX_LIMIT);
+    const intervalMs = CANDLE_INTERVAL_MINUTES[interval] * 60_000;
     // With a known window we can tell whether one klines call covers it.
     const expectedCount =
       timeRange.startTime !== undefined && timeRange.endTime !== undefined
         ? Math.ceil(
-            (timeRange.endTime - timeRange.startTime) /
-              (CANDLE_INTERVAL_MINUTES[interval] * 60_000),
+            (timeRange.endTime - timeRange.startTime) / intervalMs,
           )
         : null;
     const truncated = expectedCount !== null && expectedCount > requestLimit;
+    const providerTimeRange =
+      truncated && timeRange.endTime !== undefined
+        ? {
+            startTime: Math.max(
+              0,
+              timeRange.endTime - requestLimit * intervalMs,
+            ),
+            endTime: timeRange.endTime,
+          }
+        : timeRange;
     const descriptor: BinanceCallDescriptor = {
       endpoint: BINANCE_KLINE_PATH,
       symbol,
@@ -461,7 +572,7 @@ export class AssetCandlesService {
       symbol,
       interval,
       limit: requestLimit,
-      ...timeRange,
+      ...providerTimeRange,
     });
     const candles = this.sliceRecent(
       this.filterCandlesToRange(
@@ -492,6 +603,32 @@ export class AssetCandlesService {
         FID_INPUT_HOUR_1: query.toHHmmss,
         FID_ETC_CLS_CODE: '',
         FID_PW_DATA_INCU_YN: 'N',
+      },
+    };
+  }
+
+  private buildDomesticPeriodCall(input: {
+    asset: AssetRecord;
+    marketCode: string;
+    periodCode: KisDomesticPeriodDivCode;
+    startDate: string;
+    endDate: string;
+    requestedCount: number;
+  }): KisCallDescriptor {
+    const symbol = this.normalizeDomesticSymbol(input.asset.symbol);
+
+    return {
+      path: DOMESTIC_PERIOD_CANDLE_PATH,
+      trId: DOMESTIC_PERIOD_CANDLE_TR_ID,
+      marketCode: input.marketCode,
+      requestedCount: input.requestedCount,
+      query: {
+        FID_COND_MRKT_DIV_CODE: input.marketCode,
+        FID_INPUT_ISCD: symbol,
+        FID_INPUT_DATE_1: input.startDate,
+        FID_INPUT_DATE_2: input.endDate,
+        FID_PERIOD_DIV_CODE: input.periodCode,
+        FID_ORG_ADJ_PRC: '0',
       },
     };
   }
@@ -682,6 +819,64 @@ export class AssetCandlesService {
 
       candles.push({
         time: this.zonedDateTimeToUtc(sourceDate, sourceTime, input.timeZone),
+        open,
+        high,
+        low,
+        close,
+        volume,
+        amount,
+        sourceDate,
+        sourceTime,
+      });
+    }
+
+    return this.sortCandles(candles);
+  }
+
+  private normalizeDomesticPeriodRows(
+    rows: readonly Record<string, unknown>[],
+  ): NormalizedCandle[] {
+    const candles: NormalizedCandle[] = [];
+
+    for (const row of rows) {
+      const sourceDate = this.normalizeSourceDate(
+        this.readOptionalString(row.stck_bsop_date),
+        '',
+      );
+      const sourceTime = '000000';
+      const open = this.parseDecimal(this.readOptionalString(row.stck_oprc));
+      const high = this.parseDecimal(this.readOptionalString(row.stck_hgpr));
+      const low = this.parseDecimal(this.readOptionalString(row.stck_lwpr));
+      const close = this.parseDecimal(this.readOptionalString(row.stck_clpr));
+      const volume = this.parseDecimal(this.readOptionalString(row.acml_vol));
+      const amount = this.parseDecimal(
+        this.readOptionalString(row.acml_tr_pbmn),
+      );
+
+      if (
+        !sourceDate ||
+        !open ||
+        !high ||
+        !low ||
+        !close ||
+        !volume ||
+        !amount ||
+        open.lte(0) ||
+        high.lte(0) ||
+        low.lte(0) ||
+        close.lte(0) ||
+        volume.lt(0) ||
+        amount.lt(0)
+      ) {
+        continue;
+      }
+
+      candles.push({
+        time: this.zonedDateTimeToUtc(
+          sourceDate,
+          sourceTime,
+          KOREA_TIME_ZONE,
+        ),
         open,
         high,
         low,
@@ -944,8 +1139,8 @@ export class AssetCandlesService {
           interval: descriptor.interval,
           requestedCount: descriptor.requestedCount,
           returnedCount: candles.length,
-          // Additive metadata: only emitted when older data was cut off, so
-          // existing consumers/tests that match the exact shape keep working.
+          // Additive metadata: only emitted when older data was cut off and the
+          // provider call window was shifted to preserve the latest candles.
           ...(truncated ? { truncated: true } : {}),
         },
       },
@@ -1092,6 +1287,26 @@ export class AssetCandlesService {
       'ASSET_CANDLES_INVALID_INTERVAL',
       CANDLE_INTERVAL_ERROR_MESSAGE,
     );
+  }
+
+  private resolveDomesticPeriodDateRange(
+    query: ParsedAssetCandlesQuery,
+  ): { startDate: string; endDate: string } {
+    const startDate = query.rangeStartAt
+      ? this.compactDate(this.dateInZone(query.rangeStartAt, KOREA_TIME_ZONE))
+      : this.compactDate(query.requestedDate);
+    const endDate = query.rangeEndAt
+      ? this.compactDate(this.dateInZone(query.rangeEndAt, KOREA_TIME_ZONE))
+      : this.compactDate(query.requestedDate);
+
+    if (startDate <= endDate) {
+      return { startDate, endDate };
+    }
+
+    return {
+      startDate: endDate,
+      endDate: startDate,
+    };
   }
 
   private buildCryptoTimeRange(query: ParsedAssetCandlesQuery): {
@@ -1625,6 +1840,19 @@ export class AssetCandlesService {
 
   private compactDate(value: string): string {
     return value.replace(/-/gu, '');
+  }
+
+  private previousCompactDate(value: string): string {
+    const date = new Date(
+      Date.UTC(
+        Number(value.slice(0, 4)),
+        Number(value.slice(4, 6)) - 1,
+        Number(value.slice(6, 8)),
+      ),
+    );
+    date.setUTCDate(date.getUTCDate() - 1);
+
+    return date.toISOString().slice(0, 10).replace(/-/gu, '');
   }
 
   private formatAuthorization(
