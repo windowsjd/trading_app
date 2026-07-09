@@ -19,6 +19,7 @@ import {
   type WalletTransactionDirection,
   type WalletTransactionDto,
 } from '../../features/wallet/api';
+import { formatCurrency } from '../../utils/format';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -106,7 +107,7 @@ function formatOccurredAt(value?: string | null) {
 
 function getSignedAmount(item: WalletTransactionDto) {
   const sign = item.direction === 'credit' ? '+' : '-';
-  return `${sign}${displayValue(item.amount)} ${item.currencyCode}`;
+  return `${sign}${formatCurrency(item.amount, item.currencyCode)} ${item.currencyCode}`;
 }
 
 export default function WalletTransactionsScreen({ route }: Props) {
@@ -271,7 +272,7 @@ export default function WalletTransactionsScreen({ route }: Props) {
             <View style={styles.rowBottom}>
               <View>
                 <Text style={styles.helper}>
-                  잔액 {displayValue(item.balanceAfter)} {item.currencyCode}
+                  잔액 {formatCurrency(item.balanceAfter, item.currencyCode)} {item.currencyCode}
                 </Text>
                 <Text style={styles.helper}>
                   {formatOccurredAt(item.occurredAt)}

@@ -7,6 +7,7 @@ import type {
   QuantityString,
   RateString,
 } from '../../models/dto/common';
+import { formatCurrency, getAssetNameDisplay } from '../../utils/format';
 
 export interface RecordSeasonListItemDto {
   seasonId: string;
@@ -210,29 +211,37 @@ function normalizePage<T>(
 }
 
 export function getRecordOrderDisplay(item: RecordOrderItemDto) {
+  const currencyCode = item.currencyCode ?? item.fillCurrency ?? '';
+  const nameDisplay = getAssetNameDisplay({ name: item.name, symbol: item.symbol });
+
   return {
     key: item.orderId ?? item.id ?? `${item.assetId ?? item.symbol}-${item.executedAt}`,
     symbol: item.symbol ?? item.assetId ?? '-',
-    name: item.name ?? '-',
+    name: nameDisplay.primary,
     executedAt: item.executedAt ?? item.submittedAt ?? '-',
     side: item.side,
     quantity: item.quantity,
-    price: item.price ?? item.executedPrice ?? item.fillPriceLocal ?? '-',
-    currencyCode: item.currencyCode ?? item.fillCurrency ?? '',
-    netAmount: item.netAmount ?? item.netAmountLocal ?? '-',
+    price: formatCurrency(
+      item.price ?? item.executedPrice ?? item.fillPriceLocal,
+      currencyCode,
+    ),
+    currencyCode,
+    netAmount: formatCurrency(item.netAmount ?? item.netAmountLocal, currencyCode),
   };
 }
 
 export function getRecordExchangeDisplay(item: RecordExchangeItemDto) {
+  const feeCurrency = item.feeCurrency ?? '';
+
   return {
     key: item.exchangeId ?? item.id ?? `${item.fromCurrency}-${item.toCurrency}-${item.executedAt}`,
     executedAt: item.executedAt ?? '-',
     direction: `${item.fromCurrency} → ${item.toCurrency}`,
-    sourceAmount: item.sourceAmount,
+    sourceAmount: formatCurrency(item.sourceAmount, item.fromCurrency),
     rate: item.appliedRate ?? item.executeRate ?? item.rate ?? '-',
-    feeAmount: item.feeAmount ?? '-',
-    feeCurrency: item.feeCurrency ?? '',
-    netTargetAmount: item.netTargetAmount ?? '-',
+    feeAmount: formatCurrency(item.feeAmount, feeCurrency),
+    feeCurrency,
+    netTargetAmount: formatCurrency(item.netTargetAmount, item.toCurrency),
   };
 }
 

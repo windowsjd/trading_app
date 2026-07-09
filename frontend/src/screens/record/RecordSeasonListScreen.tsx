@@ -22,6 +22,7 @@ import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import EmptyState from '../../components/states/EmptyState';
 import CTAButton from '../../components/common/CTAButton';
+import { formatPercent } from '../../utils/format';
 
 type Props = RecordSeasonListScreenProps;
 
@@ -180,7 +181,7 @@ export default function RecordSeasonListScreen({ navigation }: Props) {
                 {item.finalRank ?? item.rank ? `#${item.finalRank ?? item.rank}` : '-'}
               </Text>
               <Text style={styles.helper}>{displayValue(item.finalTier ?? item.tier)}</Text>
-              <Text style={styles.itemTitle}>{getReturnRate(item)}%</Text>
+              <Text style={styles.itemTitle}>{formatPercent(getReturnRate(item))}%</Text>
             </View>
           </Pressable>
         )}

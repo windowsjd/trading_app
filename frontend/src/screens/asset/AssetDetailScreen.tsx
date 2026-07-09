@@ -34,6 +34,12 @@ import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 import { buildWsUrl } from '../../constants/env';
 import { formatSourceMetadata } from '../../models/dto/common';
+import {
+  formatCurrency,
+  formatKrw,
+  formatPercent,
+  getAssetNameDisplay,
+} from '../../utils/format';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -72,9 +78,6 @@ function getCandleChartPoints(
   }));
 }
 
-function formatPriceChartValue(value: number) {
-  return Number.isInteger(value) ? String(value) : value.toFixed(2);
-}
 
 export default function AssetDetailScreen({ route, navigation }: Props) {
   const rootNavigation = useRootNavigation();
@@ -174,6 +177,9 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
   const candleChartPoints = getCandleChartPoints(
     candlesQuery.data?.candles ?? [],
   );
+  const assetNameDisplay = getAssetNameDisplay(asset);
+  const formatPriceChartValue = (value: number) =>
+    formatCurrency(value, displayPriceCurrency);
 
   const seasonBlockedReason =
     seasonQuery.isLoading
@@ -222,15 +228,17 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
         contentContainerStyle={styles.content}
       >
         <View style={styles.card}>
-          <Text style={styles.title}>{asset.symbol}</Text>
-          <Text style={styles.helper}>{asset.name}</Text>
+          <Text style={styles.title}>{assetNameDisplay.primary}</Text>
+          {assetNameDisplay.secondary ? (
+            <Text style={styles.helper}>{assetNameDisplay.secondary}</Text>
+          ) : null}
           <Text style={styles.value}>
             {orderPriceAvailable
-              ? `${displayValue(displayPriceLocal)} ${displayPriceCurrency}`
+              ? `${formatCurrency(displayPriceLocal, displayPriceCurrency)} ${displayPriceCurrency}`
               : '시세 준비 중'}
           </Text>
-          <Text style={styles.helper}>KRW 환산 {displayValue(displayPriceKrw)}</Text>
-          <Text style={styles.helper}>등락률 {displayValue(displayChangeRate)}%</Text>
+          <Text style={styles.helper}>KRW 환산 {formatKrw(displayPriceKrw)}</Text>
+          <Text style={styles.helper}>등락률 {formatPercent(displayChangeRate)}%</Text>
           <Text style={styles.helper}>시장 {asset.market}</Text>
           <Text style={styles.helper}>시장 상태 {asset.marketStatus}</Text>
           <Text style={styles.helper}>
@@ -304,15 +312,19 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
             <>
               <Text style={styles.helper}>수량 {position.quantity}</Text>
               <Text style={styles.helper}>
-                평균단가 {displayValue(position.avgEntryPriceLocal ?? position.avgEntryPrice)}
+                평균단가{' '}
+                {formatCurrency(
+                  position.avgEntryPriceLocal ?? position.avgEntryPrice,
+                  displayPriceCurrency,
+                )}
               </Text>
               <Text style={styles.helper}>
-                평가금액 {displayValue(position.marketValueKrw)}
+                평가금액 {formatKrw(position.marketValueKrw)}
               </Text>
               <Text style={styles.helper}>
-                평가손익 {displayValue(position.unrealizedPnlKrw)}
+                평가손익 {formatKrw(position.unrealizedPnlKrw)}
               </Text>
-              <Text style={styles.helper}>수익률 {displayValue(position.returnRate)}%</Text>
+              <Text style={styles.helper}>수익률 {formatPercent(position.returnRate)}%</Text>
             </>
           ) : (
             <InlineEmptyState

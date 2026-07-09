@@ -4,6 +4,7 @@ import {
   isRequoteRequiredError,
 } from '../../services/api/errorMapper';
 import { formatSourceMetadata } from '../../models/dto/common';
+import { formatCurrency, formatKrw, getAssetNameDisplay } from '../../utils/format';
 
 function parseTimestamp(value?: string | null) {
   if (!value) return null;
@@ -45,23 +46,27 @@ export function getOrderQuoteExpiresInSeconds(
 export function getOrderQuoteDisplay(quote: OrderQuoteDto) {
   return {
     quoteId: displayValue(quote.quoteId),
-    price: `${displayValue(quote.price)} ${quote.currencyCode}`,
+    price: `${formatCurrency(quote.price, quote.currencyCode)} ${quote.currencyCode}`,
     quantity: displayValue(quote.quantity),
-    grossAmount: displayValue(quote.grossAmount),
+    grossAmount: formatCurrency(quote.grossAmount, quote.currencyCode),
     feeRate: displayValue(quote.feeRate),
-    feeAmount: displayValue(quote.feeAmount),
-    netAmount: displayValue(quote.netAmount),
-    walletBalanceBefore: displayValue(quote.walletBalanceBefore),
-    estimatedWalletBalanceAfter: displayValue(
+    feeAmount: formatCurrency(quote.feeAmount, quote.currencyCode),
+    netAmount: formatCurrency(quote.netAmount, quote.currencyCode),
+    walletBalanceBefore: formatCurrency(
+      quote.walletBalanceBefore,
+      quote.currencyCode,
+    ),
+    estimatedWalletBalanceAfter: formatCurrency(
       quote.estimatedWalletBalanceAfter,
+      quote.currencyCode,
     ),
     positionQuantityBefore: displayValue(quote.positionQuantityBefore),
     estimatedPositionQuantityAfter: displayValue(
       quote.estimatedPositionQuantityAfter,
     ),
-    krwGrossAmount: displayValue(quote.krwGrossAmount),
-    krwFeeAmount: displayValue(quote.krwFeeAmount),
-    krwNetAmount: displayValue(quote.krwNetAmount),
+    krwGrossAmount: formatKrw(quote.krwGrossAmount),
+    krwFeeAmount: formatKrw(quote.krwFeeAmount),
+    krwNetAmount: formatKrw(quote.krwNetAmount),
     expiresAt: displayValue(quote.expiresAt),
     maxChangeBps: displayValue(quote.maxChangeBps),
     quoteAt: displayValue(quote.quoteAt),
@@ -83,33 +88,43 @@ export function getOrderSuccessDisplay(result: CreateOrderDto) {
   const asset = order.asset;
   const currencyCode = execution.currencyCode ?? order.currencyCode ?? '';
 
+  const assetNameDisplay = asset ? getAssetNameDisplay(asset) : null;
+
   return {
     orderId: displayValue(order.id ?? order.orderId ?? execution.orderId),
     quoteId: displayValue(order.quoteId ?? execution.quoteId),
-    assetLabel:
-      asset?.symbol && asset?.name
-        ? `${asset.symbol} · ${asset.name}`
-        : displayValue(asset?.symbol ?? asset?.name ?? order.assetId ?? execution.assetId),
+    assetLabel: assetNameDisplay
+      ? assetNameDisplay.secondary
+        ? `${assetNameDisplay.primary} · ${assetNameDisplay.secondary}`
+        : assetNameDisplay.primary
+      : displayValue(order.assetId ?? execution.assetId),
     side: order.side ?? execution.side,
     quantity: displayValue(order.quantity ?? execution.quantity),
-    executedPrice: `${displayValue(
+    executedPrice: `${formatCurrency(
       execution.executedPrice ?? execution.executePrice ?? order.price,
+      currencyCode,
     )} ${currencyCode}`,
     currencyCode: displayValue(currencyCode),
-    grossAmount: displayValue(execution.grossAmount ?? order.grossAmount),
-    feeAmount: displayValue(execution.feeAmount ?? order.feeAmount),
-    netAmount: displayValue(execution.netAmount ?? order.netAmount),
+    grossAmount: formatCurrency(
+      execution.grossAmount ?? order.grossAmount,
+      currencyCode,
+    ),
+    feeAmount: formatCurrency(execution.feeAmount ?? order.feeAmount, currencyCode),
+    netAmount: formatCurrency(execution.netAmount ?? order.netAmount, currencyCode),
     submittedAt: displayValue(execution.submittedAt ?? order.submittedAt),
     executedAt: displayValue(execution.executedAt),
-    quotedPrice: displayValue(execution.quotedPrice),
-    executePrice: displayValue(execution.executePrice),
+    quotedPrice: formatCurrency(execution.quotedPrice, currencyCode),
+    executePrice: formatCurrency(execution.executePrice, currencyCode),
     priceChangeBps: displayValue(execution.priceChangeBps),
     quotedRate: displayValue(execution.quotedRate),
     executeRate: displayValue(execution.executeRate),
     rateChangeBps: displayValue(execution.rateChangeBps),
     assetPriceSource: formatSourceMetadata(execution.assetPriceSource),
     fxRateSource: formatSourceMetadata(execution.fxRateSource),
-    walletBalanceAfter: displayValue(execution.walletBalanceAfter),
+    walletBalanceAfter: formatCurrency(
+      execution.walletBalanceAfter,
+      currencyCode,
+    ),
     isAlreadyExecuted: execution.state === 'already_executed',
   };
 }

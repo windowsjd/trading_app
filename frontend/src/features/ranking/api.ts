@@ -73,6 +73,7 @@ export interface UserSeasonSummaryDto {
   topPositions: Array<{
     assetId: string;
     symbol: string;
+    name?: string;
     weight: string;
   }>;
 }

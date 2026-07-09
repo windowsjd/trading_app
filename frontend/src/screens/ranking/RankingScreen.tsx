@@ -26,6 +26,7 @@ import {
 } from '../../features/ranking/api';
 import { ERROR_CODE } from '../../models/enums/errorCode';
 import { getApiErrorCode } from '../../services/api/errorMapper';
+import { formatKrw, formatPercent } from '../../utils/format';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -299,7 +300,7 @@ export default function RankingScreen({ navigation }: Props) {
                     >
                       <Text style={styles.topRank}>#{item.rank}</Text>
                       <Text style={styles.topName}>{item.user.nickname}</Text>
-                      <Text style={styles.helper}>{item.returnRate}%</Text>
+                      <Text style={styles.helper}>{formatPercent(item.returnRate)}%</Text>
                     </Pressable>
                   ))}
                 </View>
@@ -395,9 +396,9 @@ function MyRankingCard({
         {myRanking?.rank ? `#${myRanking.rank}` : '-'}
       </Text>
       <Text style={styles.helper}>
-        등급 {getRankingTier(myRanking, rankType)} · 수익률 {displayValue(myRanking?.returnRate)}%
+        등급 {getRankingTier(myRanking, rankType)} · 수익률 {formatPercent(myRanking?.returnRate)}%
       </Text>
-      <Text style={styles.helper}>퍼센타일 {displayValue(myRanking?.percentile)}%</Text>
+      <Text style={styles.helper}>퍼센타일 {formatPercent(myRanking?.percentile)}%</Text>
       {rankType === 'final' ? (
         <Text style={styles.settledText}>최종 랭킹 확정</Text>
       ) : null}
@@ -425,13 +426,13 @@ function RankingRow({
         <View>
           <Text style={styles.name}>{item.user.nickname}</Text>
           <Text style={styles.helper}>등급 {getRankingTier(item, rankType)}</Text>
-          <Text style={styles.helper}>퍼센타일 {displayValue(item.percentile)}%</Text>
+          <Text style={styles.helper}>퍼센타일 {formatPercent(item.percentile)}%</Text>
         </View>
       </View>
 
       <View style={styles.alignEnd}>
-        <Text style={styles.value}>{item.returnRate}%</Text>
-        <Text style={styles.helper}>{item.totalAssetKrw} KRW</Text>
+        <Text style={styles.value}>{formatPercent(item.returnRate)}%</Text>
+        <Text style={styles.helper}>{formatKrw(item.totalAssetKrw)} KRW</Text>
       </View>
     </Pressable>
   );

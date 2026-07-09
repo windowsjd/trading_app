@@ -132,8 +132,8 @@ export default function RecordOrderListScreen({ route }: Props) {
               style={styles.rowCard}
             >
               <View>
-                <Text style={styles.itemTitle}>{display.symbol}</Text>
-                <Text style={styles.helper}>{display.name}</Text>
+                <Text style={styles.itemTitle}>{display.name}</Text>
+                <Text style={styles.helper}>{display.symbol}</Text>
                 <Text style={styles.helper}>{display.executedAt}</Text>
                 <Text style={styles.helper}>
                   {display.side === 'buy' ? '매수' : '매도'}

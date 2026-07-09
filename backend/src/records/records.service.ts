@@ -552,6 +552,7 @@ type UserCurrentSeasonSummaryResponse = {
     topPositions: Array<{
       assetId: string;
       symbol: string;
+      name: string;
       weight: string;
     }>;
     reason?: string;
@@ -2017,6 +2018,7 @@ export class RecordsService {
         asset: {
           select: {
             symbol: true,
+            name: true,
           },
         },
       },
@@ -2038,6 +2040,7 @@ export class RecordsService {
       .map((position) => ({
         assetId: position.assetId,
         symbol: position.asset.symbol,
+        name: position.asset.name,
         weight: this.formatDecimal(
           (position.marketValueKrw ?? new Prisma.Decimal(0))
             .div(denominator)

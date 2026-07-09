@@ -51,6 +51,7 @@ import {
   mapOrderErrorCodeToBlockedReason,
 } from '../../services/api/errorMapper';
 import { createIdempotencyKey } from '../../utils/idempotency';
+import { formatCurrency, getAssetNameDisplay } from '../../utils/format';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -559,6 +560,7 @@ export default function OrderScreen({ route, navigation }: Props) {
   }
 
   const isUsdSettlement = asset.settlementCurrency === 'USD';
+  const assetNameDisplay = getAssetNameDisplay(asset);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -567,11 +569,13 @@ export default function OrderScreen({ route, navigation }: Props) {
         contentContainerStyle={styles.content}
       >
         <View style={styles.card}>
-          <Text style={styles.title}>{asset.symbol}</Text>
-          <Text style={styles.helper}>{asset.name}</Text>
+          <Text style={styles.title}>{assetNameDisplay.primary}</Text>
+          {assetNameDisplay.secondary ? (
+            <Text style={styles.helper}>{assetNameDisplay.secondary}</Text>
+          ) : null}
           <Text style={styles.helper}>주문 방향 {side === 'buy' ? '매수' : '매도'}</Text>
           <Text style={styles.helper}>
-            현재가 {displayValue(price?.currentPrice)} {asset.priceCurrency}
+            현재가 {formatCurrency(price?.currentPrice, asset.priceCurrency)} {asset.priceCurrency}
           </Text>
           <Text style={styles.helper}>보유 수량 {positionQuantity}</Text>
           <Text style={styles.helper}>
@@ -592,7 +596,8 @@ export default function OrderScreen({ route, navigation }: Props) {
           ) : null}
           {side === 'buy' && settlementCurrency ? (
             <Text style={styles.helper}>
-              비율 계산 기준 잔액 {settlementCurrency} {displayValue(buyBalance)}
+              비율 계산 기준 잔액 {settlementCurrency}{' '}
+              {formatCurrency(buyBalance, settlementCurrency)}
             </Text>
           ) : null}
         </View>

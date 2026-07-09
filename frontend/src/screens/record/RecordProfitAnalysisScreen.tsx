@@ -25,6 +25,7 @@ import InlineEmptyState from '../../components/states/InlineEmptyState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import CTAButton from '../../components/common/CTAButton';
 import { LineChart, type LineChartPoint } from '../../components/charts';
+import { formatKrw, formatPercent, getAssetNameDisplay } from '../../utils/format';
 
 type Props = NativeStackScreenProps<
   RecordStackParamList,
@@ -41,7 +42,7 @@ function displayRank(value?: number | null) {
 }
 
 function displayPercent(value?: string | null) {
-  return value ? `${value}%` : '-';
+  return value ? `${formatPercent(value)}%` : '-';
 }
 
 function getEquityChartPoints(
@@ -55,7 +56,7 @@ function getEquityChartPoints(
 }
 
 function formatKrwChartValue(value: number) {
-  return `${value.toFixed(0)} KRW`;
+  return `${formatKrw(value)} KRW`;
 }
 
 function ProfitAssetSummary({
@@ -65,16 +66,19 @@ function ProfitAssetSummary({
   label: string;
   asset: ProfitAnalysisItemDto | null;
 }) {
+  const nameDisplay = asset ? getAssetNameDisplay(asset) : null;
+
   return (
     <View style={styles.assetSummaryRow}>
       <Text style={styles.itemTitle}>{label}</Text>
-      {asset ? (
+      {asset && nameDisplay ? (
         <>
           <Text style={styles.helper}>
-            {asset.symbol} · {asset.name}
+            {nameDisplay.primary}
+            {nameDisplay.secondary ? ` · ${nameDisplay.secondary}` : ''}
           </Text>
           <Text style={styles.helper}>
-            손익 {displayValue(asset.totalPnlKrw)} KRW
+            손익 {formatKrw(asset.totalPnlKrw)} KRW
           </Text>
           <Text style={styles.helper}>
             수익률 {displayPercent(asset.returnRate)}
@@ -152,7 +156,7 @@ export default function RecordProfitAnalysisScreen({
             등급 {displayValue(participant?.finalTier)}
           </Text>
           <Text style={styles.helper}>
-            총자산 {displayValue(performance.totalAssetKrw)} KRW
+            총자산 {formatKrw(performance.totalAssetKrw)} KRW
           </Text>
           <Text style={styles.helper}>
             수익률 {displayPercent(performance.returnRate)}
@@ -177,13 +181,13 @@ export default function RecordProfitAnalysisScreen({
           <Text style={styles.label}>손익 요약</Text>
           <Text style={styles.helper}>상태 {profitAnalysis.state}</Text>
           <Text style={styles.helper}>
-            실현 손익 {displayValue(profitAnalysis.totalRealizedPnlKrw)} KRW
+            실현 손익 {formatKrw(profitAnalysis.totalRealizedPnlKrw)} KRW
           </Text>
           <Text style={styles.helper}>
-            평가 손익 {displayValue(profitAnalysis.totalUnrealizedPnlKrw)} KRW
+            평가 손익 {formatKrw(profitAnalysis.totalUnrealizedPnlKrw)} KRW
           </Text>
           <Text style={styles.helper}>
-            총 손익 {displayValue(profitAnalysis.totalPnlKrw)} KRW
+            총 손익 {formatKrw(profitAnalysis.totalPnlKrw)} KRW
           </Text>
           {profitAnalysis.state === 'partial_unavailable' ? (
             <Text style={styles.warningText}>
@@ -214,27 +218,31 @@ export default function RecordProfitAnalysisScreen({
           {profitAnalysis.items.length === 0 ? (
             <InlineEmptyState message="표시할 자산별 손익 데이터가 없습니다." />
           ) : (
-            profitAnalysis.items.map((item) => (
-              <View key={item.assetId} style={styles.assetRow}>
-                <Text style={styles.itemTitle}>{item.symbol}</Text>
-                <Text style={styles.helper}>{item.name}</Text>
-                <Text style={styles.helper}>
-                  {item.assetType} · {item.positionState} · {item.valuationState}
-                </Text>
-                <Text style={styles.helper}>
-                  실현 {displayValue(item.realizedPnlKrw)} KRW
-                </Text>
-                <Text style={styles.helper}>
-                  평가 {displayValue(item.unrealizedPnlKrw)} KRW
-                </Text>
-                <Text style={styles.helper}>
-                  총 손익 {displayValue(item.totalPnlKrw)} KRW
-                </Text>
-                <Text style={styles.helper}>
-                  수익률 {displayPercent(item.returnRate)}
-                </Text>
-              </View>
-            ))
+            profitAnalysis.items.map((item) => {
+              const nameDisplay = getAssetNameDisplay(item);
+
+              return (
+                <View key={item.assetId} style={styles.assetRow}>
+                  <Text style={styles.itemTitle}>{nameDisplay.primary}</Text>
+                  <Text style={styles.helper}>{nameDisplay.secondary ?? item.symbol}</Text>
+                  <Text style={styles.helper}>
+                    {item.assetType} · {item.positionState} · {item.valuationState}
+                  </Text>
+                  <Text style={styles.helper}>
+                    실현 {formatKrw(item.realizedPnlKrw)} KRW
+                  </Text>
+                  <Text style={styles.helper}>
+                    평가 {formatKrw(item.unrealizedPnlKrw)} KRW
+                  </Text>
+                  <Text style={styles.helper}>
+                    총 손익 {formatKrw(item.totalPnlKrw)} KRW
+                  </Text>
+                  <Text style={styles.helper}>
+                    수익률 {displayPercent(item.returnRate)}
+                  </Text>
+                </View>
+              );
+            })
           )}
         </View>
 

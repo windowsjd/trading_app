@@ -23,6 +23,7 @@ import {
 } from '../../services/api/errorMapper';
 import { ERROR_CODE } from '../../models/enums/errorCode';
 import type { SeasonJoinViewState } from '../../models/enums/viewState';
+import { formatKrw } from '../../utils/format';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -264,7 +265,7 @@ export default function SeasonJoinScreen({ navigation }: Props) {
             시즌 기간: {season.startAt} ~ {season.endAt}
           </Text>
           <Text style={styles.helper}>
-            시작 자산: {season.initialCapitalKrw} KRW
+            시작 자산: {formatKrw(season.initialCapitalKrw)} KRW
           </Text>
           <Text style={styles.helper}>거래 수수료: {season.tradeFeeRate}</Text>
           <Text style={styles.helper}>환전 수수료: {season.fxFeeRate}</Text>

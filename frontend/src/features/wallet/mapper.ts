@@ -15,6 +15,7 @@ import {
   isRequoteRequiredError,
 } from '../../services/api/errorMapper';
 import { formatSourceMetadata } from '../../models/dto/common';
+import { formatCurrency, formatKrw } from '../../utils/format';
 
 type WalletQueryState = {
   isLoading?: boolean;
@@ -112,12 +113,12 @@ export function getFxQuoteDisplay(quote: FxQuoteDto) {
   return {
     quoteId: displayValue(quote.quoteId),
     direction: `${quote.fromCurrency} → ${quote.toCurrency}`,
-    sourceAmount: displayValue(quote.sourceAmount),
+    sourceAmount: formatCurrency(quote.sourceAmount, quote.fromCurrency),
     appliedRate: displayValue(quote.appliedRate),
-    grossTargetAmount: displayValue(quote.grossTargetAmount),
+    grossTargetAmount: formatCurrency(quote.grossTargetAmount, quote.toCurrency),
     feeRate: displayValue(quote.feeRate),
-    feeAmount: `${displayValue(quote.feeAmount)} ${quote.feeCurrency}`,
-    netTargetAmount: displayValue(quote.netTargetAmount),
+    feeAmount: `${formatCurrency(quote.feeAmount, quote.feeCurrency)} ${quote.feeCurrency}`,
+    netTargetAmount: formatCurrency(quote.netTargetAmount, quote.toCurrency),
     expiresAt: displayValue(quote.expiresAt),
     maxChangeBps: displayValue(quote.maxChangeBps),
     rateCapturedAt: displayValue(quote.rateCapturedAt),
@@ -142,7 +143,7 @@ function getWalletRows(wallets: unknown) {
         const balance = item.balanceAmount ?? item.balance;
 
         if (!currency || !balance) return null;
-        return `${currency} ${balance}`;
+        return `${currency} ${formatCurrency(balance, currency)}`;
       })
       .filter((item): item is string => !!item);
   }
@@ -151,7 +152,7 @@ function getWalletRows(wallets: unknown) {
     return Object.entries(wallets)
       .map(([currency, value]) => {
         if (typeof value === 'string' || typeof value === 'number') {
-          return `${currency} ${value}`;
+          return `${currency} ${formatCurrency(value, currency)}`;
         }
 
         if (!value || typeof value !== 'object') return null;
@@ -162,7 +163,7 @@ function getWalletRows(wallets: unknown) {
         };
         const balance = item.balanceAmount ?? item.balance;
 
-        return balance ? `${currency} ${balance}` : null;
+        return balance ? `${currency} ${formatCurrency(balance, currency)}` : null;
       })
       .filter((item): item is string => !!item);
   }
@@ -175,16 +176,22 @@ export function getFxExecuteSuccessDisplay(result: FxExecuteDto) {
     exchangeId: displayValue(result.exchangeId),
     executedAt: displayValue(result.executedAt),
     direction: `${result.fromCurrency} → ${result.toCurrency}`,
-    sourceAmount: displayValue(result.sourceAmount),
-    grossTargetAmount: displayValue(result.grossTargetAmount),
-    netTargetAmount: displayValue(result.netTargetAmount),
+    sourceAmount: formatCurrency(result.sourceAmount, result.fromCurrency),
+    grossTargetAmount: formatCurrency(result.grossTargetAmount, result.toCurrency),
+    netTargetAmount: formatCurrency(result.netTargetAmount, result.toCurrency),
     appliedRate: displayValue(result.appliedRate),
     quotedRate: displayValue(result.quotedRate),
     executeRate: displayValue(result.executeRate),
     rateChangeBps: displayValue(result.rateChangeBps),
-    fee: `${displayValue(result.feeAmount)} ${result.feeCurrency}`,
-    sourceWalletBalanceAfter: displayValue(result.sourceWalletBalanceAfter),
-    targetWalletBalanceAfter: displayValue(result.targetWalletBalanceAfter),
+    fee: `${formatCurrency(result.feeAmount, result.feeCurrency)} ${result.feeCurrency}`,
+    sourceWalletBalanceAfter: formatCurrency(
+      result.sourceWalletBalanceAfter,
+      result.fromCurrency,
+    ),
+    targetWalletBalanceAfter: formatCurrency(
+      result.targetWalletBalanceAfter,
+      result.toCurrency,
+    ),
     walletRows: getWalletRows(result.wallets),
     rateSource: formatSourceMetadata(result.rateSource),
   };

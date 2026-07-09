@@ -28,6 +28,12 @@ import {
 } from '../../features/home/mapper';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
+import {
+  formatCurrency,
+  formatKrw,
+  formatPercent,
+  getAssetNameDisplay,
+} from '../../utils/format';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -83,16 +89,16 @@ function getWalletSummaryAmount(
   }
 
   const direct = walletSummary[currencyCode];
-  if (typeof direct === 'string') return direct;
+  if (typeof direct === 'string') return formatCurrency(direct, currencyCode);
   if (direct && typeof direct === 'object') {
-    return displayValue(direct.balanceAmount);
+    return formatCurrency(direct.balanceAmount, currencyCode);
   }
 
   const wallet = walletSummary.wallets?.find(
     (item) => item.currencyCode === currencyCode,
   );
 
-  return displayValue(wallet?.balanceAmount);
+  return formatCurrency(wallet?.balanceAmount, currencyCode);
 }
 
 function getAllocationRows(section?: HomeAllocationSectionDto | null) {
@@ -138,7 +144,7 @@ function getEquityChartPoints(
 }
 
 function formatKrwChartValue(value: number) {
-  return `${value.toFixed(0)} KRW`;
+  return `${formatKrw(value)} KRW`;
 }
 
 function getSectionErrorMessage(
@@ -284,16 +290,16 @@ export default function HomeScreen({ navigation }: Props) {
             {isSectionAvailable(home.summary) ? (
               <>
                 <Text style={styles.big}>
-                  {getTotalAssetKrw(home.summary)} KRW
+                  {formatKrw(getTotalAssetKrw(home.summary))} KRW
                 </Text>
                 <Text style={styles.helper}>
-                  수익률 {displayValue(home.summary?.returnRate)}%
+                  수익률 {formatPercent(home.summary?.returnRate)}%
                 </Text>
                 <Text style={styles.helper}>
-                  실현 손익 {displayValue(home.summary?.realizedPnlKrw)}
+                  실현 손익 {formatKrw(home.summary?.realizedPnlKrw)}
                 </Text>
                 <Text style={styles.helper}>
-                  평가 손익 {displayValue(home.summary?.unrealizedPnlKrw)}
+                  평가 손익 {formatKrw(home.summary?.unrealizedPnlKrw)}
                 </Text>
                 {home.summary?.valuationSource ? (
                   <Text style={styles.helper}>
@@ -354,18 +360,18 @@ export default function HomeScreen({ navigation }: Props) {
           <Text style={styles.label}>총 자산</Text>
           {isSectionAvailable(home.summary) ? (
             <>
-              <Text style={styles.big}>{getTotalAssetKrw(home.summary)} KRW</Text>
+              <Text style={styles.big}>{formatKrw(getTotalAssetKrw(home.summary))} KRW</Text>
               <Text style={styles.helper}>
-                수익률 {displayValue(home.summary?.returnRate)}%
+                수익률 {formatPercent(home.summary?.returnRate)}%
               </Text>
               <Text style={styles.helper}>
-                KRW 현금 {displayValue(home.summary?.krwCash ?? home.summary?.krwBalance)}
+                KRW 현금 {formatKrw(home.summary?.krwCash ?? home.summary?.krwBalance)}
               </Text>
               <Text style={styles.helper}>
-                USD 환산 {displayValue(home.summary?.usdCashKrw)}
+                USD 환산 {formatKrw(home.summary?.usdCashKrw)}
               </Text>
               <Text style={styles.helper}>
-                보유자산 {displayValue(home.summary?.assetValueKrw)}
+                보유자산 {formatKrw(home.summary?.assetValueKrw)}
               </Text>
               {home.summary?.valuationSource ? (
                 <Text style={styles.helper}>
@@ -491,6 +497,10 @@ export default function HomeScreen({ navigation }: Props) {
             topPositions.map((item, index) => {
               const assetId = item.assetId ?? null;
               const rowKey = assetId ?? item.symbol ?? String(index);
+              const nameDisplay = getAssetNameDisplay({
+                name: item.name ?? item.assetName,
+                symbol: item.symbol,
+              });
 
               return (
                 <Pressable
@@ -512,18 +522,18 @@ export default function HomeScreen({ navigation }: Props) {
                 >
                   <View>
                     <Text style={styles.itemTitle}>
-                      {displayValue(item.symbol)}
+                      {nameDisplay.primary}
                     </Text>
                     <Text style={styles.helper}>
-                      {displayValue(item.name ?? item.assetName ?? item.assetType)}
+                      {nameDisplay.secondary ?? displayValue(item.assetType)}
                     </Text>
                   </View>
                   <View style={styles.alignEnd}>
                     <Text style={styles.itemTitle}>
-                      {displayValue(item.marketValueKrw)}
+                      {formatKrw(item.marketValueKrw)}
                     </Text>
                     <Text style={styles.helper}>
-                      {displayValue(item.returnRate)}%
+                      {formatPercent(item.returnRate)}%
                     </Text>
                   </View>
                 </Pressable>

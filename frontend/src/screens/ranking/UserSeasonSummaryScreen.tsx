@@ -15,6 +15,7 @@ import {
   getRankingTier,
   getUserSeasonSummary,
 } from '../../features/ranking/api';
+import { formatKrw, formatPercent, getAssetNameDisplay } from '../../utils/format';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -99,17 +100,17 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
 
             <View style={styles.card}>
               <Text style={styles.label}>현재 시즌 요약</Text>
-              <Text style={styles.helper}>수익률 {displayValue(season.returnRate)}%</Text>
-              <Text style={styles.helper}>퍼센타일 {displayValue(season.percentile)}%</Text>
-              <Text style={styles.helper}>총 자산 {displayValue(season.totalAssetKrw)} KRW</Text>
+              <Text style={styles.helper}>수익률 {formatPercent(season.returnRate)}%</Text>
+              <Text style={styles.helper}>퍼센타일 {formatPercent(season.percentile)}%</Text>
+              <Text style={styles.helper}>총 자산 {formatKrw(season.totalAssetKrw)} KRW</Text>
             </View>
 
             <View style={styles.card}>
               <Text style={styles.label}>포트폴리오 비중</Text>
-              <Text style={styles.helper}>현금 {displayValue(allocation.cashKrwValue)}</Text>
-              <Text style={styles.helper}>국내 {displayValue(allocation.domesticStockValueKrw)}</Text>
-              <Text style={styles.helper}>미국 {displayValue(allocation.usStockValueKrw)}</Text>
-              <Text style={styles.helper}>암호화폐 {displayValue(allocation.cryptoValueKrw)}</Text>
+              <Text style={styles.helper}>현금 {formatKrw(allocation.cashKrwValue)}</Text>
+              <Text style={styles.helper}>국내 {formatKrw(allocation.domesticStockValueKrw)}</Text>
+              <Text style={styles.helper}>미국 {formatKrw(allocation.usStockValueKrw)}</Text>
+              <Text style={styles.helper}>암호화폐 {formatKrw(allocation.cryptoValueKrw)}</Text>
             </View>
 
             <View style={styles.card}>
@@ -125,12 +126,21 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
             message="공개된 주요 보유 종목 정보가 없습니다."
           />
         }
-        renderItem={({ item }) => (
-          <View style={styles.positionRow}>
-            <Text style={styles.symbol}>{item.symbol}</Text>
-            <Text style={styles.weight}>{item.weight}%</Text>
-          </View>
-        )}
+        renderItem={({ item }) => {
+          const display = getAssetNameDisplay(item);
+
+          return (
+            <View style={styles.positionRow}>
+              <View>
+                <Text style={styles.symbol}>{display.primary}</Text>
+                {display.secondary ? (
+                  <Text style={styles.helper}>{display.secondary}</Text>
+                ) : null}
+              </View>
+              <Text style={styles.weight}>{formatPercent(item.weight)}%</Text>
+            </View>
+          );
+        }}
       />
     </SafeAreaView>
   );

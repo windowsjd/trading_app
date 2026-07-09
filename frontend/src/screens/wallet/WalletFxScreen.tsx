@@ -41,6 +41,7 @@ import {
   mapFxErrorCodeToBlockedReason,
 } from '../../services/api/errorMapper';
 import { createIdempotencyKey } from '../../utils/idempotency';
+import { formatKrw, formatUsd } from '../../utils/format';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -447,9 +448,9 @@ export default function WalletFxScreen({ navigation }: Props) {
       >
         <View style={styles.card}>
           <Text style={styles.label}>지갑 요약</Text>
-          <Text style={styles.value}>KRW Wallet {krwWallet}</Text>
-          <Text style={styles.value}>USD Wallet {usdWallet}</Text>
-          <Text style={styles.helper}>USD 환산 KRW {usdBalanceKrw}</Text>
+          <Text style={styles.value}>KRW Wallet {formatKrw(krwWallet)}</Text>
+          <Text style={styles.value}>USD Wallet {formatUsd(usdWallet)}</Text>
+          <Text style={styles.helper}>USD 환산 KRW {formatKrw(usdBalanceKrw)}</Text>
           <Text style={styles.helper}>환율 {rateQuery.data.rate}</Text>
           <Text style={styles.helper}>
             기준 시각 {displayValue(rateQuery.data.effectiveAt)}

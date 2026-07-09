@@ -19,6 +19,7 @@ import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import CTAButton from '../../components/common/CTAButton';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
+import { formatKrw, formatPercent, getAssetNameDisplay } from '../../utils/format';
 
 type Props = NativeStackScreenProps<RecordStackParamList, 'RecordSeasonDetail'>;
 
@@ -104,8 +105,8 @@ export default function RecordSeasonDetailScreen({ route, navigation }: Props) {
             최종 순위 {finalRank ? `#${finalRank}` : '-'}
           </Text>
           <Text style={styles.helper}>최종 등급 {displayValue(finalTier)}</Text>
-          <Text style={styles.helper}>수익률 {displayValue(returnRate)}%</Text>
-          <Text style={styles.helper}>총자산 {displayValue(totalAssetKrw)} KRW</Text>
+          <Text style={styles.helper}>수익률 {formatPercent(returnRate)}%</Text>
+          <Text style={styles.helper}>총자산 {formatKrw(totalAssetKrw)} KRW</Text>
         </View>
 
         <View style={styles.card}>
@@ -134,15 +135,15 @@ export default function RecordSeasonDetailScreen({ route, navigation }: Props) {
 
         <View style={styles.card}>
           <Text style={styles.label}>손익 요약</Text>
-          <Text style={styles.helper}>MDD {displayValue(maxDrawdown)}%</Text>
+          <Text style={styles.helper}>MDD {formatPercent(maxDrawdown)}%</Text>
           <Text style={styles.helper}>
-            실현 손익 {displayValue(profitAnalysis.totalRealizedPnlKrw)} KRW
+            실현 손익 {formatKrw(profitAnalysis.totalRealizedPnlKrw)} KRW
           </Text>
           <Text style={styles.helper}>
-            평가 손익 {displayValue(profitAnalysis.totalUnrealizedPnlKrw)} KRW
+            평가 손익 {formatKrw(profitAnalysis.totalUnrealizedPnlKrw)} KRW
           </Text>
           <Text style={styles.helper}>
-            총 손익 {displayValue(profitAnalysis.totalPnlKrw)} KRW
+            총 손익 {formatKrw(profitAnalysis.totalPnlKrw)} KRW
           </Text>
           {profitAnalysis.state !== 'available' ? (
             <Text style={styles.subtle}>손익 분석 상태 {profitAnalysis.state}</Text>
@@ -154,10 +155,16 @@ export default function RecordSeasonDetailScreen({ route, navigation }: Props) {
           {bestAsset || worstAsset ? (
             <>
               <Text style={styles.helper}>
-                최고 수익 {bestAsset ? `${bestAsset.symbol} · ${bestAsset.totalPnlKrw}` : '-'}
+                최고 수익{' '}
+                {bestAsset
+                  ? `${getAssetNameDisplay(bestAsset).primary} · ${formatKrw(bestAsset.totalPnlKrw)} KRW`
+                  : '-'}
               </Text>
               <Text style={styles.helper}>
-                최대 손실 {worstAsset ? `${worstAsset.symbol} · ${worstAsset.totalPnlKrw}` : '-'}
+                최대 손실{' '}
+                {worstAsset
+                  ? `${getAssetNameDisplay(worstAsset).primary} · ${formatKrw(worstAsset.totalPnlKrw)} KRW`
+                  : '-'}
               </Text>
             </>
           ) : (

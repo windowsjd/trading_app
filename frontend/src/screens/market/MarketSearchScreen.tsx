@@ -20,6 +20,7 @@ import {
   type AssetType,
   type MarketAssetItemDto,
 } from '../../features/market/api';
+import { formatCurrency, formatPercent, getAssetNameDisplay } from '../../utils/format';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -40,7 +41,7 @@ function getPriceText(item: MarketAssetItemDto) {
     return '시세 준비 중';
   }
 
-  return `${item.price.currentPrice} ${item.price.priceCurrency}`;
+  return `${formatCurrency(item.price.currentPrice, item.price.priceCurrency)} ${item.price.priceCurrency}`;
 }
 
 function getChangeRateText(item: MarketAssetItemDto) {
@@ -48,7 +49,7 @@ function getChangeRateText(item: MarketAssetItemDto) {
     return item.tradeBlockedReason ?? item.marketStatus;
   }
 
-  return `${item.price.changeRate}%`;
+  return `${formatPercent(item.price.changeRate)}%`;
 }
 
 export default function MarketSearchScreen({ navigation }: Props) {
@@ -196,9 +197,9 @@ export default function MarketSearchScreen({ navigation }: Props) {
             }
           >
             <View>
-              <Text style={styles.itemSymbol}>{item.symbol}</Text>
+              <Text style={styles.itemSymbol}>{getAssetNameDisplay(item).primary}</Text>
               <Text style={styles.helper}>
-                {item.name} · {item.market}
+                {item.symbol} · {item.market}
               </Text>
             </View>
 

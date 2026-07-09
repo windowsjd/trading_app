@@ -37,6 +37,7 @@ import {
   type DonutChartSegment,
   type LineChartPoint,
 } from '../../components/charts';
+import { formatKrw, formatPercent, getAssetNameDisplay } from '../../utils/format';
 
 type Props = PortfolioScreenProps;
 
@@ -60,7 +61,7 @@ function displayValue(value?: string | number | null) {
 }
 
 function formatKrwChartValue(value: number) {
-  return `${value.toFixed(0)} KRW`;
+  return `${formatKrw(value)} KRW`;
 }
 
 function getAllocationSegments(allocation: PortfolioAllocationDto): DonutChartSegment[] {
@@ -235,14 +236,14 @@ export default function PortfolioScreen({ navigation }: Props) {
           <>
             <View style={styles.card}>
               <Text style={styles.label}>총 자산</Text>
-              <Text style={styles.big}>{displayValue(summary?.totalAssetKrw)} KRW</Text>
-              <Text style={styles.helper}>수익률 {displayValue(summary?.returnRate)}%</Text>
-              <Text style={styles.helper}>KRW 현금 {displayValue(summary?.krwCash)}</Text>
+              <Text style={styles.big}>{formatKrw(summary?.totalAssetKrw)} KRW</Text>
+              <Text style={styles.helper}>수익률 {formatPercent(summary?.returnRate)}%</Text>
+              <Text style={styles.helper}>KRW 현금 {formatKrw(summary?.krwCash)}</Text>
               <Text style={styles.helper}>USD 잔액 -</Text>
-              <Text style={styles.helper}>USD 환산 KRW {displayValue(summary?.usdCashKrw)}</Text>
-              <Text style={styles.helper}>자산 평가 {displayValue(summary?.assetValueKrw)}</Text>
-              <Text style={styles.helper}>실현손익 {displayValue(summary?.realizedPnlKrw)}</Text>
-              <Text style={styles.helper}>평가손익 {displayValue(summary?.unrealizedPnlKrw)}</Text>
+              <Text style={styles.helper}>USD 환산 KRW {formatKrw(summary?.usdCashKrw)}</Text>
+              <Text style={styles.helper}>자산 평가 {formatKrw(summary?.assetValueKrw)}</Text>
+              <Text style={styles.helper}>실현손익 {formatKrw(summary?.realizedPnlKrw)}</Text>
+              <Text style={styles.helper}>평가손익 {formatKrw(summary?.unrealizedPnlKrw)}</Text>
             </View>
 
             {portfolioNotice ? (
@@ -383,15 +384,15 @@ export default function PortfolioScreen({ navigation }: Props) {
             }
           >
             <View>
-              <Text style={styles.itemTitle}>{item.symbol}</Text>
-              <Text style={styles.helper}>{item.name}</Text>
+              <Text style={styles.itemTitle}>{getAssetNameDisplay(item).primary}</Text>
+              <Text style={styles.helper}>{getAssetNameDisplay(item).secondary ?? item.symbol}</Text>
               <Text style={styles.helper}>수량 {item.quantity}</Text>
             </View>
 
             <View style={styles.alignEnd}>
-              <Text style={styles.itemTitle}>{item.marketValueKrw}</Text>
-              <Text style={styles.helper}>{item.returnRate}%</Text>
-              <Text style={styles.helper}>{item.unrealizedPnlKrw}</Text>
+              <Text style={styles.itemTitle}>{formatKrw(item.marketValueKrw)}</Text>
+              <Text style={styles.helper}>{formatPercent(item.returnRate)}%</Text>
+              <Text style={styles.helper}>{formatKrw(item.unrealizedPnlKrw)}</Text>
             </View>
           </Pressable>
         )}
