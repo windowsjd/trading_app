@@ -51,7 +51,7 @@ import {
   mapOrderErrorCodeToBlockedReason,
 } from '../../services/api/errorMapper';
 import { createIdempotencyKey } from '../../utils/idempotency';
-import { formatCurrency, getAssetNameDisplay } from '../../utils/format';
+import { formatCurrency, formatMoney, getAssetNameDisplay } from '../../utils/format';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -575,7 +575,7 @@ export default function OrderScreen({ route, navigation }: Props) {
           ) : null}
           <Text style={styles.helper}>주문 방향 {side === 'buy' ? '매수' : '매도'}</Text>
           <Text style={styles.helper}>
-            현재가 {formatCurrency(price?.currentPrice, asset.priceCurrency)} {asset.priceCurrency}
+            현재가 {formatMoney(price?.currentPrice, asset.priceCurrency)}
           </Text>
           <Text style={styles.helper}>보유 수량 {positionQuantity}</Text>
           <Text style={styles.helper}>

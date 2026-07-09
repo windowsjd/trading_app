@@ -4,7 +4,12 @@ import {
   isRequoteRequiredError,
 } from '../../services/api/errorMapper';
 import { formatSourceMetadata } from '../../models/dto/common';
-import { formatCurrency, formatKrw, getAssetNameDisplay } from '../../utils/format';
+import {
+  formatCurrency,
+  formatKrw,
+  formatMoney,
+  getAssetNameDisplay,
+} from '../../utils/format';
 
 function parseTimestamp(value?: string | null) {
   if (!value) return null;
@@ -46,7 +51,7 @@ export function getOrderQuoteExpiresInSeconds(
 export function getOrderQuoteDisplay(quote: OrderQuoteDto) {
   return {
     quoteId: displayValue(quote.quoteId),
-    price: `${formatCurrency(quote.price, quote.currencyCode)} ${quote.currencyCode}`,
+    price: formatMoney(quote.price, quote.currencyCode),
     quantity: displayValue(quote.quantity),
     grossAmount: formatCurrency(quote.grossAmount, quote.currencyCode),
     feeRate: displayValue(quote.feeRate),
@@ -100,10 +105,10 @@ export function getOrderSuccessDisplay(result: CreateOrderDto) {
       : displayValue(order.assetId ?? execution.assetId),
     side: order.side ?? execution.side,
     quantity: displayValue(order.quantity ?? execution.quantity),
-    executedPrice: `${formatCurrency(
+    executedPrice: formatMoney(
       execution.executedPrice ?? execution.executePrice ?? order.price,
       currencyCode,
-    )} ${currencyCode}`,
+    ),
     currencyCode: displayValue(currencyCode),
     grossAmount: formatCurrency(
       execution.grossAmount ?? order.grossAmount,

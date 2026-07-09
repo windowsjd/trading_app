@@ -144,7 +144,7 @@ function getEquityChartPoints(
 }
 
 function formatKrwChartValue(value: number) {
-  return `${formatKrw(value)} KRW`;
+  return `${formatKrw(value)}원`;
 }
 
 function getSectionErrorMessage(
@@ -290,7 +290,7 @@ export default function HomeScreen({ navigation }: Props) {
             {isSectionAvailable(home.summary) ? (
               <>
                 <Text style={styles.big}>
-                  {formatKrw(getTotalAssetKrw(home.summary))} KRW
+                  {formatKrw(getTotalAssetKrw(home.summary))}원
                 </Text>
                 <Text style={styles.helper}>
                   수익률 {formatPercent(home.summary?.returnRate)}%
@@ -360,7 +360,7 @@ export default function HomeScreen({ navigation }: Props) {
           <Text style={styles.label}>총 자산</Text>
           {isSectionAvailable(home.summary) ? (
             <>
-              <Text style={styles.big}>{formatKrw(getTotalAssetKrw(home.summary))} KRW</Text>
+              <Text style={styles.big}>{formatKrw(getTotalAssetKrw(home.summary))}원</Text>
               <Text style={styles.helper}>
                 수익률 {formatPercent(home.summary?.returnRate)}%
               </Text>

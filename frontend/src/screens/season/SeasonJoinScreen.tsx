@@ -265,7 +265,7 @@ export default function SeasonJoinScreen({ navigation }: Props) {
             시즌 기간: {season.startAt} ~ {season.endAt}
           </Text>
           <Text style={styles.helper}>
-            시작 자산: {formatKrw(season.initialCapitalKrw)} KRW
+            시작 자산: {formatKrw(season.initialCapitalKrw)}원
           </Text>
           <Text style={styles.helper}>거래 수수료: {season.tradeFeeRate}</Text>
           <Text style={styles.helper}>환전 수수료: {season.fxFeeRate}</Text>

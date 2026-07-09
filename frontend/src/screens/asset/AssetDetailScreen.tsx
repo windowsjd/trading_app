@@ -35,8 +35,8 @@ import { TEST_IDS } from '../../constants/testIds';
 import { buildWsUrl } from '../../constants/env';
 import { formatSourceMetadata } from '../../models/dto/common';
 import {
-  formatCurrency,
   formatKrw,
+  formatMoney,
   formatPercent,
   getAssetNameDisplay,
 } from '../../utils/format';
@@ -46,7 +46,7 @@ import ErrorState from '../../components/states/ErrorState';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import CTAButton from '../../components/common/CTAButton';
-import { LineChart, type LineChartPoint } from '../../components/charts';
+import { CandlestickChart } from '../../components/charts';
 
 type Props = AssetDetailScreenProps;
 
@@ -67,17 +67,6 @@ function getDisplayChangeRate(
     ? tickerChangeRate
     : detailChangeRate ?? null;
 }
-
-function getCandleChartPoints(
-  candles: Array<{ time: string; close: string }>,
-): LineChartPoint[] {
-  return candles.map((candle) => ({
-    x: candle.time,
-    y: candle.close,
-    label: candle.time,
-  }));
-}
-
 
 export default function AssetDetailScreen({ route, navigation }: Props) {
   const rootNavigation = useRootNavigation();
@@ -174,12 +163,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
     latestTicker?.priceEffectiveAt ?? price?.priceEffectiveAt;
   const displayFreshnessAgeSeconds = latestTicker?.freshnessAgeSeconds;
   const tradingNote = formatTradingNote(asset.tradingNote);
-  const candleChartPoints = getCandleChartPoints(
-    candlesQuery.data?.candles ?? [],
-  );
   const assetNameDisplay = getAssetNameDisplay(asset);
-  const formatPriceChartValue = (value: number) =>
-    formatCurrency(value, displayPriceCurrency);
 
   const seasonBlockedReason =
     seasonQuery.isLoading
@@ -234,7 +218,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
           ) : null}
           <Text style={styles.value}>
             {orderPriceAvailable
-              ? `${formatCurrency(displayPriceLocal, displayPriceCurrency)} ${displayPriceCurrency}`
+              ? formatMoney(displayPriceLocal, displayPriceCurrency)
               : '시세 준비 중'}
           </Text>
           <Text style={styles.helper}>KRW 환산 {formatKrw(displayPriceKrw)}</Text>
@@ -313,7 +297,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
               <Text style={styles.helper}>수량 {position.quantity}</Text>
               <Text style={styles.helper}>
                 평균단가{' '}
-                {formatCurrency(
+                {formatMoney(
                   position.avgEntryPriceLocal ?? position.avgEntryPrice,
                   displayPriceCurrency,
                 )}
@@ -367,9 +351,10 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
               </Pressable>
             </>
           ) : candlesQuery.data?.candles?.length ? (
-            <LineChart
-              points={candleChartPoints}
-              valueFormatter={formatPriceChartValue}
+            <CandlestickChart
+              candles={candlesQuery.data.candles}
+              currencyCode={displayPriceCurrency}
+              currentPrice={latestTicker?.priceLocal ?? null}
               emptyMessage="가격 추이를 표시하려면 데이터가 더 필요합니다."
             />
           ) : (

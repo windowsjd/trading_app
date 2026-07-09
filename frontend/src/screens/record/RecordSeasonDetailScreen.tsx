@@ -106,7 +106,7 @@ export default function RecordSeasonDetailScreen({ route, navigation }: Props) {
           </Text>
           <Text style={styles.helper}>최종 등급 {displayValue(finalTier)}</Text>
           <Text style={styles.helper}>수익률 {formatPercent(returnRate)}%</Text>
-          <Text style={styles.helper}>총자산 {formatKrw(totalAssetKrw)} KRW</Text>
+          <Text style={styles.helper}>총자산 {formatKrw(totalAssetKrw)}원</Text>
         </View>
 
         <View style={styles.card}>
@@ -137,13 +137,13 @@ export default function RecordSeasonDetailScreen({ route, navigation }: Props) {
           <Text style={styles.label}>손익 요약</Text>
           <Text style={styles.helper}>MDD {formatPercent(maxDrawdown)}%</Text>
           <Text style={styles.helper}>
-            실현 손익 {formatKrw(profitAnalysis.totalRealizedPnlKrw)} KRW
+            실현 손익 {formatKrw(profitAnalysis.totalRealizedPnlKrw)}원
           </Text>
           <Text style={styles.helper}>
-            평가 손익 {formatKrw(profitAnalysis.totalUnrealizedPnlKrw)} KRW
+            평가 손익 {formatKrw(profitAnalysis.totalUnrealizedPnlKrw)}원
           </Text>
           <Text style={styles.helper}>
-            총 손익 {formatKrw(profitAnalysis.totalPnlKrw)} KRW
+            총 손익 {formatKrw(profitAnalysis.totalPnlKrw)}원
           </Text>
           {profitAnalysis.state !== 'available' ? (
             <Text style={styles.subtle}>손익 분석 상태 {profitAnalysis.state}</Text>
@@ -157,13 +157,13 @@ export default function RecordSeasonDetailScreen({ route, navigation }: Props) {
               <Text style={styles.helper}>
                 최고 수익{' '}
                 {bestAsset
-                  ? `${getAssetNameDisplay(bestAsset).primary} · ${formatKrw(bestAsset.totalPnlKrw)} KRW`
+                  ? `${getAssetNameDisplay(bestAsset).primary} · ${formatKrw(bestAsset.totalPnlKrw)}원`
                   : '-'}
               </Text>
               <Text style={styles.helper}>
                 최대 손실{' '}
                 {worstAsset
-                  ? `${getAssetNameDisplay(worstAsset).primary} · ${formatKrw(worstAsset.totalPnlKrw)} KRW`
+                  ? `${getAssetNameDisplay(worstAsset).primary} · ${formatKrw(worstAsset.totalPnlKrw)}원`
                   : '-'}
               </Text>
             </>

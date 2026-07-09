@@ -56,7 +56,7 @@ function getEquityChartPoints(
 }
 
 function formatKrwChartValue(value: number) {
-  return `${formatKrw(value)} KRW`;
+  return `${formatKrw(value)}원`;
 }
 
 function ProfitAssetSummary({
@@ -78,7 +78,7 @@ function ProfitAssetSummary({
             {nameDisplay.secondary ? ` · ${nameDisplay.secondary}` : ''}
           </Text>
           <Text style={styles.helper}>
-            손익 {formatKrw(asset.totalPnlKrw)} KRW
+            손익 {formatKrw(asset.totalPnlKrw)}원
           </Text>
           <Text style={styles.helper}>
             수익률 {displayPercent(asset.returnRate)}
@@ -156,7 +156,7 @@ export default function RecordProfitAnalysisScreen({
             등급 {displayValue(participant?.finalTier)}
           </Text>
           <Text style={styles.helper}>
-            총자산 {formatKrw(performance.totalAssetKrw)} KRW
+            총자산 {formatKrw(performance.totalAssetKrw)}원
           </Text>
           <Text style={styles.helper}>
             수익률 {displayPercent(performance.returnRate)}
@@ -181,13 +181,13 @@ export default function RecordProfitAnalysisScreen({
           <Text style={styles.label}>손익 요약</Text>
           <Text style={styles.helper}>상태 {profitAnalysis.state}</Text>
           <Text style={styles.helper}>
-            실현 손익 {formatKrw(profitAnalysis.totalRealizedPnlKrw)} KRW
+            실현 손익 {formatKrw(profitAnalysis.totalRealizedPnlKrw)}원
           </Text>
           <Text style={styles.helper}>
-            평가 손익 {formatKrw(profitAnalysis.totalUnrealizedPnlKrw)} KRW
+            평가 손익 {formatKrw(profitAnalysis.totalUnrealizedPnlKrw)}원
           </Text>
           <Text style={styles.helper}>
-            총 손익 {formatKrw(profitAnalysis.totalPnlKrw)} KRW
+            총 손익 {formatKrw(profitAnalysis.totalPnlKrw)}원
           </Text>
           {profitAnalysis.state === 'partial_unavailable' ? (
             <Text style={styles.warningText}>
@@ -229,13 +229,13 @@ export default function RecordProfitAnalysisScreen({
                     {item.assetType} · {item.positionState} · {item.valuationState}
                   </Text>
                   <Text style={styles.helper}>
-                    실현 {formatKrw(item.realizedPnlKrw)} KRW
+                    실현 {formatKrw(item.realizedPnlKrw)}원
                   </Text>
                   <Text style={styles.helper}>
-                    평가 {formatKrw(item.unrealizedPnlKrw)} KRW
+                    평가 {formatKrw(item.unrealizedPnlKrw)}원
                   </Text>
                   <Text style={styles.helper}>
-                    총 손익 {formatKrw(item.totalPnlKrw)} KRW
+                    총 손익 {formatKrw(item.totalPnlKrw)}원
                   </Text>
                   <Text style={styles.helper}>
                     수익률 {displayPercent(item.returnRate)}

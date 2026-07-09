@@ -2,6 +2,7 @@
   "compilerOptions": {
     "jsx": "react-jsx",
     "baseUrl": ".",
+    "allowImportingTsExtensions": true,
     "paths": {
       "@/*": [
         "src/*"

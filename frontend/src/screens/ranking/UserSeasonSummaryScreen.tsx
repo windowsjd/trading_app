@@ -102,7 +102,7 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
               <Text style={styles.label}>현재 시즌 요약</Text>
               <Text style={styles.helper}>수익률 {formatPercent(season.returnRate)}%</Text>
               <Text style={styles.helper}>퍼센타일 {formatPercent(season.percentile)}%</Text>
-              <Text style={styles.helper}>총 자산 {formatKrw(season.totalAssetKrw)} KRW</Text>
+              <Text style={styles.helper}>총 자산 {formatKrw(season.totalAssetKrw)}원</Text>
             </View>
 
             <View style={styles.card}>

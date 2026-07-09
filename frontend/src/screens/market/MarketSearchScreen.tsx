@@ -20,7 +20,7 @@ import {
   type AssetType,
   type MarketAssetItemDto,
 } from '../../features/market/api';
-import { formatCurrency, formatPercent, getAssetNameDisplay } from '../../utils/format';
+import { formatMoney, formatPercent, getAssetNameDisplay } from '../../utils/format';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -41,7 +41,7 @@ function getPriceText(item: MarketAssetItemDto) {
     return '시세 준비 중';
   }
 
-  return `${formatCurrency(item.price.currentPrice, item.price.priceCurrency)} ${item.price.priceCurrency}`;
+  return formatMoney(item.price.currentPrice, item.price.priceCurrency);
 }
 
 function getChangeRateText(item: MarketAssetItemDto) {

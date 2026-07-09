@@ -61,7 +61,7 @@ function displayValue(value?: string | number | null) {
 }
 
 function formatKrwChartValue(value: number) {
-  return `${formatKrw(value)} KRW`;
+  return `${formatKrw(value)}원`;
 }
 
 function getAllocationSegments(allocation: PortfolioAllocationDto): DonutChartSegment[] {
@@ -236,7 +236,7 @@ export default function PortfolioScreen({ navigation }: Props) {
           <>
             <View style={styles.card}>
               <Text style={styles.label}>총 자산</Text>
-              <Text style={styles.big}>{formatKrw(summary?.totalAssetKrw)} KRW</Text>
+              <Text style={styles.big}>{formatKrw(summary?.totalAssetKrw)}원</Text>
               <Text style={styles.helper}>수익률 {formatPercent(summary?.returnRate)}%</Text>
               <Text style={styles.helper}>KRW 현금 {formatKrw(summary?.krwCash)}</Text>
               <Text style={styles.helper}>USD 잔액 -</Text>
@@ -369,7 +369,9 @@ export default function PortfolioScreen({ navigation }: Props) {
             />
           ) : null
         }
-        renderItem={({ item }) => (
+        renderItem={({ item }) => {
+          const nameDisplay = getAssetNameDisplay(item);
+          return (
           <Pressable
             testID={TEST_IDS.portfolio.positionItem(item.assetId)}
             style={styles.positionRow}
@@ -384,8 +386,8 @@ export default function PortfolioScreen({ navigation }: Props) {
             }
           >
             <View>
-              <Text style={styles.itemTitle}>{getAssetNameDisplay(item).primary}</Text>
-              <Text style={styles.helper}>{getAssetNameDisplay(item).secondary ?? item.symbol}</Text>
+              <Text style={styles.itemTitle}>{nameDisplay.primary}</Text>
+              <Text style={styles.helper}>{nameDisplay.secondary ?? item.symbol}</Text>
               <Text style={styles.helper}>수량 {item.quantity}</Text>
             </View>
 
@@ -395,7 +397,8 @@ export default function PortfolioScreen({ navigation }: Props) {
               <Text style={styles.helper}>{formatKrw(item.unrealizedPnlKrw)}</Text>
             </View>
           </Pressable>
-        )}
+          );
+        }}
         ListFooterComponent={
           <View style={styles.footerActions}>
             {positionsQuery.isFetchingNextPage ? (

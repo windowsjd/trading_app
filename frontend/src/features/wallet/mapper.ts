@@ -15,7 +15,7 @@ import {
   isRequoteRequiredError,
 } from '../../services/api/errorMapper';
 import { formatSourceMetadata } from '../../models/dto/common';
-import { formatCurrency, formatKrw } from '../../utils/format';
+import { formatCurrency, formatKrw, formatMoney } from '../../utils/format';
 
 type WalletQueryState = {
   isLoading?: boolean;
@@ -117,7 +117,7 @@ export function getFxQuoteDisplay(quote: FxQuoteDto) {
     appliedRate: displayValue(quote.appliedRate),
     grossTargetAmount: formatCurrency(quote.grossTargetAmount, quote.toCurrency),
     feeRate: displayValue(quote.feeRate),
-    feeAmount: `${formatCurrency(quote.feeAmount, quote.feeCurrency)} ${quote.feeCurrency}`,
+    feeAmount: formatMoney(quote.feeAmount, quote.feeCurrency),
     netTargetAmount: formatCurrency(quote.netTargetAmount, quote.toCurrency),
     expiresAt: displayValue(quote.expiresAt),
     maxChangeBps: displayValue(quote.maxChangeBps),
@@ -143,7 +143,7 @@ function getWalletRows(wallets: unknown) {
         const balance = item.balanceAmount ?? item.balance;
 
         if (!currency || !balance) return null;
-        return `${currency} ${formatCurrency(balance, currency)}`;
+        return formatMoney(balance, currency);
       })
       .filter((item): item is string => !!item);
   }
@@ -152,7 +152,7 @@ function getWalletRows(wallets: unknown) {
     return Object.entries(wallets)
       .map(([currency, value]) => {
         if (typeof value === 'string' || typeof value === 'number') {
-          return `${currency} ${formatCurrency(value, currency)}`;
+          return formatMoney(value, currency);
         }
 
         if (!value || typeof value !== 'object') return null;
@@ -163,7 +163,7 @@ function getWalletRows(wallets: unknown) {
         };
         const balance = item.balanceAmount ?? item.balance;
 
-        return balance ? `${currency} ${formatCurrency(balance, currency)}` : null;
+        return balance ? formatMoney(balance, currency) : null;
       })
       .filter((item): item is string => !!item);
   }
@@ -183,7 +183,7 @@ export function getFxExecuteSuccessDisplay(result: FxExecuteDto) {
     quotedRate: displayValue(result.quotedRate),
     executeRate: displayValue(result.executeRate),
     rateChangeBps: displayValue(result.rateChangeBps),
-    fee: `${formatCurrency(result.feeAmount, result.feeCurrency)} ${result.feeCurrency}`,
+    fee: formatMoney(result.feeAmount, result.feeCurrency),
     sourceWalletBalanceAfter: formatCurrency(
       result.sourceWalletBalanceAfter,
       result.fromCurrency,

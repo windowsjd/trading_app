@@ -432,7 +432,7 @@ function RankingRow({
 
       <View style={styles.alignEnd}>
         <Text style={styles.value}>{formatPercent(item.returnRate)}%</Text>
-        <Text style={styles.helper}>{formatKrw(item.totalAssetKrw)} KRW</Text>
+        <Text style={styles.helper}>{formatKrw(item.totalAssetKrw)}원</Text>
       </View>
     </Pressable>
   );
