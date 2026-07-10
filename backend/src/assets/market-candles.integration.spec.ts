@@ -1,21 +1,17 @@
 import { spawnSync } from 'node:child_process';
 
 const RUN_MARKET_CANDLES_DB_SMOKE = process.env.MARKET_CANDLES_DB_SMOKE === '1';
+const itDbIntegration = RUN_MARKET_CANDLES_DB_SMOKE ? it : it.skip;
 
 describe('MarketCandlesRepository DB smoke', () => {
-  it(
-    RUN_MARKET_CANDLES_DB_SMOKE
-      ? 'verifies idempotent upsert, half-open range reads, latest lookup, and closed-only retention deletes against PostgreSQL'
-      : 'is disabled unless MARKET_CANDLES_DB_SMOKE=1 because it needs an explicit test PostgreSQL database',
+  itDbIntegration(
+    'verifies idempotent upsert, half-open range reads, latest lookup, and closed-only retention deletes against PostgreSQL',
     () => {
-      if (!RUN_MARKET_CANDLES_DB_SMOKE) {
-        expect(process.env.MARKET_CANDLES_DB_SMOKE).not.toBe('1');
-        return;
-      }
+      runDbIntegrationPrepare();
 
       const result = spawnSync(
-        'pnpm',
-        ['tsx', '-e', MARKET_CANDLES_DB_SMOKE_RUNNER],
+        getPnpmCommand(),
+        ['exec', 'tsx', '-e', MARKET_CANDLES_DB_SMOKE_RUNNER],
         {
           cwd: process.cwd(),
           env: process.env,
@@ -39,9 +35,35 @@ describe('MarketCandlesRepository DB smoke', () => {
       expect(result.stderr).toBe('');
       expect(result.stdout).toContain('market candles db smoke ok');
     },
-    70_000,
+    130_000,
   );
 });
+
+function getPnpmCommand() {
+  return process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+}
+
+function runDbIntegrationPrepare() {
+  const result = spawnSync(getPnpmCommand(), ['run', 'test:db:prepare'], {
+    cwd: process.cwd(),
+    env: process.env,
+    encoding: 'utf8',
+    timeout: 60_000,
+  });
+
+  if (result.status !== 0) {
+    throw new Error(
+      [
+        'Market candles DB integration prepare failed.',
+        'The opt-in test applies existing Prisma migrations with `prisma migrate deploy` only; it does not reset, drop, or seed the database.',
+        'stdout:',
+        result.stdout,
+        'stderr:',
+        result.stderr,
+      ].join('\n'),
+    );
+  }
+}
 
 const MARKET_CANDLES_DB_SMOKE_RUNNER = `
 import 'dotenv/config';
@@ -276,7 +298,7 @@ async function runUnknownAssetRejection() {
   await assert.rejects(
     repository.upsertMany([candleInput({ assetId: randomUUID() })]),
     (error: unknown) => error instanceof MarketCandleValidationError,
-    'unknown assetId must be rejected via FK mapping',
+    'unknown assetId must be rejected before bulk SQL execution',
   );
 
   const coverage = await repository.getCoverage(assetId, '5m');

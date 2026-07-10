@@ -19,7 +19,9 @@ jest.mock('../generated/prisma/client', () => {
   };
 });
 
+import { Prisma } from '../generated/prisma/client';
 import {
+  ASSET_LOOKUP_CHUNK_SIZE,
   MARKET_CANDLE_UPSERT_CHUNK_SIZE,
   MarketCandlesRepository,
   MarketCandleUpsertInput,
@@ -33,8 +35,24 @@ type RawSqlQuery = {
 
 const VALUES_PER_ROW = 15;
 
+type AssetLookupQuery = {
+  where: {
+    id: {
+      in: string[];
+    };
+  };
+  select: {
+    id: true;
+  };
+};
+
 describe('MarketCandlesRepository', () => {
   const createPrisma = () => ({
+    asset: {
+      findMany: jest.fn((query: AssetLookupQuery) =>
+        Promise.resolve(query.where.id.in.map((id) => ({ id }))),
+      ),
+    },
     marketCandle: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
@@ -97,6 +115,9 @@ describe('MarketCandlesRepository', () => {
       expect(query.text).toContain(
         'ON CONFLICT ("asset_id", "interval", "open_time") DO UPDATE SET',
       );
+      expect(query.text).not.toContain('asset-1');
+      expect(query.text).not.toContain('binance');
+      expect(query.text).not.toContain('100.5');
       expect(query.values).toHaveLength(VALUES_PER_ROW);
       expect(query.values[1]).toBe('asset-1');
       expect(query.values[2]).toBe('5m');
@@ -176,6 +197,19 @@ describe('MarketCandlesRepository', () => {
       expect(query.values[8]).toBe('109');
     });
 
+    it('validates every duplicate input before selecting the last value', async () => {
+      const { prisma, repository } = createRepository();
+
+      await expect(
+        repository.upsertMany([
+          createCandleInput({ close: '100.123456789' }),
+          createCandleInput({ close: '109' }),
+        ]),
+      ).rejects.toThrow('close must have at most 8 decimal places');
+      expect(prisma.asset.findMany).not.toHaveBeenCalled();
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    });
+
     it('splits oversized batches into parameter-safe chunks', async () => {
       const { prisma, repository } = createRepository();
       prisma.$executeRaw.mockResolvedValue(1);
@@ -206,6 +240,7 @@ describe('MarketCandlesRepository', () => {
       const result = await repository.upsertMany([]);
 
       expect(result).toEqual({ writtenCount: 0 });
+      expect(prisma.asset.findMany).not.toHaveBeenCalled();
       expect(prisma.$executeRaw).not.toHaveBeenCalled();
     });
 
@@ -297,6 +332,111 @@ describe('MarketCandlesRepository', () => {
       ).rejects.toThrow('close must be a valid decimal value');
     });
 
+    it('rejects open values with more than 8 decimal places', async () => {
+      const { prisma, repository } = createRepository();
+
+      await expect(
+        repository.upsertMany([createCandleInput({ open: '100.123456789' })]),
+      ).rejects.toThrow('open must have at most 8 decimal places');
+      expect(prisma.asset.findMany).not.toHaveBeenCalled();
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    });
+
+    it('rejects volume values with more than 8 decimal places', async () => {
+      const { prisma, repository } = createRepository();
+
+      await expect(
+        repository.upsertMany([createCandleInput({ volume: '0.000000001' })]),
+      ).rejects.toThrow('volume must have at most 8 decimal places');
+      expect(prisma.asset.findMany).not.toHaveBeenCalled();
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    });
+
+    it('rejects amount values with more than 8 decimal places', async () => {
+      const { prisma, repository } = createRepository();
+
+      await expect(
+        repository.upsertMany([createCandleInput({ amount: '100.123456789' })]),
+      ).rejects.toThrow('amount must have at most 8 decimal places');
+      expect(prisma.asset.findMany).not.toHaveBeenCalled();
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    });
+
+    it('rejects price values outside Decimal(24,8) capacity', async () => {
+      const { prisma, repository } = createRepository();
+
+      await expect(
+        repository.upsertMany([
+          createCandleInput({ open: '10000000000000000' }),
+        ]),
+      ).rejects.toThrow('open exceeds Decimal(24,8) capacity');
+      expect(prisma.asset.findMany).not.toHaveBeenCalled();
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    });
+
+    it('rejects volume values outside Decimal(24,8) capacity', async () => {
+      const { prisma, repository } = createRepository();
+
+      await expect(
+        repository.upsertMany([
+          createCandleInput({ volume: '99999999999999999' }),
+        ]),
+      ).rejects.toThrow('volume exceeds Decimal(24,8) capacity');
+      await expect(
+        repository.upsertMany([
+          createCandleInput({ volume: '-10000000000000000' }),
+        ]),
+      ).rejects.toThrow('volume exceeds Decimal(24,8) capacity');
+      expect(prisma.asset.findMany).not.toHaveBeenCalled();
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    });
+
+    it('accepts values at the maximum representable Decimal(24,8) magnitude', async () => {
+      const { prisma, repository } = createRepository();
+      const maximum = '9999999999999999.99999999';
+      prisma.$executeRaw.mockResolvedValueOnce(1);
+
+      await expect(
+        repository.upsertMany([
+          createCandleInput({
+            open: maximum,
+            high: maximum,
+            low: maximum,
+            close: maximum,
+            volume: maximum,
+            amount: maximum,
+          }),
+        ]),
+      ).resolves.toEqual({ writtenCount: 1 });
+      expect(upsertQueryOf(prisma).values.slice(5, 11)).toEqual([
+        maximum,
+        maximum,
+        maximum,
+        maximum,
+        maximum,
+        maximum,
+      ]);
+    });
+
+    it('applies scale and capacity validation to Prisma.Decimal inputs', async () => {
+      const { prisma, repository } = createRepository();
+
+      await expect(
+        repository.upsertMany([
+          createCandleInput({ open: new Prisma.Decimal('100.123456789') }),
+        ]),
+      ).rejects.toThrow('open must have at most 8 decimal places');
+      await expect(
+        repository.upsertMany([
+          createCandleInput({
+            volume: new Prisma.Decimal('10000000000000000'),
+          }),
+        ]),
+      ).rejects.toThrow('volume exceeds Decimal(24,8) capacity');
+      expect(prisma.asset.findMany).not.toHaveBeenCalled();
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    });
+
     it('rejects an empty sourceProvider', async () => {
       const { repository } = createRepository();
 
@@ -315,7 +455,123 @@ describe('MarketCandlesRepository', () => {
       ).rejects.toThrow('sourceUpdatedAt must be a valid Date');
     });
 
-    it('maps a foreign key violation for an unknown assetId to a validation error', async () => {
+    it('rejects one missing asset before the first write', async () => {
+      const { prisma, repository } = createRepository();
+      prisma.asset.findMany.mockResolvedValueOnce([]);
+
+      await expect(
+        repository.upsertMany([
+          createCandleInput({ assetId: 'missing-asset-1' }),
+        ]),
+      ).rejects.toThrow(
+        'assetId does not reference an existing asset: missing-asset-1',
+      );
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    });
+
+    it('rejects a multi-asset batch when any asset is missing before all writes', async () => {
+      const { prisma, repository } = createRepository();
+      prisma.asset.findMany.mockResolvedValueOnce([
+        { id: 'asset-1' },
+        { id: 'asset-3' },
+      ]);
+
+      await expect(
+        repository.upsertMany([
+          createCandleInput({ assetId: 'asset-1' }),
+          createCandleInput({ assetId: 'asset-2' }),
+          createCandleInput({ assetId: 'asset-3' }),
+        ]),
+      ).rejects.toThrow(
+        'assetId does not reference an existing asset: asset-2',
+      );
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    });
+
+    it('does not persist an earlier 500-row chunk when a later input uses a missing asset', async () => {
+      const { prisma, repository } = createRepository();
+      prisma.asset.findMany.mockResolvedValueOnce([{ id: 'asset-1' }]);
+      const baseOpenTime = Date.parse('2026-01-01T00:00:00.000Z');
+      const candles = Array.from(
+        { length: MARKET_CANDLE_UPSERT_CHUNK_SIZE + 1 },
+        (_, index) =>
+          createCandleInput({
+            assetId:
+              index === MARKET_CANDLE_UPSERT_CHUNK_SIZE
+                ? 'missing-after-first-write-chunk'
+                : 'asset-1',
+            openTime: new Date(baseOpenTime + index * 60_000),
+            closeTime: new Date(baseOpenTime + (index + 5) * 60_000),
+          }),
+      );
+
+      await expect(repository.upsertMany(candles)).rejects.toThrow(
+        'missing-after-first-write-chunk',
+      );
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    });
+
+    it('chunks large unique asset lookups before starting bulk writes', async () => {
+      const { prisma, repository } = createRepository();
+      const total = ASSET_LOOKUP_CHUNK_SIZE + 1;
+      const candles = Array.from({ length: total }, (_, index) =>
+        createCandleInput({ assetId: `asset-${index}` }),
+      );
+      prisma.$executeRaw
+        .mockResolvedValueOnce(MARKET_CANDLE_UPSERT_CHUNK_SIZE)
+        .mockResolvedValueOnce(MARKET_CANDLE_UPSERT_CHUNK_SIZE)
+        .mockResolvedValueOnce(1);
+
+      await expect(repository.upsertMany(candles)).resolves.toEqual({
+        writtenCount: total,
+      });
+
+      expect(prisma.asset.findMany).toHaveBeenCalledTimes(2);
+      expect(prisma.asset.findMany.mock.calls[0][0].where.id.in).toHaveLength(
+        ASSET_LOOKUP_CHUNK_SIZE,
+      );
+      expect(prisma.asset.findMany.mock.calls[1][0].where.id.in).toHaveLength(
+        1,
+      );
+      expect(prisma.$executeRaw).toHaveBeenCalledTimes(3);
+    });
+
+    it('stores a batch containing multiple existing assets', async () => {
+      const { prisma, repository } = createRepository();
+      prisma.$executeRaw.mockResolvedValueOnce(2);
+
+      await expect(
+        repository.upsertMany([
+          createCandleInput({ assetId: 'asset-1' }),
+          createCandleInput({ assetId: 'asset-2' }),
+        ]),
+      ).resolves.toEqual({ writtenCount: 2 });
+
+      expect(prisma.asset.findMany).toHaveBeenCalledWith({
+        where: { id: { in: ['asset-1', 'asset-2'] } },
+        select: { id: true },
+      });
+      expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps distinct composite keys when assetId contains delimiter characters', async () => {
+      const { prisma, repository } = createRepository();
+      prisma.$executeRaw.mockResolvedValueOnce(2);
+
+      await expect(
+        repository.upsertMany([
+          createCandleInput({ assetId: 'asset|segment|one' }),
+          createCandleInput({ assetId: 'asset|segment|two' }),
+        ]),
+      ).resolves.toEqual({ writtenCount: 2 });
+
+      const query = upsertQueryOf(prisma);
+      expect(query.values).toHaveLength(2 * VALUES_PER_ROW);
+      expect(query.values[1]).toBe('asset|segment|one');
+      expect(query.values[VALUES_PER_ROW + 1]).toBe('asset|segment|two');
+    });
+
+    it('maps a foreign key race violation after preflight to a validation error', async () => {
       const { prisma, repository } = createRepository();
       prisma.$executeRaw.mockRejectedValueOnce(
         Object.assign(new Error('fk violation'), { code: 'P2003' }),

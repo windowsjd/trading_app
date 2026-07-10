@@ -15,6 +15,12 @@ export type MarketCandleInterval = (typeof MARKET_CANDLE_INTERVALS)[number];
 // 15 bind parameters per row; 500 rows = 7,500 parameters per statement,
 // well under PostgreSQL's 65,535 bind-parameter limit.
 export const MARKET_CANDLE_UPSERT_CHUNK_SIZE = 500;
+export const ASSET_LOOKUP_CHUNK_SIZE = 1_000;
+
+const MARKET_CANDLE_DECIMAL_SCALE = 8;
+const MARKET_CANDLE_DECIMAL_ABSOLUTE_LIMIT = new Prisma.Decimal(
+  '10000000000000000',
+);
 
 export type MarketCandleUpsertInput = {
   assetId: string;
@@ -95,6 +101,8 @@ export class MarketCandlesRepository {
    * Duplicate composite keys inside one batch: the LAST input wins.
    * (Pre-deduping is also required because a single INSERT .. ON CONFLICT
    * statement cannot update the same row twice.)
+   * Every referenced asset is verified before the first write chunk; the DB
+   * foreign key remains the fallback for validation/write races.
    *
    * Large batches are executed in chunks of MARKET_CANDLE_UPSERT_CHUNK_SIZE
    * rows to stay under PostgreSQL's bind-parameter limit. Each chunk is one
@@ -112,6 +120,7 @@ export class MarketCandlesRepository {
       this.validateCandle(candle, index),
     );
     const deduped = this.dedupeLastWins(validated);
+    await this.assertAssetsExist(deduped);
     let writtenCount = 0;
 
     for (
@@ -406,7 +415,7 @@ export class MarketCandlesRepository {
 
     for (const row of rows) {
       byCompositeKey.set(
-        `${row.assetId}|${row.interval}|${row.openTime.getTime()}`,
+        JSON.stringify([row.assetId, row.interval, row.openTime.getTime()]),
         row,
       );
     }
@@ -505,6 +514,18 @@ export class MarketCandlesRepository {
         );
       }
 
+      if (decimal.decimalPlaces() > MARKET_CANDLE_DECIMAL_SCALE) {
+        throw new MarketCandleValidationError(
+          `${field} must have at most 8 decimal places.`,
+        );
+      }
+
+      if (decimal.abs().gte(MARKET_CANDLE_DECIMAL_ABSOLUTE_LIMIT)) {
+        throw new MarketCandleValidationError(
+          `${field} exceeds Decimal(24,8) capacity.`,
+        );
+      }
+
       return decimal;
     } catch (error) {
       if (error instanceof MarketCandleValidationError) {
@@ -513,6 +534,43 @@ export class MarketCandlesRepository {
 
       throw new MarketCandleValidationError(
         `${field} must be a valid decimal value.`,
+      );
+    }
+  }
+
+  private async assertAssetsExist(
+    rows: readonly ValidatedCandleRow[],
+  ): Promise<void> {
+    const assetIds = [...new Set(rows.map((row) => row.assetId))];
+    const existingAssetIds = new Set<string>();
+
+    for (
+      let offset = 0;
+      offset < assetIds.length;
+      offset += ASSET_LOOKUP_CHUNK_SIZE
+    ) {
+      const assets = await this.prisma.asset.findMany({
+        where: {
+          id: {
+            in: assetIds.slice(offset, offset + ASSET_LOOKUP_CHUNK_SIZE),
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      for (const asset of assets) {
+        existingAssetIds.add(asset.id);
+      }
+    }
+
+    const missingAssetIds = assetIds.filter(
+      (assetId) => !existingAssetIds.has(assetId),
+    );
+    if (missingAssetIds.length > 0) {
+      throw new MarketCandleValidationError(
+        `assetId does not reference an existing asset: ${missingAssetIds.join(', ')}`,
       );
     }
   }
