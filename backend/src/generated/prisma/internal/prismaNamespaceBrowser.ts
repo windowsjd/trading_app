@@ -63,6 +63,7 @@ export const ModelName = {
   Asset: 'Asset',
   AssetPriceSnapshot: 'AssetPriceSnapshot',
   AssetOrderbookSnapshot: 'AssetOrderbookSnapshot',
+  MarketCandle: 'MarketCandle',
   Position: 'Position',
   Order: 'Order',
   CashWallet: 'CashWallet',
@@ -321,6 +322,28 @@ export const AssetOrderbookSnapshotScalarFieldEnum = {
 } as const
 
 export type AssetOrderbookSnapshotScalarFieldEnum = (typeof AssetOrderbookSnapshotScalarFieldEnum)[keyof typeof AssetOrderbookSnapshotScalarFieldEnum]
+
+
+export const MarketCandleScalarFieldEnum = {
+  id: 'id',
+  assetId: 'assetId',
+  interval: 'interval',
+  openTime: 'openTime',
+  closeTime: 'closeTime',
+  open: 'open',
+  high: 'high',
+  low: 'low',
+  close: 'close',
+  volume: 'volume',
+  amount: 'amount',
+  isClosed: 'isClosed',
+  sourceProvider: 'sourceProvider',
+  sourceUpdatedAt: 'sourceUpdatedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type MarketCandleScalarFieldEnum = (typeof MarketCandleScalarFieldEnum)[keyof typeof MarketCandleScalarFieldEnum]
 
 
 export const PositionScalarFieldEnum = {

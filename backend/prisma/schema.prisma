@@ -204,17 +204,17 @@ model User {
   createdAt       DateTime   @default(now()) @map("created_at")
   updatedAt       DateTime   @updatedAt @map("updated_at")
 
-  seasonParticipants   SeasonParticipant[]
-  fxExecuteRequests    FxExecuteRequest[]
-  refreshTokenSessions RefreshTokenSession[]
-  userBadges           UserBadge[]
-  seasonRewards        SeasonReward[]
-  operatorAuditLogs    OperatorAuditLog[]
-  quotes               Quote[]
-  rewardFulfillmentTargets RewardFulfillmentRequest[] @relation("RewardFulfillmentTargetUser")
+  seasonParticipants          SeasonParticipant[]
+  fxExecuteRequests           FxExecuteRequest[]
+  refreshTokenSessions        RefreshTokenSession[]
+  userBadges                  UserBadge[]
+  seasonRewards               SeasonReward[]
+  operatorAuditLogs           OperatorAuditLog[]
+  quotes                      Quote[]
+  rewardFulfillmentTargets    RewardFulfillmentRequest[] @relation("RewardFulfillmentTargetUser")
   rewardFulfillmentsRequested RewardFulfillmentRequest[] @relation("RewardFulfillmentRequestedBy")
   rewardFulfillmentsProcessed RewardFulfillmentRequest[] @relation("RewardFulfillmentProcessedBy")
-  rewardFulfillmentsCanceled RewardFulfillmentRequest[] @relation("RewardFulfillmentCanceledBy")
+  rewardFulfillmentsCanceled  RewardFulfillmentRequest[] @relation("RewardFulfillmentCanceledBy")
 
   @@map("users")
 }
@@ -278,10 +278,10 @@ model Season {
   createdAt         DateTime     @default(now()) @map("created_at")
   updatedAt         DateTime     @updatedAt @map("updated_at")
 
-  participants   SeasonParticipant[]
-  seasonRankings SeasonRanking[]
-  userBadges     UserBadge[]
-  seasonRewards  SeasonReward[]
+  participants              SeasonParticipant[]
+  seasonRankings            SeasonRanking[]
+  userBadges                UserBadge[]
+  seasonRewards             SeasonReward[]
   rewardFulfillmentRequests RewardFulfillmentRequest[]
 
   @@map("seasons")
@@ -373,22 +373,22 @@ model UserBadge {
 }
 
 model SeasonReward {
-  id                  String           @id @default(uuid())
-  seasonId            String           @map("season_id")
-  seasonParticipantId String           @map("season_participant_id")
-  userId              String           @map("user_id")
-  rewardType          SeasonRewardType @map("reward_type")
-  rewardCode          String           @map("reward_code")
-  rewardName          String           @map("reward_name")
-  rewardValueJson     Json?            @map("reward_value_json")
+  id                   String           @id @default(uuid())
+  seasonId             String           @map("season_id")
+  seasonParticipantId  String           @map("season_participant_id")
+  userId               String           @map("user_id")
+  rewardType           SeasonRewardType @map("reward_type")
+  rewardCode           String           @map("reward_code")
+  rewardName           String           @map("reward_name")
+  rewardValueJson      Json?            @map("reward_value_json")
   fulfillmentRequestId String?          @unique @map("fulfillment_request_id")
-  grantedAt           DateTime         @map("granted_at")
-  createdAt           DateTime         @default(now()) @map("created_at")
+  grantedAt            DateTime         @map("granted_at")
+  createdAt            DateTime         @default(now()) @map("created_at")
 
-  season            Season            @relation(fields: [seasonId], references: [id], onDelete: Restrict)
-  seasonParticipant SeasonParticipant @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
-  user              User              @relation(fields: [userId], references: [id], onDelete: Restrict)
-  fulfillmentRequest RewardFulfillmentRequest? @relation("SeasonRewardFulfillmentRequest", fields: [fulfillmentRequestId], references: [id], onDelete: SetNull)
+  season                    Season                     @relation(fields: [seasonId], references: [id], onDelete: Restrict)
+  seasonParticipant         SeasonParticipant          @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
+  user                      User                       @relation(fields: [userId], references: [id], onDelete: Restrict)
+  fulfillmentRequest        RewardFulfillmentRequest?  @relation("SeasonRewardFulfillmentRequest", fields: [fulfillmentRequestId], references: [id], onDelete: SetNull)
   rewardFulfillmentRequests RewardFulfillmentRequest[] @relation("RewardFulfillmentRequestSeasonReward")
 
   @@unique([seasonParticipantId, rewardCode])
@@ -457,11 +457,12 @@ model Asset {
   createdAt          DateTime     @default(now()) @map("created_at")
   updatedAt          DateTime     @updatedAt @map("updated_at")
 
-  priceSnapshots AssetPriceSnapshot[]
+  priceSnapshots     AssetPriceSnapshot[]
   orderbookSnapshots AssetOrderbookSnapshot[]
-  positions      Position[]
-  orders         Order[]
-  quotes         Quote[]
+  marketCandles      MarketCandle[]
+  positions          Position[]
+  orders             Order[]
+  quotes             Quote[]
 
   @@unique([market, symbol])
   @@index([assetType, market])
@@ -516,6 +517,37 @@ model AssetOrderbookSnapshot {
   @@index([assetId, capturedAt])
   @@index([sourceType, effectiveAt])
   @@map("asset_orderbook_snapshots")
+}
+
+model MarketCandle {
+  id              String   @id @default(uuid())
+  assetId         String   @map("asset_id")
+  // Stored as a plain string instead of a Prisma enum: API interval literals
+  // ("5m", "1d", "1w") start with a digit and cannot be enum identifiers, and
+  // later aggregation intervals (15m/30m/1h/4h) must be addable without an
+  // ALTER TYPE migration. The allowlist is enforced by MarketCandlesRepository.
+  interval        String
+  // Candle window is [openTime, closeTime); both are UTC instants.
+  openTime        DateTime @map("open_time") @db.Timestamptz(3)
+  closeTime       DateTime @map("close_time") @db.Timestamptz(3)
+  open            Decimal  @db.Decimal(24, 8)
+  high            Decimal  @db.Decimal(24, 8)
+  low             Decimal  @db.Decimal(24, 8)
+  close           Decimal  @db.Decimal(24, 8)
+  volume          Decimal  @db.Decimal(24, 8)
+  amount          Decimal? @db.Decimal(24, 8)
+  isClosed        Boolean  @map("is_closed")
+  sourceProvider  String   @map("source_provider")
+  sourceUpdatedAt DateTime @map("source_updated_at") @db.Timestamptz(3)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@unique([assetId, interval, openTime])
+  @@index([interval, openTime])
+  @@index([isClosed, openTime])
+  @@map("market_candles")
 }
 
 model Position {
@@ -682,39 +714,39 @@ model FxRateSnapshot {
 }
 
 model Quote {
-  id                   String       @id @default(uuid())
-  userId               String       @map("user_id")
-  seasonParticipantId  String?      @map("season_participant_id")
-  quoteType            QuoteType    @map("quote_type")
-  status               QuoteStatus  @default(active)
-  assetId              String?      @map("asset_id")
+  id                   String        @id @default(uuid())
+  userId               String        @map("user_id")
+  seasonParticipantId  String?       @map("season_participant_id")
+  quoteType            QuoteType     @map("quote_type")
+  status               QuoteStatus   @default(active)
+  assetId              String?       @map("asset_id")
   side                 OrderSide?
-  orderType            OrderType?   @map("order_type")
-  quantity             Decimal?     @db.Decimal(24, 8)
-  limitPrice           Decimal?     @map("limit_price") @db.Decimal(24, 8)
+  orderType            OrderType?    @map("order_type")
+  quantity             Decimal?      @db.Decimal(24, 8)
+  limitPrice           Decimal?      @map("limit_price") @db.Decimal(24, 8)
   fromCurrency         CurrencyCode? @map("from_currency")
   toCurrency           CurrencyCode? @map("to_currency")
-  sourceAmount         Decimal?     @map("source_amount") @db.Decimal(24, 8)
-  targetAmount         Decimal?     @map("target_amount") @db.Decimal(24, 8)
+  sourceAmount         Decimal?      @map("source_amount") @db.Decimal(24, 8)
+  targetAmount         Decimal?      @map("target_amount") @db.Decimal(24, 8)
   currencyCode         CurrencyCode? @map("currency_code")
-  quotedPrice          Decimal?     @map("quoted_price") @db.Decimal(24, 8)
-  quotedRate           Decimal?     @map("quoted_rate") @db.Decimal(18, 8)
-  assetPriceSnapshotId String?      @map("asset_price_snapshot_id")
-  fxRateSnapshotId     String?      @map("fx_rate_snapshot_id")
-  assetPriceSourceJson Json?        @map("asset_price_source_json")
-  fxRateSourceJson     Json?        @map("fx_rate_source_json")
-  maxChangeBps         Decimal      @map("max_change_bps") @db.Decimal(10, 4)
-  expiresAt            DateTime     @map("expires_at")
-  requestHash          String       @map("request_hash")
-  consumedAt           DateTime?    @map("consumed_at")
-  createdAt            DateTime     @default(now()) @map("created_at")
-  updatedAt            DateTime     @updatedAt @map("updated_at")
+  quotedPrice          Decimal?      @map("quoted_price") @db.Decimal(24, 8)
+  quotedRate           Decimal?      @map("quoted_rate") @db.Decimal(18, 8)
+  assetPriceSnapshotId String?       @map("asset_price_snapshot_id")
+  fxRateSnapshotId     String?       @map("fx_rate_snapshot_id")
+  assetPriceSourceJson Json?         @map("asset_price_source_json")
+  fxRateSourceJson     Json?         @map("fx_rate_source_json")
+  maxChangeBps         Decimal       @map("max_change_bps") @db.Decimal(10, 4)
+  expiresAt            DateTime      @map("expires_at")
+  requestHash          String        @map("request_hash")
+  consumedAt           DateTime?     @map("consumed_at")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
 
-  user               User               @relation(fields: [userId], references: [id], onDelete: Restrict)
-  seasonParticipant  SeasonParticipant? @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
-  asset              Asset?             @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  user               User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  seasonParticipant  SeasonParticipant?  @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
+  asset              Asset?              @relation(fields: [assetId], references: [id], onDelete: Restrict)
   assetPriceSnapshot AssetPriceSnapshot? @relation(fields: [assetPriceSnapshotId], references: [id], onDelete: Restrict)
-  fxRateSnapshot     FxRateSnapshot?    @relation(fields: [fxRateSnapshotId], references: [id], onDelete: Restrict)
+  fxRateSnapshot     FxRateSnapshot?     @relation(fields: [fxRateSnapshotId], references: [id], onDelete: Restrict)
   orders             Order[]
 
   @@index([userId, createdAt])

@@ -396,6 +396,7 @@ export const ModelName = {
   Asset: 'Asset',
   AssetPriceSnapshot: 'AssetPriceSnapshot',
   AssetOrderbookSnapshot: 'AssetOrderbookSnapshot',
+  MarketCandle: 'MarketCandle',
   Position: 'Position',
   Order: 'Order',
   CashWallet: 'CashWallet',
@@ -425,7 +426,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "operatorAuditLog" | "refreshTokenSession" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "position" | "order" | "cashWallet" | "walletTransaction" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock"
+    modelProps: "user" | "operatorAuditLog" | "refreshTokenSession" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "position" | "order" | "cashWallet" | "walletTransaction" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1314,6 +1315,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.AssetOrderbookSnapshotCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.AssetOrderbookSnapshotCountAggregateOutputType> | number
+        }
+      }
+    }
+    MarketCandle: {
+      payload: Prisma.$MarketCandlePayload<ExtArgs>
+      fields: Prisma.MarketCandleFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.MarketCandleFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketCandlePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.MarketCandleFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketCandlePayload>
+        }
+        findFirst: {
+          args: Prisma.MarketCandleFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketCandlePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.MarketCandleFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketCandlePayload>
+        }
+        findMany: {
+          args: Prisma.MarketCandleFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketCandlePayload>[]
+        }
+        create: {
+          args: Prisma.MarketCandleCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketCandlePayload>
+        }
+        createMany: {
+          args: Prisma.MarketCandleCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.MarketCandleCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketCandlePayload>[]
+        }
+        delete: {
+          args: Prisma.MarketCandleDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketCandlePayload>
+        }
+        update: {
+          args: Prisma.MarketCandleUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketCandlePayload>
+        }
+        deleteMany: {
+          args: Prisma.MarketCandleDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.MarketCandleUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.MarketCandleUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketCandlePayload>[]
+        }
+        upsert: {
+          args: Prisma.MarketCandleUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketCandlePayload>
+        }
+        aggregate: {
+          args: Prisma.MarketCandleAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateMarketCandle>
+        }
+        groupBy: {
+          args: Prisma.MarketCandleGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.MarketCandleGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.MarketCandleCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.MarketCandleCountAggregateOutputType> | number
         }
       }
     }
@@ -2620,6 +2695,28 @@ export const AssetOrderbookSnapshotScalarFieldEnum = {
 export type AssetOrderbookSnapshotScalarFieldEnum = (typeof AssetOrderbookSnapshotScalarFieldEnum)[keyof typeof AssetOrderbookSnapshotScalarFieldEnum]
 
 
+export const MarketCandleScalarFieldEnum = {
+  id: 'id',
+  assetId: 'assetId',
+  interval: 'interval',
+  openTime: 'openTime',
+  closeTime: 'closeTime',
+  open: 'open',
+  high: 'high',
+  low: 'low',
+  close: 'close',
+  volume: 'volume',
+  amount: 'amount',
+  isClosed: 'isClosed',
+  sourceProvider: 'sourceProvider',
+  sourceUpdatedAt: 'sourceUpdatedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type MarketCandleScalarFieldEnum = (typeof MarketCandleScalarFieldEnum)[keyof typeof MarketCandleScalarFieldEnum]
+
+
 export const PositionScalarFieldEnum = {
   id: 'id',
   seasonParticipantId: 'seasonParticipantId',
@@ -3550,6 +3647,7 @@ export type GlobalOmitConfig = {
   asset?: Prisma.AssetOmit
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotOmit
   assetOrderbookSnapshot?: Prisma.AssetOrderbookSnapshotOmit
+  marketCandle?: Prisma.MarketCandleOmit
   position?: Prisma.PositionOmit
   order?: Prisma.OrderOmit
   cashWallet?: Prisma.CashWalletOmit
