@@ -1,5 +1,8 @@
 import { readRedisConfig, RedisConfigError } from './redis.config';
-import { DEFAULT_REDIS_CONNECT_TIMEOUT_MS } from './redis.constants';
+import {
+  DEFAULT_REDIS_COMMAND_TIMEOUT_MS,
+  DEFAULT_REDIS_CONNECT_TIMEOUT_MS,
+} from './redis.constants';
 
 describe('readRedisConfig', () => {
   it('reads REDIS_URL and connect timeout', () => {
@@ -7,10 +10,12 @@ describe('readRedisConfig', () => {
       readRedisConfig({
         REDIS_URL: 'redis://localhost:6379',
         REDIS_CONNECT_TIMEOUT_MS: '5000',
+        REDIS_COMMAND_TIMEOUT_MS: '750',
       }),
     ).toEqual({
       url: 'redis://localhost:6379',
       connectTimeoutMs: 5000,
+      commandTimeoutMs: 750,
     });
   });
 
@@ -18,7 +23,14 @@ describe('readRedisConfig', () => {
     expect(readRedisConfig({})).toEqual({
       url: undefined,
       connectTimeoutMs: DEFAULT_REDIS_CONNECT_TIMEOUT_MS,
+      commandTimeoutMs: DEFAULT_REDIS_COMMAND_TIMEOUT_MS,
     });
+  });
+
+  it('rejects a non-positive command timeout', () => {
+    expect(() => readRedisConfig({ REDIS_COMMAND_TIMEOUT_MS: '0' })).toThrow(
+      RedisConfigError,
+    );
   });
 
   it('trims a blank REDIS_URL to undefined', () => {

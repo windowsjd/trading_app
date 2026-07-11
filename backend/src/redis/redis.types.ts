@@ -11,14 +11,20 @@ export interface RawRedisClient {
   set(
     key: string,
     value: string,
-    expiryMode: 'EX',
-    ttlSeconds: number,
+    expiryMode: 'EX' | 'PX',
+    ttl: number,
+    setMode?: 'NX',
   ): Promise<string | null>;
   del(...keys: string[]): Promise<number>;
   incr(key: string): Promise<number>;
   expire(key: string, ttlSeconds: number): Promise<number>;
   ttl(key: string): Promise<number>;
   ping(): Promise<string>;
+  eval(
+    script: string,
+    numberOfKeys: number,
+    ...args: string[]
+  ): Promise<unknown>;
   quit(): Promise<unknown>;
   disconnect(): void;
   readonly status: string;
@@ -29,6 +35,7 @@ export type RedisConfig = {
   // open (operations report errors) instead of crashing the process.
   url: string | undefined;
   connectTimeoutMs: number;
+  commandTimeoutMs: number;
 };
 
 export type RawRedisClientFactory = (config: RedisConfig) => RawRedisClient;

@@ -2,6 +2,7 @@
 // cache behavior (enabled flag, payload size, TTLs) lives with the cache
 // service, not here.
 export const DEFAULT_REDIS_CONNECT_TIMEOUT_MS = 3000;
+export const DEFAULT_REDIS_COMMAND_TIMEOUT_MS = 1000;
 
 // Bounded reconnect backoff so a downed Redis never produces a tight, infinite
 // fast-retry loop. Delay grows exponentially from MIN up to a hard MAX cap and

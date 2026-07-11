@@ -23,6 +23,7 @@ class FakeRedisClient implements RawRedisClient {
   expire = jest.fn((): Promise<number> => Promise.resolve(1));
   ttl = jest.fn((): Promise<number> => Promise.resolve(30));
   ping = jest.fn((): Promise<string> => Promise.resolve('PONG'));
+  eval = jest.fn((): Promise<unknown> => Promise.resolve(1));
   quit = jest.fn((): Promise<string> => Promise.resolve('OK'));
   disconnect = jest.fn((): void => undefined);
 
@@ -45,7 +46,7 @@ const SECRET_URL = 'redis://app:super-secret-password@redis-host:6379';
 const createHarness = (client: FakeRedisClient = new FakeRedisClient()) => {
   const factory = jest.fn(() => client);
   const service = new RedisService(
-    { url: SECRET_URL, connectTimeoutMs: 3000 },
+    { url: SECRET_URL, connectTimeoutMs: 3000, commandTimeoutMs: 1000 },
     factory,
   );
   return { client, factory, service };
@@ -159,11 +160,13 @@ describe('RedisService', () => {
     const service = new RedisService({
       url: undefined,
       connectTimeoutMs: 3000,
+      commandTimeoutMs: 1000,
     });
 
     await expect(service.get('k')).rejects.toBeInstanceOf(
       RedisUnavailableError,
     );
+    expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 
   it('never logs the Redis URL or password', async () => {
@@ -193,6 +196,14 @@ describe('RedisService', () => {
     await expect(service.get('')).rejects.toBeInstanceOf(RedisKeyError);
   });
 
+  it('validates keys before attempting an unavailable connection', async () => {
+    const client = new FakeRedisClient();
+    client.connect.mockRejectedValue(new Error('down'));
+    const { service } = createHarness(client);
+    await expect(service.get('')).rejects.toBeInstanceOf(RedisKeyError);
+    expect(client.connect).not.toHaveBeenCalled();
+  });
+
   it('rejects a non-positive TTL as a programmer error', async () => {
     const { service } = createHarness();
 
@@ -211,5 +222,61 @@ describe('RedisService', () => {
     client.emit('ready');
     expect(logSpy).toHaveBeenCalledWith('Redis connection restored.');
     expect(service.isConnected()).toBe(true);
+  });
+
+  it('discards an ended client and creates a fresh client for the next command', async () => {
+    const first = new FakeRedisClient();
+    const second = new FakeRedisClient();
+    const factory = jest
+      .fn<RawRedisClient, []>()
+      .mockReturnValueOnce(first)
+      .mockReturnValueOnce(second);
+    const service = new RedisService(
+      {
+        url: SECRET_URL,
+        connectTimeoutMs: 3000,
+        commandTimeoutMs: 1000,
+      },
+      factory,
+    );
+
+    await expect(service.ping()).resolves.toBe('PONG');
+    first.emit('end');
+    expect(service.isConnected()).toBe(false);
+    await expect(service.get('after-end')).resolves.toBeNull();
+
+    expect(factory).toHaveBeenCalledTimes(2);
+    expect(first.connect).toHaveBeenCalledTimes(1);
+    expect(second.connect).toHaveBeenCalledTimes(1);
+    expect(second.get).toHaveBeenCalledWith('after-end');
+  });
+
+  it('bounds command duration and observes a later raw rejection', async () => {
+    jest.useFakeTimers();
+    const client = new FakeRedisClient();
+    let rejectRaw!: (error: Error) => void;
+    client.get.mockReturnValue(
+      new Promise<string | null>((_, reject) => {
+        rejectRaw = reject;
+      }),
+    );
+    const service = new RedisService(
+      {
+        url: SECRET_URL,
+        connectTimeoutMs: 3000,
+        commandTimeoutMs: 100,
+      },
+      () => client,
+    );
+
+    const result = service.get('slow');
+    const expectation = expect(result).rejects.toBeInstanceOf(
+      RedisUnavailableError,
+    );
+    await jest.advanceTimersByTimeAsync(100);
+    await expectation;
+    rejectRaw(new Error('late rejection'));
+    await Promise.resolve();
+    jest.useRealTimers();
   });
 });

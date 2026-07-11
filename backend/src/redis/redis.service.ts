@@ -27,6 +27,7 @@ const defaultRawRedisClientFactory: RawRedisClientFactory = (
   return new IORedis(config.url, {
     lazyConnect: true,
     connectTimeout: config.connectTimeoutMs,
+    commandTimeout: config.commandTimeoutMs,
     maxRetriesPerRequest: REDIS_MAX_RETRIES_PER_REQUEST,
     enableOfflineQueue: false,
     retryStrategy: (times: number): number => {
@@ -67,12 +68,13 @@ export class RedisService implements OnModuleDestroy {
 
   async ping(): Promise<string> {
     const client = await this.ensureConnected();
-    return client.ping();
+    return this.runCommand(client, () => client.ping());
   }
 
   async get(key: string): Promise<string | null> {
+    const validKey = this.requireKey(key);
     const client = await this.ensureConnected();
-    return client.get(this.requireKey(key));
+    return this.runCommand(client, () => client.get(validKey));
   }
 
   /**
@@ -88,18 +90,48 @@ export class RedisService implements OnModuleDestroy {
       throw new RedisKeyError('ttlSeconds must be a positive integer.');
     }
 
+    const validKey = this.requireKey(key);
     const client = await this.ensureConnected();
-    await client.set(this.requireKey(key), value, 'EX', ttlSeconds);
+    await this.runCommand(client, () =>
+      client.set(validKey, value, 'EX', ttlSeconds),
+    );
+  }
+
+  async setNxPx(key: string, value: string, ttlMs: number): Promise<boolean> {
+    this.requirePositiveInteger(ttlMs, 'ttlMs');
+    const validKey = this.requireKey(key);
+    const client = await this.ensureConnected();
+    const result = await this.runCommand(client, () =>
+      client.set(validKey, value, 'PX', ttlMs, 'NX'),
+    );
+    return result === 'OK';
+  }
+
+  async eval(
+    script: string,
+    keys: readonly string[],
+    args: readonly string[] = [],
+  ): Promise<unknown> {
+    if (typeof script !== 'string' || script.trim() === '') {
+      throw new RedisKeyError('Redis script must be a non-empty string.');
+    }
+    const validatedKeys = keys.map((key) => this.requireKey(key));
+    const client = await this.ensureConnected();
+    return this.runCommand(client, () =>
+      client.eval(script, validatedKeys.length, ...validatedKeys, ...args),
+    );
   }
 
   async delete(key: string): Promise<number> {
+    const validKey = this.requireKey(key);
     const client = await this.ensureConnected();
-    return client.del(this.requireKey(key));
+    return this.runCommand(client, () => client.del(validKey));
   }
 
   async increment(key: string): Promise<number> {
+    const validKey = this.requireKey(key);
     const client = await this.ensureConnected();
-    return client.incr(this.requireKey(key));
+    return this.runCommand(client, () => client.incr(validKey));
   }
 
   async expire(key: string, ttlSeconds: number): Promise<boolean> {
@@ -107,14 +139,18 @@ export class RedisService implements OnModuleDestroy {
       throw new RedisKeyError('ttlSeconds must be a positive integer.');
     }
 
+    const validKey = this.requireKey(key);
     const client = await this.ensureConnected();
-    const result = await client.expire(this.requireKey(key), ttlSeconds);
+    const result = await this.runCommand(client, () =>
+      client.expire(validKey, ttlSeconds),
+    );
     return result === 1;
   }
 
   async ttl(key: string): Promise<number> {
+    const validKey = this.requireKey(key);
     const client = await this.ensureConnected();
-    return client.ttl(this.requireKey(key));
+    return this.runCommand(client, () => client.ttl(validKey));
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -156,6 +192,11 @@ export class RedisService implements OnModuleDestroy {
   private async openConnection(client: RawRedisClient): Promise<void> {
     try {
       await client.connect();
+      if (this.client !== client) {
+        throw new RedisUnavailableError(
+          'Redis connection ended while opening.',
+        );
+      }
       this.markReady();
     } catch (error) {
       // Allow a later operation to retry a fresh connect instead of caching a
@@ -171,7 +212,15 @@ export class RedisService implements OnModuleDestroy {
       return this.client;
     }
 
-    const client = this.clientFactory(this.config);
+    let client: RawRedisClient;
+    try {
+      client = this.clientFactory(this.config);
+    } catch (error) {
+      if (error instanceof RedisUnavailableError) {
+        this.handleConnectionError(error);
+      }
+      throw error;
+    }
     this.registerListeners(client);
     this.client = client;
     return client;
@@ -184,10 +233,19 @@ export class RedisService implements OnModuleDestroy {
       this.handleConnectionError(error);
     });
     client.on('ready', () => {
-      this.markReady();
+      if (this.client === client) {
+        this.markReady();
+      }
     });
     client.on('end', () => {
+      if (this.client !== client) {
+        return;
+      }
+      // An ended ioredis instance cannot be connected again. Drop every
+      // reference so the next operation constructs a fresh client.
       this.ready = false;
+      this.connectPromise = null;
+      this.client = null;
     });
   }
 
@@ -209,7 +267,7 @@ export class RedisService implements OnModuleDestroy {
     this.outageLogged = true;
     // Log only a safe error name/code — never the URL, password, or payload.
     this.logger.warn(
-      `Redis unavailable; cache operations will fail open (${this.describeError(
+      `Redis unavailable; dependent operations will degrade safely (${this.describeError(
         error,
       )}).`,
     );
@@ -237,5 +295,49 @@ export class RedisService implements OnModuleDestroy {
     }
 
     return key;
+  }
+
+  private requirePositiveInteger(value: number, field: string): void {
+    if (!Number.isSafeInteger(value) || value <= 0) {
+      throw new RedisKeyError(`${field} must be a positive integer.`);
+    }
+  }
+
+  private async runCommand<T>(
+    client: RawRedisClient,
+    command: () => Promise<T>,
+  ): Promise<T> {
+    let timer: NodeJS.Timeout | undefined;
+    const operation = Promise.resolve().then(command);
+    // Attach a rejection handler through race immediately. If the timeout wins,
+    // a later raw command rejection is still observed by Promise.race and can
+    // never become an unhandled rejection.
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new RedisUnavailableError('Redis command timed out.')),
+        this.config.commandTimeoutMs,
+      );
+    });
+
+    try {
+      const result = await Promise.race([operation, timeout]);
+      if (this.client === client) {
+        this.markReady();
+      }
+      return result;
+    } catch (error) {
+      if (error instanceof RedisKeyError) {
+        throw error;
+      }
+      this.handleConnectionError(error);
+      if (error instanceof RedisUnavailableError) {
+        throw error;
+      }
+      throw new RedisUnavailableError('Redis command failed.');
+    } finally {
+      if (timer) {
+        clearTimeout(timer);
+      }
+    }
   }
 }

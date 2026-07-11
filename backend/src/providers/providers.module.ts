@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
+import { RedisModule } from '../redis/redis.module';
+import { RedisService } from '../redis/redis.service';
 import { BinancePublicClient } from './binance/binance-public.client';
 import { BinancePriceIngestionService } from './binance/binance-price.ingestion.service';
 import { BinanceRealtimePriceCacheService } from './binance/binance-realtime-price-cache.service';
@@ -19,13 +21,16 @@ import { KisRestHogaIngestionService } from './kis/kis-rest-hoga.ingestion.servi
 import { KisWebSocketClient } from './kis/kis-websocket.client';
 import { KisWebSocketIngestionService } from './kis/kis-websocket.ingestion.service';
 import { KisWebSocketStreamingService } from './kis/kis-websocket-streaming.service';
+import { readKisRateLimitConfig } from './kis/coordination/kis-rate-limit.config';
+import { KisRateLimiterService } from './kis/coordination/kis-rate-limiter.service';
+import { KisRequestCoordinatorService } from './kis/coordination/kis-request-coordinator.service';
 import { MarketSnapshotHealthService } from './market-snapshot-health.service';
 import { ProviderConfigService } from './provider-config.service';
 import { ProviderHttpClient } from './provider-http.client';
 import { ProviderTargetResolverService } from './provider-target-resolver.service';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, RedisModule],
   providers: [
     ProviderConfigService,
     ProviderHttpClient,
@@ -39,6 +44,18 @@ import { ProviderTargetResolverService } from './provider-target-resolver.servic
     BinanceRealtimePriceEventBus,
     BinanceWebSocketIngestionService,
     BinanceWebSocketStreamingService,
+    {
+      provide: KisRateLimiterService,
+      useFactory: (redis: RedisService) =>
+        new KisRateLimiterService(redis, readKisRateLimitConfig()),
+      inject: [RedisService],
+    },
+    {
+      provide: KisRequestCoordinatorService,
+      useFactory: (limiter: KisRateLimiterService) =>
+        new KisRequestCoordinatorService(limiter),
+      inject: [KisRateLimiterService],
+    },
     KisAuthClient,
     KisQuoteClient,
     KisRestCurrentPriceIngestionService,
@@ -71,6 +88,8 @@ import { ProviderTargetResolverService } from './provider-target-resolver.servic
     KisWebSocketIngestionService,
     KisWebSocketClient,
     KisWebSocketStreamingService,
+    KisRateLimiterService,
+    KisRequestCoordinatorService,
     ProviderTargetResolverService,
     MarketSnapshotHealthService,
   ],

@@ -5,12 +5,18 @@ import type {
   CandleInterval,
 } from './asset-candles.service';
 import type { CandleCacheConfig } from './asset-candles-cache.config';
-import { readCandleCacheConfig } from './asset-candles-cache.config';
+import {
+  CandleCacheConfigError,
+  readCandleCacheConfig,
+} from './asset-candles-cache.config';
 import {
   buildCandleDataKey,
   buildCandleGenerationKey,
   CandleCacheKeyInput,
+  CandleCacheKeyError,
 } from './asset-candles-cache.keys';
+import { RedisConfigError } from '../redis/redis.config';
+import { RedisKeyError, RedisUnavailableError } from '../redis/redis.types';
 
 // Central TTL policy keyed by the API-supported CandleInterval set (the
 // `Record<CandleInterval, number>` type makes coverage exhaustive at compile
@@ -72,6 +78,8 @@ export type CandleCacheInvalidateResult =
 @Injectable()
 export class AssetCandlesCacheService {
   private readonly logger = new Logger(AssetCandlesCacheService.name);
+  private lastUnexpectedWarningAt: number | null = null;
+  private unexpectedOutageLogged = false;
 
   constructor(
     private readonly redis: RedisService,
@@ -83,7 +91,7 @@ export class AssetCandlesCacheService {
   }
 
   /**
-   * Reads the cached response for a query. Never throws: operational Redis
+   * Reads the cached response for a query. Operational Redis
    * failures are reported as `error` (callers fail open to their normal load
    * path), a missing entry is `miss`, and a corrupt/unsupported entry is
    * deleted best-effort and reported as `miss`.
@@ -98,6 +106,7 @@ export class AssetCandlesCacheService {
       const key = buildCandleDataKey({ ...input, generation });
       const raw = await this.redis.get(key);
       if (raw === null) {
+        this.markOperationalSuccess();
         return { status: 'miss' };
       }
 
@@ -108,14 +117,14 @@ export class AssetCandlesCacheService {
         return { status: 'miss' };
       }
 
+      this.markOperationalSuccess();
       return {
         status: 'hit',
         value: parsed.value,
         cachedAt: parsed.cachedAt,
       };
     } catch (error) {
-      this.logOperationalError('get', error);
-      return { status: 'error' };
+      return this.failOpenOrThrow('get', error);
     }
   }
 
@@ -154,11 +163,10 @@ export class AssetCandlesCacheService {
       const key = buildCandleDataKey({ ...input, generation });
       const ttlSeconds = resolveCandleCacheTtlSeconds(input.interval);
       await this.redis.setWithTtl(key, serialized, ttlSeconds);
-
+      this.markOperationalSuccess();
       return { status: 'stored', ttlSeconds, byteSize };
     } catch (error) {
-      this.logOperationalError('set', error);
-      return { status: 'error' };
+      return this.failOpenOrThrow('set', error);
     }
   }
 
@@ -175,10 +183,10 @@ export class AssetCandlesCacheService {
       const generation = await this.readGeneration(input.assetId);
       const key = buildCandleDataKey({ ...input, generation });
       await this.redis.delete(key);
+      this.markOperationalSuccess();
       return { status: 'invalidated' };
     } catch (error) {
-      this.logOperationalError('delete', error);
-      return { status: 'error' };
+      return this.failOpenOrThrow('delete', error);
     }
   }
 
@@ -196,10 +204,10 @@ export class AssetCandlesCacheService {
       const generation = await this.redis.increment(
         buildCandleGenerationKey(assetId),
       );
+      this.markOperationalSuccess();
       return { status: 'invalidated', generation };
     } catch (error) {
-      this.logOperationalError('invalidateAsset', error);
-      return { status: 'error' };
+      return this.failOpenOrThrow('invalidateAsset', error);
     }
   }
 
@@ -248,7 +256,7 @@ export class AssetCandlesCacheService {
       return null;
     }
 
-    if (typeof envelope.value !== 'object' || envelope.value === null) {
+    if (!isAssetCandlesResponse(envelope.value)) {
       return null;
     }
 
@@ -259,12 +267,46 @@ export class AssetCandlesCacheService {
     try {
       await this.redis.delete(key);
     } catch (error) {
-      this.logOperationalError('deleteCorrupt', error);
+      this.failOpenOrThrow('deleteCorrupt', error);
     }
   }
 
   // Logs safe metadata only (operation name + error name/code), never the key,
   // payload, URL, or any secret.
+  private failOpenOrThrow<T extends { status: 'error' }>(
+    operation: string,
+    error: unknown,
+  ): T {
+    if (isCandleCacheProgrammerError(error)) {
+      throw error;
+    }
+
+    // RedisService owns outage/recovery logging. Re-logging its operational
+    // error here on every request would flood logs during an outage.
+    if (error instanceof RedisUnavailableError) {
+      return { status: 'error' } as T;
+    }
+
+    const now = Date.now();
+    if (
+      this.lastUnexpectedWarningAt === null ||
+      now - this.lastUnexpectedWarningAt >= 30_000
+    ) {
+      this.lastUnexpectedWarningAt = now;
+      this.unexpectedOutageLogged = true;
+      this.logOperationalError(operation, error);
+    }
+    return { status: 'error' } as T;
+  }
+
+  private markOperationalSuccess(): void {
+    if (!this.unexpectedOutageLogged) {
+      return;
+    }
+    this.unexpectedOutageLogged = false;
+    this.logger.log('Candle cache operation restored.');
+  }
+
   private logOperationalError(operation: string, error: unknown): void {
     this.logger.warn(
       `Candle cache ${operation} failed; failing open (${this.describeError(
@@ -283,4 +325,106 @@ export class AssetCandlesCacheService {
 
     return 'operational error';
   }
+}
+
+function isCandleCacheProgrammerError(error: unknown): boolean {
+  return (
+    error instanceof CandleCacheKeyError ||
+    error instanceof RedisKeyError ||
+    error instanceof CandleCacheConfigError ||
+    error instanceof RedisConfigError ||
+    error instanceof TypeError ||
+    error instanceof RangeError
+  );
+}
+
+const CANDLE_RANGES = new Set([
+  '1d',
+  '7d',
+  '30d',
+  'prev_open',
+  'prev2_open',
+  '1y',
+  'season',
+]);
+const CANDLE_INTERVALS = new Set([
+  '1m',
+  '5m',
+  '15m',
+  '30m',
+  '1h',
+  '4h',
+  '1d',
+  '1w',
+]);
+const ASSET_TYPES = new Set(['domestic_stock', 'us_stock', 'crypto']);
+const CURRENCIES = new Set(['KRW', 'USD']);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function hasStrings(value: Record<string, unknown>, fields: string[]): boolean {
+  return fields.every((field) => typeof value[field] === 'string');
+}
+
+export function isAssetCandlesResponse(
+  value: unknown,
+): value is AssetCandlesResponse {
+  if (!isRecord(value) || value.success !== true || !isRecord(value.data)) {
+    return false;
+  }
+  const data = value.data;
+  if (
+    (data.state !== 'available' && data.state !== 'empty') ||
+    !isRecord(data.asset) ||
+    !hasStrings(data.asset, ['id', 'symbol', 'name', 'market']) ||
+    !ASSET_TYPES.has(String(data.asset.assetType)) ||
+    !CURRENCIES.has(String(data.asset.priceCurrency)) ||
+    !CANDLE_RANGES.has(String(data.range)) ||
+    !CANDLE_INTERVALS.has(String(data.interval)) ||
+    typeof data.requestedDate !== 'string' ||
+    !Array.isArray(data.candles) ||
+    !isRecord(data.source)
+  ) {
+    return false;
+  }
+  if (
+    !data.candles.every(
+      (candle) =>
+        isRecord(candle) &&
+        hasStrings(candle, [
+          'time',
+          'open',
+          'high',
+          'low',
+          'close',
+          'volume',
+          'amount',
+          'sourceDate',
+          'sourceTime',
+        ]),
+    )
+  ) {
+    return false;
+  }
+
+  const source = data.source;
+  if (source.provider === 'kis') {
+    return (
+      hasStrings(source, ['trId', 'path', 'marketCode']) &&
+      Number.isSafeInteger(source.requestedCount) &&
+      Number.isSafeInteger(source.returnedCount)
+    );
+  }
+  if (source.provider === 'binance') {
+    return (
+      hasStrings(source, ['endpoint', 'symbol', 'interval']) &&
+      CANDLE_INTERVALS.has(String(source.interval)) &&
+      Number.isSafeInteger(source.requestedCount) &&
+      Number.isSafeInteger(source.returnedCount) &&
+      (source.truncated === undefined || typeof source.truncated === 'boolean')
+    );
+  }
+  return false;
 }

@@ -1,4 +1,7 @@
-import { DEFAULT_REDIS_CONNECT_TIMEOUT_MS } from './redis.constants';
+import {
+  DEFAULT_REDIS_COMMAND_TIMEOUT_MS,
+  DEFAULT_REDIS_CONNECT_TIMEOUT_MS,
+} from './redis.constants';
 import type { RedisConfig } from './redis.types';
 
 export type RedisEnv = Record<string, string | undefined>;
@@ -51,6 +54,11 @@ export function readRedisConfig(env: RedisEnv = process.env): RedisConfig {
       env,
       'REDIS_CONNECT_TIMEOUT_MS',
       DEFAULT_REDIS_CONNECT_TIMEOUT_MS,
+    ),
+    commandTimeoutMs: readPositiveInteger(
+      env,
+      'REDIS_COMMAND_TIMEOUT_MS',
+      DEFAULT_REDIS_COMMAND_TIMEOUT_MS,
     ),
   };
 }

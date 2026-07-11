@@ -14,6 +14,28 @@ describe('KIS auth client skeleton', () => {
     jest.restoreAllMocks();
   });
 
+  it('acquires an oauth slot immediately before each physical token request', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve(JSON.stringify({ access_token: 'token' })),
+    } as Response);
+    const coordinator = { acquire: jest.fn().mockResolvedValue(undefined) };
+    const client = new KisAuthClient(
+      configServiceFor({ restBaseUrl: 'https://kis.example.test' }),
+      coordinator as never,
+    );
+
+    await client.requestRestToken({ path: '/oauth2/tokenP', body: {} });
+    await client.requestRestToken({ path: '/oauth2/tokenP', body: {} });
+
+    expect(coordinator.acquire).toHaveBeenCalledTimes(2);
+    expect(coordinator.acquire).toHaveBeenNthCalledWith(1, 'oauth');
+    expect(coordinator.acquire.mock.invocationCallOrder[0]).toBeLessThan(
+      fetchSpy.mock.invocationCallOrder[0],
+    );
+  });
+
   it('parses token responses without persisting token to DB', () => {
     const parsed = parseKisTokenResponse({
       access_token: 'kis-access-token',

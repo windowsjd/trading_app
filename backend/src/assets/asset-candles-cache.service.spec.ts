@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import type { RedisService } from '../redis/redis.service';
+import { RedisKeyError, RedisUnavailableError } from '../redis/redis.types';
 import type { AssetCandlesResponse } from './asset-candles.service';
 import {
   AssetCandlesCacheService,
@@ -11,6 +12,7 @@ import {
   buildCandleDataKey,
   buildCandleGenerationKey,
   CandleCacheKeyInput,
+  CandleCacheKeyError,
   CANDLE_CACHE_GENERATION_NAMESPACE,
 } from './asset-candles-cache.keys';
 
@@ -412,5 +414,92 @@ describe('AssetCandlesCacheService', () => {
       .join(' ');
     expect(logged).not.toContain('secret-token-xyz');
     expect(logged).not.toContain('BTCUSDT');
+  });
+
+  describe('error classification and envelope validation', () => {
+    const envelope = (value: unknown) =>
+      JSON.stringify({
+        version: CANDLE_CACHE_ENVELOPE_VERSION,
+        cachedAt: '2026-07-10T00:00:00.000Z',
+        value,
+      });
+
+    it('does not hide candle key or Redis key programmer errors', async () => {
+      const redis = createFakeRedis();
+      const service = createService(redis);
+      await expect(
+        service.get({ ...keyInput, assetId: '' }),
+      ).rejects.toBeInstanceOf(CandleCacheKeyError);
+
+      redis.get.mockRejectedValueOnce(new RedisKeyError('bad key'));
+      await expect(service.get(keyInput)).rejects.toBeInstanceOf(RedisKeyError);
+    });
+
+    it('fails open without duplicate warnings for RedisUnavailableError', async () => {
+      const redis = createFakeRedis();
+      redis.get.mockRejectedValue(new RedisUnavailableError('down'));
+      const service = createService(redis);
+
+      await expect(service.get(keyInput)).resolves.toEqual({ status: 'error' });
+      await expect(service.get(keyInput)).resolves.toEqual({ status: 'error' });
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['empty object', {}],
+      [
+        'invalid state',
+        {
+          ...createResponse('available'),
+          data: { ...createResponse('available').data, state: 'bad' },
+        },
+      ],
+      [
+        'invalid candle',
+        {
+          ...createResponse('available'),
+          data: {
+            ...createResponse('available').data,
+            candles: [{ time: 'only-one-field' }],
+          },
+        },
+      ],
+    ])('rejects and deletes a %s envelope', async (_label, value) => {
+      const redis = createFakeRedis();
+      mockDataValue(redis, envelope(value));
+      const service = createService(redis);
+
+      await expect(service.get(keyInput)).resolves.toEqual({ status: 'miss' });
+      expect(redis.delete).toHaveBeenCalledWith(dataKeyFor(0));
+    });
+
+    it('accepts valid Binance and KIS response envelopes', async () => {
+      const binanceRedis = createFakeRedis();
+      mockDataValue(binanceRedis, envelope(createResponse('available')));
+      await expect(
+        createService(binanceRedis).get(keyInput),
+      ).resolves.toMatchObject({
+        status: 'hit',
+      });
+
+      const kis = createResponse('empty');
+      kis.data.asset.assetType = 'domestic_stock';
+      kis.data.asset.priceCurrency = 'KRW';
+      kis.data.source = {
+        provider: 'kis',
+        trId: 'FHKST03010200',
+        path: '/uapi/candles',
+        marketCode: 'KRX',
+        requestedCount: 30,
+        returnedCount: 0,
+      };
+      const kisRedis = createFakeRedis();
+      mockDataValue(kisRedis, envelope(kis));
+      await expect(
+        createService(kisRedis).get(keyInput),
+      ).resolves.toMatchObject({
+        status: 'hit',
+      });
+    });
   });
 });

@@ -1,0 +1,204 @@
+import type { RedisLockService } from '../redis/redis-lock.service';
+import type { AssetCandlesCacheService } from './asset-candles-cache.service';
+import type { AssetCandlesResponse } from './asset-candles.service';
+import type { CandleCacheKeyInput } from './asset-candles-cache.keys';
+import {
+  AssetCandlesSingleFlightService,
+  CandleSingleFlightWaitTimeoutError,
+} from './asset-candles-single-flight.service';
+
+const key: CandleCacheKeyInput = {
+  assetId: 'asset-1',
+  range: '1d',
+  interval: '5m',
+  limit: 100,
+  requestedDate: '2026-07-11',
+};
+const response = {
+  success: true,
+  data: { marker: 'loaded' },
+} as unknown as AssetCandlesResponse;
+
+describe('AssetCandlesSingleFlightService', () => {
+  const create = (
+    options: {
+      enabled?: boolean;
+      now?: () => number;
+      sleep?: (ms: number) => Promise<void>;
+    } = {},
+  ) => {
+    const cache = {
+      isEnabled: jest.fn(() => options.enabled ?? true),
+      get: jest.fn().mockResolvedValue({ status: 'miss' }),
+      set: jest.fn().mockResolvedValue({ status: 'stored' }),
+    };
+    const locks = {
+      acquire: jest.fn().mockResolvedValue({
+        status: 'acquired',
+        lock: { key: 'lock', token: 'owner-token', ttlMs: 300 },
+      }),
+      extend: jest.fn().mockResolvedValue(true),
+      release: jest.fn().mockResolvedValue(true),
+    };
+    const service = new AssetCandlesSingleFlightService(
+      cache as unknown as AssetCandlesCacheService,
+      locks as unknown as RedisLockService,
+      {
+        lockTtlMs: 300,
+        waitTimeoutMs: 350,
+        pollIntervalMs: 100,
+        renewIntervalMs: 100,
+      },
+      options.now ?? Date.now,
+      options.sleep ??
+        ((ms) => new Promise((resolve) => setTimeout(resolve, ms))),
+    );
+    return { cache, locks, service };
+  };
+
+  afterEach(() => jest.useRealTimers());
+
+  it('runs one local loader for 20 concurrent requests and clears the map', async () => {
+    const { service } = create({ enabled: false });
+    const loader = jest.fn().mockResolvedValue(response);
+    const results = await Promise.all(
+      Array.from({ length: 20 }, () =>
+        service.getOrLoad({ cacheKeyInput: key, loader }),
+      ),
+    );
+    expect(results).toHaveLength(20);
+    expect(loader).toHaveBeenCalledTimes(1);
+    expect(service.getInFlightCount()).toBe(0);
+  });
+
+  it('keeps different keys independent', async () => {
+    const { service } = create({ enabled: false });
+    const loader = jest.fn().mockResolvedValue(response);
+    await Promise.all([
+      service.getOrLoad({ cacheKeyInput: key, loader }),
+      service.getOrLoad({
+        cacheKeyInput: { ...key, assetId: 'asset-2' },
+        loader,
+      }),
+    ]);
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns a cache hit without locking or loading', async () => {
+    const { cache, locks, service } = create();
+    cache.get.mockResolvedValueOnce({ status: 'hit', value: response });
+    const loader = jest.fn();
+    await expect(
+      service.getOrLoad({ cacheKeyInput: key, loader }),
+    ).resolves.toBe(response);
+    expect(loader).not.toHaveBeenCalled();
+    expect(locks.acquire).not.toHaveBeenCalled();
+  });
+
+  it('double-checks after lock, stores success, and releases its own lock', async () => {
+    const { cache, locks, service } = create();
+    const loader = jest.fn().mockResolvedValue(response);
+    await expect(
+      service.getOrLoad({ cacheKeyInput: key, loader }),
+    ).resolves.toBe(response);
+    expect(cache.get).toHaveBeenCalledTimes(2);
+    expect(loader).toHaveBeenCalledTimes(1);
+    expect(cache.set).toHaveBeenCalledWith(key, response);
+    expect(locks.release).toHaveBeenCalledWith(
+      expect.objectContaining({ token: 'owner-token' }),
+    );
+  });
+
+  it('returns loader success when cache storage fails operationally', async () => {
+    const { cache, service } = create();
+    cache.set.mockResolvedValueOnce({ status: 'error' });
+    await expect(
+      service.getOrLoad({ cacheKeyInput: key, loader: async () => response }),
+    ).resolves.toBe(response);
+  });
+
+  it('shares loader failure, does not cache, releases, and permits retry', async () => {
+    const { cache, locks, service } = create();
+    const failure = new Error('provider failed');
+    const loader = jest
+      .fn()
+      .mockRejectedValueOnce(failure)
+      .mockResolvedValueOnce(response);
+    const settled = await Promise.allSettled(
+      Array.from({ length: 5 }, () =>
+        service.getOrLoad({ cacheKeyInput: key, loader }),
+      ),
+    );
+    expect(
+      settled.every(
+        (item) => item.status === 'rejected' && item.reason === failure,
+      ),
+    ).toBe(true);
+    expect(cache.set).not.toHaveBeenCalled();
+    expect(locks.release).toHaveBeenCalled();
+    expect(service.getInFlightCount()).toBe(0);
+    await expect(
+      service.getOrLoad({ cacheKeyInput: key, loader }),
+    ).resolves.toBe(response);
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it('retains local single-flight when distributed Redis locking fails', async () => {
+    const { locks, service } = create();
+    locks.acquire.mockResolvedValue({ status: 'error' });
+    const loader = jest.fn().mockResolvedValue(response);
+    await Promise.all(
+      Array.from({ length: 10 }, () =>
+        service.getOrLoad({ cacheKeyInput: key, loader }),
+      ),
+    );
+    expect(loader).toHaveBeenCalledTimes(1);
+  });
+
+  it('polls a remote owner and returns the populated cache value', async () => {
+    const { cache, locks, service } = create({ sleep: async () => undefined });
+    locks.acquire.mockResolvedValueOnce({ status: 'busy' });
+    cache.get
+      .mockResolvedValueOnce({ status: 'miss' })
+      .mockResolvedValueOnce({ status: 'hit', value: response });
+    const loader = jest.fn();
+    await expect(
+      service.getOrLoad({ cacheKeyInput: key, loader }),
+    ).resolves.toBe(response);
+    expect(loader).not.toHaveBeenCalled();
+  });
+
+  it('times out after bounded polling and one failed reacquire', async () => {
+    let now = 0;
+    const { locks, service } = create({
+      now: () => now,
+      sleep: async (ms) => {
+        now += ms;
+      },
+    });
+    locks.acquire.mockResolvedValue({ status: 'busy' });
+    await expect(
+      service.getOrLoad({ cacheKeyInput: key, loader: jest.fn() }),
+    ).rejects.toBeInstanceOf(CandleSingleFlightWaitTimeoutError);
+    expect(locks.acquire).toHaveBeenCalledTimes(2);
+  });
+
+  it('renews long-running owner locks and clears the renewal timer', async () => {
+    jest.useFakeTimers();
+    const { locks, service } = create();
+    let resolveLoader!: (value: AssetCandlesResponse) => void;
+    const loader = () =>
+      new Promise<AssetCandlesResponse>((resolve) => (resolveLoader = resolve));
+    const loading = service.getOrLoad({ cacheKeyInput: key, loader });
+    await Promise.resolve();
+    await Promise.resolve();
+    await jest.advanceTimersByTimeAsync(100);
+    expect(locks.extend).toHaveBeenCalledWith(
+      expect.objectContaining({ token: 'owner-token' }),
+      300,
+    );
+    resolveLoader(response);
+    await loading;
+    expect(jest.getTimerCount()).toBe(0);
+  });
+});

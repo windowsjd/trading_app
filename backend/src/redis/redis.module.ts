@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { RedisService } from './redis.service';
+import { RedisLockService } from './redis-lock.service';
 
 // Intentionally not @Global. RedisService is a shared singleton, but requiring
 // each consuming module to import RedisModule keeps dependencies explicit and
-// test isolation intact (no hidden ambient provider). Only AssetsModule needs
-// it today for the candle cache; the step 1-3 lock/rate limiter will import it
-// where it is used.
+// test isolation intact (no hidden ambient provider). AssetsModule imports it
+// for candle cache/locks and ProvidersModule imports it for KIS coordination.
 //
 // Provided via useFactory so Nest constructs RedisService with its default
 // (env-derived config, real ioredis client factory) instead of trying to
@@ -16,7 +16,8 @@ import { RedisService } from './redis.service';
       provide: RedisService,
       useFactory: () => new RedisService(),
     },
+    RedisLockService,
   ],
-  exports: [RedisService],
+  exports: [RedisService, RedisLockService],
 })
 export class RedisModule {}
