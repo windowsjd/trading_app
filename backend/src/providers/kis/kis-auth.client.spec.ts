@@ -2,16 +2,43 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { ProviderConfigService } from '../provider-config.service';
 import { redactJsonValue } from '../provider-secret-redaction';
+import { Test } from '@nestjs/testing';
 import {
-  KisAuthClient,
+  KisAuthClient as ProductionKisAuthClient,
   parseKisApprovalKeyResponse,
   parseKisTokenResponse,
 } from './kis-auth.client';
+
+const defaultCoordinator = { acquire: jest.fn().mockResolvedValue(undefined) };
+class KisAuthClient extends ProductionKisAuthClient {
+  constructor(
+    configService: ConstructorParameters<typeof ProductionKisAuthClient>[0],
+    coordinator: ConstructorParameters<
+      typeof ProductionKisAuthClient
+    >[1] = defaultCoordinator as never,
+  ) {
+    super(configService, coordinator);
+  }
+}
 
 describe('KIS auth client skeleton', () => {
   afterEach(() => {
     jest.useRealTimers();
     jest.restoreAllMocks();
+  });
+
+  it('cannot be constructed by Nest without the mandatory coordinator', async () => {
+    await expect(
+      Test.createTestingModule({
+        providers: [
+          ProductionKisAuthClient,
+          {
+            provide: ProviderConfigService,
+            useValue: { getConfig: jest.fn() },
+          },
+        ],
+      }).compile(),
+    ).rejects.toThrow(/KisRequestCoordinatorService/u);
   });
 
   it('acquires an oauth slot immediately before each physical token request', async () => {

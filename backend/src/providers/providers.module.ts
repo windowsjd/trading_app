@@ -46,9 +46,17 @@ import { ProviderTargetResolverService } from './provider-target-resolver.servic
     BinanceWebSocketStreamingService,
     {
       provide: KisRateLimiterService,
-      useFactory: (redis: RedisService) =>
-        new KisRateLimiterService(redis, readKisRateLimitConfig()),
-      inject: [RedisService],
+      useFactory: (
+        redis: RedisService,
+        providerConfig: ProviderConfigService,
+      ) =>
+        new KisRateLimiterService(
+          redis,
+          readKisRateLimitConfig(process.env, {
+            kisEnabled: providerConfig.getKisConfig().enabled,
+          }),
+        ),
+      inject: [RedisService, ProviderConfigService],
     },
     {
       provide: KisRequestCoordinatorService,

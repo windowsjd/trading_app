@@ -226,6 +226,7 @@ Important scope for the current step:
 - Because nothing reads the cache yet, enabling `CANDLE_CACHE_ENABLED=true` in this step does **not** reduce KIS/Binance provider call volume. The reusable candle single-flight coordinator exists but is likewise **not yet wired into the candles endpoint**.
 - KIS REST rate limiting is active on the actual `KisAuthClient` OAuth and `KisQuoteClient` quote request paths. It does not affect Binance REST or either provider's WebSocket traffic. Redis atomically reserves account-wide slots using Redis server time; if Redis is unavailable, each process continues with a conservative FIFO in-process limiter instead of calling KIS without limits. Multi-instance fallback cannot enforce a shared account limit and emits one outage warning until recovery.
 - Single-flight uses local Promise sharing plus token-owned Redis locks, bounded cache polling, double-check after acquisition, and periodic ownership renewal. It is intended for bounded serving loads only; minute-scale historical backfills require a later job queue/backfill-lock design.
+- Single-flight snapshots the asset cache generation once. Local Promise and distributed lock identities include that generation, and the final cache write is one Lua operation that verifies both the owner token and unchanged generation. A successful stale loader result may be returned to its caller but is never written into a newer generation.
 - The cache **fails open**: `RedisService` connects lazily (no Redis connection is opened at boot while the cache is disabled), registers an error listener so a Redis outage cannot crash the process, and reconnects with bounded backoff. Cache reads return a `miss`/`error` status and cache writes return an `error` status when Redis is unavailable, so a Redis outage never breaks the API once the cache is wired. Redis URL/password and cached payloads are never logged.
 - Cache invalidation for one asset is O(1) via a per-asset generation counter (`candles:gen:v1:{assetId}` is `INCR`ed); prior entries under `candles:data:v1:{assetId}:g{generation}:…` become unreachable and expire by TTL. No `KEYS`, production `SCAN`, `FLUSHDB`, or `FLUSHALL` is used.
 
@@ -237,6 +238,37 @@ KIS_COORDINATION_REDIS_SMOKE=1 pnpm test -- kis-coordination.integration.spec.ts
 ```
 
 It only creates and deletes keys under a random-UUID asset namespace and never flushes shared Redis data.
+
+### Market candle retention
+
+The future 4-hour chart serves a 30-day display window. The internal source policy keeps 5-minute candles for 35 days by default, leaving a five-day safety margin. Retention deletes only rows satisfying all of `interval='5m'`, `is_closed=true`, and `open_time < cutoff`. Open 5m candles, daily candles, weekly candles, and rows exactly at the cutoff are preserved.
+
+Retention uses deterministic bounded PostgreSQL batches (default 5,000 rows), yields between full batches, and is idempotent after partial failure. The existing `(interval, open_time)` and `(is_closed, open_time)` indexes support candidate selection; no speculative index was added.
+
+Scheduler configuration:
+
+- `SCHEDULER_MARKET_CANDLE_RETENTION_ENABLED=false`
+- `MARKET_CANDLE_5M_RETENTION_DAYS=35` (minimum 31)
+- `MARKET_CANDLE_RETENTION_BATCH_SIZE=5000` (maximum 10,000)
+- `SCHEDULER_MARKET_CANDLE_RETENTION_HOUR=4`
+- `SCHEDULER_MARKET_CANDLE_RETENTION_MINUTE=0`
+- `SCHEDULER_MARKET_CANDLE_RETENTION_RUN_ON_STARTUP=false`
+
+The default schedule is 04:00 in `SCHEDULER_TIMEZONE` (`Asia/Seoul`) and is disabled by default. Due checks use persisted successful non-dry-run `OpsJobRun` history, while the shared DB lock and owner-checked renewal ensure only one deletion owner across backend instances. Failed runs can retry on a later tick. Startup opt-in uses the same due check and does not run unconditionally.
+
+Manual/operator code must call `OpsJobRunnerService.runMarketCandleRetentionJob({ trigger, requestedBy, dryRun })`; this preserves the same lock and `OpsJobRun` audit path. No unauthenticated/public retention endpoint or direct-delete script exists.
+
+Opt-in smoke commands (all use isolated UUID fixtures and `migrate deploy`; none resets or drops the database):
+
+```bash
+MARKET_CANDLE_RETENTION_DB_SMOKE=1 pnpm test -- market-candle-retention.integration.spec.ts
+KIS_COORDINATION_REDIS_SMOKE=1 pnpm test -- kis-coordination.integration.spec.ts
+CANDLE_PIPELINE_FOUNDATION_SMOKE=1 pnpm test -- candle-pipeline-foundation.integration.spec.ts
+```
+
+KIS deployments with both `KIS_MARKET_DATA_ENABLED=true` and rate limiting enabled must explicitly set `KIS_API_ENVIRONMENT=real|virtual`; missing or unknown values fail startup. Redis outages retain a per-process conservative limiter, including the relative delay carried across Redis/local transitions.
+
+The cache and single-flight coordinator remain unconnected to the candles endpoint. Historical backfill, provider-result persistence, DB serving fallback, and 5m-to-higher-interval aggregation remain unimplemented.
 
 ## Local Commands
 

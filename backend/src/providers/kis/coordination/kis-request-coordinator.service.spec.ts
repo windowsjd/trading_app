@@ -18,7 +18,10 @@ describe('KisRequestCoordinatorService', () => {
     appKeyHash: 'hash',
   };
 
-  const create = (overrides: Partial<KisRateLimitConfig> = {}) => {
+  const create = (
+    overrides: Partial<KisRateLimitConfig> = {},
+    now: () => number = Date.now,
+  ) => {
     const limiter = {
       config: { ...config, ...overrides },
       reserve: jest.fn().mockResolvedValue({ delayMs: 0, mode: 'redis' }),
@@ -27,6 +30,7 @@ describe('KisRequestCoordinatorService', () => {
       limiter,
       service: new KisRequestCoordinatorService(
         limiter as unknown as KisRateLimiterService,
+        now,
       ),
     };
   };
@@ -42,6 +46,38 @@ describe('KisRequestCoordinatorService', () => {
       ),
     );
     expect(order).toEqual([1, 2, 3]);
+  });
+
+  it('passes only the request remaining wait to Redis reservation', async () => {
+    let now = 1000;
+    let unblock!: () => void;
+    const blocked = new Promise<void>((resolve) => (unblock = resolve));
+    const { limiter, service } = create({}, () => now);
+    limiter.reserve.mockImplementationOnce(async () => {
+      await blocked;
+      return { delayMs: 0, mode: 'redis' };
+    });
+    const first = service.acquire('rest');
+    const second = service.acquire('rest');
+    now += 400;
+    unblock();
+    await Promise.all([first, second]);
+    expect(limiter.reserve).toHaveBeenNthCalledWith(2, 'rest', 600);
+  });
+
+  it('does not reserve a Redis slot after the request wait is exhausted', async () => {
+    let calls = 0;
+    const { limiter, service } = create({ maxWaitMs: 100 }, () =>
+      ++calls >= 5 ? 1101 : 1000,
+    );
+    const first = service.acquire('rest');
+    const second = service.acquire('rest');
+    const expectation = expect(second).rejects.toBeInstanceOf(
+      KisRateLimitWaitTimeoutError,
+    );
+    await first;
+    await expectation;
+    expect(limiter.reserve).toHaveBeenCalledTimes(1);
   });
 
   it('waits the exact Redis-reserved delay', async () => {

@@ -152,6 +152,23 @@ export class OpsJobRunService {
     });
   }
 
+  findLatestSucceededRunForJob(jobName: OpsJobName) {
+    return this.prisma.opsJobRun.findFirst({
+      where: {
+        jobName,
+        status: OpsJobRunStatus.succeeded,
+        dryRun: false,
+      },
+      orderBy: [{ finishedAt: 'desc' }, { startedAt: 'desc' }],
+      select: {
+        jobName: true,
+        status: true,
+        startedAt: true,
+        finishedAt: true,
+      },
+    });
+  }
+
   serializeRun(run: OpsJobRun): SerializedOpsJobRun {
     return {
       id: run.id,

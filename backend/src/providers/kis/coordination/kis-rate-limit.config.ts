@@ -25,8 +25,13 @@ type Env = Record<string, string | undefined>;
 
 export function readKisRateLimitConfig(
   env: Env = process.env,
+  options: { kisEnabled?: boolean } = {},
 ): KisRateLimitConfig {
-  const environment = readEnvironment(env.KIS_API_ENVIRONMENT);
+  const enabled = readBoolean(env.KIS_RATE_LIMIT_ENABLED, true);
+  const environment = readEnvironment(
+    env.KIS_API_ENVIRONMENT,
+    options.kisEnabled === true && enabled,
+  );
   const restMinIntervalMs = readPositiveInteger(
     env.KIS_REST_MIN_INTERVAL_MS,
     environment === 'real'
@@ -54,7 +59,7 @@ export function readKisRateLimitConfig(
   }
 
   return {
-    enabled: readBoolean(env.KIS_RATE_LIMIT_ENABLED, true),
+    enabled,
     environment,
     restMinIntervalMs,
     oauthMinIntervalMs,
@@ -86,8 +91,19 @@ export function intervalFor(
     : config.restMinIntervalMs;
 }
 
-function readEnvironment(value: string | undefined): KisApiEnvironment {
-  const normalized = value?.trim() || 'real';
+function readEnvironment(
+  value: string | undefined,
+  required: boolean,
+): KisApiEnvironment {
+  const normalized = value?.trim();
+  if (!normalized) {
+    if (required) {
+      throw new KisRateLimitConfigError(
+        'KIS_API_ENVIRONMENT is required when KIS and rate limiting are enabled.',
+      );
+    }
+    return 'real';
+  }
   if (normalized !== 'real' && normalized !== 'virtual') {
     throw new KisRateLimitConfigError(
       'KIS_API_ENVIRONMENT must be real or virtual.',

@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto';
 import type { MarketCandle } from '../generated/prisma/client';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { MARKET_CANDLE_DELETE_BATCH_MAX_LIMIT } from './market-candle-retention.constants';
+export { MARKET_CANDLE_DELETE_BATCH_MAX_LIMIT } from './market-candle-retention.constants';
 
 // Storage-supported intervals for this phase. Aggregated intervals
 // (15m/30m/1h/4h) are derived from 5m in a later phase and are not
@@ -56,6 +58,12 @@ export type MarketCandleDeleteClosedBeforeParams = {
   cutoff: Date;
   intervals?: readonly MarketCandleInterval[];
   assetId?: string;
+};
+
+export type MarketCandleDeleteClosedBeforeBatchParams = {
+  cutoff: Date;
+  interval: '5m';
+  limit: number;
 };
 
 export type MarketCandleCoverage = {
@@ -244,6 +252,48 @@ export class MarketCandlesRepository {
     });
 
     return { deletedCount: result.count };
+  }
+
+  /**
+   * Deletes at most `limit` oldest closed 5m rows. The CTE selection is
+   * deterministic and uses row locks with SKIP LOCKED so concurrent workers
+   * cannot select the same rows. Retention callers still use the Ops DB lock
+   * to keep one logical owner across batches.
+   */
+  async deleteClosedBeforeBatch(
+    params: MarketCandleDeleteClosedBeforeBatchParams,
+  ): Promise<number> {
+    const cutoff = this.requireValidDate(params.cutoff, 'cutoff');
+    if (params.interval !== '5m') {
+      throw new MarketCandleValidationError(
+        'deleteClosedBeforeBatch only supports the 5m interval.',
+      );
+    }
+    if (
+      !Number.isSafeInteger(params.limit) ||
+      params.limit <= 0 ||
+      params.limit > MARKET_CANDLE_DELETE_BATCH_MAX_LIMIT
+    ) {
+      throw new MarketCandleValidationError(
+        `deleteClosedBeforeBatch limit must be between 1 and ${MARKET_CANDLE_DELETE_BATCH_MAX_LIMIT}.`,
+      );
+    }
+
+    return this.prisma.$executeRaw(Prisma.sql`
+      WITH candidates AS (
+        SELECT "id"
+        FROM "market_candles"
+        WHERE "interval" = ${params.interval}
+          AND "is_closed" = TRUE
+          AND "open_time" < ${cutoff}
+        ORDER BY "open_time" ASC, "id" ASC
+        LIMIT ${params.limit}
+        FOR UPDATE SKIP LOCKED
+      )
+      DELETE FROM "market_candles" AS target
+      USING candidates
+      WHERE target."id" = candidates."id"
+    `);
   }
 
   /**

@@ -27,6 +27,8 @@ import {
 } from './ops-config';
 import { OpsJobLockService } from './ops-job-lock.service';
 import { OpsJobRunService, SerializedOpsJobRun } from './ops-job-run.service';
+import { MarketCandleRetentionService } from '../assets/market-candle-retention.service';
+import { readMarketCandleRetentionConfig } from '../assets/market-candle-retention.config';
 
 export type OpsJobRunnerResponse =
   | {
@@ -71,6 +73,12 @@ export type TimedOpsJobInput = OpsJobRunnerInput & {
   createEquitySnapshots?: boolean;
 };
 
+export type MarketCandleRetentionOpsJobInput = OpsJobRunnerInput & {
+  now?: string | null;
+  retentionDays?: number;
+  batchSize?: number;
+};
+
 @Injectable()
 export class OpsJobRunnerService {
   constructor(
@@ -84,6 +92,7 @@ export class OpsJobRunnerService {
     private readonly kisRestCurrentPriceIngestionService: KisRestCurrentPriceIngestionService,
     private readonly kisWebSocketClient: KisWebSocketClient,
     private readonly providerTargetResolver: ProviderTargetResolverService,
+    private readonly marketCandleRetentionService: MarketCandleRetentionService,
     private readonly prisma: PrismaService,
     private readonly lockService: OpsJobLockService,
     private readonly runService: OpsJobRunService,
@@ -411,6 +420,55 @@ export class OpsJobRunnerService {
     );
   }
 
+  runMarketCandleRetentionJob(input: MarketCandleRetentionOpsJobInput = {}) {
+    const now = this.parseOptionalDate(input.now) ?? new Date();
+    const config = readMarketCandleRetentionConfig();
+    const validated = readMarketCandleRetentionConfig({
+      MARKET_CANDLE_5M_RETENTION_DAYS: String(
+        input.retentionDays ?? config.retentionDays,
+      ),
+      MARKET_CANDLE_RETENTION_BATCH_SIZE: String(
+        input.batchSize ?? config.batchSize,
+      ),
+    });
+    const retentionDays = validated.retentionDays;
+    const batchSize = validated.batchSize;
+    const cutoff = new Date(
+      now.getTime() - retentionDays * 24 * 60 * 60 * 1000,
+    );
+    return this.runLockedOpsJob(
+      OpsJobName.market_candle_retention,
+      input,
+      'market_candle_retention:5m',
+      async (context) => {
+        const result = await this.marketCandleRetentionService.run({
+          now,
+          retentionDays,
+          batchSize,
+          isLockOwned: context.isLockOwned,
+        });
+        return {
+          cutoff: result.cutoff.toISOString(),
+          retentionDays: result.retentionDays,
+          deletedCount: result.deletedCount,
+          batchCount: result.batchCount,
+          startedAt: result.startedAt.toISOString(),
+          finishedAt: result.finishedAt.toISOString(),
+        };
+      },
+      {
+        renewLock: true,
+        dryRunResult: {
+          cutoff: cutoff.toISOString(),
+          retentionDays,
+          deletedCount: 0,
+          batchCount: 0,
+          dryRun: true,
+        },
+      },
+    );
+  }
+
   async runDailyPortfolioSnapshotJob(
     input: DailySnapshotOpsJobInput,
   ): Promise<OpsJobRunnerResponse> {
@@ -466,16 +524,25 @@ export class OpsJobRunnerService {
       return this.successResponse(locked, { locked: true, skipped: true });
     }
 
-    const run = await this.runService.createRunning({
-      jobName,
-      trigger,
-      requestedBy: input.requestedBy,
-      lockKey,
-      dryRun,
-      idempotencyKey: input.idempotencyKey,
-      maxAttempts: input.maxAttempts ?? this.defaultMaxAttempts(),
-      metadataJson: input.metadataJson,
-    });
+    let run: OpsJobRun;
+    try {
+      run = await this.runService.createRunning({
+        jobName,
+        trigger,
+        requestedBy: input.requestedBy,
+        lockKey,
+        dryRun,
+        idempotencyKey: input.idempotencyKey,
+        maxAttempts: input.maxAttempts ?? this.defaultMaxAttempts(),
+        metadataJson: input.metadataJson,
+      });
+    } catch (error) {
+      await this.lockService.releaseLock({
+        lockKey,
+        ownerId: lock.ownerId,
+      });
+      throw error;
+    }
 
     try {
       const batchResponse = await this.dailyPortfolioSnapshotJobService.run({
@@ -530,7 +597,8 @@ export class OpsJobRunnerService {
     jobName: OpsJobName,
     input: OpsJobRunnerInput,
     lockKey: string,
-    handler: () => Promise<unknown>,
+    handler: (context: { isLockOwned: () => boolean }) => Promise<unknown>,
+    options: { renewLock?: boolean; dryRunResult?: unknown } = {},
   ): Promise<OpsJobRunnerResponse> {
     const trigger = input.trigger ?? OpsJobTrigger.manual_script;
     const dryRun = input.dryRun === true;
@@ -560,24 +628,66 @@ export class OpsJobRunnerService {
       return this.successResponse(locked, { locked: true, skipped: true });
     }
 
-    const run = await this.runService.createRunning({
-      jobName,
-      trigger,
-      requestedBy: input.requestedBy,
-      lockKey,
-      dryRun,
-      idempotencyKey: input.idempotencyKey,
-      maxAttempts: input.maxAttempts ?? this.defaultMaxAttempts(),
-      metadataJson: input.metadataJson,
-    });
+    let run: OpsJobRun;
+    try {
+      run = await this.runService.createRunning({
+        jobName,
+        trigger,
+        requestedBy: input.requestedBy,
+        lockKey,
+        dryRun,
+        idempotencyKey: input.idempotencyKey,
+        maxAttempts: input.maxAttempts ?? this.defaultMaxAttempts(),
+        metadataJson: input.metadataJson,
+      });
+    } catch (error) {
+      await this.lockService.releaseLock({
+        lockKey,
+        ownerId: lock.ownerId,
+      });
+      throw error;
+    }
+
+    let lockOwned = true;
+    let renewalRunning = false;
+    let renewalPromise: Promise<void> | null = null;
+    const ttlSeconds = input.lockTtlSeconds ?? this.defaultLockTtlSeconds();
+    const renewal = options.renewLock
+      ? setInterval(
+          () => {
+            if (renewalRunning || !lockOwned) return;
+            renewalRunning = true;
+            renewalPromise = this.lockService
+              .extendLock({
+                lockKey,
+                ownerId: lock.ownerId,
+                ttlSeconds,
+              })
+              .then((extended) => {
+                if (!extended) lockOwned = false;
+              })
+              .catch(() => {
+                lockOwned = false;
+              })
+              .finally(() => {
+                renewalRunning = false;
+              });
+          },
+          Math.max(100, Math.floor((ttlSeconds * 1000) / 3)),
+        )
+      : null;
 
     try {
       const resultJson = dryRun
-        ? {
+        ? (options.dryRunResult ?? {
             dryRun: true,
             message: `${jobName} would run when dryRun is false.`,
-          }
-        : await handler();
+          })
+        : await handler({ isLockOwned: () => lockOwned });
+      if (renewalPromise) await renewalPromise;
+      if (!lockOwned) {
+        throw new Error(`${jobName} lock ownership was lost.`);
+      }
       const succeeded = await this.runService.recordSucceeded(run, {
         resultJson,
       });
@@ -602,6 +712,8 @@ export class OpsJobRunnerService {
         },
       };
     } finally {
+      if (renewal) clearInterval(renewal);
+      if (renewalPromise) await renewalPromise;
       await this.lockService.releaseLock({
         lockKey,
         ownerId: lock.ownerId,

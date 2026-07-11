@@ -17,6 +17,7 @@ import {
 } from './asset-candles-cache.keys';
 import { RedisConfigError } from '../redis/redis.config';
 import { RedisKeyError, RedisUnavailableError } from '../redis/redis.types';
+import { REDIS_SET_CANDLE_IF_OWNER_AND_GENERATION_SCRIPT } from '../redis/redis-lua-scripts';
 
 // Central TTL policy keyed by the API-supported CandleInterval set (the
 // `Record<CandleInterval, number>` type makes coverage exhaustive at compile
@@ -65,6 +66,26 @@ export type CandleCacheWriteResult =
   | { status: 'skipped_oversized'; byteSize: number }
   | { status: 'error' };
 
+export type CandleCacheConditionalWriteResult =
+  | { status: 'stored'; ttlSeconds: number; byteSize: number }
+  | { status: 'skipped_generation_changed' }
+  | { status: 'skipped_lock_lost' }
+  | { status: 'skipped_disabled' }
+  | { status: 'skipped_oversized'; byteSize: number }
+  | { status: 'error' };
+
+export type CandleCacheContext = {
+  input: CandleCacheKeyInput;
+  generation: number;
+  generationKey: string;
+  dataKey: string;
+};
+
+export type CandleCacheContextResult =
+  | { status: 'resolved'; context: CandleCacheContext }
+  | { status: 'disabled' }
+  | { status: 'error' };
+
 export type CandleCacheDeleteResult =
   | { status: 'invalidated' }
   | { status: 'disabled' }
@@ -97,14 +118,38 @@ export class AssetCandlesCacheService {
    * deleted best-effort and reported as `miss`.
    */
   async get(input: CandleCacheKeyInput): Promise<CandleCacheReadResult> {
-    if (!this.config.enabled) {
-      return { status: 'disabled' };
-    }
+    const resolved = await this.resolveContext(input);
+    if (resolved.status !== 'resolved') return resolved;
+    return this.getWithContext(resolved.context);
+  }
 
+  async resolveContext(
+    input: CandleCacheKeyInput,
+  ): Promise<CandleCacheContextResult> {
+    if (!this.config.enabled) return { status: 'disabled' };
     try {
-      const generation = await this.readGeneration(input.assetId);
-      const key = buildCandleDataKey({ ...input, generation });
-      const raw = await this.redis.get(key);
+      const generationKey = buildCandleGenerationKey(input.assetId);
+      const generation = await this.readGenerationByKey(generationKey);
+      return {
+        status: 'resolved',
+        context: {
+          input: { ...input },
+          generation,
+          generationKey,
+          dataKey: buildCandleDataKey({ ...input, generation }),
+        },
+      };
+    } catch (error) {
+      return this.failOpenOrThrow('resolveContext', error);
+    }
+  }
+
+  async getWithContext(
+    context: CandleCacheContext,
+  ): Promise<CandleCacheReadResult> {
+    if (!this.config.enabled) return { status: 'disabled' };
+    try {
+      const raw = await this.redis.get(context.dataKey);
       if (raw === null) {
         this.markOperationalSuccess();
         return { status: 'miss' };
@@ -113,7 +158,7 @@ export class AssetCandlesCacheService {
       const parsed = this.parseEnvelope(raw);
       if (!parsed) {
         // Corrupt or unsupported entry: drop it best-effort, then miss.
-        await this.safeDelete(key);
+        await this.safeDelete(context.dataKey);
         return { status: 'miss' };
       }
 
@@ -125,6 +170,43 @@ export class AssetCandlesCacheService {
       };
     } catch (error) {
       return this.failOpenOrThrow('get', error);
+    }
+  }
+
+  async setIfOwnerAndGeneration(
+    context: CandleCacheContext,
+    value: AssetCandlesResponse,
+    owner: { lockKey: string; lockToken: string },
+  ): Promise<CandleCacheConditionalWriteResult> {
+    if (!this.config.enabled) return { status: 'skipped_disabled' };
+    try {
+      const serialized = this.serializeEnvelope(value);
+      if (serialized.byteSize > this.config.maxPayloadBytes) {
+        return { status: 'skipped_oversized', byteSize: serialized.byteSize };
+      }
+      const ttlSeconds = resolveCandleCacheTtlSeconds(context.input.interval);
+      const result = Number(
+        await this.redis.eval(
+          REDIS_SET_CANDLE_IF_OWNER_AND_GENERATION_SCRIPT,
+          [owner.lockKey, context.generationKey, context.dataKey],
+          [
+            owner.lockToken,
+            String(context.generation),
+            serialized.value,
+            String(ttlSeconds),
+          ],
+        ),
+      );
+      if (result === -1) return { status: 'skipped_lock_lost' };
+      if (result === -2) return { status: 'skipped_generation_changed' };
+      if (result !== 1)
+        throw new RedisUnavailableError(
+          'Invalid conditional cache write result.',
+        );
+      this.markOperationalSuccess();
+      return { status: 'stored', ttlSeconds, byteSize: serialized.byteSize };
+    } catch (error) {
+      return this.failOpenOrThrow('setIfOwnerAndGeneration', error);
     }
   }
 
@@ -143,13 +225,8 @@ export class AssetCandlesCacheService {
     }
 
     try {
-      const envelope: CandleCacheEnvelope = {
-        version: CANDLE_CACHE_ENVELOPE_VERSION,
-        cachedAt: new Date().toISOString(),
-        value,
-      };
-      const serialized = JSON.stringify(envelope);
-      const byteSize = Buffer.byteLength(serialized, 'utf8');
+      const serialized = this.serializeEnvelope(value);
+      const byteSize = serialized.byteSize;
 
       if (byteSize > this.config.maxPayloadBytes) {
         // Log only the byte size, never the payload contents.
@@ -162,7 +239,7 @@ export class AssetCandlesCacheService {
       const generation = await this.readGeneration(input.assetId);
       const key = buildCandleDataKey({ ...input, generation });
       const ttlSeconds = resolveCandleCacheTtlSeconds(input.interval);
-      await this.redis.setWithTtl(key, serialized, ttlSeconds);
+      await this.redis.setWithTtl(key, serialized.value, ttlSeconds);
       this.markOperationalSuccess();
       return { status: 'stored', ttlSeconds, byteSize };
     } catch (error) {
@@ -215,13 +292,32 @@ export class AssetCandlesCacheService {
   // (only possible via external tampering; INCR always writes integers) is
   // treated as 0 defensively.
   private async readGeneration(assetId: string): Promise<number> {
-    const raw = await this.redis.get(buildCandleGenerationKey(assetId));
+    return this.readGenerationByKey(buildCandleGenerationKey(assetId));
+  }
+
+  private async readGenerationByKey(generationKey: string): Promise<number> {
+    const raw = await this.redis.get(generationKey);
     if (raw === null) {
       return 0;
     }
 
     const parsed = Number(raw);
     return Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
+  }
+
+  private serializeEnvelope(value: AssetCandlesResponse): {
+    value: string;
+    byteSize: number;
+  } {
+    const serialized = JSON.stringify({
+      version: CANDLE_CACHE_ENVELOPE_VERSION,
+      cachedAt: new Date().toISOString(),
+      value,
+    } satisfies CandleCacheEnvelope);
+    return {
+      value: serialized,
+      byteSize: Buffer.byteLength(serialized, 'utf8'),
+    };
   }
 
   // Returns null for any malformed, unsupported, or invalid entry so the caller

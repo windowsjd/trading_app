@@ -251,7 +251,8 @@ export const OpsJobName = {
   season_ranking_generation: 'season_ranking_generation',
   season_lifecycle_transition: 'season_lifecycle_transition',
   season_settlement: 'season_settlement',
-  reward_marker: 'reward_marker'
+  reward_marker: 'reward_marker',
+  market_candle_retention: 'market_candle_retention'
 } as const
 
 export type OpsJobName = (typeof OpsJobName)[keyof typeof OpsJobName]

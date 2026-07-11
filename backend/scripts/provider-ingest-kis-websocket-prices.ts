@@ -6,6 +6,11 @@ import { KisWebSocketClient } from '../src/providers/kis/kis-websocket.client';
 import { KisWebSocketIngestionService } from '../src/providers/kis/kis-websocket.ingestion.service';
 import { ProviderConfigService } from '../src/providers/provider-config.service';
 import type { PrismaService } from '../src/prisma/prisma.service';
+import { RedisService } from '../src/redis/redis.service';
+import { readRedisConfig } from '../src/redis/redis.config';
+import { readKisRateLimitConfig } from '../src/providers/kis/coordination/kis-rate-limit.config';
+import { KisRateLimiterService } from '../src/providers/kis/coordination/kis-rate-limiter.service';
+import { KisRequestCoordinatorService } from '../src/providers/kis/coordination/kis-request-coordinator.service';
 
 loadDotenv({ path: '.env.local' });
 loadDotenv();
@@ -87,7 +92,15 @@ export async function runProviderIngestKisWebSocketPrices(argv: string[]) {
   });
   const prisma = new PrismaClient({ adapter });
   const configService = new ProviderConfigService();
-  const authClient = new KisAuthClient(configService);
+  const redis = new RedisService(readRedisConfig());
+  const rateLimiter = new KisRateLimiterService(
+    redis,
+    readKisRateLimitConfig(process.env, {
+      kisEnabled: configService.getKisConfig().enabled,
+    }),
+  );
+  const coordinator = new KisRequestCoordinatorService(rateLimiter);
+  const authClient = new KisAuthClient(configService, coordinator);
   const ingestionService = new KisWebSocketIngestionService(
     prisma as unknown as PrismaService,
     configService,
@@ -112,6 +125,8 @@ export async function runProviderIngestKisWebSocketPrices(argv: string[]) {
       process.exitCode = 1;
     }
   } finally {
+    await coordinator.onModuleDestroy();
+    await redis.onModuleDestroy();
     await prisma.$disconnect();
   }
 }

@@ -21,6 +21,10 @@ type FakeRedis = {
   setWithTtl: jest.Mock<Promise<void>, [string, string, number]>;
   delete: jest.Mock<Promise<number>, [string]>;
   increment: jest.Mock<Promise<number>, [string]>;
+  eval: jest.Mock<
+    Promise<unknown>,
+    [string, readonly string[], readonly string[]]
+  >;
 };
 
 const keyInput: CandleCacheKeyInput = {
@@ -88,6 +92,7 @@ const createFakeRedis = (generation: string | null = null): FakeRedis => {
     setWithTtl: jest.fn((): Promise<void> => Promise.resolve()),
     delete: jest.fn((): Promise<number> => Promise.resolve(1)),
     increment: jest.fn((): Promise<number> => Promise.resolve(1)),
+    eval: jest.fn((): Promise<unknown> => Promise.resolve(1)),
   };
 };
 
@@ -396,6 +401,56 @@ describe('AssetCandlesCacheService', () => {
       await service.set(keyInput, createResponse('available'));
 
       expect(redis.setWithTtl.mock.calls[0][0]).toBe(dataKeyFor(0));
+    });
+  });
+
+  describe('generation-aware conditional writes', () => {
+    it('resolves one generation snapshot and derives both Redis keys', async () => {
+      const redis = createFakeRedis('7');
+      const service = createService(redis);
+      await expect(service.resolveContext(keyInput)).resolves.toEqual({
+        status: 'resolved',
+        context: {
+          input: keyInput,
+          generation: 7,
+          generationKey: buildCandleGenerationKey('asset-1'),
+          dataKey: dataKeyFor(7),
+        },
+      });
+    });
+
+    it.each([
+      [1, 'stored'],
+      [-1, 'skipped_lock_lost'],
+      [-2, 'skipped_generation_changed'],
+    ])('maps atomic result %s to %s', async (atomicResult, status) => {
+      const redis = createFakeRedis('3');
+      redis.eval.mockResolvedValueOnce(atomicResult);
+      const service = createService(redis);
+      const resolved = await service.resolveContext(keyInput);
+      if (resolved.status !== 'resolved') throw new Error('context missing');
+
+      await expect(
+        service.setIfOwnerAndGeneration(
+          resolved.context,
+          createResponse('available'),
+          { lockKey: 'candles:lock:v1:hash', lockToken: 'owner-token' },
+        ),
+      ).resolves.toMatchObject({ status });
+      expect(redis.eval).toHaveBeenCalledWith(
+        expect.any(String),
+        [
+          'candles:lock:v1:hash',
+          buildCandleGenerationKey('asset-1'),
+          dataKeyFor(3),
+        ],
+        [
+          'owner-token',
+          '3',
+          expect.any(String),
+          String(CANDLE_CACHE_TTL_SECONDS['5m']),
+        ],
+      );
     });
   });
 

@@ -4,6 +4,8 @@ import {
   DEFAULT_KIS_VIRTUAL_REST_MIN_INTERVAL_MS,
 } from './kis-rate-limit.config';
 import { KisRateLimitConfigError } from './kis-rate-limit.types';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 describe('KIS rate-limit config', () => {
   it('uses conservative real and virtual defaults', () => {
@@ -32,5 +34,39 @@ describe('KIS rate-limit config', () => {
     });
     expect(config.appKeyHash).toHaveLength(16);
     expect(JSON.stringify(config)).not.toContain('plain-secret-app-key');
+  });
+
+  it('requires an explicit environment only when KIS and limiting are enabled', () => {
+    expect(() => readKisRateLimitConfig({}, { kisEnabled: true })).toThrow(
+      KisRateLimitConfigError,
+    );
+    expect(() =>
+      readKisRateLimitConfig(
+        { KIS_RATE_LIMIT_ENABLED: 'false' },
+        { kisEnabled: true },
+      ),
+    ).not.toThrow();
+    expect(() =>
+      readKisRateLimitConfig({}, { kisEnabled: false }),
+    ).not.toThrow();
+    expect(
+      readKisRateLimitConfig(
+        { KIS_API_ENVIRONMENT: 'virtual' },
+        { kisEnabled: true },
+      ).environment,
+    ).toBe('virtual');
+  });
+
+  it('does not wire the KIS REST coordinator into Binance or WebSocket clients', () => {
+    for (const file of [
+      'providers/binance/binance-public.client.ts',
+      'providers/binance/binance-websocket-streaming.service.ts',
+      'providers/kis/kis-websocket.client.ts',
+      'providers/kis/kis-websocket-streaming.service.ts',
+    ]) {
+      expect(
+        readFileSync(join(process.cwd(), 'src', file), 'utf8'),
+      ).not.toContain('KisRequestCoordinatorService');
+    }
   });
 });

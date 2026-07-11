@@ -34,21 +34,31 @@ export class KisRateLimiterService {
 
   async reserve(
     trafficClass: KisTrafficClass,
+    maxWaitMs: number = this.config.maxWaitMs,
   ): Promise<KisRateLimitReservation> {
     if (!this.config.enabled) return { delayMs: 0, mode: 'local' };
+    if (!Number.isSafeInteger(maxWaitMs) || maxWaitMs <= 0) {
+      throw new KisRateLimitWaitTimeoutError();
+    }
     const intervalMs = intervalFor(this.config, trafficClass);
+    const localFloorDelay = Math.max(
+      0,
+      this.localNextAt[trafficClass] - this.now(),
+    );
     try {
       const raw = await this.redis.eval(
         REDIS_RESERVE_NEXT_AVAILABLE_SCRIPT,
         [this.keyFor(trafficClass)],
         [
           String(intervalMs),
-          String(this.config.maxWaitMs),
-          String(this.config.maxWaitMs + intervalMs + 60_000),
+          String(maxWaitMs),
+          String(maxWaitMs + intervalMs + 60_000),
+          String(localFloorDelay),
         ],
       );
       const delayMs = parseDelay(raw);
       if (delayMs < 0) throw new KisRateLimitWaitTimeoutError();
+      this.localNextAt[trafficClass] = this.now() + delayMs + intervalMs;
       if (this.distributedOutageLogged) {
         this.logger.log('Distributed KIS rate limiting restored.');
         this.distributedOutageLogged = false;
@@ -62,7 +72,7 @@ export class KisRateLimiterService {
         );
         this.distributedOutageLogged = true;
       }
-      return this.reserveLocally(trafficClass, intervalMs);
+      return this.reserveLocally(trafficClass, intervalMs, maxWaitMs);
     }
   }
 
@@ -73,11 +83,12 @@ export class KisRateLimiterService {
   private reserveLocally(
     trafficClass: KisTrafficClass,
     intervalMs: number,
+    maxWaitMs: number,
   ): KisRateLimitReservation {
     const now = this.now();
     const slotAt = Math.max(now, this.localNextAt[trafficClass]);
     const delayMs = slotAt - now;
-    if (delayMs > this.config.maxWaitMs) {
+    if (delayMs > maxWaitMs) {
       throw new KisRateLimitWaitTimeoutError();
     }
     this.localNextAt[trafficClass] = slotAt + intervalMs;

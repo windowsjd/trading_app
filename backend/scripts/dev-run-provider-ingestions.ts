@@ -14,6 +14,7 @@ import { ExchangeRateClient } from '../src/providers/exchange-rate/exchange-rate
 import { ExchangeRateIngestionService } from '../src/providers/exchange-rate/exchange-rate.ingestion.service';
 import { KisAuthClient } from '../src/providers/kis/kis-auth.client';
 import { KisQuoteClient } from '../src/providers/kis/kis-quote.client';
+import { KisRequestCoordinatorService } from '../src/providers/kis/coordination/kis-request-coordinator.service';
 import { KisRestCurrentPriceIngestionService } from '../src/providers/kis/kis-rest-current-price.ingestion.service';
 import { KoreaEximExchangeClient } from '../src/providers/korea-exim/korea-exim-exchange.client';
 import { KoreaEximExchangeIngestionService } from '../src/providers/korea-exim/korea-exim-exchange.ingestion.service';
@@ -146,15 +147,19 @@ const OPERATOR_REQUIRED_MESSAGE = [
     },
     {
       provide: KisAuthClient,
-      inject: [ProviderConfigService],
-      useFactory: (configService: ProviderConfigService) =>
-        new KisAuthClient(configService),
+      inject: [ProviderConfigService, KisRequestCoordinatorService],
+      useFactory: (
+        configService: ProviderConfigService,
+        coordinator: KisRequestCoordinatorService,
+      ) => new KisAuthClient(configService, coordinator),
     },
     {
       provide: KisQuoteClient,
-      inject: [ProviderConfigService],
-      useFactory: (configService: ProviderConfigService) =>
-        new KisQuoteClient(configService),
+      inject: [ProviderConfigService, KisRequestCoordinatorService],
+      useFactory: (
+        configService: ProviderConfigService,
+        coordinator: KisRequestCoordinatorService,
+      ) => new KisQuoteClient(configService, coordinator),
     },
     {
       provide: KisRestCurrentPriceIngestionService,

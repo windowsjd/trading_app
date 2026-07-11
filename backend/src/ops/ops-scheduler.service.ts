@@ -12,6 +12,7 @@ import {
 import {
   getOpsSchedulerConfig,
   getSchedulerBusinessDate,
+  getSchedulerLocalDateTime,
   OpsSchedulerConfig,
   ProviderOpsJobName,
 } from './ops-config';
@@ -45,13 +46,29 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
         void this.runStartupProviderJobs(startupAt);
       });
     }
+    if (config.marketCandleRetention.runOnStartup) {
+      const startupAt = new Date();
+      void Promise.resolve().then(() => {
+        void this.runMarketCandleRetentionIfDue(startupAt, config).catch(
+          (error: unknown) => {
+            console.warn('Market candle retention startup check failed.', {
+              error: error instanceof Error ? error.message : 'Unknown error',
+            });
+          },
+        );
+      });
+    }
 
     if (!config.enabled) {
       return;
     }
 
     this.interval = setInterval(() => {
-      void this.runEnabledJobs(new Date());
+      void this.runEnabledJobs(new Date()).catch((error: unknown) => {
+        console.warn('Ops scheduler tick failed.', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      });
     }, config.tickIntervalMs);
   }
 
@@ -135,7 +152,46 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
       results.push(await this.runner.runRewardMarkerJob(baseInput));
     }
 
+    const retention = await this.runMarketCandleRetentionIfDue(now, config);
+    if (retention) results.push(retention);
+
     return results;
+  }
+
+  async runMarketCandleRetentionIfDue(
+    now: Date,
+    config: OpsSchedulerConfig = getOpsSchedulerConfig(),
+  ): Promise<OpsJobRunnerResponse | undefined> {
+    if (!config.marketCandleRetention.enabled) return undefined;
+    const local = getSchedulerLocalDateTime(now, config.timezone);
+    const scheduledMinute =
+      config.marketCandleRetention.hour * 60 +
+      config.marketCandleRetention.minute;
+    if (local.hour * 60 + local.minute < scheduledMinute) return undefined;
+
+    const businessDate = getSchedulerBusinessDate(now, config.timezone);
+    const latestSucceeded = await this.runService.findLatestSucceededRunForJob(
+      OpsJobName.market_candle_retention,
+    );
+    if (
+      latestSucceeded &&
+      getSchedulerBusinessDate(latestSucceeded.startedAt, config.timezone) ===
+        businessDate
+    ) {
+      return undefined;
+    }
+
+    return this.runner.runMarketCandleRetentionJob({
+      trigger: OpsJobTrigger.scheduler,
+      requestedBy: 'scheduler',
+      dryRun: false,
+      lockTtlSeconds: config.lockTtlSeconds,
+      maxAttempts: config.maxAttempts,
+      now: now.toISOString(),
+      retentionDays: config.marketCandleRetention.retentionDays,
+      batchSize: config.marketCandleRetention.batchSize,
+      metadataJson: { businessDate },
+    });
   }
 
   async runStartupProviderJobs(

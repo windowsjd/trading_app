@@ -3,10 +3,8 @@ import { createHash } from 'node:crypto';
 import { RedisLockService, type RedisLock } from '../redis/redis-lock.service';
 import type { AssetCandlesResponse } from './asset-candles.service';
 import { AssetCandlesCacheService } from './asset-candles-cache.service';
-import {
-  buildCandleDataKey,
-  type CandleCacheKeyInput,
-} from './asset-candles-cache.keys';
+import type { CandleCacheKeyInput } from './asset-candles-cache.keys';
+import type { CandleCacheContext } from './asset-candles-cache.service';
 import {
   readCandleSingleFlightConfig,
   type CandleSingleFlightConfig,
@@ -41,19 +39,27 @@ export class AssetCandlesSingleFlightService {
   async getOrLoad(
     input: CandleSingleFlightInput,
   ): Promise<AssetCandlesResponse> {
-    // Build once for validation and a stable local identity. Generation zero is
-    // only a validation aid; the cache service still owns generation lookup.
-    const identity = buildCandleDataKey({
-      ...input.cacheKeyInput,
-      generation: 0,
-    });
-    const initial = await this.cache.get(input.cacheKeyInput);
+    const resolved = await this.cache.resolveContext(input.cacheKeyInput);
+    const identity =
+      resolved.status === 'resolved'
+        ? resolved.context.dataKey
+        : `candles:local:${createHash('sha256')
+            .update(JSON.stringify(input.cacheKeyInput))
+            .digest('hex')}`;
+    const initial =
+      resolved.status === 'resolved'
+        ? await this.cache.getWithContext(resolved.context)
+        : resolved;
     if (initial.status === 'hit') return initial.value;
 
     const existing = this.inFlight.get(identity);
     if (existing) return existing;
 
-    const promise = this.coordinate(identity, input);
+    const promise = this.coordinate(
+      identity,
+      resolved.status === 'resolved' ? resolved.context : null,
+      input,
+    );
     this.inFlight.set(identity, promise);
     try {
       return await promise;
@@ -69,9 +75,10 @@ export class AssetCandlesSingleFlightService {
 
   private async coordinate(
     identity: string,
+    context: CandleCacheContext | null,
     input: CandleSingleFlightInput,
   ): Promise<AssetCandlesResponse> {
-    if (!this.cache.isEnabled()) return input.loader();
+    if (!context || !this.cache.isEnabled()) return input.loader();
 
     const key = `candles:lock:v1:${createHash('sha256')
       .update(identity)
@@ -79,59 +86,87 @@ export class AssetCandlesSingleFlightService {
     const acquired = await this.locks.acquire(key, this.config.lockTtlMs);
     if (acquired.status === 'error') return input.loader();
     if (acquired.status === 'acquired') {
-      return this.loadAsOwner(acquired.lock, input);
+      return this.loadAsOwner(acquired.lock, context, input);
     }
-    return this.waitForOwner(key, input);
+    return this.waitForOwner(key, context, input);
   }
 
   private async loadAsOwner(
     lock: RedisLock,
+    context: CandleCacheContext,
     input: CandleSingleFlightInput,
   ): Promise<AssetCandlesResponse> {
     let ownershipLost = false;
     let finished = false;
+    let renewing = false;
+    let renewalPromise: Promise<void> | null = null;
     const renewal = setInterval(() => {
-      void this.locks.extend(lock, this.config.lockTtlMs).then((extended) => {
-        if (!finished && !extended && !ownershipLost) {
-          ownershipLost = true;
-          this.logger.warn('Candle single-flight lock ownership was lost.');
-        }
-      });
+      if (finished || renewing) return;
+      renewing = true;
+      renewalPromise = this.locks
+        .extend(lock, this.config.lockTtlMs)
+        .then((extended) => {
+          if (!finished && !extended)
+            this.markOwnershipLost(() => (ownershipLost = true), ownershipLost);
+        })
+        .catch(() => {
+          if (!finished)
+            this.markOwnershipLost(() => (ownershipLost = true), ownershipLost);
+        })
+        .finally(() => {
+          renewing = false;
+        });
     }, this.config.renewIntervalMs);
 
     try {
-      const doubleCheck = await this.cache.get(input.cacheKeyInput);
+      const doubleCheck = await this.cache.getWithContext(context);
       if (doubleCheck.status === 'hit') return doubleCheck.value;
       const value = await input.loader();
+      // A renewal may still be in flight when the loader completes. Its result
+      // must be known before a distributed write is attempted.
+      if (renewalPromise) await renewalPromise;
       // Operational cache failures are returned as status:error and do not
       // turn a successful provider load into a user-visible failure.
-      await this.cache.set(input.cacheKeyInput, value);
+      if (!ownershipLost) {
+        await this.cache.setIfOwnerAndGeneration(context, value, {
+          lockKey: lock.key,
+          lockToken: lock.token,
+        });
+      }
       return value;
     } finally {
       finished = true;
       clearInterval(renewal);
+      if (renewalPromise) await renewalPromise;
       await this.locks.release(lock);
     }
   }
 
   private async waitForOwner(
     key: string,
+    context: CandleCacheContext,
     input: CandleSingleFlightInput,
   ): Promise<AssetCandlesResponse> {
     const deadline = this.now() + this.config.waitTimeoutMs;
     while (this.now() < deadline) {
-      await this.sleep(this.config.pollIntervalMs);
-      const cached = await this.cache.get(input.cacheKeyInput);
+      const cached = await this.cache.getWithContext(context);
       if (cached.status === 'hit') return cached.value;
       if (cached.status === 'error' || cached.status === 'disabled') {
         return input.loader();
       }
+      const takeover = await this.locks.acquire(key, this.config.lockTtlMs);
+      if (takeover.status === 'acquired') {
+        return this.loadAsOwner(takeover.lock, context, input);
+      }
+      if (takeover.status === 'error') return input.loader();
+      await this.sleep(this.config.pollIntervalMs);
     }
-
-    // The original lock may have expired. Make one bounded takeover attempt.
-    const retry = await this.locks.acquire(key, this.config.lockTtlMs);
-    if (retry.status === 'acquired') return this.loadAsOwner(retry.lock, input);
-    if (retry.status === 'error') return input.loader();
     throw new CandleSingleFlightWaitTimeoutError();
+  }
+
+  private markOwnershipLost(mark: () => void, alreadyLost: boolean): void {
+    if (alreadyLost) return;
+    mark();
+    this.logger.warn('Candle single-flight lock ownership was lost.');
   }
 }

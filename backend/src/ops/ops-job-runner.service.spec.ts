@@ -9,6 +9,7 @@ jest.mock('../generated/prisma/client', () => ({
     season_lifecycle_transition: 'season_lifecycle_transition',
     season_settlement: 'season_settlement',
     reward_marker: 'reward_marker',
+    market_candle_retention: 'market_candle_retention',
   },
   OpsJobRunStatus: {
     running: 'running',
@@ -36,6 +37,9 @@ jest.mock('../batch/season-settlement-job.service', () => ({
 }));
 jest.mock('../ranking/ranking-refresh.service', () => ({
   RankingRefreshService: class RankingRefreshService {},
+}));
+jest.mock('../assets/market-candle-retention.service', () => ({
+  MarketCandleRetentionService: class MarketCandleRetentionService {},
 }));
 jest.mock('../providers/binance/binance-price.ingestion.service', () => ({
   BinancePriceIngestionService: class BinancePriceIngestionService {},
@@ -132,6 +136,9 @@ describe('OpsJobRunnerService', () => {
         unsupportedAssets: [],
       }),
     };
+    const marketCandleRetentionService = {
+      run: jest.fn(),
+    };
     const prisma = {
       season: {
         findMany: jest.fn(),
@@ -139,6 +146,7 @@ describe('OpsJobRunnerService', () => {
     };
     const lockService = {
       acquireLock: jest.fn(),
+      extendLock: jest.fn().mockResolvedValue(true),
       releaseLock: jest.fn(),
     };
     const runService = {
@@ -163,6 +171,7 @@ describe('OpsJobRunnerService', () => {
       kisRestCurrentPriceIngestionService,
       kisWebSocketClient,
       providerTargetResolver,
+      marketCandleRetentionService,
       prisma,
       service: new OpsJobRunnerService(
         dailyPortfolioSnapshotJobService as never,
@@ -175,6 +184,7 @@ describe('OpsJobRunnerService', () => {
         kisRestCurrentPriceIngestionService as never,
         kisWebSocketClient as never,
         providerTargetResolver as never,
+        marketCandleRetentionService as never,
         prisma as never,
         lockService as never,
         runService as never,
@@ -260,6 +270,105 @@ describe('OpsJobRunnerService', () => {
     expect(lockService.releaseLock).toHaveBeenCalledWith({
       lockKey: 'provider_fx_ingest:usd_krw',
       ownerId: 'owner-fx',
+    });
+  });
+
+  it('runs retention through the shared lock/run path and records its result', async () => {
+    const { lockService, runService, marketCandleRetentionService, service } =
+      createService();
+    lockService.acquireLock.mockResolvedValueOnce({
+      acquired: true,
+      lockKey: 'market_candle_retention:5m',
+      ownerId: 'retention-owner',
+      expiresAt: new Date('2026-07-11T00:10:00.000Z'),
+    });
+    runService.createRunning.mockResolvedValueOnce({
+      id: 'retention-run',
+      startedAt,
+    });
+    marketCandleRetentionService.run.mockResolvedValueOnce({
+      cutoff: new Date('2026-06-06T00:00:00.000Z'),
+      retentionDays: 35,
+      deletedCount: 12,
+      batchCount: 2,
+      startedAt: new Date('2026-07-11T00:00:00.000Z'),
+      finishedAt: new Date('2026-07-11T00:00:01.000Z'),
+    });
+    runService.recordSucceeded.mockResolvedValueOnce({
+      serialized: serializedRun({
+        jobName: OpsJobName.market_candle_retention,
+      }),
+    });
+
+    await service.runMarketCandleRetentionJob({
+      trigger: OpsJobTrigger.test,
+      now: '2026-07-11T00:00:00.000Z',
+    });
+    expect(marketCandleRetentionService.run).toHaveBeenCalledWith(
+      expect.objectContaining({ retentionDays: 35, batchSize: 5000 }),
+    );
+    expect(runService.recordSucceeded).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        resultJson: expect.objectContaining({
+          cutoff: '2026-06-06T00:00:00.000Z',
+          deletedCount: 12,
+          batchCount: 2,
+        }),
+      }),
+    );
+    expect(lockService.releaseLock).toHaveBeenCalledWith({
+      lockKey: 'market_candle_retention:5m',
+      ownerId: 'retention-owner',
+    });
+  });
+
+  it('does not call retention storage during a dry run', async () => {
+    const { lockService, runService, marketCandleRetentionService, service } =
+      createService();
+    lockService.acquireLock.mockResolvedValueOnce({
+      acquired: true,
+      lockKey: 'market_candle_retention:5m',
+      ownerId: 'dry-owner',
+      expiresAt: new Date('2026-07-11T00:10:00.000Z'),
+    });
+    runService.createRunning.mockResolvedValueOnce({
+      id: 'dry-run',
+      startedAt,
+    });
+    runService.recordSucceeded.mockResolvedValueOnce({
+      serialized: serializedRun({
+        jobName: OpsJobName.market_candle_retention,
+      }),
+    });
+    await service.runMarketCandleRetentionJob({
+      dryRun: true,
+      now: '2026-07-11T00:00:00.000Z',
+    });
+    expect(marketCandleRetentionService.run).not.toHaveBeenCalled();
+    expect(runService.recordSucceeded).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        resultJson: expect.objectContaining({ dryRun: true, deletedCount: 0 }),
+      }),
+    );
+  });
+
+  it('releases the retention lock when creating the Ops run record fails', async () => {
+    const { lockService, runService, service } = createService();
+    lockService.acquireLock.mockResolvedValueOnce({
+      acquired: true,
+      lockKey: 'market_candle_retention:5m',
+      ownerId: 'orphan-prevention-owner',
+      expiresAt: new Date('2026-07-11T00:10:00.000Z'),
+    });
+    runService.createRunning.mockRejectedValueOnce(new Error('run DB failed'));
+    await expect(service.runMarketCandleRetentionJob()).rejects.toThrow(
+      'run DB failed',
+    );
+    expect(lockService.releaseLock).toHaveBeenCalledWith({
+      lockKey: 'market_candle_retention:5m',
+      ownerId: 'orphan-prevention-owner',
     });
   });
 

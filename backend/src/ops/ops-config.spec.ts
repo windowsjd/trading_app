@@ -8,6 +8,7 @@ jest.mock('../generated/prisma/client', () => ({
     season_lifecycle_transition: 'season_lifecycle_transition',
     season_settlement: 'season_settlement',
     reward_marker: 'reward_marker',
+    market_candle_retention: 'market_candle_retention',
   },
 }));
 
@@ -15,6 +16,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { OpsJobName } from '../generated/prisma/client';
 import { getOpsSchedulerConfig } from './ops-config';
+import { OpsConfigError } from './ops-config';
 
 describe('getOpsSchedulerConfig', () => {
   it('defaults scheduler disabled, dry-run-compatible timing to 60000ms', () => {
@@ -25,6 +27,7 @@ describe('getOpsSchedulerConfig', () => {
     expect(config.lockTtlSeconds).toBe(600);
     expect(config.maxAttempts).toBe(1);
     expect(Object.values(config.jobs)).toEqual([
+      false,
       false,
       false,
       false,
@@ -46,6 +49,46 @@ describe('getOpsSchedulerConfig', () => {
     expect(config.providerIngestionRunOnStartup).toBe(false);
     expect(config.providerKisMaxSnapshots).toBe(500);
     expect(config.providerKisPriceIngestionMode).toBe('websocket_trade');
+    expect(config.marketCandleRetention).toEqual({
+      enabled: false,
+      retentionDays: 35,
+      batchSize: 5000,
+      hour: 4,
+      minute: 0,
+      runOnStartup: false,
+    });
+  });
+
+  it('validates retention schedule settings strictly', () => {
+    const config = getOpsSchedulerConfig({
+      SCHEDULER_MARKET_CANDLE_RETENTION_ENABLED: 'true',
+      MARKET_CANDLE_5M_RETENTION_DAYS: '40',
+      MARKET_CANDLE_RETENTION_BATCH_SIZE: '2500',
+      SCHEDULER_MARKET_CANDLE_RETENTION_HOUR: '3',
+      SCHEDULER_MARKET_CANDLE_RETENTION_MINUTE: '30',
+      SCHEDULER_MARKET_CANDLE_RETENTION_RUN_ON_STARTUP: 'true',
+    });
+    expect(config.enabled).toBe(true);
+    expect(config.jobs[OpsJobName.market_candle_retention]).toBe(true);
+    expect(config.marketCandleRetention).toMatchObject({
+      enabled: true,
+      retentionDays: 40,
+      batchSize: 2500,
+      hour: 3,
+      minute: 30,
+      runOnStartup: true,
+    });
+
+    for (const env of [
+      { SCHEDULER_MARKET_CANDLE_RETENTION_ENABLED: 'maybe' },
+      { MARKET_CANDLE_5M_RETENTION_DAYS: '30' },
+      { MARKET_CANDLE_RETENTION_BATCH_SIZE: '10001' },
+      { SCHEDULER_MARKET_CANDLE_RETENTION_HOUR: '24' },
+      { SCHEDULER_MARKET_CANDLE_RETENTION_MINUTE: '60' },
+      { SCHEDULER_MARKET_CANDLE_RETENTION_RUN_ON_STARTUP: 'sometimes' },
+    ]) {
+      expect(() => getOpsSchedulerConfig(env)).toThrow(OpsConfigError);
+    }
   });
 
   it('reads SCHEDULER_TICK_INTERVAL_MS and falls back on invalid values', () => {

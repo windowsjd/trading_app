@@ -59,9 +59,33 @@ describe('KisRateLimiterService', () => {
     });
     expect(Logger.prototype.warn).toHaveBeenCalledTimes(1);
     now += 125;
-    redis.eval.mockResolvedValueOnce([0, now, now]);
-    await service.reserve('rest');
+    redis.eval.mockResolvedValueOnce([125, now, now + 125]);
+    await expect(service.reserve('rest')).resolves.toMatchObject({
+      delayMs: 125,
+      mode: 'redis',
+    });
     expect(Logger.prototype.log).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves the interval when Redis fails immediately after a reservation', async () => {
+    const { redis, service } = create();
+    await service.reserve('rest');
+    redis.eval.mockRejectedValueOnce(new RedisUnavailableError('down'));
+    await expect(service.reserve('rest')).resolves.toEqual({
+      delayMs: 125,
+      mode: 'local',
+    });
+  });
+
+  it('passes the local fallback floor into Redis after recovery', async () => {
+    const { redis, service } = create();
+    redis.eval.mockRejectedValueOnce(new RedisUnavailableError('down'));
+    await service.reserve('rest');
+    redis.eval.mockResolvedValueOnce([125, 1000, 1125]);
+    await expect(service.reserve('rest')).resolves.toMatchObject({
+      delayMs: 125,
+    });
+    expect(redis.eval.mock.calls[1][2][3]).toBe('125');
   });
 
   it('maintains separate local oauth and rest buckets', async () => {

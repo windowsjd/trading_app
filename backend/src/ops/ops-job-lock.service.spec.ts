@@ -8,6 +8,7 @@ jest.mock('../generated/prisma/client', () => ({
     season_ranking_generation: 'season_ranking_generation',
     season_settlement: 'season_settlement',
     reward_marker: 'reward_marker',
+    market_candle_retention: 'market_candle_retention',
   },
 }));
 
@@ -160,6 +161,28 @@ describe('OpsJobLockService', () => {
       data: {
         releasedAt: now,
       },
+    });
+  });
+
+  it('extends only the current unexpired owner lock', async () => {
+    const { prisma, service } = createService();
+    prisma.opsJobLock.updateMany.mockResolvedValueOnce({ count: 1 });
+    await expect(
+      service.extendLock({
+        lockKey: 'market_candle_retention:5m',
+        ownerId: 'owner-1',
+        ttlSeconds: 600,
+        now,
+      }),
+    ).resolves.toBe(true);
+    expect(prisma.opsJobLock.updateMany).toHaveBeenCalledWith({
+      where: {
+        lockKey: 'market_candle_retention:5m',
+        ownerId: 'owner-1',
+        releasedAt: null,
+        expiresAt: { gt: now },
+      },
+      data: { expiresAt: new Date('2026-06-08T00:10:00.000Z') },
     });
   });
 });

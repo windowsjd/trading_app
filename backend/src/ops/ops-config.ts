@@ -18,7 +18,22 @@ export type OpsSchedulerConfig = {
   providerIngestionRunOnStartup: boolean;
   providerKisMaxSnapshots: number;
   providerKisPriceIngestionMode: KisPriceIngestionMode;
+  marketCandleRetention: {
+    enabled: boolean;
+    retentionDays: number;
+    batchSize: number;
+    hour: number;
+    minute: number;
+    runOnStartup: boolean;
+  };
 };
+
+export class OpsConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'OpsConfigError';
+  }
+}
 
 const DEFAULT_LOCK_TTL_SECONDS = 600;
 const DEFAULT_MAX_ATTEMPTS = 1;
@@ -30,6 +45,8 @@ const DEFAULT_PROVIDER_KIS_INTERVAL_SECONDS = 60;
 const DEFAULT_PROVIDER_KIS_MAX_SNAPSHOTS = 500;
 const DEFAULT_KIS_PRICE_INGESTION_MODE: KisPriceIngestionMode =
   'websocket_trade';
+const DEFAULT_RETENTION_HOUR = 4;
+const DEFAULT_RETENTION_MINUTE = 0;
 
 export function getOpsSchedulerConfig(
   env: NodeJS.ProcessEnv = process.env,
@@ -59,6 +76,43 @@ export function getOpsSchedulerConfig(
     env.SCHEDULER_PROVIDER_KIS_ENABLED ?? env.ENABLE_PROVIDER_KIS_SCHEDULER,
     false,
   );
+  const retentionEnabled = parseStrictBooleanEnv(
+    env.SCHEDULER_MARKET_CANDLE_RETENTION_ENABLED,
+    false,
+    'SCHEDULER_MARKET_CANDLE_RETENTION_ENABLED',
+  );
+  const retentionDays = parseStrictIntegerEnv(
+    env.MARKET_CANDLE_5M_RETENTION_DAYS,
+    35,
+    'MARKET_CANDLE_5M_RETENTION_DAYS',
+    31,
+  );
+  const retentionBatchSize = parseStrictIntegerEnv(
+    env.MARKET_CANDLE_RETENTION_BATCH_SIZE,
+    5000,
+    'MARKET_CANDLE_RETENTION_BATCH_SIZE',
+    1,
+    10_000,
+  );
+  const retentionHour = parseStrictIntegerEnv(
+    env.SCHEDULER_MARKET_CANDLE_RETENTION_HOUR,
+    DEFAULT_RETENTION_HOUR,
+    'SCHEDULER_MARKET_CANDLE_RETENTION_HOUR',
+    0,
+    23,
+  );
+  const retentionMinute = parseStrictIntegerEnv(
+    env.SCHEDULER_MARKET_CANDLE_RETENTION_MINUTE,
+    DEFAULT_RETENTION_MINUTE,
+    'SCHEDULER_MARKET_CANDLE_RETENTION_MINUTE',
+    0,
+    59,
+  );
+  const retentionRunOnStartup = parseStrictBooleanEnv(
+    env.SCHEDULER_MARKET_CANDLE_RETENTION_RUN_ON_STARTUP,
+    false,
+    'SCHEDULER_MARKET_CANDLE_RETENTION_RUN_ON_STARTUP',
+  );
 
   return {
     enabled:
@@ -68,7 +122,8 @@ export function getOpsSchedulerConfig(
       settlementEnabled ||
       providerFxEnabled ||
       providerBinanceEnabled ||
-      providerKisEnabled,
+      providerKisEnabled ||
+      retentionEnabled,
     timezone: parseTextEnv(env.SCHEDULER_TIMEZONE, DEFAULT_TIMEZONE),
     lockTtlSeconds: parsePositiveIntegerEnv(
       env.SCHEDULER_LOCK_TTL_SECONDS,
@@ -94,6 +149,7 @@ export function getOpsSchedulerConfig(
         env.SCHEDULER_REWARD_MARKER_ENABLED,
         false,
       ),
+      [OpsJobName.market_candle_retention]: retentionEnabled,
     },
     providerIntervalsSeconds: {
       [OpsJobName.provider_fx_ingest]: parsePositiveIntegerEnv(
@@ -115,6 +171,14 @@ export function getOpsSchedulerConfig(
     ),
     providerKisMaxSnapshots: resolveProviderKisMaxSnapshots(env),
     providerKisPriceIngestionMode: resolveKisPriceIngestionMode(env),
+    marketCandleRetention: {
+      enabled: retentionEnabled,
+      retentionDays,
+      batchSize: retentionBatchSize,
+      hour: retentionHour,
+      minute: retentionMinute,
+      runOnStartup: retentionRunOnStartup,
+    },
   };
 }
 
@@ -158,13 +222,78 @@ function resolveTickIntervalMs(env: NodeJS.ProcessEnv) {
 }
 
 export function getSchedulerBusinessDate(now: Date, timezone: string): string {
-  if (timezone === DEFAULT_TIMEZONE) {
-    return new Date(now.getTime() + 9 * 60 * 60 * 1000)
-      .toISOString()
-      .slice(0, 10);
-  }
+  const parts = getSchedulerLocalDateTime(now, timezone);
+  return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}`;
+}
 
-  return now.toISOString().slice(0, 10);
+export function getSchedulerLocalDateTime(now: Date, timezone: string) {
+  let formatter: Intl.DateTimeFormat;
+  try {
+    formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    });
+  } catch {
+    throw new OpsConfigError(
+      'SCHEDULER_TIMEZONE must be a valid IANA timezone.',
+    );
+  }
+  const values = Object.fromEntries(
+    formatter
+      .formatToParts(now)
+      .filter((part) => part.type !== 'literal')
+      .map((part) => [part.type, Number(part.value)]),
+  );
+  return {
+    year: values.year,
+    month: values.month,
+    day: values.day,
+    hour: values.hour,
+    minute: values.minute,
+  };
+}
+
+function pad(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+function parseStrictBooleanEnv(
+  value: string | undefined,
+  fallback: boolean,
+  name: string,
+): boolean {
+  if (value === undefined || value.trim() === '') return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'true' || normalized === '1') return true;
+  if (normalized === 'false' || normalized === '0') return false;
+  throw new OpsConfigError(`${name} must be true, false, 1, or 0.`);
+}
+
+function parseStrictIntegerEnv(
+  value: string | undefined,
+  fallback: number,
+  name: string,
+  min: number,
+  max = Number.MAX_SAFE_INTEGER,
+): number {
+  if (value === undefined || value.trim() === '') return fallback;
+  if (!/^\d+$/u.test(value.trim())) {
+    throw new OpsConfigError(
+      `${name} must be an integer between ${min} and ${max}.`,
+    );
+  }
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < min || parsed > max) {
+    throw new OpsConfigError(
+      `${name} must be an integer between ${min} and ${max}.`,
+    );
+  }
+  return parsed;
 }
 
 function parseBooleanEnv(value: string | undefined, fallback: boolean) {

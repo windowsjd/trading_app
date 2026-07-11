@@ -25,12 +25,32 @@ describe('AssetCandlesSingleFlightService', () => {
       enabled?: boolean;
       now?: () => number;
       sleep?: (ms: number) => Promise<void>;
+      generation?: () => number;
     } = {},
   ) => {
+    const getWithContext = jest.fn().mockResolvedValue({ status: 'miss' });
+    const setIfOwnerAndGeneration = jest
+      .fn()
+      .mockResolvedValue({ status: 'stored' });
     const cache = {
       isEnabled: jest.fn(() => options.enabled ?? true),
-      get: jest.fn().mockResolvedValue({ status: 'miss' }),
-      set: jest.fn().mockResolvedValue({ status: 'stored' }),
+      resolveContext: jest.fn(async (input: CandleCacheKeyInput) =>
+        options.enabled === false
+          ? { status: 'disabled' }
+          : {
+              status: 'resolved',
+              context: {
+                input,
+                generation: options.generation?.() ?? 0,
+                generationKey: `gen:${input.assetId}`,
+                dataKey: `data:${input.assetId}:g${options.generation?.() ?? 0}`,
+              },
+            },
+      ),
+      getWithContext,
+      get: getWithContext,
+      setIfOwnerAndGeneration,
+      set: setIfOwnerAndGeneration,
     };
     const locks = {
       acquire: jest.fn().mockResolvedValue({
@@ -103,7 +123,11 @@ describe('AssetCandlesSingleFlightService', () => {
     ).resolves.toBe(response);
     expect(cache.get).toHaveBeenCalledTimes(2);
     expect(loader).toHaveBeenCalledTimes(1);
-    expect(cache.set).toHaveBeenCalledWith(key, response);
+    expect(cache.setIfOwnerAndGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({ dataKey: 'data:asset-1:g0' }),
+      response,
+      { lockKey: 'lock', lockToken: 'owner-token' },
+    );
     expect(locks.release).toHaveBeenCalledWith(
       expect.objectContaining({ token: 'owner-token' }),
     );
@@ -180,7 +204,7 @@ describe('AssetCandlesSingleFlightService', () => {
     await expect(
       service.getOrLoad({ cacheKeyInput: key, loader: jest.fn() }),
     ).rejects.toBeInstanceOf(CandleSingleFlightWaitTimeoutError);
-    expect(locks.acquire).toHaveBeenCalledTimes(2);
+    expect(locks.acquire.mock.calls.length).toBeGreaterThan(1);
   });
 
   it('renews long-running owner locks and clears the renewal timer', async () => {
@@ -200,5 +224,104 @@ describe('AssetCandlesSingleFlightService', () => {
     resolveLoader(response);
     await loading;
     expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('does not join a pre-invalidation loader or store it into the new generation', async () => {
+    let generation = 0;
+    const stored: number[] = [];
+    const { cache, service } = create({ generation: () => generation });
+    cache.setIfOwnerAndGeneration.mockImplementation(async (context) => {
+      if (context.generation !== generation) {
+        return { status: 'skipped_generation_changed' };
+      }
+      stored.push(context.generation);
+      return { status: 'stored' };
+    });
+    let resolveOld!: (value: AssetCandlesResponse) => void;
+    const oldLoader = jest.fn(
+      () =>
+        new Promise<AssetCandlesResponse>((resolve) => (resolveOld = resolve)),
+    );
+    const newLoader = jest.fn().mockResolvedValue(response);
+    const oldRequest = service.getOrLoad({
+      cacheKeyInput: key,
+      loader: oldLoader,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    generation = 1;
+    const newRequest = service.getOrLoad({
+      cacheKeyInput: key,
+      loader: newLoader,
+    });
+    await expect(newRequest).resolves.toBe(response);
+    resolveOld(response);
+    await expect(oldRequest).resolves.toBe(response);
+
+    expect(oldLoader).toHaveBeenCalledTimes(1);
+    expect(newLoader).toHaveBeenCalledTimes(1);
+    expect(stored).toEqual([1]);
+  });
+
+  it('does not cache after renewal reports ownership loss', async () => {
+    jest.useFakeTimers();
+    const { cache, locks, service } = create();
+    locks.extend.mockResolvedValueOnce(false);
+    let resolveLoader!: (value: AssetCandlesResponse) => void;
+    const loading = service.getOrLoad({
+      cacheKeyInput: key,
+      loader: () =>
+        new Promise<AssetCandlesResponse>(
+          (resolve) => (resolveLoader = resolve),
+        ),
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    await jest.advanceTimersByTimeAsync(100);
+    resolveLoader(response);
+    await expect(loading).resolves.toBe(response);
+    expect(cache.setIfOwnerAndGeneration).not.toHaveBeenCalled();
+  });
+
+  it('waits for an in-flight renewal result before deciding to cache', async () => {
+    jest.useFakeTimers();
+    const { cache, locks, service } = create();
+    let resolveRenewal!: (value: boolean) => void;
+    locks.extend.mockReturnValueOnce(
+      new Promise<boolean>((resolve) => (resolveRenewal = resolve)),
+    );
+    let resolveLoader!: (value: AssetCandlesResponse) => void;
+    const loading = service.getOrLoad({
+      cacheKeyInput: key,
+      loader: () =>
+        new Promise<AssetCandlesResponse>(
+          (resolve) => (resolveLoader = resolve),
+        ),
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    await jest.advanceTimersByTimeAsync(100);
+    resolveLoader(response);
+    await Promise.resolve();
+    expect(cache.setIfOwnerAndGeneration).not.toHaveBeenCalled();
+    resolveRenewal(false);
+    await expect(loading).resolves.toBe(response);
+    expect(cache.setIfOwnerAndGeneration).not.toHaveBeenCalled();
+  });
+
+  it('takes over on the first polling cycle after a remote owner releases', async () => {
+    const { locks, service } = create({ sleep: async () => undefined });
+    locks.acquire
+      .mockResolvedValueOnce({ status: 'busy' })
+      .mockResolvedValueOnce({
+        status: 'acquired',
+        lock: { key: 'lock', token: 'new-owner', ttlMs: 300 },
+      });
+    const loader = jest.fn().mockResolvedValue(response);
+    await expect(
+      service.getOrLoad({ cacheKeyInput: key, loader }),
+    ).resolves.toBe(response);
+    expect(loader).toHaveBeenCalledTimes(1);
+    expect(locks.acquire).toHaveBeenCalledTimes(2);
   });
 });

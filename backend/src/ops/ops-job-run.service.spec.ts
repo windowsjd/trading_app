@@ -8,6 +8,7 @@ jest.mock('../generated/prisma/client', () => ({
     season_ranking_generation: 'season_ranking_generation',
     season_settlement: 'season_settlement',
     reward_marker: 'reward_marker',
+    market_candle_retention: 'market_candle_retention',
   },
   OpsJobRunStatus: {
     running: 'running',
@@ -42,6 +43,7 @@ describe('OpsJobRunService', () => {
     opsJobRun: {
       create: jest.fn(),
       update: jest.fn(),
+      findFirst: jest.fn(),
     },
   });
 
@@ -173,6 +175,28 @@ describe('OpsJobRunService', () => {
           reason: 'LOCKED',
         },
       }),
+    });
+  });
+
+  it('finds only successful non-dry-run history for scheduler due checks', async () => {
+    const { prisma, service } = createService();
+    prisma.opsJobRun.findFirst.mockResolvedValueOnce(null);
+    await service.findLatestSucceededRunForJob(
+      OpsJobName.market_candle_retention,
+    );
+    expect(prisma.opsJobRun.findFirst).toHaveBeenCalledWith({
+      where: {
+        jobName: OpsJobName.market_candle_retention,
+        status: OpsJobRunStatus.succeeded,
+        dryRun: false,
+      },
+      orderBy: [{ finishedAt: 'desc' }, { startedAt: 'desc' }],
+      select: {
+        jobName: true,
+        status: true,
+        startedAt: true,
+        finishedAt: true,
+      },
     });
   });
 });

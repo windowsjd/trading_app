@@ -10,6 +10,7 @@ import { AssetsService } from './assets.service';
 import { MarketCandlesRepository } from './market-candles.repository';
 import { AssetCandlesSingleFlightService } from './asset-candles-single-flight.service';
 import { readCandleSingleFlightConfig } from './asset-candles-single-flight.config';
+import { MarketCandleRetentionService } from './market-candle-retention.service';
 
 // AssetCandlesCacheService is provided (via factory so Nest supplies its default
 // env-derived config) and exported for a later serving step to inject. It is
@@ -22,6 +23,7 @@ import { readCandleSingleFlightConfig } from './asset-candles-single-flight.conf
     AssetsService,
     AssetCandlesService,
     MarketCandlesRepository,
+    MarketCandleRetentionService,
     {
       provide: AssetCandlesCacheService,
       useFactory: (redis: RedisService) => new AssetCandlesCacheService(redis),
@@ -41,6 +43,7 @@ import { readCandleSingleFlightConfig } from './asset-candles-single-flight.conf
   exports: [
     AssetsService,
     MarketCandlesRepository,
+    MarketCandleRetentionService,
     AssetCandlesCacheService,
     AssetCandlesSingleFlightService,
   ],

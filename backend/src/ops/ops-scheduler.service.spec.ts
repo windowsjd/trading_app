@@ -9,6 +9,7 @@ jest.mock('../generated/prisma/client', () => ({
     season_lifecycle_transition: 'season_lifecycle_transition',
     season_settlement: 'season_settlement',
     reward_marker: 'reward_marker',
+    market_candle_retention: 'market_candle_retention',
   },
   OpsJobRunStatus: {
     running: 'running',
@@ -40,6 +41,9 @@ jest.mock('../ranking/ranking-refresh.service', () => ({
 jest.mock('../providers/market-snapshot-health.service', () => ({
   MarketSnapshotHealthService: class MarketSnapshotHealthService {},
 }));
+jest.mock('../assets/market-candle-retention.service', () => ({
+  MarketCandleRetentionService: class MarketCandleRetentionService {},
+}));
 
 import { OpsJobName, OpsJobRunStatus } from '../generated/prisma/client';
 import { getOpsSchedulerConfig } from './ops-config';
@@ -70,9 +74,13 @@ describe('OpsSchedulerService', () => {
         .mockResolvedValue({ success: true }),
       runSeasonSettlementJob: jest.fn().mockResolvedValue({ success: true }),
       runRewardMarkerJob: jest.fn().mockResolvedValue({ success: true }),
+      runMarketCandleRetentionJob: jest
+        .fn()
+        .mockResolvedValue({ success: true }),
     };
     const runService = {
       findLatestRunForJob: jest.fn().mockResolvedValue(null),
+      findLatestSucceededRunForJob: jest.fn().mockResolvedValue(null),
     };
     const providerConfigService = {
       getConfig: jest.fn().mockReturnValue({
@@ -114,6 +122,52 @@ describe('OpsSchedulerService', () => {
     expect(getOpsSchedulerConfig().enabled).toBe(false);
     expect(service.isIntervalRegistered()).toBe(false);
     await expect(service.runEnabledJobs()).resolves.toEqual([]);
+  });
+
+  it('runs retention only after 04:00 local time and once per successful business date', async () => {
+    process.env.SCHEDULER_MARKET_CANDLE_RETENTION_ENABLED = 'true';
+    const { runner, runService, service } = createService();
+
+    await expect(
+      service.runEnabledJobs(new Date('2026-07-10T18:59:00.000Z')),
+    ).resolves.toEqual([]);
+    expect(runner.runMarketCandleRetentionJob).not.toHaveBeenCalled();
+
+    await service.runEnabledJobs(new Date('2026-07-10T19:00:00.000Z'));
+    expect(runner.runMarketCandleRetentionJob).toHaveBeenCalledTimes(1);
+    expect(runner.runMarketCandleRetentionJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        retentionDays: 35,
+        batchSize: 5000,
+        metadataJson: { businessDate: '2026-07-11' },
+      }),
+    );
+
+    runService.findLatestSucceededRunForJob.mockResolvedValueOnce({
+      startedAt: new Date('2026-07-10T19:00:00.000Z'),
+      finishedAt: new Date('2026-07-10T19:01:00.000Z'),
+    });
+    await service.runEnabledJobs(new Date('2026-07-10T20:00:00.000Z'));
+    expect(runner.runMarketCandleRetentionJob).toHaveBeenCalledTimes(1);
+
+    runService.findLatestSucceededRunForJob.mockResolvedValueOnce({
+      startedAt: new Date('2026-07-10T19:00:00.000Z'),
+      finishedAt: new Date('2026-07-10T19:01:00.000Z'),
+    });
+    await service.runEnabledJobs(new Date('2026-07-11T19:00:00.000Z'));
+    expect(runner.runMarketCandleRetentionJob).toHaveBeenCalledTimes(2);
+  });
+
+  it('uses the same due check for startup retention', async () => {
+    jest.setSystemTime(new Date('2026-07-10T19:00:00.000Z'));
+    process.env.SCHEDULER_MARKET_CANDLE_RETENTION_ENABLED = 'true';
+    process.env.SCHEDULER_MARKET_CANDLE_RETENTION_RUN_ON_STARTUP = 'true';
+    const { runner, service } = createService();
+    service.onModuleInit();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(runner.runMarketCandleRetentionJob).toHaveBeenCalledTimes(1);
+    service.clearInterval();
   });
 
   it('runs only enabled job flags when scheduler is enabled', async () => {

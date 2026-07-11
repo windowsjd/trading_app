@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ProviderConfigService } from '../provider-config.service';
 import { redactText } from '../provider-secret-redaction';
 import { ProviderConfigError, ProviderHttpError } from '../provider.types';
@@ -9,8 +9,7 @@ import { KisRequestCoordinatorService } from './coordination/kis-request-coordin
 export class KisQuoteClient {
   constructor(
     private readonly configService: ProviderConfigService,
-    @Optional()
-    private readonly requestCoordinator?: KisRequestCoordinatorService,
+    private readonly requestCoordinator: KisRequestCoordinatorService,
   ) {}
 
   async getMarketDataByExplicitPath<T>(input: {
@@ -49,7 +48,7 @@ export class KisQuoteClient {
       url.searchParams.set(key, value);
     }
 
-    await this.requestCoordinator?.acquire('rest');
+    await this.requestCoordinator.acquire('rest');
 
     const controller = new AbortController();
     const timeout = setTimeout(

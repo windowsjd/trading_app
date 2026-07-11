@@ -100,7 +100,15 @@ export class KisRequestCoordinatorService implements OnModuleDestroy {
         if (item.settled) continue;
         this.active[trafficClass] = item;
         try {
-          const reservation = await this.limiter.reserve(trafficClass);
+          const remainingWaitMs =
+            this.limiter.config.maxWaitMs - (this.now() - item.enqueuedAt);
+          if (remainingWaitMs <= 0) {
+            throw new KisRateLimitWaitTimeoutError();
+          }
+          const reservation = await this.limiter.reserve(
+            trafficClass,
+            remainingWaitMs,
+          );
           if (item.settled) continue;
           const elapsed = this.now() - item.enqueuedAt;
           if (elapsed + reservation.delayMs > this.limiter.config.maxWaitMs) {

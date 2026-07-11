@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ProviderConfigService } from '../provider-config.service';
 import { redactText } from '../provider-secret-redaction';
 import { ProviderConfigError, ProviderHttpError } from '../provider.types';
@@ -28,8 +28,7 @@ export class KisAuthClient {
 
   constructor(
     private readonly configService: ProviderConfigService,
-    @Optional()
-    private readonly requestCoordinator?: KisRequestCoordinatorService,
+    private readonly requestCoordinator: KisRequestCoordinatorService,
   ) {}
 
   getCachedToken(): ParsedKisTokenResponse | null {
@@ -279,7 +278,7 @@ export class KisAuthClient {
     const url = `${config.kis.restBaseUrl.replace(/\/+$/u, '')}${normalizedPath}`;
     // Approval/token endpoints are both KIS OAuth REST traffic. WebSocket
     // handshake/subscription frames themselves never pass this coordinator.
-    await this.requestCoordinator?.acquire('oauth');
+    await this.requestCoordinator.acquire('oauth');
     const controller = new AbortController();
     const timeout = setTimeout(
       () => controller.abort(),

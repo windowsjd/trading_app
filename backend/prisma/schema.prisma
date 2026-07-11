@@ -176,6 +176,7 @@ enum OpsJobName {
   season_lifecycle_transition
   season_settlement
   reward_marker
+  market_candle_retention
 }
 
 enum OpsJobRunStatus {

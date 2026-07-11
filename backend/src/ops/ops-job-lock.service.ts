@@ -155,6 +155,30 @@ export class OpsJobLockService {
     return result.count === 1;
   }
 
+  async extendLock(input: {
+    lockKey: string;
+    ownerId: string;
+    ttlSeconds: number;
+    now?: Date;
+  }): Promise<boolean> {
+    const now = input.now ?? new Date();
+    const ttlSeconds = Number.isSafeInteger(input.ttlSeconds)
+      ? Math.max(1, input.ttlSeconds)
+      : 1;
+    const result = await this.prisma.opsJobLock.updateMany({
+      where: {
+        lockKey: this.requiredString(input.lockKey, 'lockKey'),
+        ownerId: this.requiredString(input.ownerId, 'ownerId'),
+        releasedAt: null,
+        expiresAt: { gt: now },
+      },
+      data: {
+        expiresAt: new Date(now.getTime() + ttlSeconds * 1000),
+      },
+    });
+    return result.count === 1;
+  }
+
   private requiredString(value: string, fieldName: string) {
     if (typeof value !== 'string' || value.trim() === '') {
       throw new Error(`${fieldName} is required`);

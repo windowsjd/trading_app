@@ -1,5 +1,6 @@
-import type { ProviderConfigService } from '../provider-config.service';
+import { ProviderConfigService } from '../provider-config.service';
 import { KisQuoteClient } from './kis-quote.client';
+import { Test } from '@nestjs/testing';
 
 describe('KisQuoteClient rate-limit integration', () => {
   afterEach(() => jest.restoreAllMocks());
@@ -61,5 +62,19 @@ describe('KisQuoteClient rate-limit integration', () => {
       client.getMarketDataByExplicitPath({ path: '/quote' }),
     ).rejects.toThrow('timeout');
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('cannot be constructed by Nest without the mandatory coordinator', async () => {
+    await expect(
+      Test.createTestingModule({
+        providers: [
+          KisQuoteClient,
+          {
+            provide: ProviderConfigService,
+            useValue: { getConfig: jest.fn() },
+          },
+        ],
+      }).compile(),
+    ).rejects.toThrow(/KisRequestCoordinatorService/u);
   });
 });

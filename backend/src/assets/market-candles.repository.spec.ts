@@ -860,6 +860,48 @@ describe('MarketCandlesRepository', () => {
     });
   });
 
+  describe('deleteClosedBeforeBatch', () => {
+    it('uses a deterministic parameterized bounded closed-5m delete', async () => {
+      const { prisma, repository } = createRepository();
+      prisma.$executeRaw.mockResolvedValueOnce(17);
+      const cutoff = new Date('2026-06-06T00:00:00.000Z');
+      await expect(
+        repository.deleteClosedBeforeBatch({
+          cutoff,
+          interval: '5m',
+          limit: 5000,
+        }),
+      ).resolves.toBe(17);
+      const query = upsertQueryOf(prisma);
+      expect(query.text).toContain('"interval" = $1');
+      expect(query.text).toContain('"is_closed" = TRUE');
+      expect(query.text).toContain('"open_time" < $2');
+      expect(query.text).toContain('ORDER BY "open_time" ASC, "id" ASC');
+      expect(query.text).toContain('LIMIT $3');
+      expect(query.text).toContain('FOR UPDATE SKIP LOCKED');
+      expect(query.values).toEqual(['5m', cutoff, 5000]);
+    });
+
+    it('rejects non-5m intervals and unsafe limits before SQL execution', async () => {
+      const { prisma, repository } = createRepository();
+      await expect(
+        repository.deleteClosedBeforeBatch({
+          cutoff: new Date(),
+          interval: '1d' as never,
+          limit: 1,
+        }),
+      ).rejects.toBeInstanceOf(MarketCandleValidationError);
+      await expect(
+        repository.deleteClosedBeforeBatch({
+          cutoff: new Date(),
+          interval: '5m',
+          limit: 10001,
+        }),
+      ).rejects.toBeInstanceOf(MarketCandleValidationError);
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    });
+  });
+
   describe('getCoverage', () => {
     it('returns earliest/latest openTime and count', async () => {
       const { prisma, repository } = createRepository();
