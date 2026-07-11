@@ -10,6 +10,7 @@ jest.mock('../generated/prisma/client', () => ({
     season_settlement: 'season_settlement',
     reward_marker: 'reward_marker',
     market_candle_retention: 'market_candle_retention',
+    market_candle_sync: 'market_candle_sync',
   },
   OpsJobRunStatus: {
     running: 'running',
@@ -24,6 +25,20 @@ jest.mock('../generated/prisma/client', () => ({
     manual_script: 'manual_script',
     test: 'test',
   },
+  AssetType: {
+    domestic_stock: 'domestic_stock',
+    us_stock: 'us_stock',
+    crypto: 'crypto',
+  },
+  MarketCandleSyncMode: {
+    initial: 'initial',
+    incremental: 'incremental',
+    repair: 'repair',
+  },
+}));
+
+jest.mock('../assets/market-candle-sync.service', () => ({
+  MarketCandleSyncService: class MarketCandleSyncService {},
 }));
 
 jest.mock('../batch/daily-portfolio-snapshot-job.service', () => ({
@@ -139,6 +154,10 @@ describe('OpsJobRunnerService', () => {
     const marketCandleRetentionService = {
       run: jest.fn(),
     };
+    const marketCandleSyncService = {
+      syncAssets: jest.fn(),
+      syncAsset: jest.fn(),
+    };
     const prisma = {
       season: {
         findMany: jest.fn(),
@@ -172,6 +191,7 @@ describe('OpsJobRunnerService', () => {
       kisWebSocketClient,
       providerTargetResolver,
       marketCandleRetentionService,
+      marketCandleSyncService,
       prisma,
       service: new OpsJobRunnerService(
         dailyPortfolioSnapshotJobService as never,
@@ -185,6 +205,7 @@ describe('OpsJobRunnerService', () => {
         kisWebSocketClient as never,
         providerTargetResolver as never,
         marketCandleRetentionService as never,
+        marketCandleSyncService as never,
         prisma as never,
         lockService as never,
         runService as never,
@@ -370,6 +391,194 @@ describe('OpsJobRunnerService', () => {
       lockKey: 'market_candle_retention:5m',
       ownerId: 'orphan-prevention-owner',
     });
+  });
+
+  it('runs market candle sync through the shared lock/run path with parsed inputs', async () => {
+    const { lockService, runService, marketCandleSyncService, service } =
+      createService();
+    lockService.acquireLock.mockResolvedValueOnce({
+      acquired: true,
+      lockKey: 'market_candle_sync:manual',
+      ownerId: 'sync-owner',
+      expiresAt: new Date('2026-07-11T00:10:00.000Z'),
+    });
+    runService.createRunning.mockResolvedValueOnce({
+      id: 'sync-run',
+      startedAt,
+    });
+    marketCandleSyncService.syncAssets.mockResolvedValueOnce({
+      mode: 'incremental',
+      dryRun: false,
+      requestedAssets: 1,
+      processedAssets: 1,
+      skippedAssets: [],
+      assets: [],
+      totalFeeds: 3,
+      completedFeeds: 3,
+      failedFeeds: 0,
+      startedAt: new Date('2026-07-11T00:00:00.000Z'),
+      finishedAt: new Date('2026-07-11T00:00:05.000Z'),
+    });
+    runService.recordSucceeded.mockResolvedValueOnce({
+      serialized: serializedRun({ jobName: OpsJobName.market_candle_sync }),
+    });
+
+    const response = await service.runMarketCandleSyncJob({
+      trigger: OpsJobTrigger.test,
+      assetTypes: ['crypto'],
+      targets: ['5m', '1d'],
+      mode: 'incremental',
+      from: '2026-06-01T00:00:00.000Z',
+      resume: true,
+      continueOnError: true,
+      maxAssets: 5,
+    });
+    expect(response.success).toBe(true);
+    expect(marketCandleSyncService.syncAssets).toHaveBeenCalledWith(
+      expect.objectContaining({
+        assetTypes: ['crypto'],
+        targets: ['5m', '1d'],
+        mode: 'incremental',
+        from: new Date('2026-06-01T00:00:00.000Z'),
+        resume: true,
+        continueOnError: true,
+        maxAssets: 5,
+        dryRun: false,
+      }),
+    );
+    expect(runService.recordSucceeded).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        resultJson: expect.objectContaining({
+          totalFeeds: 3,
+          failedFeeds: 0,
+          startedAt: '2026-07-11T00:00:00.000Z',
+        }),
+      }),
+    );
+    expect(lockService.releaseLock).toHaveBeenCalledWith({
+      lockKey: 'market_candle_sync:manual',
+      ownerId: 'sync-owner',
+    });
+  });
+
+  it('records a failed sync run when any feed failed', async () => {
+    const { lockService, runService, marketCandleSyncService, service } =
+      createService();
+    lockService.acquireLock.mockResolvedValueOnce({
+      acquired: true,
+      lockKey: 'market_candle_sync:manual',
+      ownerId: 'sync-owner',
+      expiresAt: new Date('2026-07-11T00:10:00.000Z'),
+    });
+    runService.createRunning.mockResolvedValueOnce({
+      id: 'sync-run',
+      startedAt,
+    });
+    marketCandleSyncService.syncAssets.mockResolvedValueOnce({
+      mode: 'incremental',
+      dryRun: false,
+      requestedAssets: 1,
+      processedAssets: 1,
+      skippedAssets: [],
+      assets: [],
+      totalFeeds: 3,
+      completedFeeds: 2,
+      failedFeeds: 1,
+      startedAt: new Date(),
+      finishedAt: new Date(),
+    });
+    runService.recordFailed.mockResolvedValueOnce({
+      serialized: serializedRun({
+        jobName: OpsJobName.market_candle_sync,
+        status: OpsJobRunStatus.failed,
+      }),
+    });
+
+    const response = await service.runMarketCandleSyncJob({});
+    expect(response.success).toBe(false);
+    if (!response.success) {
+      expect(response.error.code).toBe('MARKET_CANDLE_SYNC_FAILED');
+    }
+    expect(runService.recordFailed).toHaveBeenCalled();
+    expect(lockService.releaseLock).toHaveBeenCalled();
+  });
+
+  it('plans a market candle sync dry run without executing the real sync', async () => {
+    const { lockService, runService, marketCandleSyncService, service } =
+      createService();
+    lockService.acquireLock.mockResolvedValueOnce({
+      acquired: true,
+      lockKey: 'market_candle_sync:manual',
+      ownerId: 'dry-owner',
+      expiresAt: new Date('2026-07-11T00:10:00.000Z'),
+    });
+    runService.createRunning.mockResolvedValueOnce({
+      id: 'dry-run',
+      startedAt,
+    });
+    marketCandleSyncService.syncAssets.mockResolvedValueOnce({
+      mode: 'incremental',
+      dryRun: true,
+      requestedAssets: 2,
+      processedAssets: 2,
+      skippedAssets: [],
+      assets: [],
+      totalFeeds: 6,
+      completedFeeds: 0,
+      failedFeeds: 0,
+      startedAt: new Date(),
+      finishedAt: new Date(),
+    });
+    runService.recordSucceeded.mockResolvedValueOnce({
+      serialized: serializedRun({ jobName: OpsJobName.market_candle_sync }),
+    });
+
+    await service.runMarketCandleSyncJob({ dryRun: true });
+    // Exactly one call, and it is the dryRun planning call.
+    expect(marketCandleSyncService.syncAssets).toHaveBeenCalledTimes(1);
+    expect(marketCandleSyncService.syncAssets).toHaveBeenCalledWith(
+      expect.objectContaining({ dryRun: true }),
+    );
+    expect(runService.recordSucceeded).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        resultJson: expect.objectContaining({ dryRun: true }),
+      }),
+    );
+  });
+
+  it('rejects invalid market candle sync inputs before touching the lock', async () => {
+    const { lockService, marketCandleSyncService, service } = createService();
+    await expect(
+      service.runMarketCandleSyncJob({ targets: ['1m'] }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        error: expect.objectContaining({
+          code: 'MARKET_CANDLE_SYNC_INVALID_INPUT',
+        }),
+      }),
+    });
+    await expect(
+      service.runMarketCandleSyncJob({ mode: 'bogus' }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        error: expect.objectContaining({
+          code: 'MARKET_CANDLE_SYNC_INVALID_INPUT',
+        }),
+      }),
+    });
+    await expect(
+      service.runMarketCandleSyncJob({ from: 'not-a-date' }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        error: expect.objectContaining({
+          code: 'MARKET_CANDLE_SYNC_INVALID_INPUT',
+        }),
+      }),
+    });
+    expect(lockService.acquireLock).not.toHaveBeenCalled();
+    expect(marketCandleSyncService.syncAssets).not.toHaveBeenCalled();
   });
 
   it('runs provider Binance ingestion through the locked provider service', async () => {

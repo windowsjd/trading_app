@@ -268,7 +268,7 @@ CANDLE_PIPELINE_FOUNDATION_SMOKE=1 pnpm test -- candle-pipeline-foundation.integ
 
 KIS deployments with both `KIS_MARKET_DATA_ENABLED=true` and rate limiting enabled must explicitly set `KIS_API_ENVIRONMENT=real|virtual`; missing or unknown values fail startup. Redis outages retain a per-process conservative limiter, including the relative delay carried across Redis/local transitions.
 
-The cache and single-flight coordinator remain unconnected to the candles endpoint. Checkpointed/automatic historical backfill orchestration, scheduled candle ingestion, DB serving fallback, and 5m-to-higher-interval aggregation remain unimplemented.
+The cache and single-flight coordinator remain unconnected to the candles endpoint. Scheduled candle ingestion and DB serving fallback remain unimplemented; checkpointed backfill orchestration and 5m-to-higher-interval aggregation are described in "Checkpointed market candle sync (5m/1d/1w)" below.
 
 ### KIS canonical 5-minute candle ingestion foundation
 
@@ -280,13 +280,73 @@ The storage-only ingestion path is separate from the existing candles HTTP endpo
 - `MarketCandleIngestionService` exposes `fetchDomesticFiveMinuteCandles`, `fetchUsFiveMinuteCandles`, `ingestDomesticFiveMinuteCandles`, and `ingestUsFiveMinuteCandles`. Ingestion writes through `MarketCandlesRepository.upsertMany`; conflict updates cannot regress `isClosed=true` to false.
 - Every physical request uses the existing `KisAuthClient`/`KisQuoteClient` coordinator and shared KIS REST limiter. No adapter creates a client or limiter instance.
 
-Only interval `5m` is persisted by this path. Domestic/US `1d` and `1w` are deferred to 2-3; checkpointed initial/incremental/repair orchestration and 5m-derived `15m`, `30m`, `1h`, and `4h` are deferred to 2-4. The path is not scheduled and is **not connected to `GET /api/v1/assets/:assetId/candles`**, Redis/DB serving, or WebSocket updates.
+Only interval `5m` is persisted by this path. Domestic/US `1d` and `1w`, checkpointed initial/incremental/repair orchestration, and 5m-derived `15m`/`30m`/`1h`/`4h` aggregation are covered in "Checkpointed market candle sync (5m/1d/1w)" below. The path is not scheduled and is **not connected to `GET /api/v1/assets/:assetId/candles`**, Redis/DB serving, or WebSocket updates.
 
 Opt-in live schema smokes require real KIS credentials, explicit `KIS_API_ENVIRONMENT`, and the matching flag. They fetch at most one page through the production rate limiter, do not write the database, and never print credentials or raw payloads:
 
 ```bash
 KIS_DOMESTIC_CANDLE_LIVE_SMOKE=1 pnpm test -- kis-candle-live.integration.spec.ts
 KIS_US_CANDLE_LIVE_SMOKE=1 pnpm test -- kis-candle-live.integration.spec.ts
+```
+
+### Checkpointed market candle sync (5m/1d/1w)
+
+Storage-only sync of the persisted candle feeds, still **not connected to `GET /api/v1/assets/:assetId/candles`** (that endpoint keeps its direct provider flow; Redis/DB serving is a unit-3 step). No scheduler triggers this job; market-close/real-time sync policy is a unit-3 decision.
+
+Providers per asset type and feed:
+
+| Asset type | 5m | 1d / 1w | sourceProvider |
+| --- | --- | --- | --- |
+| domestic_stock | KIS `inquire-time-dailychartprice` (2-1 service) | KIS `inquire-daily-itemchartprice` (`FHKST03010100`) | `kis_domestic_minute` / `kis_domestic_period` |
+| us_stock | KIS `inquire-time-itemchartprice` NMIN=5 (2-2 service) | KIS `dailyprice` (`HHDFS76240000`) | `kis_overseas_minute` / `kis_overseas_period` |
+| crypto | Binance Spot `GET /api/v3/klines` | Binance Spot `GET /api/v3/klines` | `binance_klines` |
+
+Storage policy: only `5m`, `1d`, and `1w` are persisted (5m ≈ 35 days, 1d ≈ 1 year/max ~400 rows, 1w ≈ 1 year/max ~60 rows). `1m` is never stored; `15m`/`30m`/`1h`/`4h` are derived from stored 5m at read time and never stored. Daily/weekly candles store provider-native rows — they are never rebuilt from 5m data.
+
+KIS daily/weekly specifics:
+
+- Domestic pages walk `FID_INPUT_DATE_2` backwards (≤100 rows per call, newest first) until the range start; duplicate dates are deduplicated with the latest response winning, and a non-advancing date cursor terminates the run as `cursor_not_advanced`. Adjusted prices are fixed on (`FID_ORG_ADJ_PRC=0`).
+- US pages walk `BYMD` backwards (`GUBN` 0=daily/1=weekly, `MODP=1` adjusted). Each page is a fresh idempotent request whose `BYMD` is the day before the previous page's oldest row; the response `tr_cont` continuation header is preserved as checkpoint metadata but the date cursor is the progress guarantee.
+- Daily candles cover the local trading date (`Asia/Seoul` / `America/New_York`; DST via the IANA timezone, never a fixed UTC offset — the US spring-forward date is a 23-hour window). Weekly candles are anchored to the Monday of the reported date's week. `isClosed` flips at the regular-session close (15:30 KST / 16:00 New York; Friday's close for weekly rows) and can never regress from `true` to `false` on re-sync.
+- Strict normalization everywhere: invalid timestamps, non-positive prices, negative volume, or broken OHLC bounds reject the row; a missing amount stays `null`; nothing is interpolated; a response with no valid row is never treated as success. Blank padding rows in `FHKST03010100` responses are counted separately and are not data.
+
+Binance kline specifics: forward `startTime` pagination against the 1000-row page cap, half-open `[from, to)` ranges, rows validated against the interval grid (weekly klines open Monday 00:00 UTC) with a consistent provider close time, quote-asset volume stored as `amount`, the in-progress kline kept with `isClosed=false` by the provider close time, and future klines rejected. This path uses only `BinancePublicClient` — never the KIS rate limiter.
+
+Checkpoints and resume: every asset/feed run persists a `MarketCandleSyncState` row (target range, mode, status, opaque `cursorJson`, page/row counters; no credentials or raw payloads). One provider page (or one bounded KIS 5m segment) is fetched, its candles are written through the idempotent `MarketCandlesRepository.upsertMany`, and only then does the cursor advance — a failed write never moves the cursor, so resuming re-fetches the same page and converges. `pending`/`running`/`failed`/`canceled` runs are resumable (`resume: true`, the default, takes over the newest one with its stored range and cursor); `completed` runs never regress, and `resume: false` cancels stale active rows (`SUPERSEDED`) and starts a fresh run. At most one `pending`/`running` row can exist per asset/feed (partial unique index `market_candle_sync_states_active_unique`).
+
+Modes: `initial` sweeps the full default range, `incremental` restarts from the latest stored row minus `MARKET_CANDLE_SYNC_INCREMENTAL_OVERLAP_MINUTES` (at least two intervals) so recent provider revisions are re-fetched — it inspects only the latest row and does not detect interior gaps — and `repair` re-syncs an explicit `[from, to)` range idempotently for gap repair. Runs that exhaust `MARKET_CANDLE_SYNC_MAX_PAGES`/`MAX_ROWS`/`MAX_DURATION_MS` stop as `failed` with the matching stopReason and a resumable checkpoint; `complete=true` is reported only when the target range was actually swept.
+
+Locks: the manual Ops job takes the job-level DB lock (`market_candle_sync:manual`), and each asset/feed run additionally takes a Redis backfill lock (`candles:sync:lock:v1:{assetId}:{feed}`, TTL `MARKET_CANDLE_SYNC_LOCK_TTL_SECONDS`, renewed every `MARKET_CANDLE_SYNC_LOCK_RENEW_SECONDS` between pages). Lost ownership stops the run before the next provider page with a resumable checkpoint; a busy lock fails fast with `LOCK_BUSY`; if Redis is unavailable the sync refuses to run (`LOCK_UNAVAILABLE`) rather than run without mutual exclusion. These long-lived locks are separate from the short candle HTTP single-flight locks. KIS-backed assets always run sequentially on top of the shared KIS rate limiter; `MARKET_CANDLE_SYNC_ASSET_CONCURRENCY` bounds only crypto fan-out.
+
+Read-time aggregation (`MarketCandleAggregationService`): `15m`/`30m`/`1h`/`4h` from stored 5m with open=first/high=max/low=min/close=last/volume=sum, amount=sum only when every constituent has one (otherwise `null`), and sourceUpdatedAt=max. Bucket anchors: domestic 09:00 `Asia/Seoul` with 4h buckets 09:00–13:00 and 13:00–15:30; US 09:30 `America/New_York` (DST-aware) with 4h buckets 09:30–13:30 and 13:30–16:00; crypto continuous UTC with 4h buckets at 00/04/08/12/16/20. Buckets never span different trading days. Fixed incompleteness policy: each bucket reports `expectedConstituentCount`/`actualConstituentCount`/`gapCount`/`complete`; only a fully populated historical bucket whose constituents are all closed becomes `isClosed=true`; gapped historical buckets are returned explicitly with `complete=false`/`isClosed=false` (never interpolated), and the in-progress bucket is flagged `isCurrent=true`. Without an exchange holiday calendar, empty days simply produce no buckets — absence is preserved, not synthesized.
+
+Manual Ops execution (no unauthenticated endpoint, no scheduler):
+
+```ts
+await opsJobRunnerService.runMarketCandleSyncJob({
+  trigger: OpsJobTrigger.operator,
+  requestedBy: 'ops@example.com',
+  dryRun: false,            // true: plan only — no provider calls, no candle/checkpoint writes
+  assetIds: undefined,      // default: all active supported assets
+  assetTypes: ['crypto'],   // domestic_stock | us_stock | crypto
+  targets: ['5m', '1d', '1w'],
+  mode: 'incremental',      // initial | incremental | repair (repair needs from/to)
+  from: undefined,
+  to: undefined,
+  resume: true,
+  continueOnError: true,
+  maxAssets: 10,
+});
+```
+
+The run is recorded as an `OpsJobRun` (`market_candle_sync`) whose result JSON contains per-asset/per-feed summaries (provider, range, pages, provider/accepted/rejected/duplicate/written rows, oldest/latest open time, `complete`, stopReason, status, error codes); a run with any failed feed is recorded as failed without hiding the other feeds' results. `MarketCandleSyncService.syncAsset`/`syncAssets` are the unit-3 entry points for serving-side backfill decisions.
+
+Opt-in smokes (fixtures use isolated assets and only `migrate deploy`; live smokes fetch a few bounded pages and never log credentials):
+
+```bash
+MARKET_CANDLE_SYNC_DB_SMOKE=1 pnpm test -- market-candle-sync.integration.spec.ts   # needs PostgreSQL + Redis
+KIS_PERIOD_CANDLE_LIVE_SMOKE=1 pnpm test -- kis-period-candle-live.integration.spec.ts
+BINANCE_CANDLE_LIVE_SMOKE=1 pnpm test -- binance-candle-live.integration.spec.ts
 ```
 
 ## Local Commands

@@ -10,6 +10,7 @@ jest.mock('../generated/prisma/client', () => ({
     season_settlement: 'season_settlement',
     reward_marker: 'reward_marker',
     market_candle_retention: 'market_candle_retention',
+    market_candle_sync: 'market_candle_sync',
   },
   OpsJobRunStatus: {
     running: 'running',
@@ -43,6 +44,9 @@ jest.mock('../providers/market-snapshot-health.service', () => ({
 }));
 jest.mock('../assets/market-candle-retention.service', () => ({
   MarketCandleRetentionService: class MarketCandleRetentionService {},
+}));
+jest.mock('../assets/market-candle-sync.service', () => ({
+  MarketCandleSyncService: class MarketCandleSyncService {},
 }));
 
 import { OpsJobName, OpsJobRunStatus } from '../generated/prisma/client';

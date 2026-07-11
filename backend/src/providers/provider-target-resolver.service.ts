@@ -254,7 +254,7 @@ function emptyTargets(targetSource: ProviderTargetSource): ProviderTargets {
   };
 }
 
-function toBinanceUsdtSymbol(symbol: string): string | null {
+export function toBinanceUsdtSymbol(symbol: string): string | null {
   if (!BINANCE_SYMBOL_PATTERN.test(symbol)) {
     return null;
   }

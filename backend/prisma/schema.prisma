@@ -177,6 +177,21 @@ enum OpsJobName {
   season_settlement
   reward_marker
   market_candle_retention
+  market_candle_sync
+}
+
+enum MarketCandleSyncMode {
+  initial
+  incremental
+  repair
+}
+
+enum MarketCandleSyncStatus {
+  pending
+  running
+  completed
+  failed
+  canceled
 }
 
 enum OpsJobRunStatus {
@@ -458,12 +473,13 @@ model Asset {
   createdAt          DateTime     @default(now()) @map("created_at")
   updatedAt          DateTime     @updatedAt @map("updated_at")
 
-  priceSnapshots     AssetPriceSnapshot[]
-  orderbookSnapshots AssetOrderbookSnapshot[]
-  marketCandles      MarketCandle[]
-  positions          Position[]
-  orders             Order[]
-  quotes             Quote[]
+  priceSnapshots         AssetPriceSnapshot[]
+  orderbookSnapshots     AssetOrderbookSnapshot[]
+  marketCandles          MarketCandle[]
+  marketCandleSyncStates MarketCandleSyncState[]
+  positions              Position[]
+  orders                 Order[]
+  quotes                 Quote[]
 
   @@unique([market, symbol])
   @@index([assetType, market])
@@ -549,6 +565,45 @@ model MarketCandle {
   @@index([interval, openTime])
   @@index([isClosed, openTime])
   @@map("market_candles")
+}
+
+// Persistent checkpoint for one candle sync run of a single asset/feed.
+// `feed` is the stored interval literal ("5m", "1d", "1w") — a string for the
+// same reason MarketCandle.interval is. cursorJson holds only provider-neutral
+// resume state (dates/epoch cursors); credentials and raw provider payloads
+// must never be stored here. Active-run uniqueness (at most one pending or
+// running row per asset/feed) is enforced by a partial unique index that
+// Prisma cannot express; see the migration SQL
+// (market_candle_sync_states_active_unique).
+model MarketCandleSyncState {
+  id                   String                 @id @default(uuid())
+  assetId              String                 @map("asset_id")
+  feed                 String
+  sourceProvider       String                 @map("source_provider")
+  mode                 MarketCandleSyncMode
+  status               MarketCandleSyncStatus @default(pending)
+  // Target candle range, half-open [targetFrom, targetTo), UTC instants.
+  targetFrom           DateTime               @map("target_from") @db.Timestamptz(3)
+  targetTo             DateTime               @map("target_to") @db.Timestamptz(3)
+  cursorJson           Json?                  @map("cursor_json")
+  pagesFetched         Int                    @default(0) @map("pages_fetched")
+  providerRowsReceived Int                    @default(0) @map("provider_rows_received")
+  rowsAccepted         Int                    @default(0) @map("rows_accepted")
+  rowsRejected         Int                    @default(0) @map("rows_rejected")
+  rowsDuplicated       Int                    @default(0) @map("rows_duplicated")
+  rowsWritten          Int                    @default(0) @map("rows_written")
+  lastSuccessfulPageAt DateTime?              @map("last_successful_page_at") @db.Timestamptz(3)
+  completedAt          DateTime?              @map("completed_at") @db.Timestamptz(3)
+  errorCode            String?                @map("error_code")
+  errorMessage         String?                @map("error_message")
+  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@index([assetId, feed, status])
+  @@index([status, updatedAt])
+  @@map("market_candle_sync_states")
 }
 
 model Position {

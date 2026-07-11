@@ -83,6 +83,11 @@ export type AssetOrderbookSnapshot = Prisma.AssetOrderbookSnapshotModel
  */
 export type MarketCandle = Prisma.MarketCandleModel
 /**
+ * Model MarketCandleSyncState
+ * 
+ */
+export type MarketCandleSyncState = Prisma.MarketCandleSyncStateModel
+/**
  * Model Position
  * 
  */

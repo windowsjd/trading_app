@@ -252,10 +252,31 @@ export const OpsJobName = {
   season_lifecycle_transition: 'season_lifecycle_transition',
   season_settlement: 'season_settlement',
   reward_marker: 'reward_marker',
-  market_candle_retention: 'market_candle_retention'
+  market_candle_retention: 'market_candle_retention',
+  market_candle_sync: 'market_candle_sync'
 } as const
 
 export type OpsJobName = (typeof OpsJobName)[keyof typeof OpsJobName]
+
+
+export const MarketCandleSyncMode = {
+  initial: 'initial',
+  incremental: 'incremental',
+  repair: 'repair'
+} as const
+
+export type MarketCandleSyncMode = (typeof MarketCandleSyncMode)[keyof typeof MarketCandleSyncMode]
+
+
+export const MarketCandleSyncStatus = {
+  pending: 'pending',
+  running: 'running',
+  completed: 'completed',
+  failed: 'failed',
+  canceled: 'canceled'
+} as const
+
+export type MarketCandleSyncStatus = (typeof MarketCandleSyncStatus)[keyof typeof MarketCandleSyncStatus]
 
 
 export const OpsJobRunStatus = {

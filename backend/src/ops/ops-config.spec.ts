@@ -9,6 +9,7 @@ jest.mock('../generated/prisma/client', () => ({
     season_settlement: 'season_settlement',
     reward_marker: 'reward_marker',
     market_candle_retention: 'market_candle_retention',
+    market_candle_sync: 'market_candle_sync',
   },
 }));
 
@@ -27,6 +28,7 @@ describe('getOpsSchedulerConfig', () => {
     expect(config.lockTtlSeconds).toBe(600);
     expect(config.maxAttempts).toBe(1);
     expect(Object.values(config.jobs)).toEqual([
+      false,
       false,
       false,
       false,

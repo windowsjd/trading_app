@@ -29,6 +29,14 @@ import { OpsJobLockService } from './ops-job-lock.service';
 import { OpsJobRunService, SerializedOpsJobRun } from './ops-job-run.service';
 import { MarketCandleRetentionService } from '../assets/market-candle-retention.service';
 import { readMarketCandleRetentionConfig } from '../assets/market-candle-retention.config';
+import { MarketCandleSyncService } from '../assets/market-candle-sync.service';
+import {
+  MARKET_CANDLE_SYNC_FEEDS,
+  MarketCandleSyncInputError,
+  type MarketCandleFeed,
+  type MarketCandleSyncSummary,
+} from '../assets/market-candle-sync.types';
+import { AssetType, MarketCandleSyncMode } from '../generated/prisma/client';
 
 export type OpsJobRunnerResponse =
   | {
@@ -79,6 +87,32 @@ export type MarketCandleRetentionOpsJobInput = OpsJobRunnerInput & {
   batchSize?: number;
 };
 
+export type MarketCandleSyncOpsJobInput = OpsJobRunnerInput & {
+  now?: string | null;
+  assetIds?: string[];
+  assetTypes?: string[];
+  targets?: string[];
+  mode?: string;
+  from?: string | null;
+  to?: string | null;
+  resume?: boolean;
+  continueOnError?: boolean;
+  maxAssets?: number;
+};
+
+type ParsedMarketCandleSyncInput = {
+  assetIds?: string[];
+  assetTypes?: AssetType[];
+  targets?: MarketCandleFeed[];
+  mode?: MarketCandleSyncMode;
+  from?: Date;
+  to?: Date;
+  resume?: boolean;
+  continueOnError?: boolean;
+  maxAssets?: number;
+  now?: Date;
+};
+
 @Injectable()
 export class OpsJobRunnerService {
   constructor(
@@ -93,6 +127,7 @@ export class OpsJobRunnerService {
     private readonly kisWebSocketClient: KisWebSocketClient,
     private readonly providerTargetResolver: ProviderTargetResolverService,
     private readonly marketCandleRetentionService: MarketCandleRetentionService,
+    private readonly marketCandleSyncService: MarketCandleSyncService,
     private readonly prisma: PrismaService,
     private readonly lockService: OpsJobLockService,
     private readonly runService: OpsJobRunService,
@@ -467,6 +502,140 @@ export class OpsJobRunnerService {
         },
       },
     );
+  }
+
+  /**
+   * Manual/operator execution path for checkpointed candle sync
+   * (initial/incremental/repair of the persisted 5m/1d/1w feeds). No
+   * scheduler triggers this job in this phase. The job-level Ops DB lock
+   * serializes whole runs; per-asset/feed mutual exclusion is enforced
+   * inside MarketCandleSyncService with Redis backfill locks.
+   */
+  async runMarketCandleSyncJob(
+    input: MarketCandleSyncOpsJobInput = {},
+  ): Promise<OpsJobRunnerResponse> {
+    let syncInput: ParsedMarketCandleSyncInput = {};
+    let dryRunResult: Record<string, unknown> | undefined;
+    try {
+      syncInput = this.parseMarketCandleSyncInput(input);
+      // runLockedOpsJob short-circuits dryRun before the handler, so the plan
+      // (no provider calls, no candle/checkpoint writes) is computed here.
+      if (input.dryRun === true) {
+        dryRunResult = this.serializeMarketCandleSyncSummary(
+          await this.marketCandleSyncService.syncAssets({
+            ...syncInput,
+            dryRun: true,
+          }),
+        );
+      }
+    } catch (error) {
+      if (error instanceof MarketCandleSyncInputError) {
+        throw new HttpException(
+          {
+            success: false,
+            error: {
+              code: 'MARKET_CANDLE_SYNC_INVALID_INPUT',
+              message: error.message,
+            },
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      throw error;
+    }
+
+    return this.runLockedOpsJob(
+      OpsJobName.market_candle_sync,
+      input,
+      'market_candle_sync:manual',
+      async () => {
+        const summary = await this.marketCandleSyncService.syncAssets({
+          ...syncInput,
+          dryRun: false,
+        });
+        const serialized = this.serializeMarketCandleSyncSummary(summary);
+        if (summary.failedFeeds > 0) {
+          this.throwProviderJobFailed(
+            'MARKET_CANDLE_SYNC_FAILED',
+            'Market candle sync finished with failed feeds.',
+            serialized,
+          );
+        }
+        return serialized;
+      },
+      { renewLock: true, dryRunResult },
+    );
+  }
+
+  private parseMarketCandleSyncInput(
+    input: MarketCandleSyncOpsJobInput,
+  ): ParsedMarketCandleSyncInput {
+    const assetIds = input.assetIds?.map((assetId, index) => {
+      const trimmed = typeof assetId === 'string' ? assetId.trim() : '';
+      if (trimmed === '') {
+        throw new MarketCandleSyncInputError(
+          `assetIds[${index}] must be a non-empty string.`,
+        );
+      }
+      return trimmed;
+    });
+    const assetTypes = input.assetTypes?.map((assetType) => {
+      if (!Object.values(AssetType).includes(assetType as AssetType)) {
+        throw new MarketCandleSyncInputError(
+          `assetTypes entries must be one of ${Object.values(AssetType).join(', ')}.`,
+        );
+      }
+      return assetType as AssetType;
+    });
+    const mode =
+      input.mode === undefined
+        ? undefined
+        : Object.values(MarketCandleSyncMode).includes(
+              input.mode as MarketCandleSyncMode,
+            )
+          ? (input.mode as MarketCandleSyncMode)
+          : (() => {
+              throw new MarketCandleSyncInputError(
+                'mode must be initial, incremental, or repair.',
+              );
+            })();
+    const parseDate = (value: string | null | undefined, name: string) => {
+      const text = this.optionalString(value);
+      if (!text) return undefined;
+      const date = new Date(text);
+      if (Number.isNaN(date.getTime())) {
+        throw new MarketCandleSyncInputError(
+          `${name} must be an ISO-8601 datetime.`,
+        );
+      }
+      return date;
+    };
+    const targets = input.targets?.map((target) => {
+      if (!(MARKET_CANDLE_SYNC_FEEDS as readonly string[]).includes(target)) {
+        throw new MarketCandleSyncInputError(
+          `targets entries must be one of ${MARKET_CANDLE_SYNC_FEEDS.join(', ')}.`,
+        );
+      }
+      return target as MarketCandleFeed;
+    });
+    return {
+      assetIds,
+      assetTypes,
+      targets,
+      mode,
+      from: parseDate(input.from, 'from'),
+      to: parseDate(input.to, 'to'),
+      resume: input.resume,
+      continueOnError: input.continueOnError,
+      maxAssets: input.maxAssets,
+      now: parseDate(input.now, 'now'),
+    };
+  }
+
+  private serializeMarketCandleSyncSummary(summary: MarketCandleSyncSummary) {
+    // Dates serialize to ISO strings; the summary contains only counters,
+    // codes, ids, and dates — never credentials or raw provider payloads.
+    return JSON.parse(JSON.stringify(summary)) as Record<string, unknown>;
   }
 
   async runDailyPortfolioSnapshotJob(

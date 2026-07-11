@@ -233,6 +233,7 @@ export type AssetWhereInput = {
   priceSnapshots?: Prisma.AssetPriceSnapshotListRelationFilter
   orderbookSnapshots?: Prisma.AssetOrderbookSnapshotListRelationFilter
   marketCandles?: Prisma.MarketCandleListRelationFilter
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateListRelationFilter
   positions?: Prisma.PositionListRelationFilter
   orders?: Prisma.OrderListRelationFilter
   quotes?: Prisma.QuoteListRelationFilter
@@ -253,6 +254,7 @@ export type AssetOrderByWithRelationInput = {
   priceSnapshots?: Prisma.AssetPriceSnapshotOrderByRelationAggregateInput
   orderbookSnapshots?: Prisma.AssetOrderbookSnapshotOrderByRelationAggregateInput
   marketCandles?: Prisma.MarketCandleOrderByRelationAggregateInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateOrderByRelationAggregateInput
   positions?: Prisma.PositionOrderByRelationAggregateInput
   orders?: Prisma.OrderOrderByRelationAggregateInput
   quotes?: Prisma.QuoteOrderByRelationAggregateInput
@@ -277,6 +279,7 @@ export type AssetWhereUniqueInput = Prisma.AtLeast<{
   priceSnapshots?: Prisma.AssetPriceSnapshotListRelationFilter
   orderbookSnapshots?: Prisma.AssetOrderbookSnapshotListRelationFilter
   marketCandles?: Prisma.MarketCandleListRelationFilter
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateListRelationFilter
   positions?: Prisma.PositionListRelationFilter
   orders?: Prisma.OrderListRelationFilter
   quotes?: Prisma.QuoteListRelationFilter
@@ -331,6 +334,7 @@ export type AssetCreateInput = {
   priceSnapshots?: Prisma.AssetPriceSnapshotCreateNestedManyWithoutAssetInput
   orderbookSnapshots?: Prisma.AssetOrderbookSnapshotCreateNestedManyWithoutAssetInput
   marketCandles?: Prisma.MarketCandleCreateNestedManyWithoutAssetInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateCreateNestedManyWithoutAssetInput
   positions?: Prisma.PositionCreateNestedManyWithoutAssetInput
   orders?: Prisma.OrderCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetInput
@@ -351,6 +355,7 @@ export type AssetUncheckedCreateInput = {
   priceSnapshots?: Prisma.AssetPriceSnapshotUncheckedCreateNestedManyWithoutAssetInput
   orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUncheckedCreateNestedManyWithoutAssetInput
   marketCandles?: Prisma.MarketCandleUncheckedCreateNestedManyWithoutAssetInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUncheckedCreateNestedManyWithoutAssetInput
   positions?: Prisma.PositionUncheckedCreateNestedManyWithoutAssetInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetInput
@@ -371,6 +376,7 @@ export type AssetUpdateInput = {
   priceSnapshots?: Prisma.AssetPriceSnapshotUpdateManyWithoutAssetNestedInput
   orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUpdateManyWithoutAssetNestedInput
   marketCandles?: Prisma.MarketCandleUpdateManyWithoutAssetNestedInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUpdateManyWithoutAssetNestedInput
   positions?: Prisma.PositionUpdateManyWithoutAssetNestedInput
   orders?: Prisma.OrderUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutAssetNestedInput
@@ -391,6 +397,7 @@ export type AssetUncheckedUpdateInput = {
   priceSnapshots?: Prisma.AssetPriceSnapshotUncheckedUpdateManyWithoutAssetNestedInput
   orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUncheckedUpdateManyWithoutAssetNestedInput
   marketCandles?: Prisma.MarketCandleUncheckedUpdateManyWithoutAssetNestedInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUncheckedUpdateManyWithoutAssetNestedInput
   positions?: Prisma.PositionUncheckedUpdateManyWithoutAssetNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetNestedInput
@@ -549,6 +556,20 @@ export type AssetUpdateOneRequiredWithoutMarketCandlesNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.AssetUpdateToOneWithWhereWithoutMarketCandlesInput, Prisma.AssetUpdateWithoutMarketCandlesInput>, Prisma.AssetUncheckedUpdateWithoutMarketCandlesInput>
 }
 
+export type AssetCreateNestedOneWithoutMarketCandleSyncStatesInput = {
+  create?: Prisma.XOR<Prisma.AssetCreateWithoutMarketCandleSyncStatesInput, Prisma.AssetUncheckedCreateWithoutMarketCandleSyncStatesInput>
+  connectOrCreate?: Prisma.AssetCreateOrConnectWithoutMarketCandleSyncStatesInput
+  connect?: Prisma.AssetWhereUniqueInput
+}
+
+export type AssetUpdateOneRequiredWithoutMarketCandleSyncStatesNestedInput = {
+  create?: Prisma.XOR<Prisma.AssetCreateWithoutMarketCandleSyncStatesInput, Prisma.AssetUncheckedCreateWithoutMarketCandleSyncStatesInput>
+  connectOrCreate?: Prisma.AssetCreateOrConnectWithoutMarketCandleSyncStatesInput
+  upsert?: Prisma.AssetUpsertWithoutMarketCandleSyncStatesInput
+  connect?: Prisma.AssetWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.AssetUpdateToOneWithWhereWithoutMarketCandleSyncStatesInput, Prisma.AssetUpdateWithoutMarketCandleSyncStatesInput>, Prisma.AssetUncheckedUpdateWithoutMarketCandleSyncStatesInput>
+}
+
 export type AssetCreateNestedOneWithoutPositionsInput = {
   create?: Prisma.XOR<Prisma.AssetCreateWithoutPositionsInput, Prisma.AssetUncheckedCreateWithoutPositionsInput>
   connectOrCreate?: Prisma.AssetCreateOrConnectWithoutPositionsInput
@@ -607,6 +628,7 @@ export type AssetCreateWithoutPriceSnapshotsInput = {
   updatedAt?: Date | string
   orderbookSnapshots?: Prisma.AssetOrderbookSnapshotCreateNestedManyWithoutAssetInput
   marketCandles?: Prisma.MarketCandleCreateNestedManyWithoutAssetInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateCreateNestedManyWithoutAssetInput
   positions?: Prisma.PositionCreateNestedManyWithoutAssetInput
   orders?: Prisma.OrderCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetInput
@@ -626,6 +648,7 @@ export type AssetUncheckedCreateWithoutPriceSnapshotsInput = {
   updatedAt?: Date | string
   orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUncheckedCreateNestedManyWithoutAssetInput
   marketCandles?: Prisma.MarketCandleUncheckedCreateNestedManyWithoutAssetInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUncheckedCreateNestedManyWithoutAssetInput
   positions?: Prisma.PositionUncheckedCreateNestedManyWithoutAssetInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetInput
@@ -661,6 +684,7 @@ export type AssetUpdateWithoutPriceSnapshotsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUpdateManyWithoutAssetNestedInput
   marketCandles?: Prisma.MarketCandleUpdateManyWithoutAssetNestedInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUpdateManyWithoutAssetNestedInput
   positions?: Prisma.PositionUpdateManyWithoutAssetNestedInput
   orders?: Prisma.OrderUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutAssetNestedInput
@@ -680,6 +704,7 @@ export type AssetUncheckedUpdateWithoutPriceSnapshotsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUncheckedUpdateManyWithoutAssetNestedInput
   marketCandles?: Prisma.MarketCandleUncheckedUpdateManyWithoutAssetNestedInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUncheckedUpdateManyWithoutAssetNestedInput
   positions?: Prisma.PositionUncheckedUpdateManyWithoutAssetNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetNestedInput
@@ -699,6 +724,7 @@ export type AssetCreateWithoutOrderbookSnapshotsInput = {
   updatedAt?: Date | string
   priceSnapshots?: Prisma.AssetPriceSnapshotCreateNestedManyWithoutAssetInput
   marketCandles?: Prisma.MarketCandleCreateNestedManyWithoutAssetInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateCreateNestedManyWithoutAssetInput
   positions?: Prisma.PositionCreateNestedManyWithoutAssetInput
   orders?: Prisma.OrderCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetInput
@@ -718,6 +744,7 @@ export type AssetUncheckedCreateWithoutOrderbookSnapshotsInput = {
   updatedAt?: Date | string
   priceSnapshots?: Prisma.AssetPriceSnapshotUncheckedCreateNestedManyWithoutAssetInput
   marketCandles?: Prisma.MarketCandleUncheckedCreateNestedManyWithoutAssetInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUncheckedCreateNestedManyWithoutAssetInput
   positions?: Prisma.PositionUncheckedCreateNestedManyWithoutAssetInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetInput
@@ -753,6 +780,7 @@ export type AssetUpdateWithoutOrderbookSnapshotsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   priceSnapshots?: Prisma.AssetPriceSnapshotUpdateManyWithoutAssetNestedInput
   marketCandles?: Prisma.MarketCandleUpdateManyWithoutAssetNestedInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUpdateManyWithoutAssetNestedInput
   positions?: Prisma.PositionUpdateManyWithoutAssetNestedInput
   orders?: Prisma.OrderUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutAssetNestedInput
@@ -772,6 +800,7 @@ export type AssetUncheckedUpdateWithoutOrderbookSnapshotsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   priceSnapshots?: Prisma.AssetPriceSnapshotUncheckedUpdateManyWithoutAssetNestedInput
   marketCandles?: Prisma.MarketCandleUncheckedUpdateManyWithoutAssetNestedInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUncheckedUpdateManyWithoutAssetNestedInput
   positions?: Prisma.PositionUncheckedUpdateManyWithoutAssetNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetNestedInput
@@ -791,6 +820,7 @@ export type AssetCreateWithoutMarketCandlesInput = {
   updatedAt?: Date | string
   priceSnapshots?: Prisma.AssetPriceSnapshotCreateNestedManyWithoutAssetInput
   orderbookSnapshots?: Prisma.AssetOrderbookSnapshotCreateNestedManyWithoutAssetInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateCreateNestedManyWithoutAssetInput
   positions?: Prisma.PositionCreateNestedManyWithoutAssetInput
   orders?: Prisma.OrderCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetInput
@@ -810,6 +840,7 @@ export type AssetUncheckedCreateWithoutMarketCandlesInput = {
   updatedAt?: Date | string
   priceSnapshots?: Prisma.AssetPriceSnapshotUncheckedCreateNestedManyWithoutAssetInput
   orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUncheckedCreateNestedManyWithoutAssetInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUncheckedCreateNestedManyWithoutAssetInput
   positions?: Prisma.PositionUncheckedCreateNestedManyWithoutAssetInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetInput
@@ -845,6 +876,7 @@ export type AssetUpdateWithoutMarketCandlesInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   priceSnapshots?: Prisma.AssetPriceSnapshotUpdateManyWithoutAssetNestedInput
   orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUpdateManyWithoutAssetNestedInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUpdateManyWithoutAssetNestedInput
   positions?: Prisma.PositionUpdateManyWithoutAssetNestedInput
   orders?: Prisma.OrderUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutAssetNestedInput
@@ -864,6 +896,103 @@ export type AssetUncheckedUpdateWithoutMarketCandlesInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   priceSnapshots?: Prisma.AssetPriceSnapshotUncheckedUpdateManyWithoutAssetNestedInput
   orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUncheckedUpdateManyWithoutAssetNestedInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUncheckedUpdateManyWithoutAssetNestedInput
+  positions?: Prisma.PositionUncheckedUpdateManyWithoutAssetNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetNestedInput
+}
+
+export type AssetCreateWithoutMarketCandleSyncStatesInput = {
+  id?: string
+  symbol: string
+  name: string
+  market: string
+  currencyCode: $Enums.CurrencyCode
+  priceCurrency?: $Enums.CurrencyCode
+  settlementCurrency?: $Enums.CurrencyCode
+  assetType: $Enums.AssetType
+  isActive?: boolean
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  priceSnapshots?: Prisma.AssetPriceSnapshotCreateNestedManyWithoutAssetInput
+  orderbookSnapshots?: Prisma.AssetOrderbookSnapshotCreateNestedManyWithoutAssetInput
+  marketCandles?: Prisma.MarketCandleCreateNestedManyWithoutAssetInput
+  positions?: Prisma.PositionCreateNestedManyWithoutAssetInput
+  orders?: Prisma.OrderCreateNestedManyWithoutAssetInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutAssetInput
+}
+
+export type AssetUncheckedCreateWithoutMarketCandleSyncStatesInput = {
+  id?: string
+  symbol: string
+  name: string
+  market: string
+  currencyCode: $Enums.CurrencyCode
+  priceCurrency?: $Enums.CurrencyCode
+  settlementCurrency?: $Enums.CurrencyCode
+  assetType: $Enums.AssetType
+  isActive?: boolean
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  priceSnapshots?: Prisma.AssetPriceSnapshotUncheckedCreateNestedManyWithoutAssetInput
+  orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUncheckedCreateNestedManyWithoutAssetInput
+  marketCandles?: Prisma.MarketCandleUncheckedCreateNestedManyWithoutAssetInput
+  positions?: Prisma.PositionUncheckedCreateNestedManyWithoutAssetInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetInput
+}
+
+export type AssetCreateOrConnectWithoutMarketCandleSyncStatesInput = {
+  where: Prisma.AssetWhereUniqueInput
+  create: Prisma.XOR<Prisma.AssetCreateWithoutMarketCandleSyncStatesInput, Prisma.AssetUncheckedCreateWithoutMarketCandleSyncStatesInput>
+}
+
+export type AssetUpsertWithoutMarketCandleSyncStatesInput = {
+  update: Prisma.XOR<Prisma.AssetUpdateWithoutMarketCandleSyncStatesInput, Prisma.AssetUncheckedUpdateWithoutMarketCandleSyncStatesInput>
+  create: Prisma.XOR<Prisma.AssetCreateWithoutMarketCandleSyncStatesInput, Prisma.AssetUncheckedCreateWithoutMarketCandleSyncStatesInput>
+  where?: Prisma.AssetWhereInput
+}
+
+export type AssetUpdateToOneWithWhereWithoutMarketCandleSyncStatesInput = {
+  where?: Prisma.AssetWhereInput
+  data: Prisma.XOR<Prisma.AssetUpdateWithoutMarketCandleSyncStatesInput, Prisma.AssetUncheckedUpdateWithoutMarketCandleSyncStatesInput>
+}
+
+export type AssetUpdateWithoutMarketCandleSyncStatesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  symbol?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  market?: Prisma.StringFieldUpdateOperationsInput | string
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  priceCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  assetType?: Prisma.EnumAssetTypeFieldUpdateOperationsInput | $Enums.AssetType
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  priceSnapshots?: Prisma.AssetPriceSnapshotUpdateManyWithoutAssetNestedInput
+  orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUpdateManyWithoutAssetNestedInput
+  marketCandles?: Prisma.MarketCandleUpdateManyWithoutAssetNestedInput
+  positions?: Prisma.PositionUpdateManyWithoutAssetNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutAssetNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutAssetNestedInput
+}
+
+export type AssetUncheckedUpdateWithoutMarketCandleSyncStatesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  symbol?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  market?: Prisma.StringFieldUpdateOperationsInput | string
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  priceCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  assetType?: Prisma.EnumAssetTypeFieldUpdateOperationsInput | $Enums.AssetType
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  priceSnapshots?: Prisma.AssetPriceSnapshotUncheckedUpdateManyWithoutAssetNestedInput
+  orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUncheckedUpdateManyWithoutAssetNestedInput
+  marketCandles?: Prisma.MarketCandleUncheckedUpdateManyWithoutAssetNestedInput
   positions?: Prisma.PositionUncheckedUpdateManyWithoutAssetNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetNestedInput
@@ -884,6 +1013,7 @@ export type AssetCreateWithoutPositionsInput = {
   priceSnapshots?: Prisma.AssetPriceSnapshotCreateNestedManyWithoutAssetInput
   orderbookSnapshots?: Prisma.AssetOrderbookSnapshotCreateNestedManyWithoutAssetInput
   marketCandles?: Prisma.MarketCandleCreateNestedManyWithoutAssetInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateCreateNestedManyWithoutAssetInput
   orders?: Prisma.OrderCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetInput
 }
@@ -903,6 +1033,7 @@ export type AssetUncheckedCreateWithoutPositionsInput = {
   priceSnapshots?: Prisma.AssetPriceSnapshotUncheckedCreateNestedManyWithoutAssetInput
   orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUncheckedCreateNestedManyWithoutAssetInput
   marketCandles?: Prisma.MarketCandleUncheckedCreateNestedManyWithoutAssetInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUncheckedCreateNestedManyWithoutAssetInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetInput
 }
@@ -938,6 +1069,7 @@ export type AssetUpdateWithoutPositionsInput = {
   priceSnapshots?: Prisma.AssetPriceSnapshotUpdateManyWithoutAssetNestedInput
   orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUpdateManyWithoutAssetNestedInput
   marketCandles?: Prisma.MarketCandleUpdateManyWithoutAssetNestedInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUpdateManyWithoutAssetNestedInput
   orders?: Prisma.OrderUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutAssetNestedInput
 }
@@ -957,6 +1089,7 @@ export type AssetUncheckedUpdateWithoutPositionsInput = {
   priceSnapshots?: Prisma.AssetPriceSnapshotUncheckedUpdateManyWithoutAssetNestedInput
   orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUncheckedUpdateManyWithoutAssetNestedInput
   marketCandles?: Prisma.MarketCandleUncheckedUpdateManyWithoutAssetNestedInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUncheckedUpdateManyWithoutAssetNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetNestedInput
 }
@@ -976,6 +1109,7 @@ export type AssetCreateWithoutOrdersInput = {
   priceSnapshots?: Prisma.AssetPriceSnapshotCreateNestedManyWithoutAssetInput
   orderbookSnapshots?: Prisma.AssetOrderbookSnapshotCreateNestedManyWithoutAssetInput
   marketCandles?: Prisma.MarketCandleCreateNestedManyWithoutAssetInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateCreateNestedManyWithoutAssetInput
   positions?: Prisma.PositionCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetInput
 }
@@ -995,6 +1129,7 @@ export type AssetUncheckedCreateWithoutOrdersInput = {
   priceSnapshots?: Prisma.AssetPriceSnapshotUncheckedCreateNestedManyWithoutAssetInput
   orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUncheckedCreateNestedManyWithoutAssetInput
   marketCandles?: Prisma.MarketCandleUncheckedCreateNestedManyWithoutAssetInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUncheckedCreateNestedManyWithoutAssetInput
   positions?: Prisma.PositionUncheckedCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetInput
 }
@@ -1030,6 +1165,7 @@ export type AssetUpdateWithoutOrdersInput = {
   priceSnapshots?: Prisma.AssetPriceSnapshotUpdateManyWithoutAssetNestedInput
   orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUpdateManyWithoutAssetNestedInput
   marketCandles?: Prisma.MarketCandleUpdateManyWithoutAssetNestedInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUpdateManyWithoutAssetNestedInput
   positions?: Prisma.PositionUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutAssetNestedInput
 }
@@ -1049,6 +1185,7 @@ export type AssetUncheckedUpdateWithoutOrdersInput = {
   priceSnapshots?: Prisma.AssetPriceSnapshotUncheckedUpdateManyWithoutAssetNestedInput
   orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUncheckedUpdateManyWithoutAssetNestedInput
   marketCandles?: Prisma.MarketCandleUncheckedUpdateManyWithoutAssetNestedInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUncheckedUpdateManyWithoutAssetNestedInput
   positions?: Prisma.PositionUncheckedUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetNestedInput
 }
@@ -1068,6 +1205,7 @@ export type AssetCreateWithoutQuotesInput = {
   priceSnapshots?: Prisma.AssetPriceSnapshotCreateNestedManyWithoutAssetInput
   orderbookSnapshots?: Prisma.AssetOrderbookSnapshotCreateNestedManyWithoutAssetInput
   marketCandles?: Prisma.MarketCandleCreateNestedManyWithoutAssetInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateCreateNestedManyWithoutAssetInput
   positions?: Prisma.PositionCreateNestedManyWithoutAssetInput
   orders?: Prisma.OrderCreateNestedManyWithoutAssetInput
 }
@@ -1087,6 +1225,7 @@ export type AssetUncheckedCreateWithoutQuotesInput = {
   priceSnapshots?: Prisma.AssetPriceSnapshotUncheckedCreateNestedManyWithoutAssetInput
   orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUncheckedCreateNestedManyWithoutAssetInput
   marketCandles?: Prisma.MarketCandleUncheckedCreateNestedManyWithoutAssetInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUncheckedCreateNestedManyWithoutAssetInput
   positions?: Prisma.PositionUncheckedCreateNestedManyWithoutAssetInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetInput
 }
@@ -1122,6 +1261,7 @@ export type AssetUpdateWithoutQuotesInput = {
   priceSnapshots?: Prisma.AssetPriceSnapshotUpdateManyWithoutAssetNestedInput
   orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUpdateManyWithoutAssetNestedInput
   marketCandles?: Prisma.MarketCandleUpdateManyWithoutAssetNestedInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUpdateManyWithoutAssetNestedInput
   positions?: Prisma.PositionUpdateManyWithoutAssetNestedInput
   orders?: Prisma.OrderUpdateManyWithoutAssetNestedInput
 }
@@ -1141,6 +1281,7 @@ export type AssetUncheckedUpdateWithoutQuotesInput = {
   priceSnapshots?: Prisma.AssetPriceSnapshotUncheckedUpdateManyWithoutAssetNestedInput
   orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUncheckedUpdateManyWithoutAssetNestedInput
   marketCandles?: Prisma.MarketCandleUncheckedUpdateManyWithoutAssetNestedInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUncheckedUpdateManyWithoutAssetNestedInput
   positions?: Prisma.PositionUncheckedUpdateManyWithoutAssetNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetNestedInput
 }
@@ -1154,6 +1295,7 @@ export type AssetCountOutputType = {
   priceSnapshots: number
   orderbookSnapshots: number
   marketCandles: number
+  marketCandleSyncStates: number
   positions: number
   orders: number
   quotes: number
@@ -1163,6 +1305,7 @@ export type AssetCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.
   priceSnapshots?: boolean | AssetCountOutputTypeCountPriceSnapshotsArgs
   orderbookSnapshots?: boolean | AssetCountOutputTypeCountOrderbookSnapshotsArgs
   marketCandles?: boolean | AssetCountOutputTypeCountMarketCandlesArgs
+  marketCandleSyncStates?: boolean | AssetCountOutputTypeCountMarketCandleSyncStatesArgs
   positions?: boolean | AssetCountOutputTypeCountPositionsArgs
   orders?: boolean | AssetCountOutputTypeCountOrdersArgs
   quotes?: boolean | AssetCountOutputTypeCountQuotesArgs
@@ -1202,6 +1345,13 @@ export type AssetCountOutputTypeCountMarketCandlesArgs<ExtArgs extends runtime.T
 /**
  * AssetCountOutputType without action
  */
+export type AssetCountOutputTypeCountMarketCandleSyncStatesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.MarketCandleSyncStateWhereInput
+}
+
+/**
+ * AssetCountOutputType without action
+ */
 export type AssetCountOutputTypeCountPositionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.PositionWhereInput
 }
@@ -1236,6 +1386,7 @@ export type AssetSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   priceSnapshots?: boolean | Prisma.Asset$priceSnapshotsArgs<ExtArgs>
   orderbookSnapshots?: boolean | Prisma.Asset$orderbookSnapshotsArgs<ExtArgs>
   marketCandles?: boolean | Prisma.Asset$marketCandlesArgs<ExtArgs>
+  marketCandleSyncStates?: boolean | Prisma.Asset$marketCandleSyncStatesArgs<ExtArgs>
   positions?: boolean | Prisma.Asset$positionsArgs<ExtArgs>
   orders?: boolean | Prisma.Asset$ordersArgs<ExtArgs>
   quotes?: boolean | Prisma.Asset$quotesArgs<ExtArgs>
@@ -1289,6 +1440,7 @@ export type AssetInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   priceSnapshots?: boolean | Prisma.Asset$priceSnapshotsArgs<ExtArgs>
   orderbookSnapshots?: boolean | Prisma.Asset$orderbookSnapshotsArgs<ExtArgs>
   marketCandles?: boolean | Prisma.Asset$marketCandlesArgs<ExtArgs>
+  marketCandleSyncStates?: boolean | Prisma.Asset$marketCandleSyncStatesArgs<ExtArgs>
   positions?: boolean | Prisma.Asset$positionsArgs<ExtArgs>
   orders?: boolean | Prisma.Asset$ordersArgs<ExtArgs>
   quotes?: boolean | Prisma.Asset$quotesArgs<ExtArgs>
@@ -1303,6 +1455,7 @@ export type $AssetPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     priceSnapshots: Prisma.$AssetPriceSnapshotPayload<ExtArgs>[]
     orderbookSnapshots: Prisma.$AssetOrderbookSnapshotPayload<ExtArgs>[]
     marketCandles: Prisma.$MarketCandlePayload<ExtArgs>[]
+    marketCandleSyncStates: Prisma.$MarketCandleSyncStatePayload<ExtArgs>[]
     positions: Prisma.$PositionPayload<ExtArgs>[]
     orders: Prisma.$OrderPayload<ExtArgs>[]
     quotes: Prisma.$QuotePayload<ExtArgs>[]
@@ -1716,6 +1869,7 @@ export interface Prisma__AssetClient<T, Null = never, ExtArgs extends runtime.Ty
   priceSnapshots<T extends Prisma.Asset$priceSnapshotsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Asset$priceSnapshotsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AssetPriceSnapshotPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   orderbookSnapshots<T extends Prisma.Asset$orderbookSnapshotsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Asset$orderbookSnapshotsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AssetOrderbookSnapshotPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   marketCandles<T extends Prisma.Asset$marketCandlesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Asset$marketCandlesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MarketCandlePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  marketCandleSyncStates<T extends Prisma.Asset$marketCandleSyncStatesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Asset$marketCandleSyncStatesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MarketCandleSyncStatePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   positions<T extends Prisma.Asset$positionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Asset$positionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PositionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   orders<T extends Prisma.Asset$ordersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Asset$ordersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   quotes<T extends Prisma.Asset$quotesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Asset$quotesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$QuotePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -2221,6 +2375,30 @@ export type Asset$marketCandlesArgs<ExtArgs extends runtime.Types.Extensions.Int
   take?: number
   skip?: number
   distinct?: Prisma.MarketCandleScalarFieldEnum | Prisma.MarketCandleScalarFieldEnum[]
+}
+
+/**
+ * Asset.marketCandleSyncStates
+ */
+export type Asset$marketCandleSyncStatesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the MarketCandleSyncState
+   */
+  select?: Prisma.MarketCandleSyncStateSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the MarketCandleSyncState
+   */
+  omit?: Prisma.MarketCandleSyncStateOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.MarketCandleSyncStateInclude<ExtArgs> | null
+  where?: Prisma.MarketCandleSyncStateWhereInput
+  orderBy?: Prisma.MarketCandleSyncStateOrderByWithRelationInput | Prisma.MarketCandleSyncStateOrderByWithRelationInput[]
+  cursor?: Prisma.MarketCandleSyncStateWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.MarketCandleSyncStateScalarFieldEnum | Prisma.MarketCandleSyncStateScalarFieldEnum[]
 }
 
 /**

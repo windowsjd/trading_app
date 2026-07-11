@@ -64,6 +64,7 @@ export const ModelName = {
   AssetPriceSnapshot: 'AssetPriceSnapshot',
   AssetOrderbookSnapshot: 'AssetOrderbookSnapshot',
   MarketCandle: 'MarketCandle',
+  MarketCandleSyncState: 'MarketCandleSyncState',
   Position: 'Position',
   Order: 'Order',
   CashWallet: 'CashWallet',
@@ -344,6 +345,33 @@ export const MarketCandleScalarFieldEnum = {
 } as const
 
 export type MarketCandleScalarFieldEnum = (typeof MarketCandleScalarFieldEnum)[keyof typeof MarketCandleScalarFieldEnum]
+
+
+export const MarketCandleSyncStateScalarFieldEnum = {
+  id: 'id',
+  assetId: 'assetId',
+  feed: 'feed',
+  sourceProvider: 'sourceProvider',
+  mode: 'mode',
+  status: 'status',
+  targetFrom: 'targetFrom',
+  targetTo: 'targetTo',
+  cursorJson: 'cursorJson',
+  pagesFetched: 'pagesFetched',
+  providerRowsReceived: 'providerRowsReceived',
+  rowsAccepted: 'rowsAccepted',
+  rowsRejected: 'rowsRejected',
+  rowsDuplicated: 'rowsDuplicated',
+  rowsWritten: 'rowsWritten',
+  lastSuccessfulPageAt: 'lastSuccessfulPageAt',
+  completedAt: 'completedAt',
+  errorCode: 'errorCode',
+  errorMessage: 'errorMessage',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type MarketCandleSyncStateScalarFieldEnum = (typeof MarketCandleSyncStateScalarFieldEnum)[keyof typeof MarketCandleSyncStateScalarFieldEnum]
 
 
 export const PositionScalarFieldEnum = {

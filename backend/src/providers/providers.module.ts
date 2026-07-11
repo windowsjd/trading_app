@@ -32,6 +32,10 @@ import { KisCandleNormalizerService } from './kis/candles/kis-candle-normalizer.
 import { KisDomesticFiveMinuteBuilder } from './kis/candles/kis-domestic-five-minute.builder';
 import { KisDomesticMinuteAdapter } from './kis/candles/kis-domestic-minute.adapter';
 import { KisUsMinuteAdapter } from './kis/candles/kis-us-minute.adapter';
+import { KisDomesticPeriodAdapter } from './kis/candles/kis-domestic-period.adapter';
+import { KisOverseasPeriodAdapter } from './kis/candles/kis-overseas-period.adapter';
+import { KisPeriodCandleNormalizerService } from './kis/candles/kis-period-candle-normalizer.service';
+import { BinanceCandleIngestionService } from './binance/binance-candle.ingestion.service';
 
 @Module({
   imports: [PrismaModule, RedisModule],
@@ -74,6 +78,10 @@ import { KisUsMinuteAdapter } from './kis/candles/kis-us-minute.adapter';
     KisDomesticFiveMinuteBuilder,
     KisDomesticMinuteAdapter,
     KisUsMinuteAdapter,
+    KisDomesticPeriodAdapter,
+    KisOverseasPeriodAdapter,
+    KisPeriodCandleNormalizerService,
+    BinanceCandleIngestionService,
     KisRestCurrentPriceIngestionService,
     KisRestHogaIngestionService,
     KisRealtimePriceCacheService,
@@ -101,6 +109,10 @@ import { KisUsMinuteAdapter } from './kis/candles/kis-us-minute.adapter';
     KisDomesticFiveMinuteBuilder,
     KisDomesticMinuteAdapter,
     KisUsMinuteAdapter,
+    KisDomesticPeriodAdapter,
+    KisOverseasPeriodAdapter,
+    KisPeriodCandleNormalizerService,
+    BinanceCandleIngestionService,
     KisRestCurrentPriceIngestionService,
     KisRestHogaIngestionService,
     KisRealtimePriceCacheService,

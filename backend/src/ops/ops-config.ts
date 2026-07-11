@@ -150,6 +150,9 @@ export function getOpsSchedulerConfig(
         false,
       ),
       [OpsJobName.market_candle_retention]: retentionEnabled,
+      // Manual/operator-triggered only in this phase; a market-close /
+      // realtime sync scheduler is a unit-3 decision.
+      [OpsJobName.market_candle_sync]: false,
     },
     providerIntervalsSeconds: {
       [OpsJobName.provider_fx_ingest]: parsePositiveIntegerEnv(

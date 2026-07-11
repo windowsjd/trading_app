@@ -511,6 +511,40 @@ export type EnumAssetPriceSourceTypeWithAggregatesFilter<$PrismaModel = never> =
   _max?: Prisma.NestedEnumAssetPriceSourceTypeFilter<$PrismaModel>
 }
 
+export type EnumMarketCandleSyncModeFilter<$PrismaModel = never> = {
+  equals?: $Enums.MarketCandleSyncMode | Prisma.EnumMarketCandleSyncModeFieldRefInput<$PrismaModel>
+  in?: $Enums.MarketCandleSyncMode[] | Prisma.ListEnumMarketCandleSyncModeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.MarketCandleSyncMode[] | Prisma.ListEnumMarketCandleSyncModeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumMarketCandleSyncModeFilter<$PrismaModel> | $Enums.MarketCandleSyncMode
+}
+
+export type EnumMarketCandleSyncStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.MarketCandleSyncStatus | Prisma.EnumMarketCandleSyncStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.MarketCandleSyncStatus[] | Prisma.ListEnumMarketCandleSyncStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.MarketCandleSyncStatus[] | Prisma.ListEnumMarketCandleSyncStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumMarketCandleSyncStatusFilter<$PrismaModel> | $Enums.MarketCandleSyncStatus
+}
+
+export type EnumMarketCandleSyncModeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.MarketCandleSyncMode | Prisma.EnumMarketCandleSyncModeFieldRefInput<$PrismaModel>
+  in?: $Enums.MarketCandleSyncMode[] | Prisma.ListEnumMarketCandleSyncModeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.MarketCandleSyncMode[] | Prisma.ListEnumMarketCandleSyncModeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumMarketCandleSyncModeWithAggregatesFilter<$PrismaModel> | $Enums.MarketCandleSyncMode
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumMarketCandleSyncModeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumMarketCandleSyncModeFilter<$PrismaModel>
+}
+
+export type EnumMarketCandleSyncStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.MarketCandleSyncStatus | Prisma.EnumMarketCandleSyncStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.MarketCandleSyncStatus[] | Prisma.ListEnumMarketCandleSyncStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.MarketCandleSyncStatus[] | Prisma.ListEnumMarketCandleSyncStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumMarketCandleSyncStatusWithAggregatesFilter<$PrismaModel> | $Enums.MarketCandleSyncStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumMarketCandleSyncStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumMarketCandleSyncStatusFilter<$PrismaModel>
+}
+
 export type EnumOrderSideFilter<$PrismaModel = never> = {
   equals?: $Enums.OrderSide | Prisma.EnumOrderSideFieldRefInput<$PrismaModel>
   in?: $Enums.OrderSide[] | Prisma.ListEnumOrderSideFieldRefInput<$PrismaModel>
@@ -1315,6 +1349,40 @@ export type NestedEnumAssetPriceSourceTypeWithAggregatesFilter<$PrismaModel = ne
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumAssetPriceSourceTypeFilter<$PrismaModel>
   _max?: Prisma.NestedEnumAssetPriceSourceTypeFilter<$PrismaModel>
+}
+
+export type NestedEnumMarketCandleSyncModeFilter<$PrismaModel = never> = {
+  equals?: $Enums.MarketCandleSyncMode | Prisma.EnumMarketCandleSyncModeFieldRefInput<$PrismaModel>
+  in?: $Enums.MarketCandleSyncMode[] | Prisma.ListEnumMarketCandleSyncModeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.MarketCandleSyncMode[] | Prisma.ListEnumMarketCandleSyncModeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumMarketCandleSyncModeFilter<$PrismaModel> | $Enums.MarketCandleSyncMode
+}
+
+export type NestedEnumMarketCandleSyncStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.MarketCandleSyncStatus | Prisma.EnumMarketCandleSyncStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.MarketCandleSyncStatus[] | Prisma.ListEnumMarketCandleSyncStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.MarketCandleSyncStatus[] | Prisma.ListEnumMarketCandleSyncStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumMarketCandleSyncStatusFilter<$PrismaModel> | $Enums.MarketCandleSyncStatus
+}
+
+export type NestedEnumMarketCandleSyncModeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.MarketCandleSyncMode | Prisma.EnumMarketCandleSyncModeFieldRefInput<$PrismaModel>
+  in?: $Enums.MarketCandleSyncMode[] | Prisma.ListEnumMarketCandleSyncModeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.MarketCandleSyncMode[] | Prisma.ListEnumMarketCandleSyncModeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumMarketCandleSyncModeWithAggregatesFilter<$PrismaModel> | $Enums.MarketCandleSyncMode
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumMarketCandleSyncModeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumMarketCandleSyncModeFilter<$PrismaModel>
+}
+
+export type NestedEnumMarketCandleSyncStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.MarketCandleSyncStatus | Prisma.EnumMarketCandleSyncStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.MarketCandleSyncStatus[] | Prisma.ListEnumMarketCandleSyncStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.MarketCandleSyncStatus[] | Prisma.ListEnumMarketCandleSyncStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumMarketCandleSyncStatusWithAggregatesFilter<$PrismaModel> | $Enums.MarketCandleSyncStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumMarketCandleSyncStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumMarketCandleSyncStatusFilter<$PrismaModel>
 }
 
 export type NestedEnumOrderSideFilter<$PrismaModel = never> = {

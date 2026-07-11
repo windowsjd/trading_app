@@ -397,6 +397,7 @@ export const ModelName = {
   AssetPriceSnapshot: 'AssetPriceSnapshot',
   AssetOrderbookSnapshot: 'AssetOrderbookSnapshot',
   MarketCandle: 'MarketCandle',
+  MarketCandleSyncState: 'MarketCandleSyncState',
   Position: 'Position',
   Order: 'Order',
   CashWallet: 'CashWallet',
@@ -426,7 +427,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "operatorAuditLog" | "refreshTokenSession" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "position" | "order" | "cashWallet" | "walletTransaction" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock"
+    modelProps: "user" | "operatorAuditLog" | "refreshTokenSession" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "position" | "order" | "cashWallet" | "walletTransaction" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1389,6 +1390,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.MarketCandleCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.MarketCandleCountAggregateOutputType> | number
+        }
+      }
+    }
+    MarketCandleSyncState: {
+      payload: Prisma.$MarketCandleSyncStatePayload<ExtArgs>
+      fields: Prisma.MarketCandleSyncStateFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.MarketCandleSyncStateFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketCandleSyncStatePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.MarketCandleSyncStateFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketCandleSyncStatePayload>
+        }
+        findFirst: {
+          args: Prisma.MarketCandleSyncStateFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketCandleSyncStatePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.MarketCandleSyncStateFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketCandleSyncStatePayload>
+        }
+        findMany: {
+          args: Prisma.MarketCandleSyncStateFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketCandleSyncStatePayload>[]
+        }
+        create: {
+          args: Prisma.MarketCandleSyncStateCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketCandleSyncStatePayload>
+        }
+        createMany: {
+          args: Prisma.MarketCandleSyncStateCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.MarketCandleSyncStateCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketCandleSyncStatePayload>[]
+        }
+        delete: {
+          args: Prisma.MarketCandleSyncStateDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketCandleSyncStatePayload>
+        }
+        update: {
+          args: Prisma.MarketCandleSyncStateUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketCandleSyncStatePayload>
+        }
+        deleteMany: {
+          args: Prisma.MarketCandleSyncStateDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.MarketCandleSyncStateUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.MarketCandleSyncStateUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketCandleSyncStatePayload>[]
+        }
+        upsert: {
+          args: Prisma.MarketCandleSyncStateUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketCandleSyncStatePayload>
+        }
+        aggregate: {
+          args: Prisma.MarketCandleSyncStateAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateMarketCandleSyncState>
+        }
+        groupBy: {
+          args: Prisma.MarketCandleSyncStateGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.MarketCandleSyncStateGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.MarketCandleSyncStateCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.MarketCandleSyncStateCountAggregateOutputType> | number
         }
       }
     }
@@ -2717,6 +2792,33 @@ export const MarketCandleScalarFieldEnum = {
 export type MarketCandleScalarFieldEnum = (typeof MarketCandleScalarFieldEnum)[keyof typeof MarketCandleScalarFieldEnum]
 
 
+export const MarketCandleSyncStateScalarFieldEnum = {
+  id: 'id',
+  assetId: 'assetId',
+  feed: 'feed',
+  sourceProvider: 'sourceProvider',
+  mode: 'mode',
+  status: 'status',
+  targetFrom: 'targetFrom',
+  targetTo: 'targetTo',
+  cursorJson: 'cursorJson',
+  pagesFetched: 'pagesFetched',
+  providerRowsReceived: 'providerRowsReceived',
+  rowsAccepted: 'rowsAccepted',
+  rowsRejected: 'rowsRejected',
+  rowsDuplicated: 'rowsDuplicated',
+  rowsWritten: 'rowsWritten',
+  lastSuccessfulPageAt: 'lastSuccessfulPageAt',
+  completedAt: 'completedAt',
+  errorCode: 'errorCode',
+  errorMessage: 'errorMessage',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type MarketCandleSyncStateScalarFieldEnum = (typeof MarketCandleSyncStateScalarFieldEnum)[keyof typeof MarketCandleSyncStateScalarFieldEnum]
+
+
 export const PositionScalarFieldEnum = {
   id: 'id',
   seasonParticipantId: 'seasonParticipantId',
@@ -3304,6 +3406,34 @@ export type ListEnumAssetPriceSourceTypeFieldRefInput<$PrismaModel> = FieldRefIn
 
 
 /**
+ * Reference to a field of type 'MarketCandleSyncMode'
+ */
+export type EnumMarketCandleSyncModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'MarketCandleSyncMode'>
+    
+
+
+/**
+ * Reference to a field of type 'MarketCandleSyncMode[]'
+ */
+export type ListEnumMarketCandleSyncModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'MarketCandleSyncMode[]'>
+    
+
+
+/**
+ * Reference to a field of type 'MarketCandleSyncStatus'
+ */
+export type EnumMarketCandleSyncStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'MarketCandleSyncStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'MarketCandleSyncStatus[]'
+ */
+export type ListEnumMarketCandleSyncStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'MarketCandleSyncStatus[]'>
+    
+
+
+/**
  * Reference to a field of type 'OrderSide'
  */
 export type EnumOrderSideFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OrderSide'>
@@ -3648,6 +3778,7 @@ export type GlobalOmitConfig = {
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotOmit
   assetOrderbookSnapshot?: Prisma.AssetOrderbookSnapshotOmit
   marketCandle?: Prisma.MarketCandleOmit
+  marketCandleSyncState?: Prisma.MarketCandleSyncStateOmit
   position?: Prisma.PositionOmit
   order?: Prisma.OrderOmit
   cashWallet?: Prisma.CashWalletOmit
