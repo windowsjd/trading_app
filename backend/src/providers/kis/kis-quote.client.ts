@@ -2,7 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { ProviderConfigService } from '../provider-config.service';
 import { redactText } from '../provider-secret-redaction';
 import { ProviderConfigError, ProviderHttpError } from '../provider.types';
-import type { KisLowLevelCallResult } from './kis.types';
+import type {
+  KisLowLevelCallResult,
+  KisLowLevelCallWithMetadataResult,
+} from './kis.types';
 import { KisRequestCoordinatorService } from './coordination/kis-request-coordinator.service';
 
 @Injectable()
@@ -16,7 +19,29 @@ export class KisQuoteClient {
     path: string;
     query?: Record<string, string>;
     headers?: Record<string, string>;
+    signal?: AbortSignal;
   }): Promise<KisLowLevelCallResult<T>> {
+    const result = await this.getMarketDataWithMetadataByExplicitPath<T>(input);
+    if (result.state === 'skipped') {
+      return result;
+    }
+    return {
+      state: 'available',
+      response: result.response,
+      receivedAt: result.receivedAt,
+    };
+  }
+
+  /**
+   * Additive low-level contract for KIS endpoints whose continuation state is
+   * carried in response headers. Existing callers keep the body-only method.
+   */
+  async getMarketDataWithMetadataByExplicitPath<T>(input: {
+    path: string;
+    query?: Record<string, string>;
+    headers?: Record<string, string>;
+    signal?: AbortSignal;
+  }): Promise<KisLowLevelCallWithMetadataResult<T>> {
     const config = this.configService.getConfig();
     if (!config.kis.enabled) {
       throw new ProviderConfigError(
@@ -48,7 +73,11 @@ export class KisQuoteClient {
       url.searchParams.set(key, value);
     }
 
-    await this.requestCoordinator.acquire('rest');
+    if (input.signal) {
+      await this.requestCoordinator.acquire('rest', { signal: input.signal });
+    } else {
+      await this.requestCoordinator.acquire('rest');
+    }
 
     const controller = new AbortController();
     const timeout = setTimeout(
@@ -65,7 +94,9 @@ export class KisQuoteClient {
           appsecret: config.kis.appSecret,
           ...(input.headers ?? {}),
         },
-        signal: controller.signal,
+        signal: input.signal
+          ? AbortSignal.any([controller.signal, input.signal])
+          : controller.signal,
       });
       const receivedAt = new Date();
       const bodyText = await response.text();
@@ -81,10 +112,16 @@ export class KisQuoteClient {
       }
 
       try {
+        const responseHeaders: Record<string, string> = {};
+        response.headers?.forEach((value, key) => {
+          responseHeaders[key.toLowerCase()] = value;
+        });
         return {
           state: 'available',
           response: JSON.parse(bodyText) as T,
           receivedAt,
+          headers: responseHeaders,
+          trCont: responseHeaders['tr_cont']?.trim() || null,
         };
       } catch {
         throw new ProviderHttpError(

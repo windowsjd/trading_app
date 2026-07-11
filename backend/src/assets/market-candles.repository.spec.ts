@@ -155,10 +155,19 @@ describe('MarketCandlesRepository', () => {
         'source_updated_at',
         'updated_at',
       ]) {
-        expect(query.text).toContain(`"${column}" = EXCLUDED."${column}"`);
+        if (column === 'is_closed') {
+          expect(query.text).toContain(
+            '"is_closed" = "market_candles"."is_closed" OR EXCLUDED."is_closed"',
+          );
+        } else {
+          expect(query.text).toContain(`"${column}" = EXCLUDED."${column}"`);
+        }
       }
       expect(query.text).not.toContain('"id" = EXCLUDED');
       expect(query.text).not.toContain('"created_at" = EXCLUDED');
+      expect(query.text).toContain(
+        'WHERE EXCLUDED."source_updated_at" >= "market_candles"."source_updated_at"',
+      );
     });
 
     it('stores a batch of candles in one statement', async () => {

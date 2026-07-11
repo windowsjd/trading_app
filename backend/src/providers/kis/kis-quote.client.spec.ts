@@ -77,4 +77,71 @@ describe('KisQuoteClient rate-limit integration', () => {
       }).compile(),
     ).rejects.toThrow(/KisRequestCoordinatorService/u);
   });
+
+  it('exposes lower-case response headers and tr_cont through the additive metadata method', async () => {
+    const configService = {
+      getConfig: () => ({
+        common: { httpTimeoutMs: 5000 },
+        kis: {
+          enabled: true,
+          appKey: 'key',
+          appSecret: 'secret',
+          restBaseUrl: 'https://kis.test',
+        },
+      }),
+    };
+    const coordinator = { acquire: jest.fn().mockResolvedValue(undefined) };
+    jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ tr_cont: 'M', 'x-test': 'yes' }),
+      text: () => Promise.resolve('{"output2":[]}'),
+    } as Response);
+    const client = new KisQuoteClient(
+      configService as never,
+      coordinator as never,
+    );
+    const result = await client.getMarketDataWithMetadataByExplicitPath({
+      path: '/minutes',
+    });
+    expect(result).toMatchObject({
+      state: 'available',
+      trCont: 'M',
+      headers: { tr_cont: 'M', 'x-test': 'yes' },
+    });
+  });
+
+  it('passes an adapter cancellation signal into the rate-limit queue and fetch', async () => {
+    const configService = {
+      getConfig: () => ({
+        common: { httpTimeoutMs: 5000 },
+        kis: {
+          enabled: true,
+          appKey: 'key',
+          appSecret: 'secret',
+          restBaseUrl: 'https://kis.test',
+        },
+      }),
+    };
+    const coordinator = { acquire: jest.fn().mockResolvedValue(undefined) };
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers(),
+      text: () => Promise.resolve('{}'),
+    } as Response);
+    const signal = new AbortController().signal;
+    const client = new KisQuoteClient(
+      configService as never,
+      coordinator as never,
+    );
+    await client.getMarketDataWithMetadataByExplicitPath({
+      path: '/minutes',
+      signal,
+    });
+    expect(coordinator.acquire).toHaveBeenCalledWith('rest', { signal });
+    expect((fetchSpy.mock.calls[0][1] as RequestInit).signal).toBeInstanceOf(
+      AbortSignal,
+    );
+  });
 });

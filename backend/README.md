@@ -268,7 +268,26 @@ CANDLE_PIPELINE_FOUNDATION_SMOKE=1 pnpm test -- candle-pipeline-foundation.integ
 
 KIS deployments with both `KIS_MARKET_DATA_ENABLED=true` and rate limiting enabled must explicitly set `KIS_API_ENVIRONMENT=real|virtual`; missing or unknown values fail startup. Redis outages retain a per-process conservative limiter, including the relative delay carried across Redis/local transitions.
 
-The cache and single-flight coordinator remain unconnected to the candles endpoint. Historical backfill, provider-result persistence, DB serving fallback, and 5m-to-higher-interval aggregation remain unimplemented.
+The cache and single-flight coordinator remain unconnected to the candles endpoint. Checkpointed/automatic historical backfill orchestration, scheduled candle ingestion, DB serving fallback, and 5m-to-higher-interval aggregation remain unimplemented.
+
+### KIS canonical 5-minute candle ingestion foundation
+
+The storage-only ingestion path is separate from the existing candles HTTP endpoint:
+
+- Domestic stocks call KIS `inquire-time-dailychartprice` backward by `FID_INPUT_DATE_1`/`FID_INPUT_HOUR_1`, combine all page rows before aggregation, and store only canonical 5-minute candles anchored at 09:00 Asia/Seoul. A historical bucket is written only when all five consecutive 1-minute constituents are present.
+- US stocks call KIS `inquire-time-itemchartprice` with `NMIN=5`. The response `tr_cont` header decides whether another page exists; a next request uses `tr_cont=N`, `NEXT=1`, `PINC=1`, and the prior page's oldest candle minus five minutes as `KEYB`. Only the 09:30–16:00 America/New_York regular session is accepted, so DST is handled by the IANA timezone rather than a fixed UTC offset.
+- Both paths use half-open UTC ranges (`from <= openTime < to`), strict timestamp/Decimal/OHLCV validation, timestamp deduplication, bounded pages/rows/duration, cancellation, empty-page and cursor-no-progress termination. Missing prices or volume are never synthesized, missing amount remains `null`, and missing minutes never become fake candles.
+- `MarketCandleIngestionService` exposes `fetchDomesticFiveMinuteCandles`, `fetchUsFiveMinuteCandles`, `ingestDomesticFiveMinuteCandles`, and `ingestUsFiveMinuteCandles`. Ingestion writes through `MarketCandlesRepository.upsertMany`; conflict updates cannot regress `isClosed=true` to false.
+- Every physical request uses the existing `KisAuthClient`/`KisQuoteClient` coordinator and shared KIS REST limiter. No adapter creates a client or limiter instance.
+
+Only interval `5m` is persisted by this path. Domestic/US `1d` and `1w` are deferred to 2-3; checkpointed initial/incremental/repair orchestration and 5m-derived `15m`, `30m`, `1h`, and `4h` are deferred to 2-4. The path is not scheduled and is **not connected to `GET /api/v1/assets/:assetId/candles`**, Redis/DB serving, or WebSocket updates.
+
+Opt-in live schema smokes require real KIS credentials, explicit `KIS_API_ENVIRONMENT`, and the matching flag. They fetch at most one page through the production rate limiter, do not write the database, and never print credentials or raw payloads:
+
+```bash
+KIS_DOMESTIC_CANDLE_LIVE_SMOKE=1 pnpm test -- kis-candle-live.integration.spec.ts
+KIS_US_CANDLE_LIVE_SMOKE=1 pnpm test -- kis-candle-live.integration.spec.ts
+```
 
 ## Local Commands
 

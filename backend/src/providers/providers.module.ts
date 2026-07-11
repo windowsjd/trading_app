@@ -28,6 +28,10 @@ import { MarketSnapshotHealthService } from './market-snapshot-health.service';
 import { ProviderConfigService } from './provider-config.service';
 import { ProviderHttpClient } from './provider-http.client';
 import { ProviderTargetResolverService } from './provider-target-resolver.service';
+import { KisCandleNormalizerService } from './kis/candles/kis-candle-normalizer.service';
+import { KisDomesticFiveMinuteBuilder } from './kis/candles/kis-domestic-five-minute.builder';
+import { KisDomesticMinuteAdapter } from './kis/candles/kis-domestic-minute.adapter';
+import { KisUsMinuteAdapter } from './kis/candles/kis-us-minute.adapter';
 
 @Module({
   imports: [PrismaModule, RedisModule],
@@ -66,6 +70,10 @@ import { ProviderTargetResolverService } from './provider-target-resolver.servic
     },
     KisAuthClient,
     KisQuoteClient,
+    KisCandleNormalizerService,
+    KisDomesticFiveMinuteBuilder,
+    KisDomesticMinuteAdapter,
+    KisUsMinuteAdapter,
     KisRestCurrentPriceIngestionService,
     KisRestHogaIngestionService,
     KisRealtimePriceCacheService,
@@ -89,6 +97,10 @@ import { ProviderTargetResolverService } from './provider-target-resolver.servic
     BinanceWebSocketStreamingService,
     KisAuthClient,
     KisQuoteClient,
+    KisCandleNormalizerService,
+    KisDomesticFiveMinuteBuilder,
+    KisDomesticMinuteAdapter,
+    KisUsMinuteAdapter,
     KisRestCurrentPriceIngestionService,
     KisRestHogaIngestionService,
     KisRealtimePriceCacheService,

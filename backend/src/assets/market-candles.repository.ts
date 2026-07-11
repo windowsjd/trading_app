@@ -363,10 +363,11 @@ export class MarketCandlesRepository {
         "close" = EXCLUDED."close",
         "volume" = EXCLUDED."volume",
         "amount" = EXCLUDED."amount",
-        "is_closed" = EXCLUDED."is_closed",
+        "is_closed" = "market_candles"."is_closed" OR EXCLUDED."is_closed",
         "source_provider" = EXCLUDED."source_provider",
         "source_updated_at" = EXCLUDED."source_updated_at",
         "updated_at" = EXCLUDED."updated_at"
+      WHERE EXCLUDED."source_updated_at" >= "market_candles"."source_updated_at"
     `;
 
     try {

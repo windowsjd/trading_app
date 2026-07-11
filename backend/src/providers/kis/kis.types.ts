@@ -42,3 +42,14 @@ export type KisLowLevelCallResult<T> =
       response: T;
       receivedAt: Date;
     };
+
+export type KisLowLevelCallWithMetadataResult<T> =
+  | Extract<KisLowLevelCallResult<T>, { state: 'skipped' }>
+  | {
+      state: 'available';
+      response: T;
+      receivedAt: Date;
+      /** Lower-case response headers. Credentials are request-only and absent. */
+      headers: Readonly<Record<string, string>>;
+      trCont: string | null;
+    };
