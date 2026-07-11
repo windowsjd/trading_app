@@ -28,7 +28,10 @@ export type AssetCandlesQuery = {
 // 'prev_open'  = previous regular market open → now (weekends skipped for stocks)
 // 'prev2_open' = two market days back, regular open → now
 // '1y'         = rolling 365 days → now
-type CandleRange =
+// Exported (type-only) so the candle response cache can key on and store the
+// exact HTTP response shape without duplicating these definitions. This does
+// not change the response shape or the provider call flow.
+export type CandleRange =
   | '1d'
   | '7d'
   | '30d'
@@ -36,7 +39,7 @@ type CandleRange =
   | 'prev2_open'
   | '1y'
   | 'season';
-type CandleInterval =
+export type CandleInterval =
   | '1m'
   | '5m'
   | '15m'
@@ -76,7 +79,7 @@ type ParsedAssetCandlesQuery = {
   includePrevious: boolean;
 };
 
-type CandlePayload = {
+export type CandlePayload = {
   time: string;
   open: string;
   high: string;
@@ -123,7 +126,7 @@ type BinanceCallDescriptor = {
   requestedCount: number;
 };
 
-type AssetCandlesResponse = {
+export type AssetCandlesResponse = {
   success: true;
   data: {
     state: 'available' | 'empty';

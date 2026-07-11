@@ -186,6 +186,41 @@ KIS_US_SYMBOLS=AAPL,TSLA
 
 Display/read freshness is intentionally wider than execute freshness. Asset list/detail/price, Home, positions, and live portfolio valuation use display defaults of 300 seconds for asset prices and 7200 seconds for USD/KRW. Quote paths keep shorter quote defaults, and order/FX execute paths keep the strict existing execute defaults of 10 seconds for asset prices and 60 seconds for USD/KRW.
 
+### Redis and the candle response cache
+
+Redis runs from `docker-compose.yml` alongside PostgreSQL:
+
+```bash
+cd backend
+docker compose up -d          # starts postgres and redis
+docker compose up -d redis    # redis only
+```
+
+Connection env:
+
+- `REDIS_URL`: Redis connection string (default `redis://localhost:6379`).
+- `REDIS_CONNECT_TIMEOUT_MS`: connect timeout in milliseconds; default `3000`. Must be a positive integer.
+
+Candle response cache env:
+
+- `CANDLE_CACHE_ENABLED`: default `false`. Accepts `true`/`false`/`1`/`0`.
+- `CANDLE_CACHE_MAX_PAYLOAD_BYTES`: default `2097152` (2 MiB). Must be a positive integer.
+
+Important scope for the current step:
+
+- The candle cache layer (`RedisService` + `AssetCandlesCacheService`) exists but is **not yet wired into `GET /api/v1/assets/:assetId/candles`**. `AssetCandlesService` still calls providers exactly as before.
+- Because nothing reads the cache yet, enabling `CANDLE_CACHE_ENABLED=true` in this step does **not** reduce KIS/Binance provider call volume. Provider request throttling, single-flight, and rate limiting are separate later steps and are not implemented here.
+- The cache **fails open**: `RedisService` connects lazily (no Redis connection is opened at boot while the cache is disabled), registers an error listener so a Redis outage cannot crash the process, and reconnects with bounded backoff. Cache reads return a `miss`/`error` status and cache writes return an `error` status when Redis is unavailable, so a Redis outage never breaks the API once the cache is wired. Redis URL/password and cached payloads are never logged.
+- Cache invalidation for one asset is O(1) via a per-asset generation counter (`candles:gen:v1:{assetId}` is `INCR`ed); prior entries under `candles:data:v1:{assetId}:g{generation}:…` become unreachable and expire by TTL. No `KEYS`, production `SCAN`, `FLUSHDB`, or `FLUSHALL` is used.
+
+Opt-in real Redis smoke test (needs a reachable `REDIS_URL`; runs in-process, so it works on Windows and Linux/WSL). Without the flag Jest reports it as skipped instead of passing a no-op:
+
+```bash
+CANDLE_CACHE_REDIS_SMOKE=1 pnpm test -- asset-candles-cache.integration.spec.ts
+```
+
+It only creates and deletes keys under a random-UUID asset namespace and never flushes shared Redis data.
+
 ## Local Commands
 
 ```bash
@@ -302,6 +337,13 @@ ORDER_EXECUTE_DB_INTEGRATION=1 pnpm test -- orders.execute.integration.spec.ts
 MVP_FLOW_DB_SMOKE=1 pnpm test -- mvp-flow.integration.spec.ts
 OPS_JOB_LOCK_DB_SMOKE=1 pnpm test -- ops-job-lock.integration.spec.ts
 MARKET_CANDLES_DB_SMOKE=1 pnpm test -- market-candles.integration.spec.ts
+```
+
+The candle response cache has its own opt-in real Redis smoke (needs
+`REDIS_URL`, no database):
+
+```bash
+CANDLE_CACHE_REDIS_SMOKE=1 pnpm test -- asset-candles-cache.integration.spec.ts
 ```
 
 The FX execute opt-in integration spec runs `npm run test:db:prepare`

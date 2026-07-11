@@ -17,6 +17,7 @@ import { PortfolioModule } from './portfolio/portfolio.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProvidersModule } from './providers/providers.module';
 import { RankingModule } from './ranking/ranking.module';
+import { RedisModule } from './redis/redis.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { RecordsModule } from './records/records.module';
 import { RewardsModule } from './rewards/rewards.module';
@@ -42,6 +43,7 @@ import { WalletsModule } from './wallets/wallets.module';
     PrismaModule,
     ProvidersModule,
     RankingModule,
+    RedisModule,
     RealtimeModule,
     RecordsModule,
     RewardsModule,
