@@ -7,6 +7,11 @@ export const DEFAULT_CANDLE_CACHE_MAX_PAYLOAD_BYTES = 2 * 1024 * 1024; // 2 MiB
 export type CandleCacheConfig = {
   enabled: boolean;
   maxPayloadBytes: number;
+  currentStaleTtlSeconds?: number;
+  historicalFreshTtlSeconds?: number;
+  historicalStaleTtlSeconds?: number;
+  emptyFreshTtlSeconds?: number;
+  emptyStaleTtlSeconds?: number;
 };
 
 export type CandleCacheEnv = Record<string, string | undefined>;
@@ -80,7 +85,7 @@ function readPositiveInteger(
 export function readCandleCacheConfig(
   env: CandleCacheEnv = process.env,
 ): CandleCacheConfig {
-  return {
+  const config = {
     enabled: readBooleanFlag(
       env,
       'CANDLE_CACHE_ENABLED',
@@ -91,5 +96,39 @@ export function readCandleCacheConfig(
       'CANDLE_CACHE_MAX_PAYLOAD_BYTES',
       DEFAULT_CANDLE_CACHE_MAX_PAYLOAD_BYTES,
     ),
+    currentStaleTtlSeconds: readPositiveInteger(
+      env,
+      'CANDLE_CACHE_CURRENT_STALE_TTL_SECONDS',
+      300,
+    ),
+    historicalFreshTtlSeconds: readPositiveInteger(
+      env,
+      'CANDLE_CACHE_HISTORICAL_FRESH_TTL_SECONDS',
+      900,
+    ),
+    historicalStaleTtlSeconds: readPositiveInteger(
+      env,
+      'CANDLE_CACHE_HISTORICAL_STALE_TTL_SECONDS',
+      3600,
+    ),
+    emptyFreshTtlSeconds: readPositiveInteger(
+      env,
+      'CANDLE_CACHE_EMPTY_FRESH_TTL_SECONDS',
+      10,
+    ),
+    emptyStaleTtlSeconds: readPositiveInteger(
+      env,
+      'CANDLE_CACHE_EMPTY_STALE_TTL_SECONDS',
+      60,
+    ),
   };
+  if (
+    config.historicalStaleTtlSeconds < config.historicalFreshTtlSeconds ||
+    config.emptyStaleTtlSeconds < config.emptyFreshTtlSeconds
+  ) {
+    throw new CandleCacheConfigError(
+      'Candle cache stale TTLs must be greater than or equal to fresh TTLs.',
+    );
+  }
+  return config;
 }

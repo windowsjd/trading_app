@@ -206,6 +206,9 @@ Candle response cache env:
 
 - `CANDLE_CACHE_ENABLED`: default `false`. Accepts `true`/`false`/`1`/`0`.
 - `CANDLE_CACHE_MAX_PAYLOAD_BYTES`: default `2097152` (2 MiB). Must be a positive integer.
+- `CANDLE_CACHE_CURRENT_STALE_TTL_SECONDS`: hard TTL for latest/current responses; default `300` (the interval fresh TTL remains 15s–3600s).
+- `CANDLE_CACHE_HISTORICAL_FRESH_TTL_SECONDS` / `CANDLE_CACHE_HISTORICAL_STALE_TTL_SECONDS`: completed historical response TTLs; defaults `900` / `3600`.
+- `CANDLE_CACHE_EMPTY_FRESH_TTL_SECONDS` / `CANDLE_CACHE_EMPTY_STALE_TTL_SECONDS`: shorter confirmed-empty TTLs; defaults `10` / `60`.
 - `CANDLE_SINGLE_FLIGHT_LOCK_TTL_MS`: distributed load-lock TTL; default `30000`.
 - `CANDLE_SINGLE_FLIGHT_WAIT_TIMEOUT_MS`: bounded remote-owner wait; default `35000`.
 - `CANDLE_SINGLE_FLIGHT_POLL_INTERVAL_MS`: cache polling interval; default `100`.
@@ -220,20 +223,34 @@ KIS REST coordination env:
 - `KIS_RATE_LIMIT_MAX_WAIT_MS`: queue/reservation wait bound; default `30000`.
 - `KIS_RATE_LIMIT_MAX_QUEUE_SIZE`: per-process FIFO queue bound; default `500`.
 
-Important scope for the current step:
+### Managed HTTP candle serving (unit 3-1 / 3-2)
 
-- The candle cache layer (`RedisService` + `AssetCandlesCacheService`) exists but is **not yet wired into `GET /api/v1/assets/:assetId/candles`**. `AssetCandlesService` still calls providers exactly as before.
-- Because nothing reads the cache yet, enabling `CANDLE_CACHE_ENABLED=true` in this step does **not** reduce KIS/Binance provider call volume. The reusable candle single-flight coordinator exists but is likewise **not yet wired into the candles endpoint**.
+`GET /api/v1/assets/:assetId/candles` has two explicit rollout modes. `CANDLE_SERVING_MODE=legacy` (the default) preserves the existing provider-direct path. `CANDLE_SERVING_MODE=database` enables the managed path for persisted `5m`/`1d`/`1w` feeds and read-time `15m`/`30m`/`1h`/`4h`; unknown mode values fail configuration instead of silently falling back. `1m`, ranges outside persistence/retention policy, and large cold requests without completed baseline coverage remain on legacy. Seed those cold baselines with the manual Ops `market_candle_sync` job; an HTTP request never starts an unbounded initial backfill.
+
+Managed order is fresh Redis → PostgreSQL canonical rows → bounded incremental/small repair sync → PostgreSQL requery → Redis. Provider rows are never returned directly. Operational refresh failures fall back to stale Redis and then strict PostgreSQL last-known-good; validation, configuration, schema/programmer, authentication, asset-not-found, and authorization errors are not hidden. Redis failures retain local single-flight and DB/provider serving, but distributed dedupe is unavailable until Redis recovers.
+
+The request clock is captured once. The read plan uses UTC half-open ranges, maps `5m`/derived intervals to stored `5m`, maps `1d`/`1w` directly, and pads the source start for complete higher-interval aggregation. Coverage comes from completed persistent sync target ranges and active/failed checkpoint state, not candle min/max/count. Historical incomplete aggregate buckets are removed; an unconfirmed empty store is `missing`, not a successful empty response.
+
+Cache keys use the `candles:data:v2` namespace, normalized semantic inputs, an asset generation, and a stable `latest` identity for requests without explicit `to`. Envelopes contain `schemaVersion`, `cachedAt`, `freshUntil`, `staleUntil`, and the unchanged response; Redis retains the key only through `staleUntil`. Corrupt entries delete only their exact key. Successful logical asset/feed writes increment `candles:gen:v2:{assetId}` after the durable write. Old-generation owners cannot write because the Lua write verifies both lock token and generation. An invalidation outage cannot roll back PostgreSQL; therefore hard stale TTLs remain bounded and a recovered Redis can expose an old entry only until that TTL expires.
+
+The endpoint success/error JSON contract is unchanged. Persisted provider provenance is compatibility-mapped into the existing `source` union (KIS domestic/overseas minute or period path, or Binance klines); it does not claim that an HTTP provider call occurred for the current request. The v1 payload requires `amount` to be a string, so a persisted provider-native `amount=null` is centrally mapped to `"0.00000000"` until a separately versioned public contract can represent null.
+
+Serving configuration: `CANDLE_SERVING_CURRENT_DB_FRESHNESS_MS` (default `60000`), `CANDLE_SERVING_ON_DEMAND_REFRESH_ENABLED` (default `true`), `CANDLE_SERVING_ON_DEMAND_REFRESH_MAX_DURATION_MS` (default `15000`), `CANDLE_SERVING_ON_DEMAND_REFRESH_MAX_PAGES` (default `10`), `CANDLE_SERVING_ON_DEMAND_REFRESH_MAX_ROWS` (default `5000`), `CANDLE_SERVING_STALE_WAITER_MAX_WAIT_MS` (default `500`), and `CANDLE_SERVING_ON_DEMAND_REPAIR_MAX_RANGE_MS` (default two days). These per-request budgets are clamped by the sync orchestrator's global page/row/duration budgets; cancellation and the asset/feed lock still apply.
+
+WebSocket current/higher candle updates and automatic market-close reconciliation are not implemented in this unit. They remain unit 3-3 and 3-4 work.
+
+Important operational behavior:
 - KIS REST rate limiting is active on the actual `KisAuthClient` OAuth and `KisQuoteClient` quote request paths. It does not affect Binance REST or either provider's WebSocket traffic. Redis atomically reserves account-wide slots using Redis server time; if Redis is unavailable, each process continues with a conservative FIFO in-process limiter instead of calling KIS without limits. Multi-instance fallback cannot enforce a shared account limit and emits one outage warning until recovery.
 - Single-flight uses local Promise sharing plus token-owned Redis locks, bounded cache polling, double-check after acquisition, and periodic ownership renewal. It is intended for bounded serving loads only; minute-scale historical backfills require a later job queue/backfill-lock design.
 - Single-flight snapshots the asset cache generation once. Local Promise and distributed lock identities include that generation, and the final cache write is one Lua operation that verifies both the owner token and unchanged generation. A successful stale loader result may be returned to its caller but is never written into a newer generation.
 - The cache **fails open**: `RedisService` connects lazily (no Redis connection is opened at boot while the cache is disabled), registers an error listener so a Redis outage cannot crash the process, and reconnects with bounded backoff. Cache reads return a `miss`/`error` status and cache writes return an `error` status when Redis is unavailable, so a Redis outage never breaks the API once the cache is wired. Redis URL/password and cached payloads are never logged.
-- Cache invalidation for one asset is O(1) via a per-asset generation counter (`candles:gen:v1:{assetId}` is `INCR`ed); prior entries under `candles:data:v1:{assetId}:g{generation}:…` become unreachable and expire by TTL. No `KEYS`, production `SCAN`, `FLUSHDB`, or `FLUSHALL` is used.
+- Cache invalidation for one asset is O(1) via a per-asset generation counter (`candles:gen:v2:{assetId}` is `INCR`ed); prior entries under `candles:data:v2:{assetId}:g{generation}:…` become unreachable and expire by TTL. No `KEYS`, production `SCAN`, `FLUSHDB`, or `FLUSHALL` is used.
 
 Opt-in real Redis smoke test (needs a reachable `REDIS_URL`; runs in-process, so it works on Windows and Linux/WSL). Without the flag Jest reports it as skipped instead of passing a no-op:
 
 ```bash
 CANDLE_CACHE_REDIS_SMOKE=1 pnpm test -- asset-candles-cache.integration.spec.ts
+CANDLE_SERVING_DB_SMOKE=1 pnpm test -- candle-pipeline-foundation.integration.spec.ts
 KIS_COORDINATION_REDIS_SMOKE=1 pnpm test -- kis-coordination.integration.spec.ts
 ```
 
@@ -268,7 +285,7 @@ CANDLE_PIPELINE_FOUNDATION_SMOKE=1 pnpm test -- candle-pipeline-foundation.integ
 
 KIS deployments with both `KIS_MARKET_DATA_ENABLED=true` and rate limiting enabled must explicitly set `KIS_API_ENVIRONMENT=real|virtual`; missing or unknown values fail startup. Redis outages retain a per-process conservative limiter, including the relative delay carried across Redis/local transitions.
 
-The cache and single-flight coordinator remain unconnected to the candles endpoint. Scheduled candle ingestion and DB serving fallback remain unimplemented; checkpointed backfill orchestration and 5m-to-higher-interval aggregation are described in "Checkpointed market candle sync (5m/1d/1w)" below.
+The cache and single-flight coordinator are connected to the candles endpoint only in `CANDLE_SERVING_MODE=database`. Scheduled candle ingestion remains unimplemented; checkpointed backfill orchestration and 5m-to-higher-interval aggregation are described below.
 
 ### KIS canonical 5-minute candle ingestion foundation
 
@@ -280,7 +297,7 @@ The storage-only ingestion path is separate from the existing candles HTTP endpo
 - `MarketCandleIngestionService` exposes `fetchDomesticFiveMinuteCandles`, `fetchUsFiveMinuteCandles`, `ingestDomesticFiveMinuteCandles`, and `ingestUsFiveMinuteCandles`. Ingestion writes through `MarketCandlesRepository.upsertMany`; conflict updates cannot regress `isClosed=true` to false.
 - Every physical request uses the existing `KisAuthClient`/`KisQuoteClient` coordinator and shared KIS REST limiter. No adapter creates a client or limiter instance.
 
-Only interval `5m` is persisted by this path. Domestic/US `1d` and `1w`, checkpointed initial/incremental/repair orchestration, and 5m-derived `15m`/`30m`/`1h`/`4h` aggregation are covered in "Checkpointed market candle sync (5m/1d/1w)" below. The path is not scheduled and is **not connected to `GET /api/v1/assets/:assetId/candles`**, Redis/DB serving, or WebSocket updates.
+Only interval `5m` is persisted by this ingestion path. Domestic/US `1d` and `1w`, checkpointed initial/incremental/repair orchestration, and 5m-derived `15m`/`30m`/`1h`/`4h` aggregation are covered below. It is not scheduled; database-mode HTTP serving consumes its durable rows, while WebSocket updates remain unimplemented.
 
 Opt-in live schema smokes require real KIS credentials, explicit `KIS_API_ENVIRONMENT`, and the matching flag. They fetch at most one page through the production rate limiter, do not write the database, and never print credentials or raw payloads:
 
@@ -291,7 +308,7 @@ KIS_US_CANDLE_LIVE_SMOKE=1 pnpm test -- kis-candle-live.integration.spec.ts
 
 ### Checkpointed market candle sync (5m/1d/1w)
 
-Storage-only sync of the persisted candle feeds, still **not connected to `GET /api/v1/assets/:assetId/candles`** (that endpoint keeps its direct provider flow; Redis/DB serving is a unit-3 step). No scheduler triggers this job; market-close/real-time sync policy is a unit-3 decision.
+Checkpointed sync of the persisted candle feeds is used by database-mode HTTP serving for bounded incremental/small repair refresh and by the manual Ops job for baselines. No scheduler triggers this job; market-close/real-time sync policy remains future work.
 
 Providers per asset type and feed:
 

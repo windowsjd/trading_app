@@ -13,6 +13,18 @@ jest.mock('../generated/prisma/client', () => {
       KRW: 'KRW',
       USD: 'USD',
     },
+    MarketCandleSyncMode: {
+      initial: 'initial',
+      incremental: 'incremental',
+      repair: 'repair',
+    },
+    MarketCandleSyncStatus: {
+      pending: 'pending',
+      running: 'running',
+      completed: 'completed',
+      failed: 'failed',
+      canceled: 'canceled',
+    },
     Prisma: {
       Decimal,
     },
@@ -24,6 +36,7 @@ import { HttpException } from '@nestjs/common';
 import { AssetType, CurrencyCode } from '../generated/prisma/client';
 import { ProviderHttpError } from '../providers/provider.types';
 import { AssetCandlesService } from './asset-candles.service';
+import { CandleResponseBuilder } from './candle-response.builder';
 
 type KisQuoteCall = {
   path: string;
@@ -106,11 +119,16 @@ describe('AssetCandlesService', () => {
     const kisAuthClient = createKisAuthClient();
     const kisQuoteClient = createKisQuoteClient();
     const binancePublicClient = createBinancePublicClient();
+    const serving = {
+      serve: jest.fn((_asset, _query, legacyLoader) => legacyLoader()),
+    };
     const service = new AssetCandlesService(
       prisma as never,
       kisAuthClient as never,
       kisQuoteClient as never,
       binancePublicClient as never,
+      serving as never,
+      new CandleResponseBuilder(),
     );
 
     return {
@@ -118,6 +136,7 @@ describe('AssetCandlesService', () => {
       kisAuthClient,
       kisQuoteClient,
       binancePublicClient,
+      serving,
       service,
     };
   };

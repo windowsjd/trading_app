@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   AssetType,
   MarketCandleSyncMode,
@@ -50,6 +50,8 @@ import {
   type MarketCandleSyncStopReason,
   type MarketCandleSyncSummary,
 } from './market-candle-sync.types';
+import { AssetCandlesCacheService } from './asset-candles-cache.service';
+import { ProviderConfigError } from '../providers/provider.types';
 
 const DAY_MS = 24 * 60 * 60_000;
 // Retention windows: 5m 35 days, 1d/1w one year (documented storage policy).
@@ -116,6 +118,11 @@ export type MarketCandleSyncAssetInput = {
   dryRun?: boolean;
   now?: Date;
   signal?: AbortSignal;
+  budget?: {
+    maxPages: number;
+    maxRows: number;
+    maxDurationMs: number;
+  };
 };
 
 export type MarketCandleSyncAssetsInput = {
@@ -150,6 +157,8 @@ export type MarketCandleSyncAssetsInput = {
  */
 @Injectable()
 export class MarketCandleSyncService {
+  private readonly logger = new Logger(MarketCandleSyncService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly repository: MarketCandlesRepository,
@@ -162,6 +171,7 @@ export class MarketCandleSyncService {
     private readonly binanceCandles: BinanceCandleIngestionService,
     @Inject(MARKET_CANDLE_SYNC_CONFIG)
     private readonly config: MarketCandleSyncConfig,
+    private readonly cache: AssetCandlesCacheService,
   ) {}
 
   async syncAsset(
@@ -200,6 +210,7 @@ export class MarketCandleSyncService {
       dryRun: input.dryRun === true,
       now: input.now ?? new Date(),
       signal: input.signal,
+      budget: input.budget,
     });
   }
 
@@ -289,6 +300,7 @@ export class MarketCandleSyncService {
       dryRun: input.dryRun === true,
       now,
       signal: input.signal,
+      budget: undefined,
     };
     const results: MarketCandleAssetSyncResult[] = [];
     let aborted = false;
@@ -388,6 +400,7 @@ export class MarketCandleSyncService {
       dryRun: boolean;
       now: Date;
       signal?: AbortSignal;
+      budget?: MarketCandleSyncAssetInput['budget'];
     },
   ): Promise<MarketCandleAssetSyncResult> {
     const feeds: MarketCandleFeedResult[] = [];
@@ -427,6 +440,7 @@ export class MarketCandleSyncService {
       dryRun: boolean;
       now: Date;
       signal?: AbortSignal;
+      budget?: MarketCandleSyncAssetInput['budget'];
     },
   ): Promise<MarketCandleFeedResult> {
     const sourceProvider = this.sourceProviderFor(descriptor, feed);
@@ -519,8 +533,9 @@ export class MarketCandleSyncService {
       });
     }
 
+    let result: MarketCandleFeedResult;
     try {
-      return await this.runFeedLocked(
+      result = await this.runFeedLocked(
         asset,
         descriptor,
         feed,
@@ -532,6 +547,19 @@ export class MarketCandleSyncService {
     } finally {
       await this.lockService.release(lockResult.handle);
     }
+    if (result.writtenRows > 0) {
+      const invalidated = await this.cache.invalidateAsset(asset.id);
+      if (invalidated.status === 'error') {
+        this.logger.warn(
+          JSON.stringify({
+            event: 'candle_cache_invalidation_failed',
+            assetId: asset.id,
+            feed,
+          }),
+        );
+      }
+    }
+    return result;
   }
 
   private async runFeedLocked(
@@ -547,6 +575,7 @@ export class MarketCandleSyncService {
       dryRun: boolean;
       now: Date;
       signal?: AbortSignal;
+      budget?: MarketCandleSyncAssetInput['budget'];
     },
   ): Promise<MarketCandleFeedResult> {
     const base = {
@@ -604,12 +633,26 @@ export class MarketCandleSyncService {
     const targetTo = state.targetTo;
     let cursor = asJsonObject(state.cursorJson);
     const budget: FeedBudget = {
-      pagesLeft: this.config.maxPages,
+      pagesLeft: Math.min(
+        this.config.maxPages,
+        this.requireBudgetValue(options.budget?.maxPages, 'budget.maxPages') ??
+          this.config.maxPages,
+      ),
       rowsLeft: Math.min(
         this.config.maxRows,
+        this.requireBudgetValue(options.budget?.maxRows, 'budget.maxRows') ??
+          this.config.maxRows,
         FEED_ROW_CAPS[feed] ?? this.config.maxRows,
       ),
-      deadlineMs: Date.now() + this.config.maxDurationMs,
+      deadlineMs:
+        Date.now() +
+        Math.min(
+          this.config.maxDurationMs,
+          this.requireBudgetValue(
+            options.budget?.maxDurationMs,
+            'budget.maxDurationMs',
+          ) ?? this.config.maxDurationMs,
+        ),
     };
 
     let oldestOpenTime: Date | null = null;
@@ -673,6 +716,7 @@ export class MarketCandleSyncService {
           budget,
         });
       } catch (error) {
+        if (error instanceof ProviderConfigError) throw error;
         stopReason = 'provider_error';
         status = MarketCandleSyncStatus.failed;
         errorCode = 'PROVIDER_CALL_FAILED';
@@ -1194,6 +1238,17 @@ export class MarketCandleSyncService {
     if (budget.rowsLeft <= 0) return 'max_rows';
     if (Date.now() >= budget.deadlineMs) return 'max_duration';
     return null;
+  }
+
+  private requireBudgetValue(
+    value: number | undefined,
+    label: string,
+  ): number | undefined {
+    if (value === undefined) return undefined;
+    if (!Number.isSafeInteger(value) || value <= 0) {
+      throw new MarketCandleSyncInputError(`${label} must be a positive integer.`);
+    }
+    return value;
   }
 
   private failedResult(

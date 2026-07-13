@@ -44,19 +44,23 @@ export function resolveCandleCacheTtlSeconds(interval: CandleInterval): number {
   );
 }
 
-export const CANDLE_CACHE_ENVELOPE_VERSION = 1;
+export const CANDLE_CACHE_ENVELOPE_VERSION = 2;
 
 // Versioned envelope actually stored in Redis. `value` is the exact HTTP
 // response; the envelope adds only cache metadata and never alters the response.
 export type CandleCacheEnvelope = {
-  version: number;
+  schemaVersion: number;
   cachedAt: string;
-  value: AssetCandlesResponse;
+  freshUntil: string;
+  staleUntil: string;
+  response: AssetCandlesResponse;
 };
 
 export type CandleCacheReadResult =
-  | { status: 'hit'; value: AssetCandlesResponse; cachedAt: Date }
+  | { status: 'fresh'; value: AssetCandlesResponse; cachedAt: Date }
+  | { status: 'stale'; value: AssetCandlesResponse; cachedAt: Date }
   | { status: 'miss' }
+  | { status: 'corrupt' }
   | { status: 'disabled' }
   | { status: 'error' };
 
@@ -105,6 +109,7 @@ export class AssetCandlesCacheService {
   constructor(
     private readonly redis: RedisService,
     private readonly config: CandleCacheConfig = readCandleCacheConfig(),
+    private readonly now: () => Date = () => new Date(),
   ) {}
 
   isEnabled(): boolean {
@@ -159,13 +164,19 @@ export class AssetCandlesCacheService {
       if (!parsed) {
         // Corrupt or unsupported entry: drop it best-effort, then miss.
         await this.safeDelete(context.dataKey);
+        return { status: 'corrupt' };
+      }
+
+      const nowMs = this.now().getTime();
+      if (nowMs >= parsed.staleUntil.getTime()) {
+        await this.safeDelete(context.dataKey);
         return { status: 'miss' };
       }
 
       this.markOperationalSuccess();
       return {
-        status: 'hit',
-        value: parsed.value,
+        status: nowMs < parsed.freshUntil.getTime() ? 'fresh' : 'stale',
+        value: parsed.response,
         cachedAt: parsed.cachedAt,
       };
     } catch (error) {
@@ -180,11 +191,11 @@ export class AssetCandlesCacheService {
   ): Promise<CandleCacheConditionalWriteResult> {
     if (!this.config.enabled) return { status: 'skipped_disabled' };
     try {
-      const serialized = this.serializeEnvelope(value);
+      const serialized = this.serializeEnvelope(context.input, value);
       if (serialized.byteSize > this.config.maxPayloadBytes) {
         return { status: 'skipped_oversized', byteSize: serialized.byteSize };
       }
-      const ttlSeconds = resolveCandleCacheTtlSeconds(context.input.interval);
+      const ttlSeconds = serialized.ttlSeconds;
       const result = Number(
         await this.redis.eval(
           REDIS_SET_CANDLE_IF_OWNER_AND_GENERATION_SCRIPT,
@@ -225,7 +236,7 @@ export class AssetCandlesCacheService {
     }
 
     try {
-      const serialized = this.serializeEnvelope(value);
+      const serialized = this.serializeEnvelope(input, value);
       const byteSize = serialized.byteSize;
 
       if (byteSize > this.config.maxPayloadBytes) {
@@ -238,7 +249,7 @@ export class AssetCandlesCacheService {
 
       const generation = await this.readGeneration(input.assetId);
       const key = buildCandleDataKey({ ...input, generation });
-      const ttlSeconds = resolveCandleCacheTtlSeconds(input.interval);
+      const ttlSeconds = serialized.ttlSeconds;
       await this.redis.setWithTtl(key, serialized.value, ttlSeconds);
       this.markOperationalSuccess();
       return { status: 'stored', ttlSeconds, byteSize };
@@ -305,18 +316,29 @@ export class AssetCandlesCacheService {
     return Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
   }
 
-  private serializeEnvelope(value: AssetCandlesResponse): {
+  private serializeEnvelope(
+    input: CandleCacheKeyInput,
+    value: AssetCandlesResponse,
+  ): {
     value: string;
     byteSize: number;
+    ttlSeconds: number;
   } {
+    const now = this.now();
+    const policy = this.resolveTtlPolicy(input, value);
+    const freshUntil = new Date(now.getTime() + policy.freshSeconds * 1000);
+    const staleUntil = new Date(now.getTime() + policy.staleSeconds * 1000);
     const serialized = JSON.stringify({
-      version: CANDLE_CACHE_ENVELOPE_VERSION,
-      cachedAt: new Date().toISOString(),
-      value,
+      schemaVersion: CANDLE_CACHE_ENVELOPE_VERSION,
+      cachedAt: now.toISOString(),
+      freshUntil: freshUntil.toISOString(),
+      staleUntil: staleUntil.toISOString(),
+      response: value,
     } satisfies CandleCacheEnvelope);
     return {
       value: serialized,
       byteSize: Buffer.byteLength(serialized, 'utf8'),
+      ttlSeconds: policy.staleSeconds,
     };
   }
 
@@ -324,8 +346,10 @@ export class AssetCandlesCacheService {
   // treats it as a corrupt cache. Reads fields directly (no object merge) to
   // avoid prototype-pollution from a hostile cached document.
   private parseEnvelope(raw: string): {
-    value: AssetCandlesResponse;
+    response: AssetCandlesResponse;
     cachedAt: Date;
+    freshUntil: Date;
+    staleUntil: Date;
   } | null {
     let parsed: unknown;
     try {
@@ -339,24 +363,60 @@ export class AssetCandlesCacheService {
     }
 
     const envelope = parsed as Partial<CandleCacheEnvelope>;
-    if (envelope.version !== CANDLE_CACHE_ENVELOPE_VERSION) {
+    if (envelope.schemaVersion !== CANDLE_CACHE_ENVELOPE_VERSION) {
       return null;
     }
 
-    if (typeof envelope.cachedAt !== 'string') {
+    if (
+      typeof envelope.cachedAt !== 'string' ||
+      typeof envelope.freshUntil !== 'string' ||
+      typeof envelope.staleUntil !== 'string'
+    ) {
       return null;
     }
 
     const cachedAt = new Date(envelope.cachedAt);
-    if (Number.isNaN(cachedAt.getTime())) {
+    const freshUntil = new Date(envelope.freshUntil);
+    const staleUntil = new Date(envelope.staleUntil);
+    if (
+      Number.isNaN(cachedAt.getTime()) ||
+      Number.isNaN(freshUntil.getTime()) ||
+      Number.isNaN(staleUntil.getTime()) ||
+      cachedAt.getTime() > freshUntil.getTime() ||
+      freshUntil.getTime() > staleUntil.getTime()
+    ) {
       return null;
     }
 
-    if (!isAssetCandlesResponse(envelope.value)) {
+    if (!isAssetCandlesResponse(envelope.response)) {
       return null;
     }
 
-    return { value: envelope.value, cachedAt };
+    return { response: envelope.response, cachedAt, freshUntil, staleUntil };
+  }
+
+  private resolveTtlPolicy(
+    input: CandleCacheKeyInput,
+    value: AssetCandlesResponse,
+  ): { freshSeconds: number; staleSeconds: number } {
+    const intervalFresh = resolveCandleCacheTtlSeconds(input.interval);
+    let freshSeconds = input.latest
+      ? intervalFresh
+      : Math.max(intervalFresh, this.config.historicalFreshTtlSeconds ?? 900);
+    let staleSeconds = input.latest
+      ? Math.max(freshSeconds, this.config.currentStaleTtlSeconds ?? 300)
+      : Math.max(freshSeconds, this.config.historicalStaleTtlSeconds ?? 3600);
+    if (value.data.state === 'empty') {
+      freshSeconds = Math.min(
+        freshSeconds,
+        this.config.emptyFreshTtlSeconds ?? 10,
+      );
+      staleSeconds = Math.max(
+        freshSeconds,
+        Math.min(staleSeconds, this.config.emptyStaleTtlSeconds ?? 60),
+      );
+    }
+    return { freshSeconds, staleSeconds };
   }
 
   private async safeDelete(key: string): Promise<void> {

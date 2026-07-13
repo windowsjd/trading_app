@@ -15,6 +15,8 @@ import {
   ProviderHttpError,
 } from '../providers/provider.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { CandleServingService } from './candle-serving.service';
+import { CandleResponseBuilder } from './candle-response.builder';
 
 export type AssetCandlesQuery = {
   range?: string;
@@ -51,7 +53,7 @@ export type CandleInterval =
 type CryptoCandleInterval = CandleInterval;
 type KisDomesticPeriodDivCode = 'D' | 'W';
 
-type AssetRecord = {
+export type AssetCandlesAsset = {
   id: string;
   symbol: string;
   name: string;
@@ -62,8 +64,9 @@ type AssetRecord = {
   settlementCurrency: CurrencyCode;
   isActive: boolean;
 };
+type AssetRecord = AssetCandlesAsset;
 
-type ParsedAssetCandlesQuery = {
+export type ParsedAssetCandlesQuery = {
   range: CandleRange;
   rangeProvided: boolean;
   rangeStartAt: Date | null;
@@ -77,6 +80,9 @@ type ParsedAssetCandlesQuery = {
   dateProvided: boolean;
   toProvided: boolean;
   includePrevious: boolean;
+  explicitDate: boolean;
+  explicitTo: boolean;
+  clock: Date;
 };
 
 export type CandlePayload = {
@@ -303,6 +309,8 @@ export class AssetCandlesService {
     private readonly kisAuthClient: KisAuthClient,
     private readonly kisQuoteClient: KisQuoteClient,
     private readonly binancePublicClient: BinancePublicClient,
+    private readonly serving: CandleServingService,
+    private readonly responses: CandleResponseBuilder,
   ) {}
 
   async getAssetCandles(
@@ -334,25 +342,12 @@ export class AssetCandlesService {
       );
     }
 
-    const parsedQuery = await this.parseQuery(query, asset);
+    const clock = new Date();
+    const parsedQuery = await this.parseQuery(query, asset, clock);
 
     try {
-      if (asset.assetType === AssetType.domestic_stock) {
-        return await this.getDomesticStockCandles(asset, parsedQuery);
-      }
-
-      if (asset.assetType === AssetType.us_stock) {
-        return await this.getUsStockCandles(asset, parsedQuery);
-      }
-
-      if (asset.assetType === AssetType.crypto) {
-        return await this.getCryptoCandles(asset, parsedQuery);
-      }
-
-      this.throwApiError(
-        HttpStatus.BAD_REQUEST,
-        'ASSET_CANDLES_UNSUPPORTED_ASSET_TYPE',
-        'Asset type is unsupported for candles.',
+      return await this.serving.serve(asset, parsedQuery, () =>
+        this.loadLegacy(asset, parsedQuery),
       );
     } catch (error) {
       if (error instanceof HttpException) {
@@ -382,8 +377,28 @@ export class AssetCandlesService {
     }
   }
 
+  private async loadLegacy(
+    asset: AssetCandlesAsset,
+    query: ParsedAssetCandlesQuery,
+  ): Promise<AssetCandlesResponse> {
+    if (asset.assetType === AssetType.domestic_stock) {
+      return this.getDomesticStockCandles(asset, query);
+    }
+    if (asset.assetType === AssetType.us_stock) {
+      return this.getUsStockCandles(asset, query);
+    }
+    if (asset.assetType === AssetType.crypto) {
+      return this.getCryptoCandles(asset, query);
+    }
+    this.throwApiError(
+      HttpStatus.BAD_REQUEST,
+      'ASSET_CANDLES_UNSUPPORTED_ASSET_TYPE',
+      'Asset type is unsupported for candles.',
+    );
+  }
+
   private async getDomesticStockCandles(
-    asset: AssetRecord,
+    asset: AssetCandlesAsset,
     query: ParsedAssetCandlesQuery,
   ): Promise<AssetCandlesResponse> {
     const marketCode = this.resolveDomesticKisMarketCode(asset);
@@ -398,7 +413,7 @@ export class AssetCandlesService {
     const usesTodayEndpoint =
       query.range === '1d' &&
       query.intervalMinutes < CANDLE_INTERVAL_MINUTES['1d'] &&
-      query.requestedDate === this.todayInZone(KOREA_TIME_ZONE);
+      query.requestedDate === this.dateInZone(query.clock, KOREA_TIME_ZONE);
     const descriptor = usesTodayEndpoint
       ? this.buildDomesticTodayCall(asset, query, marketCode)
       : this.buildDomesticDailyCall(asset, query, marketCode);
@@ -1084,32 +1099,7 @@ export class AssetCandlesService {
     descriptor: KisCallDescriptor,
     candles: CandlePayload[],
   ): AssetCandlesResponse {
-    return {
-      success: true,
-      data: {
-        state: candles.length > 0 ? 'available' : 'empty',
-        asset: {
-          id: asset.id,
-          symbol: asset.symbol,
-          name: asset.name,
-          assetType: asset.assetType,
-          market: asset.market,
-          priceCurrency: asset.priceCurrency ?? asset.currencyCode,
-        },
-        range: query.range,
-        interval: query.interval,
-        requestedDate: query.requestedDate,
-        candles,
-        source: {
-          provider: 'kis',
-          trId: descriptor.trId,
-          path: descriptor.path,
-          marketCode: descriptor.marketCode,
-          requestedCount: descriptor.requestedCount,
-          returnedCount: candles.length,
-        },
-      },
-    };
+    return this.responses.buildKis(asset, query, descriptor, candles);
   }
 
   private buildCryptoResponse(
@@ -1119,35 +1109,7 @@ export class AssetCandlesService {
     candles: CandlePayload[],
     truncated = false,
   ): AssetCandlesResponse {
-    return {
-      success: true,
-      data: {
-        state: candles.length > 0 ? 'available' : 'empty',
-        asset: {
-          id: asset.id,
-          symbol: asset.symbol,
-          name: asset.name,
-          assetType: asset.assetType,
-          market: asset.market,
-          priceCurrency: asset.priceCurrency ?? asset.currencyCode,
-        },
-        range: query.range,
-        interval: query.interval,
-        requestedDate: query.requestedDate,
-        candles,
-        source: {
-          provider: 'binance',
-          endpoint: descriptor.endpoint,
-          symbol: descriptor.symbol,
-          interval: descriptor.interval,
-          requestedCount: descriptor.requestedCount,
-          returnedCount: candles.length,
-          // Additive metadata: only emitted when older data was cut off and the
-          // provider call window was shifted to preserve the latest candles.
-          ...(truncated ? { truncated: true } : {}),
-        },
-      },
-    };
+    return this.responses.buildCrypto(asset, query, descriptor, candles, truncated);
   }
 
   private formatCandle(candle: NormalizedCandle): CandlePayload {
@@ -1167,6 +1129,7 @@ export class AssetCandlesService {
   private async parseQuery(
     query: AssetCandlesQuery,
     asset: AssetRecord,
+    clock: Date,
   ): Promise<ParsedAssetCandlesQuery> {
     const timeZone =
       asset.assetType === AssetType.domestic_stock
@@ -1182,7 +1145,7 @@ export class AssetCandlesService {
     const interval = this.parseInterval(query.interval, asset.assetType, range);
     const rangeWindow =
       rangeProvided || (!legacyDateProvided && !legacyToProvided)
-      ? await this.resolveRangeWindow(range, new Date(), asset)
+      ? await this.resolveRangeWindow(range, clock, asset)
       : null;
     const parsedTo = rangeWindow
       ? {
@@ -1190,10 +1153,10 @@ export class AssetCandlesService {
           instant: rangeWindow.endAt,
           provided: true,
         }
-      : this.parseTo(query.to, timeZone);
+      : this.parseTo(query.to, timeZone, clock);
     const requestedDate = rangeWindow
       ? this.dateInZone(rangeWindow.endAt, timeZone)
-      : this.parseDate(query.date, timeZone);
+      : this.parseDate(query.date, timeZone, clock);
     const toHHmmss = parsedTo.hhmmss;
 
     return {
@@ -1210,6 +1173,9 @@ export class AssetCandlesService {
       dateProvided: rangeWindow !== null || legacyDateProvided,
       toProvided: rangeWindow !== null || parsedTo.provided,
       includePrevious: this.parseBoolean(query.includePrevious, true),
+      explicitDate: legacyDateProvided,
+      explicitTo: legacyToProvided,
+      clock,
     };
   }
 
@@ -1484,10 +1450,14 @@ export class AssetCandlesService {
     return 365 * 86_400_000;
   }
 
-  private parseDate(value: string | undefined, timeZone: string): string {
+  private parseDate(
+    value: string | undefined,
+    timeZone: string,
+    clock: Date,
+  ): string {
     const text = this.parseOptionalText(value);
     if (!text) {
-      return this.todayInZone(timeZone);
+      return this.dateInZone(clock, timeZone);
     }
 
     if (!/^\d{4}-\d{2}-\d{2}$/u.test(text)) {
@@ -1516,6 +1486,7 @@ export class AssetCandlesService {
   private parseTo(
     value: string | undefined,
     timeZone: string,
+    clock: Date,
   ): {
     hhmmss: string;
     instant: Date | null;
@@ -1524,7 +1495,7 @@ export class AssetCandlesService {
     const text = this.parseOptionalText(value);
     if (!text) {
       return {
-        hhmmss: this.nowTimeInZone(timeZone),
+        hhmmss: this.timeInZone(clock, timeZone),
         instant: null,
         provided: false,
       };

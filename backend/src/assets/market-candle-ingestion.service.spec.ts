@@ -66,18 +66,20 @@ describe('MarketCandleIngestionService', () => {
       upsertMany: jest.fn().mockResolvedValue({ writtenCount: 1 }),
       ...overrides.repository,
     };
+    const cache = { invalidateAsset: jest.fn().mockResolvedValue({ status: 'invalidated', generation: 1 }) };
     const service = new MarketCandleIngestionService(
       domestic as never,
       usAdapter as never,
       new KisCandleNormalizerService(),
       new KisDomesticFiveMinuteBuilder(),
       repository as never,
+      cache as never,
     );
-    return { service, repository };
+    return { service, repository, cache };
   };
 
   it('writes only canonical 5m rows and returns complete ingestion metadata', async () => {
-    const { service, repository } = create();
+    const { service, repository, cache } = create();
     const result = await service.ingestDomesticFiveMinuteCandles(input);
     expect(result).toMatchObject({
       provider: 'kis_domestic_minute',
@@ -98,6 +100,7 @@ describe('MarketCandleIngestionService', () => {
         isClosed: true,
       }),
     ]);
+    expect(cache.invalidateAsset).toHaveBeenCalledWith('asset-1');
   });
 
   it('returns explicit incomplete metadata and does not write when all rows are malformed', async () => {
@@ -120,7 +123,7 @@ describe('MarketCandleIngestionService', () => {
   });
 
   it('propagates repository failure instead of returning successful metadata', async () => {
-    const { service } = create({
+    const { service, cache } = create({
       repository: {
         upsertMany: jest.fn().mockRejectedValue(new Error('write failed')),
       },
@@ -128,6 +131,7 @@ describe('MarketCandleIngestionService', () => {
     await expect(
       service.ingestDomesticFiveMinuteCandles(input),
     ).rejects.toThrow('write failed');
+    expect(cache.invalidateAsset).not.toHaveBeenCalled();
   });
 
   it('does not turn an empty provider page into a successful zero-row ingestion', async () => {

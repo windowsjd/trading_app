@@ -3,7 +3,7 @@ import type { CandleInterval, CandleRange } from './asset-candles.service';
 // Redis-internal cache schema version. This is NOT the public `/api/v1` URL
 // version; bumping it only rotates the cache namespace so an incompatible
 // envelope/key change cannot read stale entries. The HTTP contract is unchanged.
-export const CANDLE_CACHE_KEY_VERSION = 'v1';
+export const CANDLE_CACHE_KEY_VERSION = 'v2';
 
 export const CANDLE_CACHE_DATA_NAMESPACE = `candles:data:${CANDLE_CACHE_KEY_VERSION}`;
 export const CANDLE_CACHE_GENERATION_NAMESPACE = `candles:gen:${CANDLE_CACHE_KEY_VERSION}`;
@@ -27,6 +27,10 @@ export type CandleCacheKeyInput = {
   requestedDate: string;
   to?: string | null;
   includePrevious?: boolean;
+  normalizedFrom?: string;
+  normalizedTo?: string;
+  latest?: boolean;
+  explicitTo?: boolean;
 };
 
 export class CandleCacheKeyError extends Error {
@@ -84,6 +88,24 @@ export function buildCandleDataKey(
 
   if (input.includePrevious !== undefined) {
     segments.push(`p${input.includePrevious ? 1 : 0}`);
+  }
+
+  if (input.latest === true) {
+    segments.push('wlatest');
+  } else if (input.normalizedFrom || input.normalizedTo) {
+    if (!input.normalizedFrom || !input.normalizedTo) {
+      throw new CandleCacheKeyError(
+        'normalizedFrom and normalizedTo must be provided together.',
+      );
+    }
+    segments.push(
+      `f${encodeSegment(input.normalizedFrom, 'normalizedFrom')}`,
+      `u${encodeSegment(input.normalizedTo, 'normalizedTo')}`,
+    );
+  }
+
+  if (input.explicitTo !== undefined) {
+    segments.push(`e${input.explicitTo ? 1 : 0}`);
   }
 
   return segments.join(':');

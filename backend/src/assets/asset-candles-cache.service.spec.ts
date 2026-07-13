@@ -33,6 +33,7 @@ const keyInput: CandleCacheKeyInput = {
   interval: '5m',
   limit: 100,
   requestedDate: '2026-07-10',
+  latest: true,
 };
 
 const createResponse = (
@@ -103,11 +104,17 @@ const createService = (
   const fullConfig: CandleCacheConfig = {
     enabled: true,
     maxPayloadBytes: 2 * 1024 * 1024,
+    currentStaleTtlSeconds: 300,
+    historicalFreshTtlSeconds: 900,
+    historicalStaleTtlSeconds: 3600,
+    emptyFreshTtlSeconds: 10,
+    emptyStaleTtlSeconds: 60,
     ...config,
   };
   return new AssetCandlesCacheService(
     redis as unknown as RedisService,
     fullConfig,
+    () => new Date('2026-07-10T12:00:00.000Z'),
   );
 };
 
@@ -168,7 +175,7 @@ describe('AssetCandlesCacheService', () => {
       expect(await service.get(keyInput)).toEqual({ status: 'miss' });
     });
 
-    it('returns a hit with the restored value and cachedAt', async () => {
+    it('returns a fresh value with the restored cachedAt', async () => {
       const redis = createFakeRedis();
       const service = createService(redis);
       const response = createResponse('available');
@@ -176,19 +183,53 @@ describe('AssetCandlesCacheService', () => {
       mockDataValue(
         redis,
         JSON.stringify({
-          version: CANDLE_CACHE_ENVELOPE_VERSION,
+          schemaVersion: CANDLE_CACHE_ENVELOPE_VERSION,
           cachedAt,
-          value: response,
+          freshUntil: '2026-07-10T12:01:00.000Z',
+          staleUntil: '2026-07-10T12:05:00.000Z',
+          response,
         }),
       );
 
       const result = await service.get(keyInput);
 
       expect(result).toEqual({
-        status: 'hit',
+        status: 'fresh',
         value: response,
         cachedAt: new Date(cachedAt),
       });
+    });
+
+    it('distinguishes stale from hard-expired envelopes', async () => {
+      const redis = createFakeRedis();
+      const service = createService(redis);
+      const base = {
+        schemaVersion: CANDLE_CACHE_ENVELOPE_VERSION,
+        cachedAt: '2026-07-10T11:00:00.000Z',
+        response: createResponse('available'),
+      };
+      mockDataValue(
+        redis,
+        JSON.stringify({
+          ...base,
+          freshUntil: '2026-07-10T11:59:59.000Z',
+          staleUntil: '2026-07-10T12:05:00.000Z',
+        }),
+      );
+      await expect(service.get(keyInput)).resolves.toMatchObject({
+        status: 'stale',
+      });
+
+      mockDataValue(
+        redis,
+        JSON.stringify({
+          ...base,
+          freshUntil: '2026-07-10T11:30:00.000Z',
+          staleUntil: '2026-07-10T12:00:00.000Z',
+        }),
+      );
+      await expect(service.get(keyInput)).resolves.toEqual({ status: 'miss' });
+      expect(redis.delete).toHaveBeenCalledWith(dataKeyFor(0));
     });
 
     it('reads the entry at the current asset generation', async () => {
@@ -208,7 +249,7 @@ describe('AssetCandlesCacheService', () => {
       const service = createService(redis);
       mockDataValue(redis, 'not-json{');
 
-      expect(await service.get(keyInput)).toEqual({ status: 'miss' });
+      expect(await service.get(keyInput)).toEqual({ status: 'corrupt' });
       expect(redis.delete).toHaveBeenCalledWith(dataKeyFor(0));
     });
 
@@ -218,13 +259,15 @@ describe('AssetCandlesCacheService', () => {
       mockDataValue(
         redis,
         JSON.stringify({
-          version: 999,
+          schemaVersion: 999,
           cachedAt: '2026-07-10T12:00:00.000Z',
-          value: createResponse('available'),
+          freshUntil: '2026-07-10T12:01:00.000Z',
+          staleUntil: '2026-07-10T12:05:00.000Z',
+          response: createResponse('available'),
         }),
       );
 
-      expect(await service.get(keyInput)).toEqual({ status: 'miss' });
+      expect(await service.get(keyInput)).toEqual({ status: 'corrupt' });
     });
 
     it('treats an invalid cachedAt as a miss', async () => {
@@ -233,13 +276,15 @@ describe('AssetCandlesCacheService', () => {
       mockDataValue(
         redis,
         JSON.stringify({
-          version: CANDLE_CACHE_ENVELOPE_VERSION,
+          schemaVersion: CANDLE_CACHE_ENVELOPE_VERSION,
           cachedAt: 'not-a-date',
-          value: createResponse('available'),
+          freshUntil: '2026-07-10T12:01:00.000Z',
+          staleUntil: '2026-07-10T12:05:00.000Z',
+          response: createResponse('available'),
         }),
       );
 
-      expect(await service.get(keyInput)).toEqual({ status: 'miss' });
+      expect(await service.get(keyInput)).toEqual({ status: 'corrupt' });
     });
 
     it('returns error when the Redis read fails', async () => {
@@ -263,15 +308,17 @@ describe('AssetCandlesCacheService', () => {
       expect(redis.setWithTtl).toHaveBeenCalledTimes(1);
       const [key, serialized, ttl] = redis.setWithTtl.mock.calls[0];
       expect(key).toBe(dataKeyFor(0));
-      expect(ttl).toBe(CANDLE_CACHE_TTL_SECONDS['5m']);
+      expect(ttl).toBe(300);
       const envelope = JSON.parse(serialized) as {
-        version: number;
+        schemaVersion: number;
         cachedAt: string;
-        value: AssetCandlesResponse;
+        freshUntil: string;
+        staleUntil: string;
+        response: AssetCandlesResponse;
       };
-      expect(envelope.version).toBe(CANDLE_CACHE_ENVELOPE_VERSION);
+      expect(envelope.schemaVersion).toBe(CANDLE_CACHE_ENVELOPE_VERSION);
       expect(typeof envelope.cachedAt).toBe('string');
-      expect(envelope.value).toEqual(response);
+      expect(envelope.response).toEqual(response);
     });
 
     it('stores an empty response', async () => {
@@ -282,6 +329,7 @@ describe('AssetCandlesCacheService', () => {
 
       expect(result.status).toBe('stored');
       expect(redis.setWithTtl).toHaveBeenCalledTimes(1);
+      expect(redis.setWithTtl.mock.calls[0][2]).toBe(60);
     });
 
     it('applies the correct TTL for each interval', async () => {
@@ -297,7 +345,7 @@ describe('AssetCandlesCacheService', () => {
           createResponse('available'),
         );
         const ttl = redis.setWithTtl.mock.calls[0][2];
-        expect(ttl).toBe(CANDLE_CACHE_TTL_SECONDS[interval]);
+        expect(ttl).toBe(Math.max(CANDLE_CACHE_TTL_SECONDS[interval], 300));
       }
     });
 
@@ -448,7 +496,7 @@ describe('AssetCandlesCacheService', () => {
           'owner-token',
           '3',
           expect.any(String),
-          String(CANDLE_CACHE_TTL_SECONDS['5m']),
+          '300',
         ],
       );
     });
@@ -474,9 +522,11 @@ describe('AssetCandlesCacheService', () => {
   describe('error classification and envelope validation', () => {
     const envelope = (value: unknown) =>
       JSON.stringify({
-        version: CANDLE_CACHE_ENVELOPE_VERSION,
-        cachedAt: '2026-07-10T00:00:00.000Z',
-        value,
+        schemaVersion: CANDLE_CACHE_ENVELOPE_VERSION,
+        cachedAt: '2026-07-10T12:00:00.000Z',
+        freshUntil: '2026-07-10T13:00:00.000Z',
+        staleUntil: '2026-07-10T14:00:00.000Z',
+        response: value,
       });
 
     it('does not hide candle key or Redis key programmer errors', async () => {
@@ -524,7 +574,7 @@ describe('AssetCandlesCacheService', () => {
       mockDataValue(redis, envelope(value));
       const service = createService(redis);
 
-      await expect(service.get(keyInput)).resolves.toEqual({ status: 'miss' });
+      await expect(service.get(keyInput)).resolves.toEqual({ status: 'corrupt' });
       expect(redis.delete).toHaveBeenCalledWith(dataKeyFor(0));
     });
 
@@ -534,7 +584,7 @@ describe('AssetCandlesCacheService', () => {
       await expect(
         createService(binanceRedis).get(keyInput),
       ).resolves.toMatchObject({
-        status: 'hit',
+        status: 'fresh',
       });
 
       const kis = createResponse('empty');
@@ -553,7 +603,7 @@ describe('AssetCandlesCacheService', () => {
       await expect(
         createService(kisRedis).get(keyInput),
       ).resolves.toMatchObject({
-        status: 'hit',
+        status: 'fresh',
       });
     });
   });

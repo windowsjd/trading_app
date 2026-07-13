@@ -20,12 +20,14 @@ export class CandleSingleFlightWaitTimeoutError extends Error {
 export type CandleSingleFlightInput = {
   cacheKeyInput: CandleCacheKeyInput;
   loader: () => Promise<AssetCandlesResponse>;
+  staleWaiterMaxWaitMs?: number;
 };
 
 @Injectable()
 export class AssetCandlesSingleFlightService {
   private readonly logger = new Logger(AssetCandlesSingleFlightService.name);
   private readonly inFlight = new Map<string, Promise<AssetCandlesResponse>>();
+  private distributedOutageLogged = false;
 
   constructor(
     private readonly cache: AssetCandlesCacheService,
@@ -50,7 +52,8 @@ export class AssetCandlesSingleFlightService {
       resolved.status === 'resolved'
         ? await this.cache.getWithContext(resolved.context)
         : resolved;
-    if (initial.status === 'hit') return initial.value;
+    if (initial.status === 'fresh') return initial.value;
+    const staleValue = initial.status === 'stale' ? initial.value : null;
 
     const existing = this.inFlight.get(identity);
     if (existing) return existing;
@@ -59,6 +62,7 @@ export class AssetCandlesSingleFlightService {
       identity,
       resolved.status === 'resolved' ? resolved.context : null,
       input,
+      staleValue,
     );
     this.inFlight.set(identity, promise);
     try {
@@ -77,18 +81,26 @@ export class AssetCandlesSingleFlightService {
     identity: string,
     context: CandleCacheContext | null,
     input: CandleSingleFlightInput,
+    staleValue: AssetCandlesResponse | null,
   ): Promise<AssetCandlesResponse> {
-    if (!context || !this.cache.isEnabled()) return input.loader();
+    if (!context || !this.cache.isEnabled()) {
+      if (!context) this.warnDistributedUnavailableOnce();
+      return input.loader();
+    }
 
     const key = `candles:lock:v1:${createHash('sha256')
       .update(identity)
       .digest('hex')}`;
     const acquired = await this.locks.acquire(key, this.config.lockTtlMs);
-    if (acquired.status === 'error') return input.loader();
+    if (acquired.status === 'error') {
+      this.warnDistributedUnavailableOnce();
+      return input.loader();
+    }
+    this.distributedOutageLogged = false;
     if (acquired.status === 'acquired') {
       return this.loadAsOwner(acquired.lock, context, input);
     }
-    return this.waitForOwner(key, context, input);
+    return this.waitForOwner(key, context, input, staleValue);
   }
 
   private async loadAsOwner(
@@ -120,7 +132,7 @@ export class AssetCandlesSingleFlightService {
 
     try {
       const doubleCheck = await this.cache.getWithContext(context);
-      if (doubleCheck.status === 'hit') return doubleCheck.value;
+      if (doubleCheck.status === 'fresh') return doubleCheck.value;
       const value = await input.loader();
       // A renewal may still be in flight when the loader completes. Its result
       // must be known before a distributed write is attempted.
@@ -146,22 +158,55 @@ export class AssetCandlesSingleFlightService {
     key: string,
     context: CandleCacheContext,
     input: CandleSingleFlightInput,
+    initialStale: AssetCandlesResponse | null,
   ): Promise<AssetCandlesResponse> {
-    const deadline = this.now() + this.config.waitTimeoutMs;
+    let staleValue = initialStale;
+    const waitMs = staleValue
+      ? Math.min(
+          this.config.waitTimeoutMs,
+          input.staleWaiterMaxWaitMs ?? this.config.waitTimeoutMs,
+        )
+      : this.config.waitTimeoutMs;
+    const deadline = this.now() + waitMs;
     while (this.now() < deadline) {
       const cached = await this.cache.getWithContext(context);
-      if (cached.status === 'hit') return cached.value;
+      if (cached.status === 'fresh') return cached.value;
+      if (cached.status === 'stale') staleValue = cached.value;
       if (cached.status === 'error' || cached.status === 'disabled') {
+        this.warnDistributedUnavailableOnce();
         return input.loader();
       }
       const takeover = await this.locks.acquire(key, this.config.lockTtlMs);
       if (takeover.status === 'acquired') {
         return this.loadAsOwner(takeover.lock, context, input);
       }
-      if (takeover.status === 'error') return input.loader();
+      if (takeover.status === 'error') {
+        this.warnDistributedUnavailableOnce();
+        return input.loader();
+      }
       await this.sleep(this.config.pollIntervalMs);
     }
+    if (staleValue) {
+      this.logger.log(
+        JSON.stringify({
+          event: 'candle_delivery',
+          state: 'stale_cache_fallback',
+          reason: 'remote_refresh_in_progress',
+          assetId: context.input.assetId,
+          interval: context.input.interval,
+        }),
+      );
+      return staleValue;
+    }
     throw new CandleSingleFlightWaitTimeoutError();
+  }
+
+  private warnDistributedUnavailableOnce(): void {
+    if (this.distributedOutageLogged) return;
+    this.distributedOutageLogged = true;
+    this.logger.warn(
+      'Candle distributed single-flight is unavailable; local dedupe remains active.',
+    );
   }
 
   private markOwnershipLost(mark: () => void, alreadyLost: boolean): void {

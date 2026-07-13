@@ -20,6 +20,14 @@ import {
   MARKET_CANDLE_SYNC_CONFIG,
   readMarketCandleSyncConfig,
 } from './market-candle-sync.config';
+import {
+  CANDLE_SERVING_CONFIG,
+  readCandleServingConfig,
+} from './candle-serving.config';
+import { CandleReadPlanBuilder } from './candle-read-plan.builder';
+import { CandleResponseBuilder } from './candle-response.builder';
+import { CandleDatabaseLoader } from './candle-database.loader';
+import { CandleServingService } from './candle-serving.service';
 
 // AssetCandlesCacheService is provided (via factory so Nest supplies its default
 // env-derived config) and exported for a later serving step to inject. It is
@@ -38,6 +46,14 @@ import {
     MarketCandleBackfillLockService,
     MarketCandleSyncStateRepository,
     MarketCandleSyncService,
+    CandleReadPlanBuilder,
+    CandleResponseBuilder,
+    CandleDatabaseLoader,
+    CandleServingService,
+    {
+      provide: CANDLE_SERVING_CONFIG,
+      useFactory: () => readCandleServingConfig(),
+    },
     {
       provide: MARKET_CANDLE_SYNC_CONFIG,
       useFactory: () => readMarketCandleSyncConfig(),

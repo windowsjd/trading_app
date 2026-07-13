@@ -106,7 +106,7 @@ describe('AssetCandlesSingleFlightService', () => {
 
   it('returns a cache hit without locking or loading', async () => {
     const { cache, locks, service } = create();
-    cache.get.mockResolvedValueOnce({ status: 'hit', value: response });
+    cache.get.mockResolvedValueOnce({ status: 'fresh', value: response });
     const loader = jest.fn();
     await expect(
       service.getOrLoad({ cacheKeyInput: key, loader }),
@@ -184,7 +184,7 @@ describe('AssetCandlesSingleFlightService', () => {
     locks.acquire.mockResolvedValueOnce({ status: 'busy' });
     cache.get
       .mockResolvedValueOnce({ status: 'miss' })
-      .mockResolvedValueOnce({ status: 'hit', value: response });
+      .mockResolvedValueOnce({ status: 'fresh', value: response });
     const loader = jest.fn();
     await expect(
       service.getOrLoad({ cacheKeyInput: key, loader }),
@@ -205,6 +205,26 @@ describe('AssetCandlesSingleFlightService', () => {
       service.getOrLoad({ cacheKeyInput: key, loader: jest.fn() }),
     ).rejects.toBeInstanceOf(CandleSingleFlightWaitTimeoutError);
     expect(locks.acquire.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it('returns stale after the shorter waiter bound while another owner refreshes', async () => {
+    let now = 0;
+    const { cache, locks, service } = create({
+      now: () => now,
+      sleep: async (ms) => {
+        now += ms;
+      },
+    });
+    cache.get.mockResolvedValue({ status: 'stale', value: response });
+    locks.acquire.mockResolvedValue({ status: 'busy' });
+    await expect(
+      service.getOrLoad({
+        cacheKeyInput: key,
+        staleWaiterMaxWaitMs: 100,
+        loader: jest.fn(),
+      }),
+    ).resolves.toBe(response);
+    expect(now).toBe(100);
   });
 
   it('renews long-running owner locks and clears the renewal timer', async () => {

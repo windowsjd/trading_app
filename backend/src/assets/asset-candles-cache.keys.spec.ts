@@ -100,6 +100,25 @@ describe('candle cache keys', () => {
       );
     });
 
+    it('canonicalizes latest identity and normalized UTC windows', () => {
+      const latest = buildCandleDataKey({ ...baseInput, latest: true });
+      expect(latest).toContain(':wlatest');
+      const first = buildCandleDataKey({
+        ...baseInput,
+        normalizedFrom: '2026-07-10T00:00:00.000Z',
+        normalizedTo: '2026-07-11T00:00:00.000Z',
+        explicitTo: true,
+      });
+      const same = buildCandleDataKey({
+        ...baseInput,
+        normalizedFrom: new Date('2026-07-10T09:00:00+09:00').toISOString(),
+        normalizedTo: new Date('2026-07-11T09:00:00+09:00').toISOString(),
+        explicitTo: true,
+      });
+      expect(first).toBe(same);
+      expect(first).toContain(':e1');
+    });
+
     it('encodes special characters so they cannot break the key structure', () => {
       const key = buildCandleDataKey({
         ...baseInput,

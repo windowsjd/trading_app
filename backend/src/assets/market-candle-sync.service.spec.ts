@@ -318,6 +318,9 @@ describe('MarketCandleSyncService', () => {
       lockRenewSeconds: 40,
       ...input.config,
     };
+    const cache = {
+      invalidateAsset: jest.fn().mockResolvedValue({ status: 'invalidated', generation: 1 }),
+    };
     const service = new MarketCandleSyncService(
       prisma as never,
       repository as never,
@@ -329,6 +332,7 @@ describe('MarketCandleSyncService', () => {
       new KisPeriodCandleNormalizerService(),
       binanceCandles as never,
       config,
+      cache as never,
     );
     return {
       service,
@@ -338,6 +342,7 @@ describe('MarketCandleSyncService', () => {
       stateRepository,
       lockService,
       lockEvents,
+      cache,
       fiveMinuteIngestion,
       domesticPeriodAdapter,
       overseasPeriodAdapter,
@@ -383,6 +388,8 @@ describe('MarketCandleSyncService', () => {
     expect(feed.pagesFetched).toBe(2);
     expect(feed.acceptedRows).toBe(3);
     expect(feed.writtenRows).toBe(3);
+    expect(harness.cache.invalidateAsset).toHaveBeenCalledTimes(1);
+    expect(harness.cache.invalidateAsset).toHaveBeenCalledWith(CRYPTO_ASSET.id);
     expect(harness.repository.upsertMany).toHaveBeenCalledTimes(2);
     // The second provider call received the cursor persisted after page one.
     expect(

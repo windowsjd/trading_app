@@ -9,6 +9,11 @@ describe('readCandleCacheConfig', () => {
     expect(readCandleCacheConfig({})).toEqual({
       enabled: false,
       maxPayloadBytes: DEFAULT_CANDLE_CACHE_MAX_PAYLOAD_BYTES,
+      currentStaleTtlSeconds: 300,
+      historicalFreshTtlSeconds: 900,
+      historicalStaleTtlSeconds: 3600,
+      emptyFreshTtlSeconds: 10,
+      emptyStaleTtlSeconds: 60,
     });
   });
 

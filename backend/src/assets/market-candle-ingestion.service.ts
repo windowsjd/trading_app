@@ -11,6 +11,7 @@ import {
   type KisCandleFetchInput,
   type KisCandleStopReason,
 } from '../providers/kis/candles/kis-candle.types';
+import { AssetCandlesCacheService } from './asset-candles-cache.service';
 
 export type KisFiveMinuteFetchResult = {
   provider: typeof KIS_DOMESTIC_CANDLE_SOURCE | typeof KIS_US_CANDLE_SOURCE;
@@ -47,6 +48,7 @@ export class MarketCandleIngestionService {
     private readonly normalizer: KisCandleNormalizerService,
     private readonly domesticBuilder: KisDomesticFiveMinuteBuilder,
     private readonly repository: MarketCandlesRepository,
+    private readonly cache: AssetCandlesCacheService,
   ) {}
 
   async fetchDomesticFiveMinuteCandles(
@@ -154,6 +156,9 @@ export class MarketCandleIngestionService {
         sourceUpdatedAt: candle.sourceUpdatedAt,
       })),
     );
+    if (write.writtenCount > 0) {
+      await this.cache.invalidateAsset(result.assetId);
+    }
     const { candles: _candles, ...metadata } = result;
     return { ...metadata, writtenRows: write.writtenCount };
   }

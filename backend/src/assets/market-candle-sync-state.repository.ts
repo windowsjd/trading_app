@@ -115,6 +115,47 @@ export class MarketCandleSyncStateRepository {
     return this.prisma.marketCandleSyncState.findUnique({ where: { id } });
   }
 
+  /**
+   * Returns the newest checkpoint that overlaps a serving source range. The
+   * serving loader uses the persisted target range and terminal status rather
+   * than inferring completeness from candle min/max/count.
+   */
+  findLatestOverlapping(
+    assetId: string,
+    feed: MarketCandleFeed,
+    from: Date,
+    to: Date,
+  ): Promise<MarketCandleSyncState | null> {
+    return this.prisma.marketCandleSyncState.findFirst({
+      where: {
+        assetId,
+        feed,
+        targetFrom: { lt: to },
+        targetTo: { gt: from },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  findCompletedCovering(
+    assetId: string,
+    feed: MarketCandleFeed,
+    from: Date,
+    to: Date,
+  ): Promise<MarketCandleSyncState | null> {
+    return this.prisma.marketCandleSyncState.findFirst({
+      where: {
+        assetId,
+        feed,
+        status: MarketCandleSyncStatus.completed,
+        targetFrom: { lte: from },
+        targetTo: { gte: to },
+        completedAt: { not: null },
+      },
+      orderBy: { completedAt: 'desc' },
+    });
+  }
+
   /** Returns the refreshed row, or null when the run was not resumable. */
   async resumeRun(id: string): Promise<MarketCandleSyncState | null> {
     const updated = await this.prisma.marketCandleSyncState.updateMany({

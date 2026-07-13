@@ -84,6 +84,9 @@ import { MarketCandleAggregationService } from './src/assets/market-candle-aggre
 import { MarketCandleSyncService } from './src/assets/market-candle-sync.service';
 import { KisPeriodCandleNormalizerService } from './src/providers/kis/candles/kis-period-candle-normalizer.service';
 import { readMarketCandleSyncConfig } from './src/assets/market-candle-sync.config';
+import { AssetCandlesCacheService } from './src/assets/asset-candles-cache.service';
+import { readCandleCacheConfig } from './src/assets/asset-candles-cache.config';
+import { buildCandleGenerationKey } from './src/assets/asset-candles-cache.keys';
 
 const SUFFIX = Date.now().toString(36).toUpperCase();
 const TEST_MARKETS = {
@@ -284,6 +287,7 @@ const syncService = new MarketCandleSyncService(
   normalizer,
   binanceStub as never,
   readMarketCandleSyncConfig({}),
+  new AssetCandlesCacheService(redis, readCandleCacheConfig({ CANDLE_CACHE_ENABLED: 'true' })),
 );
 
 async function createAsset(input: {
@@ -314,6 +318,7 @@ async function countRows(assetId: string, interval: string) {
 
 async function cleanup() {
   if (assetIds.length === 0) return;
+  await Promise.allSettled(assetIds.map((assetId) => redis.delete(buildCandleGenerationKey(assetId))));
   await prisma.marketCandle.deleteMany({ where: { assetId: { in: assetIds } } });
   await prisma.marketCandleSyncState.deleteMany({
     where: { assetId: { in: assetIds } },
