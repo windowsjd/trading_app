@@ -11,6 +11,12 @@ jest.mock('../generated/prisma/client', () => ({
 jest.mock('../assets/assets.service', () => ({
   AssetsService: class AssetsService {},
 }));
+jest.mock('../assets/live-candle-overlay.service', () => ({
+  LiveCandleOverlayService: class LiveCandleOverlayService {},
+}));
+jest.mock('./live-candle-pubsub.service', () => ({
+  LiveCandlePubSubService: class LiveCandlePubSubService {},
+}));
 
 import { CurrencyCode } from '../generated/prisma/client';
 import { BinanceRealtimePriceEventBus } from '../providers/binance/binance-realtime-price-event-bus.service';
@@ -323,5 +329,49 @@ describe('AssetTickerGateway', () => {
         sourceName: 'binance_spot_ws_ticker',
       },
     });
+  });
+
+  it('never labels the KIS US delayed event feed as realtime', async () => {
+    const { gateway } = createGateway({
+      asset: {
+        id: 'asset-aapl',
+        symbol: 'AAPL',
+        name: 'Apple',
+        assetType: 'us_stock',
+        market: 'NAS',
+        priceCurrency: CurrencyCode.USD,
+      },
+      price: {
+        state: 'available',
+        currentPrice: '190.00000000',
+        changeRate: null,
+        priceCurrency: CurrencyCode.USD,
+        priceKrwState: 'unavailable',
+        priceKrw: null,
+        assetPriceSnapshotId: null,
+        priceEffectiveAt: '2026-06-19T03:00:00.000Z',
+        priceCapturedAt: '2026-06-19T03:00:10.000Z',
+        priceSource: {
+          sourceType: 'provider_api',
+          sourceName: 'kis_us_delayed_trade',
+        },
+      },
+    });
+
+    const ticker = await buildRealtimeTickerMessage(gateway, {
+      type: 'kis_realtime_price',
+      assetId: 'asset-aapl',
+      snapshotState: null,
+      price: {
+        symbol: 'AAPL',
+        price: '190.12500000',
+        currencyCode: CurrencyCode.USD,
+        sourceName: 'kis_us_delayed_trade',
+        capturedAt: '2026-06-19T03:00:29.000Z',
+        effectiveAt: '2026-06-19T02:45:29.000Z',
+      },
+    });
+
+    expect(ticker).toMatchObject({ realtime: false, delayed: true });
   });
 });

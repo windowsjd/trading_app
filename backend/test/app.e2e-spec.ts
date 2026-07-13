@@ -64,6 +64,9 @@ jest.mock('../src/generated/prisma/client', () => {
       season_settlement: 'season_settlement',
       season_lifecycle_transition: 'season_lifecycle_transition',
       reward_marker: 'reward_marker',
+      market_candle_retention: 'market_candle_retention',
+      market_candle_sync: 'market_candle_sync',
+      market_candle_reconciliation: 'market_candle_reconciliation',
     },
     OpsJobRunStatus: {
       running: 'running',
@@ -77,6 +80,18 @@ jest.mock('../src/generated/prisma/client', () => {
       operator: 'operator',
       manual_script: 'manual_script',
       test: 'test',
+    },
+    MarketCandleSyncMode: {
+      initial: 'initial',
+      incremental: 'incremental',
+      repair: 'repair',
+    },
+    MarketCandleSyncStatus: {
+      pending: 'pending',
+      running: 'running',
+      completed: 'completed',
+      failed: 'failed',
+      canceled: 'canceled',
     },
     ParticipantStatus: {
       active: 'active',
@@ -171,6 +186,7 @@ import {
   RefreshTokenSessionStatus,
 } from './../src/generated/prisma/client';
 import { PrismaService } from './../src/prisma/prisma.service';
+import { RedisService } from './../src/redis/redis.service';
 import * as argon2 from 'argon2';
 import { createHash } from 'node:crypto';
 
@@ -307,6 +323,11 @@ describe('AppController (e2e)', () => {
   const originalJwtAccessTtl = process.env.JWT_ACCESS_TTL;
   const originalRefreshTokenTtl = process.env.REFRESH_TOKEN_TTL;
   const originalSchedulerEnabled = process.env.SCHEDULER_ENABLED;
+  const originalKisRateLimitEnabled = process.env.KIS_RATE_LIMIT_ENABLED;
+  const originalBinanceWebSocketStreamingEnabled =
+    process.env.BINANCE_WEBSOCKET_STREAMING_ENABLED;
+  const originalKisWebSocketStreamingEnabled =
+    process.env.KIS_WEBSOCKET_STREAMING_ENABLED;
   const now = new Date('2026-05-09T00:00:00.000Z');
   const user = {
     id: 'user-1',
@@ -358,6 +379,9 @@ describe('AppController (e2e)', () => {
     process.env.JWT_ACCESS_TTL = '15m';
     process.env.REFRESH_TOKEN_TTL = '7d';
     process.env.SCHEDULER_ENABLED = 'false';
+    process.env.KIS_RATE_LIMIT_ENABLED = 'false';
+    process.env.BINANCE_WEBSOCKET_STREAMING_ENABLED = 'false';
+    process.env.KIS_WEBSOCKET_STREAMING_ENABLED = 'false';
   });
 
   afterAll(() => {
@@ -383,6 +407,23 @@ describe('AppController (e2e)', () => {
       delete process.env.SCHEDULER_ENABLED;
     } else {
       process.env.SCHEDULER_ENABLED = originalSchedulerEnabled;
+    }
+    if (originalKisRateLimitEnabled === undefined) {
+      delete process.env.KIS_RATE_LIMIT_ENABLED;
+    } else {
+      process.env.KIS_RATE_LIMIT_ENABLED = originalKisRateLimitEnabled;
+    }
+    if (originalBinanceWebSocketStreamingEnabled === undefined) {
+      delete process.env.BINANCE_WEBSOCKET_STREAMING_ENABLED;
+    } else {
+      process.env.BINANCE_WEBSOCKET_STREAMING_ENABLED =
+        originalBinanceWebSocketStreamingEnabled;
+    }
+    if (originalKisWebSocketStreamingEnabled === undefined) {
+      delete process.env.KIS_WEBSOCKET_STREAMING_ENABLED;
+    } else {
+      process.env.KIS_WEBSOCKET_STREAMING_ENABLED =
+        originalKisWebSocketStreamingEnabled;
     }
   });
 
@@ -520,6 +561,11 @@ describe('AppController (e2e)', () => {
     })
       .overrideProvider(PrismaService)
       .useValue(prisma)
+      .overrideProvider(RedisService)
+      .useValue({
+        ping: jest.fn().mockResolvedValue('PONG'),
+        onModuleDestroy: jest.fn().mockResolvedValue(undefined),
+      })
       .compile();
 
     jwtService = moduleFixture.get(JwtService);
@@ -844,9 +890,11 @@ describe('AppController (e2e)', () => {
       .expect((response) => {
         expect(response.body).toEqual({
           success: true,
-          data: {
+          data: expect.objectContaining({
             app: 'ok',
             database: 'ok',
+            redis: 'ok',
+            status: 'ready',
             scheduler: {
               enabled: false,
               timezone: 'Asia/Seoul',
@@ -855,8 +903,10 @@ describe('AppController (e2e)', () => {
                 provider_fx_ingest: false,
               }),
             },
+            liveCandle: expect.objectContaining({ enabled: false }),
+            reconciliation: expect.any(Array),
             currentTime: expect.any(String),
-          },
+          }),
         });
         expect(JSON.stringify(response.body)).not.toMatch(
           /DATABASE_URL|KIS_APP_SECRET|approval_key|access_token/i,

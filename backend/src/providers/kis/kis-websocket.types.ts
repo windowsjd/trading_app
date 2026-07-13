@@ -56,6 +56,16 @@ export type KisWebSocketTradeTick = {
   symbol: string;
   price: string;
   sourceTimestamp: Date | null;
+  // Exchange-local timestamp when the overseas feed supplies XYMD/XHMS.
+  // sourceTimestamp remains the KIS delivery-clock timestamp for backwards
+  // compatibility with the existing ticker path.
+  exchangeTimestamp: Date | null;
+  tradeQuantity: string | null;
+  absoluteVolume: string | null;
+  absoluteAmount: string | null;
+  eventId: string | null;
+  sequence: string | null;
+  marketSessionCode: string | null;
   receivedAt: Date;
   rawFrame: string;
   rawFields: Record<string, string>;

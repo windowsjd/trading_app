@@ -1,4 +1,9 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Optional,
+} from '@nestjs/common';
 import {
   OpsJobName,
   OpsJobRun,
@@ -37,6 +42,11 @@ import {
   type MarketCandleSyncSummary,
 } from '../assets/market-candle-sync.types';
 import { AssetType, MarketCandleSyncMode } from '../generated/prisma/client';
+import {
+  MarketCandleReconciliationService,
+  type MarketCandleReconciliationInput,
+  type ReconciliationMarket,
+} from '../assets/market-candle-reconciliation.service';
 
 export type OpsJobRunnerResponse =
   | {
@@ -100,6 +110,19 @@ export type MarketCandleSyncOpsJobInput = OpsJobRunnerInput & {
   maxAssets?: number;
 };
 
+export type MarketCandleReconciliationOpsJobInput = OpsJobRunnerInput & {
+  now?: string | null;
+  assetIds?: string[];
+  assetTypes?: string[];
+  market?: string;
+  from?: string | null;
+  to?: string | null;
+  targets?: string[];
+  maxAssets?: number;
+  maxPages?: number;
+  continueOnError?: boolean;
+};
+
 type ParsedMarketCandleSyncInput = {
   assetIds?: string[];
   assetTypes?: AssetType[];
@@ -131,6 +154,8 @@ export class OpsJobRunnerService {
     private readonly prisma: PrismaService,
     private readonly lockService: OpsJobLockService,
     private readonly runService: OpsJobRunService,
+    @Optional()
+    private readonly marketCandleReconciliationService?: MarketCandleReconciliationService,
   ) {}
 
   runProviderFxIngestJob(input: OpsJobRunnerInput = {}) {
@@ -565,6 +590,157 @@ export class OpsJobRunnerService {
       },
       { renewLock: true, dryRunResult },
     );
+  }
+
+  async runMarketCandleReconciliationJob(
+    input: MarketCandleReconciliationOpsJobInput = {},
+  ): Promise<OpsJobRunnerResponse> {
+    if (!this.marketCandleReconciliationService) {
+      throw new Error('Market candle reconciliation service is unavailable.');
+    }
+    const parsed = this.parseMarketCandleReconciliationInput(input);
+    const market = parsed.market ?? 'ALL';
+    const jobInput: OpsJobRunnerInput = {
+      ...input,
+      metadataJson:
+        input.metadataJson ?? ({ reconciliationMarket: market } as const),
+    };
+    const dryRunResult =
+      input.dryRun === true
+        ? serializeJson(
+            await this.marketCandleReconciliationService.reconcile({
+              ...parsed,
+              dryRun: true,
+            }),
+          )
+        : undefined;
+    return this.runLockedOpsJob(
+      OpsJobName.market_candle_reconciliation,
+      jobInput,
+      `market_candle_reconciliation:${market.toLowerCase()}`,
+      async () => {
+        const summary = await this.marketCandleReconciliationService?.reconcile(
+          {
+            ...parsed,
+            dryRun: false,
+          },
+        );
+        if (!summary) throw new Error('Reconciliation service disappeared.');
+        const serialized = serializeJson(summary);
+        if (summary.failedAssets > 0) {
+          this.throwProviderJobFailed(
+            'MARKET_CANDLE_RECONCILIATION_FAILED',
+            'Market candle reconciliation finished with failed assets.',
+            serialized,
+          );
+        }
+        return serialized;
+      },
+      { renewLock: true, dryRunResult },
+    );
+  }
+
+  private parseMarketCandleReconciliationInput(
+    input: MarketCandleReconciliationOpsJobInput,
+  ): MarketCandleReconciliationInput {
+    const market = input.market?.trim().toUpperCase();
+    if (
+      market &&
+      !(['KRX', 'US', 'CRYPTO', 'ALL'] as const).includes(
+        market as ReconciliationMarket,
+      )
+    ) {
+      throw new HttpException(
+        {
+          success: false,
+          error: {
+            code: 'MARKET_CANDLE_RECONCILIATION_INVALID_INPUT',
+            message: 'market must be KRX, US, CRYPTO, or ALL.',
+          },
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    const parseDate = (value: string | null | undefined, name: string) => {
+      if (!value?.trim()) return undefined;
+      const parsed = new Date(value);
+      if (Number.isNaN(parsed.getTime())) {
+        throw new HttpException(
+          {
+            success: false,
+            error: {
+              code: 'MARKET_CANDLE_RECONCILIATION_INVALID_INPUT',
+              message: `${name} must be an ISO-8601 datetime.`,
+            },
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      return parsed;
+    };
+    const targets = input.targets?.map((target) => {
+      if (!(MARKET_CANDLE_SYNC_FEEDS as readonly string[]).includes(target)) {
+        throw new HttpException(
+          {
+            success: false,
+            error: {
+              code: 'MARKET_CANDLE_RECONCILIATION_INVALID_INPUT',
+              message: `targets entries must be one of ${MARKET_CANDLE_SYNC_FEEDS.join(', ')}.`,
+            },
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      return target as MarketCandleFeed;
+    });
+    if (targets?.length === 0) {
+      throw reconciliationInputError('targets must not be empty.');
+    }
+    const assetTypes = input.assetTypes?.map((assetType) => {
+      if (!Object.values(AssetType).includes(assetType as AssetType)) {
+        throw new HttpException(
+          {
+            success: false,
+            error: {
+              code: 'MARKET_CANDLE_RECONCILIATION_INVALID_INPUT',
+              message: `assetTypes entries must be one of ${Object.values(AssetType).join(', ')}.`,
+            },
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      return assetType as AssetType;
+    });
+    const assetIds = input.assetIds?.map((assetId, index) => {
+      const value = typeof assetId === 'string' ? assetId.trim() : '';
+      if (!value) {
+        throw reconciliationInputError(
+          `assetIds[${index}] must be a non-empty string.`,
+        );
+      }
+      return value;
+    });
+    const from = parseDate(input.from, 'from');
+    const to = parseDate(input.to, 'to');
+    if ((from && !to) || (!from && to) || (from && to && from >= to)) {
+      throw reconciliationInputError(
+        'from and to must be supplied together with from earlier than to.',
+      );
+    }
+    const maxAssets = positiveInteger(input.maxAssets, 'maxAssets');
+    const maxPages = positiveInteger(input.maxPages, 'maxPages');
+    return {
+      assetIds,
+      assetTypes,
+      market: (market as ReconciliationMarket | undefined) ?? undefined,
+      from,
+      to,
+      targets,
+      maxAssets,
+      maxPages,
+      continueOnError: input.continueOnError,
+      now: parseDate(input.now, 'now'),
+    };
   }
 
   private parseMarketCandleSyncInput(
@@ -1051,4 +1227,32 @@ export class OpsJobRunnerService {
   private formatDateOnly(date: Date) {
     return date.toISOString().slice(0, 10);
   }
+}
+
+function serializeJson(value: unknown): Record<string, unknown> {
+  return JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
+}
+
+function positiveInteger(
+  value: number | undefined,
+  name: string,
+): number | undefined {
+  if (value === undefined) return undefined;
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw reconciliationInputError(`${name} must be a positive integer.`);
+  }
+  return value;
+}
+
+function reconciliationInputError(message: string): HttpException {
+  return new HttpException(
+    {
+      success: false,
+      error: {
+        code: 'MARKET_CANDLE_RECONCILIATION_INVALID_INPUT',
+        message,
+      },
+    },
+    HttpStatus.BAD_REQUEST,
+  );
 }

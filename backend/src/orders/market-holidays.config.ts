@@ -47,3 +47,16 @@ export function findMarketHoliday(
     ) ?? null
   );
 }
+
+/** Returns full-day closures and early/open-late session overrides. */
+export function findMarketSchedule(
+  market: MarketHoliday['market'],
+  holidayDate: string,
+): MarketHoliday | null {
+  return (
+    MARKET_HOLIDAYS.find(
+      (holiday) =>
+        holiday.market === market && holiday.holidayDate === holidayDate,
+    ) ?? null
+  );
+}

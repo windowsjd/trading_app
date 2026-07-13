@@ -1,5 +1,15 @@
-import { HttpException, HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
-import { MarketCandleSyncMode, MarketCandleSyncStatus } from '../generated/prisma/client';
+import {
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  Logger,
+  Optional,
+} from '@nestjs/common';
+import {
+  MarketCandleSyncMode,
+  MarketCandleSyncStatus,
+} from '../generated/prisma/client';
 import type {
   AssetCandlesAsset,
   AssetCandlesResponse,
@@ -11,13 +21,20 @@ import {
   AssetCandlesSingleFlightService,
   CandleSingleFlightWaitTimeoutError,
 } from './asset-candles-single-flight.service';
-import { CandleDatabaseLoader, type CandleDatabaseLoadResult } from './candle-database.loader';
-import { CandleReadPlanBuilder, type CandleReadPlan } from './candle-read-plan.builder';
+import {
+  CandleDatabaseLoader,
+  type CandleDatabaseLoadResult,
+} from './candle-database.loader';
+import {
+  CandleReadPlanBuilder,
+  type CandleReadPlan,
+} from './candle-read-plan.builder';
 import {
   CANDLE_SERVING_CONFIG,
   type CandleServingConfig,
 } from './candle-serving.config';
 import { MarketCandleSyncService } from './market-candle-sync.service';
+import { LiveCandleOverlayService } from './live-candle-overlay.service';
 
 export type CandleDeliveryState =
   | 'fresh_cache'
@@ -39,9 +56,21 @@ export class CandleServingService {
     private readonly sync: MarketCandleSyncService,
     @Inject(CANDLE_SERVING_CONFIG)
     private readonly config: CandleServingConfig,
+    @Optional() private readonly liveOverlay?: LiveCandleOverlayService,
   ) {}
 
   async serve(
+    asset: AssetCandlesAsset,
+    query: ParsedAssetCandlesQuery,
+    legacyLoader: () => Promise<AssetCandlesResponse>,
+  ): Promise<AssetCandlesResponse> {
+    const response = await this.serveBase(asset, query, legacyLoader);
+    return this.liveOverlay
+      ? this.liveOverlay.overlayHttpResponse(response, query)
+      : response;
+  }
+
+  private async serveBase(
     asset: AssetCandlesAsset,
     query: ParsedAssetCandlesQuery,
     legacyLoader: () => Promise<AssetCandlesResponse>,
@@ -147,11 +176,14 @@ export class CandleServingService {
     );
     let result;
     try {
-      const repair = before.state === 'missing' || before.state === 'incomplete';
+      const repair =
+        before.state === 'missing' || before.state === 'incomplete';
       result = await this.sync.syncAsset({
         assetId: asset.id,
         targets: [plan.sourceInterval as '5m' | '1d' | '1w'],
-        mode: repair ? MarketCandleSyncMode.repair : MarketCandleSyncMode.incremental,
+        mode: repair
+          ? MarketCandleSyncMode.repair
+          : MarketCandleSyncMode.incremental,
         from: plan.sourceRange.from,
         to: plan.sourceRange.to,
         resume: false,
@@ -252,7 +284,15 @@ export class CandleServingService {
     interval: string,
     extra: Record<string, unknown> = {},
   ): void {
-    this.logger.log(JSON.stringify({ event: 'candle_delivery', state, assetId, interval, ...extra }));
+    this.logger.log(
+      JSON.stringify({
+        event: 'candle_delivery',
+        state,
+        assetId,
+        interval,
+        ...extra,
+      }),
+    );
   }
 
   private errorName(error: unknown): string {

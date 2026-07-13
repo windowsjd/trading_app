@@ -4,6 +4,7 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
+import { readLiveCandleConfig } from '../../assets/live-candle.config';
 import {
   ProviderConfigService,
   type ProviderConfig,
@@ -143,6 +144,14 @@ export class KisWebSocketStreamingService
 
   start(): void {
     if (this.status.running || this.connectPromise) {
+      return;
+    }
+
+    const liveCandles = readLiveCandleConfig();
+    if (liveCandles.enabled && liveCandles.kisEnabled) {
+      this.status.enabled = false;
+      this.status.running = false;
+      this.status.state = 'disabled';
       return;
     }
 

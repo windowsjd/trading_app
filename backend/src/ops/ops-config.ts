@@ -1,4 +1,8 @@
 import { OpsJobName } from '../generated/prisma/client';
+import {
+  readMarketCandleReconciliationConfig,
+  type MarketCandleReconciliationConfig,
+} from '../assets/market-candle-reconciliation.config';
 
 export type ProviderOpsJobName =
   | typeof OpsJobName.provider_fx_ingest
@@ -26,6 +30,7 @@ export type OpsSchedulerConfig = {
     minute: number;
     runOnStartup: boolean;
   };
+  marketCandleReconciliation: MarketCandleReconciliationConfig;
 };
 
 export class OpsConfigError extends Error {
@@ -51,6 +56,7 @@ const DEFAULT_RETENTION_MINUTE = 0;
 export function getOpsSchedulerConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): OpsSchedulerConfig {
+  const marketCandleReconciliation = readMarketCandleReconciliationConfig(env);
   const rankingEnabled = parseBooleanEnv(
     env.SCHEDULER_RANKING_ENABLED ?? env.ENABLE_RANKING_SCHEDULER,
     false,
@@ -123,7 +129,8 @@ export function getOpsSchedulerConfig(
       providerFxEnabled ||
       providerBinanceEnabled ||
       providerKisEnabled ||
-      retentionEnabled,
+      retentionEnabled ||
+      marketCandleReconciliation.enabled,
     timezone: parseTextEnv(env.SCHEDULER_TIMEZONE, DEFAULT_TIMEZONE),
     lockTtlSeconds: parsePositiveIntegerEnv(
       env.SCHEDULER_LOCK_TTL_SECONDS,
@@ -153,6 +160,8 @@ export function getOpsSchedulerConfig(
       // Manual/operator-triggered only in this phase; a market-close /
       // realtime sync scheduler is a unit-3 decision.
       [OpsJobName.market_candle_sync]: false,
+      [OpsJobName.market_candle_reconciliation]:
+        marketCandleReconciliation.enabled,
     },
     providerIntervalsSeconds: {
       [OpsJobName.provider_fx_ingest]: parsePositiveIntegerEnv(
@@ -182,6 +191,7 @@ export function getOpsSchedulerConfig(
       minute: retentionMinute,
       runOnStartup: retentionRunOnStartup,
     },
+    marketCandleReconciliation,
   };
 }
 

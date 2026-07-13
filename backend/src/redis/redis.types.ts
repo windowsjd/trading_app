@@ -19,6 +19,13 @@ export interface RawRedisClient {
   incr(key: string): Promise<number>;
   expire(key: string, ttlSeconds: number): Promise<number>;
   ttl(key: string): Promise<number>;
+  publish(channel: string, message: string): Promise<number>;
+  zrangebyscore(
+    key: string,
+    min: number | string,
+    max: number | string,
+  ): Promise<string[]>;
+  zrem(key: string, ...members: string[]): Promise<number>;
   ping(): Promise<string>;
   eval(
     script: string,

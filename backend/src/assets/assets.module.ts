@@ -28,6 +28,20 @@ import { CandleReadPlanBuilder } from './candle-read-plan.builder';
 import { CandleResponseBuilder } from './candle-response.builder';
 import { CandleDatabaseLoader } from './candle-database.loader';
 import { CandleServingService } from './candle-serving.service';
+import { LIVE_CANDLE_CONFIG, readLiveCandleConfig } from './live-candle.config';
+import { LiveCandleHealthService } from './live-candle-health.service';
+import { LiveCandleEventNormalizerService } from './live-candle-event-normalizer.service';
+import { LiveCandleStoreService } from './live-candle-store.service';
+import { LiveCandleHydratorService } from './live-candle-hydrator.service';
+import { LiveCandleOverlayService } from './live-candle-overlay.service';
+import { LiveCandlePublisherService } from './live-candle-publisher.service';
+import { LiveCandlePipelineService } from './live-candle-pipeline.service';
+import { LiveCandleFinalizerService } from './live-candle-finalizer.service';
+import {
+  MARKET_CANDLE_RECONCILIATION_CONFIG,
+  readMarketCandleReconciliationConfig,
+} from './market-candle-reconciliation.config';
+import { MarketCandleReconciliationService } from './market-candle-reconciliation.service';
 
 // AssetCandlesCacheService is provided (via factory so Nest supplies its default
 // env-derived config) and exported for a later serving step to inject. It is
@@ -40,7 +54,12 @@ import { CandleServingService } from './candle-serving.service';
     AssetsService,
     AssetCandlesService,
     MarketCandlesRepository,
-    MarketCandleRetentionService,
+    {
+      provide: MarketCandleRetentionService,
+      useFactory: (repository: MarketCandlesRepository) =>
+        new MarketCandleRetentionService(repository),
+      inject: [MarketCandlesRepository],
+    },
     MarketCandleIngestionService,
     MarketCandleAggregationService,
     MarketCandleBackfillLockService,
@@ -50,6 +69,23 @@ import { CandleServingService } from './candle-serving.service';
     CandleResponseBuilder,
     CandleDatabaseLoader,
     CandleServingService,
+    LiveCandleHealthService,
+    LiveCandleEventNormalizerService,
+    LiveCandleStoreService,
+    LiveCandleHydratorService,
+    LiveCandleOverlayService,
+    LiveCandlePublisherService,
+    LiveCandlePipelineService,
+    LiveCandleFinalizerService,
+    MarketCandleReconciliationService,
+    {
+      provide: LIVE_CANDLE_CONFIG,
+      useFactory: () => readLiveCandleConfig(),
+    },
+    {
+      provide: MARKET_CANDLE_RECONCILIATION_CONFIG,
+      useFactory: () => readMarketCandleReconciliationConfig(),
+    },
     {
       provide: CANDLE_SERVING_CONFIG,
       useFactory: () => readCandleServingConfig(),
@@ -85,6 +121,15 @@ import { CandleServingService } from './candle-serving.service';
     MarketCandleSyncService,
     AssetCandlesCacheService,
     AssetCandlesSingleFlightService,
+    LIVE_CANDLE_CONFIG,
+    LiveCandleHealthService,
+    LiveCandleEventNormalizerService,
+    LiveCandleStoreService,
+    LiveCandleOverlayService,
+    LiveCandlePublisherService,
+    LiveCandlePipelineService,
+    MARKET_CANDLE_RECONCILIATION_CONFIG,
+    MarketCandleReconciliationService,
   ],
 })
 export class AssetsModule {}

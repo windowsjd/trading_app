@@ -11,6 +11,7 @@ jest.mock('../generated/prisma/client', () => ({
     reward_marker: 'reward_marker',
     market_candle_retention: 'market_candle_retention',
     market_candle_sync: 'market_candle_sync',
+    market_candle_reconciliation: 'market_candle_reconciliation',
   },
   OpsJobRunStatus: {
     running: 'running',
@@ -39,6 +40,9 @@ jest.mock('../generated/prisma/client', () => ({
 
 jest.mock('../assets/market-candle-sync.service', () => ({
   MarketCandleSyncService: class MarketCandleSyncService {},
+}));
+jest.mock('../assets/market-candle-reconciliation.service', () => ({
+  MarketCandleReconciliationService: class MarketCandleReconciliationService {},
 }));
 
 jest.mock('../batch/daily-portfolio-snapshot-job.service', () => ({
@@ -158,6 +162,9 @@ describe('OpsJobRunnerService', () => {
       syncAssets: jest.fn(),
       syncAsset: jest.fn(),
     };
+    const marketCandleReconciliationService = {
+      reconcile: jest.fn(),
+    };
     const prisma = {
       season: {
         findMany: jest.fn(),
@@ -192,6 +199,7 @@ describe('OpsJobRunnerService', () => {
       providerTargetResolver,
       marketCandleRetentionService,
       marketCandleSyncService,
+      marketCandleReconciliationService,
       prisma,
       service: new OpsJobRunnerService(
         dailyPortfolioSnapshotJobService as never,
@@ -209,9 +217,119 @@ describe('OpsJobRunnerService', () => {
         prisma as never,
         lockService as never,
         runService as never,
+        marketCandleReconciliationService as never,
       ),
     };
   };
+
+  it('runs market candle reconciliation through the market lock and Ops audit path', async () => {
+    const {
+      service,
+      lockService,
+      runService,
+      marketCandleReconciliationService,
+    } = createService();
+    lockService.acquireLock.mockResolvedValueOnce({
+      acquired: true,
+      lockKey: 'market_candle_reconciliation:crypto',
+      ownerId: 'owner-reconciliation',
+      expiresAt: new Date('2026-07-13T00:10:00.000Z'),
+    });
+    runService.createRunning.mockResolvedValueOnce({ id: 'run-1', startedAt });
+    runService.recordSucceeded.mockResolvedValueOnce({
+      serialized: serializedRun({
+        jobName: OpsJobName.market_candle_reconciliation,
+      }),
+    });
+    marketCandleReconciliationService.reconcile.mockResolvedValueOnce({
+      dryRun: false,
+      market: 'CRYPTO',
+      assetsChecked: 1,
+      missingRows: 0,
+      correctedRows: 1,
+      unchangedRows: 0,
+      failedAssets: 0,
+      results: [],
+      startedAt,
+      finishedAt: startedAt,
+    });
+
+    await expect(
+      service.runMarketCandleReconciliationJob({
+        market: 'crypto',
+        targets: ['5m'],
+        requestedBy: 'scheduler',
+      }),
+    ).resolves.toMatchObject({ success: true });
+    expect(lockService.acquireLock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jobName: OpsJobName.market_candle_reconciliation,
+        lockKey: 'market_candle_reconciliation:crypto',
+      }),
+    );
+    expect(marketCandleReconciliationService.reconcile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        market: 'CRYPTO',
+        targets: ['5m'],
+        dryRun: false,
+      }),
+    );
+  });
+
+  it('keeps reconciliation dry-run provider/write free inside the service plan', async () => {
+    const {
+      service,
+      lockService,
+      runService,
+      marketCandleReconciliationService,
+    } = createService();
+    lockService.acquireLock.mockResolvedValueOnce({
+      acquired: true,
+      lockKey: 'market_candle_reconciliation:krx',
+      ownerId: 'owner-reconciliation',
+      expiresAt: new Date('2026-07-13T00:10:00.000Z'),
+    });
+    runService.createRunning.mockResolvedValueOnce({ id: 'run-1', startedAt });
+    runService.recordSucceeded.mockResolvedValueOnce({
+      serialized: serializedRun({
+        jobName: OpsJobName.market_candle_reconciliation,
+      }),
+    });
+    marketCandleReconciliationService.reconcile.mockResolvedValueOnce({
+      dryRun: true,
+      market: 'KRX',
+      assetsChecked: 2,
+      missingRows: 0,
+      correctedRows: 0,
+      unchangedRows: 0,
+      failedAssets: 0,
+      results: [],
+      startedAt,
+      finishedAt: startedAt,
+    });
+    await service.runMarketCandleReconciliationJob({
+      market: 'KRX',
+      dryRun: true,
+    });
+    expect(marketCandleReconciliationService.reconcile).toHaveBeenCalledTimes(
+      1,
+    );
+    expect(marketCandleReconciliationService.reconcile).toHaveBeenCalledWith(
+      expect.objectContaining({ dryRun: true, market: 'KRX' }),
+    );
+  });
+
+  it('rejects unbounded or partial reconciliation ranges before starting an Ops run', async () => {
+    const { service, runService } = createService();
+    await expect(
+      service.runMarketCandleReconciliationJob({
+        market: 'CRYPTO',
+        from: '2026-07-13T00:00:00.000Z',
+        maxPages: 0,
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+    expect(runService.createRunning).not.toHaveBeenCalled();
+  });
 
   it('runs provider FX ingestion through locked provider services', async () => {
     const {

@@ -7,6 +7,7 @@ import {
   type KisWebSocketTradeTick,
 } from './kis-websocket.types';
 import { normalizeKisUsMarketCode } from './kis-websocket.subscription';
+import { zonedDateTimeToUtc } from './candles/kis-candle-time';
 
 const KIS_DOMESTIC_TRADE_FIELDS = [
   'MKSC_SHRN_ISCD',
@@ -339,6 +340,18 @@ function parseDomesticTradeRecord(input: {
     input.fields.BSOP_DATE,
     input.fields.STCK_CNTG_HOUR,
   );
+  const tradeQuantity = toOptionalNonNegativeDecimalString(
+    input.fields.CNTG_VOL,
+    'CNTG_VOL',
+  );
+  const absoluteVolume = toOptionalNonNegativeDecimalString(
+    input.fields.ACML_VOL,
+    'ACML_VOL',
+  );
+  const absoluteAmount = toOptionalNonNegativeDecimalString(
+    input.fields.ACML_TR_PBMN,
+    'ACML_TR_PBMN',
+  );
 
   if (!/^\d{6}$/u.test(symbol)) {
     throw new ProviderHttpError(
@@ -355,6 +368,23 @@ function parseDomesticTradeRecord(input: {
     symbol,
     price,
     sourceTimestamp,
+    exchangeTimestamp: sourceTimestamp,
+    tradeQuantity,
+    absoluteVolume,
+    absoluteAmount,
+    eventId: buildTradeIdentity({
+      trId: input.trId,
+      symbol,
+      eventTime: sourceTimestamp,
+      price,
+      quantity: tradeQuantity,
+      absoluteVolume,
+    }),
+    sequence: absoluteVolume,
+    marketSessionCode:
+      input.fields.HOUR_CLS_CODE.trim() ||
+      input.fields.MRKT_TRTM_CLS_CODE.trim() ||
+      null,
     receivedAt: input.receivedAt,
     rawFrame: input.rawFrame,
     rawFields: input.fields,
@@ -383,6 +413,23 @@ function parseOverseasDelayedTradeRecord(input: {
     normalizeKisDate(input.fields.KYMD),
     input.fields.KHMS,
   );
+  const exchangeTimestamp = parseZonedTimestamp(
+    normalizeKisDate(input.fields.XYMD),
+    input.fields.XHMS,
+    'America/New_York',
+  );
+  const tradeQuantity = toOptionalNonNegativeDecimalString(
+    input.fields.EVOL,
+    'EVOL',
+  );
+  const absoluteVolume = toOptionalNonNegativeDecimalString(
+    input.fields.TVOL,
+    'TVOL',
+  );
+  const absoluteAmount = toOptionalNonNegativeDecimalString(
+    input.fields.TAMT,
+    'TAMT',
+  );
 
   if (!symbol) {
     throw new ProviderHttpError(
@@ -399,6 +446,20 @@ function parseOverseasDelayedTradeRecord(input: {
     symbol,
     price,
     sourceTimestamp,
+    exchangeTimestamp,
+    tradeQuantity,
+    absoluteVolume,
+    absoluteAmount,
+    eventId: buildTradeIdentity({
+      trId: input.trId,
+      symbol,
+      eventTime: exchangeTimestamp ?? sourceTimestamp,
+      price,
+      quantity: tradeQuantity,
+      absoluteVolume,
+    }),
+    sequence: absoluteVolume,
+    marketSessionCode: input.fields.MTYP.trim() || null,
     receivedAt: input.receivedAt,
     rawFrame: input.rawFrame,
     rawFields: input.fields,
@@ -454,6 +515,48 @@ function toPositiveDecimalString(
   }
 }
 
+function toOptionalNonNegativeDecimalString(
+  value: string,
+  fieldName: string,
+): string | null {
+  const text = value.trim();
+  if (!text) return null;
+  try {
+    const decimal = new Prisma.Decimal(text);
+    if (!decimal.isFinite() || decimal.lt(0)) throw new Error();
+    return decimal.toFixed(8);
+  } catch {
+    throw new ProviderHttpError(
+      'kis',
+      'INVALID_DECIMAL',
+      `${fieldName} must be a non-negative decimal when present.`,
+    );
+  }
+}
+
+function buildTradeIdentity(input: {
+  trId: string;
+  symbol: string;
+  eventTime: Date | null;
+  price: string;
+  quantity: string | null;
+  absoluteVolume: string | null;
+}): string | null {
+  if (!input.eventTime) return null;
+  // ACML_VOL/TVOL is the strongest available monotonic identity. When it is
+  // absent, time+price+quantity is intentionally conservative: identical
+  // trades in the same provider timestamp may be deduplicated and REST
+  // reconciliation remains the final authority.
+  return [
+    input.trId,
+    input.symbol,
+    input.eventTime.toISOString(),
+    input.price,
+    input.quantity ?? '',
+    input.absoluteVolume ?? '',
+  ].join(':');
+}
+
 function normalizeKisDate(dateText: string): string {
   const value = dateText.trim();
   if (/^\d{6}$/u.test(value)) {
@@ -490,6 +593,17 @@ function parseKstTimestamp(dateText: string, timeText: string): Date | null {
   }
 
   return new Date(Date.UTC(year, month - 1, day, hour - 9, minute, second));
+}
+
+function parseZonedTimestamp(
+  dateText: string,
+  timeText: string,
+  timeZone: string,
+): Date | null {
+  const date = dateText.trim();
+  const time = timeText.trim();
+  if (!/^\d{8}$/u.test(date) || !/^\d{6}$/u.test(time)) return null;
+  return zonedDateTimeToUtc(date, time, timeZone);
 }
 
 function failed(

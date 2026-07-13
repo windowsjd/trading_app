@@ -153,6 +153,34 @@ export class RedisService implements OnModuleDestroy {
     return this.runCommand(client, () => client.ttl(validKey));
   }
 
+  async publish(channel: string, message: string): Promise<number> {
+    const validChannel = this.requireKey(channel);
+    const client = await this.ensureConnected();
+    return this.runCommand(client, () => client.publish(validChannel, message));
+  }
+
+  async zrangeByScore(
+    key: string,
+    min: number | string,
+    max: number | string,
+  ): Promise<string[]> {
+    const validKey = this.requireKey(key);
+    const client = await this.ensureConnected();
+    return this.runCommand(client, () =>
+      client.zrangebyscore(validKey, min, max),
+    );
+  }
+
+  async removeFromSortedSet(
+    key: string,
+    members: readonly string[],
+  ): Promise<number> {
+    if (members.length === 0) return 0;
+    const validKey = this.requireKey(key);
+    const client = await this.ensureConnected();
+    return this.runCommand(client, () => client.zrem(validKey, ...members));
+  }
+
   async onModuleDestroy(): Promise<void> {
     if (!this.client) {
       return;

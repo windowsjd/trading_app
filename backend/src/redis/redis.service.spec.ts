@@ -24,6 +24,9 @@ class FakeRedisClient implements RawRedisClient {
   ttl = jest.fn((): Promise<number> => Promise.resolve(30));
   ping = jest.fn((): Promise<string> => Promise.resolve('PONG'));
   eval = jest.fn((): Promise<unknown> => Promise.resolve(1));
+  publish = jest.fn((): Promise<number> => Promise.resolve(1));
+  zrangebyscore = jest.fn((): Promise<string[]> => Promise.resolve([]));
+  zrem = jest.fn((): Promise<number> => Promise.resolve(1));
   quit = jest.fn((): Promise<string> => Promise.resolve('OK'));
   disconnect = jest.fn((): void => undefined);
 
@@ -103,6 +106,24 @@ describe('RedisService', () => {
     expect(client.set).toHaveBeenCalledWith('k', 'v', 'EX', 30);
     expect(client.del).toHaveBeenCalledWith('k');
     expect(client.incr).toHaveBeenCalledWith('gen');
+  });
+
+  it('delegates live candle Pub/Sub and exact sorted-set operations', async () => {
+    const { client, service } = createHarness();
+    client.zrangebyscore.mockResolvedValueOnce(['state-1']);
+    await expect(service.publish('candles:live:v1:fanout', '{}')).resolves.toBe(
+      1,
+    );
+    await expect(
+      service.zrangeByScore('candles:live:v1:active', '-inf', 100),
+    ).resolves.toEqual(['state-1']);
+    await expect(
+      service.removeFromSortedSet('candles:live:v1:active', ['state-1']),
+    ).resolves.toBe(1);
+    expect(client.zrem).toHaveBeenCalledWith(
+      'candles:live:v1:active',
+      'state-1',
+    );
   });
 
   it('quits the client on module destroy', async () => {

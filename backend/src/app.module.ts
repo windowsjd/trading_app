@@ -20,6 +20,7 @@ import { RankingModule } from './ranking/ranking.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { RecordsModule } from './records/records.module';
 import { RewardsModule } from './rewards/rewards.module';
+import { RedisModule } from './redis/redis.module';
 import { SeasonsModule } from './seasons/seasons.module';
 import { WalletsModule } from './wallets/wallets.module';
 
@@ -43,6 +44,7 @@ import { WalletsModule } from './wallets/wallets.module';
     ProvidersModule,
     RankingModule,
     RealtimeModule,
+    RedisModule,
     RecordsModule,
     RewardsModule,
     SeasonsModule,

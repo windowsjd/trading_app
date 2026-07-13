@@ -24,6 +24,11 @@ import {
 import { OpsJobRunService } from './ops-job-run.service';
 import { MarketSnapshotHealthService } from '../providers/market-snapshot-health.service';
 import { ProviderConfigService } from '../providers/provider-config.service';
+import {
+  MarketCandleReconciliationService,
+  type ReconciliationMarket,
+} from '../assets/market-candle-reconciliation.service';
+import { resolveMarketSession } from '../orders/market-calendar.policy';
 
 @Injectable()
 export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
@@ -36,6 +41,8 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
     private readonly marketSnapshotHealthService?: MarketSnapshotHealthService,
     @Optional()
     private readonly providerConfigService?: ProviderConfigService,
+    @Optional()
+    private readonly marketCandleReconciliationService?: MarketCandleReconciliationService,
   ) {}
 
   onModuleInit() {
@@ -52,6 +59,21 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
         void this.runMarketCandleRetentionIfDue(startupAt, config).catch(
           (error: unknown) => {
             console.warn('Market candle retention startup check failed.', {
+              error: error instanceof Error ? error.message : 'Unknown error',
+            });
+          },
+        );
+      });
+    }
+    if (
+      config.marketCandleReconciliation.enabled &&
+      config.marketCandleReconciliation.startupCatchUpEnabled
+    ) {
+      const startupAt = new Date();
+      void Promise.resolve().then(() => {
+        void this.runStartupCandleReconciliation(startupAt, config).catch(
+          (error: unknown) => {
+            console.warn('Market candle reconciliation catch-up failed.', {
               error: error instanceof Error ? error.message : 'Unknown error',
             });
           },
@@ -155,7 +177,141 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
     const retention = await this.runMarketCandleRetentionIfDue(now, config);
     if (retention) results.push(retention);
 
+    for (const market of ['KRX', 'US', 'CRYPTO'] as const) {
+      const reconciliation = await this.runMarketCandleReconciliationIfDue(
+        now,
+        market,
+        config,
+      );
+      if (reconciliation) results.push(reconciliation);
+    }
+
     return results;
+  }
+
+  async runStartupCandleReconciliation(
+    now: Date,
+    config: OpsSchedulerConfig = getOpsSchedulerConfig(),
+  ): Promise<OpsJobRunnerResponse[]> {
+    if (
+      !config.marketCandleReconciliation.enabled ||
+      !config.marketCandleReconciliation.startupCatchUpEnabled
+    ) {
+      return [];
+    }
+    const results: OpsJobRunnerResponse[] = [];
+    for (const market of ['KRX', 'US', 'CRYPTO'] as const) {
+      const result = await this.runMarketCandleReconciliationIfDue(
+        now,
+        market,
+        config,
+        true,
+      );
+      if (result) results.push(result);
+    }
+    return results;
+  }
+
+  async runMarketCandleReconciliationIfDue(
+    now: Date,
+    market: Exclude<ReconciliationMarket, 'ALL'>,
+    config: OpsSchedulerConfig = getOpsSchedulerConfig(),
+    startup = false,
+  ): Promise<OpsJobRunnerResponse | undefined> {
+    const reconciliation = config.marketCandleReconciliation;
+    const enabled =
+      market === 'KRX'
+        ? reconciliation.krx.enabled
+        : market === 'US'
+          ? reconciliation.us.enabled
+          : reconciliation.crypto.enabled;
+    if (!reconciliation.enabled || !enabled) return undefined;
+
+    const latest =
+      await this.runService.findLatestSucceededReconciliationRun(market);
+    if (startup) {
+      const lastAt = latest?.finishedAt ?? latest?.startedAt;
+      const withinCatchUpBound =
+        lastAt !== undefined &&
+        now.getTime() - lastAt.getTime() <=
+          reconciliation.maxCatchUpHours * 3_600_000;
+      const covered = withinCatchUpBound
+        ? await this.marketCandleReconciliationService?.hasRecentCanonicalCoverage(
+            market,
+            now,
+          )
+        : false;
+      if (withinCatchUpBound && covered === true) return undefined;
+    } else if (market === 'CRYPTO') {
+      const lastAt = latest?.finishedAt ?? latest?.startedAt;
+      if (
+        lastAt &&
+        now.getTime() - lastAt.getTime() <
+          reconciliation.crypto.intervalSeconds * 1_000
+      ) {
+        return undefined;
+      }
+    } else {
+      const timezone = market === 'KRX' ? 'Asia/Seoul' : 'America/New_York';
+      const local = getSchedulerLocalDateTime(now, timezone);
+      const localDate = `${local.year}${String(local.month).padStart(2, '0')}${String(local.day).padStart(2, '0')}`;
+      if (!resolveMarketSession(market, localDate)) return undefined;
+      const schedule =
+        market === 'KRX' ? reconciliation.krx : reconciliation.us;
+      const [hour, minute] = schedule.time.split(':').map(Number);
+      const dueMinute = hour * 60 + minute + schedule.graceMinutes;
+      if (local.hour * 60 + local.minute < dueMinute) return undefined;
+      if (
+        latest &&
+        getSchedulerBusinessDate(latest.startedAt, timezone) ===
+          getSchedulerBusinessDate(now, timezone)
+      ) {
+        return undefined;
+      }
+    }
+
+    const timezone =
+      market === 'KRX'
+        ? 'Asia/Seoul'
+        : market === 'US'
+          ? 'America/New_York'
+          : 'UTC';
+    const businessDate = getSchedulerBusinessDate(now, timezone);
+    const targets = this.reconciliationTargets(market, now, latest?.finishedAt);
+    return this.runner.runMarketCandleReconciliationJob({
+      trigger: OpsJobTrigger.scheduler,
+      requestedBy: 'scheduler',
+      dryRun: false,
+      lockTtlSeconds: config.lockTtlSeconds,
+      maxAttempts: config.maxAttempts,
+      now: now.toISOString(),
+      market,
+      targets,
+      maxAssets: reconciliation.maxAssets,
+      maxPages: reconciliation.maxPages,
+      continueOnError: true,
+      metadataJson: { reconciliationMarket: market, businessDate, startup },
+    });
+  }
+
+  private reconciliationTargets(
+    market: Exclude<ReconciliationMarket, 'ALL'>,
+    now: Date,
+    previousFinishedAt?: Date | null,
+  ): string[] {
+    if (market !== 'CRYPTO') {
+      const timezone = market === 'KRX' ? 'Asia/Seoul' : 'America/New_York';
+      const weekday = localWeekday(now, timezone);
+      return weekday === 5 ? ['5m', '1d', '1w'] : ['5m', '1d'];
+    }
+    const targets = ['5m'];
+    if (!previousFinishedAt || utcDate(previousFinishedAt) !== utcDate(now)) {
+      targets.push('1d');
+    }
+    if (!previousFinishedAt || utcWeek(previousFinishedAt) !== utcWeek(now)) {
+      targets.push('1w');
+    }
+    return targets;
   }
 
   async runMarketCandleRetentionIfDue(
@@ -379,4 +535,29 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
 
 function isFiveMinuteBucketStart(now: Date): boolean {
   return now.getUTCMinutes() % 5 === 0;
+}
+
+function localWeekday(now: Date, timezone: string): number {
+  const label = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    weekday: 'short',
+  }).format(now);
+  return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(label);
+}
+
+function utcDate(value: Date): string {
+  return value.toISOString().slice(0, 10);
+}
+
+function utcWeek(value: Date): string {
+  const date = new Date(
+    Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()),
+  );
+  const day = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(
+    ((date.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7,
+  );
+  return `${date.getUTCFullYear()}-${String(week).padStart(2, '0')}`;
 }

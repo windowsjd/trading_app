@@ -5,6 +5,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { WebSocket as WsWebSocket } from 'ws';
+import { readLiveCandleConfig } from '../../assets/live-candle.config';
 import {
   ProviderConfigService,
   type ProviderConfig,
@@ -142,6 +143,14 @@ export class BinanceWebSocketStreamingService
 
   start(): void {
     if (this.status.running || this.connectPromise) {
+      return;
+    }
+
+    const liveCandles = readLiveCandleConfig();
+    if (liveCandles.enabled && liveCandles.binanceEnabled) {
+      this.status.enabled = false;
+      this.status.running = false;
+      this.status.state = 'disabled';
       return;
     }
 

@@ -11,7 +11,13 @@ jest.mock('./generated/prisma/client', () => ({
     season_ranking_generation: 'season_ranking_generation',
     season_settlement: 'season_settlement',
     reward_marker: 'reward_marker',
+    market_candle_retention: 'market_candle_retention',
+    market_candle_sync: 'market_candle_sync',
+    market_candle_reconciliation: 'market_candle_reconciliation',
   },
+}));
+jest.mock('./realtime/live-candle-pubsub.service', () => ({
+  LiveCandlePubSubService: class LiveCandlePubSubService {},
 }));
 
 import { Test, TestingModule } from '@nestjs/testing';

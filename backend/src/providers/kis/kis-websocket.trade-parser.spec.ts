@@ -60,6 +60,9 @@ describe('KIS WebSocket trade parser', () => {
           time: '093015',
           price: '70123',
           businessDate: '20260527',
+          quantity: '7',
+          cumulativeVolume: '1234',
+          cumulativeAmount: '86500000',
         }),
       ]),
       receivedAt,
@@ -80,6 +83,11 @@ describe('KIS WebSocket trade parser', () => {
       symbol: '005930',
       price: '70123.00000000',
       sourceTimestamp: new Date('2026-05-27T00:30:15.000Z'),
+      exchangeTimestamp: new Date('2026-05-27T00:30:15.000Z'),
+      tradeQuantity: '7.00000000',
+      absoluteVolume: '1234.00000000',
+      absoluteAmount: '86500000.00000000',
+      sequence: '1234.00000000',
     });
   });
 
@@ -125,6 +133,11 @@ describe('KIS WebSocket trade parser', () => {
           koreanTime: '231500',
           last: '190.125',
           marketType: 'NAS',
+          exchangeDate: '20260527',
+          exchangeTime: '101500',
+          quantity: '2',
+          cumulativeVolume: '500',
+          cumulativeAmount: '95000',
         }),
       ]),
       receivedAt,
@@ -142,6 +155,10 @@ describe('KIS WebSocket trade parser', () => {
       marketCode: 'NAS',
       price: '190.12500000',
       sourceTimestamp: new Date('2026-05-27T14:15:00.000Z'),
+      exchangeTimestamp: new Date('2026-05-27T14:15:00.000Z'),
+      tradeQuantity: '2.00000000',
+      absoluteVolume: '500.00000000',
+      absoluteAmount: '95000.00000000',
     });
   });
 
@@ -213,11 +230,17 @@ function domesticRecord(input: {
   time: string;
   price: string;
   businessDate: string;
+  quantity?: string;
+  cumulativeVolume?: string;
+  cumulativeAmount?: string;
 }): string[] {
   const fields = Array.from({ length: 46 }, () => '');
   fields[0] = input.symbol;
   fields[1] = input.time;
   fields[2] = input.price;
+  fields[12] = input.quantity ?? '';
+  fields[13] = input.cumulativeVolume ?? '';
+  fields[14] = input.cumulativeAmount ?? '';
   fields[33] = input.businessDate;
   fields[35] = 'N';
   return fields;
@@ -237,14 +260,24 @@ function overseasRecord(input: {
   koreanTime: string;
   last: string;
   marketType: string;
+  exchangeDate?: string;
+  exchangeTime?: string;
+  quantity?: string;
+  cumulativeVolume?: string;
+  cumulativeAmount?: string;
 }): string[] {
   const fields = Array.from({ length: 26 }, () => '');
   fields[0] = input.rsym;
   fields[1] = input.symbol;
   fields[2] = input.zdiv;
+  fields[4] = input.exchangeDate ?? '';
+  fields[5] = input.exchangeTime ?? '';
   fields[6] = input.koreanDate;
   fields[7] = input.koreanTime;
   fields[11] = input.last;
+  fields[19] = input.quantity ?? '';
+  fields[20] = input.cumulativeVolume ?? '';
+  fields[21] = input.cumulativeAmount ?? '';
   fields[25] = input.marketType;
   return fields;
 }

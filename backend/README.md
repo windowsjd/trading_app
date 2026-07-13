@@ -41,7 +41,7 @@ This service owns backend APIs, database access, financial calculations, and ser
 These are intentionally outside the current implementation and should not be added without a separate gate:
 
 - Provider-backed reward workflows.
-- Crypto candle DB persistence, frontend chart integration, Binance Futures APIs, and Binance authenticated order/account/user-data APIs.
+- Binance Futures APIs and Binance authenticated order/account/user-data APIs.
 - OANDA and Twelve Data are historical provider candidates only, not the current MVP core provider stack.
 - Batch run HTTP APIs, scheduler HTTP APIs, external reward fulfillment APIs, and reward policy/catalog APIs.
 - Production cron job implementation beyond the disabled-by-default foundation, scheduler-driven provider ingestion, scheduler-driven reward automation, or external reward fulfillment jobs.
@@ -237,7 +237,7 @@ The endpoint success/error JSON contract is unchanged. Persisted provider proven
 
 Serving configuration: `CANDLE_SERVING_CURRENT_DB_FRESHNESS_MS` (default `60000`), `CANDLE_SERVING_ON_DEMAND_REFRESH_ENABLED` (default `true`), `CANDLE_SERVING_ON_DEMAND_REFRESH_MAX_DURATION_MS` (default `15000`), `CANDLE_SERVING_ON_DEMAND_REFRESH_MAX_PAGES` (default `10`), `CANDLE_SERVING_ON_DEMAND_REFRESH_MAX_ROWS` (default `5000`), `CANDLE_SERVING_STALE_WAITER_MAX_WAIT_MS` (default `500`), and `CANDLE_SERVING_ON_DEMAND_REPAIR_MAX_RANGE_MS` (default two days). These per-request budgets are clamped by the sync orchestrator's global page/row/duration budgets; cancellation and the asset/feed lock still apply.
 
-WebSocket current/higher candle updates and automatic market-close reconciliation are not implemented in this unit. They remain unit 3-3 and 3-4 work.
+WebSocket current/higher candle updates and disabled-by-default canonical reconciliation are implemented by the unit-3 live pipeline. See [`docs/candle-live-operations.md`](docs/candle-live-operations.md).
 
 Important operational behavior:
 - KIS REST rate limiting is active on the actual `KisAuthClient` OAuth and `KisQuoteClient` quote request paths. It does not affect Binance REST or either provider's WebSocket traffic. Redis atomically reserves account-wide slots using Redis server time; if Redis is unavailable, each process continues with a conservative FIFO in-process limiter instead of calling KIS without limits. Multi-instance fallback cannot enforce a shared account limit and emits one outage warning until recovery.
@@ -285,7 +285,7 @@ CANDLE_PIPELINE_FOUNDATION_SMOKE=1 pnpm test -- candle-pipeline-foundation.integ
 
 KIS deployments with both `KIS_MARKET_DATA_ENABLED=true` and rate limiting enabled must explicitly set `KIS_API_ENVIRONMENT=real|virtual`; missing or unknown values fail startup. Redis outages retain a per-process conservative limiter, including the relative delay carried across Redis/local transitions.
 
-The cache and single-flight coordinator are connected to the candles endpoint only in `CANDLE_SERVING_MODE=database`. Scheduled candle ingestion remains unimplemented; checkpointed backfill orchestration and 5m-to-higher-interval aggregation are described below.
+The cache and single-flight coordinator are connected to the candles endpoint only in `CANDLE_SERVING_MODE=database`. Disabled-by-default post-session/rolling reconciliation reuses the checkpointed repair orchestrator; live delivery and operations are described in [`docs/candle-live-operations.md`](docs/candle-live-operations.md).
 
 ### KIS canonical 5-minute candle ingestion foundation
 
@@ -297,7 +297,7 @@ The storage-only ingestion path is separate from the existing candles HTTP endpo
 - `MarketCandleIngestionService` exposes `fetchDomesticFiveMinuteCandles`, `fetchUsFiveMinuteCandles`, `ingestDomesticFiveMinuteCandles`, and `ingestUsFiveMinuteCandles`. Ingestion writes through `MarketCandlesRepository.upsertMany`; conflict updates cannot regress `isClosed=true` to false.
 - Every physical request uses the existing `KisAuthClient`/`KisQuoteClient` coordinator and shared KIS REST limiter. No adapter creates a client or limiter instance.
 
-Only interval `5m` is persisted by this ingestion path. Domestic/US `1d` and `1w`, checkpointed initial/incremental/repair orchestration, and 5m-derived `15m`/`30m`/`1h`/`4h` aggregation are covered below. It is not scheduled; database-mode HTTP serving consumes its durable rows, while WebSocket updates remain unimplemented.
+Only interval `5m` is persisted by this ingestion path. Domestic/US `1d` and `1w`, checkpointed initial/incremental/repair orchestration, and 5m-derived `15m`/`30m`/`1h`/`4h` aggregation are covered below. Database-mode HTTP serving consumes durable rows; the live pipeline overlays Redis current candles and publishes 5m-derived current snapshots without persisting the higher intervals.
 
 Opt-in live schema smokes require real KIS credentials, explicit `KIS_API_ENVIRONMENT`, and the matching flag. They fetch at most one page through the production rate limiter, do not write the database, and never print credentials or raw payloads:
 

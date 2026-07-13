@@ -253,7 +253,8 @@ export const OpsJobName = {
   season_settlement: 'season_settlement',
   reward_marker: 'reward_marker',
   market_candle_retention: 'market_candle_retention',
-  market_candle_sync: 'market_candle_sync'
+  market_candle_sync: 'market_candle_sync',
+  market_candle_reconciliation: 'market_candle_reconciliation'
 } as const
 
 export type OpsJobName = (typeof OpsJobName)[keyof typeof OpsJobName]

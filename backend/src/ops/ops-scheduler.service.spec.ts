@@ -11,6 +11,7 @@ jest.mock('../generated/prisma/client', () => ({
     reward_marker: 'reward_marker',
     market_candle_retention: 'market_candle_retention',
     market_candle_sync: 'market_candle_sync',
+    market_candle_reconciliation: 'market_candle_reconciliation',
   },
   OpsJobRunStatus: {
     running: 'running',
@@ -48,6 +49,9 @@ jest.mock('../assets/market-candle-retention.service', () => ({
 jest.mock('../assets/market-candle-sync.service', () => ({
   MarketCandleSyncService: class MarketCandleSyncService {},
 }));
+jest.mock('../assets/market-candle-reconciliation.service', () => ({
+  MarketCandleReconciliationService: class MarketCandleReconciliationService {},
+}));
 
 import { OpsJobName, OpsJobRunStatus } from '../generated/prisma/client';
 import { getOpsSchedulerConfig } from './ops-config';
@@ -81,10 +85,14 @@ describe('OpsSchedulerService', () => {
       runMarketCandleRetentionJob: jest
         .fn()
         .mockResolvedValue({ success: true }),
+      runMarketCandleReconciliationJob: jest
+        .fn()
+        .mockResolvedValue({ success: true }),
     };
     const runService = {
       findLatestRunForJob: jest.fn().mockResolvedValue(null),
       findLatestSucceededRunForJob: jest.fn().mockResolvedValue(null),
+      findLatestSucceededReconciliationRun: jest.fn().mockResolvedValue(null),
     };
     const providerConfigService = {
       getConfig: jest.fn().mockReturnValue({
@@ -93,16 +101,21 @@ describe('OpsSchedulerService', () => {
         },
       }),
     };
+    const reconciliationService = {
+      hasRecentCanonicalCoverage: jest.fn().mockResolvedValue(false),
+    };
 
     return {
       runner,
       runService,
       providerConfigService,
+      reconciliationService,
       service: new OpsSchedulerService(
         runner as never,
         runService as never,
         undefined,
         providerConfigService as never,
+        reconciliationService as never,
       ),
     };
   };
@@ -371,5 +384,80 @@ describe('OpsSchedulerService', () => {
     expect(
       getOpsSchedulerConfig().jobs[OpsJobName.daily_portfolio_snapshot],
     ).toBe(true);
+  });
+
+  it('runs KRX reconciliation after the configured close grace and only once per successful date', async () => {
+    process.env.CANDLE_RECONCILIATION_KRX_ENABLED = 'true';
+    const { runner, runService, service } = createService();
+
+    await expect(
+      service.runEnabledJobs(new Date('2026-07-10T07:19:00.000Z')),
+    ).resolves.toEqual([]);
+    await service.runEnabledJobs(new Date('2026-07-10T07:20:00.000Z'));
+    expect(runner.runMarketCandleReconciliationJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        market: 'KRX',
+        targets: ['5m', '1d', '1w'],
+        continueOnError: true,
+        metadataJson: expect.objectContaining({
+          reconciliationMarket: 'KRX',
+          businessDate: '2026-07-10',
+        }),
+      }),
+    );
+
+    runService.findLatestSucceededReconciliationRun.mockResolvedValueOnce({
+      startedAt: new Date('2026-07-10T07:20:00.000Z'),
+      finishedAt: new Date('2026-07-10T07:21:00.000Z'),
+    });
+    await service.runEnabledJobs(new Date('2026-07-10T08:00:00.000Z'));
+    expect(runner.runMarketCandleReconciliationJob).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs crypto reconciliation on a bounded rolling interval', async () => {
+    process.env.CANDLE_RECONCILIATION_CRYPTO_ENABLED = 'true';
+    process.env.CANDLE_RECONCILIATION_CRYPTO_INTERVAL_SECONDS = '300';
+    const { runner, runService, service } = createService();
+    runService.findLatestSucceededReconciliationRun
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        startedAt: new Date('2026-07-13T00:00:00.000Z'),
+        finishedAt: new Date('2026-07-13T00:00:01.000Z'),
+      });
+
+    await service.runEnabledJobs(new Date('2026-07-13T00:00:00.000Z'));
+    await service.runEnabledJobs(new Date('2026-07-13T00:04:59.000Z'));
+    expect(runner.runMarketCandleReconciliationJob).toHaveBeenCalledTimes(1);
+    expect(runner.runMarketCandleReconciliationJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        market: 'CRYPTO',
+        targets: expect.arrayContaining(['5m', '1d']),
+      }),
+    );
+  });
+
+  it('skips startup catch-up only when both the last success and canonical coverage are fresh', async () => {
+    process.env.CANDLE_RECONCILIATION_CRYPTO_ENABLED = 'true';
+    process.env.CANDLE_RECONCILIATION_STARTUP_CATCH_UP_ENABLED = 'true';
+    const { runner, runService, reconciliationService, service } =
+      createService();
+    runService.findLatestSucceededReconciliationRun.mockResolvedValue({
+      startedAt: new Date('2026-07-13T00:00:00.000Z'),
+      finishedAt: new Date('2026-07-13T00:01:00.000Z'),
+    });
+    reconciliationService.hasRecentCanonicalCoverage.mockResolvedValue(true);
+
+    await expect(
+      service.runStartupCandleReconciliation(
+        new Date('2026-07-13T00:02:00.000Z'),
+      ),
+    ).resolves.toEqual([]);
+    expect(runner.runMarketCandleReconciliationJob).not.toHaveBeenCalled();
+
+    reconciliationService.hasRecentCanonicalCoverage.mockResolvedValue(false);
+    await service.runStartupCandleReconciliation(
+      new Date('2026-07-13T00:02:00.000Z'),
+    );
+    expect(runner.runMarketCandleReconciliationJob).toHaveBeenCalledTimes(1);
   });
 });
