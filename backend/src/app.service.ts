@@ -1,9 +1,16 @@
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import {
   LIVE_CANDLE_CONFIG,
+  validateLiveReconciliationDependencies,
   type LiveCandleConfig,
 } from './assets/live-candle.config';
 import { LiveCandleHealthService } from './assets/live-candle-health.service';
+import {
+  getMarketCalendarCoverage,
+  readMarketCalendarCoverageConfig,
+} from './orders/market-calendar/market-calendar.registry';
+import { resolveRegularSessionForEvent } from './orders/market-calendar.policy';
+import { AssetType } from './generated/prisma/client';
 import { getOpsSchedulerConfig } from './ops/ops-config';
 import { OpsJobRunService } from './ops/ops-job-run.service';
 import { PrismaService } from './prisma/prisma.service';
@@ -81,30 +88,96 @@ export class AppService {
     const pubSub =
       this.liveCandlePubSub?.getStatus() ??
       (liveEnabled ? 'unavailable' : 'disabled');
+
+    const reasons: string[] = [];
+
+    // Versioned market calendar coverage over the required year range.
+    // Missing years degrade readiness and tell operators which datasets to
+    // add; stock-market session decisions fail safe in the meantime.
+    const calendar = getMarketCalendarCoverage(
+      readMarketCalendarCoverageConfig(process.env, now),
+    );
+    if (!calendar.complete) reasons.push('MARKET_CALENDAR_COVERAGE_MISSING');
+
+    // Live ingestion without its reconciliation safety net (only reachable
+    // outside production or via the explicit escape hatch).
+    const liveReconciliationViolations =
+      liveEnabled && this.liveCandleConfig
+        ? validateLiveReconciliationDependencies({
+            live: this.liveCandleConfig,
+            reconciliation: {
+              krx: { enabled: scheduler.marketCandleReconciliation.krx.enabled },
+              us: { enabled: scheduler.marketCandleReconciliation.us.enabled },
+              crypto: {
+                enabled: scheduler.marketCandleReconciliation.crypto.enabled,
+              },
+            },
+            nodeEnv: undefined,
+          })
+        : [];
+    if (liveReconciliationViolations.length > 0) {
+      reasons.push('LIVE_RECONCILIATION_REQUIRED');
+    }
+
+    // Trade freshness is only meaningful while the market can trade: a quiet
+    // KIS socket outside the KRX regular session is healthy as long as the
+    // connection itself is alive (heartbeats). Crypto trades continuously.
+    const krxSessionOpen =
+      resolveRegularSessionForEvent(
+        { assetType: AssetType.domestic_stock, market: 'KRX' },
+        now,
+      ) !== null;
+    const staleThresholdMs = this.liveCandleConfig?.staleThresholdMs ?? 30_000;
+    const providerStale =
+      liveEnabled && liveSnapshot
+        ? Object.entries(liveSnapshot.providers).some(
+            ([name, provider]) =>
+              provider.owner &&
+              !provider.delayed &&
+              provider.eventLagMs !== null &&
+              provider.eventLagMs > staleThresholdMs &&
+              (name !== 'kis' || krxSessionOpen),
+          )
+        : false;
+    if (providerStale) reasons.push('LIVE_PROVIDER_STALE');
     const providerDegraded =
       liveEnabled && liveSnapshot
         ? Object.values(liveSnapshot.providers).some(
             (provider) =>
               provider.owner &&
               (provider.state === 'degraded' ||
-                provider.state === 'reconnecting' ||
-                provider.subscriptionsFailed > 0 ||
-                (!provider.delayed &&
-                  provider.eventLagMs !== null &&
-                  provider.eventLagMs >
-                    (this.liveCandleConfig?.staleThresholdMs ?? 30_000))),
+                provider.state === 'reconnecting'),
           )
         : false;
+    if (
+      liveEnabled &&
+      liveSnapshot &&
+      Object.values(liveSnapshot.providers).some(
+        (provider) =>
+          provider.owner && provider.lastErrorCode === 'SUBSCRIPTION_SHARD_CAP',
+      )
+    ) {
+      reasons.push('SUBSCRIPTION_SHARD_CAP');
+    }
+    if (liveEnabled && pubSub !== 'connected') {
+      reasons.push('LIVE_PUBSUB_UNAVAILABLE');
+    }
+    if (database === 'unavailable') reasons.push('CANDLE_DB_UNAVAILABLE');
+
     const reconciliation = await this.reconciliationReadiness(
       scheduler,
       now,
       database === 'ok',
     );
+    if (reconciliation.some((item) => item.state === 'stale')) {
+      reasons.push('RECONCILIATION_STALE');
+    }
+
     const degraded =
       (redisConfig.url !== undefined && redis !== 'ok') ||
-      (liveEnabled && pubSub !== 'connected') ||
       providerDegraded ||
-      reconciliation.some((item) => item.state === 'stale');
+      providerStale ||
+      reasons.length > 0;
     const status =
       database === 'unavailable'
         ? 'unavailable'
@@ -117,6 +190,7 @@ export class AppService {
       data: {
         app: 'ok',
         status,
+        reasons,
         database,
         redis,
         scheduler: {
@@ -124,6 +198,7 @@ export class AppService {
           timezone: scheduler.timezone,
           jobs: scheduler.jobs,
         },
+        marketCalendar: calendar,
         kisWebSocketStreaming:
           this.kisWebSocketStreamingService?.getStatus() ?? null,
         binanceWebSocketStreaming:
@@ -132,6 +207,7 @@ export class AppService {
           enabled: liveEnabled,
           pubSub,
           health: liveSnapshot,
+          reconciliationDependencyWarnings: liveReconciliationViolations,
         },
         reconciliation,
         currentTime: now.toISOString(),

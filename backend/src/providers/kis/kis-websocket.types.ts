@@ -17,6 +17,19 @@ export type KisWebSocketParsedAck = {
   receivedAt: Date;
 };
 
+/**
+ * Official KIS liveness control frame: the server sends a JSON frame with
+ * header.tr_id="PINGPONG" and expects the client to echo the same frame back
+ * (KIS Developers WebSocket protocol). Heartbeats prove connection liveness
+ * and must never be treated as trade-parser failures or trade freshness.
+ */
+export type KisWebSocketParsedHeartbeat = {
+  state: 'heartbeat';
+  trId: 'PINGPONG';
+  rawFrame: string;
+  receivedAt: Date;
+};
+
 export type KisWebSocketParsedSkipped = {
   state: 'skipped';
   reason: string;
@@ -45,6 +58,7 @@ export type KisWebSocketParsedTrades = {
 
 export type KisWebSocketParsedMessage =
   | KisWebSocketParsedAck
+  | KisWebSocketParsedHeartbeat
   | KisWebSocketParsedSkipped
   | KisWebSocketParsedFailed
   | KisWebSocketParsedTrades;

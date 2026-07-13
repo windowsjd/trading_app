@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Logger, Module } from '@nestjs/common';
 import { RedisModule } from '../redis/redis.module';
 import { RedisService } from '../redis/redis.service';
 import { RedisLockService } from '../redis/redis-lock.service';
@@ -28,7 +28,11 @@ import { CandleReadPlanBuilder } from './candle-read-plan.builder';
 import { CandleResponseBuilder } from './candle-response.builder';
 import { CandleDatabaseLoader } from './candle-database.loader';
 import { CandleServingService } from './candle-serving.service';
-import { LIVE_CANDLE_CONFIG, readLiveCandleConfig } from './live-candle.config';
+import {
+  LIVE_CANDLE_CONFIG,
+  readLiveCandleConfig,
+  validateLiveReconciliationDependencies,
+} from './live-candle.config';
 import { LiveCandleHealthService } from './live-candle-health.service';
 import { LiveCandleEventNormalizerService } from './live-candle-event-normalizer.service';
 import { LiveCandleStoreService } from './live-candle-store.service';
@@ -80,7 +84,20 @@ import { MarketCandleReconciliationService } from './market-candle-reconciliatio
     MarketCandleReconciliationService,
     {
       provide: LIVE_CANDLE_CONFIG,
-      useFactory: () => readLiveCandleConfig(),
+      useFactory: () => {
+        const live = readLiveCandleConfig();
+        // Refuses invalid live/reconciliation combinations in production;
+        // returns warnings elsewhere.
+        const warnings = validateLiveReconciliationDependencies({
+          live,
+          reconciliation: readMarketCandleReconciliationConfig(),
+          nodeEnv: process.env.NODE_ENV,
+        });
+        for (const warning of warnings) {
+          new Logger('LiveCandleConfig').warn(warning);
+        }
+        return live;
+      },
     },
     {
       provide: MARKET_CANDLE_RECONCILIATION_CONFIG,

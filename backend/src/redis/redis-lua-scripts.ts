@@ -239,6 +239,29 @@ redis.call('ZREM', KEYS[3], KEYS[2])
 return cjson.encode(state)
 `;
 
+// Finalizes a live candle state whose owner generation no longer holds the
+// provider lease (the owning process died or lost the lease). Safe because
+// writes to a state are gated on the lease matching the state's generation:
+// once the lease value differs (or is absent), no producer can mutate this
+// state anymore. Returns -1 while the original owner still holds the lease
+// (the normal owner-guarded finalize path must be used), 0 when the state is
+// gone or the revision moved, else the finalized state JSON.
+export const REDIS_TAKEOVER_FINALIZE_LIVE_CANDLE_SCRIPT = `
+local raw = redis.call('GET', KEYS[2])
+if not raw then return 0 end
+local state = cjson.decode(raw)
+local lease = redis.call('GET', KEYS[1])
+if lease == state.ownerGeneration then return -1 end
+if state.revision ~= tonumber(ARGV[1]) then return 0 end
+state.provisional = false
+state.finalized = true
+state.complete = true
+state.revision = state.revision + 1
+redis.call('SET', KEYS[2], cjson.encode(state), 'EX', ARGV[2])
+redis.call('ZREM', KEYS[3], KEYS[2])
+return cjson.encode(state)
+`;
+
 export const REDIS_DISCARD_RECONCILED_LIVE_CANDLE_SCRIPT = `
 local stateKey = redis.call('GET', KEYS[1])
 if not stateKey then return 0 end

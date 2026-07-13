@@ -212,6 +212,15 @@ function parseJsonAck(
     };
     const trId =
       typeof raw.header?.tr_id === 'string' ? raw.header.tr_id : null;
+    // Official KIS liveness frame; the caller must echo it back verbatim.
+    if (trId === 'PINGPONG') {
+      return {
+        state: 'heartbeat',
+        trId: 'PINGPONG',
+        rawFrame: frame,
+        receivedAt,
+      };
+    }
     const message = typeof raw.body?.msg1 === 'string' ? raw.body.msg1 : null;
     const code =
       typeof raw.body?.msg_cd === 'string'

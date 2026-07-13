@@ -110,3 +110,223 @@ BINANCE_LIVE_CANDLE_SMOKE=1 pnpm test -- binance-live-candle.integration.spec.ts
 ```
 
 The synthetic gateway/fanout tests create many in-memory clients without external providers. They verify one shared provider path, room filtering, bounded latest-only queues, sequence dedupe, and disconnect cleanup; CI does not require 10,000 real sockets.
+
+## Sync coverage completeness (stabilization)
+
+`MarketCandleSyncState.status = completed` records only that a run terminated
+normally. Whether the provider cursor actually confirmed the whole target
+range is persisted separately:
+
+- `coverageComplete` — true only when the provider cursor swept the entire
+  half-open `[targetFrom, targetTo)` range (`target_reached`) or the provider
+  authoritatively confirmed emptiness (`confirmed_empty`, currently only the
+  endTime-bounded Binance klines API qualifies).
+- `coveredFrom` / `coveredTo` — the half-open instant range actually
+  confirmed so far; it grows monotonically while a run pages and survives
+  resume.
+- `completionReason` — `target_reached`, `confirmed_empty`,
+  `empty_page_before_target`, or `provider_exhausted_before_target`.
+
+Serving (`findCompletedCovering`) accepts a checkpoint as coverage evidence
+only when `status=completed`, `coverageComplete=true`, and
+`[coveredFrom, coveredTo)` spans the requested range clamped at the request
+clock. A KIS run that stopped at the provider's minute-retention edge stays
+`completed` + `coverageComplete=false` and is repaired on demand or served
+provider-direct; it is never mistaken for confirmed-empty data.
+
+**Legacy checkpoints:** rows completed before the
+`20260713200000_add_market_candle_sync_coverage` migration keep
+`coverageComplete=false` and are no longer used as serving coverage. Re-run
+the initial/incremental sync (or an explicit repair) per asset/feed to
+restore database serving for those ranges; until then requests fall back to
+the provider-direct path. Do not backfill coverage from candle min/max.
+
+## Stale Redis fallback on database outages
+
+The serving order is: fresh Redis → return; stale Redis present → try the
+database, and on an operational failure return the stale response; no stale →
+propagate the original error. The initial `database.load` is inside the
+fallback (not only the refresh path). Only operational failures qualify —
+connection refused/reset, timeouts, pool exhaustion, transient Prisma driver
+errors (`P1xxx`, `P2024`, `P2028`, `P2034`), Redis single-flight wait
+timeouts, and operational provider-refresh failures (see
+`src/assets/candle-operational-error.ts`). Validation, configuration, schema
+invariant, and programmer errors always propagate. Each fallback logs
+`{"event":"candle_delivery","state":"stale_cache_fallback","reason":...}`.
+
+## Market calendar (versioned, audited)
+
+`src/orders/market-calendar/` holds per-market per-year datasets with
+`sourceName`, `sourceReference`, `verifiedAt`, and `version` metadata:
+
+- `US 2026/2027`: NYSE official "Holidays & Trading Hours" (Nasdaq equities
+  follow the same schedule). Includes 13:00 ET early closes (day after
+  Thanksgiving; Christmas Eve 2026) and observed holidays.
+- `KRX 2026`: the KRX year-end market-operation notice plus the 2026-05-20
+  KRX closure notice (June 3 local elections; July 17 Constitution Day,
+  re-designated a statutory holiday effective 2026-05-11). Includes the
+  Jan 2 delayed 10:00 open and the CSAT-day (2026-11-19) 10:00–16:30 session.
+- `KRX 2027`: **provisional** (`version: 2027.1-provisional`), derived from
+  the announced 2027 statutory holiday schedule and standing KRX rules. It
+  MUST be re-verified against the official KRX notice (published ~Dec 2026);
+  bump the version and drop the suffix then.
+
+Operational policy: a date in a year without a dataset is never assumed to be
+a regular trading day. Stock order/market-session decisions fail safe
+(treated as not tradable / no session), crypto is unaffected, and readiness
+reports `MARKET_CALENDAR_COVERAGE_MISSING` with the exact missing years.
+`MARKET_CALENDAR_REQUIRED_FROM_YEAR` / `MARKET_CALENDAR_REQUIRED_THROUGH_YEAR`
+override the default requirement (current year through next year). To add a
+year: create `market-calendar/data/<market>-<year>.ts` from the primary
+source, register it in `market-calendar.registry.ts`, and add tests.
+
+## Old-generation live bucket recovery
+
+When a process dies or loses its provider lease, its live states are no
+longer writable (every Lua write re-checks the lease token) and are recovered
+by the finalizer owner:
+
+- **Binance provider-final states**: after close+grace, if the provider lease
+  is absent or held by a different generation, the finalizer idempotently
+  commits the canonical row, invalidates the cache, finalizes the state via
+  the takeover Lua script (which re-checks lease≠generation), publishes the
+  final snapshot, and removes the finalize-index entry.
+- **KIS delta states** (no provider-final evidence): never closed directly.
+  They move to the bounded `candles:live:v1:reconcile-pending` sorted set and
+  are repaired by a bounded REST sync (max `CANDLE_LIVE_RECOVERY_MAX_BATCH`
+  per tick, retry backoff `CANDLE_LIVE_RECOVERY_RETRY_MS`); success publishes
+  the canonical row and cleans the live pointer, failure re-schedules and
+  shows up in the `reconcilePendingDue` gauge and
+  `recoveryRepairSuccess/Failure` counters.
+- Startup recovery runs immediately on boot from the persisted bounded
+  indexes (never a Redis SCAN) under the finalizer lease.
+
+**Configuration dependency:** live ingestion requires its reconciliation
+safety net. In production the app refuses to start with
+`CANDLE_LIVE_KIS_ENABLED` without `CANDLE_RECONCILIATION_KRX_ENABLED`,
+`CANDLE_LIVE_KIS_US_DELAYED_ENABLED` without `CANDLE_RECONCILIATION_US_ENABLED`,
+or `CANDLE_LIVE_BINANCE_ENABLED` without `CANDLE_RECONCILIATION_CRYPTO_ENABLED`
+(escape hatch: `LIVE_CANDLE_ALLOW_WITHOUT_RECONCILIATION=true`, never for
+normal operation). Elsewhere it logs a warning and readiness reports
+`LIVE_RECONCILIATION_REQUIRED`.
+
+## KIS connection liveness vs trade freshness
+
+Connection liveness and market-data freshness are separate signals:
+
+- `lastFrameAt` — any WebSocket frame (trade, ack, PINGPONG, WS ping). The
+  reconnect watchdog closes the socket only when NO frame of any kind arrives
+  within `CANDLE_LIVE_STALE_THRESHOLD_MS`; a quiet market with heartbeats
+  flowing never triggers a reconnect.
+- `lastHeartbeatAt` / `lastControlFrameAt` — official KIS `PINGPONG` frames
+  (parsed as a typed control message and echoed back verbatim per the KIS
+  WebSocket protocol), subscription acks, and WS pings.
+- `lastEventAt` — the last successfully processed trade/kline event. Trade
+  freshness feeds readiness (`LIVE_PROVIDER_STALE`) only while the market can
+  actually trade: the KIS lag check applies only during the KRX regular
+  session, and the delayed US feed is excluded from real-time lag checks.
+
+Every reconnect logs
+`{"event":"live_candle_stream_reconnect","provider":...,"reason":...}` with
+frame/heartbeat ages.
+
+## Shared frontend WebSocket
+
+One app session opens ONE authenticated `/api/v1/ws` socket.
+`frontend/src/services/ws/realtimeSocketManager.ts` owns connect/reconnect
+backoff, token loading, reference-counted `asset_ticker`/`asset_candle`
+subscriptions, restoration after reconnects, and message routing;
+`useAssetTicker`/`useAssetCandle` only register subscriptions and release
+them on unmount (the socket closes when the last subscription is released).
+Auth failures (1008/UNAUTHORIZED) stop reconnection; candle subscriptions get
+a `restored` event after every reconnect which triggers the HTTP baseline
+refetch, and `resync_required` handling is unchanged.
+
+## Release fixture smoke
+
+Real PostgreSQL + Redis, fixture providers only, isolated namespace assets,
+full cleanup, structured JSON summary + artifact:
+
+```bash
+cd backend
+CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm run smoke:candle-fixture
+# or through Jest:
+CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm test -- candle-release-fixture.integration.spec.ts
+```
+
+Pass criteria: every scenario `passed`, `"result": "passed"`, exit code 0,
+zero incomplete closed candles, zero duplicate canonical rows, zero leftover
+fixture rows/keys. Artifacts: `backend/artifacts/candle-smoke/fixture-<ts>.json`.
+The fixture smoke must pass before any real-provider smoke is attempted.
+
+CI note: this repository has no CI pipeline today. If one is added, run the
+fixture smoke with a PostgreSQL service, a Redis service, and
+`DATABASE_URL`/`REDIS_URL` pointing at them (`prisma migrate deploy` first;
+the wrapper spec runs it automatically); no provider credentials are needed —
+provider sockets are in-process fixtures. Do NOT make the long real-provider
+smokes a required CI gate; keep them as this manual/opt-in runbook.
+
+## Real-provider long smokes
+
+`scripts/candle-live-smoke.ts` is a standalone harness (not Jest-bound):
+
+```bash
+cd backend
+set -a; . ./.env; . ./.env.local; set +a
+export PROVIDER_INGESTION_ENABLED=true CANDLE_LIVE_LONG_SMOKE=1
+
+# Binance Spot, ≥90 minutes, REST verification + forced reconnect + lease takeover
+BINANCE_LIVE_CANDLE_SMOKE=1 pnpm run smoke:candle-live -- \
+  --provider binance --durationMinutes 92 --symbols BTCUSDT,ETHUSDT \
+  --verifyRest --injectReconnect --output artifacts/candle-smoke
+
+# KIS domestic, ≥60 minutes, run DURING the KRX regular session (09:00–15:30 KST)
+KIS_LIVE_CANDLE_SMOKE=1 pnpm run smoke:candle-live -- \
+  --provider kis-krx --durationMinutes 60 --symbols 005930,247540 \
+  --verifyRest --injectReconnect --output artifacts/candle-smoke
+
+# KIS US delayed, ≥60 minutes, only with entitlement + regular US session
+CANDLE_LIVE_KIS_US_DELAYED_ENABLED=true KIS_LIVE_CANDLE_SMOKE=1 \
+  pnpm run smoke:candle-live -- --provider kis-us --durationMinutes 60 \
+  --symbols AAPL --verifyRest --output artifacts/candle-smoke
+```
+
+Pass criteria (per artifact JSON): `subscriptionSucceeded > 0`,
+`eventsAccepted > 0`, `duplicateCanonicalRows = 0`,
+`incompleteClosedRows = 0`, and with `--verifyRest`
+`driftAfterReconciliation = 0`. `--injectReconnect` forces one socket close at
+half-time and one owner-lease takeover at two-thirds; the run must show the
+subscription restored and old-generation buckets recovered. A provider smoke
+that was not actually executed (missing entitlement, market closed, missing
+credentials) must be recorded as NOT RUN — never as passed. Do not inject
+Redis/PostgreSQL restarts against shared infrastructure.
+
+Artifacts: `backend/artifacts/candle-smoke/{binance,kis-krx,kis-us-delayed}-<ts>.json`
+(counters only; no credentials or raw provider frames).
+
+## Known limitation: HTTP v1 `amount` contract
+
+HTTP v1 serializes a missing quote amount as the string `"0.00000000"`, which
+loses the distinction between "zero traded value" and "amount unavailable"
+(KIS US delayed buckets legitimately have `amount = null`). This contract is
+deliberately NOT changed in this stabilization. A future v2 (or response
+metadata) should consider `amountAvailable: boolean` or `amount: string | null`.
+
+## Pre-release operational checklist
+
+1. `pnpm exec prisma migrate status` — all migrations applied, including
+   `20260713200000_add_market_candle_sync_coverage`.
+2. Re-seed sync coverage: run initial/incremental sync per active asset so
+   audited coverage checkpoints exist (legacy checkpoints no longer serve).
+3. `GET /readiness` shows `ready`; `reasons` is empty; market calendar
+   coverage spans the required years (no `MARKET_CALENDAR_COVERAGE_MISSING`);
+   the KRX 2027 dataset has been re-verified once KRX publishes its notice.
+4. Live gates and reconciliation gates enabled together (startup enforces
+   this in production).
+5. Fixture smoke passed at the release commit.
+6. Binance ≥90-minute smoke passed; KIS KRX ≥60-minute in-session smoke
+   passed; KIS US delayed smoke passed or explicitly recorded as NOT RUN with
+   the blocking reason.
+7. Lease TTL > renew interval; reconnect min ≤ max (config validation
+   enforces both).
+8. No credential/raw-frame output in logs (spot-check structured logs).

@@ -5,6 +5,7 @@ import {
 } from '../providers/kis/candles/kis-candle-time';
 import {
   findMarketSchedule,
+  hasMarketCalendarForDate,
   type MarketHoliday,
 } from './market-holidays.config';
 
@@ -70,6 +71,15 @@ export function resolveMarketSession(
   if (weekday === 'Sat' || weekday === 'Sun') return null;
 
   const dashedDate = `${localDate.slice(0, 4)}-${localDate.slice(4, 6)}-${localDate.slice(6, 8)}`;
+  // Fail-safe: a date in a year without an audited calendar dataset is never
+  // assumed to be a regular trading day. Readiness surfaces the missing year
+  // (MARKET_CALENDAR_COVERAGE_MISSING) so operators add the dataset.
+  if (
+    scheduleLookup === findMarketSchedule &&
+    !hasMarketCalendarForDate(market, dashedDate)
+  ) {
+    return null;
+  }
   const override = scheduleLookup(market, dashedDate);
   if (override?.isFullDayClosed) return null;
   const openText = parseOverrideTime(override?.openTimeOverride) ?? policy.open;

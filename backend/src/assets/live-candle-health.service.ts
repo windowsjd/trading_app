@@ -12,8 +12,14 @@ export type LiveCandleProviderHealth = {
   owner: boolean;
   delayed: boolean;
   connectedAt: string | null;
-  lastEventAt: string | null;
+  // Connection liveness: any WebSocket frame at all.
+  lastFrameAt: string | null;
+  // Control-frame liveness: provider heartbeats (KIS PINGPONG, WS ping) and
+  // subscription acks. Distinct from market-data freshness.
   lastHeartbeatAt: string | null;
+  lastControlFrameAt: string | null;
+  // Market-data freshness: last successfully processed trade/kline event.
+  lastEventAt: string | null;
   reconnectCount: number;
   subscriptionsRequested: number;
   subscriptionsActive: number;
@@ -32,6 +38,8 @@ type LiveCounters = {
   incompleteBuckets: number;
   redisLuaFailure: number;
   pubSubPublishFailure: number;
+  recoveryRepairSuccess: number;
+  recoveryRepairFailure: number;
 };
 
 @Injectable()
@@ -46,9 +54,12 @@ export class LiveCandleHealthService {
     incompleteBuckets: 0,
     redisLuaFailure: 0,
     pubSubPublishFailure: 0,
+    recoveryRepairSuccess: 0,
+    recoveryRepairFailure: 0,
   };
   private readonly providers = new Map<string, LiveCandleProviderHealth>();
   private activeBuckets = 0;
+  private reconcilePendingDue = 0;
   private lastFinalizeLatencyMs: number | null = null;
 
   increment(counter: keyof LiveCounters, value = 1): void {
@@ -57,6 +68,10 @@ export class LiveCandleHealthService {
 
   setActiveBuckets(value: number): void {
     this.activeBuckets = Math.max(0, value);
+  }
+
+  setReconcilePendingDue(value: number): void {
+    this.reconcilePendingDue = Math.max(0, value);
   }
 
   setFinalizeLatencyMs(value: number): void {
@@ -81,6 +96,7 @@ export class LiveCandleHealthService {
       liveCandle: {
         ...this.counters,
         activeBuckets: this.activeBuckets,
+        reconcilePendingDue: this.reconcilePendingDue,
         lastFinalizeLatencyMs: this.lastFinalizeLatencyMs,
       },
     };
@@ -93,8 +109,10 @@ function defaultProviderHealth(delayed: boolean): LiveCandleProviderHealth {
     owner: false,
     delayed,
     connectedAt: null,
-    lastEventAt: null,
+    lastFrameAt: null,
     lastHeartbeatAt: null,
+    lastControlFrameAt: null,
+    lastEventAt: null,
     reconnectCount: 0,
     subscriptionsRequested: 0,
     subscriptionsActive: 0,

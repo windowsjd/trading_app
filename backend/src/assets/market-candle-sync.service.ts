@@ -47,6 +47,7 @@ import {
   type MarketCandleFeed,
   type MarketCandleFeedPage,
   type MarketCandleFeedResult,
+  type MarketCandleSyncCompletionReason,
   type MarketCandleSyncStopReason,
   type MarketCandleSyncSummary,
 } from './market-candle-sync.types';
@@ -480,6 +481,10 @@ export class MarketCandleSyncService {
         oldestOpenTime: null,
         latestOpenTime: null,
         complete: true,
+        coverageComplete: true,
+        completionReason: 'target_reached',
+        coveredFrom: range.from,
+        coveredTo: range.to,
         stopReason: 'target_reached',
         status: MarketCandleSyncStatus.completed,
         syncStateId: null,
@@ -503,6 +508,10 @@ export class MarketCandleSyncService {
         oldestOpenTime: null,
         latestOpenTime: null,
         complete: false,
+        coverageComplete: false,
+        completionReason: null,
+        coveredFrom: null,
+        coveredTo: null,
         stopReason: 'dry_run',
         status: MarketCandleSyncStatus.pending,
         syncStateId: null,
@@ -662,6 +671,13 @@ export class MarketCandleSyncService {
     let complete = false;
     let errorCode: string | null = null;
     let errorMessage: string | null = null;
+    // Provider-confirmed coverage accumulated across pages (and, on resume,
+    // across runs — seeded from the checkpoint row). Pages sweep contiguously
+    // from one end of the target range, so a min/max merge stays exact.
+    let coveredFrom: Date | null = state.coveredFrom ?? null;
+    let coveredTo: Date | null = state.coveredTo ?? null;
+    let coverageComplete = false;
+    let completionReason: MarketCandleSyncCompletionReason | null = null;
 
     while (true) {
       if (options.signal?.aborted) {
@@ -770,6 +786,21 @@ export class MarketCandleSyncService {
         latestOpenTime = later(latestOpenTime, last);
       }
 
+      // Merge the page's provider-confirmed subrange into the run coverage.
+      // Only ranges the provider positively swept are merged; abnormal pages
+      // claim nothing.
+      if (page.coveredFrom !== null && page.coveredTo !== null) {
+        coveredFrom =
+          coveredFrom === null ||
+          page.coveredFrom.getTime() < coveredFrom.getTime()
+            ? page.coveredFrom
+            : coveredFrom;
+        coveredTo =
+          coveredTo === null || page.coveredTo.getTime() > coveredTo.getTime()
+            ? page.coveredTo
+            : coveredTo;
+      }
+
       // On an abnormal terminal page (canceled/timeout/malformed) the cursor
       // is preserved so a resume re-fetches from the same position.
       const recorded = await this.stateRepository.recordPageSuccess(state.id, {
@@ -781,6 +812,8 @@ export class MarketCandleSyncService {
         rowsDuplicated: page.duplicateRows,
         rowsWritten: writtenRows,
         lastSuccessfulPageAt: new Date(),
+        coveredFrom,
+        coveredTo,
       });
       if (!recorded) {
         stopReason = 'lock_lost';
@@ -812,8 +845,35 @@ export class MarketCandleSyncService {
           });
         } else if (SWEEP_TERMINAL_REASONS.has(stopReason)) {
           status = MarketCandleSyncStatus.completed;
-          complete = page.complete;
-          await this.stateRepository.markCompleted(state.id, new Date());
+          // Coverage completeness is judged from the accumulated
+          // provider-confirmed range, never from the terminal reason alone:
+          // empty_page / provider_exhausted runs that stopped before
+          // targetFrom stay coverageComplete=false and are not accepted as
+          // serving coverage. coveredTo is clamped to `now` by the page
+          // fetchers, so a target range ending at/after `now` counts as
+          // complete once everything that can exist so far was confirmed.
+          const requiredTo = Math.min(targetTo.getTime(), options.now.getTime());
+          coverageComplete =
+            coveredFrom !== null &&
+            coveredTo !== null &&
+            coveredFrom.getTime() <= targetFrom.getTime() &&
+            coveredTo.getTime() >= requiredTo;
+          complete = coverageComplete;
+          const progressRow = await this.stateRepository.findById(state.id);
+          const acceptedTotal = progressRow?.rowsAccepted ?? page.acceptedRows;
+          completionReason = coverageComplete
+            ? acceptedTotal > 0
+              ? 'target_reached'
+              : 'confirmed_empty'
+            : stopReason === 'empty_page'
+              ? 'empty_page_before_target'
+              : 'provider_exhausted_before_target';
+          await this.stateRepository.markCompleted(state.id, new Date(), {
+            coverageComplete,
+            completionReason,
+            coveredFrom,
+            coveredTo,
+          });
         } else {
           status = MarketCandleSyncStatus.failed;
           errorCode = stopReason.toUpperCase();
@@ -844,6 +904,10 @@ export class MarketCandleSyncService {
       oldestOpenTime,
       latestOpenTime,
       complete,
+      coverageComplete,
+      completionReason,
+      coveredFrom,
+      coveredTo,
       stopReason,
       status: conflicted ? status : (finalState?.status ?? status),
       syncStateId: state.id,
@@ -887,17 +951,41 @@ export class MarketCandleSyncService {
     descriptor: { kind: 'binance'; symbol: string },
   ): Promise<MarketCandleFeedPage> {
     const startTime = readIntegerField(input.cursor, 'startTime');
+    const pageStartMs =
+      startTime !== null && startTime >= input.from.getTime()
+        ? startTime
+        : input.from.getTime();
     const page = await this.binanceCandles.fetchKlinesPage({
       symbol: descriptor.symbol,
       interval: input.feed as BinanceCandleInterval,
       from: input.from,
       to: input.to,
-      cursor:
-        startTime !== null && startTime >= input.from.getTime()
-          ? { startTime }
-          : null,
+      cursor: pageStartMs > input.from.getTime() ? { startTime: pageStartMs } : null,
       now: input.now,
     });
+    // Coverage: every klines request is bounded by endTime=to-1, so a normal
+    // response is authoritative for the whole [pageStart, to) window — a
+    // short/empty page positively confirms absence up to `to`. Claims are
+    // clamped to `now` because the provider cannot confirm the future.
+    // Abnormal terminations (malformed, cursor stall) claim nothing.
+    const clampMs = Math.min(input.to.getTime(), input.now.getTime());
+    let coveredFrom: Date | null = null;
+    let coveredTo: Date | null = null;
+    if (page.nextCursor) {
+      coveredFrom = new Date(pageStartMs);
+      coveredTo = new Date(Math.min(page.nextCursor.startTime, clampMs));
+    } else if (
+      page.stopReason === 'target_reached' ||
+      page.stopReason === 'provider_exhausted' ||
+      page.stopReason === 'empty_page'
+    ) {
+      coveredFrom = new Date(pageStartMs);
+      coveredTo = new Date(clampMs);
+    }
+    if (coveredFrom !== null && coveredTo !== null && coveredFrom >= coveredTo) {
+      coveredFrom = null;
+      coveredTo = null;
+    }
     return {
       candles: page.candles,
       pagesFetched: 1,
@@ -910,6 +998,8 @@ export class MarketCandleSyncService {
         : null,
       stopReason: page.stopReason,
       complete: page.complete,
+      coveredFrom,
+      coveredTo,
     };
   }
 
@@ -943,6 +1033,8 @@ export class MarketCandleSyncService {
         ? cursorEndDate
         : defaultEndDate;
     if (endDate < fromDate) {
+      // The persisted date cursor already moved past targetFrom: the previous
+      // pages confirmed the whole range (their coverage is in the checkpoint).
       return emptyFeedPage('target_reached', true);
     }
 
@@ -1010,6 +1102,10 @@ export class MarketCandleSyncService {
         });
 
     if (page.oldestDate <= fromDate) {
+      // The date cursor chained contiguously from targetTo down past
+      // targetFrom, so the whole target range is provider-confirmed. Clamp to
+      // `now`: a target ending in the future cannot be confirmed beyond now.
+      const coveredToMs = Math.min(input.to.getTime(), input.now.getTime());
       return {
         candles: normalized.candles,
         pagesFetched: 1,
@@ -1020,6 +1116,10 @@ export class MarketCandleSyncService {
         nextCursor: null,
         stopReason: 'target_reached',
         complete: true,
+        coveredFrom:
+          coveredToMs > input.from.getTime() ? input.from : null,
+        coveredTo:
+          coveredToMs > input.from.getTime() ? new Date(coveredToMs) : null,
       };
     }
     const nextEndDate = previousDate(page.oldestDate);
@@ -1034,6 +1134,8 @@ export class MarketCandleSyncService {
         nextCursor: null,
         stopReason: 'cursor_not_advanced',
         complete: false,
+        coveredFrom: null,
+        coveredTo: null,
       };
     }
     return {
@@ -1045,9 +1147,14 @@ export class MarketCandleSyncService {
       duplicateRows: normalized.duplicateRows,
       // The date cursor always moves strictly into the past; trCont is
       // metadata only (BYMD paging keeps every request idempotent).
+      // Intermediate pages deliberately claim no coverage: local-date
+      // boundaries do not map exactly onto UTC instants, so coverage is only
+      // claimed when the terminal page proves the whole range was swept.
       nextCursor: { endDate: nextEndDate, trCont: page.trCont ?? '' },
       stopReason: null,
       complete: false,
+      coveredFrom: null,
+      coveredTo: null,
     };
   }
 
@@ -1100,37 +1207,82 @@ export class MarketCandleSyncService {
           )
         : await this.fiveMinuteIngestion.fetchUsFiveMinuteCandles(fetchInput);
 
-    const segmentSwept = SWEEP_TERMINAL_REASONS.has(result.stopReason);
-    if (!segmentSwept) {
-      // Abnormal or budget stop inside the segment. Whatever complete 5m
-      // candles were built are still written by the caller, but the cursor
-      // stays on this segment so a resume re-fetches it in full.
-      return {
-        candles: result.candles,
-        pagesFetched: Math.max(1, result.pagesFetched),
-        providerReturnedRows: result.providerReturnedRows,
-        acceptedRows: result.acceptedRows,
-        rejectedRows: result.rejectedRows,
-        duplicateRows: result.duplicateRows,
-        nextCursor: null,
-        stopReason: result.stopReason,
-        complete: false,
-      };
-    }
-
-    const reachedTargetFrom = segmentFrom.getTime() <= input.from.getTime();
-    return {
+    const base = {
       candles: result.candles,
       pagesFetched: Math.max(1, result.pagesFetched),
       providerReturnedRows: result.providerReturnedRows,
       acceptedRows: result.acceptedRows,
       rejectedRows: result.rejectedRows,
       duplicateRows: result.duplicateRows,
-      nextCursor: reachedTargetFrom
-        ? null
-        : { segmentTo: segmentFrom.getTime() },
-      stopReason: reachedTargetFrom ? 'target_reached' : null,
-      complete: reachedTargetFrom,
+    };
+    const clampedSegmentToMs = Math.min(
+      segmentTo.getTime(),
+      input.now.getTime(),
+    );
+
+    // Only the adapter's own target_reached proves the segment was swept down
+    // to segmentFrom. Geometry alone (segmentFrom <= targetFrom) must never
+    // imply completeness: the US continuation and the domestic date cursor
+    // both stop early when the provider's minute retention runs out.
+    if (result.stopReason === 'target_reached') {
+      const reachedTargetFrom = segmentFrom.getTime() <= input.from.getTime();
+      return {
+        ...base,
+        nextCursor: reachedTargetFrom
+          ? null
+          : { segmentTo: segmentFrom.getTime() },
+        stopReason: reachedTargetFrom ? 'target_reached' : null,
+        complete: reachedTargetFrom,
+        coveredFrom:
+          clampedSegmentToMs > segmentFrom.getTime() ? segmentFrom : null,
+        coveredTo:
+          clampedSegmentToMs > segmentFrom.getTime()
+            ? new Date(clampedSegmentToMs)
+            : null,
+      };
+    }
+
+    if (
+      result.stopReason === 'empty_page' ||
+      result.stopReason === 'provider_exhausted'
+    ) {
+      // The provider has nothing further into the past (retention edge,
+      // pre-listing range, or a genuinely empty tail — indistinguishable
+      // here). Terminate the run: sweeping even older segments cannot
+      // succeed. Received rows confirm coverage only from the first full 5m
+      // bucket at/after the oldest received row.
+      let coveredFrom: Date | null = null;
+      let coveredTo: Date | null = null;
+      if (result.oldestOpenTime !== null) {
+        const flooredOldest = Math.max(
+          ceilToFiveMinutes(result.oldestOpenTime.getTime()),
+          segmentFrom.getTime(),
+        );
+        if (flooredOldest < clampedSegmentToMs) {
+          coveredFrom = new Date(flooredOldest);
+          coveredTo = new Date(clampedSegmentToMs);
+        }
+      }
+      return {
+        ...base,
+        nextCursor: null,
+        stopReason: result.stopReason,
+        complete: false,
+        coveredFrom,
+        coveredTo,
+      };
+    }
+
+    // Abnormal or budget stop inside the segment. Whatever complete 5m
+    // candles were built are still written by the caller, but the cursor
+    // stays on this segment so a resume re-fetches it in full.
+    return {
+      ...base,
+      nextCursor: null,
+      stopReason: result.stopReason,
+      complete: false,
+      coveredFrom: null,
+      coveredTo: null,
     };
   }
 
@@ -1280,6 +1432,10 @@ export class MarketCandleSyncService {
       oldestOpenTime: null,
       latestOpenTime: null,
       complete: false,
+      coverageComplete: false,
+      completionReason: null,
+      coveredFrom: null,
+      coveredTo: null,
       stopReason: failure.stopReason,
       status: MarketCandleSyncStatus.failed,
       syncStateId: null,
@@ -1379,7 +1535,13 @@ function emptyFeedPage(
     nextCursor: null,
     stopReason,
     complete,
+    coveredFrom: null,
+    coveredTo: null,
   };
+}
+
+function ceilToFiveMinutes(ms: number): number {
+  return Math.ceil(ms / 300_000) * 300_000;
 }
 
 function asJsonObject(

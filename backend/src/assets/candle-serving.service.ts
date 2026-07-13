@@ -21,6 +21,7 @@ import {
   AssetCandlesSingleFlightService,
   CandleSingleFlightWaitTimeoutError,
 } from './asset-candles-single-flight.service';
+import { isCandleOperationalFallbackError } from './candle-operational-error';
 import {
   CandleDatabaseLoader,
   type CandleDatabaseLoadResult,
@@ -97,7 +98,23 @@ export class CandleServingService {
       return cached.value;
     }
     const stale = cached.status === 'stale' ? cached.value : null;
-    const initial = await this.database.load(asset, query, plan);
+
+    // The initial database read participates in the stale fallback: a
+    // database outage with a stale cached response degrades to that response
+    // instead of failing the request. Validation/config/programmer errors
+    // are never absorbed — only operational failures qualify.
+    let initial: CandleDatabaseLoadResult;
+    try {
+      initial = await this.database.load(asset, query, plan);
+    } catch (error) {
+      if (stale && this.isOperationalRefreshError(error)) {
+        this.logDelivery('stale_cache_fallback', asset.id, query.interval, {
+          reason: this.errorName(error),
+        });
+        return stale;
+      }
+      throw error;
+    }
 
     // A large request without completed baseline coverage is deliberately kept
     // on the rollout-safe provider-direct path. Operators must seed it through
@@ -141,7 +158,20 @@ export class CandleServingService {
         });
         return initial.response as AssetCandlesResponse;
       }
-      throw this.providerCompatibilityError(asset);
+      // Last resort: the managed path could not establish coverage (provider
+      // retention edge, a provider-empty asset such as a halted stock, or a
+      // database outage without any cached fallback). Serve provider-direct
+      // instead of failing the request; if the provider also fails, surface
+      // the standard provider error.
+      try {
+        const response = await legacyLoader();
+        this.logDelivery('legacy_provider', asset.id, query.interval, {
+          reason: 'managed_path_unresolved',
+        });
+        return response;
+      } catch {
+        throw this.providerCompatibilityError(asset);
+      }
     }
   }
 
@@ -252,10 +282,19 @@ export class CandleServingService {
     };
   }
 
+  /**
+   * Operational failures eligible for the stale/database fallback: refresh
+   * coordination timeouts, database connectivity/timeout/pool errors, Redis
+   * unavailability, and provider-refresh operational failures. Validation,
+   * configuration, and programmer errors always propagate.
+   */
   private isOperationalRefreshError(error: unknown): boolean {
     return (
       error instanceof CandleOperationalRefreshError ||
-      error instanceof CandleSingleFlightWaitTimeoutError
+      error instanceof CandleSingleFlightWaitTimeoutError ||
+      isCandleOperationalFallbackError(error, [
+        'CandleOperationalRefreshError',
+      ])
     );
   }
 

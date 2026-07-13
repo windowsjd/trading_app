@@ -200,6 +200,12 @@ export class LiveCandleStreamSupervisorService
           await this.connectKis(context);
         }
         attempt = 0;
+        // The socket closed without throwing (provider-initiated close,
+        // scheduled rollover, or an operator-forced reconnect); record why
+        // the loop is reconnecting.
+        if (!this.stopping && !context.lost) {
+          this.logReconnect(context.provider, 'socket_closed', null);
+        }
       } catch (error) {
         const failedSocket = context.socket;
         if (failedSocket) {
@@ -212,6 +218,7 @@ export class LiveCandleStreamSupervisorService
           if (context.socket === failedSocket) context.socket = null;
         }
         const code = error instanceof Error ? error.name : 'STREAM_ERROR';
+        this.logReconnect(context.provider, code, null);
         this.health.updateProvider(context.provider, {
           state: 'reconnecting',
           lastErrorCode: code,
@@ -263,29 +270,38 @@ export class LiveCandleStreamSupervisorService
     context.socket = socket;
     await waitForOpen(socket);
     if (context.lost || this.stopping) return;
-    let lastMessageAt = Date.now();
+    let lastFrameAt = Date.now();
     const heartbeat = setInterval(
       () => {
-        if (Date.now() - lastMessageAt > this.config.staleThresholdMs) {
-          socket.close(4000, 'heartbeat timeout');
+        // Connection liveness is judged from ANY frame (data, WS ping, or
+        // control), never from trade traffic alone.
+        if (Date.now() - lastFrameAt > this.config.staleThresholdMs) {
+          this.logReconnect('binance', 'liveness_timeout', lastFrameAt);
+          socket.close(4000, 'liveness timeout');
         }
       },
       Math.max(1_000, Math.min(5_000, this.config.staleThresholdMs)),
     );
     heartbeat.unref?.();
-    const rollover = setTimeout(
-      () => socket.close(4001, 'scheduled rollover'),
-      BINANCE_CONNECTION_LIFETIME_MS,
-    );
+    const rollover = setTimeout(() => {
+      this.logReconnect('binance', 'scheduled_rollover', lastFrameAt);
+      socket.close(4001, 'scheduled rollover');
+    }, BINANCE_CONNECTION_LIFETIME_MS);
     rollover.unref?.();
     socket.on('ping', (data?: Buffer) => {
       socket.pong?.(data);
+      lastFrameAt = Date.now();
       this.health.updateProvider('binance', {
+        lastFrameAt: new Date().toISOString(),
         lastHeartbeatAt: new Date().toISOString(),
+        lastControlFrameAt: new Date().toISOString(),
       });
     });
     socket.on('message', (data: unknown) => {
-      lastMessageAt = Date.now();
+      lastFrameAt = Date.now();
+      this.health.updateProvider('binance', {
+        lastFrameAt: new Date().toISOString(),
+      });
       this.handleBinanceMessage(data, bySymbol, context);
     });
     socket.send(
@@ -365,20 +381,34 @@ export class LiveCandleStreamSupervisorService
     context.socket = socket;
     await waitForOpen(socket);
     if (context.lost || this.stopping) return;
-    let lastMessageAt = Date.now();
+    let lastFrameAt = Date.now();
     const heartbeat = setInterval(
       () => {
-        if (Date.now() - lastMessageAt > this.config.staleThresholdMs) {
-          socket.close(4000, 'heartbeat timeout');
+        // KIS connection liveness: any frame (PINGPONG heartbeat, ack, WS
+        // ping, or trade) resets the timer. A quiet market with heartbeats
+        // flowing must never trigger a reconnect; only a truly silent socket
+        // (no trades AND no control frames) does.
+        if (Date.now() - lastFrameAt > this.config.staleThresholdMs) {
+          this.logReconnect('kis', 'liveness_timeout', lastFrameAt);
+          socket.close(4000, 'liveness timeout');
         }
       },
       Math.max(1_000, Math.min(5_000, this.config.staleThresholdMs)),
     );
     heartbeat.unref?.();
-    socket.on('message', (data: unknown) => {
-      lastMessageAt = Date.now();
+    socket.on('ping', (data?: Buffer) => {
+      socket.pong?.(data);
+      lastFrameAt = Date.now();
       this.health.updateProvider('kis', {
+        lastFrameAt: new Date().toISOString(),
         lastHeartbeatAt: new Date().toISOString(),
+        lastControlFrameAt: new Date().toISOString(),
+      });
+    });
+    socket.on('message', (data: unknown) => {
+      lastFrameAt = Date.now();
+      this.health.updateProvider('kis', {
+        lastFrameAt: new Date().toISOString(),
       });
       this.handleKisMessage(data, byKey, context);
     });
@@ -487,10 +517,31 @@ export class LiveCandleStreamSupervisorService
       receivedAt: new Date(),
     });
     if (parsed.state !== 'trades') {
+      if (parsed.state === 'heartbeat') {
+        // Official KIS PINGPONG: echo it back verbatim and record control
+        // liveness. Never counted as a trade-parser failure.
+        try {
+          context.socket?.send(parsed.rawFrame);
+        } catch {
+          // Echo failures surface through the liveness timeout.
+        }
+        this.health.updateProvider('kis', {
+          lastHeartbeatAt: new Date().toISOString(),
+          lastControlFrameAt: new Date().toISOString(),
+        });
+        return;
+      }
+      if (parsed.state === 'ack') {
+        this.health.updateProvider('kis', {
+          lastControlFrameAt: new Date().toISOString(),
+        });
+        return;
+      }
       if (parsed.state === 'failed') {
         this.health.increment('eventsRejected');
         if (parsed.reason === 'KIS_SUBSCRIPTION_ACK_FAILED') {
           this.recordSubscriptionFailure('kis', 1);
+          this.logReconnect('kis', 'subscription_rejected', Date.now());
           context.socket?.close(1011, 'subscription rejected');
         }
       }
@@ -572,6 +623,29 @@ export class LiveCandleStreamSupervisorService
       })
       .finally(() => this.pendingEvents.delete(promise));
     this.pendingEvents.add(promise);
+  }
+
+  /**
+   * Structured reconnect diagnostics: reason plus how stale the connection
+   * and market data were, so silent-market reconnect loops are visible.
+   */
+  private logReconnect(
+    provider: ProviderName,
+    reason: string,
+    lastFrameAtMs: number | null,
+  ): void {
+    const snapshot = this.health.snapshot().providers[provider];
+    this.logger.warn(
+      JSON.stringify({
+        event: 'live_candle_stream_reconnect',
+        provider,
+        reason,
+        lastFrameAgeMs:
+          lastFrameAtMs !== null ? Date.now() - lastFrameAtMs : null,
+        lastEventAt: snapshot.lastEventAt,
+        lastHeartbeatAt: snapshot.lastHeartbeatAt,
+      }),
+    );
   }
 
   private recordSubscriptionFailure(

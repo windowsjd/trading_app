@@ -414,6 +414,22 @@ describe('OpsSchedulerService', () => {
     expect(runner.runMarketCandleReconciliationJob).toHaveBeenCalledTimes(1);
   });
 
+  it('never runs stock reconciliation on a real exchange holiday', async () => {
+    process.env.CANDLE_RECONCILIATION_KRX_ENABLED = 'true';
+    process.env.CANDLE_RECONCILIATION_US_ENABLED = 'true';
+    const { runner, service } = createService();
+    // 2026-07-17 is Constitution Day (KRX closed); use a time past the KRX
+    // close grace. 2026-07-03 is Independence Day observed (US closed).
+    await service.runEnabledJobs(new Date('2026-07-17T08:00:00.000Z'));
+    expect(runner.runMarketCandleReconciliationJob).not.toHaveBeenCalledWith(
+      expect.objectContaining({ market: 'KRX', metadataJson: expect.objectContaining({ businessDate: '2026-07-17' }) }),
+    );
+    await service.runEnabledJobs(new Date('2026-07-03T22:00:00.000Z'));
+    expect(runner.runMarketCandleReconciliationJob).not.toHaveBeenCalledWith(
+      expect.objectContaining({ market: 'US', metadataJson: expect.objectContaining({ businessDate: '2026-07-03' }) }),
+    );
+  });
+
   it('runs crypto reconciliation on a bounded rolling interval', async () => {
     process.env.CANDLE_RECONCILIATION_CRYPTO_ENABLED = 'true';
     process.env.CANDLE_RECONCILIATION_CRYPTO_INTERVAL_SECONDS = '300';

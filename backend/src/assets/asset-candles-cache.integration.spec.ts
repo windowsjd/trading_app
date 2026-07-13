@@ -87,15 +87,18 @@ describe('AssetCandlesCacheService Redis smoke', () => {
         expect(stored.status).toBe('stored');
 
         const hit = await cache.get(input);
-        expect(hit.status).toBe('hit');
-        if (hit.status === 'hit') {
+        expect(hit.status).toBe('fresh');
+        if (hit.status === 'fresh') {
           expect(hit.value).toEqual(response);
           expect(hit.cachedAt).toBeInstanceOf(Date);
         }
 
+        // Redis retains the envelope through its stale TTL (current-data
+        // entries default to CANDLE_CACHE_CURRENT_STALE_TTL_SECONDS or the
+        // historical stale TTL, both bounded by an hour).
         const ttl = await redis.ttl(dataKeyGen0);
         expect(ttl).toBeGreaterThan(0);
-        expect(ttl).toBeLessThanOrEqual(30);
+        expect(ttl).toBeLessThanOrEqual(3600);
 
         const deleted = await cache.delete(input);
         expect(deleted.status).toBe('invalidated');
@@ -104,7 +107,7 @@ describe('AssetCandlesCacheService Redis smoke', () => {
         // Re-store, then invalidate the asset: the old generation-0 entry
         // survives in Redis but is no longer reachable through the cache.
         await cache.set(input, response);
-        expect((await cache.get(input)).status).toBe('hit');
+        expect((await cache.get(input)).status).toBe('fresh');
 
         const invalidated = await cache.invalidateAsset(assetId);
         expect(invalidated.status).toBe('invalidated');
@@ -113,10 +116,12 @@ describe('AssetCandlesCacheService Redis smoke', () => {
         }
         expect((await cache.get(input)).status).toBe('miss');
 
-        // Corrupt entry at the current generation: read drops it and reports miss.
+        // Corrupt entry at the current generation: the read reports it as
+        // corrupt and deletes exactly that key; the next read is a miss.
         await redis.setWithTtl(dataKeyGen1, 'not-json{', 30);
-        expect((await cache.get(input)).status).toBe('miss');
+        expect((await cache.get(input)).status).toBe('corrupt');
         expect(await redis.get(dataKeyGen1)).toBeNull();
+        expect((await cache.get(input)).status).toBe('miss');
       } finally {
         // Delete only the keys this test created.
         await redis.delete(generationKey);

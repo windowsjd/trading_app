@@ -40,6 +40,19 @@ export type MarketCandleSyncPageProgress = {
   rowsDuplicated: number;
   rowsWritten: number;
   lastSuccessfulPageAt: Date;
+  // Accumulated half-open [coveredFrom, coveredTo) range the run has
+  // confirmed so far (already merged with prior pages by the caller). Null
+  // when nothing has been confirmed yet.
+  coveredFrom: Date | null;
+  coveredTo: Date | null;
+};
+
+export type MarketCandleSyncCompletionInput = {
+  // True only when the provider cursor confirmed the whole target range.
+  coverageComplete: boolean;
+  completionReason: string;
+  coveredFrom: Date | null;
+  coveredTo: Date | null;
 };
 
 /**
@@ -137,6 +150,14 @@ export class MarketCandleSyncStateRepository {
     });
   }
 
+  /**
+   * Serving coverage evidence. A checkpoint only qualifies when the run
+   * terminated normally AND its provider cursor confirmed the whole requested
+   * range: status=completed, coverageComplete=true, and the persisted
+   * [coveredFrom, coveredTo) range spans [from, to). Legacy completed rows
+   * (created before coverage auditing) have coverageComplete=false and are
+   * deliberately excluded until a re-sync writes an audited checkpoint.
+   */
   findCompletedCovering(
     assetId: string,
     feed: MarketCandleFeed,
@@ -148,8 +169,9 @@ export class MarketCandleSyncStateRepository {
         assetId,
         feed,
         status: MarketCandleSyncStatus.completed,
-        targetFrom: { lte: from },
-        targetTo: { gte: to },
+        coverageComplete: true,
+        coveredFrom: { not: null, lte: from },
+        coveredTo: { not: null, gte: to },
         completedAt: { not: null },
       },
       orderBy: { completedAt: 'desc' },
@@ -196,17 +218,49 @@ export class MarketCandleSyncStateRepository {
         },
         rowsWritten: { increment: requireNonNegative(progress.rowsWritten) },
         lastSuccessfulPageAt: progress.lastSuccessfulPageAt,
+        coveredFrom: progress.coveredFrom,
+        coveredTo: progress.coveredTo,
       },
     });
     return updated.count === 1;
   }
 
-  async markCompleted(id: string, completedAt: Date): Promise<boolean> {
+  /**
+   * Terminates a run as completed. Coverage is a REQUIRED input: `completed`
+   * alone never implies the target range was fully confirmed. A
+   * coverageComplete=true claim must span the run's target range; violating
+   * that is a programmer error and is rejected before touching the row.
+   */
+  async markCompleted(
+    id: string,
+    completedAt: Date,
+    coverage: MarketCandleSyncCompletionInput,
+  ): Promise<boolean> {
+    if (coverage.coverageComplete) {
+      const row = await this.prisma.marketCandleSyncState.findUnique({
+        where: { id },
+        select: { targetFrom: true, targetTo: true },
+      });
+      if (
+        row &&
+        (coverage.coveredFrom === null ||
+          coverage.coveredTo === null ||
+          coverage.coveredFrom.getTime() > row.targetFrom.getTime())
+      ) {
+        throw new Error(
+          'coverageComplete=true requires a covered range spanning the target range.',
+        );
+      }
+    }
     const updated = await this.prisma.marketCandleSyncState.updateMany({
       where: { id, status: MarketCandleSyncStatus.running },
       data: {
         status: MarketCandleSyncStatus.completed,
         completedAt,
+        coverageComplete: coverage.coverageComplete,
+        completionReason: coverage.completionReason,
+        coveredFrom: coverage.coveredFrom,
+        coveredTo: coverage.coveredTo,
         errorCode: null,
         errorMessage: null,
       },

@@ -14,6 +14,19 @@ export const MARKET_CANDLE_SYNC_FEEDS: readonly MarketCandleFeed[] = [
   '1w',
 ];
 
+/**
+ * Why a run reached its terminal checkpoint state, persisted next to
+ * coverageComplete. `target_reached` / `confirmed_empty` are the only reasons
+ * that may accompany coverageComplete=true.
+ */
+export type MarketCandleSyncCompletionReason =
+  | 'target_reached'
+  | 'confirmed_empty'
+  | 'empty_page_before_target'
+  | 'provider_exhausted_before_target'
+  | 'cursor_not_advanced'
+  | 'aborted';
+
 export type MarketCandleSyncStopReason =
   | 'target_reached'
   | 'provider_exhausted'
@@ -64,10 +77,17 @@ export type MarketCandleFeedPage = {
   // Opaque resume cursor persisted to the checkpoint AFTER the page's
   // candles are written; null when the feed terminated on this page.
   nextCursor: Prisma.JsonObject | null;
-  // Set when nextCursor is null.
+  // Set when nextCursor is null. This is the terminal reason for the sweep.
   stopReason: MarketCandleSyncStopReason | null;
-  // True only when the target range was fully swept.
+  // True only when the target range was fully swept (coverage-complete for
+  // the whole target range as far as this page can tell).
   complete: boolean;
+  // Half-open [coveredFrom, coveredTo) subrange of the target range that THIS
+  // page definitively confirmed with the provider cursor (presence AND
+  // absence of candles). Null when the page confirmed nothing (abnormal
+  // terminations, budget stops, malformed responses).
+  coveredFrom: Date | null;
+  coveredTo: Date | null;
 };
 
 export type MarketCandleFeedResult = {
@@ -85,6 +105,10 @@ export type MarketCandleFeedResult = {
   oldestOpenTime: Date | null;
   latestOpenTime: Date | null;
   complete: boolean;
+  coverageComplete: boolean;
+  completionReason: MarketCandleSyncCompletionReason | null;
+  coveredFrom: Date | null;
+  coveredTo: Date | null;
   stopReason: MarketCandleSyncStopReason;
   status: MarketCandleSyncStatus;
   syncStateId: string | null;

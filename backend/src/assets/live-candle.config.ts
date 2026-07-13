@@ -17,6 +17,12 @@ export type LiveCandleConfig = {
   stateTtlSeconds: number;
   maxFutureEventSkewMs: number;
   websocketBackpressureBytes: number;
+  // Old-generation / deferred bucket recovery (bounded queue processing).
+  recoveryMaxBatch: number;
+  recoveryRetryMs: number;
+  // Escape hatch for running live ingestion without its reconciliation
+  // safety net. Never enable in production.
+  allowWithoutReconciliation: boolean;
 };
 
 export class LiveCandleConfigError extends Error {
@@ -122,6 +128,19 @@ export function readLiveCandleConfig(
       1_024,
       16_777_216,
     ),
+    recoveryMaxBatch: integer(env, 'CANDLE_LIVE_RECOVERY_MAX_BATCH', 10, 1, 200),
+    recoveryRetryMs: integer(
+      env,
+      'CANDLE_LIVE_RECOVERY_RETRY_MS',
+      60_000,
+      1_000,
+      3_600_000,
+    ),
+    allowWithoutReconciliation: boolean(
+      env,
+      'LIVE_CANDLE_ALLOW_WITHOUT_RECONCILIATION',
+      false,
+    ),
   };
 
   if (config.ownerLeaseTtlMs <= config.ownerLeaseRenewMs) {
@@ -141,6 +160,53 @@ export function readLiveCandleConfig(
   }
 
   return config;
+}
+
+/**
+ * Live ingestion must not run without its reconciliation safety net: live
+ * buckets that miss provider-final confirmation are only ever repaired by
+ * REST reconciliation, so silently running one without the other loses data.
+ *
+ * Production refuses to start on an invalid combination unless the explicit
+ * LIVE_CANDLE_ALLOW_WITHOUT_RECONCILIATION=true escape hatch is set;
+ * non-production logs a warning through the returned list.
+ */
+export function validateLiveReconciliationDependencies(input: {
+  live: LiveCandleConfig;
+  reconciliation: {
+    krx: { enabled: boolean };
+    us: { enabled: boolean };
+    crypto: { enabled: boolean };
+  };
+  nodeEnv: string | undefined;
+}): string[] {
+  if (!input.live.enabled) return [];
+  const violations: string[] = [];
+  if (input.live.kisEnabled && !input.reconciliation.krx.enabled) {
+    violations.push(
+      'CANDLE_LIVE_KIS_ENABLED=true requires CANDLE_RECONCILIATION_KRX_ENABLED=true.',
+    );
+  }
+  if (input.live.kisUsDelayedEnabled && !input.reconciliation.us.enabled) {
+    violations.push(
+      'CANDLE_LIVE_KIS_US_DELAYED_ENABLED=true requires CANDLE_RECONCILIATION_US_ENABLED=true.',
+    );
+  }
+  if (input.live.binanceEnabled && !input.reconciliation.crypto.enabled) {
+    violations.push(
+      'CANDLE_LIVE_BINANCE_ENABLED=true requires CANDLE_RECONCILIATION_CRYPTO_ENABLED=true.',
+    );
+  }
+  if (
+    violations.length > 0 &&
+    input.nodeEnv === 'production' &&
+    !input.live.allowWithoutReconciliation
+  ) {
+    throw new LiveCandleConfigError(
+      `Live candle ingestion without reconciliation is not allowed in production: ${violations.join(' ')} Set LIVE_CANDLE_ALLOW_WITHOUT_RECONCILIATION=true only for exceptional, temporary operation.`,
+    );
+  }
+  return violations;
 }
 
 function boolean(

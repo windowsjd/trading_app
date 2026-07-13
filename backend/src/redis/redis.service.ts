@@ -163,12 +163,31 @@ export class RedisService implements OnModuleDestroy {
     key: string,
     min: number | string,
     max: number | string,
+    limit?: number,
   ): Promise<string[]> {
     const validKey = this.requireKey(key);
+    if (limit !== undefined && (!Number.isSafeInteger(limit) || limit <= 0)) {
+      throw new RedisKeyError('limit must be a positive integer.');
+    }
     const client = await this.ensureConnected();
     return this.runCommand(client, () =>
-      client.zrangebyscore(validKey, min, max),
+      limit === undefined
+        ? client.zrangebyscore(validKey, min, max)
+        : client.zrangebyscore(validKey, min, max, 'LIMIT', 0, limit),
     );
+  }
+
+  async addToSortedSet(
+    key: string,
+    score: number,
+    member: string,
+  ): Promise<number> {
+    if (!Number.isFinite(score)) {
+      throw new RedisKeyError('score must be a finite number.');
+    }
+    const validKey = this.requireKey(key);
+    const client = await this.ensureConnected();
+    return this.runCommand(client, () => client.zadd(validKey, score, member));
   }
 
   async removeFromSortedSet(

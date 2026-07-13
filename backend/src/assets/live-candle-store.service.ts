@@ -6,6 +6,7 @@ import {
   REDIS_DISCARD_RECONCILED_LIVE_CANDLE_SCRIPT,
   REDIS_MARK_LIVE_CANDLE_FINALIZED_SCRIPT,
   REDIS_MARK_LIVE_CANDLE_INCOMPLETE_SCRIPT,
+  REDIS_TAKEOVER_FINALIZE_LIVE_CANDLE_SCRIPT,
 } from '../redis/redis-lua-scripts';
 import { RedisUnavailableError } from '../redis/redis.types';
 import {
@@ -23,7 +24,17 @@ import type {
 
 const LIVE_KEY_PREFIX = 'candles:live:v1';
 export const LIVE_CANDLE_ACTIVE_INDEX_KEY = `${LIVE_KEY_PREFIX}:active`;
+// Bounded recovery queue for buckets that cannot be finalized from live state
+// alone (KIS old-generation/incomplete buckets). Scored by earliest next
+// attempt time; members are `${assetId}|${openTimeMs}`.
+export const LIVE_CANDLE_RECONCILE_PENDING_KEY = `${LIVE_KEY_PREFIX}:reconcile-pending`;
 const MAX_FINALIZE_BATCH = 500;
+
+export type LiveCandleReconcilePendingEntry = {
+  member: string;
+  assetId: string;
+  openTime: Date;
+};
 
 @Injectable()
 export class LiveCandleStoreService {
@@ -179,6 +190,107 @@ export class LiveCandleStoreService {
     await this.redis.removeFromSortedSet(LIVE_CANDLE_ACTIVE_INDEX_KEY, [
       stateKey,
     ]);
+  }
+
+  /**
+   * Finalizes a state whose owner generation no longer holds the provider
+   * lease. Returns the finalized state, 'still_owned' while the original
+   * owner is alive (callers must then use the owner-guarded path), or null
+   * when the state disappeared or its revision moved.
+   */
+  async markFinalizedTakeover(input: {
+    stateKey: string;
+    providerLeaseKey: string;
+    revision: number;
+  }): Promise<LiveFiveMinuteCandleState | 'still_owned' | null> {
+    const raw = await this.redis.eval(
+      REDIS_TAKEOVER_FINALIZE_LIVE_CANDLE_SCRIPT,
+      [input.providerLeaseKey, input.stateKey, LIVE_CANDLE_ACTIVE_INDEX_KEY],
+      [String(input.revision), String(this.config.stateTtlSeconds)],
+    );
+    if (raw === -1 || raw === '-1') return 'still_owned';
+    if (raw === 0 || raw === '0') return null;
+    try {
+      return validateState(JSON.parse(String(raw)) as unknown);
+    } catch {
+      return null;
+    }
+  }
+
+  /** Queues a bucket for REST-repair recovery; score = next attempt time. */
+  async enqueueReconcilePending(
+    assetId: string,
+    openTime: Date,
+    dueAt: Date,
+  ): Promise<void> {
+    await this.redis.addToSortedSet(
+      LIVE_CANDLE_RECONCILE_PENDING_KEY,
+      dueAt.getTime(),
+      `${encodeURIComponent(assetId)}|${openTime.getTime()}`,
+    );
+  }
+
+  /** Bounded fetch of due recovery entries (no SCAN). */
+  async getDueReconcilePending(
+    now: Date,
+    limit: number,
+  ): Promise<LiveCandleReconcilePendingEntry[]> {
+    const members = await this.redis.zrangeByScore(
+      LIVE_CANDLE_RECONCILE_PENDING_KEY,
+      '-inf',
+      now.getTime(),
+      Math.max(1, limit),
+    );
+    const entries: LiveCandleReconcilePendingEntry[] = [];
+    for (const member of members) {
+      const separator = member.lastIndexOf('|');
+      if (separator <= 0) {
+        await this.redis.removeFromSortedSet(
+          LIVE_CANDLE_RECONCILE_PENDING_KEY,
+          [member],
+        );
+        continue;
+      }
+      const openMs = Number(member.slice(separator + 1));
+      if (!Number.isSafeInteger(openMs)) {
+        await this.redis.removeFromSortedSet(
+          LIVE_CANDLE_RECONCILE_PENDING_KEY,
+          [member],
+        );
+        continue;
+      }
+      entries.push({
+        member,
+        assetId: decodeURIComponent(member.slice(0, separator)),
+        openTime: new Date(openMs),
+      });
+    }
+    return entries;
+  }
+
+  async resolveReconcilePending(member: string): Promise<void> {
+    await this.redis.removeFromSortedSet(LIVE_CANDLE_RECONCILE_PENDING_KEY, [
+      member,
+    ]);
+  }
+
+  /** Re-schedules a failed recovery attempt with backoff. */
+  async deferReconcilePending(member: string, retryAt: Date): Promise<void> {
+    await this.redis.addToSortedSet(
+      LIVE_CANDLE_RECONCILE_PENDING_KEY,
+      retryAt.getTime(),
+      member,
+    );
+  }
+
+  async countReconcilePendingDue(now: Date): Promise<number> {
+    const members = await this.redis.zrangeByScore(
+      LIVE_CANDLE_RECONCILE_PENDING_KEY,
+      '-inf',
+      now.getTime(),
+      MAX_FINALIZE_BATCH,
+    );
+    return members.length;
   }
 
   async discardReconciledCurrent(

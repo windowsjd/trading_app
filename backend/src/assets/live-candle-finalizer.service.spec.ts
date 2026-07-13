@@ -7,6 +7,18 @@ jest.mock('../generated/prisma/client', () => {
       us_stock: 'us_stock',
       crypto: 'crypto',
     },
+    MarketCandleSyncMode: {
+      initial: 'initial',
+      incremental: 'incremental',
+      repair: 'repair',
+    },
+    MarketCandleSyncStatus: {
+      pending: 'pending',
+      running: 'running',
+      completed: 'completed',
+      failed: 'failed',
+      canceled: 'canceled',
+    },
     Prisma: { Decimal },
   };
 });
@@ -26,6 +38,18 @@ describe('LiveCandleFinalizerService', () => {
       markFinalized: jest.fn(async ({ revision }) => {
         calls.push('mark');
         return { ...state(), revision: revision + 1, finalized: true };
+      }),
+      markFinalizedTakeover: jest.fn(async ({ revision }) => {
+        calls.push('takeover');
+        return { ...state(), revision: revision + 1, finalized: true };
+      }),
+      enqueueReconcilePending: jest.fn(async () => calls.push('enqueue')),
+      getDueReconcilePending: jest.fn().mockResolvedValue([]),
+      resolveReconcilePending: jest.fn(async () => calls.push('resolve')),
+      deferReconcilePending: jest.fn(async () => calls.push('defer')),
+      discardReconciledCurrent: jest.fn(async () => {
+        calls.push('discard');
+        return true;
       }),
     };
     const repository = {
@@ -56,6 +80,7 @@ describe('LiveCandleFinalizerService', () => {
         return [];
       }),
     };
+    const sync = { syncAsset: jest.fn(async () => ({ feeds: [] })) };
     const health = new LiveCandleHealthService();
     const service = new LiveCandleFinalizerService(
       store as never,
@@ -66,14 +91,17 @@ describe('LiveCandleFinalizerService', () => {
       publisher as never,
       health,
       readLiveCandleConfig({}),
+      sync as never,
     );
     return {
       calls,
       store,
       repository,
       cache,
+      redis,
       locks,
       publisher,
+      sync,
       health,
       service,
     };
@@ -103,7 +131,7 @@ describe('LiveCandleFinalizerService', () => {
     expect(fixture.health.snapshot().liveCandle.finalizeSuccess).toBe(1);
   });
 
-  it('does not close an incomplete bucket and leaves it for reconciliation', async () => {
+  it('queues an incomplete bucket for REST repair instead of closing it', async () => {
     const fixture = setup();
     await finalize(
       fixture.service,
@@ -111,6 +139,11 @@ describe('LiveCandleFinalizerService', () => {
       new Date('2026-07-13T00:05:06Z'),
     );
     expect(fixture.repository.upsertMany).not.toHaveBeenCalled();
+    expect(fixture.store.enqueueReconcilePending).toHaveBeenCalledWith(
+      'asset-1',
+      new Date('2026-07-13T00:00:00.000Z'),
+      new Date('2026-07-13T00:05:06Z'),
+    );
     expect(fixture.store.removeFromFinalizeIndex).toHaveBeenCalledWith(
       'state-key',
     );
@@ -136,6 +169,138 @@ describe('LiveCandleFinalizerService', () => {
     expect(fixture.store.removeFromFinalizeIndex).not.toHaveBeenCalled();
     expect(fixture.store.markFinalized).not.toHaveBeenCalled();
     expect(fixture.health.snapshot().liveCandle.finalizeFailure).toBe(1);
+  });
+
+  describe('old-generation recovery', () => {
+    it('finalizes a provider-final bucket after the owner generation is gone', async () => {
+      const fixture = setup();
+      fixture.redis.get.mockResolvedValue('owner-2'); // lease taken over
+      await finalize(fixture.service, state(), new Date('2026-07-13T00:05:06Z'));
+      expect(fixture.calls).toEqual(['db', 'invalidate', 'takeover', 'publish']);
+      expect(fixture.store.markFinalizedTakeover).toHaveBeenCalledWith({
+        stateKey: 'state-key',
+        providerLeaseKey: 'candles:live:v1:owner:binance:0',
+        revision: 5,
+      });
+      expect(fixture.store.markFinalized).not.toHaveBeenCalled();
+    });
+
+    it('finalizes a provider-final bucket when no lease exists at all', async () => {
+      const fixture = setup();
+      fixture.redis.get.mockResolvedValue(null);
+      await finalize(fixture.service, state(), new Date('2026-07-13T00:05:06Z'));
+      expect(fixture.store.markFinalizedTakeover).toHaveBeenCalled();
+      expect(fixture.health.snapshot().liveCandle.finalizeSuccess).toBe(1);
+    });
+
+    it('never directly closes an old-generation KIS delta bucket; it goes to repair', async () => {
+      const fixture = setup();
+      fixture.redis.get.mockResolvedValue('owner-2');
+      await finalize(
+        fixture.service,
+        {
+          ...state(),
+          providerFinal: false,
+          sourceProvider: 'kis_domestic_ws_trade',
+        },
+        new Date('2026-07-13T00:05:06Z'),
+      );
+      expect(fixture.repository.upsertMany).not.toHaveBeenCalled();
+      expect(fixture.store.enqueueReconcilePending).toHaveBeenCalled();
+      expect(fixture.store.removeFromFinalizeIndex).toHaveBeenCalledWith(
+        'state-key',
+      );
+    });
+
+    it('only cleans up when a canonical closed row already exists', async () => {
+      const fixture = setup();
+      fixture.redis.get.mockResolvedValue('owner-2');
+      fixture.repository.findRange.mockResolvedValue([
+        {
+          openTime: new Date('2026-07-13T00:00:00.000Z'),
+          isClosed: true,
+        },
+      ]);
+      await finalize(
+        fixture.service,
+        { ...state(), providerFinal: false },
+        new Date('2026-07-13T00:05:06Z'),
+      );
+      expect(fixture.store.enqueueReconcilePending).not.toHaveBeenCalled();
+      expect(fixture.store.removeFromFinalizeIndex).toHaveBeenCalled();
+      expect(fixture.store.discardReconciledCurrent).toHaveBeenCalledWith(
+        'asset-1',
+        new Date('2026-07-13T00:00:00.000Z'),
+      );
+    });
+
+    it('repairs due queued buckets through bounded REST sync and resolves them', async () => {
+      const fixture = setup();
+      fixture.store.getDueReconcilePending.mockResolvedValue([
+        {
+          member: 'asset-1|1783987200000',
+          assetId: 'asset-1',
+          openTime: new Date('2026-07-13T00:00:00.000Z'),
+        },
+      ]);
+      fixture.repository.findRange.mockResolvedValue([
+        { openTime: new Date('2026-07-13T00:00:00.000Z'), isClosed: true },
+      ]);
+      await fixture.service.runOnce(new Date('2026-07-13T00:06:00Z'));
+      expect(fixture.sync.syncAsset).toHaveBeenCalledWith(
+        expect.objectContaining({
+          assetId: 'asset-1',
+          targets: ['5m'],
+          mode: 'repair',
+          from: new Date('2026-07-13T00:00:00.000Z'),
+          to: new Date('2026-07-13T00:05:00.000Z'),
+        }),
+      );
+      expect(fixture.store.resolveReconcilePending).toHaveBeenCalledWith(
+        'asset-1|1783987200000',
+      );
+      expect(fixture.store.discardReconciledCurrent).toHaveBeenCalled();
+      expect(
+        fixture.health.snapshot().liveCandle.recoveryRepairSuccess,
+      ).toBe(1);
+    });
+
+    it('re-schedules a failed repair with backoff and keeps the queue entry', async () => {
+      const fixture = setup();
+      fixture.store.getDueReconcilePending.mockResolvedValue([
+        {
+          member: 'asset-1|1783987200000',
+          assetId: 'asset-1',
+          openTime: new Date('2026-07-13T00:00:00.000Z'),
+        },
+      ]);
+      fixture.sync.syncAsset.mockRejectedValue(new Error('provider down'));
+      await fixture.service.runOnce(new Date('2026-07-13T00:06:00Z'));
+      expect(fixture.store.resolveReconcilePending).not.toHaveBeenCalled();
+      expect(fixture.store.deferReconcilePending).toHaveBeenCalled();
+      expect(
+        fixture.health.snapshot().liveCandle.recoveryRepairFailure,
+      ).toBe(1);
+    });
+
+    it('drops queue entries whose repair can never succeed (validation errors)', async () => {
+      const fixture = setup();
+      fixture.store.getDueReconcilePending.mockResolvedValue([
+        {
+          member: 'gone-asset|1783987200000',
+          assetId: 'gone-asset',
+          openTime: new Date('2026-07-13T00:00:00.000Z'),
+        },
+      ]);
+      const missing = new Error('Asset gone-asset does not exist.');
+      missing.name = 'MarketCandleSyncInputError';
+      fixture.sync.syncAsset.mockRejectedValue(missing);
+      await fixture.service.runOnce(new Date('2026-07-13T00:06:00Z'));
+      expect(fixture.store.deferReconcilePending).not.toHaveBeenCalled();
+      expect(fixture.store.resolveReconcilePending).toHaveBeenCalledWith(
+        'gone-asset|1783987200000',
+      );
+    });
   });
 });
 

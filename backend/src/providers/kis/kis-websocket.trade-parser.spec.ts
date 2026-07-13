@@ -31,6 +31,27 @@ describe('KIS WebSocket trade parser', () => {
     });
   });
 
+  it('parses the official PINGPONG heartbeat as a typed control frame, never a failure', () => {
+    const frame = JSON.stringify({
+      header: { tr_id: 'PINGPONG', datetime: '20260713113000' },
+    });
+    const parsed = parseKisWebSocketMessage({ frame, receivedAt });
+    expect(parsed).toMatchObject({
+      state: 'heartbeat',
+      trId: 'PINGPONG',
+      rawFrame: frame,
+      receivedAt,
+    });
+  });
+
+  it('keeps malformed control frames as failures without throwing', () => {
+    const parsed = parseKisWebSocketMessage({
+      frame: '{"header": {"tr_id": "PINGPONG"',
+      receivedAt,
+    });
+    expect(parsed).toMatchObject({ state: 'failed', reason: 'INVALID_JSON_ACK' });
+  });
+
   it('returns failed for KIS subscription failure ack frames', () => {
     const parsed = parseKisWebSocketMessage({
       frame: JSON.stringify({

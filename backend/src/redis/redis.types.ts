@@ -24,7 +24,11 @@ export interface RawRedisClient {
     key: string,
     min: number | string,
     max: number | string,
+    limitKeyword?: 'LIMIT',
+    offset?: number,
+    count?: number,
   ): Promise<string[]>;
+  zadd(key: string, score: number, member: string): Promise<number>;
   zrem(key: string, ...members: string[]): Promise<number>;
   ping(): Promise<string>;
   eval(

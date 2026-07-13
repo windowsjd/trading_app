@@ -595,6 +595,17 @@ model MarketCandleSyncState {
   rowsWritten          Int                    @default(0) @map("rows_written")
   lastSuccessfulPageAt DateTime?              @map("last_successful_page_at") @db.Timestamptz(3)
   completedAt          DateTime?              @map("completed_at") @db.Timestamptz(3)
+  // Coverage completeness is independent of `status`: `completed` records that
+  // the run terminated normally, while coverageComplete=true additionally
+  // asserts that the provider cursor confirmed the entire half-open
+  // [targetFrom, targetTo) range. Rows created before this column existed keep
+  // coverageComplete=false and are never used as serving coverage evidence.
+  coverageComplete     Boolean                @default(false) @map("coverage_complete")
+  completionReason     String?                @map("completion_reason")
+  // Half-open [coveredFrom, coveredTo) instants actually confirmed by the
+  // provider cursor so far (grows monotonically while the run pages).
+  coveredFrom          DateTime?              @map("covered_from") @db.Timestamptz(3)
+  coveredTo            DateTime?              @map("covered_to") @db.Timestamptz(3)
   errorCode            String?                @map("error_code")
   errorMessage         String?                @map("error_message")
   createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)

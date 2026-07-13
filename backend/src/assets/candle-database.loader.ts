@@ -59,13 +59,23 @@ export class CandleDatabaseLoader {
       };
     }
 
+    // Coverage evidence must span the requested range, clamped at the query
+    // clock: candles beyond `now` cannot exist yet, so a checkpoint whose
+    // provider-confirmed range ends at its own sync time still covers a
+    // request whose range nominally extends past the clock. Only checkpoints
+    // with coverageComplete=true qualify (see findCompletedCovering).
+    const coverageTo = new Date(
+      Math.min(plan.sourceRange.to.getTime(), query.clock.getTime()),
+    );
     const [covering, latestCheckpoint] = await Promise.all([
-      this.syncStates.findCompletedCovering(
-        plan.assetId,
-        plan.sourceInterval,
-        plan.sourceRange.from,
-        plan.sourceRange.to,
-      ),
+      coverageTo.getTime() > plan.sourceRange.from.getTime()
+        ? this.syncStates.findCompletedCovering(
+            plan.assetId,
+            plan.sourceInterval,
+            plan.sourceRange.from,
+            coverageTo,
+          )
+        : Promise.resolve(null),
       this.syncStates.findLatestOverlapping(
         plan.assetId,
         plan.sourceInterval,

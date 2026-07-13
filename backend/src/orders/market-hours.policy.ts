@@ -1,5 +1,8 @@
 import { AssetType } from '../generated/prisma/client';
-import { findMarketHoliday } from './market-holidays.config';
+import {
+  findMarketSchedule,
+  hasMarketCalendarForDate,
+} from './market-holidays.config';
 
 export type MarketTradingStatus =
   | { tradable: true }
@@ -86,20 +89,40 @@ function getSessionTradingStatus(input: {
 }): MarketTradingStatus {
   const parts = getZonedDateTimeParts(input.now, input.timeZone);
   const dateOnly = formatDateOnly(parts);
-  const holiday = findMarketHoliday(input.holidayMarket, dateOnly);
 
-  if (WEEKEND_DAYS.has(parts.weekday) || holiday) {
+  if (WEEKEND_DAYS.has(parts.weekday)) {
     return {
       tradable: false,
       reason: 'MARKET_CLOSED',
-      message: holiday
-        ? `${input.marketName} market is closed for ${holiday.name}.`
-        : `${input.marketName} market is closed.`,
+      message: `${input.marketName} market is closed.`,
     };
   }
 
+  // Fail-safe: without an audited calendar dataset for this year, the day is
+  // never assumed to be a regular trading day. Readiness reports the missing
+  // year so operators can add it.
+  if (!hasMarketCalendarForDate(input.holidayMarket, dateOnly)) {
+    return {
+      tradable: false,
+      reason: 'MARKET_CLOSED',
+      message: `${input.marketName} market calendar has no data for ${dateOnly.slice(0, 4)}; treating the day as not tradable.`,
+    };
+  }
+
+  const schedule = findMarketSchedule(input.holidayMarket, dateOnly);
+  if (schedule?.isFullDayClosed) {
+    return {
+      tradable: false,
+      reason: 'MARKET_CLOSED',
+      message: `${input.marketName} market is closed for ${schedule.name}.`,
+    };
+  }
+
+  // Early-close / delayed-open days shrink the tradable window.
+  const openSeconds = parseTimeSeconds(schedule?.openTimeOverride) ?? input.openSeconds;
+  const closeSeconds = parseTimeSeconds(schedule?.closeTimeOverride) ?? input.closeSeconds;
   const seconds = parts.hour * 60 * 60 + parts.minute * 60 + parts.second;
-  if (seconds < input.openSeconds || seconds >= input.closeSeconds) {
+  if (seconds < openSeconds || seconds >= closeSeconds) {
     return {
       tradable: false,
       reason: 'MARKET_CLOSED',
@@ -108,6 +131,17 @@ function getSessionTradingStatus(input: {
   }
 
   return { tradable: true };
+}
+
+function parseTimeSeconds(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const compact = value.replace(/:/gu, '');
+  if (!/^\d{6}$/u.test(compact)) return null;
+  return (
+    Number(compact.slice(0, 2)) * 3600 +
+    Number(compact.slice(2, 4)) * 60 +
+    Number(compact.slice(4, 6))
+  );
 }
 
 function isKrxAsset(asset: MarketHoursAsset): boolean {

@@ -91,7 +91,7 @@ async function main() {
     const candle = (interval: '5m' | '1d' | '1w', openTime: Date, isClosed: boolean) => ({ assetId, interval, openTime, closeTime: new Date(openTime.getTime() + 300000), open: '100', high: '101', low: '99', close: '100', volume: '1', amount: '100', isClosed, sourceProvider: 'foundation', sourceUpdatedAt: now });
     const recent5m = Array.from({ length: 48 }, (_, index) => candle('5m', new Date(now.getTime() - (48-index)*300000), true));
     await repository.upsertMany([candle('5m', old, true), candle('5m', new Date(old.getTime()+300000), false), ...recent5m, candle('1d', new Date(now.getTime()-86400000), true), candle('1w', new Date(now.getTime()-7*86400000), true)]);
-    assert.equal((await repository.findRange({ assetId, interval: '5m', from: old, to: now })).length, 2);
+    assert.equal((await repository.findRange({ assetId, interval: '5m', from: old, to: now })).length, 50);
 
     assert.equal((await cache.set(input, response)).status, 'stored');
     assert.equal((await cache.get(input)).status, 'fresh');
@@ -103,7 +103,7 @@ async function main() {
     const stateRepository = new MarketCandleSyncStateRepository(prisma);
     for (const feed of ['5m', '1d', '1w'] as const) {
       const state = await stateRepository.createRunning({ assetId, feed, sourceProvider: 'binance_klines', mode: 'repair', targetFrom: new Date(now.getTime()-8*86400000), targetTo: now });
-      await stateRepository.markCompleted(state.id, now);
+      await stateRepository.markCompleted(state.id, now, { coverageComplete: true, completionReason: 'target_reached', coveredFrom: new Date(now.getTime()-8*86400000), coveredTo: now });
     }
     const plans = new CandleReadPlanBuilder(servingConfig);
     const responses = new CandleResponseBuilder();

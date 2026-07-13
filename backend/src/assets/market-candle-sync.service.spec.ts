@@ -68,6 +68,10 @@ type StateRow = {
   rowsWritten: number;
   lastSuccessfulPageAt: Date | null;
   completedAt: Date | null;
+  coverageComplete: boolean;
+  completionReason: string | null;
+  coveredFrom: Date | null;
+  coveredTo: Date | null;
   errorCode: string | null;
   errorMessage: string | null;
   createdAt: Date;
@@ -98,6 +102,10 @@ class FakeStateRepository {
       rowsWritten: 0,
       lastSuccessfulPageAt: null,
       completedAt: null,
+      coverageComplete: false,
+      completionReason: null,
+      coveredFrom: null,
+      coveredTo: null,
       errorCode: null,
       errorMessage: null,
       createdAt: new Date(Date.now() + this.sequence),
@@ -152,6 +160,8 @@ class FakeStateRepository {
       rowsDuplicated: number;
       rowsWritten: number;
       lastSuccessfulPageAt: Date;
+      coveredFrom: Date | null;
+      coveredTo: Date | null;
     },
   ): Promise<boolean> {
     const row = this.rows.find((candidate) => candidate.id === id);
@@ -164,14 +174,39 @@ class FakeStateRepository {
     row.rowsDuplicated += progress.rowsDuplicated;
     row.rowsWritten += progress.rowsWritten;
     row.lastSuccessfulPageAt = progress.lastSuccessfulPageAt;
+    row.coveredFrom = progress.coveredFrom;
+    row.coveredTo = progress.coveredTo;
     return true;
   }
 
-  async markCompleted(id: string, completedAt: Date): Promise<boolean> {
+  async markCompleted(
+    id: string,
+    completedAt: Date,
+    coverage: {
+      coverageComplete: boolean;
+      completionReason: string;
+      coveredFrom: Date | null;
+      coveredTo: Date | null;
+    },
+  ): Promise<boolean> {
     const row = this.rows.find((candidate) => candidate.id === id);
     if (!row || row.status !== 'running') return false;
+    if (
+      coverage.coverageComplete &&
+      (coverage.coveredFrom === null ||
+        coverage.coveredTo === null ||
+        coverage.coveredFrom.getTime() > row.targetFrom.getTime())
+    ) {
+      throw new Error(
+        'coverageComplete=true requires a covered range spanning the target range.',
+      );
+    }
     row.status = 'completed';
     row.completedAt = completedAt;
+    row.coverageComplete = coverage.coverageComplete;
+    row.completionReason = coverage.completionReason;
+    row.coveredFrom = coverage.coveredFrom;
+    row.coveredTo = coverage.coveredTo;
     return true;
   }
 
@@ -893,5 +928,308 @@ describe('MarketCandleSyncService', () => {
       `acquire:${CRYPTO_ASSET.id}:5m`,
       `release:${CRYPTO_ASSET.id}:5m`,
     ]);
+  });
+
+  describe('coverage completeness', () => {
+    it('records a fully swept Binance run as coverage-complete (target_reached)', async () => {
+      const harness = createHarness();
+      const start = NOW.getTime() - DAY;
+      harness.binanceCandles.fetchKlinesPage.mockResolvedValue(
+        binancePage({
+          candles: [syntheticCandle(start)],
+          providerReturnedRows: 1,
+          acceptedRows: 1,
+        }),
+      );
+      const result = await harness.service.syncAsset({
+        assetId: CRYPTO_ASSET.id,
+        targets: ['5m'],
+        mode: 'initial' as never,
+        from: new Date(start),
+        to: NOW,
+        now: NOW,
+      });
+      expect(result.feeds[0].coverageComplete).toBe(true);
+      expect(result.feeds[0].completionReason).toBe('target_reached');
+      const row = harness.stateRepository.rows[0];
+      expect(row.coverageComplete).toBe(true);
+      expect(row.completionReason).toBe('target_reached');
+      expect(row.coveredFrom?.getTime()).toBe(start);
+      expect(row.coveredTo?.getTime()).toBe(NOW.getTime());
+    });
+
+    it('records a confirmed-empty Binance range as coverage-complete', async () => {
+      const harness = createHarness();
+      const start = NOW.getTime() - DAY;
+      // Binance klines requests are endTime-bounded, so an empty page
+      // positively confirms the absence of candles in the whole window.
+      harness.binanceCandles.fetchKlinesPage.mockResolvedValue(
+        binancePage({
+          stopReason: 'empty_page',
+          complete: false,
+        }),
+      );
+      const result = await harness.service.syncAsset({
+        assetId: CRYPTO_ASSET.id,
+        targets: ['5m'],
+        mode: 'initial' as never,
+        from: new Date(start),
+        to: NOW,
+        now: NOW,
+      });
+      expect(result.feeds[0].status).toBe('completed');
+      expect(result.feeds[0].coverageComplete).toBe(true);
+      expect(result.feeds[0].completionReason).toBe('confirmed_empty');
+    });
+
+    it('keeps a US 5m run that exhausted provider retention as incomplete coverage', async () => {
+      const usAsset = {
+        id: 'us-1',
+        symbol: 'AAPL',
+        market: 'NASDAQ',
+        assetType: 'us_stock',
+        isActive: true,
+      };
+      const harness = createHarness({ assets: [usAsset] });
+      const from = new Date(NOW.getTime() - 35 * DAY);
+      const oldestAvailable = new Date(NOW.getTime() - 20 * DAY);
+      harness.fiveMinuteIngestion.fetchUsFiveMinuteCandles.mockResolvedValue({
+        provider: 'kis_us_minute',
+        assetId: usAsset.id,
+        rangeFrom: from,
+        rangeTo: NOW,
+        pagesFetched: 5,
+        providerReturnedRows: 100,
+        acceptedRows: 80,
+        rejectedRows: 0,
+        duplicateRows: 0,
+        candles: [syntheticCandle(oldestAvailable.getTime())],
+        complete: false,
+        stopReason: 'provider_exhausted',
+        oldestOpenTime: oldestAvailable,
+        latestOpenTime: new Date(NOW.getTime() - FIVE_MIN),
+      });
+      const result = await harness.service.syncAsset({
+        assetId: usAsset.id,
+        targets: ['5m'],
+        mode: 'initial' as never,
+        from,
+        to: NOW,
+        now: NOW,
+      });
+      const feed = result.feeds[0];
+      // The run terminates normally but its coverage never reaches targetFrom,
+      // so it must not become serving-coverage evidence.
+      expect(feed.status).toBe('completed');
+      expect(feed.coverageComplete).toBe(false);
+      expect(feed.complete).toBe(false);
+      expect(feed.completionReason).toBe('provider_exhausted_before_target');
+      const row = harness.stateRepository.rows[0];
+      expect(row.coverageComplete).toBe(false);
+      expect(row.coveredFrom!.getTime()).toBeGreaterThanOrEqual(
+        oldestAvailable.getTime(),
+      );
+      expect(row.coveredTo?.getTime()).toBe(NOW.getTime());
+    });
+
+    it('keeps an empty US 5m page before targetFrom as incomplete, never confirmed empty', async () => {
+      const usAsset = {
+        id: 'us-1',
+        symbol: 'AAPL',
+        market: 'NASDAQ',
+        assetType: 'us_stock',
+        isActive: true,
+      };
+      const harness = createHarness({ assets: [usAsset] });
+      harness.fiveMinuteIngestion.fetchUsFiveMinuteCandles.mockResolvedValue({
+        provider: 'kis_us_minute',
+        assetId: usAsset.id,
+        rangeFrom: new Date(NOW.getTime() - 35 * DAY),
+        rangeTo: NOW,
+        pagesFetched: 1,
+        providerReturnedRows: 0,
+        acceptedRows: 0,
+        rejectedRows: 0,
+        duplicateRows: 0,
+        candles: [],
+        complete: false,
+        stopReason: 'empty_page',
+        oldestOpenTime: null,
+        latestOpenTime: null,
+      });
+      const result = await harness.service.syncAsset({
+        assetId: usAsset.id,
+        targets: ['5m'],
+        mode: 'initial' as never,
+        now: NOW,
+      });
+      const feed = result.feeds[0];
+      expect(feed.status).toBe('completed');
+      expect(feed.coverageComplete).toBe(false);
+      expect(feed.completionReason).toBe('empty_page_before_target');
+      expect(harness.stateRepository.rows[0].coveredFrom).toBeNull();
+      expect(harness.stateRepository.rows[0].coveredTo).toBeNull();
+    });
+
+    it('terminates a domestic 5m sweep at the provider history boundary with partial coverage', async () => {
+      const harness = createHarness({ assets: [DOMESTIC_ASSET] });
+      harness.fiveMinuteIngestion.fetchDomesticFiveMinuteCandles
+        .mockImplementationOnce(({ from }: { from: Date }) =>
+          Promise.resolve({
+            provider: 'kis_domestic_minute',
+            assetId: DOMESTIC_ASSET.id,
+            rangeFrom: from,
+            rangeTo: from,
+            pagesFetched: 2,
+            providerReturnedRows: 10,
+            acceptedRows: 5,
+            rejectedRows: 0,
+            duplicateRows: 0,
+            candles: [syntheticCandle(from.getTime())],
+            complete: true,
+            stopReason: 'target_reached',
+            oldestOpenTime: from,
+            latestOpenTime: from,
+          }),
+        )
+        .mockImplementationOnce(() =>
+          Promise.resolve({
+            provider: 'kis_domestic_minute',
+            assetId: DOMESTIC_ASSET.id,
+            rangeFrom: NOW,
+            rangeTo: NOW,
+            pagesFetched: 1,
+            providerReturnedRows: 0,
+            acceptedRows: 0,
+            rejectedRows: 0,
+            duplicateRows: 0,
+            candles: [],
+            complete: false,
+            stopReason: 'empty_page',
+            oldestOpenTime: null,
+            latestOpenTime: null,
+          }),
+        );
+      const to = new Date('2026-07-10T00:00:00Z');
+      const from = new Date(to.getTime() - 6 * DAY);
+      const result = await harness.service.syncAsset({
+        assetId: DOMESTIC_ASSET.id,
+        targets: ['5m'],
+        mode: 'repair' as never,
+        from,
+        to,
+        now: NOW,
+      });
+      const feed = result.feeds[0];
+      expect(feed.status).toBe('completed');
+      expect(feed.coverageComplete).toBe(false);
+      expect(feed.completionReason).toBe('empty_page_before_target');
+      // The empty segment proves the provider has nothing older: the run must
+      // stop instead of sweeping even older segments.
+      expect(
+        harness.fiveMinuteIngestion.fetchDomesticFiveMinuteCandles,
+      ).toHaveBeenCalledTimes(2);
+      const row = harness.stateRepository.rows[0];
+      // Only the first (fully swept) segment is covered: [to-2d, to).
+      expect(row.coveredFrom?.getTime()).toBe(to.getTime() - 2 * DAY);
+      expect(row.coveredTo?.getTime()).toBe(to.getTime());
+    });
+
+    it('keeps a KIS period run that hit an empty page before targetFrom as incomplete', async () => {
+      const harness = createHarness({ assets: [DOMESTIC_ASSET] });
+      const receivedAt = new Date('2026-07-10T07:00:00Z');
+      harness.domesticPeriodAdapter.fetchPeriodPage
+        .mockResolvedValueOnce({
+          state: 'ok',
+          rows: [
+            {
+              value: {
+                stck_bsop_date: '20260710',
+                stck_clpr: '101',
+                stck_oprc: '100',
+                stck_hgpr: '102',
+                stck_lwpr: '99',
+                acml_vol: '1000',
+                acml_tr_pbmn: '101000',
+              },
+              receivedAt,
+              sequence: 0,
+            },
+          ],
+          providerReturnedRows: 1,
+          blankRows: 0,
+          oldestDate: '20260710',
+          latestDate: '20260710',
+          trCont: 'D',
+        })
+        .mockResolvedValueOnce({
+          state: 'ok',
+          rows: [],
+          providerReturnedRows: 0,
+          blankRows: 0,
+          oldestDate: null,
+          latestDate: null,
+          trCont: null,
+        });
+      const result = await harness.service.syncAsset({
+        assetId: DOMESTIC_ASSET.id,
+        targets: ['1d'],
+        mode: 'repair' as never,
+        from: new Date('2026-01-01T00:00:00Z'),
+        to: new Date('2026-07-10T15:00:00Z'),
+        now: NOW,
+      });
+      const feed = result.feeds[0];
+      expect(feed.status).toBe('completed');
+      expect(feed.coverageComplete).toBe(false);
+      expect(feed.completionReason).toBe('empty_page_before_target');
+    });
+
+    it('accumulates coverage across a resumed run before declaring completeness', async () => {
+      const harness = createHarness();
+      const start = NOW.getTime() - DAY;
+      harness.binanceCandles.fetchKlinesPage
+        .mockResolvedValueOnce(
+          binancePage({
+            candles: [syntheticCandle(start)],
+            providerReturnedRows: 1,
+            acceptedRows: 1,
+            nextCursor: { startTime: start + FIVE_MIN },
+            stopReason: null,
+            complete: false,
+          }),
+        )
+        .mockRejectedValueOnce(new Error('network down'))
+        .mockResolvedValueOnce(
+          binancePage({
+            candles: [syntheticCandle(start + FIVE_MIN)],
+            providerReturnedRows: 1,
+            acceptedRows: 1,
+          }),
+        );
+      const failed = await harness.service.syncAsset({
+        assetId: CRYPTO_ASSET.id,
+        targets: ['5m'],
+        mode: 'initial' as never,
+        from: new Date(start),
+        to: NOW,
+        now: NOW,
+      });
+      expect(failed.feeds[0].status).toBe('failed');
+      const afterFailure = harness.stateRepository.rows[0];
+      expect(afterFailure.coveredFrom?.getTime()).toBe(start);
+      expect(afterFailure.coveredTo?.getTime()).toBe(start + FIVE_MIN);
+
+      const resumed = await harness.service.syncAsset({
+        assetId: CRYPTO_ASSET.id,
+        targets: ['5m'],
+        now: NOW,
+      });
+      expect(resumed.feeds[0].coverageComplete).toBe(true);
+      const row = harness.stateRepository.rows[0];
+      expect(row.coverageComplete).toBe(true);
+      expect(row.coveredFrom?.getTime()).toBe(start);
+      expect(row.coveredTo?.getTime()).toBe(NOW.getTime());
+    });
   });
 });

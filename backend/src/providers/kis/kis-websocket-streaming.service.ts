@@ -62,6 +62,7 @@ export type KisWebSocketStreamingStatus = {
   lastDisconnectedAt: string | null;
   lastMessageAt: string | null;
   lastTradeAt: string | null;
+  lastHeartbeatAt: string | null;
   lastSnapshotAt: string | null;
   reconnectCount: number;
   nextReconnectAt: string | null;
@@ -110,6 +111,7 @@ export class KisWebSocketStreamingService
     lastDisconnectedAt: null,
     lastMessageAt: null,
     lastTradeAt: null,
+    lastHeartbeatAt: null,
     lastSnapshotAt: null,
     reconnectCount: 0,
     nextReconnectAt: null,
@@ -426,6 +428,17 @@ export class KisWebSocketStreamingService
       frame: text,
       receivedAt,
     });
+    if (parsed.state === 'heartbeat') {
+      // Echo the official PINGPONG frame back verbatim (KIS protocol) and
+      // record control-frame liveness separately from trade freshness.
+      this.status.lastHeartbeatAt = receivedAt.toISOString();
+      try {
+        this.socket?.send(parsed.rawFrame);
+      } catch {
+        // A best-effort echo failure surfaces via the liveness timeout.
+      }
+      return;
+    }
     const cacheEntries = this.updateLatestCache(parsed);
     const result = await this.ingestionService.ingestParsedMessage(parsed, {
       dryRun: false,

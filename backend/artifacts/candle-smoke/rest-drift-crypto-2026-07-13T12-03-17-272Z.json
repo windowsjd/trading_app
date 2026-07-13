@@ -1,0 +1,35 @@
+{
+  "gitCommit": "e1c1b86799341ce6258c3d8716f4eceb2a5ac3d8",
+  "market": "CRYPTO",
+  "symbols": [
+    "BTCUSDT",
+    "ETHUSDT"
+  ],
+  "window": {
+    "from": "2026-07-13T10:25:00.000Z",
+    "to": "2026-07-13T12:05:00.000Z"
+  },
+  "firstPass": {
+    "missingRows": 2,
+    "ohlcDrift": 0,
+    "volumeDrift": 0,
+    "amountDrift": 0,
+    "closeStateDrift": 0,
+    "sourceTimestampOnly": 38,
+    "checkedRows": 40,
+    "substantiveTotal": 2
+  },
+  "secondPass": {
+    "missingRows": 0,
+    "ohlcDrift": 0,
+    "volumeDrift": 0,
+    "amountDrift": 0,
+    "closeStateDrift": 0,
+    "sourceTimestampOnly": 40,
+    "checkedRows": 40,
+    "substantiveTotal": 0
+  },
+  "driftBeforeReconciliation": 2,
+  "driftAfterReconciliation": 0,
+  "result": "passed"
+}

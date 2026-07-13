@@ -134,6 +134,68 @@ describe('LiveCandleStreamSupervisorService', () => {
     });
   });
 
+  it('echoes KIS PINGPONG heartbeats and keeps the connection healthy without trades', async () => {
+    const socket = new FakeSocket();
+    const fixture = setup(() => socket, [
+      { id: 'dom-1', symbol: '005930', assetType: 'domestic_stock', market: 'KOSPI', isActive: true },
+    ]);
+    const connected = connectKis(fixture.service, {
+      ...ownerContext(),
+      provider: 'kis' as never,
+    });
+    socket.open();
+    await new Promise((resolve) => setImmediate(resolve));
+    const pingpong = JSON.stringify({
+      header: { tr_id: 'PINGPONG', datetime: '20260713113000' },
+    });
+    const subscribeCount = socket.sent.length;
+    socket.emit('message', pingpong);
+    // ack-only traffic: a successful subscription ack frame.
+    socket.emit(
+      'message',
+      JSON.stringify({
+        header: { tr_id: 'H0STCNT0' },
+        body: { rt_cd: '0', msg1: 'SUBSCRIBE SUCCESS' },
+      }),
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+    socket.close(1000, 'fixture done');
+    await connected;
+
+    // The heartbeat was echoed back verbatim.
+    expect(socket.sent.slice(subscribeCount)).toContain(pingpong);
+    const kis = fixture.health.snapshot().providers.kis;
+    expect(kis.lastHeartbeatAt).not.toBeNull();
+    expect(kis.lastControlFrameAt).not.toBeNull();
+    expect(kis.lastFrameAt).not.toBeNull();
+    // No trade arrived: market-data freshness stays unset, and nothing was
+    // rejected or force-closed as a failure.
+    expect(kis.lastEventAt).toBeNull();
+    expect(fixture.health.snapshot().liveCandle.eventsRejected).toBe(0);
+    expect(
+      socket.closeCalls.filter(([code]) => code !== 1000),
+    ).toHaveLength(0);
+  });
+
+  it('handles malformed KIS control frames as rejected events without reconnecting', async () => {
+    const socket = new FakeSocket();
+    const fixture = setup(() => socket, [
+      { id: 'dom-1', symbol: '005930', assetType: 'domestic_stock', market: 'KOSPI', isActive: true },
+    ]);
+    const connected = connectKis(fixture.service, {
+      ...ownerContext(),
+      provider: 'kis' as never,
+    });
+    socket.open();
+    await new Promise((resolve) => setImmediate(resolve));
+    socket.emit('message', '{"header": {"tr_id": "PINGPONG"');
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(fixture.health.snapshot().liveCandle.eventsRejected).toBe(1);
+    expect(socket.closeCalls).toHaveLength(0);
+    socket.close(1000, 'fixture done');
+    await connected;
+  });
+
   it('closes the provider socket immediately after owner lease renewal is lost', async () => {
     jest.useFakeTimers();
     const socket = new FakeSocket();
@@ -171,7 +233,19 @@ function setup(
         enabled: true,
         wsMarketDataBaseUrl: 'wss://stream.example',
       },
-      kis: {},
+      kis: {
+        enabled: true,
+        wsBaseUrl: 'wss://kis.example',
+        wsDomesticTrId: 'H0STCNT0',
+        wsOverseasDelayedTrId: 'HDFSCNT0',
+        wsCustType: 'P',
+      },
+    }),
+  };
+  const kisAuth = {
+    requestConfiguredWebSocketApprovalKey: jest.fn().mockResolvedValue({
+      state: 'available',
+      response: { approvalKey: 'approval-key' },
     }),
   };
   const normalizer = {
@@ -194,7 +268,7 @@ function setup(
     prisma as never,
     locks as never,
     providerConfig as never,
-    {} as never,
+    kisAuth as never,
     pricePubSub as never,
     normalizer as never,
     pipeline as never,
@@ -203,6 +277,7 @@ function setup(
       ...readLiveCandleConfig({}),
       enabled: true,
       binanceEnabled: true,
+      kisEnabled: true,
       maxProviderSubscriptionsPerShard,
     },
     factory,
@@ -270,6 +345,17 @@ function connectBinance(
       connectBinance(context: unknown): Promise<void>;
     }
   ).connectBinance(context);
+}
+
+function connectKis(
+  service: LiveCandleStreamSupervisorService,
+  context: ReturnType<typeof ownerContext>,
+) {
+  return (
+    service as unknown as {
+      connectKis(context: unknown): Promise<void>;
+    }
+  ).connectKis(context);
 }
 
 function startLeaseRenewal(

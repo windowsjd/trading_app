@@ -76,6 +76,8 @@ describe('MarketCandleSyncStateRepository', () => {
       rowsRejected: 5,
       rowsDuplicated: 5,
       rowsWritten: 90,
+      coveredFrom: null,
+      coveredTo: null,
       lastSuccessfulPageAt: new Date('2026-07-10T00:00:00Z'),
     });
     expect(recorded).toBe(true);
@@ -97,6 +99,8 @@ describe('MarketCandleSyncStateRepository', () => {
       rowsRejected: 0,
       rowsDuplicated: 0,
       rowsWritten: 0,
+      coveredFrom: null,
+      coveredTo: null,
       lastSuccessfulPageAt: new Date(),
     });
     expect(delegate.updateMany.mock.calls[0][0].data.cursorJson).toBe(
@@ -111,6 +115,8 @@ describe('MarketCandleSyncStateRepository', () => {
         rowsRejected: 0,
         rowsDuplicated: 0,
         rowsWritten: 0,
+        coveredFrom: null,
+        coveredTo: null,
         lastSuccessfulPageAt: new Date(),
       }),
     ).rejects.toThrow('non-negative');
@@ -128,6 +134,8 @@ describe('MarketCandleSyncStateRepository', () => {
         rowsRejected: 0,
         rowsDuplicated: 0,
         rowsWritten: 0,
+        coveredFrom: null,
+        coveredTo: null,
         lastSuccessfulPageAt: new Date(),
       }),
     ).resolves.toBe(false);
@@ -136,7 +144,12 @@ describe('MarketCandleSyncStateRepository', () => {
   it('completes only running rows and never regresses completed rows', async () => {
     const { repository, delegate } = createRepository();
     delegate.updateMany.mockResolvedValue({ count: 1 });
-    await repository.markCompleted('sync-1', new Date());
+    await repository.markCompleted('sync-1', new Date(), {
+      coverageComplete: false,
+      completionReason: 'provider_exhausted_before_target',
+      coveredFrom: null,
+      coveredTo: null,
+    });
     expect(delegate.updateMany.mock.calls[0][0].where).toEqual({
       id: 'sync-1',
       status: 'running',
@@ -198,6 +211,89 @@ describe('MarketCandleSyncStateRepository', () => {
       status: 'canceled',
       errorCode: 'SUPERSEDED',
     });
+  });
+
+  it('persists coverage on completion and requires a spanning range for coverageComplete', async () => {
+    const { repository, delegate } = createRepository();
+    delegate.updateMany.mockResolvedValue({ count: 1 });
+    delegate.findUnique.mockResolvedValue({
+      targetFrom: new Date('2026-06-01T00:00:00Z'),
+      targetTo: new Date('2026-07-01T00:00:00Z'),
+    });
+    await repository.markCompleted('sync-1', new Date(), {
+      coverageComplete: true,
+      completionReason: 'target_reached',
+      coveredFrom: new Date('2026-06-01T00:00:00Z'),
+      coveredTo: new Date('2026-07-01T00:00:00Z'),
+    });
+    expect(delegate.updateMany.mock.calls[0][0].data).toMatchObject({
+      status: 'completed',
+      coverageComplete: true,
+      completionReason: 'target_reached',
+    });
+
+    // A coverageComplete=true claim that starts after targetFrom is a
+    // programmer error, not a persistable state.
+    await expect(
+      repository.markCompleted('sync-1', new Date(), {
+        coverageComplete: true,
+        completionReason: 'target_reached',
+        coveredFrom: new Date('2026-06-15T00:00:00Z'),
+        coveredTo: new Date('2026-07-01T00:00:00Z'),
+      }),
+    ).rejects.toThrow('covered range');
+    await expect(
+      repository.markCompleted('sync-1', new Date(), {
+        coverageComplete: true,
+        completionReason: 'confirmed_empty',
+        coveredFrom: null,
+        coveredTo: null,
+      }),
+    ).rejects.toThrow('covered range');
+  });
+
+  it('records accumulated covered range with page progress', async () => {
+    const { repository, delegate } = createRepository();
+    delegate.updateMany.mockResolvedValue({ count: 1 });
+    await repository.recordPageSuccess('sync-1', {
+      cursorJson: { startTime: 456 },
+      pagesFetched: 1,
+      providerRowsReceived: 10,
+      rowsAccepted: 10,
+      rowsRejected: 0,
+      rowsDuplicated: 0,
+      rowsWritten: 10,
+      lastSuccessfulPageAt: new Date('2026-07-10T00:00:00Z'),
+      coveredFrom: new Date('2026-07-01T00:00:00Z'),
+      coveredTo: new Date('2026-07-05T00:00:00Z'),
+    });
+    expect(delegate.updateMany.mock.calls[0][0].data).toMatchObject({
+      coveredFrom: new Date('2026-07-01T00:00:00Z'),
+      coveredTo: new Date('2026-07-05T00:00:00Z'),
+    });
+  });
+
+  it('only accepts coverage-complete checkpoints spanning the range as covering', async () => {
+    const { repository, delegate } = createRepository();
+    delegate.findFirst.mockResolvedValue(null);
+    await repository.findCompletedCovering(
+      'asset-1',
+      '5m',
+      new Date('2026-07-01T00:00:00Z'),
+      new Date('2026-07-02T00:00:00Z'),
+    );
+    const where = delegate.findFirst.mock.calls[0][0].where;
+    expect(where.status).toBe('completed');
+    expect(where.coverageComplete).toBe(true);
+    expect(where.coveredFrom).toEqual({
+      not: null,
+      lte: new Date('2026-07-01T00:00:00Z'),
+    });
+    expect(where.coveredTo).toEqual({
+      not: null,
+      gte: new Date('2026-07-02T00:00:00Z'),
+    });
+    expect(where.completedAt).toEqual({ not: null });
   });
 
   it('truncates long error messages', async () => {

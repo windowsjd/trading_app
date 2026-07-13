@@ -166,10 +166,105 @@ describe('CandleServingService', () => {
     expect(legacy).toHaveBeenCalledTimes(2);
   });
 
-  it('preserves the existing provider error when no fallback exists', async () => {
+  it('serves provider-direct when the managed path cannot resolve coverage', async () => {
+    // e.g. a provider-empty asset (halted stock) or an unresolved retention
+    // edge: no stale, no last-known-good — the provider-direct path answers.
+    const { service, database, singleFlight } = create();
+    database.load.mockResolvedValue(load('missing', null, { completedCoverage: true }));
+    singleFlight.getOrLoad.mockRejectedValue(new CandleOperationalRefreshError('coverage'));
+    const legacy = jest.fn().mockResolvedValue(response('legacy'));
+    await expect(service.serve(asset, query, legacy)).resolves.toEqual(response('legacy'));
+    expect(legacy).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves the existing provider error when every fallback fails', async () => {
     const { service, database, singleFlight } = create();
     database.load.mockResolvedValue(load('missing', null, { completedCoverage: true }));
     singleFlight.getOrLoad.mockRejectedValue(new CandleOperationalRefreshError('provider'));
-    await expect(service.serve(asset, query, jest.fn())).rejects.toMatchObject({ status: 502 } satisfies Partial<HttpException>);
+    const legacy = jest.fn().mockRejectedValue(new Error('provider down'));
+    await expect(service.serve(asset, query, legacy)).rejects.toMatchObject({ status: 502 } satisfies Partial<HttpException>);
+  });
+
+  describe('stale Redis fallback on database outages', () => {
+    const databaseDown = () => {
+      const error = new Error("Can't reach database server at localhost:5432");
+      error.name = 'PrismaClientInitializationError';
+      return error;
+    };
+    const prismaPoolTimeout = () => {
+      const error = new Error('Timed out fetching a new connection from the pool.') as Error & { code: string };
+      error.name = 'PrismaClientKnownRequestError';
+      error.code = 'P2024';
+      return error;
+    };
+
+    it('returns stale Redis when the initial database load fails operationally', async () => {
+      const { service, database, cache } = create();
+      const stale = response('stale');
+      cache.get.mockResolvedValue({ status: 'stale', value: stale });
+      database.load.mockRejectedValue(databaseDown());
+      await expect(service.serve(asset, query, jest.fn())).resolves.toBe(stale);
+    });
+
+    it('returns stale Redis on a Prisma pool/connection timeout', async () => {
+      const { service, database, cache } = create();
+      const stale = response('stale');
+      cache.get.mockResolvedValue({ status: 'stale', value: stale });
+      database.load.mockRejectedValue(prismaPoolTimeout());
+      await expect(service.serve(asset, query, jest.fn())).resolves.toBe(stale);
+    });
+
+    it('serves a fresh cache hit without touching the failed database', async () => {
+      const { service, database, cache } = create();
+      cache.get.mockResolvedValue({ status: 'fresh', value: response('cache') });
+      database.load.mockRejectedValue(databaseDown());
+      await expect(service.serve(asset, query, jest.fn())).resolves.toEqual(response('cache'));
+      expect(database.load).not.toHaveBeenCalled();
+    });
+
+    it('rethrows the database error when no stale value exists', async () => {
+      const { service, database, cache } = create();
+      cache.get.mockResolvedValue({ status: 'miss' });
+      database.load.mockRejectedValue(databaseDown());
+      await expect(service.serve(asset, query, jest.fn())).rejects.toMatchObject({
+        name: 'PrismaClientInitializationError',
+      });
+    });
+
+    it('never hides validation errors behind stale Redis', async () => {
+      const { service, database, cache } = create();
+      cache.get.mockResolvedValue({ status: 'stale', value: response('stale') });
+      const validation = new Error('interval must be 5m, 1d, or 1w.');
+      validation.name = 'MarketCandleSyncInputError';
+      database.load.mockRejectedValue(validation);
+      await expect(service.serve(asset, query, jest.fn())).rejects.toBe(validation);
+    });
+
+    it('never hides configuration errors behind stale Redis', async () => {
+      const { service, database, cache, singleFlight } = create();
+      cache.get.mockResolvedValue({ status: 'stale', value: response('stale') });
+      database.load.mockResolvedValue(load('missing', null, { completedCoverage: true }));
+      const config = new Error('KIS_APP_KEY is missing.');
+      config.name = 'ProviderConfigError';
+      singleFlight.getOrLoad.mockRejectedValue(config);
+      await expect(service.serve(asset, query, jest.fn())).rejects.toBe(config);
+    });
+
+    it('never hides schema invariant errors behind stale Redis', async () => {
+      const { service, database, cache } = create();
+      cache.get.mockResolvedValue({ status: 'stale', value: response('stale') });
+      const invariant = new Error('Validated candle request could not be converted to UTC.');
+      database.load.mockRejectedValue(invariant);
+      await expect(service.serve(asset, query, jest.fn())).rejects.toBe(invariant);
+    });
+
+    it('resumes normal serving once the database recovers', async () => {
+      const { service, database, cache } = create();
+      cache.get.mockResolvedValue({ status: 'stale', value: response('stale') });
+      database.load.mockRejectedValueOnce(databaseDown());
+      await expect(service.serve(asset, query, jest.fn())).resolves.toEqual(response('stale'));
+      database.load.mockResolvedValue(load('available', response('recovered')));
+      await expect(service.serve(asset, query, jest.fn())).resolves.toEqual(response('recovered'));
+    });
   });
 });

@@ -61,6 +61,10 @@ export type MarketCandleSyncStateMinAggregateOutputType = {
   rowsWritten: number | null
   lastSuccessfulPageAt: Date | null
   completedAt: Date | null
+  coverageComplete: boolean | null
+  completionReason: string | null
+  coveredFrom: Date | null
+  coveredTo: Date | null
   errorCode: string | null
   errorMessage: string | null
   createdAt: Date | null
@@ -84,6 +88,10 @@ export type MarketCandleSyncStateMaxAggregateOutputType = {
   rowsWritten: number | null
   lastSuccessfulPageAt: Date | null
   completedAt: Date | null
+  coverageComplete: boolean | null
+  completionReason: string | null
+  coveredFrom: Date | null
+  coveredTo: Date | null
   errorCode: string | null
   errorMessage: string | null
   createdAt: Date | null
@@ -108,6 +116,10 @@ export type MarketCandleSyncStateCountAggregateOutputType = {
   rowsWritten: number
   lastSuccessfulPageAt: number
   completedAt: number
+  coverageComplete: number
+  completionReason: number
+  coveredFrom: number
+  coveredTo: number
   errorCode: number
   errorMessage: number
   createdAt: number
@@ -151,6 +163,10 @@ export type MarketCandleSyncStateMinAggregateInputType = {
   rowsWritten?: true
   lastSuccessfulPageAt?: true
   completedAt?: true
+  coverageComplete?: true
+  completionReason?: true
+  coveredFrom?: true
+  coveredTo?: true
   errorCode?: true
   errorMessage?: true
   createdAt?: true
@@ -174,6 +190,10 @@ export type MarketCandleSyncStateMaxAggregateInputType = {
   rowsWritten?: true
   lastSuccessfulPageAt?: true
   completedAt?: true
+  coverageComplete?: true
+  completionReason?: true
+  coveredFrom?: true
+  coveredTo?: true
   errorCode?: true
   errorMessage?: true
   createdAt?: true
@@ -198,6 +218,10 @@ export type MarketCandleSyncStateCountAggregateInputType = {
   rowsWritten?: true
   lastSuccessfulPageAt?: true
   completedAt?: true
+  coverageComplete?: true
+  completionReason?: true
+  coveredFrom?: true
+  coveredTo?: true
   errorCode?: true
   errorMessage?: true
   createdAt?: true
@@ -309,6 +333,10 @@ export type MarketCandleSyncStateGroupByOutputType = {
   rowsWritten: number
   lastSuccessfulPageAt: Date | null
   completedAt: Date | null
+  coverageComplete: boolean
+  completionReason: string | null
+  coveredFrom: Date | null
+  coveredTo: Date | null
   errorCode: string | null
   errorMessage: string | null
   createdAt: Date
@@ -356,6 +384,10 @@ export type MarketCandleSyncStateWhereInput = {
   rowsWritten?: Prisma.IntFilter<"MarketCandleSyncState"> | number
   lastSuccessfulPageAt?: Prisma.DateTimeNullableFilter<"MarketCandleSyncState"> | Date | string | null
   completedAt?: Prisma.DateTimeNullableFilter<"MarketCandleSyncState"> | Date | string | null
+  coverageComplete?: Prisma.BoolFilter<"MarketCandleSyncState"> | boolean
+  completionReason?: Prisma.StringNullableFilter<"MarketCandleSyncState"> | string | null
+  coveredFrom?: Prisma.DateTimeNullableFilter<"MarketCandleSyncState"> | Date | string | null
+  coveredTo?: Prisma.DateTimeNullableFilter<"MarketCandleSyncState"> | Date | string | null
   errorCode?: Prisma.StringNullableFilter<"MarketCandleSyncState"> | string | null
   errorMessage?: Prisma.StringNullableFilter<"MarketCandleSyncState"> | string | null
   createdAt?: Prisma.DateTimeFilter<"MarketCandleSyncState"> | Date | string
@@ -381,6 +413,10 @@ export type MarketCandleSyncStateOrderByWithRelationInput = {
   rowsWritten?: Prisma.SortOrder
   lastSuccessfulPageAt?: Prisma.SortOrderInput | Prisma.SortOrder
   completedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  coverageComplete?: Prisma.SortOrder
+  completionReason?: Prisma.SortOrderInput | Prisma.SortOrder
+  coveredFrom?: Prisma.SortOrderInput | Prisma.SortOrder
+  coveredTo?: Prisma.SortOrderInput | Prisma.SortOrder
   errorCode?: Prisma.SortOrderInput | Prisma.SortOrder
   errorMessage?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -409,6 +445,10 @@ export type MarketCandleSyncStateWhereUniqueInput = Prisma.AtLeast<{
   rowsWritten?: Prisma.IntFilter<"MarketCandleSyncState"> | number
   lastSuccessfulPageAt?: Prisma.DateTimeNullableFilter<"MarketCandleSyncState"> | Date | string | null
   completedAt?: Prisma.DateTimeNullableFilter<"MarketCandleSyncState"> | Date | string | null
+  coverageComplete?: Prisma.BoolFilter<"MarketCandleSyncState"> | boolean
+  completionReason?: Prisma.StringNullableFilter<"MarketCandleSyncState"> | string | null
+  coveredFrom?: Prisma.DateTimeNullableFilter<"MarketCandleSyncState"> | Date | string | null
+  coveredTo?: Prisma.DateTimeNullableFilter<"MarketCandleSyncState"> | Date | string | null
   errorCode?: Prisma.StringNullableFilter<"MarketCandleSyncState"> | string | null
   errorMessage?: Prisma.StringNullableFilter<"MarketCandleSyncState"> | string | null
   createdAt?: Prisma.DateTimeFilter<"MarketCandleSyncState"> | Date | string
@@ -434,6 +474,10 @@ export type MarketCandleSyncStateOrderByWithAggregationInput = {
   rowsWritten?: Prisma.SortOrder
   lastSuccessfulPageAt?: Prisma.SortOrderInput | Prisma.SortOrder
   completedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  coverageComplete?: Prisma.SortOrder
+  completionReason?: Prisma.SortOrderInput | Prisma.SortOrder
+  coveredFrom?: Prisma.SortOrderInput | Prisma.SortOrder
+  coveredTo?: Prisma.SortOrderInput | Prisma.SortOrder
   errorCode?: Prisma.SortOrderInput | Prisma.SortOrder
   errorMessage?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -466,6 +510,10 @@ export type MarketCandleSyncStateScalarWhereWithAggregatesInput = {
   rowsWritten?: Prisma.IntWithAggregatesFilter<"MarketCandleSyncState"> | number
   lastSuccessfulPageAt?: Prisma.DateTimeNullableWithAggregatesFilter<"MarketCandleSyncState"> | Date | string | null
   completedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"MarketCandleSyncState"> | Date | string | null
+  coverageComplete?: Prisma.BoolWithAggregatesFilter<"MarketCandleSyncState"> | boolean
+  completionReason?: Prisma.StringNullableWithAggregatesFilter<"MarketCandleSyncState"> | string | null
+  coveredFrom?: Prisma.DateTimeNullableWithAggregatesFilter<"MarketCandleSyncState"> | Date | string | null
+  coveredTo?: Prisma.DateTimeNullableWithAggregatesFilter<"MarketCandleSyncState"> | Date | string | null
   errorCode?: Prisma.StringNullableWithAggregatesFilter<"MarketCandleSyncState"> | string | null
   errorMessage?: Prisma.StringNullableWithAggregatesFilter<"MarketCandleSyncState"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"MarketCandleSyncState"> | Date | string
@@ -489,6 +537,10 @@ export type MarketCandleSyncStateCreateInput = {
   rowsWritten?: number
   lastSuccessfulPageAt?: Date | string | null
   completedAt?: Date | string | null
+  coverageComplete?: boolean
+  completionReason?: string | null
+  coveredFrom?: Date | string | null
+  coveredTo?: Date | string | null
   errorCode?: string | null
   errorMessage?: string | null
   createdAt?: Date | string
@@ -514,6 +566,10 @@ export type MarketCandleSyncStateUncheckedCreateInput = {
   rowsWritten?: number
   lastSuccessfulPageAt?: Date | string | null
   completedAt?: Date | string | null
+  coverageComplete?: boolean
+  completionReason?: string | null
+  coveredFrom?: Date | string | null
+  coveredTo?: Date | string | null
   errorCode?: string | null
   errorMessage?: string | null
   createdAt?: Date | string
@@ -537,6 +593,10 @@ export type MarketCandleSyncStateUpdateInput = {
   rowsWritten?: Prisma.IntFieldUpdateOperationsInput | number
   lastSuccessfulPageAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  coverageComplete?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  completionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  coveredFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  coveredTo?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   errorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   errorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -562,6 +622,10 @@ export type MarketCandleSyncStateUncheckedUpdateInput = {
   rowsWritten?: Prisma.IntFieldUpdateOperationsInput | number
   lastSuccessfulPageAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  coverageComplete?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  completionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  coveredFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  coveredTo?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   errorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   errorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -586,6 +650,10 @@ export type MarketCandleSyncStateCreateManyInput = {
   rowsWritten?: number
   lastSuccessfulPageAt?: Date | string | null
   completedAt?: Date | string | null
+  coverageComplete?: boolean
+  completionReason?: string | null
+  coveredFrom?: Date | string | null
+  coveredTo?: Date | string | null
   errorCode?: string | null
   errorMessage?: string | null
   createdAt?: Date | string
@@ -609,6 +677,10 @@ export type MarketCandleSyncStateUpdateManyMutationInput = {
   rowsWritten?: Prisma.IntFieldUpdateOperationsInput | number
   lastSuccessfulPageAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  coverageComplete?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  completionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  coveredFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  coveredTo?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   errorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   errorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -633,6 +705,10 @@ export type MarketCandleSyncStateUncheckedUpdateManyInput = {
   rowsWritten?: Prisma.IntFieldUpdateOperationsInput | number
   lastSuccessfulPageAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  coverageComplete?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  completionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  coveredFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  coveredTo?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   errorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   errorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -667,6 +743,10 @@ export type MarketCandleSyncStateCountOrderByAggregateInput = {
   rowsWritten?: Prisma.SortOrder
   lastSuccessfulPageAt?: Prisma.SortOrder
   completedAt?: Prisma.SortOrder
+  coverageComplete?: Prisma.SortOrder
+  completionReason?: Prisma.SortOrder
+  coveredFrom?: Prisma.SortOrder
+  coveredTo?: Prisma.SortOrder
   errorCode?: Prisma.SortOrder
   errorMessage?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -699,6 +779,10 @@ export type MarketCandleSyncStateMaxOrderByAggregateInput = {
   rowsWritten?: Prisma.SortOrder
   lastSuccessfulPageAt?: Prisma.SortOrder
   completedAt?: Prisma.SortOrder
+  coverageComplete?: Prisma.SortOrder
+  completionReason?: Prisma.SortOrder
+  coveredFrom?: Prisma.SortOrder
+  coveredTo?: Prisma.SortOrder
   errorCode?: Prisma.SortOrder
   errorMessage?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -722,6 +806,10 @@ export type MarketCandleSyncStateMinOrderByAggregateInput = {
   rowsWritten?: Prisma.SortOrder
   lastSuccessfulPageAt?: Prisma.SortOrder
   completedAt?: Prisma.SortOrder
+  coverageComplete?: Prisma.SortOrder
+  completionReason?: Prisma.SortOrder
+  coveredFrom?: Prisma.SortOrder
+  coveredTo?: Prisma.SortOrder
   errorCode?: Prisma.SortOrder
   errorMessage?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -804,6 +892,10 @@ export type MarketCandleSyncStateCreateWithoutAssetInput = {
   rowsWritten?: number
   lastSuccessfulPageAt?: Date | string | null
   completedAt?: Date | string | null
+  coverageComplete?: boolean
+  completionReason?: string | null
+  coveredFrom?: Date | string | null
+  coveredTo?: Date | string | null
   errorCode?: string | null
   errorMessage?: string | null
   createdAt?: Date | string
@@ -827,6 +919,10 @@ export type MarketCandleSyncStateUncheckedCreateWithoutAssetInput = {
   rowsWritten?: number
   lastSuccessfulPageAt?: Date | string | null
   completedAt?: Date | string | null
+  coverageComplete?: boolean
+  completionReason?: string | null
+  coveredFrom?: Date | string | null
+  coveredTo?: Date | string | null
   errorCode?: string | null
   errorMessage?: string | null
   createdAt?: Date | string
@@ -880,6 +976,10 @@ export type MarketCandleSyncStateScalarWhereInput = {
   rowsWritten?: Prisma.IntFilter<"MarketCandleSyncState"> | number
   lastSuccessfulPageAt?: Prisma.DateTimeNullableFilter<"MarketCandleSyncState"> | Date | string | null
   completedAt?: Prisma.DateTimeNullableFilter<"MarketCandleSyncState"> | Date | string | null
+  coverageComplete?: Prisma.BoolFilter<"MarketCandleSyncState"> | boolean
+  completionReason?: Prisma.StringNullableFilter<"MarketCandleSyncState"> | string | null
+  coveredFrom?: Prisma.DateTimeNullableFilter<"MarketCandleSyncState"> | Date | string | null
+  coveredTo?: Prisma.DateTimeNullableFilter<"MarketCandleSyncState"> | Date | string | null
   errorCode?: Prisma.StringNullableFilter<"MarketCandleSyncState"> | string | null
   errorMessage?: Prisma.StringNullableFilter<"MarketCandleSyncState"> | string | null
   createdAt?: Prisma.DateTimeFilter<"MarketCandleSyncState"> | Date | string
@@ -903,6 +1003,10 @@ export type MarketCandleSyncStateCreateManyAssetInput = {
   rowsWritten?: number
   lastSuccessfulPageAt?: Date | string | null
   completedAt?: Date | string | null
+  coverageComplete?: boolean
+  completionReason?: string | null
+  coveredFrom?: Date | string | null
+  coveredTo?: Date | string | null
   errorCode?: string | null
   errorMessage?: string | null
   createdAt?: Date | string
@@ -926,6 +1030,10 @@ export type MarketCandleSyncStateUpdateWithoutAssetInput = {
   rowsWritten?: Prisma.IntFieldUpdateOperationsInput | number
   lastSuccessfulPageAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  coverageComplete?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  completionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  coveredFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  coveredTo?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   errorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   errorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -949,6 +1057,10 @@ export type MarketCandleSyncStateUncheckedUpdateWithoutAssetInput = {
   rowsWritten?: Prisma.IntFieldUpdateOperationsInput | number
   lastSuccessfulPageAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  coverageComplete?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  completionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  coveredFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  coveredTo?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   errorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   errorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -972,6 +1084,10 @@ export type MarketCandleSyncStateUncheckedUpdateManyWithoutAssetInput = {
   rowsWritten?: Prisma.IntFieldUpdateOperationsInput | number
   lastSuccessfulPageAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  coverageComplete?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  completionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  coveredFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  coveredTo?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   errorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   errorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -998,6 +1114,10 @@ export type MarketCandleSyncStateSelect<ExtArgs extends runtime.Types.Extensions
   rowsWritten?: boolean
   lastSuccessfulPageAt?: boolean
   completedAt?: boolean
+  coverageComplete?: boolean
+  completionReason?: boolean
+  coveredFrom?: boolean
+  coveredTo?: boolean
   errorCode?: boolean
   errorMessage?: boolean
   createdAt?: boolean
@@ -1023,6 +1143,10 @@ export type MarketCandleSyncStateSelectCreateManyAndReturn<ExtArgs extends runti
   rowsWritten?: boolean
   lastSuccessfulPageAt?: boolean
   completedAt?: boolean
+  coverageComplete?: boolean
+  completionReason?: boolean
+  coveredFrom?: boolean
+  coveredTo?: boolean
   errorCode?: boolean
   errorMessage?: boolean
   createdAt?: boolean
@@ -1048,6 +1172,10 @@ export type MarketCandleSyncStateSelectUpdateManyAndReturn<ExtArgs extends runti
   rowsWritten?: boolean
   lastSuccessfulPageAt?: boolean
   completedAt?: boolean
+  coverageComplete?: boolean
+  completionReason?: boolean
+  coveredFrom?: boolean
+  coveredTo?: boolean
   errorCode?: boolean
   errorMessage?: boolean
   createdAt?: boolean
@@ -1073,13 +1201,17 @@ export type MarketCandleSyncStateSelectScalar = {
   rowsWritten?: boolean
   lastSuccessfulPageAt?: boolean
   completedAt?: boolean
+  coverageComplete?: boolean
+  completionReason?: boolean
+  coveredFrom?: boolean
+  coveredTo?: boolean
   errorCode?: boolean
   errorMessage?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type MarketCandleSyncStateOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "assetId" | "feed" | "sourceProvider" | "mode" | "status" | "targetFrom" | "targetTo" | "cursorJson" | "pagesFetched" | "providerRowsReceived" | "rowsAccepted" | "rowsRejected" | "rowsDuplicated" | "rowsWritten" | "lastSuccessfulPageAt" | "completedAt" | "errorCode" | "errorMessage" | "createdAt" | "updatedAt", ExtArgs["result"]["marketCandleSyncState"]>
+export type MarketCandleSyncStateOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "assetId" | "feed" | "sourceProvider" | "mode" | "status" | "targetFrom" | "targetTo" | "cursorJson" | "pagesFetched" | "providerRowsReceived" | "rowsAccepted" | "rowsRejected" | "rowsDuplicated" | "rowsWritten" | "lastSuccessfulPageAt" | "completedAt" | "coverageComplete" | "completionReason" | "coveredFrom" | "coveredTo" | "errorCode" | "errorMessage" | "createdAt" | "updatedAt", ExtArgs["result"]["marketCandleSyncState"]>
 export type MarketCandleSyncStateInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
 }
@@ -1113,6 +1245,10 @@ export type $MarketCandleSyncStatePayload<ExtArgs extends runtime.Types.Extensio
     rowsWritten: number
     lastSuccessfulPageAt: Date | null
     completedAt: Date | null
+    coverageComplete: boolean
+    completionReason: string | null
+    coveredFrom: Date | null
+    coveredTo: Date | null
     errorCode: string | null
     errorMessage: string | null
     createdAt: Date
@@ -1558,6 +1694,10 @@ export interface MarketCandleSyncStateFieldRefs {
   readonly rowsWritten: Prisma.FieldRef<"MarketCandleSyncState", 'Int'>
   readonly lastSuccessfulPageAt: Prisma.FieldRef<"MarketCandleSyncState", 'DateTime'>
   readonly completedAt: Prisma.FieldRef<"MarketCandleSyncState", 'DateTime'>
+  readonly coverageComplete: Prisma.FieldRef<"MarketCandleSyncState", 'Boolean'>
+  readonly completionReason: Prisma.FieldRef<"MarketCandleSyncState", 'String'>
+  readonly coveredFrom: Prisma.FieldRef<"MarketCandleSyncState", 'DateTime'>
+  readonly coveredTo: Prisma.FieldRef<"MarketCandleSyncState", 'DateTime'>
   readonly errorCode: Prisma.FieldRef<"MarketCandleSyncState", 'String'>
   readonly errorMessage: Prisma.FieldRef<"MarketCandleSyncState", 'String'>
   readonly createdAt: Prisma.FieldRef<"MarketCandleSyncState", 'DateTime'>

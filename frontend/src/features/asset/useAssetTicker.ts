@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { getAccessToken } from '../../services/storage/tokenStorage';
+import { getRealtimeSocketManager } from '../../services/ws/sharedRealtimeSocket';
+import type { RealtimeSubscriptionEvent } from '../../services/ws/realtimeSocketManager';
 
 interface UseAssetTickerParams {
   assetId: string;
@@ -46,15 +47,7 @@ type AssetTickerControlMessage = {
   message?: string;
 };
 
-const RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000, 30000];
 const STALE_FRESHNESS_THRESHOLD_SECONDS = 60;
-
-function appendToken(wsUrl: string, token: string | null) {
-  if (!token) return wsUrl;
-
-  const separator = wsUrl.includes('?') ? '&' : '?';
-  return `${wsUrl}${separator}token=${encodeURIComponent(token)}`;
-}
 
 function parseTimestamp(value?: string | null) {
   if (!value) return null;
@@ -95,18 +88,20 @@ function isUnavailableTicker(payload: AssetTickerMessage) {
   return !!payload.priceKrwState && payload.priceKrwState !== 'available';
 }
 
+/**
+ * Subscribes to the asset_ticker channel on the app-wide shared WebSocket.
+ * The socket itself is owned by RealtimeSocketManager and is shared with
+ * every other realtime hook (e.g. useAssetCandle); unmounting only releases
+ * this hook's subscription.
+ */
 export function useAssetTicker({
   assetId,
   wsUrl,
   enabled = true,
 }: UseAssetTickerParams) {
-  const socketRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const reconnectAttemptRef = useRef(0);
   const latestTickerRef = useRef<AssetTickerMessage | null>(null);
   const latestSnapshotIdRef = useRef<string | null>(null);
   const latestTimestampRef = useRef<number | null>(null);
-  const shouldReconnectRef = useRef(false);
 
   const [latestTicker, setLatestTicker] = useState<AssetTickerMessage | null>(null);
   const [connectionState, setConnectionState] =
@@ -122,28 +117,6 @@ export function useAssetTicker({
     }
 
     let isMounted = true;
-    shouldReconnectRef.current = true;
-
-    const clearReconnectTimeout = () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-        reconnectTimeoutRef.current = null;
-      }
-    };
-
-    const sendSubscription = (ws: WebSocket, type: 'subscribe' | 'unsubscribe') => {
-      try {
-        ws.send(
-          JSON.stringify({
-            type,
-            channel: 'asset_ticker',
-            assetId,
-          }),
-        );
-      } catch {
-        // Ignore best-effort unsubscribe/subscription send failures.
-      }
-    };
 
     const acceptTicker = (payload: AssetTickerMessage) => {
       if (payload.assetId !== assetId) return;
@@ -175,156 +148,91 @@ export function useAssetTicker({
       setIsStale(isTickerStale(payload));
     };
 
-    const scheduleReconnect = () => {
-      if (!isMounted || !shouldReconnectRef.current) return;
+    const onEvent = (event: RealtimeSubscriptionEvent) => {
+      if (!isMounted) return;
 
-      setConnectionState((current) =>
-        current === 'auth_failed' || current === 'subscription_error'
-          ? current
-          : 'reconnecting',
-      );
-      setShowReconnectBanner(true);
-
-      const delay =
-        RECONNECT_DELAYS_MS[
-          Math.min(reconnectAttemptRef.current, RECONNECT_DELAYS_MS.length - 1)
-        ];
-      reconnectAttemptRef.current += 1;
-
-      clearReconnectTimeout();
-      reconnectTimeoutRef.current = setTimeout(() => {
-        connect();
-      }, delay);
-    };
-
-    const connect = async () => {
-      clearReconnectTimeout();
-      if (!isMounted || !shouldReconnectRef.current) return;
-
-      setConnectionState(
-        reconnectAttemptRef.current > 0 ? 'reconnecting' : 'connecting',
-      );
-
-      const token = await getAccessToken();
-      if (!isMounted || !shouldReconnectRef.current) return;
-
-      const ws = new WebSocket(appendToken(wsUrl, token));
-      socketRef.current = ws;
-
-      ws.onopen = () => {
-        if (!isMounted) return;
-
-        reconnectAttemptRef.current = 0;
-        setConnectionState('connected');
-        setShowReconnectBanner(false);
-        setConnectionState('subscribing');
-        sendSubscription(ws, 'subscribe');
-      };
-
-      ws.onmessage = (event) => {
-        if (!isMounted) return;
-
-        try {
-          const payload = JSON.parse(event.data) as
-            | AssetTickerMessage
-            | AssetTickerControlMessage;
-
-          if (payload.type === 'asset_ticker') {
-            acceptTicker(payload as AssetTickerMessage);
+      if (event.kind === 'status') {
+        switch (event.status) {
+          case 'connecting':
+            setConnectionState('connecting');
             return;
-          }
-
-          if (payload.type === 'auth_failed') {
-            shouldReconnectRef.current = false;
+          case 'connected':
+            setConnectionState('subscribing');
+            setShowReconnectBanner(false);
+            return;
+          case 'reconnecting':
+            setConnectionState((current) =>
+              current === 'auth_failed' || current === 'subscription_error'
+                ? current
+                : 'reconnecting',
+            );
+            setShowReconnectBanner(true);
+            return;
+          case 'disconnected':
+            setConnectionState('disconnected');
+            setShowReconnectBanner(true);
+            return;
+          case 'auth_failed':
             setConnectionState('auth_failed');
             setShowReconnectBanner(true);
-            ws.close();
             return;
-          }
-
-          if (payload.type === 'error') {
-            if (payload.code === 'UNAUTHORIZED') {
-              shouldReconnectRef.current = false;
-              setConnectionState('auth_failed');
-              setShowReconnectBanner(true);
-              ws.close();
-              return;
-            }
-
-            if (
-              payload.code === 'INVALID_SUBSCRIPTION' ||
-              isRelevantAssetTickerError(payload, assetId)
-            ) {
-              if (!isRelevantAssetTickerError(payload, assetId)) return;
-
-              setConnectionState('subscription_error');
-              setShowReconnectBanner(true);
-              return;
-            }
-          }
-
-          if (payload.type === 'subscription_error') {
-            if (!isCurrentAssetTickerControlMessage(payload, assetId)) return;
-
-            setConnectionState('subscription_error');
-            setShowReconnectBanner(true);
+          default:
             return;
-          }
-
-          if (payload.type === 'subscribed') {
-            if (!isCurrentAssetTickerControlMessage(payload, assetId)) return;
-
-            setConnectionState('subscribed');
-            setShowReconnectBanner(false);
-            return;
-          }
-
-          if (payload.type === 'unsubscribed') {
-            if (!isCurrentAssetTickerControlMessage(payload, assetId)) return;
-
-            setConnectionState('unsubscribed');
-            setShowReconnectBanner(false);
-          }
-        } catch {
-          // Ignore malformed messages.
         }
-      };
+      }
+      if (event.kind === 'restored') return;
 
-      ws.onerror = () => {
-        if (!isMounted) return;
-        setShowReconnectBanner(true);
-      };
+      const payload = event.payload as
+        | AssetTickerMessage
+        | AssetTickerControlMessage;
 
-      ws.onclose = (event) => {
-        if (!isMounted) return;
+      if (payload.type === 'asset_ticker') {
+        acceptTicker(payload as AssetTickerMessage);
+        return;
+      }
 
-        if (event.code === 1008) {
-          shouldReconnectRef.current = false;
-          setConnectionState('auth_failed');
+      if (payload.type === 'error') {
+        if (
+          (payload as AssetTickerControlMessage).code === 'INVALID_SUBSCRIPTION' ||
+          isRelevantAssetTickerError(payload as AssetTickerControlMessage, assetId)
+        ) {
+          if (!isRelevantAssetTickerError(payload as AssetTickerControlMessage, assetId)) return;
+          setConnectionState('subscription_error');
           setShowReconnectBanner(true);
           return;
         }
+      }
 
-        if (!shouldReconnectRef.current) return;
+      if (payload.type === 'subscription_error') {
+        if (!isCurrentAssetTickerControlMessage(payload as AssetTickerControlMessage, assetId)) return;
+        setConnectionState('subscription_error');
+        setShowReconnectBanner(true);
+        return;
+      }
 
-        setConnectionState('disconnected');
-        scheduleReconnect();
-      };
+      if (payload.type === 'subscribed') {
+        if (!isCurrentAssetTickerControlMessage(payload as AssetTickerControlMessage, assetId)) return;
+        setConnectionState('subscribed');
+        setShowReconnectBanner(false);
+        return;
+      }
+
+      if (payload.type === 'unsubscribed') {
+        if (!isCurrentAssetTickerControlMessage(payload as AssetTickerControlMessage, assetId)) return;
+        setConnectionState('unsubscribed');
+        setShowReconnectBanner(false);
+      }
     };
 
-    connect();
+    const manager = getRealtimeSocketManager(wsUrl);
+    const unsubscribe = manager.subscribe(
+      { channel: 'asset_ticker', assetId },
+      onEvent,
+    );
 
     return () => {
       isMounted = false;
-      shouldReconnectRef.current = false;
-      clearReconnectTimeout();
-
-      const ws = socketRef.current;
-      if (ws) {
-        sendSubscription(ws, 'unsubscribe');
-        ws.close();
-      }
-      socketRef.current = null;
+      unsubscribe();
     };
   }, [assetId, wsUrl, enabled]);
 

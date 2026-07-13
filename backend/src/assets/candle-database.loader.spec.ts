@@ -98,6 +98,54 @@ describe('CandleDatabaseLoader', () => {
     });
   });
 
+  it('clamps the coverage requirement at the query clock for ranges past now', async () => {
+    const { loader, states } = create();
+    const futureTo = new Date(now.getTime() + 60 * 60_000);
+    const futurePlan = {
+      ...plan,
+      requestedRange: { from: plan.requestedRange.from, to: futureTo },
+      sourceRange: { from: plan.sourceRange.from, to: futureTo },
+    };
+    await loader.load(asset, query, futurePlan);
+    // A checkpoint can only confirm candles that exist; requiring coverage
+    // beyond `now` would make current-day requests permanently uncoverable.
+    expect(states.findCompletedCovering).toHaveBeenCalledWith(
+      asset.id,
+      '5m',
+      futurePlan.sourceRange.from,
+      now,
+    );
+  });
+
+  it('treats stored rows without coverage-complete evidence as incomplete, never available', async () => {
+    const { loader, repository, states } = create();
+    repository.findRange.mockResolvedValue([candle(0), candle(5)]);
+    // A legacy `completed` checkpoint without coverage audit no longer
+    // matches findCompletedCovering, so covering resolves to null.
+    states.findCompletedCovering.mockResolvedValue(null);
+    states.findLatestOverlapping.mockResolvedValue({
+      status: MarketCandleSyncStatus.completed,
+    });
+    const result = await loader.load(asset, query, plan);
+    expect(result).toMatchObject({
+      state: 'incomplete',
+      completedCoverage: false,
+      hasBlockingCheckpoint: false,
+    });
+  });
+
+  it('never reports confirmed_empty without coverage-complete evidence', async () => {
+    const { loader, states } = create();
+    states.findCompletedCovering.mockResolvedValue(null);
+    states.findLatestOverlapping.mockResolvedValue({
+      status: MarketCandleSyncStatus.completed,
+    });
+    await expect(loader.load(asset, query, plan)).resolves.toMatchObject({
+      state: 'missing',
+      completedCoverage: false,
+    });
+  });
+
   it.each(['15m', '30m', '1h', '4h'] as const)(
     'uses the existing aggregation service for %s and removes historical gaps',
     async (interval) => {

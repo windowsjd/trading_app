@@ -146,7 +146,9 @@ export class KisWebSocketIngestionService {
     message: KisWebSocketParsedMessage,
     options: KisWebSocketIngestionOptions = {},
   ): Promise<KisWebSocketIngestionResult> {
-    if (message.state === 'ack') {
+    if (message.state === 'ack' || message.state === 'heartbeat') {
+      // PINGPONG heartbeats prove connection liveness only; they carry no
+      // market data and must never count as trade-parse failures.
       return emptyKisIngestionResult({
         dryRun: Boolean(options.dryRun),
         received: 1,
