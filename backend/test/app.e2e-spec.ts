@@ -881,37 +881,57 @@ describe('AppController (e2e)', () => {
       });
   });
 
-  it('/readiness (GET) reports database and scheduler readiness without secrets', () => {
+  it('/readiness (GET) reports database and scheduler readiness without secrets', async () => {
     prisma.$queryRaw.mockResolvedValueOnce([{ result: 1 }]);
-
-    return request(app.getHttpServer())
-      .get('/readiness')
-      .expect(200)
-      .expect((response) => {
-        expect(response.body).toEqual({
-          success: true,
-          data: expect.objectContaining({
-            app: 'ok',
-            database: 'ok',
-            redis: 'ok',
-            status: 'ready',
-            scheduler: {
-              enabled: false,
-              timezone: 'Asia/Seoul',
-              jobs: expect.objectContaining({
-                daily_portfolio_snapshot: false,
-                provider_fx_ingest: false,
-              }),
-            },
-            liveCandle: expect.objectContaining({ enabled: false }),
-            reconciliation: expect.any(Array),
-            currentTime: expect.any(String),
-          }),
+    // Pin the calendar requirement to the audited year so this contract test
+    // stays deterministic: the default range (current..next year) includes
+    // the provisional KRX 2027 dataset, which correctly degrades readiness
+    // with MARKET_CALENDAR_PROVISIONAL.
+    const priorFrom = process.env.MARKET_CALENDAR_REQUIRED_FROM_YEAR;
+    const priorThrough = process.env.MARKET_CALENDAR_REQUIRED_THROUGH_YEAR;
+    process.env.MARKET_CALENDAR_REQUIRED_FROM_YEAR = '2026';
+    process.env.MARKET_CALENDAR_REQUIRED_THROUGH_YEAR = '2026';
+    try {
+      await request(app.getHttpServer())
+        .get('/readiness')
+        .expect(200)
+        .expect((response) => {
+          expect(response.body).toEqual({
+            success: true,
+            data: expect.objectContaining({
+              app: 'ok',
+              database: 'ok',
+              redis: 'ok',
+              status: 'ready',
+              scheduler: {
+                enabled: false,
+                timezone: 'Asia/Seoul',
+                jobs: expect.objectContaining({
+                  daily_portfolio_snapshot: false,
+                  provider_fx_ingest: false,
+                }),
+              },
+              liveCandle: expect.objectContaining({ enabled: false }),
+              reconciliation: expect.any(Array),
+              currentTime: expect.any(String),
+            }),
+          });
+          expect(JSON.stringify(response.body)).not.toMatch(
+            /DATABASE_URL|KIS_APP_SECRET|approval_key|access_token/i,
+          );
         });
-        expect(JSON.stringify(response.body)).not.toMatch(
-          /DATABASE_URL|KIS_APP_SECRET|approval_key|access_token/i,
-        );
-      });
+    } finally {
+      if (priorFrom === undefined) {
+        delete process.env.MARKET_CALENDAR_REQUIRED_FROM_YEAR;
+      } else {
+        process.env.MARKET_CALENDAR_REQUIRED_FROM_YEAR = priorFrom;
+      }
+      if (priorThrough === undefined) {
+        delete process.env.MARKET_CALENDAR_REQUIRED_THROUGH_YEAR;
+      } else {
+        process.env.MARKET_CALENDAR_REQUIRED_THROUGH_YEAR = priorThrough;
+      }
+    }
   });
 
   it('/api/v1/auth/signup (POST) creates a user and returns access and refresh tokens', () => {

@@ -67,19 +67,41 @@ describe('market calendar registry', () => {
       requiredFromYear: 2026,
       requiredThroughYear: 2027,
     });
+    // Datasets are present for every required year, but KRX 2027 is only
+    // provisional: complete (presence) is true while productionReady
+    // (audited-only) stays false.
     expect(complete.complete).toBe(true);
-    expect(
-      complete.markets.find((entry) => entry.market === 'KRX')
-        ?.provisionalYears,
-    ).toEqual([2027]);
+    expect(complete.productionReady).toBe(false);
+    expect(complete.datasetsPresent).toBe(4);
+    const krx = complete.markets.find((entry) => entry.market === 'KRX')!;
+    expect(krx.provisionalYears).toEqual([2027]);
+    expect(krx.auditedYears).toEqual([2026]);
+    expect(krx.coveredYears).toEqual([2026, 2027]);
+    const us = complete.markets.find((entry) => entry.market === 'US')!;
+    expect(us.provisionalYears).toEqual([]);
+    expect(us.auditedYears).toEqual([2026, 2027]);
 
     const missing = getMarketCalendarCoverage({
       requiredFromYear: 2026,
       requiredThroughYear: 2028,
     });
     expect(missing.complete).toBe(false);
+    expect(missing.productionReady).toBe(false);
     for (const market of missing.markets) {
       expect(market.missingYears).toEqual([2028]);
+    }
+
+    // With the requirement pinned to the audited year, the provisional KRX
+    // 2027 dataset no longer affects the status at all.
+    const auditedOnly = getMarketCalendarCoverage({
+      requiredFromYear: 2026,
+      requiredThroughYear: 2026,
+    });
+    expect(auditedOnly.complete).toBe(true);
+    expect(auditedOnly.productionReady).toBe(true);
+    for (const market of auditedOnly.markets) {
+      expect(market.provisionalYears).toEqual([]);
+      expect(market.missingYears).toEqual([]);
     }
   });
 

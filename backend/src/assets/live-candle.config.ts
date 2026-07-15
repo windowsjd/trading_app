@@ -11,7 +11,15 @@ export type LiveCandleConfig = {
   reconnectMaxMs: number;
   finalizeGraceMs: number;
   finalizerIntervalMs: number;
-  staleThresholdMs: number;
+  // Connection liveness: how long a provider socket may go without ANY frame
+  // (trade, ack, PINGPONG, WS ping) before the supervisor closes it. Used by
+  // the reconnect watchdog only — never by readiness.
+  connectionLivenessTimeoutMs: number;
+  // Trade freshness: how old the last processed trade/kline event may be
+  // before readiness reports LIVE_PROVIDER_STALE (only while the market can
+  // trade; delayed feeds are excluded). Used by readiness only — never by
+  // the reconnect watchdog.
+  tradeStaleThresholdMs: number;
   maxSubscriptionsPerClient: number;
   maxProviderSubscriptionsPerShard: number;
   stateTtlSeconds: number;
@@ -86,11 +94,23 @@ export function readLiveCandleConfig(
       100,
       60_000,
     ),
-    staleThresholdMs: integer(
+    // CANDLE_LIVE_STALE_THRESHOLD_MS is DEPRECATED: it conflated connection
+    // liveness with trade freshness. It remains only as the fallback when
+    // the dedicated variable is unset; the new variables always win.
+    connectionLivenessTimeoutMs: integerWithDeprecatedFallback(
       env,
+      'CANDLE_LIVE_CONNECTION_LIVENESS_TIMEOUT_MS',
+      'CANDLE_LIVE_STALE_THRESHOLD_MS',
+      90_000,
+      5_000,
+      3_600_000,
+    ),
+    tradeStaleThresholdMs: integerWithDeprecatedFallback(
+      env,
+      'CANDLE_LIVE_TRADE_STALE_THRESHOLD_MS',
       'CANDLE_LIVE_STALE_THRESHOLD_MS',
       30_000,
-      1,
+      1_000,
       3_600_000,
     ),
     maxSubscriptionsPerClient: integer(
@@ -156,6 +176,14 @@ export function readLiveCandleConfig(
   if (config.kisUsDelayedEnabled && (!config.enabled || !config.kisEnabled)) {
     throw new LiveCandleConfigError(
       'CANDLE_LIVE_KIS_US_DELAYED_ENABLED requires live streaming and KIS live candles to be enabled.',
+    );
+  }
+  // A liveness timeout below the trade-stale threshold would reconnect a
+  // healthy socket before its market data is even considered stale. Equal
+  // values are allowed (the deprecated single variable sets both).
+  if (config.connectionLivenessTimeoutMs < config.tradeStaleThresholdMs) {
+    throw new LiveCandleConfigError(
+      'CANDLE_LIVE_CONNECTION_LIVENESS_TIMEOUT_MS must be greater than or equal to CANDLE_LIVE_TRADE_STALE_THRESHOLD_MS.',
     );
   }
 
@@ -242,4 +270,30 @@ function integer(
     );
   }
   return value;
+}
+
+/**
+ * Reads `name`, falling back to the deprecated `deprecatedName` only when
+ * `name` is unset. An invalid value in EITHER variable is a configuration
+ * error — a bad deprecated value is never silently replaced by the default.
+ */
+function integerWithDeprecatedFallback(
+  env: NodeJS.ProcessEnv,
+  name: string,
+  deprecatedName: string,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  if (env[name]?.trim()) return integer(env, name, fallback, min, max);
+  if (env[deprecatedName]?.trim()) {
+    try {
+      return integer(env, deprecatedName, fallback, min, max);
+    } catch {
+      throw new LiveCandleConfigError(
+        `${deprecatedName} (deprecated fallback for ${name}) must be an integer between ${min} and ${max}; prefer setting ${name} directly.`,
+      );
+    }
+  }
+  return fallback;
 }

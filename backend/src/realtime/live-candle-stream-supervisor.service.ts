@@ -274,13 +274,18 @@ export class LiveCandleStreamSupervisorService
     const heartbeat = setInterval(
       () => {
         // Connection liveness is judged from ANY frame (data, WS ping, or
-        // control), never from trade traffic alone.
-        if (Date.now() - lastFrameAt > this.config.staleThresholdMs) {
+        // control), never from trade traffic alone. Trade freshness is a
+        // separate readiness-only signal (tradeStaleThresholdMs) and must
+        // never close the socket.
+        if (
+          Date.now() - lastFrameAt >
+          this.config.connectionLivenessTimeoutMs
+        ) {
           this.logReconnect('binance', 'liveness_timeout', lastFrameAt);
           socket.close(4000, 'liveness timeout');
         }
       },
-      Math.max(1_000, Math.min(5_000, this.config.staleThresholdMs)),
+      Math.max(1_000, Math.min(5_000, this.config.connectionLivenessTimeoutMs)),
     );
     heartbeat.unref?.();
     const rollover = setTimeout(() => {
@@ -387,13 +392,17 @@ export class LiveCandleStreamSupervisorService
         // KIS connection liveness: any frame (PINGPONG heartbeat, ack, WS
         // ping, or trade) resets the timer. A quiet market with heartbeats
         // flowing must never trigger a reconnect; only a truly silent socket
-        // (no trades AND no control frames) does.
-        if (Date.now() - lastFrameAt > this.config.staleThresholdMs) {
+        // (no trades AND no control frames) does. Trade staleness is judged
+        // separately by readiness via tradeStaleThresholdMs.
+        if (
+          Date.now() - lastFrameAt >
+          this.config.connectionLivenessTimeoutMs
+        ) {
           this.logReconnect('kis', 'liveness_timeout', lastFrameAt);
           socket.close(4000, 'liveness timeout');
         }
       },
-      Math.max(1_000, Math.min(5_000, this.config.staleThresholdMs)),
+      Math.max(1_000, Math.min(5_000, this.config.connectionLivenessTimeoutMs)),
     );
     heartbeat.unref?.();
     socket.on('ping', (data?: Buffer) => {

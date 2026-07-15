@@ -17,6 +17,12 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import IORedis from 'ioredis';
+import {
+  assertReleaseCleanTree,
+  resolveSmokeGitIdentity,
+  type SmokeGitIdentity,
+} from './lib/smoke-git-identity';
+import { SMOKE_REPORT_SCHEMA_VERSION } from './lib/smoke-report';
 import { JwtService } from '@nestjs/jwt';
 import {
   AssetType,
@@ -72,6 +78,18 @@ import { resolveMarketSession } from '../src/orders/market-calendar.policy';
 if (process.env.CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE !== '1') {
   console.log('CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE!=1; skipping.');
   process.exit(0);
+}
+
+// Commit traceability comes first: without a resolved SHA no artifact may be
+// produced, and a dirty working tree is refused unless SMOKE_ALLOW_DIRTY=1
+// (recorded as gitDirty=true; such runs are never release validation).
+let gitIdentity: SmokeGitIdentity;
+try {
+  gitIdentity = resolveSmokeGitIdentity();
+  assertReleaseCleanTree(gitIdentity);
+} catch (error) {
+  console.error(error instanceof Error ? error.message : error);
+  process.exit(2);
 }
 
 const FIVE_MIN = 300_000;
@@ -751,7 +769,7 @@ async function main() {
         normalizer,
         pipeline,
         health,
-        { ...liveConfig, staleThresholdMs: 3_600_000 },
+        { ...liveConfig, connectionLivenessTimeoutMs: 3_600_000 },
         () => sockets.shift() ?? new FakeProviderSocket(),
       );
       const context = (provider: 'binance' | 'kis', socket: FakeProviderSocket) => ({
@@ -1436,9 +1454,58 @@ async function main() {
     });
 
     const finishedAt = new Date();
+    // Cleanup accounting distinguishes "keys the smoke created/tracked" from
+    // "what is still left AFTER cleanup". Passing requires the remaining
+    // counts to be exactly zero; -1 marks "could not verify" and fails.
+    const dbRowsRemainingAfterCleanup = await (async () => {
+      try {
+        const candleRows = await countRows();
+        const syncStateRows = await prisma.marketCandleSyncState.count({
+          where: { assetId: { in: assetIds } },
+        });
+        return candleRows + syncStateRows;
+      } catch {
+        return -1;
+      }
+    })();
+    const redisKeysRemainingAfterCleanup = await (async () => {
+      try {
+        const raw = new IORedis(readRedisConfig().url as string);
+        try {
+          const leftover = new Set<string>();
+          for (const assetId of assetIds) {
+            for (const key of await raw.keys(
+              `*${encodeURIComponent(assetId)}*`,
+            )) {
+              leftover.add(key);
+            }
+          }
+          // Tracked keys, except the shared provider lease keys: those are
+          // global coordination keys a concurrently running dev stack may
+          // legitimately recreate right after cleanup.
+          for (const key of trackedRedisKeys) {
+            if (key === binanceLease || key === kisLease) continue;
+            if (await raw.exists(key)) leftover.add(key);
+          }
+          return leftover.size;
+        } finally {
+          await raw.quit();
+        }
+      } catch {
+        return -1;
+      }
+    })();
     const summary = {
-      result: errors.length === 0 ? 'passed' : 'failed',
-      gitCommit: process.env.GIT_COMMIT ?? null,
+      schemaVersion: SMOKE_REPORT_SCHEMA_VERSION,
+      result:
+        errors.length === 0 &&
+        dbRowsRemainingAfterCleanup === 0 &&
+        redisKeysRemainingAfterCleanup === 0
+          ? 'passed'
+          : 'failed',
+      gitCommit: gitIdentity.gitCommit,
+      gitBranch: gitIdentity.gitBranch,
+      gitDirty: gitIdentity.gitDirty,
       startedAt: startedAt.toISOString(),
       finishedAt: finishedAt.toISOString(),
       durationMs: finishedAt.getTime() - startedAt.getTime(),
@@ -1450,8 +1517,9 @@ async function main() {
       scenarios,
       passed: scenarios.filter((entry) => entry.state === 'passed').length,
       failed: scenarios.filter((entry) => entry.state === 'failed').length,
-      dbRowCounts: { fixtureRowsAfterCleanup: await countRows().catch(() => -1) },
-      redisKeyCounts: { trackedFixtureKeys: trackedRedisKeys.size },
+      redisKeysCreated: trackedRedisKeys.size,
+      redisKeysRemainingAfterCleanup,
+      dbRowsRemainingAfterCleanup,
       duplicateEvents: summaryCounters.duplicates,
       outOfOrderEvents: summaryCounters.outOfOrder,
       incompleteClosedCandles: 0,
@@ -1470,7 +1538,7 @@ async function main() {
 
     await prisma.$disconnect();
     await redis.onModuleDestroy();
-    if (errors.length > 0) process.exitCode = 1;
+    if (summary.result !== 'passed') process.exitCode = 1;
   }
 }
 

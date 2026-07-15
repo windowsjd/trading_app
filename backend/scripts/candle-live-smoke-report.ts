@@ -10,11 +10,27 @@
  *       --market CRYPTO --symbols BTCUSDT,ETHUSDT \
  *       --from 2026-07-13T10:25:00Z --to 2026-07-13T12:05:00Z \
  *       --output artifacts/candle-smoke
+ *
+ * NOT_RUN mode — records that a provider smoke could NOT be executed
+ * (closed market, missing entitlement/credentials) without contacting any
+ * provider, database, or Redis. A smoke that did not run must be recorded as
+ * not_run, never as passed:
+ *
+ *   pnpm run smoke:candle-report -- \
+ *     --provider kis-us --result not_run \
+ *     --reason "US regular session closed"
  */
 import 'dotenv/config';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { execSync } from 'node:child_process';
+import {
+  assertReleaseCleanTree,
+  resolveSmokeGitIdentity,
+} from './lib/smoke-git-identity';
+import {
+  buildNotRunReport,
+  SMOKE_REPORT_SCHEMA_VERSION,
+} from './lib/smoke-report';
 import { AssetType } from '../src/generated/prisma/client';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { RedisService } from '../src/redis/redis.service';
@@ -56,6 +72,40 @@ function arg(name: string): string | undefined {
   return value && !value.startsWith('--') ? value : 'true';
 }
 
+// NOT_RUN mode runs BEFORE the long-smoke gate: it performs no provider,
+// database, or Redis access — it only records, with git identity, that a
+// provider smoke could not be executed.
+const resultArg = arg('result');
+if (resultArg !== undefined && resultArg !== 'not_run') {
+  console.error(
+    '--result only accepts not_run; passed/failed are computed by the drift verification itself.',
+  );
+  process.exit(2);
+}
+if (resultArg === 'not_run') {
+  try {
+    const identity = resolveSmokeGitIdentity();
+    const report = buildNotRunReport({
+      identity,
+      provider: arg('provider') ?? '',
+      reason: arg('reason') ?? '',
+    });
+    const notRunOutputDir = arg('output') ?? join('artifacts', 'candle-smoke');
+    mkdirSync(notRunOutputDir, { recursive: true });
+    const artifactPath = join(
+      notRunOutputDir,
+      `not-run-${report.provider}-${report.createdAt.replace(/[:.]/gu, '-')}.json`,
+    );
+    writeFileSync(artifactPath, JSON.stringify(report, null, 2));
+    console.log(JSON.stringify(report, null, 2));
+    console.error(`artifact: ${artifactPath}`);
+    process.exit(0);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(2);
+  }
+}
+
 if (process.env.CANDLE_LIVE_LONG_SMOKE !== '1') {
   console.error('CANDLE_LIVE_LONG_SMOKE!=1; refusing to run.');
   process.exit(2);
@@ -75,6 +125,12 @@ if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from >= to) {
 }
 
 async function main() {
+  // Identity first: no artifact is ever produced without a resolved commit,
+  // and a dirty tree is refused unless SMOKE_ALLOW_DIRTY=1 (recorded as
+  // gitDirty=true; never valid release evidence).
+  const gitIdentity = resolveSmokeGitIdentity();
+  assertReleaseCleanTree(gitIdentity);
+
   const prisma = new PrismaService();
   const redis = new RedisService(readRedisConfig());
   await prisma.$connect();
@@ -202,13 +258,10 @@ async function main() {
   const second = substantive(await reconcileOnce());
   const finishedAt = new Date();
   const summary = {
-    gitCommit: (() => {
-      try {
-        return execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
-      } catch {
-        return null;
-      }
-    })(),
+    schemaVersion: SMOKE_REPORT_SCHEMA_VERSION,
+    gitCommit: gitIdentity.gitCommit,
+    gitBranch: gitIdentity.gitBranch,
+    gitDirty: gitIdentity.gitDirty,
     market,
     symbols: assets.map((asset) => asset.symbol),
     window: { from: from.toISOString(), to: to.toISOString() },

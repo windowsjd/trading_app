@@ -139,7 +139,17 @@ export type MarketCandleSyncSummary = {
   }[];
   assets: MarketCandleAssetSyncResult[];
   totalFeeds: number;
+  // Runs that terminated normally (status=completed). This is NOT a coverage
+  // count: a completed run may have stopped before confirming its whole
+  // target range (e.g. provider retention edge).
   completedFeeds: number;
+  // status=completed AND coverageComplete=true — the provider cursor
+  // confirmed the whole required range.
+  coverageCompleteFeeds: number;
+  // status=completed but coverageComplete=false — terminated normally
+  // without confirming the whole required range; needs repair/initial sync
+  // before database serving owns the range.
+  completedWithIncompleteCoverageFeeds: number;
   failedFeeds: number;
   startedAt: Date;
   finishedAt: Date;

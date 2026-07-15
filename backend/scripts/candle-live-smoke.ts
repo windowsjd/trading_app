@@ -27,7 +27,11 @@
 import 'dotenv/config';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { execSync } from 'node:child_process';
+import {
+  assertReleaseCleanTree,
+  resolveSmokeGitIdentity,
+} from './lib/smoke-git-identity';
+import { SMOKE_REPORT_SCHEMA_VERSION } from './lib/smoke-report';
 import {
   AssetType,
   MarketCandleSyncMode,
@@ -117,13 +121,11 @@ const FIVE_MIN = 300_000;
 
 async function main() {
   const startedAt = new Date();
-  const gitCommit = (() => {
-    try {
-      return execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
-    } catch {
-      return null;
-    }
-  })();
+  // Identity is resolved before anything else: a smoke without a commit SHA
+  // must not start, and a dirty tree is refused unless SMOKE_ALLOW_DIRTY=1
+  // (recorded as gitDirty=true; never valid release evidence).
+  const gitIdentity = resolveSmokeGitIdentity();
+  assertReleaseCleanTree(gitIdentity);
 
   // KRX session guard.
   if (provider === 'kis-krx' && !allowOffSession) {
@@ -434,7 +436,10 @@ async function main() {
   const providerHealth = snapshot.providers[supervisorProvider];
   const finishedAt = new Date();
   const summary = {
-    gitCommit,
+    schemaVersion: SMOKE_REPORT_SCHEMA_VERSION,
+    gitCommit: gitIdentity.gitCommit,
+    gitBranch: gitIdentity.gitBranch,
+    gitDirty: gitIdentity.gitDirty,
     provider,
     market:
       provider === 'binance' ? 'CRYPTO' : provider === 'kis-krx' ? 'KRX' : 'US',

@@ -103,7 +103,7 @@ async function main() {
     const stateRepository = new MarketCandleSyncStateRepository(prisma);
     for (const feed of ['5m', '1d', '1w'] as const) {
       const state = await stateRepository.createRunning({ assetId, feed, sourceProvider: 'binance_klines', mode: 'repair', targetFrom: new Date(now.getTime()-8*86400000), targetTo: now });
-      await stateRepository.markCompleted(state.id, now, { coverageComplete: true, completionReason: 'target_reached', coveredFrom: new Date(now.getTime()-8*86400000), coveredTo: now });
+      await stateRepository.markCompleted(state.id, now, { coverageComplete: true, completionReason: 'target_reached', coveredFrom: new Date(now.getTime()-8*86400000), coveredTo: now, requiredCoveredTo: now });
     }
     const plans = new CandleReadPlanBuilder(servingConfig);
     const responses = new CandleResponseBuilder();

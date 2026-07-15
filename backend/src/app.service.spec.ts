@@ -88,25 +88,151 @@ describe('AppService candle readiness', () => {
       const result = await service.getReadiness();
       expect(result.data.status).toBe('degraded');
       expect(result.data.reasons).toContain('MARKET_CALENDAR_COVERAGE_MISSING');
+      // Missing and provisional years degrade simultaneously and separately.
+      expect(result.data.reasons).toContain('MARKET_CALENDAR_PROVISIONAL');
       const krx = result.data.marketCalendar.markets.find(
         (entry: { market: string }) => entry.market === 'KRX',
       );
       // Operators can read exactly which year datasets must be added.
       expect(krx.missingYears).toEqual([2028]);
+      expect(krx.provisionalYears).toEqual([2027]);
     } finally {
       delete process.env.MARKET_CALENDAR_REQUIRED_FROM_YEAR;
       delete process.env.MARKET_CALENDAR_REQUIRED_THROUGH_YEAR;
     }
   });
 
-  it('is ready when calendars cover the required range and nothing is degraded', async () => {
+  it('degrades with MARKET_CALENDAR_PROVISIONAL while KRX 2027 awaits the official notice', async () => {
     delete process.env.REDIS_URL;
-    const service = new AppService({
-      $queryRaw: jest.fn().mockResolvedValue([{ '?column?': 1 }]),
-    } as never);
-    const result = await service.getReadiness();
-    expect(result.data.status).toBe('ready');
-    expect(result.data.reasons).toEqual([]);
+    process.env.MARKET_CALENDAR_REQUIRED_FROM_YEAR = '2026';
+    process.env.MARKET_CALENDAR_REQUIRED_THROUGH_YEAR = '2027';
+    try {
+      const service = new AppService({
+        $queryRaw: jest.fn().mockResolvedValue([{ '?column?': 1 }]),
+      } as never);
+      const result = await service.getReadiness();
+      // Provisional data degrades readiness (never unavailable) and is
+      // reported per market/year so operators know exactly what to verify.
+      expect(result.data.status).toBe('degraded');
+      expect(result.data.reasons).toContain('MARKET_CALENDAR_PROVISIONAL');
+      expect(result.data.reasons).not.toContain(
+        'MARKET_CALENDAR_COVERAGE_MISSING',
+      );
+      expect(result.data.marketCalendar.complete).toBe(true);
+      expect(result.data.marketCalendar.productionReady).toBe(false);
+      const krx = result.data.marketCalendar.markets.find(
+        (entry: { market: string }) => entry.market === 'KRX',
+      );
+      expect(krx.provisionalYears).toEqual([2027]);
+      expect(krx.auditedYears).toEqual([2026]);
+      const us = result.data.marketCalendar.markets.find(
+        (entry: { market: string }) => entry.market === 'US',
+      );
+      expect(us.provisionalYears).toEqual([]);
+      expect(us.auditedYears).toEqual([2026, 2027]);
+    } finally {
+      delete process.env.MARKET_CALENDAR_REQUIRED_FROM_YEAR;
+      delete process.env.MARKET_CALENDAR_REQUIRED_THROUGH_YEAR;
+    }
+  });
+
+  it('is ready when the required range only spans audited calendar years', async () => {
+    delete process.env.REDIS_URL;
+    // A 2026 release that does not require 2027 pins the requirement to the
+    // audited year; the provisional KRX 2027 dataset then has no readiness
+    // effect. This narrows the REQUIREMENT — it never relabels provisional
+    // data as audited.
+    process.env.MARKET_CALENDAR_REQUIRED_FROM_YEAR = '2026';
+    process.env.MARKET_CALENDAR_REQUIRED_THROUGH_YEAR = '2026';
+    try {
+      const service = new AppService({
+        $queryRaw: jest.fn().mockResolvedValue([{ '?column?': 1 }]),
+      } as never);
+      const result = await service.getReadiness();
+      expect(result.data.status).toBe('ready');
+      expect(result.data.reasons).toEqual([]);
+      expect(result.data.marketCalendar.productionReady).toBe(true);
+    } finally {
+      delete process.env.MARKET_CALENDAR_REQUIRED_FROM_YEAR;
+      delete process.env.MARKET_CALENDAR_REQUIRED_THROUGH_YEAR;
+    }
+  });
+
+  describe('trade freshness (LIVE_PROVIDER_STALE)', () => {
+    // 2026-07-15 is an ordinary KRX trading day (Wednesday) in the audited
+    // 2026 calendar: 05:00Z = 14:00 KST (in session), 13:00Z = 22:00 KST
+    // (after close).
+    const inKrxSession = new Date('2026-07-15T05:00:00.000Z');
+    const outOfKrxSession = new Date('2026-07-15T13:00:00.000Z');
+
+    const createService = (health: LiveCandleHealthService) =>
+      new AppService(
+        {
+          $queryRaw: jest.fn().mockResolvedValue([{ '?column?': 1 }]),
+        } as never,
+        undefined,
+        undefined,
+        undefined,
+        health,
+        { getStatus: jest.fn().mockReturnValue('connected') } as never,
+        undefined,
+        { ...readLiveCandleConfig({}), enabled: true, binanceEnabled: true },
+      );
+
+    beforeEach(() => {
+      delete process.env.REDIS_URL;
+    });
+
+    it('degrades readiness when Binance trades go stale, using tradeStaleThresholdMs', async () => {
+      const health = new LiveCandleHealthService();
+      health.updateProvider('binance', {
+        owner: true,
+        state: 'connected',
+        delayed: false,
+        eventLagMs: 60_000, // above the 30s default tradeStaleThresholdMs
+      });
+      const result = await createService(health).getReadiness(inKrxSession);
+      expect(result.data.reasons).toContain('LIVE_PROVIDER_STALE');
+      expect(result.data.status).toBe('degraded');
+    });
+
+    it('keeps a fresh provider out of LIVE_PROVIDER_STALE', async () => {
+      const health = new LiveCandleHealthService();
+      health.updateProvider('binance', {
+        owner: true,
+        state: 'connected',
+        delayed: false,
+        eventLagMs: 1_000,
+      });
+      const result = await createService(health).getReadiness(inKrxSession);
+      expect(result.data.reasons).not.toContain('LIVE_PROVIDER_STALE');
+    });
+
+    it('exempts a quiet KIS feed outside the KRX regular session', async () => {
+      const health = new LiveCandleHealthService();
+      health.updateProvider('kis', {
+        owner: true,
+        state: 'connected',
+        delayed: false,
+        eventLagMs: 999_999,
+      });
+      const stale = await createService(health).getReadiness(inKrxSession);
+      expect(stale.data.reasons).toContain('LIVE_PROVIDER_STALE');
+      const quiet = await createService(health).getReadiness(outOfKrxSession);
+      expect(quiet.data.reasons).not.toContain('LIVE_PROVIDER_STALE');
+    });
+
+    it('excludes the delayed US feed from real-time staleness checks', async () => {
+      const health = new LiveCandleHealthService();
+      health.updateProvider('kis', {
+        owner: true,
+        state: 'connected',
+        delayed: true,
+        eventLagMs: 999_999,
+      });
+      const result = await createService(health).getReadiness(inKrxSession);
+      expect(result.data.reasons).not.toContain('LIVE_PROVIDER_STALE');
+    });
   });
 
   it('flags live streaming without reconciliation as LIVE_RECONCILIATION_REQUIRED', async () => {

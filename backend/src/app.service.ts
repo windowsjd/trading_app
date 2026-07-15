@@ -61,8 +61,7 @@ export class AppService {
     };
   }
 
-  async getReadiness() {
-    const now = new Date();
+  async getReadiness(now: Date = new Date()) {
     const scheduler = getOpsSchedulerConfig();
     let database: 'ok' | 'unavailable' = 'ok';
     try {
@@ -93,11 +92,20 @@ export class AppService {
 
     // Versioned market calendar coverage over the required year range.
     // Missing years degrade readiness and tell operators which datasets to
-    // add; stock-market session decisions fail safe in the meantime.
+    // add; stock-market session decisions fail safe in the meantime. A year
+    // whose dataset is only provisional (not yet verified against the
+    // official exchange notice) also degrades readiness — provisional data
+    // must never be presented as audited — without making the service
+    // unavailable; crypto is unaffected by the stock-market calendar.
     const calendar = getMarketCalendarCoverage(
       readMarketCalendarCoverageConfig(process.env, now),
     );
     if (!calendar.complete) reasons.push('MARKET_CALENDAR_COVERAGE_MISSING');
+    if (
+      calendar.markets.some((market) => market.provisionalYears.length > 0)
+    ) {
+      reasons.push('MARKET_CALENDAR_PROVISIONAL');
+    }
 
     // Live ingestion without its reconciliation safety net (only reachable
     // outside production or via the explicit escape hatch).
@@ -122,12 +130,15 @@ export class AppService {
     // Trade freshness is only meaningful while the market can trade: a quiet
     // KIS socket outside the KRX regular session is healthy as long as the
     // connection itself is alive (heartbeats). Crypto trades continuously.
+    // This uses tradeStaleThresholdMs (readiness-only); the supervisor's
+    // reconnect watchdog uses connectionLivenessTimeoutMs instead.
     const krxSessionOpen =
       resolveRegularSessionForEvent(
         { assetType: AssetType.domestic_stock, market: 'KRX' },
         now,
       ) !== null;
-    const staleThresholdMs = this.liveCandleConfig?.staleThresholdMs ?? 30_000;
+    const staleThresholdMs =
+      this.liveCandleConfig?.tradeStaleThresholdMs ?? 30_000;
     const providerStale =
       liveEnabled && liveSnapshot
         ? Object.entries(liveSnapshot.providers).some(

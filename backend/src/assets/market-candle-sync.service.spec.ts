@@ -179,6 +179,15 @@ class FakeStateRepository {
     return true;
   }
 
+  completionInputs: {
+    id: string;
+    coverageComplete: boolean;
+    completionReason: string;
+    requiredCoveredTo: Date;
+  }[] = [];
+
+  // Mirrors MarketCandleSyncStateRepository.markCompleted's invariant so the
+  // service tests fail loudly on any claim the real repository would reject.
   async markCompleted(
     id: string,
     completedAt: Date,
@@ -187,19 +196,55 @@ class FakeStateRepository {
       completionReason: string;
       coveredFrom: Date | null;
       coveredTo: Date | null;
+      requiredCoveredTo: Date;
     },
   ): Promise<boolean> {
     const row = this.rows.find((candidate) => candidate.id === id);
     if (!row || row.status !== 'running') return false;
+    this.completionInputs.push({
+      id,
+      coverageComplete: coverage.coverageComplete,
+      completionReason: coverage.completionReason,
+      requiredCoveredTo: coverage.requiredCoveredTo,
+    });
     if (
-      coverage.coverageComplete &&
-      (coverage.coveredFrom === null ||
-        coverage.coveredTo === null ||
-        coverage.coveredFrom.getTime() > row.targetFrom.getTime())
+      !(coverage.requiredCoveredTo instanceof Date) ||
+      Number.isNaN(coverage.requiredCoveredTo.getTime())
     ) {
-      throw new Error(
-        'coverageComplete=true requires a covered range spanning the target range.',
-      );
+      throw new Error('requiredCoveredTo must be a valid Date.');
+    }
+    if (coverage.coverageComplete) {
+      const requiredToMs = coverage.requiredCoveredTo.getTime();
+      if (
+        !['target_reached', 'confirmed_empty'].includes(
+          coverage.completionReason,
+        ) ||
+        coverage.coveredFrom === null ||
+        coverage.coveredTo === null ||
+        requiredToMs < row.targetFrom.getTime() ||
+        requiredToMs > row.targetTo.getTime() ||
+        coverage.coveredFrom.getTime() >= coverage.coveredTo.getTime() ||
+        coverage.coveredFrom.getTime() > row.targetFrom.getTime() ||
+        coverage.coveredTo.getTime() < requiredToMs
+      ) {
+        throw new Error(
+          'coverageComplete=true requires a covered range spanning the target range.',
+        );
+      }
+    } else {
+      if (
+        ['target_reached', 'confirmed_empty'].includes(
+          coverage.completionReason,
+        ) ||
+        (coverage.coveredFrom === null) !== (coverage.coveredTo === null) ||
+        (coverage.coveredFrom !== null &&
+          coverage.coveredTo !== null &&
+          coverage.coveredFrom.getTime() >= coverage.coveredTo.getTime())
+      ) {
+        throw new Error(
+          'coverageComplete=false requires an incomplete reason and a well-formed or absent covered range.',
+        );
+      }
     }
     row.status = 'completed';
     row.completedAt = completedAt;
@@ -1230,6 +1275,99 @@ describe('MarketCandleSyncService', () => {
       expect(row.coverageComplete).toBe(true);
       expect(row.coveredFrom?.getTime()).toBe(start);
       expect(row.coveredTo?.getTime()).toBe(NOW.getTime());
+    });
+
+    it('passes requiredCoveredTo = min(targetTo, now) to the checkpoint completion', async () => {
+      const harness = createHarness();
+      const start = NOW.getTime() - DAY;
+      const futureTo = new Date(NOW.getTime() + DAY);
+      harness.binanceCandles.fetchKlinesPage.mockResolvedValue(
+        binancePage({
+          candles: [syntheticCandle(start)],
+          providerReturnedRows: 1,
+          acceptedRows: 1,
+        }),
+      );
+      const result = await harness.service.syncAsset({
+        assetId: CRYPTO_ASSET.id,
+        targets: ['5m'],
+        mode: 'initial' as never,
+        from: new Date(start),
+        to: futureTo,
+        now: NOW,
+      });
+      // The provider can only confirm up to `now`; the run is still complete
+      // because requiredCoveredTo is clamped to now, not targetTo.
+      expect(result.feeds[0].coverageComplete).toBe(true);
+      const completion = harness.stateRepository.completionInputs[0];
+      expect(completion.requiredCoveredTo.getTime()).toBe(NOW.getTime());
+      const past = await harness.service.syncAsset({
+        assetId: CRYPTO_ASSET.id,
+        targets: ['5m'],
+        mode: 'repair' as never,
+        from: new Date(start),
+        to: new Date(start + 2 * FIVE_MIN),
+        resume: false,
+        now: NOW,
+      });
+      expect(past.feeds[0].status).toBe('completed');
+      const pastCompletion = harness.stateRepository.completionInputs.at(-1);
+      expect(pastCompletion?.requiredCoveredTo.getTime()).toBe(
+        start + 2 * FIVE_MIN,
+      );
+    });
+
+    it('summarizes completed feeds separately from coverage-complete feeds', async () => {
+      const usAsset = {
+        id: 'us-1',
+        symbol: 'AAPL',
+        market: 'NASDAQ',
+        assetType: 'us_stock',
+        isActive: true,
+      };
+      const harness = createHarness({ assets: [CRYPTO_ASSET, usAsset] });
+      const from = new Date(NOW.getTime() - 35 * DAY);
+      // Crypto: full sweep → completed + coverage-complete.
+      harness.binanceCandles.fetchKlinesPage.mockResolvedValue(
+        binancePage({
+          candles: [syntheticCandle(from.getTime())],
+          providerReturnedRows: 1,
+          acceptedRows: 1,
+        }),
+      );
+      // US 5m: provider retention ends before targetFrom → the run ends
+      // completed but coverage-incomplete.
+      const oldestAvailable = new Date(NOW.getTime() - 20 * DAY);
+      harness.fiveMinuteIngestion.fetchUsFiveMinuteCandles.mockResolvedValue({
+        provider: 'kis_us_minute',
+        assetId: usAsset.id,
+        rangeFrom: from,
+        rangeTo: NOW,
+        pagesFetched: 5,
+        providerReturnedRows: 100,
+        acceptedRows: 80,
+        rejectedRows: 0,
+        duplicateRows: 0,
+        candles: [syntheticCandle(oldestAvailable.getTime())],
+        complete: false,
+        stopReason: 'provider_exhausted',
+        oldestOpenTime: oldestAvailable,
+        latestOpenTime: new Date(NOW.getTime() - FIVE_MIN),
+      });
+      const summary = await harness.service.syncAssets({
+        targets: ['5m'],
+        mode: 'initial' as never,
+        from,
+        to: NOW,
+        now: NOW,
+      });
+      expect(summary.totalFeeds).toBe(2);
+      // completedFeeds counts normal termination only — NOT confirmed
+      // coverage; the split counters expose the difference.
+      expect(summary.completedFeeds).toBe(2);
+      expect(summary.coverageCompleteFeeds).toBe(1);
+      expect(summary.completedWithIncompleteCoverageFeeds).toBe(1);
+      expect(summary.failedFeeds).toBe(0);
     });
   });
 });

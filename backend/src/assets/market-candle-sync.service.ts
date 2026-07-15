@@ -367,6 +367,13 @@ export class MarketCandleSyncService {
     }
 
     const allFeeds = results.flatMap((result) => result.feeds);
+    // completedFeeds counts runs that TERMINATED normally, not confirmed
+    // coverage: a run that stopped at a provider retention edge is completed
+    // yet coverage-incomplete. The two coverage counters below make that
+    // distinction explicit for operators.
+    const completedFeeds = allFeeds.filter(
+      (feed) => feed.status === MarketCandleSyncStatus.completed,
+    );
     return {
       mode,
       dryRun: options.dryRun,
@@ -375,8 +382,12 @@ export class MarketCandleSyncService {
       skippedAssets,
       assets: results,
       totalFeeds: allFeeds.length,
-      completedFeeds: allFeeds.filter(
-        (feed) => feed.status === MarketCandleSyncStatus.completed,
+      completedFeeds: completedFeeds.length,
+      coverageCompleteFeeds: completedFeeds.filter(
+        (feed) => feed.coverageComplete,
+      ).length,
+      completedWithIncompleteCoverageFeeds: completedFeeds.filter(
+        (feed) => !feed.coverageComplete,
       ).length,
       failedFeeds: allFeeds.filter(
         (feed) =>
@@ -873,6 +884,10 @@ export class MarketCandleSyncService {
             completionReason,
             coveredFrom,
             coveredTo,
+            // The repository re-validates the completeness claim against
+            // this effective bound: a targetTo in the future can only be
+            // confirmed up to the sync-time `now`.
+            requiredCoveredTo: new Date(requiredTo),
           });
         } else {
           status = MarketCandleSyncStatus.failed;

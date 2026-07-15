@@ -113,11 +113,24 @@ export type MarketCalendarCoverageStatus = {
   requiredThroughYear: number;
   markets: {
     market: MarketCalendarMarket;
+    // Years with a dataset present — audited OR provisional.
     coveredYears: number[];
-    missingYears: number[];
+    // Years verified against the exchange's official/final notice.
+    auditedYears: number[];
+    // Dataset present but NOT yet verified against the official exchange
+    // notice (version carries a `-provisional` suffix), e.g. KRX 2027 until
+    // the KRX year-end notice is published.
     provisionalYears: number[];
+    missingYears: number[];
   }[];
+  // Total datasets present across markets for the required range.
+  datasetsPresent: number;
+  // Every required year has a dataset (audited or provisional). Kept with
+  // its original meaning for compatibility — presence only, NOT audit level.
   complete: boolean;
+  // Every required year has an AUDITED dataset: no missing years and no
+  // provisional years. Only this level treats the calendar as final.
+  productionReady: boolean;
 };
 
 export type MarketCalendarCoverageConfig = {
@@ -157,6 +170,7 @@ export function getMarketCalendarCoverage(
 ): MarketCalendarCoverageStatus {
   const markets = (['KRX', 'US'] as const).map((market) => {
     const coveredYears: number[] = [];
+    const auditedYears: number[] = [];
     const missingYears: number[] = [];
     const provisionalYears: number[] = [];
     for (
@@ -170,15 +184,27 @@ export function getMarketCalendarCoverage(
         continue;
       }
       coveredYears.push(year);
-      if (dataset.version.includes('provisional')) provisionalYears.push(year);
+      if (dataset.version.includes('provisional')) {
+        provisionalYears.push(year);
+      } else {
+        auditedYears.push(year);
+      }
     }
-    return { market, coveredYears, missingYears, provisionalYears };
+    return { market, coveredYears, auditedYears, missingYears, provisionalYears };
   });
   return {
     requiredFromYear: config.requiredFromYear,
     requiredThroughYear: config.requiredThroughYear,
     markets,
+    datasetsPresent: markets.reduce(
+      (total, entry) => total + entry.coveredYears.length,
+      0,
+    ),
     complete: markets.every((entry) => entry.missingYears.length === 0),
+    productionReady: markets.every(
+      (entry) =>
+        entry.missingYears.length === 0 && entry.provisionalYears.length === 0,
+    ),
   };
 }
 

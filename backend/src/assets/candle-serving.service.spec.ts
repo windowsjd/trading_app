@@ -124,16 +124,18 @@ describe('CandleServingService', () => {
     }));
   });
 
-  it('uses stale Redis on an operational refresh failure', async () => {
+  it('uses stale Redis on an operational refresh failure without a provider call', async () => {
     const { service, database, cache, singleFlight } = create();
     const stale = response('stale');
     cache.get.mockResolvedValue({ status: 'stale', value: stale });
     database.load.mockResolvedValue(load('missing', null, { completedCoverage: true }));
     singleFlight.getOrLoad.mockRejectedValue(new CandleOperationalRefreshError('timeout'));
-    await expect(service.serve(asset, query, jest.fn())).resolves.toBe(stale);
+    const legacy = jest.fn();
+    await expect(service.serve(asset, query, legacy)).resolves.toBe(stale);
+    expect(legacy).toHaveBeenCalledTimes(0);
   });
 
-  it('uses strict DB last-known-good after a failed refresh', async () => {
+  it('uses strict DB last-known-good after a failed refresh without a provider call', async () => {
     const { service, database, sync } = create();
     const old = load('available', response('db-fallback'), { fresh: false });
     database.load.mockResolvedValue(old);
@@ -141,7 +143,9 @@ describe('CandleServingService', () => {
       assetId: asset.id,
       feeds: [{ status: 'failed', complete: false, writtenRows: 0, errorCode: 'PROVIDER_CALL_FAILED' }],
     });
-    await expect(service.serve(asset, query, jest.fn())).resolves.toEqual(response('db-fallback'));
+    const legacy = jest.fn();
+    await expect(service.serve(asset, query, legacy)).resolves.toEqual(response('db-fallback'));
+    expect(legacy).toHaveBeenCalledTimes(0);
   });
 
   it('does not hide programmer errors behind stale cache', async () => {
@@ -166,23 +170,41 @@ describe('CandleServingService', () => {
     expect(legacy).toHaveBeenCalledTimes(2);
   });
 
-  it('serves provider-direct when the managed path cannot resolve coverage', async () => {
-    // e.g. a provider-empty asset (halted stock) or an unresolved retention
-    // edge: no stale, no last-known-good — the provider-direct path answers.
+  it('fails with the provider-compatible error when a managed refresh fails without any fallback, never provider-direct', async () => {
+    // No stale Redis, no strict last-known-good: the request fails with the
+    // existing crypto provider error contract. The legacy loader must not be
+    // consulted — a managed request never bypasses the durable store.
     const { service, database, singleFlight } = create();
     database.load.mockResolvedValue(load('missing', null, { completedCoverage: true }));
     singleFlight.getOrLoad.mockRejectedValue(new CandleOperationalRefreshError('coverage'));
     const legacy = jest.fn().mockResolvedValue(response('legacy'));
-    await expect(service.serve(asset, query, legacy)).resolves.toEqual(response('legacy'));
-    expect(legacy).toHaveBeenCalledTimes(1);
+    await expect(service.serve(asset, query, legacy)).rejects.toMatchObject({
+      status: 502,
+    } satisfies Partial<HttpException>);
+    await expect(service.serve(asset, query, legacy)).rejects.toMatchObject({
+      response: {
+        success: false,
+        error: expect.objectContaining({ code: 'ASSET_CANDLES_PROVIDER_ERROR' }),
+      },
+    });
+    expect(legacy).toHaveBeenCalledTimes(0);
   });
 
-  it('preserves the existing provider error when every fallback fails', async () => {
-    const { service, database, singleFlight } = create();
+  it('keeps the stock provider error contract on an unresolved managed refresh without a provider call', async () => {
+    const { service, plans, database, singleFlight } = create();
+    const stockAsset = { ...asset, id: 'asset-2', symbol: '005930', market: 'KOSPI', assetType: AssetType.domestic_stock };
+    plans.build.mockReturnValue({ ...plan, assetId: stockAsset.id, assetType: stockAsset.assetType, market: stockAsset.market });
     database.load.mockResolvedValue(load('missing', null, { completedCoverage: true }));
     singleFlight.getOrLoad.mockRejectedValue(new CandleOperationalRefreshError('provider'));
-    const legacy = jest.fn().mockRejectedValue(new Error('provider down'));
-    await expect(service.serve(asset, query, legacy)).rejects.toMatchObject({ status: 502 } satisfies Partial<HttpException>);
+    const legacy = jest.fn().mockResolvedValue(response('legacy'));
+    await expect(service.serve(stockAsset, query, legacy)).rejects.toMatchObject({
+      status: 503,
+      response: {
+        success: false,
+        error: expect.objectContaining({ code: 'ASSET_CANDLES_PROVIDER_UNAVAILABLE' }),
+      },
+    });
+    expect(legacy).toHaveBeenCalledTimes(0);
   });
 
   describe('stale Redis fallback on database outages', () => {

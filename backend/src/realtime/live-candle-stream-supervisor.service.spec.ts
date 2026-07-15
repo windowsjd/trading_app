@@ -196,6 +196,40 @@ describe('LiveCandleStreamSupervisorService', () => {
     await connected;
   });
 
+  it('keeps a heartbeating socket open past the trade-stale threshold and closes only on true frame silence', async () => {
+    jest.useFakeTimers();
+    try {
+      const socket = new FakeSocket();
+      const fixture = setup(() => socket, [cryptoAsset('btc', 'BTC')], 200, {
+        // Trade freshness is deliberately far shorter than connection
+        // liveness: the watchdog must ignore it entirely.
+        connectionLivenessTimeoutMs: 60_000,
+        tradeStaleThresholdMs: 5_000,
+      });
+      const connected = connectBinance(fixture.service, ownerContext());
+      socket.open();
+      await jest.advanceTimersByTimeAsync(0);
+
+      // 50 seconds of heartbeat-only traffic (no trades). Every inter-frame
+      // gap (10s) exceeds tradeStaleThresholdMs, yet the connection watchdog
+      // never fires because frames keep arriving within the liveness window.
+      for (let step = 0; step < 5; step += 1) {
+        await jest.advanceTimersByTimeAsync(10_000);
+        socket.emit('ping', Buffer.from('heartbeat'));
+      }
+      expect(socket.closeCalls).toHaveLength(0);
+
+      // Full silence — no frames of any kind — exceeds the liveness timeout
+      // and closes the socket for the reconnect loop. 70s covers the 60s
+      // timeout plus one 5s watchdog tick of scheduling slack.
+      await jest.advanceTimersByTimeAsync(70_000);
+      expect(socket.closeCalls.at(-1)).toEqual([4000, 'liveness timeout']);
+      await connected;
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('closes the provider socket immediately after owner lease renewal is lost', async () => {
     jest.useFakeTimers();
     const socket = new FakeSocket();
@@ -215,6 +249,7 @@ function setup(
   socketFactory: () => FakeSocket,
   assets = [cryptoAsset('btc', 'BTC')],
   maxProviderSubscriptionsPerShard = 200,
+  configOverrides: Record<string, unknown> = {},
 ) {
   const prisma = {
     asset: {
@@ -279,6 +314,7 @@ function setup(
       binanceEnabled: true,
       kisEnabled: true,
       maxProviderSubscriptionsPerShard,
+      ...configOverrides,
     },
     factory,
   );

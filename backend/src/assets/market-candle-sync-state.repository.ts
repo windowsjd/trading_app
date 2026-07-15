@@ -6,7 +6,10 @@ import {
   type MarketCandleSyncState,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import type { MarketCandleFeed } from './market-candle-sync.types';
+import type {
+  MarketCandleFeed,
+  MarketCandleSyncCompletionReason,
+} from './market-candle-sync.types';
 
 const ERROR_MESSAGE_MAX_LENGTH = 500;
 
@@ -31,6 +34,31 @@ export class ActiveMarketCandleSyncExistsError extends Error {
   }
 }
 
+/**
+ * A completion claim violated the coverage invariant. This is a programmer
+ * error: the checkpoint row is left untouched so a bad claim can never be
+ * persisted as trustworthy coverage.
+ */
+export class MarketCandleSyncStateInvariantError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'MarketCandleSyncStateInvariantError';
+  }
+}
+
+// The only terminal reasons that may accompany coverageComplete=true /
+// coverageComplete=false respectively. Kept in sync with
+// MarketCandleSyncCompletionReason.
+const COMPLETE_COVERAGE_REASONS: ReadonlySet<MarketCandleSyncCompletionReason> =
+  new Set(['target_reached', 'confirmed_empty']);
+const INCOMPLETE_COVERAGE_REASONS: ReadonlySet<MarketCandleSyncCompletionReason> =
+  new Set([
+    'empty_page_before_target',
+    'provider_exhausted_before_target',
+    'cursor_not_advanced',
+    'aborted',
+  ]);
+
 export type MarketCandleSyncPageProgress = {
   cursorJson: Prisma.JsonObject | null;
   pagesFetched: number;
@@ -50,9 +78,14 @@ export type MarketCandleSyncPageProgress = {
 export type MarketCandleSyncCompletionInput = {
   // True only when the provider cursor confirmed the whole target range.
   coverageComplete: boolean;
-  completionReason: string;
+  completionReason: MarketCandleSyncCompletionReason;
   coveredFrom: Date | null;
   coveredTo: Date | null;
+  // The instant coverage was REQUIRED to reach for this run to be complete:
+  // min(targetTo, sync-time now). targetTo may lie in the future, which no
+  // provider can confirm, so completeness is judged against this instant
+  // instead of targetTo alone.
+  requiredCoveredTo: Date;
 };
 
 /**
@@ -227,31 +260,33 @@ export class MarketCandleSyncStateRepository {
 
   /**
    * Terminates a run as completed. Coverage is a REQUIRED input: `completed`
-   * alone never implies the target range was fully confirmed. A
-   * coverageComplete=true claim must span the run's target range; violating
-   * that is a programmer error and is rejected before touching the row.
+   * alone never implies the target range was fully confirmed. The full
+   * invariant is enforced BEFORE the row is touched:
+   *
+   * coverageComplete=true —
+   * - completionReason is target_reached or confirmed_empty;
+   * - requiredCoveredTo is a valid instant inside [targetFrom, targetTo];
+   * - the covered range is well-formed (coveredFrom < coveredTo) and spans
+   *   [targetFrom, requiredCoveredTo].
+   *
+   * coverageComplete=false —
+   * - completionReason is an incomplete reason (never target_reached /
+   *   confirmed_empty);
+   * - the covered range is either fully absent or well-formed (never
+   *   one-sided).
+   *
+   * Any violation throws MarketCandleSyncStateInvariantError.
    */
   async markCompleted(
     id: string,
     completedAt: Date,
     coverage: MarketCandleSyncCompletionInput,
   ): Promise<boolean> {
-    if (coverage.coverageComplete) {
-      const row = await this.prisma.marketCandleSyncState.findUnique({
-        where: { id },
-        select: { targetFrom: true, targetTo: true },
-      });
-      if (
-        row &&
-        (coverage.coveredFrom === null ||
-          coverage.coveredTo === null ||
-          coverage.coveredFrom.getTime() > row.targetFrom.getTime())
-      ) {
-        throw new Error(
-          'coverageComplete=true requires a covered range spanning the target range.',
-        );
-      }
-    }
+    const row = await this.prisma.marketCandleSyncState.findUnique({
+      where: { id },
+      select: { targetFrom: true, targetTo: true },
+    });
+    if (row) assertCompletionInvariant(id, row, coverage);
     const updated = await this.prisma.marketCandleSyncState.updateMany({
       where: { id, status: MarketCandleSyncStatus.running },
       data: {
@@ -333,6 +368,77 @@ export class MarketCandleSyncStateRepository {
       },
     });
     return updated.count;
+  }
+}
+
+function assertCompletionInvariant(
+  id: string,
+  row: { targetFrom: Date; targetTo: Date },
+  coverage: MarketCandleSyncCompletionInput,
+): void {
+  const fail = (detail: string): never => {
+    throw new MarketCandleSyncStateInvariantError(
+      `markCompleted(${id}): ${detail}`,
+    );
+  };
+  if (coverage.coverageComplete) {
+    if (!COMPLETE_COVERAGE_REASONS.has(coverage.completionReason)) {
+      fail(
+        `coverageComplete=true does not allow completionReason=${coverage.completionReason}.`,
+      );
+    }
+    if (
+      !(coverage.requiredCoveredTo instanceof Date) ||
+      Number.isNaN(coverage.requiredCoveredTo.getTime())
+    ) {
+      fail('coverageComplete=true requires a valid requiredCoveredTo Date.');
+    }
+    const requiredToMs = coverage.requiredCoveredTo.getTime();
+    if (requiredToMs < row.targetFrom.getTime()) {
+      fail('requiredCoveredTo must not precede targetFrom.');
+    }
+    if (requiredToMs > row.targetTo.getTime()) {
+      fail('requiredCoveredTo must not exceed targetTo.');
+    }
+    if (coverage.coveredFrom === null || coverage.coveredTo === null) {
+      fail(
+        'coverageComplete=true requires a covered range spanning the target range.',
+      );
+    }
+    const coveredFromMs = (coverage.coveredFrom as Date).getTime();
+    const coveredToMs = (coverage.coveredTo as Date).getTime();
+    if (coveredFromMs >= coveredToMs) {
+      fail('the covered range must satisfy coveredFrom < coveredTo.');
+    }
+    if (coveredFromMs > row.targetFrom.getTime()) {
+      fail(
+        'coverageComplete=true requires a covered range spanning the target range (coveredFrom must reach targetFrom).',
+      );
+    }
+    if (coveredToMs < requiredToMs) {
+      fail(
+        'coverageComplete=true requires a covered range spanning the target range (coveredTo must reach requiredCoveredTo).',
+      );
+    }
+    return;
+  }
+  if (!INCOMPLETE_COVERAGE_REASONS.has(coverage.completionReason)) {
+    fail(
+      `coverageComplete=false does not allow completionReason=${coverage.completionReason}.`,
+    );
+  }
+  const hasFrom = coverage.coveredFrom !== null;
+  const hasTo = coverage.coveredTo !== null;
+  if (hasFrom !== hasTo) {
+    fail('a partial covered range must set both coveredFrom and coveredTo.');
+  }
+  if (
+    hasFrom &&
+    hasTo &&
+    (coverage.coveredFrom as Date).getTime() >=
+      (coverage.coveredTo as Date).getTime()
+  ) {
+    fail('the covered range must satisfy coveredFrom < coveredTo.');
   }
 }
 

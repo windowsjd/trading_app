@@ -18,6 +18,7 @@ jest.mock('../generated/prisma/client', () => ({
 import { Prisma } from '../generated/prisma/client';
 import {
   ActiveMarketCandleSyncExistsError,
+  MarketCandleSyncStateInvariantError,
   MarketCandleSyncStateRepository,
 } from './market-candle-sync-state.repository';
 
@@ -144,11 +145,16 @@ describe('MarketCandleSyncStateRepository', () => {
   it('completes only running rows and never regresses completed rows', async () => {
     const { repository, delegate } = createRepository();
     delegate.updateMany.mockResolvedValue({ count: 1 });
+    delegate.findUnique.mockResolvedValue({
+      targetFrom: new Date('2026-06-01T00:00:00Z'),
+      targetTo: new Date('2026-07-01T00:00:00Z'),
+    });
     await repository.markCompleted('sync-1', new Date(), {
       coverageComplete: false,
       completionReason: 'provider_exhausted_before_target',
       coveredFrom: null,
       coveredTo: null,
+      requiredCoveredTo: new Date('2026-07-01T00:00:00Z'),
     });
     expect(delegate.updateMany.mock.calls[0][0].where).toEqual({
       id: 'sync-1',
@@ -213,43 +219,226 @@ describe('MarketCandleSyncStateRepository', () => {
     });
   });
 
-  it('persists coverage on completion and requires a spanning range for coverageComplete', async () => {
-    const { repository, delegate } = createRepository();
-    delegate.updateMany.mockResolvedValue({ count: 1 });
-    delegate.findUnique.mockResolvedValue({
-      targetFrom: new Date('2026-06-01T00:00:00Z'),
-      targetTo: new Date('2026-07-01T00:00:00Z'),
-    });
-    await repository.markCompleted('sync-1', new Date(), {
-      coverageComplete: true,
-      completionReason: 'target_reached',
-      coveredFrom: new Date('2026-06-01T00:00:00Z'),
-      coveredTo: new Date('2026-07-01T00:00:00Z'),
-    });
-    expect(delegate.updateMany.mock.calls[0][0].data).toMatchObject({
-      status: 'completed',
-      coverageComplete: true,
-      completionReason: 'target_reached',
-    });
+  describe('markCompleted coverage invariant', () => {
+    const targetFrom = new Date('2026-06-01T00:00:00Z');
+    const targetTo = new Date('2026-07-01T00:00:00Z');
+    const setup = () => {
+      const { repository, delegate } = createRepository();
+      delegate.updateMany.mockResolvedValue({ count: 1 });
+      delegate.findUnique.mockResolvedValue({ targetFrom, targetTo });
+      return { repository, delegate };
+    };
 
-    // A coverageComplete=true claim that starts after targetFrom is a
-    // programmer error, not a persistable state.
-    await expect(
-      repository.markCompleted('sync-1', new Date(), {
+    it('persists a spanning coverageComplete claim (target_reached)', async () => {
+      const { repository, delegate } = setup();
+      await repository.markCompleted('sync-1', new Date(), {
         coverageComplete: true,
         completionReason: 'target_reached',
-        coveredFrom: new Date('2026-06-15T00:00:00Z'),
-        coveredTo: new Date('2026-07-01T00:00:00Z'),
-      }),
-    ).rejects.toThrow('covered range');
-    await expect(
-      repository.markCompleted('sync-1', new Date(), {
+        coveredFrom: targetFrom,
+        coveredTo: targetTo,
+        requiredCoveredTo: targetTo,
+      });
+      expect(delegate.updateMany.mock.calls[0][0].data).toMatchObject({
+        status: 'completed',
+        coverageComplete: true,
+        completionReason: 'target_reached',
+      });
+    });
+
+    it('persists a confirmed_empty claim spanning the required range', async () => {
+      const { repository, delegate } = setup();
+      await repository.markCompleted('sync-1', new Date(), {
         coverageComplete: true,
         completionReason: 'confirmed_empty',
-        coveredFrom: null,
-        coveredTo: null,
-      }),
-    ).rejects.toThrow('covered range');
+        coveredFrom: targetFrom,
+        coveredTo: targetTo,
+        requiredCoveredTo: targetTo,
+      });
+      expect(delegate.updateMany.mock.calls[0][0].data).toMatchObject({
+        coverageComplete: true,
+        completionReason: 'confirmed_empty',
+      });
+    });
+
+    it('rejects coveredFrom later than targetFrom', async () => {
+      const { repository } = setup();
+      await expect(
+        repository.markCompleted('sync-1', new Date(), {
+          coverageComplete: true,
+          completionReason: 'target_reached',
+          coveredFrom: new Date('2026-06-15T00:00:00Z'),
+          coveredTo: targetTo,
+          requiredCoveredTo: targetTo,
+        }),
+      ).rejects.toThrow(MarketCandleSyncStateInvariantError);
+    });
+
+    it('rejects coveredTo earlier than requiredCoveredTo', async () => {
+      const { repository } = setup();
+      await expect(
+        repository.markCompleted('sync-1', new Date(), {
+          coverageComplete: true,
+          completionReason: 'target_reached',
+          coveredFrom: targetFrom,
+          coveredTo: new Date('2026-06-20T00:00:00Z'),
+          requiredCoveredTo: targetTo,
+        }),
+      ).rejects.toThrow('coveredTo must reach requiredCoveredTo');
+    });
+
+    it('accepts coveredTo exactly equal to requiredCoveredTo', async () => {
+      const { repository, delegate } = setup();
+      const requiredCoveredTo = new Date('2026-06-20T00:00:00Z');
+      await expect(
+        repository.markCompleted('sync-1', new Date(), {
+          coverageComplete: true,
+          completionReason: 'target_reached',
+          coveredFrom: targetFrom,
+          coveredTo: requiredCoveredTo,
+          requiredCoveredTo,
+        }),
+      ).resolves.toBe(true);
+      expect(delegate.updateMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('validates only up to now when targetTo lies in the future', async () => {
+      // requiredCoveredTo = min(targetTo, now): a run whose target extends
+      // past `now` is complete once everything up to now is confirmed.
+      const { repository } = setup();
+      const now = new Date('2026-06-25T00:00:00Z');
+      await expect(
+        repository.markCompleted('sync-1', new Date(), {
+          coverageComplete: true,
+          completionReason: 'target_reached',
+          coveredFrom: targetFrom,
+          coveredTo: now,
+          requiredCoveredTo: now,
+        }),
+      ).resolves.toBe(true);
+    });
+
+    it('rejects a requiredCoveredTo outside [targetFrom, targetTo] or invalid', async () => {
+      const { repository } = setup();
+      await expect(
+        repository.markCompleted('sync-1', new Date(), {
+          coverageComplete: true,
+          completionReason: 'target_reached',
+          coveredFrom: targetFrom,
+          coveredTo: targetTo,
+          requiredCoveredTo: new Date('2026-05-01T00:00:00Z'),
+        }),
+      ).rejects.toThrow('must not precede targetFrom');
+      await expect(
+        repository.markCompleted('sync-1', new Date(), {
+          coverageComplete: true,
+          completionReason: 'target_reached',
+          coveredFrom: targetFrom,
+          coveredTo: new Date('2026-08-01T00:00:00Z'),
+          requiredCoveredTo: new Date('2026-08-01T00:00:00Z'),
+        }),
+      ).rejects.toThrow('must not exceed targetTo');
+      await expect(
+        repository.markCompleted('sync-1', new Date(), {
+          coverageComplete: true,
+          completionReason: 'target_reached',
+          coveredFrom: targetFrom,
+          coveredTo: targetTo,
+          requiredCoveredTo: new Date('invalid'),
+        }),
+      ).rejects.toThrow('valid requiredCoveredTo');
+    });
+
+    it('rejects a null covered range with coverageComplete=true', async () => {
+      const { repository } = setup();
+      await expect(
+        repository.markCompleted('sync-1', new Date(), {
+          coverageComplete: true,
+          completionReason: 'confirmed_empty',
+          coveredFrom: null,
+          coveredTo: null,
+          requiredCoveredTo: targetTo,
+        }),
+      ).rejects.toThrow('covered range');
+    });
+
+    it('rejects reason/coverage mismatches in both directions', async () => {
+      const { repository } = setup();
+      await expect(
+        repository.markCompleted('sync-1', new Date(), {
+          coverageComplete: true,
+          completionReason: 'provider_exhausted_before_target',
+          coveredFrom: targetFrom,
+          coveredTo: targetTo,
+          requiredCoveredTo: targetTo,
+        }),
+      ).rejects.toThrow('does not allow completionReason');
+      await expect(
+        repository.markCompleted('sync-1', new Date(), {
+          coverageComplete: false,
+          completionReason: 'target_reached',
+          coveredFrom: null,
+          coveredTo: null,
+          requiredCoveredTo: targetTo,
+        }),
+      ).rejects.toThrow('does not allow completionReason');
+      await expect(
+        repository.markCompleted('sync-1', new Date(), {
+          coverageComplete: false,
+          completionReason: 'confirmed_empty',
+          coveredFrom: null,
+          coveredTo: null,
+          requiredCoveredTo: targetTo,
+        }),
+      ).rejects.toThrow('does not allow completionReason');
+    });
+
+    it('rejects a one-sided or malformed covered range with coverageComplete=false', async () => {
+      const { repository } = setup();
+      await expect(
+        repository.markCompleted('sync-1', new Date(), {
+          coverageComplete: false,
+          completionReason: 'provider_exhausted_before_target',
+          coveredFrom: new Date('2026-06-10T00:00:00Z'),
+          coveredTo: null,
+          requiredCoveredTo: targetTo,
+        }),
+      ).rejects.toThrow('both coveredFrom and coveredTo');
+      await expect(
+        repository.markCompleted('sync-1', new Date(), {
+          coverageComplete: false,
+          completionReason: 'provider_exhausted_before_target',
+          coveredFrom: null,
+          coveredTo: new Date('2026-06-10T00:00:00Z'),
+          requiredCoveredTo: targetTo,
+        }),
+      ).rejects.toThrow('both coveredFrom and coveredTo');
+      await expect(
+        repository.markCompleted('sync-1', new Date(), {
+          coverageComplete: false,
+          completionReason: 'provider_exhausted_before_target',
+          coveredFrom: new Date('2026-06-11T00:00:00Z'),
+          coveredTo: new Date('2026-06-10T00:00:00Z'),
+          requiredCoveredTo: targetTo,
+        }),
+      ).rejects.toThrow('coveredFrom < coveredTo');
+    });
+
+    it('accepts an incomplete run with a well-formed partial covered range', async () => {
+      const { repository, delegate } = setup();
+      await expect(
+        repository.markCompleted('sync-1', new Date(), {
+          coverageComplete: false,
+          completionReason: 'provider_exhausted_before_target',
+          coveredFrom: new Date('2026-06-15T00:00:00Z'),
+          coveredTo: targetTo,
+          requiredCoveredTo: targetTo,
+        }),
+      ).resolves.toBe(true);
+      expect(delegate.updateMany.mock.calls[0][0].data).toMatchObject({
+        coverageComplete: false,
+        completionReason: 'provider_exhausted_before_target',
+      });
+    });
   });
 
   it('records accumulated covered range with page progress', async () => {

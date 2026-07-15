@@ -45,6 +45,20 @@ export type CandleDeliveryState =
   | 'database_fallback'
   | 'legacy_provider';
 
+/**
+ * Managed serving order (mode=database, managed read plan):
+ * fresh Redis → PostgreSQL → bounded sync → PostgreSQL requery → stale Redis
+ * → strict PostgreSQL last-known-good → provider-compatible error. Provider
+ * rows are never returned without a durable write + requery.
+ *
+ * legacyLoader (provider-direct) is reachable ONLY through:
+ * 1. CANDLE_SERVING_MODE=legacy — the explicit full rollback switch;
+ * 2. read plans with managedByPersistence=false (out-of-policy requests);
+ * 3. the cold-baseline policy: no completed coverage and a requested range
+ *    beyond the on-demand repair budget (logged as cold_baseline_required) —
+ *    operators seed those via the manual sync job.
+ * Once a managed refresh has started, no failure path calls legacyLoader.
+ */
 @Injectable()
 export class CandleServingService {
   private readonly logger = new Logger(CandleServingService.name);
@@ -158,20 +172,23 @@ export class CandleServingService {
         });
         return initial.response as AssetCandlesResponse;
       }
-      // Last resort: the managed path could not establish coverage (provider
-      // retention edge, a provider-empty asset such as a halted stock, or a
-      // database outage without any cached fallback). Serve provider-direct
-      // instead of failing the request; if the provider also fails, surface
-      // the standard provider error.
-      try {
-        const response = await legacyLoader();
-        this.logDelivery('legacy_provider', asset.id, query.interval, {
-          reason: 'managed_path_unresolved',
-        });
-        return response;
-      } catch {
-        throw this.providerCompatibilityError(asset);
-      }
+      // The managed refresh failed and no degraded copy exists (no stale
+      // Redis, no strict PostgreSQL last-known-good). The request fails with
+      // the provider-compatible error contract. It must NOT be answered by a
+      // provider-direct call: once a request is managed, provider rows only
+      // reach clients through the durable store, and legacyLoader is
+      // reachable solely via CANDLE_SERVING_MODE=legacy, an unmanaged read
+      // plan, or the explicit cold-baseline policy above.
+      this.logger.warn(
+        JSON.stringify({
+          event: 'candle_delivery_failed',
+          state: 'managed_unresolved',
+          assetId: asset.id,
+          interval: query.interval,
+          reason: this.errorName(error),
+        }),
+      );
+      throw this.providerCompatibilityError(asset);
     }
   }
 

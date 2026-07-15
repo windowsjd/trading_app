@@ -17,6 +17,7 @@
     "test:db:prepare": "prisma migrate deploy",
     "smoke:candle-fixture": "tsx scripts/candle-release-fixture-smoke.ts",
     "smoke:candle-live": "tsx scripts/candle-live-smoke.ts",
+    "smoke:candle-report": "tsx scripts/candle-live-smoke-report.ts",
     "dev:open-season": "tsx scripts/dev-open-season.ts",
     "dev:run-provider-ingestions": "tsx scripts/dev-run-provider-ingestions.ts",
     "dev:ensure-market-snapshots": "tsx scripts/dev-ensure-market-snapshots.ts",
@@ -78,6 +79,10 @@
       "ts"
     ],
     "rootDir": "src",
+    "roots": [
+      "<rootDir>",
+      "<rootDir>/../scripts/lib"
+    ],
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"

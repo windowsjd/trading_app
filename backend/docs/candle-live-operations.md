@@ -127,12 +127,37 @@ range is persisted separately:
 - `completionReason` — `target_reached`, `confirmed_empty`,
   `empty_page_before_target`, or `provider_exhausted_before_target`.
 
+The checkpoint repository (`markCompleted`) enforces the full completion
+invariant BEFORE the row is written, so a bad claim can never be persisted:
+
+- `coverageComplete=true` requires `completionReason` of `target_reached` or
+  `confirmed_empty`, a well-formed covered range (`coveredFrom < coveredTo`),
+  `coveredFrom <= targetFrom`, **and** `coveredTo >= requiredCoveredTo`,
+  where `requiredCoveredTo = min(targetTo, sync-time now)` is passed by the
+  sync service — a `targetTo` in the future can only ever be confirmed up to
+  `now`, and `requiredCoveredTo` itself must lie inside
+  `[targetFrom, targetTo]`.
+- `coverageComplete=false` requires an incomplete reason
+  (`empty_page_before_target`, `provider_exhausted_before_target`,
+  `cursor_not_advanced`, `aborted`) and a covered range that is either fully
+  absent or well-formed — never one-sided.
+- Violations throw `MarketCandleSyncStateInvariantError` (a programmer
+  error) without touching the row. No new migration/column is involved; this
+  is an application invariant plus tests.
+
+Sync summaries make the same distinction explicit: `completedFeeds` counts
+runs that TERMINATED normally — it is **not** a coverage count — while
+`coverageCompleteFeeds` and `completedWithIncompleteCoverageFeeds` split the
+completed runs by confirmed coverage.
+
 Serving (`findCompletedCovering`) accepts a checkpoint as coverage evidence
 only when `status=completed`, `coverageComplete=true`, and
 `[coveredFrom, coveredTo)` spans the requested range clamped at the request
 clock. A KIS run that stopped at the provider's minute-retention edge stays
-`completed` + `coverageComplete=false` and is repaired on demand or served
-provider-direct; it is never mistaken for confirmed-empty data.
+`completed` + `coverageComplete=false`; the range is repaired on demand
+(within the repair budget) or, for large cold ranges, stays on the
+cold-baseline provider path until an operator seeds it. It is never mistaken
+for confirmed-empty data.
 
 **Legacy checkpoints:** rows completed before the
 `20260713200000_add_market_candle_sync_coverage` migration keep
@@ -154,6 +179,31 @@ timeouts, and operational provider-refresh failures (see
 invariant, and programmer errors always propagate. Each fallback logs
 `{"event":"candle_delivery","state":"stale_cache_fallback","reason":...}`.
 
+## Managed serving never falls back provider-direct
+
+Once a request is managed (mode=database and a managed read plan), the ONLY
+serving order is: fresh Redis → PostgreSQL → bounded sync → PostgreSQL
+requery → stale Redis → strict PostgreSQL last-known-good → the existing
+provider-compatible error (`ASSET_CANDLES_PROVIDER_ERROR` 502 for crypto,
+`ASSET_CANDLES_PROVIDER_UNAVAILABLE` 503 for stocks; no internal operational
+detail or credential leaks into the response, and the provider is NOT called
+again). The failure is logged as
+`{"event":"candle_delivery_failed","state":"managed_unresolved"}`.
+
+Provider-direct (`legacyLoader`) is reachable only through:
+
+1. `CANDLE_SERVING_MODE=legacy` — the explicit, whole-endpoint rollback;
+2. read plans with `managedByPersistence=false` (out-of-policy requests);
+3. the cold-baseline policy — no completed baseline coverage AND a requested
+   range beyond `CANDLE_SERVING_ON_DEMAND_REPAIR_MAX_RANGE_MS`, logged as
+   `{"event":"candle_delivery","state":"legacy_provider","reason":"cold_baseline_required"}`.
+   Operators seed these baselines with the manual `market_candle_sync` job.
+
+The cold-baseline path is a deliberate PRE-refresh routing decision for
+ranges the managed path is not allowed to own yet; it is not a failure
+fallback. After a managed refresh has started, no catch/fallback path calls
+`legacyLoader`.
+
 ## Market calendar (versioned, audited)
 
 `src/orders/market-calendar/` holds per-market per-year datasets with
@@ -171,14 +221,37 @@ invariant, and programmer errors always propagate. Each fallback logs
   MUST be re-verified against the official KRX notice (published ~Dec 2026);
   bump the version and drop the suffix then.
 
+Calendar state per market/year is three-level, and readiness reflects it:
+
+1. **missing** — no dataset. Readiness reason
+   `MARKET_CALENDAR_COVERAGE_MISSING` (degraded).
+2. **provisional** — a dataset exists but has NOT been verified against the
+   exchange's official/final notice (`version` carries `-provisional`, e.g.
+   KRX 2027 `2027.1-provisional`). Readiness reason
+   `MARKET_CALENDAR_PROVISIONAL` (degraded). Provisional data is never
+   displayed as audited.
+3. **audited** — verified against the official/final source.
+
+`GET /readiness` exposes `marketCalendar` with per-market `coveredYears`,
+`auditedYears`, `provisionalYears`, and `missingYears`, plus `complete`
+(datasets present for every required year — presence only, its original
+meaning) and `productionReady` (no missing AND no provisional year). Both
+missing and provisional years degrade readiness — they never make the
+service `unavailable` (that is reserved for e.g. database loss) — crypto is
+unaffected, and stock session decisions keep failing safe (uncovered dates
+are never assumed tradable).
+
 Operational policy: a date in a year without a dataset is never assumed to be
-a regular trading day. Stock order/market-session decisions fail safe
-(treated as not tradable / no session), crypto is unaffected, and readiness
-reports `MARKET_CALENDAR_COVERAGE_MISSING` with the exact missing years.
-`MARKET_CALENDAR_REQUIRED_FROM_YEAR` / `MARKET_CALENDAR_REQUIRED_THROUGH_YEAR`
-override the default requirement (current year through next year). To add a
-year: create `market-calendar/data/<market>-<year>.ts` from the primary
-source, register it in `market-calendar.registry.ts`, and add tests.
+a regular trading day. `MARKET_CALENDAR_REQUIRED_FROM_YEAR` /
+`MARKET_CALENDAR_REQUIRED_THROUGH_YEAR` override the default requirement
+(current year through next year). KRX 2027 stays provisional until the
+official KRX year-end notice (expected ~Dec 2026) is verified; then bump the
+dataset `version` and drop the `-provisional` suffix. If a 2026 release does
+not need 2027 coverage, set `MARKET_CALENDAR_REQUIRED_THROUGH_YEAR=2026` —
+this narrows the REQUIREMENT; never use environment variables to hide a
+provisional dataset or present it as audited. To add a year: create
+`market-calendar/data/<market>-<year>.ts` from the primary source, register
+it in `market-calendar.registry.ts`, and add tests.
 
 ## Old-generation live bucket recovery
 
@@ -210,21 +283,39 @@ or `CANDLE_LIVE_BINANCE_ENABLED` without `CANDLE_RECONCILIATION_CRYPTO_ENABLED`
 normal operation). Elsewhere it logs a warning and readiness reports
 `LIVE_RECONCILIATION_REQUIRED`.
 
-## KIS connection liveness vs trade freshness
+## Connection liveness vs trade freshness
 
-Connection liveness and market-data freshness are separate signals:
+Connection liveness and market-data freshness are separate signals with
+SEPARATE configuration:
 
-- `lastFrameAt` — any WebSocket frame (trade, ack, PINGPONG, WS ping). The
-  reconnect watchdog closes the socket only when NO frame of any kind arrives
-  within `CANDLE_LIVE_STALE_THRESHOLD_MS`; a quiet market with heartbeats
-  flowing never triggers a reconnect.
+- **Connection liveness** — `CANDLE_LIVE_CONNECTION_LIVENESS_TIMEOUT_MS`
+  (default `90000`, minimum `5000`). `lastFrameAt` tracks any WebSocket frame
+  (trade, ack, PINGPONG, WS ping). The supervisor's reconnect watchdog closes
+  the socket only when NO frame of any kind arrives within this window; a
+  quiet market with heartbeats flowing never triggers a reconnect. This is
+  the ONLY setting the watchdog reads.
+- **Trade freshness** — `CANDLE_LIVE_TRADE_STALE_THRESHOLD_MS` (default
+  `30000`, minimum `1000`). `lastEventAt`/`eventLagMs` track the last
+  successfully processed trade/kline event. Readiness reports
+  `LIVE_PROVIDER_STALE` only while the market can actually trade: the KIS lag
+  check applies only during the KRX regular session, and the delayed US feed
+  is excluded from real-time lag checks. This signal NEVER closes a socket;
+  it only degrades readiness. This is the ONLY setting readiness reads.
 - `lastHeartbeatAt` / `lastControlFrameAt` — official KIS `PINGPONG` frames
   (parsed as a typed control message and echoed back verbatim per the KIS
   WebSocket protocol), subscription acks, and WS pings.
-- `lastEventAt` — the last successfully processed trade/kline event. Trade
-  freshness feeds readiness (`LIVE_PROVIDER_STALE`) only while the market can
-  actually trade: the KIS lag check applies only during the KRX regular
-  session, and the delayed US feed is excluded from real-time lag checks.
+
+The defaults keep liveness (90s) intentionally longer than trade staleness
+(30s): heartbeats arrive on the order of tens of seconds (the pre-existing
+provider streaming heartbeat rules use 60s), so market data can be reported
+stale long before a healthy-but-quiet socket is torn down. Configuration
+validation rejects a liveness timeout shorter than the trade-stale threshold.
+
+**Deprecated:** `CANDLE_LIVE_STALE_THRESHOLD_MS` conflated both meanings. It
+is kept only as a fallback for whichever dedicated variable is unset (the
+dedicated variables always win), and an invalid value in it still fails
+configuration — it is never silently replaced. Migrate to the two dedicated
+variables.
 
 Every reconnect logs
 `{"event":"live_candle_stream_reconnect","provider":...,"reason":...}` with
@@ -255,9 +346,22 @@ CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm test -- candle-release-fixture.inte
 ```
 
 Pass criteria: every scenario `passed`, `"result": "passed"`, exit code 0,
-zero incomplete closed candles, zero duplicate canonical rows, zero leftover
-fixture rows/keys. Artifacts: `backend/artifacts/candle-smoke/fixture-<ts>.json`.
-The fixture smoke must pass before any real-provider smoke is attempted.
+zero incomplete closed candles, zero duplicate canonical rows, AND
+`redisKeysRemainingAfterCleanup = 0` / `dbRowsRemainingAfterCleanup = 0`
+(these are the post-cleanup leftovers; `redisKeysCreated` counts what the run
+tracked and is intentionally a separate number). Artifacts:
+`backend/artifacts/candle-smoke/fixture-<ts>.json`. The fixture smoke must
+pass before any real-provider smoke is attempted.
+
+Commit traceability: the smoke resolves its git identity before doing any
+work (`SMOKE_GIT_COMMIT` override → `git rev-parse HEAD`; if neither yields a
+full SHA the run ABORTS — a `gitCommit: null` passed artifact cannot prove
+which code was validated, so it is impossible to produce). The artifact
+records `gitCommit`, `gitBranch`, and `gitDirty`. A dirty working tree is
+refused by default; `SMOKE_ALLOW_DIRTY=1` is a development-only escape hatch,
+the artifact keeps `gitDirty: true`, and such a run is never accepted as
+release validation. Existing historical artifacts are left untouched as
+records; they are never edited or reinterpreted.
 
 CI note: this repository has no CI pipeline today. If one is added, run the
 fixture smoke with a PostgreSQL service, a Redis service, and
@@ -296,13 +400,32 @@ Pass criteria (per artifact JSON): `subscriptionSucceeded > 0`,
 `incompleteClosedRows = 0`, and with `--verifyRest`
 `driftAfterReconciliation = 0`. `--injectReconnect` forces one socket close at
 half-time and one owner-lease takeover at two-thirds; the run must show the
-subscription restored and old-generation buckets recovered. A provider smoke
-that was not actually executed (missing entitlement, market closed, missing
-credentials) must be recorded as NOT RUN — never as passed. Do not inject
+subscription restored and old-generation buckets recovered. Do not inject
 Redis/PostgreSQL restarts against shared infrastructure.
 
-Artifacts: `backend/artifacts/candle-smoke/{binance,kis-krx,kis-us-delayed}-<ts>.json`
-(counters only; no credentials or raw provider frames).
+Every live-smoke artifact carries `schemaVersion`, `gitCommit`, `gitBranch`,
+`gitDirty`, and `result: passed | failed | not_run`. The same rules as the
+fixture smoke apply: the run aborts without a resolvable commit SHA, refuses
+a dirty tree unless `SMOKE_ALLOW_DIRTY=1` (development only, never release
+validation), and validation is only executed AFTER the release commit is
+final — an artifact for a different commit does not validate this one.
+
+A provider smoke that was not actually executed (missing entitlement, market
+closed, missing credentials) must be recorded as NOT RUN — never as passed.
+Record it with the report tool (no provider/database/Redis access; includes
+the git identity, provider, reason, and `createdAt`; never counted as a
+pass):
+
+```bash
+pnpm run smoke:candle-report -- \
+  --provider kis-us --result not_run \
+  --reason "US regular session closed"
+# artifact: backend/artifacts/candle-smoke/not-run-kis-us-<ts>.json
+```
+
+Artifacts: `backend/artifacts/candle-smoke/{binance,kis-krx,kis-us-delayed,not-run-*}-<ts>.json`
+(counters only; no credentials or raw provider frames). Historical failed
+artifacts stay as-is: they are records, never reinterpreted as passes.
 
 ## Known limitation: HTTP v1 `amount` contract
 
@@ -318,15 +441,27 @@ metadata) should consider `amountAvailable: boolean` or `amount: string | null`.
    `20260713200000_add_market_candle_sync_coverage`.
 2. Re-seed sync coverage: run initial/incremental sync per active asset so
    audited coverage checkpoints exist (legacy checkpoints no longer serve).
+   In the sync summary, check `coverageCompleteFeeds` — `completedFeeds`
+   alone only counts normal termination, not confirmed coverage.
 3. `GET /readiness` shows `ready`; `reasons` is empty; market calendar
-   coverage spans the required years (no `MARKET_CALENDAR_COVERAGE_MISSING`);
-   the KRX 2027 dataset has been re-verified once KRX publishes its notice.
+   coverage spans the required years with no
+   `MARKET_CALENDAR_COVERAGE_MISSING` and no `MARKET_CALENDAR_PROVISIONAL`
+   (either the KRX 2027 dataset has been re-verified against the official
+   KRX notice, or a 2026-only release pins
+   `MARKET_CALENDAR_REQUIRED_THROUGH_YEAR=2026` — never mask provisional
+   data).
 4. Live gates and reconciliation gates enabled together (startup enforces
    this in production).
-5. Fixture smoke passed at the release commit.
+5. Fixture smoke passed AT THE FINAL RELEASE COMMIT, from a clean tree
+   (`gitDirty: false`, `gitCommit` equals the release SHA;
+   `redisKeysRemainingAfterCleanup`/`dbRowsRemainingAfterCleanup` both 0).
+   Smokes run against a different or dirty commit do not count.
 6. Binance ≥90-minute smoke passed; KIS KRX ≥60-minute in-session smoke
-   passed; KIS US delayed smoke passed or explicitly recorded as NOT RUN with
-   the blocking reason.
-7. Lease TTL > renew interval; reconnect min ≤ max (config validation
-   enforces both).
+   passed; KIS US delayed smoke passed or explicitly recorded as NOT RUN
+   (`pnpm run smoke:candle-report -- --provider kis-us --result not_run
+   --reason ...`) with the blocking reason. Every artifact must carry the
+   release `gitCommit` with `gitDirty: false`. A previously failed artifact
+   is a historical record — never reinterpret it as a pass.
+7. Lease TTL > renew interval; reconnect min ≤ max; connection liveness ≥
+   trade-stale threshold (config validation enforces all three).
 8. No credential/raw-frame output in logs (spot-check structured logs).
