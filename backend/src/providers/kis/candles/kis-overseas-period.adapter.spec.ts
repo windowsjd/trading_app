@@ -60,8 +60,13 @@ describe('KisOverseasPeriodAdapter', () => {
       expect(result.latestDate).toBe('20260709');
       // The response continuation header is preserved as metadata.
       expect(result.trCont).toBe('M');
-      const call =
-        quote.getMarketDataWithMetadataByExplicitPath.mock.calls[0][0];
+      const overseasCalls = quote.getMarketDataWithMetadataByExplicitPath.mock
+        .calls as unknown[][];
+      const call = overseasCalls[0][0] as {
+        path: string;
+        query: unknown;
+        headers: unknown;
+      };
       expect(call.path).toBe('/uapi/overseas-price/v1/quotations/dailyprice');
       expect(call.query).toMatchObject({
         AUTH: '',

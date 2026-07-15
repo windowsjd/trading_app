@@ -65,7 +65,13 @@ describe('KisDomesticPeriodAdapter', () => {
     expect(result.oldestDate).toBe('20260708');
     expect(result.latestDate).toBe('20260710');
     expect(result.trCont).toBe('D');
-    const call = quote.getMarketDataWithMetadataByExplicitPath.mock.calls[0][0];
+    const periodCalls = quote.getMarketDataWithMetadataByExplicitPath.mock
+      .calls as unknown[][];
+    const call = periodCalls[0][0] as {
+      path: string;
+      query: unknown;
+      headers: unknown;
+    };
     expect(call.path).toBe(
       '/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice',
     );
@@ -95,9 +101,11 @@ describe('KisDomesticPeriodAdapter', () => {
       fromDate: '20250710',
       endDate: '20260710',
     });
-    expect(
-      quote.getMarketDataWithMetadataByExplicitPath.mock.calls[0][0].query,
-    ).toMatchObject({ FID_PERIOD_DIV_CODE: 'W' });
+    const weeklyCalls = quote.getMarketDataWithMetadataByExplicitPath.mock
+      .calls as unknown[][];
+    expect((weeklyCalls[0][0] as { query: unknown }).query).toMatchObject({
+      FID_PERIOD_DIV_CODE: 'W',
+    });
   });
 
   it('separates blank padding rows from data rows without treating them as data', async () => {
@@ -182,7 +190,7 @@ describe('KisDomesticPeriodAdapter', () => {
     ).not.toHaveBeenCalled();
   });
 
-  it.each([
+  it.each<[Record<string, string>, string]>([
     [{ interval: '1m' }, 'interval'],
     [{ fromDate: '2026-07-01' }, 'fromDate'],
     [{ endDate: '202607' }, 'endDate'],

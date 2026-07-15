@@ -1,5 +1,7 @@
 jest.mock('../../generated/prisma/client', () => {
-  const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
+  const { Decimal } = jest.requireActual<{ Decimal: unknown }>(
+    '@prisma/client/runtime/client',
+  );
   return { Prisma: { Decimal } };
 });
 
@@ -32,8 +34,10 @@ describe('Binance native live 5m candle smoke', () => {
             clearTimeout(timeout);
             reject(new Error('BINANCE_LIVE_CANDLE_SOCKET_ERROR'));
           });
-          socket.on('message', (data) => {
-            const result = parseBinanceFiveMinuteKline(data.toString());
+          socket.on('message', (data: Buffer | string) => {
+            const text =
+              typeof data === 'string' ? data : data.toString('utf8');
+            const result = parseBinanceFiveMinuteKline(text);
             if (result.state !== 'kline') return;
             clearTimeout(timeout);
             resolve(result);

@@ -22,6 +22,14 @@ import {
   MarketCandleSyncStateRepository,
 } from './market-candle-sync-state.repository';
 
+// Typed accessor for jest mock call arguments: jest.fn() exposes `any`
+// call tuples, so reads go through unknown before asserting the shape the
+// test actually inspects.
+const callArg = <T>(fn: jest.Mock, callIndex = 0): T => {
+  const calls = fn.mock.calls as unknown[][];
+  return calls[callIndex][0] as T;
+};
+
 describe('MarketCandleSyncStateRepository', () => {
   const createRepository = () => {
     const delegate = {
@@ -54,7 +62,7 @@ describe('MarketCandleSyncStateRepository', () => {
         assetId: 'asset-1',
         feed: '5m',
         status: 'running',
-      }),
+      }) as unknown,
     });
   });
 
@@ -82,7 +90,9 @@ describe('MarketCandleSyncStateRepository', () => {
       lastSuccessfulPageAt: new Date('2026-07-10T00:00:00Z'),
     });
     expect(recorded).toBe(true);
-    const call = delegate.updateMany.mock.calls[0][0];
+    const call = callArg<{ where: unknown; data: Record<string, unknown> }>(
+      delegate.updateMany,
+    );
     expect(call.where).toEqual({ id: 'sync-1', status: 'running' });
     expect(call.data.cursorJson).toEqual({ startTime: 123 });
     expect(call.data.pagesFetched).toEqual({ increment: 1 });
@@ -104,9 +114,10 @@ describe('MarketCandleSyncStateRepository', () => {
       coveredTo: null,
       lastSuccessfulPageAt: new Date(),
     });
-    expect(delegate.updateMany.mock.calls[0][0].data.cursorJson).toBe(
-      Prisma.DbNull,
-    );
+    expect(
+      callArg<{ data: Record<string, unknown> }>(delegate.updateMany).data
+        .cursorJson,
+    ).toBe(Prisma.DbNull);
     await expect(
       repository.recordPageSuccess('sync-1', {
         cursorJson: null,
@@ -156,7 +167,7 @@ describe('MarketCandleSyncStateRepository', () => {
       coveredTo: null,
       requiredCoveredTo: new Date('2026-07-01T00:00:00Z'),
     });
-    expect(delegate.updateMany.mock.calls[0][0].where).toEqual({
+    expect(callArg<{ where: unknown }>(delegate.updateMany).where).toEqual({
       id: 'sync-1',
       status: 'running',
     });
@@ -166,18 +177,18 @@ describe('MarketCandleSyncStateRepository', () => {
       errorCode: 'X',
       errorMessage: null,
     });
-    expect(delegate.updateMany.mock.calls[1][0].where.status.in).toEqual([
-      'running',
-      'pending',
-    ]);
+    expect(
+      callArg<{ where: { status: { in: string[] } } }>(delegate.updateMany, 1)
+        .where.status.in,
+    ).toEqual(['running', 'pending']);
     await repository.markCanceled('sync-1', {
       errorCode: 'CANCELED',
       errorMessage: null,
     });
-    expect(delegate.updateMany.mock.calls[2][0].where.status.in).toEqual([
-      'running',
-      'pending',
-    ]);
+    expect(
+      callArg<{ where: { status: { in: string[] } } }>(delegate.updateMany, 2)
+        .where.status.in,
+    ).toEqual(['running', 'pending']);
   });
 
   it('resumes pending/running/failed/canceled rows but never completed ones', async () => {
@@ -186,12 +197,10 @@ describe('MarketCandleSyncStateRepository', () => {
     delegate.findUnique.mockResolvedValue({ id: 'sync-1', status: 'running' });
     const resumed = await repository.resumeRun('sync-1');
     expect(resumed).toEqual({ id: 'sync-1', status: 'running' });
-    expect(delegate.updateMany.mock.calls[0][0].where.status.in).toEqual([
-      'pending',
-      'running',
-      'failed',
-      'canceled',
-    ]);
+    expect(
+      callArg<{ where: { status: { in: string[] } } }>(delegate.updateMany)
+        .where.status.in,
+    ).toEqual(['pending', 'running', 'failed', 'canceled']);
 
     delegate.updateMany.mockResolvedValue({ count: 0 });
     await expect(repository.resumeRun('sync-done')).resolves.toBeNull();
@@ -201,7 +210,9 @@ describe('MarketCandleSyncStateRepository', () => {
     const { repository, delegate } = createRepository();
     delegate.findFirst.mockResolvedValue(null);
     await repository.findResumable('asset-1', '1d');
-    const where = delegate.findFirst.mock.calls[0][0].where;
+    const { where } = callArg<{
+      where: { NOT: unknown; status: { in: string[] } };
+    }>(delegate.findFirst);
     expect(where.NOT).toEqual({ errorCode: 'SUPERSEDED' });
     expect(where.status.in).toContain('failed');
   });
@@ -211,7 +222,10 @@ describe('MarketCandleSyncStateRepository', () => {
     delegate.updateMany.mockResolvedValue({ count: 2 });
     const count = await repository.cancelActiveRuns('asset-1', '5m', 'reset');
     expect(count).toBe(2);
-    const call = delegate.updateMany.mock.calls[0][0];
+    const call = callArg<{
+      where: { status: { in: string[] } };
+      data: unknown;
+    }>(delegate.updateMany);
     expect(call.where.status.in).toEqual(['pending', 'running']);
     expect(call.data).toMatchObject({
       status: 'canceled',
@@ -238,7 +252,9 @@ describe('MarketCandleSyncStateRepository', () => {
         coveredTo: targetTo,
         requiredCoveredTo: targetTo,
       });
-      expect(delegate.updateMany.mock.calls[0][0].data).toMatchObject({
+      expect(
+        callArg<{ data: unknown }>(delegate.updateMany).data,
+      ).toMatchObject({
         status: 'completed',
         coverageComplete: true,
         completionReason: 'target_reached',
@@ -254,7 +270,9 @@ describe('MarketCandleSyncStateRepository', () => {
         coveredTo: targetTo,
         requiredCoveredTo: targetTo,
       });
-      expect(delegate.updateMany.mock.calls[0][0].data).toMatchObject({
+      expect(
+        callArg<{ data: unknown }>(delegate.updateMany).data,
+      ).toMatchObject({
         coverageComplete: true,
         completionReason: 'confirmed_empty',
       });
@@ -466,7 +484,9 @@ describe('MarketCandleSyncStateRepository', () => {
           requiredCoveredTo: targetTo,
         }),
       ).resolves.toBe(true);
-      expect(delegate.updateMany.mock.calls[0][0].data).toMatchObject({
+      expect(
+        callArg<{ data: unknown }>(delegate.updateMany).data,
+      ).toMatchObject({
         coverageComplete: false,
         completionReason: 'provider_exhausted_before_target',
       });
@@ -488,7 +508,7 @@ describe('MarketCandleSyncStateRepository', () => {
       coveredFrom: new Date('2026-07-01T00:00:00Z'),
       coveredTo: new Date('2026-07-05T00:00:00Z'),
     });
-    expect(delegate.updateMany.mock.calls[0][0].data).toMatchObject({
+    expect(callArg<{ data: unknown }>(delegate.updateMany).data).toMatchObject({
       coveredFrom: new Date('2026-07-01T00:00:00Z'),
       coveredTo: new Date('2026-07-05T00:00:00Z'),
     });
@@ -503,7 +523,9 @@ describe('MarketCandleSyncStateRepository', () => {
       new Date('2026-07-01T00:00:00Z'),
       new Date('2026-07-02T00:00:00Z'),
     );
-    const where = delegate.findFirst.mock.calls[0][0].where;
+    const { where } = callArg<{
+      where: Record<string, unknown>;
+    }>(delegate.findFirst);
     expect(where.status).toBe('completed');
     expect(where.coverageComplete).toBe(true);
     expect(where.coveredFrom).toEqual({
@@ -524,7 +546,9 @@ describe('MarketCandleSyncStateRepository', () => {
       errorCode: 'X',
       errorMessage: 'e'.repeat(600),
     });
-    const stored = delegate.updateMany.mock.calls[0][0].data.errorMessage;
+    const stored = callArg<{ data: { errorMessage: string } }>(
+      delegate.updateMany,
+    ).data.errorMessage;
     expect(stored.length).toBeLessThanOrEqual(500);
   });
 });

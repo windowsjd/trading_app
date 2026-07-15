@@ -112,6 +112,10 @@ export class AssetCandlesSingleFlightService {
     let finished = false;
     let renewing = false;
     let renewalPromise: Promise<void> | null = null;
+    // renewalPromise is reassigned inside the interval closure, which
+    // control-flow analysis cannot see; reading it through this accessor
+    // keeps the declared type instead of a stale `null` narrowing.
+    const pendingRenewal = (): Promise<void> | null => renewalPromise;
     const renewal = setInterval(() => {
       if (finished || renewing) return;
       renewing = true;
@@ -136,7 +140,8 @@ export class AssetCandlesSingleFlightService {
       const value = await input.loader();
       // A renewal may still be in flight when the loader completes. Its result
       // must be known before a distributed write is attempted.
-      if (renewalPromise) await renewalPromise;
+      const renewalBeforeWrite = pendingRenewal();
+      if (renewalBeforeWrite) await renewalBeforeWrite;
       // Operational cache failures are returned as status:error and do not
       // turn a successful provider load into a user-visible failure.
       if (!ownershipLost) {
@@ -149,7 +154,8 @@ export class AssetCandlesSingleFlightService {
     } finally {
       finished = true;
       clearInterval(renewal);
-      if (renewalPromise) await renewalPromise;
+      const renewalBeforeRelease = pendingRenewal();
+      if (renewalBeforeRelease) await renewalBeforeRelease;
       await this.locks.release(lock);
     }
   }

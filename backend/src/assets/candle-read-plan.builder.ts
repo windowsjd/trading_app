@@ -118,7 +118,9 @@ export class CandleReadPlanBuilder {
       query.toInstant ??
       zonedDateTimeToUtc(compactDate, query.toHHmmss, timeZone);
     if (!from || !inclusiveTo) {
-      throw new Error('Validated candle request could not be converted to UTC.');
+      throw new Error(
+        'Validated candle request could not be converted to UTC.',
+      );
     }
     const to = new Date(inclusiveTo.getTime() + 1);
     return { from, to };

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
+import { resolveMarketSession } from '../../../orders/market-calendar.policy';
 import {
   type CanonicalFiveMinuteCandle,
   type KisNormalizationResult,
@@ -12,6 +13,22 @@ const KOREA_TIME_ZONE = 'Asia/Seoul';
 const US_TIME_ZONE = 'America/New_York';
 const FIVE_MINUTES_MS = 5 * 60_000;
 
+/**
+ * Per-row classification. Benign exclusions and integrity failures are kept
+ * apart because only the latter make a fetched range data-incomplete:
+ * - excluded: pre-market/after-hours/holiday/weekend rows (per the audited
+ *   market calendar), rows outside the requested range, and future rows —
+ *   the provider legitimately returns them and they carry no completeness
+ *   signal.
+ * - integrity_failed: observable regular-session corruption — an unparsable
+ *   timestamp (fail-safe: it cannot be proven benign), a regular-session
+ *   timestamp off the 5-minute grid, or malformed OHLCV.
+ */
+type KisRowClassification =
+  | { state: 'accepted'; row: NormalizedKisCandleRow }
+  | { state: 'excluded' }
+  | { state: 'integrity_failed' };
+
 @Injectable()
 export class KisCandleNormalizerService {
   normalizeDomesticOneMinuteRows(input: {
@@ -20,12 +37,16 @@ export class KisCandleNormalizerService {
     to: Date;
     now?: Date;
   }): KisNormalizationResult {
+    // Domestic data completeness is measured downstream by the five-minute
+    // builder (incompleteBuckets from 1m coverage), so malformed domestic
+    // rows stay plain rejections here: a dropped 1m row surfaces as an
+    // incomplete bucket, never as a silently complete range.
     return this.normalizeRows(input, (raw) => {
       const date = strictString(raw.value.stck_bsop_date);
       const time = strictString(raw.value.stck_cntg_hour);
       const openTime =
         date && time ? zonedDateTimeToUtc(date, time, KOREA_TIME_ZONE) : null;
-      return this.parseOhlcv(raw, openTime, {
+      const row = this.parseOhlcv(raw, openTime, {
         open: 'stck_oprc',
         high: 'stck_hgpr',
         low: 'stck_lwpr',
@@ -33,6 +54,7 @@ export class KisCandleNormalizerService {
         volume: 'cntg_vol',
         amount: ['cntg_tr_pbmn', 'tr_pbmn'],
       });
+      return row ? { state: 'accepted', row } : { state: 'excluded' };
     });
   }
 
@@ -42,23 +64,55 @@ export class KisCandleNormalizerService {
     to: Date;
     now?: Date;
   }): KisNormalizationResult & { candles: CanonicalFiveMinuteCandle[] } {
+    const fromMs = input.from.getTime();
+    const toMs = input.to.getTime();
+    const nowMs = (input.now ?? new Date()).getTime();
+    // The audited market calendar decides the regular session per local
+    // date (weekends, holidays, early closes, delayed opens, and DST come
+    // from the calendar + IANA time zone — nothing is re-hardcoded here).
+    // A date without a session (closed day, or an uncovered calendar year,
+    // which fails safe to "no session") has no regular-session rows at all.
+    const sessionByLocalDate = new Map<
+      string,
+      ReturnType<typeof resolveMarketSession>
+    >();
     const normalized = this.normalizeRows(input, (raw) => {
       const date = firstString(raw.value, ['xymd', 'date', 'stck_bsop_date']);
       const time = firstString(raw.value, ['xhms', 'time', 'stck_cntg_hour']);
       const openTime =
         date && time ? zonedDateTimeToUtc(date, time, US_TIME_ZONE) : null;
-      if (!openTime) return null;
-      const local = getZonedParts(openTime, US_TIME_ZONE);
-      const minuteOfDay = local.hour * 60 + local.minute;
-      if (
-        local.second !== 0 ||
-        local.minute % 5 !== 0 ||
-        minuteOfDay < 9 * 60 + 30 ||
-        minuteOfDay >= 16 * 60
-      ) {
-        return null;
+      // Unparsable timestamps are observable provider corruption: they
+      // cannot be proven benign, so they count against completeness.
+      if (!openTime) return { state: 'integrity_failed' };
+      const openMs = openTime.getTime();
+      // Out of the requested range or in the future: benign — irrelevant to
+      // this range's completeness (in-progress/future buckets are never a
+      // completeness requirement).
+      if (openMs < fromMs || openMs >= toMs || openMs > nowMs) {
+        return { state: 'excluded' };
       }
-      return this.parseOhlcv(raw, openTime, {
+      const local = getZonedParts(openTime, US_TIME_ZONE);
+      const localDate = `${local.year}${String(local.month).padStart(2, '0')}${String(local.day).padStart(2, '0')}`;
+      let session = sessionByLocalDate.get(localDate);
+      if (session === undefined) {
+        session = resolveMarketSession('US', localDate);
+        sessionByLocalDate.set(localDate, session);
+      }
+      // Pre-market/after-hours (including the tail after an early close)
+      // and closed days: benign exclusions.
+      if (
+        !session ||
+        openMs < session.openTime.getTime() ||
+        openMs >= session.closeTime.getTime()
+      ) {
+        return { state: 'excluded' };
+      }
+      // Inside the regular session the provider contract is 5-minute-grid
+      // buckets; an off-grid timestamp is corrupt data.
+      if (local.second !== 0 || local.minute % 5 !== 0) {
+        return { state: 'integrity_failed' };
+      }
+      const row = this.parseOhlcv(raw, openTime, {
         open: 'open',
         high: 'high',
         low: 'low',
@@ -66,8 +120,11 @@ export class KisCandleNormalizerService {
         volume: 'evol',
         amount: ['eamt'],
       });
+      // Regular-session rows with malformed OHLCV are strict-validation
+      // failures: the row is dropped (never repaired or synthesized) and
+      // the range must not be declared complete.
+      return row ? { state: 'accepted', row } : { state: 'integrity_failed' };
     });
-    const nowMs = (input.now ?? new Date()).getTime();
     return {
       ...normalized,
       candles: normalized.rows.map((row) => ({
@@ -85,19 +142,26 @@ export class KisCandleNormalizerService {
       to: Date;
       now?: Date;
     },
-    parser: (row: KisRawCandleRow) => NormalizedKisCandleRow | null,
+    classify: (row: KisRawCandleRow) => KisRowClassification,
   ): KisNormalizationResult {
     const fromMs = input.from.getTime();
     const toMs = input.to.getTime();
     const nowMs = (input.now ?? new Date()).getTime();
     const byTimestamp = new Map<number, NormalizedKisCandleRow>();
     let rejectedRows = 0;
+    let integrityFailedRows = 0;
     let duplicateRows = 0;
 
     for (const raw of input.rows) {
-      const parsed = parser(raw);
-      const time = parsed?.openTime.getTime() ?? Number.NaN;
-      if (!parsed || time < fromMs || time >= toMs || time > nowMs) {
+      const classified = classify(raw);
+      if (classified.state !== 'accepted') {
+        rejectedRows += 1;
+        if (classified.state === 'integrity_failed') integrityFailedRows += 1;
+        continue;
+      }
+      const parsed = classified.row;
+      const time = parsed.openTime.getTime();
+      if (time < fromMs || time >= toMs || time > nowMs) {
         rejectedRows += 1;
         continue;
       }
@@ -116,7 +180,13 @@ export class KisCandleNormalizerService {
     const rows = [...byTimestamp.values()].sort(
       (left, right) => left.openTime.getTime() - right.openTime.getTime(),
     );
-    return { rows, acceptedRows: rows.length, rejectedRows, duplicateRows };
+    return {
+      rows,
+      acceptedRows: rows.length,
+      rejectedRows,
+      integrityFailedRows,
+      duplicateRows,
+    };
   }
 
   private parseOhlcv(

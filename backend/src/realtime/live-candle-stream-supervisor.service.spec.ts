@@ -1,5 +1,7 @@
 jest.mock('../generated/prisma/client', () => {
-  const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
+  const { Decimal } = jest.requireActual<{ Decimal: unknown }>(
+    '@prisma/client/runtime/client',
+  );
   return {
     PrismaClient: class PrismaClient {},
     Prisma: { Decimal },
@@ -53,7 +55,7 @@ describe('LiveCandleStreamSupervisorService', () => {
       expect.objectContaining({
         type: 'binance_realtime_price',
         assetId: 'btc',
-        price: expect.objectContaining({ price: '105.00000000' }),
+        price: expect.objectContaining({ price: '105.00000000' }) as unknown,
       }),
     );
     expect(fixture.health.snapshot().providers.binance).toMatchObject({
@@ -76,8 +78,9 @@ describe('LiveCandleStreamSupervisorService', () => {
       .spyOn(service, 'connectBinance')
       .mockRejectedValueOnce(new Error('disconnect-1'))
       .mockRejectedValueOnce(new Error('disconnect-2'))
-      .mockImplementationOnce(async () => {
+      .mockImplementationOnce(() => {
         service.stopping = true;
+        return Promise.resolve();
       });
     const sleep = jest.spyOn(service, 'sleep').mockResolvedValue();
 
@@ -136,9 +139,18 @@ describe('LiveCandleStreamSupervisorService', () => {
 
   it('echoes KIS PINGPONG heartbeats and keeps the connection healthy without trades', async () => {
     const socket = new FakeSocket();
-    const fixture = setup(() => socket, [
-      { id: 'dom-1', symbol: '005930', assetType: 'domestic_stock', market: 'KOSPI', isActive: true },
-    ]);
+    const fixture = setup(
+      () => socket,
+      [
+        {
+          id: 'dom-1',
+          symbol: '005930',
+          assetType: 'domestic_stock',
+          market: 'KOSPI',
+          isActive: true,
+        },
+      ],
+    );
     const connected = connectKis(fixture.service, {
       ...ownerContext(),
       provider: 'kis' as never,
@@ -172,16 +184,23 @@ describe('LiveCandleStreamSupervisorService', () => {
     // rejected or force-closed as a failure.
     expect(kis.lastEventAt).toBeNull();
     expect(fixture.health.snapshot().liveCandle.eventsRejected).toBe(0);
-    expect(
-      socket.closeCalls.filter(([code]) => code !== 1000),
-    ).toHaveLength(0);
+    expect(socket.closeCalls.filter(([code]) => code !== 1000)).toHaveLength(0);
   });
 
   it('handles malformed KIS control frames as rejected events without reconnecting', async () => {
     const socket = new FakeSocket();
-    const fixture = setup(() => socket, [
-      { id: 'dom-1', symbol: '005930', assetType: 'domestic_stock', market: 'KOSPI', isActive: true },
-    ]);
+    const fixture = setup(
+      () => socket,
+      [
+        {
+          id: 'dom-1',
+          symbol: '005930',
+          assetType: 'domestic_stock',
+          market: 'KOSPI',
+          isActive: true,
+        },
+      ],
+    );
     const connected = connectKis(fixture.service, {
       ...ownerContext(),
       provider: 'kis' as never,

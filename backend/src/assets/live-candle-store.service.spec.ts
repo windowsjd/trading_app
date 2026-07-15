@@ -21,13 +21,15 @@ describe('LiveCandleStoreService', () => {
     let initial: LiveFiveMinuteCandleState | null = null;
     const redis = {
       eval: jest.fn(
-        async (
+        (
           _script: string,
           _keys: readonly string[],
           args: readonly string[],
         ) => {
           initial = JSON.parse(args[4]) as LiveFiveMinuteCandleState;
-          return JSON.stringify({ status: 'updated', state: initial });
+          return Promise.resolve(
+            JSON.stringify({ status: 'updated', state: initial }),
+          );
         },
       ),
     };
@@ -55,16 +57,21 @@ describe('LiveCandleStoreService', () => {
       sourceContinuity: true,
       eventCount: 0,
     });
-    const event = JSON.parse(redis.eval.mock.calls[0][2][3]);
+    const evalCalls = redis.eval.mock.calls as unknown[][];
+    const event = JSON.parse((evalCalls[0][2] as readonly string[])[3]) as {
+      tradeQuantity: string;
+    };
     expect(event.tradeQuantity).toBe('2.00000000');
   });
 
   it('keeps a mid-bucket delta candle explicitly incomplete without hydration', async () => {
     let initial: LiveFiveMinuteCandleState | null = null;
     const redis = {
-      eval: jest.fn(async (_script, _keys, args: readonly string[]) => {
+      eval: jest.fn((_script, _keys, args: readonly string[]) => {
         initial = JSON.parse(args[4]) as LiveFiveMinuteCandleState;
-        return JSON.stringify({ status: 'updated', state: initial });
+        return Promise.resolve(
+          JSON.stringify({ status: 'updated', state: initial }),
+        );
       }),
     };
     const service = new LiveCandleStoreService(

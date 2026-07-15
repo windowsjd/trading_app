@@ -1,5 +1,7 @@
 jest.mock('../generated/prisma/client', () => {
-  const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
+  const { Decimal } = jest.requireActual<{ Decimal: unknown }>(
+    '@prisma/client/runtime/client',
+  );
   return {
     PrismaClient: class PrismaClient {},
     Prisma: { Decimal },
@@ -49,11 +51,14 @@ describe('LiveCandlePipelineService', () => {
   it('marks only a bucket entered after a continuous connection as complete-capable', async () => {
     const { store, hydrator, service } = setup();
     const event = deltaEvent('2026-07-13T00:05:00.000Z');
-    store.applyEvent.mockImplementation(async (input) => ({
-      status: 'updated',
-      stateKey: 'state-1',
-      state: stateFor(input.event),
-    }));
+    store.applyEvent.mockImplementation(
+      (input: { event: NormalizedLiveCandleEvent }) =>
+        Promise.resolve({
+          status: 'updated',
+          stateKey: 'state-1',
+          state: stateFor(input.event),
+        }),
+    );
     service.markProviderConnected({
       provider: 'kis',
       ownerGeneration: 'owner-1',
@@ -175,16 +180,22 @@ describe('LiveCandlePipelineService', () => {
   it('bounds continuity-loss tracking to the latest bucket per asset', async () => {
     const { store, service } = setup();
     store.applyEvent
-      .mockImplementationOnce(async ({ event }) => ({
-        status: 'updated',
-        stateKey: 'old-state',
-        state: stateFor(event),
-      }))
-      .mockImplementationOnce(async ({ event }) => ({
-        status: 'updated',
-        stateKey: 'current-state',
-        state: stateFor(event),
-      }));
+      .mockImplementationOnce(
+        ({ event }: { event: NormalizedLiveCandleEvent }) =>
+          Promise.resolve({
+            status: 'updated',
+            stateKey: 'old-state',
+            state: stateFor(event),
+          }),
+      )
+      .mockImplementationOnce(
+        ({ event }: { event: NormalizedLiveCandleEvent }) =>
+          Promise.resolve({
+            status: 'updated',
+            stateKey: 'current-state',
+            state: stateFor(event),
+          }),
+      );
     await service.process({
       event: deltaEvent('2026-07-13T00:00:00.000Z'),
       ownerGeneration: 'owner-1',

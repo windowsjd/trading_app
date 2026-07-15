@@ -118,11 +118,7 @@ describe('readLiveCandleConfig', () => {
         CANDLE_LIVE_STREAMING_ENABLED: 'true',
         ...overrides,
       });
-    const reconciliation = (
-      krx = false,
-      us = false,
-      crypto = false,
-    ) => ({
+    const reconciliation = (krx = false, us = false, crypto = false) => ({
       krx: { enabled: krx },
       us: { enabled: us },
       crypto: { enabled: crypto },

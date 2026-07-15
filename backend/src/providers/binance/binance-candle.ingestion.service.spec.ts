@@ -92,7 +92,10 @@ describe('BinanceCandleIngestionService', () => {
       cursor: page.nextCursor,
       now,
     });
-    expect(fetch2.mock.calls[0][0].startTime).toBe(from + 1000 * FIVE_MIN);
+    const fetch2Calls = fetch2.mock.calls as unknown[][];
+    expect((fetch2Calls[0][0] as { startTime: number }).startTime).toBe(
+      from + 1000 * FIVE_MIN,
+    );
     expect(done.nextCursor).toBeNull();
     expect(done.stopReason).toBe('target_reached');
     expect(done.complete).toBe(true);
@@ -232,7 +235,6 @@ describe('BinanceCandleIngestionService', () => {
   });
 
   it('flags a non-array response as malformed', async () => {
-    const { service } = createService([]);
     const fetchKlines = jest
       .fn()
       .mockResolvedValue({ response: { code: -1 }, receivedAt: new Date() });

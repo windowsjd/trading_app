@@ -32,10 +32,7 @@ import {
   resolveSmokeGitIdentity,
 } from './lib/smoke-git-identity';
 import { SMOKE_REPORT_SCHEMA_VERSION } from './lib/smoke-report';
-import {
-  AssetType,
-  MarketCandleSyncMode,
-} from '../src/generated/prisma/client';
+import { AssetType } from '../src/generated/prisma/client';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { RedisService } from '../src/redis/redis.service';
 import { readRedisConfig } from '../src/redis/redis.config';
@@ -133,7 +130,11 @@ async function main() {
     const localDate = `${seoul.year}${String(seoul.month).padStart(2, '0')}${String(seoul.day).padStart(2, '0')}`;
     const session = resolveMarketSession('KRX', localDate);
     const now = Date.now();
-    if (!session || now < session.openTime.getTime() || now >= session.closeTime.getTime()) {
+    if (
+      !session ||
+      now < session.openTime.getTime() ||
+      now >= session.closeTime.getTime()
+    ) {
       console.error(
         `KRX regular session is not open now (session=${session ? `${session.openTime.toISOString()}..${session.closeTime.toISOString()}` : 'closed today'}). ` +
           'Run during 09:00–15:30 KST on a trading day, or pass --allowOffSession for a liveness-only run.',
@@ -141,8 +142,13 @@ async function main() {
       process.exit(3);
     }
   }
-  if (provider === 'kis-us' && process.env.CANDLE_LIVE_KIS_US_DELAYED_ENABLED !== 'true') {
-    console.error('CANDLE_LIVE_KIS_US_DELAYED_ENABLED!=true; the delayed US feed is opt-in.');
+  if (
+    provider === 'kis-us' &&
+    process.env.CANDLE_LIVE_KIS_US_DELAYED_ENABLED !== 'true'
+  ) {
+    console.error(
+      'CANDLE_LIVE_KIS_US_DELAYED_ENABLED!=true; the delayed US feed is opt-in.',
+    );
     process.exit(3);
   }
 
@@ -205,7 +211,12 @@ async function main() {
   const aggregation = new MarketCandleAggregationService(repository);
   const overlay = new LiveCandleOverlayService(store, repository, aggregation);
   const publisher = new LiveCandlePublisherService(redis, overlay, health);
-  const pipeline = new LiveCandlePipelineService(store, hydrator, publisher, health);
+  const pipeline = new LiveCandlePipelineService(
+    store,
+    hydrator,
+    publisher,
+    health,
+  );
   const finalizer = new LiveCandleFinalizerService(
     store,
     repository,
@@ -249,12 +260,21 @@ async function main() {
     : null;
   const allAssets = await prisma.asset.findMany({
     where: { isActive: true, assetType },
-    select: { id: true, symbol: true, market: true, assetType: true, isActive: true },
+    select: {
+      id: true,
+      symbol: true,
+      market: true,
+      assetType: true,
+      isActive: true,
+    },
     orderBy: [{ symbol: 'asc' }],
   });
-  const assets = (wantedSymbols
-    ? allAssets.filter((asset) => wantedSymbols.includes(asset.symbol.toUpperCase()))
-    : allAssets
+  const assets = (
+    wantedSymbols
+      ? allAssets.filter((asset) =>
+          wantedSymbols.includes(asset.symbol.toUpperCase()),
+        )
+      : allAssets
   ).slice(0, maxAssets);
   if (assets.length === 0) {
     console.error('No matching active assets; register assets first.');
@@ -263,8 +283,10 @@ async function main() {
   // The supervisor loads its own asset list; scope it to the smoke assets.
   const scopedPrisma = {
     asset: {
-      findMany: async ({ where }: { where: { assetType: AssetType } }) =>
-        assets.filter((asset) => asset.assetType === where.assetType),
+      findMany: ({ where }: { where: { assetType: AssetType } }) =>
+        Promise.resolve(
+          assets.filter((asset) => asset.assetType === where.assetType),
+        ),
     },
   };
 
@@ -273,7 +295,7 @@ async function main() {
     locks,
     providerConfig,
     kisAuth,
-    { publish: async () => true } as never,
+    { publish: () => Promise.resolve(true) } as never,
     normalizer,
     pipeline,
     health,
@@ -314,7 +336,10 @@ async function main() {
     await sleep(5_000);
     const snapshot = health.snapshot();
     const providerHealth = snapshot.providers[supervisorProvider];
-    if (providerHealth.connectedAt && providerHealth.connectedAt !== lastConnectedAt) {
+    if (
+      providerHealth.connectedAt &&
+      providerHealth.connectedAt !== lastConnectedAt
+    ) {
       lastConnectedAt = providerHealth.connectedAt;
       metrics.connectionCount += 1;
     }
@@ -326,9 +351,14 @@ async function main() {
     const elapsedRatio = 1 - (endAt - Date.now()) / (durationMinutes * 60_000);
     if (injectReconnect && !reconnectInjected && elapsedRatio >= 0.5) {
       reconnectInjected = true;
-      const context = (supervisor as never as {
-        contexts: Map<string, { socket: { close(code: number, reason: string): void } | null }>;
-      }).contexts.get(supervisorProvider);
+      const context = (
+        supervisor as never as {
+          contexts: Map<
+            string,
+            { socket: { close(code: number, reason: string): void } | null }
+          >;
+        }
+      ).contexts.get(supervisorProvider);
       try {
         context?.socket?.close(4999, 'smoke forced reconnect');
         metrics.forcedReconnectCount += 1;
@@ -427,7 +457,8 @@ async function main() {
       if (row.isClosed && row.closeTime.getTime() > Date.now()) {
         incompleteClosedRows += 1;
       }
-      if (row.isClosed) finalizedBuckets.add(`${assetId}:${row.openTime.toISOString()}`);
+      if (row.isClosed)
+        finalizedBuckets.add(`${assetId}:${row.openTime.toISOString()}`);
     }
   }
   metrics.bucketsFinalized = finalizedBuckets.size;
@@ -447,7 +478,8 @@ async function main() {
     startedAt: startedAt.toISOString(),
     finishedAt: finishedAt.toISOString(),
     durationMinutes:
-      Math.round(((finishedAt.getTime() - startedAt.getTime()) / 60_000) * 10) / 10,
+      Math.round(((finishedAt.getTime() - startedAt.getTime()) / 60_000) * 10) /
+      10,
     connectionCount: metrics.connectionCount,
     reconnectCount: providerHealth.reconnectCount,
     forcedReconnectCount: metrics.forcedReconnectCount,
@@ -492,7 +524,9 @@ async function main() {
         ? 'passed'
         : 'failed',
     failureReasons: [
-      ...(providerHealth.subscriptionsActive > 0 ? [] : ['no active subscription']),
+      ...(providerHealth.subscriptionsActive > 0
+        ? []
+        : ['no active subscription']),
       ...(snapshot.liveCandle.eventsAccepted > 0 ? [] : ['no events accepted']),
       ...(duplicateCanonicalRows === 0 ? [] : ['duplicate canonical rows']),
       ...(incompleteClosedRows === 0 ? [] : ['incomplete closed rows']),
@@ -523,6 +557,8 @@ function sleep(ms: number): Promise<void> {
 }
 
 void main().catch((error) => {
-  console.error(error instanceof Error ? `${error.name}: ${error.message}` : error);
+  console.error(
+    error instanceof Error ? `${error.name}: ${error.message}` : error,
+  );
   process.exitCode = 1;
 });

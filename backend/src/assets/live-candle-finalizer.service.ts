@@ -19,6 +19,7 @@ import { LiveCandlePublisherService } from './live-candle-publisher.service';
 import {
   buildLiveCandleOwnerLeaseKey,
   LiveCandleStoreService,
+  type LiveCandleReconcilePendingEntry,
 } from './live-candle-store.service';
 import { MarketCandlesRepository } from './market-candles.repository';
 import { MarketCandleSyncService } from './market-candle-sync.service';
@@ -314,7 +315,7 @@ export class LiveCandleFinalizerService
     now: Date,
     isOwner: () => boolean,
   ): Promise<void> {
-    let entries;
+    let entries: LiveCandleReconcilePendingEntry[];
     try {
       entries = await this.store.getDueReconcilePending(
         now,
@@ -371,8 +372,7 @@ export class LiveCandleFinalizerService
         // unsupported) can never succeed on retry; drop the entry instead of
         // retrying it forever. Operational failures back off and retry.
         const permanent =
-          error instanceof Error &&
-          error.name === 'MarketCandleSyncInputError';
+          error instanceof Error && error.name === 'MarketCandleSyncInputError';
         if (permanent) {
           await this.store
             .resolveReconcilePending(entry.member)

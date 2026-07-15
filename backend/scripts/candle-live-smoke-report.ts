@@ -292,6 +292,8 @@ function sum<T extends Record<K, number>, K extends string>(
 }
 
 void main().catch((error) => {
-  console.error(error instanceof Error ? `${error.name}: ${error.message}` : error);
+  console.error(
+    error instanceof Error ? `${error.name}: ${error.message}` : error,
+  );
   process.exitCode = 1;
 });

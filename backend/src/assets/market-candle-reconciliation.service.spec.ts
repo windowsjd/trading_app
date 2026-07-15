@@ -1,5 +1,7 @@
 jest.mock('../generated/prisma/client', () => {
-  const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
+  const { Decimal } = jest.requireActual<{ Decimal: unknown }>(
+    '@prisma/client/runtime/client',
+  );
   return {
     PrismaClient: class PrismaClient {},
     AssetType: {
@@ -95,7 +97,7 @@ describe('MarketCandleReconciliationService', () => {
         mode: 'repair',
         targets: ['5m'],
         resume: false,
-        budget: expect.objectContaining({ maxPages: 10 }),
+        budget: expect.objectContaining({ maxPages: 10 }) as unknown,
       }),
     );
     expect(result).toMatchObject({
@@ -163,7 +165,7 @@ describe('MarketCandleReconciliationService', () => {
             gte: new Date('2026-07-13T00:05:00.000Z'),
             lt: new Date('2026-07-13T00:10:00.000Z'),
           },
-        }),
+        }) as unknown,
       }),
     );
   });

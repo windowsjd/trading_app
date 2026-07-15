@@ -367,12 +367,49 @@ the artifact keeps `gitDirty: true`, and such a run is never accepted as
 release validation. Existing historical artifacts are left untouched as
 records; they are never edited or reinterpreted.
 
-CI note: this repository has no CI pipeline today. If one is added, run the
-fixture smoke with a PostgreSQL service, a Redis service, and
-`DATABASE_URL`/`REDIS_URL` pointing at them (`prisma migrate deploy` first;
-the wrapper spec runs it automatically); no provider credentials are needed —
-provider sockets are in-process fixtures. Do NOT make the long real-provider
-smokes a required CI gate; keep them as this manual/opt-in runbook.
+## GitHub Actions CI
+
+`.github/workflows/ci.yml` runs on every pull request, on `main` pushes, and
+via `workflow_dispatch`, with `contents: read` permissions and per-ref
+concurrency cancellation. No provider API key or operational secret is
+required, and no CI command rewrites files (`--no-fix` / `--check` only).
+Three jobs:
+
+1. **Backend quality** — frozen-lockfile `pnpm install`, `prisma generate`,
+   then the candle-layer gates and the backend suite. Local reproduction:
+
+   ```bash
+   cd backend
+   pnpm run lint:candles:check    # candle-layer ESLint, --no-fix --max-warnings=0
+   pnpm run format:candles:check  # candle-layer prettier --check
+   pnpm run typecheck             # tsc --noEmit -p tsconfig.build.json
+   pnpm run build
+   pnpm test
+   ```
+
+   The candle layer (candle files under `src/assets`, `providers/kis/candles`,
+   candle-related `providers/binance` files, `src/realtime/live-candle-*`,
+   and the candle smoke scripts) is the REQUIRED lint/format gate; the rest
+   of the repository carries known pre-existing lint debt and is reported
+   separately, not gated. `pnpm run lint:candles` is the matching dev-time
+   autofix command.
+
+2. **Frontend quality** — `npm ci`, `npm run typecheck`, `npm test`
+   (`node --test` with Node 24 type stripping). The Expo app defines no build
+   script; `tsc --noEmit` is its compile gate and no placeholder build
+   command is fabricated.
+
+3. **Candle fixture integration** — PostgreSQL 16 + Redis 7 service
+   containers, `prisma migrate deploy`, then
+   `CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm run smoke:candle-fixture`
+   (fixture providers only — no provider credentials). The job then verifies
+   the artifact's `gitCommit` equals the CI SHA with `gitDirty=false` and
+   `result=passed`, and uploads `backend/artifacts/candle-smoke/` as a build
+   artifact even when the smoke fails.
+
+The long real-provider smokes (Binance ≥90min, KIS in-session ≥60min) are
+NEVER run in CI and are not a CI gate; they remain this manual, opt-in
+runbook executed against the final release commit.
 
 ## Real-provider long smokes
 

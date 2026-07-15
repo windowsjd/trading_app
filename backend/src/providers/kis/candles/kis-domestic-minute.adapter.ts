@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { KisAuthClient } from '../kis-auth.client';
 import { KisQuoteClient } from '../kis-quote.client';
+import type { KisLowLevelCallResult } from '../kis.types';
 import { ProviderConfigService } from '../../provider-config.service';
 import {
   KIS_DOMESTIC_MINUTE_PATH,
@@ -75,7 +76,7 @@ export class KisDomesticMinuteAdapter {
 
       const remainingMs = limits.maxDurationMs - (Date.now() - startedAt);
       const boundedSignal = createBoundedAbortSignal(input.signal, remainingMs);
-      let fetched;
+      let fetched: KisLowLevelCallResult<unknown>;
       try {
         fetched = await this.quoteClient.getMarketDataByExplicitPath<unknown>({
           path: KIS_DOMESTIC_MINUTE_PATH,
@@ -200,8 +201,11 @@ function domesticTimestamp(row: Record<string, unknown>): Date | null {
 }
 
 function extractOutputRows(payload: unknown): unknown[] | null {
-  if (!isRecord(payload) || !Array.isArray(payload.output2)) return null;
-  return payload.output2;
+  if (!isRecord(payload)) return null;
+  const rows: unknown = payload.output2;
+  // Array.isArray narrows `unknown` to `any[]`; re-assert the safe element
+  // type so no `any` escapes this boundary.
+  return Array.isArray(rows) ? (rows as unknown[]) : null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -148,7 +148,13 @@ export function readLiveCandleConfig(
       1_024,
       16_777_216,
     ),
-    recoveryMaxBatch: integer(env, 'CANDLE_LIVE_RECOVERY_MAX_BATCH', 10, 1, 200),
+    recoveryMaxBatch: integer(
+      env,
+      'CANDLE_LIVE_RECOVERY_MAX_BATCH',
+      10,
+      1,
+      200,
+    ),
     recoveryRetryMs: integer(
       env,
       'CANDLE_LIVE_RECOVERY_RETRY_MS',

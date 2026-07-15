@@ -58,12 +58,15 @@ describe('KisUsMinuteAdapter', () => {
       complete: true,
       stopReason: 'target_reached',
     });
-    expect(
-      quote.getMarketDataWithMetadataByExplicitPath.mock.calls[0][0].query,
-    ).toMatchObject({ NMIN: '5', PINC: '0', NEXT: '', KEYB: '' });
-    expect(
-      quote.getMarketDataWithMetadataByExplicitPath.mock.calls[1][0],
-    ).toMatchObject({
+    const usMinuteCalls = quote.getMarketDataWithMetadataByExplicitPath.mock
+      .calls as unknown[][];
+    expect((usMinuteCalls[0][0] as { query: unknown }).query).toMatchObject({
+      NMIN: '5',
+      PINC: '0',
+      NEXT: '',
+      KEYB: '',
+    });
+    expect(usMinuteCalls[1][0]).toMatchObject({
       query: { NMIN: '5', PINC: '1', NEXT: '1', KEYB: '20260710093000' },
       headers: { tr_cont: 'N' },
     });

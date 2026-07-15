@@ -90,10 +90,15 @@ const createFakeRedis = (generation: string | null = null): FakeRedis => {
       }
       return Promise.resolve(store.get(key) ?? null);
     }),
-    setWithTtl: jest.fn((): Promise<void> => Promise.resolve()),
-    delete: jest.fn((): Promise<number> => Promise.resolve(1)),
-    increment: jest.fn((): Promise<number> => Promise.resolve(1)),
-    eval: jest.fn((): Promise<unknown> => Promise.resolve(1)),
+    setWithTtl: jest.fn<Promise<void>, [string, string, number]>(() =>
+      Promise.resolve(),
+    ),
+    delete: jest.fn<Promise<number>, [string]>(() => Promise.resolve(1)),
+    increment: jest.fn<Promise<number>, [string]>(() => Promise.resolve(1)),
+    eval: jest.fn<
+      Promise<unknown>,
+      [string, readonly string[], readonly string[]]
+    >(() => Promise.resolve(1)),
   };
 };
 
@@ -492,12 +497,7 @@ describe('AssetCandlesCacheService', () => {
           buildCandleGenerationKey('asset-1'),
           dataKeyFor(3),
         ],
-        [
-          'owner-token',
-          '3',
-          expect.any(String),
-          '300',
-        ],
+        ['owner-token', '3', expect.any(String), '300'],
       );
     });
   });
@@ -574,7 +574,9 @@ describe('AssetCandlesCacheService', () => {
       mockDataValue(redis, envelope(value));
       const service = createService(redis);
 
-      await expect(service.get(keyInput)).resolves.toEqual({ status: 'corrupt' });
+      await expect(service.get(keyInput)).resolves.toEqual({
+        status: 'corrupt',
+      });
       expect(redis.delete).toHaveBeenCalledWith(dataKeyFor(0));
     });
 

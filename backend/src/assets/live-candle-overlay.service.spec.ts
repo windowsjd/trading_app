@@ -1,5 +1,7 @@
 jest.mock('../generated/prisma/client', () => {
-  const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
+  const { Decimal } = jest.requireActual<{ Decimal: unknown }>(
+    '@prisma/client/runtime/client',
+  );
   return {
     PrismaClient: class PrismaClient {},
     Prisma: { Decimal },

@@ -1,5 +1,7 @@
 jest.mock('../generated/prisma/client', () => {
-  const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
+  const { Decimal } = jest.requireActual<{ Decimal: unknown }>(
+    '@prisma/client/runtime/client',
+  );
   return {
     PrismaClient: class PrismaClient {},
     AssetType: {
@@ -34,35 +36,51 @@ describe('LiveCandleFinalizerService', () => {
     const calls: string[] = [];
     const store = {
       getDueStateKeys: jest.fn().mockResolvedValue([]),
-      removeFromFinalizeIndex: jest.fn(async () => calls.push('remove')),
-      markFinalized: jest.fn(async ({ revision }) => {
+      removeFromFinalizeIndex: jest.fn(() =>
+        Promise.resolve(calls.push('remove')),
+      ),
+      markFinalized: jest.fn(({ revision }: { revision: number }) => {
         calls.push('mark');
-        return { ...state(), revision: revision + 1, finalized: true };
+        return Promise.resolve({
+          ...state(),
+          revision: revision + 1,
+          finalized: true,
+        });
       }),
-      markFinalizedTakeover: jest.fn(async ({ revision }) => {
+      markFinalizedTakeover: jest.fn(({ revision }: { revision: number }) => {
         calls.push('takeover');
-        return { ...state(), revision: revision + 1, finalized: true };
+        return Promise.resolve({
+          ...state(),
+          revision: revision + 1,
+          finalized: true,
+        });
       }),
-      enqueueReconcilePending: jest.fn(async () => calls.push('enqueue')),
+      enqueueReconcilePending: jest.fn(() =>
+        Promise.resolve(calls.push('enqueue')),
+      ),
       getDueReconcilePending: jest.fn().mockResolvedValue([]),
-      resolveReconcilePending: jest.fn(async () => calls.push('resolve')),
-      deferReconcilePending: jest.fn(async () => calls.push('defer')),
-      discardReconciledCurrent: jest.fn(async () => {
+      resolveReconcilePending: jest.fn(() =>
+        Promise.resolve(calls.push('resolve')),
+      ),
+      deferReconcilePending: jest.fn(() =>
+        Promise.resolve(calls.push('defer')),
+      ),
+      discardReconciledCurrent: jest.fn(() => {
         calls.push('discard');
-        return true;
+        return Promise.resolve(true);
       }),
     };
     const repository = {
-      upsertMany: jest.fn(async () => {
+      upsertMany: jest.fn(() => {
         calls.push('db');
-        return { writtenCount: 1 };
+        return Promise.resolve({ writtenCount: 1 });
       }),
       findRange: jest.fn().mockResolvedValue([]),
     };
     const cache = {
-      invalidateAsset: jest.fn(async () => {
+      invalidateAsset: jest.fn(() => {
         calls.push('invalidate');
-        return { status: 'invalidated' };
+        return Promise.resolve({ status: 'invalidated' });
       }),
     };
     const redis = { get: jest.fn().mockResolvedValue('owner-1') };
@@ -75,12 +93,12 @@ describe('LiveCandleFinalizerService', () => {
       release: jest.fn().mockResolvedValue(true),
     };
     const publisher = {
-      publishState: jest.fn(async () => {
+      publishState: jest.fn(() => {
         calls.push('publish');
-        return [];
+        return Promise.resolve([]);
       }),
     };
-    const sync = { syncAsset: jest.fn(async () => ({ feeds: [] })) };
+    const sync = { syncAsset: jest.fn(() => Promise.resolve({ feeds: [] })) };
     const health = new LiveCandleHealthService();
     const service = new LiveCandleFinalizerService(
       store as never,
@@ -175,8 +193,17 @@ describe('LiveCandleFinalizerService', () => {
     it('finalizes a provider-final bucket after the owner generation is gone', async () => {
       const fixture = setup();
       fixture.redis.get.mockResolvedValue('owner-2'); // lease taken over
-      await finalize(fixture.service, state(), new Date('2026-07-13T00:05:06Z'));
-      expect(fixture.calls).toEqual(['db', 'invalidate', 'takeover', 'publish']);
+      await finalize(
+        fixture.service,
+        state(),
+        new Date('2026-07-13T00:05:06Z'),
+      );
+      expect(fixture.calls).toEqual([
+        'db',
+        'invalidate',
+        'takeover',
+        'publish',
+      ]);
       expect(fixture.store.markFinalizedTakeover).toHaveBeenCalledWith({
         stateKey: 'state-key',
         providerLeaseKey: 'candles:live:v1:owner:binance:0',
@@ -188,7 +215,11 @@ describe('LiveCandleFinalizerService', () => {
     it('finalizes a provider-final bucket when no lease exists at all', async () => {
       const fixture = setup();
       fixture.redis.get.mockResolvedValue(null);
-      await finalize(fixture.service, state(), new Date('2026-07-13T00:05:06Z'));
+      await finalize(
+        fixture.service,
+        state(),
+        new Date('2026-07-13T00:05:06Z'),
+      );
       expect(fixture.store.markFinalizedTakeover).toHaveBeenCalled();
       expect(fixture.health.snapshot().liveCandle.finalizeSuccess).toBe(1);
     });
@@ -260,9 +291,9 @@ describe('LiveCandleFinalizerService', () => {
         'asset-1|1783987200000',
       );
       expect(fixture.store.discardReconciledCurrent).toHaveBeenCalled();
-      expect(
-        fixture.health.snapshot().liveCandle.recoveryRepairSuccess,
-      ).toBe(1);
+      expect(fixture.health.snapshot().liveCandle.recoveryRepairSuccess).toBe(
+        1,
+      );
     });
 
     it('re-schedules a failed repair with backoff and keeps the queue entry', async () => {
@@ -278,9 +309,9 @@ describe('LiveCandleFinalizerService', () => {
       await fixture.service.runOnce(new Date('2026-07-13T00:06:00Z'));
       expect(fixture.store.resolveReconcilePending).not.toHaveBeenCalled();
       expect(fixture.store.deferReconcilePending).toHaveBeenCalled();
-      expect(
-        fixture.health.snapshot().liveCandle.recoveryRepairFailure,
-      ).toBe(1);
+      expect(fixture.health.snapshot().liveCandle.recoveryRepairFailure).toBe(
+        1,
+      );
     });
 
     it('drops queue entries whose repair can never succeed (validation errors)', async () => {

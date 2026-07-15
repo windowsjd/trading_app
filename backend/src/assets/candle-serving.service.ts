@@ -35,6 +35,7 @@ import {
   type CandleServingConfig,
 } from './candle-serving.config';
 import { MarketCandleSyncService } from './market-candle-sync.service';
+import type { MarketCandleAssetSyncResult } from './market-candle-sync.types';
 import { LiveCandleOverlayService } from './live-candle-overlay.service';
 
 export type CandleDeliveryState =
@@ -221,7 +222,7 @@ export class CandleServingService {
       () => controller.abort(),
       this.config.onDemandRefreshMaxDurationMs,
     );
-    let result;
+    let result: MarketCandleAssetSyncResult;
     try {
       const repair =
         before.state === 'missing' || before.state === 'incomplete';
@@ -309,9 +310,7 @@ export class CandleServingService {
     return (
       error instanceof CandleOperationalRefreshError ||
       error instanceof CandleSingleFlightWaitTimeoutError ||
-      isCandleOperationalFallbackError(error, [
-        'CandleOperationalRefreshError',
-      ])
+      isCandleOperationalFallbackError(error, ['CandleOperationalRefreshError'])
     );
   }
 

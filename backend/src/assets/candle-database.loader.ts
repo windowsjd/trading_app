@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { MarketCandleSyncStatus, type MarketCandle } from '../generated/prisma/client';
+import { MarketCandleSyncStatus } from '../generated/prisma/client';
 import type {
   AssetCandlesAsset,
   ParsedAssetCandlesQuery,
@@ -7,8 +7,14 @@ import type {
 import { MarketCandleAggregationService } from './market-candle-aggregation.service';
 import { MarketCandleSyncStateRepository } from './market-candle-sync-state.repository';
 import { MarketCandlesRepository } from './market-candles.repository';
-import { CandleReadPlanBuilder, type CandleReadPlan } from './candle-read-plan.builder';
-import { CandleResponseBuilder, type PersistedResponseCandle } from './candle-response.builder';
+import {
+  CandleReadPlanBuilder,
+  type CandleReadPlan,
+} from './candle-read-plan.builder';
+import {
+  CandleResponseBuilder,
+  type PersistedResponseCandle,
+} from './candle-response.builder';
 import {
   CANDLE_SERVING_CONFIG,
   type CandleServingConfig,
@@ -120,7 +126,10 @@ export class CandleDatabaseLoader {
         to: plan.requestedRange.to,
       });
       const usable = stored.filter((candle) => {
-        if (candle.isClosed || candle.closeTime.getTime() > query.clock.getTime()) {
+        if (
+          candle.isClosed ||
+          candle.closeTime.getTime() > query.clock.getTime()
+        ) {
           return true;
         }
         droppedIncompleteBuckets += 1;
@@ -130,12 +139,20 @@ export class CandleDatabaseLoader {
     }
 
     const response = this.responses.buildPersisted(asset, query, rows);
-    const fresh = this.isFresh(rows, covering?.completedAt ?? null, plan, query.clock);
+    const fresh = this.isFresh(
+      rows,
+      covering?.completedAt ?? null,
+      plan,
+      query.clock,
+    );
     let state: CandleDatabaseState;
     if (rows.length === 0) {
-      state = completedCoverage && !hasBlockingCheckpoint && droppedIncompleteBuckets === 0
-        ? 'confirmed_empty'
-        : 'missing';
+      state =
+        completedCoverage &&
+        !hasBlockingCheckpoint &&
+        droppedIncompleteBuckets === 0
+          ? 'confirmed_empty'
+          : 'missing';
     } else if (
       completedCoverage &&
       !hasBlockingCheckpoint &&
@@ -167,12 +184,20 @@ export class CandleDatabaseLoader {
     plan: CandleReadPlan,
     now: Date,
   ): boolean {
-    if (plan.requestedRange.to.getTime() < now.getTime() - this.config.currentFreshnessMs) {
+    if (
+      plan.requestedRange.to.getTime() <
+      now.getTime() - this.config.currentFreshnessMs
+    ) {
       return true;
     }
     let newestUpdate = completedAt?.getTime() ?? 0;
-    for (const row of rows as readonly (PersistedResponseCandle & { sourceUpdatedAt?: Date })[]) {
-      newestUpdate = Math.max(newestUpdate, row.sourceUpdatedAt?.getTime() ?? 0);
+    for (const row of rows as readonly (PersistedResponseCandle & {
+      sourceUpdatedAt?: Date;
+    })[]) {
+      newestUpdate = Math.max(
+        newestUpdate,
+        row.sourceUpdatedAt?.getTime() ?? 0,
+      );
     }
     return newestUpdate >= now.getTime() - this.config.currentFreshnessMs;
   }

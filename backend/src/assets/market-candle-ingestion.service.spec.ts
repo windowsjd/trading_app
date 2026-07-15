@@ -37,6 +37,28 @@ const domesticRow = (minute: number) => ({
   sequence: minute,
 });
 
+// 2026-07-09 is an ordinary US trading day (Thursday, EDT): the regular
+// session is 13:30–20:00 UTC.
+const usRow = (
+  time: string,
+  overrides: Record<string, unknown> = {},
+  sequence = 0,
+) => ({
+  value: {
+    xymd: '20260709',
+    xhms: time,
+    open: '100',
+    high: '102',
+    low: '99',
+    last: '101',
+    evol: '10',
+    eamt: '1000',
+    ...overrides,
+  },
+  receivedAt: new Date('2026-07-09T20:10:00Z'),
+  sequence,
+});
+
 describe('MarketCandleIngestionService', () => {
   const input = {
     asset: { id: 'asset-1', symbol: '005930', marketCode: 'J' },
@@ -66,7 +88,11 @@ describe('MarketCandleIngestionService', () => {
       upsertMany: jest.fn().mockResolvedValue({ writtenCount: 1 }),
       ...overrides.repository,
     };
-    const cache = { invalidateAsset: jest.fn().mockResolvedValue({ status: 'invalidated', generation: 1 }) };
+    const cache = {
+      invalidateAsset: jest
+        .fn()
+        .mockResolvedValue({ status: 'invalidated', generation: 1 }),
+    };
     const service = new MarketCandleIngestionService(
       domestic as never,
       usAdapter as never,
@@ -165,6 +191,82 @@ describe('MarketCandleIngestionService', () => {
       complete: false,
       completeBuckets: 0,
       incompleteBuckets: 1,
+    });
+  });
+
+  describe('US data completeness through the real normalizer', () => {
+    const usInput = {
+      asset: { id: 'us-1', symbol: 'AAPL', marketCode: 'NAS' },
+      from: new Date('2026-07-09T13:30:00Z'),
+      to: new Date('2026-07-09T13:45:00Z'),
+      now: new Date('2026-07-10T00:00:00Z'),
+    };
+    const createUs = (adapterResult: {
+      rows: ReturnType<typeof usRow>[];
+      providerReturnedRows: number;
+    }) => {
+      const usAdapter = {
+        fetchUsFiveMinuteRows: jest.fn().mockResolvedValue({
+          pagesFetched: 1,
+          duplicateRows: 0,
+          complete: true,
+          stopReason: 'target_reached',
+          oldestOpenTime: usInput.from,
+          latestOpenTime: new Date('2026-07-09T13:40:00Z'),
+          ...adapterResult,
+        }),
+      };
+      const service = new MarketCandleIngestionService(
+        { fetchDomesticOneMinuteRows: jest.fn() } as never,
+        usAdapter as never,
+        new KisCandleNormalizerService(),
+        new KisDomesticFiveMinuteBuilder(),
+        { upsertMany: jest.fn() } as never,
+        { invalidateAsset: jest.fn() } as never,
+      );
+      return service;
+    };
+
+    it('never declares complete when a regular-session row fails strict validation, even with accepted rows', async () => {
+      // The provider sweep reached its target (adapter.complete=true) and
+      // two of three regular-session buckets are valid — but the malformed
+      // 13:35 bucket is an observable hole, so the range is NOT complete.
+      const service = createUs({
+        rows: [
+          usRow('093000'),
+          usRow('093500', { high: '90' }, 1),
+          usRow('094000', {}, 2),
+        ],
+        providerReturnedRows: 3,
+      });
+      const result = await service.fetchUsFiveMinuteCandles(usInput);
+      expect(result).toMatchObject({
+        complete: false,
+        acceptedRows: 2,
+        integrityFailedRows: 1,
+        stopReason: 'target_reached',
+      });
+      expect(result.candles).toHaveLength(2);
+    });
+
+    it('keeps complete=true when only benign pre/after-hours rows are excluded', async () => {
+      const service = createUs({
+        rows: [
+          usRow('090000'), // pre-market: benign
+          usRow('093000', {}, 1),
+          usRow('093500', {}, 2),
+          usRow('094000', {}, 3),
+          usRow('163000', {}, 4), // after-hours: benign
+        ],
+        providerReturnedRows: 5,
+      });
+      const result = await service.fetchUsFiveMinuteCandles(usInput);
+      expect(result).toMatchObject({
+        complete: true,
+        acceptedRows: 3,
+        rejectedRows: 2,
+        integrityFailedRows: 0,
+      });
     });
   });
 });

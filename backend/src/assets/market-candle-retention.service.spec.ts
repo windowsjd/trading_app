@@ -13,10 +13,10 @@ describe('MarketCandleRetentionService', () => {
 
   const create = (deletions: Array<number | Error>) => {
     const repository = {
-      deleteClosedBeforeBatch: jest.fn(async () => {
+      deleteClosedBeforeBatch: jest.fn(() => {
         const next = deletions.shift() ?? 0;
-        if (next instanceof Error) throw next;
-        return next;
+        if (next instanceof Error) return Promise.reject(next);
+        return Promise.resolve(next);
       }),
     };
     const yieldToEventLoop = jest.fn().mockResolvedValue(undefined);

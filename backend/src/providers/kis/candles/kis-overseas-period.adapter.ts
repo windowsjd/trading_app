@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { KisAuthClient } from '../kis-auth.client';
 import { KisQuoteClient } from '../kis-quote.client';
+import type { KisLowLevelCallWithMetadataResult } from '../kis.types';
 import { ProviderConfigService } from '../../provider-config.service';
 import type { KisRawCandleRow } from './kis-candle.types';
 import {
@@ -57,7 +58,7 @@ export class KisOverseasPeriodAdapter {
 
     const remainingMs = Math.max(1, timeoutMs - (Date.now() - startedAt));
     const boundedSignal = createBoundedAbortSignal(input.signal, remainingMs);
-    let fetched;
+    let fetched: KisLowLevelCallWithMetadataResult<unknown>;
     try {
       fetched =
         await this.quoteClient.getMarketDataWithMetadataByExplicitPath<unknown>(
@@ -148,8 +149,11 @@ function isBlankRecord(record: Record<string, unknown>): boolean {
 }
 
 function extractOutputRows(payload: unknown): unknown[] | null {
-  if (!isRecord(payload) || !Array.isArray(payload.output2)) return null;
-  return payload.output2;
+  if (!isRecord(payload)) return null;
+  const rows: unknown = payload.output2;
+  // Array.isArray narrows `unknown` to `any[]`; re-assert the safe element
+  // type so no `any` escapes this boundary.
+  return Array.isArray(rows) ? (rows as unknown[]) : null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

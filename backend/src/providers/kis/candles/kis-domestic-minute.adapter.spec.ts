@@ -57,9 +57,9 @@ describe('KisDomesticMinuteAdapter', () => {
     });
     expect(result.rows).toHaveLength(3);
     expect(quote.getMarketDataByExplicitPath).toHaveBeenCalledTimes(2);
-    expect(
-      quote.getMarketDataByExplicitPath.mock.calls[1][0].query,
-    ).toMatchObject({
+    const minuteCalls = quote.getMarketDataByExplicitPath.mock
+      .calls as unknown[][];
+    expect((minuteCalls[1][0] as { query: unknown }).query).toMatchObject({
       FID_INPUT_DATE_1: '20260710',
       FID_INPUT_HOUR_1: '090300',
       FID_PW_DATA_INCU_YN: 'Y',

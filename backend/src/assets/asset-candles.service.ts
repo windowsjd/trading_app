@@ -565,9 +565,7 @@ export class AssetCandlesService {
     // With a known window we can tell whether one klines call covers it.
     const expectedCount =
       timeRange.startTime !== undefined && timeRange.endTime !== undefined
-        ? Math.ceil(
-            (timeRange.endTime - timeRange.startTime) / intervalMs,
-          )
+        ? Math.ceil((timeRange.endTime - timeRange.startTime) / intervalMs)
         : null;
     const truncated = expectedCount !== null && expectedCount > requestLimit;
     const providerTimeRange =
@@ -600,7 +598,13 @@ export class AssetCandlesService {
       requestLimit,
     ).map((candle) => this.formatCandle(candle));
 
-    return this.buildCryptoResponse(asset, query, descriptor, candles, truncated);
+    return this.buildCryptoResponse(
+      asset,
+      query,
+      descriptor,
+      candles,
+      truncated,
+    );
   }
 
   private buildDomesticTodayCall(
@@ -890,11 +894,7 @@ export class AssetCandlesService {
       }
 
       candles.push({
-        time: this.zonedDateTimeToUtc(
-          sourceDate,
-          sourceTime,
-          KOREA_TIME_ZONE,
-        ),
+        time: this.zonedDateTimeToUtc(sourceDate, sourceTime, KOREA_TIME_ZONE),
         open,
         high,
         low,
@@ -1109,7 +1109,13 @@ export class AssetCandlesService {
     candles: CandlePayload[],
     truncated = false,
   ): AssetCandlesResponse {
-    return this.responses.buildCrypto(asset, query, descriptor, candles, truncated);
+    return this.responses.buildCrypto(
+      asset,
+      query,
+      descriptor,
+      candles,
+      truncated,
+    );
   }
 
   private formatCandle(candle: NormalizedCandle): CandlePayload {
@@ -1139,14 +1145,13 @@ export class AssetCandlesService {
           : UTC_TIME_ZONE;
     const range = this.parseRange(query.range);
     const rangeProvided = this.parseOptionalText(query.range) !== undefined;
-    const legacyDateProvided =
-      this.parseOptionalText(query.date) !== undefined;
+    const legacyDateProvided = this.parseOptionalText(query.date) !== undefined;
     const legacyToProvided = this.parseOptionalText(query.to) !== undefined;
     const interval = this.parseInterval(query.interval, asset.assetType, range);
     const rangeWindow =
       rangeProvided || (!legacyDateProvided && !legacyToProvided)
-      ? await this.resolveRangeWindow(range, clock, asset)
-      : null;
+        ? await this.resolveRangeWindow(range, clock, asset)
+        : null;
     const parsedTo = rangeWindow
       ? {
           hhmmss: this.timeInZone(rangeWindow.endAt, timeZone),
@@ -1258,9 +1263,10 @@ export class AssetCandlesService {
     );
   }
 
-  private resolveDomesticPeriodDateRange(
-    query: ParsedAssetCandlesQuery,
-  ): { startDate: string; endDate: string } {
+  private resolveDomesticPeriodDateRange(query: ParsedAssetCandlesQuery): {
+    startDate: string;
+    endDate: string;
+  } {
     const startDate = query.rangeStartAt
       ? this.compactDate(this.dateInZone(query.rangeStartAt, KOREA_TIME_ZONE))
       : this.compactDate(query.requestedDate);

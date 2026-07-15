@@ -1,5 +1,7 @@
 jest.mock('../../generated/prisma/client', () => {
-  const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
+  const { Decimal } = jest.requireActual<{ Decimal: unknown }>(
+    '@prisma/client/runtime/client',
+  );
   return { Prisma: { Decimal } };
 });
 
@@ -53,7 +55,10 @@ describe('parseBinanceFiveMinuteKline', () => {
 
   it('accepts combined-stream envelopes and subscription acknowledgements', () => {
     const combined = parseBinanceFiveMinuteKline(
-      JSON.stringify({ stream: 'btcusdt@kline_5m', data: JSON.parse(frame()) }),
+      JSON.stringify({
+        stream: 'btcusdt@kline_5m',
+        data: JSON.parse(frame()) as unknown,
+      }),
     );
     expect(combined.state).toBe('kline');
     expect(

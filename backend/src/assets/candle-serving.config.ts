@@ -86,11 +86,7 @@ function readBoolean(env: Env, name: string, fallback: boolean): boolean {
   throw new CandleServingConfigError(`${name} must be true, false, 1, or 0.`);
 }
 
-function readPositiveInteger(
-  env: Env,
-  name: string,
-  fallback: number,
-): number {
+function readPositiveInteger(env: Env, name: string, fallback: number): number {
   const value = env[name]?.trim();
   if (!value) return fallback;
   if (!/^\d+$/u.test(value)) {

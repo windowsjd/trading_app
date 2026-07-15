@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 1,
+  "result": "passed",
+  "gitCommit": "700c3973ee80c491980d1fc15441b5e978386cbb",
+  "gitBranch": "main",
+  "gitDirty": true,
+  "startedAt": "2026-07-15T08:03:00.029Z",
+  "finishedAt": "2026-07-15T08:03:01.014Z",
+  "durationMs": 985,
+  "assets": [
+    {
+      "assetType": "crypto",
+      "symbol": "FX18B4USDT"
+    },
+    {
+      "assetType": "domestic_stock",
+      "symbol": "901499"
+    },
+    {
+      "assetType": "us_stock",
+      "symbol": "FXU18B"
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "prisma migrations applied (coverage migration present)",
+      "state": "passed"
+    },
+    {
+      "name": "historical 5m/1d/1w fixtures stored",
+      "state": "passed"
+    },
+    {
+      "name": "initial sync writes a coverage-complete checkpoint (crypto)",
+      "state": "passed"
+    },
+    {
+      "name": "provider-exhausted US sync stays coverage-incomplete",
+      "state": "passed"
+    },
+    {
+      "name": "incomplete coverage is not mistaken for a fresh/confirmed-empty database",
+      "state": "passed"
+    },
+    {
+      "name": "database serving + Redis response cache",
+      "state": "passed"
+    },
+    {
+      "name": "stale Redis + injected DB operational failure → stale fallback",
+      "state": "passed"
+    },
+    {
+      "name": "programmer/config errors are never hidden behind stale Redis",
+      "state": "passed"
+    },
+    {
+      "name": "fake provider sockets: Binance absolute + KIS delta events",
+      "state": "passed"
+    },
+    {
+      "name": "15m/30m/1h/4h overlay snapshots from live state",
+      "state": "passed"
+    },
+    {
+      "name": "Pub/Sub fanout reaches an authenticated app WebSocket client",
+      "state": "passed"
+    },
+    {
+      "name": "frontend parser/merge + shared socket fixtures",
+      "state": "passed"
+    },
+    {
+      "name": "finalizer closes buckets exactly once with cache invalidation",
+      "state": "passed"
+    },
+    {
+      "name": "old-generation Binance provider-final bucket is recovered",
+      "state": "passed"
+    },
+    {
+      "name": "old-generation KIS delta bucket goes through REST repair recovery",
+      "state": "passed"
+    },
+    {
+      "name": "REST reconciliation corrects drift to zero",
+      "state": "passed"
+    },
+    {
+      "name": "owner lease loss and provider disconnect keep buckets incomplete",
+      "state": "passed"
+    },
+    {
+      "name": "DB finalization failure preserves live state for retry",
+      "state": "passed"
+    },
+    {
+      "name": "checkpoint conflict and cursor stall are surfaced, cursor never skips",
+      "state": "passed"
+    },
+    {
+      "name": "Pub/Sub subscriber survives a forced disconnect",
+      "state": "passed"
+    },
+    {
+      "name": "holiday and early-close calendar policy",
+      "state": "passed"
+    },
+    {
+      "name": "retention deletes only aged closed 5m rows",
+      "state": "passed"
+    },
+    {
+      "name": "no incomplete closed candles and no duplicate canonical rows",
+      "state": "passed"
+    },
+    {
+      "name": "fixture cleanup leaves no rows or keys behind",
+      "state": "passed"
+    }
+  ],
+  "passed": 24,
+  "failed": 0,
+  "redisKeysCreated": 10,
+  "redisKeysRemainingAfterCleanup": 0,
+  "dbRowsRemainingAfterCleanup": 0,
+  "duplicateEvents": 2,
+  "outOfOrderEvents": 1,
+  "incompleteClosedCandles": 0,
+  "reconciliationCorrections": 1,
+  "errors": []
+}

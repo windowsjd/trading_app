@@ -26,26 +26,44 @@ describe('candle operational error classification', () => {
       ),
     ).toBe(true);
     expect(
-      isDatabaseOperationalError(named('Error', 'connect ECONNREFUSED ::1:5432')),
+      isDatabaseOperationalError(
+        named('Error', 'connect ECONNREFUSED ::1:5432'),
+      ),
     ).toBe(true);
-    expect(
-      isDatabaseOperationalError(named('Error', 'read ECONNRESET')),
-    ).toBe(true);
+    expect(isDatabaseOperationalError(named('Error', 'read ECONNRESET'))).toBe(
+      true,
+    );
     expect(
       isDatabaseOperationalError(
         named('Error', 'Connection terminated unexpectedly'),
       ),
     ).toBe(true);
     expect(
-      isDatabaseOperationalError(named('Error', 'terminating connection due to administrator command', '57P01')),
+      isDatabaseOperationalError(
+        named(
+          'Error',
+          'terminating connection due to administrator command',
+          '57P01',
+        ),
+      ),
     ).toBe(true);
   });
 
   it('never classifies validation/config/programmer errors as operational', () => {
-    expect(isDatabaseOperationalError(named('MarketCandleSyncInputError'))).toBe(false);
-    expect(isDatabaseOperationalError(named('ProviderConfigError'))).toBe(false);
-    expect(isDatabaseOperationalError(new TypeError('undefined is not a function'))).toBe(false);
-    expect(isDatabaseOperationalError(named('Error', 'interval must be 5m, 1d, or 1w.'))).toBe(false);
+    expect(
+      isDatabaseOperationalError(named('MarketCandleSyncInputError')),
+    ).toBe(false);
+    expect(isDatabaseOperationalError(named('ProviderConfigError'))).toBe(
+      false,
+    );
+    expect(
+      isDatabaseOperationalError(new TypeError('undefined is not a function')),
+    ).toBe(false);
+    expect(
+      isDatabaseOperationalError(
+        named('Error', 'interval must be 5m, 1d, or 1w.'),
+      ),
+    ).toBe(false);
     expect(
       isDatabaseOperationalError(
         named('PrismaClientKnownRequestError', 'unique violation', 'P2002'),
@@ -60,7 +78,9 @@ describe('candle operational error classification', () => {
       isCandleOperationalFallbackError(named('RedisUnavailableError')),
     ).toBe(true);
     expect(
-      isCandleOperationalFallbackError(named('CandleSingleFlightWaitTimeoutError')),
+      isCandleOperationalFallbackError(
+        named('CandleSingleFlightWaitTimeoutError'),
+      ),
     ).toBe(true);
     expect(
       isCandleOperationalFallbackError(named('CandleOperationalRefreshError'), [

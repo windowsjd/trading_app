@@ -31,6 +31,11 @@ export type KisFiveMinuteFetchResult = {
   completeBuckets?: number;
   incompleteBuckets?: number;
   rejectedBuckets?: number;
+  // US path only: observable regular-session integrity failures reported by
+  // the normalizer (unparsable timestamp, off-grid, malformed OHLCV). Any
+  // non-zero value forces complete=false. The domestic path measures data
+  // completeness through incompleteBuckets instead.
+  integrityFailedRows?: number;
 };
 
 export type KisFiveMinuteIngestionResult = Omit<
@@ -112,11 +117,21 @@ export class MarketCandleIngestionService {
       rejectedRows: normalized.rejectedRows,
       duplicateRows: adapter.duplicateRows + normalized.duplicateRows,
       candles: normalized.candles,
-      complete: adapter.complete && normalized.acceptedRows > 0,
+      // Provider sweep completion (adapter.complete) is NOT stored-data
+      // completeness: any observable regular-session integrity failure means
+      // the range has holes at unknown positions and must never be declared
+      // complete — even when some valid candles were accepted. Benign
+      // exclusions (pre-market/after-hours, holidays, out-of-range, future
+      // rows) do not affect completeness.
+      complete:
+        adapter.complete &&
+        normalized.acceptedRows > 0 &&
+        normalized.integrityFailedRows === 0,
       stopReason: adapter.stopReason,
       oldestOpenTime: normalized.candles[0]?.openTime ?? adapter.oldestOpenTime,
       latestOpenTime:
         normalized.candles.at(-1)?.openTime ?? adapter.latestOpenTime,
+      integrityFailedRows: normalized.integrityFailedRows,
     };
   }
 
@@ -135,12 +150,12 @@ export class MarketCandleIngestionService {
   private async write(
     result: KisFiveMinuteFetchResult,
   ): Promise<KisFiveMinuteIngestionResult> {
-    if (result.candles.length === 0) {
-      const { candles: _candles, ...metadata } = result;
+    const { candles, ...metadata } = result;
+    if (candles.length === 0) {
       return { ...metadata, writtenRows: 0 };
     }
     const write = await this.repository.upsertMany(
-      result.candles.map((candle) => ({
+      candles.map((candle) => ({
         assetId: result.assetId,
         interval: '5m' as const,
         openTime: candle.openTime,
@@ -159,7 +174,6 @@ export class MarketCandleIngestionService {
     if (write.writtenCount > 0) {
       await this.cache.invalidateAsset(result.assetId);
     }
-    const { candles: _candles, ...metadata } = result;
     return { ...metadata, writtenRows: write.writtenCount };
   }
 }

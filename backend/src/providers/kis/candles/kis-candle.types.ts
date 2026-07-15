@@ -67,7 +67,17 @@ export type NormalizedKisCandleRow = {
 export type KisNormalizationResult = {
   rows: NormalizedKisCandleRow[];
   acceptedRows: number;
+  // Every row that was not accepted, for any reason (benign exclusions AND
+  // integrity failures). Kept as the historical total for feed counters.
   rejectedRows: number;
+  // Subset of rejectedRows that are OBSERVABLE data-integrity failures:
+  // unparsable timestamps, regular-session rows off the 5-minute grid, and
+  // regular-session rows with malformed OHLCV. Benign exclusions
+  // (pre-market/after-hours, holidays/weekends via the market calendar,
+  // out-of-request-range, future rows, deduplicated rows) never count here.
+  // Any integrity failure means the fetched range must not be declared
+  // data-complete.
+  integrityFailedRows: number;
   duplicateRows: number;
 };
 

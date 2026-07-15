@@ -45,13 +45,12 @@ describe('BinancePublicClient', () => {
         },
       }),
     } as unknown as ProviderConfigService;
-    const httpClient = {
-      getJson: jest.fn().mockResolvedValue({
-        json: [],
-        receivedAt: new Date('2026-06-21T04:00:00.000Z'),
-        status: 200,
-      }),
-    } as unknown as ProviderHttpClient;
+    const getJson = jest.fn().mockResolvedValue({
+      json: [],
+      receivedAt: new Date('2026-06-21T04:00:00.000Z'),
+      status: 200,
+    });
+    const httpClient = { getJson } as unknown as ProviderHttpClient;
     const client = new BinancePublicClient(configService, httpClient);
 
     await client.fetchKlines({
@@ -62,9 +61,9 @@ describe('BinancePublicClient', () => {
       endTime: Date.parse('2026-06-21T04:30:00.000Z'),
     });
 
-    expect(httpClient.getJson).toHaveBeenCalledTimes(1);
+    expect(getJson).toHaveBeenCalledTimes(1);
     const [[url, options]] = (
-      httpClient.getJson as jest.MockedFunction<ProviderHttpClient['getJson']>
+      getJson as jest.MockedFunction<ProviderHttpClient['getJson']>
     ).mock.calls;
     const parsedUrl = new URL(url);
 

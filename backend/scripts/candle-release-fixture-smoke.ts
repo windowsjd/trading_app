@@ -53,9 +53,7 @@ import {
   buildLiveCandleOwnerLeaseKey,
   buildLiveCandlePointerKey,
   buildLiveCandleStateKey,
-  buildLiveCandleDedupeKey,
   LIVE_CANDLE_ACTIVE_INDEX_KEY,
-  LIVE_CANDLE_RECONCILE_PENDING_KEY,
 } from '../src/assets/live-candle-store.service';
 import { LiveCandleHydratorService } from '../src/assets/live-candle-hydrator.service';
 import { LiveCandleOverlayService } from '../src/assets/live-candle-overlay.service';
@@ -107,7 +105,10 @@ const scenarios: Scenario[] = [];
 const errors: string[] = [];
 const startedAt = new Date();
 
-async function scenario(name: string, fn: () => Promise<void>): Promise<void> {
+async function scenario(
+  name: string,
+  fn: () => Promise<void> | void,
+): Promise<void> {
   try {
     await fn();
     scenarios.push({ name, state: 'passed' });
@@ -258,7 +259,7 @@ async function main() {
     domesticMode: 'complete' as 'complete' | 'empty',
   };
   const fakeBinance = {
-    fetchKlinesPage: async (input: { from: Date; to: Date }) => {
+    fetchKlinesPage: (input: { from: Date; to: Date }) => {
       if (feedState.binanceMode === 'cursor_stall') {
         return {
           candles: [],
@@ -304,14 +305,15 @@ async function main() {
     },
   };
   const fakeFiveMinute = {
-    fetchDomesticFiveMinuteCandles: async (input: { from: Date; to: Date }) => {
+    fetchDomesticFiveMinuteCandles: (input: { from: Date; to: Date }) => {
       const empty = feedState.domesticMode === 'empty';
       const candles = empty
         ? []
         : (() => {
             const list = [] as ReturnType<typeof fixtureCandle>[];
             for (
-              let openMs = Math.ceil(input.from.getTime() / FIVE_MIN) * FIVE_MIN;
+              let openMs =
+                Math.ceil(input.from.getTime() / FIVE_MIN) * FIVE_MIN;
               openMs + FIVE_MIN <= input.to.getTime() && list.length < 6;
               openMs += FIVE_MIN
             ) {
@@ -331,9 +333,7 @@ async function main() {
         duplicateRows: 0,
         candles,
         complete: !empty,
-        stopReason: (empty ? 'empty_page' : 'target_reached') as
-          | 'empty_page'
-          | 'target_reached',
+        stopReason: empty ? 'empty_page' : 'target_reached',
         oldestOpenTime: candles[0]?.openTime ?? null,
         latestOpenTime: candles.at(-1)?.openTime ?? null,
         completeBuckets: candles.length,
@@ -341,7 +341,7 @@ async function main() {
         rejectedBuckets: 0,
       };
     },
-    fetchUsFiveMinuteCandles: async (input: { from: Date; to: Date }) => {
+    fetchUsFiveMinuteCandles: (input: { from: Date; to: Date }) => {
       // US fixture: provider retention ends 20 days before `to`, so a full
       // 35-day initial sync must stay coverage-incomplete.
       const oldestAvailable = new Date(input.to.getTime() - 20 * DAY);
@@ -365,16 +365,14 @@ async function main() {
         duplicateRows: 0,
         candles,
         complete,
-        stopReason: (complete ? 'target_reached' : 'provider_exhausted') as
-          | 'target_reached'
-          | 'provider_exhausted',
+        stopReason: complete ? 'target_reached' : 'provider_exhausted',
         oldestOpenTime: candles[0]?.openTime ?? null,
         latestOpenTime: candles.at(-1)?.openTime ?? null,
       };
     },
   };
   const fakePeriodAdapter = {
-    fetchPeriodPage: async (input: { fromDate: string }) => ({
+    fetchPeriodPage: (input: { fromDate: string }) => ({
       state: 'ok' as const,
       rows: [
         {
@@ -450,16 +448,21 @@ async function main() {
   // touch fixture assets, so its store view filters both indexes.
   const scopedAssetIds = new Set<string>();
   const scopedStore = Object.create(store) as LiveCandleStoreService;
-  (scopedStore as { getDueStateKeys: LiveCandleStoreService['getDueStateKeys'] }).getDueStateKeys =
-    async (now: Date, graceMs: number) => {
-      const keys = await store.getDueStateKeys(now, graceMs);
-      return keys.filter((key) =>
-        [...scopedAssetIds].some((id) => key.includes(encodeURIComponent(id))),
-      );
-    };
-  (scopedStore as {
-    getDueReconcilePending: LiveCandleStoreService['getDueReconcilePending'];
-  }).getDueReconcilePending = async (now: Date, limit: number) => {
+  (
+    scopedStore as {
+      getDueStateKeys: LiveCandleStoreService['getDueStateKeys'];
+    }
+  ).getDueStateKeys = async (now: Date, graceMs: number) => {
+    const keys = await store.getDueStateKeys(now, graceMs);
+    return keys.filter((key) =>
+      [...scopedAssetIds].some((id) => key.includes(encodeURIComponent(id))),
+    );
+  };
+  (
+    scopedStore as {
+      getDueReconcilePending: LiveCandleStoreService['getDueReconcilePending'];
+    }
+  ).getDueReconcilePending = async (now: Date, limit: number) => {
     const entries = await store.getDueReconcilePending(now, limit);
     return entries.filter((entry) => scopedAssetIds.has(entry.assetId));
   };
@@ -558,10 +561,7 @@ async function main() {
   const binanceLease = buildLiveCandleOwnerLeaseKey('binance');
   const kisLease = buildLiveCandleOwnerLeaseKey('kis');
   const generation = `gen-${namespace}`;
-  const trackedRedisKeys = new Set<string>([
-    binanceLease,
-    kisLease,
-  ]);
+  const trackedRedisKeys = new Set<string>([binanceLease, kisLease]);
 
   const countRows = () =>
     prisma.marketCandle.count({ where: { assetId: { in: assetIds } } });
@@ -575,17 +575,24 @@ async function main() {
 
   try {
     // 1. migrations applied (including the coverage migration).
-    await scenario('prisma migrations applied (coverage migration present)', async () => {
-      const rows = await prisma.$queryRaw<{ migration_name: string }[]>`
+    await scenario(
+      'prisma migrations applied (coverage migration present)',
+      async () => {
+        const rows = await prisma.$queryRaw<{ migration_name: string }[]>`
         SELECT migration_name FROM _prisma_migrations
         WHERE migration_name = '20260713200000_add_market_candle_sync_coverage'
           AND finished_at IS NOT NULL`;
-      assert.equal(rows.length, 1);
-    });
+        assert.equal(rows.length, 1);
+      },
+    );
 
     // 3. historical fixtures for 5m/1d/1w.
     await scenario('historical 5m/1d/1w fixtures stored', async () => {
-      const mk = (interval: '5m' | '1d' | '1w', openMs: number, closeMs: number) => ({
+      const mk = (
+        interval: '5m' | '1d' | '1w',
+        openMs: number,
+        closeMs: number,
+      ) => ({
         assetId: cryptoAsset.id,
         interval,
         openTime: new Date(openMs),
@@ -604,530 +611,632 @@ async function main() {
         mk('1d', CLOCK.getTime() - 2 * DAY, CLOCK.getTime() - DAY),
         mk('1w', CLOCK.getTime() - 14 * DAY, CLOCK.getTime() - 7 * DAY),
         // retention fixtures: an old closed 5m row (target) and 1d (non-target)
-        mk('5m', CLOCK.getTime() - 40 * DAY, CLOCK.getTime() - 40 * DAY + FIVE_MIN),
+        mk(
+          '5m',
+          CLOCK.getTime() - 40 * DAY,
+          CLOCK.getTime() - 40 * DAY + FIVE_MIN,
+        ),
         mk('1d', CLOCK.getTime() - 40 * DAY, CLOCK.getTime() - 39 * DAY),
       ]);
       assert.equal(await countRows(), 4);
     });
 
     // 4–6. checkpointed initial sync + coverage semantics.
-    await scenario('initial sync writes a coverage-complete checkpoint (crypto)', async () => {
-      const result = await sync.syncAsset({
-        assetId: cryptoAsset.id,
-        targets: ['5m'],
-        mode: MarketCandleSyncMode.initial,
-        from: new Date(CLOCK.getTime() - DAY),
-        to: CLOCK,
-        now: CLOCK,
-      });
-      const feed = result.feeds[0];
-      assert.equal(feed.status, MarketCandleSyncStatus.completed);
-      assert.equal(feed.coverageComplete, true);
-      assert.equal(feed.completionReason, 'target_reached');
-      const row = await stateRepository.findCompletedCovering(
-        cryptoAsset.id,
-        '5m',
-        new Date(CLOCK.getTime() - DAY),
-        CLOCK,
-      );
-      assert.ok(row, 'covering checkpoint must exist');
-    });
+    await scenario(
+      'initial sync writes a coverage-complete checkpoint (crypto)',
+      async () => {
+        const result = await sync.syncAsset({
+          assetId: cryptoAsset.id,
+          targets: ['5m'],
+          mode: MarketCandleSyncMode.initial,
+          from: new Date(CLOCK.getTime() - DAY),
+          to: CLOCK,
+          now: CLOCK,
+        });
+        const feed = result.feeds[0];
+        assert.equal(feed.status, MarketCandleSyncStatus.completed);
+        assert.equal(feed.coverageComplete, true);
+        assert.equal(feed.completionReason, 'target_reached');
+        const row = await stateRepository.findCompletedCovering(
+          cryptoAsset.id,
+          '5m',
+          new Date(CLOCK.getTime() - DAY),
+          CLOCK,
+        );
+        assert.ok(row, 'covering checkpoint must exist');
+      },
+    );
 
-    await scenario('provider-exhausted US sync stays coverage-incomplete', async () => {
-      const result = await sync.syncAsset({
-        assetId: usAsset.id,
-        targets: ['5m'],
-        mode: MarketCandleSyncMode.initial,
-        from: new Date(CLOCK.getTime() - 35 * DAY),
-        to: CLOCK,
-        now: CLOCK,
-      });
-      const feed = result.feeds[0];
-      assert.equal(feed.status, MarketCandleSyncStatus.completed);
-      assert.equal(feed.coverageComplete, false);
-      assert.equal(feed.completionReason, 'provider_exhausted_before_target');
-      const covering = await stateRepository.findCompletedCovering(
-        usAsset.id,
-        '5m',
-        new Date(CLOCK.getTime() - 35 * DAY),
-        CLOCK,
-      );
-      assert.equal(covering, null, 'incomplete coverage must not serve');
-    });
+    await scenario(
+      'provider-exhausted US sync stays coverage-incomplete',
+      async () => {
+        const result = await sync.syncAsset({
+          assetId: usAsset.id,
+          targets: ['5m'],
+          mode: MarketCandleSyncMode.initial,
+          from: new Date(CLOCK.getTime() - 35 * DAY),
+          to: CLOCK,
+          now: CLOCK,
+        });
+        const feed = result.feeds[0];
+        assert.equal(feed.status, MarketCandleSyncStatus.completed);
+        assert.equal(feed.coverageComplete, false);
+        assert.equal(feed.completionReason, 'provider_exhausted_before_target');
+        const covering = await stateRepository.findCompletedCovering(
+          usAsset.id,
+          '5m',
+          new Date(CLOCK.getTime() - 35 * DAY),
+          CLOCK,
+        );
+        assert.equal(covering, null, 'incomplete coverage must not serve');
+      },
+    );
 
-    await scenario('incomplete coverage is not mistaken for a fresh/confirmed-empty database', async () => {
-      const loaded = await database.load(
-        usAsset as never,
-        parsedQuery(usAsset.id, CLOCK),
-        plans.build(usAsset as never, parsedQuery(usAsset.id, CLOCK)),
-      );
-      assert.notEqual(loaded.state, 'confirmed_empty');
-      assert.notEqual(loaded.state, 'available');
-      assert.equal(loaded.completedCoverage, false);
-    });
+    await scenario(
+      'incomplete coverage is not mistaken for a fresh/confirmed-empty database',
+      async () => {
+        const loaded = await database.load(
+          usAsset as never,
+          parsedQuery(usAsset.id, CLOCK),
+          plans.build(usAsset as never, parsedQuery(usAsset.id, CLOCK)),
+        );
+        assert.notEqual(loaded.state, 'confirmed_empty');
+        assert.notEqual(loaded.state, 'available');
+        assert.equal(loaded.completedCoverage, false);
+      },
+    );
 
     // 7–8. database serving + response cache.
     await scenario('database serving + Redis response cache', async () => {
       const query = parsedQuery(cryptoAsset.id, CLOCK);
-      firstServed = await serving.serve(cryptoAsset as never, query, async () => {
-        throw new Error('legacy provider must not run');
-      });
-      assert.equal((firstServed as { data: { state: string } }).data.state, 'available');
-      const second = await serving.serve(cryptoAsset as never, query, async () => {
-        throw new Error('legacy provider must not run');
-      });
+      firstServed = await serving.serve(cryptoAsset as never, query, () =>
+        Promise.reject(new Error('legacy provider must not run')),
+      );
+      assert.equal(
+        (firstServed as { data: { state: string } }).data.state,
+        'available',
+      );
+      const second = await serving.serve(cryptoAsset as never, query, () =>
+        Promise.reject(new Error('legacy provider must not run')),
+      );
       assert.deepEqual(second, firstServed);
     });
 
     // 9–11. stale Redis + PostgreSQL operational failure → stale fallback.
-    await scenario('stale Redis + injected DB operational failure → stale fallback', async () => {
-      cacheNow = new Date(cacheNow.getTime() + 31_000);
-      const dbDown = () => {
-        const error = new Error("Can't reach database server at localhost:5432");
-        error.name = 'PrismaClientInitializationError';
-        throw error;
-      };
-      const brokenServing = new CandleServingService(
-        plans,
-        { load: async () => dbDown() } as never,
-        cache,
-        singleFlight,
-        { syncAsset: async () => dbDown() } as never,
-        servingConfig,
-      );
-      const result = await brokenServing.serve(
-        cryptoAsset as never,
-        parsedQuery(cryptoAsset.id, CLOCK),
-        async () => {
-          throw new Error('legacy provider must not run');
-        },
-      );
-      assert.deepEqual(result, firstServed);
-    });
-
-    await scenario('programmer/config errors are never hidden behind stale Redis', async () => {
-      const invariant = new Error('interval must be 5m, 1d, or 1w.');
-      invariant.name = 'MarketCandleSyncInputError';
-      const brokenServing = new CandleServingService(
-        plans,
-        { load: async () => { throw invariant; } } as never,
-        cache,
-        singleFlight,
-        { syncAsset: async () => undefined } as never,
-        servingConfig,
-      );
-      await assert.rejects(
-        brokenServing.serve(
+    await scenario(
+      'stale Redis + injected DB operational failure → stale fallback',
+      async () => {
+        cacheNow = new Date(cacheNow.getTime() + 31_000);
+        const dbDown = () => {
+          const error = new Error(
+            "Can't reach database server at localhost:5432",
+          );
+          error.name = 'PrismaClientInitializationError';
+          throw error;
+        };
+        const brokenServing = new CandleServingService(
+          plans,
+          { load: () => dbDown() } as never,
+          cache,
+          singleFlight,
+          { syncAsset: () => dbDown() } as never,
+          servingConfig,
+        );
+        const result = await brokenServing.serve(
           cryptoAsset as never,
           parsedQuery(cryptoAsset.id, CLOCK),
-          async () => {
-            throw new Error('legacy provider must not run');
-          },
-        ),
-        (error: Error) => error === invariant,
-      );
-    });
+          () => Promise.reject(new Error('legacy provider must not run')),
+        );
+        assert.deepEqual(result, firstServed);
+      },
+    );
+
+    await scenario(
+      'programmer/config errors are never hidden behind stale Redis',
+      async () => {
+        const invariant = new Error('interval must be 5m, 1d, or 1w.');
+        invariant.name = 'MarketCandleSyncInputError';
+        const brokenServing = new CandleServingService(
+          plans,
+          {
+            load: () => {
+              throw invariant;
+            },
+          } as never,
+          cache,
+          singleFlight,
+          { syncAsset: () => Promise.resolve(undefined) } as never,
+          servingConfig,
+        );
+        await assert.rejects(
+          brokenServing.serve(
+            cryptoAsset as never,
+            parsedQuery(cryptoAsset.id, CLOCK),
+            () => Promise.reject(new Error('legacy provider must not run')),
+          ),
+          (error: Error) => error === invariant,
+        );
+      },
+    );
 
     // 12–16. fake provider WebSockets through the real supervisor.
     const binanceSocket = new FakeProviderSocket();
     const kisSocket = new FakeProviderSocket();
-    await scenario('fake provider sockets: Binance absolute + KIS delta events', async () => {
-      await redis.setWithTtl(binanceLease, generation, 3600);
-      await redis.setWithTtl(kisLease, generation, 3600);
-      const sockets = [binanceSocket, kisSocket];
-      const supervisorPrisma = {
-        asset: {
-          findMany: async ({ where }: { where: { assetType: AssetType } }) =>
-            [cryptoAsset, domesticAsset, usAsset].filter(
-              (asset) => asset.assetType === where.assetType,
-            ),
-        },
-      };
-      const supervisor = new LiveCandleStreamSupervisorService(
-        supervisorPrisma as never,
-        locks,
-        {
-          getConfig: () => ({
-            common: { providerIngestionEnabled: true },
-            binance: { enabled: true, wsMarketDataBaseUrl: 'wss://fixture' },
-            kis: {
-              enabled: true,
-              wsBaseUrl: 'wss://fixture-kis',
-              wsDomesticTrId: 'H0STCNT0',
-              wsOverseasDelayedTrId: 'HDFSCNT0',
-              wsCustType: 'P',
-            },
-          }),
-        } as never,
-        {
-          requestConfiguredWebSocketApprovalKey: async () => ({
-            state: 'available',
-            response: { approvalKey: `fixture-${namespace}` },
-          }),
-        } as never,
-        { publish: async () => true } as never,
-        normalizer,
-        pipeline,
-        health,
-        { ...liveConfig, connectionLivenessTimeoutMs: 3_600_000 },
-        () => sockets.shift() ?? new FakeProviderSocket(),
-      );
-      const context = (provider: 'binance' | 'kis', socket: FakeProviderSocket) => ({
-        provider,
-        lock: { key: provider, token: generation, ttlMs: 3_600_000 },
-        leaseKey: buildLiveCandleOwnerLeaseKey(provider),
-        lost: false,
-        socket,
-        renewTimer: null,
-      });
-      // Continuity from before the bucket opened → KIS bucket is complete.
-      pipeline.markProviderConnected({
-        provider: 'kis',
-        ownerGeneration: generation,
-        connectedAt: new Date(BUCKET_OPEN.getTime() - 1),
-      });
-      pipeline.markProviderConnected({
-        provider: 'binance',
-        ownerGeneration: generation,
-        connectedAt: new Date(BUCKET_OPEN.getTime() - 1),
-      });
-
-      const connectedBinance = (supervisor as never as {
-        connectBinance(context: unknown): Promise<void>;
-      }).connectBinance(context('binance', binanceSocket));
-      await settle();
-
-      // KIS PINGPONG heartbeat handling (echo + no rejection).
-      const connectedKis = (supervisor as never as {
-        connectKis(context: unknown): Promise<void>;
-      }).connectKis(context('kis', kisSocket));
-      await settle();
-
-      const pingpong = JSON.stringify({
-        header: { tr_id: 'PINGPONG', datetime: '20260710140100' },
-      });
-      kisSocket.frame(pingpong);
-      await settle();
-      assert.ok(kisSocket.sent.includes(pingpong), 'PINGPONG must be echoed');
-
-      const rowsBefore = await countRows();
-
-      // Binance absolute klines: provisional → duplicate → out-of-order → final.
-      const kline = (eventMs: number, close: string, final: boolean) =>
-        binanceKlineFrame({
-          symbol: providerSymbol,
-          eventMs,
-          openMs: BUCKET_OPEN.getTime(),
-          open: '100',
-          high: '110',
-          low: '95',
-          close,
-          volume: '10',
-          quote: '1000',
-          final,
+    await scenario(
+      'fake provider sockets: Binance absolute + KIS delta events',
+      async () => {
+        await redis.setWithTtl(binanceLease, generation, 3600);
+        await redis.setWithTtl(kisLease, generation, 3600);
+        const sockets = [binanceSocket, kisSocket];
+        const supervisorPrisma = {
+          asset: {
+            findMany: ({ where }: { where: { assetType: AssetType } }) =>
+              Promise.resolve(
+                [cryptoAsset, domesticAsset, usAsset].filter(
+                  (asset) => asset.assetType === where.assetType,
+                ),
+              ),
+          },
+        };
+        const supervisor = new LiveCandleStreamSupervisorService(
+          supervisorPrisma as never,
+          locks,
+          {
+            getConfig: () => ({
+              common: { providerIngestionEnabled: true },
+              binance: { enabled: true, wsMarketDataBaseUrl: 'wss://fixture' },
+              kis: {
+                enabled: true,
+                wsBaseUrl: 'wss://fixture-kis',
+                wsDomesticTrId: 'H0STCNT0',
+                wsOverseasDelayedTrId: 'HDFSCNT0',
+                wsCustType: 'P',
+              },
+            }),
+          } as never,
+          {
+            requestConfiguredWebSocketApprovalKey: () =>
+              Promise.resolve({
+                state: 'available',
+                response: { approvalKey: `fixture-${namespace}` },
+              }),
+          } as never,
+          { publish: () => Promise.resolve(true) } as never,
+          normalizer,
+          pipeline,
+          health,
+          { ...liveConfig, connectionLivenessTimeoutMs: 3_600_000 },
+          () => sockets.shift() ?? new FakeProviderSocket(),
+        );
+        const context = (
+          provider: 'binance' | 'kis',
+          socket: FakeProviderSocket,
+        ) => ({
+          provider,
+          lock: { key: provider, token: generation, ttlMs: 3_600_000 },
+          leaseKey: buildLiveCandleOwnerLeaseKey(provider),
+          lost: false,
+          socket,
+          renewTimer: null,
         });
-      binanceSocket.frame(kline(BUCKET_OPEN.getTime() + 60_000, '105', false));
-      await settle();
-      binanceSocket.frame(kline(BUCKET_OPEN.getTime() + 60_000, '105', false)); // duplicate
-      await settle();
-      binanceSocket.frame(kline(BUCKET_OPEN.getTime() + 30_000, '104', false)); // out-of-order
-      await settle();
-      binanceSocket.frame(kline(BUCKET_CLOSE.getTime() - 1, '106', true)); // provider final
-      await settle();
+        // Continuity from before the bucket opened → KIS bucket is complete.
+        pipeline.markProviderConnected({
+          provider: 'kis',
+          ownerGeneration: generation,
+          connectedAt: new Date(BUCKET_OPEN.getTime() - 1),
+        });
+        pipeline.markProviderConnected({
+          provider: 'binance',
+          ownerGeneration: generation,
+          connectedAt: new Date(BUCKET_OPEN.getTime() - 1),
+        });
 
-      // KIS delta trades: two trades, then a duplicate frame.
-      const trade = (timeKst: string, price: string, qty: string, cumVol: string, cumAmt: string) =>
-        kisTradeFrame({ symbol: domesticSymbol, timeKst, price, qty, cumVol, cumAmt });
-      kisSocket.frame(trade('140001', '50000', '3', '103', '5150000'));
-      await settle();
-      kisSocket.frame(trade('140130', '50100', '2', '105', '5250200'));
-      await settle();
-      kisSocket.frame(trade('140130', '50100', '2', '105', '5250200')); // duplicate
-      await settle();
+        const connectedBinance = (
+          supervisor as never as {
+            connectBinance(context: unknown): Promise<void>;
+          }
+        ).connectBinance(context('binance', binanceSocket));
+        await settle();
 
-      const snapshot = health.snapshot().liveCandle;
-      summaryCounters.duplicates = snapshot.eventsDuplicate;
-      summaryCounters.outOfOrder = snapshot.eventsOutOfOrder;
-      assert.ok(snapshot.eventsAccepted >= 4, `accepted=${snapshot.eventsAccepted}`);
-      assert.ok(snapshot.eventsDuplicate >= 2, `duplicate=${snapshot.eventsDuplicate}`);
-      assert.ok(snapshot.eventsOutOfOrder >= 1, `outOfOrder=${snapshot.eventsOutOfOrder}`);
+        // KIS PINGPONG heartbeat handling (echo + no rejection).
+        const connectedKis = (
+          supervisor as never as {
+            connectKis(context: unknown): Promise<void>;
+          }
+        ).connectKis(context('kis', kisSocket));
+        await settle();
 
-      // invalid provider event fixture
-      const rejectedBefore = health.snapshot().liveCandle.eventsRejected;
-      kisSocket.frame('garbage|frame');
-      await settle();
-      assert.ok(health.snapshot().liveCandle.eventsRejected > rejectedBefore);
+        const pingpong = JSON.stringify({
+          header: { tr_id: 'PINGPONG', datetime: '20260710140100' },
+        });
+        kisSocket.frame(pingpong);
+        await settle();
+        assert.ok(kisSocket.sent.includes(pingpong), 'PINGPONG must be echoed');
 
-      // No DB write happened per tick.
-      assert.equal(await countRows(), rowsBefore, 'no per-tick DB writes');
+        const rowsBefore = await countRows();
 
-      // Redis live 5m state reflects the absolute kline...
-      const cryptoState = await store.getCurrent(cryptoAsset.id);
-      assert.ok(cryptoState);
-      assert.equal(cryptoState.close, '106.00000000');
-      assert.equal(cryptoState.volume, '10.00000000');
-      assert.equal(cryptoState.providerFinal, true);
-      trackedRedisKeys.add(buildLiveCandlePointerKey(cryptoAsset.id));
-      trackedRedisKeys.add(
-        buildLiveCandleStateKey(cryptoAsset.id, BUCKET_OPEN, generation),
-      );
-      // ...and the KIS delta accumulation (3 + 2 shares, no double count).
-      const domesticState = await store.getCurrent(domesticAsset.id);
-      assert.ok(domesticState);
-      assert.equal(domesticState.volume, '5.00000000');
-      assert.equal(domesticState.close, '50100.00000000');
-      assert.equal(domesticState.complete, true);
-      trackedRedisKeys.add(buildLiveCandlePointerKey(domesticAsset.id));
-      trackedRedisKeys.add(
-        buildLiveCandleStateKey(domesticAsset.id, BUCKET_OPEN, generation),
-      );
+        // Binance absolute klines: provisional → duplicate → out-of-order → final.
+        const kline = (eventMs: number, close: string, final: boolean) =>
+          binanceKlineFrame({
+            symbol: providerSymbol,
+            eventMs,
+            openMs: BUCKET_OPEN.getTime(),
+            open: '100',
+            high: '110',
+            low: '95',
+            close,
+            volume: '10',
+            quote: '1000',
+            final,
+          });
+        binanceSocket.frame(
+          kline(BUCKET_OPEN.getTime() + 60_000, '105', false),
+        );
+        await settle();
+        binanceSocket.frame(
+          kline(BUCKET_OPEN.getTime() + 60_000, '105', false),
+        ); // duplicate
+        await settle();
+        binanceSocket.frame(
+          kline(BUCKET_OPEN.getTime() + 30_000, '104', false),
+        ); // out-of-order
+        await settle();
+        binanceSocket.frame(kline(BUCKET_CLOSE.getTime() - 1, '106', true)); // provider final
+        await settle();
 
-      binanceSocket.close(1000, 'fixture done');
-      kisSocket.close(1000, 'fixture done');
-      await connectedBinance;
-      await connectedKis;
-    });
+        // KIS delta trades: two trades, then a duplicate frame.
+        const trade = (
+          timeKst: string,
+          price: string,
+          qty: string,
+          cumVol: string,
+          cumAmt: string,
+        ) =>
+          kisTradeFrame({
+            symbol: domesticSymbol,
+            timeKst,
+            price,
+            qty,
+            cumVol,
+            cumAmt,
+          });
+        kisSocket.frame(trade('140001', '50000', '3', '103', '5150000'));
+        await settle();
+        kisSocket.frame(trade('140130', '50100', '2', '105', '5250200'));
+        await settle();
+        kisSocket.frame(trade('140130', '50100', '2', '105', '5250200')); // duplicate
+        await settle();
+
+        const snapshot = health.snapshot().liveCandle;
+        summaryCounters.duplicates = snapshot.eventsDuplicate;
+        summaryCounters.outOfOrder = snapshot.eventsOutOfOrder;
+        assert.ok(
+          snapshot.eventsAccepted >= 4,
+          `accepted=${snapshot.eventsAccepted}`,
+        );
+        assert.ok(
+          snapshot.eventsDuplicate >= 2,
+          `duplicate=${snapshot.eventsDuplicate}`,
+        );
+        assert.ok(
+          snapshot.eventsOutOfOrder >= 1,
+          `outOfOrder=${snapshot.eventsOutOfOrder}`,
+        );
+
+        // invalid provider event fixture
+        const rejectedBefore = health.snapshot().liveCandle.eventsRejected;
+        kisSocket.frame('garbage|frame');
+        await settle();
+        assert.ok(health.snapshot().liveCandle.eventsRejected > rejectedBefore);
+
+        // No DB write happened per tick.
+        assert.equal(await countRows(), rowsBefore, 'no per-tick DB writes');
+
+        // Redis live 5m state reflects the absolute kline...
+        const cryptoState = await store.getCurrent(cryptoAsset.id);
+        assert.ok(cryptoState);
+        assert.equal(cryptoState.close, '106.00000000');
+        assert.equal(cryptoState.volume, '10.00000000');
+        assert.equal(cryptoState.providerFinal, true);
+        trackedRedisKeys.add(buildLiveCandlePointerKey(cryptoAsset.id));
+        trackedRedisKeys.add(
+          buildLiveCandleStateKey(cryptoAsset.id, BUCKET_OPEN, generation),
+        );
+        // ...and the KIS delta accumulation (3 + 2 shares, no double count).
+        const domesticState = await store.getCurrent(domesticAsset.id);
+        assert.ok(domesticState);
+        assert.equal(domesticState.volume, '5.00000000');
+        assert.equal(domesticState.close, '50100.00000000');
+        assert.equal(domesticState.complete, true);
+        trackedRedisKeys.add(buildLiveCandlePointerKey(domesticAsset.id));
+        trackedRedisKeys.add(
+          buildLiveCandleStateKey(domesticAsset.id, BUCKET_OPEN, generation),
+        );
+
+        binanceSocket.close(1000, 'fixture done');
+        kisSocket.close(1000, 'fixture done');
+        await connectedBinance;
+        await connectedKis;
+      },
+    );
 
     // 17. higher-interval overlays from the live 5m state.
-    await scenario('15m/30m/1h/4h overlay snapshots from live state', async () => {
-      const state = await store.getCurrent(cryptoAsset.id);
-      assert.ok(state);
-      const snapshots = await overlay.buildCurrentSnapshots(state);
-      const intervals = snapshots.map((snapshot) => snapshot.interval).sort();
-      assert.deepEqual(intervals, ['15m', '30m', '1h', '4h', '5m'].sort());
-    });
+    await scenario(
+      '15m/30m/1h/4h overlay snapshots from live state',
+      async () => {
+        const state = await store.getCurrent(cryptoAsset.id);
+        assert.ok(state);
+        const snapshots = await overlay.buildCurrentSnapshots(state);
+        const intervals = snapshots.map((snapshot) => snapshot.interval).sort();
+        assert.deepEqual(intervals, ['15m', '30m', '1h', '4h', '5m'].sort());
+      },
+    );
 
     // 18–19. Redis Pub/Sub fanout → authenticated app WebSocket.
-    await scenario('Pub/Sub fanout reaches an authenticated app WebSocket client', async () => {
-      const pubsub = new LiveCandlePubSubService(liveConfig);
-      pubsub.onModuleInit();
-      await waitFor(async () => pubsub.getStatus() === 'connected', 5_000);
+    await scenario(
+      'Pub/Sub fanout reaches an authenticated app WebSocket client',
+      async () => {
+        const pubsub = new LiveCandlePubSubService(liveConfig);
+        pubsub.onModuleInit();
+        await waitFor(() => pubsub.getStatus() === 'connected', 5_000);
 
-      const jwt = new JwtService({ secret: `fixture-${namespace}` });
-      const gatewayPrisma = {
-        asset: {
-          findUnique: async () => ({ id: cryptoAsset.id, isActive: true }),
-        },
-        user: {
-          findUnique: async () => ({ status: 'active' }),
-        },
-      };
-      const gateway = new AssetTickerGateway(
-        gatewayPrisma as never,
-        jwt,
-        { get: () => `fixture-${namespace}` } as never,
-        { getAssetPriceForTicker: async () => null } as never,
-        new KisRealtimePriceEventBus(),
-        new BinanceRealtimePriceEventBus(),
-        pubsub,
-        overlay,
-        liveConfig,
-        undefined,
-      );
-      gateway.onModuleInit();
-      const received: unknown[] = [];
-      const client = {
-        readyState: 1,
-        bufferedAmount: 0,
-        OPEN: 1,
-        send: (data: string) => received.push(JSON.parse(data)),
-        close: () => undefined,
-        on: () => undefined,
-      };
-      const token = await jwt.signAsync({ sub: 'fixture-user' });
-      await gateway.handleConnection(
-        client as never,
-        {
-          headers: { host: 'localhost' },
-          url: `/api/v1/ws?token=${token}`,
-        } as never,
-      );
-      await (gateway as never as {
-        handleMessage(client: unknown, raw: string): Promise<void>;
-      }).handleMessage(
-        client,
-        JSON.stringify({
-          type: 'subscribe',
-          channel: 'asset_candle',
-          assetId: cryptoAsset.id,
-          interval: '5m',
-        }),
-      );
-      assert.ok(
-        received.some((message) => (message as { type?: string }).type === 'subscribed'),
-        'client must be acked',
-      );
-
-      // Raw fanout assertion + end-to-end push.
-      const raw = new IORedis(readRedisConfig().url as string);
-      const rawMessages: string[] = [];
-      await raw.subscribe(LIVE_CANDLE_PUBSUB_CHANNEL);
-      raw.on('message', (_channel, message) => rawMessages.push(message));
-
-      const state = await store.getCurrent(cryptoAsset.id);
-      assert.ok(state);
-      await publisher.publishState(state);
-      await waitFor(async () => rawMessages.length > 0, 5_000);
-      await waitFor(
-        async () =>
+        const jwt = new JwtService({ secret: `fixture-${namespace}` });
+        const gatewayPrisma = {
+          asset: {
+            findUnique: () =>
+              Promise.resolve({ id: cryptoAsset.id, isActive: true }),
+          },
+          user: {
+            findUnique: () => Promise.resolve({ status: 'active' }),
+          },
+        };
+        const gateway = new AssetTickerGateway(
+          gatewayPrisma as never,
+          jwt,
+          { get: () => `fixture-${namespace}` } as never,
+          { getAssetPriceForTicker: () => Promise.resolve(null) } as never,
+          new KisRealtimePriceEventBus(),
+          new BinanceRealtimePriceEventBus(),
+          pubsub,
+          overlay,
+          liveConfig,
+          undefined,
+        );
+        gateway.onModuleInit();
+        const received: unknown[] = [];
+        const client = {
+          readyState: 1,
+          bufferedAmount: 0,
+          OPEN: 1,
+          send: (data: string) => received.push(JSON.parse(data)),
+          close: () => undefined,
+          on: () => undefined,
+        };
+        const token = await jwt.signAsync({ sub: 'fixture-user' });
+        await gateway.handleConnection(
+          client as never,
+          {
+            headers: { host: 'localhost' },
+            url: `/api/v1/ws?token=${token}`,
+          } as never,
+        );
+        await (
+          gateway as never as {
+            handleMessage(client: unknown, raw: string): Promise<void>;
+          }
+        ).handleMessage(
+          client,
+          JSON.stringify({
+            type: 'subscribe',
+            channel: 'asset_candle',
+            assetId: cryptoAsset.id,
+            interval: '5m',
+          }),
+        );
+        assert.ok(
           received.some(
-            (message) =>
-              (message as { type?: string; interval?: string }).type === 'asset_candle' &&
-              (message as { interval?: string }).interval === '5m',
+            (message) => (message as { type?: string }).type === 'subscribed',
           ),
-        5_000,
-      );
-      await raw.quit();
-      gateway.handleDisconnect(client as never);
-      gateway.onModuleDestroy();
-      await pubsub.onModuleDestroy();
-    });
+          'client must be acked',
+        );
+
+        // Raw fanout assertion + end-to-end push.
+        const raw = new IORedis(readRedisConfig().url as string);
+        const rawMessages: string[] = [];
+        await raw.subscribe(LIVE_CANDLE_PUBSUB_CHANNEL);
+        raw.on('message', (_channel, message) => rawMessages.push(message));
+
+        const state = await store.getCurrent(cryptoAsset.id);
+        assert.ok(state);
+        await publisher.publishState(state);
+        await waitFor(() => rawMessages.length > 0, 5_000);
+        await waitFor(
+          () =>
+            received.some(
+              (message) =>
+                (message as { type?: string; interval?: string }).type ===
+                  'asset_candle' &&
+                (message as { interval?: string }).interval === '5m',
+            ),
+          5_000,
+        );
+        await raw.quit();
+        gateway.handleDisconnect(client as never);
+        gateway.onModuleDestroy();
+        await pubsub.onModuleDestroy();
+      },
+    );
 
     // 20. frontend parser/merge fixtures (runs the frontend node:test suites).
-    await scenario('frontend parser/merge + shared socket fixtures', async () => {
-      const { spawnSync } = await import('node:child_process');
-      const result = spawnSync(
-        'node',
-        [
-          '--test',
-          'src/features/asset/liveCandle.test.ts',
-          'src/services/ws/realtimeSocketManager.test.ts',
-        ],
-        { cwd: join(process.cwd(), '..', 'frontend'), encoding: 'utf8', timeout: 60_000 },
-      );
-      assert.equal(result.status, 0, result.stderr || result.stdout);
-    });
+    await scenario(
+      'frontend parser/merge + shared socket fixtures',
+      async () => {
+        const { spawnSync } = await import('node:child_process');
+        const result = spawnSync(
+          'node',
+          [
+            '--test',
+            'src/features/asset/liveCandle.test.ts',
+            'src/services/ws/realtimeSocketManager.test.ts',
+          ],
+          {
+            cwd: join(process.cwd(), '..', 'frontend'),
+            encoding: 'utf8',
+            timeout: 60_000,
+          },
+        );
+        assert.equal(result.status, 0, result.stderr || result.stdout);
+      },
+    );
 
     // 21–23. bucket close → finalizer → DB row → cache invalidation.
-    await scenario('finalizer closes buckets exactly once with cache invalidation', async () => {
-      const cachedBefore = await cache.get(cacheKeyInput(cryptoAsset.id));
-      const rowsBefore = await countRows();
-      await finalizer.runOnce(new Date());
-      const closed = await repository.findRange({
-        assetId: cryptoAsset.id,
-        interval: '5m',
-        from: BUCKET_OPEN,
-        to: BUCKET_CLOSE,
-      });
-      assert.equal(closed.length, 1);
-      assert.equal(closed[0].isClosed, true);
-      assert.equal(closed[0].close.toFixed(8), '106.00000000');
-      const closedDomestic = await repository.findRange({
-        assetId: domesticAsset.id,
-        interval: '5m',
-        from: BUCKET_OPEN,
-        to: BUCKET_CLOSE,
-      });
-      assert.equal(closedDomestic.length, 1);
-      assert.equal(closedDomestic[0].volume.toFixed(8), '5.00000000');
+    await scenario(
+      'finalizer closes buckets exactly once with cache invalidation',
+      async () => {
+        const cachedBefore = await cache.get(cacheKeyInput(cryptoAsset.id));
+        const rowsBefore = await countRows();
+        await finalizer.runOnce(new Date());
+        const closed = await repository.findRange({
+          assetId: cryptoAsset.id,
+          interval: '5m',
+          from: BUCKET_OPEN,
+          to: BUCKET_CLOSE,
+        });
+        assert.equal(closed.length, 1);
+        assert.equal(closed[0].isClosed, true);
+        assert.equal(closed[0].close.toFixed(8), '106.00000000');
+        const closedDomestic = await repository.findRange({
+          assetId: domesticAsset.id,
+          interval: '5m',
+          from: BUCKET_OPEN,
+          to: BUCKET_CLOSE,
+        });
+        assert.equal(closedDomestic.length, 1);
+        assert.equal(closedDomestic[0].volume.toFixed(8), '5.00000000');
 
-      // duplicate finalization fixture: run again, still exactly one row.
-      await finalizer.runOnce(new Date());
-      const again = await repository.findRange({
-        assetId: cryptoAsset.id,
-        interval: '5m',
-        from: BUCKET_OPEN,
-        to: BUCKET_CLOSE,
-      });
-      assert.equal(again.length, 1);
-      assert.ok((await countRows()) === rowsBefore + 2);
-      // Cache generation was invalidated by the finalize commit.
-      if (cachedBefore.status === 'fresh' || cachedBefore.status === 'stale') {
-        const after = await cache.get(cacheKeyInput(cryptoAsset.id));
-        assert.notEqual(after.status, 'fresh');
-      }
-    });
+        // duplicate finalization fixture: run again, still exactly one row.
+        await finalizer.runOnce(new Date());
+        const again = await repository.findRange({
+          assetId: cryptoAsset.id,
+          interval: '5m',
+          from: BUCKET_OPEN,
+          to: BUCKET_CLOSE,
+        });
+        assert.equal(again.length, 1);
+        assert.ok((await countRows()) === rowsBefore + 2);
+        // Cache generation was invalidated by the finalize commit.
+        if (
+          cachedBefore.status === 'fresh' ||
+          cachedBefore.status === 'stale'
+        ) {
+          const after = await cache.get(cacheKeyInput(cryptoAsset.id));
+          assert.notEqual(after.status, 'fresh');
+        }
+      },
+    );
 
     // 24 + process-restart simulation: old-generation Binance recovery.
-    await scenario('old-generation Binance provider-final bucket is recovered', async () => {
-      const oldGeneration = `gen-old-${namespace}`;
-      await redis.setWithTtl(binanceLease, oldGeneration, 3600);
-      const event = normalizer.normalizeBinance(
-        parseKlineForNormalizer({
-          symbol: providerSymbol,
-          openMs: OLD_BUCKET_OPEN.getTime(),
-          close: '103',
-          final: true,
-        }),
-        cryptoAsset as never,
-        new Date(),
-      );
-      const applied = await store.applyEvent({
-        event,
-        ownerGeneration: oldGeneration,
-        ownerLeaseKey: binanceLease,
-      });
-      assert.equal(applied.status, 'updated');
-      trackedRedisKeys.add(applied.stateKey);
-      // Simulate restart: a NEW generation owns the lease now.
-      await redis.setWithTtl(binanceLease, generation, 3600);
-      await finalizer.runOnce(new Date());
-      const closed = await repository.findRange({
-        assetId: cryptoAsset.id,
-        interval: '5m',
-        from: OLD_BUCKET_OPEN,
-        to: new Date(OLD_BUCKET_OPEN.getTime() + FIVE_MIN),
-      });
-      assert.equal(closed.length, 1);
-      assert.equal(closed[0].isClosed, true);
-      assert.equal(closed[0].close.toFixed(8), '103.00000000');
-      const state = await store.getByKey(applied.stateKey);
-      assert.equal(state?.finalized, true);
-    });
+    await scenario(
+      'old-generation Binance provider-final bucket is recovered',
+      async () => {
+        const oldGeneration = `gen-old-${namespace}`;
+        await redis.setWithTtl(binanceLease, oldGeneration, 3600);
+        const event = normalizer.normalizeBinance(
+          parseKlineForNormalizer({
+            symbol: providerSymbol,
+            openMs: OLD_BUCKET_OPEN.getTime(),
+            close: '103',
+            final: true,
+          }),
+          cryptoAsset as never,
+          new Date(),
+        );
+        const applied = await store.applyEvent({
+          event,
+          ownerGeneration: oldGeneration,
+          ownerLeaseKey: binanceLease,
+        });
+        assert.equal(applied.status, 'updated');
+        trackedRedisKeys.add(applied.stateKey);
+        // Simulate restart: a NEW generation owns the lease now.
+        await redis.setWithTtl(binanceLease, generation, 3600);
+        await finalizer.runOnce(new Date());
+        const closed = await repository.findRange({
+          assetId: cryptoAsset.id,
+          interval: '5m',
+          from: OLD_BUCKET_OPEN,
+          to: new Date(OLD_BUCKET_OPEN.getTime() + FIVE_MIN),
+        });
+        assert.equal(closed.length, 1);
+        assert.equal(closed[0].isClosed, true);
+        assert.equal(closed[0].close.toFixed(8), '103.00000000');
+        const state = await store.getByKey(applied.stateKey);
+        assert.equal(state?.finalized, true);
+      },
+    );
 
     // 25–26. old-generation KIS bucket → reconcile queue → REST repair.
-    await scenario('old-generation KIS delta bucket goes through REST repair recovery', async () => {
-      const oldGeneration = `gen-old-kis-${namespace}`;
-      await redis.setWithTtl(kisLease, oldGeneration, 3600);
-      const kisEventTime = new Date(KIS_OLD_BUCKET_OPEN.getTime() + 30_000);
-      const event = normalizer.normalizeKis(
-        kisTradeTick({
-          symbol: domesticSymbol,
-          eventTime: kisEventTime,
-          price: '49000.00000000',
-          qty: '1.00000000',
-          cumVol: '50.00000000',
-        }),
-        domesticAsset as never,
-      );
-      const applied = await store.applyEvent({
-        event,
-        ownerGeneration: oldGeneration,
-        ownerLeaseKey: kisLease,
-      });
-      assert.equal(applied.status, 'updated');
-      trackedRedisKeys.add(applied.stateKey);
-      await redis.setWithTtl(kisLease, generation, 3600);
+    await scenario(
+      'old-generation KIS delta bucket goes through REST repair recovery',
+      async () => {
+        const oldGeneration = `gen-old-kis-${namespace}`;
+        await redis.setWithTtl(kisLease, oldGeneration, 3600);
+        const kisEventTime = new Date(KIS_OLD_BUCKET_OPEN.getTime() + 30_000);
+        const event = normalizer.normalizeKis(
+          kisTradeTick({
+            symbol: domesticSymbol,
+            eventTime: kisEventTime,
+            price: '49000.00000000',
+            qty: '1.00000000',
+            cumVol: '50.00000000',
+          }),
+          domesticAsset as never,
+        );
+        const applied = await store.applyEvent({
+          event,
+          ownerGeneration: oldGeneration,
+          ownerLeaseKey: kisLease,
+        });
+        assert.equal(applied.status, 'updated');
+        trackedRedisKeys.add(applied.stateKey);
+        await redis.setWithTtl(kisLease, generation, 3600);
 
-      await finalizer.runOnce(new Date());
-      // Not directly closed: queued for repair instead.
-      const direct = await repository.findRange({
-        assetId: domesticAsset.id,
-        interval: '5m',
-        from: KIS_OLD_BUCKET_OPEN,
-        to: new Date(KIS_OLD_BUCKET_OPEN.getTime() + FIVE_MIN),
-      });
-      const queuedRun = direct.filter((row) => row.isClosed && row.sourceProvider.includes('ws'));
-      assert.equal(queuedRun.length, 0, 'KIS old-generation bucket must not be closed from live state');
+        await finalizer.runOnce(new Date());
+        // Not directly closed: queued for repair instead.
+        const direct = await repository.findRange({
+          assetId: domesticAsset.id,
+          interval: '5m',
+          from: KIS_OLD_BUCKET_OPEN,
+          to: new Date(KIS_OLD_BUCKET_OPEN.getTime() + FIVE_MIN),
+        });
+        const queuedRun = direct.filter(
+          (row) => row.isClosed && row.sourceProvider.includes('ws'),
+        );
+        assert.equal(
+          queuedRun.length,
+          0,
+          'KIS old-generation bucket must not be closed from live state',
+        );
 
-      // The next finalizer tick processes the due queue entry via fixture REST.
-      await finalizer.runOnce(new Date());
-      const repaired = await repository.findRange({
-        assetId: domesticAsset.id,
-        interval: '5m',
-        from: KIS_OLD_BUCKET_OPEN,
-        to: new Date(KIS_OLD_BUCKET_OPEN.getTime() + FIVE_MIN),
-      });
-      assert.equal(repaired.length, 1);
-      assert.equal(repaired[0].isClosed, true);
-      assert.equal(repaired[0].sourceProvider, 'kis_domestic_minute');
-      const due = await store.getDueReconcilePending(new Date(), 10);
-      assert.equal(
-        due.filter((entry) => entry.assetId === domesticAsset.id).length,
-        0,
-        'queue entry must be resolved',
-      );
-    });
+        // The next finalizer tick processes the due queue entry via fixture REST.
+        await finalizer.runOnce(new Date());
+        const repaired = await repository.findRange({
+          assetId: domesticAsset.id,
+          interval: '5m',
+          from: KIS_OLD_BUCKET_OPEN,
+          to: new Date(KIS_OLD_BUCKET_OPEN.getTime() + FIVE_MIN),
+        });
+        assert.equal(repaired.length, 1);
+        assert.equal(repaired[0].isClosed, true);
+        assert.equal(repaired[0].sourceProvider, 'kis_domestic_minute');
+        const due = await store.getDueReconcilePending(new Date(), 10);
+        assert.equal(
+          due.filter((entry) => entry.assetId === domesticAsset.id).length,
+          0,
+          'queue entry must be resolved',
+        );
+      },
+    );
 
     // REST reconciliation correction (drift → 0).
     await scenario('REST reconciliation corrects drift to zero', async () => {
@@ -1152,196 +1261,249 @@ async function main() {
         to,
         now: new Date(),
       });
-      assert.equal(second.correctedRows, 0, 'drift after reconciliation must be zero');
+      assert.equal(
+        second.correctedRows,
+        0,
+        'drift after reconciliation must be zero',
+      );
       assert.ok(second.unchangedRows >= 1);
       feedState.binanceMode = 'complete';
     });
 
     // failure fixtures around ownership/incomplete state.
-    await scenario('owner lease loss and provider disconnect keep buckets incomplete', async () => {
-      // lease loss: an event under a generation that no longer owns the lease.
-      const event = normalizer.normalizeBinance(
-        parseKlineForNormalizer({
-          symbol: providerSymbol,
-          openMs: BUCKET_OPEN.getTime() + FIVE_MIN,
-          close: '107',
-          final: false,
-        }),
-        cryptoAsset as never,
-        new Date(),
-      );
-      const lost = await store.applyEvent({
-        event,
-        ownerGeneration: 'gen-imposter',
-        ownerLeaseKey: binanceLease,
-      });
-      assert.equal(lost.status, 'owner_lost');
+    await scenario(
+      'owner lease loss and provider disconnect keep buckets incomplete',
+      async () => {
+        // lease loss: an event under a generation that no longer owns the lease.
+        const event = normalizer.normalizeBinance(
+          parseKlineForNormalizer({
+            symbol: providerSymbol,
+            openMs: BUCKET_OPEN.getTime() + FIVE_MIN,
+            close: '107',
+            final: false,
+          }),
+          cryptoAsset as never,
+          new Date(),
+        );
+        const lost = await store.applyEvent({
+          event,
+          ownerGeneration: 'gen-imposter',
+          ownerLeaseKey: binanceLease,
+        });
+        assert.equal(lost.status, 'owner_lost');
 
-      // provider disconnect: continuity loss marks active states incomplete.
-      const kisEventTime = new Date(BUCKET_OPEN.getTime() + FIVE_MIN + 30_000);
-      const kisEvent = normalizer.normalizeKis(
-        kisTradeTick({
-          symbol: domesticSymbol,
-          eventTime: kisEventTime,
-          price: '50200.00000000',
-          qty: '1.00000000',
-          cumVol: '200.00000000',
-        }),
-        domesticAsset as never,
-      );
-      pipeline.markProviderConnected({
-        provider: 'kis',
-        ownerGeneration: generation,
-        connectedAt: new Date(BUCKET_OPEN.getTime() + FIVE_MIN - 1),
-      });
-      feedState.domesticMode = 'empty'; // no REST baseline for the new bucket
-      const applied = await pipeline.process({
-        event: kisEvent,
-        ownerGeneration: generation,
-        ownerLeaseKey: kisLease,
-      });
-      assert.equal(applied.status, 'updated');
-      trackedRedisKeys.add(applied.stateKey);
-      await pipeline.markProviderContinuityLost({
-        provider: 'kis',
-        ownerGeneration: generation,
-        ownerLeaseKey: kisLease,
-      });
-      const state = await store.getByKey(applied.stateKey);
-      assert.equal(state?.complete, false, 'disconnect must mark the bucket incomplete');
-      // The finalizer must never close it from live state (defers to repair).
-      feedState.domesticMode = 'empty';
-      await finalizer.runOnce(new Date());
-      const closed = await repository.findRange({
-        assetId: domesticAsset.id,
-        interval: '5m',
-        from: new Date(BUCKET_OPEN.getTime() + FIVE_MIN),
-        to: new Date(BUCKET_OPEN.getTime() + 2 * FIVE_MIN),
-      });
-      assert.equal(
-        closed.filter((row) => row.isClosed && row.sourceProvider.includes('ws')).length,
-        0,
-        'incomplete bucket must never be stored closed from live state',
-      );
-      feedState.domesticMode = 'complete';
-      // Let the queued repair recover the bucket canonically.
-      await finalizer.runOnce(new Date(Date.now() + liveConfig.recoveryRetryMs + 100));
-    });
+        // provider disconnect: continuity loss marks active states incomplete.
+        const kisEventTime = new Date(
+          BUCKET_OPEN.getTime() + FIVE_MIN + 30_000,
+        );
+        const kisEvent = normalizer.normalizeKis(
+          kisTradeTick({
+            symbol: domesticSymbol,
+            eventTime: kisEventTime,
+            price: '50200.00000000',
+            qty: '1.00000000',
+            cumVol: '200.00000000',
+          }),
+          domesticAsset as never,
+        );
+        pipeline.markProviderConnected({
+          provider: 'kis',
+          ownerGeneration: generation,
+          connectedAt: new Date(BUCKET_OPEN.getTime() + FIVE_MIN - 1),
+        });
+        feedState.domesticMode = 'empty'; // no REST baseline for the new bucket
+        const applied = await pipeline.process({
+          event: kisEvent,
+          ownerGeneration: generation,
+          ownerLeaseKey: kisLease,
+        });
+        assert.equal(applied.status, 'updated');
+        trackedRedisKeys.add(applied.stateKey);
+        await pipeline.markProviderContinuityLost({
+          provider: 'kis',
+          ownerGeneration: generation,
+          ownerLeaseKey: kisLease,
+        });
+        const state = await store.getByKey(applied.stateKey);
+        assert.equal(
+          state?.complete,
+          false,
+          'disconnect must mark the bucket incomplete',
+        );
+        // The finalizer must never close it from live state (defers to repair).
+        feedState.domesticMode = 'empty';
+        await finalizer.runOnce(new Date());
+        const closed = await repository.findRange({
+          assetId: domesticAsset.id,
+          interval: '5m',
+          from: new Date(BUCKET_OPEN.getTime() + FIVE_MIN),
+          to: new Date(BUCKET_OPEN.getTime() + 2 * FIVE_MIN),
+        });
+        assert.equal(
+          closed.filter(
+            (row) => row.isClosed && row.sourceProvider.includes('ws'),
+          ).length,
+          0,
+          'incomplete bucket must never be stored closed from live state',
+        );
+        feedState.domesticMode = 'complete';
+        // Let the queued repair recover the bucket canonically.
+        await finalizer.runOnce(
+          new Date(Date.now() + liveConfig.recoveryRetryMs + 100),
+        );
+      },
+    );
 
-    await scenario('DB finalization failure preserves live state for retry', async () => {
-      const brokenRepository = {
-        upsertMany: async () => {
-          const error = new Error('connect ECONNREFUSED 127.0.0.1:5432');
-          error.name = 'PrismaClientInitializationError';
-          throw error;
-        },
-        findRange: async () => [],
-      };
-      const brokenFinalizer = new LiveCandleFinalizerService(
-        scopedStore,
-        brokenRepository as never,
-        cache,
-        redis,
-        locks,
-        publisher,
-        health,
-        liveConfig,
-        sync,
-      );
-      const event = normalizer.normalizeBinance(
-        parseKlineForNormalizer({
-          symbol: providerSymbol,
-          openMs: BUCKET_OPEN.getTime() + 2 * FIVE_MIN,
-          close: '108',
-          final: true,
-        }),
-        cryptoAsset as never,
-        new Date(),
-      );
-      const applied = await store.applyEvent({
-        event,
-        ownerGeneration: generation,
-        ownerLeaseKey: binanceLease,
-      });
-      assert.equal(applied.status, 'updated');
-      trackedRedisKeys.add(applied.stateKey);
-      const failuresBefore = health.snapshot().liveCandle.finalizeFailure;
-      await brokenFinalizer.runOnce(new Date());
-      assert.ok(health.snapshot().liveCandle.finalizeFailure > failuresBefore);
-      const state = await store.getByKey(applied.stateKey);
-      assert.equal(state?.finalized, false, 'state must survive a DB failure');
-      // The healthy finalizer commits it afterwards.
-      await finalizer.runOnce(new Date());
-      const closed = await repository.findRange({
-        assetId: cryptoAsset.id,
-        interval: '5m',
-        from: new Date(BUCKET_OPEN.getTime() + 2 * FIVE_MIN),
-        to: new Date(BUCKET_OPEN.getTime() + 3 * FIVE_MIN),
-      });
-      assert.equal(closed.length, 1);
-    });
+    await scenario(
+      'DB finalization failure preserves live state for retry',
+      async () => {
+        const brokenRepository = {
+          upsertMany: () => {
+            const error = new Error('connect ECONNREFUSED 127.0.0.1:5432');
+            error.name = 'PrismaClientInitializationError';
+            throw error;
+          },
+          findRange: () => Promise.resolve([]),
+        };
+        const brokenFinalizer = new LiveCandleFinalizerService(
+          scopedStore,
+          brokenRepository as never,
+          cache,
+          redis,
+          locks,
+          publisher,
+          health,
+          liveConfig,
+          sync,
+        );
+        const event = normalizer.normalizeBinance(
+          parseKlineForNormalizer({
+            symbol: providerSymbol,
+            openMs: BUCKET_OPEN.getTime() + 2 * FIVE_MIN,
+            close: '108',
+            final: true,
+          }),
+          cryptoAsset as never,
+          new Date(),
+        );
+        const applied = await store.applyEvent({
+          event,
+          ownerGeneration: generation,
+          ownerLeaseKey: binanceLease,
+        });
+        assert.equal(applied.status, 'updated');
+        trackedRedisKeys.add(applied.stateKey);
+        const failuresBefore = health.snapshot().liveCandle.finalizeFailure;
+        await brokenFinalizer.runOnce(new Date());
+        assert.ok(
+          health.snapshot().liveCandle.finalizeFailure > failuresBefore,
+        );
+        const state = await store.getByKey(applied.stateKey);
+        assert.equal(
+          state?.finalized,
+          false,
+          'state must survive a DB failure',
+        );
+        // The healthy finalizer commits it afterwards.
+        await finalizer.runOnce(new Date());
+        const closed = await repository.findRange({
+          assetId: cryptoAsset.id,
+          interval: '5m',
+          from: new Date(BUCKET_OPEN.getTime() + 2 * FIVE_MIN),
+          to: new Date(BUCKET_OPEN.getTime() + 3 * FIVE_MIN),
+        });
+        assert.equal(closed.length, 1);
+      },
+    );
 
-    await scenario('checkpoint conflict and cursor stall are surfaced, cursor never skips', async () => {
-      // cursor stall
-      feedState.binanceMode = 'cursor_stall';
-      const stalled = await sync.syncAsset({
-        assetId: cryptoAsset.id,
-        targets: ['5m'],
-        mode: MarketCandleSyncMode.repair,
-        from: new Date(CLOCK.getTime() - 2 * FIVE_MIN),
-        to: CLOCK,
-        resume: false,
-        now: CLOCK,
-      });
-      assert.equal(stalled.feeds[0].status, MarketCandleSyncStatus.failed);
-      assert.equal(stalled.feeds[0].coverageComplete, false);
-      feedState.binanceMode = 'complete';
-      // checkpoint conflict: progress on a non-running row is rejected.
-      const conflicted = await stateRepository.recordPageSuccess(
-        stalled.feeds[0].syncStateId as string,
-        {
-          cursorJson: null,
-          pagesFetched: 1,
-          providerRowsReceived: 0,
-          rowsAccepted: 0,
-          rowsRejected: 0,
-          rowsDuplicated: 0,
-          rowsWritten: 0,
-          lastSuccessfulPageAt: new Date(),
-          coveredFrom: null,
-          coveredTo: null,
-        },
-      );
-      assert.equal(conflicted, false);
-    });
+    await scenario(
+      'checkpoint conflict and cursor stall are surfaced, cursor never skips',
+      async () => {
+        // cursor stall
+        feedState.binanceMode = 'cursor_stall';
+        const stalled = await sync.syncAsset({
+          assetId: cryptoAsset.id,
+          targets: ['5m'],
+          mode: MarketCandleSyncMode.repair,
+          from: new Date(CLOCK.getTime() - 2 * FIVE_MIN),
+          to: CLOCK,
+          resume: false,
+          now: CLOCK,
+        });
+        assert.equal(stalled.feeds[0].status, MarketCandleSyncStatus.failed);
+        assert.equal(stalled.feeds[0].coverageComplete, false);
+        feedState.binanceMode = 'complete';
+        // checkpoint conflict: progress on a non-running row is rejected.
+        const conflicted = await stateRepository.recordPageSuccess(
+          stalled.feeds[0].syncStateId as string,
+          {
+            cursorJson: null,
+            pagesFetched: 1,
+            providerRowsReceived: 0,
+            rowsAccepted: 0,
+            rowsRejected: 0,
+            rowsDuplicated: 0,
+            rowsWritten: 0,
+            lastSuccessfulPageAt: new Date(),
+            coveredFrom: null,
+            coveredTo: null,
+          },
+        );
+        assert.equal(conflicted, false);
+      },
+    );
 
     // Pub/Sub disconnect/reconnect fixture.
-    await scenario('Pub/Sub subscriber survives a forced disconnect', async () => {
-      const pubsub = new LiveCandlePubSubService(liveConfig);
-      pubsub.onModuleInit();
-      await waitFor(async () => pubsub.getStatus() === 'connected', 5_000);
-      const client = (pubsub as never as { client: IORedis | null }).client;
-      assert.ok(client);
-      client.disconnect(true);
-      await waitFor(async () => pubsub.getStatus() === 'connected', 10_000);
-      await pubsub.onModuleDestroy();
-    });
+    await scenario(
+      'Pub/Sub subscriber survives a forced disconnect',
+      async () => {
+        const pubsub = new LiveCandlePubSubService(liveConfig);
+        pubsub.onModuleInit();
+        await waitFor(() => pubsub.getStatus() === 'connected', 5_000);
+        const client = (pubsub as never as { client: IORedis | null }).client;
+        assert.ok(client);
+        client.disconnect(true);
+        await waitFor(() => pubsub.getStatus() === 'connected', 10_000);
+        await pubsub.onModuleDestroy();
+      },
+    );
 
     // 27. holiday / early-close policy.
-    await scenario('holiday and early-close calendar policy', async () => {
-      assert.equal(resolveMarketSession('KRX', '20260717'), null, 'Constitution Day closed');
-      assert.equal(resolveMarketSession('KRX', '20260603'), null, 'election day closed');
-      assert.equal(resolveMarketSession('US', '20260703'), null, 'July 3 observed closed');
+    await scenario('holiday and early-close calendar policy', () => {
+      assert.equal(
+        resolveMarketSession('KRX', '20260717'),
+        null,
+        'Constitution Day closed',
+      );
+      assert.equal(
+        resolveMarketSession('KRX', '20260603'),
+        null,
+        'election day closed',
+      );
+      assert.equal(
+        resolveMarketSession('US', '20260703'),
+        null,
+        'July 3 observed closed',
+      );
       const earlyClose = resolveMarketSession('US', '20261127');
       assert.ok(earlyClose);
-      assert.equal(earlyClose.closeTime.toISOString(), '2026-11-27T18:00:00.000Z');
+      assert.equal(
+        earlyClose.closeTime.toISOString(),
+        '2026-11-27T18:00:00.000Z',
+      );
       assert.equal(earlyClose.earlyClose, true);
       // No bucket may extend past the early close boundary.
-      assert.ok(earlyClose.closeTime.getTime() < Date.parse('2026-11-27T21:00:00Z'));
+      assert.ok(
+        earlyClose.closeTime.getTime() < Date.parse('2026-11-27T21:00:00Z'),
+      );
       const csat = resolveMarketSession('KRX', '20261119');
       assert.ok(csat);
       assert.equal(csat.openTime.toISOString(), '2026-11-19T01:00:00.000Z');
-      assert.equal(resolveMarketSession('KRX', '20280104'), null, 'uncovered year fails safe');
+      assert.equal(
+        resolveMarketSession('KRX', '20280104'),
+        null,
+        'uncovered year fails safe',
+      );
     });
 
     // 28. retention target vs non-target.
@@ -1370,8 +1532,10 @@ async function main() {
     });
 
     // Global invariants.
-    await scenario('no incomplete closed candles and no duplicate canonical rows', async () => {
-      const dupes = await prisma.$queryRaw<{ count: bigint }[]>`
+    await scenario(
+      'no incomplete closed candles and no duplicate canonical rows',
+      async () => {
+        const dupes = await prisma.$queryRaw<{ count: bigint }[]>`
         SELECT COUNT(*) AS count FROM (
           SELECT asset_id, interval, open_time
           FROM market_candles
@@ -1379,79 +1543,85 @@ async function main() {
           GROUP BY asset_id, interval, open_time
           HAVING COUNT(*) > 1
         ) d`;
-      assert.equal(Number(dupes[0].count), 0, 'no duplicate canonical rows');
-      const closedRows = await prisma.marketCandle.findMany({
-        where: { assetId: { in: assetIds }, isClosed: true, interval: '5m' },
-        select: { openTime: true, closeTime: true, sourceProvider: true },
-      });
-      for (const row of closedRows) {
-        assert.ok(
-          row.closeTime.getTime() <= Date.now(),
-          'closed rows must have fully elapsed buckets',
-        );
-      }
-    });
+        assert.equal(Number(dupes[0].count), 0, 'no duplicate canonical rows');
+        const closedRows = await prisma.marketCandle.findMany({
+          where: { assetId: { in: assetIds }, isClosed: true, interval: '5m' },
+          select: { openTime: true, closeTime: true, sourceProvider: true },
+        });
+        for (const row of closedRows) {
+          assert.ok(
+            row.closeTime.getTime() <= Date.now(),
+            'closed rows must have fully elapsed buckets',
+          );
+        }
+      },
+    );
   } finally {
     // 29. cleanup: fixture rows + Redis keys, then verify nothing remains.
-    await scenario('fixture cleanup leaves no rows or keys behind', async () => {
-      await prisma.marketCandleSyncState.deleteMany({
-        where: { assetId: { in: assetIds } },
-      });
-      await prisma.marketCandle.deleteMany({
-        where: { assetId: { in: assetIds } },
-      });
-      await prisma.asset.deleteMany({ where: { id: { in: assetIds } } });
+    await scenario(
+      'fixture cleanup leaves no rows or keys behind',
+      async () => {
+        await prisma.marketCandleSyncState.deleteMany({
+          where: { assetId: { in: assetIds } },
+        });
+        await prisma.marketCandle.deleteMany({
+          where: { assetId: { in: assetIds } },
+        });
+        await prisma.asset.deleteMany({ where: { id: { in: assetIds } } });
 
-      // Remove every tracked live key plus index/queue membership and cache.
-      const raw = new IORedis(readRedisConfig().url as string);
-      try {
-        for (const assetId of assetIds) {
-          await cache.invalidateAsset(assetId).catch(() => undefined);
-          const patterns = [
-            `candles:data:v2:${assetId}:*`,
-            `candles:gen:v2:${assetId}*`,
-            `candles:live:v1:state:${encodeURIComponent(assetId)}:*`,
-            `candles:live:v1:dedupe:${encodeURIComponent(assetId)}:*`,
-            `candles:live:v1:current:${encodeURIComponent(assetId)}:*`,
-          ];
-          for (const pattern of patterns) {
-            const keys = await raw.keys(pattern);
-            if (keys.length > 0) await raw.del(...keys);
-            for (const key of keys) {
-              await raw.zrem(LIVE_CANDLE_ACTIVE_INDEX_KEY, key);
+        // Remove every tracked live key plus index/queue membership and cache.
+        const raw = new IORedis(readRedisConfig().url as string);
+        try {
+          for (const assetId of assetIds) {
+            await cache.invalidateAsset(assetId).catch(() => undefined);
+            const patterns = [
+              `candles:data:v2:${assetId}:*`,
+              `candles:gen:v2:${assetId}*`,
+              `candles:live:v1:state:${encodeURIComponent(assetId)}:*`,
+              `candles:live:v1:dedupe:${encodeURIComponent(assetId)}:*`,
+              `candles:live:v1:current:${encodeURIComponent(assetId)}:*`,
+            ];
+            for (const pattern of patterns) {
+              const keys = await raw.keys(pattern);
+              if (keys.length > 0) await raw.del(...keys);
+              for (const key of keys) {
+                await raw.zrem(LIVE_CANDLE_ACTIVE_INDEX_KEY, key);
+              }
+            }
+            const pending = await store.getDueReconcilePending(
+              new Date(Date.now() + DAY),
+              100,
+            );
+            for (const entry of pending) {
+              if (entry.assetId === assetId) {
+                await store.resolveReconcilePending(entry.member);
+              }
             }
           }
-          const pending = await store.getDueReconcilePending(
-            new Date(Date.now() + DAY),
-            100,
+          for (const key of trackedRedisKeys) {
+            await raw.del(key);
+            await raw.zrem(LIVE_CANDLE_ACTIVE_INDEX_KEY, key);
+          }
+
+          // Verify: zero fixture rows and zero fixture keys.
+          assert.equal(await countRows(), 0);
+          assert.equal(
+            await prisma.marketCandleSyncState.count({
+              where: { assetId: { in: assetIds } },
+            }),
+            0,
           );
-          for (const entry of pending) {
-            if (entry.assetId === assetId) {
-              await store.resolveReconcilePending(entry.member);
-            }
+          for (const assetId of assetIds) {
+            const leftovers = await raw.keys(
+              `*${encodeURIComponent(assetId)}*`,
+            );
+            assert.deepEqual(leftovers, [], `leftover keys for ${assetId}`);
           }
+        } finally {
+          await raw.quit();
         }
-        for (const key of trackedRedisKeys) {
-          await raw.del(key);
-          await raw.zrem(LIVE_CANDLE_ACTIVE_INDEX_KEY, key);
-        }
-
-        // Verify: zero fixture rows and zero fixture keys.
-        assert.equal(await countRows(), 0);
-        assert.equal(
-          await prisma.marketCandleSyncState.count({
-            where: { assetId: { in: assetIds } },
-          }),
-          0,
-        );
-        for (const assetId of assetIds) {
-          const leftovers = await raw.keys(`*${encodeURIComponent(assetId)}*`);
-          assert.deepEqual(leftovers, [], `leftover keys for ${assetId}`);
-        }
-      } finally {
-        await raw.quit();
-      }
-    });
+      },
+    );
 
     const finishedAt = new Date();
     // Cleanup accounting distinguishes "keys the smoke created/tracked" from
@@ -1639,7 +1809,7 @@ async function settle(): Promise<void> {
 }
 
 async function waitFor(
-  predicate: () => Promise<boolean>,
+  predicate: () => boolean | Promise<boolean>,
   timeoutMs: number,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;

@@ -120,7 +120,13 @@ describe('AssetCandlesService', () => {
     const kisQuoteClient = createKisQuoteClient();
     const binancePublicClient = createBinancePublicClient();
     const serving = {
-      serve: jest.fn((_asset, _query, legacyLoader) => legacyLoader()),
+      serve: jest.fn(
+        (
+          _asset: unknown,
+          _query: unknown,
+          legacyLoader: () => Promise<unknown>,
+        ) => legacyLoader(),
+      ),
     };
     const service = new AssetCandlesService(
       prisma as never,
@@ -1668,7 +1674,7 @@ describe('AssetCandlesService', () => {
               interval === '1w'
                 ? '30'
                 : String(Number.parseInt(interval, 10)),
-          }),
+          }) as unknown,
         }),
       );
     },
@@ -1724,8 +1730,7 @@ describe('AssetCandlesService', () => {
     expect(response).toMatchObject({
       success: false,
       error: {
-        message:
-          'interval must be one of 1m, 5m, 15m, 30m, 1h, 4h, 1d, or 1w.',
+        message: 'interval must be one of 1m, 5m, 15m, 30m, 1h, 4h, 1d, or 1w.',
       },
     });
   });

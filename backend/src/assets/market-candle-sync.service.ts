@@ -863,7 +863,10 @@ export class MarketCandleSyncService {
           // serving coverage. coveredTo is clamped to `now` by the page
           // fetchers, so a target range ending at/after `now` counts as
           // complete once everything that can exist so far was confirmed.
-          const requiredTo = Math.min(targetTo.getTime(), options.now.getTime());
+          const requiredTo = Math.min(
+            targetTo.getTime(),
+            options.now.getTime(),
+          );
           coverageComplete =
             coveredFrom !== null &&
             coveredTo !== null &&
@@ -977,7 +980,8 @@ export class MarketCandleSyncService {
       interval: input.feed as BinanceCandleInterval,
       from: input.from,
       to: input.to,
-      cursor: pageStartMs > input.from.getTime() ? { startTime: pageStartMs } : null,
+      cursor:
+        pageStartMs > input.from.getTime() ? { startTime: pageStartMs } : null,
       now: input.now,
     });
     // Coverage: every klines request is bounded by endTime=to-1, so a normal
@@ -999,7 +1003,11 @@ export class MarketCandleSyncService {
       coveredFrom = new Date(pageStartMs);
       coveredTo = new Date(clampMs);
     }
-    if (coveredFrom !== null && coveredTo !== null && coveredFrom >= coveredTo) {
+    if (
+      coveredFrom !== null &&
+      coveredTo !== null &&
+      coveredFrom >= coveredTo
+    ) {
       coveredFrom = null;
       coveredTo = null;
     }
@@ -1133,8 +1141,7 @@ export class MarketCandleSyncService {
         nextCursor: null,
         stopReason: 'target_reached',
         complete: true,
-        coveredFrom:
-          coveredToMs > input.from.getTime() ? input.from : null,
+        coveredFrom: coveredToMs > input.from.getTime() ? input.from : null,
         coveredTo:
           coveredToMs > input.from.getTime() ? new Date(coveredToMs) : null,
       };
@@ -1439,7 +1446,9 @@ export class MarketCandleSyncService {
   ): number | undefined {
     if (value === undefined) return undefined;
     if (!Number.isSafeInteger(value) || value <= 0) {
-      throw new MarketCandleSyncInputError(`${label} must be a positive integer.`);
+      throw new MarketCandleSyncInputError(
+        `${label} must be a positive integer.`,
+      );
     }
     return value;
   }

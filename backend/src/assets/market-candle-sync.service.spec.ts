@@ -27,6 +27,9 @@ jest.mock('../generated/prisma/client', () => {
 });
 
 import { MarketCandleSyncService } from './market-candle-sync.service';
+import { MarketCandleIngestionService } from './market-candle-ingestion.service';
+import { KisCandleNormalizerService } from '../providers/kis/candles/kis-candle-normalizer.service';
+import { KisDomesticFiveMinuteBuilder } from '../providers/kis/candles/kis-domestic-five-minute.builder';
 import { KisPeriodCandleNormalizerService } from '../providers/kis/candles/kis-period-candle-normalizer.service';
 import { MarketCandleSyncInputError } from './market-candle-sync.types';
 import type { MarketCandleSyncConfig } from './market-candle-sync.config';
@@ -81,7 +84,7 @@ class FakeStateRepository {
   rows: StateRow[] = [];
   private sequence = 0;
 
-  async createRunning(input: {
+  createRunning(input: {
     assetId: string;
     feed: string;
     sourceProvider: string;
@@ -111,10 +114,10 @@ class FakeStateRepository {
       createdAt: new Date(Date.now() + this.sequence),
     };
     this.rows.push(row);
-    return { ...row };
+    return Promise.resolve({ ...row });
   }
 
-  async findResumable(assetId: string, feed: string): Promise<StateRow | null> {
+  findResumable(assetId: string, feed: string): Promise<StateRow | null> {
     const candidates = this.rows
       .filter(
         (row) =>
@@ -126,30 +129,30 @@ class FakeStateRepository {
       .sort(
         (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
       );
-    return candidates[0] ? { ...candidates[0] } : null;
+    return Promise.resolve(candidates[0] ? { ...candidates[0] } : null);
   }
 
-  async findById(id: string): Promise<StateRow | null> {
+  findById(id: string): Promise<StateRow | null> {
     const row = this.rows.find((candidate) => candidate.id === id);
-    return row ? { ...row } : null;
+    return Promise.resolve(row ? { ...row } : null);
   }
 
-  async resumeRun(id: string): Promise<StateRow | null> {
+  resumeRun(id: string): Promise<StateRow | null> {
     const row = this.rows.find((candidate) => candidate.id === id);
     if (
       !row ||
       !['pending', 'running', 'failed', 'canceled'].includes(row.status)
     ) {
-      return null;
+      return Promise.resolve(null);
     }
     row.status = 'running';
     row.errorCode = null;
     row.errorMessage = null;
     row.completedAt = null;
-    return { ...row };
+    return Promise.resolve({ ...row });
   }
 
-  async recordPageSuccess(
+  recordPageSuccess(
     id: string,
     progress: {
       cursorJson: Record<string, unknown> | null;
@@ -165,7 +168,7 @@ class FakeStateRepository {
     },
   ): Promise<boolean> {
     const row = this.rows.find((candidate) => candidate.id === id);
-    if (!row || row.status !== 'running') return false;
+    if (!row || row.status !== 'running') return Promise.resolve(false);
     row.cursorJson = progress.cursorJson;
     row.pagesFetched += progress.pagesFetched;
     row.providerRowsReceived += progress.providerRowsReceived;
@@ -176,7 +179,7 @@ class FakeStateRepository {
     row.lastSuccessfulPageAt = progress.lastSuccessfulPageAt;
     row.coveredFrom = progress.coveredFrom;
     row.coveredTo = progress.coveredTo;
-    return true;
+    return Promise.resolve(true);
   }
 
   completionInputs: {
@@ -188,7 +191,7 @@ class FakeStateRepository {
 
   // Mirrors MarketCandleSyncStateRepository.markCompleted's invariant so the
   // service tests fail loudly on any claim the real repository would reject.
-  async markCompleted(
+  markCompleted(
     id: string,
     completedAt: Date,
     coverage: {
@@ -200,7 +203,7 @@ class FakeStateRepository {
     },
   ): Promise<boolean> {
     const row = this.rows.find((candidate) => candidate.id === id);
-    if (!row || row.status !== 'running') return false;
+    if (!row || row.status !== 'running') return Promise.resolve(false);
     this.completionInputs.push({
       id,
       coverageComplete: coverage.coverageComplete,
@@ -252,34 +255,38 @@ class FakeStateRepository {
     row.completionReason = coverage.completionReason;
     row.coveredFrom = coverage.coveredFrom;
     row.coveredTo = coverage.coveredTo;
-    return true;
+    return Promise.resolve(true);
   }
 
-  async markFailed(
+  markFailed(
     id: string,
     failure: { errorCode: string; errorMessage: string | null },
   ): Promise<boolean> {
     const row = this.rows.find((candidate) => candidate.id === id);
-    if (!row || !['running', 'pending'].includes(row.status)) return false;
+    if (!row || !['running', 'pending'].includes(row.status)) {
+      return Promise.resolve(false);
+    }
     row.status = 'failed';
     row.errorCode = failure.errorCode;
     row.errorMessage = failure.errorMessage;
-    return true;
+    return Promise.resolve(true);
   }
 
-  async markCanceled(
+  markCanceled(
     id: string,
     reason: { errorCode: string; errorMessage: string | null },
   ): Promise<boolean> {
     const row = this.rows.find((candidate) => candidate.id === id);
-    if (!row || !['running', 'pending'].includes(row.status)) return false;
+    if (!row || !['running', 'pending'].includes(row.status)) {
+      return Promise.resolve(false);
+    }
     row.status = 'canceled';
     row.errorCode = reason.errorCode;
     row.errorMessage = reason.errorMessage;
-    return true;
+    return Promise.resolve(true);
   }
 
-  async cancelActiveRuns(
+  cancelActiveRuns(
     assetId: string,
     feed: string,
     reason: string,
@@ -297,7 +304,7 @@ class FakeStateRepository {
         count += 1;
       }
     }
-    return count;
+    return Promise.resolve(count);
   }
 }
 
@@ -330,11 +337,38 @@ function syntheticCandle(openMs: number) {
   };
 }
 
+// Typed accessor for jest mock call arguments: jest.fn() exposes `any`
+// call tuples, so reads go through unknown before asserting the shape the
+// test actually inspects.
+// Result union for the fake backfill-lock service: tests override
+// mockResolvedValue with the not-acquired branch.
+type FakeLockAcquireResult =
+  | {
+      acquired: true;
+      handle: {
+        assetId: string;
+        feed: string;
+        lock: { key: string; token: string; ttlMs: number };
+        ttlMs: number;
+        renewIntervalMs: number;
+        lastRenewedAtMs: number;
+      };
+    }
+  | { acquired: false; reason: string };
+
+const callArg = <T>(fn: jest.Mock, callIndex = 0): T => {
+  const calls = fn.mock.calls as unknown[][];
+  return calls[callIndex][0] as T;
+};
+
 describe('MarketCandleSyncService', () => {
   const createHarness = (
     input: {
       assets?: unknown[];
       config?: Partial<MarketCandleSyncConfig>;
+      // Full-flow tests inject a REAL MarketCandleIngestionService (fed by a
+      // fake adapter) instead of the default jest-mocked ingestion facade.
+      fiveMinuteIngestion?: MarketCandleIngestionService;
     } = {},
   ) => {
     const assets = input.assets ?? [CRYPTO_ASSET];
@@ -352,34 +386,44 @@ describe('MarketCandleSyncService', () => {
     };
     const upserted: unknown[][] = [];
     const repository = {
-      upsertMany: jest.fn(async (rows: unknown[]) => {
+      upsertMany: jest.fn((rows: unknown[]) => {
         upserted.push(rows);
-        return { writtenCount: rows.length };
+        return Promise.resolve({ writtenCount: rows.length });
       }),
       findLatest: jest.fn().mockResolvedValue(null),
     };
     const stateRepository = new FakeStateRepository();
     const lockEvents: string[] = [];
     const lockService = {
-      acquire: jest.fn(async ({ assetId, feed }) => {
-        lockEvents.push(`acquire:${assetId}:${feed}`);
-        return {
-          acquired: true,
-          handle: {
-            assetId,
-            feed,
-            lock: { key: 'k', token: 't', ttlMs: 1 },
-            ttlMs: 1,
-            renewIntervalMs: 1,
-            lastRenewedAtMs: 0,
-          },
-        };
-      }),
+      acquire: jest.fn(
+        ({
+          assetId,
+          feed,
+        }: {
+          assetId: string;
+          feed: string;
+        }): Promise<FakeLockAcquireResult> => {
+          lockEvents.push(`acquire:${assetId}:${feed}`);
+          return Promise.resolve({
+            acquired: true,
+            handle: {
+              assetId,
+              feed,
+              lock: { key: 'k', token: 't', ttlMs: 1 },
+              ttlMs: 1,
+              renewIntervalMs: 1,
+              lastRenewedAtMs: 0,
+            },
+          });
+        },
+      ),
       renewIfDue: jest.fn().mockResolvedValue(true),
-      release: jest.fn(async ({ assetId, feed }) => {
-        lockEvents.push(`release:${assetId}:${feed}`);
-        return true;
-      }),
+      release: jest.fn(
+        ({ assetId, feed }: { assetId: string; feed: string }) => {
+          lockEvents.push(`release:${assetId}:${feed}`);
+          return Promise.resolve(true);
+        },
+      ),
     };
     const fiveMinuteIngestion = {
       fetchDomesticFiveMinuteCandles: jest.fn(),
@@ -399,14 +443,16 @@ describe('MarketCandleSyncService', () => {
       ...input.config,
     };
     const cache = {
-      invalidateAsset: jest.fn().mockResolvedValue({ status: 'invalidated', generation: 1 }),
+      invalidateAsset: jest
+        .fn()
+        .mockResolvedValue({ status: 'invalidated', generation: 1 }),
     };
     const service = new MarketCandleSyncService(
       prisma as never,
       repository as never,
       stateRepository as never,
       lockService as never,
-      fiveMinuteIngestion as never,
+      (input.fiveMinuteIngestion ?? fiveMinuteIngestion) as never,
       domesticPeriodAdapter as never,
       overseasPeriodAdapter as never,
       new KisPeriodCandleNormalizerService(),
@@ -473,7 +519,8 @@ describe('MarketCandleSyncService', () => {
     expect(harness.repository.upsertMany).toHaveBeenCalledTimes(2);
     // The second provider call received the cursor persisted after page one.
     expect(
-      harness.binanceCandles.fetchKlinesPage.mock.calls[1][0].cursor,
+      callArg<{ cursor: unknown }>(harness.binanceCandles.fetchKlinesPage, 1)
+        .cursor,
     ).toEqual({ startTime: start + 2 * FIVE_MIN });
     const row = harness.stateRepository.rows[0];
     expect(row.status).toBe('completed');
@@ -577,7 +624,10 @@ describe('MarketCandleSyncService', () => {
     });
     expect(resumed.feeds[0].resumed).toBe(true);
     expect(resumed.feeds[0].status).toBe('completed');
-    const resumeCall = harness.binanceCandles.fetchKlinesPage.mock.calls[2][0];
+    const resumeCall = callArg<{ cursor: unknown; from: Date; to: Date }>(
+      harness.binanceCandles.fetchKlinesPage,
+      2,
+    );
     expect(resumeCall.cursor).toEqual({ startTime: start + FIVE_MIN });
     // The resumed run keeps ITS stored target range, not a recomputed one.
     expect(resumeCall.from.getTime()).toBe(start);
@@ -695,7 +745,9 @@ describe('MarketCandleSyncService', () => {
       targets: ['5m'],
       now: NOW,
     });
-    const call = harness.binanceCandles.fetchKlinesPage.mock.calls[0][0];
+    const call = callArg<{ from: Date; to: Date }>(
+      harness.binanceCandles.fetchKlinesPage,
+    );
     // overlap = max(120min, 2*5m) = 120 minutes.
     expect(call.from.getTime()).toBe(latestOpen.getTime() - 120 * 60_000);
     expect(call.to.getTime()).toBe(NOW.getTime());
@@ -786,8 +838,10 @@ describe('MarketCandleSyncService', () => {
     expect(feed.provider).toBe('kis_domestic_period');
     expect(feed.acceptedRows).toBe(3);
     // Page 2 was requested with the cursor one day before page 1's oldest.
-    const secondCall =
-      harness.domesticPeriodAdapter.fetchPeriodPage.mock.calls[1][0];
+    const secondCall = callArg<{ endDate: string; fromDate: string }>(
+      harness.domesticPeriodAdapter.fetchPeriodPage,
+      1,
+    );
     expect(secondCall.endDate).toBe('20260708');
     expect(secondCall.fromDate).toBe('20260708');
     const writtenRows = harness.upserted.flat() as {
@@ -883,10 +937,13 @@ describe('MarketCandleSyncService', () => {
       to.getTime(),
     );
     // 5 days at 2-day segments: [d3,d5), [d1,d3), [d0,d1) — newest first.
-    const calls =
-      harness.fiveMinuteIngestion.fetchDomesticFiveMinuteCandles.mock.calls.map(
-        (call) => [call[0].from.toISOString(), call[0].to.toISOString()],
-      );
+    const calls = (
+      harness.fiveMinuteIngestion.fetchDomesticFiveMinuteCandles.mock
+        .calls as unknown[][]
+    ).map((call) => {
+      const input = call[0] as { from: Date; to: Date };
+      return [input.from.toISOString(), input.to.toISOString()];
+    });
     expect(calls).toEqual([
       ['2026-07-08T00:00:00.000Z', '2026-07-10T00:00:00.000Z'],
       ['2026-07-06T00:00:00.000Z', '2026-07-08T00:00:00.000Z'],
@@ -1446,6 +1503,130 @@ describe('MarketCandleSyncService', () => {
       const row = harness.stateRepository.rows[0];
       expect(row.coveredFrom?.getTime()).toBe(to.getTime() - 2 * DAY);
       expect(row.coveredTo?.getTime()).toBe(to.getTime());
+    });
+
+    describe('US full flow: adapter → normalizer → ingestion → sync (no mocked complete)', () => {
+      const US_ASSET = {
+        id: 'us-flow-1',
+        symbol: 'AAPL',
+        market: 'NASDAQ',
+        assetType: 'us_stock',
+        isActive: true,
+      };
+      // 2026-07-09 is an ordinary US trading day (Thursday, EDT): the
+      // regular session is 13:30–20:00 UTC.
+      const usRaw = (
+        time: string,
+        overrides: Record<string, unknown> = {},
+        sequence = 0,
+      ) => ({
+        value: {
+          xymd: '20260709',
+          xhms: time,
+          open: '100',
+          high: '102',
+          low: '99',
+          last: '101',
+          evol: '10',
+          eamt: '1000',
+          ...overrides,
+        },
+        receivedAt: new Date('2026-07-09T20:10:00Z'),
+        sequence,
+      });
+      const createFullFlowHarness = () => {
+        const usAdapter = { fetchUsFiveMinuteRows: jest.fn() };
+        const realIngestion = new MarketCandleIngestionService(
+          { fetchDomesticOneMinuteRows: jest.fn() } as never,
+          usAdapter as never,
+          new KisCandleNormalizerService(),
+          new KisDomesticFiveMinuteBuilder(),
+          { upsertMany: jest.fn() } as never,
+          { invalidateAsset: jest.fn() } as never,
+        );
+        const harness = createHarness({
+          assets: [US_ASSET],
+          fiveMinuteIngestion: realIngestion,
+        });
+        return { ...harness, usAdapter };
+      };
+      const adapterResult = (rows: ReturnType<typeof usRaw>[]) => ({
+        pagesFetched: 1,
+        providerReturnedRows: rows.length,
+        rows,
+        duplicateRows: 0,
+        complete: true,
+        stopReason: 'target_reached',
+        oldestOpenTime: new Date('2026-07-09T13:30:00Z'),
+        latestOpenTime: new Date('2026-07-09T13:40:00Z'),
+      });
+
+      it('turns a regular-session strict-validation failure into data_incomplete with no coverage claim', async () => {
+        const { service, stateRepository, repository, usAdapter } =
+          createFullFlowHarness();
+        usAdapter.fetchUsFiveMinuteRows.mockResolvedValue(
+          adapterResult([
+            usRaw('093000'),
+            // Malformed OHLC inside the regular session: high < low.
+            usRaw('093500', { high: '90' }, 1),
+          ]),
+        );
+        const result = await service.syncAsset({
+          assetId: US_ASSET.id,
+          targets: ['5m'],
+          mode: 'repair' as never,
+          from: new Date('2026-07-09T13:30:00Z'),
+          to: new Date('2026-07-09T13:40:00Z'),
+          now: NOW,
+        });
+        const feed = result.feeds[0];
+        expect(feed.status).toBe('completed');
+        expect(feed.complete).toBe(false);
+        expect(feed.coverageComplete).toBe(false);
+        expect(feed.completionReason).toBe('data_incomplete');
+        // The surviving valid candle is still persisted...
+        expect(repository.upsertMany).toHaveBeenCalledTimes(1);
+        expect(feed.writtenRows).toBe(1);
+        // ...but the checkpoint claims no covered range at all.
+        const row = stateRepository.rows[0];
+        expect(row.coverageComplete).toBe(false);
+        expect(row.completionReason).toBe('data_incomplete');
+        expect(row.coveredFrom).toBeNull();
+        expect(row.coveredTo).toBeNull();
+      });
+
+      it('keeps full coverage when only benign out-of-session rows are excluded', async () => {
+        const { service, stateRepository, usAdapter } = createFullFlowHarness();
+        const from = new Date('2026-07-09T13:00:00Z'); // 09:00 ET, pre-market
+        const to = new Date('2026-07-09T13:40:00Z');
+        usAdapter.fetchUsFiveMinuteRows.mockResolvedValue({
+          ...adapterResult([
+            // In-range but pre-market: benign exclusion via the calendar.
+            usRaw('090000'),
+            usRaw('093000', {}, 1),
+            usRaw('093500', {}, 2),
+          ]),
+          oldestOpenTime: from,
+        });
+        const result = await service.syncAsset({
+          assetId: US_ASSET.id,
+          targets: ['5m'],
+          mode: 'repair' as never,
+          from,
+          to,
+          now: NOW,
+        });
+        const feed = result.feeds[0];
+        expect(feed.status).toBe('completed');
+        expect(feed.complete).toBe(true);
+        expect(feed.coverageComplete).toBe(true);
+        expect(feed.completionReason).toBe('target_reached');
+        expect(feed.acceptedRows).toBe(2);
+        const row = stateRepository.rows[0];
+        expect(row.coverageComplete).toBe(true);
+        expect(row.coveredFrom?.getTime()).toBe(from.getTime());
+        expect(row.coveredTo?.getTime()).toBe(to.getTime());
+      });
     });
 
     it('claims no row-derived partial coverage at a retention edge when buckets are incomplete', async () => {

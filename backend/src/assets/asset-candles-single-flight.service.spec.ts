@@ -34,18 +34,20 @@ describe('AssetCandlesSingleFlightService', () => {
       .mockResolvedValue({ status: 'stored' });
     const cache = {
       isEnabled: jest.fn(() => options.enabled ?? true),
-      resolveContext: jest.fn(async (input: CandleCacheKeyInput) =>
-        options.enabled === false
-          ? { status: 'disabled' }
-          : {
-              status: 'resolved',
-              context: {
-                input,
-                generation: options.generation?.() ?? 0,
-                generationKey: `gen:${input.assetId}`,
-                dataKey: `data:${input.assetId}:g${options.generation?.() ?? 0}`,
+      resolveContext: jest.fn((input: CandleCacheKeyInput) =>
+        Promise.resolve(
+          options.enabled === false
+            ? { status: 'disabled' }
+            : {
+                status: 'resolved',
+                context: {
+                  input,
+                  generation: options.generation?.() ?? 0,
+                  generationKey: `gen:${input.assetId}`,
+                  dataKey: `data:${input.assetId}:g${options.generation?.() ?? 0}`,
+                },
               },
-            },
+        ),
       ),
       getWithContext,
       get: getWithContext,
@@ -137,7 +139,10 @@ describe('AssetCandlesSingleFlightService', () => {
     const { cache, service } = create();
     cache.set.mockResolvedValueOnce({ status: 'error' });
     await expect(
-      service.getOrLoad({ cacheKeyInput: key, loader: async () => response }),
+      service.getOrLoad({
+        cacheKeyInput: key,
+        loader: () => Promise.resolve(response),
+      }),
     ).resolves.toBe(response);
   });
 
@@ -180,7 +185,9 @@ describe('AssetCandlesSingleFlightService', () => {
   });
 
   it('polls a remote owner and returns the populated cache value', async () => {
-    const { cache, locks, service } = create({ sleep: async () => undefined });
+    const { cache, locks, service } = create({
+      sleep: () => Promise.resolve(undefined),
+    });
     locks.acquire.mockResolvedValueOnce({ status: 'busy' });
     cache.get
       .mockResolvedValueOnce({ status: 'miss' })
@@ -196,8 +203,9 @@ describe('AssetCandlesSingleFlightService', () => {
     let now = 0;
     const { locks, service } = create({
       now: () => now,
-      sleep: async (ms) => {
+      sleep: (ms) => {
         now += ms;
+        return Promise.resolve();
       },
     });
     locks.acquire.mockResolvedValue({ status: 'busy' });
@@ -211,8 +219,9 @@ describe('AssetCandlesSingleFlightService', () => {
     let now = 0;
     const { cache, locks, service } = create({
       now: () => now,
-      sleep: async (ms) => {
+      sleep: (ms) => {
         now += ms;
+        return Promise.resolve();
       },
     });
     cache.get.mockResolvedValue({ status: 'stale', value: response });
@@ -250,13 +259,15 @@ describe('AssetCandlesSingleFlightService', () => {
     let generation = 0;
     const stored: number[] = [];
     const { cache, service } = create({ generation: () => generation });
-    cache.setIfOwnerAndGeneration.mockImplementation(async (context) => {
-      if (context.generation !== generation) {
-        return { status: 'skipped_generation_changed' };
-      }
-      stored.push(context.generation);
-      return { status: 'stored' };
-    });
+    cache.setIfOwnerAndGeneration.mockImplementation(
+      (context: { generation: number }) => {
+        if (context.generation !== generation) {
+          return Promise.resolve({ status: 'skipped_generation_changed' });
+        }
+        stored.push(context.generation);
+        return Promise.resolve({ status: 'stored' });
+      },
+    );
     let resolveOld!: (value: AssetCandlesResponse) => void;
     const oldLoader = jest.fn(
       () =>
@@ -330,7 +341,9 @@ describe('AssetCandlesSingleFlightService', () => {
   });
 
   it('takes over on the first polling cycle after a remote owner releases', async () => {
-    const { locks, service } = create({ sleep: async () => undefined });
+    const { locks, service } = create({
+      sleep: () => Promise.resolve(undefined),
+    });
     locks.acquire
       .mockResolvedValueOnce({ status: 'busy' })
       .mockResolvedValueOnce({

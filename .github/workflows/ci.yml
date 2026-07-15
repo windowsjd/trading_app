@@ -1,0 +1,150 @@
+# CI quality gates. Runs on every PR and on main pushes.
+#
+# Scope notes:
+# - The candle layer (backend/src/assets candle files, providers/kis/candles,
+#   candle-related providers/binance files, realtime live-candle files, and
+#   the candle smoke scripts) is a REQUIRED lint/format gate
+#   (lint:candles:check / format:candles:check). The rest of the repository
+#   has known pre-existing lint debt and is deliberately not gated yet.
+# - Long real-provider smokes (Binance/KIS WebSocket+REST) are NEVER run in
+#   CI; they are a manual runbook step (see
+#   backend/docs/candle-live-operations.md). Only the fixture smoke — real
+#   PostgreSQL + Redis with in-process fixture providers, no provider
+#   credentials — runs here.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-quality:
+    name: Backend quality
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pnpm
+        run: npm install -g pnpm@10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: backend/pnpm-lock.yaml
+      - name: Install dependencies (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+      - name: Prisma generate
+        run: pnpm exec prisma generate
+      - name: Candle-layer lint (check only, no fix)
+        run: pnpm run lint:candles:check
+      - name: Candle-layer format check
+        run: pnpm run format:candles:check
+      - name: Production typecheck
+        run: pnpm run typecheck
+      - name: Build
+        run: pnpm run build
+      - name: Unit tests
+        run: pnpm test
+
+  frontend-quality:
+    name: Frontend quality
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies (frozen lockfile)
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      # The Expo app defines no build script; `tsc --noEmit` is its compile
+      # gate. No placeholder build command is fabricated here.
+      - name: Tests (node --test, Node 24 type stripping)
+        run: npm test
+
+  candle-fixture-integration:
+    name: Candle fixture integration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: trading_app
+          POSTGRES_PASSWORD: trading_app_pw
+          POSTGRES_DB: trading_app
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U trading_app"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/trading_app?schema=public
+      REDIS_URL: redis://localhost:6379
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pnpm
+        run: npm install -g pnpm@10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: backend/pnpm-lock.yaml
+      - name: Install dependencies (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+      - name: Prisma generate
+        run: pnpm exec prisma generate
+      - name: Apply migrations
+        run: pnpm exec prisma migrate deploy
+      - name: Run release fixture smoke (no provider credentials)
+        run: CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm run smoke:candle-fixture
+      - name: Verify artifact commit traceability
+        run: |
+          shopt -s nullglob
+          files=(artifacts/candle-smoke/fixture-*.json)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "no fixture artifact produced" >&2
+            exit 1
+          fi
+          latest=$(ls -1t artifacts/candle-smoke/fixture-*.json | head -1)
+          echo "verifying $latest"
+          jq -e --arg sha "$GITHUB_SHA" \
+            '.gitCommit == $sha and .gitDirty == false and .result == "passed"' \
+            "$latest"
+      - name: Upload smoke artifacts (kept on failure too)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: candle-fixture-smoke
+          path: backend/artifacts/candle-smoke/
+          if-no-files-found: ignore

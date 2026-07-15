@@ -692,13 +692,14 @@ export class LiveCandleStreamSupervisorService
   private sleep(ms: number): Promise<void> {
     if (this.stopping) return Promise.resolve();
     return new Promise((resolve) => {
-      let timer: NodeJS.Timeout;
+      // `finish` only runs asynchronously (timer callback or an external
+      // wake), so it always observes the initialized timer below.
       const finish = () => {
         clearTimeout(timer);
         this.waiters.delete(finish);
         resolve();
       };
-      timer = setTimeout(finish, ms);
+      const timer = setTimeout(finish, ms);
       timer.unref?.();
       this.waiters.add(finish);
     });
