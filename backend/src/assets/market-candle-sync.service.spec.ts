@@ -872,6 +872,16 @@ describe('MarketCandleSyncService', () => {
     });
     expect(result.feeds[0].status).toBe('completed');
     expect(result.feeds[0].complete).toBe(true);
+    // Every segment reported complete=true, so the whole target range is
+    // provider-confirmed AND data-complete: only then is coverage complete.
+    expect(result.feeds[0].coverageComplete).toBe(true);
+    expect(result.feeds[0].completionReason).toBe('target_reached');
+    expect(harness.stateRepository.rows[0].coveredFrom?.getTime()).toBe(
+      from.getTime(),
+    );
+    expect(harness.stateRepository.rows[0].coveredTo?.getTime()).toBe(
+      to.getTime(),
+    );
     // 5 days at 2-day segments: [d3,d5), [d1,d3), [d0,d1) — newest first.
     const calls =
       harness.fiveMinuteIngestion.fetchDomesticFiveMinuteCandles.mock.calls.map(
@@ -1275,6 +1285,213 @@ describe('MarketCandleSyncService', () => {
       expect(row.coverageComplete).toBe(true);
       expect(row.coveredFrom?.getTime()).toBe(start);
       expect(row.coveredTo?.getTime()).toBe(NOW.getTime());
+    });
+
+    it('never promotes a domestic target_reached sweep with incomplete data to coverage-complete', async () => {
+      // Regression: fetchDomesticFiveMinuteCandles reports complete=false
+      // (incomplete 5m buckets survived strict validation) even though the
+      // provider sweep itself reached the segment target. The stored data
+      // has holes, so the checkpoint must NOT become serving coverage.
+      const harness = createHarness({ assets: [DOMESTIC_ASSET] });
+      const to = new Date('2026-07-10T00:00:00Z');
+      const from = new Date(to.getTime() - DAY); // single 2-day segment
+      harness.fiveMinuteIngestion.fetchDomesticFiveMinuteCandles.mockResolvedValue(
+        {
+          provider: 'kis_domestic_minute',
+          assetId: DOMESTIC_ASSET.id,
+          rangeFrom: from,
+          rangeTo: to,
+          pagesFetched: 2,
+          providerReturnedRows: 40,
+          acceptedRows: 35,
+          rejectedRows: 5,
+          duplicateRows: 0,
+          candles: [
+            syntheticCandle(from.getTime()),
+            syntheticCandle(from.getTime() + FIVE_MIN),
+          ],
+          complete: false,
+          stopReason: 'target_reached',
+          oldestOpenTime: from,
+          latestOpenTime: new Date(from.getTime() + FIVE_MIN),
+          completeBuckets: 2,
+          incompleteBuckets: 1,
+          rejectedBuckets: 0,
+        },
+      );
+      const result = await harness.service.syncAsset({
+        assetId: DOMESTIC_ASSET.id,
+        targets: ['5m'],
+        mode: 'repair' as never,
+        from,
+        to,
+        now: NOW,
+      });
+      const feed = result.feeds[0];
+      expect(feed.status).toBe('completed');
+      expect(feed.coverageComplete).toBe(false);
+      expect(feed.complete).toBe(false);
+      expect(feed.completionReason).not.toBe('target_reached');
+      expect(feed.completionReason).not.toBe('confirmed_empty');
+      // Partial candles are still written...
+      expect(harness.repository.upsertMany).toHaveBeenCalledTimes(1);
+      // ...but the checkpoint claims no covered range and cannot satisfy a
+      // findCompletedCovering-style serving query.
+      const row = harness.stateRepository.rows[0];
+      expect(row.coverageComplete).toBe(false);
+      expect(row.coveredFrom).toBeNull();
+      expect(row.coveredTo).toBeNull();
+      expect(row.completionReason).not.toBe('target_reached');
+    });
+
+    it('never promotes a US target_reached sweep with incomplete data to coverage-complete', async () => {
+      const usAsset = {
+        id: 'us-1',
+        symbol: 'AAPL',
+        market: 'NASDAQ',
+        assetType: 'us_stock',
+        isActive: true,
+      };
+      const harness = createHarness({ assets: [usAsset] });
+      const to = new Date('2026-07-10T00:00:00Z');
+      const from = new Date(to.getTime() - 30 * DAY); // single 40-day segment
+      harness.fiveMinuteIngestion.fetchUsFiveMinuteCandles.mockResolvedValue({
+        provider: 'kis_us_minute',
+        assetId: usAsset.id,
+        rangeFrom: from,
+        rangeTo: to,
+        pagesFetched: 3,
+        providerReturnedRows: 50,
+        acceptedRows: 20,
+        rejectedRows: 30,
+        duplicateRows: 0,
+        candles: [syntheticCandle(from.getTime())],
+        complete: false,
+        stopReason: 'target_reached',
+        oldestOpenTime: from,
+        latestOpenTime: from,
+      });
+      const result = await harness.service.syncAsset({
+        assetId: usAsset.id,
+        targets: ['5m'],
+        mode: 'repair' as never,
+        from,
+        to,
+        now: NOW,
+      });
+      const feed = result.feeds[0];
+      expect(feed.status).toBe('completed');
+      expect(feed.coverageComplete).toBe(false);
+      expect(feed.complete).toBe(false);
+      expect(feed.completionReason).not.toBe('target_reached');
+      const row = harness.stateRepository.rows[0];
+      expect(row.coverageComplete).toBe(false);
+      expect(row.coveredFrom).toBeNull();
+      expect(row.coveredTo).toBeNull();
+    });
+
+    it('terminates on an incomplete middle segment without bridging the hole via min/max merge', async () => {
+      // Segments sweep newest-first. If the run continued past an
+      // incomplete segment, the next (older) segment's coverage would merge
+      // with the newer coverage by min/max and silently bridge the hole.
+      const harness = createHarness({ assets: [DOMESTIC_ASSET] });
+      const to = new Date('2026-07-10T00:00:00Z');
+      const from = new Date(to.getTime() - 6 * DAY); // 3 x 2-day segments
+      const segment = (input: { from: Date; to: Date }, complete: boolean) => ({
+        provider: 'kis_domestic_minute',
+        assetId: DOMESTIC_ASSET.id,
+        rangeFrom: input.from,
+        rangeTo: input.to,
+        pagesFetched: 2,
+        providerReturnedRows: 20,
+        acceptedRows: 20,
+        rejectedRows: 0,
+        duplicateRows: 0,
+        candles: [syntheticCandle(input.from.getTime())],
+        complete,
+        stopReason: 'target_reached',
+        oldestOpenTime: input.from,
+        latestOpenTime: input.from,
+        completeBuckets: complete ? 4 : 2,
+        incompleteBuckets: complete ? 0 : 2,
+        rejectedBuckets: 0,
+      });
+      harness.fiveMinuteIngestion.fetchDomesticFiveMinuteCandles
+        .mockImplementationOnce((input: { from: Date; to: Date }) =>
+          Promise.resolve(segment(input, true)),
+        )
+        .mockImplementationOnce((input: { from: Date; to: Date }) =>
+          Promise.resolve(segment(input, false)),
+        );
+      const result = await harness.service.syncAsset({
+        assetId: DOMESTIC_ASSET.id,
+        targets: ['5m'],
+        mode: 'repair' as never,
+        from,
+        to,
+        now: NOW,
+      });
+      const feed = result.feeds[0];
+      expect(feed.status).toBe('completed');
+      expect(feed.coverageComplete).toBe(false);
+      expect(feed.completionReason).not.toBe('target_reached');
+      // The run stopped at the incomplete segment; no older segment was
+      // fetched past the hole.
+      expect(
+        harness.fiveMinuteIngestion.fetchDomesticFiveMinuteCandles,
+      ).toHaveBeenCalledTimes(2);
+      // Coverage retains only the fully complete newest segment [to-2d, to);
+      // the incomplete segment [to-4d, to-2d) is NOT inside the covered
+      // range.
+      const row = harness.stateRepository.rows[0];
+      expect(row.coveredFrom?.getTime()).toBe(to.getTime() - 2 * DAY);
+      expect(row.coveredTo?.getTime()).toBe(to.getTime());
+    });
+
+    it('claims no row-derived partial coverage at a retention edge when buckets are incomplete', async () => {
+      // provider_exhausted normally claims [oldest received bucket, segTo)
+      // as covered. When strict validation dropped incomplete buckets inside
+      // that window, the claim would overstate coverage — it must be
+      // withheld.
+      const harness = createHarness({ assets: [DOMESTIC_ASSET] });
+      const to = new Date('2026-07-10T00:00:00Z');
+      const from = new Date(to.getTime() - DAY);
+      const oldest = new Date(from.getTime() + 2 * FIVE_MIN);
+      harness.fiveMinuteIngestion.fetchDomesticFiveMinuteCandles.mockResolvedValue(
+        {
+          provider: 'kis_domestic_minute',
+          assetId: DOMESTIC_ASSET.id,
+          rangeFrom: from,
+          rangeTo: to,
+          pagesFetched: 1,
+          providerReturnedRows: 10,
+          acceptedRows: 10,
+          rejectedRows: 0,
+          duplicateRows: 0,
+          candles: [syntheticCandle(oldest.getTime())],
+          complete: false,
+          stopReason: 'provider_exhausted',
+          oldestOpenTime: oldest,
+          latestOpenTime: oldest,
+          completeBuckets: 1,
+          incompleteBuckets: 1,
+          rejectedBuckets: 0,
+        },
+      );
+      const result = await harness.service.syncAsset({
+        assetId: DOMESTIC_ASSET.id,
+        targets: ['5m'],
+        mode: 'repair' as never,
+        from,
+        to,
+        now: NOW,
+      });
+      const feed = result.feeds[0];
+      expect(feed.status).toBe('completed');
+      expect(feed.coverageComplete).toBe(false);
+      const row = harness.stateRepository.rows[0];
+      expect(row.coveredFrom).toBeNull();
+      expect(row.coveredTo).toBeNull();
     });
 
     it('passes requiredCoveredTo = min(targetTo, now) to the checkpoint completion', async () => {

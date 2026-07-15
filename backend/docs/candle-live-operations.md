@@ -125,7 +125,11 @@ range is persisted separately:
   confirmed so far; it grows monotonically while a run pages and survives
   resume.
 - `completionReason` — `target_reached`, `confirmed_empty`,
-  `empty_page_before_target`, or `provider_exhausted_before_target`.
+  `empty_page_before_target`, `provider_exhausted_before_target`, or
+  `data_incomplete` (the provider sweep reached its target, but the stored
+  data is incomplete — e.g. KIS 5m incomplete buckets survived strict
+  validation; provider-sweep completion and stored-data completeness are
+  distinct, and such a run never claims coverage).
 
 The checkpoint repository (`markCompleted`) enforces the full completion
 invariant BEFORE the row is written, so a bad claim can never be persisted:
@@ -139,8 +143,8 @@ invariant BEFORE the row is written, so a bad claim can never be persisted:
   `[targetFrom, targetTo]`.
 - `coverageComplete=false` requires an incomplete reason
   (`empty_page_before_target`, `provider_exhausted_before_target`,
-  `cursor_not_advanced`, `aborted`) and a covered range that is either fully
-  absent or well-formed — never one-sided.
+  `data_incomplete`, `cursor_not_advanced`, `aborted`) and a covered range
+  that is either fully absent or well-formed — never one-sided.
 - Violations throw `MarketCandleSyncStateInvariantError` (a programmer
   error) without touching the row. No new migration/column is involved; this
   is an application invariant plus tests.

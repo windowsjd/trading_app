@@ -24,6 +24,11 @@ export type MarketCandleSyncCompletionReason =
   | 'confirmed_empty'
   | 'empty_page_before_target'
   | 'provider_exhausted_before_target'
+  // The provider sweep reached its target, but the STORED data is incomplete
+  // (incomplete 5m buckets or strict validation left no usable candles).
+  // Provider-sweep completion and stored-data completeness are distinct;
+  // this reason never accompanies coverageComplete=true.
+  | 'data_incomplete'
   | 'cursor_not_advanced'
   | 'aborted';
 
@@ -31,6 +36,11 @@ export type MarketCandleSyncStopReason =
   | 'target_reached'
   | 'provider_exhausted'
   | 'empty_page'
+  // Sweep reached the target but the fetched data failed completeness checks
+  // (KIS 5m incomplete buckets / strict validation). The run terminates —
+  // continuing to older segments would let the min/max coverage merge bridge
+  // the hole — and the segment claims no coverage.
+  | 'data_incomplete'
   | 'max_pages'
   | 'max_rows'
   | 'max_duration'

@@ -423,6 +423,38 @@ describe('MarketCandleSyncStateRepository', () => {
       ).rejects.toThrow('coveredFrom < coveredTo');
     });
 
+    it('accepts data_incomplete only as an incomplete-coverage reason', async () => {
+      const { repository, delegate } = setup();
+      // A sweep that reached its target with incomplete stored data is a
+      // valid incomplete completion...
+      await expect(
+        repository.markCompleted('sync-1', new Date(), {
+          coverageComplete: false,
+          completionReason: 'data_incomplete',
+          coveredFrom: null,
+          coveredTo: null,
+          requiredCoveredTo: targetTo,
+        }),
+      ).resolves.toBe(true);
+      const [updateInput] = delegate.updateMany.mock.calls[0] as [
+        { data: Record<string, unknown> },
+      ];
+      expect(updateInput.data).toMatchObject({
+        coverageComplete: false,
+        completionReason: 'data_incomplete',
+      });
+      // ...and can never be persisted as coverage-complete.
+      await expect(
+        repository.markCompleted('sync-1', new Date(), {
+          coverageComplete: true,
+          completionReason: 'data_incomplete',
+          coveredFrom: targetFrom,
+          coveredTo: targetTo,
+          requiredCoveredTo: targetTo,
+        }),
+      ).rejects.toThrow('does not allow completionReason');
+    });
+
     it('accepts an incomplete run with a well-formed partial covered range', async () => {
       const { repository, delegate } = setup();
       await expect(

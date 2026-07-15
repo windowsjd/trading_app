@@ -55,6 +55,7 @@ const INCOMPLETE_COVERAGE_REASONS: ReadonlySet<MarketCandleSyncCompletionReason>
   new Set([
     'empty_page_before_target',
     'provider_exhausted_before_target',
+    'data_incomplete',
     'cursor_not_advanced',
     'aborted',
   ]);

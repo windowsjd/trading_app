@@ -87,7 +87,7 @@ const KIS_SEGMENT_MAX_PAGES = 60;
 const KIS_SEGMENT_MAX_RAW_ROWS = 12_000;
 const DOMESTIC_KRX_MARKETS = new Set(['KRX', 'KOSPI', 'KOSDAQ', 'KONEX']);
 const SWEEP_TERMINAL_REASONS: ReadonlySet<MarketCandleSyncStopReason> = new Set(
-  ['target_reached', 'provider_exhausted', 'empty_page'],
+  ['target_reached', 'provider_exhausted', 'empty_page', 'data_incomplete'],
 );
 
 type SyncAssetRecord = {
@@ -878,7 +878,9 @@ export class MarketCandleSyncService {
               : 'confirmed_empty'
             : stopReason === 'empty_page'
               ? 'empty_page_before_target'
-              : 'provider_exhausted_before_target';
+              : stopReason === 'data_incomplete'
+                ? 'data_incomplete'
+                : 'provider_exhausted_before_target';
           await this.stateRepository.markCompleted(state.id, new Date(), {
             coverageComplete,
             completionReason,
@@ -1239,7 +1241,26 @@ export class MarketCandleSyncService {
     // to segmentFrom. Geometry alone (segmentFrom <= targetFrom) must never
     // imply completeness: the US continuation and the domestic date cursor
     // both stop early when the provider's minute retention runs out.
+    //
+    // A completed provider SWEEP is still not completed DATA: the ingestion
+    // result's `complete` also requires the stored candles to be whole
+    // (accepted rows exist, and for the domestic builder incompleteBuckets
+    // is zero). A target_reached sweep whose data is incomplete has holes at
+    // unknown positions inside the segment, so it must not claim any covered
+    // range — and the run must terminate here: continuing to older segments
+    // would let the min/max coverage merge bridge right over the hole.
+    // Partial candles already fetched are still written by the caller.
     if (result.stopReason === 'target_reached') {
+      if (result.complete !== true) {
+        return {
+          ...base,
+          nextCursor: null,
+          stopReason: 'data_incomplete',
+          complete: false,
+          coveredFrom: null,
+          coveredTo: null,
+        };
+      }
       const reachedTargetFrom = segmentFrom.getTime() <= input.from.getTime();
       return {
         ...base,
@@ -1265,10 +1286,15 @@ export class MarketCandleSyncService {
       // pre-listing range, or a genuinely empty tail — indistinguishable
       // here). Terminate the run: sweeping even older segments cannot
       // succeed. Received rows confirm coverage only from the first full 5m
-      // bucket at/after the oldest received row.
+      // bucket at/after the oldest received row — and only when no
+      // incomplete bucket was dropped inside that window, since a dropped
+      // bucket is a hole the claim would silently cover.
       let coveredFrom: Date | null = null;
       let coveredTo: Date | null = null;
-      if (result.oldestOpenTime !== null) {
+      if (
+        result.oldestOpenTime !== null &&
+        (result.incompleteBuckets ?? 0) === 0
+      ) {
         const flooredOldest = Math.max(
           ceilToFiveMinutes(result.oldestOpenTime.getTime()),
           segmentFrom.getTime(),

@@ -134,6 +134,35 @@ describe('CandleDatabaseLoader', () => {
     });
   });
 
+  it('never serves a data_incomplete KIS checkpoint as completed coverage', async () => {
+    // A KIS 5m run whose provider sweep reached the target but whose stored
+    // data is incomplete terminates as status=completed with
+    // coverageComplete=false and completionReason=data_incomplete. Such a
+    // row never matches findCompletedCovering (its SQL requires
+    // coverageComplete=true), so `covering` resolves to null and stored rows
+    // with holes must surface as incomplete — never available.
+    const { loader, repository, states } = create();
+    repository.findRange.mockResolvedValue([candle(0), candle(10)]);
+    states.findCompletedCovering.mockResolvedValue(null);
+    states.findLatestOverlapping.mockResolvedValue({
+      status: MarketCandleSyncStatus.completed,
+      coverageComplete: false,
+      completionReason: 'data_incomplete',
+    });
+    await expect(loader.load(asset, query, plan)).resolves.toMatchObject({
+      state: 'incomplete',
+      completedCoverage: false,
+      hasBlockingCheckpoint: false,
+    });
+    // And an empty store backed only by that checkpoint is missing, never
+    // confirmed_empty.
+    repository.findRange.mockResolvedValue([]);
+    await expect(loader.load(asset, query, plan)).resolves.toMatchObject({
+      state: 'missing',
+      completedCoverage: false,
+    });
+  });
+
   it('never reports confirmed_empty without coverage-complete evidence', async () => {
     const { loader, states } = create();
     states.findCompletedCovering.mockResolvedValue(null);
