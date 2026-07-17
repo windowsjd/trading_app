@@ -32,8 +32,9 @@ export type KisFiveMinuteFetchResult = {
   incompleteBuckets?: number;
   rejectedBuckets?: number;
   // US path only: observable regular-session integrity failures reported by
-  // the normalizer (unparsable timestamp, off-grid, malformed OHLCV). Any
-  // non-zero value forces complete=false. The domestic path measures data
+  // the normalizer (unparsable timestamp, off-grid, malformed OHLCV in a
+  // closed bucket). Any non-zero value forces complete=false. In-progress
+  // buckets are never counted here. The domestic path measures data
   // completeness through incompleteBuckets instead.
   integrityFailedRows?: number;
 };
@@ -122,7 +123,8 @@ export class MarketCandleIngestionService {
       // the range has holes at unknown positions and must never be declared
       // complete — even when some valid candles were accepted. Benign
       // exclusions (pre-market/after-hours, holidays, out-of-range, future
-      // rows) do not affect completeness.
+      // rows, and in-progress buckets whose OHLCV has not finished forming)
+      // do not affect completeness.
       complete:
         adapter.complete &&
         normalized.acceptedRows > 0 &&

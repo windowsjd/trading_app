@@ -45,7 +45,15 @@ jobs:
       - name: Install dependencies (frozen lockfile)
         run: pnpm install --frozen-lockfile
       - name: Prisma generate
+        # prisma.config.ts resolves the datasource url from env("DATABASE_URL")
+        # while loading config, so `prisma generate` aborts when it is unset —
+        # even though no database is contacted here. A syntactically valid,
+        # non-secret placeholder satisfies the resolver; it is scoped to this
+        # step so the rest of the Backend quality job never sees a DATABASE_URL
+        # (this job has no PostgreSQL service and must not appear to have a DB).
         run: pnpm exec prisma generate
+        env:
+          DATABASE_URL: postgresql://prisma:prisma@localhost:5432/prisma?schema=public
       - name: Candle-layer lint (check only, no fix)
         run: pnpm run lint:candles:check
       - name: Candle-layer format check
@@ -126,25 +134,72 @@ jobs:
         run: pnpm exec prisma generate
       - name: Apply migrations
         run: pnpm exec prisma migrate deploy
-      - name: Run release fixture smoke (no provider credentials)
-        run: CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm run smoke:candle-fixture
-      - name: Verify artifact commit traceability
+      # Record the fixture artifacts that already exist at checkout (historical
+      # results committed to the repo). This run's artifact is identified later
+      # as the set difference — never by modification time, which cannot tell a
+      # freshly checked-out historical file apart from one written just now.
+      - name: Snapshot pre-existing fixture artifacts
         run: |
           shopt -s nullglob
-          files=(artifacts/candle-smoke/fixture-*.json)
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "no fixture artifact produced" >&2
+          : > "$RUNNER_TEMP/pre-fixtures.txt"
+          for f in artifacts/candle-smoke/fixture-*.json; do
+            basename "$f" >> "$RUNNER_TEMP/pre-fixtures.txt"
+          done
+          echo "pre-existing fixture artifacts at checkout:"
+          cat "$RUNNER_TEMP/pre-fixtures.txt"
+      - name: Run release fixture smoke (no provider credentials)
+        run: CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm run smoke:candle-fixture
+      # Identify exactly the fixture JSON this run produced (files not present at
+      # checkout). Runs on success and failure so a smoke that wrote a report
+      # before failing still yields one debuggable file — but never falls back
+      # to a historical artifact, and never masks the smoke's own exit status.
+      - name: Identify this run's fixture artifact
+        id: fixture
+        if: always()
+        run: |
+          shopt -s nullglob
+          new=""
+          for f in artifacts/candle-smoke/fixture-*.json; do
+            name="$(basename "$f")"
+            if grep -qxF "$name" "$RUNNER_TEMP/pre-fixtures.txt" 2>/dev/null; then
+              continue
+            fi
+            if [ -n "$new" ]; then
+              echo "more than one new fixture artifact appeared this run: $new and $f" >&2
+              exit 1
+            fi
+            new="$f"
+          done
+          if [ -z "$new" ]; then
+            echo "no new fixture artifact was produced this run; nothing to upload"
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "this run's fixture artifact: $new"
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          # relpath is backend-relative (run steps default to working-directory:
+          # backend); path is repo-root-relative for upload-artifact, whose
+          # action step does NOT honor defaults.run.working-directory.
+          echo "relpath=$new" >> "$GITHUB_OUTPUT"
+          echo "path=backend/$new" >> "$GITHUB_OUTPUT"
+      # Release gate: only reached when the smoke itself passed. Asserts the one
+      # file this run produced proves the checked-out commit, a clean tree, and
+      # a passed result. A failed smoke skips this step (its exit status wins).
+      - name: Verify artifact commit traceability
+        run: |
+          rel="${{ steps.fixture.outputs.relpath }}"
+          if [ -z "$rel" ]; then
+            echo "no fixture artifact produced this run to verify" >&2
             exit 1
           fi
-          latest=$(ls -1t artifacts/candle-smoke/fixture-*.json | head -1)
-          echo "verifying $latest"
+          echo "verifying $rel"
           jq -e --arg sha "$GITHUB_SHA" \
             '.gitCommit == $sha and .gitDirty == false and .result == "passed"' \
-            "$latest"
-      - name: Upload smoke artifacts (kept on failure too)
-        if: always()
+            "$rel"
+      - name: Upload this run's fixture artifact (kept on failure too)
+        if: always() && steps.fixture.outputs.found == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: candle-fixture-smoke
-          path: backend/artifacts/candle-smoke/
-          if-no-files-found: ignore
+          path: ${{ steps.fixture.outputs.path }}
+          if-no-files-found: error

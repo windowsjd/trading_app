@@ -1627,6 +1627,40 @@ describe('MarketCandleSyncService', () => {
         expect(row.coveredFrom?.getTime()).toBe(from.getTime());
         expect(row.coveredTo?.getTime()).toBe(to.getTime());
       });
+
+      it('keeps coverage complete when the only failing bucket is still in progress', async () => {
+        // The 13:35 bucket carries the SAME malformed OHLC (high < low) that
+        // the data_incomplete test above rejects — but here `now` sits inside
+        // it, so it is a benign in-progress exclusion, not an observable hole.
+        // The closed 13:30 bucket is accepted and coverage stays complete.
+        const { service, stateRepository, usAdapter } = createFullFlowHarness();
+        const from = new Date('2026-07-09T13:30:00Z');
+        const to = new Date('2026-07-09T13:40:00Z');
+        usAdapter.fetchUsFiveMinuteRows.mockResolvedValue({
+          ...adapterResult([
+            usRaw('093000'),
+            usRaw('093500', { high: '90' }, 1),
+          ]),
+          oldestOpenTime: from,
+          latestOpenTime: new Date('2026-07-09T13:35:00Z'),
+        });
+        const result = await service.syncAsset({
+          assetId: US_ASSET.id,
+          targets: ['5m'],
+          mode: 'repair' as never,
+          from,
+          to,
+          now: new Date('2026-07-09T13:37:00Z'), // inside the 13:35 bucket
+        });
+        const feed = result.feeds[0];
+        expect(feed.status).toBe('completed');
+        expect(feed.complete).toBe(true);
+        expect(feed.coverageComplete).toBe(true);
+        expect(feed.completionReason).toBe('target_reached');
+        expect(feed.acceptedRows).toBe(1);
+        const row = stateRepository.rows[0];
+        expect(row.coverageComplete).toBe(true);
+      });
     });
 
     it('claims no row-derived partial coverage at a retention edge when buckets are incomplete', async () => {

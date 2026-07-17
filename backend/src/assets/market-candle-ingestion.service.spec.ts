@@ -249,6 +249,33 @@ describe('MarketCandleIngestionService', () => {
       expect(result.candles).toHaveLength(2);
     });
 
+    it('keeps complete=true when an in-progress bucket with unformed OHLCV is dropped as benign', async () => {
+      // `now` sits inside the 13:40 bucket: the 13:30/13:35 buckets have
+      // closed (valid) and the still-open 13:40 bucket is malformed — a
+      // benign in-progress exclusion, not an observable hole. The provider
+      // sweep reached its target, so the historical range stays complete.
+      const service = createUs({
+        rows: [
+          usRow('093000'), // 13:30Z closed, valid
+          usRow('093500', {}, 1), // 13:35Z closed, valid
+          usRow('094000', { high: '90' }, 2), // 13:40Z in-progress, malformed
+        ],
+        providerReturnedRows: 3,
+      });
+      const result = await service.fetchUsFiveMinuteCandles({
+        asset: { id: 'us-1', symbol: 'AAPL', marketCode: 'NAS' },
+        from: new Date('2026-07-09T13:30:00Z'),
+        to: new Date('2026-07-09T13:45:00Z'),
+        now: new Date('2026-07-09T13:42:00Z'),
+      });
+      expect(result).toMatchObject({
+        complete: true,
+        acceptedRows: 2,
+        integrityFailedRows: 0,
+      });
+      expect(result.candles).toHaveLength(2);
+    });
+
     it('keeps complete=true when only benign pre/after-hours rows are excluded', async () => {
       const service = createUs({
         rows: [

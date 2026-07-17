@@ -17,12 +17,16 @@ const FIVE_MINUTES_MS = 5 * 60_000;
  * Per-row classification. Benign exclusions and integrity failures are kept
  * apart because only the latter make a fetched range data-incomplete:
  * - excluded: pre-market/after-hours/holiday/weekend rows (per the audited
- *   market calendar), rows outside the requested range, and future rows —
- *   the provider legitimately returns them and they carry no completeness
- *   signal.
+ *   market calendar), rows outside the requested range, future rows (the
+ *   bucket has not opened yet), and in-progress buckets whose OHLCV has not
+ *   finished forming — the provider legitimately returns them and they carry
+ *   no completeness signal.
  * - integrity_failed: observable regular-session corruption — an unparsable
  *   timestamp (fail-safe: it cannot be proven benign), a regular-session
- *   timestamp off the 5-minute grid, or malformed OHLCV.
+ *   timestamp off the 5-minute grid, or malformed OHLCV in a CLOSED bucket.
+ *   Malformed OHLCV in a still-open bucket is a benign in-progress exclusion,
+ *   not corruption; the same bucket becomes an integrity failure once it has
+ *   closed and the provider still returns it malformed.
  */
 type KisRowClassification =
   | { state: 'accepted'; row: NormalizedKisCandleRow }
@@ -85,9 +89,10 @@ export class KisCandleNormalizerService {
       // cannot be proven benign, so they count against completeness.
       if (!openTime) return { state: 'integrity_failed' };
       const openMs = openTime.getTime();
-      // Out of the requested range or in the future: benign — irrelevant to
-      // this range's completeness (in-progress/future buckets are never a
-      // completeness requirement).
+      // Out of the requested range or in the future (bucket not yet open):
+      // benign — irrelevant to this range's completeness. In-progress buckets
+      // (already open, not yet closed) fall through: they are accepted when
+      // valid and benignly excluded when their OHLCV has not finished forming.
       if (openMs < fromMs || openMs >= toMs || openMs > nowMs) {
         return { state: 'excluded' };
       }
@@ -108,7 +113,9 @@ export class KisCandleNormalizerService {
         return { state: 'excluded' };
       }
       // Inside the regular session the provider contract is 5-minute-grid
-      // buckets; an off-grid timestamp is corrupt data.
+      // buckets; an off-grid timestamp is corrupt data regardless of whether
+      // the bucket has closed (its true boundary is unknowable), so it always
+      // fails integrity.
       if (local.second !== 0 || local.minute % 5 !== 0) {
         return { state: 'integrity_failed' };
       }
@@ -120,10 +127,18 @@ export class KisCandleNormalizerService {
         volume: 'evol',
         amount: ['eamt'],
       });
-      // Regular-session rows with malformed OHLCV are strict-validation
-      // failures: the row is dropped (never repaired or synthesized) and
-      // the range must not be declared complete.
-      return row ? { state: 'accepted', row } : { state: 'integrity_failed' };
+      if (row) return { state: 'accepted', row };
+      // Strict OHLCV validation failed. The row is dropped either way (never
+      // repaired or synthesized), but its completeness meaning depends on
+      // whether the bucket has closed:
+      // - a CLOSED regular-session bucket with malformed OHLCV is an
+      //   observable hole -> integrity_failed (the range must not be declared
+      //   complete);
+      // - an IN-PROGRESS bucket whose OHLCV has not finished forming is a
+      //   benign in-progress exclusion -> not stored, not counted against
+      //   completeness, and never fails a historical range.
+      const closed = openMs + FIVE_MINUTES_MS <= nowMs;
+      return closed ? { state: 'integrity_failed' } : { state: 'excluded' };
     });
     return {
       ...normalized,

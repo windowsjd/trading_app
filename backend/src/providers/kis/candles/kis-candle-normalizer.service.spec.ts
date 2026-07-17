@@ -120,19 +120,88 @@ describe('KisCandleNormalizerService', () => {
         us('20260710', '093000', { high: '98' }),
         us('20260710', '093500', { evol: undefined }),
         us('20260710', '094000', { evol: '-1' }),
-        us('20260710', '094500'),
+        us('20260710', '095500'),
       ],
       from: new Date('2026-07-10T00:00:00Z'),
       to: new Date('2026-07-11T00:00:00Z'),
-      now: new Date('2026-07-10T13:44:59Z'),
+      now: new Date('2026-07-10T13:50:00Z'),
     });
-    // Three regular-session strict-validation failures; the 09:45 row is a
-    // not-yet-started future bucket — benign, never an integrity failure.
+    // The 09:30/09:35/09:40 buckets have all closed (now = 13:50Z is past
+    // their 13:45Z close), so their strict-validation failures are three
+    // integrity failures; the 09:55 row is a not-yet-open future bucket —
+    // benign, never an integrity failure.
     expect(result).toMatchObject({
       acceptedRows: 0,
       rejectedRows: 4,
       integrityFailedRows: 3,
     });
+  });
+
+  it('accepts an in-progress regular-session bucket and never counts it against completeness', () => {
+    const result = service.normalizeUsFiveMinuteRows({
+      rows: [us('20260710', '093000')],
+      from: new Date('2026-07-10T13:30:00Z'),
+      to: new Date('2026-07-10T14:00:00Z'),
+      now: new Date('2026-07-10T13:32:00Z'), // inside the 13:30–13:35 bucket
+    });
+    expect(result).toMatchObject({ acceptedRows: 1, integrityFailedRows: 0 });
+    expect(result.candles).toHaveLength(1);
+    expect(result.candles[0].isClosed).toBe(false);
+  });
+
+  it('drops an in-progress bucket with unformed OHLCV as a benign exclusion, not an integrity failure', () => {
+    const result = service.normalizeUsFiveMinuteRows({
+      rows: [
+        us('20260710', '093000'), // 13:30Z closed, valid
+        us('20260710', '093500', { high: '90' }), // 13:35Z in-progress, malformed
+      ],
+      from: new Date('2026-07-10T13:30:00Z'),
+      to: new Date('2026-07-10T14:00:00Z'),
+      // 13:30 bucket closed (13:35 <= 13:37); 13:35 bucket still open
+      // (13:40 > 13:37).
+      now: new Date('2026-07-10T13:37:00Z'),
+    });
+    // The still-open malformed bucket is neither stored nor an integrity
+    // failure; only the closed valid bucket is accepted.
+    expect(result).toMatchObject({ acceptedRows: 1, integrityFailedRows: 0 });
+    expect(result.candles).toHaveLength(1);
+    expect(result.candles[0].openTime.toISOString()).toBe(
+      '2026-07-10T13:30:00.000Z',
+    );
+    expect(result.candles[0].isClosed).toBe(true);
+  });
+
+  it('treats the same malformed bucket as an integrity failure once it has closed', () => {
+    const result = service.normalizeUsFiveMinuteRows({
+      rows: [
+        us('20260710', '093000'),
+        us('20260710', '093500', { high: '90' }),
+      ],
+      from: new Date('2026-07-10T13:30:00Z'),
+      to: new Date('2026-07-10T14:00:00Z'),
+      now: new Date('2026-07-10T14:00:00Z'), // both buckets long closed
+    });
+    // Identical to the in-progress case above except for `now`: once the
+    // 13:35 bucket has closed, the same malformed row is an observable hole.
+    expect(result).toMatchObject({ acceptedRows: 1, integrityFailedRows: 1 });
+  });
+
+  it('excludes a future not-yet-open bucket as benign, never an integrity failure', () => {
+    const result = service.normalizeUsFiveMinuteRows({
+      rows: [
+        us('20260710', '093000'), // 13:30Z closed, valid
+        us('20260710', '094500'), // 13:45Z future (valid OHLCV)
+      ],
+      from: new Date('2026-07-10T13:30:00Z'),
+      to: new Date('2026-07-10T14:00:00Z'),
+      // 13:45 open is still in the future; 13:30 bucket has closed.
+      now: new Date('2026-07-10T13:36:00Z'),
+    });
+    expect(result).toMatchObject({ acceptedRows: 1, integrityFailedRows: 0 });
+    expect(result.candles).toHaveLength(1);
+    expect(result.candles[0].openTime.toISOString()).toBe(
+      '2026-07-10T13:30:00.000Z',
+    );
   });
 
   it('treats an unparsable regular-session timestamp as an integrity failure, never benign', () => {
