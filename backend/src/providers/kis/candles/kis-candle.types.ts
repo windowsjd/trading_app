@@ -11,6 +11,8 @@ export const KIS_US_CANDLE_SOURCE = 'kis_overseas_minute';
 
 export type KisCandleStopReason =
   | 'target_reached'
+  | 'expected_no_data'
+  | 'calendar_unavailable'
   | 'provider_exhausted'
   | 'empty_page'
   | 'max_pages'
@@ -34,6 +36,7 @@ export type KisCandleFetchInput = {
   maxRows?: number;
   maxDurationMs?: number;
   signal?: AbortSignal;
+  now?: Date;
 };
 
 export type KisRawCandleRow = {

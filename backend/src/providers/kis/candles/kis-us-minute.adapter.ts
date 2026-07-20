@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import type { AssetType } from '../../../generated/prisma/client';
+import { inspectMarketSessionsInRange } from '../../../orders/market-calendar.policy';
 import { KisAuthClient } from '../kis-auth.client';
 import { KisQuoteClient } from '../kis-quote.client';
 import type { KisLowLevelCallWithMetadataResult } from '../kis.types';
@@ -37,6 +39,20 @@ export class KisUsMinuteAdapter {
     validateCandleAsset(input.asset);
     const startedAt = Date.now();
     if (input.signal?.aborted) return emptyResult('canceled');
+    const now = input.now ?? new Date();
+    const effectiveTo = new Date(Math.min(input.to.getTime(), now.getTime()));
+    if (effectiveTo.getTime() <= input.from.getTime()) {
+      return emptyResult('expected_no_data', true);
+    }
+    const range = inspectMarketSessionsInRange(
+      { assetType: 'us_stock' as AssetType, market: 'US' },
+      input.from,
+      effectiveTo,
+    );
+    if (!range.calendarCovered) return emptyResult('calendar_unavailable');
+    if (!range.hasTradingSession) {
+      return emptyResult('expected_no_data', true);
+    }
     const config = this.configService.getKisConfig();
     const tokenWait = await awaitWithinBudget(
       this.authClient.requestConfiguredRestToken(),
@@ -242,13 +258,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function emptyResult(
   stopReason: KisCandleAdapterResult['stopReason'],
+  complete = false,
 ): KisCandleAdapterResult {
   return {
     pagesFetched: 0,
     providerReturnedRows: 0,
     rows: [],
     duplicateRows: 0,
-    complete: false,
+    complete,
     stopReason,
     oldestOpenTime: null,
     latestOpenTime: null,

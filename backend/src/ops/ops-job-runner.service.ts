@@ -47,6 +47,7 @@ import {
   type MarketCandleReconciliationInput,
   type ReconciliationMarket,
 } from '../assets/market-candle-reconciliation.service';
+import { resolveStockMarketSessionState } from '../orders/market-calendar.policy';
 
 export type OpsJobRunnerResponse =
   | {
@@ -79,6 +80,7 @@ export type OpsJobRunnerInput = {
   maxSnapshots?: number;
   targetSource?: ProviderTargetSource;
   kisPriceIngestionMode?: KisPriceIngestionMode;
+  now?: string | null;
 };
 
 export type DailySnapshotOpsJobInput = OpsJobRunnerInput & {
@@ -269,19 +271,34 @@ export class OpsJobRunnerService {
           await this.providerTargetResolver.resolveProviderTargets({
             targetSource: input.targetSource,
           });
+        const marketPlan = this.buildKisMarketCollectionPlan(
+          targets,
+          this.parseOptionalDate(input.now) ?? new Date(),
+        );
         if (
-          targets.kisDomesticSymbols.length === 0 &&
-          targets.kisUsSymbols.length === 0
+          marketPlan.targets.kisDomesticSymbols.length === 0 &&
+          marketPlan.targets.kisUsSymbols.length === 0
         ) {
+          const noConfiguredTargets =
+            targets.kisDomesticSymbols.length === 0 &&
+            targets.kisUsSymbols.length === 0;
           return {
-            state: 'no_targets',
+            state: noConfiguredTargets
+              ? 'no_targets'
+              : marketPlan.calendarUnavailable
+                ? 'degraded'
+                : 'no_data',
             provider: 'kis',
             targetSummary: this.buildTargetSummary(targets),
             created: 0,
             skipped: 0,
             wouldCreate: 0,
             failed: 0,
-            reason: 'NO_PROVIDER_TARGET',
+            reason: noConfiguredTargets
+              ? 'NO_PROVIDER_TARGET'
+              : marketPlan.calendarUnavailable
+                ? 'MARKET_CALENDAR_COVERAGE_MISSING'
+                : 'MARKET_CLOSED_EXPECTED_NO_DATA',
           };
         }
 
@@ -289,8 +306,8 @@ export class OpsJobRunnerService {
           await this.kisRestCurrentPriceIngestionService.ingestCurrentPrices({
             dryRun: false,
             requestedBy: input.requestedBy ?? undefined,
-            domesticSymbols: targets.kisDomesticSymbols,
-            usSymbols: targets.kisUsSymbols,
+            domesticSymbols: marketPlan.targets.kisDomesticSymbols,
+            usSymbols: marketPlan.targets.kisUsSymbols,
             maxSnapshots: input.maxSnapshots,
           });
 
@@ -327,12 +344,23 @@ export class OpsJobRunnerService {
           await this.providerTargetResolver.resolveProviderTargets({
             targetSource: input.targetSource,
           });
+        const marketPlan = this.buildKisMarketCollectionPlan(
+          targets,
+          this.parseOptionalDate(input.now) ?? new Date(),
+        );
         if (
-          targets.kisDomesticSymbols.length === 0 &&
-          targets.kisUsSymbols.length === 0
+          marketPlan.targets.kisDomesticSymbols.length === 0 &&
+          marketPlan.targets.kisUsSymbols.length === 0
         ) {
+          const noConfiguredTargets =
+            targets.kisDomesticSymbols.length === 0 &&
+            targets.kisUsSymbols.length === 0;
           return {
-            state: 'no_targets',
+            state: noConfiguredTargets
+              ? 'no_targets'
+              : marketPlan.calendarUnavailable
+                ? 'degraded'
+                : 'no_data',
             provider: 'kis',
             ingestionMode: 'websocket_trade',
             targetSummary: this.buildTargetSummary(targets),
@@ -340,15 +368,19 @@ export class OpsJobRunnerService {
             skipped: 0,
             wouldCreate: 0,
             failed: 0,
-            reason: 'NO_PROVIDER_TARGET',
+            reason: noConfiguredTargets
+              ? 'NO_PROVIDER_TARGET'
+              : marketPlan.calendarUnavailable
+                ? 'MARKET_CALENDAR_COVERAGE_MISSING'
+                : 'MARKET_CLOSED_EXPECTED_NO_DATA',
           };
         }
 
         const result = await this.kisWebSocketClient.runTradePriceIngestion({
           dryRun: false,
           requestedBy: input.requestedBy ?? undefined,
-          domesticSymbols: targets.kisDomesticSymbols,
-          usSymbols: targets.kisUsSymbols,
+          domesticSymbols: marketPlan.targets.kisDomesticSymbols,
+          usSymbols: marketPlan.targets.kisUsSymbols,
           maxSnapshots: input.maxSnapshots,
         });
 
@@ -1116,6 +1148,43 @@ export class OpsJobRunnerService {
       kisDomesticSymbolCount: targets.kisDomesticSymbols.length,
       kisUsSymbolCount: targets.kisUsSymbols.length,
       unsupportedAssets: targets.unsupportedAssets,
+    };
+  }
+
+  private buildKisMarketCollectionPlan(
+    targets: ProviderTargets,
+    now: Date,
+  ): {
+    targets: ProviderTargets;
+    calendarUnavailable: boolean;
+  } {
+    const krxState = resolveStockMarketSessionState(
+      { assetType: 'domestic_stock' as AssetType, market: 'KRX' },
+      now,
+    );
+    const usState = resolveStockMarketSessionState(
+      { assetType: 'us_stock' as AssetType, market: 'NAS' },
+      now,
+    );
+    const normalizeState = (
+      state: ReturnType<typeof resolveStockMarketSessionState>,
+    ): 'open' | 'closed' | 'calendar_unavailable' =>
+      state?.state ?? 'calendar_unavailable';
+    const krxDecision = normalizeState(krxState);
+    const usDecision = normalizeState(usState);
+
+    return {
+      targets: {
+        ...targets,
+        kisDomesticSymbols:
+          krxDecision === 'open' ? targets.kisDomesticSymbols : [],
+        kisUsSymbols: usDecision === 'open' ? targets.kisUsSymbols : [],
+      },
+      calendarUnavailable:
+        (targets.kisDomesticSymbols.length > 0 &&
+          krxDecision === 'calendar_unavailable') ||
+        (targets.kisUsSymbols.length > 0 &&
+          usDecision === 'calendar_unavailable'),
     };
   }
 

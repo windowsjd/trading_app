@@ -639,7 +639,7 @@ describe('DailyPortfolioSnapshotJobService', () => {
         adminManualUsed: true,
         fallbackUsed: true,
         fallbackReasons: ['provider_rejected'],
-        rejectedProviderReasons: ['captured_at_stale'],
+        rejectedProviderReasons: ['effective_at_outside_current_session'],
       },
     });
   });

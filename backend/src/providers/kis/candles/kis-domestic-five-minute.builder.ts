@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
+import { resolveMarketSession } from '../../../orders/market-calendar.policy';
 import type {
   KisDomesticBuildResult,
   NormalizedKisCandleRow,
 } from './kis-candle.types';
-import { getZonedParts, zonedDateTimeToUtc } from './kis-candle-time';
+import { getZonedParts } from './kis-candle-time';
 
 const TIME_ZONE = 'Asia/Seoul';
 const MINUTE_MS = 60_000;
@@ -31,28 +32,28 @@ export class KisDomesticFiveMinuteBuilder {
     }
     for (const row of uniqueRows.values()) {
       const local = getZonedParts(row.openTime, TIME_ZONE);
-      const minuteOfDay = local.hour * 60 + local.minute;
+      const date = `${local.year}${String(local.month).padStart(2, '0')}${String(local.day).padStart(2, '0')}`;
+      const session = resolveMarketSession('KRX', date);
+      const rowMs = row.openTime.getTime();
       if (
+        !session ||
         local.second !== 0 ||
-        minuteOfDay < 9 * 60 ||
-        minuteOfDay >= 15 * 60 + 30
+        rowMs < session.openTime.getTime() ||
+        rowMs >= session.closeTime.getTime() ||
+        (rowMs - session.openTime.getTime()) % MINUTE_MS !== 0
       ) {
         rejectedBucketKeys.add(
           `${local.year}-${local.month}-${local.day}:${local.hour}:${Math.floor(local.minute / 5)}`,
         );
         continue;
       }
-      const bucketMinute = minuteOfDay - ((minuteOfDay - 9 * 60) % 5);
-      const date = `${local.year}${String(local.month).padStart(2, '0')}${String(local.day).padStart(2, '0')}`;
-      const time = `${String(Math.floor(bucketMinute / 60)).padStart(2, '0')}${String(bucketMinute % 60).padStart(2, '0')}00`;
-      const bucketOpen = zonedDateTimeToUtc(date, time, TIME_ZONE);
-      if (!bucketOpen) {
-        rejectedBucketKeys.add(`${date}:${time}`);
-        continue;
-      }
-      const entries = buckets.get(bucketOpen.getTime()) ?? [];
+      const bucketMs =
+        session.openTime.getTime() +
+        Math.floor((rowMs - session.openTime.getTime()) / FIVE_MINUTES_MS) *
+          FIVE_MINUTES_MS;
+      const entries = buckets.get(bucketMs) ?? [];
       entries.push(row);
-      buckets.set(bucketOpen.getTime(), entries);
+      buckets.set(bucketMs, entries);
     }
 
     const nowMs = (input.now ?? new Date()).getTime();
@@ -65,11 +66,25 @@ export class KisDomesticFiveMinuteBuilder {
       const rows = [...rawRows].sort(
         (a, b) => a.openTime.getTime() - b.openTime.getTime(),
       );
-      const closeMs = bucketMs + FIVE_MINUTES_MS;
+      const local = getZonedParts(new Date(bucketMs), TIME_ZONE);
+      const date = `${local.year}${String(local.month).padStart(2, '0')}${String(local.day).padStart(2, '0')}`;
+      const session = resolveMarketSession('KRX', date);
+      if (!session) {
+        incompleteBuckets += 1;
+        continue;
+      }
+      const closeMs = Math.min(
+        bucketMs + FIVE_MINUTES_MS,
+        session.closeTime.getTime(),
+      );
       const isCurrent = bucketMs <= nowMs && nowMs < closeMs;
+      const sessionRequiredCount = (closeMs - bucketMs) / MINUTE_MS;
       const requiredCount = isCurrent
-        ? Math.min(5, Math.floor((nowMs - bucketMs) / MINUTE_MS) + 1)
-        : 5;
+        ? Math.min(
+            sessionRequiredCount,
+            Math.floor((nowMs - bucketMs) / MINUTE_MS) + 1,
+          )
+        : sessionRequiredCount;
       const contiguous =
         rows.length === requiredCount &&
         rows.every(

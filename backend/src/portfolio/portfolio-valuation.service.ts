@@ -19,6 +19,7 @@ import {
   resolveAssetProviderEligibility,
   resolveFxProviderEligibility,
   selectFreshProviderSnapshotBySourcePriority,
+  selectMarketAwareAssetPriceSnapshotBySourcePriority,
   selectProviderSnapshotAtOrBeforeBySourcePriority,
   type ProviderWorkflow,
 } from '../providers/source-eligibility.policy';
@@ -205,7 +206,9 @@ export class PortfolioValuationService {
             valuationAt,
             isPositiveValue: (candidate) => isPositiveDecimal(candidate.price),
           })
-        : selectFreshProviderSnapshotBySourcePriority({
+        : selectMarketAwareAssetPriceSnapshotBySourcePriority({
+            asset,
+            workflow: sourceEligibilityWorkflow,
             candidates: providerCandidates,
             expectedSourceNames: providerEligibility.sourceNames,
             now: valuationAt,

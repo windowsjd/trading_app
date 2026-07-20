@@ -22,7 +22,7 @@
 - `provider_api` is allowed only for `withPrice=true` list/detail price and USD/KRW conversion in this read-only workflow.
 - Eligible asset providers are `kis_krx_realtime_trade` for KRX-family domestic stocks, `kis_us_delayed_trade` for NAS/NYS US stocks, and `binance_public_rest_24hr_ticker` for BINANCE USD crypto.
 - Eligible USD/KRW FX provider priority is `korea_exim_exchange_rate`, then `exchange_rate_api`.
-- Provider asset freshness uses capturedAt age <= 60 seconds; provider FX freshness uses capturedAt age <= 300 seconds.
+- While a stock market is open, provider asset freshness requires the configured `capturedAt` threshold and an `effectiveAt` inside the current asset session. While closed, read/display may use only a provider price from that asset market's latest completed session; it never skips back to an older session. Crypto remains continuously fresh by `capturedAt`. Provider FX freshness is unchanged.
 - Missing, stale, future, non-positive, wrong-source, or ineligible provider rows fall back to existing `admin_manual` selection.
 - The price payload may include optional public-safe `priceSource` and `fxRateSource` metadata for source/outage visibility. Raw provider payloads, `metadataJson`, and secrets are never exposed.
 
@@ -192,7 +192,9 @@ If a USD asset has an eligible asset price but USD/KRW is missing or stale, `pri
 - USD/KRW missing or stale makes only `priceKrwState = unavailable`.
 - Asset price uses fresh eligible `provider_api` first, then latest eligible `admin_manual` fallback.
 - `priceSource.fallbackUsed=true` means provider price was missing/rejected/ineligible and the displayed price used fallback metadata. `fxRateSource.fallbackUsed=true` has the same meaning for USD/KRW conversion.
-- Provider asset price freshness threshold is capturedAt age <= 60 seconds. Existing `admin_manual` fallback keeps the established latest eligible `effectiveAt <= valuationAt` behavior.
+- Open-market provider asset price freshness threshold is capturedAt age <= 60 seconds plus current-session `effectiveAt`. Closed-market KRX/US display uses the latest completed session price regardless of absolute captured age. Existing `admin_manual` fallback keeps the established latest eligible `effectiveAt <= valuationAt` behavior.
+
+This market-aware selection is also used by the initial `/api/v1/ws` `asset_ticker` snapshot. No public response field or `/api/v1` route changed.
 
 ### Sorting
 

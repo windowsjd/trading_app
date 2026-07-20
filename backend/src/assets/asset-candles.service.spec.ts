@@ -862,7 +862,7 @@ describe('AssetCandlesService', () => {
       rows: [
         domesticRow('20260618', '115959', '10'),
         domesticRow('20260619', '090000', '20'),
-        domesticRow('20260619', '120001', '30'),
+        domesticRow('20260619', '120000', '30'),
       ],
       startAt: Date.parse('2026-06-18T03:00:00.000Z'),
       endAt: Date.parse('2026-06-19T03:00:00.000Z'),
@@ -880,7 +880,7 @@ describe('AssetCandlesService', () => {
       rows: [
         domesticRow('20260612', '115959', '10'),
         domesticRow('20260613', '090000', '20'),
-        domesticRow('20260619', '120001', '30'),
+        domesticRow('20260619', '120000', '30'),
       ],
       startAt: Date.parse('2026-06-12T03:00:00.000Z'),
       endAt: Date.parse('2026-06-19T03:00:00.000Z'),
@@ -1105,7 +1105,7 @@ describe('AssetCandlesService', () => {
         rt_cd: '0',
         output2: [
           {
-            xymd: '20260619',
+            xymd: '20260618',
             xhms: '093000',
             open: '215.23',
             high: '216',
@@ -1121,9 +1121,9 @@ describe('AssetCandlesService', () => {
     const response = await service.getAssetCandles('user-1', 'asset-aapl', {
       interval: '15m',
       limit: '999',
-      date: '2026-06-19',
+      date: '2026-06-18',
       includePrevious: 'false',
-      to: '2026-06-19T13:45:00.000Z',
+      to: '2026-06-18T13:45:00.000Z',
     });
 
     expect(response.data).toMatchObject({
@@ -1136,17 +1136,17 @@ describe('AssetCandlesService', () => {
         priceCurrency: CurrencyCode.USD,
       },
       interval: '15m',
-      requestedDate: '2026-06-19',
+      requestedDate: '2026-06-18',
       candles: [
         {
-          time: '2026-06-19T13:30:00.000Z',
+          time: '2026-06-18T13:30:00.000Z',
           open: '215.23000000',
           high: '216.00000000',
           low: '214.90000000',
           close: '215.80000000',
           volume: '12000.00000000',
           amount: '2590000.00000000',
-          sourceDate: '20260619',
+          sourceDate: '20260618',
           sourceTime: '093000',
         },
       ],
@@ -1179,6 +1179,34 @@ describe('AssetCandlesService', () => {
         custtype: 'P',
       },
     });
+  });
+
+  it('returns confirmed empty for a US holiday without calling KIS', async () => {
+    const { prisma, kisAuthClient, kisQuoteClient, service } = createService();
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({
+        id: 'asset-aapl-holiday',
+        symbol: 'AAPL',
+        market: 'NAS',
+        assetType: AssetType.us_stock,
+        currencyCode: CurrencyCode.USD,
+      }),
+    );
+
+    const response = await service.getAssetCandles(
+      'user-1',
+      'asset-aapl-holiday',
+      {
+        interval: '15m',
+        date: '2026-06-19',
+        to: '2026-06-19T20:00:00.000Z',
+        includePrevious: 'false',
+      },
+    );
+
+    expect(response.data.candles).toEqual([]);
+    expect(kisAuthClient.requestConfiguredRestToken).not.toHaveBeenCalled();
+    expect(kisQuoteClient.getMarketDataByExplicitPath).not.toHaveBeenCalled();
   });
 
   it('uses Binance Spot klines for crypto candles and normalizes rows for the chart DTO', async () => {
@@ -1494,6 +1522,89 @@ describe('AssetCandlesService', () => {
     for (const candle of response.data.candles) {
       expect(Date.parse(candle.time)).toBeGreaterThanOrEqual(anchor);
     }
+  });
+
+  it('counts real sessions across a KRX holiday plus weekend for prev2_open', async () => {
+    jest.setSystemTime(new Date('2026-07-18T03:00:00.000Z'));
+    const { prisma, kisAuthClient, kisQuoteClient, service } = createService();
+    kisAuthClient.getCachedToken.mockReturnValue({
+      accessToken: 'cached-kis-token',
+      tokenType: 'Bearer',
+      expiresInSeconds: 86400,
+      expiresAt: new Date('2026-07-19T00:00:00.000Z'),
+    });
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({
+        id: 'asset-domestic-holiday-weekend',
+        symbol: '005930',
+        market: 'KRX',
+        assetType: AssetType.domestic_stock,
+        currencyCode: CurrencyCode.KRW,
+      }),
+    );
+    kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
+      state: 'available',
+      receivedAt: new Date('2026-07-18T03:00:01.000Z'),
+      response: {
+        rt_cd: '0',
+        output2: [
+          domesticRow('20260714', '150000', '10'),
+          domesticRow('20260715', '090000', '20'),
+          domesticRow('20260716', '150000', '30'),
+        ],
+      },
+    });
+
+    const response = await service.getAssetCandles(
+      'user-1',
+      'asset-domestic-holiday-weekend',
+      { range: 'prev2_open', interval: '30m' },
+    );
+
+    expect(response.data.candles.length).toBeGreaterThan(0);
+    expect(Date.parse(response.data.candles[0].time)).toBeGreaterThanOrEqual(
+      Date.parse('2026-07-15T00:00:00.000Z'),
+    );
+  });
+
+  it('uses the actual delayed open for a previous-session chart anchor', async () => {
+    jest.setSystemTime(new Date('2026-01-05T03:00:00.000Z'));
+    const { prisma, kisAuthClient, kisQuoteClient, service } = createService();
+    kisAuthClient.getCachedToken.mockReturnValue({
+      accessToken: 'cached-kis-token',
+      tokenType: 'Bearer',
+      expiresInSeconds: 86400,
+      expiresAt: new Date('2026-01-06T00:00:00.000Z'),
+    });
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({
+        id: 'asset-domestic-delayed-open',
+        symbol: '005930',
+        market: 'KRX',
+        assetType: AssetType.domestic_stock,
+        currencyCode: CurrencyCode.KRW,
+      }),
+    );
+    kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
+      state: 'available',
+      receivedAt: new Date('2026-01-05T03:00:01.000Z'),
+      response: {
+        rt_cd: '0',
+        output2: [
+          domesticRow('20260102', '095900', '10'),
+          domesticRow('20260102', '100000', '20'),
+          domesticRow('20260105', '110000', '30'),
+        ],
+      },
+    });
+
+    const response = await service.getAssetCandles(
+      'user-1',
+      'asset-domestic-delayed-open',
+      { range: 'prev_open', interval: '5m' },
+    );
+
+    expect(response.data.candles[0].time).toBe('2026-01-02T01:00:00.000Z');
   });
 
   it('keeps Binance startTime unchanged when the expected candle count fits the request limit', async () => {

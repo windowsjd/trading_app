@@ -46,12 +46,154 @@ import {
   resolveFxProviderEligibility,
   selectFreshProviderSnapshot,
   selectFreshProviderSnapshotBySourcePriority,
+  selectMarketAwareAssetPriceSnapshotBySourcePriority,
   selectProviderSnapshotAtOrBefore,
   selectProviderSnapshotAtOrBeforeBySourcePriority,
 } from './source-eligibility.policy';
 
 describe('provider source eligibility policy', () => {
   const now = new Date('2026-06-03T00:00:00.000Z');
+
+  it('uses only the latest completed KRX session price while the market is closed', () => {
+    const selected = selectMarketAwareAssetPriceSnapshotBySourcePriority({
+      asset: { assetType: AssetType.domestic_stock, market: 'KRX' },
+      workflow: 'assets_with_price',
+      candidates: [
+        {
+          id: 'older-session',
+          sourceType: AssetPriceSourceType.provider_api,
+          sourceName: PROVIDER_SOURCE_NAMES.domesticStockKrx,
+          effectiveAt: new Date('2026-07-15T06:29:00.000Z'),
+          capturedAt: new Date('2026-07-15T06:29:05.000Z'),
+          price: new Prisma.Decimal('99'),
+        },
+        {
+          id: 'latest-session',
+          sourceType: AssetPriceSourceType.provider_api,
+          sourceName: PROVIDER_SOURCE_NAMES.domesticStockKrx,
+          effectiveAt: new Date('2026-07-16T06:29:00.000Z'),
+          capturedAt: new Date('2026-07-16T06:29:05.000Z'),
+          price: new Prisma.Decimal('101'),
+        },
+      ],
+      expectedSourceNames: [PROVIDER_SOURCE_NAMES.domesticStockKrx],
+      now: new Date('2026-07-17T03:00:00.000Z'),
+      freshnessThresholdSeconds: 300,
+      isPositiveValue: (candidate) => candidate.price.gt(0),
+    });
+    expect(selected).toMatchObject({
+      state: 'selected',
+      snapshot: { id: 'latest-session' },
+    });
+    if (selected.state === 'selected') {
+      expect(selected.decision.freshnessAgeSeconds).toBeGreaterThan(300);
+    }
+  });
+
+  it('does not fall back past a missing latest completed session price', () => {
+    const selected = selectMarketAwareAssetPriceSnapshotBySourcePriority({
+      asset: { assetType: AssetType.domestic_stock, market: 'KRX' },
+      workflow: 'daily_portfolio_snapshot',
+      candidates: [
+        {
+          id: 'older-session',
+          sourceType: AssetPriceSourceType.provider_api,
+          sourceName: PROVIDER_SOURCE_NAMES.domesticStockKrx,
+          effectiveAt: new Date('2026-07-15T06:29:00.000Z'),
+          capturedAt: new Date('2026-07-15T06:29:05.000Z'),
+          price: new Prisma.Decimal('99'),
+        },
+      ],
+      expectedSourceNames: [PROVIDER_SOURCE_NAMES.domesticStockKrx],
+      now: new Date('2026-07-17T03:00:00.000Z'),
+      freshnessThresholdSeconds: 60,
+      isPositiveValue: (candidate) => candidate.price.gt(0),
+    });
+    expect(selected).toMatchObject({
+      state: 'not_selected',
+      decision: {
+        rejectedProviderReason: 'effective_at_outside_last_completed_session',
+      },
+    });
+  });
+
+  it('requires a fresh current-session price after KRX opens', () => {
+    const previousSession = selectMarketAwareAssetPriceSnapshotBySourcePriority(
+      {
+        asset: { assetType: AssetType.domestic_stock, market: 'KRX' },
+        workflow: 'orders_execute',
+        candidates: [
+          {
+            id: 'previous-session',
+            sourceType: AssetPriceSourceType.provider_api,
+            sourceName: PROVIDER_SOURCE_NAMES.domesticStockKrx,
+            effectiveAt: new Date('2026-07-16T06:29:00.000Z'),
+            capturedAt: new Date('2026-07-16T06:29:05.000Z'),
+            price: new Prisma.Decimal('101'),
+          },
+        ],
+        expectedSourceNames: [PROVIDER_SOURCE_NAMES.domesticStockKrx],
+        now: new Date('2026-07-20T00:10:00.000Z'),
+        freshnessThresholdSeconds: 10,
+        isPositiveValue: (candidate) => candidate.price.gt(0),
+      },
+    );
+    expect(previousSession).toMatchObject({
+      state: 'not_selected',
+      decision: {
+        rejectedProviderReason: 'effective_at_outside_current_session',
+      },
+    });
+
+    const staleCurrentSession =
+      selectMarketAwareAssetPriceSnapshotBySourcePriority({
+        asset: { assetType: AssetType.domestic_stock, market: 'KRX' },
+        workflow: 'assets_with_price',
+        candidates: [
+          {
+            id: 'stale-current-session',
+            sourceType: AssetPriceSourceType.provider_api,
+            sourceName: PROVIDER_SOURCE_NAMES.domesticStockKrx,
+            effectiveAt: new Date('2026-07-20T00:00:00.000Z'),
+            capturedAt: new Date('2026-07-20T00:00:00.000Z'),
+            price: new Prisma.Decimal('102'),
+          },
+        ],
+        expectedSourceNames: [PROVIDER_SOURCE_NAMES.domesticStockKrx],
+        now: new Date('2026-07-20T00:10:00.000Z'),
+        freshnessThresholdSeconds: 300,
+        isPositiveValue: (candidate) => candidate.price.gt(0),
+      });
+    expect(staleCurrentSession).toMatchObject({
+      state: 'not_selected',
+      decision: { rejectedProviderReason: 'captured_at_stale' },
+    });
+  });
+
+  it('never carries the latest session price into a closed-market order workflow', () => {
+    const selected = selectMarketAwareAssetPriceSnapshotBySourcePriority({
+      asset: { assetType: AssetType.us_stock, market: 'NAS' },
+      workflow: 'orders_quote',
+      candidates: [
+        {
+          id: 'last-close',
+          sourceType: AssetPriceSourceType.provider_api,
+          sourceName: PROVIDER_SOURCE_NAMES.usStock,
+          effectiveAt: new Date('2026-07-02T19:59:00.000Z'),
+          capturedAt: new Date('2026-07-02T19:59:05.000Z'),
+          price: new Prisma.Decimal('200'),
+        },
+      ],
+      expectedSourceNames: [PROVIDER_SOURCE_NAMES.usStock],
+      now: new Date('2026-07-03T15:00:00.000Z'),
+      freshnessThresholdSeconds: 300,
+      isPositiveValue: (candidate) => candidate.price.gt(0),
+    });
+    expect(selected).toMatchObject({
+      state: 'not_selected',
+      decision: { rejectedProviderReason: 'market_closed' },
+    });
+  });
 
   it('keeps approved provider workflows open while closed workflows stay denied', () => {
     expect(isProviderWorkflowAllowed('fx_quote')).toBe(true);

@@ -8,9 +8,15 @@ jest.mock('../generated/prisma/client', () => ({
 
 import { AssetType } from '../generated/prisma/client';
 import {
+  findLastMarketSessionOfWeek,
   findLatestCompletedMarketSession,
+  findPreviousMarketSession,
+  inspectMarketSessionsInRange,
+  isLastMarketSessionOfWeek,
   resolveMarketSession,
   resolveRegularSessionForEvent,
+  resolveStockMarketDataUpperBound,
+  resolveStockMarketSessionState,
 } from './market-calendar.policy';
 
 describe('market calendar policy', () => {
@@ -75,6 +81,78 @@ describe('market calendar policy', () => {
     expect(session?.localDate).toBe('2026-07-10');
   });
 
+  it('finds previous KRX sessions across the July 17 holiday and weekend', () => {
+    const asset = { assetType: AssetType.domestic_stock, market: 'KRX' };
+    expect(
+      findPreviousMarketSession(asset, new Date('2026-07-20T03:00:00.000Z'), 1),
+    ).toMatchObject({
+      localDate: '2026-07-16',
+      openTime: new Date('2026-07-16T00:00:00.000Z'),
+    });
+    expect(
+      findPreviousMarketSession(asset, new Date('2026-07-20T03:00:00.000Z'), 2)
+        ?.localDate,
+    ).toBe('2026-07-15');
+  });
+
+  it('uses the actual delayed open for a previous-session anchor', () => {
+    expect(
+      findPreviousMarketSession(
+        { assetType: AssetType.domestic_stock, market: 'KRX' },
+        new Date('2026-01-05T03:00:00.000Z'),
+        1,
+      ),
+    ).toMatchObject({
+      localDate: '2026-01-02',
+      openTime: new Date('2026-01-02T01:00:00.000Z'),
+    });
+  });
+
+  it('resolves open/closed state and provider upper bound per market', () => {
+    const krx = { assetType: AssetType.domestic_stock, market: 'KRX' };
+    expect(
+      resolveStockMarketSessionState(krx, new Date('2026-07-16T03:00:00.000Z'))
+        ?.state,
+    ).toBe('open');
+    expect(
+      resolveStockMarketDataUpperBound(
+        krx,
+        new Date('2026-07-18T03:00:00.000Z'),
+      ),
+    ).toEqual(new Date('2026-07-16T06:30:00.000Z'));
+    expect(
+      resolveStockMarketSessionState(krx, new Date('2028-01-04T03:00:00.000Z'))
+        ?.state,
+    ).toBe('calendar_unavailable');
+  });
+
+  it('confirms holiday-only ranges without inferring from provider emptiness', () => {
+    expect(
+      inspectMarketSessionsInRange(
+        { assetType: AssetType.us_stock, market: 'NAS' },
+        new Date('2026-07-03T04:00:00.000Z'),
+        new Date('2026-07-04T04:00:00.000Z'),
+      ),
+    ).toEqual({ calendarCovered: true, hasTradingSession: false });
+    expect(
+      inspectMarketSessionsInRange(
+        { assetType: AssetType.us_stock, market: 'NAS' },
+        new Date('2028-07-03T04:00:00.000Z'),
+        new Date('2028-07-04T04:00:00.000Z'),
+      ).calendarCovered,
+    ).toBe(false);
+  });
+
+  it('finds the last real session in weeks whose Friday is closed', () => {
+    const krxLast = findLastMarketSessionOfWeek('KRX', '2026-07-17');
+    expect(krxLast?.localDate).toBe('2026-07-16');
+    expect(krxLast && isLastMarketSessionOfWeek(krxLast)).toBe(true);
+
+    const usLast = findLastMarketSessionOfWeek('US', '2026-07-03');
+    expect(usLast?.localDate).toBe('2026-07-02');
+    expect(usLast && isLastMarketSessionOfWeek(usLast)).toBe(true);
+  });
+
   it('treats real 2026 exchange holidays as closed via the registry', () => {
     // KRX: local-election day (Wed) and Constitution Day (Fri).
     expect(resolveMarketSession('KRX', '20260603')).toBeNull();
@@ -89,6 +167,13 @@ describe('market calendar policy', () => {
     const session = resolveMarketSession('US', '20261127');
     expect(session).toMatchObject({
       closeTime: new Date('2026-11-27T18:00:00.000Z'),
+      earlyClose: true,
+    });
+  });
+
+  it('applies the registry US early close on Christmas Eve 2026', () => {
+    expect(resolveMarketSession('US', '20261224')).toMatchObject({
+      closeTime: new Date('2026-12-24T18:00:00.000Z'),
       earlyClose: true,
     });
   });

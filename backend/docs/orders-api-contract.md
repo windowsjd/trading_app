@@ -26,6 +26,7 @@
 - Upbit/Bithumb and KRW crypto trading are out of MVP scope.
 - `CurrencyCode.USDT` is not introduced; Binance `BTCUSDT`/`ETHUSDT` style USDT quote pairs are treated as USD-equivalent for MVP provider_api asset price snapshot storage.
 - Orders quote may use fresh eligible `provider_api` market data first.
+- Stock quote/create/execute never carries a previous completed-session price forward. `MARKET_CLOSED` is returned before price freshness selection while closed; after open, the price must belong to the current session. Execute keeps the 10-second threshold.
 - Orders create uses the durable quote to start immediate market execution and requires fresh eligible `provider_api` market data at execution time.
 - `POST /api/v1/orders/:orderId/execute` is not the required public user flow and is not mounted in the controller; the service method is retained only for internal compatibility/deprecation.
 - Current quote is a reference estimate, not a guaranteed execution price. Provider-backed execute reprices at execute time from fresh provider_api data, compares against the quote price/rate, and rejects excessive movement.
@@ -147,7 +148,7 @@
 - Only market orders are supported. `orderType=limit` or any provided `limitPrice` returns `ORDER_TYPE_NOT_SUPPORTED`.
 - Market orders use fresh eligible `provider_api` asset price first, then latest eligible `admin_manual` fallback with `effectiveAt <= quoteAt`.
 - Eligible provider source mapping is domestic KRX -> `kis_krx_realtime_trade`, US NAS/NYS -> `kis_us_delayed_trade`, and BINANCE USD crypto -> `binance_public_rest_24hr_ticker`.
-- Provider asset price freshness uses capturedAt age <= 60 seconds.
+- Provider asset price freshness uses capturedAt age <= 60 seconds and requires `effectiveAt` inside the current stock session. Closed-market carry-forward is not eligible for orders.
 - `currencyCode`, if provided, must match `asset.currencyCode`.
 - USD assets use fresh `provider_api` USD/KRW first by provider priority (`korea_exim_exchange_rate`, then `exchange_rate_api`), then approved fresh `admin_manual` fallback. Provider FX freshness uses capturedAt age <= 300 seconds; manual fallback uses the existing 60-second rule.
 - Missing, stale, future, non-positive, wrong-source, or ineligible provider rows fall back to the existing safe `admin_manual` quote logic.

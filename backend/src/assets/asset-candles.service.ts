@@ -5,6 +5,14 @@ import {
   Prisma,
   SeasonStatus,
 } from '../generated/prisma/client';
+import {
+  findPreviousMarketSession,
+  inspectMarketSessionsInRange,
+  resolveCalendarMarket,
+  resolveMarketSession,
+  resolveStockMarketDataUpperBound,
+  resolveStockMarketSessionState,
+} from '../orders/market-calendar.policy';
 import { BinancePublicClient } from '../providers/binance/binance-public.client';
 import type { BinanceKlinesResponse } from '../providers/binance/binance.types';
 import { KisAuthClient } from '../providers/kis/kis-auth.client';
@@ -27,8 +35,8 @@ export type AssetCandlesQuery = {
   includePrevious?: string;
 };
 
-// 'prev_open'  = previous regular market open → now (weekends skipped for stocks)
-// 'prev2_open' = two market days back, regular open → now
+// 'prev_open'  = previous real market-session open → now
+// 'prev2_open' = second previous real market-session open → now
 // '1y'         = rolling 365 days → now
 // Exported (type-only) so the candle response cache can key on and store the
 // exact HTTP response shape without duplicating these definitions. This does
@@ -410,13 +418,18 @@ export class AssetCandlesService {
     // Same-day-only ranges may use the today endpoint (30 rows). Multi-day
     // ranges (prev_open/prev2_open/7d/…) need the daily-minute endpoint, which
     // returns up to 120 rows and can cross into prior days.
+    const providerCursor = this.resolveDomesticProviderCursor(asset, query);
     const usesTodayEndpoint =
       query.range === '1d' &&
       query.intervalMinutes < CANDLE_INTERVAL_MINUTES['1d'] &&
-      query.requestedDate === this.dateInZone(query.clock, KOREA_TIME_ZONE);
+      query.requestedDate === this.dateInZone(query.clock, KOREA_TIME_ZONE) &&
+      providerCursor.date === this.compactDate(query.requestedDate);
     const descriptor = usesTodayEndpoint
-      ? this.buildDomesticTodayCall(asset, query, marketCode)
-      : this.buildDomesticDailyCall(asset, query, marketCode);
+      ? this.buildDomesticTodayCall(asset, query, marketCode, providerCursor)
+      : this.buildDomesticDailyCall(asset, query, marketCode, providerCursor);
+    if (this.isConfirmedEmptyStockRange(asset, query)) {
+      return this.buildResponse(asset, query, descriptor, []);
+    }
     const response = await this.callKisCandles(descriptor);
     const rows = this.extractRows(response);
     const normalized = this.normalizeRows(rows, {
@@ -427,7 +440,7 @@ export class AssetCandlesService {
     const bucketed = this.bucketStockCandles(
       rangeFiltered,
       query.intervalMinutes,
-      KOREA_TIME_ZONE,
+      asset,
     );
     const candles = this.sliceRecent(
       this.filterCandlesToRange(bucketed, query),
@@ -452,7 +465,7 @@ export class AssetCandlesService {
       query.limit,
       KIS_DOMESTIC_PERIOD_MAX_COUNT * maxPages,
     );
-    const dateRange = this.resolveDomesticPeriodDateRange(query);
+    const dateRange = this.resolveDomesticPeriodDateRange(query, asset);
     const sourceDescriptor = this.buildDomesticPeriodCall({
       asset,
       marketCode,
@@ -461,6 +474,9 @@ export class AssetCandlesService {
       endDate: dateRange.endDate,
       requestedCount,
     });
+    if (this.isConfirmedEmptyStockRange(asset, query)) {
+      return this.buildResponse(asset, query, sourceDescriptor, []);
+    }
     const candlesBySourceDate = new Map<string, NormalizedCandle>();
     let cursorEndDate = dateRange.endDate;
 
@@ -533,6 +549,9 @@ export class AssetCandlesService {
   ): Promise<AssetCandlesResponse> {
     const marketCode = this.resolveUsKisMarketCode(asset);
     const descriptor = this.buildOverseasCall(asset, query, marketCode);
+    if (this.isConfirmedEmptyStockRange(asset, query)) {
+      return this.buildResponse(asset, query, descriptor, []);
+    }
     const response = await this.callKisCandles(descriptor);
     const rows = this.extractRows(response);
     const normalized = this.normalizeRows(rows, {
@@ -543,7 +562,7 @@ export class AssetCandlesService {
     const bucketed = this.bucketStockCandles(
       rangeFiltered,
       query.intervalMinutes,
-      US_EASTERN_TIME_ZONE,
+      asset,
     );
     const candles = this.sliceRecent(
       this.filterCandlesToRange(bucketed, query),
@@ -611,6 +630,7 @@ export class AssetCandlesService {
     asset: AssetRecord,
     query: ParsedAssetCandlesQuery,
     marketCode: string,
+    providerCursor: { date: string; time: string },
   ): KisCallDescriptor {
     const symbol = this.normalizeDomesticSymbol(asset.symbol);
 
@@ -622,7 +642,7 @@ export class AssetCandlesService {
       query: {
         FID_COND_MRKT_DIV_CODE: marketCode,
         FID_INPUT_ISCD: symbol,
-        FID_INPUT_HOUR_1: query.toHHmmss,
+        FID_INPUT_HOUR_1: providerCursor.time,
         FID_ETC_CLS_CODE: '',
         FID_PW_DATA_INCU_YN: 'N',
       },
@@ -659,6 +679,7 @@ export class AssetCandlesService {
     asset: AssetRecord,
     query: ParsedAssetCandlesQuery,
     marketCode: string,
+    providerCursor: { date: string; time: string },
   ): KisCallDescriptor {
     const symbol = this.normalizeDomesticSymbol(asset.symbol);
 
@@ -674,8 +695,8 @@ export class AssetCandlesService {
       query: {
         FID_COND_MRKT_DIV_CODE: marketCode,
         FID_INPUT_ISCD: symbol,
-        FID_INPUT_DATE_1: this.compactDate(query.requestedDate),
-        FID_INPUT_HOUR_1: query.toHHmmss,
+        FID_INPUT_DATE_1: providerCursor.date,
+        FID_INPUT_HOUR_1: providerCursor.time,
         // 'Y' lets the 120 returned rows continue backwards into prior trading
         // days, which multi-day ranges (prev_open/prev2_open/7d/…) need.
         FID_PW_DATA_INCU_YN: query.includePrevious ? 'Y' : 'N',
@@ -990,11 +1011,23 @@ export class AssetCandlesService {
   private bucketStockCandles(
     candles: readonly NormalizedCandle[],
     intervalMinutes: number,
-    timeZone: string,
+    asset: AssetRecord,
   ): NormalizedCandle[] {
     const buckets = new Map<string, NormalizedCandle>();
+    const market = resolveCalendarMarket(asset);
+    if (!market) return [];
+    const timeZone = market === 'KRX' ? KOREA_TIME_ZONE : US_EASTERN_TIME_ZONE;
 
     for (const candle of this.sortCandles(candles)) {
+      const session = resolveMarketSession(market, candle.sourceDate);
+      const candleMs = candle.time.getTime();
+      if (
+        !session ||
+        candleMs < session.openTime.getTime() ||
+        candleMs > session.closeTime.getTime()
+      ) {
+        continue;
+      }
       const bucketSourceDate = this.bucketSourceDate(
         candle.sourceDate,
         intervalMinutes,
@@ -1002,7 +1035,17 @@ export class AssetCandlesService {
       const bucketSourceTime =
         intervalMinutes >= 1440
           ? '000000'
-          : this.bucketSourceTime(candle.sourceTime, intervalMinutes);
+          : this.sessionBucketSourceTime(
+              new Date(
+                Math.min(
+                  candle.time.getTime(),
+                  session.closeTime.getTime() - 1,
+                ),
+              ),
+              session.openTime,
+              intervalMinutes,
+              timeZone,
+            );
       const bucketKey = `${bucketSourceDate}-${bucketSourceTime}`;
       const existing = buckets.get(bucketKey);
 
@@ -1052,19 +1095,21 @@ export class AssetCandlesService {
     return date.toISOString().slice(0, 10).replace(/-/gu, '');
   }
 
-  private bucketSourceTime(
-    sourceTime: string,
+  private sessionBucketSourceTime(
+    candleTime: Date,
+    sessionOpenTime: Date,
     intervalMinutes: number,
+    timeZone: string,
   ): string {
-    const hour = Number(sourceTime.slice(0, 2));
-    const minute = Number(sourceTime.slice(2, 4));
-    const totalMinutes = hour * 60 + minute;
-    const bucketMinutes =
-      Math.floor(totalMinutes / intervalMinutes) * intervalMinutes;
-
-    return `${this.pad2(Math.floor(bucketMinutes / 60))}${this.pad2(
-      bucketMinutes % 60,
-    )}00`;
+    const intervalMs = intervalMinutes * 60_000;
+    const bucketTime = new Date(
+      sessionOpenTime.getTime() +
+        Math.floor(
+          (candleTime.getTime() - sessionOpenTime.getTime()) / intervalMs,
+        ) *
+          intervalMs,
+    );
+    return this.timeInZone(bucketTime, timeZone);
   }
 
   private sliceRecent(
@@ -1263,25 +1308,105 @@ export class AssetCandlesService {
     );
   }
 
-  private resolveDomesticPeriodDateRange(query: ParsedAssetCandlesQuery): {
+  private resolveDomesticPeriodDateRange(
+    query: ParsedAssetCandlesQuery,
+    asset: AssetRecord,
+  ): {
     startDate: string;
     endDate: string;
   } {
     const startDate = query.rangeStartAt
       ? this.compactDate(this.dateInZone(query.rangeStartAt, KOREA_TIME_ZONE))
       : this.compactDate(query.requestedDate);
-    const endDate = query.rangeEndAt
-      ? this.compactDate(this.dateInZone(query.rangeEndAt, KOREA_TIME_ZONE))
-      : this.compactDate(query.requestedDate);
+    const endDate =
+      query.explicitDate || query.explicitTo
+        ? query.rangeEndAt
+          ? this.compactDate(this.dateInZone(query.rangeEndAt, KOREA_TIME_ZONE))
+          : this.compactDate(query.requestedDate)
+        : this.resolveDomesticProviderCursor(asset, query).date;
 
     if (startDate <= endDate) {
       return { startDate, endDate };
     }
 
+    return { startDate: endDate, endDate };
+  }
+
+  private resolveDomesticProviderCursor(
+    asset: AssetRecord,
+    query: ParsedAssetCandlesQuery,
+  ): { date: string; time: string } {
+    if (query.explicitDate || query.explicitTo) {
+      return {
+        date: this.compactDate(query.requestedDate),
+        time: query.toHHmmss,
+      };
+    }
+    const requestedTo = query.rangeEndAt ?? query.clock;
+    const upperBound = resolveStockMarketDataUpperBound(
+      asset,
+      requestedTo,
+      query.clock,
+    );
+    if (!upperBound) {
+      this.throwApiError(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'ASSET_CANDLES_PROVIDER_UNAVAILABLE',
+        'Market calendar coverage is unavailable for the candle range.',
+      );
+    }
     return {
-      startDate: endDate,
-      endDate: startDate,
+      date: this.compactDate(this.dateInZone(upperBound, KOREA_TIME_ZONE)),
+      time: this.timeInZone(upperBound, KOREA_TIME_ZONE),
     };
+  }
+
+  private isConfirmedEmptyStockRange(
+    asset: AssetRecord,
+    query: ParsedAssetCandlesQuery,
+  ): boolean {
+    if (query.explicitDate && !query.includePrevious) {
+      const market = resolveCalendarMarket(asset);
+      const localDate = this.compactDate(query.requestedDate);
+      const timeZone =
+        market === 'KRX' ? KOREA_TIME_ZONE : US_EASTERN_TIME_ZONE;
+      const noon = this.zonedDateTimeToUtc(localDate, '120000', timeZone);
+      const dateState = market
+        ? resolveStockMarketSessionState(asset, noon)
+        : null;
+      if (dateState?.state === 'calendar_unavailable') {
+        this.throwApiError(
+          HttpStatus.SERVICE_UNAVAILABLE,
+          'ASSET_CANDLES_PROVIDER_UNAVAILABLE',
+          'Market calendar coverage is unavailable for the candle range.',
+        );
+      }
+      if (market && !resolveMarketSession(market, localDate)) return true;
+    }
+    if (!query.rangeStartAt || !query.rangeEndAt) return false;
+    const inspection = inspectMarketSessionsInRange(
+      asset,
+      query.rangeStartAt,
+      query.rangeEndAt,
+    );
+    if (!inspection.calendarCovered) {
+      const endState = resolveStockMarketSessionState(
+        asset,
+        new Date(query.rangeEndAt.getTime() - 1),
+      );
+      if (endState?.state === 'calendar_unavailable') {
+        this.throwApiError(
+          HttpStatus.SERVICE_UNAVAILABLE,
+          'ASSET_CANDLES_PROVIDER_UNAVAILABLE',
+          'Market calendar coverage is unavailable for the candle range.',
+        );
+      }
+      // A rolling range may begin before the maintained calendar horizon.
+      // It cannot be confirmed empty, so preserve the provider request and
+      // let covered dates normalize through the fail-closed session policy.
+      return false;
+    }
+    return !inspection.hasTradingSession;
   }
 
   private buildCryptoTimeRange(query: ParsedAssetCandlesQuery): {
@@ -1351,7 +1476,7 @@ export class AssetCandlesService {
     if (range === 'prev_open' || range === 'prev2_open') {
       return {
         startAt: this.resolveMarketOpenAnchor(
-          asset.assetType,
+          asset,
           range === 'prev_open' ? 1 : 2,
           now,
         ),
@@ -1366,41 +1491,38 @@ export class AssetCandlesService {
   }
 
   /**
-   * Start anchor for the market-open ranges: the regular-session open
-   * `daysBack` market days before "today" in the asset's market timezone.
-   *   - domestic_stock: KRX regular open 09:00 Asia/Seoul
-   *   - us_stock: US regular open 09:30 America/New_York
-   *   - crypto: trades 24/7 with no session open, so we anchor to 09:00
-   *     Asia/Seoul calendar days back to mirror the KRX-centric UX. Adjust here
-   *     if the project adopts a different crypto chart time policy.
-   * Weekends are skipped for stocks (previous *trading* day); market holidays
-   * are not modeled yet — see TODO(chart-range).
+   * Start anchor for market-open ranges. Stocks use the Nth actual exchange
+   * session strictly before today's local date, including delayed opens and
+   * excluding weekends/full-day closures. Crypto keeps the existing 09:00
+   * Asia/Seoul calendar-day anchor because it trades continuously.
    */
   private resolveMarketOpenAnchor(
-    assetType: AssetType,
+    asset: AssetRecord,
     daysBack: number,
     now: Date,
   ): Date {
-    const usesUsSession = assetType === AssetType.us_stock;
-    const timeZone = usesUsSession ? US_EASTERN_TIME_ZONE : KOREA_TIME_ZONE;
-    const openTime = usesUsSession ? '093000' : '090000';
-    const skipWeekends = assetType !== AssetType.crypto;
+    if (asset.assetType !== AssetType.crypto) {
+      const session = findPreviousMarketSession(asset, now, daysBack);
+      if (!session) {
+        this.throwApiError(
+          HttpStatus.SERVICE_UNAVAILABLE,
+          'ASSET_CANDLES_PROVIDER_UNAVAILABLE',
+          'Market calendar coverage is unavailable for the candle range.',
+        );
+      }
+      return session.openTime;
+    }
 
-    const todayParts = this.zonedParts(now, timeZone);
+    const todayParts = this.zonedParts(now, KOREA_TIME_ZONE);
     const cursor = new Date(
       Date.UTC(todayParts.year, todayParts.month - 1, todayParts.day),
     );
-    let remaining = daysBack;
-    while (remaining > 0) {
+    for (let remaining = daysBack; remaining > 0; remaining -= 1) {
       cursor.setUTCDate(cursor.getUTCDate() - 1);
-      const weekday = cursor.getUTCDay();
-      if (!skipWeekends || (weekday !== 0 && weekday !== 6)) {
-        remaining -= 1;
-      }
     }
 
     const anchorDate = cursor.toISOString().slice(0, 10).replace(/-/gu, '');
-    return this.zonedDateTimeToUtc(anchorDate, openTime, timeZone);
+    return this.zonedDateTimeToUtc(anchorDate, '090000', KOREA_TIME_ZONE);
   }
 
   private async findCurrentSeasonForRange(now: Date) {

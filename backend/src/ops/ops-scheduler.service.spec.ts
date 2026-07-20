@@ -386,14 +386,14 @@ describe('OpsSchedulerService', () => {
     ).toBe(true);
   });
 
-  it('runs KRX reconciliation after the configured close grace and only once per successful date', async () => {
+  it('runs KRX reconciliation after the actual session close grace and only once per successful date', async () => {
     process.env.CANDLE_RECONCILIATION_KRX_ENABLED = 'true';
     const { runner, runService, service } = createService();
 
     await expect(
-      service.runEnabledJobs(new Date('2026-07-10T07:19:00.000Z')),
+      service.runEnabledJobs(new Date('2026-07-10T06:49:00.000Z')),
     ).resolves.toEqual([]);
-    await service.runEnabledJobs(new Date('2026-07-10T07:20:00.000Z'));
+    await service.runEnabledJobs(new Date('2026-07-10T06:50:00.000Z'));
     expect(runner.runMarketCandleReconciliationJob).toHaveBeenCalledWith(
       expect.objectContaining({
         market: 'KRX',
@@ -407,11 +407,25 @@ describe('OpsSchedulerService', () => {
     );
 
     runService.findLatestSucceededReconciliationRun.mockResolvedValueOnce({
-      startedAt: new Date('2026-07-10T07:20:00.000Z'),
-      finishedAt: new Date('2026-07-10T07:21:00.000Z'),
+      startedAt: new Date('2026-07-10T06:50:00.000Z'),
+      finishedAt: new Date('2026-07-10T06:51:00.000Z'),
     });
     await service.runEnabledJobs(new Date('2026-07-10T08:00:00.000Z'));
     expect(runner.runMarketCandleReconciliationJob).toHaveBeenCalledTimes(1);
+  });
+
+  it('includes weekly reconciliation on Thursday before a Friday KRX holiday', async () => {
+    process.env.CANDLE_RECONCILIATION_KRX_ENABLED = 'true';
+    const { runner, service } = createService();
+
+    await service.runEnabledJobs(new Date('2026-07-16T06:50:00.000Z'));
+
+    expect(runner.runMarketCandleReconciliationJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        market: 'KRX',
+        targets: ['5m', '1d', '1w'],
+      }),
+    );
   });
 
   it('never runs stock reconciliation on a real exchange holiday', async () => {
@@ -422,12 +436,31 @@ describe('OpsSchedulerService', () => {
     // close grace. 2026-07-03 is Independence Day observed (US closed).
     await service.runEnabledJobs(new Date('2026-07-17T08:00:00.000Z'));
     expect(runner.runMarketCandleReconciliationJob).not.toHaveBeenCalledWith(
-      expect.objectContaining({ market: 'KRX', metadataJson: expect.objectContaining({ businessDate: '2026-07-17' }) }),
+      expect.objectContaining({
+        market: 'KRX',
+        metadataJson: expect.objectContaining({ businessDate: '2026-07-17' }),
+      }),
     );
     await service.runEnabledJobs(new Date('2026-07-03T22:00:00.000Z'));
     expect(runner.runMarketCandleReconciliationJob).not.toHaveBeenCalledWith(
-      expect.objectContaining({ market: 'US', metadataJson: expect.objectContaining({ businessDate: '2026-07-03' }) }),
+      expect.objectContaining({
+        market: 'US',
+        metadataJson: expect.objectContaining({ businessDate: '2026-07-03' }),
+      }),
     );
+  });
+
+  it('does not run startup stock catch-up on a full-day holiday', async () => {
+    process.env.CANDLE_RECONCILIATION_KRX_ENABLED = 'true';
+    process.env.CANDLE_RECONCILIATION_STARTUP_CATCH_UP_ENABLED = 'true';
+    const { runner, service } = createService();
+
+    await expect(
+      service.runStartupCandleReconciliation(
+        new Date('2026-07-17T08:00:00.000Z'),
+      ),
+    ).resolves.toEqual([]);
+    expect(runner.runMarketCandleReconciliationJob).not.toHaveBeenCalled();
   });
 
   it('runs crypto reconciliation on a bounded rolling interval', async () => {

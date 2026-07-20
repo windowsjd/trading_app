@@ -52,7 +52,7 @@ describe('KisPeriodCandleNormalizerService', () => {
   const wideTo = new Date('2027-01-01T00:00:00Z');
 
   describe('domestic daily', () => {
-    it('anchors candles to the Asia/Seoul trading date and closes them after 15:30 KST', () => {
+    it('anchors candles to the Asia/Seoul trading date and closes them at the actual session end', () => {
       const result = service.normalizeDomesticPeriodRows({
         rows: [domesticRow('20260710')],
         interval: '1d',
@@ -154,7 +154,7 @@ describe('KisPeriodCandleNormalizerService', () => {
   });
 
   describe('domestic weekly', () => {
-    it('anchors any reported date to Monday 00:00 KST and closes after Friday 15:30 KST', () => {
+    it('anchors any reported date to Monday 00:00 KST and closes after the last session of the week', () => {
       // 2026-07-08 is a Wednesday; its ISO week starts Monday 2026-07-06.
       const result = service.normalizeDomesticPeriodRows({
         rows: [domesticRow('20260708')],
@@ -176,6 +176,45 @@ describe('KisPeriodCandleNormalizerService', () => {
         now: new Date('2026-07-10T06:30:00Z'), // Friday 15:30 KST
       });
       expect(closed.candles[0].isClosed).toBe(true);
+    });
+
+    it('closes the weekly candle on Thursday when Friday is a KRX holiday', () => {
+      const beforeClose = service.normalizeDomesticPeriodRows({
+        rows: [domesticRow('20260716')],
+        interval: '1w',
+        from: wideFrom,
+        to: wideTo,
+        now: new Date('2026-07-16T06:29:00.000Z'),
+      });
+      expect(beforeClose.candles[0].isClosed).toBe(false);
+
+      const atClose = service.normalizeDomesticPeriodRows({
+        rows: [domesticRow('20260716')],
+        interval: '1w',
+        from: wideFrom,
+        to: wideTo,
+        now: new Date('2026-07-16T06:30:00.000Z'),
+      });
+      expect(atClose.candles[0].isClosed).toBe(true);
+    });
+
+    it('uses the 16:30 KRX close for the delayed-open session', () => {
+      const beforeClose = service.normalizeDomesticPeriodRows({
+        rows: [domesticRow('20261119')],
+        interval: '1d',
+        from: wideFrom,
+        to: wideTo,
+        now: new Date('2026-11-19T07:29:00.000Z'),
+      });
+      expect(beforeClose.candles[0].isClosed).toBe(false);
+      const atClose = service.normalizeDomesticPeriodRows({
+        rows: [domesticRow('20261119')],
+        interval: '1d',
+        from: wideFrom,
+        to: wideTo,
+        now: new Date('2026-11-19T07:30:00.000Z'),
+      });
+      expect(atClose.candles[0].isClosed).toBe(true);
     });
 
     it('merges rows from the same week into a single anchored candle', () => {
@@ -215,7 +254,7 @@ describe('KisPeriodCandleNormalizerService', () => {
       expect(candle.isClosed).toBe(true);
     });
 
-    it('spans 23 hours across the spring-forward date instead of using a fixed UTC offset', () => {
+    it('does not create a daily candle for a weekend date during the DST transition', () => {
       const result = service.normalizeOverseasPeriodRows({
         rows: [usRow('20260308')],
         interval: '1d',
@@ -223,13 +262,8 @@ describe('KisPeriodCandleNormalizerService', () => {
         to: wideTo,
         now: new Date('2026-07-01T00:00:00Z'),
       });
-      const candle = result.candles[0];
-      expect(candle.openTime.toISOString()).toBe('2026-03-08T05:00:00.000Z');
-      // Next midnight is EDT (UTC-4): only 23 hours later.
-      expect(candle.closeTime.toISOString()).toBe('2026-03-09T04:00:00.000Z');
-      expect(candle.closeTime.getTime() - candle.openTime.getTime()).toBe(
-        23 * 60 * 60 * 1000,
-      );
+      expect(result.candles).toEqual([]);
+      expect(result.rejectedRows).toBe(1);
     });
 
     it('closes a daily candle only after 16:00 New York time', () => {
@@ -249,6 +283,55 @@ describe('KisPeriodCandleNormalizerService', () => {
         now: new Date('2026-07-09T20:00:00Z'), // 16:00 EDT
       });
       expect(afterClose.candles[0].isClosed).toBe(true);
+    });
+
+    it.each(['20261127', '20261224'])(
+      'closes the %s early-close daily candle at 13:00 New York time',
+      (date) => {
+        const beforeClose = service.normalizeOverseasPeriodRows({
+          rows: [usRow(date)],
+          interval: '1d',
+          from: wideFrom,
+          to: wideTo,
+          now: new Date(
+            date === '20261127'
+              ? '2026-11-27T17:59:00.000Z'
+              : '2026-12-24T17:59:00.000Z',
+          ),
+        });
+        expect(beforeClose.candles[0].isClosed).toBe(false);
+        const atClose = service.normalizeOverseasPeriodRows({
+          rows: [usRow(date)],
+          interval: '1d',
+          from: wideFrom,
+          to: wideTo,
+          now: new Date(
+            date === '20261127'
+              ? '2026-11-27T18:00:00.000Z'
+              : '2026-12-24T18:00:00.000Z',
+          ),
+        });
+        expect(atClose.candles[0].isClosed).toBe(true);
+      },
+    );
+
+    it('closes the US weekly candle on Thursday when Friday is a holiday', () => {
+      const beforeClose = service.normalizeOverseasPeriodRows({
+        rows: [usRow('20260702')],
+        interval: '1w',
+        from: wideFrom,
+        to: wideTo,
+        now: new Date('2026-07-02T19:59:00.000Z'),
+      });
+      expect(beforeClose.candles[0].isClosed).toBe(false);
+      const atClose = service.normalizeOverseasPeriodRows({
+        rows: [usRow('20260702')],
+        interval: '1w',
+        from: wideFrom,
+        to: wideTo,
+        now: new Date('2026-07-02T20:00:00.000Z'),
+      });
+      expect(atClose.candles[0].isClosed).toBe(true);
     });
 
     it('anchors weekly candles to Monday 00:00 New York across the DST transition', () => {

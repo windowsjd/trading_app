@@ -15,16 +15,39 @@
 - Limit 주문은 buy `executePrice <= limitPrice`, sell `executePrice >= limitPrice`일 때만 체결 가능하고, 체결가는 항상 execute 시점 provider price다. 불만족 시 `ORDER_LIMIT_NOT_MARKETABLE`.
   근거: limit은 체결 가능 여부만 판단하고, 실제 체결가는 시장가 원칙을 유지한다.
 
-## Freshness Thresholds (`capturedAt` 기준)
+## Market-State-Aware Price Freshness
 
-| 대상 | Quote/Read | Execute |
-| --- | --- | --- |
-| KRX 국내주식 | 60초 | 10초 |
-| 미국주식 (NAS/NYS) | 60초 | 10초 |
-| BINANCE 암호화폐 | 60초 | 10초 |
-| USD/KRW FX | 300초 (admin_manual 폴백은 `effectiveAt` 60초) | 60초 |
+- 주식시장 개장 중에는 아래 `capturedAt` freshness와 현재 세션 안의 `effectiveAt`을 함께 요구한다. 현재 세션 가격이 없으면 stale/unavailable이며 이전 세션 가격으로 넘어가지 않는다.
+  근거: 시장이 열렸는데 현재 세션 데이터가 없는 상태는 정상 휴장이 아니라 provider 지연 또는 장애다.
+- 주식시장 폐장 후·주말·전일 휴장에는 자산별 KRX/US 캘린더가 가리키는 최근 완료 세션 안의 마지막 유효 `provider_api` 가격을 read/display, live valuation, current ranking, daily portfolio snapshot, market snapshot health에 사용할 수 있다. 해당 세션 가격이 없으면 더 오래된 세션으로 넘어가지 않는다.
+  근거: 닫힌 시장의 무거래는 정상이지만, 평가 근거는 가장 최근 완료 세션으로 유계되어야 한다.
+- 주문 quote/create/execute에는 완료 세션 carry-forward를 사용하지 않는다. 휴장 중에는 가격 선택보다 `MARKET_CLOSED`를 우선하고, 개장 후 execute는 현재 세션의 10초 freshness를 유지한다.
+  근거: 표시·평가의 종가 보존과 자금 변동 경로의 체결 안전성은 분리되어야 한다.
+- KRX와 미국 시장 상태는 자산별로 독립 판정하고 crypto는 24시간 freshness 정책을 유지한다. 시즌 날짜, 주문 생성 시각, 거래 내역 날짜, 사용자 활동일에는 주식시장 휴장일을 적용하지 않는다.
+  근거: 혼합 포트폴리오와 일반 도메인 날짜를 한 시장의 휴장 여부로 함께 중단하면 안 된다.
 
-근거: quote/read는 참고용이라 완화된 기준을 적용하고, execute는 자금 이동을 수반하므로 더 타이트한 기준을 강제한다. FX 60초 기준은 provider 도입 이전부터 쓰이던 기존 admin_manual 정책을 그대로 승계했다.
+개장 중 `capturedAt` 기준:
+
+| 대상               | Quote/Read                                     | Execute |
+| ------------------ | ---------------------------------------------- | ------- |
+| KRX 국내주식       | 60초                                           | 10초    |
+| 미국주식 (NAS/NYS) | 60초                                           | 10초    |
+| BINANCE 암호화폐   | 60초                                           | 10초    |
+| USD/KRW FX         | 300초 (admin_manual 폴백은 `effectiveAt` 60초) | 60초    |
+
+근거: quote/read는 참고용이라 완화된 기준을 적용하고, execute는 자금 이동을 수반하므로 더 타이트한 기준을 강제한다. 닫힌 주식시장의 허용 여부는 절대 age가 아니라 최근 완료 세션 소속 여부로 판정한다. FX 60초 기준은 provider 도입 이전부터 쓰이던 기존 admin_manual 정책을 그대로 승계했다.
+
+## Market-Date Calculation Inventory
+
+| 분류                       | 위치/계산                                                                                                                                                                                                                    | 결정                                                                                                                                       |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| 시장 캘린더 적용           | `orders/market-hours.policy.ts`, `assets/asset-candles.service.ts`, stock candle aggregation/build/normalization, candle provider cursor·range·empty coverage, stock reconciliation scheduler, KIS one-shot target selection | `resolveMarketSession`, 이전/최근 완료 세션, 주의 마지막 세션을 공용 정책에서 사용한다. 고정 요일·시각과 주말 전용 계산은 사용하지 않는다. |
+| 시장 캘린더 적용           | Assets/ticker, Positions, Portfolio, Home, current Records, current ranking/daily snapshot, market snapshot health, Orders의 주식 가격 선택                                                                                  | 자산별 open/closed 세션 상태와 `effectiveAt` 세션 소속을 공용 source policy에서 판정한다.                                                  |
+| 이미 공용 캘린더 사용      | live candle event normalizer, KIS US 5-minute normalizer, readiness calendar coverage                                                                                                                                        | 기존 동작을 유지하고 동일 registry/data를 계속 사용한다.                                                                                   |
+| 일반 캘린더 날짜—변경 없음 | 시즌 시작·종료·정산 기준시각, 주문 생성/체결 기록시각, 거래 내역 날짜, 사용자 활동일, daily snapshot의 날짜 key, equity rolling 기간, FX lookback                                                                            | 거래 세션을 뜻하지 않으므로 주식 휴장일을 적용하지 않는다.                                                                                 |
+| 정책상 독립                | crypto 24시간 bucket/freshness, FX 수집·freshness, long-lived WebSocket transport 연결 상태                                                                                                                                  | 주식 휴장으로 중단하지 않는다. 단, 주식 trade-data freshness/health는 해당 시장 세션 상태를 사용한다.                                      |
+
+모든 주식시장 날짜 계산의 source of truth는 `src/orders/market-calendar/`와 그 2026/2027 KRX·US 데이터다. 데이터가 없는 연도는 평일도 개장으로 추측하지 않고 fail-closed/degraded 처리한다.
 
 ## Source Type 우선순위
 

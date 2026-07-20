@@ -22,6 +22,7 @@ import {
   resolveAssetProviderEligibility,
   resolveFxProviderEligibility,
   selectFreshProviderSnapshotBySourcePriority,
+  selectMarketAwareAssetPriceSnapshotBySourcePriority,
 } from '../providers/source-eligibility.policy';
 import { presentSourceDecision } from '../providers/source-metadata.presenter';
 import {
@@ -1072,7 +1073,9 @@ export class HomeService {
         })) ?? [])
       : [];
     const providerSelection = providerEligibility.eligible
-      ? selectFreshProviderSnapshotBySourcePriority({
+      ? selectMarketAwareAssetPriceSnapshotBySourcePriority({
+          asset,
+          workflow: 'home_live_valuation',
           candidates: providerCandidates,
           expectedSourceNames: providerEligibility.sourceNames,
           now: valuationAt,

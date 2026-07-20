@@ -34,6 +34,7 @@ import {
   resolveAssetProviderEligibility,
   resolveFxProviderEligibility,
   selectFreshProviderSnapshotBySourcePriority,
+  selectMarketAwareAssetPriceSnapshotBySourcePriority,
 } from '../providers/source-eligibility.policy';
 import {
   presentSourceDecision,
@@ -1205,7 +1206,9 @@ export class OrdersService {
         capturedAt: true,
       },
     });
-    const selection = selectFreshProviderSnapshotBySourcePriority({
+    const selection = selectMarketAwareAssetPriceSnapshotBySourcePriority({
+      asset: order.asset,
+      workflow: 'orders_execute',
       candidates,
       expectedSourceNames: providerEligibility.sourceNames,
       now: executedAt,
@@ -1214,7 +1217,11 @@ export class OrdersService {
     });
 
     if (selection.state !== 'selected') {
-      if (selection.decision.rejectedProviderReason === 'captured_at_stale') {
+      if (
+        selection.decision.rejectedProviderReason === 'captured_at_stale' ||
+        selection.decision.rejectedProviderReason ===
+          'effective_at_outside_current_session'
+      ) {
         this.throwApiError(
           HttpStatus.SERVICE_UNAVAILABLE,
           'PRICE_STALE',
@@ -2311,7 +2318,9 @@ export class OrdersService {
         })
       : [];
     const providerSelection = providerEligibility.eligible
-      ? selectFreshProviderSnapshotBySourcePriority({
+      ? selectMarketAwareAssetPriceSnapshotBySourcePriority({
+          asset: input,
+          workflow: 'live_portfolio_valuation',
           candidates: providerCandidates,
           expectedSourceNames: providerEligibility.sourceNames,
           now: valuationAt,
@@ -2373,7 +2382,9 @@ export class OrdersService {
     if (!snapshot) {
       if (
         providerSelection.decision.rejectedProviderReason ===
-        'captured_at_stale'
+          'captured_at_stale' ||
+        providerSelection.decision.rejectedProviderReason ===
+          'effective_at_outside_current_session'
       ) {
         this.throwApiError(
           HttpStatus.SERVICE_UNAVAILABLE,
@@ -3412,7 +3423,9 @@ export class OrdersService {
         })) ?? [])
       : [];
     const providerSelection = providerEligibility.eligible
-      ? selectFreshProviderSnapshotBySourcePriority({
+      ? selectMarketAwareAssetPriceSnapshotBySourcePriority({
+          asset,
+          workflow: sourceWorkflow,
           candidates: providerCandidates,
           expectedSourceNames: providerEligibility.sourceNames,
           now: quoteAt,

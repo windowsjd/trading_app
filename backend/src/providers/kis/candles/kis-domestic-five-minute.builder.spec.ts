@@ -68,7 +68,7 @@ describe('KisDomesticFiveMinuteBuilder', () => {
     expect(result.candles[0].amount).toBeNull();
   });
 
-  it('never mixes different trading dates into one bucket', () => {
+  it('does not emit a bucket for a weekend trading date', () => {
     const nextDay = [0, 1, 2, 3, 4].map((offset) =>
       minute(offset, { openTime: new Date(Date.UTC(2026, 6, 11, 0, offset)) }),
     );
@@ -76,7 +76,59 @@ describe('KisDomesticFiveMinuteBuilder', () => {
       rows: [...[0, 1, 2, 3, 4].map((offset) => minute(offset)), ...nextDay],
       now: new Date('2026-07-11T01:00:00Z'),
     });
-    expect(result.candles).toHaveLength(2);
+    expect(result.candles).toHaveLength(1);
+    expect(result.rejectedBuckets).toBeGreaterThan(0);
+  });
+
+  it('uses the delayed 10:00 open as the first bucket anchor', () => {
+    const rows = [0, 1, 2, 3, 4].map((offset) =>
+      minute(offset, {
+        openTime: new Date(Date.UTC(2026, 0, 2, 1, offset)),
+        sourceUpdatedAt: new Date(Date.UTC(2026, 0, 2, 1, offset, 30)),
+      }),
+    );
+    const result = builder.build({
+      rows: [
+        minute(0, { openTime: new Date('2026-01-02T00:00:00.000Z') }),
+        ...rows,
+      ],
+      now: new Date('2026-01-02T01:06:00.000Z'),
+    });
+    expect(result.candles).toHaveLength(1);
+    expect(result.candles[0].openTime.toISOString()).toBe(
+      '2026-01-02T01:00:00.000Z',
+    );
+  });
+
+  it('keeps the 16:25 final bucket on the 16:30 KRX session', () => {
+    const rows = [0, 1, 2, 3, 4].map((offset) =>
+      minute(offset, {
+        openTime: new Date(Date.UTC(2026, 10, 19, 7, 25 + offset)),
+        sourceUpdatedAt: new Date(Date.UTC(2026, 10, 19, 7, 25 + offset, 30)),
+      }),
+    );
+    const result = builder.build({
+      rows,
+      now: new Date('2026-11-19T07:31:00.000Z'),
+    });
+    expect(result.candles).toHaveLength(1);
+    expect(result.candles[0].closeTime.toISOString()).toBe(
+      '2026-11-19T07:30:00.000Z',
+    );
+    expect(result.candles[0].isClosed).toBe(true);
+  });
+
+  it('does not create a candle on the 2026-07-17 KRX holiday', () => {
+    const rows = [0, 1, 2, 3, 4].map((offset) =>
+      minute(offset, {
+        openTime: new Date(Date.UTC(2026, 6, 17, 0, offset)),
+      }),
+    );
+    const result = builder.build({
+      rows,
+      now: new Date('2026-07-17T01:00:00.000Z'),
+    });
+    expect(result.candles).toEqual([]);
   });
 
   it('deterministically keeps the latest duplicate minute instead of rejecting the bucket', () => {

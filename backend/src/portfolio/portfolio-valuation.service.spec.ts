@@ -41,7 +41,7 @@ import { PortfolioValuationService } from './portfolio-valuation.service';
 describe('PortfolioValuationService source eligibility', () => {
   const valuationAt = new Date('2026-06-03T00:00:00.000Z');
 
-  it('uses fresh provider_api price and USD/KRW when live portfolio valuation opts in', async () => {
+  it('uses the latest completed US session price after market close', async () => {
     const prisma = createPrismaMock();
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
       id: 'sp-1',
@@ -81,9 +81,9 @@ describe('PortfolioValuationService source eligibility', () => {
         currencyCode: CurrencyCode.USD,
         sourceType: AssetPriceSourceType.provider_api,
         sourceName: 'kis_us_delayed_trade',
-        effectiveAt: new Date('2026-06-02T23:59:30.000Z'),
-        capturedAt: new Date('2026-06-02T23:59:40.000Z'),
-        createdAt: new Date('2026-06-02T23:59:41.000Z'),
+        effectiveAt: new Date('2026-06-02T19:59:30.000Z'),
+        capturedAt: new Date('2026-06-02T19:59:40.000Z'),
+        createdAt: new Date('2026-06-02T19:59:41.000Z'),
       },
     ]);
     prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
@@ -152,7 +152,7 @@ describe('PortfolioValuationService source eligibility', () => {
     expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
   });
 
-  it('uses fresh provider_api price and USD/KRW for daily portfolio snapshot valuation', async () => {
+  it('uses the latest completed US session price for a daily snapshot', async () => {
     const prisma = createPrismaMock();
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
       id: 'sp-1',
@@ -192,9 +192,9 @@ describe('PortfolioValuationService source eligibility', () => {
         currencyCode: CurrencyCode.USD,
         sourceType: AssetPriceSourceType.provider_api,
         sourceName: 'kis_us_delayed_trade',
-        effectiveAt: new Date('2026-06-02T23:59:30.000Z'),
-        capturedAt: new Date('2026-06-02T23:59:40.000Z'),
-        createdAt: new Date('2026-06-02T23:59:41.000Z'),
+        effectiveAt: new Date('2026-06-02T19:59:30.000Z'),
+        capturedAt: new Date('2026-06-02T19:59:40.000Z'),
+        createdAt: new Date('2026-06-02T19:59:41.000Z'),
       },
     ]);
     prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
@@ -248,7 +248,7 @@ describe('PortfolioValuationService source eligibility', () => {
     expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
   });
 
-  it('falls back to admin_manual when daily snapshot provider asset price is stale', async () => {
+  it('retains admin_manual fallback when the provider price is outside the required session', async () => {
     const prisma = createPrismaMock();
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
       id: 'sp-1',
@@ -319,7 +319,9 @@ describe('PortfolioValuationService source eligibility', () => {
         adminManualUsed: true,
         fallbackUsed: true,
         fallbackReasons: ['provider_rejected'],
-        rejectedProviderReasons: ['captured_at_stale'],
+        rejectedProviderReasons: [
+          'effective_at_outside_last_completed_session',
+        ],
       },
       assetPriceSourceDecisions: [
         {
@@ -328,7 +330,8 @@ describe('PortfolioValuationService source eligibility', () => {
             selectedSourceType: 'admin_manual',
             selectedSnapshotId: 'admin-price-krx',
             fallbackReason: 'provider_rejected',
-            rejectedProviderReason: 'captured_at_stale',
+            rejectedProviderReason:
+              'effective_at_outside_last_completed_session',
           },
         },
       ],
@@ -464,6 +467,100 @@ describe('PortfolioValuationService source eligibility', () => {
     ).rejects.toMatchObject({
       code: 'ASSET_PRICE_UNAVAILABLE',
     } satisfies Partial<PortfolioValuationError>);
+  });
+
+  it('applies independent KRX, US, and crypto freshness in one portfolio', async () => {
+    const prisma = createPrismaMock();
+    const mixedAt = new Date('2026-07-17T15:00:00.000Z');
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+      id: 'sp-mixed',
+      initialCapitalKrw: new Prisma.Decimal('1000000'),
+      cashWallets: [
+        {
+          currencyCode: CurrencyCode.KRW,
+          balanceAmount: new Prisma.Decimal('0'),
+        },
+        {
+          currencyCode: CurrencyCode.USD,
+          balanceAmount: new Prisma.Decimal('0'),
+        },
+      ],
+      positions: [
+        position(
+          'asset-krx',
+          AssetType.domestic_stock,
+          'KRX',
+          CurrencyCode.KRW,
+        ),
+        position('asset-us', AssetType.us_stock, 'NAS', CurrencyCode.USD),
+        position('asset-crypto', AssetType.crypto, 'BINANCE', CurrencyCode.USD),
+      ],
+    });
+    prisma.assetPriceSnapshot.findMany
+      .mockResolvedValueOnce([
+        providerPrice(
+          'price-krx-last-session',
+          'asset-krx',
+          'kis_krx_realtime_trade',
+          '2026-07-16T06:29:00.000Z',
+          CurrencyCode.KRW,
+        ),
+      ])
+      .mockResolvedValueOnce([
+        providerPrice(
+          'price-us-current',
+          'asset-us',
+          'kis_us_delayed_trade',
+          '2026-07-17T14:59:30.000Z',
+          CurrencyCode.USD,
+        ),
+      ])
+      .mockResolvedValueOnce([
+        providerPrice(
+          'price-crypto-current',
+          'asset-crypto',
+          'binance_spot_ws_ticker',
+          '2026-07-17T14:59:30.000Z',
+          CurrencyCode.USD,
+        ),
+      ]);
+    prisma.fxRateSnapshot.findMany.mockResolvedValueOnce([
+      {
+        id: 'fx-current',
+        baseCurrency: CurrencyCode.USD,
+        quoteCurrency: CurrencyCode.KRW,
+        rate: new Prisma.Decimal('1400'),
+        sourceType: FxRateSourceType.provider_api,
+        sourceName: 'exchange_rate_api',
+        effectiveAt: new Date('2026-07-17T14:59:30.000Z'),
+        capturedAt: new Date('2026-07-17T14:59:30.000Z'),
+        createdAt: new Date('2026-07-17T14:59:30.000Z'),
+        approvedByUserId: null,
+      },
+    ]);
+
+    const result = await new PortfolioValuationService(
+      prisma as never,
+    ).calculateSeasonParticipantValuation(
+      'sp-mixed',
+      mixedAt,
+      'daily_portfolio_snapshot',
+    );
+
+    expect(
+      result.assetPriceSourceDecisions.map(
+        (decision) => decision.sourceDecision.selectedSnapshotId,
+      ),
+    ).toEqual([
+      'price-krx-last-session',
+      'price-us-current',
+      'price-crypto-current',
+    ]);
+    expect(result.sourceSummary).toMatchObject({
+      providerApiUsed: true,
+      adminManualUsed: false,
+      fallbackUsed: false,
+    });
   });
 
   it('uses latest provider_api rows at or before Season.endAt for settlement without capturedAt freshness', async () => {
@@ -624,5 +721,45 @@ function createPrismaMock() {
       findMany: jest.fn().mockResolvedValue([]),
       findFirst: jest.fn(),
     },
+  };
+}
+
+function position(
+  assetId: string,
+  assetType: AssetType,
+  market: string,
+  currencyCode: CurrencyCode,
+) {
+  return {
+    assetId,
+    quantity: new Prisma.Decimal('1'),
+    averageCost: new Prisma.Decimal('1'),
+    currencyCode,
+    realizedPnl: new Prisma.Decimal('0'),
+    realizedPnlKrw: new Prisma.Decimal('0'),
+    asset: { id: assetId, assetType, market, currencyCode },
+  };
+}
+
+function providerPrice(
+  id: string,
+  assetId: string,
+  sourceName: string,
+  timestamp: string,
+  currencyCode: CurrencyCode,
+) {
+  const time = new Date(timestamp);
+  return {
+    id,
+    assetId,
+    price: new Prisma.Decimal('100'),
+    priceKrw:
+      currencyCode === CurrencyCode.KRW ? new Prisma.Decimal('100') : null,
+    currencyCode,
+    sourceType: AssetPriceSourceType.provider_api,
+    sourceName,
+    effectiveAt: time,
+    capturedAt: time,
+    createdAt: time,
   };
 }

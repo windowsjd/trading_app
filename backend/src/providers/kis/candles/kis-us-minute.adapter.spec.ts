@@ -23,6 +23,29 @@ describe('KisUsMinuteAdapter', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
+  it('treats the 2026-07-03 US holiday as confirmed empty without a provider call', async () => {
+    const quote = { getMarketDataWithMetadataByExplicitPath: jest.fn() };
+    const result = await new KisUsMinuteAdapter(
+      auth as never,
+      quote as never,
+      config as never,
+    ).fetchUsFiveMinuteRows({
+      asset: { id: 'a', symbol: 'AAPL', marketCode: 'NAS' },
+      from: new Date('2026-07-03T13:30:00.000Z'),
+      to: new Date('2026-07-03T20:00:00.000Z'),
+      now: new Date('2026-07-04T00:00:00.000Z'),
+    });
+    expect(result).toMatchObject({
+      stopReason: 'expected_no_data',
+      complete: true,
+      pagesFetched: 0,
+    });
+    expect(auth.requestConfiguredRestToken).not.toHaveBeenCalled();
+    expect(
+      quote.getMarketDataWithMetadataByExplicitPath,
+    ).not.toHaveBeenCalled();
+  });
+
   it('uses NMIN=5 and advances NEXT/KEYB/tr_cont from the last candle', async () => {
     const quote = {
       getMarketDataWithMetadataByExplicitPath: jest

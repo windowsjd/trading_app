@@ -22,7 +22,7 @@
 - Crypto KRW valuation is crypto USD price x quantity x USD/KRW rate.
 - `cryptoValueKrw` means KRW-converted value of crypto positions; `totalAssetKrw` and `returnRate` remain KRW-based.
 - Active live valuation and `topPositions` may use fresh eligible `provider_api` rows first, then existing `admin_manual` fallback rows.
-- Provider asset price freshness uses capturedAt age <= 60 seconds; provider USD/KRW freshness uses capturedAt age <= 300 seconds.
+- Open stock markets use capturedAt age <= 60 seconds plus current-session effective time; closed KRX/US assets use only their latest completed session price. Crypto and provider USD/KRW keep their existing continuous freshness rules.
 - Settled final result, ranking, rewards, equity chart reads, and scheduler/ops status do not use live provider rows. Operator-run daily snapshot generation may consume existing fresh eligible provider_api DB rows first with admin_manual fallback, but Home still reads the generated snapshot rows and does not query provider rows for daily snapshot sections.
 - Active live valuation sections may expose public-safe source metadata for outage visibility: `sourceSummary`, `priceSource`, and `fxRateSource`.
 - Daily snapshot summary, ranking, final result, rewards, and equity chart sections do not expose provider source metadata because they read existing snapshot/ranking/reward rows.
@@ -344,7 +344,7 @@ If live valuation is unavailable, `summary` is returned as:
 Read-only MVP is implemented for active joined `summary`, `ranking`, `walletSummary`, `allocation`, `topPositions`, and `equityChart`.
 
 - `allocation` uses live valuation and returns unavailable when required provider/admin asset price is missing/not eligible, or provider/admin USD/KRW data is missing or stale. `percentage` is a 0-100 decimal string, and `rate` is the 0-1 decimal fraction.
-- `topPositions` excludes zero-quantity positions, uses fresh eligible `provider_api` asset price first then `admin_manual` fallback, converts USD assets with fresh provider USD/KRW first then approved `admin_manual` fallback, sorts by `positionValueKrw` descending, and limits to 5.
+- `topPositions` excludes zero-quantity positions, applies market-aware provider selection independently to each asset (latest completed session only when that stock market is closed), then `admin_manual` fallback, converts USD assets with fresh provider USD/KRW first then approved `admin_manual` fallback, sorts by `positionValueKrw` descending, and limits to 5.
 - Live valuation `sourceSummary` and top-position `priceSource`/`fxRateSource` are optional metadata additions for provider outage/fallback UX. `fallbackUsed=true` can be shown by the frontend as provider outage/stale/fallback context; final UX wording is a separate frontend gate.
 - `equityChart` reads the latest 30 existing `daily_portfolio_snapshots` and returns them in chronological order. It does not synthesize live valuation chart points and does not create snapshots.
 - Provider ingestion, scheduler/batch, settlement, reward, fake/static/sample business data, Prisma schema changes, migrations, and seed changes remain out of scope.

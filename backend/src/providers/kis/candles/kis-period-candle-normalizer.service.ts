@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
+import {
+  findLastMarketSessionOfWeek,
+  resolveMarketSession,
+} from '../../../orders/market-calendar.policy';
 import type { KisRawCandleRow } from './kis-candle.types';
 import {
   type CanonicalPeriodCandle,
@@ -10,16 +14,9 @@ import { zonedDateTimeToUtc } from './kis-candle-time';
 
 const KOREA_TIME_ZONE = 'Asia/Seoul';
 const US_TIME_ZONE = 'America/New_York';
-// Regular-session close used to decide isClosed for provider-native daily and
-// weekly rows. Early-close days finish before this instant, so a candle is
-// never marked closed before its session actually ended; it may be marked
-// closed slightly later, and idempotent re-syncs keep updating OHLCV values.
-const KOREA_SESSION_END = '153000';
-const US_SESSION_END = '160000';
-
 type PeriodMarket = {
   timeZone: string;
-  sessionEnd: string;
+  calendarMarket: 'KRX' | 'US';
   fields: {
     date: string;
     open: string;
@@ -33,7 +30,7 @@ type PeriodMarket = {
 
 const DOMESTIC_MARKET: PeriodMarket = {
   timeZone: KOREA_TIME_ZONE,
-  sessionEnd: KOREA_SESSION_END,
+  calendarMarket: 'KRX',
   fields: {
     date: 'stck_bsop_date',
     open: 'stck_oprc',
@@ -47,7 +44,7 @@ const DOMESTIC_MARKET: PeriodMarket = {
 
 const OVERSEAS_MARKET: PeriodMarket = {
   timeZone: US_TIME_ZONE,
-  sessionEnd: US_SESSION_END,
+  calendarMarket: 'US',
   fields: {
     date: 'xymd',
     open: 'open',
@@ -221,8 +218,8 @@ export class KisPeriodCandleNormalizerService {
 type PeriodWindow = {
   openTime: Date;
   closeTime: Date;
-  // Instant after which the candle counts as closed (regular-session end of
-  // the trading date, or Friday's session end for weekly candles).
+  // Instant after which the candle counts as closed (actual session end of
+  // the trading date, or the week's last real session end).
   closedAt: Date;
 };
 
@@ -232,16 +229,14 @@ function resolvePeriodWindow(
   market: PeriodMarket,
 ): PeriodWindow | null {
   if (interval === '1d') {
+    const session = resolveMarketSession(market.calendarMarket, dateText);
+    if (!session) return null;
     const openTime = zonedDateTimeToUtc(dateText, '000000', market.timeZone);
     const nextDate = addDaysToYmd(dateText, 1);
     const closeTime = nextDate
       ? zonedDateTimeToUtc(nextDate, '000000', market.timeZone)
       : null;
-    const closedAt = zonedDateTimeToUtc(
-      dateText,
-      market.sessionEnd,
-      market.timeZone,
-    );
+    const closedAt = session.closeTime;
     if (!openTime || !closeTime || !closedAt) return null;
     return { openTime, closeTime, closedAt };
   }
@@ -249,14 +244,14 @@ function resolvePeriodWindow(
   const monday = mondayOfWeek(dateText);
   if (!monday) return null;
   const nextMonday = addDaysToYmd(monday, 7);
-  const friday = addDaysToYmd(monday, 4);
   const openTime = zonedDateTimeToUtc(monday, '000000', market.timeZone);
   const closeTime = nextMonday
     ? zonedDateTimeToUtc(nextMonday, '000000', market.timeZone)
     : null;
-  const closedAt = friday
-    ? zonedDateTimeToUtc(friday, market.sessionEnd, market.timeZone)
-    : null;
+  const closedAt = findLastMarketSessionOfWeek(
+    market.calendarMarket,
+    dateText,
+  )?.closeTime;
   if (!openTime || !closeTime || !closedAt) return null;
   return { openTime, closeTime, closedAt };
 }

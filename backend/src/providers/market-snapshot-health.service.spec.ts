@@ -39,7 +39,7 @@ import { MarketSnapshotHealthService } from './market-snapshot-health.service';
 import { PROVIDER_SOURCE_NAMES } from './source-eligibility.policy';
 
 describe('MarketSnapshotHealthService', () => {
-  const now = new Date('2026-06-03T00:00:00.000Z');
+  const now = new Date('2026-06-04T00:02:00.000Z');
 
   it('treats a 120-second old display asset snapshot as available', async () => {
     const prisma = createPrismaMock({
@@ -61,7 +61,7 @@ describe('MarketSnapshotHealthService', () => {
         price: '70000',
         currencyCode: CurrencyCode.KRW,
         sourceName: PROVIDER_SOURCE_NAMES.domesticStockKrx,
-        capturedAt: new Date('2026-06-02T23:58:00.000Z'),
+        capturedAt: new Date('2026-06-04T00:00:00.000Z'),
       }),
     ]);
     const service = createService(prisma);

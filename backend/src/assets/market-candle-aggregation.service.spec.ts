@@ -162,6 +162,40 @@ describe('MarketCandleAggregationService', () => {
       expect(result.ignoredSourceRows).toBe(2);
       expect(result.candles).toHaveLength(1);
     });
+
+    it('anchors the delayed open and preserves the 16:30 close session', () => {
+      const session = run('2026-11-19T01:00:00.000Z', 78);
+      const fourHour = service.aggregateCandles({
+        assetType: AssetType.domestic_stock,
+        interval: '4h',
+        candles: [candle('2026-11-19T00:00:00.000Z'), ...session],
+        from: new Date('2026-11-18T15:00:00.000Z'),
+        to: new Date('2026-11-19T15:00:00.000Z'),
+        now: new Date('2026-11-20T00:00:00.000Z'),
+      });
+      expect(fourHour.ignoredSourceRows).toBe(1);
+      expect(fourHour.candles).toHaveLength(2);
+      expect(fourHour.candles[0].openTime.toISOString()).toBe(
+        '2026-11-19T01:00:00.000Z',
+      );
+      expect(fourHour.candles[1].closeTime.toISOString()).toBe(
+        '2026-11-19T07:30:00.000Z',
+      );
+      expect(fourHour.candles[1].expectedConstituentCount).toBe(30);
+    });
+
+    it('does not aggregate a KRX full-day holiday', () => {
+      const result = service.aggregateCandles({
+        assetType: AssetType.domestic_stock,
+        interval: '1h',
+        candles: run('2026-07-17T00:00:00.000Z', 12),
+        from: new Date('2026-07-16T15:00:00.000Z'),
+        to: new Date('2026-07-17T15:00:00.000Z'),
+        now,
+      });
+      expect(result.candles).toEqual([]);
+      expect(result.ignoredSourceRows).toBe(12);
+    });
   });
 
   describe('US anchors (09:30 America/New_York, DST-aware)', () => {
@@ -209,6 +243,24 @@ describe('MarketCandleAggregationService', () => {
         '2026-01-15T21:00:00.000Z',
       );
       expect(fourHour.candles[1].expectedConstituentCount).toBe(30);
+    });
+
+    it('caps the Thanksgiving Friday bucket at the 13:00 early close', () => {
+      const session = run('2026-11-27T14:30:00.000Z', 42);
+      const fourHour = service.aggregateCandles({
+        assetType: AssetType.us_stock,
+        interval: '4h',
+        candles: session,
+        from: new Date('2026-11-27T05:00:00.000Z'),
+        to: new Date('2026-11-28T05:00:00.000Z'),
+        now: new Date('2026-11-28T06:00:00.000Z'),
+      });
+      expect(fourHour.candles).toHaveLength(1);
+      expect(fourHour.candles[0].closeTime.toISOString()).toBe(
+        '2026-11-27T18:00:00.000Z',
+      );
+      expect(fourHour.candles[0].expectedConstituentCount).toBe(42);
+      expect(fourHour.candles[0].complete).toBe(true);
     });
   });
 

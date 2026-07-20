@@ -179,6 +179,10 @@ Active asset target rules:
 
 KIS real-time prices are not owned by the scheduler. Enable `KIS_WEBSOCKET_STREAMING_ENABLED=true` for the long-lived stream service. KIS scheduler enablement (`SCHEDULER_PROVIDER_KIS_ENABLED=true` or `ENABLE_PROVIDER_KIS_SCHEDULER=true`) remains available for fallback/manual/debug one-shot ingestion only. `KIS_PRICE_INGESTION_MODE=websocket_trade` runs `KisWebSocketClient.runTradePriceIngestion(...)` for a bounded one-shot run; `rest_current_price` uses the existing KIS REST current-price ingestion. Both scheduler modes use `maxSnapshots` from `SCHEDULER_PROVIDER_KIS_MAX_SNAPSHOTS`, then `PROVIDER_INGESTION_MAX_SNAPSHOTS`, then the safe default `500`.
 
+Before a one-shot KIS call, the runner partitions targets with the shared market calendar. KRX closed/US open collects only US; US closed/KRX open collects only KRX; both closed records `MARKET_CLOSED_EXPECTED_NO_DATA` without a provider call. Missing calendar coverage records `MARKET_CALENDAR_COVERAGE_MISSING` as degraded and is never guessed open. Binance crypto and FX jobs are independent of stock holidays.
+
+Stock candle reconciliation is due at the actual session close plus grace. Weekly targets are selected on the week's last real session rather than by Friday weekday, and a full-day holiday produces no market reconciliation. The legacy configured local `time` remains configuration-compatible but does not override the audited session close.
+
 Provider env required before real runs:
 
 - FX: `KOREA_EXIM_EXCHANGE_ENABLED`, `KOREA_EXIM_EXCHANGE_AUTH_KEY`, `KOREA_EXIM_EXCHANGE_BASE_URL`, `KOREA_EXIM_EXCHANGE_DATA`, `KOREA_EXIM_EXCHANGE_LOOKBACK_DAYS`, or ExchangeRate-API env `EXCHANGE_RATE_API_ENABLED`, `EXCHANGE_RATE_API_KEY`, `EXCHANGE_RATE_API_BASE_URL`.

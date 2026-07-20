@@ -1,4 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import type { AssetType } from '../../../generated/prisma/client';
+import {
+  inspectMarketSessionsInRange,
+  resolveStockMarketDataUpperBound,
+} from '../../../orders/market-calendar.policy';
 import { KisAuthClient } from '../kis-auth.client';
 import { KisQuoteClient } from '../kis-quote.client';
 import type { KisLowLevelCallResult } from '../kis.types';
@@ -37,6 +42,30 @@ export class KisDomesticMinuteAdapter {
     validateCandleAsset(input.asset);
     const startedAt = Date.now();
     if (input.signal?.aborted) return emptyResult('canceled');
+    const now = input.now ?? new Date();
+    const effectiveTo = new Date(Math.min(input.to.getTime(), now.getTime()));
+    if (effectiveTo.getTime() <= input.from.getTime()) {
+      return emptyResult('expected_no_data', true);
+    }
+    const marketAsset = {
+      assetType: 'domestic_stock' as AssetType,
+      market: 'KRX',
+    };
+    const range = inspectMarketSessionsInRange(
+      marketAsset,
+      input.from,
+      effectiveTo,
+    );
+    if (!range.calendarCovered) return emptyResult('calendar_unavailable');
+    if (!range.hasTradingSession) {
+      return emptyResult('expected_no_data', true);
+    }
+    const providerTo = resolveStockMarketDataUpperBound(
+      marketAsset,
+      input.to,
+      now,
+    );
+    if (!providerTo) return emptyResult('calendar_unavailable');
     const config = this.configService.getKisConfig();
     const tokenWait = await awaitWithinBudget(
       this.authClient.requestConfiguredRestToken(),
@@ -46,7 +75,7 @@ export class KisDomesticMinuteAdapter {
     if (tokenWait.state !== 'resolved') return emptyResult(tokenWait.state);
     const token = tokenWait.value;
     if (token.state === 'skipped') return emptyResult('malformed_response');
-    let cursor = new Date(input.to.getTime() - 1);
+    let cursor = new Date(providerTo.getTime() - 1);
     const visited = new Set<string>();
     const seenRows = new Map<number, number>();
     const rows: KisRawCandleRow[] = [];
@@ -214,13 +243,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function emptyResult(
   stopReason: KisCandleAdapterResult['stopReason'],
+  complete = false,
 ): KisCandleAdapterResult {
   return {
     pagesFetched: 0,
     providerReturnedRows: 0,
     rows: [],
     duplicateRows: 0,
-    complete: false,
+    complete,
     stopReason,
     oldestOpenTime: null,
     latestOpenTime: null,

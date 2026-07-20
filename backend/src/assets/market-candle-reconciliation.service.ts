@@ -245,12 +245,17 @@ export class MarketCandleReconciliationService {
     );
     if (!session) return null;
     const localDate = session.localDate.replace(/-/gu, '');
-    const midnight = zonedDateTimeToUtc(localDate, '000000', session.timeZone);
+    const rangeStartDate = targets.includes('1w')
+      ? mondayOfWeek(localDate)
+      : localDate;
+    if (!rangeStartDate) return null;
+    const midnight = zonedDateTimeToUtc(
+      rangeStartDate,
+      '000000',
+      session.timeZone,
+    );
     if (!midnight) return null;
-    const from = targets.includes('1w')
-      ? new Date(midnight.getTime() - 7 * 86_400_000)
-      : midnight;
-    return { from, to: session.closeTime };
+    return { from: midnight, to: session.closeTime };
   }
 
   private async loadRows(
@@ -415,4 +420,21 @@ function sum(
   key: 'missingRows' | 'correctedRows' | 'unchangedRows',
 ): number {
   return results.reduce((total, result) => total + result[key], 0);
+}
+
+function mondayOfWeek(localDate: string): string | null {
+  if (!/^\d{8}$/u.test(localDate)) return null;
+  const year = Number(localDate.slice(0, 4));
+  const month = Number(localDate.slice(4, 6));
+  const day = Number(localDate.slice(6, 8));
+  const value = new Date(Date.UTC(year, month - 1, day));
+  if (
+    value.getUTCFullYear() !== year ||
+    value.getUTCMonth() !== month - 1 ||
+    value.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  value.setUTCDate(value.getUTCDate() - ((value.getUTCDay() + 6) % 7));
+  return value.toISOString().slice(0, 10).replace(/-/gu, '');
 }

@@ -1,5 +1,9 @@
 # Batch Job Foundation
 
+## Market-aware daily valuation
+
+Daily portfolio snapshot and current-ranking valuation do not stop globally because KRX or US is closed. Each position applies its own market state: a closed stock market may use only the last valid provider price inside its latest completed session; an open stock market and crypto require the normal fresh price. Missing latest-session evidence is a data problem and never silently falls back to an older provider session. Existing eligible `admin_manual` fallback remains unchanged. Season settlement keeps its separate reproducible `Season.endAt` selection policy, and snapshot dates/season dates remain ordinary calendar dates.
+
 Status: implemented foundation with operator-run daily portfolio snapshot, season ranking, daily season cycle, season settlement MVP, final tier assignment MVP, and a reward-grant gate-closed job. Scheduler/Ops foundation now exists separately and is disabled by default.
 
 ## Scope

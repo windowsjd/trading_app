@@ -8,6 +8,7 @@
 - Do not add fake ranking data or seed changes from this read API contract; persisted schema changes must go through explicit migrations.
 - Ranking rows now persist and expose tie-breaker evidence: `maxDrawdown`, `totalFillCount`, and `reachedReturnAt`.
 - Migration/backfill operations for existing tie-breaker rows are documented in `docs/ranking-backfill-runbook.md`.
+- The separate current-ranking refresh job uses the shared portfolio valuation policy per asset: open stocks and crypto require current fresh evidence, while a closed KRX/US market may use only its latest completed session price. One market's holiday does not stop another market or crypto. Historical/final ranking rows and this read API response are unchanged.
 
 ## Source Rules
 

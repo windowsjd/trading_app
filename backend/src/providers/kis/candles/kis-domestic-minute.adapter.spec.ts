@@ -22,6 +22,55 @@ describe('KisDomesticMinuteAdapter', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
+  it('skips a calendar-confirmed holiday before authentication or provider calls', async () => {
+    const quote = { getMarketDataByExplicitPath: jest.fn() };
+    const result = await new KisDomesticMinuteAdapter(
+      auth as never,
+      quote as never,
+      config as never,
+    ).fetchDomesticOneMinuteRows({
+      asset: { id: 'a', symbol: '005930', marketCode: 'J' },
+      from: new Date('2026-07-17T00:00:00.000Z'),
+      to: new Date('2026-07-17T06:30:00.000Z'),
+      now: new Date('2026-07-18T00:00:00.000Z'),
+    });
+    expect(result).toMatchObject({
+      stopReason: 'expected_no_data',
+      complete: true,
+      pagesFetched: 0,
+    });
+    expect(auth.requestConfiguredRestToken).not.toHaveBeenCalled();
+    expect(quote.getMarketDataByExplicitPath).not.toHaveBeenCalled();
+  });
+
+  it('starts a pre-open cursor at the latest completed session close', async () => {
+    const quote = {
+      getMarketDataByExplicitPath: jest.fn().mockResolvedValue({
+        state: 'available',
+        response: { output2: [] },
+        receivedAt: new Date('2026-07-19T23:30:01.000Z'),
+      }),
+    };
+    await new KisDomesticMinuteAdapter(
+      auth as never,
+      quote as never,
+      config as never,
+    ).fetchDomesticOneMinuteRows({
+      asset: { id: 'a', symbol: '005930', marketCode: 'J' },
+      from: new Date('2026-07-16T00:00:00.000Z'),
+      to: new Date('2026-07-19T23:30:00.000Z'),
+      now: new Date('2026-07-19T23:30:00.000Z'),
+    });
+    expect(quote.getMarketDataByExplicitPath).toHaveBeenCalledWith(
+      expect.objectContaining({
+        query: expect.objectContaining({
+          FID_INPUT_DATE_1: '20260716',
+          FID_INPUT_HOUR_1: '152959',
+        }),
+      }),
+    );
+  });
+
   it('walks backward with the oldest row cursor, deduplicates page overlap, and uses KIS quote client', async () => {
     const quote = {
       getMarketDataByExplicitPath: jest

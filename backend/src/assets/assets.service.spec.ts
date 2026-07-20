@@ -47,6 +47,7 @@ import { AssetsService } from './assets.service';
 
 describe('AssetsService', () => {
   const priceAt = new Date('2026-05-07T00:00:00.000Z');
+  const testNow = new Date('2026-07-20T03:00:00.000Z');
   const activeSeason = {
     id: 'season-1',
     status: SeasonStatus.active,
@@ -193,8 +194,16 @@ describe('AssetsService', () => {
     currencyCode,
     sourceType: AssetPriceSourceType.provider_api,
     sourceName,
-    effectiveAt: priceAt,
+    effectiveAt: capturedAt,
     capturedAt,
+  });
+
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(testNow);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   const freshUsdKrwSnapshot = () => ({
@@ -656,6 +665,7 @@ describe('AssetsService', () => {
         currencyCode: CurrencyCode.USD,
       }),
       priceCurrency: CurrencyCode.USD,
+      capturedAt: new Date('2026-07-17T19:59:00.000Z'),
     },
     {
       label: 'crypto BINANCE',
@@ -678,6 +688,7 @@ describe('AssetsService', () => {
         input.sourceName,
         '123.00000000',
         input.priceCurrency,
+        input.capturedAt,
       ),
     ]);
     if (input.priceCurrency === CurrencyCode.USD) {

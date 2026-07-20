@@ -15,7 +15,7 @@
 - Date-only snapshot/ranking dates are `YYYY-MM-DD`.
 - Performance values come from existing `daily_portfolio_snapshots` or `season_rankings`; the API does not calculate or fake performance.
 - Season detail `profitAnalysis` reads retained positions, including quantity `0` fully sold positions. Stored `positions.realized_pnl_krw` is the source for realized KRW PnL and is not revalued by current FX.
-- Open-position unrealized PnL uses fresh eligible provider price/FX first, then safe `admin_manual` fallback where allowed. Missing valuation data makes profit analysis partially unavailable for affected positions, not fake.
+- Open-position unrealized PnL uses market-aware eligible provider price/FX first, then safe `admin_manual` fallback where allowed. An open stock market requires a fresh current-session price; a closed KRX/US market may use only its latest completed session price. Missing valuation data makes profit analysis partially unavailable for affected positions, not fake.
 - Private ledgers, wallet balances, individual orders, and individual exchanges are exposed only through `/api/v1/records/me/**` for the authenticated user.
 - `GET /api/v1/users/:userId/records/:seasonId` is protected but returns only a public summary shape. Public portfolio summary excludes position quantity, average cost, wallet balances, individual orders, individual exchanges, and raw internal row ids.
 

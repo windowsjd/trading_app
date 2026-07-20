@@ -30,7 +30,7 @@ The persisted intervals remain `5m`, `1d`, and `1w`. Current `15m`, `30m`, `1h`,
 - KIS domestic uses the official `H0STCNT0` regular-session trade fields. Trade quantity is a delta; session cumulative volume/amount are parsed for identity/diagnostics but are not treated as a 5-minute delta.
 - KIS US uses `HDFSCNT0`, which is a delayed trade feed. It is exposed as `delayed=true`, uses exchange `XYMD/XHMS` for the candle bucket, and is never described as real-time. It remains disabled unless `CANDLE_LIVE_KIS_US_DELAYED_ENABLED=true`. No unsupported real-time US entitlement is silently substituted.
 
-Regular-session policy is KRX 09:00-15:30 `Asia/Seoul`, US 09:30-16:00 `America/New_York`, and crypto continuous UTC. Weekend, configured holiday, and early-close overrides come from the shared market-calendar policy. Pre-market/after-hours trades are rejected from regular-session candles.
+Stock sessions come only from the shared market-calendar policy: the regular defaults are KRX 09:00-15:30 `Asia/Seoul` and US 09:30-16:00 `America/New_York`, while holiday, delayed-open, early-close, and delayed-close overrides replace those defaults. Crypto remains continuous UTC. Pre-market/after-hours trades are rejected from stock candles, and a full-day holiday never creates or copies a candle.
 
 ## Ownership, state, and recovery
 
@@ -65,7 +65,9 @@ Intervals are `5m`, `15m`, `30m`, `1h`, and `4h`. Messages contain a full curren
 
 `market_candle_reconciliation` is an additive `OpsJobName`. The runner supports `trigger`, `requestedBy`, `dryRun`, `assetIds`, `assetTypes`, `market`, `from`, `to`, `targets`, `maxAssets`, `maxPages`, and `continueOnError`. It uses a market job lock plus the existing asset/feed sync locks with owner-checked renewal. Dry-run only plans selected assets: it makes no provider request and writes no candle/checkpoint.
 
-For stocks, reconciliation runs after the configured local post-close time/grace, selects the latest completed regular session through the holiday/early-close calendar, repairs `5m`, refreshes provider-native `1d`, and includes `1w` on Friday. Crypto verifies a bounded recent 5-minute window; daily/weekly targets are added at UTC day/week transitions. The result records missing rows and OHLC, volume, amount, close-state, and source-time drift per asset. A provider failure can continue to other assets; rerunning is idempotent.
+For stocks, reconciliation runs after the actual calendar session close plus grace, selects the latest completed session, repairs `5m`, refreshes provider-native `1d`, and includes `1w` when that session is the week's last real session. A Friday holiday therefore closes/reconciles the weekly candle after Thursday's session. A full-day holiday schedules no stock reconciliation. Startup catch-up and manual safety bounds are unchanged. Crypto verifies a bounded recent 5-minute window; daily/weekly targets are added at UTC day/week transitions. The result records missing rows and OHLC, volume, amount, close-state, and source-time drift per asset. A provider failure can continue to other assets; rerunning is idempotent.
+
+Provider ranges are calendar-bounded before a stock request: while open, `to=now`; after today's close, `to` is the actual close; on weekends, full-day holidays, or before open, `to` is the latest completed session close. KIS domestic backward pagination starts from this bound instead of a holiday `input.to`. A calendar-confirmed holiday empty is `confirmed_empty`/expected no-data; an empty response for a range containing an open session remains incomplete/provider-degraded. Network, authentication, and server errors remain provider failures regardless of calendar state.
 
 Scheduler gates:
 
@@ -256,6 +258,8 @@ this narrows the REQUIREMENT; never use environment variables to hide a
 provisional dataset or present it as audited. To add a year: create
 `market-calendar/data/<market>-<year>.ts` from the primary source, register
 it in `market-calendar.registry.ts`, and add tests.
+
+The same registry is the single source for chart `prev_open`/`prev2_open`, provider cursors, aggregation buckets, daily/weekly close state, and reconciliation. `30d` and `1y` remain rolling calendar durations; holidays simply have no candles. Session aggregation anchors at the actual open and caps partial `1h`/`4h` buckets at the actual close, so delayed opens, KRX 16:30 closes, and US 13:00 closes do not require service-local fixed-hour exceptions.
 
 ## Old-generation live bucket recovery
 
@@ -500,7 +504,7 @@ metadata) should consider `amountAvailable: boolean` or `amount: string | null`.
 6. Binance ≥90-minute smoke passed; KIS KRX ≥60-minute in-session smoke
    passed; KIS US delayed smoke passed or explicitly recorded as NOT RUN
    (`pnpm run smoke:candle-report -- --provider kis-us --result not_run
-   --reason ...`) with the blocking reason. Every artifact must carry the
+--reason ...`) with the blocking reason. Every artifact must carry the
    release `gitCommit` with `gitDirty: false`. A previously failed artifact
    is a historical record — never reinterpret it as a pass.
 7. Lease TTL > renew interval; reconnect min ≤ max; connection liveness ≥

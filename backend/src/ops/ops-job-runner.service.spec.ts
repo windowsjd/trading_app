@@ -865,6 +865,7 @@ describe('OpsJobRunnerService', () => {
       trigger: OpsJobTrigger.test,
       requestedBy: 'scheduler',
       maxSnapshots: 10,
+      now: '2026-07-20T03:00:00.000Z',
     });
 
     expect(response).toMatchObject({
@@ -880,7 +881,7 @@ describe('OpsJobRunnerService', () => {
       dryRun: false,
       requestedBy: 'scheduler',
       domesticSymbols: ['005930'],
-      usSymbols: ['AAPL'],
+      usSymbols: [],
       maxSnapshots: 10,
     });
     expect(runService.recordSucceeded).toHaveBeenCalledWith(
@@ -952,6 +953,7 @@ describe('OpsJobRunnerService', () => {
       trigger: OpsJobTrigger.test,
       requestedBy: 'scheduler',
       maxSnapshots: 10,
+      now: '2026-07-20T03:00:00.000Z',
     });
 
     expect(response).toMatchObject({
@@ -968,7 +970,7 @@ describe('OpsJobRunnerService', () => {
       dryRun: false,
       requestedBy: 'scheduler',
       domesticSymbols: ['005930'],
-      usSymbols: ['AAPL'],
+      usSymbols: [],
       maxSnapshots: 10,
     });
     expect(runService.recordSucceeded).toHaveBeenCalledWith(
@@ -1041,6 +1043,7 @@ describe('OpsJobRunnerService', () => {
       trigger: OpsJobTrigger.test,
       requestedBy: 'scheduler',
       kisPriceIngestionMode: 'rest_current_price',
+      now: '2026-07-20T14:00:00.000Z',
     });
 
     expect(kisWebSocketClient.runTradePriceIngestion).not.toHaveBeenCalled();
@@ -1049,10 +1052,50 @@ describe('OpsJobRunnerService', () => {
     ).toHaveBeenCalledWith({
       dryRun: false,
       requestedBy: 'scheduler',
-      domesticSymbols: ['005930'],
+      domesticSymbols: [],
       usSymbols: ['AAPL'],
       maxSnapshots: undefined,
     });
+  });
+
+  it('records both closed stock markets as expected no-data without calling KIS', async () => {
+    const {
+      kisRestCurrentPriceIngestionService,
+      lockService,
+      runService,
+      service,
+    } = createService();
+    lockService.acquireLock.mockResolvedValueOnce({
+      acquired: true,
+      lockKey: 'provider_kis_ingest:rest_current_price',
+      ownerId: 'owner-kis-closed',
+      expiresAt: new Date('2026-07-19T12:10:00.000Z'),
+    });
+    runService.createRunning.mockResolvedValueOnce({
+      id: 'run-kis-closed',
+      startedAt,
+    });
+    runService.recordSucceeded.mockResolvedValueOnce({
+      serialized: serializedRun({ jobName: OpsJobName.provider_kis_ingest }),
+    });
+
+    await service.runProviderKisRestCurrentPriceIngestJob({
+      trigger: OpsJobTrigger.test,
+      now: '2026-07-19T12:00:00.000Z',
+    });
+
+    expect(
+      kisRestCurrentPriceIngestionService.ingestCurrentPrices,
+    ).not.toHaveBeenCalled();
+    expect(runService.recordSucceeded).toHaveBeenCalledWith(
+      { id: 'run-kis-closed', startedAt },
+      expect.objectContaining({
+        resultJson: expect.objectContaining({
+          state: 'no_data',
+          reason: 'MARKET_CLOSED_EXPECTED_NO_DATA',
+        }),
+      }),
+    );
   });
 
   it('records provider KIS WebSocket failures with provider error details', async () => {
@@ -1098,6 +1141,7 @@ describe('OpsJobRunnerService', () => {
     const response = await service.runProviderKisWebSocketTradeIngestJob({
       trigger: OpsJobTrigger.test,
       requestedBy: 'scheduler',
+      now: '2026-07-20T03:00:00.000Z',
     });
 
     expect(response).toMatchObject({
@@ -1166,6 +1210,7 @@ describe('OpsJobRunnerService', () => {
 
     const response = await service.runProviderKisRestCurrentPriceIngestJob({
       trigger: OpsJobTrigger.test,
+      now: '2026-07-20T03:00:00.000Z',
     });
 
     expect(response).toMatchObject({

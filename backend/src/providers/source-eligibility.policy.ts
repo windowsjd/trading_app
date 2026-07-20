@@ -1,5 +1,6 @@
 import { CurrencyCode, Prisma } from '../generated/prisma/client';
 import type { AssetType } from '../generated/prisma/client';
+import { resolveStockMarketSessionState } from '../orders/market-calendar.policy';
 
 export const PROVIDER_SOURCE_NAMES = {
   fxUsdKrw: 'exchange_rate_api',
@@ -401,6 +402,99 @@ export function selectFreshProviderSnapshotBySourcePriority<
   };
 }
 
+const CLOSED_MARKET_CARRY_FORWARD_WORKFLOWS: ReadonlySet<ProviderWorkflow> =
+  new Set([
+    'assets_with_price',
+    'live_portfolio_valuation',
+    'home_live_valuation',
+    'positions_live_valuation',
+    'daily_portfolio_snapshot',
+  ]);
+
+/**
+ * Shared stock-price selection policy for reads, valuations, snapshots,
+ * ranking, health, and orders.
+ *
+ * - crypto remains continuous and uses capturedAt freshness;
+ * - an open stock market requires both capturedAt freshness and an
+ *   effectiveAt inside the current session;
+ * - an eligible closed-market read/valuation may use only a price whose
+ *   effectiveAt lies inside the latest completed session;
+ * - order workflows never carry a completed-session price forward.
+ */
+export function selectMarketAwareAssetPriceSnapshotBySourcePriority<
+  T extends ProviderSnapshotCandidate,
+>(input: {
+  asset: Pick<ProviderAssetCandidate, 'assetType' | 'market'>;
+  workflow: ProviderWorkflow;
+  candidates: readonly T[];
+  expectedSourceNames: readonly string[];
+  now: Date;
+  freshnessThresholdSeconds: number;
+  isPositiveValue: (candidate: T) => boolean;
+}): ProviderSnapshotSelection<T> {
+  if (input.asset.assetType === 'crypto') {
+    return selectFreshProviderSnapshotBySourcePriority(input);
+  }
+
+  const marketState = resolveStockMarketSessionState(input.asset, input.now);
+  if (!marketState || marketState.state === 'calendar_unavailable') {
+    return notSelectedForMarket('market_calendar_unavailable');
+  }
+
+  if (marketState.state === 'open') {
+    const sessionCandidates = input.candidates.filter(
+      (candidate) =>
+        candidate.effectiveAt.getTime() >=
+          marketState.currentSession.openTime.getTime() &&
+        candidate.effectiveAt.getTime() <= input.now.getTime(),
+    );
+    if (sessionCandidates.length === 0 && input.candidates.length > 0) {
+      return notSelectedForMarket('effective_at_outside_current_session');
+    }
+    return selectFreshProviderSnapshotBySourcePriority({
+      ...input,
+      candidates: sessionCandidates,
+    });
+  }
+
+  if (!CLOSED_MARKET_CARRY_FORWARD_WORKFLOWS.has(input.workflow)) {
+    return notSelectedForMarket('market_closed');
+  }
+  const completedSession = marketState.latestCompletedSession;
+  if (!completedSession) {
+    return notSelectedForMarket('last_completed_session_unavailable');
+  }
+  const sessionCandidates = input.candidates.filter(
+    (candidate) =>
+      candidate.effectiveAt.getTime() >= completedSession.openTime.getTime() &&
+      candidate.effectiveAt.getTime() <= completedSession.closeTime.getTime(),
+  );
+  if (sessionCandidates.length === 0 && input.candidates.length > 0) {
+    return notSelectedForMarket('effective_at_outside_last_completed_session');
+  }
+  const selection = selectProviderSnapshotAtOrBeforeBySourcePriority({
+    candidates: sessionCandidates,
+    expectedSourceNames: input.expectedSourceNames,
+    valuationAt: completedSession.closeTime,
+    isPositiveValue: input.isPositiveValue,
+  });
+  if (selection.state !== 'selected') return selection;
+  return {
+    ...selection,
+    decision: {
+      ...selection.decision,
+      freshnessAgeSeconds: Math.max(
+        0,
+        Math.floor(
+          (input.now.getTime() - selection.snapshot.capturedAt.getTime()) /
+            1000,
+        ),
+      ),
+    },
+  };
+}
+
 export function selectProviderSnapshotAtOrBefore<
   T extends ProviderSnapshotCandidate,
 >(input: {
@@ -703,6 +797,19 @@ function buildEmptyDecision(input: {
     fallbackReason: input.fallbackReason,
     rejectedProviderReason: input.rejectedProviderReason,
     freshnessAgeSeconds: input.freshnessAgeSeconds ?? null,
+  };
+}
+
+function notSelectedForMarket<T extends ProviderSnapshotCandidate>(
+  reason: string,
+): ProviderSnapshotSelection<T> {
+  return {
+    state: 'not_selected',
+    decision: buildEmptyDecision({
+      fallbackUsed: true,
+      fallbackReason: 'provider_rejected',
+      rejectedProviderReason: reason,
+    }),
   };
 }
 

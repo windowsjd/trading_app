@@ -1,9 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { AssetType, Prisma } from '../generated/prisma/client';
-import {
-  getZonedParts,
-  zonedDateTimeToUtc,
-} from '../providers/kis/candles/kis-candle-time';
+import { resolveMarketSession } from '../orders/market-calendar.policy';
+import { getZonedParts } from '../providers/kis/candles/kis-candle-time';
 import { MarketCandlesRepository } from './market-candles.repository';
 
 export const MARKET_CANDLE_AGGREGATION_INTERVALS = [
@@ -29,27 +27,9 @@ const AGGREGATION_INTERVAL_MINUTES: Record<
 const FIVE_MINUTES_MS = 5 * 60_000;
 const MAX_BUCKET_SPAN_MS = 4 * 60 * 60_000;
 
-type MarketSession = {
-  timeZone: string;
-  // Regular-session window in minutes from local midnight.
-  sessionStartMinutes: number;
-  sessionEndMinutes: number;
-};
-
-// Bucket anchors are fixed to each market's regular session start:
-// domestic 09:00 Asia/Seoul (session 09:00–15:30), US 09:30 America/New_York
-// (session 09:30–16:00, DST via the IANA timezone), crypto continuous UTC.
-const MARKET_SESSIONS: Partial<Record<AssetType, MarketSession>> = {
-  [AssetType.domestic_stock]: {
-    timeZone: 'Asia/Seoul',
-    sessionStartMinutes: 9 * 60,
-    sessionEndMinutes: 15 * 60 + 30,
-  },
-  [AssetType.us_stock]: {
-    timeZone: 'America/New_York',
-    sessionStartMinutes: 9 * 60 + 30,
-    sessionEndMinutes: 16 * 60,
-  },
+const MARKET_TIME_ZONES: Partial<Record<AssetType, string>> = {
+  [AssetType.domestic_stock]: 'Asia/Seoul',
+  [AssetType.us_stock]: 'America/New_York',
 };
 
 export type FiveMinuteSourceCandle = {
@@ -107,16 +87,15 @@ export class MarketCandleAggregationInputError extends Error {
  * Aggregation: open = first constituent, close = last, high = max, low = min,
  * volume = sum, amount = sum only when every constituent has one (otherwise
  * null), sourceUpdatedAt = max. Buckets never span different local trading
- * days: stock buckets exist only inside one regular session, and every crypto
- * interval divides the 24h UTC day.
+ * days: stock buckets exist only inside one calendar-resolved session, and
+ * every crypto interval divides the 24h UTC day.
  *
  * Completeness policy (fixed): missing 5m candles are NEVER interpolated.
  * Each bucket reports expected/actual constituent counts; an incomplete
  * historical bucket is returned explicitly with complete=false and
  * isClosed=false rather than being promoted to a normal closed candle, and
- * the in-progress current bucket (isCurrent=true) is likewise open. Without
- * an exchange holiday calendar, buckets on days with no stored rows simply do
- * not exist — absence is preserved instead of synthesized.
+ * the in-progress current bucket (isCurrent=true) is likewise open. Full-day
+ * holidays have no bucket, so absence is preserved instead of synthesized.
  */
 @Injectable()
 export class MarketCandleAggregationService {
@@ -285,41 +264,37 @@ export class MarketCandleAggregationService {
       };
     }
 
-    const session = MARKET_SESSIONS[assetType];
+    const timeZone = MARKET_TIME_ZONES[assetType];
+    const market =
+      assetType === AssetType.domestic_stock
+        ? 'KRX'
+        : assetType === AssetType.us_stock
+          ? 'US'
+          : null;
+    if (!timeZone || !market) return null;
+    const parts = getZonedParts(openTime, timeZone);
+    const dateText = formatYmd(parts.year, parts.month, parts.day);
+    const session = resolveMarketSession(market, dateText);
     if (!session) return null;
-    const parts = getZonedParts(openTime, session.timeZone);
-    if (parts.second !== 0 || parts.minute % 5 !== 0) return null;
-    const localMinutes = parts.hour * 60 + parts.minute;
+    const sessionOpenMs = session.openTime.getTime();
+    const sessionCloseMs = session.closeTime.getTime();
     if (
-      localMinutes < session.sessionStartMinutes ||
-      localMinutes >= session.sessionEndMinutes
+      parts.second !== 0 ||
+      openMs < sessionOpenMs ||
+      openMs >= sessionCloseMs ||
+      (openMs - sessionOpenMs) % FIVE_MINUTES_MS !== 0
     ) {
       return null;
     }
-    const offset = localMinutes - session.sessionStartMinutes;
-    const bucketStartMinutes =
-      session.sessionStartMinutes +
-      Math.floor(offset / bucketMinutes) * bucketMinutes;
-    const bucketEndMinutes = Math.min(
-      bucketStartMinutes + bucketMinutes,
-      session.sessionEndMinutes,
-    );
-    const dateText = formatYmd(parts.year, parts.month, parts.day);
-    const start = zonedDateTimeToUtc(
-      dateText,
-      formatHms(bucketStartMinutes),
-      session.timeZone,
-    );
-    const end = zonedDateTimeToUtc(
-      dateText,
-      formatHms(bucketEndMinutes),
-      session.timeZone,
-    );
-    if (!start || !end) return null;
+    const bucketSizeMs = bucketMinutes * 60_000;
+    const startMs =
+      sessionOpenMs +
+      Math.floor((openMs - sessionOpenMs) / bucketSizeMs) * bucketSizeMs;
+    const endMs = Math.min(startMs + bucketSizeMs, sessionCloseMs);
     return {
-      startMs: start.getTime(),
-      endMs: end.getTime(),
-      expectedConstituentCount: (bucketEndMinutes - bucketStartMinutes) / 5,
+      startMs,
+      endMs,
+      expectedConstituentCount: (endMs - startMs) / FIVE_MINUTES_MS,
     };
   }
 
@@ -356,9 +331,4 @@ function toDecimal(value: Prisma.Decimal | string): Prisma.Decimal {
 function formatYmd(year: number, month: number, day: number): string {
   const pad = (value: number) => String(value).padStart(2, '0');
   return `${year}${pad(month)}${pad(day)}`;
-}
-
-function formatHms(minutesOfDay: number): string {
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${pad(Math.floor(minutesOfDay / 60))}${pad(minutesOfDay % 60)}00`;
 }

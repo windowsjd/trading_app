@@ -15,6 +15,7 @@ import {
   resolveAssetProviderEligibility,
   resolveFxProviderEligibility,
   selectFreshProviderSnapshotBySourcePriority,
+  selectMarketAwareAssetPriceSnapshotBySourcePriority,
   type SourceDecision,
 } from './source-eligibility.policy';
 import {
@@ -36,7 +37,9 @@ export type MarketSnapshotHealthReason =
   | 'ASSET_PRICE_UNAVAILABLE'
   | 'ASSET_MAPPING_NOT_FOUND'
   | 'ASSET_MAPPING_AMBIGUOUS'
-  | 'PROVIDER_RUN_FAILED';
+  | 'PROVIDER_RUN_FAILED'
+  | 'MARKET_CALENDAR_COVERAGE_MISSING'
+  | 'LAST_COMPLETED_SESSION_PRICE_MISSING';
 
 export type MarketSnapshotAssetHealth = {
   assetId: string;
@@ -262,7 +265,9 @@ export class MarketSnapshotHealthService {
         })
       : [];
     const providerSelection = providerEligibility.eligible
-      ? selectFreshProviderSnapshotBySourcePriority({
+      ? selectMarketAwareAssetPriceSnapshotBySourcePriority({
+          asset,
+          workflow: 'assets_with_price',
           candidates: providerCandidates,
           expectedSourceNames: providerEligibility.sourceNames,
           now,
@@ -571,7 +576,13 @@ function reasonFromSourceDecision(
     case 'source_name_mismatch':
       return 'SOURCE_NAME_MISMATCH';
     case 'captured_at_stale':
+    case 'effective_at_outside_current_session':
       return 'CAPTURED_AT_STALE';
+    case 'market_calendar_unavailable':
+      return 'MARKET_CALENDAR_COVERAGE_MISSING';
+    case 'last_completed_session_unavailable':
+    case 'effective_at_outside_last_completed_session':
+      return 'LAST_COMPLETED_SESSION_PRICE_MISSING';
     case 'effective_at_in_future':
       return 'EFFECTIVE_AT_IN_FUTURE';
     case 'captured_at_in_future':

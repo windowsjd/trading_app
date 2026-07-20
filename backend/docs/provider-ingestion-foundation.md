@@ -75,6 +75,8 @@ This project remains a virtual trading app. External provider APIs are used only
 - If `KIS_REST_BASE_URL` or `KIS_WS_BASE_URL` is empty, KIS live calls are skipped. This does not fail ExchangeRate-API or Binance ingestion.
 - US free delayed feed is allowed for MVP row insertion only; US is documented by KIS as 0-minute delayed/free data. Hong Kong, Vietnam, China, and Japan delayed markets are not allowed in this MVP and are skipped.
 - KIS order, account, balance, fill, deposit, withdrawal, and real trading APIs are not implemented.
+- KRX and US collection eligibility is decided independently from the shared audited market calendar before scheduler/provider calls. A closed market is expected no-data and does not suppress collection for the other stock market; crypto and FX are unaffected.
+- Provider emptiness is not a holiday detector. Calendar-confirmed closed range plus empty is normal no-data; a range containing an open session plus empty is incomplete/degraded; network, authentication, and server errors remain provider failures. Missing calendar years fail closed with explicit coverage degradation.
 - Best bid/ask execution, partial fills, slippage models, and use of hoga data for execution are not implemented.
 
 ## Env

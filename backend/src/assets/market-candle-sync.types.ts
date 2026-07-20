@@ -34,6 +34,8 @@ export type MarketCandleSyncCompletionReason =
 
 export type MarketCandleSyncStopReason =
   | 'target_reached'
+  | 'expected_no_data'
+  | 'calendar_unavailable'
   | 'provider_exhausted'
   | 'empty_page'
   // Sweep reached the target but the fetched data failed completeness checks

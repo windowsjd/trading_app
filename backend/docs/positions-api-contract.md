@@ -19,7 +19,7 @@
 - Position valuation is best-effort per position. Missing market data must not fake values or fail the whole response.
 - Eligible provider source mapping is domestic KRX -> `kis_krx_realtime_trade`, US NAS/NYS -> `kis_us_delayed_trade`, and BINANCE USD crypto -> `binance_public_rest_24hr_ticker`.
 - Eligible USD/KRW provider priority is `korea_exim_exchange_rate`, then `exchange_rate_api`.
-- Provider asset price freshness uses capturedAt age <= 60 seconds; provider FX freshness uses capturedAt age <= 300 seconds.
+- Open stock markets require capturedAt age <= 60 seconds and a current-session effective timestamp. Closed KRX/US positions may use only the latest completed session's provider price; crypto still requires current freshness. Provider FX freshness remains capturedAt age <= 300 seconds.
 - Per-position valuation may include optional public-safe `priceSource` and `fxRateSource` metadata for source/outage visibility. Raw provider payloads, `metadataJson`, and secrets are never exposed.
 - `realizedPnl` is stored in the asset/order currency.
 - `realizedPnlKrw` is stored on `positions.realized_pnl_krw` and is fixed at sell execution time. KRW assets use the local realized PnL delta; USD assets use the local realized PnL delta multiplied by the execution USD/KRW rate. Current valuation FX must not revalue stored realized KRW PnL.
@@ -174,7 +174,7 @@ When required market data is missing, only that position's `valuation` becomes u
 - Asset price uses fresh eligible `provider_api` first, then latest eligible `admin_manual` fallback.
 - `priceSource` and `fxRateSource` expose selected source and fallback/rejection reason metadata without changing financial values.
 - `official_batch` is not newly allowed as a valuation source.
-- Provider asset price freshness threshold is capturedAt age <= 60 seconds. Existing `admin_manual` fallback keeps the established latest eligible `effectiveAt <= valuationAt` behavior.
+- The 60-second provider asset threshold applies while the asset market is open. Closed-market carry-forward is bounded to the latest completed session and is evaluated independently per position, so one closed market does not make a mixed portfolio unavailable. Existing `admin_manual` fallback keeps the established latest eligible `effectiveAt <= valuationAt` behavior.
 
 ## Sorting
 

@@ -5,6 +5,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import {
+  AssetType,
   OpsJobName,
   OpsJobRunStatus,
   OpsJobTrigger,
@@ -28,7 +29,11 @@ import {
   MarketCandleReconciliationService,
   type ReconciliationMarket,
 } from '../assets/market-candle-reconciliation.service';
-import { resolveMarketSession } from '../orders/market-calendar.policy';
+import {
+  findLatestCompletedMarketSession,
+  isLastMarketSessionOfWeek,
+  resolveMarketSession,
+} from '../orders/market-calendar.policy';
 
 @Injectable()
 export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
@@ -227,6 +232,19 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
           : reconciliation.crypto.enabled;
     if (!reconciliation.enabled || !enabled) return undefined;
 
+    let stockSession: ReturnType<typeof resolveMarketSession> = null;
+    let stockTimezone: string | null = null;
+    if (market !== 'CRYPTO') {
+      stockTimezone = market === 'KRX' ? 'Asia/Seoul' : 'America/New_York';
+      const local = getSchedulerLocalDateTime(now, stockTimezone);
+      const localDate = `${local.year}${String(local.month).padStart(2, '0')}${String(local.day).padStart(2, '0')}`;
+      stockSession = resolveMarketSession(market, localDate);
+      // A startup catch-up must not turn a full-day closure into a scheduled
+      // reconciliation run. Manual reconciliation retains its own explicit
+      // bounded-range path in the runner.
+      if (!stockSession) return undefined;
+    }
+
     const latest =
       await this.runService.findLatestSucceededReconciliationRun(market);
     if (startup) {
@@ -252,15 +270,15 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
         return undefined;
       }
     } else {
-      const timezone = market === 'KRX' ? 'Asia/Seoul' : 'America/New_York';
-      const local = getSchedulerLocalDateTime(now, timezone);
-      const localDate = `${local.year}${String(local.month).padStart(2, '0')}${String(local.day).padStart(2, '0')}`;
-      if (!resolveMarketSession(market, localDate)) return undefined;
+      const session = stockSession;
+      const timezone = stockTimezone;
+      if (!session || !timezone) return undefined;
       const schedule =
         market === 'KRX' ? reconciliation.krx : reconciliation.us;
-      const [hour, minute] = schedule.time.split(':').map(Number);
-      const dueMinute = hour * 60 + minute + schedule.graceMinutes;
-      if (local.hour * 60 + local.minute < dueMinute) return undefined;
+      const dueAt = new Date(
+        session.closeTime.getTime() + schedule.graceMinutes * 60_000,
+      );
+      if (now.getTime() < dueAt.getTime()) return undefined;
       if (
         latest &&
         getSchedulerBusinessDate(latest.startedAt, timezone) ===
@@ -300,9 +318,20 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
     previousFinishedAt?: Date | null,
   ): string[] {
     if (market !== 'CRYPTO') {
-      const timezone = market === 'KRX' ? 'Asia/Seoul' : 'America/New_York';
-      const weekday = localWeekday(now, timezone);
-      return weekday === 5 ? ['5m', '1d', '1w'] : ['5m', '1d'];
+      const session = findLatestCompletedMarketSession(
+        {
+          assetType:
+            market === 'KRX'
+              ? ('domestic_stock' as AssetType)
+              : ('us_stock' as AssetType),
+          market,
+        },
+        now,
+        370,
+      );
+      return session && isLastMarketSessionOfWeek(session)
+        ? ['5m', '1d', '1w']
+        : ['5m', '1d'];
     }
     const targets = ['5m'];
     if (!previousFinishedAt || utcDate(previousFinishedAt) !== utcDate(now)) {
@@ -419,6 +448,7 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
           ...baseInput,
           maxSnapshots: config.providerKisMaxSnapshots,
           kisPriceIngestionMode: config.providerKisPriceIngestionMode,
+          now: now.toISOString(),
         }),
     });
     if (kisResult) {
@@ -535,14 +565,6 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
 
 function isFiveMinuteBucketStart(now: Date): boolean {
   return now.getUTCMinutes() % 5 === 0;
-}
-
-function localWeekday(now: Date, timezone: string): number {
-  const label = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    weekday: 'short',
-  }).format(now);
-  return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(label);
 }
 
 function utcDate(value: Date): string {

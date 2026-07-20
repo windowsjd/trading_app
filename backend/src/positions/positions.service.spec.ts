@@ -73,6 +73,14 @@ describe('PositionsService', () => {
     joinedAt,
   };
 
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-20T14:00:00.000Z'));
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   const createWritableModel = () => ({
     create: jest.fn(),
     update: jest.fn(),

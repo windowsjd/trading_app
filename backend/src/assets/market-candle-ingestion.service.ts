@@ -84,10 +84,11 @@ export class MarketCandleIngestionService {
       duplicateRows: adapter.duplicateRows + normalized.duplicateRows,
       candles: built.candles,
       complete:
-        adapter.complete &&
-        normalized.acceptedRows > 0 &&
-        built.candles.length > 0 &&
-        built.incompleteBuckets === 0,
+        adapter.stopReason === 'expected_no_data' ||
+        (adapter.complete &&
+          normalized.acceptedRows > 0 &&
+          built.candles.length > 0 &&
+          built.incompleteBuckets === 0),
       stopReason: adapter.stopReason,
       oldestOpenTime: built.candles[0]?.openTime ?? adapter.oldestOpenTime,
       latestOpenTime: built.candles.at(-1)?.openTime ?? adapter.latestOpenTime,
@@ -126,9 +127,10 @@ export class MarketCandleIngestionService {
       // rows, and in-progress buckets whose OHLCV has not finished forming)
       // do not affect completeness.
       complete:
-        adapter.complete &&
-        normalized.acceptedRows > 0 &&
-        normalized.integrityFailedRows === 0,
+        adapter.stopReason === 'expected_no_data' ||
+        (adapter.complete &&
+          normalized.acceptedRows > 0 &&
+          normalized.integrityFailedRows === 0),
       stopReason: adapter.stopReason,
       oldestOpenTime: normalized.candles[0]?.openTime ?? adapter.oldestOpenTime,
       latestOpenTime:

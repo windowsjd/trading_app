@@ -53,6 +53,10 @@ import {
 } from './market-candle-sync.types';
 import { AssetCandlesCacheService } from './asset-candles-cache.service';
 import { ProviderConfigError } from '../providers/provider.types';
+import {
+  inspectMarketSessionsInRange,
+  resolveStockMarketDataUpperBound,
+} from '../orders/market-calendar.policy';
 
 const DAY_MS = 24 * 60 * 60_000;
 // Retention windows: 5m 35 days, 1d/1w one year (documented storage policy).
@@ -87,7 +91,13 @@ const KIS_SEGMENT_MAX_PAGES = 60;
 const KIS_SEGMENT_MAX_RAW_ROWS = 12_000;
 const DOMESTIC_KRX_MARKETS = new Set(['KRX', 'KOSPI', 'KOSDAQ', 'KONEX']);
 const SWEEP_TERMINAL_REASONS: ReadonlySet<MarketCandleSyncStopReason> = new Set(
-  ['target_reached', 'provider_exhausted', 'empty_page', 'data_incomplete'],
+  [
+    'target_reached',
+    'expected_no_data',
+    'provider_exhausted',
+    'empty_page',
+    'data_incomplete',
+  ],
 );
 
 type SyncAssetRecord = {
@@ -954,6 +964,27 @@ export class MarketCandleSyncService {
     if (input.descriptor.kind === 'binance') {
       return this.fetchBinancePage(input, input.descriptor);
     }
+    const effectiveTo = new Date(
+      Math.min(input.to.getTime(), input.now.getTime()),
+    );
+    if (effectiveTo.getTime() <= input.from.getTime()) {
+      return emptyFeedPage('target_reached', true);
+    }
+    const range = inspectMarketSessionsInRange(
+      input.asset,
+      input.from,
+      effectiveTo,
+    );
+    if (!range.calendarCovered) {
+      return emptyFeedPage('calendar_unavailable', false);
+    }
+    if (!range.hasTradingSession) {
+      return {
+        ...emptyFeedPage('expected_no_data', true),
+        coveredFrom: input.from,
+        coveredTo: effectiveTo,
+      };
+    }
     if (input.feed === '5m') {
       return this.fetchKisFiveMinuteSegment(input, input.descriptor);
     }
@@ -1048,8 +1079,16 @@ export class MarketCandleSyncService {
     const domestic = descriptor.kind === 'kis_domestic';
     const timeZone = domestic ? 'Asia/Seoul' : 'America/New_York';
     const fromDate = formatZonedCursor(input.from, timeZone).date;
+    const providerTo = resolveStockMarketDataUpperBound(
+      input.asset,
+      input.to,
+      input.now,
+    );
+    if (!providerTo) {
+      return emptyFeedPage('calendar_unavailable', false);
+    }
     const defaultEndDate = formatZonedCursor(
-      new Date(input.to.getTime() - 1),
+      new Date(providerTo.getTime() - 1),
       timeZone,
     ).date;
     const cursorEndDate = readDateField(input.cursor, 'endDate');
@@ -1243,6 +1282,30 @@ export class MarketCandleSyncService {
       segmentTo.getTime(),
       input.now.getTime(),
     );
+
+    if (result.stopReason === 'expected_no_data') {
+      const reachedTargetFrom = segmentFrom.getTime() <= input.from.getTime();
+      return {
+        ...base,
+        nextCursor: reachedTargetFrom
+          ? null
+          : { segmentTo: segmentFrom.getTime() },
+        stopReason: reachedTargetFrom ? 'target_reached' : null,
+        complete: reachedTargetFrom,
+        coveredFrom: segmentFrom,
+        coveredTo: new Date(clampedSegmentToMs),
+      };
+    }
+    if (result.stopReason === 'calendar_unavailable') {
+      return {
+        ...base,
+        nextCursor: null,
+        stopReason: 'calendar_unavailable',
+        complete: false,
+        coveredFrom: null,
+        coveredTo: null,
+      };
+    }
 
     // Only the adapter's own target_reached proves the segment was swept down
     // to segmentFrom. Geometry alone (segmentFrom <= targetFrom) must never
