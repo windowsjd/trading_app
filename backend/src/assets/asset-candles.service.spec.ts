@@ -1607,6 +1607,100 @@ describe('AssetCandlesService', () => {
     expect(response.data.candles[0].time).toBe('2026-01-02T01:00:00.000Z');
   });
 
+  it('anchors prev_open across the 2025→2026 year boundary to the real last 2025 session', async () => {
+    // First 2026 trading day (Fri Jan 2) 12:00 KST. The previous session
+    // skips Jan 1 (holiday) and Dec 31 (year-end closure) into 2025:
+    // prev_open = Tue 2025-12-30 09:00 KST open.
+    jest.setSystemTime(new Date('2026-01-02T03:00:00.000Z'));
+    const { prisma, kisAuthClient, kisQuoteClient, service } = createService();
+    kisAuthClient.getCachedToken.mockReturnValue({
+      accessToken: 'cached-kis-token',
+      tokenType: 'Bearer',
+      expiresInSeconds: 86400,
+      expiresAt: new Date('2026-01-03T00:00:00.000Z'),
+    });
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({
+        id: 'asset-domestic-year-boundary',
+        symbol: '005930',
+        market: 'KRX',
+        assetType: AssetType.domestic_stock,
+        currencyCode: CurrencyCode.KRW,
+      }),
+    );
+    kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
+      state: 'available',
+      receivedAt: new Date('2026-01-02T03:00:01.000Z'),
+      response: {
+        rt_cd: '0',
+        output2: [
+          domesticRow('20251229', '150000', '10'),
+          domesticRow('20251230', '090000', '20'),
+          domesticRow('20260102', '100000', '30'),
+        ],
+      },
+    });
+
+    const response = await service.getAssetCandles(
+      'user-1',
+      'asset-domestic-year-boundary',
+      { range: 'prev_open', interval: '5m' },
+    );
+
+    const anchor = Date.parse('2025-12-30T00:00:00.000Z');
+    expect(response.data.candles.length).toBeGreaterThan(0);
+    expect(Date.parse(response.data.candles[0].time)).toBe(anchor);
+    for (const candle of response.data.candles) {
+      expect(Date.parse(candle.time)).toBeGreaterThanOrEqual(anchor);
+    }
+  });
+
+  it('anchors prev2_open across the year boundary without counting closure days', async () => {
+    // Same reference day; the SECOND previous real session is Mon
+    // 2025-12-29 — Dec 31 (year-end closure), Jan 1, and the weekend are
+    // not counted as sessions.
+    jest.setSystemTime(new Date('2026-01-02T03:00:00.000Z'));
+    const { prisma, kisAuthClient, kisQuoteClient, service } = createService();
+    kisAuthClient.getCachedToken.mockReturnValue({
+      accessToken: 'cached-kis-token',
+      tokenType: 'Bearer',
+      expiresInSeconds: 86400,
+      expiresAt: new Date('2026-01-03T00:00:00.000Z'),
+    });
+    prisma.asset.findUnique.mockResolvedValueOnce(
+      asset({
+        id: 'asset-domestic-year-boundary-2',
+        symbol: '005930',
+        market: 'KRX',
+        assetType: AssetType.domestic_stock,
+        currencyCode: CurrencyCode.KRW,
+      }),
+    );
+    kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
+      state: 'available',
+      receivedAt: new Date('2026-01-02T03:00:01.000Z'),
+      response: {
+        rt_cd: '0',
+        output2: [
+          domesticRow('20251229', '090000', '10'),
+          domesticRow('20251230', '090000', '20'),
+          domesticRow('20260102', '100000', '30'),
+        ],
+      },
+    });
+
+    const response = await service.getAssetCandles(
+      'user-1',
+      'asset-domestic-year-boundary-2',
+      { range: 'prev2_open', interval: '30m' },
+    );
+
+    expect(response.data.candles.length).toBeGreaterThan(0);
+    expect(Date.parse(response.data.candles[0].time)).toBe(
+      Date.parse('2025-12-29T00:00:00.000Z'),
+    );
+  });
+
   it('keeps Binance startTime unchanged when the expected candle count fits the request limit', async () => {
     const { prisma, binancePublicClient, service } = createService();
     prisma.asset.findUnique.mockResolvedValueOnce(

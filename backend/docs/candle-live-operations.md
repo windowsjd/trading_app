@@ -215,9 +215,22 @@ fallback. After a managed refresh has started, no catch/fallback path calls
 `src/orders/market-calendar/` holds per-market per-year datasets with
 `sourceName`, `sourceReference`, `verifiedAt`, and `version` metadata:
 
+- `US 2025` (audited, historical): NYSE Group 2025/2026/2027 holiday press
+  release plus the NYSE 2025 trading-calendar PDF. Includes the unscheduled
+  2025-01-09 full closure (National Day of Mourning for President Jimmy
+  Carter, per the NYSE/Nasdaq closure notices) and the three 13:00 ET early
+  closes (Jul 3, Nov 28, Dec 24).
 - `US 2026/2027`: NYSE official "Holidays & Trading Hours" (Nasdaq equities
   follow the same schedule). Includes 13:00 ET early closes (day after
   Thanksgiving; Christmas Eve 2026) and observed holidays.
+- `KRX 2025` (audited, historical): KRX market-operation notices as relayed
+  by member firms (Samsung POP #21797/#21925, Korea Investment #45644) plus
+  KRX year-end coverage. Includes the 2025-01-02 delayed 10:00 open (close
+  15:30 unchanged), the 2025-01-27 government temporary holiday, the
+  2025-06-03 presidential-election closure, the Chuseok block Oct 6–9
+  (incl. the Oct 8 substitute holiday), the CSAT-day (2025-11-13)
+  10:00–16:30 session, and the 2025-12-31 year-end closure. 2025-10-10 was
+  NOT designated a temporary holiday and stays a trading day.
 - `KRX 2026`: the KRX year-end market-operation notice plus the 2026-05-20
   KRX closure notice (June 3 local elections; July 17 Constitution Day,
   re-designated a statutory holiday effective 2026-05-11). Includes the
@@ -226,6 +239,20 @@ fallback. After a managed refresh has started, no catch/fallback path calls
   the announced 2027 statutory holiday schedule and standing KRX rules. It
   MUST be re-verified against the official KRX notice (published ~Dec 2026);
   bump the version and drop the suffix then.
+
+The PREVIOUS calendar year is a hard requirement, not an archive: the 1d/1w
+candle sync default range is a 365-day lookback, so from any date the target
+range reaches into the prior year, and `prev_open`/`prev2_open` cross the
+year boundary during the first sessions of January. Without the prior-year
+dataset those paths fail closed (`calendar_unavailable`) by design.
+
+Unscheduled changes (temporary holidays such as the 2025-01-27 designation
+or the US 2025-01-09 mourning day, and session-time shifts) are reflected by
+editing the affected year dataset from the official/exchange notice, bumping
+its `version`, updating `verifiedAt`/`sourceReference`, and extending the
+dataset tests. There is NO runtime external calendar API fallback — the
+in-repo audited datasets are the only source, and uncovered dates stay
+fail-closed until the dataset ships.
 
 Calendar state per market/year is three-level, and readiness reflects it:
 
@@ -250,14 +277,29 @@ are never assumed tradable).
 Operational policy: a date in a year without a dataset is never assumed to be
 a regular trading day. `MARKET_CALENDAR_REQUIRED_FROM_YEAR` /
 `MARKET_CALENDAR_REQUIRED_THROUGH_YEAR` override the default requirement
-(current year through next year). KRX 2027 stays provisional until the
+(previous year through next year — the previous year is required because the
+365-day sync lookback and year-boundary previous-session anchors depend on
+it). KRX 2027 stays provisional until the
 official KRX year-end notice (expected ~Dec 2026) is verified; then bump the
 dataset `version` and drop the `-provisional` suffix. If a 2026 release does
 not need 2027 coverage, set `MARKET_CALENDAR_REQUIRED_THROUGH_YEAR=2026` —
 this narrows the REQUIREMENT; never use environment variables to hide a
 provisional dataset or present it as audited. To add a year: create
 `market-calendar/data/<market>-<year>.ts` from the primary source, register
-it in `market-calendar.registry.ts`, and add tests.
+it in `market-calendar.registry.ts`, and add tests. At each year rollover,
+check the ROLLING side too, not just the upcoming year: on the first day of
+year N the default requirement becomes N-1..N+1 and the 365-day lookback
+still reads N-1 data all year — retire a year's dataset only after it has
+left that window.
+
+Operational reasons distinguish two skip conditions that look alike in
+provider traffic: a weekend/full-day holiday is a scheduled empty day
+(`MARKET_CLOSED_EXPECTED_NO_DATA` / `confirmed_empty`, silent scheduler
+skip), while a date in an uncovered year is
+`MARKET_CALENDAR_COVERAGE_MISSING` (readiness degraded; the reconciliation
+scheduler emits a structured warning once per market per business date and
+still runs no provider job). A holiday must never be logged as missing
+coverage, and missing coverage must never be absorbed as a normal holiday.
 
 The same registry is the single source for chart `prev_open`/`prev2_open`, provider cursors, aggregation buckets, daily/weekly close state, and reconciliation. `30d` and `1y` remain rolling calendar durations; holidays simply have no candles. Session aggregation anchors at the actual open and caps partial `1h`/`4h` buckets at the actual close, so delayed opens, KRX 16:30 closes, and US 13:00 closes do not require service-local fixed-hour exceptions.
 

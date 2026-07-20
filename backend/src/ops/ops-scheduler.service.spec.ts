@@ -120,6 +120,18 @@ describe('OpsSchedulerService', () => {
     };
   };
 
+  // Typed accessor over the console.warn spy: jest exposes `any` call
+  // tuples, so reads go through unknown before narrowing to the structured
+  // warning detail the tests inspect.
+  const coverageWarningDetails = (spy: jest.SpyInstance): unknown[] =>
+    (spy.mock.calls as unknown[][])
+      .map((call) => call[1])
+      .filter(
+        (detail) =>
+          (detail as { reason?: string } | undefined)?.reason ===
+          'MARKET_CALENDAR_COVERAGE_MISSING',
+      );
+
   beforeEach(() => {
     jest.useFakeTimers();
     process.env = { ...originalEnv };
@@ -402,7 +414,7 @@ describe('OpsSchedulerService', () => {
         metadataJson: expect.objectContaining({
           reconciliationMarket: 'KRX',
           businessDate: '2026-07-10',
-        }),
+        }) as Record<string, unknown>,
       }),
     );
 
@@ -438,15 +450,141 @@ describe('OpsSchedulerService', () => {
     expect(runner.runMarketCandleReconciliationJob).not.toHaveBeenCalledWith(
       expect.objectContaining({
         market: 'KRX',
-        metadataJson: expect.objectContaining({ businessDate: '2026-07-17' }),
+        metadataJson: expect.objectContaining({
+          businessDate: '2026-07-17',
+        }) as Record<string, unknown>,
       }),
     );
     await service.runEnabledJobs(new Date('2026-07-03T22:00:00.000Z'));
     expect(runner.runMarketCandleReconciliationJob).not.toHaveBeenCalledWith(
       expect.objectContaining({
         market: 'US',
-        metadataJson: expect.objectContaining({ businessDate: '2026-07-03' }),
+        metadataJson: expect.objectContaining({
+          businessDate: '2026-07-03',
+        }) as Record<string, unknown>,
       }),
+    );
+  });
+
+  it('skips weekends silently: scheduled no-data, not a coverage warning', async () => {
+    process.env.CANDLE_RECONCILIATION_KRX_ENABLED = 'true';
+    process.env.CANDLE_RECONCILIATION_US_ENABLED = 'true';
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { runner, service } = createService();
+      // Saturday 2026-07-18 in both Asia/Seoul and America/New_York.
+      await expect(
+        service.runEnabledJobs(new Date('2026-07-18T09:00:00.000Z')),
+      ).resolves.toEqual([]);
+      expect(runner.runMarketCandleReconciliationJob).not.toHaveBeenCalled();
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('warns once per market and business date when the calendar year is uncovered', async () => {
+    process.env.CANDLE_RECONCILIATION_KRX_ENABLED = 'true';
+    process.env.CANDLE_RECONCILIATION_US_ENABLED = 'true';
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { runner, service } = createService();
+      // Wednesday 2028-01-05: no 2028 calendar dataset exists. The provider
+      // job must NOT run, and the skip must NOT look like a normal holiday.
+      await service.runEnabledJobs(new Date('2028-01-05T08:00:00.000Z'));
+      expect(runner.runMarketCandleReconciliationJob).not.toHaveBeenCalled();
+      expect(coverageWarningDetails(warnSpy)).toEqual([
+        expect.objectContaining({ market: 'KRX', startup: false }),
+        expect.objectContaining({ market: 'US', startup: false }),
+      ]);
+
+      // A later tick on the same business date does not repeat the warning.
+      warnSpy.mockClear();
+      await service.runEnabledJobs(new Date('2028-01-05T09:00:00.000Z'));
+      expect(coverageWarningDetails(warnSpy)).toHaveLength(0);
+
+      // The next business date warns again.
+      await service.runEnabledJobs(new Date('2028-01-06T08:00:00.000Z'));
+      expect(coverageWarningDetails(warnSpy)).toHaveLength(2);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('uses the real early close plus grace on the day after Thanksgiving 2026', async () => {
+    process.env.CANDLE_RECONCILIATION_US_ENABLED = 'true';
+    const { runner, service } = createService();
+    // US 2026-11-27 closes early at 13:00 ET (18:00Z); grace is 20 minutes.
+    await expect(
+      service.runEnabledJobs(new Date('2026-11-27T18:19:00.000Z')),
+    ).resolves.toEqual([]);
+    expect(runner.runMarketCandleReconciliationJob).not.toHaveBeenCalled();
+
+    await service.runEnabledJobs(new Date('2026-11-27T18:20:00.000Z'));
+    expect(runner.runMarketCandleReconciliationJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        market: 'US',
+        metadataJson: expect.objectContaining({
+          businessDate: '2026-11-27',
+        }) as Record<string, unknown>,
+      }),
+    );
+  });
+
+  it('uses the real delayed close plus grace on KRX CSAT day 2026', async () => {
+    process.env.CANDLE_RECONCILIATION_KRX_ENABLED = 'true';
+    const { runner, service } = createService();
+    // KRX 2026-11-19 session is shifted to 10:00–16:30 KST (close 07:30Z);
+    // due at close + 20 minutes grace, NOT at the regular 15:30 close.
+    await expect(
+      service.runEnabledJobs(new Date('2026-11-19T07:49:00.000Z')),
+    ).resolves.toEqual([]);
+    expect(runner.runMarketCandleReconciliationJob).not.toHaveBeenCalled();
+
+    await service.runEnabledJobs(new Date('2026-11-19T07:50:00.000Z'));
+    expect(runner.runMarketCandleReconciliationJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        market: 'KRX',
+        metadataJson: expect.objectContaining({
+          businessDate: '2026-11-19',
+        }) as Record<string, unknown>,
+      }),
+    );
+  });
+
+  it('observes calendar-unavailable on startup catch-up instead of silently skipping', async () => {
+    process.env.CANDLE_RECONCILIATION_KRX_ENABLED = 'true';
+    process.env.CANDLE_RECONCILIATION_STARTUP_CATCH_UP_ENABLED = 'true';
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { runner, service } = createService();
+      await expect(
+        service.runStartupCandleReconciliation(
+          new Date('2028-01-05T08:00:00.000Z'),
+        ),
+      ).resolves.toEqual([]);
+      expect(runner.runMarketCandleReconciliationJob).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('calendar'),
+        expect.objectContaining({
+          reason: 'MARKET_CALENDAR_COVERAGE_MISSING',
+          market: 'KRX',
+          startup: true,
+        }),
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('keeps crypto reconciliation independent of the stock calendar', async () => {
+    process.env.CANDLE_RECONCILIATION_CRYPTO_ENABLED = 'true';
+    const { runner, service } = createService();
+    // 2028 has no stock calendar dataset; crypto trades continuously and
+    // must still reconcile on its rolling interval.
+    await service.runEnabledJobs(new Date('2028-01-05T08:00:00.000Z'));
+    expect(runner.runMarketCandleReconciliationJob).toHaveBeenCalledWith(
+      expect.objectContaining({ market: 'CRYPTO' }),
     );
   });
 
@@ -480,7 +618,7 @@ describe('OpsSchedulerService', () => {
     expect(runner.runMarketCandleReconciliationJob).toHaveBeenCalledWith(
       expect.objectContaining({
         market: 'CRYPTO',
-        targets: expect.arrayContaining(['5m', '1d']),
+        targets: expect.arrayContaining(['5m', '1d']) as string[],
       }),
     );
   });

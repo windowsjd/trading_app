@@ -32,7 +32,8 @@ import {
 import {
   findLatestCompletedMarketSession,
   isLastMarketSessionOfWeek,
-  resolveMarketSession,
+  resolveStockMarketSessionState,
+  type MarketSessionWindow,
 } from '../orders/market-calendar.policy';
 
 @Injectable()
@@ -232,13 +233,30 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
           : reconciliation.crypto.enabled;
     if (!reconciliation.enabled || !enabled) return undefined;
 
-    let stockSession: ReturnType<typeof resolveMarketSession> = null;
+    let stockSession: MarketSessionWindow | null = null;
     let stockTimezone: string | null = null;
     if (market !== 'CRYPTO') {
       stockTimezone = market === 'KRX' ? 'Asia/Seoul' : 'America/New_York';
-      const local = getSchedulerLocalDateTime(now, stockTimezone);
-      const localDate = `${local.year}${String(local.month).padStart(2, '0')}${String(local.day).padStart(2, '0')}`;
-      stockSession = resolveMarketSession(market, localDate);
+      // Explicit tri-state judgement: a scheduled empty day (weekend or
+      // full-day holiday) is NOT the same condition as a year with no
+      // calendar dataset — the latter must stay observable, never be
+      // silently absorbed into "market closed today".
+      const sessionState = resolveStockMarketSessionState(
+        {
+          assetType:
+            market === 'KRX'
+              ? ('domestic_stock' as AssetType)
+              : ('us_stock' as AssetType),
+          market,
+        },
+        now,
+      );
+      if (!sessionState || sessionState.state === 'calendar_unavailable') {
+        this.warnCalendarCoverageMissing(market, now, stockTimezone, startup);
+        return undefined;
+      }
+      stockSession = sessionState.currentSession;
+      // Weekend or full-day closure: scheduled no-data — no provider work.
       // A startup catch-up must not turn a full-day closure into a scheduled
       // reconciliation run. Manual reconciliation retains its own explicit
       // bounded-range path in the runner.
@@ -310,6 +328,34 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
       continueOnError: true,
       metadataJson: { reconciliationMarket: market, businessDate, startup },
     });
+  }
+
+  // Last business date a coverage-missing warning was emitted per market:
+  // the scheduler ticks every minute, so an uncovered year would otherwise
+  // repeat the same warning ~1440×/day. One structured warning per market
+  // per local business date keeps the condition observable without noise.
+  private readonly calendarWarningByMarket = new Map<string, string>();
+
+  private warnCalendarCoverageMissing(
+    market: Exclude<ReconciliationMarket, 'ALL'>,
+    now: Date,
+    timezone: string,
+    startup: boolean,
+  ) {
+    const businessDate = getSchedulerBusinessDate(now, timezone);
+    if (!startup && this.calendarWarningByMarket.get(market) === businessDate) {
+      return;
+    }
+    this.calendarWarningByMarket.set(market, businessDate);
+    console.warn(
+      'Market candle reconciliation skipped: no calendar dataset covers the current date.',
+      {
+        reason: 'MARKET_CALENDAR_COVERAGE_MISSING',
+        market,
+        businessDate,
+        startup,
+      },
+    );
   }
 
   private reconciliationTargets(

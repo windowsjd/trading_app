@@ -3,8 +3,10 @@ import type {
   MarketCalendarMarket,
   MarketCalendarSchedule,
 } from './market-calendar.types';
+import { KRX_2025 } from './data/krx-2025';
 import { KRX_2026 } from './data/krx-2026';
 import { KRX_2027 } from './data/krx-2027';
+import { US_2025 } from './data/us-2025';
 import { US_2026 } from './data/us-2026';
 import { US_2027 } from './data/us-2027';
 
@@ -16,8 +18,10 @@ export class MarketCalendarConfigError extends Error {
 }
 
 const DATASETS: readonly MarketCalendarDataset[] = [
+  KRX_2025,
   KRX_2026,
   KRX_2027,
+  US_2025,
   US_2026,
   US_2027,
 ];
@@ -66,7 +70,9 @@ const datasetByMarketYear = new Map<string, MarketCalendarDataset>();
 for (const dataset of DATASETS) {
   const yearKey = `${dataset.market}:${dataset.year}`;
   if (datasetByMarketYear.has(yearKey)) {
-    throw new MarketCalendarConfigError(`Duplicate calendar dataset ${yearKey}.`);
+    throw new MarketCalendarConfigError(
+      `Duplicate calendar dataset ${yearKey}.`,
+    );
   }
   datasetByMarketYear.set(yearKey, dataset);
   for (const schedule of dataset.schedules) {
@@ -139,8 +145,11 @@ export type MarketCalendarCoverageConfig = {
 };
 
 /**
- * Required year range for readiness. Defaults to the current year through
- * the next year so operators are warned well before a year boundary.
+ * Required year range for readiness. Defaults to the previous year through
+ * the next year: the previous year is required because the 1d/1w candle
+ * sync's 365-day lookback (and year-boundary previous-session anchors)
+ * reach into it, and the next year so operators are warned well before a
+ * year boundary. Explicit env values override either bound.
  */
 export function readMarketCalendarCoverageConfig(
   env: NodeJS.ProcessEnv = process.env,
@@ -150,7 +159,7 @@ export function readMarketCalendarCoverageConfig(
   const fromYear = readYear(
     env,
     'MARKET_CALENDAR_REQUIRED_FROM_YEAR',
-    currentYear,
+    currentYear - 1,
   );
   const throughYear = readYear(
     env,
@@ -190,7 +199,13 @@ export function getMarketCalendarCoverage(
         auditedYears.push(year);
       }
     }
-    return { market, coveredYears, auditedYears, missingYears, provisionalYears };
+    return {
+      market,
+      coveredYears,
+      auditedYears,
+      missingYears,
+      provisionalYears,
+    };
   });
   return {
     requiredFromYear: config.requiredFromYear,

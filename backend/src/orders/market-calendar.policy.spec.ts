@@ -208,12 +208,159 @@ describe('market calendar policy', () => {
   it('fails safe on dates in years without an audited calendar dataset', () => {
     expect(resolveMarketSession('KRX', '20280104')).toBeNull();
     expect(resolveMarketSession('US', '20280104')).toBeNull();
-    expect(resolveMarketSession('KRX', '20250707')).toBeNull();
+    expect(resolveMarketSession('KRX', '20240705')).toBeNull();
     expect(
       resolveRegularSessionForEvent(
         { assetType: AssetType.domestic_stock, market: 'KRX' },
         new Date('2028-01-04T01:00:00.000Z'),
       ),
     ).toBeNull();
+  });
+
+  it('treats real 2025 exchange holidays as closed via the registry', () => {
+    // KRX: temporary holiday (Mon before Seollal), presidential-election
+    // day (Tue), Chuseok substitute holiday (Wed), year-end closure (Wed).
+    expect(resolveMarketSession('KRX', '20250127')).toBeNull();
+    expect(resolveMarketSession('KRX', '20250603')).toBeNull();
+    expect(resolveMarketSession('KRX', '20251008')).toBeNull();
+    expect(resolveMarketSession('KRX', '20251231')).toBeNull();
+    // US: National Day of Mourning for President Carter (Thu) and
+    // Independence Day (Fri).
+    expect(resolveMarketSession('US', '20250109')).toBeNull();
+    expect(resolveMarketSession('US', '20250704')).toBeNull();
+    // Regular trading days resolve with standard UTC session instants.
+    expect(resolveMarketSession('KRX', '20250707')).toMatchObject({
+      openTime: new Date('2025-07-07T00:00:00.000Z'),
+      closeTime: new Date('2025-07-07T06:30:00.000Z'),
+    });
+    expect(resolveMarketSession('US', '20250707')).toMatchObject({
+      openTime: new Date('2025-07-07T13:30:00.000Z'),
+      closeTime: new Date('2025-07-07T20:00:00.000Z'),
+    });
+    // 2025-10-10 was NOT designated a temporary holiday.
+    expect(resolveMarketSession('KRX', '20251010')).not.toBeNull();
+  });
+
+  it('resolves 2025 KRX session overrides to their real UTC instants', () => {
+    // 2025-01-02 opening day: 10:00 delayed open, regular 15:30 close.
+    expect(resolveMarketSession('KRX', '20250102')).toMatchObject({
+      openTime: new Date('2025-01-02T01:00:00.000Z'),
+      closeTime: new Date('2025-01-02T06:30:00.000Z'),
+      earlyClose: false,
+    });
+    // CSAT day 2025-11-13: whole session shifted to 10:00–16:30 KST.
+    expect(resolveMarketSession('KRX', '20251113')).toMatchObject({
+      openTime: new Date('2025-11-13T01:00:00.000Z'),
+      closeTime: new Date('2025-11-13T07:30:00.000Z'),
+    });
+  });
+
+  it('resolves 2025 US early closes with the correct EDT/EST offsets', () => {
+    // Jul 3 is EDT (UTC-4): 13:00 ET close = 17:00Z.
+    expect(resolveMarketSession('US', '20250703')).toMatchObject({
+      openTime: new Date('2025-07-03T13:30:00.000Z'),
+      closeTime: new Date('2025-07-03T17:00:00.000Z'),
+      earlyClose: true,
+    });
+    // Nov 28 and Dec 24 are EST (UTC-5) after DST ended Nov 2: 18:00Z.
+    expect(resolveMarketSession('US', '20251128')).toMatchObject({
+      closeTime: new Date('2025-11-28T18:00:00.000Z'),
+      earlyClose: true,
+    });
+    expect(resolveMarketSession('US', '20251224')).toMatchObject({
+      closeTime: new Date('2025-12-24T18:00:00.000Z'),
+      earlyClose: true,
+    });
+  });
+
+  it('keeps US DST behavior across the 2025 spring and fall transitions', () => {
+    // DST started Sunday 2025-03-09: EST open Fri Mar 7, EDT open Mon Mar 10.
+    expect(resolveMarketSession('US', '20250307')?.openTime).toEqual(
+      new Date('2025-03-07T14:30:00.000Z'),
+    );
+    expect(resolveMarketSession('US', '20250310')?.openTime).toEqual(
+      new Date('2025-03-10T13:30:00.000Z'),
+    );
+    // DST ended Sunday 2025-11-02: EDT open Fri Oct 31, EST open Mon Nov 3.
+    expect(resolveMarketSession('US', '20251031')?.openTime).toEqual(
+      new Date('2025-10-31T13:30:00.000Z'),
+    );
+    expect(resolveMarketSession('US', '20251103')?.openTime).toEqual(
+      new Date('2025-11-03T14:30:00.000Z'),
+    );
+  });
+
+  it('finds previous KRX sessions across the 2025→2026 year boundary', () => {
+    const asset = { assetType: AssetType.domestic_stock, market: 'KRX' };
+    // Reference: first 2026 trading day (Fri Jan 2). The previous session
+    // skips Jan 1 (holiday) and Dec 31 (year-end closure) back to Dec 30.
+    const reference = new Date('2026-01-02T02:00:00.000Z');
+    expect(findPreviousMarketSession(asset, reference, 1)).toMatchObject({
+      localDate: '2025-12-30',
+      openTime: new Date('2025-12-30T00:00:00.000Z'),
+      closeTime: new Date('2025-12-30T06:30:00.000Z'),
+    });
+    expect(findPreviousMarketSession(asset, reference, 2)).toMatchObject({
+      localDate: '2025-12-29',
+      openTime: new Date('2025-12-29T00:00:00.000Z'),
+    });
+    // From the second 2026 session, prev1 is the delayed-open Jan 2 session
+    // with its REAL 10:00 open, and prev2 crosses into 2025.
+    const secondDay = new Date('2026-01-05T03:00:00.000Z');
+    expect(findPreviousMarketSession(asset, secondDay, 1)).toMatchObject({
+      localDate: '2026-01-02',
+      openTime: new Date('2026-01-02T01:00:00.000Z'),
+    });
+    expect(findPreviousMarketSession(asset, secondDay, 2)).toMatchObject({
+      localDate: '2025-12-30',
+      openTime: new Date('2025-12-30T00:00:00.000Z'),
+    });
+  });
+
+  it('finds previous US sessions across the 2025→2026 year boundary', () => {
+    const asset = { assetType: AssetType.us_stock, market: 'NAS' };
+    // Reference: first 2026 US trading day (Fri Jan 2). Dec 31 2025 was a
+    // regular full session (no early close), Jan 1 2026 a holiday.
+    const reference = new Date('2026-01-02T15:00:00.000Z');
+    expect(findPreviousMarketSession(asset, reference, 1)).toMatchObject({
+      localDate: '2025-12-31',
+      openTime: new Date('2025-12-31T14:30:00.000Z'),
+      closeTime: new Date('2025-12-31T21:00:00.000Z'),
+      earlyClose: false,
+    });
+    expect(findPreviousMarketSession(asset, reference, 2)).toMatchObject({
+      localDate: '2025-12-30',
+      openTime: new Date('2025-12-30T14:30:00.000Z'),
+    });
+  });
+
+  it('spans the 2025→2026 boundary for latest-completed and range inspection', () => {
+    const krx = { assetType: AssetType.domestic_stock, market: 'KRX' };
+    // At 2026-01-02 09:30 KST (00:30Z) the delayed 10:00 open has not
+    // happened yet, so the latest COMPLETED session is 2025-12-30.
+    expect(
+      findLatestCompletedMarketSession(
+        krx,
+        new Date('2026-01-02T00:30:00.000Z'),
+        10,
+      )?.localDate,
+    ).toBe('2025-12-30');
+    // The year-end closure block (Dec 31 → Jan 1) is a confirmed no-session
+    // range, NOT a coverage gap.
+    expect(
+      inspectMarketSessionsInRange(
+        krx,
+        new Date('2025-12-30T15:00:00.000Z'),
+        new Date('2026-01-01T15:00:00.000Z'),
+      ),
+    ).toEqual({ calendarCovered: true, hasTradingSession: false });
+    // A range spanning the boundary with real sessions on both sides.
+    expect(
+      inspectMarketSessionsInRange(
+        krx,
+        new Date('2025-12-29T15:00:00.000Z'),
+        new Date('2026-01-05T15:00:00.000Z'),
+      ),
+    ).toEqual({ calendarCovered: true, hasTradingSession: true });
   });
 });

@@ -1802,4 +1802,286 @@ describe('MarketCandleSyncService', () => {
       expect(summary.failedFeeds).toBe(0);
     });
   });
+
+  // Regression: the default 1d/1w lookback is 365 days, so its target range
+  // reaches into the PREVIOUS calendar year. With the 2025 datasets present
+  // the range is calendar-covered and the provider adapter must actually be
+  // called — the run must not die as calendar_unavailable (the pre-2025-
+  // dataset regression) nor be mislabeled expected_no_data.
+  describe('default 365-day stock range across the year boundary', () => {
+    // Monday 2026-07-20 18:00 KST / 05:00 EDT: KRX closed for the day, US
+    // pre-open. Default range = [2025-07-20T09:00Z, 2026-07-20T09:00Z).
+    const SYNC_NOW = new Date('2026-07-20T09:00:00Z');
+    const US_ASSET = {
+      id: 'us-1',
+      symbol: 'AAPL',
+      market: 'NAS',
+      assetType: 'us_stock',
+      isActive: true,
+    };
+    const receivedAt = new Date('2026-07-20T08:00:00Z');
+    const domesticRow = (date: string) => ({
+      value: {
+        stck_bsop_date: date,
+        stck_clpr: '101',
+        stck_oprc: '100',
+        stck_hgpr: '102',
+        stck_lwpr: '99',
+        acml_vol: '1000',
+        acml_tr_pbmn: '101000',
+      },
+      receivedAt,
+      sequence: 0,
+    });
+    const overseasRow = (date: string) => ({
+      value: {
+        xymd: date,
+        open: '100',
+        high: '102',
+        low: '99',
+        clos: '101',
+        tvol: '1000',
+        tamt: '101000',
+      },
+      receivedAt,
+      sequence: 0,
+    });
+
+    it('runs KRX 1d initial sync over the default range and calls the provider', async () => {
+      const harness = createHarness({ assets: [DOMESTIC_ASSET] });
+      harness.domesticPeriodAdapter.fetchPeriodPage.mockResolvedValueOnce({
+        state: 'ok',
+        rows: [domesticRow('20260720'), domesticRow('20250721')],
+        providerReturnedRows: 2,
+        blankRows: 0,
+        oldestDate: '20250718',
+        latestDate: '20260720',
+        trCont: 'D',
+      });
+
+      const result = await harness.service.syncAsset({
+        assetId: DOMESTIC_ASSET.id,
+        targets: ['1d'],
+        mode: 'initial' as never,
+        now: SYNC_NOW,
+      });
+
+      const feed = result.feeds[0];
+      // The provider WAS called, over the full 365-day range.
+      expect(
+        harness.domesticPeriodAdapter.fetchPeriodPage,
+      ).toHaveBeenCalledTimes(1);
+      const call = callArg<{ fromDate: string; endDate: string }>(
+        harness.domesticPeriodAdapter.fetchPeriodPage,
+      );
+      expect(call.fromDate).toBe('20250720');
+      expect(call.endDate).toBe('20260720');
+      expect(feed.rangeFrom).toEqual(new Date('2025-07-20T09:00:00Z'));
+      expect(feed.rangeTo).toEqual(SYNC_NOW);
+      // Not misclassified as a calendar gap or a confirmed-empty holiday.
+      expect(feed.stopReason).not.toBe('calendar_unavailable');
+      expect(feed.status).toBe('completed');
+      expect(feed.stopReason).toBe('target_reached');
+      expect(feed.coverageComplete).toBe(true);
+      expect(feed.completionReason).toBe('target_reached');
+      expect(feed.acceptedRows).toBeGreaterThan(0);
+      expect(feed.writtenRows).toBeGreaterThan(0);
+    });
+
+    it('runs US 1d initial sync over the default range and calls the provider', async () => {
+      const harness = createHarness({ assets: [US_ASSET] });
+      harness.overseasPeriodAdapter.fetchPeriodPage.mockResolvedValueOnce({
+        state: 'ok',
+        rows: [overseasRow('20260717'), overseasRow('20250721')],
+        providerReturnedRows: 2,
+        blankRows: 0,
+        oldestDate: '20250718',
+        latestDate: '20260717',
+        trCont: 'D',
+      });
+
+      const result = await harness.service.syncAsset({
+        assetId: US_ASSET.id,
+        targets: ['1d'],
+        mode: 'initial' as never,
+        now: SYNC_NOW,
+      });
+
+      const feed = result.feeds[0];
+      expect(
+        harness.overseasPeriodAdapter.fetchPeriodPage,
+      ).toHaveBeenCalledTimes(1);
+      const call = callArg<{ fromDate: string; endDate: string }>(
+        harness.overseasPeriodAdapter.fetchPeriodPage,
+      );
+      expect(call.fromDate).toBe('20250720');
+      // Upper bound: latest completed US session (Fri 2026-07-17), since the
+      // US session has not opened yet at 05:00 EDT.
+      expect(call.endDate).toBe('20260717');
+      expect(feed.status).toBe('completed');
+      expect(feed.stopReason).toBe('target_reached');
+      expect(feed.coverageComplete).toBe(true);
+      expect(feed.acceptedRows).toBeGreaterThan(0);
+    });
+
+    it('runs KRX 1w initial sync over the default range and calls the provider', async () => {
+      const harness = createHarness({ assets: [DOMESTIC_ASSET] });
+      harness.domesticPeriodAdapter.fetchPeriodPage.mockResolvedValueOnce({
+        state: 'ok',
+        rows: [domesticRow('20260717'), domesticRow('20250714')],
+        providerReturnedRows: 2,
+        blankRows: 0,
+        oldestDate: '20250714',
+        latestDate: '20260717',
+        trCont: 'D',
+      });
+
+      const result = await harness.service.syncAsset({
+        assetId: DOMESTIC_ASSET.id,
+        targets: ['1w'],
+        mode: 'initial' as never,
+        now: SYNC_NOW,
+      });
+
+      const feed = result.feeds[0];
+      expect(
+        harness.domesticPeriodAdapter.fetchPeriodPage,
+      ).toHaveBeenCalledTimes(1);
+      const call = callArg<{
+        fromDate: string;
+        endDate: string;
+        interval: string;
+      }>(harness.domesticPeriodAdapter.fetchPeriodPage);
+      expect(call.interval).toBe('1w');
+      expect(call.fromDate).toBe('20250720');
+      expect(call.endDate).toBe('20260720');
+      expect(feed.status).toBe('completed');
+      expect(feed.stopReason).toBe('target_reached');
+      expect(feed.coverageComplete).toBe(true);
+      // Weekly candles anchor to the ISO Monday, incl. the 2025 week.
+      const written = harness.upserted.flat() as { openTime: Date }[];
+      expect(
+        written.some(
+          (row) =>
+            row.openTime.getTime() ===
+            new Date('2025-07-13T15:00:00Z').getTime(),
+        ),
+      ).toBe(true);
+    });
+
+    it('runs incremental sync with no stored candles over the same default range', async () => {
+      // findLatest resolves null by default: an empty table must behave like
+      // the initial 365-day range, for KRX and US alike.
+      for (const [asset, adapterKey, endDate] of [
+        [DOMESTIC_ASSET, 'domesticPeriodAdapter', '20260720'],
+        [US_ASSET, 'overseasPeriodAdapter', '20260717'],
+      ] as const) {
+        const harness = createHarness({ assets: [asset] });
+        const adapter = harness[adapterKey];
+        const row =
+          adapterKey === 'domesticPeriodAdapter'
+            ? domesticRow('20260716')
+            : overseasRow('20260716');
+        adapter.fetchPeriodPage.mockResolvedValueOnce({
+          state: 'ok',
+          rows: [row],
+          providerReturnedRows: 1,
+          blankRows: 0,
+          oldestDate: '20250718',
+          latestDate: '20260716',
+          trCont: 'D',
+        });
+
+        const result = await harness.service.syncAsset({
+          assetId: asset.id,
+          targets: ['1d'],
+          now: SYNC_NOW,
+        });
+
+        const feed = result.feeds[0];
+        expect(feed.mode).toBe('incremental');
+        expect(adapter.fetchPeriodPage).toHaveBeenCalledTimes(1);
+        const call = callArg<{ fromDate: string; endDate: string }>(
+          adapter.fetchPeriodPage,
+        );
+        expect(call.fromDate).toBe('20250720');
+        expect(call.endDate).toBe(endDate);
+        expect(feed.status).toBe('completed');
+        expect(feed.stopReason).toBe('target_reached');
+      }
+    });
+
+    it('completes a holiday-only explicit repair range without calling the provider', async () => {
+      // Seollal block 2026-02-16(Mon)–2026-02-18(Wed): calendar-covered,
+      // zero sessions → expected_no_data / confirmed_empty, no provider IO.
+      const harness = createHarness({ assets: [DOMESTIC_ASSET] });
+      const result = await harness.service.syncAsset({
+        assetId: DOMESTIC_ASSET.id,
+        targets: ['1d'],
+        mode: 'repair' as never,
+        from: new Date('2026-02-16T00:00:00Z'),
+        to: new Date('2026-02-18T08:00:00Z'),
+        now: SYNC_NOW,
+      });
+
+      const feed = result.feeds[0];
+      expect(
+        harness.domesticPeriodAdapter.fetchPeriodPage,
+      ).not.toHaveBeenCalled();
+      expect(feed.status).toBe('completed');
+      expect(feed.stopReason).toBe('expected_no_data');
+      expect(feed.coverageComplete).toBe(true);
+      expect(feed.completionReason).toBe('confirmed_empty');
+    });
+
+    it('fails closed on a range in a year without a calendar dataset', async () => {
+      // 2028 has no dataset: the range must fail as calendar_unavailable
+      // without any provider call — never assumed to be trading days and
+      // never mislabeled as a confirmed holiday.
+      const harness = createHarness({ assets: [DOMESTIC_ASSET] });
+      const result = await harness.service.syncAsset({
+        assetId: DOMESTIC_ASSET.id,
+        targets: ['1d'],
+        mode: 'repair' as never,
+        from: new Date('2028-01-05T00:00:00Z'),
+        to: new Date('2028-01-10T00:00:00Z'),
+        now: new Date('2028-01-15T00:00:00Z'),
+      });
+
+      const feed = result.feeds[0];
+      expect(
+        harness.domesticPeriodAdapter.fetchPeriodPage,
+      ).not.toHaveBeenCalled();
+      expect(feed.status).toBe('failed');
+      expect(feed.stopReason).toBe('calendar_unavailable');
+      expect(feed.errorCode).toBe('CALENDAR_UNAVAILABLE');
+      expect(feed.coverageComplete).toBe(false);
+    });
+
+    it('treats a malformed provider response as a failure, never as a holiday', async () => {
+      const harness = createHarness({ assets: [DOMESTIC_ASSET] });
+      harness.domesticPeriodAdapter.fetchPeriodPage.mockResolvedValueOnce({
+        state: 'malformed',
+        rows: [],
+        providerReturnedRows: 0,
+        blankRows: 0,
+        oldestDate: null,
+        latestDate: null,
+        trCont: null,
+      });
+
+      const result = await harness.service.syncAsset({
+        assetId: DOMESTIC_ASSET.id,
+        targets: ['1d'],
+        mode: 'initial' as never,
+        now: SYNC_NOW,
+      });
+
+      const feed = result.feeds[0];
+      expect(feed.status).toBe('failed');
+      expect(feed.stopReason).toBe('malformed_response');
+      expect(feed.coverageComplete).toBe(false);
+      expect(feed.completionReason).not.toBe('confirmed_empty');
+    });
+  });
 });

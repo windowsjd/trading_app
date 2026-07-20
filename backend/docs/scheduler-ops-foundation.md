@@ -183,6 +183,8 @@ Before a one-shot KIS call, the runner partitions targets with the shared market
 
 Stock candle reconciliation is due at the actual session close plus grace. Weekly targets are selected on the week's last real session rather than by Friday weekday, and a full-day holiday produces no market reconciliation. The legacy configured local `time` remains configuration-compatible but does not override the audited session close.
 
+The reconciliation scheduler distinguishes a scheduled empty day from missing calendar data: weekends and full-day holidays are expected no-data and skip silently, while a date in a year with no calendar dataset is `MARKET_CALENDAR_COVERAGE_MISSING` — the provider job is still not run (fail closed), but a structured warning with that reason is emitted once per market per local business date (startup catch-up always emits it) instead of being silently absorbed into "market closed". Startup catch-up also skips full-day holidays. Crypto reconciliation is independent of the stock calendar in both cases.
+
 Provider env required before real runs:
 
 - FX: `KOREA_EXIM_EXCHANGE_ENABLED`, `KOREA_EXIM_EXCHANGE_AUTH_KEY`, `KOREA_EXIM_EXCHANGE_BASE_URL`, `KOREA_EXIM_EXCHANGE_DATA`, `KOREA_EXIM_EXCHANGE_LOOKBACK_DAYS`, or ExchangeRate-API env `EXCHANGE_RATE_API_ENABLED`, `EXCHANGE_RATE_API_KEY`, `EXCHANGE_RATE_API_BASE_URL`.
