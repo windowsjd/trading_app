@@ -1,5 +1,7 @@
 jest.mock('../generated/prisma/client', () => {
-  const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
+  const { Decimal } = jest.requireActual<
+    typeof import('@prisma/client/runtime/client')
+  >('@prisma/client/runtime/client');
 
   return {
     AssetPriceSourceType: {
@@ -53,11 +55,15 @@ import { AssetsService } from './assets.service';
 describe('AssetsService', () => {
   const priceAt = new Date('2026-05-07T00:00:00.000Z');
   const testNow = new Date('2026-07-20T03:00:00.000Z');
+  // Anchored to the fixed testNow — NEVER to the real Date.now(): this
+  // fixture is built at module load, before the fake timers in beforeEach
+  // pin the clock, so real-time anchoring would make the season active only
+  // on the day the suite happens to run.
   const activeSeason = {
     id: 'season-1',
     status: SeasonStatus.active,
-    startAt: new Date(Date.now() - 86_400_000),
-    endAt: new Date(Date.now() + 86_400_000),
+    startAt: new Date(testNow.getTime() - 86_400_000),
+    endAt: new Date(testNow.getTime() + 86_400_000),
   };
 
   const createWritableModel = () => ({
@@ -276,6 +282,12 @@ describe('AssetsService', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   };
 
+  // Typed wrapper so nested matcher values are not `any` assignments.
+  const containing = (
+    value: Record<string, unknown>,
+  ): Record<string, unknown> =>
+    expect.objectContaining(value) as Record<string, unknown>;
+
   it('rejects missing authenticated user', async () => {
     const { service } = createService();
 
@@ -328,7 +340,7 @@ describe('AssetsService', () => {
 
     expect(prisma.asset.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({
+        where: containing({
           isActive: true,
           assetType: AssetType.crypto,
         }),
@@ -348,7 +360,7 @@ describe('AssetsService', () => {
 
     expect(prisma.asset.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({
+        where: containing({
           currencyCode: CurrencyCode.USD,
         }),
       }),
@@ -367,7 +379,7 @@ describe('AssetsService', () => {
 
     expect(prisma.asset.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({
+        where: containing({
           market: 'NASDAQ',
         }),
       }),
@@ -386,7 +398,7 @@ describe('AssetsService', () => {
 
     expect(prisma.asset.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({
+        where: containing({
           OR: [
             {
               symbol: {
@@ -522,7 +534,7 @@ describe('AssetsService', () => {
 
     expect(prisma.assetPriceSnapshot.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({
+        where: containing({
           assetId: 'asset-krw',
           currencyCode: CurrencyCode.KRW,
           sourceType: 'admin_manual',
@@ -581,6 +593,84 @@ describe('AssetsService', () => {
       },
     });
     expectNoAssetWrites(prisma);
+  });
+
+  it.each([
+    // Season boundaries are half-open [startAt, endAt) around the pinned
+    // testNow; none of these depend on the real run date or host timezone.
+    ['starts exactly now', 0, 86_400_000, true],
+    ['starts one second from now', 1_000, 86_400_000, false],
+    ['ended one second ago', -86_400_000, -1_000, false],
+    ['ends exactly now', -86_400_000, 0, false],
+  ] as const)(
+    'season activity boundary: %s',
+    async (_label, startOffsetMs, endOffsetMs, expectTradable) => {
+      const { prisma, service } = createService();
+      prisma.asset.count.mockResolvedValueOnce(1);
+      prisma.asset.findMany.mockResolvedValueOnce([
+        asset({
+          id: 'asset-btc',
+          symbol: 'BTCUSDT',
+          assetType: AssetType.crypto,
+          currencyCode: CurrencyCode.USD,
+        }),
+      ]);
+      prisma.season.findFirst.mockResolvedValueOnce({
+        ...activeSeason,
+        startAt: new Date(testNow.getTime() + startOffsetMs),
+        endAt: new Date(testNow.getTime() + endOffsetMs),
+      });
+      prisma.seasonParticipant.findUnique.mockResolvedValueOnce({ id: 'sp-1' });
+      prisma.fxRateSnapshot.findFirst.mockResolvedValueOnce(
+        freshUsdKrwSnapshot(),
+      );
+      prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(
+        priceSnapshot('price-btc', '100.00000000', CurrencyCode.USD),
+      );
+
+      const response = await service.getAssets('user-1');
+
+      expect(response.data.assets[0]).toMatchObject(
+        expectTradable
+          ? { tradable: true, tradeBlockedReason: null }
+          : { tradable: false, tradeBlockedReason: 'SEASON_NOT_ACTIVE' },
+      );
+    },
+  );
+
+  it('keeps trading UX stable when the host timezone differs from Seoul', async () => {
+    // The service must derive market/season decisions from the pinned
+    // instant, not the host timezone. TZ changes only affect local
+    // formatting; this guards against accidental local-time arithmetic.
+    const originalTz = process.env.TZ;
+    process.env.TZ = 'America/New_York';
+    try {
+      const { prisma, service } = createService();
+      prisma.asset.count.mockResolvedValueOnce(1);
+      prisma.asset.findMany.mockResolvedValueOnce([
+        asset({ id: 'asset-krx', assetType: AssetType.domestic_stock }),
+      ]);
+      mockTradableSeason(prisma);
+      prisma.fxRateSnapshot.findFirst.mockResolvedValueOnce(
+        freshUsdKrwSnapshot(),
+      );
+      prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(
+        priceSnapshot('price-krx', '71500.00000000'),
+      );
+
+      const response = await service.getAssets('user-1');
+
+      // testNow = 2026-07-20 12:00 KST (a regular Monday KRX session):
+      // still open regardless of the host timezone.
+      expect(response.data.assets[0]).toMatchObject({
+        marketStatus: 'open',
+        tradable: true,
+        tradeBlockedReason: null,
+      });
+    } finally {
+      if (originalTz === undefined) delete process.env.TZ;
+      else process.env.TZ = originalTz;
+    }
   });
 
   it('shows closed + MARKET_CLOSED with a carry-forward price on an override-closed day', async () => {
@@ -1275,9 +1365,12 @@ describe('AssetsService', () => {
       },
     });
     expect(response.data.freshnessAgeSeconds).toEqual(expect.any(Number));
-    expect(
-      prisma.assetPriceSnapshot.findFirst.mock.calls[0][0].select,
-    ).not.toHaveProperty('rawPayloadJson');
+    const findFirstCalls = prisma.assetPriceSnapshot.findFirst.mock
+      .calls as unknown[][];
+    const firstFindFirstArg = findFirstCalls[0][0] as {
+      select?: Record<string, unknown>;
+    };
+    expect(firstFindFirstArg.select).not.toHaveProperty('rawPayloadJson');
     expect(JSON.stringify(response.data)).not.toContain('rawPayloadJson');
     expectNoAssetWrites(prisma);
   });

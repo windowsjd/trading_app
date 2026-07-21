@@ -4188,10 +4188,13 @@ export class OrdersService {
       assertAssetTradable(asset, now);
     } catch (error) {
       if (error instanceof MarketHoursError) {
+        // MARKET_CLOSED (confirmed closure) and MARKET_CALENDAR_UNAVAILABLE
+        // (session undecidable, fail-closed) both block with 409 but keep
+        // distinct codes; ASSET_NOT_TRADABLE stays a 400 input problem.
         this.throwApiError(
-          error.code === 'MARKET_CLOSED'
-            ? HttpStatus.CONFLICT
-            : HttpStatus.BAD_REQUEST,
+          error.code === 'ASSET_NOT_TRADABLE'
+            ? HttpStatus.BAD_REQUEST
+            : HttpStatus.CONFLICT,
           error.code,
           error.message,
         );

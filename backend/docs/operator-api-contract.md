@@ -644,8 +644,9 @@ Field rules:
 ### GET /api/v1/operator/market-session-overrides
 
 Query: `market` (optional), `from`/`to` (optional `YYYY-MM-DD` range on
-`localDate`), `includeInactive` (default `false`). Returns up to 1,000 rows
-ordered by `localDate`.
+`localDate`; must be real calendar dates — `2026-02-30`/`2026-99-99` are
+rejected with `INVALID_OVERRIDE_QUERY`), `includeInactive` (default
+`false`). Returns up to 1,000 rows ordered by `localDate`.
 
 ### GET /api/v1/operator/market-session-overrides/:overrideId
 
@@ -710,9 +711,13 @@ Response example:
 }
 ```
 
-`runtimeApplied` reports whether THIS instance already reloaded its in-memory
-override snapshot; on `false` the bounded polling applies it within the
-propagation window below.
+`runtimeApplied: true` is returned only when a DB re-read that STARTED after
+the mutation committed succeeded and was applied to this instance's in-memory
+snapshot — a mutation never merely joins a refresh that was already in flight
+(whose query may predate the commit). On `false` the mutation is committed
+but not yet applied on this instance; the bounded polling applies it within
+the propagation window below, and a `.runtime_refresh_failed` audit entry
+records the miss.
 
 ### PATCH /api/v1/operator/market-session-overrides/:overrideId
 
@@ -737,27 +742,58 @@ Re-enables an inactive override (`MARKET_SESSION_OVERRIDE_ALREADY_ACTIVE`,
   instance refreshes immediately after commit. Maximum cross-instance
   staleness is therefore ~60s + one query round-trip. Register emergency
   closures at least a minute ahead when multiple instances are running.
+- Refreshes are serialized within an instance: a mutation-triggered refresh
+  that arrives while a polling refresh is in flight queues exactly ONE
+  follow-up DB read that starts after the in-flight one finishes, and all
+  mutations arriving in that window share it. Every `refreshNow` caller is
+  therefore guaranteed a read that started at or after its call (so a commit
+  made before the call is always observed), without a per-caller query storm.
+  Change listeners/candle-cache invalidation still fire only on real content
+  changes (schedule fingerprint diff), so back-to-back refreshes with
+  identical data never invalidate twice.
 - If the cold-start load fails, the process logs
   `market_session_override_cold_start_load_failed` and the stock calendar
   fails closed (`calendar_unavailable` → not tradable, `marketStatus`
   `unknown`) until the first successful load (retried every 5s). The app
   never silently serves static-only schedules while DB overrides may exist.
+  Readiness reports this as `MARKET_SESSION_OVERRIDE_NOT_LOADED` (before the
+  first attempt completes) or `MARKET_SESSION_OVERRIDE_UNAVAILABLE`
+  (cold-start failure), both `degraded`.
 - If a later refresh fails, the last-known-good snapshot stays active and a
   structured `market_session_override_refresh_failed` warning is logged.
+  "Last-known-good" means: stock-session decisions keep using the most
+  recent successfully loaded snapshot (possibly stale within the polling
+  window) instead of failing closed; readiness reports
+  `MARKET_SESSION_OVERRIDE_LAST_KNOWN_GOOD` (`degraded`) until a refresh
+  succeeds again. Crypto is unaffected in every one of these states.
 - On snapshot changes the per-asset candle cache generation for the affected
   market's assets is bumped (`market_session_override_candle_cache_invalidated`).
 
 ### Audit actions
 
-- `operator.market_session_override.upsert` (+ `.failed`)
-- `operator.market_session_override.update` (+ `.failed`)
-- `operator.market_session_override.deactivate` (+ `.failed`)
-- `operator.market_session_override.reactivate` (+ `.failed`)
+- `operator.market_session_override.upsert` (+ `.failed`, `.runtime_refresh_failed`)
+- `operator.market_session_override.update` (+ `.failed`, `.runtime_refresh_failed`)
+- `operator.market_session_override.deactivate` (+ `.failed`, `.runtime_refresh_failed`)
+- `operator.market_session_override.reactivate` (+ `.failed`, `.runtime_refresh_failed`)
+
+Every mutation attempt by an authenticated operator is audited, including
+requests that fail input validation (invalid market, malformed or
+nonexistent dates, invalid or mis-ordered times, invalid ids/notes) — input
+parsing runs inside the audited path, and the `.failed` entry carries the
+action, actor, target identification, and the sanitized `failureCode`.
+Validation-failure metadata echoes only short identifying scalars
+(market/localDate/overrideType or the override id), never raw request
+bodies, free-form text from unparsed input, secrets, or tokens. If writing
+the failure audit itself fails, the original API error is still returned
+unchanged.
 
 Success metadata contains `market`, `localDate`, `before`/`after` schedule
 values, `reason`, `note`, and `requestId`; mutation and success audit share
-one transaction. Failure metadata contains the safe input fields and
-`failureCode`. No secrets or unnecessary personal data are stored.
+one transaction. `.runtime_refresh_failed` is a best-effort post-commit
+entry (errorCode `MARKET_SESSION_OVERRIDE_RUNTIME_REFRESH_FAILED`) written
+when the committed mutation could not be applied to this instance's runtime
+snapshot (`runtimeApplied: false`); bounded polling recovers it. No secrets
+or unnecessary personal data are stored.
 
 Announcements/notices to end users are a separate operational procedure —
 this API only changes the trading calendar, it does not publish notices.

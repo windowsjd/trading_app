@@ -164,6 +164,10 @@ export class OperatorMarketSessionOverrideService {
    * Creates the override for market+localDate, or replaces the existing row's
    * schedule fields (an inactive row is reactivated). The unique(market,
    * localDate) constraint backs concurrent upserts.
+   *
+   * Input parsing runs INSIDE the audited try-block: an authenticated
+   * operator's mutation attempt must land in the audit trail even when it
+   * fails validation, not only on transaction failures.
    */
   async upsertOverride(
     actor: AuthenticatedUser | undefined,
@@ -171,26 +175,28 @@ export class OperatorMarketSessionOverrideService {
     context: OperatorRequestContext = {},
   ) {
     this.assertOperator(actor);
-    const input = this.parseOverrideInput(body);
+    let input: ParsedOverrideInput | null = null;
 
     try {
+      input = this.parseOverrideInput(body);
+      const parsed = input;
       const result = await this.prisma.$transaction(async (tx) => {
         const existing = await tx.marketSessionOverride.findUnique({
           where: {
             market_localDate: {
-              market: input.market,
-              localDate: input.localDate,
+              market: parsed.market,
+              localDate: parsed.localDate,
             },
           },
           select: OVERRIDE_SELECT,
         });
 
         const data = {
-          overrideType: input.overrideType,
-          openTime: input.openTime,
-          closeTime: input.closeTime,
-          reason: input.reason,
-          source: input.source,
+          overrideType: parsed.overrideType,
+          openTime: parsed.openTime,
+          closeTime: parsed.closeTime,
+          reason: parsed.reason,
+          source: parsed.source,
           isActive: true,
           updatedByUserId: actor.userId,
         };
@@ -203,8 +209,8 @@ export class OperatorMarketSessionOverrideService {
           : await tx.marketSessionOverride.create({
               data: {
                 ...data,
-                market: input.market,
-                localDate: input.localDate,
+                market: parsed.market,
+                localDate: parsed.localDate,
                 createdByUserId: actor.userId,
               },
               select: OVERRIDE_SELECT,
@@ -227,7 +233,7 @@ export class OperatorMarketSessionOverrideService {
               created: existing === null,
               before: existing ? this.toAuditOverride(existing) : null,
               after: this.toAuditOverride(saved),
-              reason: input.reason,
+              reason: parsed.reason,
               requestId: context.requestId ?? null,
             },
           },
@@ -237,7 +243,16 @@ export class OperatorMarketSessionOverrideService {
         return { saved, created: existing === null };
       });
 
-      const runtimeApplied = await this.refreshRuntime();
+      const runtimeApplied = await this.refreshRuntimeAudited({
+        actor,
+        action: 'operator.market_session_override.upsert',
+        targetId: result.saved.id,
+        metadata: {
+          market: result.saved.market,
+          localDate: result.saved.localDate,
+        },
+        context,
+      });
       return {
         success: true,
         data: {
@@ -250,13 +265,24 @@ export class OperatorMarketSessionOverrideService {
       await this.recordFailureIfNeeded({
         actor,
         action: 'operator.market_session_override.upsert.failed',
-        targetId: `${input.market}:${input.localDate}`,
-        metadata: {
-          market: input.market,
-          localDate: input.localDate,
-          overrideType: input.overrideType,
-          reason: input.reason,
-        },
+        targetId: input
+          ? `${input.market}:${input.localDate}`
+          : this.safeAuditText(body.market, 8) || 'invalid_input',
+        metadata: input
+          ? {
+              market: input.market,
+              localDate: input.localDate,
+              overrideType: input.overrideType,
+              reason: input.reason,
+            }
+          : {
+              // Validation failed before parsing finished: keep only short,
+              // sanitized scalar echoes of the identifying fields — never
+              // the raw request body.
+              market: this.safeAuditText(body.market, 8),
+              localDate: this.safeAuditText(body.localDate, 10),
+              overrideType: this.safeAuditText(body.overrideType, 16),
+            },
         context,
         error,
       });
@@ -275,9 +301,9 @@ export class OperatorMarketSessionOverrideService {
     context: OperatorRequestContext = {},
   ) {
     this.assertOperator(actor);
-    const id = this.parseRequiredPathText(overrideId, 'overrideId');
 
     try {
+      const id = this.parseRequiredPathText(overrideId, 'overrideId');
       const result = await this.prisma.$transaction(async (tx) => {
         const existing = await this.findOverrideOrThrow(tx, id);
         const merged = this.parseOverrideUpdate(existing, body);
@@ -321,7 +347,13 @@ export class OperatorMarketSessionOverrideService {
         return saved;
       });
 
-      const runtimeApplied = await this.refreshRuntime();
+      const runtimeApplied = await this.refreshRuntimeAudited({
+        actor,
+        action: 'operator.market_session_override.update',
+        targetId: result.id,
+        metadata: { market: result.market, localDate: result.localDate },
+        context,
+      });
       return {
         success: true,
         data: {
@@ -330,11 +362,12 @@ export class OperatorMarketSessionOverrideService {
         },
       };
     } catch (error) {
+      const safeId = this.safeAuditText(overrideId, 64) || 'invalid_input';
       await this.recordFailureIfNeeded({
         actor,
         action: 'operator.market_session_override.update.failed',
-        targetId: id,
-        metadata: { overrideId: id },
+        targetId: safeId,
+        metadata: { overrideId: safeId },
         context,
         error,
       });
@@ -372,13 +405,13 @@ export class OperatorMarketSessionOverrideService {
     context: OperatorRequestContext,
   ) {
     this.assertOperator(actor);
-    const id = this.parseRequiredPathText(overrideId, 'overrideId');
-    const note = this.parseOptionalText(body.note, MAX_NOTE_LENGTH, 'note');
     const action = isActive
       ? 'operator.market_session_override.reactivate'
       : 'operator.market_session_override.deactivate';
 
     try {
+      const id = this.parseRequiredPathText(overrideId, 'overrideId');
+      const note = this.parseOptionalText(body.note, MAX_NOTE_LENGTH, 'note');
       const result = await this.prisma.$transaction(async (tx) => {
         const existing = await this.findOverrideOrThrow(tx, id);
         if (existing.isActive === isActive) {
@@ -429,7 +462,13 @@ export class OperatorMarketSessionOverrideService {
         return saved;
       });
 
-      const runtimeApplied = await this.refreshRuntime();
+      const runtimeApplied = await this.refreshRuntimeAudited({
+        actor,
+        action,
+        targetId: result.id,
+        metadata: { market: result.market, localDate: result.localDate },
+        context,
+      });
       return {
         success: true,
         data: {
@@ -438,11 +477,12 @@ export class OperatorMarketSessionOverrideService {
         },
       };
     } catch (error) {
+      const safeId = this.safeAuditText(overrideId, 64) || 'invalid_input';
       await this.recordFailureIfNeeded({
         actor,
         action: `${action}.failed`,
-        targetId: id,
-        metadata: { overrideId: id, note },
+        targetId: safeId,
+        metadata: { overrideId: safeId },
         context,
         error,
       });
@@ -454,15 +494,47 @@ export class OperatorMarketSessionOverrideService {
     }
   }
 
-  private async refreshRuntime(): Promise<boolean> {
-    // The mutation is committed; a refresh failure here is recovered by the
-    // loader's bounded polling. Surface the outcome so operators can see
-    // whether this instance already applied the change.
+  /**
+   * Post-commit runtime refresh. The mutation is already committed; a
+   * failure here is recovered by the loader's bounded polling, but it is
+   * still recorded as a `.runtime_refresh_failed` audit entry (best-effort,
+   * outside the transaction) so operators can see that runtimeApplied:false
+   * responses left the change pending on this instance.
+   */
+  private async refreshRuntimeAudited(input: {
+    actor: AuthenticatedUser;
+    action: string;
+    targetId: string;
+    metadata: Record<string, unknown>;
+    context: OperatorRequestContext;
+  }): Promise<boolean> {
+    let applied = false;
     try {
-      return await this.overrideLoader.refreshNow('operator_mutation');
+      applied = await this.overrideLoader.refreshNow('operator_mutation');
     } catch {
-      return false;
+      applied = false;
     }
+    if (!applied) {
+      await this.recordFailureIfNeeded({
+        actor: input.actor,
+        action: `${input.action}.runtime_refresh_failed`,
+        targetId: input.targetId,
+        metadata: {
+          ...input.metadata,
+          mutationCommitted: true,
+          recovery: 'bounded polling reapplies the committed override',
+        },
+        context: input.context,
+        error: new HttpException(
+          this.errorBody(
+            'MARKET_SESSION_OVERRIDE_RUNTIME_REFRESH_FAILED',
+            'Committed override was not applied to the runtime snapshot.',
+          ),
+          HttpStatus.INTERNAL_SERVER_ERROR,
+        ),
+      });
+    }
+    return applied;
   }
 
   private async findOverrideOrThrow(
@@ -608,21 +680,30 @@ export class OperatorMarketSessionOverrideService {
     return this.parseMarket(value);
   }
 
+  /**
+   * Shared local-date parser: pattern AND real-calendar existence (so
+   * 2026-99-99 / 2026-02-30 never pass anywhere a date is accepted).
+   * Returns null instead of throwing so each call site keeps its own
+   * error code.
+   */
+  private parseCalendarDateText(value: unknown): string | null {
+    if (typeof value !== 'string' || !DATE_PATTERN.test(value)) return null;
+    const year = Number(value.slice(0, 4));
+    const month = Number(value.slice(5, 7));
+    const day = Number(value.slice(8, 10));
+    const check = new Date(Date.UTC(year, month - 1, day));
+    return check.getUTCFullYear() === year &&
+      check.getUTCMonth() === month - 1 &&
+      check.getUTCDate() === day
+      ? value
+      : null;
+  }
+
   private parseLocalDate(value: unknown): string {
-    if (typeof value === 'string' && DATE_PATTERN.test(value)) {
-      const year = Number(value.slice(0, 4));
-      const month = Number(value.slice(5, 7));
-      const day = Number(value.slice(8, 10));
-      const check = new Date(Date.UTC(year, month - 1, day));
-      if (
-        year >= 2000 &&
-        year <= 2100 &&
-        check.getUTCFullYear() === year &&
-        check.getUTCMonth() === month - 1 &&
-        check.getUTCDate() === day
-      ) {
-        return value;
-      }
+    const date = this.parseCalendarDateText(value);
+    if (date) {
+      const year = Number(date.slice(0, 4));
+      if (year >= 2000 && year <= 2100) return date;
     }
     this.throwApiError(
       HttpStatus.BAD_REQUEST,
@@ -633,11 +714,12 @@ export class OperatorMarketSessionOverrideService {
 
   private parseOptionalDate(value: unknown, fieldName: string): string | null {
     if (value === undefined || value === null || value === '') return null;
-    if (typeof value === 'string' && DATE_PATTERN.test(value)) return value;
+    const date = this.parseCalendarDateText(value);
+    if (date) return date;
     this.throwApiError(
       HttpStatus.BAD_REQUEST,
       'INVALID_OVERRIDE_QUERY',
-      `${fieldName} must be a YYYY-MM-DD date.`,
+      `${fieldName} must be a valid YYYY-MM-DD calendar date.`,
     );
   }
 
@@ -723,6 +805,18 @@ export class OperatorMarketSessionOverrideService {
         `${fieldName} is required.`,
       );
     }
+    return text;
+  }
+
+  /**
+   * Safe scalar echo of an untrusted input for audit metadata: only short
+   * strings survive (trimmed, bounded); everything else becomes null. Never
+   * use for whole bodies or free-form fields — identifying scalars only.
+   */
+  private safeAuditText(value: unknown, maxLength: number): string | null {
+    if (typeof value !== 'string') return null;
+    const text = value.trim();
+    if (!text || text.length > maxLength) return null;
     return text;
   }
 

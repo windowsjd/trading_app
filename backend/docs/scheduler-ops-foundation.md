@@ -238,6 +238,14 @@ The smoke is disabled by default because it must run only against an explicit te
 
 `GET /readiness` performs only a lightweight database query and returns public-safe app/database/scheduler status. It does not call ExchangeRate-API, Binance, KIS, or any external provider.
 
+The operator market-session override runtime is reported additively via `data.marketSessionOverride` (`mode`, `state`, `loaded`, `loadedAt`, `lastRefreshFailedAt`, `activeOverrideCount`) and these structured reasons; the check reads only in-process loader state (no extra DB query):
+
+- `MARKET_SESSION_OVERRIDE_NOT_LOADED` — the first override snapshot load has not completed yet. Stock calendars are fail-closed (`calendar_unavailable`), so the stock calendar is NOT ready even when static year coverage is complete; readiness is `degraded`.
+- `MARKET_SESSION_OVERRIDE_UNAVAILABLE` — the cold-start load failed and no load has succeeded since. Same fail-closed effect; `degraded`.
+- `MARKET_SESSION_OVERRIDE_LAST_KNOWN_GOOD` — a snapshot was loaded but the most recent refresh failed. The last successful ("last-known-good") snapshot keeps serving stock-session decisions, so the service stays up and is only `degraded`, never `unavailable`, until polling recovers.
+
+Crypto paths never depend on this state in any of the three cases.
+
 `GET /health` and `GET /health/db` remain backward-compatible.
 
 ## Closed Boundaries

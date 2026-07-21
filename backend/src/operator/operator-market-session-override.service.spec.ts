@@ -579,6 +579,199 @@ describe('OperatorMarketSessionOverrideService', () => {
     });
   });
 
+  describe('validation failure auditing', () => {
+    it.each([
+      ['invalid market', { market: 'JPX' }, 'INVALID_MARKET'],
+      [
+        'nonexistent calendar date',
+        { localDate: '2026-02-30' },
+        'INVALID_LOCAL_DATE',
+      ],
+      [
+        'invalid open time',
+        { overrideType: 'custom', openTime: '25:00', closeTime: '15:30' },
+        'INVALID_OVERRIDE_TIME',
+      ],
+      [
+        'custom time range order',
+        { overrideType: 'custom', openTime: '15:30', closeTime: '10:00' },
+        'OVERRIDE_TIME_ORDER_INVALID',
+      ],
+    ])(
+      'audits an upsert validation failure: %s',
+      async (_label, patch, code) => {
+        const { prisma, service } = createService();
+        await expectErrorCode(
+          service.upsertOverride(
+            operator,
+            {
+              market: 'KRX',
+              localDate: '2026-07-21',
+              overrideType: 'closed',
+              reason: 'emergency closure',
+              ...patch,
+            },
+            { requestId: 'req-validation' },
+          ),
+          code,
+        );
+        // The attempt itself must land in the audit trail with the actor,
+        // the action, and the sanitized failure code.
+        expect(prisma.operatorAuditLog.create).toHaveBeenCalledWith(
+          containing({
+            data: containing({
+              actorUserId: operator.userId,
+              action: 'operator.market_session_override.upsert.failed',
+              result: OperatorAuditResult.failure,
+              targetType: 'market_session_override',
+              errorCode: code,
+            }),
+          }),
+        );
+      },
+    );
+
+    it('keeps raw bodies and long values out of validation-failure metadata', async () => {
+      const { prisma, service } = createService();
+      const oversized = 'x'.repeat(500);
+      await expectErrorCode(
+        service.upsertOverride(operator, {
+          market: 'KRX',
+          localDate: oversized,
+          overrideType: 'closed',
+          reason: 'secret-adjacent free text',
+        }),
+        'INVALID_LOCAL_DATE',
+      );
+      const createCalls = prisma.operatorAuditLog.create.mock
+        .calls as unknown[][];
+      const auditData = (
+        createCalls[0][0] as {
+          data: { metadataJson: Record<string, unknown> };
+        }
+      ).data;
+      // Only short identifying scalars are echoed; the oversized value and
+      // the free-form reason of the unparsed body are dropped entirely.
+      expect(auditData.metadataJson).toMatchObject({
+        market: 'KRX',
+        localDate: null,
+        overrideType: 'closed',
+      });
+      expect(JSON.stringify(auditData)).not.toContain(oversized);
+      expect(JSON.stringify(auditData)).not.toContain('secret-adjacent');
+    });
+
+    it('audits an invalid override id on update and status changes', async () => {
+      const { prisma, service } = createService();
+      await expectErrorCode(
+        service.updateOverride(operator, '   ', { reason: 'x' }),
+        'INVALID_OVERRIDE_ID',
+      );
+      expect(prisma.operatorAuditLog.create).toHaveBeenCalledWith(
+        containing({
+          data: containing({
+            action: 'operator.market_session_override.update.failed',
+            result: OperatorAuditResult.failure,
+            errorCode: 'INVALID_OVERRIDE_ID',
+          }),
+        }),
+      );
+
+      prisma.operatorAuditLog.create.mockClear();
+      await expectErrorCode(
+        service.deactivateOverride(operator, '   '),
+        'INVALID_OVERRIDE_ID',
+      );
+      expect(prisma.operatorAuditLog.create).toHaveBeenCalledWith(
+        containing({
+          data: containing({
+            action: 'operator.market_session_override.deactivate.failed',
+            errorCode: 'INVALID_OVERRIDE_ID',
+          }),
+        }),
+      );
+    });
+
+    it('audits an invalid note on a status change', async () => {
+      const { prisma, service } = createService();
+      await expectErrorCode(
+        service.reactivateOverride(operator, 'override-1', {
+          note: 'n'.repeat(1_001),
+        }),
+        'INVALID_OVERRIDE_TEXT',
+      );
+      expect(prisma.operatorAuditLog.create).toHaveBeenCalledWith(
+        containing({
+          data: containing({
+            action: 'operator.market_session_override.reactivate.failed',
+            result: OperatorAuditResult.failure,
+            errorCode: 'INVALID_OVERRIDE_TEXT',
+          }),
+        }),
+      );
+    });
+
+    it('preserves the original validation error when the failure audit itself fails', async () => {
+      const { prisma, service } = createService();
+      prisma.operatorAuditLog.create.mockRejectedValueOnce(
+        new Error('audit insert down'),
+      );
+      await expectErrorCode(
+        service.upsertOverride(operator, {
+          market: 'JPX',
+          localDate: '2026-07-21',
+          overrideType: 'closed',
+          reason: 'emergency closure',
+        }),
+        'INVALID_MARKET',
+      );
+    });
+
+    it('records a runtime_refresh_failed audit when the post-commit refresh does not apply', async () => {
+      const { loader, prisma, service } = createService();
+      loader.refreshNow.mockResolvedValueOnce(false);
+      prisma.marketSessionOverride.findUnique.mockResolvedValueOnce(null);
+      prisma.marketSessionOverride.create.mockResolvedValueOnce(baseRecord());
+
+      const response = await service.upsertOverride(operator, {
+        market: 'KRX',
+        localDate: '2026-07-21',
+        overrideType: 'closed',
+        reason: 'emergency closure',
+      });
+
+      expect(response.data.runtimeApplied).toBe(false);
+      expect(prisma.operatorAuditLog.create).toHaveBeenLastCalledWith(
+        containing({
+          data: containing({
+            action:
+              'operator.market_session_override.upsert.runtime_refresh_failed',
+            result: OperatorAuditResult.failure,
+            errorCode: 'MARKET_SESSION_OVERRIDE_RUNTIME_REFRESH_FAILED',
+            metadataJson: containing({ mutationCommitted: true }),
+          }),
+        }),
+      );
+    });
+
+    it('does not write a runtime_refresh_failed audit when the refresh applies', async () => {
+      const { prisma, service } = createService();
+      prisma.marketSessionOverride.findUnique.mockResolvedValueOnce(null);
+      prisma.marketSessionOverride.create.mockResolvedValueOnce(baseRecord());
+
+      const response = await service.upsertOverride(operator, {
+        market: 'KRX',
+        localDate: '2026-07-21',
+        overrideType: 'closed',
+        reason: 'emergency closure',
+      });
+
+      expect(response.data.runtimeApplied).toBe(true);
+      // Exactly one audit row: the in-transaction success entry.
+      expect(prisma.operatorAuditLog.create).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('transaction consistency', () => {
     it('fails the whole mutation when the success-audit write fails inside the transaction', async () => {
       const { loader, prisma, service } = createService();
@@ -657,6 +850,22 @@ describe('OperatorMarketSessionOverrideService', () => {
         'INVALID_OVERRIDE_QUERY',
       );
     });
+
+    it.each([['2026-99-99'], ['2026-02-30'], ['2026-13-01'], ['2026-04-31']])(
+      'rejects the nonexistent query date %s',
+      async (badDate) => {
+        const { prisma, service } = createService();
+        await expectErrorCode(
+          service.listOverrides(operator, { from: badDate }),
+          'INVALID_OVERRIDE_QUERY',
+        );
+        await expectErrorCode(
+          service.listOverrides(operator, { to: badDate }),
+          'INVALID_OVERRIDE_QUERY',
+        );
+        expect(prisma.marketSessionOverride.findMany).not.toHaveBeenCalled();
+      },
+    );
 
     it('returns a single override by id', async () => {
       const { prisma, service } = createService();

@@ -248,6 +248,8 @@ export function getErrorMessageFromCode(
       return '현재 시즌이 설정되지 않았습니다.';
     case ERROR_CODE.MARKET_CLOSED:
       return '장 마감으로 주문할 수 없습니다.';
+    case ERROR_CODE.MARKET_CALENDAR_UNAVAILABLE:
+      return '시장 운영 정보를 확인할 수 없어 주문할 수 없습니다. 잠시 후 다시 시도해주세요.';
     case ERROR_CODE.PRICE_STALE:
       return '가격 갱신 대기 중입니다.';
     case ERROR_CODE.ASSET_PRICE_UNAVAILABLE:

@@ -63,9 +63,32 @@ describe('market hours policy', () => {
   });
 
   it('throws MARKET_CLOSED for closed markets', () => {
-    expect(() =>
-      assertAssetTradable(krxAsset, new Date('2026-06-19T06:30:00.000Z')),
-    ).toThrow(expect.objectContaining({ code: 'MARKET_CLOSED' }));
+    let thrown: unknown = null;
+    try {
+      assertAssetTradable(krxAsset, new Date('2026-06-19T06:30:00.000Z'));
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(MarketHoursError);
+    expect((thrown as MarketHoursError).code).toBe('MARKET_CLOSED');
+  });
+
+  it('separates confirmed closures from undecidable-calendar states by reason code', () => {
+    // Static full-day holiday (KRX Seollal 2026): confirmed closure.
+    expect(
+      getAssetTradingStatus(krxAsset, new Date('2026-02-17T03:00:00.000Z')),
+    ).toMatchObject({ tradable: false, reason: 'MARKET_CLOSED' });
+    // Regular after-hours instant: confirmed closure.
+    expect(
+      getAssetTradingStatus(krxAsset, new Date('2026-06-19T06:30:00.000Z')),
+    ).toMatchObject({ tradable: false, reason: 'MARKET_CLOSED' });
+    // A year with no calendar dataset: undecidable, NOT a confirmed closure.
+    expect(
+      getAssetTradingStatus(krxAsset, new Date('2030-06-19T03:00:00.000Z')),
+    ).toMatchObject({ tradable: false, reason: 'MARKET_CALENDAR_UNAVAILABLE' });
+    expect(
+      getAssetTradingStatus(nasAsset, new Date('2030-06-19T15:00:00.000Z')),
+    ).toMatchObject({ tradable: false, reason: 'MARKET_CALENDAR_UNAVAILABLE' });
   });
 
   describe('with operator DB overrides', () => {
@@ -168,6 +191,8 @@ describe('market hours policy', () => {
     });
 
     it('keeps calendar-unavailable distinguishable from a plain closure', () => {
+      // Cold-start state: the override store is required but has never
+      // loaded — the session is undecidable and gets its own reason code.
       markMarketSessionOverrideStoreRequired();
       const unavailable = getAssetTradingStatus(
         krxAsset,
@@ -175,7 +200,7 @@ describe('market hours policy', () => {
       );
       expect(unavailable).toMatchObject({
         tradable: false,
-        reason: 'MARKET_CLOSED',
+        reason: 'MARKET_CALENDAR_UNAVAILABLE',
         message:
           'KRX market calendar has no data for this date; treating the day as not tradable.',
       });
@@ -186,6 +211,16 @@ describe('market hours policy', () => {
         new Date('2026-07-13T03:00:00.000Z'),
       );
       expect(open.tradable).toBe(true);
+    });
+
+    it('keeps crypto tradable while the stock override store is not loaded', () => {
+      markMarketSessionOverrideStoreRequired();
+      expect(
+        getAssetTradingStatus(
+          cryptoAsset,
+          new Date('2026-07-13T03:00:00.000Z'),
+        ),
+      ).toEqual({ tradable: true });
     });
   });
 });

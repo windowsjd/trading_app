@@ -9,6 +9,7 @@ import {
   getMarketCalendarCoverage,
   readMarketCalendarCoverageConfig,
 } from './orders/market-calendar/market-calendar.registry';
+import { getMarketSessionOverrideRuntimeStatus } from './orders/market-calendar/market-session-override.store';
 import { resolveRegularSessionForEvent } from './orders/market-calendar.policy';
 import { AssetType } from './generated/prisma/client';
 import { getOpsSchedulerConfig } from './ops/ops-config';
@@ -19,6 +20,23 @@ import { KisWebSocketStreamingService } from './providers/kis/kis-websocket-stre
 import { LiveCandlePubSubService } from './realtime/live-candle-pubsub.service';
 import { RedisService } from './redis/redis.service';
 import { readRedisConfig } from './redis/redis.config';
+
+/**
+ * Structured readiness reasons for the operator market-session override
+ * runtime (additive next to MARKET_CALENDAR_COVERAGE_MISSING / _PROVISIONAL):
+ * - NOT_LOADED: the first DB snapshot load has not completed yet; stock
+ *   calendars are fail-closed (calendar_unavailable) until it does.
+ * - UNAVAILABLE: the cold-start load failed and none has succeeded since;
+ *   stock calendars stay fail-closed.
+ * - LAST_KNOWN_GOOD: a snapshot was loaded but the most recent refresh
+ *   failed; the last-known-good snapshot keeps serving (degraded only).
+ * Crypto is unaffected by all three.
+ */
+export const MARKET_SESSION_OVERRIDE_READINESS_REASONS = {
+  notLoaded: 'MARKET_SESSION_OVERRIDE_NOT_LOADED',
+  unavailable: 'MARKET_SESSION_OVERRIDE_UNAVAILABLE',
+  lastKnownGood: 'MARKET_SESSION_OVERRIDE_LAST_KNOWN_GOOD',
+} as const;
 
 @Injectable()
 export class AppService {
@@ -101,10 +119,21 @@ export class AppService {
       readMarketCalendarCoverageConfig(process.env, now),
     );
     if (!calendar.complete) reasons.push('MARKET_CALENDAR_COVERAGE_MISSING');
-    if (
-      calendar.markets.some((market) => market.provisionalYears.length > 0)
-    ) {
+    if (calendar.markets.some((market) => market.provisionalYears.length > 0)) {
       reasons.push('MARKET_CALENDAR_PROVISIONAL');
+    }
+
+    // Operator override runtime state (loaded synchronously from the
+    // in-process store — readiness never queries the DB for this). Static
+    // coverage alone is not enough for the stock calendar to be ready: until
+    // the first override snapshot loads, session decisions are fail-closed.
+    const marketSessionOverride = getMarketSessionOverrideRuntimeStatus();
+    if (marketSessionOverride.state === 'not_loaded') {
+      reasons.push(MARKET_SESSION_OVERRIDE_READINESS_REASONS.notLoaded);
+    } else if (marketSessionOverride.state === 'unavailable') {
+      reasons.push(MARKET_SESSION_OVERRIDE_READINESS_REASONS.unavailable);
+    } else if (marketSessionOverride.state === 'last_known_good') {
+      reasons.push(MARKET_SESSION_OVERRIDE_READINESS_REASONS.lastKnownGood);
     }
 
     // Live ingestion without its reconciliation safety net (only reachable
@@ -114,7 +143,9 @@ export class AppService {
         ? validateLiveReconciliationDependencies({
             live: this.liveCandleConfig,
             reconciliation: {
-              krx: { enabled: scheduler.marketCandleReconciliation.krx.enabled },
+              krx: {
+                enabled: scheduler.marketCandleReconciliation.krx.enabled,
+              },
               us: { enabled: scheduler.marketCandleReconciliation.us.enabled },
               crypto: {
                 enabled: scheduler.marketCandleReconciliation.crypto.enabled,
@@ -210,6 +241,15 @@ export class AppService {
           jobs: scheduler.jobs,
         },
         marketCalendar: calendar,
+        marketSessionOverride: {
+          mode: marketSessionOverride.mode,
+          state: marketSessionOverride.state,
+          loaded: marketSessionOverride.loaded,
+          loadedAt: marketSessionOverride.loadedAt?.toISOString() ?? null,
+          lastRefreshFailedAt:
+            marketSessionOverride.lastRefreshFailedAt?.toISOString() ?? null,
+          activeOverrideCount: marketSessionOverride.activeOverrideCount,
+        },
         kisWebSocketStreaming:
           this.kisWebSocketStreamingService?.getStatus() ?? null,
         binanceWebSocketStreaming:

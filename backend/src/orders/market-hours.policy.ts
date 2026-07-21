@@ -4,11 +4,25 @@ import {
   resolveStockMarketSessionState,
 } from './market-calendar.policy';
 
+/**
+ * Machine-readable non-tradable reasons. MARKET_CLOSED means a CONFIRMED
+ * non-trading instant (holiday, weekend, outside session hours, operator
+ * closure). MARKET_CALENDAR_UNAVAILABLE means the session could not be
+ * decided at all (year without a calendar dataset, or the operator override
+ * snapshot has not loaded) — orders are still blocked (fail-closed), but the
+ * cause is an infrastructure/coverage gap, never a confirmed closure.
+ * Consumers must branch on this code, not on the human-readable message.
+ */
+export type MarketNotTradableReason =
+  | 'MARKET_CLOSED'
+  | 'MARKET_CALENDAR_UNAVAILABLE'
+  | 'ASSET_NOT_TRADABLE';
+
 export type MarketTradingStatus =
   | { tradable: true }
   | {
       tradable: false;
-      reason: 'MARKET_CLOSED' | 'ASSET_NOT_TRADABLE';
+      reason: MarketNotTradableReason;
       message: string;
     };
 
@@ -19,7 +33,7 @@ export type MarketHoursAsset = {
 
 export class MarketHoursError extends Error {
   constructor(
-    readonly code: 'MARKET_CLOSED' | 'ASSET_NOT_TRADABLE',
+    readonly code: MarketNotTradableReason,
     message: string,
   ) {
     super(message);
@@ -38,13 +52,17 @@ export function getAssetTradingStatus(
   if (market) {
     const sessionState = resolveStockMarketSessionState(asset, now);
     if (sessionState?.state === 'open') return { tradable: true };
+    if (!sessionState || sessionState.state === 'calendar_unavailable') {
+      return {
+        tradable: false,
+        reason: 'MARKET_CALENDAR_UNAVAILABLE',
+        message: `${market} market calendar has no data for this date; treating the day as not tradable.`,
+      };
+    }
     return {
       tradable: false,
       reason: 'MARKET_CLOSED',
-      message:
-        sessionState?.state === 'calendar_unavailable'
-          ? `${market} market calendar has no data for this date; treating the day as not tradable.`
-          : `${market} market is closed.`,
+      message: `${market} market is closed.`,
     };
   }
 

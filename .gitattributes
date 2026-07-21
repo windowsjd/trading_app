@@ -1,0 +1,5 @@
+# Prisma's generated client is emitted with trailing whitespace by the
+# generator itself (npx prisma generate reproduces it byte-identically), so
+# whitespace checks (git diff --check) must not treat those files as errors.
+# The files stay committed and fully diffable; only whitespace linting is off.
+backend/src/generated/** -whitespace

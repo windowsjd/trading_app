@@ -209,6 +209,83 @@ describe('market calendar registry', () => {
     expect(coverage.complete).toBe(true);
   });
 
+  describe('Asia/Seoul current-year boundary', () => {
+    it('stays on the Seoul year just before the KST New Year instant', () => {
+      // 2026-12-31T14:59:59Z is 2026-12-31 23:59:59 KST — still 2026.
+      expect(
+        readMarketCalendarCoverageConfig(
+          {},
+          new Date('2026-12-31T14:59:59.000Z'),
+        ),
+      ).toEqual({ requiredFromYear: 2025, requiredThroughYear: 2027 });
+    });
+
+    it('rolls to the next Seoul year at exactly 15:00 UTC', () => {
+      // 2026-12-31T15:00:00Z is 2027-01-01 00:00:00 KST — Seoul year 2027,
+      // even though UTC (and any host timezone west of KST) is still 2026.
+      expect(
+        readMarketCalendarCoverageConfig(
+          {},
+          new Date('2026-12-31T15:00:00.000Z'),
+        ),
+      ).toEqual({ requiredFromYear: 2026, requiredThroughYear: 2028 });
+      expect(
+        readMarketCalendarCoverageConfig(
+          {},
+          new Date('2026-12-31T15:30:00.000Z'),
+        ),
+      ).toEqual({ requiredFromYear: 2026, requiredThroughYear: 2028 });
+    });
+
+    it('ignores the host timezone (process.env.TZ) completely', () => {
+      const originalTz = process.env.TZ;
+      const boundary = new Date('2026-12-31T15:00:00.000Z');
+      const before = new Date('2026-12-31T14:59:59.000Z');
+      try {
+        for (const tz of ['UTC', 'America/New_York', 'Pacific/Kiritimati']) {
+          process.env.TZ = tz;
+          expect(readMarketCalendarCoverageConfig({}, boundary)).toEqual({
+            requiredFromYear: 2026,
+            requiredThroughYear: 2028,
+          });
+          expect(readMarketCalendarCoverageConfig({}, before)).toEqual({
+            requiredFromYear: 2025,
+            requiredThroughYear: 2027,
+          });
+        }
+      } finally {
+        if (originalTz === undefined) delete process.env.TZ;
+        else process.env.TZ = originalTz;
+      }
+    });
+
+    it('handles leap-day and ordinary mid-year dates', () => {
+      // 2028-02-29 (leap day) 12:00 KST → Seoul year 2028.
+      expect(
+        readMarketCalendarCoverageConfig(
+          {},
+          new Date('2028-02-29T03:00:00.000Z'),
+        ),
+      ).toEqual({ requiredFromYear: 2027, requiredThroughYear: 2029 });
+      // Ordinary mid-year date far from any boundary.
+      expect(
+        readMarketCalendarCoverageConfig(
+          {},
+          new Date('2026-07-13T00:00:00.000Z'),
+        ),
+      ).toEqual({ requiredFromYear: 2025, requiredThroughYear: 2027 });
+    });
+
+    it('keeps env overrides authoritative across the Seoul boundary', () => {
+      expect(
+        readMarketCalendarCoverageConfig(
+          { MARKET_CALENDAR_REQUIRED_THROUGH_YEAR: '2027' },
+          new Date('2026-12-31T15:00:00.000Z'),
+        ),
+      ).toEqual({ requiredFromYear: 2026, requiredThroughYear: 2027 });
+    });
+  });
+
   it('reads the required year range from env, overriding the defaults', () => {
     const now = new Date('2026-07-13T00:00:00Z');
     expect(

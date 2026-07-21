@@ -1,3 +1,4 @@
+import { getZonedParts } from '../../providers/kis/candles/kis-candle-time';
 import type {
   MarketCalendarDataset,
   MarketCalendarMarket,
@@ -150,12 +151,16 @@ export type MarketCalendarCoverageConfig = {
  * sync's 365-day lookback (and year-boundary previous-session anchors)
  * reach into it, and the next year so operators are warned well before a
  * year boundary. Explicit env values override either bound.
+ *
+ * "Current year" is always the Asia/Seoul calendar year — never the host
+ * OS timezone or process.env.TZ, and not UTC (which lags Seoul by 9 hours
+ * across every New Year boundary).
  */
 export function readMarketCalendarCoverageConfig(
   env: NodeJS.ProcessEnv = process.env,
   now = new Date(),
 ): MarketCalendarCoverageConfig {
-  const currentYear = now.getUTCFullYear();
+  const currentYear = getZonedParts(now, 'Asia/Seoul').year;
   const fromYear = readYear(
     env,
     'MARKET_CALENDAR_REQUIRED_FROM_YEAR',

@@ -23,9 +23,18 @@ jest.mock('./realtime/live-candle-pubsub.service', () => ({
   LiveCandlePubSubService: class LiveCandlePubSubService {},
 }));
 
-import { AppService } from './app.service';
+import {
+  AppService,
+  MARKET_SESSION_OVERRIDE_READINESS_REASONS,
+} from './app.service';
 import { readLiveCandleConfig } from './assets/live-candle.config';
 import { LiveCandleHealthService } from './assets/live-candle-health.service';
+import {
+  applyMarketSessionOverrideSnapshot,
+  markMarketSessionOverrideStoreRequired,
+  recordMarketSessionOverrideRefreshFailure,
+  resetMarketSessionOverrideStoreForTest,
+} from './orders/market-calendar/market-session-override.store';
 
 describe('AppService candle readiness', () => {
   const originalRedisUrl = process.env.REDIS_URL;
@@ -250,5 +259,111 @@ describe('AppService candle readiness', () => {
     const result = await service.getReadiness();
     expect(result.data.reasons).toContain('LIVE_RECONCILIATION_REQUIRED');
     expect(result.data.status).toBe('degraded');
+  });
+
+  describe('market session override runtime readiness', () => {
+    // Pin the calendar requirement to an audited year so only the override
+    // runtime state drives the readiness outcome in these tests.
+    beforeEach(() => {
+      delete process.env.REDIS_URL;
+      process.env.MARKET_CALENDAR_REQUIRED_FROM_YEAR = '2026';
+      process.env.MARKET_CALENDAR_REQUIRED_THROUGH_YEAR = '2026';
+    });
+
+    afterEach(() => {
+      resetMarketSessionOverrideStoreForTest();
+      delete process.env.MARKET_CALENDAR_REQUIRED_FROM_YEAR;
+      delete process.env.MARKET_CALENDAR_REQUIRED_THROUGH_YEAR;
+    });
+
+    const createService = () =>
+      new AppService({
+        $queryRaw: jest.fn().mockResolvedValue([{ '?column?': 1 }]),
+      } as never);
+
+    it('is ready after the first snapshot load succeeds', async () => {
+      markMarketSessionOverrideStoreRequired();
+      applyMarketSessionOverrideSnapshot([], new Date());
+      const result = await createService().getReadiness();
+      expect(result.data.status).toBe('ready');
+      expect(result.data.reasons).toEqual([]);
+      expect(result.data.marketSessionOverride).toMatchObject({
+        mode: 'required',
+        state: 'ready',
+        loaded: true,
+        lastRefreshFailedAt: null,
+      });
+    });
+
+    it('degrades with NOT_LOADED before the first load completes', async () => {
+      markMarketSessionOverrideStoreRequired();
+      const result = await createService().getReadiness();
+      // Static calendar coverage alone must never report the stock calendar
+      // as ready while the override snapshot has not loaded (fail-closed).
+      expect(result.data.status).toBe('degraded');
+      expect(result.data.reasons).toContain(
+        MARKET_SESSION_OVERRIDE_READINESS_REASONS.notLoaded,
+      );
+      expect(result.data.marketSessionOverride).toMatchObject({
+        state: 'not_loaded',
+        loaded: false,
+      });
+    });
+
+    it('degrades with UNAVAILABLE on a cold-start load failure', async () => {
+      markMarketSessionOverrideStoreRequired();
+      recordMarketSessionOverrideRefreshFailure(new Date());
+      const result = await createService().getReadiness();
+      expect(result.data.status).toBe('degraded');
+      expect(result.data.reasons).toContain(
+        MARKET_SESSION_OVERRIDE_READINESS_REASONS.unavailable,
+      );
+      expect(result.data.marketSessionOverride).toMatchObject({
+        state: 'unavailable',
+        loaded: false,
+      });
+      // The HTTP API stays up (crypto is unaffected); only degraded.
+      expect(result.success).toBe(true);
+    });
+
+    it('degrades with LAST_KNOWN_GOOD when a refresh fails after a load', async () => {
+      markMarketSessionOverrideStoreRequired();
+      applyMarketSessionOverrideSnapshot([], new Date());
+      recordMarketSessionOverrideRefreshFailure(new Date());
+      const result = await createService().getReadiness();
+      expect(result.data.status).toBe('degraded');
+      expect(result.data.reasons).toContain(
+        MARKET_SESSION_OVERRIDE_READINESS_REASONS.lastKnownGood,
+      );
+      expect(result.data.reasons).not.toContain(
+        MARKET_SESSION_OVERRIDE_READINESS_REASONS.unavailable,
+      );
+      expect(result.data.marketSessionOverride).toMatchObject({
+        state: 'last_known_good',
+        loaded: true,
+      });
+    });
+
+    it('recovers to ready once a later refresh succeeds', async () => {
+      markMarketSessionOverrideStoreRequired();
+      applyMarketSessionOverrideSnapshot([], new Date());
+      recordMarketSessionOverrideRefreshFailure(new Date());
+      applyMarketSessionOverrideSnapshot([], new Date());
+      const result = await createService().getReadiness();
+      expect(result.data.status).toBe('ready');
+      expect(result.data.reasons).toEqual([]);
+      expect(result.data.marketSessionOverride).toMatchObject({
+        state: 'ready',
+      });
+    });
+
+    it('reports passthrough (no reasons) when the loader is not registered', async () => {
+      const result = await createService().getReadiness();
+      expect(result.data.status).toBe('ready');
+      expect(result.data.marketSessionOverride).toMatchObject({
+        mode: 'passthrough',
+        state: 'passthrough',
+      });
+    });
   });
 });

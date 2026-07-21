@@ -10,6 +10,7 @@ import {
   applyMarketSessionOverrideSnapshot,
   getMarketSessionOverrideStoreStatus,
   markMarketSessionOverrideStoreRequired,
+  recordMarketSessionOverrideRefreshFailure,
   type MarketSessionOverrideEntry,
   type MarketSessionOverrideKind,
 } from './market-session-override.store';
@@ -52,7 +53,8 @@ export class MarketSessionOverrideLoaderService
 {
   private readonly logger = new Logger(MarketSessionOverrideLoaderService.name);
   private timer: NodeJS.Timeout | null = null;
-  private refreshing: Promise<boolean> | null = null;
+  private inFlightRefresh: Promise<boolean> | null = null;
+  private queuedRefresh: Promise<boolean> | null = null;
   private destroyed = false;
   private readonly changeListeners =
     new Set<MarketSessionOverrideChangeListener>();
@@ -86,7 +88,8 @@ export class MarketSessionOverrideLoaderService
     this.destroyed = true;
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
-    await this.refreshing?.catch(() => undefined);
+    await this.inFlightRefresh?.catch(() => undefined);
+    await this.queuedRefresh?.catch(() => undefined);
   }
 
   /**
@@ -102,18 +105,43 @@ export class MarketSessionOverrideLoaderService
   }
 
   /**
-   * Loads the active overrides and applies them to the store. Single-flight;
-   * returns true when a snapshot was applied. On failure the last-known-good
-   * snapshot (if any) is kept and a structured warning is logged.
+   * Loads the active overrides and applies them to the store. Refreshes are
+   * serialized: every call resolves with the outcome of a DB read that
+   * STARTED at or after the call, so a mutation committed before calling
+   * refreshNow() is always observed by the load whose result is returned —
+   * even when a polling refresh (which may have read a pre-commit snapshot)
+   * is already in flight. Callers arriving while a refresh is running all
+   * share ONE queued follow-up refresh, so concurrent mutations cause at
+   * most one extra DB query instead of a query per caller.
+   *
+   * Returns true only when that (post-call) snapshot load succeeded and was
+   * applied to the store. On failure the last-known-good snapshot (if any)
+   * is kept and a structured warning is logged.
    */
   refreshNow(
     trigger: 'startup' | 'poll' | 'operator_mutation' | 'test',
   ): Promise<boolean> {
-    if (this.refreshing) return this.refreshing;
-    this.refreshing = this.refreshOnce(trigger).finally(() => {
-      this.refreshing = null;
-    });
-    return this.refreshing;
+    if (!this.inFlightRefresh) {
+      const run = this.refreshOnce(trigger).finally(() => {
+        if (this.inFlightRefresh === run) this.inFlightRefresh = null;
+      });
+      this.inFlightRefresh = run;
+      return run;
+    }
+    if (!this.queuedRefresh) {
+      // Chained AFTER the in-flight refresh settles (its finally above runs
+      // first, clearing inFlightRefresh), so the recursive call starts a
+      // fresh DB read. queuedRefresh is cleared synchronously before that
+      // read starts: a caller can only join the queue while the queued read
+      // has not begun, which preserves the started-after-call guarantee.
+      this.queuedRefresh = this.inFlightRefresh
+        .catch(() => false)
+        .then(() => {
+          this.queuedRefresh = null;
+          return this.refreshNow(trigger);
+        });
+    }
+    return this.queuedRefresh;
   }
 
   private async refreshOnce(trigger: string): Promise<boolean> {
@@ -157,6 +185,7 @@ export class MarketSessionOverrideLoaderService
       }
       return true;
     } catch (error) {
+      recordMarketSessionOverrideRefreshFailure(new Date());
       const status = getMarketSessionOverrideStoreStatus();
       this.logger.warn(
         JSON.stringify({

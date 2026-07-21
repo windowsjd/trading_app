@@ -28,11 +28,31 @@ export type MarketSessionOverrideEntry = {
   reason: string;
 };
 
+/**
+ * Runtime lifecycle of the override snapshot, for readiness reporting:
+ * - 'passthrough': the loader never registered (unit tests, tooling
+ *   processes). The static calendar is authoritative; nothing to report.
+ * - 'not_loaded': required mode, the first load has not completed yet and no
+ *   attempt has failed. Stock calendars are fail-closed.
+ * - 'unavailable': required mode, the first load failed and none has
+ *   succeeded since (cold-start failure). Stock calendars are fail-closed.
+ * - 'ready': a load succeeded and the most recent refresh also succeeded.
+ * - 'last_known_good': a load succeeded but the most recent refresh failed;
+ *   the last successful snapshot keeps serving (degraded, not fail-closed).
+ */
+export type MarketSessionOverrideRuntimeState =
+  | 'passthrough'
+  | 'not_loaded'
+  | 'unavailable'
+  | 'ready'
+  | 'last_known_good';
+
 type StoreState = {
   mode: 'passthrough' | 'required';
   loaded: boolean;
   entries: Map<string, MarketSessionOverrideEntry>;
   loadedAt: Date | null;
+  lastRefreshFailedAt: Date | null;
 };
 
 const state: StoreState = {
@@ -40,6 +60,7 @@ const state: StoreState = {
   loaded: false,
   entries: new Map(),
   loadedAt: null,
+  lastRefreshFailedAt: null,
 };
 
 function entryKey(market: MarketCalendarMarket, localDate: string): string {
@@ -66,6 +87,19 @@ export function applyMarketSessionOverrideSnapshot(
   state.entries = next;
   state.loaded = true;
   state.loadedAt = loadedAt;
+  state.lastRefreshFailedAt = null;
+}
+
+/**
+ * Records a failed load/refresh attempt so readiness can distinguish a
+ * cold-start failure ('unavailable') and a stale-but-serving snapshot
+ * ('last_known_good') without touching the DB. Cleared by the next
+ * successful applyMarketSessionOverrideSnapshot.
+ */
+export function recordMarketSessionOverrideRefreshFailure(
+  failedAt: Date,
+): void {
+  state.lastRefreshFailedAt = failedAt;
 }
 
 /**
@@ -105,10 +139,43 @@ export function getMarketSessionOverrideStoreStatus(): {
   };
 }
 
+/**
+ * Synchronous runtime status for readiness reporting. Never queries the DB —
+ * it only reads what the loader has already recorded here.
+ */
+export function getMarketSessionOverrideRuntimeStatus(): {
+  mode: 'passthrough' | 'required';
+  state: MarketSessionOverrideRuntimeState;
+  loaded: boolean;
+  loadedAt: Date | null;
+  lastRefreshFailedAt: Date | null;
+  activeOverrideCount: number;
+} {
+  const runtimeState: MarketSessionOverrideRuntimeState =
+    state.mode === 'passthrough'
+      ? 'passthrough'
+      : state.loaded
+        ? state.lastRefreshFailedAt
+          ? 'last_known_good'
+          : 'ready'
+        : state.lastRefreshFailedAt
+          ? 'unavailable'
+          : 'not_loaded';
+  return {
+    mode: state.mode,
+    state: runtimeState,
+    loaded: state.loaded,
+    loadedAt: state.loadedAt,
+    lastRefreshFailedAt: state.lastRefreshFailedAt,
+    activeOverrideCount: state.entries.size,
+  };
+}
+
 /** Restores the default passthrough state; call in test afterEach hooks. */
 export function resetMarketSessionOverrideStoreForTest(): void {
   state.mode = 'passthrough';
   state.loaded = false;
   state.entries = new Map();
   state.loadedAt = null;
+  state.lastRefreshFailedAt = null;
 }
