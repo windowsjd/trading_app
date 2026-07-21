@@ -398,6 +398,7 @@ export const ModelName = {
   AssetOrderbookSnapshot: 'AssetOrderbookSnapshot',
   MarketCandle: 'MarketCandle',
   MarketCandleSyncState: 'MarketCandleSyncState',
+  MarketSessionOverride: 'MarketSessionOverride',
   Position: 'Position',
   Order: 'Order',
   CashWallet: 'CashWallet',
@@ -427,7 +428,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "operatorAuditLog" | "refreshTokenSession" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "position" | "order" | "cashWallet" | "walletTransaction" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock"
+    modelProps: "user" | "operatorAuditLog" | "refreshTokenSession" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "position" | "order" | "cashWallet" | "walletTransaction" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1464,6 +1465,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.MarketCandleSyncStateCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.MarketCandleSyncStateCountAggregateOutputType> | number
+        }
+      }
+    }
+    MarketSessionOverride: {
+      payload: Prisma.$MarketSessionOverridePayload<ExtArgs>
+      fields: Prisma.MarketSessionOverrideFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.MarketSessionOverrideFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketSessionOverridePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.MarketSessionOverrideFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketSessionOverridePayload>
+        }
+        findFirst: {
+          args: Prisma.MarketSessionOverrideFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketSessionOverridePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.MarketSessionOverrideFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketSessionOverridePayload>
+        }
+        findMany: {
+          args: Prisma.MarketSessionOverrideFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketSessionOverridePayload>[]
+        }
+        create: {
+          args: Prisma.MarketSessionOverrideCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketSessionOverridePayload>
+        }
+        createMany: {
+          args: Prisma.MarketSessionOverrideCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.MarketSessionOverrideCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketSessionOverridePayload>[]
+        }
+        delete: {
+          args: Prisma.MarketSessionOverrideDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketSessionOverridePayload>
+        }
+        update: {
+          args: Prisma.MarketSessionOverrideUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketSessionOverridePayload>
+        }
+        deleteMany: {
+          args: Prisma.MarketSessionOverrideDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.MarketSessionOverrideUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.MarketSessionOverrideUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketSessionOverridePayload>[]
+        }
+        upsert: {
+          args: Prisma.MarketSessionOverrideUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketSessionOverridePayload>
+        }
+        aggregate: {
+          args: Prisma.MarketSessionOverrideAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateMarketSessionOverride>
+        }
+        groupBy: {
+          args: Prisma.MarketSessionOverrideGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.MarketSessionOverrideGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.MarketSessionOverrideCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.MarketSessionOverrideCountAggregateOutputType> | number
         }
       }
     }
@@ -2823,6 +2898,25 @@ export const MarketCandleSyncStateScalarFieldEnum = {
 export type MarketCandleSyncStateScalarFieldEnum = (typeof MarketCandleSyncStateScalarFieldEnum)[keyof typeof MarketCandleSyncStateScalarFieldEnum]
 
 
+export const MarketSessionOverrideScalarFieldEnum = {
+  id: 'id',
+  market: 'market',
+  localDate: 'localDate',
+  overrideType: 'overrideType',
+  openTime: 'openTime',
+  closeTime: 'closeTime',
+  reason: 'reason',
+  source: 'source',
+  isActive: 'isActive',
+  createdByUserId: 'createdByUserId',
+  updatedByUserId: 'updatedByUserId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type MarketSessionOverrideScalarFieldEnum = (typeof MarketSessionOverrideScalarFieldEnum)[keyof typeof MarketSessionOverrideScalarFieldEnum]
+
+
 export const PositionScalarFieldEnum = {
   id: 'id',
   seasonParticipantId: 'seasonParticipantId',
@@ -3438,6 +3532,34 @@ export type ListEnumMarketCandleSyncStatusFieldRefInput<$PrismaModel> = FieldRef
 
 
 /**
+ * Reference to a field of type 'MarketCalendarMarket'
+ */
+export type EnumMarketCalendarMarketFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'MarketCalendarMarket'>
+    
+
+
+/**
+ * Reference to a field of type 'MarketCalendarMarket[]'
+ */
+export type ListEnumMarketCalendarMarketFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'MarketCalendarMarket[]'>
+    
+
+
+/**
+ * Reference to a field of type 'MarketSessionOverrideType'
+ */
+export type EnumMarketSessionOverrideTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'MarketSessionOverrideType'>
+    
+
+
+/**
+ * Reference to a field of type 'MarketSessionOverrideType[]'
+ */
+export type ListEnumMarketSessionOverrideTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'MarketSessionOverrideType[]'>
+    
+
+
+/**
  * Reference to a field of type 'OrderSide'
  */
 export type EnumOrderSideFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OrderSide'>
@@ -3783,6 +3905,7 @@ export type GlobalOmitConfig = {
   assetOrderbookSnapshot?: Prisma.AssetOrderbookSnapshotOmit
   marketCandle?: Prisma.MarketCandleOmit
   marketCandleSyncState?: Prisma.MarketCandleSyncStateOmit
+  marketSessionOverride?: Prisma.MarketSessionOverrideOmit
   position?: Prisma.PositionOmit
   order?: Prisma.OrderOmit
   cashWallet?: Prisma.CashWalletOmit

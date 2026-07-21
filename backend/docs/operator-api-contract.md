@@ -591,6 +591,177 @@ Role-change success metadata contains only safe fields such as `targetUserId`, `
 
 Status/restore success metadata contains only safe fields such as `targetUserId`, `actorUserId`, `beforeStatus`, `afterStatus`, `beforeRole`, `afterRole`, `reason`, `requestId`, and `revokedRefreshSessionCount`. Status/restore failure metadata contains only safe fields such as `targetUserId`, `actorUserId`, `requestedStatus`, `reason`, `failureCode`, and `requestId`. Raw request body, `passwordHash`, refresh token, access token, raw provider payload, env, and secret values must not be stored.
 
+## Market Session Override Management
+
+Operator-managed exception layer over the static per-year market calendar
+datasets (`backend/src/orders/market-calendar/data`). Lets operators register
+emergency closures, forced regular sessions, delayed opens, and early/extended
+closes without a redeploy. No external calendar API (KIS holiday, Alpaca
+Calendar, EODHD, …) is used and no related env vars exist — the static
+datasets stay the base data and the DB layer only holds exceptions.
+
+Effective schedule precedence for one exchange-local date:
+
+1. Active DB override (`market_session_overrides`, `is_active = true`)
+2. Static per-year dataset entry
+3. No dataset for that year → `calendar_unavailable` (fail-closed)
+
+A DB override never grants calendar coverage for its year: a 2028 override
+does not make 2028 servable while the 2028 static dataset is missing (the
+response's `calendarYearCovered: false` surfaces this). Coverage years follow
+the existing Asia/Seoul-based readiness rule (previous year → next year).
+
+`overrideType` semantics:
+
+- `regular`: cancels the static closure/session change for that date and
+  forces the default session (KRX 09:00–15:30 KST, US 09:30–16:00 ET).
+  Internally distinct from "no override".
+- `closed`: full-day closure. No provider candle calls, no candles/gaps, no
+  daily bar; the day counts as zero sessions.
+- `custom`: explicit exchange-local `openTime`/`closeTime` (both required,
+  `openTime < closeTime`). Covers delayed opens and early/extended closes.
+
+Field rules:
+
+- `market`: `KRX` or `US`. Crypto is 24h and never uses this calendar.
+- `localDate`: exchange-local trading date `YYYY-MM-DD` (KRX: Asia/Seoul,
+  US: America/New_York), stored as text so the local meaning never shifts.
+- `openTime`/`closeTime`: accepted as `HH:mm` or `HH:mm:ss`; normalized to a
+  canonical compact `HHmmss` in storage (same format as the static datasets)
+  and returned as `HH:mm:ss`.
+- `reason` (required, ≤200 chars), `source` (optional, ≤500 chars).
+- `regular`/`custom` on a Saturday/Sunday are rejected
+  (`MARKET_SESSION_OVERRIDE_WEEKEND_UNSUPPORTED`) because sessions never open
+  on weekends; a weekend `closed` is accepted as a harmless annotation.
+- One override per `market` + `localDate` (DB unique constraint; a concurrent
+  duplicate maps to `MARKET_SESSION_OVERRIDE_CONFLICT`, HTTP 409).
+- Overrides are deactivated, never deleted, to preserve operational history.
+
+### Auth
+
+- `OperatorGuard`: `operator` and `admin` roles only.
+
+### GET /api/v1/operator/market-session-overrides
+
+Query: `market` (optional), `from`/`to` (optional `YYYY-MM-DD` range on
+`localDate`), `includeInactive` (default `false`). Returns up to 1,000 rows
+ordered by `localDate`.
+
+### GET /api/v1/operator/market-session-overrides/:overrideId
+
+Single override or `MARKET_SESSION_OVERRIDE_NOT_FOUND` (404).
+
+### POST /api/v1/operator/market-session-overrides
+
+Upsert by `market` + `localDate`: creates the override, or replaces the
+existing row's schedule fields and reactivates it if it was inactive.
+
+Request example (KRX emergency closure):
+
+```json
+{
+  "market": "KRX",
+  "localDate": "2026-07-21",
+  "overrideType": "closed",
+  "reason": "긴급 휴장: 시스템 장애",
+  "source": "KRX notice 2026-123"
+}
+```
+
+Request example (US delayed open):
+
+```json
+{
+  "market": "US",
+  "localDate": "2026-07-22",
+  "overrideType": "custom",
+  "openTime": "10:30",
+  "closeTime": "16:00",
+  "reason": "exchange delayed open",
+  "source": "NYSE notice"
+}
+```
+
+Response example:
+
+```json
+{
+  "success": true,
+  "data": {
+    "created": true,
+    "runtimeApplied": true,
+    "override": {
+      "id": "…",
+      "market": "KRX",
+      "localDate": "2026-07-21",
+      "overrideType": "closed",
+      "openTime": null,
+      "closeTime": null,
+      "reason": "긴급 휴장: 시스템 장애",
+      "source": "KRX notice 2026-123",
+      "isActive": true,
+      "calendarYearCovered": true,
+      "createdByUserId": "…",
+      "updatedByUserId": "…",
+      "createdAt": "…",
+      "updatedAt": "…"
+    }
+  }
+}
+```
+
+`runtimeApplied` reports whether THIS instance already reloaded its in-memory
+override snapshot; on `false` the bounded polling applies it within the
+propagation window below.
+
+### PATCH /api/v1/operator/market-session-overrides/:overrideId
+
+Partial update of `overrideType`, `openTime`, `closeTime`, `reason`,
+`source`. The merged result is re-validated (switching to `regular`/`closed`
+clears stored times; switching to `custom` requires both times).
+
+### POST /api/v1/operator/market-session-overrides/:overrideId/deactivate
+
+Marks the override inactive (`MARKET_SESSION_OVERRIDE_ALREADY_INACTIVE`, 409,
+if it already is). Optional `note` for the audit trail.
+
+### POST /api/v1/operator/market-session-overrides/:overrideId/reactivate
+
+Re-enables an inactive override (`MARKET_SESSION_OVERRIDE_ALREADY_ACTIVE`,
+409, if it already is active).
+
+### Runtime propagation
+
+- Each backend instance loads active overrides at startup and re-polls every
+  60 seconds (`MARKET_SESSION_OVERRIDE_REFRESH_INTERVAL_MS`); the mutating
+  instance refreshes immediately after commit. Maximum cross-instance
+  staleness is therefore ~60s + one query round-trip. Register emergency
+  closures at least a minute ahead when multiple instances are running.
+- If the cold-start load fails, the process logs
+  `market_session_override_cold_start_load_failed` and the stock calendar
+  fails closed (`calendar_unavailable` → not tradable, `marketStatus`
+  `unknown`) until the first successful load (retried every 5s). The app
+  never silently serves static-only schedules while DB overrides may exist.
+- If a later refresh fails, the last-known-good snapshot stays active and a
+  structured `market_session_override_refresh_failed` warning is logged.
+- On snapshot changes the per-asset candle cache generation for the affected
+  market's assets is bumped (`market_session_override_candle_cache_invalidated`).
+
+### Audit actions
+
+- `operator.market_session_override.upsert` (+ `.failed`)
+- `operator.market_session_override.update` (+ `.failed`)
+- `operator.market_session_override.deactivate` (+ `.failed`)
+- `operator.market_session_override.reactivate` (+ `.failed`)
+
+Success metadata contains `market`, `localDate`, `before`/`after` schedule
+values, `reason`, `note`, and `requestId`; mutation and success audit share
+one transaction. Failure metadata contains the safe input fields and
+`failureCode`. No secrets or unnecessary personal data are stored.
+
+Announcements/notices to end users are a separate operational procedure —
+this API only changes the trading calendar, it does not publish notices.
+
 ## Not Implemented In This MVP
 
 - HTTP batch execution API.

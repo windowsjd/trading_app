@@ -26,6 +26,10 @@ jest.mock('../generated/prisma/client', () => {
   };
 });
 
+import {
+  applyMarketSessionOverrideSnapshot,
+  resetMarketSessionOverrideStoreForTest,
+} from '../orders/market-calendar/market-session-override.store';
 import { MarketCandleSyncService } from './market-candle-sync.service';
 import { MarketCandleIngestionService } from './market-candle-ingestion.service';
 import { KisCandleNormalizerService } from '../providers/kis/candles/kis-candle-normalizer.service';
@@ -2032,6 +2036,47 @@ describe('MarketCandleSyncService', () => {
       expect(feed.stopReason).toBe('expected_no_data');
       expect(feed.coverageComplete).toBe(true);
       expect(feed.completionReason).toBe('confirmed_empty');
+    });
+
+    it('treats an operator override-CLOSED day as confirmed no-data without provider IO', async () => {
+      // 2026-07-13 is a regular Monday; an active DB CLOSED override turns
+      // the repair range into a confirmed-empty holiday range: no provider
+      // call, expected_no_data, coverage complete — never calendar_unavailable.
+      applyMarketSessionOverrideSnapshot(
+        [
+          {
+            market: 'KRX',
+            localDate: '2026-07-13',
+            overrideType: 'closed',
+            openTime: null,
+            closeTime: null,
+            reason: 'emergency closure',
+          },
+        ],
+        new Date(),
+      );
+      try {
+        const harness = createHarness({ assets: [DOMESTIC_ASSET] });
+        const result = await harness.service.syncAsset({
+          assetId: DOMESTIC_ASSET.id,
+          targets: ['1d'],
+          mode: 'repair' as never,
+          from: new Date('2026-07-13T00:00:00Z'),
+          to: new Date('2026-07-13T08:00:00Z'),
+          now: SYNC_NOW,
+        });
+
+        const feed = result.feeds[0];
+        expect(
+          harness.domesticPeriodAdapter.fetchPeriodPage,
+        ).not.toHaveBeenCalled();
+        expect(feed.status).toBe('completed');
+        expect(feed.stopReason).toBe('expected_no_data');
+        expect(feed.coverageComplete).toBe(true);
+        expect(feed.completionReason).toBe('confirmed_empty');
+      } finally {
+        resetMarketSessionOverrideStoreForTest();
+      }
     });
 
     it('fails closed on a range in a year without a calendar dataset', async () => {

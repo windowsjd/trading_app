@@ -43,6 +43,11 @@ import {
   Prisma,
   SeasonStatus,
 } from '../generated/prisma/client';
+import {
+  applyMarketSessionOverrideSnapshot,
+  markMarketSessionOverrideStoreRequired,
+  resetMarketSessionOverrideStoreForTest,
+} from '../orders/market-calendar/market-session-override.store';
 import { AssetsService } from './assets.service';
 
 describe('AssetsService', () => {
@@ -576,6 +581,85 @@ describe('AssetsService', () => {
       },
     });
     expectNoAssetWrites(prisma);
+  });
+
+  it('shows closed + MARKET_CLOSED with a carry-forward price on an override-closed day', async () => {
+    // testNow (2026-07-20 12:00 KST, Monday) is a regular open KRX session;
+    // an active operator CLOSED override flips it to a confirmed closure
+    // while the last snapshot price stays displayable.
+    applyMarketSessionOverrideSnapshot(
+      [
+        {
+          market: 'KRX',
+          localDate: '2026-07-20',
+          overrideType: 'closed',
+          openTime: null,
+          closeTime: null,
+          reason: 'emergency closure',
+        },
+      ],
+      new Date(),
+    );
+    try {
+      const { prisma, service } = createService();
+      prisma.asset.count.mockResolvedValueOnce(1);
+      prisma.asset.findMany.mockResolvedValueOnce([
+        asset({ id: 'asset-krx', assetType: AssetType.domestic_stock }),
+      ]);
+      mockTradableSeason(prisma);
+      prisma.fxRateSnapshot.findFirst.mockResolvedValueOnce(
+        freshUsdKrwSnapshot(),
+      );
+      prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(
+        priceSnapshot('price-krx', '71500.00000000'),
+      );
+
+      const response = await service.getAssets('user-1');
+
+      expect(response.data.assets[0]).toMatchObject({
+        id: 'asset-krx',
+        marketStatus: 'closed',
+        tradable: false,
+        tradeBlockedReason: 'MARKET_CLOSED',
+        price: {
+          state: 'available',
+          currentPrice: '71500.00000000',
+        },
+      });
+    } finally {
+      resetMarketSessionOverrideStoreForTest();
+    }
+  });
+
+  it('reports unknown (not closed) when calendar coverage is unavailable', async () => {
+    // Required-but-unloaded override store = calendar_unavailable. The UI
+    // must see 'unknown' (price-preparing placeholder), never a false
+    // 'closed', and the blocked reason must differ from MARKET_CLOSED.
+    markMarketSessionOverrideStoreRequired();
+    try {
+      const { prisma, service } = createService();
+      prisma.asset.count.mockResolvedValueOnce(1);
+      prisma.asset.findMany.mockResolvedValueOnce([
+        asset({ id: 'asset-krx', assetType: AssetType.domestic_stock }),
+      ]);
+      mockTradableSeason(prisma);
+      prisma.fxRateSnapshot.findFirst.mockResolvedValueOnce(
+        freshUsdKrwSnapshot(),
+      );
+      prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce(
+        priceSnapshot('price-krx', '71500.00000000'),
+      );
+
+      const response = await service.getAssets('user-1');
+
+      expect(response.data.assets[0]).toMatchObject({
+        marketStatus: 'unknown',
+        tradable: false,
+        tradeBlockedReason: 'UNKNOWN',
+      });
+    } finally {
+      resetMarketSessionOverrideStoreForTest();
+    }
   });
 
   it('marks assets without a price as not tradable with a safe reason', async () => {

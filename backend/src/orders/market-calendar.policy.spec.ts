@@ -18,6 +18,11 @@ import {
   resolveStockMarketDataUpperBound,
   resolveStockMarketSessionState,
 } from './market-calendar.policy';
+import {
+  applyMarketSessionOverrideSnapshot,
+  markMarketSessionOverrideStoreRequired,
+  resetMarketSessionOverrideStoreForTest,
+} from './market-calendar/market-session-override.store';
 
 describe('market calendar policy', () => {
   it('anchors KRX to 09:00 Asia/Seoul and excludes the close boundary', () => {
@@ -362,5 +367,235 @@ describe('market calendar policy', () => {
         new Date('2026-01-05T15:00:00.000Z'),
       ),
     ).toEqual({ calendarCovered: true, hasTradingSession: true });
+  });
+});
+
+describe('operator market session overrides (DB layer precedence)', () => {
+  const krx = { assetType: AssetType.domestic_stock, market: 'KRX' };
+  const us = { assetType: AssetType.us_stock, market: 'NAS' };
+
+  const seed = (
+    entries: readonly {
+      market: 'KRX' | 'US';
+      localDate: string;
+      overrideType: 'regular' | 'closed' | 'custom';
+      openTime?: string | null;
+      closeTime?: string | null;
+    }[],
+  ) => {
+    applyMarketSessionOverrideSnapshot(
+      entries.map((entry) => ({
+        market: entry.market,
+        localDate: entry.localDate,
+        overrideType: entry.overrideType,
+        openTime: entry.openTime ?? null,
+        closeTime: entry.closeTime ?? null,
+        reason: 'test override',
+      })),
+      new Date('2026-07-01T00:00:00.000Z'),
+    );
+  };
+
+  afterEach(() => {
+    resetMarketSessionOverrideStoreForTest();
+  });
+
+  it('a CLOSED override turns a static regular day into a full closure', () => {
+    // 2026-07-13 is a regular KRX Monday.
+    expect(resolveMarketSession('KRX', '20260713')).not.toBeNull();
+    seed([{ market: 'KRX', localDate: '2026-07-13', overrideType: 'closed' }]);
+
+    expect(resolveMarketSession('KRX', '20260713')).toBeNull();
+    const state = resolveStockMarketSessionState(
+      krx,
+      new Date('2026-07-13T03:00:00.000Z'), // midday KST
+    );
+    expect(state?.state).toBe('closed');
+    // The closure is a confirmed no-session day, never a coverage gap.
+    expect(
+      inspectMarketSessionsInRange(
+        krx,
+        new Date('2026-07-12T15:00:00.000Z'),
+        new Date('2026-07-13T15:00:00.000Z'),
+      ),
+    ).toEqual({ calendarCovered: true, hasTradingSession: false });
+  });
+
+  it('a CUSTOM override delays the open: closed before, open after, same close', () => {
+    seed([
+      {
+        market: 'KRX',
+        localDate: '2026-07-13',
+        overrideType: 'custom',
+        openTime: '100000',
+        closeTime: '153000',
+      },
+    ]);
+
+    const session = resolveMarketSession('KRX', '20260713');
+    expect(session).toMatchObject({
+      openTime: new Date('2026-07-13T01:00:00.000Z'),
+      closeTime: new Date('2026-07-13T06:30:00.000Z'),
+    });
+    expect(
+      resolveStockMarketSessionState(krx, new Date('2026-07-13T00:30:00.000Z'))
+        ?.state,
+    ).toBe('closed');
+    expect(
+      resolveStockMarketSessionState(krx, new Date('2026-07-13T01:30:00.000Z'))
+        ?.state,
+    ).toBe('open');
+  });
+
+  it('a REGULAR override restores a static full-day closure to the default session', () => {
+    // 2026-01-01 is a static KRX holiday.
+    expect(resolveMarketSession('KRX', '20260101')).toBeNull();
+    seed([{ market: 'KRX', localDate: '2026-01-01', overrideType: 'regular' }]);
+
+    expect(resolveMarketSession('KRX', '20260101')).toMatchObject({
+      openTime: new Date('2026-01-01T00:00:00.000Z'),
+      closeTime: new Date('2026-01-01T06:30:00.000Z'),
+      earlyClose: false,
+    });
+  });
+
+  it('a CUSTOM override replaces a static session-time override', () => {
+    // Static: US 2026-11-27 closes early at 13:00 ET. The DB override wins.
+    expect(resolveMarketSession('US', '20261127')?.closeTime).toEqual(
+      new Date('2026-11-27T18:00:00.000Z'),
+    );
+    seed([
+      {
+        market: 'US',
+        localDate: '2026-11-27',
+        overrideType: 'custom',
+        openTime: '100000',
+        closeTime: '140000',
+      },
+    ]);
+
+    expect(resolveMarketSession('US', '20261127')).toMatchObject({
+      openTime: new Date('2026-11-27T15:00:00.000Z'),
+      closeTime: new Date('2026-11-27T19:00:00.000Z'),
+    });
+  });
+
+  it('an override in a year without a static dataset never grants coverage', () => {
+    seed([{ market: 'KRX', localDate: '2028-03-02', overrideType: 'regular' }]);
+
+    expect(resolveMarketSession('KRX', '20280302')).toBeNull();
+    expect(
+      resolveStockMarketSessionState(krx, new Date('2028-03-02T03:00:00.000Z')),
+    ).toMatchObject({ state: 'calendar_unavailable' });
+  });
+
+  it('prev_open/prev2_open keep their session-count meaning across a delayed open', () => {
+    seed([
+      {
+        market: 'KRX',
+        localDate: '2026-07-15',
+        overrideType: 'custom',
+        openTime: '110000',
+        closeTime: '153000',
+      },
+    ]);
+
+    // Reference Thursday 2026-07-16: one session back is the delayed
+    // Wednesday session with its REAL open; two back is Tuesday. The delayed
+    // open never pushes the range an extra session into the past.
+    const reference = new Date('2026-07-16T03:00:00.000Z');
+    expect(findPreviousMarketSession(krx, reference, 1)).toMatchObject({
+      localDate: '2026-07-15',
+      openTime: new Date('2026-07-15T02:00:00.000Z'),
+    });
+    expect(findPreviousMarketSession(krx, reference, 2)).toMatchObject({
+      localDate: '2026-07-14',
+      openTime: new Date('2026-07-14T00:00:00.000Z'),
+    });
+  });
+
+  it('KRX overrides never affect US sessions and vice versa', () => {
+    seed([
+      { market: 'KRX', localDate: '2026-07-13', overrideType: 'closed' },
+      {
+        market: 'US',
+        localDate: '2026-07-14',
+        overrideType: 'custom',
+        openTime: '110000',
+        closeTime: '160000',
+      },
+    ]);
+
+    // KRX closure leaves the same-day US session untouched.
+    expect(resolveMarketSession('US', '20260713')).toMatchObject({
+      openTime: new Date('2026-07-13T13:30:00.000Z'),
+    });
+    // US delayed open leaves the same-day KRX session untouched.
+    expect(resolveMarketSession('KRX', '20260714')).toMatchObject({
+      openTime: new Date('2026-07-14T00:00:00.000Z'),
+    });
+    expect(
+      resolveStockMarketSessionState(us, new Date('2026-07-13T15:00:00.000Z'))
+        ?.state,
+    ).toBe('open');
+  });
+
+  it('a Friday CLOSED override moves the last session of the week to Thursday', () => {
+    seed([{ market: 'KRX', localDate: '2026-07-10', overrideType: 'closed' }]);
+
+    expect(findLastMarketSessionOfWeek('KRX', '2026-07-08')?.localDate).toBe(
+      '2026-07-09',
+    );
+  });
+
+  it('an early-close override ends the session (and weekly close) at the real close', () => {
+    seed([
+      {
+        market: 'KRX',
+        localDate: '2026-07-10',
+        overrideType: 'custom',
+        openTime: '090000',
+        closeTime: '120000',
+      },
+    ]);
+
+    const session = resolveMarketSession('KRX', '20260710');
+    expect(session).toMatchObject({
+      closeTime: new Date('2026-07-10T03:00:00.000Z'),
+      earlyClose: true,
+    });
+    // Weekly last-session anchor uses the overridden Friday close.
+    expect(findLastMarketSessionOfWeek('KRX', '2026-07-08')).toMatchObject({
+      localDate: '2026-07-10',
+      closeTime: new Date('2026-07-10T03:00:00.000Z'),
+    });
+    // Early close: open at 11:59 KST+3h? (02:59Z) and closed at 03:00Z.
+    expect(
+      resolveStockMarketSessionState(krx, new Date('2026-07-10T02:59:00.000Z'))
+        ?.state,
+    ).toBe('open');
+    expect(
+      resolveStockMarketSessionState(krx, new Date('2026-07-10T03:00:00.000Z'))
+        ?.state,
+    ).toBe('closed');
+  });
+
+  it('fails closed while the override store is required but not yet loaded', () => {
+    markMarketSessionOverrideStoreRequired();
+
+    expect(resolveMarketSession('KRX', '20260713')).toBeNull();
+    expect(
+      resolveStockMarketSessionState(krx, new Date('2026-07-13T03:00:00.000Z')),
+    ).toMatchObject({ state: 'calendar_unavailable' });
+
+    // After the first successful load the calendar serves normally again.
+    applyMarketSessionOverrideSnapshot([], new Date());
+    expect(resolveMarketSession('KRX', '20260713')).not.toBeNull();
+  });
+
+  it('an injected scheduleLookup still bypasses the store (test seam preserved)', () => {
+    seed([{ market: 'KRX', localDate: '2026-07-13', overrideType: 'closed' }]);
+    // Explicit lookup injection ignores both coverage gating and the store.
+    expect(resolveMarketSession('KRX', '20260713', () => null)).not.toBeNull();
   });
 });

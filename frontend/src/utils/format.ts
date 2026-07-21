@@ -113,6 +113,49 @@ export function formatMoney(
   return formatUsd(parsed);
 }
 
+export const MARKET_CLOSED_PRICE_TEXT = '휴장시간';
+export const PRICE_PREPARING_TEXT = '시세 준비 중';
+
+export type PriceUnavailableAsset = {
+  assetType?: string | null;
+  marketStatus?: string | null;
+};
+
+/**
+ * Placeholder for a price slot that has nothing displayable.
+ *   - Stock + marketStatus 'closed' (confirmed non-trading time: before open,
+ *     after close, weekend, holiday, delayed-open wait) → '휴장시간'.
+ *   - Everything else → '시세 준비 중': marketStatus 'unknown' (including
+ *     missing calendar coverage — never claim "closed" without a confirmed
+ *     calendar), 'open' with the provider not ready, and crypto (whose
+ *     24h market never closes).
+ */
+export function getUnavailablePriceText(asset: PriceUnavailableAsset): string {
+  return asset.assetType !== 'crypto' && asset.marketStatus === 'closed'
+    ? MARKET_CLOSED_PRICE_TEXT
+    : PRICE_PREPARING_TEXT;
+}
+
+export type AssetPriceTextInput = PriceUnavailableAsset & {
+  price?: {
+    state?: string | null;
+    currentPrice?: string | null;
+    priceCurrency?: FormatCurrencyCode | null;
+  } | null;
+};
+
+/**
+ * Price cell text for an asset row/card: the formatted price whenever one is
+ * displayable (including a carry-forward snapshot while the market is
+ * closed), otherwise the market-aware placeholder above.
+ */
+export function getAssetPriceText(item: AssetPriceTextInput): string {
+  if (item.price?.state !== 'available' || !item.price.currentPrice) {
+    return getUnavailablePriceText(item);
+  }
+  return formatMoney(item.price.currentPrice, item.price.priceCurrency);
+}
+
 /** Percent/return-rate display: fixed decimal places (default 2), no '%'. */
 export function formatPercent(
   value: string | number | null | undefined,

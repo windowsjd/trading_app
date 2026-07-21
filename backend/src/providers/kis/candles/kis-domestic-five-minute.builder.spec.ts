@@ -6,6 +6,10 @@ jest.mock('../../../generated/prisma/client', () => {
 });
 
 import { Prisma } from '../../../generated/prisma/client';
+import {
+  applyMarketSessionOverrideSnapshot,
+  resetMarketSessionOverrideStoreForTest,
+} from '../../../orders/market-calendar/market-session-override.store';
 import { KisDomesticFiveMinuteBuilder } from './kis-domestic-five-minute.builder';
 import type { NormalizedKisCandleRow } from './kis-candle.types';
 
@@ -116,6 +120,72 @@ describe('KisDomesticFiveMinuteBuilder', () => {
       '2026-11-19T07:30:00.000Z',
     );
     expect(result.candles[0].isClosed).toBe(true);
+  });
+
+  it('anchors at a CUSTOM override delayed open and rejects pre-open rows', () => {
+    try {
+      // Operator override: 2026-07-10 opens at 10:00 KST (01:00Z).
+      applyMarketSessionOverrideSnapshot(
+        [
+          {
+            market: 'KRX',
+            localDate: '2026-07-10',
+            overrideType: 'custom',
+            openTime: '100000',
+            closeTime: '153000',
+            reason: 'delayed open override',
+          },
+        ],
+        new Date(),
+      );
+      const delayedRows = [0, 1, 2, 3, 4].map((offset) =>
+        minute(offset, {
+          openTime: new Date(Date.UTC(2026, 6, 10, 1, offset)),
+          sourceUpdatedAt: new Date(Date.UTC(2026, 6, 10, 1, offset, 30)),
+        }),
+      );
+      const result = builder.build({
+        // Regular 09:00-anchored rows must NOT produce synthetic pre-open
+        // candles on the delayed-open day.
+        rows: [
+          ...[0, 1, 2, 3, 4].map((offset) => minute(offset)),
+          ...delayedRows,
+        ],
+        now: new Date('2026-07-10T01:06:00.000Z'),
+      });
+      expect(result.candles).toHaveLength(1);
+      expect(result.candles[0].openTime.toISOString()).toBe(
+        '2026-07-10T01:00:00.000Z',
+      );
+      expect(result.rejectedBuckets).toBeGreaterThan(0);
+    } finally {
+      resetMarketSessionOverrideStoreForTest();
+    }
+  });
+
+  it('does not create a candle on an override-CLOSED regular day', () => {
+    try {
+      applyMarketSessionOverrideSnapshot(
+        [
+          {
+            market: 'KRX',
+            localDate: '2026-07-10',
+            overrideType: 'closed',
+            openTime: null,
+            closeTime: null,
+            reason: 'emergency closure',
+          },
+        ],
+        new Date(),
+      );
+      const result = builder.build({
+        rows: [0, 1, 2, 3, 4].map((offset) => minute(offset)),
+        now: new Date('2026-07-10T01:00:00.000Z'),
+      });
+      expect(result.candles).toEqual([]);
+    } finally {
+      resetMarketSessionOverrideStoreForTest();
+    }
   });
 
   it('does not create a candle on the 2026-07-17 KRX holiday', () => {

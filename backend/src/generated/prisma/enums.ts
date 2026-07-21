@@ -291,6 +291,23 @@ export const OpsJobRunStatus = {
 export type OpsJobRunStatus = (typeof OpsJobRunStatus)[keyof typeof OpsJobRunStatus]
 
 
+export const MarketCalendarMarket = {
+  KRX: 'KRX',
+  US: 'US'
+} as const
+
+export type MarketCalendarMarket = (typeof MarketCalendarMarket)[keyof typeof MarketCalendarMarket]
+
+
+export const MarketSessionOverrideType = {
+  regular: 'regular',
+  closed: 'closed',
+  custom: 'custom'
+} as const
+
+export type MarketSessionOverrideType = (typeof MarketSessionOverrideType)[keyof typeof MarketSessionOverrideType]
+
+
 export const OpsJobTrigger = {
   scheduler: 'scheduler',
   operator: 'operator',

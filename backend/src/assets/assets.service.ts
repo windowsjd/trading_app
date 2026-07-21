@@ -24,7 +24,7 @@ import {
 } from '../providers/source-metadata.presenter';
 import { buildPagination, type Pagination } from '../common/pagination';
 import { isSeasonCurrentlyActive } from '../seasons/season-lifecycle.policy';
-import { getAssetTradingStatus } from '../orders/market-hours.policy';
+import { resolveStockMarketSessionState } from '../orders/market-calendar.policy';
 
 export type AssetsQuery = {
   assetType?: string;
@@ -1315,16 +1315,17 @@ export class AssetsService {
       return 'unknown';
     }
 
-    const tradingStatus = getAssetTradingStatus(asset, now);
-    if (tradingStatus.tradable) {
-      return 'open';
+    // Tri-state stock session mapping: 'closed' is reserved for a CONFIRMED
+    // non-trading instant (before open, after close, weekend, holiday, or an
+    // operator closure override). A date whose calendar coverage is missing
+    // (calendar_unavailable) maps to 'unknown' — the UI must show a neutral
+    // "price preparing" state there, never a false "market closed".
+    const sessionState = resolveStockMarketSessionState(asset, now);
+    if (!sessionState || sessionState.state === 'calendar_unavailable') {
+      return 'unknown';
     }
 
-    if (tradingStatus.reason === 'MARKET_CLOSED') {
-      return 'closed';
-    }
-
-    return 'unknown';
+    return sessionState.state === 'open' ? 'open' : 'closed';
   }
 
   private buildTradingNote(asset: AssetRecord) {

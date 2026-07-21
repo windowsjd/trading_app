@@ -3,6 +3,8 @@ import { RedisModule } from '../redis/redis.module';
 import { RedisService } from '../redis/redis.service';
 import { RedisLockService } from '../redis/redis-lock.service';
 import { ProvidersModule } from '../providers/providers.module';
+import { MarketSessionOverrideModule } from '../orders/market-calendar/market-session-override.module';
+import { MarketSessionOverrideCacheInvalidatorService } from './market-session-override-cache-invalidator.service';
 import { AssetCandlesCacheService } from './asset-candles-cache.service';
 import { AssetCandlesService } from './asset-candles.service';
 import { AssetsController } from './assets.controller';
@@ -52,10 +54,11 @@ import { MarketCandleReconciliationService } from './market-candle-reconciliatio
 // intentionally NOT injected into AssetCandlesService yet: the provider call
 // flow and the candles endpoint are unchanged in this step.
 @Module({
-  imports: [ProvidersModule, RedisModule],
+  imports: [ProvidersModule, RedisModule, MarketSessionOverrideModule],
   controllers: [AssetsController],
   providers: [
     AssetsService,
+    MarketSessionOverrideCacheInvalidatorService,
     AssetCandlesService,
     MarketCandlesRepository,
     {

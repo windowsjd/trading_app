@@ -38,6 +38,7 @@ import {
   formatMoney,
   formatPercent,
   getAssetNameDisplay,
+  getUnavailablePriceText,
 } from "../../utils/format";
 
 import FullPageLoading from "../../components/states/FullPageLoading";
@@ -247,7 +248,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
           <Text style={styles.value}>
             {orderPriceAvailable
               ? formatMoney(displayPriceLocal, displayPriceCurrency)
-              : "시세 준비 중"}
+              : getUnavailablePriceText(asset)}
           </Text>
           <Text style={styles.helper}>
             KRW 환산 {formatKrw(displayPriceKrw)}

@@ -10,7 +10,13 @@ import { AssetType } from '../generated/prisma/client';
 import {
   assertAssetTradable,
   getAssetTradingStatus,
+  MarketHoursError,
 } from './market-hours.policy';
+import {
+  applyMarketSessionOverrideSnapshot,
+  markMarketSessionOverrideStoreRequired,
+  resetMarketSessionOverrideStoreForTest,
+} from './market-calendar/market-session-override.store';
 
 describe('market hours policy', () => {
   const krxAsset = { assetType: AssetType.domestic_stock, market: 'KRX' };
@@ -60,5 +66,126 @@ describe('market hours policy', () => {
     expect(() =>
       assertAssetTradable(krxAsset, new Date('2026-06-19T06:30:00.000Z')),
     ).toThrow(expect.objectContaining({ code: 'MARKET_CLOSED' }));
+  });
+
+  describe('with operator DB overrides', () => {
+    afterEach(() => {
+      resetMarketSessionOverrideStoreForTest();
+    });
+
+    it('rejects orders with MARKET_CLOSED on an override-closed regular day', () => {
+      const midday = new Date('2026-07-13T03:00:00.000Z');
+      expect(getAssetTradingStatus(krxAsset, midday).tradable).toBe(true);
+
+      applyMarketSessionOverrideSnapshot(
+        [
+          {
+            market: 'KRX',
+            localDate: '2026-07-13',
+            overrideType: 'closed',
+            openTime: null,
+            closeTime: null,
+            reason: 'emergency closure',
+          },
+        ],
+        new Date(),
+      );
+
+      expect(getAssetTradingStatus(krxAsset, midday)).toMatchObject({
+        tradable: false,
+        reason: 'MARKET_CLOSED',
+        message: 'KRX market is closed.',
+      });
+      expect(() => assertAssetTradable(krxAsset, midday)).toThrow(
+        MarketHoursError,
+      );
+      // Same instant: US and crypto stay unaffected by the KRX override.
+      expect(
+        getAssetTradingStatus(nasAsset, new Date('2026-07-13T15:00:00.000Z'))
+          .tradable,
+      ).toBe(true);
+      expect(getAssetTradingStatus(cryptoAsset, midday)).toEqual({
+        tradable: true,
+      });
+    });
+
+    it('waits for a delayed CUSTOM open and allows trading afterwards', () => {
+      applyMarketSessionOverrideSnapshot(
+        [
+          {
+            market: 'KRX',
+            localDate: '2026-07-13',
+            overrideType: 'custom',
+            openTime: '100000',
+            closeTime: '153000',
+            reason: 'delayed open',
+          },
+        ],
+        new Date(),
+      );
+
+      expect(
+        getAssetTradingStatus(krxAsset, new Date('2026-07-13T00:30:00.000Z')),
+      ).toMatchObject({ tradable: false, reason: 'MARKET_CLOSED' });
+      expect(
+        getAssetTradingStatus(krxAsset, new Date('2026-07-13T01:30:00.000Z'))
+          .tradable,
+      ).toBe(true);
+    });
+
+    it('closes after a CUSTOM early close for US without touching KRX/crypto', () => {
+      applyMarketSessionOverrideSnapshot(
+        [
+          {
+            market: 'US',
+            localDate: '2026-07-13',
+            overrideType: 'custom',
+            openTime: '093000',
+            closeTime: '130000',
+            reason: 'early close',
+          },
+        ],
+        new Date(),
+      );
+
+      expect(
+        getAssetTradingStatus(nasAsset, new Date('2026-07-13T16:59:00.000Z'))
+          .tradable,
+      ).toBe(true);
+      expect(
+        getAssetTradingStatus(nasAsset, new Date('2026-07-13T17:00:00.000Z')),
+      ).toMatchObject({ tradable: false, reason: 'MARKET_CLOSED' });
+      expect(
+        getAssetTradingStatus(krxAsset, new Date('2026-07-13T03:00:00.000Z'))
+          .tradable,
+      ).toBe(true);
+      expect(
+        getAssetTradingStatus(
+          cryptoAsset,
+          new Date('2026-07-13T17:00:00.000Z'),
+        ),
+      ).toEqual({ tradable: true });
+    });
+
+    it('keeps calendar-unavailable distinguishable from a plain closure', () => {
+      markMarketSessionOverrideStoreRequired();
+      const unavailable = getAssetTradingStatus(
+        krxAsset,
+        new Date('2026-07-13T03:00:00.000Z'),
+      );
+      expect(unavailable).toMatchObject({
+        tradable: false,
+        reason: 'MARKET_CLOSED',
+        message:
+          'KRX market calendar has no data for this date; treating the day as not tradable.',
+      });
+
+      applyMarketSessionOverrideSnapshot([], new Date());
+      const open = getAssetTradingStatus(
+        krxAsset,
+        new Date('2026-07-13T03:00:00.000Z'),
+      );
+      expect(open.tradable).toBe(true);
+    });
   });
 });

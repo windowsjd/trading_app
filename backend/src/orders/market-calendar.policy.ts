@@ -4,8 +4,8 @@ import {
   zonedDateTimeToUtc,
 } from '../providers/kis/candles/kis-candle-time';
 import {
-  findMarketSchedule,
-  hasMarketCalendarForDate,
+  findEffectiveMarketSchedule,
+  hasEffectiveMarketCalendarForDate,
   type MarketHoliday,
 } from './market-holidays.config';
 
@@ -64,7 +64,7 @@ const SESSION_POLICY = {
 export function resolveRegularSessionForEvent(
   asset: MarketCalendarAsset,
   eventTime: Date,
-  scheduleLookup: typeof findMarketSchedule = findMarketSchedule,
+  scheduleLookup: typeof findEffectiveMarketSchedule = findEffectiveMarketSchedule,
 ): MarketSessionWindow | null {
   const market = resolveCalendarMarket(asset);
   if (!market || Number.isNaN(eventTime.getTime())) return null;
@@ -83,7 +83,7 @@ export function resolveRegularSessionForEvent(
 export function resolveMarketSession(
   market: 'KRX' | 'US',
   localDate: string,
-  scheduleLookup: typeof findMarketSchedule = findMarketSchedule,
+  scheduleLookup: typeof findEffectiveMarketSchedule = findEffectiveMarketSchedule,
 ): MarketSessionWindow | null {
   if (!/^\d{8}$/u.test(localDate)) return null;
   const policy = SESSION_POLICY[market];
@@ -100,8 +100,8 @@ export function resolveMarketSession(
   // assumed to be a regular trading day. Readiness surfaces the missing year
   // (MARKET_CALENDAR_COVERAGE_MISSING) so operators add the dataset.
   if (
-    scheduleLookup === findMarketSchedule &&
-    !hasMarketCalendarForDate(market, dashedDate)
+    scheduleLookup === findEffectiveMarketSchedule &&
+    !hasEffectiveMarketCalendarForDate(market, dashedDate)
   ) {
     return null;
   }
@@ -129,7 +129,7 @@ export function findLatestCompletedMarketSession(
   asset: MarketCalendarAsset,
   now: Date,
   maxLookbackDays: number,
-  scheduleLookup: typeof findMarketSchedule = findMarketSchedule,
+  scheduleLookup: typeof findEffectiveMarketSchedule = findEffectiveMarketSchedule,
 ): MarketSessionWindow | null {
   const market = resolveCalendarMarket(asset);
   if (!market || maxLookbackDays < 1) return null;
@@ -137,8 +137,8 @@ export function findLatestCompletedMarketSession(
   const local = getZonedParts(now, policy.timeZone);
   const referenceDate = compactDate(local.year, local.month, local.day);
   if (
-    scheduleLookup === findMarketSchedule &&
-    !hasMarketCalendarForDate(market, dashed(referenceDate))
+    scheduleLookup === findEffectiveMarketSchedule &&
+    !hasEffectiveMarketCalendarForDate(market, dashed(referenceDate))
   ) {
     return null;
   }
@@ -166,7 +166,7 @@ export function findPreviousMarketSession(
   reference: Date,
   sessionsBack: number,
   maxLookbackDays = 370,
-  scheduleLookup: typeof findMarketSchedule = findMarketSchedule,
+  scheduleLookup: typeof findEffectiveMarketSchedule = findEffectiveMarketSchedule,
 ): MarketSessionWindow | null {
   const market = resolveCalendarMarket(asset);
   if (
@@ -184,8 +184,8 @@ export function findPreviousMarketSession(
   const local = getZonedParts(reference, policy.timeZone);
   const referenceDate = compactDate(local.year, local.month, local.day);
   if (
-    scheduleLookup === findMarketSchedule &&
-    !hasMarketCalendarForDate(market, dashed(referenceDate))
+    scheduleLookup === findEffectiveMarketSchedule &&
+    !hasEffectiveMarketCalendarForDate(market, dashed(referenceDate))
   ) {
     return null;
   }
@@ -206,7 +206,7 @@ export function resolveStockMarketSessionState(
   asset: MarketCalendarAsset,
   now: Date,
   maxLookbackDays = 370,
-  scheduleLookup: typeof findMarketSchedule = findMarketSchedule,
+  scheduleLookup: typeof findEffectiveMarketSchedule = findEffectiveMarketSchedule,
 ): StockMarketSessionState | null {
   const market = resolveCalendarMarket(asset);
   if (!market || Number.isNaN(now.getTime())) return null;
@@ -215,8 +215,8 @@ export function resolveStockMarketSessionState(
   const localDate = compactDate(local.year, local.month, local.day);
   const dashedDate = dashed(localDate);
   if (
-    scheduleLookup === findMarketSchedule &&
-    !hasMarketCalendarForDate(market, dashedDate)
+    scheduleLookup === findEffectiveMarketSchedule &&
+    !hasEffectiveMarketCalendarForDate(market, dashedDate)
   ) {
     return {
       state: 'calendar_unavailable',
@@ -298,7 +298,7 @@ export function inspectMarketSessionsInRange(
   asset: MarketCalendarAsset,
   from: Date,
   to: Date,
-  scheduleLookup: typeof findMarketSchedule = findMarketSchedule,
+  scheduleLookup: typeof findEffectiveMarketSchedule = findEffectiveMarketSchedule,
 ): MarketSessionRangeInspection {
   const market = resolveCalendarMarket(asset);
   if (
@@ -317,8 +317,8 @@ export function inspectMarketSessionsInRange(
   for (let cursor = startDay; cursor <= endDay; cursor += 86_400_000) {
     const localDate = compactDateFromUtcMs(cursor);
     if (
-      scheduleLookup === findMarketSchedule &&
-      !hasMarketCalendarForDate(market, dashed(localDate))
+      scheduleLookup === findEffectiveMarketSchedule &&
+      !hasEffectiveMarketCalendarForDate(market, dashed(localDate))
     ) {
       return { calendarCovered: false, hasTradingSession: false };
     }
@@ -338,14 +338,14 @@ export function inspectMarketSessionsInRange(
 export function findLastMarketSessionOfWeek(
   market: 'KRX' | 'US',
   localDate: string,
-  scheduleLookup: typeof findMarketSchedule = findMarketSchedule,
+  scheduleLookup: typeof findEffectiveMarketSchedule = findEffectiveMarketSchedule,
 ): MarketSessionWindow | null {
   const compact = localDate.replace(/-/gu, '');
   const dateMs = compactDateToUtcMs(compact);
   if (dateMs === null) return null;
   if (
-    scheduleLookup === findMarketSchedule &&
-    !hasMarketCalendarForDate(market, dashed(compact))
+    scheduleLookup === findEffectiveMarketSchedule &&
+    !hasEffectiveMarketCalendarForDate(market, dashed(compact))
   ) {
     return null;
   }
@@ -364,7 +364,7 @@ export function findLastMarketSessionOfWeek(
 
 export function isLastMarketSessionOfWeek(
   session: MarketSessionWindow,
-  scheduleLookup: typeof findMarketSchedule = findMarketSchedule,
+  scheduleLookup: typeof findEffectiveMarketSchedule = findEffectiveMarketSchedule,
 ): boolean {
   return (
     findLastMarketSessionOfWeek(

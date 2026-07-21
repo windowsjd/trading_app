@@ -15,6 +15,10 @@ jest.mock('../generated/prisma/client', () => {
 
 import { AssetType } from '../generated/prisma/client';
 import {
+  applyMarketSessionOverrideSnapshot,
+  resetMarketSessionOverrideStoreForTest,
+} from '../orders/market-calendar/market-session-override.store';
+import {
   MarketCandleAggregationInputError,
   MarketCandleAggregationService,
   type FiveMinuteSourceCandle,
@@ -87,6 +91,80 @@ describe('MarketCandleAggregationService', () => {
       expect(
         thirty.candles.every((bucket) => bucket.expectedConstituentCount === 6),
       ).toBe(true);
+    });
+
+    it('anchors 1h/4h buckets at a CUSTOM delayed open and rejects pre-open rows', () => {
+      try {
+        // Operator override: 2026-07-10 KRX opens at 10:30 KST (01:30Z).
+        applyMarketSessionOverrideSnapshot(
+          [
+            {
+              market: 'KRX',
+              localDate: '2026-07-10',
+              overrideType: 'custom',
+              openTime: '103000',
+              closeTime: '153000',
+              reason: 'delayed open',
+            },
+          ],
+          new Date(),
+        );
+        // 10:30–15:30 KST = 60 five-minute candles.
+        const delayedSession = run('2026-07-10T01:30:00.000Z', 60);
+
+        const hourly = service.aggregateCandles({
+          assetType: AssetType.domestic_stock,
+          interval: '1h',
+          candles: delayedSession,
+          from: dayFrom,
+          to: dayTo,
+          now,
+        });
+        expect(hourly.candles).toHaveLength(5);
+        expect(hourly.candles[0].openTime.toISOString()).toBe(
+          '2026-07-10T01:30:00.000Z',
+        );
+        expect(
+          hourly.candles.every(
+            (bucket) => bucket.expectedConstituentCount === 12,
+          ),
+        ).toBe(true);
+
+        const fourHour = service.aggregateCandles({
+          assetType: AssetType.domestic_stock,
+          interval: '4h',
+          candles: delayedSession,
+          from: dayFrom,
+          to: dayTo,
+          now,
+        });
+        expect(fourHour.candles).toHaveLength(2);
+        expect(fourHour.candles[0].openTime.toISOString()).toBe(
+          '2026-07-10T01:30:00.000Z',
+        );
+        // Final bucket is capped at the session close (05:30–06:30Z).
+        expect(fourHour.candles[1].closeTime.toISOString()).toBe(
+          '2026-07-10T06:30:00.000Z',
+        );
+
+        // Rows stamped before the delayed open (09:00 KST anchor rows) do not
+        // create synthetic pre-open buckets — they are rejected.
+        const withPreOpenRows = service.aggregateCandles({
+          assetType: AssetType.domestic_stock,
+          interval: '1h',
+          candles: [...run('2026-07-10T00:00:00.000Z', 6), ...delayedSession],
+          from: dayFrom,
+          to: dayTo,
+          now,
+        });
+        expect(withPreOpenRows.candles).toHaveLength(5);
+        expect(withPreOpenRows.candles[0].openTime.toISOString()).toBe(
+          '2026-07-10T01:30:00.000Z',
+        );
+        expect(withPreOpenRows.ignoredSourceRows).toBe(6);
+      } finally {
+        resetMarketSessionOverrideStoreForTest();
+      }
     });
 
     it('caps the final 1h bucket at the 15:30 session end (partial session bucket)', () => {

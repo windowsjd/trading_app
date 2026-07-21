@@ -49,6 +49,18 @@
 
 모든 주식시장 날짜 계산의 source of truth는 `src/orders/market-calendar/`와 그 2025~2027 KRX·US 데이터다. 데이터가 없는 연도는 평일도 개장으로 추측하지 않고 fail-closed/degraded 처리하며, 런타임 외부 캘린더 API fallback은 사용하지 않는다. 1d·1w 동기화의 365일 lookback과 연초 `prev_open` 계열이 직전 연도 데이터를 요구하므로 readiness 기본 요구 범위는 직전 연도~다음 연도다.
 
+## Market Session Override (Operator DB Layer)
+
+- 외부 시장 캘린더 API(KIS 휴장일, Alpaca Calendar, EODHD 등)는 도입하지 않는다. 관련 env도 추가하지 않는다. 연도별 정적 데이터셋(`src/orders/market-calendar/data`)이 기본 데이터이고, 운영자 DB override(`market_session_overrides`)는 그 위의 예외 계층이다.
+- 최종 우선순위: (1) 활성 DB override → (2) 연도별 정적 캘린더 → (3) 해당 연도 데이터셋 없음이면 `calendar_unavailable`로 fail-closed. override 한 건이 있어도 그 연도의 coverage는 충족되지 않는다(예: 2028·2030처럼 미등록 연도는 자동 추정 없이 fail-closed 유지).
+- coverage 연도 계산은 기존 결정대로 Asia/Seoul 기준 연도이며 readiness 요구 범위(직전 연도~다음 연도)도 그대로다. 연도별 정적 캘린더 갱신 절차: 거래소 공식 공지 검증 → `data/{krx,us}-YYYY.ts` 추가(검증 전이면 version에 `-provisional`) → registry의 DATASETS에 등록 → 공식 공지 확인 후 provisional 제거.
+- override 의미: `regular`는 정적 휴장·시간변경을 취소하고 정규 세션 강제("override 없음"과 내부적으로 구분됨), `closed`는 종일 휴장(provider 호출·캔들·gap·일봉 생성 없음), `custom`은 사용자 지정 개장·종료(지연 개장, 조기/연장 종료). KRX와 US는 독립 판정이고 crypto는 24시간 정책으로 영향받지 않는다.
+- 지연 개장일도 하나의 거래 세션이다. `prev_open`/`prev2_open` 등 세션 개수 의미는 바뀌지 않으며, 지연 개장 때문에 캔들 과거 조회 범위를 추가 세션으로 연장하지 않는다. 세션 내부 계산(버킷 정렬, expected count, 일봉/주봉 종료, scheduler close+grace)은 실제 override 시각을 쓴다.
+- multi-instance 반영: mutation 인스턴스는 커밋 직후 즉시 반영, 다른 인스턴스는 60초 bounded polling으로 반영(최대 지연 ≈ 60초 + 질의 왕복). Redis pub/sub 대신 polling을 택했다(변경 빈도가 낮고 실패 모드가 단순).
+- 장애 정책: cold start 초기 로드 실패 시 조용히 넘어가지 않고 구조화된 error 로그 후 첫 성공까지 주식 캘린더 fail-closed(5초 재시도). 이후 refresh 실패는 last-known-good 유지 + 구조화된 warning. snapshot 변경 시 해당 시장 자산의 캔들 캐시 generation을 bump한다.
+- 긴급 휴장·지연 개장 운영 절차: operator API로 override 등록(사유 필수) → 응답의 `runtimeApplied`와 polling 지연(≤60초) 확인 → 상황 종료 시 삭제가 아니라 비활성화로 기록 보존. 사용자 공지사항은 이 계층과 무관한 별도 운영 절차다.
+- 프론트 표시: stock이 `marketStatus === 'closed'`이고 가격을 표시할 수 없으면 "휴장시간", `unknown`(캘린더 coverage 없음 포함)·provider 미준비·crypto는 "시세 준비 중"을 유지한다. 캘린더 미확인 상태를 휴장으로 표시하지 않기 위해 `calendar_unavailable`은 `marketStatus`에서 `closed`가 아니라 `unknown`으로 매핑한다.
+
 ## Source Type 우선순위
 
 - `provider_api`를 quote/execute/valuation에서 `admin_manual`보다 우선한다. `admin_manual`은 부트스트랩/수동 정정/비상 폴백 용도로만 허용하고 장기 운영 primary source로 쓰지 않는다.

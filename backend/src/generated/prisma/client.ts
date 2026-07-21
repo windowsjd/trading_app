@@ -110,6 +110,11 @@ export type MarketCandle = Prisma.MarketCandleModel
  */
 export type MarketCandleSyncState = Prisma.MarketCandleSyncStateModel
 /**
+ * Model MarketSessionOverride
+ * 
+ */
+export type MarketSessionOverride = Prisma.MarketSessionOverrideModel
+/**
  * Model Position
  * 
  */

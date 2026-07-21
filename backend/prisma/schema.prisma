@@ -203,6 +203,17 @@ enum OpsJobRunStatus {
   locked
 }
 
+enum MarketCalendarMarket {
+  KRX
+  US
+}
+
+enum MarketSessionOverrideType {
+  regular
+  closed
+  custom
+}
+
 enum OpsJobTrigger {
   scheduler
   operator
@@ -616,6 +627,40 @@ model MarketCandleSyncState {
   @@index([assetId, feed, status])
   @@index([status, updatedAt])
   @@map("market_candle_sync_states")
+}
+
+// Operator-managed exception layer over the static per-year market calendar
+// datasets (backend/src/orders/market-calendar/data). localDate is the
+// exchange's local trading date (KRX: Asia/Seoul, US: America/New_York)
+// stored as YYYY-MM-DD text so the exchange-local meaning never shifts with
+// server/DB time zones; openTime/closeTime are exchange-local HHmmss text in
+// the same canonical format the static datasets use. `regular` cancels a
+// static closure/session override and forces the default session; `closed`
+// forces a full-day closure; `custom` sets explicit open/close times (both
+// required, open < close — enforced by CHECK constraints in the migration).
+// An override never grants calendar coverage for its year: dates in years
+// without a static dataset stay fail-closed (calendar_unavailable). Rows are
+// deactivated (isActive=false) instead of deleted to preserve operational
+// history.
+model MarketSessionOverride {
+  id              String                    @id @default(uuid())
+  market          MarketCalendarMarket
+  localDate       String                    @map("local_date")
+  overrideType    MarketSessionOverrideType @map("override_type")
+  openTime        String?                   @map("open_time")
+  closeTime       String?                   @map("close_time")
+  reason          String
+  source          String?
+  isActive        Boolean                   @default(true) @map("is_active")
+  createdByUserId String                    @map("created_by_user_id")
+  updatedByUserId String                    @map("updated_by_user_id")
+  createdAt       DateTime                  @default(now()) @map("created_at")
+  updatedAt       DateTime                  @updatedAt @map("updated_at")
+
+  @@unique([market, localDate])
+  @@index([isActive, market, localDate])
+  @@index([localDate])
+  @@map("market_session_overrides")
 }
 
 model Position {

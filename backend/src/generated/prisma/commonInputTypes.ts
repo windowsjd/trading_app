@@ -545,6 +545,40 @@ export type EnumMarketCandleSyncStatusWithAggregatesFilter<$PrismaModel = never>
   _max?: Prisma.NestedEnumMarketCandleSyncStatusFilter<$PrismaModel>
 }
 
+export type EnumMarketCalendarMarketFilter<$PrismaModel = never> = {
+  equals?: $Enums.MarketCalendarMarket | Prisma.EnumMarketCalendarMarketFieldRefInput<$PrismaModel>
+  in?: $Enums.MarketCalendarMarket[] | Prisma.ListEnumMarketCalendarMarketFieldRefInput<$PrismaModel>
+  notIn?: $Enums.MarketCalendarMarket[] | Prisma.ListEnumMarketCalendarMarketFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumMarketCalendarMarketFilter<$PrismaModel> | $Enums.MarketCalendarMarket
+}
+
+export type EnumMarketSessionOverrideTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.MarketSessionOverrideType | Prisma.EnumMarketSessionOverrideTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.MarketSessionOverrideType[] | Prisma.ListEnumMarketSessionOverrideTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.MarketSessionOverrideType[] | Prisma.ListEnumMarketSessionOverrideTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumMarketSessionOverrideTypeFilter<$PrismaModel> | $Enums.MarketSessionOverrideType
+}
+
+export type EnumMarketCalendarMarketWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.MarketCalendarMarket | Prisma.EnumMarketCalendarMarketFieldRefInput<$PrismaModel>
+  in?: $Enums.MarketCalendarMarket[] | Prisma.ListEnumMarketCalendarMarketFieldRefInput<$PrismaModel>
+  notIn?: $Enums.MarketCalendarMarket[] | Prisma.ListEnumMarketCalendarMarketFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumMarketCalendarMarketWithAggregatesFilter<$PrismaModel> | $Enums.MarketCalendarMarket
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumMarketCalendarMarketFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumMarketCalendarMarketFilter<$PrismaModel>
+}
+
+export type EnumMarketSessionOverrideTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.MarketSessionOverrideType | Prisma.EnumMarketSessionOverrideTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.MarketSessionOverrideType[] | Prisma.ListEnumMarketSessionOverrideTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.MarketSessionOverrideType[] | Prisma.ListEnumMarketSessionOverrideTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumMarketSessionOverrideTypeWithAggregatesFilter<$PrismaModel> | $Enums.MarketSessionOverrideType
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumMarketSessionOverrideTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumMarketSessionOverrideTypeFilter<$PrismaModel>
+}
+
 export type EnumOrderSideFilter<$PrismaModel = never> = {
   equals?: $Enums.OrderSide | Prisma.EnumOrderSideFieldRefInput<$PrismaModel>
   in?: $Enums.OrderSide[] | Prisma.ListEnumOrderSideFieldRefInput<$PrismaModel>
@@ -1383,6 +1417,40 @@ export type NestedEnumMarketCandleSyncStatusWithAggregatesFilter<$PrismaModel = 
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumMarketCandleSyncStatusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumMarketCandleSyncStatusFilter<$PrismaModel>
+}
+
+export type NestedEnumMarketCalendarMarketFilter<$PrismaModel = never> = {
+  equals?: $Enums.MarketCalendarMarket | Prisma.EnumMarketCalendarMarketFieldRefInput<$PrismaModel>
+  in?: $Enums.MarketCalendarMarket[] | Prisma.ListEnumMarketCalendarMarketFieldRefInput<$PrismaModel>
+  notIn?: $Enums.MarketCalendarMarket[] | Prisma.ListEnumMarketCalendarMarketFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumMarketCalendarMarketFilter<$PrismaModel> | $Enums.MarketCalendarMarket
+}
+
+export type NestedEnumMarketSessionOverrideTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.MarketSessionOverrideType | Prisma.EnumMarketSessionOverrideTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.MarketSessionOverrideType[] | Prisma.ListEnumMarketSessionOverrideTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.MarketSessionOverrideType[] | Prisma.ListEnumMarketSessionOverrideTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumMarketSessionOverrideTypeFilter<$PrismaModel> | $Enums.MarketSessionOverrideType
+}
+
+export type NestedEnumMarketCalendarMarketWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.MarketCalendarMarket | Prisma.EnumMarketCalendarMarketFieldRefInput<$PrismaModel>
+  in?: $Enums.MarketCalendarMarket[] | Prisma.ListEnumMarketCalendarMarketFieldRefInput<$PrismaModel>
+  notIn?: $Enums.MarketCalendarMarket[] | Prisma.ListEnumMarketCalendarMarketFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumMarketCalendarMarketWithAggregatesFilter<$PrismaModel> | $Enums.MarketCalendarMarket
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumMarketCalendarMarketFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumMarketCalendarMarketFilter<$PrismaModel>
+}
+
+export type NestedEnumMarketSessionOverrideTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.MarketSessionOverrideType | Prisma.EnumMarketSessionOverrideTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.MarketSessionOverrideType[] | Prisma.ListEnumMarketSessionOverrideTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.MarketSessionOverrideType[] | Prisma.ListEnumMarketSessionOverrideTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumMarketSessionOverrideTypeWithAggregatesFilter<$PrismaModel> | $Enums.MarketSessionOverrideType
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumMarketSessionOverrideTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumMarketSessionOverrideTypeFilter<$PrismaModel>
 }
 
 export type NestedEnumOrderSideFilter<$PrismaModel = never> = {

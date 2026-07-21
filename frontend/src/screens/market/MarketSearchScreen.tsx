@@ -20,7 +20,11 @@ import {
   type AssetType,
   type MarketAssetItemDto,
 } from '../../features/market/api';
-import { formatMoney, formatPercent, getAssetNameDisplay } from '../../utils/format';
+import {
+  formatPercent,
+  getAssetNameDisplay,
+  getAssetPriceText,
+} from '../../utils/format';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -35,14 +39,6 @@ const SEARCH_SCOPE: Array<{ key: SearchScope; label: string }> = [
   { key: 'us_stock', label: '미국' },
   { key: 'crypto', label: '암호화폐' },
 ];
-
-function getPriceText(item: MarketAssetItemDto) {
-  if (item.price?.state !== 'available' || !item.price.currentPrice) {
-    return '시세 준비 중';
-  }
-
-  return formatMoney(item.price.currentPrice, item.price.priceCurrency);
-}
 
 function getChangeRateText(item: MarketAssetItemDto) {
   if (item.price?.state !== 'available' || !item.price.changeRate) {
@@ -204,7 +200,7 @@ export default function MarketSearchScreen({ navigation }: Props) {
             </View>
 
             <View style={styles.alignEnd}>
-              <Text style={styles.itemPrice}>{getPriceText(item)}</Text>
+              <Text style={styles.itemPrice}>{getAssetPriceText(item)}</Text>
               <Text style={styles.helper}>{getChangeRateText(item)}</Text>
               <Text style={styles.helper}>
                 {item.marketStatus} · {item.tradable ? '거래 가능' : '거래 제한'}

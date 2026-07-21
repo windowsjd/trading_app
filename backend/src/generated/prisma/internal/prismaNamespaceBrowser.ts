@@ -65,6 +65,7 @@ export const ModelName = {
   AssetOrderbookSnapshot: 'AssetOrderbookSnapshot',
   MarketCandle: 'MarketCandle',
   MarketCandleSyncState: 'MarketCandleSyncState',
+  MarketSessionOverride: 'MarketSessionOverride',
   Position: 'Position',
   Order: 'Order',
   CashWallet: 'CashWallet',
@@ -376,6 +377,25 @@ export const MarketCandleSyncStateScalarFieldEnum = {
 } as const
 
 export type MarketCandleSyncStateScalarFieldEnum = (typeof MarketCandleSyncStateScalarFieldEnum)[keyof typeof MarketCandleSyncStateScalarFieldEnum]
+
+
+export const MarketSessionOverrideScalarFieldEnum = {
+  id: 'id',
+  market: 'market',
+  localDate: 'localDate',
+  overrideType: 'overrideType',
+  openTime: 'openTime',
+  closeTime: 'closeTime',
+  reason: 'reason',
+  source: 'source',
+  isActive: 'isActive',
+  createdByUserId: 'createdByUserId',
+  updatedByUserId: 'updatedByUserId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type MarketSessionOverrideScalarFieldEnum = (typeof MarketSessionOverrideScalarFieldEnum)[keyof typeof MarketSessionOverrideScalarFieldEnum]
 
 
 export const PositionScalarFieldEnum = {

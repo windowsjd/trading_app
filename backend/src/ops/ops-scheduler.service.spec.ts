@@ -54,6 +54,10 @@ jest.mock('../assets/market-candle-reconciliation.service', () => ({
 }));
 
 import { OpsJobName, OpsJobRunStatus } from '../generated/prisma/client';
+import {
+  applyMarketSessionOverrideSnapshot,
+  resetMarketSessionOverrideStoreForTest,
+} from '../orders/market-calendar/market-session-override.store';
 import { getOpsSchedulerConfig } from './ops-config';
 import { OpsSchedulerService } from './ops-scheduler.service';
 
@@ -550,6 +554,80 @@ describe('OpsSchedulerService', () => {
         }) as Record<string, unknown>,
       }),
     );
+  });
+
+  it('uses a CUSTOM override close plus grace instead of the regular close', async () => {
+    process.env.CANDLE_RECONCILIATION_KRX_ENABLED = 'true';
+    try {
+      // Operator override: KRX 2026-07-13 closes early at 14:00 KST (05:00Z);
+      // reconciliation is due at close + 20 minutes grace, NOT at 15:30 KST.
+      applyMarketSessionOverrideSnapshot(
+        [
+          {
+            market: 'KRX',
+            localDate: '2026-07-13',
+            overrideType: 'custom',
+            openTime: '090000',
+            closeTime: '140000',
+            reason: 'early close override',
+          },
+        ],
+        new Date(),
+      );
+      const { runner, service } = createService();
+
+      await expect(
+        service.runEnabledJobs(new Date('2026-07-13T05:19:00.000Z')),
+      ).resolves.toEqual([]);
+      expect(runner.runMarketCandleReconciliationJob).not.toHaveBeenCalled();
+
+      await service.runEnabledJobs(new Date('2026-07-13T05:20:00.000Z'));
+      expect(runner.runMarketCandleReconciliationJob).toHaveBeenCalledWith(
+        expect.objectContaining({
+          market: 'KRX',
+          metadataJson: expect.objectContaining({
+            businessDate: '2026-07-13',
+          }) as Record<string, unknown>,
+        }),
+      );
+    } finally {
+      resetMarketSessionOverrideStoreForTest();
+    }
+  });
+
+  it('treats an override-closed day as scheduled no-data (no provider work, no warning)', async () => {
+    process.env.CANDLE_RECONCILIATION_KRX_ENABLED = 'true';
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      applyMarketSessionOverrideSnapshot(
+        [
+          {
+            market: 'KRX',
+            localDate: '2026-07-13',
+            overrideType: 'closed',
+            openTime: null,
+            closeTime: null,
+            reason: 'emergency closure',
+          },
+        ],
+        new Date(),
+      );
+      const { runner, service } = createService();
+
+      await service.runEnabledJobs(new Date('2026-07-13T08:00:00.000Z'));
+      expect(runner.runMarketCandleReconciliationJob).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          market: 'KRX',
+          metadataJson: expect.objectContaining({
+            businessDate: '2026-07-13',
+          }) as Record<string, unknown>,
+        }),
+      );
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+      resetMarketSessionOverrideStoreForTest();
+    }
   });
 
   it('observes calendar-unavailable on startup catch-up instead of silently skipping', async () => {
