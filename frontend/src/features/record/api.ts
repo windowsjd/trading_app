@@ -8,7 +8,11 @@ import type {
   RateString,
 } from '../../models/dto/common';
 import { formatCurrency, getAssetNameDisplay } from '../../utils/format';
-import { getOrderStatusLabel, isOpenLimitBuyOrder } from './openOrder';
+import {
+  getOrderStatusLabel,
+  hasNoExecutionResult,
+  isOpenLimitBuyOrder,
+} from './openOrder';
 
 export interface RecordSeasonListItemDto {
   seasonId: string;
@@ -223,6 +227,10 @@ export { isOpenLimitBuyOrder } from './openOrder';
 export function getRecordOrderDisplay(item: RecordOrderItemDto) {
   const currencyCode = item.currencyCode ?? item.fillCurrency ?? '';
   const nameDisplay = getAssetNameDisplay({ name: item.name, symbol: item.symbol });
+  // Submitted/canceled limit rows never filled, so their execution-result
+  // amounts are suppressed here rather than trusted to arrive null — the
+  // reservation figures are what such a row is allowed to show.
+  const noExecutionResult = hasNoExecutionResult(item);
 
   return {
     key: item.orderId ?? item.id ?? `${item.assetId ?? item.symbol}-${item.executedAt}`,
@@ -243,12 +251,17 @@ export function getRecordOrderDisplay(item: RecordOrderItemDto) {
       : null,
     submittedAt: item.submittedAt ?? '-',
     quantity: item.quantity,
-    price: formatCurrency(
-      item.price ?? item.executedPrice ?? item.fillPriceLocal,
-      currencyCode,
-    ),
+    price: noExecutionResult
+      ? formatCurrency(item.limitPrice, currencyCode)
+      : formatCurrency(
+          item.price ?? item.executedPrice ?? item.fillPriceLocal,
+          currencyCode,
+        ),
     currencyCode,
-    netAmount: formatCurrency(item.netAmount ?? item.netAmountLocal, currencyCode),
+    hasNoExecutionResult: noExecutionResult,
+    netAmount: noExecutionResult
+      ? null
+      : formatCurrency(item.netAmount ?? item.netAmountLocal, currencyCode),
   };
 }
 

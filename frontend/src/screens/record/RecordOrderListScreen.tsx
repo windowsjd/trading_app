@@ -211,17 +211,24 @@ export default function RecordOrderListScreen({ route }: Props) {
                 <View style={styles.alignEnd}>
                   <Text style={styles.helper}>수량 {display.quantity}</Text>
                   <Text style={styles.helper}>
-                    가격 {display.isLimitOrder && display.limitPrice
+                    {display.hasNoExecutionResult ? '지정가' : '가격'}{' '}
+                    {display.isLimitOrder && display.limitPrice
                       ? display.limitPrice
                       : display.price}{' '}
                     {display.currencyCode}
                   </Text>
-                  {display.reservedAmount && display.isOpenLimitBuy ? (
-                    <Text style={styles.helper}>
-                      예약금 {display.reservedAmount}
+                  {/* A limit row that never filled (submitted or canceled)
+                      has no execution amounts: its headline figure is the
+                      reservation, labeled as such. netAmount is an ACTUAL
+                      fill result and appears only once the order executed. */}
+                  {display.hasNoExecutionResult ? (
+                    <Text style={styles.itemTitle}>
+                      {display.isOpenLimitBuy ? '예약금' : '예약금 (해제)'}{' '}
+                      {display.reservedAmount ?? '-'}
                     </Text>
-                  ) : null}
-                  <Text style={styles.itemTitle}>{display.netAmount}</Text>
+                  ) : (
+                    <Text style={styles.itemTitle}>{display.netAmount}</Text>
+                  )}
                 </View>
               </View>
 

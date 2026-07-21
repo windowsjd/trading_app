@@ -117,6 +117,9 @@ import { LimitOrderCreateService } from './limit-order-create.service';
 import { OrderReservationService } from './order-reservation.service';
 import { OrdersService } from './orders.service';
 
+const toNullableDecimal = (value: string | null | undefined) =>
+  value === null || value === undefined ? null : new Prisma.Decimal(value);
+
 describe('limit buy quote/create (phase 1: reservation only)', () => {
   // 2026-05-07 is a regular Thursday: KRX session 00:00-06:30Z (09:00-15:30
   // KST). krxOpenAt is in-session; krxClosedAt is after the close.
@@ -179,7 +182,22 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       findFirst: jest.fn(),
     },
     quote: {
-      create: jest.fn().mockResolvedValue({ id: 'quote-limit-1' }),
+      // Echo the persisted reservation basis back the way Prisma returns
+      // selected columns, so the quote response is asserted against what was
+      // actually written rather than against the in-memory preview.
+      create: jest
+        .fn()
+        .mockImplementation((args: { data: Record<string, string | null> }) =>
+          Promise.resolve({
+            id: 'quote-limit-1',
+            quotedFeeRate: toNullableDecimal(args.data.quotedFeeRate),
+            quotedGrossAmount: toNullableDecimal(args.data.quotedGrossAmount),
+            quotedFeeAmount: toNullableDecimal(args.data.quotedFeeAmount),
+            quotedReservedAmount: toNullableDecimal(
+              args.data.quotedReservedAmount,
+            ),
+          }),
+        ),
       findFirst: jest.fn(),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
@@ -196,11 +214,68 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
     $queryRaw: jest.fn().mockResolvedValue([]),
   });
 
+  /**
+   * Default answers for the create transaction's `SELECT ... FOR SHARE/UPDATE`
+   * row locks. Dispatches on the SQL text so a test can still override one
+   * specific lock (e.g. an excluded participant) with `mockResolvedValueOnce`,
+   * which jest consumes before this implementation. Order-row locks used by
+   * the cancel paths keep falling through to `[]`.
+   */
+  const mockLockedRows = (
+    prisma: ReturnType<typeof createPrisma>,
+    overrides: {
+      participantStatus?: ParticipantStatus;
+      seasonStatus?: SeasonStatus;
+      seasonStartAt?: Date;
+      seasonEndAt?: Date;
+      participantUserId?: string;
+      /** Live season fee rate at CREATE time; must never reach a reservation. */
+      tradeFeeRate?: string;
+    } = {},
+  ) => {
+    prisma.$queryRaw.mockImplementation((template: unknown) => {
+      const sql = Array.isArray(template) ? template.join(' ? ') : '';
+
+      if (sql.includes('"season_participants"')) {
+        return Promise.resolve([
+          {
+            id: 'sp-1',
+            season_id: 'season-1',
+            user_id: overrides.participantUserId ?? 'user-1',
+            participant_status:
+              overrides.participantStatus ?? ParticipantStatus.active,
+          },
+        ]);
+      }
+
+      if (sql.includes('"seasons"')) {
+        return Promise.resolve([
+          {
+            id: 'season-1',
+            status: overrides.seasonStatus ?? SeasonStatus.active,
+            start_at: overrides.seasonStartAt ?? startAt,
+            end_at: overrides.seasonEndAt ?? endAt,
+            trade_fee_rate: new Prisma.Decimal(
+              overrides.tradeFeeRate ?? '0.001000',
+            ),
+          },
+        ]);
+      }
+
+      if (sql.includes('"quotes"')) {
+        return Promise.resolve([{ id: 'quote-limit-1' }]);
+      }
+
+      return Promise.resolve([]);
+    });
+  };
+
   const createService = () => {
     const prisma = createPrisma();
     prisma.$transaction.mockImplementation(async (callback: never) =>
       (callback as (tx: unknown) => Promise<unknown>)(prisma),
     );
+    mockLockedRows(prisma);
     const reservation = new OrderReservationService();
     const service = new OrdersService(
       prisma as never,
@@ -445,6 +520,77 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       });
     });
 
+    it('pins the reservation basis on the durable quote and returns it', async () => {
+      const { prisma, service } = createService();
+      mockQuoteContext(prisma);
+
+      const response = await service.quoteOrder('user-1', limitQuoteBody);
+
+      // Persisted on the quote row: create reserves exactly these numbers.
+      expect(prisma.quote.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            quotedFeeRate: '0.001000',
+            quotedGrossAmount: '150000.00000000',
+            quotedFeeAmount: '150.00000000',
+            quotedReservedAmount: '150150.00000000',
+          }) as never,
+        }),
+      );
+      // ...and echoed back to the client under explicit quoted* names, with
+      // reservedAmount kept as the existing alias.
+      expect(response.data).toMatchObject({
+        quotedFeeRate: '0.001000',
+        quotedGrossAmount: '150000.00000000',
+        quotedFeeAmount: '150.00000000',
+        quotedReservedAmount: '150150.00000000',
+        reservedAmount: '150150.00000000',
+      });
+    });
+
+    it('leaves the reservation basis null on a market quote', async () => {
+      const { prisma, service } = createService();
+      prisma.season.findFirst.mockResolvedValueOnce(activeSeason);
+      prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
+      prisma.asset.findUnique.mockResolvedValueOnce(krxAsset);
+      prisma.assetPriceSnapshot.findFirst.mockResolvedValueOnce({
+        id: 'aps-1',
+        assetId: 'asset-1',
+        price: new Prisma.Decimal('50000.00000000'),
+        currencyCode: CurrencyCode.KRW,
+        sourceType: 'provider_api',
+        effectiveAt: krxOpenAt,
+        createdAt: krxOpenAt,
+      });
+      prisma.cashWallet.findUnique.mockResolvedValueOnce({
+        balanceAmount: new Prisma.Decimal('1000000.00000000'),
+        reservedAmount: new Prisma.Decimal('0'),
+      });
+      prisma.position.findUnique.mockResolvedValueOnce(null);
+
+      await service.quoteOrder('user-1', {
+        assetId: 'asset-1',
+        side: 'buy',
+        orderType: 'market',
+        quantity: '3.000000',
+        currencyCode: CurrencyCode.KRW,
+      });
+
+      // Market quotes keep repricing at execute; they must not carry a pinned
+      // reservation basis.
+      expect(prisma.quote.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            orderType: OrderType.market,
+            quotedFeeRate: null,
+            quotedGrossAmount: null,
+            quotedFeeAmount: null,
+            quotedReservedAmount: null,
+          }) as never,
+        }),
+      );
+    });
+
     it('rejects limit quotes with LIMIT_ORDER_DISABLED when the flag is off', async () => {
       process.env.LIMIT_ORDER_ENABLED = 'false';
       const { prisma, service } = createService();
@@ -472,6 +618,12 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       limitPrice: new Prisma.Decimal('50000.00000000'),
       currencyCode: CurrencyCode.KRW,
       quotedPrice: new Prisma.Decimal('50000.00000000'),
+      // Reservation basis pinned at quote time: 3 x 50000 = 150000 gross,
+      // 0.1% fee = 150, reserved 150150.
+      quotedFeeRate: new Prisma.Decimal('0.001000'),
+      quotedGrossAmount: new Prisma.Decimal('150000.00000000'),
+      quotedFeeAmount: new Prisma.Decimal('150.00000000'),
+      quotedReservedAmount: new Prisma.Decimal('150150.00000000'),
       assetPriceSnapshotId: null,
       fxRateSnapshotId: null,
       expiresAt: new Date(Date.now() + 15_000),
@@ -499,9 +651,11 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       limitPrice: new Prisma.Decimal('50000.00000000'),
       executedPrice: null,
       currencyCode: CurrencyCode.KRW,
-      grossAmount: new Prisma.Decimal('150000.00000000'),
-      feeAmount: new Prisma.Decimal('150.00000000'),
-      netAmount: new Prisma.Decimal('150150.00000000'),
+      // No fill exists for a submitted limit order, so the execution-result
+      // columns are null; the reservation is the only monetary fact.
+      grossAmount: null,
+      feeAmount: null,
+      netAmount: null,
       assetPriceSnapshotId: null,
       fxRateSnapshotId: null,
       reservedAmount: new Prisma.Decimal('150150.00000000'),
@@ -610,6 +764,191 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       expect(prisma.assetPriceSnapshot.findMany).not.toHaveBeenCalled();
     });
 
+    it('leaves every execution-result field null on a submitted limit order', async () => {
+      const { prisma, service } = createService();
+      mockCreateContext(prisma);
+
+      const response = await service.createOrder('user-1', limitCreateBody);
+
+      // The API payload must not present an unfilled order as if it filled.
+      expect(response.data.order).toMatchObject({
+        status: OrderStatus.submitted,
+        grossAmount: null,
+        feeAmount: null,
+        netAmount: null,
+        executedPrice: null,
+        executedAt: null,
+        reservedAmount: '150150.00000000',
+      });
+      expect(response.data.execution.reservationFeeRate).toBe('0.001000');
+
+      // ...and neither must the stored row.
+      expect(prisma.order.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            grossAmount: null,
+            feeAmount: null,
+            netAmount: null,
+            executedPrice: null,
+            executedAt: null,
+            reservedAmount: '150150.00000000',
+            reservationFeeRate: '0.001000',
+          }) as never,
+        }),
+      );
+    });
+
+    it('reserves the QUOTED fee rate even after the season fee rate changes', async () => {
+      const { prisma, service } = createService();
+      // The quote was taken at 0.1%. Between quote and create an operator
+      // raised the season fee to 5% — both the pre-transaction season read and
+      // the locked season row now report 0.05.
+      mockCreateContext(prisma);
+      prisma.season.findFirst.mockReset();
+      prisma.season.findFirst.mockResolvedValueOnce({
+        ...activeSeason,
+        tradeFeeRate: new Prisma.Decimal('0.050000'),
+      });
+      mockLockedRows(prisma, { tradeFeeRate: '0.050000' });
+
+      const response = await service.createOrder('user-1', limitCreateBody);
+
+      // 5% would have reserved 157500; the quote's 0.1% basis wins.
+      expect(response.data.execution).toMatchObject({
+        reservedAmount: '150150.00000000',
+        reservationFeeRate: '0.001000',
+      });
+      expect(
+        (prisma.$executeRaw.mock.calls[0] as unknown[]).slice(1, 2),
+      ).toEqual(['150150.00000000']);
+      expect(prisma.order.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            reservedAmount: '150150.00000000',
+            reservationFeeRate: '0.001000',
+          }) as never,
+        }),
+      );
+    });
+
+    it('refuses to create when the quote carries no pinned reservation basis', async () => {
+      const { prisma, service } = createService();
+      mockCreateContext(prisma);
+      // A quote row written before the reservation basis existed: create must
+      // reject rather than silently reprice against the live season fee rate.
+      prisma.quote.findFirst.mockReset();
+      prisma.quote.findFirst.mockResolvedValueOnce(
+        activeQuoteRecord({
+          quotedFeeRate: null,
+          quotedGrossAmount: null,
+          quotedFeeAmount: null,
+          quotedReservedAmount: null,
+        }),
+      );
+
+      await expectErrorCode(
+        service.createOrder('user-1', limitCreateBody),
+        'QUOTE_RESERVATION_BASIS_INVALID',
+      );
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+      expect(prisma.order.create).not.toHaveBeenCalled();
+    });
+
+    it('refuses a quote whose stored basis contradicts limitPrice x quantity', async () => {
+      const { prisma, service } = createService();
+      mockCreateContext(prisma);
+      prisma.quote.findFirst.mockReset();
+      prisma.quote.findFirst.mockResolvedValueOnce(
+        activeQuoteRecord({
+          quotedReservedAmount: new Prisma.Decimal('1.00000000'),
+        }),
+      );
+
+      await expectErrorCode(
+        service.createOrder('user-1', limitCreateBody),
+        'QUOTE_RESERVATION_BASIS_INVALID',
+      );
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    });
+
+    it('locks the quote, participant and season rows before reserving', async () => {
+      const { prisma, service } = createService();
+      mockCreateContext(prisma);
+
+      await service.createOrder('user-1', limitCreateBody);
+
+      const lockSql = (
+        prisma.$queryRaw.mock.calls as unknown as string[][][]
+      ).map((call) => call[0].join(' ? ').replace(/\s+/g, ' '));
+      // Order matters: Quote -> SeasonParticipant -> Season, then the wallet
+      // guard. Participant before season is what keeps this compatible with
+      // settlement, which locks participant rows before the season row.
+      expect(lockSql[0]).toContain('FROM "quotes"');
+      expect(lockSql[0]).toContain('FOR UPDATE');
+      expect(lockSql[1]).toContain('FROM "season_participants"');
+      expect(lockSql[1]).toContain('FOR SHARE');
+      expect(lockSql[2]).toContain('FROM "seasons"');
+      expect(lockSql[2]).toContain('FOR SHARE');
+    });
+
+    it('fails inside the transaction when the participant was excluded after the pre-check', async () => {
+      const { prisma, service } = createService();
+      mockCreateContext(prisma);
+      // Pre-transaction read still says active (the operator committed the
+      // exclusion in the gap); the LOCKED row is the one that decides.
+      mockLockedRows(prisma, {
+        participantStatus: ParticipantStatus.excluded,
+      });
+
+      await expectErrorCode(
+        service.createOrder('user-1', limitCreateBody),
+        'PARTICIPANT_EXCLUDED',
+      );
+      // Nothing was reserved and no order row was written.
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+      expect(prisma.order.create).not.toHaveBeenCalled();
+      expect(prisma.quote.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('fails inside the transaction when the season ended after the pre-check', async () => {
+      const { prisma, service } = createService();
+      mockCreateContext(prisma);
+      mockLockedRows(prisma, { seasonStatus: SeasonStatus.ended });
+
+      await expectErrorCode(
+        service.createOrder('user-1', limitCreateBody),
+        'SEASON_NOT_ACTIVE',
+      );
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+      expect(prisma.order.create).not.toHaveBeenCalled();
+    });
+
+    it('fails inside the transaction when the season end time passed', async () => {
+      const { prisma, service } = createService();
+      mockCreateContext(prisma);
+      mockLockedRows(prisma, {
+        seasonEndAt: new Date(krxOpenAt.getTime() - 1_000),
+      });
+
+      await expectErrorCode(
+        service.createOrder('user-1', limitCreateBody),
+        'SEASON_ENDED',
+      );
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    });
+
+    it('fails inside the transaction when the locked participant belongs to another user', async () => {
+      const { prisma, service } = createService();
+      mockCreateContext(prisma);
+      mockLockedRows(prisma, { participantUserId: 'user-2' });
+
+      await expectErrorCode(
+        service.createOrder('user-1', limitCreateBody),
+        'PARTICIPANT_NOT_FOUND',
+      );
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    });
+
     it('registers a MARKETABLE limit price as submitted too (no immediate execution)', async () => {
       const { prisma, service } = createService();
       // limitPrice far above any plausible market price — still submitted;
@@ -622,6 +961,10 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
           limitPrice: new Prisma.Decimal('99999999.00000000'),
           quotedPrice: new Prisma.Decimal('99999999.00000000'),
           quantity: new Prisma.Decimal('1.000000'),
+          // Basis pinned for THIS quote: 1 x 99999999 gross, 0.1% fee.
+          quotedGrossAmount: new Prisma.Decimal('99999999.00000000'),
+          quotedFeeAmount: new Prisma.Decimal('99999.99900000'),
+          quotedReservedAmount: new Prisma.Decimal('100099998.99900000'),
           requestHash: computeOrderQuoteRequestHash({
             userId: 'user-1',
             seasonParticipantId: 'sp-1',

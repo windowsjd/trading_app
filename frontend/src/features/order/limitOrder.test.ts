@@ -2,13 +2,15 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
+  getLimitQuoteEstimateDisplay,
   getOrderSuccessDisplay,
   isOrderSuccess,
   isSubmittedLimitOrder,
 } from './mapper.ts';
-import type { CreateOrderDto } from './api.ts';
+import type { CreateOrderDto, OrderQuoteDto } from './api.ts';
 import {
   getOrderStatusLabel,
+  hasNoExecutionResult,
   isOpenLimitBuyOrder,
 } from '../record/openOrder.ts';
 import {
@@ -33,9 +35,12 @@ const submittedLimitResult: CreateOrderDto = {
     quantity: '3.000000',
     limitPrice: '50000.00000000',
     currencyCode: 'KRW',
-    grossAmount: '150000.00000000',
-    feeAmount: '150.00000000',
-    netAmount: '150150.00000000',
+    // Nothing filled, so every execution-result column is null server-side.
+    grossAmount: null,
+    feeAmount: null,
+    netAmount: null,
+    executedPrice: null,
+    executedAt: null,
     reservedAmount: '150150.00000000',
     reservationReleasedAt: null,
     submittedAt: '2026-05-07T00:01:00.000Z',
@@ -96,6 +101,123 @@ test('getOrderSuccessDisplay surfaces reservation fields for submitted limit ord
   assert.equal(display.limitPrice, '50,000원');
   assert.equal(display.reservedAmount, '150,150');
   assert.equal(display.quantity, '3.000000');
+});
+
+test('getOrderSuccessDisplay never shows execution amounts for an unfilled limit order', () => {
+  const display = getOrderSuccessDisplay(submittedLimitResult);
+  assert.equal(display.grossAmount, '-');
+  assert.equal(display.feeAmount, '-');
+  assert.equal(display.netAmount, '-');
+  assert.equal(display.executedPrice, '-');
+  assert.equal(display.executedAt, '-');
+  // The reservation IS the order's monetary fact while it is unfilled.
+  assert.equal(display.reservedAmount, '150,150');
+  assert.equal(display.reservationFeeRate, '0.001000');
+});
+
+test('a stale server fill amount cannot leak into a submitted limit display', () => {
+  // Defense in depth: even if a server response carried amounts on a
+  // submitted order, the mapper must not render them as a fill.
+  const display = getOrderSuccessDisplay({
+    ...submittedLimitResult,
+    order: {
+      ...submittedLimitResult.order,
+      grossAmount: '150000.00000000',
+      netAmount: '150150.00000000',
+      executedPrice: '50000.00000000',
+    },
+    execution: {
+      ...submittedLimitResult.execution,
+      grossAmount: '150000.00000000',
+      executedPrice: '50000.00000000',
+      executedAt: '2026-05-07T00:02:00.000Z',
+    },
+  });
+
+  assert.equal(display.grossAmount, '-');
+  assert.equal(display.netAmount, '-');
+  assert.equal(display.executedPrice, '-');
+  assert.equal(display.executedAt, '-');
+});
+
+test('executed market orders keep their real execution amounts', () => {
+  const display = getOrderSuccessDisplay({
+    order: {
+      orderId: 'order-2',
+      side: 'buy',
+      orderType: 'market',
+      status: 'executed',
+      quantity: '3.000000',
+      currencyCode: 'KRW',
+      grossAmount: '150000.00000000',
+      feeAmount: '150.00000000',
+      netAmount: '150150.00000000',
+      asset: { id: 'asset-1', symbol: '005930', name: '삼성전자' },
+    },
+    execution: {
+      state: 'executed',
+      executedPrice: '50000.00000000',
+      executedAt: '2026-05-07T00:01:30.000Z',
+      currencyCode: 'KRW',
+    },
+  } as CreateOrderDto);
+
+  assert.equal(display.isSubmittedLimitOrder, false);
+  assert.equal(display.grossAmount, '150,000');
+  assert.equal(display.feeAmount, '150');
+  assert.equal(display.netAmount, '150,150');
+  assert.equal(display.executedPrice, '50,000원');
+  assert.equal(display.executedAt, '2026-05-07T00:01:30.000Z');
+});
+
+test('limit quote estimates come from the pinned quote basis and are labeled as estimates', () => {
+  const estimate = getLimitQuoteEstimateDisplay({
+    quotedGrossAmount: '150000.00000000',
+    quotedFeeAmount: '150.00000000',
+    quotedFeeRate: '0.001000',
+    quotedReservedAmount: '150150.00000000',
+    currencyCode: 'KRW',
+  } as OrderQuoteDto);
+
+  assert.ok(estimate);
+  assert.equal(estimate.estimatedGrossAmount, '150,000');
+  assert.equal(estimate.estimatedFeeAmount, '150');
+  assert.equal(estimate.quotedFeeRate, '0.001000');
+  assert.equal(estimate.reservedAmount, '150,150');
+});
+
+test('limit quote estimates are absent for a market quote', () => {
+  assert.equal(getLimitQuoteEstimateDisplay(null), null);
+  assert.equal(getLimitQuoteEstimateDisplay(undefined), null);
+  assert.equal(
+    getLimitQuoteEstimateDisplay({ currencyCode: 'KRW' } as OrderQuoteDto),
+    null,
+  );
+});
+
+test('hasNoExecutionResult covers submitted AND canceled limit rows', () => {
+  assert.equal(
+    hasNoExecutionResult({ orderType: 'limit', status: 'submitted' }),
+    true,
+  );
+  assert.equal(
+    hasNoExecutionResult({ orderType: 'limit', status: 'canceled' }),
+    true,
+  );
+  // A market row's amounts keep their historical execution meaning.
+  assert.equal(
+    hasNoExecutionResult({ orderType: 'market', status: 'executed' }),
+    false,
+  );
+  assert.equal(
+    hasNoExecutionResult({ orderType: 'market', status: 'canceled' }),
+    false,
+  );
+  // A future filled limit order does have a result.
+  assert.equal(
+    hasNoExecutionResult({ orderType: 'limit', status: 'executed' }),
+    false,
+  );
 });
 
 test('open limit buy detection requires limit + buy + submitted', () => {

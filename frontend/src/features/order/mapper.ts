@@ -97,11 +97,54 @@ export function isSubmittedLimitOrder(
   return result?.execution?.state === 'submitted';
 }
 
+/**
+ * Quote-time estimates for an unfilled limit buy. These are the ONLY figures
+ * that may be presented as a submitted order's expected cost, and every label
+ * rendering them must say 예상/예약 — nothing here is an execution result.
+ * Returns null for a market quote, which has no pinned reservation basis.
+ */
+export function getLimitQuoteEstimateDisplay(
+  quote?: Pick<
+    OrderQuoteDto,
+    | 'quotedGrossAmount'
+    | 'quotedFeeAmount'
+    | 'quotedFeeRate'
+    | 'quotedReservedAmount'
+    | 'reservedAmount'
+    | 'currencyCode'
+  > | null,
+) {
+  if (!quote) return null;
+
+  const reserved = quote.quotedReservedAmount ?? quote.reservedAmount;
+  if (!quote.quotedGrossAmount && !quote.quotedFeeAmount && !reserved) {
+    return null;
+  }
+
+  return {
+    estimatedGrossAmount: formatCurrency(
+      quote.quotedGrossAmount,
+      quote.currencyCode,
+    ),
+    estimatedFeeAmount: formatCurrency(
+      quote.quotedFeeAmount,
+      quote.currencyCode,
+    ),
+    quotedFeeRate: displayValue(quote.quotedFeeRate),
+    reservedAmount: formatCurrency(reserved, quote.currencyCode),
+  };
+}
+
 export function getOrderSuccessDisplay(result: CreateOrderDto) {
   const order = result.order;
   const execution = result.execution;
   const asset = order.asset;
   const currencyCode = execution.currencyCode ?? order.currencyCode ?? '';
+  // A submitted limit registration has no fill, so every execution-result
+  // field is suppressed at the mapper rather than trusted to stay absent —
+  // a stale server field or a future screen must not be able to render an
+  // unfilled order as if it had executed.
+  const isSubmittedLimit = execution.state === 'submitted';
 
   const assetNameDisplay = asset ? getAssetNameDisplay(asset) : null;
 
@@ -115,19 +158,29 @@ export function getOrderSuccessDisplay(result: CreateOrderDto) {
       : displayValue(order.assetId ?? execution.assetId),
     side: order.side ?? execution.side,
     quantity: displayValue(order.quantity ?? execution.quantity),
-    executedPrice: formatMoney(
-      execution.executedPrice ?? execution.executePrice ?? order.price,
-      currencyCode,
-    ),
+    executedPrice: isSubmittedLimit
+      ? displayValue(null)
+      : formatMoney(
+          execution.executedPrice ?? execution.executePrice ?? order.price,
+          currencyCode,
+        ),
     currencyCode: displayValue(currencyCode),
-    grossAmount: formatCurrency(
-      execution.grossAmount ?? order.grossAmount,
-      currencyCode,
-    ),
-    feeAmount: formatCurrency(execution.feeAmount ?? order.feeAmount, currencyCode),
-    netAmount: formatCurrency(execution.netAmount ?? order.netAmount, currencyCode),
+    grossAmount: isSubmittedLimit
+      ? displayValue(null)
+      : formatCurrency(
+          execution.grossAmount ?? order.grossAmount,
+          currencyCode,
+        ),
+    feeAmount: isSubmittedLimit
+      ? displayValue(null)
+      : formatCurrency(execution.feeAmount ?? order.feeAmount, currencyCode),
+    netAmount: isSubmittedLimit
+      ? displayValue(null)
+      : formatCurrency(execution.netAmount ?? order.netAmount, currencyCode),
     submittedAt: displayValue(execution.submittedAt ?? order.submittedAt),
-    executedAt: displayValue(execution.executedAt),
+    executedAt: isSubmittedLimit
+      ? displayValue(null)
+      : displayValue(execution.executedAt),
     quotedPrice: formatCurrency(execution.quotedPrice, currencyCode),
     executePrice: formatCurrency(execution.executePrice, currencyCode),
     priceChangeBps: displayValue(execution.priceChangeBps),
@@ -145,8 +198,9 @@ export function getOrderSuccessDisplay(result: CreateOrderDto) {
       execution.reservedAmount ?? order.reservedAmount,
       currencyCode,
     ),
+    reservationFeeRate: displayValue(execution.reservationFeeRate),
     isAlreadyExecuted: execution.state === 'already_executed',
-    isSubmittedLimitOrder: execution.state === 'submitted',
+    isSubmittedLimitOrder: isSubmittedLimit,
   };
 }
 

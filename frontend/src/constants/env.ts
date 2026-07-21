@@ -1,4 +1,5 @@
 import { NativeModules, Platform } from 'react-native';
+import { parsePublicBooleanFlag } from './publicFlags';
 
 const API_BASE_PATH = '/api/v1';
 const WS_ENDPOINT_PATH = `${API_BASE_PATH}/ws`;
@@ -7,13 +8,40 @@ const ANDROID_EMULATOR_HOST = '10.0.2.2';
 
 declare const process:
   | {
-      env?: Record<string, string | undefined>;
+      env?: {
+        EXPO_PUBLIC_API_ORIGIN?: string;
+        EXPO_PUBLIC_WS_BASE_URL?: string;
+        EXPO_PUBLIC_LIMIT_ORDER_ENABLED?: string;
+      };
     }
   | undefined;
 
-function getRuntimeEnvValue(key: string) {
-  if (typeof process === 'undefined') return undefined;
-  return process.env?.[key]?.trim();
+/**
+ * EXPO_PUBLIC_* values MUST be read with static dot notation, one expression
+ * per variable. babel-preset-expo's inline-env-vars pass only rewrites member
+ * expressions whose property is a literal starting with `EXPO_PUBLIC_`; a
+ * dynamic `process.env[key]` lookup is invisible to it, so the value never
+ * reaches the bundle and every flag silently reads as unset. Do not refactor
+ * these three reads back behind a key-taking helper.
+ */
+const RAW_API_ORIGIN =
+  typeof process === 'undefined'
+    ? undefined
+    : process.env?.EXPO_PUBLIC_API_ORIGIN;
+
+const RAW_WS_BASE_URL =
+  typeof process === 'undefined'
+    ? undefined
+    : process.env?.EXPO_PUBLIC_WS_BASE_URL;
+
+const RAW_LIMIT_ORDER_ENABLED =
+  typeof process === 'undefined'
+    ? undefined
+    : process.env?.EXPO_PUBLIC_LIMIT_ORDER_ENABLED;
+
+/** Shared normalization applied to an ALREADY statically-read raw value. */
+function normalizeEnvValue(rawValue: string | undefined) {
+  return rawValue?.trim();
 }
 
 function trimTrailingSlash(value: string) {
@@ -83,11 +111,11 @@ function toWsOrigin(apiOrigin: string) {
 }
 
 const apiOrigin = trimTrailingSlash(
-  getRuntimeEnvValue('EXPO_PUBLIC_API_ORIGIN') || getDefaultApiOrigin(),
+  normalizeEnvValue(RAW_API_ORIGIN) || getDefaultApiOrigin(),
 );
 
 const configuredWsBaseUrl = trimTrailingSlash(
-  getRuntimeEnvValue('EXPO_PUBLIC_WS_BASE_URL') ?? '',
+  normalizeEnvValue(RAW_WS_BASE_URL) ?? '',
 );
 
 export const API_BASE_URL = apiOrigin
@@ -102,12 +130,9 @@ export const WS_BASE_URL = configuredWsBaseUrl || toWsOrigin(apiOrigin);
  * market/limit toggle. Existing submitted limit orders stay visible and
  * cancelable in the order history regardless of this flag.
  */
-export const LIMIT_ORDER_ENABLED = (() => {
-  const value = getRuntimeEnvValue('EXPO_PUBLIC_LIMIT_ORDER_ENABLED')
-    ?.trim()
-    .toLowerCase();
-  return value === 'true' || value === '1';
-})();
+export const LIMIT_ORDER_ENABLED = parsePublicBooleanFlag(
+  RAW_LIMIT_ORDER_ENABLED,
+);
 
 export function buildWsUrl(path: string) {
   if (!WS_BASE_URL) return null;

@@ -24,6 +24,13 @@ export const limitOrderErrorCodes = {
   ORDER_NOT_CANCELABLE: 'ORDER_NOT_CANCELABLE',
   /** Concurrent state change defeated the cancel after validation. */
   ORDER_CANCEL_CONFLICT: 'ORDER_CANCEL_CONFLICT',
+  /**
+   * The durable quote does not carry a usable reservation basis (missing,
+   * negative, out-of-range fee rate, or gross/fee/reserved that disagree
+   * with the canonical rounding chain). Create refuses rather than falling
+   * back to the live season fee rate.
+   */
+  QUOTE_RESERVATION_BASIS_INVALID: 'QUOTE_RESERVATION_BASIS_INVALID',
 } as const;
 
 export type LimitOrderErrorCode =
@@ -41,4 +48,5 @@ export const limitOrderErrorHttpStatus: Record<
   ORDER_RESERVATION_INCONSISTENT: HttpStatus.INTERNAL_SERVER_ERROR,
   ORDER_NOT_CANCELABLE: HttpStatus.CONFLICT,
   ORDER_CANCEL_CONFLICT: HttpStatus.CONFLICT,
+  QUOTE_RESERVATION_BASIS_INVALID: HttpStatus.CONFLICT,
 };

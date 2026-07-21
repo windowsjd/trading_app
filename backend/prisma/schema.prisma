@@ -855,6 +855,13 @@ model Quote {
   currencyCode         CurrencyCode? @map("currency_code")
   quotedPrice          Decimal?      @map("quoted_price") @db.Decimal(24, 8)
   quotedRate           Decimal?      @map("quoted_rate") @db.Decimal(18, 8)
+  // Limit-buy reservation basis pinned AT QUOTE TIME (null on market/FX
+  // quotes). Create reserves exactly these amounts, so a Season.tradeFeeRate
+  // change between quote and create can never move the user's reservation.
+  quotedFeeRate        Decimal?      @map("quoted_fee_rate") @db.Decimal(10, 6)
+  quotedGrossAmount    Decimal?      @map("quoted_gross_amount") @db.Decimal(24, 8)
+  quotedFeeAmount      Decimal?      @map("quoted_fee_amount") @db.Decimal(24, 8)
+  quotedReservedAmount Decimal?      @map("quoted_reserved_amount") @db.Decimal(24, 8)
   assetPriceSnapshotId String?       @map("asset_price_snapshot_id")
   fxRateSnapshotId     String?       @map("fx_rate_snapshot_id")
   assetPriceSourceJson Json?         @map("asset_price_source_json")

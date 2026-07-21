@@ -46,6 +46,22 @@ Limit BUY orders exist as a reservation-only foundation behind
   (`cash_wallets.reserved_amount`); `availableAmount = balance - reserved`
   is derived server-side and is the ceiling for EVERY ordinary cash debit
   (market buy, FX source debit).
+- The reservation basis is pinned on the durable quote at QUOTE time
+  (`quotes.quoted_fee_rate/_gross_amount/_fee_amount/_reserved_amount`).
+  Create reserves those stored values and never re-reads the live
+  `Season.tradeFeeRate`, so changing the season fee rate between quote and
+  create cannot move the user's reservation.
+- `grossAmount` / `feeAmount` / `netAmount` / `executedPrice` /
+  `executedAt` mean ACTUAL fill result and are **null** on every
+  `submitted` / `canceled` limit order — there is no fill in this phase.
+  An unfilled order's money is `reservedAmount` (a reservation, not a fill)
+  plus `reservationFeeRate`. Market order amounts are unchanged.
+- Create re-validates the season and the participant against rows locked
+  inside its own transaction (`Quote FOR UPDATE → SeasonParticipant FOR
+  SHARE → Season FOR SHARE → CashWallet`), so a concurrent participant
+  exclusion or season end either loses the race and lets cleanup cancel the
+  new order, or wins it and makes the create fail. Neither can leave a
+  reservation behind.
 - There is NO automatic matching/execution in this phase: a marketable
   limit price is still registered as submitted, no provider price is read,
   and price movement never changes order state. Release paths are user
@@ -56,6 +72,31 @@ Limit BUY orders exist as a reservation-only foundation behind
   never reduce it.
 - Cancel and lifecycle cleanup work even while the flag is off. Do not
   enable the flag in production until the phase-2 execution engine ships.
+- `LIMIT_ORDER_ENABLED` accepts exactly `true` / `false` / `1` / `0`
+  (trimmed, case-insensitive); omitting it means false. Any other value —
+  `yes`, `enabled`, `tru`, an explicitly empty string — **fails startup**
+  rather than being silently treated as off, so a typo can never leave an
+  operator believing the feature is on. On the client side
+  `EXPO_PUBLIC_LIMIT_ORDER_ENABLED` must be read with static dot notation
+  (`process.env.EXPO_PUBLIC_LIMIT_ORDER_ENABLED`) or the Expo bundler will
+  not inline it and the flag always reads as unset.
+
+### Limit order database integration tests (opt-in)
+
+The limit-order suites that need a real PostgreSQL are gated behind one
+switch, so `pnpm test` stays database-free by default:
+
+```bash
+LIMIT_ORDER_RESERVATION_DB_INTEGRATION=1 pnpm exec jest \
+  src/orders/limit-order-reservation.integration.spec.ts \
+  src/orders/limit-order-create-race.integration.spec.ts
+```
+
+The race suite runs create against participant exclusion and against season
+ending with a deliberate stagger so BOTH interleavings occur, and reports the
+outcome counts. It requires `prisma migrate deploy` to have been applied; it
+creates and removes its own users/seasons/participants/wallets/assets and
+never deletes anything it did not create.
 
 ## STOP / Not Implemented
 

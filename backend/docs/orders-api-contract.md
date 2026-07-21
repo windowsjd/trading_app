@@ -302,6 +302,18 @@ This is the FIRST phase of limit orders. Scope is deliberately narrow:
 - Creating a limit buy RESERVES cash (`reservedAmount = grossAmount +
   feeAmount`, computed from `limitPrice × quantity` with the exact
   market-buy rounding chain) and stores the order as `status=submitted`.
+- The reservation basis is PINNED AT QUOTE TIME on the durable quote
+  (`quotedFeeRate`, `quotedGrossAmount`, `quotedFeeAmount`,
+  `quotedReservedAmount`). Create reserves exactly those stored values and
+  never re-reads `Season.tradeFeeRate`, so an operator changing the season
+  fee rate between quote and create cannot move the user's reservation.
+- `grossAmount` / `feeAmount` / `netAmount` / `executedPrice` /
+  `executedAt` mean ACTUAL EXECUTION RESULT. A `submitted` or `canceled`
+  limit order has all of them **null** — phase 1 has no matching engine, so
+  no fill ever exists. An unfilled order's money is `reservedAmount` +
+  `reservationFeeRate` (and, before submitting, the quote's `quoted*`
+  estimates). Market orders keep their existing executed-amount meaning
+  unchanged.
 - **There is NO automatic execution.** No matching engine, no candle/price
   watching, no scheduler. A marketable limit price (above the current
   market price) is still registered as `submitted` — the server never even
@@ -322,7 +334,11 @@ This is the FIRST phase of limit orders. Scope is deliberately narrow:
   QUOTE/CREATE are rejected with `LIMIT_ORDER_DISABLED`, but cancel,
   season-end cleanup, and exclusion cleanup keep working so reserved cash
   can always be released. Keep the flag off in production until the phase-2
-  execution engine ships.
+  execution engine ships. Accepted values are exactly `true` / `false` /
+  `1` / `0` (trimmed, case-insensitive, so `TRUE` and `False` are fine);
+  omitting the variable means false. Any other value — `yes`, `enabled`,
+  `tru`, or an explicitly empty string — **fails startup** instead of being
+  silently read as off.
 - Quote TTL (15s) only bounds how long the quote can be turned into an
   order; the created `submitted` order itself has no expiry (GTC) and is
   unaffected by the quote expiring afterwards.
@@ -350,11 +366,34 @@ quotes). Rejects read-only with `INSUFFICIENT_AVAILABLE_BALANCE` when
 at quote time.
 
 Additive response fields (limit quotes only): `limitPrice`,
-`reservedAmount`, `walletReservedBefore`, `walletAvailableBefore`,
-`estimatedReservedAfter`, `estimatedAvailableAfter`. The existing
-`estimatedWalletBalanceAfter` / `estimatedPositionQuantityAfter` keep their
-market meaning of "as if eventually filled"; registration itself changes
-neither balance nor position.
+`quotedFeeRate`, `quotedGrossAmount`, `quotedFeeAmount`,
+`quotedReservedAmount`, `reservedAmount`, `walletReservedBefore`,
+`walletAvailableBefore`, `estimatedReservedAfter`,
+`estimatedAvailableAfter`. The existing `estimatedWalletBalanceAfter` /
+`estimatedPositionQuantityAfter` keep their market meaning of "as if
+eventually filled"; registration itself changes neither balance nor
+position.
+
+Field meanings:
+
+| Field | Meaning |
+| --- | --- |
+| `limitPrice` | The price the user set. `quotedPrice` equals it. |
+| `quotedFeeRate` | Season fee rate captured AT QUOTE TIME. Create uses this rate, not the live one. |
+| `quotedGrossAmount` | `round8(limitPrice × quantity)` at quote time. An ESTIMATE for an unfilled order, never a fill. |
+| `quotedFeeAmount` | `round8(quotedGrossAmount × quotedFeeRate)`. Also an estimate. |
+| `quotedReservedAmount` | `round8(quotedGrossAmount + quotedFeeAmount)` — the cash create will actually lock. |
+| `reservedAmount` | Pre-existing alias of `quotedReservedAmount`, kept for current clients. |
+| `walletBalanceBefore` | Total owned cash before the reservation. |
+| `walletReservedBefore` | Cash already locked by other submitted limit buys. |
+| `walletAvailableBefore` | `walletBalanceBefore - walletReservedBefore`. |
+| `estimatedReservedAfter` | `walletReservedBefore + quotedReservedAmount`. |
+| `estimatedAvailableAfter` | `walletAvailableBefore - quotedReservedAmount`. |
+
+The generic `grossAmount` / `feeRate` / `feeAmount` / `netAmount` fields
+stay present and carry the same numbers (`netAmount` equals the reservation
+for a limit buy) so existing clients keep working; the `quoted*` names exist
+to state without ambiguity which values are pinned and binding.
 
 ### Limit Create (`POST /api/v1/orders` with `orderType: "limit"`)
 
@@ -363,17 +402,64 @@ covers assetId/side/orderType/quantity/limitPrice/currency/hash). In ONE
 transaction: atomic cash reservation (`balance - reserved >= reservation`
 guarded in the UPDATE itself — two concurrent creates can never double-book
 the same available cash), `submitted` order row (stores `reservedAmount`
-and the registration-time `reservationFeeRate` for the future execution
-phase), quote consumption, and the idempotent response payload. Any failure
-rolls the reservation back. Idempotency: same key + same payload replays
-the stored response; same key + different
-limitPrice/quantity/orderType/assetId → `ORDER_IDEMPOTENCY_CONFLICT`.
+and the quote-time `reservationFeeRate` for the future execution phase),
+quote consumption, and the idempotent response payload. Any failure rolls
+the reservation back. Idempotency: same key + same payload replays the
+stored response; same key + different limitPrice/quantity/orderType/assetId
+→ `ORDER_IDEMPOTENCY_CONFLICT`.
 
-Response: the standard order payload (now with additive `reservedAmount`,
+**In-transaction re-validation and lock order.** The season and participant
+checks that run before the transaction are a fast-fail courtesy only; an
+operator can exclude the participant or end the season in the gap between
+them and the commit. Financial correctness therefore rests on re-reading
+both against LOCKED rows inside the create transaction, in this order:
+
+1. `Quote` — `SELECT ... FOR UPDATE` (serializes two creates on one quote).
+2. `SeasonParticipant` — `SELECT ... FOR SHARE` by id; must exist, belong to
+   the caller, and be `active` (`PARTICIPANT_EXCLUDED` / `PARTICIPANT_NOT_ACTIVE`
+   / `PARTICIPANT_NOT_FOUND`). `seasonId` is read from this locked row.
+3. `Season` — `SELECT ... FOR SHARE` by that id; must be `active` with
+   `startAt <= now < endAt` (`SEASON_NOT_ACTIVE` / `SEASON_NOT_STARTED` /
+   `SEASON_ENDED`).
+4. `CashWallet` — the guarded reservation UPDATE.
+5. `Order` insert, then the quote consume.
+
+`FOR SHARE` (not `FOR UPDATE`) means concurrent creates do not serialize
+against each other, while the exclusion write and the season-ending write —
+both plain UPDATEs, which take `FOR NO KEY UPDATE` — do conflict and must
+wait. Exactly two outcomes are therefore possible for a race, and both are
+safe: either the create commits first and the cleanup then cancels the order
+and releases its reservation, or the exclusion/ending commits first and the
+create fails. An `excluded` participant or an `ended` season can never end
+up holding a new reservation.
+
+The participant is locked BEFORE the season deliberately: settlement locks
+`SeasonParticipant` rows and only then updates `Season`, so locking the
+season first here would invert that order and could deadlock. The
+lifecycle-ending transaction touches `Season` alone, and cancel plus both
+cleanup paths take `Order → CashWallet` without locking Season/participant,
+so no cycle exists with any of them.
+
+Reservation basis: create reads `quotedFeeRate` / `quotedGrossAmount` /
+`quotedFeeAmount` / `quotedReservedAmount` off the quote and re-validates
+them (all present, non-negative, fee rate in `[0, 1]`, and the triple
+re-derivable from the quote's own `limitPrice × quantity` through the
+canonical rounding chain). A quote that fails these checks is rejected with
+`QUOTE_RESERVATION_BASIS_INVALID` (409) — there is deliberately no fallback
+to the live season fee rate, because silently repricing the reservation is
+the exact failure this pinning exists to prevent. `Order.reservedAmount` is
+set to `quotedReservedAmount` and `Order.reservationFeeRate` to
+`quotedFeeRate`.
+
+Response: the standard order payload (with additive `reservedAmount`,
 `reservationReleasedAt`, `cancelReason` fields) plus
 `execution: { state: "submitted", submittedAt, quoteId, reservedAmount,
-reservationFeeRate, duplicate }`. No provider price fields, no
-walletTransactionId, no positionId — nothing was executed.
+reservationFeeRate, duplicate }`. On the order payload
+`status=submitted`, `orderType=limit`, `side=buy`, `limitPrice` and
+`quantity` are set, `reservationReleasedAt` is null, and `grossAmount`,
+`feeAmount`, `netAmount`, `executedPrice`, `executedAt` are all **null** —
+nothing was executed. No provider price fields, no walletTransactionId, no
+positionId.
 
 ## POST /api/v1/orders/:orderId/cancel
 

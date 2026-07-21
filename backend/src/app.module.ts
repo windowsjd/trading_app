@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 import { AssetsModule } from './assets/assets.module';
 import { AuthModule } from './auth/auth.module';
 import { BatchModule } from './batch/batch.module';
+import { validateEnv } from './common/env-validation';
 import { GlobalHttpExceptionFilter } from './common/global-http-exception.filter';
 import { FxModule } from './fx/fx.module';
 import { HomeModule } from './home/home.module';
@@ -29,6 +30,9 @@ import { WalletsModule } from './wallets/wallets.module';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env.local', '.env.development', '.env'],
+      // Rejects misconfigured values at bootstrap rather than degrading
+      // silently at request time (e.g. LIMIT_ORDER_ENABLED=yes).
+      validate: validateEnv,
     }),
     AssetsModule,
     AuthModule,

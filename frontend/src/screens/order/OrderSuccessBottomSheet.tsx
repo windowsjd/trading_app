@@ -3,8 +3,11 @@ import { View, Text, StyleSheet } from 'react-native';
 
 import BottomSheetBackdrop from '../../components/common/BottomSheetBackdrop';
 import CTAButton from '../../components/common/CTAButton';
-import type { CreateOrderDto } from '../../features/order/api';
-import { getOrderSuccessDisplay } from '../../features/order/mapper';
+import type { CreateOrderDto, OrderQuoteDto } from '../../features/order/api';
+import {
+  getLimitQuoteEstimateDisplay,
+  getOrderSuccessDisplay,
+} from '../../features/order/mapper';
 
 interface OrderSuccessBottomSheetProps {
   visible: boolean;
@@ -13,6 +16,12 @@ interface OrderSuccessBottomSheetProps {
   onGoHome: () => void;
   onGoOrderHistory?: () => void;
   payload: CreateOrderDto | null;
+  /**
+   * The quote this order was created from. Supplies the quote-time ESTIMATES
+   * for an unfilled limit buy — the order itself has no gross/fee/net until it
+   * actually fills, which phase 1 never does.
+   */
+  quote?: OrderQuoteDto | null;
 }
 
 export default function OrderSuccessBottomSheet({
@@ -22,9 +31,13 @@ export default function OrderSuccessBottomSheet({
   onGoHome,
   onGoOrderHistory,
   payload,
+  quote,
 }: OrderSuccessBottomSheetProps) {
   const display = payload ? getOrderSuccessDisplay(payload) : null;
   const isSubmittedLimit = display?.isSubmittedLimitOrder === true;
+  const limitEstimate = isSubmittedLimit
+    ? getLimitQuoteEstimateDisplay(quote)
+    : null;
 
   return (
     <BottomSheetBackdrop visible={visible} onClose={onClose}>
@@ -53,9 +66,23 @@ export default function OrderSuccessBottomSheet({
           <Row label="상태" value="미체결" />
           <Row label="지정가" value={display.limitPrice} />
           <Row label="수량" value={display.quantity} />
-          <Row label="총 주문 금액" value={display.grossAmount} />
-          <Row label="수수료" value={display.feeAmount} />
-          <Row label="예약금" value={display.reservedAmount} />
+          {/* Estimates from the quote, never a fill: the labels must keep
+              saying 예상/예약 기준 so an unfilled order is not read as
+              executed. The order's own gross/fee/net stay null until it
+              actually fills. */}
+          {limitEstimate ? (
+            <>
+              <Row
+                label="예상 주문 금액 (견적 기준)"
+                value={limitEstimate.estimatedGrossAmount}
+              />
+              <Row
+                label="예상 수수료 (견적 기준)"
+                value={limitEstimate.estimatedFeeAmount}
+              />
+            </>
+          ) : null}
+          <Row label="예약금 (미체결 예약)" value={display.reservedAmount} />
           <Row label="제출 시각" value={display.submittedAt} />
         </View>
       ) : display ? (

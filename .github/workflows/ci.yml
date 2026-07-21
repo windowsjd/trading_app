@@ -87,6 +87,59 @@ jobs:
       - name: Tests (node --test, Node 24 type stripping)
         run: npm test
 
+  limit-order-db-integration:
+    name: Limit order DB integration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: trading_app
+          POSTGRES_PASSWORD: trading_app_pw
+          POSTGRES_DB: trading_app
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U trading_app"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/trading_app?schema=public
+      # Opt-in switch for the limit-order suites that need a real database.
+      LIMIT_ORDER_RESERVATION_DB_INTEGRATION: '1'
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pnpm
+        run: npm install -g pnpm@10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: backend/pnpm-lock.yaml
+      - name: Install dependencies (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+      - name: Prisma generate
+        run: pnpm exec prisma generate
+      # Also proves every migration — including the additive limit-order quote
+      # basis migration — applies cleanly to a fresh database.
+      - name: Apply migrations
+        run: pnpm exec prisma migrate deploy
+      - name: Verify migrations are fully applied
+        run: pnpm exec prisma migrate status
+      # Reservation atomicity/CHECK constraints, plus create raced against
+      # participant exclusion and season ending. These are the only assertions
+      # that can prove the FOR SHARE locks actually block a concurrent UPDATE,
+      # so a mock-only run would not substitute for them.
+      - name: Limit order reservation + create-race integration tests
+        run: >-
+          pnpm exec jest
+          src/orders/limit-order-reservation.integration.spec.ts
+          src/orders/limit-order-create-race.integration.spec.ts
+
   candle-fixture-integration:
     name: Candle fixture integration
     runs-on: ubuntu-latest

@@ -945,6 +945,9 @@ export default function OrderScreen({ route, navigation }: Props) {
       <OrderSuccessBottomSheet
         visible={!!successData}
         payload={successData}
+        // Supplies the quote-time estimates for an unfilled limit buy; the
+        // order row itself carries no gross/fee/net until it fills.
+        quote={quoteData ?? null}
         onClose={() => setSuccessData(null)}
         onGoAssetDetail={() => {
           setSuccessData(null);

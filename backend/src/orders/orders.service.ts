@@ -61,6 +61,7 @@ import { debitAvailableCash } from '../wallets/cash-wallet-atomic';
 import { assertAssetTradable, MarketHoursError } from './market-hours.policy';
 import { isLimitOrderEnabled } from './limit-order.config';
 import { limitOrderErrorCodes } from './limit-order-error-policy';
+import type { QuotedLimitReservationBasis } from './limit-order-policy';
 import {
   LimitOrderCreateService,
   type LimitOrderCreateResponse,
@@ -197,6 +198,11 @@ type OrderQuoteCalculation = {
   krwGrossAmount: Prisma.Decimal;
   krwFeeAmount: Prisma.Decimal;
   krwNetAmount: Prisma.Decimal;
+  /**
+   * Limit-buy only: the reservation basis pinned at quote time and persisted
+   * on the durable quote. Absent on market quotes, which reprice at execute.
+   */
+  limitReservationBasis?: QuotedLimitReservationBasis;
   assetPriceSnapshotId: string | null;
   fxRateSnapshotId: string | null;
   fxRate: Prisma.Decimal | null;
@@ -224,6 +230,11 @@ type DurableOrderQuoteForCreate = {
   limitPrice: Prisma.Decimal | null;
   currencyCode: CurrencyCode | null;
   quotedPrice: Prisma.Decimal;
+  /** Limit-buy reservation basis pinned at quote time (null on market quotes). */
+  quotedFeeRate: Prisma.Decimal | null;
+  quotedGrossAmount: Prisma.Decimal | null;
+  quotedFeeAmount: Prisma.Decimal | null;
+  quotedReservedAmount: Prisma.Decimal | null;
   assetPriceSnapshotId: string | null;
   fxRateSnapshotId: string | null;
   expiresAt: Date;
@@ -236,6 +247,16 @@ type OrderQuoteResponse = {
   // Additive limit-buy fields are present only on limit quotes.
   data: ReturnType<OrdersService['formatOrderQuoteData']> & {
     limitPrice?: string;
+    /**
+     * Reservation basis pinned on the durable quote. create reserves exactly
+     * quotedReservedAmount at quotedFeeRate regardless of any later
+     * Season.tradeFeeRate change. reservedAmount is the pre-existing alias of
+     * quotedReservedAmount and is kept for current clients.
+     */
+    quotedFeeRate?: string;
+    quotedGrossAmount?: string;
+    quotedFeeAmount?: string;
+    quotedReservedAmount?: string;
     reservedAmount?: string;
     walletReservedBefore?: string;
     walletAvailableBefore?: string;
@@ -638,6 +659,14 @@ export class OrdersService {
       grossAmount: preview.grossAmount,
       feeAmount: preview.feeAmount,
       netAmount: preview.reservedAmount,
+      // Pinned on the durable quote: create reserves exactly this basis even
+      // if Season.tradeFeeRate changes in between.
+      limitReservationBasis: {
+        quotedFeeRate: preview.quotedFeeRate,
+        quotedGrossAmount: preview.grossAmount,
+        quotedFeeAmount: preview.feeAmount,
+        quotedReservedAmount: preview.reservedAmount,
+      },
       krwGrossAmount: krwAmounts.krwGrossAmount,
       krwFeeAmount: krwAmounts.krwFeeAmount,
       krwNetAmount: krwAmounts.krwNetAmount,
@@ -666,14 +695,39 @@ export class OrdersService {
       userId,
       calculation,
     );
+    // Every reservation figure below comes from the durable quote row, which
+    // is exactly what create will reserve — never a re-read of the season fee
+    // rate. quoted* names state that explicitly; reservedAmount is kept as the
+    // pre-existing field name for current clients.
+    const basis = durableQuote.limitReservationBasis;
+    if (!basis) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        limitOrderErrorCodes.QUOTE_RESERVATION_BASIS_INVALID,
+        'Limit quote was stored without its reservation basis.',
+      );
+    }
 
     return {
       success: true,
       data: {
         ...this.formatOrderQuoteData(durableQuote),
         limitPrice: this.formatDecimal(request.limitPrice, monetaryScale),
+        quotedFeeRate: formatDecimalScale(basis.quotedFeeRate, feeRateScale),
+        quotedGrossAmount: this.formatDecimal(
+          basis.quotedGrossAmount,
+          monetaryScale,
+        ),
+        quotedFeeAmount: this.formatDecimal(
+          basis.quotedFeeAmount,
+          monetaryScale,
+        ),
+        quotedReservedAmount: this.formatDecimal(
+          basis.quotedReservedAmount,
+          monetaryScale,
+        ),
         reservedAmount: this.formatDecimal(
-          preview.reservedAmount,
+          basis.quotedReservedAmount,
           monetaryScale,
         ),
         walletReservedBefore: this.formatDecimal(
@@ -885,6 +939,11 @@ export class OrdersService {
       quoteId,
     });
     const submittedAt = new Date();
+    // Pre-transaction checks are a fast-fail courtesy only: they give the user
+    // a clean error without opening a transaction. They are NOT the basis of
+    // financial correctness — every one of them is re-run against locked rows
+    // inside the transaction below, because an operator can exclude the
+    // participant or end the season in the gap.
     const season = await this.findActiveSeasonOrThrow();
     this.assertSeasonTradable(season, submittedAt);
     const participant = await this.findParticipantOrThrow(season.id, userId);
@@ -899,6 +958,10 @@ export class OrdersService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
+        // Lock order: Quote → SeasonParticipant → Season → CashWallet → Order.
+        // See LimitOrderCreateService.lockTradableContextInTransaction for why
+        // the participant precedes the season and why both are FOR SHARE.
+        await limitOrderCreate.lockQuoteForCreateInTransaction(tx, quoteId);
         const quote = await this.findActiveOrderQuoteForCreateOrThrow(tx, {
           quoteId,
           userId,
@@ -916,17 +979,31 @@ export class OrdersService {
           );
         }
 
+        // Re-validate season + participant against LOCKED rows. A concurrent
+        // exclusion or season-ending either commits first (and this create
+        // fails) or waits behind these locks (and its cleanup then cancels the
+        // order this transaction is about to commit). No third outcome exists,
+        // so no reservation can outlive an exclusion or a season end.
+        await limitOrderCreate.lockTradableContextInTransaction(tx, {
+          userId,
+          seasonParticipantId: participant.id,
+          now: submittedAt,
+        });
+
         return limitOrderCreate.createSubmittedLimitBuyInTransaction(tx, {
           quote: {
             id: quote.id,
             limitPrice: quote.limitPrice,
+            quotedFeeRate: quote.quotedFeeRate,
+            quotedGrossAmount: quote.quotedGrossAmount,
+            quotedFeeAmount: quote.quotedFeeAmount,
+            quotedReservedAmount: quote.quotedReservedAmount,
             asset: {
               id: quote.asset.id,
               settlementCurrency: quote.asset.settlementCurrency,
               currencyCode: quote.asset.currencyCode,
             },
           },
-          season: { tradeFeeRate: season.tradeFeeRate },
           participant: { id: participant.id },
           quantity: request.quantity,
           idempotency,
@@ -3123,6 +3200,32 @@ export class OrdersService {
         currencyCode: this.getAssetSettlementCurrency(quote.asset),
         quotedPrice: this.formatDecimal(quote.price, monetaryScale),
         quotedRate: quote.fxRate ? this.formatDecimal(quote.fxRate, 8) : null,
+        // Limit quotes only: the reservation basis create must reuse verbatim.
+        // Market quotes leave all four null and keep repricing at execute.
+        quotedFeeRate: quote.limitReservationBasis
+          ? formatDecimalScale(
+              quote.limitReservationBasis.quotedFeeRate,
+              feeRateScale,
+            )
+          : null,
+        quotedGrossAmount: quote.limitReservationBasis
+          ? this.formatDecimal(
+              quote.limitReservationBasis.quotedGrossAmount,
+              monetaryScale,
+            )
+          : null,
+        quotedFeeAmount: quote.limitReservationBasis
+          ? this.formatDecimal(
+              quote.limitReservationBasis.quotedFeeAmount,
+              monetaryScale,
+            )
+          : null,
+        quotedReservedAmount: quote.limitReservationBasis
+          ? this.formatDecimal(
+              quote.limitReservationBasis.quotedReservedAmount,
+              monetaryScale,
+            )
+          : null,
         assetPriceSnapshotId: quote.assetPriceSnapshotId,
         fxRateSnapshotId: quote.fxRateSnapshotId,
         assetPriceSourceJson:
@@ -3135,11 +3238,32 @@ export class OrdersService {
       },
       select: {
         id: true,
+        quotedFeeRate: true,
+        quotedGrossAmount: true,
+        quotedFeeAmount: true,
+        quotedReservedAmount: true,
       },
     });
 
+    // Read the reservation basis back from the row that was just written, so
+    // the quote RESPONSE and the row CREATE will later reserve against are
+    // provably the same numbers at the same stored scale.
+    const persistedBasis =
+      durableQuote.quotedFeeRate &&
+      durableQuote.quotedGrossAmount &&
+      durableQuote.quotedFeeAmount &&
+      durableQuote.quotedReservedAmount
+        ? {
+            quotedFeeRate: durableQuote.quotedFeeRate,
+            quotedGrossAmount: durableQuote.quotedGrossAmount,
+            quotedFeeAmount: durableQuote.quotedFeeAmount,
+            quotedReservedAmount: durableQuote.quotedReservedAmount,
+          }
+        : undefined;
+
     return {
       ...quote,
+      ...(persistedBasis ? { limitReservationBasis: persistedBasis } : {}),
       quoteId: durableQuote.id,
       expiresAt,
       maxChangeBps,
@@ -3174,6 +3298,10 @@ export class OrdersService {
         limitPrice: true,
         currencyCode: true,
         quotedPrice: true,
+        quotedFeeRate: true,
+        quotedGrossAmount: true,
+        quotedFeeAmount: true,
+        quotedReservedAmount: true,
         assetPriceSnapshotId: true,
         fxRateSnapshotId: true,
         expiresAt: true,

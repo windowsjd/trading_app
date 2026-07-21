@@ -66,6 +66,18 @@ export interface OrderQuoteDto {
   // Limit-buy additive fields (present only on limit quotes). All amounts
   // are server-final decimal strings — the client never re-derives them.
   limitPrice?: MoneyString;
+  /**
+   * Reservation basis pinned on the durable quote. The server reserves exactly
+   * quotedReservedAmount at quotedFeeRate when this quote is used to create,
+   * even if the season fee rate changes in between — so these are the only
+   * numbers that may be shown as the order's expected cost.
+   * quotedGross/quotedFee are ESTIMATES for an unfilled order, never a fill.
+   * reservedAmount is the pre-existing alias of quotedReservedAmount.
+   */
+  quotedFeeRate?: RateString;
+  quotedGrossAmount?: MoneyString;
+  quotedFeeAmount?: MoneyString;
+  quotedReservedAmount?: MoneyString;
   reservedAmount?: MoneyString;
   walletReservedBefore?: MoneyString;
   walletAvailableBefore?: MoneyString;
@@ -98,9 +110,17 @@ export interface CreatedOrderDto {
   price?: MoneyString;
   limitPrice?: MoneyString | null;
   currencyCode?: CurrencyCode;
-  grossAmount?: MoneyString;
-  feeAmount?: MoneyString;
-  netAmount?: MoneyString;
+  /**
+   * ACTUAL execution result. Null until the order really fills — a submitted
+   * or canceled limit order always has all three null, because phase 1 has no
+   * matching engine. Never render these as an unfilled order's amounts.
+   */
+  grossAmount?: MoneyString | null;
+  feeAmount?: MoneyString | null;
+  netAmount?: MoneyString | null;
+  executedPrice?: MoneyString | null;
+  executedAt?: IsoDateTimeString | null;
+  /** Unfilled limit buy: cash locked by the reservation, not a fill amount. */
   reservedAmount?: MoneyString | null;
   reservationReleasedAt?: IsoDateTimeString | null;
   cancelReason?: string | null;
