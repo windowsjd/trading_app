@@ -33,7 +33,11 @@ import {
   getWallets,
   type WalletCurrency,
 } from '../../features/wallet/api';
-import { getWalletBalanceAmount } from '../../features/wallet/mapper';
+import {
+  getWalletAvailableAmount,
+  getWalletBalanceAmount,
+  getWalletReservedAmount,
+} from '../../features/wallet/mapper';
 import {
   getOrderQuoteDisplay,
   getOrderQuoteExpiresInSeconds,
@@ -42,6 +46,7 @@ import {
   isOrderRequoteRequiredCode,
   isOrderSuccess,
 } from '../../features/order/mapper';
+import { LIMIT_ORDER_ENABLED } from '../../constants/env';
 import { ERROR_CODE } from '../../models/enums/errorCode';
 import type { OrderFlowState } from '../../models/enums/viewState';
 import {
@@ -106,6 +111,19 @@ function validateQuantity(quantity: string) {
   return null;
 }
 
+function validateLimitPrice(limitPrice: string) {
+  const trimmed = limitPrice.trim();
+
+  if (!trimmed) return '지정가 가격을 입력해주세요.';
+  if (!/^(?:\d+|\d*\.\d{1,8})$/.test(trimmed)) {
+    return '지정가는 숫자와 소수점 이하 최대 8자리까지 입력할 수 있습니다.';
+  }
+  if (!Number.isFinite(Number(trimmed))) return '숫자 형식을 확인해주세요.';
+  if (Number(trimmed) <= 0) return '0보다 큰 지정가를 입력해주세요.';
+
+  return null;
+}
+
 function parsePositiveDecimal(value?: string | number | null) {
   if (value === null || value === undefined || value === '') return null;
   const parsed = typeof value === 'number' ? value : Number(value);
@@ -135,6 +153,14 @@ export default function OrderScreen({ route, navigation }: Props) {
   const queryClient = useQueryClient();
 
   const [quantity, setQuantity] = useState('');
+  // Limit orders are buy-only in phase 1; the toggle is hidden entirely
+  // unless the feature flag is on AND this is a buy screen.
+  const showLimitToggle = LIMIT_ORDER_ENABLED && side === 'buy';
+  const [orderTypeState, setOrderTypeState] = useState<'market' | 'limit'>(
+    'market',
+  );
+  const orderType = showLimitToggle ? orderTypeState : 'market';
+  const [limitPrice, setLimitPrice] = useState('');
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [domainError, setDomainError] = useState<string | null>(null);
   const [quoteData, setQuoteData] = useState<OrderQuoteDto | null>(null);
@@ -149,6 +175,8 @@ export default function OrderScreen({ route, navigation }: Props) {
     assetId,
     side,
     quantity: '',
+    orderType: 'market' as 'market' | 'limit',
+    limitPrice: '',
   });
 
   const seasonQuery = useQuery({
@@ -177,8 +205,10 @@ export default function OrderScreen({ route, navigation }: Props) {
       assetId,
       side,
       quantity: quantity.trim(),
+      orderType,
+      limitPrice: limitPrice.trim(),
     };
-  }, [assetId, side, quantity]);
+  }, [assetId, side, quantity, orderType, limitPrice]);
 
   useEffect(() => {
     if (!quoteData) return undefined;
@@ -199,7 +229,9 @@ export default function OrderScreen({ route, navigation }: Props) {
       if (
         variables.assetId !== latestInput.assetId ||
         variables.side !== latestInput.side ||
-        variables.quantity !== latestInput.quantity
+        variables.quantity !== latestInput.quantity ||
+        (variables.orderType ?? 'market') !== latestInput.orderType ||
+        (variables.limitPrice ?? '') !== latestInput.limitPrice
       ) {
         return;
       }
@@ -216,7 +248,9 @@ export default function OrderScreen({ route, navigation }: Props) {
       if (
         variables.assetId !== latestInput.assetId ||
         variables.side !== latestInput.side ||
-        variables.quantity !== latestInput.quantity
+        variables.quantity !== latestInput.quantity ||
+        (variables.orderType ?? 'market') !== latestInput.orderType ||
+        (variables.limitPrice ?? '') !== latestInput.limitPrice
       ) {
         return;
       }
@@ -264,6 +298,8 @@ export default function OrderScreen({ route, navigation }: Props) {
         }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ranking.all }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.portfolio.all }),
+        // Order history lists must show the new submitted limit order.
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.record.all }),
       ]);
     },
     onError: (error) => {
@@ -305,9 +341,14 @@ export default function OrderScreen({ route, navigation }: Props) {
     createMutation.reset();
   };
 
+  const limitPriceInvalidReason = useMemo(
+    () => (orderType === 'limit' ? validateLimitPrice(limitPrice) : null),
+    [orderType, limitPrice],
+  );
+
   const inputInvalidReason = useMemo(
-    () => validateQuantity(quantity),
-    [quantity],
+    () => validateQuantity(quantity) ?? limitPriceInvalidReason,
+    [quantity, limitPriceInvalidReason],
   );
 
   const quoteExpired = useMemo(
@@ -381,8 +422,20 @@ export default function OrderScreen({ route, navigation }: Props) {
     side === 'buy' && settlementCurrency
       ? getWalletBalanceAmount(walletsQuery.data, settlementCurrency)
       : null;
-  const buyBalanceValue = parsePositiveDecimal(buyBalance);
+  const buyReserved =
+    side === 'buy' && settlementCurrency
+      ? getWalletReservedAmount(walletsQuery.data, settlementCurrency)
+      : null;
+  // Ratio buttons and spendable-cash checks use the AVAILABLE balance
+  // (balance - reserved): cash locked by open limit orders is not spendable.
+  const buyAvailable =
+    side === 'buy' && settlementCurrency
+      ? getWalletAvailableAmount(walletsQuery.data, settlementCurrency)
+      : null;
+  const buyAvailableValue = parsePositiveDecimal(buyAvailable);
   const priceValue = parsePositiveDecimal(price?.currentPrice);
+  const limitPriceValue = parsePositiveDecimal(limitPrice);
+  const ratioPriceValue = orderType === 'limit' ? limitPriceValue : priceValue;
   const positionQuantityValue = parsePositiveDecimal(positionQuantity);
 
   const ratioDisabledReason = useMemo(() => {
@@ -400,17 +453,24 @@ export default function OrderScreen({ route, navigation }: Props) {
     if (walletsQuery.isError || !walletsQuery.data) {
       return '지갑 잔액을 확인할 수 없습니다.';
     }
-    if (!buyBalanceValue) return `${settlementCurrency} 잔액이 없습니다.`;
-    if (!priceValue) return '현재가가 없어 비율 수량을 계산할 수 없습니다.';
+    if (!buyAvailableValue) {
+      return `${settlementCurrency} 사용 가능 잔액이 없습니다.`;
+    }
+    if (!ratioPriceValue) {
+      return orderType === 'limit'
+        ? '지정가를 입력하면 비율 수량을 계산할 수 있습니다.'
+        : '현재가가 없어 비율 수량을 계산할 수 없습니다.';
+    }
 
     return null;
   }, [
-    buyBalanceValue,
+    buyAvailableValue,
+    orderType,
     preOrderBlockedReason,
     positionQuery.isError,
     positionQuery.isLoading,
     positionQuantityValue,
-    priceValue,
+    ratioPriceValue,
     settlementCurrency,
     side,
     walletsQuery.data,
@@ -479,6 +539,9 @@ export default function OrderScreen({ route, navigation }: Props) {
       assetId,
       side,
       quantity: quantity.trim(),
+      ...(orderType === 'limit'
+        ? { orderType: 'limit' as const, limitPrice: limitPrice.trim() }
+        : {}),
     });
   };
 
@@ -492,8 +555,8 @@ export default function OrderScreen({ route, navigation }: Props) {
       side === 'sell'
         ? formatQuantityInput((positionQuantityValue ?? 0) * ratio)
         : formatQuantityInput(
-            ((buyBalanceValue ?? 0) * ratio) /
-              ((priceValue ?? 0) * (1 + BUY_FEE_BUFFER)),
+            ((buyAvailableValue ?? 0) * ratio) /
+              ((ratioPriceValue ?? 0) * (1 + BUY_FEE_BUFFER)),
           );
 
     if (!nextQuantity) {
@@ -542,6 +605,13 @@ export default function OrderScreen({ route, navigation }: Props) {
       side,
       quantity: quoteData.quantity,
       idempotencyKey: executeIdempotencyKey,
+      ...(orderType === 'limit'
+        ? {
+            orderType: 'limit' as const,
+            // Server-quoted canonical limit price wins over the raw input.
+            limitPrice: quoteData.limitPrice ?? limitPrice.trim(),
+          }
+        : {}),
     });
   };
 
@@ -595,12 +665,92 @@ export default function OrderScreen({ route, navigation }: Props) {
             <Text style={styles.warningText}>{assetWarningReason}</Text>
           ) : null}
           {side === 'buy' && settlementCurrency ? (
-            <Text style={styles.helper}>
-              비율 계산 기준 잔액 {settlementCurrency}{' '}
-              {formatCurrency(buyBalance, settlementCurrency)}
-            </Text>
+            <>
+              <Text style={styles.helper}>
+                전체 현금 {settlementCurrency}{' '}
+                {formatCurrency(buyBalance, settlementCurrency)}
+              </Text>
+              <Text style={styles.helper}>
+                기존 예약금 {settlementCurrency}{' '}
+                {formatCurrency(buyReserved, settlementCurrency)}
+              </Text>
+              <Text style={styles.helper}>
+                사용 가능 현금 {settlementCurrency}{' '}
+                {formatCurrency(buyAvailable, settlementCurrency)}
+              </Text>
+            </>
           ) : null}
         </View>
+
+        {showLimitToggle ? (
+          <View style={styles.card}>
+            <Text style={styles.label}>주문 방식</Text>
+            <View style={styles.ratioRow}>
+              <Pressable
+                testID={TEST_IDS.order.typeToggleMarket}
+                style={[
+                  styles.ratioButton,
+                  orderType === 'market' && styles.typeButtonActive,
+                ]}
+                onPress={() => {
+                  if (orderType === 'market') return;
+                  setOrderTypeState('market');
+                  resetOrderActionState();
+                }}
+              >
+                <Text
+                  style={[
+                    styles.ratioButtonText,
+                    orderType === 'market' && styles.typeButtonTextActive,
+                  ]}
+                >
+                  시장가
+                </Text>
+              </Pressable>
+              <Pressable
+                testID={TEST_IDS.order.typeToggleLimit}
+                style={[
+                  styles.ratioButton,
+                  orderType === 'limit' && styles.typeButtonActive,
+                ]}
+                onPress={() => {
+                  if (orderType === 'limit') return;
+                  setOrderTypeState('limit');
+                  resetOrderActionState();
+                }}
+              >
+                <Text
+                  style={[
+                    styles.ratioButtonText,
+                    orderType === 'limit' && styles.typeButtonTextActive,
+                  ]}
+                >
+                  지정가
+                </Text>
+              </Pressable>
+            </View>
+            {orderType === 'limit' ? (
+              <>
+                <Text style={styles.label}>지정가 가격</Text>
+                <TextInput
+                  testID={TEST_IDS.order.limitPriceInput}
+                  style={styles.input}
+                  value={limitPrice}
+                  onChangeText={(value) => {
+                    setLimitPrice(value);
+                    resetOrderActionState();
+                  }}
+                  keyboardType="decimal-pad"
+                  placeholder="지정가 가격 입력"
+                />
+                <Text style={styles.helper}>
+                  지정가 매수 주문은 현재 단계에서 미체결 상태로 등록되며,
+                  주문 금액과 수수료만큼 현금이 예약됩니다.
+                </Text>
+              </>
+            ) : null}
+          </View>
+        ) : null}
 
         <View style={styles.card}>
           <Text style={styles.label}>수량 입력</Text>
@@ -681,6 +831,11 @@ export default function OrderScreen({ route, navigation }: Props) {
           ) : quoteDisplay ? (
             <>
               <Text style={styles.helper}>견적 ID {quoteDisplay.quoteId}</Text>
+              {quoteData?.limitPrice ? (
+                <Text style={styles.helper}>
+                  지정가 {formatCurrency(quoteData.limitPrice, quoteData.currencyCode)}
+                </Text>
+              ) : null}
               <Text style={styles.helper}>예상 체결가 {quoteDisplay.price}</Text>
               <Text style={styles.helper}>수량 {quoteDisplay.quantity}</Text>
               <Text style={styles.helper}>총 주문 금액 {quoteDisplay.grossAmount}</Text>
@@ -699,6 +854,35 @@ export default function OrderScreen({ route, navigation }: Props) {
               <Text style={styles.helper}>
                 주문 후 예상 포지션 {quoteDisplay.estimatedPositionQuantityAfter}
               </Text>
+              {quoteData?.reservedAmount ? (
+                <>
+                  <Text style={styles.helper}>
+                    예약 예정 금액{' '}
+                    {formatCurrency(quoteData.reservedAmount, quoteData.currencyCode)}
+                  </Text>
+                  <Text style={styles.helper}>
+                    기존 예약금{' '}
+                    {formatCurrency(
+                      quoteData.walletReservedBefore,
+                      quoteData.currencyCode,
+                    )}
+                  </Text>
+                  <Text style={styles.helper}>
+                    사용 가능 현금{' '}
+                    {formatCurrency(
+                      quoteData.walletAvailableBefore,
+                      quoteData.currencyCode,
+                    )}
+                  </Text>
+                  <Text style={styles.helper}>
+                    주문 후 예상 사용 가능 현금{' '}
+                    {formatCurrency(
+                      quoteData.estimatedAvailableAfter,
+                      quoteData.currencyCode,
+                    )}
+                  </Text>
+                </>
+              ) : null}
               <Text style={styles.helper}>KRW 순금액 {quoteDisplay.krwNetAmount}</Text>
               <Text style={styles.helper}>만료 시각 {quoteDisplay.expiresAt}</Text>
               <Text style={styles.helper}>
@@ -765,6 +949,13 @@ export default function OrderScreen({ route, navigation }: Props) {
         onGoAssetDetail={() => {
           setSuccessData(null);
           navigation.goBack();
+        }}
+        onGoOrderHistory={() => {
+          setSuccessData(null);
+          rootNavigation.navigate('MainTabs', {
+            screen: 'RecordTab',
+            params: { screen: 'RecordSeasonList' },
+          });
         }}
         onGoHome={() => {
           setSuccessData(null);
@@ -847,5 +1038,12 @@ const styles = StyleSheet.create({
   },
   ratioButtonTextDisabled: {
     color: '#999',
+  },
+  typeButtonActive: {
+    backgroundColor: '#111',
+    borderColor: '#111',
+  },
+  typeButtonTextActive: {
+    color: '#fff',
   },
 });

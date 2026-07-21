@@ -116,6 +116,9 @@ import {
   WalletTransactionType,
 } from '../generated/prisma/client';
 import { computeOrderQuoteRequestHash } from '../providers/durable-quote.policy';
+import { LimitOrderCancelService } from './limit-order-cancel.service';
+import { LimitOrderCreateService } from './limit-order-create.service';
+import { OrderReservationService } from './order-reservation.service';
 import { OrdersService } from './orders.service';
 
 describe('OrdersService', () => {
@@ -242,6 +245,8 @@ describe('OrdersService', () => {
       delete: jest.fn(),
     },
     $transaction: jest.fn(),
+    $executeRaw: jest.fn(),
+    $queryRaw: jest.fn().mockResolvedValue([]),
   });
 
   const createService = () => {
@@ -249,7 +254,21 @@ describe('OrdersService', () => {
     prisma.$transaction.mockImplementation(async (callback) =>
       callback(prisma),
     );
-    const service = new OrdersService(prisma as never);
+    const reservationService = new OrderReservationService();
+    const limitOrderCreateService = new LimitOrderCreateService(
+      prisma as never,
+      reservationService,
+    );
+    const limitOrderCancelService = new LimitOrderCancelService(
+      prisma as never,
+      reservationService,
+    );
+    const service = new OrdersService(
+      prisma as never,
+      undefined,
+      limitOrderCreateService,
+      limitOrderCancelService,
+    );
 
     return { prisma, service };
   };
@@ -753,6 +772,9 @@ describe('OrdersService', () => {
       currencyCode,
       balanceAmount: new Prisma.Decimal(before),
     });
+    // Buy debits go through the atomic raw-SQL available-balance guard;
+    // sell credits still use cashWallet.updateMany. Mock both.
+    prisma.$executeRaw.mockResolvedValueOnce(1);
     prisma.cashWallet.updateMany.mockResolvedValueOnce({ count: 1 });
     prisma.cashWallet.findFirst.mockResolvedValueOnce({
       id: 'wallet-1',
@@ -1065,6 +1087,68 @@ describe('OrdersService', () => {
     expect(prisma.seasonRanking.create).not.toHaveBeenCalled();
   };
 
+  const canceledLimitOrderRecord = (
+    overrides: Partial<Record<string, unknown>> = {},
+  ) => ({
+    id: 'order-1',
+    seasonParticipantId: 'sp-1',
+    quoteId: 'quote-1',
+    side: OrderSide.buy,
+    orderType: OrderType.limit,
+    status: OrderStatus.canceled,
+    quantity: new Prisma.Decimal('1.000000'),
+    limitPrice: new Prisma.Decimal('100.00000000'),
+    executedPrice: null,
+    currencyCode: CurrencyCode.KRW,
+    grossAmount: new Prisma.Decimal('100.00000000'),
+    feeAmount: new Prisma.Decimal('0.10000000'),
+    netAmount: new Prisma.Decimal('100.10000000'),
+    assetPriceSnapshotId: null,
+    fxRateSnapshotId: null,
+    reservedAmount: new Prisma.Decimal('100.10000000'),
+    reservationReleasedAt: canceledAt,
+    cancelReason: 'user_canceled',
+    submittedAt,
+    executedAt: null,
+    canceledAt,
+    rejectedAt: null,
+    rejectReason: null,
+    createdAt,
+    updatedAt,
+    asset: {
+      id: 'asset-1',
+      symbol: '005930',
+      name: 'Samsung',
+      market: 'KRX',
+      currencyCode: CurrencyCode.KRW,
+    },
+    ...overrides,
+  });
+
+  const expectAvailableCashDebitCall = (
+    prisma: ReturnType<typeof createPrisma>,
+    input: {
+      walletId: string;
+      seasonParticipantId: string;
+      currencyCode: CurrencyCode;
+      amount: string;
+    },
+  ) => {
+    // debitAvailableCash tagged-template values:
+    // [amount, walletId, seasonParticipantId, currencyCode, amount]
+    const matched = prisma.$executeRaw.mock.calls.some((args: unknown[]) => {
+      const values = args.slice(1);
+      return (
+        values[0] === input.amount &&
+        values[1] === input.walletId &&
+        values[2] === input.seasonParticipantId &&
+        values[3] === input.currencyCode &&
+        values[4] === input.amount
+      );
+    });
+    expect(matched).toBe(true);
+  };
+
   const expectNoOrderWrites = (
     prisma: ReturnType<typeof createPrisma>,
     options: { allowTransaction?: boolean } = {},
@@ -1088,6 +1172,7 @@ describe('OrdersService', () => {
       expect(model.delete).not.toHaveBeenCalled();
     }
 
+    expect(prisma.$executeRaw).not.toHaveBeenCalled();
     expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
     expect(prisma.exchangeTransaction.create).not.toHaveBeenCalled();
     expect(prisma.fxExecuteRequest.create).not.toHaveBeenCalled();
@@ -1126,6 +1211,7 @@ describe('OrdersService', () => {
     expect(prisma.order.updateMany).not.toHaveBeenCalled();
     expect(prisma.order.upsert).not.toHaveBeenCalled();
     expect(prisma.order.delete).not.toHaveBeenCalled();
+    expect(prisma.$executeRaw).not.toHaveBeenCalled();
     expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
     expect(prisma.exchangeTransaction.create).not.toHaveBeenCalled();
     expect(prisma.fxExecuteRequest.create).not.toHaveBeenCalled();
@@ -1162,6 +1248,7 @@ describe('OrdersService', () => {
     expect(prisma.order.updateMany).toHaveBeenCalledTimes(1);
     expect(prisma.order.upsert).not.toHaveBeenCalled();
     expect(prisma.order.delete).not.toHaveBeenCalled();
+    expect(prisma.$executeRaw).not.toHaveBeenCalled();
     expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
     expect(prisma.exchangeTransaction.create).not.toHaveBeenCalled();
     expect(prisma.fxExecuteRequest.create).not.toHaveBeenCalled();
@@ -1478,6 +1565,7 @@ describe('OrdersService', () => {
       },
       select: {
         balanceAmount: true,
+        reservedAmount: true,
       },
     });
     expect(prisma.fxRateSnapshot.findFirst).toHaveBeenCalled();
@@ -1565,7 +1653,7 @@ describe('OrdersService', () => {
         limitPrice: '50000.00000000',
         currencyCode: CurrencyCode.KRW,
       }),
-      'ORDER_TYPE_NOT_SUPPORTED',
+      'LIMIT_ORDER_DISABLED',
     );
     expectNoOrderWrites(prisma);
   });
@@ -1860,7 +1948,7 @@ describe('OrdersService', () => {
         id: true,
       },
     });
-    expect(prisma.cashWallet.updateMany).toHaveBeenCalled();
+    expect(prisma.$executeRaw).toHaveBeenCalled();
     expect(prisma.position.create).toHaveBeenCalled();
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
@@ -2009,20 +2097,11 @@ describe('OrdersService', () => {
         positionId: 'position-btc-1',
       },
     });
-    expect(prisma.cashWallet.updateMany).toHaveBeenCalledWith({
-      where: {
-        id: 'wallet-1',
-        seasonParticipantId: 'sp-1',
-        currencyCode: CurrencyCode.USD,
-        balanceAmount: {
-          gte: '500.50000000',
-        },
-      },
-      data: {
-        balanceAmount: {
-          decrement: '500.50000000',
-        },
-      },
+    expectAvailableCashDebitCall(prisma, {
+      walletId: 'wallet-1',
+      seasonParticipantId: 'sp-1',
+      currencyCode: CurrencyCode.USD,
+      amount: '500.50000000',
     });
   });
 
@@ -2039,7 +2118,7 @@ describe('OrdersService', () => {
         quoteId: 'quote-order-create-1',
         idempotencyKey: 'order-create-limit',
       }),
-      'ORDER_TYPE_NOT_SUPPORTED',
+      'LIMIT_ORDER_DISABLED',
     );
     expectNoOrderWrites(prisma);
   });
@@ -2432,15 +2511,50 @@ describe('OrdersService', () => {
     expectNoOrderWrites(prisma);
   });
 
-  it('rejects cancel orders as unsupported', async () => {
+  it('keeps market order cancel unsupported (410) after the limit rollout', async () => {
     const { prisma, service } = createService();
+    prisma.$queryRaw.mockResolvedValueOnce([{ id: 'order-submitted-1' }]);
+    prisma.order.findUnique.mockResolvedValueOnce({
+      id: 'order-submitted-1',
+      seasonParticipantId: 'sp-1',
+      quoteId: null,
+      side: OrderSide.buy,
+      orderType: OrderType.market,
+      status: OrderStatus.submitted,
+      quantity: new Prisma.Decimal('1.000000'),
+      limitPrice: null,
+      executedPrice: null,
+      currencyCode: CurrencyCode.KRW,
+      grossAmount: null,
+      feeAmount: null,
+      netAmount: null,
+      assetPriceSnapshotId: null,
+      fxRateSnapshotId: null,
+      reservedAmount: null,
+      reservationReleasedAt: null,
+      cancelReason: null,
+      submittedAt,
+      executedAt: null,
+      canceledAt: null,
+      rejectedAt: null,
+      rejectReason: null,
+      createdAt,
+      updatedAt,
+      asset: {
+        id: 'asset-1',
+        symbol: '005930',
+        name: 'Samsung',
+        market: 'KRX',
+        currencyCode: CurrencyCode.KRW,
+      },
+    });
 
     await expectErrorCode(
       service.cancelOrder('user-1', 'order-submitted-1'),
       'ORDER_CANCEL_NOT_SUPPORTED',
     );
-    expect(prisma.order.findFirst).not.toHaveBeenCalled();
     expect(prisma.order.updateMany).not.toHaveBeenCalled();
+    expect(prisma.$executeRaw).not.toHaveBeenCalled();
   });
 
   it('reads canceled orders with status filter', async () => {
@@ -2691,32 +2805,53 @@ describe('OrdersService', () => {
 
   it('returns not found for missing or unowned orders', async () => {
     const { prisma, service } = createService();
-    prisma.order.findFirst.mockResolvedValueOnce(null);
+    // Ownership is enforced in the locking SELECT itself: no row comes back.
+    prisma.$queryRaw.mockResolvedValueOnce([]);
 
     await expect(
       service.cancelOrder('user-1', 'order-other-user'),
     ).rejects.toBeInstanceOf(HttpException);
     expect(prisma.order.updateMany).not.toHaveBeenCalled();
-    expectNoOrderWrites(prisma);
+    expectNoOrderWrites(prisma, { allowTransaction: true });
   });
 
-  it.each([OrderStatus.executed, OrderStatus.canceled, OrderStatus.rejected])(
-    'rejects cancel for %s orders',
+  it.each([OrderStatus.executed, OrderStatus.rejected])(
+    'rejects cancel for %s orders with ORDER_NOT_CANCELABLE',
     async (status) => {
       const { prisma, service } = createService();
-      prisma.order.findFirst.mockResolvedValueOnce({
-        id: 'order-1',
-        seasonParticipantId: 'sp-1',
-        status,
-      });
+      prisma.$queryRaw.mockResolvedValueOnce([{ id: 'order-1' }]);
+      prisma.order.findUnique.mockResolvedValueOnce(
+        canceledLimitOrderRecord({ status }),
+      );
 
-      await expect(
+      await expectErrorCode(
         service.cancelOrder('user-1', 'order-1'),
-      ).rejects.toBeInstanceOf(HttpException);
+        'ORDER_NOT_CANCELABLE',
+      );
       expect(prisma.order.updateMany).not.toHaveBeenCalled();
-      expectNoOrderWrites(prisma);
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
     },
   );
+
+  it('replays cancel idempotently for already-canceled limit orders', async () => {
+    const { prisma, service } = createService();
+    prisma.$queryRaw.mockResolvedValueOnce([{ id: 'order-1' }]);
+    prisma.order.findUnique.mockResolvedValueOnce(
+      canceledLimitOrderRecord({ status: OrderStatus.canceled }),
+    );
+
+    const response = await service.cancelOrder('user-1', 'order-1');
+
+    expect(response.data.execution).toMatchObject({
+      state: 'not_executed',
+      reason: 'ORDER_CANCELED_BEFORE_EXECUTION',
+      alreadyCanceled: true,
+      reservedAmountReleased: null,
+    });
+    // The reservation is NEVER released twice.
+    expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    expect(prisma.order.updateMany).not.toHaveBeenCalled();
+  });
 
   it('rejects create when user has not joined the active season', async () => {
     const { prisma, service } = createService();
@@ -2841,20 +2976,11 @@ describe('OrdersService', () => {
           consumedAt: executedAt,
         },
       });
-      expect(prisma.cashWallet.updateMany).toHaveBeenCalledWith({
-        where: {
-          id: 'wallet-1',
-          seasonParticipantId: 'sp-1',
-          currencyCode: CurrencyCode.KRW,
-          balanceAmount: {
-            gte: '200.20000000',
-          },
-        },
-        data: {
-          balanceAmount: {
-            decrement: '200.20000000',
-          },
-        },
+      expectAvailableCashDebitCall(prisma, {
+        walletId: 'wallet-1',
+        seasonParticipantId: 'sp-1',
+        currencyCode: CurrencyCode.KRW,
+        amount: '200.20000000',
       });
       expect(prisma.position.create).toHaveBeenCalledWith({
         data: {
@@ -2992,20 +3118,11 @@ describe('OrdersService', () => {
           positionId: 'position-btc-1',
         },
       });
-      expect(prisma.cashWallet.updateMany).toHaveBeenCalledWith({
-        where: {
-          id: 'wallet-1',
-          seasonParticipantId: 'sp-1',
-          currencyCode: CurrencyCode.USD,
-          balanceAmount: {
-            gte: '500.50000000',
-          },
-        },
-        data: {
-          balanceAmount: {
-            decrement: '500.50000000',
-          },
-        },
+      expectAvailableCashDebitCall(prisma, {
+        walletId: 'wallet-1',
+        seasonParticipantId: 'sp-1',
+        currencyCode: CurrencyCode.USD,
+        amount: '500.50000000',
       });
       expect(prisma.position.create).toHaveBeenCalledWith({
         data: {
@@ -3913,7 +4030,7 @@ describe('OrdersService', () => {
         currencyCode: CurrencyCode.KRW,
         balanceAmount: new Prisma.Decimal('1000.00000000'),
       });
-      prisma.cashWallet.updateMany.mockResolvedValueOnce({ count: 0 });
+      prisma.$executeRaw.mockResolvedValueOnce(0);
       prisma.cashWallet.findFirst.mockResolvedValueOnce({
         balanceAmount: new Prisma.Decimal('199.00000000'),
       });

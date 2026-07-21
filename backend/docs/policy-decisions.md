@@ -99,3 +99,17 @@
 - 기본값(코드): `src/providers/kis/kis-fixed-asset-universe.ts`의 `KIS_FIXED_DOMESTIC_SYMBOLS`/`KIS_FIXED_US_SYMBOLS`. `KIS_DOMESTIC_SYMBOLS`/`KIS_US_SYMBOLS` 환경변수가 비어 있으면 이 기본값을 사용한다.
 - 자산 DB 시딩: `pnpm tsx scripts/seed-kis-fixed-asset-universe.ts [--dry-run]`로 40개 자산을 upsert한다.
 - 근거: 이 리스트는 프로젝트 결정으로 고정된 고유동성 후보군이며(공식 YTD 순위 검증을 주장하지 않음), 매 환경마다 운영자가 수동 입력하지 않도록 코드에 기본값으로 고정한다.
+
+## Limit Buy Phase 1 (Cash Reservation, No Matching)
+
+지정가 매수 1차 기반 정책. 자동 체결(매칭)은 이 단계에 존재하지 않는다.
+
+- 지원: 지정가 매수 등록/취소만. 전량 주문, GTC 성격(주문 자체 만료 없음). 지정가 매도·부분 체결·IOC/FOK/DAY·Stop·실거래소 주문은 미지원.
+- 등록은 항상 `status=submitted`. 시장가격보다 유리한(시장성) 지정가여도 즉시 체결하지 않으며, 지정가 경로는 Provider 현재가를 아예 조회하지 않는다. 가격이 지정가에 도달해도 어떤 자동 상태 변경도 없다. 해제 경로는 사용자 취소, 시즌 종료 cleanup(`season_ended`), 참가자 제외 cleanup(`participant_excluded`) 셋뿐이다.
+- 현금 의미: `balanceAmount`=총 보유 현금(총자산 평가 입력, 예약으로 감소하지 않음), `reservedAmount`=submitted 지정가 매수 예약금, `availableAmount`=balance-reserved(파생값, DB 미저장). 홈/포트폴리오/랭킹/equity·daily snapshot/정산/거래기록 평가에서 reservedAmount를 차감하지 않는다.
+- 예약금: `gross=round8(limitPrice×qty)`, `fee=round8(gross×feeRate)`, `reserved=round8(gross+fee)` — 시장가 매수 netAmount와 동일한 반올림 체인. 등록 시점 feeRate는 `orders.reservation_fee_rate`에 영구 저장(2차 체결 단계에서 동일 rate 사용).
+- 원자성: 모든 일반 현금 차감(시장가 매수, FX source debit)과 예약 생성은 단일 SQL UPDATE 안에서 `balance_amount - reserved_amount >= :amount` 가드로 판정한다(read-then-write 금지, parameterized raw SQL: `src/wallets/cash-wallet-atomic.ts`). DB CHECK(`reserved>=0`, `balance>=reserved`)가 최후 방어선.
+- 취소: Order row lock(FOR UPDATE) → CashWallet 순서. 예약 해제와 `submitted→canceled` 전이가 한 transaction이라 해제는 주문당 정확히 1회. 중복 취소는 멱등 replay. 취소는 `LIMIT_ORDER_ENABLED`와 무관하게 항상 가능.
+- 정산 전제조건: 해당 시즌에 submitted 지정가 매수 또는 reservedAmount>0 지갑이 남아 있으면 `OPEN_LIMIT_ORDER_RESERVATIONS`로 settlement를 차단한다. 시즌 lifecycle job이 tick마다 ended/settled 시즌의 잔여 예약을 자가치유 정리하므로 차단은 일시적이다.
+- 기능 플래그: `LIMIT_ORDER_ENABLED`(기본 false, 명시적 true/1만 활성). off면 지정가 quote/create만 차단(`LIMIT_ORDER_DISABLED`), 취소/cleanup은 항상 동작. 2차 자동 체결 구현 전 production 활성화는 권장하지 않는다.
+- 근거: 예약 없는 지정가 등록은 체결 시점 잔액 부족을 만들고, 예약을 balanceAmount 차감으로 구현하면 총자산이 왜곡된다. 예약을 별도 fence 컬럼으로 두면 두 문제를 모두 피하면서 기존 시장가/FX/평가 경로의 의미를 보존한다.

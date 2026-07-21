@@ -439,6 +439,9 @@ type MySeasonOrdersResponse = {
       grossAmount: string | null;
       feeAmount: string | null;
       netAmount: string | null;
+      reservedAmount: string | null;
+      reservationReleasedAt: string | null;
+      cancelReason: string | null;
       submittedAt: string;
       executedAt: string | null;
       canceledAt: string | null;
@@ -1056,6 +1059,9 @@ export class RecordsService {
           grossAmount: true,
           feeAmount: true,
           netAmount: true,
+          reservedAmount: true,
+          reservationReleasedAt: true,
+          cancelReason: true,
           submittedAt: true,
           executedAt: true,
           canceledAt: true,
@@ -1100,6 +1106,11 @@ export class RecordsService {
           grossAmount: this.formatNullableDecimal(order.grossAmount, 8),
           feeAmount: this.formatNullableDecimal(order.feeAmount, 8),
           netAmount: this.formatNullableDecimal(order.netAmount, 8),
+          reservedAmount: this.formatNullableDecimal(order.reservedAmount, 8),
+          reservationReleasedAt: this.formatNullableDate(
+            order.reservationReleasedAt,
+          ),
+          cancelReason: order.cancelReason,
           submittedAt: order.submittedAt.toISOString(),
           executedAt: this.formatNullableDate(order.executedAt),
           canceledAt: this.formatNullableDate(order.canceledAt),

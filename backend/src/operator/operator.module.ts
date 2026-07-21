@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { ProvidersModule } from '../providers/providers.module';
+import { LimitOrderCancelService } from '../orders/limit-order-cancel.service';
+import { OrderReservationService } from '../orders/order-reservation.service';
 import { MarketSessionOverrideModule } from '../orders/market-calendar/market-session-override.module';
 import { AdminUserStatusController } from './admin-user-status.controller';
 import { AdminUserManagementController } from './admin-user-management.controller';
@@ -29,6 +31,7 @@ import { OperatorUserStatusService } from './operator-user-status.service';
   ],
   providers: [
     AdminGuard,
+    LimitOrderCancelService,
     OperatorAccountManagementService,
     OperatorAuditService,
     OperatorGuard,
@@ -37,6 +40,7 @@ import { OperatorUserStatusService } from './operator-user-status.service';
     OperatorSeasonModerationService,
     OperatorService,
     OperatorUserStatusService,
+    OrderReservationService,
   ],
   exports: [AdminGuard, OperatorAuditService, OperatorGuard, OperatorService],
 })

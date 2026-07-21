@@ -41,7 +41,12 @@ type WalletsResponse = {
     participant: ReturnType<WalletsService['formatParticipant']> | null;
     wallets: Array<{
       currencyCode: CurrencyCode;
+      /** Total owned cash (valuation input; unchanged by reservations). */
       balanceAmount: string;
+      /** Cash locked by submitted limit-buy orders. */
+      reservedAmount: string;
+      /** balanceAmount - reservedAmount: spendable for new orders/FX. */
+      availableAmount: string;
       updatedAt: string;
     }>;
     summary: {
@@ -263,6 +268,7 @@ export class WalletsService {
       select: {
         currencyCode: true,
         balanceAmount: true,
+        reservedAmount: true,
         updatedAt: true,
       },
     });
@@ -276,6 +282,12 @@ export class WalletsService {
         wallets: wallets.map((wallet) => ({
           currencyCode: wallet.currencyCode,
           balanceAmount: this.formatDecimal(wallet.balanceAmount, 8),
+          reservedAmount: this.formatDecimal(wallet.reservedAmount, 8),
+          // Derived server-side with Prisma Decimal; never stored in DB.
+          availableAmount: this.formatDecimal(
+            wallet.balanceAmount.sub(wallet.reservedAmount),
+            8,
+          ),
           updatedAt: wallet.updatedAt.toISOString(),
         })),
         summary: {

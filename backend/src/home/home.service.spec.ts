@@ -769,57 +769,71 @@ describe('HomeService', () => {
   });
 
   it('uses fresh provider_api asset price for home top positions live valuation', async () => {
-    const { prisma, service } = createService();
-    mockActiveSeason(prisma);
-    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
-    prisma.dailyPortfolioSnapshot.findFirst.mockResolvedValueOnce(
-      latestSnapshot,
-    );
-    prisma.seasonRanking.findFirst.mockResolvedValueOnce(null);
-    prisma.position.findMany.mockResolvedValueOnce([
-      position(
-        'position-provider',
-        'asset-provider',
-        '2.00000000',
-        '90.00000000',
-        CurrencyCode.KRW,
-        AssetType.domestic_stock,
-      ),
-    ]);
-    prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([
-      {
-        id: 'provider-price-home',
-        price: new Prisma.Decimal('110.00000000'),
-        currencyCode: CurrencyCode.KRW,
-        sourceType: AssetPriceSourceType.provider_api,
-        sourceName: 'kis_krx_realtime_trade',
-        effectiveAt: new Date(Date.now() - 1_000),
-        capturedAt: new Date(Date.now() - 1_000),
-      },
-    ]);
-
-    const response = await service.getHome('user-1');
-
-    expect(response.data.topPositions).toMatchObject({
-      state: 'available',
-      items: [
+    // provider_api eligibility for domestic stocks requires an OPEN KRX
+    // session at valuation time. Pin the clock inside a regular session so
+    // the test does not depend on the wall-clock time it happens to run at.
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-07T00:30:00.000Z'));
+    try {
+      const { prisma, service } = createService();
+      // The shared season fixture is anchored to the real clock; re-anchor it
+      // around the pinned instant so the season is active at valuation time.
+      prisma.season.findFirst.mockResolvedValueOnce({
+        ...activeSeason,
+        startAt: new Date('2026-05-01T00:00:00.000Z'),
+        endAt: new Date('2026-05-31T00:00:00.000Z'),
+      });
+      prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
+      prisma.dailyPortfolioSnapshot.findFirst.mockResolvedValueOnce(
+        latestSnapshot,
+      );
+      prisma.seasonRanking.findFirst.mockResolvedValueOnce(null);
+      prisma.position.findMany.mockResolvedValueOnce([
+        position(
+          'position-provider',
+          'asset-provider',
+          '2.00000000',
+          '90.00000000',
+          CurrencyCode.KRW,
+          AssetType.domestic_stock,
+        ),
+      ]);
+      prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([
         {
-          assetId: 'asset-provider',
-          currentPrice: '110.00000000',
-          assetPriceSnapshotId: 'provider-price-home',
-          positionValueKrw: '220.00000000',
-          returnRate: '22.22222222',
-          priceSource: {
-            sourceType: 'provider_api',
-            sourceName: 'kis_krx_realtime_trade',
-            snapshotId: 'provider-price-home',
-            fallbackUsed: false,
-          },
+          id: 'provider-price-home',
+          price: new Prisma.Decimal('110.00000000'),
+          currencyCode: CurrencyCode.KRW,
+          sourceType: AssetPriceSourceType.provider_api,
+          sourceName: 'kis_krx_realtime_trade',
+          effectiveAt: new Date(Date.now() - 1_000),
+          capturedAt: new Date(Date.now() - 1_000),
         },
-      ],
-    });
-    expect(prisma.assetPriceSnapshot.findFirst).not.toHaveBeenCalled();
-    expectNoHomeWrites(prisma);
+      ]);
+
+      const response = await service.getHome('user-1');
+
+      expect(response.data.topPositions).toMatchObject({
+        state: 'available',
+        items: [
+          {
+            assetId: 'asset-provider',
+            currentPrice: '110.00000000',
+            assetPriceSnapshotId: 'provider-price-home',
+            positionValueKrw: '220.00000000',
+            returnRate: '22.22222222',
+            priceSource: {
+              sourceType: 'provider_api',
+              sourceName: 'kis_krx_realtime_trade',
+              snapshotId: 'provider-price-home',
+              fallbackUsed: false,
+            },
+          },
+        ],
+      });
+      expect(prisma.assetPriceSnapshot.findFirst).not.toHaveBeenCalled();
+      expectNoHomeWrites(prisma);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('marks allocation and topPositions unavailable without fake fallback when USD/KRW FX is stale', async () => {

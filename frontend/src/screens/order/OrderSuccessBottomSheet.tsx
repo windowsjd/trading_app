@@ -11,6 +11,7 @@ interface OrderSuccessBottomSheetProps {
   onClose: () => void;
   onGoAssetDetail: () => void;
   onGoHome: () => void;
+  onGoOrderHistory?: () => void;
   payload: CreateOrderDto | null;
 }
 
@@ -19,9 +20,11 @@ export default function OrderSuccessBottomSheet({
   onClose,
   onGoAssetDetail,
   onGoHome,
+  onGoOrderHistory,
   payload,
 }: OrderSuccessBottomSheetProps) {
   const display = payload ? getOrderSuccessDisplay(payload) : null;
+  const isSubmittedLimit = display?.isSubmittedLimitOrder === true;
 
   return (
     <BottomSheetBackdrop visible={visible} onClose={onClose}>
@@ -29,9 +32,33 @@ export default function OrderSuccessBottomSheet({
         <Text style={styles.iconText}>✓</Text>
       </View>
 
-      <Text style={styles.title}>주문이 완료되었습니다</Text>
+      <Text style={styles.title}>
+        {isSubmittedLimit
+          ? '지정가 매수 주문이 등록되었습니다.'
+          : '주문이 완료되었습니다'}
+      </Text>
+      {isSubmittedLimit ? (
+        <Text style={styles.subtitle}>
+          현재 단계에서는 주문이 미체결 상태로 등록됩니다. 예약된 금액은
+          주문을 취소하면 다시 사용할 수 있습니다.
+        </Text>
+      ) : null}
 
-      {display ? (
+      {display && isSubmittedLimit ? (
+        <View style={styles.card}>
+          <Row label="주문 ID" value={display.orderId} />
+          <Row label="견적 ID" value={display.quoteId} />
+          <Row label="종목" value={display.assetLabel} />
+          <Row label="주문 유형" value="지정가 매수" />
+          <Row label="상태" value="미체결" />
+          <Row label="지정가" value={display.limitPrice} />
+          <Row label="수량" value={display.quantity} />
+          <Row label="총 주문 금액" value={display.grossAmount} />
+          <Row label="수수료" value={display.feeAmount} />
+          <Row label="예약금" value={display.reservedAmount} />
+          <Row label="제출 시각" value={display.submittedAt} />
+        </View>
+      ) : display ? (
         <View style={styles.card}>
           <Row label="주문 ID" value={display.orderId} />
           <Row label="견적 ID" value={display.quoteId} />
@@ -83,7 +110,19 @@ export default function OrderSuccessBottomSheet({
       ) : null}
 
       <View style={styles.buttonRow}>
-        <CTAButton label="종목 상세로 돌아가기" onPress={onGoAssetDetail} style={styles.flex} />
+        {isSubmittedLimit && onGoOrderHistory ? (
+          <CTAButton
+            label="주문내역 보기"
+            onPress={onGoOrderHistory}
+            style={styles.flex}
+          />
+        ) : (
+          <CTAButton
+            label="종목 상세로 돌아가기"
+            onPress={onGoAssetDetail}
+            style={styles.flex}
+          />
+        )}
         <CTAButton label="홈으로 가기" onPress={onGoHome} style={styles.flex} />
       </View>
     </BottomSheetBackdrop>
@@ -117,6 +156,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '700',
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#444',
     textAlign: 'center',
   },
   card: {

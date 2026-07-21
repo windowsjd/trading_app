@@ -1,5 +1,6 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { Prisma, SeasonStatus } from '../generated/prisma/client';
+import { LimitOrderCancelService } from '../orders/limit-order-cancel.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { BatchRunJobResponse } from './batch.types';
 import { BatchService } from './batch.service';
@@ -24,6 +25,7 @@ export class SeasonLifecycleTransitionJobService {
   constructor(
     private readonly batchService: BatchService,
     private readonly prisma: PrismaService,
+    private readonly limitOrderCancelService?: LimitOrderCancelService,
   ) {}
 
   async run(
@@ -79,8 +81,11 @@ export class SeasonLifecycleTransitionJobService {
       return result;
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const refreshedCandidates = await this.findLifecycleCandidates(tx, input.now);
+    const transitioned = await this.prisma.$transaction(async (tx) => {
+      const refreshedCandidates = await this.findLifecycleCandidates(
+        tx,
+        input.now,
+      );
       result.summary.scanned = refreshedCandidates.length;
       const refreshedPlan = this.buildTransitionPlan(
         refreshedCandidates,
@@ -130,6 +135,20 @@ export class SeasonLifecycleTransitionJobService {
 
       return result;
     });
+
+    // Post-transition safety net (bounded batches, idempotent): cancel
+    // submitted limit-buy orders of ended/settled seasons and release their
+    // reservations. Runs every tick — not only when a transition happened —
+    // so leftovers from an earlier crashed run are healed automatically.
+    if (this.limitOrderCancelService) {
+      const cleanup =
+        await this.limitOrderCancelService.cleanupEndedSeasonLimitReservations({
+          now: input.now,
+        });
+      transitioned.summary.limitOrdersCanceled = cleanup.canceledOrderCount;
+    }
+
+    return transitioned;
   }
 
   private async findLifecycleCandidates(
@@ -234,6 +253,7 @@ export class SeasonLifecycleTransitionJobService {
         activated: 0,
         wouldEnd: 0,
         ended: 0,
+        limitOrdersCanceled: 0,
       },
       activatedSeasonIds: [],
       endedSeasonIds: [],

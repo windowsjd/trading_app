@@ -12,11 +12,16 @@ import type {
 import type { AssetType, CurrencyCode } from '../market/api';
 
 export type OrderSide = 'buy' | 'sell';
+export type OrderTypeDto = 'market' | 'limit';
 
 export interface OrderQuoteRequestDto {
   assetId: string;
   side: OrderSide;
   quantity: QuantityString;
+  /** Omitted → market (historical default). */
+  orderType?: OrderTypeDto;
+  /** Required when orderType='limit'; forbidden for market. */
+  limitPrice?: MoneyString;
 }
 
 export interface OrderQuoteAssetDto {
@@ -58,6 +63,14 @@ export interface OrderQuoteDto {
   expiresAt: IsoDateTimeString;
   maxChangeBps: BpsString | number;
   quoteAt: IsoDateTimeString;
+  // Limit-buy additive fields (present only on limit quotes). All amounts
+  // are server-final decimal strings — the client never re-derives them.
+  limitPrice?: MoneyString;
+  reservedAmount?: MoneyString;
+  walletReservedBefore?: MoneyString;
+  walletAvailableBefore?: MoneyString;
+  estimatedReservedAfter?: MoneyString;
+  estimatedAvailableAfter?: MoneyString;
 }
 
 export interface CreateOrderRequestDto {
@@ -66,6 +79,10 @@ export interface CreateOrderRequestDto {
   side: OrderSide;
   quantity: QuantityString;
   idempotencyKey: string;
+  /** Omitted → market (historical default). */
+  orderType?: OrderTypeDto;
+  /** Required when orderType='limit'; must equal the quoted limitPrice. */
+  limitPrice?: MoneyString;
 }
 
 export interface CreatedOrderDto {
@@ -76,12 +93,17 @@ export interface CreatedOrderDto {
   asset?: OrderQuoteAssetDto | null;
   side?: OrderSide;
   orderType?: string;
+  status?: string;
   quantity?: QuantityString;
   price?: MoneyString;
+  limitPrice?: MoneyString | null;
   currencyCode?: CurrencyCode;
   grossAmount?: MoneyString;
   feeAmount?: MoneyString;
   netAmount?: MoneyString;
+  reservedAmount?: MoneyString | null;
+  reservationReleasedAt?: IsoDateTimeString | null;
+  cancelReason?: string | null;
   submittedAt?: IsoDateTimeString;
   createdAt?: IsoDateTimeString;
 }
@@ -89,6 +111,9 @@ export interface CreatedOrderDto {
 export type OrderExecutionState =
   | 'executed'
   | 'already_executed'
+  // Limit-buy phase 1: the order is registered unfilled. No automatic
+  // execution exists yet — it stays submitted until canceled/cleaned up.
+  | 'submitted'
   | (string & {});
 
 export interface OrderExecutionDto {
@@ -121,6 +146,9 @@ export interface OrderExecutionDto {
   equitySnapshotId?: string | null;
   duplicate?: boolean;
   walletBalanceAfter?: MoneyString | null;
+  // Limit-buy additive fields (state='submitted' responses).
+  reservedAmount?: MoneyString | null;
+  reservationFeeRate?: RateString | null;
 }
 
 export interface CreateOrderDto {
@@ -141,6 +169,26 @@ export async function createOrder(payload: CreateOrderRequestDto) {
   const response = await apiClient.post<ApiSuccessResponse<CreateOrderDto>>(
     '/orders',
     payload,
+  );
+
+  return response.data.data;
+}
+
+export interface CancelOrderDto {
+  order: CreatedOrderDto;
+  execution: {
+    state: 'not_executed' | (string & {});
+    reason?: string;
+    message?: string;
+    alreadyCanceled?: boolean;
+    reservedAmountReleased?: MoneyString | null;
+  };
+}
+
+/** Cancels a submitted limit-buy order and releases its cash reservation. */
+export async function cancelOrder(orderId: string) {
+  const response = await apiClient.post<ApiSuccessResponse<CancelOrderDto>>(
+    `/orders/${orderId}/cancel`,
   );
 
   return response.data.data;

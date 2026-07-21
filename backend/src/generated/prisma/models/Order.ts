@@ -33,6 +33,8 @@ export type OrderAvgAggregateOutputType = {
   grossAmount: runtime.Decimal | null
   feeAmount: runtime.Decimal | null
   netAmount: runtime.Decimal | null
+  reservedAmount: runtime.Decimal | null
+  reservationFeeRate: runtime.Decimal | null
 }
 
 export type OrderSumAggregateOutputType = {
@@ -42,6 +44,8 @@ export type OrderSumAggregateOutputType = {
   grossAmount: runtime.Decimal | null
   feeAmount: runtime.Decimal | null
   netAmount: runtime.Decimal | null
+  reservedAmount: runtime.Decimal | null
+  reservationFeeRate: runtime.Decimal | null
 }
 
 export type OrderMinAggregateOutputType = {
@@ -63,6 +67,10 @@ export type OrderMinAggregateOutputType = {
   fxRateSnapshotId: string | null
   idempotencyKey: string | null
   requestHash: string | null
+  reservedAmount: runtime.Decimal | null
+  reservationFeeRate: runtime.Decimal | null
+  reservationReleasedAt: Date | null
+  cancelReason: string | null
   submittedAt: Date | null
   executedAt: Date | null
   canceledAt: Date | null
@@ -91,6 +99,10 @@ export type OrderMaxAggregateOutputType = {
   fxRateSnapshotId: string | null
   idempotencyKey: string | null
   requestHash: string | null
+  reservedAmount: runtime.Decimal | null
+  reservationFeeRate: runtime.Decimal | null
+  reservationReleasedAt: Date | null
+  cancelReason: string | null
   submittedAt: Date | null
   executedAt: Date | null
   canceledAt: Date | null
@@ -120,6 +132,10 @@ export type OrderCountAggregateOutputType = {
   idempotencyKey: number
   requestHash: number
   responsePayloadJson: number
+  reservedAmount: number
+  reservationFeeRate: number
+  reservationReleasedAt: number
+  cancelReason: number
   submittedAt: number
   executedAt: number
   canceledAt: number
@@ -138,6 +154,8 @@ export type OrderAvgAggregateInputType = {
   grossAmount?: true
   feeAmount?: true
   netAmount?: true
+  reservedAmount?: true
+  reservationFeeRate?: true
 }
 
 export type OrderSumAggregateInputType = {
@@ -147,6 +165,8 @@ export type OrderSumAggregateInputType = {
   grossAmount?: true
   feeAmount?: true
   netAmount?: true
+  reservedAmount?: true
+  reservationFeeRate?: true
 }
 
 export type OrderMinAggregateInputType = {
@@ -168,6 +188,10 @@ export type OrderMinAggregateInputType = {
   fxRateSnapshotId?: true
   idempotencyKey?: true
   requestHash?: true
+  reservedAmount?: true
+  reservationFeeRate?: true
+  reservationReleasedAt?: true
+  cancelReason?: true
   submittedAt?: true
   executedAt?: true
   canceledAt?: true
@@ -196,6 +220,10 @@ export type OrderMaxAggregateInputType = {
   fxRateSnapshotId?: true
   idempotencyKey?: true
   requestHash?: true
+  reservedAmount?: true
+  reservationFeeRate?: true
+  reservationReleasedAt?: true
+  cancelReason?: true
   submittedAt?: true
   executedAt?: true
   canceledAt?: true
@@ -225,6 +253,10 @@ export type OrderCountAggregateInputType = {
   idempotencyKey?: true
   requestHash?: true
   responsePayloadJson?: true
+  reservedAmount?: true
+  reservationFeeRate?: true
+  reservationReleasedAt?: true
+  cancelReason?: true
   submittedAt?: true
   executedAt?: true
   canceledAt?: true
@@ -341,6 +373,10 @@ export type OrderGroupByOutputType = {
   idempotencyKey: string | null
   requestHash: string | null
   responsePayloadJson: runtime.JsonValue | null
+  reservedAmount: runtime.Decimal | null
+  reservationFeeRate: runtime.Decimal | null
+  reservationReleasedAt: Date | null
+  cancelReason: string | null
   submittedAt: Date
   executedAt: Date | null
   canceledAt: Date | null
@@ -393,6 +429,10 @@ export type OrderWhereInput = {
   idempotencyKey?: Prisma.StringNullableFilter<"Order"> | string | null
   requestHash?: Prisma.StringNullableFilter<"Order"> | string | null
   responsePayloadJson?: Prisma.JsonNullableFilter<"Order">
+  reservedAmount?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  cancelReason?: Prisma.StringNullableFilter<"Order"> | string | null
   submittedAt?: Prisma.DateTimeFilter<"Order"> | Date | string
   executedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   canceledAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
@@ -427,6 +467,10 @@ export type OrderOrderByWithRelationInput = {
   idempotencyKey?: Prisma.SortOrderInput | Prisma.SortOrder
   requestHash?: Prisma.SortOrderInput | Prisma.SortOrder
   responsePayloadJson?: Prisma.SortOrderInput | Prisma.SortOrder
+  reservedAmount?: Prisma.SortOrderInput | Prisma.SortOrder
+  reservationFeeRate?: Prisma.SortOrderInput | Prisma.SortOrder
+  reservationReleasedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  cancelReason?: Prisma.SortOrderInput | Prisma.SortOrder
   submittedAt?: Prisma.SortOrder
   executedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   canceledAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -465,6 +509,10 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
   idempotencyKey?: Prisma.StringNullableFilter<"Order"> | string | null
   requestHash?: Prisma.StringNullableFilter<"Order"> | string | null
   responsePayloadJson?: Prisma.JsonNullableFilter<"Order">
+  reservedAmount?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  cancelReason?: Prisma.StringNullableFilter<"Order"> | string | null
   submittedAt?: Prisma.DateTimeFilter<"Order"> | Date | string
   executedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   canceledAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
@@ -499,6 +547,10 @@ export type OrderOrderByWithAggregationInput = {
   idempotencyKey?: Prisma.SortOrderInput | Prisma.SortOrder
   requestHash?: Prisma.SortOrderInput | Prisma.SortOrder
   responsePayloadJson?: Prisma.SortOrderInput | Prisma.SortOrder
+  reservedAmount?: Prisma.SortOrderInput | Prisma.SortOrder
+  reservationFeeRate?: Prisma.SortOrderInput | Prisma.SortOrder
+  reservationReleasedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  cancelReason?: Prisma.SortOrderInput | Prisma.SortOrder
   submittedAt?: Prisma.SortOrder
   executedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   canceledAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -536,6 +588,10 @@ export type OrderScalarWhereWithAggregatesInput = {
   idempotencyKey?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
   requestHash?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
   responsePayloadJson?: Prisma.JsonNullableWithAggregatesFilter<"Order">
+  reservedAmount?: Prisma.DecimalNullableWithAggregatesFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.DecimalNullableWithAggregatesFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Order"> | Date | string | null
+  cancelReason?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
   submittedAt?: Prisma.DateTimeWithAggregatesFilter<"Order"> | Date | string
   executedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Order"> | Date | string | null
   canceledAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Order"> | Date | string | null
@@ -560,6 +616,10 @@ export type OrderCreateInput = {
   idempotencyKey?: string | null
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Date | string | null
+  cancelReason?: string | null
   submittedAt: Date | string
   executedAt?: Date | string | null
   canceledAt?: Date | string | null
@@ -594,6 +654,10 @@ export type OrderUncheckedCreateInput = {
   idempotencyKey?: string | null
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Date | string | null
+  cancelReason?: string | null
   submittedAt: Date | string
   executedAt?: Date | string | null
   canceledAt?: Date | string | null
@@ -618,6 +682,10 @@ export type OrderUpdateInput = {
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -652,6 +720,10 @@ export type OrderUncheckedUpdateInput = {
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -681,6 +753,10 @@ export type OrderCreateManyInput = {
   idempotencyKey?: string | null
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Date | string | null
+  cancelReason?: string | null
   submittedAt: Date | string
   executedAt?: Date | string | null
   canceledAt?: Date | string | null
@@ -705,6 +781,10 @@ export type OrderUpdateManyMutationInput = {
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -734,6 +814,10 @@ export type OrderUncheckedUpdateManyInput = {
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -778,6 +862,10 @@ export type OrderCountOrderByAggregateInput = {
   idempotencyKey?: Prisma.SortOrder
   requestHash?: Prisma.SortOrder
   responsePayloadJson?: Prisma.SortOrder
+  reservedAmount?: Prisma.SortOrder
+  reservationFeeRate?: Prisma.SortOrder
+  reservationReleasedAt?: Prisma.SortOrder
+  cancelReason?: Prisma.SortOrder
   submittedAt?: Prisma.SortOrder
   executedAt?: Prisma.SortOrder
   canceledAt?: Prisma.SortOrder
@@ -794,6 +882,8 @@ export type OrderAvgOrderByAggregateInput = {
   grossAmount?: Prisma.SortOrder
   feeAmount?: Prisma.SortOrder
   netAmount?: Prisma.SortOrder
+  reservedAmount?: Prisma.SortOrder
+  reservationFeeRate?: Prisma.SortOrder
 }
 
 export type OrderMaxOrderByAggregateInput = {
@@ -815,6 +905,10 @@ export type OrderMaxOrderByAggregateInput = {
   fxRateSnapshotId?: Prisma.SortOrder
   idempotencyKey?: Prisma.SortOrder
   requestHash?: Prisma.SortOrder
+  reservedAmount?: Prisma.SortOrder
+  reservationFeeRate?: Prisma.SortOrder
+  reservationReleasedAt?: Prisma.SortOrder
+  cancelReason?: Prisma.SortOrder
   submittedAt?: Prisma.SortOrder
   executedAt?: Prisma.SortOrder
   canceledAt?: Prisma.SortOrder
@@ -843,6 +937,10 @@ export type OrderMinOrderByAggregateInput = {
   fxRateSnapshotId?: Prisma.SortOrder
   idempotencyKey?: Prisma.SortOrder
   requestHash?: Prisma.SortOrder
+  reservedAmount?: Prisma.SortOrder
+  reservationFeeRate?: Prisma.SortOrder
+  reservationReleasedAt?: Prisma.SortOrder
+  cancelReason?: Prisma.SortOrder
   submittedAt?: Prisma.SortOrder
   executedAt?: Prisma.SortOrder
   canceledAt?: Prisma.SortOrder
@@ -859,6 +957,8 @@ export type OrderSumOrderByAggregateInput = {
   grossAmount?: Prisma.SortOrder
   feeAmount?: Prisma.SortOrder
   netAmount?: Prisma.SortOrder
+  reservedAmount?: Prisma.SortOrder
+  reservationFeeRate?: Prisma.SortOrder
 }
 
 export type OrderCreateNestedManyWithoutSeasonParticipantInput = {
@@ -1098,6 +1198,10 @@ export type OrderCreateWithoutSeasonParticipantInput = {
   idempotencyKey?: string | null
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Date | string | null
+  cancelReason?: string | null
   submittedAt: Date | string
   executedAt?: Date | string | null
   canceledAt?: Date | string | null
@@ -1130,6 +1234,10 @@ export type OrderUncheckedCreateWithoutSeasonParticipantInput = {
   idempotencyKey?: string | null
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Date | string | null
+  cancelReason?: string | null
   submittedAt: Date | string
   executedAt?: Date | string | null
   canceledAt?: Date | string | null
@@ -1188,6 +1296,10 @@ export type OrderScalarWhereInput = {
   idempotencyKey?: Prisma.StringNullableFilter<"Order"> | string | null
   requestHash?: Prisma.StringNullableFilter<"Order"> | string | null
   responsePayloadJson?: Prisma.JsonNullableFilter<"Order">
+  reservedAmount?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.DecimalNullableFilter<"Order"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  cancelReason?: Prisma.StringNullableFilter<"Order"> | string | null
   submittedAt?: Prisma.DateTimeFilter<"Order"> | Date | string
   executedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   canceledAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
@@ -1212,6 +1324,10 @@ export type OrderCreateWithoutAssetInput = {
   idempotencyKey?: string | null
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Date | string | null
+  cancelReason?: string | null
   submittedAt: Date | string
   executedAt?: Date | string | null
   canceledAt?: Date | string | null
@@ -1244,6 +1360,10 @@ export type OrderUncheckedCreateWithoutAssetInput = {
   idempotencyKey?: string | null
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Date | string | null
+  cancelReason?: string | null
   submittedAt: Date | string
   executedAt?: Date | string | null
   canceledAt?: Date | string | null
@@ -1294,6 +1414,10 @@ export type OrderCreateWithoutAssetPriceSnapshotInput = {
   idempotencyKey?: string | null
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Date | string | null
+  cancelReason?: string | null
   submittedAt: Date | string
   executedAt?: Date | string | null
   canceledAt?: Date | string | null
@@ -1326,6 +1450,10 @@ export type OrderUncheckedCreateWithoutAssetPriceSnapshotInput = {
   idempotencyKey?: string | null
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Date | string | null
+  cancelReason?: string | null
   submittedAt: Date | string
   executedAt?: Date | string | null
   canceledAt?: Date | string | null
@@ -1376,6 +1504,10 @@ export type OrderCreateWithoutFxRateSnapshotInput = {
   idempotencyKey?: string | null
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Date | string | null
+  cancelReason?: string | null
   submittedAt: Date | string
   executedAt?: Date | string | null
   canceledAt?: Date | string | null
@@ -1408,6 +1540,10 @@ export type OrderUncheckedCreateWithoutFxRateSnapshotInput = {
   idempotencyKey?: string | null
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Date | string | null
+  cancelReason?: string | null
   submittedAt: Date | string
   executedAt?: Date | string | null
   canceledAt?: Date | string | null
@@ -1458,6 +1594,10 @@ export type OrderCreateWithoutQuoteInput = {
   idempotencyKey?: string | null
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Date | string | null
+  cancelReason?: string | null
   submittedAt: Date | string
   executedAt?: Date | string | null
   canceledAt?: Date | string | null
@@ -1490,6 +1630,10 @@ export type OrderUncheckedCreateWithoutQuoteInput = {
   idempotencyKey?: string | null
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Date | string | null
+  cancelReason?: string | null
   submittedAt: Date | string
   executedAt?: Date | string | null
   canceledAt?: Date | string | null
@@ -1544,6 +1688,10 @@ export type OrderCreateManySeasonParticipantInput = {
   idempotencyKey?: string | null
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Date | string | null
+  cancelReason?: string | null
   submittedAt: Date | string
   executedAt?: Date | string | null
   canceledAt?: Date | string | null
@@ -1568,6 +1716,10 @@ export type OrderUpdateWithoutSeasonParticipantInput = {
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1600,6 +1752,10 @@ export type OrderUncheckedUpdateWithoutSeasonParticipantInput = {
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1628,6 +1784,10 @@ export type OrderUncheckedUpdateManyWithoutSeasonParticipantInput = {
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1656,6 +1816,10 @@ export type OrderCreateManyAssetInput = {
   idempotencyKey?: string | null
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Date | string | null
+  cancelReason?: string | null
   submittedAt: Date | string
   executedAt?: Date | string | null
   canceledAt?: Date | string | null
@@ -1680,6 +1844,10 @@ export type OrderUpdateWithoutAssetInput = {
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1712,6 +1880,10 @@ export type OrderUncheckedUpdateWithoutAssetInput = {
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1740,6 +1912,10 @@ export type OrderUncheckedUpdateManyWithoutAssetInput = {
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1768,6 +1944,10 @@ export type OrderCreateManyAssetPriceSnapshotInput = {
   idempotencyKey?: string | null
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Date | string | null
+  cancelReason?: string | null
   submittedAt: Date | string
   executedAt?: Date | string | null
   canceledAt?: Date | string | null
@@ -1792,6 +1972,10 @@ export type OrderUpdateWithoutAssetPriceSnapshotInput = {
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1824,6 +2008,10 @@ export type OrderUncheckedUpdateWithoutAssetPriceSnapshotInput = {
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1852,6 +2040,10 @@ export type OrderUncheckedUpdateManyWithoutAssetPriceSnapshotInput = {
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1880,6 +2072,10 @@ export type OrderCreateManyFxRateSnapshotInput = {
   idempotencyKey?: string | null
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Date | string | null
+  cancelReason?: string | null
   submittedAt: Date | string
   executedAt?: Date | string | null
   canceledAt?: Date | string | null
@@ -1904,6 +2100,10 @@ export type OrderUpdateWithoutFxRateSnapshotInput = {
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1936,6 +2136,10 @@ export type OrderUncheckedUpdateWithoutFxRateSnapshotInput = {
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1964,6 +2168,10 @@ export type OrderUncheckedUpdateManyWithoutFxRateSnapshotInput = {
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1992,6 +2200,10 @@ export type OrderCreateManyQuoteInput = {
   idempotencyKey?: string | null
   requestHash?: string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Date | string | null
+  cancelReason?: string | null
   submittedAt: Date | string
   executedAt?: Date | string | null
   canceledAt?: Date | string | null
@@ -2016,6 +2228,10 @@ export type OrderUpdateWithoutQuoteInput = {
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -2048,6 +2264,10 @@ export type OrderUncheckedUpdateWithoutQuoteInput = {
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -2076,6 +2296,10 @@ export type OrderUncheckedUpdateManyWithoutQuoteInput = {
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -2107,6 +2331,10 @@ export type OrderSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   idempotencyKey?: boolean
   requestHash?: boolean
   responsePayloadJson?: boolean
+  reservedAmount?: boolean
+  reservationFeeRate?: boolean
+  reservationReleasedAt?: boolean
+  cancelReason?: boolean
   submittedAt?: boolean
   executedAt?: boolean
   canceledAt?: boolean
@@ -2141,6 +2369,10 @@ export type OrderSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   idempotencyKey?: boolean
   requestHash?: boolean
   responsePayloadJson?: boolean
+  reservedAmount?: boolean
+  reservationFeeRate?: boolean
+  reservationReleasedAt?: boolean
+  cancelReason?: boolean
   submittedAt?: boolean
   executedAt?: boolean
   canceledAt?: boolean
@@ -2175,6 +2407,10 @@ export type OrderSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   idempotencyKey?: boolean
   requestHash?: boolean
   responsePayloadJson?: boolean
+  reservedAmount?: boolean
+  reservationFeeRate?: boolean
+  reservationReleasedAt?: boolean
+  cancelReason?: boolean
   submittedAt?: boolean
   executedAt?: boolean
   canceledAt?: boolean
@@ -2209,6 +2445,10 @@ export type OrderSelectScalar = {
   idempotencyKey?: boolean
   requestHash?: boolean
   responsePayloadJson?: boolean
+  reservedAmount?: boolean
+  reservationFeeRate?: boolean
+  reservationReleasedAt?: boolean
+  cancelReason?: boolean
   submittedAt?: boolean
   executedAt?: boolean
   canceledAt?: boolean
@@ -2218,7 +2458,7 @@ export type OrderSelectScalar = {
   updatedAt?: boolean
 }
 
-export type OrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "seasonParticipantId" | "assetId" | "quoteId" | "side" | "orderType" | "status" | "quantity" | "limitPrice" | "executedPrice" | "currencyCode" | "grossAmount" | "feeAmount" | "netAmount" | "assetPriceSnapshotId" | "fxRateSnapshotId" | "idempotencyKey" | "requestHash" | "responsePayloadJson" | "submittedAt" | "executedAt" | "canceledAt" | "rejectedAt" | "rejectReason" | "createdAt" | "updatedAt", ExtArgs["result"]["order"]>
+export type OrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "seasonParticipantId" | "assetId" | "quoteId" | "side" | "orderType" | "status" | "quantity" | "limitPrice" | "executedPrice" | "currencyCode" | "grossAmount" | "feeAmount" | "netAmount" | "assetPriceSnapshotId" | "fxRateSnapshotId" | "idempotencyKey" | "requestHash" | "responsePayloadJson" | "reservedAmount" | "reservationFeeRate" | "reservationReleasedAt" | "cancelReason" | "submittedAt" | "executedAt" | "canceledAt" | "rejectedAt" | "rejectReason" | "createdAt" | "updatedAt", ExtArgs["result"]["order"]>
 export type OrderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
@@ -2270,6 +2510,10 @@ export type $OrderPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     idempotencyKey: string | null
     requestHash: string | null
     responsePayloadJson: runtime.JsonValue | null
+    reservedAmount: runtime.Decimal | null
+    reservationFeeRate: runtime.Decimal | null
+    reservationReleasedAt: Date | null
+    cancelReason: string | null
     submittedAt: Date
     executedAt: Date | null
     canceledAt: Date | null
@@ -2724,6 +2968,10 @@ export interface OrderFieldRefs {
   readonly idempotencyKey: Prisma.FieldRef<"Order", 'String'>
   readonly requestHash: Prisma.FieldRef<"Order", 'String'>
   readonly responsePayloadJson: Prisma.FieldRef<"Order", 'Json'>
+  readonly reservedAmount: Prisma.FieldRef<"Order", 'Decimal'>
+  readonly reservationFeeRate: Prisma.FieldRef<"Order", 'Decimal'>
+  readonly reservationReleasedAt: Prisma.FieldRef<"Order", 'DateTime'>
+  readonly cancelReason: Prisma.FieldRef<"Order", 'String'>
   readonly submittedAt: Prisma.FieldRef<"Order", 'DateTime'>
   readonly executedAt: Prisma.FieldRef<"Order", 'DateTime'>
   readonly canceledAt: Prisma.FieldRef<"Order", 'DateTime'>

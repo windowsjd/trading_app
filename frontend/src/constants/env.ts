@@ -96,6 +96,19 @@ export const API_BASE_URL = apiOrigin
 
 export const WS_BASE_URL = configuredWsBaseUrl || toWsOrigin(apiOrigin);
 
+/**
+ * Limit-buy order UI flag (phase 1: registration/cancel only, no automatic
+ * execution). Default OFF: only an explicit 'true' or '1' enables the
+ * market/limit toggle. Existing submitted limit orders stay visible and
+ * cancelable in the order history regardless of this flag.
+ */
+export const LIMIT_ORDER_ENABLED = (() => {
+  const value = getRuntimeEnvValue('EXPO_PUBLIC_LIMIT_ORDER_ENABLED')
+    ?.trim()
+    .toLowerCase();
+  return value === 'true' || value === '1';
+})();
+
 export function buildWsUrl(path: string) {
   if (!WS_BASE_URL) return null;
 

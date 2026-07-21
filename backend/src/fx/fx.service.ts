@@ -20,6 +20,7 @@ import {
 } from '../generated/prisma/client';
 import { buildPagination, type Pagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
+import { debitAvailableCash } from '../wallets/cash-wallet-atomic';
 import {
   buildFxExecuteErrorEnvelope,
   fxExecuteErrorCodes,
@@ -971,12 +972,15 @@ export class FxService {
       },
       select: {
         balanceAmount: true,
+        reservedAmount: true,
       },
     });
 
     if (
       !wallet ||
-      this.toDecimal(wallet.balanceAmount).lt(input.sourceAmount)
+      this.toDecimal(wallet.balanceAmount)
+        .sub(this.toDecimal(wallet.reservedAmount ?? '0'))
+        .lt(input.sourceAmount)
     ) {
       this.throwApiError(
         HttpStatus.CONFLICT,
@@ -1207,8 +1211,12 @@ export class FxService {
     }
 
     const sourceAmount = new Prisma.Decimal(normalizedRequest.sourceAmount);
-    const sourceWalletBalance = this.toDecimal(sourceWallet.balanceAmount);
-    if (sourceWalletBalance.lt(sourceAmount)) {
+    // Spendable cash is the AVAILABLE balance: reserved cash belongs to
+    // submitted limit-buy orders and must never fund an FX conversion.
+    const sourceWalletAvailable = this.toDecimal(
+      sourceWallet.balanceAmount,
+    ).sub(this.toDecimal(sourceWallet.reservedAmount ?? '0'));
+    if (sourceWalletAvailable.lt(sourceAmount)) {
       this.throwFxExecuteError(fxExecuteErrorCodes.INSUFFICIENT_BALANCE);
     }
 
@@ -1686,6 +1694,7 @@ export class FxService {
         seasonParticipantId: true,
         currencyCode: true,
         balanceAmount: true,
+        reservedAmount: true,
       },
     });
   }
@@ -2116,23 +2125,16 @@ export class FxService {
     tx: FxExecuteTransactionClient,
     plan: FxExecutePlan,
   ): Promise<FxExecutePostUpdateWallet> {
-    const debitResult = await tx.cashWallet.updateMany({
-      where: {
-        id: plan.sourceWalletId,
-        seasonParticipantId: plan.seasonParticipantId,
-        currencyCode: plan.fromCurrency,
-        balanceAmount: {
-          gte: plan.sourceDebitAmount,
-        },
-      },
-      data: {
-        balanceAmount: {
-          decrement: plan.sourceDebitAmount,
-        },
-      },
+    // Atomic available-balance debit: reserved cash (submitted limit-buy
+    // orders) can never be spent by FX, even under concurrent reservations.
+    const debitCount = await debitAvailableCash(tx, {
+      walletId: plan.sourceWalletId,
+      seasonParticipantId: plan.seasonParticipantId,
+      currencyCode: plan.fromCurrency,
+      amount: plan.sourceDebitAmount,
     });
 
-    if (debitResult.count !== 1) {
+    if (debitCount !== 1) {
       await this.throwSourceDebitFailure(tx, plan);
     }
 
@@ -2185,6 +2187,7 @@ export class FxService {
       },
       select: {
         balanceAmount: true,
+        reservedAmount: true,
       },
     });
 
@@ -2193,9 +2196,9 @@ export class FxService {
     }
 
     if (
-      this.toDecimal(sourceWallet.balanceAmount).lt(
-        this.toDecimal(plan.sourceDebitAmount),
-      )
+      this.toDecimal(sourceWallet.balanceAmount)
+        .sub(this.toDecimal(sourceWallet.reservedAmount ?? '0'))
+        .lt(this.toDecimal(plan.sourceDebitAmount))
     ) {
       this.throwFxExecuteError(fxExecuteErrorCodes.INSUFFICIENT_BALANCE);
     }

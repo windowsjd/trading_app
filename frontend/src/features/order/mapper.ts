@@ -2,14 +2,14 @@ import type { CreateOrderDto, OrderQuoteDto } from './api';
 import {
   isIdempotencyConflictError,
   isRequoteRequiredError,
-} from '../../services/api/errorMapper';
-import { formatSourceMetadata } from '../../models/dto/common';
+} from '../../services/api/errorMapper.ts';
+import { formatSourceMetadata } from '../../models/dto/common.ts';
 import {
   formatCurrency,
   formatKrw,
   formatMoney,
   getAssetNameDisplay,
-} from '../../utils/format';
+} from '../../utils/format.ts';
 
 function parseTimestamp(value?: string | null) {
   if (!value) return null;
@@ -83,8 +83,18 @@ export function getOrderQuoteDisplay(quote: OrderQuoteDto) {
 export function isOrderSuccess(result: CreateOrderDto | null | undefined) {
   return (
     result?.execution?.state === 'executed' ||
-    result?.execution?.state === 'already_executed'
+    result?.execution?.state === 'already_executed' ||
+    // Limit-buy phase 1: a submitted (unfilled) registration IS the success
+    // outcome — there is no automatic execution afterwards.
+    result?.execution?.state === 'submitted'
   );
+}
+
+/** True when the create result is an unfilled limit-buy registration. */
+export function isSubmittedLimitOrder(
+  result: CreateOrderDto | null | undefined,
+) {
+  return result?.execution?.state === 'submitted';
 }
 
 export function getOrderSuccessDisplay(result: CreateOrderDto) {
@@ -130,7 +140,13 @@ export function getOrderSuccessDisplay(result: CreateOrderDto) {
       execution.walletBalanceAfter,
       currencyCode,
     ),
+    limitPrice: formatMoney(order.limitPrice, currencyCode),
+    reservedAmount: formatCurrency(
+      execution.reservedAmount ?? order.reservedAmount,
+      currencyCode,
+    ),
     isAlreadyExecuted: execution.state === 'already_executed',
+    isSubmittedLimitOrder: execution.state === 'submitted',
   };
 }
 

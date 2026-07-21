@@ -166,11 +166,13 @@ describe('WalletsService', () => {
       {
         currencyCode: CurrencyCode.KRW,
         balanceAmount: new Prisma.Decimal('10000000.00000000'),
+        reservedAmount: new Prisma.Decimal('250000.00000000'),
         updatedAt,
       },
       {
         currencyCode: CurrencyCode.USD,
         balanceAmount: new Prisma.Decimal('100.00000000'),
+        reservedAmount: new Prisma.Decimal('0'),
         updatedAt,
       },
     ]);
@@ -187,11 +189,15 @@ describe('WalletsService', () => {
         {
           currencyCode: CurrencyCode.KRW,
           balanceAmount: '10000000.00000000',
+          reservedAmount: '250000.00000000',
+          availableAmount: '9750000.00000000',
           updatedAt: '2026-05-07T00:00:00.000Z',
         },
         {
           currencyCode: CurrencyCode.USD,
           balanceAmount: '100.00000000',
+          reservedAmount: '0.00000000',
+          availableAmount: '100.00000000',
         },
       ],
       summary: {

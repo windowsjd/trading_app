@@ -56,6 +56,8 @@ If the logged-in user joined the selected current season, wallets are returned r
       {
         "currencyCode": "KRW | USD",
         "balanceAmount": "<amount string>",
+        "reservedAmount": "<amount string>",
+        "availableAmount": "<amount string>",
         "updatedAt": "<UTC ISO string>"
       }
     ],
@@ -67,6 +69,20 @@ If the logged-in user joined the selected current season, wallets are returned r
   }
 }
 ```
+
+Wallet amount semantics (additive fields, phase-1 limit-buy foundation):
+
+- `balanceAmount`: total cash the user owns. This is the ONLY input to
+  total-asset valuation (home/portfolio/ranking/equity snapshots/
+  settlement/records); reservations never reduce it.
+- `reservedAmount`: cash locked by SUBMITTED limit-buy orders. Restricted
+  from further spending, but still the user's asset.
+- `availableAmount`: `balanceAmount - reservedAmount`, computed server-side
+  with Prisma Decimal (never stored in DB). Every new order, FX conversion,
+  and any other ordinary cash debit may only spend this amount; clients use
+  it for buyable-amount displays and ratio buttons.
+
+Existing clients that only read `balanceAmount` keep working unchanged.
 
 ## Not Joined Response
 

@@ -440,6 +440,10 @@ export const OrderScalarFieldEnum = {
   idempotencyKey: 'idempotencyKey',
   requestHash: 'requestHash',
   responsePayloadJson: 'responsePayloadJson',
+  reservedAmount: 'reservedAmount',
+  reservationFeeRate: 'reservationFeeRate',
+  reservationReleasedAt: 'reservationReleasedAt',
+  cancelReason: 'cancelReason',
   submittedAt: 'submittedAt',
   executedAt: 'executedAt',
   canceledAt: 'canceledAt',
@@ -457,6 +461,7 @@ export const CashWalletScalarFieldEnum = {
   seasonParticipantId: 'seasonParticipantId',
   currencyCode: 'currencyCode',
   balanceAmount: 'balanceAmount',
+  reservedAmount: 'reservedAmount',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const

@@ -36,6 +36,27 @@ This service owns backend APIs, database access, financial calculations, and ser
 - Season settlement freezes valuation at `Season.endAt`, uses the latest valid price and USD/KRW rows with `effectiveAt <= Season.endAt` without enforcing quote/execute freshness windows, writes final `equity_snapshots`, creates `rankType=final` rankings, assigns final tiers, and changes the season to `settled` only after final rank and tier readiness checks pass. Reward payout remains pending/unimplemented.
 - Market holidays are configured in `src/orders/market-holidays.config.ts`; domestic/US stock quote/create/execute return `MARKET_CLOSED` on configured holidays, while crypto orders and FX are not holiday-blocked.
 
+### Limit buy orders (phase 1 foundation, flag off by default)
+
+Limit BUY orders exist as a reservation-only foundation behind
+`LIMIT_ORDER_ENABLED` (default false):
+
+- Quote/create register a full-quantity GTC-style limit BUY as
+  `status=submitted` and atomically reserve `gross + fee` cash
+  (`cash_wallets.reserved_amount`); `availableAmount = balance - reserved`
+  is derived server-side and is the ceiling for EVERY ordinary cash debit
+  (market buy, FX source debit).
+- There is NO automatic matching/execution in this phase: a marketable
+  limit price is still registered as submitted, no provider price is read,
+  and price movement never changes order state. Release paths are user
+  cancel (`POST /api/v1/orders/:orderId/cancel`), season-end cleanup, and
+  participant-exclusion cleanup only. Settlement is blocked while open
+  reservations remain (`OPEN_LIMIT_ORDER_RESERVATIONS`).
+- Total-asset valuation keeps using the full `balanceAmount`; reservations
+  never reduce it.
+- Cancel and lifecycle cleanup work even while the flag is off. Do not
+  enable the flag in production until the phase-2 execution engine ships.
+
 ## STOP / Not Implemented
 
 These are intentionally outside the current implementation and should not be added without a separate gate:
@@ -49,7 +70,9 @@ These are intentionally outside the current implementation and should not be add
 - KIS order/account/balance/fill/deposit/withdrawal APIs, KIS orderbook/hoga, Binance authenticated/order/account/user-data APIs, and real external trading/account integrations.
 - External payment, point, coupon, gifticon, delivery, cash-out, or provider-backed reward fulfillment. App-internal operator/admin reward fulfillment creates `SeasonReward` rows only when fulfilled.
 - Access token blacklist/revocation, server-side session auth, and cookie auth.
-- Matching engine, partial fill, or exact order execute replay.
+- Matching engine, partial fill, or exact order execute replay. This
+  includes limit-order AUTO-EXECUTION: no limit-order matching service,
+  scheduler job, candle-based evidence, or Redis stream exists in phase 1.
 - Fake, static, sample, temporary, or fallback business price data.
 
 ## Environment Variables
@@ -254,6 +277,9 @@ Opt-in real Redis smoke test (needs a reachable `REDIS_URL`; runs in-process, so
 CANDLE_CACHE_REDIS_SMOKE=1 pnpm test -- asset-candles-cache.integration.spec.ts
 CANDLE_SERVING_DB_SMOKE=1 pnpm test -- candle-pipeline-foundation.integration.spec.ts
 KIS_COORDINATION_REDIS_SMOKE=1 pnpm test -- kis-coordination.integration.spec.ts
+# Limit-buy cash reservation vs PostgreSQL: concurrency (double-booking),
+# CHECK constraints, rollback, single release, reserved-cash protection.
+LIMIT_ORDER_RESERVATION_DB_INTEGRATION=1 pnpm test -- limit-order-reservation.integration.spec.ts
 ```
 
 It only creates and deletes keys under a random-UUID asset namespace and never flushes shared Redis data.

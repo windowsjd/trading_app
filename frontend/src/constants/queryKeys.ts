@@ -168,6 +168,7 @@ export const QUERY_KEYS = {
   },
 
   record: {
+    all: ['record'] as const,
     seasons: (params?: { limit?: number; offset?: number }) =>
       [
         'record',

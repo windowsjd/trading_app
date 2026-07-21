@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { LimitOrderCancelService } from '../orders/limit-order-cancel.service';
+import { OrderReservationService } from '../orders/order-reservation.service';
 import { PortfolioValuationService } from '../portfolio/portfolio-valuation.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { BatchService } from './batch.service';
@@ -14,6 +16,8 @@ import { SeasonLifecycleTransitionJobService } from './season-lifecycle-transiti
   imports: [PrismaModule],
   providers: [
     BatchService,
+    LimitOrderCancelService,
+    OrderReservationService,
     DailyPortfolioSnapshotJobService,
     DailySeasonCycleJobService,
     FinalTierAssignmentJobService,

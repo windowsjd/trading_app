@@ -63,6 +63,9 @@ export const TEST_IDS = {
     quantityInput: 'order-quantity-input',
     quoteSubmit: 'order-quote-submit',
     executeSubmit: 'order-execute-submit',
+    typeToggleMarket: 'order-type-toggle-market',
+    typeToggleLimit: 'order-type-toggle-limit',
+    limitPriceInput: 'order-limit-price-input',
   },
 
   portfolio: {
@@ -110,6 +113,7 @@ export const TEST_IDS = {
     orderFilterBuy: 'record-order-filter-buy',
     orderFilterSell: 'record-order-filter-sell',
     orderItem: (key: string) => `record-order-item-${key}`,
+    orderCancel: (key: string) => `record-order-cancel-${key}`,
 
     exchangeListScreen: 'record-exchange-list-screen',
     exchangeListRetry: 'record-exchange-list-retry',

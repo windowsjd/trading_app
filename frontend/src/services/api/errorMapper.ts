@@ -1,4 +1,4 @@
-import { ERROR_CODE, type ErrorCode } from '../../models/enums/errorCode';
+import { ERROR_CODE, type ErrorCode } from '../../models/enums/errorCode.ts';
 
 type ApiErrorLike = {
   response?: {
@@ -250,6 +250,26 @@ export function getErrorMessageFromCode(
       return '장 마감으로 주문할 수 없습니다.';
     case ERROR_CODE.MARKET_CALENDAR_UNAVAILABLE:
       return '시장 운영 정보를 확인할 수 없어 주문할 수 없습니다. 잠시 후 다시 시도해주세요.';
+    case ERROR_CODE.LIMIT_ORDER_DISABLED:
+      return '지정가 주문 기능이 아직 활성화되지 않았습니다.';
+    case ERROR_CODE.LIMIT_BUY_ONLY:
+      return '지정가 주문은 현재 매수만 지원합니다.';
+    case ERROR_CODE.INVALID_LIMIT_PRICE:
+      return '지정가 가격을 확인해주세요. 0보다 큰 숫자여야 합니다.';
+    case ERROR_CODE.INSUFFICIENT_AVAILABLE_BALANCE:
+      return '사용 가능 현금이 부족합니다. 기존 예약 주문을 확인해주세요.';
+    case ERROR_CODE.ORDER_RESERVATION_CONFLICT:
+      return '예약 처리 중 충돌이 발생했습니다. 다시 시도해주세요.';
+    case ERROR_CODE.ORDER_RESERVATION_INCONSISTENT:
+      return '예약 상태를 확인할 수 없습니다. 잠시 후 다시 시도해주세요.';
+    case ERROR_CODE.ORDER_NOT_CANCELABLE:
+      return '이미 체결되었거나 취소할 수 없는 주문입니다.';
+    case ERROR_CODE.ORDER_CANCEL_CONFLICT:
+      return '주문 상태가 변경되어 취소하지 못했습니다. 새로고침 후 다시 확인해주세요.';
+    case ERROR_CODE.ORDER_CANCEL_NOT_SUPPORTED:
+      return '시장가 주문은 취소할 수 없습니다.';
+    case ERROR_CODE.ORDER_TYPE_NOT_SUPPORTED:
+      return '지원하지 않는 주문 유형입니다.';
     case ERROR_CODE.PRICE_STALE:
       return '가격 갱신 대기 중입니다.';
     case ERROR_CODE.ASSET_PRICE_UNAVAILABLE:

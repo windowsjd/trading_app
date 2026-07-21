@@ -6,16 +6,16 @@ import type {
   WalletCurrency,
   WalletsDto,
 } from './api';
-import { ERROR_CODE } from '../../models/enums/errorCode';
+import { ERROR_CODE } from '../../models/enums/errorCode.ts';
 import type { WalletFxViewState } from '../../models/enums/viewState';
 import {
   getApiErrorCode,
   isIdempotencyConflictError,
   isQuoteExpiredError,
   isRequoteRequiredError,
-} from '../../services/api/errorMapper';
-import { formatSourceMetadata } from '../../models/dto/common';
-import { formatCurrency, formatKrw, formatMoney } from '../../utils/format';
+} from '../../services/api/errorMapper.ts';
+import { formatSourceMetadata } from '../../models/dto/common.ts';
+import { formatCurrency, formatKrw, formatMoney } from '../../utils/format.ts';
 
 type WalletQueryState = {
   isLoading?: boolean;
@@ -73,6 +73,30 @@ export function getWalletBalanceAmount(
 ) {
   const wallet = getWalletByCurrency(walletsDto, currencyCode);
   return wallet?.balanceAmount ?? wallet?.balance ?? '0';
+}
+
+/** Cash locked by submitted limit-buy orders ('0' when absent). */
+export function getWalletReservedAmount(
+  walletsDto: WalletsDto | null | undefined,
+  currencyCode: WalletCurrency,
+) {
+  const wallet = getWalletByCurrency(walletsDto, currencyCode);
+  return wallet?.reservedAmount ?? '0';
+}
+
+/**
+ * Spendable cash for new orders/FX. Prefers the server-computed
+ * availableAmount; falls back to balance for older wallet payloads that
+ * predate the reservation fields.
+ */
+export function getWalletAvailableAmount(
+  walletsDto: WalletsDto | null | undefined,
+  currencyCode: WalletCurrency,
+) {
+  const wallet = getWalletByCurrency(walletsDto, currencyCode);
+  return (
+    wallet?.availableAmount ?? wallet?.balanceAmount ?? wallet?.balance ?? '0'
+  );
 }
 
 export function calculateUsdBalanceKrw(

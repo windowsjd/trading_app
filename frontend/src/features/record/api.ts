@@ -8,6 +8,7 @@ import type {
   RateString,
 } from '../../models/dto/common';
 import { formatCurrency, getAssetNameDisplay } from '../../utils/format';
+import { getOrderStatusLabel, isOpenLimitBuyOrder } from './openOrder';
 
 export interface RecordSeasonListItemDto {
   seasonId: string;
@@ -130,14 +131,21 @@ export interface RecordOrderItemDto {
   symbol?: string;
   name?: string;
   side: 'buy' | 'sell';
+  orderType?: 'market' | 'limit' | (string & {});
+  status?: 'submitted' | 'executed' | 'canceled' | 'rejected' | (string & {});
   quantity: QuantityString;
   price?: MoneyString;
+  limitPrice?: MoneyString | null;
   executedPrice?: MoneyString;
   fillPriceLocal?: MoneyString;
   currencyCode?: 'KRW' | 'USD';
   fillCurrency?: 'KRW' | 'USD';
   netAmount?: MoneyString;
   netAmountLocal?: MoneyString;
+  // Limit-buy additive fields.
+  reservedAmount?: MoneyString | null;
+  reservationReleasedAt?: IsoDateTimeString | null;
+  cancelReason?: string | null;
 }
 
 export interface RecordExchangeItemDto {
@@ -210,16 +218,30 @@ function normalizePage<T>(
   };
 }
 
+export { isOpenLimitBuyOrder } from './openOrder';
+
 export function getRecordOrderDisplay(item: RecordOrderItemDto) {
   const currencyCode = item.currencyCode ?? item.fillCurrency ?? '';
   const nameDisplay = getAssetNameDisplay({ name: item.name, symbol: item.symbol });
 
   return {
     key: item.orderId ?? item.id ?? `${item.assetId ?? item.symbol}-${item.executedAt}`,
+    orderId: item.orderId ?? item.id ?? null,
     symbol: item.symbol ?? item.assetId ?? '-',
     name: nameDisplay.primary,
     executedAt: item.executedAt ?? item.submittedAt ?? '-',
     side: item.side,
+    // '지정가 매수' badge input; market rows keep their historical look.
+    isLimitOrder: item.orderType === 'limit',
+    statusLabel: getOrderStatusLabel(item.status),
+    isOpenLimitBuy: isOpenLimitBuyOrder(item),
+    limitPrice: item.limitPrice
+      ? formatCurrency(item.limitPrice, currencyCode)
+      : null,
+    reservedAmount: item.reservedAmount
+      ? formatCurrency(item.reservedAmount, currencyCode)
+      : null,
+    submittedAt: item.submittedAt ?? '-',
     quantity: item.quantity,
     price: formatCurrency(
       item.price ?? item.executedPrice ?? item.fillPriceLocal,

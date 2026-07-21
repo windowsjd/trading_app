@@ -21,6 +21,12 @@ export type SeasonLifecycleTransitionSummary = {
   activated: number;
   wouldEnd: number;
   ended: number;
+  /**
+   * Submitted limit-buy orders of ended/settled seasons canceled by this
+   * run (their cash reservations were released). Runs after the status
+   * transition, is idempotent, and self-heals leftovers from earlier runs.
+   */
+  limitOrdersCanceled: number;
 };
 
 export type SeasonLifecycleTransitionJobResult = {

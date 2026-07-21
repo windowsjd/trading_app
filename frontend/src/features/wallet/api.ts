@@ -15,7 +15,12 @@ export type WalletState = SectionState;
 
 export interface WalletBalanceDto {
   currencyCode: WalletCurrency;
+  /** Total owned cash (unchanged by limit-order reservations). */
   balanceAmount: MoneyString;
+  /** Cash locked by submitted limit-buy orders (additive, server-computed). */
+  reservedAmount?: MoneyString;
+  /** balanceAmount - reservedAmount; spendable for new orders/FX. */
+  availableAmount?: MoneyString;
   updatedAt?: IsoDateTimeString;
   // Legacy fallback fields until all wallet consumers are on v2.
   currency?: WalletCurrency;

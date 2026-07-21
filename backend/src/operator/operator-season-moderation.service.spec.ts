@@ -205,8 +205,62 @@ describe('OperatorSeasonModerationService', () => {
         }),
       }),
     );
-    expect(JSON.stringify(prisma.operatorAuditLog.create.mock.calls)).not.toMatch(
-      /passwordHash|rawPayload|provider_payload|token|secret/i,
+    expect(
+      JSON.stringify(prisma.operatorAuditLog.create.mock.calls),
+    ).not.toMatch(/passwordHash|rawPayload|provider_payload|token|secret/i);
+  });
+
+  it('cancels open limit buys and releases reservations inside the exclusion transaction', async () => {
+    const { prisma } = createService();
+    const limitOrderCancelService = {
+      cancelOpenLimitBuysForParticipantInTransaction: jest.fn(() =>
+        Promise.resolve({
+          canceledOrderCount: 2,
+          releasedReservationCount: 2,
+        }),
+      ),
+    };
+    const auditService = new OperatorAuditService(prisma as never);
+    const service = new OperatorSeasonModerationService(
+      prisma as never,
+      auditService,
+      limitOrderCancelService as never,
+    );
+    const participant = createParticipant();
+    const excludedAt = new Date('2026-06-21T03:01:00.000Z');
+    prisma.seasonParticipant.findFirst.mockResolvedValueOnce(participant);
+    prisma.seasonParticipant.update.mockResolvedValueOnce({
+      ...participant,
+      participantStatus: ParticipantStatus.excluded,
+      excludedAt,
+      excludedReason: 'abuse_detected',
+      excludedByUserId: actor.userId,
+      currentRank: null,
+      updatedAt: excludedAt,
+    });
+
+    await service.excludeParticipant(actor, 'season-1', 'sp-1', {
+      reason: 'abuse_detected',
+    });
+
+    expect(
+      limitOrderCancelService.cancelOpenLimitBuysForParticipantInTransaction,
+    ).toHaveBeenCalledWith(
+      prisma,
+      expect.objectContaining({
+        seasonParticipantId: 'sp-1',
+        reason: 'participant_excluded',
+      }),
+    );
+    // The cleanup result is surfaced in the success audit metadata.
+    expect(prisma.operatorAuditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          metadataJson: expect.objectContaining({
+            canceledLimitOrderCount: 2,
+          }) as Record<string, unknown>,
+        }) as Record<string, unknown>,
+      }),
     );
   });
 

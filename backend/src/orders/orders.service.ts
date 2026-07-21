@@ -57,7 +57,22 @@ import {
   calculateMaxDrawdown,
   RankingRefreshService,
 } from '../ranking/ranking-refresh.service';
+import { debitAvailableCash } from '../wallets/cash-wallet-atomic';
 import { assertAssetTradable, MarketHoursError } from './market-hours.policy';
+import { isLimitOrderEnabled } from './limit-order.config';
+import { limitOrderErrorCodes } from './limit-order-error-policy';
+import {
+  LimitOrderCreateService,
+  type LimitOrderCreateResponse,
+} from './limit-order-create.service';
+import {
+  LimitOrderCancelService,
+  type CancelLimitOrderResponse,
+} from './limit-order-cancel.service';
+import {
+  formatOrderResponse,
+  type OrderResponsePayload,
+} from './order-response.presenter';
 
 export type OrdersQuery = {
   seasonId?: string;
@@ -148,36 +163,9 @@ type OrdersResponse = {
       assetId: string | null;
     };
     pagination: Pagination;
-    orders: Array<{
-      orderId: string;
-      quoteId: string | null;
-      asset: {
-        id: string;
-        symbol: string;
-        name: string;
-        market: string;
-        currencyCode: CurrencyCode;
-      };
-      side: OrderSide;
-      orderType: OrderType;
-      status: OrderStatus;
-      quantity: string;
-      limitPrice: string | null;
-      executedPrice: string | null;
-      currencyCode: CurrencyCode;
-      grossAmount: string | null;
-      feeAmount: string | null;
-      netAmount: string | null;
-      assetPriceSnapshotId: string | null;
-      fxRateSnapshotId: string | null;
-      submittedAt: string;
-      executedAt: string | null;
-      canceledAt: string | null;
-      rejectedAt: string | null;
-      rejectReason: string | null;
-      createdAt: string;
-      updatedAt: string;
-    }>;
+    // Shared presenter shape; additive reservation fields (reservedAmount,
+    // reservationReleasedAt, cancelReason) are null for market orders.
+    orders: OrderResponsePayload[];
     reason?: string;
     message?: string;
   };
@@ -245,7 +233,15 @@ type DurableOrderQuoteForCreate = {
 
 type OrderQuoteResponse = {
   success: true;
-  data: ReturnType<OrdersService['formatOrderQuoteData']>;
+  // Additive limit-buy fields are present only on limit quotes.
+  data: ReturnType<OrdersService['formatOrderQuoteData']> & {
+    limitPrice?: string;
+    reservedAmount?: string;
+    walletReservedBefore?: string;
+    walletAvailableBefore?: string;
+    estimatedReservedAfter?: string;
+    estimatedAvailableAfter?: string;
+  };
 };
 
 type CreateOrderResponse = {
@@ -276,17 +272,9 @@ type CreateOrderResponse = {
   };
 };
 
-type CancelOrderResponse = {
-  success: true;
-  data: {
-    order: NonNullable<OrdersResponse['data']['orders']>[number];
-    execution: {
-      state: 'not_executed';
-      reason: 'ORDER_CANCELED_BEFORE_EXECUTION';
-      message: string;
-    };
-  };
-};
+// Cancel responses are built by LimitOrderCancelService
+// (CancelLimitOrderResponse); market orders still reject with
+// ORDER_CANCEL_NOT_SUPPORTED before any response is built.
 
 type ExecuteOrderResponse = {
   success: true;
@@ -434,6 +422,9 @@ const ORDER_EXECUTION_SELECT = {
   netAmount: true,
   assetPriceSnapshotId: true,
   fxRateSnapshotId: true,
+  reservedAmount: true,
+  reservationReleasedAt: true,
+  cancelReason: true,
   submittedAt: true,
   executedAt: true,
   canceledAt: true,
@@ -496,16 +487,65 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly rankingRefreshService?: RankingRefreshService,
+    private readonly limitOrderCreateService?: LimitOrderCreateService,
+    private readonly limitOrderCancelService?: LimitOrderCancelService,
   ) {}
+
+  private assertLimitOrderFeatureEnabled(): void {
+    if (!isLimitOrderEnabled()) {
+      this.throwApiError(
+        HttpStatus.FORBIDDEN,
+        limitOrderErrorCodes.LIMIT_ORDER_DISABLED,
+        'Limit orders are not enabled.',
+      );
+    }
+  }
+
+  private requireLimitOrderCreateService(): LimitOrderCreateService {
+    if (!this.limitOrderCreateService) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'LIMIT_ORDER_SERVICE_UNAVAILABLE',
+        'Limit order create service is not wired.',
+      );
+    }
+    return this.limitOrderCreateService;
+  }
+
+  private requireLimitOrderCancelService(): LimitOrderCancelService {
+    if (!this.limitOrderCancelService) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'LIMIT_ORDER_SERVICE_UNAVAILABLE',
+        'Limit order cancel service is not wired.',
+      );
+    }
+    return this.limitOrderCancelService;
+  }
 
   async quoteOrder(
     userId: string | undefined,
     body: OrderRequestBody = {},
   ): Promise<OrderQuoteResponse> {
-    const quote = await this.buildOrderQuote(
+    if (!userId) {
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
+    }
+
+    const quoteAt = new Date();
+    const request = this.parseOrderRequest(body);
+
+    if (request.orderType === OrderType.limit) {
+      return this.quoteLimitBuyOrder(userId, request, quoteAt);
+    }
+
+    const quote = await this.buildOrderQuoteFromParsedRequest(
       userId,
-      body,
-      new Date(),
+      request,
+      quoteAt,
       'orders_quote',
     );
     const durableQuote = await this.createDurableOrderQuote(userId, quote);
@@ -516,10 +556,150 @@ export class OrdersService {
     };
   }
 
+  /**
+   * Limit-buy quote: reservation preview from limitPrice × quantity only.
+   * No provider asset price is resolved; the USD/KRW snapshot (USD assets)
+   * feeds the KRW display conversion exactly like market quotes. Read-only:
+   * the wallet is never mutated at quote time.
+   */
+  private async quoteLimitBuyOrder(
+    userId: string,
+    request: ParsedOrderRequest,
+    quoteAt: Date,
+  ): Promise<OrderQuoteResponse> {
+    this.assertLimitOrderFeatureEnabled();
+    const limitOrderCreate = this.requireLimitOrderCreateService();
+    if (!request.limitPrice) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        limitOrderErrorCodes.INVALID_LIMIT_PRICE,
+        'limitPrice is required for limit orders.',
+      );
+    }
+
+    const season = await this.findActiveSeasonOrThrow();
+    this.assertSeasonTradable(season, quoteAt);
+    const participant = await this.findParticipantOrThrow(season.id, userId);
+    const asset = await this.findUsableAsset(request.assetId);
+    if (
+      request.currencyCode &&
+      request.currencyCode !== this.getAssetSettlementCurrency(asset)
+    ) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'ASSET_CURRENCY_MISMATCH',
+        'currencyCode must match asset settlementCurrency.',
+      );
+    }
+    if (
+      this.getAssetPriceCurrency(asset) !==
+      this.getAssetSettlementCurrency(asset)
+    ) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'ORDER_PRICE_SETTLEMENT_CURRENCY_NOT_SUPPORTED',
+        'Separate price and settlement currencies are not supported for order execution yet.',
+      );
+    }
+    // Same session policy as market orders: stocks only while the market is
+    // open (calendar fail-closed), crypto 24h.
+    this.assertOrderAssetTradable(asset, quoteAt);
+
+    const settlementCurrency = this.getAssetSettlementCurrency(asset);
+    const preview = await limitOrderCreate.buildLimitBuyQuotePreview({
+      participantId: participant.id,
+      assetId: asset.id,
+      currencyCode: settlementCurrency,
+      limitPrice: request.limitPrice,
+      quantity: request.quantity,
+      tradeFeeRate: season.tradeFeeRate,
+    });
+
+    const fxSnapshot =
+      settlementCurrency === CurrencyCode.USD
+        ? await this.findFreshUsdKrwSnapshot(quoteAt, 'orders_quote')
+        : null;
+    const krwAmounts = this.calculateKrwAmounts(
+      {
+        grossAmount: preview.grossAmount,
+        feeAmount: preview.feeAmount,
+        netAmount: preview.reservedAmount,
+      },
+      settlementCurrency,
+      fxSnapshot?.rate ?? null,
+    );
+
+    const calculation: OrderQuoteCalculation = {
+      season,
+      participant,
+      asset,
+      request,
+      price: request.limitPrice,
+      grossAmount: preview.grossAmount,
+      feeAmount: preview.feeAmount,
+      netAmount: preview.reservedAmount,
+      krwGrossAmount: krwAmounts.krwGrossAmount,
+      krwFeeAmount: krwAmounts.krwFeeAmount,
+      krwNetAmount: krwAmounts.krwNetAmount,
+      assetPriceSnapshotId: null,
+      fxRateSnapshotId: fxSnapshot?.id ?? null,
+      fxRate: fxSnapshot?.rate ?? null,
+      assetPriceSource: null,
+      fxRateSource: fxSnapshot?.fxRateSource ?? null,
+      walletBalanceBefore: preview.walletBalanceBefore,
+      // As-if-filled estimates (same meaning as market quotes). The
+      // REGISTRATION itself changes neither balance nor position — those
+      // effects are exposed via the additive reserved/available fields.
+      estimatedWalletBalanceAfter: preview.walletBalanceBefore.sub(
+        preview.reservedAmount,
+      ),
+      positionQuantityBefore: preview.positionQuantityBefore,
+      estimatedPositionQuantityAfter: preview.estimatedPositionQuantityAfter,
+      quoteAt,
+      quoteId: null,
+      expiresAt: null,
+      maxChangeBps: null,
+      requestHash: null,
+    };
+
+    const durableQuote = await this.createDurableOrderQuote(
+      userId,
+      calculation,
+    );
+
+    return {
+      success: true,
+      data: {
+        ...this.formatOrderQuoteData(durableQuote),
+        limitPrice: this.formatDecimal(request.limitPrice, monetaryScale),
+        reservedAmount: this.formatDecimal(
+          preview.reservedAmount,
+          monetaryScale,
+        ),
+        walletReservedBefore: this.formatDecimal(
+          preview.walletReservedBefore,
+          monetaryScale,
+        ),
+        walletAvailableBefore: this.formatDecimal(
+          preview.walletAvailableBefore,
+          monetaryScale,
+        ),
+        estimatedReservedAfter: this.formatDecimal(
+          preview.estimatedReservedAfter,
+          monetaryScale,
+        ),
+        estimatedAvailableAfter: this.formatDecimal(
+          preview.estimatedAvailableAfter,
+          monetaryScale,
+        ),
+      },
+    };
+  }
+
   async createOrder(
     userId: string | undefined,
     body: OrderRequestBody = {},
-  ): Promise<CreateOrderResponse> {
+  ): Promise<CreateOrderResponse | LimitOrderCreateResponse> {
     if (!userId) {
       this.throwApiError(
         HttpStatus.UNAUTHORIZED,
@@ -529,6 +709,11 @@ export class OrdersService {
     }
 
     const request = this.parseOrderRequest(body);
+
+    if (request.orderType === OrderType.limit) {
+      return this.createLimitBuyOrder(userId, body, request);
+    }
+
     const quoteId = this.parseQuoteId(body.quoteId);
     const idempotency = this.buildOrderCreateIdempotency({
       body,
@@ -680,12 +865,100 @@ export class OrdersService {
     }
   }
 
+  /**
+   * Creates a SUBMITTED limit-buy order with an atomic cash reservation.
+   * Never executes, never reads a provider price, never touches
+   * balanceAmount / WalletTransaction / Position — even when the limit
+   * price is marketable.
+   */
+  private async createLimitBuyOrder(
+    userId: string,
+    body: OrderRequestBody,
+    request: ParsedOrderRequest,
+  ): Promise<CreateOrderResponse | LimitOrderCreateResponse> {
+    this.assertLimitOrderFeatureEnabled();
+    const limitOrderCreate = this.requireLimitOrderCreateService();
+    const quoteId = this.parseQuoteId(body.quoteId);
+    const idempotency = this.buildOrderCreateIdempotency({
+      body,
+      request,
+      quoteId,
+    });
+    const submittedAt = new Date();
+    const season = await this.findActiveSeasonOrThrow();
+    this.assertSeasonTradable(season, submittedAt);
+    const participant = await this.findParticipantOrThrow(season.id, userId);
+    const existingOrder = await this.findIdempotentCreateOrder(
+      participant.id,
+      idempotency.idempotencyKey,
+    );
+
+    if (existingOrder) {
+      return this.replayIdempotentCreateOrder(existingOrder, idempotency);
+    }
+
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const quote = await this.findActiveOrderQuoteForCreateOrThrow(tx, {
+          quoteId,
+          userId,
+          seasonParticipantId: participant.id,
+          request,
+          now: submittedAt,
+        });
+        this.assertOrderAssetTradable(quote.asset, submittedAt);
+
+        if (!quote.limitPrice) {
+          this.throwApiError(
+            HttpStatus.CONFLICT,
+            'QUOTE_MISMATCH',
+            'Quote does not match the order create request.',
+          );
+        }
+
+        return limitOrderCreate.createSubmittedLimitBuyInTransaction(tx, {
+          quote: {
+            id: quote.id,
+            limitPrice: quote.limitPrice,
+            asset: {
+              id: quote.asset.id,
+              settlementCurrency: quote.asset.settlementCurrency,
+              currencyCode: quote.asset.currencyCode,
+            },
+          },
+          season: { tradeFeeRate: season.tradeFeeRate },
+          participant: { id: participant.id },
+          quantity: request.quantity,
+          idempotency,
+          submittedAt,
+        });
+      });
+    } catch (error) {
+      if (!this.isUniqueConstraintError(error)) {
+        throw error;
+      }
+
+      const racedOrder = await this.findIdempotentCreateOrder(
+        participant.id,
+        idempotency.idempotencyKey,
+      );
+
+      if (!racedOrder) {
+        this.throwApiError(
+          HttpStatus.CONFLICT,
+          'ORDER_IDEMPOTENCY_CONFLICT',
+          'Order idempotency conflict.',
+        );
+      }
+
+      return this.replayIdempotentCreateOrder(racedOrder, idempotency);
+    }
+  }
+
   async cancelOrder(
     userId: string | undefined,
     orderId: string | undefined,
-  ): Promise<CancelOrderResponse> {
-    await Promise.resolve();
-
+  ): Promise<CancelLimitOrderResponse> {
     if (!userId) {
       this.throwApiError(
         HttpStatus.UNAUTHORIZED,
@@ -694,12 +967,16 @@ export class OrdersService {
       );
     }
 
-    void orderId;
-    this.throwApiError(
-      HttpStatus.GONE,
-      'ORDER_CANCEL_NOT_SUPPORTED',
-      'Order cancel is not supported for MVP market orders.',
-    );
+    const parsedOrderId = this.parseOrderId(orderId);
+    // Limit buy orders are cancelable; market orders keep the historical
+    // ORDER_CANCEL_NOT_SUPPORTED (410) inside the cancel service. Cancel is
+    // intentionally NOT gated by LIMIT_ORDER_ENABLED so existing
+    // reservations can always be released.
+    return this.requireLimitOrderCancelService().cancelOwnedLimitBuyOrder({
+      userId,
+      orderId: parsedOrderId,
+      canceledAt: new Date(),
+    });
   }
 
   async executeOrder(
@@ -861,6 +1138,9 @@ export class OrdersService {
           netAmount: true,
           assetPriceSnapshotId: true,
           fxRateSnapshotId: true,
+          reservedAmount: true,
+          reservationReleasedAt: true,
+          cancelReason: true,
           submittedAt: true,
           executedAt: true,
           canceledAt: true,
@@ -1369,23 +1649,16 @@ export class OrdersService {
       order.currencyCode,
     );
     const netAmount = this.formatDecimal(plan.netAmount, monetaryScale);
-    const debitResult = await tx.cashWallet.updateMany({
-      where: {
-        id: wallet.id,
-        seasonParticipantId: order.seasonParticipantId,
-        currencyCode: order.currencyCode,
-        balanceAmount: {
-          gte: netAmount,
-        },
-      },
-      data: {
-        balanceAmount: {
-          decrement: netAmount,
-        },
-      },
+    // Atomic available-balance debit: cash reserved by submitted limit-buy
+    // orders is never spendable by a market buy, even under concurrency.
+    const debitCount = await debitAvailableCash(tx, {
+      walletId: wallet.id,
+      seasonParticipantId: order.seasonParticipantId,
+      currencyCode: order.currencyCode,
+      amount: netAmount,
     });
 
-    if (debitResult.count !== 1) {
+    if (debitCount !== 1) {
       await this.throwCashDebitFailure(tx, {
         walletId: wallet.id,
         seasonParticipantId: order.seasonParticipantId,
@@ -1707,6 +1980,7 @@ export class OrdersService {
       },
       select: {
         balanceAmount: true,
+        reservedAmount: true,
       },
     });
 
@@ -1718,7 +1992,11 @@ export class OrdersService {
       );
     }
 
-    if (wallet.balanceAmount.lt(input.amount)) {
+    if (
+      wallet.balanceAmount
+        .sub(wallet.reservedAmount ?? new Prisma.Decimal(0))
+        .lt(input.amount)
+    ) {
       this.throwApiError(
         HttpStatus.CONFLICT,
         'INSUFFICIENT_BALANCE',
@@ -2826,7 +3104,7 @@ export class OrdersService {
       side: quote.request.side,
       orderType: quote.request.orderType,
       quantity: quote.request.quantity,
-      limitPrice: null,
+      limitPrice: quote.request.limitPrice,
       currencyCode: this.getAssetSettlementCurrency(quote.asset),
     });
     const durableQuote = await this.prisma.quote.create({
@@ -2837,9 +3115,11 @@ export class OrdersService {
         status: QuoteStatus.active,
         assetId: quote.asset.id,
         side: quote.request.side,
-        orderType: OrderType.market,
+        orderType: quote.request.orderType,
         quantity: this.formatDecimal(quote.request.quantity, quantityScale),
-        limitPrice: null,
+        limitPrice: quote.request.limitPrice
+          ? this.formatDecimal(quote.request.limitPrice, monetaryScale)
+          : null,
         currencyCode: this.getAssetSettlementCurrency(quote.asset),
         quotedPrice: this.formatDecimal(quote.price, monetaryScale),
         quotedRate: quote.fxRate ? this.formatDecimal(quote.fxRate, 8) : null,
@@ -2962,9 +3242,18 @@ export class OrdersService {
       side: input.request.side,
       orderType: input.request.orderType,
       quantity: input.request.quantity,
-      limitPrice: null,
+      limitPrice: input.request.limitPrice,
       currencyCode: this.getAssetSettlementCurrency(quote.asset),
     });
+    // limitPrice must match at canonical scale in BOTH directions: a market
+    // request requires a market quote (both null) and a limit request
+    // requires the identical stored limit price.
+    const quoteLimitPriceText = quote.limitPrice
+      ? this.formatDecimal(quote.limitPrice, monetaryScale)
+      : null;
+    const requestLimitPriceText = input.request.limitPrice
+      ? this.formatDecimal(input.request.limitPrice, monetaryScale)
+      : null;
 
     if (
       quote.seasonParticipantId !== input.seasonParticipantId ||
@@ -2974,7 +3263,7 @@ export class OrdersService {
       !quote.quantity ||
       this.formatDecimal(quote.quantity, quantityScale) !==
         this.formatDecimal(input.request.quantity, quantityScale) ||
-      quote.limitPrice !== null ||
+      quoteLimitPriceText !== requestLimitPriceText ||
       quote.currencyCode !== this.getAssetSettlementCurrency(quote.asset) ||
       quote.requestHash !== expectedRequestHash ||
       !quote.quotedPrice ||
@@ -3039,7 +3328,12 @@ export class OrdersService {
       side: request.side,
       orderType: request.orderType,
       quantity: this.formatDecimal(request.quantity, quantityScale),
-      limitPrice: null,
+      // Included in the hash so replaying the same idempotencyKey with a
+      // different limitPrice is an ORDER_IDEMPOTENCY_CONFLICT. Market
+      // requests keep the historical null (hash-compatible).
+      limitPrice: request.limitPrice
+        ? this.formatDecimal(request.limitPrice, monetaryScale)
+        : null,
       currencyCode: request.currencyCode ?? null,
     };
     const canonicalJson = JSON.stringify(canonicalPayload);
@@ -3063,20 +3357,56 @@ export class OrdersService {
     }
 
     const orderType = this.parseOrderType(body.orderType);
-    if (this.hasProvidedValue(body.limitPrice)) {
+    const side = this.parseRequiredSide(body.side);
+
+    if (orderType === OrderType.market) {
+      // Historical behavior: a market request carrying limitPrice keeps the
+      // original ORDER_TYPE_NOT_SUPPORTED rejection.
+      if (this.hasProvidedValue(body.limitPrice)) {
+        this.throwApiError(
+          HttpStatus.BAD_REQUEST,
+          'ORDER_TYPE_NOT_SUPPORTED',
+          'Only market orders are supported.',
+        );
+      }
+
+      return {
+        assetId: this.parseRequiredText(body.assetId, 'assetId'),
+        side,
+        orderType,
+        quantity: this.parsePositiveQuantityField(body.quantity),
+        limitPrice: null,
+        currencyCode: this.parseOptionalCurrencyCode(body.currencyCode),
+      };
+    }
+
+    // Limit orders: phase 1 supports full-quantity BUY only.
+    if (side !== OrderSide.buy) {
       this.throwApiError(
         HttpStatus.BAD_REQUEST,
-        'ORDER_TYPE_NOT_SUPPORTED',
-        'Only market orders are supported.',
+        limitOrderErrorCodes.LIMIT_BUY_ONLY,
+        'Limit orders support buy side only.',
+      );
+    }
+
+    if (!this.hasProvidedValue(body.limitPrice)) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        limitOrderErrorCodes.INVALID_LIMIT_PRICE,
+        'limitPrice is required for limit orders.',
       );
     }
 
     return {
       assetId: this.parseRequiredText(body.assetId, 'assetId'),
-      side: this.parseRequiredSide(body.side),
+      side,
       orderType,
       quantity: this.parsePositiveQuantityField(body.quantity),
-      limitPrice: null,
+      limitPrice: this.parsePositiveDecimalField(
+        body.limitPrice,
+        'limitPrice',
+        monetaryScale,
+      ),
       currencyCode: this.parseOptionalCurrencyCode(body.currencyCode),
     };
   }
@@ -3143,6 +3473,9 @@ export class OrdersService {
         netAmount: true,
         assetPriceSnapshotId: true,
         fxRateSnapshotId: true,
+        reservedAmount: true,
+        reservationReleasedAt: true,
+        cancelReason: true,
         submittedAt: true,
         executedAt: true,
         canceledAt: true,
@@ -3168,7 +3501,7 @@ export class OrdersService {
       Awaited<ReturnType<OrdersService['findIdempotentCreateOrder']>>
     >,
     idempotency: OrderCreateIdempotency,
-  ): CreateOrderResponse {
+  ): CreateOrderResponse | LimitOrderCreateResponse {
     if (order.requestHash !== idempotency.requestHash) {
       this.throwApiError(
         HttpStatus.CONFLICT,
@@ -3178,7 +3511,33 @@ export class OrdersService {
     }
 
     if (order.responsePayloadJson) {
-      return order.responsePayloadJson as unknown as CreateOrderResponse;
+      return order.responsePayloadJson as unknown as
+        | CreateOrderResponse
+        | LimitOrderCreateResponse;
+    }
+
+    // Limit-buy creates always persist their payload in the same
+    // transaction; reaching here without one means the row predates that
+    // guarantee — rebuild a faithful submitted-state payload instead of the
+    // market executed-shape below.
+    if (order.orderType === OrderType.limit) {
+      return {
+        success: true,
+        data: {
+          order: this.formatOrder(order),
+          execution: {
+            state: 'submitted',
+            submittedAt: order.submittedAt.toISOString(),
+            quoteId: order.quoteId,
+            reservedAmount: this.formatNullableDecimal(
+              order.reservedAmount,
+              monetaryScale,
+            ),
+            reservationFeeRate: null,
+            duplicate: true,
+          },
+        },
+      };
     }
 
     const formattedOrder = this.formatOrder(order);
@@ -3218,6 +3577,7 @@ export class OrdersService {
   }
 
   private parseOrderType(value: unknown): OrderType {
+    // Omitted orderType keeps the historical market default.
     if (!this.hasProvidedValue(value)) {
       return OrderType.market;
     }
@@ -3228,11 +3588,7 @@ export class OrdersService {
     }
 
     if (text === OrderType.limit) {
-      this.throwApiError(
-        HttpStatus.BAD_REQUEST,
-        'ORDER_TYPE_NOT_SUPPORTED',
-        'Only market orders are supported.',
-      );
+      return OrderType.limit;
     }
 
     this.throwApiError(
@@ -3698,10 +4054,20 @@ export class OrdersService {
         },
         select: {
           balanceAmount: true,
+          reservedAmount: true,
         },
       });
 
-      if (!wallet || wallet.balanceAmount.lt(input.netAmount)) {
+      // Only the AVAILABLE balance may fund a market buy: cash reserved by
+      // submitted limit-buy orders is off-limits (mirrors the atomic guard
+      // applied at execution time). A missing reservedAmount (legacy test
+      // fixtures) means "no reservations".
+      if (
+        !wallet ||
+        wallet.balanceAmount
+          .sub(wallet.reservedAmount ?? new Prisma.Decimal(0))
+          .lt(input.netAmount)
+      ) {
         this.throwApiError(
           HttpStatus.CONFLICT,
           'INSUFFICIENT_BALANCE',
@@ -4024,63 +4390,10 @@ export class OrdersService {
     };
   }
 
-  private formatOrder(order: {
-    id: string;
-    quoteId?: string | null;
-    side: OrderSide;
-    orderType: OrderType;
-    status: OrderStatus;
-    quantity: Prisma.Decimal;
-    limitPrice: Prisma.Decimal | null;
-    executedPrice: Prisma.Decimal | null;
-    currencyCode: CurrencyCode;
-    grossAmount: Prisma.Decimal | null;
-    feeAmount: Prisma.Decimal | null;
-    netAmount: Prisma.Decimal | null;
-    assetPriceSnapshotId: string | null;
-    fxRateSnapshotId: string | null;
-    submittedAt: Date;
-    executedAt: Date | null;
-    canceledAt: Date | null;
-    rejectedAt: Date | null;
-    rejectReason: string | null;
-    createdAt: Date;
-    updatedAt: Date;
-    asset: {
-      id: string;
-      symbol: string;
-      name: string;
-      market: string;
-      currencyCode: CurrencyCode;
-    };
-  }) {
-    return {
-      orderId: order.id,
-      quoteId: order.quoteId ?? null,
-      asset: order.asset,
-      side: order.side,
-      orderType: order.orderType,
-      status: order.status,
-      quantity: this.formatDecimal(order.quantity, quantityScale),
-      limitPrice: this.formatNullableDecimal(order.limitPrice, monetaryScale),
-      executedPrice: this.formatNullableDecimal(
-        order.executedPrice,
-        monetaryScale,
-      ),
-      currencyCode: order.currencyCode,
-      grossAmount: this.formatNullableDecimal(order.grossAmount, monetaryScale),
-      feeAmount: this.formatNullableDecimal(order.feeAmount, monetaryScale),
-      netAmount: this.formatNullableDecimal(order.netAmount, monetaryScale),
-      assetPriceSnapshotId: order.assetPriceSnapshotId,
-      fxRateSnapshotId: order.fxRateSnapshotId,
-      submittedAt: order.submittedAt.toISOString(),
-      executedAt: this.formatNullableDate(order.executedAt),
-      canceledAt: this.formatNullableDate(order.canceledAt),
-      rejectedAt: this.formatNullableDate(order.rejectedAt),
-      rejectReason: order.rejectReason,
-      createdAt: order.createdAt.toISOString(),
-      updatedAt: order.updatedAt.toISOString(),
-    };
+  private formatOrder(
+    order: Parameters<typeof formatOrderResponse>[0],
+  ): OrderResponsePayload {
+    return formatOrderResponse(order);
   }
 
   private formatFilters(query: ParsedOrdersQuery) {

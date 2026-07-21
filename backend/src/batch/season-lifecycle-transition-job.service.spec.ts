@@ -98,18 +98,16 @@ describe('SeasonLifecycleTransitionJobService', () => {
 
   it('activates a due upcoming season and ends expired active seasons', async () => {
     const { prisma, service } = createService();
-    prisma.season.findMany
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        season('season-ended', SeasonStatus.active, {
-          startAt: '2026-05-18T00:00:00.000Z',
-          endAt: '2026-06-01T00:00:00.000Z',
-        }),
-        season('season-upcoming', SeasonStatus.upcoming, {
-          startAt: '2026-06-01T00:00:00.000Z',
-          endAt: '2026-06-14T14:59:00.000Z',
-        }),
-      ]);
+    prisma.season.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([
+      season('season-ended', SeasonStatus.active, {
+        startAt: '2026-05-18T00:00:00.000Z',
+        endAt: '2026-06-01T00:00:00.000Z',
+      }),
+      season('season-upcoming', SeasonStatus.upcoming, {
+        startAt: '2026-06-01T00:00:00.000Z',
+        endAt: '2026-06-14T14:59:00.000Z',
+      }),
+    ]);
     prisma.season.updateMany
       .mockResolvedValueOnce({ count: 1 })
       .mockResolvedValueOnce({ count: 1 });
@@ -143,6 +141,74 @@ describe('SeasonLifecycleTransitionJobService', () => {
         },
       }),
     );
+  });
+
+  it('runs the limit-order season-end cleanup after the transition and reports the count', async () => {
+    const { batchService, prisma } = createService();
+    const limitOrderCancelService = {
+      cleanupEndedSeasonLimitReservations: jest.fn().mockResolvedValue({
+        canceledOrderCount: 3,
+        releasedReservationCount: 3,
+      }),
+    };
+    const service = new SeasonLifecycleTransitionJobService(
+      batchService as never,
+      prisma as never,
+      limitOrderCancelService as never,
+    );
+    prisma.season.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([
+      season('season-ended', SeasonStatus.active, {
+        startAt: '2026-05-18T00:00:00.000Z',
+        endAt: '2026-06-01T00:00:00.000Z',
+      }),
+    ]);
+    prisma.season.updateMany.mockResolvedValueOnce({ count: 1 });
+
+    const response = await service.run({
+      now: now.toISOString(),
+      idempotencyKey: 'cleanup-key',
+    });
+
+    expect(
+      limitOrderCancelService.cleanupEndedSeasonLimitReservations,
+    ).toHaveBeenCalledWith({ now });
+    expect(response.data.run.resultPayloadJson).toMatchObject({
+      summary: {
+        ended: 1,
+        limitOrdersCanceled: 3,
+      },
+    });
+  });
+
+  it('runs the cleanup even when no transition happened (self-healing)', async () => {
+    const { batchService, prisma } = createService();
+    const limitOrderCancelService = {
+      cleanupEndedSeasonLimitReservations: jest.fn().mockResolvedValue({
+        canceledOrderCount: 1,
+        releasedReservationCount: 1,
+      }),
+    };
+    const service = new SeasonLifecycleTransitionJobService(
+      batchService as never,
+      prisma as never,
+      limitOrderCancelService as never,
+    );
+    prisma.season.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    const response = await service.run({
+      now: now.toISOString(),
+      idempotencyKey: 'cleanup-key-2',
+    });
+
+    expect(
+      limitOrderCancelService.cleanupEndedSeasonLimitReservations,
+    ).toHaveBeenCalledTimes(1);
+    expect(response.data.run.resultPayloadJson).toMatchObject({
+      summary: {
+        ended: 0,
+        limitOrdersCanceled: 1,
+      },
+    });
   });
 
   it('blocks duplicate active seasons', async () => {

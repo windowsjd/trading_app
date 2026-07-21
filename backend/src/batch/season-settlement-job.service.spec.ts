@@ -34,6 +34,14 @@ jest.mock('../generated/prisma/client', () => {
       canceled: 'canceled',
       rejected: 'rejected',
     },
+    OrderSide: {
+      buy: 'buy',
+      sell: 'sell',
+    },
+    OrderType: {
+      market: 'market',
+      limit: 'limit',
+    },
     ParticipantStatus: {
       registered: 'registered',
       active: 'active',
@@ -225,8 +233,8 @@ describe('SeasonSettlementJobService', () => {
       }),
     );
     expect(
-      prisma.seasonParticipant.findMany.mock.calls[0][0].where
-        .participantStatus.in,
+      prisma.seasonParticipant.findMany.mock.calls[0][0].where.participantStatus
+        .in,
     ).not.toContain(ParticipantStatus.excluded);
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(prisma.__tx.seasonRanking.create).toHaveBeenCalledWith({
@@ -496,6 +504,33 @@ describe('SeasonSettlementJobService', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['open submitted limit-buy orders remain', 2, 0],
+    ['wallet reservations remain', 0, 1],
+  ])(
+    'blocks settlement while %s',
+    async (_label, openOrderCount, reservedWalletCount) => {
+      const { service, prisma } = createService();
+      mockSeason(prisma, SeasonStatus.ended);
+      prisma.order.count.mockResolvedValueOnce(openOrderCount);
+      prisma.cashWallet.count.mockResolvedValueOnce(reservedWalletCount);
+
+      const response = await captureHttpExceptionResponse(
+        service.run({
+          seasonId: 'season-1',
+          settlementDate,
+        }),
+      );
+
+      expect(response.error.code).toBe('OPEN_LIMIT_ORDER_RESERVATIONS');
+      // Fails closed BEFORE any settlement write path.
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(
+        prisma.seasonRanking?.createMany ?? jest.fn(),
+      ).not.toHaveBeenCalled();
+    },
+  );
+
   it('ranks by returnRate desc, then userId asc, then seasonParticipantId asc', async () => {
     const { service, prisma } = createService();
     mockSeason(prisma, SeasonStatus.ended);
@@ -628,11 +663,9 @@ describe('SeasonSettlementJobService', () => {
   });
 });
 
-function createService(
-  portfolioValuationService?: {
-    calculateSeasonParticipantValuation: jest.Mock;
-  },
-) {
+function createService(portfolioValuationService?: {
+  calculateSeasonParticipantValuation: jest.Mock;
+}) {
   const prisma = createPrismaMock();
   const batchService = createBatchServiceMock(BATCH_STARTED_AT);
   const service = new SeasonSettlementJobService(
@@ -709,6 +742,8 @@ function createPrismaMock() {
       update: jest.fn(),
     },
     cashWallet: {
+      // Settlement precondition: no wallet may still hold a reservation.
+      count: jest.fn().mockResolvedValue(0),
       create: jest.fn(),
       update: jest.fn(),
     },
@@ -719,6 +754,8 @@ function createPrismaMock() {
       create: jest.fn(),
     },
     order: {
+      // Settlement precondition: no submitted limit-buy order may remain.
+      count: jest.fn().mockResolvedValue(0),
       findMany: jest.fn().mockResolvedValue([]),
       create: jest.fn(),
       update: jest.fn(),

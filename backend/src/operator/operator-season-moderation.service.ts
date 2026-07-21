@@ -13,6 +13,8 @@ import {
   UserRole,
 } from '../generated/prisma/client';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { LimitOrderCancelService } from '../orders/limit-order-cancel.service';
+import { LIMIT_ORDER_CANCEL_REASONS } from '../orders/limit-order-policy';
 import { PrismaService } from '../prisma/prisma.service';
 import { OperatorAuditService } from './operator-audit.service';
 import type { OperatorRequestContext } from './operator-account-management.service';
@@ -88,6 +90,7 @@ export class OperatorSeasonModerationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: OperatorAuditService,
+    private readonly limitOrderCancelService?: LimitOrderCancelService,
   ) {}
 
   async excludeParticipant(
@@ -122,6 +125,21 @@ export class OperatorSeasonModerationService {
           select: MODERATED_PARTICIPANT_SELECT,
         });
 
+        // Same transaction as the exclusion: cancel the participant's
+        // submitted limit-buy orders and release their cash reservations so
+        // no reserved cash outlives the exclusion. New orders are already
+        // blocked by the excluded participant status.
+        const limitCleanup = this.limitOrderCancelService
+          ? await this.limitOrderCancelService.cancelOpenLimitBuysForParticipantInTransaction(
+              tx,
+              {
+                seasonParticipantId: participant.id,
+                reason: LIMIT_ORDER_CANCEL_REASONS.participantExcluded,
+                canceledAt: now,
+              },
+            )
+          : { canceledOrderCount: 0, releasedReservationCount: 0 };
+
         await this.auditService.recordSuccess(
           {
             actorUserId: actor.userId,
@@ -140,6 +158,7 @@ export class OperatorSeasonModerationService {
               beforeStatus: participant.participantStatus,
               afterStatus: updated.participantStatus,
               excludedAt: updated.excludedAt?.toISOString() ?? null,
+              canceledLimitOrderCount: limitCleanup.canceledOrderCount,
               reason,
               note,
               requestId: context.requestId ?? null,

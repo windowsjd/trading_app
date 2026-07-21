@@ -7,8 +7,13 @@ import {
   FlatList,
   Pressable,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import type { RecordStackParamList } from '../../app/navigation/types';
@@ -18,6 +23,11 @@ import {
   getMySeasonOrders,
   getRecordOrderDisplay,
 } from '../../features/record/api';
+import { cancelOrder } from '../../features/order/api';
+import {
+  getApiErrorCode,
+  getErrorMessageFromCode,
+} from '../../services/api/errorMapper';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -29,8 +39,52 @@ type Filter = 'all' | 'buy' | 'sell';
 export default function RecordOrderListScreen({ route }: Props) {
   const { seasonId } = route.params;
   const [filter, setFilter] = useState<Filter>('all');
+  const queryClient = useQueryClient();
+  const [cancelingOrderId, setCancelingOrderId] = useState<string | null>(null);
 
   const side = filter === 'all' ? undefined : filter;
+
+  const cancelMutation = useMutation({
+    mutationFn: cancelOrder,
+    retry: false,
+    onSuccess: async () => {
+      setCancelingOrderId(null);
+      // The released reservation affects wallets/home/portfolio, and the
+      // canceled state must show up across order/record lists.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.record.all }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.wallet.balances }),
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.wallet.transactionsAll,
+        }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.home.dashboard }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.portfolio.all }),
+      ]);
+    },
+    onError: (error) => {
+      setCancelingOrderId(null);
+      const code = getApiErrorCode(error);
+      Alert.alert('주문 취소 실패', getErrorMessageFromCode(code));
+    },
+  });
+
+  const confirmCancel = (orderId: string, label: string) => {
+    Alert.alert(
+      '지정가 주문 취소',
+      `${label} 주문을 취소할까요? 예약된 금액은 다시 사용할 수 있게 됩니다.`,
+      [
+        { text: '유지', style: 'cancel' },
+        {
+          text: '주문 취소',
+          style: 'destructive',
+          onPress: () => {
+            setCancelingOrderId(orderId);
+            cancelMutation.mutate(orderId);
+          },
+        },
+      ],
+    );
+  };
 
   const ordersQuery = useInfiniteQuery({
     queryKey: QUERY_KEYS.record.seasonOrders({
@@ -125,28 +179,69 @@ export default function RecordOrderListScreen({ route }: Props) {
         }
         renderItem={({ item }) => {
           const display = getRecordOrderDisplay(item);
+          const isCanceling =
+            cancelMutation.isPending && cancelingOrderId === display.orderId;
 
           return (
             <Pressable
               testID={TEST_IDS.record.orderItem(display.key)}
               style={styles.rowCard}
             >
-              <View>
-                <Text style={styles.itemTitle}>{display.name}</Text>
-                <Text style={styles.helper}>{display.symbol}</Text>
-                <Text style={styles.helper}>{display.executedAt}</Text>
-                <Text style={styles.helper}>
-                  {display.side === 'buy' ? '매수' : '매도'}
-                </Text>
+              <View style={styles.rowBody}>
+                <View>
+                  <Text style={styles.itemTitle}>{display.name}</Text>
+                  <Text style={styles.helper}>{display.symbol}</Text>
+                  <Text style={styles.helper}>
+                    {display.isOpenLimitBuy
+                      ? display.submittedAt
+                      : display.executedAt}
+                  </Text>
+                  <Text style={styles.helper}>
+                    {display.isLimitOrder
+                      ? display.side === 'buy'
+                        ? '지정가 매수'
+                        : '지정가 매도'
+                      : display.side === 'buy'
+                      ? '매수'
+                      : '매도'}
+                    {display.statusLabel ? ` · ${display.statusLabel}` : ''}
+                  </Text>
+                </View>
+
+                <View style={styles.alignEnd}>
+                  <Text style={styles.helper}>수량 {display.quantity}</Text>
+                  <Text style={styles.helper}>
+                    가격 {display.isLimitOrder && display.limitPrice
+                      ? display.limitPrice
+                      : display.price}{' '}
+                    {display.currencyCode}
+                  </Text>
+                  {display.reservedAmount && display.isOpenLimitBuy ? (
+                    <Text style={styles.helper}>
+                      예약금 {display.reservedAmount}
+                    </Text>
+                  ) : null}
+                  <Text style={styles.itemTitle}>{display.netAmount}</Text>
+                </View>
               </View>
 
-              <View style={styles.alignEnd}>
-                <Text style={styles.helper}>수량 {display.quantity}</Text>
-                <Text style={styles.helper}>
-                  가격 {display.price} {display.currencyCode}
-                </Text>
-                <Text style={styles.itemTitle}>{display.netAmount}</Text>
-              </View>
+              {display.isOpenLimitBuy && display.orderId ? (
+                <Pressable
+                  testID={TEST_IDS.record.orderCancel(display.key)}
+                  style={[
+                    styles.cancelButton,
+                    isCanceling && styles.cancelButtonDisabled,
+                  ]}
+                  disabled={isCanceling}
+                  onPress={() =>
+                    confirmCancel(display.orderId as string, display.name)
+                  }
+                >
+                  <Text style={styles.cancelButtonText}>
+                    {isCanceling ? '취소 중...' : '주문 취소'}
+                  </Text>
+                </Pressable>
+              ) : null}
             </Pressable>
           );
         }}
@@ -205,9 +300,27 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 16,
     backgroundColor: '#fff',
+    marginBottom: 10,
+    gap: 12,
+  },
+  rowBody: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+  },
+  cancelButton: {
+    borderWidth: 1,
+    borderColor: '#c62828',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  cancelButtonDisabled: {
+    borderColor: '#ddd',
+  },
+  cancelButtonText: {
+    color: '#c62828',
+    fontWeight: '700',
   },
   itemTitle: { fontSize: 15, fontWeight: '700' },
   helper: { fontSize: 14, color: '#444' },

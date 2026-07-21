@@ -292,33 +292,122 @@ Same body as `POST /api/v1/orders/quote`.
 }
 ```
 
+## Limit Buy Orders (Phase 1 Foundation: Reservation Only)
+
+This is the FIRST phase of limit orders. Scope is deliberately narrow:
+
+- Limit BUY only (`LIMIT_BUY_ONLY` for limit sells); full-quantity, GTC-style.
+- KRX / US stocks (registration only while the market is open, calendar
+  fail-closed) and Binance USD-equivalent crypto (24h).
+- Creating a limit buy RESERVES cash (`reservedAmount = grossAmount +
+  feeAmount`, computed from `limitPrice × quantity` with the exact
+  market-buy rounding chain) and stores the order as `status=submitted`.
+- **There is NO automatic execution.** No matching engine, no candle/price
+  watching, no scheduler. A marketable limit price (above the current
+  market price) is still registered as `submitted` — the server never even
+  reads a provider price for a limit order. The order stays `submitted`
+  until the user cancels it or season-end / participant-exclusion cleanup
+  cancels it. Prices crossing the limit price change NOTHING in this phase.
+- Wallet meaning: `balanceAmount` (total owned cash, valuation input; never
+  reduced by a reservation), `reservedAmount` (locked by submitted limit
+  buys), `availableAmount = balance - reserved` (derived server-side, never
+  stored). Every ordinary cash debit (market buy, FX source debit) is
+  atomically guarded by `balance - reserved >= amount` in one SQL UPDATE.
+- No WalletTransaction and no Position row is written at registration or
+  cancel; only the wallet `reservedAmount` fence and the order row change.
+- Total-asset valuation (home/portfolio/ranking/equity snapshot/settlement/
+  records) keeps using the full `balanceAmount`; reservations never reduce
+  총자산.
+- Feature flag `LIMIT_ORDER_ENABLED` (default **false**): when off, limit
+  QUOTE/CREATE are rejected with `LIMIT_ORDER_DISABLED`, but cancel,
+  season-end cleanup, and exclusion cleanup keep working so reserved cash
+  can always be released. Keep the flag off in production until the phase-2
+  execution engine ships.
+- Quote TTL (15s) only bounds how long the quote can be turned into an
+  order; the created `submitted` order itself has no expiry (GTC) and is
+  unaffected by the quote expiring afterwards.
+- Lifecycle: season end (`season_lifecycle_transition` job) cancels
+  submitted limit buys of ended seasons with `cancelReason=season_ended`
+  and releases their reservations (bounded batches, idempotent,
+  self-healing); participant exclusion does the same in the exclusion
+  transaction with `cancelReason=participant_excluded`. Settlement is
+  blocked with `OPEN_LIMIT_ORDER_RESERVATIONS` while any submitted limit
+  buy or non-zero wallet reservation remains for the season.
+
+### Limit Quote (`POST /api/v1/orders/quote` with `orderType: "limit"`)
+
+Request: `assetId`, `side: "buy"`, `orderType: "limit"`, `quantity`,
+`limitPrice` (positive decimal string, scale ≤ 8), optional `currencyCode`
+matching the asset settlement currency. `orderType` omitted keeps the
+historical market default; a market request carrying `limitPrice` keeps the
+historical `ORDER_TYPE_NOT_SUPPORTED` rejection.
+
+Behavior: `quotedPrice = limitPrice` (no provider price, no
+`assetPriceSnapshotId`, no fake source metadata; USD assets still resolve a
+fresh USD/KRW snapshot for the KRW display conversion exactly like market
+quotes). Rejects read-only with `INSUFFICIENT_AVAILABLE_BALANCE` when
+`availableAmount` cannot cover the reservation. The wallet is never mutated
+at quote time.
+
+Additive response fields (limit quotes only): `limitPrice`,
+`reservedAmount`, `walletReservedBefore`, `walletAvailableBefore`,
+`estimatedReservedAfter`, `estimatedAvailableAfter`. The existing
+`estimatedWalletBalanceAfter` / `estimatedPositionQuantityAfter` keep their
+market meaning of "as if eventually filled"; registration itself changes
+neither balance nor position.
+
+### Limit Create (`POST /api/v1/orders` with `orderType: "limit"`)
+
+Same durable-quote validation as market orders (TTL 15s, `QUOTE_MISMATCH`
+covers assetId/side/orderType/quantity/limitPrice/currency/hash). In ONE
+transaction: atomic cash reservation (`balance - reserved >= reservation`
+guarded in the UPDATE itself — two concurrent creates can never double-book
+the same available cash), `submitted` order row (stores `reservedAmount`
+and the registration-time `reservationFeeRate` for the future execution
+phase), quote consumption, and the idempotent response payload. Any failure
+rolls the reservation back. Idempotency: same key + same payload replays
+the stored response; same key + different
+limitPrice/quantity/orderType/assetId → `ORDER_IDEMPOTENCY_CONFLICT`.
+
+Response: the standard order payload (now with additive `reservedAmount`,
+`reservationReleasedAt`, `cancelReason` fields) plus
+`execution: { state: "submitted", submittedAt, quoteId, reservedAmount,
+reservationFeeRate, duplicate }`. No provider price fields, no
+walletTransactionId, no positionId — nothing was executed.
+
 ## POST /api/v1/orders/:orderId/cancel
 
-This route is not currently exposed by `OrdersController`. Public MVP market orders use `POST /api/v1/orders/quote` followed by `POST /api/v1/orders`.
+Cancels the caller's own SUBMITTED limit buy order and releases its cash
+reservation. Now publicly routed. NOT gated by `LIMIT_ORDER_ENABLED`.
 
 ### Request
 
-- `orderId` path parameter is required.
-- Request body is optional and ignored in this MVP.
+- `orderId` path parameter is required. Request body is ignored.
 
 ### Behavior
 
-- HTTP requests to this path currently fall through as `NOT_FOUND`.
-- If the service-level compatibility method is invoked internally, authenticated requests return `ORDER_CANCEL_NOT_SUPPORTED`.
-- No order lookup or ownership detail is exposed.
-- No wallet, position, wallet transaction, equity snapshot, settlement, execution, scheduler, provider behavior, or order row mutation runs.
+- Lock order: Order row (`SELECT ... FOR UPDATE`, ownership enforced in the
+  locking query) → CashWallet row (the guarded release UPDATE). Release and
+  the `submitted → canceled` flip commit in one transaction, so the
+  reservation is released exactly once even under concurrent cancels.
+- Market orders keep the historical `ORDER_CANCEL_NOT_SUPPORTED` (410).
+- `executed` / `rejected` orders → `ORDER_NOT_CANCELABLE` (409).
+- Already `canceled` → idempotent success replay
+  (`execution.alreadyCanceled: true`, no second release).
+- Sets `canceledAt`, `cancelReason: "user_canceled"`,
+  `reservationReleasedAt`. `balanceAmount` unchanged; no WalletTransaction;
+  no Position change.
+- Cancel works regardless of season status so stale reservations can
+  always be freed by the user.
 
-### Error Response
+### Response
 
-```json
-{
-  "success": false,
-  "error": {
-    "code": "ORDER_CANCEL_NOT_SUPPORTED",
-    "message": "Order cancel is not supported for MVP market orders."
-  }
-}
-```
+`data.order` is the standard order payload; `data.execution` is
+`{ state: "not_executed", reason: "ORDER_CANCELED_BEFORE_EXECUTION",
+message, alreadyCanceled, reservedAmountReleased }`.
+
+`cancelReason` canonical values: `user_canceled`, `season_ended`,
+`participant_excluded` (safe for direct display; no internal detail).
 
 ## POST /api/v1/orders/:orderId/execute
 
@@ -458,6 +547,12 @@ This endpoint is not currently exposed by `OrdersController`. The retained servi
 - `ORDER_CANCEL_NOT_SUPPORTED`
 - `ORDER_NOT_CANCELABLE`
 - `ORDER_CANCEL_CONFLICT`
+- `LIMIT_ORDER_DISABLED` (limit quote/create while the feature flag is off)
+- `LIMIT_BUY_ONLY` (limit sell is not supported in phase 1)
+- `INVALID_LIMIT_PRICE`
+- `INSUFFICIENT_AVAILABLE_BALANCE` (balance - reserved cannot cover the reservation)
+- `ORDER_RESERVATION_CONFLICT`
+- `ORDER_RESERVATION_INCONSISTENT`
 - `ORDER_NOT_EXECUTABLE`
 - `ORDER_EXECUTION_CONFLICT`
 - `ORDER_PRICE_UNAVAILABLE`

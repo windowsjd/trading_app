@@ -29,6 +29,12 @@ export type FxExecuteWalletCandidate = {
   seasonParticipantId: string;
   currencyCode: FxExecuteCurrency;
   balanceAmount: DecimalInput;
+  /**
+   * Cash locked by submitted limit-buy orders. Optional for backward
+   * compatibility; treated as 0 when absent. FX may only spend the
+   * AVAILABLE balance (balance - reserved).
+   */
+  reservedAmount?: DecimalInput | null;
 };
 
 export type FxExecuteSnapshotWithId = FxExecuteSnapshotCandidate & {
@@ -125,6 +131,14 @@ export function buildFxExecutePlan(
     sourceWallet.balanceAmount,
     'sourceWallet.balanceAmount',
   );
+  const sourceWalletReserved = sourceWallet.reservedAmount
+    ? parseFiniteDecimalInput(
+        sourceWallet.reservedAmount,
+        'sourceWallet.reservedAmount',
+      )
+    : new Prisma.Decimal(0);
+  // Reserved cash (submitted limit-buy orders) is not spendable by FX.
+  const sourceWalletAvailable = sourceWalletBalance.sub(sourceWalletReserved);
   const sourceAmount = formatMoneyScale8(request.sourceAmount);
   const appliedRate = formatRateScale8(selectedSnapshot.rate);
   const feeRate = formatFeeRateScale6(input.fxFeeRate);
@@ -143,7 +157,7 @@ export function buildFxExecutePlan(
     feeAmount,
   });
 
-  if (sourceWalletBalance.lt(sourceAmount)) {
+  if (sourceWalletAvailable.lt(sourceAmount)) {
     return {
       ok: false,
       errorCode: fxExecuteErrorCodes.INSUFFICIENT_BALANCE,
