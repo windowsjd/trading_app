@@ -552,3 +552,43 @@ metadata) should consider `amountAvailable: boolean` or `amount: string | null`.
 7. Lease TTL > renew interval; reconnect min ≤ max; connection liveness ≥
    trade-stale threshold (config validation enforces all three).
 8. No credential/raw-frame output in logs (spot-check structured logs).
+
+## Canonical trade route and the limit-order matcher (phase 3)
+
+When `CANDLE_LIVE_STREAMING_ENABLED=true` and a provider's live-candle flag is
+on, `LiveCandleStreamSupervisorService` owns that provider's socket AND its
+exact-trade route (`ProviderTradeRouteRegistry`). The legacy
+KIS/Binance streaming service then neither connects nor publishes normalized
+trades, so there is exactly one socket and exactly one publisher per provider.
+
+- **KIS**: the SAME parsed trade record feeds the candle pipeline, the
+  price-display pub/sub, and the limit-order matcher. The frame is parsed once.
+- **Binance**: when `LIMIT_ORDER_AUTO_EXECUTION_ENABLED=true` the supervisor
+  subscribes `<symbol>@trade` alongside `<symbol>@kline_5m` on the SAME
+  connection. Klines go to the candle pipeline; trades go to the matcher. No
+  second Binance WebSocket is opened. With matching off, only klines are
+  subscribed and no trade is published.
+
+This makes live candles and automatic limit-order matching compatible: they are
+no longer mutually exclusive deployments.
+
+Each connection attempt mints a new connection generation. Asset subscription
+readiness is recorded per generation and discarded on reconnect, so limit
+Quote/Create for an asset stays fail-closed until the new socket has
+re-subscribed and been acknowledged (KIS per `tr_key`, Binance per SUBSCRIBE
+batch ack). Assets dropped by `CANDLE_LIVE_MAX_PROVIDER_SUBSCRIPTIONS_PER_SHARD`
+are recorded as capped and are never tradable by limit order.
+
+The subscription build is also where each asset's
+`id/symbol/market/assetType/settlementCurrency` is read — once per generation.
+Those values ride on the normalized trade event, so the limit-order publisher
+performs no per-trade database query.
+
+### Path B dependency
+
+The confirmed 5-minute candle safety net
+(`docs/limit-order-candle-reconciliation.md`) consumes only committed
+`market_candles` rows written by the finalizer. If the finalizer defers a
+bucket to REST repair, path B simply does not see that window until
+reconciliation restores it — it never reads live Redis candle state, an open
+bucket, or a REST preview.

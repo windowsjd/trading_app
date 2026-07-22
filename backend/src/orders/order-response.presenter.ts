@@ -37,6 +37,19 @@ export type OrderResponseRecord = {
   triggerEventAt?: Date | null;
   matchedAt?: Date | null;
   matchingSource?: string | null;
+  /**
+   * Path-B trigger evidence. Present only for fills whose matchingSource is
+   * 'closed_5m_candle'; triggerLowPrice is the price that PROVED the limit
+   * was touched, never the executed price (which is always the limit price).
+   */
+  candleEvidence?: {
+    marketCandleId: string;
+    interval: string;
+    openTime: Date;
+    closeTime: Date;
+    triggerLowPrice: Prisma.Decimal;
+    executionPricePolicy: string;
+  } | null;
   submittedAt: Date;
   executedAt: Date | null;
   canceledAt: Date | null;
@@ -81,6 +94,19 @@ export function formatOrderResponse(order: OrderResponseRecord) {
     triggerEventAt: formatNullableDate(order.triggerEventAt ?? null),
     matchedAt: formatNullableDate(order.matchedAt ?? null),
     matchingSource: order.matchingSource ?? null,
+    candleEvidence: order.candleEvidence
+      ? {
+          marketCandleId: order.candleEvidence.marketCandleId,
+          interval: order.candleEvidence.interval,
+          openTime: order.candleEvidence.openTime.toISOString(),
+          closeTime: order.candleEvidence.closeTime.toISOString(),
+          triggerLowPrice: formatDecimalScale(
+            order.candleEvidence.triggerLowPrice,
+            monetaryScale,
+          ),
+          executionPricePolicy: order.candleEvidence.executionPricePolicy,
+        }
+      : null,
     submittedAt: order.submittedAt.toISOString(),
     executedAt: formatNullableDate(order.executedAt),
     canceledAt: formatNullableDate(order.canceledAt),

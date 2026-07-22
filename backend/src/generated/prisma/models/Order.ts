@@ -73,8 +73,10 @@ export type OrderMinAggregateOutputType = {
   cancelReason: string | null
   matchingActivatedAt: Date | null
   matchingActivationStreamId: string | null
+  candleMatchingEligibleFrom: Date | null
   triggerEventId: string | null
   triggerEventAt: Date | null
+  limitOrderCandleEvidenceId: string | null
   matchedAt: Date | null
   matchingSource: string | null
   submittedAt: Date | null
@@ -111,8 +113,10 @@ export type OrderMaxAggregateOutputType = {
   cancelReason: string | null
   matchingActivatedAt: Date | null
   matchingActivationStreamId: string | null
+  candleMatchingEligibleFrom: Date | null
   triggerEventId: string | null
   triggerEventAt: Date | null
+  limitOrderCandleEvidenceId: string | null
   matchedAt: Date | null
   matchingSource: string | null
   submittedAt: Date | null
@@ -150,8 +154,10 @@ export type OrderCountAggregateOutputType = {
   cancelReason: number
   matchingActivatedAt: number
   matchingActivationStreamId: number
+  candleMatchingEligibleFrom: number
   triggerEventId: number
   triggerEventAt: number
+  limitOrderCandleEvidenceId: number
   matchedAt: number
   matchingSource: number
   submittedAt: number
@@ -212,8 +218,10 @@ export type OrderMinAggregateInputType = {
   cancelReason?: true
   matchingActivatedAt?: true
   matchingActivationStreamId?: true
+  candleMatchingEligibleFrom?: true
   triggerEventId?: true
   triggerEventAt?: true
+  limitOrderCandleEvidenceId?: true
   matchedAt?: true
   matchingSource?: true
   submittedAt?: true
@@ -250,8 +258,10 @@ export type OrderMaxAggregateInputType = {
   cancelReason?: true
   matchingActivatedAt?: true
   matchingActivationStreamId?: true
+  candleMatchingEligibleFrom?: true
   triggerEventId?: true
   triggerEventAt?: true
+  limitOrderCandleEvidenceId?: true
   matchedAt?: true
   matchingSource?: true
   submittedAt?: true
@@ -289,8 +299,10 @@ export type OrderCountAggregateInputType = {
   cancelReason?: true
   matchingActivatedAt?: true
   matchingActivationStreamId?: true
+  candleMatchingEligibleFrom?: true
   triggerEventId?: true
   triggerEventAt?: true
+  limitOrderCandleEvidenceId?: true
   matchedAt?: true
   matchingSource?: true
   submittedAt?: true
@@ -415,8 +427,10 @@ export type OrderGroupByOutputType = {
   cancelReason: string | null
   matchingActivatedAt: Date | null
   matchingActivationStreamId: string | null
+  candleMatchingEligibleFrom: Date | null
   triggerEventId: string | null
   triggerEventAt: Date | null
+  limitOrderCandleEvidenceId: string | null
   matchedAt: Date | null
   matchingSource: string | null
   submittedAt: Date
@@ -477,8 +491,10 @@ export type OrderWhereInput = {
   cancelReason?: Prisma.StringNullableFilter<"Order"> | string | null
   matchingActivatedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   matchingActivationStreamId?: Prisma.StringNullableFilter<"Order"> | string | null
+  candleMatchingEligibleFrom?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   triggerEventId?: Prisma.StringNullableFilter<"Order"> | string | null
   triggerEventAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  limitOrderCandleEvidenceId?: Prisma.StringNullableFilter<"Order"> | string | null
   matchedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   matchingSource?: Prisma.StringNullableFilter<"Order"> | string | null
   submittedAt?: Prisma.DateTimeFilter<"Order"> | Date | string
@@ -493,6 +509,7 @@ export type OrderWhereInput = {
   quote?: Prisma.XOR<Prisma.QuoteNullableScalarRelationFilter, Prisma.QuoteWhereInput> | null
   assetPriceSnapshot?: Prisma.XOR<Prisma.AssetPriceSnapshotNullableScalarRelationFilter, Prisma.AssetPriceSnapshotWhereInput> | null
   fxRateSnapshot?: Prisma.XOR<Prisma.FxRateSnapshotNullableScalarRelationFilter, Prisma.FxRateSnapshotWhereInput> | null
+  candleEvidence?: Prisma.XOR<Prisma.LimitOrderCandleEvidenceNullableScalarRelationFilter, Prisma.LimitOrderCandleEvidenceWhereInput> | null
 }
 
 export type OrderOrderByWithRelationInput = {
@@ -521,8 +538,10 @@ export type OrderOrderByWithRelationInput = {
   cancelReason?: Prisma.SortOrderInput | Prisma.SortOrder
   matchingActivatedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   matchingActivationStreamId?: Prisma.SortOrderInput | Prisma.SortOrder
+  candleMatchingEligibleFrom?: Prisma.SortOrderInput | Prisma.SortOrder
   triggerEventId?: Prisma.SortOrderInput | Prisma.SortOrder
   triggerEventAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  limitOrderCandleEvidenceId?: Prisma.SortOrderInput | Prisma.SortOrder
   matchedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   matchingSource?: Prisma.SortOrderInput | Prisma.SortOrder
   submittedAt?: Prisma.SortOrder
@@ -537,6 +556,7 @@ export type OrderOrderByWithRelationInput = {
   quote?: Prisma.QuoteOrderByWithRelationInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotOrderByWithRelationInput
   fxRateSnapshot?: Prisma.FxRateSnapshotOrderByWithRelationInput
+  candleEvidence?: Prisma.LimitOrderCandleEvidenceOrderByWithRelationInput
 }
 
 export type OrderWhereUniqueInput = Prisma.AtLeast<{
@@ -569,8 +589,10 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
   cancelReason?: Prisma.StringNullableFilter<"Order"> | string | null
   matchingActivatedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   matchingActivationStreamId?: Prisma.StringNullableFilter<"Order"> | string | null
+  candleMatchingEligibleFrom?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   triggerEventId?: Prisma.StringNullableFilter<"Order"> | string | null
   triggerEventAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  limitOrderCandleEvidenceId?: Prisma.StringNullableFilter<"Order"> | string | null
   matchedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   matchingSource?: Prisma.StringNullableFilter<"Order"> | string | null
   submittedAt?: Prisma.DateTimeFilter<"Order"> | Date | string
@@ -585,6 +607,7 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
   quote?: Prisma.XOR<Prisma.QuoteNullableScalarRelationFilter, Prisma.QuoteWhereInput> | null
   assetPriceSnapshot?: Prisma.XOR<Prisma.AssetPriceSnapshotNullableScalarRelationFilter, Prisma.AssetPriceSnapshotWhereInput> | null
   fxRateSnapshot?: Prisma.XOR<Prisma.FxRateSnapshotNullableScalarRelationFilter, Prisma.FxRateSnapshotWhereInput> | null
+  candleEvidence?: Prisma.XOR<Prisma.LimitOrderCandleEvidenceNullableScalarRelationFilter, Prisma.LimitOrderCandleEvidenceWhereInput> | null
 }, "id" | "quoteId" | "seasonParticipantId_idempotencyKey">
 
 export type OrderOrderByWithAggregationInput = {
@@ -613,8 +636,10 @@ export type OrderOrderByWithAggregationInput = {
   cancelReason?: Prisma.SortOrderInput | Prisma.SortOrder
   matchingActivatedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   matchingActivationStreamId?: Prisma.SortOrderInput | Prisma.SortOrder
+  candleMatchingEligibleFrom?: Prisma.SortOrderInput | Prisma.SortOrder
   triggerEventId?: Prisma.SortOrderInput | Prisma.SortOrder
   triggerEventAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  limitOrderCandleEvidenceId?: Prisma.SortOrderInput | Prisma.SortOrder
   matchedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   matchingSource?: Prisma.SortOrderInput | Prisma.SortOrder
   submittedAt?: Prisma.SortOrder
@@ -660,8 +685,10 @@ export type OrderScalarWhereWithAggregatesInput = {
   cancelReason?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
   matchingActivatedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Order"> | Date | string | null
   matchingActivationStreamId?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
+  candleMatchingEligibleFrom?: Prisma.DateTimeNullableWithAggregatesFilter<"Order"> | Date | string | null
   triggerEventId?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
   triggerEventAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Order"> | Date | string | null
+  limitOrderCandleEvidenceId?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
   matchedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Order"> | Date | string | null
   matchingSource?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
   submittedAt?: Prisma.DateTimeWithAggregatesFilter<"Order"> | Date | string
@@ -694,6 +721,7 @@ export type OrderCreateInput = {
   cancelReason?: string | null
   matchingActivatedAt?: Date | string | null
   matchingActivationStreamId?: string | null
+  candleMatchingEligibleFrom?: Date | string | null
   triggerEventId?: string | null
   triggerEventAt?: Date | string | null
   matchedAt?: Date | string | null
@@ -710,6 +738,7 @@ export type OrderCreateInput = {
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutOrdersInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutOrdersInput
+  candleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedOneWithoutOrdersInput
 }
 
 export type OrderUncheckedCreateInput = {
@@ -738,8 +767,10 @@ export type OrderUncheckedCreateInput = {
   cancelReason?: string | null
   matchingActivatedAt?: Date | string | null
   matchingActivationStreamId?: string | null
+  candleMatchingEligibleFrom?: Date | string | null
   triggerEventId?: string | null
   triggerEventAt?: Date | string | null
+  limitOrderCandleEvidenceId?: string | null
   matchedAt?: Date | string | null
   matchingSource?: string | null
   submittedAt: Date | string
@@ -772,6 +803,7 @@ export type OrderUpdateInput = {
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchingActivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingActivationStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleMatchingEligibleFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   triggerEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -788,6 +820,7 @@ export type OrderUpdateInput = {
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutOrdersNestedInput
+  candleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateOneWithoutOrdersNestedInput
 }
 
 export type OrderUncheckedUpdateInput = {
@@ -816,8 +849,10 @@ export type OrderUncheckedUpdateInput = {
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchingActivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingActivationStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleMatchingEligibleFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   triggerEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  limitOrderCandleEvidenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -855,8 +890,10 @@ export type OrderCreateManyInput = {
   cancelReason?: string | null
   matchingActivatedAt?: Date | string | null
   matchingActivationStreamId?: string | null
+  candleMatchingEligibleFrom?: Date | string | null
   triggerEventId?: string | null
   triggerEventAt?: Date | string | null
+  limitOrderCandleEvidenceId?: string | null
   matchedAt?: Date | string | null
   matchingSource?: string | null
   submittedAt: Date | string
@@ -889,6 +926,7 @@ export type OrderUpdateManyMutationInput = {
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchingActivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingActivationStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleMatchingEligibleFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   triggerEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -928,8 +966,10 @@ export type OrderUncheckedUpdateManyInput = {
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchingActivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingActivationStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleMatchingEligibleFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   triggerEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  limitOrderCandleEvidenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -982,8 +1022,10 @@ export type OrderCountOrderByAggregateInput = {
   cancelReason?: Prisma.SortOrder
   matchingActivatedAt?: Prisma.SortOrder
   matchingActivationStreamId?: Prisma.SortOrder
+  candleMatchingEligibleFrom?: Prisma.SortOrder
   triggerEventId?: Prisma.SortOrder
   triggerEventAt?: Prisma.SortOrder
+  limitOrderCandleEvidenceId?: Prisma.SortOrder
   matchedAt?: Prisma.SortOrder
   matchingSource?: Prisma.SortOrder
   submittedAt?: Prisma.SortOrder
@@ -1031,8 +1073,10 @@ export type OrderMaxOrderByAggregateInput = {
   cancelReason?: Prisma.SortOrder
   matchingActivatedAt?: Prisma.SortOrder
   matchingActivationStreamId?: Prisma.SortOrder
+  candleMatchingEligibleFrom?: Prisma.SortOrder
   triggerEventId?: Prisma.SortOrder
   triggerEventAt?: Prisma.SortOrder
+  limitOrderCandleEvidenceId?: Prisma.SortOrder
   matchedAt?: Prisma.SortOrder
   matchingSource?: Prisma.SortOrder
   submittedAt?: Prisma.SortOrder
@@ -1069,8 +1113,10 @@ export type OrderMinOrderByAggregateInput = {
   cancelReason?: Prisma.SortOrder
   matchingActivatedAt?: Prisma.SortOrder
   matchingActivationStreamId?: Prisma.SortOrder
+  candleMatchingEligibleFrom?: Prisma.SortOrder
   triggerEventId?: Prisma.SortOrder
   triggerEventAt?: Prisma.SortOrder
+  limitOrderCandleEvidenceId?: Prisma.SortOrder
   matchedAt?: Prisma.SortOrder
   matchingSource?: Prisma.SortOrder
   submittedAt?: Prisma.SortOrder
@@ -1315,6 +1361,48 @@ export type OrderUncheckedUpdateManyWithoutQuoteNestedInput = {
   deleteMany?: Prisma.OrderScalarWhereInput | Prisma.OrderScalarWhereInput[]
 }
 
+export type OrderCreateNestedManyWithoutCandleEvidenceInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutCandleEvidenceInput, Prisma.OrderUncheckedCreateWithoutCandleEvidenceInput> | Prisma.OrderCreateWithoutCandleEvidenceInput[] | Prisma.OrderUncheckedCreateWithoutCandleEvidenceInput[]
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutCandleEvidenceInput | Prisma.OrderCreateOrConnectWithoutCandleEvidenceInput[]
+  createMany?: Prisma.OrderCreateManyCandleEvidenceInputEnvelope
+  connect?: Prisma.OrderWhereUniqueInput | Prisma.OrderWhereUniqueInput[]
+}
+
+export type OrderUncheckedCreateNestedManyWithoutCandleEvidenceInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutCandleEvidenceInput, Prisma.OrderUncheckedCreateWithoutCandleEvidenceInput> | Prisma.OrderCreateWithoutCandleEvidenceInput[] | Prisma.OrderUncheckedCreateWithoutCandleEvidenceInput[]
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutCandleEvidenceInput | Prisma.OrderCreateOrConnectWithoutCandleEvidenceInput[]
+  createMany?: Prisma.OrderCreateManyCandleEvidenceInputEnvelope
+  connect?: Prisma.OrderWhereUniqueInput | Prisma.OrderWhereUniqueInput[]
+}
+
+export type OrderUpdateManyWithoutCandleEvidenceNestedInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutCandleEvidenceInput, Prisma.OrderUncheckedCreateWithoutCandleEvidenceInput> | Prisma.OrderCreateWithoutCandleEvidenceInput[] | Prisma.OrderUncheckedCreateWithoutCandleEvidenceInput[]
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutCandleEvidenceInput | Prisma.OrderCreateOrConnectWithoutCandleEvidenceInput[]
+  upsert?: Prisma.OrderUpsertWithWhereUniqueWithoutCandleEvidenceInput | Prisma.OrderUpsertWithWhereUniqueWithoutCandleEvidenceInput[]
+  createMany?: Prisma.OrderCreateManyCandleEvidenceInputEnvelope
+  set?: Prisma.OrderWhereUniqueInput | Prisma.OrderWhereUniqueInput[]
+  disconnect?: Prisma.OrderWhereUniqueInput | Prisma.OrderWhereUniqueInput[]
+  delete?: Prisma.OrderWhereUniqueInput | Prisma.OrderWhereUniqueInput[]
+  connect?: Prisma.OrderWhereUniqueInput | Prisma.OrderWhereUniqueInput[]
+  update?: Prisma.OrderUpdateWithWhereUniqueWithoutCandleEvidenceInput | Prisma.OrderUpdateWithWhereUniqueWithoutCandleEvidenceInput[]
+  updateMany?: Prisma.OrderUpdateManyWithWhereWithoutCandleEvidenceInput | Prisma.OrderUpdateManyWithWhereWithoutCandleEvidenceInput[]
+  deleteMany?: Prisma.OrderScalarWhereInput | Prisma.OrderScalarWhereInput[]
+}
+
+export type OrderUncheckedUpdateManyWithoutCandleEvidenceNestedInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutCandleEvidenceInput, Prisma.OrderUncheckedCreateWithoutCandleEvidenceInput> | Prisma.OrderCreateWithoutCandleEvidenceInput[] | Prisma.OrderUncheckedCreateWithoutCandleEvidenceInput[]
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutCandleEvidenceInput | Prisma.OrderCreateOrConnectWithoutCandleEvidenceInput[]
+  upsert?: Prisma.OrderUpsertWithWhereUniqueWithoutCandleEvidenceInput | Prisma.OrderUpsertWithWhereUniqueWithoutCandleEvidenceInput[]
+  createMany?: Prisma.OrderCreateManyCandleEvidenceInputEnvelope
+  set?: Prisma.OrderWhereUniqueInput | Prisma.OrderWhereUniqueInput[]
+  disconnect?: Prisma.OrderWhereUniqueInput | Prisma.OrderWhereUniqueInput[]
+  delete?: Prisma.OrderWhereUniqueInput | Prisma.OrderWhereUniqueInput[]
+  connect?: Prisma.OrderWhereUniqueInput | Prisma.OrderWhereUniqueInput[]
+  update?: Prisma.OrderUpdateWithWhereUniqueWithoutCandleEvidenceInput | Prisma.OrderUpdateWithWhereUniqueWithoutCandleEvidenceInput[]
+  updateMany?: Prisma.OrderUpdateManyWithWhereWithoutCandleEvidenceInput | Prisma.OrderUpdateManyWithWhereWithoutCandleEvidenceInput[]
+  deleteMany?: Prisma.OrderScalarWhereInput | Prisma.OrderScalarWhereInput[]
+}
+
 export type OrderCreateWithoutSeasonParticipantInput = {
   id?: string
   side: $Enums.OrderSide
@@ -1336,6 +1424,7 @@ export type OrderCreateWithoutSeasonParticipantInput = {
   cancelReason?: string | null
   matchingActivatedAt?: Date | string | null
   matchingActivationStreamId?: string | null
+  candleMatchingEligibleFrom?: Date | string | null
   triggerEventId?: string | null
   triggerEventAt?: Date | string | null
   matchedAt?: Date | string | null
@@ -1351,6 +1440,7 @@ export type OrderCreateWithoutSeasonParticipantInput = {
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutOrdersInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutOrdersInput
+  candleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedOneWithoutOrdersInput
 }
 
 export type OrderUncheckedCreateWithoutSeasonParticipantInput = {
@@ -1378,8 +1468,10 @@ export type OrderUncheckedCreateWithoutSeasonParticipantInput = {
   cancelReason?: string | null
   matchingActivatedAt?: Date | string | null
   matchingActivationStreamId?: string | null
+  candleMatchingEligibleFrom?: Date | string | null
   triggerEventId?: string | null
   triggerEventAt?: Date | string | null
+  limitOrderCandleEvidenceId?: string | null
   matchedAt?: Date | string | null
   matchingSource?: string | null
   submittedAt: Date | string
@@ -1446,8 +1538,10 @@ export type OrderScalarWhereInput = {
   cancelReason?: Prisma.StringNullableFilter<"Order"> | string | null
   matchingActivatedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   matchingActivationStreamId?: Prisma.StringNullableFilter<"Order"> | string | null
+  candleMatchingEligibleFrom?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   triggerEventId?: Prisma.StringNullableFilter<"Order"> | string | null
   triggerEventAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  limitOrderCandleEvidenceId?: Prisma.StringNullableFilter<"Order"> | string | null
   matchedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   matchingSource?: Prisma.StringNullableFilter<"Order"> | string | null
   submittedAt?: Prisma.DateTimeFilter<"Order"> | Date | string
@@ -1480,6 +1574,7 @@ export type OrderCreateWithoutAssetInput = {
   cancelReason?: string | null
   matchingActivatedAt?: Date | string | null
   matchingActivationStreamId?: string | null
+  candleMatchingEligibleFrom?: Date | string | null
   triggerEventId?: string | null
   triggerEventAt?: Date | string | null
   matchedAt?: Date | string | null
@@ -1495,6 +1590,7 @@ export type OrderCreateWithoutAssetInput = {
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutOrdersInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutOrdersInput
+  candleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedOneWithoutOrdersInput
 }
 
 export type OrderUncheckedCreateWithoutAssetInput = {
@@ -1522,8 +1618,10 @@ export type OrderUncheckedCreateWithoutAssetInput = {
   cancelReason?: string | null
   matchingActivatedAt?: Date | string | null
   matchingActivationStreamId?: string | null
+  candleMatchingEligibleFrom?: Date | string | null
   triggerEventId?: string | null
   triggerEventAt?: Date | string | null
+  limitOrderCandleEvidenceId?: string | null
   matchedAt?: Date | string | null
   matchingSource?: string | null
   submittedAt: Date | string
@@ -1582,6 +1680,7 @@ export type OrderCreateWithoutAssetPriceSnapshotInput = {
   cancelReason?: string | null
   matchingActivatedAt?: Date | string | null
   matchingActivationStreamId?: string | null
+  candleMatchingEligibleFrom?: Date | string | null
   triggerEventId?: string | null
   triggerEventAt?: Date | string | null
   matchedAt?: Date | string | null
@@ -1597,6 +1696,7 @@ export type OrderCreateWithoutAssetPriceSnapshotInput = {
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutOrdersInput
+  candleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedOneWithoutOrdersInput
 }
 
 export type OrderUncheckedCreateWithoutAssetPriceSnapshotInput = {
@@ -1624,8 +1724,10 @@ export type OrderUncheckedCreateWithoutAssetPriceSnapshotInput = {
   cancelReason?: string | null
   matchingActivatedAt?: Date | string | null
   matchingActivationStreamId?: string | null
+  candleMatchingEligibleFrom?: Date | string | null
   triggerEventId?: string | null
   triggerEventAt?: Date | string | null
+  limitOrderCandleEvidenceId?: string | null
   matchedAt?: Date | string | null
   matchingSource?: string | null
   submittedAt: Date | string
@@ -1684,6 +1786,7 @@ export type OrderCreateWithoutFxRateSnapshotInput = {
   cancelReason?: string | null
   matchingActivatedAt?: Date | string | null
   matchingActivationStreamId?: string | null
+  candleMatchingEligibleFrom?: Date | string | null
   triggerEventId?: string | null
   triggerEventAt?: Date | string | null
   matchedAt?: Date | string | null
@@ -1699,6 +1802,7 @@ export type OrderCreateWithoutFxRateSnapshotInput = {
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutOrdersInput
+  candleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedOneWithoutOrdersInput
 }
 
 export type OrderUncheckedCreateWithoutFxRateSnapshotInput = {
@@ -1726,8 +1830,10 @@ export type OrderUncheckedCreateWithoutFxRateSnapshotInput = {
   cancelReason?: string | null
   matchingActivatedAt?: Date | string | null
   matchingActivationStreamId?: string | null
+  candleMatchingEligibleFrom?: Date | string | null
   triggerEventId?: string | null
   triggerEventAt?: Date | string | null
+  limitOrderCandleEvidenceId?: string | null
   matchedAt?: Date | string | null
   matchingSource?: string | null
   submittedAt: Date | string
@@ -1786,6 +1892,7 @@ export type OrderCreateWithoutQuoteInput = {
   cancelReason?: string | null
   matchingActivatedAt?: Date | string | null
   matchingActivationStreamId?: string | null
+  candleMatchingEligibleFrom?: Date | string | null
   triggerEventId?: string | null
   triggerEventAt?: Date | string | null
   matchedAt?: Date | string | null
@@ -1801,6 +1908,7 @@ export type OrderCreateWithoutQuoteInput = {
   asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutOrdersInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutOrdersInput
+  candleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedOneWithoutOrdersInput
 }
 
 export type OrderUncheckedCreateWithoutQuoteInput = {
@@ -1828,8 +1936,10 @@ export type OrderUncheckedCreateWithoutQuoteInput = {
   cancelReason?: string | null
   matchingActivatedAt?: Date | string | null
   matchingActivationStreamId?: string | null
+  candleMatchingEligibleFrom?: Date | string | null
   triggerEventId?: string | null
   triggerEventAt?: Date | string | null
+  limitOrderCandleEvidenceId?: string | null
   matchedAt?: Date | string | null
   matchingSource?: string | null
   submittedAt: Date | string
@@ -1867,6 +1977,112 @@ export type OrderUpdateManyWithWhereWithoutQuoteInput = {
   data: Prisma.XOR<Prisma.OrderUpdateManyMutationInput, Prisma.OrderUncheckedUpdateManyWithoutQuoteInput>
 }
 
+export type OrderCreateWithoutCandleEvidenceInput = {
+  id?: string
+  side: $Enums.OrderSide
+  orderType: $Enums.OrderType
+  status?: $Enums.OrderStatus
+  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode: $Enums.CurrencyCode
+  grossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  feeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  netAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  idempotencyKey?: string | null
+  requestHash?: string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Date | string | null
+  cancelReason?: string | null
+  matchingActivatedAt?: Date | string | null
+  matchingActivationStreamId?: string | null
+  candleMatchingEligibleFrom?: Date | string | null
+  triggerEventId?: string | null
+  triggerEventAt?: Date | string | null
+  matchedAt?: Date | string | null
+  matchingSource?: string | null
+  submittedAt: Date | string
+  executedAt?: Date | string | null
+  canceledAt?: Date | string | null
+  rejectedAt?: Date | string | null
+  rejectReason?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  seasonParticipant: Prisma.SeasonParticipantCreateNestedOneWithoutOrdersInput
+  asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
+  quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
+  assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutOrdersInput
+  fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutOrdersInput
+}
+
+export type OrderUncheckedCreateWithoutCandleEvidenceInput = {
+  id?: string
+  seasonParticipantId: string
+  assetId: string
+  quoteId?: string | null
+  side: $Enums.OrderSide
+  orderType: $Enums.OrderType
+  status?: $Enums.OrderStatus
+  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode: $Enums.CurrencyCode
+  grossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  feeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  netAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  assetPriceSnapshotId?: string | null
+  fxRateSnapshotId?: string | null
+  idempotencyKey?: string | null
+  requestHash?: string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Date | string | null
+  cancelReason?: string | null
+  matchingActivatedAt?: Date | string | null
+  matchingActivationStreamId?: string | null
+  candleMatchingEligibleFrom?: Date | string | null
+  triggerEventId?: string | null
+  triggerEventAt?: Date | string | null
+  matchedAt?: Date | string | null
+  matchingSource?: string | null
+  submittedAt: Date | string
+  executedAt?: Date | string | null
+  canceledAt?: Date | string | null
+  rejectedAt?: Date | string | null
+  rejectReason?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+}
+
+export type OrderCreateOrConnectWithoutCandleEvidenceInput = {
+  where: Prisma.OrderWhereUniqueInput
+  create: Prisma.XOR<Prisma.OrderCreateWithoutCandleEvidenceInput, Prisma.OrderUncheckedCreateWithoutCandleEvidenceInput>
+}
+
+export type OrderCreateManyCandleEvidenceInputEnvelope = {
+  data: Prisma.OrderCreateManyCandleEvidenceInput | Prisma.OrderCreateManyCandleEvidenceInput[]
+  skipDuplicates?: boolean
+}
+
+export type OrderUpsertWithWhereUniqueWithoutCandleEvidenceInput = {
+  where: Prisma.OrderWhereUniqueInput
+  update: Prisma.XOR<Prisma.OrderUpdateWithoutCandleEvidenceInput, Prisma.OrderUncheckedUpdateWithoutCandleEvidenceInput>
+  create: Prisma.XOR<Prisma.OrderCreateWithoutCandleEvidenceInput, Prisma.OrderUncheckedCreateWithoutCandleEvidenceInput>
+}
+
+export type OrderUpdateWithWhereUniqueWithoutCandleEvidenceInput = {
+  where: Prisma.OrderWhereUniqueInput
+  data: Prisma.XOR<Prisma.OrderUpdateWithoutCandleEvidenceInput, Prisma.OrderUncheckedUpdateWithoutCandleEvidenceInput>
+}
+
+export type OrderUpdateManyWithWhereWithoutCandleEvidenceInput = {
+  where: Prisma.OrderScalarWhereInput
+  data: Prisma.XOR<Prisma.OrderUpdateManyMutationInput, Prisma.OrderUncheckedUpdateManyWithoutCandleEvidenceInput>
+}
+
 export type OrderCreateManySeasonParticipantInput = {
   id?: string
   assetId: string
@@ -1892,8 +2108,10 @@ export type OrderCreateManySeasonParticipantInput = {
   cancelReason?: string | null
   matchingActivatedAt?: Date | string | null
   matchingActivationStreamId?: string | null
+  candleMatchingEligibleFrom?: Date | string | null
   triggerEventId?: string | null
   triggerEventAt?: Date | string | null
+  limitOrderCandleEvidenceId?: string | null
   matchedAt?: Date | string | null
   matchingSource?: string | null
   submittedAt: Date | string
@@ -1926,6 +2144,7 @@ export type OrderUpdateWithoutSeasonParticipantInput = {
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchingActivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingActivationStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleMatchingEligibleFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   triggerEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1941,6 +2160,7 @@ export type OrderUpdateWithoutSeasonParticipantInput = {
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutOrdersNestedInput
+  candleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateOneWithoutOrdersNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutSeasonParticipantInput = {
@@ -1968,8 +2188,10 @@ export type OrderUncheckedUpdateWithoutSeasonParticipantInput = {
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchingActivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingActivationStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleMatchingEligibleFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   triggerEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  limitOrderCandleEvidenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2006,8 +2228,10 @@ export type OrderUncheckedUpdateManyWithoutSeasonParticipantInput = {
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchingActivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingActivationStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleMatchingEligibleFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   triggerEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  limitOrderCandleEvidenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2044,8 +2268,10 @@ export type OrderCreateManyAssetInput = {
   cancelReason?: string | null
   matchingActivatedAt?: Date | string | null
   matchingActivationStreamId?: string | null
+  candleMatchingEligibleFrom?: Date | string | null
   triggerEventId?: string | null
   triggerEventAt?: Date | string | null
+  limitOrderCandleEvidenceId?: string | null
   matchedAt?: Date | string | null
   matchingSource?: string | null
   submittedAt: Date | string
@@ -2078,6 +2304,7 @@ export type OrderUpdateWithoutAssetInput = {
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchingActivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingActivationStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleMatchingEligibleFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   triggerEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -2093,6 +2320,7 @@ export type OrderUpdateWithoutAssetInput = {
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutOrdersNestedInput
+  candleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateOneWithoutOrdersNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutAssetInput = {
@@ -2120,8 +2348,10 @@ export type OrderUncheckedUpdateWithoutAssetInput = {
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchingActivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingActivationStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleMatchingEligibleFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   triggerEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  limitOrderCandleEvidenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2158,8 +2388,10 @@ export type OrderUncheckedUpdateManyWithoutAssetInput = {
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchingActivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingActivationStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleMatchingEligibleFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   triggerEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  limitOrderCandleEvidenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2196,8 +2428,10 @@ export type OrderCreateManyAssetPriceSnapshotInput = {
   cancelReason?: string | null
   matchingActivatedAt?: Date | string | null
   matchingActivationStreamId?: string | null
+  candleMatchingEligibleFrom?: Date | string | null
   triggerEventId?: string | null
   triggerEventAt?: Date | string | null
+  limitOrderCandleEvidenceId?: string | null
   matchedAt?: Date | string | null
   matchingSource?: string | null
   submittedAt: Date | string
@@ -2230,6 +2464,7 @@ export type OrderUpdateWithoutAssetPriceSnapshotInput = {
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchingActivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingActivationStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleMatchingEligibleFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   triggerEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -2245,6 +2480,7 @@ export type OrderUpdateWithoutAssetPriceSnapshotInput = {
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutOrdersNestedInput
+  candleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateOneWithoutOrdersNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutAssetPriceSnapshotInput = {
@@ -2272,8 +2508,10 @@ export type OrderUncheckedUpdateWithoutAssetPriceSnapshotInput = {
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchingActivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingActivationStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleMatchingEligibleFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   triggerEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  limitOrderCandleEvidenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2310,8 +2548,10 @@ export type OrderUncheckedUpdateManyWithoutAssetPriceSnapshotInput = {
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchingActivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingActivationStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleMatchingEligibleFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   triggerEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  limitOrderCandleEvidenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2348,8 +2588,10 @@ export type OrderCreateManyFxRateSnapshotInput = {
   cancelReason?: string | null
   matchingActivatedAt?: Date | string | null
   matchingActivationStreamId?: string | null
+  candleMatchingEligibleFrom?: Date | string | null
   triggerEventId?: string | null
   triggerEventAt?: Date | string | null
+  limitOrderCandleEvidenceId?: string | null
   matchedAt?: Date | string | null
   matchingSource?: string | null
   submittedAt: Date | string
@@ -2382,6 +2624,7 @@ export type OrderUpdateWithoutFxRateSnapshotInput = {
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchingActivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingActivationStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleMatchingEligibleFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   triggerEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -2397,6 +2640,7 @@ export type OrderUpdateWithoutFxRateSnapshotInput = {
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput
+  candleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateOneWithoutOrdersNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutFxRateSnapshotInput = {
@@ -2424,8 +2668,10 @@ export type OrderUncheckedUpdateWithoutFxRateSnapshotInput = {
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchingActivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingActivationStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleMatchingEligibleFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   triggerEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  limitOrderCandleEvidenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2462,8 +2708,10 @@ export type OrderUncheckedUpdateManyWithoutFxRateSnapshotInput = {
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchingActivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingActivationStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleMatchingEligibleFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   triggerEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  limitOrderCandleEvidenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2500,8 +2748,10 @@ export type OrderCreateManyQuoteInput = {
   cancelReason?: string | null
   matchingActivatedAt?: Date | string | null
   matchingActivationStreamId?: string | null
+  candleMatchingEligibleFrom?: Date | string | null
   triggerEventId?: string | null
   triggerEventAt?: Date | string | null
+  limitOrderCandleEvidenceId?: string | null
   matchedAt?: Date | string | null
   matchingSource?: string | null
   submittedAt: Date | string
@@ -2534,6 +2784,7 @@ export type OrderUpdateWithoutQuoteInput = {
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchingActivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingActivationStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleMatchingEligibleFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   triggerEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -2549,6 +2800,7 @@ export type OrderUpdateWithoutQuoteInput = {
   asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutOrdersNestedInput
+  candleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateOneWithoutOrdersNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutQuoteInput = {
@@ -2576,8 +2828,10 @@ export type OrderUncheckedUpdateWithoutQuoteInput = {
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchingActivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingActivationStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleMatchingEligibleFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   triggerEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  limitOrderCandleEvidenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2614,6 +2868,168 @@ export type OrderUncheckedUpdateManyWithoutQuoteInput = {
   cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   matchingActivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchingActivationStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleMatchingEligibleFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  triggerEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  triggerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  limitOrderCandleEvidenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  matchedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  matchingSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type OrderCreateManyCandleEvidenceInput = {
+  id?: string
+  seasonParticipantId: string
+  assetId: string
+  quoteId?: string | null
+  side: $Enums.OrderSide
+  orderType: $Enums.OrderType
+  status?: $Enums.OrderStatus
+  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode: $Enums.CurrencyCode
+  grossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  feeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  netAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  assetPriceSnapshotId?: string | null
+  fxRateSnapshotId?: string | null
+  idempotencyKey?: string | null
+  requestHash?: string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Date | string | null
+  cancelReason?: string | null
+  matchingActivatedAt?: Date | string | null
+  matchingActivationStreamId?: string | null
+  candleMatchingEligibleFrom?: Date | string | null
+  triggerEventId?: string | null
+  triggerEventAt?: Date | string | null
+  matchedAt?: Date | string | null
+  matchingSource?: string | null
+  submittedAt: Date | string
+  executedAt?: Date | string | null
+  canceledAt?: Date | string | null
+  rejectedAt?: Date | string | null
+  rejectReason?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+}
+
+export type OrderUpdateWithoutCandleEvidenceInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
+  orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
+  status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  grossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  feeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  netAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  matchingActivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  matchingActivationStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleMatchingEligibleFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  triggerEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  triggerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  matchedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  matchingSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonParticipant?: Prisma.SeasonParticipantUpdateOneRequiredWithoutOrdersNestedInput
+  asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
+  quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
+  assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput
+  fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutOrdersNestedInput
+}
+
+export type OrderUncheckedUpdateWithoutCandleEvidenceInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
+  assetId?: Prisma.StringFieldUpdateOperationsInput | string
+  quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
+  orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
+  status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  grossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  feeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  netAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fxRateSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  matchingActivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  matchingActivationStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleMatchingEligibleFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  triggerEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  triggerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  matchedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  matchingSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type OrderUncheckedUpdateManyWithoutCandleEvidenceInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
+  assetId?: Prisma.StringFieldUpdateOperationsInput | string
+  quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
+  orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
+  status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  grossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  feeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  netAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fxRateSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  matchingActivatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  matchingActivationStreamId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleMatchingEligibleFrom?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   triggerEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   matchedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -2655,8 +3071,10 @@ export type OrderSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   cancelReason?: boolean
   matchingActivatedAt?: boolean
   matchingActivationStreamId?: boolean
+  candleMatchingEligibleFrom?: boolean
   triggerEventId?: boolean
   triggerEventAt?: boolean
+  limitOrderCandleEvidenceId?: boolean
   matchedAt?: boolean
   matchingSource?: boolean
   submittedAt?: boolean
@@ -2671,6 +3089,7 @@ export type OrderSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   quote?: boolean | Prisma.Order$quoteArgs<ExtArgs>
   assetPriceSnapshot?: boolean | Prisma.Order$assetPriceSnapshotArgs<ExtArgs>
   fxRateSnapshot?: boolean | Prisma.Order$fxRateSnapshotArgs<ExtArgs>
+  candleEvidence?: boolean | Prisma.Order$candleEvidenceArgs<ExtArgs>
 }, ExtArgs["result"]["order"]>
 
 export type OrderSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -2699,8 +3118,10 @@ export type OrderSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   cancelReason?: boolean
   matchingActivatedAt?: boolean
   matchingActivationStreamId?: boolean
+  candleMatchingEligibleFrom?: boolean
   triggerEventId?: boolean
   triggerEventAt?: boolean
+  limitOrderCandleEvidenceId?: boolean
   matchedAt?: boolean
   matchingSource?: boolean
   submittedAt?: boolean
@@ -2715,6 +3136,7 @@ export type OrderSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   quote?: boolean | Prisma.Order$quoteArgs<ExtArgs>
   assetPriceSnapshot?: boolean | Prisma.Order$assetPriceSnapshotArgs<ExtArgs>
   fxRateSnapshot?: boolean | Prisma.Order$fxRateSnapshotArgs<ExtArgs>
+  candleEvidence?: boolean | Prisma.Order$candleEvidenceArgs<ExtArgs>
 }, ExtArgs["result"]["order"]>
 
 export type OrderSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -2743,8 +3165,10 @@ export type OrderSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   cancelReason?: boolean
   matchingActivatedAt?: boolean
   matchingActivationStreamId?: boolean
+  candleMatchingEligibleFrom?: boolean
   triggerEventId?: boolean
   triggerEventAt?: boolean
+  limitOrderCandleEvidenceId?: boolean
   matchedAt?: boolean
   matchingSource?: boolean
   submittedAt?: boolean
@@ -2759,6 +3183,7 @@ export type OrderSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   quote?: boolean | Prisma.Order$quoteArgs<ExtArgs>
   assetPriceSnapshot?: boolean | Prisma.Order$assetPriceSnapshotArgs<ExtArgs>
   fxRateSnapshot?: boolean | Prisma.Order$fxRateSnapshotArgs<ExtArgs>
+  candleEvidence?: boolean | Prisma.Order$candleEvidenceArgs<ExtArgs>
 }, ExtArgs["result"]["order"]>
 
 export type OrderSelectScalar = {
@@ -2787,8 +3212,10 @@ export type OrderSelectScalar = {
   cancelReason?: boolean
   matchingActivatedAt?: boolean
   matchingActivationStreamId?: boolean
+  candleMatchingEligibleFrom?: boolean
   triggerEventId?: boolean
   triggerEventAt?: boolean
+  limitOrderCandleEvidenceId?: boolean
   matchedAt?: boolean
   matchingSource?: boolean
   submittedAt?: boolean
@@ -2800,13 +3227,14 @@ export type OrderSelectScalar = {
   updatedAt?: boolean
 }
 
-export type OrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "seasonParticipantId" | "assetId" | "quoteId" | "side" | "orderType" | "status" | "quantity" | "limitPrice" | "executedPrice" | "currencyCode" | "grossAmount" | "feeAmount" | "netAmount" | "assetPriceSnapshotId" | "fxRateSnapshotId" | "idempotencyKey" | "requestHash" | "responsePayloadJson" | "reservedAmount" | "reservationFeeRate" | "reservationReleasedAt" | "cancelReason" | "matchingActivatedAt" | "matchingActivationStreamId" | "triggerEventId" | "triggerEventAt" | "matchedAt" | "matchingSource" | "submittedAt" | "executedAt" | "canceledAt" | "rejectedAt" | "rejectReason" | "createdAt" | "updatedAt", ExtArgs["result"]["order"]>
+export type OrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "seasonParticipantId" | "assetId" | "quoteId" | "side" | "orderType" | "status" | "quantity" | "limitPrice" | "executedPrice" | "currencyCode" | "grossAmount" | "feeAmount" | "netAmount" | "assetPriceSnapshotId" | "fxRateSnapshotId" | "idempotencyKey" | "requestHash" | "responsePayloadJson" | "reservedAmount" | "reservationFeeRate" | "reservationReleasedAt" | "cancelReason" | "matchingActivatedAt" | "matchingActivationStreamId" | "candleMatchingEligibleFrom" | "triggerEventId" | "triggerEventAt" | "limitOrderCandleEvidenceId" | "matchedAt" | "matchingSource" | "submittedAt" | "executedAt" | "canceledAt" | "rejectedAt" | "rejectReason" | "createdAt" | "updatedAt", ExtArgs["result"]["order"]>
 export type OrderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   quote?: boolean | Prisma.Order$quoteArgs<ExtArgs>
   assetPriceSnapshot?: boolean | Prisma.Order$assetPriceSnapshotArgs<ExtArgs>
   fxRateSnapshot?: boolean | Prisma.Order$fxRateSnapshotArgs<ExtArgs>
+  candleEvidence?: boolean | Prisma.Order$candleEvidenceArgs<ExtArgs>
 }
 export type OrderIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
@@ -2814,6 +3242,7 @@ export type OrderIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extens
   quote?: boolean | Prisma.Order$quoteArgs<ExtArgs>
   assetPriceSnapshot?: boolean | Prisma.Order$assetPriceSnapshotArgs<ExtArgs>
   fxRateSnapshot?: boolean | Prisma.Order$fxRateSnapshotArgs<ExtArgs>
+  candleEvidence?: boolean | Prisma.Order$candleEvidenceArgs<ExtArgs>
 }
 export type OrderIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
@@ -2821,6 +3250,7 @@ export type OrderIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extens
   quote?: boolean | Prisma.Order$quoteArgs<ExtArgs>
   assetPriceSnapshot?: boolean | Prisma.Order$assetPriceSnapshotArgs<ExtArgs>
   fxRateSnapshot?: boolean | Prisma.Order$fxRateSnapshotArgs<ExtArgs>
+  candleEvidence?: boolean | Prisma.Order$candleEvidenceArgs<ExtArgs>
 }
 
 export type $OrderPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2831,6 +3261,7 @@ export type $OrderPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     quote: Prisma.$QuotePayload<ExtArgs> | null
     assetPriceSnapshot: Prisma.$AssetPriceSnapshotPayload<ExtArgs> | null
     fxRateSnapshot: Prisma.$FxRateSnapshotPayload<ExtArgs> | null
+    candleEvidence: Prisma.$LimitOrderCandleEvidencePayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -2858,8 +3289,10 @@ export type $OrderPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     cancelReason: string | null
     matchingActivatedAt: Date | null
     matchingActivationStreamId: string | null
+    candleMatchingEligibleFrom: Date | null
     triggerEventId: string | null
     triggerEventAt: Date | null
+    limitOrderCandleEvidenceId: string | null
     matchedAt: Date | null
     matchingSource: string | null
     submittedAt: Date
@@ -3268,6 +3701,7 @@ export interface Prisma__OrderClient<T, Null = never, ExtArgs extends runtime.Ty
   quote<T extends Prisma.Order$quoteArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$quoteArgs<ExtArgs>>): Prisma.Prisma__QuoteClient<runtime.Types.Result.GetResult<Prisma.$QuotePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   assetPriceSnapshot<T extends Prisma.Order$assetPriceSnapshotArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$assetPriceSnapshotArgs<ExtArgs>>): Prisma.Prisma__AssetPriceSnapshotClient<runtime.Types.Result.GetResult<Prisma.$AssetPriceSnapshotPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   fxRateSnapshot<T extends Prisma.Order$fxRateSnapshotArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$fxRateSnapshotArgs<ExtArgs>>): Prisma.Prisma__FxRateSnapshotClient<runtime.Types.Result.GetResult<Prisma.$FxRateSnapshotPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  candleEvidence<T extends Prisma.Order$candleEvidenceArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$candleEvidenceArgs<ExtArgs>>): Prisma.Prisma__LimitOrderCandleEvidenceClient<runtime.Types.Result.GetResult<Prisma.$LimitOrderCandleEvidencePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -3322,8 +3756,10 @@ export interface OrderFieldRefs {
   readonly cancelReason: Prisma.FieldRef<"Order", 'String'>
   readonly matchingActivatedAt: Prisma.FieldRef<"Order", 'DateTime'>
   readonly matchingActivationStreamId: Prisma.FieldRef<"Order", 'String'>
+  readonly candleMatchingEligibleFrom: Prisma.FieldRef<"Order", 'DateTime'>
   readonly triggerEventId: Prisma.FieldRef<"Order", 'String'>
   readonly triggerEventAt: Prisma.FieldRef<"Order", 'DateTime'>
+  readonly limitOrderCandleEvidenceId: Prisma.FieldRef<"Order", 'String'>
   readonly matchedAt: Prisma.FieldRef<"Order", 'DateTime'>
   readonly matchingSource: Prisma.FieldRef<"Order", 'String'>
   readonly submittedAt: Prisma.FieldRef<"Order", 'DateTime'>
@@ -3788,6 +4224,25 @@ export type Order$fxRateSnapshotArgs<ExtArgs extends runtime.Types.Extensions.In
    */
   include?: Prisma.FxRateSnapshotInclude<ExtArgs> | null
   where?: Prisma.FxRateSnapshotWhereInput
+}
+
+/**
+ * Order.candleEvidence
+ */
+export type Order$candleEvidenceArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the LimitOrderCandleEvidence
+   */
+  select?: Prisma.LimitOrderCandleEvidenceSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the LimitOrderCandleEvidence
+   */
+  omit?: Prisma.LimitOrderCandleEvidenceOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.LimitOrderCandleEvidenceInclude<ExtArgs> | null
+  where?: Prisma.LimitOrderCandleEvidenceWhereInput
 }
 
 /**

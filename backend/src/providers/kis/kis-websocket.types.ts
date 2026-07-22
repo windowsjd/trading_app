@@ -10,6 +10,8 @@ export type KisWebSocketTradeKind =
 export type KisWebSocketParsedAck = {
   state: 'ack';
   trId: string | null;
+  /** Subscribed target key echoed by KIS, used for per-asset readiness. */
+  trKey: string | null;
   message: string | null;
   code: string | null;
   success: boolean | null;
@@ -43,6 +45,8 @@ export type KisWebSocketParsedFailed = {
   reason: string;
   message: string;
   trId: string | null;
+  /** Present when the failing frame is a subscription ack for one target. */
+  trKey: string | null;
   rawFrame: string;
   receivedAt: Date;
 };

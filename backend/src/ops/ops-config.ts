@@ -3,6 +3,10 @@ import {
   readMarketCandleReconciliationConfig,
   type MarketCandleReconciliationConfig,
 } from '../assets/market-candle-reconciliation.config';
+import {
+  readLimitOrderCandleReconciliationConfig,
+  type LimitOrderCandleReconciliationConfig,
+} from '../orders/limit-matching/limit-order-candle-reconciliation.config';
 
 export type ProviderOpsJobName =
   | typeof OpsJobName.provider_fx_ingest
@@ -31,6 +35,7 @@ export type OpsSchedulerConfig = {
     runOnStartup: boolean;
   };
   marketCandleReconciliation: MarketCandleReconciliationConfig;
+  limitOrderCandleReconciliation: LimitOrderCandleReconciliationConfig;
 };
 
 export class OpsConfigError extends Error {
@@ -57,6 +62,8 @@ export function getOpsSchedulerConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): OpsSchedulerConfig {
   const marketCandleReconciliation = readMarketCandleReconciliationConfig(env);
+  const limitOrderCandleReconciliation =
+    readLimitOrderCandleReconciliationConfig(env);
   const rankingEnabled = parseBooleanEnv(
     env.SCHEDULER_RANKING_ENABLED ?? env.ENABLE_RANKING_SCHEDULER,
     false,
@@ -130,7 +137,8 @@ export function getOpsSchedulerConfig(
       providerBinanceEnabled ||
       providerKisEnabled ||
       retentionEnabled ||
-      marketCandleReconciliation.enabled,
+      marketCandleReconciliation.enabled ||
+      limitOrderCandleReconciliation.enabled,
     timezone: parseTextEnv(env.SCHEDULER_TIMEZONE, DEFAULT_TIMEZONE),
     lockTtlSeconds: parsePositiveIntegerEnv(
       env.SCHEDULER_LOCK_TTL_SECONDS,
@@ -164,6 +172,9 @@ export function getOpsSchedulerConfig(
         marketCandleReconciliation.enabled,
       // Dedicated long-running poller; never scheduled on the 60s Ops tick.
       [OpsJobName.limit_order_matcher]: false,
+      // Path-B safety net: reuses the ordinary 60s tick, default off.
+      [OpsJobName.limit_order_candle_reconciliation]:
+        limitOrderCandleReconciliation.enabled,
     },
     providerIntervalsSeconds: {
       [OpsJobName.provider_fx_ingest]: parsePositiveIntegerEnv(
@@ -194,6 +205,7 @@ export function getOpsSchedulerConfig(
       runOnStartup: retentionRunOnStartup,
     },
     marketCandleReconciliation,
+    limitOrderCandleReconciliation,
   };
 }
 

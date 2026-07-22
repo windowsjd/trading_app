@@ -16,6 +16,7 @@ jest.mock('../../prisma/prisma.service', () => ({ PrismaService: class {} }));
 
 import { AssetType, CurrencyCode } from '../../generated/prisma/client';
 import { NormalizedProviderTradeEventBus } from '../../providers/normalized-provider-trade-event-bus.service';
+import { ProviderTradeRouteRegistry } from '../../providers/provider-trade-route.registry';
 import type { RedisService } from '../../redis/redis.service';
 import type { PrismaService } from '../../prisma/prisma.service';
 import { LimitOrderPriceEventPublisher } from './limit-order-price-event.publisher';
@@ -64,6 +65,7 @@ describe('LimitOrderPriceEventPublisher', () => {
         redis,
         bus,
         health,
+        new ProviderTradeRouteRegistry(),
       );
       publisher.onModuleInit();
 
@@ -127,6 +129,7 @@ describe('LimitOrderPriceEventPublisher', () => {
       redis,
       bus,
       health,
+      new ProviderTradeRouteRegistry(),
     );
     publisher.onModuleInit();
 
@@ -183,6 +186,7 @@ describe('LimitOrderPriceEventPublisher', () => {
       {
         degradeActiveLeader: jest.fn(),
       } as unknown as LimitOrderMatcherHealthService,
+      new ProviderTradeRouteRegistry(),
     );
     publisher.onModuleInit();
 
@@ -247,6 +251,7 @@ describe('LimitOrderPriceEventPublisher', () => {
       redis,
       new NormalizedProviderTradeEventBus(),
       health,
+      new ProviderTradeRouteRegistry(),
     );
 
     await expect(
@@ -296,6 +301,7 @@ describe('LimitOrderPriceEventPublisher', () => {
       {
         degradeActiveLeader: jest.fn(),
       } as unknown as LimitOrderMatcherHealthService,
+      new ProviderTradeRouteRegistry(),
     );
 
     await expect(

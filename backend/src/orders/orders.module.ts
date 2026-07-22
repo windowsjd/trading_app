@@ -9,6 +9,8 @@ import { OrderReservationService } from './order-reservation.service';
 import { LimitOrderCreateService } from './limit-order-create.service';
 import { LimitOrderCancelService } from './limit-order-cancel.service';
 import { LimitOrderCandidateRepository } from './limit-matching/limit-order-candidate.repository';
+import { LimitOrderCandleReconciliationService } from './limit-matching/limit-order-candle-reconciliation.service';
+import { LimitOrderMatchBoundaryService } from './limit-matching/limit-order-match-boundary.service';
 import { LimitOrderEventPollerService } from './limit-matching/limit-order-event-poller.service';
 import { LimitOrderEventStreamService } from './limit-matching/limit-order-event-stream.service';
 import { LimitOrderExecutionService } from './limit-matching/limit-order-execution.service';
@@ -26,6 +28,8 @@ import { LimitOrderProviderHealthService } from './limit-matching/limit-order-pr
     LimitOrderCreateService,
     LimitOrderCancelService,
     LimitOrderCandidateRepository,
+    LimitOrderCandleReconciliationService,
+    LimitOrderMatchBoundaryService,
     LimitOrderEventStreamService,
     LimitOrderExecutionService,
     LimitOrderMatcherHealthService,
@@ -34,6 +38,10 @@ import { LimitOrderProviderHealthService } from './limit-matching/limit-order-pr
     LimitOrderProviderHealthService,
     LimitOrderEventPollerService,
   ],
-  exports: [LimitOrderCancelService],
+  exports: [
+    LimitOrderCancelService,
+    LimitOrderCandleReconciliationService,
+    LimitOrderMatchBoundaryService,
+  ],
 })
 export class OrdersModule {}

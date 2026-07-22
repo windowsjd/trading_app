@@ -13,6 +13,7 @@ import {
 } from '../provider-config.service';
 import { ProviderConfigError } from '../provider.types';
 import { NormalizedProviderTradeEventBus } from '../normalized-provider-trade-event-bus.service';
+import { ProviderTradeRouteRegistry } from '../provider-trade-route.registry';
 import {
   BinanceRealtimePriceCacheService,
   type BinanceRealtimePriceCacheEntry,
@@ -136,6 +137,8 @@ export class BinanceWebSocketStreamingService
     private readonly realtimePriceEventBus: BinanceRealtimePriceEventBus,
     @Optional()
     private readonly normalizedTradeEventBus?: NormalizedProviderTradeEventBus,
+    @Optional()
+    private readonly tradeRoutes?: ProviderTradeRouteRegistry,
   ) {}
 
   onModuleInit(): void {
@@ -152,7 +155,12 @@ export class BinanceWebSocketStreamingService
     }
 
     const liveCandles = readLiveCandleConfig();
-    if (liveCandles.enabled && liveCandles.binanceEnabled) {
+    // Exactly one canonical Binance connection per process — see the KIS
+    // counterpart for the full rationale.
+    if (
+      (liveCandles.enabled && liveCandles.binanceEnabled) ||
+      this.tradeRoutes?.claimProvider('binance', 'legacy_streaming') === false
+    ) {
       this.status.enabled = false;
       this.status.running = false;
       this.status.state = 'disabled';
@@ -186,6 +194,7 @@ export class BinanceWebSocketStreamingService
 
     await Promise.allSettled([...this.pendingMessages]);
     this.socket = null;
+    this.tradeRoutes?.releaseProvider('binance', 'legacy_streaming');
     this.markDisconnected();
     this.status.state = this.status.enabled ? 'stopped' : 'disabled';
   }
@@ -410,7 +419,10 @@ export class BinanceWebSocketStreamingService
         const mapping = await this.ingestionService.resolveLiveTradeAsset(
           parsed.trade.providerSymbol,
         );
-        if (mapping.state === 'mapped') {
+        if (
+          mapping.state === 'mapped' &&
+          this.tradeRoutes?.isOwnedBy('binance', 'legacy_streaming') !== false
+        ) {
           this.normalizedTradeEventBus?.publish({
             provider: 'binance',
             providerEventId: parsed.trade.tradeId,

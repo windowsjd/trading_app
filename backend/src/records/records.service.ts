@@ -442,6 +442,19 @@ type MySeasonOrdersResponse = {
       reservedAmount: string | null;
       reservationReleasedAt: string | null;
       cancelReason: string | null;
+      // Additive automatic-matching provenance. 'live_trade_event' fills carry
+      // the exact trade price; 'closed_5m_candle' fills are safety-net fills
+      // executed AT THE LIMIT PRICE with the candle low as touch evidence.
+      matchingSource: string | null;
+      matchedAt: string | null;
+      candleEvidence: {
+        marketCandleId: string;
+        interval: string;
+        openTime: string;
+        closeTime: string;
+        triggerLowPrice: string;
+        executionPricePolicy: string;
+      } | null;
       submittedAt: string;
       executedAt: string | null;
       canceledAt: string | null;
@@ -1062,6 +1075,18 @@ export class RecordsService {
           reservedAmount: true,
           reservationReleasedAt: true,
           cancelReason: true,
+          matchingSource: true,
+          matchedAt: true,
+          candleEvidence: {
+            select: {
+              marketCandleId: true,
+              interval: true,
+              openTime: true,
+              closeTime: true,
+              triggerLowPrice: true,
+              executionPricePolicy: true,
+            },
+          },
           submittedAt: true,
           executedAt: true,
           canceledAt: true,
@@ -1111,6 +1136,21 @@ export class RecordsService {
             order.reservationReleasedAt,
           ),
           cancelReason: order.cancelReason,
+          matchingSource: order.matchingSource,
+          matchedAt: this.formatNullableDate(order.matchedAt),
+          candleEvidence: order.candleEvidence
+            ? {
+                marketCandleId: order.candleEvidence.marketCandleId,
+                interval: order.candleEvidence.interval,
+                openTime: order.candleEvidence.openTime.toISOString(),
+                closeTime: order.candleEvidence.closeTime.toISOString(),
+                triggerLowPrice: this.formatDecimal(
+                  order.candleEvidence.triggerLowPrice,
+                  8,
+                ),
+                executionPricePolicy: order.candleEvidence.executionPricePolicy,
+              }
+            : null,
           submittedAt: order.submittedAt.toISOString(),
           executedAt: this.formatNullableDate(order.executedAt),
           canceledAt: this.formatNullableDate(order.canceledAt),

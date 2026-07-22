@@ -207,11 +207,22 @@ function parseJsonAck(
 ): KisWebSocketParsedMessage {
   try {
     const raw = JSON.parse(frame) as {
-      header?: { tr_id?: unknown };
-      body?: { msg1?: unknown; msg_cd?: unknown; rt_cd?: unknown };
+      header?: { tr_id?: unknown; tr_key?: unknown };
+      body?: {
+        msg1?: unknown;
+        msg_cd?: unknown;
+        rt_cd?: unknown;
+        output?: { tr_key?: unknown };
+      };
     };
     const trId =
       typeof raw.header?.tr_id === 'string' ? raw.header.tr_id : null;
+    const trKey =
+      typeof raw.header?.tr_key === 'string'
+        ? raw.header.tr_key
+        : typeof raw.body?.output?.tr_key === 'string'
+          ? raw.body.output.tr_key
+          : null;
     // Official KIS liveness frame; the caller must echo it back verbatim.
     if (trId === 'PINGPONG') {
       return {
@@ -236,13 +247,14 @@ function parseJsonAck(
         'KIS_SUBSCRIPTION_ACK_FAILED',
         message ?? code ?? 'KIS WebSocket subscription ack failed.',
         trId,
-        { frame, receivedAt },
+        { frame, receivedAt, trKey },
       );
     }
 
     return {
       state: 'ack',
       trId,
+      trKey,
       message,
       code,
       success,
@@ -619,13 +631,14 @@ function failed(
   reason: string,
   message: string,
   trId: string | null,
-  input: { frame: string; receivedAt: Date },
+  input: { frame: string; receivedAt: Date; trKey?: string | null },
 ): KisWebSocketParsedMessage {
   return {
     state: 'failed',
     reason,
     message,
     trId,
+    trKey: input.trKey ?? null,
     rawFrame: input.frame,
     receivedAt: input.receivedAt,
   };

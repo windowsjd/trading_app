@@ -48,6 +48,7 @@ import {
   type ReconciliationMarket,
 } from '../assets/market-candle-reconciliation.service';
 import { resolveStockMarketSessionState } from '../orders/market-calendar.policy';
+import { LimitOrderCandleReconciliationService } from '../orders/limit-matching/limit-order-candle-reconciliation.service';
 
 export type OpsJobRunnerResponse =
   | {
@@ -97,6 +98,13 @@ export type MarketCandleRetentionOpsJobInput = OpsJobRunnerInput & {
   now?: string | null;
   retentionDays?: number;
   batchSize?: number;
+};
+
+export type LimitOrderCandleReconciliationOpsJobInput = OpsJobRunnerInput & {
+  now?: string | null;
+  lookbackMs?: number;
+  candleBatchSize?: number;
+  orderBatchSize?: number;
 };
 
 export type MarketCandleSyncOpsJobInput = OpsJobRunnerInput & {
@@ -158,7 +166,44 @@ export class OpsJobRunnerService {
     private readonly runService: OpsJobRunService,
     @Optional()
     private readonly marketCandleReconciliationService?: MarketCandleReconciliationService,
+    @Optional()
+    private readonly limitOrderCandleReconciliationService?: LimitOrderCandleReconciliationService,
   ) {}
+
+  /**
+   * Path-B safety net: sweep confirmed 5m candles for limit buys whose price
+   * was touched but whose live trade event never reached the Redis Stream.
+   * Runs on the ordinary 60s Ops tick under the shared OpsJobLock — a 5m
+   * safety net has no need for a dedicated sub-second loop.
+   */
+  runLimitOrderCandleReconciliationJob(
+    input: LimitOrderCandleReconciliationOpsJobInput = {},
+  ) {
+    const service = this.limitOrderCandleReconciliationService;
+    if (!service) {
+      throw new Error(
+        'Limit-order candle reconciliation service is unavailable.',
+      );
+    }
+    const now = this.parseOptionalDate(input.now) ?? new Date();
+    return this.runLockedOpsJob(
+      OpsJobName.limit_order_candle_reconciliation,
+      input,
+      'limit_order_candle_reconciliation:5m',
+      async () => ({
+        ...(await service.reconcile({
+          now,
+          lookbackMs: input.lookbackMs,
+          candleBatchSize: input.candleBatchSize,
+          orderBatchSize: input.orderBatchSize,
+        })),
+      }),
+      {
+        renewLock: true,
+        dryRunResult: { dryRun: true, now: now.toISOString() },
+      },
+    );
+  }
 
   runProviderFxIngestJob(input: OpsJobRunnerInput = {}) {
     return this.runLockedOpsJob(

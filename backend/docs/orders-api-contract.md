@@ -337,17 +337,27 @@ feeAmount`, computed from `limitPrice × quantity` with the exact
   `tru`, or an explicitly empty string — **fails startup** instead of being
   silently read as off. `LIMIT_ORDER_AUTO_EXECUTION_ENABLED` is separately
   false by default. When true, quote/create add an `executionPolicy` object and
-  require a fresh matcher heartbeat, active Publisher subscription, and a
-  connected asset-specific KIS/Binance stream; market orders and FX are never
-  gated.
+  require a fresh matcher heartbeat within backlog/lag/ACK/retention thresholds,
+  an active Publisher subscription, and — for the REQUESTED ASSET specifically —
+  an acknowledged subscription on the canonical provider connection of the
+  current connection generation; market orders and FX are never gated.
+  `LIMIT_ORDER_CANDLE_RECONCILIATION_ENABLED` (default **false**) adds path B
+  and requires `LIMIT_ORDER_AUTO_EXECUTION_ENABLED=true`; enabling it alone
+  **fails startup**.
 - Create's final TTL/season/stock-session checks use DB `clock_timestamp()`
   after Quote/Participant/Season locks. The same time becomes submittedAt.
 - Path A consumes only normalized KIS/Binance live trade events from a Redis
   Stream. `event.price <= limitPrice` full-fills at event.price with the pinned
-  reservation fee. No latest-price polling, candle path B, public execute API,
+  reservation fee. Activation ordering uses the Redis Stream ID only, never a
+  cross-host timestamp comparison. No latest-price polling, public execute API,
   provider order API, liquidity allocation, or partial fill exists. Detailed
   event/lock/recovery semantics are in
   `docs/limit-order-live-matching-operations.md`.
+- Path B (opt-in) is the confirmed 5-minute candle SAFETY NET for events that
+  never reached the stream. It fills at **`order.limitPrice`**, never at the
+  candle low, uses only closed canonical 5m rows, never uses the partially
+  elapsed candle an order was submitted into, and never fills retroactively
+  after a season ends. See `docs/limit-order-candle-reconciliation.md`.
 - Quote TTL (15s) only bounds how long the quote can be turned into an
   order; the created `submitted` order itself has no expiry (GTC) and is
   unaffected by the quote expiring afterwards.
@@ -461,7 +471,8 @@ set to `quotedReservedAmount` and `Order.reservationFeeRate` to
 `quotedFeeRate`.
 
 Response: the standard order payload (with additive `reservedAmount`,
-`reservationReleasedAt`, `cancelReason` fields) plus
+`reservationReleasedAt`, `cancelReason`, `matchingSource`, `matchedAt`,
+`triggerEventId`, `triggerEventAt`, `candleEvidence` fields) plus
 `execution: { state: "submitted", submittedAt, quoteId, reservedAmount,
 reservationFeeRate, duplicate }` plus additive `executionPolicy`. On the order payload
 `status=submitted`, `orderType=limit`, `side=buy`, `limitPrice` and
@@ -712,3 +723,48 @@ through normalized trade -> Redis Stream -> dedicated Poller.
 - Equity snapshot creation from order execution.
 - Daily portfolio snapshot automatic generation.
 - Ranking automatic generation.
+
+## Additive matching fields (phase 2 path A / phase 3 path B)
+
+Every order payload (create, list, records) carries these additive fields. All
+existing fields keep their meaning; nothing was removed.
+
+| Field | Unfilled | Path A fill | Path B fill |
+| --- | --- | --- | --- |
+| `matchingSource` | `null` | `"live_trade_event"` | `"closed_5m_candle"` |
+| `matchedAt` | `null` | fill time | fill time |
+| `triggerEventId` | `null` | provider event id | `null` |
+| `triggerEventAt` | `null` | provider event time | candle `closeTime` |
+| `assetPriceSnapshotId` | `null` | exact trade snapshot | `null` |
+| `candleEvidence` | `null` | `null` | object below |
+| `executedPrice` | `null` | event price | order `limitPrice` |
+
+```jsonc
+"candleEvidence": {
+  "marketCandleId": "…",
+  "interval": "5m",
+  "openTime": "2026-07-22T01:00:00.000Z",
+  "closeTime": "2026-07-22T01:05:00.000Z",
+  "triggerLowPrice": "90.00000000",   // proof the limit was TOUCHED
+  "executionPricePolicy": "limit_price" // the fill price is the LIMIT price
+}
+```
+
+`triggerLowPrice` must never be presented as the price the user paid. Clients
+render a path-B fill as “5분봉 안전망 체결” with the executed price (the limit
+price) and may show the low explicitly labelled as the touch trigger.
+
+`executionPolicy` on quote/create responses is additive too:
+
+```jsonc
+"executionPolicy": {
+  "autoExecutionEnabled": true,
+  "mode": "live_trade_event",
+  "triggerType": "provider_trade_price",
+  "fullFillOnly": true,
+  "liveTradeMatchingEnabled": true,
+  "candleReconciliationEnabled": true,
+  "candleInterval": "5m",
+  "candleExecutionPricePolicy": "limit_price"
+}
+```

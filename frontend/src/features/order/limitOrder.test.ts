@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
+  getCandleEvidenceDisplay,
   getLimitQuoteEstimateDisplay,
   getLimitOrderSuccessMessage,
+  getOrderMatchingSourceLabel,
   getOrderSuccessDisplay,
   isOrderSuccess,
   isSubmittedLimitOrder,
@@ -406,4 +408,76 @@ test('existing market error semantics stay intact', () => {
     mapOrderErrorCodeToBlockedReason(ERROR_CODE.INSUFFICIENT_BALANCE),
     'blocked_insufficient_balance',
   );
+});
+
+
+test('limit success copy states the path-B fill price is the limit price', () => {
+  const reservationOnly = getLimitOrderSuccessMessage({
+    autoExecutionEnabled: false,
+    mode: 'reservation_only',
+    triggerType: null,
+    fullFillOnly: true,
+  });
+  assert.match(reservationOnly, /미체결 상태로 등록/);
+  assert.ok(!reservationOnly.includes('5분봉'));
+
+  const liveOnly = getLimitOrderSuccessMessage({
+    autoExecutionEnabled: true,
+    mode: 'live_trade_event',
+    triggerType: 'provider_trade_price',
+    fullFillOnly: true,
+    liveTradeMatchingEnabled: true,
+    candleReconciliationEnabled: false,
+    candleInterval: null,
+    candleExecutionPricePolicy: null,
+  });
+  assert.match(liveOnly, /실시간 체결가격이 지정가 이하/);
+  assert.ok(!liveOnly.includes('5분봉'));
+
+  const withCandle = getLimitOrderSuccessMessage({
+    autoExecutionEnabled: true,
+    mode: 'live_trade_event',
+    triggerType: 'provider_trade_price',
+    fullFillOnly: true,
+    liveTradeMatchingEnabled: true,
+    candleReconciliationEnabled: true,
+    candleInterval: '5m',
+    candleExecutionPricePolicy: 'limit_price',
+  });
+  assert.match(withCandle, /확정된 5분봉의 저가를 기준으로/);
+  assert.match(withCandle, /지정가 가격으로 보정 체결/);
+  // Never promise a candle-low fill, order-book fidelity, or a post-season fill.
+  assert.ok(!withCandle.includes('저가로 체결'));
+  assert.ok(!withCandle.includes('저가에 체결'));
+  assert.ok(!withCandle.includes('소급'));
+  assert.match(withCandle, /주문장 유동성과 거래량은 반영하지 않습니다/);
+});
+
+test('matching source labels distinguish live events from the 5m safety net', () => {
+  assert.equal(getOrderMatchingSourceLabel('live_trade_event'), '실시간 체결 이벤트');
+  assert.equal(getOrderMatchingSourceLabel('closed_5m_candle'), '5분봉 안전망 체결');
+  assert.equal(getOrderMatchingSourceLabel(null), null);
+  assert.equal(getOrderMatchingSourceLabel('unknown'), null);
+});
+
+test('candle evidence display labels the low as a trigger, not a fill price', () => {
+  const display = getCandleEvidenceDisplay(
+    {
+      interval: '5m',
+      openTime: '2026-07-22T01:00:00.000Z',
+      closeTime: '2026-07-22T01:05:00.000Z',
+      triggerLowPrice: '90.00000000',
+      executionPricePolicy: 'limit_price',
+    },
+    'KRW',
+  );
+  assert.ok(display);
+  assert.equal(display?.interval, '5m');
+  assert.equal(display?.openTime, '2026-07-22T01:00:00.000Z');
+  assert.equal(display?.closeTime, '2026-07-22T01:05:00.000Z');
+  assert.match(
+    display?.executionPriceNotice ?? '',
+    /체결가격은 지정가입니다\. 저가로 체결되지 않습니다\./,
+  );
+  assert.equal(getCandleEvidenceDisplay(null, 'KRW'), null);
 });

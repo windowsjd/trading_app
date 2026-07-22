@@ -274,3 +274,30 @@ The scheduler foundation does not create provider ingestion HTTP trigger APIs, b
 - Scheduler Production Ownership Gate
 - Reward Policy / Reward Catalog Gate
 - Deployment/ops runbook and production scheduler ownership gate
+
+## limit_order_candle_reconciliation (path B safety net)
+
+Ops job name `limit_order_candle_reconciliation`, added additively to
+`OpsJobName`. Default **off**.
+
+- Runs on the ordinary 60-second scheduler tick — a 5-minute candle safety net
+  needs no dedicated cadence, and `limit_order_processed_candles` (not a timer)
+  is what stops repeated ticks from re-processing the same window.
+- Serialized by the existing PostgreSQL `OpsJobLock`
+  (`limit_order_candle_reconciliation:5m`) with lock renewal, exactly like
+  market candle reconciliation.
+- Bounded per tick by `LIMIT_ORDER_CANDLE_RECONCILIATION_CANDLE_BATCH_SIZE`
+  and `..._ORDER_BATCH_SIZE`, scanning back
+  `..._LOOKBACK_MS` for closed 5m candles with no processed row.
+- Enabled by `LIMIT_ORDER_CANDLE_RECONCILIATION_ENABLED=true`, which also flips
+  `OpsSchedulerConfig.enabled` on. It requires
+  `LIMIT_ORDER_AUTO_EXECUTION_ENABLED=true`; enabling it alone fails startup.
+- `resultJson` carries `scannedCandles / processedCandles / skippedCandles /
+  matchedOrders / deferredCandles` plus the swept window.
+- The sweep additionally holds the shared limit-order event-boundary advisory
+  lock on a dedicated PostgreSQL session (see
+  `docs/limit-order-candle-reconciliation.md`), which is independent of the
+  Ops job lock: the Ops lock serializes JOB RUNS, the boundary serializes
+  matching decisions against limit-order creates and the path-A poller.
+- `limit_order_matcher` remains a dedicated long-running worker and is still
+  never scheduled on the tick.

@@ -80,7 +80,9 @@ export const ModelName = {
   BatchJobRun: 'BatchJobRun',
   OpsJobRun: 'OpsJobRun',
   OpsJobLock: 'OpsJobLock',
-  LimitOrderProcessedEvent: 'LimitOrderProcessedEvent'
+  LimitOrderProcessedEvent: 'LimitOrderProcessedEvent',
+  LimitOrderCandleEvidence: 'LimitOrderCandleEvidence',
+  LimitOrderProcessedCandle: 'LimitOrderProcessedCandle'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -449,8 +451,10 @@ export const OrderScalarFieldEnum = {
   cancelReason: 'cancelReason',
   matchingActivatedAt: 'matchingActivatedAt',
   matchingActivationStreamId: 'matchingActivationStreamId',
+  candleMatchingEligibleFrom: 'candleMatchingEligibleFrom',
   triggerEventId: 'triggerEventId',
   triggerEventAt: 'triggerEventAt',
+  limitOrderCandleEvidenceId: 'limitOrderCandleEvidenceId',
   matchedAt: 'matchedAt',
   matchingSource: 'matchingSource',
   submittedAt: 'submittedAt',
@@ -719,6 +723,42 @@ export const LimitOrderProcessedEventScalarFieldEnum = {
 } as const
 
 export type LimitOrderProcessedEventScalarFieldEnum = (typeof LimitOrderProcessedEventScalarFieldEnum)[keyof typeof LimitOrderProcessedEventScalarFieldEnum]
+
+
+export const LimitOrderCandleEvidenceScalarFieldEnum = {
+  id: 'id',
+  marketCandleId: 'marketCandleId',
+  assetId: 'assetId',
+  interval: 'interval',
+  openTime: 'openTime',
+  closeTime: 'closeTime',
+  triggerLowPrice: 'triggerLowPrice',
+  executionPricePolicy: 'executionPricePolicy',
+  provider: 'provider',
+  sourceName: 'sourceName',
+  sourceUpdatedAt: 'sourceUpdatedAt',
+  finalizedAt: 'finalizedAt',
+  policyVersion: 'policyVersion',
+  createdAt: 'createdAt'
+} as const
+
+export type LimitOrderCandleEvidenceScalarFieldEnum = (typeof LimitOrderCandleEvidenceScalarFieldEnum)[keyof typeof LimitOrderCandleEvidenceScalarFieldEnum]
+
+
+export const LimitOrderProcessedCandleScalarFieldEnum = {
+  marketCandleId: 'marketCandleId',
+  assetId: 'assetId',
+  interval: 'interval',
+  openTime: 'openTime',
+  closeTime: 'closeTime',
+  processedAt: 'processedAt',
+  matchedOrderCount: 'matchedOrderCount',
+  result: 'result',
+  skipReason: 'skipReason',
+  createdAt: 'createdAt'
+} as const
+
+export type LimitOrderProcessedCandleScalarFieldEnum = (typeof LimitOrderProcessedCandleScalarFieldEnum)[keyof typeof LimitOrderProcessedCandleScalarFieldEnum]
 
 
 export const SortOrder = {

@@ -103,7 +103,8 @@
 ## Limit Buy Phase 1 (Cash Reservation, No Matching)
 
 지정가 매수 1차 예약 기반과 2차 경로 A 정책. 상세 운영 계약은
-`docs/limit-order-live-matching-operations.md`를 따른다.
+`docs/limit-order-live-matching-operations.md`를 따른다. 3차 경로 B(확정
+5분봉 안전망)는 `docs/limit-order-candle-reconciliation.md`를 따른다.
 
 - 지원: 지정가 매수 등록/취소만. 전량 주문, GTC 성격(주문 자체 만료 없음). 지정가 매도·부분 체결·IOC/FOK/DAY·Stop·실거래소 주문은 미지원.
 - 등록은 항상 `status=submitted`로 commit된다. 자동 체결 플래그가 꺼져 있으면 reservation-only이고, 켜져 있으면 이후 normalized live trade event가 Redis Stream/Poller 경로로 처리될 때만 전량 체결된다. Create 자체는 Provider 현재가를 읽거나 즉시 체결하지 않는다.
@@ -123,3 +124,20 @@
 - 경로 A 회계: event.price<=limitPrice만 실제 event.price로 전량 체결한다. fee는 `Order.reservationFeeRate`를 사용한다. balance는 actual gross+fee만 차감하고 reserved는 원 주문 예약금 전체를 해제한다. ledger/Position/evidence/Equity/Order는 한 transaction, ranking은 commit 후 refresh다. 중복 eventId는 `limit_order_processed_events`로 막고, 제출 이전 이벤트는 Redis activation cursor로 막는다.
 - 프런트엔드 공개 플래그: `EXPO_PUBLIC_LIMIT_ORDER_ENABLED`는 반드시 정적 dot notation(`process.env.EXPO_PUBLIC_LIMIT_ORDER_ENABLED`)으로 읽는다. `babel-preset-expo`의 inline-env-vars 패스는 property가 `EXPO_PUBLIC_` 리터럴인 member expression만 치환하므로, `process.env[key]` 같은 동적 접근은 번들에 값이 아예 들어가지 않아 플래그가 항상 꺼진 것처럼 동작한다. 클라이언트는 부팅 실패시킬 지점이 없으므로 백엔드와 달리 미인식 값도 fail-closed(false)로 두고, 엄격 검증은 실제 인가 주체인 서버가 담당한다.
 - 근거: 예약 없는 지정가 등록은 체결 시점 잔액 부족을 만들고, 예약을 balanceAmount 차감으로 구현하면 총자산이 왜곡된다. 예약을 별도 fence 컬럼으로 두면 두 문제를 모두 피하면서 기존 시장가/FX/평가 경로의 의미를 보존한다.
+
+## Limit Buy Phase 3 (Event Boundary, Canonical Source, Path B)
+
+- event boundary mutex: Create·경로 A Poller·경로 B worker가 하나의 PostgreSQL advisory lock(namespace 1244660901, key 2)을 공유한다. Create는 transaction의 **첫 문장**에서 `pg_advisory_xact_lock`을 잡아 commit과 동시에 해제하고, 두 worker는 **전용 PostgreSQL 세션**에서 `pg_advisory_lock`을 잡는다(프로세스가 죽으면 세션 종료로 서버가 자동 해제 — lease/TTL 없음, Redis lock 금지). 근거: cursor 조회 후 commit 전에 XADD된 이벤트가 Poller에서 먼저 processed·ACK되면 그 이벤트는 영구 누락된다. mutex가 있으면 가능한 interleaving은 두 가지뿐이고 둘 다 정확하다.
+- lock 순서 고정: 모든 참가자가 **row lock보다 먼저** boundary를 잡는다(`boundary → Quote → SeasonParticipant → Season → Wallet`). row lock 뒤에 boundary를 잡으면 worker가 boundary를 다른 세션에서 들고 있으므로 PostgreSQL deadlock detector가 볼 수 없는 순환이 생긴다.
+- ACK 순서: Redis ACK는 durable processed-event row 저장 **이후**, boundary 해제 **이후**에만 실행한다. ACK가 먼저면 crash 시 이벤트가 완전히 유실된다.
+- ordering 기준: 주문 활성화 전후 판정은 Redis Stream ID만 사용한다(`event.streamId > order.matchingActivationStreamId`). `order.submittedAt <= event.receivedAt` 비교는 제거했다 — submittedAt은 PostgreSQL `clock_timestamp()`, receivedAt은 Node 프로세스 시계라 두 호스트의 clock skew만으로 정상 이벤트가 제외됐다. timestamp는 감사·표시·이상치 감지 용도로만 남기고, 명백히 깨진 값(60초 이상 미래, `publishedAt < receivedAt`)만 거절한다. 임의의 큰 skew tolerance로 덮지 않는다.
+- canonical provider source: Provider별로 exact-trade publisher는 정확히 하나다(`ProviderTradeRouteRegistry`). LiveCandleStreamSupervisor가 해당 Provider를 소유하면 그 연결이 canonical source가 되어, KIS는 **동일한 parse 결과**를 candle pipeline·가격 표시·matcher에 함께 전달하고, Binance는 **같은 소켓**에 `@kline_5m`과 `@trade`를 함께 구독한다. Supervisor가 비활성인 Provider만 legacy streaming service가 claim한다. 소유하지 않은 쪽은 연결도 publish도 하지 않으므로 소켓 중복·이벤트 중복이 성립할 수 없다.
+- 자산별 readiness: Provider 전체 connected가 아니라 **요청 자산**이 현재 connection generation의 구독 집합에 있고 ACK까지 완료됐을 때만 지정가 Quote/Create를 허용한다. reconnect는 새 generation을 만들어 이전 readiness를 전부 무효화한다. 오류는 `LIMIT_ORDER_PROVIDER_NOT_SUBSCRIBED` / `_SUBSCRIPTION_FAILED` / `_UNAVAILABLE`로 구분한다. 근거: 미구독 자산 주문을 받으면 체결될 수 없는 주문에 사용자 현금을 예약하게 된다.
+- per-event DB 조회 제거: 구독 구성 시 한 번 읽은 asset metadata를 registry에 보존하고 normalized tick에 실어 보내, Publisher는 trade마다 asset 조회를 하지 않는다(측정: 1000 event, asset query 0). Poller는 짧은 TTL의 bounded cache를 쓴다. 둘 다 routing 최적화일 뿐이며, candidate query와 execution transaction의 asset 재검증은 그대로 유지된다 — stale cache만으로 체결되지 않는다.
+- matcher health gate: heartbeat 존재 여부만 보지 않고 lag/pending/oldest-pending age/last ACK age/retention headroom/degraded reason을 함께 판정한다. 단, **조용한 시장은 실패가 아니다** — ACK staleness는 backlog(pending>0 또는 lag>0)가 있을 때만 판정하고, 새 leader의 첫 ACK 이전에는 leader 시작 시각을 기준으로 삼는다. fail-closed는 신규 지정가 Quote/Create에만 적용하고 Cancel·cleanup·시장가·FX는 영향받지 않는다.
+- processed-event 보존: retention 삭제를 구현하지 **않는다**. eventId를 지우면 동일 id 재수신이 신규 이벤트로 처리돼 나중에 생성된 주문을 잘못 체결할 수 있는데, 이를 배제하려면 Provider별 trade id 재사용 범위·Stream retention·주문 최대 생존 기간(GTC라 시즌 종료에만 의존)을 모두 증명해야 하고 현재는 불가능하다. 대신 row count/최고·최신 processedAt/1시간·24시간 증가량/table·index size를 heartbeat에 기록하고 BRIN index로 집계 비용을 낮췄다. 향후 partition이 정식 경로이며 임시 TTL 삭제는 두지 않는다.
+- 경로 B 체결가격: `executedPrice = order.limitPrice`. candle.low는 **도달 사실의 증거**일 뿐 체결가격이 아니다. 5분봉 저가만으로는 가격 이동 순서·체결 가능 수량·호가를 알 수 없으므로 저가 체결은 사용자에게 과도하게 유리하다. fee는 `Order.reservationFeeRate`를 쓰고, 재계산한 actualDebit이 `Order.reservedAmount`와 다르면 추가 차감·임의 보정·체결 없이 `LIMIT_ORDER_CANDLE_RESERVATION_MISMATCH`로 운영자 개입을 요구한다.
+- 경로 B 첫 허용 candle: `candleMatchingEligibleFrom`은 제출 시각을 5분 경계로 **올림**한 값이다. 주문 제출 당시 진행 중이던 봉의 저가는 주문 이전에 찍혔을 수 있고 5분봉은 시점 정보를 담지 않으므로 그 봉은 사용하지 않는다. 값이 null인 기존 주문(경로 B 이전 생성, 또는 자동 체결 off 상태 생성)은 과거 candle로 **소급 활성화하지 않는다** — backfill 없음.
+- 경로 B 시즌 경계: `candle.closeTime <= Season.endAt`이며 시즌 종료 후 소급 체결은 없다. 결과적으로 시즌 종료 직전 진행 중이던 마지막 봉의 missed touch는 복원할 수 없다. 경로 B를 위해 시즌 종료 순서를 늦추지 않았고, final drain은 별도 작업으로 남긴다.
+- 경로 A/B 배타성: 두 경로는 동일한 lock 순서와 `updateMany(status='submitted')` 가드를 공유하므로 한 주문에 정확히 한 경로만 성공한다. evidence도 배타적이다(DB CHECK): 경로 A는 `triggerEventId + assetPriceSnapshotId`, 경로 B는 `limitOrderCandleEvidenceId`, 동시 연결 불가. 경로 B는 synthetic AssetPriceSnapshot을 만들지 않는다.
+- 기능 플래그 조합: auto=false/candle=false는 reservation-only, auto=true/candle=false는 경로 A만, auto=true/candle=true는 A+B, auto=false/candle=true는 **startup error**다. 경로 B 단독 활성화는 exact trade evidence가 있는데도 모든 체결을 수 분 늦게 지정가로 처리하는 downgrade이므로 조용히 허용하지 않는다.

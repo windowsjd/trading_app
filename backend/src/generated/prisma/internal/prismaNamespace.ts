@@ -413,7 +413,9 @@ export const ModelName = {
   BatchJobRun: 'BatchJobRun',
   OpsJobRun: 'OpsJobRun',
   OpsJobLock: 'OpsJobLock',
-  LimitOrderProcessedEvent: 'LimitOrderProcessedEvent'
+  LimitOrderProcessedEvent: 'LimitOrderProcessedEvent',
+  LimitOrderCandleEvidence: 'LimitOrderCandleEvidence',
+  LimitOrderProcessedCandle: 'LimitOrderProcessedCandle'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -429,7 +431,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "operatorAuditLog" | "refreshTokenSession" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "position" | "order" | "cashWallet" | "walletTransaction" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderProcessedEvent"
+    modelProps: "user" | "operatorAuditLog" | "refreshTokenSession" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "position" | "order" | "cashWallet" | "walletTransaction" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderProcessedEvent" | "limitOrderCandleEvidence" | "limitOrderProcessedCandle"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -2653,6 +2655,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    LimitOrderCandleEvidence: {
+      payload: Prisma.$LimitOrderCandleEvidencePayload<ExtArgs>
+      fields: Prisma.LimitOrderCandleEvidenceFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.LimitOrderCandleEvidenceFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderCandleEvidencePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.LimitOrderCandleEvidenceFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderCandleEvidencePayload>
+        }
+        findFirst: {
+          args: Prisma.LimitOrderCandleEvidenceFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderCandleEvidencePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.LimitOrderCandleEvidenceFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderCandleEvidencePayload>
+        }
+        findMany: {
+          args: Prisma.LimitOrderCandleEvidenceFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderCandleEvidencePayload>[]
+        }
+        create: {
+          args: Prisma.LimitOrderCandleEvidenceCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderCandleEvidencePayload>
+        }
+        createMany: {
+          args: Prisma.LimitOrderCandleEvidenceCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.LimitOrderCandleEvidenceCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderCandleEvidencePayload>[]
+        }
+        delete: {
+          args: Prisma.LimitOrderCandleEvidenceDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderCandleEvidencePayload>
+        }
+        update: {
+          args: Prisma.LimitOrderCandleEvidenceUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderCandleEvidencePayload>
+        }
+        deleteMany: {
+          args: Prisma.LimitOrderCandleEvidenceDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.LimitOrderCandleEvidenceUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.LimitOrderCandleEvidenceUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderCandleEvidencePayload>[]
+        }
+        upsert: {
+          args: Prisma.LimitOrderCandleEvidenceUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderCandleEvidencePayload>
+        }
+        aggregate: {
+          args: Prisma.LimitOrderCandleEvidenceAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateLimitOrderCandleEvidence>
+        }
+        groupBy: {
+          args: Prisma.LimitOrderCandleEvidenceGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.LimitOrderCandleEvidenceGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.LimitOrderCandleEvidenceCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.LimitOrderCandleEvidenceCountAggregateOutputType> | number
+        }
+      }
+    }
+    LimitOrderProcessedCandle: {
+      payload: Prisma.$LimitOrderProcessedCandlePayload<ExtArgs>
+      fields: Prisma.LimitOrderProcessedCandleFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.LimitOrderProcessedCandleFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderProcessedCandlePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.LimitOrderProcessedCandleFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderProcessedCandlePayload>
+        }
+        findFirst: {
+          args: Prisma.LimitOrderProcessedCandleFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderProcessedCandlePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.LimitOrderProcessedCandleFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderProcessedCandlePayload>
+        }
+        findMany: {
+          args: Prisma.LimitOrderProcessedCandleFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderProcessedCandlePayload>[]
+        }
+        create: {
+          args: Prisma.LimitOrderProcessedCandleCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderProcessedCandlePayload>
+        }
+        createMany: {
+          args: Prisma.LimitOrderProcessedCandleCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.LimitOrderProcessedCandleCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderProcessedCandlePayload>[]
+        }
+        delete: {
+          args: Prisma.LimitOrderProcessedCandleDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderProcessedCandlePayload>
+        }
+        update: {
+          args: Prisma.LimitOrderProcessedCandleUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderProcessedCandlePayload>
+        }
+        deleteMany: {
+          args: Prisma.LimitOrderProcessedCandleDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.LimitOrderProcessedCandleUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.LimitOrderProcessedCandleUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderProcessedCandlePayload>[]
+        }
+        upsert: {
+          args: Prisma.LimitOrderProcessedCandleUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderProcessedCandlePayload>
+        }
+        aggregate: {
+          args: Prisma.LimitOrderProcessedCandleAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateLimitOrderProcessedCandle>
+        }
+        groupBy: {
+          args: Prisma.LimitOrderProcessedCandleGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.LimitOrderProcessedCandleGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.LimitOrderProcessedCandleCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.LimitOrderProcessedCandleCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -3042,8 +3192,10 @@ export const OrderScalarFieldEnum = {
   cancelReason: 'cancelReason',
   matchingActivatedAt: 'matchingActivatedAt',
   matchingActivationStreamId: 'matchingActivationStreamId',
+  candleMatchingEligibleFrom: 'candleMatchingEligibleFrom',
   triggerEventId: 'triggerEventId',
   triggerEventAt: 'triggerEventAt',
+  limitOrderCandleEvidenceId: 'limitOrderCandleEvidenceId',
   matchedAt: 'matchedAt',
   matchingSource: 'matchingSource',
   submittedAt: 'submittedAt',
@@ -3312,6 +3464,42 @@ export const LimitOrderProcessedEventScalarFieldEnum = {
 } as const
 
 export type LimitOrderProcessedEventScalarFieldEnum = (typeof LimitOrderProcessedEventScalarFieldEnum)[keyof typeof LimitOrderProcessedEventScalarFieldEnum]
+
+
+export const LimitOrderCandleEvidenceScalarFieldEnum = {
+  id: 'id',
+  marketCandleId: 'marketCandleId',
+  assetId: 'assetId',
+  interval: 'interval',
+  openTime: 'openTime',
+  closeTime: 'closeTime',
+  triggerLowPrice: 'triggerLowPrice',
+  executionPricePolicy: 'executionPricePolicy',
+  provider: 'provider',
+  sourceName: 'sourceName',
+  sourceUpdatedAt: 'sourceUpdatedAt',
+  finalizedAt: 'finalizedAt',
+  policyVersion: 'policyVersion',
+  createdAt: 'createdAt'
+} as const
+
+export type LimitOrderCandleEvidenceScalarFieldEnum = (typeof LimitOrderCandleEvidenceScalarFieldEnum)[keyof typeof LimitOrderCandleEvidenceScalarFieldEnum]
+
+
+export const LimitOrderProcessedCandleScalarFieldEnum = {
+  marketCandleId: 'marketCandleId',
+  assetId: 'assetId',
+  interval: 'interval',
+  openTime: 'openTime',
+  closeTime: 'closeTime',
+  processedAt: 'processedAt',
+  matchedOrderCount: 'matchedOrderCount',
+  result: 'result',
+  skipReason: 'skipReason',
+  createdAt: 'createdAt'
+} as const
+
+export type LimitOrderProcessedCandleScalarFieldEnum = (typeof LimitOrderProcessedCandleScalarFieldEnum)[keyof typeof LimitOrderProcessedCandleScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -4024,6 +4212,8 @@ export type GlobalOmitConfig = {
   opsJobRun?: Prisma.OpsJobRunOmit
   opsJobLock?: Prisma.OpsJobLockOmit
   limitOrderProcessedEvent?: Prisma.LimitOrderProcessedEventOmit
+  limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceOmit
+  limitOrderProcessedCandle?: Prisma.LimitOrderProcessedCandleOmit
 }
 
 /* Types for Logging */

@@ -192,7 +192,43 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
       if (reconciliation) results.push(reconciliation);
     }
 
+    const limitOrderCandles = await this.runLimitOrderCandleReconciliation(
+      now,
+      config,
+    );
+    if (limitOrderCandles) results.push(limitOrderCandles);
+
     return results;
+  }
+
+  /**
+   * Path-B safety-net sweep. Every tick: a 5-minute candle safety net does not
+   * need its own cadence, and the processed-candle table (not a timer) is what
+   * keeps repeated ticks from re-processing the same windows.
+   */
+  async runLimitOrderCandleReconciliation(
+    now: Date,
+    config: OpsSchedulerConfig = getOpsSchedulerConfig(),
+  ): Promise<OpsJobRunnerResponse | undefined> {
+    if (!config.limitOrderCandleReconciliation.enabled) return undefined;
+    try {
+      return await this.runner.runLimitOrderCandleReconciliationJob({
+        trigger: OpsJobTrigger.scheduler,
+        requestedBy: 'scheduler',
+        dryRun: false,
+        lockTtlSeconds: config.lockTtlSeconds,
+        maxAttempts: config.maxAttempts,
+        now: now.toISOString(),
+        lookbackMs: config.limitOrderCandleReconciliation.lookbackMs,
+        candleBatchSize: config.limitOrderCandleReconciliation.candleBatchSize,
+        orderBatchSize: config.limitOrderCandleReconciliation.orderBatchSize,
+      });
+    } catch (error) {
+      console.warn('Limit-order candle reconciliation tick failed.', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      return undefined;
+    }
   }
 
   async runStartupCandleReconciliation(

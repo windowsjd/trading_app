@@ -189,3 +189,13 @@ export type OpsJobLock = Prisma.OpsJobLockModel
  * 
  */
 export type LimitOrderProcessedEvent = Prisma.LimitOrderProcessedEventModel
+/**
+ * Model LimitOrderCandleEvidence
+ * 
+ */
+export type LimitOrderCandleEvidence = Prisma.LimitOrderCandleEvidenceModel
+/**
+ * Model LimitOrderProcessedCandle
+ * 
+ */
+export type LimitOrderProcessedCandle = Prisma.LimitOrderProcessedCandleModel

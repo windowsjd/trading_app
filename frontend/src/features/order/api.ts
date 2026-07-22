@@ -19,7 +19,35 @@ export interface LimitOrderExecutionPolicyDto {
   mode: 'live_trade_event' | 'reservation_only';
   triggerType: 'provider_trade_price' | null;
   fullFillOnly: boolean;
+  /**
+   * Additive path-B disclosure. The confirmed 5-minute candle safety net only
+   * ever fills AT THE LIMIT PRICE — the candle low is evidence that the limit
+   * was touched, never the price the user gets.
+   */
+  liveTradeMatchingEnabled?: boolean;
+  candleReconciliationEnabled?: boolean;
+  candleInterval?: '5m' | null;
+  candleExecutionPricePolicy?: 'limit_price' | null;
 }
+
+/**
+ * Path-B trigger evidence attached to a safety-net fill.
+ * triggerLowPrice is the confirmed 5m low that PROVED the limit was reached;
+ * it is never the executed price.
+ */
+export interface LimitOrderCandleEvidenceDto {
+  marketCandleId: string;
+  interval: string;
+  openTime: IsoDateTimeString;
+  closeTime: IsoDateTimeString;
+  triggerLowPrice: MoneyString;
+  executionPricePolicy: string;
+}
+
+export type OrderMatchingSource =
+  | 'live_trade_event'
+  | 'closed_5m_candle'
+  | (string & {});
 
 export interface OrderQuoteRequestDto {
   assetId: string;
@@ -132,6 +160,11 @@ export interface CreatedOrderDto {
   reservedAmount?: MoneyString | null;
   reservationReleasedAt?: IsoDateTimeString | null;
   cancelReason?: string | null;
+  /** Which automatic path filled the order (null while unfilled). */
+  matchingSource?: OrderMatchingSource | null;
+  matchedAt?: IsoDateTimeString | null;
+  triggerEventAt?: IsoDateTimeString | null;
+  candleEvidence?: LimitOrderCandleEvidenceDto | null;
   submittedAt?: IsoDateTimeString;
   createdAt?: IsoDateTimeString;
 }

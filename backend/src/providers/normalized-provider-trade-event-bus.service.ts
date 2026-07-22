@@ -1,5 +1,25 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { CurrencyCode } from '../generated/prisma/client';
+import type { AssetType, CurrencyCode } from '../generated/prisma/client';
+
+/**
+ * Already-validated asset metadata carried on the tick.
+ *
+ * The canonical connection read these columns once, when it built the
+ * subscription for the current connection generation. Carrying them on the
+ * event is what lets the publisher append to the Redis Stream without a
+ * per-trade `SELECT ... FROM assets`. It is a routing optimisation only:
+ * every financial decision still re-reads and re-validates the asset inside
+ * the execution transaction, so a stale value can never cause a fill.
+ */
+export type NormalizedProviderTradeAsset = {
+  assetId: string;
+  symbol: string;
+  market: string;
+  assetType: AssetType;
+  settlementCurrency: CurrencyCode;
+  /** Connection generation the metadata was captured under. */
+  generation: string;
+};
 
 /**
  * Secret-free, provider-normalized live trade boundary. Provider streaming
@@ -22,6 +42,8 @@ export type NormalizedProviderTradeTick = {
   sourceName: string;
   marketSessionCode: string | null;
   eventType: 'trade';
+  /** Present for canonical-connection publishers; absent for legacy callers. */
+  asset?: NormalizedProviderTradeAsset;
 };
 
 type Listener = (event: NormalizedProviderTradeTick) => void | Promise<void>;

@@ -45,6 +45,8 @@ import { KisPeriodCandleNormalizerService } from '../src/providers/kis/candles/k
 import { MarketCandleIngestionService } from '../src/assets/market-candle-ingestion.service';
 import { AssetCandlesCacheService } from '../src/assets/asset-candles-cache.service';
 import { readLiveCandleConfig } from '../src/assets/live-candle.config';
+import { ProviderTradeRouteRegistry } from '../src/providers/provider-trade-route.registry';
+import { NormalizedProviderTradeEventBus } from '../src/providers/normalized-provider-trade-event-bus.service';
 import { LiveCandleHealthService } from '../src/assets/live-candle-health.service';
 import {
   LiveCandleStoreService,
@@ -299,6 +301,8 @@ async function main() {
     normalizer,
     pipeline,
     health,
+    new ProviderTradeRouteRegistry(),
+    new NormalizedProviderTradeEventBus(),
     liveConfig,
     defaultLiveCandleSocketFactory,
   );

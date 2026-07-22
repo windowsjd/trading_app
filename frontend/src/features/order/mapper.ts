@@ -101,12 +101,61 @@ export function isSubmittedLimitOrder(
   return result?.execution?.state === 'submitted';
 }
 
+/**
+ * Server-authoritative limit-order execution copy.
+ *
+ * The path-B sentence deliberately says the fill happens AT THE LIMIT PRICE
+ * and calls the 5m low a 도달 확인 기준, never a 체결가격 — a candle low is
+ * evidence that the price was touched, not a price the user can obtain. It
+ * also promises no retroactive fill after a season ends and no order-book
+ * fidelity.
+ */
 export function getLimitOrderSuccessMessage(
   policy?: LimitOrderExecutionPolicyDto | null,
 ) {
-  return policy?.autoExecutionEnabled
-    ? '유효한 실시간 체결가격이 지정가 이하로 처리되면 전량 자동 체결됩니다. 주문장 유동성과 거래량은 반영하지 않습니다.'
-    : '현재 단계에서는 주문이 미체결 상태로 등록됩니다. 예약된 금액은 주문을 취소하면 다시 사용할 수 있습니다.';
+  if (!policy?.autoExecutionEnabled) {
+    return '현재 단계에서는 주문이 미체결 상태로 등록됩니다. 예약된 금액은 주문을 취소하면 다시 사용할 수 있습니다.';
+  }
+  const live =
+    '유효한 실시간 체결가격이 지정가 이하로 처리되면 전량 자동 체결됩니다. 주문장 유동성과 거래량은 반영하지 않습니다.';
+  if (!policy.candleReconciliationEnabled) return live;
+  return `${live} 실시간 이벤트가 누락된 경우에는 확정된 5분봉의 저가를 기준으로 지정가 도달 여부를 확인하고 지정가 가격으로 보정 체결할 수 있습니다.`;
+}
+
+/**
+ * How a filled limit order was matched, for display. Path B must never be
+ * described as a candle-low fill: executedPrice is always the limit price.
+ */
+export function getOrderMatchingSourceLabel(
+  matchingSource?: string | null,
+): string | null {
+  if (matchingSource === 'live_trade_event') return '실시간 체결 이벤트';
+  if (matchingSource === 'closed_5m_candle') return '5분봉 안전망 체결';
+  return null;
+}
+
+export function getCandleEvidenceDisplay(
+  evidence?: {
+    interval: string;
+    openTime: string;
+    closeTime: string;
+    triggerLowPrice: string;
+    executionPricePolicy: string;
+  } | null,
+  currencyCode?: string | null,
+) {
+  if (!evidence) return null;
+  return {
+    interval: evidence.interval,
+    openTime: displayValue(evidence.openTime),
+    closeTime: displayValue(evidence.closeTime),
+    // Labelled as the touch trigger, never as the fill price.
+    triggerLowPrice: formatMoney(evidence.triggerLowPrice, currencyCode ?? ''),
+    executionPriceNotice:
+      evidence.executionPricePolicy === 'limit_price'
+        ? '체결가격은 지정가입니다. 저가로 체결되지 않습니다.'
+        : '체결가격 정책을 확인할 수 없습니다.',
+  };
 }
 
 /**

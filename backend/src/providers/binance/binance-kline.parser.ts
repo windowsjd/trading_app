@@ -25,11 +25,51 @@ export type BinanceKlineParseResult =
   | { state: 'skipped'; reason: string }
   | { state: 'failed'; reason: string; message: string };
 
+/**
+ * Exact trade print from the `<symbol>@trade` stream of the SAME market-data
+ * connection the 5m klines arrive on. Deliberately minimal: only what the
+ * limit-order matcher needs as normalized trade evidence.
+ */
+export type BinanceMarketStreamTrade = {
+  symbol: string;
+  tradeId: string;
+  price: string;
+  eventTime: Date;
+  tradeTime: Date;
+};
+
+export type BinanceMarketStreamParseResult =
+  | BinanceKlineParseResult
+  | { state: 'trade'; trade: BinanceMarketStreamTrade };
+
 const FIVE_MINUTES_MS = 5 * 60_000;
+
+/**
+ * Single-parse dispatcher for the canonical Binance market-data socket. One
+ * `JSON.parse` per frame decides whether it is a 5m kline (candle pipeline) or
+ * an exact trade (limit-order matcher); the frame is never parsed twice and
+ * never handed to a second provider service.
+ */
+export function parseBinanceMarketStreamFrame(
+  frame: string,
+): BinanceMarketStreamParseResult {
+  return parseFrame(frame, true);
+}
 
 export function parseBinanceFiveMinuteKline(
   frame: string,
 ): BinanceKlineParseResult {
+  const result = parseFrame(frame, false);
+  // `includeTrades = false` never yields a trade; narrow for callers.
+  return result.state === 'trade'
+    ? { state: 'skipped', reason: 'UNSUPPORTED_EVENT_TYPE' }
+    : result;
+}
+
+function parseFrame(
+  frame: string,
+  includeTrades: boolean,
+): BinanceMarketStreamParseResult {
   let payload: unknown;
   try {
     payload = JSON.parse(frame) as unknown;
@@ -58,6 +98,7 @@ export function parseBinanceFiveMinuteKline(
     );
   }
   if ('result' in raw && 'id' in raw) return { state: 'ack' };
+  if (includeTrades && raw.e === 'trade') return parseTrade(raw);
   if (raw.e !== 'kline') {
     return { state: 'skipped', reason: 'UNSUPPORTED_EVENT_TYPE' };
   }
@@ -124,6 +165,38 @@ export function parseBinanceFiveMinuteKline(
     return failed(
       'INVALID_KLINE',
       error instanceof Error ? error.message : 'Invalid Binance kline.',
+    );
+  }
+}
+
+function parseTrade(
+  raw: Record<string, unknown>,
+): BinanceMarketStreamParseResult {
+  try {
+    const symbol = requiredString(raw.s, 's').toUpperCase();
+    const tradeIdRaw = raw.t;
+    if (
+      (typeof tradeIdRaw !== 'number' && typeof tradeIdRaw !== 'string') ||
+      String(tradeIdRaw).trim() === ''
+    ) {
+      throw new Error('t is required.');
+    }
+    const eventTimeMs = integer(raw.E, 'E');
+    const tradeTimeMs = integer(raw.T ?? raw.E, 'T');
+    return {
+      state: 'trade',
+      trade: {
+        symbol,
+        tradeId: String(tradeIdRaw).trim(),
+        price: positive(raw.p, 'p'),
+        eventTime: new Date(eventTimeMs),
+        tradeTime: new Date(tradeTimeMs),
+      },
+    };
+  } catch (error) {
+    return failed(
+      'INVALID_TRADE',
+      error instanceof Error ? error.message : 'Invalid Binance trade.',
     );
   }
 }

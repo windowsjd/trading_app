@@ -36,7 +36,7 @@ This service owns backend APIs, database access, financial calculations, and ser
 - Season settlement freezes valuation at `Season.endAt`, uses the latest valid price and USD/KRW rows with `effectiveAt <= Season.endAt` without enforcing quote/execute freshness windows, writes final `equity_snapshots`, creates `rankType=final` rankings, assigns final tiers, and changes the season to `settled` only after final rank and tier readiness checks pass. Reward payout remains pending/unimplemented.
 - Market holidays are configured in `src/orders/market-holidays.config.ts`; domestic/US stock quote/create/execute return `MARKET_CLOSED` on configured holidays, while crypto orders and FX are not holiday-blocked.
 
-### Limit buy orders (phase 1 reservation + phase 2 path A, flags off by default)
+### Limit buy orders (phase 1 reservation + phase 2 path A + phase 3 path B, flags off by default)
 
 Limit BUY registration exists behind `LIMIT_ORDER_ENABLED` (default false).
 Automatic live-trade matching is independently controlled by
@@ -70,9 +70,28 @@ SHARE → Season FOR SHARE → CashWallet`), so a concurrent participant
 - With auto execution off, the order remains reservation-only. With it on,
   normalized KIS/Binance trade ticks are durably XADDed to a Redis Stream and
   one PostgreSQL-advisory-lock leader full-fills eligible buys at the actual
-  event price. It is not candle/latest-price polling, and never calls an
-  external order API. See
+  event price. It is not latest-price polling, and never calls an external
+  order API. See
   [docs/limit-order-live-matching-operations.md](docs/limit-order-live-matching-operations.md).
+- Create, the path-A poller and the path-B candle worker share one PostgreSQL
+  advisory **event-boundary mutex**, so an event XADDed between Create's
+  activation-cursor read and its commit can never be processed-and-ACKed while
+  the order is still invisible. Activation ordering uses the Redis Stream ID
+  alone — never a PostgreSQL-vs-Node timestamp comparison, which used to drop
+  valid events on clock skew.
+- `LIMIT_ORDER_CANDLE_RECONCILIATION_ENABLED` (default false, requires auto
+  execution) adds **path B**: a confirmed 5-minute candle safety net for
+  events that never reached the stream. It fills at the ORDER'S LIMIT PRICE —
+  never at the candle low, which is only evidence the limit was touched — skips
+  the partially elapsed candle an order was submitted into, and never fills
+  retroactively after a season ends. See
+  [docs/limit-order-candle-reconciliation.md](docs/limit-order-candle-reconciliation.md).
+- When live candles own a provider, that same connection is the canonical
+  exact-trade source (KIS shares one parse; Binance rides `@trade` beside
+  `@kline_5m` on one socket), so live candles and automatic matching are no
+  longer mutually exclusive. New limit quote/create additionally require the
+  REQUESTED ASSET to be subscribed and acknowledged on the current connection
+  generation.
 - Total-asset valuation keeps using the full `balanceAmount`; reservations
   never reduce it.
 - Cancel and lifecycle cleanup work even while either flag is off. When auto

@@ -180,6 +180,7 @@ enum OpsJobName {
   market_candle_sync
   market_candle_reconciliation
   limit_order_matcher
+  limit_order_candle_reconciliation
 }
 
 enum MarketCandleSyncMode {
@@ -487,13 +488,14 @@ model Asset {
   createdAt          DateTime     @default(now()) @map("created_at")
   updatedAt          DateTime     @updatedAt @map("updated_at")
 
-  priceSnapshots         AssetPriceSnapshot[]
-  orderbookSnapshots     AssetOrderbookSnapshot[]
-  marketCandles          MarketCandle[]
-  marketCandleSyncStates MarketCandleSyncState[]
-  positions              Position[]
-  orders                 Order[]
-  quotes                 Quote[]
+  priceSnapshots           AssetPriceSnapshot[]
+  orderbookSnapshots       AssetOrderbookSnapshot[]
+  marketCandles            MarketCandle[]
+  marketCandleSyncStates   MarketCandleSyncState[]
+  positions                Position[]
+  orders                   Order[]
+  quotes                   Quote[]
+  limitOrderCandleEvidence LimitOrderCandleEvidence[]
 
   @@unique([market, symbol])
   @@index([assetType, market])
@@ -579,11 +581,15 @@ model MarketCandle {
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  asset Asset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  asset                 Asset                       @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  limitOrderEvidence    LimitOrderCandleEvidence[]
+  limitOrderProcessedBy LimitOrderProcessedCandle[]
 
   @@unique([assetId, interval, openTime])
   @@index([interval, openTime])
   @@index([isClosed, openTime])
+  // Path-B candle sweep: closed 5m rows of one asset ordered by window start.
+  @@index([assetId, interval, isClosed, openTime])
   @@map("market_candles")
 }
 
@@ -730,8 +736,15 @@ model Order {
   // events. These remain null for market orders and phase-1-only limit rows.
   matchingActivatedAt        DateTime?    @map("matching_activated_at")
   matchingActivationStreamId String?      @map("matching_activation_stream_id")
+  // Path-B activation boundary: the first closed 5m candle window this order
+  // may be filled from, rounded UP to a 5-minute boundary so the partially
+  // elapsed candle the order was submitted into is never used. NULL means the
+  // order predates path B (or was created while automatic matching was off)
+  // and is never retroactively activated against historical candles.
+  candleMatchingEligibleFrom DateTime?    @map("candle_matching_eligible_from")
   triggerEventId             String?      @map("trigger_event_id")
   triggerEventAt             DateTime?    @map("trigger_event_at")
+  limitOrderCandleEvidenceId String?      @map("limit_order_candle_evidence_id")
   matchedAt                  DateTime?    @map("matched_at")
   matchingSource             String?      @map("matching_source")
   submittedAt                DateTime     @map("submitted_at")
@@ -742,11 +755,12 @@ model Order {
   createdAt                  DateTime     @default(now()) @map("created_at")
   updatedAt                  DateTime     @updatedAt @map("updated_at")
 
-  seasonParticipant  SeasonParticipant   @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
-  asset              Asset               @relation(fields: [assetId], references: [id], onDelete: Restrict)
-  quote              Quote?              @relation(fields: [quoteId], references: [id], onDelete: Restrict)
-  assetPriceSnapshot AssetPriceSnapshot? @relation(fields: [assetPriceSnapshotId], references: [id], onDelete: Restrict)
-  fxRateSnapshot     FxRateSnapshot?     @relation(fields: [fxRateSnapshotId], references: [id], onDelete: Restrict)
+  seasonParticipant  SeasonParticipant         @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
+  asset              Asset                     @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  quote              Quote?                    @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  assetPriceSnapshot AssetPriceSnapshot?       @relation(fields: [assetPriceSnapshotId], references: [id], onDelete: Restrict)
+  fxRateSnapshot     FxRateSnapshot?           @relation(fields: [fxRateSnapshotId], references: [id], onDelete: Restrict)
+  candleEvidence     LimitOrderCandleEvidence? @relation(fields: [limitOrderCandleEvidenceId], references: [id], onDelete: Restrict)
 
   @@unique([seasonParticipantId, idempotencyKey])
   @@index([seasonParticipantId, submittedAt])
@@ -758,6 +772,7 @@ model Order {
   @@index([submittedAt])
   @@index([status])
   @@index([triggerEventId])
+  @@index([limitOrderCandleEvidenceId])
   @@map("orders")
 }
 
@@ -1086,4 +1101,57 @@ model LimitOrderProcessedEvent {
 
   @@index([processedAt])
   @@map("limit_order_processed_events")
+}
+
+// Path-B (closed 5m candle safety net) trigger evidence. One row per
+// (candle, policy) is shared by every order the candle fills — the candle is
+// the evidence, and MarketCandle rows are immutable once finalized, so the
+// duplicated columns exist only so the fill reason stays reproducible even if
+// retention later removes the candle row.
+model LimitOrderCandleEvidence {
+  id                   String   @id @default(uuid())
+  marketCandleId       String   @unique @map("market_candle_id")
+  assetId              String   @map("asset_id")
+  interval             String
+  openTime             DateTime @map("open_time") @db.Timestamptz(3)
+  closeTime            DateTime @map("close_time") @db.Timestamptz(3)
+  triggerLowPrice      Decimal  @map("trigger_low_price") @db.Decimal(24, 8)
+  // Always 'limit_price': a 5m low proves the limit was touched, never the
+  // price a fill could actually have been obtained at.
+  executionPricePolicy String   @map("execution_price_policy")
+  provider             String
+  sourceName           String   @map("source_name")
+  sourceUpdatedAt      DateTime @map("source_updated_at") @db.Timestamptz(3)
+  finalizedAt          DateTime @map("finalized_at") @db.Timestamptz(3)
+  policyVersion        Int      @map("policy_version")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  marketCandle MarketCandle @relation(fields: [marketCandleId], references: [id], onDelete: Restrict)
+  asset        Asset        @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  orders       Order[]
+
+  @@index([assetId, openTime])
+  @@map("limit_order_candle_evidences")
+}
+
+// Durable path-B dedupe. Written only after EVERY candidate batch for the
+// candle committed, so a crash mid-sweep re-runs the candle (already executed
+// orders are skipped by the status guard) instead of silently dropping it.
+model LimitOrderProcessedCandle {
+  marketCandleId    String   @id @map("market_candle_id")
+  assetId           String   @map("asset_id")
+  interval          String
+  openTime          DateTime @map("open_time") @db.Timestamptz(3)
+  closeTime         DateTime @map("close_time") @db.Timestamptz(3)
+  processedAt       DateTime @map("processed_at") @db.Timestamptz(3)
+  matchedOrderCount Int      @map("matched_order_count")
+  result            String
+  skipReason        String?  @map("skip_reason")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  marketCandle MarketCandle @relation(fields: [marketCandleId], references: [id], onDelete: Restrict)
+
+  @@index([assetId, openTime])
+  @@index([processedAt])
+  @@map("limit_order_processed_candles")
 }

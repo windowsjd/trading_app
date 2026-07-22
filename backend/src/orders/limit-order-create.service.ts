@@ -55,6 +55,16 @@ const LIMIT_ORDER_PAYLOAD_SELECT = {
   triggerEventAt: true,
   matchedAt: true,
   matchingSource: true,
+  candleEvidence: {
+    select: {
+      marketCandleId: true,
+      interval: true,
+      openTime: true,
+      closeTime: true,
+      triggerLowPrice: true,
+      executionPricePolicy: true,
+    },
+  },
   submittedAt: true,
   executedAt: true,
   canceledAt: true,
@@ -110,6 +120,11 @@ export type LimitOrderCreateResponse = {
       mode: 'live_trade_event' | 'reservation_only';
       triggerType: 'provider_trade_price' | null;
       fullFillOnly: true;
+      /** Additive path-B disclosure; see limitOrderExecutionPolicy(). */
+      liveTradeMatchingEnabled: boolean;
+      candleReconciliationEnabled: boolean;
+      candleInterval: '5m' | null;
+      candleExecutionPricePolicy: 'limit_price' | null;
     };
   };
 };
@@ -410,7 +425,14 @@ export class LimitOrderCreateService {
         activatedAt: Date;
         streamId: string;
       } | null;
+      /**
+       * First fully-elapsed 5m window this order may be filled from (path B).
+       * Null keeps the order path-A only — it is never activated against a
+       * candle that was already running when it was submitted.
+       */
+      candleMatchingEligibleFrom?: Date | null;
       autoExecutionEnabled?: boolean;
+      candleReconciliationEnabled?: boolean;
     },
   ): Promise<LimitOrderCreateResponse> {
     const currencyCode =
@@ -464,6 +486,7 @@ export class LimitOrderCreateService {
         cancelReason: null,
         matchingActivatedAt: input.matchingActivation?.activatedAt ?? null,
         matchingActivationStreamId: input.matchingActivation?.streamId ?? null,
+        candleMatchingEligibleFrom: input.candleMatchingEligibleFrom ?? null,
         idempotencyKey: input.idempotency.idempotencyKey,
         requestHash: input.idempotency.requestHash,
         submittedAt: input.submittedAt,
@@ -532,6 +555,13 @@ export class LimitOrderCreateService {
           triggerType:
             input.autoExecutionEnabled === true ? 'provider_trade_price' : null,
           fullFillOnly: true,
+          liveTradeMatchingEnabled: input.autoExecutionEnabled === true,
+          candleReconciliationEnabled:
+            input.candleReconciliationEnabled === true,
+          candleInterval:
+            input.candleReconciliationEnabled === true ? '5m' : null,
+          candleExecutionPricePolicy:
+            input.candleReconciliationEnabled === true ? 'limit_price' : null,
         },
       },
     };

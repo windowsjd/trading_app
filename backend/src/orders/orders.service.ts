@@ -67,6 +67,9 @@ import { RedisService } from '../redis/redis.service';
 import { assertAssetTradable, MarketHoursError } from './market-hours.policy';
 import { isLimitOrderEnabled } from './limit-order.config';
 import { readLimitOrderMatchingConfig } from './limit-matching/limit-order-matching.config';
+import { readLimitOrderCandleReconciliationConfig } from './limit-matching/limit-order-candle-reconciliation.config';
+import { calculateCandleMatchingEligibleFrom } from './limit-matching/limit-order-candle-eligibility';
+import { LimitOrderMatchBoundaryService } from './limit-matching/limit-order-match-boundary.service';
 import { LimitOrderMatcherHealthService } from './limit-matching/limit-order-matcher-health.service';
 import { LimitOrderProviderHealthService } from './limit-matching/limit-order-provider-health.service';
 import { limitOrderErrorCodes } from './limit-order-error-policy';
@@ -465,6 +468,16 @@ const ORDER_EXECUTION_SELECT = {
   triggerEventAt: true,
   matchedAt: true,
   matchingSource: true,
+  candleEvidence: {
+    select: {
+      marketCandleId: true,
+      interval: true,
+      openTime: true,
+      closeTime: true,
+      triggerLowPrice: true,
+      executionPricePolicy: true,
+    },
+  },
   submittedAt: true,
   executedAt: true,
   canceledAt: true,
@@ -525,6 +538,8 @@ const ORDER_EXECUTION_SELECT = {
 @Injectable()
 export class OrdersService {
   private readonly limitOrderMatchingConfig = readLimitOrderMatchingConfig();
+  private readonly limitOrderCandleConfig =
+    readLimitOrderCandleReconciliationConfig();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -537,6 +552,8 @@ export class OrdersService {
     private readonly redis?: RedisService,
     @Optional()
     private readonly limitOrderProviderHealth?: LimitOrderProviderHealthService,
+    @Optional()
+    private readonly limitOrderMatchBoundary?: LimitOrderMatchBoundaryService,
   ) {}
 
   private assertLimitOrderFeatureEnabled(): void {
@@ -590,7 +607,17 @@ export class OrdersService {
     await this.limitOrderMatcherHealth.assertAvailable(tx, now);
   }
 
-  private assertLimitOrderProviderAvailable(assetType: AssetType): void {
+  /**
+   * Per-ASSET readiness, not per-provider: the exact asset must be subscribed
+   * on the current canonical connection generation, otherwise the order would
+   * reserve cash that no live event could ever release.
+   */
+  private assertLimitOrderProviderAvailable(asset: {
+    id: string;
+    symbol: string;
+    market: string;
+    assetType: AssetType;
+  }): void {
     if (!this.isLimitOrderAutoExecutionEnabled()) return;
     if (!this.limitOrderProviderHealth) {
       this.throwApiError(
@@ -599,7 +626,12 @@ export class OrdersService {
         'Limit-order provider health service is not wired.',
       );
     }
-    this.limitOrderProviderHealth.assertAvailable(assetType);
+    this.limitOrderProviderHealth.assertAvailable({
+      assetId: asset.id,
+      symbol: asset.symbol,
+      market: asset.market,
+      assetType: asset.assetType,
+    });
   }
 
   async quoteOrder(
@@ -661,7 +693,7 @@ export class OrdersService {
     this.assertSeasonTradable(season, quoteAt);
     const participant = await this.findParticipantOrThrow(season.id, userId);
     const asset = await this.findUsableAsset(request.assetId);
-    this.assertLimitOrderProviderAvailable(asset.assetType);
+    this.assertLimitOrderProviderAvailable(asset);
     if (
       request.currencyCode &&
       request.currencyCode !== this.getAssetSettlementCurrency(asset)
@@ -1020,9 +1052,30 @@ export class OrdersService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
-        // Lock order: Quote → SeasonParticipant → Season → CashWallet → Order.
+        // Lock order: MatchBoundary → Quote → SeasonParticipant → Season →
+        // CashWallet → Order.
+        //
+        // The event boundary is taken FIRST, before any row lock. It makes
+        // this create mutually exclusive with the path-A poller and the
+        // path-B candle worker, which is what closes the "tail read before
+        // commit" hole: an event XADDed after the cursor read cannot be
+        // processed-and-ACKed while this order is still uncommitted. Taking
+        // it after a row lock would invert the lock order against workers
+        // that hold it on a separate session — an inversion PostgreSQL's
+        // deadlock detector cannot even see. Do not move this call.
+        //
         // See LimitOrderCreateService.lockTradableContextInTransaction for why
         // the participant precedes the season and why both are FOR SHARE.
+        if (autoExecutionEnabled) {
+          if (!this.limitOrderMatchBoundary) {
+            this.throwApiError(
+              HttpStatus.SERVICE_UNAVAILABLE,
+              'LIMIT_ORDER_MATCHER_UNAVAILABLE',
+              'Limit-order match boundary service is not wired.',
+            );
+          }
+          await this.limitOrderMatchBoundary.lockInTransaction(tx);
+        }
         await limitOrderCreate.lockQuoteForCreateInTransaction(tx, quoteId);
         // Re-validate season + participant against LOCKED rows. A concurrent
         // exclusion or season-ending either commits first (and this create
@@ -1086,7 +1139,7 @@ export class OrdersService {
           now: transactionNow,
         });
         this.assertOrderAssetTradable(quote.asset, transactionNow);
-        this.assertLimitOrderProviderAvailable(quote.asset.assetType);
+        this.assertLimitOrderProviderAvailable(quote.asset);
 
         if (!quote.limitPrice) {
           this.throwApiError(
@@ -1098,6 +1151,13 @@ export class OrdersService {
 
         const matchingActivation = activationStreamId
           ? { activatedAt: transactionNow, streamId: activationStreamId }
+          : null;
+        // Path-B boundary is recorded whenever automatic matching is on, so
+        // enabling the safety net later never has to retroactively activate
+        // orders against candles that predate them. Orders created while
+        // matching is off stay NULL and are never swept.
+        const candleMatchingEligibleFrom = autoExecutionEnabled
+          ? calculateCandleMatchingEligibleFrom(transactionNow)
           : null;
 
         return limitOrderCreate.createSubmittedLimitBuyInTransaction(tx, {
@@ -1119,7 +1179,10 @@ export class OrdersService {
           idempotency,
           submittedAt: transactionNow,
           matchingActivation,
+          candleMatchingEligibleFrom,
           autoExecutionEnabled,
+          candleReconciliationEnabled:
+            autoExecutionEnabled && this.limitOrderCandleConfig.enabled,
         });
       });
     } catch (error) {
@@ -1334,6 +1397,16 @@ export class OrdersService {
           triggerEventAt: true,
           matchedAt: true,
           matchingSource: true,
+          candleEvidence: {
+            select: {
+              marketCandleId: true,
+              interval: true,
+              openTime: true,
+              closeTime: true,
+              triggerLowPrice: true,
+              executionPricePolicy: true,
+            },
+          },
           submittedAt: true,
           executedAt: true,
           canceledAt: true,
@@ -3724,6 +3797,16 @@ export class OrdersService {
         triggerEventAt: true,
         matchedAt: true,
         matchingSource: true,
+        candleEvidence: {
+          select: {
+            marketCandleId: true,
+            interval: true,
+            openTime: true,
+            closeTime: true,
+            triggerLowPrice: true,
+            executionPricePolicy: true,
+          },
+        },
         submittedAt: true,
         executedAt: true,
         canceledAt: true,
@@ -4804,6 +4887,8 @@ export class OrdersService {
 
   private limitOrderExecutionPolicy() {
     const autoExecutionEnabled = this.isLimitOrderAutoExecutionEnabled();
+    const candleReconciliationEnabled =
+      autoExecutionEnabled && this.limitOrderCandleConfig.enabled;
     return {
       autoExecutionEnabled,
       mode: autoExecutionEnabled
@@ -4813,6 +4898,15 @@ export class OrdersService {
         ? ('provider_trade_price' as const)
         : null,
       fullFillOnly: true as const,
+      // Additive path-B disclosure. The 5m safety net never improves on the
+      // limit price, so the client can state the execution price policy
+      // exactly instead of promising a candle-low fill.
+      liveTradeMatchingEnabled: autoExecutionEnabled,
+      candleReconciliationEnabled,
+      candleInterval: candleReconciliationEnabled ? ('5m' as const) : null,
+      candleExecutionPricePolicy: candleReconciliationEnabled
+        ? ('limit_price' as const)
+        : null,
     };
   }
 

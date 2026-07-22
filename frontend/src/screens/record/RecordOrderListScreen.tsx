@@ -298,6 +298,25 @@ export default function RecordOrderListScreen({ route }: Props) {
                       <Text style={styles.itemTitle}>
                         실제 차감액 {display.netAmount}
                       </Text>
+                      {/* Matching provenance. The 5분봉 안전망 line names the
+                          confirmed low as the 도달 기준 and repeats that the
+                          fill price is the limit price — never the low. */}
+                      {display.matchingSourceLabel ? (
+                        <Text style={styles.helper}>
+                          체결 경로 {display.matchingSourceLabel}
+                        </Text>
+                      ) : null}
+                      {display.candleEvidence ? (
+                        <>
+                          <Text style={styles.helper}>
+                            {display.candleEvidence.interval} 저가(도달 기준){' '}
+                            {display.candleEvidence.triggerLowPrice}
+                          </Text>
+                          <Text style={styles.helper}>
+                            {display.candleEvidence.executionPriceNotice}
+                          </Text>
+                        </>
+                      ) : null}
                     </>
                   )}
                 </View>

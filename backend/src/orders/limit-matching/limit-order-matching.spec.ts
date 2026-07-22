@@ -175,4 +175,103 @@ describe('limit order live-trade matching policies', () => {
       ).toThrow();
     }
   });
+  it('rejects timestamps that are obviously broken without a skew tolerance', () => {
+    const now = new Date('2026-07-22T01:00:00.000Z');
+    const event = buildLimitOrderPriceEvent({
+      tick,
+      asset,
+      publishedAt: new Date('2026-07-22T01:00:00.020Z'),
+    });
+    // A sane event is accepted even though receivedAt is 10ms in the future
+    // relative to `now`: the bound is an absolute sanity limit, not an
+    // eligibility rule.
+    expect(parseLimitOrderPriceEvent(JSON.stringify(event), now)).toEqual(
+      event,
+    );
+    for (const invalid of [
+      { ...event, providerEventAt: '2026-07-22T02:00:00.000Z' },
+      { ...event, receivedAt: '2026-07-22T02:00:00.000Z' },
+      { ...event, publishedAt: '2026-07-22T02:00:00.000Z' },
+      // publishedAt is stamped after receivedAt on ONE process clock, so an
+      // inversion is a corrupted payload.
+      {
+        ...event,
+        receivedAt: '2026-07-22T01:00:00.500Z',
+        publishedAt: '2026-07-22T01:00:00.100Z',
+      },
+    ]) {
+      expect(() =>
+        parseLimitOrderPriceEvent(JSON.stringify(invalid), now),
+      ).toThrow('Invalid');
+    }
+  });
+
+  it('decides activation from stream ids alone, never from timestamps', () => {
+    // The order activated at stream id 100-0. An event at 100-1 is after it
+    // regardless of what the two hosts' clocks say.
+    const activation = '100-0';
+    expect(compareRedisStreamIds(activation, '100-1') < 0).toBe(true);
+    expect(compareRedisStreamIds(activation, '100-0') < 0).toBe(false);
+    expect(compareRedisStreamIds(activation, '99-9999') < 0).toBe(false);
+  });
+
+  it.each([
+    // DB clock ahead of the app clock: submittedAt > receivedAt, yet the
+    // event is after activation and MUST still be eligible.
+    ['db_clock_ahead', '2026-07-22T01:00:05.000Z', '2026-07-22T01:00:00.000Z'],
+    // App clock ahead of the DB clock: the reverse skew.
+    ['app_clock_ahead', '2026-07-22T01:00:00.000Z', '2026-07-22T01:00:05.000Z'],
+  ])(
+    'stream-id ordering survives %s clock skew',
+    (_case, submittedAt, receivedAt) => {
+      const order = {
+        submittedAt: new Date(submittedAt),
+        matchingActivationStreamId: '100-0',
+      };
+      const event = { receivedAt: new Date(receivedAt), streamId: '100-1' };
+      // The removed rule would have dropped the db_clock_ahead case.
+      const legacyTimestampRule = order.submittedAt <= event.receivedAt;
+      const streamIdRule =
+        compareRedisStreamIds(
+          order.matchingActivationStreamId,
+          event.streamId,
+        ) < 0;
+      expect(streamIdRule).toBe(true);
+      if (_case === 'db_clock_ahead') expect(legacyTimestampRule).toBe(false);
+    },
+  );
+
+  it('never activates an order from a stream id at or before its cursor', () => {
+    for (const streamId of ['100-0', '99-1', '1-0']) {
+      expect(compareRedisStreamIds('100-0', streamId) < 0).toBe(false);
+    }
+  });
+
+  it('validates the added health-gate environment values', () => {
+    const config = readLimitOrderMatchingConfig({
+      LIMIT_ORDER_MATCHER_MAX_LAG: '250',
+      LIMIT_ORDER_MATCHER_MAX_PENDING: '25',
+      LIMIT_ORDER_MATCHER_MAX_ACK_AGE_MS: '45000',
+      LIMIT_ORDER_MATCHER_MAX_OLDEST_PENDING_AGE_MS: '45000',
+      LIMIT_ORDER_EVENT_RETENTION_HEADROOM_RATIO: '0.35',
+      LIMIT_ORDER_PROVIDER_LIVENESS_MAX_AGE_MS: '90000',
+    } as NodeJS.ProcessEnv);
+    expect(config.maxConsumerLag).toBe(250);
+    expect(config.maxPendingCount).toBe(25);
+    expect(config.maxAckAgeMs).toBe(45_000);
+    expect(config.maxOldestPendingAgeMs).toBe(45_000);
+    expect(config.eventRetentionHeadroomRatio).toBeCloseTo(0.35);
+    expect(config.providerLivenessMaxAgeMs).toBe(90_000);
+
+    for (const env of [
+      { LIMIT_ORDER_EVENT_RETENTION_HEADROOM_RATIO: '1' },
+      { LIMIT_ORDER_EVENT_RETENTION_HEADROOM_RATIO: '-0.1' },
+      { LIMIT_ORDER_EVENT_RETENTION_HEADROOM_RATIO: 'high' },
+      { LIMIT_ORDER_MATCHER_MAX_ACK_AGE_MS: '1000' },
+    ]) {
+      expect(() =>
+        readLimitOrderMatchingConfig(env as NodeJS.ProcessEnv),
+      ).toThrow();
+    }
+  });
 });

@@ -15,6 +15,10 @@ export type LimitOrderStreamInspection = {
   groupLastDeliveredId: string | null;
   pendingCount: number;
   lag: number | null;
+  /** Current XLEN, used against LIMIT_ORDER_EVENT_MAXLEN for trim headroom. */
+  length: number | null;
+  /** Oldest un-ACKed entry ID; its millisecond part dates the backlog. */
+  oldestPendingId: string | null;
 };
 
 @Injectable()
@@ -167,6 +171,11 @@ export class LimitOrderEventStreamService implements OnModuleDestroy {
           ? pending[0]
           : 0,
       lag: typeof group?.lag === 'number' ? group.lag : null,
+      length: typeof stream.length === 'number' ? stream.length : null,
+      oldestPendingId:
+        Array.isArray(pending) && typeof pending[1] === 'string'
+          ? pending[1]
+          : null,
     };
   }
 
@@ -242,6 +251,14 @@ function pairsToObject(value: unknown): Record<string, unknown> {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/** Millisecond component of a Redis Stream ID (`<ms>-<seq>`), or null. */
+export function redisStreamIdTimestampMs(id: string | null): number | null {
+  if (!id) return null;
+  const [ms] = id.split('-');
+  const value = Number(ms);
+  return Number.isSafeInteger(value) && value >= 0 ? value : null;
 }
 
 export function compareRedisStreamIds(left: string, right: string): number {

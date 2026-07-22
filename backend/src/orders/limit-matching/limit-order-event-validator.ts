@@ -9,7 +9,19 @@ export class LimitOrderEventValidationError extends Error {
   }
 }
 
-export function parseLimitOrderPriceEvent(value: string): LimitOrderPriceEvent {
+/**
+ * Absolute sanity bound for provider/publisher timestamps. This is NOT a
+ * clock-skew tolerance used to decide order eligibility — ordering is decided
+ * purely by Redis Stream IDs. It only rejects timestamps that are obviously
+ * broken (a feed stamping events hours into the future), which would otherwise
+ * corrupt audit records and session checks.
+ */
+export const LIMIT_ORDER_EVENT_MAX_FUTURE_SKEW_MS = 60_000;
+
+export function parseLimitOrderPriceEvent(
+  value: string,
+  now: Date = new Date(),
+): LimitOrderPriceEvent {
   let raw: unknown;
   try {
     raw = JSON.parse(value);
@@ -57,6 +69,7 @@ export function parseLimitOrderPriceEvent(value: string): LimitOrderPriceEvent {
   ) {
     invalid('eventId');
   }
+  const timestamps: Record<string, number> = {};
   for (const field of ['providerEventAt', 'receivedAt', 'publishedAt']) {
     const value = event[field] as string;
     const timestamp = new Date(value);
@@ -66,7 +79,17 @@ export function parseLimitOrderPriceEvent(value: string): LimitOrderPriceEvent {
     ) {
       invalid(field);
     }
+    timestamps[field] = timestamp.getTime();
   }
+  // Obvious-invariant checks only. They never widen or narrow which orders an
+  // event may fill — that is decided by the stream ID alone.
+  const limit = now.getTime() + LIMIT_ORDER_EVENT_MAX_FUTURE_SKEW_MS;
+  if (timestamps.providerEventAt > limit) invalid('providerEventAt');
+  if (timestamps.receivedAt > limit) invalid('receivedAt');
+  if (timestamps.publishedAt > limit) invalid('publishedAt');
+  // The publisher stamps publishedAt after the source stamped receivedAt, on
+  // the same process clock, so an inversion means a corrupted payload.
+  if (timestamps.publishedAt < timestamps.receivedAt) invalid('publishedAt');
   try {
     const price = new Prisma.Decimal(event.price as string);
     if (!price.isFinite() || price.lte(0) || price.toFixed(8) !== event.price) {

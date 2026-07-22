@@ -9,6 +9,7 @@ import type {
 } from '../../models/dto/common';
 import { formatCurrency, getAssetNameDisplay } from '../../utils/format';
 import {
+  getOrderMatchingSourceLabel,
   getOrderStatusLabel,
   hasNoExecutionResult,
   isOpenLimitBuyOrder,
@@ -152,6 +153,21 @@ export interface RecordOrderItemDto {
   reservedAmount?: MoneyString | null;
   reservationReleasedAt?: IsoDateTimeString | null;
   cancelReason?: string | null;
+  /**
+   * Automatic-matching provenance. 'closed_5m_candle' rows were filled by the
+   * confirmed-candle safety net AT THE LIMIT PRICE; candleEvidence.triggerLow
+   * only proves the limit was touched inside that window.
+   */
+  matchingSource?: 'live_trade_event' | 'closed_5m_candle' | (string & {}) | null;
+  matchedAt?: IsoDateTimeString | null;
+  candleEvidence?: {
+    marketCandleId: string;
+    interval: string;
+    openTime: IsoDateTimeString;
+    closeTime: IsoDateTimeString;
+    triggerLowPrice: MoneyString;
+    executionPricePolicy: string;
+  } | null;
 }
 
 export interface RecordExchangeItemDto {
@@ -228,6 +244,7 @@ function normalizePage<T>(
 export {
   isOpenLimitBuyOrder,
   shouldPollSubmittedLimitOrders,
+  getOrderMatchingSourceLabel,
 } from './openOrder';
 
 export function getRecordOrderDisplay(item: RecordOrderItemDto) {
@@ -280,6 +297,26 @@ export function getRecordOrderDisplay(item: RecordOrderItemDto) {
     feeAmount: noExecutionResult
       ? null
       : formatCurrency(item.feeAmount, currencyCode),
+    // Automatic-matching provenance. The path-B line names the confirmed 5m
+    // low as the 도달 확인 기준 and states the fill price is the limit price,
+    // so a candle-low fill is never implied.
+    matchingSourceLabel: getOrderMatchingSourceLabel(item.matchingSource),
+    candleEvidence:
+      item.candleEvidence && !noExecutionResult
+        ? {
+            interval: item.candleEvidence.interval,
+            openTime: item.candleEvidence.openTime,
+            closeTime: item.candleEvidence.closeTime,
+            triggerLowPrice: formatCurrency(
+              item.candleEvidence.triggerLowPrice,
+              currencyCode,
+            ),
+            executionPriceNotice:
+              item.candleEvidence.executionPricePolicy === 'limit_price'
+                ? '체결가격은 지정가입니다. 저가로 체결되지 않습니다.'
+                : '체결가격 정책을 확인할 수 없습니다.',
+          }
+        : null,
   };
 }
 

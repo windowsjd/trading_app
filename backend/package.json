@@ -20,6 +20,8 @@
     "test": "jest",
     "test:db:prepare": "prisma migrate deploy",
     "smoke:candle-fixture": "tsx scripts/candle-release-fixture-smoke.ts",
+    "smoke:limit-order-candle-fixture": "tsx scripts/limit-order-candle-fixture-smoke.ts",
+    "soak:limit-order-throughput": "tsx scripts/limit-order-phase3-integration.ts",
     "smoke:candle-live": "tsx scripts/candle-live-smoke.ts",
     "smoke:candle-report": "tsx scripts/candle-live-smoke-report.ts",
     "dev:open-season": "tsx scripts/dev-open-season.ts",

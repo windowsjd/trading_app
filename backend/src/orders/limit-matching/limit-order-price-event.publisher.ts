@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NormalizedProviderTradeEventBus } from '../../providers/normalized-provider-trade-event-bus.service';
+import { ProviderTradeRouteRegistry } from '../../providers/provider-trade-route.registry';
 import { RedisService } from '../../redis/redis.service';
 import { readLimitOrderMatchingConfig } from './limit-order-matching.config';
 import { LimitOrderMatcherHealthService } from './limit-order-matcher-health.service';
@@ -25,6 +26,7 @@ export class LimitOrderPriceEventPublisher
     private readonly redis: RedisService,
     private readonly tradeEvents: NormalizedProviderTradeEventBus,
     private readonly health: LimitOrderMatcherHealthService,
+    private readonly routes: ProviderTradeRouteRegistry,
   ) {}
 
   onModuleInit(): void {
@@ -55,29 +57,9 @@ export class LimitOrderPriceEventPublisher
   async publish(
     tick: Parameters<typeof buildLimitOrderPriceEvent>[0]['tick'],
   ): Promise<string> {
-    const asset = await this.prisma.asset.findUnique({
-      where: { id: tick.assetId },
-      select: {
-        id: true,
-        symbol: true,
-        market: true,
-        assetType: true,
-        currencyCode: true,
-        settlementCurrency: true,
-        isActive: true,
-      },
-    });
-    if (!asset?.isActive) {
-      throw new Error(
-        'Normalized trade resolved to an inactive or missing asset.',
-      );
-    }
     const event = buildLimitOrderPriceEvent({
       tick,
-      asset: {
-        ...asset,
-        settlementCurrency: asset.settlementCurrency ?? asset.currencyCode,
-      },
+      asset: await this.resolveAsset(tick),
     });
     try {
       return await this.redis.xadd(
@@ -97,5 +79,58 @@ export class LimitOrderPriceEventPublisher
       );
       throw error;
     }
+  }
+
+  /**
+   * Prefers the metadata the canonical connection already read when it built
+   * the subscription for this connection generation, so the hot path performs
+   * ZERO database queries per trade. The registry lookup is generation-scoped:
+   * metadata from a superseded connection is rejected and falls through to the
+   * database, which is also the path legacy publishers (no carried metadata)
+   * take. Asset activity is still re-verified inside the execution
+   * transaction — this cache never authorises a fill on its own.
+   */
+  private async resolveAsset(
+    tick: Parameters<typeof buildLimitOrderPriceEvent>[0]['tick'],
+  ): Promise<Parameters<typeof buildLimitOrderPriceEvent>[0]['asset']> {
+    const carried = tick.asset;
+    if (carried && carried.assetId === tick.assetId) {
+      const registered = this.routes.resolveAsset(
+        tick.provider,
+        tick.assetId,
+        carried.generation,
+      );
+      if (registered) {
+        return {
+          id: registered.assetId,
+          symbol: registered.symbol,
+          market: registered.market,
+          assetType: registered.assetType,
+          settlementCurrency: registered.settlementCurrency,
+        };
+      }
+    }
+
+    const asset = await this.prisma.asset.findUnique({
+      where: { id: tick.assetId },
+      select: {
+        id: true,
+        symbol: true,
+        market: true,
+        assetType: true,
+        currencyCode: true,
+        settlementCurrency: true,
+        isActive: true,
+      },
+    });
+    if (!asset?.isActive) {
+      throw new Error(
+        'Normalized trade resolved to an inactive or missing asset.',
+      );
+    }
+    return {
+      ...asset,
+      settlementCurrency: asset.settlementCurrency ?? asset.currencyCode,
+    };
   }
 }

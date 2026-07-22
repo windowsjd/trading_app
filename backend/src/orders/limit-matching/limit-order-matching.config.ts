@@ -22,6 +22,22 @@ export type LimitOrderMatchingConfig = {
   heartbeatIntervalMs: number;
   healthMaxAgeMs: number;
   leaderRetryMs: number;
+  /** Per-asset readiness: how old the canonical connection's last frame may be. */
+  providerLivenessMaxAgeMs: number;
+  /** Backlog gates (fail-closed for NEW limit quotes/creates only). */
+  maxConsumerLag: number;
+  maxPendingCount: number;
+  maxAckAgeMs: number;
+  maxOldestPendingAgeMs: number;
+  /**
+   * Minimum fraction of LIMIT_ORDER_EVENT_MAXLEN that must still be free.
+   * A stream that has grown into its trim window can silently drop entries a
+   * consumer has not read yet, so approaching the cap fails closed.
+   */
+  eventRetentionHeadroomRatio: number;
+  /** Per-asset trade-metadata cache bound for the poller. */
+  assetCacheTtlMs: number;
+  assetCacheMaxEntries: number;
 };
 
 export class LimitOrderMatchingConfigError extends Error {
@@ -105,6 +121,60 @@ export function readLimitOrderMatchingConfig(
       600_000,
     ),
     leaderRetryMs: 2000,
+    providerLivenessMaxAgeMs: readInteger(
+      env,
+      'LIMIT_ORDER_PROVIDER_LIVENESS_MAX_AGE_MS',
+      60_000,
+      1000,
+      3_600_000,
+    ),
+    maxConsumerLag: readInteger(
+      env,
+      'LIMIT_ORDER_MATCHER_MAX_LAG',
+      5000,
+      0,
+      10_000_000,
+    ),
+    maxPendingCount: readInteger(
+      env,
+      'LIMIT_ORDER_MATCHER_MAX_PENDING',
+      1000,
+      0,
+      10_000_000,
+    ),
+    maxAckAgeMs: readInteger(
+      env,
+      'LIMIT_ORDER_MATCHER_MAX_ACK_AGE_MS',
+      60_000,
+      1000,
+      3_600_000,
+    ),
+    maxOldestPendingAgeMs: readInteger(
+      env,
+      'LIMIT_ORDER_MATCHER_MAX_OLDEST_PENDING_AGE_MS',
+      60_000,
+      1000,
+      3_600_000,
+    ),
+    eventRetentionHeadroomRatio: readRatio(
+      env,
+      'LIMIT_ORDER_EVENT_RETENTION_HEADROOM_RATIO',
+      0.2,
+    ),
+    assetCacheTtlMs: readInteger(
+      env,
+      'LIMIT_ORDER_ASSET_CACHE_TTL_MS',
+      5000,
+      0,
+      600_000,
+    ),
+    assetCacheMaxEntries: readInteger(
+      env,
+      'LIMIT_ORDER_ASSET_CACHE_MAX_ENTRIES',
+      2000,
+      1,
+      100_000,
+    ),
   };
 
   if (config.healthMaxAgeMs <= config.heartbeatIntervalMs) {
@@ -117,8 +187,29 @@ export function readLimitOrderMatchingConfig(
       'LIMIT_ORDER_PENDING_IDLE_MS must be greater than or equal to LIMIT_ORDER_EVENT_BLOCK_MS.',
     );
   }
+  if (config.maxAckAgeMs <= config.blockMs) {
+    throw new LimitOrderMatchingConfigError(
+      'LIMIT_ORDER_MATCHER_MAX_ACK_AGE_MS must be greater than LIMIT_ORDER_EVENT_BLOCK_MS.',
+    );
+  }
 
   return config;
+}
+
+function readRatio(
+  env: NodeJS.ProcessEnv,
+  name: string,
+  fallback: number,
+): number {
+  const raw = env[name];
+  if (raw === undefined) return fallback;
+  const value = Number(raw.trim());
+  if (!Number.isFinite(value) || value < 0 || value >= 1) {
+    throw new LimitOrderMatchingConfigError(
+      `${name} must be a number in [0, 1). Received: ${JSON.stringify(raw)}.`,
+    );
+  }
+  return value;
 }
 
 function readInteger(

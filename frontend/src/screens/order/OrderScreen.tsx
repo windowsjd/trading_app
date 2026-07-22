@@ -40,6 +40,7 @@ import {
   getWalletReservedAmount,
 } from '../../features/wallet/mapper';
 import {
+  getLimitOrderSuccessMessage,
   getOrderQuoteDisplay,
   getOrderQuoteExpiresInSeconds,
   isOrderIdempotencyConflictCode,
@@ -906,9 +907,7 @@ export default function OrderScreen({ route, navigation }: Props) {
                     )}
                   </Text>
                   <Text style={styles.helper}>
-                    {quoteData.executionPolicy?.autoExecutionEnabled
-                      ? '유효한 실시간 체결가격이 지정가 이하로 처리되면 전량 자동 체결됩니다. 주문장 유동성과 거래량은 반영하지 않습니다.'
-                      : '현재 단계에서는 미체결 상태로 등록됩니다.'}
+                    {getLimitOrderSuccessMessage(quoteData.executionPolicy)}
                   </Text>
                 </>
               ) : (

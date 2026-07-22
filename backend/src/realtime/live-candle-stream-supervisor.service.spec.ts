@@ -20,6 +20,8 @@ jest.mock('../assets/live-candle-pipeline.service', () => ({
 import { EventEmitter } from 'node:events';
 import { readLiveCandleConfig } from '../assets/live-candle.config';
 import { LiveCandleHealthService } from '../assets/live-candle-health.service';
+import { ProviderTradeRouteRegistry } from '../providers/provider-trade-route.registry';
+import { NormalizedProviderTradeEventBus } from '../providers/normalized-provider-trade-event-bus.service';
 import { LiveCandleStreamSupervisorService } from './live-candle-stream-supervisor.service';
 
 describe('LiveCandleStreamSupervisorService', () => {
@@ -249,6 +251,164 @@ describe('LiveCandleStreamSupervisorService', () => {
     }
   });
 
+  it('rides ONE Binance socket for kline_5m and trade when matching is on', async () => {
+    process.env.LIMIT_ORDER_AUTO_EXECUTION_ENABLED = 'true';
+    try {
+      const socket = new FakeSocket();
+      const fixture = setup(() => socket);
+      fixture.routes.claimProvider('binance', 'live_candle_supervisor');
+      const context = ownerContext();
+      fixture.routes.beginConnection({
+        provider: 'binance',
+        source: 'live_candle_supervisor',
+        generation: context.connectionGeneration,
+      });
+      const connected = connectBinance(fixture.service, context);
+      socket.open();
+      await new Promise((resolve) => setImmediate(resolve));
+
+      // One socket, one SUBSCRIBE, both stream families.
+      expect(fixture.factory).toHaveBeenCalledTimes(1);
+      expect(socket.sent).toHaveLength(1);
+      expect(JSON.parse(socket.sent[0])).toEqual({
+        method: 'SUBSCRIBE',
+        params: ['btcusdt@kline_5m', 'btcusdt@trade'],
+        id: 1,
+      });
+
+      // The batch ack activates the subscription for readiness.
+      socket.emit('message', JSON.stringify({ result: null, id: 1 }));
+      expect(
+        fixture.routes.checkAssetReadiness({
+          assetId: 'btc',
+          provider: 'binance',
+          livenessMaxAgeMs: 600_000,
+        }),
+      ).toMatchObject({ ready: true });
+
+      socket.emit('message', binanceTradeFrame());
+      socket.emit('message', binanceFrame());
+      await Promise.resolve();
+      socket.close(1000, 'fixture done');
+      await connected;
+      await Promise.resolve();
+
+      // kline -> candle pipeline, trade -> matcher; never crossed over.
+      expect(fixture.pipeline.process).toHaveBeenCalledTimes(1);
+      expect(fixture.publishedTrades).toHaveLength(1);
+      expect(fixture.publishedTrades[0]).toMatchObject({
+        provider: 'binance',
+        assetId: 'btc',
+        price: '99.50000000',
+        sourceName: 'binance_spot_ws_trade',
+        providerEventId: '4242',
+        asset: {
+          assetId: 'btc',
+          settlementCurrency: 'USD',
+          generation: context.connectionGeneration,
+        },
+      });
+    } finally {
+      delete process.env.LIMIT_ORDER_AUTO_EXECUTION_ENABLED;
+    }
+  });
+
+  it('subscribes klines only and publishes no trade when matching is off', async () => {
+    const socket = new FakeSocket();
+    const fixture = setup(() => socket);
+    fixture.routes.claimProvider('binance', 'live_candle_supervisor');
+    const context = ownerContext();
+    const connected = connectBinance(fixture.service, context);
+    socket.open();
+    await new Promise((resolve) => setImmediate(resolve));
+    socket.emit('message', JSON.stringify({ result: null, id: 1 }));
+    socket.emit('message', binanceTradeFrame());
+    await Promise.resolve();
+    socket.close(1000, 'fixture done');
+    await connected;
+
+    expect((JSON.parse(socket.sent[0]) as { params: string[] }).params).toEqual(
+      ['btcusdt@kline_5m'],
+    );
+    expect(fixture.publishedTrades).toHaveLength(0);
+  });
+
+  it('publishes a KIS exact trade from the SAME parsed frame as the candle', async () => {
+    process.env.LIMIT_ORDER_AUTO_EXECUTION_ENABLED = 'true';
+    try {
+      const socket = new FakeSocket();
+      const fixture = setup(() => socket, [domesticAsset('sam', '005930')]);
+      await Promise.resolve();
+      fixture.routes.claimProvider('kis', 'live_candle_supervisor');
+      const context = { ...ownerContext(), provider: 'kis' as const };
+      fixture.routes.beginConnection({
+        provider: 'kis',
+        source: 'live_candle_supervisor',
+        generation: context.connectionGeneration,
+      });
+      const connected = connectKis(fixture.service, context);
+      socket.open();
+      await new Promise((resolve) => setImmediate(resolve));
+
+      // Only ONE KIS socket exists for both consumers.
+      expect(fixture.factory).toHaveBeenCalledTimes(1);
+      expect(fixture.factory).toHaveBeenCalledWith('wss://kis.example');
+
+      socket.emit('message', kisAckFrame('005930'));
+      expect(
+        fixture.routes.checkAssetReadiness({
+          assetId: 'sam',
+          provider: 'kis',
+          livenessMaxAgeMs: 600_000,
+        }),
+      ).toMatchObject({ ready: true });
+
+      socket.emit('message', kisTradeFrame());
+      await Promise.resolve();
+      socket.close(1000, 'fixture done');
+      await connected;
+      await Promise.resolve();
+
+      expect(fixture.pipeline.process).toHaveBeenCalledTimes(1);
+      expect(fixture.publishedTrades).toHaveLength(1);
+      expect(fixture.publishedTrades[0]).toMatchObject({
+        provider: 'kis',
+        assetId: 'sam',
+        sourceName: 'kis_krx_realtime_trade',
+        asset: { assetId: 'sam', settlementCurrency: 'KRW' },
+      });
+    } finally {
+      delete process.env.LIMIT_ORDER_AUTO_EXECUTION_ENABLED;
+    }
+  });
+
+  it('does not publish trades for an asset outside the current generation', async () => {
+    process.env.LIMIT_ORDER_AUTO_EXECUTION_ENABLED = 'true';
+    try {
+      const socket = new FakeSocket();
+      const fixture = setup(() => socket);
+      fixture.routes.claimProvider('binance', 'live_candle_supervisor');
+      const context = ownerContext();
+      const connected = connectBinance(fixture.service, context);
+      socket.open();
+      await new Promise((resolve) => setImmediate(resolve));
+      // Reconnect invalidates the registration made above.
+      fixture.routes.beginConnection({
+        provider: 'binance',
+        source: 'live_candle_supervisor',
+        generation: 'other-generation',
+      });
+      socket.emit('message', binanceTradeFrame());
+      await Promise.resolve();
+      socket.close(1000, 'fixture done');
+      await connected;
+
+      expect(fixture.publishedTrades).toHaveLength(0);
+    } finally {
+      delete process.env.LIMIT_ORDER_AUTO_EXECUTION_ENABLED;
+    }
+  });
+
   it('closes the provider socket immediately after owner lease renewal is lost', async () => {
     jest.useFakeTimers();
     const socket = new FakeSocket();
@@ -275,6 +435,12 @@ function setup(
       findMany: jest.fn().mockResolvedValue(assets),
     },
   };
+  const routes = new ProviderTradeRouteRegistry();
+  const tradeBus = new NormalizedProviderTradeEventBus();
+  const publishedTrades: unknown[] = [];
+  tradeBus.subscribe((tick) => {
+    publishedTrades.push(tick);
+  });
   const locks = {
     acquire: jest.fn(),
     extend: jest.fn().mockResolvedValue(true),
@@ -309,6 +475,12 @@ function setup(
       eventTime: new Date(299_000),
       receivedAt: new Date(300_000),
     }),
+    normalizeKis: jest.fn().mockReturnValue({
+      price: '71000.00000000',
+      source: 'kis_krx_realtime_trade',
+      eventTime: new Date(299_000),
+      receivedAt: new Date(300_000),
+    }),
   };
   const pipeline = {
     markProviderConnected: jest.fn(),
@@ -327,6 +499,8 @@ function setup(
     normalizer as never,
     pipeline as never,
     health,
+    routes,
+    tradeBus,
     {
       ...readLiveCandleConfig({}),
       enabled: true,
@@ -344,6 +518,9 @@ function setup(
     pricePubSub,
     health,
     factory,
+    routes,
+    tradeBus,
+    publishedTrades,
   };
 }
 
@@ -354,6 +531,7 @@ function cryptoAsset(id: string, symbol: string) {
     assetType: 'crypto',
     market: 'BINANCE',
     isActive: true,
+    settlementCurrency: 'USD',
   };
 }
 
@@ -388,6 +566,7 @@ function ownerContext(socket: FakeSocket | null = null) {
     lost: false,
     socket,
     renewTimer: null as NodeJS.Timeout | null,
+    connectionGeneration: 'owner-1:conn-1',
   };
 }
 
@@ -422,6 +601,50 @@ function startLeaseRenewal(
       startLeaseRenewal(context: unknown): void;
     }
   ).startLeaseRenewal(context);
+}
+
+function domesticAsset(id: string, symbol: string) {
+  return {
+    id,
+    symbol,
+    assetType: 'domestic_stock',
+    market: 'KRX',
+    isActive: true,
+    settlementCurrency: 'KRW',
+  };
+}
+
+function binanceTradeFrame(): string {
+  return JSON.stringify({
+    e: 'trade',
+    E: 299_500,
+    s: 'BTCUSDT',
+    t: 4242,
+    p: '99.5',
+    q: '0.1',
+    T: 299_400,
+    m: false,
+  });
+}
+
+function kisAckFrame(trKey: string): string {
+  return JSON.stringify({
+    header: { tr_id: 'H0STCNT0', tr_key: trKey },
+    body: { rt_cd: '0', msg_cd: 'OPSP0000', msg1: 'SUBSCRIBE SUCCESS' },
+  });
+}
+
+function kisTradeFrame(): string {
+  // Official KIS pipe-delimited realtime frame: 0|<tr_id>|<count>|<fields>
+  const fields = Array.from({ length: 46 }, () => '');
+  fields[0] = '005930';
+  fields[1] = '090000';
+  fields[2] = '71000';
+  fields[12] = '10';
+  fields[13] = '1000';
+  fields[14] = '71000000';
+  fields[33] = '20260722';
+  return `0|H0STCNT0|001|${fields.join('^')}`;
 }
 
 function binanceFrame(): string {

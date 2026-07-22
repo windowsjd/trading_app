@@ -47,6 +47,16 @@ const CANCEL_ORDER_SELECT = {
   triggerEventAt: true,
   matchedAt: true,
   matchingSource: true,
+  candleEvidence: {
+    select: {
+      marketCandleId: true,
+      interval: true,
+      openTime: true,
+      closeTime: true,
+      triggerLowPrice: true,
+      executionPricePolicy: true,
+    },
+  },
   submittedAt: true,
   executedAt: true,
   canceledAt: true,

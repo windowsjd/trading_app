@@ -5,6 +5,7 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { WebSocket as WsWebSocket } from 'ws';
 import { AssetType, CurrencyCode } from '../generated/prisma/client';
 import {
@@ -21,11 +22,17 @@ import { LiveCandlePipelineService } from '../assets/live-candle-pipeline.servic
 import { buildLiveCandleOwnerLeaseKey } from '../assets/live-candle-store.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisLockService, type RedisLock } from '../redis/redis-lock.service';
-import { parseBinanceFiveMinuteKline } from '../providers/binance/binance-kline.parser';
+import { parseBinanceMarketStreamFrame } from '../providers/binance/binance-kline.parser';
+import { NormalizedProviderTradeEventBus } from '../providers/normalized-provider-trade-event-bus.service';
+import {
+  ProviderTradeRouteRegistry,
+  type ProviderSubscribedAsset,
+} from '../providers/provider-trade-route.registry';
 import { ProviderConfigService } from '../providers/provider-config.service';
 import { toBinanceUsdtSymbol } from '../providers/provider-target-resolver.service';
 import { KisAuthClient } from '../providers/kis/kis-auth.client';
 import { parseKisWebSocketMessage } from '../providers/kis/kis-websocket.trade-parser';
+import { readLimitOrderMatchingConfig } from '../orders/limit-matching/limit-order-matching.config';
 import {
   buildKisDomesticSubscriptionTarget,
   buildKisUsDelayedSubscriptionTarget,
@@ -55,6 +62,18 @@ type OwnedProviderContext = {
   lost: boolean;
   socket: LiveCandleSocket | null;
   renewTimer: NodeJS.Timeout | null;
+  /**
+   * Per-CONNECTION identity (not per-ownership): a reconnect mints a new one
+   * so every asset subscription readiness recorded under the previous socket
+   * is invalidated and must be re-acknowledged before limit orders are
+   * accepted again.
+   */
+  connectionGeneration: string;
+};
+
+/** Asset row plus the settlement currency the normalized trade event needs. */
+type LiveCandleTradeAsset = LiveCandleAsset & {
+  settlementCurrency: CurrencyCode;
 };
 
 const SOCKET_OPEN = 1;
@@ -71,6 +90,7 @@ export class LiveCandleStreamSupervisorService
   private readonly contexts = new Map<ProviderName, OwnedProviderContext>();
   private readonly pendingEvents = new Set<Promise<void>>();
   private readonly waiters = new Set<() => void>();
+  private readonly matching = readLimitOrderMatchingConfig();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -81,10 +101,25 @@ export class LiveCandleStreamSupervisorService
     private readonly normalizer: LiveCandleEventNormalizerService,
     private readonly pipeline: LiveCandlePipelineService,
     private readonly health: LiveCandleHealthService,
+    private readonly routes: ProviderTradeRouteRegistry,
+    private readonly tradeEvents: NormalizedProviderTradeEventBus,
     @Inject(LIVE_CANDLE_CONFIG) private readonly config: LiveCandleConfig,
     @Inject(LIVE_CANDLE_SOCKET_FACTORY)
     private readonly socketFactory: LiveCandleSocketFactory,
   ) {}
+
+  /**
+   * True when this supervisor must also act as the canonical EXACT-TRADE
+   * source for the limit-order matcher. When it is, the legacy streaming
+   * service for the same provider must neither connect nor publish, so there
+   * is exactly one socket and exactly one publisher per provider.
+   */
+  private ownsTradeRoute(provider: ProviderName): boolean {
+    return (
+      this.matching.enabled &&
+      this.routes.isOwnedBy(provider, 'live_candle_supervisor')
+    );
+  }
 
   onModuleInit(): void {
     this.start();
@@ -146,8 +181,13 @@ export class LiveCandleStreamSupervisorService
         lost: false,
         socket: null,
         renewTimer: null,
+        connectionGeneration: '',
       };
       this.contexts.set(provider, context);
+      // Exclusive claim of the provider's exact-trade route. It is taken even
+      // when automatic matching is off, so the legacy streaming service can
+      // always tell whether a canonical connection already exists.
+      this.routes.claimProvider(provider, 'live_candle_supervisor');
       this.health.updateProvider(provider, {
         owner: true,
         state: 'connecting',
@@ -157,6 +197,7 @@ export class LiveCandleStreamSupervisorService
       await this.runOwnedConnections(context);
       if (context.renewTimer) clearInterval(context.renewTimer);
       context.socket?.close(1000, 'owner released');
+      this.routes.releaseProvider(provider, 'live_candle_supervisor');
       await this.locks.release(context.lock);
       if (this.contexts.get(provider) === context)
         this.contexts.delete(provider);
@@ -194,6 +235,15 @@ export class LiveCandleStreamSupervisorService
         this.health.updateProvider(context.provider, {
           state: attempt === 0 ? 'connecting' : 'reconnecting',
         });
+        // A fresh generation per connection attempt: every asset readiness
+        // from the previous socket is dropped here and only becomes valid
+        // again once the new socket re-subscribes and is acknowledged.
+        context.connectionGeneration = `${context.lock.token}:${randomUUID()}`;
+        this.routes.beginConnection({
+          provider: context.provider,
+          source: 'live_candle_supervisor',
+          generation: context.connectionGeneration,
+        });
         if (context.provider === 'binance') {
           await this.connectBinance(context);
         } else {
@@ -224,6 +274,10 @@ export class LiveCandleStreamSupervisorService
           lastErrorCode: code,
         });
       }
+      this.routes.endConnection({
+        provider: context.provider,
+        generation: context.connectionGeneration,
+      });
       if (this.stopping || context.lost) break;
       await this.pipeline.markProviderContinuityLost({
         provider: context.provider,
@@ -254,15 +308,25 @@ export class LiveCandleStreamSupervisorService
       throw namedError('BINANCE_PROVIDER_DISABLED');
     }
     const assets = await this.loadAssets(AssetType.crypto);
-    const bySymbol = new Map<string, LiveCandleAsset>();
+    const bySymbol = new Map<string, LiveCandleTradeAsset>();
     for (const asset of assets) {
       const symbol = toBinanceUsdtSymbol(asset.symbol.trim().toUpperCase());
       if (symbol) bySymbol.set(symbol, asset);
     }
     const desiredSymbols = [...bySymbol.keys()];
-    const streams = desiredSymbols
-      .slice(0, this.config.maxProviderSubscriptionsPerShard)
-      .map((symbol) => `${symbol.toLowerCase()}@kline_5m`);
+    const subscribedSymbols = desiredSymbols.slice(
+      0,
+      this.config.maxProviderSubscriptionsPerShard,
+    );
+    const cappedSymbols = desiredSymbols.slice(subscribedSymbols.length);
+    // The matcher's exact-trade feed rides the SAME connection as the candle
+    // klines: one socket, two stream families, no second Binance WebSocket.
+    const tradeRouteOwned = this.ownsTradeRoute('binance');
+    const streams = subscribedSymbols.flatMap((symbol) =>
+      tradeRouteOwned
+        ? [`${symbol.toLowerCase()}@kline_5m`, `${symbol.toLowerCase()}@trade`]
+        : [`${symbol.toLowerCase()}@kline_5m`],
+    );
     if (streams.length === 0) throw namedError('BINANCE_STREAMS_EMPTY');
     const socket = this.socketFactory(
       `${provider.binance.wsMarketDataBaseUrl.replace(/\/+$/u, '')}/ws`,
@@ -270,6 +334,27 @@ export class LiveCandleStreamSupervisorService
     context.socket = socket;
     await waitForOpen(socket);
     if (context.lost || this.stopping) return;
+    this.routes.markConnectionOpen({
+      provider: 'binance',
+      generation: context.connectionGeneration,
+      at: Date.now(),
+    });
+    this.routes.registerSubscriptionTargets({
+      provider: 'binance',
+      generation: context.connectionGeneration,
+      assets: subscribedSymbols.map((symbol) =>
+        binanceSubscribedAsset(
+          bySymbol.get(symbol) as LiveCandleTradeAsset,
+          symbol,
+        ),
+      ),
+      cappedAssets: cappedSymbols.map((symbol) =>
+        binanceSubscribedAsset(
+          bySymbol.get(symbol) as LiveCandleTradeAsset,
+          symbol,
+        ),
+      ),
+    });
     let lastFrameAt = Date.now();
     const heartbeat = setInterval(
       () => {
@@ -296,6 +381,11 @@ export class LiveCandleStreamSupervisorService
     socket.on('ping', (data?: Buffer) => {
       socket.pong?.(data);
       lastFrameAt = Date.now();
+      this.routes.markFrame({
+        provider: 'binance',
+        generation: context.connectionGeneration,
+        at: lastFrameAt,
+      });
       this.health.updateProvider('binance', {
         lastFrameAt: new Date().toISOString(),
         lastHeartbeatAt: new Date().toISOString(),
@@ -304,6 +394,11 @@ export class LiveCandleStreamSupervisorService
     });
     socket.on('message', (data: unknown) => {
       lastFrameAt = Date.now();
+      this.routes.markFrame({
+        provider: 'binance',
+        generation: context.connectionGeneration,
+        at: lastFrameAt,
+      });
       this.health.updateProvider('binance', {
         lastFrameAt: new Date().toISOString(),
       });
@@ -313,16 +408,16 @@ export class LiveCandleStreamSupervisorService
       JSON.stringify({ method: 'SUBSCRIBE', params: streams, id: 1 }),
     );
     this.health.updateProvider('binance', {
-      state: desiredSymbols.length > streams.length ? 'degraded' : 'connected',
+      state:
+        desiredSymbols.length > subscribedSymbols.length
+          ? 'degraded'
+          : 'connected',
       connectedAt: new Date().toISOString(),
       subscriptionsRequested: desiredSymbols.length,
-      subscriptionsActive: streams.length,
-      subscriptionsFailed: desiredSymbols.length - streams.length,
+      subscriptionsActive: subscribedSymbols.length,
+      subscriptionsFailed: cappedSymbols.length,
       delayed: false,
-      lastErrorCode:
-        desiredSymbols.length > streams.length
-          ? 'SUBSCRIPTION_SHARD_CAP'
-          : null,
+      lastErrorCode: cappedSymbols.length > 0 ? 'SUBSCRIPTION_SHARD_CAP' : null,
     });
     await waitForClose(socket);
     clearInterval(heartbeat);
@@ -375,6 +470,7 @@ export class LiveCandleStreamSupervisorService
       0,
       this.config.maxProviderSubscriptionsPerShard,
     );
+    const cappedTargets = desiredTargets.slice(targets.length);
     if (targets.length === 0) throw namedError('KIS_STREAMS_EMPTY');
     const byKey = new Map(
       targets.map(({ asset, target }) => [
@@ -386,6 +482,21 @@ export class LiveCandleStreamSupervisorService
     context.socket = socket;
     await waitForOpen(socket);
     if (context.lost || this.stopping) return;
+    this.routes.markConnectionOpen({
+      provider: 'kis',
+      generation: context.connectionGeneration,
+      at: Date.now(),
+    });
+    this.routes.registerSubscriptionTargets({
+      provider: 'kis',
+      generation: context.connectionGeneration,
+      assets: targets.map(({ asset, target }) =>
+        kisSubscribedAsset(asset, target.trKey),
+      ),
+      cappedAssets: cappedTargets.map(({ asset, target }) =>
+        kisSubscribedAsset(asset, target.trKey),
+      ),
+    });
     let lastFrameAt = Date.now();
     const heartbeat = setInterval(
       () => {
@@ -408,6 +519,11 @@ export class LiveCandleStreamSupervisorService
     socket.on('ping', (data?: Buffer) => {
       socket.pong?.(data);
       lastFrameAt = Date.now();
+      this.routes.markFrame({
+        provider: 'kis',
+        generation: context.connectionGeneration,
+        at: lastFrameAt,
+      });
       this.health.updateProvider('kis', {
         lastFrameAt: new Date().toISOString(),
         lastHeartbeatAt: new Date().toISOString(),
@@ -416,6 +532,11 @@ export class LiveCandleStreamSupervisorService
     });
     socket.on('message', (data: unknown) => {
       lastFrameAt = Date.now();
+      this.routes.markFrame({
+        provider: 'kis',
+        generation: context.connectionGeneration,
+        at: lastFrameAt,
+      });
       this.health.updateProvider('kis', {
         lastFrameAt: new Date().toISOString(),
       });
@@ -435,16 +556,13 @@ export class LiveCandleStreamSupervisorService
       );
     }
     this.health.updateProvider('kis', {
-      state: desiredTargets.length > targets.length ? 'degraded' : 'connected',
+      state: cappedTargets.length > 0 ? 'degraded' : 'connected',
       connectedAt: new Date().toISOString(),
       subscriptionsRequested: desiredTargets.length,
       subscriptionsActive: targets.length,
-      subscriptionsFailed: desiredTargets.length - targets.length,
+      subscriptionsFailed: cappedTargets.length,
       delayed: us.length > 0,
-      lastErrorCode:
-        desiredTargets.length > targets.length
-          ? 'SUBSCRIPTION_SHARD_CAP'
-          : null,
+      lastErrorCode: cappedTargets.length > 0 ? 'SUBSCRIPTION_SHARD_CAP' : null,
     });
     await waitForClose(socket);
     clearInterval(heartbeat);
@@ -453,17 +571,53 @@ export class LiveCandleStreamSupervisorService
 
   private handleBinanceMessage(
     data: unknown,
-    assets: Map<string, LiveCandleAsset>,
+    assets: Map<string, LiveCandleTradeAsset>,
     context: OwnedProviderContext,
   ): void {
     const text = socketDataToText(data);
     if (!text) return this.health.increment('eventsRejected');
-    const parsed = parseBinanceFiveMinuteKline(text);
+    // ONE parse per frame decides the branch: klines feed the candle
+    // pipeline, exact trades feed the limit-order matcher.
+    const parsed = parseBinanceMarketStreamFrame(text);
+    if (parsed.state === 'ack') {
+      // Binance answers one SUBSCRIBE with one result frame; that ack is the
+      // activation signal for every stream in the batch.
+      this.routes.markSubscriptionsActive({
+        provider: 'binance',
+        generation: context.connectionGeneration,
+      });
+      return;
+    }
+    if (parsed.state === 'trade') {
+      const tradeAsset = assets.get(parsed.trade.symbol);
+      if (!tradeAsset) return this.health.increment('eventsRejected');
+      this.publishNormalizedTrade(context, {
+        provider: 'binance',
+        providerEventId: parsed.trade.tradeId,
+        providerSequence: parsed.trade.tradeId,
+        providerConnectionId: context.connectionGeneration,
+        assetId: tradeAsset.id,
+        symbol: tradeAsset.symbol,
+        providerSymbol: parsed.trade.symbol,
+        price: parsed.trade.price,
+        currencyCode: tradeAsset.settlementCurrency,
+        providerEventAt: parsed.trade.tradeTime.toISOString(),
+        receivedAt: new Date().toISOString(),
+        sourceName: 'binance_spot_ws_trade',
+        marketSessionCode: null,
+        eventType: 'trade',
+      });
+      return;
+    }
     if (parsed.state !== 'kline') {
       if (parsed.state === 'failed') {
         this.health.increment('eventsRejected');
         if (parsed.reason === 'BINANCE_SUBSCRIPTION_FAILED') {
           this.recordSubscriptionFailure('binance');
+          this.routes.markSubscriptionsFailed({
+            provider: 'binance',
+            generation: context.connectionGeneration,
+          });
           context.socket?.close(1011, 'subscription rejected');
         }
       }
@@ -516,7 +670,7 @@ export class LiveCandleStreamSupervisorService
 
   private handleKisMessage(
     data: unknown,
-    assets: Map<string, LiveCandleAsset>,
+    assets: Map<string, LiveCandleTradeAsset>,
     context: OwnedProviderContext,
   ): void {
     const text = socketDataToText(data);
@@ -541,6 +695,13 @@ export class LiveCandleStreamSupervisorService
         return;
       }
       if (parsed.state === 'ack') {
+        // KIS acknowledges each subscribe individually and echoes the
+        // tr_key; only that asset becomes ready.
+        this.routes.markSubscriptionsActive({
+          provider: 'kis',
+          generation: context.connectionGeneration,
+          match: subscriptionKeyMatcher(parsed.trKey),
+        });
         this.health.updateProvider('kis', {
           lastControlFrameAt: new Date().toISOString(),
         });
@@ -550,6 +711,11 @@ export class LiveCandleStreamSupervisorService
         this.health.increment('eventsRejected');
         if (parsed.reason === 'KIS_SUBSCRIPTION_ACK_FAILED') {
           this.recordSubscriptionFailure('kis', 1);
+          this.routes.markSubscriptionsFailed({
+            provider: 'kis',
+            generation: context.connectionGeneration,
+            match: subscriptionKeyMatcher(parsed.trKey),
+          });
           this.logReconnect('kis', 'subscription_rejected', Date.now());
           context.socket?.close(1011, 'subscription rejected');
         }
@@ -565,6 +731,28 @@ export class LiveCandleStreamSupervisorService
         continue;
       }
       const eventTime = trade.exchangeTimestamp ?? trade.sourceTimestamp;
+      // The SAME parsed trade record feeds the candle pipeline, the price
+      // display pub/sub, and the limit-order matcher. The frame is parsed
+      // exactly once, above.
+      this.publishNormalizedTrade(context, {
+        provider: 'kis',
+        providerEventId: trade.eventId,
+        providerSequence: trade.sequence,
+        providerConnectionId: context.connectionGeneration,
+        assetId: asset.id,
+        symbol: asset.symbol,
+        providerSymbol: trade.providerSymbol,
+        price: trade.price,
+        currencyCode: asset.settlementCurrency,
+        providerEventAt: (eventTime ?? trade.receivedAt).toISOString(),
+        receivedAt: trade.receivedAt.toISOString(),
+        sourceName:
+          trade.kind === 'domestic_krx_realtime_trade'
+            ? 'kis_krx_realtime_trade'
+            : 'kis_us_delayed_trade',
+        marketSessionCode: trade.marketSessionCode,
+        eventType: 'trade',
+      });
       this.trackEvent('kis', eventTime, async () => {
         const event = this.normalizer.normalizeKis(trade, asset);
         this.pipeline.markProviderConnected({
@@ -675,7 +863,42 @@ export class LiveCandleStreamSupervisorService
     });
   }
 
-  private loadAssets(assetType: AssetType): Promise<LiveCandleAsset[]> {
+  /**
+   * Publishes an exact trade onto the normalized bus, but only while this
+   * supervisor owns the provider's trade route AND automatic matching is on.
+   * Everything the downstream publisher needs about the asset rides along on
+   * the event, so no per-trade `assets` query happens anywhere on this path.
+   */
+  private publishNormalizedTrade(
+    context: OwnedProviderContext,
+    tick: Omit<
+      Parameters<NormalizedProviderTradeEventBus['publish']>[0],
+      'asset'
+    >,
+  ): void {
+    if (!this.ownsTradeRoute(context.provider)) return;
+    const registered = this.routes.resolveAsset(
+      context.provider,
+      tick.assetId,
+      context.connectionGeneration,
+    );
+    // A trade for an asset that is not part of THIS generation's subscription
+    // set is never turned into matching evidence.
+    if (!registered) return;
+    this.tradeEvents.publish({
+      ...tick,
+      asset: {
+        assetId: registered.assetId,
+        symbol: registered.symbol,
+        market: registered.market,
+        assetType: registered.assetType,
+        settlementCurrency: registered.settlementCurrency,
+        generation: context.connectionGeneration,
+      },
+    });
+  }
+
+  private loadAssets(assetType: AssetType): Promise<LiveCandleTradeAsset[]> {
     return this.prisma.asset.findMany({
       where: { isActive: true, assetType },
       select: {
@@ -684,6 +907,7 @@ export class LiveCandleStreamSupervisorService
         assetType: true,
         market: true,
         isActive: true,
+        settlementCurrency: true,
       },
       orderBy: [{ symbol: 'asc' }, { id: 'asc' }],
     });
@@ -775,4 +999,51 @@ function kisAssetKey(
   symbol: string,
 ): string {
   return `${kind}:${marketCode?.trim().toUpperCase() ?? ''}:${symbol.trim().toUpperCase()}`;
+}
+
+function binanceSubscribedAsset(
+  asset: LiveCandleTradeAsset,
+  providerSymbol: string,
+): ProviderSubscribedAsset {
+  return {
+    assetId: asset.id,
+    symbol: asset.symbol,
+    providerSymbol,
+    market: asset.market,
+    assetType: asset.assetType,
+    settlementCurrency: asset.settlementCurrency,
+    sourceName: 'binance_spot_ws_trade',
+  };
+}
+
+function kisSubscribedAsset(
+  asset: LiveCandleTradeAsset,
+  trKey: string,
+): ProviderSubscribedAsset {
+  return {
+    assetId: asset.id,
+    symbol: asset.symbol,
+    providerSymbol: trKey,
+    market: asset.market,
+    assetType: asset.assetType,
+    settlementCurrency: asset.settlementCurrency,
+    sourceName:
+      asset.assetType === AssetType.domestic_stock
+        ? 'kis_krx_realtime_trade'
+        : 'kis_us_delayed_trade',
+  };
+}
+
+/**
+ * KIS echoes the subscribed tr_key on its ack. A null key means the frame did
+ * not identify a target — treat it as covering nothing rather than silently
+ * activating every pending subscription.
+ */
+function subscriptionKeyMatcher(
+  trKey: string | null,
+): (asset: ProviderSubscribedAsset) => boolean {
+  const normalized = trKey?.trim().toUpperCase() ?? '';
+  return (asset) =>
+    normalized.length > 0 &&
+    asset.providerSymbol.trim().toUpperCase() === normalized;
 }

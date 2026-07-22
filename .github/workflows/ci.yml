@@ -119,6 +119,7 @@ jobs:
       # Opt-in switch for the limit-order suites that need a real database.
       LIMIT_ORDER_RESERVATION_DB_INTEGRATION: "1"
       LIMIT_ORDER_AUTO_EXECUTION_INTEGRATION: "1"
+      LIMIT_ORDER_PHASE3_INTEGRATION: "1"
       ORDER_EXECUTE_DB_INTEGRATION: "1"
       FX_EXECUTE_DB_INTEGRATION: "1"
       MVP_FLOW_DB_SMOKE: "1"
@@ -146,8 +147,11 @@ jobs:
       - name: Verify migrations are fully applied
         run: pnpm exec prisma migrate status
       # Reservation atomicity, deterministic lock interleavings, post-lock DB
-      # time boundaries, and the live-trade Redis Stream matcher (including
-      # pending recovery, leader takeover, accounting, and event dedupe).
+      # time boundaries, the live-trade Redis Stream matcher (path A: pending
+      # recovery, leader takeover, accounting, event dedupe, stream-ID
+      # ordering under clock skew), and phase 3 (event-boundary mutex in both
+      # interleavings, path-B confirmed-candle matching, A/B and lifecycle
+      # races, health gate, and a reduced synthetic throughput sweep).
       - name: Limit order PostgreSQL + Redis integration tests
         run: >-
           pnpm exec jest --runInBand
@@ -155,6 +159,7 @@ jobs:
           src/orders/limit-order-create-race.integration.spec.ts
           src/orders/limit-order-transaction-time.integration.spec.ts
           src/orders/limit-order-auto-execution.integration.spec.ts
+          src/orders/limit-order-phase3.integration.spec.ts
           src/orders/orders.execute.integration.spec.ts
           src/fx/fx.execute.integration.spec.ts
           src/mvp-flow.integration.spec.ts
@@ -221,6 +226,15 @@ jobs:
           cat "$RUNNER_TEMP/pre-fixtures.txt"
       - name: Run release fixture smoke (no provider credentials)
         run: CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm run smoke:candle-fixture
+      # Path-B candle eligibility against real canonical closed 5m rows written
+      # by the fixture pipeline: confirmed candle accepted, incomplete/open
+      # candle excluded, evidence recorded, executed price = limit price.
+      - name: Path-B candle eligibility fixture checks
+        run: >-
+          LIMIT_ORDER_AUTO_EXECUTION_ENABLED=true
+          LIMIT_ORDER_CANDLE_RECONCILIATION_ENABLED=true
+          LIMIT_ORDER_CANDLE_FIXTURE_SMOKE=1
+          pnpm run smoke:limit-order-candle-fixture
       # Identify exactly the fixture JSON this run produced (files not present at
       # checkout). Runs on success and failure so a smoke that wrote a report
       # before failing still yields one debuggable file — but never falls back

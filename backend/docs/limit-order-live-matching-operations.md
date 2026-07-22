@@ -1,21 +1,29 @@
 # Limit-buy live-trade matching operations
 
-This document covers phase 2 path A. All HTTP endpoints remain under
-`/api/v1`; there is no `/api/v2` route and no public limit-order execute route.
+This document covers phase 2 path A and the phase-3 hardening that goes with
+it. Path B (the confirmed 5-minute candle safety net) has its own document,
+[limit-order-candle-reconciliation.md](limit-order-candle-reconciliation.md).
+All HTTP endpoints remain under `/api/v1`; there is no `/api/v2` route and no
+public limit-order execute route.
 
 ## Scope and execution policy
 
-The only automatic execution path is:
+The primary automatic execution path is:
 
 `normalized KIS/Binance trade tick -> Redis Stream -> dedicated Poller -> PostgreSQL transaction`
 
 It is not a latest-price database poll, REST quote poll, candle-low match, or
-candle reconciliation. Path B is not implemented. A valid live trade whose
-price is at or below a submitted limit-buy price fills the whole simulated
-order at the event price. Price improvement is allowed. Exchange order-book
-liquidity and provider volume are not allocated; one event may fully fill all
-eligible orders. KIS and Binance supply market data only—no provider order API
-is called.
+candle reconciliation. A valid live trade whose price is at or below a
+submitted limit-buy price fills the whole simulated order at the event price.
+Price improvement is allowed. Exchange order-book liquidity and provider volume
+are not allocated; one event may fully fill all eligible orders. KIS and
+Binance supply market data only—no provider order API is called.
+
+Path A always has priority. Path B exists only for the case where a real trade
+did touch the limit but its event never reached the Redis Stream, and it never
+improves on the limit price. Path B cannot be enabled without path A;
+`LIMIT_ORDER_CANDLE_RECONCILIATION_ENABLED=true` with
+`LIMIT_ORDER_AUTO_EXECUTION_ENABLED=false` aborts startup.
 
 Supported orders are buy/limit/full-fill only and behave as GTC until the
 season ends. Limit sells, partial fills, IOC/FOK/DAY/stop orders and historical
@@ -45,17 +53,134 @@ quote state before resetting the form. Limit quote/success UI says “estimated�
 for gross and fee and shows the reservation; market-only execution-price,
 max-change-bps, and post-fill-position wording is hidden.
 
+## Event-boundary mutex (phase 3)
+
+Create records "every stream entry after ID X activates this order" but
+publishes nothing itself. Without a mutex this interleaving loses an event
+permanently:
+
+1. Create reads the Redis tail = `A`
+2. price event `B` is XADDed
+3. the poller reads `B`, finds no candidates (the order is uncommitted)
+4. the poller records `B` as processed and ACKs it
+5. Create commits the order with `matchingActivationStreamId = A`
+
+`B` is strictly after activation, so it should have filled the order, but it is
+already durably processed and can never be re-delivered.
+
+`LimitOrderMatchBoundaryService` closes this with a PostgreSQL advisory lock
+(namespace `1244660901`, key `2` — distinct from the matcher leader key `1`).
+Redis locks and in-process mutexes are deliberately not used: a Redis lock
+cannot be tied to a PostgreSQL transaction's commit, and a process-local mutex
+does not span instances.
+
+- **Create** takes `pg_advisory_xact_lock` as the FIRST statement of its
+  transaction, so it is released exactly at commit — the same instant the
+  order row becomes visible to the candidate query.
+- **The path-A poller and the path-B candle worker** take `pg_advisory_lock`
+  on a DEDICATED PostgreSQL connection (never a Prisma pool connection). If
+  the worker process dies, PostgreSQL tears the session down and releases the
+  lock server-side. There is no lease and no TTL.
+
+Only two orderings remain, and both are correct:
+
+| Interleaving | Result |
+| --- | --- |
+| Create first | The poller cannot observe `B` until the order row is committed and visible, so `B` fills it. |
+| Poller first | `B` is fully processed before Create reads the tail, so Create's cursor already includes `B` and `B` can never fill the new order. |
+
+**Lock order is not negotiable.** Every participant takes the boundary BEFORE
+any row lock: `boundary -> Quote -> SeasonParticipant -> Season -> Wallet` for
+Create, `boundary -> SeasonParticipant -> Season -> Order -> Wallet` for both
+workers. Acquiring the boundary after a row lock would create a cycle that
+PostgreSQL's deadlock detector cannot even see, because the worker holds its
+boundary lock on a different session than the one doing the row work.
+
+The Redis ACK happens strictly AFTER the durable processed-event row and
+strictly OUTSIDE the mutex, so a crash re-delivers the event instead of losing
+it, and a create never waits on a Redis round trip.
+
+## Stream-ID ordering and clock skew (phase 3)
+
+Activation ordering is decided by the Redis Stream ID alone:
+
+```
+event.streamId > order.matchingActivationStreamId
+```
+
+The former `order.submittedAt <= event.receivedAt` rule was REMOVED.
+`Order.submittedAt` is a PostgreSQL `clock_timestamp()` while
+`event.receivedAt` is a Node process clock; comparing them across two hosts
+dropped perfectly valid events purely from clock skew. A Redis Stream ID is a
+single-writer monotonic sequence produced by one Redis instance and needs no
+clock agreement at all.
+
+Timestamps remain for audit, display, anomaly detection and operational
+analysis. The validator still rejects obviously broken values — a
+provider/received/published timestamp more than 60s in the future, or
+`publishedAt < receivedAt` — but that is a sanity bound on corrupt payloads,
+NOT a skew tolerance used to decide eligibility, and it is deliberately not
+widened to paper over a mis-set clock.
+
 ## Event source and schema
 
-No extra provider connection is opened. KIS publishes after its validated
-trade has resolved to an asset in `KisWebSocketStreamingService`. Binance adds
-the exact `@trade` subscription beside the existing `@ticker` subscriptions on
-the same WebSocket and publishes after asset resolution in
-`BinanceWebSocketStreamingService`. Each provider serializes its trade work in
-frame-arrival order, and the common Publisher serializes asset validation plus
-XADD, so asynchronous DB responses cannot reverse two events before Redis.
-Bid, ask, book, candle, REST-current-price, admin and batch values never enter
-this stream.
+No extra provider connection is opened, and exactly one source publishes per
+provider. `ProviderTradeRouteRegistry` holds that claim.
+
+- **When the live-candle supervisor owns a provider** (live candles enabled for
+  it), that connection is the canonical exact-trade source. For KIS the SAME
+  parsed trade record feeds the candle pipeline, the price-display pub/sub and
+  the limit-order matcher — the frame is parsed exactly once. For Binance the
+  supervisor subscribes `<symbol>@trade` alongside `<symbol>@kline_5m` on the
+  SAME socket when automatic matching is on; klines go to the candle pipeline
+  and trades to the matcher, with no second Binance WebSocket.
+- **When the supervisor is inactive** for a provider, the legacy streaming
+  service claims the route and remains the fallback canonical source: KIS
+  publishes after its validated trade resolves to an asset, Binance publishes
+  from its `@trade` subscription beside `@ticker`.
+- The non-owning source neither connects nor publishes, so a duplicate socket
+  and a duplicate exact-trade event are both impossible.
+
+Each provider serializes its trade work in frame-arrival order, and the common
+Publisher serializes XADD, so asynchronous responses cannot reverse two events
+before Redis. Bid, ask, book, candle, REST-current-price, admin and batch
+values never enter this stream.
+
+## Per-asset subscription readiness (phase 3)
+
+"The provider socket is connected" does not mean the asset a user is trading is
+subscribed. `assertAvailable({ assetId, symbol, market, assetType })` now
+requires, for the asset itself:
+
+- a claimed canonical route and an established connection,
+- the asset present in the CURRENT connection generation's subscription set,
+- the subscribe request sent AND acknowledged (KIS acknowledges per `tr_key`;
+  Binance acknowledges one SUBSCRIBE batch with one result frame),
+- not dropped by `maxProviderSubscriptionsPerShard`,
+- a frame seen within `LIMIT_ORDER_PROVIDER_LIVENESS_MAX_AGE_MS`.
+
+A reconnect mints a new connection generation, which discards every previous
+readiness: nothing is tradable again until the new socket re-subscribes and is
+re-acknowledged. Failures are distinguished by code —
+`LIMIT_ORDER_PROVIDER_NOT_SUBSCRIBED`,
+`LIMIT_ORDER_PROVIDER_SUBSCRIPTION_FAILED`,
+`LIMIT_ORDER_PROVIDER_UNAVAILABLE` — all HTTP 503. When
+`LIMIT_ORDER_AUTO_EXECUTION_ENABLED=false` the reservation-only policy applies
+and none of this gates anything.
+
+## No per-event database lookups (phase 3)
+
+The canonical connection reads each asset's `id/symbol/market/assetType/
+settlementCurrency` once, when it builds the subscription for the current
+connection generation, and registers it. Those values ride on the normalized
+tick, so the Publisher performs ZERO database queries per trade. The poller
+serves its route/session validation from a bounded, short-TTL cache
+(`LIMIT_ORDER_ASSET_CACHE_TTL_MS`, `LIMIT_ORDER_ASSET_CACHE_MAX_ENTRIES`)
+keyed by asset id.
+
+Both are routing optimisations only. The candidate query joins `assets` and
+the execution transaction re-reads and re-validates the asset under its row
+locks, so a stale cache entry can never authorise a fill.
 
 Redis stores a secret-free JSON payload plus `eventId`. Schema version 1 has:
 
@@ -195,20 +320,70 @@ executed state.
 ## Health and fail-closed behavior
 
 The leader writes an `OpsJobRun(limit_order_matcher)` heartbeat containing the
-leader instance, last Redis read/success/ACK, pending count, lag, first/last
-stream IDs and degraded reason. When auto execution is on, new limit Quote and
-Create require a fresh running DB heartbeat, an active normalized-event
-Publisher subscription, and a connected KIS/Binance stream for the requested
-asset type. Redis activation-cursor failure also blocks Create. Existing order
-reads and Cancel, participant/season cleanup, market orders, and FX do not use
-this gate.
+leader instance, leader start time, last Redis read/success/ACK plus the ACK
+timestamp, pending count, oldest pending age, lag, first/last stream IDs,
+stream length, retention headroom ratio, processed-event growth statistics and
+degraded reason.
+
+Phase 3 replaced the "a heartbeat exists" gate with an explicit set of
+fail-closed conditions. New limit Quote/Create are refused when:
+
+| Condition | Env | Error code |
+| --- | --- | --- |
+| no fresh running heartbeat | `LIMIT_ORDER_MATCHER_HEALTH_MAX_AGE_MS` | `LIMIT_ORDER_MATCHER_UNAVAILABLE` |
+| leader reported a degraded reason | — | `LIMIT_ORDER_MATCHER_DEGRADED` |
+| consumer lag too high | `LIMIT_ORDER_MATCHER_MAX_LAG` | `LIMIT_ORDER_MATCHER_LAG_EXCEEDED` |
+| un-ACKed backlog too large | `LIMIT_ORDER_MATCHER_MAX_PENDING` | `LIMIT_ORDER_MATCHER_PENDING_EXCEEDED` |
+| oldest pending entry too old | `LIMIT_ORDER_MATCHER_MAX_OLDEST_PENDING_AGE_MS` | `LIMIT_ORDER_MATCHER_PENDING_STALE` |
+| backlog exists and last ACK is stale | `LIMIT_ORDER_MATCHER_MAX_ACK_AGE_MS` | `LIMIT_ORDER_MATCHER_ACK_STALE` |
+| stream grew into its trim window | `LIMIT_ORDER_EVENT_RETENTION_HEADROOM_RATIO` | `LIMIT_ORDER_EVENT_RETENTION_HEADROOM_LOW` |
+| no active publisher / provider route | — | `LIMIT_ORDER_PROVIDER_UNAVAILABLE` |
+| requested asset not subscribed | — | `LIMIT_ORDER_PROVIDER_NOT_SUBSCRIBED` |
+| requested asset's subscription rejected | — | `LIMIT_ORDER_PROVIDER_SUBSCRIPTION_FAILED` |
+
+**A quiet market is not a failure.** ACK staleness is only judged when there is
+actually a backlog (`pendingCount > 0` or `lag > 0`); an idle matcher with an
+hours-old last ACK passes. Before a newly elected leader's first ACK the age is
+measured from its start time, so a cold start into a backlog is not reported as
+a stall.
+
+Redis activation-cursor failure also blocks Create. Existing order reads and
+Cancel, participant/season cleanup, market orders, and FX never use this gate.
 
 Relevant errors include `LIMIT_ORDER_MATCHER_UNAVAILABLE`,
 `LIMIT_ORDER_EVENT_STREAM_UNAVAILABLE`, `LIMIT_ORDER_EVENT_INVALID`,
 `LIMIT_ORDER_EVENT_GAP_DETECTED`, `LIMIT_ORDER_EXECUTION_CONFLICT`,
 `LIMIT_ORDER_EXECUTION_RESERVATION_INSUFFICIENT`,
-`LIMIT_ORDER_EXECUTION_WALLET_INCONSISTENT`, and
-`LIMIT_ORDER_EXECUTION_PATH_NOT_SUPPORTED`.
+`LIMIT_ORDER_EXECUTION_WALLET_INCONSISTENT`,
+`LIMIT_ORDER_EXECUTION_PATH_NOT_SUPPORTED`, and (path B)
+`LIMIT_ORDER_CANDLE_RESERVATION_MISMATCH`.
+
+## Processed-event growth policy
+
+`limit_order_processed_events` is append-only and is what stops a duplicate
+XADD from filling an order created after the original event was processed.
+
+**No retention deletion is implemented, deliberately.** Deleting an event id
+would allow a later re-delivery of that same id to be treated as new and fill
+orders created after the original processing. Ruling that out would require
+proving all of: the reuse window of every provider's trade id (KIS supplies no
+documented global uniqueness guarantee for its realtime trade keys, and our
+fallback ids are content hashes that repeat for identical prints), the maximum
+Redis Stream retention, and the maximum lifetime of a submitted order (GTC —
+bounded only by season end, which operators can extend). Those cannot be
+bounded today, so the correctness proof cannot be written and the rows stay.
+
+Instead the growth is measured and reported on the matcher heartbeat every
+60 seconds: row count, oldest/newest `processedAt`, last-hour and last-day
+insert counts, table size and index size. A BRIN index on `processed_at` keeps
+those aggregates cheap on an append-only, time-correlated table.
+
+Capacity planning: one row is roughly 120–200 bytes including index overhead.
+At a sustained 100 events/s that is ~8.6M rows/day (~1–2 GB/day), so operators
+should alert on `lastDayCount` and `tableBytes` and plan a `processed_at`
+range partition before enabling high-rate assets. Partitioning (dropping whole
+old partitions only once an equivalent bound on order lifetime and provider id
+reuse exists) is the intended future step; ad-hoc TTL deletion is not.
 
 ## Flags and rollout
 
@@ -242,14 +417,32 @@ operator decision. Do not infer fills from current prices or candles.
 ## Verification
 
 CI runs PostgreSQL 16 and Redis 7 with migrations, migration status,
-reservation/race/time-boundary tests, and
-`limit-order-auto-execution.integration.spec.ts`. The latter proves advisory
-leader takeover, XAUTOCLAIM pending recovery, normal execution, price
-improvement accounting, above-limit non-fill, evidence sharing, durable event
-dedupe, pre-submission event exclusion, protection of later orders from
-duplicate events, both transaction-order outcomes for Cancel/exclusion/season
-end, Redis outage degradation, and retention-gap fail-closed behavior.
-External KIS or Binance credentials are not used.
+reservation/race/time-boundary tests, and both integration runners.
+
+`limit-order-auto-execution.integration.spec.ts` proves advisory leader
+takeover, XAUTOCLAIM pending recovery, normal execution, price improvement
+accounting, above-limit non-fill, evidence sharing, durable event dedupe,
+stream-ID ordering under DB/app clock skew (an event stamped BEFORE the order
+still fills it), exclusion of events before the activation cursor, protection
+of later orders from duplicate events, both transaction-order outcomes for
+Cancel/exclusion/season end, Redis outage degradation, and retention-gap
+fail-closed behavior.
+
+`limit-order-phase3.integration.spec.ts` proves the event-boundary mutex in
+both interleavings plus dedicated-session crash release (verified through
+`pg_locks`, never through sleep), path-B matching end to end, the
+first-eligible-candle boundary, path A vs path B, cancel/exclusion/season-end
+races, processed-candle idempotence and crashed-sweep re-run, the health gate
+thresholds, and a synthetic 50-asset throughput sweep that asserts ZERO
+per-event asset database queries.
+
+Measured on the reference developer machine (PostgreSQL 16 + Redis 7,
+localhost, 50 assets x 20 events): 1000 events in 298ms — 3356 events/s,
+XADD latency avg 0.30ms / p95 1ms / max 2ms, 0 asset database queries,
+70 MB heap. CI runs the same sweep as a reduced smoke; `pnpm run
+soak:limit-order-throughput` runs it standalone.
+
+External KIS or Binance credentials are not used anywhere.
 
 The record screen polls every four seconds only while focused, foregrounded,
 and holding a submitted limit order. A terminal transition invalidates order,
@@ -260,17 +453,18 @@ user-specific order WebSocket.
 
 - limit sells and partial fills are unsupported;
 - exchange order-book liquidity and actual trade volume are not allocated;
-- path B candle matching and historical missed-touch reconstruction are not
-  implemented;
 - Cancel versus execution is decided by the PostgreSQL order-row lock winner;
 - events are not retroactively filled after season end, and there is no final
   season drain;
 - order-state updates have no user-specific WebSocket and rely on conditional
   foreground polling;
-- automatic matching currently depends on the existing KIS/Binance price
-  streaming services; configurations that disable those services in favor of
-  a separate live-candle connection fail new limit Quote/Create closed rather
-  than silently accepting unmatchable orders;
+- automatic matching requires a canonical provider connection that has the
+  requested asset subscribed and acknowledged; the live-candle supervisor and
+  the legacy streaming service can each be that source, but never both for one
+  provider, and an unsubscribed asset fails new limit Quote/Create closed
+  rather than silently accepting an unmatchable order;
+- `limit_order_processed_events` has no retention deletion; long-term capacity
+  needs monitoring and eventually partitioning (see above);
 - Redis Stream retention/outage can preserve pending entries but cannot
   recreate provider events that were never successfully XADDed, so a detected
   gap requires operator intervention rather than a price/candle estimate; and

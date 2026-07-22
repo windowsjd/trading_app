@@ -325,6 +325,8 @@ export type MarketCandleWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"MarketCandle"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"MarketCandle"> | Date | string
   asset?: Prisma.XOR<Prisma.AssetScalarRelationFilter, Prisma.AssetWhereInput>
+  limitOrderEvidence?: Prisma.LimitOrderCandleEvidenceListRelationFilter
+  limitOrderProcessedBy?: Prisma.LimitOrderProcessedCandleListRelationFilter
 }
 
 export type MarketCandleOrderByWithRelationInput = {
@@ -345,6 +347,8 @@ export type MarketCandleOrderByWithRelationInput = {
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   asset?: Prisma.AssetOrderByWithRelationInput
+  limitOrderEvidence?: Prisma.LimitOrderCandleEvidenceOrderByRelationAggregateInput
+  limitOrderProcessedBy?: Prisma.LimitOrderProcessedCandleOrderByRelationAggregateInput
 }
 
 export type MarketCandleWhereUniqueInput = Prisma.AtLeast<{
@@ -369,6 +373,8 @@ export type MarketCandleWhereUniqueInput = Prisma.AtLeast<{
   createdAt?: Prisma.DateTimeFilter<"MarketCandle"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"MarketCandle"> | Date | string
   asset?: Prisma.XOR<Prisma.AssetScalarRelationFilter, Prisma.AssetWhereInput>
+  limitOrderEvidence?: Prisma.LimitOrderCandleEvidenceListRelationFilter
+  limitOrderProcessedBy?: Prisma.LimitOrderProcessedCandleListRelationFilter
 }, "id" | "assetId_interval_openTime">
 
 export type MarketCandleOrderByWithAggregationInput = {
@@ -434,6 +440,8 @@ export type MarketCandleCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   asset: Prisma.AssetCreateNestedOneWithoutMarketCandlesInput
+  limitOrderEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedManyWithoutMarketCandleInput
+  limitOrderProcessedBy?: Prisma.LimitOrderProcessedCandleCreateNestedManyWithoutMarketCandleInput
 }
 
 export type MarketCandleUncheckedCreateInput = {
@@ -453,6 +461,8 @@ export type MarketCandleUncheckedCreateInput = {
   sourceUpdatedAt: Date | string
   createdAt?: Date | string
   updatedAt?: Date | string
+  limitOrderEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedCreateNestedManyWithoutMarketCandleInput
+  limitOrderProcessedBy?: Prisma.LimitOrderProcessedCandleUncheckedCreateNestedManyWithoutMarketCandleInput
 }
 
 export type MarketCandleUpdateInput = {
@@ -472,6 +482,8 @@ export type MarketCandleUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   asset?: Prisma.AssetUpdateOneRequiredWithoutMarketCandlesNestedInput
+  limitOrderEvidence?: Prisma.LimitOrderCandleEvidenceUpdateManyWithoutMarketCandleNestedInput
+  limitOrderProcessedBy?: Prisma.LimitOrderProcessedCandleUpdateManyWithoutMarketCandleNestedInput
 }
 
 export type MarketCandleUncheckedUpdateInput = {
@@ -491,6 +503,8 @@ export type MarketCandleUncheckedUpdateInput = {
   sourceUpdatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  limitOrderEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedUpdateManyWithoutMarketCandleNestedInput
+  limitOrderProcessedBy?: Prisma.LimitOrderProcessedCandleUncheckedUpdateManyWithoutMarketCandleNestedInput
 }
 
 export type MarketCandleCreateManyInput = {
@@ -640,6 +654,11 @@ export type MarketCandleSumOrderByAggregateInput = {
   amount?: Prisma.SortOrder
 }
 
+export type MarketCandleScalarRelationFilter = {
+  is?: Prisma.MarketCandleWhereInput
+  isNot?: Prisma.MarketCandleWhereInput
+}
+
 export type MarketCandleCreateNestedManyWithoutAssetInput = {
   create?: Prisma.XOR<Prisma.MarketCandleCreateWithoutAssetInput, Prisma.MarketCandleUncheckedCreateWithoutAssetInput> | Prisma.MarketCandleCreateWithoutAssetInput[] | Prisma.MarketCandleUncheckedCreateWithoutAssetInput[]
   connectOrCreate?: Prisma.MarketCandleCreateOrConnectWithoutAssetInput | Prisma.MarketCandleCreateOrConnectWithoutAssetInput[]
@@ -682,6 +701,34 @@ export type MarketCandleUncheckedUpdateManyWithoutAssetNestedInput = {
   deleteMany?: Prisma.MarketCandleScalarWhereInput | Prisma.MarketCandleScalarWhereInput[]
 }
 
+export type MarketCandleCreateNestedOneWithoutLimitOrderEvidenceInput = {
+  create?: Prisma.XOR<Prisma.MarketCandleCreateWithoutLimitOrderEvidenceInput, Prisma.MarketCandleUncheckedCreateWithoutLimitOrderEvidenceInput>
+  connectOrCreate?: Prisma.MarketCandleCreateOrConnectWithoutLimitOrderEvidenceInput
+  connect?: Prisma.MarketCandleWhereUniqueInput
+}
+
+export type MarketCandleUpdateOneRequiredWithoutLimitOrderEvidenceNestedInput = {
+  create?: Prisma.XOR<Prisma.MarketCandleCreateWithoutLimitOrderEvidenceInput, Prisma.MarketCandleUncheckedCreateWithoutLimitOrderEvidenceInput>
+  connectOrCreate?: Prisma.MarketCandleCreateOrConnectWithoutLimitOrderEvidenceInput
+  upsert?: Prisma.MarketCandleUpsertWithoutLimitOrderEvidenceInput
+  connect?: Prisma.MarketCandleWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.MarketCandleUpdateToOneWithWhereWithoutLimitOrderEvidenceInput, Prisma.MarketCandleUpdateWithoutLimitOrderEvidenceInput>, Prisma.MarketCandleUncheckedUpdateWithoutLimitOrderEvidenceInput>
+}
+
+export type MarketCandleCreateNestedOneWithoutLimitOrderProcessedByInput = {
+  create?: Prisma.XOR<Prisma.MarketCandleCreateWithoutLimitOrderProcessedByInput, Prisma.MarketCandleUncheckedCreateWithoutLimitOrderProcessedByInput>
+  connectOrCreate?: Prisma.MarketCandleCreateOrConnectWithoutLimitOrderProcessedByInput
+  connect?: Prisma.MarketCandleWhereUniqueInput
+}
+
+export type MarketCandleUpdateOneRequiredWithoutLimitOrderProcessedByNestedInput = {
+  create?: Prisma.XOR<Prisma.MarketCandleCreateWithoutLimitOrderProcessedByInput, Prisma.MarketCandleUncheckedCreateWithoutLimitOrderProcessedByInput>
+  connectOrCreate?: Prisma.MarketCandleCreateOrConnectWithoutLimitOrderProcessedByInput
+  upsert?: Prisma.MarketCandleUpsertWithoutLimitOrderProcessedByInput
+  connect?: Prisma.MarketCandleWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.MarketCandleUpdateToOneWithWhereWithoutLimitOrderProcessedByInput, Prisma.MarketCandleUpdateWithoutLimitOrderProcessedByInput>, Prisma.MarketCandleUncheckedUpdateWithoutLimitOrderProcessedByInput>
+}
+
 export type MarketCandleCreateWithoutAssetInput = {
   id?: string
   interval: string
@@ -698,6 +745,8 @@ export type MarketCandleCreateWithoutAssetInput = {
   sourceUpdatedAt: Date | string
   createdAt?: Date | string
   updatedAt?: Date | string
+  limitOrderEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedManyWithoutMarketCandleInput
+  limitOrderProcessedBy?: Prisma.LimitOrderProcessedCandleCreateNestedManyWithoutMarketCandleInput
 }
 
 export type MarketCandleUncheckedCreateWithoutAssetInput = {
@@ -716,6 +765,8 @@ export type MarketCandleUncheckedCreateWithoutAssetInput = {
   sourceUpdatedAt: Date | string
   createdAt?: Date | string
   updatedAt?: Date | string
+  limitOrderEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedCreateNestedManyWithoutMarketCandleInput
+  limitOrderProcessedBy?: Prisma.LimitOrderProcessedCandleUncheckedCreateNestedManyWithoutMarketCandleInput
 }
 
 export type MarketCandleCreateOrConnectWithoutAssetInput = {
@@ -766,6 +817,198 @@ export type MarketCandleScalarWhereInput = {
   updatedAt?: Prisma.DateTimeFilter<"MarketCandle"> | Date | string
 }
 
+export type MarketCandleCreateWithoutLimitOrderEvidenceInput = {
+  id?: string
+  interval: string
+  openTime: Date | string
+  closeTime: Date | string
+  open: runtime.Decimal | runtime.DecimalJsLike | number | string
+  high: runtime.Decimal | runtime.DecimalJsLike | number | string
+  low: runtime.Decimal | runtime.DecimalJsLike | number | string
+  close: runtime.Decimal | runtime.DecimalJsLike | number | string
+  volume: runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  isClosed: boolean
+  sourceProvider: string
+  sourceUpdatedAt: Date | string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  asset: Prisma.AssetCreateNestedOneWithoutMarketCandlesInput
+  limitOrderProcessedBy?: Prisma.LimitOrderProcessedCandleCreateNestedManyWithoutMarketCandleInput
+}
+
+export type MarketCandleUncheckedCreateWithoutLimitOrderEvidenceInput = {
+  id?: string
+  assetId: string
+  interval: string
+  openTime: Date | string
+  closeTime: Date | string
+  open: runtime.Decimal | runtime.DecimalJsLike | number | string
+  high: runtime.Decimal | runtime.DecimalJsLike | number | string
+  low: runtime.Decimal | runtime.DecimalJsLike | number | string
+  close: runtime.Decimal | runtime.DecimalJsLike | number | string
+  volume: runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  isClosed: boolean
+  sourceProvider: string
+  sourceUpdatedAt: Date | string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  limitOrderProcessedBy?: Prisma.LimitOrderProcessedCandleUncheckedCreateNestedManyWithoutMarketCandleInput
+}
+
+export type MarketCandleCreateOrConnectWithoutLimitOrderEvidenceInput = {
+  where: Prisma.MarketCandleWhereUniqueInput
+  create: Prisma.XOR<Prisma.MarketCandleCreateWithoutLimitOrderEvidenceInput, Prisma.MarketCandleUncheckedCreateWithoutLimitOrderEvidenceInput>
+}
+
+export type MarketCandleUpsertWithoutLimitOrderEvidenceInput = {
+  update: Prisma.XOR<Prisma.MarketCandleUpdateWithoutLimitOrderEvidenceInput, Prisma.MarketCandleUncheckedUpdateWithoutLimitOrderEvidenceInput>
+  create: Prisma.XOR<Prisma.MarketCandleCreateWithoutLimitOrderEvidenceInput, Prisma.MarketCandleUncheckedCreateWithoutLimitOrderEvidenceInput>
+  where?: Prisma.MarketCandleWhereInput
+}
+
+export type MarketCandleUpdateToOneWithWhereWithoutLimitOrderEvidenceInput = {
+  where?: Prisma.MarketCandleWhereInput
+  data: Prisma.XOR<Prisma.MarketCandleUpdateWithoutLimitOrderEvidenceInput, Prisma.MarketCandleUncheckedUpdateWithoutLimitOrderEvidenceInput>
+}
+
+export type MarketCandleUpdateWithoutLimitOrderEvidenceInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  interval?: Prisma.StringFieldUpdateOperationsInput | string
+  openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  closeTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  open?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  high?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  low?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  close?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  volume?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  isClosed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sourceProvider?: Prisma.StringFieldUpdateOperationsInput | string
+  sourceUpdatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  asset?: Prisma.AssetUpdateOneRequiredWithoutMarketCandlesNestedInput
+  limitOrderProcessedBy?: Prisma.LimitOrderProcessedCandleUpdateManyWithoutMarketCandleNestedInput
+}
+
+export type MarketCandleUncheckedUpdateWithoutLimitOrderEvidenceInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  assetId?: Prisma.StringFieldUpdateOperationsInput | string
+  interval?: Prisma.StringFieldUpdateOperationsInput | string
+  openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  closeTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  open?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  high?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  low?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  close?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  volume?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  isClosed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sourceProvider?: Prisma.StringFieldUpdateOperationsInput | string
+  sourceUpdatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  limitOrderProcessedBy?: Prisma.LimitOrderProcessedCandleUncheckedUpdateManyWithoutMarketCandleNestedInput
+}
+
+export type MarketCandleCreateWithoutLimitOrderProcessedByInput = {
+  id?: string
+  interval: string
+  openTime: Date | string
+  closeTime: Date | string
+  open: runtime.Decimal | runtime.DecimalJsLike | number | string
+  high: runtime.Decimal | runtime.DecimalJsLike | number | string
+  low: runtime.Decimal | runtime.DecimalJsLike | number | string
+  close: runtime.Decimal | runtime.DecimalJsLike | number | string
+  volume: runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  isClosed: boolean
+  sourceProvider: string
+  sourceUpdatedAt: Date | string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  asset: Prisma.AssetCreateNestedOneWithoutMarketCandlesInput
+  limitOrderEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedManyWithoutMarketCandleInput
+}
+
+export type MarketCandleUncheckedCreateWithoutLimitOrderProcessedByInput = {
+  id?: string
+  assetId: string
+  interval: string
+  openTime: Date | string
+  closeTime: Date | string
+  open: runtime.Decimal | runtime.DecimalJsLike | number | string
+  high: runtime.Decimal | runtime.DecimalJsLike | number | string
+  low: runtime.Decimal | runtime.DecimalJsLike | number | string
+  close: runtime.Decimal | runtime.DecimalJsLike | number | string
+  volume: runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  isClosed: boolean
+  sourceProvider: string
+  sourceUpdatedAt: Date | string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  limitOrderEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedCreateNestedManyWithoutMarketCandleInput
+}
+
+export type MarketCandleCreateOrConnectWithoutLimitOrderProcessedByInput = {
+  where: Prisma.MarketCandleWhereUniqueInput
+  create: Prisma.XOR<Prisma.MarketCandleCreateWithoutLimitOrderProcessedByInput, Prisma.MarketCandleUncheckedCreateWithoutLimitOrderProcessedByInput>
+}
+
+export type MarketCandleUpsertWithoutLimitOrderProcessedByInput = {
+  update: Prisma.XOR<Prisma.MarketCandleUpdateWithoutLimitOrderProcessedByInput, Prisma.MarketCandleUncheckedUpdateWithoutLimitOrderProcessedByInput>
+  create: Prisma.XOR<Prisma.MarketCandleCreateWithoutLimitOrderProcessedByInput, Prisma.MarketCandleUncheckedCreateWithoutLimitOrderProcessedByInput>
+  where?: Prisma.MarketCandleWhereInput
+}
+
+export type MarketCandleUpdateToOneWithWhereWithoutLimitOrderProcessedByInput = {
+  where?: Prisma.MarketCandleWhereInput
+  data: Prisma.XOR<Prisma.MarketCandleUpdateWithoutLimitOrderProcessedByInput, Prisma.MarketCandleUncheckedUpdateWithoutLimitOrderProcessedByInput>
+}
+
+export type MarketCandleUpdateWithoutLimitOrderProcessedByInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  interval?: Prisma.StringFieldUpdateOperationsInput | string
+  openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  closeTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  open?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  high?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  low?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  close?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  volume?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  isClosed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sourceProvider?: Prisma.StringFieldUpdateOperationsInput | string
+  sourceUpdatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  asset?: Prisma.AssetUpdateOneRequiredWithoutMarketCandlesNestedInput
+  limitOrderEvidence?: Prisma.LimitOrderCandleEvidenceUpdateManyWithoutMarketCandleNestedInput
+}
+
+export type MarketCandleUncheckedUpdateWithoutLimitOrderProcessedByInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  assetId?: Prisma.StringFieldUpdateOperationsInput | string
+  interval?: Prisma.StringFieldUpdateOperationsInput | string
+  openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  closeTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  open?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  high?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  low?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  close?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  volume?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  isClosed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sourceProvider?: Prisma.StringFieldUpdateOperationsInput | string
+  sourceUpdatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  limitOrderEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedUpdateManyWithoutMarketCandleNestedInput
+}
+
 export type MarketCandleCreateManyAssetInput = {
   id?: string
   interval: string
@@ -800,6 +1043,8 @@ export type MarketCandleUpdateWithoutAssetInput = {
   sourceUpdatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  limitOrderEvidence?: Prisma.LimitOrderCandleEvidenceUpdateManyWithoutMarketCandleNestedInput
+  limitOrderProcessedBy?: Prisma.LimitOrderProcessedCandleUpdateManyWithoutMarketCandleNestedInput
 }
 
 export type MarketCandleUncheckedUpdateWithoutAssetInput = {
@@ -818,6 +1063,8 @@ export type MarketCandleUncheckedUpdateWithoutAssetInput = {
   sourceUpdatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  limitOrderEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedUpdateManyWithoutMarketCandleNestedInput
+  limitOrderProcessedBy?: Prisma.LimitOrderProcessedCandleUncheckedUpdateManyWithoutMarketCandleNestedInput
 }
 
 export type MarketCandleUncheckedUpdateManyWithoutAssetInput = {
@@ -839,6 +1086,44 @@ export type MarketCandleUncheckedUpdateManyWithoutAssetInput = {
 }
 
 
+/**
+ * Count Type MarketCandleCountOutputType
+ */
+
+export type MarketCandleCountOutputType = {
+  limitOrderEvidence: number
+  limitOrderProcessedBy: number
+}
+
+export type MarketCandleCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  limitOrderEvidence?: boolean | MarketCandleCountOutputTypeCountLimitOrderEvidenceArgs
+  limitOrderProcessedBy?: boolean | MarketCandleCountOutputTypeCountLimitOrderProcessedByArgs
+}
+
+/**
+ * MarketCandleCountOutputType without action
+ */
+export type MarketCandleCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the MarketCandleCountOutputType
+   */
+  select?: Prisma.MarketCandleCountOutputTypeSelect<ExtArgs> | null
+}
+
+/**
+ * MarketCandleCountOutputType without action
+ */
+export type MarketCandleCountOutputTypeCountLimitOrderEvidenceArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.LimitOrderCandleEvidenceWhereInput
+}
+
+/**
+ * MarketCandleCountOutputType without action
+ */
+export type MarketCandleCountOutputTypeCountLimitOrderProcessedByArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.LimitOrderProcessedCandleWhereInput
+}
+
 
 export type MarketCandleSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -858,6 +1143,9 @@ export type MarketCandleSelect<ExtArgs extends runtime.Types.Extensions.Internal
   createdAt?: boolean
   updatedAt?: boolean
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
+  limitOrderEvidence?: boolean | Prisma.MarketCandle$limitOrderEvidenceArgs<ExtArgs>
+  limitOrderProcessedBy?: boolean | Prisma.MarketCandle$limitOrderProcessedByArgs<ExtArgs>
+  _count?: boolean | Prisma.MarketCandleCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["marketCandle"]>
 
 export type MarketCandleSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -922,6 +1210,9 @@ export type MarketCandleSelectScalar = {
 export type MarketCandleOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "assetId" | "interval" | "openTime" | "closeTime" | "open" | "high" | "low" | "close" | "volume" | "amount" | "isClosed" | "sourceProvider" | "sourceUpdatedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["marketCandle"]>
 export type MarketCandleInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
+  limitOrderEvidence?: boolean | Prisma.MarketCandle$limitOrderEvidenceArgs<ExtArgs>
+  limitOrderProcessedBy?: boolean | Prisma.MarketCandle$limitOrderProcessedByArgs<ExtArgs>
+  _count?: boolean | Prisma.MarketCandleCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type MarketCandleIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
@@ -934,6 +1225,8 @@ export type $MarketCandlePayload<ExtArgs extends runtime.Types.Extensions.Intern
   name: "MarketCandle"
   objects: {
     asset: Prisma.$AssetPayload<ExtArgs>
+    limitOrderEvidence: Prisma.$LimitOrderCandleEvidencePayload<ExtArgs>[]
+    limitOrderProcessedBy: Prisma.$LimitOrderProcessedCandlePayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1347,6 +1640,8 @@ readonly fields: MarketCandleFieldRefs;
 export interface Prisma__MarketCandleClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   asset<T extends Prisma.AssetDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AssetDefaultArgs<ExtArgs>>): Prisma.Prisma__AssetClient<runtime.Types.Result.GetResult<Prisma.$AssetPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  limitOrderEvidence<T extends Prisma.MarketCandle$limitOrderEvidenceArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketCandle$limitOrderEvidenceArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$LimitOrderCandleEvidencePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  limitOrderProcessedBy<T extends Prisma.MarketCandle$limitOrderProcessedByArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketCandle$limitOrderProcessedByArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$LimitOrderProcessedCandlePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1790,6 +2085,54 @@ export type MarketCandleDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.
    * Limit how many MarketCandles to delete.
    */
   limit?: number
+}
+
+/**
+ * MarketCandle.limitOrderEvidence
+ */
+export type MarketCandle$limitOrderEvidenceArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the LimitOrderCandleEvidence
+   */
+  select?: Prisma.LimitOrderCandleEvidenceSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the LimitOrderCandleEvidence
+   */
+  omit?: Prisma.LimitOrderCandleEvidenceOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.LimitOrderCandleEvidenceInclude<ExtArgs> | null
+  where?: Prisma.LimitOrderCandleEvidenceWhereInput
+  orderBy?: Prisma.LimitOrderCandleEvidenceOrderByWithRelationInput | Prisma.LimitOrderCandleEvidenceOrderByWithRelationInput[]
+  cursor?: Prisma.LimitOrderCandleEvidenceWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.LimitOrderCandleEvidenceScalarFieldEnum | Prisma.LimitOrderCandleEvidenceScalarFieldEnum[]
+}
+
+/**
+ * MarketCandle.limitOrderProcessedBy
+ */
+export type MarketCandle$limitOrderProcessedByArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the LimitOrderProcessedCandle
+   */
+  select?: Prisma.LimitOrderProcessedCandleSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the LimitOrderProcessedCandle
+   */
+  omit?: Prisma.LimitOrderProcessedCandleOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.LimitOrderProcessedCandleInclude<ExtArgs> | null
+  where?: Prisma.LimitOrderProcessedCandleWhereInput
+  orderBy?: Prisma.LimitOrderProcessedCandleOrderByWithRelationInput | Prisma.LimitOrderProcessedCandleOrderByWithRelationInput[]
+  cursor?: Prisma.LimitOrderProcessedCandleWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.LimitOrderProcessedCandleScalarFieldEnum | Prisma.LimitOrderProcessedCandleScalarFieldEnum[]
 }
 
 /**

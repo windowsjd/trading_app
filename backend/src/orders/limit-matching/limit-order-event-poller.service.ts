@@ -11,6 +11,7 @@ import { LimitOrderCandidateRepository } from './limit-order-candidate.repositor
 import {
   compareRedisStreamIds,
   LimitOrderEventStreamService,
+  redisStreamIdTimestampMs,
   type LimitOrderStreamEntry,
 } from './limit-order-event-stream.service';
 import {
@@ -19,9 +20,21 @@ import {
 } from './limit-order-execution.service';
 import { parseLimitOrderPriceEvent } from './limit-order-event-validator';
 import type { LimitOrderPriceEvent } from './limit-order-price-event.types';
-import { LimitOrderMatcherHealthService } from './limit-order-matcher-health.service';
+import { LimitOrderMatchBoundaryService } from './limit-order-match-boundary.service';
+import {
+  LimitOrderMatcherHealthService,
+  type LimitOrderProcessedEventStats,
+} from './limit-order-matcher-health.service';
 import { LimitOrderMatcherLeaderService } from './limit-order-matcher-leader.service';
 import { readLimitOrderMatchingConfig } from './limit-order-matching.config';
+
+type CachedEventAsset = {
+  symbol: string;
+  market: string;
+  assetType: AssetType;
+  currencyCode: string;
+  expiresAt: number;
+};
 
 class MatcherFatalError extends Error {
   constructor(
@@ -48,6 +61,11 @@ export class LimitOrderEventPollerService
   private lastAcknowledgedEvent: string | null = null;
   private lastHeartbeatAt = 0;
   private lastReclaimAt = 0;
+  private lastAcknowledgedAt: string | null = null;
+  private leaderStartedAt: string | null = null;
+  private lastProcessedEventStats: LimitOrderProcessedEventStats | null = null;
+  private lastProcessedEventStatsAt = 0;
+  private readonly assetCache = new Map<string, CachedEventAsset>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -56,6 +74,7 @@ export class LimitOrderEventPollerService
     private readonly health: LimitOrderMatcherHealthService,
     private readonly candidates: LimitOrderCandidateRepository,
     private readonly execution: LimitOrderExecutionService,
+    private readonly boundary: LimitOrderMatchBoundaryService,
   ) {}
 
   onModuleInit(): void {
@@ -108,9 +127,11 @@ export class LimitOrderEventPollerService
 
   private async runAsLeader(): Promise<void> {
     await this.stream.ensureConsumerGroup(this.config);
+    const leaderStartedAt = new Date();
+    this.leaderStartedAt = leaderStartedAt.toISOString();
     this.runId = await this.health.startLeader({
       consumerName: this.config.consumerName,
-      startedAt: new Date(),
+      startedAt: leaderStartedAt,
     });
     // Establish the durable Ops row before the retention check so a startup
     // gap is recorded as failed/degraded instead of disappearing into logs.
@@ -182,30 +203,48 @@ export class LimitOrderEventPollerService
         code: 'LIMIT_ORDER_EVENT_INVALID',
         message: safeMessage(error),
       });
-      await this.stream.acknowledge(this.config, entry.streamId);
-      this.lastAcknowledgedEvent = entry.streamId;
+      await this.acknowledge(entry.streamId);
       this.logger.error(
         `LIMIT_ORDER_EVENT_INVALID moved to DLQ (${entry.streamId}): ${safeMessage(error)}`,
       );
       return;
     }
 
-    const processed = await this.prisma.limitOrderProcessedEvent.findUnique({
-      where: { eventId: event.eventId },
-      select: { eventId: true },
-    });
-    if (processed) {
-      await this.stream.acknowledge(this.config, entry.streamId);
-      this.lastAcknowledgedEvent = entry.streamId;
-      return;
+    // EVERY durable decision for this event happens inside the boundary
+    // mutex: the dedupe read, the candidate sweep, the executions, and the
+    // processed-event insert. A limit-order Create cannot observe a partial
+    // state, and its activation cursor is therefore either strictly before
+    // this event (so the event fills it) or strictly after it (so the event
+    // is already durably processed and can never fill it). The Redis ACK is
+    // deliberately OUTSIDE the mutex and strictly AFTER the DB work — an ACK
+    // before the processed row would lose the event on a crash.
+    const lease = await this.boundary.acquireSession();
+    try {
+      const processed = await this.prisma.limitOrderProcessedEvent.findUnique({
+        where: { eventId: event.eventId },
+        select: { eventId: true },
+      });
+      // A duplicate XADD of an already-processed event must not re-run the
+      // candidate sweep: orders created AFTER the original processing would
+      // otherwise be filled by a stale price. It still gets ACKed below, so
+      // the duplicate leaves the pending list.
+      if (!processed) await this.processEventUnderBoundary(entry, event);
+    } finally {
+      await lease.release();
     }
+    await this.acknowledge(entry.streamId);
+  }
 
+  /** Candidate sweep + durable dedupe insert. Callers hold the boundary. */
+  private async processEventUnderBoundary(
+    entry: LimitOrderStreamEntry,
+    event: LimitOrderPriceEvent,
+  ): Promise<void> {
     let previousCandidateIds = '';
     for (;;) {
       const candidates = await this.candidates.findCandidates({
         assetId: event.assetId,
         eventPrice: event.price,
-        eventReceivedAt: new Date(event.receivedAt),
         currencyCode: event.currencyCode,
         streamId: entry.streamId,
         batchSize: this.config.candidateBatchSize,
@@ -244,30 +283,31 @@ export class LimitOrderEventPollerService
     } catch (error) {
       if (!isUniqueConstraintError(error)) throw error;
     }
-    await this.stream.acknowledge(this.config, entry.streamId);
-    this.lastAcknowledgedEvent = entry.streamId;
   }
 
+  private async acknowledge(streamId: string): Promise<void> {
+    await this.stream.acknowledge(this.config, streamId);
+    this.lastAcknowledgedEvent = streamId;
+    this.lastAcknowledgedAt = new Date().toISOString();
+  }
+
+  /**
+   * Route/session validation for one event. The asset row is served from a
+   * short-TTL bounded cache, so a burst of trades on one asset costs a single
+   * database read instead of one per event. The cache is a routing filter
+   * only: order eligibility re-reads and re-locks the asset inside the
+   * execution transaction, so a stale entry can never authorize a fill.
+   */
   private async assertEventAsset(
     event: ReturnType<typeof parseLimitOrderPriceEvent>,
   ) {
-    const asset = await this.prisma.asset.findUnique({
-      where: { id: event.assetId },
-      select: {
-        symbol: true,
-        market: true,
-        assetType: true,
-        currencyCode: true,
-        settlementCurrency: true,
-        isActive: true,
-      },
-    });
+    const asset = await this.resolveEventAsset(event.assetId);
     if (
-      !asset?.isActive ||
+      !asset ||
       asset.symbol !== event.symbol ||
       asset.market !== event.market ||
       asset.assetType !== event.assetType ||
-      (asset.settlementCurrency ?? asset.currencyCode) !== event.currencyCode
+      asset.currencyCode !== event.currencyCode
     ) {
       throw new Error('Event asset metadata is invalid.');
     }
@@ -296,6 +336,43 @@ export class LimitOrderEventPollerService
     }
   }
 
+  private async resolveEventAsset(
+    assetId: string,
+  ): Promise<CachedEventAsset | null> {
+    const now = Date.now();
+    const cached = this.assetCache.get(assetId);
+    if (cached && cached.expiresAt > now) return cached;
+
+    const asset = await this.prisma.asset.findUnique({
+      where: { id: assetId },
+      select: {
+        symbol: true,
+        market: true,
+        assetType: true,
+        currencyCode: true,
+        settlementCurrency: true,
+        isActive: true,
+      },
+    });
+    this.assetCache.delete(assetId);
+    if (!asset?.isActive) return null;
+    // Bounded LRU-ish eviction: Map preserves insertion order, so the oldest
+    // entry is always the first key.
+    if (this.assetCache.size >= this.config.assetCacheMaxEntries) {
+      const oldest = this.assetCache.keys().next();
+      if (!oldest.done) this.assetCache.delete(oldest.value);
+    }
+    const entry: CachedEventAsset = {
+      symbol: asset.symbol,
+      market: asset.market,
+      assetType: asset.assetType,
+      currencyCode: asset.settlementCurrency ?? asset.currencyCode,
+      expiresAt: now + this.config.assetCacheTtlMs,
+    };
+    this.assetCache.set(assetId, entry);
+    return entry;
+  }
+
   private async assertNoGap(): Promise<void> {
     const info = await this.stream.inspect(this.config);
     if (
@@ -318,19 +395,64 @@ export class LimitOrderEventPollerService
     if (!force && now - this.lastHeartbeatAt < this.config.heartbeatIntervalMs)
       return;
     const info = await this.stream.inspect(this.config);
+    const oldestPendingMs = redisStreamIdTimestampMs(info.oldestPendingId);
     await this.health.heartbeat(this.runId, {
       activeLeaderInstance: this.config.consumerName,
+      leaderStartedAt: this.leaderStartedAt,
       lastRedisRead: this.lastRedisRead,
       lastSuccessfulEvent: this.lastSuccessfulEvent,
       lastAcknowledgedEvent: this.lastAcknowledgedEvent,
+      lastAcknowledgedAt: this.lastAcknowledgedAt,
       pendingCount: info.pendingCount,
+      oldestPendingAgeMs:
+        oldestPendingMs === null ? null : Math.max(0, now - oldestPendingMs),
       consumerLag: info.lag,
       streamFirstId: info.firstId,
       streamLastId: info.lastId,
+      streamLength: info.length,
+      // Fraction of the configured MAXLEN still free. A stream sitting at its
+      // cap silently trims the oldest entries, which is exactly where an
+      // un-read event would be lost.
+      retentionHeadroomRatio:
+        info.length === null
+          ? null
+          : Math.max(
+              0,
+              (this.config.eventMaxLen - info.length) / this.config.eventMaxLen,
+            ),
+      processedEvents: await this.readProcessedEventStats(now),
     });
     this.lastHeartbeatAt = now;
   }
+
+  /**
+   * Growth/ageing of the durable dedupe table. Sampled on a slower cadence
+   * than the heartbeat because it aggregates the whole table; capacity moves
+   * on a scale of hours, not seconds.
+   */
+  private async readProcessedEventStats(
+    now: number,
+  ): Promise<LimitOrderProcessedEventStats | null> {
+    if (
+      this.lastProcessedEventStats &&
+      now - this.lastProcessedEventStatsAt < PROCESSED_EVENT_STATS_INTERVAL_MS
+    ) {
+      return this.lastProcessedEventStats;
+    }
+    try {
+      this.lastProcessedEventStats =
+        await this.health.collectProcessedEventStats();
+      this.lastProcessedEventStatsAt = now;
+    } catch (error) {
+      this.logger.warn(
+        `Processed-event growth sampling failed: ${safeMessage(error)}`,
+      );
+    }
+    return this.lastProcessedEventStats;
+  }
 }
+
+const PROCESSED_EVENT_STATS_INTERVAL_MS = 60_000;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

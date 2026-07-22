@@ -50,6 +50,21 @@ export function hasNoExecutionResult(item: OrderStatusFields): boolean {
   );
 }
 
+/**
+ * How a filled limit order was matched.
+ *
+ * '5분봉 안전망 체결' must never be phrased as a candle-low fill: path B
+ * executes at the ORDER'S LIMIT PRICE and uses the confirmed 5m low only as
+ * proof that the limit was touched inside that window.
+ */
+export function getOrderMatchingSourceLabel(
+  matchingSource?: string | null,
+): string | null {
+  if (matchingSource === 'live_trade_event') return '실시간 체결 이벤트';
+  if (matchingSource === 'closed_5m_candle') return '5분봉 안전망 체결';
+  return null;
+}
+
 export function getOrderStatusLabel(status?: string | null): string | null {
   if (!status) return null;
   return ORDER_STATUS_LABEL[status] ?? status;

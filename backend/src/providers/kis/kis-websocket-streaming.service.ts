@@ -12,6 +12,7 @@ import {
 } from '../provider-config.service';
 import { ProviderConfigError, ProviderHttpError } from '../provider.types';
 import { NormalizedProviderTradeEventBus } from '../normalized-provider-trade-event-bus.service';
+import { ProviderTradeRouteRegistry } from '../provider-trade-route.registry';
 import { KisAuthClient } from './kis-auth.client';
 import {
   KisRealtimePriceCacheService,
@@ -139,6 +140,8 @@ export class KisWebSocketStreamingService
     private readonly realtimePriceEventBus: KisRealtimePriceEventBus,
     @Optional()
     private readonly normalizedTradeEventBus?: NormalizedProviderTradeEventBus,
+    @Optional()
+    private readonly tradeRoutes?: ProviderTradeRouteRegistry,
   ) {}
 
   onModuleInit(): void {
@@ -155,7 +158,14 @@ export class KisWebSocketStreamingService
     }
 
     const liveCandles = readLiveCandleConfig();
-    if (liveCandles.enabled && liveCandles.kisEnabled) {
+    // Exactly one canonical KIS connection per process. The live-candle
+    // supervisor owns it whenever live candles are on; this legacy service
+    // then neither connects nor publishes normalized trades, so no duplicate
+    // socket and no duplicate exact-trade event can exist.
+    if (
+      (liveCandles.enabled && liveCandles.kisEnabled) ||
+      this.tradeRoutes?.claimProvider('kis', 'legacy_streaming') === false
+    ) {
       this.status.enabled = false;
       this.status.running = false;
       this.status.state = 'disabled';
@@ -190,6 +200,7 @@ export class KisWebSocketStreamingService
     this.socket = null;
     this.approvalKey = null;
     this.targets = [];
+    this.tradeRoutes?.releaseProvider('kis', 'legacy_streaming');
     this.markDisconnected();
     this.status.state = this.status.enabled ? 'stopped' : 'disabled';
   }
@@ -475,6 +486,10 @@ export class KisWebSocketStreamingService
             trade.exchangeTimestamp ??
             trade.sourceTimestamp ??
             trade.receivedAt;
+          // Never a duplicate publisher: if the live-candle supervisor owns
+          // the KIS route, that connection is the only exact-trade source.
+          if (this.tradeRoutes?.isOwnedBy('kis', 'legacy_streaming') === false)
+            return;
           this.normalizedTradeEventBus?.publish({
             provider: 'kis',
             providerEventId: trade.eventId,

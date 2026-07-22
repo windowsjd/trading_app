@@ -12,6 +12,8 @@ jest.mock('../generated/prisma/client', () => ({
     market_candle_retention: 'market_candle_retention',
     market_candle_sync: 'market_candle_sync',
     market_candle_reconciliation: 'market_candle_reconciliation',
+    limit_order_matcher: 'limit_order_matcher',
+    limit_order_candle_reconciliation: 'limit_order_candle_reconciliation',
   },
   OpsJobRunStatus: {
     running: 'running',
@@ -41,6 +43,12 @@ jest.mock('../generated/prisma/client', () => ({
 jest.mock('../assets/market-candle-sync.service', () => ({
   MarketCandleSyncService: class MarketCandleSyncService {},
 }));
+jest.mock(
+  '../orders/limit-matching/limit-order-candle-reconciliation.service',
+  () => ({
+    LimitOrderCandleReconciliationService: class LimitOrderCandleReconciliationService {},
+  }),
+);
 jest.mock('../assets/market-candle-reconciliation.service', () => ({
   MarketCandleReconciliationService: class MarketCandleReconciliationService {},
 }));

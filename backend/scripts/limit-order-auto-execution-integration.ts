@@ -17,6 +17,8 @@ import {
 import { PrismaService } from '../src/prisma/prisma.service';
 import { RedisService } from '../src/redis/redis.service';
 import { NormalizedProviderTradeEventBus } from '../src/providers/normalized-provider-trade-event-bus.service';
+import { ProviderTradeRouteRegistry } from '../src/providers/provider-trade-route.registry';
+import { LimitOrderMatchBoundaryService } from '../src/orders/limit-matching/limit-order-match-boundary.service';
 import { PortfolioValuationService } from '../src/portfolio/portfolio-valuation.service';
 import { LimitOrderCandidateRepository } from '../src/orders/limit-matching/limit-order-candidate.repository';
 import { LimitOrderEventPollerService } from '../src/orders/limit-matching/limit-order-event-poller.service';
@@ -38,11 +40,13 @@ const prisma = new PrismaService();
 const redis = new RedisService();
 const tradeBus = new NormalizedProviderTradeEventBus();
 const publisherHealth = new LimitOrderMatcherHealthService(prisma);
+const tradeRoutes = new ProviderTradeRouteRegistry();
 const publisher = new LimitOrderPriceEventPublisher(
   prisma,
   redis,
   tradeBus,
   publisherHealth,
+  tradeRoutes,
 );
 const createdParticipantIds: string[] = [];
 const createdUserIds: string[] = [];
@@ -53,6 +57,9 @@ let assetId: string;
 let fxRateSnapshotId: string;
 let poller: LimitOrderEventPollerService | null = null;
 let pollerStream: LimitOrderEventStreamService | null = null;
+// The boundary service owns a dedicated `pg` client. It must be destroyed with
+// the poller, or the runner keeps an open socket and never exits.
+let pollerBoundary: LimitOrderMatchBoundaryService | null = null;
 let executionService: LimitOrderExecutionService;
 let operator: { userId: string; role: UserRole };
 
@@ -78,8 +85,12 @@ async function main(): Promise<void> {
     );
     await run('price above limit remains submitted', testPriceNotReached);
     await run(
-      'pre-submission receiver timestamp remains submitted',
-      testPreSubmissionEvent,
+      'clock skew never excludes an event after the activation cursor',
+      testClockSkewStillExecutes,
+    );
+    await run(
+      'event before the activation cursor never fills the order',
+      testEventBeforeActivationCursor,
     );
     await run(
       'duplicate event never double fills or fills a later order',
@@ -111,6 +122,8 @@ async function main(): Promise<void> {
     if (poller) await poller.onModuleDestroy().catch(() => undefined);
     if (pollerStream)
       await pollerStream.onModuleDestroy().catch(() => undefined);
+    if (pollerBoundary)
+      await pollerBoundary.onModuleDestroy().catch(() => undefined);
     await cleanupDatabase().catch(() => undefined);
     const config = readLimitOrderMatchingConfig();
     await redis.delete(config.streamKey).catch(() => undefined);
@@ -214,6 +227,7 @@ async function startPoller(): Promise<void> {
     valuation,
     rankingStub as never,
   );
+  pollerBoundary = new LimitOrderMatchBoundaryService();
   poller = new LimitOrderEventPollerService(
     prisma,
     pollerStream,
@@ -221,6 +235,7 @@ async function startPoller(): Promise<void> {
     health,
     candidates,
     executionService,
+    pollerBoundary,
   );
   poller.onModuleInit();
   await waitFor(async () => {
@@ -240,8 +255,10 @@ async function startPoller(): Promise<void> {
 async function stopPoller(): Promise<void> {
   if (poller) await poller.onModuleDestroy();
   if (pollerStream) await pollerStream.onModuleDestroy();
+  if (pollerBoundary) await pollerBoundary.onModuleDestroy();
   poller = null;
   pollerStream = null;
+  pollerBoundary = null;
 }
 
 async function testPendingRecovery(): Promise<void> {
@@ -444,22 +461,30 @@ async function testPriceNotReached(): Promise<void> {
   );
 }
 
-async function testPreSubmissionEvent(): Promise<void> {
+/**
+ * Ordering is decided by the Redis Stream ID, NEVER by comparing
+ * Order.submittedAt (a PostgreSQL clock_timestamp()) against event.receivedAt
+ * (a Node process clock). This reproduces the DB-clock-ahead skew that the old
+ * timestamp rule wrongly rejected: the event is stamped one second BEFORE the
+ * order was submitted, but its stream ID is after the activation cursor, so it
+ * must fill the order.
+ */
+async function testClockSkewStillExecutes(): Promise<void> {
   const scenario = await createSubmittedOrder({
-    label: 'pre-submission-event',
+    label: 'clock-skew-event',
     limitPrice: '100.00000000',
     quantity: '1.00000000',
     reservedAmount: '100.10000000',
   });
   const order = await prisma.order.findUniqueOrThrow({
     where: { id: scenario.orderId },
-    select: { submittedAt: true },
+    select: { submittedAt: true, matchingActivationStreamId: true },
   });
-  const oldTime = new Date(order.submittedAt.getTime() - 1000).toISOString();
-  const providerTradeId = 'pre-submission-event';
+  const skewed = new Date(order.submittedAt.getTime() - 1000).toISOString();
+  const providerTradeId = 'clock-skew-event';
   const eventId = `binance:${assetId}:${providerTradeId}`;
   eventIds.push(eventId);
-  await publisher.publish({
+  const streamId = await publisher.publish({
     provider: 'binance',
     providerEventId: providerTradeId,
     providerSequence: providerTradeId,
@@ -469,13 +494,53 @@ async function testPreSubmissionEvent(): Promise<void> {
     providerSymbol: 'BTCUSDT',
     price: '90',
     currencyCode: CurrencyCode.USD,
-    providerEventAt: oldTime,
-    receivedAt: oldTime,
+    providerEventAt: skewed,
+    receivedAt: skewed,
     sourceName: 'binance_spot_ws_trade',
     marketSessionCode: null,
     eventType: 'trade',
   });
+  // Precondition: the event really is timestamped before the order.
+  assert.ok(new Date(skewed) < order.submittedAt);
+  assert.ok(
+    compareStreamIds(order.matchingActivationStreamId ?? '0-0', streamId) < 0,
+  );
+
+  await waitForOrderStatus(scenario.orderId, OrderStatus.executed);
+  const executed = await prisma.order.findUniqueOrThrow({
+    where: { id: scenario.orderId },
+    select: { executedPrice: true, matchingSource: true },
+  });
+  assert.equal(executed.matchingSource, 'live_trade_event');
+  assert.equal(executed.executedPrice?.toFixed(8), '90.00000000');
+}
+
+/**
+ * The mirror case: an event whose stream ID is at or before the order's
+ * activation cursor never fills it, whatever the timestamps say.
+ */
+async function testEventBeforeActivationCursor(): Promise<void> {
+  const providerTradeId = 'before-activation-event';
+  const eventId = `binance:${assetId}:${providerTradeId}`;
+  eventIds.push(eventId);
+  // Published FIRST, so its stream ID precedes the order's activation cursor.
+  await publishTrade(providerTradeId, '90.00000000');
   await waitForProcessedEvent(eventId);
+
+  const scenario = await createSubmittedOrder({
+    label: 'before-activation-event',
+    limitPrice: '100.00000000',
+    quantity: '1.00000000',
+    reservedAmount: '100.10000000',
+  });
+  // Re-publish the SAME event id: dedupe plus the cursor rule both apply.
+  await publishTrade(providerTradeId, '90.00000000');
+  await waitFor(async () => {
+    const config = readLimitOrderMatchingConfig();
+    const info = await pollerStream!.inspect(config);
+    return info.pendingCount === 0;
+  }, 'before-activation event acknowledgement');
+
   assert.equal(
     (
       await prisma.order.findUniqueOrThrow({
@@ -778,6 +843,7 @@ async function testStreamGapFailClosed(): Promise<void> {
   pollerStream = new LimitOrderEventStreamService();
   const leader = new LimitOrderMatcherLeaderService();
   const health = new LimitOrderMatcherHealthService(prisma);
+  pollerBoundary = new LimitOrderMatchBoundaryService();
   poller = new LimitOrderEventPollerService(
     prisma,
     pollerStream,
@@ -785,6 +851,7 @@ async function testStreamGapFailClosed(): Promise<void> {
     health,
     new LimitOrderCandidateRepository(prisma),
     executionService,
+    pollerBoundary,
   );
   poller.onModuleInit();
   await waitFor(async () => {
@@ -824,6 +891,7 @@ async function testPublisherRedisOutage(): Promise<void> {
     unavailableRedis,
     new NormalizedProviderTradeEventBus(),
     publisherHealth,
+    new ProviderTradeRouteRegistry(),
   );
   const now = await databaseNow();
   await assert.rejects(
@@ -1159,6 +1227,14 @@ async function waitFor(
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
   throw new Error(`Timed out waiting for ${label}.`);
+}
+
+function compareStreamIds(left: string, right: string): number {
+  const [leftMs, leftSeq] = left.split('-').map((part) => BigInt(part));
+  const [rightMs, rightSeq] = right.split('-').map((part) => BigInt(part));
+  if (leftMs !== rightMs) return leftMs < rightMs ? -1 : 1;
+  if (leftSeq === rightSeq) return 0;
+  return leftSeq < rightSeq ? -1 : 1;
 }
 
 async function databaseNow(): Promise<Date> {
