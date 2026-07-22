@@ -28,6 +28,9 @@ describe('Provider trade readiness multi-instance Redis integration', () => {
           env: {
             ...process.env,
             LIMIT_ORDER_SHARED_READINESS_ENABLED: 'true',
+            // The create-path scenarios drive the real gate, which is inert
+            // unless automatic matching is on.
+            LIMIT_ORDER_AUTO_EXECUTION_ENABLED: 'true',
           },
           encoding: 'utf8',
           timeout: 180_000,
@@ -53,6 +56,11 @@ describe('Provider trade readiness multi-instance Redis integration', () => {
         'a stale heartbeat is rejected',
         'a reconnect invalidates the previous generation immediately',
         'a late release from a superseded owner cannot delete the new state',
+        'a non-owner instance completes the whole create readiness path',
+        'a non-owner create fails closed once the owner disappears',
+        'a rival cannot claim ownership while the owner heartbeats',
+        'a fenced-out owner cannot overwrite the new owner even with a newer clock',
+        'a fenced-out publisher surrenders instead of republishing',
         'a Redis failure fails closed',
         'no credential or raw provider frame reaches Redis',
       ]) {

@@ -25,6 +25,20 @@ export type LimitOrderCandleReconciliationConfig = {
    * PROCESSED immediately — only the position lags.
    */
   watermarkSafetyLagMs: number;
+  /**
+   * Two-phase guard on the STORAGE-order position: how much database time must
+   * pass between observing a sequence value and being allowed to use it as a
+   * watermark ceiling.
+   *
+   * A sequence value is assigned when a candle row is INSERTED but only becomes
+   * visible when its transaction COMMITS, so the highest visible value can
+   * still have uncommitted holes below it. This bounds how long a write
+   * transaction on `market_candles` may stay open before the guard could be
+   * wrong — and it is not the only bound: when the database role can read
+   * other backends' `xact_start`, an in-flight write transaction older than the
+   * observation holds the position back exactly, regardless of this value.
+   */
+  ingestSettleGraceMs: number;
   /** Deferred rows retried per sweep (bounded, oldest due first). */
   deferredRetryBatchSize: number;
   /** First retry delay; doubles per attempt up to deferredRetryMaxDelayMs. */
@@ -106,6 +120,13 @@ export function readLimitOrderCandleReconciliationConfig(
       900_000,
       300_000,
       86_400_000,
+    ),
+    ingestSettleGraceMs: readInteger(
+      env,
+      'LIMIT_ORDER_CANDLE_RECONCILIATION_INGEST_SETTLE_GRACE_MS',
+      60_000,
+      1000,
+      3_600_000,
     ),
     deferredRetryBatchSize: readInteger(
       env,

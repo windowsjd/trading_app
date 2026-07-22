@@ -43,15 +43,33 @@ import type {
  *       readiness of the previous generation is unreachable the instant the
  *       new meta is published; the orphaned key then expires on its own.
  *
- * GENERATION / OWNER SAFETY
- * -------------------------
- * A previous owner can be slow: its release can arrive AFTER a new owner has
- * already published. Every mutating script is therefore a compare-and-swap on
- * (generation, ownerInstance) executed inside Redis:
- *   - a write is refused when the stored record belongs to a different owner
- *     and is strictly newer;
- *   - a release deletes ONLY when the stored generation and owner both match,
- *     so a late release from the old owner is a no-op.
+ *   limit-order:trade-readiness:v1:{<provider>}:fence
+ *       Monotonic INCR counter. NEVER expires and is never reset: it is the
+ *       ordering authority for ownership and must outlive every owner.
+ *
+ * OWNER FENCING
+ * -------------
+ * A previous owner can be slow: its release — or worse, its next heartbeat —
+ * can arrive AFTER a new owner has already published. Ownership therefore is
+ * NOT decided by wall-clock `lastUpdatedAt` comparisons. Two instances that
+ * disagree about the time would each consider its own record "newer", and a
+ * paused-then-resumed old owner with a fast clock could overwrite the record
+ * of the owner that legitimately replaced it — publishing a subscription set
+ * for a socket that no longer exists, which is the one thing a fail-closed
+ * readiness view must never do.
+ *
+ * Instead, an owner must first ACQUIRE a fence token: a value from the
+ * per-provider INCR counter, handed out only while nobody else holds the meta
+ * key. Every mutating script then compares fence tokens, which are generated
+ * by Redis itself and are strictly monotonic by construction:
+ *
+ *   - a publish is refused when the stored fence token is strictly greater
+ *     (a newer owner exists), or equal but held by a different instance;
+ *   - a release deletes ONLY when generation, owner AND fence token all match,
+ *     so a late release from a superseded owner is a no-op.
+ *
+ * A fenced-out owner is told so by the return value and stops publishing; it
+ * cannot claw the shared view back while the current owner keeps heartbeating.
  *
  * FAIL-CLOSED
  * -----------
@@ -61,7 +79,14 @@ import type {
  * subscribed reserves the user's cash against a fill that can never happen.
  */
 
-export const PROVIDER_TRADE_READINESS_SCHEMA_VERSION = 1;
+/**
+ * Bumped from 1 to 2 by owner fencing: a v1 record carries no fence token, so
+ * it cannot be ordered against a v2 one. Both directions reject the other
+ * version outright, which during a rolling deploy means readiness is
+ * unavailable (fail-closed) rather than decided from a record whose ownership
+ * cannot be established.
+ */
+export const PROVIDER_TRADE_READINESS_SCHEMA_VERSION = 2;
 export const PROVIDER_TRADE_READINESS_KEY_PREFIX =
   'limit-order:trade-readiness:v1';
 
@@ -71,6 +96,12 @@ export type SharedProviderMeta = {
   ownerInstance: string;
   source: ProviderTradeSource;
   generation: string;
+  /**
+   * Redis-generated, strictly monotonic ownership token. The ONLY ordering
+   * authority between competing owners — never a timestamp, which two hosts
+   * can disagree about.
+   */
+  fenceToken: number;
   connected: boolean;
   connectedAt: number | null;
   lastFrameAt: number | null;
@@ -104,19 +135,65 @@ export function providerAssetsKey(
   return `${PROVIDER_TRADE_READINESS_KEY_PREFIX}:{${provider}}:gen:${generation}:assets`;
 }
 
+export function providerFenceKey(provider: TradeRouteProvider): string {
+  return `${PROVIDER_TRADE_READINESS_KEY_PREFIX}:{${provider}}:fence`;
+}
+
 /**
- * Refuses a write whose owner differs from the stored one AND whose
- * `lastUpdatedAt` is not newer. A zombie old owner therefore cannot overwrite
- * the record of the owner that replaced it.
+ * Hands out a fence token, and ONLY while nobody else holds the provider.
+ *
+ * The current owner re-acquiring keeps the token it already holds: renumbering
+ * a live owner on every restart of its publish loop would let it leapfrog
+ * itself and would make the token meaningless as an identity.
+ *
+ * A different owner holding a readable meta record is refused outright. The
+ * ONLY way to take over is for that record to expire, which is exactly the
+ * heartbeat semantics — an owner that stopped publishing releases the provider
+ * after at most one TTL.
+ *
+ * A meta record that cannot be decoded, or that carries no owner, is treated
+ * as absent: it can never be proven to belong to a live owner, and leaving the
+ * provider permanently unclaimable would fail every limit order closed.
+ */
+const ACQUIRE_OWNERSHIP_SCRIPT = `
+local meta = redis.call('GET', KEYS[1])
+if meta then
+  local ok, decoded = pcall(cjson.decode, meta)
+  if ok and type(decoded) == 'table' and decoded.ownerInstance then
+    if decoded.ownerInstance ~= ARGV[1] then
+      return { 0, tostring(decoded.fenceToken or 0), tostring(decoded.ownerInstance) }
+    end
+    local held = tonumber(decoded.fenceToken)
+    if held then
+      return { 1, string.format('%d', held), ARGV[1] }
+    end
+  end
+end
+local token = redis.call('INCR', KEYS[2])
+return { 1, string.format('%d', token), ARGV[1] }
+`;
+
+/**
+ * Fence-guarded publish. Refused when a strictly newer owner exists, or when
+ * the same token is claimed by a different instance (which can only happen if
+ * an operator duplicated LIMIT_ORDER_SHARED_READINESS_INSTANCE_ID).
+ *
+ * No timestamp is compared anywhere: the token is the only ordering.
  */
 const PUBLISH_META_SCRIPT = `
+local incoming = tonumber(ARGV[3])
+if not incoming then
+  return 0
+end
 local existing = redis.call('GET', KEYS[1])
 if existing then
   local ok, decoded = pcall(cjson.decode, existing)
-  if ok and decoded and decoded.ownerInstance ~= ARGV[2] then
-    local storedAt = tonumber(decoded.lastUpdatedAt) or 0
-    local incomingAt = tonumber(ARGV[3]) or 0
-    if storedAt > incomingAt then
+  if ok and type(decoded) == 'table' then
+    local stored = tonumber(decoded.fenceToken) or 0
+    if stored > incoming then
+      return 0
+    end
+    if stored == incoming and decoded.ownerInstance ~= ARGV[2] then
       return 0
     end
   end
@@ -129,10 +206,32 @@ return 1
  * Writes asset records into the generation-scoped hash and refreshes its TTL
  * in the same round trip, so a hash can never outlive its heartbeat window
  * because an EXPIRE was lost between two calls.
+ *
+ * Fence-guarded under the SAME rule as the meta publish. Assets are written
+ * BEFORE the meta of a new generation, so the guard deliberately tolerates a
+ * meta that does not mention this generation yet — it only ever refuses a
+ * writer that a newer fence token has already superseded.
  */
 const PUBLISH_ASSETS_SCRIPT = `
+local incoming = tonumber(ARGV[2])
+if not incoming then
+  return 0
+end
+local meta = redis.call('GET', KEYS[2])
+if meta then
+  local ok, decoded = pcall(cjson.decode, meta)
+  if ok and type(decoded) == 'table' then
+    local stored = tonumber(decoded.fenceToken) or 0
+    if stored > incoming then
+      return 0
+    end
+    if stored == incoming and decoded.ownerInstance ~= ARGV[3] then
+      return 0
+    end
+  end
+end
 local ttl = tonumber(ARGV[1])
-for i = 2, #ARGV, 2 do
+for i = 4, #ARGV, 2 do
   redis.call('HSET', KEYS[1], ARGV[i], ARGV[i + 1])
 end
 redis.call('EXPIRE', KEYS[1], ttl)
@@ -162,17 +261,20 @@ end
 return { 'ok', meta, record }
 `;
 
-/** Deletes only when BOTH the generation and the owner still match. */
+/** Deletes only when generation, owner AND fence token all still match. */
 const RELEASE_SCRIPT = `
 local meta = redis.call('GET', KEYS[1])
 if not meta then
   return 0
 end
 local ok, decoded = pcall(cjson.decode, meta)
-if not ok or not decoded then
+if not ok or type(decoded) ~= 'table' then
   return 0
 end
 if decoded.generation ~= ARGV[1] or decoded.ownerInstance ~= ARGV[2] then
+  return 0
+end
+if (tonumber(decoded.fenceToken) or -1) ~= tonumber(ARGV[3]) then
   return 0
 end
 redis.call('DEL', KEYS[1])
@@ -183,7 +285,8 @@ return 1
 /**
  * Drops a SUPERSEDED generation's asset hash. Guarded so it can only ever
  * delete a hash the current meta no longer points at, and only while this
- * instance still owns the meta — a late call from a replaced owner is a no-op.
+ * instance still holds the meta under the same fence token — a late call from
+ * a replaced owner is a no-op.
  */
 const RELEASE_SUPERSEDED_ASSETS_SCRIPT = `
 local meta = redis.call('GET', KEYS[1])
@@ -191,10 +294,13 @@ if not meta then
   return 0
 end
 local ok, decoded = pcall(cjson.decode, meta)
-if not ok or not decoded then
+if not ok or type(decoded) ~= 'table' then
   return 0
 end
 if decoded.ownerInstance ~= ARGV[2] then
+  return 0
+end
+if (tonumber(decoded.fenceToken) or -1) ~= tonumber(ARGV[3]) then
   return 0
 end
 if decoded.generation == ARGV[1] then
@@ -221,9 +327,40 @@ export class ProviderTradeReadinessStore {
   }
 
   /**
+   * Claims the provider and returns the fence token to publish under.
+   *
+   * `acquired: false` means another instance currently owns the shared view.
+   * That is NOT an error and must not be retried in a tight loop: the caller
+   * simply publishes nothing until the incumbent's heartbeat lapses.
+   */
+  async acquireOwnership(input: {
+    provider: TradeRouteProvider;
+    ownerInstance: string;
+  }): Promise<{
+    acquired: boolean;
+    fenceToken: number | null;
+    heldBy: string | null;
+  }> {
+    if (!this.redis) return { acquired: false, fenceToken: null, heldBy: null };
+    const raw = await this.redis.eval(
+      ACQUIRE_OWNERSHIP_SCRIPT,
+      [providerMetaKey(input.provider), providerFenceKey(input.provider)],
+      [input.ownerInstance],
+    );
+    const reply = Array.isArray(raw) ? raw : [];
+    const acquired = toNumber(reply[0]) === 1;
+    const fenceToken = toNumber(reply[1]);
+    const heldBy = typeof reply[2] === 'string' ? reply[2] : null;
+    if (!acquired || fenceToken === null || !Number.isFinite(fenceToken)) {
+      return { acquired: false, fenceToken: null, heldBy };
+    }
+    return { acquired: true, fenceToken, heldBy };
+  }
+
+  /**
    * Publishes (or refreshes) the provider record. Returns false when a newer
-   * owner already holds the key, which the caller treats as "I am no longer
-   * the owner" rather than retrying.
+   * fence token already holds the key, which the caller treats as "I have been
+   * fenced out" — it must stop publishing rather than retry.
    */
   async publishProvider(input: {
     meta: SharedProviderMeta;
@@ -237,26 +374,41 @@ export class ProviderTradeReadinessStore {
       [
         JSON.stringify(input.meta),
         input.meta.ownerInstance,
-        String(input.meta.lastUpdatedAt),
+        String(input.meta.fenceToken),
         String(input.ttlSeconds),
       ],
     );
     return toNumber(result) === 1;
   }
 
+  /** Returns false when a newer fence token has superseded this writer. */
   async publishAssets(input: {
     provider: TradeRouteProvider;
     generation: string;
+    ownerInstance: string;
+    fenceToken: number;
     records: readonly SharedAssetRecord[];
     ttlSeconds: number;
-  }): Promise<void> {
-    if (!this.redis || input.records.length === 0) return;
-    const key = providerAssetsKey(input.provider, input.generation);
-    const args: string[] = [String(input.ttlSeconds)];
+  }): Promise<boolean> {
+    if (!this.redis) return false;
+    if (input.records.length === 0) return true;
+    const args: string[] = [
+      String(input.ttlSeconds),
+      String(input.fenceToken),
+      input.ownerInstance,
+    ];
     for (const record of input.records) {
       args.push(record.assetId, JSON.stringify(record));
     }
-    await this.redis.eval(PUBLISH_ASSETS_SCRIPT, [key], args);
+    const result = await this.redis.eval(
+      PUBLISH_ASSETS_SCRIPT,
+      [
+        providerAssetsKey(input.provider, input.generation),
+        providerMetaKey(input.provider),
+      ],
+      args,
+    );
+    return toNumber(result) === 1;
   }
 
   /**
@@ -267,6 +419,7 @@ export class ProviderTradeReadinessStore {
     provider: TradeRouteProvider;
     generation: string;
     ownerInstance: string;
+    fenceToken: number;
   }): Promise<boolean> {
     if (!this.redis) return false;
     const result = await this.redis.eval(
@@ -275,7 +428,7 @@ export class ProviderTradeReadinessStore {
         providerMetaKey(input.provider),
         providerAssetsKey(input.provider, input.generation),
       ],
-      [input.generation, input.ownerInstance],
+      [input.generation, input.ownerInstance, String(input.fenceToken)],
     );
     return toNumber(result) === 1;
   }
@@ -284,6 +437,7 @@ export class ProviderTradeReadinessStore {
     provider: TradeRouteProvider;
     supersededGeneration: string;
     ownerInstance: string;
+    fenceToken: number;
   }): Promise<boolean> {
     if (!this.redis) return false;
     const result = await this.redis.eval(
@@ -292,7 +446,11 @@ export class ProviderTradeReadinessStore {
         providerMetaKey(input.provider),
         providerAssetsKey(input.provider, input.supersededGeneration),
       ],
-      [input.supersededGeneration, input.ownerInstance],
+      [
+        input.supersededGeneration,
+        input.ownerInstance,
+        String(input.fenceToken),
+      ],
     );
     return toNumber(result) === 1;
   }
@@ -349,7 +507,11 @@ export class ProviderTradeReadinessStore {
     const meta = parseJson<SharedProviderMeta>(reply[1]);
     if (
       !meta ||
-      meta.schemaVersion !== PROVIDER_TRADE_READINESS_SCHEMA_VERSION
+      meta.schemaVersion !== PROVIDER_TRADE_READINESS_SCHEMA_VERSION ||
+      // A record with no usable fence token cannot be attributed to a live
+      // owner, so it is not evidence of anything.
+      typeof meta.fenceToken !== 'number' ||
+      !Number.isFinite(meta.fenceToken)
     ) {
       return unavailable(
         `The shared ${input.provider} trade readiness record is not readable.`,

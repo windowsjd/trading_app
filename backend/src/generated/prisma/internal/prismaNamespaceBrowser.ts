@@ -348,6 +348,8 @@ export const MarketCandleScalarFieldEnum = {
   isClosed: 'isClosed',
   sourceProvider: 'sourceProvider',
   sourceUpdatedAt: 'sourceUpdatedAt',
+  ingestSeq: 'ingestSeq',
+  ingestSeqAt: 'ingestSeqAt',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -768,6 +770,10 @@ export const LimitOrderReconciliationCheckpointScalarFieldEnum = {
   interval: 'interval',
   watermarkOpenTime: 'watermarkOpenTime',
   watermarkCandleId: 'watermarkCandleId',
+  watermarkIngestSeq: 'watermarkIngestSeq',
+  pendingIngestSeq: 'pendingIngestSeq',
+  pendingIngestSeqObservedAt: 'pendingIngestSeqObservedAt',
+  lastScannedIngestSeq: 'lastScannedIngestSeq',
   lastScannedOpenTime: 'lastScannedOpenTime',
   lastScannedCloseTime: 'lastScannedCloseTime',
   lastRunAt: 'lastRunAt',

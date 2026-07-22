@@ -24,6 +24,17 @@ export type LimitOrderMatchingConfig = {
   leaderRetryMs: number;
   /** Per-asset readiness: how old the canonical connection's last frame may be. */
   providerLivenessMaxAgeMs: number;
+  /**
+   * How long a per-asset readiness PROOF stays usable.
+   *
+   * The proof is established before the create transaction opens (it may need
+   * a Redis round trip) and re-verified inside it, where a network wait under
+   * the event-boundary lock is not allowed. This bounds the gap between the
+   * two: it must comfortably cover a create's row-lock waits, and must stay
+   * far below the connection liveness window so a proof can never outlive the
+   * evidence it was based on.
+   */
+  providerReadinessProofMaxAgeMs: number;
   /** Backlog gates (fail-closed for NEW limit quotes/creates only). */
   maxConsumerLag: number;
   maxPendingCount: number;
@@ -138,6 +149,13 @@ export function readLimitOrderMatchingConfig(
       1000,
       3_600_000,
     ),
+    providerReadinessProofMaxAgeMs: readInteger(
+      env,
+      'LIMIT_ORDER_PROVIDER_READINESS_PROOF_MAX_AGE_MS',
+      15_000,
+      1000,
+      600_000,
+    ),
     maxConsumerLag: readInteger(
       env,
       'LIMIT_ORDER_MATCHER_MAX_LAG',
@@ -221,6 +239,14 @@ export function readLimitOrderMatchingConfig(
   if (config.maxAckAgeMs <= config.blockMs) {
     throw new LimitOrderMatchingConfigError(
       'LIMIT_ORDER_MATCHER_MAX_ACK_AGE_MS must be greater than LIMIT_ORDER_EVENT_BLOCK_MS.',
+    );
+  }
+  // A proof that outlives the connection-liveness window would let a create
+  // commit against evidence the readiness check itself would already have
+  // rejected as stale.
+  if (config.providerReadinessProofMaxAgeMs > config.providerLivenessMaxAgeMs) {
+    throw new LimitOrderMatchingConfigError(
+      'LIMIT_ORDER_PROVIDER_READINESS_PROOF_MAX_AGE_MS must not exceed LIMIT_ORDER_PROVIDER_LIVENESS_MAX_AGE_MS.',
     );
   }
 

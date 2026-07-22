@@ -124,9 +124,13 @@ jobs:
       # ONE service instance must serialize on a real advisory lock.
       LIMIT_ORDER_BOUNDARY_CONCURRENCY_INTEGRATION: "1"
       # Path-B durable checkpoint: a candle unprocessed for longer than the
-      # lookback must still be processed, and a retention gap must be detected.
+      # lookback must still be processed, a candle STORED after the market-time
+      # marker passed its window must still be processed (the storage-order
+      # scan position), and a retention gap must be detected.
       LIMIT_ORDER_CANDLE_CHECKPOINT_INTEGRATION: "1"
-      # Multi-instance shared readiness over a real Redis.
+      # Multi-instance shared readiness over a real Redis: cross-instance
+      # agreement, the non-owner create readiness path (proof issued before the
+      # transaction, re-verified inside it), and owner fencing.
       LIMIT_ORDER_SHARED_READINESS_INTEGRATION: "1"
       # End-to-end matcher (XADD -> XACK). Reduced volume; only
       # hardware-independent invariants are asserted, never a throughput rate.
@@ -165,10 +169,13 @@ jobs:
       # races, health gate, and a reduced synthetic PUBLISHER throughput
       # sweep), plus the hardening suites: event-boundary concurrency
       # (session-per-lease, proven through pg_locks), the path-B durable
-      # checkpoint and retention-gap detection, cross-instance shared
-      # readiness over Redis, and the END-TO-END matcher path (XADD to XACK,
-      # which is a different and much lower number than publisher XADD
-      # throughput and must never be quoted for it).
+      # checkpoint including its STORAGE-order scan position (a candle stored
+      # after the market-time marker passed its window is still swept) and
+      # retention-gap detection, cross-instance shared readiness over Redis
+      # (the non-owner create readiness path and owner fencing), and the
+      # END-TO-END matcher path (XADD to XACK, which is a different and much
+      # lower number than publisher XADD throughput and must never be quoted
+      # for it; CI gates the arithmetic, never the rate).
       - name: Limit order PostgreSQL + Redis integration tests
         run: >-
           pnpm exec jest --runInBand

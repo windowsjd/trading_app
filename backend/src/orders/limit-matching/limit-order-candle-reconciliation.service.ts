@@ -46,20 +46,48 @@ export type LimitOrderCandleReconciliationSummary = {
   permanentCandles: number;
   from: string | null;
   to: string | null;
-  /** Durable position after the run; null while no candle was ever swept. */
+  /** Market-time marker after the run; null while no candle was ever swept. */
   watermarkOpenTime: string | null;
   watermarkCandleId: string | null;
+  /** Storage-order scan position after the run. Decimal string, never a number. */
+  watermarkIngestSeq: string | null;
+  /** Highest storage-order value observed this run (the next run's ceiling). */
+  observedIngestSeq: string | null;
+  /**
+   * True when the two-phase guard held the position back this run because
+   * write transactions from the previous observation had not all resolved.
+   */
+  ingestCeilingHeld: boolean;
   gapDetected: boolean;
   degradedReason: string | null;
 };
 
 type CandleRow = CanonicalCandleRow & {
+  /** Storage-order position of this row; see the class docstring. */
+  ingestSeq: bigint;
   asset: {
     id: string;
     assetType: AssetType;
     market: string;
     isActive: boolean;
   };
+};
+
+/**
+ * One consistent observation of the storage-order space, taken on the DATABASE
+ * clock so nothing here is ever compared against a Node clock.
+ */
+type IngestObservation = {
+  dbNow: Date;
+  /**
+   * Highest sequence value the watermark may reach given what is visible now.
+   * Bounded below the first row that is NOT yet sweepable (a closed row whose
+   * window ends in the future, which clock skew or a bad backfill can produce),
+   * so such a row is never stepped over.
+   */
+  ceiling: bigint;
+  /** Oldest write transaction currently open, or null when not observable. */
+  oldestWriteXactStart: Date | null;
 };
 
 type ProcessOutcome =
@@ -91,7 +119,7 @@ type ProcessOutcome =
  * window and was never examined again — a permanent, silent miss on a
  * financial safety net, and exactly the failure a safety net exists to prevent.
  *
- * The scan is now anchored on a durable WATERMARK
+ * The scan is anchored on a durable WATERMARK
  * (limit_order_reconciliation_checkpoints) plus a durable DEFERRED QUEUE
  * (limit_order_deferred_candles):
  *
@@ -102,15 +130,43 @@ type ProcessOutcome =
  *   - a candle that fails is enqueued for bounded retry BEFORE the watermark
  *     passes it, so one bad asset delays one candle instead of blocking every
  *     later candle behind it;
- *   - the watermark additionally lags `watermarkSafetyLagMs` behind now, so it
- *     never steps over a window whose canonical closed row the finalizer has
- *     not written yet;
  *   - if candle retention removes rows the watermark has not reached, that is
  *     reported as a GAP (sticky, operator-cleared) and fails NEW limit
  *     quotes/creates closed. It is never silently skipped.
  *
  * `lookbackMs` survives only as a BOOTSTRAP/catch-up bound and a warning
  * threshold — never as a reason to drop an unprocessed candle.
+ *
+ * STORAGE ORDER, NOT MARKET ORDER
+ * -------------------------------
+ * That watermark used to be a position in the canonical `(openTime, id)`
+ * ordering — MARKET time. Rows, however, appear in STORAGE time, and one
+ * global market-time position across every asset made late-stored candles
+ * unreachable:
+ *
+ *   asset A's 10:00 window is written late (provider gap, finalizer restart,
+ *   REST backfill); asset B's 10:05 window is written on time; the sweep
+ *   advances the single global watermark past 10:05; A's row finally lands
+ *   with openTime 10:00, which is now BEFORE the watermark, so the scan —
+ *   which reads strictly after it — never returns that row again.
+ *
+ * `watermarkSafetyLagMs` bounded how long the sweep waits, never how late a
+ * row may be stored, so it could only shrink that window, not close it.
+ *
+ * The forward scan is therefore driven by `market_candles.ingest_seq`, a
+ * monotonic value a database trigger assigns when a row is written and
+ * re-assigns when the row changes in a way that can change a matching decision
+ * (it becomes closed, its low or its window moves). A late-stored candle
+ * always carries a sequence value ABOVE the watermark, so it is always
+ * scanned, however old its window is. The market-time watermark is still
+ * maintained, now purely as the bootstrap anchor and the retention-gap marker.
+ *
+ * The advance is TWO-PHASE, because a sequence value is assigned at INSERT but
+ * only becomes visible at COMMIT: the highest value a run observes may still
+ * have uncommitted holes below it. A run records what it observed and only a
+ * LATER run may use that as a ceiling, once every write transaction that was
+ * in flight at the observation has demonstrably resolved. See
+ * `resolveIngestCeiling`.
  */
 @Injectable()
 export class LimitOrderCandleReconciliationService {
@@ -145,7 +201,13 @@ export class LimitOrderCandleReconciliationService {
       input.candleBatchSize ?? this.config.candleBatchSize;
     const bootstrapLookbackMs = input.lookbackMs ?? this.config.lookbackMs;
 
-    const checkpoint = await this.ensureCheckpoint(now, bootstrapLookbackMs);
+    const observation = await this.observeIngestSpace(now);
+    const checkpoint = await this.ensureCheckpoint(
+      now,
+      bootstrapLookbackMs,
+      observation,
+    );
+    const ingestWatermark = await this.resolveIngestWatermark(checkpoint);
     await this.checkpoints.markRunStarted(now);
 
     const summary: LimitOrderCandleReconciliationSummary = {
@@ -162,6 +224,9 @@ export class LimitOrderCandleReconciliationService {
       to: now.toISOString(),
       watermarkOpenTime: checkpoint.watermark?.openTime.toISOString() ?? null,
       watermarkCandleId: checkpoint.watermark?.candleId ?? null,
+      watermarkIngestSeq: ingestWatermark.toString(),
+      observedIngestSeq: observation.ceiling.toString(),
+      ingestCeilingHeld: false,
       gapDetected: checkpoint.gapDetectedAt !== null,
       degradedReason: checkpoint.degradedReason,
     };
@@ -169,7 +234,11 @@ export class LimitOrderCandleReconciliationService {
     // Retention may have removed rows the watermark has not reached yet. This
     // is checked BEFORE the sweep so the gap is durable even if the sweep
     // itself then fails.
-    const gap = await this.detectRetentionGap(checkpoint.watermark, now);
+    const gap = await this.detectRetentionGap(
+      checkpoint.watermark,
+      ingestWatermark,
+      now,
+    );
     if (gap) {
       summary.gapDetected = true;
       summary.degradedReason = gap.reason;
@@ -179,9 +248,9 @@ export class LimitOrderCandleReconciliationService {
     //    windows, and a due retry must not be starved by a busy live stream.
     await this.runDeferredRetries(now, orderBatchSize, summary);
 
-    // 2. New windows strictly after the watermark.
+    // 2. Rows stored after the storage-order position, oldest first.
     await this.runForwardScan(
-      checkpoint.watermark,
+      { checkpoint, ingestWatermark, observation },
       now,
       candleBatchSize,
       orderBatchSize,
@@ -194,9 +263,104 @@ export class LimitOrderCandleReconciliationService {
       latest?.watermark?.openTime.toISOString() ?? summary.watermarkOpenTime;
     summary.watermarkCandleId =
       latest?.watermark?.candleId ?? summary.watermarkCandleId;
+    summary.watermarkIngestSeq =
+      latest?.ingest.watermarkSeq?.toString() ?? summary.watermarkIngestSeq;
     summary.gapDetected = latest?.gapDetectedAt != null || summary.gapDetected;
     summary.degradedReason = latest?.degradedReason ?? summary.degradedReason;
     return summary;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Storage-order observation
+  // ---------------------------------------------------------------------------
+
+  /**
+   * One round trip, one clock. Reads:
+   *
+   *   - the database clock, which every later comparison is made against;
+   *   - the highest sequence value the watermark may reach. That is normally
+   *     MAX(ingest_seq) over canonical closed 5m rows, but it is capped just
+   *     below the FIRST row that is not sweepable yet (a closed row whose
+   *     window ends in the future). Taking the plain maximum would let the
+   *     watermark step over such a row and lose it, since the scan filters it
+   *     out until its window has actually ended;
+   *   - the oldest currently open WRITE transaction. A row inserted by a
+   *     transaction that is still open carries a sequence value that is not
+   *     visible yet, so the two-phase guard must not treat an observation as
+   *     settled while such a transaction from before it is still running.
+   *     `pg_stat_activity` hides other backends' `xact_start` from
+   *     unprivileged roles, in which case this reads NULL and the elapsed-time
+   *     bound alone applies.
+   */
+  private async observeIngestSpace(now: Date): Promise<IngestObservation> {
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        dbNow: Date;
+        maxSeq: bigint | null;
+        firstUnsweepableSeq: bigint | null;
+        oldestWriteXactStart: Date | null;
+      }>
+    >`
+      SELECT
+        clock_timestamp() AS "dbNow",
+        (
+          SELECT MAX(c."ingest_seq")
+          FROM "market_candles" c
+          WHERE c."interval" = ${LIMIT_ORDER_CANDLE_INTERVAL}
+            AND c."is_closed" = true
+        ) AS "maxSeq",
+        (
+          SELECT MIN(c."ingest_seq")
+          FROM "market_candles" c
+          WHERE c."interval" = ${LIMIT_ORDER_CANDLE_INTERVAL}
+            AND c."is_closed" = true
+            AND c."close_time" > ${now}
+        ) AS "firstUnsweepableSeq",
+        (
+          SELECT MIN(a."xact_start")
+          FROM "pg_stat_activity" a
+          WHERE a."datname" = current_database()
+            AND a."backend_xid" IS NOT NULL
+            AND a."xact_start" IS NOT NULL
+        ) AS "oldestWriteXactStart"
+    `;
+    const row = rows[0];
+    const maxSeq = row?.maxSeq ?? 0n;
+    const firstUnsweepable = row?.firstUnsweepableSeq ?? null;
+    const ceiling =
+      firstUnsweepable === null
+        ? maxSeq
+        : bigintMin(maxSeq, firstUnsweepable - 1n);
+    return {
+      dbNow: row?.dbNow ?? now,
+      ceiling: ceiling < 0n ? 0n : ceiling,
+      oldestWriteXactStart: row?.oldestWriteXactStart ?? null,
+    };
+  }
+
+  /**
+   * The storage-order position to scan from, adopting 0 for a checkpoint row
+   * that predates the column. See
+   * `LimitOrderReconciliationCheckpointRepository.adoptIngestWatermark`.
+   */
+  private async resolveIngestWatermark(checkpoint: {
+    ingest: { watermarkSeq: bigint | null };
+  }): Promise<bigint> {
+    if (checkpoint.ingest.watermarkSeq !== null) {
+      return checkpoint.ingest.watermarkSeq;
+    }
+    const adopted = await this.checkpoints.adoptIngestWatermark({ seq: 0n });
+    if (adopted) {
+      this.logger.warn(
+        JSON.stringify({
+          event: 'limit_order_candle_ingest_watermark_adopted',
+          adoptedSeq: '0',
+          reason:
+            'checkpoint predates the storage-order position; re-scanning from the beginning',
+        }),
+      );
+    }
+    return (await this.checkpoints.find())?.ingest.watermarkSeq ?? 0n;
   }
 
   // ---------------------------------------------------------------------------
@@ -227,7 +391,11 @@ export class LimitOrderCandleReconciliationService {
    * `candleBatchSize`, so a long catch-up is spread over ticks instead of
    * being dropped.
    */
-  private async ensureCheckpoint(now: Date, bootstrapLookbackMs: number) {
+  private async ensureCheckpoint(
+    now: Date,
+    bootstrapLookbackMs: number,
+    observation: IngestObservation,
+  ) {
     const existing = await this.checkpoints.find();
     if (existing) return existing;
 
@@ -241,7 +409,20 @@ export class LimitOrderCandleReconciliationService {
       ? { openTime: new Date(earliestEligible.getTime() - 1), candleId: null }
       : { openTime: safeBound, candleId: null };
 
-    const checkpoint = await this.checkpoints.ensure({ watermark, now });
+    // Storage-order anchor. With an activated path-B order the sweep owes
+    // someone a window whose row may have been stored at any point, so it
+    // starts at the beginning of the sequence; the scan's own filters keep
+    // that bounded to rows an order could actually match. With no such order
+    // there is nothing owed and the position starts at the present.
+    const checkpoint = await this.checkpoints.ensure({
+      watermark,
+      ingestWatermarkSeq: earliestEligible ? 0n : observation.ceiling,
+      // Seed the two-phase guard so the SECOND run can already advance,
+      // instead of spending one extra tick establishing a ceiling.
+      pendingIngestSeq: observation.ceiling,
+      pendingIngestSeqObservedAt: observation.dbNow,
+      now,
+    });
     if (
       earliestEligible &&
       now.getTime() - earliestEligible.getTime() > bootstrapLookbackMs
@@ -262,6 +443,7 @@ export class LimitOrderCandleReconciliationService {
       JSON.stringify({
         event: 'limit_order_candle_checkpoint_bootstrapped',
         watermarkOpenTime: checkpoint.watermark?.openTime.toISOString() ?? null,
+        watermarkIngestSeq: checkpoint.ingest.watermarkSeq?.toString() ?? null,
         hadActiveOrders: earliestEligible !== null,
       }),
     );
@@ -301,9 +483,20 @@ export class LimitOrderCandleReconciliationService {
    * 2. A candle sitting in the durable retry queue whose market_candles row
    *    has disappeared. That is the same loss observed from the other side,
    *    and it is why the queue deliberately carries no foreign key.
+   *
+   * 3. A candle the STORAGE-order position has not reached whose window is
+   *    already older than the retention horizon AND that an activated order
+   *    could still match. Signal 1 alone cannot see this: the market-time
+   *    marker moves with the newest windows the sweep touched, so a single
+   *    very old row stored late sits far behind it while the marker itself
+   *    looks perfectly current. The eligible-order condition is what keeps
+   *    this exact rather than noisy — a genuinely old window that no order
+   *    could ever match is not an exposure, and turning it into a sticky alarm
+   *    would fail every new limit order closed on a healthy system.
    */
   private async detectRetentionGap(
     watermark: ReconciliationWatermark | null,
+    ingestWatermark: bigint,
     now: Date,
   ): Promise<{ reason: string } | null> {
     if (!watermark) return null;
@@ -359,7 +552,85 @@ export class LimitOrderCandleReconciliationService {
       );
       return { reason };
     }
+
+    const unscanned = await this.findOldestUnscannedMatchableCandle(
+      ingestWatermark,
+      now,
+    );
+    if (
+      unscanned &&
+      unscanned.openTime.getTime() < retentionHorizon.getTime()
+    ) {
+      const reason = 'candle_retention_passed_unscanned_candle';
+      await this.checkpoints.recordGap({
+        detectedAt: now,
+        fromOpenTime: unscanned.openTime,
+        toOpenTime: retentionHorizon,
+        reason,
+      });
+      this.logger.error(
+        JSON.stringify({
+          event: 'limit_order_candle_unscanned_retention_gap',
+          marketCandleId: unscanned.id,
+          openTime: unscanned.openTime.toISOString(),
+          ingestSeq: unscanned.ingestSeq.toString(),
+          ingestWatermarkSeq: ingestWatermark.toString(),
+          retentionHorizon: retentionHorizon.toISOString(),
+        }),
+      );
+      return { reason };
+    }
     return null;
+  }
+
+  /**
+   * Oldest window (by market time) that the storage-order position has not
+   * reached and that an activated order could still match. Uses exactly the
+   * scan's eligibility conditions, so it can never report a row the sweep
+   * would have ignored anyway.
+   */
+  private findOldestUnscannedMatchableCandle(
+    ingestWatermark: bigint,
+    to: Date,
+  ): Promise<{ id: string; openTime: Date; ingestSeq: bigint } | null> {
+    return this.prisma.$queryRaw<
+      Array<{ id: string; openTime: Date; ingestSeq: bigint }>
+    >`
+        SELECT c."id", c."open_time" AS "openTime", c."ingest_seq" AS "ingestSeq"
+        FROM "market_candles" c
+        JOIN "assets" a ON a."id" = c."asset_id"
+        WHERE c."interval" = ${LIMIT_ORDER_CANDLE_INTERVAL}
+          AND c."is_closed" = true
+          AND c."ingest_seq" IS NOT NULL
+          AND c."ingest_seq" > ${ingestWatermark.toString()}::bigint
+          AND c."close_time" <= ${to}
+          AND a."is_active" = true
+          AND NOT EXISTS (
+            SELECT 1 FROM "limit_order_processed_candles" p
+            WHERE p."market_candle_id" = c."id"
+          )
+          -- A candle already in the durable retry queue is tracked, not lost.
+          -- Its own disappearance is signal 2, and a queue that stops draining
+          -- is the deferred-backlog health gate. Alarming on it here as well
+          -- would turn ordinary retry latency into a sticky, operator-cleared
+          -- gap that fails every new limit order closed.
+          AND NOT EXISTS (
+            SELECT 1 FROM "limit_order_deferred_candles" d
+            WHERE d."market_candle_id" = c."id"
+          )
+          AND EXISTS (
+            SELECT 1 FROM "orders" o
+            WHERE o."asset_id" = c."asset_id"
+              AND o."order_type" = 'limit'
+              AND o."side" = 'buy'
+              AND o."status" = 'submitted'
+              AND o."candle_matching_eligible_from" IS NOT NULL
+              AND o."candle_matching_eligible_from" <= c."open_time"
+              AND o."limit_price" >= c."low"
+          )
+        ORDER BY c."open_time" ASC
+        LIMIT 1
+      `.then((rows) => rows[0] ?? null);
   }
 
   // ---------------------------------------------------------------------------
@@ -436,21 +707,31 @@ export class LimitOrderCandleReconciliationService {
   // ---------------------------------------------------------------------------
 
   private async runForwardScan(
-    watermark: ReconciliationWatermark | null,
+    position: {
+      checkpoint: {
+        ingest: { pendingSeq: bigint | null; pendingObservedAt: Date | null };
+      };
+      ingestWatermark: bigint;
+      observation: IngestObservation;
+    },
     now: Date,
     candleBatchSize: number,
     orderBatchSize: number,
     summary: LimitOrderCandleReconciliationSummary,
   ): Promise<void> {
     const candles = await this.findUnprocessedCandles({
-      after: watermark,
+      afterIngestSeq: position.ingestWatermark,
       to: now,
       limit: candleBatchSize,
     });
     summary.scannedCandles = candles.length;
     summary.from = candles[0]?.openTime.toISOString() ?? summary.from ?? null;
 
-    let lastHandled: CandleRow | null = null;
+    // The last row in STORAGE order is not the furthest window in MARKET
+    // order — that is the whole reason this scan exists. The market-time
+    // marker therefore tracks the greatest window handled, not the last one.
+    let lastHandledSeq: bigint | null = null;
+    let furthestHandled: CandleRow | null = null;
     for (const candle of candles) {
       const outcome = await this.processCandleGuarded(
         candle,
@@ -478,15 +759,128 @@ export class LimitOrderCandleReconciliationService {
         });
         summary.deferredCandles += 1;
       }
-      lastHandled = candle;
+      lastHandledSeq = candle.ingestSeq;
+      if (
+        !furthestHandled ||
+        comparePosition(
+          { openTime: candle.openTime, candleId: candle.id },
+          {
+            openTime: furthestHandled.openTime,
+            candleId: furthestHandled.id,
+          },
+        ) > 0
+      ) {
+        furthestHandled = candle;
+      }
     }
 
+    await this.advanceIngestPosition({
+      current: position.ingestWatermark,
+      pendingSeq: position.checkpoint.ingest.pendingSeq,
+      pendingObservedAt: position.checkpoint.ingest.pendingObservedAt,
+      observation: position.observation,
+      lastHandledSeq,
+      truncated: candles.length >= candleBatchSize,
+      summary,
+    });
+
     await this.advancePosition({
-      lastHandled,
+      lastHandled: furthestHandled,
       exhausted: candles.length < candleBatchSize,
       now,
       summary,
     });
+  }
+
+  /**
+   * Moves the STORAGE-order position forward, under the two-phase guard.
+   *
+   * A sequence value is assigned when a row is INSERTED but becomes visible
+   * only when its transaction COMMITS. The highest value visible right now can
+   * therefore still have holes below it, and stepping onto it would skip
+   * whatever fills those holes a moment later — the very failure this whole
+   * position exists to prevent, just moved from market time into storage time.
+   *
+   * So the ceiling is never this run's own observation. It is the value a
+   * PREVIOUS run observed, and only once both hold:
+   *
+   *   1. at least `ingestSettleGraceMs` of database time has passed since that
+   *      observation, and
+   *   2. no write transaction that was already open at that observation is
+   *      still running (checked exactly when `pg_stat_activity` exposes it;
+   *      when the role cannot see it, condition 1 is the bound).
+   *
+   * Every transaction in flight at the observation has then resolved, and this
+   * run's scan — which read strictly above the OLD watermark — has already
+   * returned whatever they committed.
+   *
+   * Within that ceiling the position advances to:
+   *   - the last row actually handled, when the batch was truncated (rows
+   *     beyond it were never examined), or
+   *   - the ceiling itself otherwise, which correctly steps over rows the scan
+   *     filtered out because no order could ever match them.
+   */
+  private async advanceIngestPosition(input: {
+    current: bigint;
+    pendingSeq: bigint | null;
+    pendingObservedAt: Date | null;
+    observation: IngestObservation;
+    lastHandledSeq: bigint | null;
+    truncated: boolean;
+    summary: LimitOrderCandleReconciliationSummary;
+  }): Promise<void> {
+    const ceiling = this.resolveIngestCeiling(input);
+    if (ceiling === null) {
+      input.summary.ingestCeilingHeld = true;
+    }
+
+    const candidate = input.truncated
+      ? input.lastHandledSeq
+      : (ceiling ?? input.current);
+    const bounded =
+      candidate === null
+        ? input.current
+        : ceiling === null
+          ? input.current
+          : bigintMin(candidate, ceiling);
+
+    if (bounded > input.current) {
+      await this.checkpoints.advanceIngestWatermark({
+        seq: bounded,
+        lastScannedSeq: input.lastHandledSeq,
+      });
+      input.summary.watermarkIngestSeq = bounded.toString();
+    }
+
+    // Recorded LAST, so this run's own observation can only ever be used as a
+    // ceiling by a later run.
+    await this.checkpoints.recordPendingIngestSeq({
+      seq: input.observation.ceiling,
+      observedAt: input.observation.dbNow,
+    });
+  }
+
+  /** The settled ceiling, or null when the guard holds the position back. */
+  private resolveIngestCeiling(input: {
+    pendingSeq: bigint | null;
+    pendingObservedAt: Date | null;
+    observation: IngestObservation;
+  }): bigint | null {
+    const { pendingSeq, pendingObservedAt, observation } = input;
+    if (pendingSeq === null || pendingObservedAt === null) return null;
+    const elapsedMs = observation.dbNow.getTime() - pendingObservedAt.getTime();
+    if (elapsedMs < this.config.ingestSettleGraceMs) return null;
+    if (
+      observation.oldestWriteXactStart !== null &&
+      observation.oldestWriteXactStart.getTime() <= pendingObservedAt.getTime()
+    ) {
+      // A write transaction older than the observation is still open, so a row
+      // it inserted may still appear below the pending value.
+      return null;
+    }
+    // Never above what is actually visible now: the pending value is a bound,
+    // not a promise that those rows still exist.
+    return bigintMin(pendingSeq, observation.ceiling);
   }
 
   /**
@@ -787,18 +1181,20 @@ export class LimitOrderCandleReconciliationService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Closed 5m rows strictly AFTER the durable position that have no
+   * Closed 5m rows STORED after the durable position that have no
    * processed-candle row, are not already in the durable retry queue, and
    * whose asset has at least one activated, still-open limit buy that the
    * window could fill.
+   *
+   * Ordered by `ingest_seq`, not by `open_time`: the ordering must be the one
+   * the watermark advances through, or a row could sit permanently between the
+   * scan's ordering and the position's.
    */
   private findUnprocessedCandles(input: {
-    after: ReconciliationWatermark | null;
+    afterIngestSeq: bigint;
     to: Date;
     limit: number;
   }): Promise<CandleRow[]> {
-    const afterOpenTime = input.after?.openTime ?? null;
-    const afterCandleId = input.after?.candleId ?? null;
     return this.prisma.$queryRaw<
       Array<{
         id: string;
@@ -813,6 +1209,7 @@ export class LimitOrderCandleReconciliationService {
         isClosed: boolean;
         sourceProvider: string;
         sourceUpdatedAt: Date;
+        ingestSeq: bigint;
         assetType: AssetType;
         market: string;
         assetIsActive: boolean;
@@ -831,6 +1228,7 @@ export class LimitOrderCandleReconciliationService {
           c."is_closed" AS "isClosed",
           c."source_provider" AS "sourceProvider",
           c."source_updated_at" AS "sourceUpdatedAt",
+          c."ingest_seq" AS "ingestSeq",
           a."asset_type" AS "assetType",
           a."market",
           a."is_active" AS "assetIsActive"
@@ -838,14 +1236,8 @@ export class LimitOrderCandleReconciliationService {
         JOIN "assets" a ON a."id" = c."asset_id"
         WHERE c."interval" = ${LIMIT_ORDER_CANDLE_INTERVAL}
           AND c."is_closed" = true
-          AND (
-            ${afterOpenTime}::timestamptz IS NULL
-            OR c."open_time" > ${afterOpenTime}::timestamptz
-            OR (
-              c."open_time" = ${afterOpenTime}::timestamptz
-              AND (${afterCandleId}::text IS NULL OR c."id" > ${afterCandleId}::text)
-            )
-          )
+          AND c."ingest_seq" IS NOT NULL
+          AND c."ingest_seq" > ${input.afterIngestSeq.toString()}::bigint
           AND c."close_time" <= ${input.to}
           AND a."is_active" = true
           AND NOT EXISTS (
@@ -866,7 +1258,7 @@ export class LimitOrderCandleReconciliationService {
               AND o."candle_matching_eligible_from" <= c."open_time"
               AND o."limit_price" >= c."low"
           )
-        ORDER BY c."open_time" ASC, c."id" ASC
+        ORDER BY c."ingest_seq" ASC
         LIMIT ${input.limit}
       `.then((rows) => rows.map(toCandleRow));
   }
@@ -886,6 +1278,7 @@ export class LimitOrderCandleReconciliationService {
         isClosed: boolean;
         sourceProvider: string;
         sourceUpdatedAt: Date;
+        ingestSeq: bigint | null;
         assetType: AssetType;
         market: string;
         assetIsActive: boolean;
@@ -904,13 +1297,18 @@ export class LimitOrderCandleReconciliationService {
           c."is_closed" AS "isClosed",
           c."source_provider" AS "sourceProvider",
           c."source_updated_at" AS "sourceUpdatedAt",
+          c."ingest_seq" AS "ingestSeq",
           a."asset_type" AS "assetType",
           a."market",
           a."is_active" AS "assetIsActive"
         FROM "market_candles" c
         JOIN "assets" a ON a."id" = c."asset_id"
         WHERE c."id" = ${marketCandleId}
-      `.then((rows) => (rows[0] ? toCandleRow(rows[0]) : null));
+      `.then((rows) =>
+      rows[0]
+        ? toCandleRow({ ...rows[0], ingestSeq: rows[0].ingestSeq ?? 0n })
+        : null,
+    );
   }
 
   /** Latest canonical closed window whose close time is at or before `bound`. */
@@ -959,6 +1357,7 @@ function toCandleRow(row: {
   isClosed: boolean;
   sourceProvider: string;
   sourceUpdatedAt: Date;
+  ingestSeq: bigint;
   assetType: AssetType;
   market: string;
   assetIsActive: boolean;
@@ -976,6 +1375,7 @@ function toCandleRow(row: {
     isClosed: row.isClosed,
     sourceProvider: row.sourceProvider,
     sourceUpdatedAt: row.sourceUpdatedAt,
+    ingestSeq: row.ingestSeq,
     asset: {
       id: row.assetId,
       assetType: row.assetType,
@@ -983,6 +1383,10 @@ function toCandleRow(row: {
       isActive: row.assetIsActive,
     },
   };
+}
+
+function bigintMin(left: bigint, right: bigint): bigint {
+  return left < right ? left : right;
 }
 
 function disabledSummary(): LimitOrderCandleReconciliationSummary {
@@ -1000,6 +1404,9 @@ function disabledSummary(): LimitOrderCandleReconciliationSummary {
     to: null,
     watermarkOpenTime: null,
     watermarkCandleId: null,
+    watermarkIngestSeq: null,
+    observedIngestSeq: null,
+    ingestCeilingHeld: false,
     gapDetected: false,
     degradedReason: null,
   };

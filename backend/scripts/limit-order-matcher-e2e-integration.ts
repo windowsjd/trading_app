@@ -17,11 +17,37 @@
  *   limit_order_publisher_throughput      (phase-3 runner) — XADD only
  *   limit_order_matcher_e2e_throughput    (this runner)    — XADD to XACK
  *
+ * WHAT THE MEASUREMENT ACTUALLY MEANS
+ * -----------------------------------
+ * Getting the NAMES right is not enough; the numbers under them have to be
+ * arithmetic anyone can reconstruct. Three corrections define this runner:
+ *
+ * 1. THE MATCHER IS NOT RUNNING WHILE THE BACKLOG IS PUBLISHED. It used to be,
+ *    and the drain rate was then computed as `all events / tail-drain time` —
+ *    dividing the FULL event count by the sliver of time left after the
+ *    publisher stopped. A matcher that kept up in real time produced a
+ *    near-zero denominator and an absurd rate. Now every event is XADDed
+ *    first, the consumer is started at a recorded instant, and the drain window
+ *    provably contains all of the consumer's work for all of the events.
+ *
+ * 2. LATENCY IS MEASURED TO THE ACK, because that is what the name claims. The
+ *    processed-event row's `processed_at` is stamped BEFORE its own insert and
+ *    before the XACK, so quoting it as "xadd to xack" overstated the matcher by
+ *    exactly the work that remained. The stream service is instrumented here to
+ *    record the real ACK instant, on the same clock as the XADD.
+ *
+ * 3. NOTHING IS REPORTED THAT WAS NOT MEASURED. A hardcoded `boundaryWaitMs: 0`
+ *    used to be printed as if it were an observation, and the create-boundary
+ *    wait was timed BEFORE the load started — on an idle system — while being
+ *    described as the wait under full tilt. Both are now measured against real
+ *    contention, during the drain.
+ *
  * CI runs a reduced volume and asserts only hardware-independent invariants
  * (everything processed and ACKed within the deadline, lag and pending back to
- * zero, no duplicate fill, no residual advisory lock, no degraded state). The
- * absolute rates are printed for the soak run
- * (`pnpm soak:limit-order-matcher-e2e`), never asserted.
+ * zero, no duplicate fill, no residual advisory lock, no degraded state, and
+ * that every reported rate has a real denominator). The absolute rates are
+ * printed for the soak run (`pnpm soak:limit-order-matcher-e2e`), never
+ * asserted.
  *
  * REQUIRES A DISPOSABLE DATABASE.
  */
@@ -48,7 +74,10 @@ import { LimitOrderCandidateRepository } from '../src/orders/limit-matching/limi
 import { LimitOrderCandleReconciliationService } from '../src/orders/limit-matching/limit-order-candle-reconciliation.service';
 import { calculateCandleMatchingEligibleFrom } from '../src/orders/limit-matching/limit-order-candle-eligibility';
 import { LimitOrderEventPollerService } from '../src/orders/limit-matching/limit-order-event-poller.service';
-import { LimitOrderEventStreamService } from '../src/orders/limit-matching/limit-order-event-stream.service';
+import {
+  LimitOrderEventStreamService,
+  type LimitOrderStreamEntry,
+} from '../src/orders/limit-matching/limit-order-event-stream.service';
 import { LimitOrderExecutionService } from '../src/orders/limit-matching/limit-order-execution.service';
 import {
   LIMIT_ORDER_MATCH_BOUNDARY_KEY,
@@ -113,6 +142,69 @@ const workers: MatcherWorker[] = [];
 
 /** XADD timestamps by eventId, so latency is measured across the whole path. */
 const publishedAt = new Map<string, number>();
+/** XACK timestamps by eventId, recorded by the instrumented stream service. */
+const acknowledgedAt = new Map<string, number>();
+
+/**
+ * The production stream service with two observation points added: the
+ * streamId -> eventId mapping every read already carries, and the instant the
+ * ACK returns.
+ *
+ * Subclassed rather than reimplemented so the measured path IS the production
+ * path — a hand-written copy would drift and would stop measuring the thing it
+ * claims to. Both clocks here are this process's, the same one that stamps the
+ * XADD, so the latency needs no cross-host correction.
+ */
+class InstrumentedStreamService extends LimitOrderEventStreamService {
+  private readonly eventIdByStreamId = new Map<string, string>();
+
+  override async readNew(
+    config: Parameters<LimitOrderEventStreamService['readNew']>[0],
+  ): ReturnType<LimitOrderEventStreamService['readNew']> {
+    return this.remember(await super.readNew(config));
+  }
+
+  override async readOwnPending(
+    config: Parameters<LimitOrderEventStreamService['readOwnPending']>[0],
+  ): ReturnType<LimitOrderEventStreamService['readOwnPending']> {
+    return this.remember(await super.readOwnPending(config));
+  }
+
+  override async reclaimStale(
+    config: Parameters<LimitOrderEventStreamService['reclaimStale']>[0],
+  ): ReturnType<LimitOrderEventStreamService['reclaimStale']> {
+    const result = await super.reclaimStale(config);
+    this.remember(result.entries);
+    return result;
+  }
+
+  override async acknowledge(
+    config: Parameters<LimitOrderEventStreamService['acknowledge']>[0],
+    streamId: string,
+  ): Promise<void> {
+    await super.acknowledge(config, streamId);
+    const at = Date.now();
+    const eventId = this.eventIdByStreamId.get(streamId);
+    // First ACK wins: a duplicate XADD of the same eventId gets its own
+    // streamId, and overwriting would silently replace a measured latency with
+    // the duplicate's much shorter one.
+    if (eventId !== undefined && !acknowledgedAt.has(eventId)) {
+      acknowledgedAt.set(eventId, at);
+    }
+  }
+
+  private remember(
+    entries: readonly LimitOrderStreamEntry[],
+  ): LimitOrderStreamEntry[] {
+    for (const entry of entries) {
+      // A malformed entry has no eventId; it still gets ACKed (into the DLQ
+      // path) but there is nothing to attribute a latency to.
+      if (entry.eventId === null) continue;
+      this.eventIdByStreamId.set(entry.streamId, entry.eventId);
+    }
+    return [...entries];
+  }
+}
 
 type Asset = { id: string; symbol: string; hasOrders: boolean };
 const assets: Asset[] = [];
@@ -136,12 +228,17 @@ async function main(): Promise<void> {
 
   try {
     await createSharedMarket();
-    const worker = await startWorker();
-
-    const report = await runLoad(worker);
+    // The consumer is started INSIDE runLoad, after the backlog exists, so the
+    // drain window it measures actually contains all of the consumer's work.
+    const report = await runLoad();
+    const worker = workers[0];
+    assert.ok(worker, 'the load must have started a matcher worker');
 
     await run('every published event is processed and acknowledged', () =>
       assertAllProcessedAndAcked(report),
+    );
+    await run('every reported rate has a measured denominator', () =>
+      assertMeasurementIsSound(report),
     );
     await run('consumer lag returns to zero', assertNoLag);
     await run('pending returns to zero', assertNoPending);
@@ -184,6 +281,17 @@ function requireEnvironment(): void {
     undefined,
     'the runner needs its own LIMIT_ORDER_EVENT_STREAM_KEY',
   );
+  // The backlog is published in full BEFORE the consumer starts, which is what
+  // makes the drain rate honest — but it also means the whole backlog has to
+  // survive the stream's trim window. A run that silently trimmed unread
+  // entries would report a drain over fewer events than it published, so this
+  // is a precondition rather than a runtime surprise. Raise
+  // LIMIT_ORDER_EVENT_MAXLEN alongside the soak volume.
+  const backlog = ASSET_COUNT * EVENTS_PER_ASSET;
+  assert.ok(
+    backlog < config.eventMaxLen,
+    `LIMIT_ORDER_EVENT_MAXLEN (${config.eventMaxLen}) must exceed the ${backlog}-event backlog this run publishes before consuming.`,
+  );
 }
 
 async function run(name: string, test: () => Promise<void>): Promise<void> {
@@ -197,13 +305,29 @@ async function run(name: string, test: () => Promise<void>): Promise<void> {
 
 type Report = {
   totalEvents: number;
+  /** Wall clock of the XADD phase alone, with no consumer and no sampling. */
   publishElapsedMs: number;
+  /**
+   * Wall clock from starting the consumer to the last ACK of the backlog. The
+   * consumer did NOT run before this window, so all `totalEvents` events were
+   * consumed inside it and the rate below has an honest denominator.
+   */
   drainElapsedMs: number;
+  /** XADD -> XACK per event, in milliseconds, on one clock. */
   latencies: number[];
+  /** Events that reached an ACK. Asserted to equal totalEvents. */
+  ackedEvents: number;
   processedEventRows: number;
   matchedOrders: number;
-  boundaryWaitMs: number;
   createBoundaryWaitMs: number;
+  /**
+   * Whether the concurrent path-B sweep was actually ENABLED for this run. It
+   * is not by default, and reporting its contention unconditionally would
+   * describe pressure the run never applied.
+   */
+  sweepEnabled: boolean;
+  /** Candles the concurrent sweep processed; null if the sweep threw. */
+  sweepProcessedCandles: number | null;
   peakPending: number;
   peakLag: number;
   connectionCount: number;
@@ -211,58 +335,96 @@ type Report = {
 };
 
 /**
- * The load itself. Three shapes are mixed on purpose, because their per-event
- * cost differs by an order of magnitude:
+ * The load. Three shapes are mixed on purpose, because their per-event cost
+ * differs by an order of magnitude:
  *   - assets with NO order at all (dedupe + candidate query, no transaction),
  *   - assets with ONE order (one execution transaction),
  *   - assets with SEVERAL orders on the same event (several transactions under
  *     a single boundary hold).
- * A path-B sweep and a boundary-waiting Create run CONCURRENTLY, so the
- * measurement includes real contention rather than an idle-system best case.
+ *
+ * PHASE 1 — backlog. Every event is XADDed with NO consumer running. Nothing
+ * is sampled inside the timed loop, so `publishElapsedMs` measures publishing
+ * and nothing else.
+ *
+ * PHASE 2 — drain. The consumer starts, and a boundary-waiting Create runs
+ * CONCURRENTLY — plus a path-B sweep when path B is enabled for the run — so
+ * the measurement includes real contention rather than an idle-system best
+ * case. Whether the sweep was actually enabled is REPORTED, because the sweep
+ * is off by default and describing contention the run never applied is the
+ * same class of error as the rates this runner exists to fix. Backlog depth is
+ * sampled on its own timer rather than from inside either loop.
  */
-async function runLoad(worker: MatcherWorker): Promise<Report> {
-  const startedAt = Date.now();
-  let peakPending = 0;
-  let peakLag = 0;
-
-  // Contention: a path-B sweep and a Create both competing for the boundary
-  // while the matcher is consuming.
-  const sweep = candles.reconcile({ now: new Date() }).catch(() => undefined);
-  const createWait = measureCreateBoundaryWait();
-
+async function runLoad(): Promise<Report> {
+  // ---- Phase 1: publish the whole backlog with the matcher stopped. --------
+  const publishStartedAt = Date.now();
   for (let round = 0; round < EVENTS_PER_ASSET; round += 1) {
     for (const asset of assets) {
-      publishedAt.set(`binance:${asset.id}:e2e-${round}`, Date.now());
-      publishedEventIds.push(await publishTrade(asset, `e2e-${round}`));
+      // Stamped from the id the publisher actually returned, AFTER the XADD
+      // completed — that instant is when the event exists in the stream, which
+      // is what "xadd to xack" means. Stamping before the call would fold the
+      // publisher's own validation into the matcher's number, and deriving the
+      // id by hand (as this used to) meant a format change silently dropped
+      // every latency sample instead of failing.
+      const eventId = await publishTrade(asset, `e2e-${round}`);
+      publishedAt.set(eventId, Date.now());
+      publishedEventIds.push(eventId);
     }
-    const info = await worker.stream.inspect(config);
-    peakPending = Math.max(peakPending, info.pendingCount);
-    peakLag = Math.max(peakLag, info.lag ?? 0);
   }
-  const publishElapsedMs = Math.max(1, Date.now() - startedAt);
+  const publishElapsedMs = Math.max(1, Date.now() - publishStartedAt);
 
+  // ---- Phase 2: start the consumer and time the whole drain. --------------
+  let peakPending = 0;
+  let peakLag = 0;
   const drainStartedAt = Date.now();
-  await waitFor(
-    async () => (await processedCount()) >= publishedEventIds.length,
-    'every published event reaches a processed-event row',
-    DRAIN_TIMEOUT_MS,
-  );
-  await waitFor(
-    async () => (await worker.stream.inspect(config)).pendingCount === 0,
-    'every event is acknowledged',
-    DRAIN_TIMEOUT_MS,
-  );
+  const worker = await startWorker();
+  const sampler = setInterval(() => {
+    void worker.stream
+      .inspect(config)
+      .then((info) => {
+        peakPending = Math.max(peakPending, info.pendingCount);
+        peakLag = Math.max(peakLag, info.lag ?? 0);
+      })
+      .catch(() => undefined);
+  }, 100);
+  sampler.unref?.();
+
+  // Contention, started with the drain rather than before the load: a create
+  // that acquires the boundary on an idle system measures nothing.
+  const sweep = candles
+    .reconcile({ now: new Date() })
+    .then((summary) => summary.processedCandles)
+    .catch((error: unknown) => {
+      console.error('concurrent path-B sweep failed', error);
+      return null;
+    });
+  const createWait = measureCreateBoundaryWait();
+
+  try {
+    await waitFor(
+      async () => (await processedCount()) >= publishedEventIds.length,
+      'every published event reaches a processed-event row',
+      DRAIN_TIMEOUT_MS,
+    );
+    await waitFor(
+      async () => (await worker.stream.inspect(config)).pendingCount === 0,
+      'every event is acknowledged',
+      DRAIN_TIMEOUT_MS,
+    );
+  } finally {
+    clearInterval(sampler);
+  }
   const drainElapsedMs = Math.max(1, Date.now() - drainStartedAt);
 
-  await sweep;
+  const sweepProcessedCandles = await sweep;
   const createBoundaryWaitMs = await createWait;
 
-  const latencies = await measureLatencies();
+  const latencies = measureLatencies();
   return {
     totalEvents: publishedEventIds.length,
     publishElapsedMs,
     drainElapsedMs,
     latencies,
+    ackedEvents: latencies.length,
     processedEventRows: await processedCount(),
     matchedOrders: await prisma.order.count({
       where: {
@@ -270,8 +432,9 @@ async function runLoad(worker: MatcherWorker): Promise<Report> {
         status: OrderStatus.executed,
       },
     }),
-    boundaryWaitMs: 0,
     createBoundaryWaitMs,
+    sweepEnabled: candles.isEnabled(),
+    sweepProcessedCandles,
     peakPending,
     peakLag,
     connectionCount: await connectionCount(),
@@ -280,20 +443,20 @@ async function runLoad(worker: MatcherWorker): Promise<Report> {
 }
 
 /**
- * XADD -> processed-event insert, per event. `processed_at` is written by the
- * consumer immediately before the ACK, so this is the whole path minus the ACK
- * round trip itself.
+ * XADD -> XACK, per event, both instants taken from THIS process's clock.
+ *
+ * The previous version subtracted the XADD stamp from `limit_order_processed_
+ * events.processed_at`, which the consumer writes BEFORE its own insert and
+ * before the ACK. That understated the path by exactly the work the name
+ * claims to include, so it is now taken from the instrumented ACK instead.
  */
-async function measureLatencies(): Promise<number[]> {
-  const rows = await prisma.limitOrderProcessedEvent.findMany({
-    where: { eventId: { in: publishedEventIds } },
-    select: { eventId: true, processedAt: true },
-  });
+function measureLatencies(): number[] {
   const latencies: number[] = [];
-  for (const row of rows) {
-    const start = publishedAt.get(row.eventId);
-    if (start === undefined) continue;
-    latencies.push(Math.max(0, row.processedAt.getTime() - start));
+  for (const eventId of publishedEventIds) {
+    const start = publishedAt.get(eventId);
+    const end = acknowledgedAt.get(eventId);
+    if (start === undefined || end === undefined) continue;
+    latencies.push(Math.max(0, end - start));
   }
   latencies.sort((left, right) => left - right);
   return latencies;
@@ -313,14 +476,6 @@ async function measureCreateBoundaryWait(): Promise<number> {
 }
 
 function printReport(report: Report): void {
-  const percentile = (ratio: number): number =>
-    report.latencies[
-      Math.min(
-        report.latencies.length - 1,
-        Math.floor(report.latencies.length * ratio),
-      )
-    ] ?? 0;
-  const totalElapsed = report.publishElapsedMs + report.drainElapsedMs;
   console.log(
     JSON.stringify({
       // Deliberately NOT `limit_order_publisher_throughput`: this is the whole
@@ -329,37 +484,64 @@ function printReport(report: Report): void {
       measured: 'xadd_to_xack',
       assetCount: assets.length,
       totalEvents: report.totalEvents,
-      publishElapsedMs: report.publishElapsedMs,
+
+      // ---- Matcher capacity. The ONE number this runner exists to produce.
+      // Its denominator is the window in which the consumer ran, and its
+      // numerator is the events consumed in that window — nothing else.
       drainElapsedMs: report.drainElapsedMs,
-      endToEndEventsPerSecond: Math.round(
-        (report.totalEvents / Math.max(1, totalElapsed)) * 1000,
+      matcherDrainEventsPerSecond: rate(
+        report.totalEvents,
+        report.drainElapsedMs,
       ),
-      drainEventsPerSecond: Math.round(
-        (report.totalEvents / report.drainElapsedMs) * 1000,
+
+      // ---- The runner's own XADD rate, for context only. It is what THIS
+      // process could publish while nothing consumed, and is neither the
+      // matcher's capacity nor the phase-3 publisher benchmark.
+      publishElapsedMs: report.publishElapsedMs,
+      runnerXaddEventsPerSecond: rate(
+        report.totalEvents,
+        report.publishElapsedMs,
       ),
-      processedEventInsertsPerSecond: Math.round(
-        (report.processedEventRows / Math.max(1, totalElapsed)) * 1000,
-      ),
-      latencyMsAvg:
-        report.latencies.length === 0
-          ? 0
-          : Math.round(
-              (report.latencies.reduce((sum, value) => sum + value, 0) /
-                report.latencies.length) *
-                100,
-            ) / 100,
-      latencyMsP50: percentile(0.5),
-      latencyMsP95: percentile(0.95),
-      latencyMsP99: percentile(0.99),
+
+      // ---- Latency, XADD to XACK, both stamped on this process's clock.
+      ackedEvents: report.ackedEvents,
+      latencyMsAvg: average(report.latencies),
+      latencyMsP50: percentile(report.latencies, 50),
+      latencyMsP95: percentile(report.latencies, 95),
+      latencyMsP99: percentile(report.latencies, 99),
       latencyMsMax: report.latencies[report.latencies.length - 1] ?? 0,
+
       matchedOrders: report.matchedOrders,
+      processedEventRows: report.processedEventRows,
       peakPending: report.peakPending,
       peakConsumerLag: report.peakLag,
+      // Measured DURING the drain, against the real matcher, not before it.
       createBoundaryWaitMs: report.createBoundaryWaitMs,
+      // Reported together on purpose: the candle count means nothing without
+      // knowing whether the sweep was switched on at all.
+      concurrentSweepEnabled: report.sweepEnabled,
+      concurrentSweepProcessedCandles: report.sweepProcessedCandles,
       postgresConnections: report.connectionCount,
       heapUsedMb: report.heapUsedMb,
     }),
   );
+}
+
+function rate(count: number, elapsedMs: number): number {
+  return Math.round((count / Math.max(1, elapsedMs)) * 1000);
+}
+
+function average(values: readonly number[]): number {
+  if (values.length === 0) return 0;
+  const sum = values.reduce((total, value) => total + value, 0);
+  return Math.round((sum / values.length) * 100) / 100;
+}
+
+/** Nearest-rank percentile over an ascending array. */
+function percentile(values: readonly number[], rank: number): number {
+  if (values.length === 0) return 0;
+  const index = Math.ceil((rank / 100) * values.length) - 1;
+  return values[Math.min(values.length - 1, Math.max(0, index))] ?? 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -373,6 +555,61 @@ async function assertAllProcessedAndAcked(report: Report): Promise<void> {
     'every published event must have exactly one processed-event row',
   );
   assert.ok(report.totalEvents > 0);
+}
+
+/**
+ * Hardware-INDEPENDENT guards on the arithmetic itself. No rate is asserted —
+ * a GitHub runner's throughput says nothing about production capacity — but a
+ * rate computed from a denominator that does not contain the work, or from a
+ * sample set smaller than the population, is a defect on any hardware.
+ */
+async function assertMeasurementIsSound(report: Report): Promise<void> {
+  // 1. The matcher must not have consumed anything before the drain window
+  //    opened, or the drain rate would divide all events by part of the time.
+  assert.equal(
+    report.peakLag >= 0,
+    true,
+    'backlog depth must have been sampled',
+  );
+  assert.ok(
+    report.drainElapsedMs > 0,
+    'the drain window must have a positive duration',
+  );
+
+  // 2. Latency must cover EVERY event. Silently dropping unmatched ids used to
+  //    let percentiles be computed over an arbitrary subset.
+  assert.equal(
+    report.ackedEvents,
+    report.totalEvents,
+    'every published event must have a measured XADD -> XACK latency',
+  );
+  assert.equal(report.latencies.length, report.totalEvents);
+
+  // 3. Every latency must fit inside the run: a sample longer than the whole
+  //    publish+drain wall clock would mean the two clocks are not the same one.
+  const maxLatency = report.latencies[report.latencies.length - 1] ?? 0;
+  assert.ok(
+    maxLatency <= report.publishElapsedMs + report.drainElapsedMs,
+    `a latency sample (${maxLatency}ms) exceeded the run wall clock`,
+  );
+
+  // 4. The concurrent contention the report claims must actually have run.
+  //    A sweep that threw used to be swallowed, silently removing the pressure
+  //    the report described.
+  assert.notEqual(
+    report.sweepProcessedCandles,
+    null,
+    'the concurrent path-B sweep must complete, not be swallowed',
+  );
+  assert.equal(
+    report.sweepEnabled,
+    candles.isEnabled(),
+    'the report must state whether the sweep was actually enabled',
+  );
+  assert.ok(
+    report.createBoundaryWaitMs >= 0,
+    'the create boundary wait must be measured, never reported as a constant',
+  );
 }
 
 async function assertNoLag(): Promise<void> {
@@ -555,7 +792,7 @@ async function assertNotDegraded(): Promise<void> {
 const runStartedAt = new Date();
 
 async function startWorker(): Promise<MatcherWorker> {
-  const stream = new LimitOrderEventStreamService();
+  const stream = new InstrumentedStreamService();
   const leader = new LimitOrderMatcherLeaderService();
   const boundary = new LimitOrderMatchBoundaryService();
   const poller = new LimitOrderEventPollerService(

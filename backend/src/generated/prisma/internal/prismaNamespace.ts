@@ -3237,6 +3237,8 @@ export const MarketCandleScalarFieldEnum = {
   isClosed: 'isClosed',
   sourceProvider: 'sourceProvider',
   sourceUpdatedAt: 'sourceUpdatedAt',
+  ingestSeq: 'ingestSeq',
+  ingestSeqAt: 'ingestSeqAt',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -3657,6 +3659,10 @@ export const LimitOrderReconciliationCheckpointScalarFieldEnum = {
   interval: 'interval',
   watermarkOpenTime: 'watermarkOpenTime',
   watermarkCandleId: 'watermarkCandleId',
+  watermarkIngestSeq: 'watermarkIngestSeq',
+  pendingIngestSeq: 'pendingIngestSeq',
+  pendingIngestSeqObservedAt: 'pendingIngestSeqObservedAt',
+  lastScannedIngestSeq: 'lastScannedIngestSeq',
   lastScannedOpenTime: 'lastScannedOpenTime',
   lastScannedCloseTime: 'lastScannedCloseTime',
   lastRunAt: 'lastRunAt',
@@ -3983,6 +3989,20 @@ export type EnumAssetPriceSourceTypeFieldRefInput<$PrismaModel> = FieldRefInputT
  * Reference to a field of type 'AssetPriceSourceType[]'
  */
 export type ListEnumAssetPriceSourceTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AssetPriceSourceType[]'>
+    
+
+
+/**
+ * Reference to a field of type 'BigInt'
+ */
+export type BigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BigInt'>
+    
+
+
+/**
+ * Reference to a field of type 'BigInt[]'
+ */
+export type ListBigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BigInt[]'>
     
 
 

@@ -208,6 +208,10 @@ function candle(
     sourceUpdatedAt: new Date(
       `2026-07-13T${input.sourceUpdatedAt ?? '00:04:00'}.000Z`,
     ),
+    // Storage-order position; assigned by the market_candles trigger in the
+    // database, so a fixture just needs a plausible monotonic value.
+    ingestSeq: BigInt(minute + 1),
+    ingestSeqAt: openTime,
     createdAt: openTime,
     updatedAt: openTime,
   };

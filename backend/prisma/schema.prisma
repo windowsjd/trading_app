@@ -559,27 +559,43 @@ model AssetOrderbookSnapshot {
 }
 
 model MarketCandle {
-  id              String   @id @default(uuid())
-  assetId         String   @map("asset_id")
+  id              String    @id @default(uuid())
+  assetId         String    @map("asset_id")
   // Stored as a plain string instead of a Prisma enum: API interval literals
   // ("5m", "1d", "1w") start with a digit and cannot be enum identifiers, and
   // later aggregation intervals (15m/30m/1h/4h) must be addable without an
   // ALTER TYPE migration. The allowlist is enforced by MarketCandlesRepository.
   interval        String
   // Candle window is [openTime, closeTime); both are UTC instants.
-  openTime        DateTime @map("open_time") @db.Timestamptz(3)
-  closeTime       DateTime @map("close_time") @db.Timestamptz(3)
-  open            Decimal  @db.Decimal(24, 8)
-  high            Decimal  @db.Decimal(24, 8)
-  low             Decimal  @db.Decimal(24, 8)
-  close           Decimal  @db.Decimal(24, 8)
-  volume          Decimal  @db.Decimal(24, 8)
-  amount          Decimal? @db.Decimal(24, 8)
-  isClosed        Boolean  @map("is_closed")
-  sourceProvider  String   @map("source_provider")
-  sourceUpdatedAt DateTime @map("source_updated_at") @db.Timestamptz(3)
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  openTime        DateTime  @map("open_time") @db.Timestamptz(3)
+  closeTime       DateTime  @map("close_time") @db.Timestamptz(3)
+  open            Decimal   @db.Decimal(24, 8)
+  high            Decimal   @db.Decimal(24, 8)
+  low             Decimal   @db.Decimal(24, 8)
+  close           Decimal   @db.Decimal(24, 8)
+  volume          Decimal   @db.Decimal(24, 8)
+  amount          Decimal?  @db.Decimal(24, 8)
+  isClosed        Boolean   @map("is_closed")
+  sourceProvider  String    @map("source_provider")
+  sourceUpdatedAt DateTime  @map("source_updated_at") @db.Timestamptz(3)
+  // STORAGE-order position, assigned by the `market_candles_ingest_seq`
+  // database trigger from a single sequence: on insert, and again whenever the
+  // row changes in a way that can change a path-B matching decision (it becomes
+  // closed, its low or its window moves).
+  //
+  // Path B scans by THIS column, not by openTime. openTime is market time and
+  // says nothing about when a row appeared: a candle stored late — a provider
+  // gap, a finalizer restart, a backfill — has an openTime the global watermark
+  // has long passed, and scanning in market order skipped it forever. Assigned
+  // by a trigger rather than by the application because market_candles has
+  // several writers, including a raw bulk upsert.
+  //
+  // Nullable only so the column could be added without rewriting the table; the
+  // trigger fills it for every row, and the migration backfilled the rest.
+  ingestSeq       BigInt?   @map("ingest_seq")
+  ingestSeqAt     DateTime? @map("ingest_seq_at") @db.Timestamptz(3)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   asset                 Asset                       @relation(fields: [assetId], references: [id], onDelete: Restrict)
   limitOrderEvidence    LimitOrderCandleEvidence[]
@@ -590,6 +606,8 @@ model MarketCandle {
   @@index([isClosed, openTime])
   // Path-B candle sweep: closed 5m rows of one asset ordered by window start.
   @@index([assetId, interval, isClosed, openTime])
+  // Path-B storage-order sweep: bounded forward walk over newly stored rows.
+  @@index([ingestSeq])
   @@map("market_candles")
 }
 
@@ -1171,30 +1189,45 @@ model LimitOrderProcessedCandle {
 // elapsed time. One row per scope; the scope is the interval literal, so a
 // later 1m/15m path-B variant gets its own independent position.
 model LimitOrderReconciliationCheckpoint {
-  scope                     String    @id
-  interval                  String
+  scope                      String    @id
+  interval                   String
   // NULL until the first bootstrap. `watermarkCandleId` is NULL when the
   // position is a pure time bound (bootstrap, or a gap re-anchor) rather than
   // a concrete candle row.
-  watermarkOpenTime         DateTime? @map("watermark_open_time") @db.Timestamptz(3)
-  watermarkCandleId         String?   @map("watermark_candle_id")
-  lastScannedOpenTime       DateTime? @map("last_scanned_open_time") @db.Timestamptz(3)
-  lastScannedCloseTime      DateTime? @map("last_scanned_close_time") @db.Timestamptz(3)
-  lastRunAt                 DateTime? @map("last_run_at") @db.Timestamptz(3)
-  lastSuccessfulRunAt       DateTime? @map("last_successful_run_at") @db.Timestamptz(3)
+  watermarkOpenTime          DateTime? @map("watermark_open_time") @db.Timestamptz(3)
+  watermarkCandleId          String?   @map("watermark_candle_id")
+  // STORAGE-order scan position over MarketCandle.ingestSeq. This — not the
+  // market-time watermark above — is what the forward scan reads from, so a
+  // candle stored long after its window closed is still reached. The
+  // market-time watermark remains the bootstrap anchor and the retention-gap
+  // marker.
+  watermarkIngestSeq         BigInt?   @map("watermark_ingest_seq")
+  // Two-phase advance guard. A sequence value is assigned when a row is
+  // INSERTED but only becomes visible when its transaction COMMITS, so the
+  // highest visible value may still have uncommitted holes below it. The
+  // highest value observed by a run is recorded here and only becomes eligible
+  // as a watermark ceiling on a LATER run, once every write transaction that
+  // was in flight at the observation has resolved.
+  pendingIngestSeq           BigInt?   @map("pending_ingest_seq")
+  pendingIngestSeqObservedAt DateTime? @map("pending_ingest_seq_observed_at") @db.Timestamptz(3)
+  lastScannedIngestSeq       BigInt?   @map("last_scanned_ingest_seq")
+  lastScannedOpenTime        DateTime? @map("last_scanned_open_time") @db.Timestamptz(3)
+  lastScannedCloseTime       DateTime? @map("last_scanned_close_time") @db.Timestamptz(3)
+  lastRunAt                  DateTime? @map("last_run_at") @db.Timestamptz(3)
+  lastSuccessfulRunAt        DateTime? @map("last_successful_run_at") @db.Timestamptz(3)
   // Sticky operational alarm. Cleared only by an operator (or by the documented
   // recovery procedure), never by the sweep itself: a gap means candles were
   // retention-deleted before path B could look at them, which cannot be undone.
-  degradedReason            String?   @map("degraded_reason")
-  gapDetectedAt             DateTime? @map("gap_detected_at") @db.Timestamptz(3)
-  gapFromOpenTime           DateTime? @map("gap_from_open_time") @db.Timestamptz(3)
-  gapToOpenTime             DateTime? @map("gap_to_open_time") @db.Timestamptz(3)
+  degradedReason             String?   @map("degraded_reason")
+  gapDetectedAt              DateTime? @map("gap_detected_at") @db.Timestamptz(3)
+  gapFromOpenTime            DateTime? @map("gap_from_open_time") @db.Timestamptz(3)
+  gapToOpenTime              DateTime? @map("gap_to_open_time") @db.Timestamptz(3)
   // Reservation mismatches are an unresolved financial inconsistency that never
   // self-heals; a repeated count is what turns the log line into a gate.
-  reservationMismatchCount  Int       @default(0) @map("reservation_mismatch_count")
-  lastReservationMismatchAt DateTime? @map("last_reservation_mismatch_at") @db.Timestamptz(3)
-  createdAt                 DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt                 DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  reservationMismatchCount   Int       @default(0) @map("reservation_mismatch_count")
+  lastReservationMismatchAt  DateTime? @map("last_reservation_mismatch_at") @db.Timestamptz(3)
+  createdAt                  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@map("limit_order_reconciliation_checkpoints")
 }

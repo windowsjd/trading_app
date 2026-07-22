@@ -16,6 +16,8 @@ import {
   ProviderTradeRouteRegistry,
   tradeRouteProviderForAssetType,
   type AssetTradeReadiness,
+  type ProviderTradeSource,
+  type TradeRouteProvider,
 } from '../../providers/provider-trade-route.registry';
 import { readLimitOrderMatchingConfig } from './limit-order-matching.config';
 import { LimitOrderPriceEventPublisher } from './limit-order-price-event.publisher';
@@ -25,6 +27,52 @@ export type LimitOrderProviderAssetRequest = {
   symbol: string;
   market: string;
   assetType: AssetType;
+};
+
+/**
+ * Which authority answered a readiness check.
+ *
+ *   'local'  — this process owns the provider socket; its registry mirrors the
+ *              live connection and is the authority.
+ *   'shared' — this process does NOT own the socket; the verdict came from the
+ *              cross-instance Redis view published by whichever instance does.
+ *   'legacy' — neither a registry owner nor a shared view exists, so the
+ *              per-provider streaming status answered.
+ */
+export type LimitOrderProviderReadinessOwnerMode =
+  | 'local'
+  | 'shared'
+  | 'legacy';
+
+/**
+ * Evidence that per-asset provider readiness was established, carried from the
+ * pre-transaction check into the create transaction.
+ *
+ * WHY THIS TYPE EXISTS
+ * --------------------
+ * The create transaction cannot re-run the shared (Redis) check: it holds the
+ * event-boundary advisory lock, and a network round trip under that lock
+ * stalls the matcher and every other create. Before this proof existed the
+ * in-transaction re-check was a purely synchronous call that, on an instance
+ * which does NOT own the provider socket, silently fell through to the LEGACY
+ * per-provider streaming status. On a dedicated API pod that status is not
+ * connected, so the same request that passed the shared pre-check then failed
+ * inside the transaction with 503 — the identical request succeeded or failed
+ * depending on which pod served it, which is precisely what shared readiness
+ * exists to eliminate.
+ *
+ * The proof makes the in-transaction step verify the SAME verdict the
+ * pre-check reached, in memory, with no fallback to a different authority.
+ */
+export type LimitOrderProviderReadinessProof = {
+  provider: TradeRouteProvider;
+  assetId: string;
+  source: ProviderTradeSource;
+  /** Connection generation the verdict belongs to; 'legacy' when unknown. */
+  generation: string;
+  ownerMode: LimitOrderProviderReadinessOwnerMode;
+  checkedAt: number;
+  expiresAt: number;
 };
 
 /**
@@ -76,9 +124,16 @@ export class LimitOrderProviderHealthService {
   }
 
   /**
-   * Synchronous local-only check, kept for callers already inside a
-   * non-awaitable path. Prefer `assertAvailableAsync`, which also consults the
-   * shared cross-instance view.
+   * Synchronous LOCAL-ONLY check: this process's registry, or the legacy
+   * streaming status when it owns no route. It never consults the shared view.
+   *
+   * Deliberately NOT used by the create path. On an instance that does not own
+   * the provider socket it can only answer from an authority that structurally
+   * does not know whether the asset is subscribed, which is what made
+   * non-owner API pods reject creates the shared pre-check had accepted. Use
+   * `assertAvailableAsync` + `assertReadinessProof` there. This entry point
+   * remains the definition of the local verdict, and is what the owner-side
+   * behaviour is pinned against.
    */
   assertAvailable(request: LimitOrderProviderAssetRequest): void {
     if (!this.config.enabled) return;
@@ -94,7 +149,8 @@ export class LimitOrderProviderHealthService {
   }
 
   /**
-   * Full check including the shared cross-instance readiness view.
+   * Full check including the shared cross-instance readiness view, returning a
+   * PROOF the create transaction re-verifies in memory.
    *
    * When shared readiness is enabled and this instance is NOT the owner, the
    * shared view is authoritative and its verdict is final — falling back to
@@ -103,8 +159,9 @@ export class LimitOrderProviderHealthService {
    */
   async assertAvailableAsync(
     request: LimitOrderProviderAssetRequest,
-  ): Promise<void> {
-    if (!this.config.enabled) return;
+    now = Date.now(),
+  ): Promise<LimitOrderProviderReadinessProof | null> {
+    if (!this.config.enabled) return null;
     this.assertPublisherActive();
 
     const provider = tradeRouteProviderForAssetType(request.assetType);
@@ -116,7 +173,7 @@ export class LimitOrderProviderHealthService {
     if (owner) {
       const readiness = this.localReadiness(request.assetId, provider);
       if (!readiness.ready) this.fail(readiness);
-      return;
+      return this.proof(request.assetId, readiness, 'local', now);
     }
 
     if (this.sharedConfig.enabled) {
@@ -132,10 +189,103 @@ export class LimitOrderProviderHealthService {
         livenessMaxAgeMs: this.config.providerLivenessMaxAgeMs,
       });
       if (!readiness.ready) this.fail(readiness);
-      return;
+      return this.proof(request.assetId, readiness, 'shared', now);
     }
 
     this.assertLegacyStreamingConnected(provider);
+    return {
+      provider,
+      assetId: request.assetId,
+      source: 'legacy_streaming',
+      generation: 'legacy',
+      ownerMode: 'legacy',
+      checkedAt: now,
+      expiresAt: now + this.config.providerReadinessProofMaxAgeMs,
+    };
+  }
+
+  /**
+   * In-transaction re-verification. Purely in memory: it is called while the
+   * event-boundary advisory lock is held, so it must never perform a network
+   * round trip.
+   *
+   * The rules, in order of authority:
+   *
+   *   1. The proof must cover THIS asset on THIS provider and must not have
+   *      expired. An expired proof is not evidence of anything, so it is
+   *      fail-closed like every other unresolved case.
+   *   2. If this process owns the provider NOW, its registry is fresher than
+   *      any proof and decides. A reconnect between the two checks therefore
+   *      still rejects the create.
+   *   3. If the proof was issued by this process as the owner but the route has
+   *      since been released, the socket that backed the proof is gone —
+   *      fail-closed.
+   *   4. A 'legacy' proof re-checks the legacy streaming status, which is also
+   *      in-process memory.
+   *   5. Otherwise the proof came from the shared view and stands. This is the
+   *      whole point: a non-owner API instance must NOT re-decide readiness
+   *      from a local authority that structurally cannot know the answer.
+   */
+  assertReadinessProof(
+    proof: LimitOrderProviderReadinessProof | null,
+    request: LimitOrderProviderAssetRequest,
+    now = Date.now(),
+  ): void {
+    if (!this.config.enabled) return;
+    this.assertPublisherActive();
+
+    const provider = tradeRouteProviderForAssetType(request.assetType);
+    if (!proof) {
+      this.unavailable(
+        'LIMIT_ORDER_PROVIDER_UNAVAILABLE',
+        'No provider readiness proof was established for this order.',
+      );
+    }
+    if (proof.provider !== provider || proof.assetId !== request.assetId) {
+      this.unavailable(
+        'LIMIT_ORDER_PROVIDER_UNAVAILABLE',
+        'The provider readiness proof does not cover the ordered asset.',
+      );
+    }
+    if (now > proof.expiresAt) {
+      this.unavailable(
+        'LIMIT_ORDER_PROVIDER_UNAVAILABLE',
+        `The provider readiness proof expired ${now - proof.expiresAt}ms ago.`,
+      );
+    }
+
+    const owner = this.routes.getOwner(provider);
+    if (owner) {
+      const readiness = this.localReadiness(request.assetId, provider);
+      if (!readiness.ready) this.fail(readiness);
+      return;
+    }
+    if (proof.ownerMode === 'local') {
+      this.unavailable(
+        'LIMIT_ORDER_PROVIDER_UNAVAILABLE',
+        `This instance released the ${provider} trade route after the readiness check.`,
+      );
+    }
+    if (proof.ownerMode === 'legacy') {
+      this.assertLegacyStreamingConnected(provider);
+    }
+  }
+
+  private proof(
+    assetId: string,
+    readiness: Extract<AssetTradeReadiness, { ready: true }>,
+    ownerMode: LimitOrderProviderReadinessOwnerMode,
+    now: number,
+  ): LimitOrderProviderReadinessProof {
+    return {
+      provider: readiness.provider,
+      assetId,
+      source: readiness.source,
+      generation: readiness.generation,
+      ownerMode,
+      checkedAt: now,
+      expiresAt: now + this.config.providerReadinessProofMaxAgeMs,
+    };
   }
 
   private localReadiness(

@@ -102,6 +102,26 @@ async function main(): Promise<void> {
       testRetryDoesNotDoubleFill,
     );
     await run(
+      'a candle stored after the watermark passed its window is still processed',
+      testLateStoredCandleIsStillProcessed,
+    );
+    await run(
+      'a candle that only becomes closed later is re-sequenced and swept',
+      testLateClosedCandleIsReSequenced,
+    );
+    await run(
+      'an unrelated candle update does not renumber the storage position',
+      testUnrelatedUpdateDoesNotRenumber,
+    );
+    await run(
+      'the storage position never passes an unsettled observation',
+      testIngestWatermarkTwoPhaseAdvance,
+    );
+    await run(
+      'retention passing an unscanned matchable candle is detected as a gap',
+      testUnscannedRetentionGapDetected,
+    );
+    await run(
       'retention passing the watermark is detected as a gap',
       testRetentionGapDetected,
     );
@@ -451,8 +471,390 @@ async function testRetryDoesNotDoubleFill(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// The regression: storage order vs market order
+// ---------------------------------------------------------------------------
+
+/**
+ * THE late-storage regression test.
+ *
+ * The sweep used to advance ONE GLOBAL position through the canonical
+ * `(openTime, id)` ordering — MARKET time — while rows appear in STORAGE time.
+ * A candle written late therefore arrived with an openTime the position had
+ * already passed, and a scan that reads strictly after the position never
+ * returned it again. Permanent, silent, and on the asset whose data was
+ * already unreliable.
+ *
+ * Reproduced exactly: an on-time window advances the market-time marker, and
+ * only THEN does an older window's row appear.
+ */
+async function testLateStoredCandleIsStillProcessed(): Promise<void> {
+  // The order whose window will be stored late. Its eligible window is
+  // allocated FIRST, so it is genuinely older than the on-time one below.
+  const late = await createSubmittedOrder({ label: 'late-stored' });
+
+  // An on-time window on a different asset pushes the market-time marker past
+  // the late order's window.
+  const onTimeAsset = await createAsset('on-time', { withPriceSnapshot: true });
+  const onTime = await createSubmittedOrder({
+    label: 'on-time',
+    assetIdOverride: onTimeAsset,
+  });
+  const onTimeCandle = await createClosedCandle({
+    openTime: onTime.eligibleFrom,
+    low: '90.00000000',
+    assetIdOverride: onTimeAsset,
+  });
+  // Past the safety lag, so the market-time marker genuinely advances onto the
+  // on-time window rather than being held short of it.
+  const settled = afterSafetyLag(onTimeCandle);
+  await sweep.reconcile({ now: settled });
+
+  const marker = await checkpoints.find();
+  assert.ok(marker?.watermark, 'a market-time marker must exist');
+  assert.ok(
+    marker.watermark.openTime.getTime() > late.eligibleFrom.getTime(),
+    'the market-time marker must already be PAST the window about to be stored — this is the precondition that used to lose it',
+  );
+
+  // Only now does the late row land, for a window behind that marker.
+  const lateCandle = await createClosedCandle({
+    openTime: late.eligibleFrom,
+    low: '90.00000000',
+  });
+  const lateSeq = await ingestSeqOf(lateCandle.id);
+  const onTimeSeq = await ingestSeqOf(onTimeCandle.id);
+  assert.ok(
+    lateSeq > onTimeSeq,
+    'the late row must carry a HIGHER storage position than the on-time one it follows',
+  );
+  assert.ok(
+    lateCandle.openTime.getTime() < onTimeCandle.openTime.getTime(),
+    'while carrying an EARLIER market window',
+  );
+
+  const summary = await sweep.reconcile({ now: settled });
+  assert.ok(
+    summary.scannedCandles >= 1,
+    'the late-stored candle must still be scanned',
+  );
+  assert.equal(
+    (await prisma.order.findUniqueOrThrow({ where: { id: late.orderId } }))
+      .status,
+    OrderStatus.executed,
+    'a candle stored after the market-time marker passed its window must still fill its order',
+  );
+  assert.ok(
+    await prisma.limitOrderProcessedCandle.findUnique({
+      where: { marketCandleId: lateCandle.id },
+    }),
+  );
+}
+
+/**
+ * A row is often INSERTED while its window is still open and only UPDATEd to
+ * closed five minutes later. Sequencing on insert alone would leave it below a
+ * position that had since moved on, so the trigger re-sequences it on the
+ * transition — this proves the row becomes reachable again exactly then.
+ */
+async function testLateClosedCandleIsReSequenced(): Promise<void> {
+  const scenario = await createSubmittedOrder({ label: 'late-closed' });
+  const openCandle = await createOpenCandle({
+    openTime: scenario.eligibleFrom,
+    low: '90.00000000',
+  });
+  const insertedSeq = await ingestSeqOf(openCandle.id);
+
+  // A closed row stored AFTER it, on an asset nothing is ordering, so the
+  // position has something legitimate to advance onto beyond the open row. The
+  // ceiling deliberately ignores open rows, which is exactly why the open row
+  // needs a closed successor to be stepped over at all.
+  const fillerAsset = await createAsset('filler', { withPriceSnapshot: false });
+  const filler = await createClosedCandle({
+    openTime: nextWindowBase(),
+    low: '90.00000000',
+    assetIdOverride: fillerAsset,
+  });
+
+  // The sweep runs while the row is still open: it is not a candidate, and the
+  // position moves past its storage value. TWO runs, because the two-phase
+  // guard deliberately refuses to advance onto an observation the same run
+  // took — the first run records it, the second may use it.
+  const now = afterSafetyLag(filler);
+  await sweep.reconcile({ now });
+  await forceIngestCeilingSettled();
+  await sweep.reconcile({ now });
+  const passed = await checkpoints.find();
+  assert.ok(
+    (passed?.ingest.watermarkSeq ?? -1n) >= insertedSeq,
+    'the position must have moved past the still-open row',
+  );
+  assert.equal(
+    (await prisma.order.findUniqueOrThrow({ where: { id: scenario.orderId } }))
+      .status,
+    OrderStatus.submitted,
+    'an open candle must never fill anything',
+  );
+
+  // The window closes. The trigger hands the row a NEW storage position.
+  await prisma.marketCandle.update({
+    where: { id: openCandle.id },
+    data: { isClosed: true },
+  });
+  const closedSeq = await ingestSeqOf(openCandle.id);
+  assert.ok(
+    closedSeq > insertedSeq,
+    'closing the window must re-sequence the row',
+  );
+  assert.ok(
+    closedSeq > (passed?.ingest.watermarkSeq ?? 0n),
+    'the re-sequenced row must land ABOVE the position that passed it',
+  );
+
+  await sweep.reconcile({ now });
+  assert.equal(
+    (await prisma.order.findUniqueOrThrow({ where: { id: scenario.orderId } }))
+      .status,
+    OrderStatus.executed,
+    'a window that closes late must still fill its order',
+  );
+}
+
+/**
+ * The other half of the trigger's contract: an update that cannot change a
+ * matching decision must NOT renumber the row. Churning the sequence on every
+ * touch would drag already-processed rows back in front of the scan forever.
+ */
+async function testUnrelatedUpdateDoesNotRenumber(): Promise<void> {
+  const candle = await createClosedCandle({
+    openTime: nextWindowBase(),
+    low: '90.00000000',
+  });
+  const before = await ingestSeqOf(candle.id);
+
+  await prisma.marketCandle.update({
+    where: { id: candle.id },
+    data: { sourceUpdatedAt: new Date(candle.closeTime.getTime() + 1000) },
+  });
+  assert.equal(
+    await ingestSeqOf(candle.id),
+    before,
+    'a metadata-only update must not renumber the row',
+  );
+
+  // A low that moves DOES change what the window could fill, so it must.
+  await prisma.marketCandle.update({
+    where: { id: candle.id },
+    data: { low: '80.00000000' },
+  });
+  assert.ok(
+    (await ingestSeqOf(candle.id)) > before,
+    'a low that moves must re-sequence the row',
+  );
+}
+
+/**
+ * The two-phase guard.
+ *
+ * A storage position is assigned when a row is INSERTED but only becomes
+ * visible when its transaction COMMITS, so the highest visible value can have
+ * uncommitted holes below it. The position must therefore never advance onto a
+ * value THIS run observed — only onto one an earlier run observed and that has
+ * since settled.
+ *
+ * Elapsed time is simulated by ageing the stored observation rather than by
+ * sleeping, so the assertion is deterministic.
+ */
+async function testIngestWatermarkTwoPhaseAdvance(): Promise<void> {
+  const candle = await createClosedCandle({
+    openTime: nextWindowBase(),
+    low: '90.00000000',
+  });
+  const seq = await ingestSeqOf(candle.id);
+
+  // Force a fresh, unsettled observation: nothing may advance onto it.
+  await prisma.$executeRaw`
+    UPDATE "limit_order_reconciliation_checkpoints"
+    SET "pending_ingest_seq" = NULL,
+        "pending_ingest_seq_observed_at" = NULL
+    WHERE "scope" = ${LIMIT_ORDER_RECONCILIATION_SCOPE}
+  `;
+  const before = await checkpoints.find();
+  const held = await sweep.reconcile({ now: afterCandle(candle) });
+  assert.equal(
+    held.ingestCeilingHeld,
+    true,
+    'the first observation must not be usable as its own ceiling',
+  );
+  const afterHeld = await checkpoints.find();
+  assert.equal(
+    afterHeld?.ingest.watermarkSeq?.toString(),
+    before?.ingest.watermarkSeq?.toString(),
+    'the position must not move onto an unsettled observation',
+  );
+  assert.ok(
+    (afterHeld?.ingest.pendingSeq ?? 0n) >= seq,
+    'but the observation itself must be recorded for the next run',
+  );
+
+  // The observation settles; the next run may now use it.
+  await forceIngestCeilingSettled();
+  const advanced = await sweep.reconcile({ now: afterCandle(candle) });
+  assert.equal(advanced.ingestCeilingHeld, false);
+  const afterAdvance = await checkpoints.find();
+  assert.ok(
+    (afterAdvance?.ingest.watermarkSeq ?? 0n) >= seq,
+    'a settled observation must let the position advance',
+  );
+  // Monotonic, always.
+  await sweep.reconcile({ now: afterCandle(candle) });
+  const finalPosition = await checkpoints.find();
+  assert.ok(
+    (finalPosition?.ingest.watermarkSeq ?? 0n) >=
+      (afterAdvance?.ingest.watermarkSeq ?? 0n),
+    'the storage position must never move backwards',
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Retention gap
 // ---------------------------------------------------------------------------
+
+/**
+ * The gap signal the market-time marker structurally cannot raise.
+ *
+ * A single very old window stored late sits far behind the marker while the
+ * marker itself looks perfectly current, so signal 1 stays silent. If that
+ * window is old enough for retention to remove it before the sweep gets to it,
+ * the exposure is real and must become a sticky alarm.
+ */
+async function testUnscannedRetentionGapDetected(): Promise<void> {
+  const config = readLimitOrderCandleReconciliationConfig();
+  await clearGap();
+
+  // No valuation price, so the sweep DEFERS this candle instead of filling it.
+  // That keeps both halves of this scenario meaningful: the first run sees an
+  // untracked old window (gap), the second sees the same window sitting in the
+  // durable queue (no gap).
+  const gapAsset = await createAsset('retention-gap', {
+    withPriceSnapshot: false,
+  });
+  // Older than the retention horizon, and matchable by a real activated order.
+  const ancientWindow = alignWindow(
+    new Date(Date.now() - (config.candleRetentionDays + 3) * 86_400_000),
+  );
+  // `submittedAt` on a 5-minute boundary makes eligibleFrom that same boundary,
+  // so the order is activated for exactly the ancient window below.
+  const scenario = await createSubmittedOrder({
+    label: 'retention-unscanned',
+    assetIdOverride: gapAsset,
+    submittedAt: ancientWindow,
+  });
+  assert.equal(scenario.eligibleFrom.getTime(), ancientWindow.getTime());
+  const ancient = await createClosedCandle({
+    openTime: ancientWindow,
+    low: '90.00000000',
+    assetIdOverride: gapAsset,
+  });
+
+  // Hold the position BELOW that row, which is what "not scanned yet" means.
+  const seq = await ingestSeqOf(ancient.id);
+  await prisma.$executeRaw`
+    UPDATE "limit_order_reconciliation_checkpoints"
+    SET "watermark_ingest_seq" = ${(seq - 1n).toString()}::bigint
+    WHERE "scope" = ${LIMIT_ORDER_RECONCILIATION_SCOPE}
+  `;
+  // The market-time marker stays current: signal 1 must NOT be what fires.
+  await prisma.limitOrderReconciliationCheckpoint.update({
+    where: { scope: LIMIT_ORDER_RECONCILIATION_SCOPE },
+    data: { watermarkOpenTime: new Date(), watermarkCandleId: null },
+  });
+
+  const summary = await sweep.reconcile({ now: new Date() });
+  assert.equal(summary.gapDetected, true, 'the exposure must be reported');
+  const checkpoint = await checkpoints.find();
+  assert.equal(
+    checkpoint?.degradedReason,
+    'candle_retention_passed_unscanned_candle',
+    'the reason must name the unscanned row, not the marker',
+  );
+  assert.ok(checkpoint?.gapDetectedAt, 'the gap must be durable');
+
+  // That first run also DEFERRED the candle (its asset has no valuation
+  // price), so it is now tracked. A tracked candle is not lost, and alarming
+  // on it again would turn ordinary retry latency into a sticky gap that fails
+  // every new limit order closed. Same fixture, same position — the signal
+  // must fall silent.
+  assert.ok(
+    await prisma.limitOrderDeferredCandle.findUnique({
+      where: { marketCandleId: ancient.id },
+    }),
+    'the first run must have queued the candle for retry',
+  );
+  await clearGap();
+  await prisma.$executeRaw`
+    UPDATE "limit_order_reconciliation_checkpoints"
+    SET "watermark_ingest_seq" = ${(seq - 1n).toString()}::bigint
+    WHERE "scope" = ${LIMIT_ORDER_RECONCILIATION_SCOPE}
+  `;
+  const queued = await sweep.reconcile({ now: new Date() });
+  assert.equal(
+    queued.gapDetected,
+    false,
+    'a candle already in the retry queue must not raise the unscanned gap',
+  );
+
+  // Leave nothing behind: the later health-gate scenario reads the deferred
+  // backlog, and this fixture's ancient deferral would fail it for an
+  // unrelated reason. The order never filled, so removing it is safe.
+  await prisma.limitOrderDeferredCandle.deleteMany({
+    where: { marketCandleId: ancient.id },
+  });
+  await prisma.order.deleteMany({ where: { id: scenario.orderId } });
+  await clearGap();
+}
+
+async function clearGap(): Promise<void> {
+  await prisma.limitOrderReconciliationCheckpoint.updateMany({
+    where: { scope: LIMIT_ORDER_RECONCILIATION_SCOPE },
+    data: {
+      gapDetectedAt: null,
+      gapFromOpenTime: null,
+      gapToOpenTime: null,
+      degradedReason: null,
+    },
+  });
+}
+
+/**
+ * Ages the stored observation past the settle grace, so the next run may use
+ * it as a ceiling. Simulating elapsed time beats sleeping for it: the
+ * assertion becomes deterministic instead of timing-dependent.
+ */
+async function forceIngestCeilingSettled(): Promise<void> {
+  const config = readLimitOrderCandleReconciliationConfig();
+  const agedBy = config.ingestSettleGraceMs * 2;
+  await prisma.$executeRaw`
+    UPDATE "limit_order_reconciliation_checkpoints"
+    SET "pending_ingest_seq_observed_at" =
+      COALESCE("pending_ingest_seq_observed_at", clock_timestamp())
+      - make_interval(secs => ${agedBy / 1000}::double precision)
+    WHERE "scope" = ${LIMIT_ORDER_RECONCILIATION_SCOPE}
+  `;
+}
+
+async function ingestSeqOf(marketCandleId: string): Promise<bigint> {
+  const rows = await prisma.$queryRaw<Array<{ ingestSeq: bigint | null }>>`
+    SELECT "ingest_seq" AS "ingestSeq"
+    FROM "market_candles"
+    WHERE "id" = ${marketCandleId}
+  `;
+  const seq = rows[0]?.ingestSeq;
+  assert.ok(
+    seq !== null && seq !== undefined,
+    `market candle ${marketCandleId} has no storage position; the trigger did not run`,
+  );
+  return seq;
+}
 
 /**
  * If candle retention removes rows the watermark has not reached, path B can
@@ -771,6 +1173,52 @@ async function createClosedCandle(input: {
 }
 
 /**
+ * A row for a window that has NOT closed yet — what the live finalizer writes
+ * while the window is still running. It gets a storage position on INSERT and
+ * a fresh one when it is later updated to closed.
+ */
+async function createOpenCandle(input: {
+  openTime: Date;
+  low: string;
+  assetIdOverride?: string;
+}): Promise<{
+  id: string;
+  assetId: string;
+  interval: string;
+  openTime: Date;
+  closeTime: Date;
+}> {
+  const closeTime = new Date(input.openTime.getTime() + FIVE_MINUTES_MS);
+  const targetAssetId = input.assetIdOverride ?? assetId;
+  const created = await prisma.marketCandle.create({
+    data: {
+      assetId: targetAssetId,
+      interval: '5m',
+      openTime: input.openTime,
+      closeTime,
+      open: '100.00000000',
+      high: '110.00000000',
+      low: input.low,
+      close: '105.00000000',
+      volume: '10.00000000',
+      amount: '1000.00000000',
+      isClosed: false,
+      sourceProvider: 'binance_spot_ws_5m_kline',
+      sourceUpdatedAt: closeTime,
+    },
+    select: { id: true },
+  });
+  createdCandleIds.push(created.id);
+  return {
+    id: created.id,
+    assetId: targetAssetId,
+    interval: '5m',
+    openTime: input.openTime,
+    closeTime,
+  };
+}
+
+/**
  * Monotonic window allocator. MarketCandle is unique on
  * (assetId, interval, openTime); reusing a window across tests would collide
  * instead of testing anything. Starts far enough in the past that every
@@ -791,6 +1239,18 @@ function alignWindow(value: Date): Date {
 
 function afterCandle(candle: { closeTime: Date }): Date {
   return new Date(candle.closeTime.getTime() + 60_000);
+}
+
+/**
+ * Far enough past a window that the MARKET-TIME marker may actually advance
+ * onto it. `afterCandle` alone leaves it inside `watermarkSafetyLagMs`, where
+ * the marker deliberately holds back.
+ */
+function afterSafetyLag(candle: { closeTime: Date }): Date {
+  const config = readLimitOrderCandleReconciliationConfig();
+  return new Date(
+    candle.closeTime.getTime() + config.watermarkSafetyLagMs + 60_000,
+  );
 }
 
 async function databaseNow(): Promise<Date> {

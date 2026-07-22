@@ -163,15 +163,54 @@ hole exactly in the situations it exists for.
 The scan is now anchored on a durable **watermark** plus a durable **deferred
 queue**.
 
+### Storage order, not market order
+
+The durable position that replaced the lookback was itself a position in the
+canonical `(openTime, id)` ordering — MARKET time. Rows, however, appear in
+STORAGE time, and one global market-time position shared by every asset left a
+second hole, of exactly the same shape:
+
+> asset A's 10:00–10:05 window is written late (a provider gap, a finalizer
+> restart, a REST backfill landing minutes or hours afterwards). Meanwhile
+> asset B's 10:05–10:10 window is written on time, and the sweep advances the
+> single global watermark past 10:05. A's row finally lands with an openTime of
+> 10:00, which is now BEFORE the watermark, so the scan — which reads strictly
+> after it — never returns that row again.
+
+`..._WATERMARK_SAFETY_LAG_MS` could only shrink that window, never close it: it
+bounds how long the sweep waits, not how late a row may be stored.
+
+The forward scan therefore walks **`market_candles.ingest_seq`**, a monotonic
+value assigned by the `market_candles_ingest_seq` database trigger:
+
+- on INSERT, always;
+- on UPDATE, when the row changed in a way that can change a matching decision
+  — it becomes closed, or its `low`, window or asset moves. An unrelated update
+  (a `source_updated_at` refresh) does NOT renumber it, so already-processed
+  rows are not dragged back in front of the scan forever.
+
+That second rule is what covers the common case of a row INSERTed while its
+window is still open and only UPDATEd to closed five minutes later: sequencing
+on insert alone would leave it below a position that had since moved on.
+
+It is a database trigger rather than application code because `market_candles`
+has several writers — the live finalizer, REST backfills, aggregation and
+operational scripts — through a raw bulk `INSERT .. ON CONFLICT DO UPDATE`. A
+writer that forgot to maintain the column would silently reintroduce the miss,
+and there is no single place in the application where it could be enforced for
+all of them.
+
 ### `limit_order_reconciliation_checkpoints`
 
-One row per interval scope (`scope = '5m'`). The watermark is a POSITION in the
-canonical `(openTime, id)` ordering of closed 5m candles, not a timestamp
-cursor. Its invariant:
+One row per interval scope (`scope = '5m'`), carrying TWO positions with two
+different jobs.
 
-> every closed 5m candle at or before the watermark either has a
-> processed-candle row, or has a deferred-candle row, or provably had no order
-> that could ever match it.
+**1. The storage-order position** (`watermarkIngestSeq`) — what the forward
+scan actually reads from. Its invariant:
+
+> every closed 5m candle whose ingest sequence is at or before the watermark
+> either has a processed-candle row, or has a deferred-candle row, or provably
+> had no order that could ever match it.
 
 "Provably no order" is sound because `candleMatchingEligibleFrom` is rounded UP
 to the next 5-minute boundary at Create time: an order can never become
@@ -179,31 +218,81 @@ eligible for a window that had already closed when it was submitted. So a
 window the sweep stepped over with no eligible order can never acquire one
 later.
 
-Columns: `watermarkOpenTime` / `watermarkCandleId`, `lastScannedOpenTime` /
-`lastScannedCloseTime`, `lastRunAt`, `lastSuccessfulRunAt`, `degradedReason`,
-`gapDetectedAt` / `gapFromOpenTime` / `gapToOpenTime`,
-`reservationMismatchCount` / `lastReservationMismatchAt`.
+**2. The market-time marker** (`watermarkOpenTime` / `watermarkCandleId`) — no
+longer a scan gate. It remains the bootstrap anchor and the retention-gap
+marker: "how far back in MARKET time is the sweep still responsible for" is the
+question retention answers against, and a storage position cannot answer it.
 
-### Watermark advance rules
+Columns: `watermarkIngestSeq`, `pendingIngestSeq` /
+`pendingIngestSeqObservedAt`, `lastScannedIngestSeq`, `watermarkOpenTime` /
+`watermarkCandleId`, `lastScannedOpenTime` / `lastScannedCloseTime`,
+`lastRunAt`, `lastSuccessfulRunAt`, `degradedReason`, `gapDetectedAt` /
+`gapFromOpenTime` / `gapToOpenTime`, `reservationMismatchCount` /
+`lastReservationMismatchAt`.
 
-The position moves forward only over work that became DURABLE. Two bounds
-apply and the **smaller wins**:
+### Storage-position advance rules (two-phase)
 
-1. the last candle this run actually made durable — processed row written, or
-   deferred row written. Never past a candle whose outcome is unknown.
-2. the **safety lag** (`..._WATERMARK_SAFETY_LAG_MS`, default 15 min). The
-   finalizer writes a canonical closed row some time AFTER the window ends;
-   stepping the position over a window whose row has not landed yet would skip
-   it forever. Recent candles are still PROCESSED immediately — only the
-   position lags.
+A sequence value is assigned when a row is **INSERTed** but only becomes
+visible when its transaction **COMMITs**, so the highest value a run can see
+may still have uncommitted holes below it. Advancing straight onto it would
+step over whatever fills those holes a moment later — the same failure, moved
+from market time into storage time.
 
-When a batch is NOT truncated (`scanned < candleBatchSize`) the run
-demonstrably reached the end of the eligible range, so the position may skip
-ahead to the newest closed candle within the safety lag, including windows with
-no matching order. A truncated batch stops at bound 1.
+So the ceiling is never this run's own observation. A run records the highest
+value it observed (`pendingIngestSeq`, with the DATABASE clock in
+`pendingIngestSeqObservedAt`), and a LATER run may use that as a ceiling only
+once BOTH hold:
+
+1. at least `..._INGEST_SETTLE_GRACE_MS` of database time has passed since the
+   observation, and
+2. no write transaction that was already open at that observation is still
+   running. This is checked EXACTLY, via `pg_stat_activity.xact_start`,
+   whenever the database role can see it — which it can when the application
+   uses one role, the normal case. When it cannot, rule 1 is the bound.
+
+Every transaction in flight at the observation has then resolved, and this
+run's scan — which read strictly above the OLD watermark — has already returned
+whatever they committed.
+
+Within that ceiling the position advances to:
+
+- the last row actually handled, when the batch was truncated
+  (`scanned >= candleBatchSize`) — rows beyond it were never examined;
+- the ceiling itself otherwise, which correctly steps over rows the scan
+  filtered out because no order could ever match them.
+
+The position therefore lags roughly one run plus the settle grace. That costs
+nothing: a lagging position only means rows are re-scanned, and the
+processed-candle rows filter them straight back out. The summary reports
+`ingestCeilingHeld: true` on any run the guard held back.
 
 The update is conditional and monotonic: a concurrent runner that already moved
 the position further is never pulled back.
+
+### Market-time marker advance rules
+
+Unchanged, and now only feeding the retention-gap check. Two bounds apply and
+the **smaller wins**:
+
+1. the furthest window (in market order) this run actually made durable —
+   processed row written, or deferred row written;
+2. the **safety lag** (`..._WATERMARK_SAFETY_LAG_MS`, default 15 min).
+
+When a batch is NOT truncated the run demonstrably reached the end of the
+eligible range, so the marker may skip ahead to the newest closed candle within
+the safety lag. A truncated batch stops at bound 1. Monotonic, as before.
+
+### Adopting the position on an existing deployment
+
+A checkpoint row written before these columns existed carries NULL. It is
+adopted at **0** — deliberately the most conservative value, so the first runs
+re-examine the whole sequence and RECOVER any candle the old market-time
+watermark had already stepped over. Already-processed rows are excluded by the
+scan's own filters, so the catch-up costs an index walk rather than duplicate
+work, and each run stays bounded by `candleBatchSize`. A run that finds nothing
+to do jumps straight to the ceiling. The adoption is logged once as
+`limit_order_candle_ingest_watermark_adopted` and can never pull a live
+position backwards.
 
 ### `limit_order_deferred_candles`
 
@@ -248,9 +337,9 @@ ticks instead of being dropped.
 
 ### Retention gap
 
-Two independent, exact signals:
+Three independent, exact signals:
 
-1. **The watermark is older than the candle retention horizon**
+1. **The market-time marker is older than the candle retention horizon**
    (`MARKET_CANDLE_5M_RETENTION_DAYS`, consumed from the retention job's own
    variable so the two cannot drift apart). Past that point retention is
    provably deleting windows the sweep never examined.
@@ -264,6 +353,18 @@ Two independent, exact signals:
 
 2. **A deferred candle whose `market_candles` row has disappeared.** The same
    loss seen from the other side.
+
+3. **A candle the STORAGE-order position has not reached, whose window is
+   already older than the retention horizon and that an activated order could
+   still match.** Signal 1 structurally cannot see this one: the market-time
+   marker moves with the newest windows the sweep touched, so a single very old
+   window stored late sits far behind it while the marker itself looks
+   perfectly current.
+
+   The eligible-order condition is exactly the scan's own, which is what keeps
+   this exact rather than noisy — an old window no order could ever match is
+   not an exposure, and alarming on it would fail every new limit order on a
+   healthy system. Reported as `candle_retention_passed_unscanned_candle`.
 
 A gap is **sticky**: `gapDetectedAt` keeps its first detection and the sweep
 never clears it. Candles that retention removed before path B examined them
@@ -363,6 +464,10 @@ LIMIT_ORDER_CANDLE_RECONCILIATION_LOOKBACK_MS=3600000
 LIMIT_ORDER_CANDLE_RECONCILIATION_CANDLE_BATCH_SIZE=200
 LIMIT_ORDER_CANDLE_RECONCILIATION_ORDER_BATCH_SIZE=100
 LIMIT_ORDER_CANDLE_RECONCILIATION_WATERMARK_SAFETY_LAG_MS=900000
+# Two-phase guard on the storage-order position. See "Storage-position advance
+# rules" above; an in-flight write transaction older than the observation holds
+# the position back exactly, whenever the role can read pg_stat_activity.
+LIMIT_ORDER_CANDLE_RECONCILIATION_INGEST_SETTLE_GRACE_MS=60000
 LIMIT_ORDER_CANDLE_RECONCILIATION_DEFERRED_RETRY_BATCH_SIZE=50
 LIMIT_ORDER_CANDLE_RECONCILIATION_DEFERRED_RETRY_BASE_DELAY_MS=60000
 LIMIT_ORDER_CANDLE_RECONCILIATION_DEFERRED_RETRY_MAX_DELAY_MS=1800000
@@ -439,7 +544,10 @@ scheduler that stopped ticking does.
 | Need to disable urgently | Set `LIMIT_ORDER_CANDLE_RECONCILIATION_ENABLED=false` and restart. Path A keeps running; existing orders keep their `candleMatchingEligibleFrom`, and the checkpoint keeps its position, so re-enabling resumes exactly where it stopped without a backfill. |
 | `LIMIT_ORDER_CANDLE_RECONCILIATION_GAP_DETECTED` | Candles were retention-deleted before the sweep examined them. Identify the affected window from `gap_from_open_time` / `gap_to_open_time` and the still-submitted orders whose `candle_matching_eligible_from` falls inside it, decide explicitly what to do about them, and only THEN clear the alarm: `UPDATE limit_order_reconciliation_checkpoints SET gap_detected_at = NULL, gap_from_open_time = NULL, gap_to_open_time = NULL, degraded_reason = NULL WHERE scope = '5m';`. Clearing it first hides a real exposure. |
 | Deferred candle parked as `permanent` | Inspect `last_error_code` / `last_error_message`, fix the dependency, then `UPDATE limit_order_deferred_candles SET status = 'deferred', next_retry_at = now() WHERE market_candle_id = '...';`. Never delete the row to make the alarm go away. |
-| Watermark not advancing | Check the deferred queue first (a full retry batch every tick starves nothing, but a large backlog is the usual cause), then whether closed 5m rows are actually being written for the active assets. |
+| Market-time marker not advancing | Check the deferred queue first (a full retry batch every tick starves nothing, but a large backlog is the usual cause), then whether closed 5m rows are actually being written for the active assets. |
+| `watermarkIngestSeq` not advancing while `observedIngestSeq` climbs | The two-phase guard is holding the position back — the summary reports `ingestCeilingHeld: true`. Look for a long-running WRITE transaction touching `market_candles`: `SELECT pid, xact_start, state, query FROM pg_stat_activity WHERE backend_xid IS NOT NULL ORDER BY xact_start;`. This is the guard working, not a fault; nothing is lost while it holds, only re-scanned. |
+| `candle_retention_passed_unscanned_candle` | A window older than the retention horizon is still unscanned and an activated order could match it. Identify it from `gap_from_open_time`, then follow the same operator procedure as any other gap below. |
+| `market_candles.ingest_seq` NULL on a row | The `market_candles_ingest_seq` trigger is missing — check the migration applied and the trigger exists (`\dS+ market_candles`). The sweep skips NULL rows, so this is a silent coverage hole until fixed. |
 
 ## Verification
 
@@ -456,7 +564,14 @@ scheduler that stopped ticking does.
   lookback still being processed, checkpoint resume across a restart, a
   deferred candle not blocking later candles, a retry never double-filling,
   retention-gap detection and stickiness, and the gap failing new
-  quotes/creates closed.
+  quotes/creates closed. It additionally covers the storage-order position: a
+  candle STORED after the market-time marker passed its window still being
+  processed, a row that only becomes closed later being re-sequenced and swept,
+  an unrelated update NOT renumbering a row, the two-phase guard refusing to
+  advance onto its own observation and advancing once it settles, and the
+  unscanned-candle retention gap. Elapsed time is simulated by ageing the
+  stored observation rather than by sleeping, so every assertion is
+  deterministic.
 - `limit-order-candle-reconciliation-health.spec.ts` — every gate code, the
   quiet-market and disabled-deployment non-blocking cases, and the 503
   envelope.

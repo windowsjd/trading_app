@@ -259,9 +259,45 @@ publish its readiness to Redis and every other instance read it.
 
 Every unresolved case is fail-closed. There is no fail-open branch.
 
-The shared check runs OUTSIDE the create transaction (a Redis round trip must
-never happen while the event boundary is held); the in-transaction check stays
-purely in-memory.
+#### The create-path readiness proof
+
+A limit create resolves readiness twice: once BEFORE the transaction, where a
+Redis round trip is allowed, and once INSIDE it, where one is not — the
+event-boundary advisory lock is held there and a network wait under it stalls
+the matcher and every other create.
+
+The in-transaction step used to be a plain synchronous local check. On an
+instance that owns no provider socket that check has no authority to consult,
+so it fell through to the LEGACY per-provider streaming status, which on a
+dedicated API pod is not connected. The shared pre-check accepted the order and
+the transaction then rejected it with 503: **the same request succeeded or
+failed purely by which pod served it** — exactly the inconsistency shared
+readiness exists to remove, reintroduced one layer down.
+
+The pre-transaction check now returns a `LimitOrderProviderReadinessProof`:
+
+```ts
+{ provider, assetId, source, generation, ownerMode, checkedAt, expiresAt }
+```
+
+`ownerMode` records WHICH authority answered — `local` (this process owns the
+socket), `shared` (the Redis view), or `legacy`. The in-transaction step
+(`assertReadinessProof`) is memory-only and applies, in order:
+
+1. the proof must cover this asset on this provider and must not have expired
+   (`LIMIT_ORDER_PROVIDER_READINESS_PROOF_MAX_AGE_MS`, capped at
+   `LIMIT_ORDER_PROVIDER_LIVENESS_MAX_AGE_MS`) — an expired proof is not
+   evidence and is fail-closed like every other unresolved case;
+2. if this process owns the provider NOW, the local registry is fresher than
+   any proof and decides, so a reconnect between the two checks still rejects;
+3. a `local` proof on a process that has since RELEASED the route is
+   fail-closed — the socket that backed it is gone;
+4. a `legacy` proof re-checks the legacy streaming status (also in-process);
+5. otherwise the proof stands. A non-owner instance must not re-decide
+   readiness from an authority that structurally cannot know the answer.
+
+The proof is evidence for ONE asset on ONE provider for a bounded time. It is
+not a bypass: nothing accepts an order the shared view rejected.
 
 **Redis key schema.** All keys carry a `{provider}` hash tag so a clustered
 Redis maps them to one slot and the readiness read stays a single atomic
@@ -269,8 +305,9 @@ script.
 
 | Key | Type | TTL | Contents |
 | --- | --- | --- | --- |
-| `limit-order:trade-readiness:v1:{<provider>}:meta` | string (JSON) | `LIMIT_ORDER_SHARED_READINESS_TTL_SECONDS` | schemaVersion, provider, ownerInstance, source, generation, connected, connectedAt, lastFrameAt, lastUpdatedAt, degradedReason |
+| `limit-order:trade-readiness:v1:{<provider>}:meta` | string (JSON) | `LIMIT_ORDER_SHARED_READINESS_TTL_SECONDS` | schemaVersion, provider, ownerInstance, source, generation, **fenceToken**, connected, connectedAt, lastFrameAt, lastUpdatedAt, degradedReason |
 | `limit-order:trade-readiness:v1:{<provider>}:gen:<generation>:assets` | hash | same | per assetId: providerSymbol, symbol, market, assetType, settlementCurrency, sourceName, subscription state, generation, acknowledgedAt, updatedAt |
+| `limit-order:trade-readiness:v1:{<provider>}:fence` | string (counter) | **none — never expires** | monotonic INCR ownership token; it must outlive every owner |
 
 Only routing/liveness metadata is published. **Never** a credential, an
 approval key, an access token, or a raw provider frame — asserted by the
@@ -284,13 +321,57 @@ superseded hash is then dropped explicitly (guarded so it can only delete a
 hash the current meta no longer points at, and only while this instance still
 owns the meta).
 
-Every mutating script is a compare-and-swap executed inside Redis:
+#### Owner fencing
 
-- a meta write is refused when the stored record belongs to a DIFFERENT owner
-  and is strictly newer (`lastUpdatedAt`),
-- `release` deletes ONLY when the stored generation AND ownerInstance both
-  match, so a **late release from a replaced owner is a no-op** and cannot
-  delete the new owner's state.
+Ownership is decided by a **fence token**, never by a clock.
+
+It used to be decided by comparing `lastUpdatedAt` between records written on
+DIFFERENT HOSTS. Two machines that disagree about the time each consider their
+own record "newer", so a superseded owner whose clock ran ahead — or that was
+simply paused and resumed — could overwrite the record of the owner that had
+legitimately replaced it, publishing the subscription set of a socket that no
+longer existed. Every API instance would then accept limit orders against a
+connection nobody was listening on, and the reservation could never be filled
+or released by a live event.
+
+Before it may publish anything, a publisher calls `acquireOwnership`, which
+INCRs the per-provider fence counter inside Redis and hands back the value —
+but only when nobody else holds the meta key. The counter is generated by Redis
+itself, so the ordering is monotonic by construction and involves no clock at
+all.
+
+Every mutating script is then a compare-and-swap on that token, executed inside
+Redis:
+
+- a meta or asset write is refused when the stored fence token is strictly
+  GREATER (a newer owner exists), or equal but held by a different instance;
+- `release` and the superseded-hash cleanup delete ONLY when generation, owner
+  AND fence token all match, so a **late release from a replaced owner is a
+  no-op** and cannot delete the new owner's state.
+
+A refused write means "I have been fenced out". The publisher drops its token,
+stops publishing that provider, and re-attempts acquisition on the next tick —
+which can only succeed once the incumbent stops heartbeating and its record
+expires. It does NOT retry into a publish war. Losing the shared view never
+touches the socket: the process keeps its connection and keeps answering
+readiness from its own registry, so path A is unaffected.
+
+The incumbent re-acquiring keeps the token it already holds; renumbering a live
+owner would make the token useless as an identity.
+
+Takeover therefore has exactly one trigger: the incumbent's meta record
+expiring (`LIMIT_ORDER_SHARED_READINESS_TTL_SECONDS`). Diagnostics:
+`ProviderTradeReadinessPublisher.ownershipSnapshot()`, plus the log events
+`limit_order_shared_readiness_owner_acquired`,
+`limit_order_shared_readiness_not_owner` and
+`limit_order_shared_readiness_fenced_out`.
+
+**Rolling deploys.** The record schema version is 2 (fencing added the token). A
+v1 and a v2 instance reject each other's records, so during a mixed-version
+rollout shared readiness resolves to unavailable and new limit quotes/creates
+fail closed until the rollout completes. Cancel, market orders, FX and existing
+reservations are unaffected. Deploy the socket owner and the API pods in one
+rollout, or leave `LIMIT_ORDER_SHARED_READINESS_ENABLED=false` during it.
 
 **Publishing cadence.** `ProviderTradeReadinessPublisher` mirrors the registry
 on a timer rather than write-through, because the TTL is the owner heartbeat
@@ -310,7 +391,15 @@ mismatch -> unavailable; Redis error or unknown schema version -> unavailable.
 Verified by `scripts/limit-order-shared-readiness-integration.ts`
 (`LIMIT_ORDER_SHARED_READINESS_INTEGRATION=1`) using TWO independent
 service/registry instances against one real Redis — a single-process unit test
-cannot demonstrate cross-instance agreement.
+cannot demonstrate cross-instance agreement. It covers cross-instance
+readiness, every not-ready subscription state, stale heartbeats, reconnect
+generation invalidation, late releases, **the whole create readiness path on a
+non-owner instance** (pre-transaction proof, in-transaction re-verification,
+and the local-only check still failing there), fail-closed once the owner
+disappears, and the fencing scenarios: a rival refused while the owner
+heartbeats, a fenced-out owner unable to overwrite the new one even with a
+clock an hour ahead, and a fenced-out publisher surrendering instead of
+republishing.
 
 ## No per-event database lookups (phase 3)
 
@@ -645,6 +734,7 @@ reserve user cash against a matcher that cannot possibly fill it:
 | path A enabled | `DATABASE_URL` configured (the boundary pool opens its own sessions) |
 | shared readiness enabled | path A enabled AND `REDIS_URL` configured |
 | shared readiness enabled | TTL greater than twice the publish interval |
+| always | `LIMIT_ORDER_PROVIDER_READINESS_PROOF_MAX_AGE_MS` at most `LIMIT_ORDER_PROVIDER_LIVENESS_MAX_AGE_MS` |
 | always | `CANDLE_LIVE_MAX_PROVIDER_STREAMS_PER_SHARD` within 1..1024 |
 
 Every violation is reported at once, not just the first.
@@ -656,20 +746,32 @@ Every violation is reported at once, not just the first.
 3. deploy with every limit-order flag false and verify provider streams,
    calendar readiness and `/health/ready` dependencies;
 4. enable `LIMIT_ORDER_SHARED_READINESS_ENABLED` on the socket owner and the
-   API instances, and confirm from a NON-owner instance that readiness for a
+   API instances IN ONE ROLLOUT (readiness record schema 2 and schema 1 reject
+   each other, so a mixed-version window fails new limit quotes/creates
+   closed), then confirm from a NON-owner instance that readiness for a
    known-subscribed asset resolves ready, and that a known-capped asset does
    not;
-5. enable `LIMIT_ORDER_AUTO_EXECUTION_ENABLED`; start at least two app
+5. confirm exactly ONE instance logs
+   `limit_order_shared_readiness_owner_acquired` per provider and that the
+   others log `limit_order_shared_readiness_not_owner`; a recurring
+   `limit_order_shared_readiness_fenced_out` on the same instance means two
+   supervisors are competing and one of them should not be running;
+6. enable `LIMIT_ORDER_AUTO_EXECUTION_ENABLED`; start at least two app
    instances and confirm exactly one running matcher Ops row;
-6. verify path-A health: heartbeats, consumer lag, pending count, oldest
+7. verify path-A health: heartbeats, consumer lag, pending count, oldest
    pending age, ACK age, retention headroom, boundary wait;
-7. enable `LIMIT_ORDER_ENABLED` for a small set of TEST assets only;
-8. observe event lag / pending / boundary wait / Create latency under real
-   traffic;
-9. enable `LIMIT_ORDER_CANDLE_RECONCILIATION_ENABLED`;
-10. observe the checkpoint watermark advancing, the deferred backlog staying at
-    zero, and no gap;
-11. widen the asset set gradually.
+8. enable `LIMIT_ORDER_ENABLED` for a small set of TEST assets only;
+9. observe event lag / pending / boundary wait / Create latency under real
+   traffic, and confirm a create issued to a NON-owner instance succeeds (the
+   readiness proof path) rather than returning 503;
+10. enable `LIMIT_ORDER_CANDLE_RECONCILIATION_ENABLED`;
+11. observe BOTH checkpoint positions advancing — `watermarkIngestSeq` (the
+    storage-order scan position) and `watermarkOpenTime` (the market-time
+    marker) — the deferred backlog staying at zero, and no gap. A
+    `watermarkIngestSeq` that never moves while `observedIngestSeq` climbs
+    means the two-phase guard is holding: look for a long-running write
+    transaction on `market_candles`;
+12. widen the asset set gradually.
 
 ### Rollback order
 
@@ -792,40 +894,71 @@ XADD latency avg 0.30 ms / p95 1 ms / max 2 ms, 0 asset database queries,
 70 MB heap. Standalone run:
 `pnpm run soak:limit-order-publisher-throughput`.
 
-**End-to-end matcher**, same machine, mixed no-order / single-order /
-multi-order assets, with a path-B sweep and a boundary-waiting Create running
-CONCURRENTLY. Standalone run: `pnpm run soak:limit-order-matcher-e2e`.
+**End-to-end matcher.** Standalone run: `pnpm run soak:limit-order-matcher-e2e`.
 
-| Shape | CI smoke (6 assets x 25) | Soak (30 assets x 60) |
-| --- | --- | --- |
-| total events | 150 | 1800 |
-| publish elapsed | 100 ms | 729 ms |
-| drain elapsed | 903 ms | 6 203 ms |
-| end-to-end events/s | 150 | **260** |
-| drain events/s | 166 | 290 |
-| latency avg | 375 ms | 3 228 ms |
-| latency p50 / p95 / p99 / max | 380 / 560 / 579 / 582 ms | 3 257 / 5 643 / 5 859 / 5 911 ms |
-| peak pending | 45 | 42 |
-| peak consumer lag | 104 | 1 757 |
-| Create boundary wait | 6 ms | **5 ms** |
-| PostgreSQL connections | 4 | 4 |
-| heap | 60 MB | 99 MB |
+> **The previously published end-to-end table has been withdrawn.** Its numbers
+> were produced by a methodology that did not measure what the column headings
+> said, so they cannot be corrected by arithmetic — the run has to be repeated
+> on the fixed runner. The table returns once it has been.
+>
+> What was wrong, and what the runner does now:
+>
+> 1. **The drain rate had no valid denominator.** The consumer ran throughout
+>    the publish phase, but `drain events/s` divided ALL events by the tail
+>    window that remained after publishing stopped. The better the matcher kept
+>    up, the smaller that denominator got and the more the rate overstated it;
+>    a matcher keeping up perfectly would have reported a near-infinite rate.
+>    The runner now publishes the entire backlog with the consumer STOPPED,
+>    starts it at a recorded instant, and times the whole drain — so
+>    `matcherDrainEventsPerSecond` divides the events by a window that provably
+>    contains all of the consumer's work for all of them.
+> 2. **`end-to-end events/s` was a publisher measurement.** It divided by
+>    publish+drain wall clock while the publisher was the bottleneck, so it
+>    tracked the runner's XADD loop, not matching capacity. It is gone; the
+>    runner's own XADD rate is reported as `runnerXaddEventsPerSecond`, named
+>    for what it is and not comparable to the phase-3 publisher benchmark
+>    either.
+> 3. **Latency stopped short of the ACK.** It was measured to
+>    `limit_order_processed_events.processed_at`, which the consumer stamps
+>    BEFORE its own insert and before the XACK — understating the path by
+>    exactly the work the `xadd_to_xack` label claims to include. The stream
+>    service is now instrumented to record the real ACK instant on the same
+>    clock as the XADD, and every published event must yield a sample (silently
+>    dropping unmatched ids used to let percentiles be computed over an
+>    arbitrary subset). Percentiles are nearest-rank.
+> 4. **Two figures were not measurements at all.** `boundaryWaitMs` was a
+>    hardcoded `0` printed as an observation — removed. The Create boundary wait
+>    was timed BEFORE the load started, on an idle system, while being described
+>    as the wait under full tilt; it now runs during the drain, against real
+>    contention.
+> 5. **The concurrent path-B sweep was described but not always applied.** Its
+>    failure was swallowed, and it is inert unless
+>    `LIMIT_ORDER_CANDLE_RECONCILIATION_ENABLED` is on — which it is not by
+>    default, including in CI. The report now states
+>    `concurrentSweepEnabled` alongside the candle count, and a sweep that
+>    throws fails the run instead of quietly removing the contention.
+>
+> Only the publisher figures above survive unchanged: that runner was never
+> affected.
 
-Two things are worth reading off that table. First, end-to-end throughput is
-~260 events/s against ~3 300 events/s for the publisher — a ~13x gap, which is
-exactly why the two numbers must never be quoted for each other. Second, the
-Create boundary wait stays at ~5 ms even while the matcher is saturated and
-consumer lag is in the thousands: the event boundary is held only for the
-duration of one event's durable work, so a user placing an order is not made to
-wait behind the backlog.
+Because the backlog is now published before consuming, the whole backlog must
+fit inside the stream's trim window. The runner asserts
+`LIMIT_ORDER_EVENT_MAXLEN` exceeds `assets x events-per-asset` up front rather
+than silently draining fewer events than it published; raise it alongside the
+soak volume.
 
 The end-to-end figure is the one that bounds how fast limit orders can actually
-be filled. It is deliberately NOT asserted in CI — a GitHub runner's rate says
-nothing about production capacity. CI asserts only hardware-independent
-invariants: every event processed and ACKed within the deadline, consumer lag
-back to zero, pending back to zero, no duplicate fill, a duplicate eventId not
-re-processed, a reclaimed pending entry drained, a new leader draining the
-backlog after takeover, no residual advisory lock, and no degraded state.
+be filled. Absolute rates are deliberately NOT asserted in CI — a GitHub
+runner's rate says nothing about production capacity. CI asserts only
+hardware-independent invariants: every event processed and ACKed within the
+deadline, consumer lag back to zero, pending back to zero, no duplicate fill, a
+duplicate eventId not re-processed, a reclaimed pending entry drained, a new
+leader draining the backlog after takeover, no residual advisory lock, no
+degraded state — and that **every reported rate has a measured denominator**:
+the drain window is positive, every event has a real XADD-to-XACK sample, no
+sample exceeds the run's wall clock, and the concurrent sweep actually
+completed. A rate divided by a window that does not contain the work is wrong
+on every machine, so that is a CI gate rather than a soak observation.
 
 External KIS or Binance credentials are not used anywhere.
 

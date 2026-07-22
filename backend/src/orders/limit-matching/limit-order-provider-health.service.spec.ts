@@ -208,6 +208,208 @@ describe('LimitOrderProviderHealthService', () => {
   });
 });
 
+/**
+ * The create path's two halves: a pre-transaction check that may talk to Redis
+ * and issues a PROOF, and an in-transaction re-verification that may not.
+ *
+ * The defect these pin down: on an API instance that owns no provider socket,
+ * the in-transaction step used to fall back to the LEGACY streaming status,
+ * which on such an instance is not connected. The shared pre-check accepted the
+ * create and the transaction then rejected it with 503 — the same request
+ * succeeding or failing purely by which pod served it.
+ */
+describe('LimitOrderProviderHealthService readiness proof', () => {
+  const originalFlags = {
+    auto: process.env.LIMIT_ORDER_AUTO_EXECUTION_ENABLED,
+    shared: process.env.LIMIT_ORDER_SHARED_READINESS_ENABLED,
+  };
+
+  beforeEach(() => {
+    process.env.LIMIT_ORDER_AUTO_EXECUTION_ENABLED = 'true';
+  });
+
+  afterEach(() => {
+    restore('LIMIT_ORDER_AUTO_EXECUTION_ENABLED', originalFlags.auto);
+    restore('LIMIT_ORDER_SHARED_READINESS_ENABLED', originalFlags.shared);
+  });
+
+  it('issues a shared proof on an instance that owns no route', async () => {
+    const service = sharedReadinessService({ ready: true });
+    const proof = await service.assertAvailableAsync(CRYPTO, 1000);
+
+    expect(proof).toMatchObject({
+      provider: 'binance',
+      assetId: CRYPTO.assetId,
+      ownerMode: 'shared',
+      generation: 'gen-shared',
+      checkedAt: 1000,
+    });
+    expect(proof?.expiresAt).toBeGreaterThan(1000);
+  });
+
+  it('accepts the shared proof inside the transaction on a non-owner instance', async () => {
+    // The regression: this instance has NO local route and NO legacy stream, so
+    // every local authority says "unavailable". The proof must still stand.
+    const service = sharedReadinessService({ ready: true });
+    const proof = await service.assertAvailableAsync(CRYPTO, 1000);
+
+    expect(() =>
+      service.assertReadinessProof(proof, CRYPTO, 1500),
+    ).not.toThrow();
+    // ...while the local-only check on the very same instance still fails,
+    // which is exactly what used to run here.
+    expectCode(() => service.assertAvailable(CRYPTO));
+  });
+
+  it('rejects a shared readiness verdict of not-ready before any proof exists', async () => {
+    const service = sharedReadinessService({ ready: false });
+    await expect(service.assertAvailableAsync(CRYPTO)).rejects.toBeInstanceOf(
+      HttpException,
+    );
+  });
+
+  it('fails closed on a missing, foreign or expired proof', () => {
+    const service = sharedReadinessService({ ready: true });
+    const proof = {
+      provider: 'binance' as const,
+      assetId: CRYPTO.assetId,
+      source: 'live_candle_supervisor' as const,
+      generation: 'gen-shared',
+      ownerMode: 'shared' as const,
+      checkedAt: 1000,
+      expiresAt: 2000,
+    };
+
+    expectCode(() => service.assertReadinessProof(null, CRYPTO, 1500));
+    expectCode(() =>
+      service.assertReadinessProof(
+        { ...proof, assetId: 'asset-other' },
+        CRYPTO,
+        1500,
+      ),
+    );
+    // A KIS-routed asset can never be covered by a Binance proof.
+    expectCode(() => service.assertReadinessProof(proof, DOMESTIC, 1500));
+    expectCode(() => service.assertReadinessProof(proof, CRYPTO, 2001));
+  });
+
+  it('lets the local registry overrule a proof once this instance owns the route', async () => {
+    const routes = claimedRoutes({
+      active: [subscribed(CRYPTO.assetId, 'BTCUSDT')],
+    });
+    const service = new LimitOrderProviderHealthService(
+      routes,
+      { isActive: () => true } as never,
+      undefined,
+      undefined,
+      undefined,
+      { enabled: false } as never,
+    );
+    const proof = await service.assertAvailableAsync(CRYPTO, 1000);
+    expect(proof?.ownerMode).toBe('local');
+    expect(() =>
+      service.assertReadinessProof(proof, CRYPTO, 1100),
+    ).not.toThrow();
+
+    // A reconnect between the two checks invalidates the subscription, and the
+    // local registry — which is fresher than any proof — must win.
+    routes.beginConnection({
+      provider: 'binance',
+      source: 'live_candle_supervisor',
+      generation: 'gen-2',
+    });
+    expectCode(() => service.assertReadinessProof(proof, CRYPTO, 1200));
+  });
+
+  it('fails closed when this instance released the route it proved against', async () => {
+    const routes = claimedRoutes({
+      active: [subscribed(CRYPTO.assetId, 'BTCUSDT')],
+    });
+    const service = new LimitOrderProviderHealthService(
+      routes,
+      { isActive: () => true } as never,
+      undefined,
+      undefined,
+      undefined,
+      { enabled: false } as never,
+    );
+    const proof = await service.assertAvailableAsync(CRYPTO, 1000);
+    routes.releaseProvider('binance', 'live_candle_supervisor');
+    expectCode(() => service.assertReadinessProof(proof, CRYPTO, 1100));
+  });
+
+  it('re-checks the legacy stream for a legacy proof', async () => {
+    let connected = true;
+    const service = new LimitOrderProviderHealthService(
+      new ProviderTradeRouteRegistry(),
+      { isActive: () => true } as never,
+      undefined,
+      {
+        getStatus: () => (connected ? connectedStatus() : disconnectedStatus()),
+      } as never,
+      undefined,
+      { enabled: false } as never,
+    );
+    const proof = await service.assertAvailableAsync(CRYPTO, 1000);
+    expect(proof?.ownerMode).toBe('legacy');
+    expect(() =>
+      service.assertReadinessProof(proof, CRYPTO, 1100),
+    ).not.toThrow();
+
+    connected = false;
+    expectCode(() => service.assertReadinessProof(proof, CRYPTO, 1200));
+  });
+
+  it('is inert while automatic matching is disabled', async () => {
+    process.env.LIMIT_ORDER_AUTO_EXECUTION_ENABLED = 'false';
+    const service = new LimitOrderProviderHealthService(
+      new ProviderTradeRouteRegistry(),
+    );
+    await expect(service.assertAvailableAsync(CRYPTO)).resolves.toBeNull();
+    expect(() => service.assertReadinessProof(null, CRYPTO)).not.toThrow();
+  });
+});
+
+/**
+ * An instance with no local route, no legacy stream, and shared readiness on.
+ * That is a plain API pod in a multi-instance deployment.
+ */
+function sharedReadinessService(input: {
+  ready: boolean;
+}): LimitOrderProviderHealthService {
+  return new LimitOrderProviderHealthService(
+    new ProviderTradeRouteRegistry(),
+    { isActive: () => true } as never,
+    undefined,
+    undefined,
+    {
+      isAvailable: () => true,
+      checkAssetReadiness: () =>
+        Promise.resolve(
+          input.ready
+            ? {
+                ready: true,
+                provider: 'binance',
+                source: 'live_candle_supervisor',
+                generation: 'gen-shared',
+                asset: subscribed(CRYPTO.assetId, 'BTCUSDT'),
+              }
+            : {
+                ready: false,
+                code: 'LIMIT_ORDER_PROVIDER_NOT_SUBSCRIBED',
+                reason: 'not subscribed',
+              },
+        ),
+    } as never,
+    { enabled: true } as never,
+  );
+}
+
+function restore(name: string, value: string | undefined): void {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
+}
+
 function healthService(
   routes: ProviderTradeRouteRegistry,
 ): LimitOrderProviderHealthService {

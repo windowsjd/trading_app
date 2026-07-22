@@ -33,6 +33,7 @@ export type MarketCandleAvgAggregateOutputType = {
   close: runtime.Decimal | null
   volume: runtime.Decimal | null
   amount: runtime.Decimal | null
+  ingestSeq: number | null
 }
 
 export type MarketCandleSumAggregateOutputType = {
@@ -42,6 +43,7 @@ export type MarketCandleSumAggregateOutputType = {
   close: runtime.Decimal | null
   volume: runtime.Decimal | null
   amount: runtime.Decimal | null
+  ingestSeq: bigint | null
 }
 
 export type MarketCandleMinAggregateOutputType = {
@@ -59,6 +61,8 @@ export type MarketCandleMinAggregateOutputType = {
   isClosed: boolean | null
   sourceProvider: string | null
   sourceUpdatedAt: Date | null
+  ingestSeq: bigint | null
+  ingestSeqAt: Date | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -78,6 +82,8 @@ export type MarketCandleMaxAggregateOutputType = {
   isClosed: boolean | null
   sourceProvider: string | null
   sourceUpdatedAt: Date | null
+  ingestSeq: bigint | null
+  ingestSeqAt: Date | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -97,6 +103,8 @@ export type MarketCandleCountAggregateOutputType = {
   isClosed: number
   sourceProvider: number
   sourceUpdatedAt: number
+  ingestSeq: number
+  ingestSeqAt: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -110,6 +118,7 @@ export type MarketCandleAvgAggregateInputType = {
   close?: true
   volume?: true
   amount?: true
+  ingestSeq?: true
 }
 
 export type MarketCandleSumAggregateInputType = {
@@ -119,6 +128,7 @@ export type MarketCandleSumAggregateInputType = {
   close?: true
   volume?: true
   amount?: true
+  ingestSeq?: true
 }
 
 export type MarketCandleMinAggregateInputType = {
@@ -136,6 +146,8 @@ export type MarketCandleMinAggregateInputType = {
   isClosed?: true
   sourceProvider?: true
   sourceUpdatedAt?: true
+  ingestSeq?: true
+  ingestSeqAt?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -155,6 +167,8 @@ export type MarketCandleMaxAggregateInputType = {
   isClosed?: true
   sourceProvider?: true
   sourceUpdatedAt?: true
+  ingestSeq?: true
+  ingestSeqAt?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -174,6 +188,8 @@ export type MarketCandleCountAggregateInputType = {
   isClosed?: true
   sourceProvider?: true
   sourceUpdatedAt?: true
+  ingestSeq?: true
+  ingestSeqAt?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -280,6 +296,8 @@ export type MarketCandleGroupByOutputType = {
   isClosed: boolean
   sourceProvider: string
   sourceUpdatedAt: Date
+  ingestSeq: bigint | null
+  ingestSeqAt: Date | null
   createdAt: Date
   updatedAt: Date
   _count: MarketCandleCountAggregateOutputType | null
@@ -322,6 +340,8 @@ export type MarketCandleWhereInput = {
   isClosed?: Prisma.BoolFilter<"MarketCandle"> | boolean
   sourceProvider?: Prisma.StringFilter<"MarketCandle"> | string
   sourceUpdatedAt?: Prisma.DateTimeFilter<"MarketCandle"> | Date | string
+  ingestSeq?: Prisma.BigIntNullableFilter<"MarketCandle"> | bigint | number | null
+  ingestSeqAt?: Prisma.DateTimeNullableFilter<"MarketCandle"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"MarketCandle"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"MarketCandle"> | Date | string
   asset?: Prisma.XOR<Prisma.AssetScalarRelationFilter, Prisma.AssetWhereInput>
@@ -344,6 +364,8 @@ export type MarketCandleOrderByWithRelationInput = {
   isClosed?: Prisma.SortOrder
   sourceProvider?: Prisma.SortOrder
   sourceUpdatedAt?: Prisma.SortOrder
+  ingestSeq?: Prisma.SortOrderInput | Prisma.SortOrder
+  ingestSeqAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   asset?: Prisma.AssetOrderByWithRelationInput
@@ -370,6 +392,8 @@ export type MarketCandleWhereUniqueInput = Prisma.AtLeast<{
   isClosed?: Prisma.BoolFilter<"MarketCandle"> | boolean
   sourceProvider?: Prisma.StringFilter<"MarketCandle"> | string
   sourceUpdatedAt?: Prisma.DateTimeFilter<"MarketCandle"> | Date | string
+  ingestSeq?: Prisma.BigIntNullableFilter<"MarketCandle"> | bigint | number | null
+  ingestSeqAt?: Prisma.DateTimeNullableFilter<"MarketCandle"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"MarketCandle"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"MarketCandle"> | Date | string
   asset?: Prisma.XOR<Prisma.AssetScalarRelationFilter, Prisma.AssetWhereInput>
@@ -392,6 +416,8 @@ export type MarketCandleOrderByWithAggregationInput = {
   isClosed?: Prisma.SortOrder
   sourceProvider?: Prisma.SortOrder
   sourceUpdatedAt?: Prisma.SortOrder
+  ingestSeq?: Prisma.SortOrderInput | Prisma.SortOrder
+  ingestSeqAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.MarketCandleCountOrderByAggregateInput
@@ -419,6 +445,8 @@ export type MarketCandleScalarWhereWithAggregatesInput = {
   isClosed?: Prisma.BoolWithAggregatesFilter<"MarketCandle"> | boolean
   sourceProvider?: Prisma.StringWithAggregatesFilter<"MarketCandle"> | string
   sourceUpdatedAt?: Prisma.DateTimeWithAggregatesFilter<"MarketCandle"> | Date | string
+  ingestSeq?: Prisma.BigIntNullableWithAggregatesFilter<"MarketCandle"> | bigint | number | null
+  ingestSeqAt?: Prisma.DateTimeNullableWithAggregatesFilter<"MarketCandle"> | Date | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"MarketCandle"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"MarketCandle"> | Date | string
 }
@@ -437,6 +465,8 @@ export type MarketCandleCreateInput = {
   isClosed: boolean
   sourceProvider: string
   sourceUpdatedAt: Date | string
+  ingestSeq?: bigint | number | null
+  ingestSeqAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   asset: Prisma.AssetCreateNestedOneWithoutMarketCandlesInput
@@ -459,6 +489,8 @@ export type MarketCandleUncheckedCreateInput = {
   isClosed: boolean
   sourceProvider: string
   sourceUpdatedAt: Date | string
+  ingestSeq?: bigint | number | null
+  ingestSeqAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   limitOrderEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedCreateNestedManyWithoutMarketCandleInput
@@ -479,6 +511,8 @@ export type MarketCandleUpdateInput = {
   isClosed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sourceProvider?: Prisma.StringFieldUpdateOperationsInput | string
   sourceUpdatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  ingestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  ingestSeqAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   asset?: Prisma.AssetUpdateOneRequiredWithoutMarketCandlesNestedInput
@@ -501,6 +535,8 @@ export type MarketCandleUncheckedUpdateInput = {
   isClosed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sourceProvider?: Prisma.StringFieldUpdateOperationsInput | string
   sourceUpdatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  ingestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  ingestSeqAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   limitOrderEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedUpdateManyWithoutMarketCandleNestedInput
@@ -522,6 +558,8 @@ export type MarketCandleCreateManyInput = {
   isClosed: boolean
   sourceProvider: string
   sourceUpdatedAt: Date | string
+  ingestSeq?: bigint | number | null
+  ingestSeqAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -540,6 +578,8 @@ export type MarketCandleUpdateManyMutationInput = {
   isClosed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sourceProvider?: Prisma.StringFieldUpdateOperationsInput | string
   sourceUpdatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  ingestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  ingestSeqAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -559,6 +599,8 @@ export type MarketCandleUncheckedUpdateManyInput = {
   isClosed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sourceProvider?: Prisma.StringFieldUpdateOperationsInput | string
   sourceUpdatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  ingestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  ingestSeqAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -594,6 +636,8 @@ export type MarketCandleCountOrderByAggregateInput = {
   isClosed?: Prisma.SortOrder
   sourceProvider?: Prisma.SortOrder
   sourceUpdatedAt?: Prisma.SortOrder
+  ingestSeq?: Prisma.SortOrder
+  ingestSeqAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -605,6 +649,7 @@ export type MarketCandleAvgOrderByAggregateInput = {
   close?: Prisma.SortOrder
   volume?: Prisma.SortOrder
   amount?: Prisma.SortOrder
+  ingestSeq?: Prisma.SortOrder
 }
 
 export type MarketCandleMaxOrderByAggregateInput = {
@@ -622,6 +667,8 @@ export type MarketCandleMaxOrderByAggregateInput = {
   isClosed?: Prisma.SortOrder
   sourceProvider?: Prisma.SortOrder
   sourceUpdatedAt?: Prisma.SortOrder
+  ingestSeq?: Prisma.SortOrder
+  ingestSeqAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -641,6 +688,8 @@ export type MarketCandleMinOrderByAggregateInput = {
   isClosed?: Prisma.SortOrder
   sourceProvider?: Prisma.SortOrder
   sourceUpdatedAt?: Prisma.SortOrder
+  ingestSeq?: Prisma.SortOrder
+  ingestSeqAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -652,6 +701,7 @@ export type MarketCandleSumOrderByAggregateInput = {
   close?: Prisma.SortOrder
   volume?: Prisma.SortOrder
   amount?: Prisma.SortOrder
+  ingestSeq?: Prisma.SortOrder
 }
 
 export type MarketCandleScalarRelationFilter = {
@@ -701,6 +751,14 @@ export type MarketCandleUncheckedUpdateManyWithoutAssetNestedInput = {
   deleteMany?: Prisma.MarketCandleScalarWhereInput | Prisma.MarketCandleScalarWhereInput[]
 }
 
+export type NullableBigIntFieldUpdateOperationsInput = {
+  set?: bigint | number | null
+  increment?: bigint | number
+  decrement?: bigint | number
+  multiply?: bigint | number
+  divide?: bigint | number
+}
+
 export type MarketCandleCreateNestedOneWithoutLimitOrderEvidenceInput = {
   create?: Prisma.XOR<Prisma.MarketCandleCreateWithoutLimitOrderEvidenceInput, Prisma.MarketCandleUncheckedCreateWithoutLimitOrderEvidenceInput>
   connectOrCreate?: Prisma.MarketCandleCreateOrConnectWithoutLimitOrderEvidenceInput
@@ -743,6 +801,8 @@ export type MarketCandleCreateWithoutAssetInput = {
   isClosed: boolean
   sourceProvider: string
   sourceUpdatedAt: Date | string
+  ingestSeq?: bigint | number | null
+  ingestSeqAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   limitOrderEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedManyWithoutMarketCandleInput
@@ -763,6 +823,8 @@ export type MarketCandleUncheckedCreateWithoutAssetInput = {
   isClosed: boolean
   sourceProvider: string
   sourceUpdatedAt: Date | string
+  ingestSeq?: bigint | number | null
+  ingestSeqAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   limitOrderEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedCreateNestedManyWithoutMarketCandleInput
@@ -813,6 +875,8 @@ export type MarketCandleScalarWhereInput = {
   isClosed?: Prisma.BoolFilter<"MarketCandle"> | boolean
   sourceProvider?: Prisma.StringFilter<"MarketCandle"> | string
   sourceUpdatedAt?: Prisma.DateTimeFilter<"MarketCandle"> | Date | string
+  ingestSeq?: Prisma.BigIntNullableFilter<"MarketCandle"> | bigint | number | null
+  ingestSeqAt?: Prisma.DateTimeNullableFilter<"MarketCandle"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"MarketCandle"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"MarketCandle"> | Date | string
 }
@@ -831,6 +895,8 @@ export type MarketCandleCreateWithoutLimitOrderEvidenceInput = {
   isClosed: boolean
   sourceProvider: string
   sourceUpdatedAt: Date | string
+  ingestSeq?: bigint | number | null
+  ingestSeqAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   asset: Prisma.AssetCreateNestedOneWithoutMarketCandlesInput
@@ -852,6 +918,8 @@ export type MarketCandleUncheckedCreateWithoutLimitOrderEvidenceInput = {
   isClosed: boolean
   sourceProvider: string
   sourceUpdatedAt: Date | string
+  ingestSeq?: bigint | number | null
+  ingestSeqAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   limitOrderProcessedBy?: Prisma.LimitOrderProcessedCandleUncheckedCreateNestedManyWithoutMarketCandleInput
@@ -887,6 +955,8 @@ export type MarketCandleUpdateWithoutLimitOrderEvidenceInput = {
   isClosed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sourceProvider?: Prisma.StringFieldUpdateOperationsInput | string
   sourceUpdatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  ingestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  ingestSeqAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   asset?: Prisma.AssetUpdateOneRequiredWithoutMarketCandlesNestedInput
@@ -908,6 +978,8 @@ export type MarketCandleUncheckedUpdateWithoutLimitOrderEvidenceInput = {
   isClosed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sourceProvider?: Prisma.StringFieldUpdateOperationsInput | string
   sourceUpdatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  ingestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  ingestSeqAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   limitOrderProcessedBy?: Prisma.LimitOrderProcessedCandleUncheckedUpdateManyWithoutMarketCandleNestedInput
@@ -927,6 +999,8 @@ export type MarketCandleCreateWithoutLimitOrderProcessedByInput = {
   isClosed: boolean
   sourceProvider: string
   sourceUpdatedAt: Date | string
+  ingestSeq?: bigint | number | null
+  ingestSeqAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   asset: Prisma.AssetCreateNestedOneWithoutMarketCandlesInput
@@ -948,6 +1022,8 @@ export type MarketCandleUncheckedCreateWithoutLimitOrderProcessedByInput = {
   isClosed: boolean
   sourceProvider: string
   sourceUpdatedAt: Date | string
+  ingestSeq?: bigint | number | null
+  ingestSeqAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   limitOrderEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedCreateNestedManyWithoutMarketCandleInput
@@ -983,6 +1059,8 @@ export type MarketCandleUpdateWithoutLimitOrderProcessedByInput = {
   isClosed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sourceProvider?: Prisma.StringFieldUpdateOperationsInput | string
   sourceUpdatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  ingestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  ingestSeqAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   asset?: Prisma.AssetUpdateOneRequiredWithoutMarketCandlesNestedInput
@@ -1004,6 +1082,8 @@ export type MarketCandleUncheckedUpdateWithoutLimitOrderProcessedByInput = {
   isClosed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sourceProvider?: Prisma.StringFieldUpdateOperationsInput | string
   sourceUpdatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  ingestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  ingestSeqAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   limitOrderEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedUpdateManyWithoutMarketCandleNestedInput
@@ -1023,6 +1103,8 @@ export type MarketCandleCreateManyAssetInput = {
   isClosed: boolean
   sourceProvider: string
   sourceUpdatedAt: Date | string
+  ingestSeq?: bigint | number | null
+  ingestSeqAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -1041,6 +1123,8 @@ export type MarketCandleUpdateWithoutAssetInput = {
   isClosed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sourceProvider?: Prisma.StringFieldUpdateOperationsInput | string
   sourceUpdatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  ingestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  ingestSeqAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   limitOrderEvidence?: Prisma.LimitOrderCandleEvidenceUpdateManyWithoutMarketCandleNestedInput
@@ -1061,6 +1145,8 @@ export type MarketCandleUncheckedUpdateWithoutAssetInput = {
   isClosed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sourceProvider?: Prisma.StringFieldUpdateOperationsInput | string
   sourceUpdatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  ingestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  ingestSeqAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   limitOrderEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedUpdateManyWithoutMarketCandleNestedInput
@@ -1081,6 +1167,8 @@ export type MarketCandleUncheckedUpdateManyWithoutAssetInput = {
   isClosed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   sourceProvider?: Prisma.StringFieldUpdateOperationsInput | string
   sourceUpdatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  ingestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  ingestSeqAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -1140,6 +1228,8 @@ export type MarketCandleSelect<ExtArgs extends runtime.Types.Extensions.Internal
   isClosed?: boolean
   sourceProvider?: boolean
   sourceUpdatedAt?: boolean
+  ingestSeq?: boolean
+  ingestSeqAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
@@ -1163,6 +1253,8 @@ export type MarketCandleSelectCreateManyAndReturn<ExtArgs extends runtime.Types.
   isClosed?: boolean
   sourceProvider?: boolean
   sourceUpdatedAt?: boolean
+  ingestSeq?: boolean
+  ingestSeqAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
@@ -1183,6 +1275,8 @@ export type MarketCandleSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.
   isClosed?: boolean
   sourceProvider?: boolean
   sourceUpdatedAt?: boolean
+  ingestSeq?: boolean
+  ingestSeqAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
@@ -1203,11 +1297,13 @@ export type MarketCandleSelectScalar = {
   isClosed?: boolean
   sourceProvider?: boolean
   sourceUpdatedAt?: boolean
+  ingestSeq?: boolean
+  ingestSeqAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type MarketCandleOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "assetId" | "interval" | "openTime" | "closeTime" | "open" | "high" | "low" | "close" | "volume" | "amount" | "isClosed" | "sourceProvider" | "sourceUpdatedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["marketCandle"]>
+export type MarketCandleOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "assetId" | "interval" | "openTime" | "closeTime" | "open" | "high" | "low" | "close" | "volume" | "amount" | "isClosed" | "sourceProvider" | "sourceUpdatedAt" | "ingestSeq" | "ingestSeqAt" | "createdAt" | "updatedAt", ExtArgs["result"]["marketCandle"]>
 export type MarketCandleInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   limitOrderEvidence?: boolean | Prisma.MarketCandle$limitOrderEvidenceArgs<ExtArgs>
@@ -1243,6 +1339,8 @@ export type $MarketCandlePayload<ExtArgs extends runtime.Types.Extensions.Intern
     isClosed: boolean
     sourceProvider: string
     sourceUpdatedAt: Date
+    ingestSeq: bigint | null
+    ingestSeqAt: Date | null
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["marketCandle"]>
@@ -1685,6 +1783,8 @@ export interface MarketCandleFieldRefs {
   readonly isClosed: Prisma.FieldRef<"MarketCandle", 'Boolean'>
   readonly sourceProvider: Prisma.FieldRef<"MarketCandle", 'String'>
   readonly sourceUpdatedAt: Prisma.FieldRef<"MarketCandle", 'DateTime'>
+  readonly ingestSeq: Prisma.FieldRef<"MarketCandle", 'BigInt'>
+  readonly ingestSeqAt: Prisma.FieldRef<"MarketCandle", 'DateTime'>
   readonly createdAt: Prisma.FieldRef<"MarketCandle", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"MarketCandle", 'DateTime'>
 }

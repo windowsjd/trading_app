@@ -29,6 +29,14 @@ function checkpoint(
       openTime: new Date('2026-07-22T09:40:00.000Z'),
       candleId: 'c',
     },
+    // The gate reads none of the storage-order position, but the checkpoint
+    // shape carries it, so the fixture must be a real checkpoint.
+    ingest: {
+      watermarkSeq: 10n,
+      pendingSeq: 12n,
+      pendingObservedAt: NOW,
+      lastScannedSeq: 10n,
+    },
     lastScannedOpenTime: null,
     lastScannedCloseTime: null,
     lastRunAt: NOW,

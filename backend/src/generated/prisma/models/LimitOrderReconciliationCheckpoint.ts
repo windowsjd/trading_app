@@ -27,10 +27,16 @@ export type AggregateLimitOrderReconciliationCheckpoint = {
 }
 
 export type LimitOrderReconciliationCheckpointAvgAggregateOutputType = {
+  watermarkIngestSeq: number | null
+  pendingIngestSeq: number | null
+  lastScannedIngestSeq: number | null
   reservationMismatchCount: number | null
 }
 
 export type LimitOrderReconciliationCheckpointSumAggregateOutputType = {
+  watermarkIngestSeq: bigint | null
+  pendingIngestSeq: bigint | null
+  lastScannedIngestSeq: bigint | null
   reservationMismatchCount: number | null
 }
 
@@ -39,6 +45,10 @@ export type LimitOrderReconciliationCheckpointMinAggregateOutputType = {
   interval: string | null
   watermarkOpenTime: Date | null
   watermarkCandleId: string | null
+  watermarkIngestSeq: bigint | null
+  pendingIngestSeq: bigint | null
+  pendingIngestSeqObservedAt: Date | null
+  lastScannedIngestSeq: bigint | null
   lastScannedOpenTime: Date | null
   lastScannedCloseTime: Date | null
   lastRunAt: Date | null
@@ -58,6 +68,10 @@ export type LimitOrderReconciliationCheckpointMaxAggregateOutputType = {
   interval: string | null
   watermarkOpenTime: Date | null
   watermarkCandleId: string | null
+  watermarkIngestSeq: bigint | null
+  pendingIngestSeq: bigint | null
+  pendingIngestSeqObservedAt: Date | null
+  lastScannedIngestSeq: bigint | null
   lastScannedOpenTime: Date | null
   lastScannedCloseTime: Date | null
   lastRunAt: Date | null
@@ -77,6 +91,10 @@ export type LimitOrderReconciliationCheckpointCountAggregateOutputType = {
   interval: number
   watermarkOpenTime: number
   watermarkCandleId: number
+  watermarkIngestSeq: number
+  pendingIngestSeq: number
+  pendingIngestSeqObservedAt: number
+  lastScannedIngestSeq: number
   lastScannedOpenTime: number
   lastScannedCloseTime: number
   lastRunAt: number
@@ -94,10 +112,16 @@ export type LimitOrderReconciliationCheckpointCountAggregateOutputType = {
 
 
 export type LimitOrderReconciliationCheckpointAvgAggregateInputType = {
+  watermarkIngestSeq?: true
+  pendingIngestSeq?: true
+  lastScannedIngestSeq?: true
   reservationMismatchCount?: true
 }
 
 export type LimitOrderReconciliationCheckpointSumAggregateInputType = {
+  watermarkIngestSeq?: true
+  pendingIngestSeq?: true
+  lastScannedIngestSeq?: true
   reservationMismatchCount?: true
 }
 
@@ -106,6 +130,10 @@ export type LimitOrderReconciliationCheckpointMinAggregateInputType = {
   interval?: true
   watermarkOpenTime?: true
   watermarkCandleId?: true
+  watermarkIngestSeq?: true
+  pendingIngestSeq?: true
+  pendingIngestSeqObservedAt?: true
+  lastScannedIngestSeq?: true
   lastScannedOpenTime?: true
   lastScannedCloseTime?: true
   lastRunAt?: true
@@ -125,6 +153,10 @@ export type LimitOrderReconciliationCheckpointMaxAggregateInputType = {
   interval?: true
   watermarkOpenTime?: true
   watermarkCandleId?: true
+  watermarkIngestSeq?: true
+  pendingIngestSeq?: true
+  pendingIngestSeqObservedAt?: true
+  lastScannedIngestSeq?: true
   lastScannedOpenTime?: true
   lastScannedCloseTime?: true
   lastRunAt?: true
@@ -144,6 +176,10 @@ export type LimitOrderReconciliationCheckpointCountAggregateInputType = {
   interval?: true
   watermarkOpenTime?: true
   watermarkCandleId?: true
+  watermarkIngestSeq?: true
+  pendingIngestSeq?: true
+  pendingIngestSeqObservedAt?: true
+  lastScannedIngestSeq?: true
   lastScannedOpenTime?: true
   lastScannedCloseTime?: true
   lastRunAt?: true
@@ -250,6 +286,10 @@ export type LimitOrderReconciliationCheckpointGroupByOutputType = {
   interval: string
   watermarkOpenTime: Date | null
   watermarkCandleId: string | null
+  watermarkIngestSeq: bigint | null
+  pendingIngestSeq: bigint | null
+  pendingIngestSeqObservedAt: Date | null
+  lastScannedIngestSeq: bigint | null
   lastScannedOpenTime: Date | null
   lastScannedCloseTime: Date | null
   lastRunAt: Date | null
@@ -292,6 +332,10 @@ export type LimitOrderReconciliationCheckpointWhereInput = {
   interval?: Prisma.StringFilter<"LimitOrderReconciliationCheckpoint"> | string
   watermarkOpenTime?: Prisma.DateTimeNullableFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
   watermarkCandleId?: Prisma.StringNullableFilter<"LimitOrderReconciliationCheckpoint"> | string | null
+  watermarkIngestSeq?: Prisma.BigIntNullableFilter<"LimitOrderReconciliationCheckpoint"> | bigint | number | null
+  pendingIngestSeq?: Prisma.BigIntNullableFilter<"LimitOrderReconciliationCheckpoint"> | bigint | number | null
+  pendingIngestSeqObservedAt?: Prisma.DateTimeNullableFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
+  lastScannedIngestSeq?: Prisma.BigIntNullableFilter<"LimitOrderReconciliationCheckpoint"> | bigint | number | null
   lastScannedOpenTime?: Prisma.DateTimeNullableFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
   lastScannedCloseTime?: Prisma.DateTimeNullableFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
   lastRunAt?: Prisma.DateTimeNullableFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
@@ -311,6 +355,10 @@ export type LimitOrderReconciliationCheckpointOrderByWithRelationInput = {
   interval?: Prisma.SortOrder
   watermarkOpenTime?: Prisma.SortOrderInput | Prisma.SortOrder
   watermarkCandleId?: Prisma.SortOrderInput | Prisma.SortOrder
+  watermarkIngestSeq?: Prisma.SortOrderInput | Prisma.SortOrder
+  pendingIngestSeq?: Prisma.SortOrderInput | Prisma.SortOrder
+  pendingIngestSeqObservedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  lastScannedIngestSeq?: Prisma.SortOrderInput | Prisma.SortOrder
   lastScannedOpenTime?: Prisma.SortOrderInput | Prisma.SortOrder
   lastScannedCloseTime?: Prisma.SortOrderInput | Prisma.SortOrder
   lastRunAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -333,6 +381,10 @@ export type LimitOrderReconciliationCheckpointWhereUniqueInput = Prisma.AtLeast<
   interval?: Prisma.StringFilter<"LimitOrderReconciliationCheckpoint"> | string
   watermarkOpenTime?: Prisma.DateTimeNullableFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
   watermarkCandleId?: Prisma.StringNullableFilter<"LimitOrderReconciliationCheckpoint"> | string | null
+  watermarkIngestSeq?: Prisma.BigIntNullableFilter<"LimitOrderReconciliationCheckpoint"> | bigint | number | null
+  pendingIngestSeq?: Prisma.BigIntNullableFilter<"LimitOrderReconciliationCheckpoint"> | bigint | number | null
+  pendingIngestSeqObservedAt?: Prisma.DateTimeNullableFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
+  lastScannedIngestSeq?: Prisma.BigIntNullableFilter<"LimitOrderReconciliationCheckpoint"> | bigint | number | null
   lastScannedOpenTime?: Prisma.DateTimeNullableFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
   lastScannedCloseTime?: Prisma.DateTimeNullableFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
   lastRunAt?: Prisma.DateTimeNullableFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
@@ -352,6 +404,10 @@ export type LimitOrderReconciliationCheckpointOrderByWithAggregationInput = {
   interval?: Prisma.SortOrder
   watermarkOpenTime?: Prisma.SortOrderInput | Prisma.SortOrder
   watermarkCandleId?: Prisma.SortOrderInput | Prisma.SortOrder
+  watermarkIngestSeq?: Prisma.SortOrderInput | Prisma.SortOrder
+  pendingIngestSeq?: Prisma.SortOrderInput | Prisma.SortOrder
+  pendingIngestSeqObservedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  lastScannedIngestSeq?: Prisma.SortOrderInput | Prisma.SortOrder
   lastScannedOpenTime?: Prisma.SortOrderInput | Prisma.SortOrder
   lastScannedCloseTime?: Prisma.SortOrderInput | Prisma.SortOrder
   lastRunAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -379,6 +435,10 @@ export type LimitOrderReconciliationCheckpointScalarWhereWithAggregatesInput = {
   interval?: Prisma.StringWithAggregatesFilter<"LimitOrderReconciliationCheckpoint"> | string
   watermarkOpenTime?: Prisma.DateTimeNullableWithAggregatesFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
   watermarkCandleId?: Prisma.StringNullableWithAggregatesFilter<"LimitOrderReconciliationCheckpoint"> | string | null
+  watermarkIngestSeq?: Prisma.BigIntNullableWithAggregatesFilter<"LimitOrderReconciliationCheckpoint"> | bigint | number | null
+  pendingIngestSeq?: Prisma.BigIntNullableWithAggregatesFilter<"LimitOrderReconciliationCheckpoint"> | bigint | number | null
+  pendingIngestSeqObservedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
+  lastScannedIngestSeq?: Prisma.BigIntNullableWithAggregatesFilter<"LimitOrderReconciliationCheckpoint"> | bigint | number | null
   lastScannedOpenTime?: Prisma.DateTimeNullableWithAggregatesFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
   lastScannedCloseTime?: Prisma.DateTimeNullableWithAggregatesFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
   lastRunAt?: Prisma.DateTimeNullableWithAggregatesFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
@@ -398,6 +458,10 @@ export type LimitOrderReconciliationCheckpointCreateInput = {
   interval: string
   watermarkOpenTime?: Date | string | null
   watermarkCandleId?: string | null
+  watermarkIngestSeq?: bigint | number | null
+  pendingIngestSeq?: bigint | number | null
+  pendingIngestSeqObservedAt?: Date | string | null
+  lastScannedIngestSeq?: bigint | number | null
   lastScannedOpenTime?: Date | string | null
   lastScannedCloseTime?: Date | string | null
   lastRunAt?: Date | string | null
@@ -417,6 +481,10 @@ export type LimitOrderReconciliationCheckpointUncheckedCreateInput = {
   interval: string
   watermarkOpenTime?: Date | string | null
   watermarkCandleId?: string | null
+  watermarkIngestSeq?: bigint | number | null
+  pendingIngestSeq?: bigint | number | null
+  pendingIngestSeqObservedAt?: Date | string | null
+  lastScannedIngestSeq?: bigint | number | null
   lastScannedOpenTime?: Date | string | null
   lastScannedCloseTime?: Date | string | null
   lastRunAt?: Date | string | null
@@ -436,6 +504,10 @@ export type LimitOrderReconciliationCheckpointUpdateInput = {
   interval?: Prisma.StringFieldUpdateOperationsInput | string
   watermarkOpenTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   watermarkCandleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  watermarkIngestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  pendingIngestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  pendingIngestSeqObservedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastScannedIngestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   lastScannedOpenTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastScannedCloseTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastRunAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -455,6 +527,10 @@ export type LimitOrderReconciliationCheckpointUncheckedUpdateInput = {
   interval?: Prisma.StringFieldUpdateOperationsInput | string
   watermarkOpenTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   watermarkCandleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  watermarkIngestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  pendingIngestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  pendingIngestSeqObservedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastScannedIngestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   lastScannedOpenTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastScannedCloseTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastRunAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -474,6 +550,10 @@ export type LimitOrderReconciliationCheckpointCreateManyInput = {
   interval: string
   watermarkOpenTime?: Date | string | null
   watermarkCandleId?: string | null
+  watermarkIngestSeq?: bigint | number | null
+  pendingIngestSeq?: bigint | number | null
+  pendingIngestSeqObservedAt?: Date | string | null
+  lastScannedIngestSeq?: bigint | number | null
   lastScannedOpenTime?: Date | string | null
   lastScannedCloseTime?: Date | string | null
   lastRunAt?: Date | string | null
@@ -493,6 +573,10 @@ export type LimitOrderReconciliationCheckpointUpdateManyMutationInput = {
   interval?: Prisma.StringFieldUpdateOperationsInput | string
   watermarkOpenTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   watermarkCandleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  watermarkIngestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  pendingIngestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  pendingIngestSeqObservedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastScannedIngestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   lastScannedOpenTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastScannedCloseTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastRunAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -512,6 +596,10 @@ export type LimitOrderReconciliationCheckpointUncheckedUpdateManyInput = {
   interval?: Prisma.StringFieldUpdateOperationsInput | string
   watermarkOpenTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   watermarkCandleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  watermarkIngestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  pendingIngestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  pendingIngestSeqObservedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastScannedIngestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   lastScannedOpenTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastScannedCloseTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastRunAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -531,6 +619,10 @@ export type LimitOrderReconciliationCheckpointCountOrderByAggregateInput = {
   interval?: Prisma.SortOrder
   watermarkOpenTime?: Prisma.SortOrder
   watermarkCandleId?: Prisma.SortOrder
+  watermarkIngestSeq?: Prisma.SortOrder
+  pendingIngestSeq?: Prisma.SortOrder
+  pendingIngestSeqObservedAt?: Prisma.SortOrder
+  lastScannedIngestSeq?: Prisma.SortOrder
   lastScannedOpenTime?: Prisma.SortOrder
   lastScannedCloseTime?: Prisma.SortOrder
   lastRunAt?: Prisma.SortOrder
@@ -546,6 +638,9 @@ export type LimitOrderReconciliationCheckpointCountOrderByAggregateInput = {
 }
 
 export type LimitOrderReconciliationCheckpointAvgOrderByAggregateInput = {
+  watermarkIngestSeq?: Prisma.SortOrder
+  pendingIngestSeq?: Prisma.SortOrder
+  lastScannedIngestSeq?: Prisma.SortOrder
   reservationMismatchCount?: Prisma.SortOrder
 }
 
@@ -554,6 +649,10 @@ export type LimitOrderReconciliationCheckpointMaxOrderByAggregateInput = {
   interval?: Prisma.SortOrder
   watermarkOpenTime?: Prisma.SortOrder
   watermarkCandleId?: Prisma.SortOrder
+  watermarkIngestSeq?: Prisma.SortOrder
+  pendingIngestSeq?: Prisma.SortOrder
+  pendingIngestSeqObservedAt?: Prisma.SortOrder
+  lastScannedIngestSeq?: Prisma.SortOrder
   lastScannedOpenTime?: Prisma.SortOrder
   lastScannedCloseTime?: Prisma.SortOrder
   lastRunAt?: Prisma.SortOrder
@@ -573,6 +672,10 @@ export type LimitOrderReconciliationCheckpointMinOrderByAggregateInput = {
   interval?: Prisma.SortOrder
   watermarkOpenTime?: Prisma.SortOrder
   watermarkCandleId?: Prisma.SortOrder
+  watermarkIngestSeq?: Prisma.SortOrder
+  pendingIngestSeq?: Prisma.SortOrder
+  pendingIngestSeqObservedAt?: Prisma.SortOrder
+  lastScannedIngestSeq?: Prisma.SortOrder
   lastScannedOpenTime?: Prisma.SortOrder
   lastScannedCloseTime?: Prisma.SortOrder
   lastRunAt?: Prisma.SortOrder
@@ -588,6 +691,9 @@ export type LimitOrderReconciliationCheckpointMinOrderByAggregateInput = {
 }
 
 export type LimitOrderReconciliationCheckpointSumOrderByAggregateInput = {
+  watermarkIngestSeq?: Prisma.SortOrder
+  pendingIngestSeq?: Prisma.SortOrder
+  lastScannedIngestSeq?: Prisma.SortOrder
   reservationMismatchCount?: Prisma.SortOrder
 }
 
@@ -598,6 +704,10 @@ export type LimitOrderReconciliationCheckpointSelect<ExtArgs extends runtime.Typ
   interval?: boolean
   watermarkOpenTime?: boolean
   watermarkCandleId?: boolean
+  watermarkIngestSeq?: boolean
+  pendingIngestSeq?: boolean
+  pendingIngestSeqObservedAt?: boolean
+  lastScannedIngestSeq?: boolean
   lastScannedOpenTime?: boolean
   lastScannedCloseTime?: boolean
   lastRunAt?: boolean
@@ -617,6 +727,10 @@ export type LimitOrderReconciliationCheckpointSelectCreateManyAndReturn<ExtArgs 
   interval?: boolean
   watermarkOpenTime?: boolean
   watermarkCandleId?: boolean
+  watermarkIngestSeq?: boolean
+  pendingIngestSeq?: boolean
+  pendingIngestSeqObservedAt?: boolean
+  lastScannedIngestSeq?: boolean
   lastScannedOpenTime?: boolean
   lastScannedCloseTime?: boolean
   lastRunAt?: boolean
@@ -636,6 +750,10 @@ export type LimitOrderReconciliationCheckpointSelectUpdateManyAndReturn<ExtArgs 
   interval?: boolean
   watermarkOpenTime?: boolean
   watermarkCandleId?: boolean
+  watermarkIngestSeq?: boolean
+  pendingIngestSeq?: boolean
+  pendingIngestSeqObservedAt?: boolean
+  lastScannedIngestSeq?: boolean
   lastScannedOpenTime?: boolean
   lastScannedCloseTime?: boolean
   lastRunAt?: boolean
@@ -655,6 +773,10 @@ export type LimitOrderReconciliationCheckpointSelectScalar = {
   interval?: boolean
   watermarkOpenTime?: boolean
   watermarkCandleId?: boolean
+  watermarkIngestSeq?: boolean
+  pendingIngestSeq?: boolean
+  pendingIngestSeqObservedAt?: boolean
+  lastScannedIngestSeq?: boolean
   lastScannedOpenTime?: boolean
   lastScannedCloseTime?: boolean
   lastRunAt?: boolean
@@ -669,7 +791,7 @@ export type LimitOrderReconciliationCheckpointSelectScalar = {
   updatedAt?: boolean
 }
 
-export type LimitOrderReconciliationCheckpointOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"scope" | "interval" | "watermarkOpenTime" | "watermarkCandleId" | "lastScannedOpenTime" | "lastScannedCloseTime" | "lastRunAt" | "lastSuccessfulRunAt" | "degradedReason" | "gapDetectedAt" | "gapFromOpenTime" | "gapToOpenTime" | "reservationMismatchCount" | "lastReservationMismatchAt" | "createdAt" | "updatedAt", ExtArgs["result"]["limitOrderReconciliationCheckpoint"]>
+export type LimitOrderReconciliationCheckpointOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"scope" | "interval" | "watermarkOpenTime" | "watermarkCandleId" | "watermarkIngestSeq" | "pendingIngestSeq" | "pendingIngestSeqObservedAt" | "lastScannedIngestSeq" | "lastScannedOpenTime" | "lastScannedCloseTime" | "lastRunAt" | "lastSuccessfulRunAt" | "degradedReason" | "gapDetectedAt" | "gapFromOpenTime" | "gapToOpenTime" | "reservationMismatchCount" | "lastReservationMismatchAt" | "createdAt" | "updatedAt", ExtArgs["result"]["limitOrderReconciliationCheckpoint"]>
 
 export type $LimitOrderReconciliationCheckpointPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "LimitOrderReconciliationCheckpoint"
@@ -679,6 +801,10 @@ export type $LimitOrderReconciliationCheckpointPayload<ExtArgs extends runtime.T
     interval: string
     watermarkOpenTime: Date | null
     watermarkCandleId: string | null
+    watermarkIngestSeq: bigint | null
+    pendingIngestSeq: bigint | null
+    pendingIngestSeqObservedAt: Date | null
+    lastScannedIngestSeq: bigint | null
     lastScannedOpenTime: Date | null
     lastScannedCloseTime: Date | null
     lastRunAt: Date | null
@@ -1118,6 +1244,10 @@ export interface LimitOrderReconciliationCheckpointFieldRefs {
   readonly interval: Prisma.FieldRef<"LimitOrderReconciliationCheckpoint", 'String'>
   readonly watermarkOpenTime: Prisma.FieldRef<"LimitOrderReconciliationCheckpoint", 'DateTime'>
   readonly watermarkCandleId: Prisma.FieldRef<"LimitOrderReconciliationCheckpoint", 'String'>
+  readonly watermarkIngestSeq: Prisma.FieldRef<"LimitOrderReconciliationCheckpoint", 'BigInt'>
+  readonly pendingIngestSeq: Prisma.FieldRef<"LimitOrderReconciliationCheckpoint", 'BigInt'>
+  readonly pendingIngestSeqObservedAt: Prisma.FieldRef<"LimitOrderReconciliationCheckpoint", 'DateTime'>
+  readonly lastScannedIngestSeq: Prisma.FieldRef<"LimitOrderReconciliationCheckpoint", 'BigInt'>
   readonly lastScannedOpenTime: Prisma.FieldRef<"LimitOrderReconciliationCheckpoint", 'DateTime'>
   readonly lastScannedCloseTime: Prisma.FieldRef<"LimitOrderReconciliationCheckpoint", 'DateTime'>
   readonly lastRunAt: Prisma.FieldRef<"LimitOrderReconciliationCheckpoint", 'DateTime'>

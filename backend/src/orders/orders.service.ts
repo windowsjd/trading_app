@@ -72,7 +72,10 @@ import { calculateCandleMatchingEligibleFrom } from './limit-matching/limit-orde
 import { LimitOrderMatchBoundaryService } from './limit-matching/limit-order-match-boundary.service';
 import { LimitOrderCandleReconciliationHealthService } from './limit-matching/limit-order-candle-reconciliation-health.service';
 import { LimitOrderMatcherHealthService } from './limit-matching/limit-order-matcher-health.service';
-import { LimitOrderProviderHealthService } from './limit-matching/limit-order-provider-health.service';
+import {
+  LimitOrderProviderHealthService,
+  type LimitOrderProviderReadinessProof,
+} from './limit-matching/limit-order-provider-health.service';
 import { limitOrderErrorCodes } from './limit-order-error-policy';
 import type { QuotedLimitReservationBasis } from './limit-order-policy';
 import {
@@ -637,14 +640,22 @@ export class OrdersService {
    * Per-ASSET readiness, not per-provider: the exact asset must be subscribed
    * on the current canonical connection generation, otherwise the order would
    * reserve cash that no live event could ever release.
+   *
+   * Consults the SHARED cross-instance readiness view, so an API instance that
+   * does not own the provider socket answers exactly what the owner would.
+   *
+   * Only ever called OUTSIDE the create transaction: it can perform a Redis
+   * round trip, and holding the event-boundary advisory lock across a network
+   * wait would stall the matcher and every other create. The returned PROOF is
+   * what the in-transaction step re-verifies, purely in memory.
    */
-  private assertLimitOrderProviderAvailable(asset: {
+  private async assertLimitOrderProviderAvailableAsync(asset: {
     id: string;
     symbol: string;
     market: string;
     assetType: AssetType;
-  }): void {
-    if (!this.isLimitOrderAutoExecutionEnabled()) return;
+  }): Promise<LimitOrderProviderReadinessProof | null> {
+    if (!this.isLimitOrderAutoExecutionEnabled()) return null;
     if (!this.limitOrderProviderHealth) {
       this.throwApiError(
         HttpStatus.SERVICE_UNAVAILABLE,
@@ -652,7 +663,7 @@ export class OrdersService {
         'Limit-order provider health service is not wired.',
       );
     }
-    this.limitOrderProviderHealth.assertAvailable({
+    return this.limitOrderProviderHealth.assertAvailableAsync({
       assetId: asset.id,
       symbol: asset.symbol,
       market: asset.market,
@@ -661,19 +672,24 @@ export class OrdersService {
   }
 
   /**
-   * Same gate, but also consulting the SHARED cross-instance readiness view.
+   * In-transaction re-verification of the readiness established above.
    *
-   * Only ever called OUTSIDE the create transaction: it can perform a Redis
-   * round trip, and holding the event-boundary advisory lock across a network
-   * wait would stall the matcher and every other create. The in-transaction
-   * check above stays purely in-memory.
+   * Deliberately NOT a fresh independent check: on an instance that does not
+   * own the provider socket there is no local authority that could answer, and
+   * the previous code's synchronous fallback to the legacy streaming status
+   * made every non-owner API pod reject a create it had already accepted
+   * moments earlier. The proof is re-verified instead, and is superseded by the
+   * local registry whenever THIS process does own the socket.
    */
-  private async assertLimitOrderProviderAvailableAsync(asset: {
-    id: string;
-    symbol: string;
-    market: string;
-    assetType: AssetType;
-  }): Promise<void> {
+  private assertLimitOrderProviderReadinessProof(
+    proof: LimitOrderProviderReadinessProof | null,
+    asset: {
+      id: string;
+      symbol: string;
+      market: string;
+      assetType: AssetType;
+    },
+  ): void {
     if (!this.isLimitOrderAutoExecutionEnabled()) return;
     if (!this.limitOrderProviderHealth) {
       this.throwApiError(
@@ -682,7 +698,7 @@ export class OrdersService {
         'Limit-order provider health service is not wired.',
       );
     }
-    await this.limitOrderProviderHealth.assertAvailableAsync({
+    this.limitOrderProviderHealth.assertReadinessProof(proof, {
       assetId: asset.id,
       symbol: asset.symbol,
       market: asset.market,
@@ -1107,12 +1123,16 @@ export class OrdersService {
     // SHARED (cross-instance) provider readiness is resolved here, before the
     // transaction opens, so its Redis round trip never happens while the event
     // boundary is held — that lock blocks the matcher and every other create.
-    // The in-transaction check below re-verifies the LOCAL registry against the
-    // quote's asset, which is the authority when this process owns the socket.
+    // The verdict is carried into the transaction as a PROOF and re-verified
+    // there in memory; on an instance that owns the socket the local registry
+    // supersedes it, and on one that does not there is nothing local that could
+    // legitimately overrule it.
+    let providerReadinessProof: LimitOrderProviderReadinessProof | null = null;
     if (autoExecutionEnabled) {
-      await this.assertLimitOrderProviderAvailableAsync(
-        await this.findUsableAsset(request.assetId),
-      );
+      providerReadinessProof =
+        await this.assertLimitOrderProviderAvailableAsync(
+          await this.findUsableAsset(request.assetId),
+        );
     }
     const existingOrder = await this.findIdempotentCreateOrder(
       participant.id,
@@ -1212,7 +1232,10 @@ export class OrdersService {
           now: transactionNow,
         });
         this.assertOrderAssetTradable(quote.asset, transactionNow);
-        this.assertLimitOrderProviderAvailable(quote.asset);
+        this.assertLimitOrderProviderReadinessProof(
+          providerReadinessProof,
+          quote.asset,
+        );
 
         if (!quote.limitPrice) {
           this.throwApiError(

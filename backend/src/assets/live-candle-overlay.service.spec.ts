@@ -96,6 +96,10 @@ function row(openTime: string, open: string, close: string): MarketCandle {
     isClosed: true,
     sourceProvider: 'binance_rest',
     sourceUpdatedAt: new Date(time.getTime() + 299_000),
+    // Storage-order position; assigned by the market_candles trigger in the
+    // database, so a fixture just needs a plausible monotonic value.
+    ingestSeq: BigInt(time.getTime()),
+    ingestSeqAt: time,
     createdAt: time,
     updatedAt: time,
   };

@@ -16,6 +16,13 @@ import { spawnSync } from 'node:child_process';
  * for the soak run (`pnpm soak:limit-order-matcher-e2e`) and never asserted,
  * because a GitHub runner's throughput says nothing about production capacity.
  *
+ * What IS asserted about the numbers is that they are arithmetically sound:
+ * the matcher rate's denominator is the window the consumer actually ran in
+ * (the backlog is published with the consumer stopped), every event has a real
+ * XADD -> XACK latency sample, and nothing is reported that was not measured.
+ * A rate divided by a window that does not contain the work is wrong on every
+ * machine, so it is a CI gate rather than a soak observation.
+ *
  * The runner needs a DISPOSABLE database.
  */
 const RUN_INTEGRATION = process.env.LIMIT_ORDER_MATCHER_E2E_INTEGRATION === '1';
@@ -64,6 +71,7 @@ describe('Limit order matcher end-to-end integration', () => {
       }
       for (const name of [
         'every published event is processed and acknowledged',
+        'every reported rate has a measured denominator',
         'consumer lag returns to zero',
         'pending returns to zero',
         'no order is filled twice',
@@ -80,6 +88,18 @@ describe('Limit order matcher end-to-end integration', () => {
       expect(result.stdout).toContain('limit_order_matcher_e2e_throughput');
       expect(result.stdout).toContain('"measured":"xadd_to_xack"');
       expect(result.stdout).not.toContain('limit_order_publisher_throughput');
+      // The matcher's capacity is reported under a name that says whose
+      // capacity it is, and the runner's own XADD rate under one that says it
+      // is the runner's. `drainEventsPerSecond` was neither: it divided every
+      // event by the tail window left after publishing stopped, while the
+      // consumer had been running the whole time.
+      expect(result.stdout).toContain('matcherDrainEventsPerSecond');
+      expect(result.stdout).toContain('runnerXaddEventsPerSecond');
+      expect(result.stdout).not.toContain('drainEventsPerSecond"');
+      expect(result.stdout).not.toContain('endToEndEventsPerSecond');
+      // Nothing is printed that was not measured; `boundaryWaitMs` was a
+      // hardcoded zero presented as an observation.
+      expect(result.stdout).not.toContain('"boundaryWaitMs"');
       expect(result.stdout).toContain('limit order matcher e2e integration ok');
     },
     320_000,

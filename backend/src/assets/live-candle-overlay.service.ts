@@ -228,6 +228,10 @@ function mergeLiveFiveMinute(
     isClosed: false,
     sourceProvider: state.sourceProvider,
     sourceUpdatedAt: new Date(state.sourceUpdatedAt),
+    // This overlay row is synthesized in memory and was never stored, so it has
+    // no position in the candle storage order the path-B sweep walks.
+    ingestSeq: null,
+    ingestSeqAt: null,
     createdAt: new Date(state.firstEventAt),
     updatedAt: new Date(state.sourceUpdatedAt),
   } as MarketCandle);
