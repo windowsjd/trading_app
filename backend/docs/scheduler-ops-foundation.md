@@ -287,13 +287,30 @@ Ops job name `limit_order_candle_reconciliation`, added additively to
   (`limit_order_candle_reconciliation:5m`) with lock renewal, exactly like
   market candle reconciliation.
 - Bounded per tick by `LIMIT_ORDER_CANDLE_RECONCILIATION_CANDLE_BATCH_SIZE`
-  and `..._ORDER_BATCH_SIZE`, scanning back
-  `..._LOOKBACK_MS` for closed 5m candles with no processed row.
+  and `..._ORDER_BATCH_SIZE`. The scan starts at the DURABLE watermark in
+  `limit_order_reconciliation_checkpoints`, **not** at `now - lookbackMs`: a
+  sliding window silently lost any candle that stayed unprocessed longer than
+  the lookback. `..._LOOKBACK_MS` now only bounds bootstrap catch-up and
+  raises an operational warning; it never drops an unprocessed candle.
+- A candle that fails is enqueued in `limit_order_deferred_candles` BEFORE the
+  watermark passes it, and retried with bounded exponential backoff, so one
+  asset's transient failure delays one candle instead of blocking every later
+  candle. The retry stage runs FIRST each tick, so the oldest unfinished work
+  is never starved by a busy live stream.
 - Enabled by `LIMIT_ORDER_CANDLE_RECONCILIATION_ENABLED=true`, which also flips
   `OpsSchedulerConfig.enabled` on. It requires
   `LIMIT_ORDER_AUTO_EXECUTION_ENABLED=true`; enabling it alone fails startup.
+  Startup additionally verifies the RUNNER exists — the scheduler enabled AND
+  this job enabled in the resolved Ops config — because an enabled-but-
+  unscheduled safety net would have its own health gate report a stale sweep
+  and block every new limit order while nothing was wrong with the market.
 - `resultJson` carries `scannedCandles / processedCandles / skippedCandles /
-  matchedOrders / deferredCandles` plus the swept window.
+  matchedOrders / deferredCandles / retriedCandles / recoveredCandles /
+  permanentCandles`, the swept window, the current watermark, and
+  `gapDetected` / `degradedReason`. **Watermark progress is the primary
+  liveness signal**: a watermark that stops advancing while candles keep
+  closing means the sweep is stuck even though the job keeps reporting
+  success.
 - The sweep additionally holds the shared limit-order event-boundary advisory
   lock on a dedicated PostgreSQL session (see
   `docs/limit-order-candle-reconciliation.md`), which is independent of the

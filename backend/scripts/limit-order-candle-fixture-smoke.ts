@@ -26,6 +26,7 @@ import {
 import { PrismaService } from '../src/prisma/prisma.service';
 import { PortfolioValuationService } from '../src/portfolio/portfolio-valuation.service';
 import { LimitOrderCandidateRepository } from '../src/orders/limit-matching/limit-order-candidate.repository';
+import { LimitOrderReconciliationCheckpointRepository } from '../src/orders/limit-matching/limit-order-reconciliation-checkpoint.repository';
 import { LimitOrderCandleReconciliationService } from '../src/orders/limit-matching/limit-order-candle-reconciliation.service';
 import {
   calculateCandleMatchingEligibleFrom,
@@ -66,6 +67,7 @@ async function main(): Promise<void> {
     new LimitOrderCandidateRepository(prisma),
     execution,
     boundary,
+    new LimitOrderReconciliationCheckpointRepository(prisma),
   );
   const repository = new MarketCandlesRepository(prisma);
 

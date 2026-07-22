@@ -70,6 +70,7 @@ import { readLimitOrderMatchingConfig } from './limit-matching/limit-order-match
 import { readLimitOrderCandleReconciliationConfig } from './limit-matching/limit-order-candle-reconciliation.config';
 import { calculateCandleMatchingEligibleFrom } from './limit-matching/limit-order-candle-eligibility';
 import { LimitOrderMatchBoundaryService } from './limit-matching/limit-order-match-boundary.service';
+import { LimitOrderCandleReconciliationHealthService } from './limit-matching/limit-order-candle-reconciliation-health.service';
 import { LimitOrderMatcherHealthService } from './limit-matching/limit-order-matcher-health.service';
 import { LimitOrderProviderHealthService } from './limit-matching/limit-order-provider-health.service';
 import { limitOrderErrorCodes } from './limit-order-error-policy';
@@ -554,6 +555,8 @@ export class OrdersService {
     private readonly limitOrderProviderHealth?: LimitOrderProviderHealthService,
     @Optional()
     private readonly limitOrderMatchBoundary?: LimitOrderMatchBoundaryService,
+    @Optional()
+    private readonly limitOrderCandleHealth?: LimitOrderCandleReconciliationHealthService,
   ) {}
 
   private assertLimitOrderFeatureEnabled(): void {
@@ -608,6 +611,29 @@ export class OrdersService {
   }
 
   /**
+   * Path-B (closed-candle safety net) gate for NEW quotes/creates only.
+   *
+   * Kept separate from the path-A matcher gate on purpose: its error codes name
+   * the reconciliation subsystem, so an operator can tell "live fills stopped"
+   * from "the safety net under live fills stopped" without reading logs. Inert
+   * when LIMIT_ORDER_CANDLE_RECONCILIATION_ENABLED is false, and it never
+   * blocks cancel, cleanup, market orders, or FX.
+   */
+  private async assertLimitOrderCandleReconciliationAvailable(
+    now?: Date,
+  ): Promise<void> {
+    if (!this.limitOrderCandleConfig.enabled) return;
+    if (!this.limitOrderCandleHealth) {
+      this.throwApiError(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'LIMIT_ORDER_CANDLE_RECONCILIATION_UNAVAILABLE',
+        'Limit-order candle reconciliation health service is not wired.',
+      );
+    }
+    await this.limitOrderCandleHealth.assertAvailable(now);
+  }
+
+  /**
    * Per-ASSET readiness, not per-provider: the exact asset must be subscribed
    * on the current canonical connection generation, otherwise the order would
    * reserve cash that no live event could ever release.
@@ -627,6 +653,36 @@ export class OrdersService {
       );
     }
     this.limitOrderProviderHealth.assertAvailable({
+      assetId: asset.id,
+      symbol: asset.symbol,
+      market: asset.market,
+      assetType: asset.assetType,
+    });
+  }
+
+  /**
+   * Same gate, but also consulting the SHARED cross-instance readiness view.
+   *
+   * Only ever called OUTSIDE the create transaction: it can perform a Redis
+   * round trip, and holding the event-boundary advisory lock across a network
+   * wait would stall the matcher and every other create. The in-transaction
+   * check above stays purely in-memory.
+   */
+  private async assertLimitOrderProviderAvailableAsync(asset: {
+    id: string;
+    symbol: string;
+    market: string;
+    assetType: AssetType;
+  }): Promise<void> {
+    if (!this.isLimitOrderAutoExecutionEnabled()) return;
+    if (!this.limitOrderProviderHealth) {
+      this.throwApiError(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'LIMIT_ORDER_MATCHER_UNAVAILABLE',
+        'Limit-order provider health service is not wired.',
+      );
+    }
+    await this.limitOrderProviderHealth.assertAvailableAsync({
       assetId: asset.id,
       symbol: asset.symbol,
       market: asset.market,
@@ -680,6 +736,7 @@ export class OrdersService {
   ): Promise<OrderQuoteResponse> {
     this.assertLimitOrderFeatureEnabled();
     await this.assertLimitOrderMatcherAvailable();
+    await this.assertLimitOrderCandleReconciliationAvailable(quoteAt);
     const limitOrderCreate = this.requireLimitOrderCreateService();
     if (!request.limitPrice) {
       this.throwApiError(
@@ -693,7 +750,7 @@ export class OrdersService {
     this.assertSeasonTradable(season, quoteAt);
     const participant = await this.findParticipantOrThrow(season.id, userId);
     const asset = await this.findUsableAsset(request.assetId);
-    this.assertLimitOrderProviderAvailable(asset);
+    await this.assertLimitOrderProviderAvailableAsync(asset);
     if (
       request.currencyCode &&
       request.currencyCode !== this.getAssetSettlementCurrency(asset)
@@ -1033,6 +1090,12 @@ export class OrdersService {
     });
     const autoExecutionEnabled = this.isLimitOrderAutoExecutionEnabled();
     const submittedAt = new Date();
+    // Path-B state is a slow-moving operational signal (a stuck sweep, a
+    // retention gap, a deferred backlog), so it is evaluated once here rather
+    // than inside the create transaction: it never needs the locked-row
+    // re-validation the season/participant checks below do, and keeping it out
+    // of the transaction avoids holding the event boundary across its reads.
+    await this.assertLimitOrderCandleReconciliationAvailable(submittedAt);
     // Pre-transaction checks are a fast-fail courtesy only: they give the user
     // a clean error without opening a transaction. They are NOT the basis of
     // financial correctness — every one of them is re-run against locked rows
@@ -1041,6 +1104,16 @@ export class OrdersService {
     const season = await this.findActiveSeasonOrThrow();
     this.assertSeasonTradable(season, submittedAt);
     const participant = await this.findParticipantOrThrow(season.id, userId);
+    // SHARED (cross-instance) provider readiness is resolved here, before the
+    // transaction opens, so its Redis round trip never happens while the event
+    // boundary is held — that lock blocks the matcher and every other create.
+    // The in-transaction check below re-verifies the LOCAL registry against the
+    // quote's asset, which is the authority when this process owns the socket.
+    if (autoExecutionEnabled) {
+      await this.assertLimitOrderProviderAvailableAsync(
+        await this.findUsableAsset(request.assetId),
+      );
+    }
     const existingOrder = await this.findIdempotentCreateOrder(
       participant.id,
       idempotency.idempotencyKey,

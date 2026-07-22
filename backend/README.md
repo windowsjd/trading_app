@@ -92,6 +92,20 @@ SHARE → Season FOR SHARE → CashWallet`), so a concurrent participant
   longer mutually exclusive. New limit quote/create additionally require the
   REQUESTED ASSET to be subscribed and acknowledged on the current connection
   generation.
+- `LIMIT_ORDER_SHARED_READINESS_ENABLED` (default false, requires auto
+  execution and Redis) shares that per-asset readiness ACROSS instances. The
+  route registry is per-process memory, so without it the socket-owning pod
+  accepts a limit order the other pods reject — the same request succeeding or
+  failing based on which instance the load balancer picked. The owner
+  publishes routing/liveness metadata to Redis (never a credential, an approval
+  key, an access token, or a raw frame) and every other instance reads it. All
+  failure modes are fail-closed.
+- Path B's scan position is a DURABLE watermark plus a durable deferred-retry
+  queue, not a sliding `now - lookback` window: a candle left unprocessed
+  longer than the lookback used to fall out of the window and never be examined
+  again. Candles the retention job removed before the sweep reached them are
+  reported as a sticky GAP that fails new limit registration closed rather than
+  being silently skipped.
 - Total-asset valuation keeps using the full `balanceAmount`; reservations
   never reduce it.
 - Cancel and lifecycle cleanup work even while either flag is off. When auto
@@ -120,6 +134,35 @@ LIMIT_ORDER_AUTO_EXECUTION_INTEGRATION=1 pnpm exec jest \
   src/orders/limit-order-transaction-time.integration.spec.ts \
   src/orders/limit-order-auto-execution.integration.spec.ts
 ```
+
+The phase-3 hardening suites each have their own switch. The checkpoint and
+end-to-end runners need a **disposable** database (they reset the rebuildable
+path-B checkpoint and create/remove their own fixtures):
+
+```bash
+LIMIT_ORDER_BOUNDARY_CONCURRENCY_INTEGRATION=1 \
+LIMIT_ORDER_CANDLE_CHECKPOINT_INTEGRATION=1 \
+LIMIT_ORDER_SHARED_READINESS_INTEGRATION=1 \
+LIMIT_ORDER_MATCHER_E2E_INTEGRATION=1 pnpm exec jest --runInBand \
+  src/orders/limit-matching/limit-order-boundary-concurrency.integration.spec.ts \
+  src/orders/limit-matching/limit-order-candle-checkpoint.integration.spec.ts \
+  src/providers/provider-trade-readiness.integration.spec.ts \
+  src/orders/limit-matching/limit-order-matcher-e2e.integration.spec.ts
+```
+
+### Two throughput numbers
+
+They differ by roughly an order of magnitude and must never be quoted for each
+other:
+
+| Command | Log event | Measures |
+| --- | --- | --- |
+| `pnpm run soak:limit-order-publisher-throughput` | `limit_order_publisher_throughput` | normalize + validate + XADD only |
+| `pnpm run soak:limit-order-matcher-e2e` | `limit_order_matcher_e2e_throughput` | XADD to XACK: the whole consumer path including the execution transaction |
+
+`pnpm run diagnose:limit-order-processed-events` prints exact dedupe-table
+capacity figures on demand; the matcher heartbeat itself only samples
+approximate ones, on a multi-minute interval.
 
 The race/time suites observe real PostgreSQL lock-wait state as a deterministic
 barrier. The Redis suite covers pending recovery, advisory-leader takeover,

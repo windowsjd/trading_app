@@ -199,3 +199,13 @@ export type LimitOrderCandleEvidence = Prisma.LimitOrderCandleEvidenceModel
  * 
  */
 export type LimitOrderProcessedCandle = Prisma.LimitOrderProcessedCandleModel
+/**
+ * Model LimitOrderReconciliationCheckpoint
+ * 
+ */
+export type LimitOrderReconciliationCheckpoint = Prisma.LimitOrderReconciliationCheckpointModel
+/**
+ * Model LimitOrderDeferredCandle
+ * 
+ */
+export type LimitOrderDeferredCandle = Prisma.LimitOrderDeferredCandleModel

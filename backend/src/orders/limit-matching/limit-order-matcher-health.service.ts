@@ -34,13 +34,23 @@ export type LimitOrderMatcherHeartbeat = {
 };
 
 export type LimitOrderProcessedEventStats = {
+  /**
+   * APPROXIMATE by default (planner statistics, `pg_stat_user_tables`), because
+   * an exact COUNT(*) is a full scan of an append-only table that grows without
+   * bound and was previously executed every 60 seconds. `approximate` says
+   * which kind of number this is, so an operator never reads an estimate as a
+   * ledger figure.
+   */
   rowCount: number;
+  approximate: boolean;
   oldestProcessedAt: string | null;
   newestProcessedAt: string | null;
   lastHourCount: number;
   lastDayCount: number;
   tableBytes: number | null;
   indexBytes: number | null;
+  /** When the sample was taken; a stats interval is minutes, not seconds. */
+  sampledAt: string;
 };
 
 export type LimitOrderMatcherGateFailure = {
@@ -170,13 +180,94 @@ export class LimitOrderMatcherHealthService {
   }
 
   /**
-   * Growth/ageing measurements for the durable dedupe table. No retention
-   * deletion is performed: a processed event id that were deleted could be
-   * re-delivered and fill a LATER order, and that cannot be ruled out from
-   * provider trade-id reuse alone. Capacity is therefore observed, reported,
-   * and planned for — never silently trimmed.
+   * Growth/ageing measurements for the durable dedupe table.
+   *
+   * No retention deletion is performed: a processed event id that was deleted
+   * could be re-delivered and fill a LATER order, and that cannot be ruled out
+   * from provider trade-id reuse alone. Capacity is therefore observed,
+   * reported, and planned for — never silently trimmed. See
+   * docs/limit-order-live-matching-operations.md for the capacity model and
+   * the partition-migration plan.
+   *
+   * OBSERVATION COST
+   * ----------------
+   * The previous implementation ran `COUNT(*)` plus two filtered counts over
+   * the WHOLE table every 60 seconds. On an append-only table that grows
+   * monotonically that is a sequential scan whose cost rises forever, paid by
+   * the matcher's own event loop, purely to print a number that changes on a
+   * scale of hours.
+   *
+   * The default sample is therefore APPROXIMATE:
+   *   - row count from `pg_stat_user_tables.n_live_tup` (planner statistics);
+   *   - min/max `processed_at` from the ordered index, not from an aggregate
+   *     over the heap;
+   *   - the last-hour / last-day counters from bounded index range scans;
+   *   - table/index size from the cheap `pg_*_size` catalog functions.
+   *
+   * `collectExactProcessedEventStats()` remains available for a manual
+   * diagnostic run when an exact figure is genuinely needed.
    */
   async collectProcessedEventStats(): Promise<LimitOrderProcessedEventStats> {
+    const now = new Date();
+    const hourAgo = new Date(now.getTime() - 3_600_000);
+    const dayAgo = new Date(now.getTime() - 86_400_000);
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        rowCount: bigint | null;
+        oldest: Date | null;
+        newest: Date | null;
+        lastHour: bigint;
+        lastDay: bigint;
+        tableBytes: bigint | null;
+        indexBytes: bigint | null;
+      }>
+    >`
+      SELECT
+        (
+          SELECT s."n_live_tup"::bigint
+          FROM "pg_stat_user_tables" s
+          WHERE s."relname" = 'limit_order_processed_events'
+          LIMIT 1
+        ) AS "rowCount",
+        (
+          SELECT MIN(p."processed_at") FROM "limit_order_processed_events" p
+        ) AS "oldest",
+        (
+          SELECT MAX(p."processed_at") FROM "limit_order_processed_events" p
+        ) AS "newest",
+        (
+          SELECT COUNT(*)::bigint FROM "limit_order_processed_events" p
+          WHERE p."processed_at" >= ${hourAgo}
+        ) AS "lastHour",
+        (
+          SELECT COUNT(*)::bigint FROM "limit_order_processed_events" p
+          WHERE p."processed_at" >= ${dayAgo}
+        ) AS "lastDay",
+        pg_table_size('limit_order_processed_events')::bigint AS "tableBytes",
+        pg_indexes_size('limit_order_processed_events')::bigint AS "indexBytes"
+    `;
+    const row = rows[0];
+    return {
+      rowCount: Number(row?.rowCount ?? 0),
+      approximate: true,
+      oldestProcessedAt: row?.oldest ? row.oldest.toISOString() : null,
+      newestProcessedAt: row?.newest ? row.newest.toISOString() : null,
+      lastHourCount: Number(row?.lastHour ?? 0),
+      lastDayCount: Number(row?.lastDay ?? 0),
+      tableBytes:
+        row?.tableBytes === null ? null : Number(row?.tableBytes ?? 0),
+      indexBytes:
+        row?.indexBytes === null ? null : Number(row?.indexBytes ?? 0),
+      sampledAt: now.toISOString(),
+    };
+  }
+
+  /**
+   * Exact figures. NOT on any timer: a full COUNT(*) over an unbounded
+   * append-only table belongs in a manual diagnostic run or a very
+   * low-frequency capacity report, never on the matcher heartbeat path.
+   */
+  async collectExactProcessedEventStats(): Promise<LimitOrderProcessedEventStats> {
     const now = new Date();
     const hourAgo = new Date(now.getTime() - 3_600_000);
     const dayAgo = new Date(now.getTime() - 86_400_000);
@@ -204,6 +295,7 @@ export class LimitOrderMatcherHealthService {
     const row = rows[0];
     return {
       rowCount: Number(row?.rowCount ?? 0),
+      approximate: false,
       oldestProcessedAt: row?.oldest ? row.oldest.toISOString() : null,
       newestProcessedAt: row?.newest ? row.newest.toISOString() : null,
       lastHourCount: Number(row?.lastHour ?? 0),
@@ -212,6 +304,7 @@ export class LimitOrderMatcherHealthService {
         row?.tableBytes === null ? null : Number(row?.tableBytes ?? 0),
       indexBytes:
         row?.indexBytes === null ? null : Number(row?.indexBytes ?? 0),
+      sampledAt: now.toISOString(),
     };
   }
 

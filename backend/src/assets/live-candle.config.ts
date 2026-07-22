@@ -1,5 +1,12 @@
 export const LIVE_CANDLE_CONFIG = Symbol('LIVE_CANDLE_CONFIG');
 
+/**
+ * Binance's documented hard limit: a single raw WebSocket connection accepts at
+ * most 1024 streams. Exceeding it does not degrade gracefully — the SUBSCRIBE
+ * is rejected and the connection carries no market data at all.
+ */
+export const BINANCE_MAX_STREAMS_PER_CONNECTION = 1_024;
+
 export type LiveCandleConfig = {
   enabled: boolean;
   kisEnabled: boolean;
@@ -21,7 +28,21 @@ export type LiveCandleConfig = {
   // the reconnect watchdog.
   tradeStaleThresholdMs: number;
   maxSubscriptionsPerClient: number;
+  /**
+   * Cap on ASSETS subscribed on one provider connection. Kept for backward
+   * compatibility and still enforced, but it is NOT the provider's real limit:
+   * Binance counts STREAMS, and an asset costs two of them once exact-trade
+   * matching rides the same socket.
+   */
   maxProviderSubscriptionsPerShard: number;
+  /**
+   * Cap on raw provider STREAMS on one connection — the unit Binance actually
+   * limits (1024 per connection). With the matcher off an asset costs one
+   * stream (`<symbol>@kline_5m`); with it on it costs two
+   * (`<symbol>@kline_5m` + `<symbol>@trade`), so an asset-count cap of 1024
+   * would silently request 2048 streams and have the whole SUBSCRIBE rejected.
+   */
+  maxProviderStreamsPerShard: number;
   stateTtlSeconds: number;
   maxFutureEventSkewMs: number;
   websocketBackpressureBytes: number;
@@ -126,6 +147,13 @@ export function readLiveCandleConfig(
       200,
       1,
       1_024,
+    ),
+    maxProviderStreamsPerShard: integer(
+      env,
+      'CANDLE_LIVE_MAX_PROVIDER_STREAMS_PER_SHARD',
+      BINANCE_MAX_STREAMS_PER_CONNECTION,
+      1,
+      BINANCE_MAX_STREAMS_PER_CONNECTION,
     ),
     stateTtlSeconds: integer(
       env,

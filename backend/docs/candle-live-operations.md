@@ -576,8 +576,40 @@ Each connection attempt mints a new connection generation. Asset subscription
 readiness is recorded per generation and discarded on reconnect, so limit
 Quote/Create for an asset stays fail-closed until the new socket has
 re-subscribed and been acknowledged (KIS per `tr_key`, Binance per SUBSCRIBE
-batch ack). Assets dropped by `CANDLE_LIVE_MAX_PROVIDER_SUBSCRIPTIONS_PER_SHARD`
-are recorded as capped and are never tradable by limit order.
+batch ack). Assets dropped by the subscription cap are recorded as capped and
+are never tradable by limit order.
+
+### Subscription cap is counted in STREAMS
+
+Binance limits **streams per connection (1024)**, not assets. With the matcher
+off an asset costs one stream (`<symbol>@kline_5m`); with it on it costs two
+(`<symbol>@kline_5m` + `<symbol>@trade`, deliberately on the SAME socket). An
+asset-count cap of 1024 would therefore request 2048 streams, Binance would
+reject the whole SUBSCRIBE, and the result is a connected socket carrying no
+market data at all — the worst possible failure shape, because liveness checks
+still pass.
+
+The effective asset budget is:
+
+```
+min(CANDLE_LIVE_MAX_PROVIDER_SUBSCRIPTIONS_PER_SHARD,
+    floor(CANDLE_LIVE_MAX_PROVIDER_STREAMS_PER_SHARD / streams-per-asset))
+```
+
+`CANDLE_LIVE_MAX_PROVIDER_SUBSCRIPTIONS_PER_SHARD` keeps its meaning (ASSETS)
+for backward compatibility and is still enforced;
+`CANDLE_LIVE_MAX_PROVIDER_STREAMS_PER_SHARD` (default and maximum 1024, minimum
+1, validated at startup) is the provider's real unit. The actually-built
+`streams` array is asserted against 1024 immediately before SUBSCRIBE, so a
+future change to the stream families fails loudly instead of producing a silent
+data-less connection.
+
+KIS is unaffected: its exact-trade feed is the SAME parsed frame as the candle
+feed, so one subscription target remains one stream.
+
+A reconnect re-derives the budget from scratch under a new connection
+generation, so a cap change takes effect on the next connection and no
+readiness survives from the previous one.
 
 The subscription build is also where each asset's
 `id/symbol/market/assetType/settlementCurrency` is read — once per generation.

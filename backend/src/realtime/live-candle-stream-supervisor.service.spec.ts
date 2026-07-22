@@ -333,6 +333,218 @@ describe('LiveCandleStreamSupervisorService', () => {
     expect(fixture.publishedTrades).toHaveLength(0);
   });
 
+  // -------------------------------------------------------------------------
+  // Binance subscription cap — counted in STREAMS, which is what Binance limits
+  // -------------------------------------------------------------------------
+  // An asset costs ONE stream with the matcher off and TWO with it on
+  // (`@kline_5m` + `@trade`). An asset-count cap of 1024 would therefore
+  // silently request 2048 streams, and Binance rejects the whole SUBSCRIBE —
+  // the connection then carries no market data at all.
+
+  async function subscribeParams(input: {
+    assets: Array<ReturnType<typeof cryptoAsset>>;
+    maxAssets?: number;
+    maxStreams?: number;
+    matching: boolean;
+  }): Promise<string[]> {
+    if (input.matching) {
+      process.env.LIMIT_ORDER_AUTO_EXECUTION_ENABLED = 'true';
+    }
+    try {
+      const socket = new FakeSocket();
+      const fixture = setup(
+        () => socket,
+        input.assets,
+        input.maxAssets ?? 2000,
+        input.maxStreams === undefined
+          ? {}
+          : { maxProviderStreamsPerShard: input.maxStreams },
+      );
+      fixture.routes.claimProvider('binance', 'live_candle_supervisor');
+      const context = ownerContext();
+      fixture.routes.beginConnection({
+        provider: 'binance',
+        source: 'live_candle_supervisor',
+        generation: context.connectionGeneration,
+      });
+      const connected = connectBinance(fixture.service, context);
+      socket.open();
+      await new Promise((resolve) => setImmediate(resolve));
+      const params = (JSON.parse(socket.sent[0]) as { params: string[] })
+        .params;
+      socket.close(1000, 'fixture done');
+      await connected;
+      return params;
+    } finally {
+      if (input.matching) delete process.env.LIMIT_ORDER_AUTO_EXECUTION_ENABLED;
+    }
+  }
+
+  function cryptoAssets(count: number) {
+    return Array.from({ length: count }, (_unused, index) =>
+      cryptoAsset(`a${index}`, `SYM${index}`),
+    );
+  }
+
+  it('costs one stream per asset while matching is off', async () => {
+    const params = await subscribeParams({
+      assets: cryptoAssets(10),
+      matching: false,
+    });
+    expect(params).toHaveLength(10);
+    expect(
+      params.filter((stream) => stream.endsWith('@kline_5m')),
+    ).toHaveLength(10);
+    expect(params.filter((stream) => stream.endsWith('@trade'))).toHaveLength(
+      0,
+    );
+  });
+
+  it('costs two streams per asset while matching is on', async () => {
+    const params = await subscribeParams({
+      assets: cryptoAssets(10),
+      matching: true,
+    });
+    expect(params).toHaveLength(20);
+    expect(
+      params.filter((stream) => stream.endsWith('@kline_5m')),
+    ).toHaveLength(10);
+    expect(params.filter((stream) => stream.endsWith('@trade'))).toHaveLength(
+      10,
+    );
+    // kline and trade for one asset must stay on the SAME socket.
+    expect(params).toContain('sym0usdt@kline_5m');
+    expect(params).toContain('sym0usdt@trade');
+  });
+
+  it('derives the asset budget from the stream budget when matching is on', async () => {
+    // 7 streams / 2 per asset = 3 assets, and the 4th is capped.
+    const params = await subscribeParams({
+      assets: cryptoAssets(10),
+      maxStreams: 7,
+      matching: true,
+    });
+    expect(params).toHaveLength(6);
+    expect(params).toContain('sym2usdt@trade');
+    expect(params).not.toContain('sym3usdt@kline_5m');
+  });
+
+  it('never exceeds the 1024-stream connection limit at the boundary', async () => {
+    // 512 assets x 2 streams is EXACTLY the limit; nothing may be dropped and
+    // nothing may spill over.
+    const params = await subscribeParams({
+      assets: cryptoAssets(512),
+      maxStreams: 1024,
+      matching: true,
+    });
+    expect(params).toHaveLength(1024);
+  });
+
+  it('caps assets rather than sending more than 1024 streams', async () => {
+    // 600 assets would be 1200 streams under an asset-count cap. The stream
+    // budget must win.
+    const params = await subscribeParams({
+      assets: cryptoAssets(600),
+      maxStreams: 1024,
+      matching: true,
+    });
+    expect(params).toHaveLength(1024);
+    expect(params.length).toBeLessThanOrEqual(1024);
+  });
+
+  it('marks a stream-capped asset as not subscribed for readiness', async () => {
+    process.env.LIMIT_ORDER_AUTO_EXECUTION_ENABLED = 'true';
+    try {
+      const socket = new FakeSocket();
+      const fixture = setup(() => socket, cryptoAssets(4), 2000, {
+        maxProviderStreamsPerShard: 4,
+      });
+      fixture.routes.claimProvider('binance', 'live_candle_supervisor');
+      const context = ownerContext();
+      fixture.routes.beginConnection({
+        provider: 'binance',
+        source: 'live_candle_supervisor',
+        generation: context.connectionGeneration,
+      });
+      const connected = connectBinance(fixture.service, context);
+      socket.open();
+      await new Promise((resolve) => setImmediate(resolve));
+      socket.emit('message', JSON.stringify({ result: null, id: 1 }));
+
+      // 4 streams / 2 = 2 subscribed assets; a2 and a3 are capped.
+      expect(
+        fixture.routes.checkAssetReadiness({
+          assetId: 'a1',
+          provider: 'binance',
+          livenessMaxAgeMs: 600_000,
+        }),
+      ).toMatchObject({ ready: true });
+      const capped = fixture.routes.checkAssetReadiness({
+        assetId: 'a3',
+        provider: 'binance',
+        livenessMaxAgeMs: 600_000,
+      });
+      expect(capped).toMatchObject({
+        ready: false,
+        code: 'LIMIT_ORDER_PROVIDER_NOT_SUBSCRIBED',
+      });
+      expect(!capped.ready && capped.reason).toContain('shard cap');
+
+      socket.close(1000, 'fixture done');
+      await connected;
+    } finally {
+      delete process.env.LIMIT_ORDER_AUTO_EXECUTION_ENABLED;
+    }
+  });
+
+  it('recomputes the cap and the generation after a reconnect', async () => {
+    process.env.LIMIT_ORDER_AUTO_EXECUTION_ENABLED = 'true';
+    try {
+      const assets = cryptoAssets(4);
+      const first = await subscribeParams({
+        assets,
+        maxStreams: 4,
+        matching: true,
+      });
+      expect(first).toHaveLength(4);
+
+      // A reconnect on the same process re-derives the budget from scratch and
+      // starts a NEW generation, so no readiness survives from the old one.
+      // The matcher flag is re-set because `subscribeParams` clears it on the
+      // way out, and the supervisor reads the matching config at construction.
+      process.env.LIMIT_ORDER_AUTO_EXECUTION_ENABLED = 'true';
+      const socket = new FakeSocket();
+      const fixture = setup(() => socket, assets, 2000, {
+        maxProviderStreamsPerShard: 8,
+      });
+      fixture.routes.claimProvider('binance', 'live_candle_supervisor');
+      const context = ownerContext();
+      fixture.routes.beginConnection({
+        provider: 'binance',
+        source: 'live_candle_supervisor',
+        generation: context.connectionGeneration,
+      });
+      const connected = connectBinance(fixture.service, context);
+      socket.open();
+      await new Promise((resolve) => setImmediate(resolve));
+      const second = (JSON.parse(socket.sent[0]) as { params: string[] })
+        .params;
+      expect(second).toHaveLength(8);
+      expect(
+        fixture.routes.checkAssetReadiness({
+          assetId: 'a3',
+          provider: 'binance',
+          livenessMaxAgeMs: 600_000,
+          // Not acknowledged yet on the NEW generation.
+        }),
+      ).toMatchObject({ ready: false });
+      socket.close(1000, 'fixture done');
+      await connected;
+    } finally {
+      delete process.env.LIMIT_ORDER_AUTO_EXECUTION_ENABLED;
+    }
+  });
+
   it('publishes a KIS exact trade from the SAME parsed frame as the candle', async () => {
     process.env.LIMIT_ORDER_AUTO_EXECUTION_ENABLED = 'true';
     try {

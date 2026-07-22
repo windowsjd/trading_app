@@ -8,6 +8,11 @@ import { AssetType } from '../../generated/prisma/client';
 import { BinanceWebSocketStreamingService } from '../../providers/binance/binance-websocket-streaming.service';
 import { KisWebSocketStreamingService } from '../../providers/kis/kis-websocket-streaming.service';
 import {
+  readProviderTradeReadinessConfig,
+  type ProviderTradeReadinessConfig,
+} from '../../providers/provider-trade-readiness.config';
+import { ProviderTradeReadinessStore } from '../../providers/provider-trade-readiness.store';
+import {
   ProviderTradeRouteRegistry,
   tradeRouteProviderForAssetType,
   type AssetTradeReadiness,
@@ -32,10 +37,25 @@ export type LimitOrderProviderAssetRequest = {
  * has produced a frame recently. Anything less is fail-closed, because an
  * accepted order on an unsubscribed asset would reserve the user's cash while
  * no trade event can ever fill it.
+ *
+ * RESOLUTION ORDER
+ * ----------------
+ * 1. This process owns the provider route -> the local registry is the fast
+ *    path AND the authority; it mirrors the socket directly.
+ * 2. Otherwise, when shared readiness is enabled, the Redis view published by
+ *    whichever instance DOES own the socket. Without this, a multi-instance
+ *    deployment answers the same request differently depending on which pod
+ *    received it: the owner accepts, every other pod rejects.
+ * 3. Otherwise the legacy per-provider streaming status, so a deployment that
+ *    runs neither a supervisor nor a registry-aware streaming service still
+ *    fails closed rather than silently accepting.
+ *
+ * Every unresolved case is fail-closed. There is no fail-open branch.
  */
 @Injectable()
 export class LimitOrderProviderHealthService {
   private readonly config = readLimitOrderMatchingConfig();
+  private readonly sharedConfig: ProviderTradeReadinessConfig;
 
   constructor(
     private readonly routes: ProviderTradeRouteRegistry,
@@ -45,25 +65,68 @@ export class LimitOrderProviderHealthService {
     private readonly kisStreaming?: KisWebSocketStreamingService,
     @Optional()
     private readonly binanceStreaming?: BinanceWebSocketStreamingService,
-  ) {}
+    @Optional()
+    private readonly sharedReadiness?: ProviderTradeReadinessStore,
+    // @Optional so Nest does not attempt to resolve a plain object type as a
+    // provider; the default is what production actually uses.
+    @Optional()
+    sharedConfig: ProviderTradeReadinessConfig = readProviderTradeReadinessConfig(),
+  ) {
+    this.sharedConfig = sharedConfig;
+  }
 
+  /**
+   * Synchronous local-only check, kept for callers already inside a
+   * non-awaitable path. Prefer `assertAvailableAsync`, which also consults the
+   * shared cross-instance view.
+   */
   assertAvailable(request: LimitOrderProviderAssetRequest): void {
     if (!this.config.enabled) return;
-    if (!this.publisher?.isActive()) {
-      this.unavailable(
-        'LIMIT_ORDER_PROVIDER_UNAVAILABLE',
-        'The normalized trade publisher is not active.',
-      );
+    this.assertPublisherActive();
+    const provider = tradeRouteProviderForAssetType(request.assetType);
+    const owner = this.routes.getOwner(provider);
+    if (owner) {
+      const readiness = this.localReadiness(request.assetId, provider);
+      if (!readiness.ready) this.fail(readiness);
+      return;
     }
+    this.assertLegacyStreamingConnected(provider);
+  }
+
+  /**
+   * Full check including the shared cross-instance readiness view.
+   *
+   * When shared readiness is enabled and this instance is NOT the owner, the
+   * shared view is authoritative and its verdict is final — falling back to
+   * the legacy streaming status afterwards would re-introduce exactly the
+   * inconsistency the shared view exists to remove.
+   */
+  async assertAvailableAsync(
+    request: LimitOrderProviderAssetRequest,
+  ): Promise<void> {
+    if (!this.config.enabled) return;
+    this.assertPublisherActive();
 
     const provider = tradeRouteProviderForAssetType(request.assetType);
     const owner = this.routes.getOwner(provider);
 
-    // The canonical connection registry is authoritative when a source has
+    // The canonical connection registry is authoritative when THIS process has
     // claimed the provider. It is the only place that knows WHICH assets are
     // subscribed on the live connection generation.
     if (owner) {
-      const readiness = this.routes.checkAssetReadiness({
+      const readiness = this.localReadiness(request.assetId, provider);
+      if (!readiness.ready) this.fail(readiness);
+      return;
+    }
+
+    if (this.sharedConfig.enabled) {
+      if (!this.sharedReadiness?.isAvailable()) {
+        this.unavailable(
+          'LIMIT_ORDER_PROVIDER_UNAVAILABLE',
+          'Shared provider trade readiness is enabled but its Redis backend is not wired.',
+        );
+      }
+      const readiness = await this.sharedReadiness.checkAssetReadiness({
         assetId: request.assetId,
         provider,
         livenessMaxAgeMs: this.config.providerLivenessMaxAgeMs,
@@ -72,9 +135,32 @@ export class LimitOrderProviderHealthService {
       return;
     }
 
-    // No claimed route: fall back to the legacy streaming status so a
-    // deployment that runs neither supervisor nor registry-aware streaming
-    // still fails closed instead of silently accepting orders.
+    this.assertLegacyStreamingConnected(provider);
+  }
+
+  private localReadiness(
+    assetId: string,
+    provider: ReturnType<typeof tradeRouteProviderForAssetType>,
+  ): AssetTradeReadiness {
+    return this.routes.checkAssetReadiness({
+      assetId,
+      provider,
+      livenessMaxAgeMs: this.config.providerLivenessMaxAgeMs,
+    });
+  }
+
+  private assertPublisherActive(): void {
+    if (!this.publisher?.isActive()) {
+      this.unavailable(
+        'LIMIT_ORDER_PROVIDER_UNAVAILABLE',
+        'The normalized trade publisher is not active.',
+      );
+    }
+  }
+
+  private assertLegacyStreamingConnected(
+    provider: ReturnType<typeof tradeRouteProviderForAssetType>,
+  ): void {
     const status =
       provider === 'binance'
         ? this.binanceStreaming?.getStatus()

@@ -9,7 +9,9 @@ import { OrderReservationService } from './order-reservation.service';
 import { LimitOrderCreateService } from './limit-order-create.service';
 import { LimitOrderCancelService } from './limit-order-cancel.service';
 import { LimitOrderCandidateRepository } from './limit-matching/limit-order-candidate.repository';
+import { LimitOrderCandleReconciliationHealthService } from './limit-matching/limit-order-candle-reconciliation-health.service';
 import { LimitOrderCandleReconciliationService } from './limit-matching/limit-order-candle-reconciliation.service';
+import { LimitOrderReconciliationCheckpointRepository } from './limit-matching/limit-order-reconciliation-checkpoint.repository';
 import { LimitOrderMatchBoundaryService } from './limit-matching/limit-order-match-boundary.service';
 import { LimitOrderEventPollerService } from './limit-matching/limit-order-event-poller.service';
 import { LimitOrderEventStreamService } from './limit-matching/limit-order-event-stream.service';
@@ -29,6 +31,8 @@ import { LimitOrderProviderHealthService } from './limit-matching/limit-order-pr
     LimitOrderCancelService,
     LimitOrderCandidateRepository,
     LimitOrderCandleReconciliationService,
+    LimitOrderCandleReconciliationHealthService,
+    LimitOrderReconciliationCheckpointRepository,
     LimitOrderMatchBoundaryService,
     LimitOrderEventStreamService,
     LimitOrderExecutionService,
@@ -41,6 +45,8 @@ import { LimitOrderProviderHealthService } from './limit-matching/limit-order-pr
   exports: [
     LimitOrderCancelService,
     LimitOrderCandleReconciliationService,
+    LimitOrderCandleReconciliationHealthService,
+    LimitOrderReconciliationCheckpointRepository,
     LimitOrderMatchBoundaryService,
   ],
 })

@@ -82,7 +82,9 @@ export const ModelName = {
   OpsJobLock: 'OpsJobLock',
   LimitOrderProcessedEvent: 'LimitOrderProcessedEvent',
   LimitOrderCandleEvidence: 'LimitOrderCandleEvidence',
-  LimitOrderProcessedCandle: 'LimitOrderProcessedCandle'
+  LimitOrderProcessedCandle: 'LimitOrderProcessedCandle',
+  LimitOrderReconciliationCheckpoint: 'LimitOrderReconciliationCheckpoint',
+  LimitOrderDeferredCandle: 'LimitOrderDeferredCandle'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -759,6 +761,48 @@ export const LimitOrderProcessedCandleScalarFieldEnum = {
 } as const
 
 export type LimitOrderProcessedCandleScalarFieldEnum = (typeof LimitOrderProcessedCandleScalarFieldEnum)[keyof typeof LimitOrderProcessedCandleScalarFieldEnum]
+
+
+export const LimitOrderReconciliationCheckpointScalarFieldEnum = {
+  scope: 'scope',
+  interval: 'interval',
+  watermarkOpenTime: 'watermarkOpenTime',
+  watermarkCandleId: 'watermarkCandleId',
+  lastScannedOpenTime: 'lastScannedOpenTime',
+  lastScannedCloseTime: 'lastScannedCloseTime',
+  lastRunAt: 'lastRunAt',
+  lastSuccessfulRunAt: 'lastSuccessfulRunAt',
+  degradedReason: 'degradedReason',
+  gapDetectedAt: 'gapDetectedAt',
+  gapFromOpenTime: 'gapFromOpenTime',
+  gapToOpenTime: 'gapToOpenTime',
+  reservationMismatchCount: 'reservationMismatchCount',
+  lastReservationMismatchAt: 'lastReservationMismatchAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type LimitOrderReconciliationCheckpointScalarFieldEnum = (typeof LimitOrderReconciliationCheckpointScalarFieldEnum)[keyof typeof LimitOrderReconciliationCheckpointScalarFieldEnum]
+
+
+export const LimitOrderDeferredCandleScalarFieldEnum = {
+  marketCandleId: 'marketCandleId',
+  assetId: 'assetId',
+  interval: 'interval',
+  openTime: 'openTime',
+  closeTime: 'closeTime',
+  status: 'status',
+  firstDeferredAt: 'firstDeferredAt',
+  lastDeferredAt: 'lastDeferredAt',
+  attemptCount: 'attemptCount',
+  lastErrorCode: 'lastErrorCode',
+  lastErrorMessage: 'lastErrorMessage',
+  nextRetryAt: 'nextRetryAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type LimitOrderDeferredCandleScalarFieldEnum = (typeof LimitOrderDeferredCandleScalarFieldEnum)[keyof typeof LimitOrderDeferredCandleScalarFieldEnum]
 
 
 export const SortOrder = {

@@ -38,6 +38,16 @@ export type LimitOrderMatchingConfig = {
   /** Per-asset trade-metadata cache bound for the poller. */
   assetCacheTtlMs: number;
   assetCacheMaxEntries: number;
+  /**
+   * How often the durable dedupe table's growth is sampled. Minutes, not
+   * seconds: capacity moves on a scale of hours and the sample costs catalog
+   * and index reads that the matcher's own event loop pays for.
+   */
+  processedEventStatsIntervalMs: number;
+  /** Operational warning threshold on the sampled table+index size. */
+  processedEventWarnBytes: number;
+  /** Operational warning threshold on the sampled (approximate) row count. */
+  processedEventWarnRowCount: number;
 };
 
 export class LimitOrderMatchingConfigError extends Error {
@@ -174,6 +184,27 @@ export function readLimitOrderMatchingConfig(
       2000,
       1,
       100_000,
+    ),
+    processedEventStatsIntervalMs: readInteger(
+      env,
+      'LIMIT_ORDER_PROCESSED_EVENT_STATS_INTERVAL_MS',
+      300_000,
+      60_000,
+      86_400_000,
+    ),
+    processedEventWarnBytes: readInteger(
+      env,
+      'LIMIT_ORDER_PROCESSED_EVENT_WARN_BYTES',
+      10_737_418_240,
+      1_048_576,
+      1_099_511_627_776,
+    ),
+    processedEventWarnRowCount: readInteger(
+      env,
+      'LIMIT_ORDER_PROCESSED_EVENT_WARN_ROW_COUNT',
+      500_000_000,
+      1000,
+      1_000_000_000_000,
     ),
   };
 

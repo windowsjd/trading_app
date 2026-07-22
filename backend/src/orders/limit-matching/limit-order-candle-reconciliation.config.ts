@@ -6,10 +6,59 @@ import {
 
 export type LimitOrderCandleReconciliationConfig = {
   enabled: boolean;
-  /** How far back a sweep may look for still-unprocessed closed candles. */
+  /**
+   * CATCH-UP BOUND ONLY. How far back a single sweep may reach when it has no
+   * durable position yet (bootstrap) and how large a warning-worthy catch-up
+   * range is. It is NOT a correctness bound: an unprocessed candle older than
+   * this is never dropped — it is carried by the durable checkpoint watermark
+   * and the deferred queue, and its absence from retention is reported as a
+   * gap rather than silently skipped.
+   */
   lookbackMs: number;
   candleBatchSize: number;
   orderBatchSize: number;
+  /**
+   * How long a closed window must have been elapsed before the watermark may
+   * advance past it. A canonical closed row is written by the finalizer some
+   * time after the window ends; advancing the position over a window whose row
+   * has not landed yet would skip it forever. Recent candles are still
+   * PROCESSED immediately — only the position lags.
+   */
+  watermarkSafetyLagMs: number;
+  /** Deferred rows retried per sweep (bounded, oldest due first). */
+  deferredRetryBatchSize: number;
+  /** First retry delay; doubles per attempt up to deferredRetryMaxDelayMs. */
+  deferredRetryBaseDelayMs: number;
+  deferredRetryMaxDelayMs: number;
+  /** Attempts before a deferred candle is parked as `permanent`. */
+  deferredMaxAttempts: number;
+  /**
+   * Health gate: how long ago the sweep may last have completed a run before
+   * NEW quotes/creates fail closed. This measures the RUNNER's liveness (the
+   * 60s Ops tick), not the watermark's deliberate safety lag.
+   */
+  healthMaxAgeMs: number;
+  /** Health gate: open deferred backlog size that fails closed. */
+  maxDeferredBacklog: number;
+  /** Health gate: oldest open deferral age that fails closed. */
+  maxDeferredAgeMs: number;
+  /** Health gate: repeated reservation mismatches that fail closed. */
+  maxReservationMismatchCount: number;
+  /**
+   * Retention horizon of the 5m candle table, in days. Read from the SAME
+   * variable the retention job uses (MARKET_CANDLE_5M_RETENTION_DAYS) so the
+   * two can never drift apart.
+   *
+   * Once the durable watermark is older than this, retention is PROVABLY
+   * deleting windows the sweep has not examined, and that is a gap. The
+   * comparison is deliberately against the retention POLICY rather than
+   * against the oldest surviving row: "the oldest retained candle starts after
+   * the watermark" is also true, harmlessly, whenever candle history simply
+   * begins later than the watermark (a newly stored asset, a market with no
+   * trades in the window), and turning that into a fail-closed alarm would
+   * block every new limit order for an entirely healthy system.
+   */
+  candleRetentionDays: number;
 };
 
 export function readLimitOrderCandleReconciliationConfig(
@@ -28,7 +77,7 @@ export function readLimitOrderCandleReconciliationConfig(
       'LIMIT_ORDER_CANDLE_RECONCILIATION_ENABLED requires LIMIT_ORDER_AUTO_EXECUTION_ENABLED=true.',
     );
   }
-  return {
+  const config: LimitOrderCandleReconciliationConfig = {
     enabled,
     lookbackMs: readInteger(
       env,
@@ -51,7 +100,106 @@ export function readLimitOrderCandleReconciliationConfig(
       1,
       1000,
     ),
+    watermarkSafetyLagMs: readInteger(
+      env,
+      'LIMIT_ORDER_CANDLE_RECONCILIATION_WATERMARK_SAFETY_LAG_MS',
+      900_000,
+      300_000,
+      86_400_000,
+    ),
+    deferredRetryBatchSize: readInteger(
+      env,
+      'LIMIT_ORDER_CANDLE_RECONCILIATION_DEFERRED_RETRY_BATCH_SIZE',
+      50,
+      1,
+      1000,
+    ),
+    deferredRetryBaseDelayMs: readInteger(
+      env,
+      'LIMIT_ORDER_CANDLE_RECONCILIATION_DEFERRED_RETRY_BASE_DELAY_MS',
+      60_000,
+      1000,
+      3_600_000,
+    ),
+    deferredRetryMaxDelayMs: readInteger(
+      env,
+      'LIMIT_ORDER_CANDLE_RECONCILIATION_DEFERRED_RETRY_MAX_DELAY_MS',
+      1_800_000,
+      1000,
+      86_400_000,
+    ),
+    deferredMaxAttempts: readInteger(
+      env,
+      'LIMIT_ORDER_CANDLE_RECONCILIATION_DEFERRED_MAX_ATTEMPTS',
+      50,
+      1,
+      10_000,
+    ),
+    healthMaxAgeMs: readInteger(
+      env,
+      'LIMIT_ORDER_CANDLE_RECONCILIATION_HEALTH_MAX_AGE_MS',
+      300_000,
+      60_000,
+      86_400_000,
+    ),
+    maxDeferredBacklog: readInteger(
+      env,
+      'LIMIT_ORDER_CANDLE_RECONCILIATION_MAX_DEFERRED_BACKLOG',
+      50,
+      0,
+      1_000_000,
+    ),
+    maxDeferredAgeMs: readInteger(
+      env,
+      'LIMIT_ORDER_CANDLE_RECONCILIATION_MAX_DEFERRED_AGE_MS',
+      3_600_000,
+      60_000,
+      604_800_000,
+    ),
+    maxReservationMismatchCount: readInteger(
+      env,
+      'LIMIT_ORDER_CANDLE_RECONCILIATION_MAX_RESERVATION_MISMATCH',
+      1,
+      0,
+      1_000_000,
+    ),
+    // CONSUMED, not owned. `MARKET_CANDLE_5M_RETENTION_DAYS` belongs to the Ops
+    // scheduler config, which is the single parser that validates it and
+    // refuses to boot on a bad value. Re-validating it here would raise a
+    // second, differently-typed error for the same variable and mask the
+    // owner's message, so an unusable value simply falls back to the default —
+    // startup fails on it either way, through its owner.
+    candleRetentionDays: readOptionalPositiveInteger(
+      env.MARKET_CANDLE_5M_RETENTION_DAYS,
+      35,
+    ),
   };
+
+  if (config.deferredRetryMaxDelayMs < config.deferredRetryBaseDelayMs) {
+    throw new LimitOrderMatchingConfigError(
+      'LIMIT_ORDER_CANDLE_RECONCILIATION_DEFERRED_RETRY_MAX_DELAY_MS must be greater than or equal to LIMIT_ORDER_CANDLE_RECONCILIATION_DEFERRED_RETRY_BASE_DELAY_MS.',
+    );
+  }
+  // The bootstrap reach must cover at least the window the watermark
+  // deliberately holds back, otherwise a first run could never catch up to its
+  // own safety lag.
+  if (config.lookbackMs < config.watermarkSafetyLagMs) {
+    throw new LimitOrderMatchingConfigError(
+      'LIMIT_ORDER_CANDLE_RECONCILIATION_LOOKBACK_MS must be greater than or equal to LIMIT_ORDER_CANDLE_RECONCILIATION_WATERMARK_SAFETY_LAG_MS.',
+    );
+  }
+
+  return config;
+}
+
+/** Lenient read for a variable another module owns and strictly validates. */
+function readOptionalPositiveInteger(
+  raw: string | undefined,
+  fallback: number,
+): number {
+  if (raw === undefined) return fallback;
+  const value = Number(raw.trim());
+  return Number.isSafeInteger(value) && value > 0 ? value : fallback;
 }
 
 function readInteger(

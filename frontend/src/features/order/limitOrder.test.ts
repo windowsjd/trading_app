@@ -336,10 +336,57 @@ test('new limit-order error codes map to dedicated user messages by CODE', () =>
     ERROR_CODE.ORDER_CANCEL_NOT_SUPPORTED,
     ERROR_CODE.LIMIT_ORDER_MATCHER_UNAVAILABLE,
     ERROR_CODE.LIMIT_ORDER_EVENT_STREAM_UNAVAILABLE,
+    ERROR_CODE.LIMIT_ORDER_PROVIDER_UNAVAILABLE,
+    ERROR_CODE.LIMIT_ORDER_PROVIDER_NOT_SUBSCRIBED,
+    ERROR_CODE.LIMIT_ORDER_PROVIDER_SUBSCRIPTION_FAILED,
+    ERROR_CODE.LIMIT_ORDER_CANDLE_RECONCILIATION_UNAVAILABLE,
+    ERROR_CODE.LIMIT_ORDER_CANDLE_RECONCILIATION_STALE,
+    ERROR_CODE.LIMIT_ORDER_CANDLE_RECONCILIATION_BACKLOG_EXCEEDED,
+    ERROR_CODE.LIMIT_ORDER_CANDLE_RECONCILIATION_GAP_DETECTED,
+    ERROR_CODE.LIMIT_ORDER_CANDLE_RESERVATION_MISMATCH,
   ]) {
     const message = getErrorMessageFromCode(code);
     assert.notEqual(message, generic, `expected dedicated message for ${code}`);
   }
+});
+
+test('path-B safety-net errors tell the user existing orders are unaffected', () => {
+  // These fire while cancel, cleanup, market orders and FX all keep working,
+  // so the copy must not imply the whole account is frozen.
+  for (const code of [
+    ERROR_CODE.LIMIT_ORDER_CANDLE_RECONCILIATION_UNAVAILABLE,
+    ERROR_CODE.LIMIT_ORDER_CANDLE_RECONCILIATION_STALE,
+    ERROR_CODE.LIMIT_ORDER_CANDLE_RECONCILIATION_BACKLOG_EXCEEDED,
+    ERROR_CODE.LIMIT_ORDER_CANDLE_RECONCILIATION_GAP_DETECTED,
+    ERROR_CODE.LIMIT_ORDER_CANDLE_RESERVATION_MISMATCH,
+  ]) {
+    const message = getErrorMessageFromCode(code);
+    assert.ok(
+      message.includes('기존 주문'),
+      `expected ${code} to reassure about existing orders`,
+    );
+    assert.ok(
+      message.includes('취소'),
+      `expected ${code} to state cancel is still possible`,
+    );
+  }
+});
+
+test('per-asset provider readiness errors are distinguishable from each other', () => {
+  // "not subscribed" and "subscription rejected" need different operator and
+  // user responses, so they must not collapse into one message.
+  const notSubscribed = getErrorMessageFromCode(
+    ERROR_CODE.LIMIT_ORDER_PROVIDER_NOT_SUBSCRIBED,
+  );
+  const failed = getErrorMessageFromCode(
+    ERROR_CODE.LIMIT_ORDER_PROVIDER_SUBSCRIPTION_FAILED,
+  );
+  const unavailable = getErrorMessageFromCode(
+    ERROR_CODE.LIMIT_ORDER_PROVIDER_UNAVAILABLE,
+  );
+  assert.notEqual(notSubscribed, failed);
+  assert.notEqual(notSubscribed, unavailable);
+  assert.notEqual(failed, unavailable);
 });
 
 test('success copy follows the server execution policy without promising exchange liquidity', () => {

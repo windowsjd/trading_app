@@ -426,33 +426,69 @@ export class LimitOrderEventPollerService
   }
 
   /**
-   * Growth/ageing of the durable dedupe table. Sampled on a slower cadence
-   * than the heartbeat because it aggregates the whole table; capacity moves
-   * on a scale of hours, not seconds.
+   * Growth/ageing of the durable dedupe table.
+   *
+   * Sampled on a MUCH slower cadence than the heartbeat
+   * (LIMIT_ORDER_PROCESSED_EVENT_STATS_INTERVAL_MS, minutes by default) and
+   * with approximate aggregates, because capacity moves on a scale of hours
+   * while the heartbeat runs every few seconds. A sampling failure is logged
+   * and the previous sample is reused: capacity observability must never stop
+   * the matcher itself.
    */
   private async readProcessedEventStats(
     now: number,
   ): Promise<LimitOrderProcessedEventStats | null> {
     if (
       this.lastProcessedEventStats &&
-      now - this.lastProcessedEventStatsAt < PROCESSED_EVENT_STATS_INTERVAL_MS
+      now - this.lastProcessedEventStatsAt <
+        this.config.processedEventStatsIntervalMs
     ) {
       return this.lastProcessedEventStats;
     }
     try {
-      this.lastProcessedEventStats =
-        await this.health.collectProcessedEventStats();
+      const stats = await this.health.collectProcessedEventStats();
+      this.lastProcessedEventStats = stats;
       this.lastProcessedEventStatsAt = now;
+      this.warnOnProcessedEventCapacity(stats);
     } catch (error) {
       this.logger.warn(
         `Processed-event growth sampling failed: ${safeMessage(error)}`,
       );
+      // Do not retry on the very next heartbeat: a failing sample must not
+      // become a per-tick query storm on top of an already unhealthy database.
+      this.lastProcessedEventStatsAt = now;
     }
     return this.lastProcessedEventStats;
   }
-}
 
-const PROCESSED_EVENT_STATS_INTERVAL_MS = 60_000;
+  /**
+   * Capacity warning. Retention deletion is deliberately NOT implemented (a
+   * deleted event id could be re-delivered and fill a later order), so the
+   * table grows and an operator has to act before it becomes a problem —
+   * partitioning, an archive, or a proven retention window.
+   */
+  private warnOnProcessedEventCapacity(
+    stats: LimitOrderProcessedEventStats,
+  ): void {
+    const bytes = (stats.tableBytes ?? 0) + (stats.indexBytes ?? 0);
+    if (
+      bytes < this.config.processedEventWarnBytes &&
+      stats.rowCount < this.config.processedEventWarnRowCount
+    ) {
+      return;
+    }
+    this.logger.warn(
+      JSON.stringify({
+        event: 'limit_order_processed_events_capacity_warning',
+        approximateRowCount: stats.rowCount,
+        totalBytes: bytes,
+        warnBytes: this.config.processedEventWarnBytes,
+        warnRowCount: this.config.processedEventWarnRowCount,
+        lastDayCount: stats.lastDayCount,
+      }),
+    );
+  }
+}
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

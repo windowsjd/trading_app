@@ -270,6 +270,22 @@ export function getErrorMessageFromCode(
       return '지정가 자동 체결 시스템을 확인 중입니다. 잠시 후 다시 시도해주세요.';
     case ERROR_CODE.LIMIT_ORDER_EVENT_STREAM_UNAVAILABLE:
       return '지정가 실시간 가격 이벤트를 확인할 수 없습니다. 잠시 후 다시 시도해주세요.';
+    case ERROR_CODE.LIMIT_ORDER_PROVIDER_UNAVAILABLE:
+      return '실시간 시세 연결을 확인 중입니다. 잠시 후 다시 시도해주세요.';
+    case ERROR_CODE.LIMIT_ORDER_PROVIDER_NOT_SUBSCRIBED:
+      return '이 종목은 현재 지정가 자동 체결 대상이 아닙니다. 잠시 후 다시 시도해주세요.';
+    case ERROR_CODE.LIMIT_ORDER_PROVIDER_SUBSCRIPTION_FAILED:
+      return '이 종목의 실시간 시세 구독에 실패했습니다. 잠시 후 다시 시도해주세요.';
+    // Path B: the safety net under automatic matching. The copy deliberately
+    // does not distinguish the four causes — they are operator signals, and to
+    // a user they all mean the same thing: new limit registration is paused
+    // right now, existing orders are unaffected.
+    case ERROR_CODE.LIMIT_ORDER_CANDLE_RECONCILIATION_UNAVAILABLE:
+    case ERROR_CODE.LIMIT_ORDER_CANDLE_RECONCILIATION_STALE:
+    case ERROR_CODE.LIMIT_ORDER_CANDLE_RECONCILIATION_BACKLOG_EXCEEDED:
+    case ERROR_CODE.LIMIT_ORDER_CANDLE_RECONCILIATION_GAP_DETECTED:
+    case ERROR_CODE.LIMIT_ORDER_CANDLE_RESERVATION_MISMATCH:
+      return '지정가 체결 안전장치를 점검 중입니다. 기존 주문은 그대로 유지되며 취소도 가능합니다. 잠시 후 다시 시도해주세요.';
     case ERROR_CODE.ORDER_CANCEL_NOT_SUPPORTED:
       return '시장가 주문은 취소할 수 없습니다.';
     case ERROR_CODE.ORDER_TYPE_NOT_SUPPORTED:

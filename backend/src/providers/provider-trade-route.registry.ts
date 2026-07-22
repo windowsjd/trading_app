@@ -69,6 +69,15 @@ export type AssetTradeReadiness =
       reason: string;
     };
 
+type ProviderAssetEntry = {
+  asset: ProviderSubscribedAsset;
+  state: ProviderSubscriptionState;
+  /** Last state transition; mirrored to the shared readiness view. */
+  updatedAt: number;
+  /** Set once the provider acknowledged the subscription (state 'active'). */
+  acknowledgedAt: number | null;
+};
+
 type ProviderState = {
   source: ProviderTradeSource | null;
   generation: string | null;
@@ -76,10 +85,27 @@ type ProviderState = {
   connectedAt: number | null;
   lastFrameAt: number | null;
   subscriptionsCapped: number;
-  assets: Map<
-    string,
-    { asset: ProviderSubscribedAsset; state: ProviderSubscriptionState }
-  >;
+  assets: Map<string, ProviderAssetEntry>;
+};
+
+/**
+ * Everything the shared (cross-instance) readiness view needs, read off the
+ * process that actually owns the provider socket. Routing/liveness metadata
+ * only — never a credential, an approval key, a token, or a raw frame.
+ */
+export type ProviderSharedStateSnapshot = {
+  provider: TradeRouteProvider;
+  source: ProviderTradeSource;
+  generation: string;
+  connected: boolean;
+  connectedAt: number | null;
+  lastFrameAt: number | null;
+  assets: Array<{
+    asset: ProviderSubscribedAsset;
+    state: ProviderSubscriptionState;
+    acknowledgedAt: number | null;
+    updatedAt: number;
+  }>;
 };
 
 const PROVIDERS: readonly TradeRouteProvider[] = ['kis', 'binance'];
@@ -154,12 +180,23 @@ export class ProviderTradeRouteRegistry {
   }): void {
     const state = this.state(input.provider);
     if (state.generation !== input.generation) return;
+    const at = Date.now();
     for (const asset of input.assets) {
-      state.assets.set(asset.assetId, { asset, state: 'requested' });
+      state.assets.set(asset.assetId, {
+        asset,
+        state: 'requested',
+        updatedAt: at,
+        acknowledgedAt: null,
+      });
     }
     for (const asset of input.cappedAssets ?? []) {
       if (state.assets.has(asset.assetId)) continue;
-      state.assets.set(asset.assetId, { asset, state: 'capped' });
+      state.assets.set(asset.assetId, {
+        asset,
+        state: 'capped',
+        updatedAt: at,
+        acknowledgedAt: null,
+      });
     }
     state.subscriptionsCapped = input.cappedAssets?.length ?? 0;
   }
@@ -177,10 +214,13 @@ export class ProviderTradeRouteRegistry {
   }): void {
     const state = this.state(input.provider);
     if (state.generation !== input.generation) return;
+    const at = Date.now();
     for (const entry of state.assets.values()) {
       if (entry.state !== 'requested') continue;
       if (input.match && !input.match(entry.asset)) continue;
       entry.state = 'active';
+      entry.updatedAt = at;
+      entry.acknowledgedAt = at;
     }
   }
 
@@ -191,10 +231,13 @@ export class ProviderTradeRouteRegistry {
   }): void {
     const state = this.state(input.provider);
     if (state.generation !== input.generation) return;
+    const at = Date.now();
     for (const entry of state.assets.values()) {
       if (entry.state === 'capped') continue;
       if (input.match && !input.match(entry.asset)) continue;
       entry.state = 'failed';
+      entry.updatedAt = at;
+      entry.acknowledgedAt = null;
     }
   }
 
@@ -314,6 +357,32 @@ export class ProviderTradeRouteRegistry {
       source,
       generation: state.generation,
       asset: entry.asset,
+    };
+  }
+
+  /**
+   * Full state for the shared cross-instance view, or null when this process
+   * does not currently own an established connection for the provider — in
+   * which case it has nothing authoritative to publish.
+   */
+  exportSharedState(
+    provider: TradeRouteProvider,
+  ): ProviderSharedStateSnapshot | null {
+    const state = this.state(provider);
+    if (!state.source || !state.generation || !state.connected) return null;
+    return {
+      provider,
+      source: state.source,
+      generation: state.generation,
+      connected: state.connected,
+      connectedAt: state.connectedAt,
+      lastFrameAt: state.lastFrameAt,
+      assets: [...state.assets.values()].map((entry) => ({
+        asset: entry.asset,
+        state: entry.state,
+        acknowledgedAt: entry.acknowledgedAt,
+        updatedAt: entry.updatedAt,
+      })),
     };
   }
 

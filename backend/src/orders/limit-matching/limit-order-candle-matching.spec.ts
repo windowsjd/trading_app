@@ -209,12 +209,54 @@ describe('readLimitOrderCandleReconciliationConfig', () => {
       LIMIT_ORDER_CANDLE_RECONCILIATION_CANDLE_BATCH_SIZE: '50',
       LIMIT_ORDER_CANDLE_RECONCILIATION_ORDER_BATCH_SIZE: '25',
     });
-    expect(config).toEqual({
+    expect(config).toMatchObject({
       enabled: true,
       lookbackMs: 1_800_000,
       candleBatchSize: 50,
       orderBatchSize: 25,
     });
+  });
+
+  it('exposes durable-scan defaults that never drop an unprocessed candle', () => {
+    const config = readLimitOrderCandleReconciliationConfig({
+      LIMIT_ORDER_CANDLE_RECONCILIATION_ENABLED: 'true',
+      LIMIT_ORDER_AUTO_EXECUTION_ENABLED: 'true',
+    });
+    // The watermark must lag far enough behind `now` that it cannot step over
+    // a window whose canonical closed row the finalizer has not written yet.
+    expect(config.watermarkSafetyLagMs).toBeGreaterThanOrEqual(300_000);
+    // The bootstrap reach must cover at least that lag, or a first run could
+    // never catch up to its own safety bound.
+    expect(config.lookbackMs).toBeGreaterThanOrEqual(
+      config.watermarkSafetyLagMs,
+    );
+    expect(config.deferredRetryMaxDelayMs).toBeGreaterThanOrEqual(
+      config.deferredRetryBaseDelayMs,
+    );
+    expect(config.deferredMaxAttempts).toBeGreaterThan(1);
+  });
+
+  it('rejects a bootstrap reach shorter than the watermark safety lag', () => {
+    expect(() =>
+      readLimitOrderCandleReconciliationConfig({
+        LIMIT_ORDER_CANDLE_RECONCILIATION_ENABLED: 'true',
+        LIMIT_ORDER_AUTO_EXECUTION_ENABLED: 'true',
+        LIMIT_ORDER_CANDLE_RECONCILIATION_LOOKBACK_MS: '300000',
+        LIMIT_ORDER_CANDLE_RECONCILIATION_WATERMARK_SAFETY_LAG_MS: '600000',
+      }),
+    ).toThrow(LimitOrderMatchingConfigError);
+  });
+
+  it('rejects a deferred retry ceiling below its base delay', () => {
+    expect(() =>
+      readLimitOrderCandleReconciliationConfig({
+        LIMIT_ORDER_CANDLE_RECONCILIATION_ENABLED: 'true',
+        LIMIT_ORDER_AUTO_EXECUTION_ENABLED: 'true',
+        LIMIT_ORDER_CANDLE_RECONCILIATION_DEFERRED_RETRY_BASE_DELAY_MS:
+          '600000',
+        LIMIT_ORDER_CANDLE_RECONCILIATION_DEFERRED_RETRY_MAX_DELAY_MS: '60000',
+      }),
+    ).toThrow(LimitOrderMatchingConfigError);
   });
 
   it('rejects an unparseable flag instead of silently reading it as off', () => {
@@ -238,10 +280,18 @@ describe('LimitOrderMatchBoundaryService', () => {
   it('uses one fixed advisory key for every participant', async () => {
     const service = new LimitOrderMatchBoundaryService();
     const queries: Array<{ sql: string; values: unknown[] }> = [];
+    // $executeRaw, not $queryRaw: pg_advisory_xact_lock returns `void`, which
+    // the Prisma pg driver adapter cannot decode as a result column. Reading it
+    // through $queryRaw fails at runtime and would break every create.
     await service.lockInTransaction({
-      $queryRaw: ((strings: TemplateStringsArray, ...values: unknown[]) => {
+      $executeRaw: ((strings: TemplateStringsArray, ...values: unknown[]) => {
         queries.push({ sql: strings.join('?'), values });
-        return Promise.resolve([]);
+        return Promise.resolve(1);
+      }) as never,
+      $queryRaw: (() => {
+        throw new Error(
+          'the boundary lock must not be taken through $queryRaw',
+        );
       }) as never,
     } as never);
 

@@ -39,6 +39,7 @@ import { NormalizedProviderTradeEventBus } from '../src/providers/normalized-pro
 import { ProviderTradeRouteRegistry } from '../src/providers/provider-trade-route.registry';
 import { PortfolioValuationService } from '../src/portfolio/portfolio-valuation.service';
 import { LimitOrderCandidateRepository } from '../src/orders/limit-matching/limit-order-candidate.repository';
+import { LimitOrderReconciliationCheckpointRepository } from '../src/orders/limit-matching/limit-order-reconciliation-checkpoint.repository';
 import { LimitOrderCandleReconciliationService } from '../src/orders/limit-matching/limit-order-candle-reconciliation.service';
 import { calculateCandleMatchingEligibleFrom } from '../src/orders/limit-matching/limit-order-candle-eligibility';
 import { LimitOrderEventPollerService } from '../src/orders/limit-matching/limit-order-event-poller.service';
@@ -106,6 +107,7 @@ async function main(): Promise<void> {
     new LimitOrderCandidateRepository(prisma),
     execution,
     boundary,
+    new LimitOrderReconciliationCheckpointRepository(prisma),
   );
   try {
     await createSharedMarket();
@@ -1520,6 +1522,13 @@ async function cleanupDatabase(): Promise<void> {
   await prisma.limitOrderProcessedCandle.deleteMany({
     where: { marketCandleId: { in: createdCandleIds } },
   });
+  // Path-B durable scan state. The checkpoint is a single rebuildable row per
+  // scope, so leaving it behind would carry this run's watermark into the next
+  // suite and make its first sweep skip windows it should examine.
+  await prisma.limitOrderDeferredCandle.deleteMany({
+    where: { marketCandleId: { in: createdCandleIds } },
+  });
+  await prisma.limitOrderReconciliationCheckpoint.deleteMany({});
   await prisma.seasonRanking.deleteMany({ where: { seasonId } });
   await prisma.equitySnapshot.deleteMany({
     where: { seasonParticipantId: { in: createdParticipantIds } },

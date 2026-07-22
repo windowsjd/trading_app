@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { WebSocket as WsWebSocket } from 'ws';
 import { AssetType, CurrencyCode } from '../generated/prisma/client';
 import {
+  BINANCE_MAX_STREAMS_PER_CONNECTION,
   LIVE_CANDLE_CONFIG,
   type LiveCandleConfig,
 } from '../assets/live-candle.config';
@@ -314,20 +315,33 @@ export class LiveCandleStreamSupervisorService
       if (symbol) bySymbol.set(symbol, asset);
     }
     const desiredSymbols = [...bySymbol.keys()];
-    const subscribedSymbols = desiredSymbols.slice(
-      0,
-      this.config.maxProviderSubscriptionsPerShard,
-    );
-    const cappedSymbols = desiredSymbols.slice(subscribedSymbols.length);
     // The matcher's exact-trade feed rides the SAME connection as the candle
     // klines: one socket, two stream families, no second Binance WebSocket.
     const tradeRouteOwned = this.ownsTradeRoute('binance');
+    // Binance limits STREAMS, not assets, and an asset costs two streams while
+    // the matcher owns this route. Deriving the asset budget from the stream
+    // budget is what keeps a legitimate asset cap from silently producing a
+    // rejected 2048-stream SUBSCRIBE.
+    const streamsPerAsset = tradeRouteOwned ? 2 : 1;
+    const assetBudget = Math.min(
+      this.config.maxProviderSubscriptionsPerShard,
+      Math.floor(this.config.maxProviderStreamsPerShard / streamsPerAsset),
+    );
+    const subscribedSymbols = desiredSymbols.slice(0, Math.max(0, assetBudget));
+    const cappedSymbols = desiredSymbols.slice(subscribedSymbols.length);
     const streams = subscribedSymbols.flatMap((symbol) =>
       tradeRouteOwned
         ? [`${symbol.toLowerCase()}@kline_5m`, `${symbol.toLowerCase()}@trade`]
         : [`${symbol.toLowerCase()}@kline_5m`],
     );
     if (streams.length === 0) throw namedError('BINANCE_STREAMS_EMPTY');
+    // Last-line assertion on what is ACTUALLY sent, not on what the cap
+    // arithmetic believed it would send. A future change to the stream families
+    // (a third stream per asset, a per-asset exception) fails here loudly
+    // instead of producing a connection that silently carries no data.
+    if (streams.length > BINANCE_MAX_STREAMS_PER_CONNECTION) {
+      throw namedError('BINANCE_STREAM_CAP_EXCEEDED');
+    }
     const socket = this.socketFactory(
       `${provider.binance.wsMarketDataBaseUrl.replace(/\/+$/u, '')}/ws`,
     );
