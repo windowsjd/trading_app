@@ -87,3 +87,30 @@ export async function releaseReservedCash(
       AND "reserved_amount" >= ${input.amount}::numeric
   `;
 }
+
+/**
+ * Limit-buy fill settlement: debit the actual event-price cost while releasing
+ * the order's entire limit-price reservation in one guarded statement.
+ * The post-update balance must still cover every other open reservation.
+ */
+export async function settleLimitBuyReservedCash(
+  client: AtomicCashClient,
+  input: Omit<CashWalletAmountInput, 'amount'> & {
+    actualDebit: string;
+    orderReservation: string;
+  },
+): Promise<number> {
+  return client.$executeRaw`
+    UPDATE "cash_wallets"
+    SET "balance_amount" = "balance_amount" - ${input.actualDebit}::numeric,
+        "reserved_amount" = "reserved_amount" - ${input.orderReservation}::numeric,
+        "updated_at" = clock_timestamp()
+    WHERE "id" = ${input.walletId}
+      AND "season_participant_id" = ${input.seasonParticipantId}
+      AND "currency_code" = ${input.currencyCode}::"CurrencyCode"
+      AND "reserved_amount" >= ${input.orderReservation}::numeric
+      AND "balance_amount" >= ${input.actualDebit}::numeric
+      AND "balance_amount" - ${input.actualDebit}::numeric
+          >= "reserved_amount" - ${input.orderReservation}::numeric
+  `;
+}

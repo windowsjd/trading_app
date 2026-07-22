@@ -1,4 +1,8 @@
-import type { CreateOrderDto, OrderQuoteDto } from './api';
+import type {
+  CreateOrderDto,
+  LimitOrderExecutionPolicyDto,
+  OrderQuoteDto,
+} from './api';
 import {
   isIdempotencyConflictError,
   isRequoteRequiredError,
@@ -84,8 +88,8 @@ export function isOrderSuccess(result: CreateOrderDto | null | undefined) {
   return (
     result?.execution?.state === 'executed' ||
     result?.execution?.state === 'already_executed' ||
-    // Limit-buy phase 1: a submitted (unfilled) registration IS the success
-    // outcome — there is no automatic execution afterwards.
+    // A submitted limit registration is a successful create outcome; any
+    // later path-A fill is observed through order/record refetch.
     result?.execution?.state === 'submitted'
   );
 }
@@ -95,6 +99,14 @@ export function isSubmittedLimitOrder(
   result: CreateOrderDto | null | undefined,
 ) {
   return result?.execution?.state === 'submitted';
+}
+
+export function getLimitOrderSuccessMessage(
+  policy?: LimitOrderExecutionPolicyDto | null,
+) {
+  return policy?.autoExecutionEnabled
+    ? '유효한 실시간 체결가격이 지정가 이하로 처리되면 전량 자동 체결됩니다. 주문장 유동성과 거래량은 반영하지 않습니다.'
+    : '현재 단계에서는 주문이 미체결 상태로 등록됩니다. 예약된 금액은 주문을 취소하면 다시 사용할 수 있습니다.';
 }
 
 /**

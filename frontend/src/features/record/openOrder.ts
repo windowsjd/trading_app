@@ -23,13 +23,25 @@ export function isOpenLimitBuyOrder(item: OrderStatusFields): boolean {
   );
 }
 
+export function shouldPollSubmittedLimitOrders(input: {
+  isFocused: boolean;
+  appState: string;
+  items: readonly OrderStatusFields[];
+}): boolean {
+  return (
+    input.isFocused &&
+    input.appState === 'active' &&
+    input.items.some(isOpenLimitBuyOrder)
+  );
+}
+
 /**
  * True when the row has no execution behind it, so grossAmount / feeAmount /
  * netAmount / executedPrice must not be rendered as its amounts.
  *
- * Covers submitted AND canceled limit orders: phase 1 has no matching engine,
- * so neither state ever produced a fill. A canceled row keeps its
- * reservedAmount as history — that is a reservation figure, not a fill.
+ * Covers submitted AND canceled limit orders: neither state represents a
+ * completed fill. A canceled row keeps its reservedAmount as history — that
+ * is a reservation figure, not a fill.
  */
 export function hasNoExecutionResult(item: OrderStatusFields): boolean {
   return (
@@ -38,9 +50,7 @@ export function hasNoExecutionResult(item: OrderStatusFields): boolean {
   );
 }
 
-export function getOrderStatusLabel(
-  status?: string | null,
-): string | null {
+export function getOrderStatusLabel(status?: string | null): string | null {
   if (!status) return null;
   return ORDER_STATUS_LABEL[status] ?? status;
 }

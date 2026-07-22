@@ -9,6 +9,7 @@ export const PROVIDER_SOURCE_NAMES = {
   cryptoUsd: 'binance_public_rest_24hr_ticker',
   cryptoUsdRest: 'binance_public_rest_24hr_ticker',
   cryptoUsdWebSocket: 'binance_spot_ws_ticker',
+  cryptoUsdTradeWebSocket: 'binance_spot_ws_trade',
   domesticStockKrx: 'kis_krx_realtime_trade',
   usStock: 'kis_us_delayed_trade',
 } as const;
@@ -23,12 +24,18 @@ export const BINANCE_CRYPTO_USD_PROVIDER_SOURCE_PRIORITY = [
   PROVIDER_SOURCE_NAMES.cryptoUsdRest,
 ] as const;
 
+export const BINANCE_CRYPTO_USD_LIMIT_MATCH_SOURCE_PRIORITY = [
+  PROVIDER_SOURCE_NAMES.cryptoUsdTradeWebSocket,
+  ...BINANCE_CRYPTO_USD_PROVIDER_SOURCE_PRIORITY,
+] as const;
+
 export type ProviderEligibleWorkflow =
   | 'fx_quote'
   | 'fx_execute'
   | 'assets_with_price'
   | 'orders_quote'
   | 'orders_execute'
+  | 'limit_order_execution'
   | 'live_portfolio_valuation'
   | 'home_live_valuation'
   | 'positions_live_valuation'
@@ -94,6 +101,7 @@ const ALLOWED_WORKFLOWS: ReadonlySet<ProviderEligibleWorkflow> = new Set([
   'assets_with_price',
   'orders_quote',
   'orders_execute',
+  'limit_order_execution',
   'live_portfolio_valuation',
   'home_live_valuation',
   'positions_live_valuation',
@@ -247,7 +255,10 @@ export function resolveAssetProviderEligibility(input: {
     return {
       eligible: true,
       sourceName: PROVIDER_SOURCE_NAMES.cryptoUsdWebSocket,
-      sourceNames: BINANCE_CRYPTO_USD_PROVIDER_SOURCE_PRIORITY,
+      sourceNames:
+        input.workflow === 'limit_order_execution'
+          ? BINANCE_CRYPTO_USD_LIMIT_MATCH_SOURCE_PRIORITY
+          : BINANCE_CRYPTO_USD_PROVIDER_SOURCE_PRIORITY,
       freshnessThresholdSeconds: resolveAssetPriceFreshnessThresholdSeconds(
         input.workflow,
       ),
@@ -835,7 +846,11 @@ function resolveFxFreshnessThresholdSeconds(
   workflow: ProviderEligibleWorkflow,
 ): number {
   const thresholds = getProviderFreshnessThresholdsSeconds();
-  if (workflow === 'fx_execute' || workflow === 'orders_execute') {
+  if (
+    workflow === 'fx_execute' ||
+    workflow === 'orders_execute' ||
+    workflow === 'limit_order_execution'
+  ) {
     return thresholds.fxUsdKrwExecute;
   }
 
@@ -854,7 +869,7 @@ function resolveAssetPriceFreshnessThresholdSeconds(
   workflow: ProviderEligibleWorkflow,
 ): number {
   const thresholds = getProviderFreshnessThresholdsSeconds();
-  if (workflow === 'orders_execute') {
+  if (workflow === 'orders_execute' || workflow === 'limit_order_execution') {
     return thresholds.assetPriceExecute;
   }
 

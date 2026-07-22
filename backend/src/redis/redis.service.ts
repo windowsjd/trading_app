@@ -159,6 +159,37 @@ export class RedisService implements OnModuleDestroy {
     return this.runCommand(client, () => client.publish(validChannel, message));
   }
 
+  async xadd(
+    key: string,
+    fields: Readonly<Record<string, string>>,
+    maxLen: number,
+  ): Promise<string> {
+    this.requirePositiveInteger(maxLen, 'maxLen');
+    const validKey = this.requireKey(key);
+    const fieldValues = Object.entries(fields).flatMap(([field, value]) => {
+      if (!field || typeof value !== 'string') {
+        throw new RedisKeyError('Redis stream fields must be string pairs.');
+      }
+      return [field, value];
+    });
+    if (fieldValues.length === 0) {
+      throw new RedisKeyError('Redis stream entry must contain fields.');
+    }
+    const client = await this.ensureConnected();
+    return this.runCommand(client, () =>
+      client.xadd(validKey, 'MAXLEN', '~', maxLen, '*', ...fieldValues),
+    );
+  }
+
+  async lastStreamId(key: string): Promise<string> {
+    const validKey = this.requireKey(key);
+    const client = await this.ensureConnected();
+    const entries = await this.runCommand(client, () =>
+      client.xrevrange(validKey, '+', '-', 'COUNT', 1),
+    );
+    return entries[0]?.[0] ?? '0-0';
+  }
+
   async zrangeByScore(
     key: string,
     min: number | string,

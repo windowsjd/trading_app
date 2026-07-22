@@ -266,6 +266,10 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
         return Promise.resolve([{ id: 'quote-limit-1' }]);
       }
 
+      if (sql.includes('clock_timestamp()')) {
+        return Promise.resolve([{ now: new Date() }]);
+      }
+
       return Promise.resolve([]);
     });
   };

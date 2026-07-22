@@ -26,12 +26,25 @@ describe('OrdersService.executeOrder DB integration', () => {
         );
       }
 
-      expect(result.stderr).toBe('');
+      expect(stripKnownPgAdapterDeprecationWarning(result.stderr)).toBe('');
       expect(result.stdout).toContain('order execute db integration ok');
     },
     130_000,
   );
 });
+
+function stripKnownPgAdapterDeprecationWarning(stderr: string): string {
+  return stderr
+    .split('\n')
+    .filter(
+      (line) =>
+        !line.includes(
+          'DeprecationWarning: Calling client.query() when the client is already executing a query',
+        ) && !line.includes('Use `node --trace-deprecation ...`'),
+    )
+    .join('\n')
+    .trim();
+}
 
 const ORDER_EXECUTE_DB_RUNNER = `
 import 'dotenv/config';
@@ -41,11 +54,14 @@ import {
   AssetPriceSourceType,
   AssetType,
   CurrencyCode,
+  FxRateSourceType,
   OrderSide,
   OrderStatus,
   OrderType,
   ParticipantStatus,
   Prisma,
+  QuoteStatus,
+  QuoteType,
   SeasonStatus,
   WalletTransactionDirection,
   WalletTransactionReferenceType,
@@ -55,6 +71,7 @@ import { PrismaService } from './src/prisma/prisma.service';
 import { OrdersService } from './src/orders/orders.service';
 import { RecordsService } from './src/records/records.service';
 import { WalletsService } from './src/wallets/wallets.service';
+import { computeOrderQuoteRequestHash } from './src/providers/durable-quote.policy';
 
 const TEST_PREFIX = 'order-execute-db-integration';
 const ZERO_AMOUNT = '0.00000000';
@@ -110,16 +127,19 @@ async function testBuyExecution() {
     assert.equal(response.data.order.feeAmount, '0.20000000');
     assert.equal(response.data.order.netAmount, '200.20000000');
     assert.equal(response.data.order.assetPriceSnapshotId, scenario.assetPriceSnapshotId);
-    assert.equal(response.data.order.fxRateSnapshotId, null);
+    assert.equal(
+      response.data.order.fxRateSnapshotId,
+      scenario.fxRateSnapshotId,
+    );
 
     const state = await readOrderMutationState(scenario);
-    assert.equal(state.krwWalletBalance, '799.80000000');
+    assert.equal(state.settlementWalletBalance, '799.80000000');
     assert.equal(state.positionQuantity, '2.00000000');
     assert.equal(state.positionAverageCost, '100.10000000');
     assert.equal(state.positionRealizedPnl, '0.00000000');
     assert.equal(state.orderStatus, OrderStatus.executed);
     assert.equal(state.ledgerCount, 1);
-    assert.equal(state.equitySnapshotCount, 0);
+    assert.equal(state.equitySnapshotCount, 1);
     assert.equal(state.dailyPortfolioSnapshotCount, 0);
     assert.equal(state.seasonRankingCount, 0);
 
@@ -152,7 +172,7 @@ async function testSellExecution() {
     assert.equal(response.data.order.netAmount, '199.80000000');
 
     const state = await readOrderMutationState(scenario);
-    assert.equal(state.krwWalletBalance, '299.80000000');
+    assert.equal(state.settlementWalletBalance, '299.80000000');
     assert.equal(state.positionQuantity, '3.00000000');
     assert.equal(state.positionAverageCost, '80.00000000');
     assert.equal(state.positionRealizedPnl, '39.80000000');
@@ -194,7 +214,7 @@ async function testConcurrentBuyOverspend() {
     );
 
     const wallet = await prisma.cashWallet.findUniqueOrThrow({
-      where: { id: scenario.krwWalletId },
+      where: { id: scenario.settlementWalletId },
     });
     assert.equal(formatScale8(wallet.balanceAmount), '0.00000000');
     assert.equal(
@@ -207,7 +227,7 @@ async function testConcurrentBuyOverspend() {
       1,
     );
     assert.equal(await countOrderLedgerRows(scenario), 1);
-    await expectNoSnapshotSideEffects(scenario);
+    await expectExecutionSnapshotCount(scenario, 1);
   } finally {
     await cleanupScenario(scenario);
   }
@@ -241,10 +261,10 @@ async function testConcurrentSellOversell() {
     );
 
     const state = await readOrderMutationState(scenario);
-    assert.equal(state.krwWalletBalance, '199.80000000');
+    assert.equal(state.settlementWalletBalance, '199.80000000');
     assert.equal(state.positionQuantity, '0.00000000');
     assert.equal(state.ledgerCount, 1);
-    await expectNoSnapshotSideEffects(scenario);
+    await expectExecutionSnapshotCount(scenario, 1);
   } finally {
     await cleanupScenario(scenario);
   }
@@ -273,10 +293,14 @@ async function testSameOrderConcurrentExecute() {
     assert.equal(executedResponses.length, 1);
     assert.equal(successes.length + failures.length, 2);
     for (const failure of failures) {
+      const code = getErrorCode(failure.reason);
       assert.ok(
-        ['ORDER_EXECUTION_CONFLICT', 'ORDER_NOT_EXECUTABLE'].includes(
-          getErrorCode(failure.reason),
-        ),
+        [
+          'ORDER_EXECUTION_CONFLICT',
+          'ORDER_NOT_EXECUTABLE',
+          'QUOTE_NOT_ACTIVE',
+        ].includes(code),
+        'unexpected concurrent execute error: ' + code,
       );
     }
 
@@ -284,8 +308,8 @@ async function testSameOrderConcurrentExecute() {
     assert.equal(state.orderStatus, OrderStatus.executed);
     assert.equal(state.ledgerCount, 1);
     assert.equal(state.positionQuantity, '1.00000000');
-    assert.equal(state.krwWalletBalance, '99.90000000');
-    await expectNoSnapshotSideEffects(scenario);
+    assert.equal(state.settlementWalletBalance, '99.90000000');
+    await expectExecutionSnapshotCount(scenario, 1);
   } finally {
     await cleanupScenario(scenario);
   }
@@ -316,13 +340,16 @@ async function testCancelVsExecuteRace() {
     if (order.status === OrderStatus.executed) {
       assert.equal(state.ledgerCount, 1);
       assert.equal(state.positionQuantity, '1.00000000');
-      assert.equal(state.krwWalletBalance, '99.90000000');
+      assert.equal(state.settlementWalletBalance, '99.90000000');
     } else {
       assert.equal(state.ledgerCount, 0);
       assert.equal(state.positionQuantity, '2.00000000');
-      assert.equal(state.krwWalletBalance, '0.00000000');
+      assert.equal(state.settlementWalletBalance, '0.00000000');
     }
-    await expectNoSnapshotSideEffects(scenario);
+    await expectExecutionSnapshotCount(
+      scenario,
+      order.status === OrderStatus.executed ? 1 : 0,
+    );
   } finally {
     await cleanupScenario(scenario);
   }
@@ -402,11 +429,11 @@ async function testReadVisibility() {
     assert.equal(records.data.walletTransactions.records[0].referenceId, scenario.orderId);
 
     const wallets = await walletsService.getWallets(scenario.userId);
-    const krwWallet = wallets.data.wallets.find(
-      (wallet) => wallet.currencyCode === CurrencyCode.KRW,
+    const settlementWallet = wallets.data.wallets.find(
+      (wallet) => wallet.currencyCode === CurrencyCode.USD,
     );
-    assert.ok(krwWallet);
-    assert.equal(krwWallet.balanceAmount, '799.80000000');
+    assert.ok(settlementWallet);
+    assert.equal(settlementWallet.balanceAmount, '799.80000000');
   } finally {
     await cleanupScenario(scenario);
   }
@@ -455,11 +482,11 @@ async function createScenario(label, options = {}) {
     select: { id: true },
   });
 
-  const krwWallet = await prisma.cashWallet.create({
+  await prisma.cashWallet.create({
     data: {
       seasonParticipantId: participant.id,
       currencyCode: CurrencyCode.KRW,
-      balanceAmount: options.walletBalance ?? '1000.00000000',
+      balanceAmount: ZERO_AMOUNT,
     },
     select: { id: true },
   });
@@ -468,7 +495,7 @@ async function createScenario(label, options = {}) {
     data: {
       seasonParticipantId: participant.id,
       currencyCode: CurrencyCode.USD,
-      balanceAmount: ZERO_AMOUNT,
+      balanceAmount: options.walletBalance ?? '1000.00000000',
     },
     select: { id: true },
   });
@@ -477,9 +504,11 @@ async function createScenario(label, options = {}) {
     data: {
       symbol: 'T' + suffix.slice(-20),
       name: TEST_PREFIX + '-' + label,
-      market: TEST_PREFIX + '-' + label,
-      currencyCode: CurrencyCode.KRW,
-      assetType: AssetType.domestic_stock,
+      market: 'BINANCE',
+      currencyCode: CurrencyCode.USD,
+      priceCurrency: CurrencyCode.USD,
+      settlementCurrency: CurrencyCode.USD,
+      assetType: AssetType.crypto,
       isActive: true,
     },
     select: { id: true },
@@ -489,9 +518,24 @@ async function createScenario(label, options = {}) {
     data: {
       assetId: asset.id,
       price,
-      currencyCode: CurrencyCode.KRW,
-      sourceType: AssetPriceSourceType.admin_manual,
-      sourceName: TEST_PREFIX,
+      currencyCode: CurrencyCode.USD,
+      sourceType: AssetPriceSourceType.provider_api,
+      sourceName: 'binance_spot_ws_ticker',
+      sourceTimestamp: new Date(Date.now() - 1_000),
+      effectiveAt: new Date(Date.now() - 1_000),
+      capturedAt: new Date(Date.now() - 1_000),
+      note: TEST_PREFIX + ' fixture',
+    },
+    select: { id: true },
+  });
+  const fxRateSnapshot = await prisma.fxRateSnapshot.create({
+    data: {
+      baseCurrency: CurrencyCode.USD,
+      quoteCurrency: CurrencyCode.KRW,
+      rate: '1000.00000000',
+      sourceType: FxRateSourceType.provider_api,
+      sourceName: 'exchange_rate_api',
+      sourceTimestamp: new Date(Date.now() - 1_000),
       effectiveAt: new Date(Date.now() - 1_000),
       capturedAt: new Date(Date.now() - 1_000),
       note: TEST_PREFIX + ' fixture',
@@ -506,7 +550,7 @@ async function createScenario(label, options = {}) {
         assetId: asset.id,
         quantity: options.positionQuantity,
         averageCost: options.positionAverageCost ?? '80.00000000',
-        currencyCode: CurrencyCode.KRW,
+        currencyCode: CurrencyCode.USD,
         realizedPnl: ZERO_AMOUNT,
       },
     });
@@ -515,8 +559,10 @@ async function createScenario(label, options = {}) {
   const orderId = await createSubmittedOrder(
     {
       participantId: participant.id,
+      userId: user.id,
       assetId: asset.id,
       assetPriceSnapshotId: assetPriceSnapshot.id,
+      fxRateSnapshotId: fxRateSnapshot.id,
     },
     { side, quantity, price },
   );
@@ -525,10 +571,10 @@ async function createScenario(label, options = {}) {
     userId: user.id,
     seasonId: season.id,
     participantId: participant.id,
-    krwWalletId: krwWallet.id,
-    usdWalletId: usdWallet.id,
+    settlementWalletId: usdWallet.id,
     assetId: asset.id,
     assetPriceSnapshotId: assetPriceSnapshot.id,
+    fxRateSnapshotId: fxRateSnapshot.id,
     orderId,
   };
 }
@@ -543,22 +589,54 @@ async function createSubmittedOrder(scenario, overrides = {}) {
     side === OrderSide.buy
       ? new Prisma.Decimal(grossAmount).add(feeAmount).toFixed(8)
       : new Prisma.Decimal(grossAmount).sub(feeAmount).toFixed(8);
+  const quote = await prisma.quote.create({
+    data: {
+      userId: scenario.userId,
+      seasonParticipantId: scenario.participantId,
+      quoteType: QuoteType.order,
+      status: QuoteStatus.active,
+      assetId: scenario.assetId,
+      side,
+      orderType: OrderType.market,
+      quantity,
+      limitPrice: null,
+      currencyCode: CurrencyCode.USD,
+      quotedPrice: price,
+      quotedRate: '1000.00000000',
+      assetPriceSnapshotId: scenario.assetPriceSnapshotId,
+      fxRateSnapshotId: scenario.fxRateSnapshotId,
+      maxChangeBps: '10000.0000',
+      expiresAt: new Date(Date.now() + 60_000),
+      requestHash: computeOrderQuoteRequestHash({
+        userId: scenario.userId,
+        seasonParticipantId: scenario.participantId,
+        assetId: scenario.assetId,
+        side,
+        orderType: OrderType.market,
+        quantity,
+        limitPrice: null,
+        currencyCode: CurrencyCode.USD,
+      }),
+    },
+    select: { id: true },
+  });
   const order = await prisma.order.create({
     data: {
       seasonParticipantId: scenario.participantId,
       assetId: scenario.assetId,
+      quoteId: quote.id,
       side,
       orderType: OrderType.market,
       status: OrderStatus.submitted,
       quantity,
       limitPrice: null,
       executedPrice: null,
-      currencyCode: CurrencyCode.KRW,
+      currencyCode: CurrencyCode.USD,
       grossAmount,
       feeAmount,
       netAmount,
       assetPriceSnapshotId: scenario.assetPriceSnapshotId,
-      fxRateSnapshotId: null,
+      fxRateSnapshotId: scenario.fxRateSnapshotId,
       submittedAt: new Date(),
       executedAt: null,
       canceledAt: null,
@@ -576,6 +654,9 @@ async function cleanupScenario(scenario) {
     where: { seasonParticipantId: scenario.participantId },
   });
   await prisma.order.deleteMany({
+    where: { seasonParticipantId: scenario.participantId },
+  });
+  await prisma.quote.deleteMany({
     where: { seasonParticipantId: scenario.participantId },
   });
   await prisma.position.deleteMany({
@@ -596,6 +677,9 @@ async function cleanupScenario(scenario) {
   await prisma.assetPriceSnapshot.deleteMany({
     where: { assetId: scenario.assetId },
   });
+  await prisma.fxRateSnapshot.deleteMany({
+    where: { id: scenario.fxRateSnapshotId },
+  });
   await prisma.asset.deleteMany({ where: { id: scenario.assetId } });
   await prisma.seasonParticipant.deleteMany({
     where: { id: scenario.participantId },
@@ -605,8 +689,8 @@ async function cleanupScenario(scenario) {
 }
 
 async function readOrderMutationState(scenario) {
-  const krwWallet = await prisma.cashWallet.findUniqueOrThrow({
-    where: { id: scenario.krwWalletId },
+  const settlementWallet = await prisma.cashWallet.findUniqueOrThrow({
+    where: { id: scenario.settlementWalletId },
   });
   const order = await prisma.order.findUniqueOrThrow({
     where: { id: scenario.orderId },
@@ -621,7 +705,7 @@ async function readOrderMutationState(scenario) {
   });
 
   return {
-    krwWalletBalance: formatScale8(krwWallet.balanceAmount),
+    settlementWalletBalance: formatScale8(settlementWallet.balanceAmount),
     positionQuantity: position ? formatScale8(position.quantity) : null,
     positionAverageCost: position ? formatScale8(position.averageCost) : null,
     positionRealizedPnl: position ? formatScale8(position.realizedPnl) : null,
@@ -673,12 +757,12 @@ async function countOrderLedgerRows(scenario) {
   });
 }
 
-async function expectNoSnapshotSideEffects(scenario) {
+async function expectExecutionSnapshotCount(scenario, expected) {
   assert.equal(
     await prisma.equitySnapshot.count({
       where: { seasonParticipantId: scenario.participantId },
     }),
-    0,
+    expected,
   );
   assert.equal(
     await prisma.dailyPortfolioSnapshot.count({

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   Pressable,
   ActivityIndicator,
   Alert,
+  AppState,
+  type AppStateStatus,
 } from 'react-native';
 import {
   useInfiniteQuery,
@@ -15,6 +17,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useIsFocused } from '@react-navigation/native';
 
 import type { RecordStackParamList } from '../../app/navigation/types';
 import { QUERY_KEYS } from '../../constants/queryKeys';
@@ -22,6 +25,8 @@ import { TEST_IDS } from '../../constants/testIds';
 import {
   getMySeasonOrders,
   getRecordOrderDisplay,
+  isOpenLimitBuyOrder,
+  shouldPollSubmittedLimitOrders,
 } from '../../features/record/api';
 import { cancelOrder } from '../../features/order/api';
 import {
@@ -40,9 +45,19 @@ export default function RecordOrderListScreen({ route }: Props) {
   const { seasonId } = route.params;
   const [filter, setFilter] = useState<Filter>('all');
   const queryClient = useQueryClient();
+  const isFocused = useIsFocused();
+  const [appState, setAppState] = useState<AppStateStatus>(
+    AppState.currentState,
+  );
+  const previousOpenLimitIds = useRef<Set<string>>(new Set());
   const [cancelingOrderId, setCancelingOrderId] = useState<string | null>(null);
 
   const side = filter === 'all' ? undefined : filter;
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', setAppState);
+    return () => subscription.remove();
+  }, []);
 
   const cancelMutation = useMutation({
     mutationFn: cancelOrder,
@@ -102,12 +117,53 @@ export default function RecordOrderListScreen({ route }: Props) {
       }),
     getNextPageParam: (lastPage) => lastPage.pagination.nextOffset ?? undefined,
     initialPageParam: 0,
+    refetchInterval: (query) => {
+      const pages = query.state.data?.pages ?? [];
+      const pageItems = pages.flatMap((page) => page.items);
+      return shouldPollSubmittedLimitOrders({
+        isFocused,
+        appState,
+        items: pageItems,
+      })
+        ? 4000
+        : false;
+    },
+    refetchIntervalInBackground: false,
   });
 
   const items = useMemo(
     () => ordersQuery.data?.pages.flatMap((page) => page.items) ?? [],
     [ordersQuery.data],
   );
+  const hasOpenLimit = useMemo(() => items.some(isOpenLimitBuyOrder), [items]);
+
+  useEffect(() => {
+    const terminalTransitionObserved = items.some((item) => {
+      const orderId = item.orderId ?? item.id;
+      return (
+        Boolean(orderId) &&
+        previousOpenLimitIds.current.has(orderId as string) &&
+        !isOpenLimitBuyOrder(item)
+      );
+    });
+    if (terminalTransitionObserved) {
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.order.myList() }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.record.all }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.wallet.balances }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.position.all }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.home.dashboard }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.portfolio.all }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ranking.all }),
+      ]);
+    }
+    previousOpenLimitIds.current = new Set(
+      items
+        .filter(isOpenLimitBuyOrder)
+        .map((item) => item.orderId ?? item.id)
+        .filter((orderId): orderId is string => Boolean(orderId)),
+    );
+  }, [items, queryClient]);
 
   const viewState = useMemo(() => {
     if (ordersQuery.isLoading) return 'record_orders_loading';
@@ -202,8 +258,8 @@ export default function RecordOrderListScreen({ route }: Props) {
                         ? '지정가 매수'
                         : '지정가 매도'
                       : display.side === 'buy'
-                      ? '매수'
-                      : '매도'}
+                        ? '매수'
+                        : '매도'}
                     {display.statusLabel ? ` · ${display.statusLabel}` : ''}
                   </Text>
                 </View>
@@ -211,9 +267,9 @@ export default function RecordOrderListScreen({ route }: Props) {
                 <View style={styles.alignEnd}>
                   <Text style={styles.helper}>수량 {display.quantity}</Text>
                   <Text style={styles.helper}>
-                    {display.hasNoExecutionResult ? '지정가' : '가격'}{' '}
-                    {display.isLimitOrder && display.limitPrice
-                      ? display.limitPrice
+                    {display.hasNoExecutionResult ? '지정가' : '실제 체결가격'}{' '}
+                    {display.hasNoExecutionResult
+                      ? (display.limitPrice ?? display.price)
                       : display.price}{' '}
                     {display.currencyCode}
                   </Text>
@@ -227,7 +283,22 @@ export default function RecordOrderListScreen({ route }: Props) {
                       {display.reservedAmount ?? '-'}
                     </Text>
                   ) : (
-                    <Text style={styles.itemTitle}>{display.netAmount}</Text>
+                    <>
+                      {display.isLimitOrder && display.limitPrice ? (
+                        <Text style={styles.helper}>
+                          지정가 {display.limitPrice}
+                        </Text>
+                      ) : null}
+                      <Text style={styles.helper}>
+                        실제 총액 {display.grossAmount}
+                      </Text>
+                      <Text style={styles.helper}>
+                        실제 수수료 {display.feeAmount}
+                      </Text>
+                      <Text style={styles.itemTitle}>
+                        실제 차감액 {display.netAmount}
+                      </Text>
+                    </>
                   )}
                 </View>
               </View>
@@ -281,7 +352,9 @@ function FilterChip({
       style={[styles.chip, active && styles.chipActive]}
       onPress={onPress}
     >
-      <Text style={active ? styles.chipTextActive : styles.chipText}>{label}</Text>
+      <Text style={active ? styles.chipTextActive : styles.chipText}>
+        {label}
+      </Text>
     </Pressable>
   );
 }

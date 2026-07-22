@@ -254,7 +254,8 @@ export const OpsJobName = {
   reward_marker: 'reward_marker',
   market_candle_retention: 'market_candle_retention',
   market_candle_sync: 'market_candle_sync',
-  market_candle_reconciliation: 'market_candle_reconciliation'
+  market_candle_reconciliation: 'market_candle_reconciliation',
+  limit_order_matcher: 'limit_order_matcher'
 } as const
 
 export type OpsJobName = (typeof OpsJobName)[keyof typeof OpsJobName]
@@ -312,7 +313,8 @@ export const OpsJobTrigger = {
   scheduler: 'scheduler',
   operator: 'operator',
   manual_script: 'manual_script',
-  test: 'test'
+  test: 'test',
+  worker: 'worker'
 } as const
 
 export type OpsJobTrigger = (typeof OpsJobTrigger)[keyof typeof OpsJobTrigger]

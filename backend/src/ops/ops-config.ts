@@ -162,6 +162,8 @@ export function getOpsSchedulerConfig(
       [OpsJobName.market_candle_sync]: false,
       [OpsJobName.market_candle_reconciliation]:
         marketCandleReconciliation.enabled,
+      // Dedicated long-running poller; never scheduled on the 60s Ops tick.
+      [OpsJobName.limit_order_matcher]: false,
     },
     providerIntervalsSeconds: {
       [OpsJobName.provider_fx_ingest]: parsePositiveIntegerEnv(

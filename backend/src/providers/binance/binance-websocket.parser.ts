@@ -60,6 +60,43 @@ export function parseBinanceWebSocketMessage(input: {
   }
 
   if (record.e !== '24hrTicker') {
+    if (record.e === 'trade') {
+      try {
+        const sourceTimestamp =
+          readTimestamp(record.T) ?? readTimestamp(record.E);
+        if (!sourceTimestamp) throw new Error('T is required.');
+        const tradeId = record.t;
+        if (
+          (typeof tradeId !== 'number' && typeof tradeId !== 'string') ||
+          String(tradeId).trim() === ''
+        ) {
+          throw new Error('t is required.');
+        }
+        return {
+          state: 'trade',
+          trade: {
+            providerSymbol: readRequiredString(record.s, 's').toUpperCase(),
+            streamName: unwrapped.stream,
+            tradeId: String(tradeId),
+            price: toPositiveDecimalString(
+              readRequiredString(record.p, 'p'),
+              'p',
+            ),
+            currencyCode: CurrencyCode.USD,
+            sourceTimestamp,
+            receivedAt: input.receivedAt,
+          },
+          receivedAt: input.receivedAt,
+        };
+      } catch (error) {
+        return failed(
+          'INVALID_TRADE_PAYLOAD',
+          error instanceof Error ? error.message : String(error),
+          payload,
+          input.receivedAt,
+        );
+      }
+    }
     return {
       state: 'skipped',
       reason: 'UNSUPPORTED_EVENT_TYPE',
@@ -156,7 +193,10 @@ function readOptionalDecimalString(
     return null;
   }
 
-  return toDecimalString(String(value), fieldName);
+  if (typeof value !== 'string' && typeof value !== 'number') {
+    throw new Error(`${fieldName} must be a decimal.`);
+  }
+  return toDecimalString(`${value}`, fieldName);
 }
 
 function toPositiveDecimalString(value: string, fieldName: string): string {

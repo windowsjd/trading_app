@@ -5,7 +5,7 @@ const itDbSmoke = RUN_MVP_FLOW_DB_SMOKE ? it : it.skip;
 
 describe('MVP real PostgreSQL service-composed flow smoke', () => {
   itDbSmoke(
-    'verifies provider-key-free admin_manual service-composed MVP flow against real PostgreSQL; not provider/scheduler/settlement coverage',
+    'verifies provider-key-free provider fixture service-composed MVP flow against real PostgreSQL; not external-provider/scheduler/settlement coverage',
     () => {
       const result = spawnSync('pnpm', ['tsx', '-e', MVP_FLOW_DB_RUNNER], {
         cwd: process.cwd(),
@@ -32,12 +32,25 @@ describe('MVP real PostgreSQL service-composed flow smoke', () => {
         );
       }
 
-      expect(result.stderr).toBe('');
+      expect(stripKnownPgAdapterDeprecationWarning(result.stderr)).toBe('');
       expect(result.stdout).toContain('mvp flow db smoke ok');
     },
     190_000,
   );
 });
+
+function stripKnownPgAdapterDeprecationWarning(stderr: string): string {
+  return stderr
+    .split('\n')
+    .filter(
+      (line) =>
+        !line.includes(
+          'DeprecationWarning: Calling client.query() when the client is already executing a query',
+        ) && !line.includes('Use `node --trace-deprecation ...`'),
+    )
+    .join('\n')
+    .trim();
+}
 
 const MVP_FLOW_DB_RUNNER = `
 import 'dotenv/config';
@@ -177,7 +190,7 @@ function buildScenario() {
     email: TEST_PREFIX + '-' + suffix + '@example.com',
     nickname: TEST_PREFIX + '-' + suffix,
     seasonName: TEST_PREFIX + '-season-' + suffix,
-    market: TEST_PREFIX + '-' + suffix,
+    market: 'BINANCE',
     sourceName: TEST_PREFIX + '-' + suffix,
     krwAssetSymbol: 'KRW-' + suffix.slice(0, 10),
     usdAssetSymbol: 'USD-' + suffix.slice(0, 10),
@@ -297,8 +310,8 @@ async function createSeasonAndAdminManualFixtures() {
       baseCurrency: CurrencyCode.USD,
       quoteCurrency: CurrencyCode.KRW,
       rate: fxRate,
-      sourceType: FxRateSourceType.admin_manual,
-      sourceName: scenario.sourceName,
+      sourceType: FxRateSourceType.provider_api,
+      sourceName: 'exchange_rate_api',
       sourceTimestamp: now,
       effectiveAt: now,
       capturedAt: now,
@@ -320,8 +333,10 @@ async function createSeasonAndAdminManualFixtures() {
       symbol: scenario.krwAssetSymbol,
       name: TEST_PREFIX + ' KRW asset ' + scenario.suffix,
       market: scenario.market,
-      currencyCode: CurrencyCode.KRW,
-      assetType: AssetType.domestic_stock,
+      currencyCode: CurrencyCode.USD,
+      priceCurrency: CurrencyCode.USD,
+      settlementCurrency: CurrencyCode.USD,
+      assetType: AssetType.crypto,
       isActive: true,
     },
     select: {
@@ -336,6 +351,8 @@ async function createSeasonAndAdminManualFixtures() {
       name: TEST_PREFIX + ' USD asset ' + scenario.suffix,
       market: scenario.market,
       currencyCode: CurrencyCode.USD,
+      priceCurrency: CurrencyCode.USD,
+      settlementCurrency: CurrencyCode.USD,
       assetType: AssetType.crypto,
       isActive: true,
     },
@@ -349,9 +366,9 @@ async function createSeasonAndAdminManualFixtures() {
     data: {
       assetId: scenario.krwAssetId,
       price: krwAssetPrice,
-      currencyCode: CurrencyCode.KRW,
-      sourceType: AssetPriceSourceType.admin_manual,
-      sourceName: scenario.sourceName,
+      currencyCode: CurrencyCode.USD,
+      sourceType: AssetPriceSourceType.provider_api,
+      sourceName: 'binance_spot_ws_ticker',
       sourceTimestamp: now,
       effectiveAt: now,
       capturedAt: now,
@@ -372,8 +389,8 @@ async function createSeasonAndAdminManualFixtures() {
       assetId: scenario.usdAssetId,
       price: usdAssetPrice,
       currencyCode: CurrencyCode.USD,
-      sourceType: AssetPriceSourceType.admin_manual,
-      sourceName: scenario.sourceName,
+      sourceType: AssetPriceSourceType.provider_api,
+      sourceName: 'binance_spot_ws_ticker',
       sourceTimestamp: now,
       effectiveAt: now,
       capturedAt: now,
@@ -456,6 +473,7 @@ async function assertJoinSideEffects() {
 async function assertAssetsApi() {
   const listResponse = await assetsService.getAssets(scenario.userId, {
     market: scenario.market,
+    search: scenario.suffix,
     limit: '10',
   });
 
@@ -475,10 +493,26 @@ async function assertAssetsApi() {
   );
   assert.ok(krwAsset);
   assert.ok(usdAsset);
-  assert.equal(krwAsset.price.state, 'available');
-  assert.equal(krwAsset.price.priceKrwState, 'available');
-  assert.equal(usdAsset.price.state, 'available');
-  assert.equal(usdAsset.price.priceKrwState, 'available');
+  assert.equal(
+    krwAsset.price.state,
+    'available',
+    'first asset price: ' + JSON.stringify(krwAsset.price),
+  );
+  assert.equal(
+    krwAsset.price.priceKrwState,
+    'available',
+    'first asset KRW price: ' + JSON.stringify(krwAsset.price),
+  );
+  assert.equal(
+    usdAsset.price.state,
+    'available',
+    'second asset price: ' + JSON.stringify(usdAsset.price),
+  );
+  assert.equal(
+    usdAsset.price.priceKrwState,
+    'available',
+    'second asset KRW price: ' + JSON.stringify(usdAsset.price),
+  );
   assert.equal(usdAsset.price.priceKrw, '100000.00000000');
 
   const detailResponse = await assetsService.getAsset(
@@ -521,6 +555,7 @@ async function executeFxFlow() {
 
   await keepFxFresh();
   const executeResponse = await fxService.execute(scenario.userId, {
+    quoteId: quoteResponse.data.quoteId,
     idempotencyKey: scenario.sourceName + '-fx',
     fromCurrency: CurrencyCode.KRW,
     toCurrency: CurrencyCode.USD,
@@ -607,21 +642,17 @@ async function executeOrderFlow() {
   await keepFxFresh();
   const createResponse = await ordersService.createOrder(scenario.userId, {
     ...orderBody,
+    quoteId: quoteResponse.data.quoteId,
     idempotencyKey: scenario.sourceName + '-order',
   });
   assert.equal(createResponse.success, true);
-  assert.equal(createResponse.data.order.status, OrderStatus.submitted);
-  scenario.orderId = createResponse.data.order.orderId;
-
-  await keepFxFresh();
-  const executeResponse = await ordersService.executeOrder(
-    scenario.userId,
-    scenario.orderId,
+  assert.equal(createResponse.data.order.status, OrderStatus.executed);
+  assert.equal(
+    createResponse.data.execution.walletBalanceAfter,
+    '798.80000000',
   );
-  assert.equal(executeResponse.success, true);
-  assert.equal(executeResponse.data.order.status, OrderStatus.executed);
-  assert.equal(executeResponse.data.execution.walletBalanceAfter, '798.80000000');
-  scenario.positionId = executeResponse.data.execution.positionId;
+  scenario.orderId = createResponse.data.order.orderId;
+  scenario.positionId = createResponse.data.execution.positionId;
 }
 
 async function assertOrderSideEffects() {
@@ -788,50 +819,41 @@ async function keepFxFresh() {
 }
 
 async function readMutationCounts() {
-  const [
-    exchangeTransactions,
-    walletTransactions,
-    orders,
-    positions,
-    dailyPortfolioSnapshots,
-    seasonRankings,
-    equitySnapshots,
-    assetPriceSnapshots,
-    fxRateSnapshots,
-  ] = await Promise.all([
-    prisma.exchangeTransaction.count({
-      where: { seasonParticipantId: scenario.participantId },
-    }),
-    prisma.walletTransaction.count({
-      where: { seasonParticipantId: scenario.participantId },
-    }),
-    prisma.order.count({
-      where: { seasonParticipantId: scenario.participantId },
-    }),
-    prisma.position.count({
-      where: { seasonParticipantId: scenario.participantId },
-    }),
-    prisma.dailyPortfolioSnapshot.count({
-      where: { seasonParticipantId: scenario.participantId },
-    }),
-    prisma.seasonRanking.count({
-      where: {
-        OR: [
-          { seasonId: scenario.seasonId },
-          { seasonParticipantId: scenario.participantId },
-        ],
-      },
-    }),
-    prisma.equitySnapshot.count({
-      where: { seasonParticipantId: scenario.participantId },
-    }),
-    prisma.assetPriceSnapshot.count({
-      where: { sourceName: scenario.sourceName },
-    }),
-    prisma.fxRateSnapshot.count({
-      where: { sourceName: scenario.sourceName },
-    }),
-  ]);
+  // Prisma's pg adapter warns when one test client starts concurrent queries;
+  // these are read-only smoke assertions, so keep them deterministic and
+  // sequential instead of manufacturing client-level concurrency.
+  const exchangeTransactions = await prisma.exchangeTransaction.count({
+    where: { seasonParticipantId: scenario.participantId },
+  });
+  const walletTransactions = await prisma.walletTransaction.count({
+    where: { seasonParticipantId: scenario.participantId },
+  });
+  const orders = await prisma.order.count({
+    where: { seasonParticipantId: scenario.participantId },
+  });
+  const positions = await prisma.position.count({
+    where: { seasonParticipantId: scenario.participantId },
+  });
+  const dailyPortfolioSnapshots = await prisma.dailyPortfolioSnapshot.count({
+    where: { seasonParticipantId: scenario.participantId },
+  });
+  const seasonRankings = await prisma.seasonRanking.count({
+    where: {
+      OR: [
+        { seasonId: scenario.seasonId },
+        { seasonParticipantId: scenario.participantId },
+      ],
+    },
+  });
+  const equitySnapshots = await prisma.equitySnapshot.count({
+    where: { seasonParticipantId: scenario.participantId },
+  });
+  const assetPriceSnapshots = await prisma.assetPriceSnapshot.count({
+    where: { assetId: { in: [scenario.krwAssetId, scenario.usdAssetId] } },
+  });
+  const fxRateSnapshots = await prisma.fxRateSnapshot.count({
+    where: { id: scenario.fxRateSnapshotId },
+  });
 
   return {
     exchangeTransactions,
@@ -873,7 +895,7 @@ async function cleanup() {
 
   const assets = await prisma.asset.findMany({
     where: {
-      market: {
+      name: {
         startsWith: TEST_PREFIX,
       },
     },
@@ -924,6 +946,9 @@ async function cleanup() {
     await prisma.order.deleteMany({
       where: { seasonParticipantId: { in: participantIds } },
     });
+    await prisma.quote.deleteMany({
+      where: { seasonParticipantId: { in: participantIds } },
+    });
     await prisma.position.deleteMany({
       where: { seasonParticipantId: { in: participantIds } },
     });
@@ -948,11 +973,10 @@ async function cleanup() {
     ]),
   });
   await prisma.fxRateSnapshot.deleteMany({
-    where: {
-      sourceName: {
-        startsWith: TEST_PREFIX,
-      },
-    },
+    where: orWhere([
+      { sourceName: { startsWith: TEST_PREFIX } },
+      userIds.length > 0 ? { approvedByUserId: { in: userIds } } : null,
+    ]),
   });
 
   if (participantIds.length > 0) {

@@ -179,6 +179,7 @@ enum OpsJobName {
   market_candle_retention
   market_candle_sync
   market_candle_reconciliation
+  limit_order_matcher
 }
 
 enum MarketCandleSyncMode {
@@ -219,6 +220,7 @@ enum OpsJobTrigger {
   operator
   manual_script
   test
+  worker
 }
 
 model User {
@@ -500,19 +502,24 @@ model Asset {
 }
 
 model AssetPriceSnapshot {
-  id              String               @id @default(uuid())
-  assetId         String               @map("asset_id")
-  price           Decimal              @db.Decimal(24, 8)
-  priceKrw        Decimal?             @map("price_krw") @db.Decimal(24, 8)
-  currencyCode    CurrencyCode         @map("currency_code")
-  sourceType      AssetPriceSourceType @map("source_type")
-  sourceName      String?              @map("source_name")
-  sourceTimestamp DateTime?            @map("source_timestamp")
-  effectiveAt     DateTime             @map("effective_at")
-  capturedAt      DateTime             @map("captured_at")
-  createdAt       DateTime             @default(now()) @map("created_at")
-  rawPayloadJson  Json?                @map("raw_payload_json")
-  note            String?
+  id               String               @id @default(uuid())
+  assetId          String               @map("asset_id")
+  price            Decimal              @db.Decimal(24, 8)
+  priceKrw         Decimal?             @map("price_krw") @db.Decimal(24, 8)
+  currencyCode     CurrencyCode         @map("currency_code")
+  sourceType       AssetPriceSourceType @map("source_type")
+  sourceName       String?              @map("source_name")
+  sourceTimestamp  DateTime?            @map("source_timestamp")
+  effectiveAt      DateTime             @map("effective_at")
+  capturedAt       DateTime             @map("captured_at")
+  createdAt        DateTime             @default(now()) @map("created_at")
+  rawPayloadJson   Json?                @map("raw_payload_json")
+  note             String?
+  // Exact live-trade evidence used by the limit matcher. Existing display /
+  // throttled snapshots leave these nullable; one provider event is shared by
+  // every order it fills.
+  providerEventKey String?              @unique @map("provider_event_key")
+  providerEventAt  DateTime?            @map("provider_event_at")
 
   asset  Asset   @relation(fields: [assetId], references: [id], onDelete: Restrict)
   orders Order[]
@@ -521,6 +528,7 @@ model AssetPriceSnapshot {
   @@index([assetId, effectiveAt])
   @@index([assetId, capturedAt])
   @@index([sourceType, effectiveAt])
+  @@index([providerEventAt])
   @@map("asset_price_snapshots")
 }
 
@@ -691,39 +699,48 @@ model Position {
 }
 
 model Order {
-  id                    String       @id @default(uuid())
-  seasonParticipantId   String       @map("season_participant_id")
-  assetId               String       @map("asset_id")
-  quoteId               String?      @unique @map("quote_id")
-  side                  OrderSide
-  orderType             OrderType    @map("order_type")
-  status                OrderStatus  @default(submitted)
-  quantity              Decimal      @db.Decimal(24, 8)
-  limitPrice            Decimal?     @map("limit_price") @db.Decimal(24, 8)
-  executedPrice         Decimal?     @map("executed_price") @db.Decimal(24, 8)
-  currencyCode          CurrencyCode @map("currency_code")
-  grossAmount           Decimal?     @map("gross_amount") @db.Decimal(24, 8)
-  feeAmount             Decimal?     @map("fee_amount") @db.Decimal(24, 8)
-  netAmount             Decimal?     @map("net_amount") @db.Decimal(24, 8)
-  assetPriceSnapshotId  String?      @map("asset_price_snapshot_id")
-  fxRateSnapshotId      String?      @map("fx_rate_snapshot_id")
-  idempotencyKey        String?      @map("idempotency_key")
-  requestHash           String?      @map("request_hash")
-  responsePayloadJson   Json?        @map("response_payload_json")
+  id                         String       @id @default(uuid())
+  seasonParticipantId        String       @map("season_participant_id")
+  assetId                    String       @map("asset_id")
+  quoteId                    String?      @unique @map("quote_id")
+  side                       OrderSide
+  orderType                  OrderType    @map("order_type")
+  status                     OrderStatus  @default(submitted)
+  quantity                   Decimal      @db.Decimal(24, 8)
+  limitPrice                 Decimal?     @map("limit_price") @db.Decimal(24, 8)
+  executedPrice              Decimal?     @map("executed_price") @db.Decimal(24, 8)
+  currencyCode               CurrencyCode @map("currency_code")
+  grossAmount                Decimal?     @map("gross_amount") @db.Decimal(24, 8)
+  feeAmount                  Decimal?     @map("fee_amount") @db.Decimal(24, 8)
+  netAmount                  Decimal?     @map("net_amount") @db.Decimal(24, 8)
+  assetPriceSnapshotId       String?      @map("asset_price_snapshot_id")
+  fxRateSnapshotId           String?      @map("fx_rate_snapshot_id")
+  idempotencyKey             String?      @map("idempotency_key")
+  requestHash                String?      @map("request_hash")
+  responsePayloadJson        Json?        @map("response_payload_json")
   // Limit-buy reservation bookkeeping (null for market orders): the cash
   // amount locked at submit time, the fee rate captured for the future
   // execution phase, and when the reservation was released (cancel/cleanup).
-  reservedAmount        Decimal?     @map("reserved_amount") @db.Decimal(24, 8)
-  reservationFeeRate    Decimal?     @map("reservation_fee_rate") @db.Decimal(10, 6)
-  reservationReleasedAt DateTime?    @map("reservation_released_at")
-  cancelReason          String?      @map("cancel_reason")
-  submittedAt           DateTime     @map("submitted_at")
-  executedAt            DateTime?    @map("executed_at")
-  canceledAt            DateTime?    @map("canceled_at")
-  rejectedAt            DateTime?    @map("rejected_at")
-  rejectReason          String?      @map("reject_reason")
-  createdAt             DateTime     @default(now()) @map("created_at")
-  updatedAt             DateTime     @updatedAt @map("updated_at")
+  reservedAmount             Decimal?     @map("reserved_amount") @db.Decimal(24, 8)
+  reservationFeeRate         Decimal?     @map("reservation_fee_rate") @db.Decimal(10, 6)
+  reservationReleasedAt      DateTime?    @map("reservation_released_at")
+  cancelReason               String?      @map("cancel_reason")
+  // Path-A matching activation and exact trigger evidence. The Redis stream
+  // cursor, rather than a cross-host wall clock, excludes pre-submission
+  // events. These remain null for market orders and phase-1-only limit rows.
+  matchingActivatedAt        DateTime?    @map("matching_activated_at")
+  matchingActivationStreamId String?      @map("matching_activation_stream_id")
+  triggerEventId             String?      @map("trigger_event_id")
+  triggerEventAt             DateTime?    @map("trigger_event_at")
+  matchedAt                  DateTime?    @map("matched_at")
+  matchingSource             String?      @map("matching_source")
+  submittedAt                DateTime     @map("submitted_at")
+  executedAt                 DateTime?    @map("executed_at")
+  canceledAt                 DateTime?    @map("canceled_at")
+  rejectedAt                 DateTime?    @map("rejected_at")
+  rejectReason               String?      @map("reject_reason")
+  createdAt                  DateTime     @default(now()) @map("created_at")
+  updatedAt                  DateTime     @updatedAt @map("updated_at")
 
   seasonParticipant  SeasonParticipant   @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
   asset              Asset               @relation(fields: [assetId], references: [id], onDelete: Restrict)
@@ -740,6 +757,7 @@ model Order {
   @@index([fxRateSnapshotId])
   @@index([submittedAt])
   @@index([status])
+  @@index([triggerEventId])
   @@map("orders")
 }
 
@@ -1054,4 +1072,18 @@ model OpsJobLock {
   @@index([jobName, expiresAt])
   @@index([expiresAt])
   @@map("ops_job_locks")
+}
+
+// Durable event-level dedupe. A price event can fill many orders, so the
+// event id cannot be unique on Order. Recording completion here prevents a
+// later duplicate XADD from filling orders created after the original event.
+model LimitOrderProcessedEvent {
+  eventId       String   @id @map("event_id")
+  firstStreamId String   @map("first_stream_id")
+  receivedAt    DateTime @map("received_at")
+  processedAt   DateTime @map("processed_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([processedAt])
+  @@map("limit_order_processed_events")
 }

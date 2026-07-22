@@ -51,6 +51,10 @@ const LIMIT_ORDER_PAYLOAD_SELECT = {
   reservedAmount: true,
   reservationReleasedAt: true,
   cancelReason: true,
+  triggerEventId: true,
+  triggerEventAt: true,
+  matchedAt: true,
+  matchingSource: true,
   submittedAt: true,
   executedAt: true,
   canceledAt: true,
@@ -101,6 +105,12 @@ export type LimitOrderCreateResponse = {
       reservationFeeRate: string | null;
       duplicate: boolean;
     };
+    executionPolicy: {
+      autoExecutionEnabled: boolean;
+      mode: 'live_trade_event' | 'reservation_only';
+      triggerType: 'provider_trade_price' | null;
+      fullFillOnly: true;
+    };
   };
 };
 
@@ -108,10 +118,9 @@ type LimitCreateTransactionClient = Prisma.TransactionClient;
 
 /**
  * Limit-buy phase 1: quote preview and submitted-order creation with cash
- * reservation. No provider price is read anywhere in this service, no
- * WalletTransaction/Position is written, and no execution ever happens —
- * even a marketable limit price stays `submitted` until the user cancels or
- * lifecycle cleanup releases it.
+ * reservation. No provider price is read anywhere in this service and no
+ * WalletTransaction/Position is written during Create. With path A enabled,
+ * only a later live-trade stream event may execute the submitted order.
  */
 @Injectable()
 export class LimitOrderCreateService {
@@ -248,9 +257,17 @@ export class LimitOrderCreateService {
     input: {
       userId: string;
       seasonParticipantId: string;
-      now: Date;
+      /** Compatibility for direct callers; OrdersService deliberately omits
+       * this and validates with a post-lock clock_timestamp(). */
+      now?: Date;
     },
-  ): Promise<{ seasonId: string }> {
+  ): Promise<{
+    seasonId: string;
+    participantStatus: ParticipantStatus;
+    seasonStatus: SeasonStatus;
+    seasonStartAt: Date;
+    seasonEndAt: Date;
+  }> {
     const participantRows = await tx.$queryRaw<
       Array<{
         id: string;
@@ -271,22 +288,6 @@ export class LimitOrderCreateService {
         HttpStatus.NOT_FOUND,
         'PARTICIPANT_NOT_FOUND',
         'Season participant was not found.',
-      );
-    }
-
-    if (participant.participant_status === ParticipantStatus.excluded) {
-      this.throwApiError(
-        HttpStatus.FORBIDDEN,
-        'PARTICIPANT_EXCLUDED',
-        'Season participant is excluded from trading.',
-      );
-    }
-
-    if (participant.participant_status !== ParticipantStatus.active) {
-      this.throwApiError(
-        HttpStatus.CONFLICT,
-        'PARTICIPANT_NOT_ACTIVE',
-        'Season participant is not active.',
       );
     }
 
@@ -319,31 +320,61 @@ export class LimitOrderCreateService {
       );
     }
 
-    if (season.status !== SeasonStatus.active) {
+    const context = {
+      seasonId: season.id,
+      participantStatus: participant.participant_status,
+      seasonStatus: season.status,
+      seasonStartAt: season.start_at,
+      seasonEndAt: season.end_at,
+    };
+    if (input.now) this.assertLockedTradableContext(context, input.now);
+    return context;
+  }
+
+  assertLockedTradableContext(
+    context: {
+      participantStatus: ParticipantStatus;
+      seasonStatus: SeasonStatus;
+      seasonStartAt: Date;
+      seasonEndAt: Date;
+    },
+    transactionNow: Date,
+  ): void {
+    if (context.participantStatus === ParticipantStatus.excluded) {
+      this.throwApiError(
+        HttpStatus.FORBIDDEN,
+        'PARTICIPANT_EXCLUDED',
+        'Season participant is excluded from trading.',
+      );
+    }
+    if (context.participantStatus !== ParticipantStatus.active) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'PARTICIPANT_NOT_ACTIVE',
+        'Season participant is not active.',
+      );
+    }
+    if (context.seasonStatus !== SeasonStatus.active) {
       this.throwApiError(
         HttpStatus.CONFLICT,
         'SEASON_NOT_ACTIVE',
         'Season is not active.',
       );
     }
-
-    if (input.now.getTime() < season.start_at.getTime()) {
+    if (transactionNow < context.seasonStartAt) {
       this.throwApiError(
         HttpStatus.CONFLICT,
         'SEASON_NOT_STARTED',
         'Season has not started.',
       );
     }
-
-    if (input.now.getTime() >= season.end_at.getTime()) {
+    if (transactionNow >= context.seasonEndAt) {
       this.throwApiError(
         HttpStatus.CONFLICT,
         'SEASON_ENDED',
         'Season has ended.',
       );
     }
-
-    return { seasonId: season.id };
   }
 
   /**
@@ -375,6 +406,11 @@ export class LimitOrderCreateService {
       quantity: Prisma.Decimal;
       idempotency: { idempotencyKey: string; requestHash: string };
       submittedAt: Date;
+      matchingActivation?: {
+        activatedAt: Date;
+        streamId: string;
+      } | null;
+      autoExecutionEnabled?: boolean;
     },
   ): Promise<LimitOrderCreateResponse> {
     const currencyCode =
@@ -401,10 +437,10 @@ export class LimitOrderCreateService {
 
     // 2) Submitted order row. grossAmount/feeAmount/netAmount/executedPrice/
     // executedAt mean ACTUAL EXECUTION RESULT and stay null until a fill
-    // exists — phase 1 has no matching engine, so they are null here and for
-    // the whole submitted→canceled lifetime. The unfilled order's monetary
-    // story lives in reservedAmount + reservationFeeRate (and, for the
-    // pre-submit preview, the quote's pinned quoted* amounts).
+    // exists, so they are null at submission and remain null unless the path A
+    // matcher later fills the order. The unfilled order's monetary story lives
+    // in reservedAmount + reservationFeeRate (and, for the pre-submit preview,
+    // the quote's pinned quoted* amounts).
     const created = await tx.order.create({
       data: {
         seasonParticipantId: input.participant.id,
@@ -426,6 +462,8 @@ export class LimitOrderCreateService {
         reservationFeeRate: reservationFeeRateText,
         reservationReleasedAt: null,
         cancelReason: null,
+        matchingActivatedAt: input.matchingActivation?.activatedAt ?? null,
+        matchingActivationStreamId: input.matchingActivation?.streamId ?? null,
         idempotencyKey: input.idempotency.idempotencyKey,
         requestHash: input.idempotency.requestHash,
         submittedAt: input.submittedAt,
@@ -484,6 +522,16 @@ export class LimitOrderCreateService {
           reservedAmount: reservedAmountText,
           reservationFeeRate: reservationFeeRateText,
           duplicate: false,
+        },
+        executionPolicy: {
+          autoExecutionEnabled: input.autoExecutionEnabled === true,
+          mode:
+            input.autoExecutionEnabled === true
+              ? 'live_trade_event'
+              : 'reservation_only',
+          triggerType:
+            input.autoExecutionEnabled === true ? 'provider_trade_price' : null,
+          fullFillOnly: true,
         },
       },
     };

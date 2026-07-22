@@ -1,4 +1,9 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Optional,
+} from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   AssetPriceSourceType,
@@ -58,8 +63,12 @@ import {
   RankingRefreshService,
 } from '../ranking/ranking-refresh.service';
 import { debitAvailableCash } from '../wallets/cash-wallet-atomic';
+import { RedisService } from '../redis/redis.service';
 import { assertAssetTradable, MarketHoursError } from './market-hours.policy';
 import { isLimitOrderEnabled } from './limit-order.config';
+import { readLimitOrderMatchingConfig } from './limit-matching/limit-order-matching.config';
+import { LimitOrderMatcherHealthService } from './limit-matching/limit-order-matcher-health.service';
+import { LimitOrderProviderHealthService } from './limit-matching/limit-order-provider-health.service';
 import { limitOrderErrorCodes } from './limit-order-error-policy';
 import type { QuotedLimitReservationBasis } from './limit-order-policy';
 import {
@@ -262,6 +271,12 @@ type OrderQuoteResponse = {
     walletAvailableBefore?: string;
     estimatedReservedAfter?: string;
     estimatedAvailableAfter?: string;
+    executionPolicy?: {
+      autoExecutionEnabled: boolean;
+      mode: 'live_trade_event' | 'reservation_only';
+      triggerType: 'provider_trade_price' | null;
+      fullFillOnly: true;
+    };
   };
 };
 
@@ -446,6 +461,10 @@ const ORDER_EXECUTION_SELECT = {
   reservedAmount: true,
   reservationReleasedAt: true,
   cancelReason: true,
+  triggerEventId: true,
+  triggerEventAt: true,
+  matchedAt: true,
+  matchingSource: true,
   submittedAt: true,
   executedAt: true,
   canceledAt: true,
@@ -505,11 +524,19 @@ const ORDER_EXECUTION_SELECT = {
 
 @Injectable()
 export class OrdersService {
+  private readonly limitOrderMatchingConfig = readLimitOrderMatchingConfig();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly rankingRefreshService?: RankingRefreshService,
     private readonly limitOrderCreateService?: LimitOrderCreateService,
     private readonly limitOrderCancelService?: LimitOrderCancelService,
+    @Optional()
+    private readonly limitOrderMatcherHealth?: LimitOrderMatcherHealthService,
+    @Optional()
+    private readonly redis?: RedisService,
+    @Optional()
+    private readonly limitOrderProviderHealth?: LimitOrderProviderHealthService,
   ) {}
 
   private assertLimitOrderFeatureEnabled(): void {
@@ -542,6 +569,37 @@ export class OrdersService {
       );
     }
     return this.limitOrderCancelService;
+  }
+
+  private isLimitOrderAutoExecutionEnabled(): boolean {
+    return this.limitOrderMatchingConfig.enabled;
+  }
+
+  private async assertLimitOrderMatcherAvailable(
+    tx?: Prisma.TransactionClient,
+    now?: Date,
+  ): Promise<void> {
+    if (!this.isLimitOrderAutoExecutionEnabled()) return;
+    if (!this.limitOrderMatcherHealth) {
+      this.throwApiError(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'LIMIT_ORDER_MATCHER_UNAVAILABLE',
+        'Limit-order matcher health service is not wired.',
+      );
+    }
+    await this.limitOrderMatcherHealth.assertAvailable(tx, now);
+  }
+
+  private assertLimitOrderProviderAvailable(assetType: AssetType): void {
+    if (!this.isLimitOrderAutoExecutionEnabled()) return;
+    if (!this.limitOrderProviderHealth) {
+      this.throwApiError(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'LIMIT_ORDER_MATCHER_UNAVAILABLE',
+        'Limit-order provider health service is not wired.',
+      );
+    }
+    this.limitOrderProviderHealth.assertAvailable(assetType);
   }
 
   async quoteOrder(
@@ -589,6 +647,7 @@ export class OrdersService {
     quoteAt: Date,
   ): Promise<OrderQuoteResponse> {
     this.assertLimitOrderFeatureEnabled();
+    await this.assertLimitOrderMatcherAvailable();
     const limitOrderCreate = this.requireLimitOrderCreateService();
     if (!request.limitPrice) {
       this.throwApiError(
@@ -602,6 +661,7 @@ export class OrdersService {
     this.assertSeasonTradable(season, quoteAt);
     const participant = await this.findParticipantOrThrow(season.id, userId);
     const asset = await this.findUsableAsset(request.assetId);
+    this.assertLimitOrderProviderAvailable(asset.assetType);
     if (
       request.currencyCode &&
       request.currencyCode !== this.getAssetSettlementCurrency(asset)
@@ -746,6 +806,7 @@ export class OrdersService {
           preview.estimatedAvailableAfter,
           monetaryScale,
         ),
+        executionPolicy: this.limitOrderExecutionPolicy(),
       },
     };
   }
@@ -921,9 +982,9 @@ export class OrdersService {
 
   /**
    * Creates a SUBMITTED limit-buy order with an atomic cash reservation.
-   * Never executes, never reads a provider price, never touches
-   * balanceAmount / WalletTransaction / Position — even when the limit
-   * price is marketable.
+   * This request never executes or reads a provider price and never touches
+   * balanceAmount / WalletTransaction / Position. Only a later path A stream
+   * event can fill the committed submitted order.
    */
   private async createLimitBuyOrder(
     userId: string,
@@ -938,6 +999,7 @@ export class OrdersService {
       request,
       quoteId,
     });
+    const autoExecutionEnabled = this.isLimitOrderAutoExecutionEnabled();
     const submittedAt = new Date();
     // Pre-transaction checks are a fast-fail courtesy only: they give the user
     // a clean error without opening a transaction. They are NOT the basis of
@@ -962,14 +1024,69 @@ export class OrdersService {
         // See LimitOrderCreateService.lockTradableContextInTransaction for why
         // the participant precedes the season and why both are FOR SHARE.
         await limitOrderCreate.lockQuoteForCreateInTransaction(tx, quoteId);
+        // Re-validate season + participant against LOCKED rows. A concurrent
+        // exclusion or season-ending either commits first (and this create
+        // fails) or waits behind these locks (and its cleanup then cancels the
+        // order this transaction is about to commit). No third outcome exists,
+        // so no reservation can outlive an exclusion or a season end.
+        const lockedContext =
+          await limitOrderCreate.lockTradableContextInTransaction(tx, {
+            userId,
+            seasonParticipantId: participant.id,
+          });
+
+        let activationStreamId: string | null = null;
+        if (autoExecutionEnabled) {
+          if (!this.redis) {
+            this.throwApiError(
+              HttpStatus.SERVICE_UNAVAILABLE,
+              'LIMIT_ORDER_EVENT_STREAM_UNAVAILABLE',
+              'Limit-order event stream service is not wired.',
+            );
+          }
+          try {
+            activationStreamId = await this.redis.lastStreamId(
+              this.limitOrderMatchingConfig.streamKey,
+            );
+          } catch {
+            this.throwApiError(
+              HttpStatus.SERVICE_UNAVAILABLE,
+              'LIMIT_ORDER_EVENT_STREAM_UNAVAILABLE',
+              'Limit-order event stream is unavailable.',
+            );
+          }
+        }
+
+        // PostgreSQL CURRENT_TIMESTAMP/now() are fixed at transaction start.
+        // The wall clock is read only after every authorization row lock and
+        // the optional Redis activation-cursor read, so neither lock nor
+        // network wait time is omitted from final quote/season/market checks.
+        const transactionClock = await tx.$queryRaw<Array<{ now: Date }>>`
+          SELECT clock_timestamp() AS "now"
+        `;
+        const transactionNow = transactionClock[0]?.now;
+        if (!transactionNow) {
+          this.throwApiError(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            'ORDER_EXECUTION_TRANSACTION_FAILED',
+            'Database transaction clock is unavailable.',
+          );
+        }
+        limitOrderCreate.assertLockedTradableContext(
+          lockedContext,
+          transactionNow,
+        );
+        await this.assertLimitOrderMatcherAvailable(tx, transactionNow);
+
         const quote = await this.findActiveOrderQuoteForCreateOrThrow(tx, {
           quoteId,
           userId,
           seasonParticipantId: participant.id,
           request,
-          now: submittedAt,
+          now: transactionNow,
         });
-        this.assertOrderAssetTradable(quote.asset, submittedAt);
+        this.assertOrderAssetTradable(quote.asset, transactionNow);
+        this.assertLimitOrderProviderAvailable(quote.asset.assetType);
 
         if (!quote.limitPrice) {
           this.throwApiError(
@@ -979,16 +1096,9 @@ export class OrdersService {
           );
         }
 
-        // Re-validate season + participant against LOCKED rows. A concurrent
-        // exclusion or season-ending either commits first (and this create
-        // fails) or waits behind these locks (and its cleanup then cancels the
-        // order this transaction is about to commit). No third outcome exists,
-        // so no reservation can outlive an exclusion or a season end.
-        await limitOrderCreate.lockTradableContextInTransaction(tx, {
-          userId,
-          seasonParticipantId: participant.id,
-          now: submittedAt,
-        });
+        const matchingActivation = activationStreamId
+          ? { activatedAt: transactionNow, streamId: activationStreamId }
+          : null;
 
         return limitOrderCreate.createSubmittedLimitBuyInTransaction(tx, {
           quote: {
@@ -1007,7 +1117,9 @@ export class OrdersService {
           participant: { id: participant.id },
           quantity: request.quantity,
           idempotency,
-          submittedAt,
+          submittedAt: transactionNow,
+          matchingActivation,
+          autoExecutionEnabled,
         });
       });
     } catch (error) {
@@ -1218,6 +1330,10 @@ export class OrdersService {
           reservedAmount: true,
           reservationReleasedAt: true,
           cancelReason: true,
+          triggerEventId: true,
+          triggerEventAt: true,
+          matchedAt: true,
+          matchingSource: true,
           submittedAt: true,
           executedAt: true,
           canceledAt: true,
@@ -1340,8 +1456,8 @@ export class OrdersService {
     if (order.orderType !== OrderType.market) {
       this.throwApiError(
         HttpStatus.BAD_REQUEST,
-        'ORDER_TYPE_NOT_SUPPORTED',
-        'Only market orders are supported.',
+        'LIMIT_ORDER_EXECUTION_PATH_NOT_SUPPORTED',
+        'Limit orders can only execute from the live-trade matcher.',
       );
     }
 
@@ -3604,6 +3720,10 @@ export class OrdersService {
         reservedAmount: true,
         reservationReleasedAt: true,
         cancelReason: true,
+        triggerEventId: true,
+        triggerEventAt: true,
+        matchedAt: true,
+        matchingSource: true,
         submittedAt: true,
         executedAt: true,
         canceledAt: true,
@@ -3664,6 +3784,7 @@ export class OrdersService {
             reservationFeeRate: null,
             duplicate: true,
           },
+          executionPolicy: this.limitOrderExecutionPolicy(),
         },
       };
     }
@@ -4679,6 +4800,20 @@ export class OrdersService {
       .catch((error) => {
         console.error('Current ranking refresh after order failed.', error);
       });
+  }
+
+  private limitOrderExecutionPolicy() {
+    const autoExecutionEnabled = this.isLimitOrderAutoExecutionEnabled();
+    return {
+      autoExecutionEnabled,
+      mode: autoExecutionEnabled
+        ? ('live_trade_event' as const)
+        : ('reservation_only' as const),
+      triggerType: autoExecutionEnabled
+        ? ('provider_trade_price' as const)
+        : null,
+      fullFillOnly: true as const,
+    };
   }
 
   private getHttpErrorCode(error: HttpException): string | null {

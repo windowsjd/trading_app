@@ -1,4 +1,5 @@
 import { parseLimitOrderEnabled } from '../orders/limit-order.config';
+import { readLimitOrderMatchingConfig } from '../orders/limit-matching/limit-order-matching.config';
 
 /**
  * Central startup validation for environment variables whose misconfiguration
@@ -25,6 +26,19 @@ export function validateEnv(
   // never be mistaken for a deliberate "off".
   try {
     parseLimitOrderEnabled(readOptionalString(config.LIMIT_ORDER_ENABLED));
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : String(error));
+  }
+
+  try {
+    readLimitOrderMatchingConfig(
+      Object.fromEntries(
+        Object.entries(config).map(([key, value]) => [
+          key,
+          readOptionalString(value),
+        ]),
+      ) as NodeJS.ProcessEnv,
+    );
   } catch (error) {
     errors.push(error instanceof Error ? error.message : String(error));
   }

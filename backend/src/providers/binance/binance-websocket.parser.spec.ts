@@ -15,6 +15,30 @@ import { CurrencyCode } from '../../generated/prisma/client';
 import { parseBinanceWebSocketMessage } from './binance-websocket.parser';
 
 describe('Binance WebSocket parser', () => {
+  it('parses an exact trade tick with a stable provider trade id', () => {
+    const parsed = parseBinanceWebSocketMessage({
+      frame: JSON.stringify({
+        e: 'trade',
+        E: 1784682000000,
+        T: 1784682000001,
+        s: 'BTCUSDT',
+        t: 4242,
+        p: '90000.12345678',
+      }),
+      receivedAt: new Date('2026-07-22T01:00:00.010Z'),
+    });
+
+    expect(parsed).toMatchObject({
+      state: 'trade',
+      trade: {
+        providerSymbol: 'BTCUSDT',
+        tradeId: '4242',
+        price: '90000.12345678',
+        currencyCode: CurrencyCode.USD,
+      },
+    });
+  });
+
   const receivedAt = new Date('2026-06-19T03:00:30.000Z');
 
   it('parses combined spot ticker stream payloads', () => {

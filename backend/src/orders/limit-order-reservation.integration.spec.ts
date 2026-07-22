@@ -346,9 +346,11 @@ async function testConcurrentCancelSingleRelease() {
         quantity: '3.000000',
         limitPrice: '50.00000000',
         currencyCode: CurrencyCode.KRW,
-        grossAmount: '150.00000000',
-        feeAmount: '0.15000000',
-        netAmount: '150.15000000',
+        // Execution-result columns stay null while a limit order is open;
+        // the reservation basis lives in reservedAmount/reservationFeeRate.
+        grossAmount: null,
+        feeAmount: null,
+        netAmount: null,
         reservedAmount: '150.15000000',
         reservationFeeRate: '0.001000',
         submittedAt: new Date(),

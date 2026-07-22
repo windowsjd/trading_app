@@ -88,7 +88,7 @@ jobs:
         run: npm test
 
   limit-order-db-integration:
-    name: Limit order DB integration
+    name: Limit order PostgreSQL + Redis integration
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -104,10 +104,24 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     env:
       DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/trading_app?schema=public
+      REDIS_URL: redis://localhost:6379
       # Opt-in switch for the limit-order suites that need a real database.
-      LIMIT_ORDER_RESERVATION_DB_INTEGRATION: '1'
+      LIMIT_ORDER_RESERVATION_DB_INTEGRATION: "1"
+      LIMIT_ORDER_AUTO_EXECUTION_INTEGRATION: "1"
+      ORDER_EXECUTE_DB_INTEGRATION: "1"
+      FX_EXECUTE_DB_INTEGRATION: "1"
+      MVP_FLOW_DB_SMOKE: "1"
     defaults:
       run:
         working-directory: backend
@@ -124,21 +138,26 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Prisma generate
         run: pnpm exec prisma generate
-      # Also proves every migration — including the additive limit-order quote
-      # basis migration — applies cleanly to a fresh database.
+      # Also proves every migration — including the additive path-A event,
+      # evidence, worker-trigger, and FIFO-index migrations — applies cleanly
+      # to a fresh database.
       - name: Apply migrations
         run: pnpm exec prisma migrate deploy
       - name: Verify migrations are fully applied
         run: pnpm exec prisma migrate status
-      # Reservation atomicity/CHECK constraints, plus create raced against
-      # participant exclusion and season ending. These are the only assertions
-      # that can prove the FOR SHARE locks actually block a concurrent UPDATE,
-      # so a mock-only run would not substitute for them.
-      - name: Limit order reservation + create-race integration tests
+      # Reservation atomicity, deterministic lock interleavings, post-lock DB
+      # time boundaries, and the live-trade Redis Stream matcher (including
+      # pending recovery, leader takeover, accounting, and event dedupe).
+      - name: Limit order PostgreSQL + Redis integration tests
         run: >-
-          pnpm exec jest
+          pnpm exec jest --runInBand
           src/orders/limit-order-reservation.integration.spec.ts
           src/orders/limit-order-create-race.integration.spec.ts
+          src/orders/limit-order-transaction-time.integration.spec.ts
+          src/orders/limit-order-auto-execution.integration.spec.ts
+          src/orders/orders.execute.integration.spec.ts
+          src/fx/fx.execute.integration.spec.ts
+          src/mvp-flow.integration.spec.ts
 
   candle-fixture-integration:
     name: Candle fixture integration

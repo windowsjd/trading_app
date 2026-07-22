@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import {
   getLimitQuoteEstimateDisplay,
+  getLimitOrderSuccessMessage,
   getOrderSuccessDisplay,
   isOrderSuccess,
   isSubmittedLimitOrder,
@@ -12,7 +13,9 @@ import {
   getOrderStatusLabel,
   hasNoExecutionResult,
   isOpenLimitBuyOrder,
+  shouldPollSubmittedLimitOrders,
 } from '../record/openOrder.ts';
+import { captureOrderSuccess, clearOrderSuccess } from './successState.ts';
 import {
   getWalletAvailableAmount,
   getWalletBalanceAmount,
@@ -195,6 +198,33 @@ test('limit quote estimates are absent for a market quote', () => {
   );
 });
 
+test('submitted limit success retains its quote snapshot until the sheet closes', () => {
+  const activeQuote = {
+    quotedGrossAmount: '150000.00000000',
+    quotedFeeAmount: '150.00000000',
+    quotedFeeRate: '0.001000',
+    quotedReservedAmount: '150150.00000000',
+    currencyCode: 'KRW',
+  } as OrderQuoteDto;
+  const success = captureOrderSuccess(submittedLimitResult, activeQuote);
+
+  // OrderScreen clears its active quote after create, but the success state
+  // keeps the exact quote-time estimate used by the bottom sheet.
+  const clearedActiveQuote: OrderQuoteDto | null = null;
+  assert.equal(clearedActiveQuote, null);
+  assert.equal(success.data, submittedLimitResult);
+  assert.equal(
+    getLimitQuoteEstimateDisplay(success.quote)?.estimatedGrossAmount,
+    '150,000',
+  );
+  assert.equal(
+    getLimitQuoteEstimateDisplay(success.quote)?.estimatedFeeAmount,
+    '150',
+  );
+
+  assert.deepEqual(clearOrderSuccess(), { data: null, quote: null });
+});
+
 test('hasNoExecutionResult covers submitted AND canceled limit rows', () => {
   assert.equal(
     hasNoExecutionResult({ orderType: 'limit', status: 'submitted' }),
@@ -222,19 +252,35 @@ test('hasNoExecutionResult covers submitted AND canceled limit rows', () => {
 
 test('open limit buy detection requires limit + buy + submitted', () => {
   assert.equal(
-    isOpenLimitBuyOrder({ orderType: 'limit', side: 'buy', status: 'submitted' }),
+    isOpenLimitBuyOrder({
+      orderType: 'limit',
+      side: 'buy',
+      status: 'submitted',
+    }),
     true,
   );
   assert.equal(
-    isOpenLimitBuyOrder({ orderType: 'limit', side: 'buy', status: 'canceled' }),
+    isOpenLimitBuyOrder({
+      orderType: 'limit',
+      side: 'buy',
+      status: 'canceled',
+    }),
     false,
   );
   assert.equal(
-    isOpenLimitBuyOrder({ orderType: 'limit', side: 'sell', status: 'submitted' }),
+    isOpenLimitBuyOrder({
+      orderType: 'limit',
+      side: 'sell',
+      status: 'submitted',
+    }),
     false,
   );
   assert.equal(
-    isOpenLimitBuyOrder({ orderType: 'market', side: 'buy', status: 'submitted' }),
+    isOpenLimitBuyOrder({
+      orderType: 'market',
+      side: 'buy',
+      status: 'submitted',
+    }),
     false,
   );
 });
@@ -286,17 +332,69 @@ test('new limit-order error codes map to dedicated user messages by CODE', () =>
     ERROR_CODE.ORDER_NOT_CANCELABLE,
     ERROR_CODE.ORDER_CANCEL_CONFLICT,
     ERROR_CODE.ORDER_CANCEL_NOT_SUPPORTED,
+    ERROR_CODE.LIMIT_ORDER_MATCHER_UNAVAILABLE,
+    ERROR_CODE.LIMIT_ORDER_EVENT_STREAM_UNAVAILABLE,
   ]) {
     const message = getErrorMessageFromCode(code);
     assert.notEqual(message, generic, `expected dedicated message for ${code}`);
   }
 });
 
-test('success copy never promises automatic execution', () => {
-  const display = getOrderSuccessDisplay(submittedLimitResult);
-  const rendered = JSON.stringify(display);
-  assert.ok(!rendered.includes('자동으로 체결'));
-  assert.ok(!rendered.includes('자동 체결'));
+test('success copy follows the server execution policy without promising exchange liquidity', () => {
+  const enabled = getLimitOrderSuccessMessage({
+    autoExecutionEnabled: true,
+    mode: 'live_trade_event',
+    triggerType: 'provider_trade_price',
+    fullFillOnly: true,
+  });
+  assert.match(enabled, /전량 자동 체결/);
+  assert.match(enabled, /유동성과 거래량은 반영하지 않습니다/);
+  assert.doesNotMatch(enabled, /무조건/);
+
+  const disabled = getLimitOrderSuccessMessage({
+    autoExecutionEnabled: false,
+    mode: 'reservation_only',
+    triggerType: null,
+    fullFillOnly: true,
+  });
+  assert.match(disabled, /미체결 상태로 등록/);
+  assert.doesNotMatch(disabled, /자동 체결/);
+});
+
+test('submitted-limit polling requires foreground, focus, and an open order', () => {
+  const open = [{ orderType: 'limit', side: 'buy', status: 'submitted' }];
+  assert.equal(
+    shouldPollSubmittedLimitOrders({
+      isFocused: true,
+      appState: 'active',
+      items: open,
+    }),
+    true,
+  );
+  assert.equal(
+    shouldPollSubmittedLimitOrders({
+      isFocused: false,
+      appState: 'active',
+      items: open,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldPollSubmittedLimitOrders({
+      isFocused: true,
+      appState: 'background',
+      items: open,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldPollSubmittedLimitOrders({
+      isFocused: true,
+      appState: 'active',
+      items: [{ orderType: 'limit', side: 'buy', status: 'executed' }],
+    }),
+    false,
+  );
 });
 
 test('existing market error semantics stay intact', () => {

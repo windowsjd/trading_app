@@ -6,6 +6,7 @@ import CTAButton from '../../components/common/CTAButton';
 import type { CreateOrderDto, OrderQuoteDto } from '../../features/order/api';
 import {
   getLimitQuoteEstimateDisplay,
+  getLimitOrderSuccessMessage,
   getOrderSuccessDisplay,
 } from '../../features/order/mapper';
 
@@ -19,7 +20,7 @@ interface OrderSuccessBottomSheetProps {
   /**
    * The quote this order was created from. Supplies the quote-time ESTIMATES
    * for an unfilled limit buy — the order itself has no gross/fee/net until it
-   * actually fills, which phase 1 never does.
+   * actually fills through a later matcher event.
    */
   quote?: OrderQuoteDto | null;
 }
@@ -52,8 +53,7 @@ export default function OrderSuccessBottomSheet({
       </Text>
       {isSubmittedLimit ? (
         <Text style={styles.subtitle}>
-          현재 단계에서는 주문이 미체결 상태로 등록됩니다. 예약된 금액은
-          주문을 취소하면 다시 사용할 수 있습니다.
+          {getLimitOrderSuccessMessage(payload?.executionPolicy)}
         </Text>
       ) : null}
 
@@ -96,8 +96,8 @@ export default function OrderSuccessBottomSheet({
               display.side === 'buy'
                 ? '매수'
                 : display.side === 'sell'
-                ? '매도'
-                : '-'
+                  ? '매도'
+                  : '-'
             }
           />
           <Row label="수량" value={display.quantity} />

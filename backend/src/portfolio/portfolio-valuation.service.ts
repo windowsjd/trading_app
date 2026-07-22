@@ -4,6 +4,7 @@ import {
   AssetType,
   CurrencyCode,
   FxRateSourceType,
+  Prisma,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -42,10 +43,11 @@ export class PortfolioValuationService {
     seasonParticipantId: string,
     valuationAt = new Date(),
     sourceEligibilityWorkflow: PortfolioSourceWorkflow = 'daily_portfolio_snapshot',
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
   ): Promise<PortfolioValuationResult> {
     const useSettlementPricePolicy =
       sourceEligibilityWorkflow === 'season_settlement';
-    const participant = await this.prisma.seasonParticipant.findUnique({
+    const participant = await client.seasonParticipant.findUnique({
       where: {
         id: seasonParticipantId,
       },
@@ -101,6 +103,7 @@ export class PortfolioValuationService {
           valuationAt,
           sourceEligibilityWorkflow,
           useSettlementPricePolicy,
+          client,
         ),
       })),
     );
@@ -122,6 +125,7 @@ export class PortfolioValuationService {
           valuationAt,
           sourceEligibilityWorkflow,
           useSettlementPricePolicy,
+          client,
         )
       : null;
 
@@ -146,6 +150,7 @@ export class PortfolioValuationService {
     valuationAt: Date,
     sourceEligibilityWorkflow: PortfolioSourceWorkflow,
     useSettlementPricePolicy: boolean,
+    client: Prisma.TransactionClient | PrismaService,
   ): Promise<PortfolioAssetPriceSnapshotInput | null> {
     const providerEligibility = resolveAssetProviderEligibility({
       workflow: sourceEligibilityWorkflow,
@@ -157,7 +162,7 @@ export class PortfolioValuationService {
       },
     });
     const providerCandidates = providerEligibility.eligible
-      ? ((await this.prisma.assetPriceSnapshot.findMany({
+      ? ((await client.assetPriceSnapshot.findMany({
           where: {
             assetId: asset.id,
             currencyCode: this.getAssetPriceCurrency(asset),
@@ -238,7 +243,7 @@ export class PortfolioValuationService {
       };
     }
 
-    const fallbackSnapshot = await this.prisma.assetPriceSnapshot.findFirst({
+    const fallbackSnapshot = await client.assetPriceSnapshot.findFirst({
       where: {
         assetId: asset.id,
         currencyCode: this.getAssetPriceCurrency(asset),
@@ -291,6 +296,7 @@ export class PortfolioValuationService {
     valuationAt: Date,
     sourceEligibilityWorkflow: PortfolioSourceWorkflow,
     useSettlementPricePolicy: boolean,
+    client: Prisma.TransactionClient | PrismaService,
   ) {
     const providerEligibility = resolveFxProviderEligibility({
       workflow: sourceEligibilityWorkflow,
@@ -298,7 +304,7 @@ export class PortfolioValuationService {
       quoteCurrency: CurrencyCode.KRW,
     });
     const providerCandidates = providerEligibility.eligible
-      ? ((await this.prisma.fxRateSnapshot.findMany({
+      ? ((await client.fxRateSnapshot.findMany({
           where: {
             baseCurrency: CurrencyCode.USD,
             quoteCurrency: CurrencyCode.KRW,
@@ -377,7 +383,7 @@ export class PortfolioValuationService {
       };
     }
 
-    const fallbackSnapshot = await this.prisma.fxRateSnapshot.findFirst({
+    const fallbackSnapshot = await client.fxRateSnapshot.findFirst({
       where: {
         baseCurrency: CurrencyCode.USD,
         quoteCurrency: CurrencyCode.KRW,

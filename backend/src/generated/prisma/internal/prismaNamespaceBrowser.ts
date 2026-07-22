@@ -79,7 +79,8 @@ export const ModelName = {
   SeasonRanking: 'SeasonRanking',
   BatchJobRun: 'BatchJobRun',
   OpsJobRun: 'OpsJobRun',
-  OpsJobLock: 'OpsJobLock'
+  OpsJobLock: 'OpsJobLock',
+  LimitOrderProcessedEvent: 'LimitOrderProcessedEvent'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -300,7 +301,9 @@ export const AssetPriceSnapshotScalarFieldEnum = {
   capturedAt: 'capturedAt',
   createdAt: 'createdAt',
   rawPayloadJson: 'rawPayloadJson',
-  note: 'note'
+  note: 'note',
+  providerEventKey: 'providerEventKey',
+  providerEventAt: 'providerEventAt'
 } as const
 
 export type AssetPriceSnapshotScalarFieldEnum = (typeof AssetPriceSnapshotScalarFieldEnum)[keyof typeof AssetPriceSnapshotScalarFieldEnum]
@@ -444,6 +447,12 @@ export const OrderScalarFieldEnum = {
   reservationFeeRate: 'reservationFeeRate',
   reservationReleasedAt: 'reservationReleasedAt',
   cancelReason: 'cancelReason',
+  matchingActivatedAt: 'matchingActivatedAt',
+  matchingActivationStreamId: 'matchingActivationStreamId',
+  triggerEventId: 'triggerEventId',
+  triggerEventAt: 'triggerEventAt',
+  matchedAt: 'matchedAt',
+  matchingSource: 'matchingSource',
   submittedAt: 'submittedAt',
   executedAt: 'executedAt',
   canceledAt: 'canceledAt',
@@ -699,6 +708,17 @@ export const OpsJobLockScalarFieldEnum = {
 } as const
 
 export type OpsJobLockScalarFieldEnum = (typeof OpsJobLockScalarFieldEnum)[keyof typeof OpsJobLockScalarFieldEnum]
+
+
+export const LimitOrderProcessedEventScalarFieldEnum = {
+  eventId: 'eventId',
+  firstStreamId: 'firstStreamId',
+  receivedAt: 'receivedAt',
+  processedAt: 'processedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type LimitOrderProcessedEventScalarFieldEnum = (typeof LimitOrderProcessedEventScalarFieldEnum)[keyof typeof LimitOrderProcessedEventScalarFieldEnum]
 
 
 export const SortOrder = {

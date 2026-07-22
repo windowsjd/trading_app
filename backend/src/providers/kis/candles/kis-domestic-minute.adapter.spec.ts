@@ -61,12 +61,13 @@ describe('KisDomesticMinuteAdapter', () => {
       to: new Date('2026-07-19T23:30:00.000Z'),
       now: new Date('2026-07-19T23:30:00.000Z'),
     });
+    const queryMatcher: unknown = expect.objectContaining({
+      FID_INPUT_DATE_1: '20260716',
+      FID_INPUT_HOUR_1: '152959',
+    });
     expect(quote.getMarketDataByExplicitPath).toHaveBeenCalledWith(
       expect.objectContaining({
-        query: expect.objectContaining({
-          FID_INPUT_DATE_1: '20260716',
-          FID_INPUT_HOUR_1: '152959',
-        }),
+        query: queryMatcher,
       }),
     );
   });

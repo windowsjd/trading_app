@@ -22,6 +22,13 @@ Not implemented:
 - Binance authenticated/order/account/user-data APIs
 - Real external trading/account/deposit/withdrawal API
 - Scheduler-driven reward-grant writes or automatic reward payment/delivery
+
+The limit-order matcher is deliberately not an `OpsSchedulerService` interval.
+It is a dedicated long-running Redis blocking-read loop. `OpsJobName` includes
+`limit_order_matcher` only for DB-authoritative heartbeat/audit state; active
+ownership is a session-scoped PostgreSQL advisory lock. See
+`docs/limit-order-live-matching-operations.md`.
+
 - External payment/point/coupon/gifticon/cash reward delivery
 
 ## Job Names
@@ -35,6 +42,7 @@ Not implemented:
 - `season_ranking_generation`
 - `season_settlement`
 - `reward_marker`
+- `limit_order_matcher` (long-running Poller health; not a scheduler tick)
 
 `provider_fx_ingest`, `provider_binance_ingest`, and `provider_kis_ingest` call the existing provider ingestion services through ops locks and write real provider snapshots when provider env is enabled.
 
@@ -48,7 +56,11 @@ Not implemented:
 
 - `jobName`
 - `status`: `running`, `succeeded`, `failed`, `skipped`, `locked`
-- `trigger`: `scheduler`, `operator`, `manual_script`, `test`
+- `trigger`: `scheduler`, `operator`, `manual_script`, `test`, `worker`
+
+`worker` identifies a dedicated long-running process such as the limit-order
+matcher; it does not mean the 60-second scheduler invoked the job.
+
 - `requestedBy`
 - `startedAt`, `finishedAt`, `durationMs`
 - `lockKey`, `idempotencyKey`

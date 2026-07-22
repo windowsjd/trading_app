@@ -20,6 +20,21 @@ export interface RawRedisClient {
   expire(key: string, ttlSeconds: number): Promise<number>;
   ttl(key: string): Promise<number>;
   publish(channel: string, message: string): Promise<number>;
+  xadd(
+    key: string,
+    maxlen: 'MAXLEN',
+    approximate: '~',
+    length: number,
+    id: '*',
+    ...fieldValues: string[]
+  ): Promise<string>;
+  xrevrange(
+    key: string,
+    end: '+',
+    start: '-',
+    countKeyword: 'COUNT',
+    count: number,
+  ): Promise<Array<[string, string[]]>>;
   zrangebyscore(
     key: string,
     min: number | string,

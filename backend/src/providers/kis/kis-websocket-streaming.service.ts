@@ -3,6 +3,7 @@ import {
   Logger,
   OnModuleDestroy,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { readLiveCandleConfig } from '../../assets/live-candle.config';
 import {
@@ -10,6 +11,7 @@ import {
   type ProviderConfig,
 } from '../provider-config.service';
 import { ProviderConfigError, ProviderHttpError } from '../provider.types';
+import { NormalizedProviderTradeEventBus } from '../normalized-provider-trade-event-bus.service';
 import { KisAuthClient } from './kis-auth.client';
 import {
   KisRealtimePriceCacheService,
@@ -94,6 +96,7 @@ export class KisWebSocketStreamingService
   private heartbeatTimer: NodeJS.Timeout | null = null;
   private connectPromise: Promise<void> | null = null;
   private readonly pendingMessages = new Set<Promise<void>>();
+  private tradeProcessingTail: Promise<void> = Promise.resolve();
   private reconnectAttempt = 0;
   private stopping = false;
 
@@ -134,6 +137,8 @@ export class KisWebSocketStreamingService
     private readonly ingestionService: KisWebSocketIngestionService,
     private readonly latestPriceCache: KisRealtimePriceCacheService,
     private readonly realtimePriceEventBus: KisRealtimePriceEventBus,
+    @Optional()
+    private readonly normalizedTradeEventBus?: NormalizedProviderTradeEventBus,
   ) {}
 
   onModuleInit(): void {
@@ -439,35 +444,79 @@ export class KisWebSocketStreamingService
       }
       return;
     }
-    const cacheEntries = this.updateLatestCache(parsed);
-    const result = await this.ingestionService.ingestParsedMessage(parsed, {
-      dryRun: false,
-      requestedBy: 'kis-websocket-streaming',
-      secrets: [input.approvalKey],
-    });
+    const processParsedMessage = async (): Promise<void> => {
+      const cacheEntries = this.updateLatestCache(parsed);
+      const result = await this.ingestionService.ingestParsedMessage(parsed, {
+        dryRun: false,
+        requestedBy: 'kis-websocket-streaming',
+        secrets: [input.approvalKey],
+      });
 
-    this.status.acknowledged += result.acknowledged;
-    this.status.created += result.created;
-    this.status.skipped += result.skipped;
-    this.status.failed += result.failed;
-    if (result.created > 0) {
-      this.status.lastSnapshotAt = receivedAt.toISOString();
-    }
-    if (result.errorCode) {
-      this.recordError(
-        result.errorCode,
-        result.errorMessage ?? result.errorCode,
-      );
-    }
-
-    this.publishLatestPriceEvents(cacheEntries, result.snapshots);
-
-    if (parsed.state === 'failed') {
-      this.recordError(parsed.reason, parsed.message);
-      if (parsed.reason === 'KIS_SUBSCRIPTION_ACK_FAILED') {
-        this.socket?.close(1011, 'subscription ack failed');
+      this.status.acknowledged += result.acknowledged;
+      this.status.created += result.created;
+      this.status.skipped += result.skipped;
+      this.status.failed += result.failed;
+      if (result.created > 0) {
+        this.status.lastSnapshotAt = receivedAt.toISOString();
       }
+      if (result.errorCode) {
+        this.recordError(
+          result.errorCode,
+          result.errorMessage ?? result.errorCode,
+        );
+      }
+
+      this.publishLatestPriceEvents(cacheEntries, result.snapshots);
+      if (parsed.state === 'trades') {
+        parsed.trades.forEach((trade, index) => {
+          const assetId = result.snapshots[index]?.assetId;
+          if (!assetId) return;
+          const providerEventAt =
+            trade.exchangeTimestamp ??
+            trade.sourceTimestamp ??
+            trade.receivedAt;
+          this.normalizedTradeEventBus?.publish({
+            provider: 'kis',
+            providerEventId: trade.eventId,
+            providerSequence: trade.sequence,
+            providerConnectionId: null,
+            assetId,
+            symbol: trade.symbol,
+            providerSymbol: trade.providerSymbol,
+            price: trade.price,
+            currencyCode:
+              trade.kind === 'domestic_krx_realtime_trade' ? 'KRW' : 'USD',
+            providerEventAt: providerEventAt.toISOString(),
+            receivedAt: trade.receivedAt.toISOString(),
+            sourceName:
+              trade.kind === 'domestic_krx_realtime_trade'
+                ? 'kis_krx_realtime_trade'
+                : 'kis_us_delayed_trade',
+            marketSessionCode: trade.marketSessionCode,
+            eventType: 'trade',
+          });
+        });
+      }
+
+      if (parsed.state === 'failed') {
+        this.recordError(parsed.reason, parsed.message);
+        if (parsed.reason === 'KIS_SUBSCRIPTION_ACK_FAILED') {
+          this.socket?.close(1011, 'subscription ack failed');
+        }
+      }
+    };
+
+    if (parsed.state === 'trades') {
+      await this.enqueueTradeProcessing(processParsedMessage);
+    } else {
+      await processParsedMessage();
     }
+  }
+
+  private enqueueTradeProcessing(task: () => Promise<void>): Promise<void> {
+    const processing = this.tradeProcessingTail.then(task);
+    this.tradeProcessingTail = processing.catch(() => undefined);
+    return processing;
   }
 
   private updateLatestCache(

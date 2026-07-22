@@ -146,6 +146,8 @@ export interface RecordOrderItemDto {
   fillCurrency?: 'KRW' | 'USD';
   netAmount?: MoneyString;
   netAmountLocal?: MoneyString;
+  grossAmount?: MoneyString | null;
+  feeAmount?: MoneyString | null;
   // Limit-buy additive fields.
   reservedAmount?: MoneyString | null;
   reservationReleasedAt?: IsoDateTimeString | null;
@@ -213,7 +215,8 @@ function normalizePage<T>(
   limit: number,
   offset: number,
 ): OffsetRecordResponse<T> {
-  const items = data.items ?? data.seasons ?? data.orders ?? data.exchanges ?? [];
+  const items =
+    data.items ?? data.seasons ?? data.orders ?? data.exchanges ?? [];
 
   return {
     items,
@@ -222,18 +225,27 @@ function normalizePage<T>(
   };
 }
 
-export { isOpenLimitBuyOrder } from './openOrder';
+export {
+  isOpenLimitBuyOrder,
+  shouldPollSubmittedLimitOrders,
+} from './openOrder';
 
 export function getRecordOrderDisplay(item: RecordOrderItemDto) {
   const currencyCode = item.currencyCode ?? item.fillCurrency ?? '';
-  const nameDisplay = getAssetNameDisplay({ name: item.name, symbol: item.symbol });
+  const nameDisplay = getAssetNameDisplay({
+    name: item.name,
+    symbol: item.symbol,
+  });
   // Submitted/canceled limit rows never filled, so their execution-result
   // amounts are suppressed here rather than trusted to arrive null — the
   // reservation figures are what such a row is allowed to show.
   const noExecutionResult = hasNoExecutionResult(item);
 
   return {
-    key: item.orderId ?? item.id ?? `${item.assetId ?? item.symbol}-${item.executedAt}`,
+    key:
+      item.orderId ??
+      item.id ??
+      `${item.assetId ?? item.symbol}-${item.executedAt}`,
     orderId: item.orderId ?? item.id ?? null,
     symbol: item.symbol ?? item.assetId ?? '-',
     name: nameDisplay.primary,
@@ -262,6 +274,12 @@ export function getRecordOrderDisplay(item: RecordOrderItemDto) {
     netAmount: noExecutionResult
       ? null
       : formatCurrency(item.netAmount ?? item.netAmountLocal, currencyCode),
+    grossAmount: noExecutionResult
+      ? null
+      : formatCurrency(item.grossAmount, currencyCode),
+    feeAmount: noExecutionResult
+      ? null
+      : formatCurrency(item.feeAmount, currencyCode),
   };
 }
 
@@ -269,7 +287,10 @@ export function getRecordExchangeDisplay(item: RecordExchangeItemDto) {
   const feeCurrency = item.feeCurrency ?? '';
 
   return {
-    key: item.exchangeId ?? item.id ?? `${item.fromCurrency}-${item.toCurrency}-${item.executedAt}`,
+    key:
+      item.exchangeId ??
+      item.id ??
+      `${item.fromCurrency}-${item.toCurrency}-${item.executedAt}`,
     executedAt: item.executedAt ?? '-',
     direction: `${item.fromCurrency} → ${item.toCurrency}`,
     sourceAmount: formatCurrency(item.sourceAmount, item.fromCurrency),
@@ -299,9 +320,9 @@ export async function getMySeasonRecords(params: GetRecordPageParams = {}) {
 }
 
 export async function getMySeasonRecordDetail(seasonId: string) {
-  const response = await apiClient.get<ApiSuccessResponse<RecordSeasonDetailDto>>(
-    `/records/me/seasons/${seasonId}`,
-  );
+  const response = await apiClient.get<
+    ApiSuccessResponse<RecordSeasonDetailDto>
+  >(`/records/me/seasons/${seasonId}`);
   return response.data.data;
 }
 
@@ -314,9 +335,9 @@ export async function getMySeasonEquity({
   searchParams.set('limit', String(limit));
   searchParams.set('offset', String(offset));
 
-  const response = await apiClient.get<ApiSuccessResponse<RecordSeasonEquityDto>>(
-    `/records/me/seasons/${seasonId}/equity?${searchParams.toString()}`,
-  );
+  const response = await apiClient.get<
+    ApiSuccessResponse<RecordSeasonEquityDto>
+  >(`/records/me/seasons/${seasonId}/equity?${searchParams.toString()}`);
 
   return response.data.data;
 }
@@ -335,9 +356,7 @@ export async function getMySeasonOrders(params: GetRecordOrdersParams) {
         orders?: RecordOrderItemDto[];
       }
     >
-  >(
-    `/records/me/seasons/${params.seasonId}/orders?${searchParams.toString()}`,
-  );
+  >(`/records/me/seasons/${params.seasonId}/orders?${searchParams.toString()}`);
 
   return normalizePage(response.data.data, limit, offset);
 }

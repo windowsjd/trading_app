@@ -33,6 +33,10 @@ export type OrderResponseRecord = {
   reservedAmount?: Prisma.Decimal | null;
   reservationReleasedAt?: Date | null;
   cancelReason?: string | null;
+  triggerEventId?: string | null;
+  triggerEventAt?: Date | null;
+  matchedAt?: Date | null;
+  matchingSource?: string | null;
   submittedAt: Date;
   executedAt: Date | null;
   canceledAt: Date | null;
@@ -73,6 +77,10 @@ export function formatOrderResponse(order: OrderResponseRecord) {
       order.reservationReleasedAt ?? null,
     ),
     cancelReason: order.cancelReason ?? null,
+    triggerEventId: order.triggerEventId ?? null,
+    triggerEventAt: formatNullableDate(order.triggerEventAt ?? null),
+    matchedAt: formatNullableDate(order.matchedAt ?? null),
+    matchingSource: order.matchingSource ?? null,
     submittedAt: order.submittedAt.toISOString(),
     executedAt: formatNullableDate(order.executedAt),
     canceledAt: formatNullableDate(order.canceledAt),

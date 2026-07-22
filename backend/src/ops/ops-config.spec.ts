@@ -40,6 +40,7 @@ describe('getOpsSchedulerConfig', () => {
       false,
       false,
       false,
+      false,
     ]);
     expect(config.providerIntervalsSeconds[OpsJobName.provider_fx_ingest]).toBe(
       3600,

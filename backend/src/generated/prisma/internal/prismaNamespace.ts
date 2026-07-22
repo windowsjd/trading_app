@@ -412,7 +412,8 @@ export const ModelName = {
   SeasonRanking: 'SeasonRanking',
   BatchJobRun: 'BatchJobRun',
   OpsJobRun: 'OpsJobRun',
-  OpsJobLock: 'OpsJobLock'
+  OpsJobLock: 'OpsJobLock',
+  LimitOrderProcessedEvent: 'LimitOrderProcessedEvent'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -428,7 +429,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "operatorAuditLog" | "refreshTokenSession" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "position" | "order" | "cashWallet" | "walletTransaction" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock"
+    modelProps: "user" | "operatorAuditLog" | "refreshTokenSession" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "position" | "order" | "cashWallet" | "walletTransaction" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderProcessedEvent"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -2578,6 +2579,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    LimitOrderProcessedEvent: {
+      payload: Prisma.$LimitOrderProcessedEventPayload<ExtArgs>
+      fields: Prisma.LimitOrderProcessedEventFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.LimitOrderProcessedEventFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderProcessedEventPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.LimitOrderProcessedEventFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderProcessedEventPayload>
+        }
+        findFirst: {
+          args: Prisma.LimitOrderProcessedEventFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderProcessedEventPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.LimitOrderProcessedEventFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderProcessedEventPayload>
+        }
+        findMany: {
+          args: Prisma.LimitOrderProcessedEventFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderProcessedEventPayload>[]
+        }
+        create: {
+          args: Prisma.LimitOrderProcessedEventCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderProcessedEventPayload>
+        }
+        createMany: {
+          args: Prisma.LimitOrderProcessedEventCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.LimitOrderProcessedEventCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderProcessedEventPayload>[]
+        }
+        delete: {
+          args: Prisma.LimitOrderProcessedEventDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderProcessedEventPayload>
+        }
+        update: {
+          args: Prisma.LimitOrderProcessedEventUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderProcessedEventPayload>
+        }
+        deleteMany: {
+          args: Prisma.LimitOrderProcessedEventDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.LimitOrderProcessedEventUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.LimitOrderProcessedEventUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderProcessedEventPayload>[]
+        }
+        upsert: {
+          args: Prisma.LimitOrderProcessedEventUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOrderProcessedEventPayload>
+        }
+        aggregate: {
+          args: Prisma.LimitOrderProcessedEventAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateLimitOrderProcessedEvent>
+        }
+        groupBy: {
+          args: Prisma.LimitOrderProcessedEventGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.LimitOrderProcessedEventGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.LimitOrderProcessedEventCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.LimitOrderProcessedEventCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -2819,7 +2894,9 @@ export const AssetPriceSnapshotScalarFieldEnum = {
   capturedAt: 'capturedAt',
   createdAt: 'createdAt',
   rawPayloadJson: 'rawPayloadJson',
-  note: 'note'
+  note: 'note',
+  providerEventKey: 'providerEventKey',
+  providerEventAt: 'providerEventAt'
 } as const
 
 export type AssetPriceSnapshotScalarFieldEnum = (typeof AssetPriceSnapshotScalarFieldEnum)[keyof typeof AssetPriceSnapshotScalarFieldEnum]
@@ -2963,6 +3040,12 @@ export const OrderScalarFieldEnum = {
   reservationFeeRate: 'reservationFeeRate',
   reservationReleasedAt: 'reservationReleasedAt',
   cancelReason: 'cancelReason',
+  matchingActivatedAt: 'matchingActivatedAt',
+  matchingActivationStreamId: 'matchingActivationStreamId',
+  triggerEventId: 'triggerEventId',
+  triggerEventAt: 'triggerEventAt',
+  matchedAt: 'matchedAt',
+  matchingSource: 'matchingSource',
   submittedAt: 'submittedAt',
   executedAt: 'executedAt',
   canceledAt: 'canceledAt',
@@ -3218,6 +3301,17 @@ export const OpsJobLockScalarFieldEnum = {
 } as const
 
 export type OpsJobLockScalarFieldEnum = (typeof OpsJobLockScalarFieldEnum)[keyof typeof OpsJobLockScalarFieldEnum]
+
+
+export const LimitOrderProcessedEventScalarFieldEnum = {
+  eventId: 'eventId',
+  firstStreamId: 'firstStreamId',
+  receivedAt: 'receivedAt',
+  processedAt: 'processedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type LimitOrderProcessedEventScalarFieldEnum = (typeof LimitOrderProcessedEventScalarFieldEnum)[keyof typeof LimitOrderProcessedEventScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -3929,6 +4023,7 @@ export type GlobalOmitConfig = {
   batchJobRun?: Prisma.BatchJobRunOmit
   opsJobRun?: Prisma.OpsJobRunOmit
   opsJobLock?: Prisma.OpsJobLockOmit
+  limitOrderProcessedEvent?: Prisma.LimitOrderProcessedEventOmit
 }
 
 /* Types for Logging */

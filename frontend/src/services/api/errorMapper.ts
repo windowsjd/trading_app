@@ -266,6 +266,10 @@ export function getErrorMessageFromCode(
       return '이미 체결되었거나 취소할 수 없는 주문입니다.';
     case ERROR_CODE.ORDER_CANCEL_CONFLICT:
       return '주문 상태가 변경되어 취소하지 못했습니다. 새로고침 후 다시 확인해주세요.';
+    case ERROR_CODE.LIMIT_ORDER_MATCHER_UNAVAILABLE:
+      return '지정가 자동 체결 시스템을 확인 중입니다. 잠시 후 다시 시도해주세요.';
+    case ERROR_CODE.LIMIT_ORDER_EVENT_STREAM_UNAVAILABLE:
+      return '지정가 실시간 가격 이벤트를 확인할 수 없습니다. 잠시 후 다시 시도해주세요.';
     case ERROR_CODE.ORDER_CANCEL_NOT_SUPPORTED:
       return '시장가 주문은 취소할 수 없습니다.';
     case ERROR_CODE.ORDER_TYPE_NOT_SUPPORTED:

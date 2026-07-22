@@ -14,6 +14,13 @@ import type { AssetType, CurrencyCode } from '../market/api';
 export type OrderSide = 'buy' | 'sell';
 export type OrderTypeDto = 'market' | 'limit';
 
+export interface LimitOrderExecutionPolicyDto {
+  autoExecutionEnabled: boolean;
+  mode: 'live_trade_event' | 'reservation_only';
+  triggerType: 'provider_trade_price' | null;
+  fullFillOnly: boolean;
+}
+
 export interface OrderQuoteRequestDto {
   assetId: string;
   side: OrderSide;
@@ -83,6 +90,7 @@ export interface OrderQuoteDto {
   walletAvailableBefore?: MoneyString;
   estimatedReservedAfter?: MoneyString;
   estimatedAvailableAfter?: MoneyString;
+  executionPolicy?: LimitOrderExecutionPolicyDto;
 }
 
 export interface CreateOrderRequestDto {
@@ -131,8 +139,8 @@ export interface CreatedOrderDto {
 export type OrderExecutionState =
   | 'executed'
   | 'already_executed'
-  // Limit-buy phase 1: the order is registered unfilled. No automatic
-  // execution exists yet — it stays submitted until canceled/cleaned up.
+  // A limit buy is registered unfilled; a later path-A event may transition
+  // it to executed, while Create itself returns submitted.
   | 'submitted'
   | (string & {});
 
@@ -174,6 +182,7 @@ export interface OrderExecutionDto {
 export interface CreateOrderDto {
   order: CreatedOrderDto;
   execution: OrderExecutionDto;
+  executionPolicy?: LimitOrderExecutionPolicyDto;
 }
 
 export async function quoteOrder(payload: OrderQuoteRequestDto) {

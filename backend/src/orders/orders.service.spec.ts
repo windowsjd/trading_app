@@ -3944,7 +3944,7 @@ describe('OrdersService', () => {
 
       await expectErrorCode(
         buy.service.executeOrder('user-1', 'order-execute-1'),
-        'ORDER_TYPE_NOT_SUPPORTED',
+        'LIMIT_ORDER_EXECUTION_PATH_NOT_SUPPORTED',
       );
 
       const sell = createService();
@@ -3959,7 +3959,7 @@ describe('OrdersService', () => {
 
       await expectErrorCode(
         sell.service.executeOrder('user-1', 'order-execute-1'),
-        'ORDER_TYPE_NOT_SUPPORTED',
+        'LIMIT_ORDER_EXECUTION_PATH_NOT_SUPPORTED',
       );
       expect(buy.prisma.cashWallet.updateMany).not.toHaveBeenCalled();
       expect(sell.prisma.cashWallet.updateMany).not.toHaveBeenCalled();

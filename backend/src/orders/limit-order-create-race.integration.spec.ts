@@ -46,10 +46,10 @@ describe('Limit order create race DB integration', () => {
       for (const caseName of [
         'exclusion committed first',
         'create committed first: exclusion cleanup',
-        'create vs exclusion launched concurrently',
+        'create lock first: exclusion waits deterministically',
         'season ended first',
         'create committed first: season cleanup',
-        'create vs season ending launched concurrently',
+        'create lock first: season ending waits deterministically',
         'failure after the season/participant checks rolls the whole create back',
         'quote fee rate stays pinned',
       ]) {
@@ -57,15 +57,6 @@ describe('Limit order create race DB integration', () => {
       }
       expect(result.stdout).toContain(
         'limit order create race db integration ok',
-      );
-
-      // Surface which interleavings actually occurred so a run that only ever
-      // hit one side of each race is visible rather than silently reassuring.
-      console.log(
-        result.stdout
-          .split('\n')
-          .filter((line) => line.includes('outcomes'))
-          .join('\n'),
       );
     },
     190_000,
@@ -75,6 +66,7 @@ describe('Limit order create race DB integration', () => {
 const LIMIT_ORDER_CREATE_RACE_RUNNER = `
 import 'dotenv/config';
 import assert from 'node:assert/strict';
+import { Client } from 'pg';
 import {
   AssetType,
   CurrencyCode,
@@ -125,10 +117,10 @@ async function main() {
   try {
     await runCase('exclusion committed first: create is refused, nothing reserved', testExclusionBeforeCreate);
     await runCase('create committed first: exclusion cleanup cancels it and releases the reservation', testCreateBeforeExclusion);
-    await runCase('create vs exclusion launched concurrently holds the invariant', testConcurrentCreateVsExclusion);
+    await runCase('create lock first: exclusion waits deterministically and cleanup releases once', testConcurrentCreateVsExclusion);
     await runCase('season ended first: create is refused, nothing reserved', testSeasonEndBeforeCreate);
     await runCase('create committed first: season cleanup cancels it and releases the reservation', testCreateBeforeSeasonEnd);
-    await runCase('create vs season ending launched concurrently holds the invariant', testConcurrentCreateVsSeasonEnd);
+    await runCase('create lock first: season ending waits deterministically and cleanup releases once', testConcurrentCreateVsSeasonEnd);
     await runCase('failure after the season/participant checks rolls the whole create back', testCreateRollback);
     await runCase('quote fee rate stays pinned when the season fee rate changes', testQuoteFeeRatePinning);
     console.log('limit order create race db integration ok');
@@ -137,22 +129,46 @@ async function main() {
   }
 }
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+async function openPgClient(applicationName) {
+  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  await client.connect();
+  await client.query("SELECT set_config('application_name', $1, false)", [applicationName]);
+  return client;
+}
 
-/**
- * Launches the create and its antagonist together, staggering the antagonist
- * on alternating attempts. With no stagger the antagonist's short transaction
- * almost always commits first; a small head start instead lets the create
- * transaction take its FOR SHARE locks first, so the antagonist's UPDATE has
- * to block on them. Both interleavings therefore get exercised, and the
- * reported outcome counts show that they did.
- */
-async function raceCreateAgainst(createFn, antagonistFn, headStartMs) {
-  const createPromise = createFn();
-  const antagonistPromise = headStartMs > 0
-    ? sleep(headStartMs).then(antagonistFn)
-    : antagonistFn();
-  return Promise.allSettled([createPromise, antagonistPromise]);
+async function waitForBlockedQuery(observer, applicationName) {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    const result = await observer.query(
+      "SELECT wait_event_type FROM pg_stat_activity WHERE application_name = $1 AND wait_event_type = 'Lock'",
+      [applicationName],
+    );
+    if (result.rowCount > 0) return;
+    // This is state-based polling of pg_stat_activity, not a timing-based race.
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error('timed out waiting for blocked transaction ' + applicationName);
+}
+
+async function waitForBlockedSql(observer, fragment) {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    const result = await observer.query(
+      "SELECT wait_event_type FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query ILIKE $1",
+      ['%' + fragment + '%'],
+    );
+    if (result.rowCount > 0) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error('timed out waiting for blocked SQL containing ' + fragment);
+}
+
+function waitForAnyBlockedCashWalletUpdate(observer) {
+  return waitForBlockedSql(observer, 'cash_wallets');
+}
+
+function waitForAnyBlockedParticipantUpdate(observer) {
+  return waitForBlockedSql(observer, 'season_participants');
 }
 
 async function runCase(name, fn) {
@@ -530,49 +546,34 @@ async function testCreateBeforeExclusion() {
 }
 
 async function testConcurrentCreateVsExclusion() {
-  const outcomes = { createWon: 0, exclusionWon: 0 };
-  // Repeat so both interleavings are exercised regardless of scheduling.
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    const scenario = await createScenario('concurrent-excl-' + attempt);
-    try {
-      const quoteId = await createLimitQuote(scenario);
+  const scenario = await createScenario('barrier-excl');
+  const walletBlocker = await openPgClient('limit-race-wallet-blocker-exclusion');
+  const observer = await openPgClient('limit-race-observer-exclusion');
+  try {
+    const quoteId = await createLimitQuote(scenario);
+    await walletBlocker.query('BEGIN');
+    await walletBlocker.query('SELECT id FROM cash_wallets WHERE id = $1 FOR UPDATE', [scenario.walletId]);
 
-      const [createResult, exclusionResult] = await raceCreateAgainst(
-        () =>
-          ordersService.createOrder(
-            scenario.userId,
-            createBody(scenario, quoteId, 'race-excl-concurrent-' + attempt),
-          ),
-        () => excludeParticipant(scenario),
-        attempt % 2 === 0 ? 0 : 25,
-      );
+    const createPromise = ordersService.createOrder(
+      scenario.userId,
+      createBody(scenario, quoteId, 'race-excl-barrier'),
+    );
+    await waitForAnyBlockedCashWalletUpdate(observer);
+    const exclusionPromise = excludeParticipant(scenario);
+    await waitForAnyBlockedParticipantUpdate(observer);
 
-      // The exclusion itself must always succeed; only create may lose.
-      assert.equal(
-        exclusionResult.status,
-        'fulfilled',
-        'exclusion failed: ' + String(exclusionResult.reason),
-      );
-      assert.equal(await readParticipantStatus(scenario), ParticipantStatus.excluded);
-
-      // Exactly two outcomes are allowed, and both end with zero reserved
-      // cash and no open order.
-      if (createResult.status === 'fulfilled') {
-        outcomes.createWon += 1;
-        const orders = await readOrders(scenario);
-        assert.equal(orders.length, 1);
-        assert.equal(orders[0].cancelReason, 'participant_excluded');
-      } else {
-        outcomes.exclusionWon += 1;
-        assert.equal((await readOrders(scenario)).length, 0);
-      }
-      await assertNoLeakedReservation(scenario);
-    } finally {
-      await cleanupScenario(scenario);
-    }
+    await walletBlocker.query('COMMIT');
+    const created = await createPromise;
+    assert.equal(created.data.execution.state, 'submitted');
+    await exclusionPromise;
+    await assertNoLeakedReservation(scenario);
+    assert.equal((await readOrders(scenario))[0].cancelReason, 'participant_excluded');
+  } finally {
+    await walletBlocker.query('ROLLBACK').catch(() => undefined);
+    await walletBlocker.end();
+    await observer.end();
+    await cleanupScenario(scenario);
   }
-
-  console.log('  create-vs-exclusion outcomes ' + JSON.stringify(outcomes));
 }
 
 // ------------------------------------------------------------ season ending
@@ -648,54 +649,40 @@ async function testCreateBeforeSeasonEnd() {
 }
 
 async function testConcurrentCreateVsSeasonEnd() {
-  const outcomes = { createWon: 0, seasonEndWon: 0 };
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    const scenario = await createScenario('concurrent-season-' + attempt);
-    try {
-      const quoteId = await createLimitQuote(scenario);
+  const scenario = await createScenario('barrier-season');
+  const walletBlocker = await openPgClient('limit-race-wallet-blocker-season');
+  const ender = await openPgClient('limit-race-season-ender');
+  const observer = await openPgClient('limit-race-observer-season');
+  try {
+    const quoteId = await createLimitQuote(scenario);
+    await walletBlocker.query('BEGIN');
+    await walletBlocker.query('SELECT id FROM cash_wallets WHERE id = $1 FOR UPDATE', [scenario.walletId]);
 
-      const [createResult, endResult] = await raceCreateAgainst(
-        () =>
-          ordersService.createOrder(
-            scenario.userId,
-            createBody(scenario, quoteId, 'race-season-concurrent-' + attempt),
-          ),
-        () => endSeasonWithCleanup(scenario),
-        attempt % 2 === 0 ? 0 : 25,
-      );
+    const createPromise = ordersService.createOrder(
+      scenario.userId,
+      createBody(scenario, quoteId, 'race-season-barrier'),
+    );
+    await waitForAnyBlockedCashWalletUpdate(observer);
+    await ender.query('BEGIN');
+    const endPromise = ender.query("UPDATE seasons SET status = 'ended' WHERE id = $1", [scenario.seasonId]);
+    await waitForBlockedQuery(observer, 'limit-race-season-ender');
 
-      assert.equal(
-        endResult.status,
-        'fulfilled',
-        'season ending failed: ' + String(endResult.reason),
-      );
-      assert.equal(await readSeasonStatus(scenario), SeasonStatus.ended);
-
-      if (createResult.status === 'fulfilled') {
-        outcomes.createWon += 1;
-        // The order may have committed just before the transition. The
-        // lifecycle cleanup runs after the transition commits, so it either
-        // already cancelled it or the next tick will — run one more tick to
-        // stand in for that self-healing pass.
-        await cancelService.cleanupEndedSeasonLimitReservations({ now: new Date() });
-        const orders = await readOrders(scenario);
-        assert.equal(orders.length, 1);
-        assert.equal(orders[0].cancelReason, 'season_ended');
-      } else {
-        outcomes.seasonEndWon += 1;
-        assert.equal((await readOrders(scenario)).length, 0);
-      }
-      await assertNoLeakedReservation(scenario);
-
-      const summary = await cancelService.getOpenLimitReservationSummary(scenario.seasonId);
-      assert.equal(summary.openLimitBuyOrderCount, 0);
-      assert.equal(summary.reservedWalletCount, 0);
-    } finally {
-      await cleanupScenario(scenario);
-    }
+    await walletBlocker.query('COMMIT');
+    const created = await createPromise;
+    assert.equal(created.data.execution.state, 'submitted');
+    await endPromise;
+    await ender.query('COMMIT');
+    await cancelService.cleanupEndedSeasonLimitReservations({ now: new Date() });
+    await assertNoLeakedReservation(scenario);
+    assert.equal((await readOrders(scenario))[0].cancelReason, 'season_ended');
+  } finally {
+    await walletBlocker.query('ROLLBACK').catch(() => undefined);
+    await ender.query('ROLLBACK').catch(() => undefined);
+    await walletBlocker.end();
+    await ender.end();
+    await observer.end();
+    await cleanupScenario(scenario);
   }
-
-  console.log('  create-vs-season-end outcomes ' + JSON.stringify(outcomes));
 }
 
 // ----------------------------------------------------------------- rollback

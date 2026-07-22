@@ -162,3 +162,8 @@ export type OpsJobRun = Prisma.OpsJobRunModel
  * 
  */
 export type OpsJobLock = Prisma.OpsJobLockModel
+/**
+ * Model LimitOrderProcessedEvent
+ * 
+ */
+export type LimitOrderProcessedEvent = Prisma.LimitOrderProcessedEventModel

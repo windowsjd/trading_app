@@ -97,6 +97,17 @@ export class BinanceWebSocketIngestionService {
       });
     }
 
+    if (message.state === 'trade') {
+      // Live trades are mapped and published by the streaming service into
+      // the durable limit-order event stream. They deliberately bypass the
+      // display-snapshot throttle/persistence path here.
+      return resultFromSummaries({
+        dryRun,
+        received: 1,
+        summaries: [],
+      });
+    }
+
     return this.ingestTicker(message.ticker, options);
   }
 
@@ -143,6 +154,24 @@ export class BinanceWebSocketIngestionService {
 
       throw error;
     }
+  }
+
+  async resolveLiveTradeAsset(
+    providerSymbol: string,
+  ): Promise<BinanceAssetMapping> {
+    const config = this.configService.getConfig();
+    assertBinanceWebSocketIngestionEnabled(config);
+    const symbolPolicy = parseBinanceUsdEquivalentSymbol(
+      providerSymbol,
+      config.binance.usdtAsUsdEquivalent,
+    );
+    if (!symbolPolicy.supported) {
+      return { state: 'skipped', reason: symbolPolicy.reason };
+    }
+    return this.findMappedAsset({
+      providerSymbol: symbolPolicy.providerSymbol,
+      baseSymbol: symbolPolicy.baseSymbol,
+    });
   }
 
   private async ingestOneTicker(input: {

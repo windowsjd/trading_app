@@ -1,7 +1,7 @@
 /**
  * Feature flag for the limit-buy order foundation (phase 1: reservation
  * only, no automatic matching). Default OFF — production should keep it off
- * until the phase-2 execution engine ships.
+ * unless operators intentionally expose limit-buy registration.
  *
  * Scope when disabled: new limit QUOTE/CREATE requests are rejected with
  * LIMIT_ORDER_DISABLED. Cancel and season-end / participant-exclusion
@@ -33,7 +33,10 @@ export class LimitOrderConfigError extends Error {
  * Only an ABSENT variable falls back to the documented default of false.
  * `TRUE` / `False` are accepted: comparison is trim + case-insensitive.
  */
-export function parseLimitOrderEnabled(raw: string | undefined): boolean {
+export function parseLimitOrderEnabled(
+  raw: string | undefined,
+  variableName = 'LIMIT_ORDER_ENABLED',
+): boolean {
   if (raw === undefined) {
     return false;
   }
@@ -49,7 +52,7 @@ export function parseLimitOrderEnabled(raw: string | undefined): boolean {
   }
 
   throw new LimitOrderConfigError(
-    `LIMIT_ORDER_ENABLED must be one of ${[
+    `${variableName} must be one of ${[
       ...LIMIT_ORDER_ENABLED_TRUE_VALUES,
       ...LIMIT_ORDER_ENABLED_FALSE_VALUES,
     ].join(', ')} (case-insensitive), or be omitted for the default false. ` +

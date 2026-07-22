@@ -11,7 +11,7 @@ This service owns backend APIs, database access, financial calculations, and ser
 - Internal reward fulfillment foundation: operator/admin managed request queue/status APIs, idempotent internal reward requests, fulfillment into `SeasonReward`, and fulfilled-only user reward visibility. This does not call or implement external cash, point, coupon, gifticon, payment, or delivery APIs.
 - Admin/operator runtime DBs must have migration `20260601090000_add_user_role_operator_audit_logs` applied so `users.role` and `operator_audit_logs` exist.
 - Current season lookup and season join.
-- Season write paths require effective active season state: `status=active` and `startAt <= now < endAt` for join, FX quote/execute, and orders quote/create/execute. Public order cancel is currently blocked with `ORDER_CANCEL_NOT_SUPPORTED`.
+- Season write paths require effective active season state: `status=active` and `startAt <= now < endAt` for join, FX quote/execute, and orders quote/create/execute. Submitted limit buys can be canceled; market-order cancel remains blocked with `ORDER_CANCEL_NOT_SUPPORTED`.
 - Home as one aggregate API.
 - Home settled final-result read model from existing `rankType=final` `season_rankings`.
 - Wallets, records, ranking, and orders read APIs.
@@ -36,10 +36,11 @@ This service owns backend APIs, database access, financial calculations, and ser
 - Season settlement freezes valuation at `Season.endAt`, uses the latest valid price and USD/KRW rows with `effectiveAt <= Season.endAt` without enforcing quote/execute freshness windows, writes final `equity_snapshots`, creates `rankType=final` rankings, assigns final tiers, and changes the season to `settled` only after final rank and tier readiness checks pass. Reward payout remains pending/unimplemented.
 - Market holidays are configured in `src/orders/market-holidays.config.ts`; domestic/US stock quote/create/execute return `MARKET_CLOSED` on configured holidays, while crypto orders and FX are not holiday-blocked.
 
-### Limit buy orders (phase 1 foundation, flag off by default)
+### Limit buy orders (phase 1 reservation + phase 2 path A, flags off by default)
 
-Limit BUY orders exist as a reservation-only foundation behind
-`LIMIT_ORDER_ENABLED` (default false):
+Limit BUY registration exists behind `LIMIT_ORDER_ENABLED` (default false).
+Automatic live-trade matching is independently controlled by
+`LIMIT_ORDER_AUTO_EXECUTION_ENABLED` (default false):
 
 - Quote/create register a full-quantity GTC-style limit BUY as
   `status=submitted` and atomically reserve `gross + fee` cash
@@ -52,26 +53,32 @@ Limit BUY orders exist as a reservation-only foundation behind
   `Season.tradeFeeRate`, so changing the season fee rate between quote and
   create cannot move the user's reservation.
 - `grossAmount` / `feeAmount` / `netAmount` / `executedPrice` /
-  `executedAt` mean ACTUAL fill result and are **null** on every
-  `submitted` / `canceled` limit order — there is no fill in this phase.
+  `executedAt` mean ACTUAL fill result and are **null** while a limit order is
+  `submitted` or after it is `canceled`; path A populates them only after a
+  real live-trade fill.
   An unfilled order's money is `reservedAmount` (a reservation, not a fill)
   plus `reservationFeeRate`. Market order amounts are unchanged.
 - Create re-validates the season and the participant against rows locked
   inside its own transaction (`Quote FOR UPDATE → SeasonParticipant FOR
-  SHARE → Season FOR SHARE → CashWallet`), so a concurrent participant
+SHARE → Season FOR SHARE → CashWallet`), so a concurrent participant
   exclusion or season end either loses the race and lets cleanup cancel the
   new order, or wins it and makes the create fail. Neither can leave a
   reservation behind.
-- There is NO automatic matching/execution in this phase: a marketable
-  limit price is still registered as submitted, no provider price is read,
-  and price movement never changes order state. Release paths are user
-  cancel (`POST /api/v1/orders/:orderId/cancel`), season-end cleanup, and
-  participant-exclusion cleanup only. Settlement is blocked while open
-  reservations remain (`OPEN_LIMIT_ORDER_RESERVATIONS`).
+- Create reads `clock_timestamp()` only after Quote, Participant, and Season
+  locks, then rechecks Quote TTL, season bounds, and stock market session.
+  The resulting DB time is used for submitted/created/updated timestamps.
+- With auto execution off, the order remains reservation-only. With it on,
+  normalized KIS/Binance trade ticks are durably XADDed to a Redis Stream and
+  one PostgreSQL-advisory-lock leader full-fills eligible buys at the actual
+  event price. It is not candle/latest-price polling, and never calls an
+  external order API. See
+  [docs/limit-order-live-matching-operations.md](docs/limit-order-live-matching-operations.md).
 - Total-asset valuation keeps using the full `balanceAmount`; reservations
   never reduce it.
-- Cancel and lifecycle cleanup work even while the flag is off. Do not
-  enable the flag in production until the phase-2 execution engine ships.
+- Cancel and lifecycle cleanup work even while either flag is off. When auto
+  matching is enabled but its DB heartbeat, Publisher subscription, matching
+  Redis Stream, or asset-specific KIS/Binance connection is unhealthy, only
+  new limit Quote/Create fail closed; market orders and FX remain available.
 - `LIMIT_ORDER_ENABLED` accepts exactly `true` / `false` / `1` / `0`
   (trimmed, case-insensitive); omitting it means false. Any other value —
   `yes`, `enabled`, `tru`, an explicitly empty string — **fails startup**
@@ -81,22 +88,27 @@ Limit BUY orders exist as a reservation-only foundation behind
   (`process.env.EXPO_PUBLIC_LIMIT_ORDER_ENABLED`) or the Expo bundler will
   not inline it and the flag always reads as unset.
 
-### Limit order database integration tests (opt-in)
+### Limit order PostgreSQL + Redis integration tests (opt-in)
 
 The limit-order suites that need a real PostgreSQL are gated behind one
 switch, so `pnpm test` stays database-free by default:
 
 ```bash
-LIMIT_ORDER_RESERVATION_DB_INTEGRATION=1 pnpm exec jest \
+LIMIT_ORDER_RESERVATION_DB_INTEGRATION=1 \
+LIMIT_ORDER_AUTO_EXECUTION_INTEGRATION=1 pnpm exec jest \
   src/orders/limit-order-reservation.integration.spec.ts \
-  src/orders/limit-order-create-race.integration.spec.ts
+  src/orders/limit-order-create-race.integration.spec.ts \
+  src/orders/limit-order-transaction-time.integration.spec.ts \
+  src/orders/limit-order-auto-execution.integration.spec.ts
 ```
 
-The race suite runs create against participant exclusion and against season
-ending with a deliberate stagger so BOTH interleavings occur, and reports the
-outcome counts. It requires `prisma migrate deploy` to have been applied; it
-creates and removes its own users/seasons/participants/wallets/assets and
-never deletes anything it did not create.
+The race/time suites observe real PostgreSQL lock-wait state as a deterministic
+barrier. The Redis suite covers pending recovery, advisory-leader takeover,
+price improvement, actual wallet/position/equity/evidence writes, non-fill and
+durable duplicate-event handling. They require applied migrations and local
+PostgreSQL/Redis, create isolated fixture rows/keys, and clean only those rows.
+CI also enables the existing market-order, FX, and service-composed MVP DB
+smokes in this job to guard adjacent flows.
 
 ## STOP / Not Implemented
 
@@ -111,9 +123,9 @@ These are intentionally outside the current implementation and should not be add
 - KIS order/account/balance/fill/deposit/withdrawal APIs, KIS orderbook/hoga, Binance authenticated/order/account/user-data APIs, and real external trading/account integrations.
 - External payment, point, coupon, gifticon, delivery, cash-out, or provider-backed reward fulfillment. App-internal operator/admin reward fulfillment creates `SeasonReward` rows only when fulfilled.
 - Access token blacklist/revocation, server-side session auth, and cookie auth.
-- Matching engine, partial fill, or exact order execute replay. This
-  includes limit-order AUTO-EXECUTION: no limit-order matching service,
-  scheduler job, candle-based evidence, or Redis stream exists in phase 1.
+- Limit sells, partial fills, order-book/volume allocation, historical
+  missed-touch repair, candle-based path B matching, or a public/manual limit
+  execute endpoint.
 - Fake, static, sample, temporary, or fallback business price data.
 
 ## Environment Variables
@@ -204,7 +216,15 @@ BINANCE_WS_SNAPSHOT_THROTTLE_MS=5000
 SCHEDULER_PROVIDER_BINANCE_ENABLED=false
 ```
 
-The streaming service subscribes to public Spot `<symbol>@ticker` streams such as `btcusdt@ticker`, updates an in-memory latest-price cache on every tick, publishes `/api/v1/ws` `asset_ticker` updates for subscribed clients, and writes `asset_price_snapshots` only through `BINANCE_WS_SNAPSHOT_THROTTLE_MS`. It reconnects with backoff, reconnects before Binance's 24-hour connection limit, responds to ping frames with pong payloads, and resubscribes after reconnect. REST 24hr ticker ingestion remains available for fallback/manual/debug use with the scheduler or operator paths, but should not run as the default real-time crypto path while streaming is enabled.
+The streaming service subscribes on one connection to public Spot
+`<symbol>@ticker` streams for display/snapshot behavior and `<symbol>@trade`
+streams for the disabled-by-default limit matcher publisher. Tickers update the
+in-memory latest-price cache, publish `/api/v1/ws` `asset_ticker` updates, and
+write throttled display `asset_price_snapshots`; exact trade messages do not
+enter that throttled path. The connection uses backoff, reconnects before
+Binance's 24-hour limit, responds to ping with pong, and resubscribes. REST
+24hr ticker ingestion remains fallback/manual/debug behavior and should not be
+the default real-time path while streaming is enabled.
 
 KIS long-lived WebSocket streaming starts with the NestJS backend process when `KIS_WEBSOCKET_STREAMING_ENABLED=true` and the provider gates are satisfied:
 
@@ -303,9 +323,21 @@ Serving configuration: `CANDLE_SERVING_CURRENT_DB_FRESHNESS_MS` (default `60000`
 
 WebSocket current/higher candle updates and disabled-by-default canonical reconciliation are implemented by the unit-3 live pipeline. See [`docs/candle-live-operations.md`](docs/candle-live-operations.md) — it also documents the versioned KRX/US market calendar (2025–2026 audited; KRX 2027 provisional until the official KRX year-end notice — readiness reports `MARKET_CALENDAR_COVERAGE_MISSING` for missing years and `MARKET_CALENDAR_PROVISIONAL` for provisional ones, both degraded, and `MARKET_CALENDAR_REQUIRED_FROM_YEAR`/`MARKET_CALENDAR_REQUIRED_THROUGH_YEAR` override the default previous-through-next-year required range, which the 365-day 1d/1w sync lookback depends on; uncovered dates fail safe), stale-Redis fallback semantics, old-generation live bucket recovery, connection liveness (`CANDLE_LIVE_CONNECTION_LIVENESS_TIMEOUT_MS`, supervisor watchdog) vs trade freshness (`CANDLE_LIVE_TRADE_STALE_THRESHOLD_MS`, readiness only; `CANDLE_LIVE_STALE_THRESHOLD_MS` is a deprecated fallback for both), the shared frontend WebSocket, the release fixture smoke (`CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm run smoke:candle-fixture`), the real-provider long-smoke harness (`pnpm run smoke:candle-live`), and smoke commit traceability (`SMOKE_GIT_COMMIT`, `SMOKE_ALLOW_DIRTY`, NOT_RUN reports via `pnpm run smoke:candle-report`).
 
-CI: `.github/workflows/ci.yml` gates every PR and `main` push with three jobs — **Backend quality** (`pnpm run lint:candles:check`, `pnpm run format:candles:check`, `pnpm run typecheck`, `pnpm run build`, `pnpm test`), **Frontend quality** (`npm run typecheck`, `npm test`; the Expo app has no build script — typecheck is the compile gate), and **Candle fixture integration** (PostgreSQL+Redis services, `prisma migrate deploy`, the fixture smoke with artifact commit/dirty verification). The candle layer is the required lint/format gate; repository-wide lint debt outside it is known and not yet gated. Long real-provider smokes are never run in CI — see the runbook in [`docs/candle-live-operations.md`](docs/candle-live-operations.md).
+CI: `.github/workflows/ci.yml` gates every PR and `main` push with four jobs —
+**Backend quality** (`pnpm run lint:candles:check`,
+`pnpm run format:candles:check`, `pnpm run typecheck`, `pnpm run build`,
+`pnpm test`), **Frontend quality** (`npm run typecheck`, `npm test`; the Expo
+app has no build script — typecheck is the compile gate), **Limit order
+PostgreSQL + Redis integration** (migrations, reservation/time/race/path-A and
+market-order/FX/MVP regression smokes), and **Candle fixture integration**
+(PostgreSQL+Redis services, `prisma migrate deploy`, fixture smoke with commit
+and dirty-tree verification). The candle layer is the required lint/format
+gate; repository-wide lint debt outside it is known and not yet gated. Long
+real-provider smokes are never run in CI — see the runbook in
+[`docs/candle-live-operations.md`](docs/candle-live-operations.md).
 
 Important operational behavior:
+
 - KIS REST rate limiting is active on the actual `KisAuthClient` OAuth and `KisQuoteClient` quote request paths. It does not affect Binance REST or either provider's WebSocket traffic. Redis atomically reserves account-wide slots using Redis server time; if Redis is unavailable, each process continues with a conservative FIFO in-process limiter instead of calling KIS without limits. Multi-instance fallback cannot enforce a shared account limit and emits one outage warning until recovery.
 - Single-flight uses local Promise sharing plus token-owned Redis locks, bounded cache polling, double-check after acquisition, and periodic ownership renewal. It is intended for bounded serving loads only; minute-scale historical backfills require a later job queue/backfill-lock design.
 - Single-flight snapshots the asset cache generation once. Local Promise and distributed lock identities include that generation, and the final cache write is one Lua operation that verifies both the owner token and unchanged generation. A successful stale loader result may be returned to its caller but is never written into a newer generation.
@@ -381,11 +413,11 @@ Checkpointed sync of the persisted candle feeds is used by database-mode HTTP se
 
 Providers per asset type and feed:
 
-| Asset type | 5m | 1d / 1w | sourceProvider |
-| --- | --- | --- | --- |
-| domestic_stock | KIS `inquire-time-dailychartprice` (2-1 service) | KIS `inquire-daily-itemchartprice` (`FHKST03010100`) | `kis_domestic_minute` / `kis_domestic_period` |
-| us_stock | KIS `inquire-time-itemchartprice` NMIN=5 (2-2 service) | KIS `dailyprice` (`HHDFS76240000`) | `kis_overseas_minute` / `kis_overseas_period` |
-| crypto | Binance Spot `GET /api/v3/klines` | Binance Spot `GET /api/v3/klines` | `binance_klines` |
+| Asset type     | 5m                                                     | 1d / 1w                                              | sourceProvider                                |
+| -------------- | ------------------------------------------------------ | ---------------------------------------------------- | --------------------------------------------- |
+| domestic_stock | KIS `inquire-time-dailychartprice` (2-1 service)       | KIS `inquire-daily-itemchartprice` (`FHKST03010100`) | `kis_domestic_minute` / `kis_domestic_period` |
+| us_stock       | KIS `inquire-time-itemchartprice` NMIN=5 (2-2 service) | KIS `dailyprice` (`HHDFS76240000`)                   | `kis_overseas_minute` / `kis_overseas_period` |
+| crypto         | Binance Spot `GET /api/v3/klines`                      | Binance Spot `GET /api/v3/klines`                    | `binance_klines`                              |
 
 Storage policy: only `5m`, `1d`, and `1w` are persisted (5m ≈ 35 days, 1d ≈ 1 year/max ~400 rows, 1w ≈ 1 year/max ~60 rows). `1m` is never stored; `15m`/`30m`/`1h`/`4h` are derived from stored 5m at read time and never stored. Daily/weekly candles store provider-native rows — they are never rebuilt from 5m data.
 
@@ -412,11 +444,11 @@ Manual Ops execution (no unauthenticated endpoint, no scheduler):
 await opsJobRunnerService.runMarketCandleSyncJob({
   trigger: OpsJobTrigger.operator,
   requestedBy: 'ops@example.com',
-  dryRun: false,            // true: plan only — no provider calls, no candle/checkpoint writes
-  assetIds: undefined,      // default: all active supported assets
-  assetTypes: ['crypto'],   // domestic_stock | us_stock | crypto
+  dryRun: false, // true: plan only — no provider calls, no candle/checkpoint writes
+  assetIds: undefined, // default: all active supported assets
+  assetTypes: ['crypto'], // domestic_stock | us_stock | crypto
   targets: ['5m', '1d', '1w'],
-  mode: 'incremental',      // initial | incremental | repair (repair needs from/to)
+  mode: 'incremental', // initial | incremental | repair (repair needs from/to)
   from: undefined,
   to: undefined,
   resume: true,
@@ -571,7 +603,13 @@ runner. With no `MARKET_CANDLES_DB_SMOKE=1`, Jest reports the DB test as
 skipped instead of passing a no-op test body.
 
 These tests create isolated rows and clean them up. They do not call external providers.
-`MVP_FLOW_DB_SMOKE=1` is a service-composed real PostgreSQL smoke for the current MVP user flow: Auth signup/login/refresh, season join, wallets, admin_manual FX/asset/price test fixtures, assets, FX quote/execute, orders quote/create/execute, positions, records, home, ranking unavailable, and logout-all. It uses test-only fixture rows and is not provider ingestion, scheduler, settlement, reward, seed, or sample business data.
+`MVP_FLOW_DB_SMOKE=1` is a service-composed real PostgreSQL smoke for the
+current MVP user flow: Auth signup/login/refresh, season join, wallets,
+secret-free eligible provider-source fixture rows, assets, durable FX
+quote/execute, durable market-order quote/create-immediate-execute, positions,
+records, home, ranking unavailable, and logout-all. It uses isolated test rows
+and does not call an external provider, scheduler, settlement, reward, seed,
+or sample-business-data path.
 `OPS_JOB_LOCK_DB_SMOKE=1` verifies real PostgreSQL `OpsJobLock` concurrency, active-lock blocking, expired takeover, and release/reacquire semantics against an explicit test DB. It is disabled by default.
 
 ## Docs Entry Point

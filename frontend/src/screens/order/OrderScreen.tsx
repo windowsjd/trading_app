@@ -26,13 +26,14 @@ import { isTradableMarketStatus } from '../../features/asset/mapper';
 import {
   quoteOrder,
   createOrder,
-  type CreateOrderDto,
   type OrderQuoteDto,
 } from '../../features/order/api';
 import {
-  getWallets,
-  type WalletCurrency,
-} from '../../features/wallet/api';
+  captureOrderSuccess,
+  clearOrderSuccess,
+  EMPTY_ORDER_SUCCESS_STATE,
+} from '../../features/order/successState';
+import { getWallets, type WalletCurrency } from '../../features/wallet/api';
 import {
   getWalletAvailableAmount,
   getWalletBalanceAmount,
@@ -56,7 +57,11 @@ import {
   mapOrderErrorCodeToBlockedReason,
 } from '../../services/api/errorMapper';
 import { createIdempotencyKey } from '../../utils/idempotency';
-import { formatCurrency, formatMoney, getAssetNameDisplay } from '../../utils/format';
+import {
+  formatCurrency,
+  formatMoney,
+  getAssetNameDisplay,
+} from '../../utils/format';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -169,7 +174,11 @@ export default function OrderScreen({ route, navigation }: Props) {
   >(null);
   const [orderDomainState, setOrderDomainState] =
     useState<OrderDomainState | null>(null);
-  const [successData, setSuccessData] = useState<CreateOrderDto | null>(null);
+  const [successState, setSuccessState] = useState(EMPTY_ORDER_SUCCESS_STATE);
+  // Create clears the active quote so stale inputs cannot be re-submitted,
+  // while this immutable snapshot remains available to the success sheet.
+  const successData = successState.data;
+  const successQuoteData = successState.quote;
   const [quoteNow, setQuoteNow] = useState(() => Date.now());
   const latestQuoteInputRef = useRef({
     assetId,
@@ -241,7 +250,7 @@ export default function OrderScreen({ route, navigation }: Props) {
       setOrderDomainState(null);
       setFieldError(null);
       setDomainError(null);
-      setSuccessData(null);
+      setSuccessState(clearOrderSuccess());
     },
     onError: (error, variables) => {
       const latestInput = latestQuoteInputRef.current;
@@ -274,11 +283,13 @@ export default function OrderScreen({ route, navigation }: Props) {
     onSuccess: async (result) => {
       if (!isOrderSuccess(result)) {
         setOrderDomainState('order_failed');
-        setDomainError('주문 결과를 확인할 수 없습니다. 잠시 후 다시 확인해주세요.');
+        setDomainError(
+          '주문 결과를 확인할 수 없습니다. 잠시 후 다시 확인해주세요.',
+        );
         return;
       }
 
-      setSuccessData(result);
+      setSuccessState(captureOrderSuccess(result, quoteData));
       setQuoteData(null);
       setExecuteIdempotencyKey(null);
       setOrderDomainState(null);
@@ -286,7 +297,9 @@ export default function OrderScreen({ route, navigation }: Props) {
       setDomainError(null);
 
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.asset.detail(assetId) }),
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.asset.detail(assetId),
+        }),
         queryClient.invalidateQueries({
           queryKey: QUERY_KEYS.position.list({ assetId, limit: 20, offset: 0 }),
         }),
@@ -336,7 +349,7 @@ export default function OrderScreen({ route, navigation }: Props) {
     setQuoteData(null);
     setExecuteIdempotencyKey(null);
     setOrderDomainState(null);
-    setSuccessData(null);
+    setSuccessState(clearOrderSuccess());
     quoteMutation.reset();
     createMutation.reset();
   };
@@ -357,8 +370,7 @@ export default function OrderScreen({ route, navigation }: Props) {
   );
 
   const quoteExpiresInSeconds = useMemo(
-    () =>
-      quoteData ? getOrderQuoteExpiresInSeconds(quoteData, quoteNow) : 0,
+    () => (quoteData ? getOrderQuoteExpiresInSeconds(quoteData, quoteNow) : 0),
     [quoteData, quoteNow],
   );
 
@@ -375,42 +387,41 @@ export default function OrderScreen({ route, navigation }: Props) {
   const canTradeSeason = seasonState === 'season_active_joined';
   const positionQuantity = getPositionQuantity(positionQuery.data, assetId);
 
-  const seasonBlockedReason =
-    seasonQuery.isLoading
-      ? '시즌 상태를 확인하는 중입니다.'
-      : seasonQuery.isError || !seasonQuery.data
+  const seasonBlockedReason = seasonQuery.isLoading
+    ? '시즌 상태를 확인하는 중입니다.'
+    : seasonQuery.isError || !seasonQuery.data
       ? '시즌 상태를 확인할 수 없어 주문을 잠시 막았습니다.'
       : seasonState === 'season_active_not_joined'
-      ? '시즌에 참가해야 거래할 수 있습니다.'
-      : seasonState === 'season_ended_unsettled'
-      ? '정산 중에는 거래할 수 없습니다.'
-      : !canTradeSeason
-      ? '현재 거래 가능한 시즌이 아닙니다.'
-      : null;
+        ? '시즌에 참가해야 거래할 수 있습니다.'
+        : seasonState === 'season_ended_unsettled'
+          ? '정산 중에는 거래할 수 없습니다.'
+          : !canTradeSeason
+            ? '현재 거래 가능한 시즌이 아닙니다.'
+            : null;
 
   const assetHardBlockedReason =
     asset && !asset.isActive ? '비활성 자산입니다.' : null;
 
   const assetWarningReason =
     asset && !asset.tradable
-      ? asset.tradeBlockedReason ??
-        '거래 제한 가능성이 있습니다. 서버 견적에서 최종 확인됩니다.'
+      ? (asset.tradeBlockedReason ??
+        '거래 제한 가능성이 있습니다. 서버 견적에서 최종 확인됩니다.')
       : asset && !isTradableMarketStatus(asset.marketStatus)
-      ? '장 상태는 서버 견적에서 최종 확인됩니다.'
-      : asset && !isPriceAvailable(price)
-      ? '현재 화면 시세가 없어 비율 수량 계산은 제한됩니다. 견적은 서버가 최종 판정합니다.'
-      : asset && price?.priceKrwState && price.priceKrwState !== 'available'
-      ? 'KRW 환산 시세를 사용할 수 없습니다. 견적은 서버가 최종 판정합니다.'
-      : null;
+        ? '장 상태는 서버 견적에서 최종 확인됩니다.'
+        : asset && !isPriceAvailable(price)
+          ? '현재 화면 시세가 없어 비율 수량 계산은 제한됩니다. 견적은 서버가 최종 판정합니다.'
+          : asset && price?.priceKrwState && price.priceKrwState !== 'available'
+            ? 'KRW 환산 시세를 사용할 수 없습니다. 견적은 서버가 최종 판정합니다.'
+            : null;
 
   const sellBlockedReason =
     side === 'sell' && positionQuery.isLoading
       ? '보유 수량을 확인하는 중입니다.'
       : side === 'sell' && positionQuery.isError
-      ? '보유 수량을 확인할 수 없어 매도할 수 없습니다.'
-      : side === 'sell' && Number(positionQuantity) <= 0
-      ? '보유 수량이 없어 매도할 수 없습니다.'
-      : null;
+        ? '보유 수량을 확인할 수 없어 매도할 수 없습니다.'
+        : side === 'sell' && Number(positionQuantity) <= 0
+          ? '보유 수량이 없어 매도할 수 없습니다.'
+          : null;
 
   const preOrderBlockedReason =
     seasonBlockedReason ?? assetHardBlockedReason ?? sellBlockedReason;
@@ -532,7 +543,7 @@ export default function OrderScreen({ route, navigation }: Props) {
     setQuoteData(null);
     setExecuteIdempotencyKey(null);
     setOrderDomainState(null);
-    setSuccessData(null);
+    setSuccessState(clearOrderSuccess());
     createMutation.reset();
 
     quoteMutation.mutate({
@@ -643,16 +654,21 @@ export default function OrderScreen({ route, navigation }: Props) {
           {assetNameDisplay.secondary ? (
             <Text style={styles.helper}>{assetNameDisplay.secondary}</Text>
           ) : null}
-          <Text style={styles.helper}>주문 방향 {side === 'buy' ? '매수' : '매도'}</Text>
+          <Text style={styles.helper}>
+            주문 방향 {side === 'buy' ? '매수' : '매도'}
+          </Text>
           <Text style={styles.helper}>
             현재가 {formatMoney(price?.currentPrice, asset.priceCurrency)}
           </Text>
           <Text style={styles.helper}>보유 수량 {positionQuantity}</Text>
           <Text style={styles.helper}>
-            가격 통화 {asset.priceCurrency} · 결제 통화 {asset.settlementCurrency}
+            가격 통화 {asset.priceCurrency} · 결제 통화{' '}
+            {asset.settlementCurrency}
           </Text>
           {isUsdSettlement ? (
-            <Text style={styles.helper}>이 주문은 USD Wallet 잔액을 사용합니다.</Text>
+            <Text style={styles.helper}>
+              이 주문은 USD Wallet 잔액을 사용합니다.
+            </Text>
           ) : null}
           <Text style={styles.helper}>시장 상태 {asset.marketStatus}</Text>
           <Text style={styles.helper}>
@@ -744,8 +760,8 @@ export default function OrderScreen({ route, navigation }: Props) {
                   placeholder="지정가 가격 입력"
                 />
                 <Text style={styles.helper}>
-                  지정가 매수 주문은 현재 단계에서 미체결 상태로 등록되며,
-                  주문 금액과 수수료만큼 현금이 예약됩니다.
+                  지정가 매수 주문은 제출 시 미체결 상태로 등록되며, 주문 금액과
+                  수수료만큼 현금이 예약됩니다.
                 </Text>
               </>
             ) : null}
@@ -804,11 +820,14 @@ export default function OrderScreen({ route, navigation }: Props) {
             <Text style={styles.errorText}>{inputErrorMessage}</Text>
           ) : null}
 
-          {domainError ? <Text style={styles.errorText}>{domainError}</Text> : null}
+          {domainError ? (
+            <Text style={styles.errorText}>{domainError}</Text>
+          ) : null}
 
           {isUsdSettlement &&
           domainError &&
-          domainError === getOrderDomainErrorMessage(ERROR_CODE.INSUFFICIENT_BALANCE) ? (
+          domainError ===
+            getOrderDomainErrorMessage(ERROR_CODE.INSUFFICIENT_BALANCE) ? (
             <Pressable
               style={styles.retryButton}
               onPress={() =>
@@ -831,34 +850,39 @@ export default function OrderScreen({ route, navigation }: Props) {
           ) : quoteDisplay ? (
             <>
               <Text style={styles.helper}>견적 ID {quoteDisplay.quoteId}</Text>
-              {quoteData?.limitPrice ? (
-                <Text style={styles.helper}>
-                  지정가 {formatCurrency(quoteData.limitPrice, quoteData.currencyCode)}
-                </Text>
-              ) : null}
-              <Text style={styles.helper}>예상 체결가 {quoteDisplay.price}</Text>
-              <Text style={styles.helper}>수량 {quoteDisplay.quantity}</Text>
-              <Text style={styles.helper}>총 주문 금액 {quoteDisplay.grossAmount}</Text>
-              <Text style={styles.helper}>수수료율 {quoteDisplay.feeRate}</Text>
-              <Text style={styles.helper}>수수료 {quoteDisplay.feeAmount}</Text>
-              <Text style={styles.helper}>예상 순금액 {quoteDisplay.netAmount}</Text>
-              <Text style={styles.helper}>
-                주문 전 잔액 {quoteDisplay.walletBalanceBefore}
-              </Text>
-              <Text style={styles.helper}>
-                주문 후 예상 잔액 {quoteDisplay.estimatedWalletBalanceAfter}
-              </Text>
-              <Text style={styles.helper}>
-                주문 전 포지션 {quoteDisplay.positionQuantityBefore}
-              </Text>
-              <Text style={styles.helper}>
-                주문 후 예상 포지션 {quoteDisplay.estimatedPositionQuantityAfter}
-              </Text>
-              {quoteData?.reservedAmount ? (
+              {quoteData?.orderType === 'limit' ? (
                 <>
                   <Text style={styles.helper}>
+                    지정가{' '}
+                    {formatCurrency(
+                      quoteData.limitPrice,
+                      quoteData.currencyCode,
+                    )}
+                  </Text>
+                  <Text style={styles.helper}>
+                    수량 {quoteDisplay.quantity}
+                  </Text>
+                  <Text style={styles.helper}>
+                    예상 주문금액{' '}
+                    {formatCurrency(
+                      quoteData.quotedGrossAmount ?? quoteData.grossAmount,
+                      quoteData.currencyCode,
+                    )}
+                  </Text>
+                  <Text style={styles.helper}>
+                    예상 수수료{' '}
+                    {formatCurrency(
+                      quoteData.quotedFeeAmount ?? quoteData.feeAmount,
+                      quoteData.currencyCode,
+                    )}
+                  </Text>
+                  <Text style={styles.helper}>
                     예약 예정 금액{' '}
-                    {formatCurrency(quoteData.reservedAmount, quoteData.currencyCode)}
+                    {formatCurrency(
+                      quoteData.quotedReservedAmount ??
+                        quoteData.reservedAmount,
+                      quoteData.currencyCode,
+                    )}
                   </Text>
                   <Text style={styles.helper}>
                     기존 예약금{' '}
@@ -881,24 +905,73 @@ export default function OrderScreen({ route, navigation }: Props) {
                       quoteData.currencyCode,
                     )}
                   </Text>
+                  <Text style={styles.helper}>
+                    {quoteData.executionPolicy?.autoExecutionEnabled
+                      ? '유효한 실시간 체결가격이 지정가 이하로 처리되면 전량 자동 체결됩니다. 주문장 유동성과 거래량은 반영하지 않습니다.'
+                      : '현재 단계에서는 미체결 상태로 등록됩니다.'}
+                  </Text>
                 </>
-              ) : null}
-              <Text style={styles.helper}>KRW 순금액 {quoteDisplay.krwNetAmount}</Text>
-              <Text style={styles.helper}>만료 시각 {quoteDisplay.expiresAt}</Text>
+              ) : (
+                <>
+                  <Text style={styles.helper}>
+                    예상 체결가 {quoteDisplay.price}
+                  </Text>
+                  <Text style={styles.helper}>
+                    수량 {quoteDisplay.quantity}
+                  </Text>
+                  <Text style={styles.helper}>
+                    총 주문 금액 {quoteDisplay.grossAmount}
+                  </Text>
+                  <Text style={styles.helper}>
+                    수수료율 {quoteDisplay.feeRate}
+                  </Text>
+                  <Text style={styles.helper}>
+                    수수료 {quoteDisplay.feeAmount}
+                  </Text>
+                  <Text style={styles.helper}>
+                    예상 순금액 {quoteDisplay.netAmount}
+                  </Text>
+                  <Text style={styles.helper}>
+                    주문 전 잔액 {quoteDisplay.walletBalanceBefore}
+                  </Text>
+                  <Text style={styles.helper}>
+                    주문 후 예상 잔액 {quoteDisplay.estimatedWalletBalanceAfter}
+                  </Text>
+                  <Text style={styles.helper}>
+                    주문 전 포지션 {quoteDisplay.positionQuantityBefore}
+                  </Text>
+                  <Text style={styles.helper}>
+                    주문 후 예상 포지션{' '}
+                    {quoteDisplay.estimatedPositionQuantityAfter}
+                  </Text>
+                  <Text style={styles.helper}>
+                    KRW 순금액 {quoteDisplay.krwNetAmount}
+                  </Text>
+                  <Text style={styles.helper}>
+                    허용 변동 {quoteDisplay.maxChangeBps}bps
+                  </Text>
+                  <Text style={styles.helper}>
+                    자산 가격 소스 {quoteDisplay.assetPriceSource}
+                  </Text>
+                </>
+              )}
+              <Text style={styles.helper}>
+                만료 시각 {quoteDisplay.expiresAt}
+              </Text>
               <Text style={styles.helper}>
                 남은 시간 {quoteExpiresInSeconds}초
               </Text>
               <Text style={styles.helper}>
-                허용 변동 {quoteDisplay.maxChangeBps}bps
+                환율 소스 {quoteDisplay.fxRateSource}
               </Text>
-              <Text style={styles.helper}>자산 가격 소스 {quoteDisplay.assetPriceSource}</Text>
-              <Text style={styles.helper}>환율 소스 {quoteDisplay.fxRateSource}</Text>
               {quoteExpired ? (
                 <Text style={styles.errorText}>{QUOTE_EXPIRED_MESSAGE}</Text>
               ) : null}
             </>
           ) : (
-            <Text style={styles.helper}>견적 확인 후 주문을 실행할 수 있습니다.</Text>
+            <Text style={styles.helper}>
+              견적 확인 후 주문을 실행할 수 있습니다.
+            </Text>
           )}
 
           {viewState === 'order_requote_required' ? (
@@ -917,10 +990,10 @@ export default function OrderScreen({ route, navigation }: Props) {
               viewState === 'order_quote_loading'
                 ? 'loading'
                 : preOrderBlockedReason || viewState === 'order_submitting'
-                ? 'blocked'
-                : inputInvalidReason
-                ? 'disabled'
-                : 'enabled'
+                  ? 'blocked'
+                  : inputInvalidReason
+                    ? 'disabled'
+                    : 'enabled'
             }
             onPress={requestQuote}
             style={styles.flex}
@@ -933,8 +1006,8 @@ export default function OrderScreen({ route, navigation }: Props) {
               viewState === 'order_submitting'
                 ? 'loading'
                 : canExecute
-                ? 'enabled'
-                : 'disabled'
+                  ? 'enabled'
+                  : 'disabled'
             }
             onPress={executeQuote}
             style={styles.flex}
@@ -947,21 +1020,23 @@ export default function OrderScreen({ route, navigation }: Props) {
         payload={successData}
         // Supplies the quote-time estimates for an unfilled limit buy; the
         // order row itself carries no gross/fee/net until it fills.
-        quote={quoteData ?? null}
-        onClose={() => setSuccessData(null)}
+        quote={successQuoteData}
+        onClose={() => {
+          setSuccessState(clearOrderSuccess());
+        }}
         onGoAssetDetail={() => {
-          setSuccessData(null);
+          setSuccessState(clearOrderSuccess());
           navigation.goBack();
         }}
         onGoOrderHistory={() => {
-          setSuccessData(null);
+          setSuccessState(clearOrderSuccess());
           rootNavigation.navigate('MainTabs', {
             screen: 'RecordTab',
             params: { screen: 'RecordSeasonList' },
           });
         }}
         onGoHome={() => {
-          setSuccessData(null);
+          setSuccessState(clearOrderSuccess());
           rootNavigation.reset({
             index: 0,
             routes: [

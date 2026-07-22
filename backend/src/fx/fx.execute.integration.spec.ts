@@ -10,8 +10,8 @@ describe('FxService.execute DB integration', () => {
       runDbIntegrationPrepare();
 
       const result = spawnSync(
-        getNpmCommand(),
-        ['exec', '--', 'tsx', '-e', FX_EXECUTE_DB_RUNNER],
+        getPnpmCommand(),
+        ['tsx', '-e', FX_EXECUTE_DB_RUNNER],
         {
           cwd: process.cwd(),
           env: process.env,
@@ -39,13 +39,13 @@ describe('FxService.execute DB integration', () => {
   );
 });
 
-function getNpmCommand() {
-  return process.platform === 'win32' ? 'npm.cmd' : 'npm';
+function getPnpmCommand() {
+  return process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
 }
 
 function runDbIntegrationPrepare() {
   const result = spawnSync(
-    getNpmCommand(),
+    getPnpmCommand(),
     ['run', '--silent', 'test:db:prepare'],
     {
       cwd: process.cwd(),
