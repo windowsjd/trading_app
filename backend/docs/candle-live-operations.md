@@ -616,6 +616,25 @@ The subscription build is also where each asset's
 Those values ride on the normalized trade event, so the limit-order publisher
 performs no per-trade database query.
 
+### Shared limit-order readiness is lease-backed on read and write
+
+When shared readiness is enabled, the shard-0 live-candle owner lease
+(`candles:live:v1:owner:<provider>:0`) is the authority for the cross-instance
+limit-order route. Publishing first exchanges the live lease token for a
+monotonic fencing epoch, and every meta/asset write rechecks lease and epoch in
+Redis. Reading performs a separate atomic proof: meta, actual owner lease,
+epoch-holder, current epoch, and the current generation's asset record must all
+agree. Lease expiry therefore invalidates readiness immediately; the readiness
+TTL is not an authorization grace period and wall clocks do not decide owner.
+
+On renewal failure the supervisor clears the registry's `ownerLease` before
+closing the socket. The next publisher pass compare-and-deletes only its own
+stored owner/generation/epoch. Token rotation and fenced writes use the same
+cleanup; a late old-owner cleanup cannot remove a takeover's newer epoch.
+Operationally, `LIMIT_ORDER_PROVIDER_OWNER_LEASE_LOST` means verify the real
+owner lease/renewal path, while `_READINESS_EPOCH_MISMATCH` means verify the
+epoch-holder/current-epoch chain. Do not extend TTLs to mask either failure.
+
 ### Path B dependency
 
 The confirmed 5-minute candle safety net
@@ -623,4 +642,8 @@ The confirmed 5-minute candle safety net
 `market_candles` rows written by the finalizer. If the finalizer defers a
 bucket to REST repair, path B simply does not see that window until
 reconciliation restores it — it never reads live Redis candle state, an open
-bucket, or a REST preview.
+bucket, or a REST preview. Its missing-window completion heartbeat is separate
+from the existing-row scan heartbeat, and a latest completion failure blocks
+new limit orders immediately. Deferred rows are revision-aware through
+`MarketCandle.ingestSeq`; a corrected candle can reactivate a permanent entry
+without deleting immutable evidence from the earlier revision.

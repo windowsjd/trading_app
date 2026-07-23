@@ -151,6 +151,27 @@ export class LimitOrderCandleReconciliationHealthService {
           'The limit-order window completion pass has never completed successfully.',
       };
     }
+    // A failed pass is an outage NOW, even when the previous success is still
+    // inside the age window. Looking only at the success timestamp would keep
+    // admitting new orders for up to `completionHealthMaxAgeMs` after the
+    // supervisor just proved it could not account for missing windows. The
+    // failure counter/error are the normal durable signal; runAt > successfulAt
+    // is the fail-closed fallback when persisting the detailed failure itself
+    // failed after markWindowCompletionStarted() committed.
+    const completionRunFailed =
+      checkpoint.windowCompletionConsecutiveFailures > 0 ||
+      checkpoint.windowCompletionErrorCode !== null ||
+      (checkpoint.lastWindowCompletionRunAt !== null &&
+        checkpoint.lastWindowCompletionRunAt.getTime() >
+          completionHeartbeat.getTime());
+    if (completionRunFailed) {
+      return {
+        code: LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.completionUnavailable,
+        reason: `The latest window completion pass failed (${
+          checkpoint.windowCompletionErrorCode ?? 'completion did not finish'
+        }, ${checkpoint.windowCompletionConsecutiveFailures} consecutive failure(s)).`,
+      };
+    }
     const completionAge = now.getTime() - completionHeartbeat.getTime();
     if (completionAge > this.config.completionHealthMaxAgeMs) {
       return {

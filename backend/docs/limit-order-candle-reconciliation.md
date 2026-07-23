@@ -548,11 +548,16 @@ LIMIT_ORDER_CANDLE_RECONCILIATION_WATERMARK_SAFETY_LAG_MS=900000
 # rules" above; an in-flight write transaction older than the observation holds
 # the position back exactly, whenever the role can read pg_stat_activity.
 LIMIT_ORDER_CANDLE_RECONCILIATION_INGEST_SETTLE_GRACE_MS=60000
+LIMIT_ORDER_CANDLE_COMPLETION_WINDOW_BATCH_SIZE=24
+LIMIT_ORDER_CANDLE_COMPLETION_REPAIR_BUDGET_PER_SWEEP=5
+LIMIT_ORDER_CANDLE_ASSET_FINALIZER_STALE_MS=1800000
+LIMIT_ORDER_CANDLE_MAX_ASSET_DEFERRED_BACKLOG=10
 LIMIT_ORDER_CANDLE_RECONCILIATION_DEFERRED_RETRY_BATCH_SIZE=50
 LIMIT_ORDER_CANDLE_RECONCILIATION_DEFERRED_RETRY_BASE_DELAY_MS=60000
 LIMIT_ORDER_CANDLE_RECONCILIATION_DEFERRED_RETRY_MAX_DELAY_MS=1800000
 LIMIT_ORDER_CANDLE_RECONCILIATION_DEFERRED_MAX_ATTEMPTS=50
 LIMIT_ORDER_CANDLE_RECONCILIATION_HEALTH_MAX_AGE_MS=300000
+LIMIT_ORDER_CANDLE_COMPLETION_HEALTH_MAX_AGE_MS=300000
 LIMIT_ORDER_CANDLE_RECONCILIATION_MAX_DEFERRED_BACKLOG=50
 LIMIT_ORDER_CANDLE_RECONCILIATION_MAX_DEFERRED_AGE_MS=3600000
 LIMIT_ORDER_CANDLE_RECONCILIATION_MAX_RESERVATION_MISMATCH=1
@@ -575,9 +580,15 @@ safety net under live fills stopped" without reading logs.
 | --- | --- |
 | `LIMIT_ORDER_CANDLE_RECONCILIATION_UNAVAILABLE` | no checkpoint established, no completed run yet, or a non-gap degraded reason |
 | `LIMIT_ORDER_CANDLE_RECONCILIATION_STALE` | `lastSuccessfulRunAt` older than `..._HEALTH_MAX_AGE_MS` |
-| `LIMIT_ORDER_CANDLE_RECONCILIATION_BACKLOG_EXCEEDED` | deferred backlog over `..._MAX_DEFERRED_BACKLOG`, any `permanent` row, or oldest deferral older than `..._MAX_DEFERRED_AGE_MS` |
+| `LIMIT_ORDER_CANDLE_COMPLETION_UNAVAILABLE` | completion never succeeded, or the latest pass failed/incompletely recorded after an earlier success |
+| `LIMIT_ORDER_CANDLE_COMPLETION_STALE` | last successful completion older than `..._COMPLETION_HEALTH_MAX_AGE_MS` |
+| `LIMIT_ORDER_CANDLE_RECONCILIATION_BACKLOG_EXCEEDED` | emergency total deferred+permanent queue over `..._MAX_DEFERRED_BACKLOG`; this is the only normal backlog condition that blocks every asset |
 | `LIMIT_ORDER_CANDLE_RECONCILIATION_GAP_DETECTED` | `gapDetectedAt` set |
 | `LIMIT_ORDER_CANDLE_RESERVATION_MISMATCH` | `reservationMismatchCount` over `..._MAX_RESERVATION_MISMATCH` |
+| `LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED` | requested asset's completion checkpoint has a retention gap |
+| `LIMIT_ORDER_CANDLE_FINALIZER_STALE` | requested asset's first pending window is older than `..._ASSET_FINALIZER_STALE_MS` |
+| `LIMIT_ORDER_CANDLE_ASSET_BACKLOG_EXCEEDED` | requested asset's deferred count or oldest deferred age exceeds its limit |
+| `LIMIT_ORDER_CANDLE_ASSET_PERMANENT_FAILURE` | requested asset has at least one permanent deferred row |
 
 All are HTTP 503 in the standard `{ success: false, error: { code, message } }`
 envelope.
@@ -586,9 +597,53 @@ envelope.
 inert), a quiet market, a sweep with no candle to process, market orders, FX,
 Cancel, and season-end / participant-exclusion cleanup.
 
-`lastSuccessfulRunAt` is written on every completed sweep including one that
-found nothing to do, so a quiet market never trips the staleness check — only a
-scheduler that stopped ticking does.
+`lastSuccessfulRunAt` is the row-scan heartbeat and is written on every
+completed sweep including one that found nothing to do. Window completion has
+separate run/success/error/failure-count fields. A failed latest completion is
+unavailable immediately; an older success does not buy an additional grace
+period. One healthy pass updates its success timestamp and clears the error and
+failure count. Thus a quiet market remains healthy, while either scheduler
+stage stopping or failing is visible.
+
+An asset with no submitted path-B order may have no completion checkpoint and
+still pass. Create inserts the first checkpoint in the same transaction as the
+order, anchored immediately before `candleMatchingEligibleFrom`; rollback
+removes both, and the `(asset_id, interval)` unique key makes concurrent
+creates safe. A submitted path-B order with no checkpoint is unavailable.
+
+## Deferred revision lifecycle and migration
+
+`MarketCandle.ingestSeq` is the candle revision identity.
+`limit_order_deferred_candles.candle_ingest_seq` records the exact revision the
+queue entry covers. The forward scan excludes a row only when the stored queue
+revision is greater than or equal to the current candle revision. Equal
+revision failure increments attempts while preserving `firstDeferredAt`; a
+higher revision atomically replaces asset/interval/window/error metadata,
+resets attempts and age, and reactivates `permanent` to `deferred`; a lower
+late callback is a strict no-op. Retry reloads the candle and fails closed if
+its current revision regressed. Evidence remains immutable per
+`(marketCandleId, candleIngestSeq)`, while the processed row advances to the
+latest revision.
+
+Migration
+`20260723230000_add_limit_order_deferred_candle_revision_and_completion_health`
+is additive. It adds the nullable revision and separate completion-health
+columns plus revision/asset query indexes. Existing queue rows whose candle
+still exists are deterministically backfilled from its current `ingest_seq`.
+An orphan row stays nullable and in its existing state because its enqueue-time
+revision cannot be reconstructed; `NULL` is treated as unknown/lowest, so any
+future concrete revision replaces it. The candle-evidence composite unique
+index keeps the already-deployed truncated PostgreSQL name through Prisma
+`map: "limit_order_candle_evidences_market_candle_id_candle_inges_key"`;
+this prevents a duplicate/rename drift.
+
+Roll out by deploying migrations first, verifying migrate status/diff, then
+deploying the binary with flags still false. Keep `LIMIT_ORDER_ENABLED=false`
+while starting path A/shared readiness and path B; after both path-B
+heartbeats have succeeded and per-asset checkpoints/backlogs are healthy,
+enable new limit Quote/Create traffic.
+Rollback is flag/application rollback only: do not edit or reverse applied
+migrations, and do not delete queue/checkpoint rows.
 
 ## Monitoring
 
@@ -597,12 +652,14 @@ scheduler that stopped ticking does.
   deferredCandles / retriedCandles / recoveredCandles / permanentCandles`, the
   swept window, the current `watermarkOpenTime` / `watermarkCandleId`, and
   `gapDetected` / `degradedReason`;
-- **watermark progress** is the primary liveness signal: a watermark that stops
-  advancing while candles keep closing means the sweep is stuck, even if the
-  job keeps reporting success;
-- **deferred backlog size and oldest deferral age** from
-  `limit_order_deferred_candles`; any row with `status='permanent'` needs an
-  operator;
+- **row-scan and completion success heartbeats** are independent. Alert on a
+  failed latest completion immediately and on either success age threshold;
+- **watermark progress** remains a row-scan progress signal: a watermark that
+  stops advancing while candles keep closing means the sweep is stuck;
+- **deferred backlog count and oldest age by asset** contain ordinary faults
+  to that asset. Alert globally only when the emergency total threshold is
+  crossed. Any `permanent` row still needs an operator, but does not by itself
+  stop healthy sibling assets;
 - alert on a sustained non-zero `deferredCandles` (a transient failure that is
   not clearing);
 - `limit_order_candle_rejected` warnings identify permanently invalid canonical
@@ -618,12 +675,14 @@ scheduler that stopped ticking does.
 | Symptom | Action |
 | --- | --- |
 | `LIMIT_ORDER_CANDLE_RESERVATION_MISMATCH` | Do NOT fill manually. The order keeps its reservation. Compare `limitPrice x quantity`, `reservationFeeRate` and `reservedAmount`; the order was created with an inconsistent basis. Cancel it (releasing the reservation) and have the user re-quote. |
+| `LIMIT_ORDER_CANDLE_COMPLETION_UNAVAILABLE` | Inspect `last_window_completion_run_at`, `last_window_completion_successful_at`, `window_completion_error_*`, and consecutive failures. Fix the completion dependency and wait for one successful pass; do not copy the row-scan heartbeat into the completion fields. |
+| Asset completion checkpoint missing | If no submitted path-B order exists, no action is required. If one exists, stop new orders for that asset, reconstruct/ensure the checkpoint only after checking `candle_matching_eligible_from`, and investigate why the create transaction/bootstrap row was removed. |
 | Many `deferredCandles` on one asset | Check the asset's market price snapshot and USD/KRW FX freshness — the equity snapshot each fill records needs both. Path B writes no price row of its own. |
 | Path B filling orders that path A should have caught | Check provider connection generation churn, subscription acks, publisher activity and Redis Stream health. Path B is a safety net, not the intended path. |
 | Job stuck `LOCKED` | Another instance holds `limit_order_candle_reconciliation:5m`. Verify the other instance is alive; the lock has a TTL and is renewed while the job runs. |
 | Need to disable urgently | Set `LIMIT_ORDER_CANDLE_RECONCILIATION_ENABLED=false` and restart. Path A keeps running; existing orders keep their `candleMatchingEligibleFrom`, and the checkpoint keeps its position, so re-enabling resumes exactly where it stopped without a backfill. |
 | `LIMIT_ORDER_CANDLE_RECONCILIATION_GAP_DETECTED` | Candles were retention-deleted before the sweep examined them. Identify the affected window from `gap_from_open_time` / `gap_to_open_time` and the still-submitted orders whose `candle_matching_eligible_from` falls inside it, decide explicitly what to do about them, and only THEN clear the alarm: `UPDATE limit_order_reconciliation_checkpoints SET gap_detected_at = NULL, gap_from_open_time = NULL, gap_to_open_time = NULL, degraded_reason = NULL WHERE scope = '5m';`. Clearing it first hides a real exposure. |
-| Deferred candle parked as `permanent` | Inspect `last_error_code` / `last_error_message`, fix the dependency, then `UPDATE limit_order_deferred_candles SET status = 'deferred', next_retry_at = now() WHERE market_candle_id = '...';`. Never delete the row to make the alarm go away. |
+| Deferred candle parked as `permanent` | Inspect its asset, `candle_ingest_seq`, and error. A genuine candle correction receives a higher `ingest_seq` and reactivates it automatically. If no correction is possible, make an explicit exposure decision before manually rescheduling; never delete the row merely to clear health. |
 | Market-time marker not advancing | Check the deferred queue first (a full retry batch every tick starves nothing, but a large backlog is the usual cause), then whether closed 5m rows are actually being written for the active assets. |
 | `watermarkIngestSeq` not advancing while `observedIngestSeq` climbs | The two-phase guard is holding the position back — the summary reports `ingestCeilingHeld: true`. Look for a long-running WRITE transaction touching `market_candles`: `SELECT pid, xact_start, state, query FROM pg_stat_activity WHERE backend_xid IS NOT NULL ORDER BY xact_start;`. This is the guard working, not a fault; nothing is lost while it holds, only re-scanned. |
 | `candle_retention_passed_unscanned_candle` | A window older than the retention horizon is still unscanned and an activated order could match it. Identify it from `gap_from_open_time`, then follow the same operator procedure as any other gap below. |
@@ -649,9 +708,10 @@ scheduler that stopped ticking does.
   processed, a row that only becomes closed later being re-sequenced and swept,
   an unrelated update NOT renumbering a row, the two-phase guard refusing to
   advance onto its own observation and advancing once it settles, and the
-  unscanned-candle retention gap. Elapsed time is simulated by ageing the
-  stored observation rather than by sleeping, so every assertion is
-  deterministic.
+  unscanned-candle retention gap. It also covers deferred/permanent revision
+  replacement, lower-revision no-op, completion failure/recovery, missing
+  asset checkpoint, asset isolation, and emergency global backlog. Elapsed
+  time is simulated by ageing stored observations rather than by sleeping.
 - `limit-order-candle-reconciliation-health.spec.ts` — every gate code, the
   quiet-market and disabled-deployment non-blocking cases, and the 503
   envelope.

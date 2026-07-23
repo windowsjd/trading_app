@@ -115,9 +115,7 @@ function service(input: {
       findWindowCompletion: (assetId: string) =>
         Promise.resolve(input.windowCompletions?.[assetId] ?? null),
       hasSubmittedPathBOrder: (assetId: string) =>
-        Promise.resolve(
-          input.submittedPathBAssets?.includes(assetId) ?? false,
-        ),
+        Promise.resolve(input.submittedPathBAssets?.includes(assetId) ?? false),
     } as never);
   } finally {
     for (const key of Object.keys(process.env)) {
@@ -209,11 +207,8 @@ describe('LimitOrderCandleReconciliationHealthService', () => {
     const failure = await service({
       checkpoint: checkpoint({
         lastSuccessfulRunAt: NOW,
-        lastWindowCompletionSuccessfulAt: new Date(
-          NOW.getTime() - 86_400_000,
-        ),
-        windowCompletionErrorCode: 'LIMIT_ORDER_WINDOW_COMPLETION_FAILED',
-        windowCompletionConsecutiveFailures: 12,
+        lastWindowCompletionRunAt: new Date(NOW.getTime() - 86_400_000),
+        lastWindowCompletionSuccessfulAt: new Date(NOW.getTime() - 86_400_000),
       }),
     }).evaluate(NOW);
     expect(failure?.code).toBe(
@@ -221,9 +216,38 @@ describe('LimitOrderCandleReconciliationHealthService', () => {
     );
   });
 
+  it('fails closed immediately when the latest completion pass failed after a recent success', async () => {
+    const failure = await service({
+      checkpoint: checkpoint({
+        lastWindowCompletionSuccessfulAt: new Date(NOW.getTime() - 1_000),
+        lastWindowCompletionRunAt: NOW,
+        windowCompletionErrorCode: 'LIMIT_ORDER_WINDOW_COMPLETION_FAILED',
+        windowCompletionConsecutiveFailures: 1,
+      }),
+    }).evaluate(NOW);
+    expect(failure?.code).toBe(
+      LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.completionUnavailable,
+    );
+  });
+
+  it('fails closed when a completion run started after the last success but its failure detail could not be stored', async () => {
+    const failure = await service({
+      checkpoint: checkpoint({
+        lastWindowCompletionSuccessfulAt: new Date(NOW.getTime() - 1_000),
+        lastWindowCompletionRunAt: NOW,
+        windowCompletionErrorCode: null,
+        windowCompletionConsecutiveFailures: 0,
+      }),
+    }).evaluate(NOW);
+    expect(failure?.code).toBe(
+      LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.completionUnavailable,
+    );
+  });
+
   it('recovers once the completion pass succeeds again', async () => {
     const health = service({
       checkpoint: checkpoint({
+        lastWindowCompletionRunAt: NOW,
         lastWindowCompletionSuccessfulAt: NOW,
         windowCompletionErrorCode: null,
         windowCompletionConsecutiveFailures: 0,

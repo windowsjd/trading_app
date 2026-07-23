@@ -626,6 +626,42 @@ Relevant errors include `LIMIT_ORDER_MATCHER_UNAVAILABLE`,
 `LIMIT_ORDER_EXECUTION_PATH_NOT_SUPPORTED`, and (path B)
 `LIMIT_ORDER_CANDLE_RESERVATION_MISMATCH`.
 
+## Shared-readiness read authority and Create replay
+
+Shared readiness uses the live-candle supervisor's real Redis owner lease, not
+an owner name or a readiness-only token. Write fencing proves the publisher may
+write. Read validation independently proves that the published state is still
+authoritative: one Lua execution checks the meta schema/generation/epoch, the
+actual owner lease, `lease == epoch-holder`, current epoch equality, and the
+generation-scoped asset record. No wall-clock or `ownerInstance` comparison
+grants authority. Deleting only the lease makes the next non-owner
+Quote/Create fail closed with `LIMIT_ORDER_PROVIDER_OWNER_LEASE_LOST` while
+the old meta TTL is still running.
+
+Lease loss, token rotation, a fenced asset/meta write, route release, and the
+supervisor clearing `ownerLease` all make the publisher attempt a guarded
+release. The Lua release deletes only stored meta/assets matching the old
+publisher's owner instance, generation, and epoch. A takeover published by a
+new epoch is therefore immune to a late old-owner cleanup.
+
+Limit Create has one deliberate exception to current operational gates: an
+already committed request. After request parsing and request-hash construction,
+the service looks up the caller's own order by idempotency key before provider,
+matcher, path-B, season, and market checks. An equal hash returns the stored
+first `responsePayloadJson`; a different hash is a conflict. Only a missing key
+continues into current health checks, locks, reservation, and insert. This
+ordering recovers a lost HTTP response without double reservation during the
+very outage that may have caused the retry.
+
+Rollout order is additive migration → application deploy with every limit flag
+still false → PostgreSQL 16/Redis 7 integration and drift gates → keep
+`LIMIT_ORDER_ENABLED=false` while starting path A, shared readiness, and path B
+→ wait for both path-B heartbeats and per-asset health → enable new limit
+Quote/Create traffic. To roll back application behavior, disable shared
+readiness/path B and redeploy the previous application; do not reverse or edit
+the additive migration. Existing orders remain cancelable and the new nullable
+columns are ignored by the older binary.
+
 ## Processed-event growth policy
 
 `limit_order_processed_events` is append-only and is what stops a duplicate

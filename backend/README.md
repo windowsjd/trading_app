@@ -101,8 +101,15 @@ SHARE → Season FOR SHARE → CashWallet`), so a concurrent participant
   provider owner lease (the supervisor's Redis lock) exchanged for a monotonic
   fencing epoch and re-verified inside Redis on every write, so a process that
   merely looks like an owner locally — or lost its lease — cannot publish, and
-  a replaced owner cannot overwrite its successor whatever its clock says. The
-  owner publishes routing/liveness metadata (never a credential, an approval
+  a replaced owner cannot overwrite its successor whatever its clock says.
+  Shared reads are fenced too: one Lua call checks meta, the live provider-owner
+  lease, epoch-holder, current epoch, and generation-scoped asset record before
+  issuing a proof. Removing only the real lease therefore invalidates stale
+  meta immediately, even while its TTL remains. A publisher that loses or
+  rotates its lease compare-and-deletes only its own
+  `(ownerInstance, generation, fencingEpoch)` record; a late old-owner cleanup
+  cannot delete the successor. The owner publishes routing/liveness metadata
+  (never a credential, an approval
   key, an access token, a raw frame, or the raw lease token) and every other
   instance reads it. A non-owner instance completes the whole limit
   Quote→Create against the shared view via a readiness PROOF re-verified
@@ -116,9 +123,20 @@ SHARE → Season FOR SHARE → CashWallet`), so a concurrent participant
   cursor accounts for windows whose candle row never existed — telling
   provider-confirmed no-trade apart from a feed/finalizer failure — and gates
   ONLY the affected asset (`LIMIT_ORDER_CANDLE_ASSET_*` codes) while other
-  assets keep trading. Corrected candles are re-sequenced and reprocessed as a
-  NEW revision: newly qualified orders fill once, executed orders are
+  assets keep trading. The row-scan and window-completion success heartbeats
+  are durable and independent; the latest completion failure blocks
+  immediately even if an earlier success is still fresh. Create bootstraps the
+  asset completion checkpoint in the same transaction as the first path-B
+  order. Corrected candles are re-sequenced and reprocessed as a NEW revision:
+  the deferred row carries `candleIngestSeq`, a higher revision reactivates a
+  permanent row and replaces its asset/window metadata, and a late lower
+  revision is a no-op. Newly qualified orders fill once, executed orders are
   untouched, and evidence rows are revision-scoped and immutable.
+- A committed limit Create is replayed before provider, matcher, path-B,
+  season, and market-state gates. The user-scoped lookup validates the same
+  request hash and returns the stored first response; a different hash
+  conflicts, and a genuinely new key still passes through every current gate.
+  Replay never creates another order or reservation.
 - Total-asset valuation keeps using the full `balanceAmount`; reservations
   never reduce it.
 - Cancel and lifecycle cleanup work even while either flag is off. When auto
@@ -183,7 +201,11 @@ price improvement, actual wallet/position/equity/evidence writes, non-fill and
 durable duplicate-event handling. They require applied migrations and local
 PostgreSQL/Redis, create isolated fixture rows/keys, and clean only those rows.
 CI also enables the existing market-order, FX, and service-composed MVP DB
-smokes in this job to guard adjacent flows.
+smokes in this PostgreSQL 16 + Redis 7 job to guard adjacent flows. The same
+job deploys every migration, checks `prisma migrate status`, and fails on
+`prisma migrate diff --exit-code`; the candle-evidence composite unique name
+is pinned with Prisma `map:` so PostgreSQL's deployed truncated identifier is
+not reported as drift.
 
 ## STOP / Not Implemented
 

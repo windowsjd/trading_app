@@ -295,8 +295,11 @@ Ops job name `limit_order_candle_reconciliation`, added additively to
 - A candle that fails is enqueued in `limit_order_deferred_candles` BEFORE the
   watermark passes it, and retried with bounded exponential backoff, so one
   asset's transient failure delays one candle instead of blocking every later
-  candle. The retry stage runs FIRST each tick, so the oldest unfinished work
-  is never starved by a busy live stream.
+  candle. Each row records `candle_ingest_seq`: a corrected higher revision
+  reactivates even a permanent row and replaces its asset/window metadata,
+  while a late lower revision cannot overwrite it. The retry stage runs FIRST
+  each tick, so the oldest unfinished work is never starved by a busy live
+  stream.
 - Enabled by `LIMIT_ORDER_CANDLE_RECONCILIATION_ENABLED=true`, which also flips
   `OpsSchedulerConfig.enabled` on. It requires
   `LIMIT_ORDER_AUTO_EXECUTION_ENABLED=true`; enabling it alone fails startup.
@@ -307,10 +310,13 @@ Ops job name `limit_order_candle_reconciliation`, added additively to
 - `resultJson` carries `scannedCandles / processedCandles / skippedCandles /
   matchedOrders / deferredCandles / retriedCandles / recoveredCandles /
   permanentCandles`, the swept window, the current watermark, and
-  `gapDetected` / `degradedReason`. **Watermark progress is the primary
-  liveness signal**: a watermark that stops advancing while candles keep
-  closing means the sweep is stuck even though the job keeps reporting
-  success.
+  `gapDetected` / `degradedReason`, plus `rowScanSucceeded` and a separate
+  `windowCompletion` result (`succeeded`, assets/windows/gaps, error).
+  `lastSuccessfulRunAt` is row-scan liveness only; completion has its own
+  run/success/error/consecutive-failure fields. A failed latest completion
+  blocks new limit Quote/Create immediately even when row scan keeps
+  succeeding. Ordinary deferred/permanent health is asset-scoped; only the
+  documented emergency total backlog is global.
 - The sweep additionally holds the shared limit-order event-boundary advisory
   lock on a dedicated PostgreSQL session (see
   `docs/limit-order-candle-reconciliation.md`), which is independent of the

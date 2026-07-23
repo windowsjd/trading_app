@@ -772,6 +772,36 @@ existing fields keep their meaning; nothing was removed.
 render a path-B fill as “5분봉 안전망 체결” with the executed price (the limit
 price) and may show the low explicitly labelled as the touch trigger.
 
+## Limit-create replay ordering and operational errors
+
+For a limit BUY, `POST /api/v1/orders` parses the request and computes the
+canonical request hash, then checks the authenticated user's existing order
+for the idempotency key before provider, matcher, path-B, active-season, or
+market-state gates. If the hash matches, the stored first
+`responsePayloadJson` is returned unchanged even after a provider outage,
+path-B failure, or season end. No quote is consumed again, no cash is reserved
+again, and no new order is inserted. A different hash returns
+`ORDER_IDEMPOTENCY_CONFLICT`. A key with no committed order receives no bypass
+and must pass all current gates.
+
+New operational 503 codes remain on `/api/v1`; no `/api/v2` or public/manual
+limit execute route exists:
+
+- `LIMIT_ORDER_PROVIDER_OWNER_LEASE_LOST` and
+  `LIMIT_ORDER_PROVIDER_READINESS_EPOCH_MISMATCH`: the shared route cannot
+  prove a live canonical provider owner.
+- `LIMIT_ORDER_CANDLE_COMPLETION_UNAVAILABLE` / `_STALE`: window completion
+  most recently failed/never succeeded, or stopped succeeding.
+- `LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED`,
+  `LIMIT_ORDER_CANDLE_FINALIZER_STALE`,
+  `LIMIT_ORDER_CANDLE_ASSET_BACKLOG_EXCEEDED`, and
+  `LIMIT_ORDER_CANDLE_ASSET_PERMANENT_FAILURE`: only the requested asset is
+  unhealthy unless the separate emergency global threshold is exceeded.
+
+Client messages deliberately avoid Redis, lease, epoch, fencing, and Lua
+terms; they describe a refreshing real-time connection or a candle safety-net
+recovery and ask the user to retry later.
+
 `executionPolicy` on quote/create responses is additive too:
 
 ```jsonc

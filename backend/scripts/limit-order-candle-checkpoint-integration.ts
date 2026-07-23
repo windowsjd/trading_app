@@ -1734,12 +1734,30 @@ async function testCompletionFailureNotHidden(): Promise<void> {
   );
   assert.ok(checkpoint.windowCompletionConsecutiveFailures >= 1);
 
-  // Gate: row scan fresh + completion success stale -> COMPLETION_STALE.
+  // A failed latest pass must block IMMEDIATELY even when the previous
+  // completion success is recent. Waiting for the freshness window to elapse
+  // would admit new orders after the supervisor already proved it was blind.
   await checkpoints.markRunSucceeded(new Date());
   await prisma.limitOrderReconciliationCheckpoint.updateMany({
     where: { scope: LIMIT_ORDER_RECONCILIATION_SCOPE },
     data: {
+      lastWindowCompletionSuccessfulAt: new Date(Date.now() - 1_000),
+    },
+  });
+  assert.equal(
+    (await health.evaluate(new Date()))?.code,
+    'LIMIT_ORDER_CANDLE_COMPLETION_UNAVAILABLE',
+  );
+
+  // With no failed latest pass, age alone produces COMPLETION_STALE.
+  await prisma.limitOrderReconciliationCheckpoint.updateMany({
+    where: { scope: LIMIT_ORDER_RECONCILIATION_SCOPE },
+    data: {
       lastWindowCompletionSuccessfulAt: new Date(Date.now() - 3_600_000),
+      lastWindowCompletionRunAt: new Date(Date.now() - 3_600_000),
+      windowCompletionErrorCode: null,
+      windowCompletionErrorMessage: null,
+      windowCompletionConsecutiveFailures: 0,
     },
   });
   assert.equal(
@@ -1924,9 +1942,7 @@ async function testEmergencyGlobalBacklog(): Promise<void> {
   });
   let strictHealth: LimitOrderCandleReconciliationHealthService;
   try {
-    strictHealth = new LimitOrderCandleReconciliationHealthService(
-      checkpoints,
-    );
+    strictHealth = new LimitOrderCandleReconciliationHealthService(checkpoints);
   } finally {
     for (const key of Object.keys(process.env)) {
       if (!(key in previous)) delete process.env[key];
