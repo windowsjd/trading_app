@@ -280,17 +280,45 @@ describe('LimitOrderProviderHealthService readiness proof', () => {
       expiresAt: 2000,
     };
 
-    expectCode(() => service.assertReadinessProof(null, CRYPTO, 1500));
-    expectCode(() =>
-      service.assertReadinessProof(
-        { ...proof, assetId: 'asset-other' },
-        CRYPTO,
-        1500,
-      ),
+    expectCode(
+      () => service.assertReadinessProof(null, CRYPTO, 1500),
+      'LIMIT_ORDER_PROVIDER_READINESS_PROOF_INVALID',
+    );
+    expectCode(
+      () =>
+        service.assertReadinessProof(
+          { ...proof, assetId: 'asset-other' },
+          CRYPTO,
+          1500,
+        ),
+      'LIMIT_ORDER_PROVIDER_READINESS_PROOF_INVALID',
     );
     // A KIS-routed asset can never be covered by a Binance proof.
-    expectCode(() => service.assertReadinessProof(proof, DOMESTIC, 1500));
-    expectCode(() => service.assertReadinessProof(proof, CRYPTO, 2001));
+    expectCode(
+      () => service.assertReadinessProof(proof, DOMESTIC, 1500),
+      'LIMIT_ORDER_PROVIDER_READINESS_PROOF_INVALID',
+    );
+    expectCode(
+      () => service.assertReadinessProof(proof, CRYPTO, 2001),
+      'LIMIT_ORDER_PROVIDER_READINESS_PROOF_EXPIRED',
+    );
+    // Structural rejects: unknown ownerMode, inverted window, future-dated
+    // checkedAt, an expiry window wider than the configured maximum, and a
+    // proof with no generation are all unorderable evidence.
+    for (const broken of [
+      { ...proof, ownerMode: 'imagined' as never },
+      { ...proof, source: 'other_source' as never },
+      { ...proof, checkedAt: 2500 },
+      { ...proof, checkedAt: Number.NaN },
+      { ...proof, expiresAt: Number.POSITIVE_INFINITY },
+      { ...proof, checkedAt: 1000, expiresAt: 10_000_000 },
+      { ...proof, generation: '' },
+    ]) {
+      expectCode(
+        () => service.assertReadinessProof(broken, CRYPTO, 1500),
+        'LIMIT_ORDER_PROVIDER_READINESS_PROOF_INVALID',
+      );
+    }
   });
 
   it('lets the local registry overrule a proof once this instance owns the route', async () => {
@@ -319,6 +347,24 @@ describe('LimitOrderProviderHealthService readiness proof', () => {
       generation: 'gen-2',
     });
     expectCode(() => service.assertReadinessProof(proof, CRYPTO, 1200));
+
+    // Even with the NEW generation fully subscribed and healthy, a LOCAL
+    // proof minted against the old generation is dead evidence.
+    routes.markConnectionOpen({
+      provider: 'binance',
+      generation: 'gen-2',
+      at: Date.now(),
+    });
+    routes.registerSubscriptionTargets({
+      provider: 'binance',
+      generation: 'gen-2',
+      assets: [subscribed(CRYPTO.assetId, 'BTCUSDT')],
+    });
+    routes.markSubscriptionsActive({ provider: 'binance', generation: 'gen-2' });
+    expectCode(
+      () => service.assertReadinessProof(proof, CRYPTO, 1300),
+      'LIMIT_ORDER_PROVIDER_GENERATION_CHANGED',
+    );
   });
 
   it('fails closed when this instance released the route it proved against', async () => {
@@ -335,7 +381,10 @@ describe('LimitOrderProviderHealthService readiness proof', () => {
     );
     const proof = await service.assertAvailableAsync(CRYPTO, 1000);
     routes.releaseProvider('binance', 'live_candle_supervisor');
-    expectCode(() => service.assertReadinessProof(proof, CRYPTO, 1100));
+    expectCode(
+      () => service.assertReadinessProof(proof, CRYPTO, 1100),
+      'LIMIT_ORDER_PROVIDER_GENERATION_CHANGED',
+    );
   });
 
   it('re-checks the legacy stream for a legacy proof', async () => {

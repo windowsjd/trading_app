@@ -73,6 +73,15 @@ export const ERROR_CODE = {
   LIMIT_ORDER_PROVIDER_NOT_SUBSCRIBED: 'LIMIT_ORDER_PROVIDER_NOT_SUBSCRIBED',
   LIMIT_ORDER_PROVIDER_SUBSCRIPTION_FAILED:
     'LIMIT_ORDER_PROVIDER_SUBSCRIPTION_FAILED',
+  // Readiness PROOF verdicts from inside the create transaction: the
+  // pre-check passed but its evidence could not be re-verified (expired,
+  // structurally invalid, or the provider connection generation moved).
+  LIMIT_ORDER_PROVIDER_READINESS_PROOF_EXPIRED:
+    'LIMIT_ORDER_PROVIDER_READINESS_PROOF_EXPIRED',
+  LIMIT_ORDER_PROVIDER_READINESS_PROOF_INVALID:
+    'LIMIT_ORDER_PROVIDER_READINESS_PROOF_INVALID',
+  LIMIT_ORDER_PROVIDER_GENERATION_CHANGED:
+    'LIMIT_ORDER_PROVIDER_GENERATION_CHANGED',
   // Path-B (closed-candle safety net) health. Separate from the matcher codes
   // above: these mean the SAFETY NET under automatic matching is not whole, so
   // new limit registration is refused while existing orders, cancel and
@@ -87,6 +96,13 @@ export const ERROR_CODE = {
     'LIMIT_ORDER_CANDLE_RECONCILIATION_GAP_DETECTED',
   LIMIT_ORDER_CANDLE_RESERVATION_MISMATCH:
     'LIMIT_ORDER_CANDLE_RESERVATION_MISMATCH',
+  // Asset-scoped safety-net codes: the failure names ONE asset, so only that
+  // asset's new limit registration pauses; other assets keep working.
+  LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED:
+    'LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED',
+  LIMIT_ORDER_CANDLE_FINALIZER_STALE: 'LIMIT_ORDER_CANDLE_FINALIZER_STALE',
+  LIMIT_ORDER_CANDLE_ASSET_BACKLOG_EXCEEDED:
+    'LIMIT_ORDER_CANDLE_ASSET_BACKLOG_EXCEEDED',
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODE)[keyof typeof ERROR_CODE];

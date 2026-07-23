@@ -5,11 +5,13 @@ import {
   OnModuleInit,
   Optional,
 } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import {
   readProviderTradeReadinessConfig,
   type ProviderTradeReadinessConfig,
 } from './provider-trade-readiness.config';
 import {
+  assertReadinessKeySlots,
   PROVIDER_TRADE_READINESS_SCHEMA_VERSION,
   ProviderTradeReadinessStore,
   type SharedAssetRecord,
@@ -32,32 +34,26 @@ const PROVIDERS: readonly TradeRouteProvider[] = ['kis', 'binance'];
  *   - registry mutations happen on the socket hot path (`markFrame` fires on
  *     EVERY frame) and must never await a Redis round trip.
  *
- * It publishes ONLY for providers this process actually owns and has an
- * established connection for. A process that owns nothing publishes nothing,
- * so it can never mask the real owner.
+ * OWNERSHIP = THE PROVIDER OWNER LEASE
+ * ------------------------------------
+ * Publishing rights are derived from the SAME Redis lease the live-candle
+ * supervisor holds while it owns the provider socket — never from a parallel
+ * readiness-only token, and never from the local registry alone:
  *
- * On shutdown it compare-and-deletes its own generation, so a fast restart
- * does not leave a stale "connected" record behind. The delete is a no-op if
- * another instance has already taken over — that is precisely the late-release
- * race the store's compare-and-delete exists for.
- *
- * OWNER FENCING
- * -------------
- * Before it may publish anything, this publisher acquires a FENCE TOKEN from
- * the store (see `ProviderTradeReadinessStore`). The token — not a timestamp —
- * is what makes two instances that both believe they own the socket resolvable
- * into exactly one shared-view owner:
- *
- *   - no token means no publish, so a process that lost the race stays silent
- *     instead of overwriting the winner with its own subscription set;
- *   - a refused publish means a newer token exists. The publisher drops its
- *     token immediately and stops publishing that provider. It re-attempts
- *     acquisition on the next tick, which can only succeed once the incumbent
- *     stops heartbeating and its record expires.
+ *   - the registry snapshot must carry the lease (key + token) the supervisor
+ *     registered. A claim with no lease — the legacy streaming service, or a
+ *     process whose supervisor lost its lease mid-connection — publishes
+ *     NOTHING; there is no cross-process evidence to fence the write against.
+ *   - the store exchanges that lease for a monotonic FENCING EPOCH, and every
+ *     write re-verifies lease + epoch inside Redis atomically. Losing the
+ *     lease revokes publish rights at the very next write.
+ *   - a refused write means "fenced out": the cached epoch is dropped and the
+ *     publisher goes silent for that provider. It re-attempts on later ticks,
+ *     which can only succeed while it actually holds the live lease again.
  *
  * Losing the shared view NEVER touches the socket: this process keeps owning
- * its connection and keeps answering readiness from its own registry. Only the
- * cross-instance mirror changes hands.
+ * its connection and keeps answering readiness from its own registry. Only
+ * the cross-instance mirror changes hands.
  */
 @Injectable()
 export class ProviderTradeReadinessPublisher
@@ -69,10 +65,18 @@ export class ProviderTradeReadinessPublisher
   private publishing = false;
   /** Generations this process published, so shutdown can release exactly them. */
   private readonly published = new Map<TradeRouteProvider, string>();
-  /** Fence tokens currently held. No entry means "not the shared-view owner". */
-  private readonly fenceTokens = new Map<TradeRouteProvider, number>();
-  /** Last observed rival, for diagnostics only; never a control input. */
-  private readonly fencedOutBy = new Map<TradeRouteProvider, string>();
+  /**
+   * Fencing epochs held, keyed by the lease token they were issued to. A new
+   * lease (a new ownership, even by the same process) never reuses an epoch.
+   */
+  private readonly epochs = new Map<
+    TradeRouteProvider,
+    { leaseToken: string; fencingEpoch: number }
+  >();
+  /** Last refusal reason per provider, for diagnostics only. */
+  private readonly refusals = new Map<TradeRouteProvider, string>();
+  /** Providers warned about a lease-less claim, so the log fires once. */
+  private readonly warnedNoLease = new Set<TradeRouteProvider>();
 
   constructor(
     private readonly routes: ProviderTradeRouteRegistry,
@@ -91,6 +95,9 @@ export class ProviderTradeReadinessPublisher
 
   onModuleInit(): void {
     if (!this.isEnabled()) return;
+    // Fail fast, not on the first publish: a clustered Redis rejects the
+    // fenced scripts unless every readiness key shares the lease key's slot.
+    for (const provider of PROVIDERS) assertReadinessKeySlots(provider);
     this.timer = setInterval(() => {
       void this.publishOnce();
     }, this.config.publishIntervalMs);
@@ -102,49 +109,49 @@ export class ProviderTradeReadinessPublisher
     this.timer = null;
     if (!this.store) return;
     for (const [provider, generation] of this.published) {
-      const fenceToken = this.fenceTokens.get(provider);
-      // Without the token this process cannot prove the record is its own, and
-      // a release that cannot be proven must not happen.
-      if (fenceToken === undefined) continue;
+      const epoch = this.epochs.get(provider);
+      // Without the epoch this process cannot prove the record is its own,
+      // and a release that cannot be proven must not happen.
+      if (!epoch) continue;
       await this.store
         .release({
           provider,
           generation,
           ownerInstance: this.config.instanceId,
-          fenceToken,
+          fencingEpoch: epoch.fencingEpoch,
         })
         .catch(() => undefined);
     }
     this.published.clear();
-    this.fenceTokens.clear();
+    this.epochs.clear();
   }
 
   /**
    * Diagnostics for the ops snapshot: which providers this process currently
-   * owns in the SHARED view, and under which fence token.
+   * publishes in the SHARED view, and under which fencing epoch.
    */
   ownershipSnapshot(): Record<
     string,
     {
-      fenceToken: number | null;
+      fencingEpoch: number | null;
       generation: string | null;
-      fencedOutBy?: string;
+      refusedBecause?: string;
     }
   > {
     const snapshot: Record<
       string,
       {
-        fenceToken: number | null;
+        fencingEpoch: number | null;
         generation: string | null;
-        fencedOutBy?: string;
+        refusedBecause?: string;
       }
     > = {};
     for (const provider of PROVIDERS) {
-      const rival = this.fencedOutBy.get(provider);
+      const refusal = this.refusals.get(provider);
       snapshot[provider] = {
-        fenceToken: this.fenceTokens.get(provider) ?? null,
+        fencingEpoch: this.epochs.get(provider)?.fencingEpoch ?? null,
         generation: this.published.get(provider) ?? null,
-        ...(rival === undefined ? {} : { fencedOutBy: rival }),
+        ...(refusal === undefined ? {} : { refusedBecause: refusal }),
       };
     }
     return snapshot;
@@ -183,30 +190,52 @@ export class ProviderTradeReadinessPublisher
     if (!snapshot) {
       // Not the owner (or not connected). Release only what THIS process
       // published; another instance's record is protected by the store's
-      // compare-and-delete.
+      // compare-and-delete. The claim is dropped as well: a process with
+      // nothing to publish must not keep another instance out, and deleting
+      // the meta makes every reader fail closed immediately.
       const previous = this.published.get(provider);
-      const fenceToken = this.fenceTokens.get(provider);
-      // Give up the claim as well: a process with nothing to publish must not
-      // keep another instance from taking the provider over. Deleting the meta
-      // also makes every reader fail closed immediately, which is the correct
-      // answer while this process has no established connection.
+      const epoch = this.epochs.get(provider);
       this.published.delete(provider);
-      this.fenceTokens.delete(provider);
-      if (previous && fenceToken !== undefined) {
+      this.epochs.delete(provider);
+      if (previous && epoch) {
         await store
           .release({
             provider,
             generation: previous,
             ownerInstance: this.config.instanceId,
-            fenceToken,
+            fencingEpoch: epoch.fencingEpoch,
           })
           .catch(() => undefined);
       }
       return;
     }
 
-    const fenceToken = await this.ensureFenceToken(provider);
-    if (fenceToken === null) return;
+    if (!snapshot.ownerLease) {
+      // A local claim with no Redis lease behind it. The legacy streaming
+      // service claims routes this way; a supervisor that lost its lease
+      // mid-connection clears the lease the same instant. Neither can prove
+      // ownership to another instance, so neither may publish. Fail-closed:
+      // non-owner API pods will answer "unavailable" for this provider.
+      if (!this.warnedNoLease.has(provider)) {
+        this.warnedNoLease.add(provider);
+        this.logger.warn(
+          JSON.stringify({
+            event: 'limit_order_shared_readiness_no_owner_lease',
+            provider,
+            source: snapshot.source,
+            instanceId: this.config.instanceId,
+            effect:
+              'shared readiness is not published; only the lease-holding supervisor may publish',
+          }),
+        );
+      }
+      return;
+    }
+    this.warnedNoLease.delete(provider);
+
+    const lease = snapshot.ownerLease;
+    const fencingEpoch = await this.ensureFencingEpoch(provider, lease.token);
+    if (fencingEpoch === null) return;
 
     // Assets first: a reader that resolves the new generation from the meta
     // must find its hash already populated, otherwise every asset would read
@@ -228,8 +257,8 @@ export class ProviderTradeReadinessPublisher
     const assetsAccepted = await store.publishAssets({
       provider,
       generation: snapshot.generation,
-      ownerInstance: this.config.instanceId,
-      fenceToken,
+      leaseToken: lease.token,
+      fencingEpoch,
       records,
       ttlSeconds: this.config.ttlSeconds,
     });
@@ -244,7 +273,8 @@ export class ProviderTradeReadinessPublisher
       ownerInstance: this.config.instanceId,
       source: snapshot.source,
       generation: snapshot.generation,
-      fenceToken,
+      fencingEpoch,
+      leaseTokenDigest: digestLeaseToken(lease.token),
       connected: snapshot.connected,
       connectedAt: snapshot.connectedAt,
       lastFrameAt: snapshot.lastFrameAt,
@@ -253,6 +283,7 @@ export class ProviderTradeReadinessPublisher
     };
     const accepted = await store.publishProvider({
       meta,
+      leaseToken: lease.token,
       ttlSeconds: this.config.ttlSeconds,
     });
     if (!accepted) {
@@ -270,80 +301,96 @@ export class ProviderTradeReadinessPublisher
           provider,
           supersededGeneration: previous,
           ownerInstance: this.config.instanceId,
-          fenceToken,
+          fencingEpoch,
         })
         .catch(() => undefined);
     }
     this.published.set(provider, snapshot.generation);
-    this.fencedOutBy.delete(provider);
+    this.refusals.delete(provider);
   }
 
   /**
-   * The token this process publishes under, acquiring one if it holds none.
-   * Returns null when another instance owns the shared view — the correct
-   * outcome is silence, not a retry storm.
+   * The fencing epoch this process publishes under, exchanged for the CURRENT
+   * lease token. A cached epoch is only reused while the lease token is the
+   * same one it was issued to; a new lease always re-acquires. Returns null
+   * when the lease is not actually held in Redis — the correct outcome is
+   * silence, not a retry storm.
    */
-  private async ensureFenceToken(
+  private async ensureFencingEpoch(
     provider: TradeRouteProvider,
+    leaseToken: string,
   ): Promise<number | null> {
-    const held = this.fenceTokens.get(provider);
-    if (held !== undefined) return held;
+    const held = this.epochs.get(provider);
+    if (held && held.leaseToken === leaseToken) return held.fencingEpoch;
+    this.epochs.delete(provider);
     const store = this.store;
     if (!store) return null;
 
     const claim = await store
-      .acquireOwnership({ provider, ownerInstance: this.config.instanceId })
+      .acquireOwnership({ provider, leaseToken })
       .catch(() => ({
         acquired: false as const,
-        fenceToken: null,
-        heldBy: null,
+        fencingEpoch: null,
+        reason: 'redis_error',
       }));
-    if (!claim.acquired || claim.fenceToken === null) {
-      if (claim.heldBy && this.fencedOutBy.get(provider) !== claim.heldBy) {
-        this.fencedOutBy.set(provider, claim.heldBy);
+    if (!claim.acquired || claim.fencingEpoch === null) {
+      const reason = claim.reason ?? 'refused';
+      if (this.refusals.get(provider) !== reason) {
+        this.refusals.set(provider, reason);
         this.logger.warn(
           JSON.stringify({
             event: 'limit_order_shared_readiness_not_owner',
             provider,
-            heldBy: claim.heldBy,
+            reason,
             instanceId: this.config.instanceId,
           }),
         );
       }
       return null;
     }
-    this.fenceTokens.set(provider, claim.fenceToken);
+    this.epochs.set(provider, {
+      leaseToken,
+      fencingEpoch: claim.fencingEpoch,
+    });
+    this.refusals.delete(provider);
     this.logger.log(
       JSON.stringify({
         event: 'limit_order_shared_readiness_owner_acquired',
         provider,
-        fenceToken: claim.fenceToken,
+        fencingEpoch: claim.fencingEpoch,
         instanceId: this.config.instanceId,
       }),
     );
-    return claim.fenceToken;
+    return claim.fencingEpoch;
   }
 
   /**
-   * A newer fence token exists. Surrender the claim so the shared view keeps
-   * exactly one publisher; the local socket and the local registry are
-   * untouched, so path A and owner-instance readiness keep working.
+   * The lease or epoch no longer belongs to this process. Surrender the claim
+   * so the shared view keeps exactly one publisher; the local socket and the
+   * local registry are untouched, so path A and owner-instance readiness keep
+   * working.
    */
   private handleFencedOut(
     provider: TradeRouteProvider,
     stage: 'assets' | 'meta',
   ): void {
-    const surrendered = this.fenceTokens.get(provider) ?? null;
-    this.fenceTokens.delete(provider);
+    const surrendered = this.epochs.get(provider)?.fencingEpoch ?? null;
+    this.epochs.delete(provider);
     this.published.delete(provider);
+    this.refusals.set(provider, `fenced_out_${stage}`);
     this.logger.warn(
       JSON.stringify({
         event: 'limit_order_shared_readiness_fenced_out',
         provider,
         stage,
-        surrenderedFenceToken: surrendered,
+        surrenderedFencingEpoch: surrendered,
         instanceId: this.config.instanceId,
       }),
     );
   }
+}
+
+/** Non-secret digest for diagnostics; never used in any comparison. */
+export function digestLeaseToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex').slice(0, 16);
 }

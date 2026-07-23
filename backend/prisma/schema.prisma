@@ -496,6 +496,7 @@ model Asset {
   orders                   Order[]
   quotes                   Quote[]
   limitOrderCandleEvidence LimitOrderCandleEvidence[]
+  finalizationCheckpoints  MarketCandleFinalizationCheckpoint[]
 
   @@unique([market, symbol])
   @@index([assetType, market])
@@ -1126,9 +1127,19 @@ model LimitOrderProcessedEvent {
 // the evidence, and MarketCandle rows are immutable once finalized, so the
 // duplicated columns exist only so the fill reason stays reproducible even if
 // retention later removes the candle row.
+// One IMMUTABLE evidence row per (candle, storage revision). A correction to
+// an already-processed candle re-sequences the row (new ingestSeq), and any
+// fill it newly justifies gets a NEW evidence row carrying the corrected low;
+// evidence created for earlier fills is never updated or shared across
+// revisions, so the audit trail of what each order actually filled against is
+// preserved verbatim.
 model LimitOrderCandleEvidence {
   id                   String   @id @default(uuid())
-  marketCandleId       String   @unique @map("market_candle_id")
+  marketCandleId       String   @map("market_candle_id")
+  // Storage revision (MarketCandle.ingestSeq) this evidence captures.
+  // Existing rows were backfilled with the candle's revision at migration
+  // time.
+  candleIngestSeq      BigInt   @map("candle_ingest_seq")
   assetId              String   @map("asset_id")
   interval             String
   openTime             DateTime @map("open_time") @db.Timestamptz(3)
@@ -1148,6 +1159,7 @@ model LimitOrderCandleEvidence {
   asset        Asset        @relation(fields: [assetId], references: [id], onDelete: Restrict)
   orders       Order[]
 
+  @@unique([marketCandleId, candleIngestSeq])
   @@index([assetId, openTime])
   @@map("limit_order_candle_evidences")
 }
@@ -1155,6 +1167,15 @@ model LimitOrderCandleEvidence {
 // Durable path-B dedupe. Written only after EVERY candidate batch for the
 // candle committed, so a crash mid-sweep re-runs the candle (already executed
 // orders are skipped by the status guard) instead of silently dropping it.
+//
+// REVISION-AWARE: `candleIngestSeq` records WHICH storage revision of the
+// candle was processed (MarketCandle.ingestSeq is re-assigned whenever a
+// correction changes what the window could fill). A candle whose current
+// ingestSeq is above the processed one is a NEW revision and is re-examined;
+// the status guard on orders makes the re-run additive-only (already executed
+// orders can never fill twice). One row per candle records the LATEST
+// processed revision; per-revision audit lives in the evidence rows, which
+// are immutable and revision-scoped.
 model LimitOrderProcessedCandle {
   marketCandleId    String   @id @map("market_candle_id")
   assetId           String   @map("asset_id")
@@ -1165,6 +1186,12 @@ model LimitOrderProcessedCandle {
   matchedOrderCount Int      @map("matched_order_count")
   result            String
   skipReason        String?  @map("skip_reason")
+  // Storage revision (MarketCandle.ingestSeq) this row covers. Existing rows
+  // were backfilled with the candle's revision at migration time.
+  candleIngestSeq   BigInt   @map("candle_ingest_seq")
+  // How many revisions of this candle have been processed; audit only.
+  revisionCount     Int      @default(1) @map("revision_count")
+  firstProcessedAt  DateTime @default(now()) @map("first_processed_at") @db.Timestamptz(3)
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
   marketCandle MarketCandle @relation(fields: [marketCandleId], references: [id], onDelete: Restrict)
@@ -1172,6 +1199,59 @@ model LimitOrderProcessedCandle {
   @@index([assetId, openTime])
   @@index([processedAt])
   @@map("limit_order_processed_candles")
+}
+
+// Per-asset path-B WINDOW COMPLETION cursor (finalization checkpoint).
+//
+// `market_candles.ingest_seq` tracks rows that EXIST; it cannot see a window
+// whose row was never written — a finalizer that skipped the window, a feed
+// gap, a permanently failed DB write, or a genuine no-trade window all look
+// identical: no row. This cursor is the durable protocol that tells them
+// apart, per asset, in market-time order:
+//
+//   every 5m window with closeTime <= finalizedThroughCloseTime is accounted
+//   for: a canonical closed row exists, OR the provider confirmed the range
+//   with no candle (explicit no-trade), OR the window lies outside the
+//   market session, OR it predates the asset's earliest activated order.
+//
+// The cursor never advances over a window it cannot account for; that window
+// is recorded as PENDING (bounded REST-repair retries) and, if retention
+// passes it unresolved, as a sticky per-asset GAP. Rows only ever exist for
+// assets with activated path-B orders — nothing else is owed completion.
+model MarketCandleFinalizationCheckpoint {
+  assetId                   String    @map("asset_id")
+  interval                  String
+  // Every window with closeTime <= this value is accounted for. Anchored at
+  // the asset's earliest activated order window on bootstrap.
+  finalizedThroughOpenTime  DateTime? @map("finalized_through_open_time") @db.Timestamptz(3)
+  finalizedThroughCloseTime DateTime  @map("finalized_through_close_time") @db.Timestamptz(3)
+  lastAdvancedAt            DateTime? @map("last_advanced_at") @db.Timestamptz(3)
+  lastEvaluatedAt           DateTime? @map("last_evaluated_at") @db.Timestamptz(3)
+  // First window the cursor cannot account for yet. Bounded retries; its AGE
+  // is what the asset-scoped health gate turns into FINALIZER_STALE.
+  pendingWindowOpenTime     DateTime? @map("pending_window_open_time") @db.Timestamptz(3)
+  pendingSince              DateTime? @map("pending_since") @db.Timestamptz(3)
+  pendingAttemptCount       Int       @default(0) @map("pending_attempt_count")
+  lastErrorCode             String?   @map("last_error_code")
+  degradedReason            String?   @map("degraded_reason")
+  // Sticky per-asset alarm: retention passed an unresolved window. Only an
+  // operator clears it; the loss cannot be repaired.
+  gapDetectedAt             DateTime? @map("gap_detected_at") @db.Timestamptz(3)
+  gapFromOpenTime           DateTime? @map("gap_from_open_time") @db.Timestamptz(3)
+  gapToOpenTime             DateTime? @map("gap_to_open_time") @db.Timestamptz(3)
+  // Audit counters: windows certified WITHOUT a candle row.
+  noTradeWindowCount        Int       @default(0) @map("no_trade_window_count")
+  outsideSessionWindowCount Int       @default(0) @map("outside_session_window_count")
+  repairedWindowCount       Int       @default(0) @map("repaired_window_count")
+  createdAt                 DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                 DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@id([assetId, interval])
+  @@index([pendingSince])
+  @@index([gapDetectedAt])
+  @@map("market_candle_finalization_checkpoints")
 }
 
 // Durable path-B scan position. Replaces the sliding `now - lookbackMs` window,

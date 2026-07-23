@@ -28,6 +28,12 @@ export const LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES = {
   backlogExceeded: 'LIMIT_ORDER_CANDLE_RECONCILIATION_BACKLOG_EXCEEDED',
   gapDetected: 'LIMIT_ORDER_CANDLE_RECONCILIATION_GAP_DETECTED',
   reservationMismatch: 'LIMIT_ORDER_CANDLE_RESERVATION_MISMATCH',
+  // Asset-scoped codes: the failure names ONE asset's safety net, so only
+  // that asset's new quotes/creates are refused. Everything else — other
+  // assets, cancel, cleanup, market orders, FX — keeps flowing.
+  assetGapDetected: 'LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED',
+  assetFinalizerStale: 'LIMIT_ORDER_CANDLE_FINALIZER_STALE',
+  assetBacklogExceeded: 'LIMIT_ORDER_CANDLE_ASSET_BACKLOG_EXCEEDED',
 } as const;
 
 @Injectable()
@@ -42,8 +48,15 @@ export class LimitOrderCandleReconciliationHealthService {
     return this.config.enabled;
   }
 
-  async assertAvailable(now = new Date()): Promise<void> {
-    const failure = await this.evaluate(now);
+  /**
+   * Fail-closed gate. GLOBAL checks always run; when `assetId` is given, the
+   * ASSET-SCOPED checks run as well: that asset's window-completion
+   * checkpoint (missing-window gap, stalled finalizer) and its own deferred
+   * backlog. A failure on asset X names asset X and blocks only asset X's new
+   * quotes/creates — other assets stay tradable.
+   */
+  async assertAvailable(now = new Date(), assetId?: string): Promise<void> {
+    const failure = await this.evaluate(now, assetId);
     if (!failure) return;
     throw new HttpException(
       {
@@ -56,8 +69,13 @@ export class LimitOrderCandleReconciliationHealthService {
 
   async evaluate(
     now = new Date(),
+    assetId?: string,
   ): Promise<LimitOrderCandleReconciliationGateFailure | null> {
     if (!this.config.enabled) return null;
+    if (assetId) {
+      const assetFailure = await this.evaluateAsset(assetId, now);
+      if (assetFailure) return assetFailure;
+    }
 
     const checkpoint = await this.checkpoints.find();
     if (!checkpoint) {
@@ -145,6 +163,53 @@ export class LimitOrderCandleReconciliationHealthService {
       }
     }
 
+    return null;
+  }
+
+  /**
+   * Asset-scoped verdict from the window-completion checkpoint plus the
+   * asset's own deferred rows.
+   *
+   * A MISSING checkpoint passes: checkpoints exist only for assets with
+   * activated path-B orders, and a first order on a fresh asset owes nothing
+   * to any window that closed before its creation — eligibility is rounded UP
+   * at create time. The checkpoint appears with the first sweep after the
+   * order exists.
+   */
+  private async evaluateAsset(
+    assetId: string,
+    now: Date,
+  ): Promise<LimitOrderCandleReconciliationGateFailure | null> {
+    const checkpoint = await this.checkpoints.findWindowCompletion(assetId);
+    if (checkpoint) {
+      if (checkpoint.gapDetectedAt) {
+        return {
+          code: LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.assetGapDetected,
+          reason: `Candle retention passed an unresolved window of this asset at ${checkpoint.gapDetectedAt.toISOString()}: ${
+            checkpoint.degradedReason ?? 'unknown reason'
+          }.`,
+        };
+      }
+      if (checkpoint.pendingSince) {
+        const pendingAge = now.getTime() - checkpoint.pendingSince.getTime();
+        if (pendingAge > this.config.assetFinalizerStaleMs) {
+          return {
+            code: LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.assetFinalizerStale,
+            reason: `A 5m window of this asset has been unaccounted for ${pendingAge}ms (${
+              checkpoint.lastErrorCode ?? 'unknown cause'
+            }), above the ${this.config.assetFinalizerStaleMs}ms limit.`,
+          };
+        }
+      }
+    }
+
+    const deferred = await this.checkpoints.countAssetDeferred(assetId);
+    if (deferred > this.config.maxAssetDeferredBacklog) {
+      return {
+        code: LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.assetBacklogExceeded,
+        reason: `This asset has ${deferred} deferred candle(s), above the ${this.config.maxAssetDeferredBacklog} limit.`,
+      };
+    }
     return null;
   }
 }

@@ -142,8 +142,15 @@ const workers: MatcherWorker[] = [];
 
 /** XADD timestamps by eventId, so latency is measured across the whole path. */
 const publishedAt = new Map<string, number>();
-/** XACK timestamps by eventId, recorded by the instrumented stream service. */
+/** XACK COMPLETION timestamps by eventId (instrumented stream service). */
 const acknowledgedAt = new Map<string, number>();
+/**
+ * XACK START timestamps by eventId. The poller calls acknowledge() strictly
+ * AFTER the event's durable work committed and the boundary was released, so
+ * this instant IS "processing complete" on the runner's own clock — no DB
+ * clock is mixed in, unlike the withdrawn processed_at-based reading.
+ */
+const ackStartedAt = new Map<string, number>();
 
 /**
  * The production stream service with two observation points added: the
@@ -182,6 +189,7 @@ class InstrumentedStreamService extends LimitOrderEventStreamService {
     config: Parameters<LimitOrderEventStreamService['acknowledge']>[0],
     streamId: string,
   ): Promise<void> {
+    const startedAt = Date.now();
     await super.acknowledge(config, streamId);
     const at = Date.now();
     const eventId = this.eventIdByStreamId.get(streamId);
@@ -189,6 +197,7 @@ class InstrumentedStreamService extends LimitOrderEventStreamService {
     // streamId, and overwriting would silently replace a measured latency with
     // the duplicate's much shorter one.
     if (eventId !== undefined && !acknowledgedAt.has(eventId)) {
+      ackStartedAt.set(eventId, startedAt);
       acknowledgedAt.set(eventId, at);
     }
   }
@@ -313,8 +322,12 @@ type Report = {
    * consumed inside it and the rate below has an honest denominator.
    */
   drainElapsedMs: number;
-  /** XADD -> XACK per event, in milliseconds, on one clock. */
+  /** XADD -> XACK completion per event, in milliseconds, on one clock. */
   latencies: number[];
+  /** XADD -> processing complete (= ACK start), same clock. */
+  xaddToProcessed: number[];
+  /** XACK round trip alone (ACK start -> ACK completion). */
+  ackRoundTrips: number[];
   /** Events that reached an ACK. Asserted to equal totalEvents. */
   ackedEvents: number;
   processedEventRows: number;
@@ -418,12 +431,14 @@ async function runLoad(): Promise<Report> {
   const sweepProcessedCandles = await sweep;
   const createBoundaryWaitMs = await createWait;
 
-  const latencies = measureLatencies();
+  const { latencies, xaddToProcessed, ackRoundTrips } = measureLatencies();
   return {
     totalEvents: publishedEventIds.length,
     publishElapsedMs,
     drainElapsedMs,
     latencies,
+    xaddToProcessed,
+    ackRoundTrips,
     ackedEvents: latencies.length,
     processedEventRows: await processedCount(),
     matchedOrders: await prisma.order.count({
@@ -450,16 +465,29 @@ async function runLoad(): Promise<Report> {
  * before the ACK. That understated the path by exactly the work the name
  * claims to include, so it is now taken from the instrumented ACK instead.
  */
-function measureLatencies(): number[] {
+function measureLatencies(): {
+  latencies: number[];
+  xaddToProcessed: number[];
+  ackRoundTrips: number[];
+} {
   const latencies: number[] = [];
+  const xaddToProcessed: number[] = [];
+  const ackRoundTrips: number[] = [];
   for (const eventId of publishedEventIds) {
     const start = publishedAt.get(eventId);
+    const ackStart = ackStartedAt.get(eventId);
     const end = acknowledgedAt.get(eventId);
-    if (start === undefined || end === undefined) continue;
+    if (start === undefined || ackStart === undefined || end === undefined) {
+      continue;
+    }
     latencies.push(Math.max(0, end - start));
+    xaddToProcessed.push(Math.max(0, ackStart - start));
+    ackRoundTrips.push(Math.max(0, end - ackStart));
   }
   latencies.sort((left, right) => left - right);
-  return latencies;
+  xaddToProcessed.sort((left, right) => left - right);
+  ackRoundTrips.sort((left, right) => left - right);
+  return { latencies, xaddToProcessed, ackRoundTrips };
 }
 
 /** How long a Create waits for the boundary while the matcher is at full tilt. */
@@ -503,13 +531,27 @@ function printReport(report: Report): void {
         report.publishElapsedMs,
       ),
 
-      // ---- Latency, XADD to XACK, both stamped on this process's clock.
+      // ---- Latency, all instants stamped on this process's clock.
       ackedEvents: report.ackedEvents,
+      // XADD -> XACK completion: the whole consumer path.
       latencyMsAvg: average(report.latencies),
       latencyMsP50: percentile(report.latencies, 50),
       latencyMsP95: percentile(report.latencies, 95),
       latencyMsP99: percentile(report.latencies, 99),
       latencyMsMax: report.latencies[report.latencies.length - 1] ?? 0,
+      // XADD -> processing complete (ACK start): the path minus the ACK.
+      xaddToProcessedMsP50: percentile(report.xaddToProcessed, 50),
+      xaddToProcessedMsP95: percentile(report.xaddToProcessed, 95),
+      xaddToProcessedMsP99: percentile(report.xaddToProcessed, 99),
+      // The ACK round trip alone.
+      ackRoundTripMsP50: percentile(report.ackRoundTrips, 50),
+      ackRoundTripMsP95: percentile(report.ackRoundTrips, 95),
+      ackRoundTripMsMax:
+        report.ackRoundTrips[report.ackRoundTrips.length - 1] ?? 0,
+      // The per-event boundary wait inside the poller is not instrumented
+      // (that would require production hooks); it is REPORTED as unmeasured
+      // rather than printed as a fake constant.
+      boundaryWait: 'not_measured',
 
       matchedOrders: report.matchedOrders,
       processedEventRows: report.processedEventRows,
@@ -584,6 +626,8 @@ async function assertMeasurementIsSound(report: Report): Promise<void> {
     'every published event must have a measured XADD -> XACK latency',
   );
   assert.equal(report.latencies.length, report.totalEvents);
+  assert.equal(report.xaddToProcessed.length, report.totalEvents);
+  assert.equal(report.ackRoundTrips.length, report.totalEvents);
 
   // 3. Every latency must fit inside the run: a sample longer than the whole
   //    publish+drain wall clock would mean the two clocks are not the same one.

@@ -284,30 +284,41 @@ The pre-transaction check now returns a `LimitOrderProviderReadinessProof`:
 socket), `shared` (the Redis view), or `legacy`. The in-transaction step
 (`assertReadinessProof`) is memory-only and applies, in order:
 
-1. the proof must cover this asset on this provider and must not have expired
+1. the proof must be STRUCTURALLY valid — known `ownerMode` and `source`,
+   finite ordered timestamps, an expiry window no wider than the configured
+   maximum, a non-empty generation, and a `checkedAt` not materially in the
+   future. Anything else is `LIMIT_ORDER_PROVIDER_READINESS_PROOF_INVALID`;
+2. it must cover this asset on this provider (`..._PROOF_INVALID` otherwise)
+   and must not have expired
    (`LIMIT_ORDER_PROVIDER_READINESS_PROOF_MAX_AGE_MS`, capped at
-   `LIMIT_ORDER_PROVIDER_LIVENESS_MAX_AGE_MS`) — an expired proof is not
-   evidence and is fail-closed like every other unresolved case;
-2. if this process owns the provider NOW, the local registry is fresher than
-   any proof and decides, so a reconnect between the two checks still rejects;
-3. a `local` proof on a process that has since RELEASED the route is
-   fail-closed — the socket that backed it is gone;
-4. a `legacy` proof re-checks the legacy streaming status (also in-process);
-5. otherwise the proof stands. A non-owner instance must not re-decide
+   `LIMIT_ORDER_PROVIDER_LIVENESS_MAX_AGE_MS`) —
+   `LIMIT_ORDER_PROVIDER_READINESS_PROOF_EXPIRED`;
+3. if this process owns the provider NOW, the local registry is fresher than
+   any proof and decides; a LOCAL proof whose generation no longer matches the
+   live one is `LIMIT_ORDER_PROVIDER_GENERATION_CHANGED`;
+4. a `local` proof on a process that has since RELEASED the route is
+   `LIMIT_ORDER_PROVIDER_GENERATION_CHANGED` — the socket that backed it is
+   gone;
+5. a `legacy` proof re-checks the legacy streaming status (also in-process);
+6. otherwise the proof stands. A non-owner instance must not re-decide
    readiness from an authority that structurally cannot know the answer.
 
 The proof is evidence for ONE asset on ONE provider for a bounded time. It is
 not a bypass: nothing accepts an order the shared view rejected.
 
-**Redis key schema.** All keys carry a `{provider}` hash tag so a clustered
-Redis maps them to one slot and the readiness read stays a single atomic
-script.
+**Redis key schema.** Every readiness key embeds the PROVIDER OWNER LEASE KEY
+(`candles:live:v1:owner:<provider>:0`) as its `{…}` cluster hash tag, so the
+lease and every readiness key land on ONE slot and each mutating script can
+read the live lease in the same atomic call. The invariant is asserted at
+publisher startup (`assertReadinessKeySlots`) — a clustered Redis fails fast
+rather than failing the first publish.
 
 | Key | Type | TTL | Contents |
 | --- | --- | --- | --- |
-| `limit-order:trade-readiness:v1:{<provider>}:meta` | string (JSON) | `LIMIT_ORDER_SHARED_READINESS_TTL_SECONDS` | schemaVersion, provider, ownerInstance, source, generation, **fenceToken**, connected, connectedAt, lastFrameAt, lastUpdatedAt, degradedReason |
-| `limit-order:trade-readiness:v1:{<provider>}:gen:<generation>:assets` | hash | same | per assetId: providerSymbol, symbol, market, assetType, settlementCurrency, sourceName, subscription state, generation, acknowledgedAt, updatedAt |
-| `limit-order:trade-readiness:v1:{<provider>}:fence` | string (counter) | **none — never expires** | monotonic INCR ownership token; it must outlive every owner |
+| `limit-order:trade-readiness:v2:{<leaseKey>}:meta` | string (JSON) | `LIMIT_ORDER_SHARED_READINESS_TTL_SECONDS` | schemaVersion, provider, ownerInstance, source, generation, **fencingEpoch**, **leaseTokenDigest** (non-secret), connected, connectedAt, lastFrameAt, lastUpdatedAt, degradedReason |
+| `limit-order:trade-readiness:v2:{<leaseKey>}:gen:<generation>:assets` | hash | same | per assetId: providerSymbol, symbol, market, assetType, settlementCurrency, sourceName, subscription state, generation, acknowledgedAt, updatedAt |
+| `limit-order:trade-readiness:v2:{<leaseKey>}:epoch` | string (counter) | **none — never expires** | monotonic fencing-epoch counter; must outlive every owner |
+| `limit-order:trade-readiness:v2:{<leaseKey>}:epoch-holder` | string | none | the lease token the current epoch was issued to |
 
 Only routing/liveness metadata is published. **Never** a credential, an
 approval key, an access token, or a raw provider frame — asserted by the
@@ -321,57 +332,77 @@ superseded hash is then dropped explicitly (guarded so it can only delete a
 hash the current meta no longer points at, and only while this instance still
 owns the meta).
 
-#### Owner fencing
+#### Owner fencing = the REAL provider owner lease
 
-Ownership is decided by a **fence token**, never by a clock.
+Ownership of the shared view is decided by the **provider owner lease** — the
+same Redis lock (`candles:live:v1:owner:<provider>:0`) the live-candle
+supervisor holds while it owns the socket — never by a clock, and never by a
+readiness-only token.
 
-It used to be decided by comparing `lastUpdatedAt` between records written on
-DIFFERENT HOSTS. Two machines that disagree about the time each consider their
-own record "newer", so a superseded owner whose clock ran ahead — or that was
-simply paused and resumed — could overwrite the record of the owner that had
-legitimately replaced it, publishing the subscription set of a socket that no
-longer existed. Every API instance would then accept limit orders against a
-connection nobody was listening on, and the reservation could never be filled
-or released by a live event.
+A readiness-only token (the previous design) proved that a process had once
+won a race for a readiness key; it proved NOTHING about who actually held the
+socket. A process whose local registry merely looked like an owner could
+publish, and a process that had lost the real socket lease could keep
+publishing until its token happened to be superseded.
 
-Before it may publish anything, a publisher calls `acquireOwnership`, which
-INCRs the per-provider fence counter inside Redis and hands back the value —
-but only when nobody else holds the meta key. The counter is generated by Redis
-itself, so the ordering is monotonic by construction and involves no clock at
-all.
+Now:
 
-Every mutating script is then a compare-and-swap on that token, executed inside
-Redis:
+- the supervisor REGISTERS its lease (key + token) on the trade-route registry
+  when it claims a provider, and clears it the instant lease renewal fails;
+- the publisher exchanges that lease for a **fencing epoch**
+  (`acquireOwnership`): a Redis INCR issued ONLY while the caller's lease
+  token is the live value of the lease key, read inside the same atomic
+  script. No lease, no epoch, no publish. A local registry claim alone — the
+  legacy streaming service, for example — can never acquire anything and
+  publishes NOTHING (`limit_order_shared_readiness_no_owner_lease`);
+- EVERY mutating script re-reads the lease inside Redis and refuses the write
+  unless the caller's token is still the live lease AND its epoch is still
+  current. Losing the lease revokes publish rights at the very next write,
+  atomically. The epoch is strictly monotonic across successions, so a
+  replaced owner can never win with a bigger wall-clock timestamp, a
+  paused-then-resumed callback, or any clock at all — and the REAL lease
+  holder publishes successfully even with a clock far BEHIND the zombie's;
+- `release` and the superseded-hash cleanup compare epoch + generation + owner
+  against the STORED meta, so a **late release from a replaced owner is a
+  no-op** and cannot delete the new owner's state. (A release deliberately
+  does not require the live lease: shutdown releases run after the supervisor
+  has already given the lease up.)
 
-- a meta or asset write is refused when the stored fence token is strictly
-  GREATER (a newer owner exists), or equal but held by a different instance;
-- `release` and the superseded-hash cleanup delete ONLY when generation, owner
-  AND fence token all match, so a **late release from a replaced owner is a
-  no-op** and cannot delete the new owner's state.
+The meta record publishes a non-secret `leaseTokenDigest` for diagnostics;
+the raw lease token is passed only as a script argument and never stored.
 
-A refused write means "I have been fenced out". The publisher drops its token,
-stops publishing that provider, and re-attempts acquisition on the next tick —
-which can only succeed once the incumbent stops heartbeating and its record
-expires. It does NOT retry into a publish war. Losing the shared view never
-touches the socket: the process keeps its connection and keeps answering
-readiness from its own registry, so path A is unaffected.
+The incumbent re-acquiring under the SAME lease token keeps its epoch;
+a NEW lease (a new ownership, even by the same process) always INCRs.
 
-The incumbent re-acquiring keeps the token it already holds; renumbering a live
-owner would make the token useless as an identity.
+A refused write means "fenced out". The publisher drops its epoch, stops
+publishing that provider, and re-attempts on later ticks — which can only
+succeed while it actually holds the live lease. Losing the shared view never
+touches the socket: path A is unaffected.
 
-Takeover therefore has exactly one trigger: the incumbent's meta record
-expiring (`LIMIT_ORDER_SHARED_READINESS_TTL_SECONDS`). Diagnostics:
-`ProviderTradeReadinessPublisher.ownershipSnapshot()`, plus the log events
+Old-generation socket callbacks are fenced as well: every supervisor callback
+captures its connection generation at connect time, so a late frame or ACK
+from a replaced socket carries the OLD generation and the registry's
+generation guard makes it a no-op — it can neither ready the current
+generation nor feed matching evidence (`resolveAsset` is generation-checked).
+
+Diagnostics: `ProviderTradeReadinessPublisher.ownershipSnapshot()` (fencing
+epoch, generation, refusal reason), plus the log events
 `limit_order_shared_readiness_owner_acquired`,
-`limit_order_shared_readiness_not_owner` and
+`limit_order_shared_readiness_not_owner`,
+`limit_order_shared_readiness_no_owner_lease` and
 `limit_order_shared_readiness_fenced_out`.
 
-**Rolling deploys.** The record schema version is 2 (fencing added the token). A
-v1 and a v2 instance reject each other's records, so during a mixed-version
-rollout shared readiness resolves to unavailable and new limit quotes/creates
-fail closed until the rollout completes. Cancel, market orders, FX and existing
-reservations are unaffected. Deploy the socket owner and the API pods in one
-rollout, or leave `LIMIT_ORDER_SHARED_READINESS_ENABLED=false` during it.
+**Rolling deploys.** The record schema version is 3 and the key prefix moved
+to `v2` (lease-derived fencing), so mixed-version instances do not even share
+keys: readiness resolves to unavailable (fail-closed) until the rollout
+completes. Cancel, market orders, FX and existing reservations are unaffected.
+Deploy the socket owner and the API pods in one rollout, or leave
+`LIMIT_ORDER_SHARED_READINESS_ENABLED=false` during it.
+
+**Requirement.** Shared readiness REQUIRES the live-candle supervisor as the
+socket owner (it is what holds the lease). A deployment on the legacy
+streaming services cannot publish the shared view; non-owner instances then
+fail closed by design.
 
 **Publishing cadence.** `ProviderTradeReadinessPublisher` mirrors the registry
 on a timer rather than write-through, because the TTL is the owner heartbeat
@@ -390,16 +421,20 @@ mismatch -> unavailable; Redis error or unknown schema version -> unavailable.
 
 Verified by `scripts/limit-order-shared-readiness-integration.ts`
 (`LIMIT_ORDER_SHARED_READINESS_INTEGRATION=1`) using TWO independent
-service/registry instances against one real Redis — a single-process unit test
-cannot demonstrate cross-instance agreement. It covers cross-instance
-readiness, every not-ready subscription state, stale heartbeats, reconnect
-generation invalidation, late releases, **the whole create readiness path on a
-non-owner instance** (pre-transaction proof, in-transaction re-verification,
-and the local-only check still failing there), fail-closed once the owner
-disappears, and the fencing scenarios: a rival refused while the owner
-heartbeats, a fenced-out owner unable to overwrite the new one even with a
-clock an hour ahead, and a fenced-out publisher surrendering instead of
-republishing.
+service/registry instances against one real Redis AND one real PostgreSQL — a
+single-process unit test cannot demonstrate either family. It covers the key
+slot invariant, cross-instance readiness, every not-ready subscription state,
+stale heartbeats, reconnect generation invalidation, the lease fencing matrix
+(a lease-less publisher refused despite a local owner claim; a wrong lease
+token refused with the current epoch; a stale epoch refused with the live
+token; an old owner refused after takeover even with a clock an hour ahead
+while the new owner publishes with a clock an hour behind; an old-generation
+socket ACK unable to ready the current generation; late releases as no-ops),
+**the whole non-owner Quote→Create financial flow** (durable quote, readiness
+proof, reservation moved with balance untouched, submitted order, idempotent
+replay, proof mismatch/expiry refusals), and fail-closed with no reservation
+and no order once the owner disappears — plus the no-secrets scan, which also
+asserts the RAW lease token never reaches Redis.
 
 ## No per-event database lookups (phase 3)
 

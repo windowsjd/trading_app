@@ -28,10 +28,14 @@ export type AggregateLimitOrderProcessedCandle = {
 
 export type LimitOrderProcessedCandleAvgAggregateOutputType = {
   matchedOrderCount: number | null
+  candleIngestSeq: number | null
+  revisionCount: number | null
 }
 
 export type LimitOrderProcessedCandleSumAggregateOutputType = {
   matchedOrderCount: number | null
+  candleIngestSeq: bigint | null
+  revisionCount: number | null
 }
 
 export type LimitOrderProcessedCandleMinAggregateOutputType = {
@@ -44,6 +48,9 @@ export type LimitOrderProcessedCandleMinAggregateOutputType = {
   matchedOrderCount: number | null
   result: string | null
   skipReason: string | null
+  candleIngestSeq: bigint | null
+  revisionCount: number | null
+  firstProcessedAt: Date | null
   createdAt: Date | null
 }
 
@@ -57,6 +64,9 @@ export type LimitOrderProcessedCandleMaxAggregateOutputType = {
   matchedOrderCount: number | null
   result: string | null
   skipReason: string | null
+  candleIngestSeq: bigint | null
+  revisionCount: number | null
+  firstProcessedAt: Date | null
   createdAt: Date | null
 }
 
@@ -70,6 +80,9 @@ export type LimitOrderProcessedCandleCountAggregateOutputType = {
   matchedOrderCount: number
   result: number
   skipReason: number
+  candleIngestSeq: number
+  revisionCount: number
+  firstProcessedAt: number
   createdAt: number
   _all: number
 }
@@ -77,10 +90,14 @@ export type LimitOrderProcessedCandleCountAggregateOutputType = {
 
 export type LimitOrderProcessedCandleAvgAggregateInputType = {
   matchedOrderCount?: true
+  candleIngestSeq?: true
+  revisionCount?: true
 }
 
 export type LimitOrderProcessedCandleSumAggregateInputType = {
   matchedOrderCount?: true
+  candleIngestSeq?: true
+  revisionCount?: true
 }
 
 export type LimitOrderProcessedCandleMinAggregateInputType = {
@@ -93,6 +110,9 @@ export type LimitOrderProcessedCandleMinAggregateInputType = {
   matchedOrderCount?: true
   result?: true
   skipReason?: true
+  candleIngestSeq?: true
+  revisionCount?: true
+  firstProcessedAt?: true
   createdAt?: true
 }
 
@@ -106,6 +126,9 @@ export type LimitOrderProcessedCandleMaxAggregateInputType = {
   matchedOrderCount?: true
   result?: true
   skipReason?: true
+  candleIngestSeq?: true
+  revisionCount?: true
+  firstProcessedAt?: true
   createdAt?: true
 }
 
@@ -119,6 +142,9 @@ export type LimitOrderProcessedCandleCountAggregateInputType = {
   matchedOrderCount?: true
   result?: true
   skipReason?: true
+  candleIngestSeq?: true
+  revisionCount?: true
+  firstProcessedAt?: true
   createdAt?: true
   _all?: true
 }
@@ -219,6 +245,9 @@ export type LimitOrderProcessedCandleGroupByOutputType = {
   matchedOrderCount: number
   result: string
   skipReason: string | null
+  candleIngestSeq: bigint
+  revisionCount: number
+  firstProcessedAt: Date
   createdAt: Date
   _count: LimitOrderProcessedCandleCountAggregateOutputType | null
   _avg: LimitOrderProcessedCandleAvgAggregateOutputType | null
@@ -255,6 +284,9 @@ export type LimitOrderProcessedCandleWhereInput = {
   matchedOrderCount?: Prisma.IntFilter<"LimitOrderProcessedCandle"> | number
   result?: Prisma.StringFilter<"LimitOrderProcessedCandle"> | string
   skipReason?: Prisma.StringNullableFilter<"LimitOrderProcessedCandle"> | string | null
+  candleIngestSeq?: Prisma.BigIntFilter<"LimitOrderProcessedCandle"> | bigint | number
+  revisionCount?: Prisma.IntFilter<"LimitOrderProcessedCandle"> | number
+  firstProcessedAt?: Prisma.DateTimeFilter<"LimitOrderProcessedCandle"> | Date | string
   createdAt?: Prisma.DateTimeFilter<"LimitOrderProcessedCandle"> | Date | string
   marketCandle?: Prisma.XOR<Prisma.MarketCandleScalarRelationFilter, Prisma.MarketCandleWhereInput>
 }
@@ -269,6 +301,9 @@ export type LimitOrderProcessedCandleOrderByWithRelationInput = {
   matchedOrderCount?: Prisma.SortOrder
   result?: Prisma.SortOrder
   skipReason?: Prisma.SortOrderInput | Prisma.SortOrder
+  candleIngestSeq?: Prisma.SortOrder
+  revisionCount?: Prisma.SortOrder
+  firstProcessedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   marketCandle?: Prisma.MarketCandleOrderByWithRelationInput
 }
@@ -286,6 +321,9 @@ export type LimitOrderProcessedCandleWhereUniqueInput = Prisma.AtLeast<{
   matchedOrderCount?: Prisma.IntFilter<"LimitOrderProcessedCandle"> | number
   result?: Prisma.StringFilter<"LimitOrderProcessedCandle"> | string
   skipReason?: Prisma.StringNullableFilter<"LimitOrderProcessedCandle"> | string | null
+  candleIngestSeq?: Prisma.BigIntFilter<"LimitOrderProcessedCandle"> | bigint | number
+  revisionCount?: Prisma.IntFilter<"LimitOrderProcessedCandle"> | number
+  firstProcessedAt?: Prisma.DateTimeFilter<"LimitOrderProcessedCandle"> | Date | string
   createdAt?: Prisma.DateTimeFilter<"LimitOrderProcessedCandle"> | Date | string
   marketCandle?: Prisma.XOR<Prisma.MarketCandleScalarRelationFilter, Prisma.MarketCandleWhereInput>
 }, "marketCandleId">
@@ -300,6 +338,9 @@ export type LimitOrderProcessedCandleOrderByWithAggregationInput = {
   matchedOrderCount?: Prisma.SortOrder
   result?: Prisma.SortOrder
   skipReason?: Prisma.SortOrderInput | Prisma.SortOrder
+  candleIngestSeq?: Prisma.SortOrder
+  revisionCount?: Prisma.SortOrder
+  firstProcessedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.LimitOrderProcessedCandleCountOrderByAggregateInput
   _avg?: Prisma.LimitOrderProcessedCandleAvgOrderByAggregateInput
@@ -321,6 +362,9 @@ export type LimitOrderProcessedCandleScalarWhereWithAggregatesInput = {
   matchedOrderCount?: Prisma.IntWithAggregatesFilter<"LimitOrderProcessedCandle"> | number
   result?: Prisma.StringWithAggregatesFilter<"LimitOrderProcessedCandle"> | string
   skipReason?: Prisma.StringNullableWithAggregatesFilter<"LimitOrderProcessedCandle"> | string | null
+  candleIngestSeq?: Prisma.BigIntWithAggregatesFilter<"LimitOrderProcessedCandle"> | bigint | number
+  revisionCount?: Prisma.IntWithAggregatesFilter<"LimitOrderProcessedCandle"> | number
+  firstProcessedAt?: Prisma.DateTimeWithAggregatesFilter<"LimitOrderProcessedCandle"> | Date | string
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"LimitOrderProcessedCandle"> | Date | string
 }
 
@@ -333,6 +377,9 @@ export type LimitOrderProcessedCandleCreateInput = {
   matchedOrderCount: number
   result: string
   skipReason?: string | null
+  candleIngestSeq: bigint | number
+  revisionCount?: number
+  firstProcessedAt?: Date | string
   createdAt?: Date | string
   marketCandle: Prisma.MarketCandleCreateNestedOneWithoutLimitOrderProcessedByInput
 }
@@ -347,6 +394,9 @@ export type LimitOrderProcessedCandleUncheckedCreateInput = {
   matchedOrderCount: number
   result: string
   skipReason?: string | null
+  candleIngestSeq: bigint | number
+  revisionCount?: number
+  firstProcessedAt?: Date | string
   createdAt?: Date | string
 }
 
@@ -359,6 +409,9 @@ export type LimitOrderProcessedCandleUpdateInput = {
   matchedOrderCount?: Prisma.IntFieldUpdateOperationsInput | number
   result?: Prisma.StringFieldUpdateOperationsInput | string
   skipReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleIngestSeq?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  firstProcessedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   marketCandle?: Prisma.MarketCandleUpdateOneRequiredWithoutLimitOrderProcessedByNestedInput
 }
@@ -373,6 +426,9 @@ export type LimitOrderProcessedCandleUncheckedUpdateInput = {
   matchedOrderCount?: Prisma.IntFieldUpdateOperationsInput | number
   result?: Prisma.StringFieldUpdateOperationsInput | string
   skipReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleIngestSeq?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  firstProcessedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -386,6 +442,9 @@ export type LimitOrderProcessedCandleCreateManyInput = {
   matchedOrderCount: number
   result: string
   skipReason?: string | null
+  candleIngestSeq: bigint | number
+  revisionCount?: number
+  firstProcessedAt?: Date | string
   createdAt?: Date | string
 }
 
@@ -398,6 +457,9 @@ export type LimitOrderProcessedCandleUpdateManyMutationInput = {
   matchedOrderCount?: Prisma.IntFieldUpdateOperationsInput | number
   result?: Prisma.StringFieldUpdateOperationsInput | string
   skipReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleIngestSeq?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  firstProcessedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -411,6 +473,9 @@ export type LimitOrderProcessedCandleUncheckedUpdateManyInput = {
   matchedOrderCount?: Prisma.IntFieldUpdateOperationsInput | number
   result?: Prisma.StringFieldUpdateOperationsInput | string
   skipReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleIngestSeq?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  firstProcessedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -434,11 +499,16 @@ export type LimitOrderProcessedCandleCountOrderByAggregateInput = {
   matchedOrderCount?: Prisma.SortOrder
   result?: Prisma.SortOrder
   skipReason?: Prisma.SortOrder
+  candleIngestSeq?: Prisma.SortOrder
+  revisionCount?: Prisma.SortOrder
+  firstProcessedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
 export type LimitOrderProcessedCandleAvgOrderByAggregateInput = {
   matchedOrderCount?: Prisma.SortOrder
+  candleIngestSeq?: Prisma.SortOrder
+  revisionCount?: Prisma.SortOrder
 }
 
 export type LimitOrderProcessedCandleMaxOrderByAggregateInput = {
@@ -451,6 +521,9 @@ export type LimitOrderProcessedCandleMaxOrderByAggregateInput = {
   matchedOrderCount?: Prisma.SortOrder
   result?: Prisma.SortOrder
   skipReason?: Prisma.SortOrder
+  candleIngestSeq?: Prisma.SortOrder
+  revisionCount?: Prisma.SortOrder
+  firstProcessedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -464,11 +537,16 @@ export type LimitOrderProcessedCandleMinOrderByAggregateInput = {
   matchedOrderCount?: Prisma.SortOrder
   result?: Prisma.SortOrder
   skipReason?: Prisma.SortOrder
+  candleIngestSeq?: Prisma.SortOrder
+  revisionCount?: Prisma.SortOrder
+  firstProcessedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
 export type LimitOrderProcessedCandleSumOrderByAggregateInput = {
   matchedOrderCount?: Prisma.SortOrder
+  candleIngestSeq?: Prisma.SortOrder
+  revisionCount?: Prisma.SortOrder
 }
 
 export type LimitOrderProcessedCandleCreateNestedManyWithoutMarketCandleInput = {
@@ -522,6 +600,9 @@ export type LimitOrderProcessedCandleCreateWithoutMarketCandleInput = {
   matchedOrderCount: number
   result: string
   skipReason?: string | null
+  candleIngestSeq: bigint | number
+  revisionCount?: number
+  firstProcessedAt?: Date | string
   createdAt?: Date | string
 }
 
@@ -534,6 +615,9 @@ export type LimitOrderProcessedCandleUncheckedCreateWithoutMarketCandleInput = {
   matchedOrderCount: number
   result: string
   skipReason?: string | null
+  candleIngestSeq: bigint | number
+  revisionCount?: number
+  firstProcessedAt?: Date | string
   createdAt?: Date | string
 }
 
@@ -576,6 +660,9 @@ export type LimitOrderProcessedCandleScalarWhereInput = {
   matchedOrderCount?: Prisma.IntFilter<"LimitOrderProcessedCandle"> | number
   result?: Prisma.StringFilter<"LimitOrderProcessedCandle"> | string
   skipReason?: Prisma.StringNullableFilter<"LimitOrderProcessedCandle"> | string | null
+  candleIngestSeq?: Prisma.BigIntFilter<"LimitOrderProcessedCandle"> | bigint | number
+  revisionCount?: Prisma.IntFilter<"LimitOrderProcessedCandle"> | number
+  firstProcessedAt?: Prisma.DateTimeFilter<"LimitOrderProcessedCandle"> | Date | string
   createdAt?: Prisma.DateTimeFilter<"LimitOrderProcessedCandle"> | Date | string
 }
 
@@ -588,6 +675,9 @@ export type LimitOrderProcessedCandleCreateManyMarketCandleInput = {
   matchedOrderCount: number
   result: string
   skipReason?: string | null
+  candleIngestSeq: bigint | number
+  revisionCount?: number
+  firstProcessedAt?: Date | string
   createdAt?: Date | string
 }
 
@@ -600,6 +690,9 @@ export type LimitOrderProcessedCandleUpdateWithoutMarketCandleInput = {
   matchedOrderCount?: Prisma.IntFieldUpdateOperationsInput | number
   result?: Prisma.StringFieldUpdateOperationsInput | string
   skipReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleIngestSeq?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  firstProcessedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -612,6 +705,9 @@ export type LimitOrderProcessedCandleUncheckedUpdateWithoutMarketCandleInput = {
   matchedOrderCount?: Prisma.IntFieldUpdateOperationsInput | number
   result?: Prisma.StringFieldUpdateOperationsInput | string
   skipReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleIngestSeq?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  firstProcessedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -624,6 +720,9 @@ export type LimitOrderProcessedCandleUncheckedUpdateManyWithoutMarketCandleInput
   matchedOrderCount?: Prisma.IntFieldUpdateOperationsInput | number
   result?: Prisma.StringFieldUpdateOperationsInput | string
   skipReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  candleIngestSeq?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  firstProcessedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -639,6 +738,9 @@ export type LimitOrderProcessedCandleSelect<ExtArgs extends runtime.Types.Extens
   matchedOrderCount?: boolean
   result?: boolean
   skipReason?: boolean
+  candleIngestSeq?: boolean
+  revisionCount?: boolean
+  firstProcessedAt?: boolean
   createdAt?: boolean
   marketCandle?: boolean | Prisma.MarketCandleDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["limitOrderProcessedCandle"]>
@@ -653,6 +755,9 @@ export type LimitOrderProcessedCandleSelectCreateManyAndReturn<ExtArgs extends r
   matchedOrderCount?: boolean
   result?: boolean
   skipReason?: boolean
+  candleIngestSeq?: boolean
+  revisionCount?: boolean
+  firstProcessedAt?: boolean
   createdAt?: boolean
   marketCandle?: boolean | Prisma.MarketCandleDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["limitOrderProcessedCandle"]>
@@ -667,6 +772,9 @@ export type LimitOrderProcessedCandleSelectUpdateManyAndReturn<ExtArgs extends r
   matchedOrderCount?: boolean
   result?: boolean
   skipReason?: boolean
+  candleIngestSeq?: boolean
+  revisionCount?: boolean
+  firstProcessedAt?: boolean
   createdAt?: boolean
   marketCandle?: boolean | Prisma.MarketCandleDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["limitOrderProcessedCandle"]>
@@ -681,10 +789,13 @@ export type LimitOrderProcessedCandleSelectScalar = {
   matchedOrderCount?: boolean
   result?: boolean
   skipReason?: boolean
+  candleIngestSeq?: boolean
+  revisionCount?: boolean
+  firstProcessedAt?: boolean
   createdAt?: boolean
 }
 
-export type LimitOrderProcessedCandleOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"marketCandleId" | "assetId" | "interval" | "openTime" | "closeTime" | "processedAt" | "matchedOrderCount" | "result" | "skipReason" | "createdAt", ExtArgs["result"]["limitOrderProcessedCandle"]>
+export type LimitOrderProcessedCandleOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"marketCandleId" | "assetId" | "interval" | "openTime" | "closeTime" | "processedAt" | "matchedOrderCount" | "result" | "skipReason" | "candleIngestSeq" | "revisionCount" | "firstProcessedAt" | "createdAt", ExtArgs["result"]["limitOrderProcessedCandle"]>
 export type LimitOrderProcessedCandleInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   marketCandle?: boolean | Prisma.MarketCandleDefaultArgs<ExtArgs>
 }
@@ -710,6 +821,9 @@ export type $LimitOrderProcessedCandlePayload<ExtArgs extends runtime.Types.Exte
     matchedOrderCount: number
     result: string
     skipReason: string | null
+    candleIngestSeq: bigint
+    revisionCount: number
+    firstProcessedAt: Date
     createdAt: Date
   }, ExtArgs["result"]["limitOrderProcessedCandle"]>
   composites: {}
@@ -1144,6 +1258,9 @@ export interface LimitOrderProcessedCandleFieldRefs {
   readonly matchedOrderCount: Prisma.FieldRef<"LimitOrderProcessedCandle", 'Int'>
   readonly result: Prisma.FieldRef<"LimitOrderProcessedCandle", 'String'>
   readonly skipReason: Prisma.FieldRef<"LimitOrderProcessedCandle", 'String'>
+  readonly candleIngestSeq: Prisma.FieldRef<"LimitOrderProcessedCandle", 'BigInt'>
+  readonly revisionCount: Prisma.FieldRef<"LimitOrderProcessedCandle", 'Int'>
+  readonly firstProcessedAt: Prisma.FieldRef<"LimitOrderProcessedCandle", 'DateTime'>
   readonly createdAt: Prisma.FieldRef<"LimitOrderProcessedCandle", 'DateTime'>
 }
     

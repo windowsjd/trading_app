@@ -95,6 +95,12 @@ describe('Limit order matcher end-to-end integration', () => {
       // consumer had been running the whole time.
       expect(result.stdout).toContain('matcherDrainEventsPerSecond');
       expect(result.stdout).toContain('runnerXaddEventsPerSecond');
+      // The split instrumentation: XADD->processed (ACK start) and the ACK
+      // round trip are separate, real samples; the per-event boundary wait is
+      // reported as unmeasured, never as a fake constant.
+      expect(result.stdout).toContain('xaddToProcessedMsP50');
+      expect(result.stdout).toContain('ackRoundTripMsP50');
+      expect(result.stdout).toContain('"boundaryWait":"not_measured"');
       expect(result.stdout).not.toContain('drainEventsPerSecond"');
       expect(result.stdout).not.toContain('endToEndEventsPerSecond');
       // Nothing is printed that was not measured; `boundaryWaitMs` was a

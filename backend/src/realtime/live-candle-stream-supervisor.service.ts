@@ -189,6 +189,13 @@ export class LiveCandleStreamSupervisorService
       // when automatic matching is off, so the legacy streaming service can
       // always tell whether a canonical connection already exists.
       this.routes.claimProvider(provider, 'live_candle_supervisor');
+      // Register the Redis lease BACKING the claim. This is what lets the
+      // shared-readiness publisher prove ownership inside Redis at write
+      // time; a local claim with no lease is never publishable.
+      this.routes.setOwnerLease(provider, 'live_candle_supervisor', {
+        key: leaseKey,
+        token: acquired.lock.token,
+      });
       this.health.updateProvider(provider, {
         owner: true,
         state: 'connecting',
@@ -216,6 +223,15 @@ export class LiveCandleStreamSupervisorService
         .then((renewed) => {
           if (renewed || context.lost) return;
           context.lost = true;
+          // The lease is gone, so the shared-readiness publisher must stop
+          // treating this process as provable owner IMMEDIATELY — not when
+          // the socket close handshake finally lets the ownership loop
+          // release the route. The Redis-side lease check would refuse the
+          // publish anyway; this just stops the attempt at the source.
+          this.routes.clearOwnerLease(
+            context.provider,
+            'live_candle_supervisor',
+          );
           context.socket?.close(4003, 'owner lease lost');
           this.health.updateProvider(context.provider, {
             owner: false,
@@ -346,16 +362,28 @@ export class LiveCandleStreamSupervisorService
       `${provider.binance.wsMarketDataBaseUrl.replace(/\/+$/u, '')}/ws`,
     );
     context.socket = socket;
+    // Captured ONCE per connection. Every callback below uses this constant,
+    // never `context.connectionGeneration`: a late event from a socket the
+    // reconnect loop has already replaced would otherwise read the NEW
+    // generation off the context and attribute an old socket's frame or ACK
+    // to the current connection. With the captured value, the registry's own
+    // generation guard turns every late mutation into a no-op.
+    const generation = context.connectionGeneration;
+    const isCurrent = () =>
+      context.socket === socket &&
+      context.connectionGeneration === generation &&
+      !context.lost &&
+      !this.stopping;
     await waitForOpen(socket);
     if (context.lost || this.stopping) return;
     this.routes.markConnectionOpen({
       provider: 'binance',
-      generation: context.connectionGeneration,
+      generation,
       at: Date.now(),
     });
     this.routes.registerSubscriptionTargets({
       provider: 'binance',
-      generation: context.connectionGeneration,
+      generation,
       assets: subscribedSymbols.map((symbol) =>
         binanceSubscribedAsset(
           bySymbol.get(symbol) as LiveCandleTradeAsset,
@@ -393,11 +421,12 @@ export class LiveCandleStreamSupervisorService
     }, BINANCE_CONNECTION_LIFETIME_MS);
     rollover.unref?.();
     socket.on('ping', (data?: Buffer) => {
+      if (!isCurrent()) return;
       socket.pong?.(data);
       lastFrameAt = Date.now();
       this.routes.markFrame({
         provider: 'binance',
-        generation: context.connectionGeneration,
+        generation,
         at: lastFrameAt,
       });
       this.health.updateProvider('binance', {
@@ -407,16 +436,17 @@ export class LiveCandleStreamSupervisorService
       });
     });
     socket.on('message', (data: unknown) => {
+      if (!isCurrent()) return;
       lastFrameAt = Date.now();
       this.routes.markFrame({
         provider: 'binance',
-        generation: context.connectionGeneration,
+        generation,
         at: lastFrameAt,
       });
       this.health.updateProvider('binance', {
         lastFrameAt: new Date().toISOString(),
       });
-      this.handleBinanceMessage(data, bySymbol, context);
+      this.handleBinanceMessage(data, bySymbol, context, generation);
     });
     socket.send(
       JSON.stringify({ method: 'SUBSCRIBE', params: streams, id: 1 }),
@@ -494,16 +524,25 @@ export class LiveCandleStreamSupervisorService
     );
     const socket = this.socketFactory(provider.kis.wsBaseUrl);
     context.socket = socket;
+    // Same per-connection capture as the Binance side: callbacks must never
+    // read the mutable context generation, or a late frame from a replaced
+    // socket would be attributed to the current connection.
+    const generation = context.connectionGeneration;
+    const isCurrent = () =>
+      context.socket === socket &&
+      context.connectionGeneration === generation &&
+      !context.lost &&
+      !this.stopping;
     await waitForOpen(socket);
     if (context.lost || this.stopping) return;
     this.routes.markConnectionOpen({
       provider: 'kis',
-      generation: context.connectionGeneration,
+      generation,
       at: Date.now(),
     });
     this.routes.registerSubscriptionTargets({
       provider: 'kis',
-      generation: context.connectionGeneration,
+      generation,
       assets: targets.map(({ asset, target }) =>
         kisSubscribedAsset(asset, target.trKey),
       ),
@@ -531,11 +570,12 @@ export class LiveCandleStreamSupervisorService
     );
     heartbeat.unref?.();
     socket.on('ping', (data?: Buffer) => {
+      if (!isCurrent()) return;
       socket.pong?.(data);
       lastFrameAt = Date.now();
       this.routes.markFrame({
         provider: 'kis',
-        generation: context.connectionGeneration,
+        generation,
         at: lastFrameAt,
       });
       this.health.updateProvider('kis', {
@@ -545,16 +585,17 @@ export class LiveCandleStreamSupervisorService
       });
     });
     socket.on('message', (data: unknown) => {
+      if (!isCurrent()) return;
       lastFrameAt = Date.now();
       this.routes.markFrame({
         provider: 'kis',
-        generation: context.connectionGeneration,
+        generation,
         at: lastFrameAt,
       });
       this.health.updateProvider('kis', {
         lastFrameAt: new Date().toISOString(),
       });
-      this.handleKisMessage(data, byKey, context);
+      this.handleKisMessage(data, byKey, context, generation);
     });
     for (const { target } of targets) {
       socket.send(
@@ -587,6 +628,9 @@ export class LiveCandleStreamSupervisorService
     data: unknown,
     assets: Map<string, LiveCandleTradeAsset>,
     context: OwnedProviderContext,
+    // The generation CAPTURED when this socket connected — never read off the
+    // context, which a reconnect mutates under late callbacks.
+    generation: string,
   ): void {
     const text = socketDataToText(data);
     if (!text) return this.health.increment('eventsRejected');
@@ -598,18 +642,18 @@ export class LiveCandleStreamSupervisorService
       // activation signal for every stream in the batch.
       this.routes.markSubscriptionsActive({
         provider: 'binance',
-        generation: context.connectionGeneration,
+        generation,
       });
       return;
     }
     if (parsed.state === 'trade') {
       const tradeAsset = assets.get(parsed.trade.symbol);
       if (!tradeAsset) return this.health.increment('eventsRejected');
-      this.publishNormalizedTrade(context, {
+      this.publishNormalizedTrade(context, generation, {
         provider: 'binance',
         providerEventId: parsed.trade.tradeId,
         providerSequence: parsed.trade.tradeId,
-        providerConnectionId: context.connectionGeneration,
+        providerConnectionId: generation,
         assetId: tradeAsset.id,
         symbol: tradeAsset.symbol,
         providerSymbol: parsed.trade.symbol,
@@ -630,7 +674,7 @@ export class LiveCandleStreamSupervisorService
           this.recordSubscriptionFailure('binance');
           this.routes.markSubscriptionsFailed({
             provider: 'binance',
-            generation: context.connectionGeneration,
+            generation,
           });
           context.socket?.close(1011, 'subscription rejected');
         }
@@ -686,6 +730,8 @@ export class LiveCandleStreamSupervisorService
     data: unknown,
     assets: Map<string, LiveCandleTradeAsset>,
     context: OwnedProviderContext,
+    // Captured at connect time; see handleBinanceMessage.
+    generation: string,
   ): void {
     const text = socketDataToText(data);
     if (!text) return this.health.increment('eventsRejected');
@@ -713,7 +759,7 @@ export class LiveCandleStreamSupervisorService
         // tr_key; only that asset becomes ready.
         this.routes.markSubscriptionsActive({
           provider: 'kis',
-          generation: context.connectionGeneration,
+          generation,
           match: subscriptionKeyMatcher(parsed.trKey),
         });
         this.health.updateProvider('kis', {
@@ -727,7 +773,7 @@ export class LiveCandleStreamSupervisorService
           this.recordSubscriptionFailure('kis', 1);
           this.routes.markSubscriptionsFailed({
             provider: 'kis',
-            generation: context.connectionGeneration,
+            generation,
             match: subscriptionKeyMatcher(parsed.trKey),
           });
           this.logReconnect('kis', 'subscription_rejected', Date.now());
@@ -748,11 +794,11 @@ export class LiveCandleStreamSupervisorService
       // The SAME parsed trade record feeds the candle pipeline, the price
       // display pub/sub, and the limit-order matcher. The frame is parsed
       // exactly once, above.
-      this.publishNormalizedTrade(context, {
+      this.publishNormalizedTrade(context, generation, {
         provider: 'kis',
         providerEventId: trade.eventId,
         providerSequence: trade.sequence,
-        providerConnectionId: context.connectionGeneration,
+        providerConnectionId: generation,
         assetId: asset.id,
         symbol: asset.symbol,
         providerSymbol: trade.providerSymbol,
@@ -885,6 +931,10 @@ export class LiveCandleStreamSupervisorService
    */
   private publishNormalizedTrade(
     context: OwnedProviderContext,
+    // Captured at connect time. resolveAsset checks it against the registry's
+    // CURRENT generation, so a trade from a replaced socket resolves to null
+    // and is never turned into matching evidence.
+    generation: string,
     tick: Omit<
       Parameters<NormalizedProviderTradeEventBus['publish']>[0],
       'asset'
@@ -894,7 +944,7 @@ export class LiveCandleStreamSupervisorService
     const registered = this.routes.resolveAsset(
       context.provider,
       tick.assetId,
-      context.connectionGeneration,
+      generation,
     );
     // A trade for an asset that is not part of THIS generation's subscription
     // set is never turned into matching evidence.
@@ -907,7 +957,7 @@ export class LiveCandleStreamSupervisorService
         market: registered.market,
         assetType: registered.assetType,
         settlementCurrency: registered.settlementCurrency,
-        generation: context.connectionGeneration,
+        generation,
       },
     });
   }

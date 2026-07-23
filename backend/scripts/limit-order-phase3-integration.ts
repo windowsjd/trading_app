@@ -1263,6 +1263,7 @@ async function createClosedCandle(input: {
   low: string;
   sourceProvider: string;
   sourceUpdatedAt: Date;
+  ingestSeq: bigint;
 }> {
   const closeTime = new Date(input.openTime.getTime() + FIVE_MINUTES_MS);
   const created = await prisma.marketCandle.create({
@@ -1284,6 +1285,12 @@ async function createClosedCandle(input: {
     select: { id: true },
   });
   createdCandleIds.push(created.id);
+  // The storage revision is assigned by the market_candles trigger inside
+  // PostgreSQL, so it must be read back rather than assumed.
+  const stored = await prisma.marketCandle.findUniqueOrThrow({
+    where: { id: created.id },
+    select: { ingestSeq: true },
+  });
   return {
     id: created.id,
     assetId: input.assetIdOverride ?? assetId,
@@ -1293,6 +1300,7 @@ async function createClosedCandle(input: {
     low: input.low,
     sourceProvider: 'binance_spot_ws_5m_kline',
     sourceUpdatedAt: closeTime,
+    ingestSeq: stored.ingestSeq ?? 1n,
   };
 }
 
@@ -1332,6 +1340,7 @@ function candleTrigger(candle: {
   low: string;
   sourceProvider: string;
   sourceUpdatedAt: Date;
+  ingestSeq: bigint;
 }) {
   return {
     source: 'closed_5m_candle' as const,
@@ -1345,6 +1354,7 @@ function candleTrigger(candle: {
       sourceProvider: candle.sourceProvider,
       sourceUpdatedAt: candle.sourceUpdatedAt,
       finalizedAt: candle.sourceUpdatedAt,
+      ingestSeq: candle.ingestSeq,
     },
   };
 }

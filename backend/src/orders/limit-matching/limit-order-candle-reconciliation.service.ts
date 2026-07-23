@@ -20,6 +20,10 @@ import {
   LimitOrderReconciliationCheckpointRepository,
   type ReconciliationWatermark,
 } from './limit-order-reconciliation-checkpoint.repository';
+import {
+  LimitOrderWindowCompletionService,
+  type WindowCompletionSummary,
+} from './limit-order-window-completion.service';
 
 export class LimitOrderCandleReconciliationError extends Error {
   constructor(
@@ -60,6 +64,12 @@ export type LimitOrderCandleReconciliationSummary = {
   ingestCeilingHeld: boolean;
   gapDetected: boolean;
   degradedReason: string | null;
+  /**
+   * Per-asset window COMPLETION supervision (missing windows, no-trade
+   * certification, per-asset gaps). Null when the completion service is not
+   * wired (bare test rigs) or its pass failed this run.
+   */
+  windowCompletion: WindowCompletionSummary | null;
 };
 
 type CandleRow = CanonicalCandleRow & {
@@ -181,6 +191,9 @@ export class LimitOrderCandleReconciliationService {
     private readonly execution: LimitOrderExecutionService,
     private readonly boundary: LimitOrderMatchBoundaryService,
     private readonly checkpoints: LimitOrderReconciliationCheckpointRepository,
+    // Optional so bare test rigs that only exercise the row-scan path keep
+    // working; production wiring always provides it.
+    private readonly windowCompletion?: LimitOrderWindowCompletionService,
   ) {}
 
   isEnabled(): boolean {
@@ -229,6 +242,7 @@ export class LimitOrderCandleReconciliationService {
       ingestCeilingHeld: false,
       gapDetected: checkpoint.gapDetectedAt !== null,
       degradedReason: checkpoint.degradedReason,
+      windowCompletion: null,
     };
 
     // Retention may have removed rows the watermark has not reached yet. This
@@ -244,11 +258,32 @@ export class LimitOrderCandleReconciliationService {
       summary.degradedReason = gap.reason;
     }
 
-    // 1. Durable retry queue first: the oldest unfinished work goes before new
+    // 1. WINDOW COMPLETION first: account for windows whose candle row may be
+    //    ABSENT — the one thing the row scan below structurally cannot see.
+    //    Per-asset cursors, per-asset pendings, per-asset gaps; one stalled
+    //    asset never stops another. A supervision failure is logged and the
+    //    row sweep continues: existing-row fills must not be hostage to the
+    //    absence detector, and the asset gate stays fail-closed through the
+    //    ageing pending markers either way.
+    if (this.windowCompletion) {
+      summary.windowCompletion = await this.windowCompletion
+        .supervise(now)
+        .catch((error: unknown) => {
+          this.logger.error(
+            JSON.stringify({
+              event: 'limit_order_window_completion_failed',
+              error: error instanceof Error ? error.message : String(error),
+            }),
+          );
+          return null;
+        });
+    }
+
+    // 2. Durable retry queue: the oldest unfinished work goes before new
     //    windows, and a due retry must not be starved by a busy live stream.
     await this.runDeferredRetries(now, orderBatchSize, summary);
 
-    // 2. Rows stored after the storage-order position, oldest first.
+    // 3. Rows stored after the storage-order position, oldest first.
     await this.runForwardScan(
       { checkpoint, ingestWatermark, observation },
       now,
@@ -608,6 +643,9 @@ export class LimitOrderCandleReconciliationService {
           AND NOT EXISTS (
             SELECT 1 FROM "limit_order_processed_candles" p
             WHERE p."market_candle_id" = c."id"
+              -- Revision-aware: a processed row only covers the revision it
+              -- recorded. A corrected candle (higher ingest_seq) reappears.
+              AND p."candle_ingest_seq" >= c."ingest_seq"
           )
           -- A candle already in the durable retry queue is tracked, not lost.
           -- Its own disappearance is signal 2, and a queue that stops draining
@@ -1048,14 +1086,24 @@ export class LimitOrderCandleReconciliationService {
     const lease = await this.boundary.acquireSession();
     let matchedOrderCount = 0;
     try {
+      // REVISION-AWARE dedupe: a processed row blocks re-examination only for
+      // the revision it covers. A corrected candle carries a HIGHER ingestSeq
+      // and is examined again; the status guard on orders keeps the re-run
+      // additive-only (an order executed under the previous revision can
+      // never fill twice), so only orders the correction NEWLY qualifies are
+      // touched.
       const alreadyProcessed =
         await this.prisma.limitOrderProcessedCandle.findUnique({
           where: { marketCandleId: candle.id },
-          select: { marketCandleId: true },
+          select: { candleIngestSeq: true },
         });
-      if (alreadyProcessed) {
+      if (
+        alreadyProcessed &&
+        alreadyProcessed.candleIngestSeq >= candle.ingestSeq
+      ) {
         return { state: 'processed', result: 'skipped', matchedOrderCount: 0 };
       }
+      const isRevisionRerun = alreadyProcessed !== null;
 
       let previousCandidateIds = '';
       for (;;) {
@@ -1091,6 +1139,7 @@ export class LimitOrderCandleReconciliationService {
                 sourceProvider: candle.sourceProvider,
                 sourceUpdatedAt: candle.sourceUpdatedAt,
                 finalizedAt: candle.sourceUpdatedAt,
+                ingestSeq: candle.ingestSeq,
               },
             },
           });
@@ -1108,6 +1157,18 @@ export class LimitOrderCandleReconciliationService {
         matchedOrderCount > 0 ? 'matched' : 'skipped',
         matchedOrderCount > 0 ? null : 'no_eligible_orders',
       );
+      if (isRevisionRerun) {
+        this.logger.warn(
+          JSON.stringify({
+            event: 'limit_order_candle_revision_reprocessed',
+            marketCandleId: candle.id,
+            assetId: candle.assetId,
+            openTime: candle.openTime.toISOString(),
+            candleIngestSeq: candle.ingestSeq.toString(),
+            newlyMatchedOrders: matchedOrderCount,
+          }),
+        );
+      }
     } finally {
       await lease.release();
     }
@@ -1137,14 +1198,14 @@ export class LimitOrderCandleReconciliationService {
       : 'outside_session';
   }
 
-  private recordProcessed(
+  private async recordProcessed(
     candle: CandleRow,
     processedAt: Date,
     matchedOrderCount: number,
     result: 'matched' | 'skipped',
     skipReason: string | null,
-  ): Promise<unknown> {
-    return this.prisma.limitOrderProcessedCandle
+  ): Promise<void> {
+    await this.prisma.limitOrderProcessedCandle
       .create({
         data: {
           marketCandleId: candle.id,
@@ -1156,13 +1217,29 @@ export class LimitOrderCandleReconciliationService {
           matchedOrderCount,
           result,
           skipReason,
+          candleIngestSeq: candle.ingestSeq,
+          firstProcessedAt: processedAt,
         },
       })
-      .catch((error: unknown) => {
-        // A concurrent worker already recorded the same candle. The unique
-        // primary key is what makes the sweep idempotent.
-        if (isUniqueConstraintError(error)) return undefined;
-        throw error;
+      .catch(async (error: unknown) => {
+        if (!isUniqueConstraintError(error)) throw error;
+        // Either a concurrent worker recorded the SAME revision (idempotent
+        // no-op — the monotonic guard below refuses to move backwards), or
+        // this run reprocessed a NEWER revision of an already-recorded
+        // candle: advance the row to the revision just covered, keeping the
+        // first-processed instant and accumulating the match count for audit.
+        await this.prisma.$executeRaw`
+          UPDATE "limit_order_processed_candles"
+          SET
+            "candle_ingest_seq" = ${candle.ingestSeq.toString()}::bigint,
+            "processed_at" = ${processedAt},
+            "matched_order_count" = "matched_order_count" + ${matchedOrderCount},
+            "result" = ${result},
+            "skip_reason" = ${skipReason},
+            "revision_count" = "revision_count" + 1
+          WHERE "market_candle_id" = ${candle.id}
+            AND "candle_ingest_seq" < ${candle.ingestSeq.toString()}::bigint
+        `;
       });
   }
 
@@ -1243,6 +1320,9 @@ export class LimitOrderCandleReconciliationService {
           AND NOT EXISTS (
             SELECT 1 FROM "limit_order_processed_candles" p
             WHERE p."market_candle_id" = c."id"
+              -- Revision-aware: a processed row only covers the revision it
+              -- recorded. A corrected candle (higher ingest_seq) reappears.
+              AND p."candle_ingest_seq" >= c."ingest_seq"
           )
           AND NOT EXISTS (
             SELECT 1 FROM "limit_order_deferred_candles" d
@@ -1409,6 +1489,7 @@ function disabledSummary(): LimitOrderCandleReconciliationSummary {
     ingestCeilingHeld: false,
     gapDetected: false,
     degradedReason: null,
+    windowCompletion: null,
   };
 }
 

@@ -10,9 +10,12 @@ jest.mock('../generated/prisma/client', () => ({
 import type { RedisService } from '../redis/redis.service';
 import {
   PROVIDER_TRADE_READINESS_SCHEMA_VERSION,
+  assertReadinessKeySlots,
   providerAssetsKey,
-  providerFenceKey,
+  providerEpochHolderKey,
+  providerEpochKey,
   providerMetaKey,
+  providerOwnerLeaseKey,
   ProviderTradeReadinessStore,
   type SharedAssetRecord,
   type SharedProviderMeta,
@@ -29,7 +32,8 @@ function meta(overrides: Partial<SharedProviderMeta> = {}): SharedProviderMeta {
     ownerInstance: 'owner-a',
     source: 'live_candle_supervisor',
     generation: GENERATION,
-    fenceToken: 7,
+    fencingEpoch: 7,
+    leaseTokenDigest: 'ab12cd34ef56ab12',
     connected: true,
     connectedAt: NOW - 1000,
     lastFrameAt: NOW - 500,
@@ -77,12 +81,23 @@ function readiness(reply: unknown) {
 }
 
 describe('ProviderTradeReadinessStore key schema', () => {
-  it('hash-tags every key on the provider so one script can touch them all', () => {
-    // A clustered Redis routes by the {…} tag; without it the readiness script
-    // could not read the meta and the asset hash in a single atomic call.
-    expect(providerMetaKey('binance')).toContain('{binance}');
-    expect(providerAssetsKey('binance', GENERATION)).toContain('{binance}');
+  it('hash-tags every key on the PROVIDER OWNER LEASE KEY so the fenced scripts stay single-slot', () => {
+    // A clustered Redis routes by the {…} tag. The tag is the lease key
+    // itself, so the lease and every readiness key land on ONE slot and each
+    // mutating script can read the live lease in the same atomic call.
+    const lease = providerOwnerLeaseKey('binance');
+    expect(lease).toBe('candles:live:v1:owner:binance:0');
+    for (const key of [
+      providerMetaKey('binance'),
+      providerAssetsKey('binance', GENERATION),
+      providerEpochKey('binance'),
+      providerEpochHolderKey('binance'),
+    ]) {
+      expect(key).toContain(`{${lease}}`);
+    }
     expect(providerAssetsKey('binance', GENERATION)).toContain(GENERATION);
+    expect(() => assertReadinessKeySlots('binance')).not.toThrow();
+    expect(() => assertReadinessKeySlots('kis')).not.toThrow();
   });
 
   it('scopes the asset hash to the connection generation', () => {
@@ -242,14 +257,15 @@ describe('ProviderTradeReadinessStore.checkAssetReadiness', () => {
     }
   });
 
-  it('rejects a record with no usable fence token', async () => {
-    // Without a token the record cannot be attributed to a live owner, so it is
-    // not evidence of anything — including a v1 record during a rolling deploy.
-    for (const fenceToken of [undefined, null, 'seven', Number.NaN]) {
+  it('rejects a record with no usable fencing epoch', async () => {
+    // Without an epoch the record cannot be attributed to a live owner, so it
+    // is not evidence of anything — including an earlier-version record
+    // during a rolling deploy.
+    for (const fencingEpoch of [undefined, null, 'seven', Number.NaN]) {
       expect(
         await readiness([
           'ok',
-          JSON.stringify(meta({ fenceToken: fenceToken as never })),
+          JSON.stringify(meta({ fencingEpoch: fencingEpoch as never })),
           JSON.stringify(record()),
         ]),
       ).toMatchObject({
@@ -261,16 +277,16 @@ describe('ProviderTradeReadinessStore.checkAssetReadiness', () => {
 });
 
 /**
- * Owner fencing.
+ * Owner-lease fencing.
  *
- * Ownership used to be decided by comparing `lastUpdatedAt` between records
- * written on DIFFERENT HOSTS, so a superseded owner with a fast or
- * paused-then-resumed clock could overwrite the live owner's record and
- * publish the subscription set of a socket that no longer existed. The
- * ordering authority is now a Redis-generated token, and these pin down that
- * no timestamp reaches the decision at all.
+ * Publishing rights derive from the REAL provider owner lease — the Redis
+ * lock the live-candle supervisor holds while it owns the socket — never from
+ * a parallel readiness-only token and never from a timestamp. These pin down
+ * the store-side contract: which keys each script touches, that the lease
+ * token and fencing epoch are the only ordering arguments, and that no clock
+ * value reaches any comparison.
  */
-describe('ProviderTradeReadinessStore owner fencing', () => {
+describe('ProviderTradeReadinessStore owner-lease fencing', () => {
   function recordingRedis(reply: unknown) {
     const calls: Array<{ script: string; keys: string[]; args: string[] }> = [];
     const redis = {
@@ -283,91 +299,113 @@ describe('ProviderTradeReadinessStore owner fencing', () => {
     return { redis, calls };
   }
 
-  it('gives the fence counter its own never-expiring key', () => {
-    expect(providerFenceKey('binance')).toContain('{binance}');
-    expect(providerFenceKey('binance')).not.toBe(providerMetaKey('binance'));
-    expect(providerFenceKey('binance')).not.toBe(providerFenceKey('kis'));
+  it('gives the epoch counter its own never-expiring keys', () => {
+    expect(providerEpochKey('binance')).not.toBe(providerMetaKey('binance'));
+    expect(providerEpochKey('binance')).not.toBe(providerEpochKey('kis'));
+    expect(providerEpochHolderKey('binance')).not.toBe(
+      providerEpochKey('binance'),
+    );
   });
 
-  it('acquires a token and reports the incumbent when refused', async () => {
+  it('acquires an epoch only against the live lease and reports refusals', async () => {
     const granted = new ProviderTradeReadinessStore(
-      recordingRedis(['1', '42', 'owner-a']).redis,
+      recordingRedis(['1', '42', '']).redis,
     );
     expect(
       await granted.acquireOwnership({
         provider: 'binance',
-        ownerInstance: 'owner-a',
+        leaseToken: 'lease-token-a',
       }),
-    ).toEqual({ acquired: true, fenceToken: 42, heldBy: 'owner-a' });
+    ).toEqual({ acquired: true, fencingEpoch: 42, reason: null });
 
     const refused = new ProviderTradeReadinessStore(
-      recordingRedis(['0', '41', 'owner-b']).redis,
+      recordingRedis(['0', '', 'lease_held_by_other']).redis,
     );
     expect(
       await refused.acquireOwnership({
         provider: 'binance',
-        ownerInstance: 'owner-a',
+        leaseToken: 'lease-token-a',
       }),
-    ).toEqual({ acquired: false, fenceToken: null, heldBy: 'owner-b' });
+    ).toEqual({
+      acquired: false,
+      fencingEpoch: null,
+      reason: 'lease_held_by_other',
+    });
   });
 
-  it('acquires against BOTH the meta and the fence counter', async () => {
-    const { redis, calls } = recordingRedis(['1', '9', 'owner-a']);
+  it('acquires against the LEASE key plus the epoch keys, with INCR inside Redis', async () => {
+    const { redis, calls } = recordingRedis(['1', '9', '']);
     await new ProviderTradeReadinessStore(redis).acquireOwnership({
       provider: 'binance',
-      ownerInstance: 'owner-a',
+      leaseToken: 'lease-token-a',
     });
     expect(calls[0].keys).toEqual([
-      providerMetaKey('binance'),
-      providerFenceKey('binance'),
+      providerOwnerLeaseKey('binance'),
+      providerEpochKey('binance'),
+      providerEpochHolderKey('binance'),
     ]);
+    expect(calls[0].args).toEqual(['lease-token-a']);
     // The counter is INCRemented inside the script, never read-then-written
-    // from the client, or two instances could be handed the same token.
+    // from the client, or two owners could be handed the same epoch.
     expect(calls[0].script).toContain('INCR');
   });
 
-  it('publishes the fence token and never a clock as the ordering argument', async () => {
+  it('publishes under the lease token and epoch, never a clock', async () => {
     const { redis, calls } = recordingRedis(1);
     const store = new ProviderTradeReadinessStore(redis);
-    const published = meta({ fenceToken: 12, lastUpdatedAt: NOW });
+    const published = meta({ fencingEpoch: 12, lastUpdatedAt: NOW });
     expect(
-      await store.publishProvider({ meta: published, ttlSeconds: 30 }),
+      await store.publishProvider({
+        meta: published,
+        leaseToken: 'lease-token-a',
+        ttlSeconds: 30,
+      }),
     ).toBe(true);
 
-    const [payload, owner, ordering, ttl] = calls[0].args;
-    expect(JSON.parse(payload)).toMatchObject({ fenceToken: 12 });
-    expect(owner).toBe('owner-a');
-    expect(ordering).toBe('12');
-    expect(ordering).not.toBe(String(NOW));
+    expect(calls[0].keys).toEqual([
+      providerMetaKey('binance'),
+      providerOwnerLeaseKey('binance'),
+      providerEpochKey('binance'),
+    ]);
+    const [payload, leaseToken, epoch, ttl] = calls[0].args;
+    expect(JSON.parse(payload)).toMatchObject({ fencingEpoch: 12 });
+    expect(leaseToken).toBe('lease-token-a');
+    expect(epoch).toBe('12');
+    expect(epoch).not.toBe(String(NOW));
     expect(ttl).toBe('30');
     // The regression guard: no comparison in the script may involve a
     // client-supplied timestamp.
     expect(calls[0].script).not.toContain('lastUpdatedAt');
   });
 
-  it('carries the token into asset writes, releases and superseded cleanups', async () => {
+  it('guards asset writes with the same lease+epoch and epoch-guards releases', async () => {
     const { redis, calls } = recordingRedis(1);
     const store = new ProviderTradeReadinessStore(redis);
 
     await store.publishAssets({
       provider: 'binance',
       generation: GENERATION,
-      ownerInstance: 'owner-a',
-      fenceToken: 5,
+      leaseToken: 'lease-token-a',
+      fencingEpoch: 5,
       records: [record()],
       ttlSeconds: 30,
     });
     expect(calls[0].keys).toEqual([
       providerAssetsKey('binance', GENERATION),
-      providerMetaKey('binance'),
+      providerOwnerLeaseKey('binance'),
+      providerEpochKey('binance'),
     ]);
-    expect(calls[0].args.slice(0, 3)).toEqual(['30', '5', 'owner-a']);
+    expect(calls[0].args.slice(0, 3)).toEqual([
+      '30',
+      'lease-token-a',
+      '5',
+    ]);
 
     await store.release({
       provider: 'binance',
       generation: GENERATION,
       ownerInstance: 'owner-a',
-      fenceToken: 5,
+      fencingEpoch: 5,
     });
     expect(calls[1].args).toEqual([GENERATION, 'owner-a', '5']);
 
@@ -375,7 +413,7 @@ describe('ProviderTradeReadinessStore owner fencing', () => {
       provider: 'binance',
       supersededGeneration: 'gen-0',
       ownerInstance: 'owner-a',
-      fenceToken: 5,
+      fencingEpoch: 5,
     });
     expect(calls[2].args).toEqual(['gen-0', 'owner-a', '5']);
   });
@@ -384,7 +422,8 @@ describe('ProviderTradeReadinessStore owner fencing', () => {
     const store = new ProviderTradeReadinessStore(recordingRedis(0).redis);
     expect(
       await store.publishProvider({
-        meta: meta({ fenceToken: 3 }),
+        meta: meta({ fencingEpoch: 3 }),
+        leaseToken: 'lease-token-a',
         ttlSeconds: 30,
       }),
     ).toBe(false);
@@ -392,8 +431,8 @@ describe('ProviderTradeReadinessStore owner fencing', () => {
       await store.publishAssets({
         provider: 'binance',
         generation: GENERATION,
-        ownerInstance: 'owner-a',
-        fenceToken: 3,
+        leaseToken: 'lease-token-a',
+        fencingEpoch: 3,
         records: [record()],
         ttlSeconds: 30,
       }),
@@ -405,8 +444,12 @@ describe('ProviderTradeReadinessStore owner fencing', () => {
     expect(
       await store.acquireOwnership({
         provider: 'binance',
-        ownerInstance: 'owner-a',
+        leaseToken: 'lease-token-a',
       }),
-    ).toEqual({ acquired: false, fenceToken: null, heldBy: null });
+    ).toEqual({
+      acquired: false,
+      fencingEpoch: null,
+      reason: 'redis_unwired',
+    });
   });
 });

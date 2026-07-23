@@ -437,6 +437,41 @@ export class LimitOrderReconciliationCheckpointRepository {
     return row !== null;
   }
 
+  /**
+   * The asset's window-completion checkpoint, read for the asset-scoped
+   * health gate. Interval-fixed to the path-B 5m scope.
+   */
+  async findWindowCompletion(assetId: string): Promise<{
+    pendingWindowOpenTime: Date | null;
+    pendingSince: Date | null;
+    lastErrorCode: string | null;
+    degradedReason: string | null;
+    gapDetectedAt: Date | null;
+  } | null> {
+    return this.prisma.marketCandleFinalizationCheckpoint.findUnique({
+      where: {
+        assetId_interval: {
+          assetId,
+          interval: LIMIT_ORDER_RECONCILIATION_SCOPE,
+        },
+      },
+      select: {
+        pendingWindowOpenTime: true,
+        pendingSince: true,
+        lastErrorCode: true,
+        degradedReason: true,
+        gapDetectedAt: true,
+      },
+    });
+  }
+
+  /** Open deferred rows for ONE asset, for the asset-scoped backlog gate. */
+  countAssetDeferred(assetId: string): Promise<number> {
+    return this.prisma.limitOrderDeferredCandle.count({
+      where: { assetId, status: 'deferred' },
+    });
+  }
+
   async readBacklog(): Promise<DeferredBacklog> {
     const [open, permanent, oldest] = await Promise.all([
       this.prisma.limitOrderDeferredCandle.count({

@@ -83,6 +83,7 @@ export const ModelName = {
   LimitOrderProcessedEvent: 'LimitOrderProcessedEvent',
   LimitOrderCandleEvidence: 'LimitOrderCandleEvidence',
   LimitOrderProcessedCandle: 'LimitOrderProcessedCandle',
+  MarketCandleFinalizationCheckpoint: 'MarketCandleFinalizationCheckpoint',
   LimitOrderReconciliationCheckpoint: 'LimitOrderReconciliationCheckpoint',
   LimitOrderDeferredCandle: 'LimitOrderDeferredCandle'
 } as const
@@ -732,6 +733,7 @@ export type LimitOrderProcessedEventScalarFieldEnum = (typeof LimitOrderProcesse
 export const LimitOrderCandleEvidenceScalarFieldEnum = {
   id: 'id',
   marketCandleId: 'marketCandleId',
+  candleIngestSeq: 'candleIngestSeq',
   assetId: 'assetId',
   interval: 'interval',
   openTime: 'openTime',
@@ -759,10 +761,38 @@ export const LimitOrderProcessedCandleScalarFieldEnum = {
   matchedOrderCount: 'matchedOrderCount',
   result: 'result',
   skipReason: 'skipReason',
+  candleIngestSeq: 'candleIngestSeq',
+  revisionCount: 'revisionCount',
+  firstProcessedAt: 'firstProcessedAt',
   createdAt: 'createdAt'
 } as const
 
 export type LimitOrderProcessedCandleScalarFieldEnum = (typeof LimitOrderProcessedCandleScalarFieldEnum)[keyof typeof LimitOrderProcessedCandleScalarFieldEnum]
+
+
+export const MarketCandleFinalizationCheckpointScalarFieldEnum = {
+  assetId: 'assetId',
+  interval: 'interval',
+  finalizedThroughOpenTime: 'finalizedThroughOpenTime',
+  finalizedThroughCloseTime: 'finalizedThroughCloseTime',
+  lastAdvancedAt: 'lastAdvancedAt',
+  lastEvaluatedAt: 'lastEvaluatedAt',
+  pendingWindowOpenTime: 'pendingWindowOpenTime',
+  pendingSince: 'pendingSince',
+  pendingAttemptCount: 'pendingAttemptCount',
+  lastErrorCode: 'lastErrorCode',
+  degradedReason: 'degradedReason',
+  gapDetectedAt: 'gapDetectedAt',
+  gapFromOpenTime: 'gapFromOpenTime',
+  gapToOpenTime: 'gapToOpenTime',
+  noTradeWindowCount: 'noTradeWindowCount',
+  outsideSessionWindowCount: 'outsideSessionWindowCount',
+  repairedWindowCount: 'repairedWindowCount',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type MarketCandleFinalizationCheckpointScalarFieldEnum = (typeof MarketCandleFinalizationCheckpointScalarFieldEnum)[keyof typeof MarketCandleFinalizationCheckpointScalarFieldEnum]
 
 
 export const LimitOrderReconciliationCheckpointScalarFieldEnum = {

@@ -39,6 +39,9 @@ import { LimitOrderCandleReconciliationService } from '../src/orders/limit-match
 import { readLimitOrderCandleReconciliationConfig } from '../src/orders/limit-matching/limit-order-candle-reconciliation.config';
 import { LimitOrderExecutionService } from '../src/orders/limit-matching/limit-order-execution.service';
 import { LimitOrderMatchBoundaryService } from '../src/orders/limit-matching/limit-order-match-boundary.service';
+import { LimitOrderWindowCompletionService } from '../src/orders/limit-matching/limit-order-window-completion.service';
+import { LIMIT_ORDER_CANDLE_INTERVAL } from '../src/orders/limit-matching/limit-order-candle-eligibility';
+import type { MarketCandleSyncService } from '../src/assets/market-candle-sync.service';
 import {
   LIMIT_ORDER_RECONCILIATION_SCOPE,
   LimitOrderReconciliationCheckpointRepository,
@@ -50,6 +53,41 @@ const FIVE_MINUTES_MS = 5 * 60_000;
 
 const prisma = new PrismaService();
 const boundary = new LimitOrderMatchBoundaryService();
+
+/**
+ * Deterministic stand-in for the REST-repair certifier. The completion
+ * protocol's contract with the sync service is exactly two signals — "a
+ * canonical row now exists" and "the provider cursor confirmed the range" —
+ * so the stub provides provider behavior without a network: 'covered' answers
+ * coverageComplete over the requested window (explicit no-trade), 'fail'
+ * throws (feed unreachable -> the window must stay pending, never no-trade).
+ */
+let syncVerdict: (input: {
+  assetId: string;
+  from: Date;
+}) => 'covered' | 'fail' = () => 'fail';
+const stubSync = {
+  syncAsset: (input: { assetId: string; from: Date; to: Date }) => {
+    if (syncVerdict({ assetId: input.assetId, from: input.from }) === 'fail') {
+      throw new Error('SYNC_UNAVAILABLE');
+    }
+    return Promise.resolve({
+      assetId: input.assetId,
+      symbol: 'stub',
+      assetType: 'crypto',
+      failedFeeds: 0,
+      feeds: [
+        {
+          interval: '5m',
+          coverageComplete: true,
+          coveredFrom: input.from,
+          coveredTo: input.to,
+          errorCode: null,
+        },
+      ],
+    });
+  },
+} as unknown as MarketCandleSyncService;
 const checkpoints = new LimitOrderReconciliationCheckpointRepository(prisma);
 const rankingStub = {
   refreshCurrentRankingAfterParticipantChange: () =>
@@ -122,6 +160,26 @@ async function main(): Promise<void> {
       testUnscannedRetentionGapDetected,
     );
     await run(
+      'a window with no candle row stalls only its own asset',
+      testMissingWindowStallsOnlyItsAsset,
+    );
+    await run(
+      'a provider-confirmed empty window advances the cursor as no-trade',
+      testNoTradeWindowAdvances,
+    );
+    await run(
+      'a delayed candle row completes its pending window',
+      testDelayedRowCompletesPendingWindow,
+    );
+    await run(
+      'an asset retention gap blocks only that asset',
+      testAssetRetentionGapIsAssetScoped,
+    );
+    await run(
+      'a corrected candle is reprocessed as a new revision without double fills',
+      testCandleRevisionReprocessing,
+    );
+    await run(
       'retention passing the watermark is detected as a gap',
       testRetentionGapDetected,
     );
@@ -148,6 +206,7 @@ function newSweep(): LimitOrderCandleReconciliationService {
     execution,
     boundary,
     checkpoints,
+    new LimitOrderWindowCompletionService(prisma, stubSync),
   );
 }
 
@@ -861,6 +920,411 @@ async function ingestSeqOf(marketCandleId: string): Promise<bigint> {
  * never examine them. That must become an explicit, durable alarm — never a
  * silent skip.
  */
+// ---------------------------------------------------------------------------
+// Window completion: rows that never existed
+// ---------------------------------------------------------------------------
+
+async function windowCheckpoint(targetAssetId: string) {
+  return prisma.marketCandleFinalizationCheckpoint.findUnique({
+    where: {
+      assetId_interval: {
+        assetId: targetAssetId,
+        interval: LIMIT_ORDER_CANDLE_INTERVAL,
+      },
+    },
+  });
+}
+
+/**
+ * THE missing-window regression: ingest_seq orders rows that EXIST, so a
+ * window whose row was never written was invisible. The per-asset completion
+ * cursor records it as PENDING — and asset A's stall must not stop asset B.
+ */
+async function testMissingWindowStallsOnlyItsAsset(): Promise<void> {
+  const assetA = await createAsset('missing-window', {
+    withPriceSnapshot: true,
+  });
+  const assetB = await createAsset('healthy-window', {
+    withPriceSnapshot: true,
+  });
+  const orderA = await createSubmittedOrder({
+    label: 'missing-window',
+    assetIdOverride: assetA,
+  });
+  const orderB = await createSubmittedOrder({
+    label: 'healthy-window',
+    assetIdOverride: assetB,
+  });
+  // B's window has a canonical row; A's window has NO row at all.
+  const candleB = await createClosedCandle({
+    openTime: orderB.eligibleFrom,
+    low: '90.00000000',
+    assetIdOverride: assetB,
+  });
+  syncVerdict = () => 'fail';
+
+  const now = afterSafetyLag(candleB);
+  await sweep.reconcile({ now });
+
+  // B advanced and filled; A is pending exactly at its missing window.
+  const checkpointB = await windowCheckpoint(assetB);
+  assert.ok(checkpointB);
+  assert.ok(
+    checkpointB.finalizedThroughCloseTime.getTime() >
+      orderB.eligibleFrom.getTime(),
+    "the healthy asset's cursor must advance past its finalized window",
+  );
+  assert.equal(checkpointB.pendingWindowOpenTime, null);
+  assert.equal(
+    (await prisma.order.findUniqueOrThrow({ where: { id: orderB.orderId } }))
+      .status,
+    OrderStatus.executed,
+    'the healthy asset keeps filling while a sibling asset is stalled',
+  );
+
+  const checkpointA = await windowCheckpoint(assetA);
+  assert.ok(checkpointA, 'the stalled asset must have a durable checkpoint');
+  assert.ok(checkpointA.pendingWindowOpenTime);
+  assert.equal(
+    checkpointA.pendingWindowOpenTime.getTime(),
+    orderA.eligibleFrom.getTime(),
+    'the FIRST unaccounted window must be recorded, not silently skipped',
+  );
+  assert.ok(checkpointA.pendingSince);
+  assert.equal(
+    checkpointA.finalizedThroughCloseTime.getTime(),
+    orderA.eligibleFrom.getTime(),
+    'the stalled cursor must not advance past the missing window',
+  );
+  assert.equal(
+    (await prisma.order.findUniqueOrThrow({ where: { id: orderA.orderId } }))
+      .status,
+    OrderStatus.submitted,
+  );
+
+  // The pending marker is what the ASSET-scoped gate turns into
+  // FINALIZER_STALE once it ages past the threshold; simulate the age rather
+  // than sleeping for it.
+  const staleConfig = readLimitOrderCandleReconciliationConfig();
+  await prisma.marketCandleFinalizationCheckpoint.update({
+    where: {
+      assetId_interval: {
+        assetId: assetA,
+        interval: LIMIT_ORDER_CANDLE_INTERVAL,
+      },
+    },
+    data: {
+      pendingSince: new Date(
+        Date.now() - staleConfig.assetFinalizerStaleMs * 2,
+      ),
+    },
+  });
+  const failureA = await health.evaluate(new Date(), assetA);
+  assert.equal(failureA?.code, 'LIMIT_ORDER_CANDLE_FINALIZER_STALE');
+  const failureB = await health.evaluate(new Date(), assetB);
+  assert.equal(
+    failureB,
+    null,
+    'a stalled sibling must not gate a healthy asset',
+  );
+
+  await prisma.order.deleteMany({ where: { id: orderA.orderId } });
+}
+
+/**
+ * "No trades happened" is PROVIDER evidence, never an inference from our own
+ * silence: the cursor advances over an empty window only when the provider
+ * cursor confirmed the range and returned no candle.
+ */
+async function testNoTradeWindowAdvances(): Promise<void> {
+  const asset = await createAsset('no-trade', { withPriceSnapshot: true });
+  const scenario = await createSubmittedOrder({
+    label: 'no-trade',
+    assetIdOverride: asset,
+  });
+  syncVerdict = (input) => (input.assetId === asset ? 'covered' : 'fail');
+
+  const now = new Date(
+    scenario.eligibleFrom.getTime() +
+      FIVE_MINUTES_MS +
+      readLimitOrderCandleReconciliationConfig().watermarkSafetyLagMs +
+      60_000,
+  );
+  await sweep.reconcile({ now });
+  syncVerdict = () => 'fail';
+
+  const checkpoint = await windowCheckpoint(asset);
+  assert.ok(checkpoint);
+  assert.ok(
+    checkpoint.finalizedThroughCloseTime.getTime() >
+      scenario.eligibleFrom.getTime(),
+    'a provider-confirmed empty window must not stall the cursor',
+  );
+  assert.ok(
+    checkpoint.noTradeWindowCount >= 1,
+    'the no-trade certification must be recorded durably',
+  );
+  assert.equal(checkpoint.pendingWindowOpenTime, null);
+  assert.equal(
+    (await prisma.order.findUniqueOrThrow({ where: { id: scenario.orderId } }))
+      .status,
+    OrderStatus.submitted,
+    'a no-trade window fills nothing',
+  );
+  assert.equal(
+    await health.evaluate(new Date(), asset),
+    null,
+    'a quiet market is never a failure',
+  );
+
+  await prisma.order.deleteMany({ where: { id: scenario.orderId } });
+}
+
+/**
+ * Feed down, then the row arrives late: the pending window resolves through
+ * the ordinary row path and the order still fills — nothing was lost while
+ * the window was unaccounted.
+ */
+async function testDelayedRowCompletesPendingWindow(): Promise<void> {
+  const asset = await createAsset('delayed-row', { withPriceSnapshot: true });
+  const scenario = await createSubmittedOrder({
+    label: 'delayed-row',
+    assetIdOverride: asset,
+  });
+  syncVerdict = () => 'fail';
+
+  const now = new Date(
+    scenario.eligibleFrom.getTime() +
+      FIVE_MINUTES_MS +
+      readLimitOrderCandleReconciliationConfig().watermarkSafetyLagMs +
+      60_000,
+  );
+  await sweep.reconcile({ now });
+  const pending = await windowCheckpoint(asset);
+  assert.ok(pending?.pendingWindowOpenTime, 'the window must be pending');
+
+  // The canonical row finally lands (finalizer recovery, REST repair, ...).
+  const candle = await createClosedCandle({
+    openTime: scenario.eligibleFrom,
+    low: '90.00000000',
+    assetIdOverride: asset,
+  });
+  await forceIngestCeilingSettled();
+  await sweep.reconcile({ now: afterSafetyLag(candle) });
+
+  const resolved = await windowCheckpoint(asset);
+  assert.ok(resolved);
+  assert.equal(resolved.pendingWindowOpenTime, null, 'pending must clear');
+  assert.ok(
+    resolved.finalizedThroughCloseTime.getTime() >
+      scenario.eligibleFrom.getTime(),
+  );
+  assert.equal(
+    (await prisma.order.findUniqueOrThrow({ where: { id: scenario.orderId } }))
+      .status,
+    OrderStatus.executed,
+    'the delayed window must still fill once its row exists',
+  );
+}
+
+/**
+ * Retention passing an asset's unresolved window is an unrecoverable,
+ * ASSET-scoped loss: that asset fails closed with its own code while every
+ * other asset keeps trading.
+ */
+async function testAssetRetentionGapIsAssetScoped(): Promise<void> {
+  const config = readLimitOrderCandleReconciliationConfig();
+  const gapAsset = await createAsset('asset-gap', { withPriceSnapshot: true });
+  const healthyAsset = await createAsset('asset-gap-healthy', {
+    withPriceSnapshot: true,
+  });
+  // The gap asset owes a window OLDER than the retention horizon whose row
+  // never existed and whose feed cannot confirm anything.
+  const ancientWindow = alignWindow(
+    new Date(Date.now() - (config.candleRetentionDays + 3) * 86_400_000),
+  );
+  const gapOrder = await createSubmittedOrder({
+    label: 'asset-gap',
+    assetIdOverride: gapAsset,
+    submittedAt: ancientWindow,
+  });
+  const healthyOrder = await createSubmittedOrder({
+    label: 'asset-gap-healthy',
+    assetIdOverride: healthyAsset,
+  });
+  const healthyCandle = await createClosedCandle({
+    openTime: healthyOrder.eligibleFrom,
+    low: '90.00000000',
+    assetIdOverride: healthyAsset,
+  });
+  syncVerdict = () => 'fail';
+
+  await sweep.reconcile({ now: afterSafetyLag(healthyCandle) });
+
+  const gapCheckpoint = await windowCheckpoint(gapAsset);
+  assert.ok(gapCheckpoint?.gapDetectedAt, 'the asset gap must be durable');
+  const gapFailure = await health.evaluate(new Date(), gapAsset);
+  assert.equal(gapFailure?.code, 'LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED');
+  assert.equal(
+    await health.evaluate(new Date(), healthyAsset),
+    null,
+    'an asset gap must not block other assets',
+  );
+  assert.equal(
+    (
+      await prisma.order.findUniqueOrThrow({
+        where: { id: healthyOrder.orderId },
+      })
+    ).status,
+    OrderStatus.executed,
+  );
+
+  // Sticky: a later sweep must not clear it.
+  await sweep.reconcile({ now: new Date() });
+  const still = await windowCheckpoint(gapAsset);
+  assert.equal(
+    still?.gapDetectedAt?.getTime(),
+    gapCheckpoint.gapDetectedAt.getTime(),
+  );
+
+  await prisma.order.deleteMany({ where: { id: gapOrder.orderId } });
+}
+
+// ---------------------------------------------------------------------------
+// Candle revision
+// ---------------------------------------------------------------------------
+
+/**
+ * A correction to an already-processed candle re-sequences it; the sweep
+ * reprocesses the NEW revision additively: orders the correction newly
+ * qualifies fill once, orders already executed are untouched, and the
+ * evidence written for the earlier revision stays verbatim.
+ */
+async function testCandleRevisionReprocessing(): Promise<void> {
+  const asset = await createAsset('revision', { withPriceSnapshot: true });
+  const submittedAt = nextWindowBase();
+  // Order 1 (limit 100) fills at low 90; order 2 (limit 85) does not.
+  const first = await createSubmittedOrder({
+    label: 'revision-first',
+    assetIdOverride: asset,
+    submittedAt,
+  });
+  const second = await createSubmittedOrder({
+    label: 'revision-second',
+    assetIdOverride: asset,
+    submittedAt,
+    limitPriceOverride: '85.00000000',
+  });
+  const candle = await createClosedCandle({
+    openTime: first.eligibleFrom,
+    low: '90.00000000',
+    assetIdOverride: asset,
+  });
+  syncVerdict = () => 'fail';
+  await forceIngestCeilingSettled();
+  const now = afterSafetyLag(candle);
+  await sweep.reconcile({ now });
+
+  assert.equal(await orderStatusOf(first.orderId), OrderStatus.executed);
+  assert.equal(await orderStatusOf(second.orderId), OrderStatus.submitted);
+  const firstEvidenceId = (
+    await prisma.order.findUniqueOrThrow({
+      where: { id: first.orderId },
+      select: { limitOrderCandleEvidenceId: true },
+    })
+  ).limitOrderCandleEvidenceId;
+  assert.ok(firstEvidenceId);
+  const processedBefore =
+    await prisma.limitOrderProcessedCandle.findUniqueOrThrow({
+      where: { marketCandleId: candle.id },
+    });
+
+  // The CORRECTION: the provider revises the low to 84. The DB trigger
+  // re-sequences the row; the revision-aware sweep re-examines it.
+  await prisma.marketCandle.update({
+    where: { id: candle.id },
+    data: { low: '84.00000000' },
+  });
+  await forceIngestCeilingSettled();
+  await sweep.reconcile({ now });
+
+  // Order 2 newly qualifies and fills ONCE, at ITS limit price.
+  const secondOrder = await prisma.order.findUniqueOrThrow({
+    where: { id: second.orderId },
+  });
+  assert.equal(secondOrder.status, OrderStatus.executed);
+  assert.equal(secondOrder.executedPrice?.toFixed(8), '85.00000000');
+  assert.equal(
+    await prisma.walletTransaction.count({
+      where: { referenceId: second.orderId },
+    }),
+    1,
+  );
+  // Order 1 is untouched: same single fill, same evidence row, and that
+  // evidence still carries the ORIGINAL low it filled against.
+  assert.equal(
+    await prisma.walletTransaction.count({
+      where: { referenceId: first.orderId },
+    }),
+    1,
+    'a revision must never double fill an executed order',
+  );
+  const firstOrderAfter = await prisma.order.findUniqueOrThrow({
+    where: { id: first.orderId },
+    select: { limitOrderCandleEvidenceId: true },
+  });
+  assert.equal(firstOrderAfter.limitOrderCandleEvidenceId, firstEvidenceId);
+  const firstEvidence = await prisma.limitOrderCandleEvidence.findUniqueOrThrow(
+    { where: { id: firstEvidenceId } },
+  );
+  assert.equal(
+    firstEvidence.triggerLowPrice.toFixed(8),
+    '90.00000000',
+    'revision-1 evidence must stay immutable',
+  );
+  // The correction produced a SECOND evidence row scoped to the new revision.
+  const evidenceRows = await prisma.limitOrderCandleEvidence.findMany({
+    where: { marketCandleId: candle.id },
+    orderBy: { candleIngestSeq: 'asc' },
+  });
+  assert.equal(evidenceRows.length, 2);
+  assert.equal(evidenceRows[1].triggerLowPrice.toFixed(8), '84.00000000');
+  assert.ok(evidenceRows[1].candleIngestSeq > evidenceRows[0].candleIngestSeq);
+  // The processed row advanced to the new revision, keeping its first
+  // processing instant for audit.
+  const processedAfter =
+    await prisma.limitOrderProcessedCandle.findUniqueOrThrow({
+      where: { marketCandleId: candle.id },
+    });
+  assert.ok(processedAfter.candleIngestSeq > processedBefore.candleIngestSeq);
+  assert.equal(processedAfter.revisionCount, processedBefore.revisionCount + 1);
+  assert.equal(
+    processedAfter.firstProcessedAt.getTime(),
+    processedBefore.firstProcessedAt.getTime(),
+  );
+
+  // A THIRD pass with no further correction is a no-op: same revision.
+  await sweep.reconcile({ now });
+  assert.equal(
+    (
+      await prisma.limitOrderProcessedCandle.findUniqueOrThrow({
+        where: { marketCandleId: candle.id },
+      })
+    ).revisionCount,
+    processedAfter.revisionCount,
+    'an unchanged revision must not be reprocessed',
+  );
+}
+
+async function orderStatusOf(orderId: string): Promise<OrderStatus> {
+  return (
+    await prisma.order.findUniqueOrThrow({
+      where: { id: orderId },
+      select: { status: true },
+    })
+  ).status;
+}
+
 async function testRetentionGapDetected(): Promise<void> {
   const config = readLimitOrderCandleReconciliationConfig();
   // Push the watermark behind the candle RETENTION HORIZON. That is exactly
@@ -936,6 +1400,7 @@ async function testGapFailsClosed(): Promise<void> {
 async function resetCheckpointState(): Promise<void> {
   await prisma.limitOrderDeferredCandle.deleteMany({});
   await prisma.limitOrderReconciliationCheckpoint.deleteMany({});
+  await prisma.marketCandleFinalizationCheckpoint.deleteMany({});
 }
 
 async function earliestActivatedEligibleFrom(): Promise<Date | null> {
@@ -1053,8 +1518,12 @@ async function createSubmittedOrder(input: {
   label: string;
   submittedAt?: Date;
   assetIdOverride?: string;
+  limitPriceOverride?: string;
 }): Promise<Scenario> {
   const submittedAt = input.submittedAt ?? nextWindowBase();
+  const limitPrice = input.limitPriceOverride ?? '100.00000000';
+  // reservation = limit x quantity(1) x (1 + fee 0.001), 8 decimals.
+  const reservedAmount = (Number(limitPrice) * 1.001).toFixed(8);
   const user = await prisma.user.create({
     data: {
       email: `${PREFIX}-${input.label}@example.com`,
@@ -1083,7 +1552,7 @@ async function createSubmittedOrder(input: {
       seasonParticipantId: participant.id,
       currencyCode: CurrencyCode.USD,
       balanceAmount: '1000.00000000',
-      reservedAmount: '100.10000000',
+      reservedAmount,
     },
   });
   await prisma.cashWallet.create({
@@ -1105,9 +1574,9 @@ async function createSubmittedOrder(input: {
       orderType: OrderType.limit,
       status: OrderStatus.submitted,
       quantity: '1.00000000',
-      limitPrice: '100.00000000',
+      limitPrice,
       currencyCode: CurrencyCode.USD,
-      reservedAmount: '100.10000000',
+      reservedAmount,
       reservationFeeRate: '0.001000',
       matchingActivatedAt: submittedAt,
       // Path A's activation cursor must accompany matchingActivatedAt (DB
@@ -1224,7 +1693,10 @@ async function createOpenCandle(input: {
  * instead of testing anything. Starts far enough in the past that every
  * fixture candle is well outside the runner's short lookback.
  */
-let windowCursor = alignWindow(new Date(Date.now() - 8 * 3_600_000));
+// 16h of budget: the suite allocates ~25 windows at 20-minute strides, and
+// the completion/revision scenarios added several more. Every fixture window
+// must stay in the past (and far inside candle retention).
+let windowCursor = alignWindow(new Date(Date.now() - 16 * 3_600_000));
 
 function nextWindowBase(): Date {
   windowCursor = new Date(windowCursor.getTime() + FIVE_MINUTES_MS * 4);
@@ -1265,6 +1737,9 @@ async function cleanupDatabase(): Promise<void> {
     where: { marketCandleId: { in: createdCandleIds } },
   });
   await prisma.limitOrderReconciliationCheckpoint.deleteMany({});
+  await prisma.marketCandleFinalizationCheckpoint.deleteMany({
+    where: { assetId: { in: createdAssetIds } },
+  });
   await prisma.limitOrderProcessedCandle.deleteMany({
     where: { marketCandleId: { in: createdCandleIds } },
   });

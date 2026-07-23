@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AssetsModule } from '../assets/assets.module';
 import { RankingModule } from '../ranking/ranking.module';
 import { PortfolioModule } from '../portfolio/portfolio.module';
 import { ProvidersModule } from '../providers/providers.module';
@@ -20,9 +21,18 @@ import { LimitOrderMatcherHealthService } from './limit-matching/limit-order-mat
 import { LimitOrderMatcherLeaderService } from './limit-matching/limit-order-matcher-leader.service';
 import { LimitOrderPriceEventPublisher } from './limit-matching/limit-order-price-event.publisher';
 import { LimitOrderProviderHealthService } from './limit-matching/limit-order-provider-health.service';
+import { LimitOrderWindowCompletionService } from './limit-matching/limit-order-window-completion.service';
 
 @Module({
-  imports: [RankingModule, PortfolioModule, ProvidersModule, RedisModule],
+  // AssetsModule supplies MarketCandleSyncService, the REST-repair certifier
+  // the window-completion supervisor uses to tell "no trade" from "no feed".
+  imports: [
+    AssetsModule,
+    RankingModule,
+    PortfolioModule,
+    ProvidersModule,
+    RedisModule,
+  ],
   controllers: [OrdersController],
   providers: [
     OrdersService,
@@ -40,6 +50,7 @@ import { LimitOrderProviderHealthService } from './limit-matching/limit-order-pr
     LimitOrderMatcherLeaderService,
     LimitOrderPriceEventPublisher,
     LimitOrderProviderHealthService,
+    LimitOrderWindowCompletionService,
     LimitOrderEventPollerService,
   ],
   exports: [

@@ -344,9 +344,61 @@ test('new limit-order error codes map to dedicated user messages by CODE', () =>
     ERROR_CODE.LIMIT_ORDER_CANDLE_RECONCILIATION_BACKLOG_EXCEEDED,
     ERROR_CODE.LIMIT_ORDER_CANDLE_RECONCILIATION_GAP_DETECTED,
     ERROR_CODE.LIMIT_ORDER_CANDLE_RESERVATION_MISMATCH,
+    ERROR_CODE.LIMIT_ORDER_PROVIDER_READINESS_PROOF_EXPIRED,
+    ERROR_CODE.LIMIT_ORDER_PROVIDER_READINESS_PROOF_INVALID,
+    ERROR_CODE.LIMIT_ORDER_PROVIDER_GENERATION_CHANGED,
+    ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED,
+    ERROR_CODE.LIMIT_ORDER_CANDLE_FINALIZER_STALE,
+    ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_BACKLOG_EXCEEDED,
   ]) {
     const message = getErrorMessageFromCode(code);
     assert.notEqual(message, generic, `expected dedicated message for ${code}`);
+  }
+});
+
+test('proof and asset-scoped messages never leak internal vocabulary', () => {
+  // Redis, fence, epoch, proof, checkpoint, generation are operator terms.
+  for (const code of [
+    ERROR_CODE.LIMIT_ORDER_PROVIDER_READINESS_PROOF_EXPIRED,
+    ERROR_CODE.LIMIT_ORDER_PROVIDER_READINESS_PROOF_INVALID,
+    ERROR_CODE.LIMIT_ORDER_PROVIDER_GENERATION_CHANGED,
+    ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED,
+    ERROR_CODE.LIMIT_ORDER_CANDLE_FINALIZER_STALE,
+    ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_BACKLOG_EXCEEDED,
+  ]) {
+    const message = getErrorMessageFromCode(code);
+    for (const forbidden of [
+      'Redis',
+      'fence',
+      'epoch',
+      'proof',
+      'checkpoint',
+      'generation',
+      'watermark',
+    ]) {
+      assert.ok(
+        !message.toLowerCase().includes(forbidden.toLowerCase()),
+        `${code} message must not mention ${forbidden}`,
+      );
+    }
+  }
+});
+
+test('asset-scoped safety-net messages say only this asset is affected', () => {
+  for (const code of [
+    ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED,
+    ERROR_CODE.LIMIT_ORDER_CANDLE_FINALIZER_STALE,
+    ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_BACKLOG_EXCEEDED,
+  ]) {
+    const message = getErrorMessageFromCode(code);
+    assert.ok(
+      message.includes('이 종목'),
+      `${code} must scope the pause to the one asset`,
+    );
+    assert.ok(
+      message.includes('다른 종목'),
+      `${code} must say other assets keep working`,
+    );
   }
 });
 

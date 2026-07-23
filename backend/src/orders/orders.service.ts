@@ -624,6 +624,7 @@ export class OrdersService {
    */
   private async assertLimitOrderCandleReconciliationAvailable(
     now?: Date,
+    assetId?: string,
   ): Promise<void> {
     if (!this.limitOrderCandleConfig.enabled) return;
     if (!this.limitOrderCandleHealth) {
@@ -633,7 +634,9 @@ export class OrdersService {
         'Limit-order candle reconciliation health service is not wired.',
       );
     }
-    await this.limitOrderCandleHealth.assertAvailable(now);
+    // Asset-scoped: a stalled safety net on ONE asset blocks only that
+    // asset's new quotes/creates; the global sweep state still gates all.
+    await this.limitOrderCandleHealth.assertAvailable(now, assetId);
   }
 
   /**
@@ -752,7 +755,10 @@ export class OrdersService {
   ): Promise<OrderQuoteResponse> {
     this.assertLimitOrderFeatureEnabled();
     await this.assertLimitOrderMatcherAvailable();
-    await this.assertLimitOrderCandleReconciliationAvailable(quoteAt);
+    await this.assertLimitOrderCandleReconciliationAvailable(
+      quoteAt,
+      request.assetId,
+    );
     const limitOrderCreate = this.requireLimitOrderCreateService();
     if (!request.limitPrice) {
       this.throwApiError(
@@ -1111,7 +1117,10 @@ export class OrdersService {
     // than inside the create transaction: it never needs the locked-row
     // re-validation the season/participant checks below do, and keeping it out
     // of the transaction avoids holding the event boundary across its reads.
-    await this.assertLimitOrderCandleReconciliationAvailable(submittedAt);
+    await this.assertLimitOrderCandleReconciliationAvailable(
+      submittedAt,
+      request.assetId,
+    );
     // Pre-transaction checks are a fast-fail courtesy only: they give the user
     // a clean error without opening a transaction. They are NOT the basis of
     // financial correctness — every one of them is re-run against locked rows

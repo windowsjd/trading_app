@@ -78,9 +78,22 @@ type ProviderAssetEntry = {
   acknowledgedAt: number | null;
 };
 
+/**
+ * The REAL cross-process ownership evidence: the Redis lease the live-candle
+ * supervisor holds while it owns the provider socket. Registered here so the
+ * shared-readiness publisher can prove, INSIDE Redis at write time, that this
+ * process still owns the provider. A local registry claim alone is per-process
+ * memory and proves nothing to another instance.
+ */
+export type ProviderOwnerLease = {
+  key: string;
+  token: string;
+};
+
 type ProviderState = {
   source: ProviderTradeSource | null;
   generation: string | null;
+  ownerLease: ProviderOwnerLease | null;
   connected: boolean;
   connectedAt: number | null;
   lastFrameAt: number | null;
@@ -97,6 +110,12 @@ export type ProviderSharedStateSnapshot = {
   provider: TradeRouteProvider;
   source: ProviderTradeSource;
   generation: string;
+  /**
+   * NULL when the owner never registered a Redis lease (legacy streaming).
+   * Shared readiness cannot be published without one: there is no
+   * cross-process evidence of ownership to fence the write against.
+   */
+  ownerLease: ProviderOwnerLease | null;
   connected: boolean;
   connectedAt: number | null;
   lastFrameAt: number | null;
@@ -138,6 +157,32 @@ export class ProviderTradeRouteRegistry {
     const state = this.state(provider);
     if (state.source !== source) return;
     this.providers.set(provider, emptyState());
+  }
+
+  /**
+   * Records the Redis owner lease backing this process's claim. Only the
+   * current route owner may register one, and it is cleared on release and on
+   * `clearOwnerLease` (lease lost mid-connection). The shared-readiness
+   * publisher refuses to publish anything for a provider whose claim carries
+   * no lease — a purely local claim is not provable to other instances.
+   */
+  setOwnerLease(
+    provider: TradeRouteProvider,
+    source: ProviderTradeSource,
+    lease: ProviderOwnerLease,
+  ): void {
+    const state = this.state(provider);
+    if (state.source !== source) return;
+    state.ownerLease = { key: lease.key, token: lease.token };
+  }
+
+  clearOwnerLease(
+    provider: TradeRouteProvider,
+    source: ProviderTradeSource,
+  ): void {
+    const state = this.state(provider);
+    if (state.source !== source) return;
+    state.ownerLease = null;
   }
 
   getOwner(provider: TradeRouteProvider): ProviderTradeSource | null {
@@ -374,6 +419,9 @@ export class ProviderTradeRouteRegistry {
       provider,
       source: state.source,
       generation: state.generation,
+      ownerLease: state.ownerLease
+        ? { key: state.ownerLease.key, token: state.ownerLease.token }
+        : null,
       connected: state.connected,
       connectedAt: state.connectedAt,
       lastFrameAt: state.lastFrameAt,
@@ -439,6 +487,7 @@ function emptyState(): ProviderState {
   return {
     source: null,
     generation: null,
+    ownerLease: null,
     connected: false,
     connectedAt: null,
     lastFrameAt: null,

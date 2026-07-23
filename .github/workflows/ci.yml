@@ -126,11 +126,15 @@ jobs:
       # Path-B durable checkpoint: a candle unprocessed for longer than the
       # lookback must still be processed, a candle STORED after the market-time
       # marker passed its window must still be processed (the storage-order
-      # scan position), and a retention gap must be detected.
+      # scan position), a retention gap must be detected, WINDOW COMPLETION
+      # must tell provider-confirmed no-trade from a missing feed and stall
+      # only the affected asset, and a corrected candle must be reprocessed as
+      # a new revision without double fills.
       LIMIT_ORDER_CANDLE_CHECKPOINT_INTEGRATION: "1"
-      # Multi-instance shared readiness over a real Redis: cross-instance
-      # agreement, the non-owner create readiness path (proof issued before the
-      # transaction, re-verified inside it), and owner fencing.
+      # Multi-instance shared readiness over a real Redis + PostgreSQL:
+      # lease-derived owner fencing (a publisher without the REAL provider
+      # owner lease cannot publish), clock-skew-immune takeover, and the whole
+      # non-owner Quote->Create financial flow down to the reservation.
       LIMIT_ORDER_SHARED_READINESS_INTEGRATION: "1"
       # End-to-end matcher (XADD -> XACK). Reduced volume; only
       # hardware-independent invariants are asserted, never a throughput rate.

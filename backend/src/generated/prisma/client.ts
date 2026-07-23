@@ -200,6 +200,11 @@ export type LimitOrderCandleEvidence = Prisma.LimitOrderCandleEvidenceModel
  */
 export type LimitOrderProcessedCandle = Prisma.LimitOrderProcessedCandleModel
 /**
+ * Model MarketCandleFinalizationCheckpoint
+ * 
+ */
+export type MarketCandleFinalizationCheckpoint = Prisma.MarketCandleFinalizationCheckpointModel
+/**
  * Model LimitOrderReconciliationCheckpoint
  * 
  */

@@ -8,7 +8,10 @@ jest.mock('../generated/prisma/client', () => ({
 }));
 
 import type { ProviderTradeReadinessConfig } from './provider-trade-readiness.config';
-import { ProviderTradeReadinessPublisher } from './provider-trade-readiness.publisher';
+import {
+  digestLeaseToken,
+  ProviderTradeReadinessPublisher,
+} from './provider-trade-readiness.publisher';
 import type { ProviderTradeReadinessStore } from './provider-trade-readiness.store';
 import {
   ProviderTradeRouteRegistry,
@@ -18,6 +21,8 @@ import {
 
 const OWNER = 'instance-a';
 const GENERATION = 'gen-1';
+const LEASE_KEY = 'candles:live:v1:owner:binance:0';
+const LEASE_TOKEN = 'lease-token-a';
 
 const ASSET: ProviderSubscribedAsset = {
   assetId: 'asset-btc',
@@ -42,55 +47,71 @@ function config(
 }
 
 /**
- * Records every store call so the ORDER and the ARGUMENTS can be asserted, not
- * merely the end state: "assets before meta" and "never publish without a
- * token" are both sequencing properties.
+ * Records every store call so the ORDER and the ARGUMENTS can be asserted,
+ * not merely the end state: "assets before meta", "acquire only with the
+ * lease token" and "never publish without an epoch" are all sequencing
+ * properties.
  */
 function storeStub(
   behaviour: {
-    acquire?: () => {
+    acquire?: (leaseToken: string) => {
       acquired: boolean;
-      fenceToken: number | null;
-      heldBy: string | null;
+      fencingEpoch: number | null;
+      reason: string | null;
     };
     publishMeta?: () => boolean;
     publishAssets?: () => boolean;
   } = {},
 ) {
   const calls: string[] = [];
-  const acquired: number[] = [];
-  const assetWrites: Array<{ fenceToken: number; generation: string }> = [];
-  const published: Array<{ fenceToken: number; generation: string }> = [];
-  const released: Array<{ fenceToken: number; generation: string }> = [];
+  const acquiredWith: string[] = [];
+  const assetWrites: Array<{
+    fencingEpoch: number;
+    leaseToken: string;
+    generation: string;
+  }> = [];
+  const published: Array<{
+    fencingEpoch: number;
+    leaseToken: string;
+    generation: string;
+  }> = [];
+  const released: Array<{ fencingEpoch: number; generation: string }> = [];
   const store = {
     isAvailable: () => true,
-    acquireOwnership: (input: { ownerInstance: string }) => {
+    acquireOwnership: (input: { leaseToken: string }) => {
       calls.push('acquire');
-      const result = behaviour.acquire?.() ?? {
+      acquiredWith.push(input.leaseToken);
+      const result = behaviour.acquire?.(input.leaseToken) ?? {
         acquired: true,
-        fenceToken: 1,
-        heldBy: input.ownerInstance,
+        fencingEpoch: 1,
+        reason: null,
       };
-      if (result.fenceToken !== null) acquired.push(result.fenceToken);
       return Promise.resolve(result);
     },
-    publishAssets: (input: { fenceToken: number; generation: string }) => {
+    publishAssets: (input: {
+      fencingEpoch: number;
+      leaseToken: string;
+      generation: string;
+    }) => {
       calls.push('publishAssets');
       assetWrites.push({
-        fenceToken: input.fenceToken,
+        fencingEpoch: input.fencingEpoch,
+        leaseToken: input.leaseToken,
         generation: input.generation,
       });
       const accepted = behaviour.publishAssets?.() ?? true;
       return Promise.resolve(accepted);
     },
     publishProvider: (input: {
-      meta: { fenceToken: number; generation: string };
+      meta: { fencingEpoch: number; generation: string };
+      leaseToken: string;
     }) => {
       calls.push('publishProvider');
       const accepted = behaviour.publishMeta?.() ?? true;
       if (accepted) {
         published.push({
-          fenceToken: input.meta.fenceToken,
+          fencingEpoch: input.meta.fencingEpoch,
+          leaseToken: input.leaseToken,
           generation: input.meta.generation,
         });
       }
@@ -100,10 +121,10 @@ function storeStub(
       calls.push('releaseSupersededAssets');
       return Promise.resolve(true);
     },
-    release: (input: { fenceToken: number; generation: string }) => {
+    release: (input: { fencingEpoch: number; generation: string }) => {
       calls.push('release');
       released.push({
-        fenceToken: input.fenceToken,
+        fencingEpoch: input.fencingEpoch,
         generation: input.generation,
       });
       return Promise.resolve(true);
@@ -112,7 +133,7 @@ function storeStub(
   return {
     store: store as unknown as ProviderTradeReadinessStore,
     calls,
-    acquired,
+    acquiredWith,
     assetWrites,
     published,
     released,
@@ -120,11 +141,23 @@ function storeStub(
 }
 
 function connectedRoutes(
-  provider: TradeRouteProvider = 'binance',
-  generation = GENERATION,
+  input: {
+    provider?: TradeRouteProvider;
+    generation?: string;
+    lease?: { key: string; token: string } | null;
+  } = {},
 ): ProviderTradeRouteRegistry {
+  const provider = input.provider ?? 'binance';
+  const generation = input.generation ?? GENERATION;
   const routes = new ProviderTradeRouteRegistry();
   routes.claimProvider(provider, 'live_candle_supervisor');
+  const lease =
+    input.lease === undefined
+      ? { key: LEASE_KEY, token: LEASE_TOKEN }
+      : input.lease;
+  if (lease) {
+    routes.setOwnerLease(provider, 'live_candle_supervisor', lease);
+  }
   routes.beginConnection({
     provider,
     source: 'live_candle_supervisor',
@@ -140,10 +173,10 @@ function connectedRoutes(
   return routes;
 }
 
-describe('ProviderTradeReadinessPublisher owner fencing', () => {
-  it('acquires a fence token before publishing anything', async () => {
+describe('ProviderTradeReadinessPublisher owner-lease fencing', () => {
+  it('exchanges the REGISTERED lease for an epoch before publishing anything', async () => {
     const routes = connectedRoutes();
-    const { store, calls, published, assetWrites } = storeStub();
+    const { store, calls, acquiredWith, published, assetWrites } = storeStub();
     const publisher = new ProviderTradeReadinessPublisher(
       routes,
       store,
@@ -159,22 +192,45 @@ describe('ProviderTradeReadinessPublisher owner fencing', () => {
       'publishAssets',
       'publishProvider',
     ]);
-    // Assets and meta must go out under the SAME token, or a fenced-out
-    // writer could still poison one half of the record.
-    expect(assetWrites).toEqual([{ fenceToken: 1, generation: GENERATION }]);
-    expect(published).toEqual([{ fenceToken: 1, generation: GENERATION }]);
+    expect(acquiredWith).toEqual([LEASE_TOKEN]);
+    // Assets and meta go out under the SAME lease token and epoch, or a
+    // fenced-out writer could still poison one half of the record.
+    expect(assetWrites).toEqual([
+      { fencingEpoch: 1, leaseToken: LEASE_TOKEN, generation: GENERATION },
+    ]);
+    expect(published).toEqual([
+      { fencingEpoch: 1, leaseToken: LEASE_TOKEN, generation: GENERATION },
+    ]);
     expect(publisher.ownershipSnapshot().binance).toMatchObject({
-      fenceToken: 1,
+      fencingEpoch: 1,
       generation: GENERATION,
     });
   });
 
-  it('publishes nothing at all while another instance holds the provider', async () => {
-    const { store, calls, published } = storeStub({
+  it('publishes NOTHING when the local claim carries no Redis lease', async () => {
+    // The legacy streaming service claims routes without any Redis lease. A
+    // local claim proves nothing to another instance, so it must not publish.
+    const routes = connectedRoutes({ lease: null });
+    const { store, calls } = storeStub();
+    const publisher = new ProviderTradeReadinessPublisher(
+      routes,
+      store,
+      config(),
+    );
+
+    await publisher.publishOnce(1000);
+    await publisher.publishOnce(2000);
+
+    expect(calls).toEqual([]);
+    expect(publisher.ownershipSnapshot().binance.fencingEpoch).toBeNull();
+  });
+
+  it('publishes nothing while the real lease belongs to another process', async () => {
+    const { store, calls } = storeStub({
       acquire: () => ({
         acquired: false,
-        fenceToken: null,
-        heldBy: 'instance-b',
+        fencingEpoch: null,
+        reason: 'lease_held_by_other',
       }),
     });
     const publisher = new ProviderTradeReadinessPublisher(
@@ -186,27 +242,37 @@ describe('ProviderTradeReadinessPublisher owner fencing', () => {
     await publisher.publishOnce(1000);
     await publisher.publishOnce(2000);
 
-    expect(published).toEqual([]);
     expect(calls.filter((call) => call.startsWith('publish'))).toEqual([]);
     expect(publisher.ownershipSnapshot().binance).toMatchObject({
-      fenceToken: null,
-      fencedOutBy: 'instance-b',
+      fencingEpoch: null,
+      refusedBecause: 'lease_held_by_other',
     });
   });
 
-  it('reuses the token it already holds instead of re-acquiring every tick', async () => {
-    const { store, calls } = storeStub();
+  it('reuses the epoch while the lease token is unchanged, re-acquires on a new lease', async () => {
+    let epoch = 0;
+    const { store, calls, acquiredWith } = storeStub({
+      acquire: () => ({ acquired: true, fencingEpoch: ++epoch, reason: null }),
+    });
+    const routes = connectedRoutes();
     const publisher = new ProviderTradeReadinessPublisher(
-      connectedRoutes(),
+      routes,
       store,
       config(),
     );
 
     await publisher.publishOnce(1000);
     await publisher.publishOnce(2000);
-    await publisher.publishOnce(3000);
-
     expect(calls.filter((call) => call === 'acquire')).toHaveLength(1);
+
+    // A NEW ownership (new lease token) must never reuse the old epoch.
+    routes.setOwnerLease('binance', 'live_candle_supervisor', {
+      key: LEASE_KEY,
+      token: 'lease-token-b',
+    });
+    await publisher.publishOnce(3000);
+    expect(acquiredWith).toEqual([LEASE_TOKEN, 'lease-token-b']);
+    expect(publisher.ownershipSnapshot().binance.fencingEpoch).toBe(2);
   });
 
   it('surrenders the claim when a publish is fenced out', async () => {
@@ -219,19 +285,21 @@ describe('ProviderTradeReadinessPublisher owner fencing', () => {
     );
 
     await publisher.publishOnce(1000);
-    expect(publisher.ownershipSnapshot().binance.fenceToken).toBe(1);
+    expect(publisher.ownershipSnapshot().binance.fencingEpoch).toBe(1);
 
-    // A newer owner exists: the write is refused.
+    // The lease or epoch no longer belongs to this process: refused.
     accept = false;
     await publisher.publishOnce(2000);
     expect(publisher.ownershipSnapshot().binance).toMatchObject({
-      fenceToken: null,
+      fencingEpoch: null,
       generation: null,
+      refusedBecause: 'fenced_out_meta',
     });
 
-    // The next tick re-attempts acquisition rather than republishing under the
-    // surrendered token.
+    // The next tick re-attempts acquisition rather than republishing under
+    // the surrendered epoch.
     calls.length = 0;
+    accept = true;
     await publisher.publishOnce(3000);
     expect(calls[0]).toBe('acquire');
   });
@@ -247,7 +315,7 @@ describe('ProviderTradeReadinessPublisher owner fencing', () => {
     await publisher.publishOnce(1000);
 
     expect(calls).toEqual(['acquire', 'publishAssets']);
-    expect(publisher.ownershipSnapshot().binance.fenceToken).toBeNull();
+    expect(publisher.ownershipSnapshot().binance.fencingEpoch).toBeNull();
   });
 
   it('gives the claim up when it stops owning a connected socket', async () => {
@@ -263,14 +331,14 @@ describe('ProviderTradeReadinessPublisher owner fencing', () => {
     routes.endConnection({ provider: 'binance', generation: GENERATION });
     await publisher.publishOnce(2000);
 
-    expect(released).toEqual([{ fenceToken: 1, generation: GENERATION }]);
+    expect(released).toEqual([{ fencingEpoch: 1, generation: GENERATION }]);
     expect(publisher.ownershipSnapshot().binance).toEqual({
-      fenceToken: null,
+      fencingEpoch: null,
       generation: null,
     });
   });
 
-  it('releases its own generation with its own token on shutdown', async () => {
+  it('releases its own generation with its own epoch on shutdown', async () => {
     const { store, released } = storeStub();
     const publisher = new ProviderTradeReadinessPublisher(
       connectedRoutes(),
@@ -280,16 +348,16 @@ describe('ProviderTradeReadinessPublisher owner fencing', () => {
     await publisher.publishOnce(1000);
     await publisher.onModuleDestroy();
 
-    expect(released).toEqual([{ fenceToken: 1, generation: GENERATION }]);
-    expect(publisher.ownershipSnapshot().binance.fenceToken).toBeNull();
+    expect(released).toEqual([{ fencingEpoch: 1, generation: GENERATION }]);
+    expect(publisher.ownershipSnapshot().binance.fencingEpoch).toBeNull();
   });
 
   it('does not release anything it never proved it owned', async () => {
     const { store, released } = storeStub({
       acquire: () => ({
         acquired: false,
-        fenceToken: null,
-        heldBy: 'instance-b',
+        fencingEpoch: null,
+        reason: 'lease_absent',
       }),
     });
     const publisher = new ProviderTradeReadinessPublisher(
@@ -301,5 +369,33 @@ describe('ProviderTradeReadinessPublisher owner fencing', () => {
     await publisher.onModuleDestroy();
 
     expect(released).toEqual([]);
+  });
+
+  it('publishes a lease token DIGEST in the meta, never the raw token', async () => {
+    const seen: string[] = [];
+    const routes = connectedRoutes();
+    const store = {
+      isAvailable: () => true,
+      acquireOwnership: () =>
+        Promise.resolve({ acquired: true, fencingEpoch: 1, reason: null }),
+      publishAssets: () => Promise.resolve(true),
+      publishProvider: (input: { meta: unknown }) => {
+        seen.push(JSON.stringify(input.meta));
+        return Promise.resolve(true);
+      },
+      releaseSupersededAssets: () => Promise.resolve(true),
+      release: () => Promise.resolve(true),
+    } as unknown as ProviderTradeReadinessStore;
+    const publisher = new ProviderTradeReadinessPublisher(
+      routes,
+      store,
+      config(),
+    );
+
+    await publisher.publishOnce(1000);
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toContain(digestLeaseToken(LEASE_TOKEN));
+    expect(seen[0]).not.toContain(LEASE_TOKEN);
   });
 });

@@ -335,6 +335,86 @@ A first run whose catch-up exceeds the lookback logs
 work stays bounded by `candleBatchSize`, so a long catch-up is spread over
 ticks instead of being dropped.
 
+### Window completion: rows that never existed
+
+`ingest_seq` can only order candle rows that EXIST. A window whose row was
+never written is invisible to every row scan, and four very different causes
+look identical from the database: the finalizer never processed the window, a
+feed/continuity gap swallowed it, the DB write failed permanently, or there
+were genuinely no trades. The WINDOW COMPLETION protocol
+(`market_candle_finalization_checkpoints`, one row per asset with activated
+path-B orders) tells them apart, durably:
+
+For each such asset a cursor (`finalizedThroughCloseTime`) advances over the
+asset's 5m windows in market-time order — bounded per sweep by
+`LIMIT_ORDER_CANDLE_COMPLETION_WINDOW_BATCH_SIZE`, only over windows already
+older than the safety lag — and may pass a window ONLY when it is accounted
+for:
+
+| verdict | evidence |
+| --- | --- |
+| `finalized` | a canonical closed row exists (the ingest-seq scan fills from it independently; a repair that restored the row counts `repairedWindowCount`) |
+| `no_trade` | the provider cursor CONFIRMED coverage of the window's range and returned no candle (`coverageComplete` over `[open, close)`). "No trades" is provider evidence, **never** an inference from our own silence |
+| `outside_session` | stock-market window outside the calendar session (calendar unavailable ⇒ no advance at all) |
+| bootstrap | windows before the asset's earliest activated order are vacuously complete — eligibility is rounded UP at create time |
+
+Everything else — feed gap, finalizer failure, failed write, unreachable
+provider, exhausted repair budget
+(`LIMIT_ORDER_CANDLE_COMPLETION_REPAIR_BUDGET_PER_SWEEP`) — leaves the FIRST
+unaccounted window recorded as `pendingWindowOpenTime`/`pendingSince` with
+bounded REST-repair retries on later sweeps. A pending window is never
+recorded as no-trade, and a no-trade window is never left pending.
+
+One asset's stall gates ONLY that asset (see the asset-scoped gate below);
+every other asset's cursor, scans and fills keep moving. Crypto windows are
+24/7; for KRX/US only calendar-session windows are owed a candle.
+
+The ingest-seq row scan is deliberately NOT bounded by this cursor: a path-B
+fill is evidence-based (a canonical closed row proving the low touched the
+limit) and always pays the LIMIT price, so processing an existing later row
+while an earlier sibling window is still pending changes no financial
+outcome. What the cursor adds is the one thing a row scan structurally cannot
+do — CONCLUDE something about absence.
+
+### Asset-scoped health gate
+
+`assertAvailable(now, assetId)` runs the global checks plus, for the ordered
+asset:
+
+| code | trigger |
+| --- | --- |
+| `LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED` | retention passed the asset's unresolved window (sticky, operator-cleared on the asset checkpoint) |
+| `LIMIT_ORDER_CANDLE_FINALIZER_STALE` | the asset's first unaccounted window pending longer than `LIMIT_ORDER_CANDLE_ASSET_FINALIZER_STALE_MS` |
+| `LIMIT_ORDER_CANDLE_ASSET_BACKLOG_EXCEEDED` | more than `LIMIT_ORDER_CANDLE_MAX_ASSET_DEFERRED_BACKLOG` open deferred candles on the asset |
+
+An asset with NO checkpoint passes: checkpoints exist only for assets with
+activated orders, and a first order on a fresh asset owes nothing to windows
+that closed before its creation. Global failures (scheduler stopped, DB
+unavailable, global gap) still gate every asset; asset failures gate only the
+named asset. Cancel, cleanup, market orders and FX are never gated by either.
+
+### Candle revision (corrections)
+
+The ingest-seq trigger re-sequences a candle whenever a correction changes
+what the window could fill (`is_closed`, `low`, window, asset). Processing is
+revision-aware end to end:
+
+- `limit_order_processed_candles.candle_ingest_seq` records WHICH revision the
+  row covers; a candle whose current `ingest_seq` is higher reappears in the
+  scan and is re-examined. `revision_count` and `first_processed_at` keep the
+  audit trail; the reprocess is logged as
+  `limit_order_candle_revision_reprocessed`.
+- The re-run is ADDITIVE-ONLY: the status guard on orders means an order
+  executed under revision 1 can never fill twice; only still-submitted orders
+  the correction newly qualifies are filled (at THEIR limit price, as always).
+- `limit_order_candle_evidences` is revision-scoped
+  (`UNIQUE (market_candle_id, candle_ingest_seq)`) and IMMUTABLE per revision:
+  a correction produces a NEW evidence row carrying the corrected low, and the
+  evidence an earlier fill points at keeps its original values verbatim. Two
+  revisions never share or overwrite evidence.
+- An unrelated update (`source_updated_at` refresh) does not re-sequence and
+  therefore does not reprocess.
+
 ### Retention gap
 
 Three independent, exact signals:

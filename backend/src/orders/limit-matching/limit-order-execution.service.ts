@@ -63,6 +63,12 @@ export type LimitOrderTrigger =
         sourceProvider: string;
         sourceUpdatedAt: Date;
         finalizedAt: Date;
+        /**
+         * Storage revision (MarketCandle.ingestSeq) the sweep read this
+         * candle at. Evidence is scoped to it: a corrected candle gets a NEW
+         * evidence row, and rows written for earlier revisions stay verbatim.
+         */
+        ingestSeq: bigint;
       };
     };
 
@@ -530,9 +536,17 @@ export class LimitOrderExecutionService {
   }
 
   /**
-   * One evidence row per canonical closed candle, shared by every order the
-   * candle fills. Concurrent creation is resolved by the unique index, so a
-   * retry never produces a second row for the same candle.
+   * One IMMUTABLE evidence row per (candle, storage revision), shared by
+   * every order that REVISION fills. Concurrent creation is resolved by the
+   * composite unique index, so a retry never produces a second row for the
+   * same revision.
+   *
+   * Within ONE revision the low is a constant, so an existing row whose low
+   * differs from the trigger is a genuine inconsistency and still fails
+   * closed. A DIFFERENT revision (a corrected candle) is not a mismatch — it
+   * gets its own row, and rows written for earlier revisions are never
+   * touched, so the audit trail of what each order actually filled against
+   * is preserved verbatim.
    */
   private async ensureCandleEvidence(
     tx: Prisma.TransactionClient,
@@ -542,7 +556,12 @@ export class LimitOrderExecutionService {
     >['candle'],
   ): Promise<{ id: string }> {
     const existing = await tx.limitOrderCandleEvidence.findUnique({
-      where: { marketCandleId: candle.id },
+      where: {
+        marketCandleId_candleIngestSeq: {
+          marketCandleId: candle.id,
+          candleIngestSeq: candle.ingestSeq,
+        },
+      },
       select: { id: true, triggerLowPrice: true, openTime: true },
     });
     if (existing) {
@@ -560,6 +579,7 @@ export class LimitOrderExecutionService {
     return tx.limitOrderCandleEvidence.create({
       data: {
         marketCandleId: candle.id,
+        candleIngestSeq: candle.ingestSeq,
         assetId: candle.assetId,
         interval: candle.interval,
         openTime: candle.openTime,

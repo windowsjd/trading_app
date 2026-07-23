@@ -75,6 +75,22 @@ export type LimitOrderProviderReadinessProof = {
   expiresAt: number;
 };
 
+const PROOF_OWNER_MODES: ReadonlySet<string> = new Set([
+  'local',
+  'shared',
+  'legacy',
+]);
+const PROOF_SOURCES: ReadonlySet<string> = new Set([
+  'live_candle_supervisor',
+  'legacy_streaming',
+]);
+/**
+ * A checkedAt slightly ahead of `now` is a benign monotonic/clock artifact of
+ * reading Date.now() twice; one materially in the future is an unorderable
+ * proof and is rejected as invalid.
+ */
+const PROOF_FUTURE_SKEW_TOLERANCE_MS = 1000;
+
 /**
  * Per-ASSET readiness gate for automatic limit-order matching.
  *
@@ -237,19 +253,42 @@ export class LimitOrderProviderHealthService {
     const provider = tradeRouteProviderForAssetType(request.assetType);
     if (!proof) {
       this.unavailable(
-        'LIMIT_ORDER_PROVIDER_UNAVAILABLE',
+        'LIMIT_ORDER_PROVIDER_READINESS_PROOF_INVALID',
         'No provider readiness proof was established for this order.',
+      );
+    }
+    // Structural validation BEFORE any semantic decision: a proof whose shape
+    // cannot be trusted (unknown ownerMode/source, inverted or absurd
+    // timestamps) must not even reach the expiry comparison — an attacker- or
+    // bug-shaped object with expiresAt=Infinity would otherwise pass it.
+    if (
+      !PROOF_OWNER_MODES.has(proof.ownerMode) ||
+      !PROOF_SOURCES.has(proof.source) ||
+      !Number.isFinite(proof.checkedAt) ||
+      !Number.isFinite(proof.expiresAt) ||
+      proof.checkedAt > proof.expiresAt ||
+      proof.expiresAt - proof.checkedAt >
+        this.config.providerReadinessProofMaxAgeMs ||
+      // A checkedAt in the future means the two readings cannot be ordered
+      // (clock jump, serialized proof from another host). Not evidence.
+      proof.checkedAt > now + PROOF_FUTURE_SKEW_TOLERANCE_MS ||
+      typeof proof.generation !== 'string' ||
+      proof.generation.length === 0
+    ) {
+      this.unavailable(
+        'LIMIT_ORDER_PROVIDER_READINESS_PROOF_INVALID',
+        'The provider readiness proof is structurally invalid.',
       );
     }
     if (proof.provider !== provider || proof.assetId !== request.assetId) {
       this.unavailable(
-        'LIMIT_ORDER_PROVIDER_UNAVAILABLE',
+        'LIMIT_ORDER_PROVIDER_READINESS_PROOF_INVALID',
         'The provider readiness proof does not cover the ordered asset.',
       );
     }
     if (now > proof.expiresAt) {
       this.unavailable(
-        'LIMIT_ORDER_PROVIDER_UNAVAILABLE',
+        'LIMIT_ORDER_PROVIDER_READINESS_PROOF_EXPIRED',
         `The provider readiness proof expired ${now - proof.expiresAt}ms ago.`,
       );
     }
@@ -258,11 +297,23 @@ export class LimitOrderProviderHealthService {
     if (owner) {
       const readiness = this.localReadiness(request.assetId, provider);
       if (!readiness.ready) this.fail(readiness);
+      // The local registry is fresher than any proof: when THIS process owns
+      // the socket, a generation that moved since the proof was issued means
+      // the subscription evidence the proof was based on no longer exists.
+      if (
+        proof.ownerMode === 'local' &&
+        readiness.generation !== proof.generation
+      ) {
+        this.unavailable(
+          'LIMIT_ORDER_PROVIDER_GENERATION_CHANGED',
+          `The ${provider} connection generation changed after the readiness check.`,
+        );
+      }
       return;
     }
     if (proof.ownerMode === 'local') {
       this.unavailable(
-        'LIMIT_ORDER_PROVIDER_UNAVAILABLE',
+        'LIMIT_ORDER_PROVIDER_GENERATION_CHANGED',
         `This instance released the ${provider} trade route after the readiness check.`,
       );
     }

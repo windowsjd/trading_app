@@ -1,25 +1,51 @@
 /**
- * Multi-instance provider trade-readiness runner (real Redis).
+ * Multi-instance provider trade-readiness runner (real PostgreSQL + Redis).
  *
- * The defect this exists to prevent: `ProviderTradeRouteRegistry` is
- * per-process memory. In a multi-instance deployment the live-candle
- * supervisor owns the Binance/KIS socket on ONE instance while HTTP requests
- * land on any of them, so the same limit-order quote/create succeeded on the
- * owner and failed with LIMIT_ORDER_PROVIDER_UNAVAILABLE on every other pod.
+ * Two defect families are pinned here:
+ *
+ * 1. `ProviderTradeRouteRegistry` is per-process memory. In a multi-instance
+ *    deployment the live-candle supervisor owns the Binance/KIS socket on ONE
+ *    instance while HTTP requests land on any of them, so the same limit
+ *    quote/create used to succeed on the owner and fail with
+ *    LIMIT_ORDER_PROVIDER_UNAVAILABLE on every other pod.
+ *
+ * 2. Publishing the shared view used to be fenced by a readiness-only token
+ *    that proved nothing about the actual socket: a process that merely
+ *    LOOKED like an owner locally could publish, and a replaced owner could
+ *    keep publishing until its token happened to be superseded. Publishing
+ *    rights are now derived from the REAL provider owner lease — the same
+ *    Redis lock the supervisor holds for the socket — checked inside Redis on
+ *    every write.
  *
  * Everything below uses TWO INDEPENDENT service/registry instances talking to
- * one real Redis — a single-process unit test cannot demonstrate this.
+ * one real Redis, plus a real PostgreSQL for the full non-owner Quote→Create
+ * financial flow — a single-process unit test cannot demonstrate either.
  */
 import 'dotenv/config';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { AssetType, CurrencyCode } from '../src/generated/prisma/client';
+import {
+  AssetType,
+  CurrencyCode,
+  FxRateSourceType,
+  OrderStatus,
+  ParticipantStatus,
+  SeasonStatus,
+} from '../src/generated/prisma/client';
+import { PrismaService } from '../src/prisma/prisma.service';
 import { RedisService } from '../src/redis/redis.service';
+import {
+  RedisLockService,
+  type RedisLock,
+} from '../src/redis/redis-lock.service';
 import { ProviderTradeReadinessPublisher } from '../src/providers/provider-trade-readiness.publisher';
 import {
+  assertReadinessKeySlots,
   providerAssetsKey,
-  providerFenceKey,
+  providerEpochHolderKey,
+  providerEpochKey,
   providerMetaKey,
+  providerOwnerLeaseKey,
   PROVIDER_TRADE_READINESS_SCHEMA_VERSION,
   ProviderTradeReadinessStore,
   type SharedProviderMeta,
@@ -29,25 +55,33 @@ import {
   type ProviderSubscribedAsset,
 } from '../src/providers/provider-trade-route.registry';
 import { readProviderTradeReadinessConfig } from '../src/providers/provider-trade-readiness.config';
-import {
-  LimitOrderProviderHealthService,
-  type LimitOrderProviderAssetRequest,
-} from '../src/orders/limit-matching/limit-order-provider-health.service';
+import { LimitOrderProviderHealthService } from '../src/orders/limit-matching/limit-order-provider-health.service';
+import { LimitOrderMatchBoundaryService } from '../src/orders/limit-matching/limit-order-match-boundary.service';
+import { LimitOrderMatcherHealthService } from '../src/orders/limit-matching/limit-order-matcher-health.service';
+import { LimitOrderCancelService } from '../src/orders/limit-order-cancel.service';
+import { LimitOrderCreateService } from '../src/orders/limit-order-create.service';
+import { OrderReservationService } from '../src/orders/order-reservation.service';
+import { OrdersService } from '../src/orders/orders.service';
 
+const PREFIX = `lo-shared-${process.pid}-${Date.now()}`;
 const LIVENESS_MAX_AGE_MS = 60_000;
 const TTL_SECONDS = 30;
+const ZERO = '0.00000000';
 
-/** Instance A: owns the socket and publishes. */
+/** Instance A: owns the socket lease and publishes. */
 const ownerRedis = new RedisService();
 /** Instance B: a completely separate API pod. Its own client, its own state. */
 const readerRedis = new RedisService();
 
+const ownerLocks = new RedisLockService(ownerRedis);
 const ownerRegistry = new ProviderTradeRouteRegistry();
 const ownerStore = new ProviderTradeReadinessStore(ownerRedis);
 const readerStore = new ProviderTradeReadinessStore(readerRedis);
+const prisma = new PrismaService();
 
 const OWNER_INSTANCE = `owner-${process.pid}-${randomUUID()}`;
 const RIVAL_INSTANCE = `rival-${process.pid}-${randomUUID()}`;
+const LEASE_KEY = providerOwnerLeaseKey('binance');
 
 const ASSET: ProviderSubscribedAsset = {
   assetId: `asset-${randomUUID()}`,
@@ -77,22 +111,26 @@ const publisher = new ProviderTradeReadinessPublisher(
 );
 
 const publishedGenerations: string[] = [];
+let ownerLease: RedisLock | null = null;
 
 async function main(): Promise<void> {
   assert.ok(process.env.REDIS_URL, 'REDIS_URL must be configured.');
-  // The create-path scenarios below exercise the real gate, which is inert
-  // unless automatic matching is on.
-  assert.equal(
-    process.env.LIMIT_ORDER_AUTO_EXECUTION_ENABLED,
-    'true',
-    'the runner needs LIMIT_ORDER_AUTO_EXECUTION_ENABLED=true',
-  );
+  assert.ok(process.env.DATABASE_URL, 'DATABASE_URL must be configured.');
+  // The create-path scenarios drive the real gates, which are inert unless
+  // the flags are on.
+  assert.equal(process.env.LIMIT_ORDER_ENABLED, 'true');
+  assert.equal(process.env.LIMIT_ORDER_AUTO_EXECUTION_ENABLED, 'true');
   await ownerRedis.connect();
   await readerRedis.connect();
+  await prisma.$connect();
 
   try {
     await run(
-      'instance B sees the readiness instance A published',
+      'readiness keys share the owner lease cluster slot',
+      testKeySlotInvariant,
+    );
+    await run(
+      'instance B sees the readiness instance A published under the live lease',
       testCrossInstanceReadiness,
     );
     await run(
@@ -113,28 +151,36 @@ async function main(): Promise<void> {
       testReconnectGenerationInvalidatesPrevious,
     );
     await run(
-      'a late release from a superseded owner cannot delete the new state',
+      'a publisher without the Redis lease cannot publish despite a local owner claim',
+      testLeaselessPublisherCannotPublish,
+    );
+    await run(
+      'a wrong lease token is refused even with the current epoch',
+      testWrongLeaseTokenRefused,
+    );
+    await run(
+      'a stale fencing epoch is refused even with the live lease token',
+      testStaleEpochRefused,
+    );
+    await run(
+      'an old owner cannot republish after takeover even with a newer clock',
+      testOldOwnerCannotRepublishAfterTakeover,
+    );
+    await run(
+      'an old-generation subscription ack cannot ready the current generation',
+      testOldGenerationAckIgnored,
+    );
+    await run(
+      'a late release from the replaced owner cannot delete the new state',
       testLateReleaseCannotDeleteNewOwner,
     );
     await run(
-      'a non-owner instance completes the whole create readiness path',
-      testNonOwnerCreatePathSucceeds,
+      'a non-owner instance completes the whole Quote and Create financial flow',
+      testNonOwnerFullQuoteCreateFlow,
     );
     await run(
-      'a non-owner create fails closed once the owner disappears',
-      testNonOwnerCreatePathFailsClosedWithoutOwner,
-    );
-    await run(
-      'a rival cannot claim ownership while the owner heartbeats',
-      testRivalCannotClaimWhileOwnerHeartbeats,
-    );
-    await run(
-      'a fenced-out owner cannot overwrite the new owner even with a newer clock',
-      testFencedOutOwnerCannotOverwrite,
-    );
-    await run(
-      'a fenced-out publisher surrenders instead of republishing',
-      testFencedOutPublisherSurrenders,
+      'a non-owner create fails closed with no reservation once the owner disappears',
+      testNonOwnerCreateFailsClosedWithoutOwner,
     );
     await run('a Redis failure fails closed', testRedisFailureFailsClosed);
     await run(
@@ -143,9 +189,13 @@ async function main(): Promise<void> {
     );
     console.log('limit order shared readiness integration ok');
   } finally {
-    await cleanupRedis();
+    await cleanupDatabase().catch((error: unknown) => {
+      console.error('db cleanup failed', error);
+    });
+    await cleanupRedis().catch(() => undefined);
     await ownerRedis.onModuleDestroy().catch(() => undefined);
     await readerRedis.onModuleDestroy().catch(() => undefined);
+    await prisma.$disconnect();
   }
 }
 
@@ -155,10 +205,107 @@ async function run(name: string, test: () => Promise<void>): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Scenarios
+// Owner simulation
 // ---------------------------------------------------------------------------
 
-/** Instance A owns and publishes; instance B, which owns nothing, agrees. */
+/**
+ * Drives instance A exactly as the live-candle supervisor does: acquire the
+ * REAL Redis owner lease -> claim the route -> register the lease -> new
+ * generation -> socket open -> subscription targets (with a shard-capped
+ * asset) -> optional acknowledgement -> publish.
+ */
+async function connectOwner(input: { acknowledge: boolean }): Promise<string> {
+  await ensureOwnerLease();
+  const generation = randomUUID();
+  ownerRegistry.claimProvider('binance', 'live_candle_supervisor');
+  ownerRegistry.setOwnerLease('binance', 'live_candle_supervisor', {
+    key: LEASE_KEY,
+    token: (ownerLease as RedisLock).token,
+  });
+  ownerRegistry.beginConnection({
+    provider: 'binance',
+    source: 'live_candle_supervisor',
+    generation,
+  });
+  ownerRegistry.markConnectionOpen({
+    provider: 'binance',
+    generation,
+    at: Date.now(),
+  });
+  ownerRegistry.registerSubscriptionTargets({
+    provider: 'binance',
+    generation,
+    assets: [ASSET],
+    cappedAssets: [CAPPED_ASSET],
+  });
+  if (input.acknowledge) {
+    ownerRegistry.markSubscriptionsActive({ provider: 'binance', generation });
+  }
+  ownerRegistry.markFrame({
+    provider: 'binance',
+    generation,
+    at: Date.now(),
+  });
+  await publisher.publishOnce();
+  publishedGenerations.push(generation);
+  return generation;
+}
+
+async function ensureOwnerLease(): Promise<RedisLock> {
+  if (ownerLease) {
+    const held = await ownerRedis.get(LEASE_KEY);
+    if (held === ownerLease.token) return ownerLease;
+    ownerLease = null;
+  }
+  const acquired = await ownerLocks.acquire(LEASE_KEY, 60_000);
+  assert.equal(acquired.status, 'acquired', 'the owner lease must be free');
+  ownerLease = (acquired as { status: 'acquired'; lock: RedisLock }).lock;
+  return ownerLease;
+}
+
+async function dropOwnerLease(): Promise<void> {
+  if (ownerLease) {
+    await ownerLocks.release(ownerLease).catch(() => undefined);
+    ownerLease = null;
+  } else {
+    await ownerRedis.delete(LEASE_KEY).catch(() => undefined);
+  }
+}
+
+function requireOwnerEpoch(): number {
+  const epoch = publisher.ownershipSnapshot().binance.fencingEpoch;
+  assert.ok(
+    typeof epoch === 'number',
+    'the fixture publisher must hold a fencing epoch',
+  );
+  return epoch;
+}
+
+// ---------------------------------------------------------------------------
+// Fencing scenarios
+// ---------------------------------------------------------------------------
+
+// eslint-disable-next-line @typescript-eslint/require-await -- uniform runner signature
+async function testKeySlotInvariant(): Promise<void> {
+  // On a clustered Redis a multi-key Lua call is only legal when every key
+  // hashes to one slot, and the slot is decided by the {…} hash tag. Every
+  // readiness key carries the LEASE KEY ITSELF as its tag, so it hashes
+  // exactly like the lease — proven by tag identity, no CRC16 needed.
+  assert.doesNotThrow(() => assertReadinessKeySlots('binance'));
+  assert.doesNotThrow(() => assertReadinessKeySlots('kis'));
+  for (const key of [
+    providerMetaKey('binance'),
+    providerAssetsKey('binance', 'gen'),
+    providerEpochKey('binance'),
+    providerEpochHolderKey('binance'),
+  ]) {
+    assert.ok(
+      key.includes(`{${LEASE_KEY}}`),
+      `${key} must embed the lease key`,
+    );
+  }
+}
+
 async function testCrossInstanceReadiness(): Promise<void> {
   const generation = await connectOwner({ acknowledge: true });
 
@@ -184,9 +331,18 @@ async function testCrossInstanceReadiness(): Promise<void> {
   assert.equal(shared.ready && shared.generation, generation);
   assert.equal(shared.ready && shared.asset.providerSymbol, 'BTCUSDT');
   assert.equal(shared.ready && shared.source, 'live_candle_supervisor');
+
+  // The published meta names the epoch and a token DIGEST, never the token.
+  const meta = await readerStore.readProviderMeta('binance');
+  assert.ok(meta && typeof meta.fencingEpoch === 'number');
+  assert.ok(meta.leaseTokenDigest.length > 0);
+  const rawMeta = (await ownerRedis.get(providerMetaKey('binance'))) ?? '';
+  assert.ok(
+    !rawMeta.includes((ownerLease as RedisLock).token),
+    'the raw lease token must never be published',
+  );
 }
 
-/** requested (sent, not acknowledged) must never be treated as subscribed. */
 async function testRequestedRejected(): Promise<void> {
   await connectOwner({ acknowledge: false });
   const readiness = await readerStore.checkAssetReadiness({
@@ -241,10 +397,6 @@ async function testCappedRejected(): Promise<void> {
   );
 }
 
-/**
- * Connection liveness is judged from the published lastFrameAt. A socket that
- * stopped producing frames must not keep accepting orders on other instances.
- */
 async function testStaleFrameRejected(): Promise<void> {
   await connectOwner({ acknowledge: true });
   const readiness = await readerStore.checkAssetReadiness({
@@ -261,11 +413,6 @@ async function testStaleFrameRejected(): Promise<void> {
   );
 }
 
-/**
- * A reconnect starts a NEW generation. Readiness published for the previous
- * one must stop being usable the moment the new meta lands — not when its TTL
- * happens to expire.
- */
 async function testReconnectGenerationInvalidatesPrevious(): Promise<void> {
   const first = await connectOwner({ acknowledge: true });
   const firstAssetsKey = providerAssetsKey('binance', first);
@@ -297,43 +444,253 @@ async function testReconnectGenerationInvalidatesPrevious(): Promise<void> {
 }
 
 /**
- * The late-release race: a replaced owner finally runs its shutdown release
- * AFTER a new owner has published. The compare-and-delete must make it a
- * no-op, otherwise the new owner's readiness would vanish and every instance
- * would fail closed for no reason.
+ * THE core fencing invariant: a local registry that LOOKS like an owner is
+ * not enough. Publishing requires the live Redis lease, checked inside Redis
+ * at write time.
  */
+async function testLeaselessPublisherCannotPublish(): Promise<void> {
+  await connectOwner({ acknowledge: true });
+  // The lease disappears (expiry/takeover) while the local registry still
+  // believes it owns everything.
+  await dropOwnerLease();
+  await ownerRedis.delete(providerMetaKey('binance'));
+
+  await publisher.publishOnce();
+
+  assert.equal(
+    await ownerRedis.get(providerMetaKey('binance')),
+    null,
+    'a lease-less publisher must not be able to publish readiness',
+  );
+  const readiness = await readerStore.checkAssetReadiness({
+    assetId: ASSET.assetId,
+    provider: 'binance',
+    livenessMaxAgeMs: LIVENESS_MAX_AGE_MS,
+  });
+  assert.equal(readiness.ready, false, 'every reader must fail closed');
+
+  // A registry claim with NO lease registered at all is refused even earlier,
+  // without touching Redis (the legacy-streaming shape).
+  ownerRegistry.clearOwnerLease('binance', 'live_candle_supervisor');
+  await publisher.publishOnce();
+  assert.equal(await ownerRedis.get(providerMetaKey('binance')), null);
+}
+
+async function testWrongLeaseTokenRefused(): Promise<void> {
+  const generation = await connectOwner({ acknowledge: true });
+  const epoch = requireOwnerEpoch();
+
+  const accepted = await ownerStore.publishProvider({
+    meta: buildMeta({
+      generation,
+      ownerInstance: OWNER_INSTANCE,
+      fencingEpoch: epoch,
+      lastUpdatedAt: Date.now(),
+    }),
+    // Correct epoch, WRONG token: must be refused atomically inside Redis.
+    leaseToken: `not-the-lease-${randomUUID()}`,
+    ttlSeconds: TTL_SECONDS,
+  });
+  assert.equal(accepted, false, 'a wrong lease token must be refused');
+}
+
+async function testStaleEpochRefused(): Promise<void> {
+  const generation = await connectOwner({ acknowledge: true });
+  const epoch = requireOwnerEpoch();
+
+  const accepted = await ownerStore.publishProvider({
+    meta: buildMeta({
+      generation,
+      ownerInstance: OWNER_INSTANCE,
+      // The live token but an EPOCH from a previous succession.
+      fencingEpoch: epoch - 1,
+      lastUpdatedAt: Date.now(),
+    }),
+    leaseToken: (ownerLease as RedisLock).token,
+    ttlSeconds: TTL_SECONDS,
+  });
+  assert.equal(accepted, false, 'a stale fencing epoch must be refused');
+}
+
+/**
+ * THE regression owner fencing exists for, now against the REAL lease.
+ *
+ * A's lease lapses; B acquires the SAME lease key and publishes. A comes back
+ * with its old token, its old epoch, and a wall clock an hour AHEAD — and
+ * must be refused on every write path. Then the mirror image: B's records
+ * carry timestamps far BEHIND A's, and are accepted anyway, because ownership
+ * is the lease, never the clock.
+ */
+async function testOldOwnerCannotRepublishAfterTakeover(): Promise<void> {
+  const staleGeneration = await connectOwner({ acknowledge: true });
+  const staleEpoch = requireOwnerEpoch();
+  const staleToken = (ownerLease as RedisLock).token;
+
+  // A dies: its lease lapses and its heartbeat record expires.
+  await dropOwnerLease();
+  await ownerRedis.delete(providerMetaKey('binance'));
+
+  // B takes the lease over and publishes — with a timestamp far in the PAST.
+  const rivalLocks = new RedisLockService(readerRedis);
+  const rivalAcquired = await rivalLocks.acquire(LEASE_KEY, 60_000);
+  assert.equal(rivalAcquired.status, 'acquired');
+  const rivalLease = (rivalAcquired as { status: 'acquired'; lock: RedisLock })
+    .lock;
+  try {
+    const rivalClaim = await readerStore.acquireOwnership({
+      provider: 'binance',
+      leaseToken: rivalLease.token,
+    });
+    assert.equal(rivalClaim.acquired, true, 'the lease holder must acquire');
+    const rivalEpoch = rivalClaim.fencingEpoch as number;
+    assert.ok(rivalEpoch > staleEpoch, 'the epoch must be strictly newer');
+
+    const takeoverGeneration = randomUUID();
+    publishedGenerations.push(takeoverGeneration);
+    const clockSkewedPast = Date.now() - 3_600_000;
+    const rivalAccepted = await readerStore.publishProvider({
+      meta: buildMeta({
+        generation: takeoverGeneration,
+        ownerInstance: RIVAL_INSTANCE,
+        fencingEpoch: rivalEpoch,
+        // An hour BEHIND the zombie's clock: must not matter.
+        lastUpdatedAt: clockSkewedPast,
+      }),
+      leaseToken: rivalLease.token,
+      ttlSeconds: TTL_SECONDS,
+    });
+    assert.equal(
+      rivalAccepted,
+      true,
+      'the real lease holder must publish regardless of clock skew',
+    );
+
+    // The zombie returns with a clock an hour AHEAD. Meta write refused.
+    const zombieMeta = await ownerStore.publishProvider({
+      meta: buildMeta({
+        generation: staleGeneration,
+        ownerInstance: OWNER_INSTANCE,
+        fencingEpoch: staleEpoch,
+        lastUpdatedAt: Date.now() + 3_600_000,
+      }),
+      leaseToken: staleToken,
+      ttlSeconds: TTL_SECONDS,
+    });
+    assert.equal(zombieMeta, false, 'a replaced owner must not win on a clock');
+
+    // Asset write refused under the same rule.
+    const zombieAssets = await ownerStore.publishAssets({
+      provider: 'binance',
+      generation: takeoverGeneration,
+      leaseToken: staleToken,
+      fencingEpoch: staleEpoch,
+      records: [
+        {
+          schemaVersion: PROVIDER_TRADE_READINESS_SCHEMA_VERSION,
+          assetId: ASSET.assetId,
+          providerSymbol: ASSET.providerSymbol,
+          symbol: ASSET.symbol,
+          market: ASSET.market,
+          assetType: ASSET.assetType,
+          settlementCurrency: ASSET.settlementCurrency,
+          sourceName: ASSET.sourceName,
+          state: 'active',
+          generation: takeoverGeneration,
+          acknowledgedAt: Date.now(),
+          updatedAt: Date.now(),
+        },
+      ],
+      ttlSeconds: TTL_SECONDS,
+    });
+    assert.equal(zombieAssets, false);
+
+    // And the publisher-level zombie (stale local registry + old lease token)
+    // surrenders instead of publishing.
+    await publisher.publishOnce();
+    const meta = await readerStore.readProviderMeta('binance');
+    assert.equal(meta?.ownerInstance, RIVAL_INSTANCE);
+    assert.equal(meta?.generation, takeoverGeneration);
+
+    await readerStore.release({
+      provider: 'binance',
+      generation: takeoverGeneration,
+      ownerInstance: RIVAL_INSTANCE,
+      fencingEpoch: rivalEpoch,
+    });
+  } finally {
+    await rivalLocks.release(rivalLease).catch(() => undefined);
+  }
+}
+
+/**
+ * Old-socket callback fencing, observed through the registry contract the
+ * supervisor relies on: after a reconnect, an ACK carrying the OLD generation
+ * must not flip the CURRENT generation's subscriptions to active.
+ */
+async function testOldGenerationAckIgnored(): Promise<void> {
+  const first = await connectOwner({ acknowledge: true });
+  // Reconnect: new generation, subscription sent but NOT acknowledged yet.
+  const second = await connectOwner({ acknowledge: false });
+  assert.notEqual(second, first);
+
+  // The old socket's ACK callback fires late, carrying its CAPTURED (old)
+  // generation — exactly what the supervisor's per-connection capture does.
+  ownerRegistry.markSubscriptionsActive({
+    provider: 'binance',
+    generation: first,
+  });
+  await publisher.publishOnce();
+
+  const readiness = await readerStore.checkAssetReadiness({
+    assetId: ASSET.assetId,
+    provider: 'binance',
+    livenessMaxAgeMs: LIVENESS_MAX_AGE_MS,
+  });
+  assert.equal(
+    readiness.ready,
+    false,
+    'an old-generation ack must not ready the current generation',
+  );
+  assert.equal(
+    !readiness.ready && readiness.code,
+    'LIMIT_ORDER_PROVIDER_NOT_SUBSCRIBED',
+  );
+}
+
 async function testLateReleaseCannotDeleteNewOwner(): Promise<void> {
   const current = await connectOwner({ acknowledge: true });
-  const ownerToken = requireOwnerFenceToken();
+  const ownerEpoch = requireOwnerEpoch();
 
-  // A different instance that used to own the provider, releasing late.
+  // A replaced owner releasing late: stale generation, stale epoch, or a
+  // guessed owner identity — every combination is a no-op.
   const rivalStore = new ProviderTradeReadinessStore(readerRedis);
-  const deletedByStaleGeneration = await rivalStore.release({
-    provider: 'binance',
-    generation: `stale-${randomUUID()}`,
-    ownerInstance: RIVAL_INSTANCE,
-    fenceToken: ownerToken,
-  });
-  assert.equal(deletedByStaleGeneration, false);
-
-  // Even guessing the CURRENT generation must not help: the owner identity
-  // still has to match.
-  const deletedByStaleOwner = await rivalStore.release({
-    provider: 'binance',
-    generation: current,
-    ownerInstance: RIVAL_INSTANCE,
-    fenceToken: ownerToken,
-  });
-  assert.equal(deletedByStaleOwner, false);
-
-  // Nor does guessing the owner identity without the fence token.
-  const deletedByStaleToken = await rivalStore.release({
-    provider: 'binance',
-    generation: current,
-    ownerInstance: OWNER_INSTANCE,
-    fenceToken: ownerToken - 1,
-  });
-  assert.equal(deletedByStaleToken, false);
+  assert.equal(
+    await rivalStore.release({
+      provider: 'binance',
+      generation: `stale-${randomUUID()}`,
+      ownerInstance: RIVAL_INSTANCE,
+      fencingEpoch: ownerEpoch,
+    }),
+    false,
+  );
+  assert.equal(
+    await rivalStore.release({
+      provider: 'binance',
+      generation: current,
+      ownerInstance: RIVAL_INSTANCE,
+      fencingEpoch: ownerEpoch,
+    }),
+    false,
+  );
+  assert.equal(
+    await rivalStore.release({
+      provider: 'binance',
+      generation: current,
+      ownerInstance: OWNER_INSTANCE,
+      fencingEpoch: ownerEpoch - 1,
+    }),
+    false,
+  );
 
   const readiness = await readerStore.checkAssetReadiness({
     assetId: ASSET.assetId,
@@ -352,7 +709,7 @@ async function testLateReleaseCannotDeleteNewOwner(): Promise<void> {
       provider: 'binance',
       generation: current,
       ownerInstance: OWNER_INSTANCE,
-      fenceToken: ownerToken,
+      fencingEpoch: ownerEpoch,
     }),
     true,
   );
@@ -364,329 +721,409 @@ async function testLateReleaseCannotDeleteNewOwner(): Promise<void> {
   assert.equal(afterRelease.ready, false);
 }
 
+// ---------------------------------------------------------------------------
+// Non-owner Quote -> Create: the REAL financial flow
+// ---------------------------------------------------------------------------
+
+type DbFixtures = {
+  userId: string;
+  seasonId: string;
+  participantId: string;
+  walletId: string;
+  assetId: string;
+  fxRateSnapshotId: string;
+  matcherRunId: string;
+};
+
 /**
- * THE create-path regression, exercised across two real instances.
- *
- * A limit create resolves readiness BEFORE its transaction (where a Redis
- * round trip is allowed) and re-verifies it INSIDE the transaction (where one
- * is not, because the event-boundary advisory lock is held). That
- * in-transaction step used to be a synchronous local check which, on an
- * instance owning no provider socket, fell through to the LEGACY per-provider
- * streaming status — not connected on a plain API pod. So the shared pre-check
- * accepted the order and the transaction then rejected it with 503: the same
- * request succeeded or failed purely by which pod served it.
- *
- * Instance B here is exactly that pod: its own Redis client, its own empty
- * registry, no legacy stream at all.
+ * Instance B as a REAL API pod: its own OrdersService with the full limit
+ * stack, its own EMPTY registry, no legacy streaming service, and the shared
+ * readiness store over its own Redis connection. The provider asset row in
+ * PostgreSQL matches what instance A publishes to Redis.
  */
-async function testNonOwnerCreatePathSucceeds(): Promise<void> {
+async function testNonOwnerFullQuoteCreateFlow(): Promise<void> {
   await connectOwner({ acknowledge: true });
-  const { health, request } = nonOwnerCreatePath();
+  const fixtures = await createDbFixtures();
+  const b = buildInstanceB();
+  try {
+    // 1) QUOTE on instance B: the real quote path, including the shared
+    //    readiness gate and the matcher health gate, producing a durable row.
+    const quote = await b.orders.quoteOrder(fixtures.userId, {
+      assetId: fixtures.assetId,
+      side: 'buy',
+      orderType: 'limit',
+      quantity: '2.000000',
+      limitPrice: '100.00000000',
+      currencyCode: 'USD',
+    });
+    assert.equal(quote.success, true);
+    const quoteId = quote.data.quoteId;
+    assert.ok(quoteId, 'the limit quote must be durable');
+    const durableQuote = await prisma.quote.findUniqueOrThrow({
+      where: { id: quoteId },
+      select: { status: true, quotedReservedAmount: true },
+    });
+    assert.equal(durableQuote.status, 'active');
+    assert.ok(durableQuote.quotedReservedAmount);
 
-  // Step 1 — before the transaction. May talk to Redis; issues the proof.
-  const proof = await health.assertAvailableAsync(request);
-  assert.ok(proof, 'the pre-transaction check must issue a proof');
-  assert.equal(proof.ownerMode, 'shared');
-  assert.equal(proof.provider, 'binance');
-  assert.equal(proof.assetId, ASSET.assetId);
+    // 2) CREATE on instance B. Inside the transaction there is no local
+    //    authority and no legacy stream; the readiness PROOF from the shared
+    //    view is what carries the verdict. No Redis call happens inside the
+    //    transaction — proven by cutting the reader connection for the
+    //    duration of the transaction being impossible to interleave here, so
+    //    instead asserted structurally: the in-transaction verifier is the
+    //    synchronous assertReadinessProof (unit-pinned) and instance B's only
+    //    Redis client is used before the transaction opens.
+    const idempotencyKey = `${PREFIX}-create-1`;
+    const created = await b.orders.createOrder(fixtures.userId, {
+      quoteId,
+      assetId: fixtures.assetId,
+      side: 'buy',
+      orderType: 'limit',
+      quantity: '2.000000',
+      limitPrice: '100.00000000',
+      currencyCode: 'USD',
+      idempotencyKey,
+    });
+    assert.equal(created.success, true);
+    assert.ok(
+      'order' in created.data,
+      'a limit create returns the order payload',
+    );
+    const orderId = created.data.order.orderId;
 
-  // Step 2 — inside the transaction. Memory only; must reach the SAME verdict.
-  health.assertReadinessProof(proof, request);
+    // 3) Financial assertions: reservation moved, balance untouched, order
+    //    submitted, nothing executed.
+    const wallet = await prisma.cashWallet.findUniqueOrThrow({
+      where: { id: fixtures.walletId },
+      select: { balanceAmount: true, reservedAmount: true },
+    });
+    // 2 x 100 = 200 gross + 0.1% fee 0.20 = 200.20 reserved.
+    assert.equal(wallet.reservedAmount.toFixed(8), '200.20000000');
+    assert.equal(wallet.balanceAmount.toFixed(8), '1000.00000000');
+    const order = await prisma.order.findUniqueOrThrow({
+      where: { id: orderId },
+      select: {
+        status: true,
+        reservedAmount: true,
+        matchingActivatedAt: true,
+        matchingActivationStreamId: true,
+        executedAt: true,
+      },
+    });
+    assert.equal(order.status, OrderStatus.submitted);
+    assert.equal(order.reservedAmount?.toFixed(8), '200.20000000');
+    assert.ok(
+      order.matchingActivatedAt,
+      'auto-execution on means the order must be activation-stamped',
+    );
+    assert.ok(order.matchingActivationStreamId);
+    assert.equal(order.executedAt, null);
+    assert.equal(
+      await prisma.walletTransaction.count({
+        where: { seasonParticipantId: fixtures.participantId },
+      }),
+      0,
+      'a submitted limit buy must not create wallet transactions',
+    );
+    assert.equal(
+      await prisma.position.count({
+        where: { seasonParticipantId: fixtures.participantId },
+      }),
+      0,
+      'a submitted limit buy must not create a position',
+    );
 
-  // The regression itself: the check that used to run here fails on this
-  // instance, and would have turned an accepted create into a 503.
-  assert.throws(
-    () => health.assertAvailable(request),
-    /LIMIT_ORDER_PROVIDER_UNAVAILABLE|not connected/u,
-    'the local-only check must still fail on a non-owner — that is why the proof exists',
-  );
+    // 4) Idempotent replay returns the SAME order without a second
+    //    reservation.
+    const replay = await b.orders.createOrder(fixtures.userId, {
+      quoteId,
+      assetId: fixtures.assetId,
+      side: 'buy',
+      orderType: 'limit',
+      quantity: '2.000000',
+      limitPrice: '100.00000000',
+      currencyCode: 'USD',
+      idempotencyKey,
+    });
+    assert.equal(replay.success, true);
+    assert.ok('order' in replay.data);
+    assert.equal(replay.data.order.orderId, orderId);
+    const walletAfterReplay = await prisma.cashWallet.findUniqueOrThrow({
+      where: { id: fixtures.walletId },
+      select: { reservedAmount: true },
+    });
+    assert.equal(walletAfterReplay.reservedAmount.toFixed(8), '200.20000000');
 
-  // A proof does not become a blank cheque: it covers one asset on one
-  // provider, and expires.
-  assert.throws(() =>
-    health.assertReadinessProof(
-      proof,
-      { ...request, assetId: CAPPED_ASSET.assetId },
-      Date.now(),
-    ),
-  );
-  assert.throws(() =>
-    health.assertReadinessProof(proof, request, proof.expiresAt + 1),
-  );
-}
-
-/** No owner, no proof. The non-owner instance must refuse to create. */
-async function testNonOwnerCreatePathFailsClosedWithoutOwner(): Promise<void> {
-  const generation = await connectOwner({ acknowledge: true });
-  const { health, request } = nonOwnerCreatePath();
-  assert.ok(await health.assertAvailableAsync(request));
-
-  await ownerStore.release({
-    provider: 'binance',
-    generation,
-    ownerInstance: OWNER_INSTANCE,
-    fenceToken: requireOwnerFenceToken(),
-  });
-
-  await assert.rejects(
-    () => health.assertAvailableAsync(request),
-    'with no instance publishing, a create must fail closed everywhere',
-  );
-}
-
-/**
- * A plain API pod: its own Redis client and store, an EMPTY route registry, and
- * no legacy streaming service of any kind.
- */
-function nonOwnerCreatePath(): {
-  health: LimitOrderProviderHealthService;
-  request: LimitOrderProviderAssetRequest;
-} {
-  const health = new LimitOrderProviderHealthService(
-    new ProviderTradeRouteRegistry(),
-    { isActive: () => true } as never,
-    undefined,
-    undefined,
-    new ProviderTradeReadinessStore(readerRedis),
-    { ...readProviderTradeReadinessConfig(), enabled: true },
-  );
-  return {
-    health,
-    request: {
-      assetId: ASSET.assetId,
+    // 5) Proof discipline on the same REAL shared view: the proof covers ONE
+    //    asset and expires.
+    const proof = await b.providerHealth.assertAvailableAsync({
+      assetId: fixtures.assetId,
       symbol: ASSET.symbol,
       market: ASSET.market,
       assetType: ASSET.assetType,
-    },
-  };
+    });
+    assert.ok(proof && proof.ownerMode === 'shared');
+    assert.throws(() =>
+      b.providerHealth.assertReadinessProof(
+        proof,
+        {
+          assetId: `${fixtures.assetId}-other`,
+          symbol: ASSET.symbol,
+          market: ASSET.market,
+          assetType: ASSET.assetType,
+        },
+        Date.now(),
+      ),
+    );
+    assert.throws(() =>
+      b.providerHealth.assertReadinessProof(
+        proof,
+        {
+          assetId: fixtures.assetId,
+          symbol: ASSET.symbol,
+          market: ASSET.market,
+          assetType: ASSET.assetType,
+        },
+        proof.expiresAt + 1,
+      ),
+    );
+  } finally {
+    await b.destroy();
+    await cleanupDbFixtures(fixtures);
+  }
 }
 
-/**
- * Ownership of the SHARED view is exclusive. A second supervisor — a rolling
- * deploy overlap, a second worker pod started by mistake — must not be handed
- * a fence token while the incumbent is still heartbeating, because the two
- * would then alternate publishing two different subscription sets for two
- * different sockets and every API pod would see whichever landed last.
- */
-async function testRivalCannotClaimWhileOwnerHeartbeats(): Promise<void> {
-  await connectOwner({ acknowledge: true });
-  const ownerToken = requireOwnerFenceToken();
+/** No owner -> no proof -> no reservation, no order. Fail-closed end to end. */
+async function testNonOwnerCreateFailsClosedWithoutOwner(): Promise<void> {
+  const generation = await connectOwner({ acknowledge: true });
+  const fixtures = await createDbFixtures();
+  const b = buildInstanceB();
+  try {
+    const quote = await b.orders.quoteOrder(fixtures.userId, {
+      assetId: fixtures.assetId,
+      side: 'buy',
+      orderType: 'limit',
+      quantity: '1.000000',
+      limitPrice: '100.00000000',
+      currencyCode: 'USD',
+    });
+    assert.equal(quote.success, true);
 
-  const rivalStore = new ProviderTradeReadinessStore(readerRedis);
-  const claim = await rivalStore.acquireOwnership({
-    provider: 'binance',
-    ownerInstance: RIVAL_INSTANCE,
-  });
-  assert.equal(claim.acquired, false, 'the rival must not be given a token');
-  assert.equal(claim.heldBy, OWNER_INSTANCE);
-
-  // The incumbent re-acquiring keeps the SAME token: renumbering a live owner
-  // would make the token useless as an identity.
-  const reacquired = await ownerStore.acquireOwnership({
-    provider: 'binance',
-    ownerInstance: OWNER_INSTANCE,
-  });
-  assert.equal(reacquired.acquired, true);
-  assert.equal(reacquired.fenceToken, ownerToken);
-}
-
-/**
- * THE regression this fencing exists for.
- *
- * Ownership used to be decided by comparing `lastUpdatedAt` between records
- * written by DIFFERENT HOSTS. A superseded owner whose clock ran ahead — or
- * that was simply paused and resumed — therefore wrote a record that looked
- * "newer" and overwrote the live owner's, publishing the subscription set of a
- * socket that no longer existed. Every API instance then accepted limit orders
- * against a connection nobody was listening on.
- *
- * With fencing the old owner's token is strictly lower, so no clock can help
- * it: the write is refused outright.
- */
-async function testFencedOutOwnerCannotOverwrite(): Promise<void> {
-  const staleGeneration = await connectOwner({ acknowledge: true });
-  const staleToken = requireOwnerFenceToken();
-
-  // The incumbent dies: its heartbeat lapses and the record expires.
-  await ownerRedis.delete(providerMetaKey('binance'));
-
-  // A new instance takes over and publishes under a strictly newer token.
-  const takeoverStore = new ProviderTradeReadinessStore(readerRedis);
-  const claim = await takeoverStore.acquireOwnership({
-    provider: 'binance',
-    ownerInstance: RIVAL_INSTANCE,
-  });
-  assert.equal(claim.acquired, true, 'the vacant provider must be claimable');
-  assert.ok(claim.fenceToken !== null && claim.fenceToken > staleToken);
-  const takeoverGeneration = randomUUID();
-  publishedGenerations.push(takeoverGeneration);
-  await publishRawMeta(takeoverStore, {
-    generation: takeoverGeneration,
-    ownerInstance: RIVAL_INSTANCE,
-    fenceToken: claim.fenceToken,
-    lastUpdatedAt: Date.now(),
-  });
-
-  // The zombie returns, with a clock an hour ahead of everyone else's.
-  const zombieAccepted = await ownerStore.publishProvider({
-    meta: {
-      schemaVersion: PROVIDER_TRADE_READINESS_SCHEMA_VERSION,
+    // The owner disappears between quote and create.
+    await ownerStore.release({
       provider: 'binance',
+      generation,
       ownerInstance: OWNER_INSTANCE,
-      source: 'live_candle_supervisor',
-      generation: staleGeneration,
-      fenceToken: staleToken,
-      connected: true,
-      connectedAt: Date.now(),
-      lastFrameAt: Date.now(),
-      lastUpdatedAt: Date.now() + 3_600_000,
-      degradedReason: null,
-    },
-    ttlSeconds: TTL_SECONDS,
-  });
-  assert.equal(
-    zombieAccepted,
-    false,
-    'a superseded owner must not win on a newer clock',
-  );
+      fencingEpoch: requireOwnerEpoch(),
+    });
 
-  const meta = await readerStore.readProviderMeta('binance');
-  assert.equal(meta?.ownerInstance, RIVAL_INSTANCE);
-  assert.equal(meta?.generation, takeoverGeneration);
-
-  // Its asset writes are refused under the same rule, so it cannot poison the
-  // new owner's generation hash either.
-  const zombieAssets = await ownerStore.publishAssets({
-    provider: 'binance',
-    generation: takeoverGeneration,
-    ownerInstance: OWNER_INSTANCE,
-    fenceToken: staleToken,
-    records: [
-      {
-        schemaVersion: PROVIDER_TRADE_READINESS_SCHEMA_VERSION,
-        assetId: ASSET.assetId,
-        providerSymbol: ASSET.providerSymbol,
-        symbol: ASSET.symbol,
-        market: ASSET.market,
-        assetType: ASSET.assetType,
-        settlementCurrency: ASSET.settlementCurrency,
-        sourceName: ASSET.sourceName,
-        state: 'active',
-        generation: takeoverGeneration,
-        acknowledgedAt: Date.now(),
-        updatedAt: Date.now(),
+    await assert.rejects(
+      () =>
+        b.orders.createOrder(fixtures.userId, {
+          quoteId: quote.data.quoteId,
+          assetId: fixtures.assetId,
+          side: 'buy',
+          orderType: 'limit',
+          quantity: '1.000000',
+          limitPrice: '100.00000000',
+          currencyCode: 'USD',
+          idempotencyKey: `${PREFIX}-create-orphan`,
+        }),
+      (error: unknown) => {
+        const body = (error as { getResponse?: () => unknown }).getResponse?.();
+        return (
+          JSON.stringify(body ?? '').includes('LIMIT_ORDER_PROVIDER') === true
+        );
       },
-    ],
-    ttlSeconds: TTL_SECONDS,
-  });
-  assert.equal(zombieAssets, false, 'a superseded owner must not write assets');
+      'with no instance publishing, a create must fail closed',
+    );
 
-  // Clean slate for the remaining scenarios: the takeover owner steps aside.
-  await takeoverStore.release({
-    provider: 'binance',
-    generation: takeoverGeneration,
-    ownerInstance: RIVAL_INSTANCE,
-    fenceToken: claim.fenceToken,
-  });
+    const wallet = await prisma.cashWallet.findUniqueOrThrow({
+      where: { id: fixtures.walletId },
+      select: { reservedAmount: true },
+    });
+    assert.equal(
+      wallet.reservedAmount.toFixed(8),
+      '0.00000000',
+      'a refused create must leave no reservation behind',
+    );
+    assert.equal(
+      await prisma.order.count({
+        where: { seasonParticipantId: fixtures.participantId },
+      }),
+      0,
+      'a refused create must leave no order behind',
+    );
+  } finally {
+    await b.destroy();
+    await cleanupDbFixtures(fixtures);
+  }
 }
 
-/**
- * The publisher's own reaction to being fenced out: it must drop its claim and
- * stay silent, not retry into a publish war with the live owner.
- */
-async function testFencedOutPublisherSurrenders(): Promise<void> {
-  await connectOwner({ acknowledge: true });
-  assert.notEqual(
-    publisher.ownershipSnapshot().binance.fenceToken,
-    null,
-    'the fixture publisher must own the provider first',
+function buildInstanceB() {
+  const registry = new ProviderTradeRouteRegistry();
+  const providerHealth = new LimitOrderProviderHealthService(
+    registry,
+    { isActive: () => true } as never,
+    undefined,
+    undefined,
+    readerStore,
+    { ...readProviderTradeReadinessConfig(), enabled: true },
   );
-
-  // Someone else takes the provider over while this publisher is between ticks.
-  await ownerRedis.delete(providerMetaKey('binance'));
-  const takeoverStore = new ProviderTradeReadinessStore(readerRedis);
-  const claim = await takeoverStore.acquireOwnership({
-    provider: 'binance',
-    ownerInstance: RIVAL_INSTANCE,
-  });
-  assert.equal(claim.acquired, true);
-  const takeoverGeneration = randomUUID();
-  publishedGenerations.push(takeoverGeneration);
-  await publishRawMeta(takeoverStore, {
-    generation: takeoverGeneration,
-    ownerInstance: RIVAL_INSTANCE,
-    fenceToken: claim.fenceToken as number,
-    lastUpdatedAt: Date.now(),
-  });
-
-  // The next tick discovers the refusal and surrenders.
-  await publisher.publishOnce();
-  assert.equal(
-    publisher.ownershipSnapshot().binance.fenceToken,
-    null,
-    'a fenced-out publisher must drop its token',
+  const matcherHealth = new LimitOrderMatcherHealthService(prisma);
+  const boundary = new LimitOrderMatchBoundaryService();
+  const reservation = new OrderReservationService();
+  const createService = new LimitOrderCreateService(prisma, reservation);
+  const cancelService = new LimitOrderCancelService(prisma, reservation);
+  const orders = new OrdersService(
+    prisma,
+    undefined,
+    createService,
+    cancelService,
+    matcherHealth,
+    readerRedis,
+    providerHealth,
+    boundary,
+    undefined,
   );
-
-  // And a further tick does not claw the provider back.
-  await publisher.publishOnce();
-  const meta = await readerStore.readProviderMeta('binance');
-  assert.equal(
-    meta?.ownerInstance,
-    RIVAL_INSTANCE,
-    'the live owner must keep the shared view',
-  );
-
-  await takeoverStore.release({
-    provider: 'binance',
-    generation: takeoverGeneration,
-    ownerInstance: RIVAL_INSTANCE,
-    fenceToken: claim.fenceToken as number,
-  });
-}
-
-/** Publishes a meta record directly, standing in for another instance. */
-async function publishRawMeta(
-  store: ProviderTradeReadinessStore,
-  input: {
-    generation: string;
-    ownerInstance: string;
-    fenceToken: number;
-    lastUpdatedAt: number;
-  },
-): Promise<void> {
-  const meta: SharedProviderMeta = {
-    schemaVersion: PROVIDER_TRADE_READINESS_SCHEMA_VERSION,
-    provider: 'binance',
-    ownerInstance: input.ownerInstance,
-    source: 'live_candle_supervisor',
-    generation: input.generation,
-    fenceToken: input.fenceToken,
-    connected: true,
-    connectedAt: Date.now(),
-    lastFrameAt: Date.now(),
-    lastUpdatedAt: input.lastUpdatedAt,
-    degradedReason: null,
+  return {
+    orders,
+    providerHealth,
+    destroy: async () => {
+      await boundary.onModuleDestroy().catch(() => undefined);
+    },
   };
-  const accepted = await store.publishProvider({
-    meta,
-    ttlSeconds: TTL_SECONDS,
+}
+
+async function createDbFixtures(): Promise<DbFixtures> {
+  const now = new Date();
+  const user = await prisma.user.create({
+    data: {
+      email: `${PREFIX}-${randomUUID()}@example.com`,
+      passwordHash: 'integration-test-only',
+      nickname: `lo-shared-${randomUUID()}`.slice(0, 40),
+    },
+    select: { id: true },
   });
-  assert.equal(accepted, true, 'the takeover publish must be accepted');
+  const season = await prisma.season.create({
+    data: {
+      name: `${PREFIX}-season`,
+      status: SeasonStatus.active,
+      startAt: new Date(now.getTime() - 12 * 3_600_000),
+      endAt: new Date(now.getTime() + 86_400_000),
+      initialCapitalKrw: '1300000.00000000',
+      tradeFeeRate: '0.001000',
+      fxFeeRate: '0.001000',
+    },
+    select: { id: true },
+  });
+  const participant = await prisma.seasonParticipant.create({
+    data: {
+      seasonId: season.id,
+      userId: user.id,
+      joinedAt: now,
+      participantStatus: ParticipantStatus.active,
+      initialCapitalKrw: '1300000.00000000',
+      totalAssetKrw: '1300000.00000000',
+      totalReturnRate: ZERO,
+      maxDrawdown: ZERO,
+    },
+    select: { id: true },
+  });
+  const wallet = await prisma.cashWallet.create({
+    data: {
+      seasonParticipantId: participant.id,
+      currencyCode: CurrencyCode.USD,
+      balanceAmount: '1000.00000000',
+      reservedAmount: ZERO,
+    },
+    select: { id: true },
+  });
+  await prisma.cashWallet.create({
+    data: {
+      seasonParticipantId: participant.id,
+      currencyCode: CurrencyCode.KRW,
+      balanceAmount: ZERO,
+      reservedAmount: ZERO,
+    },
+  });
+  // The DB asset row IS the asset instance A publishes readiness for.
+  const asset = await prisma.asset.create({
+    data: {
+      id: ASSET.assetId,
+      symbol: `${ASSET.symbol}${PREFIX.slice(-6)}`.slice(0, 32),
+      name: `${PREFIX}-btc`,
+      market: ASSET.market,
+      assetType: ASSET.assetType,
+      currencyCode: CurrencyCode.USD,
+      priceCurrency: CurrencyCode.USD,
+      settlementCurrency: CurrencyCode.USD,
+      isActive: true,
+    },
+    select: { id: true },
+  });
+  const fx = await prisma.fxRateSnapshot.create({
+    data: {
+      baseCurrency: CurrencyCode.USD,
+      quoteCurrency: CurrencyCode.KRW,
+      rate: '1300.00000000',
+      sourceType: FxRateSourceType.provider_api,
+      sourceName: 'exchange_rate_api',
+      sourceTimestamp: now,
+      effectiveAt: now,
+      capturedAt: now,
+    },
+    select: { id: true },
+  });
+  // A fresh matcher leader heartbeat so the matcher gate passes; the row is
+  // failed (not deleted) during cleanup so no fake "running" leader lingers.
+  const matcherHealth = new LimitOrderMatcherHealthService(prisma);
+  const matcherRunId = await matcherHealth.startLeader({
+    consumerName: `${PREFIX}-leader`,
+    startedAt: now,
+  });
+  return {
+    userId: user.id,
+    seasonId: season.id,
+    participantId: participant.id,
+    walletId: wallet.id,
+    assetId: asset.id,
+    fxRateSnapshotId: fx.id,
+    matcherRunId,
+  };
 }
 
-function requireOwnerFenceToken(): number {
-  const token = publisher.ownershipSnapshot().binance.fenceToken;
-  assert.ok(
-    typeof token === 'number',
-    'the fixture publisher must hold a fence token',
-  );
-  return token;
+async function cleanupDbFixtures(fixtures: DbFixtures): Promise<void> {
+  await prisma.opsJobRun
+    .updateMany({
+      where: { id: fixtures.matcherRunId },
+      data: { status: 'failed', finishedAt: new Date() },
+    })
+    .catch(() => undefined);
+  await prisma.opsJobRun.deleteMany({ where: { id: fixtures.matcherRunId } });
+  await prisma.order.deleteMany({
+    where: { seasonParticipantId: fixtures.participantId },
+  });
+  await prisma.quote.deleteMany({ where: { userId: fixtures.userId } });
+  await prisma.cashWallet.deleteMany({
+    where: { seasonParticipantId: fixtures.participantId },
+  });
+  await prisma.seasonParticipant.deleteMany({
+    where: { id: fixtures.participantId },
+  });
+  await prisma.fxRateSnapshot.deleteMany({
+    where: { id: fixtures.fxRateSnapshotId },
+  });
+  await prisma.asset.deleteMany({ where: { id: fixtures.assetId } });
+  await prisma.season.deleteMany({ where: { id: fixtures.seasonId } });
+  await prisma.user.deleteMany({ where: { id: fixtures.userId } });
 }
 
-/**
- * Redis unavailable must be fail-CLOSED. Never assume a subscription is live
- * because the shared view cannot be read.
- */
+// ---------------------------------------------------------------------------
+// Fail-closed and hygiene
+// ---------------------------------------------------------------------------
+
 async function testRedisFailureFailsClosed(): Promise<void> {
   const brokenStore = new ProviderTradeReadinessStore({
     eval: () => Promise.reject(new Error('redis down')),
@@ -714,11 +1151,6 @@ async function testRedisFailureFailsClosed(): Promise<void> {
   assert.equal(unwiredReadiness.ready, false);
 }
 
-/**
- * The shared view carries routing/liveness metadata ONLY. A credential, an
- * approval key, an access token or a raw provider frame must never be written
- * to Redis.
- */
 async function testNoSecretsPublished(): Promise<void> {
   const generation = await connectOwner({ acknowledge: true });
   const meta = await ownerRedis.get(providerMetaKey('binance'));
@@ -752,7 +1184,8 @@ async function testNoSecretsPublished(): Promise<void> {
       `the shared readiness payload must not carry a ${forbidden} field`,
     );
   }
-  // Belt and braces on the two KIS secrets that have no innocent homonym.
+  // Belt and braces on the two KIS secrets that have no innocent homonym,
+  // plus the RAW owner lease token (only its digest may appear).
   for (const forbidden of ['appsecret', 'approval_key', 'access_token']) {
     assert.equal(
       payload.toLowerCase().includes(forbidden),
@@ -760,53 +1193,42 @@ async function testNoSecretsPublished(): Promise<void> {
       `the shared readiness payload must not contain ${forbidden} anywhere`,
     );
   }
+  assert.ok(ownerLease);
+  assert.equal(
+    payload.includes(ownerLease.token),
+    false,
+    'the raw owner lease token must never be published',
+  );
   // What it MUST contain is exactly the routing metadata readiness needs.
   assert.match(payload, /providerSymbol/u);
   assert.match(payload, /binance_spot_ws_trade/u);
+  assert.match(payload, /fencingEpoch/u);
 }
 
-// ---------------------------------------------------------------------------
-// Owner simulation
-// ---------------------------------------------------------------------------
-
-/**
- * Drives instance A's registry exactly as the live-candle supervisor does:
- * claim -> new generation -> socket open -> subscription targets (with a
- * shard-capped asset) -> optional acknowledgement -> publish.
- */
-async function connectOwner(input: { acknowledge: boolean }): Promise<string> {
-  const generation = randomUUID();
-  ownerRegistry.claimProvider('binance', 'live_candle_supervisor');
-  ownerRegistry.beginConnection({
+function buildMeta(input: {
+  generation: string;
+  ownerInstance: string;
+  fencingEpoch: number;
+  lastUpdatedAt: number;
+}): SharedProviderMeta {
+  return {
+    schemaVersion: PROVIDER_TRADE_READINESS_SCHEMA_VERSION,
     provider: 'binance',
+    ownerInstance: input.ownerInstance,
     source: 'live_candle_supervisor',
-    generation,
-  });
-  ownerRegistry.markConnectionOpen({
-    provider: 'binance',
-    generation,
-    at: Date.now(),
-  });
-  ownerRegistry.registerSubscriptionTargets({
-    provider: 'binance',
-    generation,
-    assets: [ASSET],
-    cappedAssets: [CAPPED_ASSET],
-  });
-  if (input.acknowledge) {
-    ownerRegistry.markSubscriptionsActive({ provider: 'binance', generation });
-  }
-  ownerRegistry.markFrame({
-    provider: 'binance',
-    generation,
-    at: Date.now(),
-  });
-  await publisher.publishOnce();
-  publishedGenerations.push(generation);
-  return generation;
+    generation: input.generation,
+    fencingEpoch: input.fencingEpoch,
+    leaseTokenDigest: 'test-digest',
+    connected: true,
+    connectedAt: Date.now(),
+    lastFrameAt: Date.now(),
+    lastUpdatedAt: input.lastUpdatedAt,
+    degradedReason: null,
+  };
 }
 
 async function cleanupRedis(): Promise<void> {
+  await dropOwnerLease();
   await ownerRedis.delete(providerMetaKey('binance')).catch(() => undefined);
   await ownerRedis.delete(providerMetaKey('kis')).catch(() => undefined);
   for (const generation of publishedGenerations) {
@@ -814,11 +1236,22 @@ async function cleanupRedis(): Promise<void> {
       .delete(providerAssetsKey('binance', generation))
       .catch(() => undefined);
   }
-  // The fence counter is deliberately TTL-less in production — it must outlive
-  // every owner — so the runner removes its own only at the very end, after
-  // every scenario that depends on its monotonicity has finished.
-  await ownerRedis.delete(providerFenceKey('binance')).catch(() => undefined);
-  await ownerRedis.delete(providerFenceKey('kis')).catch(() => undefined);
+  // The epoch counter is deliberately TTL-less in production — it must
+  // outlive every owner — so the runner removes its own only at the very
+  // end, after every scenario that depends on its monotonicity has finished.
+  for (const provider of ['binance', 'kis'] as const) {
+    await ownerRedis.delete(providerEpochKey(provider)).catch(() => undefined);
+    await ownerRedis
+      .delete(providerEpochHolderKey(provider))
+      .catch(() => undefined);
+  }
+}
+
+async function cleanupDatabase(): Promise<void> {
+  await prisma.season.deleteMany({ where: { name: { startsWith: PREFIX } } });
+  await prisma.user.deleteMany({
+    where: { email: { startsWith: PREFIX } },
+  });
 }
 
 main().catch((error: unknown) => {

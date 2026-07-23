@@ -39,6 +39,26 @@ export type LimitOrderCandleReconciliationConfig = {
    * observation holds the position back exactly, regardless of this value.
    */
   ingestSettleGraceMs: number;
+  /**
+   * Window COMPLETION protocol: how many 5m windows per asset one sweep may
+   * evaluate for completeness. Bounds catch-up work per tick; nothing is
+   * dropped by the bound — the cursor simply continues next tick.
+   */
+  completionWindowBatchSize: number;
+  /**
+   * How many REST-repair probes one sweep may spend certifying windows whose
+   * candle row is missing (across all assets). A missing window past the
+   * budget stays pending and is retried next tick.
+   */
+  completionRepairBudgetPerSweep: number;
+  /**
+   * Asset-scoped health gate: how long the FIRST unaccounted window of an
+   * asset may stay pending before new quotes/creates on that asset fail
+   * closed with LIMIT_ORDER_CANDLE_FINALIZER_STALE.
+   */
+  assetFinalizerStaleMs: number;
+  /** Asset-scoped health gate: open deferred candles per asset that fail closed. */
+  maxAssetDeferredBacklog: number;
   /** Deferred rows retried per sweep (bounded, oldest due first). */
   deferredRetryBatchSize: number;
   /** First retry delay; doubles per attempt up to deferredRetryMaxDelayMs. */
@@ -127,6 +147,34 @@ export function readLimitOrderCandleReconciliationConfig(
       60_000,
       1000,
       3_600_000,
+    ),
+    completionWindowBatchSize: readInteger(
+      env,
+      'LIMIT_ORDER_CANDLE_COMPLETION_WINDOW_BATCH_SIZE',
+      24,
+      1,
+      1000,
+    ),
+    completionRepairBudgetPerSweep: readInteger(
+      env,
+      'LIMIT_ORDER_CANDLE_COMPLETION_REPAIR_BUDGET_PER_SWEEP',
+      5,
+      0,
+      100,
+    ),
+    assetFinalizerStaleMs: readInteger(
+      env,
+      'LIMIT_ORDER_CANDLE_ASSET_FINALIZER_STALE_MS',
+      1_800_000,
+      60_000,
+      86_400_000,
+    ),
+    maxAssetDeferredBacklog: readInteger(
+      env,
+      'LIMIT_ORDER_CANDLE_MAX_ASSET_DEFERRED_BACKLOG',
+      10,
+      0,
+      1_000_000,
     ),
     deferredRetryBatchSize: readInteger(
       env,

@@ -238,6 +238,7 @@ export type AssetWhereInput = {
   orders?: Prisma.OrderListRelationFilter
   quotes?: Prisma.QuoteListRelationFilter
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceListRelationFilter
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointListRelationFilter
 }
 
 export type AssetOrderByWithRelationInput = {
@@ -260,6 +261,7 @@ export type AssetOrderByWithRelationInput = {
   orders?: Prisma.OrderOrderByRelationAggregateInput
   quotes?: Prisma.QuoteOrderByRelationAggregateInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceOrderByRelationAggregateInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointOrderByRelationAggregateInput
 }
 
 export type AssetWhereUniqueInput = Prisma.AtLeast<{
@@ -286,6 +288,7 @@ export type AssetWhereUniqueInput = Prisma.AtLeast<{
   orders?: Prisma.OrderListRelationFilter
   quotes?: Prisma.QuoteListRelationFilter
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceListRelationFilter
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointListRelationFilter
 }, "id" | "market_symbol">
 
 export type AssetOrderByWithAggregationInput = {
@@ -342,6 +345,7 @@ export type AssetCreateInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedManyWithoutAssetInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateInput = {
@@ -364,6 +368,7 @@ export type AssetUncheckedCreateInput = {
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedCreateNestedManyWithoutAssetInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUpdateInput = {
@@ -386,6 +391,7 @@ export type AssetUpdateInput = {
   orders?: Prisma.OrderUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateManyWithoutAssetNestedInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateInput = {
@@ -408,6 +414,7 @@ export type AssetUncheckedUpdateInput = {
   orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedUpdateManyWithoutAssetNestedInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateManyInput = {
@@ -635,6 +642,20 @@ export type AssetUpdateOneRequiredWithoutLimitOrderCandleEvidenceNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.AssetUpdateToOneWithWhereWithoutLimitOrderCandleEvidenceInput, Prisma.AssetUpdateWithoutLimitOrderCandleEvidenceInput>, Prisma.AssetUncheckedUpdateWithoutLimitOrderCandleEvidenceInput>
 }
 
+export type AssetCreateNestedOneWithoutFinalizationCheckpointsInput = {
+  create?: Prisma.XOR<Prisma.AssetCreateWithoutFinalizationCheckpointsInput, Prisma.AssetUncheckedCreateWithoutFinalizationCheckpointsInput>
+  connectOrCreate?: Prisma.AssetCreateOrConnectWithoutFinalizationCheckpointsInput
+  connect?: Prisma.AssetWhereUniqueInput
+}
+
+export type AssetUpdateOneRequiredWithoutFinalizationCheckpointsNestedInput = {
+  create?: Prisma.XOR<Prisma.AssetCreateWithoutFinalizationCheckpointsInput, Prisma.AssetUncheckedCreateWithoutFinalizationCheckpointsInput>
+  connectOrCreate?: Prisma.AssetCreateOrConnectWithoutFinalizationCheckpointsInput
+  upsert?: Prisma.AssetUpsertWithoutFinalizationCheckpointsInput
+  connect?: Prisma.AssetWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.AssetUpdateToOneWithWhereWithoutFinalizationCheckpointsInput, Prisma.AssetUpdateWithoutFinalizationCheckpointsInput>, Prisma.AssetUncheckedUpdateWithoutFinalizationCheckpointsInput>
+}
+
 export type AssetCreateWithoutPriceSnapshotsInput = {
   id?: string
   symbol: string
@@ -654,6 +675,7 @@ export type AssetCreateWithoutPriceSnapshotsInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedManyWithoutAssetInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutPriceSnapshotsInput = {
@@ -675,6 +697,7 @@ export type AssetUncheckedCreateWithoutPriceSnapshotsInput = {
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedCreateNestedManyWithoutAssetInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutPriceSnapshotsInput = {
@@ -712,6 +735,7 @@ export type AssetUpdateWithoutPriceSnapshotsInput = {
   orders?: Prisma.OrderUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateManyWithoutAssetNestedInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutPriceSnapshotsInput = {
@@ -733,6 +757,7 @@ export type AssetUncheckedUpdateWithoutPriceSnapshotsInput = {
   orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedUpdateManyWithoutAssetNestedInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutOrderbookSnapshotsInput = {
@@ -754,6 +779,7 @@ export type AssetCreateWithoutOrderbookSnapshotsInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedManyWithoutAssetInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutOrderbookSnapshotsInput = {
@@ -775,6 +801,7 @@ export type AssetUncheckedCreateWithoutOrderbookSnapshotsInput = {
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedCreateNestedManyWithoutAssetInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutOrderbookSnapshotsInput = {
@@ -812,6 +839,7 @@ export type AssetUpdateWithoutOrderbookSnapshotsInput = {
   orders?: Prisma.OrderUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateManyWithoutAssetNestedInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutOrderbookSnapshotsInput = {
@@ -833,6 +861,7 @@ export type AssetUncheckedUpdateWithoutOrderbookSnapshotsInput = {
   orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedUpdateManyWithoutAssetNestedInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutMarketCandlesInput = {
@@ -854,6 +883,7 @@ export type AssetCreateWithoutMarketCandlesInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedManyWithoutAssetInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutMarketCandlesInput = {
@@ -875,6 +905,7 @@ export type AssetUncheckedCreateWithoutMarketCandlesInput = {
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedCreateNestedManyWithoutAssetInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutMarketCandlesInput = {
@@ -912,6 +943,7 @@ export type AssetUpdateWithoutMarketCandlesInput = {
   orders?: Prisma.OrderUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateManyWithoutAssetNestedInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutMarketCandlesInput = {
@@ -933,6 +965,7 @@ export type AssetUncheckedUpdateWithoutMarketCandlesInput = {
   orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedUpdateManyWithoutAssetNestedInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutMarketCandleSyncStatesInput = {
@@ -954,6 +987,7 @@ export type AssetCreateWithoutMarketCandleSyncStatesInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedManyWithoutAssetInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutMarketCandleSyncStatesInput = {
@@ -975,6 +1009,7 @@ export type AssetUncheckedCreateWithoutMarketCandleSyncStatesInput = {
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedCreateNestedManyWithoutAssetInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutMarketCandleSyncStatesInput = {
@@ -1012,6 +1047,7 @@ export type AssetUpdateWithoutMarketCandleSyncStatesInput = {
   orders?: Prisma.OrderUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateManyWithoutAssetNestedInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutMarketCandleSyncStatesInput = {
@@ -1033,6 +1069,7 @@ export type AssetUncheckedUpdateWithoutMarketCandleSyncStatesInput = {
   orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedUpdateManyWithoutAssetNestedInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutPositionsInput = {
@@ -1054,6 +1091,7 @@ export type AssetCreateWithoutPositionsInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedManyWithoutAssetInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutPositionsInput = {
@@ -1075,6 +1113,7 @@ export type AssetUncheckedCreateWithoutPositionsInput = {
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedCreateNestedManyWithoutAssetInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutPositionsInput = {
@@ -1112,6 +1151,7 @@ export type AssetUpdateWithoutPositionsInput = {
   orders?: Prisma.OrderUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateManyWithoutAssetNestedInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutPositionsInput = {
@@ -1133,6 +1173,7 @@ export type AssetUncheckedUpdateWithoutPositionsInput = {
   orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedUpdateManyWithoutAssetNestedInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutOrdersInput = {
@@ -1154,6 +1195,7 @@ export type AssetCreateWithoutOrdersInput = {
   positions?: Prisma.PositionCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedManyWithoutAssetInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutOrdersInput = {
@@ -1175,6 +1217,7 @@ export type AssetUncheckedCreateWithoutOrdersInput = {
   positions?: Prisma.PositionUncheckedCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedCreateNestedManyWithoutAssetInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutOrdersInput = {
@@ -1212,6 +1255,7 @@ export type AssetUpdateWithoutOrdersInput = {
   positions?: Prisma.PositionUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateManyWithoutAssetNestedInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutOrdersInput = {
@@ -1233,6 +1277,7 @@ export type AssetUncheckedUpdateWithoutOrdersInput = {
   positions?: Prisma.PositionUncheckedUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedUpdateManyWithoutAssetNestedInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutQuotesInput = {
@@ -1254,6 +1299,7 @@ export type AssetCreateWithoutQuotesInput = {
   positions?: Prisma.PositionCreateNestedManyWithoutAssetInput
   orders?: Prisma.OrderCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedManyWithoutAssetInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutQuotesInput = {
@@ -1275,6 +1321,7 @@ export type AssetUncheckedCreateWithoutQuotesInput = {
   positions?: Prisma.PositionUncheckedCreateNestedManyWithoutAssetInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedCreateNestedManyWithoutAssetInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutQuotesInput = {
@@ -1312,6 +1359,7 @@ export type AssetUpdateWithoutQuotesInput = {
   positions?: Prisma.PositionUpdateManyWithoutAssetNestedInput
   orders?: Prisma.OrderUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateManyWithoutAssetNestedInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutQuotesInput = {
@@ -1333,6 +1381,7 @@ export type AssetUncheckedUpdateWithoutQuotesInput = {
   positions?: Prisma.PositionUncheckedUpdateManyWithoutAssetNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetNestedInput
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedUpdateManyWithoutAssetNestedInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutLimitOrderCandleEvidenceInput = {
@@ -1354,6 +1403,7 @@ export type AssetCreateWithoutLimitOrderCandleEvidenceInput = {
   positions?: Prisma.PositionCreateNestedManyWithoutAssetInput
   orders?: Prisma.OrderCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutLimitOrderCandleEvidenceInput = {
@@ -1375,6 +1425,7 @@ export type AssetUncheckedCreateWithoutLimitOrderCandleEvidenceInput = {
   positions?: Prisma.PositionUncheckedCreateNestedManyWithoutAssetInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutLimitOrderCandleEvidenceInput = {
@@ -1412,6 +1463,7 @@ export type AssetUpdateWithoutLimitOrderCandleEvidenceInput = {
   positions?: Prisma.PositionUpdateManyWithoutAssetNestedInput
   orders?: Prisma.OrderUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutAssetNestedInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutLimitOrderCandleEvidenceInput = {
@@ -1433,6 +1485,111 @@ export type AssetUncheckedUpdateWithoutLimitOrderCandleEvidenceInput = {
   positions?: Prisma.PositionUncheckedUpdateManyWithoutAssetNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetNestedInput
+  finalizationCheckpoints?: Prisma.MarketCandleFinalizationCheckpointUncheckedUpdateManyWithoutAssetNestedInput
+}
+
+export type AssetCreateWithoutFinalizationCheckpointsInput = {
+  id?: string
+  symbol: string
+  name: string
+  market: string
+  currencyCode: $Enums.CurrencyCode
+  priceCurrency?: $Enums.CurrencyCode
+  settlementCurrency?: $Enums.CurrencyCode
+  assetType: $Enums.AssetType
+  isActive?: boolean
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  priceSnapshots?: Prisma.AssetPriceSnapshotCreateNestedManyWithoutAssetInput
+  orderbookSnapshots?: Prisma.AssetOrderbookSnapshotCreateNestedManyWithoutAssetInput
+  marketCandles?: Prisma.MarketCandleCreateNestedManyWithoutAssetInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateCreateNestedManyWithoutAssetInput
+  positions?: Prisma.PositionCreateNestedManyWithoutAssetInput
+  orders?: Prisma.OrderCreateNestedManyWithoutAssetInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutAssetInput
+  limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedManyWithoutAssetInput
+}
+
+export type AssetUncheckedCreateWithoutFinalizationCheckpointsInput = {
+  id?: string
+  symbol: string
+  name: string
+  market: string
+  currencyCode: $Enums.CurrencyCode
+  priceCurrency?: $Enums.CurrencyCode
+  settlementCurrency?: $Enums.CurrencyCode
+  assetType: $Enums.AssetType
+  isActive?: boolean
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  priceSnapshots?: Prisma.AssetPriceSnapshotUncheckedCreateNestedManyWithoutAssetInput
+  orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUncheckedCreateNestedManyWithoutAssetInput
+  marketCandles?: Prisma.MarketCandleUncheckedCreateNestedManyWithoutAssetInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUncheckedCreateNestedManyWithoutAssetInput
+  positions?: Prisma.PositionUncheckedCreateNestedManyWithoutAssetInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetInput
+  limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedCreateNestedManyWithoutAssetInput
+}
+
+export type AssetCreateOrConnectWithoutFinalizationCheckpointsInput = {
+  where: Prisma.AssetWhereUniqueInput
+  create: Prisma.XOR<Prisma.AssetCreateWithoutFinalizationCheckpointsInput, Prisma.AssetUncheckedCreateWithoutFinalizationCheckpointsInput>
+}
+
+export type AssetUpsertWithoutFinalizationCheckpointsInput = {
+  update: Prisma.XOR<Prisma.AssetUpdateWithoutFinalizationCheckpointsInput, Prisma.AssetUncheckedUpdateWithoutFinalizationCheckpointsInput>
+  create: Prisma.XOR<Prisma.AssetCreateWithoutFinalizationCheckpointsInput, Prisma.AssetUncheckedCreateWithoutFinalizationCheckpointsInput>
+  where?: Prisma.AssetWhereInput
+}
+
+export type AssetUpdateToOneWithWhereWithoutFinalizationCheckpointsInput = {
+  where?: Prisma.AssetWhereInput
+  data: Prisma.XOR<Prisma.AssetUpdateWithoutFinalizationCheckpointsInput, Prisma.AssetUncheckedUpdateWithoutFinalizationCheckpointsInput>
+}
+
+export type AssetUpdateWithoutFinalizationCheckpointsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  symbol?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  market?: Prisma.StringFieldUpdateOperationsInput | string
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  priceCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  assetType?: Prisma.EnumAssetTypeFieldUpdateOperationsInput | $Enums.AssetType
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  priceSnapshots?: Prisma.AssetPriceSnapshotUpdateManyWithoutAssetNestedInput
+  orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUpdateManyWithoutAssetNestedInput
+  marketCandles?: Prisma.MarketCandleUpdateManyWithoutAssetNestedInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUpdateManyWithoutAssetNestedInput
+  positions?: Prisma.PositionUpdateManyWithoutAssetNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutAssetNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutAssetNestedInput
+  limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateManyWithoutAssetNestedInput
+}
+
+export type AssetUncheckedUpdateWithoutFinalizationCheckpointsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  symbol?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  market?: Prisma.StringFieldUpdateOperationsInput | string
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  priceCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  assetType?: Prisma.EnumAssetTypeFieldUpdateOperationsInput | $Enums.AssetType
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  priceSnapshots?: Prisma.AssetPriceSnapshotUncheckedUpdateManyWithoutAssetNestedInput
+  orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUncheckedUpdateManyWithoutAssetNestedInput
+  marketCandles?: Prisma.MarketCandleUncheckedUpdateManyWithoutAssetNestedInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUncheckedUpdateManyWithoutAssetNestedInput
+  positions?: Prisma.PositionUncheckedUpdateManyWithoutAssetNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetNestedInput
+  limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 
@@ -1449,6 +1606,7 @@ export type AssetCountOutputType = {
   orders: number
   quotes: number
   limitOrderCandleEvidence: number
+  finalizationCheckpoints: number
 }
 
 export type AssetCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1460,6 +1618,7 @@ export type AssetCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.
   orders?: boolean | AssetCountOutputTypeCountOrdersArgs
   quotes?: boolean | AssetCountOutputTypeCountQuotesArgs
   limitOrderCandleEvidence?: boolean | AssetCountOutputTypeCountLimitOrderCandleEvidenceArgs
+  finalizationCheckpoints?: boolean | AssetCountOutputTypeCountFinalizationCheckpointsArgs
 }
 
 /**
@@ -1528,6 +1687,13 @@ export type AssetCountOutputTypeCountLimitOrderCandleEvidenceArgs<ExtArgs extend
   where?: Prisma.LimitOrderCandleEvidenceWhereInput
 }
 
+/**
+ * AssetCountOutputType without action
+ */
+export type AssetCountOutputTypeCountFinalizationCheckpointsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.MarketCandleFinalizationCheckpointWhereInput
+}
+
 
 export type AssetSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -1549,6 +1715,7 @@ export type AssetSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   orders?: boolean | Prisma.Asset$ordersArgs<ExtArgs>
   quotes?: boolean | Prisma.Asset$quotesArgs<ExtArgs>
   limitOrderCandleEvidence?: boolean | Prisma.Asset$limitOrderCandleEvidenceArgs<ExtArgs>
+  finalizationCheckpoints?: boolean | Prisma.Asset$finalizationCheckpointsArgs<ExtArgs>
   _count?: boolean | Prisma.AssetCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["asset"]>
 
@@ -1604,6 +1771,7 @@ export type AssetInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   orders?: boolean | Prisma.Asset$ordersArgs<ExtArgs>
   quotes?: boolean | Prisma.Asset$quotesArgs<ExtArgs>
   limitOrderCandleEvidence?: boolean | Prisma.Asset$limitOrderCandleEvidenceArgs<ExtArgs>
+  finalizationCheckpoints?: boolean | Prisma.Asset$finalizationCheckpointsArgs<ExtArgs>
   _count?: boolean | Prisma.AssetCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type AssetIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -1620,6 +1788,7 @@ export type $AssetPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     orders: Prisma.$OrderPayload<ExtArgs>[]
     quotes: Prisma.$QuotePayload<ExtArgs>[]
     limitOrderCandleEvidence: Prisma.$LimitOrderCandleEvidencePayload<ExtArgs>[]
+    finalizationCheckpoints: Prisma.$MarketCandleFinalizationCheckpointPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -2035,6 +2204,7 @@ export interface Prisma__AssetClient<T, Null = never, ExtArgs extends runtime.Ty
   orders<T extends Prisma.Asset$ordersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Asset$ordersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   quotes<T extends Prisma.Asset$quotesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Asset$quotesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$QuotePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   limitOrderCandleEvidence<T extends Prisma.Asset$limitOrderCandleEvidenceArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Asset$limitOrderCandleEvidenceArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$LimitOrderCandleEvidencePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  finalizationCheckpoints<T extends Prisma.Asset$finalizationCheckpointsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Asset$finalizationCheckpointsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MarketCandleFinalizationCheckpointPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2657,6 +2827,30 @@ export type Asset$limitOrderCandleEvidenceArgs<ExtArgs extends runtime.Types.Ext
   take?: number
   skip?: number
   distinct?: Prisma.LimitOrderCandleEvidenceScalarFieldEnum | Prisma.LimitOrderCandleEvidenceScalarFieldEnum[]
+}
+
+/**
+ * Asset.finalizationCheckpoints
+ */
+export type Asset$finalizationCheckpointsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the MarketCandleFinalizationCheckpoint
+   */
+  select?: Prisma.MarketCandleFinalizationCheckpointSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the MarketCandleFinalizationCheckpoint
+   */
+  omit?: Prisma.MarketCandleFinalizationCheckpointOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.MarketCandleFinalizationCheckpointInclude<ExtArgs> | null
+  where?: Prisma.MarketCandleFinalizationCheckpointWhereInput
+  orderBy?: Prisma.MarketCandleFinalizationCheckpointOrderByWithRelationInput | Prisma.MarketCandleFinalizationCheckpointOrderByWithRelationInput[]
+  cursor?: Prisma.MarketCandleFinalizationCheckpointWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.MarketCandleFinalizationCheckpointScalarFieldEnum | Prisma.MarketCandleFinalizationCheckpointScalarFieldEnum[]
 }
 
 /**

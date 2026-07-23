@@ -93,19 +93,32 @@ SHARE → Season FOR SHARE → CashWallet`), so a concurrent participant
   REQUESTED ASSET to be subscribed and acknowledged on the current connection
   generation.
 - `LIMIT_ORDER_SHARED_READINESS_ENABLED` (default false, requires auto
-  execution and Redis) shares that per-asset readiness ACROSS instances. The
-  route registry is per-process memory, so without it the socket-owning pod
-  accepts a limit order the other pods reject — the same request succeeding or
-  failing based on which instance the load balancer picked. The owner
-  publishes routing/liveness metadata to Redis (never a credential, an approval
-  key, an access token, or a raw frame) and every other instance reads it. All
-  failure modes are fail-closed.
+  execution, Redis, and the live-candle supervisor as socket owner) shares that
+  per-asset readiness ACROSS instances. The route registry is per-process
+  memory, so without it the socket-owning pod accepts a limit order the other
+  pods reject — the same request succeeding or failing based on which instance
+  the load balancer picked. Publishing rights are derived from the REAL
+  provider owner lease (the supervisor's Redis lock) exchanged for a monotonic
+  fencing epoch and re-verified inside Redis on every write, so a process that
+  merely looks like an owner locally — or lost its lease — cannot publish, and
+  a replaced owner cannot overwrite its successor whatever its clock says. The
+  owner publishes routing/liveness metadata (never a credential, an approval
+  key, an access token, a raw frame, or the raw lease token) and every other
+  instance reads it. A non-owner instance completes the whole limit
+  Quote→Create against the shared view via a readiness PROOF re-verified
+  in-memory inside the create transaction. All failure modes are fail-closed.
 - Path B's scan position is a DURABLE watermark plus a durable deferred-retry
   queue, not a sliding `now - lookback` window: a candle left unprocessed
   longer than the lookback used to fall out of the window and never be examined
   again. Candles the retention job removed before the sweep reached them are
   reported as a sticky GAP that fails new limit registration closed rather than
-  being silently skipped.
+  being silently skipped. On top of the row scan, a per-asset WINDOW COMPLETION
+  cursor accounts for windows whose candle row never existed — telling
+  provider-confirmed no-trade apart from a feed/finalizer failure — and gates
+  ONLY the affected asset (`LIMIT_ORDER_CANDLE_ASSET_*` codes) while other
+  assets keep trading. Corrected candles are re-sequenced and reprocessed as a
+  NEW revision: newly qualified orders fill once, executed orders are
+  untouched, and evidence rows are revision-scoped and immutable.
 - Total-asset valuation keeps using the full `balanceAmount`; reservations
   never reduce it.
 - Cancel and lifecycle cleanup work even while either flag is off. When auto

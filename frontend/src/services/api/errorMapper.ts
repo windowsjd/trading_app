@@ -276,6 +276,14 @@ export function getErrorMessageFromCode(
       return '이 종목은 현재 지정가 자동 체결 대상이 아닙니다. 잠시 후 다시 시도해주세요.';
     case ERROR_CODE.LIMIT_ORDER_PROVIDER_SUBSCRIPTION_FAILED:
       return '이 종목의 실시간 시세 구독에 실패했습니다. 잠시 후 다시 시도해주세요.';
+    // Readiness proof verdicts: the connection check passed moments ago but
+    // could not be re-confirmed at the moment of registration. To the user
+    // they all mean "the live price connection is refreshing" — internal
+    // proof/generation vocabulary never reaches the copy.
+    case ERROR_CODE.LIMIT_ORDER_PROVIDER_READINESS_PROOF_EXPIRED:
+    case ERROR_CODE.LIMIT_ORDER_PROVIDER_READINESS_PROOF_INVALID:
+    case ERROR_CODE.LIMIT_ORDER_PROVIDER_GENERATION_CHANGED:
+      return '이 종목의 실시간 시세 연결이 갱신 중입니다. 잠시 후 다시 시도해주세요.';
     // Path B: the safety net under automatic matching. The copy deliberately
     // does not distinguish the four causes — they are operator signals, and to
     // a user they all mean the same thing: new limit registration is paused
@@ -286,6 +294,12 @@ export function getErrorMessageFromCode(
     case ERROR_CODE.LIMIT_ORDER_CANDLE_RECONCILIATION_GAP_DETECTED:
     case ERROR_CODE.LIMIT_ORDER_CANDLE_RESERVATION_MISMATCH:
       return '지정가 체결 안전장치를 점검 중입니다. 기존 주문은 그대로 유지되며 취소도 가능합니다. 잠시 후 다시 시도해주세요.';
+    // Asset-scoped safety-net pauses: only THIS asset's new limit
+    // registration is affected, and the copy says so.
+    case ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED:
+    case ERROR_CODE.LIMIT_ORDER_CANDLE_FINALIZER_STALE:
+    case ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_BACKLOG_EXCEEDED:
+      return '이 종목의 자동 체결 안전망을 확인하는 중입니다. 이 종목의 신규 지정가 등록만 잠시 제한되며, 기존 주문과 다른 종목은 정상 이용 가능합니다.';
     case ERROR_CODE.ORDER_CANCEL_NOT_SUPPORTED:
       return '시장가 주문은 취소할 수 없습니다.';
     case ERROR_CODE.ORDER_TYPE_NOT_SUPPORTED:
