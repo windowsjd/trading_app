@@ -156,8 +156,12 @@ async function main(): Promise<void> {
       testIngestWatermarkTwoPhaseAdvance,
     );
     await run(
-      'retention passing an unscanned matchable candle is detected as a gap',
+      'retention passing an unscanned matchable candle gaps only that asset',
       testUnscannedRetentionGapDetected,
+    );
+    await run(
+      'a deferred candle whose row vanished gaps only its own asset',
+      testDeferredOrphanIsAssetScoped,
     );
     await run(
       'a window with no candle row stalls only its own asset',
@@ -857,15 +861,71 @@ async function testUnscannedRetentionGapDetected(): Promise<void> {
     data: { watermarkOpenTime: new Date(), watermarkCandleId: null },
   });
 
+  // A second asset that is completely healthy. The exposure below belongs to
+  // ONE asset, and this one must keep trading through it.
+  const bystanderAsset = await createAsset('retention-gap-bystander');
+  const bystanderOrder = await createSubmittedOrder({
+    label: 'retention-bystander',
+    assetIdOverride: bystanderAsset,
+  });
+
   const summary = await sweep.reconcile({ now: new Date() });
-  assert.equal(summary.gapDetected, true, 'the exposure must be reported');
-  const checkpoint = await checkpoints.find();
   assert.equal(
-    checkpoint?.degradedReason,
+    summary.assetGapsDetected,
+    1,
+    'the exposure must be reported against exactly one asset',
+  );
+  // ASSET-SCOPED, not global. The candle row names its asset, so the loss
+  // blocks that asset alone: recording it on the shared checkpoint used to
+  // fail every other asset's new limit orders for a window they had no part
+  // in.
+  assert.equal(
+    summary.gapDetected,
+    false,
+    'a per-asset loss must not raise the system-wide alarm',
+  );
+  const shared = await checkpoints.find();
+  assert.equal(shared?.gapDetectedAt ?? null, null);
+  assert.equal(shared?.degradedReason ?? null, null);
+
+  const checkpoint = await windowCheckpoint(gapAsset);
+  assert.ok(checkpoint?.gapDetectedAt, 'the gap must be durable');
+  assert.equal(
+    checkpoint.gapReason,
     'candle_retention_passed_unscanned_candle',
     'the reason must name the unscanned row, not the marker',
   );
-  assert.ok(checkpoint?.gapDetectedAt, 'the gap must be durable');
+  assert.equal(
+    checkpoint.gapMarketCandleId,
+    ancient.id,
+    'the gap must identify the candle it was observed on',
+  );
+  assert.ok(
+    checkpoint.gapCandleIngestSeq !== null,
+    'the gap must record the revision observed at detection',
+  );
+
+  await freshHeartbeats();
+  assert.equal(
+    (await health.evaluate(new Date(), gapAsset))?.code,
+    'LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED',
+    'the affected asset must fail closed',
+  );
+  assert.equal(
+    await health.evaluate(new Date(), bystanderAsset),
+    null,
+    'an unrelated asset must keep accepting new limit orders',
+  );
+  assert.equal(
+    await health.evaluate(new Date()),
+    null,
+    'the shared gate must stay open',
+  );
+
+  // Clear the asset gap so the "already queued" half below measures only the
+  // detector, and so later scenarios start from a clean asset.
+  await clearAssetGap(gapAsset);
+  await prisma.order.deleteMany({ where: { id: bystanderOrder.orderId } });
 
   // That first run also DEFERRED the candle (its asset has no valuation
   // price), so it is now tracked. A tracked candle is not lost, and alarming
@@ -890,6 +950,20 @@ async function testUnscannedRetentionGapDetected(): Promise<void> {
     false,
     'a candle already in the retry queue must not raise the unscanned gap',
   );
+  assert.equal(
+    queued.assetGapsDetected,
+    0,
+    'nor an asset-scoped one: a tracked candle is not a lost candle',
+  );
+  // The completion supervisor may independently gap this asset — its window
+  // is ancient and no row will ever account for the windows after it, which
+  // is a genuine and separate finding. What must not reappear is the ROW
+  // detector's reason.
+  assert.notEqual(
+    (await windowCheckpoint(gapAsset))?.gapReason,
+    'candle_retention_passed_unscanned_candle',
+    'the unscanned-candle signal must stay silent for a queued candle',
+  );
 
   // Leave nothing behind: the later health-gate scenario reads the deferred
   // backlog, and this fixture's ancient deferral would fail it for an
@@ -908,6 +982,25 @@ async function clearGap(): Promise<void> {
       gapDetectedAt: null,
       gapFromOpenTime: null,
       gapToOpenTime: null,
+      degradedReason: null,
+    },
+  });
+}
+
+/** The documented operator action for a sticky per-asset gap. */
+async function clearAssetGap(targetAssetId: string): Promise<void> {
+  await prisma.marketCandleFinalizationCheckpoint.updateMany({
+    where: {
+      assetId: targetAssetId,
+      interval: LIMIT_ORDER_CANDLE_INTERVAL,
+    },
+    data: {
+      gapDetectedAt: null,
+      gapFromOpenTime: null,
+      gapToOpenTime: null,
+      gapReason: null,
+      gapMarketCandleId: null,
+      gapCandleIngestSeq: null,
       degradedReason: null,
     },
   });
@@ -1234,6 +1327,129 @@ async function testAssetRetentionGapIsAssetScoped(): Promise<void> {
   );
 
   await prisma.order.deleteMany({ where: { id: gapOrder.orderId } });
+}
+
+/**
+ * A DEFERRED entry whose candle row disappeared under retention. The queue
+ * deliberately carries no foreign key so exactly this is observable, and the
+ * entry carries the asset id so the loss can be ATTRIBUTED.
+ *
+ * It used to be recorded on the shared reconciliation checkpoint, whose gap
+ * flag fails new limit quotes/creates for every asset — so one asset's deleted
+ * candle stopped the whole book. It must now block that asset alone, and only
+ * one asset's finding must never hide another's.
+ */
+async function testDeferredOrphanIsAssetScoped(): Promise<void> {
+  await clearGap();
+  // Two assets, each with a deferred entry whose candle row is then removed.
+  // Two, not one, because the detector used to return a single global row:
+  // the older asset's orphan hid the newer asset's completely.
+  const first = await createAsset('orphan-a', { withPriceSnapshot: false });
+  const second = await createAsset('orphan-b', { withPriceSnapshot: false });
+  const healthy = await createAsset('orphan-healthy');
+
+  const orphanIds: string[] = [];
+  for (const [index, targetAsset] of [first, second].entries()) {
+    const order = await createSubmittedOrder({
+      label: `orphan-${index}`,
+      assetIdOverride: targetAsset,
+    });
+    const candle = await createClosedCandle({
+      openTime: order.eligibleFrom,
+      low: '90.00000000',
+      assetIdOverride: targetAsset,
+    });
+    // No valuation price on these assets, so the sweep DEFERS rather than
+    // fills — which is what puts a real entry in the queue.
+    await sweep.reconcile({ now: afterSafetyLag(candle) });
+    assert.ok(
+      await prisma.limitOrderDeferredCandle.findUnique({
+        where: { marketCandleId: candle.id },
+      }),
+      'the sweep must have queued the candle',
+    );
+    // Retention removes the row from under the queue entry.
+    await prisma.marketCandle.delete({ where: { id: candle.id } });
+    orphanIds.push(candle.id);
+  }
+
+  const healthyOrder = await createSubmittedOrder({
+    label: 'orphan-healthy',
+    assetIdOverride: healthy,
+  });
+  const healthyCandle = await createClosedCandle({
+    openTime: healthyOrder.eligibleFrom,
+    low: '90.00000000',
+    assetIdOverride: healthy,
+  });
+
+  const summary = await sweep.reconcile({ now: afterSafetyLag(healthyCandle) });
+  assert.equal(
+    summary.gapDetected,
+    false,
+    'a deferred orphan must not raise the system-wide alarm',
+  );
+  assert.equal(
+    summary.assetGapsDetected,
+    2,
+    'BOTH affected assets must be recorded in one pass',
+  );
+  assert.equal(
+    (await checkpoints.find())?.gapDetectedAt ?? null,
+    null,
+    'the shared checkpoint must stay clean',
+  );
+
+  for (const [index, targetAsset] of [first, second].entries()) {
+    const checkpoint = await windowCheckpoint(targetAsset);
+    assert.ok(checkpoint?.gapDetectedAt, `asset ${index} must carry the gap`);
+    assert.equal(checkpoint.gapReason, 'deferred_candle_retention_removed');
+    assert.equal(checkpoint.gapMarketCandleId, orphanIds[index]);
+  }
+
+  await freshHeartbeats();
+  for (const targetAsset of [first, second]) {
+    const failure = await health.evaluate(new Date(), targetAsset);
+    assert.equal(failure?.code, 'LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED');
+  }
+  assert.equal(
+    await health.evaluate(new Date(), healthy),
+    null,
+    'the unaffected asset must keep accepting new limit orders',
+  );
+  assert.equal(
+    await health.evaluate(new Date()),
+    null,
+    'and the shared gate must stay open',
+  );
+  // Path B keeps FILLING the healthy asset while the other two are gapped.
+  assert.equal(
+    (
+      await prisma.order.findUniqueOrThrow({
+        where: { id: healthyOrder.orderId },
+      })
+    ).status,
+    OrderStatus.executed,
+    'an asset gap must not stop other assets being filled',
+  );
+
+  // Sticky: a second pass must not rewrite the original evidence.
+  const before = await windowCheckpoint(first);
+  await sweep.reconcile({ now: new Date() });
+  const after = await windowCheckpoint(first);
+  assert.equal(
+    after?.gapDetectedAt?.getTime(),
+    before?.gapDetectedAt?.getTime(),
+    'the first detection must win',
+  );
+
+  await prisma.limitOrderDeferredCandle.deleteMany({
+    where: { marketCandleId: { in: orphanIds } },
+  });
+  for (const targetAsset of [first, second]) {
+    await clearAssetGap(targetAsset);
+  }
+  await clearGap();
 }
 
 // ---------------------------------------------------------------------------

@@ -59,6 +59,17 @@ export type LimitOrderCandleReconciliationConfig = {
   assetFinalizerStaleMs: number;
   /** Asset-scoped health gate: open deferred candles per asset that fail closed. */
   maxAssetDeferredBacklog: number;
+  /**
+   * How many DISTINCT ASSETS one sweep may record a retention gap for.
+   *
+   * The detector reports one finding per asset rather than one overall,
+   * because a single global row let the oldest asset's loss hide every other
+   * asset's while those assets kept accepting orders their safety net could no
+   * longer cover. This bounds the write burst a mass-retention event could
+   * cause; nothing is dropped by the bound — the remaining assets are recorded
+   * by the next sweep, and the truncation is logged.
+   */
+  assetGapBatchSize: number;
   /** Deferred rows retried per sweep (bounded, oldest due first). */
   deferredRetryBatchSize: number;
   /** First retry delay; doubles per attempt up to deferredRetryMaxDelayMs. */
@@ -192,6 +203,13 @@ export function readLimitOrderCandleReconciliationConfig(
       10,
       0,
       1_000_000,
+    ),
+    assetGapBatchSize: readInteger(
+      env,
+      'LIMIT_ORDER_CANDLE_ASSET_GAP_BATCH_SIZE',
+      50,
+      1,
+      1000,
     ),
     deferredRetryBatchSize: readInteger(
       env,

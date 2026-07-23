@@ -139,6 +139,18 @@ jobs:
       # End-to-end matcher (XADD -> XACK). Reduced volume; only
       # hardware-independent invariants are asserted, never a throughput rate.
       LIMIT_ORDER_MATCHER_E2E_INTEGRATION: "1"
+      # EXISTING-DATABASE UPGRADE. Creates its own scratch database on the same
+      # server and deploys migrations in stages, so the pre-fix intermediate
+      # state (a PERMANENT deferred entry stamped with a candle revision it
+      # never processed) is reproduced rather than simulated, and the recovery
+      # is driven through the real sweep. This is the one path-B property a
+      # fully-migrated database cannot express.
+      LIMIT_ORDER_LEGACY_DEFERRED_MIGRATION_INTEGRATION: "1"
+      # Idempotent replay of a COMMITTED limit create: ahead of the feature
+      # flag and the create-service wiring, resolving to the caller's own order
+      # even when the same key was reused in another season, and never
+      # producing a second order or a second cash reservation.
+      LIMIT_ORDER_IDEMPOTENT_REPLAY_INTEGRATION: "1"
       ORDER_EXECUTE_DB_INTEGRATION: "1"
       FX_EXECUTE_DB_INTEGRATION: "1"
       MVP_FLOW_DB_SMOKE: "1"
@@ -199,6 +211,8 @@ jobs:
           src/orders/limit-order-phase3.integration.spec.ts
           src/orders/limit-matching/limit-order-boundary-concurrency.integration.spec.ts
           src/orders/limit-matching/limit-order-candle-checkpoint.integration.spec.ts
+          src/orders/limit-matching/limit-order-legacy-deferred-migration.integration.spec.ts
+          src/orders/limit-order-idempotent-replay.integration.spec.ts
           src/orders/limit-matching/limit-order-matcher-e2e.integration.spec.ts
           src/providers/provider-trade-readiness.integration.spec.ts
           src/orders/orders.execute.integration.spec.ts

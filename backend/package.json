@@ -24,6 +24,8 @@
     "soak:limit-order-publisher-throughput": "tsx scripts/limit-order-phase3-integration.ts",
     "soak:limit-order-matcher-e2e": "tsx scripts/limit-order-matcher-e2e-integration.ts",
     "diagnose:limit-order-processed-events": "tsx scripts/limit-order-processed-event-capacity.ts",
+    "integration:limit-order-legacy-deferred-migration": "tsx scripts/limit-order-legacy-deferred-migration-integration.ts",
+    "integration:limit-order-idempotent-replay": "tsx scripts/limit-order-idempotent-replay-integration.ts",
     "smoke:candle-live": "tsx scripts/candle-live-smoke.ts",
     "smoke:candle-report": "tsx scripts/candle-live-smoke-report.ts",
     "dev:open-season": "tsx scripts/dev-open-season.ts",

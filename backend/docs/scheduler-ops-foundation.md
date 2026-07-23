@@ -311,12 +311,21 @@ Ops job name `limit_order_candle_reconciliation`, added additively to
   matchedOrders / deferredCandles / retriedCandles / recoveredCandles /
   permanentCandles`, the swept window, the current watermark, and
   `gapDetected` / `degradedReason`, plus `rowScanSucceeded` and a separate
-  `windowCompletion` result (`succeeded`, assets/windows/gaps, error).
+  `windowCompletion` result (`succeeded`, assets/windows/gaps, error), and
+  `assetGapsDetected` — how many ASSETS this run recorded a retention gap for.
   `lastSuccessfulRunAt` is row-scan liveness only; completion has its own
   run/success/error/consecutive-failure fields. A failed latest completion
   blocks new limit Quote/Create immediately even when row scan keeps
   succeeding. Ordinary deferred/permanent health is asset-scoped; only the
   documented emergency total backlog is global.
+- `gapDetected` is now GLOBAL scope only (the shared market-time watermark
+  behind retention). Findings that name one asset — a deferred entry whose
+  candle row disappeared, an unscanned matchable candle past the horizon —
+  are recorded on that asset's `market_candle_finalization_checkpoints` row
+  and counted in `assetGapsDetected`, so one asset's data loss no longer stops
+  every other asset's new limit orders. Per-asset gap recording is bounded per
+  run by `LIMIT_ORDER_CANDLE_ASSET_GAP_BATCH_SIZE`; anything over the bound is
+  recorded on the next run and logged, never dropped.
 - The sweep additionally holds the shared limit-order event-boundary advisory
   lock on a dedicated PostgreSQL session (see
   `docs/limit-order-candle-reconciliation.md`), which is independent of the

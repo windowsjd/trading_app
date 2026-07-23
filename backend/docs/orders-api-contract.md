@@ -260,6 +260,10 @@ Same body as `POST /api/v1/orders/quote`.
 - `quoteId` is included in the create idempotency request hash.
 - Same `seasonParticipantId + idempotencyKey` and same request hash replays the stored create response without creating a second order.
 - Same `seasonParticipantId + idempotencyKey` and different request hash, including a different `quoteId`, returns `ORDER_IDEMPOTENCY_CONFLICT`.
+- This participant-scoped lookup is the MARKET create path. Limit creates
+  resolve the replay by `quoteId` instead — see *Idempotency lookup scope*
+  below — because a limit replay must work with no active season and must not
+  collide with the same key reused in another season.
 - DB unique constraint `(season_participant_id, idempotency_key)` prevents duplicate order rows under races.
 - If create hits a unique race (`P2002`), the service rereads the existing order:
   - same request hash: replay.
@@ -423,9 +427,12 @@ guarded in the UPDATE itself — two concurrent creates can never double-book
 the same available cash), `submitted` order row (stores `reservedAmount`
 and the quote-time `reservationFeeRate` for the future execution phase),
 quote consumption, and the idempotent response payload. Any failure rolls
-the reservation back. Idempotency: same key + same payload replays the
-stored response; same key + different limitPrice/quantity/orderType/assetId
-→ `ORDER_IDEMPOTENCY_CONFLICT`.
+the reservation back. Idempotency: same quote + same key + same payload
+replays the stored response; same quote + same key + different
+limitPrice/quantity/orderType/assetId → `ORDER_IDEMPOTENCY_CONFLICT`. The
+replay runs BEFORE `LIMIT_ORDER_ENABLED`, before the create-service wiring
+check and before every health gate — see *Limit-create replay ordering and
+operational errors* at the end of this document.
 
 **In-transaction re-validation and lock order.** The season and participant
 checks that run before the transaction are a fast-fail courtesy only; an
@@ -774,15 +781,62 @@ price) and may show the low explicitly labelled as the touch trigger.
 
 ## Limit-create replay ordering and operational errors
 
-For a limit BUY, `POST /api/v1/orders` parses the request and computes the
-canonical request hash, then checks the authenticated user's existing order
-for the idempotency key before provider, matcher, path-B, active-season, or
-market-state gates. If the hash matches, the stored first
-`responsePayloadJson` is returned unchanged even after a provider outage,
-path-B failure, or season end. No quote is consumed again, no cash is reserved
-again, and no new order is inserted. A different hash returns
-`ORDER_IDEMPOTENCY_CONFLICT`. A key with no committed order receives no bypass
-and must pass all current gates.
+For a limit BUY, `POST /api/v1/orders` runs in exactly this order:
+
+1. authenticate the caller;
+2. parse the body and compute the canonical request hash (`quoteId`,
+   `assetId`, `side`, `orderType`, `quantity`, `limitPrice`, `currencyCode`) —
+   a body too malformed to hash still returns its ordinary validation error;
+3. look up the caller's existing order **for that quote**;
+4. if one exists and the hash matches, return the stored first
+   `responsePayloadJson` unchanged — **and stop**;
+5. if one exists and the hash differs, return `ORDER_IDEMPOTENCY_CONFLICT`;
+6. only with no existing order: `LIMIT_ORDER_ENABLED`, create-service wiring,
+   provider readiness, path-A matcher health, path-B reconciliation health,
+   active season, participant status, market session, then the create
+   transaction.
+
+**The replay precedes the feature flag and the service wiring, not just the
+health gates.** A create that already committed owes its caller the response
+the system already produced, whatever has happened since — including an
+emergency `LIMIT_ORDER_ENABLED=false` rollback, or an instance deployed without
+`LimitOrderCreateService`. The flag exists to stop NEW registrations; using it
+to withhold a committed response would fail precisely the retries this replay
+exists to absorb. A genuinely new quote under a flag-off deployment still gets
+`LIMIT_ORDER_DISABLED`, and on an unwired instance still gets
+`LIMIT_ORDER_SERVICE_UNAVAILABLE`.
+
+A replay consumes no quote again, reserves no cash again, inserts no order,
+performs no database write at all, and reads no active season — so it still
+works after the season ended.
+
+### Idempotency lookup scope
+
+The replay is keyed on `(quoteId, idempotencyKey, owner)` and requires
+`orderType = limit`.
+
+`Order.quoteId` is UNIQUE, and every limit create carries a durable quote that
+is user-scoped and consumed exactly once, so this scope is EQUAL to a real
+database uniqueness constraint. The only uniqueness the database enforces on
+the key itself is `(seasonParticipantId, idempotencyKey)` — a key is unique
+within a season PARTICIPATION, not across a user's lifetime. A lookup scoped to
+`(userId, idempotencyKey)` was therefore strictly wider than the constraint it
+replayed and had to break ties itself (newest first), so a client reusing one
+key across two seasons — which the schema permits — had its season-1 retry
+resolved to the season-2 order and answered `ORDER_IDEMPOTENCY_CONFLICT`
+although both requests were individually valid.
+
+**Cross-season policy:** the same `idempotencyKey` MAY be reused in a later
+season. Each request resolves to the order created from its own quote, and each
+retry replays that order.
+
+`ORDER_IDEMPOTENCY_CONFLICT` (409) is returned when, for the requested quote:
+
+- the stored order's request hash differs;
+- the quote is presented under a different `idempotencyKey`;
+- the quote was already consumed by a market order;
+- the quote/order belongs to another user — another user's order is never
+  replayed and never disclosed.
 
 New operational 503 codes remain on `/api/v1`; no `/api/v2` or public/manual
 limit execute route exists:
@@ -794,9 +848,18 @@ limit execute route exists:
   most recently failed/never succeeded, or stopped succeeding.
 - `LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED`,
   `LIMIT_ORDER_CANDLE_FINALIZER_STALE`,
-  `LIMIT_ORDER_CANDLE_ASSET_BACKLOG_EXCEEDED`, and
-  `LIMIT_ORDER_CANDLE_ASSET_PERMANENT_FAILURE`: only the requested asset is
-  unhealthy unless the separate emergency global threshold is exceeded.
+  `LIMIT_ORDER_CANDLE_ASSET_BACKLOG_EXCEEDED`,
+  `LIMIT_ORDER_CANDLE_ASSET_PERMANENT_FAILURE`, and
+  `LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED`: only the requested
+  asset is unhealthy unless the separate emergency global threshold is
+  exceeded. `LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED` now also covers the two
+  retention findings that name one asset (a queue entry whose candle row
+  disappeared, an unscanned matchable candle past the horizon); those used to
+  raise the GLOBAL `LIMIT_ORDER_CANDLE_RECONCILIATION_GAP_DETECTED` and stop
+  every asset. `LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED` means that
+  asset's safety net is re-verifying queue entries whose tracked candle
+  revision was inferred rather than observed; it normally clears on the next
+  sweep.
 
 Client messages deliberately avoid Redis, lease, epoch, fencing, and Lua
 terms; they describe a refreshing real-time connection or a candle safety-net

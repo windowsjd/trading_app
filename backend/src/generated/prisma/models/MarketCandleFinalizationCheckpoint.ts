@@ -28,6 +28,7 @@ export type AggregateMarketCandleFinalizationCheckpoint = {
 
 export type MarketCandleFinalizationCheckpointAvgAggregateOutputType = {
   pendingAttemptCount: number | null
+  gapCandleIngestSeq: number | null
   noTradeWindowCount: number | null
   outsideSessionWindowCount: number | null
   repairedWindowCount: number | null
@@ -35,6 +36,7 @@ export type MarketCandleFinalizationCheckpointAvgAggregateOutputType = {
 
 export type MarketCandleFinalizationCheckpointSumAggregateOutputType = {
   pendingAttemptCount: number | null
+  gapCandleIngestSeq: bigint | null
   noTradeWindowCount: number | null
   outsideSessionWindowCount: number | null
   repairedWindowCount: number | null
@@ -55,6 +57,9 @@ export type MarketCandleFinalizationCheckpointMinAggregateOutputType = {
   gapDetectedAt: Date | null
   gapFromOpenTime: Date | null
   gapToOpenTime: Date | null
+  gapReason: string | null
+  gapMarketCandleId: string | null
+  gapCandleIngestSeq: bigint | null
   noTradeWindowCount: number | null
   outsideSessionWindowCount: number | null
   repairedWindowCount: number | null
@@ -77,6 +82,9 @@ export type MarketCandleFinalizationCheckpointMaxAggregateOutputType = {
   gapDetectedAt: Date | null
   gapFromOpenTime: Date | null
   gapToOpenTime: Date | null
+  gapReason: string | null
+  gapMarketCandleId: string | null
+  gapCandleIngestSeq: bigint | null
   noTradeWindowCount: number | null
   outsideSessionWindowCount: number | null
   repairedWindowCount: number | null
@@ -99,6 +107,9 @@ export type MarketCandleFinalizationCheckpointCountAggregateOutputType = {
   gapDetectedAt: number
   gapFromOpenTime: number
   gapToOpenTime: number
+  gapReason: number
+  gapMarketCandleId: number
+  gapCandleIngestSeq: number
   noTradeWindowCount: number
   outsideSessionWindowCount: number
   repairedWindowCount: number
@@ -110,6 +121,7 @@ export type MarketCandleFinalizationCheckpointCountAggregateOutputType = {
 
 export type MarketCandleFinalizationCheckpointAvgAggregateInputType = {
   pendingAttemptCount?: true
+  gapCandleIngestSeq?: true
   noTradeWindowCount?: true
   outsideSessionWindowCount?: true
   repairedWindowCount?: true
@@ -117,6 +129,7 @@ export type MarketCandleFinalizationCheckpointAvgAggregateInputType = {
 
 export type MarketCandleFinalizationCheckpointSumAggregateInputType = {
   pendingAttemptCount?: true
+  gapCandleIngestSeq?: true
   noTradeWindowCount?: true
   outsideSessionWindowCount?: true
   repairedWindowCount?: true
@@ -137,6 +150,9 @@ export type MarketCandleFinalizationCheckpointMinAggregateInputType = {
   gapDetectedAt?: true
   gapFromOpenTime?: true
   gapToOpenTime?: true
+  gapReason?: true
+  gapMarketCandleId?: true
+  gapCandleIngestSeq?: true
   noTradeWindowCount?: true
   outsideSessionWindowCount?: true
   repairedWindowCount?: true
@@ -159,6 +175,9 @@ export type MarketCandleFinalizationCheckpointMaxAggregateInputType = {
   gapDetectedAt?: true
   gapFromOpenTime?: true
   gapToOpenTime?: true
+  gapReason?: true
+  gapMarketCandleId?: true
+  gapCandleIngestSeq?: true
   noTradeWindowCount?: true
   outsideSessionWindowCount?: true
   repairedWindowCount?: true
@@ -181,6 +200,9 @@ export type MarketCandleFinalizationCheckpointCountAggregateInputType = {
   gapDetectedAt?: true
   gapFromOpenTime?: true
   gapToOpenTime?: true
+  gapReason?: true
+  gapMarketCandleId?: true
+  gapCandleIngestSeq?: true
   noTradeWindowCount?: true
   outsideSessionWindowCount?: true
   repairedWindowCount?: true
@@ -290,6 +312,9 @@ export type MarketCandleFinalizationCheckpointGroupByOutputType = {
   gapDetectedAt: Date | null
   gapFromOpenTime: Date | null
   gapToOpenTime: Date | null
+  gapReason: string | null
+  gapMarketCandleId: string | null
+  gapCandleIngestSeq: bigint | null
   noTradeWindowCount: number
   outsideSessionWindowCount: number
   repairedWindowCount: number
@@ -335,6 +360,9 @@ export type MarketCandleFinalizationCheckpointWhereInput = {
   gapDetectedAt?: Prisma.DateTimeNullableFilter<"MarketCandleFinalizationCheckpoint"> | Date | string | null
   gapFromOpenTime?: Prisma.DateTimeNullableFilter<"MarketCandleFinalizationCheckpoint"> | Date | string | null
   gapToOpenTime?: Prisma.DateTimeNullableFilter<"MarketCandleFinalizationCheckpoint"> | Date | string | null
+  gapReason?: Prisma.StringNullableFilter<"MarketCandleFinalizationCheckpoint"> | string | null
+  gapMarketCandleId?: Prisma.StringNullableFilter<"MarketCandleFinalizationCheckpoint"> | string | null
+  gapCandleIngestSeq?: Prisma.BigIntNullableFilter<"MarketCandleFinalizationCheckpoint"> | bigint | number | null
   noTradeWindowCount?: Prisma.IntFilter<"MarketCandleFinalizationCheckpoint"> | number
   outsideSessionWindowCount?: Prisma.IntFilter<"MarketCandleFinalizationCheckpoint"> | number
   repairedWindowCount?: Prisma.IntFilter<"MarketCandleFinalizationCheckpoint"> | number
@@ -358,6 +386,9 @@ export type MarketCandleFinalizationCheckpointOrderByWithRelationInput = {
   gapDetectedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   gapFromOpenTime?: Prisma.SortOrderInput | Prisma.SortOrder
   gapToOpenTime?: Prisma.SortOrderInput | Prisma.SortOrder
+  gapReason?: Prisma.SortOrderInput | Prisma.SortOrder
+  gapMarketCandleId?: Prisma.SortOrderInput | Prisma.SortOrder
+  gapCandleIngestSeq?: Prisma.SortOrderInput | Prisma.SortOrder
   noTradeWindowCount?: Prisma.SortOrder
   outsideSessionWindowCount?: Prisma.SortOrder
   repairedWindowCount?: Prisma.SortOrder
@@ -385,6 +416,9 @@ export type MarketCandleFinalizationCheckpointWhereUniqueInput = Prisma.AtLeast<
   gapDetectedAt?: Prisma.DateTimeNullableFilter<"MarketCandleFinalizationCheckpoint"> | Date | string | null
   gapFromOpenTime?: Prisma.DateTimeNullableFilter<"MarketCandleFinalizationCheckpoint"> | Date | string | null
   gapToOpenTime?: Prisma.DateTimeNullableFilter<"MarketCandleFinalizationCheckpoint"> | Date | string | null
+  gapReason?: Prisma.StringNullableFilter<"MarketCandleFinalizationCheckpoint"> | string | null
+  gapMarketCandleId?: Prisma.StringNullableFilter<"MarketCandleFinalizationCheckpoint"> | string | null
+  gapCandleIngestSeq?: Prisma.BigIntNullableFilter<"MarketCandleFinalizationCheckpoint"> | bigint | number | null
   noTradeWindowCount?: Prisma.IntFilter<"MarketCandleFinalizationCheckpoint"> | number
   outsideSessionWindowCount?: Prisma.IntFilter<"MarketCandleFinalizationCheckpoint"> | number
   repairedWindowCount?: Prisma.IntFilter<"MarketCandleFinalizationCheckpoint"> | number
@@ -408,6 +442,9 @@ export type MarketCandleFinalizationCheckpointOrderByWithAggregationInput = {
   gapDetectedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   gapFromOpenTime?: Prisma.SortOrderInput | Prisma.SortOrder
   gapToOpenTime?: Prisma.SortOrderInput | Prisma.SortOrder
+  gapReason?: Prisma.SortOrderInput | Prisma.SortOrder
+  gapMarketCandleId?: Prisma.SortOrderInput | Prisma.SortOrder
+  gapCandleIngestSeq?: Prisma.SortOrderInput | Prisma.SortOrder
   noTradeWindowCount?: Prisma.SortOrder
   outsideSessionWindowCount?: Prisma.SortOrder
   repairedWindowCount?: Prisma.SortOrder
@@ -438,6 +475,9 @@ export type MarketCandleFinalizationCheckpointScalarWhereWithAggregatesInput = {
   gapDetectedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"MarketCandleFinalizationCheckpoint"> | Date | string | null
   gapFromOpenTime?: Prisma.DateTimeNullableWithAggregatesFilter<"MarketCandleFinalizationCheckpoint"> | Date | string | null
   gapToOpenTime?: Prisma.DateTimeNullableWithAggregatesFilter<"MarketCandleFinalizationCheckpoint"> | Date | string | null
+  gapReason?: Prisma.StringNullableWithAggregatesFilter<"MarketCandleFinalizationCheckpoint"> | string | null
+  gapMarketCandleId?: Prisma.StringNullableWithAggregatesFilter<"MarketCandleFinalizationCheckpoint"> | string | null
+  gapCandleIngestSeq?: Prisma.BigIntNullableWithAggregatesFilter<"MarketCandleFinalizationCheckpoint"> | bigint | number | null
   noTradeWindowCount?: Prisma.IntWithAggregatesFilter<"MarketCandleFinalizationCheckpoint"> | number
   outsideSessionWindowCount?: Prisma.IntWithAggregatesFilter<"MarketCandleFinalizationCheckpoint"> | number
   repairedWindowCount?: Prisma.IntWithAggregatesFilter<"MarketCandleFinalizationCheckpoint"> | number
@@ -459,6 +499,9 @@ export type MarketCandleFinalizationCheckpointCreateInput = {
   gapDetectedAt?: Date | string | null
   gapFromOpenTime?: Date | string | null
   gapToOpenTime?: Date | string | null
+  gapReason?: string | null
+  gapMarketCandleId?: string | null
+  gapCandleIngestSeq?: bigint | number | null
   noTradeWindowCount?: number
   outsideSessionWindowCount?: number
   repairedWindowCount?: number
@@ -482,6 +525,9 @@ export type MarketCandleFinalizationCheckpointUncheckedCreateInput = {
   gapDetectedAt?: Date | string | null
   gapFromOpenTime?: Date | string | null
   gapToOpenTime?: Date | string | null
+  gapReason?: string | null
+  gapMarketCandleId?: string | null
+  gapCandleIngestSeq?: bigint | number | null
   noTradeWindowCount?: number
   outsideSessionWindowCount?: number
   repairedWindowCount?: number
@@ -503,6 +549,9 @@ export type MarketCandleFinalizationCheckpointUpdateInput = {
   gapDetectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   gapFromOpenTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   gapToOpenTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  gapReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  gapMarketCandleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  gapCandleIngestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   noTradeWindowCount?: Prisma.IntFieldUpdateOperationsInput | number
   outsideSessionWindowCount?: Prisma.IntFieldUpdateOperationsInput | number
   repairedWindowCount?: Prisma.IntFieldUpdateOperationsInput | number
@@ -526,6 +575,9 @@ export type MarketCandleFinalizationCheckpointUncheckedUpdateInput = {
   gapDetectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   gapFromOpenTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   gapToOpenTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  gapReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  gapMarketCandleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  gapCandleIngestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   noTradeWindowCount?: Prisma.IntFieldUpdateOperationsInput | number
   outsideSessionWindowCount?: Prisma.IntFieldUpdateOperationsInput | number
   repairedWindowCount?: Prisma.IntFieldUpdateOperationsInput | number
@@ -548,6 +600,9 @@ export type MarketCandleFinalizationCheckpointCreateManyInput = {
   gapDetectedAt?: Date | string | null
   gapFromOpenTime?: Date | string | null
   gapToOpenTime?: Date | string | null
+  gapReason?: string | null
+  gapMarketCandleId?: string | null
+  gapCandleIngestSeq?: bigint | number | null
   noTradeWindowCount?: number
   outsideSessionWindowCount?: number
   repairedWindowCount?: number
@@ -569,6 +624,9 @@ export type MarketCandleFinalizationCheckpointUpdateManyMutationInput = {
   gapDetectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   gapFromOpenTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   gapToOpenTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  gapReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  gapMarketCandleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  gapCandleIngestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   noTradeWindowCount?: Prisma.IntFieldUpdateOperationsInput | number
   outsideSessionWindowCount?: Prisma.IntFieldUpdateOperationsInput | number
   repairedWindowCount?: Prisma.IntFieldUpdateOperationsInput | number
@@ -591,6 +649,9 @@ export type MarketCandleFinalizationCheckpointUncheckedUpdateManyInput = {
   gapDetectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   gapFromOpenTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   gapToOpenTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  gapReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  gapMarketCandleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  gapCandleIngestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   noTradeWindowCount?: Prisma.IntFieldUpdateOperationsInput | number
   outsideSessionWindowCount?: Prisma.IntFieldUpdateOperationsInput | number
   repairedWindowCount?: Prisma.IntFieldUpdateOperationsInput | number
@@ -628,6 +689,9 @@ export type MarketCandleFinalizationCheckpointCountOrderByAggregateInput = {
   gapDetectedAt?: Prisma.SortOrder
   gapFromOpenTime?: Prisma.SortOrder
   gapToOpenTime?: Prisma.SortOrder
+  gapReason?: Prisma.SortOrder
+  gapMarketCandleId?: Prisma.SortOrder
+  gapCandleIngestSeq?: Prisma.SortOrder
   noTradeWindowCount?: Prisma.SortOrder
   outsideSessionWindowCount?: Prisma.SortOrder
   repairedWindowCount?: Prisma.SortOrder
@@ -637,6 +701,7 @@ export type MarketCandleFinalizationCheckpointCountOrderByAggregateInput = {
 
 export type MarketCandleFinalizationCheckpointAvgOrderByAggregateInput = {
   pendingAttemptCount?: Prisma.SortOrder
+  gapCandleIngestSeq?: Prisma.SortOrder
   noTradeWindowCount?: Prisma.SortOrder
   outsideSessionWindowCount?: Prisma.SortOrder
   repairedWindowCount?: Prisma.SortOrder
@@ -657,6 +722,9 @@ export type MarketCandleFinalizationCheckpointMaxOrderByAggregateInput = {
   gapDetectedAt?: Prisma.SortOrder
   gapFromOpenTime?: Prisma.SortOrder
   gapToOpenTime?: Prisma.SortOrder
+  gapReason?: Prisma.SortOrder
+  gapMarketCandleId?: Prisma.SortOrder
+  gapCandleIngestSeq?: Prisma.SortOrder
   noTradeWindowCount?: Prisma.SortOrder
   outsideSessionWindowCount?: Prisma.SortOrder
   repairedWindowCount?: Prisma.SortOrder
@@ -679,6 +747,9 @@ export type MarketCandleFinalizationCheckpointMinOrderByAggregateInput = {
   gapDetectedAt?: Prisma.SortOrder
   gapFromOpenTime?: Prisma.SortOrder
   gapToOpenTime?: Prisma.SortOrder
+  gapReason?: Prisma.SortOrder
+  gapMarketCandleId?: Prisma.SortOrder
+  gapCandleIngestSeq?: Prisma.SortOrder
   noTradeWindowCount?: Prisma.SortOrder
   outsideSessionWindowCount?: Prisma.SortOrder
   repairedWindowCount?: Prisma.SortOrder
@@ -688,6 +759,7 @@ export type MarketCandleFinalizationCheckpointMinOrderByAggregateInput = {
 
 export type MarketCandleFinalizationCheckpointSumOrderByAggregateInput = {
   pendingAttemptCount?: Prisma.SortOrder
+  gapCandleIngestSeq?: Prisma.SortOrder
   noTradeWindowCount?: Prisma.SortOrder
   outsideSessionWindowCount?: Prisma.SortOrder
   repairedWindowCount?: Prisma.SortOrder
@@ -749,6 +821,9 @@ export type MarketCandleFinalizationCheckpointCreateWithoutAssetInput = {
   gapDetectedAt?: Date | string | null
   gapFromOpenTime?: Date | string | null
   gapToOpenTime?: Date | string | null
+  gapReason?: string | null
+  gapMarketCandleId?: string | null
+  gapCandleIngestSeq?: bigint | number | null
   noTradeWindowCount?: number
   outsideSessionWindowCount?: number
   repairedWindowCount?: number
@@ -770,6 +845,9 @@ export type MarketCandleFinalizationCheckpointUncheckedCreateWithoutAssetInput =
   gapDetectedAt?: Date | string | null
   gapFromOpenTime?: Date | string | null
   gapToOpenTime?: Date | string | null
+  gapReason?: string | null
+  gapMarketCandleId?: string | null
+  gapCandleIngestSeq?: bigint | number | null
   noTradeWindowCount?: number
   outsideSessionWindowCount?: number
   repairedWindowCount?: number
@@ -821,6 +899,9 @@ export type MarketCandleFinalizationCheckpointScalarWhereInput = {
   gapDetectedAt?: Prisma.DateTimeNullableFilter<"MarketCandleFinalizationCheckpoint"> | Date | string | null
   gapFromOpenTime?: Prisma.DateTimeNullableFilter<"MarketCandleFinalizationCheckpoint"> | Date | string | null
   gapToOpenTime?: Prisma.DateTimeNullableFilter<"MarketCandleFinalizationCheckpoint"> | Date | string | null
+  gapReason?: Prisma.StringNullableFilter<"MarketCandleFinalizationCheckpoint"> | string | null
+  gapMarketCandleId?: Prisma.StringNullableFilter<"MarketCandleFinalizationCheckpoint"> | string | null
+  gapCandleIngestSeq?: Prisma.BigIntNullableFilter<"MarketCandleFinalizationCheckpoint"> | bigint | number | null
   noTradeWindowCount?: Prisma.IntFilter<"MarketCandleFinalizationCheckpoint"> | number
   outsideSessionWindowCount?: Prisma.IntFilter<"MarketCandleFinalizationCheckpoint"> | number
   repairedWindowCount?: Prisma.IntFilter<"MarketCandleFinalizationCheckpoint"> | number
@@ -842,6 +923,9 @@ export type MarketCandleFinalizationCheckpointCreateManyAssetInput = {
   gapDetectedAt?: Date | string | null
   gapFromOpenTime?: Date | string | null
   gapToOpenTime?: Date | string | null
+  gapReason?: string | null
+  gapMarketCandleId?: string | null
+  gapCandleIngestSeq?: bigint | number | null
   noTradeWindowCount?: number
   outsideSessionWindowCount?: number
   repairedWindowCount?: number
@@ -863,6 +947,9 @@ export type MarketCandleFinalizationCheckpointUpdateWithoutAssetInput = {
   gapDetectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   gapFromOpenTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   gapToOpenTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  gapReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  gapMarketCandleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  gapCandleIngestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   noTradeWindowCount?: Prisma.IntFieldUpdateOperationsInput | number
   outsideSessionWindowCount?: Prisma.IntFieldUpdateOperationsInput | number
   repairedWindowCount?: Prisma.IntFieldUpdateOperationsInput | number
@@ -884,6 +971,9 @@ export type MarketCandleFinalizationCheckpointUncheckedUpdateWithoutAssetInput =
   gapDetectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   gapFromOpenTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   gapToOpenTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  gapReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  gapMarketCandleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  gapCandleIngestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   noTradeWindowCount?: Prisma.IntFieldUpdateOperationsInput | number
   outsideSessionWindowCount?: Prisma.IntFieldUpdateOperationsInput | number
   repairedWindowCount?: Prisma.IntFieldUpdateOperationsInput | number
@@ -905,6 +995,9 @@ export type MarketCandleFinalizationCheckpointUncheckedUpdateManyWithoutAssetInp
   gapDetectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   gapFromOpenTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   gapToOpenTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  gapReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  gapMarketCandleId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  gapCandleIngestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   noTradeWindowCount?: Prisma.IntFieldUpdateOperationsInput | number
   outsideSessionWindowCount?: Prisma.IntFieldUpdateOperationsInput | number
   repairedWindowCount?: Prisma.IntFieldUpdateOperationsInput | number
@@ -929,6 +1022,9 @@ export type MarketCandleFinalizationCheckpointSelect<ExtArgs extends runtime.Typ
   gapDetectedAt?: boolean
   gapFromOpenTime?: boolean
   gapToOpenTime?: boolean
+  gapReason?: boolean
+  gapMarketCandleId?: boolean
+  gapCandleIngestSeq?: boolean
   noTradeWindowCount?: boolean
   outsideSessionWindowCount?: boolean
   repairedWindowCount?: boolean
@@ -952,6 +1048,9 @@ export type MarketCandleFinalizationCheckpointSelectCreateManyAndReturn<ExtArgs 
   gapDetectedAt?: boolean
   gapFromOpenTime?: boolean
   gapToOpenTime?: boolean
+  gapReason?: boolean
+  gapMarketCandleId?: boolean
+  gapCandleIngestSeq?: boolean
   noTradeWindowCount?: boolean
   outsideSessionWindowCount?: boolean
   repairedWindowCount?: boolean
@@ -975,6 +1074,9 @@ export type MarketCandleFinalizationCheckpointSelectUpdateManyAndReturn<ExtArgs 
   gapDetectedAt?: boolean
   gapFromOpenTime?: boolean
   gapToOpenTime?: boolean
+  gapReason?: boolean
+  gapMarketCandleId?: boolean
+  gapCandleIngestSeq?: boolean
   noTradeWindowCount?: boolean
   outsideSessionWindowCount?: boolean
   repairedWindowCount?: boolean
@@ -998,6 +1100,9 @@ export type MarketCandleFinalizationCheckpointSelectScalar = {
   gapDetectedAt?: boolean
   gapFromOpenTime?: boolean
   gapToOpenTime?: boolean
+  gapReason?: boolean
+  gapMarketCandleId?: boolean
+  gapCandleIngestSeq?: boolean
   noTradeWindowCount?: boolean
   outsideSessionWindowCount?: boolean
   repairedWindowCount?: boolean
@@ -1005,7 +1110,7 @@ export type MarketCandleFinalizationCheckpointSelectScalar = {
   updatedAt?: boolean
 }
 
-export type MarketCandleFinalizationCheckpointOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"assetId" | "interval" | "finalizedThroughOpenTime" | "finalizedThroughCloseTime" | "lastAdvancedAt" | "lastEvaluatedAt" | "pendingWindowOpenTime" | "pendingSince" | "pendingAttemptCount" | "lastErrorCode" | "degradedReason" | "gapDetectedAt" | "gapFromOpenTime" | "gapToOpenTime" | "noTradeWindowCount" | "outsideSessionWindowCount" | "repairedWindowCount" | "createdAt" | "updatedAt", ExtArgs["result"]["marketCandleFinalizationCheckpoint"]>
+export type MarketCandleFinalizationCheckpointOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"assetId" | "interval" | "finalizedThroughOpenTime" | "finalizedThroughCloseTime" | "lastAdvancedAt" | "lastEvaluatedAt" | "pendingWindowOpenTime" | "pendingSince" | "pendingAttemptCount" | "lastErrorCode" | "degradedReason" | "gapDetectedAt" | "gapFromOpenTime" | "gapToOpenTime" | "gapReason" | "gapMarketCandleId" | "gapCandleIngestSeq" | "noTradeWindowCount" | "outsideSessionWindowCount" | "repairedWindowCount" | "createdAt" | "updatedAt", ExtArgs["result"]["marketCandleFinalizationCheckpoint"]>
 export type MarketCandleFinalizationCheckpointInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
 }
@@ -1036,6 +1141,9 @@ export type $MarketCandleFinalizationCheckpointPayload<ExtArgs extends runtime.T
     gapDetectedAt: Date | null
     gapFromOpenTime: Date | null
     gapToOpenTime: Date | null
+    gapReason: string | null
+    gapMarketCandleId: string | null
+    gapCandleIngestSeq: bigint | null
     noTradeWindowCount: number
     outsideSessionWindowCount: number
     repairedWindowCount: number
@@ -1479,6 +1587,9 @@ export interface MarketCandleFinalizationCheckpointFieldRefs {
   readonly gapDetectedAt: Prisma.FieldRef<"MarketCandleFinalizationCheckpoint", 'DateTime'>
   readonly gapFromOpenTime: Prisma.FieldRef<"MarketCandleFinalizationCheckpoint", 'DateTime'>
   readonly gapToOpenTime: Prisma.FieldRef<"MarketCandleFinalizationCheckpoint", 'DateTime'>
+  readonly gapReason: Prisma.FieldRef<"MarketCandleFinalizationCheckpoint", 'String'>
+  readonly gapMarketCandleId: Prisma.FieldRef<"MarketCandleFinalizationCheckpoint", 'String'>
+  readonly gapCandleIngestSeq: Prisma.FieldRef<"MarketCandleFinalizationCheckpoint", 'BigInt'>
   readonly noTradeWindowCount: Prisma.FieldRef<"MarketCandleFinalizationCheckpoint", 'Int'>
   readonly outsideSessionWindowCount: Prisma.FieldRef<"MarketCandleFinalizationCheckpoint", 'Int'>
   readonly repairedWindowCount: Prisma.FieldRef<"MarketCandleFinalizationCheckpoint", 'Int'>

@@ -62,8 +62,18 @@ export type LimitOrderCandleReconciliationSummary = {
    * write transactions from the previous observation had not all resolved.
    */
   ingestCeilingHeld: boolean;
+  /**
+   * GLOBAL gap only. A per-asset retention loss no longer sets this: it is
+   * recorded on that asset's completion checkpoint and counted below.
+   */
   gapDetected: boolean;
   degradedReason: string | null;
+  /**
+   * Per-asset retention gaps recorded by THIS run's detector (a deferred entry
+   * whose candle row disappeared, an unscanned matchable candle past the
+   * horizon). Each blocks exactly one asset's new limit quotes/creates.
+   */
+  assetGapsDetected: number;
   /**
    * True when the ROW SCAN over existing candle rows completed. This is what
    * `markRunSucceeded` records; it deliberately says nothing about the window
@@ -118,6 +128,18 @@ type ProcessOutcome =
       matchedOrderCount: number;
     }
   | { state: 'deferred'; reason: string; code: string | null };
+
+/**
+ * Retention findings, split by BLAST RADIUS rather than lumped together.
+ * `global` is set only when the shared scan position itself is behind
+ * retention — the one case where the loss cannot be attributed to any asset.
+ * Everything else is a list of per-asset findings, already recorded on those
+ * assets' completion checkpoints.
+ */
+type RetentionGapVerdict = {
+  global: { reason: string } | null;
+  assetGaps: Array<{ assetId: string; reason: string }>;
+};
 
 /**
  * Path B — the confirmed 5-minute candle safety net.
@@ -253,6 +275,7 @@ export class LimitOrderCandleReconciliationService {
       ingestCeilingHeld: false,
       gapDetected: checkpoint.gapDetectedAt !== null,
       degradedReason: checkpoint.degradedReason,
+      assetGapsDetected: 0,
       rowScanSucceeded: false,
       windowCompletion: null,
     };
@@ -260,15 +283,22 @@ export class LimitOrderCandleReconciliationService {
     // Retention may have removed rows the watermark has not reached yet. This
     // is checked BEFORE the sweep so the gap is durable even if the sweep
     // itself then fails.
+    //
+    // Findings are classified, not merged: a per-asset loss is recorded on
+    // that asset's completion checkpoint and blocks that asset alone, while
+    // only the shared scan watermark falling behind retention sets the global
+    // flag. Neither aborts the sweep — the assets that are still whole must
+    // keep being filled.
     const gap = await this.detectRetentionGap(
       checkpoint.watermark,
       ingestWatermark,
       now,
     );
-    if (gap) {
+    if (gap.global) {
       summary.gapDetected = true;
-      summary.degradedReason = gap.reason;
+      summary.degradedReason = gap.global.reason;
     }
+    summary.assetGapsDetected = gap.assetGaps.length;
 
     // 1. WINDOW COMPLETION first: account for windows whose candle row may be
     //    ABSENT — the one thing the row scan below structurally cannot see.
@@ -577,12 +607,20 @@ export class LimitOrderCandleReconciliationService {
     watermark: ReconciliationWatermark | null,
     ingestWatermark: bigint,
     now: Date,
-  ): Promise<{ reason: string } | null> {
-    if (!watermark) return null;
+  ): Promise<RetentionGapVerdict> {
+    const verdict: RetentionGapVerdict = { global: null, assetGaps: [] };
+    if (!watermark) return verdict;
 
     const retentionHorizon = new Date(
       now.getTime() - this.config.candleRetentionDays * 86_400_000,
     );
+
+    // GLOBAL, and the only genuinely global one. The market-time watermark is
+    // a single position shared by every asset; when retention has passed it,
+    // the rows that were removed cannot be attributed to any particular asset,
+    // so the exposure is system-wide by construction. Reported first and
+    // alone: once the shared ordering position is behind retention, per-asset
+    // findings add no information an operator can act on separately.
     if (watermark.openTime.getTime() < retentionHorizon.getTime()) {
       const reason = 'candle_retention_passed_watermark';
       await this.checkpoints.recordGap({
@@ -594,88 +632,162 @@ export class LimitOrderCandleReconciliationService {
       this.logger.error(
         JSON.stringify({
           event: 'limit_order_candle_retention_gap',
+          scope: 'global',
           watermarkOpenTime: watermark.openTime.toISOString(),
           retentionHorizon: retentionHorizon.toISOString(),
           retentionDays: this.config.candleRetentionDays,
         }),
       );
-      return { reason };
+      verdict.global = { reason };
+      return verdict;
     }
 
-    const orphan = await this.prisma.$queryRaw<
-      Array<{ marketCandleId: string; openTime: Date }>
+    // ASSET-SCOPED. A deferred entry whose candle row disappeared names
+    // exactly one asset — the queue carries `asset_id` precisely so the loss
+    // can be attributed — so it blocks that asset and no other.
+    //
+    // One row PER ASSET, not one row overall: with a single global LIMIT 1 the
+    // oldest asset's orphan hid every other asset's, and each sweep would
+    // surface them one at a time while the assets behind it kept accepting
+    // orders their safety net could no longer cover. The per-sweep bound keeps
+    // a mass-retention event from turning into an unbounded write burst; the
+    // remainder is picked up by the next sweep and logged here.
+    const orphans = await this.prisma.$queryRaw<
+      Array<{
+        assetId: string;
+        interval: string;
+        marketCandleId: string;
+        openTime: Date;
+        candleIngestSeq: bigint | null;
+        totalAssets: number;
+      }>
     >`
-      SELECT d."market_candle_id" AS "marketCandleId", d."open_time" AS "openTime"
-      FROM "limit_order_deferred_candles" d
-      WHERE NOT EXISTS (
-        SELECT 1 FROM "market_candles" c WHERE c."id" = d."market_candle_id"
+      WITH "per_asset" AS (
+        SELECT DISTINCT ON (d."asset_id")
+          d."asset_id" AS "assetId",
+          d."interval" AS "interval",
+          d."market_candle_id" AS "marketCandleId",
+          d."open_time" AS "openTime",
+          d."candle_ingest_seq" AS "candleIngestSeq"
+        FROM "limit_order_deferred_candles" d
+        WHERE NOT EXISTS (
+          SELECT 1 FROM "market_candles" c WHERE c."id" = d."market_candle_id"
+        )
+        ORDER BY d."asset_id" ASC, d."open_time" ASC
       )
-      ORDER BY d."open_time" ASC
-      LIMIT 1
+      SELECT *, (SELECT COUNT(*)::int FROM "per_asset") AS "totalAssets"
+      FROM "per_asset"
+      ORDER BY "openTime" ASC
+      LIMIT ${this.config.assetGapBatchSize}
     `;
-    const missing = orphan[0];
-    if (missing) {
+    for (const missing of orphans) {
       const reason = 'deferred_candle_retention_removed';
-      await this.checkpoints.recordGap({
+      await this.checkpoints.recordAssetGap({
+        assetId: missing.assetId,
+        interval: missing.interval,
         detectedAt: now,
         fromOpenTime: missing.openTime,
         toOpenTime: missing.openTime,
         reason,
+        marketCandleId: missing.marketCandleId,
+        candleIngestSeq: missing.candleIngestSeq,
       });
       this.logger.error(
         JSON.stringify({
           event: 'limit_order_candle_deferred_row_missing',
+          scope: 'asset',
+          assetId: missing.assetId,
           marketCandleId: missing.marketCandleId,
           openTime: missing.openTime.toISOString(),
         }),
       );
-      return { reason };
+      verdict.assetGaps.push({ assetId: missing.assetId, reason });
+    }
+    const orphanAssets = orphans[0]?.totalAssets ?? 0;
+    if (orphanAssets > orphans.length) {
+      this.logger.error(
+        JSON.stringify({
+          event: 'limit_order_candle_deferred_row_missing_truncated',
+          recordedAssets: orphans.length,
+          totalAssets: orphanAssets,
+          effect: 'remaining assets are recorded by the next sweep',
+        }),
+      );
     }
 
-    const unscanned = await this.findOldestUnscannedMatchableCandle(
+    // ASSET-SCOPED. Same reasoning: the candle row identifies its asset, so a
+    // window this asset lost never has to stop another asset's orders. One per
+    // asset, oldest window first.
+    const unscanned = await this.findOldestUnscannedMatchableCandles(
       ingestWatermark,
       now,
+      retentionHorizon,
     );
-    if (
-      unscanned &&
-      unscanned.openTime.getTime() < retentionHorizon.getTime()
-    ) {
+    for (const row of unscanned) {
       const reason = 'candle_retention_passed_unscanned_candle';
-      await this.checkpoints.recordGap({
+      await this.checkpoints.recordAssetGap({
+        assetId: row.assetId,
+        interval: row.interval,
         detectedAt: now,
-        fromOpenTime: unscanned.openTime,
+        fromOpenTime: row.openTime,
         toOpenTime: retentionHorizon,
         reason,
+        marketCandleId: row.id,
+        candleIngestSeq: row.ingestSeq,
       });
       this.logger.error(
         JSON.stringify({
           event: 'limit_order_candle_unscanned_retention_gap',
-          marketCandleId: unscanned.id,
-          openTime: unscanned.openTime.toISOString(),
-          ingestSeq: unscanned.ingestSeq.toString(),
+          scope: 'asset',
+          assetId: row.assetId,
+          marketCandleId: row.id,
+          openTime: row.openTime.toISOString(),
+          ingestSeq: row.ingestSeq.toString(),
           ingestWatermarkSeq: ingestWatermark.toString(),
           retentionHorizon: retentionHorizon.toISOString(),
         }),
       );
-      return { reason };
+      verdict.assetGaps.push({ assetId: row.assetId, reason });
     }
-    return null;
+    return verdict;
   }
 
   /**
-   * Oldest window (by market time) that the storage-order position has not
-   * reached and that an activated order could still match. Uses exactly the
-   * scan's eligibility conditions, so it can never report a row the sweep
-   * would have ignored anyway.
+   * Oldest window (by market time) PER ASSET that the storage-order position
+   * has not reached, that an activated order could still match, and that
+   * retention has already passed. Uses exactly the scan's eligibility
+   * conditions, so it can never report a row the sweep would have ignored
+   * anyway.
    */
-  private findOldestUnscannedMatchableCandle(
+  private findOldestUnscannedMatchableCandles(
     ingestWatermark: bigint,
     to: Date,
-  ): Promise<{ id: string; openTime: Date; ingestSeq: bigint } | null> {
+    retentionHorizon: Date,
+  ): Promise<
+    Array<{
+      id: string;
+      assetId: string;
+      interval: string;
+      openTime: Date;
+      ingestSeq: bigint;
+    }>
+  > {
     return this.prisma.$queryRaw<
-      Array<{ id: string; openTime: Date; ingestSeq: bigint }>
+      Array<{
+        id: string;
+        assetId: string;
+        interval: string;
+        openTime: Date;
+        ingestSeq: bigint;
+      }>
     >`
-        SELECT c."id", c."open_time" AS "openTime", c."ingest_seq" AS "ingestSeq"
+      WITH "per_asset" AS (
+        SELECT DISTINCT ON (c."asset_id")
+          c."id",
+          c."asset_id" AS "assetId",
+          c."interval" AS "interval",
+          c."open_time" AS "openTime",
+          c."ingest_seq" AS "ingestSeq"
         FROM "market_candles" c
         JOIN "assets" a ON a."id" = c."asset_id"
         WHERE c."interval" = ${LIMIT_ORDER_CANDLE_INTERVAL}
@@ -715,9 +827,18 @@ export class LimitOrderCandleReconciliationService {
               AND o."candle_matching_eligible_from" <= c."open_time"
               AND o."limit_price" >= c."low"
           )
-        ORDER BY c."open_time" ASC
-        LIMIT 1
-      `.then((rows) => rows[0] ?? null);
+          -- Only rows retention has ALREADY passed are an exposure. Pushing
+          -- this into the query (it used to be a caller-side check on the one
+          -- returned row) is what makes DISTINCT ON per asset correct: without
+          -- it the oldest unscanned row of an asset could be inside the
+          -- horizon and mask an older, genuinely gapped row of the same asset.
+          AND c."open_time" < ${retentionHorizon}
+        ORDER BY c."asset_id" ASC, c."open_time" ASC
+      )
+      SELECT * FROM "per_asset"
+      ORDER BY "openTime" ASC
+      LIMIT ${this.config.assetGapBatchSize}
+    `;
   }
 
   // ---------------------------------------------------------------------------
@@ -738,10 +859,15 @@ export class LimitOrderCandleReconciliationService {
       const candle = await this.loadCandle(deferred.marketCandleId);
       if (!candle) {
         // The row vanished under retention. detectRetentionGap already raised
-        // the alarm; park the entry so it stops consuming retry budget while
-        // staying visible as backlog. The entry keeps ITS OWN revision: there
-        // is no current candle revision to adopt, and a NULL must never erase
-        // a known one.
+        // the alarm on THIS asset; park the entry so it stops consuming retry
+        // budget while staying visible as that asset's backlog. The entry
+        // keeps ITS OWN revision: there is no current candle revision to
+        // adopt, and a NULL must never erase a known one.
+        //
+        // An entry queued for legacy re-verification becomes a `legacy_orphan`
+        // instead: the question it was reopened to answer — which revision it
+        // actually covered — can no longer be answered from the data, so it
+        // must not silently return to being a trusted `current` entry.
         await this.checkpoints.upsertDeferred({
           marketCandleId: deferred.marketCandleId,
           candleIngestSeq: deferred.candleIngestSeq,
@@ -754,6 +880,8 @@ export class LimitOrderCandleReconciliationService {
           errorCode: 'LIMIT_ORDER_CANDLE_ROW_MISSING',
           errorMessage: 'The market candle row no longer exists.',
           status: 'permanent',
+          revisionState:
+            deferred.revisionState === 'current' ? undefined : 'legacy_orphan',
         });
         summary.permanentCandles += 1;
         continue;
@@ -788,7 +916,8 @@ export class LimitOrderCandleReconciliationService {
         summary.deferredCandles += 1;
         continue;
       }
-      const revisionAdvanced = trackedSeq === null || candle.ingestSeq > trackedSeq;
+      const revisionAdvanced =
+        trackedSeq === null || candle.ingestSeq > trackedSeq;
 
       const outcome = await this.processCandleGuarded(
         candle,
@@ -1597,6 +1726,7 @@ function disabledSummary(): LimitOrderCandleReconciliationSummary {
     ingestCeilingHeld: false,
     gapDetected: false,
     degradedReason: null,
+    assetGapsDetected: 0,
     rowScanSucceeded: false,
     windowCompletion: null,
   };

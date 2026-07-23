@@ -132,11 +132,29 @@ SHARE → Season FOR SHARE → CashWallet`), so a concurrent participant
   permanent row and replaces its asset/window metadata, and a late lower
   revision is a no-op. Newly qualified orders fill once, executed orders are
   untouched, and evidence rows are revision-scoped and immutable.
-- A committed limit Create is replayed before provider, matcher, path-B,
-  season, and market-state gates. The user-scoped lookup validates the same
-  request hash and returns the stored first response; a different hash
-  conflicts, and a genuinely new key still passes through every current gate.
-  Replay never creates another order or reservation.
+- A committed limit Create is replayed before `LIMIT_ORDER_ENABLED`, before
+  the create-service wiring check, and before the provider, matcher, path-B,
+  season, and market-state gates — an emergency rollback or a partially wired
+  instance must not withhold a response the system already produced. The
+  lookup is keyed on the QUOTE (which is unique and consumed once), so its
+  scope equals a real database uniqueness constraint: the same
+  `idempotencyKey` reused in a later season resolves to that season's own
+  order instead of conflicting. A different request hash conflicts, another
+  user's order is never replayed, and a genuinely new quote still passes
+  through every current gate. Replay performs no write at all — no extra
+  order, no extra reservation.
+- Path-B retention findings are recorded at the blast radius they have. A
+  queue entry whose candle row disappeared and an unscanned matchable candle
+  past the retention horizon each name ONE asset and now gap only that asset
+  (`LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED`), with every affected asset
+  recorded in the same sweep; only the shared scan watermark falling behind
+  retention is still global.
+- Queue entries whose tracked candle revision was INFERRED by the earlier
+  revision backfill rather than observed are reopened for re-verification by
+  an additive migration, so a candle correction made before that backfill can
+  still be filled. Such an asset fails closed with
+  `LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED` until the sweep settles
+  it; an entry whose candle row is already gone stays parked for an operator.
 - Total-asset valuation keeps using the full `balanceAmount`; reservations
   never reduce it.
 - Cancel and lifecycle cleanup work even while either flag is off. When auto

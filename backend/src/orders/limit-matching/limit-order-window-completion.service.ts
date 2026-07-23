@@ -36,6 +36,14 @@ type CheckpointRow = {
 };
 
 /**
+ * Sticky reason stamped on an asset gap raised by THIS supervisor (retention
+ * passed a window whose row was never written), distinct from the reasons the
+ * row sweep raises for candles that do exist.
+ */
+export const WINDOW_COMPLETION_GAP_REASON =
+  'candle_retention_passed_unaccounted_window';
+
+/**
  * Path-B WINDOW COMPLETION supervisor.
  *
  * `market_candles.ingest_seq` orders rows that EXIST; this service accounts
@@ -251,6 +259,14 @@ export class LimitOrderWindowCompletionService {
         "gap_to_open_time" = CASE
           WHEN "gap_detected_at" IS NOT NULL THEN "gap_to_open_time"
           WHEN ${gapped} THEN ${retentionHorizon}::timestamptz
+          ELSE NULL
+        END,
+        -- Sticky, unlike "degraded_reason" a few lines above, which this
+        -- statement overwrites on every pass with the current stop reason.
+        -- An operator clearing a gap needs the reason it was RAISED with.
+        "gap_reason" = CASE
+          WHEN "gap_detected_at" IS NOT NULL THEN "gap_reason"
+          WHEN ${gapped} THEN ${WINDOW_COMPLETION_GAP_REASON}
           ELSE NULL
         END,
         "updated_at" = CURRENT_TIMESTAMP

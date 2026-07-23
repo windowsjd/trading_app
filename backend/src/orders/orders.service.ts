@@ -1160,32 +1160,41 @@ export class OrdersService {
     body: OrderRequestBody,
     request: ParsedOrderRequest,
   ): Promise<CreateOrderResponse | LimitOrderCreateResponse> {
-    this.assertLimitOrderFeatureEnabled();
-    const limitOrderCreate = this.requireLimitOrderCreateService();
     const quoteId = this.parseQuoteId(body.quoteId);
     const idempotency = this.buildOrderCreateIdempotency({
       body,
       request,
       quoteId,
     });
-    // IDEMPOTENT REPLAY FIRST — before every health gate and state check. A
-    // create that already COMMITTED owes its caller the stored first
+    // IDEMPOTENT REPLAY FIRST — before the feature flag, before service
+    // wiring, before every health gate and state check.
+    //
+    // A create that already COMMITTED owes its caller the stored first
     // response, whatever has happened since: provider readiness lost, path-B
-    // safety net degraded, matcher down, season ended. Re-running those gates
-    // here would 503 a request whose order and reservation already exist —
-    // the retry storm this replay exists to absorb is most likely EXACTLY
-    // when such a gate is failing. The lookup is scoped to the caller's own
-    // orders (seasonParticipant.userId), never another user's, and does not
-    // require resolving the active season, so a season-ended replay still
-    // returns the original payload. A different request under the same key
-    // is a conflict; only a genuinely NEW key proceeds to the gates below.
-    const replayedOrder = await this.findIdempotentCreateOrderForUser(
+    // safety net degraded, matcher down, season ended, the feature switched
+    // off, this instance deployed without the create service. Re-running any
+    // of those gates here would fail a request whose order and reservation
+    // already exist, and the retry storm this replay absorbs is most likely
+    // EXACTLY when such a gate is failing or a rollback just landed.
+    // LIMIT_ORDER_ENABLED stops NEW registrations; it was never meant to
+    // withhold a response the system already committed to.
+    //
+    // The lookup is keyed on the QUOTE, which is user-scoped, single-use and
+    // uniquely tied to at most one order — so it needs no active season, and
+    // the same idempotencyKey reused in a later season resolves to that
+    // season's own order instead of colliding. It never returns another
+    // user's order. A different request under the same quote is a conflict;
+    // only a genuinely new quote proceeds to the gates below.
+    const replayedOrder = await this.findIdempotentLimitCreateOrderForQuote({
       userId,
-      idempotency.idempotencyKey,
-    );
+      quoteId,
+      idempotencyKey: idempotency.idempotencyKey,
+    });
     if (replayedOrder) {
       return this.replayIdempotentCreateOrder(replayedOrder, idempotency);
     }
+    this.assertLimitOrderFeatureEnabled();
+    const limitOrderCreate = this.requireLimitOrderCreateService();
     const autoExecutionEnabled = this.isLimitOrderAutoExecutionEnabled();
     const submittedAt = new Date();
     // Path-B state is a slow-moving operational signal (a stuck sweep, a
@@ -1363,10 +1372,23 @@ export class OrdersService {
         throw error;
       }
 
-      const racedOrder = await this.findIdempotentCreateOrder(
-        participant.id,
-        idempotency.idempotencyKey,
-      );
+      // Two unique constraints can raise here and they mean different things.
+      // `orders_quote_id_key` — the concurrent winner used the SAME quote, so
+      // the quote-scoped lookup finds exactly the order this request wanted
+      // and replays it. `(seasonParticipantId, idempotencyKey)` — the key was
+      // reused with a DIFFERENT quote inside one season, which the quote
+      // lookup cannot see; the participant-scoped fallback finds that order
+      // and the request-hash comparison turns it into the conflict it is.
+      const racedOrder =
+        (await this.findIdempotentLimitCreateOrderForQuote({
+          userId,
+          quoteId,
+          idempotencyKey: idempotency.idempotencyKey,
+        })) ??
+        (await this.findIdempotentCreateOrder(
+          participant.id,
+          idempotency.idempotencyKey,
+        ));
 
       if (!racedOrder) {
         this.throwApiError(
@@ -3938,27 +3960,65 @@ export class OrdersService {
   }
 
   /**
-   * USER-scoped idempotent-create lookup, used by the replay-first step of
-   * limit Create. Scoped by `seasonParticipant.userId` rather than a resolved
-   * participant id so it works WITHOUT reading the active season — which is
-   * what lets a replay succeed after the season ended, or while the season
-   * lookup's prerequisites are failing. Never returns another user's order.
-   * The newest match wins when the same key was (incorrectly) reused across
-   * seasons; the request-hash comparison then replays or conflicts exactly
-   * like the participant-scoped path.
+   * QUOTE-scoped idempotent-create lookup, used by the replay-first step of
+   * limit Create.
+   *
+   * WHY THE QUOTE AND NOT THE KEY ALONE
+   * -----------------------------------
+   * The durable uniqueness the database actually enforces on
+   * `idempotencyKey` is `(seasonParticipantId, idempotencyKey)` — a key is
+   * unique WITHIN a season participation, not across a user's lifetime. A
+   * lookup scoped to `(userId, idempotencyKey)` was therefore strictly WIDER
+   * than the constraint it was replaying, and had to break the tie itself
+   * (newest first). A client that reuses one key across two seasons — which
+   * the schema permits — would then have its season-1 retry resolved to the
+   * season-2 order and answered with ORDER_IDEMPOTENCY_CONFLICT, even though
+   * both requests were individually valid.
+   *
+   * `Order.quoteId` is UNIQUE, and a limit Create always carries a durable
+   * quote that is user-scoped and consumed exactly once. Keying the lookup on
+   * it makes the replay scope EQUAL to a real database uniqueness constraint
+   * instead of wider than one, resolves to the caller's own order in the
+   * season that order belongs to, and needs no active-season read — so a
+   * replay still works after the season ended.
+   *
+   * Everything the caller asserted must match; anything else is a conflict
+   * rather than a silent new create, because the quote is already consumed:
+   *   - another user's quote/order  (never replayed, never leaked)
+   *   - a market order on that quote
+   *   - the same quote presented under a different idempotencyKey
+   * The request-hash comparison then happens in replayIdempotentCreateOrder,
+   * exactly as on the participant-scoped path.
    */
-  private async findIdempotentCreateOrderForUser(
-    userId: string,
-    idempotencyKey: string,
-  ) {
-    return this.prisma.order.findFirst({
-      where: {
-        idempotencyKey,
-        seasonParticipant: { userId },
+  private async findIdempotentLimitCreateOrderForQuote(input: {
+    userId: string;
+    quoteId: string;
+    idempotencyKey: string;
+  }) {
+    const order = await this.prisma.order.findUnique({
+      where: { quoteId: input.quoteId },
+      select: {
+        ...IDEMPOTENT_CREATE_ORDER_SELECT,
+        idempotencyKey: true,
+        seasonParticipant: { select: { userId: true } },
       },
-      orderBy: { createdAt: 'desc' },
-      select: IDEMPOTENT_CREATE_ORDER_SELECT,
     });
+
+    if (!order) return null;
+
+    if (
+      order.seasonParticipant.userId !== input.userId ||
+      order.orderType !== OrderType.limit ||
+      order.idempotencyKey !== input.idempotencyKey
+    ) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'ORDER_IDEMPOTENCY_CONFLICT',
+        'This quote was already used by a different order create request.',
+      );
+    }
+
+    return order;
   }
 
   private async findIdempotentCreateOrder(

@@ -812,7 +812,14 @@ Every violation is reported at once, not just the first.
 
 ### Rollout order
 
-1. apply and verify migrations without resetting data (all additive);
+1. apply and verify migrations without resetting data (all additive):
+   `prisma migrate deploy`, then `migrate status` and `migrate diff
+   --from-config-datasource --to-schema prisma/schema.prisma --exit-code`.
+   On an EXISTING database, the revision-provenance migration reports in its
+   `RAISE NOTICE` how many deferred-queue entries it reopened for
+   re-verification and how many it parked as legacy orphans; check both before
+   continuing, and see the existing-database upgrade procedure in
+   [limit-order-candle-reconciliation.md](limit-order-candle-reconciliation.md);
 2. provision durable Redis retention and alerting;
 3. deploy with every limit-order flag false and verify provider streams,
    calendar readiness and `/health/ready` dependencies;
@@ -842,7 +849,13 @@ Every violation is reported at once, not just the first.
     `watermarkIngestSeq` that never moves while `observedIngestSeq` climbs
     means the two-phase guard is holding: look for a long-running write
     transaction on `market_candles`;
-12. widen the asset set gradually.
+12. on an existing database, confirm the reopened queue entries drain — a
+    successful re-verification DELETES the row. While any remain, that asset
+    fails new Quote/Create closed with
+    `LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED`, which is expected and
+    self-clearing. An entry stuck as `legacy_orphan` cannot self-clear and
+    needs the exposure decision in the path-B runbook;
+13. widen the asset set gradually.
 
 ### Rollback order
 
@@ -859,7 +872,13 @@ Every violation is reported at once, not just the first.
 6. prefer FLAG rollback over migration rollback. The migrations are additive
    and harmless when the features are off; rolling them back would drop the
    durable checkpoint and deferred queue, which are the only record of what
-   path B has and has not examined.
+   path B has and has not examined;
+7. a `LIMIT_ORDER_ENABLED=false` rollback does NOT strand a caller whose create
+   already committed: the idempotent replay runs ahead of the flag, so a retry
+   still receives the stored first response — with no second order and no
+   second reservation — while genuinely new registrations stay refused. The
+   same holds for an application rollback to a build without
+   `LimitOrderCreateService`.
 
 ### Monitoring required before enabling
 
@@ -873,6 +892,8 @@ Every violation is reported at once, not just the first.
 | processed-event capacity | heartbeat `processedEvents` (approximate) + capacity warning log | none (operational) |
 | path-B sweep liveness | checkpoint `lastSuccessfulRunAt` | `LIMIT_ORDER_CANDLE_RECONCILIATION_STALE` |
 | path-B deferred backlog | `limit_order_deferred_candles` | `LIMIT_ORDER_CANDLE_RECONCILIATION_BACKLOG_EXCEEDED` |
+| per-asset retention gap | `market_candle_finalization_checkpoints.gap_detected_at` / `gap_reason` | `LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED` (that asset only) |
+| unverified revision provenance | `limit_order_deferred_candles.revision_state <> 'current'` | `LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED` (that asset only) |
 | path-B retention gap | checkpoint `gapDetectedAt` | `LIMIT_ORDER_CANDLE_RECONCILIATION_GAP_DETECTED` |
 | reservation mismatch | checkpoint `reservationMismatchCount` | `LIMIT_ORDER_CANDLE_RESERVATION_MISMATCH` |
 | shared readiness freshness | provider meta TTL / `lastFrameAt` | `LIMIT_ORDER_PROVIDER_UNAVAILABLE` |

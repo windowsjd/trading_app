@@ -40,6 +40,14 @@ export const LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES = {
   assetFinalizerStale: 'LIMIT_ORDER_CANDLE_FINALIZER_STALE',
   assetBacklogExceeded: 'LIMIT_ORDER_CANDLE_ASSET_BACKLOG_EXCEEDED',
   assetPermanentFailure: 'LIMIT_ORDER_CANDLE_ASSET_PERMANENT_FAILURE',
+  // Asset-scoped and distinct from an ordinary backlog on purpose: a queue
+  // entry whose tracked candle revision was INFERRED by the provenance
+  // backfill rather than observed. Until the sweep re-verifies it against the
+  // candle's current revision, this asset may have an unexamined correction,
+  // and the operator action ("wait for the next sweep, or investigate why it
+  // cannot settle") differs from "the queue is too long".
+  assetLegacyReviewRequired:
+    'LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED',
 } as const;
 
 @Injectable()
@@ -229,8 +237,14 @@ export class LimitOrderCandleReconciliationHealthService {
       if (checkpoint.gapDetectedAt) {
         return {
           code: LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.assetGapDetected,
+          // `gapReason` is the sticky field stamped when the gap was RAISED.
+          // `degradedReason` is the completion supervisor's current stop
+          // reason and is rewritten on every pass, so it is only a fallback
+          // for gaps recorded before that field existed.
           reason: `Candle retention passed an unresolved window of this asset at ${checkpoint.gapDetectedAt.toISOString()}: ${
-            checkpoint.degradedReason ?? 'unknown reason'
+            checkpoint.gapReason ??
+            checkpoint.degradedReason ??
+            'unknown reason'
           }.`,
         };
       }
@@ -254,6 +268,19 @@ export class LimitOrderCandleReconciliationHealthService {
     }
 
     const backlog = await this.checkpoints.readAssetBacklog(assetId);
+    // Reported BEFORE the generic permanent/backlog checks below, because a
+    // legacy entry lands in one of those buckets too and the generic message
+    // would send the operator looking for a stuck candle rather than for the
+    // re-verification the provenance migration queued. Both block the asset;
+    // only this one says why.
+    if (backlog.legacyReviewCount > 0) {
+      return {
+        code: LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.assetLegacyReviewRequired,
+        reason: `This asset has ${backlog.legacyReviewCount} candle queue entry/entries whose tracked revision was never verified (oldest since ${
+          backlog.oldestLegacyReviewAt?.toISOString() ?? 'unknown'
+        }); the safety net re-checks them against the current candle revision before new orders are accepted.`,
+      };
+    }
     // A permanent entry is an unresolved financial exposure on THIS asset: a
     // window whose fill decision could not be made and will not be retried.
     // It blocks this asset's new orders until an operator (or a candle

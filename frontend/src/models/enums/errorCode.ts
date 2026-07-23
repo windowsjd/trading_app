@@ -119,6 +119,12 @@ export const ERROR_CODE = {
     'LIMIT_ORDER_CANDLE_ASSET_BACKLOG_EXCEEDED',
   LIMIT_ORDER_CANDLE_ASSET_PERMANENT_FAILURE:
     'LIMIT_ORDER_CANDLE_ASSET_PERMANENT_FAILURE',
+  // Asset-scoped: this asset's safety net is re-checking historical price
+  // data whose coverage could not be confirmed. Transient and self-clearing,
+  // unlike the permanent-failure code above, so the copy says "recovering"
+  // rather than "needs recovery".
+  LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED:
+    'LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED',
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODE)[keyof typeof ERROR_CODE];

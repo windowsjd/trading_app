@@ -77,6 +77,8 @@ function assetBacklog(
     permanentCount: 0,
     oldestDeferredAt: null,
     oldestPermanentAt: null,
+    legacyReviewCount: 0,
+    oldestLegacyReviewAt: null,
     ...overrides,
   };
 }
@@ -87,6 +89,7 @@ type WindowCompletionRow = {
   lastErrorCode: string | null;
   degradedReason: string | null;
   gapDetectedAt: Date | null;
+  gapReason: string | null;
 } | null;
 
 function service(input: {
@@ -377,6 +380,124 @@ describe('LimitOrderCandleReconciliationHealthService', () => {
     expect((await health.evaluate(NOW, 'asset-b'))?.code).toBe(
       LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.stale,
     );
+  });
+
+  // -------------------------------------------------------------------------
+  // Asset-scoped retention gap and legacy revision review
+  // -------------------------------------------------------------------------
+
+  it('blocks only the asset whose completion checkpoint carries a retention gap', async () => {
+    const health = service({
+      windowCompletions: {
+        'asset-a': {
+          pendingWindowOpenTime: null,
+          pendingSince: null,
+          lastErrorCode: null,
+          degradedReason: null,
+          gapDetectedAt: NOW,
+          gapReason: 'deferred_candle_retention_removed',
+        },
+      },
+    });
+    const failureA = await health.evaluate(NOW, 'asset-a');
+    expect(failureA?.code).toBe(
+      LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.assetGapDetected,
+    );
+    // The STICKY reason the gap was raised with, not whatever the completion
+    // supervisor happened to write into degradedReason on its last pass.
+    expect(failureA?.reason).toContain('deferred_candle_retention_removed');
+    expect(await health.evaluate(NOW, 'asset-b')).toBeNull();
+    // And the shared gate stays open: one asset's data loss is not a
+    // system-wide outage.
+    expect(await health.evaluate(NOW)).toBeNull();
+  });
+
+  it('prefers the sticky gap reason over the supervisor stop reason', async () => {
+    const health = service({
+      windowCompletions: {
+        'asset-a': {
+          pendingWindowOpenTime: null,
+          pendingSince: null,
+          lastErrorCode: null,
+          // Rewritten on every completion pass; must not be quoted when a
+          // sticky gapReason exists.
+          degradedReason: 'provider repair budget exhausted',
+          gapDetectedAt: NOW,
+          gapReason: 'candle_retention_passed_unscanned_candle',
+        },
+      },
+    });
+    const failure = await health.evaluate(NOW, 'asset-a');
+    expect(failure?.reason).toContain(
+      'candle_retention_passed_unscanned_candle',
+    );
+    expect(failure?.reason).not.toContain('provider repair budget exhausted');
+  });
+
+  it('falls back to degradedReason for gaps recorded before gapReason existed', async () => {
+    const health = service({
+      windowCompletions: {
+        'asset-a': {
+          pendingWindowOpenTime: null,
+          pendingSince: null,
+          lastErrorCode: null,
+          degradedReason: 'legacy stored reason',
+          gapDetectedAt: NOW,
+          gapReason: null,
+        },
+      },
+    });
+    expect((await health.evaluate(NOW, 'asset-a'))?.reason).toContain(
+      'legacy stored reason',
+    );
+  });
+
+  it('blocks only the asset with an unverified legacy queue entry', async () => {
+    // The provenance migration reopened an entry whose tracked candle
+    // revision was inferred rather than observed. Until the sweep re-verifies
+    // it, THIS asset cannot accept new limit orders — and no other asset is
+    // affected, nor is the global gate.
+    const health = service({
+      assetBacklogs: {
+        'asset-a': assetBacklog({
+          deferredCount: 1,
+          legacyReviewCount: 1,
+          oldestLegacyReviewAt: new Date(NOW.getTime() - 60_000),
+          oldestDeferredAt: new Date(NOW.getTime() - 60_000),
+        }),
+      },
+    });
+    const failure = await health.evaluate(NOW, 'asset-a');
+    expect(failure?.code).toBe(
+      LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.assetLegacyReviewRequired,
+    );
+    expect(await health.evaluate(NOW, 'asset-b')).toBeNull();
+    expect(await health.evaluate(NOW)).toBeNull();
+  });
+
+  it('names the legacy review before the generic permanent-failure code', async () => {
+    // A legacy orphan is BOTH permanent and unverified. The operator action
+    // differs, so the specific code must win.
+    const health = service({
+      assetBacklogs: {
+        'asset-a': assetBacklog({
+          permanentCount: 1,
+          oldestPermanentAt: new Date(NOW.getTime() - 60_000),
+          legacyReviewCount: 1,
+          oldestLegacyReviewAt: new Date(NOW.getTime() - 60_000),
+        }),
+      },
+    });
+    expect((await health.evaluate(NOW, 'asset-a'))?.code).toBe(
+      LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.assetLegacyReviewRequired,
+    );
+  });
+
+  it('stops naming the legacy review once the entry is verified and drained', async () => {
+    const health = service({
+      assetBacklogs: { 'asset-a': assetBacklog({ legacyReviewCount: 0 }) },
+    });
+    expect(await health.evaluate(NOW, 'asset-a')).toBeNull();
   });
 
   it('uses codes distinct from the path-A matcher gate', async () => {

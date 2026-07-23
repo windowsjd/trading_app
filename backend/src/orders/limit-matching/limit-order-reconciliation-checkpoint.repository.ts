@@ -102,15 +102,27 @@ export type ReconciliationCheckpoint = {
   lastReservationMismatchAt: Date | null;
 };
 
+/**
+ * Whether a queue entry's tracked revision was OBSERVED or merely INFERRED.
+ * The value alone cannot say: a backfilled revision and an observed one are
+ * byte-identical, and a PERMANENT entry carrying an inferred revision silently
+ * blocks that revision from both the forward scan and the retry loop.
+ */
+export type DeferredRevisionState =
+  | 'current'
+  | 'legacy_unknown'
+  | 'legacy_orphan';
+
 export type DeferredCandleRow = {
   marketCandleId: string;
   /**
-   * Candle revision (MarketCandle.ingestSeq) this entry tracks. NULL only on
-   * rows that predate the column and whose candle row no longer exists (the
-   * backfill stamped every row whose candle survived); read as "unknown =
-   * lowest", so any concrete revision replaces it.
+   * Candle revision (MarketCandle.ingestSeq) this entry tracks. NULL on rows
+   * whose revision was never observed — rows predating the column and rows the
+   * provenance migration reset for re-verification. Read as "unknown =
+   * lowest", so any concrete revision replaces it and it suppresses nothing.
    */
   candleIngestSeq: bigint | null;
+  revisionState: string;
   assetId: string;
   interval: string;
   openTime: Date;
@@ -135,6 +147,31 @@ export type AssetDeferredBacklog = {
   permanentCount: number;
   oldestDeferredAt: Date | null;
   oldestPermanentAt: Date | null;
+  /**
+   * Entries whose tracked revision was never observed and that the provenance
+   * migration therefore queued for re-verification. Non-zero means this
+   * asset's safety net has an unsettled revision question, which is a distinct
+   * operator action from an ordinary backlog and gets its own error code.
+   */
+  legacyReviewCount: number;
+  oldestLegacyReviewAt: Date | null;
+};
+
+/**
+ * A retention finding attributable to exactly ONE asset. Recorded on that
+ * asset's window-completion checkpoint instead of the shared reconciliation
+ * checkpoint, so the loss blocks that asset's new limit quotes/creates and
+ * nothing else.
+ */
+export type AssetRetentionGap = {
+  assetId: string;
+  interval?: string;
+  detectedAt: Date;
+  fromOpenTime: Date | null;
+  toOpenTime: Date | null;
+  reason: string;
+  marketCandleId?: string | null;
+  candleIngestSeq?: bigint | null;
 };
 
 @Injectable()
@@ -419,6 +456,66 @@ export class LimitOrderReconciliationCheckpointRepository {
     });
   }
 
+  /**
+   * Records a retention gap against ONE asset's window-completion checkpoint.
+   *
+   * Why this exists next to `recordGap`: two of the sweep's three retention
+   * signals — a deferred entry whose candle row disappeared, and an unscanned
+   * matchable candle older than the retention horizon — name exactly one
+   * asset. Recording them on the shared checkpoint failed every other asset's
+   * new limit orders for a loss they had no part in. Only the sweep's own
+   * market-time watermark falling behind retention is genuinely global, and
+   * that one still goes through `recordGap`.
+   *
+   * STICKY, exactly like the global gap: the first detection wins and is never
+   * overwritten or cleared here, because retention-removed candles cannot be
+   * recovered and only an operator can decide the exposure is settled. Later
+   * detections on an already-gapped asset are no-ops, so a re-running sweep
+   * (or a new owner) never rewrites the original evidence.
+   *
+   * The row is created when absent: a gap can be found for an asset the
+   * completion supervisor has not bootstrapped yet, and losing the alarm
+   * because there was nowhere to put it is the one outcome that must not
+   * happen. `finalizedThroughCloseTime` is anchored at the gap window so the
+   * cursor cannot claim to have accounted for anything it has not.
+   */
+  async recordAssetGap(input: AssetRetentionGap): Promise<void> {
+    const interval = input.interval ?? LIMIT_ORDER_RECONCILIATION_SCOPE;
+    const anchor = input.fromOpenTime ?? input.detectedAt;
+    const ingestSeq = seqParam(input.candleIngestSeq ?? null);
+    await this.prisma.$executeRaw`
+      INSERT INTO "market_candle_finalization_checkpoints" AS f (
+        "asset_id", "interval", "finalized_through_close_time",
+        "last_evaluated_at", "gap_detected_at", "gap_from_open_time",
+        "gap_to_open_time", "gap_reason", "gap_market_candle_id",
+        "gap_candle_ingest_seq", "created_at", "updated_at"
+      ) VALUES (
+        ${input.assetId},
+        ${interval},
+        ${anchor},
+        ${input.detectedAt},
+        ${input.detectedAt},
+        ${input.fromOpenTime},
+        ${input.toOpenTime},
+        ${input.reason},
+        ${input.marketCandleId ?? null},
+        ${ingestSeq}::bigint,
+        ${input.detectedAt},
+        ${input.detectedAt}
+      )
+      ON CONFLICT ("asset_id", "interval") DO UPDATE SET
+        "gap_detected_at" = EXCLUDED."gap_detected_at",
+        "gap_from_open_time" = EXCLUDED."gap_from_open_time",
+        "gap_to_open_time" = EXCLUDED."gap_to_open_time",
+        "gap_reason" = EXCLUDED."gap_reason",
+        "gap_market_candle_id" = EXCLUDED."gap_market_candle_id",
+        "gap_candle_ingest_seq" = EXCLUDED."gap_candle_ingest_seq",
+        "last_evaluated_at" = EXCLUDED."last_evaluated_at",
+        "updated_at" = EXCLUDED."updated_at"
+      WHERE f."gap_detected_at" IS NULL
+    `;
+  }
+
   async recordReservationMismatch(now: Date, scope?: string): Promise<void> {
     await this.prisma.limitOrderReconciliationCheckpoint.updateMany({
       where: { scope: scope ?? LIMIT_ORDER_RECONCILIATION_SCOPE },
@@ -459,6 +556,16 @@ export class LimitOrderReconciliationCheckpointRepository {
    *   incoming revision < stored   NO-OP. A late callback for a superseded
    *                                revision must not overwrite the newer
    *                                entry's state.
+   *
+   * PROVENANCE moves with the revision. Writing a CONCRETE revision means the
+   * caller loaded the candle and read that value off it, so the entry becomes
+   * `current` and stamps `revisionVerifiedAt` — this is how a row the
+   * provenance migration reset for re-verification returns to being trusted.
+   * Writing a NULL revision (the candle row is gone, there is nothing to read)
+   * leaves the stored provenance untouched, so an unverified entry can never
+   * be promoted to trusted by an absence. `revisionState` may be forced by the
+   * caller for the one case the value cannot express: a legacy entry whose
+   * candle has since disappeared becomes a `legacy_orphan`.
    */
   async upsertDeferred(input: {
     marketCandleId: string;
@@ -472,15 +579,19 @@ export class LimitOrderReconciliationCheckpointRepository {
     errorCode: string | null;
     errorMessage: string | null;
     status?: 'deferred' | 'permanent';
+    revisionState?: DeferredRevisionState;
   }): Promise<void> {
     const message = input.errorMessage?.slice(0, 1000) ?? null;
     const status = input.status ?? 'deferred';
+    // NULL means "derive from the revision being written"; a value forces it.
+    const forcedRevisionState = input.revisionState ?? null;
     await this.prisma.$executeRaw`
       INSERT INTO "limit_order_deferred_candles" AS d (
         "market_candle_id", "candle_ingest_seq", "asset_id", "interval",
         "open_time", "close_time", "status", "first_deferred_at",
         "last_deferred_at", "attempt_count", "last_error_code",
-        "last_error_message", "next_retry_at", "created_at", "updated_at"
+        "last_error_message", "next_retry_at", "revision_state",
+        "revision_verified_at", "created_at", "updated_at"
       ) VALUES (
         ${input.marketCandleId},
         ${seqParam(input.candleIngestSeq)}::bigint,
@@ -495,10 +606,33 @@ export class LimitOrderReconciliationCheckpointRepository {
         ${input.errorCode},
         ${message},
         ${input.nextRetryAt},
+        COALESCE(
+          ${forcedRevisionState},
+          CASE
+            WHEN ${seqParam(input.candleIngestSeq)}::bigint IS NOT NULL
+            THEN 'current' ELSE 'legacy_unknown'
+          END
+        ),
+        CASE
+          WHEN ${seqParam(input.candleIngestSeq)}::bigint IS NOT NULL
+          THEN ${input.now}::timestamptz ELSE NULL
+        END,
         ${input.now},
         ${input.now}
       )
       ON CONFLICT ("market_candle_id") DO UPDATE SET
+        "revision_state" = COALESCE(
+          ${forcedRevisionState},
+          CASE
+            WHEN EXCLUDED."candle_ingest_seq" IS NOT NULL
+            THEN 'current' ELSE d."revision_state"
+          END
+        ),
+        "revision_verified_at" = CASE
+          WHEN EXCLUDED."candle_ingest_seq" IS NOT NULL
+          THEN EXCLUDED."revision_verified_at"
+          ELSE d."revision_verified_at"
+        END,
         "candle_ingest_seq" = CASE
           WHEN EXCLUDED."candle_ingest_seq" IS NOT NULL
             AND (d."candle_ingest_seq" IS NULL
@@ -568,6 +702,7 @@ export class LimitOrderReconciliationCheckpointRepository {
       select: {
         marketCandleId: true,
         candleIngestSeq: true,
+        revisionState: true,
         assetId: true,
         interval: true,
         openTime: true,
@@ -626,6 +761,7 @@ export class LimitOrderReconciliationCheckpointRepository {
     lastErrorCode: string | null;
     degradedReason: string | null;
     gapDetectedAt: Date | null;
+    gapReason: string | null;
   } | null> {
     return this.prisma.marketCandleFinalizationCheckpoint.findUnique({
       where: {
@@ -638,8 +774,11 @@ export class LimitOrderReconciliationCheckpointRepository {
         pendingWindowOpenTime: true,
         pendingSince: true,
         lastErrorCode: true,
+        // The sweep rewrites `degradedReason` on every pass; `gapReason` is
+        // the sticky field the gate should quote for a gap.
         degradedReason: true,
         gapDetectedAt: true,
+        gapReason: true,
       },
     });
   }
@@ -655,13 +794,17 @@ export class LimitOrderReconciliationCheckpointRepository {
         permanentCount: number;
         oldestDeferredAt: Date | null;
         oldestPermanentAt: Date | null;
+        legacyReviewCount: number;
+        oldestLegacyReviewAt: Date | null;
       }>
     >`
       SELECT
         COUNT(*) FILTER (WHERE "status" = 'deferred')::int AS "deferredCount",
         COUNT(*) FILTER (WHERE "status" = 'permanent')::int AS "permanentCount",
         MIN("first_deferred_at") FILTER (WHERE "status" = 'deferred') AS "oldestDeferredAt",
-        MIN("first_deferred_at") FILTER (WHERE "status" = 'permanent') AS "oldestPermanentAt"
+        MIN("first_deferred_at") FILTER (WHERE "status" = 'permanent') AS "oldestPermanentAt",
+        COUNT(*) FILTER (WHERE "revision_state" <> 'current')::int AS "legacyReviewCount",
+        MIN("first_deferred_at") FILTER (WHERE "revision_state" <> 'current') AS "oldestLegacyReviewAt"
       FROM "limit_order_deferred_candles"
       WHERE "asset_id" = ${assetId}
     `;
@@ -671,6 +814,8 @@ export class LimitOrderReconciliationCheckpointRepository {
       permanentCount: row?.permanentCount ?? 0,
       oldestDeferredAt: row?.oldestDeferredAt ?? null,
       oldestPermanentAt: row?.oldestPermanentAt ?? null,
+      legacyReviewCount: row?.legacyReviewCount ?? 0,
+      oldestLegacyReviewAt: row?.oldestLegacyReviewAt ?? null,
     };
   }
 

@@ -419,7 +419,7 @@ records; they are never edited or reinterpreted.
 via `workflow_dispatch`, with `contents: read` permissions and per-ref
 concurrency cancellation. No provider API key or operational secret is
 required, and no CI command rewrites files (`--no-fix` / `--check` only).
-Three jobs:
+Four jobs:
 
 1. **Backend quality** — frozen-lockfile `pnpm install`, `prisma generate`,
    then the candle-layer gates and the backend suite. Local reproduction:
@@ -445,7 +445,23 @@ Three jobs:
    script; `tsc --noEmit` is its compile gate and no placeholder build
    command is fabricated.
 
-3. **Candle fixture integration** — PostgreSQL 16 + Redis 7 service
+3. **Limit order PostgreSQL + Redis integration** — PostgreSQL 16 + Redis 7
+   service containers, `prisma migrate deploy`, `prisma migrate status`, and a
+   `prisma migrate diff --exit-code` drift gate, then the opt-in limit-order
+   suites (path A/B matching, boundary concurrency, the path-B durable
+   checkpoint including asset-scoped retention gaps, shared readiness, the
+   XADD→XACK matcher end-to-end, market execute, FX and the MVP flow). Two of
+   them are about state a fully-migrated database cannot express: the
+   EXISTING-DATABASE UPGRADE suite, which creates its own scratch database and
+   deploys migrations in stages to reproduce the pre-fix deferred-queue state
+   before proving the recovery through the real sweep; and the idempotent
+   replay suite, which proves a committed limit create is replayed ahead of the
+   feature flag and the service wiring without a second order or reservation.
+   CI pass/fail is judged on correctness invariants only — all events
+   processed and ACKed, pending 0, lag 0, no duplicate fill, no residual
+   advisory lock, no migration drift — never on a throughput number.
+
+4. **Candle fixture integration** — PostgreSQL 16 + Redis 7 service
    containers, `prisma migrate deploy`, then
    `CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm run smoke:candle-fixture`
    (fixture providers only — no provider credentials). The job then verifies
@@ -647,3 +663,17 @@ from the existing-row scan heartbeat, and a latest completion failure blocks
 new limit orders immediately. Deferred rows are revision-aware through
 `MarketCandle.ingestSeq`; a corrected candle can reactivate a permanent entry
 without deleting immutable evidence from the earlier revision.
+
+A queue entry can only be trusted to suppress a revision when that revision was
+OBSERVED on a candle row. Entries predating the revision column carry a
+backfill-INFERRED value instead, and are reopened for re-verification by
+`20260724120000_add_limit_order_deferred_revision_provenance_and_asset_gap`;
+until the sweep settles them, that asset alone fails new limit Quote/Create
+with `LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED`.
+
+Retention losses that name ONE asset — an entry whose `market_candles` row was
+removed, an unscanned matchable candle past the horizon — are recorded on that
+asset's `market_candle_finalization_checkpoints` row and gate that asset only.
+Only the shared scan watermark falling behind retention is a global alarm. A
+candle-retention change therefore affects the assets whose windows it removed,
+not the whole book.

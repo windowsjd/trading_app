@@ -417,7 +417,43 @@ revision-aware end to end:
 
 ### Retention gap
 
-Three independent, exact signals:
+Three independent, exact signals — and each is recorded at the **blast radius
+it actually has**. Two of the three name exactly one asset; recording those on
+the shared checkpoint failed every other asset's new limit orders for a loss
+they had no part in.
+
+| Signal | Scope | Recorded on | Gate code |
+| --- | --- | --- | --- |
+| Shared market-time marker past the retention horizon | **global** | `limit_order_reconciliation_checkpoints` | `LIMIT_ORDER_CANDLE_RECONCILIATION_GAP_DETECTED` |
+| Deferred entry whose `market_candles` row disappeared | **asset** | `market_candle_finalization_checkpoints` | `LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED` |
+| Unscanned matchable candle past the horizon | **asset** | `market_candle_finalization_checkpoints` | `LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED` |
+| Retention passed an unaccounted WINDOW (completion supervisor) | **asset** | `market_candle_finalization_checkpoints` | `LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED` |
+
+Only the first is genuinely global: the market-time marker is ONE position
+shared by every asset, so once retention has passed it the removed rows cannot
+be attributed to any particular asset. The others carry an `asset_id` — the
+deferred queue stores one precisely so the loss can be attributed, and a candle
+row identifies its own asset — so they block that asset's new limit
+Quote/Create and nothing else. Other assets keep quoting, creating and being
+filled; Cancel, season-end and exclusion cleanup, market orders and FX are
+untouched either way.
+
+Asset gaps are recorded **one row per affected asset per sweep**, bounded by
+`LIMIT_ORDER_CANDLE_ASSET_GAP_BATCH_SIZE` (default 50). A single global row
+used to let the oldest asset's loss hide every other asset's, so those assets
+kept accepting orders whose safety net was already blind. If more assets are
+affected than the bound, the remainder is recorded by the next sweep and the
+truncation is logged as `limit_order_candle_deferred_row_missing_truncated`.
+
+The per-asset gap columns carry the evidence an operator needs:
+`gap_detected_at`, `gap_from_open_time`, `gap_to_open_time`, `gap_reason`,
+`gap_market_candle_id` (nullable) and `gap_candle_ingest_seq` (nullable).
+`gap_reason` is separate from `degraded_reason` on purpose: the completion
+supervisor rewrites `degraded_reason` on every pass with its current stop
+reason, while a sticky operator-owned alarm needs the reason it was RAISED
+with.
+
+The three signals in detail:
 
 1. **The market-time marker is older than the candle retention horizon**
    (`MARKET_CANDLE_5M_RETENTION_DAYS`, consumed from the retention job's own
@@ -444,14 +480,15 @@ Three independent, exact signals:
    The eligible-order condition is exactly the scan's own, which is what keeps
    this exact rather than noisy — an old window no order could ever match is
    not an exposure, and alarming on it would fail every new limit order on a
-   healthy system. Reported as `candle_retention_passed_unscanned_candle`.
+   healthy system. Reported as `candle_retention_passed_unscanned_candle`,
+   against that candle's own asset.
 
-A gap is **sticky**: `gapDetectedAt` keeps its first detection and the sweep
-never clears it. Candles that retention removed before path B examined them
-cannot be recovered, so only an operator can decide the exposure is settled.
-While it is set, new limit Quote/Create fail closed with
-`LIMIT_ORDER_CANDLE_RECONCILIATION_GAP_DETECTED`; Cancel, season-end and
-exclusion cleanup, market orders and FX are untouched.
+A gap is **sticky**, global or per-asset: `gapDetectedAt` keeps its first
+detection and the sweep never overwrites or clears it. Candles that retention
+removed before path B examined them cannot be recovered, so only an operator
+can decide the exposure is settled. While it is set, new limit Quote/Create
+fail closed for the affected scope; Cancel, season-end and exclusion cleanup,
+market orders and FX are untouched.
 
 ### What `lookbackMs` is still for
 
@@ -637,13 +674,111 @@ index keeps the already-deployed truncated PostgreSQL name through Prisma
 `map: "limit_order_candle_evidences_market_candle_id_candle_inges_key"`;
 this prevents a duplicate/rename drift.
 
-Roll out by deploying migrations first, verifying migrate status/diff, then
-deploying the binary with flags still false. Keep `LIMIT_ORDER_ENABLED=false`
-while starting path A/shared readiness and path B; after both path-B
-heartbeats have succeeded and per-asset checkpoints/backlogs are healthy,
-enable new limit Quote/Create traffic.
+#### Why that backfill needed a follow-up: revision PROVENANCE
+
+The backfill above records WHICH revision an entry tracks. It cannot record
+which revision the entry was ENQUEUED for — that value was never stored — and
+for a `permanent` entry the difference is a silent, permanent miss:
+
+1. revision 1 of a candle fails, exhausts its retry budget, and is parked as
+   `permanent` (tracking revision 1, unrecorded);
+2. **before** the deploy the candle is corrected — a lower `low`, a moved
+   window — and the ingest trigger re-sequences it to revision 2;
+3. the backfill stamps the permanent entry with the CURRENT revision, 2, so the
+   row now asserts "revision 2 is tracked", which nothing ever verified;
+4. the forward scan excludes the candle: its predicate is
+   `d.candle_ingest_seq >= c.ingest_seq`, and `2 >= 2` holds;
+5. the retry loop never sees it: `findDueDeferred` selects `status = 'deferred'`
+   only.
+
+Revision 2 is unreachable from both directions, forever, and an order whose
+limit the corrected low newly touches is never filled.
+
+Migration
+`20260724120000_add_limit_order_deferred_revision_provenance_and_asset_gap`
+closes it, additively. A legacy row and a row written by the current
+revision-aware code are byte-identical, so provenance cannot be re-derived from
+the data; the only durable discriminator is WHEN the row was created relative
+to the moment the revision column started being written. That boundary is read
+from `_prisma_migrations.finished_at` for `20260723230000` and the verdict is
+FROZEN into `limit_order_deferred_candles.revision_state`, which makes every
+later application of the migration a no-op on the same rows.
+
+| `revision_state` | Meaning | Effect |
+| --- | --- | --- |
+| `current` | The tracked revision was OBSERVED on a candle row by revision-aware code. | Trusted; suppresses that revision normally. |
+| `legacy_unknown` | The tracked revision was INFERRED by the backfill. | Reopened: `status='deferred'`, `candle_ingest_seq=NULL`, `attempt_count=1`, `next_retry_at=now`, `last_error_code='LIMIT_ORDER_CANDLE_LEGACY_REVISION_REVIEW'`. Suppresses nothing, so the next sweep re-verifies it against the candle's CURRENT revision. |
+| `legacy_orphan` | Legacy, and the `market_candles` row is already gone. | NOT reopened — retrying it could only fail forever, and accepting it would silently write off an exposure. Stays `permanent`, blocking that asset alone. |
+
+Deliberate choices, in the conservative direction:
+
+- **`first_deferred_at` is PRESERVED** on reactivation, against the instinct to
+  reset it. It is what the asset-scoped health gate measures backlog age from,
+  so resetting it would UNBLOCK the asset for new limit orders while the
+  re-verification it is waiting for has not happened yet. The revision-scoped
+  retry clock lives in `revision_migrated_at` / `next_retry_at`. A successful
+  sweep deletes the row, which is what clears the gate.
+- **`attempt_count` restarts at 1**, the table CHECK floor and the same value
+  the runtime writes on a revision replacement. The exhausted budget belonged
+  to a revision that is no longer the one being examined.
+- **When the boundary cannot be read at all** (no `_prisma_migrations`), every
+  existing row is treated as legacy. Being wrong in the "legacy" direction
+  costs one extra sweep of a candle whose orders are protected by their own
+  status guard; being wrong in the "current" direction loses a fill.
+- **Rows written after the backfill are untouched** — no reclassification, no
+  reset retry budget, no reset age.
+- **Nothing is deleted or re-filled.** An already-executed order cannot fill
+  twice (status guard), and evidence rows stay immutable per
+  `(marketCandleId, candleIngestSeq)`; only a `submitted` order that the NEW
+  revision newly qualifies can fill.
+
+While an asset has any non-`current` entry, its new limit Quote/Create fail
+closed with `LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED` — reported
+ahead of the generic permanent/backlog codes, because the operator action
+differs ("wait for the sweep, or investigate why it cannot settle" rather than
+"the queue is too long"). Once the sweep observes a real revision it writes
+`revision_state='current'` with `revision_verified_at`, and a successful
+re-verification removes the entry entirely.
+
+The same migration adds `gap_reason`, `gap_market_candle_id` and
+`gap_candle_ingest_seq` to `market_candle_finalization_checkpoints`, which is
+what lets the two per-asset retention signals above be recorded there instead
+of on the shared checkpoint.
+
+### Existing-database upgrade procedure
+
+1. `pnpm exec prisma migrate deploy`, then `migrate status` and `migrate diff
+   --from-config-datasource --to-schema prisma/schema.prisma --exit-code`.
+2. Read the migration's `RAISE NOTICE`: it reports how many entries were
+   reactivated for re-verification and how many were parked as legacy orphans.
+3. Inspect what it classified:
+   ```sql
+   SELECT asset_id, status, revision_state, count(*)
+   FROM limit_order_deferred_candles
+   WHERE revision_state <> 'current'
+   GROUP BY 1, 2, 3;
+   ```
+4. Deploy the binary with flags still false.
+5. Start path A / shared readiness and path B. Watch for the reactivated
+   entries to drain: a successful re-verification DELETES the row.
+6. Any `legacy_orphan` that remains is a real, unrecoverable exposure on that
+   asset. Follow the runbook row below before clearing anything.
+7. Only then enable new limit Quote/Create traffic
+   (`LIMIT_ORDER_ENABLED=true`).
+
 Rollback is flag/application rollback only: do not edit or reverse applied
-migrations, and do not delete queue/checkpoint rows.
+migrations, and do not delete queue/checkpoint rows. A rolled-back binary with
+`LIMIT_ORDER_ENABLED=false` still replays already-committed creates (see
+`docs/orders-api-contract.md`), so a rollback never strands a caller's
+committed order.
+
+If the migration itself fails to apply, Prisma marks it failed and blocks
+later migrations. Do NOT edit the file. Fix the underlying cause (the only
+row-level constraint it can hit is
+`limit_order_deferred_candles_window_check`), then
+`prisma migrate resolve --rolled-back <name>` and deploy again; the migration
+is written to be safe to re-apply, and its `revision_migrated_at` guard makes a
+second application a no-op on rows it already handled.
 
 ## Monitoring
 
@@ -681,11 +816,14 @@ migrations, and do not delete queue/checkpoint rows.
 | Path B filling orders that path A should have caught | Check provider connection generation churn, subscription acks, publisher activity and Redis Stream health. Path B is a safety net, not the intended path. |
 | Job stuck `LOCKED` | Another instance holds `limit_order_candle_reconciliation:5m`. Verify the other instance is alive; the lock has a TTL and is renewed while the job runs. |
 | Need to disable urgently | Set `LIMIT_ORDER_CANDLE_RECONCILIATION_ENABLED=false` and restart. Path A keeps running; existing orders keep their `candleMatchingEligibleFrom`, and the checkpoint keeps its position, so re-enabling resumes exactly where it stopped without a backfill. |
-| `LIMIT_ORDER_CANDLE_RECONCILIATION_GAP_DETECTED` | Candles were retention-deleted before the sweep examined them. Identify the affected window from `gap_from_open_time` / `gap_to_open_time` and the still-submitted orders whose `candle_matching_eligible_from` falls inside it, decide explicitly what to do about them, and only THEN clear the alarm: `UPDATE limit_order_reconciliation_checkpoints SET gap_detected_at = NULL, gap_from_open_time = NULL, gap_to_open_time = NULL, degraded_reason = NULL WHERE scope = '5m';`. Clearing it first hides a real exposure. |
+| `LIMIT_ORDER_CANDLE_RECONCILIATION_GAP_DETECTED` | GLOBAL scope: the shared market-time marker itself is behind retention, so the loss cannot be attributed to one asset. (A single asset's loss no longer raises this — see `LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED`.) Candles were retention-deleted before the sweep examined them. Identify the affected window from `gap_from_open_time` / `gap_to_open_time` and the still-submitted orders whose `candle_matching_eligible_from` falls inside it, decide explicitly what to do about them, and only THEN clear the alarm: `UPDATE limit_order_reconciliation_checkpoints SET gap_detected_at = NULL, gap_from_open_time = NULL, gap_to_open_time = NULL, degraded_reason = NULL WHERE scope = '5m';`. Clearing it first hides a real exposure. |
 | Deferred candle parked as `permanent` | Inspect its asset, `candle_ingest_seq`, and error. A genuine candle correction receives a higher `ingest_seq` and reactivates it automatically. If no correction is possible, make an explicit exposure decision before manually rescheduling; never delete the row merely to clear health. |
 | Market-time marker not advancing | Check the deferred queue first (a full retry batch every tick starves nothing, but a large backlog is the usual cause), then whether closed 5m rows are actually being written for the active assets. |
 | `watermarkIngestSeq` not advancing while `observedIngestSeq` climbs | The two-phase guard is holding the position back — the summary reports `ingestCeilingHeld: true`. Look for a long-running WRITE transaction touching `market_candles`: `SELECT pid, xact_start, state, query FROM pg_stat_activity WHERE backend_xid IS NOT NULL ORDER BY xact_start;`. This is the guard working, not a fault; nothing is lost while it holds, only re-scanned. |
-| `candle_retention_passed_unscanned_candle` | A window older than the retention horizon is still unscanned and an activated order could match it. Identify it from `gap_from_open_time`, then follow the same operator procedure as any other gap below. |
+| `candle_retention_passed_unscanned_candle` | A window older than the retention horizon is still unscanned and an activated order could match it. ASSET-scoped: read `gap_from_open_time` / `gap_market_candle_id` from that asset's `market_candle_finalization_checkpoints` row, then follow the asset-gap procedure below. |
+| `LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED` | ONE asset lost candle evidence; every other asset is unaffected and keeps trading. Read `gap_reason`, `gap_from_open_time`, `gap_to_open_time`, `gap_market_candle_id` from `market_candle_finalization_checkpoints` for that asset. Identify the still-`submitted` orders on that asset whose `candle_matching_eligible_from` falls inside the window, decide explicitly what to do about them, and only THEN clear the alarm: `UPDATE market_candle_finalization_checkpoints SET gap_detected_at = NULL, gap_from_open_time = NULL, gap_to_open_time = NULL, gap_reason = NULL, gap_market_candle_id = NULL, gap_candle_ingest_seq = NULL WHERE asset_id = '<id>' AND interval = '5m';`. Clearing it first hides a real exposure. |
+| `LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED` | The provenance migration reopened this asset's queue entries because their tracked candle revision was inferred, not observed. Normally self-clearing: the next sweep re-verifies against the current revision and deletes the entry. If it persists, inspect `revision_state`, `revision_migrated_at` and `last_error_message` — a `legacy_orphan` cannot self-clear (its candle row is gone) and needs the exposure decision below. Never flip `revision_state` to `current` by hand to silence the gate. |
+| Deferred entry stuck as `legacy_orphan` | Its candle row was retention-removed before the safety net could examine it, so which revision it covered is unknowable. Identify the still-`submitted` orders on that asset whose `candle_matching_eligible_from` covers `open_time`, make an explicit exposure decision, and only then remove the entry. Do not delete it merely to reopen the asset. |
 | `market_candles.ingest_seq` NULL on a row | The `market_candles_ingest_seq` trigger is missing — check the migration applied and the trigger exists (`\dS+ market_candles`). The sweep skips NULL rows, so this is a silent coverage hole until fixed. |
 
 ## Verification
@@ -712,9 +850,35 @@ migrations, and do not delete queue/checkpoint rows.
   replacement, lower-revision no-op, completion failure/recovery, missing
   asset checkpoint, asset isolation, and emergency global backlog. Elapsed
   time is simulated by ageing stored observations rather than by sleeping.
+  Both per-asset retention signals are asserted at ASSET scope: a deferred
+  entry whose row vanished and an unscanned matchable candle each gap only
+  their own asset, every affected asset is recorded in one pass rather than one
+  at a time, the shared checkpoint stays clean, and an unaffected asset keeps
+  being quoted, created and FILLED throughout.
+- `limit-order-legacy-deferred-migration.integration.spec.ts`
+  (`LIMIT_ORDER_LEGACY_DEFERRED_MIGRATION_INTEGRATION=1`, needs a disposable
+  PostgreSQL SERVER) — the EXISTING-DATABASE UPGRADE, which a fully-migrated
+  database structurally cannot express. It creates its own scratch database
+  and deploys migrations in three stages, so the pre-fix state is reproduced
+  rather than simulated: it first asserts the DEFECT (a permanent entry stamped
+  with a revision it never processed, unreachable by both the scan and the
+  retry loop), then that the provenance migration reopens it, parks an
+  unrecoverable orphan, leaves a revision-aware entry untouched, is a no-op on
+  re-application, and finally drives the REAL sweep to prove the corrected
+  revision is processed, the newly-qualifying order fills once at the LIMIT
+  price, and the already-executed order is untouched.
+- `limit-order-candle-retention-gap.spec.ts` — the blast-radius classification
+  in isolation: which signal is global, which is per-asset, that every affected
+  asset is reported, and that a per-asset finding never becomes a global one.
+- `limit-order-deferred-revision-provenance.spec.ts` — the runtime half of the
+  provenance rules: a reopened entry whose candle then disappears becomes a
+  `legacy_orphan` rather than silently returning to trusted, and a `current`
+  entry's provenance is left alone.
 - `limit-order-candle-reconciliation-health.spec.ts` — every gate code, the
-  quiet-market and disabled-deployment non-blocking cases, and the 503
-  envelope.
+  quiet-market and disabled-deployment non-blocking cases, the 503 envelope,
+  the asset-scoped gap reason preference (sticky `gapReason` over the
+  supervisor's rewritten `degradedReason`), and the legacy-review code being
+  named ahead of the generic permanent/backlog codes.
 - `pnpm run smoke:limit-order-candle-fixture` — path-B eligibility against rows
   written through the canonical `MarketCandlesRepository` upsert path, with no
   provider credentials.
@@ -731,6 +895,13 @@ migrations, and do not delete queue/checkpoint rows.
 - path B recovers nothing if the 5-minute candle itself was never produced;
 - a retention gap cannot be repaired, only detected: the alarm is sticky and
   requires an explicit operator decision about the affected orders;
+- a queue entry classified `legacy_orphan` cannot be re-verified at all — its
+  candle row is gone, so which revision it covered is unknowable. It blocks its
+  own asset until an operator makes the exposure decision;
+- per-asset gap recording is bounded per sweep
+  (`LIMIT_ORDER_CANDLE_ASSET_GAP_BATCH_SIZE`); a mass-retention event records
+  the remaining assets on later sweeps, and the truncation is logged rather
+  than silently dropped;
 - path B does not reconstruct intra-candle ordering, so simultaneous touches
   across many orders all fill at their own limit prices;
 - no user-specific order WebSocket; the client polls conditionally.

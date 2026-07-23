@@ -312,6 +312,13 @@ export function getErrorMessageFromCode(
     // before new limit registration can resume for it.
     case ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_PERMANENT_FAILURE:
       return '이 종목의 시세 데이터 복구가 필요합니다. 이 종목의 신규 지정가 등록만 잠시 제한되며, 기존 주문과 다른 종목은 정상 이용 가능합니다.';
+    // Asset-scoped and self-clearing: the safety net is re-checking past price
+    // data for this asset. Distinct copy from the permanent case above because
+    // the user's action differs — waiting is enough here. Internal vocabulary
+    // (revision, ingest sequence, migration, checkpoint) never reaches the
+    // user.
+    case ERROR_CODE.LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED:
+      return '이 종목의 과거 시세 데이터를 확인하는 중입니다. 잠시 후 다시 시도해주세요. 기존 주문과 다른 종목은 정상 이용 가능합니다.';
     case ERROR_CODE.ORDER_CANCEL_NOT_SUPPORTED:
       return '시장가 주문은 취소할 수 없습니다.';
     case ERROR_CODE.ORDER_TYPE_NOT_SUPPORTED:

@@ -1249,6 +1249,19 @@ model MarketCandleFinalizationCheckpoint {
   gapDetectedAt             DateTime? @map("gap_detected_at") @db.Timestamptz(3)
   gapFromOpenTime           DateTime? @map("gap_from_open_time") @db.Timestamptz(3)
   gapToOpenTime             DateTime? @map("gap_to_open_time") @db.Timestamptz(3)
+  // Why the gap was raised. Separate from `degradedReason`, which the
+  // completion supervisor rewrites on every pass with its current stop reason:
+  // a sticky, operator-owned alarm needs a field the sweep never overwrites.
+  // Also carries the retention findings the path-B sweep used to record
+  // GLOBALLY (a deferred entry whose candle row disappeared, an unscanned
+  // matchable candle past the retention horizon) — both name exactly one
+  // asset, so both belong here rather than on the shared checkpoint.
+  gapReason                 String?   @map("gap_reason")
+  // The candle the finding was observed on, when there is one. A
+  // window-completion gap has no row by definition; a deferred-entry gap
+  // still identifies the id whose row retention removed.
+  gapMarketCandleId         String?   @map("gap_market_candle_id")
+  gapCandleIngestSeq        BigInt?   @map("gap_candle_ingest_seq")
   // Audit counters: windows certified WITHOUT a candle row.
   noTradeWindowCount        Int       @default(0) @map("no_trade_window_count")
   outsideSessionWindowCount Int       @default(0) @map("outside_session_window_count")
@@ -1345,35 +1358,60 @@ model LimitOrderReconciliationCheckpoint {
 // retention removes must be detectable as a gap, and an FK would instead make
 // the retention job fail.
 model LimitOrderDeferredCandle {
-  marketCandleId   String   @id @map("market_candle_id")
+  marketCandleId     String    @id @map("market_candle_id")
   // Storage revision (MarketCandle.ingestSeq) this queue entry tracks. A
   // correction re-sequences the candle; a deferred (even PERMANENT) entry for
   // a lower revision never suppresses the new revision: the forward scan
   // re-surfaces the candle and the entry is atomically re-pointed at the new
   // revision (status reactivated, attempt budget reset).
   //
-  // NULLABLE by necessity, not by design: rows enqueued before this column
-  // existed cannot have their enqueue-time revision reconstructed, and rows
-  // whose market_candles row retention already removed have no current
-  // revision to adopt. Backfill stamps every row whose candle still exists;
-  // a NULL revision is treated as "unknown = lowest", so any concrete
-  // revision replaces it. New writes always carry the revision.
-  candleIngestSeq  BigInt?  @map("candle_ingest_seq")
-  assetId          String   @map("asset_id")
-  interval         String
-  openTime         DateTime @map("open_time") @db.Timestamptz(3)
-  closeTime        DateTime @map("close_time") @db.Timestamptz(3)
+  // NULLABLE by necessity, not by design. A NULL revision is read as
+  // "unknown = lowest", so it suppresses nothing and any concrete revision
+  // replaces it. Three ways a row can hold NULL:
+  //   * it was enqueued before this column existed and its candle row is
+  //     already gone, so no revision can be adopted;
+  //   * the provenance migration RESET it (see `revisionState` below) because
+  //     the revision it carried was inferred by backfill rather than observed;
+  //   * the candle row disappeared while the entry sat in the queue.
+  // New writes from the sweep always carry the revision they observed.
+  candleIngestSeq    BigInt?   @map("candle_ingest_seq")
+  // PROVENANCE of `candleIngestSeq`, because the value alone cannot say
+  // whether it was OBSERVED or INFERRED:
+  //
+  //   'current'        written by revision-aware code from the candle row it
+  //                    actually loaded. Trusted; suppresses that revision.
+  //   'legacy_unknown' the entry predates the revision column, so the backfill
+  //                    stamped it with whatever revision the candle happened
+  //                    to have at migration time. A PERMANENT entry stamped
+  //                    that way blocked the correction it was stamped with
+  //                    from both directions — the forward scan excluded it
+  //                    (tracked >= current) and the retry loop skipped it
+  //                    (permanent). Reactivated for re-verification with a
+  //                    NULL revision so it suppresses nothing.
+  //   'legacy_orphan'  legacy AND the market_candles row is already gone. Not
+  //                    re-verifiable; parked as permanent, which the
+  //                    ASSET-scoped gate turns into a block on that asset
+  //                    alone.
+  revisionState      String    @default("current") @map("revision_state")
+  // When the provenance migration reclassified this row; NULL if untouched.
+  revisionMigratedAt DateTime? @map("revision_migrated_at") @db.Timestamptz(3)
+  // When the runtime last wrote a revision it OBSERVED on the candle.
+  revisionVerifiedAt DateTime? @map("revision_verified_at") @db.Timestamptz(3)
+  assetId            String    @map("asset_id")
+  interval           String
+  openTime           DateTime  @map("open_time") @db.Timestamptz(3)
+  closeTime          DateTime  @map("close_time") @db.Timestamptz(3)
   // 'deferred' — still retryable; 'permanent' — retry budget exhausted or the
   // candle row is gone. Both keep blocking-worthy backlog visible to the gate.
-  status           String   @default("deferred")
-  firstDeferredAt  DateTime @map("first_deferred_at") @db.Timestamptz(3)
-  lastDeferredAt   DateTime @map("last_deferred_at") @db.Timestamptz(3)
-  attemptCount     Int      @default(1) @map("attempt_count")
-  lastErrorCode    String?  @map("last_error_code")
-  lastErrorMessage String?  @map("last_error_message")
-  nextRetryAt      DateTime @map("next_retry_at") @db.Timestamptz(3)
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  status             String    @default("deferred")
+  firstDeferredAt    DateTime  @map("first_deferred_at") @db.Timestamptz(3)
+  lastDeferredAt     DateTime  @map("last_deferred_at") @db.Timestamptz(3)
+  attemptCount       Int       @default(1) @map("attempt_count")
+  lastErrorCode      String?   @map("last_error_code")
+  lastErrorMessage   String?   @map("last_error_message")
+  nextRetryAt        DateTime  @map("next_retry_at") @db.Timestamptz(3)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([status, nextRetryAt])
   @@index([status, firstDeferredAt])

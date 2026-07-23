@@ -355,6 +355,7 @@ test('new limit-order error codes map to dedicated user messages by CODE', () =>
     ERROR_CODE.LIMIT_ORDER_CANDLE_FINALIZER_STALE,
     ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_BACKLOG_EXCEEDED,
     ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_PERMANENT_FAILURE,
+    ERROR_CODE.LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED,
   ]) {
     const message = getErrorMessageFromCode(code);
     assert.notEqual(message, generic, `expected dedicated message for ${code}`);
@@ -375,6 +376,7 @@ test('proof and asset-scoped messages never leak internal vocabulary', () => {
     ERROR_CODE.LIMIT_ORDER_CANDLE_FINALIZER_STALE,
     ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_BACKLOG_EXCEEDED,
     ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_PERMANENT_FAILURE,
+    ERROR_CODE.LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED,
   ]) {
     const message = getErrorMessageFromCode(code);
     for (const forbidden of [
@@ -386,6 +388,11 @@ test('proof and asset-scoped messages never leak internal vocabulary', () => {
       'generation',
       'watermark',
       'lease',
+      // Path-B revision/backfill vocabulary is an operator concept too.
+      'migration',
+      'revision',
+      'ingest',
+      'backfill',
     ]) {
       assert.ok(
         !message.toLowerCase().includes(forbidden.toLowerCase()),
@@ -401,6 +408,7 @@ test('asset-scoped safety-net messages say only this asset is affected', () => {
     ERROR_CODE.LIMIT_ORDER_CANDLE_FINALIZER_STALE,
     ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_BACKLOG_EXCEEDED,
     ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_PERMANENT_FAILURE,
+    ERROR_CODE.LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED,
   ]) {
     const message = getErrorMessageFromCode(code);
     assert.ok(
