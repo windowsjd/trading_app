@@ -28,12 +28,18 @@ export const LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES = {
   backlogExceeded: 'LIMIT_ORDER_CANDLE_RECONCILIATION_BACKLOG_EXCEEDED',
   gapDetected: 'LIMIT_ORDER_CANDLE_RECONCILIATION_GAP_DETECTED',
   reservationMismatch: 'LIMIT_ORDER_CANDLE_RESERVATION_MISMATCH',
+  // WINDOW-COMPLETION heartbeat, separate from the row-scan heartbeat above:
+  // the missing-window supervisor has never succeeded / stopped succeeding.
+  // Global by nature — the pass covers every asset with activated orders.
+  completionUnavailable: 'LIMIT_ORDER_CANDLE_COMPLETION_UNAVAILABLE',
+  completionStale: 'LIMIT_ORDER_CANDLE_COMPLETION_STALE',
   // Asset-scoped codes: the failure names ONE asset's safety net, so only
   // that asset's new quotes/creates are refused. Everything else — other
   // assets, cancel, cleanup, market orders, FX — keeps flowing.
   assetGapDetected: 'LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED',
   assetFinalizerStale: 'LIMIT_ORDER_CANDLE_FINALIZER_STALE',
   assetBacklogExceeded: 'LIMIT_ORDER_CANDLE_ASSET_BACKLOG_EXCEEDED',
+  assetPermanentFailure: 'LIMIT_ORDER_CANDLE_ASSET_PERMANENT_FAILURE',
 } as const;
 
 @Injectable()
@@ -110,9 +116,10 @@ export class LimitOrderCandleReconciliationHealthService {
       };
     }
 
-    // Runner liveness. `lastSuccessfulRunAt` is written on every completed
-    // sweep, including one that legitimately found nothing to do, so a quiet
-    // market never trips this — only a scheduler that stopped ticking does.
+    // ROW-SCAN runner liveness. `lastSuccessfulRunAt` is written on every
+    // completed sweep, including one that legitimately found nothing to do,
+    // so a quiet market never trips this — only a scheduler that stopped
+    // ticking does.
     const heartbeat = checkpoint.lastSuccessfulRunAt;
     if (!heartbeat) {
       return {
@@ -129,6 +136,31 @@ export class LimitOrderCandleReconciliationHealthService {
       };
     }
 
+    // WINDOW-COMPLETION liveness, checked SEPARATELY: the missing-window
+    // supervisor records its own heartbeat, and a pass that keeps failing
+    // must block new orders even while the row scan above stays perfectly
+    // healthy. `lastWindowCompletionRunAt` doubles as the wiring signal — a
+    // deployment that has never even started a completion pass while the row
+    // scan is alive means the supervisor is not running, which is exactly
+    // the "safety net is blind to absent rows" condition.
+    const completionHeartbeat = checkpoint.lastWindowCompletionSuccessfulAt;
+    if (!completionHeartbeat) {
+      return {
+        code: LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.completionUnavailable,
+        reason:
+          'The limit-order window completion pass has never completed successfully.',
+      };
+    }
+    const completionAge = now.getTime() - completionHeartbeat.getTime();
+    if (completionAge > this.config.completionHealthMaxAgeMs) {
+      return {
+        code: LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.completionStale,
+        reason: `The window completion pass last succeeded ${completionAge}ms ago (${
+          checkpoint.windowCompletionErrorCode ?? 'no recorded error'
+        }, ${checkpoint.windowCompletionConsecutiveFailures} consecutive failure(s)), above the ${this.config.completionHealthMaxAgeMs}ms limit.`,
+      };
+    }
+
     // A degraded reason that is not a gap (permanently parked work, a
     // repeatedly failing dependency) still means the safety net is not whole.
     if (checkpoint.degradedReason) {
@@ -138,29 +170,18 @@ export class LimitOrderCandleReconciliationHealthService {
       };
     }
 
+    // EMERGENCY GLOBAL tier only. Per-asset failures (a permanent entry, an
+    // over-age deferral, a per-asset backlog) are contained by the
+    // asset-scoped gate below and deliberately do NOT appear here: one
+    // asset's stuck candle must not block every other asset's new orders.
+    // What remains global is total queue size threatening system capacity.
     const backlog = await this.checkpoints.readBacklog();
     const total = backlog.openCount + backlog.permanentCount;
     if (total > this.config.maxDeferredBacklog) {
       return {
         code: LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.backlogExceeded,
-        reason: `Candle reconciliation has ${total} deferred candle(s), above the ${this.config.maxDeferredBacklog} limit.`,
+        reason: `Candle reconciliation has ${total} deferred/permanent candle(s) across all assets, above the emergency ${this.config.maxDeferredBacklog} limit.`,
       };
-    }
-    if (backlog.permanentCount > 0) {
-      return {
-        code: LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.backlogExceeded,
-        reason: `Candle reconciliation has ${backlog.permanentCount} candle(s) parked as permanently unprocessable.`,
-      };
-    }
-    if (backlog.oldestFirstDeferredAt) {
-      const deferredAge =
-        now.getTime() - backlog.oldestFirstDeferredAt.getTime();
-      if (deferredAge > this.config.maxDeferredAgeMs) {
-        return {
-          code: LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.backlogExceeded,
-          reason: `The oldest deferred candle has been unprocessed for ${deferredAge}ms, above the ${this.config.maxDeferredAgeMs}ms limit.`,
-        };
-      }
     }
 
     return null;
@@ -168,13 +189,15 @@ export class LimitOrderCandleReconciliationHealthService {
 
   /**
    * Asset-scoped verdict from the window-completion checkpoint plus the
-   * asset's own deferred rows.
+   * asset's own deferred/permanent queue entries.
    *
-   * A MISSING checkpoint passes: checkpoints exist only for assets with
-   * activated path-B orders, and a first order on a fresh asset owes nothing
-   * to any window that closed before its creation — eligibility is rounded UP
-   * at create time. The checkpoint appears with the first sweep after the
-   * order exists.
+   * A MISSING checkpoint passes ONLY while the asset has no activated path-B
+   * order: nothing is owed to any window that closed before the first order
+   * (eligibility is rounded UP at create time). With a submitted path-B order
+   * present, an absent checkpoint means the completion supervisor has never
+   * accounted for this asset — fail closed. Create bootstraps the checkpoint
+   * inside the create transaction, so in the steady state this only trips on
+   * pre-bootstrap legacy orders or an operator-deleted checkpoint.
    */
   private async evaluateAsset(
     assetId: string,
@@ -201,14 +224,42 @@ export class LimitOrderCandleReconciliationHealthService {
           };
         }
       }
+    } else if (await this.checkpoints.hasSubmittedPathBOrder(assetId)) {
+      return {
+        code: LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.completionUnavailable,
+        reason:
+          'This asset has an activated path-B order but no window-completion checkpoint; the safety net has never accounted for it.',
+      };
     }
 
-    const deferred = await this.checkpoints.countAssetDeferred(assetId);
-    if (deferred > this.config.maxAssetDeferredBacklog) {
+    const backlog = await this.checkpoints.readAssetBacklog(assetId);
+    // A permanent entry is an unresolved financial exposure on THIS asset: a
+    // window whose fill decision could not be made and will not be retried.
+    // It blocks this asset's new orders until an operator (or a candle
+    // correction, which reactivates the entry) settles it — and ONLY this
+    // asset's: the global gate deliberately no longer reacts to it.
+    if (backlog.permanentCount > 0) {
+      return {
+        code: LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.assetPermanentFailure,
+        reason: `This asset has ${backlog.permanentCount} candle(s) parked as permanently unprocessable (oldest since ${
+          backlog.oldestPermanentAt?.toISOString() ?? 'unknown'
+        }).`,
+      };
+    }
+    if (backlog.deferredCount > this.config.maxAssetDeferredBacklog) {
       return {
         code: LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.assetBacklogExceeded,
-        reason: `This asset has ${deferred} deferred candle(s), above the ${this.config.maxAssetDeferredBacklog} limit.`,
+        reason: `This asset has ${backlog.deferredCount} deferred candle(s), above the ${this.config.maxAssetDeferredBacklog} limit.`,
       };
+    }
+    if (backlog.oldestDeferredAt) {
+      const deferredAge = now.getTime() - backlog.oldestDeferredAt.getTime();
+      if (deferredAge > this.config.maxDeferredAgeMs) {
+        return {
+          code: LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.assetBacklogExceeded,
+          reason: `This asset's oldest deferred candle has been unprocessed for ${deferredAge}ms, above the ${this.config.maxDeferredAgeMs}ms limit.`,
+        };
+      }
     }
     return null;
   }

@@ -27,15 +27,18 @@ export type AggregateLimitOrderDeferredCandle = {
 }
 
 export type LimitOrderDeferredCandleAvgAggregateOutputType = {
+  candleIngestSeq: number | null
   attemptCount: number | null
 }
 
 export type LimitOrderDeferredCandleSumAggregateOutputType = {
+  candleIngestSeq: bigint | null
   attemptCount: number | null
 }
 
 export type LimitOrderDeferredCandleMinAggregateOutputType = {
   marketCandleId: string | null
+  candleIngestSeq: bigint | null
   assetId: string | null
   interval: string | null
   openTime: Date | null
@@ -53,6 +56,7 @@ export type LimitOrderDeferredCandleMinAggregateOutputType = {
 
 export type LimitOrderDeferredCandleMaxAggregateOutputType = {
   marketCandleId: string | null
+  candleIngestSeq: bigint | null
   assetId: string | null
   interval: string | null
   openTime: Date | null
@@ -70,6 +74,7 @@ export type LimitOrderDeferredCandleMaxAggregateOutputType = {
 
 export type LimitOrderDeferredCandleCountAggregateOutputType = {
   marketCandleId: number
+  candleIngestSeq: number
   assetId: number
   interval: number
   openTime: number
@@ -88,15 +93,18 @@ export type LimitOrderDeferredCandleCountAggregateOutputType = {
 
 
 export type LimitOrderDeferredCandleAvgAggregateInputType = {
+  candleIngestSeq?: true
   attemptCount?: true
 }
 
 export type LimitOrderDeferredCandleSumAggregateInputType = {
+  candleIngestSeq?: true
   attemptCount?: true
 }
 
 export type LimitOrderDeferredCandleMinAggregateInputType = {
   marketCandleId?: true
+  candleIngestSeq?: true
   assetId?: true
   interval?: true
   openTime?: true
@@ -114,6 +122,7 @@ export type LimitOrderDeferredCandleMinAggregateInputType = {
 
 export type LimitOrderDeferredCandleMaxAggregateInputType = {
   marketCandleId?: true
+  candleIngestSeq?: true
   assetId?: true
   interval?: true
   openTime?: true
@@ -131,6 +140,7 @@ export type LimitOrderDeferredCandleMaxAggregateInputType = {
 
 export type LimitOrderDeferredCandleCountAggregateInputType = {
   marketCandleId?: true
+  candleIngestSeq?: true
   assetId?: true
   interval?: true
   openTime?: true
@@ -235,6 +245,7 @@ export type LimitOrderDeferredCandleGroupByArgs<ExtArgs extends runtime.Types.Ex
 
 export type LimitOrderDeferredCandleGroupByOutputType = {
   marketCandleId: string
+  candleIngestSeq: bigint | null
   assetId: string
   interval: string
   openTime: Date
@@ -275,6 +286,7 @@ export type LimitOrderDeferredCandleWhereInput = {
   OR?: Prisma.LimitOrderDeferredCandleWhereInput[]
   NOT?: Prisma.LimitOrderDeferredCandleWhereInput | Prisma.LimitOrderDeferredCandleWhereInput[]
   marketCandleId?: Prisma.StringFilter<"LimitOrderDeferredCandle"> | string
+  candleIngestSeq?: Prisma.BigIntNullableFilter<"LimitOrderDeferredCandle"> | bigint | number | null
   assetId?: Prisma.StringFilter<"LimitOrderDeferredCandle"> | string
   interval?: Prisma.StringFilter<"LimitOrderDeferredCandle"> | string
   openTime?: Prisma.DateTimeFilter<"LimitOrderDeferredCandle"> | Date | string
@@ -292,6 +304,7 @@ export type LimitOrderDeferredCandleWhereInput = {
 
 export type LimitOrderDeferredCandleOrderByWithRelationInput = {
   marketCandleId?: Prisma.SortOrder
+  candleIngestSeq?: Prisma.SortOrderInput | Prisma.SortOrder
   assetId?: Prisma.SortOrder
   interval?: Prisma.SortOrder
   openTime?: Prisma.SortOrder
@@ -312,6 +325,7 @@ export type LimitOrderDeferredCandleWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.LimitOrderDeferredCandleWhereInput | Prisma.LimitOrderDeferredCandleWhereInput[]
   OR?: Prisma.LimitOrderDeferredCandleWhereInput[]
   NOT?: Prisma.LimitOrderDeferredCandleWhereInput | Prisma.LimitOrderDeferredCandleWhereInput[]
+  candleIngestSeq?: Prisma.BigIntNullableFilter<"LimitOrderDeferredCandle"> | bigint | number | null
   assetId?: Prisma.StringFilter<"LimitOrderDeferredCandle"> | string
   interval?: Prisma.StringFilter<"LimitOrderDeferredCandle"> | string
   openTime?: Prisma.DateTimeFilter<"LimitOrderDeferredCandle"> | Date | string
@@ -329,6 +343,7 @@ export type LimitOrderDeferredCandleWhereUniqueInput = Prisma.AtLeast<{
 
 export type LimitOrderDeferredCandleOrderByWithAggregationInput = {
   marketCandleId?: Prisma.SortOrder
+  candleIngestSeq?: Prisma.SortOrderInput | Prisma.SortOrder
   assetId?: Prisma.SortOrder
   interval?: Prisma.SortOrder
   openTime?: Prisma.SortOrder
@@ -354,6 +369,7 @@ export type LimitOrderDeferredCandleScalarWhereWithAggregatesInput = {
   OR?: Prisma.LimitOrderDeferredCandleScalarWhereWithAggregatesInput[]
   NOT?: Prisma.LimitOrderDeferredCandleScalarWhereWithAggregatesInput | Prisma.LimitOrderDeferredCandleScalarWhereWithAggregatesInput[]
   marketCandleId?: Prisma.StringWithAggregatesFilter<"LimitOrderDeferredCandle"> | string
+  candleIngestSeq?: Prisma.BigIntNullableWithAggregatesFilter<"LimitOrderDeferredCandle"> | bigint | number | null
   assetId?: Prisma.StringWithAggregatesFilter<"LimitOrderDeferredCandle"> | string
   interval?: Prisma.StringWithAggregatesFilter<"LimitOrderDeferredCandle"> | string
   openTime?: Prisma.DateTimeWithAggregatesFilter<"LimitOrderDeferredCandle"> | Date | string
@@ -371,6 +387,7 @@ export type LimitOrderDeferredCandleScalarWhereWithAggregatesInput = {
 
 export type LimitOrderDeferredCandleCreateInput = {
   marketCandleId: string
+  candleIngestSeq?: bigint | number | null
   assetId: string
   interval: string
   openTime: Date | string
@@ -388,6 +405,7 @@ export type LimitOrderDeferredCandleCreateInput = {
 
 export type LimitOrderDeferredCandleUncheckedCreateInput = {
   marketCandleId: string
+  candleIngestSeq?: bigint | number | null
   assetId: string
   interval: string
   openTime: Date | string
@@ -405,6 +423,7 @@ export type LimitOrderDeferredCandleUncheckedCreateInput = {
 
 export type LimitOrderDeferredCandleUpdateInput = {
   marketCandleId?: Prisma.StringFieldUpdateOperationsInput | string
+  candleIngestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   interval?: Prisma.StringFieldUpdateOperationsInput | string
   openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -422,6 +441,7 @@ export type LimitOrderDeferredCandleUpdateInput = {
 
 export type LimitOrderDeferredCandleUncheckedUpdateInput = {
   marketCandleId?: Prisma.StringFieldUpdateOperationsInput | string
+  candleIngestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   interval?: Prisma.StringFieldUpdateOperationsInput | string
   openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -439,6 +459,7 @@ export type LimitOrderDeferredCandleUncheckedUpdateInput = {
 
 export type LimitOrderDeferredCandleCreateManyInput = {
   marketCandleId: string
+  candleIngestSeq?: bigint | number | null
   assetId: string
   interval: string
   openTime: Date | string
@@ -456,6 +477,7 @@ export type LimitOrderDeferredCandleCreateManyInput = {
 
 export type LimitOrderDeferredCandleUpdateManyMutationInput = {
   marketCandleId?: Prisma.StringFieldUpdateOperationsInput | string
+  candleIngestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   interval?: Prisma.StringFieldUpdateOperationsInput | string
   openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -473,6 +495,7 @@ export type LimitOrderDeferredCandleUpdateManyMutationInput = {
 
 export type LimitOrderDeferredCandleUncheckedUpdateManyInput = {
   marketCandleId?: Prisma.StringFieldUpdateOperationsInput | string
+  candleIngestSeq?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   interval?: Prisma.StringFieldUpdateOperationsInput | string
   openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -490,6 +513,7 @@ export type LimitOrderDeferredCandleUncheckedUpdateManyInput = {
 
 export type LimitOrderDeferredCandleCountOrderByAggregateInput = {
   marketCandleId?: Prisma.SortOrder
+  candleIngestSeq?: Prisma.SortOrder
   assetId?: Prisma.SortOrder
   interval?: Prisma.SortOrder
   openTime?: Prisma.SortOrder
@@ -506,11 +530,13 @@ export type LimitOrderDeferredCandleCountOrderByAggregateInput = {
 }
 
 export type LimitOrderDeferredCandleAvgOrderByAggregateInput = {
+  candleIngestSeq?: Prisma.SortOrder
   attemptCount?: Prisma.SortOrder
 }
 
 export type LimitOrderDeferredCandleMaxOrderByAggregateInput = {
   marketCandleId?: Prisma.SortOrder
+  candleIngestSeq?: Prisma.SortOrder
   assetId?: Prisma.SortOrder
   interval?: Prisma.SortOrder
   openTime?: Prisma.SortOrder
@@ -528,6 +554,7 @@ export type LimitOrderDeferredCandleMaxOrderByAggregateInput = {
 
 export type LimitOrderDeferredCandleMinOrderByAggregateInput = {
   marketCandleId?: Prisma.SortOrder
+  candleIngestSeq?: Prisma.SortOrder
   assetId?: Prisma.SortOrder
   interval?: Prisma.SortOrder
   openTime?: Prisma.SortOrder
@@ -544,6 +571,7 @@ export type LimitOrderDeferredCandleMinOrderByAggregateInput = {
 }
 
 export type LimitOrderDeferredCandleSumOrderByAggregateInput = {
+  candleIngestSeq?: Prisma.SortOrder
   attemptCount?: Prisma.SortOrder
 }
 
@@ -551,6 +579,7 @@ export type LimitOrderDeferredCandleSumOrderByAggregateInput = {
 
 export type LimitOrderDeferredCandleSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   marketCandleId?: boolean
+  candleIngestSeq?: boolean
   assetId?: boolean
   interval?: boolean
   openTime?: boolean
@@ -568,6 +597,7 @@ export type LimitOrderDeferredCandleSelect<ExtArgs extends runtime.Types.Extensi
 
 export type LimitOrderDeferredCandleSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   marketCandleId?: boolean
+  candleIngestSeq?: boolean
   assetId?: boolean
   interval?: boolean
   openTime?: boolean
@@ -585,6 +615,7 @@ export type LimitOrderDeferredCandleSelectCreateManyAndReturn<ExtArgs extends ru
 
 export type LimitOrderDeferredCandleSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   marketCandleId?: boolean
+  candleIngestSeq?: boolean
   assetId?: boolean
   interval?: boolean
   openTime?: boolean
@@ -602,6 +633,7 @@ export type LimitOrderDeferredCandleSelectUpdateManyAndReturn<ExtArgs extends ru
 
 export type LimitOrderDeferredCandleSelectScalar = {
   marketCandleId?: boolean
+  candleIngestSeq?: boolean
   assetId?: boolean
   interval?: boolean
   openTime?: boolean
@@ -617,13 +649,14 @@ export type LimitOrderDeferredCandleSelectScalar = {
   updatedAt?: boolean
 }
 
-export type LimitOrderDeferredCandleOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"marketCandleId" | "assetId" | "interval" | "openTime" | "closeTime" | "status" | "firstDeferredAt" | "lastDeferredAt" | "attemptCount" | "lastErrorCode" | "lastErrorMessage" | "nextRetryAt" | "createdAt" | "updatedAt", ExtArgs["result"]["limitOrderDeferredCandle"]>
+export type LimitOrderDeferredCandleOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"marketCandleId" | "candleIngestSeq" | "assetId" | "interval" | "openTime" | "closeTime" | "status" | "firstDeferredAt" | "lastDeferredAt" | "attemptCount" | "lastErrorCode" | "lastErrorMessage" | "nextRetryAt" | "createdAt" | "updatedAt", ExtArgs["result"]["limitOrderDeferredCandle"]>
 
 export type $LimitOrderDeferredCandlePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "LimitOrderDeferredCandle"
   objects: {}
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     marketCandleId: string
+    candleIngestSeq: bigint | null
     assetId: string
     interval: string
     openTime: Date
@@ -1061,6 +1094,7 @@ export interface Prisma__LimitOrderDeferredCandleClient<T, Null = never, ExtArgs
  */
 export interface LimitOrderDeferredCandleFieldRefs {
   readonly marketCandleId: Prisma.FieldRef<"LimitOrderDeferredCandle", 'String'>
+  readonly candleIngestSeq: Prisma.FieldRef<"LimitOrderDeferredCandle", 'BigInt'>
   readonly assetId: Prisma.FieldRef<"LimitOrderDeferredCandle", 'String'>
   readonly interval: Prisma.FieldRef<"LimitOrderDeferredCandle", 'String'>
   readonly openTime: Prisma.FieldRef<"LimitOrderDeferredCandle", 'DateTime'>

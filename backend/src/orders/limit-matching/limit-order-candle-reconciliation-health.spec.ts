@@ -5,6 +5,9 @@
 jest.mock('../../generated/prisma/client', () => ({
   PrismaClient: class PrismaClient {},
   Prisma: {},
+  OrderSide: { buy: 'buy', sell: 'sell' },
+  OrderStatus: { submitted: 'submitted', executed: 'executed' },
+  OrderType: { limit: 'limit', market: 'market' },
 }));
 
 import { HttpException } from '@nestjs/common';
@@ -13,6 +16,7 @@ import {
   LimitOrderCandleReconciliationHealthService,
 } from './limit-order-candle-reconciliation-health.service';
 import type {
+  AssetDeferredBacklog,
   DeferredBacklog,
   ReconciliationCheckpoint,
 } from './limit-order-reconciliation-checkpoint.repository';
@@ -41,6 +45,11 @@ function checkpoint(
     lastScannedCloseTime: null,
     lastRunAt: NOW,
     lastSuccessfulRunAt: NOW,
+    lastWindowCompletionRunAt: NOW,
+    lastWindowCompletionSuccessfulAt: NOW,
+    windowCompletionErrorCode: null,
+    windowCompletionErrorMessage: null,
+    windowCompletionConsecutiveFailures: 0,
     degradedReason: null,
     gapDetectedAt: null,
     gapFromOpenTime: null,
@@ -60,9 +69,32 @@ function backlog(overrides: Partial<DeferredBacklog> = {}): DeferredBacklog {
   };
 }
 
+function assetBacklog(
+  overrides: Partial<AssetDeferredBacklog> = {},
+): AssetDeferredBacklog {
+  return {
+    deferredCount: 0,
+    permanentCount: 0,
+    oldestDeferredAt: null,
+    oldestPermanentAt: null,
+    ...overrides,
+  };
+}
+
+type WindowCompletionRow = {
+  pendingWindowOpenTime: Date | null;
+  pendingSince: Date | null;
+  lastErrorCode: string | null;
+  degradedReason: string | null;
+  gapDetectedAt: Date | null;
+} | null;
+
 function service(input: {
   checkpoint?: ReconciliationCheckpoint | null;
   backlog?: DeferredBacklog;
+  assetBacklogs?: Record<string, AssetDeferredBacklog>;
+  windowCompletions?: Record<string, WindowCompletionRow>;
+  submittedPathBAssets?: string[];
   env?: NodeJS.ProcessEnv;
 }) {
   const previous = { ...process.env };
@@ -78,6 +110,14 @@ function service(input: {
           input.checkpoint === undefined ? checkpoint() : input.checkpoint,
         ),
       readBacklog: () => Promise.resolve(input.backlog ?? backlog()),
+      readAssetBacklog: (assetId: string) =>
+        Promise.resolve(input.assetBacklogs?.[assetId] ?? assetBacklog()),
+      findWindowCompletion: (assetId: string) =>
+        Promise.resolve(input.windowCompletions?.[assetId] ?? null),
+      hasSubmittedPathBOrder: (assetId: string) =>
+        Promise.resolve(
+          input.submittedPathBAssets?.includes(assetId) ?? false,
+        ),
     } as never);
   } finally {
     for (const key of Object.keys(process.env)) {
@@ -146,11 +186,62 @@ describe('LimitOrderCandleReconciliationHealthService', () => {
     );
   });
 
-  it('fails closed when the deferred backlog exceeds its limit', async () => {
+  // -------------------------------------------------------------------------
+  // Window-completion heartbeat, separate from the row scan
+  // -------------------------------------------------------------------------
+
+  it('fails closed when the completion pass never succeeded, even with a healthy row scan', async () => {
+    // THE hidden-failure case: row scan fine, completion never succeeded.
+    const failure = await service({
+      checkpoint: checkpoint({
+        lastWindowCompletionRunAt: NOW,
+        lastWindowCompletionSuccessfulAt: null,
+        windowCompletionErrorCode: 'LIMIT_ORDER_WINDOW_COMPLETION_FAILED',
+        windowCompletionConsecutiveFailures: 3,
+      }),
+    }).evaluate(NOW);
+    expect(failure?.code).toBe(
+      LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.completionUnavailable,
+    );
+  });
+
+  it('fails closed when the completion heartbeat is stale while the row scan is fresh', async () => {
+    const failure = await service({
+      checkpoint: checkpoint({
+        lastSuccessfulRunAt: NOW,
+        lastWindowCompletionSuccessfulAt: new Date(
+          NOW.getTime() - 86_400_000,
+        ),
+        windowCompletionErrorCode: 'LIMIT_ORDER_WINDOW_COMPLETION_FAILED',
+        windowCompletionConsecutiveFailures: 12,
+      }),
+    }).evaluate(NOW);
+    expect(failure?.code).toBe(
+      LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.completionStale,
+    );
+  });
+
+  it('recovers once the completion pass succeeds again', async () => {
+    const health = service({
+      checkpoint: checkpoint({
+        lastWindowCompletionSuccessfulAt: NOW,
+        windowCompletionErrorCode: null,
+        windowCompletionConsecutiveFailures: 0,
+      }),
+    });
+    expect(await health.evaluate(NOW)).toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // Global gate = emergency tier only
+  // -------------------------------------------------------------------------
+
+  it('fails every asset closed when the TOTAL backlog exceeds the emergency limit', async () => {
     const failure = await service({
       backlog: backlog({ openCount: 999 }),
       env: {
         LIMIT_ORDER_CANDLE_RECONCILIATION_MAX_DEFERRED_BACKLOG: '10',
+        LIMIT_ORDER_CANDLE_MAX_ASSET_DEFERRED_BACKLOG: '5',
       },
     }).evaluate(NOW);
     expect(failure?.code).toBe(
@@ -158,25 +249,23 @@ describe('LimitOrderCandleReconciliationHealthService', () => {
     );
   });
 
-  it('fails closed when a candle is parked as permanently unprocessable', async () => {
-    const failure = await service({
-      backlog: backlog({ permanentCount: 1 }),
-    }).evaluate(NOW);
-    expect(failure?.code).toBe(
-      LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.backlogExceeded,
-    );
+  it('does NOT fail globally on a single permanent entry — that is asset-scoped', async () => {
+    expect(
+      await service({
+        backlog: backlog({ permanentCount: 1 }),
+      }).evaluate(NOW),
+    ).toBeNull();
   });
 
-  it('fails closed when the oldest deferral is too old', async () => {
-    const failure = await service({
-      backlog: backlog({
-        openCount: 1,
-        oldestFirstDeferredAt: new Date(NOW.getTime() - 86_400_000),
-      }),
-    }).evaluate(NOW);
-    expect(failure?.code).toBe(
-      LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.backlogExceeded,
-    );
+  it('does NOT fail globally on one old deferral — that is asset-scoped', async () => {
+    expect(
+      await service({
+        backlog: backlog({
+          openCount: 1,
+          oldestFirstDeferredAt: new Date(NOW.getTime() - 86_400_000),
+        }),
+      }).evaluate(NOW),
+    ).toBeNull();
   });
 
   it('fails closed on repeated reservation mismatches', async () => {
@@ -185,6 +274,84 @@ describe('LimitOrderCandleReconciliationHealthService', () => {
     }).evaluate(NOW);
     expect(failure?.code).toBe(
       LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.reservationMismatch,
+    );
+  });
+
+  // -------------------------------------------------------------------------
+  // Asset-scoped isolation
+  // -------------------------------------------------------------------------
+
+  it('blocks only the asset with a permanent entry; a healthy sibling passes', async () => {
+    const health = service({
+      assetBacklogs: {
+        'asset-a': assetBacklog({
+          permanentCount: 1,
+          oldestPermanentAt: new Date(NOW.getTime() - 3_600_000),
+        }),
+      },
+    });
+    const failureA = await health.evaluate(NOW, 'asset-a');
+    expect(failureA?.code).toBe(
+      LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.assetPermanentFailure,
+    );
+    expect(await health.evaluate(NOW, 'asset-b')).toBeNull();
+  });
+
+  it('blocks only the asset whose deferred backlog exceeds its limit', async () => {
+    const health = service({
+      assetBacklogs: {
+        'asset-a': assetBacklog({ deferredCount: 99 }),
+      },
+      env: { LIMIT_ORDER_CANDLE_MAX_ASSET_DEFERRED_BACKLOG: '10' },
+    });
+    const failureA = await health.evaluate(NOW, 'asset-a');
+    expect(failureA?.code).toBe(
+      LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.assetBacklogExceeded,
+    );
+    expect(await health.evaluate(NOW, 'asset-b')).toBeNull();
+  });
+
+  it('blocks only the asset whose oldest deferral aged past the limit', async () => {
+    const health = service({
+      assetBacklogs: {
+        'asset-a': assetBacklog({
+          deferredCount: 1,
+          oldestDeferredAt: new Date(NOW.getTime() - 86_400_000),
+        }),
+      },
+    });
+    const failureA = await health.evaluate(NOW, 'asset-a');
+    expect(failureA?.code).toBe(
+      LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.assetBacklogExceeded,
+    );
+    expect(await health.evaluate(NOW, 'asset-b')).toBeNull();
+  });
+
+  it('fails an asset with a submitted path-B order but no completion checkpoint', async () => {
+    const health = service({
+      submittedPathBAssets: ['asset-a'],
+    });
+    const failure = await health.evaluate(NOW, 'asset-a');
+    expect(failure?.code).toBe(
+      LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.completionUnavailable,
+    );
+  });
+
+  it('passes an asset with no orders and no completion checkpoint', async () => {
+    expect(await service({}).evaluate(NOW, 'asset-fresh')).toBeNull();
+  });
+
+  it('a global failure blocks every asset', async () => {
+    const health = service({
+      checkpoint: checkpoint({
+        lastSuccessfulRunAt: new Date(NOW.getTime() - 86_400_000),
+      }),
+    });
+    expect((await health.evaluate(NOW, 'asset-a'))?.code).toBe(
+      LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.stale,
+    );
+    expect((await health.evaluate(NOW, 'asset-b'))?.code).toBe(
+      LIMIT_ORDER_CANDLE_RECONCILIATION_ERROR_CODES.stale,
     );
   });
 

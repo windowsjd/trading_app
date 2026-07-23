@@ -65,11 +65,22 @@ export type LimitOrderCandleReconciliationSummary = {
   gapDetected: boolean;
   degradedReason: string | null;
   /**
-   * Per-asset window COMPLETION supervision (missing windows, no-trade
-   * certification, per-asset gaps). Null when the completion service is not
-   * wired (bare test rigs) or its pass failed this run.
+   * True when the ROW SCAN over existing candle rows completed. This is what
+   * `markRunSucceeded` records; it deliberately says nothing about the window
+   * completion pass below — the two succeed and fail independently.
    */
-  windowCompletion: WindowCompletionSummary | null;
+  rowScanSucceeded: boolean;
+  /**
+   * Per-asset window COMPLETION supervision (missing windows, no-trade
+   * certification, per-asset gaps). Null only when the completion service is
+   * not wired (bare test rigs). A pass that failed is reported explicitly
+   * with `succeeded: false` and the error message — never as a silent null —
+   * and is recorded on the durable completion heartbeat, which the
+   * quote/create health gate reads separately from the row-scan heartbeat.
+   */
+  windowCompletion:
+    | (WindowCompletionSummary & { succeeded: boolean; error: string | null })
+    | null;
 };
 
 type CandleRow = CanonicalCandleRow & {
@@ -242,6 +253,7 @@ export class LimitOrderCandleReconciliationService {
       ingestCeilingHeld: false,
       gapDetected: checkpoint.gapDetectedAt !== null,
       degradedReason: checkpoint.degradedReason,
+      rowScanSucceeded: false,
       windowCompletion: null,
     };
 
@@ -261,22 +273,50 @@ export class LimitOrderCandleReconciliationService {
     // 1. WINDOW COMPLETION first: account for windows whose candle row may be
     //    ABSENT — the one thing the row scan below structurally cannot see.
     //    Per-asset cursors, per-asset pendings, per-asset gaps; one stalled
-    //    asset never stops another. A supervision failure is logged and the
-    //    row sweep continues: existing-row fills must not be hostage to the
-    //    absence detector, and the asset gate stays fail-closed through the
-    //    ageing pending markers either way.
+    //    asset never stops another. A supervision failure is recorded on its
+    //    OWN durable heartbeat and the row sweep continues: existing-row
+    //    fills must not be hostage to the absence detector, but the failure
+    //    must never be laundered into overall success either — the health
+    //    gate reads the completion heartbeat separately, so a completion pass
+    //    that keeps failing blocks new quotes/creates even while the row-scan
+    //    heartbeat stays perfectly healthy.
     if (this.windowCompletion) {
-      summary.windowCompletion = await this.windowCompletion
-        .supervise(now)
-        .catch((error: unknown) => {
-          this.logger.error(
-            JSON.stringify({
-              event: 'limit_order_window_completion_failed',
-              error: error instanceof Error ? error.message : String(error),
-            }),
-          );
-          return null;
-        });
+      await this.checkpoints.markWindowCompletionStarted(now);
+      try {
+        const completion = await this.windowCompletion.supervise(now);
+        await this.checkpoints.markWindowCompletionSucceeded(now);
+        summary.windowCompletion = {
+          ...completion,
+          succeeded: true,
+          error: null,
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.error(
+          JSON.stringify({
+            event: 'limit_order_window_completion_failed',
+            error: message,
+          }),
+        );
+        await this.checkpoints
+          .markWindowCompletionFailed({
+            now,
+            errorCode: 'LIMIT_ORDER_WINDOW_COMPLETION_FAILED',
+            errorMessage: message,
+          })
+          .catch(() => undefined);
+        summary.windowCompletion = {
+          succeeded: false,
+          error: message,
+          assetsEvaluated: 0,
+          windowsFinalized: 0,
+          windowsNoTrade: 0,
+          windowsOutsideSession: 0,
+          windowsRepaired: 0,
+          windowsPending: 0,
+          assetGapsDetected: 0,
+        };
+      }
     }
 
     // 2. Durable retry queue: the oldest unfinished work goes before new
@@ -292,7 +332,11 @@ export class LimitOrderCandleReconciliationService {
       summary,
     );
 
+    // ROW-SCAN heartbeat only: reaching this line proves the deferred-retry
+    // stage and the forward scan completed. Window completion has its own
+    // heartbeat above and its failure is NOT laundered into this one.
     await this.checkpoints.markRunSucceeded(now);
+    summary.rowScanSucceeded = true;
     const latest = await this.checkpoints.find();
     summary.watermarkOpenTime =
       latest?.watermark?.openTime.toISOString() ?? summary.watermarkOpenTime;
@@ -652,9 +696,14 @@ export class LimitOrderCandleReconciliationService {
           -- is the deferred-backlog health gate. Alarming on it here as well
           -- would turn ordinary retry latency into a sticky, operator-cleared
           -- gap that fails every new limit order closed.
+          -- Revision-aware: the entry only covers the revision it tracks. A
+          -- corrected candle (higher ingest_seq) — even one whose entry is
+          -- PERMANENT — reappears here; a NULL tracked revision is unknown
+          -- and never suppresses anything.
           AND NOT EXISTS (
             SELECT 1 FROM "limit_order_deferred_candles" d
             WHERE d."market_candle_id" = c."id"
+              AND d."candle_ingest_seq" >= c."ingest_seq"
           )
           AND EXISTS (
             SELECT 1 FROM "orders" o
@@ -690,9 +739,12 @@ export class LimitOrderCandleReconciliationService {
       if (!candle) {
         // The row vanished under retention. detectRetentionGap already raised
         // the alarm; park the entry so it stops consuming retry budget while
-        // staying visible as backlog.
+        // staying visible as backlog. The entry keeps ITS OWN revision: there
+        // is no current candle revision to adopt, and a NULL must never erase
+        // a known one.
         await this.checkpoints.upsertDeferred({
           marketCandleId: deferred.marketCandleId,
+          candleIngestSeq: deferred.candleIngestSeq,
           assetId: deferred.assetId,
           interval: deferred.interval,
           openTime: deferred.openTime,
@@ -707,13 +759,50 @@ export class LimitOrderCandleReconciliationService {
         continue;
       }
 
+      // Revision identity check BEFORE processing. The queue entry tracks a
+      // specific revision of the candle:
+      //   current == tracked  -> ordinary retry.
+      //   current >  tracked  -> the candle was corrected while queued; the
+      //                          retry simply processes the CURRENT rows (the
+      //                          same data the forward scan would deliver) and
+      //                          the failure path below re-points the entry at
+      //                          the current revision, restarting its budget.
+      //   current <  tracked  -> data invariant violation: ingest_seq is
+      //                          monotonic and never reissued backwards.
+      //                          Fail closed on this entry — do NOT process a
+      //                          candle whose revision identity cannot be
+      //                          trusted — and surface it for an operator.
+      const trackedSeq = deferred.candleIngestSeq;
+      if (trackedSeq !== null && candle.ingestSeq < trackedSeq) {
+        this.logger.error(
+          JSON.stringify({
+            event: 'limit_order_candle_revision_regressed',
+            marketCandleId: deferred.marketCandleId,
+            assetId: deferred.assetId,
+            trackedIngestSeq: trackedSeq.toString(),
+            currentIngestSeq: candle.ingestSeq.toString(),
+            effect:
+              'entry left untouched; the candle revision moved backwards, which the ingest trigger guarantees impossible',
+          }),
+        );
+        summary.deferredCandles += 1;
+        continue;
+      }
+      const revisionAdvanced = trackedSeq === null || candle.ingestSeq > trackedSeq;
+
       const outcome = await this.processCandleGuarded(
         candle,
         orderBatchSize,
         now,
       );
       if (outcome.state === 'processed') {
-        await this.checkpoints.resolveDeferred(deferred.marketCandleId);
+        // Revision-guarded: only removes the entry at or below the revision
+        // just processed, so a concurrent re-point at an even newer revision
+        // survives.
+        await this.checkpoints.resolveDeferred(
+          deferred.marketCandleId,
+          candle.ingestSeq,
+        );
         summary.recoveredCandles += 1;
         summary.processedCandles += 1;
         summary.matchedOrders += outcome.matchedOrderCount;
@@ -721,10 +810,14 @@ export class LimitOrderCandleReconciliationService {
         continue;
       }
 
-      const attempt = deferred.attemptCount + 1;
+      // A revision that ADVANCED restarts the attempt budget: the entry now
+      // tracks different candle data, and exhausting it because an obsolete
+      // revision burned the budget would park the NEW revision unseen.
+      const attempt = revisionAdvanced ? 1 : deferred.attemptCount + 1;
       const exhausted = attempt >= this.config.deferredMaxAttempts;
       await this.checkpoints.upsertDeferred({
         marketCandleId: candle.id,
+        candleIngestSeq: candle.ingestSeq,
         assetId: candle.assetId,
         interval: candle.interval,
         openTime: candle.openTime,
@@ -780,12 +873,22 @@ export class LimitOrderCandleReconciliationService {
         summary.processedCandles += 1;
         summary.matchedOrders += outcome.matchedOrderCount;
         if (outcome.result === 'skipped') summary.skippedCandles += 1;
+        // The scan re-surfaces candles whose queue entry tracks a LOWER
+        // revision (including PERMANENT entries — a correction reopens them).
+        // Processing the current revision settles that entry; the guarded
+        // delete leaves any concurrently re-pointed newer revision alone.
+        await this.checkpoints.resolveDeferred(candle.id, candle.ingestSeq);
       } else {
         // Durable enqueue BEFORE the position may pass this candle. If the
         // enqueue itself fails the watermark stops here, which is the safe
-        // direction: the candle is simply re-scanned next tick.
+        // direction: the candle is simply re-scanned next tick. Carries the
+        // candle's CURRENT revision: on an entry tracking an older revision
+        // this atomically re-points it (reactivating a permanent entry and
+        // restarting its attempt budget), on the same revision it counts one
+        // more attempt, and it can never regress a newer entry.
         await this.checkpoints.upsertDeferred({
           marketCandleId: candle.id,
+          candleIngestSeq: candle.ingestSeq,
           assetId: candle.assetId,
           interval: candle.interval,
           openTime: candle.openTime,
@@ -1324,9 +1427,14 @@ export class LimitOrderCandleReconciliationService {
               -- recorded. A corrected candle (higher ingest_seq) reappears.
               AND p."candle_ingest_seq" >= c."ingest_seq"
           )
+          -- Revision-aware: a queue entry only covers the revision it
+          -- tracks. A corrected candle (higher ingest_seq) — even one whose
+          -- entry is PERMANENT — is scanned again; a NULL tracked revision
+          -- is unknown and never suppresses anything.
           AND NOT EXISTS (
             SELECT 1 FROM "limit_order_deferred_candles" d
             WHERE d."market_candle_id" = c."id"
+              AND d."candle_ingest_seq" >= c."ingest_seq"
           )
           AND EXISTS (
             SELECT 1 FROM "orders" o
@@ -1489,6 +1597,7 @@ function disabledSummary(): LimitOrderCandleReconciliationSummary {
     ingestCeilingHeld: false,
     gapDetected: false,
     degradedReason: null,
+    rowScanSucceeded: false,
     windowCompletion: null,
   };
 }

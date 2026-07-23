@@ -30,6 +30,7 @@ export type LimitOrderReconciliationCheckpointAvgAggregateOutputType = {
   watermarkIngestSeq: number | null
   pendingIngestSeq: number | null
   lastScannedIngestSeq: number | null
+  windowCompletionConsecutiveFailures: number | null
   reservationMismatchCount: number | null
 }
 
@@ -37,6 +38,7 @@ export type LimitOrderReconciliationCheckpointSumAggregateOutputType = {
   watermarkIngestSeq: bigint | null
   pendingIngestSeq: bigint | null
   lastScannedIngestSeq: bigint | null
+  windowCompletionConsecutiveFailures: number | null
   reservationMismatchCount: number | null
 }
 
@@ -53,6 +55,11 @@ export type LimitOrderReconciliationCheckpointMinAggregateOutputType = {
   lastScannedCloseTime: Date | null
   lastRunAt: Date | null
   lastSuccessfulRunAt: Date | null
+  lastWindowCompletionRunAt: Date | null
+  lastWindowCompletionSuccessfulAt: Date | null
+  windowCompletionErrorCode: string | null
+  windowCompletionErrorMessage: string | null
+  windowCompletionConsecutiveFailures: number | null
   degradedReason: string | null
   gapDetectedAt: Date | null
   gapFromOpenTime: Date | null
@@ -76,6 +83,11 @@ export type LimitOrderReconciliationCheckpointMaxAggregateOutputType = {
   lastScannedCloseTime: Date | null
   lastRunAt: Date | null
   lastSuccessfulRunAt: Date | null
+  lastWindowCompletionRunAt: Date | null
+  lastWindowCompletionSuccessfulAt: Date | null
+  windowCompletionErrorCode: string | null
+  windowCompletionErrorMessage: string | null
+  windowCompletionConsecutiveFailures: number | null
   degradedReason: string | null
   gapDetectedAt: Date | null
   gapFromOpenTime: Date | null
@@ -99,6 +111,11 @@ export type LimitOrderReconciliationCheckpointCountAggregateOutputType = {
   lastScannedCloseTime: number
   lastRunAt: number
   lastSuccessfulRunAt: number
+  lastWindowCompletionRunAt: number
+  lastWindowCompletionSuccessfulAt: number
+  windowCompletionErrorCode: number
+  windowCompletionErrorMessage: number
+  windowCompletionConsecutiveFailures: number
   degradedReason: number
   gapDetectedAt: number
   gapFromOpenTime: number
@@ -115,6 +132,7 @@ export type LimitOrderReconciliationCheckpointAvgAggregateInputType = {
   watermarkIngestSeq?: true
   pendingIngestSeq?: true
   lastScannedIngestSeq?: true
+  windowCompletionConsecutiveFailures?: true
   reservationMismatchCount?: true
 }
 
@@ -122,6 +140,7 @@ export type LimitOrderReconciliationCheckpointSumAggregateInputType = {
   watermarkIngestSeq?: true
   pendingIngestSeq?: true
   lastScannedIngestSeq?: true
+  windowCompletionConsecutiveFailures?: true
   reservationMismatchCount?: true
 }
 
@@ -138,6 +157,11 @@ export type LimitOrderReconciliationCheckpointMinAggregateInputType = {
   lastScannedCloseTime?: true
   lastRunAt?: true
   lastSuccessfulRunAt?: true
+  lastWindowCompletionRunAt?: true
+  lastWindowCompletionSuccessfulAt?: true
+  windowCompletionErrorCode?: true
+  windowCompletionErrorMessage?: true
+  windowCompletionConsecutiveFailures?: true
   degradedReason?: true
   gapDetectedAt?: true
   gapFromOpenTime?: true
@@ -161,6 +185,11 @@ export type LimitOrderReconciliationCheckpointMaxAggregateInputType = {
   lastScannedCloseTime?: true
   lastRunAt?: true
   lastSuccessfulRunAt?: true
+  lastWindowCompletionRunAt?: true
+  lastWindowCompletionSuccessfulAt?: true
+  windowCompletionErrorCode?: true
+  windowCompletionErrorMessage?: true
+  windowCompletionConsecutiveFailures?: true
   degradedReason?: true
   gapDetectedAt?: true
   gapFromOpenTime?: true
@@ -184,6 +213,11 @@ export type LimitOrderReconciliationCheckpointCountAggregateInputType = {
   lastScannedCloseTime?: true
   lastRunAt?: true
   lastSuccessfulRunAt?: true
+  lastWindowCompletionRunAt?: true
+  lastWindowCompletionSuccessfulAt?: true
+  windowCompletionErrorCode?: true
+  windowCompletionErrorMessage?: true
+  windowCompletionConsecutiveFailures?: true
   degradedReason?: true
   gapDetectedAt?: true
   gapFromOpenTime?: true
@@ -294,6 +328,11 @@ export type LimitOrderReconciliationCheckpointGroupByOutputType = {
   lastScannedCloseTime: Date | null
   lastRunAt: Date | null
   lastSuccessfulRunAt: Date | null
+  lastWindowCompletionRunAt: Date | null
+  lastWindowCompletionSuccessfulAt: Date | null
+  windowCompletionErrorCode: string | null
+  windowCompletionErrorMessage: string | null
+  windowCompletionConsecutiveFailures: number
   degradedReason: string | null
   gapDetectedAt: Date | null
   gapFromOpenTime: Date | null
@@ -340,6 +379,11 @@ export type LimitOrderReconciliationCheckpointWhereInput = {
   lastScannedCloseTime?: Prisma.DateTimeNullableFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
   lastRunAt?: Prisma.DateTimeNullableFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
   lastSuccessfulRunAt?: Prisma.DateTimeNullableFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
+  lastWindowCompletionRunAt?: Prisma.DateTimeNullableFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
+  lastWindowCompletionSuccessfulAt?: Prisma.DateTimeNullableFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
+  windowCompletionErrorCode?: Prisma.StringNullableFilter<"LimitOrderReconciliationCheckpoint"> | string | null
+  windowCompletionErrorMessage?: Prisma.StringNullableFilter<"LimitOrderReconciliationCheckpoint"> | string | null
+  windowCompletionConsecutiveFailures?: Prisma.IntFilter<"LimitOrderReconciliationCheckpoint"> | number
   degradedReason?: Prisma.StringNullableFilter<"LimitOrderReconciliationCheckpoint"> | string | null
   gapDetectedAt?: Prisma.DateTimeNullableFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
   gapFromOpenTime?: Prisma.DateTimeNullableFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
@@ -363,6 +407,11 @@ export type LimitOrderReconciliationCheckpointOrderByWithRelationInput = {
   lastScannedCloseTime?: Prisma.SortOrderInput | Prisma.SortOrder
   lastRunAt?: Prisma.SortOrderInput | Prisma.SortOrder
   lastSuccessfulRunAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  lastWindowCompletionRunAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  lastWindowCompletionSuccessfulAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  windowCompletionErrorCode?: Prisma.SortOrderInput | Prisma.SortOrder
+  windowCompletionErrorMessage?: Prisma.SortOrderInput | Prisma.SortOrder
+  windowCompletionConsecutiveFailures?: Prisma.SortOrder
   degradedReason?: Prisma.SortOrderInput | Prisma.SortOrder
   gapDetectedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   gapFromOpenTime?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -389,6 +438,11 @@ export type LimitOrderReconciliationCheckpointWhereUniqueInput = Prisma.AtLeast<
   lastScannedCloseTime?: Prisma.DateTimeNullableFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
   lastRunAt?: Prisma.DateTimeNullableFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
   lastSuccessfulRunAt?: Prisma.DateTimeNullableFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
+  lastWindowCompletionRunAt?: Prisma.DateTimeNullableFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
+  lastWindowCompletionSuccessfulAt?: Prisma.DateTimeNullableFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
+  windowCompletionErrorCode?: Prisma.StringNullableFilter<"LimitOrderReconciliationCheckpoint"> | string | null
+  windowCompletionErrorMessage?: Prisma.StringNullableFilter<"LimitOrderReconciliationCheckpoint"> | string | null
+  windowCompletionConsecutiveFailures?: Prisma.IntFilter<"LimitOrderReconciliationCheckpoint"> | number
   degradedReason?: Prisma.StringNullableFilter<"LimitOrderReconciliationCheckpoint"> | string | null
   gapDetectedAt?: Prisma.DateTimeNullableFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
   gapFromOpenTime?: Prisma.DateTimeNullableFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
@@ -412,6 +466,11 @@ export type LimitOrderReconciliationCheckpointOrderByWithAggregationInput = {
   lastScannedCloseTime?: Prisma.SortOrderInput | Prisma.SortOrder
   lastRunAt?: Prisma.SortOrderInput | Prisma.SortOrder
   lastSuccessfulRunAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  lastWindowCompletionRunAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  lastWindowCompletionSuccessfulAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  windowCompletionErrorCode?: Prisma.SortOrderInput | Prisma.SortOrder
+  windowCompletionErrorMessage?: Prisma.SortOrderInput | Prisma.SortOrder
+  windowCompletionConsecutiveFailures?: Prisma.SortOrder
   degradedReason?: Prisma.SortOrderInput | Prisma.SortOrder
   gapDetectedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   gapFromOpenTime?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -443,6 +502,11 @@ export type LimitOrderReconciliationCheckpointScalarWhereWithAggregatesInput = {
   lastScannedCloseTime?: Prisma.DateTimeNullableWithAggregatesFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
   lastRunAt?: Prisma.DateTimeNullableWithAggregatesFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
   lastSuccessfulRunAt?: Prisma.DateTimeNullableWithAggregatesFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
+  lastWindowCompletionRunAt?: Prisma.DateTimeNullableWithAggregatesFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
+  lastWindowCompletionSuccessfulAt?: Prisma.DateTimeNullableWithAggregatesFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
+  windowCompletionErrorCode?: Prisma.StringNullableWithAggregatesFilter<"LimitOrderReconciliationCheckpoint"> | string | null
+  windowCompletionErrorMessage?: Prisma.StringNullableWithAggregatesFilter<"LimitOrderReconciliationCheckpoint"> | string | null
+  windowCompletionConsecutiveFailures?: Prisma.IntWithAggregatesFilter<"LimitOrderReconciliationCheckpoint"> | number
   degradedReason?: Prisma.StringNullableWithAggregatesFilter<"LimitOrderReconciliationCheckpoint"> | string | null
   gapDetectedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
   gapFromOpenTime?: Prisma.DateTimeNullableWithAggregatesFilter<"LimitOrderReconciliationCheckpoint"> | Date | string | null
@@ -466,6 +530,11 @@ export type LimitOrderReconciliationCheckpointCreateInput = {
   lastScannedCloseTime?: Date | string | null
   lastRunAt?: Date | string | null
   lastSuccessfulRunAt?: Date | string | null
+  lastWindowCompletionRunAt?: Date | string | null
+  lastWindowCompletionSuccessfulAt?: Date | string | null
+  windowCompletionErrorCode?: string | null
+  windowCompletionErrorMessage?: string | null
+  windowCompletionConsecutiveFailures?: number
   degradedReason?: string | null
   gapDetectedAt?: Date | string | null
   gapFromOpenTime?: Date | string | null
@@ -489,6 +558,11 @@ export type LimitOrderReconciliationCheckpointUncheckedCreateInput = {
   lastScannedCloseTime?: Date | string | null
   lastRunAt?: Date | string | null
   lastSuccessfulRunAt?: Date | string | null
+  lastWindowCompletionRunAt?: Date | string | null
+  lastWindowCompletionSuccessfulAt?: Date | string | null
+  windowCompletionErrorCode?: string | null
+  windowCompletionErrorMessage?: string | null
+  windowCompletionConsecutiveFailures?: number
   degradedReason?: string | null
   gapDetectedAt?: Date | string | null
   gapFromOpenTime?: Date | string | null
@@ -512,6 +586,11 @@ export type LimitOrderReconciliationCheckpointUpdateInput = {
   lastScannedCloseTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastRunAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastSuccessfulRunAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastWindowCompletionRunAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastWindowCompletionSuccessfulAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  windowCompletionErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  windowCompletionErrorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  windowCompletionConsecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   degradedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   gapDetectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   gapFromOpenTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -535,6 +614,11 @@ export type LimitOrderReconciliationCheckpointUncheckedUpdateInput = {
   lastScannedCloseTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastRunAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastSuccessfulRunAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastWindowCompletionRunAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastWindowCompletionSuccessfulAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  windowCompletionErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  windowCompletionErrorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  windowCompletionConsecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   degradedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   gapDetectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   gapFromOpenTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -558,6 +642,11 @@ export type LimitOrderReconciliationCheckpointCreateManyInput = {
   lastScannedCloseTime?: Date | string | null
   lastRunAt?: Date | string | null
   lastSuccessfulRunAt?: Date | string | null
+  lastWindowCompletionRunAt?: Date | string | null
+  lastWindowCompletionSuccessfulAt?: Date | string | null
+  windowCompletionErrorCode?: string | null
+  windowCompletionErrorMessage?: string | null
+  windowCompletionConsecutiveFailures?: number
   degradedReason?: string | null
   gapDetectedAt?: Date | string | null
   gapFromOpenTime?: Date | string | null
@@ -581,6 +670,11 @@ export type LimitOrderReconciliationCheckpointUpdateManyMutationInput = {
   lastScannedCloseTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastRunAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastSuccessfulRunAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastWindowCompletionRunAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastWindowCompletionSuccessfulAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  windowCompletionErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  windowCompletionErrorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  windowCompletionConsecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   degradedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   gapDetectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   gapFromOpenTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -604,6 +698,11 @@ export type LimitOrderReconciliationCheckpointUncheckedUpdateManyInput = {
   lastScannedCloseTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastRunAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastSuccessfulRunAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastWindowCompletionRunAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastWindowCompletionSuccessfulAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  windowCompletionErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  windowCompletionErrorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  windowCompletionConsecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   degradedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   gapDetectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   gapFromOpenTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -627,6 +726,11 @@ export type LimitOrderReconciliationCheckpointCountOrderByAggregateInput = {
   lastScannedCloseTime?: Prisma.SortOrder
   lastRunAt?: Prisma.SortOrder
   lastSuccessfulRunAt?: Prisma.SortOrder
+  lastWindowCompletionRunAt?: Prisma.SortOrder
+  lastWindowCompletionSuccessfulAt?: Prisma.SortOrder
+  windowCompletionErrorCode?: Prisma.SortOrder
+  windowCompletionErrorMessage?: Prisma.SortOrder
+  windowCompletionConsecutiveFailures?: Prisma.SortOrder
   degradedReason?: Prisma.SortOrder
   gapDetectedAt?: Prisma.SortOrder
   gapFromOpenTime?: Prisma.SortOrder
@@ -641,6 +745,7 @@ export type LimitOrderReconciliationCheckpointAvgOrderByAggregateInput = {
   watermarkIngestSeq?: Prisma.SortOrder
   pendingIngestSeq?: Prisma.SortOrder
   lastScannedIngestSeq?: Prisma.SortOrder
+  windowCompletionConsecutiveFailures?: Prisma.SortOrder
   reservationMismatchCount?: Prisma.SortOrder
 }
 
@@ -657,6 +762,11 @@ export type LimitOrderReconciliationCheckpointMaxOrderByAggregateInput = {
   lastScannedCloseTime?: Prisma.SortOrder
   lastRunAt?: Prisma.SortOrder
   lastSuccessfulRunAt?: Prisma.SortOrder
+  lastWindowCompletionRunAt?: Prisma.SortOrder
+  lastWindowCompletionSuccessfulAt?: Prisma.SortOrder
+  windowCompletionErrorCode?: Prisma.SortOrder
+  windowCompletionErrorMessage?: Prisma.SortOrder
+  windowCompletionConsecutiveFailures?: Prisma.SortOrder
   degradedReason?: Prisma.SortOrder
   gapDetectedAt?: Prisma.SortOrder
   gapFromOpenTime?: Prisma.SortOrder
@@ -680,6 +790,11 @@ export type LimitOrderReconciliationCheckpointMinOrderByAggregateInput = {
   lastScannedCloseTime?: Prisma.SortOrder
   lastRunAt?: Prisma.SortOrder
   lastSuccessfulRunAt?: Prisma.SortOrder
+  lastWindowCompletionRunAt?: Prisma.SortOrder
+  lastWindowCompletionSuccessfulAt?: Prisma.SortOrder
+  windowCompletionErrorCode?: Prisma.SortOrder
+  windowCompletionErrorMessage?: Prisma.SortOrder
+  windowCompletionConsecutiveFailures?: Prisma.SortOrder
   degradedReason?: Prisma.SortOrder
   gapDetectedAt?: Prisma.SortOrder
   gapFromOpenTime?: Prisma.SortOrder
@@ -694,6 +809,7 @@ export type LimitOrderReconciliationCheckpointSumOrderByAggregateInput = {
   watermarkIngestSeq?: Prisma.SortOrder
   pendingIngestSeq?: Prisma.SortOrder
   lastScannedIngestSeq?: Prisma.SortOrder
+  windowCompletionConsecutiveFailures?: Prisma.SortOrder
   reservationMismatchCount?: Prisma.SortOrder
 }
 
@@ -712,6 +828,11 @@ export type LimitOrderReconciliationCheckpointSelect<ExtArgs extends runtime.Typ
   lastScannedCloseTime?: boolean
   lastRunAt?: boolean
   lastSuccessfulRunAt?: boolean
+  lastWindowCompletionRunAt?: boolean
+  lastWindowCompletionSuccessfulAt?: boolean
+  windowCompletionErrorCode?: boolean
+  windowCompletionErrorMessage?: boolean
+  windowCompletionConsecutiveFailures?: boolean
   degradedReason?: boolean
   gapDetectedAt?: boolean
   gapFromOpenTime?: boolean
@@ -735,6 +856,11 @@ export type LimitOrderReconciliationCheckpointSelectCreateManyAndReturn<ExtArgs 
   lastScannedCloseTime?: boolean
   lastRunAt?: boolean
   lastSuccessfulRunAt?: boolean
+  lastWindowCompletionRunAt?: boolean
+  lastWindowCompletionSuccessfulAt?: boolean
+  windowCompletionErrorCode?: boolean
+  windowCompletionErrorMessage?: boolean
+  windowCompletionConsecutiveFailures?: boolean
   degradedReason?: boolean
   gapDetectedAt?: boolean
   gapFromOpenTime?: boolean
@@ -758,6 +884,11 @@ export type LimitOrderReconciliationCheckpointSelectUpdateManyAndReturn<ExtArgs 
   lastScannedCloseTime?: boolean
   lastRunAt?: boolean
   lastSuccessfulRunAt?: boolean
+  lastWindowCompletionRunAt?: boolean
+  lastWindowCompletionSuccessfulAt?: boolean
+  windowCompletionErrorCode?: boolean
+  windowCompletionErrorMessage?: boolean
+  windowCompletionConsecutiveFailures?: boolean
   degradedReason?: boolean
   gapDetectedAt?: boolean
   gapFromOpenTime?: boolean
@@ -781,6 +912,11 @@ export type LimitOrderReconciliationCheckpointSelectScalar = {
   lastScannedCloseTime?: boolean
   lastRunAt?: boolean
   lastSuccessfulRunAt?: boolean
+  lastWindowCompletionRunAt?: boolean
+  lastWindowCompletionSuccessfulAt?: boolean
+  windowCompletionErrorCode?: boolean
+  windowCompletionErrorMessage?: boolean
+  windowCompletionConsecutiveFailures?: boolean
   degradedReason?: boolean
   gapDetectedAt?: boolean
   gapFromOpenTime?: boolean
@@ -791,7 +927,7 @@ export type LimitOrderReconciliationCheckpointSelectScalar = {
   updatedAt?: boolean
 }
 
-export type LimitOrderReconciliationCheckpointOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"scope" | "interval" | "watermarkOpenTime" | "watermarkCandleId" | "watermarkIngestSeq" | "pendingIngestSeq" | "pendingIngestSeqObservedAt" | "lastScannedIngestSeq" | "lastScannedOpenTime" | "lastScannedCloseTime" | "lastRunAt" | "lastSuccessfulRunAt" | "degradedReason" | "gapDetectedAt" | "gapFromOpenTime" | "gapToOpenTime" | "reservationMismatchCount" | "lastReservationMismatchAt" | "createdAt" | "updatedAt", ExtArgs["result"]["limitOrderReconciliationCheckpoint"]>
+export type LimitOrderReconciliationCheckpointOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"scope" | "interval" | "watermarkOpenTime" | "watermarkCandleId" | "watermarkIngestSeq" | "pendingIngestSeq" | "pendingIngestSeqObservedAt" | "lastScannedIngestSeq" | "lastScannedOpenTime" | "lastScannedCloseTime" | "lastRunAt" | "lastSuccessfulRunAt" | "lastWindowCompletionRunAt" | "lastWindowCompletionSuccessfulAt" | "windowCompletionErrorCode" | "windowCompletionErrorMessage" | "windowCompletionConsecutiveFailures" | "degradedReason" | "gapDetectedAt" | "gapFromOpenTime" | "gapToOpenTime" | "reservationMismatchCount" | "lastReservationMismatchAt" | "createdAt" | "updatedAt", ExtArgs["result"]["limitOrderReconciliationCheckpoint"]>
 
 export type $LimitOrderReconciliationCheckpointPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "LimitOrderReconciliationCheckpoint"
@@ -809,6 +945,11 @@ export type $LimitOrderReconciliationCheckpointPayload<ExtArgs extends runtime.T
     lastScannedCloseTime: Date | null
     lastRunAt: Date | null
     lastSuccessfulRunAt: Date | null
+    lastWindowCompletionRunAt: Date | null
+    lastWindowCompletionSuccessfulAt: Date | null
+    windowCompletionErrorCode: string | null
+    windowCompletionErrorMessage: string | null
+    windowCompletionConsecutiveFailures: number
     degradedReason: string | null
     gapDetectedAt: Date | null
     gapFromOpenTime: Date | null
@@ -1252,6 +1393,11 @@ export interface LimitOrderReconciliationCheckpointFieldRefs {
   readonly lastScannedCloseTime: Prisma.FieldRef<"LimitOrderReconciliationCheckpoint", 'DateTime'>
   readonly lastRunAt: Prisma.FieldRef<"LimitOrderReconciliationCheckpoint", 'DateTime'>
   readonly lastSuccessfulRunAt: Prisma.FieldRef<"LimitOrderReconciliationCheckpoint", 'DateTime'>
+  readonly lastWindowCompletionRunAt: Prisma.FieldRef<"LimitOrderReconciliationCheckpoint", 'DateTime'>
+  readonly lastWindowCompletionSuccessfulAt: Prisma.FieldRef<"LimitOrderReconciliationCheckpoint", 'DateTime'>
+  readonly windowCompletionErrorCode: Prisma.FieldRef<"LimitOrderReconciliationCheckpoint", 'String'>
+  readonly windowCompletionErrorMessage: Prisma.FieldRef<"LimitOrderReconciliationCheckpoint", 'String'>
+  readonly windowCompletionConsecutiveFailures: Prisma.FieldRef<"LimitOrderReconciliationCheckpoint", 'Int'>
   readonly degradedReason: Prisma.FieldRef<"LimitOrderReconciliationCheckpoint", 'String'>
   readonly gapDetectedAt: Prisma.FieldRef<"LimitOrderReconciliationCheckpoint", 'DateTime'>
   readonly gapFromOpenTime: Prisma.FieldRef<"LimitOrderReconciliationCheckpoint", 'DateTime'>

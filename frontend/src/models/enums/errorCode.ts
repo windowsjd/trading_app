@@ -82,6 +82,14 @@ export const ERROR_CODE = {
     'LIMIT_ORDER_PROVIDER_READINESS_PROOF_INVALID',
   LIMIT_ORDER_PROVIDER_GENERATION_CHANGED:
     'LIMIT_ORDER_PROVIDER_GENERATION_CHANGED',
+  // Shared-readiness authority verdicts: the record in Redis is not backed by
+  // a live provider owner (lease lost, or published under a superseded
+  // fencing epoch). To the user both mean "the live price connection is
+  // refreshing".
+  LIMIT_ORDER_PROVIDER_OWNER_LEASE_LOST:
+    'LIMIT_ORDER_PROVIDER_OWNER_LEASE_LOST',
+  LIMIT_ORDER_PROVIDER_READINESS_EPOCH_MISMATCH:
+    'LIMIT_ORDER_PROVIDER_READINESS_EPOCH_MISMATCH',
   // Path-B (closed-candle safety net) health. Separate from the matcher codes
   // above: these mean the SAFETY NET under automatic matching is not whole, so
   // new limit registration is refused while existing orders, cancel and
@@ -96,6 +104,12 @@ export const ERROR_CODE = {
     'LIMIT_ORDER_CANDLE_RECONCILIATION_GAP_DETECTED',
   LIMIT_ORDER_CANDLE_RESERVATION_MISMATCH:
     'LIMIT_ORDER_CANDLE_RESERVATION_MISMATCH',
+  // Window-completion heartbeat: the safety net's missing-window supervisor
+  // has never succeeded / stopped succeeding. Same user meaning as the other
+  // safety-net pauses.
+  LIMIT_ORDER_CANDLE_COMPLETION_UNAVAILABLE:
+    'LIMIT_ORDER_CANDLE_COMPLETION_UNAVAILABLE',
+  LIMIT_ORDER_CANDLE_COMPLETION_STALE: 'LIMIT_ORDER_CANDLE_COMPLETION_STALE',
   // Asset-scoped safety-net codes: the failure names ONE asset, so only that
   // asset's new limit registration pauses; other assets keep working.
   LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED:
@@ -103,6 +117,8 @@ export const ERROR_CODE = {
   LIMIT_ORDER_CANDLE_FINALIZER_STALE: 'LIMIT_ORDER_CANDLE_FINALIZER_STALE',
   LIMIT_ORDER_CANDLE_ASSET_BACKLOG_EXCEEDED:
     'LIMIT_ORDER_CANDLE_ASSET_BACKLOG_EXCEEDED',
+  LIMIT_ORDER_CANDLE_ASSET_PERMANENT_FAILURE:
+    'LIMIT_ORDER_CANDLE_ASSET_PERMANENT_FAILURE',
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODE)[keyof typeof ERROR_CODE];

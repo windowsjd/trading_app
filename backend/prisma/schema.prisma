@@ -1119,6 +1119,10 @@ model LimitOrderProcessedEvent {
   createdAt     DateTime @default(now()) @map("created_at")
 
   @@index([processedAt])
+  // Growth/age observability on an append-only, processed_at-correlated
+  // table. Declared here (not only in migration SQL) so `migrate diff`
+  // reports no drift.
+  @@index([processedAt], map: "limit_order_processed_events_processed_at_brin_idx", type: Brin)
   @@map("limit_order_processed_events")
 }
 
@@ -1159,7 +1163,13 @@ model LimitOrderCandleEvidence {
   asset        Asset        @relation(fields: [assetId], references: [id], onDelete: Restrict)
   orders       Order[]
 
-  @@unique([marketCandleId, candleIngestSeq])
+  // `map:` pins the name the migration actually created. The hand-truncated
+  // name ("..._inges_key", 62 bytes) predates this pin and differs from the
+  // name Prisma would derive under PostgreSQL's 63-byte identifier limit
+  // ("..._ingest_key"); without the pin `prisma migrate diff` reports a
+  // rename on every run. Existing applied migrations are never edited, so
+  // the schema adopts the deployed name instead.
+  @@unique([marketCandleId, candleIngestSeq], map: "limit_order_candle_evidences_market_candle_id_candle_inges_key")
   @@index([assetId, openTime])
   @@map("limit_order_candle_evidences")
 }
@@ -1244,7 +1254,7 @@ model MarketCandleFinalizationCheckpoint {
   outsideSessionWindowCount Int       @default(0) @map("outside_session_window_count")
   repairedWindowCount       Int       @default(0) @map("repaired_window_count")
   createdAt                 DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt                 DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedAt                 DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   asset Asset @relation(fields: [assetId], references: [id], onDelete: Restrict)
 
@@ -1269,45 +1279,59 @@ model MarketCandleFinalizationCheckpoint {
 // elapsed time. One row per scope; the scope is the interval literal, so a
 // later 1m/15m path-B variant gets its own independent position.
 model LimitOrderReconciliationCheckpoint {
-  scope                      String    @id
-  interval                   String
+  scope                               String    @id
+  interval                            String
   // NULL until the first bootstrap. `watermarkCandleId` is NULL when the
   // position is a pure time bound (bootstrap, or a gap re-anchor) rather than
   // a concrete candle row.
-  watermarkOpenTime          DateTime? @map("watermark_open_time") @db.Timestamptz(3)
-  watermarkCandleId          String?   @map("watermark_candle_id")
+  watermarkOpenTime                   DateTime? @map("watermark_open_time") @db.Timestamptz(3)
+  watermarkCandleId                   String?   @map("watermark_candle_id")
   // STORAGE-order scan position over MarketCandle.ingestSeq. This — not the
   // market-time watermark above — is what the forward scan reads from, so a
   // candle stored long after its window closed is still reached. The
   // market-time watermark remains the bootstrap anchor and the retention-gap
   // marker.
-  watermarkIngestSeq         BigInt?   @map("watermark_ingest_seq")
+  watermarkIngestSeq                  BigInt?   @map("watermark_ingest_seq")
   // Two-phase advance guard. A sequence value is assigned when a row is
   // INSERTED but only becomes visible when its transaction COMMITS, so the
   // highest visible value may still have uncommitted holes below it. The
   // highest value observed by a run is recorded here and only becomes eligible
   // as a watermark ceiling on a LATER run, once every write transaction that
   // was in flight at the observation has resolved.
-  pendingIngestSeq           BigInt?   @map("pending_ingest_seq")
-  pendingIngestSeqObservedAt DateTime? @map("pending_ingest_seq_observed_at") @db.Timestamptz(3)
-  lastScannedIngestSeq       BigInt?   @map("last_scanned_ingest_seq")
-  lastScannedOpenTime        DateTime? @map("last_scanned_open_time") @db.Timestamptz(3)
-  lastScannedCloseTime       DateTime? @map("last_scanned_close_time") @db.Timestamptz(3)
-  lastRunAt                  DateTime? @map("last_run_at") @db.Timestamptz(3)
-  lastSuccessfulRunAt        DateTime? @map("last_successful_run_at") @db.Timestamptz(3)
+  pendingIngestSeq                    BigInt?   @map("pending_ingest_seq")
+  pendingIngestSeqObservedAt          DateTime? @map("pending_ingest_seq_observed_at") @db.Timestamptz(3)
+  lastScannedIngestSeq                BigInt?   @map("last_scanned_ingest_seq")
+  lastScannedOpenTime                 DateTime? @map("last_scanned_open_time") @db.Timestamptz(3)
+  lastScannedCloseTime                DateTime? @map("last_scanned_close_time") @db.Timestamptz(3)
+  // ROW-SCAN heartbeat: the ingest-seq sweep over rows that EXIST. Success
+  // here says nothing about window completion (below) — the two are separate
+  // liveness signals and the health gate checks BOTH.
+  lastRunAt                           DateTime? @map("last_run_at") @db.Timestamptz(3)
+  lastSuccessfulRunAt                 DateTime? @map("last_successful_run_at") @db.Timestamptz(3)
+  // WINDOW-COMPLETION heartbeat: the per-asset missing-window supervisor.
+  // Recorded independently of the row scan so a completion pass that keeps
+  // failing can never hide behind a healthy row-scan heartbeat. `runAt` is
+  // stamped when a pass STARTS; `successfulAt` only when it completed without
+  // throwing; a failure records the error and increments the consecutive
+  // counter while leaving `successfulAt` untouched.
+  lastWindowCompletionRunAt           DateTime? @map("last_window_completion_run_at") @db.Timestamptz(3)
+  lastWindowCompletionSuccessfulAt    DateTime? @map("last_window_completion_successful_at") @db.Timestamptz(3)
+  windowCompletionErrorCode           String?   @map("window_completion_error_code")
+  windowCompletionErrorMessage        String?   @map("window_completion_error_message")
+  windowCompletionConsecutiveFailures Int       @default(0) @map("window_completion_consecutive_failures")
   // Sticky operational alarm. Cleared only by an operator (or by the documented
   // recovery procedure), never by the sweep itself: a gap means candles were
   // retention-deleted before path B could look at them, which cannot be undone.
-  degradedReason             String?   @map("degraded_reason")
-  gapDetectedAt              DateTime? @map("gap_detected_at") @db.Timestamptz(3)
-  gapFromOpenTime            DateTime? @map("gap_from_open_time") @db.Timestamptz(3)
-  gapToOpenTime              DateTime? @map("gap_to_open_time") @db.Timestamptz(3)
+  degradedReason                      String?   @map("degraded_reason")
+  gapDetectedAt                       DateTime? @map("gap_detected_at") @db.Timestamptz(3)
+  gapFromOpenTime                     DateTime? @map("gap_from_open_time") @db.Timestamptz(3)
+  gapToOpenTime                       DateTime? @map("gap_to_open_time") @db.Timestamptz(3)
   // Reservation mismatches are an unresolved financial inconsistency that never
   // self-heals; a repeated count is what turns the log line into a gate.
-  reservationMismatchCount   Int       @default(0) @map("reservation_mismatch_count")
-  lastReservationMismatchAt  DateTime? @map("last_reservation_mismatch_at") @db.Timestamptz(3)
-  createdAt                  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt                  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  reservationMismatchCount            Int       @default(0) @map("reservation_mismatch_count")
+  lastReservationMismatchAt           DateTime? @map("last_reservation_mismatch_at") @db.Timestamptz(3)
+  createdAt                           DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@map("limit_order_reconciliation_checkpoints")
 }
@@ -1322,6 +1346,19 @@ model LimitOrderReconciliationCheckpoint {
 // the retention job fail.
 model LimitOrderDeferredCandle {
   marketCandleId   String   @id @map("market_candle_id")
+  // Storage revision (MarketCandle.ingestSeq) this queue entry tracks. A
+  // correction re-sequences the candle; a deferred (even PERMANENT) entry for
+  // a lower revision never suppresses the new revision: the forward scan
+  // re-surfaces the candle and the entry is atomically re-pointed at the new
+  // revision (status reactivated, attempt budget reset).
+  //
+  // NULLABLE by necessity, not by design: rows enqueued before this column
+  // existed cannot have their enqueue-time revision reconstructed, and rows
+  // whose market_candles row retention already removed have no current
+  // revision to adopt. Backfill stamps every row whose candle still exists;
+  // a NULL revision is treated as "unknown = lowest", so any concrete
+  // revision replaces it. New writes always carry the revision.
+  candleIngestSeq  BigInt?  @map("candle_ingest_seq")
   assetId          String   @map("asset_id")
   interval         String
   openTime         DateTime @map("open_time") @db.Timestamptz(3)
@@ -1336,10 +1373,16 @@ model LimitOrderDeferredCandle {
   lastErrorMessage String?  @map("last_error_message")
   nextRetryAt      DateTime @map("next_retry_at") @db.Timestamptz(3)
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([status, nextRetryAt])
   @@index([status, firstDeferredAt])
   @@index([assetId, openTime])
+  // Index-only probe for the revision-aware forward-scan exclusion
+  // (d.market_candle_id = c.id AND d.candle_ingest_seq >= c.ingest_seq).
+  @@index([marketCandleId, candleIngestSeq])
+  // Asset-scoped backlog gate: per-asset deferred/permanent counts and oldest
+  // ages are read on every limit quote/create for that asset.
+  @@index([assetId, status, firstDeferredAt])
   @@map("limit_order_deferred_candles")
 }

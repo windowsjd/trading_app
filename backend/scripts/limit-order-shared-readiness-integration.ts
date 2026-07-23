@@ -175,12 +175,36 @@ async function main(): Promise<void> {
       testLateReleaseCannotDeleteNewOwner,
     );
     await run(
+      'losing ONLY the lease fails the very next read, TTL notwithstanding',
+      testLeaseLossFailsReadImmediately,
+    );
+    await run(
+      'a lease held under a different token than the epoch-holder fails the read',
+      testLeaseHolderMismatchFailsRead,
+    );
+    await run(
+      'a superseded fencing epoch fails the read',
+      testEpochMismatchFailsRead,
+    );
+    await run(
+      'the publisher deletes its own stale record the tick after losing the lease',
+      testPublisherReleasesStaleMetaOnLeaseLoss,
+    );
+    await run(
       'a non-owner instance completes the whole Quote and Create financial flow',
       testNonOwnerFullQuoteCreateFlow,
     );
     await run(
       'a non-owner create fails closed with no reservation once the owner disappears',
       testNonOwnerCreateFailsClosedWithoutOwner,
+    );
+    await run(
+      'a non-owner create fails closed when ONLY the lease is lost',
+      testNonOwnerCreateFailsClosedOnLeaseLoss,
+    );
+    await run(
+      'an already-committed create replays BEFORE every gate, through any failure',
+      testIdempotentReplayBypassesGates,
     );
     await run('a Redis failure fails closed', testRedisFailureFailsClosed);
     await run(
@@ -722,6 +746,149 @@ async function testLateReleaseCannotDeleteNewOwner(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Read-side lease verification: stale readiness dies WITH the lease
+// ---------------------------------------------------------------------------
+
+/**
+ * THE read-side regression: the owner publishes, then its REAL socket lease
+ * disappears (expiry, crash, takeover in progress). The meta/assets keys are
+ * still within their TTL — and must be worthless anyway. The read verifies
+ * the live lease atomically, so the very next read fails closed; nothing
+ * waits for the TTL.
+ */
+async function testLeaseLossFailsReadImmediately(): Promise<void> {
+  await connectOwner({ acknowledge: true });
+  const before = await readerStore.checkAssetReadiness({
+    assetId: ASSET.assetId,
+    provider: 'binance',
+    livenessMaxAgeMs: LIVENESS_MAX_AGE_MS,
+  });
+  assert.equal(before.ready, true);
+
+  // ONLY the lease vanishes. Meta and assets stay, TTL intact.
+  await dropOwnerLease();
+  assert.ok(
+    await ownerRedis.get(providerMetaKey('binance')),
+    'the fixture must keep the meta record alive — the TTL is the point',
+  );
+
+  const after = await readerStore.checkAssetReadiness({
+    assetId: ASSET.assetId,
+    provider: 'binance',
+    livenessMaxAgeMs: LIVENESS_MAX_AGE_MS,
+  });
+  assert.equal(after.ready, false, 'no live lease, no readiness — instantly');
+  assert.equal(
+    !after.ready && after.code,
+    'LIMIT_ORDER_PROVIDER_OWNER_LEASE_LOST',
+  );
+
+  // And no proof can be issued from it either.
+  const b = buildInstanceB();
+  try {
+    await assert.rejects(
+      () =>
+        b.providerHealth.assertAvailableAsync({
+          assetId: ASSET.assetId,
+          symbol: ASSET.symbol,
+          market: ASSET.market,
+          assetType: ASSET.assetType,
+        }),
+      (error: unknown) => {
+        const body = (error as { getResponse?: () => unknown }).getResponse?.();
+        return JSON.stringify(body ?? '').includes(
+          'LIMIT_ORDER_PROVIDER_OWNER_LEASE_LOST',
+        );
+      },
+    );
+  } finally {
+    await b.destroy();
+  }
+}
+
+/**
+ * The lease key exists but is held under a DIFFERENT token than the one the
+ * current epoch was issued to: a takeover in progress (successor holds the
+ * lease, has not acquired an epoch yet). The old record must not be readable
+ * during that window.
+ */
+async function testLeaseHolderMismatchFailsRead(): Promise<void> {
+  await connectOwner({ acknowledge: true });
+  // Replace the live lease value with a stranger's token, bypassing the lock
+  // service — exactly what a successor's acquire produces before it exchanges
+  // the lease for an epoch.
+  await ownerRedis.setWithTtl(LEASE_KEY, `stranger-${randomUUID()}`, 60);
+
+  const readiness = await readerStore.checkAssetReadiness({
+    assetId: ASSET.assetId,
+    provider: 'binance',
+    livenessMaxAgeMs: LIVENESS_MAX_AGE_MS,
+  });
+  assert.equal(readiness.ready, false);
+  assert.equal(
+    !readiness.ready && readiness.code,
+    'LIMIT_ORDER_PROVIDER_OWNER_LEASE_LOST',
+  );
+
+  // Hand the lease back so the fixture chain stays deterministic.
+  await ownerRedis.delete(LEASE_KEY);
+  ownerLease = null;
+}
+
+/**
+ * The record's fencing epoch is no longer the CURRENT epoch (a successor
+ * already advanced it). The record is stale-by-succession regardless of every
+ * timestamp and every TTL.
+ */
+async function testEpochMismatchFailsRead(): Promise<void> {
+  await connectOwner({ acknowledge: true });
+  // A successor advances the epoch counter; the stored meta still carries the
+  // previous one.
+  await readerRedis.increment(providerEpochKey('binance'));
+
+  const readiness = await readerStore.checkAssetReadiness({
+    assetId: ASSET.assetId,
+    provider: 'binance',
+    livenessMaxAgeMs: LIVENESS_MAX_AGE_MS,
+  });
+  assert.equal(readiness.ready, false);
+  assert.equal(
+    !readiness.ready && readiness.code,
+    'LIMIT_ORDER_PROVIDER_READINESS_EPOCH_MISMATCH',
+  );
+
+  // Drive one fenced-out tick so the publisher surrenders its now-stale epoch
+  // and the next scenario's publish re-acquires cleanly.
+  await publisher.publishOnce();
+}
+
+/**
+ * Publisher self-cleanup: when the supervisor clears the owner lease (lost
+ * mid-connection), the next publish tick must compare-and-delete the record
+ * THIS process published — not merely stop republishing and leave the stale
+ * record to its TTL.
+ */
+async function testPublisherReleasesStaleMetaOnLeaseLoss(): Promise<void> {
+  await connectOwner({ acknowledge: true });
+  assert.ok(await ownerRedis.get(providerMetaKey('binance')));
+
+  ownerRegistry.clearOwnerLease('binance', 'live_candle_supervisor');
+  await publisher.publishOnce();
+
+  assert.equal(
+    await ownerRedis.get(providerMetaKey('binance')),
+    null,
+    'the publisher must remove its own stale record immediately',
+  );
+  const readiness = await readerStore.checkAssetReadiness({
+    assetId: ASSET.assetId,
+    provider: 'binance',
+    livenessMaxAgeMs: LIVENESS_MAX_AGE_MS,
+  });
+  assert.equal(readiness.ready, false);
+}
+
+// ---------------------------------------------------------------------------
 // Non-owner Quote -> Create: the REAL financial flow
 // ---------------------------------------------------------------------------
 
@@ -832,6 +999,20 @@ async function testNonOwnerFullQuoteCreateFlow(): Promise<void> {
       }),
       0,
       'a submitted limit buy must not create a position',
+    );
+    // The create transaction bootstraps the asset's window-completion
+    // checkpoint, so the asset-scoped path-B gate never sees "submitted
+    // order, no checkpoint" between the first order and the first sweep.
+    const completionCheckpoint =
+      await prisma.marketCandleFinalizationCheckpoint.findUnique({
+        where: {
+          assetId_interval: { assetId: fixtures.assetId, interval: '5m' },
+        },
+        select: { finalizedThroughCloseTime: true },
+      });
+    assert.ok(
+      completionCheckpoint,
+      'the create transaction must bootstrap the completion checkpoint',
     );
 
     // 4) Idempotent replay returns the SAME order without a second
@@ -954,6 +1135,190 @@ async function testNonOwnerCreateFailsClosedWithoutOwner(): Promise<void> {
       }),
       0,
       'a refused create must leave no order behind',
+    );
+  } finally {
+    await b.destroy();
+    await cleanupDbFixtures(fixtures);
+  }
+}
+
+/**
+ * Spec scenario: Quote succeeds, then ONLY the real owner lease disappears
+ * between quote and create. The stale meta/assets are still within TTL; the
+ * create's fresh readiness read must fail closed on the lease check, leaving
+ * no reservation and no order.
+ */
+async function testNonOwnerCreateFailsClosedOnLeaseLoss(): Promise<void> {
+  await connectOwner({ acknowledge: true });
+  const fixtures = await createDbFixtures();
+  const b = buildInstanceB();
+  try {
+    const quote = await b.orders.quoteOrder(fixtures.userId, {
+      assetId: fixtures.assetId,
+      side: 'buy',
+      orderType: 'limit',
+      quantity: '1.000000',
+      limitPrice: '100.00000000',
+      currencyCode: 'USD',
+    });
+    assert.equal(quote.success, true);
+
+    // ONLY the lease is lost. Meta and assets stay within their TTL.
+    await dropOwnerLease();
+    assert.ok(
+      await ownerRedis.get(providerMetaKey('binance')),
+      'the stale record must still be in Redis for this scenario to bite',
+    );
+
+    await assert.rejects(
+      () =>
+        b.orders.createOrder(fixtures.userId, {
+          quoteId: quote.data.quoteId,
+          assetId: fixtures.assetId,
+          side: 'buy',
+          orderType: 'limit',
+          quantity: '1.000000',
+          limitPrice: '100.00000000',
+          currencyCode: 'USD',
+          idempotencyKey: `${PREFIX}-create-lease-lost`,
+        }),
+      (error: unknown) => {
+        const body = (error as { getResponse?: () => unknown }).getResponse?.();
+        return JSON.stringify(body ?? '').includes(
+          'LIMIT_ORDER_PROVIDER_OWNER_LEASE_LOST',
+        );
+      },
+      'a create against a leaseless record must fail closed with the lease code',
+    );
+
+    const wallet = await prisma.cashWallet.findUniqueOrThrow({
+      where: { id: fixtures.walletId },
+      select: { reservedAmount: true },
+    });
+    assert.equal(wallet.reservedAmount.toFixed(8), '0.00000000');
+    assert.equal(
+      await prisma.order.count({
+        where: { seasonParticipantId: fixtures.participantId },
+      }),
+      0,
+    );
+  } finally {
+    await b.destroy();
+    await cleanupDbFixtures(fixtures);
+  }
+}
+
+/**
+ * IDEMPOTENT REPLAY FIRST. A create that already committed must replay its
+ * stored first response BEFORE the provider gate, the matcher gate and the
+ * season checks — through a provider outage AND after the season ended —
+ * with the same order id and not one extra cent reserved. A NEW key under the
+ * same outage keeps failing closed.
+ */
+async function testIdempotentReplayBypassesGates(): Promise<void> {
+  const generation = await connectOwner({ acknowledge: true });
+  const fixtures = await createDbFixtures();
+  const b = buildInstanceB();
+  try {
+    const quote = await b.orders.quoteOrder(fixtures.userId, {
+      assetId: fixtures.assetId,
+      side: 'buy',
+      orderType: 'limit',
+      quantity: '2.000000',
+      limitPrice: '100.00000000',
+      currencyCode: 'USD',
+    });
+    assert.equal(quote.success, true);
+    const request = {
+      quoteId: quote.data.quoteId,
+      assetId: fixtures.assetId,
+      side: 'buy',
+      orderType: 'limit',
+      quantity: '2.000000',
+      limitPrice: '100.00000000',
+      currencyCode: 'USD',
+      idempotencyKey: `${PREFIX}-replay-1`,
+    };
+    const created = await b.orders.createOrder(fixtures.userId, request);
+    assert.equal(created.success, true);
+    assert.ok('order' in created.data);
+    const orderId = created.data.order.orderId;
+    const reservedAfterCreate = '200.20000000';
+
+    // The provider disappears COMPLETELY: readiness released AND lease gone.
+    await ownerStore.release({
+      provider: 'binance',
+      generation,
+      ownerInstance: OWNER_INSTANCE,
+      fencingEpoch: requireOwnerEpoch(),
+    });
+    await dropOwnerLease();
+
+    // Same key, same request: the stored response replays; no gate runs.
+    const replay = await b.orders.createOrder(fixtures.userId, request);
+    assert.ok('order' in replay.data);
+    assert.equal(
+      replay.data.order.orderId,
+      orderId,
+      'the replay must return the ORIGINAL order',
+    );
+    const wallet = await prisma.cashWallet.findUniqueOrThrow({
+      where: { id: fixtures.walletId },
+      select: { reservedAmount: true },
+    });
+    assert.equal(
+      wallet.reservedAmount.toFixed(8),
+      reservedAfterCreate,
+      'a replay must not reserve a second time',
+    );
+    assert.equal(
+      await prisma.order.count({
+        where: { seasonParticipantId: fixtures.participantId },
+      }),
+      1,
+    );
+
+    // Same key, DIFFERENT request: conflict, original order untouched.
+    await assert.rejects(
+      () =>
+        b.orders.createOrder(fixtures.userId, {
+          ...request,
+          limitPrice: '101.00000000',
+        }),
+      (error: unknown) => {
+        const body = (error as { getResponse?: () => unknown }).getResponse?.();
+        return JSON.stringify(body ?? '').includes(
+          'ORDER_IDEMPOTENCY_CONFLICT',
+        );
+      },
+    );
+
+    // The season ends. The replay STILL returns the original response —
+    // an already-committed create owes its caller the first answer, and the
+    // user-scoped lookup does not need an active season to find it.
+    await prisma.season.update({
+      where: { id: fixtures.seasonId },
+      data: { endAt: new Date(Date.now() - 60_000) },
+    });
+    const afterSeasonEnd = await b.orders.createOrder(fixtures.userId, request);
+    assert.ok('order' in afterSeasonEnd.data);
+    assert.equal(afterSeasonEnd.data.order.orderId, orderId);
+    assert.equal(
+      await prisma.order.count({
+        where: { seasonParticipantId: fixtures.participantId },
+      }),
+      1,
+      'a season-ended replay must not create anything',
+    );
+
+    // A NEW key under the same outage still fails closed — replay is a
+    // property of an already-committed create, never a gate bypass for new
+    // work. (The season-end check fires first here; both are fail-closed.)
+    await assert.rejects(() =>
+      b.orders.createOrder(fixtures.userId, {
+        ...request,
+        idempotencyKey: `${PREFIX}-replay-new-key`,
+      }),
     );
   } finally {
     await b.destroy();
@@ -1114,6 +1479,11 @@ async function cleanupDbFixtures(fixtures: DbFixtures): Promise<void> {
   });
   await prisma.fxRateSnapshot.deleteMany({
     where: { id: fixtures.fxRateSnapshotId },
+  });
+  // The create transaction bootstraps the asset's window-completion
+  // checkpoint, which references the asset with ON DELETE RESTRICT.
+  await prisma.marketCandleFinalizationCheckpoint.deleteMany({
+    where: { assetId: fixtures.assetId },
   });
   await prisma.asset.deleteMany({ where: { id: fixtures.assetId } });
   await prisma.season.deleteMany({ where: { id: fixtures.seasonId } });

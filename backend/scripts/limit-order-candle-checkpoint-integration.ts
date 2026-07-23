@@ -180,6 +180,34 @@ async function main(): Promise<void> {
       testCandleRevisionReprocessing,
     );
     await run(
+      'a DEFERRED candle recovers through a corrected revision',
+      testDeferredRevisionRecovery,
+    );
+    await run(
+      'a PERMANENT entry is reactivated by a corrected revision',
+      testPermanentRevisionReactivation,
+    );
+    await run(
+      'the deferred queue applies revision rules atomically',
+      testDeferredUpsertRevisionRules,
+    );
+    await run(
+      'a completion failure is never hidden by a healthy row scan',
+      testCompletionFailureNotHidden,
+    );
+    await run(
+      'a submitted order without a completion checkpoint fails closed',
+      testSubmittedOrderWithoutCheckpoint,
+    );
+    await run(
+      'a permanent entry blocks only its own asset and clears via revision',
+      testAssetPermanentIsolation,
+    );
+    await run(
+      'an emergency global backlog blocks every asset',
+      testEmergencyGlobalBacklog,
+    );
+    await run(
       'retention passing the watermark is detected as a gap',
       testRetentionGapDetected,
     );
@@ -493,6 +521,7 @@ async function testRetryDoesNotDoubleFill(): Promise<void> {
   });
   await checkpoints.upsertDeferred({
     marketCandleId: candle.id,
+    candleIngestSeq: await ingestSeqOf(candle.id),
     assetId: candle.assetId,
     interval: candle.interval,
     openTime: candle.openTime,
@@ -885,6 +914,20 @@ async function clearGap(): Promise<void> {
 }
 
 /**
+ * Re-stamps BOTH liveness heartbeats (row scan + window completion) on the
+ * wall clock. The fixtures deliberately drive sweeps with SIMULATED clocks
+ * hours in the past, so the stored heartbeats look ancient to a health
+ * evaluation at `new Date()`; a scenario asserting "this asset is healthy"
+ * must first pin liveness to the clock it evaluates with, or it would be
+ * testing the fixture clock skew instead of the asset isolation it is about.
+ */
+async function freshHeartbeats(): Promise<void> {
+  const now = new Date();
+  await checkpoints.markRunSucceeded(now);
+  await checkpoints.markWindowCompletionSucceeded(now);
+}
+
+/**
  * Ages the stored observation past the settle grace, so the next run may use
  * it as a ceiling. Simulating elapsed time beats sleeping for it: the
  * assertion becomes deterministic instead of timing-dependent.
@@ -1019,6 +1062,7 @@ async function testMissingWindowStallsOnlyItsAsset(): Promise<void> {
       ),
     },
   });
+  await freshHeartbeats();
   const failureA = await health.evaluate(new Date(), assetA);
   assert.equal(failureA?.code, 'LIMIT_ORDER_CANDLE_FINALIZER_STALE');
   const failureB = await health.evaluate(new Date(), assetB);
@@ -1071,6 +1115,7 @@ async function testNoTradeWindowAdvances(): Promise<void> {
     OrderStatus.submitted,
     'a no-trade window fills nothing',
   );
+  await freshHeartbeats();
   assert.equal(
     await health.evaluate(new Date(), asset),
     null,
@@ -1163,6 +1208,7 @@ async function testAssetRetentionGapIsAssetScoped(): Promise<void> {
 
   const gapCheckpoint = await windowCheckpoint(gapAsset);
   assert.ok(gapCheckpoint?.gapDetectedAt, 'the asset gap must be durable');
+  await freshHeartbeats();
   const gapFailure = await health.evaluate(new Date(), gapAsset);
   assert.equal(gapFailure?.code, 'LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED');
   assert.equal(
@@ -1325,6 +1371,588 @@ async function orderStatusOf(orderId: string): Promise<OrderStatus> {
   ).status;
 }
 
+// ---------------------------------------------------------------------------
+// Deferred-queue revision identity
+// ---------------------------------------------------------------------------
+
+/**
+ * A candle corrected WHILE SITTING IN THE DEFERRED QUEUE. The queue entry
+ * tracks revision 1; the forward scan must re-surface revision 2 (the entry
+ * only covers the revision it tracks) and processing the current rows must
+ * settle the entry.
+ */
+async function testDeferredRevisionRecovery(): Promise<void> {
+  const asset = await createAsset('rev-deferred', { withPriceSnapshot: false });
+  const scenario = await createSubmittedOrder({
+    label: 'rev-deferred',
+    assetIdOverride: asset,
+  });
+  const candle = await createClosedCandle({
+    openTime: scenario.eligibleFrom,
+    low: '90.00000000',
+    assetIdOverride: asset,
+  });
+  syncVerdict = () => 'fail';
+
+  await sweep.reconcile({ now: afterCandle(candle) });
+  const rev1 = await ingestSeqOf(candle.id);
+  const queued = await prisma.limitOrderDeferredCandle.findUniqueOrThrow({
+    where: { marketCandleId: candle.id },
+  });
+  assert.equal(
+    queued.candleIngestSeq?.toString(),
+    rev1.toString(),
+    'the queue entry must record the revision it tracks',
+  );
+
+  // The correction lands while the entry is still queued. Push the retry far
+  // into the future so ONLY the forward scan can re-surface the candle — that
+  // is the path a lower-revision entry used to suppress forever.
+  await prisma.marketCandle.update({
+    where: { id: candle.id },
+    data: { low: '89.00000000' },
+  });
+  const rev2 = await ingestSeqOf(candle.id);
+  assert.ok(rev2 > rev1, 'the correction must re-sequence the candle');
+  await prisma.limitOrderDeferredCandle.update({
+    where: { marketCandleId: candle.id },
+    data: { nextRetryAt: new Date(Date.now() + 3_600_000) },
+  });
+
+  await seedPriceSnapshot(asset);
+  await forceIngestCeilingSettled();
+  await sweep.reconcile({ now: afterCandle(candle) });
+
+  assert.equal(
+    await prisma.limitOrderDeferredCandle.count({
+      where: { marketCandleId: candle.id },
+    }),
+    0,
+    'processing the corrected revision must settle the queue entry',
+  );
+  assert.equal(await orderStatusOf(scenario.orderId), OrderStatus.executed);
+  const processed = await prisma.limitOrderProcessedCandle.findUniqueOrThrow({
+    where: { marketCandleId: candle.id },
+  });
+  assert.equal(
+    processed.candleIngestSeq.toString(),
+    rev2.toString(),
+    'the processed row must record the revision actually processed',
+  );
+}
+
+/**
+ * THE reactivation regression: revision 1 exhausted its budget and was parked
+ * PERMANENT; a correction produced revision 2. Permanent rows are never
+ * retried and the old scan skipped any candle with a queue entry — revision 2
+ * was silently lost forever. Now: the scan re-surfaces the candle, the entry
+ * is atomically re-pointed (permanent -> deferred, attempts restart), and the
+ * retry fills exactly the orders the correction newly qualifies.
+ */
+async function testPermanentRevisionReactivation(): Promise<void> {
+  const asset = await createAsset('rev-permanent', {
+    withPriceSnapshot: false,
+  });
+  const submittedAt = nextWindowBase();
+  const first = await createSubmittedOrder({
+    label: 'rev-perm-first',
+    assetIdOverride: asset,
+    submittedAt,
+  });
+  const second = await createSubmittedOrder({
+    label: 'rev-perm-second',
+    assetIdOverride: asset,
+    submittedAt,
+    limitPriceOverride: '85.00000000',
+  });
+  const candle = await createClosedCandle({
+    openTime: first.eligibleFrom,
+    low: '90.00000000',
+    assetIdOverride: asset,
+  });
+  syncVerdict = () => 'fail';
+
+  await sweep.reconcile({ now: afterCandle(candle) });
+  const rev1 = await ingestSeqOf(candle.id);
+  // Park it PERMANENT, exactly as an exhausted retry budget would.
+  await prisma.limitOrderDeferredCandle.update({
+    where: { marketCandleId: candle.id },
+    data: {
+      status: 'permanent',
+      nextRetryAt: new Date(Date.now() + 3_600_000),
+    },
+  });
+  const parked = await prisma.limitOrderDeferredCandle.findUniqueOrThrow({
+    where: { marketCandleId: candle.id },
+  });
+
+  // The correction: low 84 — order 2 (limit 85) NEWLY qualifies.
+  await prisma.marketCandle.update({
+    where: { id: candle.id },
+    data: { low: '84.00000000' },
+  });
+  const rev2 = await ingestSeqOf(candle.id);
+  assert.ok(rev2 > rev1);
+
+  // Still no valuation price: the re-surfaced revision fails processing, and
+  // the failure must RE-POINT the entry rather than count another attempt
+  // against the obsolete revision. A strictly later simulated clock, so the
+  // age-anchor reset below is observable.
+  await forceIngestCeilingSettled();
+  await sweep.reconcile({
+    now: new Date(afterCandle(candle).getTime() + 60_000),
+  });
+  const reactivated = await prisma.limitOrderDeferredCandle.findUniqueOrThrow({
+    where: { marketCandleId: candle.id },
+  });
+  assert.equal(
+    reactivated.status,
+    'deferred',
+    'a corrected revision must reactivate a PERMANENT entry',
+  );
+  assert.equal(
+    reactivated.candleIngestSeq?.toString(),
+    rev2.toString(),
+    'the entry must now track the corrected revision',
+  );
+  assert.equal(
+    reactivated.attemptCount,
+    1,
+    'the attempt budget must restart for the new revision',
+  );
+  assert.ok(
+    reactivated.firstDeferredAt.getTime() > parked.firstDeferredAt.getTime(),
+    'backlog age must describe the revision actually being retried',
+  );
+
+  // The valuation source recovers; the ordinary retry drains the entry.
+  await seedPriceSnapshot(asset);
+  await prisma.limitOrderDeferredCandle.update({
+    where: { marketCandleId: candle.id },
+    data: { nextRetryAt: new Date(Date.now() - 1000) },
+  });
+  await sweep.reconcile({ now: new Date() });
+
+  assert.equal(
+    await prisma.limitOrderDeferredCandle.count({
+      where: { marketCandleId: candle.id },
+    }),
+    0,
+  );
+  const firstOrder = await prisma.order.findUniqueOrThrow({
+    where: { id: first.orderId },
+  });
+  const secondOrder = await prisma.order.findUniqueOrThrow({
+    where: { id: second.orderId },
+  });
+  // Both fill at THEIR limit prices (path B never improves on the low), and
+  // exactly once each.
+  assert.equal(firstOrder.status, OrderStatus.executed);
+  assert.equal(firstOrder.executedPrice?.toFixed(8), '100.00000000');
+  assert.equal(secondOrder.status, OrderStatus.executed);
+  assert.equal(secondOrder.executedPrice?.toFixed(8), '85.00000000');
+  for (const orderId of [first.orderId, second.orderId]) {
+    assert.equal(
+      await prisma.walletTransaction.count({ where: { referenceId: orderId } }),
+      1,
+      'reactivation must never double fill',
+    );
+  }
+  // Evidence exists only for the revision that actually filled.
+  const evidence = await prisma.limitOrderCandleEvidence.findMany({
+    where: { marketCandleId: candle.id },
+  });
+  assert.equal(evidence.length, 1);
+  assert.equal(evidence[0].candleIngestSeq.toString(), rev2.toString());
+}
+
+/**
+ * The queue's revision rules, pinned at the repository level against real
+ * PostgreSQL: same revision counts an attempt, a higher revision replaces the
+ * entry's identity and metadata, a lower revision is a strict no-op, and the
+ * revision-guarded resolve never deletes a newer entry.
+ */
+async function testDeferredUpsertRevisionRules(): Promise<void> {
+  const asset = await createAsset('rev-rules', { withPriceSnapshot: true });
+  const otherAsset = await createAsset('rev-rules-b', {
+    withPriceSnapshot: true,
+  });
+  const candle = await createClosedCandle({
+    openTime: nextWindowBase(),
+    low: '90.00000000',
+    assetIdOverride: asset,
+  });
+  const seq = await ingestSeqOf(candle.id);
+  const future = new Date(Date.now() + 3_600_000);
+  const t0 = new Date('2026-07-23T10:00:00.000Z');
+  const t1 = new Date('2026-07-23T10:05:00.000Z');
+  const t2 = new Date('2026-07-23T10:10:00.000Z');
+  const t3 = new Date('2026-07-23T10:15:00.000Z');
+
+  const base = {
+    marketCandleId: candle.id,
+    assetId: asset,
+    interval: '5m',
+    openTime: candle.openTime,
+    closeTime: candle.closeTime,
+    nextRetryAt: future,
+  };
+  await checkpoints.upsertDeferred({
+    ...base,
+    candleIngestSeq: seq,
+    now: t0,
+    errorCode: 'E_FIRST',
+    errorMessage: 'first failure',
+  });
+  // Same revision -> one more attempt; firstDeferredAt preserved.
+  await checkpoints.upsertDeferred({
+    ...base,
+    candleIngestSeq: seq,
+    now: t1,
+    errorCode: 'E_RETRY',
+    errorMessage: 'second failure',
+  });
+  let row = await prisma.limitOrderDeferredCandle.findUniqueOrThrow({
+    where: { marketCandleId: candle.id },
+  });
+  assert.equal(row.attemptCount, 2);
+  assert.equal(row.firstDeferredAt.getTime(), t0.getTime());
+  assert.equal(row.lastErrorCode, 'E_RETRY');
+
+  // Higher revision -> full replacement: identity, metadata, status,
+  // attempts, error, age anchor. Even out of PERMANENT.
+  await prisma.limitOrderDeferredCandle.update({
+    where: { marketCandleId: candle.id },
+    data: { status: 'permanent' },
+  });
+  const shifted = new Date(candle.openTime.getTime() + FIVE_MINUTES_MS);
+  await checkpoints.upsertDeferred({
+    ...base,
+    candleIngestSeq: seq + 10n,
+    assetId: otherAsset,
+    openTime: shifted,
+    closeTime: new Date(shifted.getTime() + FIVE_MINUTES_MS),
+    now: t2,
+    errorCode: 'E_REVISION',
+    errorMessage: 'revision failure',
+  });
+  row = await prisma.limitOrderDeferredCandle.findUniqueOrThrow({
+    where: { marketCandleId: candle.id },
+  });
+  assert.equal(row.candleIngestSeq?.toString(), (seq + 10n).toString());
+  assert.equal(row.status, 'deferred');
+  assert.equal(row.attemptCount, 1);
+  assert.equal(row.assetId, otherAsset);
+  assert.equal(row.openTime.getTime(), shifted.getTime());
+  assert.equal(row.firstDeferredAt.getTime(), t2.getTime());
+  assert.equal(row.lastErrorCode, 'E_REVISION');
+
+  // Lower revision (a late callback for the superseded revision) -> no-op.
+  await checkpoints.upsertDeferred({
+    ...base,
+    candleIngestSeq: seq,
+    now: t3,
+    errorCode: 'E_LATE',
+    errorMessage: 'late duplicate',
+    status: 'permanent',
+  });
+  row = await prisma.limitOrderDeferredCandle.findUniqueOrThrow({
+    where: { marketCandleId: candle.id },
+  });
+  assert.equal(row.candleIngestSeq?.toString(), (seq + 10n).toString());
+  assert.equal(row.status, 'deferred');
+  assert.equal(row.attemptCount, 1);
+  assert.equal(row.lastErrorCode, 'E_REVISION');
+
+  // Revision-guarded resolve: settling an OLDER revision must not delete the
+  // newer entry; settling the tracked revision does.
+  await checkpoints.resolveDeferred(candle.id, seq);
+  assert.equal(
+    await prisma.limitOrderDeferredCandle.count({
+      where: { marketCandleId: candle.id },
+    }),
+    1,
+    'resolving a superseded revision must leave the newer entry',
+  );
+  await checkpoints.resolveDeferred(candle.id, seq + 10n);
+  assert.equal(
+    await prisma.limitOrderDeferredCandle.count({
+      where: { marketCandleId: candle.id },
+    }),
+    0,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Window-completion heartbeat separation
+// ---------------------------------------------------------------------------
+
+/**
+ * THE hidden-failure regression: the completion pass throws, the row scan
+ * continues and used to stamp the ONLY heartbeat — so a safety net that was
+ * blind to absent rows looked perfectly healthy. The two heartbeats are now
+ * separate and the gate reads BOTH.
+ */
+async function testCompletionFailureNotHidden(): Promise<void> {
+  const failingCompletion = {
+    supervise: () => Promise.reject(new Error('completion exploded')),
+  } as unknown as LimitOrderWindowCompletionService;
+  const failingSweep = new LimitOrderCandleReconciliationService(
+    prisma,
+    new LimitOrderCandidateRepository(prisma),
+    execution,
+    boundary,
+    checkpoints,
+    failingCompletion,
+  );
+
+  const now = new Date();
+  const summary = await failingSweep.reconcile({ now });
+  assert.equal(summary.rowScanSucceeded, true, 'the row scan must continue');
+  assert.equal(
+    summary.windowCompletion?.succeeded,
+    false,
+    'the failure must be reported explicitly, never as silent success',
+  );
+
+  const checkpoint = await checkpoints.find();
+  assert.ok(checkpoint);
+  assert.equal(
+    checkpoint.lastSuccessfulRunAt?.getTime(),
+    now.getTime(),
+    'the row-scan heartbeat moves',
+  );
+  assert.equal(checkpoint.lastWindowCompletionRunAt?.getTime(), now.getTime());
+  assert.notEqual(
+    checkpoint.lastWindowCompletionSuccessfulAt?.getTime(),
+    now.getTime(),
+    'the completion SUCCESS heartbeat must not move on a failed pass',
+  );
+  assert.equal(
+    checkpoint.windowCompletionErrorCode,
+    'LIMIT_ORDER_WINDOW_COMPLETION_FAILED',
+  );
+  assert.ok(checkpoint.windowCompletionConsecutiveFailures >= 1);
+
+  // Gate: row scan fresh + completion success stale -> COMPLETION_STALE.
+  await checkpoints.markRunSucceeded(new Date());
+  await prisma.limitOrderReconciliationCheckpoint.updateMany({
+    where: { scope: LIMIT_ORDER_RECONCILIATION_SCOPE },
+    data: {
+      lastWindowCompletionSuccessfulAt: new Date(Date.now() - 3_600_000),
+    },
+  });
+  assert.equal(
+    (await health.evaluate(new Date()))?.code,
+    'LIMIT_ORDER_CANDLE_COMPLETION_STALE',
+  );
+  // And a pass that NEVER succeeded -> COMPLETION_UNAVAILABLE.
+  await prisma.limitOrderReconciliationCheckpoint.updateMany({
+    where: { scope: LIMIT_ORDER_RECONCILIATION_SCOPE },
+    data: { lastWindowCompletionSuccessfulAt: null },
+  });
+  assert.equal(
+    (await health.evaluate(new Date()))?.code,
+    'LIMIT_ORDER_CANDLE_COMPLETION_UNAVAILABLE',
+  );
+
+  // Recovery: one healthy pass clears the error state and reopens the gate.
+  syncVerdict = () => 'fail';
+  await sweep.reconcile({ now: new Date() });
+  const recovered = await checkpoints.find();
+  assert.equal(recovered?.windowCompletionErrorCode, null);
+  assert.equal(recovered?.windowCompletionConsecutiveFailures, 0);
+  assert.ok(recovered?.lastWindowCompletionSuccessfulAt);
+  assert.equal(await health.evaluate(new Date()), null);
+}
+
+/**
+ * Missing-checkpoint policy: with a submitted path-B order the asset is OWED
+ * completion accounting, so an absent checkpoint fails closed; without such
+ * an order nothing is owed and the absence passes.
+ */
+async function testSubmittedOrderWithoutCheckpoint(): Promise<void> {
+  const asset = await createAsset('no-ckpt', { withPriceSnapshot: true });
+  const scenario = await createSubmittedOrder({
+    label: 'no-ckpt',
+    assetIdOverride: asset,
+  });
+  await freshHeartbeats();
+
+  const failure = await health.evaluate(new Date(), asset);
+  assert.equal(
+    failure?.code,
+    'LIMIT_ORDER_CANDLE_COMPLETION_UNAVAILABLE',
+    'a submitted order with no completion checkpoint must fail closed',
+  );
+
+  await prisma.order.deleteMany({ where: { id: scenario.orderId } });
+  assert.equal(
+    await health.evaluate(new Date(), asset),
+    null,
+    'with no activated order, a missing checkpoint owes nothing',
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Asset-scoped permanent isolation + emergency global tier
+// ---------------------------------------------------------------------------
+
+async function testAssetPermanentIsolation(): Promise<void> {
+  const assetA = await createAsset('perm-a', { withPriceSnapshot: true });
+  const assetB = await createAsset('perm-b', { withPriceSnapshot: true });
+  // The limit sits BELOW the candle low, so the sweep itself never examines
+  // the candle; the permanent entry below is planted by hand.
+  const orderA = await createSubmittedOrder({
+    label: 'perm-a',
+    assetIdOverride: assetA,
+    limitPriceOverride: '50.00000000',
+  });
+  const orderB = await createSubmittedOrder({
+    label: 'perm-b',
+    assetIdOverride: assetB,
+  });
+  // A real candle row backs the permanent entry (the queue deliberately has
+  // no FK, but an orphaned entry raises the retention-gap alarm instead).
+  const candleA = await createClosedCandle({
+    openTime: orderA.eligibleFrom,
+    low: '90.00000000',
+    assetIdOverride: assetA,
+  });
+  // Give both assets completion checkpoints via a provider-confirmed pass.
+  syncVerdict = () => 'covered';
+  await sweep.reconcile({ now: new Date() });
+  syncVerdict = () => 'fail';
+
+  await checkpoints.upsertDeferred({
+    marketCandleId: candleA.id,
+    candleIngestSeq: await ingestSeqOf(candleA.id),
+    assetId: assetA,
+    interval: '5m',
+    openTime: candleA.openTime,
+    closeTime: candleA.closeTime,
+    now: new Date(),
+    nextRetryAt: new Date(Date.now() + 3_600_000),
+    errorCode: 'E_PERMANENT',
+    errorMessage: 'parked for the isolation scenario',
+    status: 'permanent',
+  });
+  await freshHeartbeats();
+
+  assert.equal(
+    (await health.evaluate(new Date(), assetA))?.code,
+    'LIMIT_ORDER_CANDLE_ASSET_PERMANENT_FAILURE',
+    "asset A's permanent entry must block asset A",
+  );
+  assert.equal(
+    await health.evaluate(new Date(), assetB),
+    null,
+    "asset A's permanent entry must NOT block asset B",
+  );
+  assert.equal(
+    await health.evaluate(new Date()),
+    null,
+    'one permanent entry is asset-scoped, never a global outage',
+  );
+
+  // Spec scenario E: a corrected revision drains the permanent entry and the
+  // asset recovers on its own — no operator surgery on the queue. Low 45 now
+  // touches the 50 limit, so the corrected revision newly qualifies order A.
+  await prisma.marketCandle.update({
+    where: { id: candleA.id },
+    data: { low: '45.00000000' },
+  });
+  await forceIngestCeilingSettled();
+  await sweep.reconcile({ now: new Date() });
+  assert.equal(await orderStatusOf(orderA.orderId), OrderStatus.executed);
+  assert.equal(
+    await prisma.limitOrderDeferredCandle.count({
+      where: { marketCandleId: candleA.id },
+    }),
+    0,
+  );
+  await freshHeartbeats();
+  assert.equal(
+    await health.evaluate(new Date(), assetA),
+    null,
+    'processing the corrected revision must restore the asset gate',
+  );
+
+  await prisma.order.deleteMany({ where: { id: orderB.orderId } });
+}
+
+async function testEmergencyGlobalBacklog(): Promise<void> {
+  const asset = await createAsset('emergency', { withPriceSnapshot: true });
+  const bystander = await createAsset('emergency-bystander', {
+    withPriceSnapshot: true,
+  });
+  const candles = [] as Array<Awaited<ReturnType<typeof createClosedCandle>>>;
+  // No orders exist on this asset, so the sweep never examines these rows;
+  // they exist only to back the queue entries with real candles.
+  for (let index = 0; index < 3; index += 1) {
+    candles.push(
+      await createClosedCandle({
+        openTime: nextWindowBase(),
+        low: '90.00000000',
+        assetIdOverride: asset,
+      }),
+    );
+  }
+  for (const candle of candles) {
+    await checkpoints.upsertDeferred({
+      marketCandleId: candle.id,
+      candleIngestSeq: await ingestSeqOf(candle.id),
+      assetId: asset,
+      interval: '5m',
+      openTime: candle.openTime,
+      closeTime: candle.closeTime,
+      now: new Date(),
+      nextRetryAt: new Date(Date.now() + 3_600_000),
+      errorCode: 'E_EMERGENCY',
+      errorMessage: 'emergency backlog fixture',
+      status: 'deferred',
+    });
+  }
+
+  // A gate configured with a LOW emergency ceiling, so three entries breach
+  // it without allocating dozens of fixture windows. The asset threshold sits
+  // below it, as the config validation enforces in production too.
+  const previous = { ...process.env };
+  Object.assign(process.env, {
+    LIMIT_ORDER_CANDLE_RECONCILIATION_MAX_DEFERRED_BACKLOG: '2',
+    LIMIT_ORDER_CANDLE_MAX_ASSET_DEFERRED_BACKLOG: '1',
+  });
+  let strictHealth: LimitOrderCandleReconciliationHealthService;
+  try {
+    strictHealth = new LimitOrderCandleReconciliationHealthService(
+      checkpoints,
+    );
+  } finally {
+    for (const key of Object.keys(process.env)) {
+      if (!(key in previous)) delete process.env[key];
+    }
+    Object.assign(process.env, previous);
+  }
+
+  await freshHeartbeats();
+  assert.equal(
+    (await strictHealth.evaluate(new Date()))?.code,
+    'LIMIT_ORDER_CANDLE_RECONCILIATION_BACKLOG_EXCEEDED',
+    'the emergency tier trips on TOTAL queue size',
+  );
+  assert.equal(
+    (await strictHealth.evaluate(new Date(), bystander))?.code,
+    'LIMIT_ORDER_CANDLE_RECONCILIATION_BACKLOG_EXCEEDED',
+    'an emergency blocks EVERY asset, including healthy bystanders',
+  );
+
+  await prisma.limitOrderDeferredCandle.deleteMany({
+    where: { marketCandleId: { in: candles.map((candle) => candle.id) } },
+  });
+  await freshHeartbeats();
+  assert.equal(await health.evaluate(new Date()), null);
+}
+
 async function testRetentionGapDetected(): Promise<void> {
   const config = readLimitOrderCandleReconciliationConfig();
   // Push the watermark behind the candle RETENTION HORIZON. That is exactly
@@ -1385,7 +2013,7 @@ async function testGapFailsClosed(): Promise<void> {
       degradedReason: null,
     },
   });
-  await checkpoints.markRunSucceeded(new Date());
+  await freshHeartbeats();
   assert.equal(
     await health.evaluate(new Date()),
     null,

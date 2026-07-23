@@ -165,6 +165,15 @@ jobs:
         run: pnpm exec prisma migrate deploy
       - name: Verify migrations are fully applied
         run: pnpm exec prisma migrate status
+      # Schema drift gate: the deployed database must express EXACTLY what
+      # schema.prisma declares (index names pinned with `map:` included).
+      # --exit-code returns 2 on any difference, failing the job.
+      - name: Verify no schema drift against the deployed database
+        run: >-
+          pnpm exec prisma migrate diff
+          --from-config-datasource
+          --to-schema prisma/schema.prisma
+          --exit-code
       # Reservation atomicity, deterministic lock interleavings, post-lock DB
       # time boundaries, the live-trade Redis Stream matcher (path A: pending
       # recovery, leader takeover, accounting, event dedupe, stream-ID

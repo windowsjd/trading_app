@@ -53,7 +53,15 @@ export type ProviderSubscriptionState =
 export type AssetTradeReadinessFailureCode =
   | 'LIMIT_ORDER_PROVIDER_UNAVAILABLE'
   | 'LIMIT_ORDER_PROVIDER_NOT_SUBSCRIBED'
-  | 'LIMIT_ORDER_PROVIDER_SUBSCRIPTION_FAILED';
+  | 'LIMIT_ORDER_PROVIDER_SUBSCRIPTION_FAILED'
+  // Shared-readiness only: the record in Redis is not backed by a LIVE
+  // provider owner lease (absent, or held under a different token than the
+  // one the fencing epoch was issued to). Local registry reads never emit
+  // these — a process that owns the socket IS the lease holder.
+  | 'LIMIT_ORDER_PROVIDER_OWNER_LEASE_LOST'
+  // Shared-readiness only: the record's fencing epoch is not the CURRENT
+  // Redis epoch, i.e. it was published by a superseded owner.
+  | 'LIMIT_ORDER_PROVIDER_READINESS_EPOCH_MISMATCH';
 
 export type AssetTradeReadiness =
   | {

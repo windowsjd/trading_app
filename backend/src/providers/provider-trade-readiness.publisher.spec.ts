@@ -338,6 +338,80 @@ describe('ProviderTradeReadinessPublisher owner-lease fencing', () => {
     });
   });
 
+  it('releases its own stale record the tick after the owner lease is cleared', async () => {
+    // `clearOwnerLease` is what the supervisor calls the instant it loses the
+    // socket lease mid-connection. The record this process already published
+    // must not sit in Redis until its TTL: the next tick compare-and-deletes
+    // it, so even a reader on the OLD read path fails closed immediately.
+    const routes = connectedRoutes();
+    const { store, released } = storeStub();
+    const publisher = new ProviderTradeReadinessPublisher(
+      routes,
+      store,
+      config(),
+    );
+    await publisher.publishOnce(1000);
+    expect(released).toEqual([]);
+
+    routes.clearOwnerLease('binance', 'live_candle_supervisor');
+    await publisher.publishOnce(2000);
+
+    expect(released).toEqual([{ fencingEpoch: 1, generation: GENERATION }]);
+    expect(publisher.ownershipSnapshot().binance).toMatchObject({
+      fencingEpoch: null,
+      generation: null,
+    });
+  });
+
+  it('releases the old-token record before acquiring under a rotated lease token', async () => {
+    let epoch = 0;
+    const { store, calls, released } = storeStub({
+      acquire: () => ({ acquired: true, fencingEpoch: ++epoch, reason: null }),
+    });
+    const routes = connectedRoutes();
+    const publisher = new ProviderTradeReadinessPublisher(
+      routes,
+      store,
+      config(),
+    );
+    await publisher.publishOnce(1000);
+
+    // A NEW ownership (same process, new token): the record published under
+    // the OLD token is stale-by-authority and is released before anything is
+    // published under the new epoch.
+    routes.setOwnerLease('binance', 'live_candle_supervisor', {
+      key: LEASE_KEY,
+      token: 'lease-token-b',
+    });
+    calls.length = 0;
+    await publisher.publishOnce(2000);
+
+    expect(released).toEqual([{ fencingEpoch: 1, generation: GENERATION }]);
+    expect(calls.indexOf('release')).toBeLessThan(calls.indexOf('acquire'));
+    expect(publisher.ownershipSnapshot().binance.fencingEpoch).toBe(2);
+  });
+
+  it('attempts a guarded release of its own record when fenced out', async () => {
+    let accept = true;
+    const { store, released } = storeStub({ publishMeta: () => accept });
+    const publisher = new ProviderTradeReadinessPublisher(
+      connectedRoutes(),
+      store,
+      config(),
+    );
+    await publisher.publishOnce(1000);
+
+    accept = false;
+    await publisher.publishOnce(2000);
+
+    // The release is COMPARE-AND-DELETE inside the store (owner + generation
+    // + epoch against the stored meta), so when a successor already
+    // republished this is a harmless no-op — and when the lease merely
+    // EXPIRED with no successor, it removes this process's unprovable record
+    // instead of leaving it to its TTL.
+    expect(released).toEqual([{ fencingEpoch: 1, generation: GENERATION }]);
+  });
+
   it('releases its own generation with its own epoch on shutdown', async () => {
     const { store, released } = storeStub();
     const publisher = new ProviderTradeReadinessPublisher(

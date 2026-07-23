@@ -26,6 +26,10 @@ import {
   validateQuotedLimitReservationBasis,
   type QuotedLimitReservationBasis,
 } from './limit-order-policy';
+import {
+  FIVE_MINUTES_MS,
+  LIMIT_ORDER_CANDLE_INTERVAL,
+} from './limit-matching/limit-order-candle-eligibility';
 import { OrderReservationService } from './order-reservation.service';
 import {
   formatOrderResponse,
@@ -496,6 +500,38 @@ export class LimitOrderCreateService {
       },
       select: { id: true },
     });
+
+    // 2b) Bootstrap the asset's window-completion checkpoint IN THE SAME
+    // transaction as the order that makes the asset owe completion. Without
+    // this, the asset-scoped health gate would see "submitted path-B order,
+    // no checkpoint" (fail-closed) for every create between the first order
+    // and the next sweep tick. ON CONFLICT DO NOTHING never moves an existing
+    // cursor; a rollback of this create rolls the checkpoint back with it;
+    // concurrent creates are serialized by the unique (asset_id, interval)
+    // key. The anchor mirrors the supervisor's bootstrap: everything before
+    // the order's first eligible window is vacuously complete.
+    if (input.candleMatchingEligibleFrom) {
+      const anchor = new Date(
+        Math.floor(
+          input.candleMatchingEligibleFrom.getTime() / FIVE_MINUTES_MS,
+        ) * FIVE_MINUTES_MS,
+      );
+      await tx.$executeRaw`
+        INSERT INTO "market_candle_finalization_checkpoints" (
+          "asset_id", "interval",
+          "finalized_through_open_time", "finalized_through_close_time",
+          "created_at", "updated_at"
+        ) VALUES (
+          ${input.quote.asset.id},
+          ${LIMIT_ORDER_CANDLE_INTERVAL},
+          ${new Date(anchor.getTime() - FIVE_MINUTES_MS)},
+          ${anchor},
+          ${input.submittedAt},
+          ${input.submittedAt}
+        )
+        ON CONFLICT ("asset_id", "interval") DO NOTHING
+      `;
+    }
 
     // 3) Consume the quote inside the same transaction.
     const consumeResult = await tx.quote.updateMany({

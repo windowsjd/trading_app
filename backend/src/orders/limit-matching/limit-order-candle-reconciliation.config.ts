@@ -72,9 +72,26 @@ export type LimitOrderCandleReconciliationConfig = {
    * 60s Ops tick), not the watermark's deliberate safety lag.
    */
   healthMaxAgeMs: number;
-  /** Health gate: open deferred backlog size that fails closed. */
+  /**
+   * Health gate: how long ago the WINDOW-COMPLETION pass may last have
+   * SUCCEEDED before new quotes/creates fail closed. Separate from
+   * healthMaxAgeMs because the two heartbeats are separate: a completion pass
+   * that keeps failing must not hide behind a healthy row-scan heartbeat.
+   */
+  completionHealthMaxAgeMs: number;
+  /**
+   * Health gate: EMERGENCY GLOBAL backlog threshold on the total deferred +
+   * permanent queue size across ALL assets. Asset-scoped isolation is the
+   * normal containment (maxAssetDeferredBacklog); this trips only when the
+   * whole queue grows to a size that threatens system capacity, and it blocks
+   * every asset. Keep it comfortably above maxAssetDeferredBacklog.
+   */
   maxDeferredBacklog: number;
-  /** Health gate: oldest open deferral age that fails closed. */
+  /**
+   * ASSET-scoped health gate: oldest open deferral age (for one asset) that
+   * fails that asset closed. Deliberately not a global trigger — one asset's
+   * stuck candle must not block every other asset's new orders.
+   */
   maxDeferredAgeMs: number;
   /** Health gate: repeated reservation mismatches that fail closed. */
   maxReservationMismatchCount: number;
@@ -211,6 +228,13 @@ export function readLimitOrderCandleReconciliationConfig(
       60_000,
       86_400_000,
     ),
+    completionHealthMaxAgeMs: readInteger(
+      env,
+      'LIMIT_ORDER_CANDLE_COMPLETION_HEALTH_MAX_AGE_MS',
+      300_000,
+      60_000,
+      86_400_000,
+    ),
     maxDeferredBacklog: readInteger(
       env,
       'LIMIT_ORDER_CANDLE_RECONCILIATION_MAX_DEFERRED_BACKLOG',
@@ -247,6 +271,14 @@ export function readLimitOrderCandleReconciliationConfig(
   if (config.deferredRetryMaxDelayMs < config.deferredRetryBaseDelayMs) {
     throw new LimitOrderMatchingConfigError(
       'LIMIT_ORDER_CANDLE_RECONCILIATION_DEFERRED_RETRY_MAX_DELAY_MS must be greater than or equal to LIMIT_ORDER_CANDLE_RECONCILIATION_DEFERRED_RETRY_BASE_DELAY_MS.',
+    );
+  }
+  // The global threshold is the EMERGENCY tier above the per-asset gate. A
+  // global bound at or below the asset bound would let a single asset's
+  // contained backlog trip the whole-system gate, defeating asset isolation.
+  if (config.maxDeferredBacklog < config.maxAssetDeferredBacklog) {
+    throw new LimitOrderMatchingConfigError(
+      'LIMIT_ORDER_CANDLE_RECONCILIATION_MAX_DEFERRED_BACKLOG must be greater than or equal to LIMIT_ORDER_CANDLE_MAX_ASSET_DEFERRED_BACKLOG.',
     );
   }
   // The bootstrap reach must cover at least the window the watermark

@@ -83,6 +83,10 @@ import type {
  *     compared anywhere in the ownership decision.
  *   - releases compare epoch + generation + owner against the STORED meta, so
  *     a late release from a replaced owner is a no-op.
+ *   - every READ re-verifies the same chain atomically: live lease present,
+ *     lease token == epoch-holder, current epoch == meta.fencingEpoch. A
+ *     record whose owner lost the real lease is unusable the INSTANT the
+ *     lease is gone, not when the record's TTL happens to lapse.
  *
  * FAIL-CLOSED
  * -----------
@@ -286,10 +290,36 @@ return 1
 `;
 
 /**
- * Single-round-trip readiness read: resolves the current generation from the
- * meta record and reads the asset field of THAT generation's hash. Doing both
- * in one script removes the window where a reconnect lands between the two
- * reads and the caller mixes a new meta with an old asset record.
+ * Single-round-trip readiness read that verifies the record is backed by the
+ * LIVE provider owner lease, atomically with the read itself.
+ *
+ * Write-time fencing alone leaves a window: an owner publishes, then loses
+ * the real socket lease, and the meta key's TTL keeps the stale record
+ * readable until it expires. A reader that only checks the meta would issue
+ * a readiness proof — and admit a Create — against a provider connection
+ * that provably has no live owner. This script closes that window by
+ * re-deriving, inside ONE atomic Redis call, the same chain of authority the
+ * write path enforces:
+ *
+ *   1.  meta exists                                   (else no_meta)
+ *   2.  meta parses as JSON                           (else malformed_meta)
+ *   3.  meta.schemaVersion is the current version     (else malformed_meta)
+ *   4.  meta.generation exists                        (else malformed_meta)
+ *   5.  meta.fencingEpoch is a usable number          (else malformed_meta)
+ *   6.  the REAL provider owner lease key exists      (else lease_absent)
+ *   7.  the live lease token IS the token the current
+ *       epoch was issued to (epoch-holder)            (else lease_holder_mismatch)
+ *   8.  the current Redis epoch exists                (else epoch_missing)
+ *   9.  the current Redis epoch IS meta.fencingEpoch  (else epoch_mismatch)
+ *   10. the generation-scoped hash has the asset      (else no_asset)
+ *   11. the asset record parses with the current
+ *       schemaVersion                                 (else malformed_asset)
+ *   12. the asset record's generation IS the meta's   (else generation_mismatch)
+ *
+ * No timestamp and no ownerInstance string participates in any of these
+ * decisions: ownership is the lease + the monotonic epoch, nothing else.
+ * Timestamps remain liveness/diagnostic inputs only, applied by the caller.
+ * Every non-ok status is fail-closed.
  */
 const READ_READINESS_SCRIPT = `
 local meta = redis.call('GET', KEYS[1])
@@ -297,13 +327,48 @@ if not meta then
   return { 'no_meta' }
 end
 local ok, decoded = pcall(cjson.decode, meta)
-if not ok or not decoded or not decoded.generation then
-  return { 'no_meta' }
+if not ok or type(decoded) ~= 'table' then
+  return { 'malformed_meta' }
+end
+if tostring(decoded.schemaVersion) ~= ARGV[3] then
+  return { 'malformed_meta' }
+end
+if not decoded.generation or decoded.generation == '' then
+  return { 'malformed_meta' }
+end
+local metaEpoch = tonumber(decoded.fencingEpoch)
+if not metaEpoch or metaEpoch < 1 then
+  return { 'malformed_meta' }
+end
+local lease = redis.call('GET', KEYS[2])
+if not lease then
+  return { 'lease_absent' }
+end
+local holder = redis.call('GET', KEYS[4])
+if not holder or holder ~= lease then
+  return { 'lease_holder_mismatch' }
+end
+local epoch = redis.call('GET', KEYS[3])
+if not epoch then
+  return { 'epoch_missing' }
+end
+if tonumber(epoch) ~= metaEpoch then
+  return { 'epoch_mismatch' }
 end
 local assetsKey = ARGV[1] .. ':gen:' .. decoded.generation .. ':assets'
 local record = redis.call('HGET', assetsKey, ARGV[2])
 if not record then
   return { 'no_asset', meta }
+end
+local rok, rdecoded = pcall(cjson.decode, record)
+if not rok or type(rdecoded) ~= 'table' then
+  return { 'malformed_asset', meta }
+end
+if tostring(rdecoded.schemaVersion) ~= ARGV[3] then
+  return { 'malformed_asset', meta }
+end
+if rdecoded.generation ~= decoded.generation then
+  return { 'generation_mismatch', meta }
 end
 return { 'ok', meta, record }
 `;
@@ -544,8 +609,17 @@ export class ProviderTradeReadinessStore {
     try {
       raw = await this.redis.eval(
         READ_READINESS_SCRIPT,
-        [providerMetaKey(input.provider)],
-        [readinessKeyPrefix(input.provider), input.assetId],
+        [
+          providerMetaKey(input.provider),
+          providerOwnerLeaseKey(input.provider),
+          providerEpochKey(input.provider),
+          providerEpochHolderKey(input.provider),
+        ],
+        [
+          readinessKeyPrefix(input.provider),
+          input.assetId,
+          String(PROVIDER_TRADE_READINESS_SCHEMA_VERSION),
+        ],
       );
     } catch (error) {
       // Redis unavailable is fail-CLOSED. Never assume the subscription is
@@ -566,6 +640,29 @@ export class ProviderTradeReadinessStore {
       return unavailable(
         `No instance is publishing a ${input.provider} canonical trade connection.`,
       );
+    }
+    if (status === 'malformed_meta') {
+      return unavailable(
+        `The shared ${input.provider} trade readiness record is not readable.`,
+      );
+    }
+    // The record exists but the REAL provider owner lease behind it is gone or
+    // belongs to a different token than the fencing epoch was issued to. The
+    // record is stale-by-authority regardless of its TTL: fail closed NOW, not
+    // when the TTL happens to lapse.
+    if (status === 'lease_absent' || status === 'lease_holder_mismatch') {
+      return {
+        ready: false,
+        code: 'LIMIT_ORDER_PROVIDER_OWNER_LEASE_LOST',
+        reason: `The ${input.provider} canonical trade connection has no live owner lease backing its shared readiness.`,
+      };
+    }
+    if (status === 'epoch_missing' || status === 'epoch_mismatch') {
+      return {
+        ready: false,
+        code: 'LIMIT_ORDER_PROVIDER_READINESS_EPOCH_MISMATCH',
+        reason: `The shared ${input.provider} trade readiness record was published under a superseded fencing epoch.`,
+      };
     }
 
     const meta = parseJson<SharedProviderMeta>(reply[1]);
@@ -602,19 +699,14 @@ export class ProviderTradeReadinessStore {
       );
     }
 
-    if (status !== 'ok') {
+    if (status === 'no_asset') {
       return {
         ready: false,
         code: 'LIMIT_ORDER_PROVIDER_NOT_SUBSCRIBED',
         reason: `The asset is not part of the current ${input.provider} subscription target set.`,
       };
     }
-
-    const record = parseJson<SharedAssetRecord>(reply[2]);
-    if (
-      !record ||
-      record.schemaVersion !== PROVIDER_TRADE_READINESS_SCHEMA_VERSION
-    ) {
+    if (status === 'malformed_asset') {
       return unavailable(
         `The shared ${input.provider} asset readiness record is not readable.`,
       );
@@ -622,9 +714,28 @@ export class ProviderTradeReadinessStore {
     // The hash is generation-scoped, so this can only differ if a record was
     // written into the wrong key. Treat the disagreement as unavailable rather
     // than trusting either side.
-    if (record.generation !== meta.generation) {
+    if (status === 'generation_mismatch') {
       return unavailable(
         `The shared ${input.provider} asset readiness record belongs to a superseded connection generation.`,
+      );
+    }
+    if (status !== 'ok') {
+      // Unknown status from a mixed-version deployment: not evidence.
+      return unavailable(
+        `The shared ${input.provider} trade readiness read returned an unknown status.`,
+      );
+    }
+
+    const record = parseJson<SharedAssetRecord>(reply[2]);
+    if (
+      !record ||
+      record.schemaVersion !== PROVIDER_TRADE_READINESS_SCHEMA_VERSION ||
+      record.generation !== meta.generation
+    ) {
+      // The script already verified these; re-parsing defensively here means a
+      // truncated reply or a script/store version skew still fails closed.
+      return unavailable(
+        `The shared ${input.provider} asset readiness record is not readable.`,
       );
     }
     if (record.state === 'capped') {

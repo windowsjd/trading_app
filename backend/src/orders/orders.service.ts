@@ -539,6 +539,64 @@ const ORDER_EXECUTION_SELECT = {
   },
 } as const;
 
+/**
+ * Everything the idempotent-create replay needs to return the stored first
+ * response (or rebuild a faithful payload for rows predating
+ * responsePayloadJson). Shared by the user-scoped replay-first lookup and the
+ * participant-scoped race-recovery lookup so the two can never drift.
+ */
+const IDEMPOTENT_CREATE_ORDER_SELECT = {
+  id: true,
+  quoteId: true,
+  requestHash: true,
+  responsePayloadJson: true,
+  side: true,
+  orderType: true,
+  status: true,
+  quantity: true,
+  limitPrice: true,
+  executedPrice: true,
+  currencyCode: true,
+  grossAmount: true,
+  feeAmount: true,
+  netAmount: true,
+  assetPriceSnapshotId: true,
+  fxRateSnapshotId: true,
+  reservedAmount: true,
+  reservationReleasedAt: true,
+  cancelReason: true,
+  triggerEventId: true,
+  triggerEventAt: true,
+  matchedAt: true,
+  matchingSource: true,
+  candleEvidence: {
+    select: {
+      marketCandleId: true,
+      interval: true,
+      openTime: true,
+      closeTime: true,
+      triggerLowPrice: true,
+      executionPricePolicy: true,
+    },
+  },
+  submittedAt: true,
+  executedAt: true,
+  canceledAt: true,
+  rejectedAt: true,
+  rejectReason: true,
+  createdAt: true,
+  updatedAt: true,
+  asset: {
+    select: {
+      id: true,
+      symbol: true,
+      name: true,
+      market: true,
+      currencyCode: true,
+    },
+  },
+} as const;
+
 @Injectable()
 export class OrdersService {
   private readonly limitOrderMatchingConfig = readLimitOrderMatchingConfig();
@@ -1110,6 +1168,24 @@ export class OrdersService {
       request,
       quoteId,
     });
+    // IDEMPOTENT REPLAY FIRST — before every health gate and state check. A
+    // create that already COMMITTED owes its caller the stored first
+    // response, whatever has happened since: provider readiness lost, path-B
+    // safety net degraded, matcher down, season ended. Re-running those gates
+    // here would 503 a request whose order and reservation already exist —
+    // the retry storm this replay exists to absorb is most likely EXACTLY
+    // when such a gate is failing. The lookup is scoped to the caller's own
+    // orders (seasonParticipant.userId), never another user's, and does not
+    // require resolving the active season, so a season-ended replay still
+    // returns the original payload. A different request under the same key
+    // is a conflict; only a genuinely NEW key proceeds to the gates below.
+    const replayedOrder = await this.findIdempotentCreateOrderForUser(
+      userId,
+      idempotency.idempotencyKey,
+    );
+    if (replayedOrder) {
+      return this.replayIdempotentCreateOrder(replayedOrder, idempotency);
+    }
     const autoExecutionEnabled = this.isLimitOrderAutoExecutionEnabled();
     const submittedAt = new Date();
     // Path-B state is a slow-moving operational signal (a stuck sweep, a
@@ -1142,14 +1218,6 @@ export class OrdersService {
         await this.assertLimitOrderProviderAvailableAsync(
           await this.findUsableAsset(request.assetId),
         );
-    }
-    const existingOrder = await this.findIdempotentCreateOrder(
-      participant.id,
-      idempotency.idempotencyKey,
-    );
-
-    if (existingOrder) {
-      return this.replayIdempotentCreateOrder(existingOrder, idempotency);
     }
 
     try {
@@ -3869,6 +3937,30 @@ export class OrdersService {
     return value.trim();
   }
 
+  /**
+   * USER-scoped idempotent-create lookup, used by the replay-first step of
+   * limit Create. Scoped by `seasonParticipant.userId` rather than a resolved
+   * participant id so it works WITHOUT reading the active season — which is
+   * what lets a replay succeed after the season ended, or while the season
+   * lookup's prerequisites are failing. Never returns another user's order.
+   * The newest match wins when the same key was (incorrectly) reused across
+   * seasons; the request-hash comparison then replays or conflicts exactly
+   * like the participant-scoped path.
+   */
+  private async findIdempotentCreateOrderForUser(
+    userId: string,
+    idempotencyKey: string,
+  ) {
+    return this.prisma.order.findFirst({
+      where: {
+        idempotencyKey,
+        seasonParticipant: { userId },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: IDEMPOTENT_CREATE_ORDER_SELECT,
+    });
+  }
+
   private async findIdempotentCreateOrder(
     seasonParticipantId: string,
     idempotencyKey: string,
@@ -3878,57 +3970,7 @@ export class OrdersService {
         seasonParticipantId,
         idempotencyKey,
       },
-      select: {
-        id: true,
-        quoteId: true,
-        requestHash: true,
-        responsePayloadJson: true,
-        side: true,
-        orderType: true,
-        status: true,
-        quantity: true,
-        limitPrice: true,
-        executedPrice: true,
-        currencyCode: true,
-        grossAmount: true,
-        feeAmount: true,
-        netAmount: true,
-        assetPriceSnapshotId: true,
-        fxRateSnapshotId: true,
-        reservedAmount: true,
-        reservationReleasedAt: true,
-        cancelReason: true,
-        triggerEventId: true,
-        triggerEventAt: true,
-        matchedAt: true,
-        matchingSource: true,
-        candleEvidence: {
-          select: {
-            marketCandleId: true,
-            interval: true,
-            openTime: true,
-            closeTime: true,
-            triggerLowPrice: true,
-            executionPricePolicy: true,
-          },
-        },
-        submittedAt: true,
-        executedAt: true,
-        canceledAt: true,
-        rejectedAt: true,
-        rejectReason: true,
-        createdAt: true,
-        updatedAt: true,
-        asset: {
-          select: {
-            id: true,
-            symbol: true,
-            name: true,
-            market: true,
-            currencyCode: true,
-          },
-        },
-      },
+      select: IDEMPOTENT_CREATE_ORDER_SELECT,
     });
   }
 

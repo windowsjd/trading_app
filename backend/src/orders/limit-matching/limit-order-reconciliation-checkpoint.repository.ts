@@ -1,4 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import {
+  OrderSide,
+  OrderStatus,
+  OrderType,
+} from '../../generated/prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LIMIT_ORDER_CANDLE_INTERVAL } from './limit-order-candle-eligibility';
 
@@ -75,8 +80,20 @@ export type ReconciliationCheckpoint = {
   ingest: ReconciliationIngestPosition;
   lastScannedOpenTime: Date | null;
   lastScannedCloseTime: Date | null;
+  /** ROW-SCAN heartbeat only; window completion has its own pair below. */
   lastRunAt: Date | null;
   lastSuccessfulRunAt: Date | null;
+  /**
+   * WINDOW-COMPLETION heartbeat, recorded independently of the row scan so a
+   * completion pass that keeps failing can never hide behind a healthy
+   * row-scan heartbeat. `successfulAt` moves ONLY when a pass completed
+   * without throwing.
+   */
+  lastWindowCompletionRunAt: Date | null;
+  lastWindowCompletionSuccessfulAt: Date | null;
+  windowCompletionErrorCode: string | null;
+  windowCompletionErrorMessage: string | null;
+  windowCompletionConsecutiveFailures: number;
   degradedReason: string | null;
   gapDetectedAt: Date | null;
   gapFromOpenTime: Date | null;
@@ -87,6 +104,13 @@ export type ReconciliationCheckpoint = {
 
 export type DeferredCandleRow = {
   marketCandleId: string;
+  /**
+   * Candle revision (MarketCandle.ingestSeq) this entry tracks. NULL only on
+   * rows that predate the column and whose candle row no longer exists (the
+   * backfill stamped every row whose candle survived); read as "unknown =
+   * lowest", so any concrete revision replaces it.
+   */
+  candleIngestSeq: bigint | null;
   assetId: string;
   interval: string;
   openTime: Date;
@@ -103,6 +127,14 @@ export type DeferredBacklog = {
   openCount: number;
   permanentCount: number;
   oldestFirstDeferredAt: Date | null;
+};
+
+/** Per-asset queue state for the ASSET-scoped health gate. */
+export type AssetDeferredBacklog = {
+  deferredCount: number;
+  permanentCount: number;
+  oldestDeferredAt: Date | null;
+  oldestPermanentAt: Date | null;
 };
 
 @Injectable()
@@ -132,6 +164,12 @@ export class LimitOrderReconciliationCheckpointRepository {
       lastScannedCloseTime: row.lastScannedCloseTime,
       lastRunAt: row.lastRunAt,
       lastSuccessfulRunAt: row.lastSuccessfulRunAt,
+      lastWindowCompletionRunAt: row.lastWindowCompletionRunAt,
+      lastWindowCompletionSuccessfulAt: row.lastWindowCompletionSuccessfulAt,
+      windowCompletionErrorCode: row.windowCompletionErrorCode,
+      windowCompletionErrorMessage: row.windowCompletionErrorMessage,
+      windowCompletionConsecutiveFailures:
+        row.windowCompletionConsecutiveFailures,
       degradedReason: row.degradedReason,
       gapDetectedAt: row.gapDetectedAt,
       gapFromOpenTime: row.gapFromOpenTime,
@@ -301,10 +339,56 @@ export class LimitOrderReconciliationCheckpointRepository {
     });
   }
 
+  /**
+   * ROW-SCAN success only. This heartbeat says "the sweep over candle rows
+   * that exist completed"; it deliberately says NOTHING about the
+   * window-completion pass, which records its own heartbeat below — a
+   * completion failure must never be laundered into overall success.
+   */
   async markRunSucceeded(now: Date, scope?: string): Promise<void> {
     await this.prisma.limitOrderReconciliationCheckpoint.updateMany({
       where: { scope: scope ?? LIMIT_ORDER_RECONCILIATION_SCOPE },
       data: { lastRunAt: now, lastSuccessfulRunAt: now },
+    });
+  }
+
+  async markWindowCompletionStarted(now: Date, scope?: string): Promise<void> {
+    await this.prisma.limitOrderReconciliationCheckpoint.updateMany({
+      where: { scope: scope ?? LIMIT_ORDER_RECONCILIATION_SCOPE },
+      data: { lastWindowCompletionRunAt: now },
+    });
+  }
+
+  async markWindowCompletionSucceeded(
+    now: Date,
+    scope?: string,
+  ): Promise<void> {
+    await this.prisma.limitOrderReconciliationCheckpoint.updateMany({
+      where: { scope: scope ?? LIMIT_ORDER_RECONCILIATION_SCOPE },
+      data: {
+        lastWindowCompletionSuccessfulAt: now,
+        windowCompletionErrorCode: null,
+        windowCompletionErrorMessage: null,
+        windowCompletionConsecutiveFailures: 0,
+      },
+    });
+  }
+
+  /** Records the failure; `lastWindowCompletionSuccessfulAt` is NOT touched. */
+  async markWindowCompletionFailed(input: {
+    now: Date;
+    errorCode: string;
+    errorMessage: string | null;
+    scope?: string;
+  }): Promise<void> {
+    await this.prisma.limitOrderReconciliationCheckpoint.updateMany({
+      where: { scope: input.scope ?? LIMIT_ORDER_RECONCILIATION_SCOPE },
+      data: {
+        windowCompletionErrorCode: input.errorCode,
+        windowCompletionErrorMessage:
+          input.errorMessage?.slice(0, 1000) ?? null,
+        windowCompletionConsecutiveFailures: { increment: 1 },
+      },
     });
   }
 
@@ -353,9 +437,32 @@ export class LimitOrderReconciliationCheckpointRepository {
    * Enqueues or re-schedules a candle the sweep could not finish. This MUST
    * succeed before the watermark is allowed to pass the candle: the durable
    * row is the only thing that keeps the retry alive once the position moves.
+   *
+   * REVISION-AWARE, decided atomically inside one conditional upsert against
+   * the STORED row (a read-then-write pair would race a concurrent runner):
+   *
+   *   incoming revision > stored   REVISION REPLACEMENT. The entry is
+   *                                re-pointed at the new revision: candle
+   *                                metadata (asset/interval/window) adopted,
+   *                                status set from the caller (reactivating a
+   *                                PERMANENT entry back to retryable),
+   *                                attempt budget restarted at 1, error
+   *                                fields replaced, and firstDeferredAt reset
+   *                                so backlog age describes the revision
+   *                                actually being retried. A NULL stored
+   *                                revision reads as "unknown = lowest".
+   *   incoming revision = stored   RETRY. attemptCount increments,
+   *                                firstDeferredAt is preserved,
+   *                                lastDeferredAt/nextRetryAt/error move. An
+   *                                incoming NULL (candle row gone) also lands
+   *                                here and never erases a stored revision.
+   *   incoming revision < stored   NO-OP. A late callback for a superseded
+   *                                revision must not overwrite the newer
+   *                                entry's state.
    */
   async upsertDeferred(input: {
     marketCandleId: string;
+    candleIngestSeq: bigint | null;
     assetId: string;
     interval: string;
     openTime: Date;
@@ -367,31 +474,86 @@ export class LimitOrderReconciliationCheckpointRepository {
     status?: 'deferred' | 'permanent';
   }): Promise<void> {
     const message = input.errorMessage?.slice(0, 1000) ?? null;
-    await this.prisma.limitOrderDeferredCandle.upsert({
-      where: { marketCandleId: input.marketCandleId },
-      create: {
-        marketCandleId: input.marketCandleId,
-        assetId: input.assetId,
-        interval: input.interval,
-        openTime: input.openTime,
-        closeTime: input.closeTime,
-        status: input.status ?? 'deferred',
-        firstDeferredAt: input.now,
-        lastDeferredAt: input.now,
-        attemptCount: 1,
-        lastErrorCode: input.errorCode,
-        lastErrorMessage: message,
-        nextRetryAt: input.nextRetryAt,
-      },
-      update: {
-        status: input.status ?? 'deferred',
-        lastDeferredAt: input.now,
-        attemptCount: { increment: 1 },
-        lastErrorCode: input.errorCode,
-        lastErrorMessage: message,
-        nextRetryAt: input.nextRetryAt,
-      },
-    });
+    const status = input.status ?? 'deferred';
+    await this.prisma.$executeRaw`
+      INSERT INTO "limit_order_deferred_candles" AS d (
+        "market_candle_id", "candle_ingest_seq", "asset_id", "interval",
+        "open_time", "close_time", "status", "first_deferred_at",
+        "last_deferred_at", "attempt_count", "last_error_code",
+        "last_error_message", "next_retry_at", "created_at", "updated_at"
+      ) VALUES (
+        ${input.marketCandleId},
+        ${seqParam(input.candleIngestSeq)}::bigint,
+        ${input.assetId},
+        ${input.interval},
+        ${input.openTime},
+        ${input.closeTime},
+        ${status},
+        ${input.now},
+        ${input.now},
+        1,
+        ${input.errorCode},
+        ${message},
+        ${input.nextRetryAt},
+        ${input.now},
+        ${input.now}
+      )
+      ON CONFLICT ("market_candle_id") DO UPDATE SET
+        "candle_ingest_seq" = CASE
+          WHEN EXCLUDED."candle_ingest_seq" IS NOT NULL
+            AND (d."candle_ingest_seq" IS NULL
+              OR EXCLUDED."candle_ingest_seq" > d."candle_ingest_seq")
+          THEN EXCLUDED."candle_ingest_seq"
+          ELSE d."candle_ingest_seq"
+        END,
+        "asset_id" = CASE
+          WHEN EXCLUDED."candle_ingest_seq" IS NOT NULL
+            AND (d."candle_ingest_seq" IS NULL
+              OR EXCLUDED."candle_ingest_seq" > d."candle_ingest_seq")
+          THEN EXCLUDED."asset_id" ELSE d."asset_id"
+        END,
+        "interval" = CASE
+          WHEN EXCLUDED."candle_ingest_seq" IS NOT NULL
+            AND (d."candle_ingest_seq" IS NULL
+              OR EXCLUDED."candle_ingest_seq" > d."candle_ingest_seq")
+          THEN EXCLUDED."interval" ELSE d."interval"
+        END,
+        "open_time" = CASE
+          WHEN EXCLUDED."candle_ingest_seq" IS NOT NULL
+            AND (d."candle_ingest_seq" IS NULL
+              OR EXCLUDED."candle_ingest_seq" > d."candle_ingest_seq")
+          THEN EXCLUDED."open_time" ELSE d."open_time"
+        END,
+        "close_time" = CASE
+          WHEN EXCLUDED."candle_ingest_seq" IS NOT NULL
+            AND (d."candle_ingest_seq" IS NULL
+              OR EXCLUDED."candle_ingest_seq" > d."candle_ingest_seq")
+          THEN EXCLUDED."close_time" ELSE d."close_time"
+        END,
+        "first_deferred_at" = CASE
+          WHEN EXCLUDED."candle_ingest_seq" IS NOT NULL
+            AND (d."candle_ingest_seq" IS NULL
+              OR EXCLUDED."candle_ingest_seq" > d."candle_ingest_seq")
+          THEN EXCLUDED."first_deferred_at" ELSE d."first_deferred_at"
+        END,
+        "attempt_count" = CASE
+          WHEN EXCLUDED."candle_ingest_seq" IS NOT NULL
+            AND (d."candle_ingest_seq" IS NULL
+              OR EXCLUDED."candle_ingest_seq" > d."candle_ingest_seq")
+          THEN 1 ELSE d."attempt_count" + 1
+        END,
+        "status" = EXCLUDED."status",
+        "last_deferred_at" = EXCLUDED."last_deferred_at",
+        "last_error_code" = EXCLUDED."last_error_code",
+        "last_error_message" = EXCLUDED."last_error_message",
+        "next_retry_at" = EXCLUDED."next_retry_at",
+        "updated_at" = EXCLUDED."updated_at"
+      WHERE NOT (
+        EXCLUDED."candle_ingest_seq" IS NOT NULL
+        AND d."candle_ingest_seq" IS NOT NULL
+        AND EXCLUDED."candle_ingest_seq" < d."candle_ingest_seq"
+      )
+    `;
   }
 
   /** Due, still-retryable deferrals, oldest window first. */
@@ -405,6 +567,7 @@ export class LimitOrderReconciliationCheckpointRepository {
       take: input.limit,
       select: {
         marketCandleId: true,
+        candleIngestSeq: true,
         assetId: true,
         interval: true,
         openTime: true,
@@ -419,14 +582,30 @@ export class LimitOrderReconciliationCheckpointRepository {
     });
   }
 
-  async resolveDeferred(marketCandleId: string): Promise<void> {
-    await this.prisma.limitOrderDeferredCandle
-      .delete({ where: { marketCandleId } })
-      .catch((error: unknown) => {
-        // Already resolved by a concurrent runner; nothing to undo.
-        if (isRecordNotFoundError(error)) return undefined;
-        throw error;
-      });
+  /**
+   * Removes the queue entry after the candle was processed.
+   *
+   * Revision-guarded: only entries at or below the revision that was actually
+   * processed (or with an unknown NULL revision) are removed. A concurrent
+   * runner that already re-pointed the entry at a HIGHER revision keeps its
+   * entry — deleting it would silently drop the newer revision's retry.
+   */
+  async resolveDeferred(
+    marketCandleId: string,
+    processedIngestSeq?: bigint | null,
+  ): Promise<void> {
+    await this.prisma.limitOrderDeferredCandle.deleteMany({
+      where:
+        processedIngestSeq === undefined || processedIngestSeq === null
+          ? { marketCandleId }
+          : {
+              marketCandleId,
+              OR: [
+                { candleIngestSeq: null },
+                { candleIngestSeq: { lte: processedIngestSeq } },
+              ],
+            },
+    });
   }
 
   async isDeferred(marketCandleId: string): Promise<boolean> {
@@ -465,11 +644,55 @@ export class LimitOrderReconciliationCheckpointRepository {
     });
   }
 
-  /** Open deferred rows for ONE asset, for the asset-scoped backlog gate. */
-  countAssetDeferred(assetId: string): Promise<number> {
-    return this.prisma.limitOrderDeferredCandle.count({
-      where: { assetId, status: 'deferred' },
+  /**
+   * One asset's queue state for the ASSET-scoped health gate: deferred and
+   * permanent counts plus the age anchors, in a single round trip.
+   */
+  async readAssetBacklog(assetId: string): Promise<AssetDeferredBacklog> {
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        deferredCount: number;
+        permanentCount: number;
+        oldestDeferredAt: Date | null;
+        oldestPermanentAt: Date | null;
+      }>
+    >`
+      SELECT
+        COUNT(*) FILTER (WHERE "status" = 'deferred')::int AS "deferredCount",
+        COUNT(*) FILTER (WHERE "status" = 'permanent')::int AS "permanentCount",
+        MIN("first_deferred_at") FILTER (WHERE "status" = 'deferred') AS "oldestDeferredAt",
+        MIN("first_deferred_at") FILTER (WHERE "status" = 'permanent') AS "oldestPermanentAt"
+      FROM "limit_order_deferred_candles"
+      WHERE "asset_id" = ${assetId}
+    `;
+    const row = rows[0];
+    return {
+      deferredCount: row?.deferredCount ?? 0,
+      permanentCount: row?.permanentCount ?? 0,
+      oldestDeferredAt: row?.oldestDeferredAt ?? null,
+      oldestPermanentAt: row?.oldestPermanentAt ?? null,
+    };
+  }
+
+  /**
+   * Whether the asset currently has a path-B-activated submitted limit buy.
+   * The asset-scoped gate uses this to decide what a MISSING window-completion
+   * checkpoint means: nothing is owed without such an order (pass); with one,
+   * an absent checkpoint means the safety net never accounted for the asset
+   * (fail closed).
+   */
+  async hasSubmittedPathBOrder(assetId: string): Promise<boolean> {
+    const row = await this.prisma.order.findFirst({
+      where: {
+        assetId,
+        orderType: OrderType.limit,
+        side: OrderSide.buy,
+        status: OrderStatus.submitted,
+        candleMatchingEligibleFrom: { not: null },
+      },
+      select: { id: true },
     });
+    return row !== null;
   }
 
   async readBacklog(): Promise<DeferredBacklog> {
@@ -508,10 +731,6 @@ function seqParam(value: bigint | null): string | null {
 
 function isUniqueConstraintError(error: unknown): boolean {
   return hasPrismaCode(error, 'P2002');
-}
-
-function isRecordNotFoundError(error: unknown): boolean {
-  return hasPrismaCode(error, 'P2025');
 }
 
 function hasPrismaCode(error: unknown, code: string): boolean {

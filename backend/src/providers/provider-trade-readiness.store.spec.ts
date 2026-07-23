@@ -257,6 +257,92 @@ describe('ProviderTradeReadinessStore.checkAssetReadiness', () => {
     }
   });
 
+  it('fails closed with OWNER_LEASE_LOST when the live lease is gone or held by another token', async () => {
+    // The record may still be within its TTL — irrelevant. No live lease, no
+    // readiness, IMMEDIATELY. This is the read-side half of the fencing:
+    // write-time checks cannot revoke a record that was published before the
+    // lease died.
+    for (const status of ['lease_absent', 'lease_holder_mismatch']) {
+      expect(await readiness([status])).toMatchObject({
+        ready: false,
+        code: 'LIMIT_ORDER_PROVIDER_OWNER_LEASE_LOST',
+      });
+    }
+  });
+
+  it('fails closed with EPOCH_MISMATCH when the record epoch is not the current Redis epoch', async () => {
+    for (const status of ['epoch_missing', 'epoch_mismatch']) {
+      expect(await readiness([status])).toMatchObject({
+        ready: false,
+        code: 'LIMIT_ORDER_PROVIDER_READINESS_EPOCH_MISMATCH',
+      });
+    }
+  });
+
+  it('fails closed on malformed meta / malformed asset / generation mismatch statuses', async () => {
+    expect(await readiness(['malformed_meta'])).toMatchObject({
+      ready: false,
+      code: 'LIMIT_ORDER_PROVIDER_UNAVAILABLE',
+    });
+    expect(
+      await readiness(['malformed_asset', JSON.stringify(meta())]),
+    ).toMatchObject({
+      ready: false,
+      code: 'LIMIT_ORDER_PROVIDER_UNAVAILABLE',
+    });
+    expect(
+      await readiness(['generation_mismatch', JSON.stringify(meta())]),
+    ).toMatchObject({
+      ready: false,
+      code: 'LIMIT_ORDER_PROVIDER_UNAVAILABLE',
+    });
+  });
+
+  it('fails closed on an unknown status from a mixed-version deployment', async () => {
+    expect(
+      await readiness(['status_from_the_future', JSON.stringify(meta())]),
+    ).toMatchObject({
+      ready: false,
+      code: 'LIMIT_ORDER_PROVIDER_UNAVAILABLE',
+    });
+  });
+
+  it('reads through a script that verifies the LIVE lease, holder and epoch atomically', async () => {
+    const calls: Array<{ script: string; keys: string[]; args: string[] }> = [];
+    const redis = {
+      eval: (script: string, keys: string[], args: string[] = []) => {
+        calls.push({ script, keys, args });
+        return Promise.resolve([
+          'ok',
+          JSON.stringify(meta()),
+          JSON.stringify(record()),
+        ]);
+      },
+      get: () => Promise.resolve(null),
+    } as unknown as RedisService;
+    await new ProviderTradeReadinessStore(redis).checkAssetReadiness({
+      assetId: 'asset-1',
+      provider: 'binance',
+      livenessMaxAgeMs: LIVENESS_MAX_AGE_MS,
+      now: NOW,
+    });
+    // The read must carry the lease, epoch and epoch-holder keys — the same
+    // authority chain the writes are fenced on — so the whole verdict is one
+    // atomic Redis call. Reading the meta alone would trust a record whose
+    // owner already lost the socket.
+    expect(calls[0].keys).toEqual([
+      providerMetaKey('binance'),
+      providerOwnerLeaseKey('binance'),
+      providerEpochKey('binance'),
+      providerEpochHolderKey('binance'),
+    ]);
+    expect(calls[0].script).toContain('lease_absent');
+    expect(calls[0].script).toContain('lease_holder_mismatch');
+    expect(calls[0].script).toContain('epoch_mismatch');
+    // No timestamp participates in the ownership decision.
+    expect(calls[0].script).not.toContain('lastUpdatedAt');
+  });
+
   it('rejects a record with no usable fencing epoch', async () => {
     // Without an epoch the record cannot be attributed to a live owner, so it
     // is not evidence of anything — including an earlier-version record

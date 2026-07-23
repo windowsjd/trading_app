@@ -283,6 +283,10 @@ export function getErrorMessageFromCode(
     case ERROR_CODE.LIMIT_ORDER_PROVIDER_READINESS_PROOF_EXPIRED:
     case ERROR_CODE.LIMIT_ORDER_PROVIDER_READINESS_PROOF_INVALID:
     case ERROR_CODE.LIMIT_ORDER_PROVIDER_GENERATION_CHANGED:
+    // Shared-readiness authority verdicts (lease/epoch). Internal
+    // lease/fencing/epoch vocabulary never reaches the copy.
+    case ERROR_CODE.LIMIT_ORDER_PROVIDER_OWNER_LEASE_LOST:
+    case ERROR_CODE.LIMIT_ORDER_PROVIDER_READINESS_EPOCH_MISMATCH:
       return '이 종목의 실시간 시세 연결이 갱신 중입니다. 잠시 후 다시 시도해주세요.';
     // Path B: the safety net under automatic matching. The copy deliberately
     // does not distinguish the four causes — they are operator signals, and to
@@ -293,6 +297,10 @@ export function getErrorMessageFromCode(
     case ERROR_CODE.LIMIT_ORDER_CANDLE_RECONCILIATION_BACKLOG_EXCEEDED:
     case ERROR_CODE.LIMIT_ORDER_CANDLE_RECONCILIATION_GAP_DETECTED:
     case ERROR_CODE.LIMIT_ORDER_CANDLE_RESERVATION_MISMATCH:
+    // The missing-window supervisor's own heartbeat (separate from the sweep
+    // heartbeat): to the user, the same system-wide safety-net pause.
+    case ERROR_CODE.LIMIT_ORDER_CANDLE_COMPLETION_UNAVAILABLE:
+    case ERROR_CODE.LIMIT_ORDER_CANDLE_COMPLETION_STALE:
       return '지정가 체결 안전장치를 점검 중입니다. 기존 주문은 그대로 유지되며 취소도 가능합니다. 잠시 후 다시 시도해주세요.';
     // Asset-scoped safety-net pauses: only THIS asset's new limit
     // registration is affected, and the copy says so.
@@ -300,6 +308,10 @@ export function getErrorMessageFromCode(
     case ERROR_CODE.LIMIT_ORDER_CANDLE_FINALIZER_STALE:
     case ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_BACKLOG_EXCEEDED:
       return '이 종목의 자동 체결 안전망을 확인하는 중입니다. 이 종목의 신규 지정가 등록만 잠시 제한되며, 기존 주문과 다른 종목은 정상 이용 가능합니다.';
+    // Asset-scoped, operator-owned: this asset's price data needs recovery
+    // before new limit registration can resume for it.
+    case ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_PERMANENT_FAILURE:
+      return '이 종목의 시세 데이터 복구가 필요합니다. 이 종목의 신규 지정가 등록만 잠시 제한되며, 기존 주문과 다른 종목은 정상 이용 가능합니다.';
     case ERROR_CODE.ORDER_CANCEL_NOT_SUPPORTED:
       return '시장가 주문은 취소할 수 없습니다.';
     case ERROR_CODE.ORDER_TYPE_NOT_SUPPORTED:

@@ -3771,6 +3771,11 @@ export const LimitOrderReconciliationCheckpointScalarFieldEnum = {
   lastScannedCloseTime: 'lastScannedCloseTime',
   lastRunAt: 'lastRunAt',
   lastSuccessfulRunAt: 'lastSuccessfulRunAt',
+  lastWindowCompletionRunAt: 'lastWindowCompletionRunAt',
+  lastWindowCompletionSuccessfulAt: 'lastWindowCompletionSuccessfulAt',
+  windowCompletionErrorCode: 'windowCompletionErrorCode',
+  windowCompletionErrorMessage: 'windowCompletionErrorMessage',
+  windowCompletionConsecutiveFailures: 'windowCompletionConsecutiveFailures',
   degradedReason: 'degradedReason',
   gapDetectedAt: 'gapDetectedAt',
   gapFromOpenTime: 'gapFromOpenTime',
@@ -3786,6 +3791,7 @@ export type LimitOrderReconciliationCheckpointScalarFieldEnum = (typeof LimitOrd
 
 export const LimitOrderDeferredCandleScalarFieldEnum = {
   marketCandleId: 'marketCandleId',
+  candleIngestSeq: 'candleIngestSeq',
   assetId: 'assetId',
   interval: 'interval',
   openTime: 'openTime',

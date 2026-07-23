@@ -193,29 +193,23 @@ export class ProviderTradeReadinessPublisher
       // compare-and-delete. The claim is dropped as well: a process with
       // nothing to publish must not keep another instance out, and deleting
       // the meta makes every reader fail closed immediately.
-      const previous = this.published.get(provider);
-      const epoch = this.epochs.get(provider);
-      this.published.delete(provider);
-      this.epochs.delete(provider);
-      if (previous && epoch) {
-        await store
-          .release({
-            provider,
-            generation: previous,
-            ownerInstance: this.config.instanceId,
-            fencingEpoch: epoch.fencingEpoch,
-          })
-          .catch(() => undefined);
-      }
+      await this.releasePublished(provider, 'route_released');
       return;
     }
 
     if (!snapshot.ownerLease) {
       // A local claim with no Redis lease behind it. The legacy streaming
       // service claims routes this way; a supervisor that lost its lease
-      // mid-connection clears the lease the same instant. Neither can prove
-      // ownership to another instance, so neither may publish. Fail-closed:
-      // non-owner API pods will answer "unavailable" for this provider.
+      // mid-connection clears the lease (`clearOwnerLease`) the same instant.
+      // Neither can prove ownership to another instance, so neither may
+      // publish — AND whatever THIS process already published is now a stale
+      // record with no live lease behind it. It must not sit in Redis until
+      // its TTL lapses: readers fail closed on the lease check either way,
+      // but the record's continued existence invites diagnosis confusion and
+      // depends on every reader running the new read path. Compare-and-delete
+      // it NOW; the store's guard (owner + generation + epoch against the
+      // STORED meta) makes this a no-op if a new owner already republished.
+      await this.releasePublished(provider, 'owner_lease_missing');
       if (!this.warnedNoLease.has(provider)) {
         this.warnedNoLease.add(provider);
         this.logger.warn(
@@ -225,7 +219,7 @@ export class ProviderTradeReadinessPublisher
             source: snapshot.source,
             instanceId: this.config.instanceId,
             effect:
-              'shared readiness is not published; only the lease-holding supervisor may publish',
+              'shared readiness is not published; own stale record released; only the lease-holding supervisor may publish',
           }),
         );
       }
@@ -234,8 +228,22 @@ export class ProviderTradeReadinessPublisher
     this.warnedNoLease.delete(provider);
 
     const lease = snapshot.ownerLease;
+    // A NEW lease token (a new ownership, even by the same process) makes
+    // everything published under the OLD token stale-by-authority. Release it
+    // before acquiring under the new token, so no reader window mixes the two.
+    const cached = this.epochs.get(provider);
+    if (cached && cached.leaseToken !== lease.token) {
+      await this.releasePublished(provider, 'lease_token_rotated');
+    }
     const fencingEpoch = await this.ensureFencingEpoch(provider, lease.token);
-    if (fencingEpoch === null) return;
+    if (fencingEpoch === null) {
+      // The route claims a lease this process cannot exchange for an epoch —
+      // the live lease belongs to someone else (or Redis refused). Anything
+      // this process previously published is unprovable now; release it under
+      // the guarded compare-and-delete rather than waiting for the TTL.
+      await this.releasePublished(provider, 'epoch_refused');
+      return;
+    }
 
     // Assets first: a reader that resolves the new generation from the meta
     // must find its hash already populated, otherwise every asset would read
@@ -263,7 +271,7 @@ export class ProviderTradeReadinessPublisher
       ttlSeconds: this.config.ttlSeconds,
     });
     if (!assetsAccepted) {
-      this.handleFencedOut(provider, 'assets');
+      await this.handleFencedOut(provider, 'assets');
       return;
     }
 
@@ -287,7 +295,7 @@ export class ProviderTradeReadinessPublisher
       ttlSeconds: this.config.ttlSeconds,
     });
     if (!accepted) {
-      this.handleFencedOut(provider, 'meta');
+      await this.handleFencedOut(provider, 'meta');
       return;
     }
 
@@ -369,14 +377,18 @@ export class ProviderTradeReadinessPublisher
    * so the shared view keeps exactly one publisher; the local socket and the
    * local registry are untouched, so path A and owner-instance readiness keep
    * working.
+   *
+   * Also attempts a guarded release of what this process previously
+   * published: if a new owner already republished, the compare-and-delete is
+   * a no-op; if the refusal came from a lease that merely EXPIRED (no
+   * successor yet), the release removes this process's now-unprovable record
+   * instead of leaving it to its TTL.
    */
-  private handleFencedOut(
+  private async handleFencedOut(
     provider: TradeRouteProvider,
     stage: 'assets' | 'meta',
-  ): void {
+  ): Promise<void> {
     const surrendered = this.epochs.get(provider)?.fencingEpoch ?? null;
-    this.epochs.delete(provider);
-    this.published.delete(provider);
     this.refusals.set(provider, `fenced_out_${stage}`);
     this.logger.warn(
       JSON.stringify({
@@ -384,6 +396,45 @@ export class ProviderTradeReadinessPublisher
         provider,
         stage,
         surrenderedFencingEpoch: surrendered,
+        instanceId: this.config.instanceId,
+      }),
+    );
+    await this.releasePublished(provider, `fenced_out_${stage}`);
+  }
+
+  /**
+   * Guarded compare-and-delete of the record THIS process published, then
+   * drops the local claim. Deleting a successor's record is impossible: the
+   * store's release script verifies owner instance, generation AND fencing
+   * epoch against the STORED meta before touching anything.
+   */
+  private async releasePublished(
+    provider: TradeRouteProvider,
+    cause: string,
+  ): Promise<void> {
+    const generation = this.published.get(provider);
+    const epoch = this.epochs.get(provider);
+    this.published.delete(provider);
+    this.epochs.delete(provider);
+    // Without the epoch this process cannot prove the record is its own, and
+    // a release that cannot be proven must not happen.
+    if (!this.store || !generation || !epoch) return;
+    const released = await this.store
+      .release({
+        provider,
+        generation,
+        ownerInstance: this.config.instanceId,
+        fencingEpoch: epoch.fencingEpoch,
+      })
+      .catch(() => false);
+    this.logger.warn(
+      JSON.stringify({
+        event: 'limit_order_shared_readiness_stale_release',
+        provider,
+        cause,
+        generation,
+        fencingEpoch: epoch.fencingEpoch,
+        released,
         instanceId: this.config.instanceId,
       }),
     );
