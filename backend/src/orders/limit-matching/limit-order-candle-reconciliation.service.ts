@@ -642,29 +642,238 @@ export class LimitOrderCandleReconciliationService {
       return verdict;
     }
 
-    // ASSET-SCOPED. A deferred entry whose candle row disappeared names
-    // exactly one asset — the queue carries `asset_id` precisely so the loss
-    // can be attributed — so it blocks that asset and no other.
+    // ASSET-SCOPED. A deferred entry whose candle row disappeared and an
+    // unscanned matchable candle past the horizon each name exactly one asset
+    // — the queue carries `asset_id` precisely so the loss can be attributed
+    // — so each blocks that asset and no other.
     //
-    // One row PER ASSET, not one row overall: with a single global LIMIT 1 the
-    // oldest asset's orphan hid every other asset's, and each sweep would
-    // surface them one at a time while the assets behind it kept accepting
-    // orders their safety net could no longer cover. The per-sweep bound keeps
-    // a mass-retention event from turning into an unbounded write burst; the
-    // remainder is picked up by the next sweep and logged here.
+    // ONE SWEEP-WIDE WRITE BUDGET. `assetGapBatchSize` bounds the NEW sticky
+    // gaps one sweep may record IN TOTAL, across both probes — not per probe,
+    // which would let a sweep write up to twice the configured burst. The
+    // orphan probe draws from the budget first (a vanished row is the harder
+    // loss); whatever remains funds the unscanned probe; at zero the
+    // unscanned probe is not even queried.
     //
-    // ALREADY-GAPPED ASSETS ARE EXCLUDED, which is what makes the bound a
-    // write-burst limit rather than a correctness limit. recordAssetGap is
-    // sticky (first detection wins, later calls are no-ops), so without the
-    // exclusion the same oldest `assetGapBatchSize` assets would fill the
-    // batch on every sweep and any asset past the limit would NEVER be
-    // reached: 51 problem assets with a batch of 50 left asset 51 accepting
-    // orders its safety net could not cover, forever. Excluding assets whose
-    // sticky gap is already recorded makes each sweep advance to assets that
-    // still need one, so every affected asset is recorded within
-    // ceil(n / batchSize) sweeps. The existing gap evidence itself is never
-    // touched here.
-    const orphans = await this.prisma.$queryRaw<
+    // The budget is a write-burst limit, never a correctness limit, and two
+    // exclusions make that true:
+    //   - assets whose sticky gap is already durable are excluded in the
+    //     queries (recordAssetGap is first-detection-wins, so re-visiting
+    //     them would burn budget on no-ops and starve every asset past the
+    //     limit forever);
+    //   - assets touched by THIS sweep (inserted, or raced by a concurrent
+    //     runner) are excluded from every later candidate query of the sweep,
+    //     so one asset never consumes two slots and a raced no-op frees its
+    //     slot for the next still-unrecorded asset instead of ending the
+    //     probe.
+    // Each probe is therefore a bounded loop: re-query up to the remaining
+    // budget while raced candidates keep freeing slots, and stop as soon as a
+    // query returns nothing new. n affected assets are all recorded within
+    // ceil(n / assetGapBatchSize) sweeps. Existing gap evidence is never
+    // touched.
+    let remainingBudget = this.config.assetGapBatchSize;
+    const seenAssets = new Set<string>();
+    const stats = {
+      orphanCandidates: 0,
+      orphanInserted: 0,
+      orphanAlreadyExists: 0,
+      unscannedCandidates: 0,
+      unscannedInserted: 0,
+      unscannedAlreadyExists: 0,
+      /** Candidates the LAST orphan query still saw beyond what it returned. */
+      orphanEstimatedRemaining: 0,
+      /** The last unscanned query filled its limit, so more likely remain. */
+      unscannedPossiblyTruncated: false,
+    };
+
+    // ---- Probe 1: deferred entries whose market_candles row disappeared.
+    while (remainingBudget > 0) {
+      const orphans = await this.findOrphanedDeferredAssets(remainingBudget, [
+        ...seenAssets,
+      ]);
+      if (orphans.length === 0) {
+        stats.orphanEstimatedRemaining = 0;
+        break;
+      }
+      stats.orphanCandidates += orphans.length;
+      stats.orphanEstimatedRemaining = Math.max(
+        0,
+        (orphans[0]?.totalAssets ?? 0) - orphans.length,
+      );
+      let progressed = false;
+      for (const missing of orphans) {
+        if (seenAssets.has(missing.assetId)) continue;
+        seenAssets.add(missing.assetId);
+        progressed = true;
+        const reason = 'deferred_candle_retention_removed';
+        const outcome = await this.checkpoints.recordAssetGap({
+          assetId: missing.assetId,
+          interval: missing.interval,
+          detectedAt: now,
+          fromOpenTime: missing.openTime,
+          toOpenTime: missing.openTime,
+          reason,
+          marketCandleId: missing.marketCandleId,
+          candleIngestSeq: missing.candleIngestSeq,
+        });
+        if (outcome !== 'inserted') {
+          // The query excludes already-gapped assets, so this only happens
+          // when a concurrent runner recorded the same asset between the
+          // query and the write. The asset IS gapped either way; it is just
+          // not THIS sweep's new finding and consumes no budget.
+          stats.orphanAlreadyExists += 1;
+          this.logger.warn(
+            JSON.stringify({
+              event: 'limit_order_candle_asset_gap_already_present',
+              scope: 'asset',
+              assetId: missing.assetId,
+              reason,
+            }),
+          );
+          continue;
+        }
+        stats.orphanInserted += 1;
+        remainingBudget -= 1;
+        this.logger.error(
+          JSON.stringify({
+            event: 'limit_order_candle_deferred_row_missing',
+            scope: 'asset',
+            assetId: missing.assetId,
+            marketCandleId: missing.marketCandleId,
+            openTime: missing.openTime.toISOString(),
+          }),
+        );
+        verdict.assetGaps.push({ assetId: missing.assetId, reason });
+        if (remainingBudget <= 0) break;
+      }
+      // Every returned candidate was already seen: the query cannot make
+      // progress any more, so re-querying would loop forever.
+      if (!progressed) break;
+    }
+
+    // ---- Probe 2: unscanned matchable candles past the retention horizon,
+    // funded by whatever the orphan probe left. Skipped entirely at zero.
+    while (remainingBudget > 0) {
+      const unscanned = await this.findOldestUnscannedMatchableCandles(
+        ingestWatermark,
+        now,
+        retentionHorizon,
+        [...seenAssets],
+        remainingBudget,
+      );
+      if (unscanned.length === 0) {
+        stats.unscannedPossiblyTruncated = false;
+        break;
+      }
+      stats.unscannedCandidates += unscanned.length;
+      stats.unscannedPossiblyTruncated = unscanned.length >= remainingBudget;
+      let progressed = false;
+      for (const row of unscanned) {
+        if (seenAssets.has(row.assetId)) continue;
+        seenAssets.add(row.assetId);
+        progressed = true;
+        const reason = 'candle_retention_passed_unscanned_candle';
+        const outcome = await this.checkpoints.recordAssetGap({
+          assetId: row.assetId,
+          interval: row.interval,
+          detectedAt: now,
+          fromOpenTime: row.openTime,
+          toOpenTime: retentionHorizon,
+          reason,
+          marketCandleId: row.id,
+          candleIngestSeq: row.ingestSeq,
+        });
+        if (outcome !== 'inserted') {
+          stats.unscannedAlreadyExists += 1;
+          this.logger.warn(
+            JSON.stringify({
+              event: 'limit_order_candle_asset_gap_already_present',
+              scope: 'asset',
+              assetId: row.assetId,
+              reason,
+            }),
+          );
+          continue;
+        }
+        stats.unscannedInserted += 1;
+        remainingBudget -= 1;
+        this.logger.error(
+          JSON.stringify({
+            event: 'limit_order_candle_unscanned_retention_gap',
+            scope: 'asset',
+            assetId: row.assetId,
+            marketCandleId: row.id,
+            openTime: row.openTime.toISOString(),
+            ingestSeq: row.ingestSeq.toString(),
+            ingestWatermarkSeq: ingestWatermark.toString(),
+            retentionHorizon: retentionHorizon.toISOString(),
+          }),
+        );
+        verdict.assetGaps.push({ assetId: row.assetId, reason });
+        if (remainingBudget <= 0) break;
+      }
+      if (!progressed) break;
+    }
+
+    // One accounting line per sweep that did (or deferred) gap work, so an
+    // operator can tell "budget exhausted, more next sweep" from "nothing
+    // left to record" without reconstructing it from per-asset lines.
+    const totalInserted = stats.orphanInserted + stats.unscannedInserted;
+    const truncated =
+      remainingBudget <= 0 &&
+      (stats.orphanEstimatedRemaining > 0 || stats.unscannedPossiblyTruncated);
+    if (
+      totalInserted > 0 ||
+      stats.orphanAlreadyExists > 0 ||
+      stats.unscannedAlreadyExists > 0 ||
+      truncated
+    ) {
+      this.logger.log(
+        JSON.stringify({
+          event: 'limit_order_candle_asset_gap_budget',
+          configuredBudget: this.config.assetGapBatchSize,
+          orphanCandidates: stats.orphanCandidates,
+          orphanInserted: stats.orphanInserted,
+          orphanAlreadyExists: stats.orphanAlreadyExists,
+          unscannedCandidates: stats.unscannedCandidates,
+          unscannedInserted: stats.unscannedInserted,
+          unscannedAlreadyExists: stats.unscannedAlreadyExists,
+          totalInserted,
+          remainingBudget,
+          orphanEstimatedRemaining: stats.orphanEstimatedRemaining,
+          unscannedPossiblyTruncated: stats.unscannedPossiblyTruncated,
+          truncated,
+          effect: truncated
+            ? 'sweep budget exhausted; remaining assets are recorded by the next sweep'
+            : 'all pending findings recorded within this sweep',
+        }),
+      );
+    }
+    return verdict;
+  }
+
+  /**
+   * Oldest deferred entry (by market time) PER ASSET whose `market_candles`
+   * row no longer exists — retention removed the evidence from under the
+   * queue. Assets whose sticky gap is already durable, and assets this sweep
+   * already touched (`excludeAssetIds`), are excluded so the sweep-wide
+   * budget always advances to assets that still need their first gap.
+   * `totalAssets` counts every candidate the query could still see, which is
+   * what the budget accounting reports as the remaining backlog estimate.
+   */
+  private findOrphanedDeferredAssets(
+    limit: number,
+    excludeAssetIds: string[],
+  ): Promise<
+    Array<{
+      assetId: string;
+      interval: string;
+      marketCandleId: string;
+      openTime: Date;
+      candleIngestSeq: bigint | null;
+      totalAssets: number;
+    }>
+  > {
+    return this.prisma.$queryRaw<
       Array<{
         assetId: string;
         interval: string;
@@ -685,6 +894,7 @@ export class LimitOrderCandleReconciliationService {
         WHERE NOT EXISTS (
           SELECT 1 FROM "market_candles" c WHERE c."id" = d."market_candle_id"
         )
+          AND NOT (d."asset_id" = ANY(${excludeAssetIds}))
           AND NOT EXISTS (
             SELECT 1 FROM "market_candle_finalization_checkpoints" f
             WHERE f."asset_id" = d."asset_id"
@@ -696,113 +906,8 @@ export class LimitOrderCandleReconciliationService {
       SELECT *, (SELECT COUNT(*)::int FROM "per_asset") AS "totalAssets"
       FROM "per_asset"
       ORDER BY "openTime" ASC
-      LIMIT ${this.config.assetGapBatchSize}
+      LIMIT ${limit}
     `;
-    // Assets whose gap THIS sweep recorded (or raced). The unscanned probe
-    // below excludes them so one sweep never spends two findings — and two
-    // batch slots — on the same asset.
-    const gappedThisSweep = new Set<string>();
-    for (const missing of orphans) {
-      const reason = 'deferred_candle_retention_removed';
-      const outcome = await this.checkpoints.recordAssetGap({
-        assetId: missing.assetId,
-        interval: missing.interval,
-        detectedAt: now,
-        fromOpenTime: missing.openTime,
-        toOpenTime: missing.openTime,
-        reason,
-        marketCandleId: missing.marketCandleId,
-        candleIngestSeq: missing.candleIngestSeq,
-      });
-      gappedThisSweep.add(missing.assetId);
-      if (outcome !== 'inserted') {
-        // The query excludes already-gapped assets, so this only happens when
-        // a concurrent runner recorded the same asset between the query and
-        // the write. The asset IS gapped either way; it just is not THIS
-        // sweep's new finding.
-        this.logger.warn(
-          JSON.stringify({
-            event: 'limit_order_candle_asset_gap_already_present',
-            scope: 'asset',
-            assetId: missing.assetId,
-            reason,
-          }),
-        );
-        continue;
-      }
-      this.logger.error(
-        JSON.stringify({
-          event: 'limit_order_candle_deferred_row_missing',
-          scope: 'asset',
-          assetId: missing.assetId,
-          marketCandleId: missing.marketCandleId,
-          openTime: missing.openTime.toISOString(),
-        }),
-      );
-      verdict.assetGaps.push({ assetId: missing.assetId, reason });
-    }
-    const orphanAssets = orphans[0]?.totalAssets ?? 0;
-    if (orphanAssets > orphans.length) {
-      this.logger.error(
-        JSON.stringify({
-          event: 'limit_order_candle_deferred_row_missing_truncated',
-          recordedAssets: orphans.length,
-          totalAssets: orphanAssets,
-          effect: 'remaining assets are recorded by the next sweep',
-        }),
-      );
-    }
-
-    // ASSET-SCOPED. Same reasoning: the candle row identifies its asset, so a
-    // window this asset lost never has to stop another asset's orders. One per
-    // asset, oldest window first. Already-gapped assets are excluded exactly
-    // as in the orphan probe above — same starvation, same fix — plus the
-    // assets the orphan pass just recorded in THIS sweep, whose new gap the
-    // query snapshot cannot see yet.
-    const unscanned = await this.findOldestUnscannedMatchableCandles(
-      ingestWatermark,
-      now,
-      retentionHorizon,
-      [...gappedThisSweep],
-    );
-    for (const row of unscanned) {
-      const reason = 'candle_retention_passed_unscanned_candle';
-      const outcome = await this.checkpoints.recordAssetGap({
-        assetId: row.assetId,
-        interval: row.interval,
-        detectedAt: now,
-        fromOpenTime: row.openTime,
-        toOpenTime: retentionHorizon,
-        reason,
-        marketCandleId: row.id,
-        candleIngestSeq: row.ingestSeq,
-      });
-      if (outcome !== 'inserted') {
-        this.logger.warn(
-          JSON.stringify({
-            event: 'limit_order_candle_asset_gap_already_present',
-            scope: 'asset',
-            assetId: row.assetId,
-            reason,
-          }),
-        );
-        continue;
-      }
-      this.logger.error(
-        JSON.stringify({
-          event: 'limit_order_candle_unscanned_retention_gap',
-          scope: 'asset',
-          assetId: row.assetId,
-          marketCandleId: row.id,
-          openTime: row.openTime.toISOString(),
-          ingestSeq: row.ingestSeq.toString(),
-          ingestWatermarkSeq: ingestWatermark.toString(),
-          retentionHorizon: retentionHorizon.toISOString(),
-        }),
-      );
-      verdict.assetGaps.push({ assetId: row.assetId, reason });
-    }
-    return verdict;
   }
 
   /**
@@ -813,16 +918,19 @@ export class LimitOrderCandleReconciliationService {
    * anyway.
    *
    * Assets that already carry a sticky gap are excluded — in the query for
-   * gaps already durable, and via `excludeAssetIds` for the ones the SAME
-   * sweep's orphan pass just recorded — so the per-sweep batch always
+   * gaps already durable, and via `excludeAssetIds` for every asset THIS
+   * sweep already touched (either probe) — so the sweep-wide budget always
    * advances to assets that still need their first gap instead of re-visiting
    * ones whose recordAssetGap would be a no-op (see detectRetentionGap).
+   * `limit` is the budget REMAINING after the orphan probe, never the raw
+   * configured batch size: the two probes share one write budget.
    */
   private findOldestUnscannedMatchableCandles(
     ingestWatermark: bigint,
     to: Date,
     retentionHorizon: Date,
     excludeAssetIds: string[],
+    limit: number,
   ): Promise<
     Array<{
       id: string;
@@ -875,13 +983,18 @@ export class LimitOrderCandleReconciliationService {
           -- is the deferred-backlog health gate. Alarming on it here as well
           -- would turn ordinary retry latency into a sticky, operator-cleared
           -- gap that fails every new limit order closed.
-          -- Revision-aware: the entry only covers the revision it tracks. A
-          -- corrected candle (higher ingest_seq) — even one whose entry is
-          -- PERMANENT — reappears here; a NULL tracked revision is unknown
-          -- and never suppresses anything.
+          -- Revision-aware AND provenance-aware: only a VERIFIED 'current'
+          -- entry may claim to cover a revision. A NULL tracked revision is
+          -- unknown and never suppresses anything; a concrete value on a
+          -- non-current or unverified entry is a backfill inference or a
+          -- legacy_orphan's forensic evidence — nothing ever observed it on
+          -- the candle, so treating it as coverage could silence this signal
+          -- with a value that was never true.
           AND NOT EXISTS (
             SELECT 1 FROM "limit_order_deferred_candles" d
             WHERE d."market_candle_id" = c."id"
+              AND d."revision_state" = 'current'
+              AND d."revision_verified_at" IS NOT NULL
               AND d."candle_ingest_seq" >= c."ingest_seq"
           )
           AND EXISTS (
@@ -904,7 +1017,7 @@ export class LimitOrderCandleReconciliationService {
       )
       SELECT * FROM "per_asset"
       ORDER BY "openTime" ASC
-      LIMIT ${this.config.assetGapBatchSize}
+      LIMIT ${limit}
     `;
   }
 
@@ -931,12 +1044,23 @@ export class LimitOrderCandleReconciliationService {
         // keeps ITS OWN revision: there is no current candle revision to
         // adopt, and a NULL must never erase a known one.
         //
+        // NOTHING WAS OBSERVED here — the candle is gone — so this call is
+        // explicitly unobserved: the stored sequence rides along purely as
+        // FORENSIC evidence and no verification timestamp may be written.
+        // (The old shape inferred "observed" from the sequence being
+        // non-NULL, which stamped revision_verified_at on a legacy_orphan —
+        // a verification the retry never performed.)
+        //
         // An entry queued for legacy re-verification becomes a `legacy_orphan`
         // instead: the question it was reopened to answer — which revision it
         // actually covered — can no longer be answered from the data, so it
-        // must not silently return to being a trusted `current` entry.
+        // must not silently return to being a trusted `current` entry. An
+        // already-verified `current` entry keeps its state and its evidence:
+        // the observation it records did happen, even though the candle has
+        // since been removed.
         await this.checkpoints.upsertDeferred({
           marketCandleId: deferred.marketCandleId,
+          revisionObserved: false,
           candleIngestSeq: deferred.candleIngestSeq,
           assetId: deferred.assetId,
           interval: deferred.interval,
@@ -1013,6 +1137,8 @@ export class LimitOrderCandleReconciliationService {
       const exhausted = attempt >= this.config.deferredMaxAttempts;
       await this.checkpoints.upsertDeferred({
         marketCandleId: candle.id,
+        // OBSERVED: `loadCandle` above read this sequence off the candle row.
+        revisionObserved: true,
         candleIngestSeq: candle.ingestSeq,
         assetId: candle.assetId,
         interval: candle.interval,
@@ -1078,12 +1204,14 @@ export class LimitOrderCandleReconciliationService {
         // Durable enqueue BEFORE the position may pass this candle. If the
         // enqueue itself fails the watermark stops here, which is the safe
         // direction: the candle is simply re-scanned next tick. Carries the
-        // candle's CURRENT revision: on an entry tracking an older revision
-        // this atomically re-points it (reactivating a permanent entry and
-        // restarting its attempt budget), on the same revision it counts one
-        // more attempt, and it can never regress a newer entry.
+        // candle's CURRENT revision, OBSERVED off the row the scan just
+        // loaded: on an entry tracking an older revision this atomically
+        // re-points it (reactivating a permanent entry and restarting its
+        // attempt budget), on the same revision it counts one more attempt,
+        // and it can never regress a newer entry.
         await this.checkpoints.upsertDeferred({
           marketCandleId: candle.id,
+          revisionObserved: true,
           candleIngestSeq: candle.ingestSeq,
           assetId: candle.assetId,
           interval: candle.interval,
@@ -1623,13 +1751,21 @@ export class LimitOrderCandleReconciliationService {
               -- recorded. A corrected candle (higher ingest_seq) reappears.
               AND p."candle_ingest_seq" >= c."ingest_seq"
           )
-          -- Revision-aware: a queue entry only covers the revision it
-          -- tracks. A corrected candle (higher ingest_seq) — even one whose
-          -- entry is PERMANENT — is scanned again; a NULL tracked revision
-          -- is unknown and never suppresses anything.
+          -- Revision-aware AND provenance-aware: a queue entry only covers
+          -- the revision it tracks, and only when that revision was VERIFIED
+          -- — observed on the candle row by the runtime ('current' with
+          -- revision_verified_at). A corrected candle (higher ingest_seq) —
+          -- even one whose entry is PERMANENT — is scanned again; a NULL
+          -- tracked revision is unknown and never suppresses anything; and a
+          -- concrete value without observation proof (a backfill inference
+          -- that escaped repair, a legacy_orphan's forensic evidence) must
+          -- never make the scan skip a candle, because nothing ever proved
+          -- that revision was examined.
           AND NOT EXISTS (
             SELECT 1 FROM "limit_order_deferred_candles" d
             WHERE d."market_candle_id" = c."id"
+              AND d."revision_state" = 'current'
+              AND d."revision_verified_at" IS NOT NULL
               AND d."candle_ingest_seq" >= c."ingest_seq"
           )
           AND EXISTS (

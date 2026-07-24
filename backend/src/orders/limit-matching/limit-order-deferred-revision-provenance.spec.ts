@@ -13,7 +13,11 @@ jest.mock('../../generated/prisma/client', () => {
 });
 
 import { LimitOrderCandleReconciliationService } from './limit-order-candle-reconciliation.service';
-import type { DeferredCandleRow } from './limit-order-reconciliation-checkpoint.repository';
+import {
+  LimitOrderReconciliationCheckpointRepository,
+  type DeferredCandleRow,
+  type UpsertDeferredInput,
+} from './limit-order-reconciliation-checkpoint.repository';
 
 /**
  * PROVENANCE of a deferred entry's tracked candle revision.
@@ -36,6 +40,7 @@ const NOW = new Date('2026-07-24T12:00:00.000Z');
 
 type UpsertCall = {
   marketCandleId: string;
+  revisionObserved: boolean;
   candleIngestSeq: bigint | null;
   status?: string;
   revisionState?: string;
@@ -127,22 +132,30 @@ describe('deferred candle revision provenance', () => {
       revisionState: 'legacy_orphan',
       errorCode: 'LIMIT_ORDER_CANDLE_ROW_MISSING',
     });
-    // No revision is invented for it either.
+    // No revision is invented for it either, and the call carries NO
+    // observation claim: the candle is gone, nothing was read.
     expect(upserts[0]?.candleIngestSeq).toBeNull();
+    expect(upserts[0]?.revisionObserved).toBe(false);
     expect(summary.permanentCandles).toBe(1);
   });
 
   it('keeps an already-orphaned legacy entry orphaned', async () => {
     const { upserts } = await retryWithMissingCandle(
-      deferredRow({ revisionState: 'legacy_orphan' }),
+      deferredRow({ revisionState: 'legacy_orphan', candleIngestSeq: 9n }),
     );
-    expect(upserts[0]?.revisionState).toBe('legacy_orphan');
+    expect(upserts[0]).toMatchObject({
+      revisionState: 'legacy_orphan',
+      revisionObserved: false,
+      // The forensic value rides along but is NOT an observation.
+      candleIngestSeq: 9n,
+    });
   });
 
   it('leaves a trusted entry provenance alone when its candle is gone', async () => {
     // A `current` entry knows exactly which revision it tracks; the row simply
     // disappeared. Nothing about its provenance changed, so the runtime must
-    // not force a state and must not erase the known revision.
+    // not force a state and must not erase the known revision — but it must
+    // also not CLAIM a fresh observation for a candle it could not read.
     const { upserts } = await retryWithMissingCandle(
       deferredRow({ revisionState: 'current', candleIngestSeq: 12n }),
     );
@@ -150,7 +163,116 @@ describe('deferred candle revision provenance', () => {
     expect(upserts[0]).toMatchObject({
       status: 'permanent',
       revisionState: undefined,
+      revisionObserved: false,
       candleIngestSeq: 12n,
     });
+  });
+});
+
+describe('upsertDeferred provenance guard rails', () => {
+  const base = {
+    marketCandleId: 'candle-1',
+    assetId: 'asset-a',
+    interval: '5m',
+    openTime: new Date('2026-07-24T10:00:00.000Z'),
+    closeTime: new Date('2026-07-24T10:05:00.000Z'),
+    now: NOW,
+    nextRetryAt: NOW,
+    errorCode: null,
+    errorMessage: null,
+  };
+
+  function repository() {
+    const executions: unknown[] = [];
+    const prisma = {
+      $executeRaw: (...args: unknown[]) => {
+        executions.push(args);
+        return Promise.resolve(1);
+      },
+    };
+    return {
+      executions,
+      repo: new LimitOrderReconciliationCheckpointRepository(prisma as never),
+    };
+  }
+
+  // The compile-time union already rejects these shapes; the casts simulate a
+  // caller that bypassed it (plain JS, a stale build), which must hit the
+  // runtime wall BEFORE any SQL runs — the same combinations the DB CHECK
+  // constraint would reject, but with an error that names the caller.
+  it.each([
+    [
+      'an observed revision with a NULL sequence',
+      { revisionObserved: true, candleIngestSeq: null },
+    ],
+    [
+      'an observed revision forcing legacy_unknown',
+      {
+        revisionObserved: true,
+        candleIngestSeq: 5n,
+        revisionState: 'legacy_unknown',
+      },
+    ],
+    [
+      'an observed revision forcing legacy_orphan',
+      {
+        revisionObserved: true,
+        candleIngestSeq: 5n,
+        revisionState: 'legacy_orphan',
+      },
+    ],
+    [
+      'an unobserved call forcing current',
+      {
+        revisionObserved: false,
+        candleIngestSeq: null,
+        revisionState: 'current',
+      },
+    ],
+    [
+      'an unobserved legacy_unknown carrying a revision value',
+      {
+        revisionObserved: false,
+        candleIngestSeq: 5n,
+        revisionState: 'legacy_unknown',
+      },
+    ],
+  ])('rejects %s before any SQL runs', async (_label, patch) => {
+    const { repo, executions } = repository();
+    await expect(
+      repo.upsertDeferred({ ...base, ...patch } as UpsertDeferredInput),
+    ).rejects.toThrow(/upsertDeferred/);
+    expect(executions).toHaveLength(0);
+  });
+
+  it.each([
+    [
+      'an observed concrete revision',
+      { revisionObserved: true, candleIngestSeq: 5n },
+    ],
+    [
+      'an unobserved legacy_unknown with no revision',
+      { revisionObserved: false, candleIngestSeq: null },
+    ],
+    [
+      'an unobserved legacy_orphan preserving a forensic revision',
+      {
+        revisionObserved: false,
+        candleIngestSeq: 5n,
+        revisionState: 'legacy_orphan',
+      },
+    ],
+    [
+      'an unobserved legacy_orphan with no revision',
+      {
+        revisionObserved: false,
+        candleIngestSeq: null,
+        revisionState: 'legacy_orphan',
+      },
+    ],
+  ])('accepts %s', async (_label, patch) => {
+    const { repo, executions } = repository();
+    await repo.upsertDeferred({ ...base, ...patch } as UpsertDeferredInput);
+    expect(executions).toHaveLength(1);
   });
 });

@@ -815,15 +815,19 @@ Every violation is reported at once, not just the first.
 1. apply and verify migrations without resetting data (all additive):
    `prisma migrate deploy`, then `migrate status` and `migrate diff
    --from-config-datasource --to-schema prisma/schema.prisma --exit-code`.
-   On an EXISTING database, BOTH provenance migrations report in their
-   `RAISE NOTICE` how many deferred-queue entries they reopened for
-   re-verification and how many they parked as legacy orphans. The second one
-   (`20260724200000`, clock-independent re-verification) is expected to pick
-   up rows the first one's `created_at` boundary missed — any row whose
+   On an EXISTING database, all THREE provenance migrations report in their
+   `RAISE NOTICE` how many deferred-queue entries they touched. The second
+   one (`20260724200000`, clock-independent re-verification) is expected to
+   pick up rows the first one's `created_at` boundary missed — any row whose
    application-written `created_at` sat ahead of the database clock, plus any
-   revision-aware row written before `revision_verified_at` existed. Check
-   both notices before continuing, and see the existing-database upgrade
-   procedure in
+   revision-aware row written before `revision_verified_at` existed. The
+   third (`20260724230000`, provenance invariants) repairs rows whose
+   state / revision / verification evidence disagree and then adds the CHECK
+   constraint `limit_order_deferred_candles_revision_provenance_check`; a
+   non-zero repair count there means the pre-fix runtime wrote inconsistent
+   provenance (for example a legacy_orphan carrying a verification stamp) and
+   those assets will go through one re-verification sweep. Check the notices
+   before continuing, and see the existing-database upgrade procedure in
    [limit-order-candle-reconciliation.md](limit-order-candle-reconciliation.md);
 2. provision durable Redis retention and alerting;
 3. deploy with every limit-order flag false and verify provider streams,
@@ -898,7 +902,7 @@ Every violation is reported at once, not just the first.
 | path-B sweep liveness | checkpoint `lastSuccessfulRunAt` | `LIMIT_ORDER_CANDLE_RECONCILIATION_STALE` |
 | path-B deferred backlog | `limit_order_deferred_candles` | `LIMIT_ORDER_CANDLE_RECONCILIATION_BACKLOG_EXCEEDED` |
 | per-asset retention gap | `market_candle_finalization_checkpoints.gap_detected_at` / `gap_reason` | `LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED` (that asset only) |
-| unverified revision provenance | `limit_order_deferred_candles.revision_state <> 'current'` | `LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED` (that asset only) |
+| unverified revision provenance | `limit_order_deferred_candles`: `revision_state <> 'current'` OR `revision_verified_at IS NULL` OR `candle_ingest_seq IS NULL` | `LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED` (that asset only) |
 | path-B retention gap | checkpoint `gapDetectedAt` | `LIMIT_ORDER_CANDLE_RECONCILIATION_GAP_DETECTED` |
 | reservation mismatch | checkpoint `reservationMismatchCount` | `LIMIT_ORDER_CANDLE_RESERVATION_MISMATCH` |
 | shared readiness freshness | provider meta TTL / `lastFrameAt` | `LIMIT_ORDER_PROVIDER_UNAVAILABLE` |

@@ -529,6 +529,8 @@ async function testRetryDoesNotDoubleFill(): Promise<void> {
   });
   await checkpoints.upsertDeferred({
     marketCandleId: candle.id,
+    // Observed: the fixture reads the sequence off the real candle row.
+    revisionObserved: true,
     candleIngestSeq: await ingestSeqOf(candle.id),
     assetId: candle.assetId,
     interval: candle.interval,
@@ -1392,6 +1394,8 @@ async function testAssetGapBatchProgression(): Promise<void> {
       const missingCandleId = randomUUID();
       await checkpoints.upsertDeferred({
         marketCandleId: missingCandleId,
+        // Unobserved: nothing was read off any candle row (there is none).
+        revisionObserved: false,
         candleIngestSeq: null,
         assetId: asset,
         interval: LIMIT_ORDER_CANDLE_INTERVAL,
@@ -1500,6 +1504,86 @@ async function testAssetGapBatchProgression(): Promise<void> {
       );
     }
 
+    // ---- SHARED sweep-wide budget: orphans and unscanned candles TOGETHER
+    // may not exceed the budget in one sweep. Two fresh orphan assets plus
+    // three fresh unscanned assets with budget 2: sweep 1 spends everything
+    // on the orphan probe (the unscanned probe is not even reached), sweeps
+    // 2-3 drain the unscanned assets, sweep 4 finds nothing.
+    const sharedOrphanAssets: string[] = [];
+    for (let index = 0; index < 2; index += 1) {
+      const asset = await createAsset(`gap-shared-orphan-${index}`, {
+        withPriceSnapshot: false,
+      });
+      const openTime = nextWindowBase();
+      const missingId = randomUUID();
+      orphanCandleIds.push(missingId);
+      await checkpoints.upsertDeferred({
+        marketCandleId: missingId,
+        revisionObserved: false,
+        candleIngestSeq: null,
+        assetId: asset,
+        interval: LIMIT_ORDER_CANDLE_INTERVAL,
+        openTime,
+        closeTime: new Date(openTime.getTime() + FIVE_MINUTES_MS),
+        now: new Date(),
+        nextRetryAt: new Date(Date.now() + 3_600_000),
+        errorCode: 'LIMIT_ORDER_CANDLE_ROW_MISSING',
+        errorMessage: 'shared budget fixture (orphan)',
+      });
+      sharedOrphanAssets.push(asset);
+    }
+    const sharedUnscannedAssets: string[] = [];
+    let sharedMinSeq: bigint | null = null;
+    for (let index = 0; index < 3; index += 1) {
+      const asset = await createAsset(`gap-shared-unscanned-${index}`, {
+        withPriceSnapshot: false,
+      });
+      const ancientWindow = alignWindow(
+        new Date(
+          Date.now() -
+            (config.candleRetentionDays + 6) * 86_400_000 +
+            index * FIVE_MINUTES_MS,
+        ),
+      );
+      const order = await createSubmittedOrder({
+        label: `gap-shared-unscanned-${index}`,
+        assetIdOverride: asset,
+        submittedAt: ancientWindow,
+      });
+      fixtureOrderIds.push(order.orderId);
+      const candle = await createClosedCandle({
+        openTime: ancientWindow,
+        low: '90.00000000',
+        assetIdOverride: asset,
+      });
+      const seq = await ingestSeqOf(candle.id);
+      sharedMinSeq =
+        sharedMinSeq === null || seq < sharedMinSeq ? seq : sharedMinSeq;
+      sharedUnscannedAssets.push(asset);
+    }
+    assert.ok(sharedMinSeq !== null);
+    const sharedSweeps: string[][] = [];
+    for (let sweepIndex = 0; sweepIndex < 4; sweepIndex += 1) {
+      const verdict = await detect(sharedMinSeq - 1n);
+      assert.ok(
+        verdict.assetGaps.length <= 2,
+        'one sweep must never record more NEW gaps than the budget',
+      );
+      sharedSweeps.push(verdict.assetGaps.map((gap) => gap.assetId));
+    }
+    assert.deepEqual(
+      sharedSweeps,
+      [
+        // Orphans consume the whole budget first...
+        [sharedOrphanAssets[0], sharedOrphanAssets[1]],
+        // ...then the remaining budget reaches the unscanned assets.
+        [sharedUnscannedAssets[0], sharedUnscannedAssets[1]],
+        [sharedUnscannedAssets[2]],
+        [],
+      ],
+      'orphan and unscanned probes must share ONE sweep-wide budget',
+    );
+
     // ---- Mixed signals: one asset exposed by BOTH probes in the same sweep
     // gets exactly ONE sticky gap (the orphan pass wins, the unscanned probe
     // excludes what this sweep just recorded), and the first evidence
@@ -1526,6 +1610,8 @@ async function testAssetGapBatchProgression(): Promise<void> {
     orphanCandleIds.push(mixedMissingId);
     await checkpoints.upsertDeferred({
       marketCandleId: mixedMissingId,
+      // Unobserved: nothing was read off any candle row (there is none).
+      revisionObserved: false,
       candleIngestSeq: null,
       assetId: mixedAsset,
       interval: LIMIT_ORDER_CANDLE_INTERVAL,
@@ -2068,6 +2154,7 @@ async function testDeferredUpsertRevisionRules(): Promise<void> {
   };
   await checkpoints.upsertDeferred({
     ...base,
+    revisionObserved: true,
     candleIngestSeq: seq,
     now: t0,
     errorCode: 'E_FIRST',
@@ -2076,6 +2163,7 @@ async function testDeferredUpsertRevisionRules(): Promise<void> {
   // Same revision -> one more attempt; firstDeferredAt preserved.
   await checkpoints.upsertDeferred({
     ...base,
+    revisionObserved: true,
     candleIngestSeq: seq,
     now: t1,
     errorCode: 'E_RETRY',
@@ -2097,6 +2185,7 @@ async function testDeferredUpsertRevisionRules(): Promise<void> {
   const shifted = new Date(candle.openTime.getTime() + FIVE_MINUTES_MS);
   await checkpoints.upsertDeferred({
     ...base,
+    revisionObserved: true,
     candleIngestSeq: seq + 10n,
     assetId: otherAsset,
     openTime: shifted,
@@ -2119,6 +2208,7 @@ async function testDeferredUpsertRevisionRules(): Promise<void> {
   // Lower revision (a late callback for the superseded revision) -> no-op.
   await checkpoints.upsertDeferred({
     ...base,
+    revisionObserved: true,
     candleIngestSeq: seq,
     now: t3,
     errorCode: 'E_LATE',
@@ -2313,6 +2403,8 @@ async function testAssetPermanentIsolation(): Promise<void> {
 
   await checkpoints.upsertDeferred({
     marketCandleId: candleA.id,
+    // Observed: the fixture reads the sequence off the real candle row.
+    revisionObserved: true,
     candleIngestSeq: await ingestSeqOf(candleA.id),
     assetId: assetA,
     interval: '5m',
@@ -2388,6 +2480,8 @@ async function testEmergencyGlobalBacklog(): Promise<void> {
   for (const candle of candles) {
     await checkpoints.upsertDeferred({
       marketCandleId: candle.id,
+      // Observed: the fixture reads the sequence off the real candle row.
+      revisionObserved: true,
       candleIngestSeq: await ingestSeqOf(candle.id),
       assetId: asset,
       interval: '5m',

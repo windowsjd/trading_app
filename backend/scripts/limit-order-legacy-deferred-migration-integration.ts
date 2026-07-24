@@ -95,12 +95,19 @@ const PHASE_2_THROUGH =
 const PROVENANCE_MIGRATION =
   '20260724120000_add_limit_order_deferred_revision_provenance_and_asset_gap';
 /**
- * The clock-independent re-verification migration under test: any queue row
- * with neither revision_verified_at nor revision_migrated_at is reclassified,
- * whatever its created_at says.
+ * The clock-independent re-verification migration: any queue row with neither
+ * revision_verified_at nor revision_migrated_at is reclassified, whatever its
+ * created_at says.
  */
 const REVERIFY_MIGRATION =
   '20260724200000_reverify_limit_order_deferred_unverified_revision_provenance';
+/**
+ * The provenance-invariant migration under test: repairs rows whose state /
+ * revision / verification evidence disagree, then freezes the invariants into
+ * a table CHECK constraint.
+ */
+const ENFORCE_MIGRATION =
+  '20260724230000_enforce_limit_order_deferred_revision_provenance_invariants';
 
 const FIVE_MINUTES_MS = 5 * 60_000;
 const SUFFIX = `${process.pid}_${Date.now()}`;
@@ -140,6 +147,20 @@ async function main(): Promise<void> {
       () => assertClockSkewDefectReproduced(client!, fixture),
     );
 
+    // Phase 4: through the clock-independent re-verification migration, but
+    // BEFORE the invariant-enforcement migration. Rows seeded here model what
+    // the pre-fix RUNTIME could still write after 20260724200000 (an
+    // unverified 'current', a legacy_orphan stamped with verification it
+    // never earned) — the states the enforcement migration repairs and its
+    // CHECK constraint then forbids.
+    deployThrough('phase4', REVERIFY_MIGRATION, scratchUrl);
+    const invalid = await seedInvalidProvenanceState(client, fixture);
+    const verified = await seedVerifiedModernDeferred(client, fixture);
+    await run(
+      'an unverified current row neither suppresses the scan nor passes health',
+      () => assertUnverifiedRowsDoNotSuppress(scratchUrl, invalid, verified),
+    );
+
     deployAll(scratchUrl);
     await run(
       'the provenance migration reopens the legacy permanent entry for re-verification',
@@ -161,17 +182,28 @@ async function main(): Promise<void> {
       'an unverified revision-aware entry is conservatively re-verified',
       () => assertModernReverified(client!, modern),
     );
-    const verified = await seedVerifiedModernDeferred(client, fixture);
+    await run('invalid current rows are conservatively reclassified', () =>
+      assertInvalidCurrentRepaired(client!, invalid),
+    );
+    await run(
+      'a legacy orphan keeps forensic evidence but loses unearned verification',
+      () => assertOrphanEvidenceScrubbed(client!, invalid),
+    );
     await run(
       'a runtime-verified entry is untouched by the re-verification migration',
       () => assertVerifiedModernUntouched(client!, verified),
     );
+    await run(
+      'the provenance CHECK rejects invalid rows and accepts valid ones',
+      () => assertProvenanceCheckConstraint(client!, fixture),
+    );
     await run('re-running the provenance migrations changes nothing', () =>
-      assertMigrationIsIdempotent(client!, fixture, verified),
+      assertMigrationIsIdempotent(client!, fixture, verified, invalid),
     );
     await run(
       'the reopened entry lets the sweep process the corrected revision',
-      () => assertSweepRecoversRevisionTwo(scratchUrl, fixture),
+      () =>
+        assertSweepRecoversRevisionTwo(scratchUrl, fixture, invalid, verified),
     );
 
     console.log('limit order legacy deferred migration integration ok');
@@ -799,16 +831,30 @@ async function seedModernDeferred(
 /**
  * An entry exactly as the CURRENT runtime leaves it: concrete observed
  * revision, revision_state 'current' and a DB-clock revision_verified_at.
- * This is the one class of row the re-verification migration must never
- * touch. Seeded after the full deploy (the columns exist by then); the
- * assertion re-applies the migration SQL by hand.
+ * This is the one class of row the provenance migrations must never touch —
+ * and the ONLY class whose revision may suppress the forward scan, which is
+ * why it carries a submitted order: the scan-suppression assertion pairs it
+ * against the unverified fixture below.
  */
 async function seedVerifiedModernDeferred(
   client: Client,
   fixture: Fixture,
-): Promise<{ marketCandleId: string; assetId: string; attemptCount: number }> {
+): Promise<{
+  marketCandleId: string;
+  assetId: string;
+  attemptCount: number;
+  orderId: string;
+}> {
   const assetId = await insertAsset(client, 'verified');
   await insertPriceSnapshot(client, assetId, await databaseNow(client));
+  const order = await insertSubmittedOrder(client, {
+    seasonId: fixture.seasonId,
+    assetId,
+    label: 'verified',
+    limitPrice: '100.00000000',
+    openTime: fixture.openTime,
+    now: await databaseNow(client),
+  });
   const marketCandleId = await insertClosedCandle(client, {
     assetId,
     openTime: fixture.openTime,
@@ -829,7 +875,131 @@ async function seedVerifiedModernDeferred(
        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
     [marketCandleId, seq, assetId, ts(fixture.openTime), ts(fixture.closeTime)],
   );
-  return { marketCandleId, assetId, attemptCount: 3 };
+  return { marketCandleId, assetId, attemptCount: 3, orderId: order.orderId };
+}
+
+type InvalidProvenanceFixture = {
+  /** 'current' + concrete seq + verified NULL, candle EXISTS, order pending. */
+  unverifiedCurrent: {
+    marketCandleId: string;
+    assetId: string;
+    ingestSeq: string;
+    orderId: string;
+  };
+  /** 'current' + concrete seq + verified NULL, candle MISSING. */
+  unverifiedCurrentOrphan: {
+    marketCandleId: string;
+    assetId: string;
+    forensicSeq: string;
+  };
+  /** 'legacy_orphan' + forensic seq + verified NOT NULL (the unearned stamp). */
+  orphanWithUnearnedVerification: {
+    marketCandleId: string;
+    assetId: string;
+    forensicSeq: string;
+  };
+};
+
+/**
+ * The three inconsistent shapes the enforcement migration repairs, seeded
+ * exactly as the pre-fix runtime could have written them AFTER the
+ * re-verification migration (which is why they are inserted at phase 4):
+ * an unverified 'current' from the writer that promoted on any non-NULL
+ * sequence, and a legacy_orphan carrying the verification timestamp the old
+ * missing-candle retry stamped whenever the forensic sequence rode along.
+ */
+async function seedInvalidProvenanceState(
+  client: Client,
+  fixture: Fixture,
+): Promise<InvalidProvenanceFixture> {
+  const now = await databaseNow(client);
+
+  // (E) Unverified current, candle present, order newly qualified by its low.
+  const assetE = await insertAsset(client, 'invalid-current');
+  await insertPriceSnapshot(client, assetE, now);
+  const orderE = await insertSubmittedOrder(client, {
+    seasonId: fixture.seasonId,
+    assetId: assetE,
+    label: 'invalid-current',
+    limitPrice: '95.00000000',
+    openTime: fixture.openTime,
+    now,
+  });
+  const candleE = await insertClosedCandle(client, {
+    assetId: assetE,
+    openTime: fixture.openTime,
+    closeTime: fixture.closeTime,
+    low: '94.00000000',
+  });
+  const seqE = await ingestSeqOf(client, candleE);
+  await client.query(
+    `INSERT INTO "limit_order_deferred_candles" (
+       "market_candle_id", "candle_ingest_seq", "asset_id", "interval",
+       "open_time", "close_time", "status", "first_deferred_at",
+       "last_deferred_at", "attempt_count", "last_error_code",
+       "last_error_message", "next_retry_at", "revision_state",
+       "revision_verified_at", "created_at", "updated_at"
+     ) VALUES ($1, $2, $3, '5m', $4, $5, 'deferred', CURRENT_TIMESTAMP,
+       CURRENT_TIMESTAMP, 2, 'LIMIT_ORDER_CANDLE_VALUATION_UNAVAILABLE',
+       'unverified current fixture', CURRENT_TIMESTAMP + interval '1 hour',
+       'current', NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+    [candleE, seqE, assetE, ts(fixture.openTime), ts(fixture.closeTime)],
+  );
+
+  // (F) Unverified current whose candle never existed / was removed.
+  const assetF = await insertAsset(client, 'invalid-current-orphan');
+  const missingCandleF = randomUUID();
+  await client.query(
+    `INSERT INTO "limit_order_deferred_candles" (
+       "market_candle_id", "candle_ingest_seq", "asset_id", "interval",
+       "open_time", "close_time", "status", "first_deferred_at",
+       "last_deferred_at", "attempt_count", "last_error_code",
+       "last_error_message", "next_retry_at", "revision_state",
+       "revision_verified_at", "created_at", "updated_at"
+     ) VALUES ($1, '777', $2, '5m', $3, $4, 'deferred', CURRENT_TIMESTAMP,
+       CURRENT_TIMESTAMP, 2, 'LIMIT_ORDER_CANDLE_VALUATION_UNAVAILABLE',
+       'unverified current orphan fixture', CURRENT_TIMESTAMP,
+       'current', NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+    [missingCandleF, assetF, ts(fixture.openTime), ts(fixture.closeTime)],
+  );
+
+  // (G) legacy_orphan with the verification stamp it could never have earned.
+  const assetG = await insertAsset(client, 'orphan-verified');
+  const missingCandleG = randomUUID();
+  await client.query(
+    `INSERT INTO "limit_order_deferred_candles" (
+       "market_candle_id", "candle_ingest_seq", "asset_id", "interval",
+       "open_time", "close_time", "status", "first_deferred_at",
+       "last_deferred_at", "attempt_count", "last_error_code",
+       "last_error_message", "next_retry_at", "revision_state",
+       "revision_verified_at", "revision_migrated_at", "created_at",
+       "updated_at"
+     ) VALUES ($1, '888', $2, '5m', $3, $4, 'permanent', CURRENT_TIMESTAMP,
+       CURRENT_TIMESTAMP, 5, 'LIMIT_ORDER_CANDLE_ROW_MISSING',
+       'orphan with unearned verification fixture', CURRENT_TIMESTAMP,
+       'legacy_orphan', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
+       CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+    [missingCandleG, assetG, ts(fixture.openTime), ts(fixture.closeTime)],
+  );
+
+  return {
+    unverifiedCurrent: {
+      marketCandleId: candleE,
+      assetId: assetE,
+      ingestSeq: seqE,
+      orderId: orderE.orderId,
+    },
+    unverifiedCurrentOrphan: {
+      marketCandleId: missingCandleF,
+      assetId: assetF,
+      forensicSeq: '777',
+    },
+    orphanWithUnearnedVerification: {
+      marketCandleId: missingCandleG,
+      assetId: assetG,
+      forensicSeq: '888',
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1110,10 +1280,265 @@ async function assertModernReverified(
 }
 
 /**
- * The row the migration must never touch: the runtime observed the revision
+ * The pre-repair, pre-CHECK window: with the runtime already at the current
+ * code, an unverified 'current' row must ALREADY be powerless — the forward
+ * scan must not let it suppress its candle, and the asset health gate must
+ * already count it as legacy review — even before the enforcement migration
+ * repairs the data. The verified fixture is the control: its candle IS
+ * suppressed and its asset is NOT under legacy review.
+ */
+async function assertUnverifiedRowsDoNotSuppress(
+  scratchUrl: string,
+  invalid: InvalidProvenanceFixture,
+  verified: { marketCandleId: string; assetId: string },
+): Promise<void> {
+  const previousUrl = process.env.DATABASE_URL;
+  process.env.DATABASE_URL = scratchUrl;
+  try {
+    const prisma = new PrismaService();
+    try {
+      const checkpoints = new LimitOrderReconciliationCheckpointRepository(
+        prisma,
+      );
+      const sweep = new LimitOrderCandleReconciliationService(
+        prisma,
+        new LimitOrderCandidateRepository(prisma),
+        undefined as never,
+        undefined as never,
+        checkpoints,
+        undefined,
+      );
+      const scanned = await (
+        sweep as unknown as {
+          findUnprocessedCandles(input: {
+            afterIngestSeq: bigint;
+            to: Date;
+            limit: number;
+          }): Promise<Array<{ id: string }>>;
+        }
+      ).findUnprocessedCandles({
+        afterIngestSeq: 0n,
+        to: new Date(),
+        limit: 500,
+      });
+      const scannedIds = new Set(scanned.map((row) => row.id));
+      assert.ok(
+        scannedIds.has(invalid.unverifiedCurrent.marketCandleId),
+        'an UNVERIFIED current entry must not suppress its candle from the scan',
+      );
+      assert.ok(
+        !scannedIds.has(verified.marketCandleId),
+        'a VERIFIED current entry must keep suppressing its tracked revision',
+      );
+
+      const backlogInvalid = await checkpoints.readAssetBacklog(
+        invalid.unverifiedCurrent.assetId,
+      );
+      assert.equal(
+        backlogInvalid.legacyReviewCount,
+        1,
+        'an unverified current row must count as legacy review for its asset',
+      );
+      const backlogVerified = await checkpoints.readAssetBacklog(
+        verified.assetId,
+      );
+      assert.equal(
+        backlogVerified.legacyReviewCount,
+        0,
+        'a fully verified current row is not legacy review',
+      );
+    } finally {
+      await prisma.$disconnect();
+    }
+  } finally {
+    if (previousUrl === undefined) delete process.env.DATABASE_URL;
+    else process.env.DATABASE_URL = previousUrl;
+  }
+}
+
+/**
+ * The enforcement migration's repair of rows that CLAIMED trusted provenance
+ * without complete evidence: with the candle still present the row is
+ * reopened for re-verification; without it the row is parked as an orphan,
+ * keeping the unproven value only as forensic evidence.
+ */
+async function assertInvalidCurrentRepaired(
+  client: Client,
+  invalid: InvalidProvenanceFixture,
+): Promise<void> {
+  const reopened = await deferredRow(
+    client,
+    invalid.unverifiedCurrent.marketCandleId,
+  );
+  assert.equal(reopened.revision_state, 'legacy_unknown');
+  assert.equal(reopened.status, 'deferred');
+  assert.equal(reopened.candle_ingest_seq, null);
+  assert.equal(reopened.revision_verified_at, null);
+  assert.equal(reopened.attempt_count, 1);
+  assert.equal(
+    reopened.last_error_code,
+    'LIMIT_ORDER_CANDLE_LEGACY_REVISION_REVIEW',
+  );
+  assert.ok(reopened.revision_migrated_at);
+
+  const orphaned = await deferredRow(
+    client,
+    invalid.unverifiedCurrentOrphan.marketCandleId,
+  );
+  assert.equal(orphaned.revision_state, 'legacy_orphan');
+  assert.equal(orphaned.status, 'permanent');
+  assert.equal(orphaned.revision_verified_at, null);
+  assert.equal(
+    orphaned.candle_ingest_seq,
+    invalid.unverifiedCurrentOrphan.forensicSeq,
+    'the unproven value survives as forensic evidence only',
+  );
+  assert.equal(orphaned.last_error_code, 'LIMIT_ORDER_CANDLE_ROW_MISSING');
+}
+
+/**
+ * The verification stamp the old missing-candle retry wrote onto a
+ * legacy_orphan is scrubbed — it claimed an observation that never happened —
+ * while the state and the forensic sequence are preserved verbatim.
+ */
+async function assertOrphanEvidenceScrubbed(
+  client: Client,
+  invalid: InvalidProvenanceFixture,
+): Promise<void> {
+  const row = await deferredRow(
+    client,
+    invalid.orphanWithUnearnedVerification.marketCandleId,
+  );
+  assert.equal(row.revision_state, 'legacy_orphan');
+  assert.equal(row.status, 'permanent');
+  assert.equal(
+    row.revision_verified_at,
+    null,
+    'the unearned verification stamp must be scrubbed',
+  );
+  assert.equal(
+    row.candle_ingest_seq,
+    invalid.orphanWithUnearnedVerification.forensicSeq,
+    'the forensic sequence must be preserved',
+  );
+  assert.ok(row.revision_migrated_at, 'migration provenance is kept');
+}
+
+/**
+ * The frozen invariants: the CHECK constraint added by the enforcement
+ * migration must reject every inconsistent provenance shape at the DATABASE,
+ * whatever code produced it, and accept every consistent one.
+ */
+async function assertProvenanceCheckConstraint(
+  client: Client,
+  fixture: Fixture,
+): Promise<void> {
+  const insert = (columns: {
+    seq: string | null;
+    state: string;
+    verified: boolean;
+  }) =>
+    client.query<{ market_candle_id: string }>(
+      `INSERT INTO "limit_order_deferred_candles" (
+         "market_candle_id", "candle_ingest_seq", "asset_id", "interval",
+         "open_time", "close_time", "status", "first_deferred_at",
+         "last_deferred_at", "attempt_count", "last_error_code",
+         "last_error_message", "next_retry_at", "revision_state",
+         "revision_verified_at", "created_at", "updated_at"
+       ) VALUES ($1, $2, $3, '5m', $4, $5, 'deferred', CURRENT_TIMESTAMP,
+         CURRENT_TIMESTAMP, 1, NULL, 'check fixture',
+         CURRENT_TIMESTAMP + interval '1 hour', $6,
+         CASE WHEN $7 THEN CURRENT_TIMESTAMP ELSE NULL END,
+         CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+       RETURNING "market_candle_id"`,
+      [
+        randomUUID(),
+        columns.seq,
+        `check-${randomUUID()}`,
+        ts(fixture.openTime),
+        ts(fixture.closeTime),
+        columns.state,
+        columns.verified,
+      ],
+    );
+
+  const rejected: Array<{
+    label: string;
+    seq: string | null;
+    state: string;
+    verified: boolean;
+  }> = [
+    {
+      label: 'current without verification',
+      seq: '5',
+      state: 'current',
+      verified: false,
+    },
+    {
+      label: 'current without a revision',
+      seq: null,
+      state: 'current',
+      verified: true,
+    },
+    {
+      label: 'legacy_unknown with a revision',
+      seq: '5',
+      state: 'legacy_unknown',
+      verified: false,
+    },
+    {
+      label: 'legacy_unknown with verification',
+      seq: null,
+      state: 'legacy_unknown',
+      verified: true,
+    },
+    {
+      label: 'legacy_orphan with verification',
+      seq: '5',
+      state: 'legacy_orphan',
+      verified: true,
+    },
+  ];
+  for (const combo of rejected) {
+    await assert.rejects(
+      insert(combo),
+      (error: unknown) =>
+        (error as { code?: string }).code === '23514' &&
+        String((error as Error).message).includes(
+          'limit_order_deferred_candles_revision_provenance_check',
+        ),
+      `the CHECK must reject ${combo.label}`,
+    );
+  }
+
+  const accepted: Array<{
+    seq: string | null;
+    state: string;
+    verified: boolean;
+  }> = [
+    { seq: '5', state: 'current', verified: true },
+    { seq: null, state: 'legacy_unknown', verified: false },
+    { seq: null, state: 'legacy_orphan', verified: false },
+    { seq: '5', state: 'legacy_orphan', verified: false },
+  ];
+  const acceptedIds: string[] = [];
+  for (const combo of accepted) {
+    const result = await insert(combo);
+    acceptedIds.push(result.rows[0].market_candle_id);
+  }
+  // The CHECK-fixture rows are this assertion's own scratch data; remove them
+  // so the backlog assertions after the sweep count only the scenario rows.
+  await client.query(
+    `DELETE FROM "limit_order_deferred_candles" WHERE "market_candle_id" = ANY($1)`,
+    [acceptedIds],
+  );
+}
+
+/**
+ * The row the migrations must never touch: the runtime observed the revision
  * AND durably recorded that observation (revision_verified_at). Status,
- * attempt budget, retry schedule and revision state all survive a re-run of
- * the migration verbatim.
+ * attempt budget, retry schedule and revision state all survived the full
+ * deploy, and survive a manual re-run of both later migrations verbatim.
  */
 async function assertVerifiedModernUntouched(
   client: Client,
@@ -1121,6 +1546,7 @@ async function assertVerifiedModernUntouched(
 ): Promise<void> {
   const before = await deferredRow(client, verified.marketCandleId);
   await client.query(readMigrationSql(REVERIFY_MIGRATION));
+  await client.query(readMigrationSql(ENFORCE_MIGRATION));
   const row = await deferredRow(client, verified.marketCandleId);
   assert.equal(row.status, 'deferred');
   assert.equal(row.revision_state, 'current');
@@ -1153,6 +1579,7 @@ async function assertMigrationIsIdempotent(
   client: Client,
   fixture: Fixture,
   verified: { marketCandleId: string; attemptCount: number },
+  invalid: InvalidProvenanceFixture,
 ): Promise<void> {
   const subjects = [
     fixture.candleA,
@@ -1160,12 +1587,16 @@ async function assertMigrationIsIdempotent(
     fixture.candleC,
     fixture.candleD,
     verified.marketCandleId,
+    invalid.unverifiedCurrent.marketCandleId,
+    invalid.unverifiedCurrentOrphan.marketCandleId,
+    invalid.orphanWithUnearnedVerification.marketCandleId,
   ];
   const before = await Promise.all(
     subjects.map((id) => deferredRow(client, id)),
   );
   await client.query(readMigrationSql(PROVENANCE_MIGRATION));
   await client.query(readMigrationSql(REVERIFY_MIGRATION));
+  await client.query(readMigrationSql(ENFORCE_MIGRATION));
   const after = await Promise.all(
     subjects.map((id) => deferredRow(client, id)),
   );
@@ -1200,6 +1631,13 @@ async function assertMigrationIsIdempotent(
 async function assertSweepRecoversRevisionTwo(
   scratchUrl: string,
   fixture: Fixture,
+  invalid: InvalidProvenanceFixture,
+  verified: {
+    marketCandleId: string;
+    assetId: string;
+    attemptCount: number;
+    orderId: string;
+  },
 ): Promise<void> {
   // PrismaService reads DATABASE_URL in its CONSTRUCTOR, so the scratch
   // database only has to be the process default while these services are
@@ -1329,14 +1767,68 @@ async function assertSweepRecoversRevisionTwo(
         );
       }
 
-      // The orphaned assets (B past-skew, D future-skew) are still blocked;
-      // the recovered assets are not blocked by them.
-      for (const orphanAsset of [fixture.assetB, fixture.assetD]) {
+      // The repaired unverified-current asset recovers the same way: its
+      // reopened entry is re-verified by the sweep and its newly-qualified
+      // order fills once at the LIMIT price.
+      const invalidOrder = await prisma.order.findUniqueOrThrow({
+        where: { id: invalid.unverifiedCurrent.orderId },
+        select: { status: true, executedPrice: true, matchingSource: true },
+      });
+      assert.equal(
+        invalidOrder.status,
+        'executed',
+        'the repaired unverified-current entry must not have cost the fill',
+      );
+      assert.equal(invalidOrder.executedPrice?.toString(), '95');
+      assert.equal(invalidOrder.matchingSource, 'closed_5m_candle');
+      assert.equal(
+        await prisma.limitOrderDeferredCandle.findUnique({
+          where: {
+            marketCandleId: invalid.unverifiedCurrent.marketCandleId,
+          },
+        }),
+        null,
+        'a successfully re-verified entry must leave the queue',
+      );
+
+      // The VERIFIED control entry keeps doing exactly what trusted coverage
+      // does: it suppresses its tracked revision, so its order is NOT filled
+      // by the sweep and the entry survives untouched.
+      const verifiedOrder = await prisma.order.findUniqueOrThrow({
+        where: { id: verified.orderId },
+        select: { status: true },
+      });
+      assert.equal(
+        verifiedOrder.status,
+        'submitted',
+        'a verified tracked revision must keep suppressing the scan',
+      );
+      const verifiedRow =
+        await prisma.limitOrderDeferredCandle.findUniqueOrThrow({
+          where: { marketCandleId: verified.marketCandleId },
+        });
+      assert.equal(verifiedRow.revisionState, 'current');
+      assert.ok(verifiedRow.revisionVerifiedAt);
+      assert.equal(verifiedRow.attemptCount, verified.attemptCount);
+
+      // The orphaned assets (B past-skew, D future-skew, and both invalid
+      // provenance orphans) are still blocked; the recovered assets are not
+      // blocked by them.
+      for (const orphanAsset of [
+        fixture.assetB,
+        fixture.assetD,
+        invalid.unverifiedCurrentOrphan.assetId,
+        invalid.orphanWithUnearnedVerification.assetId,
+      ]) {
         const backlog = await checkpoints.readAssetBacklog(orphanAsset);
         assert.equal(backlog.permanentCount, 1);
         assert.equal(backlog.legacyReviewCount, 1);
       }
-      for (const recovered of [fixture.assetA, fixture.assetC]) {
+      for (const recovered of [
+        fixture.assetA,
+        fixture.assetC,
+        invalid.unverifiedCurrent.assetId,
+      ]) {
         const backlog = await checkpoints.readAssetBacklog(recovered);
         assert.equal(backlog.permanentCount, 0);
         assert.equal(backlog.legacyReviewCount, 0);

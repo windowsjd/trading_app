@@ -55,12 +55,16 @@ describe('Limit order legacy deferred migration upgrade integration', () => {
         // these ever stop holding, the fixes protect against nothing.
         'the pre-fix backfill stamps a permanent entry with the CORRECTED revision',
         'the created_at boundary reopens past-clock rows but MISSES future-clock rows',
+        'an unverified current row neither suppresses the scan nor passes health',
         'the provenance migration reopens the legacy permanent entry for re-verification',
         'a legacy entry whose candle is gone stays parked as an orphan',
         'a future-created_at legacy entry is reopened despite the clock skew',
         'a future-created_at legacy entry without a candle becomes an orphan',
         'an unverified revision-aware entry is conservatively re-verified',
+        'invalid current rows are conservatively reclassified',
+        'a legacy orphan keeps forensic evidence but loses unearned verification',
         'a runtime-verified entry is untouched by the re-verification migration',
+        'the provenance CHECK rejects invalid rows and accepts valid ones',
         're-running the provenance migrations changes nothing',
         'the reopened entry lets the sweep process the corrected revision',
       ]) {

@@ -113,6 +113,47 @@ export type DeferredRevisionState =
   | 'legacy_unknown'
   | 'legacy_orphan';
 
+/**
+ * Provenance-invariant shapes of a queue row, enforced at three layers: this
+ * compile-time union, a runtime assertion in `upsertDeferred`, and the DB
+ * CHECK constraint `limit_order_deferred_candles_revision_provenance_check`:
+ *
+ *   current         candleIngestSeq NOT NULL AND revisionVerifiedAt NOT NULL
+ *   legacy_unknown  candleIngestSeq NULL AND revisionVerifiedAt NULL
+ *   legacy_orphan   revisionVerifiedAt NULL (candleIngestSeq free: a NULL
+ *                   when nothing was ever known, or the FORENSIC value the
+ *                   row carried when its candle disappeared)
+ */
+export type UpsertDeferredInput = {
+  marketCandleId: string;
+  assetId: string;
+  interval: string;
+  openTime: Date;
+  closeTime: Date;
+  now: Date;
+  nextRetryAt: Date;
+  errorCode: string | null;
+  errorMessage: string | null;
+  status?: 'deferred' | 'permanent';
+} & (
+  | {
+      /** This call read `candleIngestSeq` off the loaded candle row. */
+      revisionObserved: true;
+      candleIngestSeq: bigint;
+      revisionState?: 'current';
+    }
+  | {
+      /**
+       * Nothing was read off a candle row: `candleIngestSeq` is at most a
+       * FORENSIC value preserved from the stored row, never a new
+       * observation, and no verification evidence is written.
+       */
+      revisionObserved: false;
+      candleIngestSeq: bigint | null;
+      revisionState?: 'legacy_unknown' | 'legacy_orphan';
+    }
+);
+
 export type DeferredCandleRow = {
   marketCandleId: string;
   /**
@@ -547,8 +588,33 @@ export class LimitOrderReconciliationCheckpointRepository {
    * succeed before the watermark is allowed to pass the candle: the durable
    * row is the only thing that keeps the retry alive once the position moves.
    *
+   * REVISION VALUE AND OBSERVATION PROOF ARE SEPARATE INPUTS. A non-NULL
+   * `candleIngestSeq` alone must never be read as "this call observed the
+   * revision on a candle row": a caller preserving a FORENSIC value (a
+   * missing-candle retry passing the stored sequence back) carries a value it
+   * did not observe. `revisionObserved` is the explicit proof bit:
+   *
+   *   revisionObserved: true    the caller LOADED the candle row and read
+   *                             `candleIngestSeq` off it in this call. Only
+   *                             these calls may create/refresh trusted
+   *                             provenance: revision_state = 'current' and
+   *                             revision_verified_at = CURRENT_TIMESTAMP
+   *                             (DATABASE clock — the provenance-authority
+   *                             timestamp migrations compare against their
+   *                             own DB-clock state; an application clock here
+   *                             would re-create the clock-skew ambiguity the
+   *                             provenance columns exist to remove).
+   *   revisionObserved: false   nothing was read off a candle row. The call
+   *                             NEVER writes revision_verified_at, never
+   *                             promotes to 'current', and never moves the
+   *                             stored revision; it may force a legacy state
+   *                             (`legacy_orphan` for a re-verification entry
+   *                             whose candle disappeared) while preserving
+   *                             the stored sequence as forensic evidence.
+   *
    * REVISION-AWARE, decided atomically inside one conditional upsert against
-   * the STORED row (a read-then-write pair would race a concurrent runner):
+   * the STORED row (a read-then-write pair would race a concurrent runner).
+   * For an OBSERVED revision:
    *
    *   incoming revision > stored   REVISION REPLACEMENT. The entry is
    *                                re-pointed at the new revision: candle
@@ -556,54 +622,68 @@ export class LimitOrderReconciliationCheckpointRepository {
    *                                status set from the caller (reactivating a
    *                                PERMANENT entry back to retryable),
    *                                attempt budget restarted at 1, error
-   *                                fields replaced, and firstDeferredAt reset
-   *                                so backlog age describes the revision
-   *                                actually being retried. A NULL stored
-   *                                revision reads as "unknown = lowest".
+   *                                fields replaced, firstDeferredAt reset,
+   *                                state 'current', verifiedAt stamped. A
+   *                                NULL stored revision reads as
+   *                                "unknown = lowest", which is how a
+   *                                legacy_unknown entry is promoted back to
+   *                                trusted once actually re-observed.
    *   incoming revision = stored   RETRY. attemptCount increments,
    *                                firstDeferredAt is preserved,
-   *                                lastDeferredAt/nextRetryAt/error move. An
-   *                                incoming NULL (candle row gone) also lands
-   *                                here and never erases a stored revision.
+   *                                lastDeferredAt/nextRetryAt/error move,
+   *                                verifiedAt refreshes (this call did
+   *                                observe the revision).
    *   incoming revision < stored   NO-OP. A late callback for a superseded
    *                                revision must not overwrite the newer
    *                                entry's state.
    *
-   * PROVENANCE moves with the revision. Writing a CONCRETE revision means the
-   * caller loaded the candle and read that value off it, so the entry becomes
-   * `current` and stamps `revisionVerifiedAt` — this is how a row the
-   * provenance migration reset for re-verification returns to being trusted.
-   * `revisionVerifiedAt` is stamped with the DATABASE clock
-   * (CURRENT_TIMESTAMP), never the caller's `now`: it is the provenance
-   * AUTHORITY timestamp that migrations compare against their own DB-clock
-   * boundaries, so putting an application wall clock in it would re-create
-   * the exact clock-skew ambiguity the provenance columns exist to remove.
+   * An UNOBSERVED call only moves retry bookkeeping (status, attempt+1,
+   * error, nextRetryAt) and — when forced — the legacy state; stored
+   * revision, state (unless forced) and verifiedAt are preserved, so an
+   * unverified entry can never be promoted to trusted by an absence, and a
+   * legacy_orphan can never acquire a verification timestamp it did not earn.
+   *
    * The business timestamps (first/lastDeferredAt, nextRetryAt) stay on the
    * caller's clock — they describe sweep scheduling, not provenance.
-   * Writing a NULL revision (the candle row is gone, there is nothing to read)
-   * leaves the stored provenance untouched, so an unverified entry can never
-   * be promoted to trusted by an absence. `revisionState` may be forced by the
-   * caller for the one case the value cannot express: a legacy entry whose
-   * candle has since disappeared becomes a `legacy_orphan`.
    */
-  async upsertDeferred(input: {
-    marketCandleId: string;
-    candleIngestSeq: bigint | null;
-    assetId: string;
-    interval: string;
-    openTime: Date;
-    closeTime: Date;
-    now: Date;
-    nextRetryAt: Date;
-    errorCode: string | null;
-    errorMessage: string | null;
-    status?: 'deferred' | 'permanent';
-    revisionState?: DeferredRevisionState;
-  }): Promise<void> {
+  async upsertDeferred(input: UpsertDeferredInput): Promise<void> {
     const message = input.errorMessage?.slice(0, 1000) ?? null;
     const status = input.status ?? 'deferred';
-    // NULL means "derive from the revision being written"; a value forces it.
+    const observed = input.revisionObserved;
+    // NULL means "derive/preserve"; a value forces a legacy state.
     const forcedRevisionState = input.revisionState ?? null;
+
+    // The type narrows these, but callers outside the compiler (tests, JS)
+    // must hit the same wall: the invalid combinations below are exactly the
+    // rows the DB CHECK constraint rejects, and failing here names the caller
+    // instead of surfacing as an opaque constraint violation.
+    if (observed) {
+      if (input.candleIngestSeq === null) {
+        throw new Error(
+          'upsertDeferred: an observed revision requires a concrete candleIngestSeq.',
+        );
+      }
+      if (forcedRevisionState !== null && forcedRevisionState !== 'current') {
+        throw new Error(
+          `upsertDeferred: an observed revision cannot force revisionState '${forcedRevisionState}'.`,
+        );
+      }
+    } else {
+      if (forcedRevisionState === 'current') {
+        throw new Error(
+          "upsertDeferred: revisionState 'current' requires an observed revision.",
+        );
+      }
+      if (
+        input.candleIngestSeq !== null &&
+        forcedRevisionState === 'legacy_unknown'
+      ) {
+        throw new Error(
+          "upsertDeferred: 'legacy_unknown' carries no revision; pass candleIngestSeq null.",
+        );
+      }
+    }
+
     await this.prisma.$executeRaw`
       INSERT INTO "limit_order_deferred_candles" AS d (
         "market_candle_id", "candle_ingest_seq", "asset_id", "interval",
@@ -625,72 +705,83 @@ export class LimitOrderReconciliationCheckpointRepository {
         ${input.errorCode},
         ${message},
         ${input.nextRetryAt},
-        COALESCE(
-          ${forcedRevisionState},
-          CASE
-            WHEN ${seqParam(input.candleIngestSeq)}::bigint IS NOT NULL
-            THEN 'current' ELSE 'legacy_unknown'
-          END
-        ),
+        -- Observed inserts are trusted 'current'. Unobserved inserts carry no
+        -- proof: the forced legacy state when given, otherwise
+        -- 'legacy_unknown' for an unknown revision and 'legacy_orphan' for a
+        -- forensic value whose candle this call did not read (the one way an
+        -- unobserved insert can hold a concrete sequence).
         CASE
-          WHEN ${seqParam(input.candleIngestSeq)}::bigint IS NOT NULL
-          THEN CURRENT_TIMESTAMP ELSE NULL
+          WHEN ${observed} THEN 'current'
+          ELSE COALESCE(
+            ${forcedRevisionState},
+            CASE
+              WHEN ${seqParam(input.candleIngestSeq)}::bigint IS NULL
+              THEN 'legacy_unknown' ELSE 'legacy_orphan'
+            END
+          )
         END,
+        CASE WHEN ${observed} THEN CURRENT_TIMESTAMP ELSE NULL END,
         ${input.now},
         ${input.now}
       )
       ON CONFLICT ("market_candle_id") DO UPDATE SET
-        "revision_state" = COALESCE(
-          ${forcedRevisionState},
-          CASE
-            WHEN EXCLUDED."candle_ingest_seq" IS NOT NULL
-            THEN 'current' ELSE d."revision_state"
-          END
-        ),
+        "revision_state" = CASE
+          WHEN ${forcedRevisionState}::text IS NOT NULL
+          THEN ${forcedRevisionState}
+          WHEN ${observed} THEN 'current'
+          ELSE d."revision_state"
+        END,
+        -- Verification evidence moves ONLY on observation. A forced legacy
+        -- state explicitly drops it (a legacy row has, by definition, no
+        -- trusted observation), and an unobserved call preserves whatever
+        -- evidence the row already carried.
         "revision_verified_at" = CASE
-          WHEN EXCLUDED."candle_ingest_seq" IS NOT NULL
-          THEN EXCLUDED."revision_verified_at"
+          WHEN ${forcedRevisionState}::text IS NOT NULL THEN NULL
+          WHEN ${observed} THEN CURRENT_TIMESTAMP
           ELSE d."revision_verified_at"
         END,
         "candle_ingest_seq" = CASE
-          WHEN EXCLUDED."candle_ingest_seq" IS NOT NULL
+          WHEN ${observed}
             AND (d."candle_ingest_seq" IS NULL
               OR EXCLUDED."candle_ingest_seq" > d."candle_ingest_seq")
           THEN EXCLUDED."candle_ingest_seq"
+          -- A forced legacy_unknown carries no revision (DB CHECK); a forced
+          -- legacy_orphan keeps the stored value as forensic evidence.
+          WHEN ${forcedRevisionState}::text = 'legacy_unknown' THEN NULL
           ELSE d."candle_ingest_seq"
         END,
         "asset_id" = CASE
-          WHEN EXCLUDED."candle_ingest_seq" IS NOT NULL
+          WHEN ${observed}
             AND (d."candle_ingest_seq" IS NULL
               OR EXCLUDED."candle_ingest_seq" > d."candle_ingest_seq")
           THEN EXCLUDED."asset_id" ELSE d."asset_id"
         END,
         "interval" = CASE
-          WHEN EXCLUDED."candle_ingest_seq" IS NOT NULL
+          WHEN ${observed}
             AND (d."candle_ingest_seq" IS NULL
               OR EXCLUDED."candle_ingest_seq" > d."candle_ingest_seq")
           THEN EXCLUDED."interval" ELSE d."interval"
         END,
         "open_time" = CASE
-          WHEN EXCLUDED."candle_ingest_seq" IS NOT NULL
+          WHEN ${observed}
             AND (d."candle_ingest_seq" IS NULL
               OR EXCLUDED."candle_ingest_seq" > d."candle_ingest_seq")
           THEN EXCLUDED."open_time" ELSE d."open_time"
         END,
         "close_time" = CASE
-          WHEN EXCLUDED."candle_ingest_seq" IS NOT NULL
+          WHEN ${observed}
             AND (d."candle_ingest_seq" IS NULL
               OR EXCLUDED."candle_ingest_seq" > d."candle_ingest_seq")
           THEN EXCLUDED."close_time" ELSE d."close_time"
         END,
         "first_deferred_at" = CASE
-          WHEN EXCLUDED."candle_ingest_seq" IS NOT NULL
+          WHEN ${observed}
             AND (d."candle_ingest_seq" IS NULL
               OR EXCLUDED."candle_ingest_seq" > d."candle_ingest_seq")
           THEN EXCLUDED."first_deferred_at" ELSE d."first_deferred_at"
         END,
         "attempt_count" = CASE
-          WHEN EXCLUDED."candle_ingest_seq" IS NOT NULL
+          WHEN ${observed}
             AND (d."candle_ingest_seq" IS NULL
               OR EXCLUDED."candle_ingest_seq" > d."candle_ingest_seq")
           THEN 1 ELSE d."attempt_count" + 1
@@ -822,8 +913,22 @@ export class LimitOrderReconciliationCheckpointRepository {
         COUNT(*) FILTER (WHERE "status" = 'permanent')::int AS "permanentCount",
         MIN("first_deferred_at") FILTER (WHERE "status" = 'deferred') AS "oldestDeferredAt",
         MIN("first_deferred_at") FILTER (WHERE "status" = 'permanent') AS "oldestPermanentAt",
-        COUNT(*) FILTER (WHERE "revision_state" <> 'current')::int AS "legacyReviewCount",
-        MIN("first_deferred_at") FILTER (WHERE "revision_state" <> 'current') AS "oldestLegacyReviewAt"
+        -- A row is under legacy review when its revision provenance is not
+        -- FULLY trusted: a non-current state, OR a 'current' row missing
+        -- either half of its proof (concrete revision + verification
+        -- evidence). The DB CHECK forbids new rows of the latter shape, but
+        -- the gate must also fail closed on data that predates the
+        -- constraint or arrives while it is not yet validated.
+        COUNT(*) FILTER (
+          WHERE "revision_state" <> 'current'
+            OR "revision_verified_at" IS NULL
+            OR "candle_ingest_seq" IS NULL
+        )::int AS "legacyReviewCount",
+        MIN("first_deferred_at") FILTER (
+          WHERE "revision_state" <> 'current'
+            OR "revision_verified_at" IS NULL
+            OR "candle_ingest_seq" IS NULL
+        ) AS "oldestLegacyReviewAt"
       FROM "limit_order_deferred_candles"
       WHERE "asset_id" = ${assetId}
     `;

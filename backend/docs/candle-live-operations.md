@@ -672,8 +672,12 @@ and — clock-independently, for rows whose application-written `created_at`
 defeated that migration's time boundary — by
 `20260724200000_reverify_limit_order_deferred_unverified_revision_provenance`,
 which classifies purely on whether the runtime durably recorded the
-observation (`revision_verified_at`); until the sweep settles them, that asset
-alone fails new limit Quote/Create with
+observation (`revision_verified_at`);
+`20260724230000_enforce_limit_order_deferred_revision_provenance_invariants`
+then repairs any remaining state/revision/verification inconsistency and
+freezes the valid shapes into a DB CHECK constraint, and the scan itself only
+accepts a VERIFIED `current` entry as revision coverage. Until the sweep
+settles reopened entries, that asset alone fails new limit Quote/Create with
 `LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED`.
 
 Retention losses that name ONE asset — an entry whose `market_candles` row was

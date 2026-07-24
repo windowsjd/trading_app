@@ -67,10 +67,11 @@ function detect(input: {
   unscanned?: UnscannedRow[];
   assetGapBatchSize?: number;
   /**
-   * Simulates the sticky-gap state recordAssetGap finds per asset:
-   * 'already_exists' means the asset already carried a gap (a concurrent
-   * runner's write — the query-side exclusion keeps re-sightings out of the
-   * batch in the first place).
+   * Overrides the sticky-gap verdict recordAssetGap would return.
+   * 'already_exists' simulates a CONCURRENT runner having recorded the asset
+   * between the candidate query and the write — the asset becomes durably
+   * gapped either way (later queries exclude it), it just is not THIS
+   * sweep's new finding and must not consume budget.
    */
   recordOutcome?: (assetId: string) => 'inserted' | 'already_exists';
 }) {
@@ -90,16 +91,39 @@ function detect(input: {
 
   const globalGaps: Array<{ reason: string }> = [];
   const assetGaps: AssetRetentionGap[] = [];
+  /**
+   * Durable sticky-gap state, exactly what the real queries' NOT EXISTS on
+   * `gap_detected_at` sees: every asset recordAssetGap has touched (inserted
+   * here, or raced by the simulated concurrent runner) is excluded from every
+   * later candidate query — including the next sweep's, which is what makes
+   * multi-sweep progression observable in a unit harness.
+   */
+  const gappedAssets = new Set<string>();
 
   try {
     const prisma = {
       // The detector issues exactly one raw query of its own (the orphan
       // probe); the unscanned probe goes through the private helper below and
       // is stubbed there, so this dispatcher stays a single honest branch.
-      $queryRaw: (strings: TemplateStringsArray) => {
+      // The probe's parameters are honored the way the SQL would: the
+      // excluded-asset array and the LIMIT (the only array / only number
+      // among the bindings), plus the durable sticky-gap exclusion above.
+      $queryRaw: (strings: TemplateStringsArray, ...values: unknown[]) => {
         const sql = strings.join(' ');
         if (sql.includes('limit_order_deferred_candles')) {
-          return Promise.resolve(input.orphans ?? []);
+          const exclude = (values.find(Array.isArray) as string[]) ?? [];
+          const limit =
+            (values.find((value) => typeof value === 'number') as number) ??
+            Number.MAX_SAFE_INTEGER;
+          const candidates = (input.orphans ?? []).filter(
+            (row) =>
+              !exclude.includes(row.assetId) && !gappedAssets.has(row.assetId),
+          );
+          return Promise.resolve(
+            candidates
+              .slice(0, limit)
+              .map((row) => ({ ...row, totalAssets: candidates.length })),
+          );
         }
         throw new Error(`unexpected query: ${sql}`);
       },
@@ -111,9 +135,13 @@ function detect(input: {
       },
       recordAssetGap: (gap: AssetRetentionGap) => {
         assetGaps.push(gap);
-        return Promise.resolve(
-          input.recordOutcome?.(gap.assetId) ?? ('inserted' as const),
-        );
+        const outcome =
+          input.recordOutcome?.(gap.assetId) ??
+          (gappedAssets.has(gap.assetId)
+            ? ('already_exists' as const)
+            : ('inserted' as const));
+        gappedAssets.add(gap.assetId);
+        return Promise.resolve(outcome);
       },
     };
     // Only the datasource and the checkpoint repository participate in gap
@@ -140,27 +168,37 @@ function detect(input: {
         to: Date,
         retentionHorizon: Date,
         excludeAssetIds: string[],
+        limit: number,
       ): Promise<UnscannedRow[]>;
     };
     const unscannedExclusions: string[][] = [];
+    const unscannedLimits: number[] = [];
     internals.findOldestUnscannedMatchableCandles = (
       _watermark,
       _to,
       _horizon,
       excludeAssetIds,
+      limit,
     ) => {
       unscannedExclusions.push([...excludeAssetIds]);
+      unscannedLimits.push(limit);
       return Promise.resolve(
-        (input.unscanned ?? []).filter(
-          (row) => !excludeAssetIds.includes(row.assetId),
-        ),
+        (input.unscanned ?? [])
+          .filter(
+            (row) =>
+              !excludeAssetIds.includes(row.assetId) &&
+              !gappedAssets.has(row.assetId),
+          )
+          .slice(0, limit),
       );
     };
 
     return {
       globalGaps,
       assetGaps,
+      gappedAssets,
       unscannedExclusions,
+      unscannedLimits,
       run: () =>
         internals.detectRetentionGap(
           { openTime: input.watermarkOpenTime, candleId: 'w' },
@@ -391,7 +429,7 @@ describe('path-B retention gap classification', () => {
     });
     const verdict = await harness.run();
 
-    expect(harness.unscannedExclusions).toEqual([['asset-a']]);
+    expect(harness.unscannedExclusions[0]).toEqual(['asset-a']);
     expect(verdict.assetGaps).toEqual([
       { assetId: 'asset-a', reason: 'deferred_candle_retention_removed' },
       {
@@ -399,5 +437,131 @@ describe('path-B retention gap classification', () => {
         reason: 'candle_retention_passed_unscanned_candle',
       },
     ]);
+  });
+
+  // -------------------------------------------------------------------------
+  // SWEEP-WIDE write budget: `assetGapBatchSize` bounds the NEW gaps one
+  // sweep records IN TOTAL across both probes, not per probe.
+  // -------------------------------------------------------------------------
+
+  it('bounds the new gaps of one sweep by the budget across BOTH probes', async () => {
+    // 2 orphans + 3 unscanned with a budget of 2: per-probe limits would
+    // record 4 in the first sweep (2 + 2). The shared budget records exactly
+    // 2 per sweep and still reaches every asset in finite sweeps.
+    const harness = detect({
+      watermarkOpenTime: RECENT,
+      assetGapBatchSize: 2,
+      orphans: [
+        orphan({ assetId: 'asset-a', marketCandleId: 'candle-a' }),
+        orphan({ assetId: 'asset-b', marketCandleId: 'candle-b' }),
+      ],
+      unscanned: [
+        unscanned({ assetId: 'asset-c', id: 'candle-c' }),
+        unscanned({ assetId: 'asset-d', id: 'candle-d' }),
+        unscanned({ assetId: 'asset-e', id: 'candle-e' }),
+      ],
+    });
+
+    const sweeps: string[][] = [];
+    for (let index = 0; index < 4; index += 1) {
+      const verdict = await harness.run();
+      expect(verdict.assetGaps.length).toBeLessThanOrEqual(2);
+      sweeps.push(verdict.assetGaps.map((gap) => gap.assetId));
+    }
+    expect(sweeps).toEqual([
+      ['asset-a', 'asset-b'], // orphans exhaust the budget...
+      ['asset-c', 'asset-d'], // ...so unscanned waits for the next sweep
+      ['asset-e'],
+      [],
+    ]);
+    // Sweep 1 exhausted the budget on orphans, so the unscanned probe was not
+    // even queried that sweep.
+    expect(harness.unscannedLimits.length).toBeGreaterThan(0);
+    expect(Math.min(...harness.unscannedLimits)).toBeGreaterThan(0);
+  });
+
+  it('does not query the unscanned probe once orphans exhausted the budget', async () => {
+    const harness = detect({
+      watermarkOpenTime: RECENT,
+      assetGapBatchSize: 2,
+      orphans: [
+        orphan({ assetId: 'asset-a', marketCandleId: 'candle-a' }),
+        orphan({ assetId: 'asset-b', marketCandleId: 'candle-b' }),
+      ],
+      unscanned: [unscanned({ assetId: 'asset-c', id: 'candle-c' })],
+    });
+    const verdict = await harness.run();
+    expect(verdict.assetGaps.map((gap) => gap.assetId)).toEqual([
+      'asset-a',
+      'asset-b',
+    ]);
+    expect(harness.unscannedExclusions).toEqual([]);
+  });
+
+  it('hands the full budget to the unscanned probe when no orphan exists', async () => {
+    const harness = detect({
+      watermarkOpenTime: RECENT,
+      assetGapBatchSize: 2,
+      unscanned: [
+        unscanned({ assetId: 'asset-c', id: 'candle-c' }),
+        unscanned({ assetId: 'asset-d', id: 'candle-d' }),
+        unscanned({ assetId: 'asset-e', id: 'candle-e' }),
+      ],
+    });
+    const verdict = await harness.run();
+    expect(verdict.assetGaps.map((gap) => gap.assetId)).toEqual([
+      'asset-c',
+      'asset-d',
+    ]);
+    expect(harness.unscannedLimits[0]).toBe(2);
+  });
+
+  it('does not let a raced already_exists consume budget', async () => {
+    // Concurrent runner recorded asset-a between the query and the write: the
+    // no-op frees its slot, the orphan probe re-queries, and the remaining
+    // budget still funds the unscanned probe. Total NEW gaps stay within the
+    // budget and the race costs nothing.
+    const harness = detect({
+      watermarkOpenTime: RECENT,
+      assetGapBatchSize: 2,
+      orphans: [
+        orphan({ assetId: 'asset-a', marketCandleId: 'candle-a' }),
+        orphan({ assetId: 'asset-b', marketCandleId: 'candle-b' }),
+      ],
+      unscanned: [unscanned({ assetId: 'asset-c', id: 'candle-c' })],
+      recordOutcome: (assetId) =>
+        assetId === 'asset-a' ? 'already_exists' : 'inserted',
+    });
+    const verdict = await harness.run();
+    expect(verdict.assetGaps).toEqual([
+      { assetId: 'asset-b', reason: 'deferred_candle_retention_removed' },
+      {
+        assetId: 'asset-c',
+        reason: 'candle_retention_passed_unscanned_candle',
+      },
+    ]);
+    // Both orphan attempts happened; only the inserted one counted.
+    expect(
+      harness.assetGaps.filter(
+        (gap) => gap.reason === 'deferred_candle_retention_removed',
+      ),
+    ).toHaveLength(2);
+  });
+
+  it('spends one budget slot for an asset both probes expose', async () => {
+    const harness = detect({
+      watermarkOpenTime: RECENT,
+      assetGapBatchSize: 2,
+      orphans: [orphan({ assetId: 'asset-a', marketCandleId: 'candle-a' })],
+      unscanned: [unscanned({ assetId: 'asset-a', id: 'candle-a2' })],
+    });
+    const verdict = await harness.run();
+    // One sticky gap, one slot, the orphan evidence wins (it ran first).
+    expect(verdict.assetGaps).toEqual([
+      { assetId: 'asset-a', reason: 'deferred_candle_retention_removed' },
+    ]);
+    expect(
+      harness.assetGaps.filter((gap) => gap.assetId === 'asset-a'),
+    ).toHaveLength(1);
   });
 });

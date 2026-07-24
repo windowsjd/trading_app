@@ -438,29 +438,46 @@ Quote/Create and nothing else. Other assets keep quoting, creating and being
 filled; Cancel, season-end and exclusion cleanup, market orders and FX are
 untouched either way.
 
-Asset gaps are recorded **one row per affected asset per sweep**, bounded by
-`LIMIT_ORDER_CANDLE_ASSET_GAP_BATCH_SIZE` (default 50). A single global row
-used to let the oldest asset's loss hide every other asset's, so those assets
-kept accepting orders whose safety net was already blind. If more assets are
-affected than the bound, the remainder is recorded by the next sweep and the
-truncation is logged as `limit_order_candle_deferred_row_missing_truncated`.
+Asset gaps are recorded **one row per affected asset**, bounded by
+`LIMIT_ORDER_CANDLE_ASSET_GAP_BATCH_SIZE` (default 50) — a **single
+sweep-wide write budget SHARED by both probes**, not a per-probe limit (which
+would let one sweep write up to twice the configured burst). A single global
+row used to let the oldest asset's loss hide every other asset's, so those
+assets kept accepting orders whose safety net was already blind.
+
+How the budget is spent:
+
+1. the **orphan probe** (deferred entries whose candle row disappeared) draws
+   from the budget first, in a bounded re-query loop of at most the remaining
+   budget per query;
+2. whatever remains funds the **unscanned probe**; at zero it is not even
+   queried;
+3. only an actual **new insert** consumes budget: a raced
+   `'already_exists'` (a concurrent runner recorded the asset between the
+   query and the write) frees its slot, is logged as
+   `limit_order_candle_asset_gap_already_present`, and the probe re-queries
+   for the next still-unrecorded asset;
+4. a sweep therefore records between 0 and `assetGapBatchSize` NEW gaps —
+   never more — and one accounting line
+   (`limit_order_candle_asset_gap_budget`) reports configured budget,
+   per-probe candidates / inserted / already-exists counts, the total, and
+   whether the budget was exhausted with candidates remaining (which the next
+   sweep picks up).
 
 The bound is a WRITE-BURST limit, never a correctness limit, and what makes
 that true is that **assets whose sticky gap is already recorded are excluded
 from both probes** (`NOT EXISTS` on
 `market_candle_finalization_checkpoints.gap_detected_at`, plus an explicit
-exclusion of the assets the same sweep's orphan pass just recorded, which the
-query snapshot cannot see yet). `recordAssetGap` is sticky — first detection
-wins, later calls are no-ops — so without the exclusion the same oldest
-`batchSize` assets would fill every batch with no-ops and any asset past the
-limit would NEVER be reached. With it, each sweep advances to assets that
-still need their first gap, so `n` affected assets are all recorded within
+exclusion of every asset the SAME sweep already touched, which the query
+snapshot cannot see yet). `recordAssetGap` is sticky — first detection wins,
+later calls are no-ops — so without the exclusion the same oldest `batchSize`
+assets would fill every batch with no-ops and any asset past the limit would
+NEVER be reached. With it, each sweep advances to assets that still need
+their first gap, so `n` affected assets are all recorded within
 `ceil(n / batchSize)` sweeps, and one asset never consumes two slots in one
-sweep even when both signals name it. `recordAssetGap` reports whether the
-call actually inserted a new gap (`'inserted'` vs `'already_exists'`), and the
-sweep summary's `assetGapsDetected` counts only genuinely NEW findings — a
-raced re-sighting is logged as `limit_order_candle_asset_gap_already_present`
-and not counted. Existing gap evidence is never overwritten by any of this.
+sweep even when both signals name it. The sweep summary's
+`assetGapsDetected` counts only genuinely NEW findings. Existing gap evidence
+is never overwritten by any of this.
 
 The per-asset gap columns carry the evidence an operator needs:
 `gap_detected_at`, `gap_from_open_time`, `gap_to_open_time`, `gap_reason`,
@@ -747,6 +764,59 @@ The sweep-scheduling timestamps (`first_deferred_at`, `last_deferred_at`,
 `next_retry_at`) stay on the caller's clock; they describe retry timing, not
 provenance.
 
+### Provenance invariants: value vs observation proof
+
+A revision VALUE and the PROOF that it was observed are separate things, and
+`upsertDeferred` keeps them separate with an explicit `revisionObserved`
+input (a discriminated union at compile time, a runtime assertion beneath it):
+
+- `revisionObserved: true` — the caller LOADED the candle row and read
+  `candleIngestSeq` off it in this call. Only these calls create or refresh
+  trusted provenance: `revision_state = 'current'`,
+  `revision_verified_at = CURRENT_TIMESTAMP`.
+- `revisionObserved: false` — nothing was read off a candle row. The call
+  never writes `revision_verified_at`, never promotes to `'current'`, never
+  moves the stored revision; it may force a legacy state while preserving the
+  stored sequence as FORENSIC evidence. This is exactly the missing-candle
+  retry: the old writer inferred "observed" from the sequence being non-NULL
+  and stamped verification onto the `legacy_orphan` it was parking — a
+  verification that retry never performed.
+
+The consistent row shapes — enforced in the type system, in a runtime
+assertion, and by the DB CHECK constraint
+`limit_order_deferred_candles_revision_provenance_check` (added by
+`20260724230000_enforce_limit_order_deferred_revision_provenance_invariants`
+after a conservative data repair) — are:
+
+| `revision_state` | `candle_ingest_seq` | `revision_verified_at` |
+| --- | --- | --- |
+| `current` | NOT NULL | NOT NULL |
+| `legacy_unknown` | NULL | NULL |
+| `legacy_orphan` | free (NULL, or the FORENSIC value the row carried when its candle disappeared) | NULL |
+
+The repair reclassifies any pre-existing row that violated this — an
+unverified `'current'` reopens as `legacy_unknown` when its candle still
+exists and parks as `legacy_orphan` when it does not; a legacy row carrying
+an unearned verification stamp keeps its state and loses only the stamp —
+and never touches a valid row. The constraint also pins the `revision_state`
+value domain (any other value fails every branch).
+
+Two consumers are hardened to trust ONLY complete provenance, as
+defense-in-depth for data predating the constraint:
+
+- **scan suppression**: a deferred entry excludes its candle from the forward
+  scan and from the unscanned-retention probe only when
+  `revision_state = 'current' AND revision_verified_at IS NOT NULL AND
+  candle_ingest_seq >= candle.ingest_seq`. A NULL revision never suppressed
+  anything; now an unverified concrete value — a backfill inference that
+  escaped repair, a `legacy_orphan`'s forensic evidence — cannot silence the
+  safety net either.
+- **health gate**: `legacyReviewCount` counts `revision_state <> 'current'
+  OR revision_verified_at IS NULL OR candle_ingest_seq IS NULL`, so an
+  invalid "current" row fails its asset closed with
+  `LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED` instead of passing as
+  healthy coverage.
+
 | `revision_state` | Meaning | Effect |
 | --- | --- | --- |
 | `current` | The tracked revision was OBSERVED on a candle row by revision-aware code. | Trusted; suppresses that revision normally. |
@@ -914,8 +984,14 @@ second application a no-op on rows it already handled.
   the DB future is still trusted while past-clock rows are reopened), then
   that the full upgrade reopens legacy rows in BOTH skew directions
   identically, parks unrecoverable orphans in both directions, conservatively
-  re-verifies an unverified revision-aware entry, leaves a runtime-VERIFIED
-  entry untouched, is a no-op on re-application of both provenance
+  re-verifies an unverified revision-aware entry, repairs INVALID provenance
+  (an unverified `'current'` reopens or parks by candle presence; a
+  `legacy_orphan` keeps its forensic sequence and loses only the unearned
+  verification stamp), proves — pre-repair — that an unverified `'current'`
+  neither suppresses the scan nor passes the health gate while a VERIFIED
+  entry does both, proves the CHECK constraint rejects all five invalid
+  shapes and accepts all four valid ones, leaves a runtime-VERIFIED entry
+  untouched, is a no-op on re-application of all three provenance
   migrations, and finally drives the REAL sweep to prove the corrected
   revisions are processed, the newly-qualifying orders fill once at their
   LIMIT prices, and the already-executed orders are untouched.
@@ -925,11 +1001,13 @@ second application a no-op on rows it already handled.
   `assetGapsDetected` counts only newly recorded gaps, and that the unscanned
   probe excludes the assets the same sweep's orphan pass just recorded.
 - checkpoint scenario `more gapped assets than the batch size are all recorded
-  across sweeps` — batch progression against the real database: five orphaned
+  across sweeps` — budget progression against the real database: five orphaned
   assets and five unscanned assets with `assetGapBatchSize=2` are fully
-  recorded in `2, 2, 1, 0` new findings per sweep for each signal, a mixed
-  asset trips both signals but records exactly one sticky gap, and the first
-  evidence survives later sweeps.
+  recorded in `2, 2, 1, 0` new findings per sweep for each signal; a combined
+  two-orphan + three-unscanned fixture proves the budget is SHARED (sweep 1
+  spends everything on orphans and the unscanned probe is not reached, sweeps
+  2–4 record `2, 1, 0`); a mixed asset trips both signals but records exactly
+  one sticky gap; and the first evidence survives later sweeps.
 - `limit-order-deferred-revision-provenance.spec.ts` — the runtime half of the
   provenance rules: a reopened entry whose candle then disappears becomes a
   `legacy_orphan` rather than silently returning to trusted, and a `current`

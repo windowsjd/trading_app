@@ -147,7 +147,13 @@ jobs:
       # application and database clocks: legacy rows whose created_at sits in
       # the DB future (application clock ahead) escaped the created_at-boundary
       # provenance migration and are recovered by the clock-independent
-      # re-verification migration; verified modern rows stay untouched. This is
+      # re-verification migration; verified modern rows stay untouched. And
+      # covers the PROVENANCE INVARIANTS: invalid rows (an unverified
+      # 'current', a legacy_orphan carrying an unearned verification stamp)
+      # are conservatively repaired, the DB CHECK constraint rejects every
+      # invalid shape and accepts every valid one, an unverified entry never
+      # suppresses the forward scan nor passes the health gate, and only a
+      # runtime-VERIFIED entry keeps suppressing its tracked revision. This is
       # the one path-B property a fully-migrated database cannot express.
       LIMIT_ORDER_LEGACY_DEFERRED_MIGRATION_INTEGRATION: "1"
       # Idempotent replay of a COMMITTED limit create: ahead of the feature
