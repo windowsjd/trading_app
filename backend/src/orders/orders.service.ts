@@ -65,11 +65,14 @@ import {
 import { debitAvailableCash } from '../wallets/cash-wallet-atomic';
 import { assertAssetTradable, MarketHoursError } from './market-hours.policy';
 import { isLimitOrderEnabled } from './limit-order.config';
+import { readLimitOrderMatchingConfig } from './limit-order-matching.config';
 import { limitOrderErrorCodes } from './limit-order-error-policy';
 import type { QuotedLimitReservationBasis } from './limit-order-policy';
 import {
+  buildLimitOrderExecutionPolicy,
   LimitOrderCreateService,
   type LimitOrderCreateResponse,
+  type LimitOrderExecutionPolicy,
 } from './limit-order-create.service';
 import {
   LimitOrderCancelService,
@@ -267,12 +270,7 @@ type OrderQuoteResponse = {
     walletAvailableBefore?: string;
     estimatedReservedAfter?: string;
     estimatedAvailableAfter?: string;
-    executionPolicy?: {
-      autoExecutionEnabled: boolean;
-      mode: 'live_trade_event' | 'reservation_only';
-      triggerType: 'provider_trade_price' | null;
-      fullFillOnly: true;
-    };
+    executionPolicy?: LimitOrderExecutionPolicy;
   };
 };
 
@@ -1106,6 +1104,8 @@ export class OrdersService {
           quantity: request.quantity,
           idempotency,
           submittedAt: transactionNow,
+          autoExecutionEnabled: this.limitOrderExecutionPolicy()
+            .autoExecutionEnabled,
         });
       });
     } catch (error) {
@@ -4832,21 +4832,36 @@ export class OrdersService {
   }
 
   /**
-   * Kept for API-shape stability: clients read the execution policy from the
-   * server rather than a client env flag. Automatic matching is not
-   * implemented, so this always reports the reservation-only reality.
+   * Server-authoritative execution policy on quote/create responses. Automatic
+   * matching is on only when BOTH the limit-order feature and the scheduler
+   * matching job are enabled. When on, submitted orders are filled by the
+   * scheduler matcher: path A at a fresh provider snapshot price, path B at the
+   * order's limit price off a closed 5m candle touch. Never a live-exchange
+   * order — the client must not imply guaranteed exchange execution.
    */
-  private limitOrderExecutionPolicy() {
-    return {
-      autoExecutionEnabled: false as const,
-      mode: 'reservation_only' as const,
-      triggerType: null,
-      fullFillOnly: true as const,
-      liveTradeMatchingEnabled: false as const,
-      candleReconciliationEnabled: false as const,
-      candleInterval: null,
-      candleExecutionPricePolicy: null,
-    };
+  private limitOrderExecutionPolicy(): LimitOrderExecutionPolicy {
+    return buildLimitOrderExecutionPolicy({
+      autoExecutionEnabled:
+        isLimitOrderEnabled() && readLimitOrderMatchingConfig().matchingEnabled,
+    });
+  }
+
+  /**
+   * Reuses the market-buy post-fill portfolio snapshot verbatim for a limit
+   * fill, so both leave identical equity-snapshot and position valuation. Thin
+   * public wrapper over the private market path; called only by the limit-order
+   * execution service inside its fill transaction.
+   */
+  async recordOrderExecutedPortfolioSnapshotInTransaction(
+    tx: Prisma.TransactionClient,
+    seasonParticipantId: string,
+    capturedAt: Date,
+  ): Promise<string | null> {
+    return this.recordOrderExecutedPortfolioSnapshot(
+      tx as OrderExecuteTransactionClient,
+      seasonParticipantId,
+      capturedAt,
+    );
   }
 
   private getHttpErrorCode(error: HttpException): string | null {

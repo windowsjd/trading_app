@@ -3,6 +3,7 @@ import {
   readMarketCandleReconciliationConfig,
   type MarketCandleReconciliationConfig,
 } from '../assets/market-candle-reconciliation.config';
+import { readLimitOrderMatchingConfig } from '../orders/limit-order-matching.config';
 
 export type ProviderOpsJobName =
   | typeof OpsJobName.provider_fx_ingest
@@ -31,6 +32,10 @@ export type OpsSchedulerConfig = {
     runOnStartup: boolean;
   };
   marketCandleReconciliation: MarketCandleReconciliationConfig;
+  /** Dedicated (non-tick) interval for the limit-order matching job. */
+  limitOrderMatchingIntervalMs: number;
+  /** Fills per matching cycle before the rest roll to the next cycle. */
+  limitOrderMatchBatchSize: number;
 };
 
 export class OpsConfigError extends Error {
@@ -57,6 +62,7 @@ export function getOpsSchedulerConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): OpsSchedulerConfig {
   const marketCandleReconciliation = readMarketCandleReconciliationConfig(env);
+  const limitOrderMatching = readLimitOrderMatchingConfig(env);
   const rankingEnabled = parseBooleanEnv(
     env.SCHEDULER_RANKING_ENABLED ?? env.ENABLE_RANKING_SCHEDULER,
     false,
@@ -130,7 +136,8 @@ export function getOpsSchedulerConfig(
       providerBinanceEnabled ||
       providerKisEnabled ||
       retentionEnabled ||
-      marketCandleReconciliation.enabled,
+      marketCandleReconciliation.enabled ||
+      limitOrderMatching.matchingEnabled,
     timezone: parseTextEnv(env.SCHEDULER_TIMEZONE, DEFAULT_TIMEZONE),
     lockTtlSeconds: parsePositiveIntegerEnv(
       env.SCHEDULER_LOCK_TTL_SECONDS,
@@ -162,7 +169,10 @@ export function getOpsSchedulerConfig(
       [OpsJobName.market_candle_sync]: false,
       [OpsJobName.market_candle_reconciliation]:
         marketCandleReconciliation.enabled,
-      // Vestigial DB enum values from the removed automatic-matching layer
+      // Scheduler-driven limit-order matching (paths A/B). Runs on its own
+      // dedicated interval, not the shared tick — see OpsSchedulerService.
+      [OpsJobName.limit_order_matching]: limitOrderMatching.matchingEnabled,
+      // Vestigial DB enum values from the removed EVENT-based matching layer
       // (PostgreSQL cannot drop enum values). Never scheduled.
       [OpsJobName.limit_order_matcher]: false,
       [OpsJobName.limit_order_candle_reconciliation]: false,
@@ -196,6 +206,8 @@ export function getOpsSchedulerConfig(
       runOnStartup: retentionRunOnStartup,
     },
     marketCandleReconciliation,
+    limitOrderMatchingIntervalMs: limitOrderMatching.intervalMs,
+    limitOrderMatchBatchSize: limitOrderMatching.batchSize,
   };
 }
 

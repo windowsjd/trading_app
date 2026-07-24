@@ -15,18 +15,18 @@ export type OrderSide = 'buy' | 'sell';
 export type OrderTypeDto = 'market' | 'limit';
 
 /**
- * Server-authoritative execution policy. Automatic execution is not
- * implemented on the backend, so this always reports
- * `autoExecutionEnabled: false` / `mode: 'reservation_only'` today; the field
- * stays so the copy keeps following the server rather than a client flag.
+ * Server-authoritative execution policy. When automatic matching is enabled,
+ * the backend scheduler fills submitted limit buys (path A at a fresh provider
+ * snapshot price, path B at the order's limit price off a closed 5m candle
+ * touch). When off, `reservation_only`: nothing fills automatically. The client
+ * follows this rather than a client-side flag, and never promises live-exchange
+ * execution.
  */
 export interface LimitOrderExecutionPolicyDto {
   autoExecutionEnabled: boolean;
-  mode: 'live_trade_event' | 'reservation_only';
-  triggerType: 'provider_trade_price' | null;
+  mode: 'scheduler_snapshot_candle' | 'reservation_only';
+  triggerType: 'provider_snapshot_or_closed_candle' | null;
   fullFillOnly: boolean;
-  liveTradeMatchingEnabled?: boolean;
-  candleReconciliationEnabled?: boolean;
   candleInterval?: '5m' | null;
   candleExecutionPricePolicy?: 'limit_price' | null;
 }

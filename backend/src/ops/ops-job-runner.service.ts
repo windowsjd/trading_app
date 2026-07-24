@@ -48,6 +48,12 @@ import {
   type ReconciliationMarket,
 } from '../assets/market-candle-reconciliation.service';
 import { resolveStockMarketSessionState } from '../orders/market-calendar.policy';
+import { LimitOrderMatchingService } from '../orders/limit-order-matching.service';
+
+export type LimitOrderMatchingOpsJobInput = OpsJobRunnerInput & {
+  now?: string | null;
+  batchSize?: number;
+};
 
 export type OpsJobRunnerResponse =
   | {
@@ -158,7 +164,30 @@ export class OpsJobRunnerService {
     private readonly runService: OpsJobRunService,
     @Optional()
     private readonly marketCandleReconciliationService?: MarketCandleReconciliationService,
+    @Optional()
+    private readonly limitOrderMatchingService?: LimitOrderMatchingService,
   ) {}
+
+  /**
+   * One limit-order matching cycle (paths A/B) under the shared OpsJobLock, so
+   * only one instance matches at a time. The scheduler pre-gates dispatch on
+   * whether any fillable order exists, so this writes an audit row only when
+   * there is real work — never on idle ticks.
+   */
+  runLimitOrderMatchingJob(input: LimitOrderMatchingOpsJobInput = {}) {
+    const service = this.limitOrderMatchingService;
+    if (!service) {
+      throw new Error('Limit-order matching service is unavailable.');
+    }
+    const now = this.parseOptionalDate(input.now) ?? new Date();
+    return this.runLockedOpsJob(
+      OpsJobName.limit_order_matching,
+      input,
+      'limit_order_matching:current',
+      async () =>
+        service.matchDueLimitOrders({ now, batchSize: input.batchSize }),
+    );
+  }
 
   runProviderFxIngestJob(input: OpsJobRunnerInput = {}) {
     return this.runLockedOpsJob(

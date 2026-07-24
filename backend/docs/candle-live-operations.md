@@ -562,12 +562,28 @@ metadata) should consider `amountAvailable: boolean` or `amount: string | null`.
    trade-stale threshold (config validation enforces all three).
 8. No credential/raw-frame output in logs (spot-check structured logs).
 
-## Limit-order matching (removed)
+## Limit-order matching and closed 5m candles (path B)
 
-The event-based limit-order matching layer (canonical exact-trade route,
-`ProviderTradeRouteRegistry`, shared readiness, the path-B candle safety net)
-has been removed. The live-candle supervisor subscribes provider streams for
-the candle pipeline only, and the legacy KIS/Binance streaming services keep
-their original display/snapshot behavior. Automatic limit-order matching is
-planned as separate scheduler-based work and will document its own provider
-interactions when it lands.
+The EVENT-based matching layer (canonical exact-trade route,
+`ProviderTradeRouteRegistry`, shared readiness) was removed: the live-candle
+supervisor subscribes provider streams for the candle pipeline only, and the
+legacy KIS/Binance streaming services keep their original display/snapshot
+behavior. No provider hook publishes to a matcher.
+
+Automatic matching was reimplemented as a SCHEDULER job
+(`limit_order_matching`) that READS committed rows, so it depends on this
+pipeline only as a consumer:
+
+- Path B reads CLOSED 5-minute `MarketCandle` rows (`isClosed=true`) written by
+  the live finalizer / reconciliation here. It never reads live Redis candle
+  state, an open bucket, or a REST preview; a candle it hasn't finalized yet is
+  simply not a trigger until it lands.
+- Crypto and KIS domestic produce closed 5m candles reliably; KIS US only when
+  delayed US candles are enabled, so US path B is effective only then —
+  otherwise US limit buys fill via path A (fresh snapshot) alone.
+- Path B validates each candle's window against the market session
+  (`resolveRegularSessionForEvent`) and the calendar, fail-closed on gaps, so a
+  holiday / uncovered candle never triggers a fill.
+
+See `docs/scheduler-ops-foundation.md` (`limit_order_matching`) and
+`docs/policy-decisions.md` for the matching semantics.

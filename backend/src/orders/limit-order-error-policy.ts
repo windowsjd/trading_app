@@ -32,12 +32,27 @@ export const limitOrderErrorCodes = {
    */
   QUOTE_RESERVATION_BASIS_INVALID: 'QUOTE_RESERVATION_BASIS_INVALID',
   /**
-   * Manual/market execute paths refuse limit orders. There is no automatic
-   * matching implemented, and a limit order must never fill through the
+   * Manual/market execute paths refuse limit orders. Automatic fills happen
+   * ONLY through the scheduler-driven matcher (paths A/B), never through the
    * market-order execute path.
    */
   LIMIT_ORDER_EXECUTION_PATH_NOT_SUPPORTED:
     'LIMIT_ORDER_EXECUTION_PATH_NOT_SUPPORTED',
+  /**
+   * A concurrent state change (cancel / cleanup / another fill) defeated a fill
+   * after its guards passed. Internal to the matcher; the order stays whatever
+   * the winner made it.
+   */
+  LIMIT_ORDER_EXECUTION_CONFLICT: 'LIMIT_ORDER_EXECUTION_CONFLICT',
+  /**
+   * Automatic matching is turned off (SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED
+   * false). Registration still works; nothing fills automatically.
+   */
+  LIMIT_ORDER_MATCHING_DISABLED: 'LIMIT_ORDER_MATCHING_DISABLED',
+  /** Path-B candle evidence is malformed or inconsistent (operational). */
+  LIMIT_ORDER_EVIDENCE_INVALID: 'LIMIT_ORDER_EVIDENCE_INVALID',
+  /** No closed 5m candle is a valid path-B trigger for the order (operational). */
+  LIMIT_ORDER_CANDLE_NOT_ELIGIBLE: 'LIMIT_ORDER_CANDLE_NOT_ELIGIBLE',
 } as const;
 
 export type LimitOrderErrorCode =
@@ -57,4 +72,8 @@ export const limitOrderErrorHttpStatus: Record<
   ORDER_CANCEL_CONFLICT: HttpStatus.CONFLICT,
   QUOTE_RESERVATION_BASIS_INVALID: HttpStatus.CONFLICT,
   LIMIT_ORDER_EXECUTION_PATH_NOT_SUPPORTED: HttpStatus.BAD_REQUEST,
+  LIMIT_ORDER_EXECUTION_CONFLICT: HttpStatus.CONFLICT,
+  LIMIT_ORDER_MATCHING_DISABLED: HttpStatus.FORBIDDEN,
+  LIMIT_ORDER_EVIDENCE_INVALID: HttpStatus.INTERNAL_SERVER_ERROR,
+  LIMIT_ORDER_CANDLE_NOT_ELIGIBLE: HttpStatus.CONFLICT,
 };

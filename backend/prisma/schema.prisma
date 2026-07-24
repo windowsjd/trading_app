@@ -181,6 +181,7 @@ enum OpsJobName {
   market_candle_reconciliation
   limit_order_matcher
   limit_order_candle_reconciliation
+  limit_order_matching
 }
 
 enum MarketCandleSyncMode {
@@ -575,12 +576,13 @@ model MarketCandle {
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  asset              Asset                      @relation(fields: [assetId], references: [id], onDelete: Restrict)
-  limitOrderEvidence LimitOrderCandleEvidence[]
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Restrict)
 
   @@unique([assetId, interval, openTime])
   @@index([interval, openTime])
   @@index([isClosed, openTime])
+  // Path-B candidate scan: closed 5m rows of one asset ordered by window start.
+  @@index([assetId, interval, isClosed, openTime])
   @@map("market_candles")
 }
 
@@ -1067,13 +1069,19 @@ model OpsJobLock {
 }
 
 // Closed-candle trigger evidence (spec §7 model). One row per candle is shared
-// by every order the candle fills — the candle is the evidence, and the
-// duplicated columns exist so the fill reason stays reproducible even if
-// retention later removes the candle row. Preserved at the schema level for
-// the future scheduler-based matching; no code writes it today.
+// by every order the candle fills — the candle IS the evidence, and the
+// duplicated columns keep the fill reason reproducible even after retention
+// removes the candle row. Deliberately NOT foreign-keyed to market_candles:
+// evidence must outlive the candle (§18), so market_candle_id is a plain
+// denormalized reference. Identity is (asset, interval, window, provider), so
+// one row is shared by every order the same closed 5m candle fills. The actual
+// per-order fill price is the ORDER's limitPrice (Order.executedPrice); this
+// row only records that the limit was touched and the fill-price policy.
 model LimitOrderCandleEvidence {
   id                   String   @id @default(uuid())
-  marketCandleId       String   @unique(map: "limit_order_candle_evidences_market_candle_id_key") @map("market_candle_id")
+  // Denormalized reference to the candle that proved the touch (no FK — the
+  // candle may be retention-deleted while this evidence lives on).
+  marketCandleId       String   @map("market_candle_id")
   assetId              String   @map("asset_id")
   interval             String
   openTime             DateTime @map("open_time") @db.Timestamptz(3)
@@ -1089,10 +1097,10 @@ model LimitOrderCandleEvidence {
   policyVersion        Int      @map("policy_version")
   createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  marketCandle MarketCandle @relation(fields: [marketCandleId], references: [id], onDelete: Restrict)
-  asset        Asset        @relation(fields: [assetId], references: [id], onDelete: Restrict)
-  orders       Order[]
+  asset  Asset   @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  orders Order[]
 
+  @@unique([assetId, interval, openTime, provider], map: "limit_order_candle_evidences_asset_interval_open_provider_key")
   @@index([assetId, openTime])
   @@map("limit_order_candle_evidences")
 }

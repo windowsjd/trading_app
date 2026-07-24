@@ -318,14 +318,19 @@ feeAmount`, computed from `limitPrice × quantity` with the exact
   `reservationFeeRate` (and, before submitting, the quote's `quoted*`
   estimates). Market orders keep their existing executed-amount meaning
   unchanged.
-- Create never executes immediately or reads a provider price. The order is
-  reservation-only: **automatic execution is not implemented** (the former
-  event-based matching layer has been removed; a scheduler-based
-  implementation is planned separately). A submitted limit order changes
-  state only through user cancel or season/exclusion cleanup.
+- Create never executes immediately or reads a provider price — a submitted
+  order is filled LATER by the scheduler matcher (when
+  `SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED=true`), or changes state through user
+  cancel / season / exclusion cleanup. Path A fills at a fresh provider snapshot
+  price when it reaches the limit; path B fills at the ORDER's limit price off a
+  closed 5m candle low touch (never the candle low; never the partial submit
+  candle; never a candle older than the lookback or closing after season endAt).
+  The matcher is scheduler-polling based (PostgreSQL OpsJobLock, no Redis Stream)
+  and never places a real exchange order.
 - Registration completes against PostgreSQL alone. The validation surface is
   season, participant, asset, market session, quote, and wallet; Redis or
-  provider WebSocket state never gates a limit quote/create.
+  provider WebSocket state never gates a limit quote/create, and the matcher is
+  independent (the money commits in PostgreSQL fill transactions).
 - Wallet meaning: `balanceAmount` (total owned cash, valuation input; never
   reduced by a reservation), `reservedAmount` (locked by submitted limit
   buys), `availableAmount = balance - reserved` (derived server-side, never
@@ -343,9 +348,11 @@ feeAmount`, computed from `limitPrice × quantity` with the exact
   `1` / `0` (trimmed, case-insensitive, so `TRUE` and `False` are fine);
   omitting the variable means false. Any other value — `yes`, `enabled`,
   `tru`, or an explicitly empty string — **fails startup** instead of being
-  silently read as off. Quote/create keep returning the additive
-  `executionPolicy` object for API-shape stability; it always reports
-  `autoExecutionEnabled: false` and `mode: "reservation_only"`.
+  silently read as off. Automatic matching has its own flag,
+  `SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED` (default false); quote/create return
+  the additive server-authoritative `executionPolicy` object reflecting it
+  (`autoExecutionEnabled` true → `mode: "scheduler_snapshot_candle"`, else
+  `reservation_only`).
 - Create's final TTL/season/stock-session checks use DB `clock_timestamp()`
   after Quote/Participant/Season locks. The same time becomes submittedAt.
 - No public execute API, provider order API, liquidity allocation, or
@@ -714,14 +721,17 @@ at all today; automatic matching is planned as separate work.
 - Daily portfolio snapshot automatic generation.
 - Ranking automatic generation.
 
-## Removed matching fields
+## Limit fill result fields
 
-The event-based matching layer's additive order-payload fields
-(`matchingSource`, `matchedAt`, `triggerEventId`, `triggerEventAt`,
-`candleEvidence`) have been removed along with that layer. `executedPrice`,
-`grossAmount`, `feeAmount`, `netAmount`, `executedAt`, and
-`assetPriceSnapshotId` keep their meaning (actual fill result; null for every
-limit order today).
+A scheduler-filled limit order carries the same actual-result fields as a
+market fill: `executedPrice` (path A: snapshot price / path B: the limit
+price), `grossAmount`, `feeAmount`, `netAmount` (`gross + fee` at the pinned
+`reservationFeeRate`), `executedAt`, `reservationReleasedAt`, and exactly one
+evidence link — path A `assetPriceSnapshotId`, path B `limitOrderCandleEvidenceId`
+(the other is null). These are null while `submitted` or `canceled`. The
+event-era provenance fields (`matchingSource`, `triggerEventId`, …) do not
+exist. `limit_order_candle_evidences` is never surfaced as a price snapshot, so
+it cannot affect current price / valuation / ranking.
 
 ## Limit-create replay ordering and operational errors
 
@@ -794,22 +804,29 @@ foreign consumed `quoteId` answered `ORDER_IDEMPOTENCY_CONFLICT` immediately
 while a nonexistent one did not — an ownership-information side channel.)
 
 No public or manual limit execute route exists, and no `/api/v2` route
-exists. The event-layer operational 503 codes (matcher/provider/stream/candle
-reconciliation health) were removed with the matching layer; `LIMIT_ORDER_DISABLED`
-is the only limit-specific gate on new registrations.
+exists. Automatic fills happen ONLY through the scheduler matcher (paths A/B);
+the internal execute path rejects `orderType=limit` with
+`LIMIT_ORDER_EXECUTION_PATH_NOT_SUPPORTED`. `LIMIT_ORDER_DISABLED` gates new
+registration. The matcher's own error codes
+(`LIMIT_ORDER_EXECUTION_CONFLICT`, `ORDER_RESERVATION_INCONSISTENT`,
+`LIMIT_ORDER_MATCHING_DISABLED`, `LIMIT_ORDER_EVIDENCE_INVALID`,
+`LIMIT_ORDER_CANDLE_NOT_ELIGIBLE`) are internal/operational — they never reach a
+user-facing quote/create/cancel response.
 
-`executionPolicy` on quote/create responses is additive and reports the
-reservation-only reality:
+`executionPolicy` on quote/create responses is additive and server-authoritative
+(shown here with matching enabled):
 
 ```jsonc
 "executionPolicy": {
-  "autoExecutionEnabled": false,
-  "mode": "reservation_only",
-  "triggerType": null,
+  "autoExecutionEnabled": true,
+  "mode": "scheduler_snapshot_candle",
+  "triggerType": "provider_snapshot_or_closed_candle",
   "fullFillOnly": true,
-  "liveTradeMatchingEnabled": false,
-  "candleReconciliationEnabled": false,
-  "candleInterval": null,
-  "candleExecutionPricePolicy": null
+  "candleInterval": "5m",
+  "candleExecutionPricePolicy": "limit_price"
 }
 ```
+
+When matching is off it reports `autoExecutionEnabled: false`,
+`mode: "reservation_only"`, `triggerType: null`, `candleInterval: null`,
+`candleExecutionPricePolicy: null`.

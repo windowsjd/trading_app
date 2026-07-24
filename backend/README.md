@@ -36,13 +36,35 @@ This service owns backend APIs, database access, financial calculations, and ser
 - Season settlement freezes valuation at `Season.endAt`, uses the latest valid price and USD/KRW rows with `effectiveAt <= Season.endAt` without enforcing quote/execute freshness windows, writes final `equity_snapshots`, creates `rankType=final` rankings, assigns final tiers, and changes the season to `settled` only after final rank and tier readiness checks pass. Reward payout remains pending/unimplemented.
 - Market holidays are configured in `src/orders/market-holidays.config.ts`; domestic/US stock quote/create/execute return `MARKET_CLOSED` on configured holidays, while crypto orders and FX are not holiday-blocked.
 
-### Limit buy orders (registration + reservation; automatic execution NOT implemented)
+### Limit buy orders (registration + reservation + scheduler-based auto-execution)
 
 Limit BUY registration exists behind `LIMIT_ORDER_ENABLED` (default false).
-**There is no automatic execution**: a submitted limit order changes state
-only through user cancel or season/exclusion cleanup. The former event-based
-matching layer (Redis Stream matcher, "path A/B") has been removed; a
-scheduler-based matching implementation is planned as separate work.
+Automatic execution is a SEPARATE flag, `SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED`
+(default false): when on, a scheduler job fills submitted limit buys. It is
+scheduler-polling based — NOT a Redis Stream matcher (that event-based layer was
+removed) and never a live-exchange order.
+
+- **Path A (fresh snapshot):** a submitted buy fills when the latest VALID
+  `provider_api` `AssetPriceSnapshot` reaches the limit, at the SNAPSHOT price
+  (price improvement allowed). Reuses the exact order-execute eligibility:
+  admin_manual / official_batch rejected, stocks need an open session, crypto
+  is 24h.
+- **Path B (closed 5m candle touch):** for buys not filled by path A, a closed
+  5-minute `MarketCandle` whose low reached the limit triggers a fill AT THE
+  ORDER's LIMIT PRICE — never the candle low (which is only touch evidence). It
+  never uses the partial candle the order was submitted into
+  (`firstEligibleCandleOpen` rounds submit time up to the next 5m boundary),
+  never a candle older than `LIMIT_ORDER_CANDLE_LOOKBACK_MS` (default 15m, no
+  outage backfill), and never a candle closing after the season endAt. Path B
+  lags up to ~5 minutes plus a scheduler tick, so the copy never claims
+  real-time. US-stock path B is only effective when delayed US candles are
+  produced; otherwise US buys fill via path A only.
+- The matcher runs on a DEDICATED interval (`LIMIT_ORDER_MATCHING_INTERVAL_MS`,
+  default/max 5000ms = half the 10s execute-freshness), single-instance via the
+  PostgreSQL `OpsJobLock` (`limit_order_matching`), never Redis. Each order
+  fills in its own transaction; batch-limited (`LIMIT_ORDER_MATCH_BATCH_SIZE`),
+  the rest roll to the next cycle oldest-first. The scheduler pre-gates dispatch
+  on whether any fillable order exists, so an idle system writes no audit rows.
 
 - Quote/create register a full-quantity GTC-style limit BUY as
   `status=submitted` and atomically reserve `gross + fee` cash
@@ -54,17 +76,23 @@ scheduler-based matching implementation is planned as separate work.
   Create reserves those stored values and never re-reads the live
   `Season.tradeFeeRate`, so changing the season fee rate between quote and
   create cannot move the user's reservation.
-- `grossAmount` / `feeAmount` / `netAmount` / `executedPrice` /
-  `executedAt` mean ACTUAL fill result and are **null** while a limit order is
-  `submitted` or after it is `canceled`. With no execution path, they stay
-  null for every limit order today. An unfilled order's money is
-  `reservedAmount` (a reservation, not a fill) plus `reservationFeeRate`.
-  Market order amounts are unchanged.
+- On a fill: the actual net (`gross + fee` at the execution price and the
+  order's PINNED `reservationFeeRate`, never the live season rate) is debited
+  from `balanceAmount` and the WHOLE reservation is released in one guarded
+  statement (`settleLimitBuyReservedCash`), so a price-improvement difference
+  returns to `availableAmount`. The order becomes `executed` with real
+  `executedPrice`/`grossAmount`/`feeAmount`/`netAmount`, a path-A
+  `assetPriceSnapshotId` or path-B `limitOrderCandleEvidenceId`, plus one
+  `order_buy` wallet transaction, a position (same average-cost policy as market
+  buy), and an `order_executed` equity snapshot valued identically to a market
+  fill. `grossAmount`/`feeAmount`/`netAmount`/`executedPrice`/`executedAt` are
+  **null** while `submitted` or `canceled`.
 - Registration completes against **PostgreSQL alone**. The validation surface
   is season, participant, asset, market session, quote, and wallet — Redis or
   provider WebSocket state never gates a limit quote/create, and an
   unreachable Redis does not block registration (covered by an integration
-  test).
+  test). The matcher is independent: the money always commits in PostgreSQL
+  transactions.
 - Create re-validates the season and the participant against rows locked
   inside its own transaction (`Quote FOR UPDATE → SeasonParticipant FOR
 SHARE → Season FOR SHARE → CashWallet`), so a concurrent participant
@@ -84,20 +112,30 @@ SHARE → Season FOR SHARE → CashWallet`), so a concurrent participant
   different request hash conflicts, another user's order is never replayed,
   and a genuinely new quote still passes through every current gate. Replay
   performs no write at all — no extra order, no extra reservation.
-- The quote/create responses keep the additive `executionPolicy` object for
-  API-shape stability; it always reports
-  `autoExecutionEnabled: false, mode: "reservation_only"` today.
+- The quote/create responses carry the additive server-authoritative
+  `executionPolicy` object: `autoExecutionEnabled` true →
+  `mode: "scheduler_snapshot_candle"`, else `reservation_only`. The client
+  renders its success copy from this, never a client flag, and never promises
+  live-exchange execution.
+- A user cancel and an automatic fill both take `Order (FOR UPDATE) → CashWallet`
+  and re-check `status = submitted`, so exactly one wins: if the fill commits
+  first the cancel returns `ORDER_NOT_CANCELABLE`; if the cancel commits first
+  the matcher sees a non-submitted order and skips it. No double debit, no double
+  reservation release. The fill also re-checks the season is active and unexpired,
+  so a season-end that races a fill is arbitrated on the same order row.
+- `limit_order_candle_evidences` stores ONE shared row per (asset, interval,
+  window, provider) — every order the candle fills references it. It is NOT
+  foreign-keyed to `market_candles` (evidence outlives candle retention) and
+  never becomes a price snapshot, so candle evidence cannot pollute current
+  price / valuation / ranking. The `OpsJobName` values `limit_order_matcher` /
+  `limit_order_candle_reconciliation` and the `OpsJobTrigger` value `worker`
+  are vestigial from the removed event layer (PostgreSQL cannot drop enum
+  values); nothing schedules them.
 - Total-asset valuation keeps using the full `balanceAmount`; reservations
   never reduce it.
-- Cancel and lifecycle cleanup work even while the flag is off. Settlement is
-  blocked while a submitted limit order or a non-zero wallet reservation
-  exists.
-- The `limit_order_candle_evidences` table and
-  `orders.limit_order_candle_evidence_id` remain in the schema as the
-  closed-candle evidence model for the future matching implementation; no
-  code writes them today. The `OpsJobName` values `limit_order_matcher` /
-  `limit_order_candle_reconciliation` and the `OpsJobTrigger` value `worker`
-  are vestigial (PostgreSQL cannot drop enum values); nothing schedules them.
+- Cancel and lifecycle cleanup work even while `LIMIT_ORDER_ENABLED` is off.
+  Settlement is blocked while a submitted limit order or a non-zero wallet
+  reservation exists.
 - `LIMIT_ORDER_ENABLED` accepts exactly `true` / `false` / `1` / `0`
   (trimmed, case-insensitive); omitting it means false. Any other value —
   `yes`, `enabled`, `tru`, an explicitly empty string — **fails startup**
@@ -149,10 +187,11 @@ These are intentionally outside the current implementation and should not be add
 - KIS order/account/balance/fill/deposit/withdrawal APIs, KIS orderbook/hoga, Binance authenticated/order/account/user-data APIs, and real external trading/account integrations.
 - External payment, point, coupon, gifticon, delivery, cash-out, or provider-backed reward fulfillment. App-internal operator/admin reward fulfillment creates `SeasonReward` rows only when fulfilled.
 - Access token blacklist/revocation, server-side session auth, and cookie auth.
-- Limit sells, partial fills, order-book/volume allocation, historical
-  missed-touch repair, automatic limit-order execution (event-based or
-  otherwise — a scheduler-based implementation is planned separately), or a
-  public/manual limit execute endpoint.
+- Limit sells, partial fills, order-book/volume allocation, real exchange
+  liquidity, historical missed-touch repair (a touch between submit and the
+  next 5m boundary that left no snapshot can be missed), Redis Stream / event
+  matching, order claim/lease, or a public/manual limit execute endpoint.
+  (Scheduler-based path-A/B auto-execution IS implemented — see above.)
 - Fake, static, sample, temporary, or fallback business price data.
 
 ## Environment Variables

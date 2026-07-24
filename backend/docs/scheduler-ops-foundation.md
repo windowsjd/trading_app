@@ -23,10 +23,11 @@ Not implemented:
 - Real external trading/account/deposit/withdrawal API
 - Scheduler-driven reward-grant writes or automatic reward payment/delivery
 
-`OpsJobName` still contains `limit_order_matcher` and
-`limit_order_candle_reconciliation` (and `OpsJobTrigger` contains `worker`)
-only because PostgreSQL cannot drop enum values: the event-based limit-order
-matching layer that used them has been removed and nothing schedules them.
+Scheduler-based limit-order matching runs as the `limit_order_matching` Ops job
+(see its own section below). The older `limit_order_matcher` and
+`limit_order_candle_reconciliation` values (and `OpsJobTrigger` `worker`) remain
+only because PostgreSQL cannot drop enum values — they belonged to the removed
+EVENT-based matching layer and nothing schedules them.
 
 - External payment/point/coupon/gifticon/cash reward delivery
 
@@ -41,7 +42,9 @@ matching layer that used them has been removed and nothing schedules them.
 - `season_ranking_generation`
 - `season_settlement`
 - `reward_marker`
-- `limit_order_matcher` (vestigial; the removed matching layer used it — never scheduled)
+- `limit_order_matching` (scheduler-based limit-order paths A/B; runs on a
+  dedicated interval, not the shared tick — see below)
+- `limit_order_matcher` (vestigial; the removed event layer used it — never scheduled)
 
 `provider_fx_ingest`, `provider_binance_ingest`, and `provider_kis_ingest` call the existing provider ingestion services through ops locks and write real provider snapshots when provider env is enabled.
 
@@ -274,10 +277,32 @@ The scheduler foundation does not create provider ingestion HTTP trigger APIs, b
 - Reward Policy / Reward Catalog Gate
 - Deployment/ops runbook and production scheduler ownership gate
 
-## limit_order_candle_reconciliation (removed)
+## limit_order_matching (scheduler paths A/B)
 
-This Ops job belonged to the removed event-based limit-order matching layer
-(the path-B candle safety net). The job wiring, its config flags
-(`LIMIT_ORDER_CANDLE_RECONCILIATION_*`), and its state tables have been
-removed; the `OpsJobName` value remains only because PostgreSQL cannot drop
-enum values. Nothing schedules it.
+Ops job `limit_order_matching`, added additively to `OpsJobName`. Default
+**off** (`SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED=false`).
+
+- Runs on a DEDICATED `setInterval` inside `OpsSchedulerService`
+  (`LIMIT_ORDER_MATCHING_INTERVAL_MS`, default/max 5000ms), NOT the shared 60s
+  tick — so lowering it never changes any other job's cadence. A per-process
+  guard skips a tick while the previous cycle is still running.
+- Single-instance execution is the existing `OpsJobLockService` +
+  `ops_job_locks` (lock key `limit_order_matching:current`), NEVER a Redis lock.
+- The dedicated tick pre-gates on `hasFillableWork(now)` (does any fillable
+  submitted limit buy exist) BEFORE acquiring the lock, so an idle system
+  produces no `ops_job_runs` rows; a row is written only when there is real
+  matching work.
+- One cycle: for each asset with fillable submitted limit buys, evaluate path A
+  (fresh provider snapshot) then path B (closed 5m candle touch), and fill
+  qualifying orders each in its OWN transaction, oldest first. Bounded by
+  `LIMIT_ORDER_MATCH_BATCH_SIZE` fills per cycle; the rest roll over. One order's
+  error is isolated and retried next cycle; a DB-level failure fails the job run.
+- `resultJson` carries `assetsScanned / ordersConsidered / filledPathA /
+  filledPathB / skipped / errors / batchExhausted`.
+- Startup validation caps the interval at half the 10s provider execute
+  freshness, and warns (not fails) if matching is enabled while
+  `LIMIT_ORDER_ENABLED=false` (a legitimate "drain existing orders" state).
+
+Full matching semantics (fill price, first-eligible candle, lookback, season
+endAt, lock order, evidence isolation) are in `docs/policy-decisions.md`
+(“Limit Buy Scheduler Matching”) and `docs/orders-api-contract.md`.

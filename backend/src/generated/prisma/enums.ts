@@ -256,7 +256,8 @@ export const OpsJobName = {
   market_candle_sync: 'market_candle_sync',
   market_candle_reconciliation: 'market_candle_reconciliation',
   limit_order_matcher: 'limit_order_matcher',
-  limit_order_candle_reconciliation: 'limit_order_candle_reconciliation'
+  limit_order_candle_reconciliation: 'limit_order_candle_reconciliation',
+  limit_order_matching: 'limit_order_matching'
 } as const
 
 export type OpsJobName = (typeof OpsJobName)[keyof typeof OpsJobName]

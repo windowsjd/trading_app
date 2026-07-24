@@ -116,16 +116,19 @@ jobs:
     env:
       DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/trading_app?schema=public
       REDIS_URL: redis://localhost:6379
-      # Opt-in switch for the limit-order suites that need a real database.
-      # (Automatic matching is not implemented; only the money-layer suites
-      # remain: reservation atomicity, deterministic races, post-lock time
-      # boundaries, no-Redis registration, and idempotent create replay.)
+      # Opt-in switch for the money-layer limit-order suites: reservation
+      # atomicity, deterministic races, post-lock time boundaries, no-Redis
+      # registration.
       LIMIT_ORDER_RESERVATION_DB_INTEGRATION: "1"
       # Idempotent replay of a COMMITTED limit create: ahead of the feature
       # flag and the create-service wiring, resolving to the caller's own order
       # even when the same key was reused in another season, and never
       # producing a second order or a second cash reservation.
       LIMIT_ORDER_IDEMPOTENT_REPLAY_INTEGRATION: "1"
+      # Scheduler-based matching (paths A/B): fill price (snapshot vs limit),
+      # pinned reservation fee, first-eligible/partial-candle exclusion,
+      # cancel-vs-fill, ended-season, and candle-evidence isolation.
+      LIMIT_ORDER_MATCHING_DB_INTEGRATION: "1"
       ORDER_EXECUTE_DB_INTEGRATION: "1"
       FX_EXECUTE_DB_INTEGRATION: "1"
       MVP_FLOW_DB_SMOKE: "1"
@@ -162,9 +165,10 @@ jobs:
           --to-schema prisma/schema.prisma
           --exit-code
       # Reservation atomicity, deterministic lock interleavings, post-lock DB
-      # time boundaries, no-Redis limit registration, and idempotent create
-      # replay — the money layer that remains now that automatic matching has
-      # been removed.
+      # time boundaries, no-Redis registration, idempotent create replay, and
+      # the scheduler-based matcher (paths A/B: fill price, pinned fee,
+      # partial-candle exclusion, cancel-vs-fill, ended season, evidence
+      # isolation).
       - name: Limit order PostgreSQL integration tests
         run: >-
           pnpm exec jest --runInBand
@@ -173,6 +177,7 @@ jobs:
           src/orders/limit-order-transaction-time.integration.spec.ts
           src/orders/limit-order-create-no-redis.integration.spec.ts
           src/orders/limit-order-idempotent-replay.integration.spec.ts
+          src/orders/limit-order-matching.integration.spec.ts
           src/orders/orders.execute.integration.spec.ts
           src/fx/fx.execute.integration.spec.ts
           src/mvp-flow.integration.spec.ts

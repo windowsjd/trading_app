@@ -125,10 +125,10 @@ export const API_BASE_URL = apiOrigin
 export const WS_BASE_URL = configuredWsBaseUrl || toWsOrigin(apiOrigin);
 
 /**
- * Limit-buy order UI flag (phase 1: registration/cancel only, no automatic
- * execution). Default OFF: only an explicit 'true' or '1' enables the
- * market/limit toggle. Existing submitted limit orders stay visible and
- * cancelable in the order history regardless of this flag.
+ * Limit-buy order UI flag (shows the market/limit toggle). Default OFF: only an
+ * explicit 'true' or '1' enables it. Whether a submitted order is auto-filled
+ * is server-authoritative via the quote/create executionPolicy, not this flag.
+ * Existing submitted limit orders stay visible and cancelable regardless.
  */
 export const LIMIT_ORDER_ENABLED = parsePublicBooleanFlag(
   RAW_LIMIT_ORDER_ENABLED,

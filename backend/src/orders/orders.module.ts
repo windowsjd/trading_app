@@ -9,6 +9,10 @@ import { OrdersService } from './orders.service';
 import { OrderReservationService } from './order-reservation.service';
 import { LimitOrderCreateService } from './limit-order-create.service';
 import { LimitOrderCancelService } from './limit-order-cancel.service';
+import { LimitOrderCandidateRepository } from './limit-order-candidate.repository';
+import { LimitOrderCandleEvidenceService } from './limit-order-candle-evidence.service';
+import { LimitOrderExecutionService } from './limit-order-execution.service';
+import { LimitOrderMatchingService } from './limit-order-matching.service';
 
 @Module({
   imports: [
@@ -24,7 +28,11 @@ import { LimitOrderCancelService } from './limit-order-cancel.service';
     OrderReservationService,
     LimitOrderCreateService,
     LimitOrderCancelService,
+    LimitOrderCandidateRepository,
+    LimitOrderCandleEvidenceService,
+    LimitOrderExecutionService,
+    LimitOrderMatchingService,
   ],
-  exports: [LimitOrderCancelService],
+  exports: [LimitOrderCancelService, LimitOrderMatchingService],
 })
 export class OrdersModule {}

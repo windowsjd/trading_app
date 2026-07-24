@@ -54,6 +54,9 @@ jest.mock('../assets/market-candle-sync.service', () => ({
 jest.mock('../assets/market-candle-reconciliation.service', () => ({
   MarketCandleReconciliationService: class MarketCandleReconciliationService {},
 }));
+jest.mock('../orders/limit-order-matching.service', () => ({
+  LimitOrderMatchingService: class LimitOrderMatchingService {},
+}));
 
 import { OpsJobName, OpsJobRunStatus } from '../generated/prisma/client';
 import {

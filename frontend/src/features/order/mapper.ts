@@ -102,12 +102,10 @@ export function isSubmittedLimitOrder(
 }
 
 /**
- * Server-authoritative limit-order execution copy.
- *
- * The backend has no automatic execution today, so its executionPolicy always
- * reports autoExecutionEnabled=false and the reservation-only copy renders.
- * The live branch stays so the copy keeps following the server if a future
- * matching implementation turns the policy back on.
+ * Server-authoritative limit-order execution copy. The auto-execution branch is
+ * driven by executionPolicy.autoExecutionEnabled. It deliberately avoids
+ * "실시간" (path B fills off a closed 5m candle, up to a few minutes late) and
+ * never promises live-exchange execution — this is a virtual fill system.
  */
 export function getLimitOrderSuccessMessage(
   policy?: LimitOrderExecutionPolicyDto | null,
@@ -115,7 +113,7 @@ export function getLimitOrderSuccessMessage(
   if (!policy?.autoExecutionEnabled) {
     return '현재 단계에서는 주문이 미체결 상태로 등록됩니다. 예약된 금액은 주문을 취소하면 다시 사용할 수 있습니다.';
   }
-  return '유효한 실시간 체결가격이 지정가 이하로 처리되면 전량 자동 체결됩니다. 주문장 유동성과 거래량은 반영하지 않습니다.';
+  return '유효한 체결가격이 지정가 이하가 되면 전량 자동 체결됩니다. 체결까지 수 분 지연될 수 있으며, 주문장 유동성과 거래량은 반영하지 않습니다.';
 }
 
 /**

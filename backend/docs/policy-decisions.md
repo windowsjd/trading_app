@@ -100,12 +100,12 @@
 - 자산 DB 시딩: `pnpm tsx scripts/seed-kis-fixed-asset-universe.ts [--dry-run]`로 40개 자산을 upsert한다.
 - 근거: 이 리스트는 프로젝트 결정으로 고정된 고유동성 후보군이며(공식 YTD 순위 검증을 주장하지 않음), 매 환경마다 운영자가 수동 입력하지 않도록 코드에 기본값으로 고정한다.
 
-## Limit Buy (Cash Reservation, Automatic Execution NOT Implemented)
+## Limit Buy (Cash Reservation + Scheduler Auto-Execution)
 
-지정가 매수는 등록(quote/create)·예약·취소·시즌 정리까지만 구현되어 있다.
-자동 체결은 구현되어 있지 않다: 이벤트 기반 매칭 계층(Redis Stream matcher,
-경로 A/B)은 제거되었고, 스케줄러 기반 매칭은 별도 작업으로 재구현 예정이다.
-submitted 지정가 주문의 상태는 사용자 취소 또는 시즌/제외 cleanup으로만 바뀐다.
+지정가 매수는 등록(quote/create)·예약·취소·시즌 정리 + 스케줄러 기반 자동 체결
+(경로 A/B)까지 구현되어 있다. 등록은 PostgreSQL만으로 완결되고, 자동 체결은
+별도 플래그 `SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED`로 켜지는 OpsJobLock 기반
+스케줄러 job이 수행한다. 자동 체결은 아래 "Limit Buy Scheduler Matching" 참조.
 
 - 지원: 지정가 매수 등록/취소만. 전량 주문, GTC 성격(주문 자체 만료 없음). 지정가 매도·부분 체결·IOC/FOK/DAY·Stop·실거래소 주문은 미지원.
 - 등록은 항상 `status=submitted`로 commit되며 reservation-only다. Create 자체는 Provider 현재가를 읽거나 즉시 체결하지 않는다. 등록은 PostgreSQL만으로 완결된다 — 검증 대상은 시즌·참가자·자산·시장세션·Quote·지갑뿐이고, Redis나 Provider WebSocket 상태는 등록을 가로막지 않는다(Redis 미기동 통합 테스트로 보증).
@@ -121,18 +121,46 @@ submitted 지정가 주문의 상태는 사용자 취소 또는 시즌/제외 cl
 - 원자성: 모든 일반 현금 차감(시장가 매수, FX source debit)과 예약 생성은 단일 SQL UPDATE 안에서 `balance_amount - reserved_amount >= :amount` 가드로 판정한다(read-then-write 금지, parameterized raw SQL: `src/wallets/cash-wallet-atomic.ts`). DB CHECK(`reserved>=0`, `balance>=reserved`)가 최후 방어선.
 - 취소: Order row lock(FOR UPDATE) → CashWallet 순서. 예약 해제와 `submitted→canceled` 전이가 한 transaction이라 해제는 주문당 정확히 1회. 중복 취소는 멱등 replay. 취소는 `LIMIT_ORDER_ENABLED`와 무관하게 항상 가능.
 - 정산 전제조건: 해당 시즌에 submitted 지정가 매수 또는 reservedAmount>0 지갑이 남아 있으면 `OPEN_LIMIT_ORDER_RESERVATIONS`로 settlement를 차단한다. 시즌 lifecycle job이 tick마다 ended/settled 시즌의 잔여 예약을 자가치유 정리하므로 차단은 일시적이다.
-- 기능 플래그: `LIMIT_ORDER_ENABLED`(기본 false, strict boolean parser)만 존재한다. true면 신규 지정가 Quote/Create가 열리고, false면 신규 등록만 막히며 Cancel/cleanup/시장가/FX는 계속 동작한다. 자동 체결 관련 플래그(`LIMIT_ORDER_AUTO_EXECUTION_ENABLED` 등)는 매칭 계층 제거와 함께 삭제되었고, 매칭 재구현 시 그 작업이 자체 플래그를 정의한다.
+- 기능 플래그: `LIMIT_ORDER_ENABLED`(기본 false)는 신규 Quote/Create만 연다. 자동 체결은 별도 `SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED`(기본 false)로 켠다. 둘 다 strict boolean parser. matching만 켜고 registration을 끄면 신규 등록은 막히되 기존 submitted 주문은 계속 체결되는 "drain" 상태이며, startup에서 WARNING을 남긴다.
 - 프런트엔드 공개 플래그: `EXPO_PUBLIC_LIMIT_ORDER_ENABLED`는 반드시 정적 dot notation(`process.env.EXPO_PUBLIC_LIMIT_ORDER_ENABLED`)으로 읽는다. `babel-preset-expo`의 inline-env-vars 패스는 property가 `EXPO_PUBLIC_` 리터럴인 member expression만 치환하므로, `process.env[key]` 같은 동적 접근은 번들에 값이 아예 들어가지 않아 플래그가 항상 꺼진 것처럼 동작한다. 클라이언트는 부팅 실패시킬 지점이 없으므로 백엔드와 달리 미인식 값도 fail-closed(false)로 두고, 엄격 검증은 실제 인가 주체인 서버가 담당한다.
 - 근거: 예약 없는 지정가 등록은 체결 시점 잔액 부족을 만들고, 예약을 balanceAmount 차감으로 구현하면 총자산이 왜곡된다. 예약을 별도 fence 컬럼으로 두면 두 문제를 모두 피하면서 기존 시장가/FX/평가 경로의 의미를 보존한다.
 
-## Limit Buy Automatic Matching (REMOVED — reimplementation pending)
+## Limit Buy Scheduler Matching (경로 A/B, OpsJobLock, 주문별 tx)
 
-이벤트 기반 자동 체결 계층(경로 A Redis Stream matcher, 경로 B 확정 5분봉
-안전망, event boundary mutex, shared readiness, 활성화 토큰, provider
-capability matrix)과 그 정책 문서(`limit-order-event-authority.md`,
-`limit-order-live-matching-operations.md`, `limit-order-candle-reconciliation.md`)는
-제거되었다. 스키마에는 spec §7 evidence 모델(`limit_order_candle_evidences`,
-`orders.limit_order_candle_evidence_id`)과 후보 조회 FIFO index만 남아 있고,
-`OpsJobName.limit_order_matcher`/`limit_order_candle_reconciliation`·
-`OpsJobTrigger.worker` enum 값은 PostgreSQL 제약(enum 값 삭제 불가)으로 잔존한다.
-스케줄러 기반 매칭은 별도 세션에서 별도 게이트로 재구현한다.
+이벤트 기반 매칭 계층(Redis Stream matcher, 활성화 토큰, shared readiness)은
+제거되었고, 자동 체결은 **스케줄러 폴링**으로 재구현했다. Redis Stream/consumer
+group/claim/lease를 쓰지 않으며, 단일 실행 보장은 기존 PostgreSQL
+OpsJobLockService + ops_job_locks다(Redis lock 아님). 실제 거래소 주문도 아니다.
+
+- 트리거: `OpsSchedulerService`의 **전용 interval**(`LIMIT_ORDER_MATCHING_INTERVAL_MS`,
+  기본/최대 5000ms) — 공유 60s tick을 낮추지 않아 다른 job cadence 무변경. idle 시
+  (체결 대상 submitted 주문 0건) dispatch를 건너뛰어 ops_job_runs 스팸을 막는다.
+  runner는 `OpsJobName.limit_order_matching` lock으로 한 인스턴스만 실행.
+- interval ≤ execute freshness(10s)/2: matcher가 수용한 snapshot이 체결 commit 전에
+  stale해지지 않도록 config parser가 강제(startup 실패).
+- 경로 A(fresh snapshot): 자산의 최신 유효 `provider_api` AssetPriceSnapshot이
+  limitPrice 이하이면 **snapshot 가격**으로 체결(가격 개선 허용). 기존 시장가 execute의
+  source eligibility·freshness·시장세션 판정을 그대로 재사용(admin_manual/official_batch
+  거절, 주식은 개장 세션 필요, crypto 24h).
+- 경로 B(closed 5분봉 터치): 경로 A 미체결분에 대해, 마감된 5분봉 low가 limitPrice
+  이하이면 **order.limitPrice**로 체결(candle.low는 터치 evidence일 뿐). 주문 제출 시각을
+  다음 5분 경계로 올린 `firstEligibleCandleOpen` 이후 캔들만, `LIMIT_ORDER_CANDLE_LOOKBACK_MS`
+  (기본 15분) 이내, closeTime ≤ season.endAt인 캔들만 사용. 주문 제출 중이던 첫 부분 캔들은
+  절대 사용하지 않는다. 주식은 캔들 window가 유효 세션 안에 있어야 함(휴장/미커버리지 제외).
+- 체결 tx(주문별 독립): Order(FOR UPDATE) → CashWallet(guarded settle) → Position →
+  WalletTransaction 순서(취소·cleanup과 동일). status=submitted·시즌 active·now<endAt·
+  참가자 active·자산 active·execPrice≤limitPrice 재검증. actualNet=round(execPrice*qty*(1+
+  reservationFeeRate)) ≤ reservedAmount 강제. `settleLimitBuyReservedCash`로 balance -= net,
+  reserved -= 주문예약금 전체를 한 문장에 처리(가격 개선 차액은 availableAmount로 복귀).
+  USD 자산은 fill 시점 fresh USD/KRW snapshot을 fxRateSnapshotId evidence로 부착하며, 없으면
+  해당 주문은 이번 cycle 체결을 미룬다(user requote 없는 자동 체결이라 stale FX로 진행 불가).
+- 취소·체결 경합: 둘 다 Order row lock + status=submitted 조건 → 정확히 한쪽 승리. 체결
+  선commit이면 취소는 ORDER_NOT_CANCELABLE, 취소 선commit이면 matcher가 skip. 이중 차감·이중
+  해제 없음. 시즌 종료 경합도 같은 Order row에서 중재.
+- evidence 격리: `limit_order_candle_evidences`는 (asset, interval, window, provider)당 1행을
+  주문들이 공유하고 market_candles FK가 없어(retention 이후에도 생존) 합성 AssetPriceSnapshot을
+  만들지 않는다 → 현재가·평가·랭킹을 오염시키지 않는다.
+- 배치: `LIMIT_ORDER_MATCH_BATCH_SIZE`(기본 200) 체결/사이클, 초과분은 다음 cycle로 이월
+  (submittedAt ASC, id ASC FIFO). 주문별 오류는 격리(다음 cycle 재시도).
+- 잔존 enum: `OpsJobName.limit_order_matcher`/`limit_order_candle_reconciliation`,
+  `OpsJobTrigger.worker`는 제거된 이벤트 계층 값으로 PostgreSQL 제약상 남지만 스케줄되지 않는다.

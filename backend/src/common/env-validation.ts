@@ -1,4 +1,5 @@
 import { parseLimitOrderEnabled } from '../orders/limit-order.config';
+import { readLimitOrderMatchingConfig } from '../orders/limit-order-matching.config';
 import { readLiveCandleConfig } from '../assets/live-candle.config';
 
 /**
@@ -25,15 +26,35 @@ export function validateEnv(
   // LIMIT_ORDER_ENABLED: absent → false; otherwise exactly true/false/1/0
   // (trim + case-insensitive). Anything else is a boot failure, so a typo can
   // never be mistaken for a deliberate "off".
-  collect(errors, () =>
+  const limitOrderEnabled = collect(errors, () =>
     parseLimitOrderEnabled(readOptionalString(config.LIMIT_ORDER_ENABLED)),
   );
+
+  // SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED + the matching interval / batch /
+  // lookback are strictly validated by their own parser. The parser also caps
+  // the interval at half the 10s execute-freshness window, so a snapshot the
+  // matcher accepts can never age past freshness before the fill commits.
+  const matching = collect(errors, () => readLimitOrderMatchingConfig(env));
 
   collect(errors, () => readLiveCandleConfig(env));
 
   if (errors.length > 0) {
     throw new Error(
       `Invalid environment configuration:\n- ${errors.join('\n- ')}`,
+    );
+  }
+
+  // Questionable-but-valid operational combo, surfaced as a warning (never a
+  // boot failure): matching is ON while new limit registration is OFF. New
+  // orders are blocked but any ALREADY-submitted limit orders keep filling — a
+  // legitimate "drain" state, so it is allowed and merely flagged.
+  if (matching?.matchingEnabled && limitOrderEnabled === false) {
+    console.warn(
+      JSON.stringify({
+        event: 'limit_order_matching_without_registration',
+        message:
+          'SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED=true while LIMIT_ORDER_ENABLED=false: no new limit orders can be registered, but existing submitted orders will still be auto-filled.',
+      }),
     );
   }
 

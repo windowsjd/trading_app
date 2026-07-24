@@ -35,10 +35,14 @@ import {
   resolveStockMarketSessionState,
   type MarketSessionWindow,
 } from '../orders/market-calendar.policy';
+import { LimitOrderMatchingService } from '../orders/limit-order-matching.service';
 
 @Injectable()
 export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
   private interval: NodeJS.Timeout | null = null;
+  private limitOrderMatchingInterval: NodeJS.Timeout | null = null;
+  /** Guards against a slow matching cycle overlapping the next dedicated tick. */
+  private limitOrderMatchingRunning = false;
 
   constructor(
     private readonly runner: OpsJobRunnerService,
@@ -49,6 +53,8 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
     private readonly providerConfigService?: ProviderConfigService,
     @Optional()
     private readonly marketCandleReconciliationService?: MarketCandleReconciliationService,
+    @Optional()
+    private readonly limitOrderMatchingService?: LimitOrderMatchingService,
   ) {}
 
   onModuleInit() {
@@ -98,6 +104,16 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
         });
       });
     }, config.tickIntervalMs);
+
+    // Limit-order matching runs on its OWN dedicated interval, NOT the shared
+    // tick: it must poll every few seconds while a fresh provider snapshot is
+    // still fresh, and lowering the shared tick would change every other job's
+    // cadence. Every other job stays on tickIntervalMs, untouched.
+    if (config.jobs[OpsJobName.limit_order_matching]) {
+      this.limitOrderMatchingInterval = setInterval(() => {
+        void this.runLimitOrderMatchingTick(new Date());
+      }, config.limitOrderMatchingIntervalMs);
+    }
   }
 
   onModuleDestroy() {
@@ -105,12 +121,48 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
   }
 
   clearInterval() {
-    if (!this.interval) {
-      return;
+    if (this.interval) {
+      clearInterval(this.interval);
+      this.interval = null;
     }
+    if (this.limitOrderMatchingInterval) {
+      clearInterval(this.limitOrderMatchingInterval);
+      this.limitOrderMatchingInterval = null;
+    }
+  }
 
-    clearInterval(this.interval);
-    this.interval = null;
+  /**
+   * Dedicated limit-order matching tick. Pre-gates on whether ANY fillable
+   * submitted limit buy exists so an idle system writes no audit rows, and
+   * skips a tick while the previous cycle is still running (a slow cycle must
+   * not stack). Single-instance execution is still the OpsJobLock inside the
+   * runner — this guard is only per-process overlap protection.
+   */
+  async runLimitOrderMatchingTick(now = new Date()): Promise<void> {
+    const service = this.limitOrderMatchingService;
+    if (!service || this.limitOrderMatchingRunning) return;
+    const config = getOpsSchedulerConfig();
+    if (!config.enabled || !config.jobs[OpsJobName.limit_order_matching]) return;
+
+    this.limitOrderMatchingRunning = true;
+    try {
+      if (!(await service.hasFillableWork(now))) return;
+      await this.runner.runLimitOrderMatchingJob({
+        trigger: OpsJobTrigger.scheduler,
+        requestedBy: 'scheduler',
+        dryRun: false,
+        lockTtlSeconds: config.lockTtlSeconds,
+        maxAttempts: config.maxAttempts,
+        now: now.toISOString(),
+        batchSize: config.limitOrderMatchBatchSize,
+      });
+    } catch (error) {
+      console.warn('Limit-order matching tick failed.', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    } finally {
+      this.limitOrderMatchingRunning = false;
+    }
   }
 
   isIntervalRegistered() {

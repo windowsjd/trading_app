@@ -341,8 +341,8 @@ test('new limit-order error codes map to dedicated user messages by CODE', () =>
 test('success copy follows the server execution policy without promising exchange liquidity', () => {
   const enabled = getLimitOrderSuccessMessage({
     autoExecutionEnabled: true,
-    mode: 'live_trade_event',
-    triggerType: 'provider_trade_price',
+    mode: 'scheduler_snapshot_candle',
+    triggerType: 'provider_snapshot_or_closed_candle',
     fullFillOnly: true,
   });
   assert.match(enabled, /전량 자동 체결/);
@@ -407,7 +407,7 @@ test('existing market error semantics stay intact', () => {
 });
 
 
-test('limit success copy renders reservation-only today and keeps the live branch server-driven', () => {
+test('limit success copy is server-driven: reservation-only vs scheduler auto-execution', () => {
   const reservationOnly = getLimitOrderSuccessMessage({
     autoExecutionEnabled: false,
     mode: 'reservation_only',
@@ -417,12 +417,14 @@ test('limit success copy renders reservation-only today and keeps the live branc
   assert.match(reservationOnly, /미체결 상태로 등록/);
   assert.ok(!reservationOnly.includes('자동 체결'));
 
-  const live = getLimitOrderSuccessMessage({
+  const auto = getLimitOrderSuccessMessage({
     autoExecutionEnabled: true,
-    mode: 'live_trade_event',
-    triggerType: 'provider_trade_price',
+    mode: 'scheduler_snapshot_candle',
+    triggerType: 'provider_snapshot_or_closed_candle',
     fullFillOnly: true,
   });
-  assert.match(live, /실시간 체결가격이 지정가 이하/);
-  assert.match(live, /주문장 유동성과 거래량은 반영하지 않습니다/);
+  assert.match(auto, /체결가격이 지정가 이하가 되면/);
+  assert.match(auto, /주문장 유동성과 거래량은 반영하지 않습니다/);
+  // Path B fills off a closed 5m candle, so the copy must not claim real-time.
+  assert.ok(!auto.includes('실시간'));
 });

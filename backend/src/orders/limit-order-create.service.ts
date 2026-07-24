@@ -102,22 +102,39 @@ export type LimitOrderCreateResponse = {
       duplicate: boolean;
     };
     /**
-     * Kept for API-shape stability. Automatic matching is not implemented,
-     * so every field reports the reservation-only reality; clients must keep
-     * treating these values as server-authoritative.
+     * Server-authoritative execution policy. When automatic matching is on it
+     * reports the scheduler matcher (path A snapshot / path B closed-candle
+     * touch, filled at the limit price); when off, reservation_only. Clients
+     * read this rather than a client flag.
      */
-    executionPolicy: {
-      autoExecutionEnabled: false;
-      mode: 'reservation_only';
-      triggerType: null;
-      fullFillOnly: true;
-      liveTradeMatchingEnabled: false;
-      candleReconciliationEnabled: false;
-      candleInterval: null;
-      candleExecutionPricePolicy: null;
-    };
+    executionPolicy: LimitOrderExecutionPolicy;
   };
 };
+
+export type LimitOrderExecutionPolicy = {
+  autoExecutionEnabled: boolean;
+  mode: 'scheduler_snapshot_candle' | 'reservation_only';
+  triggerType: 'provider_snapshot_or_closed_candle' | null;
+  fullFillOnly: true;
+  candleInterval: '5m' | null;
+  candleExecutionPricePolicy: 'limit_price' | null;
+};
+
+export function buildLimitOrderExecutionPolicy(input: {
+  autoExecutionEnabled: boolean;
+}): LimitOrderExecutionPolicy {
+  const { autoExecutionEnabled } = input;
+  return {
+    autoExecutionEnabled,
+    mode: autoExecutionEnabled ? 'scheduler_snapshot_candle' : 'reservation_only',
+    triggerType: autoExecutionEnabled
+      ? 'provider_snapshot_or_closed_candle'
+      : null,
+    fullFillOnly: true,
+    candleInterval: autoExecutionEnabled ? '5m' : null,
+    candleExecutionPricePolicy: autoExecutionEnabled ? 'limit_price' : null,
+  };
+}
 
 type LimitCreateTransactionClient = Prisma.TransactionClient;
 
@@ -412,6 +429,9 @@ export class LimitOrderCreateService {
       quantity: Prisma.Decimal;
       idempotency: { idempotencyKey: string; requestHash: string };
       submittedAt: Date;
+      /** Whether the scheduler matcher will auto-fill this order; drives the
+       * additive executionPolicy on the response. Defaults to false. */
+      autoExecutionEnabled?: boolean;
     },
   ): Promise<LimitOrderCreateResponse> {
     const currencyCode =
@@ -522,16 +542,9 @@ export class LimitOrderCreateService {
           reservationFeeRate: reservationFeeRateText,
           duplicate: false,
         },
-        executionPolicy: {
-          autoExecutionEnabled: false,
-          mode: 'reservation_only',
-          triggerType: null,
-          fullFillOnly: true,
-          liveTradeMatchingEnabled: false,
-          candleReconciliationEnabled: false,
-          candleInterval: null,
-          candleExecutionPricePolicy: null,
-        },
+        executionPolicy: buildLimitOrderExecutionPolicy({
+          autoExecutionEnabled: input.autoExecutionEnabled === true,
+        }),
       },
     };
 

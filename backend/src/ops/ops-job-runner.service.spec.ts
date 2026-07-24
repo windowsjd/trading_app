@@ -46,6 +46,9 @@ jest.mock('../assets/market-candle-sync.service', () => ({
 jest.mock('../assets/market-candle-reconciliation.service', () => ({
   MarketCandleReconciliationService: class MarketCandleReconciliationService {},
 }));
+jest.mock('../orders/limit-order-matching.service', () => ({
+  LimitOrderMatchingService: class LimitOrderMatchingService {},
+}));
 
 jest.mock('../batch/daily-portfolio-snapshot-job.service', () => ({
   DailyPortfolioSnapshotJobService: class DailyPortfolioSnapshotJobService {},
