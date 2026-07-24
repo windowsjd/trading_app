@@ -813,7 +813,10 @@ works after the season ended.
 ### Idempotency lookup scope
 
 The replay is keyed on `(quoteId, idempotencyKey, owner)` and requires
-`orderType = limit`.
+`orderType = limit`. OWNERSHIP IS PART OF THE DATABASE QUERY (a relation
+filter on the caller's `userId`), not an application-side comparison on a row
+fetched by `quoteId` alone — another user's order row is never even read into
+the process.
 
 `Order.quoteId` is UNIQUE, and every limit create carries a durable quote that
 is user-scoped and consumed exactly once, so this scope is EQUAL to a real
@@ -830,13 +833,22 @@ although both requests were individually valid.
 season. Each request resolves to the order created from its own quote, and each
 retry replays that order.
 
-`ORDER_IDEMPOTENCY_CONFLICT` (409) is returned when, for the requested quote:
+`ORDER_IDEMPOTENCY_CONFLICT` (409) is returned when, for the caller's OWN
+consumed quote:
 
 - the stored order's request hash differs;
 - the quote is presented under a different `idempotencyKey`;
-- the quote was already consumed by a market order;
-- the quote/order belongs to another user — another user's order is never
-  replayed and never disclosed.
+- the quote was already consumed by a market order.
+
+**Another user's `quoteId` is indistinguishable from a `quoteId` that never
+existed.** Both return no row from the ownership-scoped replay lookup and
+proceed through the SAME gates to the same user-scoped quote validation,
+ending in the same error (`QUOTE_NOT_FOUND` when the gates pass; the same
+gate error as any new create otherwise). The response can therefore not be
+used to probe whether someone else's quote exists or was consumed, and
+another user's order is never replayed and never disclosed. (Previously a
+foreign consumed `quoteId` answered `ORDER_IDEMPOTENCY_CONFLICT` immediately
+while a nonexistent one did not — an ownership-information side channel.)
 
 New operational 503 codes remain on `/api/v1`; no `/api/v2` or public/manual
 limit execute route exists:

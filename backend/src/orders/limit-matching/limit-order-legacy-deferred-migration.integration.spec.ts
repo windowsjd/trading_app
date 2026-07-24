@@ -51,13 +51,17 @@ describe('Limit order legacy deferred migration upgrade integration', () => {
         );
       }
       for (const name of [
-        // The defect itself, asserted BEFORE the fix is deployed: if this ever
-        // stops holding, the fix protects against nothing.
+        // The defects themselves, asserted BEFORE each fix is deployed: if
+        // these ever stop holding, the fixes protect against nothing.
         'the pre-fix backfill stamps a permanent entry with the CORRECTED revision',
+        'the created_at boundary reopens past-clock rows but MISSES future-clock rows',
         'the provenance migration reopens the legacy permanent entry for re-verification',
         'a legacy entry whose candle is gone stays parked as an orphan',
-        'a revision-aware entry written after the backfill is untouched',
-        're-running the provenance migration changes nothing',
+        'a future-created_at legacy entry is reopened despite the clock skew',
+        'a future-created_at legacy entry without a candle becomes an orphan',
+        'an unverified revision-aware entry is conservatively re-verified',
+        'a runtime-verified entry is untouched by the re-verification migration',
+        're-running the provenance migrations changes nothing',
         'the reopened entry lets the sweep process the corrected revision',
       ]) {
         expect(result.stdout).toContain(`ok ${name}`);

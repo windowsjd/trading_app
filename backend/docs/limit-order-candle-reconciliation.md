@@ -445,6 +445,23 @@ kept accepting orders whose safety net was already blind. If more assets are
 affected than the bound, the remainder is recorded by the next sweep and the
 truncation is logged as `limit_order_candle_deferred_row_missing_truncated`.
 
+The bound is a WRITE-BURST limit, never a correctness limit, and what makes
+that true is that **assets whose sticky gap is already recorded are excluded
+from both probes** (`NOT EXISTS` on
+`market_candle_finalization_checkpoints.gap_detected_at`, plus an explicit
+exclusion of the assets the same sweep's orphan pass just recorded, which the
+query snapshot cannot see yet). `recordAssetGap` is sticky — first detection
+wins, later calls are no-ops — so without the exclusion the same oldest
+`batchSize` assets would fill every batch with no-ops and any asset past the
+limit would NEVER be reached. With it, each sweep advances to assets that
+still need their first gap, so `n` affected assets are all recorded within
+`ceil(n / batchSize)` sweeps, and one asset never consumes two slots in one
+sweep even when both signals name it. `recordAssetGap` reports whether the
+call actually inserted a new gap (`'inserted'` vs `'already_exists'`), and the
+sweep summary's `assetGapsDetected` counts only genuinely NEW findings — a
+raced re-sighting is logged as `limit_order_candle_asset_gap_already_present`
+and not counted. Existing gap evidence is never overwritten by any of this.
+
 The per-asset gap columns carry the evidence an operator needs:
 `gap_detected_at`, `gap_from_open_time`, `gap_to_open_time`, `gap_reason`,
 `gap_market_candle_id` (nullable) and `gap_candle_ingest_seq` (nullable).
@@ -694,15 +711,41 @@ for a `permanent` entry the difference is a silent, permanent miss:
 Revision 2 is unreachable from both directions, forever, and an order whose
 limit the corrected low newly touches is never filled.
 
-Migration
+Two additive migrations close it.
+
 `20260724120000_add_limit_order_deferred_revision_provenance_and_asset_gap`
-closes it, additively. A legacy row and a row written by the current
-revision-aware code are byte-identical, so provenance cannot be re-derived from
-the data; the only durable discriminator is WHEN the row was created relative
-to the moment the revision column started being written. That boundary is read
-from `_prisma_migrations.finished_at` for `20260723230000` and the verdict is
-FROZEN into `limit_order_deferred_candles.revision_state`, which makes every
-later application of the migration a no-op on the same rows.
+introduced the provenance columns and reclassified by comparing the row's
+`created_at` to `_prisma_migrations.finished_at` for `20260723230000`. That
+boundary turned out to be CLOCK-UNSAFE: `created_at` is written from the
+APPLICATION clock (`upsertDeferred` passes its own `now`), while the migration
+ledger is stamped by the DATABASE clock. With the application clock running
+ahead of the database, a genuinely legacy row can carry a `created_at` later
+than the migration's `finished_at` and be mistaken for a modern row — leaving
+its inferred revision trusted and the corrected revision unreachable, which is
+the original defect all over again, now conditional on how two unrelated wall
+clocks happened to be set.
+
+`20260724200000_reverify_limit_order_deferred_unverified_revision_provenance`
+therefore replaces the time comparison with a CLOCK-INDEPENDENT criterion:
+whether the runtime ever durably recorded OBSERVING the tracked revision.
+A row with `revision_verified_at IS NULL` and `revision_migrated_at IS NULL`
+has no evidence that its revision is anything but a backfill inference —
+whatever its `created_at` says, in either skew direction — and is
+conservatively reclassified (`legacy_unknown` when its candle still exists,
+`legacy_orphan` when it is gone). No application-written timestamp
+(`created_at`, `updated_at`, provider timestamps, process wall clocks)
+participates in the verdict. Every touched row gets `revision_migrated_at`
+stamped, which makes re-application a strict no-op; on a fresh database the
+queue is empty and the migration does nothing. The verdict stays FROZEN in
+`limit_order_deferred_candles.revision_state`.
+
+`revision_verified_at` itself is stamped with the DATABASE clock
+(`CURRENT_TIMESTAMP` inside the upsert), never the caller's `now` — it is the
+provenance-authority timestamp future migrations may reason about, so putting
+an application clock in it would re-create the exact ambiguity this closes.
+The sweep-scheduling timestamps (`first_deferred_at`, `last_deferred_at`,
+`next_retry_at`) stay on the caller's clock; they describe retry timing, not
+provenance.
 
 | `revision_state` | Meaning | Effect |
 | --- | --- | --- |
@@ -721,12 +764,16 @@ Deliberate choices, in the conservative direction:
 - **`attempt_count` restarts at 1**, the table CHECK floor and the same value
   the runtime writes on a revision replacement. The exhausted budget belonged
   to a revision that is no longer the one being examined.
-- **When the boundary cannot be read at all** (no `_prisma_migrations`), every
-  existing row is treated as legacy. Being wrong in the "legacy" direction
-  costs one extra sweep of a candle whose orders are protected by their own
-  status guard; being wrong in the "current" direction loses a fill.
-- **Rows written after the backfill are untouched** — no reclassification, no
-  reset retry budget, no reset age.
+- **Unproven means legacy.** The re-verification migration treats every row
+  without a durable observation record as legacy — including rows written by
+  revision-aware code before `revision_verified_at` existed, whose revision
+  WAS genuinely observed. Being wrong in the "legacy" direction costs one
+  extra sweep of a candle whose orders are protected by their own status
+  guard; being wrong in the "current" direction loses a fill. The two errors
+  are not symmetric.
+- **Only verified rows are untouched** — a row with `revision_verified_at`
+  set keeps its status, revision, retry budget, retry schedule and age
+  through any re-application of either migration.
 - **Nothing is deleted or re-filled.** An already-executed order cannot fill
   twice (status guard), and evidence rows stay immutable per
   `(marketCandleId, candleIngestSeq)`; only a `submitted` order that the NEW
@@ -859,17 +906,30 @@ second application a no-op on rows it already handled.
   (`LIMIT_ORDER_LEGACY_DEFERRED_MIGRATION_INTEGRATION=1`, needs a disposable
   PostgreSQL SERVER) — the EXISTING-DATABASE UPGRADE, which a fully-migrated
   database structurally cannot express. It creates its own scratch database
-  and deploys migrations in three stages, so the pre-fix state is reproduced
-  rather than simulated: it first asserts the DEFECT (a permanent entry stamped
-  with a revision it never processed, unreachable by both the scan and the
-  retry loop), then that the provenance migration reopens it, parks an
-  unrecoverable orphan, leaves a revision-aware entry untouched, is a no-op on
-  re-application, and finally drives the REAL sweep to prove the corrected
-  revision is processed, the newly-qualifying order fills once at the LIMIT
-  price, and the already-executed order is untouched.
+  and deploys migrations in four stages, so each pre-fix state is reproduced
+  rather than simulated: it first asserts the ORIGINAL defect (a permanent
+  entry stamped with a revision it never processed, unreachable by both the
+  scan and the retry loop), then the CLOCK-SKEW defect (after the
+  created_at-boundary migration alone, a legacy row whose `created_at` sits in
+  the DB future is still trusted while past-clock rows are reopened), then
+  that the full upgrade reopens legacy rows in BOTH skew directions
+  identically, parks unrecoverable orphans in both directions, conservatively
+  re-verifies an unverified revision-aware entry, leaves a runtime-VERIFIED
+  entry untouched, is a no-op on re-application of both provenance
+  migrations, and finally drives the REAL sweep to prove the corrected
+  revisions are processed, the newly-qualifying orders fill once at their
+  LIMIT prices, and the already-executed orders are untouched.
 - `limit-order-candle-retention-gap.spec.ts` — the blast-radius classification
   in isolation: which signal is global, which is per-asset, that every affected
-  asset is reported, and that a per-asset finding never becomes a global one.
+  asset is reported, that a per-asset finding never becomes a global one, that
+  `assetGapsDetected` counts only newly recorded gaps, and that the unscanned
+  probe excludes the assets the same sweep's orphan pass just recorded.
+- checkpoint scenario `more gapped assets than the batch size are all recorded
+  across sweeps` — batch progression against the real database: five orphaned
+  assets and five unscanned assets with `assetGapBatchSize=2` are fully
+  recorded in `2, 2, 1, 0` new findings per sweep for each signal, a mixed
+  asset trips both signals but records exactly one sticky gap, and the first
+  evidence survives later sweeps.
 - `limit-order-deferred-revision-provenance.spec.ts` — the runtime half of the
   provenance rules: a reopened entry whose candle then disappears becomes a
   `legacy_orphan` rather than silently returning to trusted, and a `current`

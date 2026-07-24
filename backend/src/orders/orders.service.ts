@@ -3982,9 +3982,20 @@ export class OrdersService {
    * season that order belongs to, and needs no active-season read — so a
    * replay still works after the season ended.
    *
-   * Everything the caller asserted must match; anything else is a conflict
-   * rather than a silent new create, because the quote is already consumed:
-   *   - another user's quote/order  (never replayed, never leaked)
+   * OWNERSHIP IS PART OF THE QUERY, not an application-side comparison on a
+   * row fetched by quoteId alone. The old shape loaded whatever order held
+   * the quoteId — another user's included — and answered a mismatched owner
+   * with an immediate ORDER_IDEMPOTENCY_CONFLICT, while a quoteId that
+   * matched no order fell through to the ordinary create gates. That
+   * difference let a caller probe whether someone ELSE's quoteId had been
+   * consumed. With the relation filter, another user's consumed quote and a
+   * quoteId that never existed both return null here and proceed through the
+   * SAME gates to the same user-scoped quote lookup (QUOTE_NOT_FOUND for
+   * both) — no other user's row is ever read into this process, let alone
+   * replayed.
+   *
+   * For the caller's OWN consumed quote, everything they asserted must still
+   * match; anything else is a conflict rather than a silent new create:
    *   - a market order on that quote
    *   - the same quote presented under a different idempotencyKey
    * The request-hash comparison then happens in replayIdempotentCreateOrder,
@@ -3995,19 +4006,20 @@ export class OrdersService {
     quoteId: string;
     idempotencyKey: string;
   }) {
-    const order = await this.prisma.order.findUnique({
-      where: { quoteId: input.quoteId },
+    const order = await this.prisma.order.findFirst({
+      where: {
+        quoteId: input.quoteId,
+        seasonParticipant: { userId: input.userId },
+      },
       select: {
         ...IDEMPOTENT_CREATE_ORDER_SELECT,
         idempotencyKey: true,
-        seasonParticipant: { select: { userId: true } },
       },
     });
 
     if (!order) return null;
 
     if (
-      order.seasonParticipant.userId !== input.userId ||
       order.orderType !== OrderType.limit ||
       order.idempotencyKey !== input.idempotencyKey
     ) {

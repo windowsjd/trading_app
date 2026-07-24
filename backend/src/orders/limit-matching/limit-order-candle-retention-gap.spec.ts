@@ -66,6 +66,13 @@ function detect(input: {
   orphans?: OrphanRow[];
   unscanned?: UnscannedRow[];
   assetGapBatchSize?: number;
+  /**
+   * Simulates the sticky-gap state recordAssetGap finds per asset:
+   * 'already_exists' means the asset already carried a gap (a concurrent
+   * runner's write — the query-side exclusion keeps re-sightings out of the
+   * batch in the first place).
+   */
+  recordOutcome?: (assetId: string) => 'inserted' | 'already_exists';
 }) {
   const previous = { ...process.env };
   Object.assign(process.env, {
@@ -104,7 +111,9 @@ function detect(input: {
       },
       recordAssetGap: (gap: AssetRetentionGap) => {
         assetGaps.push(gap);
-        return Promise.resolve();
+        return Promise.resolve(
+          input.recordOutcome?.(gap.assetId) ?? ('inserted' as const),
+        );
       },
     };
     // Only the datasource and the checkpoint repository participate in gap
@@ -126,14 +135,32 @@ function detect(input: {
         global: { reason: string } | null;
         assetGaps: Array<{ assetId: string; reason: string }>;
       }>;
-      findOldestUnscannedMatchableCandles(): Promise<UnscannedRow[]>;
+      findOldestUnscannedMatchableCandles(
+        ingestWatermark: bigint,
+        to: Date,
+        retentionHorizon: Date,
+        excludeAssetIds: string[],
+      ): Promise<UnscannedRow[]>;
     };
-    internals.findOldestUnscannedMatchableCandles = () =>
-      Promise.resolve(input.unscanned ?? []);
+    const unscannedExclusions: string[][] = [];
+    internals.findOldestUnscannedMatchableCandles = (
+      _watermark,
+      _to,
+      _horizon,
+      excludeAssetIds,
+    ) => {
+      unscannedExclusions.push([...excludeAssetIds]);
+      return Promise.resolve(
+        (input.unscanned ?? []).filter(
+          (row) => !excludeAssetIds.includes(row.assetId),
+        ),
+      );
+    };
 
     return {
       globalGaps,
       assetGaps,
+      unscannedExclusions,
       run: () =>
         internals.detectRetentionGap(
           { openTime: input.watermarkOpenTime, candleId: 'w' },
@@ -313,5 +340,64 @@ describe('path-B retention gap classification', () => {
     expect(verdict.global).toBeNull();
     expect(harness.globalGaps).toHaveLength(0);
     expect(harness.assetGaps).toHaveLength(2);
+  });
+
+  it('counts only gaps THIS sweep actually recorded, not raced re-sightings', async () => {
+    // recordAssetGap is sticky and first-detection-wins; when a concurrent
+    // runner recorded the same asset between the probe and the write, this
+    // sweep's call is a no-op and must not inflate assetGapsDetected — the
+    // summary means "new findings", and batch-progression accounting depends
+    // on it being exact.
+    const harness = detect({
+      watermarkOpenTime: RECENT,
+      orphans: [
+        orphan({ assetId: 'asset-a', totalAssets: 2 }),
+        orphan({
+          assetId: 'asset-b',
+          marketCandleId: 'candle-b',
+          totalAssets: 2,
+        }),
+      ],
+      recordOutcome: (assetId) =>
+        assetId === 'asset-b' ? 'already_exists' : 'inserted',
+    });
+    const verdict = await harness.run();
+
+    expect(verdict.assetGaps).toEqual([
+      { assetId: 'asset-a', reason: 'deferred_candle_retention_removed' },
+    ]);
+    // The write was still ATTEMPTED for both (sticky no-op is harmless); only
+    // the verdict — and through it the summary count — is filtered.
+    expect(harness.assetGaps.map((gap) => gap.assetId)).toEqual([
+      'asset-a',
+      'asset-b',
+    ]);
+  });
+
+  it('excludes assets the orphan pass just gapped from the unscanned probe', async () => {
+    // Both probes can name the same asset in one sweep (its deferred entry
+    // lost its candle AND it has another unscanned old window). The sticky
+    // gap the orphan pass just wrote is invisible to the unscanned query's
+    // own already-gapped exclusion (same-sweep write), so the service passes
+    // the set explicitly — one asset must not consume two batch slots, and
+    // the first gap evidence must not be raced by a second finding.
+    const harness = detect({
+      watermarkOpenTime: RECENT,
+      orphans: [orphan({ assetId: 'asset-a' })],
+      unscanned: [
+        unscanned({ assetId: 'asset-a', id: 'candle-a2' }),
+        unscanned({ assetId: 'asset-b', id: 'candle-b' }),
+      ],
+    });
+    const verdict = await harness.run();
+
+    expect(harness.unscannedExclusions).toEqual([['asset-a']]);
+    expect(verdict.assetGaps).toEqual([
+      { assetId: 'asset-a', reason: 'deferred_candle_retention_removed' },
+      {
+        assetId: 'asset-b',
+        reason: 'candle_retention_passed_unscanned_candle',
+      },
+    ]);
   });
 });

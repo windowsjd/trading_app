@@ -96,6 +96,7 @@ describe('Limit order path-B durable checkpoint integration', () => {
         'a provider-confirmed empty window advances the cursor as no-trade',
         'a delayed candle row completes its pending window',
         'an asset retention gap blocks only that asset',
+        'more gapped assets than the batch size are all recorded across sweeps',
         'a corrected candle is reprocessed as a new revision without double fills',
         'retention passing the watermark is detected as a gap',
         'a gap fails new quotes/creates closed and stays sticky',

@@ -815,10 +815,15 @@ Every violation is reported at once, not just the first.
 1. apply and verify migrations without resetting data (all additive):
    `prisma migrate deploy`, then `migrate status` and `migrate diff
    --from-config-datasource --to-schema prisma/schema.prisma --exit-code`.
-   On an EXISTING database, the revision-provenance migration reports in its
-   `RAISE NOTICE` how many deferred-queue entries it reopened for
-   re-verification and how many it parked as legacy orphans; check both before
-   continuing, and see the existing-database upgrade procedure in
+   On an EXISTING database, BOTH provenance migrations report in their
+   `RAISE NOTICE` how many deferred-queue entries they reopened for
+   re-verification and how many they parked as legacy orphans. The second one
+   (`20260724200000`, clock-independent re-verification) is expected to pick
+   up rows the first one's `created_at` boundary missed — any row whose
+   application-written `created_at` sat ahead of the database clock, plus any
+   revision-aware row written before `revision_verified_at` existed. Check
+   both notices before continuing, and see the existing-database upgrade
+   procedure in
    [limit-order-candle-reconciliation.md](limit-order-candle-reconciliation.md);
 2. provision durable Redis retention and alerting;
 3. deploy with every limit-order flag false and verify provider streams,

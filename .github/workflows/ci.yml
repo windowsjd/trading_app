@@ -143,8 +143,12 @@ jobs:
       # server and deploys migrations in stages, so the pre-fix intermediate
       # state (a PERMANENT deferred entry stamped with a candle revision it
       # never processed) is reproduced rather than simulated, and the recovery
-      # is driven through the real sweep. This is the one path-B property a
-      # fully-migrated database cannot express.
+      # is driven through the real sweep. Also covers CLOCK SKEW between the
+      # application and database clocks: legacy rows whose created_at sits in
+      # the DB future (application clock ahead) escaped the created_at-boundary
+      # provenance migration and are recovered by the clock-independent
+      # re-verification migration; verified modern rows stay untouched. This is
+      # the one path-B property a fully-migrated database cannot express.
       LIMIT_ORDER_LEGACY_DEFERRED_MIGRATION_INTEGRATION: "1"
       # Idempotent replay of a COMMITTED limit create: ahead of the feature
       # flag and the create-service wiring, resolving to the caller's own order

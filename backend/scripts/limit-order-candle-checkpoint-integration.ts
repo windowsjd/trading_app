@@ -180,6 +180,10 @@ async function main(): Promise<void> {
       testAssetRetentionGapIsAssetScoped,
     );
     await run(
+      'more gapped assets than the batch size are all recorded across sweeps',
+      testAssetGapBatchProgression,
+    );
+    await run(
       'a corrected candle is reprocessed as a new revision without double fills',
       testCandleRevisionReprocessing,
     );
@@ -1330,6 +1334,249 @@ async function testAssetRetentionGapIsAssetScoped(): Promise<void> {
 }
 
 /**
+ * BATCH PROGRESSION of the per-asset gap detector.
+ *
+ * `assetGapBatchSize` bounds how many DISTINCT assets one sweep may record a
+ * gap for — a write-burst limit. It must never become a correctness limit:
+ * recordAssetGap is sticky (first detection wins, later calls no-op), so a
+ * detector that kept selecting the same oldest assets would burn every batch
+ * slot on no-ops and NEVER reach the assets past the limit. The probes
+ * therefore exclude assets whose sticky gap is already recorded, and this
+ * scenario pins the resulting guarantee: with batch size 2 and five affected
+ * assets, sweeps record 2, 2, 1 and then 0 NEW gaps — for the orphan signal,
+ * the unscanned signal, and a mixed case where one asset trips both.
+ *
+ * The detector is driven directly (the same private entry point the sweep
+ * calls, against the real database) so the counts measure the queries alone:
+ * a full reconcile would also defer the fixture candles through the forward
+ * scan, which silences the unscanned signal after one pass by design.
+ */
+async function testAssetGapBatchProgression(): Promise<void> {
+  await clearGap();
+  const previousBatchSize = process.env.LIMIT_ORDER_CANDLE_ASSET_GAP_BATCH_SIZE;
+  process.env.LIMIT_ORDER_CANDLE_ASSET_GAP_BATCH_SIZE = '2';
+  const orphanCandleIds: string[] = [];
+  const fixtureOrderIds: string[] = [];
+  try {
+    // The service reads its config at construction, so the batch size takes
+    // effect on a fresh instance only; the shared `sweep` is untouched.
+    const batchSweep = newSweep();
+    const internals = batchSweep as unknown as {
+      detectRetentionGap(
+        watermark: { openTime: Date; candleId: string | null },
+        ingestWatermark: bigint,
+        now: Date,
+      ): Promise<{
+        global: { reason: string } | null;
+        assetGaps: Array<{ assetId: string; reason: string }>;
+      }>;
+    };
+    const detect = (ingestWatermark: bigint) =>
+      internals.detectRetentionGap(
+        // A current market-time watermark: the GLOBAL retention signal must
+        // stay silent throughout — everything here is asset-scoped.
+        { openTime: new Date(), candleId: null },
+        ingestWatermark,
+        new Date(),
+      );
+
+    // ---- Orphan signal: five assets, each with a deferred entry whose
+    // candle row no longer exists. Retries are scheduled far in the future so
+    // only the detector ever looks at these rows.
+    const orphanAssets: string[] = [];
+    for (let index = 0; index < 5; index += 1) {
+      const asset = await createAsset(`gap-batch-orphan-${index}`, {
+        withPriceSnapshot: false,
+      });
+      const openTime = nextWindowBase();
+      const missingCandleId = randomUUID();
+      await checkpoints.upsertDeferred({
+        marketCandleId: missingCandleId,
+        candleIngestSeq: null,
+        assetId: asset,
+        interval: LIMIT_ORDER_CANDLE_INTERVAL,
+        openTime,
+        closeTime: new Date(openTime.getTime() + FIVE_MINUTES_MS),
+        now: new Date(),
+        nextRetryAt: new Date(Date.now() + 3_600_000),
+        errorCode: 'LIMIT_ORDER_CANDLE_ROW_MISSING',
+        errorMessage: 'batch progression fixture',
+      });
+      orphanAssets.push(asset);
+      orphanCandleIds.push(missingCandleId);
+    }
+    const healthyAsset = await createAsset('gap-batch-healthy');
+
+    const orphanCounts: number[] = [];
+    for (let sweepIndex = 0; sweepIndex < 4; sweepIndex += 1) {
+      const verdict = await detect(0n);
+      assert.equal(
+        verdict.global,
+        null,
+        'a per-asset backlog must never trip the global retention alarm',
+      );
+      orphanCounts.push(verdict.assetGaps.length);
+      if (sweepIndex === 0) {
+        // Sticky evidence anchor: the first sweep's detection instant on the
+        // first recorded asset must survive every later sweep untouched.
+        const first = await windowCheckpoint(verdict.assetGaps[0].assetId);
+        assert.ok(first?.gapDetectedAt);
+      }
+    }
+    assert.deepEqual(
+      orphanCounts,
+      [2, 2, 1, 0],
+      'each sweep must record at most batchSize NEW gaps and still reach every asset',
+    );
+    for (const asset of orphanAssets) {
+      const checkpoint = await windowCheckpoint(asset);
+      assert.ok(
+        checkpoint?.gapDetectedAt,
+        'every affected asset must be gapped',
+      );
+      assert.equal(checkpoint.gapReason, 'deferred_candle_retention_removed');
+    }
+    await freshHeartbeats();
+    assert.equal(
+      (await health.evaluate(new Date(), orphanAssets[0]))?.code,
+      'LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED',
+    );
+    assert.equal(
+      await health.evaluate(new Date(), healthyAsset),
+      null,
+      'an unaffected asset must keep accepting new limit orders',
+    );
+    assert.equal(await windowCheckpoint(healthyAsset), null);
+
+    // ---- Unscanned signal: five assets, each owing an ancient matchable
+    // window the storage position has not reached. Same batch, same
+    // progression guarantee.
+    const config = readLimitOrderCandleReconciliationConfig();
+    const unscannedAssets: string[] = [];
+    let minSeq: bigint | null = null;
+    for (let index = 0; index < 5; index += 1) {
+      const asset = await createAsset(`gap-batch-unscanned-${index}`, {
+        withPriceSnapshot: false,
+      });
+      const ancientWindow = alignWindow(
+        new Date(
+          Date.now() -
+            (config.candleRetentionDays + 4) * 86_400_000 +
+            index * FIVE_MINUTES_MS,
+        ),
+      );
+      const order = await createSubmittedOrder({
+        label: `gap-batch-unscanned-${index}`,
+        assetIdOverride: asset,
+        submittedAt: ancientWindow,
+      });
+      assert.equal(order.eligibleFrom.getTime(), ancientWindow.getTime());
+      fixtureOrderIds.push(order.orderId);
+      const candle = await createClosedCandle({
+        openTime: ancientWindow,
+        low: '90.00000000',
+        assetIdOverride: asset,
+      });
+      const seq = await ingestSeqOf(candle.id);
+      minSeq = minSeq === null || seq < minSeq ? seq : minSeq;
+      unscannedAssets.push(asset);
+    }
+    assert.ok(minSeq !== null);
+    const unscannedCounts: number[] = [];
+    for (let sweepIndex = 0; sweepIndex < 4; sweepIndex += 1) {
+      const verdict = await detect(minSeq - 1n);
+      unscannedCounts.push(verdict.assetGaps.length);
+    }
+    assert.deepEqual(
+      unscannedCounts,
+      [2, 2, 1, 0],
+      'the unscanned probe must advance past already-gapped assets too',
+    );
+    for (const asset of unscannedAssets) {
+      const checkpoint = await windowCheckpoint(asset);
+      assert.equal(
+        checkpoint?.gapReason,
+        'candle_retention_passed_unscanned_candle',
+      );
+    }
+
+    // ---- Mixed signals: one asset exposed by BOTH probes in the same sweep
+    // gets exactly ONE sticky gap (the orphan pass wins, the unscanned probe
+    // excludes what this sweep just recorded), and the first evidence
+    // survives the second sweep.
+    const mixedAsset = await createAsset('gap-batch-mixed', {
+      withPriceSnapshot: false,
+    });
+    const mixedWindow = alignWindow(
+      new Date(Date.now() - (config.candleRetentionDays + 5) * 86_400_000),
+    );
+    const mixedOrder = await createSubmittedOrder({
+      label: 'gap-batch-mixed',
+      assetIdOverride: mixedAsset,
+      submittedAt: mixedWindow,
+    });
+    fixtureOrderIds.push(mixedOrder.orderId);
+    const mixedCandle = await createClosedCandle({
+      openTime: mixedWindow,
+      low: '90.00000000',
+      assetIdOverride: mixedAsset,
+    });
+    const mixedSeq = await ingestSeqOf(mixedCandle.id);
+    const mixedMissingId = randomUUID();
+    orphanCandleIds.push(mixedMissingId);
+    await checkpoints.upsertDeferred({
+      marketCandleId: mixedMissingId,
+      candleIngestSeq: null,
+      assetId: mixedAsset,
+      interval: LIMIT_ORDER_CANDLE_INTERVAL,
+      openTime: mixedWindow,
+      closeTime: new Date(mixedWindow.getTime() + FIVE_MINUTES_MS),
+      now: new Date(),
+      nextRetryAt: new Date(Date.now() + 3_600_000),
+      errorCode: 'LIMIT_ORDER_CANDLE_ROW_MISSING',
+      errorMessage: 'batch progression fixture (mixed)',
+    });
+    const mixedVerdict = await detect(mixedSeq - 1n);
+    assert.deepEqual(
+      mixedVerdict.assetGaps,
+      [{ assetId: mixedAsset, reason: 'deferred_candle_retention_removed' }],
+      'one asset must consume one batch slot even when both signals name it',
+    );
+    const mixedCheckpoint = await windowCheckpoint(mixedAsset);
+    assert.ok(mixedCheckpoint?.gapDetectedAt);
+    assert.equal(
+      mixedCheckpoint.gapReason,
+      'deferred_candle_retention_removed',
+    );
+    const mixedAgain = await detect(mixedSeq - 1n);
+    assert.equal(
+      mixedAgain.assetGaps.length,
+      0,
+      'an already-gapped asset must not resurface as a new finding',
+    );
+    assert.equal(
+      (await windowCheckpoint(mixedAsset))?.gapDetectedAt?.getTime(),
+      mixedCheckpoint.gapDetectedAt.getTime(),
+      'the first gap evidence must win',
+    );
+  } finally {
+    if (previousBatchSize === undefined) {
+      delete process.env.LIMIT_ORDER_CANDLE_ASSET_GAP_BATCH_SIZE;
+    } else {
+      process.env.LIMIT_ORDER_CANDLE_ASSET_GAP_BATCH_SIZE = previousBatchSize;
+    }
+    // Leave no queue rows or eligible orders behind: later scenarios measure
+    // the global backlog and drive full sweeps whose forward scan would
+    // otherwise pick these fixtures up. The sticky asset gaps stay (they are
+    // asset-scoped and these assets appear in no later scenario).
+    await prisma.limitOrderDeferredCandle.deleteMany({
+      where: { marketCandleId: { in: orphanCandleIds } },
+    });
+    await prisma.order.deleteMany({ where: { id: { in: fixtureOrderIds } } });
+  }
+}
+
+/**
  * A DEFERRED entry whose candle row disappeared under retention. The queue
  * deliberately carries no foreign key so exactly this is observable, and the
  * entry carries the asset id so the loss can be ATTRIBUTED.
@@ -1368,9 +1615,15 @@ async function testDeferredOrphanIsAssetScoped(): Promise<void> {
       }),
       'the sweep must have queued the candle',
     );
-    // Retention removes the row from under the queue entry.
-    await prisma.marketCandle.delete({ where: { id: candle.id } });
     orphanIds.push(candle.id);
+  }
+  // Retention removes BOTH rows from under their queue entries only after
+  // both are queued: the detector counts NEW findings and excludes assets it
+  // already gapped, so the single detecting sweep below must be the first one
+  // to see either loss for "both in one pass" to measure the old LIMIT-1
+  // hiding rather than the enqueue order.
+  for (const orphanId of orphanIds) {
+    await prisma.marketCandle.delete({ where: { id: orphanId } });
   }
 
   const healthyOrder = await createSubmittedOrder({

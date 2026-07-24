@@ -107,7 +107,7 @@ async function main(): Promise<void> {
       testRequestHashConflict,
     );
     await run(
-      'another user cannot replay this order',
+      'another user can neither replay nor probe this order',
       testForeignUserCannotReplay,
     );
     console.log('limit order idempotent replay integration ok');
@@ -375,10 +375,30 @@ async function testForeignUserCannotReplay(): Promise<void> {
   );
   await assertCommitted(owner, first);
 
+  // The stranger presents the owner's quoteId with the SAME key and the SAME
+  // request body (identical hash). Ownership is part of the replay lookup's
+  // QUERY, so the owner's committed order is never read for this caller: the
+  // request falls through the ordinary gates to the USER-scoped quote lookup
+  // and fails there.
   const stranger = await createScenario('stranger');
-  await assertErrorCode(
+  const foreignError = await captureErrorCode(
     orders.createOrder(stranger.userId, createBody(owner, quoteId, key)),
-    'ORDER_IDEMPOTENCY_CONFLICT',
+  );
+  assert.equal(foreignError, 'QUOTE_NOT_FOUND');
+
+  // A quoteId that never existed takes EXACTLY the same path to EXACTLY the
+  // same error, so the response cannot be used to probe whether someone
+  // else's quote exists or was consumed.
+  const ghostError = await captureErrorCode(
+    orders.createOrder(
+      stranger.userId,
+      createBody(owner, randomUUID(), `${key}-ghost`),
+    ),
+  );
+  assert.equal(
+    ghostError,
+    foreignError,
+    'another user quote and a nonexistent quote must be indistinguishable',
   );
 
   await assertNoExtraCommit(owner, 1);
@@ -453,20 +473,21 @@ async function assertErrorCode(
   promise: Promise<unknown>,
   code: string,
 ): Promise<void> {
+  assert.equal(await captureErrorCode(promise), code);
+}
+
+async function captureErrorCode(promise: Promise<unknown>): Promise<string> {
   try {
     await promise;
   } catch (error) {
-    assert.ok(
-      error instanceof HttpException,
-      `expected an HttpException for ${code}`,
-    );
+    assert.ok(error instanceof HttpException, 'expected an HttpException');
     const response = error.getResponse() as {
       error?: { code?: string };
     };
-    assert.equal(response.error?.code, code);
-    return;
+    assert.ok(response.error?.code, 'the error must carry a code');
+    return response.error.code;
   }
-  assert.fail(`expected ${code} but the call resolved`);
+  return assert.fail('expected the call to reject');
 }
 
 // ---------------------------------------------------------------------------

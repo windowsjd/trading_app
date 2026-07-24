@@ -54,7 +54,7 @@ describe('Limit order idempotent replay integration', () => {
         'a committed create replays after the season ended',
         'the same key in two seasons replays each season own order',
         'a different request under the same quote is a conflict',
-        'another user cannot replay this order',
+        'another user can neither replay nor probe this order',
       ]) {
         expect(result.stdout).toContain(`ok ${name}`);
       }

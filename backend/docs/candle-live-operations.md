@@ -667,9 +667,14 @@ without deleting immutable evidence from the earlier revision.
 A queue entry can only be trusted to suppress a revision when that revision was
 OBSERVED on a candle row. Entries predating the revision column carry a
 backfill-INFERRED value instead, and are reopened for re-verification by
-`20260724120000_add_limit_order_deferred_revision_provenance_and_asset_gap`;
-until the sweep settles them, that asset alone fails new limit Quote/Create
-with `LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED`.
+`20260724120000_add_limit_order_deferred_revision_provenance_and_asset_gap`
+and — clock-independently, for rows whose application-written `created_at`
+defeated that migration's time boundary — by
+`20260724200000_reverify_limit_order_deferred_unverified_revision_provenance`,
+which classifies purely on whether the runtime durably recorded the
+observation (`revision_verified_at`); until the sweep settles them, that asset
+alone fails new limit Quote/Create with
+`LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED`.
 
 Retention losses that name ONE asset — an entry whose `market_candles` row was
 removed, an unscanned matchable candle past the horizon — are recorded on that

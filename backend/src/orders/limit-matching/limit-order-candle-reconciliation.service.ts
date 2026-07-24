@@ -652,6 +652,18 @@ export class LimitOrderCandleReconciliationService {
     // orders their safety net could no longer cover. The per-sweep bound keeps
     // a mass-retention event from turning into an unbounded write burst; the
     // remainder is picked up by the next sweep and logged here.
+    //
+    // ALREADY-GAPPED ASSETS ARE EXCLUDED, which is what makes the bound a
+    // write-burst limit rather than a correctness limit. recordAssetGap is
+    // sticky (first detection wins, later calls are no-ops), so without the
+    // exclusion the same oldest `assetGapBatchSize` assets would fill the
+    // batch on every sweep and any asset past the limit would NEVER be
+    // reached: 51 problem assets with a batch of 50 left asset 51 accepting
+    // orders its safety net could not cover, forever. Excluding assets whose
+    // sticky gap is already recorded makes each sweep advance to assets that
+    // still need one, so every affected asset is recorded within
+    // ceil(n / batchSize) sweeps. The existing gap evidence itself is never
+    // touched here.
     const orphans = await this.prisma.$queryRaw<
       Array<{
         assetId: string;
@@ -673,6 +685,12 @@ export class LimitOrderCandleReconciliationService {
         WHERE NOT EXISTS (
           SELECT 1 FROM "market_candles" c WHERE c."id" = d."market_candle_id"
         )
+          AND NOT EXISTS (
+            SELECT 1 FROM "market_candle_finalization_checkpoints" f
+            WHERE f."asset_id" = d."asset_id"
+              AND f."interval" = d."interval"
+              AND f."gap_detected_at" IS NOT NULL
+          )
         ORDER BY d."asset_id" ASC, d."open_time" ASC
       )
       SELECT *, (SELECT COUNT(*)::int FROM "per_asset") AS "totalAssets"
@@ -680,9 +698,13 @@ export class LimitOrderCandleReconciliationService {
       ORDER BY "openTime" ASC
       LIMIT ${this.config.assetGapBatchSize}
     `;
+    // Assets whose gap THIS sweep recorded (or raced). The unscanned probe
+    // below excludes them so one sweep never spends two findings — and two
+    // batch slots — on the same asset.
+    const gappedThisSweep = new Set<string>();
     for (const missing of orphans) {
       const reason = 'deferred_candle_retention_removed';
-      await this.checkpoints.recordAssetGap({
+      const outcome = await this.checkpoints.recordAssetGap({
         assetId: missing.assetId,
         interval: missing.interval,
         detectedAt: now,
@@ -692,6 +714,22 @@ export class LimitOrderCandleReconciliationService {
         marketCandleId: missing.marketCandleId,
         candleIngestSeq: missing.candleIngestSeq,
       });
+      gappedThisSweep.add(missing.assetId);
+      if (outcome !== 'inserted') {
+        // The query excludes already-gapped assets, so this only happens when
+        // a concurrent runner recorded the same asset between the query and
+        // the write. The asset IS gapped either way; it just is not THIS
+        // sweep's new finding.
+        this.logger.warn(
+          JSON.stringify({
+            event: 'limit_order_candle_asset_gap_already_present',
+            scope: 'asset',
+            assetId: missing.assetId,
+            reason,
+          }),
+        );
+        continue;
+      }
       this.logger.error(
         JSON.stringify({
           event: 'limit_order_candle_deferred_row_missing',
@@ -717,15 +755,19 @@ export class LimitOrderCandleReconciliationService {
 
     // ASSET-SCOPED. Same reasoning: the candle row identifies its asset, so a
     // window this asset lost never has to stop another asset's orders. One per
-    // asset, oldest window first.
+    // asset, oldest window first. Already-gapped assets are excluded exactly
+    // as in the orphan probe above — same starvation, same fix — plus the
+    // assets the orphan pass just recorded in THIS sweep, whose new gap the
+    // query snapshot cannot see yet.
     const unscanned = await this.findOldestUnscannedMatchableCandles(
       ingestWatermark,
       now,
       retentionHorizon,
+      [...gappedThisSweep],
     );
     for (const row of unscanned) {
       const reason = 'candle_retention_passed_unscanned_candle';
-      await this.checkpoints.recordAssetGap({
+      const outcome = await this.checkpoints.recordAssetGap({
         assetId: row.assetId,
         interval: row.interval,
         detectedAt: now,
@@ -735,6 +777,17 @@ export class LimitOrderCandleReconciliationService {
         marketCandleId: row.id,
         candleIngestSeq: row.ingestSeq,
       });
+      if (outcome !== 'inserted') {
+        this.logger.warn(
+          JSON.stringify({
+            event: 'limit_order_candle_asset_gap_already_present',
+            scope: 'asset',
+            assetId: row.assetId,
+            reason,
+          }),
+        );
+        continue;
+      }
       this.logger.error(
         JSON.stringify({
           event: 'limit_order_candle_unscanned_retention_gap',
@@ -758,11 +811,18 @@ export class LimitOrderCandleReconciliationService {
    * retention has already passed. Uses exactly the scan's eligibility
    * conditions, so it can never report a row the sweep would have ignored
    * anyway.
+   *
+   * Assets that already carry a sticky gap are excluded — in the query for
+   * gaps already durable, and via `excludeAssetIds` for the ones the SAME
+   * sweep's orphan pass just recorded — so the per-sweep batch always
+   * advances to assets that still need their first gap instead of re-visiting
+   * ones whose recordAssetGap would be a no-op (see detectRetentionGap).
    */
   private findOldestUnscannedMatchableCandles(
     ingestWatermark: bigint,
     to: Date,
     retentionHorizon: Date,
+    excludeAssetIds: string[],
   ): Promise<
     Array<{
       id: string;
@@ -796,6 +856,13 @@ export class LimitOrderCandleReconciliationService {
           AND c."ingest_seq" > ${ingestWatermark.toString()}::bigint
           AND c."close_time" <= ${to}
           AND a."is_active" = true
+          AND NOT (c."asset_id" = ANY(${excludeAssetIds}))
+          AND NOT EXISTS (
+            SELECT 1 FROM "market_candle_finalization_checkpoints" f
+            WHERE f."asset_id" = c."asset_id"
+              AND f."interval" = c."interval"
+              AND f."gap_detected_at" IS NOT NULL
+          )
           AND NOT EXISTS (
             SELECT 1 FROM "limit_order_processed_candles" p
             WHERE p."market_candle_id" = c."id"

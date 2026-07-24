@@ -478,12 +478,21 @@ export class LimitOrderReconciliationCheckpointRepository {
    * because there was nowhere to put it is the one outcome that must not
    * happen. `finalizedThroughCloseTime` is anchored at the gap window so the
    * cursor cannot claim to have accounted for anything it has not.
+   *
+   * Returns whether THIS call recorded a new sticky gap ('inserted') or was a
+   * no-op because the asset already carried one ('already_exists'). The
+   * distinction feeds the sweep summary (`assetGapsDetected` counts genuinely
+   * NEW findings, not re-sightings) and the batch-progression logging; it does
+   * NOT change the first-detection-wins policy — an existing gap is still
+   * never overwritten here.
    */
-  async recordAssetGap(input: AssetRetentionGap): Promise<void> {
+  async recordAssetGap(
+    input: AssetRetentionGap,
+  ): Promise<'inserted' | 'already_exists'> {
     const interval = input.interval ?? LIMIT_ORDER_RECONCILIATION_SCOPE;
     const anchor = input.fromOpenTime ?? input.detectedAt;
     const ingestSeq = seqParam(input.candleIngestSeq ?? null);
-    await this.prisma.$executeRaw`
+    const affected = await this.prisma.$executeRaw`
       INSERT INTO "market_candle_finalization_checkpoints" AS f (
         "asset_id", "interval", "finalized_through_close_time",
         "last_evaluated_at", "gap_detected_at", "gap_from_open_time",
@@ -514,6 +523,9 @@ export class LimitOrderReconciliationCheckpointRepository {
         "updated_at" = EXCLUDED."updated_at"
       WHERE f."gap_detected_at" IS NULL
     `;
+    // INSERT counts 1; DO UPDATE on a not-yet-gapped row counts 1; a conflict
+    // whose WHERE guard rejected the update (gap already present) counts 0.
+    return affected > 0 ? 'inserted' : 'already_exists';
   }
 
   async recordReservationMismatch(now: Date, scope?: string): Promise<void> {
@@ -561,6 +573,13 @@ export class LimitOrderReconciliationCheckpointRepository {
    * caller loaded the candle and read that value off it, so the entry becomes
    * `current` and stamps `revisionVerifiedAt` — this is how a row the
    * provenance migration reset for re-verification returns to being trusted.
+   * `revisionVerifiedAt` is stamped with the DATABASE clock
+   * (CURRENT_TIMESTAMP), never the caller's `now`: it is the provenance
+   * AUTHORITY timestamp that migrations compare against their own DB-clock
+   * boundaries, so putting an application wall clock in it would re-create
+   * the exact clock-skew ambiguity the provenance columns exist to remove.
+   * The business timestamps (first/lastDeferredAt, nextRetryAt) stay on the
+   * caller's clock — they describe sweep scheduling, not provenance.
    * Writing a NULL revision (the candle row is gone, there is nothing to read)
    * leaves the stored provenance untouched, so an unverified entry can never
    * be promoted to trusted by an absence. `revisionState` may be forced by the
@@ -615,7 +634,7 @@ export class LimitOrderReconciliationCheckpointRepository {
         ),
         CASE
           WHEN ${seqParam(input.candleIngestSeq)}::bigint IS NOT NULL
-          THEN ${input.now}::timestamptz ELSE NULL
+          THEN CURRENT_TIMESTAMP ELSE NULL
         END,
         ${input.now},
         ${input.now}

@@ -85,9 +85,22 @@ const PHASE_1_THROUGH =
 /** The migration that introduced the column and its inferring backfill. */
 const PHASE_2_THROUGH =
   '20260723230000_add_limit_order_deferred_candle_revision_and_completion_health';
-/** The provenance migration under test. */
+/**
+ * The first provenance migration. Its legacy criterion compared the
+ * APPLICATION-written created_at to the DATABASE-written migration
+ * finished_at — two different clock domains — so a legacy row whose
+ * application clock ran ahead of the database escaped it (see phase 3
+ * assertions below).
+ */
 const PROVENANCE_MIGRATION =
   '20260724120000_add_limit_order_deferred_revision_provenance_and_asset_gap';
+/**
+ * The clock-independent re-verification migration under test: any queue row
+ * with neither revision_verified_at nor revision_migrated_at is reclassified,
+ * whatever its created_at says.
+ */
+const REVERIFY_MIGRATION =
+  '20260724200000_reverify_limit_order_deferred_unverified_revision_provenance';
 
 const FIVE_MINUTES_MS = 5 * 60_000;
 const SUFFIX = `${process.pid}_${Date.now()}`;
@@ -112,10 +125,20 @@ async function main(): Promise<void> {
       () => assertDefectReproduced(client!, fixture),
     );
 
-    // A revision-aware entry written by the CURRENT code, after the backfill
-    // migration. Scenario C's subject: the provenance migration must not touch
-    // it.
+    // A revision-aware entry written between the backfill migration and the
+    // provenance migrations. Its revision WAS genuinely observed, but nothing
+    // durable proves that (revision_verified_at did not exist yet), so the
+    // clock-independent policy conservatively re-verifies it too.
     const modern = await seedModernDeferred(client, fixture);
+
+    // Phase 3: the FIRST provenance migration alone. It classifies by
+    // comparing the application-written created_at to the migration ledger's
+    // finished_at — which is exactly what the clock-skew fixtures expose.
+    deployThrough('phase3', PROVENANCE_MIGRATION, scratchUrl);
+    await run(
+      'the created_at boundary reopens past-clock rows but MISSES future-clock rows',
+      () => assertClockSkewDefectReproduced(client!, fixture),
+    );
 
     deployAll(scratchUrl);
     await run(
@@ -127,11 +150,24 @@ async function main(): Promise<void> {
       () => assertLegacyOrphan(client!, fixture),
     );
     await run(
-      'a revision-aware entry written after the backfill is untouched',
-      () => assertModernUntouched(client!, modern),
+      'a future-created_at legacy entry is reopened despite the clock skew',
+      () => assertFutureSkewReactivated(client!, fixture),
     );
-    await run('re-running the provenance migration changes nothing', () =>
-      assertMigrationIsIdempotent(client!, fixture, modern),
+    await run(
+      'a future-created_at legacy entry without a candle becomes an orphan',
+      () => assertFutureSkewOrphan(client!, fixture),
+    );
+    await run(
+      'an unverified revision-aware entry is conservatively re-verified',
+      () => assertModernReverified(client!, modern),
+    );
+    const verified = await seedVerifiedModernDeferred(client, fixture);
+    await run(
+      'a runtime-verified entry is untouched by the re-verification migration',
+      () => assertVerifiedModernUntouched(client!, verified),
+    );
+    await run('re-running the provenance migrations changes nothing', () =>
+      assertMigrationIsIdempotent(client!, fixture, verified),
     );
     await run(
       'the reopened entry lets the sweep process the corrected revision',
@@ -272,12 +308,25 @@ function deployWithConfig(
 type Fixture = {
   assetA: string;
   assetB: string;
+  /**
+   * The application-clock-runs-AHEAD asset: its legacy queue rows carry a
+   * created_at ten minutes in the DATABASE's future, so the created_at
+   * boundary of the first provenance migration mistakes them for modern rows.
+   */
+  assetC: string;
+  /** Future-created_at legacy entry whose candle row is already gone. */
+  assetD: string;
   candleA: string;
   candleB: string;
+  candleC: string;
+  candleD: string;
   /** Ingest sequence of candle A at revision 1, before the correction. */
   revisionOne: string;
   /** Ingest sequence of candle A at revision 2, after the correction. */
   revisionTwo: string;
+  /** Ingest sequences of candle C before and after ITS correction. */
+  revisionOneC: string;
+  revisionTwoC: string;
   openTime: Date;
   closeTime: Date;
   seasonId: string;
@@ -286,6 +335,9 @@ type Fixture = {
   /** Already EXECUTED before the correction; must never fill twice. */
   executedOrderId: string;
   pendingParticipantId: string;
+  /** Asset C's pending/executed pair, mirroring asset A under future skew. */
+  pendingOrderIdC: string;
+  executedOrderIdC: string;
 };
 
 async function seedLegacyState(client: Client): Promise<Fixture> {
@@ -324,8 +376,12 @@ async function seedLegacyState(client: Client): Promise<Fixture> {
 
   const assetA = await insertAsset(client, 'A');
   const assetB = await insertAsset(client, 'B');
+  const assetC = await insertAsset(client, 'C');
+  const assetD = await insertAsset(client, 'D');
   await insertPriceSnapshot(client, assetA, now);
   await insertPriceSnapshot(client, assetB, now);
+  await insertPriceSnapshot(client, assetC, now);
+  await insertPriceSnapshot(client, assetD, now);
 
   // Both orders were activated for this window (eligibleFrom <= openTime).
   const pending = await insertSubmittedOrder(client, {
@@ -369,6 +425,44 @@ async function seedLegacyState(client: Client): Promise<Fixture> {
     [executed.orderId, ts(now), `legacy-path-a-${SUFFIX}`, snapshotId],
   );
 
+  // Asset C mirrors asset A exactly — a newly-qualified pending order and an
+  // already-executed one — but its legacy queue rows will carry a FUTURE
+  // created_at, which is the clock-skew case under test.
+  const pendingC = await insertSubmittedOrder(client, {
+    seasonId,
+    assetId: assetC,
+    label: 'pending-c',
+    limitPrice: '95.00000000',
+    openTime,
+    now,
+  });
+  const executedC = await insertSubmittedOrder(client, {
+    seasonId,
+    assetId: assetC,
+    label: 'executed-c',
+    limitPrice: '120.00000000',
+    openTime,
+    now,
+  });
+  const snapshotIdC = await latestPriceSnapshotId(client, assetC);
+  await client.query(
+    `UPDATE "orders"
+        SET "status" = 'executed',
+            "executed_price" = '120.00000000',
+            "gross_amount" = '120.00000000',
+            "fee_amount" = '0.12000000',
+            "net_amount" = '120.12000000',
+            "executed_at" = $2,
+            "matched_at" = $2,
+            "reservation_released_at" = $2,
+            "matching_source" = 'live_trade_event',
+            "trigger_event_id" = $3,
+            "trigger_event_at" = $2,
+            "asset_price_snapshot_id" = $4
+      WHERE "id" = $1`,
+    [executedC.orderId, ts(now), `legacy-path-a-c-${SUFFIX}`, snapshotIdC],
+  );
+
   const candleA = await insertClosedCandle(client, {
     assetId: assetA,
     openTime,
@@ -381,16 +475,40 @@ async function seedLegacyState(client: Client): Promise<Fixture> {
     closeTime,
     low: '99.00000000',
   });
+  const candleC = await insertClosedCandle(client, {
+    assetId: assetC,
+    openTime,
+    closeTime,
+    low: '99.00000000',
+  });
+  const candleD = await insertClosedCandle(client, {
+    assetId: assetD,
+    openTime,
+    closeTime,
+    low: '99.00000000',
+  });
   const revisionOne = await ingestSeqOf(client, candleA);
+  const revisionOneC = await ingestSeqOf(client, candleC);
 
   // The legacy queue rows: written while `candle_ingest_seq` does not exist,
   // which is exactly why their revision can never be reconstructed.
+  //
+  // created_at is written EXPLICITLY skewed in both directions. The runtime
+  // stamps created_at from the APPLICATION clock (upsertDeferred passes its
+  // own `now`), so relative to the database clock that the migration ledger
+  // uses it can sit on either side of reality:
+  //   A, B  ->  ten minutes in the DB past   (application clock BEHIND)
+  //   C, D  ->  ten minutes in the DB future (application clock AHEAD)
+  // A correct classification must not depend on that direction at all.
+  const pastSkewMs = -10 * 60_000;
+  const futureSkewMs = 10 * 60_000;
   await insertLegacyDeferred(client, {
     marketCandleId: candleA,
     assetId: assetA,
     openTime,
     closeTime,
     now,
+    createdAtSkewMs: pastSkewMs,
   });
   await insertLegacyDeferred(client, {
     marketCandleId: candleB,
@@ -398,10 +516,29 @@ async function seedLegacyState(client: Client): Promise<Fixture> {
     openTime,
     closeTime,
     now,
+    createdAtSkewMs: pastSkewMs,
+  });
+  await insertLegacyDeferred(client, {
+    marketCandleId: candleC,
+    assetId: assetC,
+    openTime,
+    closeTime,
+    now,
+    createdAtSkewMs: futureSkewMs,
+  });
+  await insertLegacyDeferred(client, {
+    marketCandleId: candleD,
+    assetId: assetD,
+    openTime,
+    closeTime,
+    now,
+    createdAtSkewMs: futureSkewMs,
   });
 
   // THE CORRECTION. A lower low is precisely a change that can make a window
-  // newly fillable, and the ingest trigger re-sequences the row for it.
+  // newly fillable, and the ingest trigger re-sequences the row for it. Both
+  // clock directions get the identical correction, so any divergence in the
+  // outcome can only come from the classification policy.
   await client.query(
     `UPDATE "market_candles" SET "low" = '94.00000000', "updated_at" = $2 WHERE "id" = $1`,
     [candleA, ts(now)],
@@ -411,25 +548,44 @@ async function seedLegacyState(client: Client): Promise<Fixture> {
     BigInt(revisionTwo) > BigInt(revisionOne),
     'the correction must have produced a new candle revision',
   );
+  await client.query(
+    `UPDATE "market_candles" SET "low" = '94.00000000', "updated_at" = $2 WHERE "id" = $1`,
+    [candleC, ts(now)],
+  );
+  const revisionTwoC = await ingestSeqOf(client, candleC);
+  assert.ok(
+    BigInt(revisionTwoC) > BigInt(revisionOneC),
+    'the correction must have produced a new revision of candle C',
+  );
 
   // Scenario B's subject: asset B's candle row is removed by retention while
   // its legacy entry stays behind. Deleting it here (before the backfill) is
-  // what makes the backfill leave that entry's revision NULL.
+  // what makes the backfill leave that entry's revision NULL. Asset D is the
+  // same loss under FUTURE clock skew.
   await client.query(`DELETE FROM "market_candles" WHERE "id" = $1`, [candleB]);
+  await client.query(`DELETE FROM "market_candles" WHERE "id" = $1`, [candleD]);
 
   return {
     assetA,
     assetB,
+    assetC,
+    assetD,
     candleA,
     candleB,
+    candleC,
+    candleD,
     revisionOne,
     revisionTwo,
+    revisionOneC,
+    revisionTwoC,
     openTime,
     closeTime,
     seasonId,
     pendingOrderId: pending.orderId,
     executedOrderId: executed.orderId,
     pendingParticipantId: pending.participantId,
+    pendingOrderIdC: pendingC.orderId,
+    executedOrderIdC: executedC.orderId,
   };
 }
 
@@ -567,6 +723,10 @@ async function insertClosedCandle(
 /**
  * A queue row exactly as the pre-column code wrote it: no revision, retry
  * budget exhausted, parked as permanent.
+ *
+ * `createdAtSkewMs` shifts created_at relative to the database clock in
+ * either direction, reproducing the application clock the runtime actually
+ * writes there. The classification under test must be independent of it.
  */
 async function insertLegacyDeferred(
   client: Client,
@@ -576,8 +736,12 @@ async function insertLegacyDeferred(
     openTime: Date;
     closeTime: Date;
     now: Date;
+    createdAtSkewMs?: number;
   },
 ): Promise<void> {
+  const createdAt = new Date(
+    input.now.getTime() + (input.createdAtSkewMs ?? 0),
+  );
   await client.query(
     `INSERT INTO "limit_order_deferred_candles" (
        "market_candle_id", "asset_id", "interval", "open_time", "close_time",
@@ -585,18 +749,25 @@ async function insertLegacyDeferred(
        "last_error_code", "last_error_message", "next_retry_at", "created_at",
        "updated_at"
      ) VALUES ($1, $2, '5m', $3, $4, 'permanent', $5, $5, 5,
-       'LIMIT_ORDER_CANDLE_VALUATION_UNAVAILABLE', 'legacy failure', $5, $5, $5)`,
+       'LIMIT_ORDER_CANDLE_VALUATION_UNAVAILABLE', 'legacy failure', $5, $6, $6)`,
     [
       input.marketCandleId,
       input.assetId,
       ts(input.openTime),
       ts(input.closeTime),
       ts(input.now),
+      ts(createdAt),
     ],
   );
 }
 
-/** A revision-aware entry written AFTER the backfill migration. */
+/**
+ * A revision-aware entry written AFTER the backfill migration but BEFORE the
+ * provenance migrations, i.e. by code that observed the revision without yet
+ * having anywhere to record that observation (revision_verified_at did not
+ * exist). The clock-independent policy treats "no durable proof" as
+ * "re-verify", so this row is EXPECTED to be conservatively reopened.
+ */
 async function seedModernDeferred(
   client: Client,
   fixture: Fixture,
@@ -620,6 +791,42 @@ async function seedModernDeferred(
        CURRENT_TIMESTAMP, 3, 'LIMIT_ORDER_CANDLE_VALUATION_UNAVAILABLE',
        'modern failure', CURRENT_TIMESTAMP + interval '1 hour',
        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+    [marketCandleId, seq, assetId, ts(fixture.openTime), ts(fixture.closeTime)],
+  );
+  return { marketCandleId, assetId, attemptCount: 3 };
+}
+
+/**
+ * An entry exactly as the CURRENT runtime leaves it: concrete observed
+ * revision, revision_state 'current' and a DB-clock revision_verified_at.
+ * This is the one class of row the re-verification migration must never
+ * touch. Seeded after the full deploy (the columns exist by then); the
+ * assertion re-applies the migration SQL by hand.
+ */
+async function seedVerifiedModernDeferred(
+  client: Client,
+  fixture: Fixture,
+): Promise<{ marketCandleId: string; assetId: string; attemptCount: number }> {
+  const assetId = await insertAsset(client, 'verified');
+  await insertPriceSnapshot(client, assetId, await databaseNow(client));
+  const marketCandleId = await insertClosedCandle(client, {
+    assetId,
+    openTime: fixture.openTime,
+    closeTime: fixture.closeTime,
+    low: '99.00000000',
+  });
+  const seq = await ingestSeqOf(client, marketCandleId);
+  await client.query(
+    `INSERT INTO "limit_order_deferred_candles" (
+       "market_candle_id", "candle_ingest_seq", "asset_id", "interval",
+       "open_time", "close_time", "status", "first_deferred_at",
+       "last_deferred_at", "attempt_count", "last_error_code",
+       "last_error_message", "next_retry_at", "revision_state",
+       "revision_verified_at", "created_at", "updated_at"
+     ) VALUES ($1, $2, $3, '5m', $4, $5, 'deferred', CURRENT_TIMESTAMP,
+       CURRENT_TIMESTAMP, 3, 'LIMIT_ORDER_CANDLE_VALUATION_UNAVAILABLE',
+       'verified failure', CURRENT_TIMESTAMP + interval '1 hour', 'current',
+       CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
     [marketCandleId, seq, assetId, ts(fixture.openTime), ts(fixture.closeTime)],
   );
   return { marketCandleId, assetId, attemptCount: 3 };
@@ -700,6 +907,69 @@ async function assertDefectReproduced(
   // Asset B's entry got no revision at all: its candle row was already gone.
   const orphan = await deferredRow(client, fixture.candleB);
   assert.equal(orphan.candle_ingest_seq, null);
+
+  // The FUTURE-created_at rows are in the identical trap: C stamped with the
+  // corrected revision it never processed, D with nothing at all.
+  const futureRow = await deferredRow(client, fixture.candleC);
+  assert.equal(futureRow.status, 'permanent');
+  assert.equal(futureRow.candle_ingest_seq, fixture.revisionTwoC);
+  const futureOrphan = await deferredRow(client, fixture.candleD);
+  assert.equal(futureOrphan.candle_ingest_seq, null);
+}
+
+/**
+ * Phase 3 = the FIRST provenance migration alone. Its created_at boundary
+ * works for rows whose application clock was at or behind the database clock
+ * (assets A and B), and silently MISSES rows whose application clock ran
+ * ahead (assets C and D): they still look like trusted modern rows, so the
+ * corrected revision of candle C remains unreachable from both directions.
+ * This is the defect the clock-independent migration closes; if this
+ * assertion ever stops holding, that migration protects against nothing.
+ */
+async function assertClockSkewDefectReproduced(
+  client: Client,
+  fixture: Fixture,
+): Promise<void> {
+  // Past-skew rows: correctly reclassified by the created_at boundary.
+  const past = await deferredRow(client, fixture.candleA);
+  assert.equal(past.revision_state, 'legacy_unknown');
+  assert.equal(past.status, 'deferred');
+  const pastOrphan = await deferredRow(client, fixture.candleB);
+  assert.equal(pastOrphan.revision_state, 'legacy_orphan');
+
+  // Future-skew rows: MISSED. Still 'current', still permanent, still
+  // asserting a revision nothing ever verified.
+  const future = await deferredRow(client, fixture.candleC);
+  assert.equal(
+    future.revision_state,
+    'current',
+    'the created_at boundary must have mistaken the future-clock row for modern',
+  );
+  assert.equal(future.status, 'permanent');
+  assert.equal(future.candle_ingest_seq, fixture.revisionTwoC);
+  assert.equal(future.revision_migrated_at, null);
+  assert.equal(future.revision_verified_at, null);
+
+  // Both recovery directions are closed for candle C at this point.
+  const { rows: scan } = await client.query(
+    `SELECT 1 FROM "market_candles" c
+      WHERE c."id" = $1
+        AND NOT EXISTS (
+          SELECT 1 FROM "limit_order_deferred_candles" d
+          WHERE d."market_candle_id" = c."id"
+            AND d."candle_ingest_seq" >= c."ingest_seq"
+        )`,
+    [fixture.candleC],
+  );
+  assert.equal(
+    scan.length,
+    0,
+    'the forward scan must still be excluding the corrected candle C',
+  );
+
+  const futureOrphan = await deferredRow(client, fixture.candleD);
+  assert.equal(futureOrphan.revision_state, 'current');
+  assert.equal(futureOrphan.revision_migrated_at, null);
 }
 
 async function assertLegacyReactivated(
@@ -766,48 +1036,139 @@ async function assertLegacyOrphan(
   assert.equal(row.last_error_code, 'LIMIT_ORDER_CANDLE_ROW_MISSING');
 }
 
-async function assertModernUntouched(
+/**
+ * The clock-skew recovery: after the clock-independent migration, the
+ * future-created_at legacy entry is reopened exactly like the past one —
+ * classification no longer depends on which way the clocks were skewed.
+ */
+async function assertFutureSkewReactivated(
+  client: Client,
+  fixture: Fixture,
+): Promise<void> {
+  const row = await deferredRow(client, fixture.candleC);
+  assert.equal(row.status, 'deferred', 'the entry must be retryable again');
+  assert.equal(
+    row.candle_ingest_seq,
+    null,
+    'the inferred revision must be dropped so the entry suppresses nothing',
+  );
+  assert.equal(row.revision_state, 'legacy_unknown');
+  assert.ok(row.revision_migrated_at, 'the reclassification must be recorded');
+  assert.equal(row.revision_verified_at, null);
+  assert.equal(row.attempt_count, 1);
+  assert.equal(
+    row.last_error_code,
+    'LIMIT_ORDER_CANDLE_LEGACY_REVISION_REVIEW',
+  );
+
+  // The forward scan can reach candle C again.
+  const { rows: scan } = await client.query(
+    `SELECT 1 FROM "market_candles" c
+      WHERE c."id" = $1
+        AND NOT EXISTS (
+          SELECT 1 FROM "limit_order_deferred_candles" d
+          WHERE d."market_candle_id" = c."id"
+            AND d."candle_ingest_seq" >= c."ingest_seq"
+        )`,
+    [fixture.candleC],
+  );
+  assert.equal(scan.length, 1, 'the corrected candle C must be visible again');
+}
+
+async function assertFutureSkewOrphan(
+  client: Client,
+  fixture: Fixture,
+): Promise<void> {
+  const row = await deferredRow(client, fixture.candleD);
+  assert.equal(row.status, 'permanent');
+  assert.equal(row.revision_state, 'legacy_orphan');
+  assert.ok(row.revision_migrated_at);
+  assert.equal(row.last_error_code, 'LIMIT_ORDER_CANDLE_ROW_MISSING');
+}
+
+/**
+ * A revision that WAS observed but never durably recorded as observed is
+ * indistinguishable from a backfill inference, so the conservative policy
+ * reopens it. The cost is one extra sweep (its orders are protected by their
+ * status guard); the alternative — trusting it — is the exact hole the
+ * clock-skew rows fell into.
+ */
+async function assertModernReverified(
   client: Client,
   modern: { marketCandleId: string; attemptCount: number },
 ): Promise<void> {
   const row = await deferredRow(client, modern.marketCandleId);
   assert.equal(row.status, 'deferred');
+  assert.equal(row.revision_state, 'legacy_unknown');
+  assert.ok(row.revision_migrated_at, 'the reclassification must be recorded');
+  assert.equal(
+    row.candle_ingest_seq,
+    null,
+    'the unproven revision must be dropped for re-verification',
+  );
+  assert.equal(row.attempt_count, 1);
+}
+
+/**
+ * The row the migration must never touch: the runtime observed the revision
+ * AND durably recorded that observation (revision_verified_at). Status,
+ * attempt budget, retry schedule and revision state all survive a re-run of
+ * the migration verbatim.
+ */
+async function assertVerifiedModernUntouched(
+  client: Client,
+  verified: { marketCandleId: string; attemptCount: number },
+): Promise<void> {
+  const before = await deferredRow(client, verified.marketCandleId);
+  await client.query(readMigrationSql(REVERIFY_MIGRATION));
+  const row = await deferredRow(client, verified.marketCandleId);
+  assert.equal(row.status, 'deferred');
   assert.equal(row.revision_state, 'current');
   assert.equal(
     row.revision_migrated_at,
     null,
-    'a revision-aware entry must not be reclassified',
+    'a verified entry must not be reclassified',
   );
   assert.equal(
     row.attempt_count,
-    modern.attemptCount,
+    verified.attemptCount,
     'its retry budget must not be reset',
   );
   assert.ok(row.candle_ingest_seq, 'its observed revision must survive');
+  assert.equal(
+    row.next_retry_at.toISOString(),
+    before.next_retry_at.toISOString(),
+    'its retry schedule must survive',
+  );
+  assert.ok(row.revision_verified_at, 'the observation record must survive');
 }
 
 /**
- * The migration is written to be safe to re-apply — a rebuilt environment, a
- * replayed deploy, an operator running the file by hand. Re-running it must
- * not reset a retry budget a second time, and must not reclassify anything.
+ * Both provenance migrations are written to be safe to re-apply — a rebuilt
+ * environment, a replayed deploy, an operator running the files by hand.
+ * Re-running them must not reset a retry budget a second time, and must not
+ * reclassify anything.
  */
 async function assertMigrationIsIdempotent(
   client: Client,
   fixture: Fixture,
-  modern: { marketCandleId: string; attemptCount: number },
+  verified: { marketCandleId: string; attemptCount: number },
 ): Promise<void> {
-  const before = await Promise.all([
-    deferredRow(client, fixture.candleA),
-    deferredRow(client, fixture.candleB),
-    deferredRow(client, modern.marketCandleId),
-  ]);
-  const sql = readMigrationSql(PROVENANCE_MIGRATION);
-  await client.query(sql);
-  const after = await Promise.all([
-    deferredRow(client, fixture.candleA),
-    deferredRow(client, fixture.candleB),
-    deferredRow(client, modern.marketCandleId),
-  ]);
+  const subjects = [
+    fixture.candleA,
+    fixture.candleB,
+    fixture.candleC,
+    fixture.candleD,
+    verified.marketCandleId,
+  ];
+  const before = await Promise.all(
+    subjects.map((id) => deferredRow(client, id)),
+  );
+  await client.query(readMigrationSql(PROVENANCE_MIGRATION));
+  await client.query(readMigrationSql(REVERIFY_MIGRATION));
+  const after = await Promise.all(
+    subjects.map((id) => deferredRow(client, id)),
+  );
   for (const [index, row] of after.entries()) {
     assert.deepEqual(
       {
@@ -816,6 +1177,7 @@ async function assertMigrationIsIdempotent(
         state: row.revision_state,
         attempts: row.attempt_count,
         migratedAt: row.revision_migrated_at?.toISOString() ?? null,
+        verifiedAt: row.revision_verified_at?.toISOString() ?? null,
       },
       {
         status: before[index].status,
@@ -823,6 +1185,7 @@ async function assertMigrationIsIdempotent(
         state: before[index].revision_state,
         attempts: before[index].attempt_count,
         migratedAt: before[index].revision_migrated_at?.toISOString() ?? null,
+        verifiedAt: before[index].revision_verified_at?.toISOString() ?? null,
       },
       `row ${index} must be unchanged by a second application`,
     );
@@ -926,24 +1289,58 @@ async function assertSweepRecoversRevisionTwo(
       );
       assert.equal(executed.matchingSource, 'live_trade_event');
 
-      // The reopened entry is settled and gone, so the asset stops being
-      // blocked by it.
-      const remaining = await prisma.limitOrderDeferredCandle.findUnique({
-        where: { marketCandleId: fixture.candleA },
+      // The FUTURE-clock asset recovers identically: corrected revision
+      // processed, newly-qualified order filled once at the LIMIT price, the
+      // already-executed order untouched.
+      const processedC = await prisma.limitOrderProcessedCandle.findUnique({
+        where: { marketCandleId: fixture.candleC },
+      });
+      assert.ok(processedC, "candle C's corrected revision must be processed");
+      assert.equal(processedC.candleIngestSeq.toString(), fixture.revisionTwoC);
+      const pendingC = await prisma.order.findUniqueOrThrow({
+        where: { id: fixture.pendingOrderIdC },
+        select: { status: true, executedPrice: true, matchingSource: true },
       });
       assert.equal(
-        remaining,
-        null,
-        'a successfully re-verified entry must leave the queue',
+        pendingC.status,
+        'executed',
+        'the future-created_at legacy entry must not have cost the fill',
       );
+      assert.equal(pendingC.executedPrice?.toString(), '95');
+      assert.equal(pendingC.matchingSource, 'closed_5m_candle');
+      const executedC = await prisma.order.findUniqueOrThrow({
+        where: { id: fixture.executedOrderIdC },
+        select: { status: true, executedPrice: true, matchingSource: true },
+      });
+      assert.equal(executedC.status, 'executed');
+      assert.equal(executedC.executedPrice?.toString(), '120');
+      assert.equal(executedC.matchingSource, 'live_trade_event');
 
-      // Asset B is still blocked, and asset A is not blocked by asset B.
-      const backlogB = await checkpoints.readAssetBacklog(fixture.assetB);
-      assert.equal(backlogB.permanentCount, 1);
-      assert.equal(backlogB.legacyReviewCount, 1);
-      const backlogA = await checkpoints.readAssetBacklog(fixture.assetA);
-      assert.equal(backlogA.permanentCount, 0);
-      assert.equal(backlogA.legacyReviewCount, 0);
+      // The reopened entries are settled and gone, so their assets stop being
+      // blocked by them.
+      for (const candleId of [fixture.candleA, fixture.candleC]) {
+        const remaining = await prisma.limitOrderDeferredCandle.findUnique({
+          where: { marketCandleId: candleId },
+        });
+        assert.equal(
+          remaining,
+          null,
+          'a successfully re-verified entry must leave the queue',
+        );
+      }
+
+      // The orphaned assets (B past-skew, D future-skew) are still blocked;
+      // the recovered assets are not blocked by them.
+      for (const orphanAsset of [fixture.assetB, fixture.assetD]) {
+        const backlog = await checkpoints.readAssetBacklog(orphanAsset);
+        assert.equal(backlog.permanentCount, 1);
+        assert.equal(backlog.legacyReviewCount, 1);
+      }
+      for (const recovered of [fixture.assetA, fixture.assetC]) {
+        const backlog = await checkpoints.readAssetBacklog(recovered);
+        assert.equal(backlog.permanentCount, 0);
+        assert.equal(backlog.legacyReviewCount, 0);
+      }
     } finally {
       await prisma.$disconnect();
     }

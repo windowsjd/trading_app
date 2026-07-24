@@ -692,9 +692,10 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
     };
 
     /**
-     * The replay-first lookup is keyed on the QUOTE (Order.quoteId is unique),
-     * so it is the FIRST `order.findUnique` of a limit create and must be
-     * queued before the post-create read-back below.
+     * The replay-first lookup is keyed on the QUOTE (Order.quoteId is unique)
+     * with the caller's ownership in the query itself (relation filter on
+     * seasonParticipant.userId), so it is the FIRST `order.findFirst` of a
+     * limit create; the post-create read-back below stays on `findUnique`.
      */
     const idempotentOrderRecord = (
       overrides: Record<string, unknown> = {},
@@ -708,7 +709,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
     });
 
     const mockCreateContext = (prisma: ReturnType<typeof createPrisma>) => {
-      prisma.order.findUnique.mockResolvedValueOnce(null); // replay lookup
+      prisma.order.findFirst.mockResolvedValueOnce(null); // replay lookup
       prisma.season.findFirst.mockResolvedValueOnce(activeSeason);
       prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
       prisma.quote.findFirst.mockResolvedValueOnce(activeQuoteRecord());
@@ -973,7 +974,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       const { prisma, service } = createService();
       // limitPrice far above any plausible market price — still submitted;
       // marketability is never even evaluated (no provider price read).
-      prisma.order.findUnique.mockResolvedValueOnce(null); // replay lookup
+      prisma.order.findFirst.mockResolvedValueOnce(null); // replay lookup
       prisma.season.findFirst.mockResolvedValueOnce(activeSeason);
       prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
       prisma.quote.findFirst.mockResolvedValueOnce(
@@ -1063,7 +1064,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
     it('replays the stored payload for the same idempotency key', async () => {
       const { prisma, service } = createService();
       const storedPayload = { success: true, data: { marker: 'stored' } };
-      prisma.order.findUnique.mockResolvedValueOnce(
+      prisma.order.findFirst.mockResolvedValueOnce(
         idempotentOrderRecord({ responsePayloadJson: storedPayload }),
       );
 
@@ -1075,6 +1076,16 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       // Replay resolves the caller's order from the quote alone: no active
       // season is read, so a replay still works after the season ended.
       expect(prisma.season.findFirst).not.toHaveBeenCalled();
+      // OWNERSHIP IS IN THE QUERY: the lookup can only ever return one of the
+      // caller's own orders, so another user's row is never even read.
+      expect(prisma.order.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            quoteId: 'quote-limit-1',
+            seasonParticipant: { userId: 'user-1' },
+          }) as never,
+        }),
+      );
     });
 
     it.each([
@@ -1085,7 +1096,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       'conflicts when the same idempotency key is reused with a different %s',
       async (_field, patch) => {
         const { prisma, service } = createService();
-        prisma.order.findUnique.mockResolvedValueOnce(idempotentOrderRecord());
+        prisma.order.findFirst.mockResolvedValueOnce(idempotentOrderRecord());
 
         await expectErrorCode(
           service.createOrder('user-1', {
@@ -1157,7 +1168,12 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
         service.createOrder('user-1', limitCreateBody),
         'LIMIT_ORDER_DISABLED',
       );
-      expect(prisma.order.findFirst).not.toHaveBeenCalled();
+      // The replay-first lookup legitimately runs BEFORE the flag (a
+      // committed create must replay through a rollback); with no committed
+      // order the flag then refuses the NEW create before anything else.
+      expect(prisma.order.findFirst).toHaveBeenCalledTimes(1);
+      expect(prisma.order.create).not.toHaveBeenCalled();
+      expect(prisma.season.findFirst).not.toHaveBeenCalled();
       expect(prisma.$executeRaw).not.toHaveBeenCalled();
     });
 
@@ -1176,7 +1192,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       process.env.LIMIT_ORDER_ENABLED = '0';
       const { prisma, service } = createService();
       const storedPayload = { success: true, data: { marker: 'stored' } };
-      prisma.order.findUnique.mockResolvedValueOnce(
+      prisma.order.findFirst.mockResolvedValueOnce(
         idempotentOrderRecord({ responsePayloadJson: storedPayload }),
       );
 
@@ -1193,7 +1209,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       const prisma = createPrisma();
       mockLockedRows(prisma);
       const storedPayload = { success: true, data: { marker: 'stored' } };
-      prisma.order.findUnique.mockResolvedValueOnce(
+      prisma.order.findFirst.mockResolvedValueOnce(
         idempotentOrderRecord({ responsePayloadJson: storedPayload }),
       );
       // Deliberately NO LimitOrderCreateService: replay must not need it.
@@ -1210,7 +1226,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       const prisma = createPrisma();
       mockLockedRows(prisma);
       const storedPayload = { success: true, data: { marker: 'stored' } };
-      prisma.order.findUnique.mockResolvedValueOnce(
+      prisma.order.findFirst.mockResolvedValueOnce(
         idempotentOrderRecord({ responsePayloadJson: storedPayload }),
       );
       const candleHealth = {
@@ -1268,7 +1284,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       const payloadOne = { success: true, data: { marker: 'season-1' } };
       const payloadTwo = { success: true, data: { marker: 'season-2' } };
 
-      prisma.order.findUnique.mockImplementation(
+      prisma.order.findFirst.mockImplementation(
         (args: { where: { quoteId: string } }) =>
           Promise.resolve(
             args.where.quoteId === 'quote-limit-1'
@@ -1292,21 +1308,58 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
     });
 
     it('never replays another user order for the same quote and key', async () => {
+      // Ownership lives in the QUERY (relation filter on the caller's
+      // userId), so another user's consumed quoteId returns NO row — exactly
+      // what a quoteId that never existed returns. Both fall through to the
+      // ordinary gates and the user-scoped quote lookup, so the caller cannot
+      // tell from the error whether someone else's quote exists, and the
+      // foreign order row is never read into the process at all.
       const { prisma, service } = createService();
-      prisma.order.findUnique.mockResolvedValueOnce(
-        idempotentOrderRecord({ seasonParticipant: { userId: 'user-2' } }),
-      );
+      prisma.order.findFirst.mockResolvedValueOnce(null); // ownership miss
+      prisma.season.findFirst.mockResolvedValueOnce(activeSeason);
+      prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
+      prisma.quote.findFirst.mockResolvedValueOnce(null); // user-scoped
 
       await expectErrorCode(
         service.createOrder('user-1', limitCreateBody),
-        'ORDER_IDEMPOTENCY_CONFLICT',
+        'QUOTE_NOT_FOUND',
+      );
+      expect(prisma.order.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            quoteId: 'quote-limit-1',
+            seasonParticipant: { userId: 'user-1' },
+          }) as never,
+        }),
+      );
+      // No order, no reservation.
+      expect(prisma.order.create).not.toHaveBeenCalled();
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    });
+
+    it('answers a nonexistent quote identically to another user quote', async () => {
+      // The two cases are byte-identical from the replay lookup on: the same
+      // null result, the same gates, the same QUOTE_NOT_FOUND. Nothing in the
+      // flow may branch on "the quoteId exists but is someone else's".
+      const { prisma, service } = createService();
+      prisma.order.findFirst.mockResolvedValueOnce(null);
+      prisma.season.findFirst.mockResolvedValueOnce(activeSeason);
+      prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
+      prisma.quote.findFirst.mockResolvedValueOnce(null);
+
+      await expectErrorCode(
+        service.createOrder('user-1', {
+          ...limitCreateBody,
+          quoteId: 'quote-that-never-existed',
+        }),
+        'QUOTE_NOT_FOUND',
       );
       expect(prisma.$executeRaw).not.toHaveBeenCalled();
     });
 
     it('conflicts when a consumed quote is presented under a different key', async () => {
       const { prisma, service } = createService();
-      prisma.order.findUnique.mockResolvedValueOnce(
+      prisma.order.findFirst.mockResolvedValueOnce(
         idempotentOrderRecord({ idempotencyKey: 'some-other-key' }),
       );
 
@@ -1318,8 +1371,11 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
     });
 
     it('conflicts when the quote was already consumed by a market order', async () => {
+      // The caller's OWN quote consumed by their own market order: the
+      // ownership-scoped lookup returns the row and the orderType check turns
+      // it into a precise conflict.
       const { prisma, service } = createService();
-      prisma.order.findUnique.mockResolvedValueOnce(
+      prisma.order.findFirst.mockResolvedValueOnce(
         idempotentOrderRecord({ orderType: OrderType.market }),
       );
 
@@ -1332,7 +1388,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
 
     it('rebuilds a submitted payload for a legacy row with no stored response', async () => {
       const { prisma, service } = createService();
-      prisma.order.findUnique.mockResolvedValueOnce(
+      prisma.order.findFirst.mockResolvedValueOnce(
         idempotentOrderRecord({ responsePayloadJson: null }),
       );
 
