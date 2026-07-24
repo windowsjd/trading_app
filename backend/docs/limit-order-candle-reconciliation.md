@@ -1,5 +1,12 @@
 # Limit-buy path B — confirmed 5-minute candle safety net
 
+> **Normative authority.** For *when* Path B may fill a window relative to Path
+> A — the coverage gate, "a closed candle is not sufficient on its own", and
+> the rule that Path B must not pre-empt a usable/in-flight Path-A event — see
+> [`limit-order-event-authority.md`](./limit-order-event-authority.md) §5–§6,
+> §11, §13. That document is normative; this one is corrected where they
+> disagree.
+
 Phase 3, path B. All HTTP endpoints remain under `/api/v1`; there is no
 `/api/v2` route and no public limit-order execute route. Path A is documented
 in [limit-order-live-matching-operations.md](limit-order-live-matching-operations.md).

@@ -356,9 +356,61 @@ test('new limit-order error codes map to dedicated user messages by CODE', () =>
     ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_BACKLOG_EXCEEDED,
     ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_PERMANENT_FAILURE,
     ERROR_CODE.LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED,
+    ERROR_CODE.LIMIT_ORDER_PROVIDER_CAPABILITY_UNSUPPORTED,
+    ERROR_CODE.LIMIT_ORDER_INGRESS_UNAVAILABLE,
+    ERROR_CODE.LIMIT_ORDER_INGRESS_BACKLOG_EXCEEDED,
+    ERROR_CODE.LIMIT_ORDER_INGRESS_STALE,
+    ERROR_CODE.LIMIT_ORDER_INGRESS_GAP_DETECTED,
+    ERROR_CODE.LIMIT_ORDER_EVENT_INVALID_RATE_EXCEEDED,
+    ERROR_CODE.LIMIT_ORDER_EVENT_ROUTE_DEGRADED,
+    ERROR_CODE.LIMIT_ORDER_PATH_A_COVERAGE_PENDING,
+    ERROR_CODE.LIMIT_ORDER_PATH_A_COVERAGE_GAP,
+    ERROR_CODE.LIMIT_ORDER_STREAM_RETENTION_UNSAFE,
   ]) {
     const message = getErrorMessageFromCode(code);
     assert.notEqual(message, generic, `expected dedicated message for ${code}`);
+  }
+});
+
+test('event-authority error codes never leak internal vocabulary', () => {
+  for (const code of [
+    ERROR_CODE.LIMIT_ORDER_PROVIDER_CAPABILITY_UNSUPPORTED,
+    ERROR_CODE.LIMIT_ORDER_INGRESS_UNAVAILABLE,
+    ERROR_CODE.LIMIT_ORDER_INGRESS_BACKLOG_EXCEEDED,
+    ERROR_CODE.LIMIT_ORDER_INGRESS_STALE,
+    ERROR_CODE.LIMIT_ORDER_INGRESS_GAP_DETECTED,
+    ERROR_CODE.LIMIT_ORDER_EVENT_INVALID_RATE_EXCEEDED,
+    ERROR_CODE.LIMIT_ORDER_EVENT_ROUTE_DEGRADED,
+    ERROR_CODE.LIMIT_ORDER_PATH_A_COVERAGE_PENDING,
+    ERROR_CODE.LIMIT_ORDER_PATH_A_COVERAGE_GAP,
+    ERROR_CODE.LIMIT_ORDER_STREAM_RETENTION_UNSAFE,
+  ]) {
+    const message = getErrorMessageFromCode(code);
+    for (const forbidden of [
+      'redis',
+      'ingress',
+      'stream',
+      'epoch',
+      'generation',
+      'sequence',
+      'ack',
+      'dlq',
+      'coverage',
+      'watermark',
+      // KIS US delayed feed must never be presented as real-time.
+      '실시간 체결',
+    ]) {
+      assert.ok(
+        !message.toLowerCase().includes(forbidden.toLowerCase()),
+        `${code} message must not mention ${forbidden}`,
+      );
+    }
+    // Every new code is a new-registration pause that keeps existing orders
+    // usable, so the copy must reassure about existing orders.
+    assert.ok(
+      message.includes('기존 주문'),
+      `${code} must reassure that existing orders keep working`,
+    );
   }
 });
 

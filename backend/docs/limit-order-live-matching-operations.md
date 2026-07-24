@@ -1,5 +1,15 @@
 # Limit-buy live-trade matching operations
 
+> **Normative authority.** Where this document and
+> [`limit-order-event-authority.md`](./limit-order-event-authority.md) disagree
+> about *when a provider trade event may fill an order* — Path A/B authority and
+> priority, event identity vs. ordering, the three clocks (occurrence /
+> receive / stream), the order activation token, provider capability, delayed-
+> event handling, durable ingress, and ACK-aware safe trimming — that document
+> wins and this one is the one to correct. In particular, the historical
+> "ordering is decided purely by Redis Stream IDs" stance is **superseded**:
+> a Redis Stream ID proves arrival order only, never venue occurrence order.
+
 This document covers phase 2 path A and the phase-3 hardening that goes with
 it. Path B (the confirmed 5-minute candle safety net) has its own document,
 [limit-order-candle-reconciliation.md](limit-order-candle-reconciliation.md).

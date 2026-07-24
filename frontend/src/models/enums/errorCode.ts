@@ -125,6 +125,24 @@ export const ERROR_CODE = {
   // rather than "needs recovery".
   LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED:
     'LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED',
+  // Event-authority / durable-ingress codes (see backend
+  // docs/limit-order-event-authority.md). The route cannot prove authoritative
+  // live-trade ordering, or the received-trade sync / safe retention is not
+  // whole. All are new-registration pauses: existing orders, cancel and
+  // cleanup keep working. Internal vocabulary (ingress, stream, epoch,
+  // generation, sequence, ACK, DLQ, coverage watermark) never reaches the copy.
+  LIMIT_ORDER_PROVIDER_CAPABILITY_UNSUPPORTED:
+    'LIMIT_ORDER_PROVIDER_CAPABILITY_UNSUPPORTED',
+  LIMIT_ORDER_INGRESS_UNAVAILABLE: 'LIMIT_ORDER_INGRESS_UNAVAILABLE',
+  LIMIT_ORDER_INGRESS_BACKLOG_EXCEEDED: 'LIMIT_ORDER_INGRESS_BACKLOG_EXCEEDED',
+  LIMIT_ORDER_INGRESS_STALE: 'LIMIT_ORDER_INGRESS_STALE',
+  LIMIT_ORDER_INGRESS_GAP_DETECTED: 'LIMIT_ORDER_INGRESS_GAP_DETECTED',
+  LIMIT_ORDER_EVENT_INVALID_RATE_EXCEEDED:
+    'LIMIT_ORDER_EVENT_INVALID_RATE_EXCEEDED',
+  LIMIT_ORDER_EVENT_ROUTE_DEGRADED: 'LIMIT_ORDER_EVENT_ROUTE_DEGRADED',
+  LIMIT_ORDER_PATH_A_COVERAGE_PENDING: 'LIMIT_ORDER_PATH_A_COVERAGE_PENDING',
+  LIMIT_ORDER_PATH_A_COVERAGE_GAP: 'LIMIT_ORDER_PATH_A_COVERAGE_GAP',
+  LIMIT_ORDER_STREAM_RETENTION_UNSAFE: 'LIMIT_ORDER_STREAM_RETENTION_UNSAFE',
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODE)[keyof typeof ERROR_CODE];

@@ -319,6 +319,27 @@ export function getErrorMessageFromCode(
     // user.
     case ERROR_CODE.LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED:
       return '이 종목의 과거 시세 데이터를 확인하는 중입니다. 잠시 후 다시 시도해주세요. 기존 주문과 다른 종목은 정상 이용 가능합니다.';
+    // Capability: this asset's route cannot provide authoritative live-trade
+    // auto-matching. Not a transient wait — the copy states it plainly while
+    // keeping existing orders safe. (Never implies "실시간" for a delayed feed.)
+    case ERROR_CODE.LIMIT_ORDER_PROVIDER_CAPABILITY_UNSUPPORTED:
+      return '이 종목은 현재 지정가 자동 체결 대상이 아닙니다. 기존 주문은 유지되며 취소할 수 있습니다.';
+    // Received-trade sync / safe retention is not whole for this asset, or its
+    // automatic-matching coverage is still catching up. Only this asset's new
+    // limit registration pauses. Internal terms never reach the copy.
+    case ERROR_CODE.LIMIT_ORDER_INGRESS_UNAVAILABLE:
+    case ERROR_CODE.LIMIT_ORDER_INGRESS_BACKLOG_EXCEEDED:
+    case ERROR_CODE.LIMIT_ORDER_INGRESS_STALE:
+    case ERROR_CODE.LIMIT_ORDER_INGRESS_GAP_DETECTED:
+    case ERROR_CODE.LIMIT_ORDER_PATH_A_COVERAGE_PENDING:
+    case ERROR_CODE.LIMIT_ORDER_PATH_A_COVERAGE_GAP:
+    case ERROR_CODE.LIMIT_ORDER_STREAM_RETENTION_UNSAFE:
+      return '이 종목의 자동 체결 기록을 동기화하는 중입니다. 이 종목의 신규 지정가 주문을 잠시 제한합니다. 기존 주문은 유지되며 취소할 수 있습니다. 잠시 후 다시 시도해주세요.';
+    // The received trade-event feed for this asset's route is degraded
+    // (repeated invalid events). Same user meaning: a new-registration pause.
+    case ERROR_CODE.LIMIT_ORDER_EVENT_INVALID_RATE_EXCEEDED:
+    case ERROR_CODE.LIMIT_ORDER_EVENT_ROUTE_DEGRADED:
+      return '이 종목의 체결 시세 연결을 확인하는 중입니다. 이 종목의 신규 지정가 주문을 잠시 제한합니다. 기존 주문은 유지되며 취소할 수 있습니다. 잠시 후 다시 시도해주세요.';
     case ERROR_CODE.ORDER_CANCEL_NOT_SUPPORTED:
       return '시장가 주문은 취소할 수 없습니다.';
     case ERROR_CODE.ORDER_TYPE_NOT_SUPPORTED:

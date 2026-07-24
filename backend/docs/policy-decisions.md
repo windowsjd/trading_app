@@ -167,3 +167,15 @@
 - Prisma index naming: 기존 migration이 PostgreSQL 63-byte 제한에 맞춰 만든 `limit_order_candle_evidences_market_candle_id_candle_inges_key`를 schema의 composite unique `map:`으로 고정한다. 적용 migration을 rename/edit하거나 같은 unique를 중복 생성하지 않는다.
 - Binance 구독 상한: Binance가 제한하는 단위는 자산이 아니라 **stream**(연결당 1024)이다. matcher가 켜지면 자산당 `@kline_5m` + `@trade` 2 stream이므로 자산 수 기준 1024 상한은 실제로 2048 stream을 요청해 SUBSCRIBE 전체가 거절되고 **연결은 살아 있으나 시세가 전혀 오지 않는** 상태가 된다. 실효 자산 예산은 `min(자산상한, floor(stream상한 / 자산당 stream 수))`이고, 실제 전송하는 `streams.length`에 대해 마지막 방어 assertion을 둔다.
 - processed-event 관측 비용: retention 삭제는 여전히 하지 않되, 매 60초 전수 `COUNT(*)`는 폐기한다. append-only 무한 증가 테이블의 순차 스캔 비용을 matcher event loop가 영원히 부담하면서, 시간 단위로만 변하는 숫자를 출력하는 구조였다. 기본 샘플은 `pg_stat_user_tables.n_live_tup` 기반 **근사값**이며 수 분 간격으로 수집하고 payload에 `approximate: true`를 명시한다. 정확한 수치는 수동 진단 script로 제공한다. 샘플 실패는 matcher를 중단시키지 않고 직전 샘플을 재사용한다.
+
+## Limit Buy Event Authority (경로 A/B 권위, Provider Capability, 활성화 토큰)
+
+상세·정규 계약은 `docs/limit-order-event-authority.md`(normative)를 따른다.
+
+- Normative 문서 지정: "provider 거래 이벤트가 **언제** 주문을 체결할 수 있는가"의 단일 정규 문서는 `limit-order-event-authority.md`다. live-matching·candle-reconciliation은 이 문서를 참조하며 충돌 시 event-authority 문서가 우선한다.
+- 세 시각 분리: 거래 발생(occurrence=`providerEventAt`) / 서버 수신(`receivedAt`·`publishedAt`) / Redis 저장(streamId)은 별개다. Redis Stream ID는 **서버 도착 순서만** 증명하며 거래소 발생 순서의 권위가 아니다. 기존 "ordering은 Redis Stream ID로만 결정한다"는 입장은 폐기한다.
+- Provider capability matrix: route별 Path A 허용은 코드(`provider-trade-capability.ts`)의 **선언된 capability**이며 공식 문서 + 파서가 실제 포착하는 필드로만 근거한다. Binance `@trade.t`(자산별 monotonic unique 거래 ID)는 authoritative → `provider_sequence`(Path A 허용). KIS 국내(합성 ID + 누적거래량 sequence)와 KIS 미국(지연 시세)는 authoritative ordering이 없어 `path_b_only`. 미분류/`unsupported` route는 신규 지정가 fail-closed이며 arrival-order Path A로 조용히 fallback하지 않는다.
+- 활성화 토큰: 주문 활성화는 Redis tail(`matchingActivationStreamId`) **단독**이 아니라 route가 요구하는 durable evidence(provider/route/generation/epoch/mode + provider_sequence 또는 time watermark)로 판정한다. Path A 체결은 이벤트의 authoritative sequence가 활성화 sequence보다 **strictly greater**일 때만 가능하다(=는 boundary라 배제, <는 지연·제출 이전이라 배제). generation·epoch 불일치와 malformed/부재 토큰은 fail-closed. synthetic ID만 있는 route는 sequence 비교에 도달하지 않는다.
+- 지연 이벤트 방어: 제출 이전 발생·제출 이후 도착한 거래는 authoritative sequence ≤ 활성화 sequence이므로 도착 순서와 무관하게 체결하지 못한다. Node clock↔provider clock 직접 비교, arbitrary grace, synthetic ID 문자열 정렬은 단독 근거로 쓰지 않는다.
+- 기존 submitted 주문: 활성화 evidence가 없는 기존 지정가 주문은 임의 토큰을 backfill하지 않고 Path A 체결하지 않는다(과거 ordering 권위를 사후 생성하지 않음). Path B health와 기존 candle eligibility가 안전하면 Path B만 허용하거나 운영자가 cancel/recreate한다. additive migration만 쓰고 기존 실행·wallet·reservation·evidence는 불변.
+- 단계: 이번 1차는 정규 계약 + capability matrix + 활성화/지연 판정 **순수 로직**(+unit test)까지 enforce한다. durable ingress·bounded queue·coverage checkpoint·safe trim·DLQ·heartbeat schemaVersion 및 live-path wiring은 event-authority 문서 §16이 "Contract(planned)"로 표기한 후속 단계이며 현재 코드에 존재한다고 보고하지 않는다.
