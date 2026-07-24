@@ -77,12 +77,7 @@ describe('Binance WebSocket streaming service', () => {
     expect(socket.sent).toHaveLength(1);
     expect(JSON.parse(socket.sent[0])).toEqual({
       method: 'SUBSCRIBE',
-      params: [
-        'btcusdt@ticker',
-        'btcusdt@trade',
-        'ethusdt@ticker',
-        'ethusdt@trade',
-      ],
+      params: ['btcusdt@ticker', 'ethusdt@ticker'],
       id: 1,
     });
     expect(service.getStatus()).toMatchObject({

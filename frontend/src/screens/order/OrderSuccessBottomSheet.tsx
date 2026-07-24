@@ -19,8 +19,8 @@ interface OrderSuccessBottomSheetProps {
   payload: CreateOrderDto | null;
   /**
    * The quote this order was created from. Supplies the quote-time ESTIMATES
-   * for an unfilled limit buy — the order itself has no gross/fee/net until it
-   * actually fills through a later matcher event.
+   * for an unfilled limit buy — the order itself has no gross/fee/net unless
+   * it actually fills, and no automatic execution exists today.
    */
   quote?: OrderQuoteDto | null;
 }

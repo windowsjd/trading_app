@@ -2,10 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
-  getCandleEvidenceDisplay,
   getLimitQuoteEstimateDisplay,
   getLimitOrderSuccessMessage,
-  getOrderMatchingSourceLabel,
   getOrderSuccessDisplay,
   isOrderSuccess,
   isSubmittedLimitOrder,
@@ -334,185 +332,10 @@ test('new limit-order error codes map to dedicated user messages by CODE', () =>
     ERROR_CODE.ORDER_NOT_CANCELABLE,
     ERROR_CODE.ORDER_CANCEL_CONFLICT,
     ERROR_CODE.ORDER_CANCEL_NOT_SUPPORTED,
-    ERROR_CODE.LIMIT_ORDER_MATCHER_UNAVAILABLE,
-    ERROR_CODE.LIMIT_ORDER_EVENT_STREAM_UNAVAILABLE,
-    ERROR_CODE.LIMIT_ORDER_PROVIDER_UNAVAILABLE,
-    ERROR_CODE.LIMIT_ORDER_PROVIDER_NOT_SUBSCRIBED,
-    ERROR_CODE.LIMIT_ORDER_PROVIDER_SUBSCRIPTION_FAILED,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_RECONCILIATION_UNAVAILABLE,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_RECONCILIATION_STALE,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_RECONCILIATION_BACKLOG_EXCEEDED,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_RECONCILIATION_GAP_DETECTED,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_RESERVATION_MISMATCH,
-    ERROR_CODE.LIMIT_ORDER_PROVIDER_READINESS_PROOF_EXPIRED,
-    ERROR_CODE.LIMIT_ORDER_PROVIDER_READINESS_PROOF_INVALID,
-    ERROR_CODE.LIMIT_ORDER_PROVIDER_GENERATION_CHANGED,
-    ERROR_CODE.LIMIT_ORDER_PROVIDER_OWNER_LEASE_LOST,
-    ERROR_CODE.LIMIT_ORDER_PROVIDER_READINESS_EPOCH_MISMATCH,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_COMPLETION_UNAVAILABLE,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_COMPLETION_STALE,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_FINALIZER_STALE,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_BACKLOG_EXCEEDED,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_PERMANENT_FAILURE,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED,
-    ERROR_CODE.LIMIT_ORDER_PROVIDER_CAPABILITY_UNSUPPORTED,
-    ERROR_CODE.LIMIT_ORDER_INGRESS_UNAVAILABLE,
-    ERROR_CODE.LIMIT_ORDER_INGRESS_BACKLOG_EXCEEDED,
-    ERROR_CODE.LIMIT_ORDER_INGRESS_STALE,
-    ERROR_CODE.LIMIT_ORDER_INGRESS_GAP_DETECTED,
-    ERROR_CODE.LIMIT_ORDER_EVENT_INVALID_RATE_EXCEEDED,
-    ERROR_CODE.LIMIT_ORDER_EVENT_ROUTE_DEGRADED,
-    ERROR_CODE.LIMIT_ORDER_PATH_A_COVERAGE_PENDING,
-    ERROR_CODE.LIMIT_ORDER_PATH_A_COVERAGE_GAP,
-    ERROR_CODE.LIMIT_ORDER_STREAM_RETENTION_UNSAFE,
   ]) {
     const message = getErrorMessageFromCode(code);
     assert.notEqual(message, generic, `expected dedicated message for ${code}`);
   }
-});
-
-test('event-authority error codes never leak internal vocabulary', () => {
-  for (const code of [
-    ERROR_CODE.LIMIT_ORDER_PROVIDER_CAPABILITY_UNSUPPORTED,
-    ERROR_CODE.LIMIT_ORDER_INGRESS_UNAVAILABLE,
-    ERROR_CODE.LIMIT_ORDER_INGRESS_BACKLOG_EXCEEDED,
-    ERROR_CODE.LIMIT_ORDER_INGRESS_STALE,
-    ERROR_CODE.LIMIT_ORDER_INGRESS_GAP_DETECTED,
-    ERROR_CODE.LIMIT_ORDER_EVENT_INVALID_RATE_EXCEEDED,
-    ERROR_CODE.LIMIT_ORDER_EVENT_ROUTE_DEGRADED,
-    ERROR_CODE.LIMIT_ORDER_PATH_A_COVERAGE_PENDING,
-    ERROR_CODE.LIMIT_ORDER_PATH_A_COVERAGE_GAP,
-    ERROR_CODE.LIMIT_ORDER_STREAM_RETENTION_UNSAFE,
-  ]) {
-    const message = getErrorMessageFromCode(code);
-    for (const forbidden of [
-      'redis',
-      'ingress',
-      'stream',
-      'epoch',
-      'generation',
-      'sequence',
-      'ack',
-      'dlq',
-      'coverage',
-      'watermark',
-      // KIS US delayed feed must never be presented as real-time.
-      '실시간 체결',
-    ]) {
-      assert.ok(
-        !message.toLowerCase().includes(forbidden.toLowerCase()),
-        `${code} message must not mention ${forbidden}`,
-      );
-    }
-    // Every new code is a new-registration pause that keeps existing orders
-    // usable, so the copy must reassure about existing orders.
-    assert.ok(
-      message.includes('기존 주문'),
-      `${code} must reassure that existing orders keep working`,
-    );
-  }
-});
-
-test('proof and asset-scoped messages never leak internal vocabulary', () => {
-  // Redis, fence, epoch, proof, checkpoint, generation are operator terms.
-  for (const code of [
-    ERROR_CODE.LIMIT_ORDER_PROVIDER_READINESS_PROOF_EXPIRED,
-    ERROR_CODE.LIMIT_ORDER_PROVIDER_READINESS_PROOF_INVALID,
-    ERROR_CODE.LIMIT_ORDER_PROVIDER_GENERATION_CHANGED,
-    ERROR_CODE.LIMIT_ORDER_PROVIDER_OWNER_LEASE_LOST,
-    ERROR_CODE.LIMIT_ORDER_PROVIDER_READINESS_EPOCH_MISMATCH,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_COMPLETION_UNAVAILABLE,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_COMPLETION_STALE,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_FINALIZER_STALE,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_BACKLOG_EXCEEDED,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_PERMANENT_FAILURE,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED,
-  ]) {
-    const message = getErrorMessageFromCode(code);
-    for (const forbidden of [
-      'Redis',
-      'fence',
-      'epoch',
-      'proof',
-      'checkpoint',
-      'generation',
-      'watermark',
-      'lease',
-      // Path-B revision/backfill vocabulary is an operator concept too.
-      'migration',
-      'revision',
-      'ingest',
-      'backfill',
-    ]) {
-      assert.ok(
-        !message.toLowerCase().includes(forbidden.toLowerCase()),
-        `${code} message must not mention ${forbidden}`,
-      );
-    }
-  }
-});
-
-test('asset-scoped safety-net messages say only this asset is affected', () => {
-  for (const code of [
-    ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_FINALIZER_STALE,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_BACKLOG_EXCEEDED,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_ASSET_PERMANENT_FAILURE,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED,
-  ]) {
-    const message = getErrorMessageFromCode(code);
-    assert.ok(
-      message.includes('이 종목'),
-      `${code} must scope the pause to the one asset`,
-    );
-    assert.ok(
-      message.includes('다른 종목'),
-      `${code} must say other assets keep working`,
-    );
-  }
-});
-
-test('path-B safety-net errors tell the user existing orders are unaffected', () => {
-  // These fire while cancel, cleanup, market orders and FX all keep working,
-  // so the copy must not imply the whole account is frozen.
-  for (const code of [
-    ERROR_CODE.LIMIT_ORDER_CANDLE_RECONCILIATION_UNAVAILABLE,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_RECONCILIATION_STALE,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_RECONCILIATION_BACKLOG_EXCEEDED,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_RECONCILIATION_GAP_DETECTED,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_RESERVATION_MISMATCH,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_COMPLETION_UNAVAILABLE,
-    ERROR_CODE.LIMIT_ORDER_CANDLE_COMPLETION_STALE,
-  ]) {
-    const message = getErrorMessageFromCode(code);
-    assert.ok(
-      message.includes('기존 주문'),
-      `expected ${code} to reassure about existing orders`,
-    );
-    assert.ok(
-      message.includes('취소'),
-      `expected ${code} to state cancel is still possible`,
-    );
-  }
-});
-
-test('per-asset provider readiness errors are distinguishable from each other', () => {
-  // "not subscribed" and "subscription rejected" need different operator and
-  // user responses, so they must not collapse into one message.
-  const notSubscribed = getErrorMessageFromCode(
-    ERROR_CODE.LIMIT_ORDER_PROVIDER_NOT_SUBSCRIBED,
-  );
-  const failed = getErrorMessageFromCode(
-    ERROR_CODE.LIMIT_ORDER_PROVIDER_SUBSCRIPTION_FAILED,
-  );
-  const unavailable = getErrorMessageFromCode(
-    ERROR_CODE.LIMIT_ORDER_PROVIDER_UNAVAILABLE,
-  );
-  assert.notEqual(notSubscribed, failed);
-  assert.notEqual(notSubscribed, unavailable);
-  assert.notEqual(failed, unavailable);
 });
 
 test('success copy follows the server execution policy without promising exchange liquidity', () => {
@@ -584,7 +407,7 @@ test('existing market error semantics stay intact', () => {
 });
 
 
-test('limit success copy states the path-B fill price is the limit price', () => {
+test('limit success copy renders reservation-only today and keeps the live branch server-driven', () => {
   const reservationOnly = getLimitOrderSuccessMessage({
     autoExecutionEnabled: false,
     mode: 'reservation_only',
@@ -592,65 +415,14 @@ test('limit success copy states the path-B fill price is the limit price', () =>
     fullFillOnly: true,
   });
   assert.match(reservationOnly, /미체결 상태로 등록/);
-  assert.ok(!reservationOnly.includes('5분봉'));
+  assert.ok(!reservationOnly.includes('자동 체결'));
 
-  const liveOnly = getLimitOrderSuccessMessage({
+  const live = getLimitOrderSuccessMessage({
     autoExecutionEnabled: true,
     mode: 'live_trade_event',
     triggerType: 'provider_trade_price',
     fullFillOnly: true,
-    liveTradeMatchingEnabled: true,
-    candleReconciliationEnabled: false,
-    candleInterval: null,
-    candleExecutionPricePolicy: null,
   });
-  assert.match(liveOnly, /실시간 체결가격이 지정가 이하/);
-  assert.ok(!liveOnly.includes('5분봉'));
-
-  const withCandle = getLimitOrderSuccessMessage({
-    autoExecutionEnabled: true,
-    mode: 'live_trade_event',
-    triggerType: 'provider_trade_price',
-    fullFillOnly: true,
-    liveTradeMatchingEnabled: true,
-    candleReconciliationEnabled: true,
-    candleInterval: '5m',
-    candleExecutionPricePolicy: 'limit_price',
-  });
-  assert.match(withCandle, /확정된 5분봉의 저가를 기준으로/);
-  assert.match(withCandle, /지정가 가격으로 보정 체결/);
-  // Never promise a candle-low fill, order-book fidelity, or a post-season fill.
-  assert.ok(!withCandle.includes('저가로 체결'));
-  assert.ok(!withCandle.includes('저가에 체결'));
-  assert.ok(!withCandle.includes('소급'));
-  assert.match(withCandle, /주문장 유동성과 거래량은 반영하지 않습니다/);
-});
-
-test('matching source labels distinguish live events from the 5m safety net', () => {
-  assert.equal(getOrderMatchingSourceLabel('live_trade_event'), '실시간 체결 이벤트');
-  assert.equal(getOrderMatchingSourceLabel('closed_5m_candle'), '5분봉 안전망 체결');
-  assert.equal(getOrderMatchingSourceLabel(null), null);
-  assert.equal(getOrderMatchingSourceLabel('unknown'), null);
-});
-
-test('candle evidence display labels the low as a trigger, not a fill price', () => {
-  const display = getCandleEvidenceDisplay(
-    {
-      interval: '5m',
-      openTime: '2026-07-22T01:00:00.000Z',
-      closeTime: '2026-07-22T01:05:00.000Z',
-      triggerLowPrice: '90.00000000',
-      executionPricePolicy: 'limit_price',
-    },
-    'KRW',
-  );
-  assert.ok(display);
-  assert.equal(display?.interval, '5m');
-  assert.equal(display?.openTime, '2026-07-22T01:00:00.000Z');
-  assert.equal(display?.closeTime, '2026-07-22T01:05:00.000Z');
-  assert.match(
-    display?.executionPriceNotice ?? '',
-    /체결가격은 지정가입니다\. 저가로 체결되지 않습니다\./,
-  );
-  assert.equal(getCandleEvidenceDisplay(null, 'KRW'), null);
+  assert.match(live, /실시간 체결가격이 지정가 이하/);
+  assert.match(live, /주문장 유동성과 거래량은 반영하지 않습니다/);
 });

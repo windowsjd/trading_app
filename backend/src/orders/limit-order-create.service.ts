@@ -26,10 +26,6 @@ import {
   validateQuotedLimitReservationBasis,
   type QuotedLimitReservationBasis,
 } from './limit-order-policy';
-import {
-  FIVE_MINUTES_MS,
-  LIMIT_ORDER_CANDLE_INTERVAL,
-} from './limit-matching/limit-order-candle-eligibility';
 import { OrderReservationService } from './order-reservation.service';
 import {
   formatOrderResponse,
@@ -55,20 +51,6 @@ const LIMIT_ORDER_PAYLOAD_SELECT = {
   reservedAmount: true,
   reservationReleasedAt: true,
   cancelReason: true,
-  triggerEventId: true,
-  triggerEventAt: true,
-  matchedAt: true,
-  matchingSource: true,
-  candleEvidence: {
-    select: {
-      marketCandleId: true,
-      interval: true,
-      openTime: true,
-      closeTime: true,
-      triggerLowPrice: true,
-      executionPricePolicy: true,
-    },
-  },
   submittedAt: true,
   executedAt: true,
   canceledAt: true,
@@ -111,7 +93,7 @@ export type LimitOrderCreateResponse = {
   data: {
     order: OrderResponsePayload;
     execution: {
-      /** Phase 1 never executes a limit order at create time. */
+      /** A limit order is never executed at create time. */
       state: 'submitted';
       submittedAt: string;
       quoteId: string | null;
@@ -119,16 +101,20 @@ export type LimitOrderCreateResponse = {
       reservationFeeRate: string | null;
       duplicate: boolean;
     };
+    /**
+     * Kept for API-shape stability. Automatic matching is not implemented,
+     * so every field reports the reservation-only reality; clients must keep
+     * treating these values as server-authoritative.
+     */
     executionPolicy: {
-      autoExecutionEnabled: boolean;
-      mode: 'live_trade_event' | 'reservation_only';
-      triggerType: 'provider_trade_price' | null;
+      autoExecutionEnabled: false;
+      mode: 'reservation_only';
+      triggerType: null;
       fullFillOnly: true;
-      /** Additive path-B disclosure; see limitOrderExecutionPolicy(). */
-      liveTradeMatchingEnabled: boolean;
-      candleReconciliationEnabled: boolean;
-      candleInterval: '5m' | null;
-      candleExecutionPricePolicy: 'limit_price' | null;
+      liveTradeMatchingEnabled: false;
+      candleReconciliationEnabled: false;
+      candleInterval: null;
+      candleExecutionPricePolicy: null;
     };
   };
 };
@@ -136,10 +122,11 @@ export type LimitOrderCreateResponse = {
 type LimitCreateTransactionClient = Prisma.TransactionClient;
 
 /**
- * Limit-buy phase 1: quote preview and submitted-order creation with cash
- * reservation. No provider price is read anywhere in this service and no
- * WalletTransaction/Position is written during Create. With path A enabled,
- * only a later live-trade stream event may execute the submitted order.
+ * Limit-buy quote preview and submitted-order creation with cash reservation.
+ * No provider price is read anywhere in this service and no
+ * WalletTransaction/Position is written during Create. Registration completes
+ * against PostgreSQL alone; automatic matching is not implemented, so a
+ * submitted order changes state only through user cancel or cleanup.
  */
 @Injectable()
 export class LimitOrderCreateService {
@@ -425,18 +412,6 @@ export class LimitOrderCreateService {
       quantity: Prisma.Decimal;
       idempotency: { idempotencyKey: string; requestHash: string };
       submittedAt: Date;
-      matchingActivation?: {
-        activatedAt: Date;
-        streamId: string;
-      } | null;
-      /**
-       * First fully-elapsed 5m window this order may be filled from (path B).
-       * Null keeps the order path-A only — it is never activated against a
-       * candle that was already running when it was submitted.
-       */
-      candleMatchingEligibleFrom?: Date | null;
-      autoExecutionEnabled?: boolean;
-      candleReconciliationEnabled?: boolean;
     },
   ): Promise<LimitOrderCreateResponse> {
     const currencyCode =
@@ -463,8 +438,8 @@ export class LimitOrderCreateService {
 
     // 2) Submitted order row. grossAmount/feeAmount/netAmount/executedPrice/
     // executedAt mean ACTUAL EXECUTION RESULT and stay null until a fill
-    // exists, so they are null at submission and remain null unless the path A
-    // matcher later fills the order. The unfilled order's monetary story lives
+    // exists — and with no automatic matching implemented, a submitted limit
+    // order has no fill path at all. The unfilled order's monetary story lives
     // in reservedAmount + reservationFeeRate (and, for the pre-submit preview,
     // the quote's pinned quoted* amounts).
     const created = await tx.order.create({
@@ -488,9 +463,6 @@ export class LimitOrderCreateService {
         reservationFeeRate: reservationFeeRateText,
         reservationReleasedAt: null,
         cancelReason: null,
-        matchingActivatedAt: input.matchingActivation?.activatedAt ?? null,
-        matchingActivationStreamId: input.matchingActivation?.streamId ?? null,
-        candleMatchingEligibleFrom: input.candleMatchingEligibleFrom ?? null,
         idempotencyKey: input.idempotency.idempotencyKey,
         requestHash: input.idempotency.requestHash,
         submittedAt: input.submittedAt,
@@ -500,38 +472,6 @@ export class LimitOrderCreateService {
       },
       select: { id: true },
     });
-
-    // 2b) Bootstrap the asset's window-completion checkpoint IN THE SAME
-    // transaction as the order that makes the asset owe completion. Without
-    // this, the asset-scoped health gate would see "submitted path-B order,
-    // no checkpoint" (fail-closed) for every create between the first order
-    // and the next sweep tick. ON CONFLICT DO NOTHING never moves an existing
-    // cursor; a rollback of this create rolls the checkpoint back with it;
-    // concurrent creates are serialized by the unique (asset_id, interval)
-    // key. The anchor mirrors the supervisor's bootstrap: everything before
-    // the order's first eligible window is vacuously complete.
-    if (input.candleMatchingEligibleFrom) {
-      const anchor = new Date(
-        Math.floor(
-          input.candleMatchingEligibleFrom.getTime() / FIVE_MINUTES_MS,
-        ) * FIVE_MINUTES_MS,
-      );
-      await tx.$executeRaw`
-        INSERT INTO "market_candle_finalization_checkpoints" (
-          "asset_id", "interval",
-          "finalized_through_open_time", "finalized_through_close_time",
-          "created_at", "updated_at"
-        ) VALUES (
-          ${input.quote.asset.id},
-          ${LIMIT_ORDER_CANDLE_INTERVAL},
-          ${new Date(anchor.getTime() - FIVE_MINUTES_MS)},
-          ${anchor},
-          ${input.submittedAt},
-          ${input.submittedAt}
-        )
-        ON CONFLICT ("asset_id", "interval") DO NOTHING
-      `;
-    }
 
     // 3) Consume the quote inside the same transaction.
     const consumeResult = await tx.quote.updateMany({
@@ -583,21 +523,14 @@ export class LimitOrderCreateService {
           duplicate: false,
         },
         executionPolicy: {
-          autoExecutionEnabled: input.autoExecutionEnabled === true,
-          mode:
-            input.autoExecutionEnabled === true
-              ? 'live_trade_event'
-              : 'reservation_only',
-          triggerType:
-            input.autoExecutionEnabled === true ? 'provider_trade_price' : null,
+          autoExecutionEnabled: false,
+          mode: 'reservation_only',
+          triggerType: null,
           fullFillOnly: true,
-          liveTradeMatchingEnabled: input.autoExecutionEnabled === true,
-          candleReconciliationEnabled:
-            input.candleReconciliationEnabled === true,
-          candleInterval:
-            input.candleReconciliationEnabled === true ? '5m' : null,
-          candleExecutionPricePolicy:
-            input.candleReconciliationEnabled === true ? 'limit_price' : null,
+          liveTradeMatchingEnabled: false,
+          candleReconciliationEnabled: false,
+          candleInterval: null,
+          candleExecutionPricePolicy: null,
         },
       },
     };

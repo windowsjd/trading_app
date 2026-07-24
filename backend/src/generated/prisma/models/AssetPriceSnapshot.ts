@@ -49,8 +49,6 @@ export type AssetPriceSnapshotMinAggregateOutputType = {
   capturedAt: Date | null
   createdAt: Date | null
   note: string | null
-  providerEventKey: string | null
-  providerEventAt: Date | null
 }
 
 export type AssetPriceSnapshotMaxAggregateOutputType = {
@@ -66,8 +64,6 @@ export type AssetPriceSnapshotMaxAggregateOutputType = {
   capturedAt: Date | null
   createdAt: Date | null
   note: string | null
-  providerEventKey: string | null
-  providerEventAt: Date | null
 }
 
 export type AssetPriceSnapshotCountAggregateOutputType = {
@@ -84,8 +80,6 @@ export type AssetPriceSnapshotCountAggregateOutputType = {
   createdAt: number
   rawPayloadJson: number
   note: number
-  providerEventKey: number
-  providerEventAt: number
   _all: number
 }
 
@@ -113,8 +107,6 @@ export type AssetPriceSnapshotMinAggregateInputType = {
   capturedAt?: true
   createdAt?: true
   note?: true
-  providerEventKey?: true
-  providerEventAt?: true
 }
 
 export type AssetPriceSnapshotMaxAggregateInputType = {
@@ -130,8 +122,6 @@ export type AssetPriceSnapshotMaxAggregateInputType = {
   capturedAt?: true
   createdAt?: true
   note?: true
-  providerEventKey?: true
-  providerEventAt?: true
 }
 
 export type AssetPriceSnapshotCountAggregateInputType = {
@@ -148,8 +138,6 @@ export type AssetPriceSnapshotCountAggregateInputType = {
   createdAt?: true
   rawPayloadJson?: true
   note?: true
-  providerEventKey?: true
-  providerEventAt?: true
   _all?: true
 }
 
@@ -253,8 +241,6 @@ export type AssetPriceSnapshotGroupByOutputType = {
   createdAt: Date
   rawPayloadJson: runtime.JsonValue | null
   note: string | null
-  providerEventKey: string | null
-  providerEventAt: Date | null
   _count: AssetPriceSnapshotCountAggregateOutputType | null
   _avg: AssetPriceSnapshotAvgAggregateOutputType | null
   _sum: AssetPriceSnapshotSumAggregateOutputType | null
@@ -294,8 +280,6 @@ export type AssetPriceSnapshotWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"AssetPriceSnapshot"> | Date | string
   rawPayloadJson?: Prisma.JsonNullableFilter<"AssetPriceSnapshot">
   note?: Prisma.StringNullableFilter<"AssetPriceSnapshot"> | string | null
-  providerEventKey?: Prisma.StringNullableFilter<"AssetPriceSnapshot"> | string | null
-  providerEventAt?: Prisma.DateTimeNullableFilter<"AssetPriceSnapshot"> | Date | string | null
   asset?: Prisma.XOR<Prisma.AssetScalarRelationFilter, Prisma.AssetWhereInput>
   orders?: Prisma.OrderListRelationFilter
   quotes?: Prisma.QuoteListRelationFilter
@@ -315,8 +299,6 @@ export type AssetPriceSnapshotOrderByWithRelationInput = {
   createdAt?: Prisma.SortOrder
   rawPayloadJson?: Prisma.SortOrderInput | Prisma.SortOrder
   note?: Prisma.SortOrderInput | Prisma.SortOrder
-  providerEventKey?: Prisma.SortOrderInput | Prisma.SortOrder
-  providerEventAt?: Prisma.SortOrderInput | Prisma.SortOrder
   asset?: Prisma.AssetOrderByWithRelationInput
   orders?: Prisma.OrderOrderByRelationAggregateInput
   quotes?: Prisma.QuoteOrderByRelationAggregateInput
@@ -324,7 +306,6 @@ export type AssetPriceSnapshotOrderByWithRelationInput = {
 
 export type AssetPriceSnapshotWhereUniqueInput = Prisma.AtLeast<{
   id?: string
-  providerEventKey?: string
   AND?: Prisma.AssetPriceSnapshotWhereInput | Prisma.AssetPriceSnapshotWhereInput[]
   OR?: Prisma.AssetPriceSnapshotWhereInput[]
   NOT?: Prisma.AssetPriceSnapshotWhereInput | Prisma.AssetPriceSnapshotWhereInput[]
@@ -340,11 +321,10 @@ export type AssetPriceSnapshotWhereUniqueInput = Prisma.AtLeast<{
   createdAt?: Prisma.DateTimeFilter<"AssetPriceSnapshot"> | Date | string
   rawPayloadJson?: Prisma.JsonNullableFilter<"AssetPriceSnapshot">
   note?: Prisma.StringNullableFilter<"AssetPriceSnapshot"> | string | null
-  providerEventAt?: Prisma.DateTimeNullableFilter<"AssetPriceSnapshot"> | Date | string | null
   asset?: Prisma.XOR<Prisma.AssetScalarRelationFilter, Prisma.AssetWhereInput>
   orders?: Prisma.OrderListRelationFilter
   quotes?: Prisma.QuoteListRelationFilter
-}, "id" | "providerEventKey">
+}, "id">
 
 export type AssetPriceSnapshotOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
@@ -360,8 +340,6 @@ export type AssetPriceSnapshotOrderByWithAggregationInput = {
   createdAt?: Prisma.SortOrder
   rawPayloadJson?: Prisma.SortOrderInput | Prisma.SortOrder
   note?: Prisma.SortOrderInput | Prisma.SortOrder
-  providerEventKey?: Prisma.SortOrderInput | Prisma.SortOrder
-  providerEventAt?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.AssetPriceSnapshotCountOrderByAggregateInput
   _avg?: Prisma.AssetPriceSnapshotAvgOrderByAggregateInput
   _max?: Prisma.AssetPriceSnapshotMaxOrderByAggregateInput
@@ -386,8 +364,6 @@ export type AssetPriceSnapshotScalarWhereWithAggregatesInput = {
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"AssetPriceSnapshot"> | Date | string
   rawPayloadJson?: Prisma.JsonNullableWithAggregatesFilter<"AssetPriceSnapshot">
   note?: Prisma.StringNullableWithAggregatesFilter<"AssetPriceSnapshot"> | string | null
-  providerEventKey?: Prisma.StringNullableWithAggregatesFilter<"AssetPriceSnapshot"> | string | null
-  providerEventAt?: Prisma.DateTimeNullableWithAggregatesFilter<"AssetPriceSnapshot"> | Date | string | null
 }
 
 export type AssetPriceSnapshotCreateInput = {
@@ -403,8 +379,6 @@ export type AssetPriceSnapshotCreateInput = {
   createdAt?: Date | string
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: string | null
-  providerEventKey?: string | null
-  providerEventAt?: Date | string | null
   asset: Prisma.AssetCreateNestedOneWithoutPriceSnapshotsInput
   orders?: Prisma.OrderCreateNestedManyWithoutAssetPriceSnapshotInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetPriceSnapshotInput
@@ -424,8 +398,6 @@ export type AssetPriceSnapshotUncheckedCreateInput = {
   createdAt?: Date | string
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: string | null
-  providerEventKey?: string | null
-  providerEventAt?: Date | string | null
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
 }
@@ -443,8 +415,6 @@ export type AssetPriceSnapshotUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  providerEventKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  providerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   asset?: Prisma.AssetUpdateOneRequiredWithoutPriceSnapshotsNestedInput
   orders?: Prisma.OrderUpdateManyWithoutAssetPriceSnapshotNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutAssetPriceSnapshotNestedInput
@@ -464,8 +434,6 @@ export type AssetPriceSnapshotUncheckedUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  providerEventKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  providerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
 }
@@ -484,8 +452,6 @@ export type AssetPriceSnapshotCreateManyInput = {
   createdAt?: Date | string
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: string | null
-  providerEventKey?: string | null
-  providerEventAt?: Date | string | null
 }
 
 export type AssetPriceSnapshotUpdateManyMutationInput = {
@@ -501,8 +467,6 @@ export type AssetPriceSnapshotUpdateManyMutationInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  providerEventKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  providerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type AssetPriceSnapshotUncheckedUpdateManyInput = {
@@ -519,8 +483,6 @@ export type AssetPriceSnapshotUncheckedUpdateManyInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  providerEventKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  providerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type AssetPriceSnapshotListRelationFilter = {
@@ -547,8 +509,6 @@ export type AssetPriceSnapshotCountOrderByAggregateInput = {
   createdAt?: Prisma.SortOrder
   rawPayloadJson?: Prisma.SortOrder
   note?: Prisma.SortOrder
-  providerEventKey?: Prisma.SortOrder
-  providerEventAt?: Prisma.SortOrder
 }
 
 export type AssetPriceSnapshotAvgOrderByAggregateInput = {
@@ -569,8 +529,6 @@ export type AssetPriceSnapshotMaxOrderByAggregateInput = {
   capturedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   note?: Prisma.SortOrder
-  providerEventKey?: Prisma.SortOrder
-  providerEventAt?: Prisma.SortOrder
 }
 
 export type AssetPriceSnapshotMinOrderByAggregateInput = {
@@ -586,8 +544,6 @@ export type AssetPriceSnapshotMinOrderByAggregateInput = {
   capturedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   note?: Prisma.SortOrder
-  providerEventKey?: Prisma.SortOrder
-  providerEventAt?: Prisma.SortOrder
 }
 
 export type AssetPriceSnapshotSumOrderByAggregateInput = {
@@ -699,8 +655,6 @@ export type AssetPriceSnapshotCreateWithoutAssetInput = {
   createdAt?: Date | string
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: string | null
-  providerEventKey?: string | null
-  providerEventAt?: Date | string | null
   orders?: Prisma.OrderCreateNestedManyWithoutAssetPriceSnapshotInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetPriceSnapshotInput
 }
@@ -718,8 +672,6 @@ export type AssetPriceSnapshotUncheckedCreateWithoutAssetInput = {
   createdAt?: Date | string
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: string | null
-  providerEventKey?: string | null
-  providerEventAt?: Date | string | null
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
 }
@@ -767,8 +719,6 @@ export type AssetPriceSnapshotScalarWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"AssetPriceSnapshot"> | Date | string
   rawPayloadJson?: Prisma.JsonNullableFilter<"AssetPriceSnapshot">
   note?: Prisma.StringNullableFilter<"AssetPriceSnapshot"> | string | null
-  providerEventKey?: Prisma.StringNullableFilter<"AssetPriceSnapshot"> | string | null
-  providerEventAt?: Prisma.DateTimeNullableFilter<"AssetPriceSnapshot"> | Date | string | null
 }
 
 export type AssetPriceSnapshotCreateWithoutOrdersInput = {
@@ -784,8 +734,6 @@ export type AssetPriceSnapshotCreateWithoutOrdersInput = {
   createdAt?: Date | string
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: string | null
-  providerEventKey?: string | null
-  providerEventAt?: Date | string | null
   asset: Prisma.AssetCreateNestedOneWithoutPriceSnapshotsInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetPriceSnapshotInput
 }
@@ -804,8 +752,6 @@ export type AssetPriceSnapshotUncheckedCreateWithoutOrdersInput = {
   createdAt?: Date | string
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: string | null
-  providerEventKey?: string | null
-  providerEventAt?: Date | string | null
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
 }
 
@@ -838,8 +784,6 @@ export type AssetPriceSnapshotUpdateWithoutOrdersInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  providerEventKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  providerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   asset?: Prisma.AssetUpdateOneRequiredWithoutPriceSnapshotsNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutAssetPriceSnapshotNestedInput
 }
@@ -858,8 +802,6 @@ export type AssetPriceSnapshotUncheckedUpdateWithoutOrdersInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  providerEventKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  providerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
 }
 
@@ -876,8 +818,6 @@ export type AssetPriceSnapshotCreateWithoutQuotesInput = {
   createdAt?: Date | string
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: string | null
-  providerEventKey?: string | null
-  providerEventAt?: Date | string | null
   asset: Prisma.AssetCreateNestedOneWithoutPriceSnapshotsInput
   orders?: Prisma.OrderCreateNestedManyWithoutAssetPriceSnapshotInput
 }
@@ -896,8 +836,6 @@ export type AssetPriceSnapshotUncheckedCreateWithoutQuotesInput = {
   createdAt?: Date | string
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: string | null
-  providerEventKey?: string | null
-  providerEventAt?: Date | string | null
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
 }
 
@@ -930,8 +868,6 @@ export type AssetPriceSnapshotUpdateWithoutQuotesInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  providerEventKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  providerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   asset?: Prisma.AssetUpdateOneRequiredWithoutPriceSnapshotsNestedInput
   orders?: Prisma.OrderUpdateManyWithoutAssetPriceSnapshotNestedInput
 }
@@ -950,8 +886,6 @@ export type AssetPriceSnapshotUncheckedUpdateWithoutQuotesInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  providerEventKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  providerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
 }
 
@@ -968,8 +902,6 @@ export type AssetPriceSnapshotCreateManyAssetInput = {
   createdAt?: Date | string
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: string | null
-  providerEventKey?: string | null
-  providerEventAt?: Date | string | null
 }
 
 export type AssetPriceSnapshotUpdateWithoutAssetInput = {
@@ -985,8 +917,6 @@ export type AssetPriceSnapshotUpdateWithoutAssetInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  providerEventKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  providerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   orders?: Prisma.OrderUpdateManyWithoutAssetPriceSnapshotNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutAssetPriceSnapshotNestedInput
 }
@@ -1004,8 +934,6 @@ export type AssetPriceSnapshotUncheckedUpdateWithoutAssetInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  providerEventKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  providerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
 }
@@ -1023,8 +951,6 @@ export type AssetPriceSnapshotUncheckedUpdateManyWithoutAssetInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  providerEventKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  providerEventAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 
@@ -1081,8 +1007,6 @@ export type AssetPriceSnapshotSelect<ExtArgs extends runtime.Types.Extensions.In
   createdAt?: boolean
   rawPayloadJson?: boolean
   note?: boolean
-  providerEventKey?: boolean
-  providerEventAt?: boolean
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   orders?: boolean | Prisma.AssetPriceSnapshot$ordersArgs<ExtArgs>
   quotes?: boolean | Prisma.AssetPriceSnapshot$quotesArgs<ExtArgs>
@@ -1103,8 +1027,6 @@ export type AssetPriceSnapshotSelectCreateManyAndReturn<ExtArgs extends runtime.
   createdAt?: boolean
   rawPayloadJson?: boolean
   note?: boolean
-  providerEventKey?: boolean
-  providerEventAt?: boolean
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["assetPriceSnapshot"]>
 
@@ -1122,8 +1044,6 @@ export type AssetPriceSnapshotSelectUpdateManyAndReturn<ExtArgs extends runtime.
   createdAt?: boolean
   rawPayloadJson?: boolean
   note?: boolean
-  providerEventKey?: boolean
-  providerEventAt?: boolean
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["assetPriceSnapshot"]>
 
@@ -1141,11 +1061,9 @@ export type AssetPriceSnapshotSelectScalar = {
   createdAt?: boolean
   rawPayloadJson?: boolean
   note?: boolean
-  providerEventKey?: boolean
-  providerEventAt?: boolean
 }
 
-export type AssetPriceSnapshotOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "assetId" | "price" | "priceKrw" | "currencyCode" | "sourceType" | "sourceName" | "sourceTimestamp" | "effectiveAt" | "capturedAt" | "createdAt" | "rawPayloadJson" | "note" | "providerEventKey" | "providerEventAt", ExtArgs["result"]["assetPriceSnapshot"]>
+export type AssetPriceSnapshotOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "assetId" | "price" | "priceKrw" | "currencyCode" | "sourceType" | "sourceName" | "sourceTimestamp" | "effectiveAt" | "capturedAt" | "createdAt" | "rawPayloadJson" | "note", ExtArgs["result"]["assetPriceSnapshot"]>
 export type AssetPriceSnapshotInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   orders?: boolean | Prisma.AssetPriceSnapshot$ordersArgs<ExtArgs>
@@ -1180,8 +1098,6 @@ export type $AssetPriceSnapshotPayload<ExtArgs extends runtime.Types.Extensions.
     createdAt: Date
     rawPayloadJson: runtime.JsonValue | null
     note: string | null
-    providerEventKey: string | null
-    providerEventAt: Date | null
   }, ExtArgs["result"]["assetPriceSnapshot"]>
   composites: {}
 }
@@ -1621,8 +1537,6 @@ export interface AssetPriceSnapshotFieldRefs {
   readonly createdAt: Prisma.FieldRef<"AssetPriceSnapshot", 'DateTime'>
   readonly rawPayloadJson: Prisma.FieldRef<"AssetPriceSnapshot", 'Json'>
   readonly note: Prisma.FieldRef<"AssetPriceSnapshot", 'String'>
-  readonly providerEventKey: Prisma.FieldRef<"AssetPriceSnapshot", 'String'>
-  readonly providerEventAt: Prisma.FieldRef<"AssetPriceSnapshot", 'DateTime'>
 }
     
 

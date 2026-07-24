@@ -23,11 +23,10 @@ Not implemented:
 - Real external trading/account/deposit/withdrawal API
 - Scheduler-driven reward-grant writes or automatic reward payment/delivery
 
-The limit-order matcher is deliberately not an `OpsSchedulerService` interval.
-It is a dedicated long-running Redis blocking-read loop. `OpsJobName` includes
-`limit_order_matcher` only for DB-authoritative heartbeat/audit state; active
-ownership is a session-scoped PostgreSQL advisory lock. See
-`docs/limit-order-live-matching-operations.md`.
+`OpsJobName` still contains `limit_order_matcher` and
+`limit_order_candle_reconciliation` (and `OpsJobTrigger` contains `worker`)
+only because PostgreSQL cannot drop enum values: the event-based limit-order
+matching layer that used them has been removed and nothing schedules them.
 
 - External payment/point/coupon/gifticon/cash reward delivery
 
@@ -42,7 +41,7 @@ ownership is a session-scoped PostgreSQL advisory lock. See
 - `season_ranking_generation`
 - `season_settlement`
 - `reward_marker`
-- `limit_order_matcher` (long-running Poller health; not a scheduler tick)
+- `limit_order_matcher` (vestigial; the removed matching layer used it — never scheduled)
 
 `provider_fx_ingest`, `provider_binance_ingest`, and `provider_kis_ingest` call the existing provider ingestion services through ops locks and write real provider snapshots when provider env is enabled.
 
@@ -58,8 +57,8 @@ ownership is a session-scoped PostgreSQL advisory lock. See
 - `status`: `running`, `succeeded`, `failed`, `skipped`, `locked`
 - `trigger`: `scheduler`, `operator`, `manual_script`, `test`, `worker`
 
-`worker` identifies a dedicated long-running process such as the limit-order
-matcher; it does not mean the 60-second scheduler invoked the job.
+`worker` identified a dedicated long-running process in the removed
+limit-order matching layer; it is vestigial and no current job records it.
 
 - `requestedBy`
 - `startedAt`, `finishedAt`, `durationMs`
@@ -275,61 +274,10 @@ The scheduler foundation does not create provider ingestion HTTP trigger APIs, b
 - Reward Policy / Reward Catalog Gate
 - Deployment/ops runbook and production scheduler ownership gate
 
-## limit_order_candle_reconciliation (path B safety net)
+## limit_order_candle_reconciliation (removed)
 
-Ops job name `limit_order_candle_reconciliation`, added additively to
-`OpsJobName`. Default **off**.
-
-- Runs on the ordinary 60-second scheduler tick — a 5-minute candle safety net
-  needs no dedicated cadence, and `limit_order_processed_candles` (not a timer)
-  is what stops repeated ticks from re-processing the same window.
-- Serialized by the existing PostgreSQL `OpsJobLock`
-  (`limit_order_candle_reconciliation:5m`) with lock renewal, exactly like
-  market candle reconciliation.
-- Bounded per tick by `LIMIT_ORDER_CANDLE_RECONCILIATION_CANDLE_BATCH_SIZE`
-  and `..._ORDER_BATCH_SIZE`. The scan starts at the DURABLE watermark in
-  `limit_order_reconciliation_checkpoints`, **not** at `now - lookbackMs`: a
-  sliding window silently lost any candle that stayed unprocessed longer than
-  the lookback. `..._LOOKBACK_MS` now only bounds bootstrap catch-up and
-  raises an operational warning; it never drops an unprocessed candle.
-- A candle that fails is enqueued in `limit_order_deferred_candles` BEFORE the
-  watermark passes it, and retried with bounded exponential backoff, so one
-  asset's transient failure delays one candle instead of blocking every later
-  candle. Each row records `candle_ingest_seq`: a corrected higher revision
-  reactivates even a permanent row and replaces its asset/window metadata,
-  while a late lower revision cannot overwrite it. The retry stage runs FIRST
-  each tick, so the oldest unfinished work is never starved by a busy live
-  stream.
-- Enabled by `LIMIT_ORDER_CANDLE_RECONCILIATION_ENABLED=true`, which also flips
-  `OpsSchedulerConfig.enabled` on. It requires
-  `LIMIT_ORDER_AUTO_EXECUTION_ENABLED=true`; enabling it alone fails startup.
-  Startup additionally verifies the RUNNER exists — the scheduler enabled AND
-  this job enabled in the resolved Ops config — because an enabled-but-
-  unscheduled safety net would have its own health gate report a stale sweep
-  and block every new limit order while nothing was wrong with the market.
-- `resultJson` carries `scannedCandles / processedCandles / skippedCandles /
-  matchedOrders / deferredCandles / retriedCandles / recoveredCandles /
-  permanentCandles`, the swept window, the current watermark, and
-  `gapDetected` / `degradedReason`, plus `rowScanSucceeded` and a separate
-  `windowCompletion` result (`succeeded`, assets/windows/gaps, error), and
-  `assetGapsDetected` — how many ASSETS this run recorded a retention gap for.
-  `lastSuccessfulRunAt` is row-scan liveness only; completion has its own
-  run/success/error/consecutive-failure fields. A failed latest completion
-  blocks new limit Quote/Create immediately even when row scan keeps
-  succeeding. Ordinary deferred/permanent health is asset-scoped; only the
-  documented emergency total backlog is global.
-- `gapDetected` is now GLOBAL scope only (the shared market-time watermark
-  behind retention). Findings that name one asset — a deferred entry whose
-  candle row disappeared, an unscanned matchable candle past the horizon —
-  are recorded on that asset's `market_candle_finalization_checkpoints` row
-  and counted in `assetGapsDetected`, so one asset's data loss no longer stops
-  every other asset's new limit orders. Per-asset gap recording is bounded per
-  run by `LIMIT_ORDER_CANDLE_ASSET_GAP_BATCH_SIZE`; anything over the bound is
-  recorded on the next run and logged, never dropped.
-- The sweep additionally holds the shared limit-order event-boundary advisory
-  lock on a dedicated PostgreSQL session (see
-  `docs/limit-order-candle-reconciliation.md`), which is independent of the
-  Ops job lock: the Ops lock serializes JOB RUNS, the boundary serializes
-  matching decisions against limit-order creates and the path-A poller.
-- `limit_order_matcher` remains a dedicated long-running worker and is still
-  never scheduled on the tick.
+This Ops job belonged to the removed event-based limit-order matching layer
+(the path-B candle safety net). The job wiring, its config flags
+(`LIMIT_ORDER_CANDLE_RECONCILIATION_*`), and its state tables have been
+removed; the `OpsJobName` value remains only because PostgreSQL cannot drop
+enum values. Nothing schedules it.

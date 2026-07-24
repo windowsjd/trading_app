@@ -36,10 +36,6 @@ import { KisDomesticPeriodAdapter } from './kis/candles/kis-domestic-period.adap
 import { KisOverseasPeriodAdapter } from './kis/candles/kis-overseas-period.adapter';
 import { KisPeriodCandleNormalizerService } from './kis/candles/kis-period-candle-normalizer.service';
 import { BinanceCandleIngestionService } from './binance/binance-candle.ingestion.service';
-import { NormalizedProviderTradeEventBus } from './normalized-provider-trade-event-bus.service';
-import { ProviderTradeReadinessPublisher } from './provider-trade-readiness.publisher';
-import { ProviderTradeReadinessStore } from './provider-trade-readiness.store';
-import { ProviderTradeRouteRegistry } from './provider-trade-route.registry';
 
 @Module({
   imports: [PrismaModule, RedisModule],
@@ -95,10 +91,6 @@ import { ProviderTradeRouteRegistry } from './provider-trade-route.registry';
     KisWebSocketStreamingService,
     ProviderTargetResolverService,
     MarketSnapshotHealthService,
-    NormalizedProviderTradeEventBus,
-    ProviderTradeRouteRegistry,
-    ProviderTradeReadinessStore,
-    ProviderTradeReadinessPublisher,
   ],
   exports: [
     ProviderConfigService,
@@ -132,10 +124,6 @@ import { ProviderTradeRouteRegistry } from './provider-trade-route.registry';
     KisRequestCoordinatorService,
     ProviderTargetResolverService,
     MarketSnapshotHealthService,
-    NormalizedProviderTradeEventBus,
-    ProviderTradeRouteRegistry,
-    ProviderTradeReadinessStore,
-    ProviderTradeReadinessPublisher,
   ],
 })
 export class ProvidersModule {}

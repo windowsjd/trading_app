@@ -3,7 +3,6 @@ import {
   Logger,
   OnModuleDestroy,
   OnModuleInit,
-  Optional,
 } from '@nestjs/common';
 import { readLiveCandleConfig } from '../../assets/live-candle.config';
 import {
@@ -11,8 +10,6 @@ import {
   type ProviderConfig,
 } from '../provider-config.service';
 import { ProviderConfigError, ProviderHttpError } from '../provider.types';
-import { NormalizedProviderTradeEventBus } from '../normalized-provider-trade-event-bus.service';
-import { ProviderTradeRouteRegistry } from '../provider-trade-route.registry';
 import { KisAuthClient } from './kis-auth.client';
 import {
   KisRealtimePriceCacheService,
@@ -97,7 +94,6 @@ export class KisWebSocketStreamingService
   private heartbeatTimer: NodeJS.Timeout | null = null;
   private connectPromise: Promise<void> | null = null;
   private readonly pendingMessages = new Set<Promise<void>>();
-  private tradeProcessingTail: Promise<void> = Promise.resolve();
   private reconnectAttempt = 0;
   private stopping = false;
 
@@ -138,10 +134,6 @@ export class KisWebSocketStreamingService
     private readonly ingestionService: KisWebSocketIngestionService,
     private readonly latestPriceCache: KisRealtimePriceCacheService,
     private readonly realtimePriceEventBus: KisRealtimePriceEventBus,
-    @Optional()
-    private readonly normalizedTradeEventBus?: NormalizedProviderTradeEventBus,
-    @Optional()
-    private readonly tradeRoutes?: ProviderTradeRouteRegistry,
   ) {}
 
   onModuleInit(): void {
@@ -158,14 +150,7 @@ export class KisWebSocketStreamingService
     }
 
     const liveCandles = readLiveCandleConfig();
-    // Exactly one canonical KIS connection per process. The live-candle
-    // supervisor owns it whenever live candles are on; this legacy service
-    // then neither connects nor publishes normalized trades, so no duplicate
-    // socket and no duplicate exact-trade event can exist.
-    if (
-      (liveCandles.enabled && liveCandles.kisEnabled) ||
-      this.tradeRoutes?.claimProvider('kis', 'legacy_streaming') === false
-    ) {
+    if (liveCandles.enabled && liveCandles.kisEnabled) {
       this.status.enabled = false;
       this.status.running = false;
       this.status.state = 'disabled';
@@ -200,7 +185,6 @@ export class KisWebSocketStreamingService
     this.socket = null;
     this.approvalKey = null;
     this.targets = [];
-    this.tradeRoutes?.releaseProvider('kis', 'legacy_streaming');
     this.markDisconnected();
     this.status.state = this.status.enabled ? 'stopped' : 'disabled';
   }
@@ -455,83 +439,35 @@ export class KisWebSocketStreamingService
       }
       return;
     }
-    const processParsedMessage = async (): Promise<void> => {
-      const cacheEntries = this.updateLatestCache(parsed);
-      const result = await this.ingestionService.ingestParsedMessage(parsed, {
-        dryRun: false,
-        requestedBy: 'kis-websocket-streaming',
-        secrets: [input.approvalKey],
-      });
+    const cacheEntries = this.updateLatestCache(parsed);
+    const result = await this.ingestionService.ingestParsedMessage(parsed, {
+      dryRun: false,
+      requestedBy: 'kis-websocket-streaming',
+      secrets: [input.approvalKey],
+    });
 
-      this.status.acknowledged += result.acknowledged;
-      this.status.created += result.created;
-      this.status.skipped += result.skipped;
-      this.status.failed += result.failed;
-      if (result.created > 0) {
-        this.status.lastSnapshotAt = receivedAt.toISOString();
-      }
-      if (result.errorCode) {
-        this.recordError(
-          result.errorCode,
-          result.errorMessage ?? result.errorCode,
-        );
-      }
-
-      this.publishLatestPriceEvents(cacheEntries, result.snapshots);
-      if (parsed.state === 'trades') {
-        parsed.trades.forEach((trade, index) => {
-          const assetId = result.snapshots[index]?.assetId;
-          if (!assetId) return;
-          const providerEventAt =
-            trade.exchangeTimestamp ??
-            trade.sourceTimestamp ??
-            trade.receivedAt;
-          // Never a duplicate publisher: if the live-candle supervisor owns
-          // the KIS route, that connection is the only exact-trade source.
-          if (this.tradeRoutes?.isOwnedBy('kis', 'legacy_streaming') === false)
-            return;
-          this.normalizedTradeEventBus?.publish({
-            provider: 'kis',
-            providerEventId: trade.eventId,
-            providerSequence: trade.sequence,
-            providerConnectionId: null,
-            assetId,
-            symbol: trade.symbol,
-            providerSymbol: trade.providerSymbol,
-            price: trade.price,
-            currencyCode:
-              trade.kind === 'domestic_krx_realtime_trade' ? 'KRW' : 'USD',
-            providerEventAt: providerEventAt.toISOString(),
-            receivedAt: trade.receivedAt.toISOString(),
-            sourceName:
-              trade.kind === 'domestic_krx_realtime_trade'
-                ? 'kis_krx_realtime_trade'
-                : 'kis_us_delayed_trade',
-            marketSessionCode: trade.marketSessionCode,
-            eventType: 'trade',
-          });
-        });
-      }
-
-      if (parsed.state === 'failed') {
-        this.recordError(parsed.reason, parsed.message);
-        if (parsed.reason === 'KIS_SUBSCRIPTION_ACK_FAILED') {
-          this.socket?.close(1011, 'subscription ack failed');
-        }
-      }
-    };
-
-    if (parsed.state === 'trades') {
-      await this.enqueueTradeProcessing(processParsedMessage);
-    } else {
-      await processParsedMessage();
+    this.status.acknowledged += result.acknowledged;
+    this.status.created += result.created;
+    this.status.skipped += result.skipped;
+    this.status.failed += result.failed;
+    if (result.created > 0) {
+      this.status.lastSnapshotAt = receivedAt.toISOString();
     }
-  }
+    if (result.errorCode) {
+      this.recordError(
+        result.errorCode,
+        result.errorMessage ?? result.errorCode,
+      );
+    }
 
-  private enqueueTradeProcessing(task: () => Promise<void>): Promise<void> {
-    const processing = this.tradeProcessingTail.then(task);
-    this.tradeProcessingTail = processing.catch(() => undefined);
-    return processing;
+    this.publishLatestPriceEvents(cacheEntries, result.snapshots);
+
+    if (parsed.state === 'failed') {
+      this.recordError(parsed.reason, parsed.message);
+      if (parsed.reason === 'KIS_SUBSCRIPTION_ACK_FAILED') {
+        this.socket?.close(1011, 'subscription ack failed');
+      }
+    }
   }
 
   private updateLatestCache(

@@ -36,11 +36,13 @@ This service owns backend APIs, database access, financial calculations, and ser
 - Season settlement freezes valuation at `Season.endAt`, uses the latest valid price and USD/KRW rows with `effectiveAt <= Season.endAt` without enforcing quote/execute freshness windows, writes final `equity_snapshots`, creates `rankType=final` rankings, assigns final tiers, and changes the season to `settled` only after final rank and tier readiness checks pass. Reward payout remains pending/unimplemented.
 - Market holidays are configured in `src/orders/market-holidays.config.ts`; domestic/US stock quote/create/execute return `MARKET_CLOSED` on configured holidays, while crypto orders and FX are not holiday-blocked.
 
-### Limit buy orders (phase 1 reservation + phase 2 path A + phase 3 path B, flags off by default)
+### Limit buy orders (registration + reservation; automatic execution NOT implemented)
 
 Limit BUY registration exists behind `LIMIT_ORDER_ENABLED` (default false).
-Automatic live-trade matching is independently controlled by
-`LIMIT_ORDER_AUTO_EXECUTION_ENABLED` (default false):
+**There is no automatic execution**: a submitted limit order changes state
+only through user cancel or season/exclusion cleanup. The former event-based
+matching layer (Redis Stream matcher, "path A/B") has been removed; a
+scheduler-based matching implementation is planned as separate work.
 
 - Quote/create register a full-quantity GTC-style limit BUY as
   `status=submitted` and atomically reserve `gross + fee` cash
@@ -54,10 +56,15 @@ Automatic live-trade matching is independently controlled by
   create cannot move the user's reservation.
 - `grossAmount` / `feeAmount` / `netAmount` / `executedPrice` /
   `executedAt` mean ACTUAL fill result and are **null** while a limit order is
-  `submitted` or after it is `canceled`; path A populates them only after a
-  real live-trade fill.
-  An unfilled order's money is `reservedAmount` (a reservation, not a fill)
-  plus `reservationFeeRate`. Market order amounts are unchanged.
+  `submitted` or after it is `canceled`. With no execution path, they stay
+  null for every limit order today. An unfilled order's money is
+  `reservedAmount` (a reservation, not a fill) plus `reservationFeeRate`.
+  Market order amounts are unchanged.
+- Registration completes against **PostgreSQL alone**. The validation surface
+  is season, participant, asset, market session, quote, and wallet — Redis or
+  provider WebSocket state never gates a limit quote/create, and an
+  unreachable Redis does not block registration (covered by an integration
+  test).
 - Create re-validates the season and the participant against rows locked
   inside its own transaction (`Quote FOR UPDATE → SeasonParticipant FOR
 SHARE → Season FOR SHARE → CashWallet`), so a concurrent participant
@@ -67,100 +74,30 @@ SHARE → Season FOR SHARE → CashWallet`), so a concurrent participant
 - Create reads `clock_timestamp()` only after Quote, Participant, and Season
   locks, then rechecks Quote TTL, season bounds, and stock market session.
   The resulting DB time is used for submitted/created/updated timestamps.
-- With auto execution off, the order remains reservation-only. With it on,
-  normalized KIS/Binance trade ticks are durably XADDed to a Redis Stream and
-  one PostgreSQL-advisory-lock leader full-fills eligible buys at the actual
-  event price. It is not latest-price polling, and never calls an external
-  order API. See
-  [docs/limit-order-live-matching-operations.md](docs/limit-order-live-matching-operations.md).
-- Create, the path-A poller and the path-B candle worker share one PostgreSQL
-  advisory **event-boundary mutex**, so an event XADDed between Create's
-  activation-cursor read and its commit can never be processed-and-ACKed while
-  the order is still invisible. Activation ordering uses the Redis Stream ID
-  alone — never a PostgreSQL-vs-Node timestamp comparison, which used to drop
-  valid events on clock skew.
-- `LIMIT_ORDER_CANDLE_RECONCILIATION_ENABLED` (default false, requires auto
-  execution) adds **path B**: a confirmed 5-minute candle safety net for
-  events that never reached the stream. It fills at the ORDER'S LIMIT PRICE —
-  never at the candle low, which is only evidence the limit was touched — skips
-  the partially elapsed candle an order was submitted into, and never fills
-  retroactively after a season ends. See
-  [docs/limit-order-candle-reconciliation.md](docs/limit-order-candle-reconciliation.md).
-- When live candles own a provider, that same connection is the canonical
-  exact-trade source (KIS shares one parse; Binance rides `@trade` beside
-  `@kline_5m` on one socket), so live candles and automatic matching are no
-  longer mutually exclusive. New limit quote/create additionally require the
-  REQUESTED ASSET to be subscribed and acknowledged on the current connection
-  generation.
-- `LIMIT_ORDER_SHARED_READINESS_ENABLED` (default false, requires auto
-  execution, Redis, and the live-candle supervisor as socket owner) shares that
-  per-asset readiness ACROSS instances. The route registry is per-process
-  memory, so without it the socket-owning pod accepts a limit order the other
-  pods reject — the same request succeeding or failing based on which instance
-  the load balancer picked. Publishing rights are derived from the REAL
-  provider owner lease (the supervisor's Redis lock) exchanged for a monotonic
-  fencing epoch and re-verified inside Redis on every write, so a process that
-  merely looks like an owner locally — or lost its lease — cannot publish, and
-  a replaced owner cannot overwrite its successor whatever its clock says.
-  Shared reads are fenced too: one Lua call checks meta, the live provider-owner
-  lease, epoch-holder, current epoch, and generation-scoped asset record before
-  issuing a proof. Removing only the real lease therefore invalidates stale
-  meta immediately, even while its TTL remains. A publisher that loses or
-  rotates its lease compare-and-deletes only its own
-  `(ownerInstance, generation, fencingEpoch)` record; a late old-owner cleanup
-  cannot delete the successor. The owner publishes routing/liveness metadata
-  (never a credential, an approval
-  key, an access token, a raw frame, or the raw lease token) and every other
-  instance reads it. A non-owner instance completes the whole limit
-  Quote→Create against the shared view via a readiness PROOF re-verified
-  in-memory inside the create transaction. All failure modes are fail-closed.
-- Path B's scan position is a DURABLE watermark plus a durable deferred-retry
-  queue, not a sliding `now - lookback` window: a candle left unprocessed
-  longer than the lookback used to fall out of the window and never be examined
-  again. Candles the retention job removed before the sweep reached them are
-  reported as a sticky GAP that fails new limit registration closed rather than
-  being silently skipped. On top of the row scan, a per-asset WINDOW COMPLETION
-  cursor accounts for windows whose candle row never existed — telling
-  provider-confirmed no-trade apart from a feed/finalizer failure — and gates
-  ONLY the affected asset (`LIMIT_ORDER_CANDLE_ASSET_*` codes) while other
-  assets keep trading. The row-scan and window-completion success heartbeats
-  are durable and independent; the latest completion failure blocks
-  immediately even if an earlier success is still fresh. Create bootstraps the
-  asset completion checkpoint in the same transaction as the first path-B
-  order. Corrected candles are re-sequenced and reprocessed as a NEW revision:
-  the deferred row carries `candleIngestSeq`, a higher revision reactivates a
-  permanent row and replaces its asset/window metadata, and a late lower
-  revision is a no-op. Newly qualified orders fill once, executed orders are
-  untouched, and evidence rows are revision-scoped and immutable.
 - A committed limit Create is replayed before `LIMIT_ORDER_ENABLED`, before
-  the create-service wiring check, and before the provider, matcher, path-B,
-  season, and market-state gates — an emergency rollback or a partially wired
-  instance must not withhold a response the system already produced. The
-  lookup is keyed on the QUOTE (which is unique and consumed once), so its
-  scope equals a real database uniqueness constraint: the same
-  `idempotencyKey` reused in a later season resolves to that season's own
-  order instead of conflicting. A different request hash conflicts, another
-  user's order is never replayed, and a genuinely new quote still passes
-  through every current gate. Replay performs no write at all — no extra
-  order, no extra reservation.
-- Path-B retention findings are recorded at the blast radius they have. A
-  queue entry whose candle row disappeared and an unscanned matchable candle
-  past the retention horizon each name ONE asset and now gap only that asset
-  (`LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED`), with every affected asset
-  recorded in the same sweep; only the shared scan watermark falling behind
-  retention is still global.
-- Queue entries whose tracked candle revision was INFERRED by the earlier
-  revision backfill rather than observed are reopened for re-verification by
-  an additive migration, so a candle correction made before that backfill can
-  still be filled. Such an asset fails closed with
-  `LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED` until the sweep settles
-  it; an entry whose candle row is already gone stays parked for an operator.
+  the create-service wiring check, and before the season and market-state
+  gates — an emergency rollback or a partially wired instance must not
+  withhold a response the system already produced. The lookup is keyed on the
+  QUOTE (which is unique and consumed once), so its scope equals a real
+  database uniqueness constraint: the same `idempotencyKey` reused in a later
+  season resolves to that season's own order instead of conflicting. A
+  different request hash conflicts, another user's order is never replayed,
+  and a genuinely new quote still passes through every current gate. Replay
+  performs no write at all — no extra order, no extra reservation.
+- The quote/create responses keep the additive `executionPolicy` object for
+  API-shape stability; it always reports
+  `autoExecutionEnabled: false, mode: "reservation_only"` today.
 - Total-asset valuation keeps using the full `balanceAmount`; reservations
   never reduce it.
-- Cancel and lifecycle cleanup work even while either flag is off. When auto
-  matching is enabled but its DB heartbeat, Publisher subscription, matching
-  Redis Stream, or asset-specific KIS/Binance connection is unhealthy, only
-  new limit Quote/Create fail closed; market orders and FX remain available.
+- Cancel and lifecycle cleanup work even while the flag is off. Settlement is
+  blocked while a submitted limit order or a non-zero wallet reservation
+  exists.
+- The `limit_order_candle_evidences` table and
+  `orders.limit_order_candle_evidence_id` remain in the schema as the
+  closed-candle evidence model for the future matching implementation; no
+  code writes them today. The `OpsJobName` values `limit_order_matcher` /
+  `limit_order_candle_reconciliation` and the `OpsJobTrigger` value `worker`
+  are vestigial (PostgreSQL cannot drop enum values); nothing schedules them.
 - `LIMIT_ORDER_ENABLED` accepts exactly `true` / `false` / `1` / `0`
   (trimmed, case-insensitive); omitting it means false. Any other value —
   `yes`, `enabled`, `tru`, an explicitly empty string — **fails startup**
@@ -170,60 +107,34 @@ SHARE → Season FOR SHARE → CashWallet`), so a concurrent participant
   (`process.env.EXPO_PUBLIC_LIMIT_ORDER_ENABLED`) or the Expo bundler will
   not inline it and the flag always reads as unset.
 
-### Limit order PostgreSQL + Redis integration tests (opt-in)
+### Limit order PostgreSQL integration tests (opt-in)
 
 The limit-order suites that need a real PostgreSQL are gated behind one
 switch, so `pnpm test` stays database-free by default:
 
 ```bash
-LIMIT_ORDER_RESERVATION_DB_INTEGRATION=1 \
-LIMIT_ORDER_AUTO_EXECUTION_INTEGRATION=1 pnpm exec jest \
+LIMIT_ORDER_RESERVATION_DB_INTEGRATION=1 pnpm exec jest \
   src/orders/limit-order-reservation.integration.spec.ts \
   src/orders/limit-order-create-race.integration.spec.ts \
   src/orders/limit-order-transaction-time.integration.spec.ts \
-  src/orders/limit-order-auto-execution.integration.spec.ts
+  src/orders/limit-order-create-no-redis.integration.spec.ts
 ```
 
-The phase-3 hardening suites each have their own switch. The checkpoint and
-end-to-end runners need a **disposable** database (they reset the rebuildable
-path-B checkpoint and create/remove their own fixtures):
+The idempotent-replay suite has its own switch:
 
 ```bash
-LIMIT_ORDER_BOUNDARY_CONCURRENCY_INTEGRATION=1 \
-LIMIT_ORDER_CANDLE_CHECKPOINT_INTEGRATION=1 \
-LIMIT_ORDER_SHARED_READINESS_INTEGRATION=1 \
-LIMIT_ORDER_MATCHER_E2E_INTEGRATION=1 pnpm exec jest --runInBand \
-  src/orders/limit-matching/limit-order-boundary-concurrency.integration.spec.ts \
-  src/orders/limit-matching/limit-order-candle-checkpoint.integration.spec.ts \
-  src/providers/provider-trade-readiness.integration.spec.ts \
-  src/orders/limit-matching/limit-order-matcher-e2e.integration.spec.ts
+LIMIT_ORDER_IDEMPOTENT_REPLAY_INTEGRATION=1 pnpm exec jest \
+  src/orders/limit-order-idempotent-replay.integration.spec.ts
 ```
 
-### Two throughput numbers
-
-They differ by roughly an order of magnitude and must never be quoted for each
-other:
-
-| Command | Log event | Measures |
-| --- | --- | --- |
-| `pnpm run soak:limit-order-publisher-throughput` | `limit_order_publisher_throughput` | normalize + validate + XADD only |
-| `pnpm run soak:limit-order-matcher-e2e` | `limit_order_matcher_e2e_throughput` | XADD to XACK: the whole consumer path including the execution transaction |
-
-`pnpm run diagnose:limit-order-processed-events` prints exact dedupe-table
-capacity figures on demand; the matcher heartbeat itself only samples
-approximate ones, on a multi-minute interval.
-
 The race/time suites observe real PostgreSQL lock-wait state as a deterministic
-barrier. The Redis suite covers pending recovery, advisory-leader takeover,
-price improvement, actual wallet/position/equity/evidence writes, non-fill and
-durable duplicate-event handling. They require applied migrations and local
-PostgreSQL/Redis, create isolated fixture rows/keys, and clean only those rows.
-CI also enables the existing market-order, FX, and service-composed MVP DB
-smokes in this PostgreSQL 16 + Redis 7 job to guard adjacent flows. The same
-job deploys every migration, checks `prisma migrate status`, and fails on
-`prisma migrate diff --exit-code`; the candle-evidence composite unique name
-is pinned with Prisma `map:` so PostgreSQL's deployed truncated identifier is
-not reported as drift.
+barrier; the no-Redis suite points `REDIS_URL` at an unreachable port and
+proves quote/create/cancel still succeed. They require applied migrations and a
+local PostgreSQL, create isolated fixture rows, and clean only those rows. CI
+also enables the existing market-order, FX, and service-composed MVP DB smokes
+in the same PostgreSQL 16 + Redis 7 job to guard adjacent flows. The job
+deploys every migration, checks `prisma migrate status`, and fails on
+`prisma migrate diff --exit-code`.
 
 ## STOP / Not Implemented
 
@@ -239,8 +150,9 @@ These are intentionally outside the current implementation and should not be add
 - External payment, point, coupon, gifticon, delivery, cash-out, or provider-backed reward fulfillment. App-internal operator/admin reward fulfillment creates `SeasonReward` rows only when fulfilled.
 - Access token blacklist/revocation, server-side session auth, and cookie auth.
 - Limit sells, partial fills, order-book/volume allocation, historical
-  missed-touch repair, candle-based path B matching, or a public/manual limit
-  execute endpoint.
+  missed-touch repair, automatic limit-order execution (event-based or
+  otherwise — a scheduler-based implementation is planned separately), or a
+  public/manual limit execute endpoint.
 - Fake, static, sample, temporary, or fallback business price data.
 
 ## Environment Variables
@@ -332,11 +244,9 @@ SCHEDULER_PROVIDER_BINANCE_ENABLED=false
 ```
 
 The streaming service subscribes on one connection to public Spot
-`<symbol>@ticker` streams for display/snapshot behavior and `<symbol>@trade`
-streams for the disabled-by-default limit matcher publisher. Tickers update the
+`<symbol>@ticker` streams for display/snapshot behavior. Tickers update the
 in-memory latest-price cache, publish `/api/v1/ws` `asset_ticker` updates, and
-write throttled display `asset_price_snapshots`; exact trade messages do not
-enter that throttled path. The connection uses backoff, reconnects before
+write throttled display `asset_price_snapshots`. The connection uses backoff, reconnects before
 Binance's 24-hour limit, responds to ping with pong, and resubscribes. REST
 24hr ticker ingestion remains fallback/manual/debug behavior and should not be
 the default real-time path while streaming is enabled.
@@ -443,8 +353,9 @@ CI: `.github/workflows/ci.yml` gates every PR and `main` push with four jobs —
 `pnpm run format:candles:check`, `pnpm run typecheck`, `pnpm run build`,
 `pnpm test`), **Frontend quality** (`npm run typecheck`, `npm test`; the Expo
 app has no build script — typecheck is the compile gate), **Limit order
-PostgreSQL + Redis integration** (migrations, reservation/time/race/path-A and
-market-order/FX/MVP regression smokes), and **Candle fixture integration**
+PostgreSQL integration** (migrations, reservation/time/race/no-Redis
+registration/idempotent replay and market-order/FX/MVP regression smokes),
+and **Candle fixture integration**
 (PostgreSQL+Redis services, `prisma migrate deploy`, fixture smoke with commit
 and dirty-tree verification). The candle layer is the required lint/format
 gate; repository-wide lint debt outside it is known and not yet gated. Long

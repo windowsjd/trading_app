@@ -3,10 +3,6 @@ import {
   readMarketCandleReconciliationConfig,
   type MarketCandleReconciliationConfig,
 } from '../assets/market-candle-reconciliation.config';
-import {
-  readLimitOrderCandleReconciliationConfig,
-  type LimitOrderCandleReconciliationConfig,
-} from '../orders/limit-matching/limit-order-candle-reconciliation.config';
 
 export type ProviderOpsJobName =
   | typeof OpsJobName.provider_fx_ingest
@@ -35,7 +31,6 @@ export type OpsSchedulerConfig = {
     runOnStartup: boolean;
   };
   marketCandleReconciliation: MarketCandleReconciliationConfig;
-  limitOrderCandleReconciliation: LimitOrderCandleReconciliationConfig;
 };
 
 export class OpsConfigError extends Error {
@@ -62,8 +57,6 @@ export function getOpsSchedulerConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): OpsSchedulerConfig {
   const marketCandleReconciliation = readMarketCandleReconciliationConfig(env);
-  const limitOrderCandleReconciliation =
-    readLimitOrderCandleReconciliationConfig(env);
   const rankingEnabled = parseBooleanEnv(
     env.SCHEDULER_RANKING_ENABLED ?? env.ENABLE_RANKING_SCHEDULER,
     false,
@@ -137,8 +130,7 @@ export function getOpsSchedulerConfig(
       providerBinanceEnabled ||
       providerKisEnabled ||
       retentionEnabled ||
-      marketCandleReconciliation.enabled ||
-      limitOrderCandleReconciliation.enabled,
+      marketCandleReconciliation.enabled,
     timezone: parseTextEnv(env.SCHEDULER_TIMEZONE, DEFAULT_TIMEZONE),
     lockTtlSeconds: parsePositiveIntegerEnv(
       env.SCHEDULER_LOCK_TTL_SECONDS,
@@ -170,11 +162,10 @@ export function getOpsSchedulerConfig(
       [OpsJobName.market_candle_sync]: false,
       [OpsJobName.market_candle_reconciliation]:
         marketCandleReconciliation.enabled,
-      // Dedicated long-running poller; never scheduled on the 60s Ops tick.
+      // Vestigial DB enum values from the removed automatic-matching layer
+      // (PostgreSQL cannot drop enum values). Never scheduled.
       [OpsJobName.limit_order_matcher]: false,
-      // Path-B safety net: reuses the ordinary 60s tick, default off.
-      [OpsJobName.limit_order_candle_reconciliation]:
-        limitOrderCandleReconciliation.enabled,
+      [OpsJobName.limit_order_candle_reconciliation]: false,
     },
     providerIntervalsSeconds: {
       [OpsJobName.provider_fx_ingest]: parsePositiveIntegerEnv(
@@ -205,7 +196,6 @@ export function getOpsSchedulerConfig(
       runOnStartup: retentionRunOnStartup,
     },
     marketCandleReconciliation,
-    limitOrderCandleReconciliation,
   };
 }
 

@@ -21,12 +21,6 @@ export type BinanceWebSocketParsedTicker = {
   receivedAt: Date;
 };
 
-export type BinanceWebSocketParsedTrade = {
-  state: 'trade';
-  trade: BinanceWebSocketTrade;
-  receivedAt: Date;
-};
-
 export type BinanceWebSocketParsedSkipped = {
   state: 'skipped';
   reason: string;
@@ -46,7 +40,6 @@ export type BinanceWebSocketParsedMessage =
   | BinanceWebSocketParsedAck
   | BinanceWebSocketParsedServerShutdown
   | BinanceWebSocketParsedTicker
-  | BinanceWebSocketParsedTrade
   | BinanceWebSocketParsedSkipped
   | BinanceWebSocketParsedFailed;
 
@@ -62,16 +55,6 @@ export type BinanceWebSocketTicker = {
   effectiveAt: Date;
   receivedAt: Date;
   rawPayload: unknown;
-};
-
-export type BinanceWebSocketTrade = {
-  providerSymbol: string;
-  streamName: string | null;
-  tradeId: string;
-  price: string;
-  currencyCode: CurrencyCode;
-  sourceTimestamp: Date;
-  receivedAt: Date;
 };
 
 export type BinanceWebSocketTickerSummary = {

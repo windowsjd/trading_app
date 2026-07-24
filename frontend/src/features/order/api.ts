@@ -14,40 +14,22 @@ import type { AssetType, CurrencyCode } from '../market/api';
 export type OrderSide = 'buy' | 'sell';
 export type OrderTypeDto = 'market' | 'limit';
 
+/**
+ * Server-authoritative execution policy. Automatic execution is not
+ * implemented on the backend, so this always reports
+ * `autoExecutionEnabled: false` / `mode: 'reservation_only'` today; the field
+ * stays so the copy keeps following the server rather than a client flag.
+ */
 export interface LimitOrderExecutionPolicyDto {
   autoExecutionEnabled: boolean;
   mode: 'live_trade_event' | 'reservation_only';
   triggerType: 'provider_trade_price' | null;
   fullFillOnly: boolean;
-  /**
-   * Additive path-B disclosure. The confirmed 5-minute candle safety net only
-   * ever fills AT THE LIMIT PRICE — the candle low is evidence that the limit
-   * was touched, never the price the user gets.
-   */
   liveTradeMatchingEnabled?: boolean;
   candleReconciliationEnabled?: boolean;
   candleInterval?: '5m' | null;
   candleExecutionPricePolicy?: 'limit_price' | null;
 }
-
-/**
- * Path-B trigger evidence attached to a safety-net fill.
- * triggerLowPrice is the confirmed 5m low that PROVED the limit was reached;
- * it is never the executed price.
- */
-export interface LimitOrderCandleEvidenceDto {
-  marketCandleId: string;
-  interval: string;
-  openTime: IsoDateTimeString;
-  closeTime: IsoDateTimeString;
-  triggerLowPrice: MoneyString;
-  executionPricePolicy: string;
-}
-
-export type OrderMatchingSource =
-  | 'live_trade_event'
-  | 'closed_5m_candle'
-  | (string & {});
 
 export interface OrderQuoteRequestDto {
   assetId: string;
@@ -148,8 +130,9 @@ export interface CreatedOrderDto {
   currencyCode?: CurrencyCode;
   /**
    * ACTUAL execution result. Null until the order really fills — a submitted
-   * or canceled limit order always has all three null, because phase 1 has no
-   * matching engine. Never render these as an unfilled order's amounts.
+   * or canceled limit order always has these null, and with no automatic
+   * matching implemented they stay null for every limit order today. Never
+   * render these as an unfilled order's amounts.
    */
   grossAmount?: MoneyString | null;
   feeAmount?: MoneyString | null;
@@ -160,11 +143,6 @@ export interface CreatedOrderDto {
   reservedAmount?: MoneyString | null;
   reservationReleasedAt?: IsoDateTimeString | null;
   cancelReason?: string | null;
-  /** Which automatic path filled the order (null while unfilled). */
-  matchingSource?: OrderMatchingSource | null;
-  matchedAt?: IsoDateTimeString | null;
-  triggerEventAt?: IsoDateTimeString | null;
-  candleEvidence?: LimitOrderCandleEvidenceDto | null;
   submittedAt?: IsoDateTimeString;
   createdAt?: IsoDateTimeString;
 }
@@ -172,8 +150,8 @@ export interface CreatedOrderDto {
 export type OrderExecutionState =
   | 'executed'
   | 'already_executed'
-  // A limit buy is registered unfilled; a later path-A event may transition
-  // it to executed, while Create itself returns submitted.
+  // A limit buy is registered unfilled; Create returns submitted and nothing
+  // fills it automatically today.
   | 'submitted'
   | (string & {});
 

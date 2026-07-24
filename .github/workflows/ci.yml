@@ -88,7 +88,7 @@ jobs:
         run: npm test
 
   limit-order-db-integration:
-    name: Limit order PostgreSQL + Redis integration
+    name: Limit order PostgreSQL integration
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -117,45 +117,10 @@ jobs:
       DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/trading_app?schema=public
       REDIS_URL: redis://localhost:6379
       # Opt-in switch for the limit-order suites that need a real database.
+      # (Automatic matching is not implemented; only the money-layer suites
+      # remain: reservation atomicity, deterministic races, post-lock time
+      # boundaries, no-Redis registration, and idempotent create replay.)
       LIMIT_ORDER_RESERVATION_DB_INTEGRATION: "1"
-      LIMIT_ORDER_AUTO_EXECUTION_INTEGRATION: "1"
-      LIMIT_ORDER_PHASE3_INTEGRATION: "1"
-      # Event-boundary concurrency: two concurrent acquireSession() calls on
-      # ONE service instance must serialize on a real advisory lock.
-      LIMIT_ORDER_BOUNDARY_CONCURRENCY_INTEGRATION: "1"
-      # Path-B durable checkpoint: a candle unprocessed for longer than the
-      # lookback must still be processed, a candle STORED after the market-time
-      # marker passed its window must still be processed (the storage-order
-      # scan position), a retention gap must be detected, WINDOW COMPLETION
-      # must tell provider-confirmed no-trade from a missing feed and stall
-      # only the affected asset, and a corrected candle must be reprocessed as
-      # a new revision without double fills.
-      LIMIT_ORDER_CANDLE_CHECKPOINT_INTEGRATION: "1"
-      # Multi-instance shared readiness over a real Redis + PostgreSQL:
-      # lease-derived owner fencing (a publisher without the REAL provider
-      # owner lease cannot publish), clock-skew-immune takeover, and the whole
-      # non-owner Quote->Create financial flow down to the reservation.
-      LIMIT_ORDER_SHARED_READINESS_INTEGRATION: "1"
-      # End-to-end matcher (XADD -> XACK). Reduced volume; only
-      # hardware-independent invariants are asserted, never a throughput rate.
-      LIMIT_ORDER_MATCHER_E2E_INTEGRATION: "1"
-      # EXISTING-DATABASE UPGRADE. Creates its own scratch database on the same
-      # server and deploys migrations in stages, so the pre-fix intermediate
-      # state (a PERMANENT deferred entry stamped with a candle revision it
-      # never processed) is reproduced rather than simulated, and the recovery
-      # is driven through the real sweep. Also covers CLOCK SKEW between the
-      # application and database clocks: legacy rows whose created_at sits in
-      # the DB future (application clock ahead) escaped the created_at-boundary
-      # provenance migration and are recovered by the clock-independent
-      # re-verification migration; verified modern rows stay untouched. And
-      # covers the PROVENANCE INVARIANTS: invalid rows (an unverified
-      # 'current', a legacy_orphan carrying an unearned verification stamp)
-      # are conservatively repaired, the DB CHECK constraint rejects every
-      # invalid shape and accepts every valid one, an unverified entry never
-      # suppresses the forward scan nor passes the health gate, and only a
-      # runtime-VERIFIED entry keeps suppressing its tracked revision. This is
-      # the one path-B property a fully-migrated database cannot express.
-      LIMIT_ORDER_LEGACY_DEFERRED_MIGRATION_INTEGRATION: "1"
       # Idempotent replay of a COMMITTED limit create: ahead of the feature
       # flag and the create-service wiring, resolving to the caller's own order
       # even when the same key was reused in another season, and never
@@ -180,9 +145,9 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Prisma generate
         run: pnpm exec prisma generate
-      # Also proves every migration — including the additive path-A event,
-      # evidence, worker-trigger, and FIFO-index migrations — applies cleanly
-      # to a fresh database.
+      # Also proves every migration — including the additive event-layer
+      # migrations and the cleanup migration that removes that layer again —
+      # applies cleanly to a fresh database.
       - name: Apply migrations
         run: pnpm exec prisma migrate deploy
       - name: Verify migrations are fully applied
@@ -197,34 +162,17 @@ jobs:
           --to-schema prisma/schema.prisma
           --exit-code
       # Reservation atomicity, deterministic lock interleavings, post-lock DB
-      # time boundaries, the live-trade Redis Stream matcher (path A: pending
-      # recovery, leader takeover, accounting, event dedupe, stream-ID
-      # ordering under clock skew), and phase 3 (event-boundary mutex in both
-      # interleavings, path-B confirmed-candle matching, A/B and lifecycle
-      # races, health gate, and a reduced synthetic PUBLISHER throughput
-      # sweep), plus the hardening suites: event-boundary concurrency
-      # (session-per-lease, proven through pg_locks), the path-B durable
-      # checkpoint including its STORAGE-order scan position (a candle stored
-      # after the market-time marker passed its window is still swept) and
-      # retention-gap detection, cross-instance shared readiness over Redis
-      # (the non-owner create readiness path and owner fencing), and the
-      # END-TO-END matcher path (XADD to XACK, which is a different and much
-      # lower number than publisher XADD throughput and must never be quoted
-      # for it; CI gates the arithmetic, never the rate).
-      - name: Limit order PostgreSQL + Redis integration tests
+      # time boundaries, no-Redis limit registration, and idempotent create
+      # replay — the money layer that remains now that automatic matching has
+      # been removed.
+      - name: Limit order PostgreSQL integration tests
         run: >-
           pnpm exec jest --runInBand
           src/orders/limit-order-reservation.integration.spec.ts
           src/orders/limit-order-create-race.integration.spec.ts
           src/orders/limit-order-transaction-time.integration.spec.ts
-          src/orders/limit-order-auto-execution.integration.spec.ts
-          src/orders/limit-order-phase3.integration.spec.ts
-          src/orders/limit-matching/limit-order-boundary-concurrency.integration.spec.ts
-          src/orders/limit-matching/limit-order-candle-checkpoint.integration.spec.ts
-          src/orders/limit-matching/limit-order-legacy-deferred-migration.integration.spec.ts
+          src/orders/limit-order-create-no-redis.integration.spec.ts
           src/orders/limit-order-idempotent-replay.integration.spec.ts
-          src/orders/limit-matching/limit-order-matcher-e2e.integration.spec.ts
-          src/providers/provider-trade-readiness.integration.spec.ts
           src/orders/orders.execute.integration.spec.ts
           src/fx/fx.execute.integration.spec.ts
           src/mvp-flow.integration.spec.ts
@@ -291,15 +239,6 @@ jobs:
           cat "$RUNNER_TEMP/pre-fixtures.txt"
       - name: Run release fixture smoke (no provider credentials)
         run: CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm run smoke:candle-fixture
-      # Path-B candle eligibility against real canonical closed 5m rows written
-      # by the fixture pipeline: confirmed candle accepted, incomplete/open
-      # candle excluded, evidence recorded, executed price = limit price.
-      - name: Path-B candle eligibility fixture checks
-        run: >-
-          LIMIT_ORDER_AUTO_EXECUTION_ENABLED=true
-          LIMIT_ORDER_CANDLE_RECONCILIATION_ENABLED=true
-          LIMIT_ORDER_CANDLE_FIXTURE_SMOKE=1
-          pnpm run smoke:limit-order-candle-fixture
       # Identify exactly the fixture JSON this run produced (files not present at
       # checkout). Runs on success and failure so a smoke that wrote a report
       # before failing still yields one debuggable file — but never falls back

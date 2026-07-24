@@ -51,12 +51,6 @@ jest.mock('../assets/market-candle-retention.service', () => ({
 jest.mock('../assets/market-candle-sync.service', () => ({
   MarketCandleSyncService: class MarketCandleSyncService {},
 }));
-jest.mock(
-  '../orders/limit-matching/limit-order-candle-reconciliation.service',
-  () => ({
-    LimitOrderCandleReconciliationService: class LimitOrderCandleReconciliationService {},
-  }),
-);
 jest.mock('../assets/market-candle-reconciliation.service', () => ({
   MarketCandleReconciliationService: class MarketCandleReconciliationService {},
 }));

@@ -163,32 +163,7 @@ export type OpsJobRun = Prisma.OpsJobRunModel
  */
 export type OpsJobLock = Prisma.OpsJobLockModel
 /**
- * Model LimitOrderProcessedEvent
- * 
- */
-export type LimitOrderProcessedEvent = Prisma.LimitOrderProcessedEventModel
-/**
  * Model LimitOrderCandleEvidence
  * 
  */
 export type LimitOrderCandleEvidence = Prisma.LimitOrderCandleEvidenceModel
-/**
- * Model LimitOrderProcessedCandle
- * 
- */
-export type LimitOrderProcessedCandle = Prisma.LimitOrderProcessedCandleModel
-/**
- * Model MarketCandleFinalizationCheckpoint
- * 
- */
-export type MarketCandleFinalizationCheckpoint = Prisma.MarketCandleFinalizationCheckpointModel
-/**
- * Model LimitOrderReconciliationCheckpoint
- * 
- */
-export type LimitOrderReconciliationCheckpoint = Prisma.LimitOrderReconciliationCheckpointModel
-/**
- * Model LimitOrderDeferredCandle
- * 
- */
-export type LimitOrderDeferredCandle = Prisma.LimitOrderDeferredCandleModel

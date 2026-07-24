@@ -80,12 +80,7 @@ export const ModelName = {
   BatchJobRun: 'BatchJobRun',
   OpsJobRun: 'OpsJobRun',
   OpsJobLock: 'OpsJobLock',
-  LimitOrderProcessedEvent: 'LimitOrderProcessedEvent',
-  LimitOrderCandleEvidence: 'LimitOrderCandleEvidence',
-  LimitOrderProcessedCandle: 'LimitOrderProcessedCandle',
-  MarketCandleFinalizationCheckpoint: 'MarketCandleFinalizationCheckpoint',
-  LimitOrderReconciliationCheckpoint: 'LimitOrderReconciliationCheckpoint',
-  LimitOrderDeferredCandle: 'LimitOrderDeferredCandle'
+  LimitOrderCandleEvidence: 'LimitOrderCandleEvidence'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -306,9 +301,7 @@ export const AssetPriceSnapshotScalarFieldEnum = {
   capturedAt: 'capturedAt',
   createdAt: 'createdAt',
   rawPayloadJson: 'rawPayloadJson',
-  note: 'note',
-  providerEventKey: 'providerEventKey',
-  providerEventAt: 'providerEventAt'
+  note: 'note'
 } as const
 
 export type AssetPriceSnapshotScalarFieldEnum = (typeof AssetPriceSnapshotScalarFieldEnum)[keyof typeof AssetPriceSnapshotScalarFieldEnum]
@@ -349,8 +342,6 @@ export const MarketCandleScalarFieldEnum = {
   isClosed: 'isClosed',
   sourceProvider: 'sourceProvider',
   sourceUpdatedAt: 'sourceUpdatedAt',
-  ingestSeq: 'ingestSeq',
-  ingestSeqAt: 'ingestSeqAt',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -454,14 +445,7 @@ export const OrderScalarFieldEnum = {
   reservationFeeRate: 'reservationFeeRate',
   reservationReleasedAt: 'reservationReleasedAt',
   cancelReason: 'cancelReason',
-  matchingActivatedAt: 'matchingActivatedAt',
-  matchingActivationStreamId: 'matchingActivationStreamId',
-  candleMatchingEligibleFrom: 'candleMatchingEligibleFrom',
-  triggerEventId: 'triggerEventId',
-  triggerEventAt: 'triggerEventAt',
   limitOrderCandleEvidenceId: 'limitOrderCandleEvidenceId',
-  matchedAt: 'matchedAt',
-  matchingSource: 'matchingSource',
   submittedAt: 'submittedAt',
   executedAt: 'executedAt',
   canceledAt: 'canceledAt',
@@ -719,21 +703,9 @@ export const OpsJobLockScalarFieldEnum = {
 export type OpsJobLockScalarFieldEnum = (typeof OpsJobLockScalarFieldEnum)[keyof typeof OpsJobLockScalarFieldEnum]
 
 
-export const LimitOrderProcessedEventScalarFieldEnum = {
-  eventId: 'eventId',
-  firstStreamId: 'firstStreamId',
-  receivedAt: 'receivedAt',
-  processedAt: 'processedAt',
-  createdAt: 'createdAt'
-} as const
-
-export type LimitOrderProcessedEventScalarFieldEnum = (typeof LimitOrderProcessedEventScalarFieldEnum)[keyof typeof LimitOrderProcessedEventScalarFieldEnum]
-
-
 export const LimitOrderCandleEvidenceScalarFieldEnum = {
   id: 'id',
   marketCandleId: 'marketCandleId',
-  candleIngestSeq: 'candleIngestSeq',
   assetId: 'assetId',
   interval: 'interval',
   openTime: 'openTime',
@@ -749,108 +721,6 @@ export const LimitOrderCandleEvidenceScalarFieldEnum = {
 } as const
 
 export type LimitOrderCandleEvidenceScalarFieldEnum = (typeof LimitOrderCandleEvidenceScalarFieldEnum)[keyof typeof LimitOrderCandleEvidenceScalarFieldEnum]
-
-
-export const LimitOrderProcessedCandleScalarFieldEnum = {
-  marketCandleId: 'marketCandleId',
-  assetId: 'assetId',
-  interval: 'interval',
-  openTime: 'openTime',
-  closeTime: 'closeTime',
-  processedAt: 'processedAt',
-  matchedOrderCount: 'matchedOrderCount',
-  result: 'result',
-  skipReason: 'skipReason',
-  candleIngestSeq: 'candleIngestSeq',
-  revisionCount: 'revisionCount',
-  firstProcessedAt: 'firstProcessedAt',
-  createdAt: 'createdAt'
-} as const
-
-export type LimitOrderProcessedCandleScalarFieldEnum = (typeof LimitOrderProcessedCandleScalarFieldEnum)[keyof typeof LimitOrderProcessedCandleScalarFieldEnum]
-
-
-export const MarketCandleFinalizationCheckpointScalarFieldEnum = {
-  assetId: 'assetId',
-  interval: 'interval',
-  finalizedThroughOpenTime: 'finalizedThroughOpenTime',
-  finalizedThroughCloseTime: 'finalizedThroughCloseTime',
-  lastAdvancedAt: 'lastAdvancedAt',
-  lastEvaluatedAt: 'lastEvaluatedAt',
-  pendingWindowOpenTime: 'pendingWindowOpenTime',
-  pendingSince: 'pendingSince',
-  pendingAttemptCount: 'pendingAttemptCount',
-  lastErrorCode: 'lastErrorCode',
-  degradedReason: 'degradedReason',
-  gapDetectedAt: 'gapDetectedAt',
-  gapFromOpenTime: 'gapFromOpenTime',
-  gapToOpenTime: 'gapToOpenTime',
-  gapReason: 'gapReason',
-  gapMarketCandleId: 'gapMarketCandleId',
-  gapCandleIngestSeq: 'gapCandleIngestSeq',
-  noTradeWindowCount: 'noTradeWindowCount',
-  outsideSessionWindowCount: 'outsideSessionWindowCount',
-  repairedWindowCount: 'repairedWindowCount',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
-} as const
-
-export type MarketCandleFinalizationCheckpointScalarFieldEnum = (typeof MarketCandleFinalizationCheckpointScalarFieldEnum)[keyof typeof MarketCandleFinalizationCheckpointScalarFieldEnum]
-
-
-export const LimitOrderReconciliationCheckpointScalarFieldEnum = {
-  scope: 'scope',
-  interval: 'interval',
-  watermarkOpenTime: 'watermarkOpenTime',
-  watermarkCandleId: 'watermarkCandleId',
-  watermarkIngestSeq: 'watermarkIngestSeq',
-  pendingIngestSeq: 'pendingIngestSeq',
-  pendingIngestSeqObservedAt: 'pendingIngestSeqObservedAt',
-  lastScannedIngestSeq: 'lastScannedIngestSeq',
-  lastScannedOpenTime: 'lastScannedOpenTime',
-  lastScannedCloseTime: 'lastScannedCloseTime',
-  lastRunAt: 'lastRunAt',
-  lastSuccessfulRunAt: 'lastSuccessfulRunAt',
-  lastWindowCompletionRunAt: 'lastWindowCompletionRunAt',
-  lastWindowCompletionSuccessfulAt: 'lastWindowCompletionSuccessfulAt',
-  windowCompletionErrorCode: 'windowCompletionErrorCode',
-  windowCompletionErrorMessage: 'windowCompletionErrorMessage',
-  windowCompletionConsecutiveFailures: 'windowCompletionConsecutiveFailures',
-  degradedReason: 'degradedReason',
-  gapDetectedAt: 'gapDetectedAt',
-  gapFromOpenTime: 'gapFromOpenTime',
-  gapToOpenTime: 'gapToOpenTime',
-  reservationMismatchCount: 'reservationMismatchCount',
-  lastReservationMismatchAt: 'lastReservationMismatchAt',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
-} as const
-
-export type LimitOrderReconciliationCheckpointScalarFieldEnum = (typeof LimitOrderReconciliationCheckpointScalarFieldEnum)[keyof typeof LimitOrderReconciliationCheckpointScalarFieldEnum]
-
-
-export const LimitOrderDeferredCandleScalarFieldEnum = {
-  marketCandleId: 'marketCandleId',
-  candleIngestSeq: 'candleIngestSeq',
-  revisionState: 'revisionState',
-  revisionMigratedAt: 'revisionMigratedAt',
-  revisionVerifiedAt: 'revisionVerifiedAt',
-  assetId: 'assetId',
-  interval: 'interval',
-  openTime: 'openTime',
-  closeTime: 'closeTime',
-  status: 'status',
-  firstDeferredAt: 'firstDeferredAt',
-  lastDeferredAt: 'lastDeferredAt',
-  attemptCount: 'attemptCount',
-  lastErrorCode: 'lastErrorCode',
-  lastErrorMessage: 'lastErrorMessage',
-  nextRetryAt: 'nextRetryAt',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
-} as const
-
-export type LimitOrderDeferredCandleScalarFieldEnum = (typeof LimitOrderDeferredCandleScalarFieldEnum)[keyof typeof LimitOrderDeferredCandleScalarFieldEnum]
 
 
 export const SortOrder = {

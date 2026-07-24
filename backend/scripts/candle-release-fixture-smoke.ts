@@ -67,8 +67,6 @@ import { LiveCandleEventNormalizerService } from '../src/assets/live-candle-even
 import { MarketCandleReconciliationService } from '../src/assets/market-candle-reconciliation.service';
 import { MarketCandleRetentionService } from '../src/assets/market-candle-retention.service';
 import { LiveCandleStreamSupervisorService } from '../src/realtime/live-candle-stream-supervisor.service';
-import { ProviderTradeRouteRegistry } from '../src/providers/provider-trade-route.registry';
-import { NormalizedProviderTradeEventBus } from '../src/providers/normalized-provider-trade-event-bus.service';
 import { LiveCandlePubSubService } from '../src/realtime/live-candle-pubsub.service';
 import { AssetTickerGateway } from '../src/realtime/asset-ticker.gateway';
 import { KisRealtimePriceEventBus } from '../src/providers/kis/kis-realtime-price-event-bus.service';
@@ -807,8 +805,6 @@ async function main() {
           normalizer,
           pipeline,
           health,
-          new ProviderTradeRouteRegistry(),
-          new NormalizedProviderTradeEventBus(),
           { ...liveConfig, connectionLivenessTimeoutMs: 3_600_000 },
           () => sockets.shift() ?? new FakeProviderSocket(),
         );
@@ -822,7 +818,6 @@ async function main() {
           lost: false,
           socket,
           renewTimer: null,
-          connectionGeneration: `${generation}:${provider}`,
         });
         // Continuity from before the bucket opened → KIS bucket is complete.
         pipeline.markProviderConnected({

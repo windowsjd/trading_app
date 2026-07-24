@@ -50,7 +50,7 @@ describe('Limit order idempotent replay integration', () => {
       for (const name of [
         'a committed create replays while the feature flag is off',
         'a committed create replays on an instance with no create service',
-        'a committed create replays while every health gate is failing',
+        'a committed create replays on a minimally wired service instance',
         'a committed create replays after the season ended',
         'the same key in two seasons replays each season own order',
         'a different request under the same quote is a conflict',

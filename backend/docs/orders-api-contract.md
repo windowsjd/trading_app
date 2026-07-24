@@ -313,14 +313,19 @@ feeAmount`, computed from `limitPrice × quantity` with the exact
   fee rate between quote and create cannot move the user's reservation.
 - `grossAmount` / `feeAmount` / `netAmount` / `executedPrice` /
   `executedAt` mean ACTUAL EXECUTION RESULT. A `submitted` or `canceled`
-  limit order has all of them **null** until a real path-A match. An unfilled order's money is `reservedAmount` +
+  limit order has all of them **null** — and with no automatic execution
+  implemented, they stay null for every limit order today. An unfilled order's money is `reservedAmount` +
   `reservationFeeRate` (and, before submitting, the quote's `quoted*`
   estimates). Market orders keep their existing executed-amount meaning
   unchanged.
-- Create never executes immediately or reads a provider price. With
-  `LIMIT_ORDER_AUTO_EXECUTION_ENABLED=false`, the order remains reservation
-  only. With it enabled, only a later normalized live trade Redis Stream
-  event can execute it; candle/REST/latest-snapshot polling is not used.
+- Create never executes immediately or reads a provider price. The order is
+  reservation-only: **automatic execution is not implemented** (the former
+  event-based matching layer has been removed; a scheduler-based
+  implementation is planned separately). A submitted limit order changes
+  state only through user cancel or season/exclusion cleanup.
+- Registration completes against PostgreSQL alone. The validation surface is
+  season, participant, asset, market session, quote, and wallet; Redis or
+  provider WebSocket state never gates a limit quote/create.
 - Wallet meaning: `balanceAmount` (total owned cash, valuation input; never
   reduced by a reservation), `reservedAmount` (locked by submitted limit
   buys), `availableAmount = balance - reserved` (derived server-side, never
@@ -334,34 +339,18 @@ feeAmount`, computed from `limitPrice × quantity` with the exact
 - Feature flag `LIMIT_ORDER_ENABLED` (default **false**): when off, limit
   QUOTE/CREATE are rejected with `LIMIT_ORDER_DISABLED`, but cancel,
   season-end cleanup, and exclusion cleanup keep working so reserved cash
-  can always be released. Keep the flag off until the path-A rollout checks
-  are complete. Accepted values are exactly `true` / `false` /
+  can always be released. Accepted values are exactly `true` / `false` /
   `1` / `0` (trimmed, case-insensitive, so `TRUE` and `False` are fine);
   omitting the variable means false. Any other value — `yes`, `enabled`,
   `tru`, or an explicitly empty string — **fails startup** instead of being
-  silently read as off. `LIMIT_ORDER_AUTO_EXECUTION_ENABLED` is separately
-  false by default. When true, quote/create add an `executionPolicy` object and
-  require a fresh matcher heartbeat within backlog/lag/ACK/retention thresholds,
-  an active Publisher subscription, and — for the REQUESTED ASSET specifically —
-  an acknowledged subscription on the canonical provider connection of the
-  current connection generation; market orders and FX are never gated.
-  `LIMIT_ORDER_CANDLE_RECONCILIATION_ENABLED` (default **false**) adds path B
-  and requires `LIMIT_ORDER_AUTO_EXECUTION_ENABLED=true`; enabling it alone
-  **fails startup**.
+  silently read as off. Quote/create keep returning the additive
+  `executionPolicy` object for API-shape stability; it always reports
+  `autoExecutionEnabled: false` and `mode: "reservation_only"`.
 - Create's final TTL/season/stock-session checks use DB `clock_timestamp()`
   after Quote/Participant/Season locks. The same time becomes submittedAt.
-- Path A consumes only normalized KIS/Binance live trade events from a Redis
-  Stream. `event.price <= limitPrice` full-fills at event.price with the pinned
-  reservation fee. Activation ordering uses the Redis Stream ID only, never a
-  cross-host timestamp comparison. No latest-price polling, public execute API,
-  provider order API, liquidity allocation, or partial fill exists. Detailed
-  event/lock/recovery semantics are in
-  `docs/limit-order-live-matching-operations.md`.
-- Path B (opt-in) is the confirmed 5-minute candle SAFETY NET for events that
-  never reached the stream. It fills at **`order.limitPrice`**, never at the
-  candle low, uses only closed canonical 5m rows, never uses the partially
-  elapsed candle an order was submitted into, and never fills retroactively
-  after a season ends. See `docs/limit-order-candle-reconciliation.md`.
+- No public execute API, provider order API, liquidity allocation, or
+  partial fill exists for limit orders; the internal order-execute path
+  rejects `orderType=limit` with `LIMIT_ORDER_EXECUTION_PATH_NOT_SUPPORTED`.
 - Quote TTL (15s) only bounds how long the quote can be turned into an
   order; the created `submitted` order itself has no expiry (GTC) and is
   unaffected by the quote expiring afterwards.
@@ -527,8 +516,8 @@ message, alreadyCanceled, reservedAmountReleased }`.
 This endpoint is not currently exposed by `OrdersController`. The retained service method is internal compatibility/deprecation code only. The required public user flow is `POST /api/v1/orders` with a durable `quoteId` and `idempotencyKey`, which immediately executes market orders.
 
 The retained internal method rejects every limit order with
-`LIMIT_ORDER_EXECUTION_PATH_NOT_SUPPORTED`. Limit execution is available only
-through normalized trade -> Redis Stream -> dedicated Poller.
+`LIMIT_ORDER_EXECUTION_PATH_NOT_SUPPORTED`. There is no limit-execution path
+at all today; automatic matching is planned as separate work.
 
 ### Request
 
@@ -669,33 +658,9 @@ through normalized trade -> Redis Stream -> dedicated Poller.
 - `ORDER_NOT_CANCELABLE`
 - `ORDER_CANCEL_CONFLICT`
 - `LIMIT_ORDER_DISABLED` (limit quote/create while the feature flag is off)
-- `LIMIT_ORDER_MATCHER_UNAVAILABLE`
-- `LIMIT_ORDER_MATCHER_DEGRADED`
-- `LIMIT_ORDER_MATCHER_LAG_EXCEEDED`
-- `LIMIT_ORDER_MATCHER_PENDING_EXCEEDED`
-- `LIMIT_ORDER_MATCHER_PENDING_STALE`
-- `LIMIT_ORDER_MATCHER_ACK_STALE`
-- `LIMIT_ORDER_EVENT_RETENTION_HEADROOM_LOW`
-- `LIMIT_ORDER_PROVIDER_UNAVAILABLE`
-- `LIMIT_ORDER_PROVIDER_NOT_SUBSCRIBED`
-- `LIMIT_ORDER_PROVIDER_SUBSCRIPTION_FAILED`
-- Path-B (closed-candle safety net) health, distinct from the path-A matcher
-  codes above so an operator and the client can tell "live fills stopped" from
-  "the safety net under live fills stopped". All HTTP 503, all gating NEW limit
-  quote/create ONLY — never cancel, cleanup, market orders or FX:
-  - `LIMIT_ORDER_CANDLE_RECONCILIATION_UNAVAILABLE`
-  - `LIMIT_ORDER_CANDLE_RECONCILIATION_STALE`
-  - `LIMIT_ORDER_CANDLE_RECONCILIATION_BACKLOG_EXCEEDED`
-  - `LIMIT_ORDER_CANDLE_RECONCILIATION_GAP_DETECTED`
-  - `LIMIT_ORDER_CANDLE_RESERVATION_MISMATCH`
-- `LIMIT_ORDER_EVENT_STREAM_UNAVAILABLE`
-- `LIMIT_ORDER_EVENT_INVALID`
-- `LIMIT_ORDER_EVENT_GAP_DETECTED`
-- `LIMIT_ORDER_EXECUTION_CONFLICT`
-- `LIMIT_ORDER_EXECUTION_RESERVATION_INSUFFICIENT`
-- `LIMIT_ORDER_EXECUTION_WALLET_INCONSISTENT`
-- `LIMIT_ORDER_EXECUTION_PATH_NOT_SUPPORTED`
-- `LIMIT_BUY_ONLY` (limit sell is not supported in phase 1)
+- `LIMIT_ORDER_EXECUTION_PATH_NOT_SUPPORTED` (internal execute path refuses
+  limit orders; there is no limit-execution path)
+- `LIMIT_BUY_ONLY` (limit sell is not supported)
 - `INVALID_LIMIT_PRICE`
 - `INSUFFICIENT_AVAILABLE_BALANCE` (balance - reserved cannot cover the reservation)
 - `ORDER_RESERVATION_CONFLICT`
@@ -749,35 +714,14 @@ through normalized trade -> Redis Stream -> dedicated Poller.
 - Daily portfolio snapshot automatic generation.
 - Ranking automatic generation.
 
-## Additive matching fields (phase 2 path A / phase 3 path B)
+## Removed matching fields
 
-Every order payload (create, list, records) carries these additive fields. All
-existing fields keep their meaning; nothing was removed.
-
-| Field | Unfilled | Path A fill | Path B fill |
-| --- | --- | --- | --- |
-| `matchingSource` | `null` | `"live_trade_event"` | `"closed_5m_candle"` |
-| `matchedAt` | `null` | fill time | fill time |
-| `triggerEventId` | `null` | provider event id | `null` |
-| `triggerEventAt` | `null` | provider event time | candle `closeTime` |
-| `assetPriceSnapshotId` | `null` | exact trade snapshot | `null` |
-| `candleEvidence` | `null` | `null` | object below |
-| `executedPrice` | `null` | event price | order `limitPrice` |
-
-```jsonc
-"candleEvidence": {
-  "marketCandleId": "…",
-  "interval": "5m",
-  "openTime": "2026-07-22T01:00:00.000Z",
-  "closeTime": "2026-07-22T01:05:00.000Z",
-  "triggerLowPrice": "90.00000000",   // proof the limit was TOUCHED
-  "executionPricePolicy": "limit_price" // the fill price is the LIMIT price
-}
-```
-
-`triggerLowPrice` must never be presented as the price the user paid. Clients
-render a path-B fill as “5분봉 안전망 체결” with the executed price (the limit
-price) and may show the low explicitly labelled as the touch trigger.
+The event-based matching layer's additive order-payload fields
+(`matchingSource`, `matchedAt`, `triggerEventId`, `triggerEventAt`,
+`candleEvidence`) have been removed along with that layer. `executedPrice`,
+`grossAmount`, `feeAmount`, `netAmount`, `executedAt`, and
+`assetPriceSnapshotId` keep their meaning (actual fill result; null for every
+limit order today).
 
 ## Limit-create replay ordering and operational errors
 
@@ -792,7 +736,6 @@ For a limit BUY, `POST /api/v1/orders` runs in exactly this order:
    `responsePayloadJson` unchanged — **and stop**;
 5. if one exists and the hash differs, return `ORDER_IDEMPOTENCY_CONFLICT`;
 6. only with no existing order: `LIMIT_ORDER_ENABLED`, create-service wiring,
-   provider readiness, path-A matcher health, path-B reconciliation health,
    active season, participant status, market session, then the create
    transaction.
 
@@ -850,44 +793,23 @@ another user's order is never replayed and never disclosed. (Previously a
 foreign consumed `quoteId` answered `ORDER_IDEMPOTENCY_CONFLICT` immediately
 while a nonexistent one did not — an ownership-information side channel.)
 
-New operational 503 codes remain on `/api/v1`; no `/api/v2` or public/manual
-limit execute route exists:
+No public or manual limit execute route exists, and no `/api/v2` route
+exists. The event-layer operational 503 codes (matcher/provider/stream/candle
+reconciliation health) were removed with the matching layer; `LIMIT_ORDER_DISABLED`
+is the only limit-specific gate on new registrations.
 
-- `LIMIT_ORDER_PROVIDER_OWNER_LEASE_LOST` and
-  `LIMIT_ORDER_PROVIDER_READINESS_EPOCH_MISMATCH`: the shared route cannot
-  prove a live canonical provider owner.
-- `LIMIT_ORDER_CANDLE_COMPLETION_UNAVAILABLE` / `_STALE`: window completion
-  most recently failed/never succeeded, or stopped succeeding.
-- `LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED`,
-  `LIMIT_ORDER_CANDLE_FINALIZER_STALE`,
-  `LIMIT_ORDER_CANDLE_ASSET_BACKLOG_EXCEEDED`,
-  `LIMIT_ORDER_CANDLE_ASSET_PERMANENT_FAILURE`, and
-  `LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED`: only the requested
-  asset is unhealthy unless the separate emergency global threshold is
-  exceeded. `LIMIT_ORDER_CANDLE_ASSET_GAP_DETECTED` now also covers the two
-  retention findings that name one asset (a queue entry whose candle row
-  disappeared, an unscanned matchable candle past the horizon); those used to
-  raise the GLOBAL `LIMIT_ORDER_CANDLE_RECONCILIATION_GAP_DETECTED` and stop
-  every asset. `LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED` means that
-  asset's safety net is re-verifying queue entries whose tracked candle
-  revision was inferred rather than observed; it normally clears on the next
-  sweep.
-
-Client messages deliberately avoid Redis, lease, epoch, fencing, and Lua
-terms; they describe a refreshing real-time connection or a candle safety-net
-recovery and ask the user to retry later.
-
-`executionPolicy` on quote/create responses is additive too:
+`executionPolicy` on quote/create responses is additive and reports the
+reservation-only reality:
 
 ```jsonc
 "executionPolicy": {
-  "autoExecutionEnabled": true,
-  "mode": "live_trade_event",
-  "triggerType": "provider_trade_price",
+  "autoExecutionEnabled": false,
+  "mode": "reservation_only",
+  "triggerType": null,
   "fullFillOnly": true,
-  "liveTradeMatchingEnabled": true,
-  "candleReconciliationEnabled": true,
-  "candleInterval": "5m",
-  "candleExecutionPricePolicy": "limit_price"
+  "liveTradeMatchingEnabled": false,
+  "candleReconciliationEnabled": false,
+  "candleInterval": null,
+  "candleExecutionPricePolicy": null
 }
 ```

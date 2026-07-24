@@ -445,21 +445,14 @@ Four jobs:
    script; `tsc --noEmit` is its compile gate and no placeholder build
    command is fabricated.
 
-3. **Limit order PostgreSQL + Redis integration** — PostgreSQL 16 + Redis 7
+3. **Limit order PostgreSQL integration** — PostgreSQL 16 + Redis 7
    service containers, `prisma migrate deploy`, `prisma migrate status`, and a
    `prisma migrate diff --exit-code` drift gate, then the opt-in limit-order
-   suites (path A/B matching, boundary concurrency, the path-B durable
-   checkpoint including asset-scoped retention gaps, shared readiness, the
-   XADD→XACK matcher end-to-end, market execute, FX and the MVP flow). Two of
-   them are about state a fully-migrated database cannot express: the
-   EXISTING-DATABASE UPGRADE suite, which creates its own scratch database and
-   deploys migrations in stages to reproduce the pre-fix deferred-queue state
-   before proving the recovery through the real sweep; and the idempotent
-   replay suite, which proves a committed limit create is replayed ahead of the
-   feature flag and the service wiring without a second order or reservation.
-   CI pass/fail is judged on correctness invariants only — all events
-   processed and ACKed, pending 0, lag 0, no duplicate fill, no residual
-   advisory lock, no migration drift — never on a throughput number.
+   money-layer suites (reservation atomicity, deterministic create races,
+   post-lock time boundaries, no-Redis registration, idempotent create
+   replay), plus market execute, FX and the MVP flow. CI pass/fail is judged
+   on correctness invariants and migration-drift checks only, never on a
+   throughput number.
 
 4. **Candle fixture integration** — PostgreSQL 16 + Redis 7 service
    containers, `prisma migrate deploy`, then
@@ -569,120 +562,12 @@ metadata) should consider `amountAvailable: boolean` or `amount: string | null`.
    trade-stale threshold (config validation enforces all three).
 8. No credential/raw-frame output in logs (spot-check structured logs).
 
-## Canonical trade route and the limit-order matcher (phase 3)
+## Limit-order matching (removed)
 
-When `CANDLE_LIVE_STREAMING_ENABLED=true` and a provider's live-candle flag is
-on, `LiveCandleStreamSupervisorService` owns that provider's socket AND its
-exact-trade route (`ProviderTradeRouteRegistry`). The legacy
-KIS/Binance streaming service then neither connects nor publishes normalized
-trades, so there is exactly one socket and exactly one publisher per provider.
-
-- **KIS**: the SAME parsed trade record feeds the candle pipeline, the
-  price-display pub/sub, and the limit-order matcher. The frame is parsed once.
-- **Binance**: when `LIMIT_ORDER_AUTO_EXECUTION_ENABLED=true` the supervisor
-  subscribes `<symbol>@trade` alongside `<symbol>@kline_5m` on the SAME
-  connection. Klines go to the candle pipeline; trades go to the matcher. No
-  second Binance WebSocket is opened. With matching off, only klines are
-  subscribed and no trade is published.
-
-This makes live candles and automatic limit-order matching compatible: they are
-no longer mutually exclusive deployments.
-
-Each connection attempt mints a new connection generation. Asset subscription
-readiness is recorded per generation and discarded on reconnect, so limit
-Quote/Create for an asset stays fail-closed until the new socket has
-re-subscribed and been acknowledged (KIS per `tr_key`, Binance per SUBSCRIBE
-batch ack). Assets dropped by the subscription cap are recorded as capped and
-are never tradable by limit order.
-
-### Subscription cap is counted in STREAMS
-
-Binance limits **streams per connection (1024)**, not assets. With the matcher
-off an asset costs one stream (`<symbol>@kline_5m`); with it on it costs two
-(`<symbol>@kline_5m` + `<symbol>@trade`, deliberately on the SAME socket). An
-asset-count cap of 1024 would therefore request 2048 streams, Binance would
-reject the whole SUBSCRIBE, and the result is a connected socket carrying no
-market data at all — the worst possible failure shape, because liveness checks
-still pass.
-
-The effective asset budget is:
-
-```
-min(CANDLE_LIVE_MAX_PROVIDER_SUBSCRIPTIONS_PER_SHARD,
-    floor(CANDLE_LIVE_MAX_PROVIDER_STREAMS_PER_SHARD / streams-per-asset))
-```
-
-`CANDLE_LIVE_MAX_PROVIDER_SUBSCRIPTIONS_PER_SHARD` keeps its meaning (ASSETS)
-for backward compatibility and is still enforced;
-`CANDLE_LIVE_MAX_PROVIDER_STREAMS_PER_SHARD` (default and maximum 1024, minimum
-1, validated at startup) is the provider's real unit. The actually-built
-`streams` array is asserted against 1024 immediately before SUBSCRIBE, so a
-future change to the stream families fails loudly instead of producing a silent
-data-less connection.
-
-KIS is unaffected: its exact-trade feed is the SAME parsed frame as the candle
-feed, so one subscription target remains one stream.
-
-A reconnect re-derives the budget from scratch under a new connection
-generation, so a cap change takes effect on the next connection and no
-readiness survives from the previous one.
-
-The subscription build is also where each asset's
-`id/symbol/market/assetType/settlementCurrency` is read — once per generation.
-Those values ride on the normalized trade event, so the limit-order publisher
-performs no per-trade database query.
-
-### Shared limit-order readiness is lease-backed on read and write
-
-When shared readiness is enabled, the shard-0 live-candle owner lease
-(`candles:live:v1:owner:<provider>:0`) is the authority for the cross-instance
-limit-order route. Publishing first exchanges the live lease token for a
-monotonic fencing epoch, and every meta/asset write rechecks lease and epoch in
-Redis. Reading performs a separate atomic proof: meta, actual owner lease,
-epoch-holder, current epoch, and the current generation's asset record must all
-agree. Lease expiry therefore invalidates readiness immediately; the readiness
-TTL is not an authorization grace period and wall clocks do not decide owner.
-
-On renewal failure the supervisor clears the registry's `ownerLease` before
-closing the socket. The next publisher pass compare-and-deletes only its own
-stored owner/generation/epoch. Token rotation and fenced writes use the same
-cleanup; a late old-owner cleanup cannot remove a takeover's newer epoch.
-Operationally, `LIMIT_ORDER_PROVIDER_OWNER_LEASE_LOST` means verify the real
-owner lease/renewal path, while `_READINESS_EPOCH_MISMATCH` means verify the
-epoch-holder/current-epoch chain. Do not extend TTLs to mask either failure.
-
-### Path B dependency
-
-The confirmed 5-minute candle safety net
-(`docs/limit-order-candle-reconciliation.md`) consumes only committed
-`market_candles` rows written by the finalizer. If the finalizer defers a
-bucket to REST repair, path B simply does not see that window until
-reconciliation restores it — it never reads live Redis candle state, an open
-bucket, or a REST preview. Its missing-window completion heartbeat is separate
-from the existing-row scan heartbeat, and a latest completion failure blocks
-new limit orders immediately. Deferred rows are revision-aware through
-`MarketCandle.ingestSeq`; a corrected candle can reactivate a permanent entry
-without deleting immutable evidence from the earlier revision.
-
-A queue entry can only be trusted to suppress a revision when that revision was
-OBSERVED on a candle row. Entries predating the revision column carry a
-backfill-INFERRED value instead, and are reopened for re-verification by
-`20260724120000_add_limit_order_deferred_revision_provenance_and_asset_gap`
-and — clock-independently, for rows whose application-written `created_at`
-defeated that migration's time boundary — by
-`20260724200000_reverify_limit_order_deferred_unverified_revision_provenance`,
-which classifies purely on whether the runtime durably recorded the
-observation (`revision_verified_at`);
-`20260724230000_enforce_limit_order_deferred_revision_provenance_invariants`
-then repairs any remaining state/revision/verification inconsistency and
-freezes the valid shapes into a DB CHECK constraint, and the scan itself only
-accepts a VERIFIED `current` entry as revision coverage. Until the sweep
-settles reopened entries, that asset alone fails new limit Quote/Create with
-`LIMIT_ORDER_CANDLE_LEGACY_DEFERRED_REVIEW_REQUIRED`.
-
-Retention losses that name ONE asset — an entry whose `market_candles` row was
-removed, an unscanned matchable candle past the horizon — are recorded on that
-asset's `market_candle_finalization_checkpoints` row and gate that asset only.
-Only the shared scan watermark falling behind retention is a global alarm. A
-candle-retention change therefore affects the assets whose windows it removed,
-not the whole book.
+The event-based limit-order matching layer (canonical exact-trade route,
+`ProviderTradeRouteRegistry`, shared readiness, the path-B candle safety net)
+has been removed. The live-candle supervisor subscribes provider streams for
+the candle pipeline only, and the legacy KIS/Binance streaming services keep
+their original display/snapshot behavior. Automatic limit-order matching is
+planned as separate scheduler-based work and will document its own provider
+interactions when it lands.

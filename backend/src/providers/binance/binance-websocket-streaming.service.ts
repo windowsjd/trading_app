@@ -3,7 +3,6 @@ import {
   Logger,
   OnModuleDestroy,
   OnModuleInit,
-  Optional,
 } from '@nestjs/common';
 import { WebSocket as WsWebSocket } from 'ws';
 import { readLiveCandleConfig } from '../../assets/live-candle.config';
@@ -12,8 +11,6 @@ import {
   type ProviderConfig,
 } from '../provider-config.service';
 import { ProviderConfigError } from '../provider.types';
-import { NormalizedProviderTradeEventBus } from '../normalized-provider-trade-event-bus.service';
-import { ProviderTradeRouteRegistry } from '../provider-trade-route.registry';
 import {
   BinanceRealtimePriceCacheService,
   type BinanceRealtimePriceCacheEntry,
@@ -95,7 +92,6 @@ export class BinanceWebSocketStreamingService
   private maxConnectionTimer: NodeJS.Timeout | null = null;
   private connectPromise: Promise<void> | null = null;
   private readonly pendingMessages = new Set<Promise<void>>();
-  private tradeProcessingTail: Promise<void> = Promise.resolve();
   private streamNames: string[] = [];
   private reconnectAttempt = 0;
   private stopping = false;
@@ -135,10 +131,6 @@ export class BinanceWebSocketStreamingService
     private readonly ingestionService: BinanceWebSocketIngestionService,
     private readonly latestPriceCache: BinanceRealtimePriceCacheService,
     private readonly realtimePriceEventBus: BinanceRealtimePriceEventBus,
-    @Optional()
-    private readonly normalizedTradeEventBus?: NormalizedProviderTradeEventBus,
-    @Optional()
-    private readonly tradeRoutes?: ProviderTradeRouteRegistry,
   ) {}
 
   onModuleInit(): void {
@@ -155,12 +147,7 @@ export class BinanceWebSocketStreamingService
     }
 
     const liveCandles = readLiveCandleConfig();
-    // Exactly one canonical Binance connection per process — see the KIS
-    // counterpart for the full rationale.
-    if (
-      (liveCandles.enabled && liveCandles.binanceEnabled) ||
-      this.tradeRoutes?.claimProvider('binance', 'legacy_streaming') === false
-    ) {
+    if (liveCandles.enabled && liveCandles.binanceEnabled) {
       this.status.enabled = false;
       this.status.running = false;
       this.status.state = 'disabled';
@@ -194,7 +181,6 @@ export class BinanceWebSocketStreamingService
 
     await Promise.allSettled([...this.pendingMessages]);
     this.socket = null;
-    this.tradeRoutes?.releaseProvider('binance', 'legacy_streaming');
     this.markDisconnected();
     this.status.state = this.status.enabled ? 'stopped' : 'disabled';
   }
@@ -354,16 +340,14 @@ export class BinanceWebSocketStreamingService
     this.status.connecting = false;
     this.status.reconnecting = false;
     this.status.lastConnectedAt = now;
-    this.status.subscribedSymbolCount = input.streamNames.filter((stream) =>
-      stream.endsWith('@ticker'),
-    ).length;
+    this.status.subscribedSymbolCount = input.streamNames.length;
     this.status.lastErrorCode = null;
     this.status.lastErrorMessage = null;
     this.reconnectAttempt = 0;
     this.startHeartbeat(input.config.binance.wsStreamingHeartbeatTimeoutMs);
     this.startMaxConnectionTimer(socket);
     this.logger.log(
-      `Binance WebSocket streaming connected with ${this.status.subscribedSymbolCount} ticker streams.`,
+      `Binance WebSocket streaming connected with ${input.streamNames.length} ticker streams.`,
     );
   }
 
@@ -411,36 +395,6 @@ export class BinanceWebSocketStreamingService
         'Binance sent serverShutdown and requested reconnect.',
       );
       this.socket?.close(1012, 'server shutdown');
-      return;
-    }
-
-    if (parsed.state === 'trade') {
-      await this.enqueueTradeProcessing(async () => {
-        const mapping = await this.ingestionService.resolveLiveTradeAsset(
-          parsed.trade.providerSymbol,
-        );
-        if (
-          mapping.state === 'mapped' &&
-          this.tradeRoutes?.isOwnedBy('binance', 'legacy_streaming') !== false
-        ) {
-          this.normalizedTradeEventBus?.publish({
-            provider: 'binance',
-            providerEventId: parsed.trade.tradeId,
-            providerSequence: parsed.trade.tradeId,
-            providerConnectionId: null,
-            assetId: mapping.assetId,
-            symbol: parsed.trade.providerSymbol,
-            providerSymbol: parsed.trade.providerSymbol,
-            price: parsed.trade.price,
-            currencyCode: parsed.trade.currencyCode,
-            providerEventAt: parsed.trade.sourceTimestamp.toISOString(),
-            receivedAt: parsed.trade.receivedAt.toISOString(),
-            sourceName: 'binance_spot_ws_trade',
-            marketSessionCode: null,
-            eventType: 'trade',
-          });
-        }
-      });
       return;
     }
 
@@ -498,12 +452,6 @@ export class BinanceWebSocketStreamingService
       snapshotState: summary?.state ?? null,
       snapshotReason: summary?.reason,
     });
-  }
-
-  private enqueueTradeProcessing(task: () => Promise<void>): Promise<void> {
-    const processing = this.tradeProcessingTail.then(task);
-    this.tradeProcessingTail = processing.catch(() => undefined);
-    return processing;
   }
 
   private sendSubscribe(
@@ -722,7 +670,7 @@ function buildTickerStreamNames(symbols: readonly string[]): string[] {
     }
 
     seen.add(normalized);
-    streams.push(`${normalized}@ticker`, `${normalized}@trade`);
+    streams.push(`${normalized}@ticker`);
   }
 
   return streams;

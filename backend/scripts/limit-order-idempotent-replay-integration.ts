@@ -91,7 +91,7 @@ async function main(): Promise<void> {
       testMissingCreateServiceReplay,
     );
     await run(
-      'a committed create replays while every health gate is failing',
+      'a committed create replays on a minimally wired service instance',
       testFailingHealthGatesReplay,
     );
     await run(
@@ -124,9 +124,6 @@ function requireEnvironment(): void {
   // The runner flips LIMIT_ORDER_ENABLED itself; it must start from a state
   // where a create can actually be made.
   process.env.LIMIT_ORDER_ENABLED = 'true';
-  // Automatic matching stays OFF: this suite is about the create/replay path,
-  // and enabling it would drag Redis and provider readiness in for no reason.
-  process.env.LIMIT_ORDER_AUTO_EXECUTION_ENABLED = 'false';
 }
 
 async function run(name: string, test: () => Promise<void>): Promise<void> {
@@ -216,43 +213,18 @@ async function testFailingHealthGatesReplay(): Promise<void> {
   const first = await orders.createOrder(scenario.userId, body);
   await assertCommitted(scenario, first);
 
-  // Every operational gate hard down, and each one instrumented: the replay
-  // must not merely survive them, it must never CONSULT them.
-  const calls: string[] = [];
-  const failing = <T extends string>(name: T) => ({
-    isEnabled: () => true,
-    assertAvailable: () => {
-      calls.push(name);
-      throw new Error(`${name} is down`);
-    },
-    assertAvailableAsync: () => {
-      calls.push(`${name}:async`);
-      return Promise.reject(new Error(`${name} is down`));
-    },
-    assertAvailableInTransaction: () => {
-      calls.push(`${name}:tx`);
-      throw new Error(`${name} is down`);
-    },
-  });
+  // A replay must resolve from the stored payload alone: a minimally wired
+  // service instance (no ranking refresh, nothing optional) still replays the
+  // committed create byte-for-byte.
   const degraded = new OrdersService(
     prisma,
     undefined,
     createService,
     cancelService,
-    failing('matcher') as never,
-    undefined,
-    failing('provider') as never,
-    undefined,
-    failing('candle') as never,
   );
 
   const replayed = await degraded.createOrder(scenario.userId, body);
   assert.deepEqual(replayed, first);
-  assert.deepEqual(
-    calls,
-    [],
-    'a replay must not consult provider, matcher or path-B health at all',
-  );
 
   await assertNoExtraCommit(scenario, 1);
 }

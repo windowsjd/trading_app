@@ -1222,27 +1222,13 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       expect(prisma.$executeRaw).not.toHaveBeenCalled();
     });
 
-    it('replays without consulting provider, matcher or path-B health', async () => {
+    it('replays from the stored payload without reading any current state', async () => {
       const prisma = createPrisma();
       mockLockedRows(prisma);
       const storedPayload = { success: true, data: { marker: 'stored' } };
       prisma.order.findFirst.mockResolvedValueOnce(
         idempotentOrderRecord({ responsePayloadJson: storedPayload }),
       );
-      const candleHealth = {
-        assertAvailable: jest.fn(),
-        isEnabled: () => true,
-      };
-      const matcherHealth = {
-        assertAvailableInTransaction: jest.fn(),
-        assertAvailable: jest.fn(),
-        isEnabled: () => true,
-      };
-      const providerHealth = {
-        assertAvailable: jest.fn(),
-        assertAvailableAsync: jest.fn(),
-        isEnabled: () => true,
-      };
       const service = new OrdersService(
         prisma as never,
         undefined,
@@ -1251,23 +1237,14 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
           new OrderReservationService(),
         ),
         undefined,
-        matcherHealth as never,
-        undefined,
-        providerHealth as never,
-        undefined,
-        candleHealth as never,
       );
 
       expect(await service.createOrder('user-1', limitCreateBody)).toBe(
         storedPayload,
       );
-      expect(candleHealth.assertAvailable).not.toHaveBeenCalled();
-      expect(matcherHealth.assertAvailable).not.toHaveBeenCalled();
-      expect(matcherHealth.assertAvailableInTransaction).not.toHaveBeenCalled();
-      expect(providerHealth.assertAvailable).not.toHaveBeenCalled();
-      expect(providerHealth.assertAvailableAsync).not.toHaveBeenCalled();
-      // Nor the active season: a replay must survive the season ending.
+      // Not even the active season: a replay must survive the season ending.
       expect(prisma.season.findFirst).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
     // -----------------------------------------------------------------------

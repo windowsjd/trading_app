@@ -27,13 +27,11 @@ export type AggregateLimitOrderCandleEvidence = {
 }
 
 export type LimitOrderCandleEvidenceAvgAggregateOutputType = {
-  candleIngestSeq: number | null
   triggerLowPrice: runtime.Decimal | null
   policyVersion: number | null
 }
 
 export type LimitOrderCandleEvidenceSumAggregateOutputType = {
-  candleIngestSeq: bigint | null
   triggerLowPrice: runtime.Decimal | null
   policyVersion: number | null
 }
@@ -41,7 +39,6 @@ export type LimitOrderCandleEvidenceSumAggregateOutputType = {
 export type LimitOrderCandleEvidenceMinAggregateOutputType = {
   id: string | null
   marketCandleId: string | null
-  candleIngestSeq: bigint | null
   assetId: string | null
   interval: string | null
   openTime: Date | null
@@ -59,7 +56,6 @@ export type LimitOrderCandleEvidenceMinAggregateOutputType = {
 export type LimitOrderCandleEvidenceMaxAggregateOutputType = {
   id: string | null
   marketCandleId: string | null
-  candleIngestSeq: bigint | null
   assetId: string | null
   interval: string | null
   openTime: Date | null
@@ -77,7 +73,6 @@ export type LimitOrderCandleEvidenceMaxAggregateOutputType = {
 export type LimitOrderCandleEvidenceCountAggregateOutputType = {
   id: number
   marketCandleId: number
-  candleIngestSeq: number
   assetId: number
   interval: number
   openTime: number
@@ -95,13 +90,11 @@ export type LimitOrderCandleEvidenceCountAggregateOutputType = {
 
 
 export type LimitOrderCandleEvidenceAvgAggregateInputType = {
-  candleIngestSeq?: true
   triggerLowPrice?: true
   policyVersion?: true
 }
 
 export type LimitOrderCandleEvidenceSumAggregateInputType = {
-  candleIngestSeq?: true
   triggerLowPrice?: true
   policyVersion?: true
 }
@@ -109,7 +102,6 @@ export type LimitOrderCandleEvidenceSumAggregateInputType = {
 export type LimitOrderCandleEvidenceMinAggregateInputType = {
   id?: true
   marketCandleId?: true
-  candleIngestSeq?: true
   assetId?: true
   interval?: true
   openTime?: true
@@ -127,7 +119,6 @@ export type LimitOrderCandleEvidenceMinAggregateInputType = {
 export type LimitOrderCandleEvidenceMaxAggregateInputType = {
   id?: true
   marketCandleId?: true
-  candleIngestSeq?: true
   assetId?: true
   interval?: true
   openTime?: true
@@ -145,7 +136,6 @@ export type LimitOrderCandleEvidenceMaxAggregateInputType = {
 export type LimitOrderCandleEvidenceCountAggregateInputType = {
   id?: true
   marketCandleId?: true
-  candleIngestSeq?: true
   assetId?: true
   interval?: true
   openTime?: true
@@ -250,7 +240,6 @@ export type LimitOrderCandleEvidenceGroupByArgs<ExtArgs extends runtime.Types.Ex
 export type LimitOrderCandleEvidenceGroupByOutputType = {
   id: string
   marketCandleId: string
-  candleIngestSeq: bigint
   assetId: string
   interval: string
   openTime: Date
@@ -291,7 +280,6 @@ export type LimitOrderCandleEvidenceWhereInput = {
   NOT?: Prisma.LimitOrderCandleEvidenceWhereInput | Prisma.LimitOrderCandleEvidenceWhereInput[]
   id?: Prisma.StringFilter<"LimitOrderCandleEvidence"> | string
   marketCandleId?: Prisma.StringFilter<"LimitOrderCandleEvidence"> | string
-  candleIngestSeq?: Prisma.BigIntFilter<"LimitOrderCandleEvidence"> | bigint | number
   assetId?: Prisma.StringFilter<"LimitOrderCandleEvidence"> | string
   interval?: Prisma.StringFilter<"LimitOrderCandleEvidence"> | string
   openTime?: Prisma.DateTimeFilter<"LimitOrderCandleEvidence"> | Date | string
@@ -312,7 +300,6 @@ export type LimitOrderCandleEvidenceWhereInput = {
 export type LimitOrderCandleEvidenceOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   marketCandleId?: Prisma.SortOrder
-  candleIngestSeq?: Prisma.SortOrder
   assetId?: Prisma.SortOrder
   interval?: Prisma.SortOrder
   openTime?: Prisma.SortOrder
@@ -332,12 +319,10 @@ export type LimitOrderCandleEvidenceOrderByWithRelationInput = {
 
 export type LimitOrderCandleEvidenceWhereUniqueInput = Prisma.AtLeast<{
   id?: string
-  marketCandleId_candleIngestSeq?: Prisma.LimitOrderCandleEvidenceMarketCandleIdCandleIngestSeqCompoundUniqueInput
+  marketCandleId?: string
   AND?: Prisma.LimitOrderCandleEvidenceWhereInput | Prisma.LimitOrderCandleEvidenceWhereInput[]
   OR?: Prisma.LimitOrderCandleEvidenceWhereInput[]
   NOT?: Prisma.LimitOrderCandleEvidenceWhereInput | Prisma.LimitOrderCandleEvidenceWhereInput[]
-  marketCandleId?: Prisma.StringFilter<"LimitOrderCandleEvidence"> | string
-  candleIngestSeq?: Prisma.BigIntFilter<"LimitOrderCandleEvidence"> | bigint | number
   assetId?: Prisma.StringFilter<"LimitOrderCandleEvidence"> | string
   interval?: Prisma.StringFilter<"LimitOrderCandleEvidence"> | string
   openTime?: Prisma.DateTimeFilter<"LimitOrderCandleEvidence"> | Date | string
@@ -353,12 +338,11 @@ export type LimitOrderCandleEvidenceWhereUniqueInput = Prisma.AtLeast<{
   marketCandle?: Prisma.XOR<Prisma.MarketCandleScalarRelationFilter, Prisma.MarketCandleWhereInput>
   asset?: Prisma.XOR<Prisma.AssetScalarRelationFilter, Prisma.AssetWhereInput>
   orders?: Prisma.OrderListRelationFilter
-}, "id" | "marketCandleId_candleIngestSeq">
+}, "id" | "marketCandleId">
 
 export type LimitOrderCandleEvidenceOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   marketCandleId?: Prisma.SortOrder
-  candleIngestSeq?: Prisma.SortOrder
   assetId?: Prisma.SortOrder
   interval?: Prisma.SortOrder
   openTime?: Prisma.SortOrder
@@ -384,7 +368,6 @@ export type LimitOrderCandleEvidenceScalarWhereWithAggregatesInput = {
   NOT?: Prisma.LimitOrderCandleEvidenceScalarWhereWithAggregatesInput | Prisma.LimitOrderCandleEvidenceScalarWhereWithAggregatesInput[]
   id?: Prisma.StringWithAggregatesFilter<"LimitOrderCandleEvidence"> | string
   marketCandleId?: Prisma.StringWithAggregatesFilter<"LimitOrderCandleEvidence"> | string
-  candleIngestSeq?: Prisma.BigIntWithAggregatesFilter<"LimitOrderCandleEvidence"> | bigint | number
   assetId?: Prisma.StringWithAggregatesFilter<"LimitOrderCandleEvidence"> | string
   interval?: Prisma.StringWithAggregatesFilter<"LimitOrderCandleEvidence"> | string
   openTime?: Prisma.DateTimeWithAggregatesFilter<"LimitOrderCandleEvidence"> | Date | string
@@ -401,7 +384,6 @@ export type LimitOrderCandleEvidenceScalarWhereWithAggregatesInput = {
 
 export type LimitOrderCandleEvidenceCreateInput = {
   id?: string
-  candleIngestSeq: bigint | number
   interval: string
   openTime: Date | string
   closeTime: Date | string
@@ -421,7 +403,6 @@ export type LimitOrderCandleEvidenceCreateInput = {
 export type LimitOrderCandleEvidenceUncheckedCreateInput = {
   id?: string
   marketCandleId: string
-  candleIngestSeq: bigint | number
   assetId: string
   interval: string
   openTime: Date | string
@@ -439,7 +420,6 @@ export type LimitOrderCandleEvidenceUncheckedCreateInput = {
 
 export type LimitOrderCandleEvidenceUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  candleIngestSeq?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   interval?: Prisma.StringFieldUpdateOperationsInput | string
   openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   closeTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -459,7 +439,6 @@ export type LimitOrderCandleEvidenceUpdateInput = {
 export type LimitOrderCandleEvidenceUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   marketCandleId?: Prisma.StringFieldUpdateOperationsInput | string
-  candleIngestSeq?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   interval?: Prisma.StringFieldUpdateOperationsInput | string
   openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -478,7 +457,6 @@ export type LimitOrderCandleEvidenceUncheckedUpdateInput = {
 export type LimitOrderCandleEvidenceCreateManyInput = {
   id?: string
   marketCandleId: string
-  candleIngestSeq: bigint | number
   assetId: string
   interval: string
   openTime: Date | string
@@ -495,7 +473,6 @@ export type LimitOrderCandleEvidenceCreateManyInput = {
 
 export type LimitOrderCandleEvidenceUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  candleIngestSeq?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   interval?: Prisma.StringFieldUpdateOperationsInput | string
   openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   closeTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -512,7 +489,6 @@ export type LimitOrderCandleEvidenceUpdateManyMutationInput = {
 export type LimitOrderCandleEvidenceUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   marketCandleId?: Prisma.StringFieldUpdateOperationsInput | string
-  candleIngestSeq?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   interval?: Prisma.StringFieldUpdateOperationsInput | string
   openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -542,15 +518,9 @@ export type LimitOrderCandleEvidenceNullableScalarRelationFilter = {
   isNot?: Prisma.LimitOrderCandleEvidenceWhereInput | null
 }
 
-export type LimitOrderCandleEvidenceMarketCandleIdCandleIngestSeqCompoundUniqueInput = {
-  marketCandleId: string
-  candleIngestSeq: bigint | number
-}
-
 export type LimitOrderCandleEvidenceCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   marketCandleId?: Prisma.SortOrder
-  candleIngestSeq?: Prisma.SortOrder
   assetId?: Prisma.SortOrder
   interval?: Prisma.SortOrder
   openTime?: Prisma.SortOrder
@@ -566,7 +536,6 @@ export type LimitOrderCandleEvidenceCountOrderByAggregateInput = {
 }
 
 export type LimitOrderCandleEvidenceAvgOrderByAggregateInput = {
-  candleIngestSeq?: Prisma.SortOrder
   triggerLowPrice?: Prisma.SortOrder
   policyVersion?: Prisma.SortOrder
 }
@@ -574,7 +543,6 @@ export type LimitOrderCandleEvidenceAvgOrderByAggregateInput = {
 export type LimitOrderCandleEvidenceMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   marketCandleId?: Prisma.SortOrder
-  candleIngestSeq?: Prisma.SortOrder
   assetId?: Prisma.SortOrder
   interval?: Prisma.SortOrder
   openTime?: Prisma.SortOrder
@@ -592,7 +560,6 @@ export type LimitOrderCandleEvidenceMaxOrderByAggregateInput = {
 export type LimitOrderCandleEvidenceMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   marketCandleId?: Prisma.SortOrder
-  candleIngestSeq?: Prisma.SortOrder
   assetId?: Prisma.SortOrder
   interval?: Prisma.SortOrder
   openTime?: Prisma.SortOrder
@@ -608,7 +575,6 @@ export type LimitOrderCandleEvidenceMinOrderByAggregateInput = {
 }
 
 export type LimitOrderCandleEvidenceSumOrderByAggregateInput = {
-  candleIngestSeq?: Prisma.SortOrder
   triggerLowPrice?: Prisma.SortOrder
   policyVersion?: Prisma.SortOrder
 }
@@ -713,17 +679,8 @@ export type LimitOrderCandleEvidenceUpdateOneWithoutOrdersNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.LimitOrderCandleEvidenceUpdateToOneWithWhereWithoutOrdersInput, Prisma.LimitOrderCandleEvidenceUpdateWithoutOrdersInput>, Prisma.LimitOrderCandleEvidenceUncheckedUpdateWithoutOrdersInput>
 }
 
-export type BigIntFieldUpdateOperationsInput = {
-  set?: bigint | number
-  increment?: bigint | number
-  decrement?: bigint | number
-  multiply?: bigint | number
-  divide?: bigint | number
-}
-
 export type LimitOrderCandleEvidenceCreateWithoutAssetInput = {
   id?: string
-  candleIngestSeq: bigint | number
   interval: string
   openTime: Date | string
   closeTime: Date | string
@@ -742,7 +699,6 @@ export type LimitOrderCandleEvidenceCreateWithoutAssetInput = {
 export type LimitOrderCandleEvidenceUncheckedCreateWithoutAssetInput = {
   id?: string
   marketCandleId: string
-  candleIngestSeq: bigint | number
   interval: string
   openTime: Date | string
   closeTime: Date | string
@@ -789,7 +745,6 @@ export type LimitOrderCandleEvidenceScalarWhereInput = {
   NOT?: Prisma.LimitOrderCandleEvidenceScalarWhereInput | Prisma.LimitOrderCandleEvidenceScalarWhereInput[]
   id?: Prisma.StringFilter<"LimitOrderCandleEvidence"> | string
   marketCandleId?: Prisma.StringFilter<"LimitOrderCandleEvidence"> | string
-  candleIngestSeq?: Prisma.BigIntFilter<"LimitOrderCandleEvidence"> | bigint | number
   assetId?: Prisma.StringFilter<"LimitOrderCandleEvidence"> | string
   interval?: Prisma.StringFilter<"LimitOrderCandleEvidence"> | string
   openTime?: Prisma.DateTimeFilter<"LimitOrderCandleEvidence"> | Date | string
@@ -806,7 +761,6 @@ export type LimitOrderCandleEvidenceScalarWhereInput = {
 
 export type LimitOrderCandleEvidenceCreateWithoutMarketCandleInput = {
   id?: string
-  candleIngestSeq: bigint | number
   interval: string
   openTime: Date | string
   closeTime: Date | string
@@ -824,7 +778,6 @@ export type LimitOrderCandleEvidenceCreateWithoutMarketCandleInput = {
 
 export type LimitOrderCandleEvidenceUncheckedCreateWithoutMarketCandleInput = {
   id?: string
-  candleIngestSeq: bigint | number
   assetId: string
   interval: string
   openTime: Date | string
@@ -868,7 +821,6 @@ export type LimitOrderCandleEvidenceUpdateManyWithWhereWithoutMarketCandleInput 
 
 export type LimitOrderCandleEvidenceCreateWithoutOrdersInput = {
   id?: string
-  candleIngestSeq: bigint | number
   interval: string
   openTime: Date | string
   closeTime: Date | string
@@ -887,7 +839,6 @@ export type LimitOrderCandleEvidenceCreateWithoutOrdersInput = {
 export type LimitOrderCandleEvidenceUncheckedCreateWithoutOrdersInput = {
   id?: string
   marketCandleId: string
-  candleIngestSeq: bigint | number
   assetId: string
   interval: string
   openTime: Date | string
@@ -920,7 +871,6 @@ export type LimitOrderCandleEvidenceUpdateToOneWithWhereWithoutOrdersInput = {
 
 export type LimitOrderCandleEvidenceUpdateWithoutOrdersInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  candleIngestSeq?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   interval?: Prisma.StringFieldUpdateOperationsInput | string
   openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   closeTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -939,7 +889,6 @@ export type LimitOrderCandleEvidenceUpdateWithoutOrdersInput = {
 export type LimitOrderCandleEvidenceUncheckedUpdateWithoutOrdersInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   marketCandleId?: Prisma.StringFieldUpdateOperationsInput | string
-  candleIngestSeq?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   interval?: Prisma.StringFieldUpdateOperationsInput | string
   openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -957,7 +906,6 @@ export type LimitOrderCandleEvidenceUncheckedUpdateWithoutOrdersInput = {
 export type LimitOrderCandleEvidenceCreateManyAssetInput = {
   id?: string
   marketCandleId: string
-  candleIngestSeq: bigint | number
   interval: string
   openTime: Date | string
   closeTime: Date | string
@@ -973,7 +921,6 @@ export type LimitOrderCandleEvidenceCreateManyAssetInput = {
 
 export type LimitOrderCandleEvidenceUpdateWithoutAssetInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  candleIngestSeq?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   interval?: Prisma.StringFieldUpdateOperationsInput | string
   openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   closeTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -992,7 +939,6 @@ export type LimitOrderCandleEvidenceUpdateWithoutAssetInput = {
 export type LimitOrderCandleEvidenceUncheckedUpdateWithoutAssetInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   marketCandleId?: Prisma.StringFieldUpdateOperationsInput | string
-  candleIngestSeq?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   interval?: Prisma.StringFieldUpdateOperationsInput | string
   openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   closeTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1010,7 +956,6 @@ export type LimitOrderCandleEvidenceUncheckedUpdateWithoutAssetInput = {
 export type LimitOrderCandleEvidenceUncheckedUpdateManyWithoutAssetInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   marketCandleId?: Prisma.StringFieldUpdateOperationsInput | string
-  candleIngestSeq?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   interval?: Prisma.StringFieldUpdateOperationsInput | string
   openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   closeTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1026,7 +971,6 @@ export type LimitOrderCandleEvidenceUncheckedUpdateManyWithoutAssetInput = {
 
 export type LimitOrderCandleEvidenceCreateManyMarketCandleInput = {
   id?: string
-  candleIngestSeq: bigint | number
   assetId: string
   interval: string
   openTime: Date | string
@@ -1043,7 +987,6 @@ export type LimitOrderCandleEvidenceCreateManyMarketCandleInput = {
 
 export type LimitOrderCandleEvidenceUpdateWithoutMarketCandleInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  candleIngestSeq?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   interval?: Prisma.StringFieldUpdateOperationsInput | string
   openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   closeTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1061,7 +1004,6 @@ export type LimitOrderCandleEvidenceUpdateWithoutMarketCandleInput = {
 
 export type LimitOrderCandleEvidenceUncheckedUpdateWithoutMarketCandleInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  candleIngestSeq?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   interval?: Prisma.StringFieldUpdateOperationsInput | string
   openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1079,7 +1021,6 @@ export type LimitOrderCandleEvidenceUncheckedUpdateWithoutMarketCandleInput = {
 
 export type LimitOrderCandleEvidenceUncheckedUpdateManyWithoutMarketCandleInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  candleIngestSeq?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   assetId?: Prisma.StringFieldUpdateOperationsInput | string
   interval?: Prisma.StringFieldUpdateOperationsInput | string
   openTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1128,7 +1069,6 @@ export type LimitOrderCandleEvidenceCountOutputTypeCountOrdersArgs<ExtArgs exten
 export type LimitOrderCandleEvidenceSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   marketCandleId?: boolean
-  candleIngestSeq?: boolean
   assetId?: boolean
   interval?: boolean
   openTime?: boolean
@@ -1150,7 +1090,6 @@ export type LimitOrderCandleEvidenceSelect<ExtArgs extends runtime.Types.Extensi
 export type LimitOrderCandleEvidenceSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   marketCandleId?: boolean
-  candleIngestSeq?: boolean
   assetId?: boolean
   interval?: boolean
   openTime?: boolean
@@ -1170,7 +1109,6 @@ export type LimitOrderCandleEvidenceSelectCreateManyAndReturn<ExtArgs extends ru
 export type LimitOrderCandleEvidenceSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   marketCandleId?: boolean
-  candleIngestSeq?: boolean
   assetId?: boolean
   interval?: boolean
   openTime?: boolean
@@ -1190,7 +1128,6 @@ export type LimitOrderCandleEvidenceSelectUpdateManyAndReturn<ExtArgs extends ru
 export type LimitOrderCandleEvidenceSelectScalar = {
   id?: boolean
   marketCandleId?: boolean
-  candleIngestSeq?: boolean
   assetId?: boolean
   interval?: boolean
   openTime?: boolean
@@ -1205,7 +1142,7 @@ export type LimitOrderCandleEvidenceSelectScalar = {
   createdAt?: boolean
 }
 
-export type LimitOrderCandleEvidenceOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "marketCandleId" | "candleIngestSeq" | "assetId" | "interval" | "openTime" | "closeTime" | "triggerLowPrice" | "executionPricePolicy" | "provider" | "sourceName" | "sourceUpdatedAt" | "finalizedAt" | "policyVersion" | "createdAt", ExtArgs["result"]["limitOrderCandleEvidence"]>
+export type LimitOrderCandleEvidenceOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "marketCandleId" | "assetId" | "interval" | "openTime" | "closeTime" | "triggerLowPrice" | "executionPricePolicy" | "provider" | "sourceName" | "sourceUpdatedAt" | "finalizedAt" | "policyVersion" | "createdAt", ExtArgs["result"]["limitOrderCandleEvidence"]>
 export type LimitOrderCandleEvidenceInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   marketCandle?: boolean | Prisma.MarketCandleDefaultArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
@@ -1231,7 +1168,6 @@ export type $LimitOrderCandleEvidencePayload<ExtArgs extends runtime.Types.Exten
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     marketCandleId: string
-    candleIngestSeq: bigint
     assetId: string
     interval: string
     openTime: Date
@@ -1672,7 +1608,6 @@ export interface Prisma__LimitOrderCandleEvidenceClient<T, Null = never, ExtArgs
 export interface LimitOrderCandleEvidenceFieldRefs {
   readonly id: Prisma.FieldRef<"LimitOrderCandleEvidence", 'String'>
   readonly marketCandleId: Prisma.FieldRef<"LimitOrderCandleEvidence", 'String'>
-  readonly candleIngestSeq: Prisma.FieldRef<"LimitOrderCandleEvidence", 'BigInt'>
   readonly assetId: Prisma.FieldRef<"LimitOrderCandleEvidence", 'String'>
   readonly interval: Prisma.FieldRef<"LimitOrderCandleEvidence", 'String'>
   readonly openTime: Prisma.FieldRef<"LimitOrderCandleEvidence", 'DateTime'>
