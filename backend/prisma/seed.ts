@@ -1,171 +1,62 @@
-import "dotenv/config";
-import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from '../src/generated/prisma/client';
 import {
-  PrismaClient,
-  UserStatus,
-  SeasonStatus,
-  ParticipantStatus,
-  CurrencyCode,
-  WalletTransactionDirection,
-  WalletTransactionReferenceType,
-  WalletTransactionType,
-} from "../src/generated/prisma/client";
+  formatDatabaseTarget,
+  loadRuntimeEnv,
+  requireDatabaseUrl,
+} from '../scripts/lib/load-runtime-env';
+import {
+  ensureDevBaselineParticipant,
+  ensureDevSeasonOpen,
+} from '../scripts/lib/dev-baseline';
+
+/**
+ * NON-DESTRUCTIVE development seed.
+ *
+ * This used to reset the season to a closed window and overwrite participant
+ * financials and wallet balances on every run, which fought `dev:open-season`
+ * and could wipe local trading state. It now delegates to the shared,
+ * create-if-absent dev baseline: the season is kept active (2000-2099) and the
+ * dev user / participant / wallets / initial grant are created only when
+ * missing. Existing balances, ledgers, ranks, and orders are never touched.
+ *
+ * Env is loaded exactly like the running backend (.env.local > .env.development
+ * > .env) so `prisma db seed` targets the same database.
+ */
+
+loadRuntimeEnv();
 
 const adapter = new PrismaPg({
-  connectionString: process.env.DATABASE_URL as string,
+  connectionString: requireDatabaseUrl(),
 });
 
-const prisma = new PrismaClient({
-  adapter,
-});
-
-const DEV_JOINED_AT = new Date("2026-03-30T00:00:00Z");
-const DEV_INITIAL_CAPITAL_KRW = "10000000.00000000";
-const ZERO_AMOUNT = "0.00000000";
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  const user = await prisma.user.upsert({
-    where: { email: "dev1@example.com" },
-    update: {
-      nickname: "dev_trader_01",
-      status: UserStatus.active,
-    },
-    create: {
-      id: "usr_dev_001",
-      email: "dev1@example.com",
-      passwordHash: "dev_only_hash",
-      nickname: "dev_trader_01",
-      status: UserStatus.active,
-    },
-  });
+  console.log(
+    `Seed target DB: ${formatDatabaseTarget(process.env.DATABASE_URL)}`,
+  );
 
-  const season = await prisma.season.upsert({
-    where: { id: "sea_2026_s1" },
-    update: {
-      name: "Season 1",
-      status: SeasonStatus.active,
-      startAt: new Date("2026-03-30T00:00:00Z"),
-      endAt: new Date("2026-04-12T14:59:00Z"),
-      initialCapitalKrw: DEV_INITIAL_CAPITAL_KRW,
-      tradeFeeRate: "0.001000",
-      fxFeeRate: "0.001000",
-    },
-    create: {
-      id: "sea_2026_s1",
-      name: "Season 1",
-      status: SeasonStatus.active,
-      startAt: new Date("2026-03-30T00:00:00Z"),
-      endAt: new Date("2026-04-12T14:59:00Z"),
-      initialCapitalKrw: DEV_INITIAL_CAPITAL_KRW,
-      tradeFeeRate: "0.001000",
-      fxFeeRate: "0.001000",
-    },
-  });
+  const season = await ensureDevSeasonOpen({ prisma, apply: true });
+  console.log(
+    `Season ${season.seasonId}: ${season.action} (status=${season.status}, ${season.startAt} -> ${season.endAt})`,
+  );
+  for (const other of season.otherActiveSeasons) {
+    console.warn(
+      `Warning: other active season left unmodified: ${other.id} / ${other.name}`,
+    );
+  }
 
-  const seasonParticipant = await prisma.seasonParticipant.upsert({
-    where: {
-      seasonId_userId: {
-        seasonId: season.id,
-        userId: user.id,
-      },
-    },
-    update: {
-      joinedAt: DEV_JOINED_AT,
-      participantStatus: ParticipantStatus.active,
-      initialCapitalKrw: DEV_INITIAL_CAPITAL_KRW,
-      totalAssetKrw: DEV_INITIAL_CAPITAL_KRW,
-      totalReturnRate: ZERO_AMOUNT,
-      maxDrawdown: ZERO_AMOUNT,
-      currentRank: null,
-      finalRank: null,
-      finalTier: null,
-    },
-    create: {
-      id: "sp_dev_001",
-      seasonId: season.id,
-      userId: user.id,
-      joinedAt: DEV_JOINED_AT,
-      participantStatus: ParticipantStatus.active,
-      initialCapitalKrw: DEV_INITIAL_CAPITAL_KRW,
-      totalAssetKrw: DEV_INITIAL_CAPITAL_KRW,
-      totalReturnRate: ZERO_AMOUNT,
-      maxDrawdown: ZERO_AMOUNT,
-    },
-  });
+  const baseline = await ensureDevBaselineParticipant({ prisma, apply: true });
+  console.log(
+    `Dev user: ${baseline.userAction}; participant: ${baseline.participantAction}` +
+      ` (walletsCreated=${baseline.walletsCreated}, grantCreated=${baseline.grantCreated})`,
+  );
+  for (const note of baseline.notes) {
+    console.log(`- ${note}`);
+  }
 
-  const krwWallet = await prisma.cashWallet.upsert({
-    where: {
-      seasonParticipantId_currencyCode: {
-        seasonParticipantId: seasonParticipant.id,
-        currencyCode: CurrencyCode.KRW,
-      },
-    },
-    update: {
-      balanceAmount: DEV_INITIAL_CAPITAL_KRW,
-    },
-    create: {
-      id: "wal_krw_dev_001",
-      seasonParticipantId: seasonParticipant.id,
-      currencyCode: CurrencyCode.KRW,
-      balanceAmount: DEV_INITIAL_CAPITAL_KRW,
-    },
-  });
-
-  await prisma.cashWallet.upsert({
-    where: {
-      seasonParticipantId_currencyCode: {
-        seasonParticipantId: seasonParticipant.id,
-        currencyCode: CurrencyCode.USD,
-      },
-    },
-    update: {
-      balanceAmount: ZERO_AMOUNT,
-    },
-    create: {
-      id: "wal_usd_dev_001",
-      seasonParticipantId: seasonParticipant.id,
-      currencyCode: CurrencyCode.USD,
-      balanceAmount: ZERO_AMOUNT,
-    },
-  });
-
-  await prisma.walletTransaction.upsert({
-    where: {
-      id: "wtx_initial_grant_dev_001",
-    },
-    update: {
-      seasonParticipantId: seasonParticipant.id,
-      walletId: krwWallet.id,
-      currencyCode: CurrencyCode.KRW,
-      direction: WalletTransactionDirection.credit,
-      txType: WalletTransactionType.initial_grant,
-      referenceType: WalletTransactionReferenceType.season_join,
-      referenceId: seasonParticipant.id,
-      amount: DEV_INITIAL_CAPITAL_KRW,
-      balanceAfter: DEV_INITIAL_CAPITAL_KRW,
-      occurredAt: seasonParticipant.joinedAt,
-    },
-    create: {
-      id: "wtx_initial_grant_dev_001",
-      seasonParticipantId: seasonParticipant.id,
-      walletId: krwWallet.id,
-      currencyCode: CurrencyCode.KRW,
-      direction: WalletTransactionDirection.credit,
-      txType: WalletTransactionType.initial_grant,
-      referenceType: WalletTransactionReferenceType.season_join,
-      referenceId: seasonParticipant.id,
-      amount: DEV_INITIAL_CAPITAL_KRW,
-      balanceAfter: DEV_INITIAL_CAPITAL_KRW,
-      occurredAt: seasonParticipant.joinedAt,
-    },
-  });
-
-  console.log("seed completed");
-  console.log({
-    userId: user.id,
-    seasonId: season.id,
-    seasonParticipantId: seasonParticipant.id,
-  });
+  console.log('seed completed (non-destructive)');
 }
 
 main()

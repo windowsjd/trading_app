@@ -1,60 +1,67 @@
-import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client';
 import { KIS_FIXED_ASSET_UNIVERSE } from '../src/providers/kis/kis-fixed-asset-universe';
+import {
+  formatDatabaseTarget,
+  loadRuntimeEnv,
+  requireDatabaseUrl,
+} from './lib/load-runtime-env';
+import {
+  type AssetUniverseApplyResult,
+  applyAssetUniverse,
+  describeAssetUniverseResult,
+} from './lib/asset-universe-apply';
+import type { AssetUniverseDesired } from './lib/asset-universe-upsert';
+
+/**
+ * Seed the fixed 40-symbol KIS stock universe (15 domestic + 25 US) into
+ * `assets`. Additive and idempotent: creates missing rows and refreshes the
+ * contract fields (name/currencies/assetType/isActive) on existing rows without
+ * touching prices, orders, positions, or the symbol list itself.
+ *
+ * Default run applies; `--dry-run` prints the plan without writing. Env is
+ * loaded like the backend so it targets the same DB.
+ */
+
+export function buildKisDesiredUniverse(): AssetUniverseDesired[] {
+  return KIS_FIXED_ASSET_UNIVERSE.map((entry) => ({
+    symbol: entry.symbol,
+    name: entry.name,
+    market: entry.market,
+    assetType: entry.assetType,
+    currencyCode: entry.currencyCode,
+    priceCurrency: entry.currencyCode,
+    settlementCurrency: entry.currencyCode,
+  }));
+}
+
+export async function seedKisFixedAssetUniverse(input: {
+  prisma: PrismaClient;
+  apply: boolean;
+}): Promise<AssetUniverseApplyResult> {
+  return applyAssetUniverse({
+    prisma: input.prisma,
+    desired: buildKisDesiredUniverse(),
+    apply: input.apply,
+  });
+}
 
 export async function runSeedKisFixedAssetUniverse(argv: string[]) {
   const dryRun = argv.includes('--dry-run');
+  loadRuntimeEnv();
 
-  if (dryRun) {
-    console.log(
-      `KIS fixed asset universe dry-run: ${KIS_FIXED_ASSET_UNIVERSE.length} assets would be upserted.`,
-    );
-    console.log(JSON.stringify(KIS_FIXED_ASSET_UNIVERSE, null, 2));
-    return;
-  }
-
-  if (!process.env.DATABASE_URL) {
-    throw new Error('DATABASE_URL is required.');
-  }
-
-  const adapter = new PrismaPg({
-    connectionString: process.env.DATABASE_URL,
-  });
+  const adapter = new PrismaPg({ connectionString: requireDatabaseUrl() });
   const prisma = new PrismaClient({ adapter });
 
   try {
-    for (const entry of KIS_FIXED_ASSET_UNIVERSE) {
-      const asset = await prisma.asset.upsert({
-        where: {
-          market_symbol: { market: entry.market, symbol: entry.symbol },
-        },
-        create: {
-          symbol: entry.symbol,
-          name: entry.name,
-          market: entry.market,
-          currencyCode: entry.currencyCode,
-          priceCurrency: entry.currencyCode,
-          settlementCurrency: entry.currencyCode,
-          assetType: entry.assetType,
-          isActive: true,
-        },
-        update: {
-          name: entry.name,
-          currencyCode: entry.currencyCode,
-          priceCurrency: entry.currencyCode,
-          settlementCurrency: entry.currencyCode,
-          assetType: entry.assetType,
-          isActive: true,
-        },
-        select: { id: true, symbol: true, market: true },
-      });
-      console.log(`upserted ${asset.market}:${asset.symbol} (${asset.id})`);
+    console.log(`Target DB: ${formatDatabaseTarget(process.env.DATABASE_URL)}`);
+    const result = await seedKisFixedAssetUniverse({ prisma, apply: !dryRun });
+    for (const line of describeAssetUniverseResult(
+      'KIS fixed asset universe',
+      result,
+    )) {
+      console.log(line);
     }
-
-    console.log(
-      `KIS fixed asset universe seed completed: ${KIS_FIXED_ASSET_UNIVERSE.length} assets.`,
-    );
   } finally {
     await prisma.$disconnect();
   }

@@ -549,7 +549,30 @@ pnpm dev:open-season
 npm run dev:open-season
 ```
 
-This upserts `sea_2026_s1` as `status=active`, `startAt=2000-01-01T00:00:00.000Z`, and `endAt=2099-12-31T23:59:59.000Z`. This is a temporary development/testing setting only.
+This upserts `sea_2026_s1` as `status=active`, `startAt=2000-01-01T00:00:00.000Z`, and `endAt=2099-12-31T23:59:59.000Z`. This is a temporary development/testing setting only. `--dry-run` reports the intended action without writing.
+
+All DB-touching dev/recovery scripts and `prisma db seed` now load env exactly like the running backend (`.env.local` > `.env.development` > `.env`, real `process.env` winning), so they always target the same database the API server uses. `prisma db seed` is non-destructive: it keeps the dev season open and creates the dev user/participant/wallets/initial grant only when absent, never resetting existing balances, ledgers, ranks, or the season window.
+
+### Recovering a reset local development database
+
+If the local development database was reset (business rows gone) but must NOT be dropped/reset any further, restore the dev baseline and register the fixed asset universes with one idempotent command:
+
+```bash
+cd backend
+pnpm dev:recover-local-data -- --dry-run   # plan only, guaranteed no writes
+pnpm dev:recover-local-data -- --apply     # perform the recovery
+```
+
+It keeps `sea_2026_s1` open, creates the dev user/participant/KRW+USD wallets/initial KRW grant only when absent (never resetting existing balances or ledgers, never double-granting), and registers the fixed 40 KIS stocks (15 domestic + 25 US) plus 10 Binance crypto assets. It is additive and safe to re-run: a second `--apply` reports everything `unchanged`. It never runs reset/drop/truncate/delete. The command prints a password-free DB identity, per-step create/update/unchanged counts, and a final verification (`40/40`, `10/10`, and active-asset counts by type).
+
+Register a single universe with the same safety contract:
+
+```bash
+pnpm dev:seed-kis-universe -- --dry-run       # default run applies; --dry-run plans only
+pnpm dev:seed-binance-universe -- --apply     # --dry-run is the safe default with no flag
+```
+
+The Binance seed validates all 10 symbols against the public `GET /api/v3/exchangeInfo` (exact symbol, `status=TRADING`, Spot permission, `quoteAsset=USDT`, matching `baseAsset`) before any write; a single failure aborts the whole run with no DB change (no partial registration), then upserts on the `(market, symbol)` key inside one transaction. `--apply` and `--dry-run` together are rejected as a validation error, and `--skip-provider-validation` is an offline-only escape hatch (loudly warned, refused under `NODE_ENV=production`). The fixed Binance universe is stored as `market=BINANCE`, `assetType=crypto`, and `currencyCode=priceCurrency=settlementCurrency=USD` (USDT-as-USD MVP policy; no `CurrencyCode.USDT`).
 
 Resolve "market data preparing" locally by opening the dev season, running providers, and verifying active asset coverage:
 

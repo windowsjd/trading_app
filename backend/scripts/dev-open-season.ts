@@ -1,97 +1,44 @@
-import { config as loadDotenv } from 'dotenv';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, SeasonStatus } from '../src/generated/prisma/client';
+import {
+  formatDatabaseTarget,
+  loadRuntimeEnv,
+  requireDatabaseUrl,
+} from './lib/load-runtime-env';
+import { ensureDevSeasonOpen } from './lib/dev-baseline';
 
-loadDotenv({ path: '.env.local', quiet: true });
-loadDotenv({ path: '.env.development', quiet: true });
-loadDotenv({ quiet: true });
+/**
+ * Open the local development season `sea_2026_s1` as always active
+ * (2000-2099). Thin CLI over the shared, non-destructive `ensureDevSeasonOpen`;
+ * `--dry-run` reports the intended action without writing. Env is loaded like
+ * the backend so it targets the same DB.
+ */
 
-const DEV_SEASON_ID = 'sea_2026_s1';
-const DEV_SEASON_START_AT = new Date('2000-01-01T00:00:00.000Z');
-const DEV_SEASON_END_AT = new Date('2099-12-31T23:59:59.000Z');
+async function main(argv: string[]) {
+  const dryRun = argv.includes('--dry-run');
+  loadRuntimeEnv();
 
-function requireDatabaseUrl() {
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) {
-    throw new Error('DATABASE_URL is required.');
-  }
-
-  return databaseUrl;
-}
-
-async function main() {
-  const adapter = new PrismaPg({
-    connectionString: requireDatabaseUrl(),
-  });
+  const adapter = new PrismaPg({ connectionString: requireDatabaseUrl() });
   const prisma = new PrismaClient({ adapter });
 
   try {
-    const otherActiveSeasons = await prisma.season.findMany({
-      where: {
-        status: SeasonStatus.active,
-        id: {
-          not: DEV_SEASON_ID,
-        },
-      },
-      orderBy: {
-        startAt: 'asc',
-      },
-      select: {
-        id: true,
-        name: true,
-        startAt: true,
-        endAt: true,
-      },
-    });
+    console.log(`Target DB: ${formatDatabaseTarget(process.env.DATABASE_URL)}`);
 
-    if (otherActiveSeasons.length > 0) {
+    const result = await ensureDevSeasonOpen({ prisma, apply: !dryRun });
+
+    for (const other of result.otherActiveSeasons) {
       console.warn(
-        `Warning: found ${otherActiveSeasons.length} other active season(s). They were not modified.`,
+        `Warning: other active season left unmodified: ${other.id} / ${other.name} / startAt=${other.startAt} / endAt=${other.endAt}`,
       );
-      for (const season of otherActiveSeasons) {
-        console.warn(
-          `- ${season.id} / ${season.name} / startAt=${season.startAt.toISOString()} / endAt=${season.endAt.toISOString()}`,
-        );
-      }
     }
 
-    const season = await prisma.season.upsert({
-      where: {
-        id: DEV_SEASON_ID,
-      },
-      update: {
-        name: 'Season 1',
-        status: SeasonStatus.active,
-        startAt: DEV_SEASON_START_AT,
-        endAt: DEV_SEASON_END_AT,
-        initialCapitalKrw: '10000000.00000000',
-        tradeFeeRate: '0.001000',
-        fxFeeRate: '0.001000',
-      },
-      create: {
-        id: DEV_SEASON_ID,
-        name: 'Season 1',
-        status: SeasonStatus.active,
-        startAt: DEV_SEASON_START_AT,
-        endAt: DEV_SEASON_END_AT,
-        initialCapitalKrw: '10000000.00000000',
-        tradeFeeRate: '0.001000',
-        fxFeeRate: '0.001000',
-      },
-    });
-
-    console.log('Development season is open.');
     console.log(
-      `- ${season.id} / ${season.name} / ${season.status} / startAt=${season.startAt.toISOString()} / endAt=${season.endAt.toISOString()}`,
+      `Development season ${result.seasonId}: ${result.action} (status=${result.status}, startAt=${result.startAt}, endAt=${result.endAt})`,
     );
 
     const activeSeasons = await prisma.season.findMany({
-      where: {
-        status: SeasonStatus.active,
-      },
-      orderBy: {
-        startAt: 'asc',
-      },
+      where: { status: SeasonStatus.active },
+      orderBy: { startAt: 'asc' },
       select: {
         id: true,
         name: true,
@@ -100,11 +47,10 @@ async function main() {
         endAt: true,
       },
     });
-
-    console.log('Active seasons');
-    for (const activeSeason of activeSeasons) {
+    console.log('Active seasons:');
+    for (const season of activeSeasons) {
       console.log(
-        `- ${activeSeason.id} / ${activeSeason.name} / ${activeSeason.status} / startAt=${activeSeason.startAt.toISOString()} / endAt=${activeSeason.endAt.toISOString()}`,
+        `- ${season.id} / ${season.name} / ${season.status} / startAt=${season.startAt.toISOString()} / endAt=${season.endAt.toISOString()}`,
       );
     }
   } finally {
@@ -113,7 +59,7 @@ async function main() {
 }
 
 if (require.main === module) {
-  main().catch((error: unknown) => {
+  main(process.argv.slice(2)).catch((error: unknown) => {
     process.exitCode = 1;
     if (error instanceof Error) {
       console.error(`dev open season failed: ${error.message}`);
