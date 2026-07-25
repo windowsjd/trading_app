@@ -22,6 +22,7 @@
     "smoke:candle-fixture": "tsx scripts/candle-release-fixture-smoke.ts",
     "integration:limit-order-idempotent-replay": "tsx scripts/limit-order-idempotent-replay-integration.ts",
     "smoke:candle-live": "tsx scripts/candle-live-smoke.ts",
+    "smoke:binance-fixed-universe": "tsx scripts/binance-fixed-universe-smoke.ts",
     "smoke:candle-report": "tsx scripts/candle-live-smoke-report.ts",
     "dev:open-season": "tsx scripts/dev-open-season.ts",
     "dev:run-provider-ingestions": "tsx scripts/dev-run-provider-ingestions.ts",

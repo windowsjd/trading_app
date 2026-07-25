@@ -22,6 +22,8 @@ import { buildLiveCandleOwnerLeaseKey } from '../assets/live-candle-store.servic
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisLockService, type RedisLock } from '../redis/redis-lock.service';
 import { parseBinanceFiveMinuteKline } from '../providers/binance/binance-kline.parser';
+import { parseBinanceWebSocketMessage } from '../providers/binance/binance-websocket.parser';
+import { BinanceWebSocketIngestionService } from '../providers/binance/binance-websocket.ingestion.service';
 import { ProviderConfigService } from '../providers/provider-config.service';
 import { toBinanceUsdtSymbol } from '../providers/provider-target-resolver.service';
 import { KisAuthClient } from '../providers/kis/kis-auth.client';
@@ -81,6 +83,10 @@ export class LiveCandleStreamSupervisorService
     private readonly normalizer: LiveCandleEventNormalizerService,
     private readonly pipeline: LiveCandlePipelineService,
     private readonly health: LiveCandleHealthService,
+    // In live-candle mode the standalone Binance ticker streaming service is
+    // disabled, so this owned connection also writes ticker price snapshots so
+    // the REST market list (which reads asset_price_snapshots) stays fresh.
+    private readonly binanceTickerIngestion: BinanceWebSocketIngestionService,
     @Inject(LIVE_CANDLE_CONFIG) private readonly config: LiveCandleConfig,
     @Inject(LIVE_CANDLE_SOCKET_FACTORY)
     private readonly socketFactory: LiveCandleSocketFactory,
@@ -260,10 +266,20 @@ export class LiveCandleStreamSupervisorService
       if (symbol) bySymbol.set(symbol, asset);
     }
     const desiredSymbols = [...bySymbol.keys()];
-    const streams = desiredSymbols
-      .slice(0, this.config.maxProviderSubscriptionsPerShard)
-      .map((symbol) => `${symbol.toLowerCase()}@kline_5m`);
-    if (streams.length === 0) throw namedError('BINANCE_STREAMS_EMPTY');
+    const cappedSymbols = desiredSymbols.slice(
+      0,
+      this.config.maxProviderSubscriptionsPerShard,
+    );
+    if (cappedSymbols.length === 0) throw namedError('BINANCE_STREAMS_EMPTY');
+    // One owned connection carries BOTH the 5m kline stream (candles) and the
+    // ticker stream (price snapshots) per symbol. This keeps a single Binance
+    // socket under a single owner lease while still feeding
+    // asset_price_snapshots in live-candle mode (where the standalone ticker
+    // streaming service is disabled).
+    const streams = cappedSymbols.flatMap((symbol) => [
+      `${symbol.toLowerCase()}@kline_5m`,
+      `${symbol.toLowerCase()}@ticker`,
+    ]);
     const socket = this.socketFactory(
       `${provider.binance.wsMarketDataBaseUrl.replace(/\/+$/u, '')}/ws`,
     );
@@ -313,14 +329,16 @@ export class LiveCandleStreamSupervisorService
       JSON.stringify({ method: 'SUBSCRIBE', params: streams, id: 1 }),
     );
     this.health.updateProvider('binance', {
-      state: desiredSymbols.length > streams.length ? 'degraded' : 'connected',
+      state:
+        desiredSymbols.length > cappedSymbols.length ? 'degraded' : 'connected',
       connectedAt: new Date().toISOString(),
+      // Subscription counts are per SYMBOL (each symbol opens 2 streams).
       subscriptionsRequested: desiredSymbols.length,
-      subscriptionsActive: streams.length,
-      subscriptionsFailed: desiredSymbols.length - streams.length,
+      subscriptionsActive: cappedSymbols.length,
+      subscriptionsFailed: desiredSymbols.length - cappedSymbols.length,
       delayed: false,
       lastErrorCode:
-        desiredSymbols.length > streams.length
+        desiredSymbols.length > cappedSymbols.length
           ? 'SUBSCRIPTION_SHARD_CAP'
           : null,
     });
@@ -458,6 +476,20 @@ export class LiveCandleStreamSupervisorService
   ): void {
     const text = socketDataToText(data);
     if (!text) return this.health.increment('eventsRejected');
+    // Route by event type so a ticker frame is never handed to the kline
+    // parser (or vice versa), which would inflate the rejected-event counter.
+    if (readBinanceStreamEventType(text) === '24hrTicker') {
+      this.handleBinanceTickerFrame(text, assets);
+      return;
+    }
+    this.handleBinanceKlineFrame(text, assets, context);
+  }
+
+  private handleBinanceKlineFrame(
+    text: string,
+    assets: Map<string, LiveCandleAsset>,
+    context: OwnedProviderContext,
+  ): void {
     const parsed = parseBinanceFiveMinuteKline(text);
     if (parsed.state !== 'kline') {
       if (parsed.state === 'failed') {
@@ -512,6 +544,48 @@ export class LiveCandleStreamSupervisorService
       }
       return result;
     });
+  }
+
+  private handleBinanceTickerFrame(
+    text: string,
+    assets: Map<string, LiveCandleAsset>,
+  ): void {
+    const parsed = parseBinanceWebSocketMessage({
+      frame: text,
+      receivedAt: new Date(),
+    });
+    if (parsed.state !== 'ticker') {
+      // ack / skipped frames are silent; only a genuine parse failure counts.
+      if (parsed.state === 'failed') this.health.increment('eventsRejected');
+      return;
+    }
+    if (!assets.has(parsed.ticker.providerSymbol)) {
+      this.health.increment('eventsRejected');
+      return;
+    }
+    // Ticker snapshots feed asset_price_snapshots (source binance_spot_ws_ticker)
+    // through the shared, throttled/deduped ingestion service. They must NOT
+    // drive candle trade-freshness (lastEventAt) — that readiness signal is
+    // owned by kline events only.
+    this.trackBackground(() =>
+      this.binanceTickerIngestion.ingestTicker(parsed.ticker, {
+        dryRun: false,
+        requestedBy: 'live-candle-binance-ticker',
+      }),
+    );
+  }
+
+  private trackBackground(operation: () => Promise<unknown>): void {
+    const promise = operation()
+      .then(() => undefined)
+      .catch((error: unknown) => {
+        this.health.updateProvider('binance', {
+          lastErrorCode:
+            error instanceof Error ? error.name : 'TICKER_INGEST_ERROR',
+        });
+      })
+      .finally(() => this.pendingEvents.delete(promise));
+    this.pendingEvents.add(promise);
   }
 
   private handleKisMessage(
@@ -767,6 +841,30 @@ function namedError(name: string): Error {
   const error = new Error(name);
   error.name = name;
   return error;
+}
+
+/**
+ * Cheap event-type probe used to route a Binance stream frame to the correct
+ * parser. Returns the `e` discriminator (e.g. `kline`, `24hrTicker`) unwrapping
+ * a combined-stream envelope, or null for control frames (ack / error) that
+ * carry no event type — those fall through to the kline handler which already
+ * treats ack and subscription-failure frames.
+ */
+function readBinanceStreamEventType(text: string): string | null {
+  try {
+    const payload = JSON.parse(text) as unknown;
+    const record =
+      payload && typeof payload === 'object' && 'data' in payload
+        ? (payload as { data: unknown }).data
+        : payload;
+    if (record && typeof record === 'object' && 'e' in record) {
+      const eventType = (record as { e: unknown }).e;
+      return typeof eventType === 'string' ? eventType : null;
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 function kisAssetKey(

@@ -805,6 +805,20 @@ async function main() {
           normalizer,
           pipeline,
           health,
+          {
+            ingestTicker: () =>
+              Promise.resolve({
+                success: true,
+                provider: 'binance',
+                dryRun: false,
+                received: 0,
+                created: 0,
+                skipped: 0,
+                wouldCreate: 0,
+                failed: 0,
+                tickers: [],
+              }),
+          } as never,
           { ...liveConfig, connectionLivenessTimeoutMs: 3_600_000 },
           () => sockets.shift() ?? new FakeProviderSocket(),
         );

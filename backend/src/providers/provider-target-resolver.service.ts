@@ -11,6 +11,7 @@ import {
   KIS_FIXED_DOMESTIC_SYMBOLS,
   KIS_FIXED_US_SYMBOLS,
 } from './kis/kis-fixed-asset-universe';
+import { BINANCE_FIXED_SYMBOLS } from './binance/binance-fixed-asset-universe';
 
 export type ProviderTargetSource = 'active_assets' | 'env' | 'merged';
 
@@ -40,7 +41,9 @@ type ActiveAssetTargetRecord = {
   isActive: boolean;
 };
 
-const DEFAULT_BINANCE_SYMBOLS = ['BTCUSDT', 'ETHUSDT'];
+// Env-target fallback shares the fixed 10-symbol universe used by the config
+// service and seeds — no separate BTC/ETH default lives here.
+const DEFAULT_BINANCE_SYMBOLS: string[] = [...BINANCE_FIXED_SYMBOLS];
 const DOMESTIC_KRX_MARKETS = new Set(['KRX', 'KOSPI', 'KOSDAQ', 'KONEX']);
 const US_STOCK_MARKETS = new Set(['NAS', 'NASDAQ', 'NYS', 'NYSE']);
 const BINANCE_SYMBOL_PATTERN = /^[A-Z0-9]{1,32}$/u;

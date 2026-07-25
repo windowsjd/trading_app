@@ -1,5 +1,6 @@
 import { buildProviderConfig } from './provider-config.service';
 import { ProviderConfigError } from './provider.types';
+import { BINANCE_FIXED_SYMBOLS } from './binance/binance-fixed-asset-universe';
 
 describe('provider config', () => {
   it('allows all providers disabled with missing secrets', () => {
@@ -184,6 +185,26 @@ describe('provider config', () => {
     });
 
     expect(config.binance.symbols).toEqual(['BTCUSDT', 'ETHUSDT']);
+  });
+
+  it('defaults Binance symbols to the fixed 10-symbol universe when unset', () => {
+    expect(buildProviderConfig({}).binance.symbols).toEqual([
+      ...BINANCE_FIXED_SYMBOLS,
+    ]);
+    expect(buildProviderConfig({}).binance.symbols).toHaveLength(10);
+  });
+
+  it('defaults Binance symbols to the fixed universe when the env value is blank', () => {
+    expect(
+      buildProviderConfig({ BINANCE_CRYPTO_SYMBOLS: '   ' }).binance.symbols,
+    ).toEqual([...BINANCE_FIXED_SYMBOLS]);
+  });
+
+  it('prefers an explicit BINANCE_CRYPTO_SYMBOLS value over the fixed default', () => {
+    expect(
+      buildProviderConfig({ BINANCE_CRYPTO_SYMBOLS: 'BTCUSDT,ETHUSDT' }).binance
+        .symbols,
+    ).toEqual(['BTCUSDT', 'ETHUSDT']);
   });
 
   it('parses Binance WebSocket streaming env defaults and overrides', () => {

@@ -63,6 +63,7 @@ import {
   defaultLiveCandleSocketFactory,
 } from '../src/realtime/live-candle-stream-supervisor.service';
 import { ProviderConfigService } from '../src/providers/provider-config.service';
+import { BinanceWebSocketIngestionService } from '../src/providers/binance/binance-websocket.ingestion.service';
 import { ProviderHttpClient } from '../src/providers/provider-http.client';
 import { BinancePublicClient } from '../src/providers/binance/binance-public.client';
 import { BinanceCandleIngestionService } from '../src/providers/binance/binance-candle.ingestion.service';
@@ -299,6 +300,7 @@ async function main() {
     normalizer,
     pipeline,
     health,
+    new BinanceWebSocketIngestionService(prisma, providerConfig),
     liveConfig,
     defaultLiveCandleSocketFactory,
   );

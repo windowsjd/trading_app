@@ -40,7 +40,9 @@ This project remains a virtual trading app. External provider APIs are used only
 
 - Uses public REST market data only.
 - Does not use Binance API key or secret.
-- Uses configured symbols such as `BTCUSDT` and `ETHUSDT`.
+- Symbols come from ONE source of truth. When `BINANCE_CRYPTO_SYMBOLS` is unset/blank, both `ProviderConfigService.binance.symbols` (general ticker WebSocket) and `resolveEnvProviderTargets().binanceSymbols` (REST env targeting) fall back to `BINANCE_FIXED_SYMBOLS` (the fixed 10-symbol universe); there is no separate `['BTCUSDT','ETHUSDT']` default in either place. `active_assets`/`merged` targeting instead builds symbols from the registered active DB assets, so all registered coins are covered, not just BTC/ETH.
+- REST 24hr ticker ingestion writes snapshots with `sourceName=binance_public_rest_24hr_ticker`; the Spot ticker WebSocket writes `sourceName=binance_spot_ws_ticker`. Both are eligible for crypto reads (`BINANCE_CRYPTO_USD_PROVIDER_SOURCE_PRIORITY`), so a coin is "price available" once either source has a fresh row.
+- In live-candle mode (`CANDLE_LIVE_STREAMING_ENABLED=true` + `CANDLE_LIVE_BINANCE_ENABLED=true`) the standalone ticker streaming service is disabled, so the live-candle supervisor's single owned Binance connection subscribes BOTH `<symbol>@kline_5m` (candles) AND `<symbol>@ticker`, routing ticker frames through the shared `BinanceWebSocketIngestionService` so `asset_price_snapshots` keep updating for the REST-backed market list. Startup backfill reuses `SCHEDULER_PROVIDER_INGESTION_RUN_ON_STARTUP` (no second startup ingestion path).
 - Inserts `asset_price_snapshots` rows with `sourceType=provider_api` and `currencyCode=USD` only when an existing active `BINANCE` crypto asset mapping is unambiguous.
 - Does not create fake assets.
 - MVP treats Binance USDT quote pairs as USD-equivalent for internal USD snapshot storage. USDT depeg risk is not modeled in this MVP foundation.
@@ -174,6 +176,14 @@ Binance:
 ```bash
 pnpm tsx scripts/provider-ingest-binance-prices.ts --dry-run --symbols BTCUSDT,ETHUSDT --requested-by local-operator
 ```
+
+Opt-in real Binance public market-data smoke for the fixed 10-symbol universe (read-only: public REST + WebSocket only, no DB, no API key, refused under `NODE_ENV=production`, reports `NOT_RUN` without the flag):
+
+```bash
+BINANCE_MARKET_DATA_SMOKE=1 pnpm smoke:binance-fixed-universe
+```
+
+It verifies exchangeInfo TRADING/Spot/USDT, REST 24hr ticker prices, and WS `@ticker` delivery for all 10 symbols.
 
 KIS WebSocket trade prices:
 

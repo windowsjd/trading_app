@@ -40,7 +40,7 @@ describe('LiveCandleStreamSupervisorService', () => {
     expect(fixture.factory).toHaveBeenCalledWith('wss://stream.example/ws');
     expect(JSON.parse(socket.sent[0])).toEqual({
       method: 'SUBSCRIBE',
-      params: ['btcusdt@kline_5m'],
+      params: ['btcusdt@kline_5m', 'btcusdt@ticker'],
       id: 1,
     });
     expect(socket.pong).toHaveBeenCalledWith(Buffer.from('heartbeat'));
@@ -63,6 +63,50 @@ describe('LiveCandleStreamSupervisorService', () => {
       subscriptionsActive: 1,
       delayed: false,
     });
+  });
+
+  it('routes a Binance ticker frame to snapshot ingestion, not the candle pipeline', async () => {
+    const socket = new FakeSocket();
+    const fixture = setup(() => socket);
+    const connected = connectBinance(fixture.service, ownerContext());
+    socket.open();
+    await new Promise((resolve) => setImmediate(resolve));
+    socket.emit('message', binanceTickerFrame());
+    await new Promise((resolve) => setImmediate(resolve));
+    socket.close(1000, 'fixture done');
+    await connected;
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(fixture.binanceTickerIngestion.ingestTicker).toHaveBeenCalledTimes(
+      1,
+    );
+    expect(fixture.binanceTickerIngestion.ingestTicker).toHaveBeenCalledWith(
+      expect.objectContaining({
+        providerSymbol: 'BTCUSDT',
+        price: '106.50000000',
+      }),
+      expect.objectContaining({ dryRun: false }),
+    );
+    // A ticker is not a candle event: the pipeline is untouched and nothing is
+    // counted as a rejected candle event.
+    expect(fixture.pipeline.process).not.toHaveBeenCalled();
+    expect(fixture.health.snapshot().liveCandle.eventsRejected).toBe(0);
+  });
+
+  it('does not call ticker ingestion for a kline frame (no double routing)', async () => {
+    const socket = new FakeSocket();
+    const fixture = setup(() => socket);
+    const connected = connectBinance(fixture.service, ownerContext());
+    socket.open();
+    await new Promise((resolve) => setImmediate(resolve));
+    socket.emit('message', binanceFrame());
+    await new Promise((resolve) => setImmediate(resolve));
+    socket.close(1000, 'fixture done');
+    await connected;
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(fixture.binanceTickerIngestion.ingestTicker).not.toHaveBeenCalled();
+    expect(fixture.pipeline.process).toHaveBeenCalledTimes(1);
   });
 
   it('uses bounded exponential reconnect without overlapping connection attempts', async () => {
@@ -317,6 +361,19 @@ function setup(
   };
   const pricePubSub = { publish: jest.fn().mockResolvedValue(true) };
   const health = new LiveCandleHealthService();
+  const binanceTickerIngestion = {
+    ingestTicker: jest.fn().mockResolvedValue({
+      success: true,
+      provider: 'binance',
+      dryRun: false,
+      received: 1,
+      created: 1,
+      skipped: 0,
+      wouldCreate: 0,
+      failed: 0,
+      tickers: [],
+    }),
+  };
   const factory = jest.fn(socketFactory);
   const service = new LiveCandleStreamSupervisorService(
     prisma as never,
@@ -327,6 +384,7 @@ function setup(
     normalizer as never,
     pipeline as never,
     health,
+    binanceTickerIngestion as never,
     {
       ...readLiveCandleConfig({}),
       enabled: true,
@@ -343,6 +401,7 @@ function setup(
     pipeline,
     pricePubSub,
     health,
+    binanceTickerIngestion,
     factory,
   };
 }
@@ -422,6 +481,19 @@ function startLeaseRenewal(
       startLeaseRenewal(context: unknown): void;
     }
   ).startLeaseRenewal(context);
+}
+
+function binanceTickerFrame(symbol = 'BTCUSDT', close = '106.5'): string {
+  return JSON.stringify({
+    e: '24hrTicker',
+    E: 299_500,
+    s: symbol,
+    c: close,
+    P: '1.5',
+    b: '106.4',
+    a: '106.6',
+    C: 299_400,
+  });
 }
 
 function binanceFrame(): string {

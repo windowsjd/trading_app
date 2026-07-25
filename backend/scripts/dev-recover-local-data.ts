@@ -10,7 +10,11 @@ import {
   loadRuntimeEnv,
   requireDatabaseUrl,
 } from './lib/load-runtime-env';
-import { parseApplyDryRunFlags } from './lib/cli-flags';
+import { parseRecoveryArgs } from './lib/recovery-args';
+import {
+  buildBinanceReadiness,
+  formatBinanceReadinessLines,
+} from './lib/market-readiness';
 import {
   ensureDevBaselineParticipant,
   ensureDevSeasonOpen,
@@ -27,6 +31,14 @@ import {
   buildBinanceDesiredUniverse,
   seedBinanceFixedAssetUniverse,
 } from './seed-binance-fixed-asset-universe';
+import type { PrismaService } from '../src/prisma/prisma.service';
+import { ProviderConfigService } from '../src/providers/provider-config.service';
+import {
+  ProviderTargetResolverService,
+  toBinanceUsdtSymbol,
+} from '../src/providers/provider-target-resolver.service';
+import { MarketSnapshotHealthService } from '../src/providers/market-snapshot-health.service';
+import { runProviderIngestionCheck } from './dev-run-provider-ingestions';
 
 /**
  * One-command, safe, repeatable recovery for a reset local dev DB.
@@ -41,9 +53,8 @@ import {
  */
 
 async function main(argv: string[]) {
-  const flags = parseApplyDryRunFlags(argv, {
-    allowSkipProviderValidation: true,
-  });
+  const { flags, ensureMarketSnapshots, operatorEmail, operatorUserId } =
+    parseRecoveryArgs(argv);
   loadRuntimeEnv();
   const databaseUrl = requireDatabaseUrl();
 
@@ -61,7 +72,7 @@ async function main(argv: string[]) {
 
   try {
     // 1) Development season kept open (non-destructive).
-    console.log('\n[1/4] Development season');
+    console.log('\n[1/5] Development season');
     const season = await ensureDevSeasonOpen({ prisma, apply: flags.apply });
     for (const other of season.otherActiveSeasons) {
       console.warn(
@@ -73,7 +84,7 @@ async function main(argv: string[]) {
     );
 
     // 2) Dev user / participant / wallets / grant (create-if-absent only).
-    console.log('\n[2/4] Dev baseline (user / participant / wallets / grant)');
+    console.log('\n[2/5] Dev baseline (user / participant / wallets / grant)');
     const baseline = await ensureDevBaselineParticipant({
       prisma,
       apply: flags.apply,
@@ -86,14 +97,14 @@ async function main(argv: string[]) {
     }
 
     // 3) KIS fixed universe (40).
-    console.log('\n[3/4] KIS fixed asset universe');
+    console.log('\n[3/5] KIS fixed asset universe');
     const kis = await seedKisFixedAssetUniverse({ prisma, apply: flags.apply });
     for (const line of describeAssetUniverseResult('  KIS', kis)) {
       console.log(line);
     }
 
     // 4) Binance fixed universe (10) — validated against exchangeInfo first.
-    console.log('\n[4/4] Binance fixed asset universe');
+    console.log('\n[4/5] Binance fixed asset universe');
     const binance = await seedBinanceFixedAssetUniverse({
       prisma,
       apply: flags.apply,
@@ -120,8 +131,9 @@ async function main(argv: string[]) {
       }
     }
 
-    // Final verification.
-    console.log('\n=== Final verification ===');
+    // Data-recovery verification (asset metadata + baseline) — deliberately
+    // distinct from market-data readiness reported in step [5/5].
+    console.log('\n=== Data recovery verification ===');
     const kisDesired = buildKisDesiredUniverse();
     const binanceDesired = buildBinanceDesiredUniverse();
     const kisVerify = await verifyAssetUniverse(prisma, kisDesired);
@@ -141,23 +153,135 @@ async function main(argv: string[]) {
       console.log(`  ! ${issue}`);
     }
 
-    const overallOk =
+    const dataRecoveryOk =
       binance.ok &&
       (flags.apply
         ? kisVerify.verified === kisVerify.total &&
           binanceVerify.verified === binanceVerify.total
         : true);
 
+    // 5) Market data readiness. Registering 50 assets is NOT the same as the
+    // market being ready (fresh price snapshots). Report the two separately.
+    console.log('\n[5/5] Market data readiness');
+    await runMarketSnapshotBootstrap({
+      apply: flags.apply,
+      ensureMarketSnapshots,
+      operatorEmail,
+      operatorUserId,
+    });
+    const readiness = await evaluateBinanceReadiness(prisma);
+    for (const line of formatBinanceReadinessLines(readiness)) {
+      console.log(line);
+    }
+
     console.log(
-      `\nRecovery ${overallOk ? 'OK' : 'INCOMPLETE'} (mode=${flags.mode}).` +
-        (flags.apply ? '' : ' Re-run with --apply to write.'),
+      `\nData recovery: ${dataRecoveryOk ? 'OK' : 'INCOMPLETE'}` +
+        (flags.apply ? '' : ' (dry-run; re-run with --apply to write)'),
     );
-    if (!overallOk) {
+    console.log(
+      `Market data readiness: ${readiness.ready ? 'READY' : 'NOT_READY'}`,
+    );
+
+    // Fail only when the recovery itself is incomplete, or a snapshot bootstrap
+    // was explicitly requested (with --apply) yet the market is still not
+    // ready. A plain recovery never fails on readiness alone, since provider
+    // env or network can legitimately be absent locally.
+    if (
+      !dataRecoveryOk ||
+      (ensureMarketSnapshots && flags.apply && !readiness.ready)
+    ) {
       process.exitCode = 1;
     }
   } finally {
     await prisma.$disconnect();
   }
+}
+
+/**
+ * Create fresh price snapshots for the registered Binance universe by reusing
+ * the existing provider-ingestion runner (no second startup ingestion path).
+ * Only runs on `--apply` + `--ensure-market-snapshots` with the provider gates
+ * enabled; otherwise it clearly reports NOT_RUN/SKIPPED with a reason.
+ */
+async function runMarketSnapshotBootstrap(input: {
+  apply: boolean;
+  ensureMarketSnapshots: boolean;
+  operatorEmail?: string;
+  operatorUserId?: string;
+}): Promise<void> {
+  if (!input.ensureMarketSnapshots) {
+    console.log(
+      '  Market snapshot bootstrap: NOT_RUN (pass --ensure-market-snapshots to create snapshots)',
+    );
+    return;
+  }
+  if (!input.apply) {
+    console.log(
+      '  Market snapshot bootstrap: SKIPPED (dry-run; re-run with --apply)',
+    );
+    return;
+  }
+
+  const config = new ProviderConfigService().getConfig();
+  if (!config.common.providerIngestionEnabled) {
+    console.log('  Market snapshot bootstrap: NOT_RUN');
+    console.log('  Reason: PROVIDER_INGESTION_DISABLED');
+    return;
+  }
+  if (!config.binance.enabled) {
+    console.log('  Market snapshot bootstrap: NOT_RUN');
+    console.log('  Reason: BINANCE_PUBLIC_MARKET_DATA_DISABLED');
+    return;
+  }
+
+  const providerArgs = [
+    '--provider',
+    'binance',
+    '--target-source',
+    'active_assets',
+    '--no-fail-on-unavailable',
+  ];
+  if (config.koreaEximExchange.enabled) {
+    providerArgs.push('--provider', 'korea-exim');
+  } else if (config.exchangeRateApi.enabled) {
+    providerArgs.push('--provider', 'exchange-rate');
+  }
+  if (input.operatorEmail) {
+    providerArgs.push('--operator-email', input.operatorEmail);
+  }
+  if (input.operatorUserId) {
+    providerArgs.push('--operator-user-id', input.operatorUserId);
+  }
+
+  console.log(
+    '  Market snapshot bootstrap: RUNNING (Binance REST + any enabled FX provider)',
+  );
+  try {
+    await runProviderIngestionCheck(providerArgs, {
+      title: 'Market snapshot bootstrap',
+    });
+  } catch (error) {
+    console.error(
+      `  Market snapshot bootstrap: FAILED — ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+}
+
+async function evaluateBinanceReadiness(prisma: PrismaClient) {
+  const prismaService = prisma as unknown as PrismaService;
+  const resolver = new ProviderTargetResolverService(prismaService);
+  const health = new MarketSnapshotHealthService(prismaService, resolver);
+  const [targets, coverage] = await Promise.all([
+    resolver.resolveProviderTargets({ targetSource: 'active_assets' }),
+    health.checkActiveAssetCoverage({ targetSource: 'active_assets' }),
+  ]);
+  return buildBinanceReadiness({
+    assets: coverage.assets,
+    binanceTargetSymbols: targets.binanceSymbols,
+    toProviderSymbol: (symbol) => toBinanceUsdtSymbol(symbol),
+  });
 }
 
 async function countActiveAssetsByType(prisma: PrismaClient): Promise<{

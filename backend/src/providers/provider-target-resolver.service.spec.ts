@@ -15,7 +15,9 @@ import { AssetType, CurrencyCode } from '../generated/prisma/client';
 import {
   ProviderTargetResolverService,
   resolveActiveAssetTargetsFromRecords,
+  resolveEnvProviderTargets,
 } from './provider-target-resolver.service';
+import { BINANCE_FIXED_SYMBOLS } from './binance/binance-fixed-asset-universe';
 
 describe('ProviderTargetResolverService', () => {
   it('builds Binance BTCUSDT target from active BTC crypto asset', () => {
@@ -136,6 +138,19 @@ describe('ProviderTargetResolverService', () => {
     expect(targets.binanceSymbols).toEqual(['BTCUSDT', 'ETHUSDT']);
     expect(targets.kisDomesticSymbols).toEqual(['005930']);
     expect(targets.kisUsSymbols).toEqual(['AAPL', 'TSLA']);
+  });
+
+  it('falls back to the fixed 10-symbol Binance universe when the env watchlist is unset', () => {
+    const targets = resolveEnvProviderTargets({});
+    expect(targets.binanceSymbols).toEqual([...BINANCE_FIXED_SYMBOLS]);
+    expect(targets.binanceSymbols).toHaveLength(10);
+  });
+
+  it('honors an explicit BINANCE_CRYPTO_SYMBOLS env override over the fixed default', () => {
+    const targets = resolveEnvProviderTargets({
+      BINANCE_CRYPTO_SYMBOLS: 'BTCUSDT, bnbusdt',
+    });
+    expect(targets.binanceSymbols).toEqual(['BTCUSDT', 'BNBUSDT']);
   });
 });
 

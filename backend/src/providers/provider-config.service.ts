@@ -14,6 +14,7 @@ import {
   KIS_FIXED_DOMESTIC_SYMBOLS,
   KIS_FIXED_US_SYMBOLS,
 } from './kis/kis-fixed-asset-universe';
+import { BINANCE_FIXED_SYMBOLS } from './binance/binance-fixed-asset-universe';
 
 export type CommonProviderConfig = {
   providerIngestionEnabled: boolean;
@@ -221,8 +222,12 @@ export function buildProviderConfig(env: ProviderEnv): ProviderConfig {
     wsMarketDataBaseUrl:
       readOptionalTrimmedEnv(env, 'BINANCE_WS_MARKET_DATA_BASE_URL') ??
       'wss://stream.binance.com:9443',
+    // Fallback is the fixed 10-symbol Binance MVP universe (single source of
+    // truth), NOT a separate BTC/ETH pair. The ticker WebSocket streaming
+    // service subscribes from this list, so an unset BINANCE_CRYPTO_SYMBOLS
+    // must still stream all 10 registered coins.
     symbols:
-      binanceSymbols.length > 0 ? binanceSymbols : ['BTCUSDT', 'ETHUSDT'],
+      binanceSymbols.length > 0 ? binanceSymbols : [...BINANCE_FIXED_SYMBOLS],
     usdtAsUsdEquivalent: readBooleanEnv(
       env,
       'BINANCE_CRYPTO_USDT_AS_USD_EQUIVALENT',
