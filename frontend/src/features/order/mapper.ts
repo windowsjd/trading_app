@@ -9,9 +9,9 @@ import {
 } from '../../services/api/errorMapper.ts';
 import { formatSourceMetadata } from '../../models/dto/common.ts';
 import {
+  formatAssetPrice,
   formatCurrency,
   formatKrw,
-  formatMoney,
   getAssetNameDisplay,
 } from '../../utils/format.ts';
 
@@ -52,10 +52,22 @@ export function getOrderQuoteExpiresInSeconds(
   return Math.max(0, Math.floor((expiresAt - getNowTimestamp(now)) / 1000));
 }
 
-export function getOrderQuoteDisplay(quote: OrderQuoteDto) {
+/**
+ * `displayPriceDecimals` (from the asset DTO) applies to the UNIT price only.
+ * Money totals — gross/fee/net/wallet — keep the currency's own formatting so a
+ * crypto tick size never widens an amount column.
+ */
+export function getOrderQuoteDisplay(
+  quote: OrderQuoteDto,
+  displayPriceDecimals?: number | null,
+) {
   return {
     quoteId: displayValue(quote.quoteId),
-    price: formatMoney(quote.price, quote.currencyCode),
+    price: formatAssetPrice(
+      quote.price,
+      quote.currencyCode,
+      displayPriceDecimals,
+    ),
     quantity: displayValue(quote.quantity),
     grossAmount: formatCurrency(quote.grossAmount, quote.currencyCode),
     feeRate: displayValue(quote.feeRate),
@@ -154,7 +166,10 @@ export function getLimitQuoteEstimateDisplay(
   };
 }
 
-export function getOrderSuccessDisplay(result: CreateOrderDto) {
+export function getOrderSuccessDisplay(
+  result: CreateOrderDto,
+  displayPriceDecimals?: number | null,
+) {
   const order = result.order;
   const execution = result.execution;
   const asset = order.asset;
@@ -179,9 +194,10 @@ export function getOrderSuccessDisplay(result: CreateOrderDto) {
     quantity: displayValue(order.quantity ?? execution.quantity),
     executedPrice: isSubmittedLimit
       ? displayValue(null)
-      : formatMoney(
+      : formatAssetPrice(
           execution.executedPrice ?? execution.executePrice ?? order.price,
           currencyCode,
+          displayPriceDecimals,
         ),
     currencyCode: displayValue(currencyCode),
     grossAmount: isSubmittedLimit
@@ -200,8 +216,16 @@ export function getOrderSuccessDisplay(result: CreateOrderDto) {
     executedAt: isSubmittedLimit
       ? displayValue(null)
       : displayValue(execution.executedAt),
-    quotedPrice: formatCurrency(execution.quotedPrice, currencyCode),
-    executePrice: formatCurrency(execution.executePrice, currencyCode),
+    quotedPrice: formatAssetPrice(
+      execution.quotedPrice,
+      currencyCode,
+      displayPriceDecimals,
+    ),
+    executePrice: formatAssetPrice(
+      execution.executePrice,
+      currencyCode,
+      displayPriceDecimals,
+    ),
     priceChangeBps: displayValue(execution.priceChangeBps),
     quotedRate: displayValue(execution.quotedRate),
     executeRate: displayValue(execution.executeRate),
@@ -212,7 +236,11 @@ export function getOrderSuccessDisplay(result: CreateOrderDto) {
       execution.walletBalanceAfter,
       currencyCode,
     ),
-    limitPrice: formatMoney(order.limitPrice, currencyCode),
+    limitPrice: formatAssetPrice(
+      order.limitPrice,
+      currencyCode,
+      displayPriceDecimals,
+    ),
     reservedAmount: formatCurrency(
       execution.reservedAmount ?? order.reservedAmount,
       currencyCode,

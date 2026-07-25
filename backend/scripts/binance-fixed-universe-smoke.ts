@@ -10,6 +10,7 @@ import {
   type BinanceExchangeInfoResponse,
   validateBinanceSpotUniverse,
 } from '../src/providers/binance/binance-exchange-info.validation';
+import { readBinanceSymbolPricePrecision } from '../src/providers/binance/binance-tick-size';
 import { loadRuntimeEnv } from './lib/load-runtime-env';
 
 /**
@@ -22,6 +23,7 @@ import { loadRuntimeEnv } from './lib/load-runtime-env';
  * refused under NODE_ENV=production. Without the env flag it reports NOT_RUN and
  * exits 0 (never a fake pass). It verifies:
  *   1. exchangeInfo TRADING/Spot/USDT for all 10,
+ *   1b. exchangeInfo PRICE_FILTER.tickSize matches the declared display decimals,
  *   2. REST 24hr ticker returns a positive price for all 10,
  *   3. the WS ticker stream delivers at least one tick per symbol within a bound.
  */
@@ -78,6 +80,36 @@ async function main() {
     );
   }
 
+  // 1b) PRICE_FILTER.tickSize vs the reviewed fixed-universe fallback. The app
+  // prefers the live value at runtime; this catches drift in the constant that
+  // serves display decimals whenever exchangeInfo is unreachable.
+  const livePrecision = new Map(
+    readBinanceSymbolPricePrecision(exchangeInfo.json).map((entry) => [
+      entry.symbol,
+      entry,
+    ]),
+  );
+  let tickSizeOk = 0;
+  for (const entry of BINANCE_FIXED_ASSET_UNIVERSE) {
+    const live = livePrecision.get(entry.symbol);
+    if (!live) {
+      console.error(
+        `  x tickSize ${entry.symbol}: no PRICE_FILTER in response`,
+      );
+      continue;
+    }
+    if (live.displayPriceDecimals !== entry.displayPriceDecimals) {
+      console.error(
+        `  x tickSize ${entry.symbol}: live ${live.priceTickSize} (${live.displayPriceDecimals}d) != declared ${entry.priceTickSize} (${entry.displayPriceDecimals}d)`,
+      );
+      continue;
+    }
+    tickSizeOk += 1;
+  }
+  console.log(
+    `tickSize display decimals: ${tickSizeOk}/${BINANCE_FIXED_SYMBOLS.length}`,
+  );
+
   // 2) REST 24hr ticker per symbol (public endpoint, no gates).
   let restOk = 0;
   for (const symbol of BINANCE_FIXED_SYMBOLS) {
@@ -119,6 +151,7 @@ async function main() {
 
   const pass =
     validation.ok &&
+    tickSizeOk === BINANCE_FIXED_SYMBOLS.length &&
     restOk === BINANCE_FIXED_SYMBOLS.length &&
     wsOk === BINANCE_FIXED_SYMBOLS.length;
   console.log(`\nbinance-fixed-universe-smoke: ${pass ? 'PASS' : 'FAIL'}`);

@@ -3,6 +3,7 @@ import { ProviderConfigService } from '../provider-config.service';
 import { ProviderHttpClient } from '../provider-http.client';
 import { ProviderConfigError } from '../provider.types';
 import type {
+  BinanceExchangeInfoApiResponse,
   BinanceKlinesResponse,
   BinanceTicker24hrResponse,
 } from './binance.types';
@@ -47,6 +48,63 @@ export class BinancePublicClient {
         timeoutMs: config.common.httpTimeoutMs,
       },
     );
+
+    return {
+      response: result.json,
+      receivedAt: result.receivedAt,
+    };
+  }
+
+  /**
+   * `GET /api/v3/exchangeInfo` for an explicit symbol list — the same public,
+   * key-less endpoint the fixed-universe seed/smoke already uses. Only symbol
+   * trading rules (incl. `PRICE_FILTER.tickSize`) come back; no account data.
+   */
+  async fetchExchangeInfo(symbols: readonly string[]): Promise<{
+    response: BinanceExchangeInfoApiResponse;
+    receivedAt: Date;
+  }> {
+    const config = this.configService.getConfig();
+    if (!config.common.providerIngestionEnabled) {
+      throw new ProviderConfigError(
+        'common',
+        'PROVIDER_INGESTION_DISABLED',
+        'Provider ingestion is disabled.',
+      );
+    }
+
+    if (!config.binance.enabled) {
+      throw new ProviderConfigError(
+        'binance',
+        'PROVIDER_DISABLED',
+        'Binance public market data provider is disabled.',
+      );
+    }
+
+    const normalized = [
+      ...new Set(
+        symbols
+          .map((symbol) => symbol.trim().toUpperCase())
+          .filter((symbol) => symbol.length > 0),
+      ),
+    ];
+    if (normalized.length === 0) {
+      throw new ProviderConfigError(
+        'binance',
+        'BINANCE_EXCHANGE_INFO_SYMBOLS_EMPTY',
+        'Binance exchangeInfo requires at least one symbol.',
+      );
+    }
+
+    const baseUrl = config.binance.restBaseUrl.replace(/\/+$/u, '');
+    const url = `${baseUrl}/api/v3/exchangeInfo?symbols=${encodeURIComponent(
+      JSON.stringify(normalized),
+    )}`;
+    const result =
+      await this.httpClient.getJson<BinanceExchangeInfoApiResponse>(url, {
+        provider: 'binance',
+        timeoutMs: config.common.httpTimeoutMs,
+      });
 
     return {
       response: result.json,

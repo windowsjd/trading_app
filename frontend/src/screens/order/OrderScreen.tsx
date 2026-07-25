@@ -59,8 +59,8 @@ import {
 } from '../../services/api/errorMapper';
 import { createIdempotencyKey } from '../../utils/idempotency';
 import {
+  formatAssetPrice,
   formatCurrency,
-  formatMoney,
   getAssetNameDisplay,
 } from '../../utils/format';
 
@@ -376,7 +376,10 @@ export default function OrderScreen({ route, navigation }: Props) {
   );
 
   const quoteDisplay = useMemo(
-    () => (quoteData ? getOrderQuoteDisplay(quoteData) : null),
+    () =>
+      quoteData
+        ? getOrderQuoteDisplay(quoteData, asset?.displayPriceDecimals)
+        : null,
     [quoteData],
   );
 
@@ -659,7 +662,12 @@ export default function OrderScreen({ route, navigation }: Props) {
             주문 방향 {side === 'buy' ? '매수' : '매도'}
           </Text>
           <Text style={styles.helper}>
-            현재가 {formatMoney(price?.currentPrice, asset.priceCurrency)}
+            현재가{' '}
+            {formatAssetPrice(
+              price?.currentPrice,
+              asset.priceCurrency,
+              asset.displayPriceDecimals,
+            )}
           </Text>
           <Text style={styles.helper}>보유 수량 {positionQuantity}</Text>
           <Text style={styles.helper}>
@@ -855,9 +863,10 @@ export default function OrderScreen({ route, navigation }: Props) {
                 <>
                   <Text style={styles.helper}>
                     지정가{' '}
-                    {formatCurrency(
+                    {formatAssetPrice(
                       quoteData.limitPrice,
                       quoteData.currencyCode,
+                      asset.displayPriceDecimals,
                     )}
                   </Text>
                   <Text style={styles.helper}>
@@ -1020,6 +1029,7 @@ export default function OrderScreen({ route, navigation }: Props) {
         // Supplies the quote-time estimates for an unfilled limit buy; the
         // order row itself carries no gross/fee/net until it fills.
         quote={successQuoteData}
+        displayPriceDecimals={asset?.displayPriceDecimals}
         onClose={() => {
           setSuccessState(clearOrderSuccess());
         }}

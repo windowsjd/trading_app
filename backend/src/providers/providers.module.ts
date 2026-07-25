@@ -6,6 +6,7 @@ import { BinancePublicClient } from './binance/binance-public.client';
 import { BinancePriceIngestionService } from './binance/binance-price.ingestion.service';
 import { BinanceRealtimePriceCacheService } from './binance/binance-realtime-price-cache.service';
 import { BinanceRealtimePriceEventBus } from './binance/binance-realtime-price-event-bus.service';
+import { BinanceSymbolMetadataService } from './binance/binance-symbol-metadata.service';
 import { BinanceWebSocketIngestionService } from './binance/binance-websocket.ingestion.service';
 import { BinanceWebSocketStreamingService } from './binance/binance-websocket-streaming.service';
 import { ExchangeRateClient } from './exchange-rate/exchange-rate.client';
@@ -50,6 +51,7 @@ import { BinanceCandleIngestionService } from './binance/binance-candle.ingestio
     BinancePriceIngestionService,
     BinanceRealtimePriceCacheService,
     BinanceRealtimePriceEventBus,
+    BinanceSymbolMetadataService,
     BinanceWebSocketIngestionService,
     BinanceWebSocketStreamingService,
     {
@@ -101,6 +103,7 @@ import { BinanceCandleIngestionService } from './binance/binance-candle.ingestio
     BinancePriceIngestionService,
     BinanceRealtimePriceCacheService,
     BinanceRealtimePriceEventBus,
+    BinanceSymbolMetadataService,
     BinanceWebSocketIngestionService,
     BinanceWebSocketStreamingService,
     KisAuthClient,

@@ -32,6 +32,13 @@ export interface MarketAssetItemDto {
   name: string;
   market: string;
   priceCurrency: CurrencyCode;
+  /**
+   * Unit-price display decimals declared by the provider (Binance
+   * PRICE_FILTER.tickSize). Optional/nullable: null or absent keeps the
+   * currency's default formatting. Never used for money totals.
+   */
+  displayPriceDecimals?: number | null;
+  changeRate?: PercentString | null;
   settlementCurrency: CurrencyCode;
   isActive: boolean;
   marketStatus: string;

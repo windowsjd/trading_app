@@ -46,6 +46,8 @@ export interface AssetDetailAssetDto {
   name: string;
   market: string;
   priceCurrency: CurrencyCode;
+  /** See MarketAssetItemDto.displayPriceDecimals (same additive field). */
+  displayPriceDecimals?: number | null;
   settlementCurrency: CurrencyCode;
   isActive: boolean;
   marketStatus: string;

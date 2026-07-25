@@ -16,8 +16,11 @@ import {
 import { IncomingMessage } from 'node:http';
 import { URL } from 'node:url';
 import { WebSocket, WebSocketServer as WsServer } from 'ws';
-import { UserStatus } from '../generated/prisma/client';
-import { AssetsService } from '../assets/assets.service';
+import { CurrencyCode, UserStatus } from '../generated/prisma/client';
+import {
+  AssetsService,
+  type RealtimePriceKrwConversion,
+} from '../assets/assets.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   BinanceRealtimePriceEvent,
@@ -529,6 +532,7 @@ export class AssetTickerGateway
         assetId: asset.id,
         symbol: asset.symbol,
         name: asset.name,
+        displayPriceDecimals: asset.displayPriceDecimals ?? null,
         priceLocal: null,
         priceCurrency: asset.priceCurrency,
         priceKrw: null,
@@ -551,6 +555,7 @@ export class AssetTickerGateway
       assetId: asset.id,
       symbol: asset.symbol,
       name: asset.name,
+      displayPriceDecimals: asset.displayPriceDecimals ?? null,
       priceLocal: price.currentPrice,
       priceCurrency: price.priceCurrency,
       priceKrw: priceKrwAvailable ? price.priceKrw : null,
@@ -585,6 +590,11 @@ export class AssetTickerGateway
     const delayed =
       event.type === 'kis_realtime_price' &&
       event.price.sourceName === 'kis_us_delayed_trade';
+    // The snapshot-derived `priceKrw` belongs to an OLDER local price. Pairing
+    // it with this event's fresh local price would render two different points
+    // in time as one quote, so KRW is recomputed from the currently eligible
+    // USD/KRW snapshot and reported unavailable when there is none.
+    const krw = await this.buildRealtimePriceKrw(event);
 
     return {
       ...ticker,
@@ -606,7 +616,41 @@ export class AssetTickerGateway
       ...('changeRate' in event.price
         ? { changeRate: event.price.changeRate }
         : {}),
+      ...(krw.state === 'available'
+        ? {
+            priceKrw: krw.priceKrw,
+            priceKrwState: 'available' as const,
+            priceKrwReason: undefined,
+            priceKrwMessage: undefined,
+            ...(krw.fxRateSource ? { fxRateSource: krw.fxRateSource } : {}),
+          }
+        : {
+            priceKrw: null,
+            priceKrwState: 'unavailable' as const,
+            priceKrwReason: krw.reason,
+            priceKrwMessage: krw.message,
+            ...(krw.fxRateSource ? { fxRateSource: krw.fxRateSource } : {}),
+          }),
     };
+  }
+
+  private async buildRealtimePriceKrw(
+    event: RealtimePriceEvent,
+  ): Promise<RealtimePriceKrwConversion> {
+    try {
+      return await this.assetsService.convertRealtimePriceToKrw({
+        priceLocal: event.price.price,
+        priceCurrency: event.price.currencyCode as CurrencyCode,
+      });
+    } catch {
+      // A KRW conversion failure must never suppress the local realtime price.
+      return {
+        state: 'unavailable',
+        reason: 'FX_RATE_UNAVAILABLE',
+        message: 'USD/KRW FX rate snapshot is unavailable.',
+        fxRateSource: null,
+      };
+    }
   }
 
   private async authenticate(request: IncomingMessage): Promise<string | null> {

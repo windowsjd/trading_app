@@ -120,6 +120,12 @@ Binance:
 
 Binance Spot WebSocket streaming is the real-time crypto price path. It uses public `<symbol>@ticker` market streams without Binance API keys, updates the in-memory latest-price cache on every tick, publishes `/api/v1/ws` `asset_ticker` events, and stores throttled `asset_price_snapshots` with `sourceName=binance_spot_ws_ticker`. The REST 24hr ticker ingestion path remains available for fallback/manual/debug use.
 
+**App price basis.** The price the app shows for a Binance asset is the *Binance Spot last trade price* — the `c` field of the `24hrTicker` event. `b`/`a` (best bid/ask) travel in the realtime event for completeness but are NOT displayed, and there is no mid-price. Binance Futures, mark price, index price, other exchanges and cross-exchange averages are explicitly out of scope, so a value compared against a Futures/mark-price screen can legitimately differ. USDT quote pairs are treated as USD-equivalent (MVP policy; no `CurrencyCode.USDT`), so a small USDT/USD basis difference is also expected. Only `@ticker` is subscribed — no `@trade`, `@aggTrade` or `@bookTicker`.
+
+**Which service fans out.** Exactly one path is active per configuration: with `CANDLE_LIVE_STREAMING_ENABLED=true` + `CANDLE_LIVE_BINANCE_ENABLED=true` the live-candle owner connection carries `@ticker` and publishes it (see `docs/candle-live-operations.md`), and `BinanceWebSocketStreamingService` reports `state=disabled`; otherwise the standalone streaming service owns the fanout. Both use `sourceName=binance_spot_ws_ticker` and the same event payload, and both keep the `BINANCE_WS_SNAPSHOT_THROTTLE_MS` (default 5000) DB write throttle. Restarting the backend after a mode switch leaves exactly one active path.
+
+**Display precision (`PRICE_FILTER.tickSize`).** `BinanceSymbolMetadataService` derives per-symbol unit-price display decimals from the public `GET /api/v3/exchangeInfo` endpoint already used by the seed/smoke — no new vendor, no API key, no DB table and no migration. Reads are synchronous from an in-memory cache (6h TTL, refreshed in the background, at most one refresh in flight; a failed refresh keeps the last successful values and retries no sooner than 5 minutes later, logging only an error code). Until a refresh lands — and whenever the provider is disabled or unreachable — it serves the reviewed `priceTickSize`/`displayPriceDecimals` constants in `binance-fixed-asset-universe.ts`; `pnpm smoke:binance-fixed-universe` verifies those constants against the live tickSize. Current values: BTC/ETH/BNB/SOL/ZEC = 2, LINK = 3, XRP/TRX/XLM = 4, DOGE = 5. The value is exposed to clients as `displayPriceDecimals` (see `docs/assets-api-contract.md`); non-Binance assets get `null` and keep their existing formatting.
+
 KIS:
 
 - `KIS_MARKET_DATA_ENABLED`
@@ -183,7 +189,7 @@ Opt-in real Binance public market-data smoke for the fixed 10-symbol universe (r
 BINANCE_MARKET_DATA_SMOKE=1 pnpm smoke:binance-fixed-universe
 ```
 
-It verifies exchangeInfo TRADING/Spot/USDT, REST 24hr ticker prices, and WS `@ticker` delivery for all 10 symbols.
+It verifies exchangeInfo TRADING/Spot/USDT, `PRICE_FILTER.tickSize` vs the declared `displayPriceDecimals`, REST 24hr ticker prices, and WS `@ticker` delivery for all 10 symbols.
 
 KIS WebSocket trade prices:
 

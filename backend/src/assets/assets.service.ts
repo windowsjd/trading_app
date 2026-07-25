@@ -1,4 +1,9 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Optional,
+} from '@nestjs/common';
 import {
   AssetPriceSourceType,
   AssetType,
@@ -22,6 +27,7 @@ import {
   presentSourceDecision,
   type PublicSourceMetadata,
 } from '../providers/source-metadata.presenter';
+import { BinanceSymbolMetadataService } from '../providers/binance/binance-symbol-metadata.service';
 import { buildPagination, type Pagination } from '../common/pagination';
 import { isSeasonCurrentlyActive } from '../seasons/season-lifecycle.policy';
 import { resolveStockMarketSessionState } from '../orders/market-calendar.policy';
@@ -165,9 +171,30 @@ export type AssetTickerPriceSelection = {
     assetType: AssetType;
     market: string;
     priceCurrency: CurrencyCode;
+    displayPriceDecimals: number | null;
   };
   price: AssetPricePayload;
 };
+
+/**
+ * KRW conversion for a realtime local price that is NEWER than any stored
+ * snapshot. Realtime fanout must never pair a fresh local price with the KRW
+ * value of an older snapshot, so the gateway recomputes it here from the
+ * currently eligible USD/KRW snapshot (same source-eligibility policy as REST)
+ * or reports it unavailable.
+ */
+export type RealtimePriceKrwConversion =
+  | {
+      state: 'available';
+      priceKrw: string;
+      fxRateSource: PublicSourceMetadata | null;
+    }
+  | {
+      state: 'unavailable';
+      reason: 'FX_RATE_UNAVAILABLE' | 'FX_RATE_STALE';
+      message: string;
+      fxRateSource: PublicSourceMetadata | null;
+    };
 
 type AssetListItem = ReturnType<AssetsService['formatAssetMetadata']> & {
   price?: AssetPricePayload;
@@ -208,6 +235,7 @@ type AssetPriceResponse = {
         market: string;
         currentPrice: string;
         priceCurrency: CurrencyCode;
+        displayPriceDecimals: number | null;
         priceKrwState: 'available' | 'unavailable';
         priceKrw: string | null;
         priceKrwReason?: 'FX_RATE_UNAVAILABLE' | 'FX_RATE_STALE';
@@ -228,6 +256,7 @@ type AssetPriceResponse = {
         assetType: AssetType;
         market: string;
         priceCurrency: CurrencyCode;
+        displayPriceDecimals: number | null;
         currentPrice: null;
         priceKrwState: 'unavailable';
         priceKrw: null;
@@ -253,7 +282,14 @@ const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
 
 @Injectable()
 export class AssetsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    // Optional so unit specs (and any consumer without ProvidersModule) can
+    // construct the service; a missing provider simply yields
+    // `displayPriceDecimals: null`, which keeps the previous display policy.
+    @Optional()
+    private readonly binanceSymbolMetadata?: BinanceSymbolMetadataService,
+  ) {}
 
   async getAssets(
     userId: string | undefined,
@@ -408,6 +444,7 @@ export class AssetsService {
           assetType: asset.assetType,
           market: asset.market,
           priceCurrency: this.getAssetPriceCurrency(asset),
+          displayPriceDecimals: this.getDisplayPriceDecimals(asset),
           currentPrice: null,
           priceKrwState: 'unavailable',
           priceKrw: null,
@@ -438,6 +475,7 @@ export class AssetsService {
         market: asset.market,
         currentPrice: price.currentPrice,
         priceCurrency: price.priceCurrency,
+        displayPriceDecimals: this.getDisplayPriceDecimals(asset),
         priceKrwState: price.priceKrwState,
         priceKrw: priceKrwAvailable ? price.priceKrw : null,
         ...(priceKrwAvailable
@@ -494,8 +532,52 @@ export class AssetsService {
         assetType: asset.assetType,
         market: asset.market,
         priceCurrency: this.getAssetPriceCurrency(asset),
+        displayPriceDecimals: this.getDisplayPriceDecimals(asset),
       },
       price: price.payload,
+    };
+  }
+
+  /**
+   * Converts a realtime local price to KRW with the currently eligible USD/KRW
+   * snapshot. KRW-priced assets are already KRW, so their local price is
+   * returned unchanged. Returns `unavailable` (never a stale mix) when no
+   * eligible FX row exists.
+   */
+  async convertRealtimePriceToKrw(input: {
+    priceLocal: string;
+    priceCurrency: CurrencyCode;
+    valuationAt?: Date;
+  }): Promise<RealtimePriceKrwConversion> {
+    if (input.priceCurrency === CurrencyCode.KRW) {
+      return {
+        state: 'available',
+        priceKrw: this.formatDecimal(new Prisma.Decimal(input.priceLocal), 8),
+        fxRateSource: null,
+      };
+    }
+
+    const selection = await this.findUsdKrwSelection(
+      input.valuationAt ?? new Date(),
+    );
+    if (selection.state === 'available') {
+      return {
+        state: 'available',
+        priceKrw: this.formatDecimal(
+          new Prisma.Decimal(input.priceLocal).mul(selection.rate),
+          8,
+        ),
+        fxRateSource: presentSourceDecision(selection.sourceDecision),
+      };
+    }
+
+    return {
+      state: 'unavailable',
+      reason: selection.code,
+      message: selection.message,
+      fxRateSource: selection.sourceDecision
+        ? presentSourceDecision(selection.sourceDecision)
+        : null,
     };
   }
 
@@ -1206,6 +1288,23 @@ export class AssetsService {
     };
   }
 
+  /**
+   * Per-asset unit-price display decimals, or null when the app has no
+   * provider-declared precision for that asset (all non-Binance assets today).
+   * Money totals are unaffected — this is a unit-price display hint only.
+   */
+  private getDisplayPriceDecimals(asset: {
+    market: string;
+    symbol: string;
+  }): number | null {
+    return (
+      this.binanceSymbolMetadata?.getDisplayPriceDecimals({
+        market: asset.market,
+        symbol: asset.symbol,
+      }) ?? null
+    );
+  }
+
   private formatAssetMetadata(asset: AssetRecord, tradingUx: AssetTradingUx) {
     return {
       assetId: asset.id,
@@ -1217,6 +1316,9 @@ export class AssetsService {
       currencyCode: asset.currencyCode,
       priceCurrency: this.getAssetPriceCurrency(asset),
       settlementCurrency: this.getAssetSettlementCurrency(asset),
+      // Additive, nullable display hint (Binance PRICE_FILTER.tickSize based).
+      // Clients that ignore it keep their previous formatting.
+      displayPriceDecimals: this.getDisplayPriceDecimals(asset),
       isActive: asset.isActive,
       changeRate: tradingUx.changeRate,
       marketStatus: tradingUx.marketStatus,

@@ -2,6 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 
 import { getRealtimeSocketManager } from '../../services/ws/sharedRealtimeSocket';
 import type { RealtimeSubscriptionEvent } from '../../services/ws/realtimeSocketManager';
+import {
+  applyTicker,
+  isTickerStale,
+  type AssetTickerAcceptState,
+  type AssetTickerMessage,
+} from './assetTickerPolicy';
 
 interface UseAssetTickerParams {
   assetId: string;
@@ -20,24 +26,9 @@ export type AssetTickerConnectionState =
   | 'auth_failed'
   | 'subscription_error';
 
-export interface AssetTickerMessage {
-  type: 'asset_ticker';
-  assetId: string;
-  symbol?: string;
-  name?: string;
-  priceLocal: string | null;
-  priceCurrency?: 'KRW' | 'USD';
-  priceKrw: string | null;
-  priceKrwState?: string;
-  changeRate?: string | null;
-  assetPriceSnapshotId?: string | null;
-  priceCapturedAt?: string | null;
-  priceEffectiveAt?: string | null;
-  capturedAt?: string | null;
-  freshnessAgeSeconds?: number | null;
-  reason?: string;
-  message?: string;
-}
+// The ticker shape and the accept/stale rules are shared with the market list;
+// re-exported here so existing `useAssetTicker` imports keep working.
+export type { AssetTickerMessage } from './assetTickerPolicy';
 
 type AssetTickerControlMessage = {
   type?: string;
@@ -46,27 +37,6 @@ type AssetTickerControlMessage = {
   code?: string;
   message?: string;
 };
-
-const STALE_FRESHNESS_THRESHOLD_SECONDS = 60;
-
-function parseTimestamp(value?: string | null) {
-  if (!value) return null;
-  const timestamp = Date.parse(value);
-  return Number.isFinite(timestamp) ? timestamp : null;
-}
-
-function getTickerTimestamp(payload: AssetTickerMessage) {
-  return parseTimestamp(payload.priceCapturedAt ?? payload.capturedAt) ??
-    parseTimestamp(payload.priceEffectiveAt);
-}
-
-function isTickerStale(payload: AssetTickerMessage | null) {
-  const freshnessAgeSeconds = payload?.freshnessAgeSeconds;
-  if (typeof freshnessAgeSeconds !== 'number') return false;
-
-  // Server-driven freshness metadata is not yet exposed as a threshold.
-  return freshnessAgeSeconds > STALE_FRESHNESS_THRESHOLD_SECONDS;
-}
 
 function isCurrentAssetTickerControlMessage(
   payload: AssetTickerControlMessage,
@@ -84,10 +54,6 @@ function isRelevantAssetTickerError(
   return true;
 }
 
-function isUnavailableTicker(payload: AssetTickerMessage) {
-  return !!payload.priceKrwState && payload.priceKrwState !== 'available';
-}
-
 /**
  * Subscribes to the asset_ticker channel on the app-wide shared WebSocket.
  * The socket itself is owned by RealtimeSocketManager and is shared with
@@ -99,9 +65,7 @@ export function useAssetTicker({
   wsUrl,
   enabled = true,
 }: UseAssetTickerParams) {
-  const latestTickerRef = useRef<AssetTickerMessage | null>(null);
-  const latestSnapshotIdRef = useRef<string | null>(null);
-  const latestTimestampRef = useRef<number | null>(null);
+  const acceptStateRef = useRef<AssetTickerAcceptState | null>(null);
 
   const [latestTicker, setLatestTicker] = useState<AssetTickerMessage | null>(null);
   const [connectionState, setConnectionState] =
@@ -121,31 +85,15 @@ export function useAssetTicker({
     const acceptTicker = (payload: AssetTickerMessage) => {
       if (payload.assetId !== assetId) return;
 
-      const snapshotId = payload.assetPriceSnapshotId ?? null;
-      if (snapshotId && snapshotId === latestSnapshotIdRef.current) return;
+      const current = acceptStateRef.current;
+      const next = applyTicker(current, payload);
+      // Rejected by the shared policy (duplicate snapshot / older timestamp /
+      // unorderable priced event): keep the last accepted ticker as-is.
+      if (next === current) return;
 
-      const nextTimestamp = getTickerTimestamp(payload);
-      const currentTimestamp = latestTimestampRef.current;
-      if (
-        nextTimestamp === null &&
-        latestTickerRef.current &&
-        !isUnavailableTicker(payload)
-      ) {
-        return;
-      }
-      if (
-        nextTimestamp !== null &&
-        currentTimestamp !== null &&
-        nextTimestamp < currentTimestamp
-      ) {
-        return;
-      }
-
-      latestTickerRef.current = payload;
-      latestSnapshotIdRef.current = snapshotId;
-      latestTimestampRef.current = nextTimestamp;
-      setLatestTicker(payload);
-      setIsStale(isTickerStale(payload));
+      acceptStateRef.current = next;
+      setLatestTicker(next?.ticker ?? null);
+      setIsStale(isTickerStale(next?.ticker ?? null));
     };
 
     const onEvent = (event: RealtimeSubscriptionEvent) => {

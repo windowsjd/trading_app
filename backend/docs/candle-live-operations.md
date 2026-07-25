@@ -11,8 +11,9 @@ provider WebSocket -> typed parser/normalizer -> owner-checked Redis Lua
                    -> Redis Pub/Sub -> authenticated /api/v1/ws gateways
                    -> subscribed chart clients
 
-validated latest price -> separate Redis provider-price Pub/Sub
-                       -> existing asset_ticker subscribers
+Binance @ticker  -> immediate provider-price Redis Pub/Sub
+                 -> existing asset_ticker subscribers (no DB wait)
+                 -> (separately) throttled asset_price_snapshots write
 
 bucket close + grace -> PostgreSQL MarketCandle upsert
                      -> response-cache generation invalidation
@@ -27,7 +28,12 @@ The persisted intervals remain `5m`, `1d`, and `1w`. Current `15m`, `30m`, `1h`,
 ## Provider feeds
 
 - Binance uses native Spot `@kline_5m`. Each frame is an absolute OHLC/base-volume/quote-volume snapshot; volume is replaced, not added. The supervisor answers ping, reconnects with bounded exponential backoff/jitter, restores subscriptions, and rolls the connection before Binance's 24-hour limit.
-- The owned Binance connection ALSO subscribes `<symbol>@ticker` for every active crypto asset (2 streams per symbol on the one socket, one owner lease). Frames are routed by event type (`e`): `kline` events drive the candle pipeline; `24hrTicker` events are written to `asset_price_snapshots` via the shared `BinanceWebSocketIngestionService` (`sourceName=binance_spot_ws_ticker`, existing throttle/dedup). This keeps the REST market list (which reads `asset_price_snapshots`) fresh in live-candle mode, where the standalone ticker streaming service is disabled. Ticker writes never touch the candle trade-freshness (`lastEventAt`) readiness signal, which stays kline-only, and a ticker frame is never fed to the kline parser (no rejected-event inflation). All active crypto symbols are covered — not just BTC/ETH.
+- The owned Binance connection ALSO subscribes `<symbol>@ticker` for every active crypto asset (2 streams per symbol on the one socket, one owner lease). Frames are routed by event type (`e`): `kline` events drive the candle pipeline; `24hrTicker` events start TWO independent jobs, neither waiting on the other:
+  1. **App fanout (immediate).** The ticker is published to the shared provider-price Redis Pub/Sub (`ProviderPricePubSubService`, the same topic the kline path uses) as soon as the frame is parsed, with `assetId`, the ticker's `c` (last trade price) as `price`, `changeRate` (`P`), `bidPrice` (`b`), `askPrice` (`a`), `effectiveAt`/`capturedAt` and `sourceName=binance_spot_ws_ticker`. `snapshotState` is `null` because the DB write has not been decided yet. The screen price is therefore NOT gated on a DB write or on the gateway's 3s snapshot polling. A failed publish increments `pubSubPublishFailure`.
+  2. **DB snapshot (throttled, background).** The same ticker goes to the shared `BinanceWebSocketIngestionService` (`sourceName=binance_spot_ws_ticker`), keeping the existing per-asset throttle (`BINANCE_WS_SNAPSHOT_THROTTLE_MS`, default 5000) and dedup, so write volume is unchanged. This keeps the REST market list (which reads `asset_price_snapshots`) fresh in live-candle mode, where the standalone ticker streaming service is disabled. A thrown error or a `success: false` result is recorded on the Binance provider's `lastErrorCode` — a failed write never blocks the fanout, but it is never silent either.
+
+  Ticker frames never touch the candle trade-freshness (`lastEventAt`) readiness signal, which stays kline-only, and a ticker frame is never fed to the kline parser (no rejected-event inflation). All active crypto symbols are covered — not just BTC/ETH.
+- Exactly one Binance ticker fanout path is live at a time: `BinanceWebSocketStreamingService.start()` stands down (`state=disabled`) when `CANDLE_LIVE_STREAMING_ENABLED=true` and `CANDLE_LIVE_BINANCE_ENABLED=true`, so the standalone socket and the live-candle owner connection can never publish the same ticker twice. With live-candle Binance off, the standalone service owns the fanout as before. Both paths use the same `binance_spot_ws_ticker` source name and the same event payload contract.
 - KIS domestic uses the official `H0STCNT0` regular-session trade fields. Trade quantity is a delta; session cumulative volume/amount are parsed for identity/diagnostics but are not treated as a 5-minute delta.
 - KIS US uses `HDFSCNT0`, which is a delayed trade feed. It is exposed as `delayed=true`, uses exchange `XYMD/XHMS` for the candle bucket, and is never described as real-time. It remains disabled unless `CANDLE_LIVE_KIS_US_DELAYED_ENABLED=true`. No unsupported real-time US entitlement is silently substituted.
 
@@ -378,8 +384,27 @@ One app session opens ONE authenticated `/api/v1/ws` socket.
 `frontend/src/services/ws/realtimeSocketManager.ts` owns connect/reconnect
 backoff, token loading, reference-counted `asset_ticker`/`asset_candle`
 subscriptions, restoration after reconnects, and message routing;
-`useAssetTicker`/`useAssetCandle` only register subscriptions and release
-them on unmount (the socket closes when the last subscription is released).
+`useAssetTicker`/`useAssetCandle`/`useMarketTickers` only register
+subscriptions and release them on unmount (the socket closes when the last
+subscription is released).
+
+The market list is REST baseline + live overlay:
+`MarketScreen` renders the paginated REST rows immediately, then
+`useMarketTickers` subscribes the currently loaded assetIds on that SAME
+shared socket (many `asset_ticker` subscriptions, one connection — never one
+socket per symbol, and no batch channel). New pages add only the new ids; a
+tab change subscribes the new tab BEFORE releasing the old one so the socket
+is never left without subscribers. `mergeMarketAssetTicker` overlays only the
+price fields onto the REST row and returns the SAME object for untouched
+rows, so the memoized `MarketAssetRow` re-renders only the asset that ticked.
+
+Detail and list share ONE acceptance policy
+(`frontend/src/features/asset/assetTickerPolicy.ts`): a repeated
+`assetPriceSnapshotId` is ignored, an older event time never overwrites a
+newer one, a priced event with no timestamp never overwrites a known price
+(an unavailable one still applies), staleness is judged from the server's
+`freshnessAgeSeconds` (> 60s), and a disconnect keeps the last good price on
+screen behind a single screen-level reconnect notice.
 Auth failures (1008/UNAUTHORIZED) stop reconnection; candle subscriptions get
 a `restored` event after every reconnect which triggers the HTTP baseline
 refetch, and `resync_required` handling is unchanged.

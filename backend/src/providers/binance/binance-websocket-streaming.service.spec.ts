@@ -30,6 +30,7 @@ import { BinanceWebSocketStreamingService } from './binance-websocket-streaming.
 
 describe('Binance WebSocket streaming service', () => {
   const originalWebSocket = globalThis.WebSocket;
+  const originalEnv = { ...process.env };
   let service: BinanceWebSocketStreamingService | null = null;
 
   beforeEach(() => {
@@ -41,6 +42,7 @@ describe('Binance WebSocket streaming service', () => {
     await service?.stop();
     service = null;
     globalThis.WebSocket = originalWebSocket;
+    process.env = { ...originalEnv };
     jest.restoreAllMocks();
   });
 
@@ -63,6 +65,41 @@ describe('Binance WebSocket streaming service', () => {
       running: false,
       state: 'disabled',
       connected: false,
+    });
+  });
+
+  it('stands down in live-candle Binance mode so a ticker is never fanned out twice', async () => {
+    // The live-candle owner connection carries <symbol>@ticker itself; running
+    // this standalone socket at the same time would publish every ticker twice.
+    process.env.CANDLE_LIVE_STREAMING_ENABLED = 'true';
+    process.env.CANDLE_LIVE_BINANCE_ENABLED = 'true';
+    const ingestionService = createIngestionService();
+    service = createService({ ingestionService });
+
+    service.start();
+    await flushAsync();
+
+    expect(FakeWebSocket.instances).toHaveLength(0);
+    expect(ingestionService.ingestParsedMessage).not.toHaveBeenCalled();
+    expect(service.getStatus()).toMatchObject({
+      enabled: false,
+      running: false,
+      state: 'disabled',
+    });
+  });
+
+  it('owns the ticker fanout when live-candle Binance mode is off', async () => {
+    process.env.CANDLE_LIVE_STREAMING_ENABLED = 'false';
+    process.env.CANDLE_LIVE_BINANCE_ENABLED = 'false';
+    service = createService();
+
+    service.start();
+    await flushAsync();
+
+    expect(FakeWebSocket.instances).toHaveLength(1);
+    expect(service.getStatus()).toMatchObject({
+      enabled: true,
+      connected: true,
     });
   });
 

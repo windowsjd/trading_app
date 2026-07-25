@@ -1,6 +1,22 @@
+/**
+ * `assets.market` value for every Binance Spot asset. Declared in this pure
+ * module so precision/metadata code can key on it without importing the
+ * Prisma-bound ingestion module; `BINANCE_MARKET` re-exports this value.
+ */
+export const BINANCE_ASSET_MARKET = 'BINANCE';
+
 export type BinanceFixedAssetUniverseEntry = {
   /** Binance Spot trading symbol as returned by exchangeInfo, e.g. `BTCUSDT`. */
   symbol: string;
+  /**
+   * Last reviewed `PRICE_FILTER.tickSize` for this symbol. This is a FALLBACK
+   * only: BinanceSymbolMetadataService prefers the live exchangeInfo value and
+   * uses this constant when the provider is disabled or unreachable.
+   * `scripts/binance-fixed-universe-smoke.ts` verifies it against the real API.
+   */
+  priceTickSize: string;
+  /** Display decimals derived from `priceTickSize` (fallback, see above). */
+  displayPriceDecimals: number;
   /** Spot base asset, e.g. `BTC`. Must equal exchangeInfo `baseAsset`. */
   baseAsset: string;
   name: string;
@@ -40,6 +56,8 @@ export const BINANCE_FIXED_ASSET_UNIVERSE: readonly BinanceFixedAssetUniverseEnt
   [
     {
       symbol: 'BTCUSDT',
+      priceTickSize: '0.01000000',
+      displayPriceDecimals: 2,
       baseAsset: 'BTC',
       name: 'Bitcoin',
       market: 'BINANCE',
@@ -50,6 +68,8 @@ export const BINANCE_FIXED_ASSET_UNIVERSE: readonly BinanceFixedAssetUniverseEnt
     },
     {
       symbol: 'ETHUSDT',
+      priceTickSize: '0.01000000',
+      displayPriceDecimals: 2,
       baseAsset: 'ETH',
       name: 'Ethereum',
       market: 'BINANCE',
@@ -60,6 +80,8 @@ export const BINANCE_FIXED_ASSET_UNIVERSE: readonly BinanceFixedAssetUniverseEnt
     },
     {
       symbol: 'BNBUSDT',
+      priceTickSize: '0.01000000',
+      displayPriceDecimals: 2,
       baseAsset: 'BNB',
       name: 'BNB',
       market: 'BINANCE',
@@ -70,6 +92,8 @@ export const BINANCE_FIXED_ASSET_UNIVERSE: readonly BinanceFixedAssetUniverseEnt
     },
     {
       symbol: 'XRPUSDT',
+      priceTickSize: '0.00010000',
+      displayPriceDecimals: 4,
       baseAsset: 'XRP',
       name: 'XRP',
       market: 'BINANCE',
@@ -80,6 +104,8 @@ export const BINANCE_FIXED_ASSET_UNIVERSE: readonly BinanceFixedAssetUniverseEnt
     },
     {
       symbol: 'SOLUSDT',
+      priceTickSize: '0.01000000',
+      displayPriceDecimals: 2,
       baseAsset: 'SOL',
       name: 'Solana',
       market: 'BINANCE',
@@ -90,6 +116,8 @@ export const BINANCE_FIXED_ASSET_UNIVERSE: readonly BinanceFixedAssetUniverseEnt
     },
     {
       symbol: 'TRXUSDT',
+      priceTickSize: '0.00010000',
+      displayPriceDecimals: 4,
       baseAsset: 'TRX',
       name: 'TRON',
       market: 'BINANCE',
@@ -100,6 +128,8 @@ export const BINANCE_FIXED_ASSET_UNIVERSE: readonly BinanceFixedAssetUniverseEnt
     },
     {
       symbol: 'DOGEUSDT',
+      priceTickSize: '0.00001000',
+      displayPriceDecimals: 5,
       baseAsset: 'DOGE',
       name: 'Dogecoin',
       market: 'BINANCE',
@@ -110,6 +140,8 @@ export const BINANCE_FIXED_ASSET_UNIVERSE: readonly BinanceFixedAssetUniverseEnt
     },
     {
       symbol: 'ZECUSDT',
+      priceTickSize: '0.01000000',
+      displayPriceDecimals: 2,
       baseAsset: 'ZEC',
       name: 'Zcash',
       market: 'BINANCE',
@@ -120,6 +152,8 @@ export const BINANCE_FIXED_ASSET_UNIVERSE: readonly BinanceFixedAssetUniverseEnt
     },
     {
       symbol: 'XLMUSDT',
+      priceTickSize: '0.00010000',
+      displayPriceDecimals: 4,
       baseAsset: 'XLM',
       name: 'Stellar',
       market: 'BINANCE',
@@ -130,6 +164,8 @@ export const BINANCE_FIXED_ASSET_UNIVERSE: readonly BinanceFixedAssetUniverseEnt
     },
     {
       symbol: 'LINKUSDT',
+      priceTickSize: '0.00100000',
+      displayPriceDecimals: 3,
       baseAsset: 'LINK',
       name: 'Chainlink',
       market: 'BINANCE',

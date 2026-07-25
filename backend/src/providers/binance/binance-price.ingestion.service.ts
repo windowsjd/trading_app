@@ -7,6 +7,7 @@ import {
   Prisma,
 } from '../../generated/prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { BINANCE_ASSET_MARKET } from './binance-fixed-asset-universe';
 import { ProviderConfigService } from '../provider-config.service';
 import { buildProviderRawPayloadJson } from '../provider-raw-payload';
 import { ProviderConfigError, ProviderHttpError } from '../provider.types';
@@ -47,7 +48,7 @@ type BinanceAssetMapping =
       reason: string;
     };
 
-export const BINANCE_MARKET = 'BINANCE';
+export const BINANCE_MARKET = BINANCE_ASSET_MARKET;
 export const BINANCE_REST_24HR_TICKER_SOURCE_NAME =
   'binance_public_rest_24hr_ticker';
 export const BINANCE_SPOT_WS_TICKER_SOURCE_NAME = 'binance_spot_ws_ticker';

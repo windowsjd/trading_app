@@ -33,7 +33,17 @@ describe('AssetTickerGateway', () => {
     jest.useRealTimers();
   });
 
-  const createGateway = (selection: unknown) => {
+  const createGateway = (
+    selection: unknown,
+    krwConversion: unknown = {
+      state: 'available',
+      priceKrw: '1.00000000',
+      fxRateSource: {
+        sourceType: 'provider_api',
+        sourceName: 'korea_exim_exchange_rate',
+      },
+    },
+  ) => {
     const prisma = {
       user: {
         findUnique: jest.fn(),
@@ -56,6 +66,7 @@ describe('AssetTickerGateway', () => {
     };
     const assetsService = {
       getAssetPriceForTicker: jest.fn().mockResolvedValue(selection),
+      convertRealtimePriceToKrw: jest.fn().mockResolvedValue(krwConversion),
     };
     const eventBus = new KisRealtimePriceEventBus();
     const binanceEventBus = new BinanceRealtimePriceEventBus();
@@ -373,5 +384,143 @@ describe('AssetTickerGateway', () => {
     });
 
     expect(ticker).toMatchObject({ realtime: false, delayed: true });
+  });
+
+  const binanceSelection = (displayPriceDecimals: number | null) => ({
+    asset: {
+      id: 'asset-doge',
+      symbol: 'DOGEUSDT',
+      name: 'Dogecoin',
+      assetType: 'crypto',
+      market: 'BINANCE',
+      priceCurrency: CurrencyCode.USD,
+      displayPriceDecimals,
+    },
+    price: {
+      state: 'available',
+      currentPrice: '0.24500000',
+      changeRate: null,
+      priceCurrency: CurrencyCode.USD,
+      priceKrwState: 'available',
+      // Deliberately stale: paired with the OLD 0.245 local price.
+      priceKrw: '343.00000000',
+      assetPriceSnapshotId: 'price-provider-1',
+      priceEffectiveAt: '2026-06-19T03:00:00.000Z',
+      priceCapturedAt: '2026-06-19T03:00:10.000Z',
+      priceSource: {
+        sourceType: 'provider_api',
+        sourceName: 'binance_spot_ws_ticker',
+      },
+    },
+  });
+
+  const binanceTickerEvent = {
+    type: 'binance_realtime_price',
+    assetId: 'asset-doge',
+    snapshotState: null,
+    price: {
+      key: 'DOGEUSDT',
+      providerSymbol: 'DOGEUSDT',
+      streamName: 'dogeusdt@ticker',
+      price: '0.24560000',
+      changeRate: '1.75000000',
+      bidPrice: '0.24559000',
+      askPrice: '0.24561000',
+      currencyCode: CurrencyCode.USD,
+      sourceName: 'binance_spot_ws_ticker',
+      capturedAt: '2026-06-19T03:00:29.000Z',
+      effectiveAt: '2026-06-19T03:00:29.000Z',
+      updatedAt: '2026-06-19T03:00:29.000Z',
+    },
+  };
+
+  it('carries displayPriceDecimals on both polled and realtime ticker payloads', async () => {
+    const { gateway } = createGateway(binanceSelection(5));
+
+    const polled = await buildTickerMessage(gateway, 'asset-doge');
+    const realtime = await buildRealtimeTickerMessage(
+      gateway,
+      binanceTickerEvent,
+    );
+
+    expect(polled).toMatchObject({ displayPriceDecimals: 5 });
+    expect(realtime).toMatchObject({ displayPriceDecimals: 5 });
+  });
+
+  it('sends displayPriceDecimals null when no provider precision is known', async () => {
+    const { gateway } = createGateway(binanceSelection(null));
+
+    const ticker = await buildTickerMessage(gateway, 'asset-doge');
+
+    expect(ticker).toMatchObject({ displayPriceDecimals: null });
+  });
+
+  it('recomputes KRW for a realtime price instead of reusing the snapshot KRW', async () => {
+    const { gateway, assetsService } = createGateway(binanceSelection(5), {
+      state: 'available',
+      priceKrw: '343.84000000',
+      fxRateSource: {
+        sourceType: 'provider_api',
+        sourceName: 'korea_exim_exchange_rate',
+      },
+    });
+
+    const ticker = await buildRealtimeTickerMessage(
+      gateway,
+      binanceTickerEvent,
+    );
+
+    expect(assetsService.convertRealtimePriceToKrw).toHaveBeenCalledWith({
+      priceLocal: '0.24560000',
+      priceCurrency: CurrencyCode.USD,
+    });
+    expect(ticker).toMatchObject({
+      priceLocal: '0.24560000',
+      priceKrw: '343.84000000',
+      priceKrwState: 'available',
+      fxRateSource: { sourceName: 'korea_exim_exchange_rate' },
+    });
+    // The stale snapshot KRW never reaches the client.
+    expect(ticker.priceKrw).not.toBe('343.00000000');
+  });
+
+  it('reports KRW unavailable rather than mixing a fresh local price with a stale FX conversion', async () => {
+    const { gateway } = createGateway(binanceSelection(5), {
+      state: 'unavailable',
+      reason: 'FX_RATE_STALE',
+      message: 'USD/KRW FX rate snapshot is stale.',
+      fxRateSource: null,
+    });
+
+    const ticker = await buildRealtimeTickerMessage(
+      gateway,
+      binanceTickerEvent,
+    );
+
+    expect(ticker).toMatchObject({
+      priceLocal: '0.24560000',
+      priceKrw: null,
+      priceKrwState: 'unavailable',
+      priceKrwReason: 'FX_RATE_STALE',
+    });
+  });
+
+  it('keeps the local realtime price when the KRW conversion throws', async () => {
+    const { gateway, assetsService } = createGateway(binanceSelection(5));
+    assetsService.convertRealtimePriceToKrw.mockRejectedValue(
+      new Error('db down'),
+    );
+
+    const ticker = await buildRealtimeTickerMessage(
+      gateway,
+      binanceTickerEvent,
+    );
+
+    expect(ticker).toMatchObject({
+      priceLocal: '0.24560000',
+      priceKrw: null,
+      priceKrwState: 'unavailable',
+      priceKrwReason: 'FX_RATE_UNAVAILABLE',
+    });
   });
 });

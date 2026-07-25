@@ -133,11 +133,16 @@ describe('AssetsService', () => {
     $transaction: jest.fn(),
   });
 
-  const createService = () => {
+  const createService = (binanceSymbolMetadata?: {
+    getDisplayPriceDecimals: jest.Mock;
+  }) => {
     const prisma = createPrisma();
-    const service = new AssetsService(prisma as never);
+    const service = new AssetsService(
+      prisma as never,
+      binanceSymbolMetadata as never,
+    );
 
-    return { prisma, service };
+    return { prisma, service, binanceSymbolMetadata };
   };
 
   const mockTradableSeason = (prisma: ReturnType<typeof createPrisma>) => {
@@ -292,6 +297,50 @@ describe('AssetsService', () => {
     const { service } = createService();
 
     await expectApiError(service.getAssets(undefined), 401, 'UNAUTHORIZED');
+  });
+
+  it('exposes provider display decimals on list, detail and ticker payloads', async () => {
+    const getDisplayPriceDecimals = jest.fn().mockReturnValue(5);
+    const { prisma, service } = createService({ getDisplayPriceDecimals });
+    const dogeAsset = asset({
+      id: 'asset-doge',
+      symbol: 'DOGEUSDT',
+      assetType: AssetType.crypto,
+      currencyCode: CurrencyCode.USD,
+    });
+    prisma.asset.count.mockResolvedValue(1);
+    prisma.asset.findMany.mockResolvedValue([dogeAsset]);
+    prisma.assetPriceSnapshot.findMany.mockResolvedValue([]);
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValue(null);
+    prisma.fxRateSnapshot.findMany.mockResolvedValue([]);
+    prisma.fxRateSnapshot.findFirst.mockResolvedValue(null);
+    prisma.asset.findUnique.mockResolvedValue(dogeAsset);
+    prisma.asset.findFirst.mockResolvedValue(dogeAsset);
+
+    const list = await service.getAssets('user-1');
+    const detail = await service.getAsset('user-1', 'asset-doge');
+    const ticker = await service.getAssetPriceForTicker('asset-doge');
+
+    expect(getDisplayPriceDecimals).toHaveBeenCalledWith({
+      market: 'BINANCE',
+      symbol: 'DOGEUSDT',
+    });
+    // Same value on every surface the client can read it from.
+    expect(list.data.assets[0].displayPriceDecimals).toBe(5);
+    expect(detail.data.asset.displayPriceDecimals).toBe(5);
+    expect(ticker?.asset.displayPriceDecimals).toBe(5);
+  });
+
+  it('keeps displayPriceDecimals null when no provider precision is wired', async () => {
+    const { prisma, service } = createService();
+    prisma.asset.count.mockResolvedValue(1);
+    prisma.asset.findMany.mockResolvedValue([asset({ id: 'asset-krx' })]);
+    prisma.assetPriceSnapshot.findMany.mockResolvedValue([]);
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValue(null);
+
+    const list = await service.getAssets('user-1');
+
+    expect(list.data.assets[0].displayPriceDecimals).toBeNull();
   });
 
   it('returns available empty assets when no assets match', async () => {

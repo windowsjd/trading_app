@@ -9,6 +9,12 @@ export type BinanceTicker24hrResponse = {
   [key: string]: unknown;
 };
 
+/** Shape-agnostic `GET /api/v3/exchangeInfo` body; parsed by binance-tick-size. */
+export type BinanceExchangeInfoApiResponse = {
+  symbols?: unknown;
+  [key: string]: unknown;
+};
+
 export type BinanceKlineRow = readonly unknown[];
 
 export type BinanceKlinesResponse = readonly unknown[];

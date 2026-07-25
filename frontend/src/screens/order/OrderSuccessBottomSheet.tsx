@@ -23,6 +23,8 @@ interface OrderSuccessBottomSheetProps {
    * scheduler matcher fills it (when auto-execution is enabled).
    */
   quote?: OrderQuoteDto | null;
+  /** Asset unit-price decimals; totals keep the currency default. */
+  displayPriceDecimals?: number | null;
 }
 
 export default function OrderSuccessBottomSheet({
@@ -33,8 +35,11 @@ export default function OrderSuccessBottomSheet({
   onGoOrderHistory,
   payload,
   quote,
+  displayPriceDecimals,
 }: OrderSuccessBottomSheetProps) {
-  const display = payload ? getOrderSuccessDisplay(payload) : null;
+  const display = payload
+    ? getOrderSuccessDisplay(payload, displayPriceDecimals)
+    : null;
   const isSubmittedLimit = display?.isSubmittedLimitOrder === true;
   const limitEstimate = isSubmittedLimit
     ? getLimitQuoteEstimateDisplay(quote)

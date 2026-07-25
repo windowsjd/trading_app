@@ -23,6 +23,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RedisLockService, type RedisLock } from '../redis/redis-lock.service';
 import { parseBinanceFiveMinuteKline } from '../providers/binance/binance-kline.parser';
 import { parseBinanceWebSocketMessage } from '../providers/binance/binance-websocket.parser';
+import { BINANCE_SPOT_WS_TICKER_SOURCE_NAME } from '../providers/binance/binance-price.ingestion.service';
 import { BinanceWebSocketIngestionService } from '../providers/binance/binance-websocket.ingestion.service';
 import { ProviderConfigService } from '../providers/provider-config.service';
 import { toBinanceUsdtSymbol } from '../providers/provider-target-resolver.service';
@@ -86,6 +87,8 @@ export class LiveCandleStreamSupervisorService
     // In live-candle mode the standalone Binance ticker streaming service is
     // disabled, so this owned connection also writes ticker price snapshots so
     // the REST market list (which reads asset_price_snapshots) stays fresh.
+    // The app-facing fanout does NOT go through here — see
+    // handleBinanceTickerFrame, which publishes to pricePubSub immediately.
     private readonly binanceTickerIngestion: BinanceWebSocketIngestionService,
     @Inject(LIVE_CANDLE_CONFIG) private readonly config: LiveCandleConfig,
     @Inject(LIVE_CANDLE_SOCKET_FACTORY)
@@ -559,20 +562,59 @@ export class LiveCandleStreamSupervisorService
       if (parsed.state === 'failed') this.health.increment('eventsRejected');
       return;
     }
-    if (!assets.has(parsed.ticker.providerSymbol)) {
+    const asset = assets.get(parsed.ticker.providerSymbol);
+    if (!asset) {
       this.health.increment('eventsRejected');
       return;
     }
-    // Ticker snapshots feed asset_price_snapshots (source binance_spot_ws_ticker)
-    // through the shared, throttled/deduped ingestion service. They must NOT
-    // drive candle trade-freshness (lastEventAt) — that readiness signal is
-    // owned by kline events only.
-    this.trackBackground(() =>
-      this.binanceTickerIngestion.ingestTicker(parsed.ticker, {
+    const ticker = parsed.ticker;
+    // Two INDEPENDENT jobs, neither waiting on the other:
+    //   1. app fanout — published immediately so the screen price is not gated
+    //      on a DB write or on the gateway's snapshot polling interval,
+    //   2. DB snapshot — the shared throttled/deduped ingestion service, so
+    //      write volume is unchanged (BINANCE_WS_SNAPSHOT_THROTTLE_MS).
+    // Ticker frames must NOT drive candle trade-freshness (lastEventAt); that
+    // readiness signal is owned by kline events only.
+    this.trackBackground(async () => {
+      const published = await this.pricePubSub.publish({
+        type: 'binance_realtime_price',
+        assetId: asset.id,
+        // The DB write happens on a separate job, so its outcome is unknown
+        // here; `null` means "no snapshot state claimed by this event".
+        snapshotState: null,
+        price: {
+          key: ticker.providerSymbol,
+          providerSymbol: ticker.providerSymbol,
+          streamName:
+            ticker.streamName ??
+            `${ticker.providerSymbol.toLowerCase()}@ticker`,
+          // Screen price is the Binance Spot last trade price (`c`).
+          price: ticker.price,
+          changeRate: ticker.changeRate,
+          bidPrice: ticker.bidPrice,
+          askPrice: ticker.askPrice,
+          currencyCode: 'USD',
+          sourceName: BINANCE_SPOT_WS_TICKER_SOURCE_NAME,
+          effectiveAt: ticker.effectiveAt.toISOString(),
+          capturedAt: ticker.receivedAt.toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      });
+      if (!published) this.health.increment('pubSubPublishFailure');
+    });
+    this.trackBackground(async () => {
+      const result = await this.binanceTickerIngestion.ingestTicker(ticker, {
         dryRun: false,
         requestedBy: 'live-candle-binance-ticker',
-      }),
-    );
+      });
+      // Ingestion reports config/HTTP problems as a failed result instead of
+      // throwing; a silent failure here would hide a stale REST market list.
+      if (!result.success) {
+        this.health.updateProvider('binance', {
+          lastErrorCode: result.errorCode ?? 'TICKER_INGEST_FAILED',
+        });
+      }
+    });
   }
 
   private trackBackground(operation: () => Promise<unknown>): void {

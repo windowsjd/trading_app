@@ -20,6 +20,7 @@ jest.mock('../assets/live-candle-pipeline.service', () => ({
 import { EventEmitter } from 'node:events';
 import { readLiveCandleConfig } from '../assets/live-candle.config';
 import { LiveCandleHealthService } from '../assets/live-candle-health.service';
+import { BINANCE_FIXED_SYMBOLS } from '../providers/binance/binance-fixed-asset-universe';
 import { LiveCandleStreamSupervisorService } from './live-candle-stream-supervisor.service';
 
 describe('LiveCandleStreamSupervisorService', () => {
@@ -90,6 +91,145 @@ describe('LiveCandleStreamSupervisorService', () => {
     // A ticker is not a candle event: the pipeline is untouched and nothing is
     // counted as a rejected candle event.
     expect(fixture.pipeline.process).not.toHaveBeenCalled();
+    expect(fixture.health.snapshot().liveCandle.eventsRejected).toBe(0);
+  });
+
+  it('fans a Binance ticker out to the shared price pub/sub exactly once, using the spot last-trade price', async () => {
+    const socket = new FakeSocket();
+    const fixture = setup(() => socket);
+    const connected = connectBinance(fixture.service, ownerContext());
+    socket.open();
+    await new Promise((resolve) => setImmediate(resolve));
+    socket.emit('message', binanceTickerFrame());
+    await new Promise((resolve) => setImmediate(resolve));
+    socket.close(1000, 'fixture done');
+    await connected;
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const tickerPublishes = publishedEvents(fixture).filter(
+      (event) => event.price.sourceName === 'binance_spot_ws_ticker',
+    );
+    expect(tickerPublishes).toHaveLength(1);
+    expect(tickerPublishes[0]).toMatchObject({
+      type: 'binance_realtime_price',
+      assetId: 'btc',
+      snapshotState: null,
+      price: {
+        providerSymbol: 'BTCUSDT',
+        // `c` (last trade), never bid/ask/mid.
+        price: '106.50000000',
+        changeRate: '1.50000000',
+        bidPrice: '106.40000000',
+        askPrice: '106.60000000',
+        currencyCode: 'USD',
+        sourceName: 'binance_spot_ws_ticker',
+      },
+    });
+  });
+
+  it('fans a ticker out without waiting for the DB snapshot write, and a failed write never blocks fanout', async () => {
+    const socket = new FakeSocket();
+    const fixture = setup(() => socket);
+    let releaseIngestion: (() => void) | null = null;
+    fixture.binanceTickerIngestion.ingestTicker.mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          releaseIngestion = () => reject(new Error('DB_WRITE_FAILED'));
+        }),
+    );
+    const connected = connectBinance(fixture.service, ownerContext());
+    socket.open();
+    await new Promise((resolve) => setImmediate(resolve));
+    socket.emit('message', binanceTickerFrame());
+    await new Promise((resolve) => setImmediate(resolve));
+
+    // The DB write is still pending, yet the app already has the price.
+    expect(fixture.binanceTickerIngestion.ingestTicker).toHaveBeenCalledTimes(
+      1,
+    );
+    expect(fixture.pricePubSub.publish).toHaveBeenCalledTimes(1);
+
+    releaseIngestion?.();
+    await new Promise((resolve) => setImmediate(resolve));
+    socket.close(1000, 'fixture done');
+    await connected;
+    await new Promise((resolve) => setImmediate(resolve));
+
+    // The failure is not silent.
+    expect(fixture.health.snapshot().providers.binance.lastErrorCode).toBe(
+      'Error',
+    );
+  });
+
+  it('records a failed ticker DB ingestion result in health', async () => {
+    const socket = new FakeSocket();
+    const fixture = setup(() => socket);
+    fixture.binanceTickerIngestion.ingestTicker.mockResolvedValue({
+      success: false,
+      provider: 'binance',
+      dryRun: false,
+      received: 1,
+      created: 0,
+      skipped: 0,
+      wouldCreate: 0,
+      failed: 1,
+      tickers: [],
+      errorCode: 'PROVIDER_DISABLED',
+    });
+    const connected = connectBinance(fixture.service, ownerContext());
+    socket.open();
+    await new Promise((resolve) => setImmediate(resolve));
+    socket.emit('message', binanceTickerFrame());
+    await new Promise((resolve) => setImmediate(resolve));
+    socket.close(1000, 'fixture done');
+    await connected;
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(fixture.pricePubSub.publish).toHaveBeenCalledTimes(1);
+    expect(fixture.health.snapshot().providers.binance.lastErrorCode).toBe(
+      'PROVIDER_DISABLED',
+    );
+  });
+
+  it('counts a failed ticker fanout publish in pubSubPublishFailure', async () => {
+    const socket = new FakeSocket();
+    const fixture = setup(() => socket);
+    fixture.pricePubSub.publish.mockResolvedValue(false);
+    const connected = connectBinance(fixture.service, ownerContext());
+    socket.open();
+    await new Promise((resolve) => setImmediate(resolve));
+    socket.emit('message', binanceTickerFrame());
+    await new Promise((resolve) => setImmediate(resolve));
+    socket.close(1000, 'fixture done');
+    await connected;
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(fixture.health.snapshot().liveCandle.pubSubPublishFailure).toBe(1);
+  });
+
+  it('maps every fixed Binance universe symbol to an assetId for ticker fanout', async () => {
+    const socket = new FakeSocket();
+    const assets = BINANCE_FIXED_SYMBOLS.map((symbol) =>
+      cryptoAsset(`asset-${symbol}`, symbol),
+    );
+    const fixture = setup(() => socket, assets);
+    const connected = connectBinance(fixture.service, ownerContext());
+    socket.open();
+    await new Promise((resolve) => setImmediate(resolve));
+    for (const symbol of BINANCE_FIXED_SYMBOLS) {
+      socket.emit('message', binanceTickerFrame(symbol));
+    }
+    await new Promise((resolve) => setImmediate(resolve));
+    socket.close(1000, 'fixture done');
+    await connected;
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const publishedAssetIds = publishedEvents(fixture).map(
+      (event) => event.assetId,
+    );
+    expect(publishedAssetIds.sort()).toEqual(
+      BINANCE_FIXED_SYMBOLS.map((symbol) => `asset-${symbol}`).sort(),
+    );
     expect(fixture.health.snapshot().liveCandle.eventsRejected).toBe(0);
   });
 
@@ -404,6 +544,19 @@ function setup(
     binanceTickerIngestion,
     factory,
   };
+}
+
+type PublishedPriceEvent = {
+  assetId: string;
+  price: { sourceName: string };
+};
+
+function publishedEvents(fixture: {
+  pricePubSub: { publish: jest.Mock };
+}): PublishedPriceEvent[] {
+  return fixture.pricePubSub.publish.mock.calls.map(
+    (call: unknown[]) => call[0] as PublishedPriceEvent,
+  );
 }
 
 function cryptoAsset(id: string, symbol: string) {

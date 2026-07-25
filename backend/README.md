@@ -290,6 +290,27 @@ Binance's 24-hour limit, responds to ping with pong, and resubscribes. REST
 24hr ticker ingestion remains fallback/manual/debug behavior and should not be
 the default real-time path while streaming is enabled.
 
+This service stands down (`state=disabled`) when live-candle Binance mode is
+on (`CANDLE_LIVE_STREAMING_ENABLED=true` + `CANDLE_LIVE_BINANCE_ENABLED=true`);
+in that mode the live-candle owner connection carries `<symbol>@ticker` and
+publishes each ticker to the app IMMEDIATELY, with the throttled
+`asset_price_snapshots` write running as a separate background job (see
+`docs/candle-live-operations.md`). Exactly one ticker fanout path is active per
+configuration, both use `sourceName=binance_spot_ws_ticker`, and
+`BINANCE_WS_SNAPSHOT_THROTTLE_MS` (default 5000) governs DB write volume in
+both.
+
+The app's displayed crypto price is the **Binance Spot last trade price** —
+the `24hrTicker` `c` field. Best bid/ask (`b`/`a`) are carried in the realtime
+event but not displayed, and Futures/mark/index prices and cross-exchange
+averages are not used, so values compared against a Futures screen can differ.
+Per-symbol display precision comes from `PRICE_FILTER.tickSize` on the public
+`GET /api/v3/exchangeInfo` (cached in memory by `BinanceSymbolMetadataService`;
+no API key, no new vendor, no DB table) and reaches clients as the additive
+nullable `displayPriceDecimals` field on the assets list/detail/price responses
+and the `asset_ticker` payload. It governs asset UNIT prices only — wallet
+balances, order totals and fees keep the existing USD 2-decimal formatting.
+
 KIS long-lived WebSocket streaming starts with the NestJS backend process when `KIS_WEBSOCKET_STREAMING_ENABLED=true` and the provider gates are satisfied:
 
 ```env

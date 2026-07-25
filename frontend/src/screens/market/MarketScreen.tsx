@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -13,16 +13,15 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import type { MarketScreenProps } from '../../app/navigation/types';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
+import { buildWsUrl } from '../../constants/env';
 import {
   getAssets,
   type AssetType,
   type MarketAssetItemDto,
 } from '../../features/market/api';
-import {
-  formatPercent,
-  getAssetNameDisplay,
-  getAssetPriceText,
-} from '../../utils/format';
+import { MarketAssetRow } from '../../features/market/MarketAssetRow';
+import { mergeMarketAssetTickers } from '../../features/market/mergeMarketAssetTicker';
+import { useMarketTickers } from '../../features/market/useMarketTickers';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -36,16 +35,11 @@ const TABS: Array<{ key: AssetType; label: string }> = [
   { key: 'crypto', label: '암호화폐' },
 ];
 
-function getChangeRateText(item: MarketAssetItemDto) {
-  if (item.price?.state !== 'available' || !item.price.changeRate) {
-    return item.tradeBlockedReason ?? item.marketStatus;
-  }
-
-  return `${formatPercent(item.price.changeRate)}%`;
-}
+const CRYPTO_PRICE_BASIS_TEXT = '가격 기준: Binance Spot 최근 체결가';
 
 export default function MarketScreen({ navigation }: Props) {
   const [selectedTab, setSelectedTab] = useState<AssetType>('domestic_stock');
+  const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
 
   const marketQuery = useInfiniteQuery({
     queryKey: QUERY_KEYS.market.assets({
@@ -65,7 +59,9 @@ export default function MarketScreen({ navigation }: Props) {
     initialPageParam: 0,
   });
 
-  const items = useMemo(() => {
+  // REST is the baseline: the list renders as soon as it arrives, before the
+  // socket is up.
+  const restItems = useMemo(() => {
     const byId = new Map<string, MarketAssetItemDto>();
 
     marketQuery.data?.pages.forEach((page) => {
@@ -76,6 +72,34 @@ export default function MarketScreen({ navigation }: Props) {
 
     return Array.from(byId.values());
   }, [marketQuery.data]);
+
+  const assetIds = useMemo(
+    () => restItems.map((item) => item.id),
+    [restItems],
+  );
+
+  // Live overlay: the currently loaded rows subscribe on the app's shared
+  // socket. Changing tab releases the previous tab's rows; loading another page
+  // only adds the new ids.
+  const {
+    tickersByAssetId,
+    showReconnectBanner,
+    staleAssetIds,
+  } = useMarketTickers({
+    assetIds,
+    wsUrl: wsUrl ?? '',
+    enabled: !!wsUrl,
+  });
+
+  const items = useMemo(
+    () => mergeMarketAssetTickers(restItems, tickersByAssetId),
+    [restItems, tickersByAssetId],
+  );
+
+  const openAsset = useCallback(
+    (assetId: string) => navigation.navigate('AssetDetail', { assetId }),
+    [navigation],
+  );
 
   const hasPriceErrors = useMemo(
     () =>
@@ -153,10 +177,29 @@ export default function MarketScreen({ navigation }: Props) {
               <Text style={styles.searchEntryText}>종목명 또는 심볼 검색</Text>
             </Pressable>
 
+            {selectedTab === 'crypto' ? (
+              <Text style={styles.priceBasisText}>
+                {CRYPTO_PRICE_BASIS_TEXT}
+              </Text>
+            ) : null}
+
             {viewState === 'market_partial_price_unavailable' ? (
               <View style={styles.inlineWarning}>
                 <Text style={styles.inlineWarningText}>
                   일부 종목 시세를 아직 불러오지 못했습니다.
+                </Text>
+              </View>
+            ) : null}
+
+            {/* One screen-level notice; rows never repeat a connection error. */}
+            {showReconnectBanner ? (
+              <View
+                testID={TEST_IDS.market.reconnectBanner}
+                style={styles.inlineWarning}
+              >
+                <Text style={styles.inlineWarningText}>
+                  실시간 연결이 불안정합니다. 마지막 수신 가격을 표시하고
+                  있습니다.
                 </Text>
               </View>
             ) : null}
@@ -169,28 +212,11 @@ export default function MarketScreen({ navigation }: Props) {
           />
         }
         renderItem={({ item }) => (
-          <Pressable
-            testID={TEST_IDS.market.item(item.id)}
-            style={styles.itemRow}
-            onPress={() =>
-              navigation.navigate('AssetDetail', { assetId: item.id })
-            }
-          >
-            <View>
-              <Text style={styles.itemSymbol}>{getAssetNameDisplay(item).primary}</Text>
-              <Text style={styles.helper}>
-                {item.symbol} · {item.market}
-              </Text>
-            </View>
-
-            <View style={styles.alignEnd}>
-              <Text style={styles.itemPrice}>{getAssetPriceText(item)}</Text>
-              <Text style={styles.helper}>{getChangeRateText(item)}</Text>
-              <Text style={styles.helper}>
-                {item.marketStatus} · {item.tradable ? '거래 가능' : '거래 제한'}
-              </Text>
-            </View>
-          </Pressable>
+          <MarketAssetRow
+            item={item}
+            isStale={staleAssetIds.has(item.id)}
+            onPress={openAsset}
+          />
         )}
         ListFooterComponent={
           marketQuery.isFetchingNextPage ? (
@@ -253,5 +279,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF8E1',
   },
   inlineWarningText: { fontSize: 13, color: '#725400' },
+  priceBasisText: { fontSize: 13, color: '#666' },
   footerLoader: { paddingVertical: 16 },
 });

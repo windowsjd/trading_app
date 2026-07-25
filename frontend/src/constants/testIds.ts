@@ -48,6 +48,7 @@ export const TEST_IDS = {
     tabCrypto: 'market-tab-crypto',
     searchInput: 'market-search-input',
     item: (assetId: string) => `market-item-${assetId}`,
+    reconnectBanner: 'market-reconnect-banner',
   },
 
   assetDetail: {

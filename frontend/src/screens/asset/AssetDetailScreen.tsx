@@ -34,8 +34,8 @@ import { TEST_IDS } from "../../constants/testIds";
 import { buildWsUrl } from "../../constants/env";
 import { formatSourceMetadata } from "../../models/dto/common";
 import {
+  formatAssetPrice,
   formatKrw,
-  formatMoney,
   formatPercent,
   getAssetNameDisplay,
   getUnavailablePriceText,
@@ -49,6 +49,8 @@ import CTAButton from "../../components/common/CTAButton";
 import { CandlestickChart } from "../../components/charts";
 
 type Props = AssetDetailScreenProps;
+
+const BINANCE_PRICE_BASIS_TEXT = "가격 기준: Binance Spot 최근 체결가";
 
 function displayValue(value?: string | number | boolean | null) {
   if (value === null || value === undefined || value === "") return "-";
@@ -176,6 +178,12 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
   const displayEffectiveAt =
     latestTicker?.priceEffectiveAt ?? price?.priceEffectiveAt;
   const displayFreshnessAgeSeconds = latestTicker?.freshnessAgeSeconds;
+  // Unit-price precision: the ticker repeats the REST value, so either source
+  // gives the same decimals; null falls back to the currency default.
+  const displayPriceDecimals =
+    latestTicker?.displayPriceDecimals ?? asset.displayPriceDecimals ?? null;
+  const isBinanceSpotAsset =
+    asset.assetType === "crypto" && asset.market?.toUpperCase() === "BINANCE";
   const tradingNote = formatTradingNote(asset.tradingNote);
   const assetNameDisplay = getAssetNameDisplay(asset);
   // Dev-only chart diagnostics (never rendered in production builds): how many
@@ -247,9 +255,16 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
           ) : null}
           <Text style={styles.value}>
             {orderPriceAvailable
-              ? formatMoney(displayPriceLocal, displayPriceCurrency)
+              ? formatAssetPrice(
+                  displayPriceLocal,
+                  displayPriceCurrency,
+                  displayPriceDecimals,
+                )
               : getUnavailablePriceText(asset)}
           </Text>
+          {isBinanceSpotAsset ? (
+            <Text style={styles.helper}>{BINANCE_PRICE_BASIS_TEXT}</Text>
+          ) : null}
           <Text style={styles.helper}>
             KRW 환산 {formatKrw(displayPriceKrw)}
           </Text>
@@ -338,9 +353,10 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
               <Text style={styles.helper}>수량 {position.quantity}</Text>
               <Text style={styles.helper}>
                 평균단가{" "}
-                {formatMoney(
+                {formatAssetPrice(
                   position.avgEntryPriceLocal ?? position.avgEntryPrice,
                   displayPriceCurrency,
+                  displayPriceDecimals,
                 )}
               </Text>
               <Text style={styles.helper}>

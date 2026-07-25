@@ -25,6 +25,8 @@
 - While a stock market is open, provider asset freshness requires the configured `capturedAt` threshold and an `effectiveAt` inside the current asset session. While closed, read/display may use only a provider price from that asset market's latest completed session; it never skips back to an older session. Crypto remains continuously fresh by `capturedAt`. Provider FX freshness is unchanged.
 - Missing, stale, future, non-positive, wrong-source, or ineligible provider rows fall back to existing `admin_manual` selection.
 - The price payload may include optional public-safe `priceSource` and `fxRateSource` metadata for source/outage visibility. Raw provider payloads, `metadataJson`, and secrets are never exposed.
+- `displayPriceDecimals` (additive, nullable) is the number of decimal places a client should use for that asset's UNIT price. It comes from the provider's own tick size — for Binance assets, `PRICE_FILTER.tickSize` on the public `GET /api/v3/exchangeInfo` (BTC/ETH/BNB/SOL/ZEC = 2, LINK = 3, XRP/TRX/XLM = 4, DOGE = 5); every non-Binance asset is `null`, meaning "keep the currency's default formatting". It is present on the list item, the detail asset, `GET /api/v1/assets/:assetId/price`, and the `/api/v1/ws` `asset_ticker` payload, and all four report the same value for the same asset. Clients must not infer decimals from a price's magnitude. It applies to unit prices only — wallet balances, order totals and fees keep the currency's own formatting (USD 2 decimals). Existing clients that ignore the field are unaffected; there is no `/api/v2`.
+- For Binance assets the price is the Binance **Spot last trade price** (the `24hrTicker` `c` field), not a Futures/mark/index price, not bid/ask, and not a cross-exchange average. USDT pairs are treated as USD-equivalent, so a comparison against a Futures screen or a USDT/USD basis can legitimately differ.
 
 ## Role Compared With Other APIs
 
@@ -91,6 +93,7 @@
         "market": "<string>",
         "assetType": "domestic_stock | us_stock | crypto",
         "currencyCode": "KRW | USD",
+        "displayPriceDecimals": "<integer | null>",
         "isActive": true,
         "changeRate": "<decimal string | null>",
         "price": {
@@ -196,6 +199,8 @@ If a USD asset has an eligible asset price but USD/KRW is missing or stale, `pri
 
 This market-aware selection is also used by the initial `/api/v1/ws` `asset_ticker` snapshot. No public response field or `/api/v1` route changed.
 
+Realtime `asset_ticker` events carry a provider price that is NEWER than any stored snapshot, so their KRW value is recomputed from the currently eligible USD/KRW snapshot (same source-eligibility policy as REST) instead of being copied from the snapshot the local price no longer belongs to. If no eligible FX row exists, the event keeps the local price and reports `priceKrwState=unavailable` with `priceKrwReason=FX_RATE_UNAVAILABLE | FX_RATE_STALE` — a fresh local price is never paired with an older KRW conversion. KRW-priced assets need no conversion. The frontend applies the same rule when overlaying a ticker onto a REST list row.
+
 ### Sorting
 
 Default sorting is DB-level:
@@ -226,6 +231,7 @@ Default sorting is DB-level:
       "market": "<string>",
       "assetType": "domestic_stock | us_stock | crypto",
       "currencyCode": "KRW | USD",
+      "displayPriceDecimals": "<integer | null>",
       "isActive": true,
       "price": "<same price object as list>",
       "tradingNote": {

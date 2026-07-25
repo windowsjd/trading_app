@@ -37,6 +37,109 @@ export function formatUsd(value: string | number | null | undefined): string {
   return `${sign}${withThousandsSeparator(integerPart)}.${decimalPart}`;
 }
 
+const MAX_DISPLAY_PRICE_DECIMALS = 8;
+
+/**
+ * Rounds a decimal STRING to `decimals` places without going through a float.
+ * `Number('0.245600001')` and friends round fine, but numbers big enough to hit
+ * exponent notation ("1e+21") or long crypto strings can render wrong, so the
+ * rounding is done on the digits. Returns null for anything non-decimal
+ * (exponent strings included) so the caller can fall back.
+ */
+function toFixedDecimalString(value: string, decimals: number): string | null {
+  const trimmed = value.trim();
+  const match = /^([+-]?)(\d+)(?:\.(\d*))?$/u.exec(trimmed);
+  if (!match) return null;
+
+  const [, rawSign, integerDigits, fractionDigits = ''] = match;
+  const digits = `${integerDigits}${fractionDigits}`;
+  const pointIndex = integerDigits.length;
+  const keep = pointIndex + decimals;
+
+  let kept = digits.slice(0, keep).padEnd(keep, '0');
+  const nextDigit = digits.charCodeAt(keep);
+  // Half-up on the magnitude, matching toFixed's usual reading.
+  if (nextDigit >= 53 /* '5' */) {
+    let index = kept.length - 1;
+    let carry = 1;
+    const chars = kept.split('');
+    while (index >= 0 && carry === 1) {
+      const next = chars[index].charCodeAt(0) - 48 + 1;
+      if (next === 10) {
+        chars[index] = '0';
+      } else {
+        chars[index] = String(next);
+        carry = 0;
+      }
+      index -= 1;
+    }
+    kept = (carry === 1 ? '1' : '') + chars.join('');
+  }
+
+  const integerLength = kept.length - decimals;
+  const integerPart = (kept.slice(0, integerLength) || '0').replace(
+    /^0+(?=\d)/u,
+    '',
+  );
+  const fractionPart = kept.slice(integerLength);
+  const isZero = !/[1-9]/u.test(kept);
+  const sign = rawSign === '-' && !isZero ? '-' : '';
+
+  return `${sign}${withThousandsSeparator(integerPart)}${
+    decimals > 0 ? `.${fractionPart}` : ''
+  }`;
+}
+
+function normalizeDisplayPriceDecimals(
+  displayPriceDecimals?: number | null,
+): number | null {
+  if (typeof displayPriceDecimals !== 'number') return null;
+  if (!Number.isInteger(displayPriceDecimals)) return null;
+  if (displayPriceDecimals < 0) return null;
+  return Math.min(displayPriceDecimals, MAX_DISPLAY_PRICE_DECIMALS);
+}
+
+/**
+ * Asset UNIT price display (a market row's price, the detail header price, the
+ * order screen's current price). Unlike `formatMoney` — which stays the policy
+ * for wallet balances, order totals and fees — this honors the provider's
+ * declared precision so a 0.24560 coin is not rendered as $0.25.
+ *
+ *   - KRW assets  → 원 units, unchanged.
+ *   - USD assets with `displayPriceDecimals` (Binance tickSize) → that many
+ *     decimals, trailing zeros kept to match the exchange's own display.
+ *   - USD assets without it → the existing 2-decimal policy.
+ *
+ * Missing/invalid values render as '-'; callers use the '시세 준비 중'
+ * placeholder for a price slot with nothing to show.
+ */
+export function formatAssetPrice(
+  value: string | number | null | undefined,
+  currencyCode?: FormatCurrencyCode | null,
+  displayPriceDecimals?: number | null,
+): string {
+  const code = normalizeCurrencyCode(currencyCode);
+  if (code === 'KRW') return formatMoney(value, code);
+
+  const decimals = normalizeDisplayPriceDecimals(displayPriceDecimals);
+  if (decimals === null) return formatMoney(value, currencyCode);
+  if (toFiniteNumber(value) === null) return '-';
+
+  // API money values arrive as decimal STRINGS and are rounded digit-by-digit.
+  // A number input is rounded once by toFixed (no double rounding) and then
+  // only gets its separators here.
+  const formatted =
+    typeof value === 'number'
+      ? toFixedDecimalString(value.toFixed(decimals), decimals)
+      : (toFixedDecimalString(String(value), decimals) ??
+        // Exponent notation or another shape the string path rejects: the
+        // numeric fallback still beats showing a raw exponent to the user.
+        toFixedDecimalString(Number(value).toFixed(decimals), decimals));
+  if (formatted === null) return formatMoney(value, currencyCode);
+
+  return code === 'USD' ? `${USD_SYMBOL}${formatted}` : formatted;
+}
+
 /**
  * Normalizes a raw currency code (trims + upper-cases) and narrows it to a code
  * the app officially formats. "usd", "USD ", "Usd" → "USD"; "krw", "KRW " → "KRW".
@@ -137,6 +240,8 @@ export function getUnavailablePriceText(asset: PriceUnavailableAsset): string {
 }
 
 export type AssetPriceTextInput = PriceUnavailableAsset & {
+  /** Provider-declared unit-price decimals; null keeps the previous policy. */
+  displayPriceDecimals?: number | null;
   price?: {
     state?: string | null;
     currentPrice?: string | null;
@@ -147,13 +252,18 @@ export type AssetPriceTextInput = PriceUnavailableAsset & {
 /**
  * Price cell text for an asset row/card: the formatted price whenever one is
  * displayable (including a carry-forward snapshot while the market is
- * closed), otherwise the market-aware placeholder above.
+ * closed), otherwise the market-aware placeholder above. Uses the asset's
+ * declared unit-price precision so the list and the detail screen agree.
  */
 export function getAssetPriceText(item: AssetPriceTextInput): string {
   if (item.price?.state !== 'available' || !item.price.currentPrice) {
     return getUnavailablePriceText(item);
   }
-  return formatMoney(item.price.currentPrice, item.price.priceCurrency);
+  return formatAssetPrice(
+    item.price.currentPrice,
+    item.price.priceCurrency,
+    item.displayPriceDecimals,
+  );
 }
 
 /** Percent/return-rate display: fixed decimal places (default 2), no '%'. */
