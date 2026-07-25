@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { getRealtimeSocketManager } from '../../services/ws/sharedRealtimeSocket';
+import { useStaleRecheck } from '../asset/useStaleRecheck';
 import {
   EMPTY_MARKET_TICKER_SNAPSHOT,
   MarketTickerStore,
@@ -60,6 +61,12 @@ export function useMarketTickers({
     if (!active) return;
     storeRef.current?.setAssetIds(assetIdKey ? assetIdKey.split(',') : []);
   }, [active, assetIdKey, wsUrl]);
+
+  // Same clock-driven stale policy as the detail screen; only runs while the
+  // list actually holds tickers and the app is foregrounded.
+  useStaleRecheck(snapshot.tickersByAssetId.size > 0, () => {
+    storeRef.current?.recomputeStaleness();
+  });
 
   return snapshot;
 }

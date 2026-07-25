@@ -49,6 +49,10 @@ import {
   ProviderPricePubSubService,
   type ProviderRealtimePriceEvent,
 } from './provider-price-pubsub.service';
+import type {
+  TickerFanoutMetrics,
+  TickerFanoutMetricsSource,
+} from './ticker-fanout-metrics';
 
 type AccessTokenPayload = {
   sub?: unknown;
@@ -86,6 +90,13 @@ const TICKER_POLL_INTERVAL_MS = 3000;
 const CANDLE_BACKPRESSURE_FLUSH_MS = 100;
 const DEFAULT_CANDLE_SUBSCRIPTION_LIMIT = 20;
 const DEFAULT_CANDLE_BACKPRESSURE_BYTES = 1_048_576;
+/**
+ * Hard ceiling on one client's coalesced ticker queue. The queue is keyed by
+ * assetId (so it is already bounded by that client's subscriptions), but this
+ * guarantees a bound even if subscriptions ever grow unbounded: the oldest
+ * queued asset is evicted so the newest prices always win.
+ */
+const MAX_PENDING_TICKERS_PER_CLIENT = 64;
 
 @Injectable()
 @WebSocketGateway({
@@ -96,7 +107,8 @@ export class AssetTickerGateway
     OnGatewayConnection<WebSocket>,
     OnGatewayDisconnect<WebSocket>,
     OnModuleInit,
-    OnModuleDestroy
+    OnModuleDestroy,
+    TickerFanoutMetricsSource
 {
   @WebSocketServer()
   private readonly server!: WsServer;
@@ -110,6 +122,10 @@ export class AssetTickerGateway
   private unsubscribeProviderPrices: (() => void) | null = null;
   private backpressureTimer: NodeJS.Timeout | null = null;
   private liveCandlePubSubStatus: LiveCandlePubSubStatus = 'disabled';
+  // Debug/health counters for ticker delivery (see getTickerFanoutMetrics).
+  private tickerSentCount = 0;
+  private tickerCoalescedCount = 0;
+  private tickerDroppedCount = 0;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -446,12 +462,64 @@ export class AssetTickerGateway
       this.liveCandleConfig?.websocketBackpressureBytes ??
       DEFAULT_CANDLE_BACKPRESSURE_BYTES;
     if (client.bufferedAmount > maxBuffered) {
-      state.pendingTickers.set(assetId, ticker);
+      this.queuePendingTicker(state, assetId, ticker);
       return;
     }
     if (this.sendJson(client, ticker)) {
+      this.tickerSentCount += 1;
       state.pendingTickers.delete(assetId);
     }
+  }
+
+  private queuePendingTicker(
+    state: ClientState,
+    assetId: string,
+    ticker: Record<string, unknown>,
+  ): void {
+    // Latest-only: an older queued ticker for this asset is replaced, so
+    // intermediate prices are dropped rather than buffered.
+    if (state.pendingTickers.has(assetId)) {
+      state.pendingTickers.set(assetId, ticker);
+      this.tickerCoalescedCount += 1;
+      return;
+    }
+    if (state.pendingTickers.size >= MAX_PENDING_TICKERS_PER_CLIENT) {
+      // Map preserves insertion order: evict the oldest queued asset.
+      const oldest = state.pendingTickers.keys().next();
+      if (!oldest.done) {
+        state.pendingTickers.delete(oldest.value);
+        this.tickerDroppedCount += 1;
+      }
+    }
+    state.pendingTickers.set(assetId, ticker);
+    this.tickerCoalescedCount += 1;
+  }
+
+  /**
+   * Observable ticker-delivery counters (exposed through `GET /readiness`).
+   * `coalesced` counts tickers that were queued instead of written because the
+   * socket was saturated; `dropped` counts queue-cap evictions.
+   */
+  getTickerFanoutMetrics(): TickerFanoutMetrics {
+    let pendingTickers = 0;
+    let clientsWithPendingTickers = 0;
+    let maxPendingTickersPerClient = 0;
+    for (const state of this.clients.values()) {
+      const size = state.pendingTickers.size;
+      pendingTickers += size;
+      if (size > 0) clientsWithPendingTickers += 1;
+      if (size > maxPendingTickersPerClient) maxPendingTickersPerClient = size;
+    }
+    return {
+      clients: this.clients.size,
+      sent: this.tickerSentCount,
+      coalesced: this.tickerCoalescedCount,
+      dropped: this.tickerDroppedCount,
+      pendingTickers,
+      clientsWithPendingTickers,
+      maxPendingTickersPerClient,
+      pendingTickerLimitPerClient: MAX_PENDING_TICKERS_PER_CLIENT,
+    };
   }
 
   private flushPendingTickers(): void {
@@ -471,6 +539,7 @@ export class AssetTickerGateway
           continue;
         }
         if (this.sendJson(client, ticker)) {
+          this.tickerSentCount += 1;
           state.pendingTickers.delete(assetId);
         } else {
           break;

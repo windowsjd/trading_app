@@ -17,6 +17,10 @@ import { OpsJobRunService } from './ops/ops-job-run.service';
 import { PrismaService } from './prisma/prisma.service';
 import { BinanceWebSocketStreamingService } from './providers/binance/binance-websocket-streaming.service';
 import { KisWebSocketStreamingService } from './providers/kis/kis-websocket-streaming.service';
+import {
+  TICKER_FANOUT_METRICS,
+  type TickerFanoutMetricsSource,
+} from './realtime/ticker-fanout-metrics';
 import { LiveCandlePubSubService } from './realtime/live-candle-pubsub.service';
 import { RedisService } from './redis/redis.service';
 import { readRedisConfig } from './redis/redis.config';
@@ -57,6 +61,9 @@ export class AppService {
     @Optional()
     @Inject(LIVE_CANDLE_CONFIG)
     private readonly liveCandleConfig?: LiveCandleConfig,
+    @Optional()
+    @Inject(TICKER_FANOUT_METRICS)
+    private readonly assetTickerGateway?: TickerFanoutMetricsSource,
   ) {}
 
   getHealth() {
@@ -241,6 +248,8 @@ export class AppService {
           jobs: scheduler.jobs,
         },
         marketCalendar: calendar,
+        // Ticker delivery counters (slow-client coalescing/backpressure).
+        assetTicker: this.assetTickerGateway?.getTickerFanoutMetrics() ?? null,
         marketSessionOverride: {
           mode: marketSessionOverride.mode,
           state: marketSessionOverride.state,

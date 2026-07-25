@@ -23,11 +23,7 @@ import { getPositionForAsset, getPositions } from "../../features/position/api";
 import { getCurrentSeason } from "../../features/season/api";
 import { toSeasonDomainState } from "../../features/season/mapper";
 import { useAssetTicker } from "../../features/asset/useAssetTicker";
-import {
-  selectDisplayPriceKrw,
-  selectDisplayPriceKrwState,
-  selectDisplayPriceSource,
-} from "../../features/asset/displayPricePolicy";
+import { selectDisplayPrice } from "../../features/asset/displayPricePolicy";
 import { useAssetCandle } from "../../features/asset/useAssetCandle";
 import { mergeAssetCandleSnapshot } from "../../features/asset/liveCandle";
 import {
@@ -163,31 +159,32 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
   const livePriceAvailable = !!latestTicker?.priceLocal;
   const orderPriceAvailable = priceAvailable || livePriceAvailable;
 
-  const displayPriceLocal =
-    latestTicker?.priceLocal ?? (priceAvailable ? price?.currentPrice : null);
+  // ONE basis for the whole price block: while a realtime ticker is shown,
+  // its local price, KRW state/reason, price source, FX source, timestamps and
+  // freshness are all taken from that ticker — REST and realtime metadata are
+  // never mixed (see displayPricePolicy).
+  const displayPrice = selectDisplayPrice({
+    latestTicker,
+    restPrice: price,
+    assetPriceCurrency: asset.priceCurrency,
+    assetDisplayPriceDecimals: asset.displayPriceDecimals,
+  });
+  const displayPriceLocal = displayPrice.priceLocal;
   const displayPriceCurrency =
-    latestTicker?.priceCurrency ?? asset.priceCurrency;
-  // The latest ticker's local price and KRW state are used AS A SET; when the
-  // ticker's KRW is unavailable the REST KRW must NOT fill in (it belongs to
-  // the older REST local price).
-  const displayPriceKrw = selectDisplayPriceKrw(latestTicker, price);
-  const displayPriceKrwState = selectDisplayPriceKrwState(latestTicker, price);
-  const displayPriceSource = selectDisplayPriceSource(latestTicker, price);
+    displayPrice.priceCurrency ?? asset.priceCurrency;
+  const displayPriceKrw = displayPrice.priceKrw;
+  const displayPriceKrwState = displayPrice.priceKrwState;
+  const displayPriceSource = displayPrice.priceSource;
+  const displayFxRateSource = displayPrice.fxRateSource;
   const displayChangeRate = getDisplayChangeRate(
     latestTicker?.changeRate,
     price?.changeRate,
   );
-  const displayCapturedAt =
-    latestTicker?.priceCapturedAt ??
-    latestTicker?.capturedAt ??
-    price?.priceCapturedAt;
-  const displayEffectiveAt =
-    latestTicker?.priceEffectiveAt ?? price?.priceEffectiveAt;
-  const displayFreshnessAgeSeconds = latestTicker?.freshnessAgeSeconds;
-  // Unit-price precision: the ticker repeats the REST value, so either source
-  // gives the same decimals; null falls back to the currency default.
-  const displayPriceDecimals =
-    latestTicker?.displayPriceDecimals ?? asset.displayPriceDecimals ?? null;
+  const displayCapturedAt = displayPrice.priceCapturedAt;
+  const displayEffectiveAt = displayPrice.priceEffectiveAt;
+  const displayFreshnessAgeSeconds = displayPrice.freshnessAgeSeconds;
+  const displayPriceDecimals = displayPrice.displayPriceDecimals;
+  const displayPriceKrwMessage = displayPrice.priceKrwMessage;
   const isBinanceSpotAsset =
     asset.assetType === "crypto" && asset.market?.toUpperCase() === "BINANCE";
   const tradingNote = formatTradingNote(asset.tradingNote);
@@ -236,7 +233,8 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
         : !orderPriceAvailable
           ? "현재 화면 시세가 없어도 서버 견적에서 최종 확인됩니다."
           : displayPriceKrwState && displayPriceKrwState !== "available"
-            ? "KRW 환산 시세를 사용할 수 없습니다. 서버 견적에서 최종 확인됩니다."
+            ? (displayPriceKrwMessage ??
+              "KRW 환산 시세를 사용할 수 없습니다. 서버 견적에서 최종 확인됩니다.")
             : null;
 
   const buyBlockedReason = seasonBlockedReason ?? assetHardBlockedReason;
@@ -272,7 +270,14 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
             <Text style={styles.helper}>{BINANCE_PRICE_BASIS_TEXT}</Text>
           ) : null}
           <Text style={styles.helper}>
-            KRW 환산 {formatKrw(displayPriceKrw)}
+            KRW 환산{" "}
+            {displayPriceKrwState === "available"
+              ? formatKrw(displayPriceKrw)
+              : `사용 불가${
+                  displayPrice.priceKrwReason
+                    ? ` (${displayPrice.priceKrwReason})`
+                    : ""
+                }`}
           </Text>
           <Text style={styles.helper}>
             등락률 {formatPercent(displayChangeRate)}%
@@ -303,6 +308,12 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
             가격 소스{" "}
             {formatSourceMetadata(
               displayPriceSource as Parameters<typeof formatSourceMetadata>[0],
+            )}
+          </Text>
+          <Text style={styles.helper}>
+            환율 소스{" "}
+            {formatSourceMetadata(
+              displayFxRateSource as Parameters<typeof formatSourceMetadata>[0],
             )}
           </Text>
 

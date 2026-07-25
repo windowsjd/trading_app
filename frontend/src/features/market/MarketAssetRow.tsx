@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 
 import { TEST_IDS } from '../../constants/testIds';
@@ -7,10 +7,15 @@ import {
   getAssetNameDisplay,
   getAssetPriceText,
 } from '../../utils/format';
+import type { AssetTickerMessage } from '../asset/assetTickerPolicy';
 import type { MarketAssetItemDto } from './api';
+import { mergeMarketAssetTicker } from './mergeMarketAssetTicker';
 
 type Props = {
+  /** REST baseline row — never rebuilt when some other asset ticks. */
   item: MarketAssetItemDto;
+  /** This asset's latest realtime ticker, or null. */
+  ticker?: AssetTickerMessage | null;
   /** True when this row's realtime price is past the freshness threshold. */
   isStale?: boolean;
   onPress: (assetId: string) => void;
@@ -25,12 +30,19 @@ function getChangeRateText(item: MarketAssetItemDto) {
 }
 
 /**
- * One market list row, split out and memoized so a ticker for BTCUSDT only
- * re-renders the BTCUSDT row: the merge helper returns the SAME item object for
- * untouched rows, so the props comparison below short-circuits everything else.
+ * One market list row.
+ *
+ * The REST item and this asset's ticker arrive as SEPARATE props and are
+ * merged here, inside the row: a BTC tick changes only the BTC row's `ticker`
+ * prop, so the memo comparator below short-circuits every other row instead of
+ * the screen rebuilding a merged object per row on every tick.
  */
-function MarketAssetRowComponent({ item, isStale, onPress }: Props) {
-  const nameDisplay = getAssetNameDisplay(item);
+function MarketAssetRowComponent({ item, ticker, isStale, onPress }: Props) {
+  const displayItem = useMemo(
+    () => mergeMarketAssetTicker(item, ticker ?? undefined),
+    [item, ticker],
+  );
+  const nameDisplay = getAssetNameDisplay(displayItem);
 
   return (
     <Pressable
@@ -41,17 +53,18 @@ function MarketAssetRowComponent({ item, isStale, onPress }: Props) {
       <View>
         <Text style={styles.itemSymbol}>{nameDisplay.primary}</Text>
         <Text style={styles.helper}>
-          {item.symbol} · {item.market}
+          {displayItem.symbol} · {displayItem.market}
         </Text>
       </View>
 
       <View style={styles.alignEnd}>
         <Text style={[styles.itemPrice, isStale && styles.itemPriceStale]}>
-          {getAssetPriceText(item)}
+          {getAssetPriceText(displayItem)}
         </Text>
-        <Text style={styles.helper}>{getChangeRateText(item)}</Text>
+        <Text style={styles.helper}>{getChangeRateText(displayItem)}</Text>
         <Text style={styles.helper}>
-          {item.marketStatus} · {item.tradable ? '거래 가능' : '거래 제한'}
+          {displayItem.marketStatus} ·{' '}
+          {displayItem.tradable ? '거래 가능' : '거래 제한'}
         </Text>
       </View>
     </Pressable>
@@ -62,6 +75,9 @@ export const MarketAssetRow = React.memo(
   MarketAssetRowComponent,
   (previous, next) =>
     previous.item === next.item &&
+    // Identity comparison: the store hands out the same ticker object until
+    // that asset actually receives a newer accepted ticker.
+    (previous.ticker ?? null) === (next.ticker ?? null) &&
     previous.isStale === next.isStale &&
     previous.onPress === next.onPress,
 );

@@ -1,7 +1,6 @@
 import {
   applyTicker,
   isTickerStaleAt,
-  STALE_RECHECK_INTERVAL_MS,
   type AssetTickerAcceptState,
   type AssetTickerMessage,
 } from '../asset/assetTickerPolicy.ts';
@@ -88,7 +87,6 @@ export class MarketTickerStore {
   private connectionState: MarketTickerConnectionState = 'idle';
   private snapshot: MarketTickerSnapshot = EMPTY_SNAPSHOT;
   private disposed = false;
-  private staleTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(manager: MarketTickerSocketManager, onChange: () => void) {
     this.manager = manager;
@@ -132,20 +130,19 @@ export class MarketTickerStore {
     }
 
     if (changed) this.publish();
-    this.syncStaleTimer();
   }
 
   /**
-   * Re-judges every accepted ticker's staleness by the clock. Runs on an
-   * interval while subscriptions exist, so a feed that simply STOPS (provider
-   * outage) still flips its rows to stale without any new message arriving.
-   * Public so tests can drive it with an explicit `nowMs`.
+   * Re-judges every accepted ticker's staleness by the clock. The owning hook
+   * drives this on an interval (only while tickers exist and the app is in the
+   * foreground), so a feed that simply STOPS still flips its rows to stale
+   * without any new message arriving. `nowMs` is injectable for tests.
    */
   recomputeStaleness(nowMs = Date.now()): void {
     if (this.disposed) return;
     let changed = false;
     for (const [assetId, state] of this.accepted) {
-      const stale = isTickerStaleAt(state, nowMs);
+      const stale = isTickerStaleAt(state.ticker, nowMs);
       if (stale && !this.stale.has(assetId)) {
         this.stale.add(assetId);
         changed = true;
@@ -157,22 +154,6 @@ export class MarketTickerStore {
     if (changed) this.publish();
   }
 
-  private syncStaleTimer(): void {
-    const shouldRun = !this.disposed && this.subscriptions.size > 0;
-    if (shouldRun && !this.staleTimer) {
-      this.staleTimer = setInterval(
-        () => this.recomputeStaleness(),
-        STALE_RECHECK_INTERVAL_MS,
-      );
-      // Under Node (tests) a live interval would pin the process open; RN
-      // timers have no unref, hence the optional call.
-      (this.staleTimer as { unref?: () => void }).unref?.();
-    } else if (!shouldRun && this.staleTimer) {
-      clearInterval(this.staleTimer);
-      this.staleTimer = null;
-    }
-  }
-
   getSnapshot(): MarketTickerSnapshot {
     return this.snapshot;
   }
@@ -181,14 +162,15 @@ export class MarketTickerStore {
     return [...this.subscriptions.keys()];
   }
 
+  /** True when at least one accepted ticker could go stale over time. */
+  hasAcceptedTickers(): boolean {
+    return this.accepted.size > 0;
+  }
+
   /** Releases only THIS screen's subscriptions; the shared socket lives on. */
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    if (this.staleTimer) {
-      clearInterval(this.staleTimer);
-      this.staleTimer = null;
-    }
     for (const unsubscribe of this.subscriptions.values()) unsubscribe();
     this.subscriptions.clear();
   }
@@ -238,7 +220,7 @@ export class MarketTickerStore {
     if (next === current || !next) return;
 
     this.accepted.set(assetId, next);
-    if (isTickerStaleAt(next, Date.now())) {
+    if (isTickerStaleAt(next.ticker, Date.now())) {
       this.stale.add(assetId);
     } else {
       this.stale.delete(assetId);

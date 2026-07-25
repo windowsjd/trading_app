@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -20,10 +20,6 @@ import {
   type MarketAssetItemDto,
 } from '../../features/market/api';
 import { MarketAssetRow } from '../../features/market/MarketAssetRow';
-import {
-  createMarketTickerMergeCache,
-  mergeMarketAssetTickersCached,
-} from '../../features/market/mergeMarketAssetTicker';
 import { useMarketTickers } from '../../features/market/useMarketTickers';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
@@ -62,9 +58,10 @@ export default function MarketScreen({ navigation }: Props) {
     initialPageParam: 0,
   });
 
-  // REST is the baseline: the list renders as soon as it arrives, before the
-  // socket is up.
-  const restItems = useMemo(() => {
+  // REST is the baseline and stays untouched: rows receive their ticker as a
+  // separate prop and merge it themselves, so one asset's tick never rebuilds
+  // the other rows' data.
+  const items = useMemo(() => {
     const byId = new Map<string, MarketAssetItemDto>();
 
     marketQuery.data?.pages.forEach((page) => {
@@ -76,10 +73,7 @@ export default function MarketScreen({ navigation }: Props) {
     return Array.from(byId.values());
   }, [marketQuery.data]);
 
-  const assetIds = useMemo(
-    () => restItems.map((item) => item.id),
-    [restItems],
-  );
+  const assetIds = useMemo(() => items.map((item) => item.id), [items]);
 
   // Live overlay: the currently loaded rows subscribe on the app's shared
   // socket. Changing tab releases the previous tab's rows; loading another page
@@ -93,19 +87,6 @@ export default function MarketScreen({ navigation }: Props) {
     wsUrl: wsUrl ?? '',
     enabled: !!wsUrl,
   });
-
-  // Per-row identity cache: only the row whose ticker (or REST item) actually
-  // changed gets a new object, so React.memo skips every other row.
-  const mergeCacheRef = useRef(createMarketTickerMergeCache());
-  const items = useMemo(
-    () =>
-      mergeMarketAssetTickersCached(
-        restItems,
-        tickersByAssetId,
-        mergeCacheRef.current,
-      ),
-    [restItems, tickersByAssetId],
-  );
 
   const openAsset = useCallback(
     (assetId: string) => navigation.navigate('AssetDetail', { assetId }),
@@ -225,6 +206,7 @@ export default function MarketScreen({ navigation }: Props) {
         renderItem={({ item }) => (
           <MarketAssetRow
             item={item}
+            ticker={tickersByAssetId.get(item.id) ?? null}
             isStale={staleAssetIds.has(item.id)}
             onPress={openAsset}
           />

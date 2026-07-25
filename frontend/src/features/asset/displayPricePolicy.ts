@@ -1,56 +1,139 @@
 import type { AssetTickerMessage } from './assetTickerPolicy';
 
 /**
- * Which price set the detail screen shows when it has BOTH a REST baseline and
- * a realtime ticker.
+ * ONE basis for every price field the detail screen shows.
  *
- * Rule: the latest ticker is used AS A SET, or not at all.
- *  - no ticker            → REST local + REST KRW (when available)
- *  - ticker, KRW available → ticker local + ticker KRW
- *  - ticker, KRW unavailable → ticker local + KRW null (state unavailable)
+ * A realtime ticker and the REST snapshot describe two different moments, so
+ * the screen picks a basis and takes the WHOLE set from it:
+ *   - a latest ticker exists  → local price, KRW state/value/reason, price
+ *     source, FX source, captured/effective time and freshness all come from
+ *     that ticker (a ticker whose KRW is unavailable shows KRW unavailable —
+ *     the REST KRW never fills in beside a newer local price),
+ *   - no ticker              → the REST price payload, unchanged.
  *
- * The forbidden combination is a NEW local price next to the OLD REST KRW
- * value: those are two different moments rendered as one quote.
+ * `displayPriceDecimals` is asset metadata (not a moment), so the ticker value
+ * is preferred only when it declares one; otherwise the asset's REST value.
  */
 
 export type RestDisplayPrice = {
+  state?: string | null;
+  currentPrice?: string | null;
+  priceCurrency?: 'KRW' | 'USD' | null;
   priceKrwState?: string | null;
   priceKrw?: string | null;
+  priceKrwReason?: string | null;
+  priceKrwMessage?: string | null;
+  changeRate?: string | null;
+  priceCapturedAt?: string | null;
+  priceEffectiveAt?: string | null;
   priceSource?: unknown;
+  fxRateSource?: unknown;
 };
 
-export function selectDisplayPriceKrw(
-  latestTicker: AssetTickerMessage | null | undefined,
-  restPrice: RestDisplayPrice | null | undefined,
-): string | null {
+export type DisplayPriceBasis = 'realtime' | 'rest' | 'none';
+
+export type DisplayPrice = {
+  /** Which side of the data the whole set came from. */
+  basis: DisplayPriceBasis;
+  priceLocal: string | null;
+  priceCurrency: 'KRW' | 'USD' | null;
+  priceKrw: string | null;
+  priceKrwState: string | undefined;
+  priceKrwReason: string | undefined;
+  priceKrwMessage: string | undefined;
+  changeRate: string | null;
+  priceCapturedAt: string | null;
+  priceEffectiveAt: string | null;
+  freshnessAgeSeconds: number | null;
+  priceSource: unknown;
+  fxRateSource: unknown;
+  displayPriceDecimals: number | null;
+  /** True while a realtime ticker price is on screen. */
+  isRealtime: boolean;
+};
+
+function isRestPriceAvailable(price?: RestDisplayPrice | null): boolean {
+  return price?.state === 'available' && !!price.currentPrice;
+}
+
+export function selectDisplayPrice(input: {
+  latestTicker?: AssetTickerMessage | null;
+  restPrice?: RestDisplayPrice | null;
+  assetPriceCurrency?: 'KRW' | 'USD' | null;
+  assetDisplayPriceDecimals?: number | null;
+}): DisplayPrice {
+  const { latestTicker, restPrice } = input;
+  const decimalsFallback = input.assetDisplayPriceDecimals ?? null;
+
   if (latestTicker) {
-    return latestTicker.priceKrwState === 'available'
-      ? (latestTicker.priceKrw ?? null)
-      : null;
+    const krwAvailable = latestTicker.priceKrwState === 'available';
+    return {
+      basis: 'realtime',
+      priceLocal: latestTicker.priceLocal ?? null,
+      priceCurrency: latestTicker.priceCurrency ?? input.assetPriceCurrency ?? null,
+      priceKrw: krwAvailable ? (latestTicker.priceKrw ?? null) : null,
+      priceKrwState: latestTicker.priceKrwState,
+      priceKrwReason: krwAvailable ? undefined : latestTicker.priceKrwReason,
+      priceKrwMessage: krwAvailable ? undefined : latestTicker.priceKrwMessage,
+      changeRate: latestTicker.changeRate ?? null,
+      priceCapturedAt:
+        latestTicker.priceCapturedAt ?? latestTicker.capturedAt ?? null,
+      priceEffectiveAt: latestTicker.priceEffectiveAt ?? null,
+      freshnessAgeSeconds: latestTicker.freshnessAgeSeconds ?? null,
+      // Realtime payloads always carry their own source; the REST source is a
+      // last resort so the row is never blank.
+      priceSource: latestTicker.priceSource ?? restPrice?.priceSource ?? null,
+      // FX source belongs to the ticker's own conversion attempt (present for
+      // both available and unavailable outcomes), never the REST snapshot's.
+      fxRateSource: latestTicker.fxRateSource ?? null,
+      displayPriceDecimals:
+        typeof latestTicker.displayPriceDecimals === 'number'
+          ? latestTicker.displayPriceDecimals
+          : decimalsFallback,
+      isRealtime: true,
+    };
   }
-  return restPrice?.priceKrwState === 'available'
-    ? (restPrice.priceKrw ?? null)
-    : null;
-}
 
-export function selectDisplayPriceKrwState(
-  latestTicker: AssetTickerMessage | null | undefined,
-  restPrice: RestDisplayPrice | null | undefined,
-): string | undefined {
-  if (latestTicker) return latestTicker.priceKrwState;
-  return restPrice?.priceKrwState ?? undefined;
-}
+  if (isRestPriceAvailable(restPrice)) {
+    const krwAvailable = restPrice?.priceKrwState === 'available';
+    return {
+      basis: 'rest',
+      priceLocal: restPrice?.currentPrice ?? null,
+      priceCurrency: restPrice?.priceCurrency ?? input.assetPriceCurrency ?? null,
+      priceKrw: krwAvailable ? (restPrice?.priceKrw ?? null) : null,
+      priceKrwState: restPrice?.priceKrwState ?? undefined,
+      priceKrwReason: krwAvailable
+        ? undefined
+        : (restPrice?.priceKrwReason ?? undefined),
+      priceKrwMessage: krwAvailable
+        ? undefined
+        : (restPrice?.priceKrwMessage ?? undefined),
+      changeRate: restPrice?.changeRate ?? null,
+      priceCapturedAt: restPrice?.priceCapturedAt ?? null,
+      priceEffectiveAt: restPrice?.priceEffectiveAt ?? null,
+      freshnessAgeSeconds: null,
+      priceSource: restPrice?.priceSource ?? null,
+      fxRateSource: restPrice?.fxRateSource ?? null,
+      displayPriceDecimals: decimalsFallback,
+      isRealtime: false,
+    };
+  }
 
-/**
- * Source metadata for the price actually on screen: the ticker's own source
- * while a realtime price is displayed, the REST source otherwise. Prevents a
- * realtime `binance_spot_ws_ticker` price being captioned with a stale REST
- * snapshot's source row.
- */
-export function selectDisplayPriceSource(
-  latestTicker: AssetTickerMessage | null | undefined,
-  restPrice: RestDisplayPrice | null | undefined,
-): unknown {
-  if (latestTicker) return latestTicker.priceSource ?? null;
-  return restPrice?.priceSource ?? null;
+  return {
+    basis: 'none',
+    priceLocal: null,
+    priceCurrency: input.assetPriceCurrency ?? null,
+    priceKrw: null,
+    priceKrwState: restPrice?.priceKrwState ?? undefined,
+    priceKrwReason: restPrice?.priceKrwReason ?? undefined,
+    priceKrwMessage: restPrice?.priceKrwMessage ?? undefined,
+    changeRate: null,
+    priceCapturedAt: null,
+    priceEffectiveAt: null,
+    freshnessAgeSeconds: null,
+    priceSource: null,
+    fxRateSource: null,
+    displayPriceDecimals: decimalsFallback,
+    isRealtime: false,
+  };
 }

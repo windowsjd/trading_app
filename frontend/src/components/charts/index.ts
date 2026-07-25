@@ -4,6 +4,13 @@ export type {
   CandlestickChartCandle,
   CandlestickChartProps,
 } from './CandlestickChart';
+export { default as CandlestickChartRenderer } from './CandlestickChartRenderer';
+export type {
+  CandlestickChartGeometry,
+  CandlestickChartRendererProps,
+  RenderedCandle,
+} from './CandlestickChartRenderer';
+export * from './candlestickViewport';
 export { default as DonutChart } from './DonutChart';
 export type { DonutChartProps, DonutChartSegment } from './DonutChart';
 export { default as LineChart } from './LineChart';

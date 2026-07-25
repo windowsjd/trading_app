@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import {
   applyTicker,
+  getTickerAgeMs,
   getTickerTimestamp,
   isTickerStale,
   isTickerStaleAt,
@@ -135,26 +136,59 @@ describe('assetTickerPolicy', () => {
     assert.equal(isTickerStale(null), false);
   });
 
-  it('flips to stale purely by the clock advancing (no new ticker needed)', () => {
-    const state = toAssetTickerAcceptState(ticker());
+  it('measures ticker age from its own event time', () => {
     const receivedAt = Date.parse('2026-07-25T03:00:10.000Z');
 
-    assert.equal(isTickerStaleAt(state, receivedAt + 59_000), false);
-    assert.equal(isTickerStaleAt(state, receivedAt + 61_000), true);
+    assert.equal(getTickerAgeMs(ticker(), receivedAt + 5_000), 5_000);
+    // Clock skew (event in the future) never yields a negative age.
+    assert.equal(getTickerAgeMs(ticker(), receivedAt - 5_000), 0);
+    assert.equal(getTickerAgeMs(null, receivedAt), null);
+    assert.equal(
+      getTickerAgeMs(
+        ticker({
+          priceCapturedAt: null,
+          capturedAt: null,
+          priceEffectiveAt: null,
+        }),
+        receivedAt,
+      ),
+      null,
+    );
+  });
+
+  it('flips to stale purely by the clock advancing (no new ticker needed)', () => {
+    const payload = ticker();
+    const receivedAt = Date.parse('2026-07-25T03:00:10.000Z');
+
+    assert.equal(isTickerStaleAt(payload, receivedAt + 59_000), false);
+    assert.equal(isTickerStaleAt(payload, receivedAt + 61_000), true);
     assert.equal(isTickerStaleAt(null, receivedAt), false);
   });
 
-  it('falls back to the server freshness age for timestamp-less tickers', () => {
-    const state = toAssetTickerAcceptState(
-      ticker({
-        priceCapturedAt: null,
-        capturedAt: null,
-        priceEffectiveAt: null,
-        freshnessAgeSeconds: 120,
-      }),
-    );
+  it('uses the SAME threshold as the freshness-age check (no second constant)', () => {
+    const receivedAt = Date.parse('2026-07-25T03:00:10.000Z');
+    const boundary = ticker({ freshnessAgeSeconds: 61 });
 
-    assert.equal(isTickerStaleAt(state, Date.parse('2030-01-01T00:00:00Z')), true);
+    assert.equal(isTickerStale(boundary), true);
+    assert.equal(isTickerStaleAt(boundary, receivedAt + 61_000), true);
+  });
+
+  it('falls back to the server freshness age for timestamp-less tickers', () => {
+    const payload = ticker({
+      priceCapturedAt: null,
+      capturedAt: null,
+      priceEffectiveAt: null,
+      freshnessAgeSeconds: 120,
+    });
+
+    assert.equal(isTickerStaleAt(payload, Date.parse('2030-01-01T00:00:00Z')), true);
+    assert.equal(
+      isTickerStaleAt(
+        { ...payload, freshnessAgeSeconds: 10 },
+        Date.parse('2030-01-01T00:00:00Z'),
+      ),
+      false,
+    );
   });
 
   it('applyTicker returns the SAME state object when the ticker is rejected', () => {

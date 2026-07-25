@@ -306,7 +306,9 @@ negative-cached unknown/inactive ids) and USD/KRW conversion from a 2s-TTL
 cached eligible FX selection; only cache misses read the DB. Realtime events
 claim no snapshot row (`assetPriceSnapshotId: null`) and slow WebSocket
 clients receive latest-only coalesced tickers behind the shared backpressure
-threshold instead of an unbounded backlog.
+threshold instead of an unbounded backlog (per-client queue capped, cleared on
+unsubscribe/disconnect). `GET /readiness` exposes the delivery counters under
+`data.assetTicker` (`sent`, `coalesced`, `dropped`, `pendingTickers`, …).
 
 The app's displayed crypto price is the **Binance Spot last trade price** —
 the `24hrTicker` `c` field. Best bid/ask (`b`/`a`) are carried in the realtime

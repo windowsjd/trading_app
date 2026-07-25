@@ -2,10 +2,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
-  createMarketTickerMergeCache,
   mergeMarketAssetTicker,
   mergeMarketAssetTickers,
-  mergeMarketAssetTickersCached,
 } from './mergeMarketAssetTicker.ts';
 import type { AssetTickerMessage } from '../asset/assetTickerPolicy.ts';
 import type { MarketAssetItemDto } from './api.ts';
@@ -165,63 +163,60 @@ describe('mergeMarketAssetTicker displayPriceDecimals', () => {
   });
 });
 
-describe('mergeMarketAssetTickersCached', () => {
-  it('keeps the merged row identity for assets whose inputs did not change', () => {
-    const cache = createMarketTickerMergeCache();
-    const rows = [
-      restItem(),
-      restItem({ id: 'asset-btc', symbol: 'BTCUSDT' }),
-    ];
-    const tickerA1 = liveTicker();
-    const tickerB = liveTicker({
+describe('market row inputs (props passed to MarketAssetRow)', () => {
+  // The screen passes `item` and `ticker` separately and the row merges them,
+  // so a tick must change ONLY that asset's props identity.
+  const rowProps = (
+    items: MarketAssetItemDto[],
+    tickers: Map<string, AssetTickerMessage>,
+  ) =>
+    items.map((item) => ({
+      item,
+      ticker: tickers.get(item.id) ?? null,
+    }));
+
+  it('changes only the ticking asset\'s ticker prop identity', () => {
+    const rows = [restItem(), restItem({ id: 'asset-btc', symbol: 'BTCUSDT' })];
+    const dogeTicker = liveTicker();
+    const btcTicker = liveTicker({
       assetId: 'asset-btc',
       assetPriceSnapshotId: 'snap-live-btc',
     });
-
-    const first = mergeMarketAssetTickersCached(
+    const before = rowProps(
       rows,
       new Map([
-        ['asset-doge', tickerA1],
-        ['asset-btc', tickerB],
+        ['asset-doge', dogeTicker],
+        ['asset-btc', btcTicker],
       ]),
-      cache,
     );
-    // Only asset-doge ticks again; asset-btc keeps the same ticker reference.
-    const tickerA2 = liveTicker({
+
+    // Only DOGE ticks; the store keeps handing out the SAME BTC ticker object.
+    const dogeTicker2 = liveTicker({
       assetPriceSnapshotId: 'snap-live-2',
       priceLocal: '0.24990000',
       priceCapturedAt: '2026-07-25T03:00:35.000Z',
-      priceEffectiveAt: '2026-07-25T03:00:35.000Z',
     });
-    const second = mergeMarketAssetTickersCached(
+    const after = rowProps(
       rows,
       new Map([
-        ['asset-doge', tickerA2],
-        ['asset-btc', tickerB],
+        ['asset-doge', dogeTicker2],
+        ['asset-btc', btcTicker],
       ]),
-      cache,
     );
 
-    // Doge row is new (its ticker changed)…
-    assert.notEqual(second[0], first[0]);
-    assert.equal(second[0].price?.currentPrice, '0.24990000');
-    // …but the untouched BTC row keeps its EXACT identity → React.memo skips it.
-    assert.equal(second[1], first[1]);
+    assert.notEqual(after[0].ticker, before[0].ticker);
+    assert.equal(after[0].item, before[0].item);
+    // BTC row props are unchanged by identity → React.memo skips it.
+    assert.equal(after[1].ticker, before[1].ticker);
+    assert.equal(after[1].item, before[1].item);
   });
 
-  it('prunes cache entries for rows that left the list', () => {
-    const cache = createMarketTickerMergeCache();
-    mergeMarketAssetTickersCached([restItem()], new Map(), cache);
-    assert.equal(cache.size, 1);
+  it('merges inside the row without mutating the REST baseline', () => {
+    const item = restItem();
+    const merged = mergeMarketAssetTicker(item, liveTicker());
 
-    mergeMarketAssetTickersCached(
-      [restItem({ id: 'asset-btc', symbol: 'BTCUSDT' })],
-      new Map(),
-      cache,
-    );
-
-    assert.equal(cache.size, 1);
-    assert.equal(cache.has('asset-btc'), true);
+    assert.equal(item.price?.currentPrice, '0.24500000');
+    assert.equal(merged.price?.currentPrice, '0.24560000');
   });
 });
 

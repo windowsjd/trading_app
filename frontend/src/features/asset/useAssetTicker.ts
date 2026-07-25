@@ -5,10 +5,10 @@ import type { RealtimeSubscriptionEvent } from '../../services/ws/realtimeSocket
 import {
   applyTicker,
   isTickerStaleAt,
-  STALE_RECHECK_INTERVAL_MS,
   type AssetTickerAcceptState,
   type AssetTickerMessage,
 } from './assetTickerPolicy';
+import { useStaleRecheck } from './useStaleRecheck';
 
 interface UseAssetTickerParams {
   assetId: string;
@@ -94,7 +94,7 @@ export function useAssetTicker({
 
       acceptStateRef.current = next;
       setLatestTicker(next?.ticker ?? null);
-      setIsStale(isTickerStaleAt(next, Date.now()));
+      setIsStale(isTickerStaleAt(next?.ticker ?? null, Date.now()));
     };
 
     const onEvent = (event: RealtimeSubscriptionEvent) => {
@@ -178,19 +178,20 @@ export function useAssetTicker({
       { channel: 'asset_ticker', assetId },
       onEvent,
     );
-    // When tickers STOP arriving, staleness must still advance with the
-    // clock; this re-judges the last accepted ticker on an interval.
-    const staleTimer = setInterval(() => {
-      if (!isMounted) return;
-      setIsStale(isTickerStaleAt(acceptStateRef.current, Date.now()));
-    }, STALE_RECHECK_INTERVAL_MS);
 
     return () => {
       isMounted = false;
-      clearInterval(staleTimer);
+      acceptStateRef.current = null;
       unsubscribe();
     };
   }, [assetId, wsUrl, enabled]);
+
+  // Staleness must also advance with the CLOCK: while this screen holds a
+  // ticker (and the app is foregrounded) the last accepted one is re-judged
+  // on an interval, so a feed that simply stops still turns stale.
+  useStaleRecheck(!!latestTicker, () => {
+    setIsStale(isTickerStaleAt(acceptStateRef.current?.ticker ?? null, Date.now()));
+  });
 
   return {
     connectionState,

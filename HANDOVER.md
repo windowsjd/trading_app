@@ -12,6 +12,74 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 실시간 표시 일관성 마무리 + 캔들 차트 gesture/viewport 재구성 (2026-07-26)
+
+**목적**
+
+직전(2026-07-25 2차) 작업의 잔여 결함을 마무리하고, 캔들 차트를 요구된 구조
+(순수 viewport 모듈 + 공통 renderer + 플랫폼별 얇은 gesture adapter)로 재구성한다.
+
+**A. 실시간 표시 일관성**
+
+- 상세 화면이 표시하는 가격 블록 전체가 **하나의 기준**을 쓴다
+  (`features/asset/displayPricePolicy.ts`의 `selectDisplayPrice`). realtime
+  ticker가 있으면 local price·`priceKrwState`·`priceKrwReason`·`priceKrwMessage`·
+  `priceSource`·`fxRateSource`·capturedAt/effectiveAt·freshness·decimals를 모두
+  그 ticker에서 가져오고, ticker가 없을 때만 REST 세트를 쓴다. REST/realtime
+  metadata 혼합 불가. 화면에 `환율 소스` 행과 KRW 사용 불가 사유 표시를 추가.
+- MarketScreen 행 리렌더: 병합 캐시를 걷어내고 요구된 구조로 변경 —
+  `item`(REST baseline)과 `ticker`를 **별도 prop**으로 넘기고
+  `MarketAssetRow` 내부에서 `mergeMarketAssetTicker`로 병합, `React.memo`
+  comparator가 item/ticker/isStale/onPress identity를 비교한다.
+- stale: `getTickerAgeMs(ticker, nowMs)` / `isTickerStaleAt(ticker, nowMs)`
+  (임계값은 기존 60초 상수 재사용, 중복 상수 없음) + `useStaleRecheck` 훅이
+  5초 주기로 재판정. ticker를 보유한 화면에서만 timer가 돌고, unmount·
+  백그라운드 전환 시 정지하며 foreground 복귀 시 즉시 1회 재판정한다.
+- ticker backpressure 보강: 클라이언트별 pending 큐를 자산 키 기준 + 64개
+  상한(가장 오래된 자산부터 제거)으로 제한하고, unsubscribe/disconnect 시
+  정리, 카운터를 `GET /readiness`의 `data.assetTicker`로 노출
+  (`TICKER_FANOUT_METRICS` 토큰 주입 — readiness가 gateway 클래스를 직접
+  import하지 않는다).
+
+**B. 캔들 차트 재구성**
+
+- viewport 모델을 요구 사양대로 `{visibleCount, rightOffset}`으로 변경하고
+  `candlestickViewport.ts`(+test)로 이전: `createDefaultViewport`,
+  `clampVisibleCount`, `clampRightOffset`, `getVisibleIndexRange`,
+  `panViewportByPixels`, `zoomViewportAtFocalPoint`, `resetViewport`,
+  `isViewingLatest` 등. 상수는 MIN 20 / DEFAULT 60 / MAX 180, buffer 2.
+- `candlestickLayout.ts`(+test) 복원: slot/body 픽셀 폭과 x ↔ visible offset
+  매핑만 담당(zoom은 visibleCount 변경이지 scaleX가 아님).
+- `candlestickGesturePolicy.ts`(+test): 수평 pan 의도 판정, 웹 wheel 의도
+  분류(zoom / pan / page-scroll), wheel·pinch scale 범위 — 양 플랫폼 공유.
+- `CandlestickChartRenderer.tsx`: 공통 SVG renderer(모바일·웹 공용, 복제 없음).
+- `CandlestickGestures.native.tsx`(RNGH pinch/pan/long-press) /
+  `.web.tsx`(mouse drag/hover/ctrl+wheel). `CandlestickGestures.tsx`는 props
+  계약 + gesture 없는 fallback이며 Metro가 플랫폼별로 해석한다.
+- `CandlestickChart.tsx`는 viewport 상태·geometry·visible slice·컨트롤
+  (`+`/`−`/`초기화`, 접근성 label)만 담당한다.
+- 패키지: `npx expo install react-native-gesture-handler react-native-reanimated
+  react-native-worklets`, `babel.config.js`에 `react-native-worklets/plugin`,
+  `App.tsx`에 `GestureHandlerRootView` 1회 wrapping.
+
+**주의사항**
+
+- **네이티브 재빌드 필요**: gesture-handler/reanimated는 네이티브 모듈이라
+  기존 dev client로는 실행되지 않는다(`npx expo run:android` 또는 새 EAS dev
+  build). Expo web은 추가 설정 없이 동작한다.
+- 차트는 로드된 캔들 범위 안에서만 이동한다(무한 과거 로딩·cursor pagination·
+  candle API 변경 없음). 확장 지점은 `CandlestickChart`가 받는 candle 배열이며
+  viewport 계산과 slice는 이미 분리되어 있다.
+- 실시간 payload는 여전히 `assetPriceSnapshotId: null`(timestamp로 정렬).
+- DB migration 없음. 주문·체결·지정가·지갑·원장 불변.
+
+**검증**
+
+- backend typecheck/build/test 2048 pass, frontend typecheck/test 218 pass,
+  `expo export` web·android 성공(웹 번들에만 DOM adapter 포함 확인).
+- 모바일 실기기/에뮬레이터 제스처 수동 검증과 웹 브라우저 수동 검증은
+  환경 부재로 NOT_RUN(순수 모듈 테스트 + 번들 검증으로 대체).
+
 ### 작업 단위: 실시간 fanout 경량화·표시 결함 보완 + 캔들 차트 viewport 인터랙션 (2026-07-25)
 
 **목적**
@@ -174,6 +242,22 @@ cd frontend && npm run typecheck && npm test
 ---
 
 ## 2. 최신 작업 시간순 기록
+
+### 2026-07-26 — 실시간 표시 일관성 마무리 + 캔들 차트 gesture/viewport 재구성
+
+- 상세 화면 가격 블록을 단일 기준(selectDisplayPrice)으로 통일: KRW 상태·사유·
+  메시지·가격 source·FX source·시각·정밀도가 모두 같은 데이터에서 나온다.
+- MarketScreen을 item/ticker 별도 prop + 행 내부 병합 구조로 변경(리렌더 격리).
+- stale 판정을 `getTickerAgeMs`/`isTickerStaleAt(ticker, now)` + 5초 재판정
+  훅으로 정리(백그라운드에서는 timer 정지).
+- ticker backpressure에 큐 상한·정리·readiness 메트릭(`data.assetTicker`) 추가.
+- 캔들 차트를 `{visibleCount, rightOffset}` viewport + 공통 renderer + 플랫폼별
+  gesture adapter 구조로 재구성(기본 60개, MIN 20/MAX 180, focal point zoom,
+  visible 기준 Y축, 과거 구간 현재가선 숨김, visible+buffer만 렌더,
+  timeframe reset, +/−/초기화 버튼).
+- gesture-handler/reanimated/worklets 도입 → **네이티브 dev client 재빌드 필요**.
+- 검증: backend 2048 pass, frontend 218 pass, expo export web/android 성공.
+  실기기·브라우저 수동 검증은 NOT_RUN.
 
 ### 2026-07-25 (2차) — 실시간 fanout 경량화·표시 결함 보완 + 캔들 차트 viewport
 

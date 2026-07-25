@@ -515,6 +515,8 @@ describe('AssetTickerGateway', () => {
       priceLocal: '0.24560000',
       priceCurrency: CurrencyCode.USD,
     });
+    // One FX lookup per event — never twice for the same ticker.
+    expect(assetsService.convertRealtimePriceToKrw).toHaveBeenCalledTimes(1);
     expect(ticker).toMatchObject({
       priceLocal: '0.24560000',
       priceKrw: '343.84000000',
@@ -663,6 +665,88 @@ describe('AssetTickerGateway', () => {
       priceLocal: '0.25010000',
     });
     expect(state.pendingTickers.size).toBe(0);
+  });
+
+  it('bounds the pending queue and keeps the newest assets when it overflows', async () => {
+    const { gateway } = createGateway(
+      null,
+      DEFAULT_KRW_CONVERSION,
+      dogeMetadata(5),
+    );
+    const { client, state } = attachClient(gateway, 'asset-doge', 10_000_000);
+    // Subscribe far more assets than the per-client queue limit.
+    const limit = gateway.getTickerFanoutMetrics().pendingTickerLimitPerClient;
+    for (let index = 0; index < limit + 10; index += 1) {
+      state.subscriptions.set(`asset-${index}`, null);
+    }
+
+    for (let index = 0; index < limit + 10; index += 1) {
+      (
+        gateway as unknown as {
+          sendTickerMessage(
+            client: unknown,
+            state: unknown,
+            assetId: string,
+            ticker: Record<string, unknown>,
+          ): void;
+        }
+      ).sendTickerMessage(client, state, `asset-${index}`, {
+        type: 'asset_ticker',
+        assetId: `asset-${index}`,
+      });
+    }
+
+    expect(state.pendingTickers.size).toBe(limit);
+    // Oldest assets were evicted; the most recent ones survive.
+    expect(state.pendingTickers.has(`asset-${limit + 9}`)).toBe(true);
+    expect(state.pendingTickers.has('asset-0')).toBe(false);
+    expect(gateway.getTickerFanoutMetrics().dropped).toBeGreaterThan(0);
+  });
+
+  it('reports observable ticker delivery metrics', async () => {
+    const { gateway } = createGateway(
+      null,
+      DEFAULT_KRW_CONVERSION,
+      dogeMetadata(5),
+    );
+    const fast = attachClient(gateway, 'asset-doge');
+    const slow = attachClient(gateway, 'asset-doge', 10_000_000);
+
+    await pushRealtimePriceEvent(gateway, binanceTickerEvent);
+    await pushRealtimePriceEvent(gateway, {
+      ...binanceTickerEvent,
+      price: { ...binanceTickerEvent.price, price: '0.25010000' },
+    });
+
+    const metrics = gateway.getTickerFanoutMetrics();
+    expect(metrics).toMatchObject({
+      clients: 2,
+      sent: 2,
+      pendingTickers: 1,
+      clientsWithPendingTickers: 1,
+      maxPendingTickersPerClient: 1,
+    });
+    expect(metrics.coalesced).toBeGreaterThanOrEqual(2);
+    expect(fast.client.send).toHaveBeenCalledTimes(2);
+    expect(slow.client.send).not.toHaveBeenCalled();
+  });
+
+  it('clears pending tickers when the client disconnects', async () => {
+    const { gateway } = createGateway(
+      null,
+      DEFAULT_KRW_CONVERSION,
+      dogeMetadata(5),
+    );
+    const { client } = attachClient(gateway, 'asset-doge', 10_000_000);
+    await pushRealtimePriceEvent(gateway, binanceTickerEvent);
+    expect(gateway.getTickerFanoutMetrics().pendingTickers).toBe(1);
+
+    gateway.handleDisconnect(client as never);
+
+    expect(gateway.getTickerFanoutMetrics()).toMatchObject({
+      clients: 0,
+      pendingTickers: 0,
+    });
   });
 
   it('drops a queued ticker whose row unsubscribed before the flush', async () => {

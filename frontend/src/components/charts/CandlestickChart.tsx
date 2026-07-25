@@ -1,33 +1,33 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  GestureResponderEvent,
   LayoutChangeEvent,
-  PanResponder,
-  Platform,
+  Pressable,
   StyleSheet,
+  Text,
   View,
 } from 'react-native';
-import Svg, { G, Line as SvgLine, Rect, Text as SvgText } from 'react-native-svg';
 
-import { formatCurrency, formatMoney } from '../../utils/format';
+import { formatMoney } from '../../utils/format';
+import CandlestickChartRenderer, {
+  type CandlestickChartGeometry,
+  type RenderedCandle,
+} from './CandlestickChartRenderer';
+// Platform-resolved: `.native.tsx` on iOS/Android, `.web.tsx` on web (the
+// base file is the type contract + no-gesture fallback).
+import CandlestickGestures from './CandlestickGestures';
+import { computeSlotLayout, visibleOffsetForX } from './candlestickLayout';
 import {
-  LONG_PRESS_MS,
   adjustViewportForDataChange,
-  createInitialViewport,
-  indexForPixel,
-  isAtLatestEdge,
-  isHorizontalPanIntent,
+  createDefaultViewport,
+  getRenderIndexRange,
+  getVisibleIndexRange,
+  isViewingLatest,
   panViewportByPixels,
-  pinchScale,
-  strictVisibleIndexRange,
-  touchDistance,
-  viewportSlotLayout,
-  visibleIndexRange,
-  wheelZoomScale,
-  xCenterForIndex,
-  zoomViewportAtPixel,
-  type ChartViewport,
-} from './chartViewport';
+  resetViewport,
+  zoomViewportAtFocalPoint,
+  zoomViewportByStep,
+  type CandleViewport,
+} from './candlestickViewport';
 import ChartEmptyState from './ChartEmptyState';
 
 export type CandlestickChartCandle = {
@@ -48,9 +48,9 @@ export type CandlestickChartProps = {
   height?: number;
   emptyMessage?: string;
   /**
-   * Changing this key resets the viewport to the default latest-60 window.
-   * Pass the timeframe (and asset) identity so a tab switch starts fresh even
-   * when React Query serves the new candles from cache without unmounting.
+   * Changing this key resets the viewport to the latest default window. Pass
+   * the timeframe (and asset) identity so switching tabs starts fresh even
+   * when React Query serves the new candles from cache.
    */
   viewportResetKey?: string | number;
 };
@@ -65,18 +65,10 @@ type ParsedCandle = {
 };
 
 const DEFAULT_WIDTH = 320;
-// Hard parse cap aligned with the largest single API page (Binance klines:
-// 1000). The viewport renders only the visible window + buffer out of these.
+// Parse cap aligned with the largest single API page (Binance klines: 1000).
+// Only the visible window + buffer is ever rendered out of these.
 const MAX_PARSED_CANDLES = 1000;
 const PADDING = { top: 12, right: 66, bottom: 26, left: 8 };
-const GRID_LINES = 4;
-const LONG_PRESS_MOVE_SLOP_PX = 10;
-
-const UP_COLOR = '#16a34a';
-const DOWN_COLOR = '#dc2626';
-const GRID_COLOR = '#eef1f4';
-const AXIS_TEXT_COLOR = '#98a2b3';
-const CROSSHAIR_COLOR = '#64748b';
 
 const WEEKDAY_KO: Record<string, string> = {
   Sun: '일',
@@ -148,16 +140,15 @@ function parseCandles(candles: CandlestickChartCandle[]): ParsedCandle[] {
     : parsed;
 }
 
-type GestureSession = {
-  mode: 'idle' | 'pan' | 'pinch' | 'crosshair';
-  startViewport: ChartViewport | null;
-  panBaseDx: number;
-  pinchStartDistance: number;
-  pinchStartViewport: ChartViewport | null;
-  longPressTimer: ReturnType<typeof setTimeout> | null;
-  touchStart: { x: number; y: number } | null;
-};
-
+/**
+ * Candlestick chart with a pan/zoom viewport over the ALREADY LOADED candles.
+ *
+ * This component owns viewport state and geometry; `CandlestickChartRenderer`
+ * draws (one renderer for every platform) and `CandlestickGestures.native/web`
+ * only translate raw gestures into pan/zoom/crosshair intent. Moving beyond the
+ * loaded range is intentionally impossible — fetching more history is a future
+ * addition that would only extend the candle array handed in here.
+ */
 export default function CandlestickChart({
   candles,
   currencyCode,
@@ -167,310 +158,154 @@ export default function CandlestickChart({
   viewportResetKey,
 }: CandlestickChartProps) {
   const [width, setWidth] = useState(DEFAULT_WIDTH);
-  const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null);
+  const [crosshair, setCrosshair] = useState<{ x: number; y: number } | null>(
+    null,
+  );
 
   const parsed = useMemo(() => parseCandles(candles), [candles]);
-  const [viewport, setViewport] = useState<ChartViewport>(() =>
-    createInitialViewport(parsed.length),
+  const total = parsed.length;
+  const [viewport, setViewport] = useState<CandleViewport>(() =>
+    createDefaultViewport(total),
   );
 
   const chartWidth = Math.max(width, 160);
   const innerWidth = Math.max(chartWidth - PADDING.left - PADDING.right, 1);
   const innerHeight = Math.max(height - PADDING.top - PADDING.bottom, 1);
+  const { slotWidth, bodyWidth } = computeSlotLayout(
+    innerWidth,
+    viewport.visibleCount,
+  );
 
-  // Latest values for gesture handlers created once via refs.
-  const viewportRef = useRef(viewport);
-  viewportRef.current = viewport;
-  const totalRef = useRef(parsed.length);
-  totalRef.current = parsed.length;
+  // Gesture handlers read the live values through refs so the adapters can be
+  // memoized and never rebuild mid-gesture.
+  const totalRef = useRef(total);
+  totalRef.current = total;
   const innerWidthRef = useRef(innerWidth);
   innerWidthRef.current = innerWidth;
-  const gestureRef = useRef<GestureSession>({
-    mode: 'idle',
-    startViewport: null,
-    panBaseDx: 0,
-    pinchStartDistance: 0,
-    pinchStartViewport: null,
-    longPressTimer: null,
-    touchStart: null,
-  });
+  const slotWidthRef = useRef(slotWidth);
+  slotWidthRef.current = slotWidth;
+  const gestureStartViewportRef = useRef<CandleViewport>(viewport);
+  const viewportRef = useRef(viewport);
+  viewportRef.current = viewport;
 
-  // Timeframe switches reset to the latest-60 default; data growth while
-  // parked at the right edge follows the newest candle, panned-back positions
-  // are preserved (item: only the loaded range is ever shown).
+  // Timeframe/asset switch resets to the latest default window; otherwise a
+  // data-length change follows the right edge (live append) or preserves the
+  // history position the user is looking at.
   const lastResetKeyRef = useRef(viewportResetKey);
-  const prevTotalRef = useRef(parsed.length);
+  const previousTotalRef = useRef(total);
   useEffect(() => {
-    const total = parsed.length;
     const keyChanged = lastResetKeyRef.current !== viewportResetKey;
     lastResetKeyRef.current = viewportResetKey;
-    const previousTotal = prevTotalRef.current;
-    prevTotalRef.current = total;
+    const previousTotal = previousTotalRef.current;
+    previousTotalRef.current = total;
+    if (keyChanged) {
+      setCrosshair(null);
+      setViewport(resetViewport(total));
+      return;
+    }
     setViewport((current) =>
-      keyChanged
-        ? createInitialViewport(total)
-        : adjustViewportForDataChange(current, previousTotal, total),
+      adjustViewportForDataChange(current, previousTotal, total),
     );
-  }, [parsed.length, viewportResetKey]);
+  }, [total, viewportResetKey]);
 
   const onLayout = (event: LayoutChangeEvent) => {
     const nextWidth = Math.floor(event.nativeEvent.layout.width);
     if (nextWidth > 0 && nextWidth !== width) setWidth(nextWidth);
   };
 
-  const handlePointer = (x: number, y: number) => {
-    const clampedX = Math.max(
-      PADDING.left,
-      Math.min(x, PADDING.left + innerWidthRef.current),
-    );
-    const clampedY = Math.max(
-      PADDING.top,
-      Math.min(y, PADDING.top + innerHeight),
-    );
-    setPointer({ x: clampedX, y: clampedY });
-  };
-
-  const clearPointer = () => setPointer(null);
-
-  const clearLongPressTimer = () => {
-    const gesture = gestureRef.current;
-    if (gesture.longPressTimer) {
-      clearTimeout(gesture.longPressTimer);
-      gesture.longPressTimer = null;
-    }
-  };
-
-  const endGestureSession = () => {
-    const gesture = gestureRef.current;
-    clearLongPressTimer();
-    if (gesture.mode === 'crosshair') clearPointer();
-    gesture.mode = 'idle';
-    gesture.startViewport = null;
-    gesture.pinchStartViewport = null;
-    gesture.pinchStartDistance = 0;
-    gesture.touchStart = null;
-  };
-
-  const startPinch = (touches: readonly { pageX: number; pageY: number; locationX?: number }[]) => {
-    const gesture = gestureRef.current;
-    gesture.mode = 'pinch';
-    gesture.pinchStartDistance = touchDistance(touches[0], touches[1]);
-    gesture.pinchStartViewport = viewportRef.current;
-    clearPointer();
-  };
-
-  const applyPinch = (
-    touches: readonly { pageX: number; pageY: number; locationX?: number }[],
-  ) => {
-    const gesture = gestureRef.current;
-    if (!gesture.pinchStartViewport || gesture.pinchStartDistance <= 0) return;
-    const scale = pinchScale(
-      touchDistance(touches[0], touches[1]),
-      gesture.pinchStartDistance,
-    );
-    const midLocationX =
-      ((touches[0].locationX ?? 0) + (touches[1].locationX ?? 0)) / 2;
-    setViewport(
-      zoomViewportAtPixel(
-        gesture.pinchStartViewport,
-        scale,
-        midLocationX - PADDING.left,
-        innerWidthRef.current,
-        totalRef.current,
-      ),
-    );
-  };
-
-  // One PanResponder instance; everything mutable lives in refs.
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (event, gestureState) => {
-        const gesture = gestureRef.current;
-        if (gesture.mode === 'crosshair') return true;
-        const touches = event.nativeEvent.touches ?? [];
-        if (touches.length >= 2) return true;
-        // Vertical single-finger drags stay with the parent ScrollView.
-        return isHorizontalPanIntent(gestureState.dx, gestureState.dy);
-      },
-      onPanResponderGrant: (event, gestureState) => {
-        const gesture = gestureRef.current;
-        clearLongPressTimer();
-        if (gesture.mode === 'crosshair') {
-          handlePointer(
-            event.nativeEvent.locationX,
-            event.nativeEvent.locationY,
-          );
-          return;
-        }
-        const touches = event.nativeEvent.touches ?? [];
-        if (touches.length >= 2) {
-          startPinch(touches);
-          return;
-        }
-        gesture.mode = 'pan';
-        gesture.startViewport = viewportRef.current;
-        gesture.panBaseDx = gestureState.dx;
-      },
-      onPanResponderMove: (event, gestureState) => {
-        const gesture = gestureRef.current;
-        if (gesture.mode === 'crosshair') {
-          handlePointer(
-            event.nativeEvent.locationX,
-            event.nativeEvent.locationY,
-          );
-          return;
-        }
-        const touches = event.nativeEvent.touches ?? [];
-        if (touches.length >= 2) {
-          if (gesture.mode !== 'pinch') {
-            startPinch(touches);
-          } else {
-            applyPinch(touches);
-          }
-          return;
-        }
-        if (gesture.mode === 'pinch') {
-          // One finger lifted mid-pinch: continue as a pan from here.
-          gesture.mode = 'pan';
-          gesture.startViewport = viewportRef.current;
-          gesture.panBaseDx = gestureState.dx;
-          return;
-        }
-        if (gesture.mode !== 'pan' || !gesture.startViewport) return;
-        setViewport(
-          panViewportByPixels(
-            gesture.startViewport,
-            gestureState.dx - gesture.panBaseDx,
-            innerWidthRef.current,
-            totalRef.current,
-          ),
-        );
-      },
-      onPanResponderRelease: endGestureSession,
-      onPanResponderTerminate: endGestureSession,
-      // Never hand an ACTIVE pan/pinch/crosshair back to the ScrollView.
-      onPanResponderTerminationRequest: () =>
-        gestureRef.current.mode === 'idle',
-    }),
-  ).current;
-
-  // Long-press (touch only): held still past the delay → crosshair mode. The
-  // raw touch handlers fire alongside the responder system, so the timer can
-  // arm before any responder claim happens.
-  const onTouchStart = (event: GestureResponderEvent) => {
-    const touches = event.nativeEvent.touches ?? [];
-    const gesture = gestureRef.current;
-    if (touches.length !== 1) {
-      clearLongPressTimer();
-      return;
-    }
-    const { locationX, locationY } = event.nativeEvent;
-    gesture.touchStart = { x: locationX, y: locationY };
-    clearLongPressTimer();
-    gesture.longPressTimer = setTimeout(() => {
-      gesture.longPressTimer = null;
-      if (gesture.mode !== 'idle' || !gesture.touchStart) return;
-      gesture.mode = 'crosshair';
-      handlePointer(gesture.touchStart.x, gesture.touchStart.y);
-    }, LONG_PRESS_MS);
-  };
-
-  const onTouchMove = (event: GestureResponderEvent) => {
-    const gesture = gestureRef.current;
-    if (!gesture.touchStart || gesture.mode !== 'idle') return;
-    const { locationX, locationY } = event.nativeEvent;
-    const movedFar =
-      Math.hypot(
-        locationX - gesture.touchStart.x,
-        locationY - gesture.touchStart.y,
-      ) > LONG_PRESS_MOVE_SLOP_PX;
-    // Movement before the delay elapses means pan/scroll, not a long-press.
-    if (movedFar) clearLongPressTimer();
-  };
-
-  const onTouchEndOrCancel = (event: GestureResponderEvent) => {
-    if ((event.nativeEvent.touches ?? []).length > 0) return;
-    endGestureSession();
-  };
-
-  // Web: wheel / trackpad zoom anchored at the cursor. react-native-web View
-  // refs expose the DOM element, so a non-passive listener can preventDefault
-  // the page scroll while zooming.
-  const containerRef = useRef<View>(null);
-  useEffect(() => {
-    if (Platform.OS !== 'web') return undefined;
-    const node = containerRef.current as unknown as
-      | (HTMLElement & {
-          addEventListener: HTMLElement['addEventListener'];
-        })
-      | null;
-    if (!node?.addEventListener) return undefined;
-    const onWheel = (event: WheelEvent) => {
-      event.preventDefault();
-      const rect = node.getBoundingClientRect();
-      const pixelX = event.clientX - rect.left - PADDING.left;
-      setViewport((current) =>
-        zoomViewportAtPixel(
-          current,
-          wheelZoomScale(event.deltaY),
-          pixelX,
-          innerWidthRef.current,
-          totalRef.current,
-        ),
-      );
-    };
-    node.addEventListener('wheel', onWheel, { passive: false });
-    return () => node.removeEventListener('wheel', onWheel);
+  const handleGestureStart = useCallback(() => {
+    gestureStartViewportRef.current = viewportRef.current;
   }, []);
 
-  // Web: hover crosshair (suppressed while dragging).
-  const webHoverProps: Record<string, unknown> =
-    Platform.OS === 'web'
-      ? {
-          onMouseMove: (event: {
-            clientX: number;
-            clientY: number;
-            currentTarget: {
-              getBoundingClientRect: () => { left: number; top: number };
-            };
-          }) => {
-            if (gestureRef.current.mode === 'pan') {
-              clearPointer();
-              return;
-            }
-            const rect = event.currentTarget.getBoundingClientRect();
-            handlePointer(event.clientX - rect.left, event.clientY - rect.top);
-          },
-          onMouseLeave: clearPointer,
-        }
-      : {};
+  const handlePan = useCallback((translationX: number) => {
+    setViewport((current) => {
+      const next = panViewportByPixels(
+        gestureStartViewportRef.current,
+        translationX,
+        slotWidthRef.current,
+        totalRef.current,
+      );
+      // Only a real index change re-renders (gestures fire per pixel).
+      return next.rightOffset === current.rightOffset &&
+        next.visibleCount === current.visibleCount
+        ? current
+        : next;
+    });
+  }, []);
 
-  const geometry = useMemo(() => {
-    if (parsed.length === 0) return null;
-    const total = parsed.length;
-    const strict = strictVisibleIndexRange(viewport, total);
-    if (strict.endExclusive <= strict.start) return null;
+  const handleZoom = useCallback((scale: number, focalX: number) => {
+    setViewport((current) => {
+      const next = zoomViewportAtFocalPoint(
+        gestureStartViewportRef.current,
+        scale,
+        focalX,
+        innerWidthRef.current,
+        totalRef.current,
+      );
+      return next.visibleCount === current.visibleCount &&
+        next.rightOffset === current.rightOffset
+        ? current
+        : next;
+    });
+  }, []);
 
-    const { slotWidth, bodyWidth } = viewportSlotLayout(
-      innerWidth,
-      viewport.size,
+  const handleCrosshair = useCallback(
+    (position: { x: number; y: number } | null) => {
+      if (!position) {
+        setCrosshair(null);
+        return;
+      }
+      const clampedX = Math.max(
+        PADDING.left,
+        Math.min(position.x, PADDING.left + innerWidthRef.current),
+      );
+      const clampedY = Math.max(
+        PADDING.top,
+        Math.min(position.y, PADDING.top + innerHeight),
+      );
+      setCrosshair({ x: clampedX, y: clampedY });
+    },
+    [innerHeight],
+  );
+
+  const handleGestureEnd = useCallback(() => {
+    gestureStartViewportRef.current = viewportRef.current;
+  }, []);
+
+  const zoomIn = useCallback(() => {
+    setViewport((current) => zoomViewportByStep(current, 'in', totalRef.current));
+  }, []);
+  const zoomOut = useCallback(() => {
+    setViewport((current) =>
+      zoomViewportByStep(current, 'out', totalRef.current),
     );
-    const lastCandle = parsed[total - 1];
-    const latestVisible = strict.endExclusive >= total;
-    const livePrice = toNumber(currentPrice ?? null);
-    const currentPriceValue = livePrice ?? lastCandle.close;
+  }, []);
+  const resetToLatest = useCallback(() => {
+    setCrosshair(null);
+    setViewport(resetViewport(totalRef.current));
+  }, []);
 
-    // Y-axis from the candles ACTUALLY on screen (strict window, no buffer);
-    // the current price participates only while the latest candle is visible.
+  const geometry = useMemo<CandlestickChartGeometry | null>(() => {
+    if (total === 0) return null;
+    const { startIndex, endIndex } = getVisibleIndexRange(total, viewport);
+    if (endIndex <= startIndex) return null;
+
+    const viewingLatest = isViewingLatest(viewport);
+    const livePrice = toNumber(currentPrice ?? null);
+    const currentPriceValue = viewingLatest
+      ? (livePrice ?? parsed[total - 1].close)
+      : null;
+
+    // Y axis from the candles ACTUALLY on screen. In history the current price
+    // is excluded entirely so it cannot distort the range.
     let minY = Number.POSITIVE_INFINITY;
     let maxY = Number.NEGATIVE_INFINITY;
-    for (let index = strict.start; index < strict.endExclusive; index += 1) {
+    for (let index = startIndex; index < endIndex; index += 1) {
       const candle = parsed[index];
       if (candle.low < minY) minY = candle.low;
       if (candle.high > maxY) maxY = candle.high;
     }
-    if (latestVisible && Number.isFinite(currentPriceValue)) {
+    if (currentPriceValue !== null && Number.isFinite(currentPriceValue)) {
       minY = Math.min(minY, currentPriceValue);
       maxY = Math.max(maxY, currentPriceValue);
     }
@@ -486,328 +321,174 @@ export default function CandlestickChart({
     maxY += pad;
     range = maxY - minY;
 
-    const xForIndex = (index: number) =>
-      xCenterForIndex(index, viewport, innerWidth, PADDING.left);
-    const yForPrice = (price: number) =>
-      PADDING.top + (1 - (price - minY) / range) * innerHeight;
-    const priceForY = (y: number) =>
-      minY + (1 - (y - PADDING.top) / innerHeight) * range;
-
     return {
-      strict,
-      rendered: visibleIndexRange(viewport, total),
+      width: chartWidth,
+      height,
+      innerWidth,
+      innerHeight,
+      padding: PADDING,
       slotWidth,
       bodyWidth,
+      startIndex,
       minY,
       maxY,
       range,
-      latestVisible,
-      currentPriceValue,
-      currentBullish: lastCandle.bullish,
-      xForIndex,
-      yForPrice,
-      priceForY,
     };
-  }, [parsed, viewport, innerWidth, innerHeight, currentPrice]);
+  }, [
+    parsed,
+    total,
+    viewport,
+    currentPrice,
+    chartWidth,
+    height,
+    innerWidth,
+    innerHeight,
+    slotWidth,
+    bodyWidth,
+  ]);
 
-  // Candle and grid nodes are memoized so crosshair moves (pointer state) do
-  // not rebuild them; only pan/zoom (viewport) and data changes do. Only the
-  // visible window + buffer is materialized as SVG nodes.
-  const candleNodes = useMemo(() => {
-    if (!geometry) return null;
-    const { rendered, bodyWidth, xForIndex, yForPrice } = geometry;
-    const nodes = [] as React.ReactElement[];
-    for (let index = rendered.start; index < rendered.endExclusive; index += 1) {
-      const candle = parsed[index];
-      const x = xForIndex(index);
-      const color = candle.bullish ? UP_COLOR : DOWN_COLOR;
-      const highY = yForPrice(candle.high);
-      const lowY = yForPrice(candle.low);
-      const openY = yForPrice(candle.open);
-      const closeY = yForPrice(candle.close);
-      const bodyTop = Math.min(openY, closeY);
-      const bodyHeight = Math.max(Math.abs(openY - closeY), 1);
-      nodes.push(
-        <G key={`candle-${parsed[index].time}`}>
-          <SvgLine
-            x1={x}
-            y1={highY}
-            x2={x}
-            y2={lowY}
-            stroke={color}
-            strokeWidth={1}
-          />
-          <Rect
-            x={x - bodyWidth / 2}
-            y={bodyTop}
-            width={bodyWidth}
-            height={bodyHeight}
-            fill={color}
-            rx={0.5}
-          />
-        </G>,
-      );
+  // Visible window + buffer only: at most ~180 + 4 SVG candle groups even when
+  // 1000 candles are loaded.
+  const renderedCandles = useMemo<RenderedCandle[]>(() => {
+    if (total === 0) return [];
+    const { startIndex, endIndex } = getRenderIndexRange(total, viewport);
+    const list: RenderedCandle[] = [];
+    for (let index = startIndex; index < endIndex; index += 1) {
+      list.push({ index, ...parsed[index] });
     }
-    return nodes;
-  }, [parsed, geometry]);
+    return list;
+  }, [parsed, total, viewport]);
 
-  const gridNodes = useMemo(() => {
-    if (!geometry) return null;
-    const { minY, range, yForPrice } = geometry;
-    const rightX = PADDING.left + innerWidth;
-    return Array.from({ length: GRID_LINES + 1 }, (_, index) => {
-      const value = minY + (range * index) / GRID_LINES;
-      const y = yForPrice(value);
-      return (
-        <G key={`grid-${index}`}>
-          <SvgLine
-            x1={PADDING.left}
-            y1={y}
-            x2={rightX}
-            y2={y}
-            stroke={GRID_COLOR}
-            strokeWidth={1}
-          />
-          <SvgText
-            x={rightX + 4}
-            y={y + 3}
-            fontSize={9}
-            fill={AXIS_TEXT_COLOR}
-          >
-            {formatCurrency(value, currencyCode)}
-          </SvgText>
-        </G>
-      );
-    });
-  }, [geometry, currencyCode, innerWidth]);
-
-  if (parsed.length < 1 || !geometry) {
+  if (total < 1 || !geometry) {
     return <ChartEmptyState message={emptyMessage} />;
   }
 
-  const {
-    strict,
-    latestVisible,
-    currentPriceValue,
-    currentBullish,
-    xForIndex,
-    yForPrice,
-    priceForY,
-  } = geometry;
+  const { startIndex, endIndex } = getVisibleIndexRange(total, viewport);
+  const viewingLatest = isViewingLatest(viewport);
+  const livePrice = toNumber(currentPrice ?? null);
+  const currentPriceValue = viewingLatest
+    ? (livePrice ?? parsed[total - 1].close)
+    : null;
 
-  const rightEdgeX = PADDING.left + innerWidth;
-  const bottomY = PADDING.top + innerHeight;
-  const currentColor = currentBullish ? UP_COLOR : DOWN_COLOR;
-  const currentPriceY = yForPrice(currentPriceValue);
-  const showCurrentPriceLine =
-    latestVisible &&
-    currentPriceY >= PADDING.top - 1 &&
-    currentPriceY <= bottomY + 1;
+  // Crosshair x → visible offset → ORIGINAL candle index, so its labels always
+  // describe the candle actually under the line.
+  const crosshairState = crosshair
+    ? {
+        index:
+          startIndex +
+          visibleOffsetForX(
+            crosshair.x,
+            PADDING.left,
+            slotWidth,
+            endIndex - startIndex,
+          ),
+        y: crosshair.y,
+      }
+    : null;
 
-  // Crosshair: vertical snaps to the nearest visible candle; horizontal is
-  // free at the pointer.
-  let crosshair: {
-    x: number;
-    y: number;
-    price: number;
-    timeLabel: string;
-  } | null = null;
-  if (pointer) {
-    const index = indexForPixel(
-      pointer.x,
-      viewport,
-      innerWidth,
-      PADDING.left,
-      parsed.length,
-    );
-    if (index !== null) {
-      crosshair = {
-        x: xForIndex(index),
-        y: pointer.y,
-        price: priceForY(pointer.y),
-        timeLabel: formatSeoulDateTimeLabel(parsed[index].time),
-      };
-    }
-  }
-
-  const firstLabel = formatSeoulDateTimeLabel(parsed[strict.start].time);
-  const lastLabel = formatSeoulDateTimeLabel(
-    parsed[strict.endExclusive - 1].time,
-  );
+  const accessibilityLabel = [
+    '캔들 차트',
+    `${endIndex - startIndex}개 표시 중`,
+    viewingLatest ? '최신 구간' : '과거 구간',
+    `현재가 ${formatMoney(
+      livePrice ?? parsed[total - 1].close,
+      currencyCode,
+    )}`,
+  ].join(', ');
 
   return (
-    <View
-      ref={containerRef}
-      onLayout={onLayout}
-      style={[styles.container, { height }]}
-      accessible
-      accessibilityRole="image"
-      accessibilityLabel={`캔들 차트. 현재가 ${formatMoney(currentPriceValue, currencyCode)}`}
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEndOrCancel}
-      onTouchCancel={onTouchEndOrCancel}
-      {...panResponder.panHandlers}
-      {...webHoverProps}
-    >
-      <Svg width="100%" height={height}>
-        {/* Grid + right-axis price labels (memoized) */}
-        {gridNodes}
+    <View style={styles.wrapper}>
+      <View
+        onLayout={onLayout}
+        style={[styles.container, { height }]}
+        accessible
+        accessibilityRole="image"
+        accessibilityLabel={accessibilityLabel}
+      >
+        <CandlestickGestures
+          innerWidth={innerWidth}
+          paddingLeft={PADDING.left}
+          slotWidth={slotWidth}
+          onGestureStart={handleGestureStart}
+          onPan={handlePan}
+          onZoom={handleZoom}
+          onCrosshair={handleCrosshair}
+          onGestureEnd={handleGestureEnd}
+        >
+          <CandlestickChartRenderer
+            geometry={geometry}
+            candles={renderedCandles}
+            currencyCode={currencyCode}
+            currentPrice={currentPriceValue}
+            currentBullish={parsed[total - 1].bullish}
+            crosshair={crosshairState}
+            formatTimeLabel={formatSeoulDateTimeLabel}
+            firstVisibleTime={parsed[startIndex]?.time ?? null}
+            lastVisibleTime={parsed[endIndex - 1]?.time ?? null}
+          />
+        </CandlestickGestures>
+      </View>
 
-        {/* Candles (memoized; visible window + buffer only) */}
-        {candleNodes}
-
-        {/* Current-price dashed line + colored label (latest candle on screen) */}
-        {showCurrentPriceLine ? (
-          <G>
-            <SvgLine
-              x1={PADDING.left}
-              y1={currentPriceY}
-              x2={rightEdgeX}
-              y2={currentPriceY}
-              stroke={currentColor}
-              strokeWidth={1}
-              strokeDasharray="3 3"
-            />
-            <Rect
-              x={rightEdgeX}
-              y={currentPriceY - 8}
-              width={PADDING.right}
-              height={16}
-              fill={currentColor}
-              rx={2}
-            />
-            <SvgText
-              x={rightEdgeX + 4}
-              y={currentPriceY + 3}
-              fontSize={9}
-              fontWeight="bold"
-              fill="#ffffff"
-            >
-              {formatMoney(currentPriceValue, currencyCode)}
-            </SvgText>
-          </G>
-        ) : null}
-
-        {/* Crosshair */}
-        {crosshair ? (
-          <G>
-            <SvgLine
-              x1={crosshair.x}
-              y1={PADDING.top}
-              x2={crosshair.x}
-              y2={bottomY}
-              stroke={CROSSHAIR_COLOR}
-              strokeWidth={1}
-              strokeDasharray="2 2"
-            />
-            <SvgLine
-              x1={PADDING.left}
-              y1={crosshair.y}
-              x2={rightEdgeX}
-              y2={crosshair.y}
-              stroke={CROSSHAIR_COLOR}
-              strokeWidth={1}
-              strokeDasharray="2 2"
-            />
-            {/* Pointer price label (right) */}
-            <Rect
-              x={rightEdgeX}
-              y={crosshair.y - 8}
-              width={PADDING.right}
-              height={16}
-              fill={CROSSHAIR_COLOR}
-              rx={2}
-            />
-            <SvgText
-              x={rightEdgeX + 4}
-              y={crosshair.y + 3}
-              fontSize={9}
-              fontWeight="bold"
-              fill="#ffffff"
-            >
-              {formatMoney(crosshair.price, currencyCode)}
-            </SvgText>
-            {/* Pointer time label (bottom) */}
-            <Rect
-              x={Math.max(
-                PADDING.left,
-                Math.min(crosshair.x - 62, rightEdgeX - 124),
-              )}
-              y={bottomY + 4}
-              width={124}
-              height={16}
-              fill={CROSSHAIR_COLOR}
-              rx={2}
-            />
-            <SvgText
-              x={Math.max(
-                PADDING.left + 62,
-                Math.min(crosshair.x, rightEdgeX - 62),
-              )}
-              y={bottomY + 15}
-              fontSize={9}
-              fontWeight="bold"
-              fill="#ffffff"
-              textAnchor="middle"
-            >
-              {crosshair.timeLabel}
-            </SvgText>
-          </G>
-        ) : (
-          // Minimal static x-axis context: first / last VISIBLE candle time.
-          <G>
-            <SvgText
-              x={PADDING.left}
-              y={bottomY + 15}
-              fontSize={9}
-              fill={AXIS_TEXT_COLOR}
-            >
-              {firstLabel}
-            </SvgText>
-            <SvgText
-              x={rightEdgeX}
-              y={bottomY + 15}
-              fontSize={9}
-              fill={AXIS_TEXT_COLOR}
-              textAnchor="end"
-            >
-              {lastLabel}
-            </SvgText>
-          </G>
-        )}
-      </Svg>
-      {!latestVisible && !isAtLatestEdge(viewport, parsed.length) ? (
-        // Subtle hint that history mode is active (latest candle off screen).
-        <View style={styles.historyBadge} pointerEvents="none">
-          <SvgBadge />
-        </View>
-      ) : null}
+      {/* Screen-reader and non-gesture users must be able to drive the chart. */}
+      <View style={styles.controls}>
+        <Pressable
+          style={styles.controlButton}
+          onPress={zoomOut}
+          accessibilityRole="button"
+          accessibilityLabel="차트 축소"
+        >
+          <Text style={styles.controlText}>−</Text>
+        </Pressable>
+        <Pressable
+          style={styles.controlButton}
+          onPress={zoomIn}
+          accessibilityRole="button"
+          accessibilityLabel="차트 확대"
+        >
+          <Text style={styles.controlText}>＋</Text>
+        </Pressable>
+        <Pressable
+          style={styles.controlButton}
+          onPress={resetToLatest}
+          accessibilityRole="button"
+          accessibilityLabel="차트를 최신 구간으로 초기화"
+        >
+          <Text style={styles.controlText}>초기화</Text>
+        </Pressable>
+        <Text style={styles.controlHint}>
+          {endIndex - startIndex}개
+          {viewingLatest ? '' : ' · 과거 구간'}
+        </Text>
+      </View>
     </View>
   );
 }
 
-/** Tiny "history mode" marker: a right-pointing chevron in a pill. */
-function SvgBadge() {
-  return (
-    <Svg width={22} height={22}>
-      <Rect x={0} y={0} width={22} height={22} rx={11} fill="#0f172a66" />
-      <SvgLine x1={8} y1={6} x2={15} y2={11} stroke="#ffffff" strokeWidth={2} />
-      <SvgLine x1={15} y1={11} x2={8} y2={16} stroke="#ffffff" strokeWidth={2} />
-    </Svg>
-  );
-}
-
 const styles = StyleSheet.create({
+  wrapper: { width: '100%' },
   container: {
     width: '100%',
     backgroundColor: '#ffffff',
     borderRadius: 8,
     overflow: 'hidden',
   },
-  historyBadge: {
-    position: 'absolute',
-    right: PADDING.right + 4,
-    top: 8,
+  controls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
   },
+  controlButton: {
+    minWidth: 44,
+    minHeight: 32,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  controlText: { fontSize: 14, fontWeight: '600', color: '#111' },
+  controlHint: { fontSize: 12, color: '#98a2b3' },
 });

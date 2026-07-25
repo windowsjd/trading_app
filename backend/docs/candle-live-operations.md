@@ -37,7 +37,7 @@ The persisted intervals remain `5m`, `1d`, and `1w`. Current `15m`, `30m`, `1h`,
   1. `RealtimeAssetMetadataCacheService` — assetId → {symbol, name, assetType, market, priceCurrency} with a 5-minute TTL (30s negative TTL for unknown/inactive ids, which are rejected). Only a cache miss touches the `assets` table; a DB failure serves the last known entry and never takes the stream down. `displayPriceDecimals` is resolved per read from the in-memory Binance tickSize cache, so precision refreshes propagate without a flush.
   2. A 2-second USD/KRW selection cache inside `AssetsService.convertRealtimePriceToKrw` — one FX read per burst (available AND unavailable results are cached), same source-eligibility policy; REST paths keep their per-request reads. KRW-priced assets convert without touching FX.
   Realtime events therefore carry `assetPriceSnapshotId: null` (the DB write is decoupled/throttled, no stored row is claimed); clients order them by `priceCapturedAt`/`priceEffectiveAt`, which every realtime event carries. The 3s snapshot poller may re-send a row the throttled writer created moments earlier — the shared frontend accept policy dedupes/orders it away.
-- **Ticker backpressure (latest-only coalescing).** Both the poller and the realtime path deliver through one send helper: when a client socket's buffered bytes exceed the shared threshold (`CANDLE_LIVE_WEBSOCKET_BACKPRESSURE_BYTES` config value, same knob as candles, default 1MB), the ticker is coalesced into a per-asset latest-only queue instead of being written; the 100ms flush timer drains it once the socket catches up. A slow client skips straight to the newest price per asset and never accumulates a ticker backlog; queued tickers for rows that unsubscribed meanwhile are dropped.
+- **Ticker backpressure (latest-only coalescing).** Both the poller and the realtime path deliver through one send helper: when a client socket's buffered bytes exceed the shared threshold (`CANDLE_LIVE_WEBSOCKET_BACKPRESSURE_BYTES` config value, same knob as candles, default 1MB), the ticker is coalesced into a per-asset latest-only queue instead of being written; the 100ms flush timer (shared with candles, separate map) drains it once the socket catches up. A slow client skips straight to the newest price per asset and never accumulates a ticker backlog. Bounds and cleanup: the queue is keyed by assetId and additionally capped at 64 entries per client (oldest asset evicted first), queued tickers for rows that unsubscribed are dropped at flush time, and disconnect removes the client state entirely. The counters are observable at `GET /readiness` → `data.assetTicker` (`sent`, `coalesced`, `dropped`, `pendingTickers`, `clientsWithPendingTickers`, `maxPendingTickersPerClient`, `pendingTickerLimitPerClient`); readiness reads them through the `TICKER_FANOUT_METRICS` token, never the gateway class.
 - Exactly one Binance ticker fanout path is live at a time: `BinanceWebSocketStreamingService.start()` stands down (`state=disabled`) when `CANDLE_LIVE_STREAMING_ENABLED=true` and `CANDLE_LIVE_BINANCE_ENABLED=true`, so the standalone socket and the live-candle owner connection can never publish the same ticker twice. With live-candle Binance off, the standalone service owns the fanout as before. Both paths use the same `binance_spot_ws_ticker` source name and the same event payload contract.
 - KIS domestic uses the official `H0STCNT0` regular-session trade fields. Trade quantity is a delta; session cumulative volume/amount are parsed for identity/diagnostics but are not treated as a 5-minute delta.
 - KIS US uses `HDFSCNT0`, which is a delayed trade feed. It is exposed as `delayed=true`, uses exchange `XYMD/XHMS` for the candle bucket, and is never described as real-time. It remains disabled unless `CANDLE_LIVE_KIS_US_DELAYED_ENABLED=true`. No unsupported real-time US entitlement is silently substituted.
@@ -425,28 +425,69 @@ row so precision updates reach the list live.
 
 ## Candlestick chart viewport
 
-`frontend/src/components/charts/chartViewport.ts` (pure, node --test covered)
-+ `CandlestickChart.tsx` implement a mobile-first zoom/pan chart over the
-ALREADY LOADED candles (no infinite history loading):
+The asset detail chart pans and zooms over the candles the API ALREADY
+returned. Files (`frontend/src/components/charts/`):
 
-- Default window: the latest 60 candles at identical density on every
-  timeframe; sparser data right-aligns with a blank left region.
-- Mobile: two-finger pinch zooms about the finger midpoint (12–240 visible
-  candles, capped by the loaded range); one-finger HORIZONTAL drag pans;
-  vertical drags are never claimed, so the parent ScrollView scrolls; holding
-  ~300ms without moving enters crosshair mode (scrubbing follows the finger,
-  released on lift).
-- Web (react-native-web): mouse drag pans via the same responder; wheel /
-  trackpad zooms about the cursor through a non-passive DOM listener; hover
-  shows the crosshair.
-- The y-axis is recomputed from the candles actually on screen; only the
-  visible window + a 4-candle buffer is materialized as SVG nodes; the
-  current-price line renders only while the latest candle is visible; a
-  timeframe switch (viewportResetKey) resets to the latest-60 default; new
-  live candles follow the right edge only when the user is parked there.
-Auth failures (1008/UNAUTHORIZED) stop reconnection; candle subscriptions get
-a `restored` event after every reconnect which triggers the HTTP baseline
-refetch, and `resync_required` handling is unchanged.
+| File | Role |
+| --- | --- |
+| `candlestickViewport.ts` | Pure viewport math: `{visibleCount, rightOffset}`, clamps, index ranges, pan/zoom/focal-point, data-change adjustment |
+| `candlestickLayout.ts` | Pure pixel geometry: slot/body width for the current zoom, x ↔ visible-offset mapping |
+| `candlestickGesturePolicy.ts` | Pure gesture policy shared by both adapters: horizontal-pan intent, wheel intent (zoom/pan/page-scroll), wheel & pinch scale bounds |
+| `CandlestickChartRenderer.tsx` | The ONE SVG renderer (grid, candles, axes, current-price line, crosshair) — never duplicated per platform |
+| `CandlestickGestures.native.tsx` | RNGH adapter: pinch, horizontal pan, long-press crosshair |
+| `CandlestickGestures.web.tsx` | DOM adapter: mouse drag pan, hover crosshair, ctrl/cmd+wheel zoom |
+| `CandlestickChart.tsx` | Viewport state, geometry, visible slice, controls; assembles renderer + platform adapter |
+
+`CandlestickGestures.tsx` holds the shared props contract and a no-gesture
+fallback; Metro resolves `./CandlestickGestures` to the `.native`/`.web` file
+per platform (verified in the exported bundles).
+
+Policy:
+
+- **Default density.** Every timeframe opens on the latest `60` candles
+  (`MIN 20 / DEFAULT 60 / MAX 180`); a data set smaller than 60 shows all of
+  it. 5m and 1w therefore have the same candle width for the same chart width.
+- **Zoom changes `visibleCount`**, never an SVG `scaleX` — axis text is never
+  scaled. Zoom is anchored at the pinch/wheel focal point, so the candle under
+  the fingers keeps its position and zooming inside history does not jump to
+  the latest candle.
+- **Pan** converts `translationX / slotWidth` into whole candles against a
+  snapshot taken at gesture start (no accumulated float drift) and stops at
+  both data edges.
+- **Mobile gestures**: two-finger pinch = zoom; one-finger horizontal drag =
+  pan (`activeOffsetX` + `failOffsetY`, so vertical swipes stay with the
+  detail screen's ScrollView); ~300ms long press = crosshair, scrubbed through
+  a manually-activated pan so vertical scrubbing works without stealing normal
+  vertical scrolls. No inertia/fling/rubber-band in this version.
+- **Web gestures**: left-drag pans (crosshair suppressed during the drag),
+  hover shows the crosshair, ctrl/cmd + wheel (also what a trackpad pinch
+  reports) zooms at the pointer, shift/horizontal wheel pans, and a plain
+  vertical wheel is left to the page so the detail page still scrolls. Only
+  the zoom/pan cases call `preventDefault`, so browser zoom is untouched.
+- **Y axis** is computed from the candles actually on screen. The
+  current-price line is drawn ONLY while `rightOffset === 0`; in history it is
+  hidden and excluded from the min/max so it cannot distort the range.
+- **Rendering** materializes the visible window + 2 candles of buffer, so a
+  1000-candle payload still renders ~60 (max ~182) candle groups. Pan/zoom
+  update React state only when the visible index actually changes.
+- **Timeframe switch** (`viewportResetKey` = `assetId:interval`) resets to the
+  latest 60 and clears the crosshair. `+` / `−` / `초기화` buttons provide the
+  same control without gestures and carry accessibility labels; the chart's
+  own accessibility label reports the visible candle count, whether it is the
+  latest or a history window, and the current price.
+- **Live candle append** keeps the right edge pinned while viewing the latest;
+  while viewing history the same candles stay on screen (`rightOffset` ages
+  with the appended count) so the viewport never jumps to the newest data.
+- **Data range**: movement is bounded by the loaded array. There is no
+  automatic past-loading, cursor pagination or candle API change; adding it
+  later only means growing that array — the viewport/slice split already keeps
+  that separate.
+
+Native gesture packages (`react-native-gesture-handler`,
+`react-native-reanimated`, `react-native-worklets`) were added via
+`npx expo install`, `babel.config.js` now carries `react-native-worklets/plugin`,
+and `GestureHandlerRootView` wraps the app root once in `App.tsx`. A dev-client
+rebuild is required for native devices; Expo web needs no extra setup.
 
 ## Release fixture smoke
 

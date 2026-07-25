@@ -206,7 +206,14 @@ Realtime `asset_ticker` events are built from the provider event plus in-memory 
 - realtime events always have `assetPriceSnapshotId: null`; ordering/dedup uses `priceCapturedAt`/`priceEffectiveAt` (always present on realtime events),
 - `changeRate` on a realtime event is the provider's own field (Binance `P`) or `null` (KIS trades carry none),
 - the 3-second snapshot poller can additionally deliver a snapshot-backed message for a row the throttled writer just created; the shared frontend accept policy drops it when older than the latest realtime event,
-- slow sockets get latest-only delivery: past a buffered-bytes threshold the server coalesces tickers per asset (newest wins) and flushes when the socket drains.
+- slow sockets get latest-only delivery: past a buffered-bytes threshold the server coalesces tickers per asset (newest wins, queue capped per client) and flushes when the socket drains; the counters are visible at `GET /readiness` → `data.assetTicker`.
+
+A realtime event carries its OWN `priceKrwState`, `priceKrwReason`,
+`priceKrwMessage` and `fxRateSource` for the conversion of that price. Clients
+must consume the ticker as one set — local price, KRW state/reason, price
+source, FX source, captured/effective time, freshness and display decimals —
+and must not backfill any of those from the REST snapshot while a realtime
+price is displayed.
 
 ### Sorting
 

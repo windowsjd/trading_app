@@ -17,6 +17,11 @@ export interface AssetTickerMessage {
   priceCurrency?: 'KRW' | 'USD';
   priceKrw: string | null;
   priceKrwState?: string;
+  /** Present when the server could not convert THIS price to KRW. */
+  priceKrwReason?: string | null;
+  priceKrwMessage?: string | null;
+  /** Source of the FX row used for this ticker's KRW conversion. */
+  fxRateSource?: { sourceType?: string; sourceName?: string } | null;
   changeRate?: string | null;
   assetPriceSnapshotId?: string | null;
   priceCapturedAt?: string | null;
@@ -69,23 +74,36 @@ export function isTickerStale(
 }
 
 /** How often screens re-judge staleness when NO new ticker arrives. */
-export const STALE_RECHECK_INTERVAL_MS = 10_000;
+export const STALE_RECHECK_INTERVAL_MS = 5_000;
 
 /**
- * Time-aware staleness: computed from the accepted ticker's own event time vs
- * `nowMs`, so a screen flips to stale by the clock advancing — not only when
- * the next (possibly never-arriving) ticker carries a big freshnessAgeSeconds.
- * Tickers without an event time fall back to the server-reported age.
+ * Age of a ticker at `nowMs`, measured from its own event time
+ * (capturedAt → effectiveAt). Null when the ticker carries no usable
+ * timestamp, in which case callers fall back to `freshnessAgeSeconds`.
+ */
+export function getTickerAgeMs(
+  payload: AssetTickerMessage | null | undefined,
+  nowMs: number,
+): number | null {
+  if (!payload) return null;
+  const timestamp = getTickerTimestamp(payload);
+  if (timestamp === null) return null;
+  return Math.max(0, nowMs - timestamp);
+}
+
+/**
+ * Time-aware staleness against the SAME threshold as `isTickerStale`, so a
+ * screen flips to stale by the clock advancing — not only when the next
+ * (possibly never-arriving) ticker reports a large freshness age.
  */
 export function isTickerStaleAt(
-  state: AssetTickerAcceptState | null | undefined,
+  payload: AssetTickerMessage | null | undefined,
   nowMs: number,
 ): boolean {
-  if (!state) return false;
-  if (state.timestamp !== null) {
-    return nowMs - state.timestamp > STALE_FRESHNESS_THRESHOLD_SECONDS * 1000;
-  }
-  return isTickerStale(state.ticker);
+  if (!payload) return false;
+  const ageMs = getTickerAgeMs(payload, nowMs);
+  if (ageMs === null) return isTickerStale(payload);
+  return ageMs > STALE_FRESHNESS_THRESHOLD_SECONDS * 1000;
 }
 
 /**
