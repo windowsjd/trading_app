@@ -4,7 +4,8 @@ import { getRealtimeSocketManager } from '../../services/ws/sharedRealtimeSocket
 import type { RealtimeSubscriptionEvent } from '../../services/ws/realtimeSocketManager';
 import {
   applyTicker,
-  isTickerStale,
+  isTickerStaleAt,
+  STALE_RECHECK_INTERVAL_MS,
   type AssetTickerAcceptState,
   type AssetTickerMessage,
 } from './assetTickerPolicy';
@@ -93,7 +94,7 @@ export function useAssetTicker({
 
       acceptStateRef.current = next;
       setLatestTicker(next?.ticker ?? null);
-      setIsStale(isTickerStale(next?.ticker ?? null));
+      setIsStale(isTickerStaleAt(next, Date.now()));
     };
 
     const onEvent = (event: RealtimeSubscriptionEvent) => {
@@ -177,9 +178,16 @@ export function useAssetTicker({
       { channel: 'asset_ticker', assetId },
       onEvent,
     );
+    // When tickers STOP arriving, staleness must still advance with the
+    // clock; this re-judges the last accepted ticker on an interval.
+    const staleTimer = setInterval(() => {
+      if (!isMounted) return;
+      setIsStale(isTickerStaleAt(acceptStateRef.current, Date.now()));
+    }, STALE_RECHECK_INTERVAL_MS);
 
     return () => {
       isMounted = false;
+      clearInterval(staleTimer);
       unsubscribe();
     };
   }, [assetId, wsUrl, enabled]);

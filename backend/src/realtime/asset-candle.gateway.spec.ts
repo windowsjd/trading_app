@@ -35,6 +35,7 @@ describe('AssetTickerGateway asset_candle channel', () => {
       jwt as never,
       config as never,
       { getAssetPriceForTicker: jest.fn() } as never,
+      { getMetadata: jest.fn().mockResolvedValue(null) } as never,
       new KisRealtimePriceEventBus(),
       new BinanceRealtimePriceEventBus(),
       undefined,

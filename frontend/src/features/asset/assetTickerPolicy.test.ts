@@ -5,6 +5,7 @@ import {
   applyTicker,
   getTickerTimestamp,
   isTickerStale,
+  isTickerStaleAt,
   isUnavailableTicker,
   shouldAcceptTicker,
   toAssetTickerAcceptState,
@@ -132,6 +133,28 @@ describe('assetTickerPolicy', () => {
     assert.equal(isTickerStale(ticker({ freshnessAgeSeconds: 61 })), true);
     assert.equal(isTickerStale(ticker({ freshnessAgeSeconds: null })), false);
     assert.equal(isTickerStale(null), false);
+  });
+
+  it('flips to stale purely by the clock advancing (no new ticker needed)', () => {
+    const state = toAssetTickerAcceptState(ticker());
+    const receivedAt = Date.parse('2026-07-25T03:00:10.000Z');
+
+    assert.equal(isTickerStaleAt(state, receivedAt + 59_000), false);
+    assert.equal(isTickerStaleAt(state, receivedAt + 61_000), true);
+    assert.equal(isTickerStaleAt(null, receivedAt), false);
+  });
+
+  it('falls back to the server freshness age for timestamp-less tickers', () => {
+    const state = toAssetTickerAcceptState(
+      ticker({
+        priceCapturedAt: null,
+        capturedAt: null,
+        priceEffectiveAt: null,
+        freshnessAgeSeconds: 120,
+      }),
+    );
+
+    assert.equal(isTickerStaleAt(state, Date.parse('2030-01-01T00:00:00Z')), true);
   });
 
   it('applyTicker returns the SAME state object when the ticker is rejected', () => {

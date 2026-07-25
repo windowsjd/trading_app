@@ -33,6 +33,11 @@ The persisted intervals remain `5m`, `1d`, and `1w`. Current `15m`, `30m`, `1h`,
   2. **DB snapshot (throttled, background).** The same ticker goes to the shared `BinanceWebSocketIngestionService` (`sourceName=binance_spot_ws_ticker`), keeping the existing per-asset throttle (`BINANCE_WS_SNAPSHOT_THROTTLE_MS`, default 5000) and dedup, so write volume is unchanged. This keeps the REST market list (which reads `asset_price_snapshots`) fresh in live-candle mode, where the standalone ticker streaming service is disabled. A thrown error or a `success: false` result is recorded on the Binance provider's `lastErrorCode` — a failed write never blocks the fanout, but it is never silent either.
 
   Ticker frames never touch the candle trade-freshness (`lastEventAt`) readiness signal, which stays kline-only, and a ticker frame is never fed to the kline parser (no rejected-event inflation). All active crypto symbols are covered — not just BTC/ETH.
+- **Gateway fanout does no per-event DB work.** `AssetTickerGateway` builds the realtime `asset_ticker` payload from the provider event itself plus two in-memory caches — it never calls the snapshot-based `buildSnapshotTickerMessage()` (full REST price selection) on the realtime path:
+  1. `RealtimeAssetMetadataCacheService` — assetId → {symbol, name, assetType, market, priceCurrency} with a 5-minute TTL (30s negative TTL for unknown/inactive ids, which are rejected). Only a cache miss touches the `assets` table; a DB failure serves the last known entry and never takes the stream down. `displayPriceDecimals` is resolved per read from the in-memory Binance tickSize cache, so precision refreshes propagate without a flush.
+  2. A 2-second USD/KRW selection cache inside `AssetsService.convertRealtimePriceToKrw` — one FX read per burst (available AND unavailable results are cached), same source-eligibility policy; REST paths keep their per-request reads. KRW-priced assets convert without touching FX.
+  Realtime events therefore carry `assetPriceSnapshotId: null` (the DB write is decoupled/throttled, no stored row is claimed); clients order them by `priceCapturedAt`/`priceEffectiveAt`, which every realtime event carries. The 3s snapshot poller may re-send a row the throttled writer created moments earlier — the shared frontend accept policy dedupes/orders it away.
+- **Ticker backpressure (latest-only coalescing).** Both the poller and the realtime path deliver through one send helper: when a client socket's buffered bytes exceed the shared threshold (`CANDLE_LIVE_WEBSOCKET_BACKPRESSURE_BYTES` config value, same knob as candles, default 1MB), the ticker is coalesced into a per-asset latest-only queue instead of being written; the 100ms flush timer drains it once the socket catches up. A slow client skips straight to the newest price per asset and never accumulates a ticker backlog; queued tickers for rows that unsubscribed meanwhile are dropped.
 - Exactly one Binance ticker fanout path is live at a time: `BinanceWebSocketStreamingService.start()` stands down (`state=disabled`) when `CANDLE_LIVE_STREAMING_ENABLED=true` and `CANDLE_LIVE_BINANCE_ENABLED=true`, so the standalone socket and the live-candle owner connection can never publish the same ticker twice. With live-candle Binance off, the standalone service owns the fanout as before. Both paths use the same `binance_spot_ws_ticker` source name and the same event payload contract.
 - KIS domestic uses the official `H0STCNT0` regular-session trade fields. Trade quantity is a delta; session cumulative volume/amount are parsed for identity/diagnostics but are not treated as a 5-minute delta.
 - KIS US uses `HDFSCNT0`, which is a delayed trade feed. It is exposed as `delayed=true`, uses exchange `XYMD/XHMS` for the candle bucket, and is never described as real-time. It remains disabled unless `CANDLE_LIVE_KIS_US_DELAYED_ENABLED=true`. No unsupported real-time US entitlement is silently substituted.
@@ -402,9 +407,43 @@ Detail and list share ONE acceptance policy
 (`frontend/src/features/asset/assetTickerPolicy.ts`): a repeated
 `assetPriceSnapshotId` is ignored, an older event time never overwrites a
 newer one, a priced event with no timestamp never overwrites a known price
-(an unavailable one still applies), staleness is judged from the server's
-`freshnessAgeSeconds` (> 60s), and a disconnect keeps the last good price on
-screen behind a single screen-level reconnect notice.
+(an unavailable one still applies), staleness is judged from the accepted
+ticker's own event time (> 60s), and a disconnect keeps the last good price
+on screen behind a single screen-level reconnect notice. Staleness also
+advances with the CLOCK: both screens re-judge the last accepted ticker every
+10 seconds (`isTickerStaleAt`), so a feed that simply stops flips to stale
+without another message.
+
+Detail-screen display policy (`displayPricePolicy.ts`): the latest ticker is
+used AS A SET — its local price with its own KRW state and its own
+`priceSource`. A ticker whose KRW is unavailable shows KRW as unavailable
+(the old REST KRW never fills in), and the 가격 소스 row captions whichever
+price is actually displayed. The market list re-renders only the row whose
+ticker changed: `mergeMarketAssetTickersCached` returns identical row objects
+for untouched rows, and the ticker's `displayPriceDecimals` travels onto the
+row so precision updates reach the list live.
+
+## Candlestick chart viewport
+
+`frontend/src/components/charts/chartViewport.ts` (pure, node --test covered)
++ `CandlestickChart.tsx` implement a mobile-first zoom/pan chart over the
+ALREADY LOADED candles (no infinite history loading):
+
+- Default window: the latest 60 candles at identical density on every
+  timeframe; sparser data right-aligns with a blank left region.
+- Mobile: two-finger pinch zooms about the finger midpoint (12–240 visible
+  candles, capped by the loaded range); one-finger HORIZONTAL drag pans;
+  vertical drags are never claimed, so the parent ScrollView scrolls; holding
+  ~300ms without moving enters crosshair mode (scrubbing follows the finger,
+  released on lift).
+- Web (react-native-web): mouse drag pans via the same responder; wheel /
+  trackpad zooms about the cursor through a non-passive DOM listener; hover
+  shows the crosshair.
+- The y-axis is recomputed from the candles actually on screen; only the
+  visible window + a 4-candle buffer is materialized as SVG nodes; the
+  current-price line renders only while the latest candle is visible; a
+  timeframe switch (viewportResetKey) resets to the latest-60 default; new
+  live candles follow the right edge only when the user is parked there.
 Auth failures (1008/UNAUTHORIZED) stop reconnection; candle subscriptions get
 a `restored` event after every reconnect which triggers the HTTP baseline
 refetch, and `resync_required` handling is unchanged.

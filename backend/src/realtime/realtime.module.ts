@@ -4,6 +4,7 @@ import { AssetsModule } from '../assets/assets.module';
 import { ProvidersModule } from '../providers/providers.module';
 import { RedisModule } from '../redis/redis.module';
 import { AssetTickerGateway } from './asset-ticker.gateway';
+import { RealtimeAssetMetadataCacheService } from './realtime-asset-metadata-cache.service';
 import { LiveCandlePubSubService } from './live-candle-pubsub.service';
 import { ProviderPricePubSubService } from './provider-price-pubsub.service';
 import {
@@ -16,6 +17,7 @@ import {
   imports: [AssetsModule, ProvidersModule, RedisModule, JwtModule.register({})],
   providers: [
     AssetTickerGateway,
+    RealtimeAssetMetadataCacheService,
     LiveCandlePubSubService,
     ProviderPricePubSubService,
     LiveCandleStreamSupervisorService,

@@ -273,6 +273,50 @@ describe('MarketTickerStore', () => {
     assert.equal(snapshot.tickersByAssetId.get('a')?.priceLocal, '100.00000000');
   });
 
+  it('marks rows stale by time passing when the feed goes quiet', async () => {
+    const { store, getChanges } = createStore();
+    store.setAssetIds(['a']);
+    await delay(0);
+    const socket = FakeSocket.instances[0];
+    socket.open();
+    // acceptTicker judges staleness against the REAL clock, so the fixture
+    // must carry a fresh timestamp here.
+    const receivedAt = Date.now();
+    const receivedAtIso = new Date(receivedAt).toISOString();
+    socket.receive(
+      ticker('a', {
+        priceCapturedAt: receivedAtIso,
+        priceEffectiveAt: receivedAtIso,
+      }),
+    );
+    assert.equal(store.getSnapshot().staleAssetIds.has('a'), false);
+
+    // No further messages — only the clock moves.
+    store.recomputeStaleness(receivedAt + 61_000);
+
+    const snapshot = store.getSnapshot();
+    assert.equal(snapshot.staleAssetIds.has('a'), true);
+    // The last price is still shown, just flagged stale.
+    assert.equal(snapshot.tickersByAssetId.get('a')?.priceLocal, '100.00000000');
+
+    // Re-running with the same verdict publishes nothing new.
+    const changes = getChanges();
+    store.recomputeStaleness(receivedAt + 62_000);
+    assert.equal(getChanges(), changes);
+
+    // A fresh ticker clears the stale flag again.
+    const freshIso = new Date(receivedAt + 120_000).toISOString();
+    socket.receive(
+      ticker('a', {
+        assetPriceSnapshotId: 'a-snap-2',
+        priceCapturedAt: freshIso,
+        priceEffectiveAt: freshIso,
+      }),
+    );
+    store.recomputeStaleness(receivedAt + 125_000);
+    assert.equal(store.getSnapshot().staleAssetIds.has('a'), false);
+  });
+
   it('records a subscription error for the row it belongs to', async () => {
     const { store } = createStore();
     store.setAssetIds(['a', 'b']);

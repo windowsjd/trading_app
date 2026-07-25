@@ -42,6 +42,13 @@ export function mergeMarketAssetTicker(
 
   return {
     ...item,
+    // Provider-declared unit-price precision travels with the ticker, so a
+    // backend precision refresh reaches already-rendered rows. A ticker with
+    // no declared value never wipes the REST one.
+    displayPriceDecimals:
+      typeof ticker.displayPriceDecimals === 'number'
+        ? ticker.displayPriceDecimals
+        : item.displayPriceDecimals,
     changeRate:
       typeof ticker.changeRate === 'string' ? ticker.changeRate : item.changeRate,
     price: {
@@ -73,4 +80,47 @@ export function mergeMarketAssetTickers(
   return items.map((item) =>
     mergeMarketAssetTicker(item, tickersByAssetId.get(item.id)),
   );
+}
+
+type MergeCacheEntry = {
+  item: MarketAssetItemDto;
+  ticker: AssetTickerMessage | undefined;
+  merged: MarketAssetItemDto;
+};
+
+export type MarketTickerMergeCache = Map<string, MergeCacheEntry>;
+
+export function createMarketTickerMergeCache(): MarketTickerMergeCache {
+  return new Map();
+}
+
+/**
+ * Identity-preserving variant for the list screen: when a row's REST item AND
+ * its ticker are both unchanged (by reference), the PREVIOUS merged object is
+ * returned, so `React.memo` rows skip re-rendering when some other asset
+ * ticks. Without this, every publish produced a fresh merged object per row
+ * with a ticker, re-rendering the whole visible list on each tick.
+ */
+export function mergeMarketAssetTickersCached(
+  items: readonly MarketAssetItemDto[],
+  tickersByAssetId: ReadonlyMap<string, AssetTickerMessage>,
+  cache: MarketTickerMergeCache,
+): MarketAssetItemDto[] {
+  const liveIds = new Set<string>();
+  const merged = items.map((item) => {
+    liveIds.add(item.id);
+    const ticker = tickersByAssetId.get(item.id);
+    const cached = cache.get(item.id);
+    if (cached && cached.item === item && cached.ticker === ticker) {
+      return cached.merged;
+    }
+    const next = mergeMarketAssetTicker(item, ticker);
+    cache.set(item.id, { item, ticker, merged: next });
+    return next;
+  });
+  // Rows that left the list (tab change) must not pin old objects in memory.
+  for (const id of [...cache.keys()]) {
+    if (!liveIds.has(id)) cache.delete(id);
+  }
+  return merged;
 }

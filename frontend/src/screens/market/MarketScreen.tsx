@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -20,7 +20,10 @@ import {
   type MarketAssetItemDto,
 } from '../../features/market/api';
 import { MarketAssetRow } from '../../features/market/MarketAssetRow';
-import { mergeMarketAssetTickers } from '../../features/market/mergeMarketAssetTicker';
+import {
+  createMarketTickerMergeCache,
+  mergeMarketAssetTickersCached,
+} from '../../features/market/mergeMarketAssetTicker';
 import { useMarketTickers } from '../../features/market/useMarketTickers';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
@@ -91,8 +94,16 @@ export default function MarketScreen({ navigation }: Props) {
     enabled: !!wsUrl,
   });
 
+  // Per-row identity cache: only the row whose ticker (or REST item) actually
+  // changed gets a new object, so React.memo skips every other row.
+  const mergeCacheRef = useRef(createMarketTickerMergeCache());
   const items = useMemo(
-    () => mergeMarketAssetTickers(restItems, tickersByAssetId),
+    () =>
+      mergeMarketAssetTickersCached(
+        restItems,
+        tickersByAssetId,
+        mergeCacheRef.current,
+      ),
     [restItems, tickersByAssetId],
   );
 

@@ -12,6 +12,78 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 실시간 fanout 경량화·표시 결함 보완 + 캔들 차트 viewport 인터랙션 (2026-07-25)
+
+**목적**
+
+직전 "암호화폐 시세 실시간성·표시 정밀도 개선" 작업에서 남은 결함 8건을 보완하고,
+캔들 차트를 모바일 중심의 확대·축소·좌우 이동(viewport) 차트로 개선한다.
+가상 트레이딩 앱 수준 유지: 거래소급 차트 엔진·무한 과거 로딩·지표 시스템 없음.
+
+**A. 실시간 보완 변경 요약**
+
+- (백엔드) 실시간 ticker 한 건마다 돌던 DB 조회 제거.
+  `AssetTickerGateway`가 `buildSnapshotTickerMessage()`(구독 ack + 3초 poll 전용,
+  기존 `buildTickerMessage` 개명)와 분리된 `buildRealtimeTickerMessageFromEvent()`로
+  event + 캐시만으로 payload를 만든다.
+  - `RealtimeAssetMetadataCacheService`(신규, realtime/): assetId→자산 identity,
+    5분 TTL, unknown/inactive 30초 negative cache, DB 실패 시 마지막 값 유지.
+    `displayPriceDecimals`는 읽기 시점마다 Binance tickSize 메모리 캐시에서 해석.
+  - `AssetsService.convertRealtimePriceToKrw` 내부 2초 TTL USD/KRW selection
+    캐시(가용/불가 결과 모두 캐시, 동시 miss 1회 조회 병합). REST 경로는 불변.
+  - 실시간 event는 `assetPriceSnapshotId: null`로 나간다(저장 스냅샷을 주장하지
+    않음). 정렬/dedup은 `priceCapturedAt`/`priceEffectiveAt` 기준. 3초 poller가
+    같은 가격의 스냅샷 메시지를 한 번 더 보낼 수 있으나 프런트 수락 정책이 걸러낸다.
+- (백엔드) ticker backpressure + 최신값 coalescing: 클라이언트 소켓 buffered
+  bytes가 임계값(캔들과 동일 knob, 기본 1MB) 초과 시 자산별 최신 1건만 보관,
+  100ms flush 타이머가 소켓이 비면 전송. 해제된 구독의 잔여 큐는 폐기.
+- (프런트) 상세 화면 KRW fallback 결함 수정: `displayPricePolicy.ts`의
+  `selectDisplayPriceKrw/State/Source` — 최신 ticker가 있으면 local price·KRW
+  상태·priceSource를 한 세트로 사용, ticker KRW unavailable이면 과거 REST KRW를
+  절대 조합하지 않음. 가격 소스 표기도 실제 표시 가격의 소스를 따라간다.
+- (프런트) 목록 리렌더 격리: `mergeMarketAssetTickersCached`(자산별 identity
+  캐시)로 틱이 온 행만 새 객체가 되어 `React.memo` 행이 그 행만 리렌더.
+- (프런트) 시간 경과 stale: `isTickerStaleAt(state, nowMs)` + 10초 재판정
+  (`useAssetTicker` interval, `MarketTickerStore` 타이머·`recomputeStaleness`).
+  ticker가 끊겨도 60초 지나면 stale로 전환된다.
+- (프런트) ticker의 `displayPriceDecimals`가 목록 행 병합에 반영된다.
+
+**B. 캔들 차트 viewport 변경 요약**
+
+- `frontend/src/components/charts/chartViewport.ts`(신규, 순수 모듈): offset/size
+  viewport, 기본 최신 60개(모든 타임프레임 동일 밀도, 데이터가 적으면 오른쪽
+  정렬 + 왼쪽 여백), pan/zoom 클램프(12~240개, 로드된 범위 내), 보이는 구간 +
+  버퍼 4개만 렌더, y축은 보이는 캔들 기준, 우측 끝 고정 시 신규 캔들 follow,
+  wheel/pinch/수평 의도 판정 등 gesture 수학 포함. `node --test` 25케이스.
+- `CandlestickChart.tsx` 재작성: PanResponder 기반 —
+  두 손가락 pinch 확대·축소(손가락 중점 anchor), 한 손가락 수평 드래그 pan,
+  세로 드래그는 클레임하지 않아 부모 ScrollView가 스크롤, ~300ms 길게 누르면
+  크로스헤어(이동 추적, 뗄 때 해제). 웹(react-native-web): 마우스 드래그 pan
+  (동일 responder), non-passive DOM wheel 리스너로 커서 anchor 줌, hover
+  크로스헤어. 현재가 라인은 최신 캔들이 보일 때만. 타임프레임 전환 시
+  `viewportResetKey`(assetId:interval)로 최신 60개로 초기화.
+- 기존 `candlestickLayout.ts`(+test)는 viewport 모듈이 대체하여 삭제
+  (오른쪽 정렬·밀도 정책은 chartViewport 테스트가 커버).
+
+**주의사항**
+
+- 실시간 payload 계약 변화: `assetPriceSnapshotId`가 실시간 event에서 항상 null.
+  스냅샷 기반 메시지(구독 ack·poll)는 기존 그대로. 클라이언트는 timestamp로 정렬.
+- gateway 생성자에 `RealtimeAssetMetadataCacheService`가 필수 param으로 추가됨
+  (spec/스크립트에서 직접 생성 시 mock 필요 — candle-release-fixture-smoke 포함 수정).
+- 차트는 로드된 캔들 범위 안에서만 이동한다. 과거 무한 로딩은 의도적으로 제외.
+- DB migration 없음. 주문·체결·지정가·지갑·원장 불변.
+
+**검증**
+
+- backend: typecheck/build/test 2045 pass (신규: metadata cache 8, FX 캐시 3,
+  gateway 이벤트 빌더·backpressure 15, 기타).
+- frontend: typecheck/test 168 pass (신규: displayPricePolicy 5, 정책 stale 2,
+  store stale 1, merge decimals·identity 4, chartViewport 25), expo export
+  android/web 성공.
+- 실기기 pinch/long-press 제스처는 에뮬레이터 부재로 미실행(NOT_RUN) — gesture
+  수학은 순수 모듈 테스트로 검증, 컴포넌트는 typecheck + 번들로 확인.
+
 ### 작업 단위: 암호화폐 시세 실시간성·표시 정밀도 개선 (2026-07-25)
 
 **목적**
@@ -102,6 +174,20 @@ cd frontend && npm run typecheck && npm test
 ---
 
 ## 2. 최신 작업 시간순 기록
+
+### 2026-07-25 (2차) — 실시간 fanout 경량화·표시 결함 보완 + 캔들 차트 viewport
+
+- 실시간 ticker fanout에서 이벤트당 DB 조회 제거(자산 metadata 5분 캐시 + FX 2초
+  캐시), snapshot 기반 빌더와 분리, `assetPriceSnapshotId: null` 계약.
+- WebSocket ticker backpressure(자산별 최신값 coalescing) 추가.
+- 상세 화면 최신 ticker local price ↔ 과거 REST KRW 혼합 차단, 가격 소스 일치.
+- 목록 행 identity 캐시로 틱이 온 행만 리렌더, ticker displayPriceDecimals 반영.
+- 시간 경과 기반 stale 재판정(10초 주기, 상세+목록).
+- 캔들 차트: viewport 기반 pinch 줌 / 수평 드래그 pan / 길게 눌러 크로스헤어 /
+  웹 wheel·드래그, 기본 최신 60개 동일 밀도, 보이는 캔들 기준 y축, 보이는
+  구간+버퍼만 SVG 렌더, 타임프레임 전환 시 초기화, 로드된 범위 내 이동만.
+- 검증: backend 2045 pass, frontend 168 pass, expo export android/web 성공.
+- DB migration 없음, 기존 금융 데이터 변경 없음.
 
 ### 2026-07-25 — 암호화폐 시세 실시간성·표시 정밀도 개선
 

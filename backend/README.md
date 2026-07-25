@@ -300,6 +300,14 @@ configuration, both use `sourceName=binance_spot_ws_ticker`, and
 `BINANCE_WS_SNAPSHOT_THROTTLE_MS` (default 5000) governs DB write volume in
 both.
 
+Realtime `asset_ticker` fanout is DB-free per event: asset identity comes from
+an in-memory metadata cache (`RealtimeAssetMetadataCacheService`, 5m TTL,
+negative-cached unknown/inactive ids) and USD/KRW conversion from a 2s-TTL
+cached eligible FX selection; only cache misses read the DB. Realtime events
+claim no snapshot row (`assetPriceSnapshotId: null`) and slow WebSocket
+clients receive latest-only coalesced tickers behind the shared backpressure
+threshold instead of an unbounded backlog.
+
 The app's displayed crypto price is the **Binance Spot last trade price** —
 the `24hrTicker` `c` field. Best bid/ask (`b`/`a`) are carried in the realtime
 event but not displayed, and Futures/mark/index prices and cross-exchange

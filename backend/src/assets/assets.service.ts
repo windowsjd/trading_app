@@ -273,6 +273,12 @@ type AssetPriceResponse = {
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
+/**
+ * Realtime-fanout-only USD/KRW selection cache TTL. Short on purpose: display
+ * conversion may lag a brand-new FX row by at most this long, while realtime
+ * ticker bursts stop re-reading fx_rate_snapshots per event.
+ */
+const REALTIME_FX_CACHE_TTL_MS = 2_000;
 const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
   SeasonStatus.active,
   SeasonStatus.upcoming,
@@ -282,6 +288,12 @@ const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
 
 @Injectable()
 export class AssetsService {
+  private realtimeUsdKrwCache: {
+    selection: UsdKrwSelection;
+    expiresAt: number;
+  } | null = null;
+  private realtimeUsdKrwInFlight: Promise<UsdKrwSelection> | null = null;
+
   constructor(
     private readonly prisma: PrismaService,
     // Optional so unit specs (and any consumer without ProvidersModule) can
@@ -543,6 +555,12 @@ export class AssetsService {
    * snapshot. KRW-priced assets are already KRW, so their local price is
    * returned unchanged. Returns `unavailable` (never a stale mix) when no
    * eligible FX row exists.
+   *
+   * The eligible-selection result (available OR unavailable) is cached for a
+   * couple of seconds: realtime tickers arrive many times per second across
+   * assets, and the eligible USD/KRW row does not change at that cadence, so
+   * one event does at most one FX read and most events do none. REST paths are
+   * untouched — they keep their per-request `findUsdKrwSelection`.
    */
   async convertRealtimePriceToKrw(input: {
     priceLocal: string;
@@ -557,7 +575,7 @@ export class AssetsService {
       };
     }
 
-    const selection = await this.findUsdKrwSelection(
+    const selection = await this.getRealtimeUsdKrwSelection(
       input.valuationAt ?? new Date(),
     );
     if (selection.state === 'available') {
@@ -579,6 +597,31 @@ export class AssetsService {
         ? presentSourceDecision(selection.sourceDecision)
         : null,
     };
+  }
+
+  private async getRealtimeUsdKrwSelection(
+    valuationAt: Date,
+  ): Promise<UsdKrwSelection> {
+    const now = Date.now();
+    const cached = this.realtimeUsdKrwCache;
+    if (cached && now < cached.expiresAt) return cached.selection;
+
+    // Coalesce a burst of concurrent misses into one DB read.
+    if (!this.realtimeUsdKrwInFlight) {
+      this.realtimeUsdKrwInFlight = this.findUsdKrwSelection(valuationAt)
+        .then((selection) => {
+          this.realtimeUsdKrwCache = {
+            selection,
+            expiresAt: Date.now() + REALTIME_FX_CACHE_TTL_MS,
+          };
+          return selection;
+        })
+        .finally(() => {
+          this.realtimeUsdKrwInFlight = null;
+        });
+    }
+
+    return this.realtimeUsdKrwInFlight;
   }
 
   private async buildAssetsWithPrices(

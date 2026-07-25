@@ -28,6 +28,7 @@ describe('asset candle synthetic fanout harness', () => {
       {} as never,
       {} as never,
       {} as never,
+      { getMetadata: jest.fn().mockResolvedValue(null) } as never,
       new KisRealtimePriceEventBus(),
       new BinanceRealtimePriceEventBus(),
       undefined,

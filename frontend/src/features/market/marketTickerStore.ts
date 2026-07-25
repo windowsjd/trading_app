@@ -1,6 +1,7 @@
 import {
   applyTicker,
-  isTickerStale,
+  isTickerStaleAt,
+  STALE_RECHECK_INTERVAL_MS,
   type AssetTickerAcceptState,
   type AssetTickerMessage,
 } from '../asset/assetTickerPolicy.ts';
@@ -87,6 +88,7 @@ export class MarketTickerStore {
   private connectionState: MarketTickerConnectionState = 'idle';
   private snapshot: MarketTickerSnapshot = EMPTY_SNAPSHOT;
   private disposed = false;
+  private staleTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(manager: MarketTickerSocketManager, onChange: () => void) {
     this.manager = manager;
@@ -130,6 +132,45 @@ export class MarketTickerStore {
     }
 
     if (changed) this.publish();
+    this.syncStaleTimer();
+  }
+
+  /**
+   * Re-judges every accepted ticker's staleness by the clock. Runs on an
+   * interval while subscriptions exist, so a feed that simply STOPS (provider
+   * outage) still flips its rows to stale without any new message arriving.
+   * Public so tests can drive it with an explicit `nowMs`.
+   */
+  recomputeStaleness(nowMs = Date.now()): void {
+    if (this.disposed) return;
+    let changed = false;
+    for (const [assetId, state] of this.accepted) {
+      const stale = isTickerStaleAt(state, nowMs);
+      if (stale && !this.stale.has(assetId)) {
+        this.stale.add(assetId);
+        changed = true;
+      } else if (!stale && this.stale.has(assetId)) {
+        this.stale.delete(assetId);
+        changed = true;
+      }
+    }
+    if (changed) this.publish();
+  }
+
+  private syncStaleTimer(): void {
+    const shouldRun = !this.disposed && this.subscriptions.size > 0;
+    if (shouldRun && !this.staleTimer) {
+      this.staleTimer = setInterval(
+        () => this.recomputeStaleness(),
+        STALE_RECHECK_INTERVAL_MS,
+      );
+      // Under Node (tests) a live interval would pin the process open; RN
+      // timers have no unref, hence the optional call.
+      (this.staleTimer as { unref?: () => void }).unref?.();
+    } else if (!shouldRun && this.staleTimer) {
+      clearInterval(this.staleTimer);
+      this.staleTimer = null;
+    }
   }
 
   getSnapshot(): MarketTickerSnapshot {
@@ -144,6 +185,10 @@ export class MarketTickerStore {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    if (this.staleTimer) {
+      clearInterval(this.staleTimer);
+      this.staleTimer = null;
+    }
     for (const unsubscribe of this.subscriptions.values()) unsubscribe();
     this.subscriptions.clear();
   }
@@ -193,7 +238,7 @@ export class MarketTickerStore {
     if (next === current || !next) return;
 
     this.accepted.set(assetId, next);
-    if (isTickerStale(next.ticker)) {
+    if (isTickerStaleAt(next, Date.now())) {
       this.stale.add(assetId);
     } else {
       this.stale.delete(assetId);

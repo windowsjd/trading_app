@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  createMarketTickerMergeCache,
   mergeMarketAssetTicker,
   mergeMarketAssetTickers,
+  mergeMarketAssetTickersCached,
 } from './mergeMarketAssetTicker.ts';
 import type { AssetTickerMessage } from '../asset/assetTickerPolicy.ts';
 import type { MarketAssetItemDto } from './api.ts';
@@ -140,6 +142,86 @@ describe('mergeMarketAssetTicker', () => {
     );
 
     assert.equal(merged.price?.currentPrice, '0.24560000');
+  });
+});
+
+describe('mergeMarketAssetTicker displayPriceDecimals', () => {
+  it('applies the ticker-declared decimals to the row', () => {
+    const merged = mergeMarketAssetTicker(
+      restItem({ displayPriceDecimals: 2 }),
+      liveTicker({ displayPriceDecimals: 5 }),
+    );
+
+    assert.equal(merged.displayPriceDecimals, 5);
+  });
+
+  it('keeps the REST decimals when the ticker declares none', () => {
+    const merged = mergeMarketAssetTicker(
+      restItem({ displayPriceDecimals: 4 }),
+      liveTicker({ displayPriceDecimals: null }),
+    );
+
+    assert.equal(merged.displayPriceDecimals, 4);
+  });
+});
+
+describe('mergeMarketAssetTickersCached', () => {
+  it('keeps the merged row identity for assets whose inputs did not change', () => {
+    const cache = createMarketTickerMergeCache();
+    const rows = [
+      restItem(),
+      restItem({ id: 'asset-btc', symbol: 'BTCUSDT' }),
+    ];
+    const tickerA1 = liveTicker();
+    const tickerB = liveTicker({
+      assetId: 'asset-btc',
+      assetPriceSnapshotId: 'snap-live-btc',
+    });
+
+    const first = mergeMarketAssetTickersCached(
+      rows,
+      new Map([
+        ['asset-doge', tickerA1],
+        ['asset-btc', tickerB],
+      ]),
+      cache,
+    );
+    // Only asset-doge ticks again; asset-btc keeps the same ticker reference.
+    const tickerA2 = liveTicker({
+      assetPriceSnapshotId: 'snap-live-2',
+      priceLocal: '0.24990000',
+      priceCapturedAt: '2026-07-25T03:00:35.000Z',
+      priceEffectiveAt: '2026-07-25T03:00:35.000Z',
+    });
+    const second = mergeMarketAssetTickersCached(
+      rows,
+      new Map([
+        ['asset-doge', tickerA2],
+        ['asset-btc', tickerB],
+      ]),
+      cache,
+    );
+
+    // Doge row is new (its ticker changed)…
+    assert.notEqual(second[0], first[0]);
+    assert.equal(second[0].price?.currentPrice, '0.24990000');
+    // …but the untouched BTC row keeps its EXACT identity → React.memo skips it.
+    assert.equal(second[1], first[1]);
+  });
+
+  it('prunes cache entries for rows that left the list', () => {
+    const cache = createMarketTickerMergeCache();
+    mergeMarketAssetTickersCached([restItem()], new Map(), cache);
+    assert.equal(cache.size, 1);
+
+    mergeMarketAssetTickersCached(
+      [restItem({ id: 'asset-btc', symbol: 'BTCUSDT' })],
+      new Map(),
+      cache,
+    );
+
+    assert.equal(cache.size, 1);
+    assert.equal(cache.has('asset-btc'), true);
   });
 });
 

@@ -43,6 +43,7 @@ describe('AssetTickerGateway', () => {
         sourceName: 'korea_exim_exchange_rate',
       },
     },
+    metadata: unknown = null,
   ) => {
     const prisma = {
       user: {
@@ -68,6 +69,9 @@ describe('AssetTickerGateway', () => {
       getAssetPriceForTicker: jest.fn().mockResolvedValue(selection),
       convertRealtimePriceToKrw: jest.fn().mockResolvedValue(krwConversion),
     };
+    const realtimeAssetMetadata = {
+      getMetadata: jest.fn().mockResolvedValue(metadata),
+    };
     const eventBus = new KisRealtimePriceEventBus();
     const binanceEventBus = new BinanceRealtimePriceEventBus();
     const gateway = new AssetTickerGateway(
@@ -75,19 +79,29 @@ describe('AssetTickerGateway', () => {
       jwtService as never,
       configService as never,
       assetsService as never,
+      realtimeAssetMetadata as never,
       eventBus,
       binanceEventBus,
     );
 
-    return { assetsService, eventBus, binanceEventBus, gateway, prisma };
+    return {
+      assetsService,
+      realtimeAssetMetadata,
+      eventBus,
+      binanceEventBus,
+      gateway,
+      prisma,
+    };
   };
 
   const buildTickerMessage = (gateway: AssetTickerGateway, assetId: string) =>
     (
       gateway as unknown as {
-        buildTickerMessage(assetId: string): Promise<Record<string, unknown>>;
+        buildSnapshotTickerMessage(
+          assetId: string,
+        ): Promise<Record<string, unknown>>;
       }
-    ).buildTickerMessage(assetId);
+    ).buildSnapshotTickerMessage(assetId);
 
   const buildRealtimeTickerMessage = (
     gateway: AssetTickerGateway,
@@ -95,11 +109,11 @@ describe('AssetTickerGateway', () => {
   ) =>
     (
       gateway as unknown as {
-        buildRealtimeTickerMessage(
+        buildRealtimeTickerMessageFromEvent(
           event: unknown,
         ): Promise<Record<string, unknown>>;
       }
-    ).buildRealtimeTickerMessage(event);
+    ).buildRealtimeTickerMessageFromEvent(event);
 
   it('formats WS ticker from the REST asset price selection policy', async () => {
     const { assetsService, gateway, prisma } = createGateway({
@@ -215,32 +229,24 @@ describe('AssetTickerGateway', () => {
     expect(JSON.stringify(ticker)).not.toContain('rawPayloadJson');
   });
 
-  it('can overlay KIS realtime cache values on the existing ticker payload', async () => {
-    const { gateway } = createGateway({
-      asset: {
-        id: 'asset-samsung',
+  it('builds KIS realtime tickers from the event + metadata cache without re-reading snapshots', async () => {
+    const { gateway, assetsService, realtimeAssetMetadata } = createGateway(
+      null,
+      {
+        state: 'available',
+        priceKrw: '70123.00000000',
+        fxRateSource: null,
+      },
+      {
+        assetId: 'asset-samsung',
         symbol: '005930',
         name: 'Samsung Electronics',
         assetType: 'domestic_stock',
         market: 'KRX',
         priceCurrency: CurrencyCode.KRW,
+        displayPriceDecimals: null,
       },
-      price: {
-        state: 'available',
-        currentPrice: '70000.00000000',
-        changeRate: null,
-        priceCurrency: CurrencyCode.KRW,
-        priceKrwState: 'available',
-        priceKrw: '70000.00000000',
-        assetPriceSnapshotId: 'price-provider-1',
-        priceEffectiveAt: '2026-06-19T03:00:00.000Z',
-        priceCapturedAt: '2026-06-19T03:00:10.000Z',
-        priceSource: {
-          sourceType: 'provider_api',
-          sourceName: 'kis_krx_realtime_trade',
-        },
-      },
-    });
+    );
 
     const ticker = await buildRealtimeTickerMessage(gateway, {
       type: 'kis_realtime_price',
@@ -257,14 +263,23 @@ describe('AssetTickerGateway', () => {
       },
     });
 
+    // The realtime path never re-runs the snapshot/asset selection.
+    expect(assetsService.getAssetPriceForTicker).not.toHaveBeenCalled();
+    expect(realtimeAssetMetadata.getMetadata).toHaveBeenCalledWith(
+      'asset-samsung',
+    );
     expect(ticker).toMatchObject({
       type: 'asset_ticker',
       assetId: 'asset-samsung',
+      symbol: '005930',
+      name: 'Samsung Electronics',
       realtime: true,
       snapshotState: 'skipped',
       snapshotReason: 'THROTTLED_PROVIDER_SNAPSHOT',
       priceLocal: '70123.00000000',
       priceCurrency: CurrencyCode.KRW,
+      // Realtime events claim no stored snapshot row.
+      assetPriceSnapshotId: null,
       priceCapturedAt: '2026-06-19T03:00:29.000Z',
       priceEffectiveAt: '2026-06-19T03:00:29.000Z',
       freshnessAgeSeconds: 1,
@@ -275,31 +290,15 @@ describe('AssetTickerGateway', () => {
     });
   });
 
-  it('can overlay Binance realtime cache values on the existing ticker payload', async () => {
-    const { gateway } = createGateway({
-      asset: {
-        id: 'asset-btc',
-        symbol: 'BTC',
-        name: 'Bitcoin',
-        assetType: 'crypto',
-        market: 'BINANCE',
-        priceCurrency: CurrencyCode.USD,
-      },
-      price: {
-        state: 'available',
-        currentPrice: '100000.00000000',
-        changeRate: '1.50000000',
-        priceCurrency: CurrencyCode.USD,
-        priceKrwState: 'available',
-        priceKrw: '140000000.00000000',
-        assetPriceSnapshotId: 'price-provider-1',
-        priceEffectiveAt: '2026-06-19T03:00:00.000Z',
-        priceCapturedAt: '2026-06-19T03:00:10.000Z',
-        priceSource: {
-          sourceType: 'provider_api',
-          sourceName: 'binance_spot_ws_ticker',
-        },
-      },
+  it('builds Binance realtime tickers from the event fields (price/changeRate/source)', async () => {
+    const { gateway, prisma } = createGateway(null, DEFAULT_KRW_CONVERSION, {
+      assetId: 'asset-btc',
+      symbol: 'BTCUSDT',
+      name: 'Bitcoin',
+      assetType: 'crypto',
+      market: 'BINANCE',
+      priceCurrency: CurrencyCode.USD,
+      displayPriceDecimals: 2,
     });
 
     const ticker = await buildRealtimeTickerMessage(gateway, {
@@ -323,18 +322,23 @@ describe('AssetTickerGateway', () => {
       },
     });
 
+    expect(prisma.asset.findFirst).not.toHaveBeenCalled();
+    expect(prisma.assetPriceSnapshot.findFirst).not.toHaveBeenCalled();
     expect(ticker).toMatchObject({
       type: 'asset_ticker',
       assetId: 'asset-btc',
+      symbol: 'BTCUSDT',
       realtime: true,
       snapshotState: 'skipped',
       snapshotReason: 'THROTTLED_PROVIDER_SNAPSHOT',
       priceLocal: '100123.00000000',
       priceCurrency: CurrencyCode.USD,
+      assetPriceSnapshotId: null,
       priceCapturedAt: '2026-06-19T03:00:29.000Z',
       priceEffectiveAt: '2026-06-19T03:00:28.000Z',
       freshnessAgeSeconds: 1,
       changeRate: '1.75000000',
+      displayPriceDecimals: 2,
       priceSource: {
         sourceType: 'provider_api',
         sourceName: 'binance_spot_ws_ticker',
@@ -342,31 +346,41 @@ describe('AssetTickerGateway', () => {
     });
   });
 
-  it('never labels the KIS US delayed event feed as realtime', async () => {
-    const { gateway } = createGateway({
-      asset: {
-        id: 'asset-aapl',
-        symbol: 'AAPL',
-        name: 'Apple',
-        assetType: 'us_stock',
-        market: 'NAS',
-        priceCurrency: CurrencyCode.USD,
-      },
+  it('drops realtime events for unknown or inactive assets', async () => {
+    const { gateway } = createGateway(null, DEFAULT_KRW_CONVERSION, null);
+
+    const ticker = await buildRealtimeTickerMessage(gateway, {
+      type: 'binance_realtime_price',
+      assetId: 'asset-gone',
+      snapshotState: null,
       price: {
-        state: 'available',
-        currentPrice: '190.00000000',
+        key: 'GONEUSDT',
+        providerSymbol: 'GONEUSDT',
+        streamName: 'goneusdt@ticker',
+        price: '1.00000000',
         changeRate: null,
-        priceCurrency: CurrencyCode.USD,
-        priceKrwState: 'unavailable',
-        priceKrw: null,
-        assetPriceSnapshotId: null,
-        priceEffectiveAt: '2026-06-19T03:00:00.000Z',
-        priceCapturedAt: '2026-06-19T03:00:10.000Z',
-        priceSource: {
-          sourceType: 'provider_api',
-          sourceName: 'kis_us_delayed_trade',
-        },
+        bidPrice: null,
+        askPrice: null,
+        currencyCode: CurrencyCode.USD,
+        sourceName: 'binance_spot_ws_ticker',
+        capturedAt: '2026-06-19T03:00:29.000Z',
+        effectiveAt: '2026-06-19T03:00:29.000Z',
+        updatedAt: '2026-06-19T03:00:29.000Z',
       },
+    });
+
+    expect(ticker).toBeNull();
+  });
+
+  it('never labels the KIS US delayed event feed as realtime', async () => {
+    const { gateway } = createGateway(null, DEFAULT_KRW_CONVERSION, {
+      assetId: 'asset-aapl',
+      symbol: 'AAPL',
+      name: 'Apple',
+      assetType: 'us_stock',
+      market: 'NAS',
+      priceCurrency: CurrencyCode.USD,
+      displayPriceDecimals: null,
     });
 
     const ticker = await buildRealtimeTickerMessage(gateway, {
@@ -384,6 +398,25 @@ describe('AssetTickerGateway', () => {
     });
 
     expect(ticker).toMatchObject({ realtime: false, delayed: true });
+  });
+
+  const DEFAULT_KRW_CONVERSION = {
+    state: 'available',
+    priceKrw: '1.00000000',
+    fxRateSource: {
+      sourceType: 'provider_api',
+      sourceName: 'korea_exim_exchange_rate',
+    },
+  };
+
+  const dogeMetadata = (displayPriceDecimals: number | null) => ({
+    assetId: 'asset-doge',
+    symbol: 'DOGEUSDT',
+    name: 'Dogecoin',
+    assetType: 'crypto',
+    market: 'BINANCE',
+    priceCurrency: CurrencyCode.USD,
+    displayPriceDecimals,
   });
 
   const binanceSelection = (displayPriceDecimals: number | null) => ({
@@ -435,7 +468,11 @@ describe('AssetTickerGateway', () => {
   };
 
   it('carries displayPriceDecimals on both polled and realtime ticker payloads', async () => {
-    const { gateway } = createGateway(binanceSelection(5));
+    const { gateway } = createGateway(
+      binanceSelection(5),
+      DEFAULT_KRW_CONVERSION,
+      dogeMetadata(5),
+    );
 
     const polled = await buildTickerMessage(gateway, 'asset-doge');
     const realtime = await buildRealtimeTickerMessage(
@@ -456,14 +493,18 @@ describe('AssetTickerGateway', () => {
   });
 
   it('recomputes KRW for a realtime price instead of reusing the snapshot KRW', async () => {
-    const { gateway, assetsService } = createGateway(binanceSelection(5), {
-      state: 'available',
-      priceKrw: '343.84000000',
-      fxRateSource: {
-        sourceType: 'provider_api',
-        sourceName: 'korea_exim_exchange_rate',
+    const { gateway, assetsService } = createGateway(
+      binanceSelection(5),
+      {
+        state: 'available',
+        priceKrw: '343.84000000',
+        fxRateSource: {
+          sourceType: 'provider_api',
+          sourceName: 'korea_exim_exchange_rate',
+        },
       },
-    });
+      dogeMetadata(5),
+    );
 
     const ticker = await buildRealtimeTickerMessage(
       gateway,
@@ -485,12 +526,16 @@ describe('AssetTickerGateway', () => {
   });
 
   it('reports KRW unavailable rather than mixing a fresh local price with a stale FX conversion', async () => {
-    const { gateway } = createGateway(binanceSelection(5), {
-      state: 'unavailable',
-      reason: 'FX_RATE_STALE',
-      message: 'USD/KRW FX rate snapshot is stale.',
-      fxRateSource: null,
-    });
+    const { gateway } = createGateway(
+      binanceSelection(5),
+      {
+        state: 'unavailable',
+        reason: 'FX_RATE_STALE',
+        message: 'USD/KRW FX rate snapshot is stale.',
+        fxRateSource: null,
+      },
+      dogeMetadata(5),
+    );
 
     const ticker = await buildRealtimeTickerMessage(
       gateway,
@@ -505,8 +550,144 @@ describe('AssetTickerGateway', () => {
     });
   });
 
+  type FakeClient = {
+    readyState: number;
+    bufferedAmount: number;
+    send: jest.Mock;
+  };
+
+  const attachClient = (
+    gateway: AssetTickerGateway,
+    assetId: string,
+    bufferedAmount = 0,
+  ) => {
+    const client: FakeClient = {
+      readyState: 1,
+      bufferedAmount,
+      send: jest.fn(),
+    };
+    const state = {
+      userId: 'user-1',
+      subscriptions: new Map<string, string | null>([[assetId, null]]),
+      candleSubscriptions: new Map(),
+      pendingCandles: new Map(),
+      pendingTickers: new Map<string, Record<string, unknown>>(),
+    };
+    (
+      gateway as unknown as {
+        clients: Map<unknown, unknown>;
+      }
+    ).clients.set(client, state);
+    return { client, state };
+  };
+
+  const pushRealtimePriceEvent = (
+    gateway: AssetTickerGateway,
+    event: unknown,
+  ) =>
+    (
+      gateway as unknown as {
+        pushRealtimePriceEvent(event: unknown): Promise<void>;
+      }
+    ).pushRealtimePriceEvent(event);
+
+  const flushPendingTickers = (gateway: AssetTickerGateway) =>
+    (
+      gateway as unknown as { flushPendingTickers(): void }
+    ).flushPendingTickers();
+
+  it('sends realtime tickers straight through when the socket can drain', async () => {
+    const { gateway } = createGateway(
+      null,
+      DEFAULT_KRW_CONVERSION,
+      dogeMetadata(5),
+    );
+    const { client, state } = attachClient(gateway, 'asset-doge');
+
+    await pushRealtimePriceEvent(gateway, binanceTickerEvent);
+
+    expect(client.send).toHaveBeenCalledTimes(1);
+    expect(state.pendingTickers.size).toBe(0);
+  });
+
+  it('coalesces tickers per asset for a slow socket instead of queueing them all', async () => {
+    const { gateway } = createGateway(
+      null,
+      DEFAULT_KRW_CONVERSION,
+      dogeMetadata(5),
+    );
+    const { client, state } = attachClient(
+      gateway,
+      'asset-doge',
+      10_000_000, // past the backpressure threshold
+    );
+
+    await pushRealtimePriceEvent(gateway, binanceTickerEvent);
+    await pushRealtimePriceEvent(gateway, {
+      ...binanceTickerEvent,
+      price: { ...binanceTickerEvent.price, price: '0.24990000' },
+    });
+    await pushRealtimePriceEvent(gateway, {
+      ...binanceTickerEvent,
+      price: { ...binanceTickerEvent.price, price: '0.25010000' },
+    });
+
+    // Nothing was written to the saturated socket, and only the NEWEST price
+    // survives — a slow client never accumulates a ticker backlog.
+    expect(client.send).not.toHaveBeenCalled();
+    expect(state.pendingTickers.size).toBe(1);
+    expect(state.pendingTickers.get('asset-doge')).toMatchObject({
+      priceLocal: '0.25010000',
+    });
+  });
+
+  it('flushes the coalesced latest ticker once the socket drains', async () => {
+    const { gateway } = createGateway(
+      null,
+      DEFAULT_KRW_CONVERSION,
+      dogeMetadata(5),
+    );
+    const { client, state } = attachClient(gateway, 'asset-doge', 10_000_000);
+
+    await pushRealtimePriceEvent(gateway, binanceTickerEvent);
+    await pushRealtimePriceEvent(gateway, {
+      ...binanceTickerEvent,
+      price: { ...binanceTickerEvent.price, price: '0.25010000' },
+    });
+
+    client.bufferedAmount = 0;
+    flushPendingTickers(gateway);
+
+    expect(client.send).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(client.send.mock.calls[0][0] as string)).toMatchObject({
+      priceLocal: '0.25010000',
+    });
+    expect(state.pendingTickers.size).toBe(0);
+  });
+
+  it('drops a queued ticker whose row unsubscribed before the flush', async () => {
+    const { gateway } = createGateway(
+      null,
+      DEFAULT_KRW_CONVERSION,
+      dogeMetadata(5),
+    );
+    const { client, state } = attachClient(gateway, 'asset-doge', 10_000_000);
+
+    await pushRealtimePriceEvent(gateway, binanceTickerEvent);
+    state.subscriptions.delete('asset-doge');
+    client.bufferedAmount = 0;
+    flushPendingTickers(gateway);
+
+    expect(client.send).not.toHaveBeenCalled();
+    expect(state.pendingTickers.size).toBe(0);
+  });
+
   it('keeps the local realtime price when the KRW conversion throws', async () => {
-    const { gateway, assetsService } = createGateway(binanceSelection(5));
+    const { gateway, assetsService } = createGateway(
+      binanceSelection(5),
+      DEFAULT_KRW_CONVERSION,
+      dogeMetadata(5),
+    );
     assetsService.convertRealtimePriceToKrw.mockRejectedValue(
       new Error('db down'),
     );

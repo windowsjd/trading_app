@@ -21,6 +21,7 @@ import {
   AssetsService,
   type RealtimePriceKrwConversion,
 } from '../assets/assets.service';
+import { RealtimeAssetMetadataCacheService } from './realtime-asset-metadata-cache.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   BinanceRealtimePriceEvent,
@@ -61,6 +62,12 @@ type ClientState = {
     { lastSequence: number; lastRevision: number }
   >;
   pendingCandles: Map<string, AssetCandleSnapshotEvent>;
+  /**
+   * Latest-only ticker queue for a slow socket: one coalesced entry per
+   * assetId, so a client that cannot drain never accumulates an unbounded
+   * ticker backlog — it just skips straight to the newest price.
+   */
+  pendingTickers: Map<string, Record<string, unknown>>;
 };
 
 type SubscriptionMessage = {
@@ -109,6 +116,8 @@ export class AssetTickerGateway
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly assetsService: AssetsService,
+    // Static asset identity for realtime events; NEVER a per-event DB read.
+    private readonly realtimeAssetMetadata: RealtimeAssetMetadataCacheService,
     private readonly kisRealtimePriceEventBus: KisRealtimePriceEventBus,
     private readonly binanceRealtimePriceEventBus: BinanceRealtimePriceEventBus,
     @Optional() private readonly liveCandlePubSub?: LiveCandlePubSubService,
@@ -143,10 +152,10 @@ export class AssetTickerGateway
       this.providerPricePubSub?.subscribe((event) =>
         this.pushRealtimePriceEvent(event),
       ) ?? null;
-    this.backpressureTimer = setInterval(
-      () => this.flushPendingCandles(),
-      CANDLE_BACKPRESSURE_FLUSH_MS,
-    );
+    this.backpressureTimer = setInterval(() => {
+      this.flushPendingCandles();
+      this.flushPendingTickers();
+    }, CANDLE_BACKPRESSURE_FLUSH_MS);
     this.backpressureTimer.unref?.();
   }
 
@@ -182,6 +191,7 @@ export class AssetTickerGateway
       subscriptions: new Map(),
       candleSubscriptions: new Map(),
       pendingCandles: new Map(),
+      pendingTickers: new Map(),
     });
     client.on('message', (data) => {
       void this.handleMessage(client, data.toString());
@@ -222,7 +232,7 @@ export class AssetTickerGateway
       return;
     }
     if (message.type === 'subscribe') {
-      const ticker = await this.buildTickerMessage(assetId);
+      const ticker = await this.buildSnapshotTickerMessage(assetId);
       if (!ticker) {
         this.sendInvalidSubscription(client);
         return;
@@ -234,12 +244,13 @@ export class AssetTickerGateway
         channel: 'asset_ticker',
         assetId,
       });
-      this.sendJson(client, ticker);
+      this.sendTickerMessage(client, state, assetId, ticker);
       return;
     }
 
     if (message.type === 'unsubscribe') {
       state.subscriptions.delete(assetId);
+      state.pendingTickers.delete(assetId);
       this.sendJson(client, {
         type: 'unsubscribed',
         channel: 'asset_ticker',
@@ -368,7 +379,7 @@ export class AssetTickerGateway
     }
 
     for (const assetId of assetIds) {
-      const ticker = await this.buildTickerMessage(assetId);
+      const ticker = await this.buildSnapshotTickerMessage(assetId);
       if (!ticker) {
         continue;
       }
@@ -389,7 +400,7 @@ export class AssetTickerGateway
         }
 
         state.subscriptions.set(assetId, ticker.assetPriceSnapshotId);
-        this.sendJson(client, ticker);
+        this.sendTickerMessage(client, state, assetId, ticker);
       }
     }
   }
@@ -399,7 +410,7 @@ export class AssetTickerGateway
       return;
     }
 
-    const ticker = await this.buildRealtimeTickerMessage(event);
+    const ticker = await this.buildRealtimeTickerMessageFromEvent(event);
     if (!ticker) {
       return;
     }
@@ -414,12 +425,56 @@ export class AssetTickerGateway
         continue;
       }
 
-      this.sendJson(client, ticker);
-      if (event.snapshotState === 'created') {
-        state.subscriptions.set(
-          event.assetId,
-          ticker.assetPriceSnapshotId ?? null,
-        );
+      this.sendTickerMessage(client, state, event.assetId, ticker);
+    }
+  }
+
+  /**
+   * Latest-only ticker delivery with lightweight backpressure: a socket whose
+   * kernel buffer is already past the threshold gets the message coalesced
+   * into `pendingTickers` (newest per asset wins) instead of being written to,
+   * and the shared flush timer drains it once the client catches up. Shares
+   * the candle path's byte threshold — one knob for both channels.
+   */
+  private sendTickerMessage(
+    client: WebSocket,
+    state: ClientState,
+    assetId: string,
+    ticker: Record<string, unknown>,
+  ): void {
+    const maxBuffered =
+      this.liveCandleConfig?.websocketBackpressureBytes ??
+      DEFAULT_CANDLE_BACKPRESSURE_BYTES;
+    if (client.bufferedAmount > maxBuffered) {
+      state.pendingTickers.set(assetId, ticker);
+      return;
+    }
+    if (this.sendJson(client, ticker)) {
+      state.pendingTickers.delete(assetId);
+    }
+  }
+
+  private flushPendingTickers(): void {
+    for (const [client, state] of this.clients.entries()) {
+      if (client.readyState !== WebSocket.OPEN) {
+        this.clients.delete(client);
+        continue;
+      }
+      const maxBuffered =
+        this.liveCandleConfig?.websocketBackpressureBytes ??
+        DEFAULT_CANDLE_BACKPRESSURE_BYTES;
+      for (const [assetId, ticker] of [...state.pendingTickers.entries()]) {
+        if (client.bufferedAmount > maxBuffered) break;
+        // A row that unsubscribed while queued must not be delivered late.
+        if (!state.subscriptions.has(assetId)) {
+          state.pendingTickers.delete(assetId);
+          continue;
+        }
+        if (this.sendJson(client, ticker)) {
+          state.pendingTickers.delete(assetId);
+        } else {
+          break;
+        }
       }
     }
   }
@@ -519,7 +574,12 @@ export class AssetTickerGateway
     }
   }
 
-  private async buildTickerMessage(assetId: string) {
+  /**
+   * Snapshot-backed ticker (subscribe ack + 3s poll fallback). Reads the full
+   * REST price selection; NEVER called from the realtime event path, which
+   * would otherwise re-run these DB reads once per provider tick.
+   */
+  private async buildSnapshotTickerMessage(assetId: string) {
     const selection = await this.assetsService.getAssetPriceForTicker(assetId);
     if (!selection) {
       return null;
@@ -578,32 +638,51 @@ export class AssetTickerGateway
     };
   }
 
-  private async buildRealtimeTickerMessage(event: RealtimePriceEvent) {
+  /**
+   * Realtime ticker built ONLY from the provider event, the in-memory asset
+   * metadata cache, and the short-TTL FX cache. No asset row, no
+   * asset_price_snapshots read, no per-event display-precision fetch — one
+   * provider tick must not fan out into repeated DB work.
+   *
+   * `assetPriceSnapshotId` is null on purpose: the DB snapshot write is
+   * decoupled (and throttled), so a realtime event claims no stored row.
+   * Clients order these messages by capturedAt/effectiveAt, which every
+   * realtime event carries.
+   */
+  private async buildRealtimeTickerMessageFromEvent(event: RealtimePriceEvent) {
     if (!event.assetId) {
       return null;
     }
 
-    const ticker = await this.buildTickerMessage(event.assetId);
-    if (!ticker) {
+    const metadata = await this.realtimeAssetMetadata.getMetadata(
+      event.assetId,
+    );
+    // Unknown or inactive assets never fan out.
+    if (!metadata) {
       return null;
     }
+
     const delayed =
       event.type === 'kis_realtime_price' &&
       event.price.sourceName === 'kis_us_delayed_trade';
-    // The snapshot-derived `priceKrw` belongs to an OLDER local price. Pairing
-    // it with this event's fresh local price would render two different points
-    // in time as one quote, so KRW is recomputed from the currently eligible
-    // USD/KRW snapshot and reported unavailable when there is none.
+    // A stored snapshot's `priceKrw` would belong to an OLDER local price, so
+    // KRW is computed for THIS price from the currently eligible USD/KRW
+    // selection (short-TTL cached) and reported unavailable when there is none.
     const krw = await this.buildRealtimePriceKrw(event);
 
     return {
-      ...ticker,
+      type: 'asset_ticker',
+      assetId: metadata.assetId,
+      symbol: metadata.symbol,
+      name: metadata.name,
+      displayPriceDecimals: metadata.displayPriceDecimals,
       realtime: !delayed,
       ...(delayed ? { delayed: true } : {}),
       snapshotState: event.snapshotState,
       ...(event.snapshotReason ? { snapshotReason: event.snapshotReason } : {}),
       priceLocal: event.price.price,
       priceCurrency: event.price.currencyCode,
+      assetPriceSnapshotId: null,
       priceCapturedAt: event.price.capturedAt,
       priceEffectiveAt: event.price.effectiveAt,
       freshnessAgeSeconds: this.calculateFreshnessAgeSeconds(
@@ -613,15 +692,12 @@ export class AssetTickerGateway
         sourceType: 'provider_api',
         sourceName: event.price.sourceName,
       },
-      ...('changeRate' in event.price
-        ? { changeRate: event.price.changeRate }
-        : {}),
+      changeRate:
+        'changeRate' in event.price ? (event.price.changeRate ?? null) : null,
       ...(krw.state === 'available'
         ? {
             priceKrw: krw.priceKrw,
             priceKrwState: 'available' as const,
-            priceKrwReason: undefined,
-            priceKrwMessage: undefined,
             ...(krw.fxRateSource ? { fxRateSource: krw.fxRateSource } : {}),
           }
         : {

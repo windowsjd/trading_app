@@ -1009,6 +1009,7 @@ async function main() {
           jwt,
           { get: () => `fixture-${namespace}` } as never,
           { getAssetPriceForTicker: () => Promise.resolve(null) } as never,
+          { getMetadata: () => Promise.resolve(null) } as never,
           new KisRealtimePriceEventBus(),
           new BinanceRealtimePriceEventBus(),
           pubsub,

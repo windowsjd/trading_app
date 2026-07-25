@@ -68,6 +68,26 @@ export function isTickerStale(
   return freshnessAgeSeconds > STALE_FRESHNESS_THRESHOLD_SECONDS;
 }
 
+/** How often screens re-judge staleness when NO new ticker arrives. */
+export const STALE_RECHECK_INTERVAL_MS = 10_000;
+
+/**
+ * Time-aware staleness: computed from the accepted ticker's own event time vs
+ * `nowMs`, so a screen flips to stale by the clock advancing — not only when
+ * the next (possibly never-arriving) ticker carries a big freshnessAgeSeconds.
+ * Tickers without an event time fall back to the server-reported age.
+ */
+export function isTickerStaleAt(
+  state: AssetTickerAcceptState | null | undefined,
+  nowMs: number,
+): boolean {
+  if (!state) return false;
+  if (state.timestamp !== null) {
+    return nowMs - state.timestamp > STALE_FRESHNESS_THRESHOLD_SECONDS * 1000;
+  }
+  return isTickerStale(state.ticker);
+}
+
 /**
  * Whether `next` may replace `current`:
  *  - the same snapshot id is never applied twice,

@@ -331,6 +331,76 @@ describe('AssetsService', () => {
     expect(ticker?.asset.displayPriceDecimals).toBe(5);
   });
 
+  it('caches the realtime USD/KRW selection for a short TTL (one FX read per burst)', async () => {
+    const { prisma, service } = createService();
+    prisma.fxRateSnapshot.findMany.mockResolvedValue([]);
+    prisma.fxRateSnapshot.findFirst.mockResolvedValue(freshUsdKrwSnapshot());
+
+    const first = await service.convertRealtimePriceToKrw({
+      priceLocal: '2.00000000',
+      priceCurrency: CurrencyCode.USD,
+    });
+    const second = await service.convertRealtimePriceToKrw({
+      priceLocal: '3.00000000',
+      priceCurrency: CurrencyCode.USD,
+    });
+
+    expect(first).toMatchObject({
+      state: 'available',
+      priceKrw: '2800.00000000',
+    });
+    // Same cached rate, new local price — no second FX read.
+    expect(second).toMatchObject({
+      state: 'available',
+      priceKrw: '4200.00000000',
+    });
+    expect(prisma.fxRateSnapshot.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.fxRateSnapshot.findFirst).toHaveBeenCalledTimes(1);
+
+    // TTL expiry → exactly one more read.
+    jest.setSystemTime(new Date(testNow.getTime() + 2_500));
+    await service.convertRealtimePriceToKrw({
+      priceLocal: '2.00000000',
+      priceCurrency: CurrencyCode.USD,
+    });
+    expect(prisma.fxRateSnapshot.findMany).toHaveBeenCalledTimes(2);
+  });
+
+  it('caches an unavailable realtime FX selection too (no per-event retry storm)', async () => {
+    const { prisma, service } = createService();
+    prisma.fxRateSnapshot.findMany.mockResolvedValue([]);
+    prisma.fxRateSnapshot.findFirst.mockResolvedValue(null);
+
+    const first = await service.convertRealtimePriceToKrw({
+      priceLocal: '2.00000000',
+      priceCurrency: CurrencyCode.USD,
+    });
+    const second = await service.convertRealtimePriceToKrw({
+      priceLocal: '2.00000000',
+      priceCurrency: CurrencyCode.USD,
+    });
+
+    expect(first.state).toBe('unavailable');
+    expect(second.state).toBe('unavailable');
+    expect(prisma.fxRateSnapshot.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('converts KRW-priced realtime prices without touching FX at all', async () => {
+    const { prisma, service } = createService();
+
+    const conversion = await service.convertRealtimePriceToKrw({
+      priceLocal: '70123.00000000',
+      priceCurrency: CurrencyCode.KRW,
+    });
+
+    expect(conversion).toMatchObject({
+      state: 'available',
+      priceKrw: '70123.00000000',
+    });
+    expect(prisma.fxRateSnapshot.findMany).not.toHaveBeenCalled();
+    expect(prisma.fxRateSnapshot.findFirst).not.toHaveBeenCalled();
+  });
+
   it('keeps displayPriceDecimals null when no provider precision is wired', async () => {
     const { prisma, service } = createService();
     prisma.asset.count.mockResolvedValue(1);

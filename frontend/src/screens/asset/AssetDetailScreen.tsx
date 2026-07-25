@@ -23,6 +23,11 @@ import { getPositionForAsset, getPositions } from "../../features/position/api";
 import { getCurrentSeason } from "../../features/season/api";
 import { toSeasonDomainState } from "../../features/season/mapper";
 import { useAssetTicker } from "../../features/asset/useAssetTicker";
+import {
+  selectDisplayPriceKrw,
+  selectDisplayPriceKrwState,
+  selectDisplayPriceSource,
+} from "../../features/asset/displayPricePolicy";
 import { useAssetCandle } from "../../features/asset/useAssetCandle";
 import { mergeAssetCandleSnapshot } from "../../features/asset/liveCandle";
 import {
@@ -162,11 +167,12 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
     latestTicker?.priceLocal ?? (priceAvailable ? price?.currentPrice : null);
   const displayPriceCurrency =
     latestTicker?.priceCurrency ?? asset.priceCurrency;
-  const displayPriceKrw =
-    latestTicker?.priceKrw ??
-    (price?.priceKrwState === "available" ? price?.priceKrw : null);
-  const displayPriceKrwState =
-    latestTicker?.priceKrwState ?? price?.priceKrwState;
+  // The latest ticker's local price and KRW state are used AS A SET; when the
+  // ticker's KRW is unavailable the REST KRW must NOT fill in (it belongs to
+  // the older REST local price).
+  const displayPriceKrw = selectDisplayPriceKrw(latestTicker, price);
+  const displayPriceKrwState = selectDisplayPriceKrwState(latestTicker, price);
+  const displayPriceSource = selectDisplayPriceSource(latestTicker, price);
   const displayChangeRate = getDisplayChangeRate(
     latestTicker?.changeRate,
     price?.changeRate,
@@ -294,7 +300,10 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
           </Text>
           <Text style={styles.helper}>실시간 연결 {connectionState}</Text>
           <Text style={styles.helper}>
-            가격 소스 {formatSourceMetadata(price?.priceSource)}
+            가격 소스{" "}
+            {formatSourceMetadata(
+              displayPriceSource as Parameters<typeof formatSourceMetadata>[0],
+            )}
           </Text>
 
           {tradingNote ? (
@@ -417,6 +426,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
               currencyCode={displayPriceCurrency}
               currentPrice={latestTicker?.priceLocal ?? null}
               emptyMessage="가격 추이를 표시하려면 데이터가 더 필요합니다."
+              viewportResetKey={`${assetId}:${selectedTimeframe.interval}`}
             />
           ) : (
             <InlineEmptyState message="표시할 차트 데이터가 없습니다." />

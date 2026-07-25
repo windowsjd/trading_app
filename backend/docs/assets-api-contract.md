@@ -199,7 +199,14 @@ If a USD asset has an eligible asset price but USD/KRW is missing or stale, `pri
 
 This market-aware selection is also used by the initial `/api/v1/ws` `asset_ticker` snapshot. No public response field or `/api/v1` route changed.
 
-Realtime `asset_ticker` events carry a provider price that is NEWER than any stored snapshot, so their KRW value is recomputed from the currently eligible USD/KRW snapshot (same source-eligibility policy as REST) instead of being copied from the snapshot the local price no longer belongs to. If no eligible FX row exists, the event keeps the local price and reports `priceKrwState=unavailable` with `priceKrwReason=FX_RATE_UNAVAILABLE | FX_RATE_STALE` — a fresh local price is never paired with an older KRW conversion. KRW-priced assets need no conversion. The frontend applies the same rule when overlaying a ticker onto a REST list row.
+Realtime `asset_ticker` events carry a provider price that is NEWER than any stored snapshot, so their KRW value is recomputed from the currently eligible USD/KRW snapshot (same source-eligibility policy as REST; served from a 2-second in-memory cache on the realtime path) instead of being copied from the snapshot the local price no longer belongs to. If no eligible FX row exists, the event keeps the local price and reports `priceKrwState=unavailable` with `priceKrwReason=FX_RATE_UNAVAILABLE | FX_RATE_STALE` — a fresh local price is never paired with an older KRW conversion. KRW-priced assets need no conversion. The frontend applies the same rule when overlaying a ticker onto a REST list row, and the detail screen uses the latest ticker's local price + KRW state + `priceSource` as one set (a ticker-unavailable KRW is shown unavailable; the REST KRW never fills in next to a newer local price).
+
+Realtime `asset_ticker` events are built from the provider event plus in-memory caches — per event there is no asset row read, no `asset_price_snapshots` read, and no snapshot `changeRate` recomputation. Consequences for clients:
+
+- realtime events always have `assetPriceSnapshotId: null`; ordering/dedup uses `priceCapturedAt`/`priceEffectiveAt` (always present on realtime events),
+- `changeRate` on a realtime event is the provider's own field (Binance `P`) or `null` (KIS trades carry none),
+- the 3-second snapshot poller can additionally deliver a snapshot-backed message for a row the throttled writer just created; the shared frontend accept policy drops it when older than the latest realtime event,
+- slow sockets get latest-only delivery: past a buffered-bytes threshold the server coalesces tickers per asset (newest wins) and flushes when the socket drains.
 
 ### Sorting
 
