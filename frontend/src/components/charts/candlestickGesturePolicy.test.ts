@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import {
   HORIZONTAL_PAN_SLOP_PX,
   classifyWheelIntent,
+  createCrosshairSession,
   isHorizontalPanIntent,
   pinchScale,
   wheelZoomScale,
@@ -44,6 +45,92 @@ describe('classifyWheelIntent', () => {
   it('leaves a plain vertical wheel to the page', () => {
     assert.equal(classifyWheelIntent({ deltaY: 120 }), 'page-scroll');
     assert.equal(classifyWheelIntent({ deltaY: -120 }), 'page-scroll');
+  });
+});
+
+describe('crosshair session', () => {
+  function makeSession() {
+    const crosshairCalls: ({ x: number; y: number } | null)[] = [];
+    let gestureEnds = 0;
+    const session = createCrosshairSession({
+      onCrosshair: (point) => crosshairCalls.push(point),
+      onGestureEnd: () => {
+        gestureEnds += 1;
+      },
+    });
+    return {
+      session,
+      crosshairCalls,
+      gestureEnds: () => gestureEnds,
+    };
+  }
+
+  it('is inactive until a long press starts it', () => {
+    const { session, crosshairCalls } = makeSession();
+    assert.equal(session.isActive(), false);
+    // A plain horizontal pan / vertical swipe never calls start(), so no
+    // crosshair appears for either.
+    assert.equal(session.move({ x: 10, y: 10 }), false);
+    assert.deepEqual(crosshairCalls, []);
+  });
+
+  it('shows and moves the crosshair once armed', () => {
+    const { session, crosshairCalls } = makeSession();
+    session.start({ x: 10, y: 20 });
+    assert.equal(session.isActive(), true);
+    assert.equal(session.move({ x: 30, y: 40 }), true);
+    assert.deepEqual(crosshairCalls, [
+      { x: 10, y: 20 },
+      { x: 30, y: 40 },
+    ]);
+  });
+
+  it('ends on finalize even when the touch never moved', () => {
+    // Long press → lift with no movement: `crosshairPan` never activated, so
+    // the long press finalize is the only thing that can clear it.
+    const { session, crosshairCalls, gestureEnds } = makeSession();
+    session.start({ x: 10, y: 20 });
+
+    assert.equal(session.end(), true);
+    assert.equal(session.isActive(), false);
+    assert.equal(crosshairCalls.at(-1), null);
+    assert.equal(gestureEnds(), 1);
+  });
+
+  it('is idempotent, so every recognizer may finalize it', () => {
+    // long-press finalize + crosshair-pan finalize both fire for one lift.
+    const { session, crosshairCalls, gestureEnds } = makeSession();
+    session.start({ x: 10, y: 20 });
+    session.end();
+
+    assert.equal(session.end(), false);
+    assert.equal(session.end(), false);
+    assert.equal(gestureEnds(), 1, 'gesture end reported exactly once');
+    assert.equal(
+      crosshairCalls.filter((call) => call === null).length,
+      1,
+      'crosshair cleared exactly once',
+    );
+  });
+
+  it('drops the crosshair when a pinch takes over', () => {
+    const { session, crosshairCalls, gestureEnds } = makeSession();
+    session.start({ x: 10, y: 20 });
+
+    // Pinch onBegin ends the crosshair before snapshotting the viewport.
+    assert.equal(session.end(), true);
+    assert.equal(session.isActive(), false);
+    assert.equal(crosshairCalls.at(-1), null);
+    assert.equal(gestureEnds(), 1);
+    // The pinch's own finalize must not clear a crosshair that is not there.
+    assert.equal(session.end(), false);
+  });
+
+  it('does nothing on a finalize that follows no long press', () => {
+    const { session, crosshairCalls, gestureEnds } = makeSession();
+    assert.equal(session.end(), false);
+    assert.deepEqual(crosshairCalls, []);
+    assert.equal(gestureEnds(), 0);
   });
 });
 

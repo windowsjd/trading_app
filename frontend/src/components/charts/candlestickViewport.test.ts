@@ -32,12 +32,33 @@ describe('default viewport', () => {
     assert.equal(endIndex, 600);
   });
 
-  it('shows all 40 candles when fewer than the default exist', () => {
-    const viewport = createDefaultViewport(40);
-    assert.equal(viewport.visibleCount, 40);
-    assert.deepEqual(getVisibleIndexRange(40, viewport), {
+  it('keeps the 60-slot default when fewer candles exist', () => {
+    // The slot count is what fixes the candle WIDTH, so a 40-candle timeframe
+    // must open with the same 60 slots as a 600-candle one.
+    for (const total of [60, 40, 12, 1]) {
+      const viewport = createDefaultViewport(total);
+      assert.equal(
+        viewport.visibleCount,
+        DEFAULT_VISIBLE_CANDLES,
+        `total=${total}`,
+      );
+      assert.equal(viewport.rightOffset, 0, `total=${total}`);
+      // …while the index range still covers only the candles that exist.
+      assert.deepEqual(getVisibleIndexRange(total, viewport), {
+        startIndex: 0,
+        endIndex: total,
+      });
+    }
+  });
+
+  it('collapses only when there is no data at all', () => {
+    assert.deepEqual(createDefaultViewport(0), {
+      visibleCount: 0,
+      rightOffset: 0,
+    });
+    assert.deepEqual(getVisibleIndexRange(0, createDefaultViewport(0)), {
       startIndex: 0,
-      endIndex: 40,
+      endIndex: 0,
     });
   });
 
@@ -50,7 +71,8 @@ describe('default viewport', () => {
 
   it('resetViewport returns the default window', () => {
     assert.deepEqual(resetViewport(600), { visibleCount: 60, rightOffset: 0 });
-    assert.deepEqual(resetViewport(12), { visibleCount: 12, rightOffset: 0 });
+    assert.deepEqual(resetViewport(12), { visibleCount: 60, rightOffset: 0 });
+    assert.deepEqual(resetViewport(0), { visibleCount: 0, rightOffset: 0 });
   });
 });
 
@@ -90,9 +112,19 @@ describe('pan', () => {
   });
 
   it('cannot pan at all when everything already fits', () => {
-    const viewport = createDefaultViewport(40);
-    assert.equal(panViewportByPixels(viewport, 500, SLOT, 40).rightOffset, 0);
-    assert.equal(panViewportByPixels(viewport, -500, SLOT, 40).rightOffset, 0);
+    for (const total of [40, 12, 60]) {
+      const viewport = createDefaultViewport(total);
+      assert.equal(
+        panViewportByPixels(viewport, 500, SLOT, total).rightOffset,
+        0,
+        `total=${total}`,
+      );
+      assert.equal(
+        panViewportByPixels(viewport, -500, SLOT, total).rightOffset,
+        0,
+        `total=${total}`,
+      );
+    }
   });
 
   it('ignores unusable pan inputs', () => {
@@ -155,11 +187,20 @@ describe('zoom', () => {
     assert.ok(Math.abs(zoomed.rightOffset - 315) <= 2);
   });
 
-  it('cannot zoom out beyond the loaded data', () => {
-    const viewport = createDefaultViewport(40);
-    const zoomedOut = zoomViewportAtFocalPoint(viewport, 0.1, 150, 300, 40);
+  it('zooms a short data set by SLOTS, never by candle count', () => {
+    // 12 candles: zooming in widens them (fewer slots) but the data still ends
+    // at the right edge, and zooming out is bounded by the slot ceiling.
+    const viewport = createDefaultViewport(12);
+    const zoomedIn = zoomViewportAtFocalPoint(viewport, 3, 300, 300, 12);
+    const zoomedOut = zoomViewportAtFocalPoint(viewport, 0.01, 150, 300, 12);
 
-    assert.equal(zoomedOut.visibleCount, 40);
+    assert.equal(zoomedIn.visibleCount, 20);
+    assert.equal(zoomedIn.rightOffset, 0);
+    assert.deepEqual(getVisibleIndexRange(12, zoomedIn), {
+      startIndex: 0,
+      endIndex: 12,
+    });
+    assert.equal(zoomedOut.visibleCount, MAX_VISIBLE_CANDLES);
     assert.equal(zoomedOut.rightOffset, 0);
   });
 
@@ -175,11 +216,14 @@ describe('zoom', () => {
 });
 
 describe('clamps and invalid input', () => {
-  it('clampVisibleCount respects data-aware bounds', () => {
+  it('clampVisibleCount bounds SLOTS, not the amount of data', () => {
     assert.equal(clampVisibleCount(5, 600), MIN_VISIBLE_CANDLES);
     assert.equal(clampVisibleCount(1000, 600), MAX_VISIBLE_CANDLES);
-    assert.equal(clampVisibleCount(1000, 40), 40);
-    assert.equal(clampVisibleCount(30, 10), 10);
+    // A short data set does not shrink the slot count (that is what used to
+    // make 12-candle charts render absurdly fat candles).
+    assert.equal(clampVisibleCount(1000, 40), MAX_VISIBLE_CANDLES);
+    assert.equal(clampVisibleCount(30, 10), 30);
+    assert.equal(clampVisibleCount(60, 1), 60);
   });
 
   it('handles NaN, zero and negative inputs safely', () => {
@@ -274,6 +318,43 @@ describe('data changes', () => {
 
     assert.equal(grown.rightOffset, 101);
     assert.deepEqual(after, before);
+  });
+
+  it('keeps the candle width steady across the 59 → 60 → 61 append', () => {
+    // The width comes from visibleCount, so it must not move when the data
+    // crosses the default slot count.
+    const at59 = createDefaultViewport(59);
+    const at60 = adjustViewportForDataChange(at59, 59, 60);
+    const at61 = adjustViewportForDataChange(at60, 60, 61);
+
+    assert.equal(at59.visibleCount, DEFAULT_VISIBLE_CANDLES);
+    assert.equal(at60.visibleCount, DEFAULT_VISIBLE_CANDLES);
+    assert.equal(at61.visibleCount, DEFAULT_VISIBLE_CANDLES);
+
+    // 59 candles: all of them, right-aligned. 61: the newest 60 only.
+    assert.deepEqual(getVisibleIndexRange(59, at59), {
+      startIndex: 0,
+      endIndex: 59,
+    });
+    assert.deepEqual(getVisibleIndexRange(60, at60), {
+      startIndex: 0,
+      endIndex: 60,
+    });
+    assert.deepEqual(getVisibleIndexRange(61, at61), {
+      startIndex: 1,
+      endIndex: 61,
+    });
+  });
+
+  it('holds the history window when a live candle is appended to a short set', () => {
+    // 80 candles, looking back 10: appending must not drag the view forward.
+    const history = { visibleCount: 60, rightOffset: 10 };
+    const before = getVisibleIndexRange(80, history);
+    const grown = adjustViewportForDataChange(history, 80, 81);
+
+    assert.equal(grown.visibleCount, 60);
+    assert.equal(grown.rightOffset, 11);
+    assert.deepEqual(getVisibleIndexRange(81, grown), before);
   });
 
   it('clamps a history viewport when the data set shrinks', () => {

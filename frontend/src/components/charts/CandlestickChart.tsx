@@ -7,7 +7,7 @@ import {
   View,
 } from 'react-native';
 
-import { formatMoney } from '../../utils/format';
+import { formatChartPrice } from './candlestickPriceFormat';
 import CandlestickChartRenderer, {
   type CandlestickChartGeometry,
   type RenderedCandle,
@@ -15,7 +15,11 @@ import CandlestickChartRenderer, {
 // Platform-resolved: `.native.tsx` on iOS/Android, `.web.tsx` on web (the
 // base file is the type contract + no-gesture fallback).
 import CandlestickGestures from './CandlestickGestures';
-import { computeSlotLayout, visibleOffsetForX } from './candlestickLayout';
+import {
+  computeLeadingEmptySlots,
+  computeSlotLayout,
+  originalCandleIndexForX,
+} from './candlestickLayout';
 import {
   adjustViewportForDataChange,
   createDefaultViewport,
@@ -43,6 +47,12 @@ export type CandlestickChartProps = {
   candles: CandlestickChartCandle[];
   /** Price currency ('KRW' | 'USD' | …). Drives label precision/unit. */
   currencyCode?: string | null;
+  /**
+   * Provider-declared unit-price decimals for this asset (the same value the
+   * detail header prices with). Without it a 0.24560 coin would render as
+   * $0.25 on the axis, the current-price label and the crosshair.
+   */
+  displayPriceDecimals?: number | null;
   /** Live price for the current-price line. Falls back to the last candle close. */
   currentPrice?: string | number | null;
   height?: number;
@@ -143,6 +153,11 @@ function parseCandles(candles: CandlestickChartCandle[]): ParsedCandle[] {
 /**
  * Candlestick chart with a pan/zoom viewport over the ALREADY LOADED candles.
  *
+ * The viewport counts SCREEN SLOTS (60 by default on every timeframe), not
+ * candles: a timeframe that only returned 12 candles draws them at the normal
+ * width against the right edge with 48 empty slots on the left, instead of 12
+ * absurdly fat ones.
+ *
  * This component owns viewport state and geometry; `CandlestickChartRenderer`
  * draws (one renderer for every platform) and `CandlestickGestures.native/web`
  * only translate raw gestures into pan/zoom/crosshair intent. Moving beyond the
@@ -152,6 +167,7 @@ function parseCandles(candles: CandlestickChartCandle[]): ParsedCandle[] {
 export default function CandlestickChart({
   candles,
   currencyCode,
+  displayPriceDecimals,
   currentPrice,
   height = 240,
   emptyMessage = '표시할 차트 데이터가 없습니다.',
@@ -330,6 +346,12 @@ export default function CandlestickChart({
       slotWidth,
       bodyWidth,
       startIndex,
+      // Short data sets keep the default candle width and sit against the right
+      // edge; the shortfall becomes empty slots on the left.
+      leadingEmptySlots: computeLeadingEmptySlots(
+        viewport.visibleCount,
+        endIndex - startIndex,
+      ),
       minY,
       maxY,
       range,
@@ -370,18 +392,20 @@ export default function CandlestickChart({
     ? (livePrice ?? parsed[total - 1].close)
     : null;
 
-  // Crosshair x → visible offset → ORIGINAL candle index, so its labels always
-  // describe the candle actually under the line.
+  // Crosshair x → slot → ORIGINAL candle index, so its labels always describe
+  // a candle that exists: a pointer over the empty leading slots of a short
+  // data set snaps to the first real candle instead of a negative index.
   const crosshairState = crosshair
     ? {
-        index:
-          startIndex +
-          visibleOffsetForX(
-            crosshair.x,
-            PADDING.left,
-            slotWidth,
-            endIndex - startIndex,
-          ),
+        index: originalCandleIndexForX({
+          x: crosshair.x,
+          paddingLeft: PADDING.left,
+          slotWidth,
+          viewportVisibleCount: viewport.visibleCount,
+          startIndex,
+          endIndex,
+          leadingEmptySlots: geometry.leadingEmptySlots,
+        }),
         y: crosshair.y,
       }
     : null;
@@ -390,9 +414,10 @@ export default function CandlestickChart({
     '캔들 차트',
     `${endIndex - startIndex}개 표시 중`,
     viewingLatest ? '최신 구간' : '과거 구간',
-    `현재가 ${formatMoney(
+    `현재가 ${formatChartPrice(
       livePrice ?? parsed[total - 1].close,
       currencyCode,
+      displayPriceDecimals,
     )}`,
   ].join(', ');
 
@@ -419,6 +444,7 @@ export default function CandlestickChart({
             geometry={geometry}
             candles={renderedCandles}
             currencyCode={currencyCode}
+            displayPriceDecimals={displayPriceDecimals}
             currentPrice={currentPriceValue}
             currentBullish={parsed[total - 1].bullish}
             crosshair={crosshairState}

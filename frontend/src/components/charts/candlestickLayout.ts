@@ -42,8 +42,9 @@ export function computeSlotLayout(
 }
 
 /**
- * Center x of a candle, given its offset from the first VISIBLE candle.
- * (`index - startIndex`, so callers keep using original array indices.)
+ * Center x of a candle, given its SLOT offset from the left edge of the plot.
+ * (`leadingEmptySlots + index - startIndex`, so callers keep using original
+ * array indices.)
  */
 export function candleXCenter(
   paddingLeft: number,
@@ -54,8 +55,29 @@ export function candleXCenter(
 }
 
 /**
- * Visible-window offset under a pointer x, clamped to the window. Combine with
- * the viewport's `startIndex` to get the original candle index.
+ * Empty slots on the LEFT when fewer candles are loaded than the viewport has
+ * slots. Keeping the shortfall on the left is what right-aligns a 12-candle
+ * chart while its candles stay exactly as wide as a 600-candle one.
+ */
+export function computeLeadingEmptySlots(
+  viewportVisibleCount: number,
+  actualVisibleCount: number,
+): number {
+  const slots =
+    Number.isFinite(viewportVisibleCount) && viewportVisibleCount > 0
+      ? Math.floor(viewportVisibleCount)
+      : 0;
+  const actual =
+    Number.isFinite(actualVisibleCount) && actualVisibleCount > 0
+      ? Math.floor(actualVisibleCount)
+      : 0;
+  return Math.max(0, slots - actual);
+}
+
+/**
+ * Slot under a pointer x, clamped to the viewport's slot count. Slots include
+ * the empty leading ones, so this is NOT a candle index — see
+ * `originalCandleIndexForX`.
  */
 export function visibleOffsetForX(
   x: number,
@@ -66,4 +88,34 @@ export function visibleOffsetForX(
   if (!Number.isFinite(x) || slotWidth <= 0 || visibleCount <= 0) return 0;
   const raw = Math.round((x - paddingLeft) / slotWidth - 0.5);
   return clamp(raw, 0, visibleCount - 1);
+}
+
+/**
+ * Pointer x → ORIGINAL candle index, the one the crosshair labels describe.
+ *
+ * Empty leading slots hold no candle, so a pointer over them snaps to the first
+ * real one; a pointer past the right edge snaps to the last. The result is
+ * always inside [startIndex, endIndex - 1], so a crosshair can never address a
+ * candle that does not exist.
+ */
+export function originalCandleIndexForX(input: {
+  x: number;
+  paddingLeft: number;
+  slotWidth: number;
+  /** Viewport slot count (empty slots included). */
+  viewportVisibleCount: number;
+  startIndex: number;
+  endIndex: number;
+  leadingEmptySlots: number;
+}): number {
+  const { startIndex, endIndex } = input;
+  if (endIndex <= startIndex) return startIndex;
+  const slot = visibleOffsetForX(
+    input.x,
+    input.paddingLeft,
+    input.slotWidth,
+    input.viewportVisibleCount,
+  );
+  const leading = Math.max(0, Math.floor(input.leadingEmptySlots));
+  return clamp(startIndex + (slot - leading), startIndex, endIndex - 1);
 }

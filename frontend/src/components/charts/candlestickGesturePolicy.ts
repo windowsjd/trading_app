@@ -61,3 +61,54 @@ export function pinchScale(
   if (!Number.isFinite(currentDistance) || startDistance <= 0) return 1;
   return Math.min(Math.max(currentDistance / startDistance, 0.2), 5);
 }
+
+export type CrosshairPoint = { x: number; y: number };
+
+export type CrosshairSession = {
+  isActive: () => boolean;
+  /** Long press armed crosshair mode. */
+  start: (point: CrosshairPoint) => void;
+  /** Scrub while armed; ignored (returns false) when not. */
+  move: (point: CrosshairPoint) => boolean;
+  /**
+   * Leave crosshair mode. Safe to call from EVERY recognizer that can end it
+   * (long-press finalize, pan finalize, pinch begin) — only the first call
+   * after a `start` does anything, so the chart never gets a stray clear or a
+   * doubled gesture-end.
+   */
+  end: () => boolean;
+};
+
+/**
+ * Crosshair mode as a tiny state machine, outside React state because several
+ * recognizers read it synchronously mid-gesture.
+ *
+ * It lives here (not in the native adapter) so the "a lift always ends the
+ * crosshair, no matter which recognizer saw it" rule is unit-tested without
+ * rendering gesture-handler.
+ */
+export function createCrosshairSession(callbacks: {
+  onCrosshair: (point: CrosshairPoint | null) => void;
+  onGestureEnd: () => void;
+}): CrosshairSession {
+  let active = false;
+  return {
+    isActive: () => active,
+    start(point) {
+      active = true;
+      callbacks.onCrosshair(point);
+    },
+    move(point) {
+      if (!active) return false;
+      callbacks.onCrosshair(point);
+      return true;
+    },
+    end() {
+      if (!active) return false;
+      active = false;
+      callbacks.onCrosshair(null);
+      callbacks.onGestureEnd();
+      return true;
+    },
+  };
+}

@@ -6,6 +6,7 @@ import {
   HORIZONTAL_PAN_SLOP_PX,
   LONG_PRESS_MOVE_SLOP_PX,
   LONG_PRESS_MS,
+  createCrosshairSession,
   pinchScale,
 } from './candlestickGesturePolicy';
 import type { CandlestickGesturesProps } from './CandlestickGestures';
@@ -20,6 +21,8 @@ import type { CandlestickGesturesProps } from './CandlestickGestures';
  *    runs through `crosshairPan`, a manually-activated pan that only claims
  *    the touch once crosshair mode is on — which is why a vertical scrub works
  *    while a normal vertical swipe still belongs to the parent ScrollView.
+ *    BOTH recognizers finalize the crosshair, so lifting the finger ends it
+ *    whether or not the touch ever moved (and cancel/fail count as a lift).
  *  - CHART PAN is a one-finger pan constrained with `activeOffsetX` /
  *    `failOffsetY`: it activates only for clearly horizontal drags, so the
  *    detail screen keeps scrolling vertically. It is skipped in crosshair mode.
@@ -38,14 +41,10 @@ export default function CandlestickGestures({
 }: CandlestickGesturesProps) {
   const gesture = useMemo(() => {
     // Crosshair mode is read synchronously by several recognizers, so it lives
-    // outside React state.
-    const session = { crosshair: false };
-
+    // outside React state (the state machine itself is in the shared policy).
+    const session = createCrosshairSession({ onCrosshair, onGestureEnd });
     const endCrosshair = () => {
-      if (!session.crosshair) return;
-      session.crosshair = false;
-      onCrosshair(null);
-      onGestureEnd();
+      session.end();
     };
 
     const longPress = Gesture.LongPress()
@@ -53,19 +52,23 @@ export default function CandlestickGestures({
       .maxDistance(LONG_PRESS_MOVE_SLOP_PX)
       .shouldCancelWhenOutside(false)
       .onStart((event) => {
-        session.crosshair = true;
-        onCrosshair({ x: event.x, y: event.y });
+        session.start({ x: event.x, y: event.y });
       })
+      // A hold that is released WITHOUT moving never reaches `crosshairPan`
+      // (it only activates on touch move), and a cancelled/failed hold has no
+      // end event of its own — so the long press must clear the crosshair too.
+      // `session.end()` is idempotent, so both paths firing is harmless.
+      .onFinalize(endCrosshair)
       .runOnJS(true);
 
     const crosshairPan = Gesture.Pan()
       // Stays out of the way until a long press has armed crosshair mode.
       .manualActivation(true)
       .onTouchesMove((event, manager) => {
-        if (!session.crosshair) return;
+        if (!session.isActive()) return;
         manager.activate();
         const touch = event.changedTouches[0] ?? event.allTouches[0];
-        if (touch) onCrosshair({ x: touch.x, y: touch.y });
+        if (touch) session.move({ x: touch.x, y: touch.y });
       })
       .onFinalize(endCrosshair)
       .runOnJS(true);
@@ -76,19 +79,20 @@ export default function CandlestickGestures({
       .minPointers(1)
       .maxPointers(1)
       .onBegin(() => {
-        if (!session.crosshair) onGestureStart();
+        if (!session.isActive()) onGestureStart();
       })
       .onUpdate((event) => {
-        if (session.crosshair) return;
+        if (session.isActive()) return;
         onPan(event.translationX);
       })
       .onFinalize(() => {
-        if (!session.crosshair) onGestureEnd();
+        if (!session.isActive()) onGestureEnd();
       })
       .runOnJS(true);
 
     const pinch = Gesture.Pinch()
       .onBegin(() => {
+        // A long press that turns into a pinch drops crosshair mode first.
         endCrosshair();
         onGestureStart();
       })

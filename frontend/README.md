@@ -30,7 +30,9 @@ must be free of React Native imports and their relative imports need explicit
 - `features/asset/displayPricePolicy.ts` picks ONE basis for the detail
   screen's whole price block (realtime ticker or REST snapshot). REST and
   realtime metadata are never mixed — a ticker whose KRW is unavailable shows
-  KRW unavailable rather than borrowing the older REST KRW.
+  KRW unavailable rather than borrowing the older REST KRW, and a ticker
+  without a change rate shows none rather than the older REST one. The screen
+  renders `displayPrice.changeRate` directly; there is no second selector.
 - The market list passes `item` (REST baseline) and `ticker` as separate props
   to `MarketAssetRow`, which merges them itself; a tick therefore only changes
   that row's props identity and `React.memo` skips the others.
@@ -47,13 +49,19 @@ extension). Behaviour, constants and the reasoning are documented in
 `backend/docs/candle-live-operations.md` ("Candlestick chart viewport").
 
 Mobile: pinch to zoom, one-finger horizontal drag to pan, long press for the
-crosshair; vertical swipes still scroll the detail screen. Web: drag to pan,
-hover for the crosshair, ctrl/cmd + wheel (or trackpad pinch) to zoom. `+`,
-`−` and `초기화` buttons do the same without gestures.
+crosshair (released by whichever recognizer sees the lift, so a hold that never
+moved still clears it); vertical swipes still scroll the detail screen. Web:
+drag to pan, hover for the crosshair, ctrl/cmd + wheel (or trackpad pinch) to
+zoom. `+`, `−` and `초기화` buttons do the same without gestures.
 
-**Native rebuild required.** `react-native-gesture-handler`,
-`react-native-reanimated` and `react-native-worklets` are native modules added
-via `npx expo install`, `babel.config.js` carries
-`react-native-worklets/plugin`, and `App.tsx` wraps the app in
-`GestureHandlerRootView`. Rebuild the dev client (`npx expo run:android`, or a
-new EAS dev build) before testing on a device; Expo web needs no extra setup.
+The viewport counts SCREEN SLOTS (60 by default on every timeframe), not
+candles: a timeframe with only 12 candles draws them at the normal width
+against the right edge with empty slots on the left. Prices on the chart use
+`displayPriceDecimals`, so pass it from the screen — see `formatChartPrice`.
+
+**Native rebuild required.** `react-native-gesture-handler` is a native module
+(`npx expo install`) and `App.tsx` wraps the app in `GestureHandlerRootView`.
+Rebuild the dev client (`npx expo run:android`, or a new EAS dev build) before
+testing on a device; Expo web needs no extra setup. Reanimated/Worklets are NOT
+used — all gesture callbacks run on the JS thread, and `babel.config.js` is the
+plain Expo preset.

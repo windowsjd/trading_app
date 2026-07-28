@@ -12,6 +12,120 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 차트 표시 정밀도·슬롯 정렬·clip 보완 + Reanimated 제거 (2026-07-29)
+
+**목적**
+
+직전(2026-07-26) 작업의 잔여 결함 보완. 신규 기능 확장이 아니며 거래소급 차트
+엔진·애니메이션 구조를 추가하지 않는다. viewport/pan/pinch/web drag/stale/
+실시간 가격 보완 기능은 그대로 유지한다.
+
+**A. 차트 가격 표시 정밀도**
+
+- 문제: 상세 헤더 가격은 `displayPriceDecimals`를 쓰는데 차트는 USD 2자리
+  포맷(`formatCurrency`/`formatMoney`)이라 DOGE 0.24560이 축·라벨에서 $0.25로
+  잘렸다.
+- `CandlestickChartProps`/`CandlestickChartRendererProps`에
+  `displayPriceDecimals?: number | null` 추가. `AssetDetailScreen`이
+  `displayPriceDecimals={displayPriceDecimals}`(= `displayPrice.displayPriceDecimals`,
+  헤더 가격과 동일한 값)를 넘긴다.
+- 차트 가격 표시는 전부 신규 `candlestickPriceFormat.ts`의 `formatChartPrice`
+  (= `formatAssetPrice(value, currency, decimals)`) 한 곳을 통과한다:
+  Y축 라벨, 현재가선 라벨, 크로스헤어 가격 라벨, 접근성 label의 현재가.
+- 지갑 잔액·평가금액·주문 총액·수수료·KRW/USD 총액은 기존 `formatMoney`/
+  `formatCurrency` 정책 유지. 포맷 문자열은 표시 전용이며 가격 계산·주문
+  요청에 들어가지 않는다.
+
+**B. 60개 미만 데이터의 기본 캔들 폭**
+
+- `viewport.visibleCount`는 이제 **화면 슬롯 수**이며 실제 데이터 개수와
+  무관하다. `clampVisibleCount`는 MIN 20 / MAX 180으로만 clamp하고 데이터
+  개수로 줄이지 않는다(데이터 0개일 때만 0).
+- `createDefaultViewport(600|60|40|12)` → `{visibleCount: 60, rightOffset: 0}`,
+  `createDefaultViewport(0)` → `{0, 0}`.
+- `getVisibleIndexRange()`는 실제 데이터 인덱스만 반환한다(40개면 0~40).
+- `candlestickLayout.ts`에 `computeLeadingEmptySlots(visibleCount, actual)`
+  추가 → 부족분은 **왼쪽 빈 슬롯**, 캔들은 오른쪽 정렬. x는
+  `paddingLeft + (leadingEmptySlots + index - startIndex + 0.5) * slotWidth`,
+  `slotWidth = innerWidth / viewport.visibleCount`.
+- 결과: 12개든 600개든 기본 캔들 폭이 같고, 확대/축소도 빈 슬롯 포함 슬롯 수
+  기준으로 동작한다(12개 데이터를 20슬롯까지 확대해도 오른쪽 정렬 유지).
+- pan: `totalCount <= visibleCount`이면 rightOffset이 0으로 고정되어 좌우
+  이동 불가. live append: 59→60→61에서 슬롯 수 60 불변, 61에서 최신 60개만
+  표시, 과거 구간에서는 rightOffset이 append 수만큼 늙어 화면이 고정된다.
+
+**C. 빈 슬롯 크로스헤어**
+
+- `originalCandleIndexForX({x, paddingLeft, slotWidth, viewportVisibleCount,
+  startIndex, endIndex, leadingEmptySlots})` 추가. 빈 슬롯 위 포인터는 **첫
+  실제 캔들로 snap**하고, 결과는 항상 `[startIndex, endIndex-1]` 안이라
+  음수·미존재 인덱스가 생기지 않는다. `CandlestickChart`가 크로스헤어 인덱스를
+  이 함수로 계산한다(기존 `visibleOffsetForX`는 슬롯 계산용으로 남는다).
+
+**D. render buffer SVG clipping**
+
+- `CandlestickChartRenderer`에 `<Defs><ClipPath>` + plot `<Rect>`
+  (x=padding.left, y=padding.top, w=innerWidth, h=innerHeight)를 추가하고
+  캔들 layer(wick+body)를 `<G clipPath="url(#…)">`로 감쌌다. 좌우 buffer
+  캔들이 가격축·차트 바깥으로 새지 않는다.
+- clip id는 `useId()`를 id-safe 문자로 정리해 인스턴스별로 만든다(고정 id 금지
+  — 한 화면에 차트가 여럿이어도 충돌하지 않는다).
+- 가격축 텍스트·현재가 라벨·크로스헤어 라벨·시간 라벨은 clip 바깥이라 그대로
+  보인다.
+
+**E. 상세 등락률 basis 통일**
+
+- `AssetDetailScreen`의 `getDisplayChangeRate()`(ticker → REST fallback) 제거.
+  다른 화면 사용처 없음을 검색으로 확인 후 삭제.
+- `const displayChangeRate = displayPrice.changeRate;` — realtime ticker가
+  있으면 ticker의 changeRate만 쓰고, 그것이 null이면 등락률도 표시하지 않는다
+  (과거 REST 값으로 채우지 않음). ticker가 없을 때만 REST changeRate 사용.
+
+**F. Reanimated·Worklets 제거**
+
+- 저장소 전체 검색 결과 `react-native-reanimated`/`react-native-worklets`를
+  실제로 import하는 코드 없음(문서·package.json·babel.config.js·proguard
+  주석뿐). gesture callback은 전부 `runOnJS(true)`라 worklet이 없다.
+- `frontend/package.json`에서 두 패키지 제거 + `npm install`로
+  `package-lock.json` 갱신(11 packages removed). 남은 lock 언급은
+  `expo-modules-core`의 **optional** peerDependency 한 줄뿐이다.
+- `babel.config.js`는 `react-native-worklets/plugin`을 빼고 Expo 기본
+  preset만 남겼다(파일 자체는 유지 — Expo 기본 설정 지점).
+- `react-native-gesture-handler`와 `App.tsx`의 `GestureHandlerRootView`는
+  **유지**. Reanimated 기반 차트 애니메이션은 새로 만들지 않았다.
+- 남은 흔적 1건: `frontend/android/app/proguard-rules.pro`의
+  `# react-native-reanimated` keep 규칙(존재하지 않는 클래스 keep이라 무해).
+  네이티브 빌드 파일이라 이번 표시 보완 작업에서는 건드리지 않았다. 다음
+  `expo prebuild`/release 정리 때 함께 제거하면 된다.
+
+**G. long press 종료 보강**
+
+- 크로스헤어 상태를 `candlestickGesturePolicy.ts`의
+  `createCrosshairSession()`(순수 상태 머신, 단위 테스트 가능)으로 옮기고
+  `longPress.onFinalize(endCrosshair)`를 추가했다. 움직이지 않고 손을 뗀 경우
+  `crosshairPan`은 activate된 적이 없어 종료 이벤트가 없었는데, 이제 long
+  press finalize가 반드시 정리한다(취소/실패/차트 바깥 이동 포함).
+- `end()`는 idempotent라 long press + crosshair pan이 함께 finalize돼도
+  `onCrosshair(null)`/`onGestureEnd`는 각각 1회만 발생하고 viewport snapshot이
+  어긋나지 않는다. pinch `onBegin`은 기존대로 크로스헤어를 먼저 정리한다.
+  일반 가로 pan·세로 scroll은 `start()`를 부르지 않으므로 크로스헤어가 뜨지
+  않는다(gesture composition 자체는 그대로).
+
+**검증**
+
+- frontend `npm run typecheck` 통과, `npm test` **224 pass / 0 fail**
+  (viewport·layout·crosshair·gesture policy·차트 가격 포맷·displayPrice basis).
+- `npx expo export --platform web` / `--platform android` 모두 성공
+  (reanimated/worklets 없이, babel plugin 없이 번들됨). 웹 번들에 clipPath와
+  `candle-plot-` id 생성 코드 포함 확인.
+- **Android 실기기/에뮬레이터 수동 검증 NOT_RUN**, **웹 브라우저 수동 검증
+  NOT_RUN** — 이 환경에 adb·emulator·JDK·브라우저가 없다(설치된 것 없음 확인).
+  대체 검증은 순수 모듈 단위 테스트 + 두 플랫폼 번들 export + 번들 내 코드
+  포함 확인뿐이다. 제스처·clip 렌더 결과는 다음 담당자가 실기기/브라우저에서
+  확인해야 한다.
+- 백엔드 코드 변경 없음(문서만 수정) → backend 테스트 미실행.
+- DB migration 없음. 주문·체결·포지션·지갑·원장·캔들 API/스키마 불변.
+
 ### 작업 단위: 실시간 표시 일관성 마무리 + 캔들 차트 gesture/viewport 재구성 (2026-07-26)
 
 **목적**
@@ -61,12 +175,16 @@
 - 패키지: `npx expo install react-native-gesture-handler react-native-reanimated
   react-native-worklets`, `babel.config.js`에 `react-native-worklets/plugin`,
   `App.tsx`에 `GestureHandlerRootView` 1회 wrapping.
+  → **2026-07-29 정정**: reanimated/worklets는 실제로 쓰이지 않아 제거했다.
+  현재는 gesture-handler + `GestureHandlerRootView`만 남았고 babel plugin도 없다.
 
 **주의사항**
 
-- **네이티브 재빌드 필요**: gesture-handler/reanimated는 네이티브 모듈이라
-  기존 dev client로는 실행되지 않는다(`npx expo run:android` 또는 새 EAS dev
-  build). Expo web은 추가 설정 없이 동작한다.
+- **네이티브 재빌드 필요**: gesture-handler는 네이티브 모듈이라 기존 dev
+  client로는 실행되지 않는다(`npx expo run:android` 또는 새 EAS dev build).
+  Expo web은 추가 설정 없이 동작한다.
+  (2026-07-29에 reanimated/worklets를 제거했으므로 네이티브 모듈은
+  gesture-handler뿐이다.)
 - 차트는 로드된 캔들 범위 안에서만 이동한다(무한 과거 로딩·cursor pagination·
   candle API 변경 없음). 확장 지점은 `CandlestickChart`가 받는 candle 배열이며
   viewport 계산과 slice는 이미 분리되어 있다.
@@ -243,6 +361,31 @@ cd frontend && npm run typecheck && npm test
 
 ## 2. 최신 작업 시간순 기록
 
+### 2026-07-29 — 차트 표시 정밀도·슬롯 정렬·clip 보완 + Reanimated 제거
+
+- 차트 가격축·현재가 라벨·크로스헤어·접근성 문구가 종목별
+  `displayPriceDecimals`를 쓴다(`AssetDetailScreen` → `CandlestickChart` →
+  renderer, 공통 `formatChartPrice`). DOGE 등 저가 코인이 더 이상 2자리로
+  잘리지 않는다. 지갑·평가금액·주문 총액·수수료 포맷 정책은 불변.
+- viewport의 `visibleCount`를 **화면 슬롯 수**로 재정의: 데이터가 60개보다
+  적어도 기본 60슬롯을 유지하고 부족분은 왼쪽 빈 슬롯, 캔들은 오른쪽 정렬.
+  40개·12개 차트의 캔들 폭이 600개와 같아졌다. 데이터 0개일 때만 빈 viewport.
+- `originalCandleIndexForX()`로 빈 슬롯 위 크로스헤어를 첫 실제 캔들에 snap
+  (미존재/음수 인덱스 불가).
+- render buffer 캔들에 plot 영역 SVG clipPath 적용(`useId` 기반 인스턴스별
+  id). 가격축·현재가/크로스헤어 라벨은 clip 바깥이라 그대로 표시된다.
+- 상세 등락률을 `displayPrice.changeRate` 단일 basis로 통일하고
+  `getDisplayChangeRate()` 제거 — realtime 가격 + 과거 REST 등락률 혼합 불가.
+- 실사용처가 없던 `react-native-reanimated`/`react-native-worklets` 제거
+  (package.json + lock 갱신, babel worklets plugin 제거). gesture-handler와
+  `GestureHandlerRootView`는 유지.
+- 모바일 long press 종료 보강: 크로스헤어를 `createCrosshairSession()`
+  상태 머신으로 옮기고 `longPress.onFinalize`를 추가(움직이지 않고 손을 떼도
+  종료, 중복 호출 안전).
+- 검증: frontend typecheck 통과, 224 pass, expo export web/android 성공.
+  Android 실기기·에뮬레이터와 웹 브라우저 수동 검증은 환경 부재로 NOT_RUN.
+  백엔드 코드 변경 없음(문서만), DB migration 없음, 금융 데이터 불변.
+
 ### 2026-07-26 — 실시간 표시 일관성 마무리 + 캔들 차트 gesture/viewport 재구성
 
 - 상세 화면 가격 블록을 단일 기준(selectDisplayPrice)으로 통일: KRW 상태·사유·
@@ -256,6 +399,7 @@ cd frontend && npm run typecheck && npm test
   visible 기준 Y축, 과거 구간 현재가선 숨김, visible+buffer만 렌더,
   timeframe reset, +/−/초기화 버튼).
 - gesture-handler/reanimated/worklets 도입 → **네이티브 dev client 재빌드 필요**.
+  (2026-07-29에 reanimated/worklets 제거 — 현재 네이티브 모듈은 gesture-handler뿐.)
 - 검증: backend 2048 pass, frontend 218 pass, expo export web/android 성공.
   실기기·브라우저 수동 검증은 NOT_RUN.
 

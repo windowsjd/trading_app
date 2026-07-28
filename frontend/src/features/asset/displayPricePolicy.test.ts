@@ -134,6 +134,24 @@ describe('selectDisplayPrice — realtime basis', () => {
     assert.equal(display.displayPriceDecimals, 2);
   });
 
+  it('never fills a missing ticker change rate from the REST snapshot', () => {
+    // A realtime price beside an OLD change rate describes two moments at once.
+    // The detail screen renders `displayPrice.changeRate` directly, so this is
+    // the whole rule: no change rate rather than a stale one.
+    for (const changeRate of [null, undefined]) {
+      const display = selectDisplayPrice({
+        latestTicker: ticker({ changeRate }),
+        restPrice,
+        ...assetInput,
+      });
+
+      assert.equal(display.basis, 'realtime');
+      assert.equal(display.priceLocal, '0.24560000');
+      assert.equal(display.changeRate, null);
+      assert.notEqual(display.changeRate, restPrice.changeRate);
+    }
+  });
+
   it('reports a coherent set: every field comes from the same moment', () => {
     const display = selectDisplayPrice({
       latestTicker: ticker(),
@@ -169,6 +187,8 @@ describe('selectDisplayPrice — REST basis', () => {
       'binance_public_rest_24hr_ticker',
     );
     assert.equal(display.displayPriceDecimals, 2);
+    // Without a ticker the REST change rate IS the current basis.
+    assert.equal(display.changeRate, '1.00000000');
   });
 
   it('reports REST KRW unavailability with its reason', () => {

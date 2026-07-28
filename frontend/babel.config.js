@@ -1,10 +1,10 @@
-// Added for react-native-reanimated 4: its worklets runtime requires this
-// Babel plugin, and it must stay LAST in the plugin list. Everything else is
-// the Expo default that Metro used before this file existed.
+// Plain Expo default. The Worklets Babel plugin that once lived here was only
+// needed by react-native-reanimated, which the app no longer depends on — the
+// chart's gestures are gesture-handler recognizers with JS callbacks, so there
+// is no worklet to compile.
 module.exports = function babelConfig(api) {
   api.cache(true);
   return {
     presets: ['babel-preset-expo'],
-    plugins: ['react-native-worklets/plugin'],
   };
 };

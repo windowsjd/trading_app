@@ -1,9 +1,16 @@
-import React, { useMemo } from 'react';
+import React, { useId, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Svg, { G, Line as SvgLine, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, {
+  ClipPath,
+  Defs,
+  G,
+  Line as SvgLine,
+  Rect,
+  Text as SvgText,
+} from 'react-native-svg';
 
-import { formatCurrency, formatMoney } from '../../utils/format';
 import { candleXCenter } from './candlestickLayout';
+import { formatChartPrice } from './candlestickPriceFormat';
 
 /**
  * The ONE candlestick renderer, shared by every platform. Gesture adapters
@@ -39,6 +46,12 @@ export type CandlestickChartGeometry = {
   bodyWidth: number;
   /** First VISIBLE candle index; x positions are measured from it. */
   startIndex: number;
+  /**
+   * Empty slots before the first candle (short data sets are right-aligned so
+   * every timeframe keeps the same candle width). 0 whenever the data fills
+   * the viewport.
+   */
+  leadingEmptySlots: number;
   minY: number;
   maxY: number;
   range: number;
@@ -49,6 +62,12 @@ export type CandlestickChartRendererProps = {
   /** Visible window + buffer only — never the whole loaded array. */
   candles: RenderedCandle[];
   currencyCode?: string | null;
+  /**
+   * Provider-declared unit-price decimals, so the axis / current price /
+   * crosshair show a 0.24560 coin as 0.24560 rather than 0.25. Null keeps the
+   * currency's default policy.
+   */
+  displayPriceDecimals?: number | null;
   /** Only supplied while the latest candle is on screen. */
   currentPrice?: number | null;
   currentBullish?: boolean;
@@ -70,6 +89,7 @@ export default function CandlestickChartRenderer({
   geometry,
   candles,
   currencyCode,
+  displayPriceDecimals,
   currentPrice,
   currentBullish = true,
   crosshair,
@@ -77,10 +97,27 @@ export default function CandlestickChartRenderer({
   firstVisibleTime,
   lastVisibleTime,
 }: CandlestickChartRendererProps) {
-  const { padding, innerWidth, innerHeight, slotWidth, bodyWidth, startIndex } =
-    geometry;
+  const {
+    padding,
+    innerWidth,
+    innerHeight,
+    slotWidth,
+    bodyWidth,
+    startIndex,
+    leadingEmptySlots,
+  } = geometry;
   const rightEdgeX = padding.left + innerWidth;
   const bottomY = padding.top + innerHeight;
+
+  // Per-instance clip id: several charts can share one page, and a fixed id
+  // would make them all clip to whichever plot rendered last. `useId` can
+  // contain characters that are invalid in a URL fragment, so it is reduced to
+  // id-safe characters.
+  const instanceId = useId().replace(/[^a-zA-Z0-9_-]/gu, '');
+  const plotClipId = `candle-plot-${instanceId}`;
+
+  const formatPrice = (value: number | null | undefined) =>
+    formatChartPrice(value, currencyCode, displayPriceDecimals);
 
   const yForPrice = useMemo(() => {
     const { minY, range } = geometry;
@@ -96,7 +133,7 @@ export default function CandlestickChartRenderer({
         const x = candleXCenter(
           padding.left,
           slotWidth,
-          candle.index - startIndex,
+          leadingEmptySlots + candle.index - startIndex,
         );
         const color = candle.bullish ? UP_COLOR : DOWN_COLOR;
         const openY = yForPrice(candle.open);
@@ -124,7 +161,15 @@ export default function CandlestickChartRenderer({
           </G>
         );
       }),
-    [candles, padding.left, slotWidth, startIndex, bodyWidth, yForPrice],
+    [
+      candles,
+      padding.left,
+      slotWidth,
+      startIndex,
+      leadingEmptySlots,
+      bodyWidth,
+      yForPrice,
+    ],
   );
 
   const gridNodes = useMemo(() => {
@@ -143,12 +188,19 @@ export default function CandlestickChartRenderer({
             strokeWidth={1}
           />
           <SvgText x={rightEdgeX + 4} y={y + 3} fontSize={9} fill={AXIS_TEXT_COLOR}>
-            {formatCurrency(value, currencyCode)}
+            {formatChartPrice(value, currencyCode, displayPriceDecimals)}
           </SvgText>
         </G>
       );
     });
-  }, [geometry, yForPrice, padding.left, rightEdgeX, currencyCode]);
+  }, [
+    geometry,
+    yForPrice,
+    padding.left,
+    rightEdgeX,
+    currencyCode,
+    displayPriceDecimals,
+  ]);
 
   const crosshairCandle =
     crosshair != null
@@ -156,7 +208,11 @@ export default function CandlestickChartRenderer({
       : undefined;
   const crosshairX =
     crosshair != null
-      ? candleXCenter(padding.left, slotWidth, crosshair.index - startIndex)
+      ? candleXCenter(
+          padding.left,
+          slotWidth,
+          leadingEmptySlots + crosshair.index - startIndex,
+        )
       : 0;
   const crosshairPrice =
     crosshair != null
@@ -177,8 +233,25 @@ export default function CandlestickChartRenderer({
   return (
     <View style={styles.container}>
       <Svg width="100%" height={geometry.height}>
+        <Defs>
+          <ClipPath id={plotClipId}>
+            <Rect
+              x={padding.left}
+              y={padding.top}
+              width={innerWidth}
+              height={innerHeight}
+            />
+          </ClipPath>
+        </Defs>
+
         {gridNodes}
-        {candleNodes}
+        {/*
+          Only the candle layer is clipped: the render buffer deliberately draws
+          a couple of candles past each edge so a pan never shows a blank strip,
+          and without this they would spill over the right price axis. Axis text
+          and the price labels stay OUTSIDE the clip so they remain visible.
+        */}
+        <G clipPath={`url(#${plotClipId})`}>{candleNodes}</G>
 
         {showCurrentPrice && currentPriceY !== null ? (
           <G>
@@ -206,7 +279,7 @@ export default function CandlestickChartRenderer({
               fontWeight="bold"
               fill="#ffffff"
             >
-              {formatMoney(currentPrice, currencyCode)}
+              {formatPrice(currentPrice)}
             </SvgText>
           </G>
         ) : null}
@@ -246,7 +319,7 @@ export default function CandlestickChartRenderer({
               fontWeight="bold"
               fill="#ffffff"
             >
-              {formatMoney(crosshairPrice, currencyCode)}
+              {formatPrice(crosshairPrice)}
             </SvgText>
             <Rect
               x={Math.max(

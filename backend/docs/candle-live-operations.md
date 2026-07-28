@@ -431,8 +431,9 @@ returned. Files (`frontend/src/components/charts/`):
 | File | Role |
 | --- | --- |
 | `candlestickViewport.ts` | Pure viewport math: `{visibleCount, rightOffset}`, clamps, index ranges, pan/zoom/focal-point, data-change adjustment |
-| `candlestickLayout.ts` | Pure pixel geometry: slot/body width for the current zoom, x ↔ visible-offset mapping |
-| `candlestickGesturePolicy.ts` | Pure gesture policy shared by both adapters: horizontal-pan intent, wheel intent (zoom/pan/page-scroll), wheel & pinch scale bounds |
+| `candlestickLayout.ts` | Pure pixel geometry: slot/body width for the current zoom, leading empty slots, x → slot → original candle index |
+| `candlestickPriceFormat.ts` | The ONE chart price formatter (axis, current price, crosshair, accessibility) — honors the asset's `displayPriceDecimals` |
+| `candlestickGesturePolicy.ts` | Pure gesture policy shared by both adapters: horizontal-pan intent, wheel intent (zoom/pan/page-scroll), wheel & pinch scale bounds, crosshair session state machine |
 | `CandlestickChartRenderer.tsx` | The ONE SVG renderer (grid, candles, axes, current-price line, crosshair) — never duplicated per platform |
 | `CandlestickGestures.native.tsx` | RNGH adapter: pinch, horizontal pan, long-press crosshair |
 | `CandlestickGestures.web.tsx` | DOM adapter: mouse drag pan, hover crosshair, ctrl/cmd+wheel zoom |
@@ -444,9 +445,29 @@ per platform (verified in the exported bundles).
 
 Policy:
 
-- **Default density.** Every timeframe opens on the latest `60` candles
-  (`MIN 20 / DEFAULT 60 / MAX 180`); a data set smaller than 60 shows all of
-  it. 5m and 1w therefore have the same candle width for the same chart width.
+- **Default density.** `visibleCount` counts SCREEN SLOTS, not candles, and is
+  independent of how much data exists: every timeframe opens on 60 slots
+  (`MIN 20 / DEFAULT 60 / MAX 180`), so 5m and 1w have exactly the same candle
+  width for the same chart width. Only an empty data set collapses it to 0.
+- **Short data sets are right-aligned.** With fewer candles than slots the
+  shortfall becomes EMPTY slots on the left
+  (`computeLeadingEmptySlots(visibleCount, endIndex - startIndex)`) and the
+  newest candle keeps the right edge — 12 candles render at the normal width,
+  not as 12 fat ones. `getVisibleIndexRange` still returns REAL data indices
+  only, and `originalCandleIndexForX` snaps a pointer over an empty slot to the
+  first real candle, so the crosshair can never address a candle that does not
+  exist. Panning is impossible while everything fits (`rightOffset` stays 0).
+- **Price precision.** Y-axis labels, the current-price label, the crosshair
+  price and the accessibility summary all go through `formatChartPrice`, which
+  takes the asset's `displayPriceDecimals` (the same value the detail header
+  prices with) — a DOGE chart shows `$0.24560`, not `$0.25`. The chart receives
+  it as the `displayPriceDecimals` prop from `AssetDetailScreen`. Display only:
+  formatted strings never re-enter price math.
+- **Clipping.** The candle layer (wicks + bodies) is wrapped in a `<G>` with a
+  per-instance `clipPath` covering the plot rect, so the 2-candle render buffer
+  cannot spill over the right price axis. The clip id is derived from React's
+  `useId`, so several charts on one page never share it. Axis text, the
+  current-price label and the crosshair labels stay outside the clip.
 - **Zoom changes `visibleCount`**, never an SVG `scaleX` — axis text is never
   scaled. Zoom is anchored at the pinch/wheel focal point, so the candle under
   the fingers keeps its position and zooming inside history does not jump to
@@ -454,11 +475,16 @@ Policy:
 - **Pan** converts `translationX / slotWidth` into whole candles against a
   snapshot taken at gesture start (no accumulated float drift) and stops at
   both data edges.
-- **Mobile gestures**: two-finger pinch = zoom; one-finger horizontal drag =
-  pan (`activeOffsetX` + `failOffsetY`, so vertical swipes stay with the
-  detail screen's ScrollView); ~300ms long press = crosshair, scrubbed through
-  a manually-activated pan so vertical scrubbing works without stealing normal
-  vertical scrolls. No inertia/fling/rubber-band in this version.
+- **Mobile gestures**: two-finger pinch = zoom (it ends crosshair mode first);
+  one-finger horizontal drag = pan (`activeOffsetX` + `failOffsetY`, so
+  vertical swipes stay with the detail screen's ScrollView); ~300ms long press
+  = crosshair, scrubbed through a manually-activated pan so vertical scrubbing
+  works without stealing normal vertical scrolls. Crosshair mode is a shared
+  `createCrosshairSession` state machine and BOTH the long press and the
+  crosshair pan finalize it, so lifting the finger always clears it — including
+  a hold that never moved (which the pan never sees) and a cancelled/failed
+  recognizer. `end()` is idempotent, so the doubled finalize reports one
+  gesture end. No inertia/fling/rubber-band in this version.
 - **Web gestures**: left-drag pans (crosshair suppressed during the drag),
   hover shows the crosshair, ctrl/cmd + wheel (also what a trackpad pinch
   reports) zooms at the pointer, shift/horizontal wheel pans, and a plain
@@ -483,11 +509,13 @@ Policy:
   later only means growing that array — the viewport/slice split already keeps
   that separate.
 
-Native gesture packages (`react-native-gesture-handler`,
-`react-native-reanimated`, `react-native-worklets`) were added via
-`npx expo install`, `babel.config.js` now carries `react-native-worklets/plugin`,
-and `GestureHandlerRootView` wraps the app root once in `App.tsx`. A dev-client
-rebuild is required for native devices; Expo web needs no extra setup.
+`react-native-gesture-handler` is the only native gesture package, and
+`GestureHandlerRootView` wraps the app root once in `App.tsx`. Every gesture
+callback is `runOnJS(true)`, so there are no worklets:
+`react-native-reanimated` / `react-native-worklets` were removed along with the
+`react-native-worklets/plugin` Babel entry (`babel.config.js` is now the plain
+Expo preset). A dev-client rebuild is still required whenever the native module
+set changes; Expo web needs no extra setup.
 
 ## Release fixture smoke
 

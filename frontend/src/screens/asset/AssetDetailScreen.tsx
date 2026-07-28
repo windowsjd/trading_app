@@ -62,15 +62,6 @@ function isPriceAvailable(price?: AssetDetailPriceDto | null) {
   return price?.state === "available" && !!price.currentPrice;
 }
 
-function getDisplayChangeRate(
-  tickerChangeRate?: string | null,
-  detailChangeRate?: string | null,
-) {
-  return typeof tickerChangeRate === "string"
-    ? tickerChangeRate
-    : (detailChangeRate ?? null);
-}
-
 export default function AssetDetailScreen({ route, navigation }: Props) {
   const rootNavigation = useRootNavigation();
   const { assetId } = route.params;
@@ -176,10 +167,10 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
   const displayPriceKrwState = displayPrice.priceKrwState;
   const displayPriceSource = displayPrice.priceSource;
   const displayFxRateSource = displayPrice.fxRateSource;
-  const displayChangeRate = getDisplayChangeRate(
-    latestTicker?.changeRate,
-    price?.changeRate,
-  );
+  // Same basis as every other price field: a realtime ticker without a change
+  // rate shows no change rate — the older REST one never fills in next to a
+  // newer realtime price.
+  const displayChangeRate = displayPrice.changeRate;
   const displayCapturedAt = displayPrice.priceCapturedAt;
   const displayEffectiveAt = displayPrice.priceEffectiveAt;
   const displayFreshnessAgeSeconds = displayPrice.freshnessAgeSeconds;
@@ -435,6 +426,7 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
             <CandlestickChart
               candles={chartCandles}
               currencyCode={displayPriceCurrency}
+              displayPriceDecimals={displayPriceDecimals}
               currentPrice={latestTicker?.priceLocal ?? null}
               emptyMessage="가격 추이를 표시하려면 데이터가 더 필요합니다."
               viewportResetKey={`${assetId}:${selectedTimeframe.interval}`}

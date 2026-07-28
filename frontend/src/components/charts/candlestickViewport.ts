@@ -3,9 +3,17 @@
 // covers every rule the gestures depend on.
 //
 // The viewport is a window over the ALREADY LOADED candle array:
-//   visibleCount — how many candles fill the chart width,
+//   visibleCount — how many SLOTS fill the chart width,
 //   rightOffset  — how many candles the window sits back from the newest one
 //                  (0 = latest candle is the rightmost one on screen).
+//
+// `visibleCount` counts SCREEN SLOTS, not candles, and is deliberately
+// independent of how much data exists: a 5m chart with 40 candles and a 1w
+// chart with 600 both open at 60 slots, so a candle is the same width on every
+// timeframe. When fewer candles than slots are loaded, the missing ones stay
+// EMPTY on the LEFT and the newest candle keeps the right edge (see
+// `computeLeadingEmptySlots` in candlestickLayout.ts).
+//
 // Panning/zooming never leaves the loaded range: this module knows nothing
 // about fetching more history, which keeps that a future addition rather than
 // a hidden dependency.
@@ -38,9 +46,9 @@ function safeTotal(totalCount: number): number {
 }
 
 /**
- * Visible-count bounds for a data set: never more candles than exist, never
- * below the zoom-in floor, never above the zoom-out ceiling. With fewer than
- * MIN_VISIBLE_CANDLES loaded, the whole (small) set is the only legal window.
+ * Slot-count bounds: the zoom-in floor and the zoom-out ceiling, NOT the amount
+ * of data. A short data set keeps the default slot width and simply leaves the
+ * left slots empty — only a completely empty data set collapses the viewport.
  */
 export function clampVisibleCount(
   visibleCount: number,
@@ -48,10 +56,8 @@ export function clampVisibleCount(
 ): number {
   const total = safeTotal(totalCount);
   if (total === 0) return 0;
-  const max = Math.min(MAX_VISIBLE_CANDLES, total);
-  const min = Math.min(MIN_VISIBLE_CANDLES, total);
-  if (!Number.isFinite(visibleCount)) return Math.min(max, DEFAULT_VISIBLE_CANDLES);
-  return clamp(Math.round(visibleCount), min, max);
+  if (!Number.isFinite(visibleCount)) return DEFAULT_VISIBLE_CANDLES;
+  return clamp(Math.round(visibleCount), MIN_VISIBLE_CANDLES, MAX_VISIBLE_CANDLES);
 }
 
 /** Keeps the window inside the data: 0 = latest, max = oldest. */
@@ -67,7 +73,11 @@ export function clampRightOffset(
   return clamp(Math.round(rightOffset), 0, max);
 }
 
-/** Latest data, default density (or everything when fewer candles exist). */
+/**
+ * Latest data at the default density. The slot count is the SAME for every
+ * timeframe (60) even when fewer candles are loaded — those charts render
+ * right-aligned with empty leading slots instead of fat candles.
+ */
 export function createDefaultViewport(totalCount: number): CandleViewport {
   const visibleCount = clampVisibleCount(DEFAULT_VISIBLE_CANDLES, totalCount);
   return { visibleCount, rightOffset: 0 };
@@ -94,6 +104,11 @@ export function clampViewport(
   };
 }
 
+/**
+ * REAL data indices on screen. With fewer candles than slots this returns the
+ * whole data set (0 → totalCount); the leftover slots are empty space, never
+ * fake indices.
+ */
 export function getVisibleIndexRange(
   totalCount: number,
   viewport: CandleViewport,
