@@ -32,6 +32,7 @@ import type { ParsedAssetCandlesQuery } from './asset-candles.service';
 import { CandleDatabaseLoader } from './candle-database.loader';
 import { CandleReadPlanBuilder } from './candle-read-plan.builder';
 import { CandleResponseBuilder } from './candle-response.builder';
+import { resolveRequiredFiveMinuteSlotEndMs } from './candle-expected-slots.policy';
 import { MarketCandleAggregationService } from './market-candle-aggregation.service';
 import type { CandleServingConfig } from './candle-serving.config';
 
@@ -135,16 +136,23 @@ describe('chart windows over a stored 5m fixture', () => {
 
   type StoredRow = ReturnType<typeof storedRow>;
 
+  /**
+   * The rows a market really stores for one session. KRX stops at the last
+   * continuous-trading slot (15:15): 15:20–15:30 is the closing single-price
+   * auction, which produces no 5m candle at all, so fabricating those two
+   * rows would hide the very regression these fixtures guard.
+   */
   const sessionRows = (
     market: 'KRX' | 'US',
     localDate: string,
   ): StoredRow[] => {
     const session = resolveMarketSession(market, localDate);
     if (!session) return [];
+    const endMs = resolveRequiredFiveMinuteSlotEndMs(session);
     const rows: StoredRow[] = [];
     for (
       let openMs = session.openTime.getTime();
-      openMs < session.closeTime.getTime();
+      openMs < endMs;
       openMs += FIVE_MIN
     ) {
       rows.push(storedRow(new Date(openMs)));
@@ -255,6 +263,67 @@ describe('chart windows over a stored 5m fixture', () => {
     expect(Math.min(...times)).toBeGreaterThanOrEqual(
       request.rangeStartAt!.getTime(),
     );
+  });
+
+  it('keeps the KRX afternoon 4h bucket that ends in the closing auction', async () => {
+    const now = new Date('2026-07-10T07:00:00.000Z'); // after the KRX close
+    const rows = localDates('Asia/Seoul', now, 31).flatMap((date) =>
+      sessionRows('KRX', date),
+    );
+    const { loader } = createLoader(rows);
+    const request = query('30d', '4h', 200, now, 30);
+
+    const result = await loader.load(asset(AssetType.domestic_stock), request);
+    const candles = result.response!.data.candles;
+
+    // Regression: the 13:00–15:30 bucket used to demand 30 constituents
+    // (13:00 … 15:25). The 15:20/15:25 auction slots never exist, so every
+    // afternoon bucket was judged incomplete and dropped — taking the fully
+    // formed 13:00–15:20 data off the chart with it.
+    expect(result.droppedIncompleteBuckets).toBe(0);
+    expect(result.state).toBe('available');
+
+    const afternoon = candles.filter(
+      (candle) => Date.parse(candle.time) % DAY_MS === 4 * 60 * 60_000,
+    );
+    expect(afternoon.length).toBe(candles.length / 2);
+    expect(
+      candles.some(
+        (candle) => candle.time === '2026-07-09T04:00:00.000Z', // 13:00 KST
+      ),
+    ).toBe(true);
+  });
+
+  it('serves the KRX 3d/15m chart down to the 15:15 closing slot', async () => {
+    const now = new Date('2026-07-10T07:00:00.000Z');
+    const rows = localDates('Asia/Seoul', now, 4).flatMap((date) =>
+      sessionRows('KRX', date),
+    );
+    const { loader, plans } = createLoader(rows);
+    const request = query('3d', '15m', 288, now, 3);
+    const stockAsset = asset(AssetType.domestic_stock);
+
+    const plan = plans.build(stockAsset, request);
+    expect(plan).toMatchObject({
+      sourceInterval: '5m',
+      requiresAggregation: true,
+      managedByPersistence: true,
+    });
+
+    const result = await loader.load(stockAsset, request, plan);
+    const candles = result.response!.data.candles;
+
+    expect(result.state).toBe('available');
+    expect(result.droppedIncompleteBuckets).toBe(0);
+    // Three calendar days back from a Friday covers Wed/Thu/Fri sessions.
+    expect(tradingDays(candles, 'Asia/Seoul').size).toBe(3);
+    // 26 fifteen-minute buckets per session; the last opens at 15:15 KST and
+    // needs only its single 15:15 constituent.
+    expect(candles.length).toBe(3 * 26);
+    expect(
+      candles.some((candle) => candle.time === '2026-07-10T06:15:00.000Z'),
+    ).toBe(true);
+    expect(result.response!.data.source.requestedCount).toBe(288);
   });
 
   it('serves a US 30d/4h chart across many trading days', async () => {

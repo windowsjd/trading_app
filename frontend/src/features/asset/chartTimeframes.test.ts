@@ -20,10 +20,12 @@ const INTERVAL_MINUTES: Record<string, number> = {
 };
 
 // Worst-case window length per range (crypto trades 24/7): prev_open ≈ 2 days,
-// prev2_open ≈ 3 days, 14d = 14 days, 30d = 30 days, 1y = 366 days.
+// prev2_open ≈ 3 days, 3d = 3 days, 14d = 14 days, 30d = 30 days,
+// 1y = 366 days.
 const RANGE_WORST_CASE_DAYS: Record<string, number> = {
   prev_open: 2,
   prev2_open: 3,
+  '3d': 3,
   '14d': 14,
   '30d': 30,
   '1y': 366,
@@ -59,7 +61,7 @@ test('range and limit policy matches the backend candle windows', () => {
     })),
     [
       { interval: '5m', range: 'prev_open', limit: 600 },
-      { interval: '15m', range: 'prev_open', limit: 200 },
+      { interval: '15m', range: '3d', limit: 288 },
       { interval: '30m', range: '14d', limit: 672 },
       { interval: '1h', range: '14d', limit: 336 },
       { interval: '4h', range: '30d', limit: 200 },
@@ -116,6 +118,16 @@ test('30m and 1h show the last 14 days at the crypto upper-bound limit', () => {
   assert.deepEqual(
     { range: hourly?.range, limit: hourly?.limit },
     { range: '14d', limit: 336 },
+  );
+});
+
+test('15m shows the last 3 days from the request clock', () => {
+  const fifteen = ASSET_CHART_TIMEFRAMES.find((tab) => tab.interval === '15m');
+  // 3 days x 96 fifteen-minute candles is the crypto upper bound; stocks
+  // return fewer (regular session only), which is expected, not truncation.
+  assert.deepEqual(
+    { range: fifteen?.range, limit: fifteen?.limit },
+    { range: '3d', limit: 288 },
   );
 });
 

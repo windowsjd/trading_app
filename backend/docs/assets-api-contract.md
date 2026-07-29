@@ -293,10 +293,12 @@ Trading note policy:
 - `interval` optional. Default is `5m`.
   - Allowed for all asset candle types: `1m`, `5m`, `15m`, `30m`, `1h`, `4h`, `1d`, `1w`.
 - `range` optional. Default is `1d`.
-  - Allowed: `1d`, `7d`, `14d`, `30d`, `prev_open`, `prev2_open`, `1y`, `season`.
-  - `1d` / `7d` / `14d` / `30d` / `1y` are rolling windows: exactly N x 24h
-    before the request clock up to the request clock. `14d` is the window the
-    `30m` and `1h` chart tabs request; `30d` is what `4h` requests.
+  - Allowed: `1d`, `3d`, `7d`, `14d`, `30d`, `prev_open`, `prev2_open`, `1y`,
+    `season`.
+  - `1d` / `3d` / `7d` / `14d` / `30d` / `1y` are rolling windows: exactly
+    N x 24h before the request clock up to the request clock. `3d` is the
+    window the `15m` chart tab requests; `14d` is what `30m` and `1h` request;
+    `30d` is what `4h` requests.
   - `prev_open` / `prev2_open` anchor at the previous (or second previous) real
     market session open, `season` at the current season start.
   - Every interval is allowed for every range; unknown values are
@@ -306,8 +308,8 @@ Trading note policy:
   - Must be a positive integer.
   - Values greater than `1000` (the Binance single-call cap) are clamped to
     `1000`; per-provider caps clamp lower when a provider call is made. The
-    chart tabs send `672` (`14d`/`30m`), `336` (`14d`/`1h`) and `200`
-    (`30d`/`4h`), and a database answer echoes the requested value in
+    chart tabs send `288` (`3d`/`15m`), `672` (`14d`/`30m`), `336` (`14d`/`1h`)
+    and `200` (`30d`/`4h`), and a database answer echoes the requested value in
     `source.requestedCount`.
 - `date` optional `YYYY-MM-DD`.
   - When present for crypto, Binance receives UTC `startTime` at that date's start and `endTime` at that date's end unless `to` is provided.

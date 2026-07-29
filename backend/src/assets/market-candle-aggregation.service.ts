@@ -2,6 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { AssetType, Prisma } from '../generated/prisma/client';
 import { resolveMarketSession } from '../orders/market-calendar.policy';
 import { getZonedParts } from '../providers/kis/candles/kis-candle-time';
+import {
+  countRequiredFiveMinuteSlots,
+  resolveRequiredFiveMinuteSlotEndMs,
+} from './candle-expected-slots.policy';
 import { MarketCandlesRepository } from './market-candles.repository';
 
 export const MARKET_CANDLE_AGGREGATION_INTERVALS = [
@@ -58,7 +62,14 @@ export type AggregatedMarketCandle = {
   amount: Prisma.Decimal | null;
   isClosed: boolean;
   sourceUpdatedAt: Date;
+  /**
+   * 5m slots this bucket is EXPECTED to contain — not simply its span / 5m.
+   * Slots a market never trades continuously in are excluded (see
+   * `candle-expected-slots.policy`): the KRX 15:20/15:25 closing-auction slots
+   * produce no 5m candle, so the 13:00–15:30 four-hour bucket expects 28.
+   */
   expectedConstituentCount: number;
+  /** Every stored constituent, including non-required auction-window slots. */
   actualConstituentCount: number;
   gapCount: number;
   complete: boolean;
@@ -96,6 +107,12 @@ export class MarketCandleAggregationInputError extends Error {
  * isClosed=false rather than being promoted to a normal closed candle, and
  * the in-progress current bucket (isCurrent=true) is likewise open. Full-day
  * holidays have no bucket, so absence is preserved instead of synthesized.
+ *
+ * "Expected" means slots the market actually trades continuously in, not the
+ * bucket span divided by five minutes: the KRX closing single-price auction
+ * (15:20–15:30) produces no 5m candle at all, so requiring those slots made
+ * every KRX bucket touching the close permanently incomplete and dropped the
+ * fully formed 13:00–15:20 data with them. See `candle-expected-slots.policy`.
  */
 @Injectable()
 export class MarketCandleAggregationService {
@@ -219,7 +236,16 @@ export class MarketCandleAggregationService {
 
     const expected = window.expectedConstituentCount;
     const actual = ordered.length;
-    const complete = actual >= expected;
+    // Completeness counts only the REQUIRED slots that are present. Rows in a
+    // non-required slot (a KRX auction-window candle, if one ever exists) are
+    // aggregated into the OHLCV above but must not mask a missing required
+    // slot by padding the total back up to `expected`.
+    const requiredPresent = ordered.reduce(
+      (count, row) =>
+        row.openTime.getTime() < window.requiredSlotEndMs ? count + 1 : count,
+      0,
+    );
+    const complete = requiredPresent >= expected;
     const nowMs = now.getTime();
     const isCurrent = nowMs >= window.startMs && nowMs < window.endMs;
     return {
@@ -238,7 +264,7 @@ export class MarketCandleAggregationService {
       sourceUpdatedAt,
       expectedConstituentCount: expected,
       actualConstituentCount: actual,
-      gapCount: Math.max(0, expected - actual),
+      gapCount: Math.max(0, expected - requiredPresent),
       complete,
       isCurrent,
     };
@@ -261,6 +287,8 @@ export class MarketCandleAggregationService {
         startMs,
         endMs: startMs + sizeMs,
         expectedConstituentCount: bucketMinutes / 5,
+        // Crypto trades continuously: every slot in the bucket is required.
+        requiredSlotEndMs: startMs + sizeMs,
       };
     }
 
@@ -294,7 +322,12 @@ export class MarketCandleAggregationService {
     return {
       startMs,
       endMs,
-      expectedConstituentCount: (endMs - startMs) / FIVE_MINUTES_MS,
+      expectedConstituentCount: countRequiredFiveMinuteSlots(
+        session,
+        startMs,
+        endMs,
+      ),
+      requiredSlotEndMs: resolveRequiredFiveMinuteSlotEndMs(session),
     };
   }
 
@@ -322,6 +355,11 @@ type BucketWindow = {
   startMs: number;
   endMs: number;
   expectedConstituentCount: number;
+  /**
+   * Exclusive upper bound of 5m openTimes that count toward completeness.
+   * Equals `endMs` everywhere except the KRX closing-auction window.
+   */
+  requiredSlotEndMs: number;
 };
 
 function toDecimal(value: Prisma.Decimal | string): Prisma.Decimal {

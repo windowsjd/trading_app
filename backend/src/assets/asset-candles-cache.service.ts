@@ -496,6 +496,7 @@ function isCandleCacheProgrammerError(error: unknown): boolean {
 
 const CANDLE_RANGES = new Set([
   '1d',
+  '3d',
   '7d',
   '14d',
   '30d',

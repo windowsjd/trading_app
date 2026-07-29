@@ -75,9 +75,10 @@ candles: a timeframe with only 12 candles draws them at the normal width
 against the right edge with empty slots on the left. Prices on the chart use
 `displayPriceDecimals`, so pass it from the screen — see `formatChartPrice`.
 
-Timeframe windows (`features/asset/chartTimeframes.ts`): `5m`/`15m` use
-`prev_open`, `30m` and `1h` use `14d` (limit 672 / 336), `4h` uses `30d`
-(limit 200), `1d`/`1w` use `1y`. The backend aggregates 15m–4h from its stored
+Timeframe windows (`features/asset/chartTimeframes.ts`): `5m` uses
+`prev_open`, `15m` uses `3d` (limit 288 — the market-open anchor gave stocks
+barely a session and a half), `30m` and `1h` use `14d` (limit 672 / 336), `4h`
+uses `30d` (limit 200), `1d`/`1w` use `1y`. The backend aggregates 15m–4h from its stored
 5m feed (35-day retention); the limits are the crypto 24/7 upper bounds, so
 stocks legitimately return fewer candles. While that stored baseline is still
 being seeded the API answers `ASSET_CANDLES_BASELINE_NOT_READY` and the detail

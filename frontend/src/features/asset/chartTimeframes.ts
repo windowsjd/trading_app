@@ -5,6 +5,7 @@
 //   - 'prev_open'  = previous regular market open → now
 //                    (KRX 09:00 KST / US 09:30 ET / crypto 09:00 KST anchor)
 //   - 'prev2_open' = two market days back, regular open → now
+//   - '3d'         = rolling 3 days → now
 //   - '14d'        = rolling 14 days → now
 //   - '30d'        = rolling 30 days → now
 //   - '1y'         = rolling 365 days → now (Binance max window; KIS returns
@@ -20,6 +21,7 @@
 
 export type AssetCandleRange =
   | '1d'
+  | '3d'
   | '7d'
   | '14d'
   | '30d'
@@ -51,8 +53,10 @@ export type AssetChartTimeframe = {
 export const ASSET_CHART_TIMEFRAMES: AssetChartTimeframe[] = [
   // ~2 days × 288 5m-candles/day = 576
   { label: '5m', interval: '5m', range: 'prev_open', limit: 600 },
-  // ~2 days × 96 = 192
-  { label: '15m', interval: '15m', range: 'prev_open', limit: 200 },
+  // 3 days × 96 = 288 (crypto upper bound). A rolling 3-day window rather than
+  // 'prev_open': the market-open anchor gave stocks barely a session and a
+  // half, which is too short to read a 15m chart.
+  { label: '15m', interval: '15m', range: '3d', limit: 288 },
   // 14 days × 48 = 672 (crypto upper bound)
   { label: '30m', interval: '30m', range: '14d', limit: 672 },
   // 14 days × 24 = 336 (crypto upper bound)

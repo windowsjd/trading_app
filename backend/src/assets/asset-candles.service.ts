@@ -37,12 +37,13 @@ export type AssetCandlesQuery = {
 
 // 'prev_open'  = previous real market-session open → now
 // 'prev2_open' = second previous real market-session open → now
-// '7d'/'14d'/'30d'/'1y' = rolling N days → now
+// '3d'/'7d'/'14d'/'30d'/'1y' = rolling N days → now
 // Exported (type-only) so the candle response cache can key on and store the
 // exact HTTP response shape without duplicating these definitions. This does
 // not change the response shape or the provider call flow.
 export type CandleRange =
   | '1d'
+  | '3d'
   | '7d'
   | '14d'
   | '30d'
@@ -215,6 +216,7 @@ const CANDLE_INTERVAL_ERROR_MESSAGE =
 
 const DEFAULT_INTERVAL_BY_RANGE: Record<CandleRange, CandleInterval> = {
   '1d': '5m',
+  '3d': '15m',
   '7d': '1h',
   '14d': '1h',
   '30d': '1d',
@@ -239,6 +241,7 @@ type RollingCandleRange = Exclude<
 >;
 const ROLLING_RANGE_DURATION_MS: Record<RollingCandleRange, number> = {
   '1d': DAY_MS,
+  '3d': 3 * DAY_MS,
   '7d': 7 * DAY_MS,
   '14d': 14 * DAY_MS,
   '30d': 30 * DAY_MS,
@@ -269,6 +272,7 @@ const CANDLE_INTERVALS: Record<CandleInterval, true> = {
 
 const CANDLE_RANGES: Record<CandleRange, true> = {
   '1d': true,
+  '3d': true,
   '7d': true,
   '14d': true,
   '30d': true,
@@ -283,6 +287,7 @@ const RANGE_INTERVALS: Record<
   Readonly<Record<CandleInterval, true>>
 > = {
   '1d': CANDLE_INTERVALS,
+  '3d': CANDLE_INTERVALS,
   '7d': CANDLE_INTERVALS,
   '14d': CANDLE_INTERVALS,
   '30d': CANDLE_INTERVALS,
@@ -1264,7 +1269,7 @@ export class AssetCandlesService {
     this.throwApiError(
       HttpStatus.BAD_REQUEST,
       'ASSET_CANDLES_INVALID_RANGE',
-      'range must be one of 1d, 7d, 14d, 30d, prev_open, prev2_open, 1y, or season.',
+      'range must be one of 1d, 3d, 7d, 14d, 30d, prev_open, prev2_open, 1y, or season.',
     );
   }
 

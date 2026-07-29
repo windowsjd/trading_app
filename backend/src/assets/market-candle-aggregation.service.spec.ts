@@ -89,9 +89,14 @@ describe('MarketCandleAggregationService', () => {
         now,
       });
       expect(thirty.candles).toHaveLength(13);
+      // Every bucket expects 6 except the last (15:00–15:30), whose 15:20 and
+      // 15:25 slots fall in the closing single-price auction.
       expect(
-        thirty.candles.every((bucket) => bucket.expectedConstituentCount === 6),
+        thirty.candles
+          .slice(0, 12)
+          .every((bucket) => bucket.expectedConstituentCount === 6),
       ).toBe(true);
+      expect(thirty.candles[12].expectedConstituentCount).toBe(4);
     });
 
     it('anchors 1h/4h buckets at a CUSTOM delayed open and rejects pre-open rows', () => {
@@ -125,11 +130,13 @@ describe('MarketCandleAggregationService', () => {
         expect(hourly.candles[0].openTime.toISOString()).toBe(
           '2026-07-10T01:30:00.000Z',
         );
+        // 14:30–15:30 is the only bucket touching the closing auction.
         expect(
-          hourly.candles.every(
-            (bucket) => bucket.expectedConstituentCount === 12,
-          ),
+          hourly.candles
+            .slice(0, 4)
+            .every((bucket) => bucket.expectedConstituentCount === 12),
         ).toBe(true);
+        expect(hourly.candles[4].expectedConstituentCount).toBe(10);
 
         const fourHour = service.aggregateCandles({
           assetType: AssetType.domestic_stock,
@@ -182,7 +189,8 @@ describe('MarketCandleAggregationService', () => {
       // 15:00–15:30 KST bucket: expected 6, closeTime capped at 15:30 KST.
       expect(last.openTime.toISOString()).toBe('2026-07-10T06:00:00.000Z');
       expect(last.closeTime.toISOString()).toBe('2026-07-10T06:30:00.000Z');
-      expect(last.expectedConstituentCount).toBe(6);
+      // Spans 6 grid slots but expects 4: 15:20/15:25 are auction slots.
+      expect(last.expectedConstituentCount).toBe(4);
       expect(last.complete).toBe(true);
       expect(last.isClosed).toBe(true);
     });
@@ -203,8 +211,12 @@ describe('MarketCandleAggregationService', () => {
       expect(first.expectedConstituentCount).toBe(48);
       expect(second.openTime.toISOString()).toBe('2026-07-10T04:00:00.000Z');
       expect(second.closeTime.toISOString()).toBe('2026-07-10T06:30:00.000Z');
-      expect(second.expectedConstituentCount).toBe(30);
-      // volume: 30 constituents * 10; amount: 30 * 1010.
+      // 13:00–15:30 spans 30 grid slots and expects 28 (13:00 … 15:15).
+      expect(second.expectedConstituentCount).toBe(28);
+      // This fixture is synthetic and does carry 15:20/15:25 rows: they are
+      // still aggregated (30 constituents * 10 volume, * 1010 amount) even
+      // though completeness never required them.
+      expect(second.actualConstituentCount).toBe(30);
       expect(second.volume.toFixed()).toBe('300');
       expect(second.amount?.toFixed()).toBe('30300');
     });
@@ -260,7 +272,109 @@ describe('MarketCandleAggregationService', () => {
       expect(fourHour.candles[1].closeTime.toISOString()).toBe(
         '2026-11-19T07:30:00.000Z',
       );
-      expect(fourHour.candles[1].expectedConstituentCount).toBe(30);
+      // The auction window follows the overridden 16:30 close, so 16:20 and
+      // 16:25 are the excluded slots here — not 15:20/15:25.
+      expect(fourHour.candles[1].expectedConstituentCount).toBe(28);
+    });
+
+    // Regression: what KIS actually delivers. The KRX closing single-price
+    // auction (15:20–15:30) has no continuous-trading minutes, so the domestic
+    // minute feed jumps from 15:19 straight to a single 15:30 auction print
+    // and the 5m builder's last candle of every day opens at 15:15. Requiring
+    // the 15:20/15:25 slots made every bucket touching the close incomplete,
+    // and the read path then dropped the whole afternoon bucket — including
+    // the fully formed 13:00–15:20 data.
+    const realSession = run('2026-07-10T00:00:00.000Z', 76); // 09:00–15:15 KST
+
+    it('completes every KRX bucket when the day ends at the 15:15 slot', () => {
+      for (const interval of ['15m', '30m', '1h', '4h'] as const) {
+        const result = service.aggregateCandles({
+          assetType: AssetType.domestic_stock,
+          interval,
+          candles: realSession,
+          from: dayFrom,
+          to: dayTo,
+          now,
+        });
+        expect(result.candles.length).toBeGreaterThan(0);
+        const gapped = result.candles.filter((bucket) => !bucket.complete);
+        expect(gapped.map((bucket) => bucket.openTime.toISOString())).toEqual(
+          [],
+        );
+        expect(
+          result.candles.every(
+            (bucket) => bucket.isClosed && bucket.gapCount === 0,
+          ),
+        ).toBe(true);
+      }
+    });
+
+    it('keeps the 13:00–15:30 four-hour bucket without the auction slots', () => {
+      const fourHour = service.aggregateCandles({
+        assetType: AssetType.domestic_stock,
+        interval: '4h',
+        candles: realSession,
+        from: dayFrom,
+        to: dayTo,
+        now,
+      });
+      const afternoon = fourHour.candles[1];
+      expect(afternoon.openTime.toISOString()).toBe('2026-07-10T04:00:00.000Z');
+      expect(afternoon.closeTime.toISOString()).toBe(
+        '2026-07-10T06:30:00.000Z',
+      );
+      expect(afternoon.expectedConstituentCount).toBe(28);
+      expect(afternoon.actualConstituentCount).toBe(28);
+      expect(afternoon.gapCount).toBe(0);
+      expect(afternoon.complete).toBe(true);
+      expect(afternoon.isClosed).toBe(true);
+    });
+
+    it('still reports a real hole next to the auction window', () => {
+      // Drop 15:15 (the last REQUIRED slot) but keep everything else: the
+      // exclusion must not become a blanket amnesty for the session tail.
+      const holed = realSession.filter(
+        (row) => row.openTime.toISOString() !== '2026-07-10T06:15:00.000Z',
+      );
+      const hourly = service.aggregateCandles({
+        assetType: AssetType.domestic_stock,
+        interval: '1h',
+        candles: holed,
+        from: dayFrom,
+        to: dayTo,
+        now,
+      });
+      const last = hourly.candles[hourly.candles.length - 1];
+      expect(last.openTime.toISOString()).toBe('2026-07-10T06:00:00.000Z');
+      expect(last.expectedConstituentCount).toBe(4);
+      expect(last.actualConstituentCount).toBe(3);
+      expect(last.gapCount).toBe(1);
+      expect(last.complete).toBe(false);
+      expect(last.isClosed).toBe(false);
+    });
+
+    it('does not let an auction-slot row mask a missing required slot', () => {
+      // 15:15 missing, 15:20 present: the totals match (4 rows in the bucket)
+      // but the required slot is still absent, so the bucket stays incomplete.
+      const swapped = [
+        ...realSession.filter(
+          (row) => row.openTime.toISOString() !== '2026-07-10T06:15:00.000Z',
+        ),
+        candle('2026-07-10T06:20:00.000Z'),
+      ];
+      const hourly = service.aggregateCandles({
+        assetType: AssetType.domestic_stock,
+        interval: '1h',
+        candles: swapped,
+        from: dayFrom,
+        to: dayTo,
+        now,
+      });
+      const last = hourly.candles[hourly.candles.length - 1];
+      expect(last.expectedConstituentCount).toBe(4);
+      expect(last.actualConstituentCount).toBe(4);
+      expect(last.gapCount).toBe(1);
+      expect(last.complete).toBe(false);
     });
 
     it('does not aggregate a KRX full-day holiday', () => {

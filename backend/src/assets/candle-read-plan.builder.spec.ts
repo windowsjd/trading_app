@@ -72,8 +72,9 @@ describe('CandleReadPlanBuilder', () => {
     );
   });
 
-  // The three chart tabs that must be owned by the database path.
+  // The four aggregated chart tabs that must be owned by the database path.
   it.each([
+    ['15m', '3d', 3, 288] as const,
     ['30m', '14d', 14, 672] as const,
     ['1h', '14d', 14, 336] as const,
     ['4h', '30d', 30, 200] as const,

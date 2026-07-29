@@ -44,6 +44,8 @@ The persisted intervals remain `5m`, `1d`, and `1w`. Current `15m`, `30m`, `1h`,
 
 Stock sessions come only from the shared market-calendar policy: the regular defaults are KRX 09:00-15:30 `Asia/Seoul` and US 09:30-16:00 `America/New_York`, while holiday, delayed-open, early-close, and delayed-close overrides replace those defaults. Crypto remains continuous UTC. Pre-market/after-hours trades are rejected from stock candles, and a full-day holiday never creates or copies a candle.
 
+**The KRX session is open longer than it trades continuously.** The last 10 minutes (15:20-15:30 on a regular day) are the closing single-price auction: orders are accepted, but they match in one auction at the close, so there are no continuous-trading prints. KIS's domestic minute feed shows this directly — it returns 15:15…15:19 and then jumps to a single 15:30 auction row — and `KisDomesticFiveMinuteBuilder` consequently makes 15:15 the last 5m candle of every trading day (76 per full session, not 78). The session window itself stays 09:00-15:30 because order matching genuinely runs until the close; only aggregation completeness excludes the auction slots (`candle-expected-slots.policy.ts`). The 15:30 auction print falls on the session-close boundary and is counted in the builder's `rejectedBuckets`, so a small non-zero `rejectedBuckets` on domestic syncs is expected, not a defect.
+
 ## Ownership, state, and recovery
 
 Each provider shard has one Redis lease owner. Only that owner opens the provider socket. Lease renewal is token-checked; loss closes the socket, stops processing, and prevents old-generation Lua updates/finalization. A separate renewed finalizer lease permits only one instance to scan/write due buckets while still checking the provider generation lease before each finalization. Gateway instances only consume Redis Pub/Sub and never create per-user provider subscriptions.
@@ -246,7 +248,7 @@ coverage evidence still fails.
 | Chart tab | range | limit | source | window |
 | --- | --- | --- | --- | --- |
 | `5m` | `prev_open` | 600 | stored `5m` | ~2 sessions |
-| `15m` | `prev_open` | 200 | aggregated from stored `5m` | ~2 sessions |
+| `15m` | `3d` | 288 | aggregated from stored `5m` | rolling 3 days |
 | `30m` | `14d` | 672 | aggregated from stored `5m` | rolling 14 days |
 | `1h` | `14d` | 336 | aggregated from stored `5m` | rolling 14 days |
 | `4h` | `30d` | 200 | aggregated from stored `5m` | rolling 30 days |
@@ -254,11 +256,16 @@ coverage evidence still fails.
 | `1w` | `1y` | 60 | stored `1w` | rolling 365 days |
 
 Stored `5m` retention is 35 days (`MARKET_CANDLE_5M_RETENTION_DAYS`), which
-holds both the 14-day and the 30-day window including the 4h source padding
+holds the 3-day, 14-day and 30-day windows including the 4h source padding
 (`30d + 4h < 35d`), so those requests stay `managedByPersistence=true`. The
-`30m`/`1h` limits are the crypto (24/7) upper bounds — 14 × 48 and 14 × 24;
-stocks legitimately return fewer because they only trade during the regular
-session. No 15m/30m/1h/4h table exists and none should be added.
+`15m`/`30m`/`1h` limits are the crypto (24/7) upper bounds — 3 × 96, 14 × 48
+and 14 × 24; stocks legitimately return fewer because they only trade during
+the regular session. No 15m/30m/1h/4h table exists and none should be added.
+
+`15m` uses the rolling `3d` window rather than the `prev_open` market-open
+anchor: `prev_open` gave stocks roughly one and a half sessions, which is too
+short to read a 15m chart. `5m` keeps `prev_open` — a 3-day 5m window would be
+864 crypto candles, past what one chart usefully draws.
 
 **Coverage evidence is the UNION of coverage-audited checkpoints**
 (`findCandleCoverage`). One run can never keep a 14-day window covered up to
@@ -294,6 +301,14 @@ cannot answer at all falls through to `ASSET_CANDLES_BASELINE_NOT_READY`
 `cold_baseline_partial_window` (baseline not seeded yet),
 `coverage_unconfirmed` (the sync could not claim coverage — e.g. KIS
 `data_incomplete`), `incomplete_buckets_dropped` (a real 5m hole).
+
+`incomplete_buckets_dropped` on a KRX chart used to be routine rather than
+exceptional: every bucket touching the close (the 13:00-15:30 4h bucket, the
+15:00-15:30 30m/1h buckets, the 15:15 15m bucket) demanded the 15:20/15:25
+auction slots that never exist, so the fully formed afternoon data was dropped
+from every domestic chart. Expected constituents now exclude the auction
+window, so this reason should again mean a genuine hole in the stored 5m feed
+— investigate the sync rather than the aggregation when it appears.
 
 **A KIS `data_incomplete` segment no longer stops the sweep.** The domestic
 minute feed routinely leaves a few unusable minutes in the newest segment

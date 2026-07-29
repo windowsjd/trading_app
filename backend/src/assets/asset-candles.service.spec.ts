@@ -1398,6 +1398,8 @@ describe('AssetCandlesService', () => {
 
   it.each([
     ['1d', '5m', Date.parse('2026-06-18T03:00:00.000Z')],
+    // The 15m chart tab: exactly 3 x 24h before the clock.
+    ['3d', '15m', Date.parse('2026-06-16T03:00:00.000Z')],
     ['7d', '1h', Date.parse('2026-06-12T03:00:00.000Z')],
     // Exactly 14 x 24h before the clock — NOT the 1y fall-through the old
     // if-chain produced for unrecognized ranges.
