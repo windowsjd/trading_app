@@ -7,7 +7,9 @@ import { fileURLToPath } from 'node:url';
 import {
   CANDLE_BASELINE_NOT_READY_CODE,
   CANDLE_BASELINE_NOT_READY_MESSAGE,
+  describeCandleError,
   getApiErrorCode,
+  getApiErrorStatus,
   isCandleBaselineNotReadyError,
 } from './candleErrors.ts';
 
@@ -56,6 +58,37 @@ describe('candle baseline-not-ready classification', () => {
   });
 });
 
+describe('describeCandleError (what the chart area says)', () => {
+  it('keeps the preparing state for a baseline error', () => {
+    const view = describeCandleError(apiError(CANDLE_BASELINE_NOT_READY_CODE));
+    assert.equal(view.kind, 'baseline_preparing');
+    assert.equal(view.title, CANDLE_BASELINE_NOT_READY_MESSAGE);
+  });
+
+  it('shows a real failure AS a failure, with the backend error code', () => {
+    // Hiding this behind a loading skeleton is what made an outage look like
+    // a slow request and hid the reason.
+    const view = describeCandleError(
+      apiError('ASSET_CANDLES_PROVIDER_UNAVAILABLE'),
+    );
+    assert.equal(view.kind, 'failed');
+    assert.equal(view.title, '차트를 불러오지 못했습니다.');
+    assert.ok(view.message.includes('ASSET_CANDLES_PROVIDER_UNAVAILABLE'));
+  });
+
+  it('falls back to the HTTP status, then to a network hint', () => {
+    const statusOnly = describeCandleError({ response: { status: 502 } });
+    assert.equal(statusOnly.kind, 'failed');
+    assert.ok(statusOnly.message.includes('502'));
+    assert.equal(getApiErrorStatus({ response: { status: 502 } }), 502);
+
+    const networkError = describeCandleError(new Error('Network Error'));
+    assert.equal(networkError.kind, 'failed');
+    assert.ok(networkError.message.includes('네트워크'));
+    assert.equal(getApiErrorStatus(new Error('x')), null);
+  });
+});
+
 describe('asset detail screen wiring', () => {
   // No React renderer in this test runner (node --test over .ts), so the
   // screen's use of the preparing state is asserted against its source.
@@ -69,11 +102,13 @@ describe('asset detail screen wiring', () => {
 
   it('shows the preparing state for a baseline error and keeps the retry button', () => {
     assert.ok(
-      screenSource.includes('isCandleBaselineNotReadyError(candlesQuery.error)'),
-      'the chart error branch classifies the baseline error',
+      screenSource.includes('describeCandleError(candlesQuery.error)'),
+      'the chart error branch describes the actual error',
     );
-    assert.ok(screenSource.includes('CANDLE_BASELINE_NOT_READY_MESSAGE'));
-    assert.ok(screenSource.includes('CANDLE_BASELINE_NOT_READY_HELPER'));
+    assert.ok(
+      !/candlesQuery\.isError[\s\S]{0,400}<SectionSkeleton/.test(screenSource),
+      'a failed candle request must not render as a loading skeleton',
+    );
     assert.ok(
       screenSource.includes('TEST_IDS.assetDetail.chartRetry'),
       'retry stays available in the baseline state',

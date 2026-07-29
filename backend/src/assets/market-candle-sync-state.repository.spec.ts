@@ -515,7 +515,7 @@ describe('MarketCandleSyncStateRepository', () => {
     });
   });
 
-  describe('findCompletedCoverageUnion', () => {
+  describe('findCandleCoverage', () => {
     const range = (fromIso: string, toIso: string, completedIso = toIso) => ({
       coveredFrom: new Date(fromIso),
       coveredTo: new Date(toIso),
@@ -525,7 +525,7 @@ describe('MarketCandleSyncStateRepository', () => {
     it('queries only coverage-audited checkpoints that overlap the range', async () => {
       const { repository, delegate } = createRepository();
       delegate.findMany.mockResolvedValue([]);
-      await repository.findCompletedCoverageUnion(
+      await repository.findCandleCoverage(
         'asset-1',
         '5m',
         new Date('2026-07-01T00:00:00Z'),
@@ -553,75 +553,96 @@ describe('MarketCandleSyncStateRepository', () => {
         range('2026-07-13T23:00:00Z', '2026-07-15T00:10:00Z'),
       ]);
       await expect(
-        repository.findCompletedCoverageUnion(
+        repository.findCandleCoverage(
           'asset-1',
           '5m',
           new Date('2026-07-01T00:00:00Z'),
           new Date('2026-07-15T00:00:00Z'),
         ),
       ).resolves.toEqual({
-        covered: true,
+        startsAtRequestedFrom: true,
+        // Clamped at the requested end, never past it.
+        contiguousCoveredTo: new Date('2026-07-15T00:00:00Z'),
         newestCompletedAt: new Date('2026-07-15T00:10:00Z'),
+        hasInteriorGap: false,
       });
     });
 
-    it('reports NOT covered when a hole remains between checkpoints', async () => {
+    it('reports how far coverage reaches when only the recent TAIL is missing', async () => {
+      // The everyday case: the last incremental sync finished at 21:00 and the
+      // chart is requested at 21:01. The history is confirmed; only the last
+      // minute is not. This must NOT read as "no baseline".
+      const { repository, delegate } = createRepository();
+      delegate.findMany.mockResolvedValue([
+        range('2026-06-10T00:00:00Z', '2026-07-14T21:00:00Z'),
+      ]);
+      await expect(
+        repository.findCandleCoverage(
+          'asset-1',
+          '5m',
+          new Date('2026-07-01T00:00:00Z'),
+          new Date('2026-07-14T21:01:00Z'),
+        ),
+      ).resolves.toEqual({
+        startsAtRequestedFrom: true,
+        contiguousCoveredTo: new Date('2026-07-14T21:00:00Z'),
+        newestCompletedAt: new Date('2026-07-14T21:00:00Z'),
+        hasInteriorGap: false,
+      });
+    });
+
+    it('flags an INTERIOR hole separately from a missing tail', async () => {
       const { repository, delegate } = createRepository();
       delegate.findMany.mockResolvedValue([
         range('2026-06-10T00:00:00Z', '2026-07-05T00:00:00Z'),
-        // 2 hours missing here — a gap the chart must not treat as covered.
+        // 2 hours missing here, then coverage resumes: a real hole.
         range('2026-07-05T02:00:00Z', '2026-07-15T00:00:00Z'),
       ]);
       await expect(
-        repository.findCompletedCoverageUnion(
+        repository.findCandleCoverage(
           'asset-1',
           '5m',
           new Date('2026-07-01T00:00:00Z'),
           new Date('2026-07-15T00:00:00Z'),
         ),
-      ).resolves.toEqual({ covered: false, newestCompletedAt: null });
+      ).resolves.toEqual({
+        startsAtRequestedFrom: true,
+        contiguousCoveredTo: new Date('2026-07-05T00:00:00Z'),
+        newestCompletedAt: new Date('2026-07-05T00:00:00Z'),
+        hasInteriorGap: true,
+      });
     });
 
-    it('reports NOT covered when the union stops short of the requested end', async () => {
-      const { repository, delegate } = createRepository();
-      delegate.findMany.mockResolvedValue([
-        range('2026-06-10T00:00:00Z', '2026-07-14T00:00:00Z'),
-      ]);
-      await expect(
-        repository.findCompletedCoverageUnion(
-          'asset-1',
-          '5m',
-          new Date('2026-07-01T00:00:00Z'),
-          new Date('2026-07-15T00:00:00Z'),
-        ),
-      ).resolves.toEqual({ covered: false, newestCompletedAt: null });
-    });
-
-    it('reports NOT covered when the range starts before the oldest coverage', async () => {
+    it('reports no coverage when it does not start at the requested from', async () => {
       const { repository, delegate } = createRepository();
       delegate.findMany.mockResolvedValue([
         range('2026-07-02T00:00:00Z', '2026-07-15T00:00:00Z'),
       ]);
       await expect(
-        repository.findCompletedCoverageUnion(
+        repository.findCandleCoverage(
           'asset-1',
           '5m',
           new Date('2026-07-01T00:00:00Z'),
           new Date('2026-07-15T00:00:00Z'),
         ),
-      ).resolves.toEqual({ covered: false, newestCompletedAt: null });
+      ).resolves.toEqual({
+        startsAtRequestedFrom: false,
+        contiguousCoveredTo: null,
+        newestCompletedAt: null,
+        hasInteriorGap: false,
+      });
     });
 
     it('rejects an empty or inverted range without querying', async () => {
       const { repository, delegate } = createRepository();
       await expect(
-        repository.findCompletedCoverageUnion(
+        repository.findCandleCoverage(
           'asset-1',
           '5m',
           new Date('2026-07-15T00:00:00Z'),
           new Date('2026-07-15T00:00:00Z'),
         ),
-      ).resolves.toEqual({ covered: false, newestCompletedAt: null });
+      ).resolves.toMatchObject({ startsAtRequestedFrom: false });
       expect(delegate.findMany).not.toHaveBeenCalled();
     });
   });

@@ -1451,10 +1451,11 @@ describe('MarketCandleSyncService', () => {
       expect(row.coveredTo).toBeNull();
     });
 
-    it('terminates on an incomplete middle segment without bridging the hole via min/max merge', async () => {
-      // Segments sweep newest-first. If the run continued past an
-      // incomplete segment, the next (older) segment's coverage would merge
-      // with the newer coverage by min/max and silently bridge the hole.
+    it('keeps sweeping past an incomplete middle segment but never bridges the hole', async () => {
+      // Segments sweep newest-first. The sweep CONTINUES past an incomplete
+      // segment so the store still gets the older history a chart draws, but
+      // the run's confirmed range is sealed at the hole — the min/max merge
+      // must not bridge it with the older segment's coverage.
       const harness = createHarness({ assets: [DOMESTIC_ASSET] });
       const to = new Date('2026-07-10T00:00:00Z');
       const from = new Date(to.getTime() - 6 * DAY); // 3 x 2-day segments
@@ -1483,6 +1484,9 @@ describe('MarketCandleSyncService', () => {
         )
         .mockImplementationOnce((input: { from: Date; to: Date }) =>
           Promise.resolve(segment(input, false)),
+        )
+        .mockImplementationOnce((input: { from: Date; to: Date }) =>
+          Promise.resolve(segment(input, true)),
         );
       const result = await harness.service.syncAsset({
         assetId: DOMESTIC_ASSET.id,
@@ -1495,15 +1499,15 @@ describe('MarketCandleSyncService', () => {
       const feed = result.feeds[0];
       expect(feed.status).toBe('completed');
       expect(feed.coverageComplete).toBe(false);
-      expect(feed.completionReason).not.toBe('target_reached');
-      // The run stopped at the incomplete segment; no older segment was
-      // fetched past the hole.
+      expect(feed.completionReason).toBe('data_incomplete');
+      // All three segments were fetched: the oldest history is stored even
+      // though the middle segment has a hole.
       expect(
         harness.fiveMinuteIngestion.fetchDomesticFiveMinuteCandles,
-      ).toHaveBeenCalledTimes(2);
-      // Coverage retains only the fully complete newest segment [to-2d, to);
-      // the incomplete segment [to-4d, to-2d) is NOT inside the covered
-      // range.
+      ).toHaveBeenCalledTimes(3);
+      // Coverage still retains ONLY the fully complete newest segment
+      // [to-2d, to). Neither the incomplete segment nor the complete segment
+      // BEHIND it may extend the confirmed range.
       const row = harness.stateRepository.rows[0];
       expect(row.coveredFrom?.getTime()).toBe(to.getTime() - 2 * DAY);
       expect(row.coveredTo?.getTime()).toBe(to.getTime());

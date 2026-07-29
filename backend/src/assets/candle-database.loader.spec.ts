@@ -102,9 +102,11 @@ describe('CandleDatabaseLoader', () => {
     const plans = { build: jest.fn().mockReturnValue(plan) };
     const repository = { findRange: jest.fn().mockResolvedValue([]) };
     const states = {
-      findCompletedCoverageUnion: jest.fn().mockResolvedValue({
-        covered: true,
+      findCandleCoverage: jest.fn().mockResolvedValue({
+        startsAtRequestedFrom: true,
+        contiguousCoveredTo: now,
         newestCompletedAt: new Date('2026-07-13T00:19:30Z'),
+        hasInteriorGap: false,
       }),
       findLatestOverlapping: jest
         .fn()
@@ -136,6 +138,7 @@ describe('CandleDatabaseLoader', () => {
         maxManagedFiveMinuteRangeMs: 35 * 86_400_000,
         maxManagedPeriodRangeMs: 365 * 86_400_000,
         maxOnDemandRepairRangeMs: 2 * 86_400_000,
+        coverageTailToleranceMs: 86_400_000,
       },
     );
     return { loader, repository, states, aggregation, responses };
@@ -163,9 +166,11 @@ describe('CandleDatabaseLoader', () => {
     await expect(loader.load(asset, query, plan)).resolves.toMatchObject({
       state: 'confirmed_empty',
     });
-    states.findCompletedCoverageUnion.mockResolvedValue({
-      covered: false,
+    states.findCandleCoverage.mockResolvedValue({
+      startsAtRequestedFrom: false,
+      contiguousCoveredTo: null,
       newestCompletedAt: null,
+      hasInteriorGap: false,
     });
     states.findLatestOverlapping.mockResolvedValue(null);
     await expect(loader.load(asset, query, plan)).resolves.toMatchObject({
@@ -197,7 +202,7 @@ describe('CandleDatabaseLoader', () => {
     await loader.load(asset, query, futurePlan);
     // A checkpoint can only confirm candles that exist; requiring coverage
     // beyond `now` would make current-day requests permanently uncoverable.
-    expect(states.findCompletedCoverageUnion).toHaveBeenCalledWith(
+    expect(states.findCandleCoverage).toHaveBeenCalledWith(
       asset.id,
       '5m',
       futurePlan.sourceRange.from,
@@ -210,9 +215,11 @@ describe('CandleDatabaseLoader', () => {
     repository.findRange.mockResolvedValue([candle(0), candle(5)]);
     // A legacy `completed` checkpoint without coverage audit no longer
     // matches the coverage union, so it reports covered=false.
-    states.findCompletedCoverageUnion.mockResolvedValue({
-      covered: false,
+    states.findCandleCoverage.mockResolvedValue({
+      startsAtRequestedFrom: false,
+      contiguousCoveredTo: null,
       newestCompletedAt: null,
+      hasInteriorGap: false,
     });
     states.findLatestOverlapping.mockResolvedValue({
       status: MarketCandleSyncStatus.completed,
@@ -234,9 +241,11 @@ describe('CandleDatabaseLoader', () => {
     // with holes must surface as incomplete — never available.
     const { loader, repository, states } = create();
     repository.findRange.mockResolvedValue([candle(0), candle(10)]);
-    states.findCompletedCoverageUnion.mockResolvedValue({
-      covered: false,
+    states.findCandleCoverage.mockResolvedValue({
+      startsAtRequestedFrom: false,
+      contiguousCoveredTo: null,
       newestCompletedAt: null,
+      hasInteriorGap: false,
     });
     states.findLatestOverlapping.mockResolvedValue({
       status: MarketCandleSyncStatus.completed,
@@ -259,9 +268,11 @@ describe('CandleDatabaseLoader', () => {
 
   it('never reports confirmed_empty without coverage-complete evidence', async () => {
     const { loader, states } = create();
-    states.findCompletedCoverageUnion.mockResolvedValue({
-      covered: false,
+    states.findCandleCoverage.mockResolvedValue({
+      startsAtRequestedFrom: false,
+      contiguousCoveredTo: null,
       newestCompletedAt: null,
+      hasInteriorGap: false,
     });
     states.findLatestOverlapping.mockResolvedValue({
       status: MarketCandleSyncStatus.completed,
@@ -269,6 +280,98 @@ describe('CandleDatabaseLoader', () => {
     await expect(loader.load(asset, query, plan)).resolves.toMatchObject({
       state: 'missing',
       completedCoverage: false,
+    });
+  });
+
+  describe('coverage classification', () => {
+    const coverage = (
+      overrides: Partial<{
+        startsAtRequestedFrom: boolean;
+        contiguousCoveredTo: Date | null;
+        newestCompletedAt: Date | null;
+        hasInteriorGap: boolean;
+      }> = {},
+    ) => ({
+      startsAtRequestedFrom: true,
+      contiguousCoveredTo: now,
+      newestCompletedAt: new Date('2026-07-13T00:19:30Z'),
+      hasInteriorGap: false,
+      ...overrides,
+    });
+
+    it('is complete when confirmed coverage reaches the clock', async () => {
+      const { loader, repository } = create();
+      repository.findRange.mockResolvedValue([candle(0)]);
+      await expect(loader.load(asset, query, plan)).resolves.toMatchObject({
+        coverageStatus: 'complete',
+        completedCoverage: true,
+        state: 'available',
+      });
+    });
+
+    it('serves a stale TAIL: history confirmed, last minutes not re-synced', async () => {
+      // The everyday case between incremental syncs. It must stay servable —
+      // demanding coverage exactly to the request clock made every long
+      // window fail one minute after a sync.
+      const { loader, repository, states } = create();
+      repository.findRange.mockResolvedValue([candle(0), candle(5)]);
+      states.findCandleCoverage.mockResolvedValue(
+        coverage({ contiguousCoveredTo: new Date(now.getTime() - 60_000) }),
+      );
+      await expect(loader.load(asset, query, plan)).resolves.toMatchObject({
+        coverageStatus: 'stale_tail',
+        completedCoverage: false,
+        state: 'available',
+        storedCandleCount: 2,
+      });
+    });
+
+    it('is insufficient when the tail lags beyond the tolerance', async () => {
+      const { loader, repository, states } = create();
+      repository.findRange.mockResolvedValue([candle(0)]);
+      states.findCandleCoverage.mockResolvedValue(
+        coverage({
+          contiguousCoveredTo: new Date(now.getTime() - 3 * 86_400_000),
+        }),
+      );
+      await expect(loader.load(asset, query, plan)).resolves.toMatchObject({
+        coverageStatus: 'insufficient',
+        state: 'incomplete',
+      });
+    });
+
+    it('never tolerates an interior hole, however recent', async () => {
+      const { loader, repository, states } = create();
+      repository.findRange.mockResolvedValue([candle(0)]);
+      states.findCandleCoverage.mockResolvedValue(
+        coverage({
+          contiguousCoveredTo: new Date(now.getTime() - 60_000),
+          hasInteriorGap: true,
+        }),
+      );
+      await expect(loader.load(asset, query, plan)).resolves.toMatchObject({
+        coverageStatus: 'insufficient',
+        hasCoverageInteriorGap: true,
+        state: 'incomplete',
+      });
+    });
+
+    it('reports how many usable candles the store produced', async () => {
+      const { loader, repository, states } = create();
+      repository.findRange.mockResolvedValue([
+        candle(0),
+        candle(5),
+        candle(10),
+      ]);
+      states.findCandleCoverage.mockResolvedValue(
+        coverage({ startsAtRequestedFrom: false, contiguousCoveredTo: null }),
+      );
+      // limit is 2 in this fixture, so the newest two survive.
+      await expect(loader.load(asset, query, plan)).resolves.toMatchObject({
+        coverageStatus: 'insufficient',
+        storedCandleCount: 2,
+        state: 'incomplete',
+      });
     });
   });
 

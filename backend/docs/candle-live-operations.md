@@ -261,12 +261,50 @@ stocks legitimately return fewer because they only trade during the regular
 session. No 15m/30m/1h/4h table exists and none should be added.
 
 **Coverage evidence is the UNION of coverage-audited checkpoints**
-(`findCompletedCoverageUnion`). One run can never keep a 14-day window
-covered up to "now": the seeded baseline confirms `[now-35d, its finish time)`
-and each later incremental run confirms its own tail. Rows are merged only
-when they are individually `status=completed` + `coverageComplete=true` with a
-well-formed `[coveredFrom, coveredTo)`; one hole between them means "not
-covered".
+(`findCandleCoverage`). One run can never keep a 14-day window covered up to
+"now": the seeded baseline confirms `[now-35d, its finish time)` and each
+later incremental run confirms its own tail. Rows are merged only when they
+are individually `status=completed` + `coverageComplete=true` with a
+well-formed `[coveredFrom, coveredTo)`.
+
+The result is NOT a boolean, because "the history is confirmed but the last
+minute has not been re-confirmed" and "there is a hole in the middle" are
+different situations. It reports `startsAtRequestedFrom`,
+`contiguousCoveredTo`, `hasInteriorGap` and `newestCompletedAt`, which the
+loader turns into a status:
+
+| Status | Meaning | Effect |
+| --- | --- | --- |
+| `complete` | confirmed from the requested start to the clock | `state=available`, no refresh needed |
+| `stale_tail` | history confirmed, tail behind by ≤ `CANDLE_SERVING_COVERAGE_TAIL_TOLERANCE_MS` (default 1 day) | still `available`; the tail is refreshed by the normal bounded sync |
+| `insufficient` | coverage does not start at the requested `from`, has an INTERIOR hole, or lags beyond the tolerance | `incomplete`; served as `database_partial` when candles exist |
+
+Without the tail tolerance a chart requested one minute after an incremental
+sync was judged "no baseline" and the whole window failed — the exact bug that
+made 30m/1h/4h return `ASSET_CANDLES_BASELINE_NOT_READY` in a dev environment
+that had just synced. An interior hole is never tolerated, however recent.
+
+**Unconfirmed coverage is not an empty screen.** Whenever the store yields
+usable candles the request is answered from them and logged as
+`{"state":"database_partial","reason":…}` with the coverage context. Every
+candle returned that way is a validated stored candle and incomplete buckets
+are still dropped; the window is simply shorter. Only a window the store
+cannot answer at all falls through to `ASSET_CANDLES_BASELINE_NOT_READY`
+(aggregated) or the provider-compatible error. Reasons seen in practice:
+`cold_baseline_partial_window` (baseline not seeded yet),
+`coverage_unconfirmed` (the sync could not claim coverage — e.g. KIS
+`data_incomplete`), `incomplete_buckets_dropped` (a real 5m hole).
+
+**A KIS `data_incomplete` segment no longer stops the sweep.** The domestic
+minute feed routinely leaves a few unusable minutes in the newest segment
+(the KRX 15:20–15:30 closing auction has no continuous-trading minutes at
+all). The sync used to terminate the whole run there, so the store kept only
+~2 days of history and a 14/30-day chart drew one or two candles. Now the
+sweep continues to the older segments — every candle is still individually
+validated — while the run SEALS its coverage claim at the hole
+(`MarketCandleFeedPage.coverageSealed`): no later page may extend
+`[coveredFrom, coveredTo)` past it, so the min/max merge can never bridge a
+hole and `coverageComplete` stays false.
 
 ### Seeding and keeping the baseline
 

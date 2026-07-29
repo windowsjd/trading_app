@@ -5,7 +5,10 @@ import type {
   ParsedAssetCandlesQuery,
 } from './asset-candles.service';
 import { MarketCandleAggregationService } from './market-candle-aggregation.service';
-import { MarketCandleSyncStateRepository } from './market-candle-sync-state.repository';
+import {
+  MarketCandleSyncStateRepository,
+  type CandleCoverageEvidence,
+} from './market-candle-sync-state.repository';
 import { MarketCandlesRepository } from './market-candles.repository';
 import {
   CandleReadPlanBuilder,
@@ -26,13 +29,31 @@ export type CandleDatabaseState =
   | 'available'
   | 'incomplete';
 
+/**
+ * How confirmed sync coverage relates to the requested window:
+ *  - `complete`     — confirmed from the requested start up to the clock;
+ *  - `stale_tail`   — the history is confirmed, only the recent tail (within
+ *                     `coverageTailToleranceMs`) has not been re-confirmed
+ *                     since the last sync. Normal between incremental runs;
+ *  - `insufficient` — coverage does not start at the requested `from`, has an
+ *                     interior hole, or lags far behind the clock.
+ */
+export type CandleCoverageStatus = 'complete' | 'stale_tail' | 'insufficient';
+
 export type CandleDatabaseLoadResult = {
   plan: CandleReadPlan;
   state: CandleDatabaseState;
   fresh: boolean;
+  /** True only for `complete` coverage (the strict, historical meaning). */
   completedCoverage: boolean;
+  coverageStatus: CandleCoverageStatus;
+  /** How far confirmed coverage reaches contiguously from the requested start. */
+  coveredTo: Date | null;
+  hasCoverageInteriorGap: boolean;
   hasBlockingCheckpoint: boolean;
   droppedIncompleteBuckets: number;
+  /** Usable candles the store actually produced for this window. */
+  storedCandleCount: number;
   response: ReturnType<CandleResponseBuilder['buildPersisted']> | null;
 };
 
@@ -59,8 +80,12 @@ export class CandleDatabaseLoader {
         state: 'missing',
         fresh: false,
         completedCoverage: false,
+        coverageStatus: 'insufficient',
+        coveredTo: null,
+        hasCoverageInteriorGap: false,
         hasBlockingCheckpoint: false,
         droppedIncompleteBuckets: 0,
+        storedCandleCount: 0,
         response: null,
       };
     }
@@ -78,13 +103,18 @@ export class CandleDatabaseLoader {
     );
     const [coverage, latestCheckpoint] = await Promise.all([
       coverageTo.getTime() > plan.sourceRange.from.getTime()
-        ? this.syncStates.findCompletedCoverageUnion(
+        ? this.syncStates.findCandleCoverage(
             plan.assetId,
             plan.sourceInterval,
             plan.sourceRange.from,
             coverageTo,
           )
-        : Promise.resolve({ covered: false, newestCompletedAt: null }),
+        : Promise.resolve<CandleCoverageEvidence>({
+            startsAtRequestedFrom: false,
+            contiguousCoveredTo: null,
+            newestCompletedAt: null,
+            hasInteriorGap: false,
+          }),
       this.syncStates.findLatestOverlapping(
         plan.assetId,
         plan.sourceInterval,
@@ -95,7 +125,8 @@ export class CandleDatabaseLoader {
     const hasBlockingCheckpoint =
       latestCheckpoint !== null &&
       latestCheckpoint.status !== MarketCandleSyncStatus.completed;
-    const completedCoverage = coverage.covered;
+    const coverageStatus = this.classifyCoverage(coverage, coverageTo);
+    const completedCoverage = coverageStatus === 'complete';
 
     let rows: PersistedResponseCandle[];
     let droppedIncompleteBuckets = 0;
@@ -148,19 +179,18 @@ export class CandleDatabaseLoader {
       plan,
       query.clock,
     );
+    // `available` still means "the store fully answers this request". A
+    // stale tail is NOT a hole: the history is confirmed and only the last
+    // stretch has not been re-confirmed since the previous sync, so it stays
+    // servable (the caller refreshes it because `fresh` is false).
+    const trustworthy =
+      (coverageStatus === 'complete' || coverageStatus === 'stale_tail') &&
+      !hasBlockingCheckpoint &&
+      droppedIncompleteBuckets === 0;
     let state: CandleDatabaseState;
     if (rows.length === 0) {
-      state =
-        completedCoverage &&
-        !hasBlockingCheckpoint &&
-        droppedIncompleteBuckets === 0
-          ? 'confirmed_empty'
-          : 'missing';
-    } else if (
-      completedCoverage &&
-      !hasBlockingCheckpoint &&
-      droppedIncompleteBuckets === 0
-    ) {
+      state = trustworthy && completedCoverage ? 'confirmed_empty' : 'missing';
+    } else if (trustworthy) {
       state = 'available';
     } else {
       state = 'incomplete';
@@ -171,10 +201,38 @@ export class CandleDatabaseLoader {
       state,
       fresh,
       completedCoverage,
+      coverageStatus,
+      coveredTo: coverage.contiguousCoveredTo,
+      hasCoverageInteriorGap: coverage.hasInteriorGap,
       hasBlockingCheckpoint,
       droppedIncompleteBuckets,
+      storedCandleCount: rows.length,
       response,
     };
+  }
+
+  /**
+   * Coverage classification. The tail tolerance exists because a checkpoint
+   * confirms coverage only up to its own finish time: one minute after an
+   * incremental sync the window is already "not confirmed to now", and
+   * demanding exact-to-the-clock coverage would make every long window
+   * permanently unservable between syncs.
+   */
+  private classifyCoverage(
+    coverage: CandleCoverageEvidence,
+    coverageTo: Date,
+  ): CandleCoverageStatus {
+    if (!coverage.startsAtRequestedFrom || !coverage.contiguousCoveredTo) {
+      return 'insufficient';
+    }
+    // A hole inside the window is never tolerated, however recent it is.
+    if (coverage.hasInteriorGap) return 'insufficient';
+    const missingTailMs =
+      coverageTo.getTime() - coverage.contiguousCoveredTo.getTime();
+    if (missingTailMs <= 0) return 'complete';
+    return missingTailMs <= this.config.coverageTailToleranceMs
+      ? 'stale_tail'
+      : 'insufficient';
   }
 
   private latest<T>(rows: readonly T[], limit: number): T[] {

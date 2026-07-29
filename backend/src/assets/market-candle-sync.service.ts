@@ -698,6 +698,9 @@ export class MarketCandleSyncService {
     let coveredFrom: Date | null = state.coveredFrom ?? null;
     let coveredTo: Date | null = state.coveredTo ?? null;
     let coverageComplete = false;
+    // Set once a page reports a hole in the stored data; from then on no page
+    // may extend the confirmed range (see MarketCandleFeedPage.coverageSealed).
+    let coverageSealed = false;
     let completionReason: MarketCandleSyncCompletionReason | null = null;
 
     while (true) {
@@ -807,10 +810,19 @@ export class MarketCandleSyncService {
         latestOpenTime = later(latestOpenTime, last);
       }
 
+      // A page that found a hole seals the run's coverage claim: everything
+      // fetched afterwards is still stored, but the confirmed range stops at
+      // the hole instead of being bridged by the min/max merge.
+      if (page.coverageSealed === true) coverageSealed = true;
+
       // Merge the page's provider-confirmed subrange into the run coverage.
       // Only ranges the provider positively swept are merged; abnormal pages
       // claim nothing.
-      if (page.coveredFrom !== null && page.coveredTo !== null) {
+      if (
+        !coverageSealed &&
+        page.coveredFrom !== null &&
+        page.coveredTo !== null
+      ) {
         coveredFrom =
           coveredFrom === null ||
           page.coveredFrom.getTime() < coveredFrom.getTime()
@@ -878,6 +890,7 @@ export class MarketCandleSyncService {
             options.now.getTime(),
           );
           coverageComplete =
+            !coverageSealed &&
             coveredFrom !== null &&
             coveredTo !== null &&
             coveredFrom.getTime() <= targetFrom.getTime() &&
@@ -889,10 +902,10 @@ export class MarketCandleSyncService {
             ? acceptedTotal > 0
               ? 'target_reached'
               : 'confirmed_empty'
-            : stopReason === 'empty_page'
-              ? 'empty_page_before_target'
-              : stopReason === 'data_incomplete'
-                ? 'data_incomplete'
+            : coverageSealed || stopReason === 'data_incomplete'
+              ? 'data_incomplete'
+              : stopReason === 'empty_page'
+                ? 'empty_page_before_target'
                 : 'provider_exhausted_before_target';
           await this.stateRepository.markCompleted(state.id, new Date(), {
             coverageComplete,
@@ -1317,18 +1330,29 @@ export class MarketCandleSyncService {
     // (accepted rows exist, and for the domestic builder incompleteBuckets
     // is zero). A target_reached sweep whose data is incomplete has holes at
     // unknown positions inside the segment, so it must not claim any covered
-    // range — and the run must terminate here: continuing to older segments
-    // would let the min/max coverage merge bridge right over the hole.
+    // range, and no LATER page may extend the run's range past it —
+    // `coverageSealed` enforces that instead of the min/max merge bridging
+    // the hole.
+    //
+    // The sweep itself CONTINUES to older segments: KIS routinely leaves a
+    // few unusable minutes in the newest segment, and stopping there left the
+    // store with ~2 days of history, which is what made 14/30-day charts show
+    // one or two candles. Fetching the rest fills the store with individually
+    // validated candles while the run still reports coverageComplete=false.
     // Partial candles already fetched are still written by the caller.
     if (result.stopReason === 'target_reached') {
       if (result.complete !== true) {
+        const reachedTargetFrom = segmentFrom.getTime() <= input.from.getTime();
         return {
           ...base,
-          nextCursor: null,
-          stopReason: 'data_incomplete',
+          nextCursor: reachedTargetFrom
+            ? null
+            : { segmentTo: segmentFrom.getTime() },
+          stopReason: reachedTargetFrom ? 'data_incomplete' : null,
           complete: false,
           coveredFrom: null,
           coveredTo: null,
+          coverageSealed: true,
         };
       }
       const reachedTargetFrom = segmentFrom.getTime() <= input.from.getTime();

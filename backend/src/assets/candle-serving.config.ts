@@ -11,6 +11,7 @@ export type CandleServingConfig = {
   maxManagedFiveMinuteRangeMs: number;
   maxManagedPeriodRangeMs: number;
   maxOnDemandRepairRangeMs: number;
+  coverageTailToleranceMs: number;
 };
 
 export const CANDLE_SERVING_CONFIG = Symbol('CANDLE_SERVING_CONFIG');
@@ -79,6 +80,17 @@ export function readCandleServingConfig(
       env,
       'CANDLE_SERVING_ON_DEMAND_REPAIR_MAX_RANGE_MS',
       2 * DAY_MS,
+    ),
+    // A checkpoint confirms coverage only up to its own finish time, so a
+    // window is "not confirmed to now" one minute after a sync completes.
+    // Within this tolerance the history still counts as covered and the
+    // recent tail is refreshed by the normal bounded sync instead of failing
+    // the whole request. Default: one day, which spans an overnight gap
+    // between operator/incremental syncs.
+    coverageTailToleranceMs: readPositiveInteger(
+      env,
+      'CANDLE_SERVING_COVERAGE_TAIL_TOLERANCE_MS',
+      DAY_MS,
     ),
   };
 }

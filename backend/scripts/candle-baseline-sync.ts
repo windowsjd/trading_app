@@ -37,8 +37,6 @@
  * and coverage timestamps; no credential or provider payload is logged.
  */
 import 'reflect-metadata';
-import { NestFactory } from '@nestjs/core';
-import { Module } from '@nestjs/common';
 
 import {
   formatDatabaseTarget,
@@ -48,11 +46,32 @@ import {
 
 loadRuntimeEnv();
 
-import { AssetsModule } from '../src/assets/assets.module';
-import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { RedisService } from '../src/redis/redis.service';
+import { readRedisConfig } from '../src/redis/redis.config';
+import { RedisLockService } from '../src/redis/redis-lock.service';
+import { AssetCandlesCacheService } from '../src/assets/asset-candles-cache.service';
+import { MarketCandlesRepository } from '../src/assets/market-candles.repository';
+import { MarketCandleBackfillLockService } from '../src/assets/market-candle-backfill-lock.service';
+import { MarketCandleIngestionService } from '../src/assets/market-candle-ingestion.service';
 import { MarketCandleSyncService } from '../src/assets/market-candle-sync.service';
+import { readMarketCandleSyncConfig } from '../src/assets/market-candle-sync.config';
 import { MarketCandleSyncStateRepository } from '../src/assets/market-candle-sync-state.repository';
+import { ProviderConfigService } from '../src/providers/provider-config.service';
+import { ProviderHttpClient } from '../src/providers/provider-http.client';
+import { BinancePublicClient } from '../src/providers/binance/binance-public.client';
+import { BinanceCandleIngestionService } from '../src/providers/binance/binance-candle.ingestion.service';
+import { KisRateLimiterService } from '../src/providers/kis/coordination/kis-rate-limiter.service';
+import { KisRequestCoordinatorService } from '../src/providers/kis/coordination/kis-request-coordinator.service';
+import { KisAuthClient } from '../src/providers/kis/kis-auth.client';
+import { KisQuoteClient } from '../src/providers/kis/kis-quote.client';
+import { KisDomesticMinuteAdapter } from '../src/providers/kis/candles/kis-domestic-minute.adapter';
+import { KisUsMinuteAdapter } from '../src/providers/kis/candles/kis-us-minute.adapter';
+import { KisCandleNormalizerService } from '../src/providers/kis/candles/kis-candle-normalizer.service';
+import { KisDomesticFiveMinuteBuilder } from '../src/providers/kis/candles/kis-domestic-five-minute.builder';
+import { KisDomesticPeriodAdapter } from '../src/providers/kis/candles/kis-domestic-period.adapter';
+import { KisOverseasPeriodAdapter } from '../src/providers/kis/candles/kis-overseas-period.adapter';
+import { KisPeriodCandleNormalizerService } from '../src/providers/kis/candles/kis-period-candle-normalizer.service';
 import {
   MarketCandleSyncMode,
   AssetType,
@@ -61,8 +80,45 @@ import {
 const DAY_MS = 24 * 60 * 60_000;
 const DEFAULT_BASELINE_DAYS = 35;
 
-@Module({ imports: [PrismaModule, AssetsModule] })
-class CandleBaselineSyncModule {}
+/**
+ * The sync dependencies, wired explicitly (the same objects the Nest module
+ * provides). This mirrors the release smoke harness: booting the whole
+ * application context here would also start the live-candle pipeline and the
+ * realtime sockets, which an operator command must not do.
+ */
+function createSyncService(prisma: PrismaService, redis: RedisService) {
+  const repository = new MarketCandlesRepository(prisma);
+  const cache = new AssetCandlesCacheService(redis);
+  const providerConfig = new ProviderConfigService();
+  const httpClient = new ProviderHttpClient();
+  const coordinator = new KisRequestCoordinatorService(
+    new KisRateLimiterService(redis),
+  );
+  const kisAuth = new KisAuthClient(providerConfig, coordinator);
+  const kisQuote = new KisQuoteClient(providerConfig, coordinator);
+  return new MarketCandleSyncService(
+    prisma,
+    repository,
+    new MarketCandleSyncStateRepository(prisma),
+    new MarketCandleBackfillLockService(new RedisLockService(redis)),
+    new MarketCandleIngestionService(
+      new KisDomesticMinuteAdapter(kisAuth, kisQuote, providerConfig),
+      new KisUsMinuteAdapter(kisAuth, kisQuote, providerConfig),
+      new KisCandleNormalizerService(),
+      new KisDomesticFiveMinuteBuilder(),
+      repository,
+      cache,
+    ),
+    new KisDomesticPeriodAdapter(kisAuth, kisQuote, providerConfig),
+    new KisOverseasPeriodAdapter(kisAuth, kisQuote, providerConfig),
+    new KisPeriodCandleNormalizerService(),
+    new BinanceCandleIngestionService(
+      new BinancePublicClient(providerConfig, httpClient),
+    ),
+    readMarketCandleSyncConfig(),
+    cache,
+  );
+}
 
 type Args = {
   report: boolean;
@@ -183,18 +239,23 @@ async function report(
   );
   for (const asset of assets) {
     // Same evidence the serving path uses (union of coverage-audited runs).
-    const coverage = await states.findCompletedCoverageUnion(
-      asset.id,
-      '5m',
-      from,
-      now,
-    );
-    if (coverage.covered) ready += 1;
+    const coverage = await states.findCandleCoverage(asset.id, '5m', from, now);
+    // "READY" = the chart path can trust the window: coverage starts at the
+    // requested start, has no interior hole, and is at most one day behind.
+    const ready5m =
+      coverage.startsAtRequestedFrom &&
+      !coverage.hasInteriorGap &&
+      coverage.contiguousCoveredTo !== null &&
+      now.getTime() - coverage.contiguousCoveredTo.getTime() <= DAY_MS;
+    if (ready5m) ready += 1;
     console.log(
       [
-        coverage.covered ? 'READY   ' : 'MISSING ',
+        ready5m ? 'READY   ' : 'MISSING ',
         asset.assetType.padEnd(15),
         asset.symbol.padEnd(10),
+        `startsAtFrom=${coverage.startsAtRequestedFrom}`,
+        `coveredTo=${iso(coverage.contiguousCoveredTo)}`,
+        `interiorGap=${coverage.hasInteriorGap}`,
         `lastCompletedAt=${iso(coverage.newestCompletedAt)}`,
       ].join(' '),
     );
@@ -235,17 +296,17 @@ async function main(): Promise<number> {
 
   // Syncing runs the real thing: provider clients, Redis backfill locks and
   // the checkpointed sync service, exactly as the Ops job does.
-  const app = await NestFactory.createApplicationContext(
-    CandleBaselineSyncModule,
-    { logger: ['error', 'warn'] },
-  );
+  const prisma = new PrismaService();
+  await prisma.$connect();
+  const redis = new RedisService(readRedisConfig());
+  const syncService = createSyncService(prisma, redis);
   try {
     const now = new Date();
     const from = new Date(now.getTime() - args.days * DAY_MS);
     console.log(
       `mode=${args.mode} dryRun=${!args.apply} window=${iso(from)} → ${iso(now)} feed=5m`,
     );
-    const summary = await app.get(MarketCandleSyncService).syncAssets({
+    const summary = await syncService.syncAssets({
       targets: ['5m'],
       mode: args.mode,
       // incremental resolves its own start from the newest stored candle; an
@@ -288,7 +349,8 @@ async function main(): Promise<number> {
     }
     return summary.failedFeeds > 0 ? 1 : 0;
   } finally {
-    await app.close();
+    await prisma.$disconnect();
+    await redis.onModuleDestroy();
   }
 }
 

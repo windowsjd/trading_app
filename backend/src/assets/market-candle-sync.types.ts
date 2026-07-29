@@ -100,6 +100,11 @@ export type MarketCandleFeedPage = {
   // terminations, budget stops, malformed responses).
   coveredFrom: Date | null;
   coveredTo: Date | null;
+  // The stored data inside this page has a hole (incomplete 5m buckets), so
+  // no LATER page may extend the run's confirmed range past it. The sweep may
+  // continue — the stored history is what charts draw — but the run can never
+  // claim coverage across the hole.
+  coverageSealed?: boolean;
 };
 
 export type MarketCandleFeedResult = {

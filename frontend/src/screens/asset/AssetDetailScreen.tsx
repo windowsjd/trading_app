@@ -25,11 +25,7 @@ import { toSeasonDomainState } from "../../features/season/mapper";
 import { useAssetTicker } from "../../features/asset/useAssetTicker";
 import { selectDisplayPrice } from "../../features/asset/displayPricePolicy";
 import { useAssetCandle } from "../../features/asset/useAssetCandle";
-import {
-  CANDLE_BASELINE_NOT_READY_HELPER,
-  CANDLE_BASELINE_NOT_READY_MESSAGE,
-  isCandleBaselineNotReadyError,
-} from "../../features/asset/candleErrors";
+import { describeCandleError } from "../../features/asset/candleErrors";
 import { mergeAssetCandleSnapshot } from "../../features/asset/liveCandle";
 import {
   formatTradingNote,
@@ -418,16 +414,13 @@ export default function AssetDetailScreen({ route, navigation }: Props) {
             <SectionSkeleton lines={5} />
           ) : candlesQuery.isError ? (
             <>
-              {/* The 5m baseline these candles are aggregated from is still
-                  being synced — a preparing state, not a chart failure. */}
-              {isCandleBaselineNotReadyError(candlesQuery.error) ? (
-                <InlineEmptyState
-                  title={CANDLE_BASELINE_NOT_READY_MESSAGE}
-                  message={CANDLE_BASELINE_NOT_READY_HELPER}
-                />
-              ) : (
-                <SectionSkeleton lines={4} />
-              )}
+              {/* A failed chart request must read as a failure with its
+                  reason, not as a loading skeleton. The one exception is the
+                  5m baseline still syncing, which is a "preparing" state. */}
+              <InlineEmptyState
+                title={describeCandleError(candlesQuery.error).title}
+                message={describeCandleError(candlesQuery.error).message}
+              />
               <Pressable
                 testID={TEST_IDS.assetDetail.chartRetry}
                 style={styles.retryButton}

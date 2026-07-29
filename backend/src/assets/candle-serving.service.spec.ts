@@ -130,16 +130,23 @@ describe('CandleServingService', () => {
     state: CandleDatabaseLoadResult['state'],
     value: AssetCandlesResponse | null,
     overrides: Partial<CandleDatabaseLoadResult> = {},
-  ): CandleDatabaseLoadResult => ({
-    plan,
-    state,
-    fresh: true,
-    completedCoverage: true,
-    hasBlockingCheckpoint: false,
-    droppedIncompleteBuckets: 0,
-    response: value,
-    ...overrides,
-  });
+  ): CandleDatabaseLoadResult => {
+    const completedCoverage = overrides.completedCoverage ?? true;
+    return {
+      plan,
+      state,
+      fresh: true,
+      completedCoverage,
+      coverageStatus: completedCoverage ? 'complete' : 'insufficient',
+      coveredTo: completedCoverage ? clock : null,
+      hasCoverageInteriorGap: false,
+      hasBlockingCheckpoint: false,
+      droppedIncompleteBuckets: 0,
+      storedCandleCount: value?.data.candles.length ?? 0,
+      response: value,
+      ...overrides,
+    };
+  };
 
   const create = (mode: 'legacy' | 'database' = 'database') => {
     const plans = { build: jest.fn().mockReturnValue(plan) };
@@ -169,6 +176,7 @@ describe('CandleServingService', () => {
         maxManagedFiveMinuteRangeMs: 35 * 86_400_000,
         maxManagedPeriodRangeMs: 365 * 86_400_000,
         maxOnDemandRepairRangeMs: 2 * 86_400_000,
+        coverageTailToleranceMs: 86_400_000,
       },
     );
     return { service, plans, database, cache, singleFlight, sync };
@@ -355,6 +363,110 @@ describe('CandleServingService', () => {
       },
     );
 
+    it('serves the stored window when coverage is unseeded but candles exist', async () => {
+      // The real dev-environment case: a 14-day request, no seeded baseline,
+      // but the store already holds a couple of days of validated 5m candles.
+      // A shorter chart beats an error screen; nothing is fabricated.
+      const { service, plans, database, sync } = create();
+      plans.build.mockReturnValue(aggregatedPlan('30m', 14));
+      database.load.mockResolvedValue(
+        load('incomplete', response('db-partial'), {
+          completedCoverage: false,
+          coverageStatus: 'insufficient',
+          coveredTo: null,
+          storedCandleCount: 96,
+        }),
+      );
+      const legacy = jest.fn();
+      await expect(
+        service.serve(asset, { ...query, interval: '30m' }, legacy),
+      ).resolves.toEqual(response('db-partial'));
+      expect(legacy).not.toHaveBeenCalled();
+      expect(sync.syncAsset).not.toHaveBeenCalled();
+    });
+
+    it('treats a stale TAIL as servable instead of a cold baseline', async () => {
+      // Coverage confirmed up to the last incremental sync, request one
+      // minute later. This must go through the managed path (refresh + DB),
+      // never the cold-baseline error.
+      const { service, plans, database, sync } = create();
+      plans.build.mockReturnValue(aggregatedPlan('4h', 30));
+      database.load.mockResolvedValue(
+        load('available', response('db-tail'), {
+          completedCoverage: false,
+          coverageStatus: 'stale_tail',
+          coveredTo: new Date(clock.getTime() - 60_000),
+          fresh: true,
+        }),
+      );
+      const legacy = jest.fn();
+      await expect(
+        service.serve(asset, { ...query, interval: '4h' }, legacy),
+      ).resolves.toEqual(response('db-tail'));
+      expect(legacy).not.toHaveBeenCalled();
+      expect(sync.syncAsset).not.toHaveBeenCalled();
+    });
+
+    it('still reports BASELINE_NOT_READY when the store has nothing to show', async () => {
+      const { service, plans, database } = create();
+      plans.build.mockReturnValue(aggregatedPlan('1h', 14));
+      database.load.mockResolvedValue(
+        load('missing', null, {
+          completedCoverage: false,
+          coverageStatus: 'insufficient',
+          storedCandleCount: 0,
+        }),
+      );
+      const legacy = jest.fn();
+      await expect(
+        service.serve(asset, { ...query, interval: '1h' }, legacy),
+      ).rejects.toMatchObject({
+        response: { error: { code: 'ASSET_CANDLES_BASELINE_NOT_READY' } },
+      });
+      expect(legacy).not.toHaveBeenCalled();
+    });
+
+    it('serves stored candles instead of failing when the managed refresh cannot confirm coverage', async () => {
+      // KIS `data_incomplete`: the sweep wrote usable candles but claimed no
+      // coverage. Before this the whole chart 503'd.
+      const { service, plans, database, sync } = create();
+      plans.build.mockReturnValue({
+        ...plan,
+        requestedRange: {
+          from: new Date(clock.getTime() - 36 * 60 * 60_000),
+          to: clock,
+        },
+        sourceRange: {
+          from: new Date(clock.getTime() - 36 * 60 * 60_000),
+          to: clock,
+        },
+      });
+      database.load.mockResolvedValue(
+        load('incomplete', response('db-stored'), {
+          completedCoverage: false,
+          coverageStatus: 'insufficient',
+          fresh: false,
+          storedCandleCount: 137,
+        }),
+      );
+      sync.syncAsset.mockResolvedValue({
+        assetId: asset.id,
+        feeds: [
+          {
+            status: 'completed',
+            complete: false,
+            writtenRows: 137,
+            stopReason: 'data_incomplete',
+          },
+        ],
+      });
+      const legacy = jest.fn();
+      await expect(service.serve(asset, query, legacy)).resolves.toEqual(
+        response('db-stored'),
+      );
+      expect(legacy).not.toHaveBeenCalled();
+    });
+
     it('keeps NON-aggregated cold ranges (1d/1w/5m) on the documented legacy path', async () => {
       const { service, plans, database } = create();
       plans.build.mockReturnValue({
@@ -368,7 +480,11 @@ describe('CandleServingService', () => {
         },
       });
       database.load.mockResolvedValue(
-        load('missing', null, { completedCoverage: false }),
+        load('missing', null, {
+          completedCoverage: false,
+          coverageStatus: 'insufficient',
+          storedCandleCount: 0,
+        }),
       );
       const legacy = jest.fn().mockResolvedValue(response('legacy'));
       await expect(

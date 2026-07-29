@@ -238,6 +238,7 @@ async function main() {
     maxManagedFiveMinuteRangeMs: 35 * DAY,
     maxManagedPeriodRangeMs: 365 * DAY,
     maxOnDemandRepairRangeMs: 2 * DAY,
+    coverageTailToleranceMs: DAY,
   };
 
   // ── fixture provider feeds ────────────────────────────────────────────────

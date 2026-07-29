@@ -44,6 +44,10 @@ export type CandleDeliveryState =
   | 'provider_refreshed'
   | 'stale_cache_fallback'
   | 'database_fallback'
+  // Stored candles served while coverage is not fully confirmed (unseeded
+  // baseline, a refresh that could not finish, dropped incomplete buckets).
+  // Every returned candle is a validated stored one; the window may be short.
+  | 'database_partial'
   | 'legacy_provider';
 
 /**
@@ -63,8 +67,15 @@ export type CandleDeliveryState =
  * They exist only as read-time aggregates of the stored 5m feed, so a
  * provider-direct answer is one truncated minute page bucketed without any
  * completeness check — e.g. a single bogus 4h candle for a 30-day request.
- * Without a baseline those requests fail with ASSET_CANDLES_BASELINE_NOT_READY
- * so the client can say "preparing" instead of drawing wrong candles.
+ *
+ * "Coverage is not fully confirmed" is NOT the same as "there is nothing to
+ * show". Whenever the store yields usable candles the request is answered
+ * from them (`database_partial`) — every one of those candles is a validated
+ * stored candle and incomplete buckets are still dropped. Only a window the
+ * store cannot answer at all falls through to
+ * ASSET_CANDLES_BASELINE_NOT_READY (aggregated) or the provider-compatible
+ * error, so an unseeded baseline degrades to a shorter chart instead of an
+ * empty screen.
  *
  * Once a managed refresh has started, no failure path calls legacyLoader.
  */
@@ -141,13 +152,23 @@ export class CandleServingService {
       throw error;
     }
 
-    // A large request without completed baseline coverage cannot be answered
-    // from the store yet. Operators seed it through the manual sync job.
+    // A large request whose baseline coverage was never seeded (not merely
+    // "the tail is a few minutes behind") cannot be repaired inside a request
+    // budget. Operators seed it through the manual sync job.
     if (
-      !initial.completedCoverage &&
+      initial.coverageStatus === 'insufficient' &&
       plan.sourceRange.to.getTime() - plan.sourceRange.from.getTime() >
         this.config.maxOnDemandRepairRangeMs
     ) {
+      // Whatever the store DOES hold for the window is still real, validated
+      // data: serve it as a shorter chart rather than showing nothing.
+      if (this.hasServableCandles(initial)) {
+        this.logDelivery('database_partial', asset.id, query, plan, {
+          reason: 'cold_baseline_partial_window',
+          ...this.coverageContext(initial),
+        });
+        return initial.response as AssetCandlesResponse;
+      }
       // 15m/30m/1h/4h are read-time aggregates of the stored 5m feed. The
       // provider-direct path would bucket ONE truncated minute page (KIS caps
       // a page at 120 rows) into "candles" without any constituent check, so a
@@ -156,12 +177,14 @@ export class CandleServingService {
       if (plan.requiresAggregation) {
         this.logDeliveryFailed('baseline_not_ready', asset.id, query, plan, {
           reason: 'cold_baseline_required',
+          ...this.coverageContext(initial),
         });
         throw this.baselineNotReadyError();
       }
       const response = await legacyLoader();
       this.logDelivery('legacy_provider', asset.id, query, plan, {
         reason: 'cold_baseline_required',
+        ...this.coverageContext(initial),
       });
       return response;
     }
@@ -190,6 +213,16 @@ export class CandleServingService {
       if (this.usableLastKnownGood(initial)) {
         this.logDelivery('database_fallback', asset.id, query, plan, {
           reason: this.errorName(error),
+        });
+        return initial.response as AssetCandlesResponse;
+      }
+      // Last resort before failing: the store still holds validated candles
+      // for this window even though coverage is unconfirmed. A shorter chart
+      // beats an error screen, and no provider row is involved.
+      if (this.hasServableCandles(initial)) {
+        this.logDelivery('database_partial', asset.id, query, plan, {
+          reason: this.errorName(error),
+          ...this.coverageContext(initial),
         });
         return initial.response as AssetCandlesResponse;
       }
@@ -286,22 +319,24 @@ export class CandleServingService {
       return after.response as AssetCandlesResponse;
     }
 
-    // Provider-confirmed coverage for the whole range, but some historical
-    // aggregate buckets are missing constituents even after the repair (a
-    // real hole in the 5m feed, e.g. an illiquid window the provider never
-    // filled). The incomplete buckets stay DROPPED — they are never promoted
-    // to normal candles — and the complete ones are served rather than
-    // failing a 30-day chart over one gap.
-    if (
-      after.state === 'incomplete' &&
-      after.completedCoverage &&
-      after.response?.data.state === 'available'
-    ) {
-      this.logDelivery('database_fallback', asset.id, query, plan, {
-        reason: 'incomplete_buckets_dropped',
-        droppedIncompleteBuckets: after.droppedIncompleteBuckets,
+    // The refresh did not produce a fully confirmed window, but the store
+    // holds validated candles for it: a historical bucket is missing
+    // constituents (a real hole in the 5m feed), the sync could not confirm
+    // coverage (KIS `data_incomplete`, provider retention, budget stop), or
+    // the baseline was never seeded. Incomplete buckets stay DROPPED — they
+    // are never promoted to normal candles — and the complete ones are served
+    // instead of failing a whole chart.
+    if (this.hasServableCandles(after)) {
+      this.logDelivery('database_partial', asset.id, query, plan, {
+        reason:
+          after.droppedIncompleteBuckets > 0
+            ? 'incomplete_buckets_dropped'
+            : 'coverage_unconfirmed',
+        syncStopReason: result.feeds[0]?.stopReason ?? null,
+        syncErrorCode: result.feeds[0]?.errorCode ?? null,
+        ...this.coverageContext(after),
       });
-      return after.response;
+      return after.response as AssetCandlesResponse;
     }
 
     const feed = result.feeds[0];
@@ -316,6 +351,26 @@ export class CandleServingService {
       result.completedCoverage &&
       result.droppedIncompleteBuckets === 0
     );
+  }
+
+  /** The store produced at least one validated candle for this window. */
+  private hasServableCandles(result: CandleDatabaseLoadResult): boolean {
+    return (
+      result.response?.data.state === 'available' &&
+      result.storedCandleCount > 0
+    );
+  }
+
+  private coverageContext(
+    result: CandleDatabaseLoadResult,
+  ): Record<string, unknown> {
+    return {
+      coverageStatus: result.coverageStatus,
+      coveredTo: result.coveredTo?.toISOString() ?? null,
+      coverageInteriorGap: result.hasCoverageInteriorGap,
+      storedCandles: result.storedCandleCount,
+      droppedIncompleteBuckets: result.droppedIncompleteBuckets,
+    };
   }
 
   private cacheKey(

@@ -81,8 +81,11 @@ Timeframe windows (`features/asset/chartTimeframes.ts`): `5m`/`15m` use
 5m feed (35-day retention); the limits are the crypto 24/7 upper bounds, so
 stocks legitimately return fewer candles. While that stored baseline is still
 being seeded the API answers `ASSET_CANDLES_BASELINE_NOT_READY` and the detail
-screen shows "차트 데이터를 준비 중입니다." with the existing retry button
-instead of a chart error (`features/asset/candleErrors.ts`).
+screen shows "차트 데이터를 준비 중입니다." with the existing retry button.
+Every OTHER candle failure now reads as a failure — `describeCandleError`
+renders "차트를 불러오지 못했습니다." plus the backend error code (or the HTTP
+status / a network hint), because rendering an outage as a loading skeleton
+hid the reason from whoever was debugging it (`features/asset/candleErrors.ts`).
 
 **Native rebuild required.** `react-native-gesture-handler` is a native module
 (`npx expo install`) and `App.tsx` wraps the app in `GestureHandlerRootView`.

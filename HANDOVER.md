@@ -12,6 +12,107 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 캔들 차트 미표시 장애 수정(coverage 판정 모델·부분 서빙·KIS 스윕) (2026-07-29)
+
+**목적**
+
+직전 작업(`71529b5c`) 이후 실제 개발 환경에서 5m/15m/30m/1h/4h 차트가 전부
+표시되지 않던 장애를 재현·원인 확정하고, 5분봉부터 4시간봉까지 실제로 표시되게
+만든다.
+
+**A. 실제 재현 결과(수정 전, 로컬 백엔드 :3000, 2026-07-29 22:10 KST)**
+
+| 자산 | interval/range | HTTP | 코드 |
+| --- | --- | --- | --- |
+| 005930 | 5m/prev_open | 503 | ASSET_CANDLES_PROVIDER_UNAVAILABLE |
+| 005930 | 15m/prev_open | 503 | ASSET_CANDLES_PROVIDER_UNAVAILABLE |
+| 005930 | 30m/14d, 1h/14d, 4h/30d | 503 | ASSET_CANDLES_BASELINE_NOT_READY |
+| 005930 | 1d/1y | 200 | candles=243 |
+| BTCUSDT | 5m/prev_open | 200 | candles=447 |
+| BTCUSDT | 30m/14d, 4h/30d | 503 | ASSET_CANDLES_BASELINE_NOT_READY |
+| TSLA | 5m/prev_open | 503 | ASSET_CANDLES_PROVIDER_UNAVAILABLE |
+
+체크포인트 테이블(`market_candle_sync_states`)에서 확정한 원인:
+
+1. **5분봉 baseline 미시딩** — 전 자산 coverage 없음(`--report` 전부 MISSING).
+2. **KIS 도메스틱 repair가 항상 `data_incomplete`** — 6페이지/720행 중 701행
+   accepted, 19행 rejected → 일부 5분 버킷이 불완전 → 런이 coverage를 전혀
+   claim하지 못한다(`covered=[-,-)`). 그런데 DB에는 137개의 정상 캔들이 있었고
+   서빙은 그럼에도 503을 냈다.
+3. **coverage 판정이 boolean** — 요청 시각까지 정확히 연속 커버되어야 해서 sync
+   완료 1분 뒤면 다시 미준비로 판정된다.
+4. KIS 레이트리밋(`EGW00201` 초당 거래건수, `EGW00133` 토큰 1분당 1회)이 반복
+   repair로 자주 발생 → `PROVIDER_CALL_FAILED`.
+5. 프런트가 baseline 이외의 캔들 오류를 skeleton으로 감춰 원인이 안 보였다.
+
+**B. coverage 판정 모델 교체**
+
+- `findCompletedCoverageUnion(): boolean` → **`findCandleCoverage()`**:
+  `{ startsAtRequestedFrom, contiguousCoveredTo, newestCompletedAt,
+  hasInteriorGap }`.
+- 로더가 3단계로 분류한다(`CandleCoverageStatus`).
+  - `complete`: 요청 시작~요청 시각까지 확인됨.
+  - `stale_tail`: 과거는 확인됐고 최신 tail만 미확인(기본 1일 이내,
+    `CANDLE_SERVING_COVERAGE_TAIL_TOLERANCE_MS`) → **정상 서빙**하고 tail은
+    기존 bounded sync가 갱신한다.
+  - `insufficient`: 시작점 미달·중간 구멍·tail이 허용치 초과.
+- **중간 구멍(hasInteriorGap)은 아무리 최근이어도 절대 허용하지 않는다.**
+
+**C. 미확인 coverage ≠ 빈 화면 (`database_partial`)**
+
+- 저장된 캔들이 하나라도 있으면 그것으로 응답한다. 반환 캔들은 전부 개별 검증된
+  저장 캔들이고 불완전 버킷은 계속 제외된다. 창이 짧아질 뿐이다.
+- 로그 reason: `cold_baseline_partial_window`, `coverage_unconfirmed`,
+  `incomplete_buckets_dropped`.
+- `ASSET_CANDLES_BASELINE_NOT_READY`는 **보여줄 캔들이 아예 없을 때만** 낸다.
+
+**D. KIS `data_incomplete` 스윕 중단 제거**
+
+- 도메스틱 5분봉 세그먼트가 불완전해도 **더 오래된 세그먼트 수집을 계속**한다.
+  대신 그 시점에 run의 coverage claim을 **봉인**(`coverageSealed`)해 이후
+  페이지가 `[coveredFrom, coveredTo)`를 구멍 너머로 확장하지 못하게 했다.
+  min/max 병합이 구멍을 잇는 일은 여전히 불가능하고 `coverageComplete`는 false다.
+- 효과(실측): 005930 14일 initial sync가 137행 → **669행**(9거래일)으로 늘고,
+  30분봉 차트가 31개 → 103개, 1시간봉이 15개 → 51개가 됐다.
+
+**E. 프런트 오류 표시**
+
+- `describeCandleError()` 추가: baseline 오류만 "차트 데이터를 준비 중입니다.",
+  그 외에는 "차트를 불러오지 못했습니다." + 백엔드 오류 코드(또는 HTTP 상태·
+  네트워크 안내)를 보여준다. 더 이상 skeleton으로 감추지 않는다.
+
+**F. baseline 스크립트 수정**
+
+- `scripts/candle-baseline-sync.ts`의 sync 경로가 Nest 애플리케이션 컨텍스트를
+  부팅하다 조용히 종료되던 문제를 고쳤다(라이브 파이프라인·소켓까지 뜨는 것도
+  운영 명령으로 부적절). 릴리스 스모크 하네스처럼 sync 의존성만 명시적으로
+  조립한다. `--report`는 여전히 PostgreSQL만 필요하다.
+
+**검증(실제 실행)**
+
+- baseline 시딩: crypto 14일 2자산 `coverageComplete=2`(각 4032행),
+  005930 14일 669행(coverage는 정직하게 미claim).
+- 수정 후 실제 HTTP 응답(자체 인스턴스 :3010, 괄호는 캔들 수):
+
+| 자산 | 5m | 15m | 30m/14d | 1h/14d | 4h/30d | 1d/1y |
+| --- | --- | --- | --- | --- | --- | --- |
+| 005930 | 200 (137) | 200 (43) | 200 (103) | 200 (51) | 200 (7) | 200 (243) |
+| BTCUSDT | 200 (453) | 200 (151) | 200 (672) | 200 (336) | 200 (84) | 200 (365) |
+
+- backend jest 2097 pass, typecheck·build·lint·format 통과, frontend typecheck·
+  test 통과, expo export web/android 성공.
+
+**주의사항 / 남은 한계**
+
+- **KRX 15:20~15:30은 종가 단일가 매매 구간이라 분봉이 없다.** 그래서 매 세션의
+  15:20·15:25 5분 버킷이 항상 비고, 오후 4시간봉(13:00~15:30)은 불완전으로
+  판정돼 제외된다(005930 30일 4시간봉이 7개인 이유). 캔들 전용 "연속매매 종료
+  시각" 개념을 넣으면 해결되지만 세션 정책은 주문 경로와 공유하므로 이번에는
+  건드리지 않았다.
+- KIS는 앱키 단위 호출 제한이 있다. 백엔드와 baseline 스크립트를 동시에 돌리면
+  `EGW00201`/`EGW00133`이 난다. 시딩은 부하가 적을 때 하거나 자산을 나눠 실행한다.
+- 로컬에서 백엔드를 두 개 띄우면 KIS WebSocket 구독이 서로 충돌한다.
+
 ### 작업 단위: 30분·1시간봉 14일 확대와 4시간봉 DB 집계 경로 정상화 (2026-07-29)
 
 **목적**
@@ -694,6 +795,35 @@ cd frontend && npm run typecheck && npm test
 ---
 
 ## 2. 최신 작업 시간순 기록
+
+### 2026-07-29 — 캔들 차트 미표시 장애 수정(coverage 판정·부분 서빙·KIS 스윕)
+
+- 실제 백엔드에 요청을 보내 장애를 재현했다: 5m/15m는 503
+  `ASSET_CANDLES_PROVIDER_UNAVAILABLE`, 30m/1h/4h는 503
+  `ASSET_CANDLES_BASELINE_NOT_READY`, 1d만 200. 체크포인트 테이블에서 원인을
+  확정했다(baseline 미시딩, KIS repair의 `data_incomplete`, boolean coverage
+  판정, KIS 레이트리밋, 프런트의 skeleton 은폐).
+- coverage 판정을 boolean에서 `{startsAtRequestedFrom, contiguousCoveredTo,
+  hasInteriorGap, newestCompletedAt}`로 바꾸고 `complete / stale_tail /
+  insufficient` 3단계로 분류했다. sync 직후 tail 몇 분이 미확인이어도(기본 1일
+  허용) 차트는 정상 서빙되고, 중간 구멍은 여전히 절대 허용하지 않는다.
+- coverage가 미확인이어도 저장된 캔들이 있으면 그것으로 응답한다
+  (`database_partial`). 반환 캔들은 전부 검증된 저장 캔들이며 불완전 버킷은
+  계속 제외된다. `BASELINE_NOT_READY`는 보여줄 캔들이 전혀 없을 때만 낸다.
+- KIS 도메스틱 스윕이 `data_incomplete` 세그먼트에서 run 전체를 멈추던 동작을
+  제거했다. 더 오래된 세그먼트까지 계속 수집하되 coverage claim은 구멍에서
+  봉인해 min/max 병합이 구멍을 잇지 못하게 했다. 005930 14일 sync가 137행 →
+  669행(9거래일)으로 늘었다.
+- 프런트가 baseline 이외의 캔들 오류를 skeleton으로 감추던 것을 고쳤다
+  (`describeCandleError`: 제목 + 백엔드 오류 코드/HTTP 상태/네트워크 안내).
+- baseline 스크립트의 sync 경로가 앱 컨텍스트 부팅에서 조용히 죽던 문제를 고쳐
+  실제 시딩을 수행했다: crypto 2자산 coverage 완료, 005930 669행.
+- 실측 결과 5m·15m·30m·1h·4h·1d가 KRX/암호화폐 모두 200으로 표시된다. KRX 오후
+  4시간봉이 빠지는 건 15:20~15:30 종가 단일가 구간에 분봉이 없기 때문이며
+  한계로 문서화했다.
+- 검증: backend jest 2097 pass, typecheck·build·lint 통과, frontend typecheck·
+  test 통과, expo export web/android 성공. DB migration 없음, 주문·체결·포지션·
+  지갑·원장 불변.
 
 ### 2026-07-29 — 30분·1시간봉 14일 확대와 4시간봉 DB 집계 경로 정상화
 

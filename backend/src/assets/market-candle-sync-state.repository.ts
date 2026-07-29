@@ -19,6 +19,24 @@ const ERROR_MESSAGE_MAX_LENGTH = 500;
 // an unbounded scan.
 const COVERAGE_UNION_MAX_ROWS = 2000;
 
+/**
+ * What confirmed sync coverage says about one requested window. See
+ * `findCandleCoverage`.
+ */
+export type CandleCoverageEvidence = {
+  startsAtRequestedFrom: boolean;
+  contiguousCoveredTo: Date | null;
+  newestCompletedAt: Date | null;
+  hasInteriorGap: boolean;
+};
+
+const EMPTY_COVERAGE: CandleCoverageEvidence = {
+  startsAtRequestedFrom: false,
+  contiguousCoveredTo: null,
+  newestCompletedAt: null,
+  hasInteriorGap: false,
+};
+
 // Statuses a run can be resumed/taken over from. `running` is included
 // because a crashed instance leaves its row as running; the caller must hold
 // the asset/feed backfill lock before taking such a row over. `canceled` is
@@ -227,22 +245,31 @@ export class MarketCandleSyncStateRepository {
    * needs coverage right up to the request clock, so the evidence is the
    * UNION of coverage-complete checkpoints.
    *
+   * The result is deliberately NOT a boolean. "The history is confirmed but
+   * the last minute is not yet re-confirmed" and "there is a hole in the
+   * middle of the window" are completely different situations: the first is
+   * normal between incremental syncs and must still draw a chart, the second
+   * means the stored window is untrustworthy. Callers get both facts:
+   *
+   *  - `startsAtRequestedFrom` — confirmed coverage begins at/before `from`;
+   *  - `contiguousCoveredTo`   — how far the contiguous union reaches from
+   *    `from` (null when it never starts there);
+   *  - `hasInteriorGap`        — later confirmed coverage exists beyond a hole,
+   *    i.e. the missing part is INSIDE the window, not just its tail;
+   *  - `newestCompletedAt`     — freshness of the newest run that contributed.
+   *
    * Each row still has to be individually coverage-audited (status=completed,
-   * coverageComplete=true, well-formed `[coveredFrom, coveredTo)`) — this only
-   * merges adjacent/overlapping confirmed subranges, and a single hole between
-   * them means "not covered". Rows are bounded (`COVERAGE_UNION_MAX_ROWS`);
-   * hitting that bound without reaching `to` reports not-covered rather than
-   * guessing.
+   * coverageComplete=true, well-formed `[coveredFrom, coveredTo)`); this only
+   * merges adjacent/overlapping confirmed subranges. Rows are bounded
+   * (`COVERAGE_UNION_MAX_ROWS`).
    */
-  async findCompletedCoverageUnion(
+  async findCandleCoverage(
     assetId: string,
     feed: MarketCandleFeed,
     from: Date,
     to: Date,
-  ): Promise<{ covered: boolean; newestCompletedAt: Date | null }> {
-    if (from.getTime() >= to.getTime()) {
-      return { covered: false, newestCompletedAt: null };
-    }
+  ): Promise<CandleCoverageEvidence> {
+    if (from.getTime() >= to.getTime()) return EMPTY_COVERAGE;
     const rows = await this.prisma.marketCandleSyncState.findMany({
       where: {
         assetId,
@@ -258,27 +285,40 @@ export class MarketCandleSyncStateRepository {
       select: { coveredFrom: true, coveredTo: true, completedAt: true },
     });
 
-    let cursorMs = from.getTime();
+    const fromMs = from.getTime();
     const toMs = to.getTime();
+    let cursorMs = fromMs;
+    let started = false;
     let newestCompletedAt: Date | null = null;
+    let hasInteriorGap = false;
     for (const row of rows) {
       if (!row.coveredFrom || !row.coveredTo || !row.completedAt) continue;
-      // Rows are ordered by coveredFrom, so the first one starting after the
-      // cursor leaves a hole no later row can fill.
-      if (row.coveredFrom.getTime() > cursorMs) break;
+      if (row.coveredFrom.getTime() > cursorMs) {
+        // Rows are ordered by coveredFrom, so this row starts after a hole.
+        // Coverage that resumes later inside the window is an INTERIOR gap;
+        // everything past the contiguous prefix stays unconfirmed either way.
+        if (started && row.coveredFrom.getTime() < toMs) hasInteriorGap = true;
+        break;
+      }
       if (row.coveredTo.getTime() <= cursorMs) continue;
-      cursorMs = row.coveredTo.getTime();
+      started = true;
+      cursorMs = Math.min(row.coveredTo.getTime(), toMs);
       if (
         newestCompletedAt === null ||
         row.completedAt.getTime() > newestCompletedAt.getTime()
       ) {
         newestCompletedAt = row.completedAt;
       }
-      if (cursorMs >= toMs) {
-        return { covered: true, newestCompletedAt };
-      }
+      if (cursorMs >= toMs) break;
     }
-    return { covered: false, newestCompletedAt: null };
+
+    if (!started) return EMPTY_COVERAGE;
+    return {
+      startsAtRequestedFrom: true,
+      contiguousCoveredTo: new Date(cursorMs),
+      newestCompletedAt,
+      hasInteriorGap,
+    };
   }
 
   /** Returns the refreshed row, or null when the run was not resumable. */

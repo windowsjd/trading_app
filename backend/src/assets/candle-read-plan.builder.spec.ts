@@ -23,6 +23,7 @@ describe('CandleReadPlanBuilder', () => {
     maxManagedFiveMinuteRangeMs: 35 * 86_400_000,
     maxManagedPeriodRangeMs: 365 * 86_400_000,
     maxOnDemandRepairRangeMs: 2 * 86_400_000,
+    coverageTailToleranceMs: 86_400_000,
   });
   const asset = {
     id: 'asset-1',

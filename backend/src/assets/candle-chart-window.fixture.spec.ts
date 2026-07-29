@@ -61,6 +61,7 @@ describe('chart windows over a stored 5m fixture', () => {
     maxManagedFiveMinuteRangeMs: 35 * DAY_MS,
     maxManagedPeriodRangeMs: 365 * DAY_MS,
     maxOnDemandRepairRangeMs: 2 * DAY_MS,
+    coverageTailToleranceMs: DAY_MS,
   };
 
   const asset = (assetType: AssetType) => ({
@@ -184,9 +185,12 @@ describe('chart windows over a stored 5m fixture', () => {
     const syncStates = {
       // A seeded baseline plus its incremental tails: the union covers the
       // requested window up to the request clock.
-      findCompletedCoverageUnion: jest
-        .fn()
-        .mockResolvedValue({ covered: true, newestCompletedAt: new Date() }),
+      findCandleCoverage: jest.fn().mockResolvedValue({
+        startsAtRequestedFrom: true,
+        contiguousCoveredTo: new Date('2100-01-01T00:00:00.000Z'),
+        newestCompletedAt: new Date(),
+        hasInteriorGap: false,
+      }),
       findLatestOverlapping: jest.fn().mockResolvedValue({
         status: 'completed',
       }),
