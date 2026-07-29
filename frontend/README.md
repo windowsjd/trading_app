@@ -49,10 +49,20 @@ extension). Behaviour, constants and the reasoning are documented in
 `backend/docs/candle-live-operations.md` ("Candlestick chart viewport").
 
 Mobile: pinch to zoom, one-finger horizontal drag to pan, long press for the
-crosshair (released by whichever recognizer sees the lift, so a hold that never
-moved still clears it); vertical swipes still scroll the detail screen. Web:
-drag to pan, hover for the crosshair, ctrl/cmd + wheel (or trackpad pinch) to
-zoom. `+`, `−` and `초기화` buttons do the same without gestures.
+crosshair (released by whichever recognizer sees the lift — including a hold
+that never moved, or a finger that leaves the chart); vertical swipes still
+scroll the detail screen. Web: drag to pan, hover for the crosshair, and the
+mouse wheel over the chart zooms (shift/horizontal wheel pans instead). All
+start/end events go through one gesture-lifecycle session, so a gesture reports
+exactly one start and one end no matter how many recognizers finalize it.
+
+There are NO zoom buttons and no candle-count UI — `visibleCount` is internal
+viewport state that pinch/wheel drive. The only button is a small `최신`
+overlay that returns to the latest 60 slots, and it appears only once the
+viewport has moved. Chart height is responsive
+(`getCandlestickChartHeight`): ~52% of the window (380–480) on phones, ~60%
+(500–680) at ≥768px width, recomputed on rotation/resize. Everything below the
+chart is reached with the detail screen's existing vertical ScrollView.
 
 The viewport counts SCREEN SLOTS (60 by default on every timeframe), not
 candles: a timeframe with only 12 candles draws them at the normal width

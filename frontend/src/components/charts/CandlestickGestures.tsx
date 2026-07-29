@@ -21,6 +21,9 @@ export type CandlestickGesturesProps = {
   paddingLeft: number;
   /** Current candle slot width, for pixel → candle pan conversion. */
   slotWidth: number;
+  /** Full chart box, so a touch leaving it can end crosshair mode. */
+  chartWidth: number;
+  chartHeight: number;
 
   /** A pan/pinch is starting: snapshot the current viewport. */
   onGestureStart: () => void;

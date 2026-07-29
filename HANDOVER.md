@@ -12,6 +12,135 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 캔들 차트 조작 정리·세로 공간 확대 (2026-07-29)
+
+**목적**
+
+차트 조작 방식을 "모바일=제스처, 웹=휠/드래그" 한 가지로 정리하고 차트 세로
+공간을 전문 거래 앱 수준으로 키운다. 프런트 전용 보완이며 백엔드·DB·캔들 API·
+주문·포지션·지갑·원장은 건드리지 않는다. 기존 viewport/gesture 구조를 재사용하고
+외부 차트 라이브러리·거래소급 차트 엔진·애니메이션은 추가하지 않는다.
+
+**A. 확대·축소 UI와 캔들 개수 문구 제거**
+
+- `CandlestickChart` 하단 control bar 전체 제거: `−`/`＋` 버튼, `초기화` 버튼,
+  `N개 · 과거 구간` 문구, 접근성 label(`차트 확대`/`차트 축소`),
+  `styles.controls`/`controlButton`/`controlText`/`controlHint`,
+  `zoomIn`/`zoomOut` callback.
+- 접근성 label에서도 `N개 표시 중`을 뺐다(사용자에게 캔들 개수를 노출하지
+  않는다). label은 `캔들 차트, 최신/과거 구간, 현재가 …`만 남는다.
+- 버튼 전용이던 `zoomViewportByStep()`/`ZOOM_STEP_SCALE`을
+  `candlestickViewport.ts`에서 삭제(다른 사용처 없음을 검색으로 확인).
+  단위 테스트도 "step 헬퍼가 존재하지 않는다"는 회귀 테스트로 교체했다.
+- **내부 `visibleCount`는 그대로 유지한다.** `MIN 20 / DEFAULT 60 / MAX 180`,
+  `zoomViewportAtFocalPoint`, pinch·wheel → visibleCount 환산, 슬롯 계산은
+  전부 유지된다. 사용자가 개수를 고르지 않을 뿐, 확대 상태는 여전히
+  visibleCount로 표현된다.
+- 사용자가 캔들 개수를 선택하는 UI는 어디에도 없다(`AssetDetailScreen`도
+  `visibleCount`를 모른다).
+
+**B. 최신 구간 복귀 버튼**
+
+- 차트 위 좌상단에 작은 `최신` 오버레이 버튼 하나만 남겼다(접근성 label
+  `차트를 최신 구간으로 초기화`). 동작: `rightOffset = 0`,
+  `visibleCount = DEFAULT_VISIBLE_CANDLES`, `crosshair = null`.
+- `isDefaultViewport(viewport, total)`(신규, 순수 함수)가 false일 때만 렌더된다
+  — 기본 상태 차트에는 버튼조차 보이지 않는다.
+- `accessible` 차트 박스의 **형제**로 두어 스크린리더에서 버튼이 가려지지
+  않게 했다(자식으로 두면 iOS에서 접근 불가).
+
+**C. 모바일 조작 정책**
+
+- 두 손가락 pinch = 확대·축소, 한 손가락 가로 drag = 좌우 이동,
+  한 손가락 세로 swipe = 부모 ScrollView, long press = 크로스헤어,
+  long press 후 drag = 크로스헤어 이동. 모바일에 확대·축소 버튼은 없다.
+- long press가 차트 밖으로 나가면 크로스헤어 종료:
+  `shouldCancelWhenOutside(false)` → `(true)`(longPress + crosshairPan),
+  추가로 scrub 좌표를 `isWithinChartBounds(point, {width, height})`로 검사해
+  차트 밖이면 `session.end('crosshair')`. 손가락이 다시 들어와도 끝난 session은
+  되살아나지 않고, 새 long press는 정상 동작한다.
+
+**D. gesture lifecycle 중복 종료 방지**
+
+- `createCrosshairSession`을 `createChartGestureSession`으로 확장
+  (`candlestickGesturePolicy.ts`, React Native import 없는 순수 함수).
+  상태: `none | pan | pinch | crosshair`.
+  - `begin(type)`: 활성 gesture가 없을 때만 시작 + `onGestureStart` 1회
+  - `end(type)`: 현재 owner와 일치할 때만 종료 + `onGestureEnd` 1회
+    (crosshair면 `onCrosshair(null)`도 1회)
+  - `takeOver(type)`: 명시적 전환(crosshair→pinch: 종료 1회 후 시작 1회)
+  - owner가 아닌 recognizer의 finalize는 상태를 바꾸지 않는다.
+- native adapter의 네 recognizer(longPress/crosshairPan/chartPan/pinch)가 모두
+  이 session만 호출한다. `onGestureStart()`/`onGestureEnd()` 직접 호출 없음.
+- chartPan은 **활성화 시점**(`onStart`)에 session을 잡는다. touch-down에 잡으면
+  long press가 crosshair를 시작할 수 없다. translation도 활성화 지점 기준으로
+  보정(`event.translationX - panOriginX`)해 slop만큼 튀지 않는다.
+
+**E. 웹 wheel 정책**
+
+- `classifyWheelIntent()`: ① Shift+wheel → pan, ② |deltaX| > |deltaY| → pan,
+  ③ 그 외 세로 wheel → zoom. Ctrl/Cmd 여부와 무관하게 세로 wheel은 zoom이다
+  (trackpad pinch 포함). `'page-scroll'` 분기는 제거했다.
+- 차트 위 wheel은 전부 `preventDefault()`(listener는 `passive: false` 유지)
+  하므로 차트 위에서 페이지 스크롤·브라우저 확대가 일어나지 않는다. 차트 밖
+  wheel은 애초에 이 listener에 오지 않으므로 페이지가 정상 스크롤된다.
+- 마우스 왼쪽 drag 좌우 이동, hover 크로스헤어는 그대로다.
+
+**F. 연속 wheel 세션**
+
+- 이벤트마다 start/end를 내면 React 리렌더보다 wheel 버스트가 빨라 매번 같은
+  (오래된) viewport snapshot을 다시 확대하게 되고 한 단계만 적용된다.
+  `createWheelGestureSession()`(순수, timer 주입 가능)으로 버스트를 한 gesture로
+  묶었다: 첫 이벤트에서 `onGestureStart` 1회 → 이후 **누적** scale/pan을 같은
+  snapshot에 적용 → 약 120ms 무입력이면 `onGestureEnd`.
+- zoom↔pan 전환은 세션을 닫고 새로 연다. mousedown/mouseleave도 세션을 닫고,
+  unmount 시 `dispose()`가 대기 중인 timer를 정리한다(콜백 미발생).
+
+**G. 반응형 차트 높이**
+
+- `candlestickChartHeight.ts`(순수) 신규:
+  `getCandlestickChartHeight(windowWidth, windowHeight)`
+  - width < 768: `clamp(height * 0.52, 380, 480)`
+  - width ≥ 768: `clamp(height * 0.60, 500, 680)`
+  - 비정상 dimension은 해당 클래스 최소값으로 fallback.
+- `CandlestickChart`가 `useWindowDimensions()`로 값을 받아 회전·브라우저 resize
+  때 자동 재계산한다. 기존 고정 `height = 240`은 제거.
+- `height` prop은 override로 유지:
+  `heightOverride ?? getCandlestickChartHeight(windowWidth, windowHeight)`
+  (변수명 `windowHeight`/`chartHeight`/`heightOverride`로 분리).
+  `AssetDetailScreen`은 height를 넘기지 않는다. 다른 화면의 차트 사용처는 없다.
+
+**H. 상세 화면 레이아웃**
+
+- `AssetDetailScreen`의 기존 단일 세로 ScrollView를 그대로 쓴다. 중첩
+  ScrollView·가로 ScrollView를 추가하지 않았고, 차트를 줄여 한 화면에 넣지도
+  않는다. 차트가 커진 만큼 매수·매도 버튼 등은 아래로 내려가고 스크롤로 본다.
+- 차트 위 한 손가락 세로 swipe는 여전히 부모 ScrollView로 간다
+  (`activeOffsetX` + `failOffsetY` 유지).
+- 시간봉 chip(5m~1w)과 `viewportResetKey = assetId:interval`은 그대로라
+  시간봉을 바꾸면 60슬롯·rightOffset 0·크로스헤어 해제로 초기화된다.
+
+**검증**
+
+- `npm run typecheck` 통과, `npm test` 266 pass / 0 fail.
+- `npx expo export --platform web` / `--platform android` 성공. 번들 문자열
+  검사: `차트를 최신 구간으로 초기화` 존재, `차트 확대`/`차트 축소`/`개 표시 중`
+  부재(web 번들 unicode-escape 디코딩, android hbc UTF-16 스캔).
+- Android 실기기/에뮬레이터와 웹 브라우저 수동 검증은 환경 부재로 **NOT_RUN**.
+- 백엔드 코드 변경 없음(문서만), DB migration 없음, 주문·체결·포지션·지갑·원장
+  불변.
+
+**주의사항**
+
+- `visibleCount`를 "사용자에게 보이는 개수"로 되돌리지 말 것. 내부 확대 상태
+  표현이며 UI로 노출하지 않는다.
+- 새 recognizer를 추가하면 반드시 `createChartGestureSession`을 통해서만
+  start/end를 내야 한다. 직접 `onGestureStart/End`를 부르면 중복 종료가 다시
+  생긴다.
+- 컴포넌트 렌더 테스트 러너가 없어 "버튼이 없다" 류는
+  `candlestickChartControls.test.ts`의 소스 문자열 검사로 지킨다. 문구를 바꾸면
+  이 테스트도 함께 고쳐야 한다.
+
 ### 작업 단위: 차트 표시 정밀도·슬롯 정렬·clip 보완 + Reanimated 제거 (2026-07-29)
 
 **목적**
@@ -100,6 +229,8 @@
 
 **G. long press 종료 보강**
 
+- (→ 2026-07-29 "캔들 차트 조작 정리" 작업에서 이 session은
+  `createChartGestureSession()`(none/pan/pinch/crosshair)으로 확장됐다.)
 - 크로스헤어 상태를 `candlestickGesturePolicy.ts`의
   `createCrosshairSession()`(순수 상태 머신, 단위 테스트 가능)으로 옮기고
   `longPress.onFinalize(endCrosshair)`를 추가했다. 움직이지 않고 손을 뗀 경우
@@ -166,12 +297,16 @@
   매핑만 담당(zoom은 visibleCount 변경이지 scaleX가 아님).
 - `candlestickGesturePolicy.ts`(+test): 수평 pan 의도 판정, 웹 wheel 의도
   분류(zoom / pan / page-scroll), wheel·pinch scale 범위 — 양 플랫폼 공유.
+  (→ 2026-07-29 "캔들 차트 조작 정리" 작업에서 `page-scroll` 분기 제거,
+  gesture lifecycle·wheel session 상태 머신 추가.)
 - `CandlestickChartRenderer.tsx`: 공통 SVG renderer(모바일·웹 공용, 복제 없음).
 - `CandlestickGestures.native.tsx`(RNGH pinch/pan/long-press) /
   `.web.tsx`(mouse drag/hover/ctrl+wheel). `CandlestickGestures.tsx`는 props
   계약 + gesture 없는 fallback이며 Metro가 플랫폼별로 해석한다.
 - `CandlestickChart.tsx`는 viewport 상태·geometry·visible slice·컨트롤
-  (`+`/`−`/`초기화`, 접근성 label)만 담당한다.
+  (`+`/`−`/`초기화`, 접근성 label)만 담당한다. (→ 2026-07-29 "캔들 차트 조작
+  정리" 작업에서 확대·축소 버튼과 개수 문구를 제거하고 `최신` 버튼 하나만
+  남겼다. 반응형 높이도 이때 추가.)
 - 패키지: `npx expo install react-native-gesture-handler react-native-reanimated
   react-native-worklets`, `babel.config.js`에 `react-native-worklets/plugin`,
   `App.tsx`에 `GestureHandlerRootView` 1회 wrapping.
@@ -360,6 +495,42 @@ cd frontend && npm run typecheck && npm test
 ---
 
 ## 2. 최신 작업 시간순 기록
+
+### 2026-07-29 — 캔들 차트 조작 정리·세로 공간 확대
+
+- 차트 하단 `−`/`＋` 확대·축소 버튼과 `N개` 표시 캔들 개수 문구, `초기화`
+  버튼, 관련 접근성 label·스타일·callback을 제거했다. 접근성 label에서도 캔들
+  개수 문구를 뺐다. 버튼 전용 `zoomViewportByStep()`/`ZOOM_STEP_SCALE`도 삭제.
+- **내부 `visibleCount` viewport 상태는 유지한다**(MIN 20 / DEFAULT 60 /
+  MAX 180, `zoomViewportAtFocalPoint`, 슬롯 계산). 사용자가 캔들 개수를 고르는
+  UI만 사라졌고 확대 상태는 계속 visibleCount로 계산한다.
+- 모바일: 두 손가락 pinch만으로 확대·축소, 한 손가락 가로 drag 이동, 세로
+  swipe는 부모 ScrollView, long press 크로스헤어 — 확대·축소 버튼 없음.
+- 웹: 차트 위 **일반 세로 마우스 휠로 확대·축소**(Ctrl/Cmd+wheel·트랙패드
+  pinch 포함), Shift+wheel과 가로 트랙패드 입력은 좌우 이동, 마우스 drag 좌우
+  이동·hover 크로스헤어 유지. 차트가 처리한 wheel은 모두 `preventDefault()`
+  (`passive: false`)라 차트 위에서 페이지 스크롤·브라우저 확대가 없고, 차트
+  밖 wheel은 그대로 페이지 스크롤이다.
+- 연속 wheel은 `createWheelGestureSession()`으로 한 gesture로 묶어 누적 확대가
+  정확하다(첫 이벤트 start 1회 → 누적 scale 적용 → 약 120ms 무입력 시 end,
+  unmount 시 timer 정리).
+- 최신 구간 복귀는 차트 위 작은 `최신` 버튼 하나만 남겼다(기본 viewport일
+  때는 숨김, `rightOffset 0` + 60슬롯 + 크로스헤어 해제).
+- long press 중 손가락이 차트 밖으로 나가면 크로스헤어를 종료한다
+  (`shouldCancelWhenOutside(true)` + `isWithinChartBounds` 검사).
+- `createChartGestureSession()`(none/pan/pinch/crosshair 순수 상태 머신)으로
+  long press·crosshairPan·chartPan·pinch의 중복 finalize를 흡수해
+  `onGestureStart`/`onGestureEnd`가 실제 gesture당 정확히 1회씩 호출된다.
+- 차트 기본 높이를 반응형으로 확대: 모바일 `clamp(화면높이*0.52, 380, 480)`,
+  넓은 웹·태블릿 `clamp(화면높이*0.60, 500, 680)`. `useWindowDimensions()`로
+  회전·브라우저 resize에 재계산되고, `height` prop을 넘기면 그 값이 우선한다.
+- 상세 화면은 기존 단일 세로 ScrollView를 그대로 쓴다(중첩 스크롤 추가 없음).
+  차트가 커진 만큼 아래 콘텐츠는 스크롤로 확인한다. 시간봉 변경 시 60슬롯·
+  rightOffset 0으로 초기화되는 동작도 그대로다.
+- 검증: frontend typecheck 통과, 266 pass, expo export web/android 성공(번들
+  문자열로 최신 버튼 존재·확대/축소 label 부재 확인). Android 실기기와 웹
+  브라우저 수동 검증은 환경 부재로 NOT_RUN. 백엔드 코드 변경 없음(문서만),
+  DB migration 없음, 주문·포지션·지갑·원장 불변.
 
 ### 2026-07-29 — 차트 표시 정밀도·슬롯 정렬·clip 보완 + Reanimated 제거
 

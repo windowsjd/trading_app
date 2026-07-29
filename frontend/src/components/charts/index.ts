@@ -10,6 +10,7 @@ export type {
   CandlestickChartRendererProps,
   RenderedCandle,
 } from './CandlestickChartRenderer';
+export * from './candlestickChartHeight';
 export * from './candlestickViewport';
 export { default as DonutChart } from './DonutChart';
 export type { DonutChartProps, DonutChartSegment } from './DonutChart';

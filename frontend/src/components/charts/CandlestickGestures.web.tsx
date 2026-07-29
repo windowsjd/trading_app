@@ -3,6 +3,7 @@ import { View } from 'react-native';
 
 import {
   classifyWheelIntent,
+  createWheelGestureSession,
   wheelZoomScale,
 } from './candlestickGesturePolicy';
 import type { CandlestickGesturesProps } from './CandlestickGestures';
@@ -13,16 +14,25 @@ import type { CandlestickGesturesProps } from './CandlestickGestures';
  *  - LEFT MOUSE DRAG pans; the crosshair is suppressed while dragging and
  *    returns on the next hover move.
  *  - HOVER shows the crosshair; leaving the chart clears it.
- *  - CTRL/CMD + wheel — which is also what browsers report for a trackpad
- *    pinch — zooms about the pointer. Shift/horizontal wheel pans. A plain
- *    vertical wheel is left alone so the page keeps scrolling, and only the
- *    zoom/pan cases call preventDefault (so browser zoom is untouched).
+ *  - WHEEL over the chart zooms about the pointer — a plain vertical wheel,
+ *    and equally Ctrl/Cmd + wheel, which is what browsers report for a
+ *    trackpad pinch. Shift + wheel and horizontal trackpad input pan instead.
+ *    Every wheel event the chart handles calls `preventDefault()` (the
+ *    listener is `passive: false`), so the page neither scrolls nor
+ *    browser-zooms while the pointer is over the chart; wheels anywhere else
+ *    never reach this adapter and scroll the detail screen normally.
+ *  - A wheel BURST is one gesture: the viewport is snapshotted once and each
+ *    event applies the accumulated zoom/pan against it, so fast scrolling
+ *    accumulates instead of re-zooming a stale snapshot (see
+ *    `createWheelGestureSession`).
  */
 export default function CandlestickGestures({
   children,
   innerWidth,
   paddingLeft,
   slotWidth,
+  chartWidth,
+  chartHeight,
   onGestureStart,
   onPan,
   onZoom,
@@ -39,6 +49,8 @@ export default function CandlestickGestures({
     innerWidth,
     paddingLeft,
     slotWidth,
+    chartWidth,
+    chartHeight,
     onGestureStart,
     onPan,
     onZoom,
@@ -49,6 +61,8 @@ export default function CandlestickGestures({
     innerWidth,
     paddingLeft,
     slotWidth,
+    chartWidth,
+    chartHeight,
     onGestureStart,
     onPan,
     onZoom,
@@ -65,29 +79,36 @@ export default function CandlestickGestures({
     const node = containerRef.current as unknown as HTMLElement | null;
     if (!node?.addEventListener) return undefined;
 
+    const wheelSession = createWheelGestureSession({
+      onGestureStart: () => handlersRef.current.onGestureStart(),
+      onZoom: (scale, focalX) => handlersRef.current.onZoom(scale, focalX),
+      onPan: (translationX) => handlersRef.current.onPan(translationX),
+      onGestureEnd: () => handlersRef.current.onGestureEnd(),
+    });
+
     const onWheel = (event: WheelEvent) => {
       const handlers = handlersRef.current;
-      const intent = classifyWheelIntent(event);
-      if (intent === 'page-scroll') return; // page keeps scrolling
-      // Only zoom/pan consume the event.
+      // A no-op wheel neither zooms nor scrolls anything: leave it alone
+      // instead of opening a gesture session for it.
+      if (!event.deltaX && !event.deltaY) return;
+      // The chart handles every wheel that lands on it, so the page must not
+      // scroll or browser-zoom underneath it.
       event.preventDefault();
       const local = toLocal(node, event.clientX, event.clientY);
-      if (intent === 'zoom') {
-        handlers.onGestureStart();
-        handlers.onZoom(
+      if (classifyWheelIntent(event) === 'zoom') {
+        wheelSession.zoom(
           wheelZoomScale(event.deltaY),
           local.x - handlers.paddingLeft,
         );
-        handlers.onGestureEnd();
         return;
       }
-      handlers.onGestureStart();
-      handlers.onPan(-(event.deltaX || event.deltaY));
-      handlers.onGestureEnd();
+      wheelSession.pan(-(event.deltaX || event.deltaY));
     };
 
     const onMouseDown = (event: MouseEvent) => {
       if (event.button !== 0) return;
+      // A drag owns the viewport snapshot: close any open wheel session first.
+      wheelSession.end();
       dragRef.current = { active: true, startX: event.clientX };
       handlersRef.current.onGestureStart();
       handlersRef.current.onCrosshair(null);
@@ -111,6 +132,7 @@ export default function CandlestickGestures({
 
     const onMouseLeave = () => {
       endDrag();
+      wheelSession.end();
       handlersRef.current.onCrosshair(null);
     };
 
@@ -127,6 +149,8 @@ export default function CandlestickGestures({
       node.removeEventListener('mousemove', onMouseMove);
       node.removeEventListener('mouseleave', onMouseLeave);
       window.removeEventListener('mouseup', endDrag);
+      // Drop the pending idle timer so it cannot fire after unmount.
+      wheelSession.dispose();
     };
   }, [toLocal]);
 

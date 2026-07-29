@@ -201,21 +201,20 @@ export function zoomViewportAtFocalPoint(
   };
 }
 
-/** Zoom-button steps: one press = one comfortable density change. */
-export const ZOOM_STEP_SCALE = 1.5;
-
-export function zoomViewportByStep(
+/**
+ * Is this viewport the default window (latest data, default density)? The
+ * chart uses it to show its "최신" reset affordance only when it would do
+ * something.
+ */
+export function isDefaultViewport(
   viewport: CandleViewport,
-  direction: 'in' | 'out',
   totalCount: number,
-): CandleViewport {
-  // Buttons zoom about the right edge so the newest candles stay in view.
-  return zoomViewportAtFocalPoint(
-    viewport,
-    direction === 'in' ? ZOOM_STEP_SCALE : 1 / ZOOM_STEP_SCALE,
-    1,
-    1,
-    totalCount,
+): boolean {
+  const base = clampViewport(viewport, totalCount);
+  const target = createDefaultViewport(totalCount);
+  return (
+    base.visibleCount === target.visibleCount &&
+    base.rightOffset === target.rightOffset
   );
 }
 

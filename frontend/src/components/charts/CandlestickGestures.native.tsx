@@ -6,26 +6,37 @@ import {
   HORIZONTAL_PAN_SLOP_PX,
   LONG_PRESS_MOVE_SLOP_PX,
   LONG_PRESS_MS,
-  createCrosshairSession,
+  createChartGestureSession,
+  isWithinChartBounds,
   pinchScale,
 } from './candlestickGesturePolicy';
 import type { CandlestickGesturesProps } from './CandlestickGestures';
 
 /**
- * Native (iOS/Android) gesture adapter.
+ * Native (iOS/Android) gesture adapter. There are no zoom controls on screen:
+ * these gestures are the whole zoom/pan vocabulary.
  *
  * Recognizers and how they stay out of each other's way:
- *  - PINCH (two fingers) zooms about the finger midpoint. It clears crosshair
- *    mode so a leftover long press cannot fight it.
+ *  - PINCH (two fingers) zooms about the finger midpoint. It TAKES OVER the
+ *    session, so a long press that turns into a pinch ends the crosshair first
+ *    and the pinch still reports exactly one start and one end.
  *  - LONG PRESS (~300ms, held still) turns crosshair mode ON. Scrubbing then
  *    runs through `crosshairPan`, a manually-activated pan that only claims
  *    the touch once crosshair mode is on — which is why a vertical scrub works
  *    while a normal vertical swipe still belongs to the parent ScrollView.
- *    BOTH recognizers finalize the crosshair, so lifting the finger ends it
- *    whether or not the touch ever moved (and cancel/fail count as a lift).
+ *    Leaving the chart box ends the crosshair (`shouldCancelWhenOutside` plus
+ *    an explicit bounds check on the scrub itself), and BOTH recognizers may
+ *    finalize it — the session ignores everything but the first.
  *  - CHART PAN is a one-finger pan constrained with `activeOffsetX` /
  *    `failOffsetY`: it activates only for clearly horizontal drags, so the
- *    detail screen keeps scrolling vertically. It is skipped in crosshair mode.
+ *    detail screen keeps scrolling vertically. It claims the session on
+ *    ACTIVATION (not on touch down), so it never blocks a long press, and it
+ *    measures translation from the activation point so the chart does not jump
+ *    by the activation slop.
+ *
+ * Every start/end goes through `createChartGestureSession`, so the chart sees
+ * one `onGestureStart`/`onGestureEnd` per real gesture no matter how many of
+ * these simultaneous recognizers finalize for a single lift.
  *
  * A drag maps 1:1 to candles and stops at the data edges — no inertia, fling
  * or rubber-band in this first version.
@@ -33,6 +44,8 @@ import type { CandlestickGesturesProps } from './CandlestickGestures';
 export default function CandlestickGestures({
   children,
   paddingLeft,
+  chartWidth,
+  chartHeight,
   onGestureStart,
   onPan,
   onZoom,
@@ -40,37 +53,57 @@ export default function CandlestickGestures({
   onGestureEnd,
 }: CandlestickGesturesProps) {
   const gesture = useMemo(() => {
-    // Crosshair mode is read synchronously by several recognizers, so it lives
-    // outside React state (the state machine itself is in the shared policy).
-    const session = createCrosshairSession({ onCrosshair, onGestureEnd });
-    const endCrosshair = () => {
-      session.end();
-    };
+    // Read synchronously by several recognizers, so it lives outside React
+    // state (the state machine itself is in the shared policy).
+    const session = createChartGestureSession({
+      onGestureStart,
+      onGestureEnd,
+      onCrosshair,
+    });
+    const chartBox = { width: chartWidth, height: chartHeight };
+    // Chart pan reports translation from the touch start; the session begins
+    // at ACTIVATION, so the slop travelled before that is subtracted.
+    let panOriginX = 0;
 
     const longPress = Gesture.LongPress()
       .minDuration(LONG_PRESS_MS)
       .maxDistance(LONG_PRESS_MOVE_SLOP_PX)
-      .shouldCancelWhenOutside(false)
+      // A finger that leaves the chart cancels the hold, which finalizes here
+      // and clears the crosshair.
+      .shouldCancelWhenOutside(true)
       .onStart((event) => {
-        session.start({ x: event.x, y: event.y });
+        session.startCrosshair({ x: event.x, y: event.y });
       })
-      // A hold that is released WITHOUT moving never reaches `crosshairPan`
-      // (it only activates on touch move), and a cancelled/failed hold has no
-      // end event of its own — so the long press must clear the crosshair too.
-      // `session.end()` is idempotent, so both paths firing is harmless.
-      .onFinalize(endCrosshair)
+      // A hold released WITHOUT moving never reaches `crosshairPan` (it only
+      // activates on touch move), and a cancelled/failed hold has no end event
+      // of its own — so the long press must end the crosshair too. The session
+      // ignores it when the crosshair is already gone.
+      .onFinalize(() => {
+        session.end('crosshair');
+      })
       .runOnJS(true);
 
     const crosshairPan = Gesture.Pan()
       // Stays out of the way until a long press has armed crosshair mode.
       .manualActivation(true)
+      .shouldCancelWhenOutside(true)
       .onTouchesMove((event, manager) => {
-        if (!session.isActive()) return;
+        if (!session.isCrosshairActive()) return;
         manager.activate();
         const touch = event.changedTouches[0] ?? event.allTouches[0];
-        if (touch) session.move({ x: touch.x, y: touch.y });
+        if (!touch) return;
+        const point = { x: touch.x, y: touch.y };
+        // Scrubbed off the chart: end crosshair mode instead of tracking a
+        // finger that is no longer over the plot.
+        if (!isWithinChartBounds(point, chartBox)) {
+          session.end('crosshair');
+          return;
+        }
+        session.moveCrosshair(point);
       })
-      .onFinalize(endCrosshair)
+      .onFinalize(() => {
+        session.end('crosshair');
+      })
       .runOnJS(true);
 
     const chartPan = Gesture.Pan()
@@ -78,36 +111,47 @@ export default function CandlestickGestures({
       .failOffsetY([-HORIZONTAL_PAN_SLOP_PX * 2, HORIZONTAL_PAN_SLOP_PX * 2])
       .minPointers(1)
       .maxPointers(1)
-      .onBegin(() => {
-        if (!session.isActive()) onGestureStart();
+      .onStart((event) => {
+        panOriginX = event.translationX;
+        session.begin('pan');
       })
       .onUpdate((event) => {
-        if (session.isActive()) return;
-        onPan(event.translationX);
+        if (!session.isOwner('pan')) return;
+        onPan(event.translationX - panOriginX);
       })
       .onFinalize(() => {
-        if (!session.isActive()) onGestureEnd();
+        session.end('pan');
       })
       .runOnJS(true);
 
     const pinch = Gesture.Pinch()
       .onBegin(() => {
-        // A long press that turns into a pinch drops crosshair mode first.
-        endCrosshair();
-        onGestureStart();
+        // A long press (or an in-flight pan) that turns into a pinch hands the
+        // session over: the previous gesture ends once, the pinch starts once.
+        session.takeOver('pinch');
       })
       .onUpdate((event) => {
+        if (!session.isOwner('pinch')) return;
         // `event.scale` is already relative to the pinch start; the shared
         // policy bounds it so a single bad frame cannot explode the zoom.
         onZoom(pinchScale(event.scale, 1), event.focalX - paddingLeft);
       })
       .onFinalize(() => {
-        onGestureEnd();
+        session.end('pinch');
       })
       .runOnJS(true);
 
     return Gesture.Simultaneous(pinch, longPress, crosshairPan, chartPan);
-  }, [paddingLeft, onGestureStart, onPan, onZoom, onCrosshair, onGestureEnd]);
+  }, [
+    paddingLeft,
+    chartWidth,
+    chartHeight,
+    onGestureStart,
+    onPan,
+    onZoom,
+    onCrosshair,
+    onGestureEnd,
+  ]);
 
   return (
     <GestureDetector gesture={gesture}>

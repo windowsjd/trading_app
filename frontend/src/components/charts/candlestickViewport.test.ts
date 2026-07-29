@@ -12,12 +12,13 @@ import {
   createDefaultViewport,
   getRenderIndexRange,
   getVisibleIndexRange,
+  isDefaultViewport,
   isViewingLatest,
   panViewportByPixels,
   resetViewport,
   zoomViewportAtFocalPoint,
-  zoomViewportByStep,
 } from './candlestickViewport.ts';
+import * as viewportModule from './candlestickViewport.ts';
 
 const SLOT = 5; // px per candle at 300px inner width / 60 candles
 
@@ -204,14 +205,40 @@ describe('zoom', () => {
     assert.equal(zoomedOut.rightOffset, 0);
   });
 
-  it('zoom buttons step in and out around the newest candles', () => {
-    const start = createDefaultViewport(600);
-    const zoomedIn = zoomViewportByStep(start, 'in', 600);
-    const zoomedOut = zoomViewportByStep(start, 'out', 600);
+  it('zooms only through a focal point — there are no zoom step controls', () => {
+    // Zoom is pinch (native) / wheel (web) only; nothing in the app may zoom
+    // by pressing a button, so this module exposes no step helper.
+    assert.equal(
+      (viewportModule as Record<string, unknown>).zoomViewportByStep,
+      undefined,
+    );
+    assert.equal(
+      (viewportModule as Record<string, unknown>).ZOOM_STEP_SCALE,
+      undefined,
+    );
+  });
+});
 
-    assert.equal(zoomedIn.visibleCount, 40);
-    assert.equal(zoomedOut.visibleCount, 90);
-    assert.equal(zoomedIn.rightOffset, 0);
+describe('isDefaultViewport (the "최신" reset affordance)', () => {
+  it('is true for the default window on any data length', () => {
+    assert.equal(isDefaultViewport(createDefaultViewport(600), 600), true);
+    assert.equal(isDefaultViewport(createDefaultViewport(12), 12), true);
+    assert.equal(isDefaultViewport({ visibleCount: 60, rightOffset: 0 }, 600), true);
+  });
+
+  it('is false in history or at a non-default zoom', () => {
+    assert.equal(isDefaultViewport({ visibleCount: 60, rightOffset: 30 }, 600), false);
+    assert.equal(isDefaultViewport({ visibleCount: 25, rightOffset: 0 }, 600), false);
+    assert.equal(isDefaultViewport({ visibleCount: 180, rightOffset: 0 }, 600), false);
+  });
+
+  it('resetting from any state returns the default window', () => {
+    // What the "최신" button does: 60 slots, pinned to the newest candle.
+    const reset = resetViewport(600);
+    assert.equal(reset.visibleCount, DEFAULT_VISIBLE_CANDLES);
+    assert.equal(reset.rightOffset, 0);
+    assert.equal(isDefaultViewport(reset, 600), true);
+    assert.equal(isViewingLatest(reset), true);
   });
 });
 

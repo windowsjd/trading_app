@@ -4,9 +4,11 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
+import { getCandlestickChartHeight } from './candlestickChartHeight';
 import { formatChartPrice } from './candlestickPriceFormat';
 import CandlestickChartRenderer, {
   type CandlestickChartGeometry,
@@ -25,11 +27,11 @@ import {
   createDefaultViewport,
   getRenderIndexRange,
   getVisibleIndexRange,
+  isDefaultViewport,
   isViewingLatest,
   panViewportByPixels,
   resetViewport,
   zoomViewportAtFocalPoint,
-  zoomViewportByStep,
   type CandleViewport,
 } from './candlestickViewport';
 import ChartEmptyState from './ChartEmptyState';
@@ -55,6 +57,10 @@ export type CandlestickChartProps = {
   displayPriceDecimals?: number | null;
   /** Live price for the current-price line. Falls back to the last candle close. */
   currentPrice?: string | number | null;
+  /**
+   * Fixed chart height in px. Omit it (the detail screen does) to get the
+   * responsive height from `getCandlestickChartHeight`.
+   */
   height?: number;
   emptyMessage?: string;
   /**
@@ -163,17 +169,26 @@ function parseCandles(candles: CandlestickChartCandle[]): ParsedCandle[] {
  * only translate raw gestures into pan/zoom/crosshair intent. Moving beyond the
  * loaded range is intentionally impossible — fetching more history is a future
  * addition that would only extend the candle array handed in here.
+ *
+ * Zoom has NO on-screen controls: mobile pinches, web wheels. `visibleCount`
+ * is an internal viewport value, never a candle count the user picks. The only
+ * button is the small "최신" reset, and it only appears when the viewport has
+ * actually moved off the default window.
  */
 export default function CandlestickChart({
   candles,
   currencyCode,
   displayPriceDecimals,
   currentPrice,
-  height = 240,
+  height: heightOverride,
   emptyMessage = '표시할 차트 데이터가 없습니다.',
   viewportResetKey,
 }: CandlestickChartProps) {
   const [width, setWidth] = useState(DEFAULT_WIDTH);
+  // Re-runs on rotation and on browser resize, so the chart height follows.
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const chartHeight =
+    heightOverride ?? getCandlestickChartHeight(windowWidth, windowHeight);
   const [crosshair, setCrosshair] = useState<{ x: number; y: number } | null>(
     null,
   );
@@ -186,7 +201,7 @@ export default function CandlestickChart({
 
   const chartWidth = Math.max(width, 160);
   const innerWidth = Math.max(chartWidth - PADDING.left - PADDING.right, 1);
-  const innerHeight = Math.max(height - PADDING.top - PADDING.bottom, 1);
+  const innerHeight = Math.max(chartHeight - PADDING.top - PADDING.bottom, 1);
   const { slotWidth, bodyWidth } = computeSlotLayout(
     innerWidth,
     viewport.visibleCount,
@@ -288,14 +303,6 @@ export default function CandlestickChart({
     gestureStartViewportRef.current = viewportRef.current;
   }, []);
 
-  const zoomIn = useCallback(() => {
-    setViewport((current) => zoomViewportByStep(current, 'in', totalRef.current));
-  }, []);
-  const zoomOut = useCallback(() => {
-    setViewport((current) =>
-      zoomViewportByStep(current, 'out', totalRef.current),
-    );
-  }, []);
   const resetToLatest = useCallback(() => {
     setCrosshair(null);
     setViewport(resetViewport(totalRef.current));
@@ -339,7 +346,7 @@ export default function CandlestickChart({
 
     return {
       width: chartWidth,
-      height,
+      height: chartHeight,
       innerWidth,
       innerHeight,
       padding: PADDING,
@@ -362,7 +369,7 @@ export default function CandlestickChart({
     viewport,
     currentPrice,
     chartWidth,
-    height,
+    chartHeight,
     innerWidth,
     innerHeight,
     slotWidth,
@@ -410,9 +417,12 @@ export default function CandlestickChart({
       }
     : null;
 
+  // The viewport is off its default window, so the reset affordance would do
+  // something. (It is the only chart button: zoom has no controls.)
+  const canResetViewport = !isDefaultViewport(viewport, total);
+
   const accessibilityLabel = [
     '캔들 차트',
-    `${endIndex - startIndex}개 표시 중`,
     viewingLatest ? '최신 구간' : '과거 구간',
     `현재가 ${formatChartPrice(
       livePrice ?? parsed[total - 1].close,
@@ -425,7 +435,7 @@ export default function CandlestickChart({
     <View style={styles.wrapper}>
       <View
         onLayout={onLayout}
-        style={[styles.container, { height }]}
+        style={[styles.container, { height: chartHeight }]}
         accessible
         accessibilityRole="image"
         accessibilityLabel={accessibilityLabel}
@@ -434,6 +444,8 @@ export default function CandlestickChart({
           innerWidth={innerWidth}
           paddingLeft={PADDING.left}
           slotWidth={slotWidth}
+          chartWidth={chartWidth}
+          chartHeight={chartHeight}
           onGestureStart={handleGestureStart}
           onPan={handlePan}
           onZoom={handleZoom}
@@ -455,66 +467,45 @@ export default function CandlestickChart({
         </CandlestickGestures>
       </View>
 
-      {/* Screen-reader and non-gesture users must be able to drive the chart. */}
-      <View style={styles.controls}>
+      {/* Only affordance on the chart: back to the latest window at the
+          default density. Hidden while already there, and a SIBLING of the
+          `accessible` chart box so screen readers can still reach it. */}
+      {canResetViewport ? (
         <Pressable
-          style={styles.controlButton}
-          onPress={zoomOut}
-          accessibilityRole="button"
-          accessibilityLabel="차트 축소"
-        >
-          <Text style={styles.controlText}>−</Text>
-        </Pressable>
-        <Pressable
-          style={styles.controlButton}
-          onPress={zoomIn}
-          accessibilityRole="button"
-          accessibilityLabel="차트 확대"
-        >
-          <Text style={styles.controlText}>＋</Text>
-        </Pressable>
-        <Pressable
-          style={styles.controlButton}
+          style={styles.resetButton}
           onPress={resetToLatest}
           accessibilityRole="button"
           accessibilityLabel="차트를 최신 구간으로 초기화"
         >
-          <Text style={styles.controlText}>초기화</Text>
+          <Text style={styles.resetText}>최신</Text>
         </Pressable>
-        <Text style={styles.controlHint}>
-          {endIndex - startIndex}개
-          {viewingLatest ? '' : ' · 과거 구간'}
-        </Text>
-      </View>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: { width: '100%' },
+  // `relative` anchors the absolutely positioned reset button to the chart box.
+  wrapper: { width: '100%', position: 'relative' },
   container: {
     width: '100%',
     backgroundColor: '#ffffff',
     borderRadius: 8,
     overflow: 'hidden',
   },
-  controls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 8,
-  },
-  controlButton: {
-    minWidth: 44,
-    minHeight: 32,
+  resetButton: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    minHeight: 28,
     paddingHorizontal: 10,
+    paddingVertical: 4,
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
+    borderColor: '#dfe3e8',
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.92)',
   },
-  controlText: { fontSize: 14, fontWeight: '600', color: '#111' },
-  controlHint: { fontSize: 12, color: '#98a2b3' },
+  resetText: { fontSize: 12, fontWeight: '600', color: '#111' },
 });

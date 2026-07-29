@@ -433,11 +433,12 @@ returned. Files (`frontend/src/components/charts/`):
 | `candlestickViewport.ts` | Pure viewport math: `{visibleCount, rightOffset}`, clamps, index ranges, pan/zoom/focal-point, data-change adjustment |
 | `candlestickLayout.ts` | Pure pixel geometry: slot/body width for the current zoom, leading empty slots, x → slot → original candle index |
 | `candlestickPriceFormat.ts` | The ONE chart price formatter (axis, current price, crosshair, accessibility) — honors the asset's `displayPriceDecimals` |
-| `candlestickGesturePolicy.ts` | Pure gesture policy shared by both adapters: horizontal-pan intent, wheel intent (zoom/pan/page-scroll), wheel & pinch scale bounds, crosshair session state machine |
+| `candlestickGesturePolicy.ts` | Pure gesture policy shared by both adapters: horizontal-pan intent, wheel intent (zoom/pan), wheel & pinch scale bounds, chart-bounds test, gesture LIFECYCLE state machine, wheel-burst session |
+| `candlestickChartHeight.ts` | Pure responsive chart height (phone ~52% / 380–480, tablet-web ~60% / 500–680) |
 | `CandlestickChartRenderer.tsx` | The ONE SVG renderer (grid, candles, axes, current-price line, crosshair) — never duplicated per platform |
 | `CandlestickGestures.native.tsx` | RNGH adapter: pinch, horizontal pan, long-press crosshair |
-| `CandlestickGestures.web.tsx` | DOM adapter: mouse drag pan, hover crosshair, ctrl/cmd+wheel zoom |
-| `CandlestickChart.tsx` | Viewport state, geometry, visible slice, controls; assembles renderer + platform adapter |
+| `CandlestickGestures.web.tsx` | DOM adapter: mouse drag pan, hover crosshair, wheel zoom/pan |
+| `CandlestickChart.tsx` | Viewport state, geometry, visible slice, responsive height, the single "최신" reset button; assembles renderer + platform adapter |
 
 `CandlestickGestures.tsx` holds the shared props contract and a no-gesture
 fallback; Metro resolves `./CandlestickGestures` to the `.native`/`.web` file
@@ -475,21 +476,57 @@ Policy:
 - **Pan** converts `translationX / slotWidth` into whole candles against a
   snapshot taken at gesture start (no accumulated float drift) and stops at
   both data edges.
-- **Mobile gestures**: two-finger pinch = zoom (it ends crosshair mode first);
-  one-finger horizontal drag = pan (`activeOffsetX` + `failOffsetY`, so
-  vertical swipes stay with the detail screen's ScrollView); ~300ms long press
-  = crosshair, scrubbed through a manually-activated pan so vertical scrubbing
-  works without stealing normal vertical scrolls. Crosshair mode is a shared
-  `createCrosshairSession` state machine and BOTH the long press and the
-  crosshair pan finalize it, so lifting the finger always clears it — including
-  a hold that never moved (which the pan never sees) and a cancelled/failed
-  recognizer. `end()` is idempotent, so the doubled finalize reports one
-  gesture end. No inertia/fling/rubber-band in this version.
+- **No zoom controls on screen.** There are no `+` / `−` buttons, no candle
+  count text and no way for the user to pick a candle count: zoom is pinch
+  (mobile) and wheel (web) only. `visibleCount` remains an INTERNAL viewport
+  value that pinch/wheel convert into — it is never surfaced as UI. The chart's
+  one button is a small `최신` overlay (a11y `차트를 최신 구간으로 초기화`)
+  that resets to `visibleCount = DEFAULT_VISIBLE_CANDLES`, `rightOffset = 0`
+  and clears the crosshair; it renders only when `isDefaultViewport()` is
+  false, so an untouched chart shows no chrome at all.
+- **Mobile gestures**: two-finger pinch = zoom; one-finger horizontal drag =
+  pan (`activeOffsetX` + `failOffsetY`, so vertical swipes stay with the detail
+  screen's ScrollView); ~300ms long press = crosshair, scrubbed through a
+  manually-activated pan so vertical scrubbing works without stealing normal
+  vertical scrolls. A scrub that leaves the chart ends the crosshair —
+  `shouldCancelWhenOutside(true)` on both the long press and the crosshair pan,
+  plus an explicit `isWithinChartBounds` check on the scrub, and the finished
+  session does not revive when the finger comes back in. No
+  inertia/fling/rubber-band in this version.
+- **Gesture lifecycle**: all four simultaneous recognizers route through
+  `createChartGestureSession` (`none | pan | pinch | crosshair`).
+  `begin(type)` claims the chart only when nothing owns it, `end(type)` fires
+  only for the current owner, and `takeOver(type)` is the explicit hand-off
+  (crosshair → pinch: crosshair ends once, pinch starts once). So
+  `onGestureStart`/`onGestureEnd` fire exactly once per real gesture even
+  though a single lift finalizes several recognizers, and a finalize from a
+  recognizer that never owned the chart changes nothing. Chart pan claims the
+  session on ACTIVATION (never on touch-down, so it cannot block a long press)
+  and measures translation from the activation point, so the activation slop
+  does not jump the chart.
 - **Web gestures**: left-drag pans (crosshair suppressed during the drag),
-  hover shows the crosshair, ctrl/cmd + wheel (also what a trackpad pinch
-  reports) zooms at the pointer, shift/horizontal wheel pans, and a plain
-  vertical wheel is left to the page so the detail page still scrolls. Only
-  the zoom/pan cases call `preventDefault`, so browser zoom is untouched.
+  hover shows the crosshair, and the wheel over the chart is the chart's:
+  shift + wheel and horizontal trackpad input pan, every other vertical wheel
+  zooms at the pointer — including ctrl/cmd + wheel, which is what browsers
+  report for a trackpad pinch. Every wheel the chart receives calls
+  `preventDefault` (listener stays `passive: false`), so neither page scroll
+  nor browser zoom happens over the chart; wheels outside the chart never
+  reach the adapter and scroll the page normally.
+- **Wheel bursts are ONE gesture.** A wheel burst arrives faster than React
+  re-renders, so per-event start/end pairs would re-zoom the same stale
+  snapshot and only one notch would stick. `createWheelGestureSession` opens a
+  session on the first event (one viewport snapshot), applies the ACCUMULATED
+  scale/pan against it, and closes after a ~120ms idle gap; switching between
+  zoom and pan closes and reopens cleanly, a mouse-down/leave closes it, and
+  unmount disposes the pending timer without firing.
+- **Chart height is responsive**, not a fixed 240px strip:
+  `getCandlestickChartHeight(windowWidth, windowHeight)` — width < 768 → ~52%
+  of the window clamped to 380–480, width ≥ 768 → ~60% clamped to 500–680,
+  falling back to the class minimum for unusable dimensions. It is fed by
+  `useWindowDimensions()`, so rotation and browser resize recompute it. An
+  explicit `height` prop still wins (`heightOverride ?? …`); `AssetDetailScreen`
+  passes none. The chart is never shrunk to fit more content on one screen —
+  the detail screen's existing single ScrollView carries the rest.
 - **Y axis** is computed from the candles actually on screen. The
   current-price line is drawn ONLY while `rightOffset === 0`; in history it is
   hidden and excluded from the min/max so it cannot distort the range.
@@ -497,10 +534,10 @@ Policy:
   1000-candle payload still renders ~60 (max ~182) candle groups. Pan/zoom
   update React state only when the visible index actually changes.
 - **Timeframe switch** (`viewportResetKey` = `assetId:interval`) resets to the
-  latest 60 and clears the crosshair. `+` / `−` / `초기화` buttons provide the
-  same control without gestures and carry accessibility labels; the chart's
-  own accessibility label reports the visible candle count, whether it is the
-  latest or a history window, and the current price.
+  latest 60 slots (`rightOffset = 0`) and clears the crosshair, so a zoom from
+  the previous timeframe never carries over. The chart's accessibility label
+  reports whether it is the latest or a history window plus the current price
+  (no candle count).
 - **Live candle append** keeps the right edge pinned while viewing the latest;
   while viewing history the same candles stay on screen (`rightOffset` ages
   with the appended count) so the viewport never jumps to the newest data.
