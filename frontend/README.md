@@ -59,10 +59,16 @@ exactly one start and one end no matter how many recognizers finalize it.
 There are NO zoom buttons and no candle-count UI — `visibleCount` is internal
 viewport state that pinch/wheel drive. The only button is a small `최신`
 overlay that returns to the latest 60 slots, and it appears only once the
-viewport has moved. Chart height is responsive
-(`getCandlestickChartHeight`): ~52% of the window (380–480) on phones, ~60%
-(500–680) at ≥768px width, recomputed on rotation/resize. Everything below the
-chart is reached with the detail screen's existing vertical ScrollView.
+viewport has moved. A wheel that arrives while a mouse drag is in progress is
+swallowed (still `preventDefault`, but no zoom/pan) so only one gesture ever
+writes the viewport; wheels work normally again after mouseup.
+
+Chart height is responsive (`getCandlestickChartHeight`): ~52% of the window
+(380–480) for phones and narrow web, ~60% (500–680) for tablets and wide web,
+recomputed on rotation/resize. The layout class is not width alone — native
+devices are judged by their SHORT side (`< 600` = phone, so a landscape 844×390
+phone stays a phone), web by window width (`< 768` = narrow). Everything below
+the chart is reached with the detail screen's existing vertical ScrollView.
 
 The viewport counts SCREEN SLOTS (60 by default on every timeframe), not
 candles: a timeframe with only 12 candles draws them at the normal width

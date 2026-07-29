@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   LayoutChangeEvent,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -8,7 +9,10 @@ import {
   View,
 } from 'react-native';
 
-import { getCandlestickChartHeight } from './candlestickChartHeight';
+import {
+  getCandlestickChartHeight,
+  toChartLayoutPlatform,
+} from './candlestickChartHeight';
 import { formatChartPrice } from './candlestickPriceFormat';
 import CandlestickChartRenderer, {
   type CandlestickChartGeometry,
@@ -186,9 +190,15 @@ export default function CandlestickChart({
 }: CandlestickChartProps) {
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   // Re-runs on rotation and on browser resize, so the chart height follows.
+  // The platform matters: a landscape PHONE is wide but is not a tablet.
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const chartHeight =
-    heightOverride ?? getCandlestickChartHeight(windowWidth, windowHeight);
+    heightOverride ??
+    getCandlestickChartHeight({
+      windowWidth,
+      windowHeight,
+      platform: toChartLayoutPlatform(Platform.OS),
+    });
   const [crosshair, setCrosshair] = useState<{ x: number; y: number } | null>(
     null,
   );

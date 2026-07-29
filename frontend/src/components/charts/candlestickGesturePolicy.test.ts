@@ -9,6 +9,7 @@ import {
   isHorizontalPanIntent,
   isWithinChartBounds,
   pinchScale,
+  resolveWheelHandling,
   wheelZoomScale,
 } from './candlestickGesturePolicy.ts';
 
@@ -54,6 +55,76 @@ describe('classifyWheelIntent', () => {
       classifyWheelIntent({ deltaX: 2, deltaY: 90, shiftKey: true }),
       'pan',
     );
+  });
+});
+
+describe('resolveWheelHandling (wheel vs an active mouse drag)', () => {
+  const idle = { dragActive: false };
+  const dragging = { dragActive: true };
+
+  it('zooms and pans normally while no drag is running', () => {
+    assert.equal(resolveWheelHandling({ deltaY: -120 }, idle), 'zoom');
+    assert.equal(resolveWheelHandling({ deltaY: 120, ctrlKey: true }, idle), 'zoom');
+    assert.equal(resolveWheelHandling({ deltaY: 120, shiftKey: true }, idle), 'pan');
+    assert.equal(resolveWheelHandling({ deltaX: -80, deltaY: 4 }, idle), 'pan');
+  });
+
+  it('consumes — never zooms or pans — every wheel during a drag', () => {
+    // Two gestures writing the viewport at once is the bug; the drag wins.
+    assert.equal(resolveWheelHandling({ deltaY: -120 }, dragging), 'consume');
+    assert.equal(resolveWheelHandling({ deltaY: 120, ctrlKey: true }, dragging), 'consume');
+    assert.equal(resolveWheelHandling({ deltaY: 120, shiftKey: true }, dragging), 'consume');
+    assert.equal(resolveWheelHandling({ deltaX: -80, deltaY: 4 }, dragging), 'consume');
+    // Consumed still means preventDefault: the page must not scroll mid-drag.
+    assert.notEqual(resolveWheelHandling({ deltaY: 120 }, dragging), 'skip');
+  });
+
+  it('leaves a no-op wheel completely alone', () => {
+    assert.equal(resolveWheelHandling({ deltaX: 0, deltaY: 0 }, idle), 'skip');
+    assert.equal(resolveWheelHandling({}, idle), 'skip');
+  });
+
+  it('drives the adapter: no wheel session is opened during a drag', () => {
+    // Mirrors CandlestickGestures.web: resolve → (skip: return) →
+    // preventDefault → (consume: return) → session.
+    const events: string[] = [];
+    let prevented = 0;
+    let dragActive = false;
+    const session = createWheelGestureSession({
+      onGestureStart: () => events.push('start'),
+      onZoom: () => events.push('zoom'),
+      onPan: () => events.push('pan'),
+      onGestureEnd: () => events.push('end'),
+      setTimer: () => 1,
+      clearTimer: () => {},
+    });
+    const wheel = (event: { deltaX?: number; deltaY?: number; shiftKey?: boolean }) => {
+      const handling = resolveWheelHandling(event, { dragActive });
+      if (handling === 'skip') return;
+      prevented += 1;
+      if (handling === 'consume') return;
+      if (handling === 'zoom') session.zoom(1.2, 100);
+      else session.pan(-40);
+    };
+
+    // Drag starts: mouse down ends any open wheel session and takes over.
+    dragActive = true;
+    session.end();
+    wheel({ deltaY: -120 });
+    wheel({ deltaY: 120, shiftKey: true });
+
+    assert.equal(prevented, 2, 'both mid-drag wheels were consumed');
+    assert.deepEqual(events, [], 'no zoom, no pan, no gesture start/end');
+    assert.equal(session.isActive(), false, 'no wheel session opened');
+
+    // mouseup → wheels work again, and they accumulate as one burst.
+    dragActive = false;
+    wheel({ deltaY: -120 });
+    wheel({ deltaY: -120 });
+
+    assert.equal(prevented, 4);
+    assert.deepEqual(events, ['start', 'zoom', 'zoom'], 'one start, accumulating zooms');
+    assert.equal(session.isActive(), true);
   });
 });
 

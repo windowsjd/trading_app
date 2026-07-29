@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useRef } from 'react';
 import { View } from 'react-native';
 
 import {
-  classifyWheelIntent,
   createWheelGestureSession,
+  resolveWheelHandling,
   wheelZoomScale,
 } from './candlestickGesturePolicy';
 import type { CandlestickGesturesProps } from './CandlestickGestures';
@@ -14,6 +14,9 @@ import type { CandlestickGesturesProps } from './CandlestickGestures';
  *  - LEFT MOUSE DRAG pans; the crosshair is suppressed while dragging and
  *    returns on the next hover move.
  *  - HOVER shows the crosshair; leaving the chart clears it.
+ *  - A wheel that arrives DURING a drag is swallowed (still `preventDefault`,
+ *    but no zoom/pan and no wheel session): one gesture owns the viewport at a
+ *    time. Wheels work normally again after mouseup.
  *  - WHEEL over the chart zooms about the pointer — a plain vertical wheel,
  *    and equally Ctrl/Cmd + wheel, which is what browsers report for a
  *    trackpad pinch. Shift + wheel and horizontal trackpad input pan instead.
@@ -88,14 +91,19 @@ export default function CandlestickGestures({
 
     const onWheel = (event: WheelEvent) => {
       const handlers = handlersRef.current;
-      // A no-op wheel neither zooms nor scrolls anything: leave it alone
-      // instead of opening a gesture session for it.
-      if (!event.deltaX && !event.deltaY) return;
+      const handling = resolveWheelHandling(event, {
+        dragActive: dragRef.current.active,
+      });
+      if (handling === 'skip') return;
       // The chart handles every wheel that lands on it, so the page must not
-      // scroll or browser-zoom underneath it.
+      // scroll or browser-zoom underneath it — including the wheels swallowed
+      // during a drag.
       event.preventDefault();
+      // Mid-drag: consumed, but no zoom, no pan and NO wheel session, so the
+      // drag keeps its own viewport snapshot and its single start/end pair.
+      if (handling === 'consume') return;
       const local = toLocal(node, event.clientX, event.clientY);
-      if (classifyWheelIntent(event) === 'zoom') {
+      if (handling === 'zoom') {
         wheelSession.zoom(
           wheelZoomScale(event.deltaY),
           local.x - handlers.paddingLeft,

@@ -12,6 +12,77 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 가로 휴대전화 차트 높이 오분류·웹 drag 중 wheel 충돌 수정 (2026-07-29)
+
+**목적**
+
+직전 작업(`ccda963e`)의 결함 2건만 고치는 소규모 보완. 신규 기능 없음.
+백엔드·DB·캔들 API·주문·체결·포지션·지갑·원장 불변.
+
+**A. 가로 방향 휴대전화가 태블릿·웹 레이아웃으로 분류되던 문제**
+
+- 문제: `getCandlestickChartHeight(windowWidth, windowHeight)`가 **너비만**으로
+  판정했다. 같은 기기가 세로 390 × 844일 때는 휴대전화, 가로 844 × 390이 되면
+  844 ≥ 768이라 wide로 바뀌어 `clamp(390*0.6, 500, 680)` = **500px** 차트를
+  390px 화면에 그리려 했다.
+- `candlestickChartHeight.ts`(순수 유지)에 layout class를 추가:
+  `getCandlestickChartLayoutClass({windowWidth, windowHeight, platform})`
+  → `phone | tablet | webNarrow | webWide`.
+  - **네이티브(ios/android/그 외)**: 짧은 변 `Math.min(w, h)` 기준.
+    `< 600` → phone, `>= 600` → tablet. 회전해도 짧은 변은 그대로라 layout
+    class가 바뀌지 않는다.
+  - **웹**: 기존대로 창 너비 기준. `< 768` → webNarrow, `>= 768` → webWide
+    (브라우저 창 844px는 실제로 wide 레이아웃이 맞다).
+- 높이 정책 자체는 불변: phone·webNarrow = `clamp(h*0.52, 380, 480)`,
+  tablet·webWide = `clamp(h*0.60, 500, 680)`.
+- 결과: 네이티브 844 × 390 → phone → **380px**(500px 아님).
+  768 × 1024와 1024 × 768은 둘 다 tablet, 웹 844 × 390은 그대로 wide.
+- `Platform.OS`는 `toChartLayoutPlatform()`(순수)로 매핑해
+  `CandlestickChart`에서 넘긴다. User-Agent 검사·device-info 라이브러리·
+  반응형 프레임워크는 도입하지 않았다. macOS/Windows 등은 `unknown`으로
+  네이티브(짧은 변) 규칙을 쓴다.
+- 기존 계약 유지: `height` prop override 우선, `useWindowDimensions()`로 회전·
+  브라우저 resize 재계산, 비정상 dimension은 더 작은 class의 최소값
+  (짧은 변이 이상값이어도 phone → tablet으로 승격되지 않는다),
+  `AssetDetailScreen`은 height 미전달, 전역 상태 추가 없음.
+
+**B. 웹 마우스 드래그 중 wheel 입력 충돌**
+
+- 문제: `onWheel()`이 `dragRef.current.active`를 보지 않아 드래그 중 wheel이
+  새 wheel session을 열 수 있었다. drag pan과 wheel zoom이 동시에 viewport를
+  바꾸고, `onGestureStart()`가 드래그 도중 다시 호출돼 snapshot이 교체되며,
+  종료도 mouseup과 wheel idle timer에서 따로 발생했다.
+- 정책: **드래그 중 wheel은 무시하되 소비한다.**
+  `resolveWheelHandling(event, {dragActive})`(순수) 신규:
+  - `dragActive` → `'consume'` (preventDefault만 하고 즉시 return)
+  - deltaX·deltaY 둘 다 0 → `'skip'` (아무것도 하지 않음)
+  - 그 외 → 기존 `classifyWheelIntent()` 결과(`zoom` | `pan`)
+- 어댑터는 `skip`이면 return, 아니면 `preventDefault()`, `consume`이면 return.
+  즉 드래그 중 wheel은 zoom·pan·`onGestureStart`·`onGestureEnd`·wheel session
+  시작이 전부 없고, 페이지 스크롤·브라우저 확대도 발생하지 않는다.
+- wheel로 활성 drag를 강제 종료하지 않는다. mouseup 이후에는
+  `dragRef.current.active = false`가 되어 wheel zoom/pan·burst 누적·idle
+  timer가 원래대로 동작한다. mousedown 시 기존 `wheelSession.end()` 호출과
+  unmount 시 `dispose()`도 그대로다.
+- 새 통합 pointer state machine은 만들지 않았다(작은 순수 함수 1개 + 어댑터
+  분기 3줄).
+
+**검증**
+
+- `npm run typecheck` 통과, `npm test` **277 pass / 0 fail**
+  (신규 layout class·회전 불변·가로 휴대전화 380px·drag-wheel 충돌 테스트 포함).
+- `npx expo export --platform web` / `--platform android` 성공.
+- 웹 브라우저·네이티브 실기기 수동 검증은 환경 부재로 **NOT_RUN**.
+- 백엔드 코드 변경 없음(문서만), DB migration 없음, 주문·체결·포지션·지갑·
+  원장 불변.
+
+**주의사항**
+
+- 네이티브 layout class를 다시 너비만으로 판정하지 말 것(가로 휴대전화 회귀).
+  웹만 너비 기준이다.
+- 드래그 중 wheel을 `skip`으로 바꾸면 페이지가 드래그 도중 스크롤된다.
+  반드시 `preventDefault` 후 return하는 `consume`이어야 한다.
+
 ### 작업 단위: 캔들 차트 조작 정리·세로 공간 확대 (2026-07-29)
 
 **목적**
@@ -103,6 +174,10 @@
   - width < 768: `clamp(height * 0.52, 380, 480)`
   - width ≥ 768: `clamp(height * 0.60, 500, 680)`
   - 비정상 dimension은 해당 클래스 최소값으로 fallback.
+  - (→ 같은 날 후속 작업에서 이 **너비 단독 판정**이 가로 방향 휴대전화를
+    태블릿으로 오분류하는 문제로 수정됐다. 현재는 네이티브=짧은 변 600px,
+    웹=창 너비 768px 기준이며 입력도 `{windowWidth, windowHeight, platform}`
+    객체다.)
 - `CandlestickChart`가 `useWindowDimensions()`로 값을 받아 회전·브라우저 resize
   때 자동 재계산한다. 기존 고정 `height = 240`은 제거.
 - `height` prop은 override로 유지:
@@ -495,6 +570,31 @@ cd frontend && npm run typecheck && npm test
 ---
 
 ## 2. 최신 작업 시간순 기록
+
+### 2026-07-29 — 가로 휴대전화 차트 높이 오분류·웹 drag 중 wheel 충돌 수정
+
+- 차트 높이 layout 판정이 **너비만** 보던 문제 수정. 가로 방향 휴대전화
+  (예: 390 × 844 기기가 회전한 844 × 390)가 844 ≥ 768이라 wide로 오분류되어
+  390px 화면에 500px 차트를 요구했다.
+- 새 판정: 네이티브는 **짧은 변**(`min(width, height)`) 기준으로
+  `< 600` phone / `>= 600` tablet — 회전해도 class가 바뀌지 않는다. 웹은 기존
+  창 너비 기준 `< 768` narrow / `>= 768` wide를 유지한다
+  (`getCandlestickChartLayoutClass` → `phone | tablet | webNarrow | webWide`).
+- 결과: 네이티브 844 × 390 → phone → 380px(500px 아님), 768 × 1024·1024 × 768
+  → tablet, 웹 844 × 390 → wide 유지. 높이 범위(휴대전화 52%/380~480,
+  태블릿·wide web 60%/500~680)와 height prop override, 회전·resize 재계산,
+  비정상 dimension fallback은 그대로다.
+- `Platform.OS`를 `toChartLayoutPlatform()`으로 순수 함수에 넘긴다.
+  User-Agent 판정·device-info 라이브러리·responsive 프레임워크 추가 없음.
+- 웹에서 **마우스 드래그 중 들어온 wheel은 무시하되 소비**한다
+  (`resolveWheelHandling(event, {dragActive})` → `consume`):
+  `preventDefault()`는 유지해 페이지 스크롤·브라우저 확대가 없고, zoom·pan·
+  `onGestureStart`/`onGestureEnd`·wheel session 시작은 전부 하지 않는다.
+  wheel로 drag를 강제 종료하지 않으며, mouseup 이후 wheel zoom/pan과 burst
+  누적·idle timer는 원래대로 동작한다.
+- 검증: typecheck 통과, 277 pass, expo export web/android 성공. 웹 브라우저·
+  네이티브 실기기 수동 검증은 환경 부재로 NOT_RUN. 백엔드 코드 변경 없음
+  (문서만), DB migration 없음, 주문·체결·포지션·지갑·원장 불변.
 
 ### 2026-07-29 — 캔들 차트 조작 정리·세로 공간 확대
 

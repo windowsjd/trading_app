@@ -52,6 +52,36 @@ export function classifyWheelIntent(event: {
   return 'zoom';
 }
 
+/**
+ * What the chart does with a wheel event that landed on it:
+ *  - `zoom` / `pan`  — handle it (and consume it),
+ *  - `consume`       — swallow it WITHOUT touching the viewport,
+ *  - `skip`          — not ours; leave the event completely alone.
+ *
+ * A wheel that arrives DURING a left-button drag is consumed: letting it open
+ * a wheel session would have two gestures writing the viewport at once (a
+ * second `onGestureStart` replacing the drag's snapshot mid-drag, then two
+ * separate ends). Ignoring it must still `preventDefault`, or the page would
+ * scroll away under a drag that is very much in progress.
+ */
+export type WheelHandling = 'zoom' | 'pan' | 'consume' | 'skip';
+
+export function resolveWheelHandling(
+  event: {
+    deltaX?: number;
+    deltaY?: number;
+    ctrlKey?: boolean;
+    metaKey?: boolean;
+    shiftKey?: boolean;
+  },
+  state: { dragActive: boolean },
+): WheelHandling {
+  if (state.dragActive) return 'consume';
+  // A no-op wheel neither zooms nor scrolls anything.
+  if (!(event.deltaX ?? 0) && !(event.deltaY ?? 0)) return 'skip';
+  return classifyWheelIntent(event);
+}
+
 /** Wheel delta → zoom factor (scroll up / pinch out = zoom in). */
 export function wheelZoomScale(deltaY: number): number {
   if (!Number.isFinite(deltaY) || deltaY === 0) return 1;

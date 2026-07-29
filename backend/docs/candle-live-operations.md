@@ -433,8 +433,8 @@ returned. Files (`frontend/src/components/charts/`):
 | `candlestickViewport.ts` | Pure viewport math: `{visibleCount, rightOffset}`, clamps, index ranges, pan/zoom/focal-point, data-change adjustment |
 | `candlestickLayout.ts` | Pure pixel geometry: slot/body width for the current zoom, leading empty slots, x → slot → original candle index |
 | `candlestickPriceFormat.ts` | The ONE chart price formatter (axis, current price, crosshair, accessibility) — honors the asset's `displayPriceDecimals` |
-| `candlestickGesturePolicy.ts` | Pure gesture policy shared by both adapters: horizontal-pan intent, wheel intent (zoom/pan), wheel & pinch scale bounds, chart-bounds test, gesture LIFECYCLE state machine, wheel-burst session |
-| `candlestickChartHeight.ts` | Pure responsive chart height (phone ~52% / 380–480, tablet-web ~60% / 500–680) |
+| `candlestickGesturePolicy.ts` | Pure gesture policy shared by both adapters: horizontal-pan intent, wheel intent (zoom/pan) and drag-aware wheel handling, wheel & pinch scale bounds, chart-bounds test, gesture LIFECYCLE state machine, wheel-burst session |
+| `candlestickChartHeight.ts` | Pure layout class (native short side / web width) + responsive chart height (phone ~52% / 380–480, tablet-wide web ~60% / 500–680) |
 | `CandlestickChartRenderer.tsx` | The ONE SVG renderer (grid, candles, axes, current-price line, crosshair) — never duplicated per platform |
 | `CandlestickGestures.native.tsx` | RNGH adapter: pinch, horizontal pan, long-press crosshair |
 | `CandlestickGestures.web.tsx` | DOM adapter: mouse drag pan, hover crosshair, wheel zoom/pan |
@@ -504,6 +504,13 @@ Policy:
   session on ACTIVATION (never on touch-down, so it cannot block a long press)
   and measures translation from the activation point, so the activation slop
   does not jump the chart.
+- **One gesture owns the viewport on web.** A wheel that arrives DURING a
+  left-button drag is CONSUMED (`resolveWheelHandling(event, {dragActive})` →
+  `consume`): `preventDefault` still runs, so the page cannot scroll out from
+  under the drag, but no zoom, no pan and no wheel session start — otherwise a
+  second `onGestureStart` would replace the drag's viewport snapshot mid-drag
+  and both would end separately. The drag is never force-ended by a wheel; on
+  `mouseup` wheels resume normally. A zero-delta wheel is `skip`ped entirely.
 - **Web gestures**: left-drag pans (crosshair suppressed during the drag),
   hover shows the crosshair, and the wheel over the chart is the chart's:
   shift + wheel and horizontal trackpad input pan, every other vertical wheel
@@ -520,13 +527,22 @@ Policy:
   zoom and pan closes and reopens cleanly, a mouse-down/leave closes it, and
   unmount disposes the pending timer without firing.
 - **Chart height is responsive**, not a fixed 240px strip:
-  `getCandlestickChartHeight(windowWidth, windowHeight)` — width < 768 → ~52%
-  of the window clamped to 380–480, width ≥ 768 → ~60% clamped to 500–680,
-  falling back to the class minimum for unusable dimensions. It is fed by
-  `useWindowDimensions()`, so rotation and browser resize recompute it. An
-  explicit `height` prop still wins (`heightOverride ?? …`); `AssetDetailScreen`
-  passes none. The chart is never shrunk to fit more content on one screen —
-  the detail screen's existing single ScrollView carries the rest.
+  `getCandlestickChartHeight({windowWidth, windowHeight, platform})` — phone /
+  narrow web → ~52% of the window clamped to 380–480, tablet / wide web → ~60%
+  clamped to 500–680, falling back to the class minimum for unusable
+  dimensions. It is fed by `useWindowDimensions()` + `Platform.OS`, so rotation
+  and browser resize recompute it. An explicit `height` prop still wins
+  (`heightOverride ?? …`); `AssetDetailScreen` passes none. The chart is never
+  shrunk to fit more content on one screen — the detail screen's existing
+  single ScrollView carries the rest.
+- **Layout class is NOT width alone** (`getCandlestickChartLayoutClass` →
+  `phone | tablet | webNarrow | webWide`). A landscape phone is 844 × 390:
+  judged by width it would pass for a tablet and ask for a 500px chart inside a
+  390px window. So NATIVE devices are classified by their SHORT side
+  (`min(width, height) < 600` → phone), which does not change when the device
+  rotates; WEB keeps the window-width rule (`< 768` → narrow), where the window
+  width really is the layout. `Platform.OS` reaches the pure function through
+  `toChartLayoutPlatform()` — no user-agent sniffing, no device-info library.
 - **Y axis** is computed from the candles actually on screen. The
   current-price line is drawn ONLY while `rightOffset === 0`; in history it is
   hidden and excluded from the min/max so it cannot distort the range.

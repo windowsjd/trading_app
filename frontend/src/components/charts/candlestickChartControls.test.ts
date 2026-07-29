@@ -106,9 +106,8 @@ describe('chart height', () => {
 
   it('lets an explicit height prop win over the responsive default', () => {
     assert.ok(
-      chartSource.includes(
-        'heightOverride ?? getCandlestickChartHeight(windowWidth, windowHeight)',
-      ),
+      /heightOverride \?\?\s*getCandlestickChartHeight\(\{/.test(chartSource),
+      'height prop overrides the responsive height',
     );
   });
 
@@ -192,8 +191,37 @@ describe('gesture adapters', () => {
     assert.ok(webGestureSource.includes('event.preventDefault()'));
     assert.ok(webGestureSource.includes('createWheelGestureSession'));
     assert.ok(webGestureSource.includes('wheelSession.dispose()'), 'idle timer cleaned up');
-    assert.ok(webGestureSource.includes("classifyWheelIntent(event) === 'zoom'"));
+    assert.ok(webGestureSource.includes("handling === 'zoom'"));
     assert.ok(webGestureSource.includes("addEventListener('mousedown'"), 'mouse drag pan kept');
     assert.ok(webGestureSource.includes("addEventListener('mousemove'"), 'hover crosshair kept');
+    assert.ok(webGestureSource.includes('wheelSession.end();'), 'mouse down closes any open wheel session');
+  });
+
+  it('web: a wheel during a drag is consumed before any session work', () => {
+    assert.ok(
+      webGestureSource.includes('dragActive: dragRef.current.active'),
+      'the wheel handler knows whether a drag is running',
+    );
+    const wheelHandler = webGestureSource.slice(
+      webGestureSource.indexOf('const onWheel ='),
+      webGestureSource.indexOf('const onMouseDown ='),
+    );
+    const preventIndex = wheelHandler.indexOf('event.preventDefault()');
+    const consumeIndex = wheelHandler.indexOf("handling === 'consume'");
+    const sessionIndex = wheelHandler.indexOf('wheelSession.');
+    assert.ok(preventIndex > 0 && consumeIndex > 0 && sessionIndex > 0);
+    assert.ok(
+      preventIndex < consumeIndex,
+      'a consumed wheel still calls preventDefault (no page scroll mid-drag)',
+    );
+    assert.ok(
+      consumeIndex < sessionIndex,
+      'the drag guard returns BEFORE the wheel session is touched',
+    );
+  });
+
+  it('chart: the layout class is platform-aware, not width-only', () => {
+    assert.ok(chartSource.includes('toChartLayoutPlatform(Platform.OS)'));
+    assert.ok(chartSource.includes('useWindowDimensions'));
   });
 });
