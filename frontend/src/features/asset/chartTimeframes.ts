@@ -5,9 +5,14 @@
 //   - 'prev_open'  = previous regular market open → now
 //                    (KRX 09:00 KST / US 09:30 ET / crypto 09:00 KST anchor)
 //   - 'prev2_open' = two market days back, regular open → now
+//   - '14d'        = rolling 14 days → now
 //   - '30d'        = rolling 30 days → now
 //   - '1y'         = rolling 365 days → now (Binance max window; KIS returns
 //                    whatever its retention allows)
+//
+// 15m/30m/1h/4h are aggregated by the backend from the stored 5m feed (35-day
+// retention), so their windows are bounded by that retention, not by a
+// provider page size.
 //
 // 1m was removed from the chart on purpose: KIS same-day minute data is capped
 // at 30 rows, which cannot draw a meaningful 1m chart. The backend still
@@ -16,6 +21,7 @@
 export type AssetCandleRange =
   | '1d'
   | '7d'
+  | '14d'
   | '30d'
   | 'prev_open'
   | 'prev2_open'
@@ -39,18 +45,18 @@ export type AssetChartTimeframe = {
 };
 
 // Limits are sized from the worst-case expected candle count for the window
-// (crypto trades 24/7, so it is always the upper bound); stocks simply return
-// fewer. All stay within the Binance 1000-row single-call cap. KIS clamps
-// lower server-side (30/120 rows per call).
+// (crypto trades 24/7, so it is always the upper bound); stocks return fewer
+// because they only trade during the regular session. All stay within the
+// Binance 1000-row single-call cap.
 export const ASSET_CHART_TIMEFRAMES: AssetChartTimeframe[] = [
   // ~2 days × 288 5m-candles/day = 576
   { label: '5m', interval: '5m', range: 'prev_open', limit: 600 },
   // ~2 days × 96 = 192
   { label: '15m', interval: '15m', range: 'prev_open', limit: 200 },
-  // ~3 days × 48 = 144
-  { label: '30m', interval: '30m', range: 'prev2_open', limit: 160 },
-  // ~3 days × 24 = 72
-  { label: '1h', interval: '1h', range: 'prev2_open', limit: 80 },
+  // 14 days × 48 = 672 (crypto upper bound)
+  { label: '30m', interval: '30m', range: '14d', limit: 672 },
+  // 14 days × 24 = 336 (crypto upper bound)
+  { label: '1h', interval: '1h', range: '14d', limit: 336 },
   // 30 days × 6 = 180
   { label: '4h', interval: '4h', range: '30d', limit: 200 },
   // ~366 daily candles per year

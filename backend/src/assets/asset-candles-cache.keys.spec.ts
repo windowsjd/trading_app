@@ -42,6 +42,36 @@ describe('candle cache keys', () => {
       );
     });
 
+    it('keys the 14d chart windows without colliding with 1d/7d/30d/1y', () => {
+      // 30m and 1h both request 14d; 4h requests 30d. Every (range, interval,
+      // limit) triple must land on its own key.
+      const chartKeys = (
+        [
+          { range: '14d', interval: '30m', limit: 672 },
+          { range: '14d', interval: '1h', limit: 336 },
+          { range: '30d', interval: '4h', limit: 200 },
+          { range: '1d', interval: '30m', limit: 672 },
+          { range: '7d', interval: '1h', limit: 336 },
+          { range: '1y', interval: '1h', limit: 336 },
+        ] as const
+      ).map((chart) => buildCandleDataKey({ ...baseInput, ...chart }));
+
+      expect(new Set(chartKeys).size).toBe(chartKeys.length);
+      expect(chartKeys[0]).toBe(
+        `${CANDLE_CACHE_DATA_NAMESPACE}:asset-1:g0:2026-07-10:14d:30m:672`,
+      );
+      // A generation bump (5m write → invalidateAsset) rotates them all.
+      expect(
+        buildCandleDataKey({
+          ...baseInput,
+          range: '14d',
+          interval: '30m',
+          limit: 672,
+          generation: 1,
+        }),
+      ).not.toBe(chartKeys[0]);
+    });
+
     it('differs when interval differs', () => {
       expect(buildCandleDataKey({ ...baseInput, interval: '1d' })).not.toBe(
         buildCandleDataKey(baseInput),

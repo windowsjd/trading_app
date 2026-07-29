@@ -30,6 +30,7 @@
     "dev:seed-kis-universe": "tsx scripts/seed-kis-fixed-asset-universe.ts",
     "dev:seed-binance-universe": "tsx scripts/seed-binance-fixed-asset-universe.ts",
     "dev:recover-local-data": "tsx scripts/dev-recover-local-data.ts",
+    "candle:baseline": "tsx scripts/candle-baseline-sync.ts",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",

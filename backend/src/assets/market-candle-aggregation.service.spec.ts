@@ -14,6 +14,7 @@ jest.mock('../generated/prisma/client', () => {
 });
 
 import { AssetType } from '../generated/prisma/client';
+import { resolveMarketSession } from '../orders/market-calendar.policy';
 import {
   applyMarketSessionOverrideSnapshot,
   resetMarketSessionOverrideStoreForTest,
@@ -523,6 +524,229 @@ describe('MarketCandleAggregationService', () => {
           now,
         }),
       ).toThrow(MarketCandleAggregationInputError);
+    });
+  });
+
+  // The chart windows this aggregation actually serves: 30m/1h over 14 days
+  // and 4h over 30 days, all built from stored 5m candles. Sessions come from
+  // the same market calendar the service uses, so days the calendar has no
+  // session for (weekends, holidays) simply contribute no 5m rows — exactly
+  // what the store looks like.
+  describe('multi-day chart windows (14d / 30d)', () => {
+    const sessionFiveMinutes = (
+      market: 'KRX' | 'US',
+      localDate: string,
+    ): FiveMinuteSourceCandle[] => {
+      const session = resolveMarketSession(market, localDate);
+      if (!session) return [];
+      const rows: FiveMinuteSourceCandle[] = [];
+      for (
+        let openMs = session.openTime.getTime();
+        openMs < session.closeTime.getTime();
+        openMs += FIVE_MIN
+      ) {
+        rows.push(candle(new Date(openMs).toISOString()));
+      }
+      return rows;
+    };
+
+    const localDatesBack = (
+      timeZone: string,
+      endIso: string,
+      days: number,
+    ): string[] => {
+      const dates: string[] = [];
+      const end = new Date(endIso).getTime();
+      for (let index = days - 1; index >= 0; index -= 1) {
+        const day = new Date(end - index * 24 * 60 * 60_000);
+        dates.push(
+          new Intl.DateTimeFormat('en-CA', {
+            timeZone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          })
+            .format(day)
+            .replace(/-/gu, ''),
+        );
+      }
+      return [...new Set(dates)];
+    };
+
+    it('returns KRX 4h candles across many trading days for a 30-day window', () => {
+      const nowUtc = new Date('2026-07-10T07:00:00.000Z'); // after the KRX close
+      const from = new Date(nowUtc.getTime() - 30 * 24 * 60 * 60_000);
+      const dates = localDatesBack('Asia/Seoul', nowUtc.toISOString(), 31);
+      const candles = dates.flatMap((date) => sessionFiveMinutes('KRX', date));
+
+      const result = service.aggregateCandles({
+        assetType: AssetType.domestic_stock,
+        interval: '4h',
+        candles,
+        from,
+        to: nowUtc,
+        now: nowUtc,
+      });
+
+      const tradingDays = new Set(
+        result.candles.map((bucket) =>
+          new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Seoul',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          }).format(bucket.openTime),
+        ),
+      );
+      // The bug this replaces returned ONE truncated candle for the whole
+      // 30-day window.
+      expect(tradingDays.size).toBeGreaterThanOrEqual(15);
+      expect(result.candles.length).toBeGreaterThanOrEqual(30);
+      expect(result.candles.length).toBe(tradingDays.size * 2); // 09:00 + 13:00
+      expect(result.candles.every((bucket) => bucket.complete)).toBe(true);
+      expect(result.candles.every((bucket) => bucket.isClosed)).toBe(true);
+      // Weekends and holidays are absent, never synthesized.
+      expect(tradingDays.size).toBeLessThan(dates.length);
+      expect(result.candles[0].openTime.getTime()).toBeGreaterThanOrEqual(
+        from.getTime(),
+      );
+    });
+
+    it('returns US 4h candles across many trading days for a 30-day window (through a DST-free month)', () => {
+      const nowUtc = new Date('2026-07-10T21:00:00.000Z'); // after the US close
+      const from = new Date(nowUtc.getTime() - 30 * 24 * 60 * 60_000);
+      const dates = localDatesBack(
+        'America/New_York',
+        nowUtc.toISOString(),
+        31,
+      );
+      const candles = dates.flatMap((date) => sessionFiveMinutes('US', date));
+
+      const result = service.aggregateCandles({
+        assetType: AssetType.us_stock,
+        interval: '4h',
+        candles,
+        from,
+        to: nowUtc,
+        now: nowUtc,
+      });
+
+      const tradingDays = new Set(
+        result.candles.map((bucket) =>
+          new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'America/New_York',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          }).format(bucket.openTime),
+        ),
+      );
+      expect(tradingDays.size).toBeGreaterThanOrEqual(15);
+      expect(result.candles.length).toBeGreaterThanOrEqual(30);
+      expect(result.candles.every((bucket) => bucket.complete)).toBe(true);
+    });
+
+    it('spans a US DST transition inside one 30-day window', () => {
+      // 2026-03-08 is the spring-forward date; the window covers both sides.
+      const nowUtc = new Date('2026-03-20T20:00:00.000Z');
+      const from = new Date(nowUtc.getTime() - 30 * 24 * 60 * 60_000);
+      const dates = localDatesBack(
+        'America/New_York',
+        nowUtc.toISOString(),
+        31,
+      );
+      const candles = dates.flatMap((date) => sessionFiveMinutes('US', date));
+
+      const result = service.aggregateCandles({
+        assetType: AssetType.us_stock,
+        interval: '4h',
+        candles,
+        from,
+        to: nowUtc,
+        now: nowUtc,
+      });
+
+      const opensBeforeDst = result.candles
+        .filter((bucket) => bucket.openTime < new Date('2026-03-08T00:00:00Z'))
+        .map((bucket) => bucket.openTime.toISOString().slice(11, 16));
+      const opensAfterDst = result.candles
+        .filter((bucket) => bucket.openTime > new Date('2026-03-09T00:00:00Z'))
+        .map((bucket) => bucket.openTime.toISOString().slice(11, 16));
+      // 09:30 EST = 14:30Z before the switch, 09:30 EDT = 13:30Z after it —
+      // the session anchor follows the IANA zone, not a fixed UTC offset.
+      expect(opensBeforeDst).toContain('14:30');
+      expect(opensAfterDst).toContain('13:30');
+      expect(opensAfterDst).not.toContain('14:30');
+      expect(result.candles.every((bucket) => bucket.complete)).toBe(true);
+    });
+
+    it('caps a 14-day crypto window at 672 30m and 336 1h candles', () => {
+      const to = new Date('2026-07-10T00:00:00.000Z');
+      const from = new Date(to.getTime() - 14 * 24 * 60 * 60_000);
+      const candles = run(from.toISOString(), (14 * 24 * 60) / 5);
+
+      const halfHour = service.aggregateCandles({
+        assetType: AssetType.crypto,
+        interval: '30m',
+        candles,
+        from,
+        to,
+        now: to,
+      });
+      const hourly = service.aggregateCandles({
+        assetType: AssetType.crypto,
+        interval: '1h',
+        candles,
+        from,
+        to,
+        now: to,
+      });
+
+      expect(halfHour.candles).toHaveLength(672);
+      expect(hourly.candles).toHaveLength(336);
+      expect(halfHour.candles[0].openTime.getTime()).toBe(from.getTime());
+      expect(halfHour.candles.every((bucket) => bucket.complete)).toBe(true);
+      expect(hourly.candles.every((bucket) => bucket.complete)).toBe(true);
+    });
+
+    it('keeps the oldest 14-day stock candles ~14 days back and drops a gapped bucket', () => {
+      const nowUtc = new Date('2026-07-10T07:00:00.000Z');
+      const from = new Date(nowUtc.getTime() - 14 * 24 * 60 * 60_000);
+      const dates = localDatesBack('Asia/Seoul', nowUtc.toISOString(), 15);
+      const candles = dates.flatMap((date) => sessionFiveMinutes('KRX', date));
+      // Remove one 5m row from the newest session's first 30m bucket.
+      const lastDayRows = sessionFiveMinutes('KRX', dates[dates.length - 1]);
+      const gapped = lastDayRows.length
+        ? candles.filter(
+            (row) =>
+              row.openTime.getTime() !== lastDayRows[1].openTime.getTime(),
+          )
+        : candles;
+
+      const result = service.aggregateCandles({
+        assetType: AssetType.domestic_stock,
+        interval: '30m',
+        candles: gapped,
+        from,
+        to: nowUtc,
+        now: nowUtc,
+      });
+
+      const oldest = result.candles[0];
+      expect(oldest.openTime.getTime()).toBeGreaterThanOrEqual(from.getTime());
+      // Within the first three days of the window (weekend at the edge).
+      expect(oldest.openTime.getTime()).toBeLessThan(
+        from.getTime() + 4 * 24 * 60 * 60_000,
+      );
+      const holed = result.candles.find(
+        (bucket) =>
+          bucket.openTime.getTime() === lastDayRows[0].openTime.getTime(),
+      );
+      // The bucket missing a constituent is reported incomplete and open, so
+      // the serving loader drops it instead of drawing a partial candle.
+      expect(holed?.complete).toBe(false);
+      expect(holed?.isClosed).toBe(false);
+      expect(holed?.gapCount).toBe(1);
     });
   });
 

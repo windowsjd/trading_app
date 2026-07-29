@@ -212,15 +212,91 @@ Provider-direct (`legacyLoader`) is reachable only through:
 
 1. `CANDLE_SERVING_MODE=legacy` — the explicit, whole-endpoint rollback;
 2. read plans with `managedByPersistence=false` (out-of-policy requests);
-3. the cold-baseline policy — no completed baseline coverage AND a requested
-   range beyond `CANDLE_SERVING_ON_DEMAND_REPAIR_MAX_RANGE_MS`, logged as
+3. the cold-baseline policy for NON-aggregated feeds (`5m`, `1d`, `1w`) — no
+   completed baseline coverage AND a requested range beyond
+   `CANDLE_SERVING_ON_DEMAND_REPAIR_MAX_RANGE_MS`, logged as
    `{"event":"candle_delivery","state":"legacy_provider","reason":"cold_baseline_required"}`.
    Operators seed these baselines with the manual `market_candle_sync` job.
+
+**Aggregated intervals are excluded from (3).** `15m`/`30m`/`1h`/`4h` exist
+only as read-time aggregates of the stored `5m` feed, so a provider-direct
+answer is ONE truncated minute page (KIS caps a page at 120 rows) bucketed
+with no constituent check — a 30-day `4h` request came back as a single
+fabricated candle (`candles=1 · req=120 · ret=1 · 30d/4h`). Without baseline
+coverage those requests now fail with
+`ASSET_CANDLES_BASELINE_NOT_READY` (503, logged as
+`{"event":"candle_delivery_failed","state":"baseline_not_ready","reason":"cold_baseline_required"}`)
+and the client shows "차트 데이터를 준비 중입니다." with a retry. The legacy
+`bucketStockCandles` path therefore never serves a managed request.
 
 The cold-baseline path is a deliberate PRE-refresh routing decision for
 ranges the managed path is not allowed to own yet; it is not a failure
 fallback. After a managed refresh has started, no catch/fallback path calls
 `legacyLoader`.
+
+One exception keeps a real chart usable: when coverage IS confirmed for the
+whole range but individual historical buckets are missing constituents even
+after the bounded repair, the incomplete buckets stay dropped and the complete
+ones are served (`{"state":"database_fallback","reason":"incomplete_buckets_dropped"}`).
+An incomplete bucket is never promoted to a normal candle, and a range without
+coverage evidence still fails.
+
+## Chart windows and the 5m baseline
+
+| Chart tab | range | limit | source | window |
+| --- | --- | --- | --- | --- |
+| `5m` | `prev_open` | 600 | stored `5m` | ~2 sessions |
+| `15m` | `prev_open` | 200 | aggregated from stored `5m` | ~2 sessions |
+| `30m` | `14d` | 672 | aggregated from stored `5m` | rolling 14 days |
+| `1h` | `14d` | 336 | aggregated from stored `5m` | rolling 14 days |
+| `4h` | `30d` | 200 | aggregated from stored `5m` | rolling 30 days |
+| `1d` | `1y` | 400 | stored `1d` | rolling 365 days |
+| `1w` | `1y` | 60 | stored `1w` | rolling 365 days |
+
+Stored `5m` retention is 35 days (`MARKET_CANDLE_5M_RETENTION_DAYS`), which
+holds both the 14-day and the 30-day window including the 4h source padding
+(`30d + 4h < 35d`), so those requests stay `managedByPersistence=true`. The
+`30m`/`1h` limits are the crypto (24/7) upper bounds — 14 × 48 and 14 × 24;
+stocks legitimately return fewer because they only trade during the regular
+session. No 15m/30m/1h/4h table exists and none should be added.
+
+**Coverage evidence is the UNION of coverage-audited checkpoints**
+(`findCompletedCoverageUnion`). One run can never keep a 14-day window
+covered up to "now": the seeded baseline confirms `[now-35d, its finish time)`
+and each later incremental run confirms its own tail. Rows are merged only
+when they are individually `status=completed` + `coverageComplete=true` with a
+well-formed `[coveredFrom, coveredTo)`; one hole between them means "not
+covered".
+
+### Seeding and keeping the baseline
+
+```bash
+cd backend
+# What can the database serve today? (PostgreSQL only, no provider calls.)
+pnpm candle:baseline -- --report
+
+# Plan the 35-day 5m baseline (no provider call, no write).
+pnpm candle:baseline -- --dry-run
+
+# Seed it for every active asset. Resumable: re-run after an interruption.
+pnpm candle:baseline -- --apply
+pnpm candle:baseline -- --apply --asset-type domestic_stock   # or us_stock / crypto
+
+# Keep the tail fresh afterwards (cheap; run on a schedule).
+pnpm candle:baseline -- --apply --mode incremental
+```
+
+`scripts/candle-baseline-sync.ts` is a thin wrapper around the SAME
+`MarketCandleSyncService.syncAssets` the Ops `market_candle_sync` job runs —
+no second sync implementation. `--report` prints `READY`/`MISSING` per asset
+plus the newest coverage completion time, which is exactly the evidence the
+serving path uses. `--apply` needs the real provider credentials (KIS for
+stocks, Binance for crypto) and Redis (backfill locks).
+
+Live 5m rows also keep arriving through the live-candle pipeline
+(`LIVE_CANDLE_*`) and the disabled-by-default reconciliation job; those
+paths write candles but do NOT write coverage checkpoints, so the incremental
+sync above is what keeps a long-window chart coverage-complete.
 
 ## Market calendar (versioned, audited)
 

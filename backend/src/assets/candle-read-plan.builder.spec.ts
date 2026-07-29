@@ -71,6 +71,44 @@ describe('CandleReadPlanBuilder', () => {
     );
   });
 
+  // The three chart tabs that must be owned by the database path.
+  it.each([
+    ['30m', '14d', 14, 672] as const,
+    ['1h', '14d', 14, 336] as const,
+    ['4h', '30d', 30, 200] as const,
+  ])(
+    'keeps the %s chart request (%s) managed on the stored 5m feed',
+    (interval, range, days, limit) => {
+      const to = new Date('2026-07-13T00:00:00Z');
+      const from = new Date(to.getTime() - days * 86_400_000);
+      const result = builder.build(asset, {
+        ...base,
+        range,
+        interval,
+        limit,
+        rangeStartAt: from,
+        rangeEndAt: to,
+      });
+
+      expect(result).toMatchObject({
+        sourceInterval: '5m',
+        requiresAggregation: true,
+        managedByPersistence: true,
+        outOfPolicyReason: null,
+        limit,
+      });
+      // 4h source padding included, the window still fits the 35-day 5m
+      // retention — that is what keeps it out of the legacy path.
+      expect(result.sourceRange.from.getTime()).toBe(
+        from.getTime() - 4 * 60 * 60_000,
+      );
+      expect(
+        result.sourceRange.to.getTime() - result.sourceRange.from.getTime(),
+      ).toBeLessThanOrEqual(35 * 86_400_000);
+      expect(result.requestedRange.from.getTime()).toBe(from.getTime());
+    },
+  );
+
   it('keeps 1m and retention-exceeding source windows on legacy', () => {
     expect(builder.build(asset, { ...base, interval: '1m' })).toMatchObject({
       managedByPersistence: false,

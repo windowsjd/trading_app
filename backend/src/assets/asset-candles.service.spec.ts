@@ -36,6 +36,7 @@ import { HttpException } from '@nestjs/common';
 import { AssetType, CurrencyCode } from '../generated/prisma/client';
 import { ProviderHttpError } from '../providers/provider.types';
 import { AssetCandlesService } from './asset-candles.service';
+import type { ParsedAssetCandlesQuery } from './asset-candles.service';
 import { CandleResponseBuilder } from './candle-response.builder';
 
 type KisQuoteCall = {
@@ -1398,6 +1399,9 @@ describe('AssetCandlesService', () => {
   it.each([
     ['1d', '5m', Date.parse('2026-06-18T03:00:00.000Z')],
     ['7d', '1h', Date.parse('2026-06-12T03:00:00.000Z')],
+    // Exactly 14 x 24h before the clock — NOT the 1y fall-through the old
+    // if-chain produced for unrecognized ranges.
+    ['14d', '1h', Date.parse('2026-06-05T03:00:00.000Z')],
     ['30d', '1d', Date.parse('2026-05-20T03:00:00.000Z')],
     // Crypto trades 24/7: prev_open anchors to 09:00 KST calendar days back.
     ['prev_open', '5m', Date.parse('2026-06-18T00:00:00.000Z')],
@@ -1438,6 +1442,106 @@ describe('AssetCandlesService', () => {
       });
     },
   );
+
+  describe('14d rolling range (30m/1h chart windows)', () => {
+    it('hands the serving layer a 14-day window and the requested limit', async () => {
+      const { prisma, kisAuthClient, kisQuoteClient, service, serving } =
+        createService();
+      kisAuthClient.getCachedToken.mockReturnValue({
+        accessToken: 'cached-kis-token',
+        tokenType: 'Bearer',
+        expiresInSeconds: 86400,
+        expiresAt: new Date('2026-06-23T00:00:00.000Z'),
+      });
+      prisma.asset.findUnique.mockResolvedValueOnce(
+        asset({
+          id: 'asset-domestic-14d',
+          symbol: '005930',
+          market: 'KRX',
+          assetType: AssetType.domestic_stock,
+          currencyCode: CurrencyCode.KRW,
+        }),
+      );
+      kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValue({
+        state: 'available',
+        receivedAt: new Date('2026-06-19T03:00:01.000Z'),
+        response: { rt_cd: '0', output2: [] },
+      });
+
+      await service.getAssetCandles('user-1', 'asset-domestic-14d', {
+        range: '14d',
+        interval: '30m',
+        limit: '672',
+      });
+
+      const parsed = (
+        serving.serve.mock.calls[0] as unknown[]
+      )[1] as ParsedAssetCandlesQuery;
+      expect(parsed.range).toBe('14d');
+      expect(parsed.interval).toBe('30m');
+      expect(parsed.limit).toBe(672);
+      const windowMs =
+        (parsed.rangeEndAt as Date).getTime() -
+        (parsed.rangeStartAt as Date).getTime();
+      expect(windowMs).toBe(14 * 86_400_000);
+      // Regression: the removed if-chain returned 365 days for any range it
+      // did not recognize, so an unbranched 14d silently became a year.
+      expect(windowMs).not.toBe(365 * 86_400_000);
+      expect((parsed.rangeEndAt as Date).toISOString()).toBe(
+        '2026-06-19T03:00:00.000Z',
+      );
+      expect((parsed.rangeStartAt as Date).toISOString()).toBe(
+        '2026-06-05T03:00:00.000Z',
+      );
+    });
+
+    it('accepts 14d for every chart interval and keeps 1h as its default', async () => {
+      for (const interval of ['30m', '1h', '4h'] as const) {
+        const { prisma, binancePublicClient, service, serving } =
+          createService();
+        prisma.asset.findUnique.mockResolvedValueOnce(
+          asset({
+            id: `asset-btc-14d-${interval}`,
+            symbol: 'BTC',
+            market: 'BINANCE',
+            assetType: AssetType.crypto,
+            currencyCode: CurrencyCode.USD,
+          }),
+        );
+        binancePublicClient.fetchKlines.mockResolvedValueOnce({
+          receivedAt: new Date('2026-06-19T03:00:01.000Z'),
+          response: [],
+        });
+        const response = await service.getAssetCandles(
+          'user-1',
+          `asset-btc-14d-${interval}`,
+          { range: '14d', interval, limit: '672' },
+        );
+        expect(response.data.range).toBe('14d');
+        expect(response.data.interval).toBe(interval);
+        expect(serving.serve).toHaveBeenCalledTimes(1);
+      }
+    });
+
+    it('still rejects unknown ranges and names 14d in the message', async () => {
+      const { prisma, service } = createService();
+      prisma.asset.findUnique.mockResolvedValueOnce(
+        asset({
+          id: 'asset-btc-14dx',
+          symbol: 'BTC',
+          market: 'BINANCE',
+          assetType: AssetType.crypto,
+          currencyCode: CurrencyCode.USD,
+        }),
+      );
+      const envelope = (await expectApiError(
+        service.getAssetCandles('user-1', 'asset-btc-14dx', { range: '14' }),
+        400,
+        'ASSET_CANDLES_INVALID_RANGE',
+      )) as { error: { message: string } };
+      expect(envelope.error.message).toContain('14d');
+    });
+  });
 
   it('uses current season start and 1d default interval for season range', async () => {
     const { prisma, binancePublicClient, service } = createService();

@@ -68,20 +68,23 @@ export class CandleDatabaseLoader {
     // Coverage evidence must span the requested range, clamped at the query
     // clock: candles beyond `now` cannot exist yet, so a checkpoint whose
     // provider-confirmed range ends at its own sync time still covers a
-    // request whose range nominally extends past the clock. Only checkpoints
-    // with coverageComplete=true qualify (see findCompletedCovering).
+    // request whose range nominally extends past the clock. Only
+    // coverage-audited checkpoints qualify, and the evidence is the UNION of
+    // them: a long range is covered by the seeded baseline run plus the
+    // incremental runs that confirmed the tail since (see
+    // findCompletedCoverageUnion).
     const coverageTo = new Date(
       Math.min(plan.sourceRange.to.getTime(), query.clock.getTime()),
     );
-    const [covering, latestCheckpoint] = await Promise.all([
+    const [coverage, latestCheckpoint] = await Promise.all([
       coverageTo.getTime() > plan.sourceRange.from.getTime()
-        ? this.syncStates.findCompletedCovering(
+        ? this.syncStates.findCompletedCoverageUnion(
             plan.assetId,
             plan.sourceInterval,
             plan.sourceRange.from,
             coverageTo,
           )
-        : Promise.resolve(null),
+        : Promise.resolve({ covered: false, newestCompletedAt: null }),
       this.syncStates.findLatestOverlapping(
         plan.assetId,
         plan.sourceInterval,
@@ -92,7 +95,7 @@ export class CandleDatabaseLoader {
     const hasBlockingCheckpoint =
       latestCheckpoint !== null &&
       latestCheckpoint.status !== MarketCandleSyncStatus.completed;
-    const completedCoverage = covering !== null;
+    const completedCoverage = coverage.covered;
 
     let rows: PersistedResponseCandle[];
     let droppedIncompleteBuckets = 0;
@@ -141,7 +144,7 @@ export class CandleDatabaseLoader {
     const response = this.responses.buildPersisted(asset, query, rows);
     const fresh = this.isFresh(
       rows,
-      covering?.completedAt ?? null,
+      coverage.newestCompletedAt,
       plan,
       query.clock,
     );

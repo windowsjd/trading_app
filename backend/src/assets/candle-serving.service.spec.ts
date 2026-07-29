@@ -304,6 +304,127 @@ describe('CandleServingService', () => {
     expect(legacy).toHaveBeenCalledTimes(2);
   });
 
+  describe('cold baseline for aggregated intervals (15m/30m/1h/4h)', () => {
+    // 30m/1h ask for 14 days and 4h for 30 days, all aggregated from the
+    // stored 5m feed. KIS caps a minute page at 120 rows, so the legacy path
+    // would bucket one truncated page into "candles" — the `candles=1 ·
+    // req=120 · ret=1 · 30d/4h` bug. Those requests must fail loudly instead.
+    const aggregatedPlan = (
+      targetInterval: '15m' | '30m' | '1h' | '4h',
+      days: number,
+    ): CandleReadPlan => ({
+      ...plan,
+      targetInterval,
+      requiresAggregation: true,
+      requestedRange: {
+        from: new Date(clock.getTime() - days * 86_400_000),
+        to: clock,
+      },
+      sourceRange: {
+        from: new Date(clock.getTime() - days * 86_400_000 - 4 * 60 * 60_000),
+        to: clock,
+      },
+    });
+
+    it.each([
+      ['30m', 14],
+      ['1h', 14],
+      ['4h', 30],
+      ['15m', 7],
+    ] as const)(
+      'answers %s over %s days with BASELINE_NOT_READY instead of truncated provider candles',
+      async (interval, days) => {
+        const { service, plans, database, sync } = create();
+        plans.build.mockReturnValue(aggregatedPlan(interval, days));
+        database.load.mockResolvedValue(
+          load('missing', null, { completedCoverage: false }),
+        );
+        const legacy = jest.fn().mockResolvedValue(response('legacy'));
+
+        await expect(
+          service.serve(asset, { ...query, interval }, legacy),
+        ).rejects.toMatchObject({
+          response: {
+            success: false,
+            error: { code: 'ASSET_CANDLES_BASELINE_NOT_READY' },
+          },
+          status: 503,
+        });
+        expect(legacy).not.toHaveBeenCalled();
+        expect(sync.syncAsset).not.toHaveBeenCalled();
+      },
+    );
+
+    it('keeps NON-aggregated cold ranges (1d/1w/5m) on the documented legacy path', async () => {
+      const { service, plans, database } = create();
+      plans.build.mockReturnValue({
+        ...plan,
+        targetInterval: '1d',
+        sourceInterval: '1d',
+        requiresAggregation: false,
+        sourceRange: {
+          from: new Date(clock.getTime() - 365 * 86_400_000),
+          to: clock,
+        },
+      });
+      database.load.mockResolvedValue(
+        load('missing', null, { completedCoverage: false }),
+      );
+      const legacy = jest.fn().mockResolvedValue(response('legacy'));
+      await expect(
+        service.serve(asset, { ...query, interval: '1d' }, legacy),
+      ).resolves.toEqual(response('legacy'));
+      expect(legacy).toHaveBeenCalledTimes(1);
+    });
+
+    it('serves an aggregated request from the database once baseline coverage exists', async () => {
+      const { service, plans, database, sync } = create();
+      plans.build.mockReturnValue(aggregatedPlan('4h', 30));
+      database.load.mockResolvedValue(
+        load('available', response('db-4h'), { completedCoverage: true }),
+      );
+      const legacy = jest.fn();
+      await expect(
+        service.serve(asset, { ...query, interval: '4h' }, legacy),
+      ).resolves.toEqual(response('db-4h'));
+      expect(legacy).not.toHaveBeenCalled();
+      expect(sync.syncAsset).not.toHaveBeenCalled();
+    });
+
+    it('still allows the explicit legacy rollback mode for aggregated intervals', async () => {
+      const { service, database } = create('legacy');
+      const legacy = jest.fn().mockResolvedValue(response('legacy'));
+      await expect(
+        service.serve(asset, { ...query, interval: '4h' }, legacy),
+      ).resolves.toEqual(response('legacy'));
+      expect(legacy).toHaveBeenCalledTimes(1);
+      expect(database.load).not.toHaveBeenCalled();
+    });
+
+    it('serves the complete buckets when coverage is confirmed but a historical bucket has a hole', async () => {
+      // Dropping the gapped bucket is the completeness policy; failing the
+      // whole 30-day chart over one missing 5m row is not.
+      const { service, plans, database, sync } = create();
+      plans.build.mockReturnValue(aggregatedPlan('4h', 30));
+      database.load.mockResolvedValue(
+        load('incomplete', response('db-partial'), {
+          completedCoverage: true,
+          droppedIncompleteBuckets: 2,
+          fresh: false,
+        }),
+      );
+      sync.syncAsset.mockResolvedValue({
+        assetId: asset.id,
+        feeds: [{ status: 'completed', complete: false, writtenRows: 0 }],
+      });
+      const legacy = jest.fn();
+      await expect(
+        service.serve(asset, { ...query, interval: '4h' }, legacy),
+      ).resolves.toEqual(response('db-partial'));
+      expect(legacy).not.toHaveBeenCalled();
+    });
+  });
+
   it('fails with the provider-compatible error when a managed refresh fails without any fallback, never provider-direct', async () => {
     // No stale Redis, no strict last-known-good: the request fails with the
     // existing crypto provider error contract. The legacy loader must not be

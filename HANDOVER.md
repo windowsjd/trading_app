@@ -12,6 +12,130 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 30분·1시간봉 14일 확대와 4시간봉 DB 집계 경로 정상화 (2026-07-29)
+
+**목적**
+
+30분·1시간봉을 최근 14일, 4시간봉을 최근 30일로 표시하고, 15분~4시간봉이
+저장된 5분봉 집계(관리형 DB 경로)로만 제공되게 한다. KIS 단일 호출(120행)
+레거시 경로가 정상 차트 경로에 개입하지 못하게 막는다. DB 스키마·주문·포지션·
+지갑·원장은 변경하지 않는다.
+
+**A. 원인**
+
+- `CANDLE_SERVING_MODE` 기본값이 `legacy`였고 로컬 `.env*`에도 값이 없어
+  모든 캔들 요청이 provider-direct 경로를 탔다.
+- 그 경로에서 4시간봉은 KIS 분봉 1페이지(최대 120행)를 받아
+  `bucketStockCandles()`로 묶기 때문에 30일 요청이 사실상 캔들 1개가 됐다
+  (`candles=1 · req=120 · ret=1 · 30d/4h`). 미국주식도 한 페이지(120행)라
+  약 6일치만 나왔다.
+- `database` 모드로 바꿔도 남는 문제가 두 가지 있었다.
+  1. cold baseline 분기가 관리형 요청을 조용히 `legacyLoader()`로 폴백시켜
+     같은 잘린 응답을 "정상 차트"로 돌려줬다.
+  2. coverage 증거를 **단일 체크포인트**로만 판정했다. 35일 baseline 1회
+     실행은 `[now-35d, 실행시각)`만 확인하므로, 최신 구간까지 필요한 14일·30일
+     요청은 baseline 직후부터 영구히 "커버리지 없음"이 된다.
+- `rangeDurationMs()`가 `1d/7d/30d` 외 값을 모두 365일로 처리해서, `14d`를
+  분기 없이 추가하면 1년 창이 될 구조였다.
+
+**B. `14d` 범위 정식 추가**
+
+- `CandleRange`, `CANDLE_RANGES`, `RANGE_INTERVALS`,
+  `DEFAULT_INTERVAL_BY_RANGE`(`14d` → `1h`), 오류 메시지,
+  캐시 검증 집합(`asset-candles-cache.service.ts`), 프런트
+  `AssetCandleRange`에 모두 추가.
+- 범위 길이 계산을 if-chain에서 **exhaustive map**
+  (`ROLLING_RANGE_DURATION_MS`)으로 교체했다. 이제 range를 추가하고 길이를
+  빠뜨리면 365일로 흘러가는 대신 컴파일 에러가 난다. `14d`는 정확히
+  14 × 24h rolling window다.
+- 캐시 키는 range 문자열을 그대로 쓰므로 `14d`가 자동 반영된다(충돌 테스트 추가).
+
+**C. 프런트 타임프레임**
+
+- 30m: `14d` / limit 672, 1h: `14d` / limit 336, 4h: `30d` / limit 200.
+  672 = 14일 × 48, 336 = 14일 × 24 (암호화폐 24시간 기준 상한). 주식은 정규장만
+  거래하므로 더 적게 오는 것이 정상이다.
+- 5m/15m/1d/1w 정책은 그대로.
+
+**D. 관리형 경로에서 레거시 폴백 차단**
+
+- cold baseline(커버리지 없음 + 요청 범위가 on-demand repair 예산 초과) 분기를
+  **집계 인터벌(15m/30m/1h/4h)** 에서는 `legacyLoader()` 대신
+  `ASSET_CANDLES_BASELINE_NOT_READY`(503) 오류로 바꿨다. 잘린 KIS 페이지를
+  정상 캔들처럼 반환하지 않는다.
+- 비집계 요청(5m/1d/1w)과 `managedByPersistence=false`(1m 등), 그리고 명시적
+  `CANDLE_SERVING_MODE=legacy` 전체 롤백은 기존 동작을 유지한다. 그래야
+  baseline이 없는 환경에서도 앱 전체가 빈 화면이 되지 않는다.
+- 커버리지는 확인됐는데 과거 일부 버킷에 5분봉 구멍이 있으면, 불완전 버킷은
+  계속 **버리고** 완전한 버킷만 제공한다
+  (`database_fallback` / `incomplete_buckets_dropped`). 구멍 하나로 30일 차트
+  전체가 503이 되지 않게 하되, 불완전 캔들을 정상 캔들로 승격하지는 않는다.
+
+**E. coverage 증거를 체크포인트 합집합으로**
+
+- `MarketCandleSyncStateRepository.findCompletedCoverageUnion()` 추가.
+  개별 행은 여전히 `status=completed` + `coverageComplete=true` +
+  well-formed `[coveredFrom, coveredTo)` 여야 하고, 그 확인 구간들을 병합해
+  요청 범위를 덮는지 본다. 중간에 구멍이 하나라도 있으면 "커버 안 됨"이다.
+  행 수는 상한(2000)으로 막았다.
+- 이로써 "35일 baseline 1회 + 이후 incremental tail" 조합이 14일 창을 현재까지
+  커버할 수 있다. `CandleDatabaseLoader`가 이 판정을 쓴다.
+
+**F. 기본 serving 모드**
+
+- `readCandleServingConfig()` 기본값을 `database`로 바꾸고 빈 문자열도 기본값
+  취급(`.env`의 빈 줄이 앱을 죽이지 않게). `.env.example`도 `database`로 바꾸고
+  주석에 baseline 시딩 명령을 적었다. `legacy`는 명시적 긴급 롤백 전용이다.
+
+**G. baseline 준비/확인 경로**
+
+- `backend/scripts/candle-baseline-sync.ts` (+ `pnpm candle:baseline`) 추가.
+  기존 `MarketCandleSyncService.syncAssets`(Ops `market_candle_sync` 잡과 같은
+  코드 경로)를 감싸기만 하며 동기화 로직을 복제하지 않는다.
+  - `--report`: PostgreSQL만으로 자산별 `READY`/`MISSING` + 최신 커버리지 완료
+    시각 출력(서빙 경로와 동일한 판정 함수 사용).
+  - `--dry-run` / `--apply` / `--mode incremental` / `--days` /
+    `--asset-type` / `--asset-id` / `--max-assets` / `--no-resume`.
+  - `--apply`는 실제 provider 자격증명과 Redis(백필 락)가 필요하다.
+- 최신 5분봉 유지 경로(live candle pipeline, reconciliation)는 캔들만 쓰고
+  커버리지 체크포인트를 남기지 않으므로, 장기창 차트를 계속 DB로 서빙하려면
+  `--mode incremental`을 주기적으로 돌려야 한다(문서화).
+
+**H. 프런트 준비중 상태**
+
+- `features/asset/candleErrors.ts`(순수): API 오류 코드 추출 +
+  `isCandleBaselineNotReadyError()`.
+- `AssetDetailScreen`은 baseline 오류일 때만 "차트 데이터를 준비 중입니다."
+  안내를 보여주고 기존 "차트 다시 시도" 버튼을 그대로 쓴다. 실제 provider
+  장애는 기존 오류 표시 그대로다.
+
+**I. 진단 정보**
+
+- `candle_delivery` / `candle_delivery_failed` 로그에 delivery state,
+  target/source interval, range, limit, requested·source 범위, 커버리지 여부,
+  fallback reason을 담았다. HTTP 응답 형태는 그대로이며 내부 정보는 노출하지
+  않는다. DB 응답의 `source.requestedCount`는 프런트가 보낸 limit(672/336/200)을
+  그대로 반영하므로, 개발용 표시에 `req=120`이 보이면 아직 레거시 경로다.
+
+**검증**
+
+- backend: `npx jest` 2080 passed / 0 failed (159 suites, 24 skipped = DB·실
+  provider 필요 스위트), `npm run typecheck`, `npm run build`, `npm run lint` 통과.
+- frontend: `npm run typecheck`, `npm test` 통과, expo export web/android 성공.
+- `pnpm candle:baseline -- --report`를 로컬 DB에 실제 실행 → 활성 자산 전부
+  `MISSING`(로컬에 5분봉 커버리지 체크포인트가 없음)으로 확인.
+- 실제 KIS/Binance 자격증명이 필요한 baseline `--apply`와 실기기 차트 확인은
+  이 환경에서 실행하지 못했다(NOT_RUN).
+
+**주의사항**
+
+- 15m~4h용 별도 테이블을 만들지 말 것. canonical source는 `market_candles`의
+  5분봉이고 상위 봉은 조회 시 집계다.
+- `database` 모드에서 15m~4h 차트가 "준비 중"이면 장애가 아니라 baseline 미시딩
+  이다. `pnpm candle:baseline -- --report`로 확인하고 `--apply`로 시딩한다.
+- coverage 판정을 다시 단일 행으로 되돌리면 baseline 직후부터 장기창 차트가
+  전부 "준비 중"이 된다.
+
 ### 작업 단위: 가로 휴대전화 차트 높이 오분류·웹 drag 중 wheel 충돌 수정 (2026-07-29)
 
 **목적**
@@ -570,6 +694,37 @@ cd frontend && npm run typecheck && npm test
 ---
 
 ## 2. 최신 작업 시간순 기록
+
+### 2026-07-29 — 30분·1시간봉 14일 확대와 4시간봉 DB 집계 경로 정상화
+
+- 백엔드에 `14d` 캔들 범위를 정식 추가했다(타입·허용 집합·기본 interval·오류
+  메시지·캐시 검증·프런트 타입). 범위 길이 계산은 if-chain에서 exhaustive map
+  으로 바꿔, 새 범위를 빠뜨리면 365일로 새지 않고 컴파일 에러가 나게 했다.
+- 프런트 타임프레임: 30분봉 `14d`/672, 1시간봉 `14d`/336, 4시간봉 `30d`/200.
+  5m·15m·1d·1w는 기존 정책 유지.
+- `CANDLE_SERVING_MODE` 기본값을 `legacy` → **`database`** 로 바꿨다(.env.example
+  포함). `legacy`는 명시적 긴급 롤백 전용으로 남는다.
+- 15m/30m/1h/4h는 저장된 5분봉 집계로만 제공한다. baseline이 없을 때 잘린 KIS
+  120행 응답으로 폴백하던 분기를 `ASSET_CANDLES_BASELINE_NOT_READY`(503)로
+  바꿨고, 프런트는 이를 "차트 데이터를 준비 중입니다." 상태 + 재시도로 표시한다
+  (5m/1d/1w와 1m 등 비집계 요청의 기존 호환 경로는 유지).
+- serving coverage 판정을 단일 체크포인트에서 **coverage-audited 체크포인트
+  합집합**으로 확장했다(`findCompletedCoverageUnion`). 35일 baseline 1회 +
+  이후 incremental tail이 14일·30일 창을 현재 시점까지 커버할 수 있다. 개별
+  행의 완전성 요건은 그대로이며 중간 구멍은 여전히 "커버 안 됨"이다.
+- 커버리지는 있는데 과거 버킷에 5분봉 구멍이 있으면 불완전 버킷은 버리고 완전한
+  버킷만 제공한다(`incomplete_buckets_dropped`). 불완전 캔들을 정상 캔들로
+  올리지는 않는다.
+- baseline 시딩/확인용 `pnpm candle:baseline`(`scripts/candle-baseline-sync.ts`)
+  추가 — 기존 `MarketCandleSyncService.syncAssets`를 감싼 얇은 래퍼이고 동기화
+  로직 복제는 없다. `--report`는 DB만으로 자산별 준비 상태를 출력한다.
+- `candle_delivery` 로그에 delivery state·source interval·range·요청 범위·
+  커버리지·fallback reason을 추가했다(응답 형태 불변). DB 응답의
+  `requestedCount`는 672/336/200을 그대로 반영한다.
+- 검증: backend jest 2080 pass, typecheck·build·lint 통과, frontend typecheck·
+  test 통과, expo export web/android 성공, 로컬 DB에 `--report` 실제 실행.
+  실제 provider 자격증명이 필요한 baseline `--apply`와 실기기 차트 확인은
+  NOT_RUN. DB migration 없음, 주문·체결·포지션·지갑·원장 불변.
 
 ### 2026-07-29 — 가로 휴대전화 차트 높이 오분류·웹 drag 중 wheel 충돌 수정
 

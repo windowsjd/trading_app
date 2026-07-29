@@ -37,13 +37,14 @@ export type AssetCandlesQuery = {
 
 // 'prev_open'  = previous real market-session open → now
 // 'prev2_open' = second previous real market-session open → now
-// '1y'         = rolling 365 days → now
+// '7d'/'14d'/'30d'/'1y' = rolling N days → now
 // Exported (type-only) so the candle response cache can key on and store the
 // exact HTTP response shape without duplicating these definitions. This does
 // not change the response shape or the provider call flow.
 export type CandleRange =
   | '1d'
   | '7d'
+  | '14d'
   | '30d'
   | 'prev_open'
   | 'prev2_open'
@@ -215,11 +216,33 @@ const CANDLE_INTERVAL_ERROR_MESSAGE =
 const DEFAULT_INTERVAL_BY_RANGE: Record<CandleRange, CandleInterval> = {
   '1d': '5m',
   '7d': '1h',
+  '14d': '1h',
   '30d': '1d',
   prev_open: '5m',
   prev2_open: '30m',
   '1y': '1d',
   season: '1d',
+};
+
+/**
+ * Rolling ranges: exactly N × 24h before the request clock → now.
+ *
+ * This is an EXHAUSTIVE map on purpose. The previous if-chain returned 365
+ * days for anything it did not recognize, so adding a range without touching
+ * it silently produced a one-year window; a missing entry here is a compile
+ * error instead.
+ */
+const DAY_MS = 86_400_000;
+type RollingCandleRange = Exclude<
+  CandleRange,
+  'season' | 'prev_open' | 'prev2_open'
+>;
+const ROLLING_RANGE_DURATION_MS: Record<RollingCandleRange, number> = {
+  '1d': DAY_MS,
+  '7d': 7 * DAY_MS,
+  '14d': 14 * DAY_MS,
+  '30d': 30 * DAY_MS,
+  '1y': 365 * DAY_MS,
 };
 
 const CANDLE_INTERVAL_MINUTES: Record<CandleInterval, number> = {
@@ -247,6 +270,7 @@ const CANDLE_INTERVALS: Record<CandleInterval, true> = {
 const CANDLE_RANGES: Record<CandleRange, true> = {
   '1d': true,
   '7d': true,
+  '14d': true,
   '30d': true,
   prev_open: true,
   prev2_open: true,
@@ -260,6 +284,7 @@ const RANGE_INTERVALS: Record<
 > = {
   '1d': CANDLE_INTERVALS,
   '7d': CANDLE_INTERVALS,
+  '14d': CANDLE_INTERVALS,
   '30d': CANDLE_INTERVALS,
   prev_open: CANDLE_INTERVALS,
   prev2_open: CANDLE_INTERVALS,
@@ -1239,7 +1264,7 @@ export class AssetCandlesService {
     this.throwApiError(
       HttpStatus.BAD_REQUEST,
       'ASSET_CANDLES_INVALID_RANGE',
-      'range must be one of 1d, 7d, 30d, prev_open, prev2_open, 1y, or season.',
+      'range must be one of 1d, 7d, 14d, 30d, prev_open, prev2_open, 1y, or season.',
     );
   }
 
@@ -1560,22 +1585,8 @@ export class AssetCandlesService {
     });
   }
 
-  private rangeDurationMs(
-    range: Exclude<CandleRange, 'season' | 'prev_open' | 'prev2_open'>,
-  ): number {
-    if (range === '1d') {
-      return 86_400_000;
-    }
-
-    if (range === '7d') {
-      return 7 * 86_400_000;
-    }
-
-    if (range === '30d') {
-      return 30 * 86_400_000;
-    }
-
-    return 365 * 86_400_000;
+  private rangeDurationMs(range: RollingCandleRange): number {
+    return ROLLING_RANGE_DURATION_MS[range];
   }
 
   private parseDate(

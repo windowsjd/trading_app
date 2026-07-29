@@ -280,16 +280,35 @@ Trading note policy:
 - The frontend asset detail chart tabs use the same order: `1m`, `5m`, `15m`, `30m`, `1h`, `4h`, `1d`, `1w`.
 - 그 외 interval은 validation error로 처리한다.
 - 필요 시 서버가 더 짧은 원천 candle을 집계해 상위 interval candle을 생성한다.
+- `15m`, `30m`, `1h`, `4h` are aggregated at read time from the STORED `5m`
+  feed (35-day retention), never from a separate stored table. Until that
+  baseline is seeded for the requested window the endpoint answers
+  `ASSET_CANDLES_BASELINE_NOT_READY` (503) instead of returning a truncated
+  provider-direct page; clients show a "preparing" state and retry. See
+  [`candle-live-operations.md`](candle-live-operations.md).
 - Raw Binance rows, raw provider payloads, metadata JSON, and secrets are never exposed.
 
 ### Query Parameters
 
 - `interval` optional. Default is `5m`.
   - Allowed for all asset candle types: `1m`, `5m`, `15m`, `30m`, `1h`, `4h`, `1d`, `1w`.
+- `range` optional. Default is `1d`.
+  - Allowed: `1d`, `7d`, `14d`, `30d`, `prev_open`, `prev2_open`, `1y`, `season`.
+  - `1d` / `7d` / `14d` / `30d` / `1y` are rolling windows: exactly N x 24h
+    before the request clock up to the request clock. `14d` is the window the
+    `30m` and `1h` chart tabs request; `30d` is what `4h` requests.
+  - `prev_open` / `prev2_open` anchor at the previous (or second previous) real
+    market session open, `season` at the current season start.
+  - Every interval is allowed for every range; unknown values are
+    `ASSET_CANDLES_INVALID_RANGE`.
 - `limit` optional.
   - Default: `100`.
   - Must be a positive integer.
-  - Values greater than `100` are clamped to `100`.
+  - Values greater than `1000` (the Binance single-call cap) are clamped to
+    `1000`; per-provider caps clamp lower when a provider call is made. The
+    chart tabs send `672` (`14d`/`30m`), `336` (`14d`/`1h`) and `200`
+    (`30d`/`4h`), and a database answer echoes the requested value in
+    `source.requestedCount`.
 - `date` optional `YYYY-MM-DD`.
   - When present for crypto, Binance receives UTC `startTime` at that date's start and `endTime` at that date's end unless `to` is provided.
 - `to` optional `HHmmss` or ISO datetime.
@@ -350,9 +369,15 @@ Trading note policy:
 - `INVALID_LIMIT`
 - `INVALID_OFFSET`
 - `ASSET_CANDLES_INVALID_INTERVAL`
+- `ASSET_CANDLES_INVALID_RANGE`
 - `ASSET_CANDLES_UNSUPPORTED_SYMBOL`
 - `ASSET_CANDLES_PROVIDER_ERROR`
+- `ASSET_CANDLES_PROVIDER_UNAVAILABLE`
 - `ASSET_CANDLES_PROVIDER_MALFORMED_RESPONSE`
+- `ASSET_CANDLES_BASELINE_NOT_READY` (503) — the stored 5m baseline for this
+  window is still being prepared, so the aggregated `15m`/`30m`/`1h`/`4h`
+  answer would be incomplete. Not a provider outage: the client shows
+  "차트 데이터를 준비 중입니다." and retries.
 
 ## Not Implemented
 

@@ -29,7 +29,12 @@ type Env = Record<string, string | undefined>;
 export function readCandleServingConfig(
   env: Env = process.env,
 ): CandleServingConfig {
-  const rawMode = (env.CANDLE_SERVING_MODE ?? 'legacy').trim().toLowerCase();
+  // `database` is the normal serving mode: 15m/30m/1h/4h are aggregated from
+  // the stored 5m feed at read time, so a provider-direct answer for them can
+  // only be a truncated single page. `legacy` stays available as the explicit
+  // emergency rollback switch.
+  // A blank value is "not configured" (an empty `.env` line), not a typo.
+  const rawMode = env.CANDLE_SERVING_MODE?.trim().toLowerCase() || 'database';
   if (rawMode !== 'legacy' && rawMode !== 'database') {
     throw new CandleServingConfigError(
       'CANDLE_SERVING_MODE must be legacy or database.',

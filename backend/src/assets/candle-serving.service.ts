@@ -55,9 +55,17 @@ export type CandleDeliveryState =
  * legacyLoader (provider-direct) is reachable ONLY through:
  * 1. CANDLE_SERVING_MODE=legacy — the explicit full rollback switch;
  * 2. read plans with managedByPersistence=false (out-of-policy requests);
- * 3. the cold-baseline policy: no completed coverage and a requested range
- *    beyond the on-demand repair budget (logged as cold_baseline_required) —
- *    operators seed those via the manual sync job.
+ * 3. the cold-baseline policy for NON-aggregated feeds: no completed coverage
+ *    and a requested range beyond the on-demand repair budget (logged as
+ *    cold_baseline_required) — operators seed those via the manual sync job.
+ *
+ * Aggregated intervals (15m/30m/1h/4h) are deliberately excluded from (3).
+ * They exist only as read-time aggregates of the stored 5m feed, so a
+ * provider-direct answer is one truncated minute page bucketed without any
+ * completeness check — e.g. a single bogus 4h candle for a 30-day request.
+ * Without a baseline those requests fail with ASSET_CANDLES_BASELINE_NOT_READY
+ * so the client can say "preparing" instead of drawing wrong candles.
+ *
  * Once a managed refresh has started, no failure path calls legacyLoader.
  */
 @Injectable()
@@ -93,14 +101,16 @@ export class CandleServingService {
   ): Promise<AssetCandlesResponse> {
     if (this.config.mode === 'legacy') {
       const response = await legacyLoader();
-      this.logDelivery('legacy_provider', asset.id, query.interval);
+      this.logDelivery('legacy_provider', asset.id, query, null, {
+        reason: 'serving_mode_legacy',
+      });
       return response;
     }
 
     const plan = this.plans.build(asset, query);
     if (!plan.managedByPersistence) {
       const response = await legacyLoader();
-      this.logDelivery('legacy_provider', asset.id, query.interval, {
+      this.logDelivery('legacy_provider', asset.id, query, plan, {
         reason: plan.outOfPolicyReason,
       });
       return response;
@@ -109,7 +119,7 @@ export class CandleServingService {
     const key = this.cacheKey(asset.id, query, plan);
     const cached = await this.cache.get(key);
     if (cached.status === 'fresh') {
-      this.logDelivery('fresh_cache', asset.id, query.interval);
+      this.logDelivery('fresh_cache', asset.id, query, plan);
       return cached.value;
     }
     const stale = cached.status === 'stale' ? cached.value : null;
@@ -123,7 +133,7 @@ export class CandleServingService {
       initial = await this.database.load(asset, query, plan);
     } catch (error) {
       if (stale && this.isOperationalRefreshError(error)) {
-        this.logDelivery('stale_cache_fallback', asset.id, query.interval, {
+        this.logDelivery('stale_cache_fallback', asset.id, query, plan, {
           reason: this.errorName(error),
         });
         return stale;
@@ -131,16 +141,26 @@ export class CandleServingService {
       throw error;
     }
 
-    // A large request without completed baseline coverage is deliberately kept
-    // on the rollout-safe provider-direct path. Operators must seed it through
-    // the manual sync job before database serving can own it.
+    // A large request without completed baseline coverage cannot be answered
+    // from the store yet. Operators seed it through the manual sync job.
     if (
       !initial.completedCoverage &&
       plan.sourceRange.to.getTime() - plan.sourceRange.from.getTime() >
         this.config.maxOnDemandRepairRangeMs
     ) {
+      // 15m/30m/1h/4h are read-time aggregates of the stored 5m feed. The
+      // provider-direct path would bucket ONE truncated minute page (KIS caps
+      // a page at 120 rows) into "candles" without any constituent check, so a
+      // 30-day 4h request comes back as a single fabricated candle. Fail
+      // explicitly instead; the client shows a "preparing" state.
+      if (plan.requiresAggregation) {
+        this.logDeliveryFailed('baseline_not_ready', asset.id, query, plan, {
+          reason: 'cold_baseline_required',
+        });
+        throw this.baselineNotReadyError();
+      }
       const response = await legacyLoader();
-      this.logDelivery('legacy_provider', asset.id, query.interval, {
+      this.logDelivery('legacy_provider', asset.id, query, plan, {
         reason: 'cold_baseline_required',
       });
       return response;
@@ -154,7 +174,7 @@ export class CandleServingService {
       });
       // The coordinator can return a stale waiter value after its short wait.
       if (stale && response === stale) {
-        this.logDelivery('stale_cache_fallback', asset.id, query.interval, {
+        this.logDelivery('stale_cache_fallback', asset.id, query, plan, {
           reason: 'remote_refresh_in_progress',
         });
       }
@@ -162,13 +182,13 @@ export class CandleServingService {
     } catch (error) {
       if (!this.isOperationalRefreshError(error)) throw error;
       if (stale) {
-        this.logDelivery('stale_cache_fallback', asset.id, query.interval, {
+        this.logDelivery('stale_cache_fallback', asset.id, query, plan, {
           reason: this.errorName(error),
         });
         return stale;
       }
       if (this.usableLastKnownGood(initial)) {
-        this.logDelivery('database_fallback', asset.id, query.interval, {
+        this.logDelivery('database_fallback', asset.id, query, plan, {
           reason: this.errorName(error),
         });
         return initial.response as AssetCandlesResponse;
@@ -180,15 +200,9 @@ export class CandleServingService {
       // reach clients through the durable store, and legacyLoader is
       // reachable solely via CANDLE_SERVING_MODE=legacy, an unmanaged read
       // plan, or the explicit cold-baseline policy above.
-      this.logger.warn(
-        JSON.stringify({
-          event: 'candle_delivery_failed',
-          state: 'managed_unresolved',
-          assetId: asset.id,
-          interval: query.interval,
-          reason: this.errorName(error),
-        }),
-      );
+      this.logDeliveryFailed('managed_unresolved', asset.id, query, plan, {
+        reason: this.errorName(error),
+      });
       throw this.providerCompatibilityError(asset);
     }
   }
@@ -203,13 +217,15 @@ export class CandleServingService {
       (before.state === 'available' || before.state === 'confirmed_empty') &&
       before.fresh
     ) {
-      this.logDelivery('database_fresh', asset.id, query.interval);
+      this.logDelivery('database_fresh', asset.id, query, plan, {
+        completedCoverage: before.completedCoverage,
+      });
       return before.response as AssetCandlesResponse;
     }
 
     if (!this.config.onDemandRefreshEnabled) {
       if (this.usableLastKnownGood(before)) {
-        this.logDelivery('database_fallback', asset.id, query.interval, {
+        this.logDelivery('database_fallback', asset.id, query, plan, {
           reason: 'on_demand_refresh_disabled',
         });
         return before.response as AssetCandlesResponse;
@@ -258,11 +274,36 @@ export class CandleServingService {
       this.logDelivery(
         refreshComplete ? 'provider_refreshed' : 'database_fallback',
         asset.id,
-        query.interval,
-        refreshComplete ? {} : { reason: 'refresh_incomplete_db_satisfied' },
+        query,
+        plan,
+        {
+          completedCoverage: after.completedCoverage,
+          ...(refreshComplete
+            ? {}
+            : { reason: 'refresh_incomplete_db_satisfied' }),
+        },
       );
       return after.response as AssetCandlesResponse;
     }
+
+    // Provider-confirmed coverage for the whole range, but some historical
+    // aggregate buckets are missing constituents even after the repair (a
+    // real hole in the 5m feed, e.g. an illiquid window the provider never
+    // filled). The incomplete buckets stay DROPPED — they are never promoted
+    // to normal candles — and the complete ones are served rather than
+    // failing a 30-day chart over one gap.
+    if (
+      after.state === 'incomplete' &&
+      after.completedCoverage &&
+      after.response?.data.state === 'available'
+    ) {
+      this.logDelivery('database_fallback', asset.id, query, plan, {
+        reason: 'incomplete_buckets_dropped',
+        droppedIncompleteBuckets: after.droppedIncompleteBuckets,
+      });
+      return after.response;
+    }
+
     const feed = result.feeds[0];
     throw new CandleOperationalRefreshError(
       feed?.errorCode ?? feed?.stopReason ?? 'Candle refresh did not complete.',
@@ -333,20 +374,87 @@ export class CandleServingService {
     );
   }
 
+  /**
+   * Server-side delivery diagnostics. Everything an operator needs to tell a
+   * database answer from a provider-direct one — delivery state, target and
+   * source interval, requested range, coverage, fallback reason — is logged
+   * here; the HTTP response shape is unchanged and leaks none of it.
+   */
   private logDelivery(
     state: CandleDeliveryState,
     assetId: string,
-    interval: string,
+    query: ParsedAssetCandlesQuery,
+    plan: CandleReadPlan | null,
     extra: Record<string, unknown> = {},
   ): void {
     this.logger.log(
       JSON.stringify({
         event: 'candle_delivery',
         state,
-        assetId,
-        interval,
+        ...this.deliveryContext(assetId, query, plan),
         ...extra,
       }),
+    );
+  }
+
+  private logDeliveryFailed(
+    state: 'managed_unresolved' | 'baseline_not_ready',
+    assetId: string,
+    query: ParsedAssetCandlesQuery,
+    plan: CandleReadPlan | null,
+    extra: Record<string, unknown> = {},
+  ): void {
+    this.logger.warn(
+      JSON.stringify({
+        event: 'candle_delivery_failed',
+        state,
+        ...this.deliveryContext(assetId, query, plan),
+        ...extra,
+      }),
+    );
+  }
+
+  private deliveryContext(
+    assetId: string,
+    query: ParsedAssetCandlesQuery,
+    plan: CandleReadPlan | null,
+  ): Record<string, unknown> {
+    return {
+      assetId,
+      interval: query.interval,
+      range: query.range,
+      limit: query.limit,
+      ...(plan
+        ? {
+            sourceInterval: plan.sourceInterval,
+            requiresAggregation: plan.requiresAggregation,
+            requestedFrom: plan.requestedRange.from.toISOString(),
+            requestedTo: plan.requestedRange.to.toISOString(),
+            sourceFrom: plan.sourceRange.from.toISOString(),
+            sourceTo: plan.sourceRange.to.toISOString(),
+          }
+        : {}),
+    };
+  }
+
+  /**
+   * The 5m baseline that 15m/30m/1h/4h are aggregated from has not been
+   * seeded for this range yet. This is NOT a provider outage: the client is
+   * expected to show a "chart data is being prepared" state and retry, and
+   * the operator seeds the range with the manual `market_candle_sync` job.
+   */
+  private baselineNotReadyError(): HttpException {
+    return new HttpException(
+      {
+        success: false,
+        error: {
+          code: 'ASSET_CANDLES_BASELINE_NOT_READY',
+          message:
+            'Stored 5m baseline coverage is being prepared for this candle range.',
+          details: null,
+        },
+      },
+      HttpStatus.SERVICE_UNAVAILABLE,
     );
   }
 

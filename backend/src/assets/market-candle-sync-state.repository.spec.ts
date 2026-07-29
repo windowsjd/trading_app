@@ -35,6 +35,7 @@ describe('MarketCandleSyncStateRepository', () => {
     const delegate = {
       create: jest.fn(),
       findFirst: jest.fn(),
+      findMany: jest.fn(),
       findUnique: jest.fn(),
       updateMany: jest.fn(),
     };
@@ -511,6 +512,117 @@ describe('MarketCandleSyncStateRepository', () => {
     expect(callArg<{ data: unknown }>(delegate.updateMany).data).toMatchObject({
       coveredFrom: new Date('2026-07-01T00:00:00Z'),
       coveredTo: new Date('2026-07-05T00:00:00Z'),
+    });
+  });
+
+  describe('findCompletedCoverageUnion', () => {
+    const range = (fromIso: string, toIso: string, completedIso = toIso) => ({
+      coveredFrom: new Date(fromIso),
+      coveredTo: new Date(toIso),
+      completedAt: new Date(completedIso),
+    });
+
+    it('queries only coverage-audited checkpoints that overlap the range', async () => {
+      const { repository, delegate } = createRepository();
+      delegate.findMany.mockResolvedValue([]);
+      await repository.findCompletedCoverageUnion(
+        'asset-1',
+        '5m',
+        new Date('2026-07-01T00:00:00Z'),
+        new Date('2026-07-15T00:00:00Z'),
+      );
+      const { where, orderBy, take } = callArg<{
+        where: Record<string, unknown>;
+        orderBy: unknown;
+        take: number;
+      }>(delegate.findMany);
+      expect(where.status).toBe('completed');
+      expect(where.coverageComplete).toBe(true);
+      expect(where.completedAt).toEqual({ not: null });
+      expect(orderBy).toEqual([{ coveredFrom: 'asc' }, { coveredTo: 'desc' }]);
+      expect(take).toBeGreaterThan(0);
+    });
+
+    it('stitches the seeded baseline together with later incremental tails', async () => {
+      // The real shape: one 35-day baseline run plus the incremental runs that
+      // confirmed the tail since. No single row covers "14 days ago → now".
+      const { repository, delegate } = createRepository();
+      delegate.findMany.mockResolvedValue([
+        range('2026-06-10T00:00:00Z', '2026-07-10T00:00:00Z'),
+        range('2026-07-09T22:00:00Z', '2026-07-14T00:00:00Z'),
+        range('2026-07-13T23:00:00Z', '2026-07-15T00:10:00Z'),
+      ]);
+      await expect(
+        repository.findCompletedCoverageUnion(
+          'asset-1',
+          '5m',
+          new Date('2026-07-01T00:00:00Z'),
+          new Date('2026-07-15T00:00:00Z'),
+        ),
+      ).resolves.toEqual({
+        covered: true,
+        newestCompletedAt: new Date('2026-07-15T00:10:00Z'),
+      });
+    });
+
+    it('reports NOT covered when a hole remains between checkpoints', async () => {
+      const { repository, delegate } = createRepository();
+      delegate.findMany.mockResolvedValue([
+        range('2026-06-10T00:00:00Z', '2026-07-05T00:00:00Z'),
+        // 2 hours missing here — a gap the chart must not treat as covered.
+        range('2026-07-05T02:00:00Z', '2026-07-15T00:00:00Z'),
+      ]);
+      await expect(
+        repository.findCompletedCoverageUnion(
+          'asset-1',
+          '5m',
+          new Date('2026-07-01T00:00:00Z'),
+          new Date('2026-07-15T00:00:00Z'),
+        ),
+      ).resolves.toEqual({ covered: false, newestCompletedAt: null });
+    });
+
+    it('reports NOT covered when the union stops short of the requested end', async () => {
+      const { repository, delegate } = createRepository();
+      delegate.findMany.mockResolvedValue([
+        range('2026-06-10T00:00:00Z', '2026-07-14T00:00:00Z'),
+      ]);
+      await expect(
+        repository.findCompletedCoverageUnion(
+          'asset-1',
+          '5m',
+          new Date('2026-07-01T00:00:00Z'),
+          new Date('2026-07-15T00:00:00Z'),
+        ),
+      ).resolves.toEqual({ covered: false, newestCompletedAt: null });
+    });
+
+    it('reports NOT covered when the range starts before the oldest coverage', async () => {
+      const { repository, delegate } = createRepository();
+      delegate.findMany.mockResolvedValue([
+        range('2026-07-02T00:00:00Z', '2026-07-15T00:00:00Z'),
+      ]);
+      await expect(
+        repository.findCompletedCoverageUnion(
+          'asset-1',
+          '5m',
+          new Date('2026-07-01T00:00:00Z'),
+          new Date('2026-07-15T00:00:00Z'),
+        ),
+      ).resolves.toEqual({ covered: false, newestCompletedAt: null });
+    });
+
+    it('rejects an empty or inverted range without querying', async () => {
+      const { repository, delegate } = createRepository();
+      await expect(
+        repository.findCompletedCoverageUnion(
+          'asset-1',
+          '5m',
+          new Date('2026-07-15T00:00:00Z'),
+          new Date('2026-07-15T00:00:00Z'),
+        ),
+      ).resolves.toEqual({ covered: false, newestCompletedAt: null });
+      expect(delegate.findMany).not.toHaveBeenCalled();
     });
   });
 

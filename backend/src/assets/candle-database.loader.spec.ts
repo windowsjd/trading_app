@@ -102,9 +102,10 @@ describe('CandleDatabaseLoader', () => {
     const plans = { build: jest.fn().mockReturnValue(plan) };
     const repository = { findRange: jest.fn().mockResolvedValue([]) };
     const states = {
-      findCompletedCovering: jest
-        .fn()
-        .mockResolvedValue({ completedAt: new Date('2026-07-13T00:19:30Z') }),
+      findCompletedCoverageUnion: jest.fn().mockResolvedValue({
+        covered: true,
+        newestCompletedAt: new Date('2026-07-13T00:19:30Z'),
+      }),
       findLatestOverlapping: jest
         .fn()
         .mockResolvedValue({ status: MarketCandleSyncStatus.completed }),
@@ -162,7 +163,10 @@ describe('CandleDatabaseLoader', () => {
     await expect(loader.load(asset, query, plan)).resolves.toMatchObject({
       state: 'confirmed_empty',
     });
-    states.findCompletedCovering.mockResolvedValue(null);
+    states.findCompletedCoverageUnion.mockResolvedValue({
+      covered: false,
+      newestCompletedAt: null,
+    });
     states.findLatestOverlapping.mockResolvedValue(null);
     await expect(loader.load(asset, query, plan)).resolves.toMatchObject({
       state: 'missing',
@@ -193,7 +197,7 @@ describe('CandleDatabaseLoader', () => {
     await loader.load(asset, query, futurePlan);
     // A checkpoint can only confirm candles that exist; requiring coverage
     // beyond `now` would make current-day requests permanently uncoverable.
-    expect(states.findCompletedCovering).toHaveBeenCalledWith(
+    expect(states.findCompletedCoverageUnion).toHaveBeenCalledWith(
       asset.id,
       '5m',
       futurePlan.sourceRange.from,
@@ -205,8 +209,11 @@ describe('CandleDatabaseLoader', () => {
     const { loader, repository, states } = create();
     repository.findRange.mockResolvedValue([candle(0), candle(5)]);
     // A legacy `completed` checkpoint without coverage audit no longer
-    // matches findCompletedCovering, so covering resolves to null.
-    states.findCompletedCovering.mockResolvedValue(null);
+    // matches the coverage union, so it reports covered=false.
+    states.findCompletedCoverageUnion.mockResolvedValue({
+      covered: false,
+      newestCompletedAt: null,
+    });
     states.findLatestOverlapping.mockResolvedValue({
       status: MarketCandleSyncStatus.completed,
     });
@@ -222,12 +229,15 @@ describe('CandleDatabaseLoader', () => {
     // A KIS 5m run whose provider sweep reached the target but whose stored
     // data is incomplete terminates as status=completed with
     // coverageComplete=false and completionReason=data_incomplete. Such a
-    // row never matches findCompletedCovering (its SQL requires
-    // coverageComplete=true), so `covering` resolves to null and stored rows
+    // row never matches the coverage union (its SQL requires
+    // coverageComplete=true), so coverage resolves to covered=false and rows
     // with holes must surface as incomplete — never available.
     const { loader, repository, states } = create();
     repository.findRange.mockResolvedValue([candle(0), candle(10)]);
-    states.findCompletedCovering.mockResolvedValue(null);
+    states.findCompletedCoverageUnion.mockResolvedValue({
+      covered: false,
+      newestCompletedAt: null,
+    });
     states.findLatestOverlapping.mockResolvedValue({
       status: MarketCandleSyncStatus.completed,
       coverageComplete: false,
@@ -249,7 +259,10 @@ describe('CandleDatabaseLoader', () => {
 
   it('never reports confirmed_empty without coverage-complete evidence', async () => {
     const { loader, states } = create();
-    states.findCompletedCovering.mockResolvedValue(null);
+    states.findCompletedCoverageUnion.mockResolvedValue({
+      covered: false,
+      newestCompletedAt: null,
+    });
     states.findLatestOverlapping.mockResolvedValue({
       status: MarketCandleSyncStatus.completed,
     });

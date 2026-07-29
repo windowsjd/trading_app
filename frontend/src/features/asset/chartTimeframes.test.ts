@@ -5,6 +5,7 @@ import {
   ASSET_CHART_TIMEFRAMES,
   DEFAULT_ASSET_CHART_TIMEFRAME,
 } from './chartTimeframes.ts';
+import { QUERY_KEYS } from '../../constants/queryKeys.ts';
 
 const BINANCE_KLINE_MAX_LIMIT = 1000;
 
@@ -19,13 +20,19 @@ const INTERVAL_MINUTES: Record<string, number> = {
 };
 
 // Worst-case window length per range (crypto trades 24/7): prev_open ≈ 2 days,
-// prev2_open ≈ 3 days, 30d = 30 days, 1y = 366 days.
+// prev2_open ≈ 3 days, 14d = 14 days, 30d = 30 days, 1y = 366 days.
 const RANGE_WORST_CASE_DAYS: Record<string, number> = {
   prev_open: 2,
   prev2_open: 3,
+  '14d': 14,
   '30d': 30,
   '1y': 366,
 };
+
+// The backend aggregates 15m/30m/1h/4h from the stored 5m feed, which is kept
+// for 35 days. No aggregated tab may ask for more than that.
+const FIVE_MINUTE_RETENTION_DAYS = 35;
+const AGGREGATED_INTERVALS = new Set(['15m', '30m', '1h', '4h']);
 
 test('1m tab is not offered', () => {
   assert.ok(
@@ -53,8 +60,8 @@ test('range and limit policy matches the backend candle windows', () => {
     [
       { interval: '5m', range: 'prev_open', limit: 600 },
       { interval: '15m', range: 'prev_open', limit: 200 },
-      { interval: '30m', range: 'prev2_open', limit: 160 },
-      { interval: '1h', range: 'prev2_open', limit: 80 },
+      { interval: '30m', range: '14d', limit: 672 },
+      { interval: '1h', range: '14d', limit: 336 },
       { interval: '4h', range: '30d', limit: 200 },
       { interval: '1d', range: '1y', limit: 400 },
       { interval: '1w', range: '1y', limit: 60 },
@@ -94,4 +101,67 @@ test('daily and weekly limits are fixed for 1y chart requests', () => {
 
   assert.equal(daily?.limit, 400);
   assert.equal(weekly?.limit, 60);
+});
+
+test('30m and 1h show the last 14 days at the crypto upper-bound limit', () => {
+  const halfHour = ASSET_CHART_TIMEFRAMES.find((tab) => tab.interval === '30m');
+  const hourly = ASSET_CHART_TIMEFRAMES.find((tab) => tab.interval === '1h');
+
+  // 14 days x 48 half-hour candles, 14 days x 24 hourly candles. Stocks return
+  // fewer (regular session only) — that is expected, not a truncation.
+  assert.deepEqual(
+    { range: halfHour?.range, limit: halfHour?.limit },
+    { range: '14d', limit: 672 },
+  );
+  assert.deepEqual(
+    { range: hourly?.range, limit: hourly?.limit },
+    { range: '14d', limit: 336 },
+  );
+});
+
+test('4h shows the last 30 days', () => {
+  const fourHour = ASSET_CHART_TIMEFRAMES.find((tab) => tab.interval === '4h');
+  assert.deepEqual(
+    { range: fourHour?.range, limit: fourHour?.limit },
+    { range: '30d', limit: 200 },
+  );
+});
+
+test('aggregated tabs stay inside the 35-day 5m retention window', () => {
+  for (const tab of ASSET_CHART_TIMEFRAMES) {
+    if (!AGGREGATED_INTERVALS.has(tab.interval)) continue;
+    const days = RANGE_WORST_CASE_DAYS[tab.range];
+    assert.ok(
+      days !== undefined && days <= FIVE_MINUTE_RETENTION_DAYS,
+      `${tab.label}: ${tab.range} exceeds the stored 5m retention window`,
+    );
+  }
+});
+
+test('each timeframe gets its own candle query key (14d never collides)', () => {
+  const keys = ASSET_CHART_TIMEFRAMES.map((tab) =>
+    JSON.stringify(
+      QUERY_KEYS.asset.candles('asset-1', {
+        range: tab.range,
+        interval: tab.interval,
+        limit: tab.limit,
+      }),
+    ),
+  );
+  assert.equal(new Set(keys).size, keys.length, 'query keys must be distinct');
+
+  const halfHour = ASSET_CHART_TIMEFRAMES.find((tab) => tab.interval === '30m')!;
+  assert.deepEqual(
+    QUERY_KEYS.asset.candles('asset-1', {
+      range: halfHour.range,
+      interval: halfHour.interval,
+      limit: halfHour.limit,
+    }),
+    ['asset', 'candles', 'asset-1', '14d', '30m', 672],
+  );
+  // A 14d key must not be confused with the 1d or 1y windows.
+  assert.notDeepEqual(
+    QUERY_KEYS.asset.candles('asset-1', { range: '14d', interval: '1h' }),
+    QUERY_KEYS.asset.candles('asset-1', { range: '1d', interval: '1h' }),
+  );
 });

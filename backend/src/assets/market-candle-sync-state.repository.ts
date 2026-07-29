@@ -13,6 +13,12 @@ import type {
 
 const ERROR_MESSAGE_MAX_LENGTH = 500;
 
+// Upper bound on the checkpoints one coverage-union query stitches together.
+// A 35-day baseline plus hourly incremental tails stays far below this; the
+// bound only stops a pathological row count from turning a chart request into
+// an unbounded scan.
+const COVERAGE_UNION_MAX_ROWS = 2000;
+
 // Statuses a run can be resumed/taken over from. `running` is included
 // because a crashed instance leaves its row as running; the caller must hold
 // the asset/feed backfill lock before taking such a row over. `canceled` is
@@ -210,6 +216,69 @@ export class MarketCandleSyncStateRepository {
       },
       orderBy: { completedAt: 'desc' },
     });
+  }
+
+  /**
+   * Serving coverage evidence STITCHED across checkpoints.
+   *
+   * One checkpoint can never keep a long range covered up to "now": the
+   * 35-day baseline run confirms `[now-35d, its own finish time)`, and every
+   * later incremental run confirms only its own tail. A 14-day chart request
+   * needs coverage right up to the request clock, so the evidence is the
+   * UNION of coverage-complete checkpoints.
+   *
+   * Each row still has to be individually coverage-audited (status=completed,
+   * coverageComplete=true, well-formed `[coveredFrom, coveredTo)`) — this only
+   * merges adjacent/overlapping confirmed subranges, and a single hole between
+   * them means "not covered". Rows are bounded (`COVERAGE_UNION_MAX_ROWS`);
+   * hitting that bound without reaching `to` reports not-covered rather than
+   * guessing.
+   */
+  async findCompletedCoverageUnion(
+    assetId: string,
+    feed: MarketCandleFeed,
+    from: Date,
+    to: Date,
+  ): Promise<{ covered: boolean; newestCompletedAt: Date | null }> {
+    if (from.getTime() >= to.getTime()) {
+      return { covered: false, newestCompletedAt: null };
+    }
+    const rows = await this.prisma.marketCandleSyncState.findMany({
+      where: {
+        assetId,
+        feed,
+        status: MarketCandleSyncStatus.completed,
+        coverageComplete: true,
+        coveredFrom: { not: null, lt: to },
+        coveredTo: { not: null, gt: from },
+        completedAt: { not: null },
+      },
+      orderBy: [{ coveredFrom: 'asc' }, { coveredTo: 'desc' }],
+      take: COVERAGE_UNION_MAX_ROWS,
+      select: { coveredFrom: true, coveredTo: true, completedAt: true },
+    });
+
+    let cursorMs = from.getTime();
+    const toMs = to.getTime();
+    let newestCompletedAt: Date | null = null;
+    for (const row of rows) {
+      if (!row.coveredFrom || !row.coveredTo || !row.completedAt) continue;
+      // Rows are ordered by coveredFrom, so the first one starting after the
+      // cursor leaves a hole no later row can fill.
+      if (row.coveredFrom.getTime() > cursorMs) break;
+      if (row.coveredTo.getTime() <= cursorMs) continue;
+      cursorMs = row.coveredTo.getTime();
+      if (
+        newestCompletedAt === null ||
+        row.completedAt.getTime() > newestCompletedAt.getTime()
+      ) {
+        newestCompletedAt = row.completedAt;
+      }
+      if (cursorMs >= toMs) {
+        return { covered: true, newestCompletedAt };
+      }
+    }
+    return { covered: false, newestCompletedAt: null };
   }
 
   /** Returns the refreshed row, or null when the run was not resumable. */
