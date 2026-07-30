@@ -11,7 +11,7 @@ This service owns backend APIs, database access, financial calculations, and ser
 - Internal reward fulfillment foundation: operator/admin managed request queue/status APIs, idempotent internal reward requests, fulfillment into `SeasonReward`, and fulfilled-only user reward visibility. This does not call or implement external cash, point, coupon, gifticon, payment, or delivery APIs.
 - Admin/operator runtime DBs must have migration `20260601090000_add_user_role_operator_audit_logs` applied so `users.role` and `operator_audit_logs` exist.
 - Current season lookup and season join.
-- Season write paths require effective active season state: `status=active` and `startAt <= now < endAt` for join, FX quote/execute, and orders quote/create/execute. Submitted limit buys can be canceled; market-order cancel remains blocked with `ORDER_CANCEL_NOT_SUPPORTED`.
+- Season write paths require effective active season state: `status=active` and `startAt <= now < endAt` for join, FX quote/execute, and orders quote/create/execute. Public order cancel is currently blocked with `ORDER_CANCEL_NOT_SUPPORTED`.
 - Home as one aggregate API.
 - Home settled final-result read model from existing `rankType=final` `season_rankings`.
 - Wallets, records, ranking, and orders read APIs.
@@ -36,144 +36,6 @@ This service owns backend APIs, database access, financial calculations, and ser
 - Season settlement freezes valuation at `Season.endAt`, uses the latest valid price and USD/KRW rows with `effectiveAt <= Season.endAt` without enforcing quote/execute freshness windows, writes final `equity_snapshots`, creates `rankType=final` rankings, assigns final tiers, and changes the season to `settled` only after final rank and tier readiness checks pass. Reward payout remains pending/unimplemented.
 - Market holidays are configured in `src/orders/market-holidays.config.ts`; domestic/US stock quote/create/execute return `MARKET_CLOSED` on configured holidays, while crypto orders and FX are not holiday-blocked.
 
-### Limit buy orders (registration + reservation + scheduler-based auto-execution)
-
-Limit BUY registration exists behind `LIMIT_ORDER_ENABLED` (default false).
-Automatic execution is a SEPARATE flag, `SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED`
-(default false): when on, a scheduler job fills submitted limit buys. It is
-scheduler-polling based — NOT a Redis Stream matcher (that event-based layer was
-removed) and never a live-exchange order.
-
-- **Path A (fresh snapshot):** a submitted buy fills when the latest VALID
-  `provider_api` `AssetPriceSnapshot` reaches the limit, at the SNAPSHOT price
-  (price improvement allowed). Reuses the exact order-execute eligibility:
-  admin_manual / official_batch rejected, stocks need an open session, crypto
-  is 24h.
-- **Path B (closed 5m candle touch):** for buys not filled by path A, a closed
-  5-minute `MarketCandle` whose low reached the limit triggers a fill AT THE
-  ORDER's LIMIT PRICE — never the candle low (which is only touch evidence). It
-  never uses the partial candle the order was submitted into
-  (`firstEligibleCandleOpen` rounds submit time up to the next 5m boundary),
-  never a candle older than `LIMIT_ORDER_CANDLE_LOOKBACK_MS` (default 15m, no
-  outage backfill), and never a candle closing after the season endAt. Path B
-  lags up to ~5 minutes plus a scheduler tick, so the copy never claims
-  real-time. US-stock path B is only effective when delayed US candles are
-  produced; otherwise US buys fill via path A only.
-- The matcher runs on a DEDICATED interval (`LIMIT_ORDER_MATCHING_INTERVAL_MS`,
-  default/max 5000ms = half the 10s execute-freshness), single-instance via the
-  PostgreSQL `OpsJobLock` (`limit_order_matching`), never Redis. Each order
-  fills in its own transaction; batch-limited (`LIMIT_ORDER_MATCH_BATCH_SIZE`),
-  the rest roll to the next cycle oldest-first. The scheduler pre-gates dispatch
-  on whether any fillable order exists, so an idle system writes no audit rows.
-
-- Quote/create register a full-quantity GTC-style limit BUY as
-  `status=submitted` and atomically reserve `gross + fee` cash
-  (`cash_wallets.reserved_amount`); `availableAmount = balance - reserved`
-  is derived server-side and is the ceiling for EVERY ordinary cash debit
-  (market buy, FX source debit).
-- The reservation basis is pinned on the durable quote at QUOTE time
-  (`quotes.quoted_fee_rate/_gross_amount/_fee_amount/_reserved_amount`).
-  Create reserves those stored values and never re-reads the live
-  `Season.tradeFeeRate`, so changing the season fee rate between quote and
-  create cannot move the user's reservation.
-- On a fill: the actual net (`gross + fee` at the execution price and the
-  order's PINNED `reservationFeeRate`, never the live season rate) is debited
-  from `balanceAmount` and the WHOLE reservation is released in one guarded
-  statement (`settleLimitBuyReservedCash`), so a price-improvement difference
-  returns to `availableAmount`. The order becomes `executed` with real
-  `executedPrice`/`grossAmount`/`feeAmount`/`netAmount`, a path-A
-  `assetPriceSnapshotId` or path-B `limitOrderCandleEvidenceId`, plus one
-  `order_buy` wallet transaction, a position (same average-cost policy as market
-  buy), and an `order_executed` equity snapshot valued identically to a market
-  fill. `grossAmount`/`feeAmount`/`netAmount`/`executedPrice`/`executedAt` are
-  **null** while `submitted` or `canceled`.
-- Registration completes against **PostgreSQL alone**. The validation surface
-  is season, participant, asset, market session, quote, and wallet — Redis or
-  provider WebSocket state never gates a limit quote/create, and an
-  unreachable Redis does not block registration (covered by an integration
-  test). The matcher is independent: the money always commits in PostgreSQL
-  transactions.
-- Create re-validates the season and the participant against rows locked
-  inside its own transaction (`Quote FOR UPDATE → SeasonParticipant FOR
-SHARE → Season FOR SHARE → CashWallet`), so a concurrent participant
-  exclusion or season end either loses the race and lets cleanup cancel the
-  new order, or wins it and makes the create fail. Neither can leave a
-  reservation behind.
-- Create reads `clock_timestamp()` only after Quote, Participant, and Season
-  locks, then rechecks Quote TTL, season bounds, and stock market session.
-  The resulting DB time is used for submitted/created/updated timestamps.
-- A committed limit Create is replayed before `LIMIT_ORDER_ENABLED`, before
-  the create-service wiring check, and before the season and market-state
-  gates — an emergency rollback or a partially wired instance must not
-  withhold a response the system already produced. The lookup is keyed on the
-  QUOTE (which is unique and consumed once), so its scope equals a real
-  database uniqueness constraint: the same `idempotencyKey` reused in a later
-  season resolves to that season's own order instead of conflicting. A
-  different request hash conflicts, another user's order is never replayed,
-  and a genuinely new quote still passes through every current gate. Replay
-  performs no write at all — no extra order, no extra reservation.
-- The quote/create responses carry the additive server-authoritative
-  `executionPolicy` object: `autoExecutionEnabled` true →
-  `mode: "scheduler_snapshot_candle"`, else `reservation_only`. The client
-  renders its success copy from this, never a client flag, and never promises
-  live-exchange execution.
-- A user cancel and an automatic fill both take `Order (FOR UPDATE) → CashWallet`
-  and re-check `status = submitted`, so exactly one wins: if the fill commits
-  first the cancel returns `ORDER_NOT_CANCELABLE`; if the cancel commits first
-  the matcher sees a non-submitted order and skips it. No double debit, no double
-  reservation release. The fill also re-checks the season is active and unexpired,
-  so a season-end that races a fill is arbitrated on the same order row.
-- `limit_order_candle_evidences` stores ONE shared row per (asset, interval,
-  window, provider) — every order the candle fills references it. It is NOT
-  foreign-keyed to `market_candles` (evidence outlives candle retention) and
-  never becomes a price snapshot, so candle evidence cannot pollute current
-  price / valuation / ranking. The `OpsJobName` values `limit_order_matcher` /
-  `limit_order_candle_reconciliation` and the `OpsJobTrigger` value `worker`
-  are vestigial from the removed event layer (PostgreSQL cannot drop enum
-  values); nothing schedules them.
-- Total-asset valuation keeps using the full `balanceAmount`; reservations
-  never reduce it.
-- Cancel and lifecycle cleanup work even while `LIMIT_ORDER_ENABLED` is off.
-  Settlement is blocked while a submitted limit order or a non-zero wallet
-  reservation exists.
-- `LIMIT_ORDER_ENABLED` accepts exactly `true` / `false` / `1` / `0`
-  (trimmed, case-insensitive); omitting it means false. Any other value —
-  `yes`, `enabled`, `tru`, an explicitly empty string — **fails startup**
-  rather than being silently treated as off, so a typo can never leave an
-  operator believing the feature is on. On the client side
-  `EXPO_PUBLIC_LIMIT_ORDER_ENABLED` must be read with static dot notation
-  (`process.env.EXPO_PUBLIC_LIMIT_ORDER_ENABLED`) or the Expo bundler will
-  not inline it and the flag always reads as unset.
-
-### Limit order PostgreSQL integration tests (opt-in)
-
-The limit-order suites that need a real PostgreSQL are gated behind one
-switch, so `pnpm test` stays database-free by default:
-
-```bash
-LIMIT_ORDER_RESERVATION_DB_INTEGRATION=1 pnpm exec jest \
-  src/orders/limit-order-reservation.integration.spec.ts \
-  src/orders/limit-order-create-race.integration.spec.ts \
-  src/orders/limit-order-transaction-time.integration.spec.ts \
-  src/orders/limit-order-create-no-redis.integration.spec.ts
-```
-
-The idempotent-replay suite has its own switch:
-
-```bash
-LIMIT_ORDER_IDEMPOTENT_REPLAY_INTEGRATION=1 pnpm exec jest \
-  src/orders/limit-order-idempotent-replay.integration.spec.ts
-```
-
-The race/time suites observe real PostgreSQL lock-wait state as a deterministic
-barrier; the no-Redis suite points `REDIS_URL` at an unreachable port and
-proves quote/create/cancel still succeed. They require applied migrations and a
-local PostgreSQL, create isolated fixture rows, and clean only those rows. CI
-also enables the existing market-order, FX, and service-composed MVP DB smokes
-in the same PostgreSQL 16 + Redis 7 job to guard adjacent flows. The job
-deploys every migration, checks `prisma migrate status`, and fails on
-`prisma migrate diff --exit-code`.
-
 ## STOP / Not Implemented
 
 These are intentionally outside the current implementation and should not be added without a separate gate:
@@ -187,11 +49,7 @@ These are intentionally outside the current implementation and should not be add
 - KIS order/account/balance/fill/deposit/withdrawal APIs, KIS orderbook/hoga, Binance authenticated/order/account/user-data APIs, and real external trading/account integrations.
 - External payment, point, coupon, gifticon, delivery, cash-out, or provider-backed reward fulfillment. App-internal operator/admin reward fulfillment creates `SeasonReward` rows only when fulfilled.
 - Access token blacklist/revocation, server-side session auth, and cookie auth.
-- Limit sells, partial fills, order-book/volume allocation, real exchange
-  liquidity, historical missed-touch repair (a touch between submit and the
-  next 5m boundary that left no snapshot can be missed), Redis Stream / event
-  matching, order claim/lease, or a public/manual limit execute endpoint.
-  (Scheduler-based path-A/B auto-execution IS implemented — see above.)
+- Matching engine, partial fill, or exact order execute replay.
 - Fake, static, sample, temporary, or fallback business price data.
 
 ## Environment Variables
@@ -265,7 +123,7 @@ Provider intervals are checked against the latest `ops_job_runs` row and do not 
 
 Korea EXIM exchange provider env is `KOREA_EXIM_EXCHANGE_ENABLED`, `KOREA_EXIM_EXCHANGE_AUTH_KEY`, `KOREA_EXIM_EXCHANGE_BASE_URL`, `KOREA_EXIM_EXCHANGE_DATA`, and `KOREA_EXIM_EXCHANGE_LOOKBACK_DAYS`. The request URL is `https://oapi.koreaexim.go.kr/site/program/financial/exchangeJSON` with `authkey`, `searchdate`, and `data=AP01`; USD/KRW uses the USD row's `DEAL_BAS_R` value with commas removed. ExchangeRate-API fallback env is `EXCHANGE_RATE_API_ENABLED`, `EXCHANGE_RATE_API_KEY`, and `EXCHANGE_RATE_API_BASE_URL`. Real auth keys must live only in `.env.local`; `.env.example` keeps the auth key blank. ExchangeRate-API remains the fallback provider after Korea EXIM exchange.
 
-Binance public market data uses `BINANCE_PUBLIC_MARKET_DATA_ENABLED`, `BINANCE_REST_BASE_URL`, `BINANCE_WS_MARKET_DATA_BASE_URL`, `BINANCE_CRYPTO_SYMBOLS`, and `BINANCE_CRYPTO_USDT_AS_USD_EQUIVALENT`, with `BINANCE_REST_BASE_URL` defaulting to `https://api.binance.com` and `BINANCE_WS_MARKET_DATA_BASE_URL` defaulting to `wss://stream.binance.com:9443` when unset. When `BINANCE_CRYPTO_SYMBOLS` is unset or blank, `ProviderConfigService.binance.symbols` (used by the general ticker WebSocket) and `resolveEnvProviderTargets().binanceSymbols` (used by REST env targeting) both fall back to the same fixed 10-symbol universe `BINANCE_FIXED_SYMBOLS` (`BTCUSDT,ETHUSDT,BNBUSDT,XRPUSDT,SOLUSDT,TRXUSDT,DOGEUSDT,ZECUSDT,XLMUSDT,LINKUSDT`) from `src/providers/binance/binance-fixed-asset-universe.ts` — there is no separate BTC/ETH default. Setting `BINANCE_CRYPTO_SYMBOLS` explicitly pins the general ticker WebSocket to exactly that list, while `SCHEDULER_PROVIDER_TARGET_SOURCE=active_assets|merged` (default `merged`) REST ingestion and the live-candle WebSocket instead build targets from the registered active DB assets. Crypto candles use only the public Spot `GET /api/v3/klines` endpoint with USDT quote symbols such as `BTCUSDT` and `ETHUSDT`; supported kline intervals are `1m`, `5m`, `15m`, `30m`, `1h`, `4h`, `1d`, and `1w`. No Binance API key or secret is required for public Spot candle or WebSocket market-data paths.
+Binance public market data uses `BINANCE_PUBLIC_MARKET_DATA_ENABLED`, `BINANCE_REST_BASE_URL`, `BINANCE_WS_MARKET_DATA_BASE_URL`, `BINANCE_CRYPTO_SYMBOLS`, and `BINANCE_CRYPTO_USDT_AS_USD_EQUIVALENT`, with `BINANCE_REST_BASE_URL` defaulting to `https://api.binance.com` and `BINANCE_WS_MARKET_DATA_BASE_URL` defaulting to `wss://stream.binance.com:9443` when unset. Crypto candles use only the public Spot `GET /api/v3/klines` endpoint with USDT quote symbols such as `BTCUSDT` and `ETHUSDT`; supported kline intervals are `1m`, `5m`, `15m`, `30m`, `1h`, `4h`, `1d`, and `1w`. No Binance API key or secret is required for public Spot candle or WebSocket market-data paths.
 
 Binance long-lived WebSocket streaming starts with the NestJS backend process when `BINANCE_WEBSOCKET_STREAMING_ENABLED=true` and the provider gates are satisfied:
 
@@ -282,44 +140,7 @@ BINANCE_WS_SNAPSHOT_THROTTLE_MS=5000
 SCHEDULER_PROVIDER_BINANCE_ENABLED=false
 ```
 
-The streaming service subscribes on one connection to public Spot
-`<symbol>@ticker` streams for display/snapshot behavior. Tickers update the
-in-memory latest-price cache, publish `/api/v1/ws` `asset_ticker` updates, and
-write throttled display `asset_price_snapshots`. The connection uses backoff, reconnects before
-Binance's 24-hour limit, responds to ping with pong, and resubscribes. REST
-24hr ticker ingestion remains fallback/manual/debug behavior and should not be
-the default real-time path while streaming is enabled.
-
-This service stands down (`state=disabled`) when live-candle Binance mode is
-on (`CANDLE_LIVE_STREAMING_ENABLED=true` + `CANDLE_LIVE_BINANCE_ENABLED=true`);
-in that mode the live-candle owner connection carries `<symbol>@ticker` and
-publishes each ticker to the app IMMEDIATELY, with the throttled
-`asset_price_snapshots` write running as a separate background job (see
-`docs/candle-live-operations.md`). Exactly one ticker fanout path is active per
-configuration, both use `sourceName=binance_spot_ws_ticker`, and
-`BINANCE_WS_SNAPSHOT_THROTTLE_MS` (default 5000) governs DB write volume in
-both.
-
-Realtime `asset_ticker` fanout is DB-free per event: asset identity comes from
-an in-memory metadata cache (`RealtimeAssetMetadataCacheService`, 5m TTL,
-negative-cached unknown/inactive ids) and USD/KRW conversion from a 2s-TTL
-cached eligible FX selection; only cache misses read the DB. Realtime events
-claim no snapshot row (`assetPriceSnapshotId: null`) and slow WebSocket
-clients receive latest-only coalesced tickers behind the shared backpressure
-threshold instead of an unbounded backlog (per-client queue capped, cleared on
-unsubscribe/disconnect). `GET /readiness` exposes the delivery counters under
-`data.assetTicker` (`sent`, `coalesced`, `dropped`, `pendingTickers`, …).
-
-The app's displayed crypto price is the **Binance Spot last trade price** —
-the `24hrTicker` `c` field. Best bid/ask (`b`/`a`) are carried in the realtime
-event but not displayed, and Futures/mark/index prices and cross-exchange
-averages are not used, so values compared against a Futures screen can differ.
-Per-symbol display precision comes from `PRICE_FILTER.tickSize` on the public
-`GET /api/v3/exchangeInfo` (cached in memory by `BinanceSymbolMetadataService`;
-no API key, no new vendor, no DB table) and reaches clients as the additive
-nullable `displayPriceDecimals` field on the assets list/detail/price responses
-and the `asset_ticker` payload. It governs asset UNIT prices only — wallet
-balances, order totals and fees keep the existing USD 2-decimal formatting.
+The streaming service subscribes to public Spot `<symbol>@ticker` streams such as `btcusdt@ticker`, updates an in-memory latest-price cache on every tick, publishes `/api/v1/ws` `asset_ticker` updates for subscribed clients, and writes `asset_price_snapshots` only through `BINANCE_WS_SNAPSHOT_THROTTLE_MS`. It reconnects with backoff, reconnects before Binance's 24-hour connection limit, responds to ping frames with pong payloads, and resubscribes after reconnect. REST 24hr ticker ingestion remains available for fallback/manual/debug use with the scheduler or operator paths, but should not run as the default real-time crypto path while streaming is enabled.
 
 KIS long-lived WebSocket streaming starts with the NestJS backend process when `KIS_WEBSOCKET_STREAMING_ENABLED=true` and the provider gates are satisfied:
 
@@ -404,9 +225,7 @@ KIS REST coordination env:
 
 ### Managed HTTP candle serving (unit 3-1 / 3-2)
 
-`GET /api/v1/assets/:assetId/candles` has two explicit modes. `CANDLE_SERVING_MODE=database` (the DEFAULT) is the normal one: persisted `5m`/`1d`/`1w` feeds plus read-time `15m`/`30m`/`1h`/`4h` aggregated from the stored `5m` rows. `CANDLE_SERVING_MODE=legacy` is the explicit emergency rollback to the provider-direct path; unknown mode values fail configuration instead of silently falling back. `1m`, ranges outside persistence/retention policy, and large cold NON-aggregated requests without completed baseline coverage stay on the provider-direct path.
-
-Aggregated intervals never do: `15m`/`30m`/`1h`/`4h` only exist as aggregates of the stored `5m` feed, so without baseline coverage they return `ASSET_CANDLES_BASELINE_NOT_READY` (503) and the client shows a "preparing" state instead of a truncated KIS page (which produced the `candles=1 · req=120 · ret=1 · 30d/4h` chart). Chart windows: `30m` and `1h` request `14d` (limit 672 / 336), `4h` requests `30d` (limit 200); stored `5m` retention is 35 days, which covers both including the 4h aggregation padding. Seed the baseline with `pnpm candle:baseline -- --apply` (a thin wrapper around the same `MarketCandleSyncService` the Ops `market_candle_sync` job runs), check it with `pnpm candle:baseline -- --report`, and keep the tail fresh with `--mode incremental`; an HTTP request never starts an unbounded initial backfill. Serving coverage is the union of coverage-audited checkpoints, so the seeded baseline plus later incremental tails together cover a 14-day window up to now. Coverage is graded, not boolean (`findCandleCoverage` → `complete` / `stale_tail` / `insufficient`): a tail that lags the request clock by up to `CANDLE_SERVING_COVERAGE_TAIL_TOLERANCE_MS` (default one day) still serves, because a checkpoint can only confirm coverage up to its own finish time; an interior hole never does. When coverage is unconfirmed but the store holds validated candles, the request is answered from them (`database_partial`, logged with the coverage context) instead of failing — a shorter chart, never a fabricated one. `ASSET_CANDLES_BASELINE_NOT_READY` is reserved for windows the store cannot answer at all.
+`GET /api/v1/assets/:assetId/candles` has two explicit rollout modes. `CANDLE_SERVING_MODE=legacy` (the default) preserves the existing provider-direct path. `CANDLE_SERVING_MODE=database` enables the managed path for persisted `5m`/`1d`/`1w` feeds and read-time `15m`/`30m`/`1h`/`4h`; unknown mode values fail configuration instead of silently falling back. `1m`, ranges outside persistence/retention policy, and large cold requests without completed baseline coverage remain on legacy. Seed those cold baselines with the manual Ops `market_candle_sync` job; an HTTP request never starts an unbounded initial backfill.
 
 Managed order is fresh Redis → PostgreSQL canonical rows → bounded incremental/small repair sync → PostgreSQL requery → Redis. Provider rows are never returned directly. Operational failures — including a PostgreSQL outage during the INITIAL database read, connection resets/timeouts/pool exhaustion, transient Prisma driver errors, and Redis single-flight wait timeouts (classified in `src/assets/candle-operational-error.ts`) — fall back to stale Redis and then strict PostgreSQL last-known-good; validation, configuration, schema/programmer, authentication, asset-not-found, and authorization errors are not hidden. When neither degraded copy exists, the request fails with the existing provider-compatible error contract (`ASSET_CANDLES_PROVIDER_ERROR` 502 for crypto, `ASSET_CANDLES_PROVIDER_UNAVAILABLE` 503 for stocks) WITHOUT contacting the provider: once a managed refresh has started, no failure path bypasses the canonical store with a provider-direct response (logged as `candle_delivery_failed`/`managed_unresolved`). Provider-direct serving is reachable only through `CANDLE_SERVING_MODE=legacy` (the explicit full-rollback switch), unmanaged read plans, or the documented cold-baseline policy (logged as `cold_baseline_required` — a request without completed baseline coverage whose range exceeds the on-demand repair budget, seeded by operators through the manual sync job). Redis failures retain local single-flight and DB/provider serving, but distributed dedupe is unavailable until Redis recovers.
 
@@ -416,26 +235,13 @@ Cache keys use the `candles:data:v2` namespace, normalized semantic inputs, an a
 
 The endpoint success/error JSON contract is unchanged. Persisted provider provenance is compatibility-mapped into the existing `source` union (KIS domestic/overseas minute or period path, or Binance klines); it does not claim that an HTTP provider call occurred for the current request. The v1 payload requires `amount` to be a string, so a persisted provider-native `amount=null` is centrally mapped to `"0.00000000"` until a separately versioned public contract can represent null. **Known limitation:** this mapping loses the distinction between "zero traded value" and "amount unavailable"; a future v2 (or response metadata) should consider `amountAvailable`/nullable `amount`. This stabilization deliberately makes no breaking v1 change.
 
-Serving configuration: `CANDLE_SERVING_CURRENT_DB_FRESHNESS_MS` (default `60000`), `CANDLE_SERVING_ON_DEMAND_REFRESH_ENABLED` (default `true`), `CANDLE_SERVING_ON_DEMAND_REFRESH_MAX_DURATION_MS` (default `15000`), `CANDLE_SERVING_ON_DEMAND_REFRESH_MAX_PAGES` (default `15` — one repair sweep must cover the whole 15m/3d source window, up to 4 KRX sessions ≈ 13 KIS minute pages, because the sweep pages backward from the newest edge and a smaller budget re-reads the same pages on every retry), `CANDLE_SERVING_ON_DEMAND_REFRESH_MAX_ROWS` (default `5000`), `CANDLE_SERVING_STALE_WAITER_MAX_WAIT_MS` (default `500`), and `CANDLE_SERVING_ON_DEMAND_REPAIR_MAX_RANGE_MS` (default four days: above the 15m tab's `3d + 4h` source span so a cold asset self-heals on demand; the 14d/30d windows stay above it and are baseline-seeded instead). These per-request budgets are clamped by the sync orchestrator's global page/row/duration budgets; cancellation and the asset/feed lock still apply.
+Serving configuration: `CANDLE_SERVING_CURRENT_DB_FRESHNESS_MS` (default `60000`), `CANDLE_SERVING_ON_DEMAND_REFRESH_ENABLED` (default `true`), `CANDLE_SERVING_ON_DEMAND_REFRESH_MAX_DURATION_MS` (default `15000`), `CANDLE_SERVING_ON_DEMAND_REFRESH_MAX_PAGES` (default `10`), `CANDLE_SERVING_ON_DEMAND_REFRESH_MAX_ROWS` (default `5000`), `CANDLE_SERVING_STALE_WAITER_MAX_WAIT_MS` (default `500`), and `CANDLE_SERVING_ON_DEMAND_REPAIR_MAX_RANGE_MS` (default two days). These per-request budgets are clamped by the sync orchestrator's global page/row/duration budgets; cancellation and the asset/feed lock still apply.
 
 WebSocket current/higher candle updates and disabled-by-default canonical reconciliation are implemented by the unit-3 live pipeline. See [`docs/candle-live-operations.md`](docs/candle-live-operations.md) — it also documents the versioned KRX/US market calendar (2025–2026 audited; KRX 2027 provisional until the official KRX year-end notice — readiness reports `MARKET_CALENDAR_COVERAGE_MISSING` for missing years and `MARKET_CALENDAR_PROVISIONAL` for provisional ones, both degraded, and `MARKET_CALENDAR_REQUIRED_FROM_YEAR`/`MARKET_CALENDAR_REQUIRED_THROUGH_YEAR` override the default previous-through-next-year required range, which the 365-day 1d/1w sync lookback depends on; uncovered dates fail safe), stale-Redis fallback semantics, old-generation live bucket recovery, connection liveness (`CANDLE_LIVE_CONNECTION_LIVENESS_TIMEOUT_MS`, supervisor watchdog) vs trade freshness (`CANDLE_LIVE_TRADE_STALE_THRESHOLD_MS`, readiness only; `CANDLE_LIVE_STALE_THRESHOLD_MS` is a deprecated fallback for both), the shared frontend WebSocket, the release fixture smoke (`CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm run smoke:candle-fixture`), the real-provider long-smoke harness (`pnpm run smoke:candle-live`), and smoke commit traceability (`SMOKE_GIT_COMMIT`, `SMOKE_ALLOW_DIRTY`, NOT_RUN reports via `pnpm run smoke:candle-report`).
 
-CI: `.github/workflows/ci.yml` gates every PR and `main` push with four jobs —
-**Backend quality** (`pnpm run lint:candles:check`,
-`pnpm run format:candles:check`, `pnpm run typecheck`, `pnpm run build`,
-`pnpm test`), **Frontend quality** (`npm run typecheck`, `npm test`; the Expo
-app has no build script — typecheck is the compile gate), **Limit order
-PostgreSQL integration** (migrations, reservation/time/race/no-Redis
-registration/idempotent replay and market-order/FX/MVP regression smokes),
-and **Candle fixture integration**
-(PostgreSQL+Redis services, `prisma migrate deploy`, fixture smoke with commit
-and dirty-tree verification). The candle layer is the required lint/format
-gate; repository-wide lint debt outside it is known and not yet gated. Long
-real-provider smokes are never run in CI — see the runbook in
-[`docs/candle-live-operations.md`](docs/candle-live-operations.md).
+CI: `.github/workflows/ci.yml` gates every PR and `main` push with three jobs — **Backend quality** (`pnpm run lint:candles:check`, `pnpm run format:candles:check`, `pnpm run typecheck`, `pnpm run build`, `pnpm test`), **Frontend quality** (`npm run typecheck`, `npm test`; the Expo app has no build script — typecheck is the compile gate), and **Candle fixture integration** (PostgreSQL+Redis services, `prisma migrate deploy`, the fixture smoke with artifact commit/dirty verification). The candle layer is the required lint/format gate; repository-wide lint debt outside it is known and not yet gated. Long real-provider smokes are never run in CI — see the runbook in [`docs/candle-live-operations.md`](docs/candle-live-operations.md).
 
 Important operational behavior:
-
 - KIS REST rate limiting is active on the actual `KisAuthClient` OAuth and `KisQuoteClient` quote request paths. It does not affect Binance REST or either provider's WebSocket traffic. Redis atomically reserves account-wide slots using Redis server time; if Redis is unavailable, each process continues with a conservative FIFO in-process limiter instead of calling KIS without limits. Multi-instance fallback cannot enforce a shared account limit and emits one outage warning until recovery.
 - Single-flight uses local Promise sharing plus token-owned Redis locks, bounded cache polling, double-check after acquisition, and periodic ownership renewal. It is intended for bounded serving loads only; minute-scale historical backfills require a later job queue/backfill-lock design.
 - Single-flight snapshots the asset cache generation once. Local Promise and distributed lock identities include that generation, and the final cache write is one Lua operation that verifies both the owner token and unchanged generation. A successful stale loader result may be returned to its caller but is never written into a newer generation.
@@ -448,9 +254,6 @@ Opt-in real Redis smoke test (needs a reachable `REDIS_URL`; runs in-process, so
 CANDLE_CACHE_REDIS_SMOKE=1 pnpm test -- asset-candles-cache.integration.spec.ts
 CANDLE_SERVING_DB_SMOKE=1 pnpm test -- candle-pipeline-foundation.integration.spec.ts
 KIS_COORDINATION_REDIS_SMOKE=1 pnpm test -- kis-coordination.integration.spec.ts
-# Limit-buy cash reservation vs PostgreSQL: concurrency (double-booking),
-# CHECK constraints, rollback, single release, reserved-cash protection.
-LIMIT_ORDER_RESERVATION_DB_INTEGRATION=1 pnpm test -- limit-order-reservation.integration.spec.ts
 ```
 
 It only creates and deletes keys under a random-UUID asset namespace and never flushes shared Redis data.
@@ -469,8 +272,6 @@ Scheduler configuration:
 - `SCHEDULER_MARKET_CANDLE_RETENTION_HOUR=4`
 - `SCHEDULER_MARKET_CANDLE_RETENTION_MINUTE=0`
 - `SCHEDULER_MARKET_CANDLE_RETENTION_RUN_ON_STARTUP=false`
-- `SCHEDULER_MARKET_CANDLE_SYNC_ENABLED=false` — scheduled incremental upkeep of the persisted candle feeds (`5m`/`1d`/`1w`) through the SAME checkpointed `market_candle_sync` Ops job the operator API triggers (`mode=incremental`, all active assets). Keeps the 35-day 5m baseline the 15m/30m/1h/4h charts aggregate from moving forward after the one-off `pnpm candle:baseline -- --apply` seeding; cold assets self-seed via the feed-default lookbacks. An in-process guard skips ticks while the previous sync is still running; cross-instance exclusion stays the Ops DB job lock. Unlike the provider snapshot jobs, a failed run does NOT retry on the next tick: one transient provider hiccup on any of the ~120 asset/feed sweeps marks the whole run failed, so fast-retry would turn the 10-minute cadence into a per-tick loop against the shared KIS budget — the flaky feed instead retries on the next interval from its checkpoint.
-- `SCHEDULER_MARKET_CANDLE_SYNC_INTERVAL_SECONDS=600`
 
 The default schedule is 04:00 in `SCHEDULER_TIMEZONE` (`Asia/Seoul`) and is disabled by default. Due checks use persisted successful non-dry-run `OpsJobRun` history, while the shared DB lock and owner-checked renewal ensure only one deletion owner across backend instances. Failed runs can retry on a later tick. Startup opt-in uses the same due check and does not run unconditionally.
 
@@ -513,11 +314,11 @@ Checkpointed sync of the persisted candle feeds is used by database-mode HTTP se
 
 Providers per asset type and feed:
 
-| Asset type     | 5m                                                     | 1d / 1w                                              | sourceProvider                                |
-| -------------- | ------------------------------------------------------ | ---------------------------------------------------- | --------------------------------------------- |
-| domestic_stock | KIS `inquire-time-dailychartprice` (2-1 service)       | KIS `inquire-daily-itemchartprice` (`FHKST03010100`) | `kis_domestic_minute` / `kis_domestic_period` |
-| us_stock       | KIS `inquire-time-itemchartprice` NMIN=5 (2-2 service) | KIS `dailyprice` (`HHDFS76240000`)                   | `kis_overseas_minute` / `kis_overseas_period` |
-| crypto         | Binance Spot `GET /api/v3/klines`                      | Binance Spot `GET /api/v3/klines`                    | `binance_klines`                              |
+| Asset type | 5m | 1d / 1w | sourceProvider |
+| --- | --- | --- | --- |
+| domestic_stock | KIS `inquire-time-dailychartprice` (2-1 service) | KIS `inquire-daily-itemchartprice` (`FHKST03010100`) | `kis_domestic_minute` / `kis_domestic_period` |
+| us_stock | KIS `inquire-time-itemchartprice` NMIN=5 (2-2 service) | KIS `dailyprice` (`HHDFS76240000`) | `kis_overseas_minute` / `kis_overseas_period` |
+| crypto | Binance Spot `GET /api/v3/klines` | Binance Spot `GET /api/v3/klines` | `binance_klines` |
 
 Storage policy: only `5m`, `1d`, and `1w` are persisted (5m ≈ 35 days, 1d ≈ 1 year/max ~400 rows, 1w ≈ 1 year/max ~60 rows). `1m` is never stored; `15m`/`30m`/`1h`/`4h` are derived from stored 5m at read time and never stored. Daily/weekly candles store provider-native rows — they are never rebuilt from 5m data.
 
@@ -538,19 +339,17 @@ Locks: the manual Ops job takes the job-level DB lock (`market_candle_sync:manua
 
 Read-time aggregation (`MarketCandleAggregationService`): `15m`/`30m`/`1h`/`4h` from stored 5m with open=first/high=max/low=min/close=last/volume=sum, amount=sum only when every constituent has one (otherwise `null`), and sourceUpdatedAt=max. Bucket anchors: domestic 09:00 `Asia/Seoul` with 4h buckets 09:00–13:00 and 13:00–15:30; US 09:30 `America/New_York` (DST-aware) with 4h buckets 09:30–13:30 and 13:30–16:00; crypto continuous UTC with 4h buckets at 00/04/08/12/16/20. Buckets never span different trading days. Fixed incompleteness policy: each bucket reports `expectedConstituentCount`/`actualConstituentCount`/`gapCount`/`complete`; only a fully populated historical bucket whose constituents are all closed becomes `isClosed=true`; gapped historical buckets are returned explicitly with `complete=false`/`isClosed=false` (never interpolated), and the in-progress bucket is flagged `isCurrent=true`. Without an exchange holiday calendar, empty days simply produce no buckets — absence is preserved, not synthesized.
 
-Expected constituents are the slots a market actually trades continuously in, not the bucket span divided by five minutes (`candle-expected-slots.policy.ts`). The KRX closing single-price auction — the last 10 minutes of the session, 15:20–15:30 on a regular day — accepts orders but matches them in one auction at the close, so KIS returns no minute rows for it and no 15:20/15:25 five-minute candle ever exists. Those slots are therefore excluded from the completeness check: the domestic 13:00–15:30 4h bucket expects 28 constituents (13:00 … 15:15), the 15:00–15:30 30m/1h buckets expect 4, and the 15:15 15m bucket expects 1. The window is derived from the session close, so a calendar close override moves it (the 10:00–16:30 수능일 session excludes 16:20/16:25). Exclusion is not amnesty: a missing REQUIRED slot still makes the bucket incomplete, and a stored auction-window candle is aggregated into the OHLCV without counting toward completeness. US and crypto require every slot.
-
 Manual Ops execution (no unauthenticated endpoint, no scheduler):
 
 ```ts
 await opsJobRunnerService.runMarketCandleSyncJob({
   trigger: OpsJobTrigger.operator,
   requestedBy: 'ops@example.com',
-  dryRun: false, // true: plan only — no provider calls, no candle/checkpoint writes
-  assetIds: undefined, // default: all active supported assets
-  assetTypes: ['crypto'], // domestic_stock | us_stock | crypto
+  dryRun: false,            // true: plan only — no provider calls, no candle/checkpoint writes
+  assetIds: undefined,      // default: all active supported assets
+  assetTypes: ['crypto'],   // domestic_stock | us_stock | crypto
   targets: ['5m', '1d', '1w'],
-  mode: 'incremental', // initial | incremental | repair (repair needs from/to)
+  mode: 'incremental',      // initial | incremental | repair (repair needs from/to)
   from: undefined,
   to: undefined,
   resume: true,
@@ -586,34 +385,7 @@ pnpm dev:open-season
 npm run dev:open-season
 ```
 
-This upserts `sea_2026_s1` as `status=active`, `startAt=2000-01-01T00:00:00.000Z`, and `endAt=2099-12-31T23:59:59.000Z`. This is a temporary development/testing setting only. `--dry-run` reports the intended action without writing.
-
-All DB-touching dev/recovery scripts and `prisma db seed` now load env exactly like the running backend (`.env.local` > `.env.development` > `.env`, real `process.env` winning), so they always target the same database the API server uses. `prisma db seed` is non-destructive: it keeps the dev season open and creates the dev user/participant/wallets/initial grant only when absent, never resetting existing balances, ledgers, ranks, or the season window.
-
-### Recovering a reset local development database
-
-If the local development database was reset (business rows gone) but must NOT be dropped/reset any further, restore the dev baseline and register the fixed asset universes with one idempotent command:
-
-```bash
-cd backend
-pnpm dev:recover-local-data -- --dry-run   # plan only, guaranteed no writes
-pnpm dev:recover-local-data -- --apply     # perform the recovery
-```
-
-It keeps `sea_2026_s1` open, creates the dev user/participant/KRW+USD wallets/initial KRW grant only when absent (never resetting existing balances or ledgers, never double-granting), and registers the fixed 40 KIS stocks (15 domestic + 25 US) plus 10 Binance crypto assets. It is additive and safe to re-run: a second `--apply` reports everything `unchanged`. It never runs reset/drop/truncate/delete. The command prints a password-free DB identity, per-step create/update/unchanged counts, and a final verification (`40/40`, `10/10`, and active-asset counts by type).
-
-The command has five steps and **separates asset registration from market-data readiness** — registering 50 assets is not the same as the market being ready. Step `[5/5] Market data readiness` prints, per Binance symbol, whether it is a resolved provider target, whether a fresh `asset_price_snapshots` row exists, its source name, `capturedAt` age, and the unavailable reason (e.g. `PROVIDER_MISSING`), then a final `Data recovery: OK` line and a separate `Market data readiness: READY | NOT_READY` line. Pass `--ensure-market-snapshots --operator-email <admin-or-operator-email>` (or `--operator-user-id <id>`) with `--apply` to first create fresh snapshots by reusing the existing Binance REST ingestion (plus any enabled USD/KRW FX provider); if the provider gates are off it reports `Market snapshot bootstrap: NOT_RUN` with a reason (e.g. `PROVIDER_INGESTION_DISABLED`) rather than faking success. `--dry-run` performs zero writes (no assets, season, wallets, ledger, price, or FX rows) and only reports the plan and current readiness.
-
-Newly registered crypto only shows a price once it has a fresh `asset_price_snapshots` row. Those rows come from the general Binance ticker WebSocket (`BINANCE_WEBSOCKET_STREAMING_ENABLED=true`), the live-candle Binance WebSocket (`CANDLE_LIVE_STREAMING_ENABLED=true` + `CANDLE_LIVE_BINANCE_ENABLED=true`, which now also subscribes `<symbol>@ticker` and writes snapshots), or REST ingestion. All of these use the fixed 10-symbol universe (`BINANCE_FIXED_SYMBOLS`): the general ticker WebSocket falls back to it when `BINANCE_CRYPTO_SYMBOLS` is unset, and `active_assets`/`merged` target resolution builds it from the registered assets. **After changing `BINANCE_CRYPTO_SYMBOLS` (or upgrading), restart the backend** so the long-lived ticker WebSocket resubscribes to all 10 streams; until then, run `pnpm dev:recover-local-data -- --apply --ensure-market-snapshots --operator-email <email>` or `pnpm dev:ensure-market-snapshots ...` to backfill snapshots.
-
-Register a single universe with the same safety contract:
-
-```bash
-pnpm dev:seed-kis-universe -- --dry-run       # default run applies; --dry-run plans only
-pnpm dev:seed-binance-universe -- --apply     # --dry-run is the safe default with no flag
-```
-
-The Binance seed validates all 10 symbols against the public `GET /api/v3/exchangeInfo` (exact symbol, `status=TRADING`, Spot permission, `quoteAsset=USDT`, matching `baseAsset`) before any write; a single failure aborts the whole run with no DB change (no partial registration), then upserts on the `(market, symbol)` key inside one transaction. `--apply` and `--dry-run` together are rejected as a validation error, and `--skip-provider-validation` is an offline-only escape hatch (loudly warned, refused under `NODE_ENV=production`). The fixed Binance universe is stored as `market=BINANCE`, `assetType=crypto`, and `currencyCode=priceCurrency=settlementCurrency=USD` (USDT-as-USD MVP policy; no `CurrencyCode.USDT`).
+This upserts `sea_2026_s1` as `status=active`, `startAt=2000-01-01T00:00:00.000Z`, and `endAt=2099-12-31T23:59:59.000Z`. This is a temporary development/testing setting only.
 
 Resolve "market data preparing" locally by opening the dev season, running providers, and verifying active asset coverage:
 
@@ -732,13 +504,7 @@ runner. With no `MARKET_CANDLES_DB_SMOKE=1`, Jest reports the DB test as
 skipped instead of passing a no-op test body.
 
 These tests create isolated rows and clean them up. They do not call external providers.
-`MVP_FLOW_DB_SMOKE=1` is a service-composed real PostgreSQL smoke for the
-current MVP user flow: Auth signup/login/refresh, season join, wallets,
-secret-free eligible provider-source fixture rows, assets, durable FX
-quote/execute, durable market-order quote/create-immediate-execute, positions,
-records, home, ranking unavailable, and logout-all. It uses isolated test rows
-and does not call an external provider, scheduler, settlement, reward, seed,
-or sample-business-data path.
+`MVP_FLOW_DB_SMOKE=1` is a service-composed real PostgreSQL smoke for the current MVP user flow: Auth signup/login/refresh, season join, wallets, admin_manual FX/asset/price test fixtures, assets, FX quote/execute, orders quote/create/execute, positions, records, home, ranking unavailable, and logout-all. It uses test-only fixture rows and is not provider ingestion, scheduler, settlement, reward, seed, or sample business data.
 `OPS_JOB_LOCK_DB_SMOKE=1` verifies real PostgreSQL `OpsJobLock` concurrency, active-lock blocking, expired takeover, and release/reacquire semantics against an explicit test DB. It is disabled by default.
 
 ## Docs Entry Point
