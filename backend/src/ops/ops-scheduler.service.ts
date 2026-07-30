@@ -15,7 +15,6 @@ import {
   getSchedulerBusinessDate,
   getSchedulerLocalDateTime,
   OpsSchedulerConfig,
-  ProviderOpsJobName,
 } from './ops-config';
 import {
   OpsJobRunnerResponse,
@@ -41,6 +40,8 @@ import { LimitOrderMatchingService } from '../orders/limit-order-matching.servic
 export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
   private interval: NodeJS.Timeout | null = null;
   private limitOrderMatchingInterval: NodeJS.Timeout | null = null;
+  /** Prevents same-process tick overlap of the candle sync job (see below). */
+  private marketCandleSyncInFlight = false;
   /** Guards against a slow matching cycle overlapping the next dedicated tick. */
   private limitOrderMatchingRunning = false;
 
@@ -142,7 +143,8 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
     const service = this.limitOrderMatchingService;
     if (!service || this.limitOrderMatchingRunning) return;
     const config = getOpsSchedulerConfig();
-    if (!config.enabled || !config.jobs[OpsJobName.limit_order_matching]) return;
+    if (!config.enabled || !config.jobs[OpsJobName.limit_order_matching])
+      return;
 
     this.limitOrderMatchingRunning = true;
     try {
@@ -244,7 +246,77 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
       if (reconciliation) results.push(reconciliation);
     }
 
+    // Last on purpose: a candle sync sweep can take minutes on a cold store
+    // and must not delay the cheap snapshot/season jobs of the same tick.
+    const candleSync = await this.runMarketCandleSyncIfDue(
+      now,
+      baseInput,
+      config,
+    );
+    if (candleSync) results.push(candleSync);
+
     return results;
+  }
+
+  /**
+   * Scheduled incremental upkeep of the persisted candle feeds. Reuses the
+   * SAME checkpointed Ops job the operator API triggers (job-level DB lock,
+   * per-asset/feed Redis backfill locks, budgets, coverage checkpoints) with
+   * mode=incremental: warm assets re-fetch their tail from the latest stored
+   * row minus the revision overlap, and an asset with an empty store falls
+   * back to the feed-default lookback (35d for 5m), so cold assets self-seed
+   * over successive runs. This is what keeps the 35-day 5m baseline — which
+   * the 15m/30m/1h/4h charts are aggregated from — moving forward without an
+   * operator re-running `candle:baseline`.
+   *
+   * The in-process flag guards against tick overlap: a cold-start sweep can
+   * outlast the shared tick interval, and without the guard every following
+   * tick would burn a run attempt on the busy Ops job lock. Cross-instance
+   * mutual exclusion stays the Ops DB job lock, unchanged.
+   *
+   * Unlike the provider snapshot jobs, a FAILED run does NOT become due
+   * again on the next tick. The runner records the whole run as failed when
+   * ANY of the ~120 asset/feed sweeps failed (one transient KIS hiccup is
+   * enough), so failed-fast-retry would degrade the 10-minute cadence to a
+   * per-tick retry loop against the shared KIS budget. Baseline upkeep is
+   * not latency-critical; the flaky feed simply retries on the next
+   * interval, resuming from its checkpoint.
+   */
+  async runMarketCandleSyncIfDue(
+    now: Date,
+    baseInput: OpsJobRunnerInput,
+    config: OpsSchedulerConfig = getOpsSchedulerConfig(),
+  ): Promise<OpsJobRunnerResponse | undefined> {
+    if (!config.marketCandleSync.enabled) return undefined;
+    if (this.marketCandleSyncInFlight) return undefined;
+    this.marketCandleSyncInFlight = true;
+    try {
+      const latestRun = await this.runService.findLatestRunForJob(
+        OpsJobName.market_candle_sync,
+      );
+      if (latestRun) {
+        const lastRunAt = latestRun.finishedAt ?? latestRun.startedAt;
+        if (
+          now.getTime() - lastRunAt.getTime() <
+          config.marketCandleSync.intervalSeconds * 1000
+        ) {
+          return undefined;
+        }
+      }
+      try {
+        return await this.runner.runMarketCandleSyncJob({
+          ...baseInput,
+          mode: 'incremental',
+          continueOnError: true,
+          now: now.toISOString(),
+        });
+      } catch {
+        // Recorded on the run row; the next interval retries from checkpoints.
+        return undefined;
+      }
+    } finally {
+      this.marketCandleSyncInFlight = false;
+    }
   }
 
   async runStartupCandleReconciliation(
@@ -567,7 +639,7 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async runProviderJobIfDue(input: {
-    jobName: ProviderOpsJobName;
+    jobName: OpsJobName;
     enabled: boolean;
     intervalSeconds: number;
     now: Date;
@@ -597,7 +669,7 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async isProviderJobDue(
-    jobName: ProviderOpsJobName,
+    jobName: OpsJobName,
     intervalSeconds: number,
     now: Date,
   ) {

@@ -62,6 +62,32 @@ describe('getOpsSchedulerConfig', () => {
       minute: 0,
       runOnStartup: false,
     });
+    expect(config.marketCandleSync).toEqual({
+      enabled: false,
+      intervalSeconds: 600,
+    });
+  });
+
+  it('enables the scheduled incremental candle sync with its own flag', () => {
+    const config = getOpsSchedulerConfig({
+      SCHEDULER_MARKET_CANDLE_SYNC_ENABLED: 'true',
+      SCHEDULER_MARKET_CANDLE_SYNC_INTERVAL_SECONDS: '300',
+    });
+
+    // The flag alone must both mark the job runnable and wake the scheduler
+    // tick, mirroring every other job flag in the enabled OR-chain.
+    expect(config.enabled).toBe(true);
+    expect(config.jobs[OpsJobName.market_candle_sync]).toBe(true);
+    expect(config.marketCandleSync).toEqual({
+      enabled: true,
+      intervalSeconds: 300,
+    });
+
+    expect(() =>
+      getOpsSchedulerConfig({
+        SCHEDULER_MARKET_CANDLE_SYNC_ENABLED: 'not-a-bool',
+      }),
+    ).toThrow('SCHEDULER_MARKET_CANDLE_SYNC_ENABLED');
   });
 
   it('validates retention schedule settings strictly', () => {

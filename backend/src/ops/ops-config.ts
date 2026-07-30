@@ -31,6 +31,17 @@ export type OpsSchedulerConfig = {
     minute: number;
     runOnStartup: boolean;
   };
+  /**
+   * Scheduled incremental upkeep of the persisted candle feeds (5m/1d/1w)
+   * through the existing `market_candle_sync` Ops job. Keeps the 5m baseline
+   * the 15m/30m/1h/4h charts aggregate from moving forward after the one-off
+   * `candle:baseline` seeding; cold assets self-seed via the feed-default
+   * lookback windows.
+   */
+  marketCandleSync: {
+    enabled: boolean;
+    intervalSeconds: number;
+  };
   marketCandleReconciliation: MarketCandleReconciliationConfig;
   /** Dedicated (non-tick) interval for the limit-order matching job. */
   limitOrderMatchingIntervalMs: number;
@@ -57,6 +68,7 @@ const DEFAULT_KIS_PRICE_INGESTION_MODE: KisPriceIngestionMode =
   'websocket_trade';
 const DEFAULT_RETENTION_HOUR = 4;
 const DEFAULT_RETENTION_MINUTE = 0;
+const DEFAULT_MARKET_CANDLE_SYNC_INTERVAL_SECONDS = 600;
 
 export function getOpsSchedulerConfig(
   env: NodeJS.ProcessEnv = process.env,
@@ -125,6 +137,15 @@ export function getOpsSchedulerConfig(
     false,
     'SCHEDULER_MARKET_CANDLE_RETENTION_RUN_ON_STARTUP',
   );
+  const marketCandleSyncEnabled = parseStrictBooleanEnv(
+    env.SCHEDULER_MARKET_CANDLE_SYNC_ENABLED,
+    false,
+    'SCHEDULER_MARKET_CANDLE_SYNC_ENABLED',
+  );
+  const marketCandleSyncIntervalSeconds = parsePositiveIntegerEnv(
+    env.SCHEDULER_MARKET_CANDLE_SYNC_INTERVAL_SECONDS,
+    DEFAULT_MARKET_CANDLE_SYNC_INTERVAL_SECONDS,
+  );
 
   return {
     enabled:
@@ -136,6 +157,7 @@ export function getOpsSchedulerConfig(
       providerBinanceEnabled ||
       providerKisEnabled ||
       retentionEnabled ||
+      marketCandleSyncEnabled ||
       marketCandleReconciliation.enabled ||
       limitOrderMatching.matchingEnabled,
     timezone: parseTextEnv(env.SCHEDULER_TIMEZONE, DEFAULT_TIMEZONE),
@@ -164,9 +186,10 @@ export function getOpsSchedulerConfig(
         false,
       ),
       [OpsJobName.market_candle_retention]: retentionEnabled,
-      // Manual/operator-triggered only in this phase; a market-close /
-      // realtime sync scheduler is a unit-3 decision.
-      [OpsJobName.market_candle_sync]: false,
+      // Interval-scheduled incremental upkeep (opt-in). The scheduler runs
+      // the SAME checkpointed Ops job the operator API triggers; manual runs
+      // stay available regardless of this flag.
+      [OpsJobName.market_candle_sync]: marketCandleSyncEnabled,
       [OpsJobName.market_candle_reconciliation]:
         marketCandleReconciliation.enabled,
       // Scheduler-driven limit-order matching (paths A/B). Runs on its own
@@ -204,6 +227,10 @@ export function getOpsSchedulerConfig(
       hour: retentionHour,
       minute: retentionMinute,
       runOnStartup: retentionRunOnStartup,
+    },
+    marketCandleSync: {
+      enabled: marketCandleSyncEnabled,
+      intervalSeconds: marketCandleSyncIntervalSeconds,
     },
     marketCandleReconciliation,
     limitOrderMatchingIntervalMs: limitOrderMatching.intervalMs,

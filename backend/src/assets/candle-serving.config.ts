@@ -59,10 +59,16 @@ export function readCandleServingConfig(
       'CANDLE_SERVING_ON_DEMAND_REFRESH_MAX_DURATION_MS',
       15_000,
     ),
+    // Sized so one on-demand repair can sweep the WHOLE 15m/3d source window
+    // (3d + 4h padding can span up to 4 KRX sessions ≈ ~1,530 domestic 1m
+    // rows ≈ 13 pages at 120 rows/page). The sweep pages backward from the
+    // newest edge, so a budget smaller than the window leaves the oldest
+    // chunk permanently unfetched — every retry re-reads the same newest
+    // pages and stops at the same boundary.
     onDemandRefreshMaxPages: readPositiveInteger(
       env,
       'CANDLE_SERVING_ON_DEMAND_REFRESH_MAX_PAGES',
-      10,
+      15,
     ),
     onDemandRefreshMaxRows: readPositiveInteger(
       env,
@@ -76,10 +82,18 @@ export function readCandleServingConfig(
     ),
     maxManagedFiveMinuteRangeMs: 35 * DAY_MS,
     maxManagedPeriodRangeMs: 365 * DAY_MS,
+    // Must cover the largest chart window that is expected to SELF-HEAL on
+    // demand: the 15m tab requests range=3d, whose aggregated read plan spans
+    // 3d + 4h of source padding. With the old 2-day default that request
+    // could never start a repair — a cold asset answered 503
+    // (baseline_not_ready) or froze at whatever short window the store held
+    // (cold_baseline_partial_window). 30m/1h/4h (14d/30d) stay ABOVE this
+    // bound on purpose: those windows are seeded by the baseline job and kept
+    // fresh by the scheduled incremental sync, not by request-time repair.
     maxOnDemandRepairRangeMs: readPositiveInteger(
       env,
       'CANDLE_SERVING_ON_DEMAND_REPAIR_MAX_RANGE_MS',
-      2 * DAY_MS,
+      4 * DAY_MS,
     ),
     // A checkpoint confirms coverage only up to its own finish time, so a
     // window is "not confirmed to now" one minute after a sync completes.

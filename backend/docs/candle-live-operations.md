@@ -267,6 +267,17 @@ anchor: `prev_open` gave stocks roughly one and a half sessions, which is too
 short to read a 15m chart. `5m` keeps `prev_open` — a 3-day 5m window would be
 864 crypto candles, past what one chart usefully draws.
 
+The `15m/3d` tab is also the LARGEST window allowed to self-heal at request
+time: `CANDLE_SERVING_ON_DEMAND_REPAIR_MAX_RANGE_MS` defaults to 4 days,
+above the tab's `3d + 4h` source span, and
+`CANDLE_SERVING_ON_DEMAND_REFRESH_MAX_PAGES` defaults to 15 so one repair
+sweep covers the whole window (up to 4 KRX sessions ≈ ~1,530 domestic 1m
+rows ≈ 13 pages; the sweep pages backward from the newest edge, so a smaller
+budget would leave the oldest chunk permanently unfetched on every retry).
+`14d`/`30d` windows stay above the repair bound on purpose — they are
+baseline-seeded and kept fresh by the scheduled incremental sync, never
+repaired inside a request.
+
 **Coverage evidence is the UNION of coverage-audited checkpoints**
 (`findCandleCoverage`). One run can never keep a 14-day window covered up to
 "now": the seeded baseline confirms `[now-35d, its finish time)` and each
@@ -338,6 +349,21 @@ pnpm candle:baseline -- --apply --asset-type domestic_stock   # or us_stock / cr
 # Keep the tail fresh afterwards (cheap; run on a schedule).
 pnpm candle:baseline -- --apply --mode incremental
 ```
+
+The scheduled form of that incremental upkeep is built in: setting
+`SCHEDULER_MARKET_CANDLE_SYNC_ENABLED=true` (interval
+`SCHEDULER_MARKET_CANDLE_SYNC_INTERVAL_SECONDS`, default 600) makes the Ops
+scheduler run the SAME checkpointed `market_candle_sync` job with
+`mode=incremental` for every active asset and all three persisted feeds
+(`5m`/`1d`/`1w`). Warm assets re-fetch their tail from the latest stored row
+minus the revision overlap; an asset whose store is empty falls back to the
+feed-default lookback (35 days for `5m`), so cold assets self-seed over
+successive runs. The one-off `--apply` seeding above is still the fastest way
+to fill a fresh environment; the scheduled job is what keeps every window
+servable afterwards. Overlap safety is unchanged: the Ops DB job lock
+serializes whole runs across instances, per-asset/feed Redis backfill locks
+serialize with on-demand HTTP refreshes, and the scheduler skips a tick while
+its previous sync is still in flight.
 
 `scripts/candle-baseline-sync.ts` is a thin wrapper around the SAME
 `MarketCandleSyncService.syncAssets` the Ops `market_candle_sync` job runs —

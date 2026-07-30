@@ -94,6 +94,7 @@ describe('OpsSchedulerService', () => {
       runMarketCandleRetentionJob: jest
         .fn()
         .mockResolvedValue({ success: true }),
+      runMarketCandleSyncJob: jest.fn().mockResolvedValue({ success: true }),
       runMarketCandleReconciliationJob: jest
         .fn()
         .mockResolvedValue({ success: true }),
@@ -194,6 +195,106 @@ describe('OpsSchedulerService', () => {
     });
     await service.runEnabledJobs(new Date('2026-07-11T19:00:00.000Z'));
     expect(runner.runMarketCandleRetentionJob).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not schedule market candle sync unless its flag is set', async () => {
+    process.env.SCHEDULER_ENABLED = 'true';
+    const { runner, service } = createService();
+
+    await service.runEnabledJobs(new Date('2026-07-10T03:00:00.000Z'));
+
+    expect(runner.runMarketCandleSyncJob).not.toHaveBeenCalled();
+  });
+
+  it('runs the incremental candle sync job on its own interval', async () => {
+    process.env.SCHEDULER_MARKET_CANDLE_SYNC_ENABLED = 'true';
+    process.env.SCHEDULER_MARKET_CANDLE_SYNC_INTERVAL_SECONDS = '600';
+    const { runner, runService, service } = createService();
+
+    await service.runEnabledJobs(new Date('2026-07-10T03:00:00.000Z'));
+    expect(runner.runMarketCandleSyncJob).toHaveBeenCalledTimes(1);
+    expect(runner.runMarketCandleSyncJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'incremental',
+        continueOnError: true,
+        requestedBy: 'scheduler',
+        now: '2026-07-10T03:00:00.000Z',
+      }),
+    );
+
+    // Inside the interval since the last (finished) run: not due.
+    runService.findLatestRunForJob.mockResolvedValue({
+      status: OpsJobRunStatus.succeeded,
+      startedAt: new Date('2026-07-10T03:00:00.000Z'),
+      finishedAt: new Date('2026-07-10T03:01:00.000Z'),
+    });
+    await service.runEnabledJobs(new Date('2026-07-10T03:05:00.000Z'));
+    expect(runner.runMarketCandleSyncJob).toHaveBeenCalledTimes(1);
+
+    // Past the interval: due again.
+    await service.runEnabledJobs(new Date('2026-07-10T03:11:30.000Z'));
+    expect(runner.runMarketCandleSyncJob).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not fast-retry a failed candle sync before its interval', async () => {
+    process.env.SCHEDULER_MARKET_CANDLE_SYNC_ENABLED = 'true';
+    process.env.SCHEDULER_MARKET_CANDLE_SYNC_INTERVAL_SECONDS = '600';
+    const { runner, runService, service } = createService();
+
+    // One flaky feed marks the WHOLE run failed; per-tick retries would hit
+    // the shared KIS budget every minute, so a failed run must still wait
+    // out the interval (unlike the 60s provider snapshot jobs).
+    runService.findLatestRunForJob.mockResolvedValue({
+      status: OpsJobRunStatus.failed,
+      startedAt: new Date('2026-07-10T03:00:00.000Z'),
+      finishedAt: new Date('2026-07-10T03:01:30.000Z'),
+    });
+    await service.runEnabledJobs(new Date('2026-07-10T03:03:00.000Z'));
+    expect(runner.runMarketCandleSyncJob).not.toHaveBeenCalled();
+
+    await service.runEnabledJobs(new Date('2026-07-10T03:12:00.000Z'));
+    expect(runner.runMarketCandleSyncJob).toHaveBeenCalledTimes(1);
+  });
+
+  it('absorbs a candle sync job failure instead of failing the tick', async () => {
+    process.env.SCHEDULER_MARKET_CANDLE_SYNC_ENABLED = 'true';
+    const { runner, service } = createService();
+    runner.runMarketCandleSyncJob.mockRejectedValueOnce(
+      new Error('MARKET_CANDLE_SYNC_FAILED'),
+    );
+
+    await expect(
+      service.runEnabledJobs(new Date('2026-07-10T03:00:00.000Z')),
+    ).resolves.toEqual([]);
+    expect(runner.runMarketCandleSyncJob).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips a candle sync tick while the previous run is still in flight', async () => {
+    process.env.SCHEDULER_MARKET_CANDLE_SYNC_ENABLED = 'true';
+    const { runner, service } = createService();
+
+    let release: (() => void) | undefined;
+    runner.runMarketCandleSyncJob.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve({ success: true });
+        }),
+    );
+
+    const first = service.runEnabledJobs(new Date('2026-07-10T03:00:00.000Z'));
+    // Drain microtasks until the first tick reaches the in-flight sync.
+    for (
+      let spins = 0;
+      runner.runMarketCandleSyncJob.mock.calls.length === 0 && spins < 100;
+      spins += 1
+    ) {
+      await Promise.resolve();
+    }
+    await service.runEnabledJobs(new Date('2026-07-10T03:20:00.000Z'));
+    expect(runner.runMarketCandleSyncJob).toHaveBeenCalledTimes(1);
+
+    release?.();
+    await first;
   });
 
   it('uses the same due check for startup retention', async () => {

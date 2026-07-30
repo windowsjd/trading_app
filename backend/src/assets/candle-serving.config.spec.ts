@@ -38,4 +38,26 @@ describe('readCandleServingConfig', () => {
       config.maxManagedFiveMinuteRangeMs,
     );
   });
+
+  it('lets the 15m/3d chart self-heal inside the on-demand repair budget', () => {
+    const config = readCandleServingConfig({});
+    const DAY_MS = 24 * 60 * 60_000;
+    // The 15m tab requests range=3d; its aggregated read plan spans 3d + 4h
+    // of source padding. The repair bound must exceed that or a cold asset
+    // answers 503/short-partial forever instead of repairing on demand.
+    expect(config.maxOnDemandRepairRangeMs).toBe(4 * DAY_MS);
+    expect(3 * DAY_MS + 4 * 60 * 60_000).toBeLessThan(
+      config.maxOnDemandRepairRangeMs,
+    );
+    // ... and 14d/30d windows must stay ABOVE it: those are baseline-seeded,
+    // never request-time repaired.
+    expect(14 * DAY_MS).toBeGreaterThan(config.maxOnDemandRepairRangeMs);
+
+    // One repair sweep must be able to cover the whole 3d + 4h window. The
+    // sweep pages backward from the newest edge, so a smaller budget leaves
+    // the oldest chunk permanently unfetched: a 3d + 4h window can span 4
+    // KRX sessions ≈ ~1,530 domestic 1m rows ≈ 13 pages at 120 rows/page.
+    expect(config.onDemandRefreshMaxPages).toBe(15);
+    expect(config.onDemandRefreshMaxPages).toBeGreaterThanOrEqual(13);
+  });
 });

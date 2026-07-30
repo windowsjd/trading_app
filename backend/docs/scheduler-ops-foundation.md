@@ -44,6 +44,18 @@ EVENT-based matching layer and nothing schedules them.
 - `reward_marker`
 - `limit_order_matching` (scheduler-based limit-order paths A/B; runs on a
   dedicated interval, not the shared tick — see below)
+- `market_candle_sync` (scheduled incremental upkeep of the persisted candle
+  feeds when `SCHEDULER_MARKET_CANDLE_SYNC_ENABLED=true`; due-checked every
+  tick against `SCHEDULER_MARKET_CANDLE_SYNC_INTERVAL_SECONDS`, default 600.
+  Runs the SAME checkpointed job the operator API triggers with
+  `mode=incremental` for all active assets and feeds; an in-process guard
+  skips ticks while the previous sync is still running, and cross-instance
+  exclusion stays the Ops DB job lock. Unlike the provider snapshot jobs, a
+  FAILED run waits out the full interval instead of retrying next tick — one
+  transient provider error on any asset/feed marks the whole run failed, and
+  per-tick retries would hammer the shared KIS budget. See
+  [`candle-live-operations.md`](candle-live-operations.md) for the baseline
+  seeding this maintains.)
 - `limit_order_matcher` (vestigial; the removed event layer used it — never scheduled)
 
 `provider_fx_ingest`, `provider_binance_ingest`, and `provider_kis_ingest` call the existing provider ingestion services through ops locks and write real provider snapshots when provider env is enabled.
