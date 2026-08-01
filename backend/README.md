@@ -11,6 +11,7 @@ This service owns backend APIs, database access, financial calculations, and ser
 - Internal reward fulfillment foundation: operator/admin managed request queue/status APIs, idempotent internal reward requests, fulfillment into `SeasonReward`, and fulfilled-only user reward visibility. This does not call or implement external cash, point, coupon, gifticon, payment, or delivery APIs.
 - Admin/operator runtime DBs must have migration `20260601090000_add_user_role_operator_audit_logs` applied so `users.role` and `operator_audit_logs` exist.
 - Current season lookup and season join.
+- TradingAccount foundation shared by season mode and the future general (non-season) mode: season join creates a season-scoped `trading_accounts` row in the same transaction as the participant/wallets/initial grant, existing participants are backfilled 1:1, and at most one `mode=general` account per user is enforced by a partial unique index. General-mode entry/wallets/grant and rewarded-ad funding are NOT implemented yet — rules and contract in `docs/trading-modes-and-accounts.md`.
 - Season write paths require effective active season state: `status=active` and `startAt <= now < endAt` for join, FX quote/execute, and orders quote/create/execute. Public order cancel is currently blocked with `ORDER_CANCEL_NOT_SUPPORTED`.
 - Home as one aggregate API.
 - Home settled final-result read model from existing `rankType=final` `season_rankings`.

@@ -254,11 +254,18 @@ export type DateTimeNullableWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedDateTimeNullableFilter<$PrismaModel>
 }
 
-export type EnumSeasonStatusFilter<$PrismaModel = never> = {
-  equals?: $Enums.SeasonStatus | Prisma.EnumSeasonStatusFieldRefInput<$PrismaModel>
-  in?: $Enums.SeasonStatus[] | Prisma.ListEnumSeasonStatusFieldRefInput<$PrismaModel>
-  notIn?: $Enums.SeasonStatus[] | Prisma.ListEnumSeasonStatusFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumSeasonStatusFilter<$PrismaModel> | $Enums.SeasonStatus
+export type EnumTradingAccountModeFilter<$PrismaModel = never> = {
+  equals?: $Enums.TradingAccountMode | Prisma.EnumTradingAccountModeFieldRefInput<$PrismaModel>
+  in?: $Enums.TradingAccountMode[] | Prisma.ListEnumTradingAccountModeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.TradingAccountMode[] | Prisma.ListEnumTradingAccountModeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumTradingAccountModeFilter<$PrismaModel> | $Enums.TradingAccountMode
+}
+
+export type EnumTradingAccountStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.TradingAccountStatus | Prisma.EnumTradingAccountStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.TradingAccountStatus[] | Prisma.ListEnumTradingAccountStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.TradingAccountStatus[] | Prisma.ListEnumTradingAccountStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumTradingAccountStatusFilter<$PrismaModel> | $Enums.TradingAccountStatus
 }
 
 export type DecimalFilter<$PrismaModel = never> = {
@@ -272,14 +279,24 @@ export type DecimalFilter<$PrismaModel = never> = {
   not?: Prisma.NestedDecimalFilter<$PrismaModel> | runtime.Decimal | runtime.DecimalJsLike | number | string
 }
 
-export type EnumSeasonStatusWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.SeasonStatus | Prisma.EnumSeasonStatusFieldRefInput<$PrismaModel>
-  in?: $Enums.SeasonStatus[] | Prisma.ListEnumSeasonStatusFieldRefInput<$PrismaModel>
-  notIn?: $Enums.SeasonStatus[] | Prisma.ListEnumSeasonStatusFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumSeasonStatusWithAggregatesFilter<$PrismaModel> | $Enums.SeasonStatus
+export type EnumTradingAccountModeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.TradingAccountMode | Prisma.EnumTradingAccountModeFieldRefInput<$PrismaModel>
+  in?: $Enums.TradingAccountMode[] | Prisma.ListEnumTradingAccountModeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.TradingAccountMode[] | Prisma.ListEnumTradingAccountModeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumTradingAccountModeWithAggregatesFilter<$PrismaModel> | $Enums.TradingAccountMode
   _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumSeasonStatusFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumSeasonStatusFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumTradingAccountModeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumTradingAccountModeFilter<$PrismaModel>
+}
+
+export type EnumTradingAccountStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.TradingAccountStatus | Prisma.EnumTradingAccountStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.TradingAccountStatus[] | Prisma.ListEnumTradingAccountStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.TradingAccountStatus[] | Prisma.ListEnumTradingAccountStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumTradingAccountStatusWithAggregatesFilter<$PrismaModel> | $Enums.TradingAccountStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumTradingAccountStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumTradingAccountStatusFilter<$PrismaModel>
 }
 
 export type DecimalWithAggregatesFilter<$PrismaModel = never> = {
@@ -296,6 +313,23 @@ export type DecimalWithAggregatesFilter<$PrismaModel = never> = {
   _sum?: Prisma.NestedDecimalFilter<$PrismaModel>
   _min?: Prisma.NestedDecimalFilter<$PrismaModel>
   _max?: Prisma.NestedDecimalFilter<$PrismaModel>
+}
+
+export type EnumSeasonStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.SeasonStatus | Prisma.EnumSeasonStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.SeasonStatus[] | Prisma.ListEnumSeasonStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.SeasonStatus[] | Prisma.ListEnumSeasonStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumSeasonStatusFilter<$PrismaModel> | $Enums.SeasonStatus
+}
+
+export type EnumSeasonStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.SeasonStatus | Prisma.EnumSeasonStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.SeasonStatus[] | Prisma.ListEnumSeasonStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.SeasonStatus[] | Prisma.ListEnumSeasonStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumSeasonStatusWithAggregatesFilter<$PrismaModel> | $Enums.SeasonStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumSeasonStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumSeasonStatusFilter<$PrismaModel>
 }
 
 export type EnumParticipantStatusFilter<$PrismaModel = never> = {
@@ -1128,11 +1162,18 @@ export type NestedDateTimeNullableWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedDateTimeNullableFilter<$PrismaModel>
 }
 
-export type NestedEnumSeasonStatusFilter<$PrismaModel = never> = {
-  equals?: $Enums.SeasonStatus | Prisma.EnumSeasonStatusFieldRefInput<$PrismaModel>
-  in?: $Enums.SeasonStatus[] | Prisma.ListEnumSeasonStatusFieldRefInput<$PrismaModel>
-  notIn?: $Enums.SeasonStatus[] | Prisma.ListEnumSeasonStatusFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumSeasonStatusFilter<$PrismaModel> | $Enums.SeasonStatus
+export type NestedEnumTradingAccountModeFilter<$PrismaModel = never> = {
+  equals?: $Enums.TradingAccountMode | Prisma.EnumTradingAccountModeFieldRefInput<$PrismaModel>
+  in?: $Enums.TradingAccountMode[] | Prisma.ListEnumTradingAccountModeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.TradingAccountMode[] | Prisma.ListEnumTradingAccountModeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumTradingAccountModeFilter<$PrismaModel> | $Enums.TradingAccountMode
+}
+
+export type NestedEnumTradingAccountStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.TradingAccountStatus | Prisma.EnumTradingAccountStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.TradingAccountStatus[] | Prisma.ListEnumTradingAccountStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.TradingAccountStatus[] | Prisma.ListEnumTradingAccountStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumTradingAccountStatusFilter<$PrismaModel> | $Enums.TradingAccountStatus
 }
 
 export type NestedDecimalFilter<$PrismaModel = never> = {
@@ -1146,14 +1187,24 @@ export type NestedDecimalFilter<$PrismaModel = never> = {
   not?: Prisma.NestedDecimalFilter<$PrismaModel> | runtime.Decimal | runtime.DecimalJsLike | number | string
 }
 
-export type NestedEnumSeasonStatusWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.SeasonStatus | Prisma.EnumSeasonStatusFieldRefInput<$PrismaModel>
-  in?: $Enums.SeasonStatus[] | Prisma.ListEnumSeasonStatusFieldRefInput<$PrismaModel>
-  notIn?: $Enums.SeasonStatus[] | Prisma.ListEnumSeasonStatusFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumSeasonStatusWithAggregatesFilter<$PrismaModel> | $Enums.SeasonStatus
+export type NestedEnumTradingAccountModeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.TradingAccountMode | Prisma.EnumTradingAccountModeFieldRefInput<$PrismaModel>
+  in?: $Enums.TradingAccountMode[] | Prisma.ListEnumTradingAccountModeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.TradingAccountMode[] | Prisma.ListEnumTradingAccountModeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumTradingAccountModeWithAggregatesFilter<$PrismaModel> | $Enums.TradingAccountMode
   _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumSeasonStatusFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumSeasonStatusFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumTradingAccountModeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumTradingAccountModeFilter<$PrismaModel>
+}
+
+export type NestedEnumTradingAccountStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.TradingAccountStatus | Prisma.EnumTradingAccountStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.TradingAccountStatus[] | Prisma.ListEnumTradingAccountStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.TradingAccountStatus[] | Prisma.ListEnumTradingAccountStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumTradingAccountStatusWithAggregatesFilter<$PrismaModel> | $Enums.TradingAccountStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumTradingAccountStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumTradingAccountStatusFilter<$PrismaModel>
 }
 
 export type NestedDecimalWithAggregatesFilter<$PrismaModel = never> = {
@@ -1170,6 +1221,23 @@ export type NestedDecimalWithAggregatesFilter<$PrismaModel = never> = {
   _sum?: Prisma.NestedDecimalFilter<$PrismaModel>
   _min?: Prisma.NestedDecimalFilter<$PrismaModel>
   _max?: Prisma.NestedDecimalFilter<$PrismaModel>
+}
+
+export type NestedEnumSeasonStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.SeasonStatus | Prisma.EnumSeasonStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.SeasonStatus[] | Prisma.ListEnumSeasonStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.SeasonStatus[] | Prisma.ListEnumSeasonStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumSeasonStatusFilter<$PrismaModel> | $Enums.SeasonStatus
+}
+
+export type NestedEnumSeasonStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.SeasonStatus | Prisma.EnumSeasonStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.SeasonStatus[] | Prisma.ListEnumSeasonStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.SeasonStatus[] | Prisma.ListEnumSeasonStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumSeasonStatusWithAggregatesFilter<$PrismaModel> | $Enums.SeasonStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumSeasonStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumSeasonStatusFilter<$PrismaModel>
 }
 
 export type NestedEnumParticipantStatusFilter<$PrismaModel = never> = {

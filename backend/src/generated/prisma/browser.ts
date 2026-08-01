@@ -33,6 +33,11 @@ export type OperatorAuditLog = Prisma.OperatorAuditLogModel
  */
 export type RefreshTokenSession = Prisma.RefreshTokenSessionModel
 /**
+ * Model TradingAccount
+ * 
+ */
+export type TradingAccount = Prisma.TradingAccountModel
+/**
  * Model Season
  * 
  */

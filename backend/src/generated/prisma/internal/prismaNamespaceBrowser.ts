@@ -54,6 +54,7 @@ export const ModelName = {
   User: 'User',
   OperatorAuditLog: 'OperatorAuditLog',
   RefreshTokenSession: 'RefreshTokenSession',
+  TradingAccount: 'TradingAccount',
   Season: 'Season',
   SeasonParticipant: 'SeasonParticipant',
   Badge: 'Badge',
@@ -150,6 +151,21 @@ export const RefreshTokenSessionScalarFieldEnum = {
 export type RefreshTokenSessionScalarFieldEnum = (typeof RefreshTokenSessionScalarFieldEnum)[keyof typeof RefreshTokenSessionScalarFieldEnum]
 
 
+export const TradingAccountScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  mode: 'mode',
+  status: 'status',
+  initialCapitalKrw: 'initialCapitalKrw',
+  openedAt: 'openedAt',
+  closedAt: 'closedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type TradingAccountScalarFieldEnum = (typeof TradingAccountScalarFieldEnum)[keyof typeof TradingAccountScalarFieldEnum]
+
+
 export const SeasonScalarFieldEnum = {
   id: 'id',
   name: 'name',
@@ -191,6 +207,7 @@ export const SeasonParticipantScalarFieldEnum = {
   resultCorrectedAt: 'resultCorrectedAt',
   resultCorrectedReason: 'resultCorrectedReason',
   resultCorrectedByUserId: 'resultCorrectedByUserId',
+  tradingAccountId: 'tradingAccountId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const

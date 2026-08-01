@@ -215,6 +215,7 @@ export type UserWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
   seasonParticipants?: Prisma.SeasonParticipantListRelationFilter
+  tradingAccounts?: Prisma.TradingAccountListRelationFilter
   fxExecuteRequests?: Prisma.FxExecuteRequestListRelationFilter
   refreshTokenSessions?: Prisma.RefreshTokenSessionListRelationFilter
   userBadges?: Prisma.UserBadgeListRelationFilter
@@ -238,6 +239,7 @@ export type UserOrderByWithRelationInput = {
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   seasonParticipants?: Prisma.SeasonParticipantOrderByRelationAggregateInput
+  tradingAccounts?: Prisma.TradingAccountOrderByRelationAggregateInput
   fxExecuteRequests?: Prisma.FxExecuteRequestOrderByRelationAggregateInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionOrderByRelationAggregateInput
   userBadges?: Prisma.UserBadgeOrderByRelationAggregateInput
@@ -264,6 +266,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
   seasonParticipants?: Prisma.SeasonParticipantListRelationFilter
+  tradingAccounts?: Prisma.TradingAccountListRelationFilter
   fxExecuteRequests?: Prisma.FxExecuteRequestListRelationFilter
   refreshTokenSessions?: Prisma.RefreshTokenSessionListRelationFilter
   userBadges?: Prisma.UserBadgeListRelationFilter
@@ -317,6 +320,7 @@ export type UserCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
   userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
@@ -340,6 +344,7 @@ export type UserUncheckedCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
   userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
@@ -363,6 +368,7 @@ export type UserUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
   userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
@@ -386,6 +392,7 @@ export type UserUncheckedUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
   userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
@@ -526,6 +533,20 @@ export type UserUpdateOneRequiredWithoutRefreshTokenSessionsNestedInput = {
   upsert?: Prisma.UserUpsertWithoutRefreshTokenSessionsInput
   connect?: Prisma.UserWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutRefreshTokenSessionsInput, Prisma.UserUpdateWithoutRefreshTokenSessionsInput>, Prisma.UserUncheckedUpdateWithoutRefreshTokenSessionsInput>
+}
+
+export type UserCreateNestedOneWithoutTradingAccountsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutTradingAccountsInput, Prisma.UserUncheckedCreateWithoutTradingAccountsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutTradingAccountsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutTradingAccountsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutTradingAccountsInput, Prisma.UserUncheckedCreateWithoutTradingAccountsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutTradingAccountsInput
+  upsert?: Prisma.UserUpsertWithoutTradingAccountsInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutTradingAccountsInput, Prisma.UserUpdateWithoutTradingAccountsInput>, Prisma.UserUncheckedUpdateWithoutTradingAccountsInput>
 }
 
 export type UserCreateNestedOneWithoutSeasonParticipantsInput = {
@@ -669,6 +690,7 @@ export type UserCreateWithoutOperatorAuditLogsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
   userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
@@ -691,6 +713,7 @@ export type UserUncheckedCreateWithoutOperatorAuditLogsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
   userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
@@ -729,6 +752,7 @@ export type UserUpdateWithoutOperatorAuditLogsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
   userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
@@ -751,6 +775,7 @@ export type UserUncheckedUpdateWithoutOperatorAuditLogsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
   userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
@@ -773,6 +798,7 @@ export type UserCreateWithoutRefreshTokenSessionsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
   userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
   seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
@@ -795,6 +821,7 @@ export type UserUncheckedCreateWithoutRefreshTokenSessionsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
   userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
   seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
@@ -833,6 +860,7 @@ export type UserUpdateWithoutRefreshTokenSessionsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
   userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
   seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
@@ -855,7 +883,116 @@ export type UserUncheckedUpdateWithoutRefreshTokenSessionsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
+}
+
+export type UserCreateWithoutTradingAccountsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  nickname: string
+  profileImageUrl?: string | null
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
+}
+
+export type UserUncheckedCreateWithoutTradingAccountsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  nickname: string
+  profileImageUrl?: string | null
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
+}
+
+export type UserCreateOrConnectWithoutTradingAccountsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutTradingAccountsInput, Prisma.UserUncheckedCreateWithoutTradingAccountsInput>
+}
+
+export type UserUpsertWithoutTradingAccountsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutTradingAccountsInput, Prisma.UserUncheckedUpdateWithoutTradingAccountsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutTradingAccountsInput, Prisma.UserUncheckedCreateWithoutTradingAccountsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutTradingAccountsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutTradingAccountsInput, Prisma.UserUncheckedUpdateWithoutTradingAccountsInput>
+}
+
+export type UserUpdateWithoutTradingAccountsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
+}
+
+export type UserUncheckedUpdateWithoutTradingAccountsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
   userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
   seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
@@ -876,6 +1013,7 @@ export type UserCreateWithoutSeasonParticipantsInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
   userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
@@ -898,6 +1036,7 @@ export type UserUncheckedCreateWithoutSeasonParticipantsInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
   userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
@@ -936,6 +1075,7 @@ export type UserUpdateWithoutSeasonParticipantsInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
   userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
@@ -958,6 +1098,7 @@ export type UserUncheckedUpdateWithoutSeasonParticipantsInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
   userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
@@ -981,6 +1122,7 @@ export type UserCreateWithoutUserBadgesInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
   seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
@@ -1003,6 +1145,7 @@ export type UserUncheckedCreateWithoutUserBadgesInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
   seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
@@ -1041,6 +1184,7 @@ export type UserUpdateWithoutUserBadgesInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
   seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
@@ -1063,6 +1207,7 @@ export type UserUncheckedUpdateWithoutUserBadgesInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
   seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
@@ -1085,6 +1230,7 @@ export type UserCreateWithoutSeasonRewardsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
   userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
@@ -1107,6 +1253,7 @@ export type UserUncheckedCreateWithoutSeasonRewardsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
   userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
@@ -1145,6 +1292,7 @@ export type UserUpdateWithoutSeasonRewardsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
   userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
@@ -1167,6 +1315,7 @@ export type UserUncheckedUpdateWithoutSeasonRewardsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
   userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
@@ -1189,6 +1338,7 @@ export type UserCreateWithoutRewardFulfillmentTargetsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
   userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
@@ -1211,6 +1361,7 @@ export type UserUncheckedCreateWithoutRewardFulfillmentTargetsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
   userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
@@ -1238,6 +1389,7 @@ export type UserCreateWithoutRewardFulfillmentsRequestedInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
   userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
@@ -1260,6 +1412,7 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsRequestedInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
   userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
@@ -1287,6 +1440,7 @@ export type UserCreateWithoutRewardFulfillmentsProcessedInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
   userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
@@ -1309,6 +1463,7 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsProcessedInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
   userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
@@ -1336,6 +1491,7 @@ export type UserCreateWithoutRewardFulfillmentsCanceledInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
   userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
@@ -1358,6 +1514,7 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsCanceledInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
   userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
@@ -1396,6 +1553,7 @@ export type UserUpdateWithoutRewardFulfillmentTargetsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
   userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
@@ -1418,6 +1576,7 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentTargetsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
   userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
@@ -1451,6 +1610,7 @@ export type UserUpdateWithoutRewardFulfillmentsRequestedInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
   userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
@@ -1473,6 +1633,7 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsRequestedInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
   userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
@@ -1506,6 +1667,7 @@ export type UserUpdateWithoutRewardFulfillmentsProcessedInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
   userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
@@ -1528,6 +1690,7 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsProcessedInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
   userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
@@ -1561,6 +1724,7 @@ export type UserUpdateWithoutRewardFulfillmentsCanceledInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
   userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
@@ -1583,6 +1747,7 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsCanceledInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
   userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
@@ -1605,6 +1770,7 @@ export type UserCreateWithoutQuotesInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
   userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
@@ -1627,6 +1793,7 @@ export type UserUncheckedCreateWithoutQuotesInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
   userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
@@ -1665,6 +1832,7 @@ export type UserUpdateWithoutQuotesInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
   userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
@@ -1687,6 +1855,7 @@ export type UserUncheckedUpdateWithoutQuotesInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
   userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
@@ -1709,6 +1878,7 @@ export type UserCreateWithoutFxExecuteRequestsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
   userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
   seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
@@ -1731,6 +1901,7 @@ export type UserUncheckedCreateWithoutFxExecuteRequestsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
   userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
   seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
@@ -1769,6 +1940,7 @@ export type UserUpdateWithoutFxExecuteRequestsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
   userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
   seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
@@ -1791,6 +1963,7 @@ export type UserUncheckedUpdateWithoutFxExecuteRequestsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
   refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
   userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
   seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
@@ -1809,6 +1982,7 @@ export type UserUncheckedUpdateWithoutFxExecuteRequestsInput = {
 
 export type UserCountOutputType = {
   seasonParticipants: number
+  tradingAccounts: number
   fxExecuteRequests: number
   refreshTokenSessions: number
   userBadges: number
@@ -1823,6 +1997,7 @@ export type UserCountOutputType = {
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   seasonParticipants?: boolean | UserCountOutputTypeCountSeasonParticipantsArgs
+  tradingAccounts?: boolean | UserCountOutputTypeCountTradingAccountsArgs
   fxExecuteRequests?: boolean | UserCountOutputTypeCountFxExecuteRequestsArgs
   refreshTokenSessions?: boolean | UserCountOutputTypeCountRefreshTokenSessionsArgs
   userBadges?: boolean | UserCountOutputTypeCountUserBadgesArgs
@@ -1850,6 +2025,13 @@ export type UserCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extensi
  */
 export type UserCountOutputTypeCountSeasonParticipantsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.SeasonParticipantWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountTradingAccountsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.TradingAccountWhereInput
 }
 
 /**
@@ -1934,6 +2116,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   createdAt?: boolean
   updatedAt?: boolean
   seasonParticipants?: boolean | Prisma.User$seasonParticipantsArgs<ExtArgs>
+  tradingAccounts?: boolean | Prisma.User$tradingAccountsArgs<ExtArgs>
   fxExecuteRequests?: boolean | Prisma.User$fxExecuteRequestsArgs<ExtArgs>
   refreshTokenSessions?: boolean | Prisma.User$refreshTokenSessionsArgs<ExtArgs>
   userBadges?: boolean | Prisma.User$userBadgesArgs<ExtArgs>
@@ -1986,6 +2169,7 @@ export type UserSelectScalar = {
 export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "email" | "passwordHash" | "nickname" | "profileImageUrl" | "status" | "role" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   seasonParticipants?: boolean | Prisma.User$seasonParticipantsArgs<ExtArgs>
+  tradingAccounts?: boolean | Prisma.User$tradingAccountsArgs<ExtArgs>
   fxExecuteRequests?: boolean | Prisma.User$fxExecuteRequestsArgs<ExtArgs>
   refreshTokenSessions?: boolean | Prisma.User$refreshTokenSessionsArgs<ExtArgs>
   userBadges?: boolean | Prisma.User$userBadgesArgs<ExtArgs>
@@ -2005,6 +2189,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   name: "User"
   objects: {
     seasonParticipants: Prisma.$SeasonParticipantPayload<ExtArgs>[]
+    tradingAccounts: Prisma.$TradingAccountPayload<ExtArgs>[]
     fxExecuteRequests: Prisma.$FxExecuteRequestPayload<ExtArgs>[]
     refreshTokenSessions: Prisma.$RefreshTokenSessionPayload<ExtArgs>[]
     userBadges: Prisma.$UserBadgePayload<ExtArgs>[]
@@ -2421,6 +2606,7 @@ readonly fields: UserFieldRefs;
 export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   seasonParticipants<T extends Prisma.User$seasonParticipantsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$seasonParticipantsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SeasonParticipantPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  tradingAccounts<T extends Prisma.User$tradingAccountsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$tradingAccountsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TradingAccountPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   fxExecuteRequests<T extends Prisma.User$fxExecuteRequestsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$fxExecuteRequestsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FxExecuteRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   refreshTokenSessions<T extends Prisma.User$refreshTokenSessionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$refreshTokenSessionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RefreshTokenSessionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   userBadges<T extends Prisma.User$userBadgesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$userBadgesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$UserBadgePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -2883,6 +3069,30 @@ export type User$seasonParticipantsArgs<ExtArgs extends runtime.Types.Extensions
   take?: number
   skip?: number
   distinct?: Prisma.SeasonParticipantScalarFieldEnum | Prisma.SeasonParticipantScalarFieldEnum[]
+}
+
+/**
+ * User.tradingAccounts
+ */
+export type User$tradingAccountsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the TradingAccount
+   */
+  select?: Prisma.TradingAccountSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the TradingAccount
+   */
+  omit?: Prisma.TradingAccountOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.TradingAccountInclude<ExtArgs> | null
+  where?: Prisma.TradingAccountWhereInput
+  orderBy?: Prisma.TradingAccountOrderByWithRelationInput | Prisma.TradingAccountOrderByWithRelationInput[]
+  cursor?: Prisma.TradingAccountWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.TradingAccountScalarFieldEnum | Prisma.TradingAccountScalarFieldEnum[]
 }
 
 /**

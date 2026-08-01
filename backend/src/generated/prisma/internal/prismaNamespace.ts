@@ -387,6 +387,7 @@ export const ModelName = {
   User: 'User',
   OperatorAuditLog: 'OperatorAuditLog',
   RefreshTokenSession: 'RefreshTokenSession',
+  TradingAccount: 'TradingAccount',
   Season: 'Season',
   SeasonParticipant: 'SeasonParticipant',
   Badge: 'Badge',
@@ -429,7 +430,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "operatorAuditLog" | "refreshTokenSession" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "position" | "order" | "cashWallet" | "walletTransaction" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence"
+    modelProps: "user" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "position" | "order" | "cashWallet" | "walletTransaction" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -652,6 +653,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.RefreshTokenSessionCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.RefreshTokenSessionCountAggregateOutputType> | number
+        }
+      }
+    }
+    TradingAccount: {
+      payload: Prisma.$TradingAccountPayload<ExtArgs>
+      fields: Prisma.TradingAccountFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.TradingAccountFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TradingAccountPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.TradingAccountFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TradingAccountPayload>
+        }
+        findFirst: {
+          args: Prisma.TradingAccountFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TradingAccountPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.TradingAccountFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TradingAccountPayload>
+        }
+        findMany: {
+          args: Prisma.TradingAccountFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TradingAccountPayload>[]
+        }
+        create: {
+          args: Prisma.TradingAccountCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TradingAccountPayload>
+        }
+        createMany: {
+          args: Prisma.TradingAccountCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.TradingAccountCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TradingAccountPayload>[]
+        }
+        delete: {
+          args: Prisma.TradingAccountDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TradingAccountPayload>
+        }
+        update: {
+          args: Prisma.TradingAccountUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TradingAccountPayload>
+        }
+        deleteMany: {
+          args: Prisma.TradingAccountDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.TradingAccountUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.TradingAccountUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TradingAccountPayload>[]
+        }
+        upsert: {
+          args: Prisma.TradingAccountUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TradingAccountPayload>
+        }
+        aggregate: {
+          args: Prisma.TradingAccountAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateTradingAccount>
+        }
+        groupBy: {
+          args: Prisma.TradingAccountGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TradingAccountGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.TradingAccountCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TradingAccountCountAggregateOutputType> | number
         }
       }
     }
@@ -2743,6 +2818,21 @@ export const RefreshTokenSessionScalarFieldEnum = {
 export type RefreshTokenSessionScalarFieldEnum = (typeof RefreshTokenSessionScalarFieldEnum)[keyof typeof RefreshTokenSessionScalarFieldEnum]
 
 
+export const TradingAccountScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  mode: 'mode',
+  status: 'status',
+  initialCapitalKrw: 'initialCapitalKrw',
+  openedAt: 'openedAt',
+  closedAt: 'closedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type TradingAccountScalarFieldEnum = (typeof TradingAccountScalarFieldEnum)[keyof typeof TradingAccountScalarFieldEnum]
+
+
 export const SeasonScalarFieldEnum = {
   id: 'id',
   name: 'name',
@@ -2784,6 +2874,7 @@ export const SeasonParticipantScalarFieldEnum = {
   resultCorrectedAt: 'resultCorrectedAt',
   resultCorrectedReason: 'resultCorrectedReason',
   resultCorrectedByUserId: 'resultCorrectedByUserId',
+  tradingAccountId: 'tradingAccountId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -3462,16 +3553,30 @@ export type ListEnumRefreshTokenSessionStatusFieldRefInput<$PrismaModel> = Field
 
 
 /**
- * Reference to a field of type 'SeasonStatus'
+ * Reference to a field of type 'TradingAccountMode'
  */
-export type EnumSeasonStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SeasonStatus'>
+export type EnumTradingAccountModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TradingAccountMode'>
     
 
 
 /**
- * Reference to a field of type 'SeasonStatus[]'
+ * Reference to a field of type 'TradingAccountMode[]'
  */
-export type ListEnumSeasonStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SeasonStatus[]'>
+export type ListEnumTradingAccountModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TradingAccountMode[]'>
+    
+
+
+/**
+ * Reference to a field of type 'TradingAccountStatus'
+ */
+export type EnumTradingAccountStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TradingAccountStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'TradingAccountStatus[]'
+ */
+export type ListEnumTradingAccountStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TradingAccountStatus[]'>
     
 
 
@@ -3486,6 +3591,20 @@ export type DecimalFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel,
  * Reference to a field of type 'Decimal[]'
  */
 export type ListDecimalFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Decimal[]'>
+    
+
+
+/**
+ * Reference to a field of type 'SeasonStatus'
+ */
+export type EnumSeasonStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SeasonStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'SeasonStatus[]'
+ */
+export type ListEnumSeasonStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SeasonStatus[]'>
     
 
 
@@ -3999,6 +4118,7 @@ export type GlobalOmitConfig = {
   user?: Prisma.UserOmit
   operatorAuditLog?: Prisma.OperatorAuditLogOmit
   refreshTokenSession?: Prisma.RefreshTokenSessionOmit
+  tradingAccount?: Prisma.TradingAccountOmit
   season?: Prisma.SeasonOmit
   seasonParticipant?: Prisma.SeasonParticipantOmit
   badge?: Prisma.BadgeOmit

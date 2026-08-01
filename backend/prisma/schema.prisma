@@ -40,6 +40,17 @@ enum ParticipantStatus {
   excluded
 }
 
+enum TradingAccountMode {
+  season
+  general
+}
+
+enum TradingAccountStatus {
+  active
+  suspended
+  closed
+}
+
 enum CurrencyCode {
   KRW
   USD
@@ -237,6 +248,7 @@ model User {
   updatedAt       DateTime   @updatedAt @map("updated_at")
 
   seasonParticipants          SeasonParticipant[]
+  tradingAccounts             TradingAccount[]
   fxExecuteRequests           FxExecuteRequest[]
   refreshTokenSessions        RefreshTokenSession[]
   userBadges                  UserBadge[]
@@ -297,6 +309,37 @@ model RefreshTokenSession {
   @@map("refresh_token_sessions")
 }
 
+// Common trading-account foundation shared by season mode and the future
+// general (non-season) mode. Wallets/orders/positions/exchanges/snapshots
+// still reference SeasonParticipant during the transition; only the account
+// identity layer lives here today. General-mode accounts are NOT created yet
+// (no rows with mode=general exist until the general-mode entry API ships).
+// initialCapitalKrw is the account's initial external grant only — future ad
+// rewards are ledgered as WalletTransaction rows and must never mutate it.
+// "At most one general account per user" is enforced by a partial unique
+// index that Prisma cannot express; see the migration SQL
+// (trading_accounts_general_owner_unique). status=active does not by itself
+// permit season trading: Season.status/window and ParticipantStatus checks
+// remain authoritative for season accounts.
+model TradingAccount {
+  id                String               @id @default(uuid())
+  userId            String               @map("user_id")
+  mode              TradingAccountMode
+  status            TradingAccountStatus @default(active)
+  initialCapitalKrw Decimal              @map("initial_capital_krw") @db.Decimal(24, 8)
+  openedAt          DateTime             @map("opened_at")
+  closedAt          DateTime?            @map("closed_at")
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime             @updatedAt @map("updated_at")
+
+  user              User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  seasonParticipant SeasonParticipant?
+
+  @@index([userId, mode])
+  @@index([mode, status])
+  @@map("trading_accounts")
+}
+
 model Season {
   id                String       @id @default(uuid())
   name              String
@@ -343,11 +386,17 @@ model SeasonParticipant {
   resultCorrectedAt       DateTime?         @map("result_corrected_at")
   resultCorrectedReason   String?           @map("result_corrected_reason")
   resultCorrectedByUserId String?           @map("result_corrected_by_user_id")
+  // Transitional nullable link to the common trading account. Backfilled for
+  // all pre-existing participants by the add_trading_account_foundation
+  // migration; every new join path must set it. Planned to be tightened to
+  // NOT NULL in a follow-up work unit once no writer can leave it null.
+  tradingAccountId        String?           @unique @map("trading_account_id")
   createdAt               DateTime          @default(now()) @map("created_at")
   updatedAt               DateTime          @updatedAt @map("updated_at")
 
   season                    Season                     @relation(fields: [seasonId], references: [id], onDelete: Cascade)
   user                      User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tradingAccount            TradingAccount?            @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   cashWallets               CashWallet[]
   walletTransactions        WalletTransaction[]
   exchangeTransactions      ExchangeTransaction[]

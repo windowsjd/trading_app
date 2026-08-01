@@ -56,6 +56,23 @@ export const ParticipantStatus = {
 export type ParticipantStatus = (typeof ParticipantStatus)[keyof typeof ParticipantStatus]
 
 
+export const TradingAccountMode = {
+  season: 'season',
+  general: 'general'
+} as const
+
+export type TradingAccountMode = (typeof TradingAccountMode)[keyof typeof TradingAccountMode]
+
+
+export const TradingAccountStatus = {
+  active: 'active',
+  suspended: 'suspended',
+  closed: 'closed'
+} as const
+
+export type TradingAccountStatus = (typeof TradingAccountStatus)[keyof typeof TradingAccountStatus]
+
+
 export const CurrencyCode = {
   KRW: 'KRW',
   USD: 'USD'

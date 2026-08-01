@@ -17,12 +17,13 @@ Use this directory in this order:
    - `docs/rewards-api-contract.md`
    - `docs/operator-api-contract.md`
 2. `docs/policy-decisions.md` — freshness thresholds, execute repricing/maxChangeBps, source-type priority, crypto USD settlement, and final provider selection, each with a one-line rationale. This is the policy source of truth; it replaces `realtime-execution-policy.md`, `asset-price-freshness-policy.md`, `crypto-usd-settlement-policy-update.md`, and `provider-final-selection-readiness-recheck.md`.
-3. `docs/provider-ingestion-foundation.md` — how provider ingestion is configured and operated (env vars, operator commands, per-provider request/response mapping). The fixed 40-symbol KIS watchlist now lives in code at `src/providers/kis/kis-fixed-asset-universe.ts` (seed with `pnpm tsx scripts/seed-kis-fixed-asset-universe.ts`), not in a doc.
-4. `docs/scheduler-ops-foundation.md` — scheduler/ops foundation (disabled-by-default, dry-run-by-default).
-5. `docs/batch-job-foundation.md` — batch job foundation for daily snapshot/ranking/cycle/settlement/final-tier/reward-grant jobs.
-6. `docs/ranking-backfill-runbook.md` — migration/backfill runbook for ranking tie-breakers.
-7. `docs/operator-api-contract.md` — admin/operator authorization, account management, and audit foundation.
-8. `docs/codex-rulepack.md` — coding rulepack for Codex/agent work in this repo.
-9. `docs/provider-fixtures/` — test fixtures referenced by provider tests.
+3. `docs/trading-modes-and-accounts.md` — season/general investment mode rules, the general-mode one-time 10M KRW grant + rewarded-ad funding policy, the TradingAccount foundation contract (partial unique index, backfill mapping, join transaction), and what is NOT implemented yet (general-mode APIs, ad rewards, time-weighted returns).
+4. `docs/provider-ingestion-foundation.md` — how provider ingestion is configured and operated (env vars, operator commands, per-provider request/response mapping). The fixed 40-symbol KIS watchlist now lives in code at `src/providers/kis/kis-fixed-asset-universe.ts` (seed with `pnpm tsx scripts/seed-kis-fixed-asset-universe.ts`), not in a doc.
+5. `docs/scheduler-ops-foundation.md` — scheduler/ops foundation (disabled-by-default, dry-run-by-default).
+6. `docs/batch-job-foundation.md` — batch job foundation for daily snapshot/ranking/cycle/settlement/final-tier/reward-grant jobs.
+7. `docs/ranking-backfill-runbook.md` — migration/backfill runbook for ranking tie-breakers.
+8. `docs/operator-api-contract.md` — admin/operator authorization, account management, and audit foundation.
+9. `docs/codex-rulepack.md` — coding rulepack for Codex/agent work in this repo.
+10. `docs/provider-fixtures/` — test fixtures referenced by provider tests.
 
 Read-only/quote source metadata is exposed as backward-compatible optional fields such as `rateSource`, `priceSource`, `assetPriceSource`, `fxRateSource`, and live valuation `sourceSummary`. Daily snapshot batch results include public-safe aggregate `sourceSummary`/fallback information in `batch_job_runs.resultPayloadJson`. These fields contain public-safe source type/name/snapshot/timing/fallback reasons only; raw provider payloads and secrets remain excluded.

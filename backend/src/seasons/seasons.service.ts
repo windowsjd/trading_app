@@ -5,6 +5,8 @@ import {
   Prisma,
   SeasonStatus,
   SnapshotReason,
+  TradingAccountMode,
+  TradingAccountStatus,
   UserStatus,
   WalletTransactionDirection,
   WalletTransactionReferenceType,
@@ -282,6 +284,23 @@ export class SeasonsService {
           8,
         );
 
+        // The season-scoped trading account is created in the SAME transaction
+        // as the participant, wallets, and initial grant, so a failure in any
+        // later step rolls the account back too and a replayed join can never
+        // leave a duplicate or orphan account.
+        const tradingAccount = await tx.tradingAccount.create({
+          data: {
+            userId,
+            mode: TradingAccountMode.season,
+            status: TradingAccountStatus.active,
+            initialCapitalKrw,
+            openedAt: joinedAt,
+          },
+          select: {
+            id: true,
+          },
+        });
+
         const participant = await tx.seasonParticipant.create({
           data: {
             seasonId: season.id,
@@ -292,6 +311,7 @@ export class SeasonsService {
             totalAssetKrw: initialCapitalKrw,
             totalReturnRate: ZERO_AMOUNT,
             maxDrawdown: ZERO_AMOUNT,
+            tradingAccountId: tradingAccount.id,
           },
           select: {
             id: true,

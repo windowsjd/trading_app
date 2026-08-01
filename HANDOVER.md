@@ -12,6 +12,104 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 시즌·일반모드 규칙 확정 + TradingAccount DB foundation (2026-08-01)
+
+**목적**
+
+시즌모드와 일반모드(무기한 가상투자)의 규칙·계산 기준·상태·API 방향을 확정해
+문서화하고, 두 모드가 공유할 공통 거래계정(`trading_accounts`)의 DB 기반을
+additive migration으로 추가한 뒤 기존 시즌 참가자를 season 계정으로 backfill한다.
+일반모드 전체 구현이 아니다 — 일반계정 생성 API·지갑·최초 지급·광고 기능은
+이번 범위에서 만들지 않았다.
+
+**확정한 규칙 (상세: `backend/docs/trading-modes-and-accounts.md`, 정책 요약:
+`backend/docs/policy-decisions.md`의 Investment Modes 섹션)**
+
+- 두 모드는 사용자 계정만 공유하고 지갑·주문·포지션·손익·스냅샷·수익률을 완전
+  분리한다. 계정 간 자금 이전 없음.
+- 일반모드 최초 가상자금은 계정 최초 생성 시 10,000,000 KRW **1회** 지급뿐이다.
+  기존 문서·프롬프트의 "가입일 기준 매월 1,000만 원, 말일 보정, grantAnchorDay,
+  nextGrantAt, 월 지급 스케줄러, 소급 지급" 규칙은 전부 폐기했고 관련 DB 필드도
+  추가 금지로 못박았다.
+- 추가 가상자금은 향후 **보상형 광고**로만 획득한다. 광고 보상금은 현금이 아닌
+  내부 가상자금이며, 투자수익이 아니라 **외부 가상자금 유입**으로 취급해 누적
+  투자손익(= 총자산 − 누적 외부자금)과 대표 수익률에서 제외한다. 보상 유입
+  자체로 수익률이 변하면 안 되므로 대표 수익률은 단순 비율 대신 유입 시점을
+  구간 경계로 하는 **시간가중수익률(향후 구현)** 을 쓴다. 1회 지급액·일일
+  한도·제공자는 미정(운영 설정값). 광고 SDK·시청 UI·검증/지급 API·이력
+  테이블·`ad_reward` WalletTransactionType은 전부 미구현이며 이번에 추가하지
+  않았다.
+- 자금 고갈 시 자동 초기화·자동 재지급 없음.
+
+**DB 변경 (migration `20260801120000_add_trading_account_foundation`, additive)**
+
+- enum `TradingAccountMode(season|general)`, `TradingAccountStatus(active|
+  suspended|closed)` + `trading_accounts` 테이블(id uuid, userId FK RESTRICT,
+  mode, status, initialCapitalKrw Decimal(24,8) `>0` CHECK, openedAt,
+  closedAt nullable `>= openedAt` CHECK). 월 지급 필드 없음, 광고 누적 컬럼 없음
+  (누적 보상금은 향후 원장 집계로 계산).
+- `season_participants.trading_account_id` nullable TEXT + `@unique` + FK
+  RESTRICT (1:1). 배포 호환용 transitional nullable이며 **후속 작업에서 NOT
+  NULL 강화 예정**(schema comment에 기록).
+- partial unique index `trading_accounts_general_owner_unique`
+  (`ON (user_id) WHERE mode='general'`): 사용자당 general 1개 강제, 시즌 다계정
+  허용. Prisma가 표현 못해 raw SQL 관리(schema 주석 참조).
+  `@@unique([userId, mode])`는 시즌 다계정을 막으므로 사용 금지.
+- backfill: 기존 참가자 전건에 season 계정 1:1 생성. userId·initialCapitalKrw
+  복사, openedAt=joinedAt, closedAt=NULL(종료 시각 날조 금지), status 매핑
+  registered/active→active, excluded→suspended, finished/rewarded→closed.
+  계정 id는 `md5('trading-account:season-participant:'||id)::uuid` 결정적
+  유도(내장 함수만, extension 없음), `IS NULL` 가드로 멱등. **general 계정·
+  일반 지갑·광고 데이터는 일절 생성하지 않는다(0건이 정상).** 기존 금융
+  데이터(지갑·원장·주문·포지션·환전·스냅샷·랭킹)와 seasonParticipantId FK는
+  불변.
+
+**코드 변경**
+
+- `SeasonsService.joinSeason`: 같은 트랜잭션 안에서 TradingAccount 생성 →
+  참가자 생성(+link) → KRW/USD 지갑 → initial_grant 원장 → equity snapshot.
+  중간 실패 시 계정까지 rollback, 중복 참가는 기존 409(P2002 race 포함) 유지,
+  **응답 계약 불변**(tradingAccountId 미노출 — 프런트 미사용).
+- `scripts/lib/dev-baseline.ts`(seed/dev:open-season/dev:recover-local-data
+  공유): `ta_dev_001` 계정을 참가자와 원자적으로 생성. replay 멱등 확인.
+- SeasonParticipant를 직접 만드는 통합 fixture 8곳(fx execute, orders execute,
+  limit-order reservation/race/transaction-time/no-redis 스펙, matching·replay
+  스크립트)이 실제 TradingAccount 행을 만들어 연결하도록 갱신했고, cleanup은
+  participant 삭제 후·user 삭제 전에 계정을 지운다(user FK RESTRICT 때문).
+  mvp-flow 스모크 cleanup도 동일 처리.
+
+**테스트·검증 (전부 로컬 user-space PG16, UTC)**
+
+- 신규 `src/seasons/trading-account-schema.spec.ts`(schema·migration 텍스트
+  계약: enum 값, 금지 필드 부재, partial index·CHECK·매핑 존재, 거래 테이블이
+  아직 participant 기준임, 파괴 구문 부재) — 기본 `pnpm test`에 포함.
+- 신규 `src/seasons/trading-account.integration.spec.ts`
+  (`TRADING_ACCOUNT_DB_INTEGRATION=1` opt-in): migration 파일에서 backfill SQL을
+  그대로 읽어 실행해 상태 매핑·복사·1:1·멱등·비파괴를 검증, partial unique·
+  계정 공유 금지·CHECK 위반, join 원자성·replay 409·rollback 주입(cashWallet/
+  walletTransaction 실패 시 계정까지 rollback), 동시 join race 1계정을 실제
+  PostgreSQL에서 검증. PG를 내리면 실패함을 확인(가짜 통과 아님).
+- prisma format/validate·typecheck·build 통과, unit 2,139 pass. 빈 DB 전체
+  migration 적용, "직전 migration 상태 + 5개 status 참가자·지갑·원장 fixture"
+  DB에 신규 migration 적용 후 검증 쿼리 전 항목 0건(§19 완료 기준 전부 충족).
+  FX/orders/limit-order DB 스위트, matching·replay 통합 스크립트, MVP flow
+  스모크 통과.
+- e2e(app.e2e-spec)는 generated-client jest.mock에 TradingAccount enum을
+  추가해야 했다(누락 시 join 500). JWT secret을 맞춘 환경에서 HEAD와 동일한
+  3개 env 실패만 남고 join 포함 106 pass — 회귀 없음.
+
+**주의/미구현**
+
+- `limit-order-transaction-time` 스펙의 market-close 케이스는 KRX 개장 시간에만
+  통과하는 기존 환경 의존 케이스(주말 실행 시 MARKET_CLOSED로 실패, 이번 변경과
+  무관). 또한 이 스펙은 nickname 40자 절단 때문에 실패 후 잔여 행이 남으면
+  재실행이 P2002로 막힌다 — 잔여 user/계정 수동 정리 필요.
+- 일반모드 계정 생성·최초 지급·모드 선택 UI·광고 전 기능·시간가중수익률 계산·
+  거래 테이블의 accountId 전환은 미구현. 후속 순서는
+  `trading-modes-and-accounts.md` §8.
+- 01~05 v3 Word 문서는 저장소에 없어 수정하지 않았다. Markdown이 원본이며 Word
+  재생성은 별도 필요.
+
 ### 작업 단위: 캔들 차트 미표시 장애 수정(coverage 판정 모델·부분 서빙·KIS 스윕) (2026-07-29)
 
 **목적**
@@ -795,6 +893,29 @@ cd frontend && npm run typecheck && npm test
 ---
 
 ## 2. 최신 작업 시간순 기록
+
+### 2026-08-01 — 시즌·일반모드 규칙 확정 + TradingAccount DB foundation
+
+- 시즌/일반 두 투자 모드의 자산 완전 분리, 일반모드 최초 1,000만 원 1회 지급
+  (월 자동 지급 전면 폐기), 보상형 광고 기반 추가 자금, 광고 보상금의 투자손익·
+  수익률 제외와 시간가중수익률 방향을 확정하고
+  `backend/docs/trading-modes-and-accounts.md`(신규)와 `policy-decisions.md`에
+  문서화했다. 광고 기능·일반모드 API는 전부 미구현임을 명시했다.
+- additive migration `20260801120000_add_trading_account_foundation`으로
+  `TradingAccountMode/Status` enum과 `trading_accounts` 테이블(양수 자본·종료
+  시각 CHECK, user FK RESTRICT), general 계정 사용자당 1개 partial unique
+  index를 추가하고, 기존 SeasonParticipant 전건에 season 계정을 결정적 id로
+  backfill해 nullable unique `trading_account_id`로 연결했다(후속 NOT NULL
+  예정). general 계정·일반 지갑·광고 데이터는 생성하지 않았고 기존 금융
+  데이터는 불변이다.
+- 시즌 참가 트랜잭션이 계정→참가자→지갑→원장→스냅샷을 한 트랜잭션으로 만들고
+  중간 실패 시 계정까지 rollback된다(응답 계약 불변). dev-baseline과 통합
+  fixture 8곳, mvp-flow cleanup도 계정 생성/정리를 반영했다.
+- 검증: prisma format/validate·typecheck·build·unit 2,139 pass, 신규 schema
+  계약 스펙 + opt-in PostgreSQL 통합 스펙(backfill SQL 실측·partial unique·
+  CHECK·rollback·race), 빈 DB/직전 상태 DB migration 적용, 검증 쿼리 전 항목
+  0건, FX/orders/limit-order/MVP flow DB 스위트 통과. e2e는 mock enum 추가로
+  join 500을 수정, JWT env를 맞추면 HEAD와 동일한 3개 env 실패만 남는다.
 
 ### 2026-07-29 — 캔들 차트 미표시 장애 수정(coverage 판정·부분 서빙·KIS 스윕)
 

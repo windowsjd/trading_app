@@ -2,6 +2,8 @@ import {
   CurrencyCode,
   ParticipantStatus,
   SeasonStatus,
+  TradingAccountMode,
+  TradingAccountStatus,
   UserStatus,
   WalletTransactionDirection,
   WalletTransactionReferenceType,
@@ -40,6 +42,7 @@ export const DEV_USER_NICKNAME = 'dev_trader_01';
 export const DEV_USER_PASSWORD_HASH = 'dev_only_hash';
 
 export const DEV_SEASON_PARTICIPANT_ID = 'sp_dev_001';
+export const DEV_TRADING_ACCOUNT_ID = 'ta_dev_001';
 export const DEV_KRW_WALLET_ID = 'wal_krw_dev_001';
 export const DEV_USD_WALLET_ID = 'wal_usd_dev_001';
 export const DEV_INITIAL_GRANT_TX_ID = 'wtx_initial_grant_dev_001';
@@ -209,7 +212,7 @@ export async function ensureDevBaselineParticipant(input: {
 
   if (!apply) {
     notes.push(
-      'Participant absent; a dry-run apply would create the participant, KRW+USD wallets, and the initial KRW grant.',
+      'Participant absent; a dry-run apply would create the trading account, participant, KRW+USD wallets, and the initial KRW grant.',
     );
     return {
       userAction,
@@ -229,9 +232,22 @@ export async function ensureDevBaselineParticipant(input: {
 
   const resolvedUserId = userId;
 
-  // Create participant + both wallets + initial grant atomically so a partial
-  // failure never leaves a participant without its funding ledger.
+  // Create trading account + participant + both wallets + initial grant
+  // atomically so a partial failure never leaves a participant without its
+  // trading account or funding ledger.
   const result = await prisma.$transaction(async (tx) => {
+    const tradingAccount = await tx.tradingAccount.create({
+      data: {
+        id: DEV_TRADING_ACCOUNT_ID,
+        userId: resolvedUserId,
+        mode: TradingAccountMode.season,
+        status: TradingAccountStatus.active,
+        initialCapitalKrw: DEV_INITIAL_CAPITAL_KRW,
+        openedAt: DEV_JOINED_AT,
+      },
+      select: { id: true },
+    });
+
     const participant = await tx.seasonParticipant.create({
       data: {
         id: DEV_SEASON_PARTICIPANT_ID,
@@ -243,6 +259,7 @@ export async function ensureDevBaselineParticipant(input: {
         totalAssetKrw: DEV_INITIAL_CAPITAL_KRW,
         totalReturnRate: ZERO_AMOUNT,
         maxDrawdown: ZERO_AMOUNT,
+        tradingAccountId: tradingAccount.id,
       },
       select: { id: true },
     });
@@ -288,7 +305,7 @@ export async function ensureDevBaselineParticipant(input: {
   });
 
   notes.push(
-    'Participant absent; created participant, KRW+USD wallets, and one initial KRW grant.',
+    'Participant absent; created trading account, participant, KRW+USD wallets, and one initial KRW grant.',
   );
 
   return {

@@ -164,3 +164,22 @@ OpsJobLockService + ops_job_locks다(Redis lock 아님). 실제 거래소 주문
   (submittedAt ASC, id ASC FIFO). 주문별 오류는 격리(다음 cycle 재시도).
 - 잔존 enum: `OpsJobName.limit_order_matcher`/`limit_order_candle_reconciliation`,
   `OpsJobTrigger.worker`는 제거된 이벤트 계층 값으로 PostgreSQL 제약상 남지만 스케줄되지 않는다.
+
+## Investment Modes (Season / General) + TradingAccount Foundation
+
+- 시즌모드와 일반모드는 하나의 사용자 계정을 공유하되 거래계정·지갑·주문·포지션·손익·스냅샷을 완전히 분리하고, 계정 간 자금·자산 이전은 지원하지 않는다.
+  근거: 대회형 시즌 성과와 무기한 개인 투자 기록이 섞이면 랭킹·수익률 양쪽의 의미가 깨진다.
+- 공통 계정 계층은 `trading_accounts`(mode=season|general)이며, 이번 단계에서는 식별 계층만 도입하고 지갑·주문·포지션은 여전히 seasonParticipantId를 참조한다(transitional; 후속 작업에서 accountId 전환).
+  근거: 기존 시즌 기능을 깨지 않는 additive 전환 경로가 필요하다.
+- 사용자당 general 계정은 최대 1개이며 DB partial unique index(`trading_accounts_general_owner_unique`, `WHERE mode='general'`)로 강제한다. `@@unique([userId, mode])`는 사용하지 않는다.
+  근거: 시즌 계정은 시즌마다 여러 개가 정상이므로 composite unique로는 표현할 수 없다.
+- 일반모드 최초 가상자금은 계정 최초 생성 시 10,000,000 KRW 1회 지급뿐이다. 월별/가입일 기준/스케줄러 정기 지급과 grantAnchorDay·nextGrantAt류 필드는 폐기·금지한다. 소진 시 자동 재지급·계정 초기화도 없다.
+  근거: 반복 무상 지급은 수익률 비교 의미를 없애고, 지급일 스케줄링 상태는 유지비만 만든다.
+- 일반모드 추가 가상자금은 보상형 광고 완료 보상으로만 획득한다(광고 보상은 general 계정 한정, 서버 검증·이벤트 고유 ID·중복 지급 차단·지급+원장 단일 트랜잭션 필수). 1회 지급액·일일 한도·제공자는 운영 설정값으로 미정.
+  근거: 클라이언트 신고만으로 잔액이 늘 수 있으면 가상자금이라도 원장 무결성이 무너진다.
+- 광고 보상금은 투자수익이 아니라 외부 가상자금 유입이다. 누적 투자손익 = 현재 총자산 − 누적 외부 가상자금(최초 지급 + 광고 보상 + 운영자 외부 조정)으로 계산하고, 대표 수익률은 단순 (총자산−외부자금)/외부자금 대신 외부자금 유입 시점을 구간 경계로 하는 시간가중수익률(향후 구현)을 쓴다. `TradingAccount.initialCapitalKrw`와 누적 보상 컬럼에 가산하지 않고 원장 집계로만 계산한다.
+  근거: 보상 유입 자체로 수익률이 변하면 실제 투자 성과 지표가 왜곡된다.
+- 시즌 거래 가능 판정은 기존 Season.status·기간·ParticipantStatus 검증을 유지하고 TradingAccount.status(active/suspended/closed)는 공통 계정 상태로만 쓴다. backfill 매핑: registered/active→active, excluded→suspended, finished/rewarded→closed, closedAt은 확실한 종료 시각이 없으면 NULL.
+  근거: 검증 체계를 한 번에 갈아끼우면 시즌 회귀 위험이 크고, 종료 시각 날조는 금융 기록 원칙에 반한다.
+
+세부 계약·ERD·QA 체크리스트는 `docs/trading-modes-and-accounts.md`.

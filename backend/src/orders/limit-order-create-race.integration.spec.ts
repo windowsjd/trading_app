@@ -223,6 +223,16 @@ async function createScenario(label) {
     select: { id: true },
   });
 
+  const tradingAccount = await prisma.tradingAccount.create({
+    data: {
+      userId: user.id,
+      mode: 'season',
+      initialCapitalKrw: '10000000.00000000',
+      openedAt: now,
+    },
+    select: { id: true },
+  });
+
   const participant = await prisma.seasonParticipant.create({
     data: {
       seasonId: season.id,
@@ -233,6 +243,7 @@ async function createScenario(label) {
       totalAssetKrw: '10000000.00000000',
       totalReturnRate: ZERO_AMOUNT,
       maxDrawdown: ZERO_AMOUNT,
+      tradingAccountId: tradingAccount.id,
     },
     select: { id: true },
   });
@@ -346,6 +357,9 @@ async function cleanupScenario(scenario) {
   });
   await prisma.asset.deleteMany({ where: { id: scenario.assetId } });
   await prisma.season.deleteMany({ where: { id: scenario.seasonId } });
+  await prisma.tradingAccount.deleteMany({
+    where: { userId: { in: [scenario.userId, scenario.operator.userId] } },
+  });
   await prisma.user.deleteMany({
     where: { id: { in: [scenario.userId, scenario.operator.userId] } },
   });

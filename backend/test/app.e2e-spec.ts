@@ -131,6 +131,15 @@ jest.mock('../src/generated/prisma/client', () => {
       scheduled: 'scheduled',
       settlement: 'settlement',
     },
+    TradingAccountMode: {
+      season: 'season',
+      general: 'general',
+    },
+    TradingAccountStatus: {
+      active: 'active',
+      suspended: 'suspended',
+      closed: 'closed',
+    },
     UserStatus: {
       active: 'active',
       suspended: 'suspended',
@@ -284,6 +293,9 @@ type PrismaMock = {
     findUnique: jest.Mock;
     findFirst: jest.Mock;
     update: jest.Mock;
+  };
+  tradingAccount: {
+    create: jest.Mock;
   };
   seasonRanking: {
     count: jest.Mock;
@@ -526,6 +538,9 @@ describe('AppController (e2e)', () => {
         findFirst: jest.fn(),
         update: jest.fn(),
       },
+      tradingAccount: {
+        create: jest.fn(),
+      },
       seasonRanking: {
         count: jest.fn(),
         create: jest.fn(),
@@ -666,6 +681,7 @@ describe('AppController (e2e)', () => {
 
   const expectNoModelWriteMutationCalls = () => {
     expect(prisma.seasonParticipant.create).not.toHaveBeenCalled();
+    expect(prisma.tradingAccount.create).not.toHaveBeenCalled();
     expect(prisma.cashWallet.create).not.toHaveBeenCalled();
     expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
     expect(prisma.fxExecuteRequest.create).not.toHaveBeenCalled();
@@ -3121,6 +3137,9 @@ describe('AppController (e2e)', () => {
         mockActiveUser();
         prisma.season.findUnique.mockResolvedValueOnce(season);
         prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
+        prisma.tradingAccount.create.mockResolvedValueOnce({
+          id: 'trading-account-1',
+        });
         prisma.seasonParticipant.create.mockResolvedValueOnce({
           id: participant.id,
         });
@@ -3147,7 +3166,22 @@ describe('AppController (e2e)', () => {
           },
         });
         expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-        expect(prisma.seasonParticipant.create).toHaveBeenCalled();
+        expect(prisma.tradingAccount.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({
+            userId: user.id,
+            mode: 'season',
+            status: 'active',
+            openedAt: expect.any(Date),
+          }),
+          select: { id: true },
+        });
+        expect(prisma.seasonParticipant.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              tradingAccountId: 'trading-account-1',
+            }),
+          }),
+        );
         expect(prisma.cashWallet.create).toHaveBeenCalledTimes(2);
         expect(prisma.walletTransaction.create).toHaveBeenCalledTimes(1);
         expect(prisma.equitySnapshot.create).toHaveBeenCalledWith({

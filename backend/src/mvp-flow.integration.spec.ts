@@ -985,6 +985,11 @@ async function cleanup() {
     });
   }
   if (userIds.length > 0) {
+    // Trading accounts (created by joinSeason) block user deletion (RESTRICT),
+    // so remove them after their participants and before the users.
+    await prisma.tradingAccount.deleteMany({
+      where: { userId: { in: userIds } },
+    });
     await prisma.refreshTokenSession.deleteMany({
       where: { userId: { in: userIds } },
     });

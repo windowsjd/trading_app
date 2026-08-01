@@ -31,6 +31,15 @@ jest.mock('../generated/prisma/client', () => {
       scheduled: 'scheduled',
       settlement: 'settlement',
     },
+    TradingAccountMode: {
+      season: 'season',
+      general: 'general',
+    },
+    TradingAccountStatus: {
+      active: 'active',
+      suspended: 'suspended',
+      closed: 'closed',
+    },
     UserStatus: {
       active: 'active',
       suspended: 'suspended',
@@ -62,6 +71,9 @@ describe('SeasonsService', () => {
     },
     seasonParticipant: {
       findUnique: jest.fn(),
+      create: jest.fn(),
+    },
+    tradingAccount: {
       create: jest.fn(),
     },
     user: {
@@ -253,6 +265,9 @@ describe('SeasonsService', () => {
       status: 'active',
     });
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
+    prisma.tradingAccount.create.mockResolvedValueOnce({
+      id: 'ta-1',
+    });
     prisma.seasonParticipant.create.mockResolvedValueOnce({
       id: 'sp-1',
     });
@@ -273,6 +288,23 @@ describe('SeasonsService', () => {
         USD: '0.00000000',
       },
     });
+    expect(prisma.tradingAccount.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId: 'user-1',
+        mode: 'season',
+        status: 'active',
+        initialCapitalKrw: '1000000.00000000',
+        openedAt: expect.any(Date),
+      }),
+      select: { id: true },
+    });
+    expect(prisma.seasonParticipant.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          tradingAccountId: 'ta-1',
+        }),
+      }),
+    );
     expect(prisma.equitySnapshot.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         seasonParticipantId: 'sp-1',
