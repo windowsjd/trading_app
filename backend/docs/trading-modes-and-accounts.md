@@ -14,21 +14,31 @@
 - 향후 시간가중수익률(TWR) 적용 원칙
 - TradingAccount 공통 거래계정 구조
 
-**이번 작업에서 구현됨:**
+**구현됨:**
 
 - `TradingAccount` DB foundation (enum, 테이블, 제약, 인덱스)
 - 기존 `SeasonParticipant` 전건에 대한 season TradingAccount backfill
 - 신규 시즌 참가 시 같은 트랜잭션 안에서 TradingAccount 생성·연결
+- 배포 경계 `tradingAccountId=null` 참가자의 링크 복구 계층 (§3.5):
+  joinSeason 기존 참가자 경로, dev baseline, 운영자 제외, 운영용
+  dry-run/apply 복구 스크립트가 공유하는 결정적 계정 ID 복구
+- 운영자 참가자 제외 시 같은 트랜잭션에서 TradingAccount `suspended` 동기화 (§4.4)
+- `GET /api/v1/trading-accounts` 목록·`GET /api/v1/trading-accounts/:accountId`
+  상세 조회 API와 공용 소유권 검증 계층 `TradingAccountAccessService` (§5.2)
 
 **아직 구현되지 않음 (문서만 보고 사용 가능하다고 오해하지 말 것):**
 
 - 일반모드 계정 생성(진입) API, 일반모드 지갑, 최초 1,000만 원 실제 지급
 - 로그인 후 모드 선택 화면, 앱 내 모드 전환
-- 거래 API의 accountId 전환 (주문·포지션·지갑은 여전히 seasonParticipantId 기준)
+- 거래 API의 accountId 전환 (주문·포지션·지갑은 여전히 seasonParticipantId 기준;
+  `/trading-accounts/:accountId/wallets` 같은 하위 거래 endpoint도 미구현)
 - 광고 SDK, 광고 시청 UI, 광고 보상 검증·지급 API, 광고 보상 이력 테이블,
   광고 보상 WalletTransactionType, 광고 1회당 지급액·일일 한도 확정
 - 시간가중수익률 계산 코드
 - 일반모드 포트폴리오·주문·포지션·스냅샷
+- `tradingAccountId` NOT NULL 강화 (전제조건은 §3.5.5)
+- 시즌 finished/rewarded/settled 전환 시 account `closed` 일괄 동기화,
+  suspended 계정 재활성화, 운영자 일반계정 정지 API (§4.4의 잔여 범위)
 
 ## 1. 게임규칙 (01 게임규칙서 대응)
 
@@ -227,6 +237,57 @@ Season → SeasonParticipant → TradingAccount
 
 개발 baseline(`prisma/seed.ts`·`dev:open-season`·`dev:recover-local-data`가 공유하는 `scripts/lib/dev-baseline.ts`)도 동일하게 계정(`ta_dev_001`)을 참가자와 원자적으로 생성한다. 통합 테스트 fixture들도 실제 TradingAccount 행을 생성해 연결한다.
 
+### 3.5 배포 경계 null link 복구 (deploy-boundary repair)
+
+**문제.** `trading_account_id`는 배포 호환성을 위해 아직 nullable이다. migration은 적용 시점에 존재한 참가자만 backfill하므로, migration 적용 후 아직 구버전 서버가 돌고 있는 배포 경계에서 구버전 writer가 `tradingAccountId=null` 참가자를 만들 수 있다. 이 참가자는 재참가 요청이 기존 409로 즉시 차단되기 때문에 방치하면 영구히 계정 없이 남는다.
+
+**복구 규칙 (단일 구현: `src/seasons/season-trading-account-link.ts`).**
+
+- 계정 ID는 migration backfill과 **동일한 결정적 유도**를 쓴다:
+  `md5('trading-account:season-participant:' || participantId)::uuid` 와
+  바이트 단위로 같은 값을 Node `crypto` md5로 생성한다
+  (`deriveSeasonTradingAccountId`). md5는 보안 용도가 아니라 결정적 식별자
+  유도 전용이며, 토큰·인증에 절대 사용하지 않는다. 같은 participantId는 항상
+  같은 accountId가 되므로 동시 복구가 orphan 계정을 만들 수 없다.
+- 복구 데이터 매핑은 backfill과 동일: `userId`·`initialCapitalKrw` 복사
+  (totalAssetKrw는 사용하지 않음), `openedAt=joinedAt`, `closedAt=null`,
+  status는 §4.3 표의 ParticipantStatus 매핑.
+- 전체 복구는 호출자의 DB 트랜잭션 안에서 수행하고, 계정 insert는 raw
+  `INSERT ... ON CONFLICT ("id") DO NOTHING`, 링크는
+  `updateMany(where: { id, tradingAccountId: null })` 가드로 처리해 동시 복구
+  race에서도 계정 하나·링크 하나만 남는다.
+- 지갑·원장·주문·포지션·환전·스냅샷은 **절대 수정하지 않는다**. initial grant
+  재지급·스냅샷 재생성 없음.
+- 다음 불일치는 조용히 덮어쓰지 않고
+  `SeasonTradingAccountLinkIntegrityError`(코드
+  `TRADING_ACCOUNT_LINK_INTEGRITY`)로 fail-closed 한다: 계정 userId ≠ 참가자
+  userId, mode ≠ season, 결정적 계정의 initialCapitalKrw/openedAt 불일치, 계정이
+  이미 다른 참가자에 연결됨, 참가자가 이미 다른 계정에 연결됨.
+
+**복구 경로 4곳 (모두 같은 구현 공유).**
+
+1. `joinSeason` 기존 참가자 경로 — 기존 참가자의 `tradingAccountId`가 null이면
+   같은 트랜잭션에서 링크만 복구한 뒤, **기존 API 계약 그대로 409
+   `SEASON_ALREADY_JOINED`를 반환**한다(복구는 commit되고 409는 commit 후
+   던진다). 복구 실패는 409로 감추지 않고 500 `TRADING_ACCOUNT_LINK_INTEGRITY`
+   구조화 오류로 전달한다.
+2. 운영자 참가자 제외 — 제외 트랜잭션 안에서 먼저 링크를 복구한 뒤 suspended
+   동기화를 계속한다 (§4.4).
+3. dev baseline (`ensureDevBaselineParticipant`) — 기존 dev 참가자의 링크가
+   null이면 apply에서 링크만 복구하고 notes에 기록한다. dry-run은 복구 예정만
+   보고한다. 지갑·잔액·원장은 불변, replay 시 추가 계정 없음.
+4. 운영용 스크립트 `pnpm trading-accounts:repair-links`
+   (`scripts/repair-missing-trading-account-links.ts`) — **기본 dry-run**,
+   실제 수정은 `--apply` 명시 필수. null 참가자 수·복구(예정) 건수·참가자별
+   실패 원인을 출력하고, apply 후 남은 null 건수를 재검증한다. 참가자별로
+   독립 트랜잭션이라 일부 실패가 나머지 복구를 막지 않으며, 여러 번 실행해도
+   결과가 같다. DROP/TRUNCATE/DELETE/reset 없음, general 계정 생성 없음.
+
+**NOT NULL 강화 전제조건 (별도 작업).** ① 모든 production writer가 값을 기록,
+② 복구 스크립트 apply 완료, ③ `trading_account_id IS NULL` 0건 확인, ④ 구버전
+인스턴스 완전 종료, ⑤ 배포 순서 확정 — 이 다섯 가지가 모두 확인된 후에만
+NOT NULL migration을 진행한다.
+
 ## 4. 상태정의 (04 상태정의서 대응)
 
 ### 4.1 TradingAccountMode
@@ -252,18 +313,71 @@ Season → SeasonParticipant → TradingAccount
 
 기존 `SeasonStatus`·`ParticipantStatus`는 삭제·대체하지 않는다. `WalletTransactionType`에 `ad_reward`류 값은 이번 작업에서 추가하지 않았다(광고 보상 실제 구현 작업에서 추가).
 
+### 4.4 참가자 제외 ↔ TradingAccount 상태 동기화 (구현됨)
+
+운영자가 시즌 참가자를 제외하면 **같은 DB 트랜잭션** 안에서 두 상태를 함께 바꾼다.
+
+- `SeasonParticipant.participantStatus = excluded` (기존 excludedAt/Reason/By,
+  `currentRank=null`, 제출 상태 지정가 매수 취소·예약금 반환, 감사 로그 유지)
+- 연결된 season `TradingAccount.status = suspended`
+
+규칙:
+
+- `tradingAccountId`가 null인 legacy 참가자는 같은 트랜잭션에서 먼저 §3.5
+  규칙으로 링크를 복구한 뒤 suspended로 바꾼다.
+- 이미 `suspended`면 idempotent하게 유지한다.
+- `closed` 계정은 **절대 suspended로 되돌리지 않는다** (finished/rewarded
+  참가자 제외 시 계정은 closed 그대로).
+- 계정 userId ≠ 참가자 userId 또는 mode ≠ season이면 임의 수정 없이 500
+  `TRADING_ACCOUNT_LINK_INTEGRITY`로 fail-closed 한다.
+- 어느 한쪽 update나 지정가 취소가 실패하면 참가자 제외·계정 상태 변경이 함께
+  rollback된다.
+- 감사 로그 metadata에 `tradingAccountId`, `beforeTradingAccountStatus`,
+  `afterTradingAccountStatus`, `tradingAccountLinkRepaired`를 추가했다
+  (전체 account 객체·민감정보는 기록하지 않음).
+
+**이번 범위에서 구현하지 않은 상태 동기화 (시즌 lifecycle 격리 작업에서 별도
+처리):** 시즌 settled 시 account 일괄 closed, rewarded/finished 전환 시 closed
+동기화, suspended 계정 재활성화, 운영자 일반계정 정지 API.
+
 ## 5. API 방향 (03 API 명세서 대응)
 
-### 5.1 현재 구현 (변경 없음)
+### 5.1 기존 API (변경 없음)
 
 - `GET /api/v1/seasons`, `GET /api/v1/seasons/current`
-- `POST /api/v1/seasons/:seasonId/join` — 응답 계약 불변. 내부적으로 season TradingAccount가 함께 생성되지만 응답에 `tradingAccountId`는 노출하지 않는다.
+- `POST /api/v1/seasons/:seasonId/join` — 응답 계약 불변. 내부적으로 season TradingAccount가 함께 생성되지만 응답에 `tradingAccountId`는 노출하지 않는다. 기존 참가자 재요청은 (필요 시 §3.5 링크 복구 후) 여전히 409다.
 - 기존 wallets / orders / positions / portfolio / fx / records API — 전부 seasonParticipant 기준 그대로.
 
-### 5.2 향후 예정 (미구현 — 어떤 endpoint도 아직 존재하지 않음)
+### 5.2 거래계정 조회 API (구현됨)
 
-- `GET /trading-accounts` — 내 거래계정 목록
-- `GET /trading-accounts/:accountId` — 거래계정 상세
+상세 계약: `docs/trading-accounts-api-contract.md`. 요약:
+
+- `GET /api/v1/trading-accounts` — 로그인 사용자가 소유한 **실존** 계정 목록.
+  general 계정이 아직 없으면 season 계정만 반환하며, 가상의 placeholder를
+  만들지 않는다. 정렬은 `openedAt desc → createdAt desc → id asc`로 결정적.
+- `GET /api/v1/trading-accounts/:accountId` — 소유 계정 상세.
+- 존재하지 않는 accountId와 **다른 사용자 소유 accountId는 동일한 404**
+  `TRADING_ACCOUNT_NOT_FOUND`로 응답한다(소유권을 조회 WHERE에 포함; 타인
+  계정의 존재 여부를 403으로 노출하지 않음).
+- `TradingAccount.status`는 조회 허용 여부가 아니라 자산 변경 가능 여부다.
+  소유자는 active/suspended/closed 계정을 모두 조회할 수 있다.
+- 응답에 지갑 잔액·포지션·주문·환전·평가·수익률·순위·광고 정보는 넣지 않는다
+  (아직 seasonParticipant 기준이며 accountId 전환 후 후속 작업에서 제공).
+- 소유권 검증은 `TradingAccountAccessService`(`listOwnedAccounts`,
+  `getOwnedAccountOrThrow`)가 담당하며, 향후 wallet/order/position/portfolio
+  API가 이 계층을 재사용한다. season 계정에 participant가 없거나 userId가
+  다르거나 general 계정에 participant가 붙어 있으면 404로 감추지 않고 500
+  `TRADING_ACCOUNT_INTEGRITY`로 fail-closed 한다.
+
+**서버는 "현재 선택 계정"을 저장하지 않는다.** JWT·세션·User 테이블·전역
+singleton 어디에도 currentTradingAccountId/currentMode를 두지 않는다. 계정
+선택은 프런트 UI 상태이고, 향후 거래 API는 요청 경로
+(`/api/v1/trading-accounts/:accountId/wallets` 등) 또는 명시적 요청 필드로
+accountId를 전달하며 서버는 요청마다 소유권을 다시 검증한다. (이번 작업에서
+하위 거래 endpoint는 구현하지 않았다.)
+
+### 5.3 향후 예정 (미구현)
+
 - 일반계정 최초 생성 또는 조회 (최초 진입 시 생성 + 1,000만 원 1회 지급)
 - accountId 기반 portfolio/wallet/order API (seasonParticipantId 경로의 전환)
 - 광고 보상 시작/claim API, 광고 완료 검증 callback 또는 server verification API, 광고 보상 내역 API
@@ -283,7 +397,13 @@ Season → SeasonParticipant → TradingAccount
 
 ## 7. QA 체크리스트 (05 QA 체크리스트 대응)
 
-### 7.1 이번 작업 검증 항목
+이 섹션은 세 가지를 구분한다: ① 재사용 가능한 **영구 체크리스트**(체크박스는
+항상 `[ ]`로 유지하고, 실행할 때마다 아래 실행 결과 표에 기록한다),
+② **커밋별 실행 결과 표**(그 커밋에서 실제 실행한 것만 PASS/FAIL, 실행하지
+않았으면 NOT_RUN), ③ 향후 기능의 **NOT_IMPLEMENTED 초안**(7.4). 실행하지 않은
+항목을 PASS나 `[x]`로 표시하지 않는다.
+
+### 7.1 TradingAccount foundation 영구 체크리스트
 
 - [ ] 기존 SeasonParticipant 수 = backfill된 season TradingAccount 수
 - [ ] 모든 기존 SeasonParticipant.tradingAccountId가 유효한 FK (null 0건, dangling 0건)
@@ -303,7 +423,58 @@ Season → SeasonParticipant → TradingAccount
 
 자동화: `src/seasons/trading-account-schema.spec.ts`(schema·migration 계약, 기본 `pnpm test`에 포함), `src/seasons/trading-account.integration.spec.ts`(`TRADING_ACCOUNT_DB_INTEGRATION=1`로 opt-in, 실제 PostgreSQL에서 backfill SQL·partial unique·CHECK·트랜잭션 rollback·race 검증).
 
-### 7.2 향후 광고 QA 초안 (전부 NOT_IMPLEMENTED)
+### 7.2 null link 복구·제외 동기화·계정 API 영구 체크리스트
+
+- [ ] 같은 participantId는 항상 같은 결정적 accountId (Postgres `md5(...)::uuid` cast와 바이트 일치)
+- [ ] null link 복구가 계정만 생성·연결하고 지갑·원장·주문·포지션·스냅샷 불변
+- [ ] 복구 status 매핑이 §4.3 표와 일치 (registered/active→active, excluded→suspended, finished/rewarded→closed)
+- [ ] 복구 replay·동시 복구에서 계정 하나, orphan 없음
+- [ ] userId/mode/initialCapitalKrw/openedAt 불일치·타 참가자 연결 시 fail-closed (덮어쓰기 없음)
+- [ ] joinSeason 기존 참가자: 링크 복구 후에도 409 계약 유지, 복구 실패는 409로 은폐하지 않음
+- [ ] dev baseline: null link만 복구, dry-run은 무변경, replay 시 추가 계정 없음
+- [ ] 복구 스크립트: 기본 dry-run, --apply 명시 필요, apply 후 null 0건 재검증, 재실행 멱등
+- [ ] 참가자 제외 시 account active→suspended, 이미 suspended면 idempotent, closed는 되돌리지 않음
+- [ ] 제외·계정 상태 변경·지정가 취소가 한 트랜잭션 (어느 하나 실패 시 전체 rollback)
+- [ ] 감사 로그에 tradingAccountId·before/after account status 기록
+- [ ] 계정 목록: 인증 필수, 소유 계정만, season 정보 포함, general은 season=null, placeholder 미생성
+- [ ] 계정 상세: 타인·미존재 accountId 동일 404, suspended/closed 조회 허용
+- [ ] season↔participant relation 구조 위반 시 500 TRADING_ACCOUNT_INTEGRITY
+- [ ] 기존 seasons/wallets/fx/orders/portfolio/records API 응답 계약 불변
+
+자동화: `src/seasons/season-trading-account-link.spec.ts`,
+`src/seasons/seasons.service.spec.ts`,
+`src/operator/operator-season-moderation.service.spec.ts`,
+`src/trading-accounts/trading-accounts.service.spec.ts`,
+`scripts/lib/dev-baseline.spec.ts`,
+`scripts/lib/repair-trading-account-links.spec.ts`(이상 기본 `pnpm test`),
+`src/seasons/trading-account-link.integration.spec.ts`
+(`TRADING_ACCOUNT_DB_INTEGRATION=1` opt-in, 실제 PostgreSQL), e2e
+`test/app.e2e-spec.ts`의 trading-accounts 3건.
+
+### 7.3 커밋별 실행 결과
+
+**2026-08-01 (커밋 39aee655, TradingAccount DB foundation):** HANDOVER 기록 기준
+7.1 전 항목 실행 완료(unit 2,139 pass + opt-in DB 통합 + 검증 쿼리 0건). 단,
+2026-08-03 검증에서 `seasons.join.integration.spec.ts`(opt-in
+`SEASON_JOIN_DB_INTEGRATION=1`)의 cleanup이 joinSeason이 생성하는
+TradingAccount를 지우지 않아 해당 커밋 상태에서는 FK 오류로 실패함을
+확인했다(이번 작업에서 cleanup 수정).
+
+**2026-08-03 (이번 작업, 로컬 실행 — hosted CI 없음):**
+
+| 검증 | 결과 | 근거 |
+| --- | --- | --- |
+| prisma format / validate / generate | PASS | schema 변경 없음, client 재생성 |
+| typecheck / build | PASS | `pnpm typecheck`, `pnpm build` |
+| unit + script spec (`pnpm test`) | PASS | 2,189 pass (신규 +50) |
+| 7.1 opt-in DB 통합 (`TRADING_ACCOUNT_DB_INTEGRATION=1`) | PASS | 로컬 PostgreSQL 16 |
+| 7.2 opt-in DB 통합 (`trading-account-link.integration.spec.ts`) | PASS | 결정적 ID Postgres 대조·복구·race·rollback·404 등 12 케이스 |
+| 시즌 참가 / FX / 시장가·지정가 주문 DB 통합 (opt-in 5종) | PASS | `--runInBand` 직렬 실행 |
+| e2e (`pnpm test:e2e`) | PASS(조건부) | 109/112 pass; 나머지 3건(readiness/wallets/orders-cancel)은 `.env.local` env 기인으로 HEAD와 동일 |
+| 운영 복구 시나리오 A (스크립트 dry-run→apply→재실행) | PASS | 격리 dev DB, 금융 데이터 불변 확인 |
+| 운영 복구 시나리오 B (join 재요청 409+복구) / C (제외 시 복구+suspended) | PASS | 7.2 DB 통합 케이스로 실행 |
+
+### 7.4 향후 광고 QA 초안 (전부 NOT_IMPLEMENTED)
 
 - [ ] NOT_IMPLEMENTED — 광고 완료 검증 실패 시 지급 없음
 - [ ] NOT_IMPLEMENTED — 동일 광고 이벤트 재전송 시 중복 지급 없음
@@ -314,9 +485,9 @@ Season → SeasonParticipant → TradingAccount
 
 ## 8. 후속 작업 권장 순서
 
-1. `season_participants.trading_account_id` NOT NULL 강화 (모든 writer가 값을 채우는 것 확인 후)
+1. `season_participants.trading_account_id` NOT NULL 강화 (§3.5.5의 전제조건 5가지 확인 후)
 2. 일반모드 계정 최초 생성 API + 일반모드 지갑 + 최초 1,000만 원 1회 지급 (지급·원장 원자성, 재지급 차단)
-3. `GET /trading-accounts` 계열 조회 API
-4. 지갑·주문·포지션·스냅샷의 accountId 전환 (seasonParticipantId와 병행 기간 필요)
+3. 지갑·주문·포지션·스냅샷의 accountId 전환 (`/trading-accounts/:accountId/...` 하위 endpoint, seasonParticipantId와 병행 기간 필요) — 소유권 판정은 `TradingAccountAccessService` 재사용
+4. 시즌 lifecycle 격리: finished/rewarded/settled 전환 시 account closed 동기화, suspended 재활성화, 운영자 일반계정 정지
 5. 광고 보상: 제공자 선정 → AdRewardClaim 테이블 + `ad_reward` WalletTransactionType + 서버 검증·지급 API + 운영 설정값
 6. 시간가중수익률 계산 + 외부자금 유입 경계 스냅샷

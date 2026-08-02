@@ -405,6 +405,22 @@ npm run dev:run-provider-ingestions -- --operator-email <operator@example.com>
 
 The operator actor must be an existing user with `role=operator` or `role=admin`. You may pass `--operator-user-id <USER_ID>` instead, or set `LOCAL_OPERATOR_USER_ID` / `LOCAL_OPERATOR_EMAIL`. The scripts default to non-dry-run writes, `--target-source merged`, `--max-snapshots 500`, and fail when active asset price coverage is unavailable. Pass `--dry-run` to check providers without inserting snapshots, `--target-source active_assets|env|merged` to control target resolution, `--no-fail-on-unavailable` for diagnostics only, `--verbose` to print failed/skipped provider target details, or limit a run with `--provider binance`, `--provider kis`, `--provider korea-exim`, or `--provider exchange-rate`.
 
+Repair season participants left with `trading_account_id = null` by an
+old-version writer during the TradingAccount deploy boundary (link-only,
+non-destructive; wallets/ledgers/orders are never touched and no general
+account is ever created):
+
+```bash
+pnpm trading-accounts:repair-links           # dry-run (default; no writes)
+pnpm trading-accounts:repair-links --apply   # perform the repair, then re-verify null count
+```
+
+The repair uses the same deterministic account id as the migration backfill
+(`md5('trading-account:season-participant:' || id)::uuid`), is idempotent
+across re-runs, reports per-participant failures without stopping, and exits
+non-zero when any participant could not be repaired. See
+`docs/trading-modes-and-accounts.md` §3.5.
+
 When the app shows market data as preparing or unavailable, verify that the backend has rows in:
 
 ```text
@@ -482,6 +498,7 @@ AUTH_DB_SMOKE=1 pnpm test -- auth.integration.spec.ts
 SEASON_JOIN_DB_INTEGRATION=1 pnpm test -- seasons.join.integration.spec.ts
 FX_EXECUTE_DB_INTEGRATION=1 pnpm test -- fx.execute.integration.spec.ts
 ORDER_EXECUTE_DB_INTEGRATION=1 pnpm test -- orders.execute.integration.spec.ts
+TRADING_ACCOUNT_DB_INTEGRATION=1 pnpm test -- trading-account.integration.spec.ts trading-account-link.integration.spec.ts
 MVP_FLOW_DB_SMOKE=1 pnpm test -- mvp-flow.integration.spec.ts
 OPS_JOB_LOCK_DB_SMOKE=1 pnpm test -- ops-job-lock.integration.spec.ts
 MARKET_CANDLES_DB_SMOKE=1 pnpm test -- market-candles.integration.spec.ts

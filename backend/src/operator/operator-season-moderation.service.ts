@@ -10,12 +10,18 @@ import {
   Prisma,
   SeasonRankingType,
   SeasonStatus,
+  TradingAccountMode,
+  TradingAccountStatus,
   UserRole,
 } from '../generated/prisma/client';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { LimitOrderCancelService } from '../orders/limit-order-cancel.service';
 import { LIMIT_ORDER_CANCEL_REASONS } from '../orders/limit-order-policy';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  ensureSeasonTradingAccountLink,
+  SeasonTradingAccountLinkIntegrityError,
+} from '../seasons/season-trading-account-link';
 import { OperatorAuditService } from './operator-audit.service';
 import type { OperatorRequestContext } from './operator-account-management.service';
 import { hasOperatorRole } from './operator.guard';
@@ -42,7 +48,10 @@ const MODERATED_PARTICIPANT_SELECT = {
   id: true,
   seasonId: true,
   userId: true,
+  joinedAt: true,
   participantStatus: true,
+  initialCapitalKrw: true,
+  tradingAccountId: true,
   totalAssetKrw: true,
   totalReturnRate: true,
   maxDrawdown: true,
@@ -75,8 +84,19 @@ type ModeratedParticipant = Prisma.SeasonParticipantGetPayload<{
 
 type ModerationTransactionClient = Pick<
   Prisma.TransactionClient,
-  'operatorAuditLog' | 'seasonParticipant' | 'seasonRanking'
+  | 'operatorAuditLog'
+  | 'seasonParticipant'
+  | 'seasonRanking'
+  | 'tradingAccount'
+  | '$executeRaw'
 >;
+
+type ExcludedAccountSync = {
+  tradingAccountId: string;
+  beforeTradingAccountStatus: TradingAccountStatus;
+  afterTradingAccountStatus: TradingAccountStatus;
+  tradingAccountLinkRepaired: boolean;
+};
 
 type FinalRankingRow = {
   id: string;
@@ -109,6 +129,14 @@ export class OperatorSeasonModerationService {
       return await this.prisma.$transaction(async (tx) => {
         const participant = await this.findParticipantOrThrow(tx, target);
         this.assertExcludeAllowed(participant);
+
+        // Same transaction as the exclusion: the linked season trading
+        // account is moved to suspended (repairing a legacy null link
+        // first), so a failure in either update rolls both back.
+        const accountSync = await this.syncExcludedParticipantTradingAccount(
+          tx,
+          participant,
+        );
 
         const now = new Date();
         const updated = await tx.seasonParticipant.update({
@@ -157,6 +185,12 @@ export class OperatorSeasonModerationService {
               participantUserId: participant.userId,
               beforeStatus: participant.participantStatus,
               afterStatus: updated.participantStatus,
+              tradingAccountId: accountSync.tradingAccountId,
+              beforeTradingAccountStatus:
+                accountSync.beforeTradingAccountStatus,
+              afterTradingAccountStatus: accountSync.afterTradingAccountStatus,
+              tradingAccountLinkRepaired:
+                accountSync.tradingAccountLinkRepaired,
               excludedAt: updated.excludedAt?.toISOString() ?? null,
               canceledLimitOrderCount: limitCleanup.canceledOrderCount,
               reason,
@@ -434,6 +468,82 @@ export class OperatorSeasonModerationService {
           : 'Season participant final result correction failed.',
       );
     }
+  }
+
+  /**
+   * Keep the linked season TradingAccount in sync with an exclusion:
+   * active → suspended, suspended stays suspended (idempotent), and a closed
+   * account is never reverted. A legacy null link (deploy-boundary
+   * participant) is repaired first inside the same transaction. Any
+   * account/participant mismatch fails closed instead of being overwritten.
+   */
+  private async syncExcludedParticipantTradingAccount(
+    tx: ModerationTransactionClient,
+    participant: ModeratedParticipant,
+  ): Promise<ExcludedAccountSync> {
+    let tradingAccountId = participant.tradingAccountId;
+    let tradingAccountLinkRepaired = false;
+
+    if (!tradingAccountId) {
+      const link = await ensureSeasonTradingAccountLink(tx, {
+        id: participant.id,
+        userId: participant.userId,
+        joinedAt: participant.joinedAt,
+        participantStatus: participant.participantStatus,
+        initialCapitalKrw: participant.initialCapitalKrw,
+        tradingAccountId: null,
+      });
+      tradingAccountId = link.tradingAccountId;
+      tradingAccountLinkRepaired = link.action !== 'already-linked';
+    }
+
+    const account = await tx.tradingAccount.findUnique({
+      where: { id: tradingAccountId },
+      select: { id: true, userId: true, mode: true, status: true },
+    });
+
+    if (!account) {
+      throw new SeasonTradingAccountLinkIntegrityError(
+        'Participant references a trading account that does not exist.',
+        { seasonParticipantId: participant.id, tradingAccountId },
+      );
+    }
+
+    if (
+      account.userId !== participant.userId ||
+      account.mode !== TradingAccountMode.season
+    ) {
+      throw new SeasonTradingAccountLinkIntegrityError(
+        'Linked trading account does not match the excluded participant.',
+        {
+          seasonParticipantId: participant.id,
+          tradingAccountId: account.id,
+          accountUserId: account.userId,
+          participantUserId: participant.userId,
+          accountMode: account.mode,
+        },
+      );
+    }
+
+    const afterTradingAccountStatus =
+      account.status === TradingAccountStatus.closed
+        ? TradingAccountStatus.closed
+        : TradingAccountStatus.suspended;
+
+    if (afterTradingAccountStatus !== account.status) {
+      await tx.tradingAccount.update({
+        where: { id: account.id },
+        data: { status: TradingAccountStatus.suspended },
+        select: { id: true },
+      });
+    }
+
+    return {
+      tradingAccountId: account.id,
+      beforeTradingAccountStatus: account.status,
+      afterTradingAccountStatus,
+      tradingAccountLinkRepaired,
+    };
   }
 
   private async findParticipantOrThrow(
@@ -781,9 +891,11 @@ export class OperatorSeasonModerationService {
       const errorCode =
         this.isUniqueConstraintError(input.error)
           ? 'FINAL_RANK_CONFLICT'
-          : input.error instanceof HttpException
-            ? this.extractErrorCode(input.error)
-            : 'OPERATOR_SEASON_MODERATION_FAILED';
+          : input.error instanceof SeasonTradingAccountLinkIntegrityError
+            ? input.error.code
+            : input.error instanceof HttpException
+              ? this.extractErrorCode(input.error)
+              : 'OPERATOR_SEASON_MODERATION_FAILED';
 
       await this.auditService.recordFailure({
         actorUserId: input.actor.userId,
@@ -817,6 +929,14 @@ export class OperatorSeasonModerationService {
   ) {
     if (error instanceof HttpException) {
       return error;
+    }
+
+    if (error instanceof SeasonTradingAccountLinkIntegrityError) {
+      // Data-consistency failure: surface the structured code instead of the
+      // generic moderation failure so it is never mistaken for a user error.
+      return new InternalServerErrorException(
+        this.errorBody(error.code, error.message),
+      );
     }
 
     if (this.isUniqueConstraintError(error)) {

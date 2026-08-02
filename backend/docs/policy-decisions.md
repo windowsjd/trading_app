@@ -183,3 +183,18 @@ OpsJobLockService + ops_job_locks다(Redis lock 아님). 실제 거래소 주문
   근거: 검증 체계를 한 번에 갈아끼우면 시즌 회귀 위험이 크고, 종료 시각 날조는 금융 기록 원칙에 반한다.
 
 세부 계약·ERD·QA 체크리스트는 `docs/trading-modes-and-accounts.md`.
+
+## TradingAccount Link Repair + Account Read API
+
+- `season_participants.trading_account_id`는 배포 경계(구버전 writer가 null 참가자를 생성) 동안 nullable을 유지하고, NOT NULL 강화는 "모든 writer 기록 + 복구 apply 완료 + null 0건 + 구버전 종료 + 배포 순서 확정"을 모두 확인한 별도 작업으로만 수행한다.
+  근거: 순단 없는 롤링 배포에서 스키마 강화를 먼저 하면 구버전 write가 통째로 실패한다.
+- null link 복구 계정의 ID는 migration backfill과 동일한 결정적 유도(`md5('trading-account:season-participant:'||id)::uuid`)를 애플리케이션에서도 재현해 사용하며, 랜덤 UUID 복구는 금지한다. 복구는 계정·링크만 만들고 지갑·원장·주문·포지션·스냅샷은 절대 수정하지 않으며, userId/mode/초기자금/openedAt 불일치는 덮어쓰지 않고 `TRADING_ACCOUNT_LINK_INTEGRITY`로 fail-closed 한다.
+  근거: 결정적 ID여야 동시 복구가 orphan 계정을 만들 수 없고, 불일치 자동 수정은 금융 데이터 손상을 은폐한다.
+- joinSeason은 기존 참가자의 null link를 같은 트랜잭션에서 복구한 뒤에도 기존 계약대로 409 `SEASON_ALREADY_JOINED`를 반환한다(복구는 commit, 409는 commit 후). 운영 일괄 복구는 `pnpm trading-accounts:repair-links`(기본 dry-run, `--apply` 명시 필수)로 수행한다.
+  근거: 복구를 위해 참가 API 응답 계약을 바꾸면 프런트 호환이 깨진다.
+- 운영자 참가자 제외는 같은 트랜잭션에서 연결 season 계정을 suspended로 동기화한다(null link면 먼저 복구, 이미 suspended면 idempotent, closed는 되돌리지 않음). finished/rewarded/settled 전환 시의 closed 동기화·suspended 재활성화는 시즌 lifecycle 격리 작업으로 미룬다.
+  근거: 제외와 계정 정지가 다른 트랜잭션이면 부분 실패 시 상태가 갈라진다.
+- 거래계정 조회는 `GET /api/v1/trading-accounts`(목록)·`/:accountId`(상세)이며, 존재하지 않는 계정과 타인 소유 계정은 동일한 404 `TRADING_ACCOUNT_NOT_FOUND`로 응답한다(403 금지 — 존재 여부 노출 방지). status는 읽기 gate가 아니므로 소유자는 suspended/closed 계정도 조회할 수 있다.
+  근거: 오류 코드가 존재 여부 oracle이 되면 계정 열거 공격이 가능해진다.
+- 서버는 현재 선택 계정/모드를 어디에도 저장하지 않는다(JWT claim·세션·User 컬럼·전역 singleton 금지). 향후 거래 API는 경로/필드로 accountId를 명시하고 요청마다 `TradingAccountAccessService`로 소유권을 재검증한다.
+  근거: 서버 저장 선택 상태는 다중 기기·동시 요청에서 잘못된 계정으로의 자산 변경을 만든다.

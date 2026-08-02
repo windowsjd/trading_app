@@ -30,6 +30,7 @@
     "dev:seed-kis-universe": "tsx scripts/seed-kis-fixed-asset-universe.ts",
     "dev:seed-binance-universe": "tsx scripts/seed-binance-fixed-asset-universe.ts",
     "dev:recover-local-data": "tsx scripts/dev-recover-local-data.ts",
+    "trading-accounts:repair-links": "tsx scripts/repair-missing-trading-account-links.ts",
     "candle:baseline": "tsx scripts/candle-baseline-sync.ts",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",

@@ -58,7 +58,9 @@ jest.mock('../generated/prisma/client', () => {
   };
 });
 
+import { HttpException } from '@nestjs/common';
 import { Prisma, SeasonStatus } from '../generated/prisma/client';
+import { deriveSeasonTradingAccountId } from './season-trading-account-link';
 import { SeasonsService } from './seasons.service';
 
 describe('SeasonsService', () => {
@@ -72,10 +74,13 @@ describe('SeasonsService', () => {
     seasonParticipant: {
       findUnique: jest.fn(),
       create: jest.fn(),
+      updateMany: jest.fn(),
     },
     tradingAccount: {
       create: jest.fn(),
+      findUnique: jest.fn(),
     },
+    $executeRaw: jest.fn().mockResolvedValue(1),
     user: {
       findUnique: jest.fn(),
     },
@@ -247,6 +252,136 @@ describe('SeasonsService', () => {
     await expect(
       service.getSeasons({ status: 'archived' }),
     ).rejects.toBeInstanceOf(Error);
+  });
+
+  const activeSeason = () =>
+    season({
+      status: SeasonStatus.active,
+      startAt: new Date(Date.now() - 86_400_000),
+      endAt: new Date(Date.now() + 86_400_000),
+    });
+
+  const existingParticipant = (tradingAccountId: string | null) => ({
+    id: 'sp-existing',
+    userId: 'user-1',
+    joinedAt: new Date('2026-05-02T00:00:00.000Z'),
+    participantStatus: 'active',
+    initialCapitalKrw: new Prisma.Decimal('1000000.00000000'),
+    tradingAccountId,
+  });
+
+  const expectStatus = async (work: Promise<unknown>, status: number) => {
+    let caught: unknown;
+    try {
+      await work;
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(HttpException);
+    expect((caught as HttpException).getStatus()).toBe(status);
+    return caught as HttpException;
+  };
+
+  it('returns 409 without touching accounts when the existing participant is already linked', async () => {
+    const { prisma, service } = createService();
+    prisma.$transaction.mockImplementation(async (callback) =>
+      callback(prisma),
+    );
+    prisma.season.findUnique.mockResolvedValueOnce(activeSeason());
+    prisma.user.findUnique.mockResolvedValueOnce({ status: 'active' });
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+      existingParticipant('ta-existing'),
+    );
+
+    const error = await expectStatus(
+      service.joinSeason('season-1', 'user-1'),
+      409,
+    );
+
+    expect((error.getResponse() as { error: { code: string } }).error.code).toBe(
+      'SEASON_ALREADY_JOINED',
+    );
+    expect(prisma.tradingAccount.create).not.toHaveBeenCalled();
+    expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    expect(prisma.tradingAccount.findUnique).not.toHaveBeenCalled();
+    expect(prisma.seasonParticipant.updateMany).not.toHaveBeenCalled();
+    expect(prisma.cashWallet.create).not.toHaveBeenCalled();
+    expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+    expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
+  });
+
+  it('repairs a legacy null trading-account link and still returns 409', async () => {
+    const { prisma, service } = createService();
+    prisma.$transaction.mockImplementation(async (callback) =>
+      callback(prisma),
+    );
+    prisma.season.findUnique.mockResolvedValueOnce(activeSeason());
+    prisma.user.findUnique.mockResolvedValueOnce({ status: 'active' });
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+      existingParticipant(null),
+    );
+    prisma.tradingAccount.findUnique.mockResolvedValueOnce(null);
+    prisma.seasonParticipant.updateMany.mockResolvedValueOnce({ count: 1 });
+
+    const error = await expectStatus(
+      service.joinSeason('season-1', 'user-1'),
+      409,
+    );
+
+    const deterministicId = deriveSeasonTradingAccountId('sp-existing');
+    expect((error.getResponse() as { error: { code: string } }).error.code).toBe(
+      'SEASON_ALREADY_JOINED',
+    );
+    expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(prisma.$executeRaw.mock.calls[0].slice(1)).toEqual([
+      deterministicId,
+      'user-1',
+      'season',
+      'active',
+      '1000000.00000000',
+      new Date('2026-05-02T00:00:00.000Z'),
+    ]);
+    expect(prisma.seasonParticipant.updateMany).toHaveBeenCalledWith({
+      where: { id: 'sp-existing', tradingAccountId: null },
+      data: { tradingAccountId: deterministicId },
+    });
+    // Repair never re-creates wallets, grants, or snapshots.
+    expect(prisma.cashWallet.create).not.toHaveBeenCalled();
+    expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+    expect(prisma.equitySnapshot.create).not.toHaveBeenCalled();
+    expect(prisma.seasonParticipant.create).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a failed link repair as a 500 integrity error, not SEASON_ALREADY_JOINED', async () => {
+    const { prisma, service } = createService();
+    prisma.$transaction.mockImplementation(async (callback) =>
+      callback(prisma),
+    );
+    prisma.season.findUnique.mockResolvedValueOnce(activeSeason());
+    prisma.user.findUnique.mockResolvedValueOnce({ status: 'active' });
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+      existingParticipant(null),
+    );
+    // Deterministic id already taken by another user's account: fail closed.
+    prisma.tradingAccount.findUnique.mockResolvedValueOnce({
+      id: deriveSeasonTradingAccountId('sp-existing'),
+      userId: 'user-other',
+      mode: 'season',
+      status: 'active',
+      initialCapitalKrw: new Prisma.Decimal('1000000.00000000'),
+      openedAt: new Date('2026-05-02T00:00:00.000Z'),
+      seasonParticipant: null,
+    });
+
+    const error = await expectStatus(
+      service.joinSeason('season-1', 'user-1'),
+      500,
+    );
+
+    expect((error.getResponse() as { error: { code: string } }).error.code).toBe(
+      'TRADING_ACCOUNT_LINK_INTEGRITY',
+    );
+    expect(prisma.seasonParticipant.updateMany).not.toHaveBeenCalled();
   });
 
   it('creates initial season_join equity snapshot inside season join transaction', async () => {

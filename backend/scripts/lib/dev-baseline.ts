@@ -10,6 +10,7 @@ import {
   WalletTransactionType,
   type PrismaClient,
 } from '../../src/generated/prisma/client';
+import { ensureSeasonTradingAccountLink } from '../../src/seasons/season-trading-account-link';
 
 /**
  * Non-destructive dev baseline: the always-open development season and the
@@ -147,6 +148,7 @@ export type DevBaselineResult = {
   seasonParticipantId: string | null;
   walletsCreated: number;
   grantCreated: boolean;
+  accountLinkRepaired: boolean;
   notes: string[];
 };
 
@@ -192,13 +194,56 @@ export async function ensureDevBaselineParticipant(input: {
   const existingParticipant = userId
     ? await prisma.seasonParticipant.findUnique({
         where: { seasonId_userId: { seasonId: DEV_SEASON_ID, userId } },
-        select: { id: true },
+        select: {
+          id: true,
+          userId: true,
+          joinedAt: true,
+          participantStatus: true,
+          initialCapitalKrw: true,
+          tradingAccountId: true,
+        },
       })
     : null;
 
   if (existingParticipant) {
+    if (existingParticipant.tradingAccountId) {
+      notes.push(
+        'Participant already exists; wallets, balances, and ledger left untouched.',
+      );
+      return {
+        userAction,
+        participantAction: 'exists',
+        seasonParticipantId: existingParticipant.id,
+        walletsCreated: 0,
+        grantCreated: false,
+        accountLinkRepaired: false,
+        notes,
+      };
+    }
+
+    // Deploy-boundary legacy participant without a trading account link:
+    // repair ONLY the link (deterministic account id, shared repair rules).
+    // Wallets, balances, ledger, and snapshots are never touched here.
+    if (!apply) {
+      notes.push(
+        'Participant exists without a trading account link; apply would repair the link only (no wallet, balance, ledger, or snapshot changes).',
+      );
+      return {
+        userAction,
+        participantAction: 'exists',
+        seasonParticipantId: existingParticipant.id,
+        walletsCreated: 0,
+        grantCreated: false,
+        accountLinkRepaired: false,
+        notes,
+      };
+    }
+
+    const link = await prisma.$transaction((tx) =>
+      ensureSeasonTradingAccountLink(tx, existingParticipant),
+    );
     notes.push(
-      'Participant already exists; wallets, balances, and ledger left untouched.',
+      `Participant existed without a trading account link; repaired link to ${link.tradingAccountId} (${link.action}). Wallets, balances, and ledger left untouched.`,
     );
     return {
       userAction,
@@ -206,6 +251,7 @@ export async function ensureDevBaselineParticipant(input: {
       seasonParticipantId: existingParticipant.id,
       walletsCreated: 0,
       grantCreated: false,
+      accountLinkRepaired: link.action !== 'already-linked',
       notes,
     };
   }
@@ -220,6 +266,7 @@ export async function ensureDevBaselineParticipant(input: {
       seasonParticipantId: null,
       walletsCreated: 0,
       grantCreated: false,
+      accountLinkRepaired: false,
       notes,
     };
   }
@@ -314,6 +361,7 @@ export async function ensureDevBaselineParticipant(input: {
     seasonParticipantId: result.participantId,
     walletsCreated: 2,
     grantCreated: true,
+    accountLinkRepaired: false,
     notes,
   };
 }

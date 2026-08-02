@@ -23,6 +23,7 @@ import { RecordsModule } from './records/records.module';
 import { RewardsModule } from './rewards/rewards.module';
 import { RedisModule } from './redis/redis.module';
 import { SeasonsModule } from './seasons/seasons.module';
+import { TradingAccountsModule } from './trading-accounts/trading-accounts.module';
 import { WalletsModule } from './wallets/wallets.module';
 
 @Module({
@@ -52,6 +53,7 @@ import { WalletsModule } from './wallets/wallets.module';
     RecordsModule,
     RewardsModule,
     SeasonsModule,
+    TradingAccountsModule,
     WalletsModule,
   ],
   controllers: [AppController],

@@ -296,6 +296,10 @@ type PrismaMock = {
   };
   tradingAccount: {
     create: jest.Mock;
+    findFirst: jest.Mock;
+    findMany: jest.Mock;
+    findUnique: jest.Mock;
+    update: jest.Mock;
   };
   seasonRanking: {
     count: jest.Mock;
@@ -540,6 +544,10 @@ describe('AppController (e2e)', () => {
       },
       tradingAccount: {
         create: jest.fn(),
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
       },
       seasonRanking: {
         count: jest.fn(),
@@ -1654,7 +1662,10 @@ describe('AppController (e2e)', () => {
       id: 'sp-1',
       seasonId: 'season-1',
       userId: 'managed-user-1',
+      joinedAt: now,
       participantStatus: 'active',
+      initialCapitalKrw: new Prisma.Decimal('10000000.00000000'),
+      tradingAccountId: 'trading-account-1',
       totalAssetKrw: new Prisma.Decimal('10100000.00000000'),
       totalReturnRate: new Prisma.Decimal('1.00000000'),
       maxDrawdown: new Prisma.Decimal('0.50000000'),
@@ -1681,6 +1692,16 @@ describe('AppController (e2e)', () => {
     prisma.seasonParticipant.findFirst.mockResolvedValueOnce(
       moderatedParticipant,
     );
+    // Linked season trading account is suspended in the same transaction.
+    prisma.tradingAccount.findUnique.mockResolvedValueOnce({
+      id: 'trading-account-1',
+      userId: 'managed-user-1',
+      mode: 'season',
+      status: 'active',
+    });
+    prisma.tradingAccount.update.mockResolvedValueOnce({
+      id: 'trading-account-1',
+    });
     prisma.seasonParticipant.update.mockResolvedValueOnce({
       ...moderatedParticipant,
       participantStatus: 'excluded',
@@ -1739,6 +1760,9 @@ describe('AppController (e2e)', () => {
               metadataJson: expect.objectContaining({
                 beforeStatus: 'active',
                 afterStatus: 'excluded',
+                tradingAccountId: 'trading-account-1',
+                beforeTradingAccountStatus: 'active',
+                afterTradingAccountStatus: 'suspended',
                 reason: 'abuse_detected',
               }),
             }),
@@ -2418,6 +2442,116 @@ describe('AppController (e2e)', () => {
         });
     },
   );
+
+  it('/api/v1/trading-accounts (GET) rejects unauthenticated requests before service work', () => {
+    return request(app.getHttpServer())
+      .get('/api/v1/trading-accounts')
+      .expect(401)
+      .expect((response) => {
+        expectUnauthorizedBody(response.body);
+        expect(prisma.tradingAccount.findMany).not.toHaveBeenCalled();
+      });
+  });
+
+  it('/api/v1/trading-accounts (GET) lists only the owner accounts with season info', async () => {
+    resetPrismaMocks();
+    mockActiveUser();
+    const openedAt = new Date('2026-07-01T00:00:00.000Z');
+    prisma.tradingAccount.findMany.mockResolvedValueOnce([
+      {
+        id: 'trading-account-1',
+        userId: user.id,
+        mode: 'season',
+        status: 'active',
+        initialCapitalKrw: new Prisma.Decimal('10000000.00000000'),
+        openedAt,
+        closedAt: null,
+        createdAt: openedAt,
+        updatedAt: openedAt,
+        seasonParticipant: {
+          id: participant.id,
+          userId: user.id,
+          participantStatus: 'active',
+          joinedAt: openedAt,
+          season: {
+            id: season.id,
+            name: season.name,
+            status: 'active',
+            startAt: openedAt,
+            endAt: new Date('2026-09-01T00:00:00.000Z'),
+          },
+        },
+      },
+    ]);
+    const token = await createValidAccessToken();
+
+    await request(app.getHttpServer())
+      .get('/api/v1/trading-accounts')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: true,
+          data: {
+            accounts: [
+              {
+                id: 'trading-account-1',
+                mode: 'season',
+                status: 'active',
+                initialCapitalKrw: '10000000.00000000',
+                openedAt: openedAt.toISOString(),
+                closedAt: null,
+                season: {
+                  seasonId: season.id,
+                  seasonName: season.name,
+                  seasonParticipantId: participant.id,
+                  participantStatus: 'active',
+                  joinedAt: openedAt.toISOString(),
+                },
+              },
+            ],
+          },
+        });
+      });
+
+    // Ownership is enforced in the query itself.
+    expect(prisma.tradingAccount.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: user.id },
+      }),
+    );
+  });
+
+  it('/api/v1/trading-accounts/:accountId (GET) answers the same 404 for missing and foreign accounts', async () => {
+    resetPrismaMocks();
+    mockActiveUser();
+    // The ownership-scoped lookup returns null both when the id does not
+    // exist and when it belongs to another user.
+    prisma.tradingAccount.findFirst.mockResolvedValue(null);
+    const token = await createValidAccessToken();
+
+    for (const accountId of ['missing-account', 'other-users-account']) {
+      await request(app.getHttpServer())
+        .get(`/api/v1/trading-accounts/${accountId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(404)
+        .expect((response) => {
+          expect(response.body).toMatchObject({
+            success: false,
+            error: {
+              code: 'TRADING_ACCOUNT_NOT_FOUND',
+              message: 'Trading account not found',
+            },
+          });
+        });
+    }
+
+    expect(prisma.tradingAccount.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'other-users-account', userId: user.id },
+      }),
+    );
+  });
 
   it('/api/v1/home (GET) rejects unauthenticated requests before service work', () => {
     return request(app.getHttpServer())

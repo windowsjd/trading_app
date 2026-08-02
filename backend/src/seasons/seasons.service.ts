@@ -21,6 +21,10 @@ import {
   type SeasonLifecycleMode,
   type SeasonLifecycleSeason,
 } from './season-lifecycle.policy';
+import {
+  ensureSeasonTradingAccountLink,
+  SeasonTradingAccountLinkIntegrityError,
+} from './season-trading-account-link';
 
 type CurrentSeasonResponse = {
   success: true;
@@ -95,6 +99,13 @@ type JoinSeasonResponse = {
     };
   };
 };
+
+// The already-joined outcome is returned (not thrown) from the join
+// transaction so a legacy null-link repair performed inside it commits before
+// the API-contract 409 is raised.
+type JoinSeasonTransactionResult =
+  | { kind: 'already-joined' }
+  | { kind: 'joined'; response: JoinSeasonResponse };
 
 const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
   SeasonStatus.active,
@@ -216,8 +227,10 @@ export class SeasonsService {
       );
     }
 
+    let result: JoinSeasonTransactionResult;
+
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      result = await this.prisma.$transaction(async (tx) => {
         const season = await tx.season.findUnique({
           where: {
             id: seasonId,
@@ -267,15 +280,24 @@ export class SeasonsService {
           },
           select: {
             id: true,
+            userId: true,
+            joinedAt: true,
+            participantStatus: true,
+            initialCapitalKrw: true,
+            tradingAccountId: true,
           },
         });
 
         if (existingParticipant) {
-          this.throwApiError(
-            HttpStatus.CONFLICT,
-            'SEASON_ALREADY_JOINED',
-            'Season already joined',
-          );
+          if (!existingParticipant.tradingAccountId) {
+            // Deploy-boundary legacy row: an old-version writer created this
+            // participant without a trading account. Repair ONLY the account
+            // link (never wallets/ledger/snapshots) before returning the
+            // unchanged 409 contract.
+            await ensureSeasonTradingAccountLink(tx, existingParticipant);
+          }
+
+          return { kind: 'already-joined' } as const;
         }
 
         const joinedAt = new Date();
@@ -365,19 +387,32 @@ export class SeasonsService {
         });
 
         return {
-          success: true,
-          data: {
-            seasonParticipantId: participant.id,
-            seasonId: season.id,
-            joinedAt: joinedAt.toISOString(),
-            wallets: {
-              KRW: initialCapitalKrw,
-              USD: ZERO_AMOUNT,
+          kind: 'joined',
+          response: {
+            success: true,
+            data: {
+              seasonParticipantId: participant.id,
+              seasonId: season.id,
+              joinedAt: joinedAt.toISOString(),
+              wallets: {
+                KRW: initialCapitalKrw,
+                USD: ZERO_AMOUNT,
+              },
             },
           },
-        };
+        } as const;
       });
     } catch (error) {
+      if (error instanceof SeasonTradingAccountLinkIntegrityError) {
+        // A failed link repair is a server-side data problem; never disguise
+        // it as the ordinary SEASON_ALREADY_JOINED conflict.
+        this.throwApiError(
+          HttpStatus.INTERNAL_SERVER_ERROR,
+          error.code,
+          error.message,
+        );
+      }
+
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
@@ -391,6 +426,16 @@ export class SeasonsService {
 
       throw error;
     }
+
+    if (result.kind === 'already-joined') {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'SEASON_ALREADY_JOINED',
+        'Season already joined',
+      );
+    }
+
+    return result.response;
   }
 
   private async findCurrentSeason(): Promise<CurrentSeasonRecord> {

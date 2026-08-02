@@ -12,6 +12,87 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: TradingAccount null link 복구 + 제외 동기화 + 거래계정 조회 API (2026-08-03)
+
+**목적**
+
+직전 TradingAccount foundation의 배포 경계 보완과 작업 3(거래계정
+조회·소유권 검증)을 함께 수행한다. ① 배포 전환 중 구버전 writer가 만들 수
+있는 `tradingAccountId=null` 시즌 참가자를 안전하게 복구하고, ② 운영자 참가자
+제외 시 연결 계정을 같은 트랜잭션에서 suspended로 동기화하며, ③ 로그인
+사용자가 자신의 거래계정 목록/상세를 조회하는 API와 향후 금융 API가 재사용할
+소유권 검증 계층을 만든다. 일반모드 계정 생성·최초 지급·광고·거래 API의
+accountId 전환·NOT NULL 강화는 이번 범위가 아니다.
+
+**핵심 변경**
+
+- `src/seasons/season-trading-account-link.ts` (신규, 복구 규칙 단일 구현):
+  `deriveSeasonTradingAccountId`(migration의 `md5(...)::uuid`와 바이트 동일,
+  보안 용도 아님 명시), backfill과 같은 status 매핑, 트랜잭션 내
+  `ensureSeasonTradingAccountLink`(raw `INSERT ... ON CONFLICT DO NOTHING` +
+  null 가드 `updateMany`로 동시 복구에서도 계정 1개·orphan 0), 읽기 전용
+  `preview...`, 불일치 fail-closed 오류 `TRADING_ACCOUNT_LINK_INTEGRITY`.
+  Prisma upsert는 이 경로에서 native ON CONFLICT로 내려가지 않아 race에서
+  P2002로 트랜잭션이 abort되므로 raw insert를 쓴다(통합 테스트로 실측).
+- `joinSeason`: 기존 참가자 조회 select 확장, null link면 같은 트랜잭션에서
+  링크만 복구(지갑·원장·스냅샷 불변) 후 **commit 뒤** 기존 409
+  `SEASON_ALREADY_JOINED` 반환(트랜잭션 결과를 sentinel로 돌려 409를 밖에서
+  던지는 구조로 변경). 복구 실패는 409로 감추지 않고 500 구조화 오류.
+- 운영자 제외(`operator-season-moderation.service.ts`): 같은 트랜잭션에서
+  링크 복구(필요 시) → 계정 active→suspended(이미 suspended면 idempotent,
+  closed는 불변) → 참가자 제외 → 지정가 취소·예약금 반환 → 감사 로그
+  (metadata에 tradingAccountId·before/after status·linkRepaired 추가).
+- dev baseline(`scripts/lib/dev-baseline.ts`): 기존 참가자의 null link를
+  apply에서 링크만 복구(공통 helper 사용), dry-run은 예정만 보고, notes와
+  `accountLinkRepaired` 반환 필드에 기록.
+- 운영 스크립트 `scripts/repair-missing-trading-account-links.ts` + package
+  script `trading-accounts:repair-links`: 기본 dry-run/`--apply` 명시,
+  참가자별 독립 트랜잭션·부분 실패 보고·apply 후 null 재검증·멱등.
+- 신규 `src/trading-accounts/` 모듈: `GET /api/v1/trading-accounts`(목록,
+  openedAt desc 결정적 정렬)·`GET .../:accountId`(상세). 미존재와 타인 소유는
+  동일 404 `TRADING_ACCOUNT_NOT_FOUND`, suspended/closed도 소유자는 조회 가능,
+  season↔participant 구조 위반은 500 `TRADING_ACCOUNT_INTEGRITY`.
+  `TradingAccountAccessService`(listOwnedAccounts/getOwnedAccountOrThrow)를
+  export해 향후 wallet/order/position API가 재사용. 서버는 현재 선택
+  계정/모드를 어디에도 저장하지 않는다. 계약: `docs/trading-accounts-api-contract.md`.
+- 기존 API(시즌/지갑/주문/FX/포트폴리오/records) 경로·응답 계약 불변. 시즌
+  참가 응답에 tradingAccountId를 추가하지 않았다.
+- 테스트 인프라 수정: `seasons.join.integration.spec.ts`의 cleanup이
+  joinSeason이 만드는 TradingAccount를 지우지 않아 HEAD(39aee655)에서도 FK
+  오류로 실패하던 것을 수정(테스트만, 제품 코드 아님).
+
+**검증 (로컬 실행 — hosted CI 없음)**
+
+- prisma format/validate/generate·typecheck·build 통과, unit `pnpm test`
+  2,189 pass(신규 +50).
+- opt-in PostgreSQL 통합: 기존 `trading-account.integration.spec.ts` + 신규
+  `trading-account-link.integration.spec.ts`(결정적 ID를 Postgres
+  `md5(...)::uuid` cast와 대조, 5개 status 복구 매핑·금융 행 불변·replay,
+  동시 복구 race, join 복구+409, 제외 suspended/null 복구/rollback 3종/closed
+  유지, 소유권 404, 스크립트 dry-run→apply→멱등 재실행 12 케이스) PASS.
+  시즌 참가/FX/시장가·지정가 주문 DB 통합 5종 `--runInBand` 직렬 PASS
+  (병렬 실행은 공유 DB 간섭으로 실패하므로 직렬 필수).
+- e2e: 신규 trading-accounts 3건 포함 109/112 pass. 나머지 3건
+  (readiness/wallets/orders-cancel)은 `.env.local` env 기인으로 HEAD와 동일
+  (stash로 HEAD 재실행해 동일 실패 확인). `JWT_ACCESS_SECRET=test-secret`
+  필요.
+- 운영 시나리오 A를 실제 CLI로 검증: null 참가자 fixture → dry-run(무변경
+  확인) → `--apply`(계정 생성·연결, 지갑 잔액·원장 불변) → 재실행(추가 계정
+  없음, null 0건).
+
+**주의사항**
+
+- `trading_account_id`는 여전히 nullable. NOT NULL은 "모든 writer 기록 +
+  복구 apply + null 0건 + 구버전 종료 + 배포 순서 확정" 확인 후 별도 작업
+  (`docs/trading-modes-and-accounts.md` §3.5.5).
+- finished/rewarded/settled 전환 시 계정 closed 동기화·suspended 재활성화·
+  일반계정 정지 API는 미구현(시즌 lifecycle 격리 작업).
+- DB 통합 스위트들은 같은 DB를 공유하므로 반드시 `--runInBand`로 직렬 실행.
+  또한 `pnpm test -- --runInBand`처럼 `--`를 넣으면 jest가 플래그를 경로
+  패턴으로 취급하니 `pnpm test --runInBand ...`로 실행할 것.
+- QA 문서(§7)는 영구 체크리스트([ ] 유지)와 커밋별 실행 결과 표를 분리하는
+  방식(방식 A)으로 정리했다.
+
 ### 작업 단위: 시즌·일반모드 규칙 확정 + TradingAccount DB foundation (2026-08-01)
 
 **목적**
@@ -893,6 +974,31 @@ cd frontend && npm run typecheck && npm test
 ---
 
 ## 2. 최신 작업 시간순 기록
+
+### 2026-08-03 — TradingAccount null link 복구 + 제외 suspended 동기화 + 거래계정 조회 API
+
+- 배포 경계에서 구버전 writer가 만드는 `tradingAccountId=null` 참가자를
+  복구하는 공통 계층을 추가했다: migration과 바이트 동일한 결정적 계정
+  ID(md5→uuid), backfill과 같은 status 매핑, raw ON CONFLICT insert + null
+  가드 updateMany로 동시 복구에서도 계정 1개·orphan 0, 불일치는 덮어쓰지 않고
+  `TRADING_ACCOUNT_LINK_INTEGRITY` fail-closed. 지갑·원장·주문·포지션·스냅샷은
+  절대 수정하지 않는다.
+- joinSeason 기존 참가자 경로가 null link를 같은 트랜잭션에서 복구한 뒤 기존
+  409 계약을 유지한다(복구 commit 후 409). dev baseline도 링크만 복구한다.
+  운영용 `pnpm trading-accounts:repair-links`(기본 dry-run, `--apply` 명시)를
+  추가했다.
+- 운영자 참가자 제외가 같은 트랜잭션에서 연결 계정을 suspended로 동기화한다
+  (null link면 먼저 복구, closed는 되돌리지 않음, 감사 로그에 계정 상태
+  전후 기록). settled/rewarded/finished 시점의 closed 동기화는 후속 작업.
+- `GET /api/v1/trading-accounts`·`/:accountId` 조회 API와
+  `TradingAccountAccessService` 소유권 계층을 추가했다. 타인/미존재 계정은
+  동일 404, suspended/closed 조회 허용, 서버측 현재 선택 계정 저장 없음.
+  계약 문서 `docs/trading-accounts-api-contract.md` 신규.
+- 검증: typecheck·build·unit 2,189 pass, 신규 링크 DB 통합 12케이스(결정적 ID
+  Postgres 대조·race·rollback 포함)와 기존 DB 스위트 직렬 PASS, e2e 109/112
+  (실패 3건은 HEAD와 동일한 env 기인, stash로 대조 확인), 운영 시나리오 A를
+  실제 CLI dry-run→apply→재실행으로 검증. HEAD에서 깨져 있던 join DB 스위트
+  cleanup(FK)을 수정했다.
 
 ### 2026-08-01 — 시즌·일반모드 규칙 확정 + TradingAccount DB foundation
 

@@ -514,6 +514,12 @@ async function cleanupScenario(scenario) {
     where: { seasonId: scenario.seasonId },
   });
   await prisma.season.deleteMany({ where: { id: scenario.seasonId } });
+  // joinSeason creates a season TradingAccount in the same transaction; it
+  // must be removed after its participant and before the user (both FKs are
+  // RESTRICT).
+  await prisma.tradingAccount.deleteMany({
+    where: { userId: scenario.userId },
+  });
   await prisma.user.deleteMany({ where: { id: scenario.userId } });
 }
 

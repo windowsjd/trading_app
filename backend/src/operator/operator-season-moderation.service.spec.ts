@@ -27,6 +27,15 @@ jest.mock('../generated/prisma/client', () => {
       ended: 'ended',
       settled: 'settled',
     },
+    TradingAccountMode: {
+      season: 'season',
+      general: 'general',
+    },
+    TradingAccountStatus: {
+      active: 'active',
+      suspended: 'suspended',
+      closed: 'closed',
+    },
     UserRole: {
       user: 'user',
       operator: 'operator',
@@ -43,6 +52,7 @@ import {
   SeasonStatus,
   UserRole,
 } from '../generated/prisma/client';
+import { deriveSeasonTradingAccountId } from '../seasons/season-trading-account-link';
 import { OperatorAuditService } from './operator-audit.service';
 import { OperatorSeasonModerationService } from './operator-season-moderation.service';
 
@@ -66,7 +76,10 @@ describe('OperatorSeasonModerationService', () => {
     id: 'sp-1',
     seasonId: 'season-1',
     userId: 'user-1',
+    joinedAt: new Date('2026-06-01T00:00:00.000Z'),
     participantStatus: ParticipantStatus.active,
+    initialCapitalKrw: new Prisma.Decimal('10000000.00000000'),
+    tradingAccountId: 'ta-1',
     totalAssetKrw: new Prisma.Decimal('10100000.00000000'),
     totalReturnRate: new Prisma.Decimal('1.00000000'),
     maxDrawdown: new Prisma.Decimal('0.50000000'),
@@ -99,15 +112,30 @@ describe('OperatorSeasonModerationService', () => {
       },
       seasonParticipant: {
         findFirst: jest.fn(),
+        findUnique: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
       },
       seasonRanking: {
         findFirst: jest.fn(),
         update: jest.fn(),
         create: jest.fn(),
       },
+      tradingAccount: {
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
+      $executeRaw: jest.fn().mockResolvedValue(1),
     };
     prisma.$transaction.mockImplementation((callback) => callback(prisma));
+    // Default: the participant's linked season account exists and is active.
+    prisma.tradingAccount.findUnique.mockResolvedValue({
+      id: 'ta-1',
+      userId: 'user-1',
+      mode: 'season',
+      status: 'active',
+    });
+    prisma.tradingAccount.update.mockResolvedValue({ id: 'ta-1' });
 
     return prisma;
   };
@@ -208,6 +236,188 @@ describe('OperatorSeasonModerationService', () => {
     expect(
       JSON.stringify(prisma.operatorAuditLog.create.mock.calls),
     ).not.toMatch(/passwordHash|rawPayload|provider_payload|token|secret/i);
+  });
+
+  it('suspends the linked season trading account in the same transaction and audits before/after', async () => {
+    const { prisma, service } = createService();
+    const participant = createParticipant();
+    prisma.seasonParticipant.findFirst.mockResolvedValueOnce(participant);
+    prisma.seasonParticipant.update.mockResolvedValueOnce({
+      ...participant,
+      participantStatus: ParticipantStatus.excluded,
+      excludedAt: now,
+      currentRank: null,
+    });
+
+    await service.excludeParticipant(actor, 'season-1', 'sp-1', {
+      reason: 'abuse_detected',
+    });
+
+    // Only the linked account is touched — never any other account.
+    expect(prisma.tradingAccount.update).toHaveBeenCalledTimes(1);
+    expect(prisma.tradingAccount.update).toHaveBeenCalledWith({
+      where: { id: 'ta-1' },
+      data: { status: 'suspended' },
+      select: { id: true },
+    });
+    expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    expect(prisma.operatorAuditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          metadataJson: expect.objectContaining({
+            tradingAccountId: 'ta-1',
+            beforeTradingAccountStatus: 'active',
+            afterTradingAccountStatus: 'suspended',
+            tradingAccountLinkRepaired: false,
+          }) as Record<string, unknown>,
+        }) as Record<string, unknown>,
+      }),
+    );
+  });
+
+  it('keeps an already suspended trading account suspended (idempotent)', async () => {
+    const { prisma, service } = createService();
+    const participant = createParticipant();
+    prisma.tradingAccount.findUnique.mockResolvedValue({
+      id: 'ta-1',
+      userId: 'user-1',
+      mode: 'season',
+      status: 'suspended',
+    });
+    prisma.seasonParticipant.findFirst.mockResolvedValueOnce(participant);
+    prisma.seasonParticipant.update.mockResolvedValueOnce({
+      ...participant,
+      participantStatus: ParticipantStatus.excluded,
+      excludedAt: now,
+      currentRank: null,
+    });
+
+    await service.excludeParticipant(actor, 'season-1', 'sp-1', {});
+
+    expect(prisma.tradingAccount.update).not.toHaveBeenCalled();
+    expect(prisma.operatorAuditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          metadataJson: expect.objectContaining({
+            beforeTradingAccountStatus: 'suspended',
+            afterTradingAccountStatus: 'suspended',
+          }) as Record<string, unknown>,
+        }) as Record<string, unknown>,
+      }),
+    );
+  });
+
+  it('never reverts a closed trading account to suspended', async () => {
+    const { prisma, service } = createService();
+    const participant = createParticipant({
+      participantStatus: ParticipantStatus.finished,
+      season: {
+        id: 'season-1',
+        status: SeasonStatus.ended,
+        endAt: new Date('2026-06-20T00:00:00.000Z'),
+      },
+    });
+    prisma.tradingAccount.findUnique.mockResolvedValue({
+      id: 'ta-1',
+      userId: 'user-1',
+      mode: 'season',
+      status: 'closed',
+    });
+    prisma.seasonParticipant.findFirst.mockResolvedValueOnce(participant);
+    prisma.seasonParticipant.update.mockResolvedValueOnce({
+      ...participant,
+      participantStatus: ParticipantStatus.excluded,
+      excludedAt: now,
+      currentRank: null,
+    });
+
+    await service.excludeParticipant(actor, 'season-1', 'sp-1', {});
+
+    expect(prisma.tradingAccount.update).not.toHaveBeenCalled();
+    expect(prisma.operatorAuditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          metadataJson: expect.objectContaining({
+            beforeTradingAccountStatus: 'closed',
+            afterTradingAccountStatus: 'closed',
+          }) as Record<string, unknown>,
+        }) as Record<string, unknown>,
+      }),
+    );
+  });
+
+  it('repairs a legacy null account link inside the exclusion transaction before suspending', async () => {
+    const { prisma, service } = createService();
+    const participant = createParticipant({ tradingAccountId: null });
+    const deterministicId = deriveSeasonTradingAccountId('sp-1');
+    prisma.seasonParticipant.findFirst.mockResolvedValueOnce(participant);
+    // ensure(): deterministic account does not exist yet.
+    prisma.tradingAccount.findUnique.mockResolvedValueOnce(null);
+    prisma.seasonParticipant.updateMany.mockResolvedValueOnce({ count: 1 });
+    // sync(): the repaired account is fetched for the status change.
+    prisma.tradingAccount.findUnique.mockResolvedValueOnce({
+      id: deterministicId,
+      userId: 'user-1',
+      mode: 'season',
+      status: 'active',
+    });
+    prisma.seasonParticipant.update.mockResolvedValueOnce({
+      ...participant,
+      participantStatus: ParticipantStatus.excluded,
+      excludedAt: now,
+      currentRank: null,
+    });
+
+    await service.excludeParticipant(actor, 'season-1', 'sp-1', {});
+
+    expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(prisma.$executeRaw.mock.calls[0].slice(1)).toEqual([
+      deterministicId,
+      'user-1',
+      'season',
+      'active',
+      '10000000.00000000',
+      new Date('2026-06-01T00:00:00.000Z'),
+    ]);
+    expect(prisma.seasonParticipant.updateMany).toHaveBeenCalledWith({
+      where: { id: 'sp-1', tradingAccountId: null },
+      data: { tradingAccountId: deterministicId },
+    });
+    expect(prisma.tradingAccount.update).toHaveBeenCalledWith({
+      where: { id: deterministicId },
+      data: { status: 'suspended' },
+      select: { id: true },
+    });
+    expect(prisma.operatorAuditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          metadataJson: expect.objectContaining({
+            tradingAccountId: deterministicId,
+            tradingAccountLinkRepaired: true,
+          }) as Record<string, unknown>,
+        }) as Record<string, unknown>,
+      }),
+    );
+  });
+
+  it('fails closed with a structured 500 when the linked account does not match the participant', async () => {
+    const { prisma, service } = createService();
+    const participant = createParticipant();
+    prisma.tradingAccount.findUnique.mockResolvedValue({
+      id: 'ta-1',
+      userId: 'user-other',
+      mode: 'season',
+      status: 'active',
+    });
+    prisma.seasonParticipant.findFirst.mockResolvedValueOnce(participant);
+
+    await expectErrorCode(
+      service.excludeParticipant(actor, 'season-1', 'sp-1', {}),
+      'TRADING_ACCOUNT_LINK_INTEGRITY',
+    );
+    // The mismatch aborts before any state change in the transaction.
+    expect(prisma.seasonParticipant.update).not.toHaveBeenCalled();
+    expect(prisma.tradingAccount.update).not.toHaveBeenCalled();
   });
 
   it('cancels open limit buys and releases reservations inside the exclusion transaction', async () => {
