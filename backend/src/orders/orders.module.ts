@@ -4,6 +4,7 @@ import { RankingModule } from '../ranking/ranking.module';
 import { PortfolioModule } from '../portfolio/portfolio.module';
 import { ProvidersModule } from '../providers/providers.module';
 import { RedisModule } from '../redis/redis.module';
+import { TradingAccountsModule } from '../trading-accounts/trading-accounts.module';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 import { OrderReservationService } from './order-reservation.service';
@@ -13,6 +14,7 @@ import { LimitOrderCandidateRepository } from './limit-order-candidate.repositor
 import { LimitOrderCandleEvidenceService } from './limit-order-candle-evidence.service';
 import { LimitOrderExecutionService } from './limit-order-execution.service';
 import { LimitOrderMatchingService } from './limit-order-matching.service';
+import { TradingAccountOrdersController } from './trading-account-orders.controller';
 
 @Module({
   imports: [
@@ -21,8 +23,9 @@ import { LimitOrderMatchingService } from './limit-order-matching.service';
     PortfolioModule,
     ProvidersModule,
     RedisModule,
+    TradingAccountsModule,
   ],
-  controllers: [OrdersController],
+  controllers: [OrdersController, TradingAccountOrdersController],
   providers: [
     OrdersService,
     OrderReservationService,

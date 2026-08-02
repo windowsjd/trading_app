@@ -14,8 +14,9 @@
   are identical by construction.
 - Market-rate reads stay on the public `GET /api/v1/fx/rates/current`
   (not duplicated per account).
-- Orders/positions are NOT account-scoped yet; general-mode FX/wallets are
-  NOT implemented (see gating below).
+- Orders/positions ARE account-scoped as of 작업 5 — see
+  `docs/trading-account-orders-api-contract.md`. General-mode FX/wallets are
+  still NOT implemented (see gating below).
 
 ## Common Rules
 - Authentication required on every route (401 `UNAUTHORIZED` without a valid
@@ -39,6 +40,16 @@
   exist yet returns an empty `wallets` array (`summary.totalWallets = 0`).
 - Rows are scoped by the financial rows' own `tradingAccountId` (never by a
   client-provided participant id); no other account's rows can appear.
+- Season-account read integrity (작업 5 보완): before returning, the service
+  probes the linked participant's CashWallet / WalletTransaction (including
+  the linked wallet's scope) / ExchangeTransaction / FxExecuteRequest rows
+  for NULL or mismatched `tradingAccountId` with indexed existence queries.
+  Any anomaly fails closed with 500 `FINANCIAL_SCOPE_REPAIR_REQUIRED`
+  (null — run `pnpm trading-accounts:repair-financial-scope`) or 500
+  `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH` (non-null mismatch) instead of
+  presenting a partial/empty result as a normally-empty account. General
+  accounts have no participant, so the probe is skipped and a genuinely
+  empty account stays a normal empty response.
 
 `GET .../wallets` response data:
 ```json
@@ -79,21 +90,42 @@ Gating, in order:
    participant status incl. excluded, quote freshness/repricing, balance
    checks, fee policy).
 
-Execute additionally verifies that the source and target wallets belong to
-the path account (a non-null wallet scope that disagrees fails closed with
-500 `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`) and that the participant has
-a trading-account link (else 500 `TRADING_ACCOUNT_LINK_INTEGRITY`; run
-`pnpm trading-accounts:repair-links`).
+Quote and execute both verify the wallets used (quote: the source-balance
+wallet; execute: source and target) carry the verified account scope: a
+NULL wallet scope now fails closed with 500
+`FINANCIAL_SCOPE_REPAIR_REQUIRED` (작업 5 보완 — previously tolerated), a
+non-null mismatch with 500 `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`, and a
+missing participant link with 500 `TRADING_ACCOUNT_LINK_INTEGRITY` (run
+`pnpm trading-accounts:repair-links`). The verified account id also rides in
+every balance-mutating UPDATE's WHERE (id + participant + account +
+currency + atomic balance guards), so a concurrent scope change matches 0
+rows. FX quotes dual-write `tradingAccountId` on the durable quote row;
+execute refuses a quote whose non-null account differs from the path
+account (`QUOTE_MISMATCH`) and consumes quotes with an account-conditioned
+updateMany (NULL legacy quotes stay executable for their own participant
+only).
 
-## Idempotency
-- Account-scoped execute looks the command up by the new
-  `(tradingAccountId, idempotencyKey)` unique: replaying the same key on the
-  same account returns the stored result without further mutation.
-- Different USERS' accounts may reuse the same key. Transitional caveat: the
-  legacy `(userId, idempotencyKey)` unique is intentionally kept until the
-  participant-id removal work unit, so the SAME user reusing a key across two
-  of their own accounts is still rejected (surfaces as the legacy
-  idempotency conflict).
+## Idempotency (작업 5 보완: account-scoped for every new request)
+- Every new execute request — legacy endpoint included (it resolves the
+  participant's account first) — is idempotent per
+  `(tradingAccountId, idempotencyKey)`: replaying the same key on the same
+  account returns the stored result without further mutation; a different
+  request under the same key is the idempotency conflict.
+- The SAME user may now reuse one key across two of their own accounts (and
+  different users always could): the former global
+  `UNIQUE(user_id, idempotency_key)` was REPLACED by a PostgreSQL partial
+  unique index that protects ONLY legacy rows —
+  `UNIQUE (user_id, idempotency_key) WHERE trading_account_id IS NULL`
+  (`fx_execute_requests_user_id_idempotency_key_legacy_null_key`). Prisma
+  cannot express partial uniques, so it lives in the
+  `add_trading_scope_and_fx_legacy_partial_unique` migration and is asserted
+  by the schema contract tests.
+- Legacy NULL-scope rows stay replayable, but ONLY through a fallback pinned
+  to the same user AND the same participant
+  (`userId + seasonParticipantId + key + tradingAccountId IS NULL`) —
+  another participant's or another season's legacy row is never replayed,
+  and post-unique-violation requeries use the same scope rules (never a
+  bare per-user lookup).
 
 ## Dual-Write Guarantee
 Every row written by execute (FxExecuteRequest, ExchangeTransaction, source

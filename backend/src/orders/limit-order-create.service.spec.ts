@@ -141,6 +141,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
     id: 'sp-1',
     participantStatus: ParticipantStatus.active,
     joinedAt: startAt,
+    tradingAccountId: 'trading-account-1',
   };
 
   const krxAsset = {
@@ -244,6 +245,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
             user_id: overrides.participantUserId ?? 'user-1',
             participant_status:
               overrides.participantStatus ?? ParticipantStatus.active,
+            trading_account_id: 'trading-account-1',
           },
         ]);
       }
@@ -303,6 +305,9 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
     prisma.asset.findUnique.mockResolvedValueOnce(input.asset ?? krxAsset);
     prisma.cashWallet.findUnique.mockResolvedValueOnce({
+      id: 'wallet-1',
+      seasonParticipantId: 'sp-1',
+      tradingAccountId: 'trading-account-1',
       balanceAmount: new Prisma.Decimal(input.balance ?? '1000000.00000000'),
       reservedAmount: new Prisma.Decimal(input.reserved ?? '0'),
     });
@@ -567,6 +572,9 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
         createdAt: krxOpenAt,
       });
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
+        id: 'wallet-1',
+        seasonParticipantId: 'sp-1',
+        tradingAccountId: 'trading-account-1',
         balanceAmount: new Prisma.Decimal('1000000.00000000'),
         reservedAmount: new Prisma.Decimal('0'),
       });
@@ -614,6 +622,7 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
     ) => ({
       id: 'quote-limit-1',
       seasonParticipantId: 'sp-1',
+      tradingAccountId: 'trading-account-1',
       status: 'active',
       assetId: 'asset-1',
       side: 'buy',
@@ -714,7 +723,11 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       prisma.seasonParticipant.findUnique.mockResolvedValueOnce(participant);
       prisma.quote.findFirst.mockResolvedValueOnce(activeQuoteRecord());
       prisma.asset.findUnique.mockResolvedValueOnce(krxAsset); // tradable check
-      prisma.cashWallet.findUnique.mockResolvedValueOnce({ id: 'wallet-1' });
+      prisma.cashWallet.findUnique.mockResolvedValueOnce({
+        id: 'wallet-1',
+        seasonParticipantId: 'sp-1',
+        tradingAccountId: 'trading-account-1',
+      });
       prisma.$executeRaw.mockResolvedValueOnce(1); // reservation applied
       prisma.order.create.mockResolvedValueOnce({ id: 'order-limit-1' });
       prisma.order.findUnique.mockResolvedValueOnce(createdOrderRecord());
@@ -743,12 +756,13 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       });
 
       // Atomic reservation through the raw guard (values:
-      // [amount, walletId, participantId, currency, amount]).
+      // [amount, walletId, participantId, tradingAccountId, currency, amount]).
       expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
       expect((prisma.$executeRaw.mock.calls[0] as unknown[]).slice(1)).toEqual([
         '150150.00000000',
         'wallet-1',
         'sp-1',
+        'trading-account-1',
         CurrencyCode.KRW,
         '150150.00000000',
       ]);
@@ -768,9 +782,19 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
         }),
       );
 
-      // Quote consumed inside the same transaction.
+      // Quote consumed inside the same transaction, conditioned on the
+      // participant and the verified account (NULL legacy scope stays
+      // consumable).
       expect(prisma.quote.updateMany).toHaveBeenCalledWith({
-        where: { id: 'quote-limit-1', status: 'active' },
+        where: {
+          id: 'quote-limit-1',
+          status: 'active',
+          seasonParticipantId: 'sp-1',
+          OR: [
+            { tradingAccountId: 'trading-account-1' },
+            { tradingAccountId: null },
+          ],
+        },
         data: expect.objectContaining({ status: 'consumed' }) as never,
       });
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
@@ -999,7 +1023,11 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
         }),
       );
       prisma.asset.findUnique.mockResolvedValueOnce(krxAsset);
-      prisma.cashWallet.findUnique.mockResolvedValueOnce({ id: 'wallet-1' });
+      prisma.cashWallet.findUnique.mockResolvedValueOnce({
+        id: 'wallet-1',
+        seasonParticipantId: 'sp-1',
+        tradingAccountId: 'trading-account-1',
+      });
       prisma.$executeRaw.mockResolvedValueOnce(1);
       prisma.order.create.mockResolvedValueOnce({ id: 'order-limit-1' });
       prisma.order.findUnique.mockResolvedValueOnce(createdOrderRecord());
@@ -1024,7 +1052,11 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       prisma.order.findFirst.mockResolvedValueOnce(null);
       prisma.quote.findFirst.mockResolvedValueOnce(activeQuoteRecord());
       prisma.asset.findUnique.mockResolvedValueOnce(krxAsset);
-      prisma.cashWallet.findUnique.mockResolvedValueOnce({ id: 'wallet-1' });
+      prisma.cashWallet.findUnique.mockResolvedValueOnce({
+        id: 'wallet-1',
+        seasonParticipantId: 'sp-1',
+        tradingAccountId: 'trading-account-1',
+      });
       prisma.$executeRaw.mockResolvedValueOnce(1);
       prisma.order.create.mockRejectedValueOnce(
         new Error('order insert failed'),
@@ -1046,7 +1078,11 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
       prisma.order.findFirst.mockResolvedValueOnce(null);
       prisma.quote.findFirst.mockResolvedValueOnce(activeQuoteRecord());
       prisma.asset.findUnique.mockResolvedValueOnce(krxAsset);
-      prisma.cashWallet.findUnique.mockResolvedValueOnce({ id: 'wallet-1' });
+      prisma.cashWallet.findUnique.mockResolvedValueOnce({
+        id: 'wallet-1',
+        seasonParticipantId: 'sp-1',
+        tradingAccountId: 'trading-account-1',
+      });
       prisma.$executeRaw.mockResolvedValueOnce(0);
       prisma.cashWallet.findFirst.mockResolvedValueOnce({
         balanceAmount: new Prisma.Decimal('100000.00000000'),

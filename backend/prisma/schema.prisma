@@ -334,14 +334,17 @@ model TradingAccount {
 
   user                 User                  @relation(fields: [userId], references: [id], onDelete: Restrict)
   seasonParticipant    SeasonParticipant?
-  // Financial back-relations (transitional accountId scope; rows also keep
-  // their legacy seasonParticipantId until the removal work unit). NO
-  // aggregate/cached value columns live here — balances, ledgers, and
-  // exchange totals are always derived from the financial tables.
+  // Financial + trading back-relations (transitional accountId scope; rows
+  // also keep their legacy seasonParticipantId until the removal work unit).
+  // NO aggregate/cached value columns live here — balances, ledgers,
+  // positions, and returns are always derived from the source tables.
   cashWallets          CashWallet[]
   walletTransactions   WalletTransaction[]
   exchangeTransactions ExchangeTransaction[]
   fxExecuteRequests    FxExecuteRequest[]
+  orders               Order[]
+  positions            Position[]
+  quotes               Quote[]
 
   @@index([userId, mode])
   @@index([mode, status])
@@ -730,6 +733,11 @@ model MarketSessionOverride {
 model Position {
   id                  String       @id @default(uuid())
   seasonParticipantId String       @map("season_participant_id")
+  // Transitional dual identity (see CashWallet): nullable trading-account
+  // scope next to the legacy seasonParticipantId. Backfilled from the
+  // participant link by add_trading_scope_and_fx_legacy_partial_unique;
+  // every new writer sets BOTH. NOT NULL tightening is a later work unit.
+  tradingAccountId    String?      @map("trading_account_id")
   assetId             String       @map("asset_id")
   quantity            Decimal      @db.Decimal(24, 8)
   averageCost         Decimal      @map("average_cost") @db.Decimal(24, 8)
@@ -746,10 +754,15 @@ model Position {
   updatedAt           DateTime     @updatedAt @map("updated_at")
 
   seasonParticipant SeasonParticipant @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
+  tradingAccount    TradingAccount?   @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   asset             Asset             @relation(fields: [assetId], references: [id], onDelete: Restrict)
 
   @@unique([seasonParticipantId, assetId])
+  // One aggregate position per asset per trading account. NULL legacy rows
+  // stay allowed (PostgreSQL treats NULLs as distinct in unique indexes).
+  @@unique([tradingAccountId, assetId])
   @@index([seasonParticipantId])
+  @@index([tradingAccountId])
   @@index([assetId])
   @@map("positions")
 }
@@ -757,6 +770,10 @@ model Position {
 model Order {
   id                         String       @id @default(uuid())
   seasonParticipantId        String       @map("season_participant_id")
+  // Transitional dual identity (see CashWallet). The trading account is the
+  // asset-isolation boundary for order data; the participant link stays for
+  // season state/ranking/settlement until the removal work unit.
+  tradingAccountId           String?      @map("trading_account_id")
   assetId                    String       @map("asset_id")
   quoteId                    String?      @unique @map("quote_id")
   side                       OrderSide
@@ -793,6 +810,7 @@ model Order {
   updatedAt                  DateTime     @updatedAt @map("updated_at")
 
   seasonParticipant  SeasonParticipant         @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
+  tradingAccount     TradingAccount?           @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   asset              Asset                     @relation(fields: [assetId], references: [id], onDelete: Restrict)
   quote              Quote?                    @relation(fields: [quoteId], references: [id], onDelete: Restrict)
   assetPriceSnapshot AssetPriceSnapshot?       @relation(fields: [assetPriceSnapshotId], references: [id], onDelete: Restrict)
@@ -800,8 +818,14 @@ model Order {
   candleEvidence     LimitOrderCandleEvidence? @relation(fields: [limitOrderCandleEvidenceId], references: [id], onDelete: Restrict)
 
   @@unique([seasonParticipantId, idempotencyKey])
+  // Account-scoped create idempotency: the same key may be reused by the
+  // SAME user on a different trading account. NULL legacy rows stay allowed;
+  // idempotencyKey stays nullable with its existing meaning.
+  @@unique([tradingAccountId, idempotencyKey])
   @@index([seasonParticipantId, submittedAt])
   @@index([seasonParticipantId, status])
+  @@index([tradingAccountId, submittedAt])
+  @@index([tradingAccountId, status])
   @@index([assetId])
   @@index([quoteId])
   @@index([assetPriceSnapshotId])
@@ -930,6 +954,11 @@ model Quote {
   id                   String        @id @default(uuid())
   userId               String        @map("user_id")
   seasonParticipantId  String?       @map("season_participant_id")
+  // Transitional dual identity (see CashWallet). A quote is not an asset
+  // mutation but grants later execution authority, so it carries the same
+  // account isolation: order/FX execution refuses quotes whose account
+  // differs, and only NULL legacy quotes pass the explicit legacy checks.
+  tradingAccountId     String?       @map("trading_account_id")
   quoteType            QuoteType     @map("quote_type")
   status               QuoteStatus   @default(active)
   assetId              String?       @map("asset_id")
@@ -964,6 +993,7 @@ model Quote {
 
   user               User                @relation(fields: [userId], references: [id], onDelete: Restrict)
   seasonParticipant  SeasonParticipant?  @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
+  tradingAccount     TradingAccount?     @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   asset              Asset?              @relation(fields: [assetId], references: [id], onDelete: Restrict)
   assetPriceSnapshot AssetPriceSnapshot? @relation(fields: [assetPriceSnapshotId], references: [id], onDelete: Restrict)
   fxRateSnapshot     FxRateSnapshot?     @relation(fields: [fxRateSnapshotId], references: [id], onDelete: Restrict)
@@ -971,6 +1001,8 @@ model Quote {
 
   @@index([userId, createdAt])
   @@index([seasonParticipantId, createdAt])
+  @@index([tradingAccountId, createdAt])
+  @@index([tradingAccountId, status, expiresAt])
   @@index([quoteType, status, expiresAt])
   @@index([requestHash])
   @@index([assetId, createdAt])
@@ -1005,11 +1037,17 @@ model FxExecuteRequest {
   tradingAccount      TradingAccount?      @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   exchangeTransaction ExchangeTransaction? @relation(fields: [exchangeTransactionId], references: [id], onDelete: Restrict)
 
-  @@unique([userId, idempotencyKey])
-  // Account-scoped idempotency: a future general account and a season
-  // account of the SAME user may reuse a key once the legacy
-  // (userId, idempotencyKey) unique above is dropped in the participant-id
-  // removal work unit. NULL legacy rows stay allowed.
+  // Account-scoped idempotency: the SAME user may reuse a key across two
+  // different trading accounts (e.g. a season and a future general account);
+  // within one account the key stays unique. NULL legacy rows stay allowed.
+  //
+  // The former global per-user unique on (userId, idempotencyKey) was
+  // REPLACED by a PostgreSQL partial unique index protecting ONLY legacy
+  // rows: UNIQUE (user_id, idempotency_key) WHERE trading_account_id IS
+  // NULL. Prisma's schema DSL cannot express partial unique indexes, so it
+  // lives only in the add_trading_scope_and_fx_legacy_partial_unique
+  // migration (fx_execute_requests_user_id_idempotency_key_legacy_null_key)
+  // and is asserted by the schema contract tests.
   @@unique([tradingAccountId, idempotencyKey])
   @@index([seasonParticipantId, requestedAt])
   @@index([tradingAccountId, requestedAt])

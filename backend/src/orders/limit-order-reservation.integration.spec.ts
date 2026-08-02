@@ -147,6 +147,7 @@ async function createScenario(label, options = {}) {
   const wallet = await prisma.cashWallet.create({
     data: {
       seasonParticipantId: participant.id,
+      tradingAccountId: tradingAccount.id,
       currencyCode: CurrencyCode.KRW,
       balanceAmount: options.balance ?? '1000.00000000',
       reservedAmount: options.reserved ?? ZERO_AMOUNT,
@@ -174,6 +175,7 @@ async function createScenario(label, options = {}) {
     userId: user.id,
     seasonId: season.id,
     participantId: participant.id,
+    tradingAccountId: tradingAccount.id,
     walletId: wallet.id,
     assetId,
   };
@@ -213,6 +215,7 @@ function reservationInput(scenario, amount) {
   return {
     walletId: scenario.walletId,
     seasonParticipantId: scenario.participantId,
+    tradingAccountId: scenario.tradingAccountId,
     currencyCode: CurrencyCode.KRW,
     amount,
   };
@@ -351,6 +354,7 @@ async function testConcurrentCancelSingleRelease() {
     const order = await prisma.order.create({
       data: {
         seasonParticipantId: scenario.participantId,
+        tradingAccountId: scenario.tradingAccountId,
         assetId: scenario.assetId,
         side: OrderSide.buy,
         orderType: OrderType.limit,

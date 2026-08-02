@@ -496,6 +496,7 @@ async function createScenario(label, options = {}) {
   await prisma.cashWallet.create({
     data: {
       seasonParticipantId: participant.id,
+      tradingAccountId: tradingAccount.id,
       currencyCode: CurrencyCode.KRW,
       balanceAmount: ZERO_AMOUNT,
     },
@@ -505,6 +506,7 @@ async function createScenario(label, options = {}) {
   const usdWallet = await prisma.cashWallet.create({
     data: {
       seasonParticipantId: participant.id,
+      tradingAccountId: tradingAccount.id,
       currencyCode: CurrencyCode.USD,
       balanceAmount: options.walletBalance ?? '1000.00000000',
     },
@@ -558,6 +560,7 @@ async function createScenario(label, options = {}) {
     await prisma.position.create({
       data: {
         seasonParticipantId: participant.id,
+        tradingAccountId: tradingAccount.id,
         assetId: asset.id,
         quantity: options.positionQuantity,
         averageCost: options.positionAverageCost ?? '80.00000000',
@@ -570,6 +573,7 @@ async function createScenario(label, options = {}) {
   const orderId = await createSubmittedOrder(
     {
       participantId: participant.id,
+      tradingAccountId: tradingAccount.id,
       userId: user.id,
       assetId: asset.id,
       assetPriceSnapshotId: assetPriceSnapshot.id,
@@ -582,6 +586,7 @@ async function createScenario(label, options = {}) {
     userId: user.id,
     seasonId: season.id,
     participantId: participant.id,
+    tradingAccountId: tradingAccount.id,
     settlementWalletId: usdWallet.id,
     assetId: asset.id,
     assetPriceSnapshotId: assetPriceSnapshot.id,
@@ -634,6 +639,7 @@ async function createSubmittedOrder(scenario, overrides = {}) {
   const order = await prisma.order.create({
     data: {
       seasonParticipantId: scenario.participantId,
+      tradingAccountId: scenario.tradingAccountId,
       assetId: scenario.assetId,
       quoteId: quote.id,
       side,

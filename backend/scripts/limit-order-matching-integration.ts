@@ -357,6 +357,7 @@ type Scenario = {
   userId: string;
   seasonId: string;
   participantId: string;
+  tradingAccountId: string;
   walletId: string;
   assetId: string;
   now: Date;
@@ -420,6 +421,7 @@ async function createScenario(
   const wallet = await prisma.cashWallet.create({
     data: {
       seasonParticipantId: participant.id,
+      tradingAccountId: tradingAccount.id,
       currencyCode: CurrencyCode.USD,
       balanceAmount: START_BALANCE,
       reservedAmount: ZERO,
@@ -431,6 +433,7 @@ async function createScenario(
   await prisma.cashWallet.create({
     data: {
       seasonParticipantId: participant.id,
+      tradingAccountId: tradingAccount.id,
       currencyCode: CurrencyCode.KRW,
       balanceAmount: ZERO,
       reservedAmount: ZERO,
@@ -457,6 +460,7 @@ async function createScenario(
     userId: user.id,
     seasonId: season.id,
     participantId: participant.id,
+    tradingAccountId: tradingAccount.id,
     walletId: wallet.id,
     assetId: asset.id,
     now,
@@ -475,6 +479,7 @@ async function createSubmittedLimitOrder(
 ): Promise<{ id: string }> {
   const reserved = await reservation.reserveForLimitBuy(prisma, {
     seasonParticipantId: s.participantId,
+    tradingAccountId: s.tradingAccountId,
     currencyCode: CurrencyCode.USD,
     amount: input.reservedAmount,
   });
@@ -482,6 +487,7 @@ async function createSubmittedLimitOrder(
   return prisma.order.create({
     data: {
       seasonParticipantId: s.participantId,
+      tradingAccountId: s.tradingAccountId,
       assetId: s.assetId,
       side: OrderSide.buy,
       orderType: OrderType.limit,

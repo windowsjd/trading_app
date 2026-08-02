@@ -14,6 +14,7 @@ import {
 import { buildPagination, type Pagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { TradingAccountAccessService } from '../trading-accounts/trading-account-access.service';
+import { assertSeasonAccountFinancialScopeIntegrity } from '../trading-accounts/trading-account-financial-integrity';
 
 export type WalletTransactionsQuery = {
   currency?: string;
@@ -133,6 +134,15 @@ export class WalletsService {
   ) {
     const account = await this.resolveOwnedAccount(userId, tradingAccountId);
 
+    // A season participant whose financial rows lost their account scope
+    // must NOT read as a normally-empty account — fail closed instead of
+    // silently omitting wallets. General accounts (no participant) skip
+    // this and legitimately return an empty array.
+    await assertSeasonAccountFinancialScopeIntegrity(this.prisma, {
+      tradingAccountId: account.id,
+      seasonParticipantId: account.seasonParticipant?.id ?? null,
+    });
+
     const wallets = await this.prisma.cashWallet.findMany({
       where: {
         tradingAccountId: account.id,
@@ -189,6 +199,13 @@ export class WalletsService {
   ) {
     const parsedQuery = this.parseWalletTransactionsQuery(query);
     const account = await this.resolveOwnedAccount(userId, tradingAccountId);
+
+    // Same fail-closed rule as the wallet view: unscoped/mis-scoped ledger
+    // rows must never be silently dropped from an account-scoped read.
+    await assertSeasonAccountFinancialScopeIntegrity(this.prisma, {
+      tradingAccountId: account.id,
+      seasonParticipantId: account.seasonParticipant?.id ?? null,
+    });
 
     const where = {
       tradingAccountId: account.id,

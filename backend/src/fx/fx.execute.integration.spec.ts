@@ -607,6 +607,7 @@ async function createScenario(label, options = {}) {
   const sourceWallet = await prisma.cashWallet.create({
     data: {
       seasonParticipantId: participant.id,
+      tradingAccountId: tradingAccount.id,
       currencyCode: sourceCurrency,
       balanceAmount: options.sourceBalance ?? '2000.00000000',
     },
@@ -616,6 +617,7 @@ async function createScenario(label, options = {}) {
   const targetWallet = await prisma.cashWallet.create({
     data: {
       seasonParticipantId: participant.id,
+      tradingAccountId: tradingAccount.id,
       currencyCode: targetCurrency,
       balanceAmount: options.targetBalance ?? ZERO_AMOUNT,
     },

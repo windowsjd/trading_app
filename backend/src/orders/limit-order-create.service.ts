@@ -15,6 +15,7 @@ import {
   monetaryScale,
 } from '../fx/fx-decimal-policy';
 import { PrismaService } from '../prisma/prisma.service';
+import { assertCashWalletTradingAccountScope } from '../wallets/cash-wallet-scope';
 import {
   limitOrderErrorCodes,
   limitOrderErrorHttpStatus,
@@ -126,7 +127,9 @@ export function buildLimitOrderExecutionPolicy(input: {
   const { autoExecutionEnabled } = input;
   return {
     autoExecutionEnabled,
-    mode: autoExecutionEnabled ? 'scheduler_snapshot_candle' : 'reservation_only',
+    mode: autoExecutionEnabled
+      ? 'scheduler_snapshot_candle'
+      : 'reservation_only',
     triggerType: autoExecutionEnabled
       ? 'provider_snapshot_or_closed_candle'
       : null,
@@ -159,6 +162,8 @@ export class LimitOrderCreateService {
    */
   async buildLimitBuyQuotePreview(input: {
     participantId: string;
+    /** VERIFIED trading account id (participant link / owned account). */
+    tradingAccountId: string;
     assetId: string;
     currencyCode: CurrencyCode;
     limitPrice: Prisma.Decimal;
@@ -180,6 +185,9 @@ export class LimitOrderCreateService {
           },
         },
         select: {
+          id: true,
+          seasonParticipantId: true,
+          tradingAccountId: true,
           balanceAmount: true,
           reservedAmount: true,
         },
@@ -196,6 +204,15 @@ export class LimitOrderCreateService {
         },
       }),
     ]);
+
+    // Scope before balance: a wallet without (or with a foreign) account
+    // scope must never back an available-balance preview.
+    if (wallet) {
+      assertCashWalletTradingAccountScope(wallet, {
+        seasonParticipantId: input.participantId,
+        tradingAccountId: input.tradingAccountId,
+      });
+    }
 
     const walletBalanceBefore = wallet?.balanceAmount ?? new Prisma.Decimal(0);
     const walletReservedBefore =
@@ -290,6 +307,8 @@ export class LimitOrderCreateService {
     seasonStatus: SeasonStatus;
     seasonStartAt: Date;
     seasonEndAt: Date;
+    /** Trading-account link read from the LOCKED participant row. */
+    tradingAccountId: string | null;
   }> {
     const participantRows = await tx.$queryRaw<
       Array<{
@@ -297,9 +316,11 @@ export class LimitOrderCreateService {
         season_id: string;
         user_id: string;
         participant_status: ParticipantStatus;
+        trading_account_id: string | null;
       }>
     >`
-      SELECT "id", "season_id", "user_id", "participant_status"
+      SELECT "id", "season_id", "user_id", "participant_status",
+             "trading_account_id"
       FROM "season_participants"
       WHERE "id" = ${input.seasonParticipantId}
       FOR SHARE
@@ -349,6 +370,7 @@ export class LimitOrderCreateService {
       seasonStatus: season.status,
       seasonStartAt: season.start_at,
       seasonEndAt: season.end_at,
+      tradingAccountId: participant.trading_account_id,
     };
     if (input.now) this.assertLockedTradableContext(context, input.now);
     return context;
@@ -425,7 +447,12 @@ export class LimitOrderCreateService {
           currencyCode: CurrencyCode;
         };
       };
-      participant: { id: string };
+      participant: {
+        id: string;
+        /** VERIFIED trading account id (participant link, re-checked against
+         * the locked row by the caller). */
+        tradingAccountId: string;
+      };
       quantity: Prisma.Decimal;
       idempotency: { idempotencyKey: string; requestHash: string };
       submittedAt: Date;
@@ -449,9 +476,12 @@ export class LimitOrderCreateService {
       feeRateScale,
     );
 
-    // 1) Atomic cash reservation (fails the whole transaction on shortage).
+    // 1) Atomic cash reservation (fails the whole transaction on shortage;
+    // the wallet's scope is verified and rides in the UPDATE's WHERE, so a
+    // foreign/unscoped wallet can never be reserved against).
     await this.reservation.reserveForLimitBuy(tx, {
       seasonParticipantId: input.participant.id,
+      tradingAccountId: input.participant.tradingAccountId,
       currencyCode,
       amount: reservedAmountText,
     });
@@ -465,6 +495,7 @@ export class LimitOrderCreateService {
     const created = await tx.order.create({
       data: {
         seasonParticipantId: input.participant.id,
+        tradingAccountId: input.participant.tradingAccountId,
         assetId: input.quote.asset.id,
         quoteId: input.quote.id,
         side: OrderSide.buy,
@@ -493,11 +524,19 @@ export class LimitOrderCreateService {
       select: { id: true },
     });
 
-    // 3) Consume the quote inside the same transaction.
+    // 3) Consume the quote inside the same transaction. Account-conditioned:
+    // only this participant's quote flips, and only when its scope is the
+    // verified account (NULL legacy quotes stay consumable — the caller
+    // already pinned them to the participant + request hash).
     const consumeResult = await tx.quote.updateMany({
       where: {
         id: input.quote.id,
         status: QuoteStatus.active,
+        seasonParticipantId: input.participant.id,
+        OR: [
+          { tradingAccountId: input.participant.tradingAccountId },
+          { tradingAccountId: null },
+        ],
       },
       data: {
         status: QuoteStatus.consumed,

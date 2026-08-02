@@ -1,5 +1,17 @@
 # Orders API Contract
 
+> 작업 5 (2026-08-03): the same order surface is also exposed account-scoped
+> under `/api/v1/trading-accounts/:accountId/orders[...]`, sharing this
+> service core (fees, quote consumption, wallet/ledger/position writes,
+> idempotency, rollback). This legacy surface is UNCHANGED — routes,
+> request/response contracts, error codes, pagination, and filters all stay.
+> New orders/quotes additionally dual-write the participant's
+> `tradingAccountId`, wallet mutations fail closed on null/mismatched wallet
+> scope (500 `FINANCIAL_SCOPE_REPAIR_REQUIRED` /
+> `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`), and order idempotency is
+> account-first with a pinned legacy fallback. See
+> `docs/trading-account-orders-api-contract.md`.
+
 ## Status
 
 - `GET /api/v1/orders` read-only MVP is implemented.

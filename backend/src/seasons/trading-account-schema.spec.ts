@@ -136,15 +136,19 @@ describe('TradingAccount schema contract', () => {
     expect(modelBlock('User')).toMatch(/tradingAccounts\s+TradingAccount\[\]/);
   });
 
-  it('keeps the transitional dual identity on the four financial tables only', () => {
-    // Financial tables carry BOTH identifiers during the transition: the
-    // legacy participant id stays required and the account scope is a
-    // NULLABLE addition (NOT NULL tightening is a later work unit).
+  it('keeps the transitional dual identity on the financial AND trading tables', () => {
+    // Financial + trading tables carry BOTH identifiers during the
+    // transition: the legacy participant id keeps its previous meaning
+    // (required on financial tables/Order/Position, nullable on Quote) and
+    // the account scope is a NULLABLE addition (NOT NULL tightening is a
+    // later work unit).
     for (const model of [
       'CashWallet',
       'WalletTransaction',
       'ExchangeTransaction',
       'FxExecuteRequest',
+      'Order',
+      'Position',
     ]) {
       const block = modelBlock(model);
       expect(block).toMatch(/seasonParticipantId\s+String\s/);
@@ -154,11 +158,18 @@ describe('TradingAccount schema contract', () => {
       );
     }
 
-    // Orders/positions/snapshots/rankings stay participant-only until their
-    // own migration work units.
+    // Quote keeps its historical NULLABLE participant id and gains the same
+    // nullable account scope.
+    const quoteBlock = modelBlock('Quote');
+    expect(quoteBlock).toMatch(/seasonParticipantId\s+String\?/);
+    expect(quoteBlock).toMatch(/tradingAccountId\s+String\?/);
+    expect(quoteBlock).toMatch(
+      /tradingAccount\s+TradingAccount\?\s+@relation\([^)]*onDelete: Restrict/,
+    );
+
+    // Snapshots/rankings stay participant-only until their own migration
+    // work units.
     for (const model of [
-      'Position',
-      'Order',
       'EquitySnapshot',
       'DailyPortfolioSnapshot',
       'SeasonRanking',
@@ -167,6 +178,12 @@ describe('TradingAccount schema contract', () => {
       expect(block).toContain('seasonParticipantId');
       expect(block).not.toContain('tradingAccountId');
     }
+
+    // LimitOrderCandleEvidence is reached through the Order relation and
+    // must not gain a duplicated account FK.
+    expect(modelBlock('LimitOrderCandleEvidence')).not.toContain(
+      'tradingAccountId',
+    );
   });
 
   it('keeps the account-scoped financial uniques and back-relations', () => {
@@ -176,7 +193,11 @@ describe('TradingAccount schema contract', () => {
     expect(modelBlock('CashWallet')).toContain(
       '@@unique([tradingAccountId, currencyCode])',
     );
-    expect(modelBlock('FxExecuteRequest')).toContain(
+    // The global per-user FX idempotency unique was REPLACED by a partial
+    // unique index (legacy null-scope rows only) that Prisma cannot express;
+    // it lives in the add_trading_scope_and_fx_legacy_partial_unique
+    // migration and is asserted in that migration's contract tests below.
+    expect(modelBlock('FxExecuteRequest')).not.toContain(
       '@@unique([userId, idempotencyKey])',
     );
     expect(modelBlock('FxExecuteRequest')).toContain(
@@ -195,11 +216,14 @@ describe('TradingAccount schema contract', () => {
       'walletTransactions',
       'exchangeTransactions',
       'fxExecuteRequests',
+      'orders',
+      'positions',
+      'quotes',
     ]) {
       expect(accountBlock).toContain(relation);
     }
     // No cached aggregate columns on the account: financial values are
-    // always derived from wallets/ledgers/exchanges.
+    // always derived from wallets/ledgers/exchanges/positions.
     for (const forbidden of [
       'walletBalance',
       'totalLedgerAmount',
@@ -208,9 +232,43 @@ describe('TradingAccount schema contract', () => {
       'cumulativeAdReward',
       'currentAsset',
       'totalReturnRate',
+      'totalAssetKrw',
+      'positionValue',
+      'orderCount',
+      'currentBalance',
+      'realizedPnl',
+      'unrealizedPnl',
     ]) {
       expect(accountBlock).not.toContain(forbidden);
     }
+  });
+
+  it('keeps the account-scoped trading uniques and indexes', () => {
+    const orderBlock = modelBlock('Order');
+    expect(orderBlock).toContain(
+      '@@unique([seasonParticipantId, idempotencyKey])',
+    );
+    expect(orderBlock).toContain(
+      '@@unique([tradingAccountId, idempotencyKey])',
+    );
+    expect(orderBlock).toContain('@@index([tradingAccountId, submittedAt])');
+    expect(orderBlock).toContain('@@index([tradingAccountId, status])');
+    // idempotencyKey keeps its historical nullable meaning.
+    expect(orderBlock).toMatch(/idempotencyKey\s+String\?/);
+
+    const positionBlock = modelBlock('Position');
+    expect(positionBlock).toContain('@@unique([seasonParticipantId, assetId])');
+    expect(positionBlock).toContain('@@unique([tradingAccountId, assetId])');
+    expect(positionBlock).toContain('@@index([tradingAccountId])');
+
+    const quoteBlock = modelBlock('Quote');
+    expect(quoteBlock).toContain('@@index([tradingAccountId, createdAt])');
+    expect(quoteBlock).toContain(
+      '@@index([tradingAccountId, status, expiresAt])',
+    );
+    // No new unique on quotes: they are single-use via status/consume, not
+    // via a uniqueness constraint.
+    expect(quoteBlock).not.toMatch(/@@unique\(\[tradingAccountId/);
   });
 
   it('documents that season lifecycle enums stay authoritative', () => {
@@ -402,6 +460,142 @@ describe('add_financial_trading_account_scope migration contract', () => {
       'NET_TARGET_AMOUNT',
       'FEE_AMOUNT',
       'IDEMPOTENCY_KEY"  =',
+    ]) {
+      expect(sqlOnly).not.toContain(`SET "${column}"`);
+    }
+  });
+});
+
+describe('add_trading_scope_and_fx_legacy_partial_unique migration contract', () => {
+  const tradingMigration = readFileSync(
+    join(
+      __dirname,
+      '..',
+      '..',
+      'prisma',
+      'migrations',
+      '20260803150000_add_trading_scope_and_fx_legacy_partial_unique',
+      'migration.sql',
+    ),
+    'utf8',
+  );
+
+  it('adds nullable trading_account_id to exactly orders, positions, and quotes', () => {
+    for (const table of ['orders', 'positions', 'quotes']) {
+      expect(tradingMigration).toContain(
+        `ALTER TABLE "${table}" ADD COLUMN     "trading_account_id" TEXT;`,
+      );
+    }
+    for (const table of [
+      'equity_snapshots',
+      'daily_portfolio_snapshots',
+      'season_rankings',
+      'limit_order_candle_evidences',
+    ]) {
+      expect(tradingMigration).not.toContain(`ALTER TABLE "${table}"`);
+    }
+    // The new columns stay nullable: no NOT NULL definition or tightening.
+    expect(tradingMigration).not.toContain('TEXT NOT NULL');
+    expect(tradingMigration).not.toContain('SET NOT NULL');
+  });
+
+  it('backfills from the participant link with IS NULL guards (idempotent, never guessed)', () => {
+    for (const alias of ['o', 'p', 'q']) {
+      expect(tradingMigration).toContain(
+        `AND ${alias}."trading_account_id" IS NULL`,
+      );
+    }
+    expect(tradingMigration).toContain(
+      'AND sp."trading_account_id" IS NOT NULL',
+    );
+    // Quotes join through season_participants, so participant-less quotes
+    // are naturally excluded — and the migration never fabricates accounts.
+    expect(tradingMigration).not.toContain('INSERT INTO "trading_accounts"');
+  });
+
+  it('creates the account-scoped uniques, indexes, and RESTRICT FKs', () => {
+    expect(tradingMigration).toContain(
+      'CREATE UNIQUE INDEX "orders_trading_account_id_idempotency_key_key"',
+    );
+    expect(tradingMigration).toContain(
+      'CREATE INDEX "orders_trading_account_id_submitted_at_idx"',
+    );
+    expect(tradingMigration).toContain(
+      'CREATE INDEX "orders_trading_account_id_status_idx"',
+    );
+    expect(tradingMigration).toContain(
+      'CREATE UNIQUE INDEX "positions_trading_account_id_asset_id_key"',
+    );
+    expect(tradingMigration).toContain(
+      'CREATE INDEX "positions_trading_account_id_idx"',
+    );
+    expect(tradingMigration).toContain(
+      'CREATE INDEX "quotes_trading_account_id_created_at_idx"',
+    );
+    expect(tradingMigration).toContain(
+      'CREATE INDEX "quotes_trading_account_id_status_expires_at_idx"',
+    );
+    for (const table of ['orders', 'positions', 'quotes']) {
+      expect(tradingMigration).toMatch(
+        new RegExp(
+          `"${table}_trading_account_id_fkey"[\\s\\S]*ON DELETE RESTRICT`,
+        ),
+      );
+    }
+  });
+
+  it('replaces the global FX user unique with the legacy-null partial unique, fail-closed', () => {
+    // Duplicate guard must abort the migration instead of deleting/merging.
+    expect(tradingMigration).toContain('RAISE EXCEPTION');
+    expect(tradingMigration).toMatch(
+      /GROUP BY "user_id", "idempotency_key"\s+HAVING count\(\*\) > 1/,
+    );
+    // Partial unique is created BEFORE the old global unique is dropped.
+    const createIdx = tradingMigration.indexOf(
+      'CREATE UNIQUE INDEX "fx_execute_requests_user_id_idempotency_key_legacy_null_key"',
+    );
+    const dropIdx = tradingMigration.indexOf(
+      'DROP INDEX "fx_execute_requests_user_id_idempotency_key_key"',
+    );
+    expect(createIdx).toBeGreaterThan(-1);
+    expect(dropIdx).toBeGreaterThan(-1);
+    expect(createIdx).toBeLessThan(dropIdx);
+    expect(tradingMigration).toMatch(
+      /ON "fx_execute_requests"\("user_id", "idempotency_key"\) WHERE "trading_account_id" IS NULL;/,
+    );
+  });
+
+  it('contains no destructive statement beyond the single FX index swap and touches no value column', () => {
+    const sqlOnly = tradingMigration
+      .split('\n')
+      .filter((line) => !line.trimStart().startsWith('--'))
+      .join('\n')
+      .toUpperCase();
+    expect(sqlOnly).not.toContain('DROP TABLE');
+    expect(sqlOnly).not.toContain('DROP COLUMN');
+    expect(sqlOnly).not.toContain('TRUNCATE');
+    expect(sqlOnly).not.toContain('RENAME');
+    expect(sqlOnly).not.toContain('DELETE FROM');
+    // Exactly ONE index drop: the replaced global FX unique.
+    const dropStatements = sqlOnly
+      .split('\n')
+      .filter((line) => line.includes('DROP INDEX'));
+    expect(dropStatements).toHaveLength(1);
+    expect(dropStatements[0]).toContain(
+      'FX_EXECUTE_REQUESTS_USER_ID_IDEMPOTENCY_KEY_KEY',
+    );
+    for (const column of [
+      'STATUS',
+      'QUANTITY',
+      'AVERAGE_COST',
+      'REALIZED_PNL',
+      'EXECUTED_PRICE',
+      'GROSS_AMOUNT',
+      'NET_AMOUNT',
+      'RESERVED_AMOUNT',
+      'REQUEST_HASH',
+      'EXPIRES_AT',
+      'CONSUMED_AT',
     ]) {
       expect(sqlOnly).not.toContain(`SET "${column}"`);
     }

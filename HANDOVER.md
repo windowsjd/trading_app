@@ -12,6 +12,107 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 주문·포지션·Quote TradingAccount 전환 + 직전 작업 결함 3종 보완 (2026-08-03, 작업 5)
+
+**목적**
+
+작업 5(Order·Position·Quote의 TradingAccount 기준 전환 + account-scoped
+주문·포지션 API 기반)와 직전 작업 4에서 발견된 세 결함(① 지갑 scope
+null/불일치 상태에서도 거래 허용, ② account-scoped 금융 조회가 null scope
+행을 정상 빈 결과로 은폐, ③ 같은 사용자의 다른 계정 간 FX idempotency key
+재사용 차단) 보완을 함께 수행. 일반모드 계정/지갑/지급·광고·시간가중수익률·
+프런트 연결·스냅샷 3모델 전환·NOT NULL 강화·seasonParticipantId 제거는
+범위가 아니다.
+
+**핵심 변경**
+
+- 보완 ①: 공통 guard `assertCashWalletTradingAccountScope`
+  (`src/wallets/cash-wallet-scope.ts`) — 지갑 변경·지갑 잔액 기반 quote 생성
+  전에 participant+account scope를 검증(null → 500
+  `FINANCIAL_SCOPE_REPAIR_REQUIRED`, 불일치 → 500
+  `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`; 자동 backfill·덮어쓰기 금지,
+  400류 금지). FX quote/execute·시장가 매수/매도·지정가
+  quote/생성/체결/취소/cleanup·운영자 제외 등 balanceAmount/reservedAmount를
+  만지는 전 경로 적용. `cash-wallet-atomic.ts`의 4개 원자 UPDATE WHERE에
+  `trading_account_id` 추가(검증-업데이트 사이 race도 0행 fail-closed).
+- 보완 ②: `trading-account-financial-integrity.ts` — account-scoped
+  지갑/원장/환전(그리고 주문/포지션) 조회 전에 참가자 행의 null·불일치
+  scope를 findFirst 존재 쿼리로 검사, 발견 시 부분/빈 결과 대신 repair-
+  required/mismatch 500. general 계정(참가자 없음)은 스킵되어 정상 빈 결과.
+- 보완 ③: FX 전역 `UNIQUE(user_id, idempotency_key)`를 partial unique
+  (`… WHERE trading_account_id IS NULL`)로 교체(같은 사용자의 계정 간 키
+  재사용 허용; partial 생성 → 전역 DROP 순서, null 중복 발견 시 RAISE로
+  fail-closed). 서비스 조회는 legacy endpoint 포함 계정 우선 + legacy null
+  행 fallback(user+participant 고정), unique 충돌 후 재조회도 동일 규칙.
+- 작업 5 schema/migration
+  (`20260803150000_add_trading_scope_and_fx_legacy_partial_unique`):
+  Order·Position·Quote에 nullable tradingAccountId + Restrict FK, Order
+  `(account, idempotencyKey)` unique + submittedAt/status 인덱스, Position
+  `(account, assetId)` unique, Quote 계정 인덱스 2종, TradingAccount 역관계
+  3종. additive backfill(IS NULL 가드, 멱등, participant 없는 quote는 null
+  유지, 값·상태·hash 불변 — fingerprint로 검증). 스냅샷 3모델·
+  LimitOrderCandleEvidence 비변경.
+- 신규 writer dual-write + 계정 격리: 시장가/지정가 Order, 주문/FX Quote,
+  Position 생성·증가·감소 전부 participant+account 기록(링크 null이면
+  `TRADING_ACCOUNT_LINK_INTEGRITY` 중단). 기존 Position update는 scope
+  검증(null → `TRADING_SCOPE_REPAIR_REQUIRED`, 불일치 →
+  `TRADING_ACCOUNT_SCOPE_MISMATCH`) + updateMany WHERE에 계정 포함(타 계정
+  포지션 감소 불가). Quote는 non-null 계정 불일치 시 `QUOTE_MISMATCH`,
+  소비는 `id+status+participant+(계정 OR null)` 조건 updateMany(타 계정
+  quote 소비 불가), requestHash 계산식 비변경. Order 멱등성은 계정 우선 +
+  legacy null fallback(같은 계정 같은 키 replay/conflict, 다른 계정 키
+  재사용 허용). 지정가 create는 잠근 참가자 행의 링크 재검증, 자동 체결은
+  체결 트랜잭션 안에서 order/participant/quote/wallet/position 계정 일치
+  재검증 + 계정 suspended/closed는 skip(주문 유지).
+- account-scoped API: `/api/v1/trading-accounts/:accountId/orders`(목록/상세/
+  quote/생성/취소 — execute는 legacy에도 없어 미노출)·`/positions`(목록).
+  조회는 status 무관 소유자 허용, 타인/미존재 계정·타 계정 orderId 동일 404,
+  general 신규 주문 409 `GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED`, suspended/
+  closed 신규 quote/주문 409 `TRADING_ACCOUNT_NOT_ACTIVE`. 취소는 보호
+  동작이라 status gate 없음(scope 손상 시 repair-required 중단 + rollback).
+  legacy 주문/포지션 API 계약 불변, 같은 서비스 코어 공유(수수료·체결가·지갑/
+  원장/포지션 변화·멱등성 동일 — DB 통합으로 실측). 계약 문서 신규
+  `docs/trading-account-orders-api-contract.md`.
+- 운영 스크립트 `trading-accounts:repair-trading-scope`(기본 dry-run) 추가:
+  Order·Position·Quote null scope만 참가자 링크로 backfill, mismatch·
+  order↔quote 불일치·participant 없는 quote는 보고만(각각
+  `TRADING_ACCOUNT_SCOPE_MISMATCH`/`ORDER_QUOTE_ACCOUNT_SCOPE_MISMATCH`/
+  `QUOTE_PARTICIPANT_SCOPE_MISSING`), apply 후 잔여 시 exit 1. 역할 3단:
+  repair-links → repair-financial-scope → repair-trading-scope.
+
+**검증 (로컬 실행 — hosted CI 없음)**
+
+- prisma format/validate/generate·`migrate diff`(DB↔schema 차이 없음)·
+  typecheck·build·unit `pnpm test` 2,243 pass.
+- dev DB에서 migration 전후 read-only fingerprint 불변(주문·포지션·quote·FX
+  값 해시), opt-in PostgreSQL 14스위트 직렬(--runInBand) PASS — 기존 12종
+  (join/FX/시장가/지정가 5종/matching/MVP flow/trading-account 3종) + 신규
+  `trading-account-trading-scope.integration.spec.ts` 6블록(인덱스/partial
+  unique·insert-level unique 의미·repair 스크립트·지정가 lifecycle scope
+  fail-closed와 rollback·account 조회 동등성/404/probe·FX 동일 사용자 계정 간
+  키 재사용+legacy replay 참가자 고정). 기존 통합 러너들의 fixture를
+  dual-write로 갱신.
+- e2e 115/118 pass. 실패 3건(readiness/wallets/orders-cancel)은 기준 커밋
+  e91921aa에서 git stash로 동일 재현 확인한 env 기인 **BASELINE_FAIL**.
+- 운영 CLI 시나리오(dev DB): old-writer null scope 3행(주문·포지션·quote)
+  심기 → repair-trading-scope dry-run(보고만) → --apply(3행 backfill, 잔여
+  0/0, exit 0) → 값 불변 확인 → 재실행 멱등 exit 0. §20 완료 기준 쿼리
+  전부 0(null·mismatch·order-quote 불일치·계정별 중복·legacy partial 위반·
+  orphan/general 자동 생성).
+
+**주의사항**
+
+- Order·Position·Quote tradingAccountId는 nullable 유지. NOT NULL 전제와
+  통합 배포 순서(migration → 신버전 → 구버전 종료 → repair-links →
+  repair-financial-scope → repair-trading-scope → 0건 확인)는
+  `docs/trading-modes-and-accounts.md` §3.7.9.
+- FX·주문 모두 같은 사용자의 계정 간 idempotency key 재사용이 이제
+  허용된다(직전 문서의 "작업 10에서 해소" 주의는 이 작업으로 해소됨).
+- 지갑/주문/포지션/quote의 scope 손상 상태에서는 거래·취소·체결·account
+  조회가 구조화된 500으로 막힌다 — 복구 스크립트 실행이 선행 조건이다.
+- eslint는 HEAD에서도 클린이 아니며 이번 작업에서 전체 lint를 통과 조건으로
+  삼지 않았다(기존 관례 유지).
+
 ### 작업 단위: 금융(지갑·원장·환전) TradingAccount 전환 + 직전 작업 결함 3종 보완 (2026-08-03)
 
 **목적**
@@ -1067,6 +1168,38 @@ cd frontend && npm run typecheck && npm test
 ---
 
 ## 2. 최신 작업 시간순 기록
+
+### 2026-08-03 — 주문·포지션·Quote TradingAccount 전환 + 복구 결함 3종 보완 (작업 5)
+
+- 직전 작업 4 결함 보완: ① 지갑 변경·지갑 잔액 기반 quote 생성 전 공통
+  scope guard(null → `FINANCIAL_SCOPE_REPAIR_REQUIRED` 500, 불일치 →
+  `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH` 500)를 시장가/지정가/FX 전
+  경로에 적용하고 원자 UPDATE WHERE에 `trading_account_id` 추가,
+  ② account-scoped 금융 조회가 참가자의 null/불일치 scope 행 존재 시 빈
+  결과 대신 repair-required 500으로 fail-closed(general 계정은 정상 빈 결과),
+  ③ FX 전역 per-user unique를 legacy null 행 전용 partial unique로 교체해
+  같은 사용자의 계정 간 idempotency key 재사용 허용(신규 요청 멱등성은
+  legacy endpoint 포함 전부 계정 기준, legacy replay는 user+participant
+  고정 fallback).
+- additive migration으로 Order·Position·Quote에 nullable tradingAccountId +
+  Restrict FK + 계정 unique(주문 idempotency, 포지션 asset)·조회 인덱스를
+  추가하고 참가자 링크에서 backfill(멱등, participant 없는 quote는 null
+  유지, 값·상태·hash 불변). 신규 writer 전부 dual-write(링크 null이면
+  fail-closed), 기존 Position/Quote는 계정 검증 후에만 update/소비(타 계정
+  포지션 감소·quote 소비 불가), 지정가 자동 체결은 트랜잭션 내 계정 일치
+  재검증 + suspended/closed 계정 skip.
+- account-scoped 주문·포지션 API 추가(`…/:accountId/orders` 목록/상세/quote/
+  생성/취소, `…/positions` 목록; 타인·미존재·타 계정 orderId 동일 404,
+  general 409, suspended/closed 신규 주문 409·조회 허용·취소 허용). legacy
+  주문·포지션 API 계약 불변, 같은 서비스 코어 공유. 운영 스크립트
+  `trading-accounts:repair-trading-scope`(기본 dry-run, mismatch 보고만,
+  apply 후 잔여 시 exit 1) 추가. 계약 문서
+  `docs/trading-account-orders-api-contract.md` 신규.
+- 검증: unit 2,243 pass, opt-in DB 통합 14종 직렬 PASS(신규 trading-scope
+  6블록 포함, 기존 러너 fixture dual-write 갱신), e2e 115/118(실패 3건은
+  기준 커밋 e91921aa에서 동일 재현 확인한 BASELINE_FAIL), dev DB migration
+  전후 fingerprint 불변 + repair-trading-scope dry→apply→멱등 재실행 실측 +
+  §20 완료 기준 쿼리 전부 0.
 
 ### 2026-08-03 — 금융(지갑·원장·환전) TradingAccount 전환 + 복구 결함 3종 보완
 

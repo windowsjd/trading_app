@@ -1,4 +1,4 @@
-import { HttpException, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import {
   CurrencyCode,
   FxRateSourceType,
@@ -8,6 +8,8 @@ import {
   ParticipantStatus,
   Prisma,
   SeasonStatus,
+  TradingAccountMode,
+  TradingAccountStatus,
   WalletTransactionDirection,
   WalletTransactionReferenceType,
   WalletTransactionType,
@@ -15,6 +17,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { formatDecimalScale, monetaryScale } from '../fx/fx-decimal-policy';
 import { settleLimitBuyReservedCash } from '../wallets/cash-wallet-atomic';
+import { assertCashWalletTradingAccountScope } from '../wallets/cash-wallet-scope';
 import {
   resolveFxProviderEligibility,
   selectFreshProviderSnapshotBySourcePriority,
@@ -79,6 +82,7 @@ type ExecTx = Prisma.TransactionClient;
 const EXEC_ORDER_SELECT = {
   id: true,
   seasonParticipantId: true,
+  tradingAccountId: true,
   assetId: true,
   side: true,
   orderType: true,
@@ -89,10 +93,20 @@ const EXEC_ORDER_SELECT = {
   reservedAmount: true,
   reservationFeeRate: true,
   asset: { select: { id: true, isActive: true } },
+  quote: {
+    select: {
+      id: true,
+      seasonParticipantId: true,
+      tradingAccountId: true,
+    },
+  },
   seasonParticipant: {
     select: {
       participantStatus: true,
       tradingAccountId: true,
+      tradingAccount: {
+        select: { id: true, mode: true, status: true },
+      },
       season: {
         select: { id: true, status: true, startAt: true, endAt: true },
       },
@@ -179,6 +193,51 @@ export class LimitOrderExecutionService {
         return { state: 'skipped', orderId, reason: 'asset_inactive' };
       }
 
+      // 3b) Trading-account re-validation against the LOCKED rows. Scope
+      // integrity problems (missing/mismatched links, foreign quote) are
+      // structured errors — repair scripts must run, and the noisy retry is
+      // the operator signal. A suspended/closed account is a normal skip:
+      // automatic fills stop, the submitted order and its reservation stay.
+      const participantAccountId = order.seasonParticipant.tradingAccountId;
+      const account = order.seasonParticipant.tradingAccount;
+      if (!participantAccountId || !account) {
+        this.throwLimitOrderError(
+          limitOrderErrorCodes.TRADING_ACCOUNT_LINK_INTEGRITY,
+          'Participant has no trading account link; run trading-accounts:repair-links.',
+        );
+      }
+      if (!order.tradingAccountId) {
+        this.throwTradingScopeError(
+          'TRADING_SCOPE_REPAIR_REQUIRED',
+          'Order has no trading account scope; run trading-accounts:repair-trading-scope.',
+        );
+      }
+      if (
+        order.tradingAccountId !== participantAccountId ||
+        account.mode !== TradingAccountMode.season
+      ) {
+        this.throwTradingScopeError(
+          'TRADING_ACCOUNT_SCOPE_MISMATCH',
+          'Order is scoped to a different trading account than its participant.',
+        );
+      }
+      if (account.status !== TradingAccountStatus.active) {
+        return { state: 'skipped', orderId, reason: 'account_not_active' };
+      }
+      if (
+        order.quote &&
+        ((order.quote.tradingAccountId !== null &&
+          order.quote.tradingAccountId !== order.tradingAccountId) ||
+          (order.quote.seasonParticipantId !== null &&
+            order.quote.seasonParticipantId !== order.seasonParticipantId))
+      ) {
+        this.throwTradingScopeError(
+          'TRADING_ACCOUNT_SCOPE_MISMATCH',
+          'Order quote is scoped to a different trading account or participant.',
+        );
+      }
+      const tradingAccountId = order.tradingAccountId;
+
       // 4) Re-verify the price basis reaches the limit (§19 step 12).
       if (plan.executedPrice.gt(order.limitPrice)) {
         return { state: 'skipped', orderId, reason: 'price_above_limit' };
@@ -227,6 +286,8 @@ export class LimitOrderExecutionService {
 
       // 7) Settle wallet: debit the actual net, release the whole reservation,
       // in one guarded statement (balance still covers all other reservations).
+      // The wallet must carry the ORDER's verified account scope — null or
+      // foreign scope rolls the whole fill back before any money moves.
       const wallet = await tx.cashWallet.findUnique({
         where: {
           seasonParticipantId_currencyCode: {
@@ -234,7 +295,7 @@ export class LimitOrderExecutionService {
             currencyCode: order.currencyCode,
           },
         },
-        select: { id: true },
+        select: { id: true, seasonParticipantId: true, tradingAccountId: true },
       });
       if (!wallet) {
         this.throwLimitOrderError(
@@ -242,9 +303,14 @@ export class LimitOrderExecutionService {
           'Cash wallet for the order reservation was not found.',
         );
       }
+      assertCashWalletTradingAccountScope(wallet, {
+        seasonParticipantId: order.seasonParticipantId,
+        tradingAccountId,
+      });
       const settled = await settleLimitBuyReservedCash(tx, {
         walletId: wallet.id,
         seasonParticipantId: order.seasonParticipantId,
+        tradingAccountId,
         currencyCode: order.currencyCode,
         actualDebit: netAmountText,
         orderReservation: reservedAmountText,
@@ -270,9 +336,11 @@ export class LimitOrderExecutionService {
           );
       }
 
-      // 9) Position (same average-cost policy as market buy).
+      // 9) Position (same average-cost policy as market buy), scoped to the
+      // order's verified account.
       await this.upsertBuyPosition(tx, {
         seasonParticipantId: order.seasonParticipantId,
+        tradingAccountId,
         assetId: order.assetId,
         currencyCode: order.currencyCode,
         quantity: order.quantity,
@@ -284,20 +352,11 @@ export class LimitOrderExecutionService {
         where: { id: wallet.id },
         select: { balanceAmount: true },
       });
-      // Transitional dual-write: a fill must never create a ledger row for a
-      // participant whose account link is missing (deploy-boundary state
-      // that trading-accounts:repair-links has to fix first).
-      if (!order.seasonParticipant.tradingAccountId) {
-        this.throwLimitOrderError(
-          limitOrderErrorCodes.TRADING_ACCOUNT_LINK_INTEGRITY,
-          'Participant has no trading account link; run trading-accounts:repair-links.',
-        );
-      }
 
       await tx.walletTransaction.create({
         data: {
           seasonParticipantId: order.seasonParticipantId,
-          tradingAccountId: order.seasonParticipant.tradingAccountId,
+          tradingAccountId,
           walletId: wallet.id,
           currencyCode: order.currencyCode,
           direction: WalletTransactionDirection.debit,
@@ -364,6 +423,8 @@ export class LimitOrderExecutionService {
     tx: ExecTx,
     input: {
       seasonParticipantId: string;
+      /** VERIFIED account scope of the order being filled. */
+      tradingAccountId: string;
       assetId: string;
       currencyCode: CurrencyCode;
       quantity: Prisma.Decimal;
@@ -377,8 +438,28 @@ export class LimitOrderExecutionService {
           assetId: input.assetId,
         },
       },
-      select: { id: true, quantity: true, averageCost: true },
+      select: {
+        id: true,
+        tradingAccountId: true,
+        quantity: true,
+        averageCost: true,
+      },
     });
+
+    // Existing position must carry the SAME account scope as the order:
+    // null → repair first, foreign → corruption. Both roll the fill back.
+    if (existing && existing.tradingAccountId === null) {
+      this.throwTradingScopeError(
+        'TRADING_SCOPE_REPAIR_REQUIRED',
+        'Position has no trading account scope; run trading-accounts:repair-trading-scope.',
+      );
+    }
+    if (existing && existing.tradingAccountId !== input.tradingAccountId) {
+      this.throwTradingScopeError(
+        'TRADING_ACCOUNT_SCOPE_MISMATCH',
+        'Position belongs to a different trading account.',
+      );
+    }
 
     const { newQuantity, newAverageCost } = calculateBuyPositionAverageCost({
       netAmount: input.netAmount,
@@ -390,6 +471,7 @@ export class LimitOrderExecutionService {
       const created = await tx.position.create({
         data: {
           seasonParticipantId: input.seasonParticipantId,
+          tradingAccountId: input.tradingAccountId,
           assetId: input.assetId,
           quantity: formatDecimalScale(newQuantity, monetaryScale),
           averageCost: formatDecimalScale(newAverageCost, monetaryScale),
@@ -407,6 +489,7 @@ export class LimitOrderExecutionService {
     const updated = await tx.position.updateMany({
       where: {
         id: existing.id,
+        tradingAccountId: input.tradingAccountId,
         quantity: existing.quantity,
         averageCost: existing.averageCost,
       },
@@ -480,6 +563,13 @@ export class LimitOrderExecutionService {
     throw new HttpException(
       { success: false, error: { code, message } },
       limitOrderErrorHttpStatus[code],
+    );
+  }
+
+  private throwTradingScopeError(code: string, message: string): never {
+    throw new HttpException(
+      { success: false, error: { code, message } },
+      HttpStatus.INTERNAL_SERVER_ERROR,
     );
   }
 }

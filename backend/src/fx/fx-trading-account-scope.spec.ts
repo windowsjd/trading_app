@@ -139,6 +139,18 @@ const createServices = () => {
     exchangeTransaction: {
       count: jest.fn().mockResolvedValue(0),
       findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
+    // Financial scope-integrity probes (getExchangesForTradingAccount runs
+    // them before listing): null means the participant has no anomalous rows.
+    cashWallet: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
+    walletTransaction: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
+    fxExecuteRequest: {
+      findFirst: jest.fn().mockResolvedValue(null),
     },
   };
   const accessService = {

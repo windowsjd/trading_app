@@ -12,8 +12,11 @@
 - Account-scoped finance sub-resources
   (`/api/v1/trading-accounts/:accountId/wallets`, `wallet-transactions`,
   `fx/quote|execute|transactions`) are implemented — see
-  `docs/trading-account-finance-api-contract.md`. Order/position/portfolio
-  sub-resources are still NOT implemented.
+  `docs/trading-account-finance-api-contract.md`. Account-scoped order and
+  position sub-resources (`orders`, `orders/:orderId`, `orders/quote`,
+  `orders/:orderId/cancel`, `positions`) are implemented (작업 5) — see
+  `docs/trading-account-orders-api-contract.md`. Portfolio sub-resources are
+  still NOT implemented.
 
 ## Source Rules
 - Source of truth is `trading_accounts` (+ `season_participants`/`seasons` for

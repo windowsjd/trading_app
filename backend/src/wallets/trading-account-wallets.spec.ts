@@ -55,10 +55,20 @@ const createServices = (accountStatus = 'active') => {
   const prisma = {
     cashWallet: {
       findMany: jest.fn().mockResolvedValue([]),
+      // Scope-integrity probe (assertSeasonAccountFinancialScopeIntegrity):
+      // null = no anomalous rows, so the healthy account reads proceed.
+      findFirst: jest.fn().mockResolvedValue(null),
     },
     walletTransaction: {
       count: jest.fn().mockResolvedValue(0),
       findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
+    exchangeTransaction: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
+    fxExecuteRequest: {
+      findFirst: jest.fn().mockResolvedValue(null),
     },
   };
   const accessService = {

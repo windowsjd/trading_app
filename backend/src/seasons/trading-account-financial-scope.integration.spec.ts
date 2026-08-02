@@ -709,12 +709,13 @@ async function testLegacyFxExecuteDualWrite() {
     const response = await fxService.execute(scenario.userId, body);
     assert.equal(response.success, true);
 
-    const request = await prisma.fxExecuteRequest.findUniqueOrThrow({
+    // The global (userId, idempotencyKey) unique is gone (replaced by the
+    // account unique + the legacy-null partial unique), so this lookup is a
+    // plain findFirst now.
+    const request = await prisma.fxExecuteRequest.findFirstOrThrow({
       where: {
-        userId_idempotencyKey: {
-          userId: scenario.userId,
-          idempotencyKey: 'legacy-dual-write-key',
-        },
+        userId: scenario.userId,
+        idempotencyKey: 'legacy-dual-write-key',
       },
     });
     assert.equal(request.tradingAccountId, scenario.accountId);

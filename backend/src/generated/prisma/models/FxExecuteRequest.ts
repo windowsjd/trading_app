@@ -349,7 +349,6 @@ export type FxExecuteRequestOrderByWithRelationInput = {
 
 export type FxExecuteRequestWhereUniqueInput = Prisma.AtLeast<{
   id?: string
-  userId_idempotencyKey?: Prisma.FxExecuteRequestUserIdIdempotencyKeyCompoundUniqueInput
   tradingAccountId_idempotencyKey?: Prisma.FxExecuteRequestTradingAccountIdIdempotencyKeyCompoundUniqueInput
   AND?: Prisma.FxExecuteRequestWhereInput | Prisma.FxExecuteRequestWhereInput[]
   OR?: Prisma.FxExecuteRequestWhereInput[]
@@ -375,7 +374,7 @@ export type FxExecuteRequestWhereUniqueInput = Prisma.AtLeast<{
   seasonParticipant?: Prisma.XOR<Prisma.SeasonParticipantScalarRelationFilter, Prisma.SeasonParticipantWhereInput>
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountNullableScalarRelationFilter, Prisma.TradingAccountWhereInput> | null
   exchangeTransaction?: Prisma.XOR<Prisma.ExchangeTransactionNullableScalarRelationFilter, Prisma.ExchangeTransactionWhereInput> | null
-}, "id" | "userId_idempotencyKey" | "tradingAccountId_idempotencyKey">
+}, "id" | "tradingAccountId_idempotencyKey">
 
 export type FxExecuteRequestOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
@@ -578,11 +577,6 @@ export type FxExecuteRequestListRelationFilter = {
 
 export type FxExecuteRequestOrderByRelationAggregateInput = {
   _count?: Prisma.SortOrder
-}
-
-export type FxExecuteRequestUserIdIdempotencyKeyCompoundUniqueInput = {
-  userId: string
-  idempotencyKey: string
 }
 
 export type FxExecuteRequestTradingAccountIdIdempotencyKeyCompoundUniqueInput = {

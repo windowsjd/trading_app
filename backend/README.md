@@ -436,9 +436,26 @@ Only the null `trading_account_id` column is filled from each row's
 participant link; amounts/balances/fees/ids/idempotency keys are never
 modified, mismatching stored scopes are reported
 (`FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`) and never overwritten, and
-`--apply` exits non-zero while any null or mismatch remains. Deployment
-order and the NOT NULL preconditions: `docs/trading-modes-and-accounts.md`
-§3.5–§3.6.
+`--apply` exits non-zero while any null or mismatch remains.
+
+Backfill trading rows (orders/positions/quotes) left with
+`trading_account_id = null` by an old-version writer — run AFTER
+repair-links has converged (typically after repair-financial-scope):
+
+```bash
+pnpm trading-accounts:repair-trading-scope           # dry-run (default)
+pnpm trading-accounts:repair-trading-scope --apply   # fill null scopes, then re-verify
+```
+
+Same safety contract: only the null `trading_account_id` column is filled
+from each row's participant link; order statuses/amounts/reservations,
+position quantities/average costs/PnL, and quote statuses/hashes are never
+modified. Mismatches (`TRADING_ACCOUNT_SCOPE_MISMATCH`), order↔quote scope
+disagreements (`ORDER_QUOTE_ACCOUNT_SCOPE_MISMATCH`), and participant-less
+quotes (`QUOTE_PARTICIPANT_SCOPE_MISSING`, never guessed) are reported and
+never auto-corrected; `--apply` exits non-zero while any null/mismatch
+remains. Deployment order and the NOT NULL preconditions:
+`docs/trading-modes-and-accounts.md` §3.5–§3.7.
 
 When the app shows market data as preparing or unavailable, verify that the backend has rows in:
 

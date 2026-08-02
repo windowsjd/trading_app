@@ -356,6 +356,9 @@ describe('OrdersService', () => {
     balance = '1000.00000000',
   ) => {
     prisma.cashWallet.findUnique.mockResolvedValueOnce({
+      id: 'wallet-1',
+      seasonParticipantId: 'sp-1',
+      tradingAccountId: 'trading-account-1',
       balanceAmount: new Prisma.Decimal(balance),
     });
   };
@@ -502,12 +505,19 @@ describe('OrdersService', () => {
         : null);
     const seasonParticipantId =
       (overrides.seasonParticipantId as string | undefined) ?? 'sp-1';
+    const tradingAccountId = Object.prototype.hasOwnProperty.call(
+      overrides,
+      'tradingAccountId',
+    )
+      ? (overrides.tradingAccountId as string | null)
+      : 'trading-account-1';
     const userId = (overrides.userId as string | undefined) ?? 'user-1';
 
     return {
       id: (overrides.id as string | undefined) ?? 'quote-order-1',
       userId,
       seasonParticipantId,
+      tradingAccountId,
       status: (overrides.status as string | undefined) ?? 'active',
       assetId,
       side,
@@ -559,6 +569,7 @@ describe('OrdersService', () => {
 
   const idempotentOrderRecord = (requestHash: string) => ({
     id: 'order-idempotent-1',
+    tradingAccountId: 'trading-account-1',
     requestHash,
     responsePayloadJson: {
       success: true,
@@ -671,6 +682,7 @@ describe('OrdersService', () => {
     return {
       id: 'order-execute-1',
       seasonParticipantId: 'sp-1',
+      tradingAccountId: 'trading-account-1',
       assetId,
       quoteId: quote?.id ?? null,
       side,
@@ -770,6 +782,7 @@ describe('OrdersService', () => {
     prisma.cashWallet.findUnique.mockResolvedValueOnce({
       id: 'wallet-1',
       seasonParticipantId: 'sp-1',
+      tradingAccountId: 'trading-account-1',
       currencyCode,
       balanceAmount: new Prisma.Decimal(before),
     });
@@ -1131,20 +1144,23 @@ describe('OrdersService', () => {
     input: {
       walletId: string;
       seasonParticipantId: string;
+      tradingAccountId?: string;
       currencyCode: CurrencyCode;
       amount: string;
     },
   ) => {
     // debitAvailableCash tagged-template values:
-    // [amount, walletId, seasonParticipantId, currencyCode, amount]
+    // [amount, walletId, seasonParticipantId, tradingAccountId, currencyCode, amount]
+    const tradingAccountId = input.tradingAccountId ?? 'trading-account-1';
     const matched = prisma.$executeRaw.mock.calls.some((args: unknown[]) => {
       const values = args.slice(1);
       return (
         values[0] === input.amount &&
         values[1] === input.walletId &&
         values[2] === input.seasonParticipantId &&
-        values[3] === input.currencyCode &&
-        values[4] === input.amount
+        values[3] === tradingAccountId &&
+        values[4] === input.currencyCode &&
+        values[5] === input.amount
       );
     });
     expect(matched).toBe(true);
@@ -1315,6 +1331,7 @@ describe('OrdersService', () => {
           status: 'active',
           userId: 'user-1',
           seasonParticipantId: 'sp-1',
+          tradingAccountId: 'trading-account-1',
           assetId: 'asset-1',
           side: OrderSide.buy,
           orderType: OrderType.market,
@@ -1385,6 +1402,27 @@ describe('OrdersService', () => {
     expect(prisma.quote.create).not.toHaveBeenCalled();
     expect(prisma.order.create).not.toHaveBeenCalled();
     expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the participant has no trading account link', async () => {
+    const { prisma, service } = createService();
+    mockActiveSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+      ...participant,
+      tradingAccountId: null,
+    });
+
+    await expectErrorCode(
+      service.quoteOrder('user-1', {
+        assetId: 'asset-1',
+        side: 'buy',
+        orderType: 'market',
+        quantity: '2.000000',
+      }),
+      'TRADING_ACCOUNT_LINK_INTEGRITY',
+    );
+    expect(prisma.asset.findUnique).not.toHaveBeenCalled();
+    expectNoOrderWrites(prisma);
   });
 
   it('uses fresh provider_api asset price and FX for orders quote only', async () => {
@@ -1565,6 +1603,9 @@ describe('OrdersService', () => {
         },
       },
       select: {
+        id: true,
+        seasonParticipantId: true,
+        tradingAccountId: true,
         balanceAmount: true,
         reservedAmount: true,
       },
@@ -1906,6 +1947,7 @@ describe('OrdersService', () => {
       expect.objectContaining({
         data: expect.objectContaining({
           seasonParticipantId: 'sp-1',
+          tradingAccountId: 'trading-account-1',
           assetId: 'asset-1',
           status: OrderStatus.submitted,
           quantity: '2.000000',
@@ -1922,6 +1964,11 @@ describe('OrdersService', () => {
       where: {
         id: 'quote-order-create-1',
         status: 'active',
+        seasonParticipantId: 'sp-1',
+        OR: [
+          { tradingAccountId: 'trading-account-1' },
+          { tradingAccountId: null },
+        ],
       },
       data: {
         status: 'consumed',
@@ -2292,6 +2339,9 @@ describe('OrdersService', () => {
       fxRateSnapshotId: null,
     });
     let racedRequestHash = '';
+    // Pre-transaction idempotent lookup probes the account scope first and
+    // the legacy null scope second — both must miss to reach the create.
+    prisma.order.findFirst.mockResolvedValueOnce(null);
     prisma.order.findFirst.mockResolvedValueOnce(null);
     prisma.order.create.mockImplementationOnce((args) => {
       racedRequestHash = args.data.requestHash;
@@ -2331,6 +2381,9 @@ describe('OrdersService', () => {
       assetPriceSnapshotId: 'aps-1',
       fxRateSnapshotId: null,
     });
+    // Pre-transaction idempotent lookup probes the account scope first and
+    // the legacy null scope second — both must miss to reach the create.
+    prisma.order.findFirst.mockResolvedValueOnce(null);
     prisma.order.findFirst.mockResolvedValueOnce(null);
     prisma.order.create.mockRejectedValueOnce({ code: 'P2002' });
     prisma.order.findFirst.mockResolvedValueOnce(
@@ -2417,6 +2470,7 @@ describe('OrdersService', () => {
     prisma.order.findFirst.mockResolvedValueOnce({
       id: 'order-1',
       seasonParticipantId: 'sp-1',
+      tradingAccountId: 'trading-account-1',
       assetId: 'asset-1',
       quoteId: 'quote-order-1',
       side: OrderSide.buy,
@@ -2453,6 +2507,7 @@ describe('OrdersService', () => {
         id: 'sp-1',
         participantStatus: ParticipantStatus.active,
         joinedAt,
+        tradingAccountId: 'trading-account-1',
         season: activeSeason,
       },
       assetPriceSnapshot: {
@@ -2971,6 +3026,11 @@ describe('OrdersService', () => {
         where: {
           id: 'quote-order-execute-1',
           status: 'active',
+          seasonParticipantId: 'sp-1',
+          OR: [
+            { tradingAccountId: 'trading-account-1' },
+            { tradingAccountId: null },
+          ],
         },
         data: {
           status: 'consumed',
@@ -2986,6 +3046,7 @@ describe('OrdersService', () => {
       expect(prisma.position.create).toHaveBeenCalledWith({
         data: {
           seasonParticipantId: 'sp-1',
+          tradingAccountId: 'trading-account-1',
           assetId: 'asset-1',
           quantity: '2.00000000',
           averageCost: '100.10000000',
@@ -3129,6 +3190,7 @@ describe('OrdersService', () => {
       expect(prisma.position.create).toHaveBeenCalledWith({
         data: {
           seasonParticipantId: 'sp-1',
+          tradingAccountId: 'trading-account-1',
           assetId: 'asset-btc',
           quantity: '0.01000000',
           averageCost: '50050.00000000',
@@ -3286,6 +3348,8 @@ describe('OrdersService', () => {
       mockExecutionPrice(prisma);
       prisma.position.findUnique.mockResolvedValueOnce({
         id: 'position-1',
+        seasonParticipantId: 'sp-1',
+        tradingAccountId: 'trading-account-1',
         quantity: new Prisma.Decimal('5.00000000'),
         averageCost: new Prisma.Decimal('80.00000000'),
         currencyCode: CurrencyCode.KRW,
@@ -3540,6 +3604,8 @@ describe('OrdersService', () => {
       mockExecutionWallet(prisma, '1000.00000000', '799.80000000');
       prisma.position.findUnique.mockResolvedValueOnce({
         id: 'position-1',
+        seasonParticipantId: 'sp-1',
+        tradingAccountId: 'trading-account-1',
         quantity: new Prisma.Decimal('3.00000000'),
         averageCost: new Prisma.Decimal('90.00000000'),
         currencyCode: CurrencyCode.KRW,
@@ -3557,6 +3623,7 @@ describe('OrdersService', () => {
         where: {
           id: 'position-1',
           seasonParticipantId: 'sp-1',
+          tradingAccountId: 'trading-account-1',
           assetId: 'asset-1',
           quantity: '3.00000000',
           averageCost: '90.00000000',
@@ -3581,6 +3648,8 @@ describe('OrdersService', () => {
       mockExecutionPrice(prisma);
       prisma.position.findUnique.mockResolvedValueOnce({
         id: 'position-1',
+        seasonParticipantId: 'sp-1',
+        tradingAccountId: 'trading-account-1',
         quantity: new Prisma.Decimal('5.00000000'),
         averageCost: new Prisma.Decimal('80.00000000'),
         currencyCode: CurrencyCode.KRW,
@@ -3606,6 +3675,7 @@ describe('OrdersService', () => {
         where: {
           id: 'position-1',
           seasonParticipantId: 'sp-1',
+          tradingAccountId: 'trading-account-1',
           assetId: 'asset-1',
           quantity: {
             gte: '2.00000000',
@@ -3627,6 +3697,7 @@ describe('OrdersService', () => {
         where: {
           id: 'wallet-1',
           seasonParticipantId: 'sp-1',
+          tradingAccountId: 'trading-account-1',
           currencyCode: CurrencyCode.KRW,
         },
         data: {
@@ -3661,6 +3732,8 @@ describe('OrdersService', () => {
       mockExecutionPrice(prisma, '70.00000000');
       prisma.position.findUnique.mockResolvedValueOnce({
         id: 'position-1',
+        seasonParticipantId: 'sp-1',
+        tradingAccountId: 'trading-account-1',
         quantity: new Prisma.Decimal('5.00000000'),
         averageCost: new Prisma.Decimal('80.00000000'),
         currencyCode: CurrencyCode.KRW,
@@ -3714,6 +3787,8 @@ describe('OrdersService', () => {
       mockExecutionFx(prisma);
       prisma.position.findUnique.mockResolvedValueOnce({
         id: 'position-btc-1',
+        seasonParticipantId: 'sp-1',
+        tradingAccountId: 'trading-account-1',
         quantity: new Prisma.Decimal('0.02000000'),
         averageCost: new Prisma.Decimal('40000.00000000'),
         currencyCode: CurrencyCode.USD,
@@ -3767,6 +3842,7 @@ describe('OrdersService', () => {
         where: {
           id: 'position-btc-1',
           seasonParticipantId: 'sp-1',
+          tradingAccountId: 'trading-account-1',
           assetId: 'asset-btc',
           quantity: {
             gte: '0.01000000',
@@ -3788,6 +3864,7 @@ describe('OrdersService', () => {
         where: {
           id: 'wallet-1',
           seasonParticipantId: 'sp-1',
+          tradingAccountId: 'trading-account-1',
           currencyCode: CurrencyCode.USD,
         },
         data: {
@@ -4029,6 +4106,7 @@ describe('OrdersService', () => {
       prisma.cashWallet.findUnique.mockResolvedValueOnce({
         id: 'wallet-1',
         seasonParticipantId: 'sp-1',
+        tradingAccountId: 'trading-account-1',
         currencyCode: CurrencyCode.KRW,
         balanceAmount: new Prisma.Decimal('1000.00000000'),
       });
@@ -4066,6 +4144,8 @@ describe('OrdersService', () => {
       mockExecutionPrice(insufficient.prisma);
       insufficient.prisma.position.findUnique.mockResolvedValueOnce({
         id: 'position-1',
+        seasonParticipantId: 'sp-1',
+        tradingAccountId: 'trading-account-1',
         quantity: new Prisma.Decimal('1.00000000'),
         averageCost: new Prisma.Decimal('80.00000000'),
         currencyCode: CurrencyCode.KRW,
@@ -4138,6 +4218,8 @@ describe('OrdersService', () => {
       mockExecutionPrice(prisma);
       prisma.position.findUnique.mockResolvedValueOnce({
         id: 'position-1',
+        seasonParticipantId: 'sp-1',
+        tradingAccountId: 'trading-account-1',
         quantity: new Prisma.Decimal('2.00000000'),
         averageCost: new Prisma.Decimal('80.00000000'),
         currencyCode: CurrencyCode.KRW,

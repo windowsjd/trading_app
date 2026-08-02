@@ -543,6 +543,7 @@ async function createScenario(
   const wallet = await prisma.cashWallet.create({
     data: {
       seasonParticipantId: participant.id,
+      tradingAccountId: tradingAccount.id,
       currencyCode: CurrencyCode.KRW,
       balanceAmount: '1000000.00000000',
       reservedAmount: ZERO,

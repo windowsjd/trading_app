@@ -237,10 +237,12 @@ type PrismaMock = {
   exchangeTransaction: {
     count: jest.Mock;
     create: jest.Mock;
+    findFirst: jest.Mock;
     findMany: jest.Mock;
   };
   fxExecuteRequest: {
     create: jest.Mock;
+    findFirst: jest.Mock;
     findUnique: jest.Mock;
     update: jest.Mock;
   };
@@ -323,6 +325,7 @@ type PrismaMock = {
   walletTransaction: {
     count: jest.Mock;
     create: jest.Mock;
+    findFirst: jest.Mock;
     findMany: jest.Mock;
   };
   equitySnapshot: {
@@ -482,10 +485,12 @@ describe('AppController (e2e)', () => {
       exchangeTransaction: {
         count: jest.fn(),
         create: jest.fn(),
+        findFirst: jest.fn(),
         findMany: jest.fn(),
       },
       fxExecuteRequest: {
         create: jest.fn(),
+        findFirst: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
       },
@@ -571,6 +576,7 @@ describe('AppController (e2e)', () => {
       walletTransaction: {
         count: jest.fn(),
         create: jest.fn(),
+        findFirst: jest.fn(),
         findMany: jest.fn(),
       },
       equitySnapshot: {

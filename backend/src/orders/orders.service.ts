@@ -19,6 +19,8 @@ import {
   QuoteType,
   SeasonStatus,
   SnapshotReason,
+  TradingAccountMode,
+  TradingAccountStatus,
   WalletTransactionDirection,
   WalletTransactionReferenceType,
   WalletTransactionType,
@@ -62,7 +64,10 @@ import {
   calculateMaxDrawdown,
   RankingRefreshService,
 } from '../ranking/ranking-refresh.service';
+import { TradingAccountAccessService } from '../trading-accounts/trading-account-access.service';
+import { assertSeasonAccountOrderScopeIntegrity } from '../trading-accounts/trading-account-financial-integrity';
 import { debitAvailableCash } from '../wallets/cash-wallet-atomic';
+import { assertCashWalletTradingAccountScope } from '../wallets/cash-wallet-scope';
 import { assertAssetTradable, MarketHoursError } from './market-hours.policy';
 import { isLimitOrderEnabled } from './limit-order.config';
 import { readLimitOrderMatchingConfig } from './limit-order-matching.config';
@@ -117,6 +122,20 @@ type OrdersParticipant = {
   id: string;
   participantStatus: ParticipantStatus;
   joinedAt: Date;
+  tradingAccountId: string | null;
+};
+
+/**
+ * Season trading context every order mutation runs in. Both producers —
+ * the legacy current-season resolution and the accountId-path resolution —
+ * end here, so the quote/create/execute core is ONE implementation.
+ * tradingAccountId is always the VERIFIED account (participant link or the
+ * owned account named in the path; the 1:1 FK makes them identical).
+ */
+type SeasonTradingContext = {
+  season: ActiveOrderSeason;
+  participant: OrdersParticipant;
+  tradingAccountId: string;
 };
 
 type ActiveOrderSeason = OrdersSeason & {
@@ -230,6 +249,7 @@ type OrderQuoteCalculation = {
 type DurableOrderQuoteForCreate = {
   id: string;
   seasonParticipantId: string | null;
+  tradingAccountId: string | null;
   status: QuoteStatus;
   assetId: string | null;
   side: OrderSide | null;
@@ -337,6 +357,7 @@ type ExecuteOrderResponse = {
 type OrderExecutionRecord = {
   id: string;
   seasonParticipantId: string;
+  tradingAccountId: string | null;
   assetId: string;
   quoteId: string | null;
   side: OrderSide;
@@ -372,6 +393,7 @@ type OrderExecutionRecord = {
     id: string;
     userId: string;
     seasonParticipantId: string | null;
+    tradingAccountId: string | null;
     status: QuoteStatus;
     assetId: string | null;
     side: OrderSide | null;
@@ -439,6 +461,7 @@ const quantityScale = 6;
 const ORDER_EXECUTION_SELECT = {
   id: true,
   seasonParticipantId: true,
+  tradingAccountId: true,
   assetId: true,
   quoteId: true,
   side: true,
@@ -480,6 +503,7 @@ const ORDER_EXECUTION_SELECT = {
       id: true,
       userId: true,
       seasonParticipantId: true,
+      tradingAccountId: true,
       status: true,
       assetId: true,
       side: true,
@@ -523,6 +547,7 @@ const ORDER_EXECUTION_SELECT = {
 const IDEMPOTENT_CREATE_ORDER_SELECT = {
   id: true,
   quoteId: true,
+  tradingAccountId: true,
   requestHash: true,
   responsePayloadJson: true,
   side: true,
@@ -565,7 +590,20 @@ export class OrdersService {
     private readonly rankingRefreshService?: RankingRefreshService,
     private readonly limitOrderCreateService?: LimitOrderCreateService,
     private readonly limitOrderCancelService?: LimitOrderCancelService,
+    @Optional()
+    private readonly tradingAccountAccessService?: TradingAccountAccessService,
   ) {}
+
+  private requireTradingAccountAccessService(): TradingAccountAccessService {
+    if (!this.tradingAccountAccessService) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'INTERNAL_ERROR',
+        'Trading account access service unavailable',
+      );
+    }
+    return this.tradingAccountAccessService;
+  }
 
   private assertLimitOrderFeatureEnabled(): void {
     if (!isLimitOrderEnabled()) {
@@ -633,6 +671,56 @@ export class OrdersService {
   }
 
   /**
+   * Account-scoped quote: the SAME calculation/persistence core as the
+   * legacy quote — only the season/participant resolution changes (owned
+   * account named in the path instead of the implicit current season).
+   */
+  async quoteOrderForTradingAccount(
+    userId: string | undefined,
+    tradingAccountId: string,
+    body: OrderRequestBody = {},
+  ): Promise<OrderQuoteResponse> {
+    if (!userId) {
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
+    }
+
+    const quoteAt = new Date();
+    const request = this.parseOrderRequest(body);
+    const context = await this.resolveAccountSeasonTradingContext(
+      userId,
+      tradingAccountId,
+      quoteAt,
+    );
+
+    if (request.orderType === OrderType.limit) {
+      this.assertLimitOrderFeatureEnabled();
+      return this.quoteLimitBuyOrderForContext(
+        userId,
+        request,
+        quoteAt,
+        context,
+      );
+    }
+
+    const quote = await this.buildOrderQuoteForContext({
+      ...context,
+      request,
+      quoteAt,
+      sourceWorkflow: 'orders_quote',
+    });
+    const durableQuote = await this.createDurableOrderQuote(userId, quote);
+
+    return {
+      success: true,
+      data: this.formatOrderQuoteData(durableQuote),
+    };
+  }
+
+  /**
    * Limit-buy quote: reservation preview from limitPrice × quantity only.
    * No provider asset price is resolved; the USD/KRW snapshot (USD assets)
    * feeds the KRW display conversion exactly like market quotes. Read-only:
@@ -643,8 +731,10 @@ export class OrdersService {
     request: ParsedOrderRequest,
     quoteAt: Date,
   ): Promise<OrderQuoteResponse> {
+    // Same gate order as before the account-context refactor: feature flag
+    // and service wiring fail before any DB read.
     this.assertLimitOrderFeatureEnabled();
-    const limitOrderCreate = this.requireLimitOrderCreateService();
+    this.requireLimitOrderCreateService();
     if (!request.limitPrice) {
       this.throwApiError(
         HttpStatus.BAD_REQUEST,
@@ -656,6 +746,32 @@ export class OrdersService {
     const season = await this.findActiveSeasonOrThrow();
     this.assertSeasonTradable(season, quoteAt);
     const participant = await this.findParticipantOrThrow(season.id, userId);
+    const tradingAccountId =
+      this.requireParticipantTradingAccountId(participant);
+
+    return this.quoteLimitBuyOrderForContext(userId, request, quoteAt, {
+      season,
+      participant,
+      tradingAccountId,
+    });
+  }
+
+  private async quoteLimitBuyOrderForContext(
+    userId: string,
+    request: ParsedOrderRequest,
+    quoteAt: Date,
+    context: SeasonTradingContext,
+  ): Promise<OrderQuoteResponse> {
+    const { season, participant, tradingAccountId } = context;
+    const limitOrderCreate = this.requireLimitOrderCreateService();
+    if (!request.limitPrice) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        limitOrderErrorCodes.INVALID_LIMIT_PRICE,
+        'limitPrice is required for limit orders.',
+      );
+    }
+
     const asset = await this.findUsableAsset(request.assetId);
     if (
       request.currencyCode &&
@@ -684,6 +800,7 @@ export class OrdersService {
     const settlementCurrency = this.getAssetSettlementCurrency(asset);
     const preview = await limitOrderCreate.buildLimitBuyQuotePreview({
       participantId: participant.id,
+      tradingAccountId,
       assetId: asset.id,
       currencyCode: settlementCurrency,
       limitPrice: request.limitPrice,
@@ -834,10 +951,87 @@ export class OrdersService {
     const season = await this.findActiveSeasonOrThrow();
     this.assertSeasonTradable(season, submittedAt);
     const participant = await this.findParticipantOrThrow(season.id, userId);
-    const existingOrder = await this.findIdempotentCreateOrder(
-      participant.id,
-      idempotency.idempotencyKey,
+    const tradingAccountId =
+      this.requireParticipantTradingAccountId(participant);
+
+    return this.createMarketOrderForContext({
+      userId,
+      request,
+      quoteId,
+      idempotency,
+      submittedAt,
+      context: { season, participant, tradingAccountId },
+    });
+  }
+
+  /**
+   * Account-scoped create: gates on account ownership/mode/status, then the
+   * SAME market/limit create cores as the legacy endpoint (fees, quote
+   * consumption, wallet/ledger/position writes, idempotency, rollback).
+   */
+  async createOrderForTradingAccount(
+    userId: string | undefined,
+    tradingAccountId: string,
+    body: OrderRequestBody = {},
+  ): Promise<CreateOrderResponse | LimitOrderCreateResponse> {
+    if (!userId) {
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
+    }
+
+    const request = this.parseOrderRequest(body);
+    const submittedAt = new Date();
+
+    if (request.orderType === OrderType.limit) {
+      return this.createLimitBuyOrderForAccount(
+        userId,
+        tradingAccountId,
+        body,
+        request,
+      );
+    }
+
+    const quoteId = this.parseQuoteId(body.quoteId);
+    const idempotency = this.buildOrderCreateIdempotency({
+      body,
+      request,
+      quoteId,
+    });
+    const context = await this.resolveAccountSeasonTradingContext(
+      userId,
+      tradingAccountId,
+      submittedAt,
     );
+
+    return this.createMarketOrderForContext({
+      userId,
+      request,
+      quoteId,
+      idempotency,
+      submittedAt,
+      context,
+    });
+  }
+
+  private async createMarketOrderForContext(input: {
+    userId: string;
+    request: ParsedOrderRequest;
+    quoteId: string;
+    idempotency: OrderCreateIdempotency;
+    submittedAt: Date;
+    context: SeasonTradingContext;
+  }): Promise<CreateOrderResponse | LimitOrderCreateResponse> {
+    const { userId, request, quoteId, idempotency, submittedAt } = input;
+    const { season, participant, tradingAccountId } = input.context;
+    const existingOrder = await this.findIdempotentCreateOrder({
+      tradingAccountId,
+      seasonParticipantId: participant.id,
+      userId,
+      idempotencyKey: idempotency.idempotencyKey,
+    });
 
     if (existingOrder) {
       return this.replayIdempotentCreateOrder(existingOrder, idempotency);
@@ -849,6 +1043,7 @@ export class OrdersService {
           quoteId,
           userId,
           seasonParticipantId: participant.id,
+          tradingAccountId,
           request,
           now: submittedAt,
         });
@@ -873,6 +1068,7 @@ export class OrdersService {
           data: {
             id: orderId,
             seasonParticipantId: participant.id,
+            tradingAccountId,
             assetId: quote.asset.id,
             quoteId: quote.id,
             side: request.side,
@@ -958,10 +1154,12 @@ export class OrdersService {
         throw error;
       }
 
-      const racedOrder = await this.findIdempotentCreateOrder(
-        participant.id,
-        idempotency.idempotencyKey,
-      );
+      const racedOrder = await this.findIdempotentCreateOrder({
+        tradingAccountId,
+        seasonParticipantId: participant.id,
+        userId,
+        idempotencyKey: idempotency.idempotencyKey,
+      });
 
       if (!racedOrder) {
         this.throwApiError(
@@ -1020,7 +1218,6 @@ export class OrdersService {
       return this.replayIdempotentCreateOrder(replayedOrder, idempotency);
     }
     this.assertLimitOrderFeatureEnabled();
-    const limitOrderCreate = this.requireLimitOrderCreateService();
     const submittedAt = new Date();
     // Pre-transaction checks are a fast-fail courtesy only: they give the user
     // a clean error without opening a transaction. They are NOT the basis of
@@ -1030,6 +1227,85 @@ export class OrdersService {
     const season = await this.findActiveSeasonOrThrow();
     this.assertSeasonTradable(season, submittedAt);
     const participant = await this.findParticipantOrThrow(season.id, userId);
+    const tradingAccountId =
+      this.requireParticipantTradingAccountId(participant);
+
+    return this.createLimitBuyOrderForContext({
+      userId,
+      request,
+      quoteId,
+      idempotency,
+      context: { season, participant, tradingAccountId },
+    });
+  }
+
+  /**
+   * Account-scoped limit create. Ownership resolves FIRST (a foreign or
+   * unknown account is always the same 404), then the committed-replay
+   * lookup runs — but only an order that belongs to THIS account replays;
+   * the same quote consumed under a different account is a conflict. All
+   * remaining gates and the create transaction are the shared core.
+   */
+  private async createLimitBuyOrderForAccount(
+    userId: string,
+    tradingAccountId: string,
+    body: OrderRequestBody,
+    request: ParsedOrderRequest,
+  ): Promise<CreateOrderResponse | LimitOrderCreateResponse> {
+    const quoteId = this.parseQuoteId(body.quoteId);
+    const idempotency = this.buildOrderCreateIdempotency({
+      body,
+      request,
+      quoteId,
+    });
+    const account =
+      await this.requireTradingAccountAccessService().getOwnedAccountOrThrow(
+        userId,
+        tradingAccountId.trim(),
+      );
+
+    const replayedOrder = await this.findIdempotentLimitCreateOrderForQuote({
+      userId,
+      quoteId,
+      idempotencyKey: idempotency.idempotencyKey,
+    });
+    if (replayedOrder) {
+      if (replayedOrder.tradingAccountId !== account.id) {
+        this.throwApiError(
+          HttpStatus.CONFLICT,
+          'ORDER_IDEMPOTENCY_CONFLICT',
+          'This quote was already used by a different order create request.',
+        );
+      }
+      return this.replayIdempotentCreateOrder(replayedOrder, idempotency);
+    }
+
+    this.assertLimitOrderFeatureEnabled();
+    const submittedAt = new Date();
+    const context = await this.resolveAccountSeasonTradingContextForAccount(
+      account,
+      submittedAt,
+    );
+
+    return this.createLimitBuyOrderForContext({
+      userId,
+      request,
+      quoteId,
+      idempotency,
+      context,
+    });
+  }
+
+  private async createLimitBuyOrderForContext(input: {
+    userId: string;
+    request: ParsedOrderRequest;
+    quoteId: string;
+    idempotency: OrderCreateIdempotency;
+    context: SeasonTradingContext;
+  }): Promise<CreateOrderResponse | LimitOrderCreateResponse> {
+    const { userId, request, quoteId, idempotency } = input;
+    const { participant, tradingAccountId } = input.context;
+    const limitOrderCreate = this.requireLimitOrderCreateService();
 
     try {
       return await this.prisma.$transaction(async (tx) => {
@@ -1050,6 +1326,18 @@ export class OrdersService {
             userId,
             seasonParticipantId: participant.id,
           });
+
+        // Trading-account link re-verified against the LOCKED participant
+        // row: a null or different link at commit time fails the create
+        // instead of writing an unscoped/mis-scoped order.
+        if (lockedContext.tradingAccountId !== tradingAccountId) {
+          this.throwTradingScopeIntegrityError(
+            lockedContext.tradingAccountId === null
+              ? 'TRADING_ACCOUNT_LINK_INTEGRITY'
+              : 'TRADING_ACCOUNT_SCOPE_MISMATCH',
+            'Participant trading-account link changed while creating the order.',
+          );
+        }
 
         // PostgreSQL CURRENT_TIMESTAMP/now() are fixed at transaction start.
         // The wall clock is read only after every authorization row lock, so
@@ -1075,6 +1363,7 @@ export class OrdersService {
           quoteId,
           userId,
           seasonParticipantId: participant.id,
+          tradingAccountId,
           request,
           now: transactionNow,
         });
@@ -1102,12 +1391,12 @@ export class OrdersService {
               currencyCode: quote.asset.currencyCode,
             },
           },
-          participant: { id: participant.id },
+          participant: { id: participant.id, tradingAccountId },
           quantity: request.quantity,
           idempotency,
           submittedAt: transactionNow,
-          autoExecutionEnabled: this.limitOrderExecutionPolicy()
-            .autoExecutionEnabled,
+          autoExecutionEnabled:
+            this.limitOrderExecutionPolicy().autoExecutionEnabled,
         });
       });
     } catch (error) {
@@ -1118,20 +1407,23 @@ export class OrdersService {
       // Two unique constraints can raise here and they mean different things.
       // `orders_quote_id_key` — the concurrent winner used the SAME quote, so
       // the quote-scoped lookup finds exactly the order this request wanted
-      // and replays it. `(seasonParticipantId, idempotencyKey)` — the key was
-      // reused with a DIFFERENT quote inside one season, which the quote
-      // lookup cannot see; the participant-scoped fallback finds that order
-      // and the request-hash comparison turns it into the conflict it is.
+      // and replays it. `(seasonParticipantId, idempotencyKey)` /
+      // `(tradingAccountId, idempotencyKey)` — the key was reused with a
+      // DIFFERENT quote inside one season/account, which the quote lookup
+      // cannot see; the account-scoped fallback finds that order and the
+      // request-hash comparison turns it into the conflict it is.
       const racedOrder =
         (await this.findIdempotentLimitCreateOrderForQuote({
           userId,
           quoteId,
           idempotencyKey: idempotency.idempotencyKey,
         })) ??
-        (await this.findIdempotentCreateOrder(
-          participant.id,
-          idempotency.idempotencyKey,
-        ));
+        (await this.findIdempotentCreateOrder({
+          tradingAccountId,
+          seasonParticipantId: participant.id,
+          userId,
+          idempotencyKey: idempotency.idempotencyKey,
+        }));
 
       if (!racedOrder) {
         this.throwApiError(
@@ -1166,6 +1458,43 @@ export class OrdersService {
       userId,
       orderId: parsedOrderId,
       canceledAt: new Date(),
+    });
+  }
+
+  /**
+   * Account-scoped cancel. Cancel releases a reservation — a protective
+   * action, not new risk — so like the legacy cancel it is NOT gated on
+   * account/participant status: an owner may cancel their own submitted
+   * limit order on an active, suspended, or closed account. The order must
+   * belong to the named account (a foreign/unknown/other-account orderId is
+   * the same 404), and the wallet-scope guard inside the cancel service
+   * still fails closed on unscoped or mis-scoped rows.
+   */
+  async cancelOrderForTradingAccount(
+    userId: string | undefined,
+    tradingAccountId: string,
+    orderId: string | undefined,
+  ): Promise<CancelLimitOrderResponse> {
+    if (!userId) {
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
+    }
+
+    const parsedOrderId = this.parseOrderId(orderId);
+    const account =
+      await this.requireTradingAccountAccessService().getOwnedAccountOrThrow(
+        userId,
+        tradingAccountId.trim(),
+      );
+
+    return this.requireLimitOrderCancelService().cancelOwnedLimitBuyOrder({
+      userId,
+      orderId: parsedOrderId,
+      canceledAt: new Date(),
+      expectedTradingAccountId: account.id,
     });
   }
 
@@ -1424,6 +1753,266 @@ export class OrdersService {
     };
   }
 
+  /**
+   * Account-scoped order list: rows are selected by the ORDER's own
+   * tradingAccountId (never a client-provided participant id). Read-only
+   * and status-blind — owners can read active, suspended, and closed
+   * accounts alike. A season participant whose orders lost their account
+   * scope fails closed (repair required) instead of looking empty.
+   */
+  async getOrdersForTradingAccount(
+    userId: string | undefined,
+    tradingAccountId: string,
+    query: OrdersQuery = {},
+  ) {
+    if (!userId) {
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
+    }
+
+    const parsedQuery = this.parseQuery(query);
+    const account =
+      await this.requireTradingAccountAccessService().getOwnedAccountOrThrow(
+        userId,
+        tradingAccountId.trim(),
+      );
+
+    await assertSeasonAccountOrderScopeIntegrity(this.prisma, {
+      tradingAccountId: account.id,
+      seasonParticipantId: account.seasonParticipant?.id ?? null,
+    });
+
+    const where = {
+      tradingAccountId: account.id,
+      ...(parsedQuery.status ? { status: parsedQuery.status } : {}),
+      ...(parsedQuery.side ? { side: parsedQuery.side } : {}),
+      ...(parsedQuery.assetId ? { assetId: parsedQuery.assetId } : {}),
+    };
+    const [total, orders] = await Promise.all([
+      this.prisma.order.count({ where }),
+      this.prisma.order.findMany({
+        where,
+        orderBy: [{ submittedAt: 'desc' }, { createdAt: 'desc' }],
+        skip: parsedQuery.offset,
+        take: parsedQuery.limit,
+        select: {
+          id: true,
+          quoteId: true,
+          side: true,
+          orderType: true,
+          status: true,
+          quantity: true,
+          limitPrice: true,
+          executedPrice: true,
+          currencyCode: true,
+          grossAmount: true,
+          feeAmount: true,
+          netAmount: true,
+          assetPriceSnapshotId: true,
+          fxRateSnapshotId: true,
+          reservedAmount: true,
+          reservationReleasedAt: true,
+          cancelReason: true,
+          submittedAt: true,
+          executedAt: true,
+          canceledAt: true,
+          rejectedAt: true,
+          rejectReason: true,
+          createdAt: true,
+          updatedAt: true,
+          asset: {
+            select: {
+              id: true,
+              symbol: true,
+              name: true,
+              market: true,
+              currencyCode: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      success: true as const,
+      data: {
+        state: 'available' as const,
+        tradingAccountId: account.id,
+        filters: this.formatFilters(parsedQuery),
+        pagination: this.pagination(parsedQuery, total, orders.length),
+        orders: orders.map((order) => this.formatOrder(order)),
+      },
+    };
+  }
+
+  /**
+   * Account-scoped order detail. A nonexistent orderId and another
+   * account's orderId are the same 404 (no cross-account existence oracle).
+   */
+  async getOrderForTradingAccount(
+    userId: string | undefined,
+    tradingAccountId: string,
+    orderId: string | undefined,
+  ): Promise<OrderDetailResponse> {
+    if (!userId) {
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
+    }
+
+    const parsedOrderId = this.parseOrderId(orderId);
+    const account =
+      await this.requireTradingAccountAccessService().getOwnedAccountOrThrow(
+        userId,
+        tradingAccountId.trim(),
+      );
+
+    await assertSeasonAccountOrderScopeIntegrity(this.prisma, {
+      tradingAccountId: account.id,
+      seasonParticipantId: account.seasonParticipant?.id ?? null,
+    });
+
+    const order = await this.prisma.order.findFirst({
+      where: {
+        id: parsedOrderId,
+        tradingAccountId: account.id,
+      },
+      select: {
+        ...ORDER_EXECUTION_SELECT,
+        assetPriceSnapshot: {
+          select: {
+            sourceType: true,
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      this.throwApiError(
+        HttpStatus.NOT_FOUND,
+        'ORDER_NOT_FOUND',
+        'Order not found.',
+      );
+    }
+
+    const priceSource =
+      order.assetPriceSnapshot?.sourceType ===
+        AssetPriceSourceType.provider_api ||
+      order.assetPriceSnapshot?.sourceType === AssetPriceSourceType.admin_manual
+        ? order.assetPriceSnapshot.sourceType
+        : null;
+
+    return {
+      success: true,
+      data: {
+        order: this.formatOrder(order),
+        execution: {
+          state: order.status,
+          priceSource,
+          quoteId: order.quoteId,
+          assetPriceSnapshotId: order.assetPriceSnapshotId,
+          fxRateSnapshotId: order.fxRateSnapshotId,
+        },
+      },
+    };
+  }
+
+  /**
+   * Resolve an owned account into a mutation-grade season trading context.
+   * Gate order: ownership (404) → mode (general trading unimplemented,
+   * 409) → account status (409) → season/participant tradability (the same
+   * asserts the legacy path uses). TradingAccount.status alone NEVER
+   * authorizes trading — season window and participant status still gate.
+   */
+  private async resolveAccountSeasonTradingContext(
+    userId: string,
+    tradingAccountId: string,
+    now: Date,
+  ): Promise<SeasonTradingContext> {
+    const account =
+      await this.requireTradingAccountAccessService().getOwnedAccountOrThrow(
+        userId,
+        tradingAccountId.trim(),
+      );
+
+    return this.resolveAccountSeasonTradingContextForAccount(account, now);
+  }
+
+  private async resolveAccountSeasonTradingContextForAccount(
+    account: {
+      id: string;
+      mode: TradingAccountMode;
+      status: TradingAccountStatus;
+      seasonParticipant: {
+        id: string;
+        participantStatus: ParticipantStatus;
+        joinedAt: Date;
+        season: { id: string };
+      } | null;
+    },
+    now: Date,
+  ): Promise<SeasonTradingContext> {
+    // General-mode trading is not implemented: no wallets or funding exist
+    // for general accounts, and a GET/POST must never fabricate them.
+    if (
+      account.mode !== TradingAccountMode.season ||
+      !account.seasonParticipant
+    ) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED',
+        'Trading is not available for general accounts yet.',
+      );
+    }
+
+    if (account.status !== TradingAccountStatus.active) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'TRADING_ACCOUNT_NOT_ACTIVE',
+        'Trading account is not active',
+      );
+    }
+
+    const season = await this.prisma.season.findUnique({
+      where: { id: account.seasonParticipant.season.id },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        startAt: true,
+        endAt: true,
+        tradeFeeRate: true,
+      },
+    });
+
+    if (!season) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'SEASON_NOT_ACTIVE',
+        'Season is not active.',
+      );
+    }
+
+    this.assertSeasonTradable(season, now);
+    this.assertParticipantTradable(account.seasonParticipant.participantStatus);
+
+    return {
+      season,
+      participant: {
+        id: account.seasonParticipant.id,
+        participantStatus: account.seasonParticipant.participantStatus,
+        joinedAt: account.seasonParticipant.joinedAt,
+        tradingAccountId: account.id,
+      },
+      tradingAccountId: account.id,
+    };
+  }
+
   private async findOwnedOrderForExecution(
     tx: OrderExecuteTransactionClient,
     orderId: string,
@@ -1596,6 +2185,20 @@ export class OrdersService {
       limitPrice: order.orderType === OrderType.limit ? order.limitPrice : null,
       currencyCode: order.currencyCode,
     });
+
+    // Account isolation: a quote minted under a different trading account is
+    // never executable, even for the same user. NULL legacy quotes pass and
+    // stay pinned to the participant + request hash below.
+    if (
+      quote.tradingAccountId !== null &&
+      quote.tradingAccountId !== this.requireOrderTradingScope(order)
+    ) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'QUOTE_MISMATCH',
+        'Quote does not match the submitted order.',
+      );
+    }
 
     if (
       quote.seasonParticipantId !== order.seasonParticipantId ||
@@ -1832,11 +2435,16 @@ export class OrdersService {
     order: OrderExecutionRecord,
     plan: OrderExecutionPlan,
   ): Promise<OrderExecutionTransactionResult> {
+    // Verified account scope FIRST: the order's own scope, the participant
+    // link, and (via the checks below) the wallet/position/quote must all
+    // name the same trading account before any money moves.
+    const tradingAccountId = this.requireOrderTradingScope(order);
     await this.consumeOrderQuoteInTransaction(tx, order, plan.executedAt);
     const wallet = await this.findCashWalletForExecution(
       tx,
       order.seasonParticipantId,
       order.currencyCode,
+      tradingAccountId,
     );
     const netAmount = this.formatDecimal(plan.netAmount, monetaryScale);
     // Atomic available-balance debit: cash reserved by submitted limit-buy
@@ -1844,6 +2452,7 @@ export class OrdersService {
     const debitCount = await debitAvailableCash(tx, {
       walletId: wallet.id,
       seasonParticipantId: order.seasonParticipantId,
+      tradingAccountId,
       currencyCode: order.currencyCode,
       amount: netAmount,
     });
@@ -1862,11 +2471,16 @@ export class OrdersService {
       seasonParticipantId: order.seasonParticipantId,
       currencyCode: order.currencyCode,
     });
-    const positionId = await this.createOrUpdateBuyPosition(tx, order, plan);
+    const positionId = await this.createOrUpdateBuyPosition(
+      tx,
+      order,
+      plan,
+      tradingAccountId,
+    );
     const walletTransaction = await tx.walletTransaction.create({
       data: {
         seasonParticipantId: order.seasonParticipantId,
-        tradingAccountId: this.requireOrderTradingAccountId(order),
+        tradingAccountId,
         walletId: wallet.id,
         currencyCode: order.currencyCode,
         direction: WalletTransactionDirection.debit,
@@ -1911,6 +2525,7 @@ export class OrdersService {
     order: OrderExecutionRecord,
     plan: OrderExecutionPlan,
   ): Promise<OrderExecutionTransactionResult> {
+    const tradingAccountId = this.requireOrderTradingScope(order);
     await this.consumeOrderQuoteInTransaction(tx, order, plan.executedAt);
     const position = await tx.position.findUnique({
       where: {
@@ -1921,6 +2536,8 @@ export class OrdersService {
       },
       select: {
         id: true,
+        seasonParticipantId: true,
+        tradingAccountId: true,
         quantity: true,
         averageCost: true,
         currencyCode: true,
@@ -1934,6 +2551,13 @@ export class OrdersService {
         'Order position was not found.',
       );
     }
+
+    // Never decrement another account's position: the position must carry
+    // the SAME verified account scope as the order (null → repair first).
+    this.assertPositionTradingScope(position, {
+      seasonParticipantId: order.seasonParticipantId,
+      tradingAccountId,
+    });
 
     if (position.currencyCode !== order.currencyCode) {
       this.throwApiError(
@@ -1960,6 +2584,7 @@ export class OrdersService {
       where: {
         id: position.id,
         seasonParticipantId: order.seasonParticipantId,
+        tradingAccountId,
         assetId: order.assetId,
         quantity: {
           gte: this.formatDecimal(order.quantity, monetaryScale),
@@ -1987,12 +2612,14 @@ export class OrdersService {
       tx,
       order.seasonParticipantId,
       order.currencyCode,
+      tradingAccountId,
     );
     const netAmount = this.formatDecimal(plan.netAmount, monetaryScale);
     const creditResult = await tx.cashWallet.updateMany({
       where: {
         id: wallet.id,
         seasonParticipantId: order.seasonParticipantId,
+        tradingAccountId,
         currencyCode: order.currencyCode,
       },
       data: {
@@ -2018,7 +2645,7 @@ export class OrdersService {
     const walletTransaction = await tx.walletTransaction.create({
       data: {
         seasonParticipantId: order.seasonParticipantId,
-        tradingAccountId: this.requireOrderTradingAccountId(order),
+        tradingAccountId,
         walletId: wallet.id,
         currencyCode: order.currencyCode,
         direction: WalletTransactionDirection.credit,
@@ -2071,10 +2698,19 @@ export class OrdersService {
       );
     }
 
+    // Account-conditioned consume: only this participant's quote flips, and
+    // only when its scope is the order's verified account (NULL legacy
+    // quotes stay consumable — they were already pinned to the participant
+    // and request hash by the execution-time validation).
     const result = await tx.quote.updateMany({
       where: {
         id: order.quoteId,
         status: QuoteStatus.active,
+        seasonParticipantId: order.seasonParticipantId,
+        OR: [
+          { tradingAccountId: this.requireOrderTradingScope(order) },
+          { tradingAccountId: null },
+        ],
       },
       data: {
         status: QuoteStatus.consumed,
@@ -2095,6 +2731,7 @@ export class OrdersService {
     tx: OrderExecuteTransactionClient,
     seasonParticipantId: string,
     currencyCode: CurrencyCode,
+    tradingAccountId: string,
   ) {
     const wallet = await tx.cashWallet.findUnique({
       where: {
@@ -2106,6 +2743,7 @@ export class OrdersService {
       select: {
         id: true,
         seasonParticipantId: true,
+        tradingAccountId: true,
         currencyCode: true,
         balanceAmount: true,
       },
@@ -2119,7 +2757,12 @@ export class OrdersService {
       );
     }
 
-    return wallet;
+    // Null or mismatched wallet scope fails closed (500) BEFORE any debit
+    // or credit — never auto-backfilled mid-trade.
+    return assertCashWalletTradingAccountScope(wallet, {
+      seasonParticipantId,
+      tradingAccountId,
+    });
   }
 
   private async findCashWalletAfterUpdateOrThrow(
@@ -2241,6 +2884,7 @@ export class OrdersService {
     tx: OrderExecuteTransactionClient,
     order: OrderExecutionRecord,
     plan: OrderExecutionPlan,
+    tradingAccountId: string,
   ): Promise<string> {
     const position = await tx.position.findUnique({
       where: {
@@ -2251,6 +2895,8 @@ export class OrdersService {
       },
       select: {
         id: true,
+        seasonParticipantId: true,
+        tradingAccountId: true,
         quantity: true,
         averageCost: true,
         currencyCode: true,
@@ -2265,6 +2911,7 @@ export class OrdersService {
       const created = await tx.position.create({
         data: {
           seasonParticipantId: order.seasonParticipantId,
+          tradingAccountId,
           assetId: order.assetId,
           quantity: this.formatDecimal(order.quantity, monetaryScale),
           averageCost: this.formatDecimal(averageCost, monetaryScale),
@@ -2279,6 +2926,13 @@ export class OrdersService {
 
       return created.id;
     }
+
+    // A null or foreign account scope on the existing position fails the
+    // whole execution (repair first) — never auto-adopted mid-trade.
+    this.assertPositionTradingScope(position, {
+      seasonParticipantId: order.seasonParticipantId,
+      tradingAccountId,
+    });
 
     if (position.currencyCode !== order.currencyCode) {
       this.throwApiError(
@@ -2301,6 +2955,7 @@ export class OrdersService {
       where: {
         id: position.id,
         seasonParticipantId: order.seasonParticipantId,
+        tradingAccountId,
         assetId: order.assetId,
         quantity: this.formatDecimal(position.quantity, monetaryScale),
         averageCost: this.formatDecimal(position.averageCost, monetaryScale),
@@ -3141,10 +3796,13 @@ export class OrdersService {
     const season = await this.findActiveSeasonOrThrow();
     this.assertSeasonTradable(season, quoteAt);
     const participant = await this.findParticipantOrThrow(season.id, userId);
+    const tradingAccountId =
+      this.requireParticipantTradingAccountId(participant);
 
     return this.buildOrderQuoteForContext({
       season,
       participant,
+      tradingAccountId,
       request,
       quoteAt,
       sourceWorkflow,
@@ -3154,11 +3812,19 @@ export class OrdersService {
   private async buildOrderQuoteForContext(input: {
     season: ActiveOrderSeason;
     participant: OrdersParticipant;
+    tradingAccountId: string;
     request: ParsedOrderRequest;
     quoteAt: Date;
     sourceWorkflow: OrderQuoteSourceWorkflow;
   }): Promise<OrderQuoteCalculation> {
-    const { season, participant, request, quoteAt, sourceWorkflow } = input;
+    const {
+      season,
+      participant,
+      tradingAccountId,
+      request,
+      quoteAt,
+      sourceWorkflow,
+    } = input;
     const asset = await this.findUsableAsset(request.assetId);
     if (
       request.currencyCode &&
@@ -3225,6 +3891,7 @@ export class OrdersService {
 
     const previewBalances = await this.assertOrderResourcesAvailable({
       participantId: participant.id,
+      tradingAccountId,
       assetId: asset.id,
       side: request.side,
       currencyCode: this.getAssetSettlementCurrency(asset),
@@ -3303,6 +3970,12 @@ export class OrdersService {
       data: {
         userId,
         seasonParticipantId: quote.participant.id,
+        // Dual-write: quote rows always carry the verified account. Every
+        // producer of OrderQuoteCalculation resolves the link fail-closed
+        // (requireParticipantTradingAccountId) before reaching here.
+        tradingAccountId: this.requireParticipantTradingAccountId(
+          quote.participant,
+        ),
         quoteType: QuoteType.order,
         status: QuoteStatus.active,
         assetId: quote.asset.id,
@@ -3392,6 +4065,7 @@ export class OrdersService {
       quoteId: string;
       userId: string;
       seasonParticipantId: string;
+      tradingAccountId: string;
       request: ParsedOrderRequest;
       now: Date;
     },
@@ -3405,6 +4079,7 @@ export class OrdersService {
       select: {
         id: true,
         seasonParticipantId: true,
+        tradingAccountId: true,
         status: true,
         assetId: true,
         side: true,
@@ -3442,6 +4117,20 @@ export class OrdersService {
         HttpStatus.NOT_FOUND,
         'QUOTE_NOT_FOUND',
         'Quote not found.',
+      );
+    }
+
+    // Account isolation: a quote minted under a different trading account
+    // cannot back an order create on this account. NULL legacy quotes pass
+    // and stay pinned to the participant + request hash below.
+    if (
+      quote.tradingAccountId !== null &&
+      quote.tradingAccountId !== input.tradingAccountId
+    ) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'QUOTE_MISMATCH',
+        'Quote does not match the order create request.',
       );
     }
 
@@ -3764,14 +4453,38 @@ export class OrdersService {
     return order;
   }
 
-  private async findIdempotentCreateOrder(
-    seasonParticipantId: string,
-    idempotencyKey: string,
-  ) {
+  /**
+   * Account-first idempotent-create lookup. The DB uniqueness this replays
+   * is (tradingAccountId, idempotencyKey); the same user may reuse a key on
+   * a DIFFERENT account without colliding. When the account has no row, a
+   * LEGACY null-scope order (written before the trading-scope transition) is
+   * still replayable — but only one pinned to the same participant AND the
+   * same user, so no other season's or user's order is ever selected.
+   */
+  private async findIdempotentCreateOrder(input: {
+    tradingAccountId: string;
+    seasonParticipantId: string;
+    userId: string;
+    idempotencyKey: string;
+  }) {
+    const accountOrder = await this.prisma.order.findFirst({
+      where: {
+        tradingAccountId: input.tradingAccountId,
+        idempotencyKey: input.idempotencyKey,
+      },
+      select: IDEMPOTENT_CREATE_ORDER_SELECT,
+    });
+
+    if (accountOrder) {
+      return accountOrder;
+    }
+
     return this.prisma.order.findFirst({
       where: {
-        seasonParticipantId,
-        idempotencyKey,
+        seasonParticipantId: input.seasonParticipantId,
+        idempotencyKey: input.idempotencyKey,
+        tradingAccountId: null,
+        seasonParticipant: { userId: input.userId },
       },
       select: IDEMPOTENT_CREATE_ORDER_SELECT,
     });
@@ -4317,6 +5030,7 @@ export class OrdersService {
 
   private async assertOrderResourcesAvailable(input: {
     participantId: string;
+    tradingAccountId: string;
     assetId: string;
     side: OrderSide;
     currencyCode: CurrencyCode;
@@ -4335,10 +5049,22 @@ export class OrdersService {
           },
         },
         select: {
+          id: true,
+          seasonParticipantId: true,
+          tradingAccountId: true,
           balanceAmount: true,
           reservedAmount: true,
         },
       });
+
+      // Scope before balance: an unscoped/mis-scoped wallet must never be
+      // the balance basis of a quote (500 repair-required/mismatch).
+      if (wallet) {
+        assertCashWalletTradingAccountScope(wallet, {
+          seasonParticipantId: input.participantId,
+          tradingAccountId: input.tradingAccountId,
+        });
+      }
 
       // Only the AVAILABLE balance may fund a market buy: cash reserved by
       // submitted limit-buy orders is off-limits (mirrors the atomic guard
@@ -4403,9 +5129,19 @@ export class OrdersService {
         },
       },
       select: {
+        id: true,
+        seasonParticipantId: true,
+        tradingAccountId: true,
         balanceAmount: true,
       },
     });
+
+    if (wallet) {
+      assertCashWalletTradingAccountScope(wallet, {
+        seasonParticipantId: input.participantId,
+        tradingAccountId: input.tradingAccountId,
+      });
+    }
 
     return {
       walletBalanceBefore: wallet?.balanceAmount ?? new Prisma.Decimal(0),
@@ -4591,6 +5327,7 @@ export class OrdersService {
         id: true,
         participantStatus: true,
         joinedAt: true,
+        tradingAccountId: true,
       },
     });
   }
@@ -4810,17 +5547,15 @@ export class OrdersService {
   }
 
   /**
-   * Transitional dual-write guard: every new ledger row must carry the
-   * participant's trading account. A null link is a deploy-boundary state
-   * that must be repaired (trading-accounts:repair-links) — never silently
-   * spread onto new financial rows.
+   * Transitional dual-write guard: every writer needs the participant's
+   * trading-account link. A null link is a deploy-boundary state that must
+   * be repaired (trading-accounts:repair-links) — never silently spread
+   * onto new orders/quotes/positions/ledger rows.
    */
-  private requireOrderTradingAccountId(order: {
-    seasonParticipantId: string;
-    seasonParticipant: { tradingAccountId: string | null };
+  private requireParticipantTradingAccountId(participant: {
+    tradingAccountId: string | null;
   }): string {
-    const tradingAccountId = order.seasonParticipant.tradingAccountId;
-    if (!tradingAccountId) {
+    if (!participant.tradingAccountId) {
       this.throwApiError(
         HttpStatus.INTERNAL_SERVER_ERROR,
         'TRADING_ACCOUNT_LINK_INTEGRITY',
@@ -4828,7 +5563,84 @@ export class OrdersService {
       );
     }
 
-    return tradingAccountId;
+    return participant.tradingAccountId;
+  }
+
+  /**
+   * Execution-time scope resolution for an existing order: the order's OWN
+   * tradingAccountId must exist (else the trading-scope repair has to run
+   * first) and must equal the participant's link. Only then may wallets,
+   * positions, quotes, and ledger rows be touched under that account.
+   */
+  private requireOrderTradingScope(order: {
+    tradingAccountId: string | null;
+    seasonParticipant: { tradingAccountId: string | null };
+  }): string {
+    const participantAccountId = order.seasonParticipant.tradingAccountId;
+    if (!participantAccountId) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'TRADING_ACCOUNT_LINK_INTEGRITY',
+        'Participant has no trading account link; run trading-accounts:repair-links.',
+      );
+    }
+
+    if (!order.tradingAccountId) {
+      this.throwTradingScopeIntegrityError(
+        'TRADING_SCOPE_REPAIR_REQUIRED',
+        'Order has no trading account scope; run trading-accounts:repair-trading-scope.',
+      );
+    }
+
+    if (order.tradingAccountId !== participantAccountId) {
+      this.throwTradingScopeIntegrityError(
+        'TRADING_ACCOUNT_SCOPE_MISMATCH',
+        'Order is scoped to a different trading account than its participant.',
+      );
+    }
+
+    return order.tradingAccountId;
+  }
+
+  /**
+   * A position touched by an execution must carry the same verified account
+   * scope as the order. Null → repair first; mismatch → corruption. Never
+   * auto-adopted or overwritten mid-trade.
+   */
+  private assertPositionTradingScope(
+    position: {
+      seasonParticipantId: string;
+      tradingAccountId: string | null;
+    },
+    expected: { seasonParticipantId: string; tradingAccountId: string },
+  ): void {
+    if (position.seasonParticipantId !== expected.seasonParticipantId) {
+      this.throwTradingScopeIntegrityError(
+        'TRADING_ACCOUNT_SCOPE_MISMATCH',
+        'Position belongs to a different season participant.',
+      );
+    }
+
+    if (position.tradingAccountId == null) {
+      this.throwTradingScopeIntegrityError(
+        'TRADING_SCOPE_REPAIR_REQUIRED',
+        'Position has no trading account scope; run trading-accounts:repair-trading-scope.',
+      );
+    }
+
+    if (position.tradingAccountId !== expected.tradingAccountId) {
+      this.throwTradingScopeIntegrityError(
+        'TRADING_ACCOUNT_SCOPE_MISMATCH',
+        'Position belongs to a different trading account.',
+      );
+    }
+  }
+
+  private throwTradingScopeIntegrityError(
+    code: string,
+    message: string,
+  ): never {
+    this.throwApiError(HttpStatus.INTERNAL_SERVER_ERROR, code, message);
   }
 
   private throwApiError(

@@ -1,4 +1,9 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Optional,
+} from '@nestjs/common';
 import {
   AssetPriceSourceType,
   AssetType,
@@ -10,6 +15,8 @@ import {
 } from '../generated/prisma/client';
 import { isFxSnapshotStaleForPortfolioValuation } from '../portfolio/portfolio-valuation.policy';
 import { PrismaService } from '../prisma/prisma.service';
+import { TradingAccountAccessService } from '../trading-accounts/trading-account-access.service';
+import { assertSeasonAccountPositionScopeIntegrity } from '../trading-accounts/trading-account-financial-integrity';
 import {
   buildAdminManualFallbackDecision,
   isPositiveDecimal,
@@ -242,7 +249,97 @@ const MAX_LIMIT = 100;
 
 @Injectable()
 export class PositionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional()
+    private readonly tradingAccountAccessService?: TradingAccountAccessService,
+  ) {}
+
+  /**
+   * Account-scoped position list: rows are selected by the POSITION's own
+   * tradingAccountId (never a client-provided participant id), with the
+   * same filters, valuation, sorting, pagination, and serialization as the
+   * legacy /positions response. Read-only and status-blind — active,
+   * suspended, and closed accounts are all readable by their owner, and a
+   * GET never creates or mutates positions. A general account with no
+   * positions is a normal empty list; a season participant whose positions
+   * lost their account scope fails closed (repair required) instead of
+   * looking empty.
+   */
+  async getPositionsForTradingAccount(
+    userId: string | undefined,
+    tradingAccountId: string,
+    query: PositionsQuery = {},
+  ) {
+    if (!userId) {
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
+    }
+
+    if (!this.tradingAccountAccessService) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'INTERNAL_ERROR',
+        'Trading account access service unavailable',
+      );
+    }
+
+    const parsedQuery = this.parseQuery(query);
+    const account =
+      await this.tradingAccountAccessService.getOwnedAccountOrThrow(
+        userId,
+        typeof tradingAccountId === 'string'
+          ? tradingAccountId.trim()
+          : tradingAccountId,
+      );
+
+    await assertSeasonAccountPositionScopeIntegrity(this.prisma, {
+      tradingAccountId: account.id,
+      seasonParticipantId: account.seasonParticipant?.id ?? null,
+    });
+
+    const valuationAt = new Date();
+    const positions = await this.findPositionsByScope(
+      { tradingAccountId: account.id },
+      parsedQuery,
+    );
+    const usdKrwSelection = await this.findUsdKrwSelectionIfNeeded(
+      positions,
+      valuationAt,
+    );
+    const items = await Promise.all(
+      positions.map((position) =>
+        this.buildPositionItem(position, valuationAt, usdKrwSelection),
+      ),
+    );
+    const sortedItems = items.sort((left, right) =>
+      this.comparePositionItems(left, right),
+    );
+    const paginatedItems = sortedItems.slice(
+      parsedQuery.offset,
+      parsedQuery.offset + parsedQuery.limit,
+    );
+
+    return {
+      success: true as const,
+      data: {
+        state: 'available' as const,
+        tradingAccountId: account.id,
+        filters: this.formatFilters(parsedQuery),
+        pagination: this.pagination(
+          parsedQuery,
+          sortedItems.length,
+          paginatedItems.length,
+        ),
+        positions: paginatedItems.map((item) => this.formatPositionItem(item)),
+        summary: this.buildSummary(sortedItems),
+        valuationErrors: this.buildValuationErrors(sortedItems),
+      },
+    };
+  }
 
   async getPositions(
     userId: string | undefined,
@@ -901,8 +998,15 @@ export class PositionsService {
     seasonParticipantId: string,
     query: ParsedPositionsQuery,
   ): Promise<PositionRecord[]> {
+    return this.findPositionsByScope({ seasonParticipantId }, query);
+  }
+
+  private async findPositionsByScope(
+    scope: { seasonParticipantId: string } | { tradingAccountId: string },
+    query: ParsedPositionsQuery,
+  ): Promise<PositionRecord[]> {
     const where: Prisma.PositionWhereInput = {
-      seasonParticipantId,
+      ...scope,
       ...(query.includeClosed
         ? {}
         : {

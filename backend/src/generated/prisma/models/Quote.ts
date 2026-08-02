@@ -58,6 +58,7 @@ export type QuoteMinAggregateOutputType = {
   id: string | null
   userId: string | null
   seasonParticipantId: string | null
+  tradingAccountId: string | null
   quoteType: $Enums.QuoteType | null
   status: $Enums.QuoteStatus | null
   assetId: string | null
@@ -90,6 +91,7 @@ export type QuoteMaxAggregateOutputType = {
   id: string | null
   userId: string | null
   seasonParticipantId: string | null
+  tradingAccountId: string | null
   quoteType: $Enums.QuoteType | null
   status: $Enums.QuoteStatus | null
   assetId: string | null
@@ -122,6 +124,7 @@ export type QuoteCountAggregateOutputType = {
   id: number
   userId: number
   seasonParticipantId: number
+  tradingAccountId: number
   quoteType: number
   status: number
   assetId: number
@@ -186,6 +189,7 @@ export type QuoteMinAggregateInputType = {
   id?: true
   userId?: true
   seasonParticipantId?: true
+  tradingAccountId?: true
   quoteType?: true
   status?: true
   assetId?: true
@@ -218,6 +222,7 @@ export type QuoteMaxAggregateInputType = {
   id?: true
   userId?: true
   seasonParticipantId?: true
+  tradingAccountId?: true
   quoteType?: true
   status?: true
   assetId?: true
@@ -250,6 +255,7 @@ export type QuoteCountAggregateInputType = {
   id?: true
   userId?: true
   seasonParticipantId?: true
+  tradingAccountId?: true
   quoteType?: true
   status?: true
   assetId?: true
@@ -371,6 +377,7 @@ export type QuoteGroupByOutputType = {
   id: string
   userId: string
   seasonParticipantId: string | null
+  tradingAccountId: string | null
   quoteType: $Enums.QuoteType
   status: $Enums.QuoteStatus
   assetId: string | null
@@ -428,6 +435,7 @@ export type QuoteWhereInput = {
   id?: Prisma.StringFilter<"Quote"> | string
   userId?: Prisma.StringFilter<"Quote"> | string
   seasonParticipantId?: Prisma.StringNullableFilter<"Quote"> | string | null
+  tradingAccountId?: Prisma.StringNullableFilter<"Quote"> | string | null
   quoteType?: Prisma.EnumQuoteTypeFilter<"Quote"> | $Enums.QuoteType
   status?: Prisma.EnumQuoteStatusFilter<"Quote"> | $Enums.QuoteStatus
   assetId?: Prisma.StringNullableFilter<"Quote"> | string | null
@@ -458,6 +466,7 @@ export type QuoteWhereInput = {
   updatedAt?: Prisma.DateTimeFilter<"Quote"> | Date | string
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   seasonParticipant?: Prisma.XOR<Prisma.SeasonParticipantNullableScalarRelationFilter, Prisma.SeasonParticipantWhereInput> | null
+  tradingAccount?: Prisma.XOR<Prisma.TradingAccountNullableScalarRelationFilter, Prisma.TradingAccountWhereInput> | null
   asset?: Prisma.XOR<Prisma.AssetNullableScalarRelationFilter, Prisma.AssetWhereInput> | null
   assetPriceSnapshot?: Prisma.XOR<Prisma.AssetPriceSnapshotNullableScalarRelationFilter, Prisma.AssetPriceSnapshotWhereInput> | null
   fxRateSnapshot?: Prisma.XOR<Prisma.FxRateSnapshotNullableScalarRelationFilter, Prisma.FxRateSnapshotWhereInput> | null
@@ -468,6 +477,7 @@ export type QuoteOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   userId?: Prisma.SortOrder
   seasonParticipantId?: Prisma.SortOrderInput | Prisma.SortOrder
+  tradingAccountId?: Prisma.SortOrderInput | Prisma.SortOrder
   quoteType?: Prisma.SortOrder
   status?: Prisma.SortOrder
   assetId?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -498,6 +508,7 @@ export type QuoteOrderByWithRelationInput = {
   updatedAt?: Prisma.SortOrder
   user?: Prisma.UserOrderByWithRelationInput
   seasonParticipant?: Prisma.SeasonParticipantOrderByWithRelationInput
+  tradingAccount?: Prisma.TradingAccountOrderByWithRelationInput
   asset?: Prisma.AssetOrderByWithRelationInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotOrderByWithRelationInput
   fxRateSnapshot?: Prisma.FxRateSnapshotOrderByWithRelationInput
@@ -511,6 +522,7 @@ export type QuoteWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.QuoteWhereInput | Prisma.QuoteWhereInput[]
   userId?: Prisma.StringFilter<"Quote"> | string
   seasonParticipantId?: Prisma.StringNullableFilter<"Quote"> | string | null
+  tradingAccountId?: Prisma.StringNullableFilter<"Quote"> | string | null
   quoteType?: Prisma.EnumQuoteTypeFilter<"Quote"> | $Enums.QuoteType
   status?: Prisma.EnumQuoteStatusFilter<"Quote"> | $Enums.QuoteStatus
   assetId?: Prisma.StringNullableFilter<"Quote"> | string | null
@@ -541,6 +553,7 @@ export type QuoteWhereUniqueInput = Prisma.AtLeast<{
   updatedAt?: Prisma.DateTimeFilter<"Quote"> | Date | string
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   seasonParticipant?: Prisma.XOR<Prisma.SeasonParticipantNullableScalarRelationFilter, Prisma.SeasonParticipantWhereInput> | null
+  tradingAccount?: Prisma.XOR<Prisma.TradingAccountNullableScalarRelationFilter, Prisma.TradingAccountWhereInput> | null
   asset?: Prisma.XOR<Prisma.AssetNullableScalarRelationFilter, Prisma.AssetWhereInput> | null
   assetPriceSnapshot?: Prisma.XOR<Prisma.AssetPriceSnapshotNullableScalarRelationFilter, Prisma.AssetPriceSnapshotWhereInput> | null
   fxRateSnapshot?: Prisma.XOR<Prisma.FxRateSnapshotNullableScalarRelationFilter, Prisma.FxRateSnapshotWhereInput> | null
@@ -551,6 +564,7 @@ export type QuoteOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   userId?: Prisma.SortOrder
   seasonParticipantId?: Prisma.SortOrderInput | Prisma.SortOrder
+  tradingAccountId?: Prisma.SortOrderInput | Prisma.SortOrder
   quoteType?: Prisma.SortOrder
   status?: Prisma.SortOrder
   assetId?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -593,6 +607,7 @@ export type QuoteScalarWhereWithAggregatesInput = {
   id?: Prisma.StringWithAggregatesFilter<"Quote"> | string
   userId?: Prisma.StringWithAggregatesFilter<"Quote"> | string
   seasonParticipantId?: Prisma.StringNullableWithAggregatesFilter<"Quote"> | string | null
+  tradingAccountId?: Prisma.StringNullableWithAggregatesFilter<"Quote"> | string | null
   quoteType?: Prisma.EnumQuoteTypeWithAggregatesFilter<"Quote"> | $Enums.QuoteType
   status?: Prisma.EnumQuoteStatusWithAggregatesFilter<"Quote"> | $Enums.QuoteStatus
   assetId?: Prisma.StringNullableWithAggregatesFilter<"Quote"> | string | null
@@ -652,6 +667,7 @@ export type QuoteCreateInput = {
   updatedAt?: Date | string
   user: Prisma.UserCreateNestedOneWithoutQuotesInput
   seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutQuotesInput
+  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutQuotesInput
   asset?: Prisma.AssetCreateNestedOneWithoutQuotesInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutQuotesInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutQuotesInput
@@ -662,6 +678,7 @@ export type QuoteUncheckedCreateInput = {
   id?: string
   userId: string
   seasonParticipantId?: string | null
+  tradingAccountId?: string | null
   quoteType: $Enums.QuoteType
   status?: $Enums.QuoteStatus
   assetId?: string | null
@@ -722,6 +739,7 @@ export type QuoteUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   user?: Prisma.UserUpdateOneRequiredWithoutQuotesNestedInput
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutQuotesNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutQuotesNestedInput
   asset?: Prisma.AssetUpdateOneWithoutQuotesNestedInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutQuotesNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutQuotesNestedInput
@@ -732,6 +750,7 @@ export type QuoteUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   quoteType?: Prisma.EnumQuoteTypeFieldUpdateOperationsInput | $Enums.QuoteType
   status?: Prisma.EnumQuoteStatusFieldUpdateOperationsInput | $Enums.QuoteStatus
   assetId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -767,6 +786,7 @@ export type QuoteCreateManyInput = {
   id?: string
   userId: string
   seasonParticipantId?: string | null
+  tradingAccountId?: string | null
   quoteType: $Enums.QuoteType
   status?: $Enums.QuoteStatus
   assetId?: string | null
@@ -830,6 +850,7 @@ export type QuoteUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   quoteType?: Prisma.EnumQuoteTypeFieldUpdateOperationsInput | $Enums.QuoteType
   status?: Prisma.EnumQuoteStatusFieldUpdateOperationsInput | $Enums.QuoteStatus
   assetId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -879,6 +900,7 @@ export type QuoteCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   userId?: Prisma.SortOrder
   seasonParticipantId?: Prisma.SortOrder
+  tradingAccountId?: Prisma.SortOrder
   quoteType?: Prisma.SortOrder
   status?: Prisma.SortOrder
   assetId?: Prisma.SortOrder
@@ -927,6 +949,7 @@ export type QuoteMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   userId?: Prisma.SortOrder
   seasonParticipantId?: Prisma.SortOrder
+  tradingAccountId?: Prisma.SortOrder
   quoteType?: Prisma.SortOrder
   status?: Prisma.SortOrder
   assetId?: Prisma.SortOrder
@@ -959,6 +982,7 @@ export type QuoteMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   userId?: Prisma.SortOrder
   seasonParticipantId?: Prisma.SortOrder
+  tradingAccountId?: Prisma.SortOrder
   quoteType?: Prisma.SortOrder
   status?: Prisma.SortOrder
   assetId?: Prisma.SortOrder
@@ -1040,6 +1064,48 @@ export type QuoteUncheckedUpdateManyWithoutUserNestedInput = {
   connect?: Prisma.QuoteWhereUniqueInput | Prisma.QuoteWhereUniqueInput[]
   update?: Prisma.QuoteUpdateWithWhereUniqueWithoutUserInput | Prisma.QuoteUpdateWithWhereUniqueWithoutUserInput[]
   updateMany?: Prisma.QuoteUpdateManyWithWhereWithoutUserInput | Prisma.QuoteUpdateManyWithWhereWithoutUserInput[]
+  deleteMany?: Prisma.QuoteScalarWhereInput | Prisma.QuoteScalarWhereInput[]
+}
+
+export type QuoteCreateNestedManyWithoutTradingAccountInput = {
+  create?: Prisma.XOR<Prisma.QuoteCreateWithoutTradingAccountInput, Prisma.QuoteUncheckedCreateWithoutTradingAccountInput> | Prisma.QuoteCreateWithoutTradingAccountInput[] | Prisma.QuoteUncheckedCreateWithoutTradingAccountInput[]
+  connectOrCreate?: Prisma.QuoteCreateOrConnectWithoutTradingAccountInput | Prisma.QuoteCreateOrConnectWithoutTradingAccountInput[]
+  createMany?: Prisma.QuoteCreateManyTradingAccountInputEnvelope
+  connect?: Prisma.QuoteWhereUniqueInput | Prisma.QuoteWhereUniqueInput[]
+}
+
+export type QuoteUncheckedCreateNestedManyWithoutTradingAccountInput = {
+  create?: Prisma.XOR<Prisma.QuoteCreateWithoutTradingAccountInput, Prisma.QuoteUncheckedCreateWithoutTradingAccountInput> | Prisma.QuoteCreateWithoutTradingAccountInput[] | Prisma.QuoteUncheckedCreateWithoutTradingAccountInput[]
+  connectOrCreate?: Prisma.QuoteCreateOrConnectWithoutTradingAccountInput | Prisma.QuoteCreateOrConnectWithoutTradingAccountInput[]
+  createMany?: Prisma.QuoteCreateManyTradingAccountInputEnvelope
+  connect?: Prisma.QuoteWhereUniqueInput | Prisma.QuoteWhereUniqueInput[]
+}
+
+export type QuoteUpdateManyWithoutTradingAccountNestedInput = {
+  create?: Prisma.XOR<Prisma.QuoteCreateWithoutTradingAccountInput, Prisma.QuoteUncheckedCreateWithoutTradingAccountInput> | Prisma.QuoteCreateWithoutTradingAccountInput[] | Prisma.QuoteUncheckedCreateWithoutTradingAccountInput[]
+  connectOrCreate?: Prisma.QuoteCreateOrConnectWithoutTradingAccountInput | Prisma.QuoteCreateOrConnectWithoutTradingAccountInput[]
+  upsert?: Prisma.QuoteUpsertWithWhereUniqueWithoutTradingAccountInput | Prisma.QuoteUpsertWithWhereUniqueWithoutTradingAccountInput[]
+  createMany?: Prisma.QuoteCreateManyTradingAccountInputEnvelope
+  set?: Prisma.QuoteWhereUniqueInput | Prisma.QuoteWhereUniqueInput[]
+  disconnect?: Prisma.QuoteWhereUniqueInput | Prisma.QuoteWhereUniqueInput[]
+  delete?: Prisma.QuoteWhereUniqueInput | Prisma.QuoteWhereUniqueInput[]
+  connect?: Prisma.QuoteWhereUniqueInput | Prisma.QuoteWhereUniqueInput[]
+  update?: Prisma.QuoteUpdateWithWhereUniqueWithoutTradingAccountInput | Prisma.QuoteUpdateWithWhereUniqueWithoutTradingAccountInput[]
+  updateMany?: Prisma.QuoteUpdateManyWithWhereWithoutTradingAccountInput | Prisma.QuoteUpdateManyWithWhereWithoutTradingAccountInput[]
+  deleteMany?: Prisma.QuoteScalarWhereInput | Prisma.QuoteScalarWhereInput[]
+}
+
+export type QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput = {
+  create?: Prisma.XOR<Prisma.QuoteCreateWithoutTradingAccountInput, Prisma.QuoteUncheckedCreateWithoutTradingAccountInput> | Prisma.QuoteCreateWithoutTradingAccountInput[] | Prisma.QuoteUncheckedCreateWithoutTradingAccountInput[]
+  connectOrCreate?: Prisma.QuoteCreateOrConnectWithoutTradingAccountInput | Prisma.QuoteCreateOrConnectWithoutTradingAccountInput[]
+  upsert?: Prisma.QuoteUpsertWithWhereUniqueWithoutTradingAccountInput | Prisma.QuoteUpsertWithWhereUniqueWithoutTradingAccountInput[]
+  createMany?: Prisma.QuoteCreateManyTradingAccountInputEnvelope
+  set?: Prisma.QuoteWhereUniqueInput | Prisma.QuoteWhereUniqueInput[]
+  disconnect?: Prisma.QuoteWhereUniqueInput | Prisma.QuoteWhereUniqueInput[]
+  delete?: Prisma.QuoteWhereUniqueInput | Prisma.QuoteWhereUniqueInput[]
+  connect?: Prisma.QuoteWhereUniqueInput | Prisma.QuoteWhereUniqueInput[]
+  update?: Prisma.QuoteUpdateWithWhereUniqueWithoutTradingAccountInput | Prisma.QuoteUpdateWithWhereUniqueWithoutTradingAccountInput[]
+  updateMany?: Prisma.QuoteUpdateManyWithWhereWithoutTradingAccountInput | Prisma.QuoteUpdateManyWithWhereWithoutTradingAccountInput[]
   deleteMany?: Prisma.QuoteScalarWhereInput | Prisma.QuoteScalarWhereInput[]
 }
 
@@ -1275,6 +1341,7 @@ export type QuoteCreateWithoutUserInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutQuotesInput
+  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutQuotesInput
   asset?: Prisma.AssetCreateNestedOneWithoutQuotesInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutQuotesInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutQuotesInput
@@ -1284,6 +1351,7 @@ export type QuoteCreateWithoutUserInput = {
 export type QuoteUncheckedCreateWithoutUserInput = {
   id?: string
   seasonParticipantId?: string | null
+  tradingAccountId?: string | null
   quoteType: $Enums.QuoteType
   status?: $Enums.QuoteStatus
   assetId?: string | null
@@ -1348,6 +1416,7 @@ export type QuoteScalarWhereInput = {
   id?: Prisma.StringFilter<"Quote"> | string
   userId?: Prisma.StringFilter<"Quote"> | string
   seasonParticipantId?: Prisma.StringNullableFilter<"Quote"> | string | null
+  tradingAccountId?: Prisma.StringNullableFilter<"Quote"> | string | null
   quoteType?: Prisma.EnumQuoteTypeFilter<"Quote"> | $Enums.QuoteType
   status?: Prisma.EnumQuoteStatusFilter<"Quote"> | $Enums.QuoteStatus
   assetId?: Prisma.StringNullableFilter<"Quote"> | string | null
@@ -1378,6 +1447,102 @@ export type QuoteScalarWhereInput = {
   updatedAt?: Prisma.DateTimeFilter<"Quote"> | Date | string
 }
 
+export type QuoteCreateWithoutTradingAccountInput = {
+  id?: string
+  quoteType: $Enums.QuoteType
+  status?: $Enums.QuoteStatus
+  side?: $Enums.OrderSide | null
+  orderType?: $Enums.OrderType | null
+  quantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  fromCurrency?: $Enums.CurrencyCode | null
+  toCurrency?: $Enums.CurrencyCode | null
+  sourceAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  targetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode?: $Enums.CurrencyCode | null
+  quotedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  maxChangeBps: runtime.Decimal | runtime.DecimalJsLike | number | string
+  expiresAt: Date | string
+  requestHash: string
+  consumedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  user: Prisma.UserCreateNestedOneWithoutQuotesInput
+  seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutQuotesInput
+  asset?: Prisma.AssetCreateNestedOneWithoutQuotesInput
+  assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutQuotesInput
+  fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutQuotesInput
+  orders?: Prisma.OrderCreateNestedManyWithoutQuoteInput
+}
+
+export type QuoteUncheckedCreateWithoutTradingAccountInput = {
+  id?: string
+  userId: string
+  seasonParticipantId?: string | null
+  quoteType: $Enums.QuoteType
+  status?: $Enums.QuoteStatus
+  assetId?: string | null
+  side?: $Enums.OrderSide | null
+  orderType?: $Enums.OrderType | null
+  quantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  fromCurrency?: $Enums.CurrencyCode | null
+  toCurrency?: $Enums.CurrencyCode | null
+  sourceAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  targetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode?: $Enums.CurrencyCode | null
+  quotedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  assetPriceSnapshotId?: string | null
+  fxRateSnapshotId?: string | null
+  assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  maxChangeBps: runtime.Decimal | runtime.DecimalJsLike | number | string
+  expiresAt: Date | string
+  requestHash: string
+  consumedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutQuoteInput
+}
+
+export type QuoteCreateOrConnectWithoutTradingAccountInput = {
+  where: Prisma.QuoteWhereUniqueInput
+  create: Prisma.XOR<Prisma.QuoteCreateWithoutTradingAccountInput, Prisma.QuoteUncheckedCreateWithoutTradingAccountInput>
+}
+
+export type QuoteCreateManyTradingAccountInputEnvelope = {
+  data: Prisma.QuoteCreateManyTradingAccountInput | Prisma.QuoteCreateManyTradingAccountInput[]
+  skipDuplicates?: boolean
+}
+
+export type QuoteUpsertWithWhereUniqueWithoutTradingAccountInput = {
+  where: Prisma.QuoteWhereUniqueInput
+  update: Prisma.XOR<Prisma.QuoteUpdateWithoutTradingAccountInput, Prisma.QuoteUncheckedUpdateWithoutTradingAccountInput>
+  create: Prisma.XOR<Prisma.QuoteCreateWithoutTradingAccountInput, Prisma.QuoteUncheckedCreateWithoutTradingAccountInput>
+}
+
+export type QuoteUpdateWithWhereUniqueWithoutTradingAccountInput = {
+  where: Prisma.QuoteWhereUniqueInput
+  data: Prisma.XOR<Prisma.QuoteUpdateWithoutTradingAccountInput, Prisma.QuoteUncheckedUpdateWithoutTradingAccountInput>
+}
+
+export type QuoteUpdateManyWithWhereWithoutTradingAccountInput = {
+  where: Prisma.QuoteScalarWhereInput
+  data: Prisma.XOR<Prisma.QuoteUpdateManyMutationInput, Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountInput>
+}
+
 export type QuoteCreateWithoutSeasonParticipantInput = {
   id?: string
   quoteType: $Enums.QuoteType
@@ -1406,6 +1571,7 @@ export type QuoteCreateWithoutSeasonParticipantInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   user: Prisma.UserCreateNestedOneWithoutQuotesInput
+  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutQuotesInput
   asset?: Prisma.AssetCreateNestedOneWithoutQuotesInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutQuotesInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutQuotesInput
@@ -1415,6 +1581,7 @@ export type QuoteCreateWithoutSeasonParticipantInput = {
 export type QuoteUncheckedCreateWithoutSeasonParticipantInput = {
   id?: string
   userId: string
+  tradingAccountId?: string | null
   quoteType: $Enums.QuoteType
   status?: $Enums.QuoteStatus
   assetId?: string | null
@@ -1501,6 +1668,7 @@ export type QuoteCreateWithoutAssetInput = {
   updatedAt?: Date | string
   user: Prisma.UserCreateNestedOneWithoutQuotesInput
   seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutQuotesInput
+  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutQuotesInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutQuotesInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutQuotesInput
   orders?: Prisma.OrderCreateNestedManyWithoutQuoteInput
@@ -1510,6 +1678,7 @@ export type QuoteUncheckedCreateWithoutAssetInput = {
   id?: string
   userId: string
   seasonParticipantId?: string | null
+  tradingAccountId?: string | null
   quoteType: $Enums.QuoteType
   status?: $Enums.QuoteStatus
   side?: $Enums.OrderSide | null
@@ -1595,6 +1764,7 @@ export type QuoteCreateWithoutAssetPriceSnapshotInput = {
   updatedAt?: Date | string
   user: Prisma.UserCreateNestedOneWithoutQuotesInput
   seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutQuotesInput
+  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutQuotesInput
   asset?: Prisma.AssetCreateNestedOneWithoutQuotesInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutQuotesInput
   orders?: Prisma.OrderCreateNestedManyWithoutQuoteInput
@@ -1604,6 +1774,7 @@ export type QuoteUncheckedCreateWithoutAssetPriceSnapshotInput = {
   id?: string
   userId: string
   seasonParticipantId?: string | null
+  tradingAccountId?: string | null
   quoteType: $Enums.QuoteType
   status?: $Enums.QuoteStatus
   assetId?: string | null
@@ -1689,6 +1860,7 @@ export type QuoteCreateWithoutOrdersInput = {
   updatedAt?: Date | string
   user: Prisma.UserCreateNestedOneWithoutQuotesInput
   seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutQuotesInput
+  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutQuotesInput
   asset?: Prisma.AssetCreateNestedOneWithoutQuotesInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutQuotesInput
   fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutQuotesInput
@@ -1698,6 +1870,7 @@ export type QuoteUncheckedCreateWithoutOrdersInput = {
   id?: string
   userId: string
   seasonParticipantId?: string | null
+  tradingAccountId?: string | null
   quoteType: $Enums.QuoteType
   status?: $Enums.QuoteStatus
   assetId?: string | null
@@ -1773,6 +1946,7 @@ export type QuoteUpdateWithoutOrdersInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   user?: Prisma.UserUpdateOneRequiredWithoutQuotesNestedInput
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutQuotesNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutQuotesNestedInput
   asset?: Prisma.AssetUpdateOneWithoutQuotesNestedInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutQuotesNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutQuotesNestedInput
@@ -1782,6 +1956,7 @@ export type QuoteUncheckedUpdateWithoutOrdersInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   quoteType?: Prisma.EnumQuoteTypeFieldUpdateOperationsInput | $Enums.QuoteType
   status?: Prisma.EnumQuoteStatusFieldUpdateOperationsInput | $Enums.QuoteStatus
   assetId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1841,6 +2016,7 @@ export type QuoteCreateWithoutFxRateSnapshotInput = {
   updatedAt?: Date | string
   user: Prisma.UserCreateNestedOneWithoutQuotesInput
   seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutQuotesInput
+  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutQuotesInput
   asset?: Prisma.AssetCreateNestedOneWithoutQuotesInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutQuotesInput
   orders?: Prisma.OrderCreateNestedManyWithoutQuoteInput
@@ -1850,6 +2026,7 @@ export type QuoteUncheckedCreateWithoutFxRateSnapshotInput = {
   id?: string
   userId: string
   seasonParticipantId?: string | null
+  tradingAccountId?: string | null
   quoteType: $Enums.QuoteType
   status?: $Enums.QuoteStatus
   assetId?: string | null
@@ -1909,6 +2086,7 @@ export type QuoteUpdateManyWithWhereWithoutFxRateSnapshotInput = {
 export type QuoteCreateManyUserInput = {
   id?: string
   seasonParticipantId?: string | null
+  tradingAccountId?: string | null
   quoteType: $Enums.QuoteType
   status?: $Enums.QuoteStatus
   assetId?: string | null
@@ -1967,6 +2145,7 @@ export type QuoteUpdateWithoutUserInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutQuotesNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutQuotesNestedInput
   asset?: Prisma.AssetUpdateOneWithoutQuotesNestedInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutQuotesNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutQuotesNestedInput
@@ -1976,6 +2155,7 @@ export type QuoteUpdateWithoutUserInput = {
 export type QuoteUncheckedUpdateWithoutUserInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   quoteType?: Prisma.EnumQuoteTypeFieldUpdateOperationsInput | $Enums.QuoteType
   status?: Prisma.EnumQuoteStatusFieldUpdateOperationsInput | $Enums.QuoteStatus
   assetId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2010,6 +2190,145 @@ export type QuoteUncheckedUpdateWithoutUserInput = {
 export type QuoteUncheckedUpdateManyWithoutUserInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  quoteType?: Prisma.EnumQuoteTypeFieldUpdateOperationsInput | $Enums.QuoteType
+  status?: Prisma.EnumQuoteStatusFieldUpdateOperationsInput | $Enums.QuoteStatus
+  assetId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  side?: Prisma.NullableEnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide | null
+  orderType?: Prisma.NullableEnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType | null
+  quantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  fromCurrency?: Prisma.NullableEnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode | null
+  toCurrency?: Prisma.NullableEnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode | null
+  sourceAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  targetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode?: Prisma.NullableEnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode | null
+  quotedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fxRateSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  maxChangeBps?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  requestHash?: Prisma.StringFieldUpdateOperationsInput | string
+  consumedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type QuoteCreateManyTradingAccountInput = {
+  id?: string
+  userId: string
+  seasonParticipantId?: string | null
+  quoteType: $Enums.QuoteType
+  status?: $Enums.QuoteStatus
+  assetId?: string | null
+  side?: $Enums.OrderSide | null
+  orderType?: $Enums.OrderType | null
+  quantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  fromCurrency?: $Enums.CurrencyCode | null
+  toCurrency?: $Enums.CurrencyCode | null
+  sourceAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  targetAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode?: $Enums.CurrencyCode | null
+  quotedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedGrossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedFeeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedReservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  assetPriceSnapshotId?: string | null
+  fxRateSnapshotId?: string | null
+  assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  maxChangeBps: runtime.Decimal | runtime.DecimalJsLike | number | string
+  expiresAt: Date | string
+  requestHash: string
+  consumedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+}
+
+export type QuoteUpdateWithoutTradingAccountInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  quoteType?: Prisma.EnumQuoteTypeFieldUpdateOperationsInput | $Enums.QuoteType
+  status?: Prisma.EnumQuoteStatusFieldUpdateOperationsInput | $Enums.QuoteStatus
+  side?: Prisma.NullableEnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide | null
+  orderType?: Prisma.NullableEnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType | null
+  quantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  fromCurrency?: Prisma.NullableEnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode | null
+  toCurrency?: Prisma.NullableEnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode | null
+  sourceAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  targetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode?: Prisma.NullableEnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode | null
+  quotedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  maxChangeBps?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  requestHash?: Prisma.StringFieldUpdateOperationsInput | string
+  consumedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  user?: Prisma.UserUpdateOneRequiredWithoutQuotesNestedInput
+  seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutQuotesNestedInput
+  asset?: Prisma.AssetUpdateOneWithoutQuotesNestedInput
+  assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutQuotesNestedInput
+  fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutQuotesNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutQuoteNestedInput
+}
+
+export type QuoteUncheckedUpdateWithoutTradingAccountInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  quoteType?: Prisma.EnumQuoteTypeFieldUpdateOperationsInput | $Enums.QuoteType
+  status?: Prisma.EnumQuoteStatusFieldUpdateOperationsInput | $Enums.QuoteStatus
+  assetId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  side?: Prisma.NullableEnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide | null
+  orderType?: Prisma.NullableEnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType | null
+  quantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  fromCurrency?: Prisma.NullableEnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode | null
+  toCurrency?: Prisma.NullableEnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode | null
+  sourceAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  targetAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode?: Prisma.NullableEnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode | null
+  quotedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedGrossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedFeeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quotedReservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fxRateSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  assetPriceSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  fxRateSourceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  maxChangeBps?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  requestHash?: Prisma.StringFieldUpdateOperationsInput | string
+  consumedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutQuoteNestedInput
+}
+
+export type QuoteUncheckedUpdateManyWithoutTradingAccountInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   quoteType?: Prisma.EnumQuoteTypeFieldUpdateOperationsInput | $Enums.QuoteType
   status?: Prisma.EnumQuoteStatusFieldUpdateOperationsInput | $Enums.QuoteStatus
   assetId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2043,6 +2362,7 @@ export type QuoteUncheckedUpdateManyWithoutUserInput = {
 export type QuoteCreateManySeasonParticipantInput = {
   id?: string
   userId: string
+  tradingAccountId?: string | null
   quoteType: $Enums.QuoteType
   status?: $Enums.QuoteStatus
   assetId?: string | null
@@ -2101,6 +2421,7 @@ export type QuoteUpdateWithoutSeasonParticipantInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   user?: Prisma.UserUpdateOneRequiredWithoutQuotesNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutQuotesNestedInput
   asset?: Prisma.AssetUpdateOneWithoutQuotesNestedInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutQuotesNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutQuotesNestedInput
@@ -2110,6 +2431,7 @@ export type QuoteUpdateWithoutSeasonParticipantInput = {
 export type QuoteUncheckedUpdateWithoutSeasonParticipantInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
+  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   quoteType?: Prisma.EnumQuoteTypeFieldUpdateOperationsInput | $Enums.QuoteType
   status?: Prisma.EnumQuoteStatusFieldUpdateOperationsInput | $Enums.QuoteStatus
   assetId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2144,6 +2466,7 @@ export type QuoteUncheckedUpdateWithoutSeasonParticipantInput = {
 export type QuoteUncheckedUpdateManyWithoutSeasonParticipantInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
+  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   quoteType?: Prisma.EnumQuoteTypeFieldUpdateOperationsInput | $Enums.QuoteType
   status?: Prisma.EnumQuoteStatusFieldUpdateOperationsInput | $Enums.QuoteStatus
   assetId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2178,6 +2501,7 @@ export type QuoteCreateManyAssetInput = {
   id?: string
   userId: string
   seasonParticipantId?: string | null
+  tradingAccountId?: string | null
   quoteType: $Enums.QuoteType
   status?: $Enums.QuoteStatus
   side?: $Enums.OrderSide | null
@@ -2236,6 +2560,7 @@ export type QuoteUpdateWithoutAssetInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   user?: Prisma.UserUpdateOneRequiredWithoutQuotesNestedInput
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutQuotesNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutQuotesNestedInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutQuotesNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutQuotesNestedInput
   orders?: Prisma.OrderUpdateManyWithoutQuoteNestedInput
@@ -2245,6 +2570,7 @@ export type QuoteUncheckedUpdateWithoutAssetInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   quoteType?: Prisma.EnumQuoteTypeFieldUpdateOperationsInput | $Enums.QuoteType
   status?: Prisma.EnumQuoteStatusFieldUpdateOperationsInput | $Enums.QuoteStatus
   side?: Prisma.NullableEnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide | null
@@ -2279,6 +2605,7 @@ export type QuoteUncheckedUpdateManyWithoutAssetInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   quoteType?: Prisma.EnumQuoteTypeFieldUpdateOperationsInput | $Enums.QuoteType
   status?: Prisma.EnumQuoteStatusFieldUpdateOperationsInput | $Enums.QuoteStatus
   side?: Prisma.NullableEnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide | null
@@ -2312,6 +2639,7 @@ export type QuoteCreateManyAssetPriceSnapshotInput = {
   id?: string
   userId: string
   seasonParticipantId?: string | null
+  tradingAccountId?: string | null
   quoteType: $Enums.QuoteType
   status?: $Enums.QuoteStatus
   assetId?: string | null
@@ -2370,6 +2698,7 @@ export type QuoteUpdateWithoutAssetPriceSnapshotInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   user?: Prisma.UserUpdateOneRequiredWithoutQuotesNestedInput
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutQuotesNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutQuotesNestedInput
   asset?: Prisma.AssetUpdateOneWithoutQuotesNestedInput
   fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutQuotesNestedInput
   orders?: Prisma.OrderUpdateManyWithoutQuoteNestedInput
@@ -2379,6 +2708,7 @@ export type QuoteUncheckedUpdateWithoutAssetPriceSnapshotInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   quoteType?: Prisma.EnumQuoteTypeFieldUpdateOperationsInput | $Enums.QuoteType
   status?: Prisma.EnumQuoteStatusFieldUpdateOperationsInput | $Enums.QuoteStatus
   assetId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2413,6 +2743,7 @@ export type QuoteUncheckedUpdateManyWithoutAssetPriceSnapshotInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   quoteType?: Prisma.EnumQuoteTypeFieldUpdateOperationsInput | $Enums.QuoteType
   status?: Prisma.EnumQuoteStatusFieldUpdateOperationsInput | $Enums.QuoteStatus
   assetId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2446,6 +2777,7 @@ export type QuoteCreateManyFxRateSnapshotInput = {
   id?: string
   userId: string
   seasonParticipantId?: string | null
+  tradingAccountId?: string | null
   quoteType: $Enums.QuoteType
   status?: $Enums.QuoteStatus
   assetId?: string | null
@@ -2504,6 +2836,7 @@ export type QuoteUpdateWithoutFxRateSnapshotInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   user?: Prisma.UserUpdateOneRequiredWithoutQuotesNestedInput
   seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutQuotesNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutQuotesNestedInput
   asset?: Prisma.AssetUpdateOneWithoutQuotesNestedInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutQuotesNestedInput
   orders?: Prisma.OrderUpdateManyWithoutQuoteNestedInput
@@ -2513,6 +2846,7 @@ export type QuoteUncheckedUpdateWithoutFxRateSnapshotInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   quoteType?: Prisma.EnumQuoteTypeFieldUpdateOperationsInput | $Enums.QuoteType
   status?: Prisma.EnumQuoteStatusFieldUpdateOperationsInput | $Enums.QuoteStatus
   assetId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2547,6 +2881,7 @@ export type QuoteUncheckedUpdateManyWithoutFxRateSnapshotInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   quoteType?: Prisma.EnumQuoteTypeFieldUpdateOperationsInput | $Enums.QuoteType
   status?: Prisma.EnumQuoteStatusFieldUpdateOperationsInput | $Enums.QuoteStatus
   assetId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2611,6 +2946,7 @@ export type QuoteSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   id?: boolean
   userId?: boolean
   seasonParticipantId?: boolean
+  tradingAccountId?: boolean
   quoteType?: boolean
   status?: boolean
   assetId?: boolean
@@ -2641,6 +2977,7 @@ export type QuoteSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   updatedAt?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   seasonParticipant?: boolean | Prisma.Quote$seasonParticipantArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.Quote$tradingAccountArgs<ExtArgs>
   asset?: boolean | Prisma.Quote$assetArgs<ExtArgs>
   assetPriceSnapshot?: boolean | Prisma.Quote$assetPriceSnapshotArgs<ExtArgs>
   fxRateSnapshot?: boolean | Prisma.Quote$fxRateSnapshotArgs<ExtArgs>
@@ -2652,6 +2989,7 @@ export type QuoteSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   id?: boolean
   userId?: boolean
   seasonParticipantId?: boolean
+  tradingAccountId?: boolean
   quoteType?: boolean
   status?: boolean
   assetId?: boolean
@@ -2682,6 +3020,7 @@ export type QuoteSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   updatedAt?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   seasonParticipant?: boolean | Prisma.Quote$seasonParticipantArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.Quote$tradingAccountArgs<ExtArgs>
   asset?: boolean | Prisma.Quote$assetArgs<ExtArgs>
   assetPriceSnapshot?: boolean | Prisma.Quote$assetPriceSnapshotArgs<ExtArgs>
   fxRateSnapshot?: boolean | Prisma.Quote$fxRateSnapshotArgs<ExtArgs>
@@ -2691,6 +3030,7 @@ export type QuoteSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   id?: boolean
   userId?: boolean
   seasonParticipantId?: boolean
+  tradingAccountId?: boolean
   quoteType?: boolean
   status?: boolean
   assetId?: boolean
@@ -2721,6 +3061,7 @@ export type QuoteSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   updatedAt?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   seasonParticipant?: boolean | Prisma.Quote$seasonParticipantArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.Quote$tradingAccountArgs<ExtArgs>
   asset?: boolean | Prisma.Quote$assetArgs<ExtArgs>
   assetPriceSnapshot?: boolean | Prisma.Quote$assetPriceSnapshotArgs<ExtArgs>
   fxRateSnapshot?: boolean | Prisma.Quote$fxRateSnapshotArgs<ExtArgs>
@@ -2730,6 +3071,7 @@ export type QuoteSelectScalar = {
   id?: boolean
   userId?: boolean
   seasonParticipantId?: boolean
+  tradingAccountId?: boolean
   quoteType?: boolean
   status?: boolean
   assetId?: boolean
@@ -2760,10 +3102,11 @@ export type QuoteSelectScalar = {
   updatedAt?: boolean
 }
 
-export type QuoteOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "seasonParticipantId" | "quoteType" | "status" | "assetId" | "side" | "orderType" | "quantity" | "limitPrice" | "fromCurrency" | "toCurrency" | "sourceAmount" | "targetAmount" | "currencyCode" | "quotedPrice" | "quotedRate" | "quotedFeeRate" | "quotedGrossAmount" | "quotedFeeAmount" | "quotedReservedAmount" | "assetPriceSnapshotId" | "fxRateSnapshotId" | "assetPriceSourceJson" | "fxRateSourceJson" | "maxChangeBps" | "expiresAt" | "requestHash" | "consumedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["quote"]>
+export type QuoteOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "seasonParticipantId" | "tradingAccountId" | "quoteType" | "status" | "assetId" | "side" | "orderType" | "quantity" | "limitPrice" | "fromCurrency" | "toCurrency" | "sourceAmount" | "targetAmount" | "currencyCode" | "quotedPrice" | "quotedRate" | "quotedFeeRate" | "quotedGrossAmount" | "quotedFeeAmount" | "quotedReservedAmount" | "assetPriceSnapshotId" | "fxRateSnapshotId" | "assetPriceSourceJson" | "fxRateSourceJson" | "maxChangeBps" | "expiresAt" | "requestHash" | "consumedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["quote"]>
 export type QuoteInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   seasonParticipant?: boolean | Prisma.Quote$seasonParticipantArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.Quote$tradingAccountArgs<ExtArgs>
   asset?: boolean | Prisma.Quote$assetArgs<ExtArgs>
   assetPriceSnapshot?: boolean | Prisma.Quote$assetPriceSnapshotArgs<ExtArgs>
   fxRateSnapshot?: boolean | Prisma.Quote$fxRateSnapshotArgs<ExtArgs>
@@ -2773,6 +3116,7 @@ export type QuoteInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs =
 export type QuoteIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   seasonParticipant?: boolean | Prisma.Quote$seasonParticipantArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.Quote$tradingAccountArgs<ExtArgs>
   asset?: boolean | Prisma.Quote$assetArgs<ExtArgs>
   assetPriceSnapshot?: boolean | Prisma.Quote$assetPriceSnapshotArgs<ExtArgs>
   fxRateSnapshot?: boolean | Prisma.Quote$fxRateSnapshotArgs<ExtArgs>
@@ -2780,6 +3124,7 @@ export type QuoteIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extens
 export type QuoteIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   seasonParticipant?: boolean | Prisma.Quote$seasonParticipantArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.Quote$tradingAccountArgs<ExtArgs>
   asset?: boolean | Prisma.Quote$assetArgs<ExtArgs>
   assetPriceSnapshot?: boolean | Prisma.Quote$assetPriceSnapshotArgs<ExtArgs>
   fxRateSnapshot?: boolean | Prisma.Quote$fxRateSnapshotArgs<ExtArgs>
@@ -2790,6 +3135,7 @@ export type $QuotePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   objects: {
     user: Prisma.$UserPayload<ExtArgs>
     seasonParticipant: Prisma.$SeasonParticipantPayload<ExtArgs> | null
+    tradingAccount: Prisma.$TradingAccountPayload<ExtArgs> | null
     asset: Prisma.$AssetPayload<ExtArgs> | null
     assetPriceSnapshot: Prisma.$AssetPriceSnapshotPayload<ExtArgs> | null
     fxRateSnapshot: Prisma.$FxRateSnapshotPayload<ExtArgs> | null
@@ -2799,6 +3145,7 @@ export type $QuotePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     id: string
     userId: string
     seasonParticipantId: string | null
+    tradingAccountId: string | null
     quoteType: $Enums.QuoteType
     status: $Enums.QuoteStatus
     assetId: string | null
@@ -3223,6 +3570,7 @@ export interface Prisma__QuoteClient<T, Null = never, ExtArgs extends runtime.Ty
   readonly [Symbol.toStringTag]: "PrismaPromise"
   user<T extends Prisma.UserDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.UserDefaultArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   seasonParticipant<T extends Prisma.Quote$seasonParticipantArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Quote$seasonParticipantArgs<ExtArgs>>): Prisma.Prisma__SeasonParticipantClient<runtime.Types.Result.GetResult<Prisma.$SeasonParticipantPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  tradingAccount<T extends Prisma.Quote$tradingAccountArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Quote$tradingAccountArgs<ExtArgs>>): Prisma.Prisma__TradingAccountClient<runtime.Types.Result.GetResult<Prisma.$TradingAccountPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   asset<T extends Prisma.Quote$assetArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Quote$assetArgs<ExtArgs>>): Prisma.Prisma__AssetClient<runtime.Types.Result.GetResult<Prisma.$AssetPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   assetPriceSnapshot<T extends Prisma.Quote$assetPriceSnapshotArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Quote$assetPriceSnapshotArgs<ExtArgs>>): Prisma.Prisma__AssetPriceSnapshotClient<runtime.Types.Result.GetResult<Prisma.$AssetPriceSnapshotPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   fxRateSnapshot<T extends Prisma.Quote$fxRateSnapshotArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Quote$fxRateSnapshotArgs<ExtArgs>>): Prisma.Prisma__FxRateSnapshotClient<runtime.Types.Result.GetResult<Prisma.$FxRateSnapshotPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
@@ -3259,6 +3607,7 @@ export interface QuoteFieldRefs {
   readonly id: Prisma.FieldRef<"Quote", 'String'>
   readonly userId: Prisma.FieldRef<"Quote", 'String'>
   readonly seasonParticipantId: Prisma.FieldRef<"Quote", 'String'>
+  readonly tradingAccountId: Prisma.FieldRef<"Quote", 'String'>
   readonly quoteType: Prisma.FieldRef<"Quote", 'QuoteType'>
   readonly status: Prisma.FieldRef<"Quote", 'QuoteStatus'>
   readonly assetId: Prisma.FieldRef<"Quote", 'String'>
@@ -3704,6 +4053,25 @@ export type Quote$seasonParticipantArgs<ExtArgs extends runtime.Types.Extensions
    */
   include?: Prisma.SeasonParticipantInclude<ExtArgs> | null
   where?: Prisma.SeasonParticipantWhereInput
+}
+
+/**
+ * Quote.tradingAccount
+ */
+export type Quote$tradingAccountArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the TradingAccount
+   */
+  select?: Prisma.TradingAccountSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the TradingAccount
+   */
+  omit?: Prisma.TradingAccountOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.TradingAccountInclude<ExtArgs> | null
+  where?: Prisma.TradingAccountWhereInput
 }
 
 /**

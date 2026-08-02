@@ -4,6 +4,7 @@ import {
   releaseReservedCash,
   reserveAvailableCash,
 } from '../wallets/cash-wallet-atomic';
+import { assertCashWalletTradingAccountScope } from '../wallets/cash-wallet-scope';
 import {
   limitOrderErrorCodes,
   limitOrderErrorHttpStatus,
@@ -34,6 +35,8 @@ export class OrderReservationService {
     tx: ReservationTransactionClient,
     input: {
       seasonParticipantId: string;
+      /** VERIFIED trading account id (participant link). */
+      tradingAccountId: string;
       currencyCode: CurrencyCode;
       /** Canonical scale-8 decimal string, > 0. */
       amount: string;
@@ -46,7 +49,7 @@ export class OrderReservationService {
           currencyCode: input.currencyCode,
         },
       },
-      select: { id: true },
+      select: { id: true, seasonParticipantId: true, tradingAccountId: true },
     });
 
     if (!wallet) {
@@ -56,9 +59,18 @@ export class OrderReservationService {
       );
     }
 
+    // Null/mismatched wallet scope fails closed (500 repair-required or
+    // mismatch) BEFORE any reservation; the account id also rides in the
+    // atomic UPDATE's WHERE below.
+    assertCashWalletTradingAccountScope(wallet, {
+      seasonParticipantId: input.seasonParticipantId,
+      tradingAccountId: input.tradingAccountId,
+    });
+
     const reservedCount = await reserveAvailableCash(tx, {
       walletId: wallet.id,
       seasonParticipantId: input.seasonParticipantId,
+      tradingAccountId: input.tradingAccountId,
       currencyCode: input.currencyCode,
       amount: input.amount,
     });
@@ -88,6 +100,8 @@ export class OrderReservationService {
     input: {
       walletId: string;
       seasonParticipantId: string;
+      /** VERIFIED trading account id (order/wallet verified scope). */
+      tradingAccountId: string;
       currencyCode: CurrencyCode;
       /** Canonical scale-8 decimal string, > 0. */
       amount: string;

@@ -251,6 +251,7 @@ async function createScenario(label) {
   const wallet = await prisma.cashWallet.create({
     data: {
       seasonParticipantId: participant.id,
+      tradingAccountId: tradingAccount.id,
       currencyCode: CurrencyCode.KRW,
       balanceAmount: '1000000.00000000',
       reservedAmount: ZERO_AMOUNT,
@@ -278,6 +279,7 @@ async function createScenario(label) {
     operator: { userId: operator.id, role: operator.role },
     seasonId: season.id,
     participantId: participant.id,
+    tradingAccountId: tradingAccount.id,
     walletId: wallet.id,
     assetId: asset.id,
   };
@@ -744,7 +746,10 @@ async function testCreateRollback() {
               currencyCode: CurrencyCode.KRW,
             },
           },
-          participant: { id: scenario.participantId },
+          participant: {
+            id: scenario.participantId,
+            tradingAccountId: scenario.tradingAccountId,
+          },
           quantity: quote.quantity,
           idempotency: { idempotencyKey: 'race-rollback-1', requestHash: 'race-rollback-1' },
           submittedAt: new Date(),

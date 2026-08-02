@@ -155,6 +155,7 @@ describe('FxService', () => {
       },
       fxExecuteRequest: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
       },
@@ -290,9 +291,11 @@ describe('FxService', () => {
     balanceAmount: string,
   ) => {
     prisma.cashWallet.findUnique.mockResolvedValueOnce({
+      id: `quote-source-wallet-${currencyCode}`,
       balanceAmount: new Prisma.Decimal(balanceAmount),
       currencyCode,
       seasonParticipantId: 'participant-1',
+      tradingAccountId: 'trading-account-1',
     });
   };
 
@@ -1026,6 +1029,7 @@ describe('FxService', () => {
           status: 'active',
           userId: 'user-1',
           seasonParticipantId: 'participant-1',
+          tradingAccountId: 'trading-account-1',
           fromCurrency: CurrencyCode.KRW,
           toCurrency: CurrencyCode.USD,
           sourceAmount: '135000.00000000',
@@ -1357,6 +1361,9 @@ describe('FxService', () => {
         },
       },
       select: {
+        id: true,
+        seasonParticipantId: true,
+        tradingAccountId: true,
         balanceAmount: true,
         reservedAmount: true,
       },
@@ -1400,6 +1407,9 @@ describe('FxService', () => {
         },
       },
       select: {
+        id: true,
+        seasonParticipantId: true,
+        tradingAccountId: true,
         balanceAmount: true,
         reservedAmount: true,
       },
@@ -1428,12 +1438,14 @@ describe('FxService', () => {
     const sourceWallet = {
       id: 'source-wallet-1',
       seasonParticipantId: 'participant-1',
+      tradingAccountId: 'trading-account-1',
       currencyCode: CurrencyCode.KRW,
       balanceAmount: new Prisma.Decimal('1000.00000000'),
     };
     const targetWallet = {
       id: 'target-wallet-1',
       seasonParticipantId: 'participant-1',
+      tradingAccountId: 'trading-account-1',
       currencyCode: CurrencyCode.USD,
       balanceAmount: new Prisma.Decimal('0.00000000'),
     };
@@ -1459,6 +1471,7 @@ describe('FxService', () => {
     const activeFxQuote = {
       id: 'quote-fx-1',
       seasonParticipantId: 'participant-1',
+      tradingAccountId: 'trading-account-1',
       status: 'active',
       fromCurrency: CurrencyCode.KRW,
       toCurrency: CurrencyCode.USD,
@@ -1706,6 +1719,11 @@ describe('FxService', () => {
         where: {
           id: 'quote-fx-1',
           status: 'active',
+          seasonParticipantId: 'participant-1',
+          OR: [
+            { tradingAccountId: 'trading-account-1' },
+            { tradingAccountId: null },
+          ],
         },
         data: {
           status: 'consumed',
@@ -1713,12 +1731,14 @@ describe('FxService', () => {
         },
       });
       // Atomic available-balance debit (raw SQL tagged template values:
-      // [amount, walletId, seasonParticipantId, currencyCode, amount]).
+      // [amount, walletId, seasonParticipantId, tradingAccountId,
+      // currencyCode, amount]).
       expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
       expect((prisma.$executeRaw.mock.calls[0] as unknown[]).slice(1)).toEqual([
         '1000.00000000',
         'source-wallet-1',
         'participant-1',
+        'trading-account-1',
         CurrencyCode.KRW,
         '1000.00000000',
       ]);
@@ -1726,6 +1746,7 @@ describe('FxService', () => {
         where: {
           id: 'target-wallet-1',
           seasonParticipantId: 'participant-1',
+          tradingAccountId: 'trading-account-1',
           currencyCode: CurrencyCode.USD,
         },
         data: {
@@ -2620,10 +2641,32 @@ describe('FxService', () => {
 
       expect(prisma.fxExecuteRequest.findUnique).toHaveBeenCalledWith({
         where: {
-          userId_idempotencyKey: {
-            userId: 'user-1',
+          tradingAccountId_idempotencyKey: {
+            tradingAccountId: 'trading-account-1',
             idempotencyKey: 'idempotency-key-1',
           },
+        },
+        select: {
+          id: true,
+          idempotencyKey: true,
+          requestHash: true,
+          status: true,
+          requestedAt: true,
+          completedAt: true,
+          responsePayloadJson: true,
+          errorCode: true,
+          errorMessage: true,
+          exchangeTransactionId: true,
+        },
+      });
+      // Account row missing → the legacy null-scope fallback is pinned to
+      // the same user AND participant (never a bare per-user lookup).
+      expect(prisma.fxExecuteRequest.findFirst).toHaveBeenCalledWith({
+        where: {
+          userId: 'user-1',
+          seasonParticipantId: 'participant-1',
+          idempotencyKey: 'idempotency-key-1',
+          tradingAccountId: null,
         },
         select: {
           id: true,

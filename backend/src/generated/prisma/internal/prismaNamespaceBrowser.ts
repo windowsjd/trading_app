@@ -419,6 +419,7 @@ export type MarketSessionOverrideScalarFieldEnum = (typeof MarketSessionOverride
 export const PositionScalarFieldEnum = {
   id: 'id',
   seasonParticipantId: 'seasonParticipantId',
+  tradingAccountId: 'tradingAccountId',
   assetId: 'assetId',
   quantity: 'quantity',
   averageCost: 'averageCost',
@@ -441,6 +442,7 @@ export type PositionScalarFieldEnum = (typeof PositionScalarFieldEnum)[keyof typ
 export const OrderScalarFieldEnum = {
   id: 'id',
   seasonParticipantId: 'seasonParticipantId',
+  tradingAccountId: 'tradingAccountId',
   assetId: 'assetId',
   quoteId: 'quoteId',
   side: 'side',
@@ -552,6 +554,7 @@ export const QuoteScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
   seasonParticipantId: 'seasonParticipantId',
+  tradingAccountId: 'tradingAccountId',
   quoteType: 'quoteType',
   status: 'status',
   assetId: 'assetId',

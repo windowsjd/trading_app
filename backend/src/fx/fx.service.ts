@@ -23,7 +23,9 @@ import {
 import { buildPagination, type Pagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { TradingAccountAccessService } from '../trading-accounts/trading-account-access.service';
+import { assertSeasonAccountFinancialScopeIntegrity } from '../trading-accounts/trading-account-financial-integrity';
 import { debitAvailableCash } from '../wallets/cash-wallet-atomic';
+import { assertCashWalletTradingAccountScope } from '../wallets/cash-wallet-scope';
 import {
   buildFxExecuteErrorEnvelope,
   fxExecuteErrorCodes,
@@ -295,6 +297,7 @@ type ProviderFxExecutePlan = FxExecutePlan & {
 type FxExecuteQuoteRecord = {
   id: string;
   seasonParticipantId: string | null;
+  tradingAccountId: string | null;
   status: QuoteStatus;
   fromCurrency: CurrencyCode | null;
   toCurrency: CurrencyCode | null;
@@ -515,6 +518,14 @@ export class FxService {
           : tradingAccountId,
       );
 
+    // A season account whose participant still owns unscoped/mis-scoped
+    // financial rows must NOT look like a normally-empty account: fail
+    // closed (repair required) instead of silently omitting history.
+    await assertSeasonAccountFinancialScopeIntegrity(this.prisma, {
+      tradingAccountId: account.id,
+      seasonParticipantId: account.seasonParticipant?.id ?? null,
+    });
+
     const where = {
       tradingAccountId: account.id,
     };
@@ -621,6 +632,7 @@ export class FxService {
         select: {
           id: true,
           participantStatus: true,
+          tradingAccountId: true,
         },
       });
 
@@ -706,14 +718,27 @@ export class FxService {
     userId: string;
     request: ReturnType<FxService['validateQuoteRequest']>;
     season: ActiveSeasonRecord;
-    participant: { id: string };
+    participant: { id: string; tradingAccountId: string | null };
     now: Date;
   }): Promise<FxQuoteResponse> {
     const { userId, request, season, participant, now } = input;
 
     {
+      // Dual-write guard: a quote grants later execution authority, so it
+      // must never be minted for a participant whose account link is
+      // missing (deploy-boundary state; repair-links fixes it).
+      if (!participant.tradingAccountId) {
+        this.throwApiError(
+          HttpStatus.INTERNAL_SERVER_ERROR,
+          'TRADING_ACCOUNT_LINK_INTEGRITY',
+          'Participant has no trading account link; run trading-accounts:repair-links.',
+        );
+      }
+      const tradingAccountId = participant.tradingAccountId;
+
       await this.assertQuoteSourceWalletBalance({
         seasonParticipantId: participant.id,
+        tradingAccountId,
         fromCurrency: request.fromCurrency,
         sourceAmount: request.sourceAmount,
       });
@@ -769,6 +794,7 @@ export class FxService {
         data: {
           userId,
           seasonParticipantId: participant.id,
+          tradingAccountId,
           quoteType: QuoteType.fx,
           status: QuoteStatus.active,
           fromCurrency: request.fromCurrency,
@@ -860,7 +886,6 @@ export class FxService {
         // Dual-write guard: a missing account link must never spread onto
         // new financial rows (fail-closed inside executeFxForContext).
         tradingAccountId: participant.tradingAccountId,
-        idempotencyScope: 'user',
       });
     } catch (error) {
       if (error instanceof HttpException) {
@@ -912,7 +937,6 @@ export class FxService {
         executeNow,
         participantId: context.participant.id,
         tradingAccountId: context.account.id,
-        idempotencyScope: 'account',
       });
     } catch (error) {
       if (error instanceof HttpException) {
@@ -930,7 +954,6 @@ export class FxService {
     executeNow: Date;
     participantId: string;
     tradingAccountId: string | null;
-    idempotencyScope: 'user' | 'account';
   }): Promise<FxExecuteSkeletonResponse> {
     const { userId, body, season, executeNow, participantId } = input;
 
@@ -953,16 +976,17 @@ export class FxService {
     }
 
     const normalizedRequest = preflightResult.value;
-    const existingCommand =
-      input.idempotencyScope === 'account'
-        ? await this.findFxExecuteCommandCandidateByAccount(
-            tradingAccountId,
-            normalizedRequest.idempotencyKey,
-          )
-        : await this.findFxExecuteCommandCandidate(
-            userId,
-            normalizedRequest.idempotencyKey,
-          );
+    // Idempotency is ACCOUNT-scoped for every new request (legacy and
+    // account endpoints both resolve a verified account first). Legacy
+    // null-scope rows written before the transition are still replayable,
+    // but ONLY for the same user + same participant — never another
+    // participant's (or another season's) row.
+    const existingCommand = await this.findFxExecuteCommandForIdempotency({
+      tradingAccountId,
+      userId,
+      seasonParticipantId: participantId,
+      idempotencyKey: normalizedRequest.idempotencyKey,
+    });
 
     if (existingCommand) {
       const response = mapFxExecuteOrchestrationDecisionToSkeletonResponse(
@@ -989,6 +1013,7 @@ export class FxService {
       quoteId,
       userId,
       seasonParticipantId: participantId,
+      tradingAccountId,
       normalizedRequest,
       executeNow,
     });
@@ -1005,21 +1030,16 @@ export class FxService {
       this.findProviderFxExecuteSnapshot(executeNow),
     ]);
 
-    // Both wallets must belong to the SAME trading account as the
-    // participant. A non-null mismatch is data corruption and fails closed;
-    // a null wallet scope (legacy row awaiting the financial-scope repair)
-    // is tolerated because the rows written below carry the verified id.
+    // Both wallets must be scoped to the SAME verified trading account as
+    // the participant. A null scope is a repair-required deploy-boundary
+    // state and a mismatch is data corruption — both fail closed with a
+    // structured 500 BEFORE any balance math (never an in-request backfill).
     for (const wallet of [sourceWallet, targetWallet]) {
-      if (
-        wallet &&
-        wallet.tradingAccountId != null &&
-        wallet.tradingAccountId !== tradingAccountId
-      ) {
-        this.throwApiError(
-          HttpStatus.INTERNAL_SERVER_ERROR,
-          'FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH',
-          'Wallet belongs to a different trading account.',
-        );
+      if (wallet) {
+        assertCashWalletTradingAccountScope(wallet, {
+          seasonParticipantId: participantId,
+          tradingAccountId,
+        });
       }
     }
 
@@ -1178,6 +1198,7 @@ export class FxService {
     quoteId: string;
     userId: string;
     seasonParticipantId: string;
+    tradingAccountId: string;
     normalizedRequest: NormalizedFxExecuteRequest;
     executeNow: Date;
   }): Promise<FxExecuteQuoteRecord> {
@@ -1190,6 +1211,7 @@ export class FxService {
       select: {
         id: true,
         seasonParticipantId: true,
+        tradingAccountId: true,
         status: true,
         fromCurrency: true,
         toCurrency: true,
@@ -1203,6 +1225,17 @@ export class FxService {
 
     if (!quote) {
       this.throwFxExecuteError(fxExecuteErrorCodes.QUOTE_NOT_FOUND);
+    }
+
+    // Account isolation: a quote minted for a different trading account is
+    // never executable here, even for the same user. Only NULL legacy quotes
+    // (pre-transition rows) pass through, and those are still pinned to the
+    // same participant + request hash below.
+    if (
+      quote.tradingAccountId !== null &&
+      quote.tradingAccountId !== input.tradingAccountId
+    ) {
+      this.throwFxExecuteError(fxExecuteErrorCodes.QUOTE_MISMATCH);
     }
 
     if (quote.status !== QuoteStatus.active) {
@@ -1248,6 +1281,7 @@ export class FxService {
 
   private async assertQuoteSourceWalletBalance(input: {
     seasonParticipantId: string;
+    tradingAccountId: string;
     fromCurrency: CurrencyCode;
     sourceAmount: Prisma.Decimal;
   }): Promise<void> {
@@ -1259,10 +1293,22 @@ export class FxService {
         },
       },
       select: {
+        id: true,
+        seasonParticipantId: true,
+        tradingAccountId: true,
         balanceAmount: true,
         reservedAmount: true,
       },
     });
+
+    // Scope before balance: an unscoped/mis-scoped wallet must never be the
+    // balance basis of a quote (500 repair-required/mismatch, not 409).
+    if (wallet) {
+      assertCashWalletTradingAccountScope(wallet, {
+        seasonParticipantId: input.seasonParticipantId,
+        tradingAccountId: input.tradingAccountId,
+      });
+    }
 
     if (
       !wallet ||
@@ -1916,16 +1962,49 @@ export class FxService {
     }
   }
 
-  private async findFxExecuteCommandCandidate(
-    userId: string,
-    idempotencyKey: string,
-  ): Promise<FxExecuteCommandCandidate | null> {
-    const command = await this.prisma.fxExecuteRequest.findUnique({
+  /**
+   * Unified idempotency lookup for NEW execute requests: the account row
+   * wins; only when the account has none is a LEGACY null-scope row
+   * considered — and that fallback is pinned to the same user AND the same
+   * participant, so another participant's (or another season's) legacy row
+   * can never be replayed. The former global (userId, idempotencyKey)
+   * lookup is gone together with its unique index.
+   */
+  private async findFxExecuteCommandForIdempotency(input: {
+    tradingAccountId: string;
+    userId: string;
+    seasonParticipantId: string;
+    idempotencyKey: string;
+  }): Promise<FxExecuteCommandCandidate | null> {
+    const accountCommand = await this.findFxExecuteCommandCandidateByAccount(
+      input.tradingAccountId,
+      input.idempotencyKey,
+    );
+
+    if (accountCommand) {
+      return accountCommand;
+    }
+
+    return this.findLegacyFxExecuteCommandCandidate(input);
+  }
+
+  /**
+   * Legacy replay path: pre-transition rows carry tradingAccountId = null
+   * and stay unique per (userId, idempotencyKey) via the partial unique
+   * index. The participant condition keeps the fallback from ever selecting
+   * a different season's row for the same user.
+   */
+  private async findLegacyFxExecuteCommandCandidate(input: {
+    userId: string;
+    seasonParticipantId: string;
+    idempotencyKey: string;
+  }): Promise<FxExecuteCommandCandidate | null> {
+    const command = await this.prisma.fxExecuteRequest.findFirst({
       where: {
-        userId_idempotencyKey: {
-          userId,
-          idempotencyKey,
-        },
+        userId: input.userId,
+        seasonParticipantId: input.seasonParticipantId,
+        idempotencyKey: input.idempotencyKey,
+        tradingAccountId: null,
       },
       select: {
         id: true,
@@ -2184,10 +2263,16 @@ export class FxService {
       }
 
       if (this.isUniqueConstraintError(error)) {
-        const existingCommand = await this.findFxExecuteCommandCandidate(
-          input.normalizedRequest.userId,
-          input.normalizedRequest.idempotencyKey,
-        );
+        // Post-conflict requery uses the SAME scope rules as the original
+        // lookup: the account row first, then the user+participant-pinned
+        // legacy null row. Never a bare per-user query — that could replay
+        // another account's command.
+        const existingCommand = await this.findFxExecuteCommandForIdempotency({
+          tradingAccountId: input.tradingAccountId,
+          userId: input.normalizedRequest.userId,
+          seasonParticipantId: input.normalizedRequest.seasonParticipantId,
+          idempotencyKey: input.normalizedRequest.idempotencyKey,
+        });
 
         if (existingCommand) {
           const response = mapFxExecuteOrchestrationDecisionToSkeletonResponse(
@@ -2248,10 +2333,16 @@ export class FxService {
       },
     });
 
+    // Account-conditioned consume: only THIS participant's quote flips, and
+    // only when its account scope is the verified one (NULL legacy quotes
+    // were already pinned to the participant + request hash upstream). A
+    // quote of another account can never be consumed here.
     const quoteConsumeResult = await tx.quote.updateMany({
       where: {
         id: plan.quoteId,
         status: QuoteStatus.active,
+        seasonParticipantId: plan.seasonParticipantId,
+        OR: [{ tradingAccountId }, { tradingAccountId: null }],
       },
       data: {
         status: QuoteStatus.consumed,
@@ -2263,8 +2354,16 @@ export class FxService {
       this.throwFxExecuteError(fxExecuteErrorCodes.QUOTE_NOT_ACTIVE);
     }
 
-    const sourceWallet = await this.debitSourceWalletOrThrow(tx, plan);
-    const targetWallet = await this.creditTargetWalletOrThrow(tx, plan);
+    const sourceWallet = await this.debitSourceWalletOrThrow(
+      tx,
+      plan,
+      tradingAccountId,
+    );
+    const targetWallet = await this.creditTargetWalletOrThrow(
+      tx,
+      plan,
+      tradingAccountId,
+    );
 
     const exchangeTransaction = await tx.exchangeTransaction.create({
       data: {
@@ -2561,12 +2660,16 @@ export class FxService {
   private async debitSourceWalletOrThrow(
     tx: FxExecuteTransactionClient,
     plan: FxExecutePlan,
+    tradingAccountId: string,
   ): Promise<FxExecutePostUpdateWallet> {
     // Atomic available-balance debit: reserved cash (submitted limit-buy
     // orders) can never be spent by FX, even under concurrent reservations.
+    // The account id is part of the UPDATE's WHERE, so a wallet whose scope
+    // changed (or was never set) after the pre-check matches 0 rows.
     const debitCount = await debitAvailableCash(tx, {
       walletId: plan.sourceWalletId,
       seasonParticipantId: plan.seasonParticipantId,
+      tradingAccountId,
       currencyCode: plan.fromCurrency,
       amount: plan.sourceDebitAmount,
     });
@@ -2586,11 +2689,13 @@ export class FxService {
   private async creditTargetWalletOrThrow(
     tx: FxExecuteTransactionClient,
     plan: FxExecutePlan,
+    tradingAccountId: string,
   ): Promise<FxExecutePostUpdateWallet> {
     const creditResult = await tx.cashWallet.updateMany({
       where: {
         id: plan.targetWalletId,
         seasonParticipantId: plan.seasonParticipantId,
+        tradingAccountId,
         currencyCode: plan.toCurrency,
       },
       data: {

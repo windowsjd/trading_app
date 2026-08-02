@@ -9,6 +9,7 @@ import {
 } from '../generated/prisma/client';
 import { formatDecimalScale, monetaryScale } from '../fx/fx-decimal-policy';
 import { PrismaService } from '../prisma/prisma.service';
+import { assertCashWalletTradingAccountScope } from '../wallets/cash-wallet-scope';
 import {
   limitOrderErrorCodes,
   limitOrderErrorHttpStatus,
@@ -27,6 +28,12 @@ import {
 const CANCEL_ORDER_SELECT = {
   id: true,
   seasonParticipantId: true,
+  tradingAccountId: true,
+  seasonParticipant: {
+    select: {
+      tradingAccountId: true,
+    },
+  },
   quoteId: true,
   side: true,
   orderType: true,
@@ -111,18 +118,35 @@ export class LimitOrderCancelService {
     userId: string;
     orderId: string;
     canceledAt: Date;
+    /**
+     * Account-scoped cancel only: restricts the cancel to orders whose own
+     * tradingAccountId equals this id, so another account's orderId (and a
+     * legacy null-scope order) is the same 404 as a nonexistent one.
+     */
+    expectedTradingAccountId?: string;
   }): Promise<CancelLimitOrderResponse> {
     return this.prisma.$transaction(async (tx) => {
       // Lock the order row first (Order → CashWallet lock order). Ownership
-      // is enforced in the same locking statement.
-      const lockedRows = await tx.$queryRaw<Array<{ id: string }>>`
-        SELECT o."id"
-        FROM "orders" o
-        JOIN "season_participants" sp ON sp."id" = o."season_participant_id"
-        WHERE o."id" = ${input.orderId}
-          AND sp."user_id" = ${input.userId}
-        FOR UPDATE OF o
-      `;
+      // (and, on the account-scoped path, account membership) is enforced in
+      // the same locking statement.
+      const lockedRows = input.expectedTradingAccountId
+        ? await tx.$queryRaw<Array<{ id: string }>>`
+            SELECT o."id"
+            FROM "orders" o
+            JOIN "season_participants" sp ON sp."id" = o."season_participant_id"
+            WHERE o."id" = ${input.orderId}
+              AND sp."user_id" = ${input.userId}
+              AND o."trading_account_id" = ${input.expectedTradingAccountId}
+            FOR UPDATE OF o
+          `
+        : await tx.$queryRaw<Array<{ id: string }>>`
+            SELECT o."id"
+            FROM "orders" o
+            JOIN "season_participants" sp ON sp."id" = o."season_participant_id"
+            WHERE o."id" = ${input.orderId}
+              AND sp."user_id" = ${input.userId}
+            FOR UPDATE OF o
+          `;
 
       if (lockedRows.length !== 1) {
         throw new HttpException(
@@ -195,6 +219,7 @@ export class LimitOrderCancelService {
       const releasedAmount = await this.releaseAndCancelLockedOrder(tx, {
         orderId: order.id,
         seasonParticipantId: order.seasonParticipantId,
+        tradingAccountId: this.requireOrderTradingScopeForRelease(order),
         currencyCode: order.currencyCode,
         reservedAmount: order.reservedAmount,
         cancelReason: LIMIT_ORDER_CANCEL_REASONS.userCanceled,
@@ -251,6 +276,8 @@ export class LimitOrderCancelService {
         select: {
           id: true,
           seasonParticipantId: true,
+          tradingAccountId: true,
+          seasonParticipant: { select: { tradingAccountId: true } },
           currencyCode: true,
           status: true,
           orderType: true,
@@ -271,6 +298,7 @@ export class LimitOrderCancelService {
       await this.releaseAndCancelLockedOrder(tx, {
         orderId: order.id,
         seasonParticipantId: order.seasonParticipantId,
+        tradingAccountId: this.requireOrderTradingScopeForRelease(order),
         currencyCode: order.currencyCode,
         reservedAmount: order.reservedAmount,
         cancelReason: input.reason,
@@ -341,6 +369,8 @@ export class LimitOrderCancelService {
             select: {
               id: true,
               seasonParticipantId: true,
+              tradingAccountId: true,
+              seasonParticipant: { select: { tradingAccountId: true } },
               currencyCode: true,
               reservedAmount: true,
             },
@@ -350,6 +380,7 @@ export class LimitOrderCancelService {
           await this.releaseAndCancelLockedOrder(tx, {
             orderId: order.id,
             seasonParticipantId: order.seasonParticipantId,
+            tradingAccountId: this.requireOrderTradingScopeForRelease(order),
             currencyCode: order.currencyCode,
             reservedAmount: order.reservedAmount,
             cancelReason: LIMIT_ORDER_CANCEL_REASONS.seasonEnded,
@@ -422,6 +453,9 @@ export class LimitOrderCancelService {
     input: {
       orderId: string;
       seasonParticipantId: string;
+      /** VERIFIED account scope (order scope, checked against the
+       * participant link by requireOrderTradingScopeForRelease). */
+      tradingAccountId: string;
       currencyCode: CurrencyCode;
       reservedAmount: Prisma.Decimal | null;
       cancelReason: LimitOrderCancelReason;
@@ -442,7 +476,7 @@ export class LimitOrderCancelService {
           currencyCode: input.currencyCode,
         },
       },
-      select: { id: true },
+      select: { id: true, seasonParticipantId: true, tradingAccountId: true },
     });
 
     if (!wallet) {
@@ -452,6 +486,14 @@ export class LimitOrderCancelService {
       );
     }
 
+    // Wallet scope must match the ORDER's verified account exactly before
+    // any reservation is decreased: a null-scope wallet is repair-required,
+    // a foreign wallet is never touched (both structured 500s).
+    assertCashWalletTradingAccountScope(wallet, {
+      seasonParticipantId: input.seasonParticipantId,
+      tradingAccountId: input.tradingAccountId,
+    });
+
     const releasedAmountText = formatDecimalScale(
       input.reservedAmount,
       monetaryScale,
@@ -460,6 +502,7 @@ export class LimitOrderCancelService {
     await this.reservation.releaseLimitBuyReservation(tx, {
       walletId: wallet.id,
       seasonParticipantId: input.seasonParticipantId,
+      tradingAccountId: input.tradingAccountId,
       currencyCode: input.currencyCode,
       amount: releasedAmountText,
     });
@@ -485,6 +528,48 @@ export class LimitOrderCancelService {
     }
 
     return releasedAmountText;
+  }
+
+  /**
+   * A release may only move the reservation of the ORDER's own account.
+   * The order's scope must exist (else run
+   * trading-accounts:repair-trading-scope first — a release is protective,
+   * but guessing the account is not) and must equal the participant link.
+   * Both violations are structured 500s and roll the whole cancel back.
+   */
+  private requireOrderTradingScopeForRelease(order: {
+    tradingAccountId: string | null;
+    seasonParticipant: { tradingAccountId: string | null };
+  }): string {
+    if (!order.tradingAccountId) {
+      throw new HttpException(
+        {
+          success: false,
+          error: {
+            code: 'TRADING_SCOPE_REPAIR_REQUIRED',
+            message:
+              'Order has no trading account scope; run trading-accounts:repair-trading-scope before releasing its reservation.',
+          },
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    if (order.tradingAccountId !== order.seasonParticipant.tradingAccountId) {
+      throw new HttpException(
+        {
+          success: false,
+          error: {
+            code: 'TRADING_ACCOUNT_SCOPE_MISMATCH',
+            message:
+              'Order is scoped to a different trading account than its participant.',
+          },
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    return order.tradingAccountId;
   }
 
   private buildCancelResponse(

@@ -1,5 +1,13 @@
 # GET /api/v1/positions API Contract
 
+> 작업 5 (2026-08-03): the same position list is also exposed account-scoped
+> under `GET /api/v1/trading-accounts/:accountId/positions` (same filters,
+> valuation, sorting, serialization; rows selected by the position's own
+> `tradingAccountId`). This legacy surface is UNCHANGED, and both return the
+> same positions for the same season account. New positions dual-write
+> `tradingAccountId`; execution paths verify position scope before mutating.
+> See `docs/trading-account-orders-api-contract.md`.
+
 ## Status
 
 - `GET /api/v1/positions` read-only MVP is implemented.

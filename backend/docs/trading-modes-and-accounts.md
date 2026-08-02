@@ -325,8 +325,8 @@ NOT NULL migration을 진행한다.
 ### 3.6 금융 4개 모델의 TradingAccount 전환 (작업 4, 2026-08-03 구현)
 
 **대상 모델:** `CashWallet`, `WalletTransaction`, `ExchangeTransaction`,
-`FxExecuteRequest`. Order·Position·Quote·EquitySnapshot·DailyPortfolioSnapshot·
-SeasonRanking은 이번 범위가 아니며 schema를 변경하지 않았다.
+`FxExecuteRequest`. Order·Position·Quote는 작업 5(§3.7)에서 전환되었고,
+EquitySnapshot·DailyPortfolioSnapshot·SeasonRanking은 여전히 미전환이다.
 
 #### 3.6.1 transitional dual identity
 
@@ -414,7 +414,197 @@ read-only 검증 완료. `seasonParticipantId` 제거는 작업 10 이전에 하
 dry-run → ⑨ repair-financial-scope --apply → ⑩ 금융 null 0·mismatch 0 확인 →
 ⑪ 신규 account-scoped API smoke → ⑫ 기존 wallet/fx API smoke → ⑬ NOT NULL은
 후속 작업으로 보류. **구버전 writer가 실행 중인 상태에서 복구 성공을 선언하지
-않는다.**
+않는다.** (작업 5 이후의 통합 배포 순서는 §3.7.9가 대체한다.)
+
+### 3.7 Order·Position·Quote의 TradingAccount 전환 (작업 5, 2026-08-03 구현)
+
+**대상 모델:** `Order`, `Position`, `Quote`(주문 quote와 FX quote 공용).
+EquitySnapshot·DailyPortfolioSnapshot·SeasonRanking·SeasonReward·
+RewardFulfillmentRequest·LimitOrderCandleEvidence(Order 관계로 사용,
+중복 계정 FK 금지)·AssetPriceSnapshot·FxRateSnapshot은 변경하지 않았다.
+제거 작업이 아니라 transitional dual identity 전환이다: SeasonParticipant는
+계속 시즌 상태·랭킹·보상·정산을 담당하고, TradingAccount가 거래 데이터의
+자산 격리 기준이 된다.
+
+#### 3.7.1 transitional dual identity (schema)
+
+세 모델 모두 기존 `seasonParticipantId`를 유지한 채 nullable
+`tradingAccountId` + `TradingAccount?` 관계(onDelete: **Restrict** — 거래
+기록이 계정 삭제를 막는다)를 추가했다. 추가 제약/인덱스:
+
+- `Order` `@@unique([tradingAccountId, idempotencyKey])`(계정 기준 생성
+  멱등성; 같은 사용자라도 계정이 다르면 같은 키 재사용 가능. NULL 계정·NULL
+  키 행은 unique의 NULL-distinct 의미로 허용, idempotencyKey nullable 의미
+  불변) + `(tradingAccountId, submittedAt)`·`(tradingAccountId, status)`
+  인덱스. 기존 `@@unique([seasonParticipantId, idempotencyKey])` 유지.
+- `Position` `@@unique([tradingAccountId, assetId])` — 한 거래계정은 같은
+  자산에 집계 포지션 1개. 기존 `@@unique([seasonParticipantId, assetId])`
+  유지. `(tradingAccountId)` 인덱스.
+- `Quote` `(tradingAccountId, createdAt)`·`(tradingAccountId, status,
+  expiresAt)` 인덱스. 신규 unique 없음(quote는 status/consume로 단일 사용을
+  보장한다).
+- TradingAccount 역관계 3개(orders/positions/quotes) 추가. 캐시 컬럼
+  (totalAssetKrw·positionValue·orderCount·currentBalance·realizedPnl 등)은
+  금지 그대로다.
+
+#### 3.7.2 FX 멱등성 unique 재구성 (보완 3)
+
+기존 전역 `UNIQUE(user_id, idempotency_key)`(인덱스
+`fx_execute_requests_user_id_idempotency_key_key`)는 같은 사용자가 서로 다른
+계정에서 같은 키를 쓰는 것을 막았다. 이번 migration이 이를 **legacy null 행만
+보호하는 partial unique**로 교체했다:
+
+```
+UNIQUE (user_id, idempotency_key) WHERE trading_account_id IS NULL
+-- fx_execute_requests_user_id_idempotency_key_legacy_null_key
+```
+
+Prisma DSL은 partial unique를 표현하지 못하므로 schema.prisma에는 나타나지
+않고(모델 주석 + migration SQL + schema 계약 테스트가 근거), 계정 unique
+`(tradingAccountId, idempotencyKey)`는 유지된다. 교체 순서는 partial 생성 →
+전역 unique DROP이라 어느 시점에도 무보호 행이 없고, null-scope 중복이
+존재하면 migration이 임의 삭제·병합 없이 RAISE EXCEPTION으로 fail-closed
+한다. 서비스 조회는 계정 우선(`tradingAccountId+key`) → 없으면 legacy 행
+fallback(`userId+seasonParticipantId+key+tradingAccountId IS NULL` — 다른
+참가자·다른 시즌의 null 행은 절대 replay하지 않음)이며, legacy endpoint의
+신규 쓰기도 참가자의 계정을 해석해 계정 기준으로 생성한다. unique 충돌 후
+재조회도 같은 규칙을 쓴다(전역 per-user 재조회 금지).
+
+#### 3.7.3 migration backfill (`20260803150000_add_trading_scope_and_fx_legacy_partial_unique`)
+
+additive migration이 orders/positions/quotes의 tradingAccountId를 연결된
+`SeasonParticipant.tradingAccountId`에서 복사한다(양쪽 IS NULL 가드, 멱등).
+참가자 링크가 null인 행과 participant가 없는 quote 행은 null로 남기며
+migration이 계정을 만들지 않는다. 주문 상태·수량·가격·수수료·예약금, 포지션
+수량·평균단가·실현손익, quote 상태·hash·금액·만료·소비 시각, ID는 일절
+변경되지 않는다(전후 fingerprint + opt-in PostgreSQL 테스트로 검증). 파괴적
+구문은 FX 전역 unique 인덱스 DROP 1건뿐이다.
+
+#### 3.7.4 지갑 scope fail-closed (보완 1)
+
+지갑을 변경하거나 지갑 잔액을 근거로 주문·환전 quote를 만들기 전에 항상
+`wallet.seasonParticipantId == 참가자` + `wallet.tradingAccountId == 검증된
+계정`을 확인한다(`assertCashWalletTradingAccountScope`,
+`src/wallets/cash-wallet-scope.ts`).
+
+- `wallet.tradingAccountId IS NULL` → **500
+  `FINANCIAL_SCOPE_REPAIR_REQUIRED`** (메시지에
+  trading-accounts:repair-financial-scope 실행 필요 명시). 거래 도중 자동
+  backfill 금지.
+- 참가자·계정 불일치 → **500 `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`**.
+  덮어쓰기·자동 수정 금지. 400류 클라이언트 오류로 다루지 않는다(서버 정합성
+  문제).
+- 적용 경로(전부): FX quote 잔액 확인·FX execute source/target, 시장가 매수
+  quote·debit, 시장가 매도 credit, 지정가 quote available 확인·생성 예약·자동
+  체결 settle·취소/만료/운영자 제외 cleanup의 예약 반환.
+- 동시성: 사전 검증에 더해 `cash-wallet-atomic.ts`의 모든 원자적 UPDATE
+  WHERE에 `trading_account_id = 검증된 계정`이 포함된다(id·participant·
+  currency·잔액/예약 조건과 함께). 검증과 update 사이에 scope가 바뀌면 0행
+  매칭으로 fail-closed 된다.
+
+#### 3.7.5 account-scoped 조회의 조용한 누락 방지 (보완 2)
+
+account-scoped 지갑·원장·환전 조회는 반환 전에 시즌 참가자의 금융 4모델에서
+`tradingAccountId IS NULL` 또는 계정 불일치 행(원장은 연결 wallet의 scope
+불일치 포함)을 존재 여부 쿼리(findFirst, 인덱스 사용)로 검사하고, 하나라도
+있으면 빈/부분 결과 대신 500(`FINANCIAL_SCOPE_REPAIR_REQUIRED` /
+`FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`)으로 fail-closed 한다
+(`src/trading-accounts/trading-account-financial-integrity.ts`). 같은
+원칙으로 account-scoped 주문 조회는 참가자의 Order 이상 행을, 포지션 조회는
+Position 이상 행을 검사한다(null → `FINANCIAL_SCOPE_REPAIR_REQUIRED`,
+mismatch → `TRADING_ACCOUNT_SCOPE_MISMATCH`). general 계정은 참가자가 없어
+검사가 스킵되고 정상적으로 빈 결과를 반환하며, GET이 계정·지갑·포지션을
+생성하거나 1,000만 원을 지급하는 일은 없다.
+
+#### 3.7.6 신규 writer dual-write와 Quote 계정 격리
+
+모든 신규 Order·Position·Quote writer는 seasonParticipantId와
+tradingAccountId를 함께 기록한다. 참가자 링크가 null이면 신규 쓰기를
+`TRADING_ACCOUNT_LINK_INTEGRITY`(500)로 중단한다(quote 포함 — quote는 자산을
+직접 바꾸지 않지만 실행 권한을 제공하므로 같은 격리가 필요).
+
+- 시장가/지정가 Order 생성, idempotent replay, 지정가 체결의 Position
+  생성/증가, 시장가 매수/매도 Position 생성/증가/감소, 주문·FX quote 생성,
+  테스트 fixture·통합 러너·dev baseline 전부 dual-write.
+- 기존 Position update 시 `position.tradingAccountId == 현재 계정`을
+  검증한다(null → 500 `TRADING_SCOPE_REPAIR_REQUIRED`, mismatch → 500
+  `TRADING_ACCOUNT_SCOPE_MISMATCH`; 자동 복구하며 진행 금지). 시장가 매도의
+  Position 감소·지정가 체결의 updateMany WHERE에도 tradingAccountId가
+  포함되어 다른 계정 포지션 수량을 감소시킬 수 없다.
+- Quote 검증(주문 create/execute, FX execute): persisted
+  `quote.tradingAccountId`가 non-null이면 실행 계정과 일치해야 하며(불일치 →
+  `QUOTE_MISMATCH`), null legacy quote만 기존 참가자+requestHash 검증 경로로
+  통과한다. quote 소비 updateMany WHERE는 `id + status=active +
+  seasonParticipantId + (계정 일치 OR null)`이라 다른 계정 quote의 상태를
+  바꿀 수 없다. requestHash 계산식은 교체하지 않았다(전면 재작성 금지;
+  계정 격리는 저장된 tradingAccountId 검증으로 완성).
+- Order 멱등성: 계정 우선 조회(`tradingAccountId+key`) → legacy null 행
+  fallback(`seasonParticipantId+key+계정 null+user 소유권`). 같은 계정 같은
+  키는 requestHash가 같으면 저장된 최초 응답 replay, 다르면
+  `ORDER_IDEMPOTENCY_CONFLICT`. 같은 사용자의 다른 계정 간 키 재사용 허용.
+
+#### 3.7.7 trading scope 운영 복구 스크립트
+
+`pnpm trading-accounts:repair-trading-scope`(`scripts/repair-trading-scope.ts`,
+로직 `scripts/lib/repair-trading-scope.ts`) — migration 이후 구버전 writer가
+만든 null scope Order·Position·Quote의 backfill 전용. 역할 구분:
+repair-links(참가자↔계정 link·excluded-active) → repair-financial-scope(금융
+4모델) → **repair-trading-scope(Order·Position·Quote)**.
+
+- 기본 dry-run, `--apply` 명시 필수, unknown 옵션·플래그 동시 사용 거부,
+  500행 배치 cursor 순회, IS NULL 가드 update만(금액·수량·상태 불변), 멱등.
+- 참가자 링크 null 행은 `MISSING_PARTICIPANT_TRADING_ACCOUNT_LINK`로 보고만
+  (repair-links 먼저). non-null mismatch는 `TRADING_ACCOUNT_SCOPE_MISMATCH`로
+  보고만(덮어쓰기 금지). Order↔연결 Quote의 계정/참가자 불일치는
+  `ORDER_QUOTE_ACCOUNT_SCOPE_MISMATCH`. participant 없는 quote는 계정을
+  추측하지 않고 `QUOTE_PARTICIPANT_SCOPE_MISSING`으로 보고한다(주문·환전용
+  데이터이므로 정합성 실패로 취급). backfill 실패는
+  `TRADING_SCOPE_BACKFILL_FAILED`.
+- `--apply` 종료 코드: Order/Position/participant-linked Quote의 null 잔여,
+  scope mismatch 잔여, order-quote 불일치, 행별 실패, 검증 실패 중 하나라도
+  있으면 exit 1.
+
+#### 3.7.8 account-scoped 주문·포지션 API와 지정가 자동 체결 gate
+
+`docs/trading-account-orders-api-contract.md`가 계약 원문이다. 요약:
+
+- `GET/POST /api/v1/trading-accounts/:accountId/orders[...]`,
+  `GET /api/v1/trading-accounts/:accountId/positions`. 조회는
+  active/suspended/closed 모두 허용(소유자), 미존재·타인 계정은 동일 404,
+  다른 계정 orderId도 동일 404. 신규 quote/주문은 계정 소유권 + mode=season
+  (general은 409 `GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED`) +
+  TradingAccount.status=active(아니면 409 `TRADING_ACCOUNT_NOT_ACTIVE`) +
+  기존 시즌/참가자/시장/가격/지갑/잔액 정책 전부를 요구한다(계정 status만으로
+  거래 허용 금지). account-scoped execute endpoint는 만들지 않았다(legacy에도
+  없음 — 시장가는 create 내부 실행, 지정가는 스케줄러 체결).
+- 취소는 보호 동작이므로 legacy와 동일하게 계정/참가자 status로 gate하지
+  않는다(소유자는 suspended/closed 계정의 submitted 지정가도 취소 가능).
+  단 order/wallet scope가 null·불일치면 자동 추정 없이 repair-required로
+  중단하고 주문 상태·예약금 변경이 함께 rollback 된다.
+- 지정가 자동 체결(스케줄러)은 체결 트랜잭션 안에서 locked row 기준으로
+  `order.tradingAccountId` 존재·참가자 링크 일치·account.mode=season·연결
+  quote scope 일치·wallet/position scope 일치를 재검증한다. 계정이
+  suspended/closed면 **체결하지 않고 skip**(`account_not_active`; 주문은
+  submitted 유지, 기존 정책대로 자동 취소하지 않음). scope 손상은 구조화된
+  500으로 fail-closed(다음 사이클 재시도가 운영 신호).
+- legacy 주문·포지션 API는 계약 그대로 유지되며 account-scoped와 같은
+  서비스 코어를 공유한다(수수료·체결가·환율·지갑/원장/포지션 변화·멱등성·
+  rollback 동일 — DB 통합 테스트로 실측).
+
+#### 3.7.9 NOT NULL 보류와 통합 배포 순서
+
+Order·Position·Quote의 tradingAccountId도 nullable을 유지한다(§3.6.5와 같은
+전제 + 스냅샷 3모델 미전환). 통합 배포 순서:
+
+① 최신 main·DB 백업 확인 → ② additive migration 검토 → ③ migration 적용 →
+④ 신버전 배포 → ⑤ 구버전 완전 종료 → ⑥ repair-links dry-run → ⑦
+repair-links --apply → ⑧ 참가자 null link·excluded-active 0 확인 → ⑨
+repair-financial-scope dry-run → ⑩ --apply → ⑪ 금융 null·mismatch 0 확인 →
+⑫ repair-trading-scope dry-run → ⑬ --apply → ⑭ Order·Position·Quote
+null·mismatch 0 확인 → ⑮ account-scoped wallet·FX smoke → ⑯ account-scoped
+order·position smoke → ⑰ 기존 wallet·FX·order·position API smoke → ⑱ NOT
+NULL은 후속 작업으로 보류. **구버전 writer가 실행 중인 상태에서 복구 성공을
+선언하지 않는다.**
 
 ## 4. 상태정의 (04 상태정의서 대응)
 
@@ -511,17 +701,29 @@ legacy `/api/v1/wallets`·`/api/v1/fx/*`는 계약 그대로 유지되고 두 �
 서비스 계산 규칙을 공유한다. 상세:
 `docs/trading-account-finance-api-contract.md`.
 
+**account-scoped 주문·포지션 API (작업 5에서 추가):** 소유 계정 하위의
+`GET .../orders`·`GET .../orders/:orderId`(조회, active/suspended/closed 모두
+허용, 다른 계정 orderId는 동일 404), `POST .../orders/quote`·
+`POST .../orders`(시즌계정 + account active + 기존 시즌/참가자/시장/가격/지갑
+정책 전부; general은 409 `GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED`),
+`POST .../orders/:orderId/cancel`(보호 동작 — 계정 status로 gate하지 않음),
+`GET .../positions`(조회). account-scoped execute endpoint는 legacy에도
+없으므로 만들지 않았다. legacy `/api/v1/orders`·`/api/v1/positions`는 계약
+그대로 유지되고 같은 서비스 코어를 공유한다. 상세:
+`docs/trading-account-orders-api-contract.md`.
+
 **서버는 "현재 선택 계정"을 저장하지 않는다.** JWT·세션·User 테이블·전역
 singleton 어디에도 currentTradingAccountId/currentMode를 두지 않는다. 계정
-선택은 프런트 UI 상태이고, 향후 거래 API는 요청 경로
-(`/api/v1/trading-accounts/:accountId/wallets` 등) 또는 명시적 요청 필드로
-accountId를 전달하며 서버는 요청마다 소유권을 다시 검증한다. (이번 작업에서
-하위 거래 endpoint는 구현하지 않았다.)
+선택은 프런트 UI 상태이고, 거래 API는 요청 경로
+(`/api/v1/trading-accounts/:accountId/...`)로 accountId를 전달하며 서버는
+요청마다 소유권을 다시 검증한다.
 
 ### 5.3 향후 예정 (미구현)
 
 - 일반계정 최초 생성 또는 조회 (최초 진입 시 생성 + 1,000만 원 1회 지급)
-- accountId 기반 portfolio/wallet/order API (seasonParticipantId 경로의 전환)
+- accountId 기반 portfolio API (EquitySnapshot·DailyPortfolioSnapshot·
+  SeasonRanking의 accountId 전환 포함)
+- 프런트엔드 accountId 연결·로그인 후 모드 선택 화면
 - 광고 보상 시작/claim API, 광고 완료 검증 callback 또는 server verification API, 광고 보상 내역 API
   (광고 제공자가 미정이므로 provider별 endpoint는 확정하지 않는다)
 
@@ -649,6 +851,20 @@ TradingAccount를 지우지 않아 해당 커밋 상태에서는 FK 오류로 �
 | e2e (`pnpm test:e2e`, `JWT_ACCESS_SECRET=test-secret`) | 115/118 PASS | 신규 6건 포함. 실패 3건(readiness/wallets/orders-cancel)은 **BASELINE_FAIL** — 기준 커밋 a0bedb77에서 동일 재현되는 env 기인 실패 |
 | 운영 CLI 시나리오 (repair-links dry→apply→재실행, financial-scope 순서 포함) | PASS | 격리 dev DB, exit 0, null·mismatch 0, 지갑 잔액 불변 |
 
+**2026-08-03 3차 (작업 5 + 보완 3종, 로컬 실행 — hosted CI 없음):**
+
+| 검증 | 결과 | 근거 |
+| --- | --- | --- |
+| prisma format / validate / generate | PASS | 신규 migration(`…150000_add_trading_scope_and_fx_legacy_partial_unique`) 포함; `migrate diff`(DB↔schema) 차이 없음 |
+| typecheck / build | PASS | `pnpm typecheck`, `pnpm build` |
+| unit + script spec (`pnpm test`) | PASS | 2,243 pass (Order/Position/Quote scope·FX partial unique·probe 계약 반영) |
+| migration 적용·비파괴 (dev DB fingerprint 전후) | PASS | `migrate deploy` 1건 적용, 주문·포지션·quote·FX 값 해시 불변 |
+| opt-in DB 통합 14종 직렬 (`--runInBand`) | PASS | 기존 12종 + 신규 `trading-account-trading-scope` + 기존 러너 fixture dual-write 갱신 |
+| 신규 trading-scope DB 통합 6블록 | PASS | 인덱스/partial unique·insert-level unique 의미·repair 스크립트·지정가 생성/취소/체결 scope fail-closed·account 조회 동등성/404/probe·FX 동일 사용자 계정 간 키 재사용+legacy replay 고정 |
+| e2e (`pnpm test:e2e`, `JWT_ACCESS_SECRET=test-secret`) | 115/118 PASS | 실패 3건(readiness/wallets/orders-cancel)은 **BASELINE_FAIL** — 기준 커밋 e91921aa에서 git stash로 동일 재현 확인(env 기인) |
+| 운영 CLI 시나리오 (repair-trading-scope dry→apply→verify→재실행) | PASS | dev DB에 old-writer null scope 3행 심기 → dry-run 보고(변경 없음) → apply(3행 backfill, 잔여 0/0, exit 0) → 값 불변 확인 → 재실행 멱등 exit 0 |
+| §20 완료 기준 검증 쿼리 | PASS | null·mismatch·order-quote 불일치·계정별 idempotency/position 중복·legacy partial 위반·orphan/general 계정 전부 0 |
+
 ### 7.4 향후 광고 QA 초안 (전부 NOT_IMPLEMENTED)
 
 - [ ] NOT_IMPLEMENTED — 광고 완료 검증 실패 시 지급 없음
@@ -662,7 +878,9 @@ TradingAccount를 지우지 않아 해당 커밋 상태에서는 FK 오류로 �
 
 1. `season_participants.trading_account_id` NOT NULL 강화 (§3.5.5의 전제조건 5가지 확인 후)
 2. 일반모드 계정 최초 생성 API + 일반모드 지갑 + 최초 1,000만 원 1회 지급 (지급·원장 원자성, 재지급 차단)
-3. 주문·포지션·Quote·스냅샷의 accountId 전환 (지갑·원장·환전은 2026-08-03 완료; 소유권 판정은 `TradingAccountAccessService` 재사용)
+3. 스냅샷 3모델(EquitySnapshot·DailyPortfolioSnapshot·SeasonRanking)의 accountId 전환 + accountId 기반 portfolio API
+   (지갑·원장·환전과 주문·포지션·Quote는 2026-08-03 완료; 소유권 판정은 `TradingAccountAccessService` 재사용)
 4. 시즌 lifecycle 격리: finished/rewarded/settled 전환 시 account closed 동기화, suspended 재활성화, 운영자 일반계정 정지
 5. 광고 보상: 제공자 선정 → AdRewardClaim 테이블 + `ad_reward` WalletTransactionType + 서버 검증·지급 API + 운영 설정값
 6. 시간가중수익률 계산 + 외부자금 유입 경계 스냅샷
+7. tradingAccountId NOT NULL 강화·seasonParticipantId 제거(작업 10)는 스냅샷 전환과 구버전 writer 완전 종료 이후에만 검토

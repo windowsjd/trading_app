@@ -12,6 +12,12 @@ import { Prisma } from '../generated/prisma/client';
  * guard held and the mutation applied; 0 means it must be treated as a
  * failed debit/reservation (callers decide the error code).
  *
+ * Trading-account scope (작업 5 보완 1): every WHERE also pins the wallet's
+ * trading_account_id to the VERIFIED account the caller resolved (via
+ * assertCashWalletTradingAccountScope). A wallet whose scope is null or was
+ * concurrently re-scoped therefore matches 0 rows and the mutation fails
+ * closed instead of moving another account's cash.
+ *
  * updated_at is bumped manually because @updatedAt only applies to Prisma
  * model mutations, not raw SQL.
  */
@@ -21,6 +27,8 @@ type AtomicCashClient = Pick<Prisma.TransactionClient, '$executeRaw'>;
 export type CashWalletAmountInput = {
   walletId: string;
   seasonParticipantId: string;
+  /** VERIFIED trading account id (never null; assert scope first). */
+  tradingAccountId: string;
   /** CurrencyCode enum value (KRW | USD). */
   currencyCode: string;
   /** Canonical positive decimal string (scale 8). Never a JS number. */
@@ -42,6 +50,7 @@ export async function debitAvailableCash(
         "updated_at" = NOW()
     WHERE "id" = ${input.walletId}
       AND "season_participant_id" = ${input.seasonParticipantId}
+      AND "trading_account_id" = ${input.tradingAccountId}
       AND "currency_code" = ${input.currencyCode}::"CurrencyCode"
       AND "balance_amount" - "reserved_amount" >= ${input.amount}::numeric
   `;
@@ -62,6 +71,7 @@ export async function reserveAvailableCash(
         "updated_at" = NOW()
     WHERE "id" = ${input.walletId}
       AND "season_participant_id" = ${input.seasonParticipantId}
+      AND "trading_account_id" = ${input.tradingAccountId}
       AND "currency_code" = ${input.currencyCode}::"CurrencyCode"
       AND "balance_amount" - "reserved_amount" >= ${input.amount}::numeric
   `;
@@ -83,6 +93,7 @@ export async function releaseReservedCash(
         "updated_at" = NOW()
     WHERE "id" = ${input.walletId}
       AND "season_participant_id" = ${input.seasonParticipantId}
+      AND "trading_account_id" = ${input.tradingAccountId}
       AND "currency_code" = ${input.currencyCode}::"CurrencyCode"
       AND "reserved_amount" >= ${input.amount}::numeric
   `;
@@ -107,6 +118,7 @@ export async function settleLimitBuyReservedCash(
         "updated_at" = clock_timestamp()
     WHERE "id" = ${input.walletId}
       AND "season_participant_id" = ${input.seasonParticipantId}
+      AND "trading_account_id" = ${input.tradingAccountId}
       AND "currency_code" = ${input.currencyCode}::"CurrencyCode"
       AND "reserved_amount" >= ${input.orderReservation}::numeric
       AND "balance_amount" >= ${input.actualDebit}::numeric
