@@ -332,8 +332,16 @@ model TradingAccount {
   createdAt         DateTime             @default(now()) @map("created_at")
   updatedAt         DateTime             @updatedAt @map("updated_at")
 
-  user              User               @relation(fields: [userId], references: [id], onDelete: Restrict)
-  seasonParticipant SeasonParticipant?
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Restrict)
+  seasonParticipant    SeasonParticipant?
+  // Financial back-relations (transitional accountId scope; rows also keep
+  // their legacy seasonParticipantId until the removal work unit). NO
+  // aggregate/cached value columns live here — balances, ledgers, and
+  // exchange totals are always derived from the financial tables.
+  cashWallets          CashWallet[]
+  walletTransactions   WalletTransaction[]
+  exchangeTransactions ExchangeTransaction[]
+  fxExecuteRequests    FxExecuteRequest[]
 
   @@index([userId, mode])
   @@index([mode, status])
@@ -807,6 +815,11 @@ model Order {
 model CashWallet {
   id                  String       @id @default(uuid())
   seasonParticipantId String       @map("season_participant_id")
+  // Transitional dual identity: nullable trading-account scope added next to
+  // the legacy seasonParticipantId. Backfilled from the participant link by
+  // the add_financial_trading_account_scope migration; every new writer sets
+  // BOTH. Tightened to NOT NULL only in a follow-up work unit.
+  tradingAccountId    String?      @map("trading_account_id")
   currencyCode        CurrencyCode @map("currency_code")
   balanceAmount       Decimal      @map("balance_amount") @db.Decimal(24, 8)
   // Cash locked by submitted limit-buy orders. Never subtracted from total
@@ -817,16 +830,25 @@ model CashWallet {
   updatedAt           DateTime     @updatedAt @map("updated_at")
 
   seasonParticipant  SeasonParticipant   @relation(fields: [seasonParticipantId], references: [id], onDelete: Cascade)
+  tradingAccount     TradingAccount?     @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   walletTransactions WalletTransaction[]
 
   @@unique([seasonParticipantId, currencyCode])
+  // One wallet per currency per account; NULL legacy rows stay allowed
+  // (PostgreSQL treats NULLs as distinct in unique indexes).
+  @@unique([tradingAccountId, currencyCode])
   @@index([seasonParticipantId])
+  @@index([tradingAccountId])
   @@map("cash_wallets")
 }
 
 model WalletTransaction {
   id                  String                         @id @default(uuid())
   seasonParticipantId String                         @map("season_participant_id")
+  // Transitional dual identity (see CashWallet). Stored directly on the
+  // ledger row — account-level ledger reads/audits/aggregations must not
+  // depend on walking the wallet relation.
+  tradingAccountId    String?                        @map("trading_account_id")
   walletId            String                         @map("wallet_id")
   currencyCode        CurrencyCode                   @map("currency_code")
   direction           WalletTransactionDirection
@@ -839,9 +861,11 @@ model WalletTransaction {
   createdAt           DateTime                       @default(now()) @map("created_at")
 
   seasonParticipant SeasonParticipant @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
+  tradingAccount    TradingAccount?   @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   wallet            CashWallet        @relation(fields: [walletId], references: [id], onDelete: Restrict)
 
   @@index([seasonParticipantId, occurredAt])
+  @@index([tradingAccountId, occurredAt])
   @@index([walletId, occurredAt])
   @@index([referenceType, referenceId])
   @@map("wallet_transactions")
@@ -850,6 +874,8 @@ model WalletTransaction {
 model ExchangeTransaction {
   id                  String       @id @default(uuid())
   seasonParticipantId String       @map("season_participant_id")
+  // Transitional dual identity (see CashWallet).
+  tradingAccountId    String?      @map("trading_account_id")
   fxRateSnapshotId    String?      @map("fx_rate_snapshot_id")
   fromCurrency        CurrencyCode @map("from_currency")
   toCurrency          CurrencyCode @map("to_currency")
@@ -864,10 +890,12 @@ model ExchangeTransaction {
   createdAt           DateTime     @default(now()) @map("created_at")
 
   seasonParticipant SeasonParticipant  @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
+  tradingAccount    TradingAccount?    @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   fxRateSnapshot    FxRateSnapshot?    @relation(fields: [fxRateSnapshotId], references: [id], onDelete: Restrict)
   fxExecuteRequests FxExecuteRequest[]
 
   @@index([seasonParticipantId, executedAt])
+  @@index([tradingAccountId, executedAt])
   @@index([fxRateSnapshotId])
   @@index([fromCurrency, toCurrency, executedAt])
   @@map("exchange_transactions")
@@ -955,6 +983,8 @@ model FxExecuteRequest {
   id                    String                 @id @default(uuid())
   userId                String                 @map("user_id")
   seasonParticipantId   String                 @map("season_participant_id")
+  // Transitional dual identity (see CashWallet).
+  tradingAccountId      String?                @map("trading_account_id")
   idempotencyKey        String                 @map("idempotency_key")
   requestHash           String                 @map("request_hash")
   fromCurrency          CurrencyCode           @map("from_currency")
@@ -972,10 +1002,17 @@ model FxExecuteRequest {
 
   user                User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
   seasonParticipant   SeasonParticipant    @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
+  tradingAccount      TradingAccount?      @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   exchangeTransaction ExchangeTransaction? @relation(fields: [exchangeTransactionId], references: [id], onDelete: Restrict)
 
   @@unique([userId, idempotencyKey])
+  // Account-scoped idempotency: a future general account and a season
+  // account of the SAME user may reuse a key once the legacy
+  // (userId, idempotencyKey) unique above is dropped in the participant-id
+  // removal work unit. NULL legacy rows stay allowed.
+  @@unique([tradingAccountId, idempotencyKey])
   @@index([seasonParticipantId, requestedAt])
+  @@index([tradingAccountId, requestedAt])
   @@index([status, requestedAt])
   @@index([exchangeTransactionId])
   @@map("fx_execute_requests")

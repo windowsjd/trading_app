@@ -151,6 +151,18 @@ describe('ensureDevBaselineParticipant trading-account link repair', () => {
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
       devParticipant(null),
     );
+    prisma.tradingAccount.findUnique
+      .mockResolvedValueOnce(null)
+      // Post-insert re-read validation of the stored deterministic row.
+      .mockResolvedValueOnce({
+        id: deriveSeasonTradingAccountId(DEV_SEASON_PARTICIPANT_ID),
+        userId: DEV_USER_ID,
+        mode: 'season',
+        status: 'active',
+        initialCapitalKrw: new Prisma.Decimal(CAPITAL),
+        openedAt: new Date('2026-03-30T00:00:00.000Z'),
+        seasonParticipant: null,
+      });
 
     const result = await ensureDevBaselineParticipant({
       prisma: prisma as never,

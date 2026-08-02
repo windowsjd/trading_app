@@ -2553,6 +2553,186 @@ describe('AppController (e2e)', () => {
     );
   });
 
+  it('/api/v1/trading-accounts/:accountId/wallets (GET) rejects unauthenticated requests', () => {
+    return request(app.getHttpServer())
+      .get('/api/v1/trading-accounts/trading-account-1/wallets')
+      .expect(401)
+      .expect((response) => {
+        expectUnauthorizedBody(response.body);
+        expect(prisma.cashWallet.findMany).not.toHaveBeenCalled();
+      });
+  });
+
+  it('/api/v1/trading-accounts/:accountId/wallets (GET) returns owner wallets scoped by account', async () => {
+    resetPrismaMocks();
+    mockActiveUser();
+    prisma.tradingAccount.findFirst.mockResolvedValueOnce({
+      id: 'trading-account-1',
+      userId: user.id,
+      mode: 'season',
+      status: 'suspended',
+      initialCapitalKrw: new Prisma.Decimal('10000000.00000000'),
+      openedAt: now,
+      closedAt: null,
+      createdAt: now,
+      updatedAt: now,
+      seasonParticipant: {
+        id: participant.id,
+        userId: user.id,
+        participantStatus: 'active',
+        joinedAt: now,
+        season: {
+          id: season.id,
+          name: season.name,
+          status: 'active',
+          startAt: now,
+          endAt: now,
+        },
+      },
+    });
+    prisma.cashWallet.findMany.mockResolvedValueOnce([
+      {
+        currencyCode: 'KRW',
+        balanceAmount: new Prisma.Decimal('10000000.00000000'),
+        reservedAmount: new Prisma.Decimal('250000.00000000'),
+        updatedAt: now,
+      },
+    ]);
+    const token = await createValidAccessToken();
+
+    await request(app.getHttpServer())
+      .get('/api/v1/trading-accounts/trading-account-1/wallets')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: true,
+          data: {
+            tradingAccountId: 'trading-account-1',
+            wallets: [
+              {
+                currencyCode: 'KRW',
+                balanceAmount: '10000000.00000000',
+                reservedAmount: '250000.00000000',
+                availableAmount: '9750000.00000000',
+              },
+            ],
+            summary: {
+              totalWallets: 1,
+              hasKrwWallet: true,
+              hasUsdWallet: false,
+            },
+          },
+        });
+      });
+
+    // Suspended accounts stay readable; the query is account-scoped and a
+    // GET never creates wallets.
+    expect(prisma.cashWallet.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { tradingAccountId: 'trading-account-1' },
+      }),
+    );
+    expect(prisma.cashWallet.create).not.toHaveBeenCalled();
+  });
+
+  it('/api/v1/trading-accounts/:accountId/wallets (GET) answers the same 404 for foreign accounts', async () => {
+    resetPrismaMocks();
+    mockActiveUser();
+    prisma.tradingAccount.findFirst.mockResolvedValue(null);
+    const token = await createValidAccessToken();
+
+    await request(app.getHttpServer())
+      .get('/api/v1/trading-accounts/other-users-account/wallets')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(404)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: false,
+          error: { code: 'TRADING_ACCOUNT_NOT_FOUND' },
+        });
+      });
+    expect(prisma.cashWallet.findMany).not.toHaveBeenCalled();
+  });
+
+  it('/api/v1/trading-accounts/:accountId/fx/quote (POST) rejects unauthenticated requests', () => {
+    return request(app.getHttpServer())
+      .post('/api/v1/trading-accounts/trading-account-1/fx/quote')
+      .send({
+        fromCurrency: 'KRW',
+        toCurrency: 'USD',
+        sourceAmount: '1000.00000000',
+      })
+      .expect(401)
+      .expect((response) => {
+        expectUnauthorizedBody(response.body);
+      });
+  });
+
+  it('/api/v1/trading-accounts/:accountId/fx/execute (POST) rejects unauthenticated requests', () => {
+    return request(app.getHttpServer())
+      .post('/api/v1/trading-accounts/trading-account-1/fx/execute')
+      .send({})
+      .expect(401)
+      .expect((response) => {
+        expectUnauthorizedBody(response.body);
+        expect(prisma.fxExecuteRequest.create).not.toHaveBeenCalled();
+      });
+  });
+
+  it('/api/v1/trading-accounts/:accountId/fx/transactions (GET) lists account-scoped exchanges', async () => {
+    resetPrismaMocks();
+    mockActiveUser();
+    prisma.tradingAccount.findFirst.mockResolvedValueOnce({
+      id: 'trading-account-1',
+      userId: user.id,
+      mode: 'season',
+      status: 'closed',
+      initialCapitalKrw: new Prisma.Decimal('10000000.00000000'),
+      openedAt: now,
+      closedAt: now,
+      createdAt: now,
+      updatedAt: now,
+      seasonParticipant: {
+        id: participant.id,
+        userId: user.id,
+        participantStatus: 'active',
+        joinedAt: now,
+        season: {
+          id: season.id,
+          name: season.name,
+          status: 'active',
+          startAt: now,
+          endAt: now,
+        },
+      },
+    });
+    prisma.exchangeTransaction.count.mockResolvedValueOnce(0);
+    prisma.exchangeTransaction.findMany.mockResolvedValueOnce([]);
+    const token = await createValidAccessToken();
+
+    await request(app.getHttpServer())
+      .get('/api/v1/trading-accounts/trading-account-1/fx/transactions')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: true,
+          data: {
+            state: 'available',
+            tradingAccountId: 'trading-account-1',
+            exchanges: [],
+          },
+        });
+      });
+
+    expect(prisma.exchangeTransaction.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { tradingAccountId: 'trading-account-1' },
+      }),
+    );
+  });
+
   it('/api/v1/home (GET) rejects unauthenticated requests before service work', () => {
     return request(app.getHttpServer())
       .get('/api/v1/home')

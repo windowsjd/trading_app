@@ -389,6 +389,7 @@ type OrderExecutionRecord = {
     id: string;
     participantStatus: ParticipantStatus;
     joinedAt: Date;
+    tradingAccountId: string | null;
     season: ActiveOrderSeason;
   };
 };
@@ -498,6 +499,7 @@ const ORDER_EXECUTION_SELECT = {
       id: true,
       participantStatus: true,
       joinedAt: true,
+      tradingAccountId: true,
       season: {
         select: {
           id: true,
@@ -1864,6 +1866,7 @@ export class OrdersService {
     const walletTransaction = await tx.walletTransaction.create({
       data: {
         seasonParticipantId: order.seasonParticipantId,
+        tradingAccountId: this.requireOrderTradingAccountId(order),
         walletId: wallet.id,
         currencyCode: order.currencyCode,
         direction: WalletTransactionDirection.debit,
@@ -2015,6 +2018,7 @@ export class OrdersService {
     const walletTransaction = await tx.walletTransaction.create({
       data: {
         seasonParticipantId: order.seasonParticipantId,
+        tradingAccountId: this.requireOrderTradingAccountId(order),
         walletId: wallet.id,
         currencyCode: order.currencyCode,
         direction: WalletTransactionDirection.credit,
@@ -4803,6 +4807,28 @@ export class OrdersService {
         message,
       },
     };
+  }
+
+  /**
+   * Transitional dual-write guard: every new ledger row must carry the
+   * participant's trading account. A null link is a deploy-boundary state
+   * that must be repaired (trading-accounts:repair-links) — never silently
+   * spread onto new financial rows.
+   */
+  private requireOrderTradingAccountId(order: {
+    seasonParticipantId: string;
+    seasonParticipant: { tradingAccountId: string | null };
+  }): string {
+    const tradingAccountId = order.seasonParticipant.tradingAccountId;
+    if (!tradingAccountId) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'TRADING_ACCOUNT_LINK_INTEGRITY',
+        'Participant has no trading account link; run trading-accounts:repair-links.',
+      );
+    }
+
+    return tradingAccountId;
   }
 
   private throwApiError(

@@ -1,4 +1,9 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Optional,
+} from '@nestjs/common';
 import {
   CurrencyCode,
   ParticipantStatus,
@@ -8,6 +13,7 @@ import {
 } from '../generated/prisma/client';
 import { buildPagination, type Pagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
+import { TradingAccountAccessService } from '../trading-accounts/trading-account-access.service';
 
 export type WalletTransactionsQuery = {
   currency?: string;
@@ -107,7 +113,160 @@ const MAX_LIMIT = 100;
 
 @Injectable()
 export class WalletsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional()
+    private readonly tradingAccountAccessService?: TradingAccountAccessService,
+  ) {}
+
+  /**
+   * Account-scoped wallet view. Same balance/reserved/available math and
+   * serialization as the legacy /wallets response — only the scoping
+   * changes: the owned account named in the path replaces the implicit
+   * current-season participant. Read-only for active, suspended, and closed
+   * accounts alike; a GET never creates wallets or accounts, so an account
+   * whose wallets do not exist yet simply returns an empty array.
+   */
+  async getWalletsForTradingAccount(
+    userId: string | undefined,
+    tradingAccountId: string,
+  ) {
+    const account = await this.resolveOwnedAccount(userId, tradingAccountId);
+
+    const wallets = await this.prisma.cashWallet.findMany({
+      where: {
+        tradingAccountId: account.id,
+      },
+      orderBy: {
+        currencyCode: 'asc',
+      },
+      select: {
+        currencyCode: true,
+        balanceAmount: true,
+        reservedAmount: true,
+        updatedAt: true,
+      },
+    });
+
+    return {
+      success: true as const,
+      data: {
+        tradingAccountId: account.id,
+        wallets: wallets.map((wallet) => ({
+          currencyCode: wallet.currencyCode,
+          balanceAmount: this.formatDecimal(wallet.balanceAmount, 8),
+          reservedAmount: this.formatDecimal(wallet.reservedAmount, 8),
+          // Derived server-side with Prisma Decimal; never stored in DB.
+          availableAmount: this.formatDecimal(
+            wallet.balanceAmount.sub(wallet.reservedAmount),
+            8,
+          ),
+          updatedAt: wallet.updatedAt.toISOString(),
+        })),
+        summary: {
+          totalWallets: wallets.length,
+          hasKrwWallet: wallets.some(
+            (wallet) => wallet.currencyCode === CurrencyCode.KRW,
+          ),
+          hasUsdWallet: wallets.some(
+            (wallet) => wallet.currencyCode === CurrencyCode.USD,
+          ),
+        },
+      },
+    };
+  }
+
+  /**
+   * Account-scoped ledger view: same filters, ordering, pagination, and row
+   * serialization as the legacy /wallets/transactions response, scoped by
+   * the ledger rows' own tradingAccountId (never a client-provided
+   * participant id).
+   */
+  async getWalletTransactionsForTradingAccount(
+    userId: string | undefined,
+    tradingAccountId: string,
+    query: WalletTransactionsQuery = {},
+  ) {
+    const parsedQuery = this.parseWalletTransactionsQuery(query);
+    const account = await this.resolveOwnedAccount(userId, tradingAccountId);
+
+    const where = {
+      tradingAccountId: account.id,
+      ...(parsedQuery.currency ? { currencyCode: parsedQuery.currency } : {}),
+      ...(parsedQuery.direction ? { direction: parsedQuery.direction } : {}),
+      ...this.walletTransactionTxTypeWhere(parsedQuery.txType),
+    };
+    const [total, transactions] = await Promise.all([
+      this.prisma.walletTransaction.count({ where }),
+      this.prisma.walletTransaction.findMany({
+        where,
+        orderBy: [{ occurredAt: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
+        skip: parsedQuery.offset,
+        take: parsedQuery.limit,
+        select: {
+          id: true,
+          currencyCode: true,
+          direction: true,
+          txType: true,
+          referenceType: true,
+          referenceId: true,
+          amount: true,
+          balanceAfter: true,
+          occurredAt: true,
+          createdAt: true,
+        },
+      }),
+    ]);
+
+    return {
+      success: true as const,
+      data: {
+        tradingAccountId: account.id,
+        filters: this.walletTransactionFilters(parsedQuery),
+        transactions: transactions.map((transaction) => ({
+          id: transaction.id,
+          currencyCode: transaction.currencyCode,
+          direction: transaction.direction,
+          txType: transaction.txType,
+          referenceType: transaction.referenceType,
+          referenceId: transaction.referenceId,
+          amount: this.formatDecimal(transaction.amount, 8),
+          balanceAfter: this.formatDecimal(transaction.balanceAfter, 8),
+          occurredAt: transaction.occurredAt.toISOString(),
+          createdAt: transaction.createdAt.toISOString(),
+        })),
+        pagination: this.pagination(parsedQuery, total, transactions.length),
+      },
+    };
+  }
+
+  private async resolveOwnedAccount(
+    userId: string | undefined,
+    tradingAccountId: string,
+  ) {
+    if (!userId) {
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
+    }
+
+    if (!this.tradingAccountAccessService) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'INTERNAL_ERROR',
+        'Trading account access service unavailable',
+      );
+    }
+
+    return this.tradingAccountAccessService.getOwnedAccountOrThrow(
+      userId,
+      typeof tradingAccountId === 'string'
+        ? tradingAccountId.trim()
+        : tradingAccountId,
+    );
+  }
 
   async getWalletTransactions(
     userId: string | undefined,
@@ -513,7 +672,10 @@ export class WalletsService {
       case 'order_fill':
         return {
           txType: {
-            in: [WalletTransactionType.order_buy, WalletTransactionType.order_sell],
+            in: [
+              WalletTransactionType.order_buy,
+              WalletTransactionType.order_sell,
+            ],
           },
         };
       default:

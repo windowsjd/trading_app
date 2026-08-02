@@ -9,9 +9,11 @@
 - Wallet balances, positions, orders, FX, portfolio valuation, returns, and
   ad-reward data are NOT part of these responses (they are still
   seasonParticipant-based; they move here only after the accountId migration).
-- Sub-resource trading endpoints
-  (`/api/v1/trading-accounts/:accountId/wallets|orders|portfolio`) are NOT
-  implemented yet; they are the planned shape for the accountId migration.
+- Account-scoped finance sub-resources
+  (`/api/v1/trading-accounts/:accountId/wallets`, `wallet-transactions`,
+  `fx/quote|execute|transactions`) are implemented — see
+  `docs/trading-account-finance-api-contract.md`. Order/position/portfolio
+  sub-resources are still NOT implemented.
 
 ## Source Rules
 - Source of truth is `trading_accounts` (+ `season_participants`/`seasons` for

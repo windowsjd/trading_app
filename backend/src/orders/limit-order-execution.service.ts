@@ -49,7 +49,11 @@ export type LimitFillPlan =
       executedPrice: Prisma.Decimal;
       assetPriceSnapshotId: string;
     }
-  | { path: 'candle'; executedPrice: Prisma.Decimal; candle: EligibleClosedCandle };
+  | {
+      path: 'candle';
+      executedPrice: Prisma.Decimal;
+      candle: EligibleClosedCandle;
+    };
 
 export type LimitFillOutcome =
   | {
@@ -88,6 +92,7 @@ const EXEC_ORDER_SELECT = {
   seasonParticipant: {
     select: {
       participantStatus: true,
+      tradingAccountId: true,
       season: {
         select: { id: true, status: true, startAt: true, endAt: true },
       },
@@ -165,7 +170,9 @@ export class LimitOrderExecutionService {
       ) {
         return { state: 'skipped', orderId, reason: 'season_not_active' };
       }
-      if (order.seasonParticipant.participantStatus !== ParticipantStatus.active) {
+      if (
+        order.seasonParticipant.participantStatus !== ParticipantStatus.active
+      ) {
         return { state: 'skipped', orderId, reason: 'participant_not_active' };
       }
       if (!order.asset.isActive) {
@@ -201,11 +208,18 @@ export class LimitOrderExecutionService {
       if (order.currencyCode === CurrencyCode.USD) {
         fxRateSnapshotId = await this.resolveFxEvidenceSnapshotId(tx, now);
         if (!fxRateSnapshotId) {
-          return { state: 'skipped', orderId, reason: 'fx_evidence_unavailable' };
+          return {
+            state: 'skipped',
+            orderId,
+            reason: 'fx_evidence_unavailable',
+          };
         }
       }
 
-      const netAmountText = formatDecimalScale(amounts.netAmount, monetaryScale);
+      const netAmountText = formatDecimalScale(
+        amounts.netAmount,
+        monetaryScale,
+      );
       const reservedAmountText = formatDecimalScale(
         order.reservedAmount,
         monetaryScale,
@@ -270,9 +284,20 @@ export class LimitOrderExecutionService {
         where: { id: wallet.id },
         select: { balanceAmount: true },
       });
+      // Transitional dual-write: a fill must never create a ledger row for a
+      // participant whose account link is missing (deploy-boundary state
+      // that trading-accounts:repair-links has to fix first).
+      if (!order.seasonParticipant.tradingAccountId) {
+        this.throwLimitOrderError(
+          limitOrderErrorCodes.TRADING_ACCOUNT_LINK_INTEGRITY,
+          'Participant has no trading account link; run trading-accounts:repair-links.',
+        );
+      }
+
       await tx.walletTransaction.create({
         data: {
           seasonParticipantId: order.seasonParticipantId,
+          tradingAccountId: order.seasonParticipant.tradingAccountId,
           walletId: wallet.id,
           currencyCode: order.currencyCode,
           direction: WalletTransactionDirection.debit,

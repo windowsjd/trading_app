@@ -416,10 +416,29 @@ pnpm trading-accounts:repair-links --apply   # perform the repair, then re-verif
 ```
 
 The repair uses the same deterministic account id as the migration backfill
-(`md5('trading-account:season-participant:' || id)::uuid`), is idempotent
-across re-runs, reports per-participant failures without stopping, and exits
-non-zero when any participant could not be repaired. See
-`docs/trading-modes-and-accounts.md` §3.5.
+(`md5('trading-account:season-participant:' || id)::uuid`), also corrects
+already-excluded participants whose season account is still `active`
+(active→suspended only; closed/general/mismatched accounts are never
+touched), is idempotent across re-runs, and reports per-participant failures
+without stopping. `--apply` exits non-zero unless the post-apply verification
+confirms ZERO remaining null links and ZERO excluded-active mismatches.
+
+Backfill financial rows (wallets/ledger/exchanges/fx requests) left with
+`trading_account_id = null` by an old-version writer — run AFTER
+repair-links has converged:
+
+```bash
+pnpm trading-accounts:repair-financial-scope           # dry-run (default)
+pnpm trading-accounts:repair-financial-scope --apply   # fill null scopes, then re-verify
+```
+
+Only the null `trading_account_id` column is filled from each row's
+participant link; amounts/balances/fees/ids/idempotency keys are never
+modified, mismatching stored scopes are reported
+(`FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`) and never overwritten, and
+`--apply` exits non-zero while any null or mismatch remains. Deployment
+order and the NOT NULL preconditions: `docs/trading-modes-and-accounts.md`
+§3.5–§3.6.
 
 When the app shows market data as preparing or unavailable, verify that the backend has rows in:
 
@@ -498,7 +517,7 @@ AUTH_DB_SMOKE=1 pnpm test -- auth.integration.spec.ts
 SEASON_JOIN_DB_INTEGRATION=1 pnpm test -- seasons.join.integration.spec.ts
 FX_EXECUTE_DB_INTEGRATION=1 pnpm test -- fx.execute.integration.spec.ts
 ORDER_EXECUTE_DB_INTEGRATION=1 pnpm test -- orders.execute.integration.spec.ts
-TRADING_ACCOUNT_DB_INTEGRATION=1 pnpm test -- trading-account.integration.spec.ts trading-account-link.integration.spec.ts
+TRADING_ACCOUNT_DB_INTEGRATION=1 pnpm test -- trading-account.integration.spec.ts trading-account-link.integration.spec.ts trading-account-financial-scope.integration.spec.ts
 MVP_FLOW_DB_SMOKE=1 pnpm test -- mvp-flow.integration.spec.ts
 OPS_JOB_LOCK_DB_SMOKE=1 pnpm test -- ops-job-lock.integration.spec.ts
 MARKET_CANDLES_DB_SMOKE=1 pnpm test -- market-candles.integration.spec.ts

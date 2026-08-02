@@ -351,8 +351,19 @@ describe('OperatorSeasonModerationService', () => {
     const participant = createParticipant({ tradingAccountId: null });
     const deterministicId = deriveSeasonTradingAccountId('sp-1');
     prisma.seasonParticipant.findFirst.mockResolvedValueOnce(participant);
-    // ensure(): deterministic account does not exist yet.
-    prisma.tradingAccount.findUnique.mockResolvedValueOnce(null);
+    // ensure(): deterministic account does not exist yet; the post-insert
+    // re-read returns the freshly stored deterministic row.
+    prisma.tradingAccount.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: deterministicId,
+        userId: 'user-1',
+        mode: 'season',
+        status: 'active',
+        initialCapitalKrw: new Prisma.Decimal('10000000.00000000'),
+        openedAt: new Date('2026-06-01T00:00:00.000Z'),
+        seasonParticipant: null,
+      });
     prisma.seasonParticipant.updateMany.mockResolvedValueOnce({ count: 1 });
     // sync(): the repaired account is fetched for the status change.
     prisma.tradingAccount.findUnique.mockResolvedValueOnce({

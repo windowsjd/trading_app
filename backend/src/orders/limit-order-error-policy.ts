@@ -53,6 +53,12 @@ export const limitOrderErrorCodes = {
   LIMIT_ORDER_EVIDENCE_INVALID: 'LIMIT_ORDER_EVIDENCE_INVALID',
   /** No closed 5m candle is a valid path-B trigger for the order (operational). */
   LIMIT_ORDER_CANDLE_NOT_ELIGIBLE: 'LIMIT_ORDER_CANDLE_NOT_ELIGIBLE',
+  /**
+   * The participant's trading-account link is missing (deploy-boundary
+   * state). New financial rows are never written without it; run
+   * trading-accounts:repair-links first.
+   */
+  TRADING_ACCOUNT_LINK_INTEGRITY: 'TRADING_ACCOUNT_LINK_INTEGRITY',
 } as const;
 
 export type LimitOrderErrorCode =
@@ -76,4 +82,5 @@ export const limitOrderErrorHttpStatus: Record<
   LIMIT_ORDER_MATCHING_DISABLED: HttpStatus.FORBIDDEN,
   LIMIT_ORDER_EVIDENCE_INVALID: HttpStatus.INTERNAL_SERVER_ERROR,
   LIMIT_ORDER_CANDLE_NOT_ELIGIBLE: HttpStatus.CONFLICT,
+  TRADING_ACCOUNT_LINK_INTEGRITY: HttpStatus.INTERNAL_SERVER_ERROR,
 };

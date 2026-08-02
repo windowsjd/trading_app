@@ -136,12 +136,27 @@ describe('TradingAccount schema contract', () => {
     expect(modelBlock('User')).toMatch(/tradingAccounts\s+TradingAccount\[\]/);
   });
 
-  it('keeps every trading table on SeasonParticipant (no premature account migration)', () => {
+  it('keeps the transitional dual identity on the four financial tables only', () => {
+    // Financial tables carry BOTH identifiers during the transition: the
+    // legacy participant id stays required and the account scope is a
+    // NULLABLE addition (NOT NULL tightening is a later work unit).
     for (const model of [
       'CashWallet',
       'WalletTransaction',
       'ExchangeTransaction',
       'FxExecuteRequest',
+    ]) {
+      const block = modelBlock(model);
+      expect(block).toMatch(/seasonParticipantId\s+String\s/);
+      expect(block).toMatch(/tradingAccountId\s+String\?/);
+      expect(block).toMatch(
+        /tradingAccount\s+TradingAccount\?\s+@relation\([^)]*onDelete: Restrict/,
+      );
+    }
+
+    // Orders/positions/snapshots/rankings stay participant-only until their
+    // own migration work units.
+    for (const model of [
       'Position',
       'Order',
       'EquitySnapshot',
@@ -151,6 +166,50 @@ describe('TradingAccount schema contract', () => {
       const block = modelBlock(model);
       expect(block).toContain('seasonParticipantId');
       expect(block).not.toContain('tradingAccountId');
+    }
+  });
+
+  it('keeps the account-scoped financial uniques and back-relations', () => {
+    expect(modelBlock('CashWallet')).toContain(
+      '@@unique([seasonParticipantId, currencyCode])',
+    );
+    expect(modelBlock('CashWallet')).toContain(
+      '@@unique([tradingAccountId, currencyCode])',
+    );
+    expect(modelBlock('FxExecuteRequest')).toContain(
+      '@@unique([userId, idempotencyKey])',
+    );
+    expect(modelBlock('FxExecuteRequest')).toContain(
+      '@@unique([tradingAccountId, idempotencyKey])',
+    );
+    expect(modelBlock('WalletTransaction')).toContain(
+      '@@index([tradingAccountId, occurredAt])',
+    );
+    expect(modelBlock('ExchangeTransaction')).toContain(
+      '@@index([tradingAccountId, executedAt])',
+    );
+
+    const accountBlock = modelBlock('TradingAccount');
+    for (const relation of [
+      'cashWallets',
+      'walletTransactions',
+      'exchangeTransactions',
+      'fxExecuteRequests',
+    ]) {
+      expect(accountBlock).toContain(relation);
+    }
+    // No cached aggregate columns on the account: financial values are
+    // always derived from wallets/ledgers/exchanges.
+    for (const forbidden of [
+      'walletBalance',
+      'totalLedgerAmount',
+      'totalExchangeAmount',
+      'cumulativeDeposit',
+      'cumulativeAdReward',
+      'currentAsset',
+      'totalReturnRate',
+    ]) {
+      expect(accountBlock).not.toContain(forbidden);
     }
   });
 
@@ -245,5 +304,106 @@ describe('add_trading_account_foundation migration contract', () => {
       `md5('trading-account:season-participant:' || sp."id")::uuid::text`,
     );
     expect(migration).not.toContain('CREATE EXTENSION');
+  });
+});
+
+describe('add_financial_trading_account_scope migration contract', () => {
+  const financialMigration = readFileSync(
+    join(
+      __dirname,
+      '..',
+      '..',
+      'prisma',
+      'migrations',
+      '20260803120000_add_financial_trading_account_scope',
+      'migration.sql',
+    ),
+    'utf8',
+  );
+
+  it('adds nullable trading_account_id to exactly the four financial tables', () => {
+    for (const table of [
+      'cash_wallets',
+      'wallet_transactions',
+      'exchange_transactions',
+      'fx_execute_requests',
+    ]) {
+      expect(financialMigration).toContain(
+        `ALTER TABLE "${table}" ADD COLUMN     "trading_account_id" TEXT;`,
+      );
+    }
+    expect(financialMigration).not.toContain('ALTER TABLE "orders"');
+    expect(financialMigration).not.toContain('ALTER TABLE "positions"');
+    // Executable SQL must not tighten the new columns; header comments may
+    // mention the words.
+    // The new columns stay nullable: no NOT NULL column definition or
+    // tightening (backfill WHERE clauses legitimately use IS NOT NULL).
+    expect(financialMigration).not.toContain('TEXT NOT NULL');
+    expect(financialMigration).not.toContain('SET NOT NULL');
+  });
+
+  it('backfills from the participant link with IS NULL guards (idempotent, never guessed)', () => {
+    for (const alias of ['w', 't', 'e', 'r']) {
+      expect(financialMigration).toContain(
+        `AND ${alias}."trading_account_id" IS NULL`,
+      );
+    }
+    expect(financialMigration).toContain(
+      'AND sp."trading_account_id" IS NOT NULL',
+    );
+    // The migration must never fabricate accounts.
+    expect(financialMigration).not.toContain('INSERT INTO "trading_accounts"');
+  });
+
+  it('creates the account-scoped uniques, indexes, and RESTRICT FKs', () => {
+    expect(financialMigration).toContain(
+      'CREATE UNIQUE INDEX "cash_wallets_trading_account_id_currency_code_key"',
+    );
+    expect(financialMigration).toContain(
+      'CREATE UNIQUE INDEX "fx_execute_requests_trading_account_id_idempotency_key_key"',
+    );
+    expect(financialMigration).toContain(
+      'CREATE INDEX "wallet_transactions_trading_account_id_occurred_at_idx"',
+    );
+    expect(financialMigration).toContain(
+      'CREATE INDEX "exchange_transactions_trading_account_id_executed_at_idx"',
+    );
+    for (const table of [
+      'cash_wallets',
+      'wallet_transactions',
+      'exchange_transactions',
+      'fx_execute_requests',
+    ]) {
+      expect(financialMigration).toMatch(
+        new RegExp(
+          `"${table}_trading_account_id_fkey"[\\s\\S]*ON DELETE RESTRICT`,
+        ),
+      );
+    }
+  });
+
+  it('contains no destructive statement and touches no amount column', () => {
+    const sqlOnly = financialMigration
+      .split('\n')
+      .filter((line) => !line.trimStart().startsWith('--'))
+      .join('\n')
+      .toUpperCase();
+    expect(sqlOnly).not.toContain('DROP TABLE');
+    expect(sqlOnly).not.toContain('DROP COLUMN');
+    expect(sqlOnly).not.toContain('TRUNCATE');
+    expect(sqlOnly).not.toContain('RENAME');
+    expect(sqlOnly).not.toContain('DELETE FROM');
+    for (const column of [
+      'BALANCE_AMOUNT',
+      'RESERVED_AMOUNT',
+      'AMOUNT',
+      'BALANCE_AFTER',
+      'SOURCE_AMOUNT',
+      'NET_TARGET_AMOUNT',
+      'FEE_AMOUNT',
+      'IDEMPOTENCY_KEY"  =',
+    ]) {
+      expect(sqlOnly).not.toContain(`SET "${column}"`);
+    }
   });
 });

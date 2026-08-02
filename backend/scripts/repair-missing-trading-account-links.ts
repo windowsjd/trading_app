@@ -6,20 +6,32 @@ import {
   loadRuntimeEnv,
   requireDatabaseUrl,
 } from './lib/load-runtime-env';
-import { repairMissingTradingAccountLinks } from './lib/repair-trading-account-links';
+import {
+  repairMissingTradingAccountLinks,
+  resolveRepairLinksExitCode,
+} from './lib/repair-trading-account-links';
 
 /**
- * Operational repair for the TradingAccount deploy boundary: season
- * participants created with tradingAccountId = null by an old-version writer.
+ * Operational repair for participant↔trading-account consistency:
+ *
+ *  1. Season participants created with tradingAccountId = null by an
+ *     old-version writer (deploy boundary).
+ *  2. Participants excluded before the exclusion→suspended sync shipped,
+ *     whose season account is therefore still active.
  *
  * Safety contract:
  *  - Bare invocation is a DRY-RUN; writes require an explicit `--apply`.
- *  - Only the missing participant→account link is repaired (deterministic
- *    account id identical to the migration backfill). Wallets, ledgers,
- *    orders, positions, exchanges, and snapshots are never modified, and no
- *    general-mode account is ever created.
- *  - Already-linked participants are never touched; re-running is idempotent.
+ *  - Only the participant→account link and the account status
+ *    (active→suspended, guarded) are repaired. Wallets, ledgers, orders,
+ *    positions, exchanges, snapshots, exclusion metadata, ranks, and rewards
+ *    are never modified. Closed accounts are never reverted; general
+ *    accounts and mismatched (foreign-user) accounts are never touched.
+ *  - Already-consistent rows are never modified; re-running is idempotent.
  *  - Never drops, truncates, deletes, or resets anything.
+ *  - `--apply` exits non-zero unless the post-apply verification confirms
+ *    ZERO remaining null links and ZERO remaining excluded-active
+ *    mismatches. The follow-up NOT NULL migration must only be considered
+ *    after this command exits 0.
  *
  * Usage:
  *   pnpm trading-accounts:repair-links             # dry-run (default)
@@ -46,10 +58,19 @@ async function main(argv: string[]) {
     });
 
     console.log(
-      `\nParticipants with tradingAccountId = null: ${summary.nullLinkCount}`,
+      `\n[1] Participants with tradingAccountId = null: ${summary.nullLinkCount}`,
     );
-
     for (const outcome of summary.outcomes) {
+      console.log(
+        `  - ${outcome.seasonParticipantId} (season=${outcome.seasonId}, user=${outcome.userId})` +
+          ` -> account ${outcome.tradingAccountId} [${outcome.action}]`,
+      );
+    }
+
+    console.log(
+      `\n[2] Excluded participants with an active season account: ${summary.excludedActiveMismatchCount}`,
+    );
+    for (const outcome of summary.excludedActiveOutcomes) {
       console.log(
         `  - ${outcome.seasonParticipantId} (season=${outcome.seasonId}, user=${outcome.userId})` +
           ` -> account ${outcome.tradingAccountId} [${outcome.action}]`,
@@ -68,19 +89,56 @@ async function main(argv: string[]) {
 
     if (flags.apply) {
       console.log(
-        `\nRepaired: ${summary.outcomes.length}, failed: ${summary.failures.length}`,
+        `\nLink repairs: ${summary.outcomes.length}, status corrections: ` +
+          `${summary.excludedActiveOutcomes.filter((o) => o.action === 'suspended').length}, ` +
+          `failed: ${summary.failures.length}`,
       );
       console.log(
         `Remaining null links after apply: ${summary.remainingNullLinkCount}`,
       );
-    } else {
       console.log(
-        `\nWould repair: ${summary.outcomes.length}, would fail: ${summary.failures.length}` +
+        `Remaining excluded-active mismatches after apply: ${summary.remainingExcludedActiveMismatchCount}`,
+      );
+    } else {
+      const pending =
+        summary.outcomes.length +
+        summary.excludedActiveOutcomes.filter(
+          (o) => o.action === 'would-suspend',
+        ).length;
+      console.log(
+        `\nWould repair: ${pending} row(s), would fail: ${summary.failures.length}` +
           ' (dry-run; re-run with --apply to write)',
+      );
+      if (pending > 0 || summary.failures.length > 0) {
+        console.log(
+          'ACTION REQUIRED: inconsistencies exist; run with --apply after stopping old-version writers.',
+        );
+      }
+    }
+
+    const { exitCode, problems } = resolveRepairLinksExitCode(summary);
+    if (flags.apply && exitCode !== 0) {
+      console.error('\nRepair did NOT converge:');
+      for (const problem of problems) {
+        console.error(`  ! ${problem}`);
+      }
+      console.error(
+        [
+          'Possible causes: an old-version writer is still running and creating',
+          'new null-link participants, a participant repair failed above, the',
+          'linked account data is inconsistent (see failures), or excluded-active',
+          'mismatches remain. Stop all old-version instances and re-run',
+          '`pnpm trading-accounts:repair-links --apply`. The NOT NULL migration',
+          'must NOT proceed until this command exits 0 with zero remaining rows.',
+        ].join('\n'),
       );
     }
 
-    if (summary.failures.length > 0) {
+    if (flags.apply) {
+      process.exitCode = exitCode;
+    } else if (summary.failures.length > 0) {
+      // Dry-run still fails loudly when integrity failures were detected —
+      // those rows can never be auto-repaired and need investigation.
       process.exitCode = 1;
     }
   } finally {

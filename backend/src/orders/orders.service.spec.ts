@@ -149,6 +149,7 @@ describe('OrdersService', () => {
     id: 'sp-1',
     participantStatus: ParticipantStatus.active,
     joinedAt,
+    tradingAccountId: 'trading-account-1',
   };
 
   const createPrisma = () => ({
@@ -2999,6 +3000,7 @@ describe('OrdersService', () => {
       expect(prisma.walletTransaction.create).toHaveBeenCalledWith({
         data: {
           seasonParticipantId: 'sp-1',
+          tradingAccountId: 'trading-account-1',
           walletId: 'wallet-1',
           currencyCode: CurrencyCode.KRW,
           direction: WalletTransactionDirection.debit,

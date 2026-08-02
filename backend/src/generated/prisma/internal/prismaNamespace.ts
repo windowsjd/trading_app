@@ -3145,6 +3145,7 @@ export type OrderScalarFieldEnum = (typeof OrderScalarFieldEnum)[keyof typeof Or
 export const CashWalletScalarFieldEnum = {
   id: 'id',
   seasonParticipantId: 'seasonParticipantId',
+  tradingAccountId: 'tradingAccountId',
   currencyCode: 'currencyCode',
   balanceAmount: 'balanceAmount',
   reservedAmount: 'reservedAmount',
@@ -3158,6 +3159,7 @@ export type CashWalletScalarFieldEnum = (typeof CashWalletScalarFieldEnum)[keyof
 export const WalletTransactionScalarFieldEnum = {
   id: 'id',
   seasonParticipantId: 'seasonParticipantId',
+  tradingAccountId: 'tradingAccountId',
   walletId: 'walletId',
   currencyCode: 'currencyCode',
   direction: 'direction',
@@ -3176,6 +3178,7 @@ export type WalletTransactionScalarFieldEnum = (typeof WalletTransactionScalarFi
 export const ExchangeTransactionScalarFieldEnum = {
   id: 'id',
   seasonParticipantId: 'seasonParticipantId',
+  tradingAccountId: 'tradingAccountId',
   fxRateSnapshotId: 'fxRateSnapshotId',
   fromCurrency: 'fromCurrency',
   toCurrency: 'toCurrency',
@@ -3253,6 +3256,7 @@ export const FxExecuteRequestScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
   seasonParticipantId: 'seasonParticipantId',
+  tradingAccountId: 'tradingAccountId',
   idempotencyKey: 'idempotencyKey',
   requestHash: 'requestHash',
   fromCurrency: 'fromCurrency',

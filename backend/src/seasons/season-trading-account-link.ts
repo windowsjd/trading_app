@@ -150,8 +150,9 @@ export type SeasonTradingAccountLinkPreview = {
 /**
  * Ensure the participant is linked to its season TradingAccount. Must run
  * inside the caller's DB transaction. Safe under concurrent repair: the
- * deterministic id + upsert + guarded updateMany guarantee exactly one
- * account and no orphan even when two repairs race.
+ * deterministic id + conflict-ignoring insert + post-insert re-read
+ * validation + guarded updateMany guarantee exactly one verified account and
+ * no orphan even when two repairs race.
  */
 export async function ensureSeasonTradingAccountLink(
   tx: SeasonTradingAccountLinkClient,
@@ -186,6 +187,7 @@ export async function ensureSeasonTradingAccountLink(
     select: LINK_ACCOUNT_SELECT,
   })) as LinkAccountRow | null;
 
+  let insertedCount = 0;
   if (existing) {
     validateDeterministicAccount(existing, participant, initialCapitalKrw);
   } else {
@@ -193,7 +195,7 @@ export async function ensureSeasonTradingAccountLink(
     // inserting the same deterministic id must not raise a unique violation,
     // which would abort this whole transaction in PostgreSQL. A conflict can
     // only be the identical deterministic row, and it is never modified.
-    await tx.$executeRaw`
+    insertedCount = await tx.$executeRaw`
       INSERT INTO "trading_accounts" (
         "id", "user_id", "mode", "status",
         "initial_capital_krw", "opened_at", "closed_at",
@@ -214,6 +216,25 @@ export async function ensureSeasonTradingAccountLink(
       )
       ON CONFLICT ("id") DO NOTHING
     `;
+
+    // The first lookup and the insert are not atomic: a concurrent
+    // transaction may have inserted a DIFFERENT row under the same
+    // deterministic id, which DO NOTHING silently ignores. Always re-read
+    // what is actually stored and validate it BEFORE linking the
+    // participant; never link an account that was not verified.
+    const stored = (await tx.tradingAccount.findUnique({
+      where: { id: accountId },
+      select: LINK_ACCOUNT_SELECT,
+    })) as LinkAccountRow | null;
+
+    if (!stored) {
+      throw new SeasonTradingAccountLinkIntegrityError(
+        'Deterministic trading account is missing after insert.',
+        { seasonParticipantId: participant.id, tradingAccountId: accountId },
+      );
+    }
+
+    validateDeterministicAccount(stored, participant, initialCapitalKrw);
   }
 
   let linked: { count: number };
@@ -266,7 +287,12 @@ export async function ensureSeasonTradingAccountLink(
 
   return {
     tradingAccountId: accountId,
-    action: existing ? 'linked-existing-account' : 'created-and-linked',
+    // insertedCount distinguishes a real insert from an ignored conflict
+    // where a concurrent identical repair created the row first.
+    action:
+      existing || insertedCount === 0
+        ? 'linked-existing-account'
+        : 'created-and-linked',
   };
 }
 

@@ -198,3 +198,20 @@ OpsJobLockService + ops_job_locks다(Redis lock 아님). 실제 거래소 주문
   근거: 오류 코드가 존재 여부 oracle이 되면 계정 열거 공격이 가능해진다.
 - 서버는 현재 선택 계정/모드를 어디에도 저장하지 않는다(JWT claim·세션·User 컬럼·전역 singleton 금지). 향후 거래 API는 경로/필드로 accountId를 명시하고 요청마다 `TradingAccountAccessService`로 소유권을 재검증한다.
   근거: 서버 저장 선택 상태는 다중 기기·동시 요청에서 잘못된 계정으로의 자산 변경을 만든다.
+
+## Financial TradingAccount Scope (Wallet/Ledger/FX 전환)
+
+- 금융 4개 테이블(cash_wallets, wallet_transactions, exchange_transactions, fx_execute_requests)은 전환 기간 동안 seasonParticipantId(필수)와 tradingAccountId(nullable)를 함께 보유하고, 모든 신규 writer는 두 값을 dual-write한다. 참가자 링크가 null이면 새 금융 쓰기를 `TRADING_ACCOUNT_LINK_INTEGRITY`로 중단한다.
+  근거: 복구가 필요한 배포 경계 상태를 새 금융 행으로 확산시키면 NOT NULL 전환이 영원히 불가능해진다.
+- WalletTransaction은 wallet 관계 유도 대신 자체 tradingAccountId 컬럼을 보유한다. TradingAccount에는 잔액·누적액·수익률류 캐시 컬럼을 두지 않는다(금융 값의 원천은 지갑·원장·거래 테이블).
+  근거: 계정별 원장 감사·집계는 조인 없이 조회 가능해야 하고, 캐시 컬럼은 원장과의 불일치 가능성만 만든다.
+- migration backfill은 참가자 링크 복사만 수행한다(IS NULL 가드, 멱등). 링크 없는 참가자의 금융 행은 null로 남기고 migration에서 계정을 만들거나 애플리케이션 복구를 재구현하지 않는다. 이후 정리는 `trading-accounts:repair-links --apply` → `trading-accounts:repair-financial-scope --apply` 순서로만 수행한다.
+  근거: SQL과 애플리케이션에 복구 규칙이 두 벌 있으면 반드시 어긋난다.
+- 복구 CLI(--apply)는 잔여 null·잔여 mismatch·행별 실패·검증 실패 중 하나라도 남으면 exit 1이다. 저장 scope가 참가자 링크와 다르면 `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`로 보고만 하고 절대 덮어쓰지 않는다. NOT NULL 강화는 두 CLI가 exit 0 + 잔여 0으로 끝난 후에만 검토한다.
+  근거: "오류 없이 끝남"과 "정합성 수렴"은 다르며, 자동 교정은 금융 데이터 손상을 은폐한다.
+- FX idempotency는 계정 기준 `(tradingAccountId, idempotencyKey)` unique를 추가하고 legacy `(userId, idempotencyKey)` unique는 참가자 id 제거 작업까지 유지한다(같은 사용자의 계정 간 키 재사용은 전환 기간 동안 계속 차단됨을 문서화).
+  근거: legacy unique를 먼저 지우면 구버전 writer의 멱등성이 깨진다.
+- account-scoped 환전 변경은 소유권(동일 404) + mode=season(general은 409 GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED) + TradingAccount.status=active(아니면 409 TRADING_ACCOUNT_NOT_ACTIVE) + 기존 시즌/참가자/quote 정책 전부를 요구한다. account status만으로 시즌 거래를 허용하지 않으며, 조회는 status와 무관하게 소유자에게 항상 허용된다.
+  근거: 계정 상태는 자산 변경 게이트일 뿐 시즌 거래 가능 판정의 대체물이 아니다.
+- legacy wallet/fx endpoint는 계약 그대로 유지하고 account-scoped endpoint와 같은 서비스 코드를 공유한다(수수료·환율·잔액 변경·원장·멱등·오류 코드·원자성 동일). 배포 순서는 migration → 신버전 → 구버전 종료 → repair-links → repair-financial-scope → 검증 0건 → (후속) NOT NULL.
+  근거: 환전 규칙이 두 벌 존재하는 순간부터 두 경로의 결과가 갈라진다.

@@ -320,7 +320,18 @@ describe('SeasonsService', () => {
     prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
       existingParticipant(null),
     );
-    prisma.tradingAccount.findUnique.mockResolvedValueOnce(null);
+    prisma.tradingAccount.findUnique
+      .mockResolvedValueOnce(null)
+      // Post-insert re-read validation of the stored deterministic row.
+      .mockResolvedValueOnce({
+        id: deriveSeasonTradingAccountId('sp-existing'),
+        userId: 'user-1',
+        mode: 'season',
+        status: 'active',
+        initialCapitalKrw: new Prisma.Decimal('1000000.00000000'),
+        openedAt: new Date('2026-05-02T00:00:00.000Z'),
+        seasonParticipant: null,
+      });
     prisma.seasonParticipant.updateMany.mockResolvedValueOnce({ count: 1 });
 
     const error = await expectStatus(
@@ -440,6 +451,29 @@ describe('SeasonsService', () => {
         }),
       }),
     );
+    // Transitional dual-write: KRW+USD wallets and the initial grant all
+    // carry the created account id next to the participant id.
+    expect(prisma.cashWallet.create).toHaveBeenNthCalledWith(1, {
+      data: expect.objectContaining({
+        seasonParticipantId: 'sp-1',
+        tradingAccountId: 'ta-1',
+        currencyCode: 'KRW',
+      }),
+    });
+    expect(prisma.cashWallet.create).toHaveBeenNthCalledWith(2, {
+      data: expect.objectContaining({
+        seasonParticipantId: 'sp-1',
+        tradingAccountId: 'ta-1',
+        currencyCode: 'USD',
+      }),
+    });
+    expect(prisma.walletTransaction.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        seasonParticipantId: 'sp-1',
+        tradingAccountId: 'ta-1',
+        txType: 'initial_grant',
+      }),
+    });
     expect(prisma.equitySnapshot.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         seasonParticipantId: 'sp-1',

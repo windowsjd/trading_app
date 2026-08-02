@@ -280,6 +280,7 @@ describe('FxService', () => {
       id: 'participant-1',
       participantStatus: 'active',
       joinedAt: new Date('2026-04-28T01:00:00.000Z'),
+      tradingAccountId: 'trading-account-1',
     });
   };
 
@@ -1686,6 +1687,7 @@ describe('FxService', () => {
     ) => {
       expect(prisma.fxExecuteRequest.create).toHaveBeenCalledWith({
         data: {
+          tradingAccountId: 'trading-account-1',
           userId: 'user-1',
           seasonParticipantId: 'participant-1',
           idempotencyKey: 'idempotency-key-1',
@@ -1734,6 +1736,7 @@ describe('FxService', () => {
       });
       expect(prisma.exchangeTransaction.create).toHaveBeenCalledWith({
         data: {
+          tradingAccountId: 'trading-account-1',
           seasonParticipantId: 'participant-1',
           fxRateSnapshotId: 'fx-snapshot-1',
           fromCurrency: CurrencyCode.KRW,
@@ -2203,6 +2206,7 @@ describe('FxService', () => {
       expect(prisma.walletTransaction.create).toHaveBeenCalledTimes(2);
       expect(prisma.walletTransaction.create).toHaveBeenNthCalledWith(1, {
         data: {
+          tradingAccountId: 'trading-account-1',
           seasonParticipantId: 'participant-1',
           walletId: 'source-wallet-1',
           currencyCode: CurrencyCode.KRW,
@@ -2220,6 +2224,7 @@ describe('FxService', () => {
       });
       expect(prisma.walletTransaction.create).toHaveBeenNthCalledWith(2, {
         data: {
+          tradingAccountId: 'trading-account-1',
           seasonParticipantId: 'participant-1',
           walletId: 'target-wallet-1',
           currencyCode: CurrencyCode.USD,
@@ -2643,6 +2648,7 @@ describe('FxService', () => {
         select: {
           id: true,
           seasonParticipantId: true,
+          tradingAccountId: true,
           currencyCode: true,
           balanceAmount: true,
           reservedAmount: true,
@@ -2658,6 +2664,7 @@ describe('FxService', () => {
         select: {
           id: true,
           seasonParticipantId: true,
+          tradingAccountId: true,
           currencyCode: true,
           balanceAmount: true,
           reservedAmount: true,

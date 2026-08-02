@@ -12,6 +12,99 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 금융(지갑·원장·환전) TradingAccount 전환 + 직전 작업 결함 3종 보완 (2026-08-03)
+
+**목적**
+
+작업 4(지갑·원장·환전의 TradingAccount 기준 전환)와 직전 작업에서 발견된 세
+결함(① 과거 excluded 참가자의 active 계정 방치, ② ON CONFLICT 후 저장 계정
+미검증, ③ 복구 CLI가 null 잔여에도 성공 종료) 보완을 함께 수행. 주문·포지션
+전환, 일반모드 계정/지갑/지급, 광고, NOT NULL 강화, seasonParticipantId 제거는
+범위가 아니다.
+
+**핵심 변경**
+
+- 보완 ②: `ensureSeasonTradingAccountLink`가 ON CONFLICT DO NOTHING 이후
+  저장된 계정을 **반드시 재조회**해 id/userId/mode/초기자금/openedAt/타 참가자
+  연결을 검증한 뒤에만 링크한다($executeRaw 반환값으로 created/linked 구분).
+  불일치·미존재는 `TRADING_ACCOUNT_LINK_INTEGRITY` fail-closed. status는 자동
+  하향/상향 없음. 실제 PostgreSQL race interleaving(첫 조회 null → 타 트랜잭션
+  불일치 삽입 → conflict 무시 → 재조회가 거부) 테스트 포함.
+- 보완 ①: `trading-accounts:repair-links`가 excluded 참가자 + active season
+  계정 불일치를 함께 점검·보정한다(active→suspended guarded update만;
+  suspended/closed/general/userId 불일치는 불변, userId 불일치는 fail-closed
+  보고). 제외 API 재호출은 기존 409 계약 유지(자동 보정 없음).
+- 보완 ③: CLI 종료 코드 계약 — `--apply`는 실패 ≥1, null link 잔여 ≥1,
+  excluded-active 잔여 ≥1, 검증 미조회 중 하나라도 있으면 exit 1 + 원인/재실행
+  안내(`resolveRepairLinksExitCode`). dry-run은 분석 완료 시 0(정합성 실패
+  발견 시 1).
+- 작업 4 schema/migration
+  (`20260803120000_add_financial_trading_account_scope`): CashWallet·
+  WalletTransaction·ExchangeTransaction·FxExecuteRequest에 nullable
+  `tradingAccountId` + Restrict FK, `cash_wallets(trading_account_id,
+  currency_code)` unique, `fx_execute_requests(trading_account_id,
+  idempotency_key)` unique(legacy (userId,key) unique는 유지 — 같은 사용자의
+  계정 간 키 재사용은 작업 10까지 차단됨), 조회 인덱스 3종, TradingAccount
+  역관계 4종(캐시 컬럼 금지 유지). backfill은 참가자 링크 복사만(IS NULL 가드,
+  멱등, 계정 생성 없음, null 링크 행은 null 유지). dev DB fingerprint 전후
+  비교로 행 수·금액·ID 불변 확인.
+- dual-write: 시즌 참가(지갑 2 + initial_grant), dev baseline, FX 실행
+  (FxExecuteRequest·ExchangeTransaction·출금/입금 원장 — 단일 트랜잭션 유지),
+  시장가 매수/매도 원장, 지정가 체결 원장이 모두 participant의
+  tradingAccountId를 함께 기록. 참가자 링크 null이면 금융 쓰기를
+  `TRADING_ACCOUNT_LINK_INTEGRITY`(500)로 중단(조용한 null 기록 금지).
+  Order/Position/Quote/스냅샷 모델은 불변. settlement/adjustment 원장 writer는
+  아직 존재하지 않음(enum만).
+- 신규 `trading-accounts:repair-financial-scope`
+  (`scripts/repair-financial-trading-account-scope.ts` + lib):
+  금융 4모델 null scope backfill 전용, 기본 dry-run, 500행 배치, missing
+  participant link 행은 보고만(repair-links 먼저 안내), 저장 scope 불일치는
+  `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH` 보고·덮어쓰기 금지(wallet↔ledger
+  불일치 포함), apply 후 null·mismatch 0 재검증, 잔여 시 exit 1, 멱등.
+- account-scoped 금융 API: `GET /api/v1/trading-accounts/:accountId/wallets`·
+  `wallet-transactions`(조회 — active/suspended/closed 허용, GET은 아무것도
+  생성 안 함), `POST .../fx/quote`·`execute`, `GET .../fx/transactions`.
+  controller는 wallets/fx 모듈에 두고 TradingAccountsModule의 access service를
+  재사용(소유권 404 통일). FX 변경 게이트: mode=season(general은 409
+  GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED) + status=active(아니면 409
+  TRADING_ACCOUNT_NOT_ACTIVE) + 기존 시즌/참가자/quote 정책 전부. FxService·
+  WalletsService의 같은 계산 코드를 legacy와 공유(수수료·환율·원장·멱등·오류
+  코드·원자성 동일 — DB 통합으로 실측). idempotency는 계정 unique로 조회
+  (같은 계정 replay 동일 응답, 다른 사용자 계정은 같은 키 허용). source/target
+  지갑의 account scope 불일치는 fail-closed. legacy wallets/fx 계약 불변.
+- 계약 문서 신규 `docs/trading-account-finance-api-contract.md`.
+
+**검증 (로컬 실행 — hosted CI 없음)**
+
+- prisma format/validate/generate·typecheck·build·unit `pnpm test` 전체 pass
+  (신규: link 재검증, repair-links 확장/exit, financial-scope lib, wallets/fx
+  account-scoped gating, dual-write 단언, schema/migration 계약).
+- opt-in PostgreSQL 12스위트 직렬(--runInBand) PASS: 기존 join/FX/시장가/
+  지정가 5종/MVP flow/trading-account 2종 + 신규
+  `trading-account-financial-scope.integration.spec.ts` 8케이스(backfill
+  비파괴·멱등, financial-scope repair, join dual-write + legacy/scoped 지갑·
+  원장 동등성, FX legacy/scoped dual-write·동등성·계정 멱등성·cross-user 키
+  재사용, suspended/excluded/foreign/general 게이트, excluded-active 보정
+  수렴, ON CONFLICT race fail-closed).
+- e2e 115/118 pass(신규 6건 포함). 실패 3건(readiness/wallets/orders-cancel)은
+  기준 커밋에서 동일 재현되는 BASELINE_FAIL(env 기인).
+- 운영 CLI 시나리오(격리 dev DB): financial-scope dry-run이 missing link 차단
+  안내 → repair-links --apply(link 1 복구 + excluded-active 1 suspended,
+  잔여 0/0, exit 0) → financial-scope --apply(지갑·원장 backfill, 잔액 불변,
+  잔여 0, exit 0) → 재실행 멱등.
+
+**주의사항**
+
+- 금융 4모델 tradingAccountId는 nullable 유지. NOT NULL 전제 9가지와 배포
+  순서(migration → 신버전 → 구버전 종료 → repair-links → financial-scope →
+  0건 확인)는 `docs/trading-modes-and-accounts.md` §3.6.5.
+- 전환 기간 동안 같은 사용자의 계정 간 idempotency key 재사용은 legacy
+  (userId,key) unique 때문에 계속 차단된다(작업 10에서 해소).
+- DB 스위트는 공유 DB라 반드시 `pnpm test --runInBand --runTestsByPath ...`
+  직렬 실행(`--` 삽입 금지). e2e는 `JWT_ACCESS_SECRET=test-secret` 필요.
+- 통합 러너들이 repair를 DB 전역으로 apply하므로 dev DB에 의도적으로 남겨 둔
+  legacy fixture는 러너 실행 후 복구된 상태일 수 있다.
+
 ### 작업 단위: TradingAccount null link 복구 + 제외 동기화 + 거래계정 조회 API (2026-08-03)
 
 **목적**
@@ -974,6 +1067,32 @@ cd frontend && npm run typecheck && npm test
 ---
 
 ## 2. 최신 작업 시간순 기록
+
+### 2026-08-03 — 금융(지갑·원장·환전) TradingAccount 전환 + 복구 결함 3종 보완
+
+- 직전 작업 결함 보완: ① 링크 복구가 ON CONFLICT 이후 저장 계정을 재조회·
+  검증한 뒤에만 참가자를 연결(불일치 fail-closed, 실제 PG race로 검증),
+  ② repair-links가 과거 excluded 참가자의 active 계정을 탐지해
+  suspended로 보정(closed/general/타인 계정 불변), ③ 복구 CLI가 null·
+  mismatch 잔여 시 exit 1로 종료(NOT NULL 전제는 exit 0 + 잔여 0).
+- additive migration으로 금융 4모델(지갑·원장·환전거래·환전요청)에 nullable
+  tradingAccountId + Restrict FK + 계정 unique(지갑 통화, FX idempotency)·
+  인덱스를 추가하고 참가자 링크에서 backfill(IS NULL 가드, 멱등, 금액·ID
+  불변, null 링크는 null 유지). 신규 writer 전부(시즌 참가, dev baseline,
+  환전, 시장가/지정가 원장)가 seasonParticipantId + tradingAccountId를
+  dual-write하고, 링크 null이면 금융 쓰기를 중단한다.
+- 운영 스크립트 `trading-accounts:repair-financial-scope`(기본 dry-run) 추가:
+  null scope만 참가자 링크로 backfill, 불일치는 보고만·덮어쓰기 금지, apply
+  후 null·mismatch 0 재검증(잔여 시 exit 1).
+- account-scoped 금융 API 추가: `/api/v1/trading-accounts/:accountId/`
+  아래 wallets·wallet-transactions(조회, suspended/closed 허용)·fx quote/
+  execute/transactions(시즌 정책 + account active 요구, general 미구현 409,
+  타인/미존재 동일 404). legacy wallets/fx 계약 불변, 같은 서비스 계산 공유,
+  계정 기준 idempotency. 계약 문서 `trading-account-finance-api-contract.md`.
+- 검증: unit 전체 pass, DB 통합 12종 직렬 PASS(신규 financial-scope 8케이스
+  포함), e2e 115/118(3건은 기준 커밋 동일 BASELINE_FAIL), dev DB에서
+  migration 전후 fingerprint 불변 + 운영 CLI 시나리오(dry→apply→멱등 재실행,
+  exit 0) 실측.
 
 ### 2026-08-03 — TradingAccount null link 복구 + 제외 suspended 동기화 + 거래계정 조회 API
 

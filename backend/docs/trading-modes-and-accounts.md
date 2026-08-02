@@ -25,18 +25,28 @@
 - 운영자 참가자 제외 시 같은 트랜잭션에서 TradingAccount `suspended` 동기화 (§4.4)
 - `GET /api/v1/trading-accounts` 목록·`GET /api/v1/trading-accounts/:accountId`
   상세 조회 API와 공용 소유권 검증 계층 `TradingAccountAccessService` (§5.2)
+- 금융 4개 모델(CashWallet·WalletTransaction·ExchangeTransaction·
+  FxExecuteRequest)의 transitional `tradingAccountId` 추가 + migration
+  backfill + 신규 writer dual-write (§3.6)
+- 금융 scope 운영 복구 `pnpm trading-accounts:repair-financial-scope` (§3.6.3)
+- 기존 excluded 참가자의 active 계정 상태 보정(repair-links 확장)과 복구 CLI
+  실패 종료 코드 계약 (§3.5)
+- account-scoped 금융 조회/환전 API:
+  `GET /api/v1/trading-accounts/:accountId/wallets`·`wallet-transactions`,
+  `POST .../fx/quote`·`fx/execute`, `GET .../fx/transactions`
+  (계약: `docs/trading-account-finance-api-contract.md`)
 
 **아직 구현되지 않음 (문서만 보고 사용 가능하다고 오해하지 말 것):**
 
 - 일반모드 계정 생성(진입) API, 일반모드 지갑, 최초 1,000만 원 실제 지급
 - 로그인 후 모드 선택 화면, 앱 내 모드 전환
-- 거래 API의 accountId 전환 (주문·포지션·지갑은 여전히 seasonParticipantId 기준;
-  `/trading-accounts/:accountId/wallets` 같은 하위 거래 endpoint도 미구현)
+- Order·Position·Quote·스냅샷의 accountId 전환 (주문·포지션 거래 주체는 여전히
+  seasonParticipantId 기준; 지갑·원장·환전만 §3.6의 dual-write 전환 완료)
 - 광고 SDK, 광고 시청 UI, 광고 보상 검증·지급 API, 광고 보상 이력 테이블,
   광고 보상 WalletTransactionType, 광고 1회당 지급액·일일 한도 확정
 - 시간가중수익률 계산 코드
 - 일반모드 포트폴리오·주문·포지션·스냅샷
-- `tradingAccountId` NOT NULL 강화 (전제조건은 §3.5.5)
+- `tradingAccountId` NOT NULL 강화 (참가자: §3.5.5, 금융 4모델: §3.6.5)
 - 시즌 finished/rewarded/settled 전환 시 account `closed` 일괄 동기화,
   suspended 계정 재활성화, 운영자 일반계정 정지 API (§4.4의 잔여 범위)
 
@@ -256,6 +266,15 @@ Season → SeasonParticipant → TradingAccount
   `INSERT ... ON CONFLICT ("id") DO NOTHING`, 링크는
   `updateMany(where: { id, tradingAccountId: null })` 가드로 처리해 동시 복구
   race에서도 계정 하나·링크 하나만 남는다.
+- **ON CONFLICT 후 재조회 검증(2026-08-03 보완):** 최초 조회와 INSERT 사이에
+  다른 트랜잭션이 같은 결정적 ID로 *다른 내용*의 계정을 삽입할 수 있으므로,
+  INSERT 후 반드시 저장된 계정을 다시 조회해
+  id/userId/mode/initialCapitalKrw/openedAt/타 참가자 연결 여부를 검증한 뒤에만
+  참가자를 연결한다. 재조회 실패·불일치는 `TRADING_ACCOUNT_LINK_INTEGRITY`로
+  중단하며, 검증되지 않은 계정이 링크되는 일은 없다(실제 PostgreSQL race
+  interleaving 테스트로 검증). status는 재조회 검증 대상이 아니다 — 동시 상태
+  변화가 정상 존재할 수 있고, participant 상태 대비 더 강한 종료 상태(closed
+  등)를 임의로 되돌리거나 하향/상향 변경하지 않는다.
 - 지갑·원장·주문·포지션·환전·스냅샷은 **절대 수정하지 않는다**. initial grant
   재지급·스냅샷 재생성 없음.
 - 다음 불일치는 조용히 덮어쓰지 않고
@@ -278,15 +297,124 @@ Season → SeasonParticipant → TradingAccount
    보고한다. 지갑·잔액·원장은 불변, replay 시 추가 계정 없음.
 4. 운영용 스크립트 `pnpm trading-accounts:repair-links`
    (`scripts/repair-missing-trading-account-links.ts`) — **기본 dry-run**,
-   실제 수정은 `--apply` 명시 필수. null 참가자 수·복구(예정) 건수·참가자별
-   실패 원인을 출력하고, apply 후 남은 null 건수를 재검증한다. 참가자별로
-   독립 트랜잭션이라 일부 실패가 나머지 복구를 막지 않으며, 여러 번 실행해도
-   결과가 같다. DROP/TRUNCATE/DELETE/reset 없음, general 계정 생성 없음.
+   실제 수정은 `--apply` 명시 필수. 참가자별 독립 트랜잭션이라 일부 실패가
+   나머지 복구를 막지 않으며, 여러 번 실행해도 결과가 같다.
+   DROP/TRUNCATE/DELETE/reset 없음, general 계정 생성 없음.
+   2026-08-03 확장으로 이 스크립트는 두 종류의 정합성을 함께 점검한다:
+   ① null link 복구, ② **excluded 참가자 + active season 계정 상태 보정**
+   (제외→suspended 동기화 배포 전에 이미 제외된 참가자는 재호출이 409라 계정이
+   active로 남는다; 대상 = excluded + mode=season + status=active + userId
+   일치. active→suspended만 guarded update로 수행하고 suspended/closed/general/
+   userId 불일치(fail-closed 보고)는 절대 변경하지 않으며, 지갑·예약금·원장·
+   주문·포지션·환전·스냅샷·제외 사유/시각·순위·보상도 불변). 이미 excluded인
+   참가자에 대한 제외 API 재호출은 기존 계약대로 409를 유지하고 자동 보정하지
+   않는다 — 기존 데이터 보정은 이 스크립트가 담당한다.
+   **종료 코드 계약:** `--apply`는 ⓐ 참가자별 실패 ≥1, ⓑ apply 후 null link
+   잔여 ≥1, ⓒ excluded-active 불일치 잔여 ≥1, ⓓ 최종 검증 쿼리 실패/미조회 중
+   하나라도 해당하면 exit 1로 종료하고 원인(구버전 writer 실행 중, 복구 중 신규
+   null 생성, 데이터 불일치 등)과 재실행 안내를 출력한다. dry-run은 분석이
+   정상 완료되면 0으로 종료하되 수정 필요 사실을 명시한다(정합성 실패가
+   발견되면 dry-run도 1). **NOT NULL migration은 이 명령이 exit 0 + 잔여 0건으로
+   끝난 후에만 가능하다.**
 
 **NOT NULL 강화 전제조건 (별도 작업).** ① 모든 production writer가 값을 기록,
 ② 복구 스크립트 apply 완료, ③ `trading_account_id IS NULL` 0건 확인, ④ 구버전
 인스턴스 완전 종료, ⑤ 배포 순서 확정 — 이 다섯 가지가 모두 확인된 후에만
 NOT NULL migration을 진행한다.
+
+### 3.6 금융 4개 모델의 TradingAccount 전환 (작업 4, 2026-08-03 구현)
+
+**대상 모델:** `CashWallet`, `WalletTransaction`, `ExchangeTransaction`,
+`FxExecuteRequest`. Order·Position·Quote·EquitySnapshot·DailyPortfolioSnapshot·
+SeasonRanking은 이번 범위가 아니며 schema를 변경하지 않았다.
+
+#### 3.6.1 transitional dual identity
+
+네 모델 모두 기존 `seasonParticipantId`(필수)를 유지한 채 nullable
+`tradingAccountId` + `TradingAccount?` 관계(onDelete: **Restrict** — 금융
+기록이 계정 삭제를 막는다; Cascade 금지)를 추가했다. 추가 제약:
+
+- `CashWallet` `@@unique([tradingAccountId, currencyCode])` — 계정당 통화별
+  지갑 1개 (PostgreSQL unique의 NULL-distinct 의미로 legacy null 행 다수 허용)
+- `FxExecuteRequest` `@@unique([tradingAccountId, idempotencyKey])` — 계정
+  기준 멱등성. 기존 `@@unique([userId, idempotencyKey])`는 작업 10(참가자 id
+  제거) 전까지 유지되므로, **같은 사용자**가 다른 계정에서 같은 키를 재사용하는
+  것은 전환 기간 동안 여전히 legacy unique에 막힌다(서로 다른 사용자는 가능).
+- 조회 인덱스: `wallet_transactions(trading_account_id, occurred_at)`,
+  `exchange_transactions(trading_account_id, executed_at)`,
+  `fx_execute_requests(trading_account_id, requested_at)`,
+  `cash_wallets(trading_account_id)`
+- `WalletTransaction`은 wallet 관계를 따라가지 않고 **자체적으로**
+  tradingAccountId를 보유한다(계정별 원장 감사·집계·향후 수익률 계산용).
+- TradingAccount에 역관계 4개(cashWallets/walletTransactions/
+  exchangeTransactions/fxExecuteRequests)만 추가했고, 누적 잔액·수익률류 캐시
+  컬럼은 추가 금지 그대로다(원천은 항상 지갑·원장·거래 데이터).
+
+#### 3.6.2 migration backfill (`20260803120000_add_financial_trading_account_scope`)
+
+additive migration이 각 금융 행의 tradingAccountId를 연결된
+`SeasonParticipant.tradingAccountId`에서 복사한다(4개 UPDATE, 양쪽 IS NULL
+가드로 멱등). 참가자 링크가 null이면 금융 행도 null로 남기며 **migration이
+계정을 만들거나 애플리케이션 복구를 재구현하지 않는다**. 기존 행 수·금액·
+잔액·예약금·수수료·상태·idempotency key·ID는 일절 변경되지 않는다(전후
+fingerprint와 opt-in PostgreSQL 테스트로 검증).
+
+#### 3.6.3 금융 scope 운영 복구 스크립트
+
+`pnpm trading-accounts:repair-financial-scope`
+(`scripts/repair-financial-trading-account-scope.ts`) — migration 이후 구버전
+writer가 만든 null scope 금융 행의 backfill 전용. 기본 dry-run, `--apply`
+명시 필수, unknown 옵션·`--apply --dry-run` 동시 사용 거부, 500행 배치·
+IS NULL 가드 update만 수행(금액 필드 불변), 멱등.
+
+- 참가자 링크가 null인 행은 수정하지 않고
+  `MISSING_PARTICIPANT_TRADING_ACCOUNT_LINK`로 보고한다 — 먼저
+  `trading-accounts:repair-links --apply`가 필요하다고 안내.
+- 이미 값이 있는 행이 참가자 링크와 다르면 **절대 덮어쓰지 않고**
+  `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`로 보고한다. wallet과
+  wallet_transaction의 scope 불일치도 검사한다.
+- `--apply` 종료 코드: 금융 4모델 null 잔여, scope mismatch 잔여, 행별 실패,
+  검증 쿼리 실패 중 하나라도 있으면 exit 1.
+
+#### 3.6.4 신규 writer dual-write
+
+신규 애플리케이션이 생성하는 모든 금융 행은 seasonParticipantId와
+tradingAccountId를 **함께** 기록한다(두 값은 같은 참가자·계정을 가리켜야 함).
+
+- 시즌 참가: KRW/USD 지갑 + initial_grant 원장 (join 트랜잭션에서 생성한 계정 id)
+- dev baseline: 동일 (`ta_dev_001`)
+- 환전 실행: FxExecuteRequest·ExchangeTransaction·출금/입금 WalletTransaction
+  전부 같은 계정 id, 기존과 동일한 하나의 트랜잭션(중간 실패 시 전체 rollback)
+- 시장가 매수/매도 원장, 지정가 체결 원장: 주문의 참가자 링크에서 계정 id를
+  읽어 기록 (Order/Position 모델 자체는 미변경)
+- **fail-closed:** 참가자 링크가 null이면 금융 쓰기를 중단하고
+  `TRADING_ACCOUNT_LINK_INTEGRITY`(500)를 반환한다 — 복구가 필요한 상태를 새
+  금융 행으로 확산시키지 않는다. 조용한 null 기록 금지.
+- 정산(settlement)·운영자 조정(adjustment) 원장 writer는 아직 존재하지
+  않는다(enum만 존재). 구현되는 시점에 dual-write 규칙을 따라야 한다.
+
+일관성 계약(신규 쓰기 전부): `row.seasonParticipantId → participant.tradingAccountId
+== row.tradingAccountId`, `walletTransaction.tradingAccountId ==
+wallet.tradingAccountId`. DB trigger는 사용하지 않으며 additive
+FK/unique + dual-write + resolver + backfill + 복구 스크립트 + PostgreSQL
+정합성 테스트 + read-only 검증 쿼리의 조합으로 보장한다.
+
+#### 3.6.5 NOT NULL 보류와 배포 순서
+
+새 금융 tradingAccountId 컬럼은 nullable을 유지한다(구버전 writer/rolling
+deployment 호환, backfill·dual-write 검증·주문/포지션 전환 잔여). NOT NULL
+검토 전제조건: ① 모든 production writer가 기록, ② repair-links 성공(exit 0),
+③ repair-financial-scope 성공(exit 0), ④ 참가자 null link 0, ⑤ 금융 4모델
+null 0, ⑥ scope mismatch 0, ⑦ 구버전 완전 종료, ⑧ 배포 순서 확정, ⑨ 운영 DB
+read-only 검증 완료. `seasonParticipantId` 제거는 작업 10 이전에 하지 않는다.
+
+**권장 배포 순서:** ① 백업·migration 검토 → ② additive migration 적용 →
+③ 신버전 배포 → ④ 구버전 완전 종료 → ⑤ repair-links dry-run → ⑥ repair-links
+--apply → ⑦ 참가자 null 0·excluded-active 0 확인 → ⑧ repair-financial-scope
+dry-run → ⑨ repair-financial-scope --apply → ⑩ 금융 null 0·mismatch 0 확인 →
+⑪ 신규 account-scoped API smoke → ⑫ 기존 wallet/fx API smoke → ⑬ NOT NULL은
+후속 작업으로 보류. **구버전 writer가 실행 중인 상태에서 복구 성공을 선언하지
+않는다.**
 
 ## 4. 상태정의 (04 상태정의서 대응)
 
@@ -336,6 +464,10 @@ NOT NULL migration을 진행한다.
   `afterTradingAccountStatus`, `tradingAccountLinkRepaired`를 추가했다
   (전체 account 객체·민감정보는 기록하지 않음).
 
+**기존 데이터 보정(2026-08-03):** 이 동기화 배포 이전에 제외된 참가자의
+excluded+active 불일치는 `pnpm trading-accounts:repair-links`가 점검·보정한다
+(§3.5). 제외 API 재호출 시 자동 보정은 넣지 않았다(409 계약 유지).
+
 **이번 범위에서 구현하지 않은 상태 동기화 (시즌 lifecycle 격리 작업에서 별도
 처리):** 시즌 settled 시 account 일괄 closed, rewarded/finished 전환 시 closed
 동기화, suspended 계정 재활성화, 운영자 일반계정 정지 API.
@@ -368,6 +500,16 @@ NOT NULL migration을 진행한다.
   API가 이 계층을 재사용한다. season 계정에 participant가 없거나 userId가
   다르거나 general 계정에 participant가 붙어 있으면 404로 감추지 않고 500
   `TRADING_ACCOUNT_INTEGRITY`로 fail-closed 한다.
+
+**account-scoped 금융 API (작업 4에서 추가):** 소유 계정 하위의
+`GET .../wallets`·`GET .../wallet-transactions`(조회, active/suspended/closed
+모두 허용), `POST .../fx/quote`·`POST .../fx/execute`(시즌계정 + account
+active + 기존 시즌/참가자 정책을 모두 통과해야 하며 suspended/closed는 409
+`TRADING_ACCOUNT_NOT_ACTIVE`, general 계정은 409
+`GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED`), `GET .../fx/transactions`(조회).
+legacy `/api/v1/wallets`·`/api/v1/fx/*`는 계약 그대로 유지되고 두 경로는 같은
+서비스 계산 규칙을 공유한다. 상세:
+`docs/trading-account-finance-api-contract.md`.
 
 **서버는 "현재 선택 계정"을 저장하지 않는다.** JWT·세션·User 테이블·전역
 singleton 어디에도 currentTradingAccountId/currentMode를 두지 않는다. 계정
@@ -441,15 +583,35 @@ accountId를 전달하며 서버는 요청마다 소유권을 다시 검증한�
 - [ ] season↔participant relation 구조 위반 시 500 TRADING_ACCOUNT_INTEGRITY
 - [ ] 기존 seasons/wallets/fx/orders/portfolio/records API 응답 계약 불변
 
+금융 scope·account-scoped 금융 API (2026-08-03 추가):
+
+- [ ] ON CONFLICT 후 저장 계정 재조회·검증 후에만 링크 (불일치·미존재 fail-closed, race에서도 미검증 계정 연결 없음)
+- [ ] excluded+active 불일치를 dry-run이 탐지하고 apply가 active→suspended만 보정 (suspended/closed/general/userId 불일치 불변)
+- [ ] repair-links --apply: 실패·null 잔여·excluded-active 잔여·검증 실패 시 exit 1, 수렴 시 exit 0
+- [ ] 금융 4모델에 nullable tradingAccountId + Restrict FK + 계정 unique/인덱스 존재, Order/Position schema 불변
+- [ ] migration backfill: 참가자 링크 복사, null 링크는 null 유지, 행 수·금액·ID·idempotency key 불변, 재실행 멱등, general 계정 0
+- [ ] repair-financial-scope: 기본 dry-run, null만 backfill, missing-link 보고 후 불변, mismatch 덮어쓰기 금지, apply 후 null·mismatch 0 검증, 잔여 시 exit 1, 멱등
+- [ ] 신규 writer dual-write: join 지갑/grant·환전 요청/거래/원장·시장가/지정가 원장 전부 participant accountId 기록, 링크 null이면 fail-closed
+- [ ] account-scoped wallets/ledger 조회: 소유권 404 통일, suspended/closed 조회 허용, GET이 지갑·계정 미생성, legacy와 값 일치
+- [ ] account-scoped FX: 시즌 정책 + account active 요구, suspended/closed 409, general 409, 소유권 404, source/target wallet 동일 계정 검증
+- [ ] 계정 기준 idempotency: 같은 계정 replay 동일 응답, 다른 사용자 계정은 같은 키 사용 가능, 환전 트랜잭션 원자성 유지
+- [ ] legacy wallet/fx API 계약 불변, legacy와 account-scoped 계산 결과 동일
+
 자동화: `src/seasons/season-trading-account-link.spec.ts`,
 `src/seasons/seasons.service.spec.ts`,
 `src/operator/operator-season-moderation.service.spec.ts`,
 `src/trading-accounts/trading-accounts.service.spec.ts`,
 `scripts/lib/dev-baseline.spec.ts`,
 `scripts/lib/repair-trading-account-links.spec.ts`(이상 기본 `pnpm test`),
-`src/seasons/trading-account-link.integration.spec.ts`
+`scripts/lib/repair-financial-trading-account-scope.spec.ts`,
+`src/wallets/trading-account-wallets.spec.ts`,
+`src/fx/fx-trading-account-scope.spec.ts`,
+`src/fx/fx.service.spec.ts`·`src/orders/orders.service.spec.ts`(dual-write
+단언 포함, 이상 기본 `pnpm test`),
+`src/seasons/trading-account-link.integration.spec.ts`·
+`src/seasons/trading-account-financial-scope.integration.spec.ts`
 (`TRADING_ACCOUNT_DB_INTEGRATION=1` opt-in, 실제 PostgreSQL), e2e
-`test/app.e2e-spec.ts`의 trading-accounts 3건.
+`test/app.e2e-spec.ts`의 trading-accounts 9건.
 
 ### 7.3 커밋별 실행 결과
 
@@ -474,6 +636,19 @@ TradingAccount를 지우지 않아 해당 커밋 상태에서는 FK 오류로 �
 | 운영 복구 시나리오 A (스크립트 dry-run→apply→재실행) | PASS | 격리 dev DB, 금융 데이터 불변 확인 |
 | 운영 복구 시나리오 B (join 재요청 409+복구) / C (제외 시 복구+suspended) | PASS | 7.2 DB 통합 케이스로 실행 |
 
+**2026-08-03 2차 (작업 4 + 보완 3종, 로컬 실행 — hosted CI 없음):**
+
+| 검증 | 결과 | 근거 |
+| --- | --- | --- |
+| prisma format / validate / generate | PASS | 신규 migration 포함 |
+| typecheck / build | PASS | `pnpm typecheck`, `pnpm build` |
+| unit + script spec (`pnpm test`) | PASS | 2,231 pass (신규 +42) |
+| migration backfill·비파괴 (dev DB fingerprint 전후) | PASS | 행 수·금액 합계·ID 불변, legacy null 유지 |
+| opt-in DB 통합 12종 직렬 (`--runInBand`) | PASS | link/financial-scope/join/FX/시장가/지정가 5종/MVP flow 포함 |
+| 신규 financial-scope DB 통합 8케이스 | PASS | backfill·dual-write·repair·equivalence·idempotency·gating·excluded-active·ON CONFLICT race |
+| e2e (`pnpm test:e2e`, `JWT_ACCESS_SECRET=test-secret`) | 115/118 PASS | 신규 6건 포함. 실패 3건(readiness/wallets/orders-cancel)은 **BASELINE_FAIL** — 기준 커밋 a0bedb77에서 동일 재현되는 env 기인 실패 |
+| 운영 CLI 시나리오 (repair-links dry→apply→재실행, financial-scope 순서 포함) | PASS | 격리 dev DB, exit 0, null·mismatch 0, 지갑 잔액 불변 |
+
 ### 7.4 향후 광고 QA 초안 (전부 NOT_IMPLEMENTED)
 
 - [ ] NOT_IMPLEMENTED — 광고 완료 검증 실패 시 지급 없음
@@ -487,7 +662,7 @@ TradingAccount를 지우지 않아 해당 커밋 상태에서는 FK 오류로 �
 
 1. `season_participants.trading_account_id` NOT NULL 강화 (§3.5.5의 전제조건 5가지 확인 후)
 2. 일반모드 계정 최초 생성 API + 일반모드 지갑 + 최초 1,000만 원 1회 지급 (지급·원장 원자성, 재지급 차단)
-3. 지갑·주문·포지션·스냅샷의 accountId 전환 (`/trading-accounts/:accountId/...` 하위 endpoint, seasonParticipantId와 병행 기간 필요) — 소유권 판정은 `TradingAccountAccessService` 재사용
+3. 주문·포지션·Quote·스냅샷의 accountId 전환 (지갑·원장·환전은 2026-08-03 완료; 소유권 판정은 `TradingAccountAccessService` 재사용)
 4. 시즌 lifecycle 격리: finished/rewarded/settled 전환 시 account closed 동기화, suspended 재활성화, 운영자 일반계정 정지
 5. 광고 보상: 제공자 선정 → AdRewardClaim 테이블 + `ad_reward` WalletTransactionType + 서버 검증·지급 API + 운영 설정값
 6. 시간가중수익률 계산 + 외부자금 유입 경계 스냅샷

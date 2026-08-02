@@ -172,7 +172,10 @@ describe('ensureSeasonTradingAccountLink', () => {
 
   it('creates the deterministic season account and links a null participant', async () => {
     const tx = createTx();
-    tx.tradingAccount.findUnique.mockResolvedValueOnce(null);
+    tx.tradingAccount.findUnique
+      .mockResolvedValueOnce(null)
+      // Post-insert re-read: what is actually stored under the id.
+      .mockResolvedValueOnce(matchingAccount({ status: 'suspended' }));
 
     const result = await ensureSeasonTradingAccountLink(
       tx as never,
@@ -183,6 +186,8 @@ describe('ensureSeasonTradingAccountLink', () => {
       tradingAccountId: DETERMINISTIC_ID,
       action: 'created-and-linked',
     });
+    // The stored account is ALWAYS re-read and validated after the insert.
+    expect(tx.tradingAccount.findUnique).toHaveBeenCalledTimes(2);
     expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
     expect(rawInsertParams(tx)).toEqual([
       DETERMINISTIC_ID,
@@ -216,7 +221,9 @@ describe('ensureSeasonTradingAccountLink', () => {
 
   it('treats a concurrent identical link as already linked', async () => {
     const tx = createTx();
-    tx.tradingAccount.findUnique.mockResolvedValueOnce(null);
+    tx.tradingAccount.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(matchingAccount());
     tx.seasonParticipant.updateMany.mockResolvedValueOnce({ count: 0 });
     tx.seasonParticipant.findUnique.mockResolvedValueOnce({
       tradingAccountId: DETERMINISTIC_ID,
@@ -284,6 +291,75 @@ describe('ensureSeasonTradingAccountLink', () => {
     await expect(
       ensureSeasonTradingAccountLink(tx as never, participant()),
     ).rejects.toBeInstanceOf(SeasonTradingAccountLinkIntegrityError);
+  });
+});
+
+describe('ensureSeasonTradingAccountLink post-insert conflict validation', () => {
+  // Interleaving under test: the first findUnique sees null, a concurrent
+  // transaction inserts a row under the same deterministic id, our INSERT is
+  // ignored by ON CONFLICT DO NOTHING — the stored row MUST be re-read and
+  // validated before any participant link is written.
+  const conflictTx = (storedRow: unknown, insertedCount = 0) => {
+    const tx = createTx();
+    tx.tradingAccount.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(storedRow);
+    tx.$executeRaw.mockResolvedValueOnce(insertedCount);
+    return tx;
+  };
+
+  it('links normally when the conflicting row is the identical deterministic account', async () => {
+    const tx = conflictTx(matchingAccount(), 0);
+
+    const result = await ensureSeasonTradingAccountLink(
+      tx as never,
+      participant(),
+    );
+
+    expect(result).toEqual({
+      tradingAccountId: DETERMINISTIC_ID,
+      action: 'linked-existing-account',
+    });
+    expect(tx.seasonParticipant.updateMany).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['a different user', { userId: 'user-other' }],
+    ['general mode', { mode: 'general' }],
+    [
+      'a different initial capital',
+      { initialCapitalKrw: new Prisma.Decimal('1.00000000') },
+    ],
+    [
+      'a different openedAt',
+      { openedAt: new Date('2020-01-01T00:00:00.000Z') },
+    ],
+    [
+      'a link to another participant',
+      { seasonParticipant: { id: 'sp-other' } },
+    ],
+  ])(
+    'never links when the conflicting stored row has %s',
+    async (_label, overrides) => {
+      const tx = conflictTx(
+        matchingAccount(overrides as Record<string, unknown>),
+        0,
+      );
+
+      await expect(
+        ensureSeasonTradingAccountLink(tx as never, participant()),
+      ).rejects.toBeInstanceOf(SeasonTradingAccountLinkIntegrityError);
+      expect(tx.seasonParticipant.updateMany).not.toHaveBeenCalled();
+    },
+  );
+
+  it('fails closed when the account cannot be re-read after the insert', async () => {
+    const tx = conflictTx(null, 0);
+
+    await expect(
+      ensureSeasonTradingAccountLink(tx as never, participant()),
+    ).rejects.toBeInstanceOf(SeasonTradingAccountLinkIntegrityError);
+    expect(tx.seasonParticipant.updateMany).not.toHaveBeenCalled();
   });
 });
 
