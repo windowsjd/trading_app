@@ -25,6 +25,13 @@ import type { PrismaClient } from '../../src/generated/prisma/client';
  *    total, unpaired or inconsistent external-funding before/after pairs,
  *    keyed granted claims with no boundary pair, duplicate account/date daily
  *    rows, and season snapshots left unscoped or mis-scoped
+ *  - (작업 6·7 보완) accounts whose newest state is an unpaired "before" row,
+ *    ledger-vs-snapshot cumulative external funding mismatches, the before /
+ *    after halves of a missing boundary reported SEPARATELY, each boundary
+ *    invariant (amount, account scope, factor/returnRate, investment PnL,
+ *    after-total) reported on its own, general daily rows polluted with a
+ *    participant or missing performance columns, and daily rows written to a
+ *    closed general account
  */
 
 export const GENERAL_ACCOUNT_INITIAL_CAPITAL_KRW = '10000000.00000000';
@@ -67,6 +74,19 @@ export type GeneralAccountAuditSummary = {
   duplicateAccountDateDailySnapshots: number;
   seasonSnapshotsWithoutAccountScope: number;
   seasonSnapshotsWithScopeMismatch: number;
+  // ---- 작업 6·7 보완 checks ----
+  accountsWithLatestSnapshotBefore: number;
+  accountsWithExternalFundingDiscontinuity: number;
+  keyedGrantedClaimsWithoutBoundaryBefore: number;
+  keyedGrantedClaimsWithoutBoundaryAfter: number;
+  boundaryPairsWithAmountMismatch: number;
+  boundaryPairsWithAccountScopeMismatch: number;
+  boundaryPairsWithFactorMismatch: number;
+  boundaryPairsWithInvestmentPnlMismatch: number;
+  boundaryPairsWithTotalAssetMismatch: number;
+  generalDailySnapshotsWithSeasonParticipant: number;
+  generalDailySnapshotsMissingPerformanceValues: number;
+  dailySnapshotsOnClosedAccounts: number;
   findings: GeneralAccountAuditFinding[];
 };
 
@@ -540,6 +560,215 @@ async function auditGeneralPerformance(
     'duplicate (account, date) daily snapshot group(s)',
   );
 
+  // ------------------------------------------------------ 작업 6·7 보완
+  //
+  // `latest` uses the SAME phase rank the runtime does: within one capturedAt
+  // an `after` row is the committed end state, a `before` row is the transient
+  // one, and neither is decided by a UUID. Keeping the two definitions
+  // identical is the point — an audit that ranked rows differently from the
+  // service would report healthy accounts as broken and vice versa.
+  const latestSnapshotCte = `
+    SELECT DISTINCT ON (s."trading_account_id")
+      s."trading_account_id" AS account_id,
+      s."snapshot_reason" AS reason,
+      s."cumulative_external_funding_krw" AS cumulative_funding
+    FROM "equity_snapshots" s
+    JOIN "trading_accounts" a ON a."id" = s."trading_account_id"
+    WHERE a."mode" = 'general'
+    ORDER BY
+      s."trading_account_id",
+      s."captured_at" DESC,
+      CASE s."snapshot_reason"
+        WHEN 'external_funding_after' THEN 2
+        WHEN 'external_funding_before' THEN 0
+        ELSE 1
+      END DESC,
+      s."created_at" DESC,
+      s."id" DESC
+  `;
+
+  const accountsWithLatestSnapshotBefore = report(
+    await q(
+      prisma.$queryRawUnsafe(`
+      WITH latest AS (${latestSnapshotCte})
+      SELECT count(*)::int AS n
+      FROM latest
+      WHERE reason = 'external_funding_before'
+    `),
+    ),
+    'GENERAL_PERFORMANCE_LATEST_IS_BEFORE',
+    'general account(s) whose newest performance state is an unpaired external-funding "before" row',
+  );
+
+  const accountsWithExternalFundingDiscontinuity = report(
+    await q(
+      prisma.$queryRawUnsafe(`
+      WITH latest AS (${latestSnapshotCte}),
+      funding AS (
+        SELECT "trading_account_id" AS account_id, sum("amount") AS total
+        FROM "wallet_transactions"
+        WHERE "direction" = 'credit'
+          AND (
+            ("tx_type" = 'initial_grant' AND "reference_type" = 'general_account_open')
+            OR ("tx_type" = 'ad_reward' AND "reference_type" = 'ad_reward_claim')
+          )
+        GROUP BY "trading_account_id"
+      )
+      SELECT count(*)::int AS n
+      FROM latest l
+      LEFT JOIN funding f ON f.account_id = l.account_id
+      WHERE l.cumulative_funding IS DISTINCT FROM coalesce(f.total, 0)
+    `),
+    ),
+    'GENERAL_PERFORMANCE_EXTERNAL_FUNDING_MISMATCH',
+    'general account(s) whose newest snapshot cumulative external funding disagrees with the ledger total',
+  );
+
+  const keyedGrantedClaimsWithoutBoundaryBefore = report(
+    await q(prisma.$queryRaw`
+      SELECT count(*)::int AS n
+      FROM "ad_reward_claims" c
+      WHERE c."status" = 'granted'
+        AND c."idempotency_key" IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM "equity_snapshots" s
+          WHERE s."external_funding_reference_id" = c."id"
+            AND s."snapshot_reason" = 'external_funding_before'
+        )
+    `),
+    'AD_REWARD_CLAIM_BOUNDARY_BEFORE_MISSING',
+    'keyed granted claim(s) have no external-funding "before" snapshot',
+  );
+
+  const keyedGrantedClaimsWithoutBoundaryAfter = report(
+    await q(prisma.$queryRaw`
+      SELECT count(*)::int AS n
+      FROM "ad_reward_claims" c
+      WHERE c."status" = 'granted'
+        AND c."idempotency_key" IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM "equity_snapshots" s
+          WHERE s."external_funding_reference_id" = c."id"
+            AND s."snapshot_reason" = 'external_funding_after'
+        )
+    `),
+    'AD_REWARD_CLAIM_BOUNDARY_AFTER_MISSING',
+    'keyed granted claim(s) have no external-funding "after" snapshot',
+  );
+
+  // The pair invariants, reported ONE BY ONE. The combined
+  // EXTERNAL_FUNDING_PAIR_INCONSISTENT count above stays for continuity, but an
+  // operator needs to know WHICH invariant broke to know what happened.
+  const pairCount = async (predicate: string) =>
+    q(
+      prisma.$queryRawUnsafe(`
+        SELECT count(*)::int AS n
+        FROM "equity_snapshots" b
+        JOIN "equity_snapshots" a
+          ON a."trading_account_id" = b."trading_account_id"
+         AND a."external_funding_reference_id" = b."external_funding_reference_id"
+         AND a."snapshot_reason" = 'external_funding_after'
+        WHERE b."snapshot_reason" = 'external_funding_before'
+          AND (${predicate})
+      `),
+    );
+
+  const boundaryPairsWithAmountMismatch = report(
+    await pairCount(
+      `a."external_funding_amount_krw" IS DISTINCT FROM b."external_funding_amount_krw"`,
+    ),
+    'EXTERNAL_FUNDING_PAIR_AMOUNT_MISMATCH',
+    'external-funding pair(s) whose before/after amounts disagree',
+  );
+
+  const boundaryPairsWithAccountScopeMismatch = report(
+    await q(prisma.$queryRaw`
+      SELECT count(*)::int AS n
+      FROM "equity_snapshots" s
+      WHERE s."snapshot_reason" IN ('external_funding_before', 'external_funding_after')
+        AND (
+          s."trading_account_id" IS NULL
+          OR s."season_participant_id" IS NOT NULL
+          OR NOT EXISTS (
+            SELECT 1 FROM "ad_reward_claims" c
+            WHERE c."id" = s."external_funding_reference_id"
+              AND c."trading_account_id" = s."trading_account_id"
+          )
+        )
+        AND s."external_funding_reference_type" = 'ad_reward_claim'
+    `),
+    'EXTERNAL_FUNDING_BOUNDARY_ACCOUNT_SCOPE_MISMATCH',
+    'ad-reward boundary snapshot(s) missing account scope, carrying a participant, or pointing at another account’s claim',
+  );
+
+  const boundaryPairsWithFactorMismatch = report(
+    await pairCount(
+      `a."time_weighted_return_factor" IS DISTINCT FROM b."time_weighted_return_factor"
+       OR a."return_rate" IS DISTINCT FROM b."return_rate"`,
+    ),
+    'EXTERNAL_FUNDING_PAIR_FACTOR_MISMATCH',
+    'external-funding pair(s) where the inflow moved the TWR factor or return rate',
+  );
+
+  const boundaryPairsWithInvestmentPnlMismatch = report(
+    await pairCount(
+      `a."investment_pnl_krw" IS DISTINCT FROM b."investment_pnl_krw"`,
+    ),
+    'EXTERNAL_FUNDING_PAIR_INVESTMENT_PNL_MISMATCH',
+    'external-funding pair(s) where the inflow moved investment PnL',
+  );
+
+  const boundaryPairsWithTotalAssetMismatch = report(
+    await pairCount(
+      `(a."total_asset_krw" - b."total_asset_krw") IS DISTINCT FROM b."external_funding_amount_krw"
+       OR (a."cumulative_external_funding_krw" - b."cumulative_external_funding_krw")
+          IS DISTINCT FROM b."external_funding_amount_krw"`,
+    ),
+    'EXTERNAL_FUNDING_PAIR_TOTAL_ASSET_MISMATCH',
+    'external-funding pair(s) where the after totals are not before plus the inflow',
+  );
+
+  const generalDailySnapshotsWithSeasonParticipant = report(
+    await q(prisma.$queryRaw`
+      SELECT count(*)::int AS n
+      FROM "daily_portfolio_snapshots" d
+      JOIN "trading_accounts" a ON a."id" = d."trading_account_id"
+      WHERE a."mode" = 'general' AND d."season_participant_id" IS NOT NULL
+    `),
+    'GENERAL_DAILY_SNAPSHOT_HAS_SEASON_PARTICIPANT',
+    'general daily snapshot(s) carry a season participant link',
+  );
+
+  const generalDailySnapshotsMissingPerformanceValues = report(
+    await q(prisma.$queryRaw`
+      SELECT count(*)::int AS n
+      FROM "daily_portfolio_snapshots" d
+      JOIN "trading_accounts" a ON a."id" = d."trading_account_id"
+      WHERE a."mode" = 'general'
+        AND d."season_participant_id" IS NULL
+        AND (
+          d."cumulative_external_funding_krw" IS NULL
+          OR d."investment_pnl_krw" IS NULL
+          OR d."time_weighted_return_factor" IS NULL
+        )
+    `),
+    'GENERAL_DAILY_SNAPSHOT_PERFORMANCE_VALUES_MISSING',
+    'general daily snapshot(s) are missing TWR / external-funding / investment-PnL columns',
+  );
+
+  const dailySnapshotsOnClosedAccounts = report(
+    await q(prisma.$queryRaw`
+      SELECT count(*)::int AS n
+      FROM "daily_portfolio_snapshots" d
+      JOIN "trading_accounts" a ON a."id" = d."trading_account_id"
+      WHERE a."mode" = 'general'
+        AND a."status" = 'closed'
+        AND (a."closed_at" IS NULL OR d."created_at" > a."closed_at")
+    `),
+    'GENERAL_DAILY_SNAPSHOT_ON_CLOSED_ACCOUNT',
+    'daily snapshot(s) were written to a closed general account after it closed',
+  );
+
   const seasonSnapshotsWithoutAccountScope = report(
     await q(prisma.$queryRaw`
       SELECT count(*)::int AS n
@@ -579,6 +808,18 @@ async function auditGeneralPerformance(
     duplicateAccountDateDailySnapshots,
     seasonSnapshotsWithoutAccountScope,
     seasonSnapshotsWithScopeMismatch,
+    accountsWithLatestSnapshotBefore,
+    accountsWithExternalFundingDiscontinuity,
+    keyedGrantedClaimsWithoutBoundaryBefore,
+    keyedGrantedClaimsWithoutBoundaryAfter,
+    boundaryPairsWithAmountMismatch,
+    boundaryPairsWithAccountScopeMismatch,
+    boundaryPairsWithFactorMismatch,
+    boundaryPairsWithInvestmentPnlMismatch,
+    boundaryPairsWithTotalAssetMismatch,
+    generalDailySnapshotsWithSeasonParticipant,
+    generalDailySnapshotsMissingPerformanceValues,
+    dailySnapshotsOnClosedAccounts,
   };
 }
 

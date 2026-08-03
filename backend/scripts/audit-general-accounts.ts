@@ -123,6 +123,44 @@ async function main() {
       `  season snapshots with a scope mismatch: ${summary.seasonSnapshotsWithScopeMismatch}`,
     );
 
+    console.log('\nboundary order + funding continuity (작업 6·7 보완):');
+    console.log(
+      `  accounts whose latest state is a "before" row: ${summary.accountsWithLatestSnapshotBefore}`,
+    );
+    console.log(
+      `  ledger vs latest-snapshot external funding mismatches: ${summary.accountsWithExternalFundingDiscontinuity}`,
+    );
+    console.log(
+      `  keyed granted claims missing the "before" row: ${summary.keyedGrantedClaimsWithoutBoundaryBefore}`,
+    );
+    console.log(
+      `  keyed granted claims missing the "after" row: ${summary.keyedGrantedClaimsWithoutBoundaryAfter}`,
+    );
+    console.log(
+      `  boundary amount mismatches: ${summary.boundaryPairsWithAmountMismatch}`,
+    );
+    console.log(
+      `  boundary account-scope mismatches: ${summary.boundaryPairsWithAccountScopeMismatch}`,
+    );
+    console.log(
+      `  boundary factor/returnRate mismatches: ${summary.boundaryPairsWithFactorMismatch}`,
+    );
+    console.log(
+      `  boundary investment-PnL mismatches: ${summary.boundaryPairsWithInvestmentPnlMismatch}`,
+    );
+    console.log(
+      `  boundary after-total mismatches: ${summary.boundaryPairsWithTotalAssetMismatch}`,
+    );
+    console.log(
+      `  general daily rows with a season participant: ${summary.generalDailySnapshotsWithSeasonParticipant}`,
+    );
+    console.log(
+      `  general daily rows missing performance values: ${summary.generalDailySnapshotsMissingPerformanceValues}`,
+    );
+    console.log(
+      `  daily rows written to closed accounts: ${summary.dailySnapshotsOnClosedAccounts}`,
+    );
+
     if (summary.findings.length > 0) {
       console.error(`\nFindings: ${summary.findings.length}`);
       for (const finding of summary.findings.slice(0, 50)) {

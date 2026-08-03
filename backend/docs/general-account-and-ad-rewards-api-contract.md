@@ -17,12 +17,18 @@ The existing account-scoped finance reads
 now also serve general accounts unchanged — see
 `docs/trading-account-finance-api-contract.md`.
 
-NOT implemented in this work unit (deliberately still blocked):
+General-mode performance landed later, in 작업 7 and 작업 6·7 보완 — see the
+second half of this document. EquitySnapshot, DailyPortfolioSnapshot,
+portfolio valuation, time-weighted return, investment PnL display, and the
+general-account daily snapshot job ARE implemented now; the list below is the
+current one.
+
+NOT implemented (deliberately still blocked):
 
 - general-mode orders (`GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED`) and FX
   (`GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED`),
-- general-mode positions, EquitySnapshot, DailyPortfolioSnapshot,
-  portfolio valuation, time-weighted return, investment PnL display,
+- general-mode positions and any general-mode trading activation,
+- SeasonRanking's TradingAccount transition,
 - a real ad-network adapter, an ad SDK, an ad-watching screen, the
   post-login mode-selection screen, and any frontend change.
 
@@ -235,6 +241,33 @@ must call `POST /api/v1/trading-accounts/general` first.
 
 Advisory only; performs no grant and writes nothing.
 
+Evaluation order (작업 6 보완 4) — structure before configuration:
+
+1. authentication
+2. account ownership + `mode=general` (unknown and foreign ids are the same
+   404; a season account is `AD_REWARD_GENERAL_ACCOUNT_ONLY`)
+3. **full general-account financial integrity**
+   (`assertGeneralAccountFinancialIntegrity`: exactly one KRW and one USD
+   wallet, both account-scoped with no participant link, exactly one
+   `initial_grant`/`general_account_open` ledger row for 10,000,000 KRW on the
+   KRW wallet with the account as its `referenceId`, and no wallet or ledger
+   row of this account carrying a `seasonParticipantId` or pointing at another
+   account's wallet)
+4. `AD_REWARD_ENABLED`
+5. provider adapter registered
+6. account status
+7. daily count / daily amount / cooldown
+
+Step 3 used to run last — effectively never, because steps 4–6 short-circuit
+in the current release. An account with a vanished USD wallet or a missing
+initial grant therefore answered a perfectly normal
+`{ "eligible": false, "reason": "AD_REWARD_DISABLED" }`. It now answers 500
+`GENERAL_ACCOUNT_INTEGRITY` instead: whether ads are switched on has nothing
+to do with whether the account's money is intact. Damage is detected while
+the feature is disabled, while no provider is registered, and for suspended
+and closed accounts. The check is READ-ONLY — no wallet, grant, or ledger row
+is ever created to "fix" what is missing.
+
 ```json
 {
   "success": true,
@@ -265,9 +298,11 @@ every limit against locked rows.
 
 ### POST .../ad-rewards/claim
 
-Request body: `{ "provider": "<key>", "proof": "<opaque>" }`
-(`verificationToken` is accepted as an alias for `proof`). There is
-deliberately no reward-amount or event-id field.
+Request body:
+`{ "provider": "<key>", "proof": "<opaque>", "idempotencyKey": "<key>" }`
+(`verificationToken` is accepted as an alias for `proof`). All three are
+REQUIRED. There is deliberately no reward-amount, event-id, user-id,
+account-id, granted-timestamp, request-hash, or response-payload field.
 
 Order of work:
 
@@ -499,7 +534,7 @@ same event under a DIFFERENT key still replays for the same user+account and
 is still 409 `AD_REWARD_EVENT_ALREADY_USED` for anyone else; a claim's stored
 `idempotencyKey` is never overwritten and there is no alias table.
 
-## Claim integrity before replay (작업 6 보완 3)
+## One replay validator for every path (작업 6 보완 3 + 4)
 
 A granted claim used to replay as `{ duplicate: true, walletBalanceAfter: null }`
 when its ledger link was missing — a success response for a payout the server
@@ -517,6 +552,67 @@ could not evidence. Before any replay the claim is now validated:
   synchronous flow — never replayed as success.
 
 Violations are **500 `AD_REWARD_CLAIM_INTEGRITY`**, never repaired.
+
+### The paths were unified (작업 6 보완 4)
+
+There used to be three replay resolvers and they disagreed. The
+pre-transaction command-key path ran the full ledger check; the
+in-transaction raced-key path only asked "is `walletTransaction` non-null?";
+the provider-event path asked nothing and could answer
+`{ "duplicate": true, "walletBalanceAfter": null }`. Which validation a caller
+got depended on how its request happened to race — the one dimension that must
+NOT change what "your reward was already paid" means.
+
+All five entry points now funnel through ONE async resolver:
+
+1. `(tradingAccountId, idempotencyKey)` found before the transaction
+2. the same key found again after winning the account row lock
+3. `(provider, providerEventId)` found inside the transaction
+4. a P2002 on the command-key unique, re-read outside the transaction
+5. a P2002 on the provider-event unique, re-read outside the transaction
+
+It always checks, in this order: claim `userId` + `tradingAccountId` against
+the owned account → terminal status (`granted` / `rejected` only) → keyed
+command state → for a refusal: no ledger link, a recognised limit code, and a
+stored refusal payload naming that same code → for a payout: the account's
+full financial structure, the whole ledger row, the keyed external-funding
+boundary pair, and the stored response payload against the live ledger.
+
+`matchedBy` keeps the two idempotency axes apart. A `command_key` match must
+have the same `requestHash`; a `provider_event` match is a DIFFERENT command
+by definition, so its hash is not compared — comparing it would turn a
+legitimate duplicate-event answer into a bogus conflict.
+
+Guarantees on every path: the verifier is never re-called, the wallet is never
+re-credited, no ledger row or snapshot is created, a damaged claim is never
+auto-repaired and never hidden behind `duplicate: true`, no success response
+carries `walletBalanceAfter: null`, and another user's event is never
+disclosed.
+
+**Contract change to note:** a `rejected` claim whose `failureCode` is not one
+of the three limit codes previously replayed as 409
+`AD_REWARD_EVENT_ALREADY_USED` on the provider-event path. It is now 500
+`AD_REWARD_CLAIM_INTEGRITY`, matching the command-key path. That state is
+corruption, and 409 concealed it. Every other status and code is unchanged.
+
+### `responsePayloadJson` is used, not just stored
+
+The payload written inside the payout transaction is canonical data. Every
+replay compares its `claimId`, `walletBalanceAfter`, and `grantedAt` against
+the live ledger and claim, and a refusal payload's `code` against
+`failureCode`. Drift between the two means one of them was rewritten after the
+fact, which is exactly what a `duplicate: true` success must not paper over.
+The response body itself still follows the documented replay shape
+(`granted: false, duplicate: true`).
+
+### Committed commands survive state and config changes
+
+A COMMITTED command owes its caller the first result. Suspending or closing
+the account, switching `AD_REWARD_ENABLED` off, or removing the provider
+adapter does NOT break a retry of an already-paid command — the command-key
+lookup runs before those gates on purpose, and no verifier call or money
+movement is involved. A NEW command in those states is still refused as
+before. The one thing that does refuse a retry is damaged stored data.
 
 ## Full general-account integrity (작업 6 보완 2)
 
@@ -591,6 +687,75 @@ Rejected claims and replays write no boundary rows at all. The partial unique
 `(tradingAccountId, externalFundingReferenceType, externalFundingReferenceId,
 snapshotReason)` guarantees one before and one after per claim.
 
+### Boundary ORDER does not come from a UUID (작업 7 보완 1)
+
+The pair is written inside ONE transaction, so `before` and `after` routinely
+share both `capturedAt` AND `createdAt`, and their ids are random UUIDv4 with
+no creation order. Ordering by `capturedAt, createdAt, id` therefore decided
+the pair by coin flip: roughly half the accounts reported the `before` row as
+their latest state — a false 500 `GENERAL_PERFORMANCE_INTEGRITY` on a
+perfectly committed payout — and rendered history as `after → before`.
+
+The order is now stated instead of inferred. Each snapshot has a **phase
+rank** within one `capturedAt`:
+
+| reason | rank |
+| --- | --- |
+| `external_funding_before` | 0 |
+| everything else (`scheduled`, origins, `order_executed`, …) | 1 |
+| `external_funding_after` | 2 |
+
+- History ascending: `capturedAt` → phase rank → `createdAt` → `id`, so a pair
+  always reads **before → after**.
+- Latest state: the maximum `capturedAt` is resolved first, then only the rows
+  AT that instant are ranked — never the whole history, and never more than a
+  bounded page (more than 32 rows sharing one instant fails closed rather than
+  ranking a truncated set).
+- Ordinary snapshots all share rank 1, so their existing relative ordering is
+  unchanged.
+- `id` is only ever the last resort between two otherwise indistinguishable
+  rows; it never decides a boundary pair. No schema column was added.
+
+The audit script ranks with the same three-value CASE expression, so it can
+never disagree with the service about which row is current.
+
+### Ledger and snapshot must not drift apart (작업 7 보완 2)
+
+An ordinary advance is `factor × currentTotal / previousTotal`, which assumes
+every KRW between the two totals was EARNED. That only holds while no external
+funding arrived since the snapshot being advanced from.
+
+So before any ordinary TWR advance:
+
+```
+latestPerformanceSnapshot.cumulativeExternalFundingKrw
+  == verified external-funding ledger total
+```
+
+If they differ, nothing advances and the response is a structured 500 reusing
+the existing **`GENERAL_PERFORMANCE_INTEGRITY`** code (no new error code was
+added). Without this, an ad payout whose ledger and wallet credit committed
+but whose `after` boundary went missing left the ledger ahead of the snapshot,
+and the very next portfolio read silently reported the reward as INVESTMENT
+PROFIT.
+
+Applied on: `GET .../portfolio`, `GET .../portfolio/equity`, ordinary
+snapshot generation, the `before` snapshot inside an ad payout (where the new
+ledger row does not exist yet, so the stored state must match the PRE-payout
+total), and the general daily snapshot job. Inside the payout transaction the
+mirror check also runs after the claim is flipped to `granted`: the committed
+`after` boundary must equal the committed ledger, and a mismatch rolls the
+credit, ledger row, claim, and both boundary rows back together.
+
+For a keyed granted claim the whole boundary pair is verified on replay:
+exactly one `before` and one `after`, both scoped to the claim's account with
+`seasonParticipantId = null` and `referenceType = ad_reward_claim`,
+`externalFundingAmountKrw` equal to the claim's `rewardAmountKrw`, identical
+factor / returnRate / investment PnL, and after-totals equal to before plus
+the reward. Pre-작업 7 UNKEYED claims are exempt: no pair is expected, none is
+fabricated, and none is guessed — those accounts are handled by the explicit
+`performance_baseline` backfill.
+
 ## GET .../portfolio
 
 Ownership → the same 404 for unknown/foreign; readable for active, suspended,
@@ -629,10 +794,18 @@ DailyPortfolioSnapshot and fall back to EquitySnapshot when there is none.
 
 Points carry `time`, `totalAssetKrw`, `returnRate`, `returnRateMethod`,
 `cumulativeExternalFundingKrw`, `investmentPnlKrw`, `snapshotReason`,
-`externalFundingAmountKrw`. Ordering is `capturedAt, createdAt, id` ascending
-— a before/after pair shares one `capturedAt`, so the tie-breakers are
-required, and the same rule makes "latest snapshot" resolution unambiguous
-(the latest can never be an unpaired `before`).
+`externalFundingAmountKrw`. Ordering is `capturedAt` → boundary phase rank →
+`createdAt` → `id` ascending (see "Boundary ORDER does not come from a UUID"),
+so a before/after pair sharing one `capturedAt` and one `createdAt` always
+reads before → after regardless of which id happens to be larger.
+
+For a general account this endpoint also enforces the funding-continuity
+invariant: a history whose latest state already disagrees with the ledger is
+reported as 500 `GENERAL_PERFORMANCE_INTEGRITY` rather than charted.
+
+Once the general daily snapshot job has produced rows, `7d` / `30d` / `all`
+use DailyPortfolioSnapshot; the EquitySnapshot fallback remains for accounts
+that do not have enough daily rows yet.
 
 A general account with no origin is `GENERAL_PERFORMANCE_NOT_INITIALIZED`,
 never an empty chart.
@@ -654,5 +827,13 @@ never an empty chart.
   checks (origin presence/uniqueness, participant leakage, missing columns,
   PnL and factor/return disagreement, negative values, unpaired or
   inconsistent boundary pairs, keyed claims without a boundary pair, duplicate
-  account/date daily rows, unscoped or mis-scoped season snapshots). Still
-  read-only, still no `--apply`.
+  account/date daily rows, unscoped or mis-scoped season snapshots), and with
+  the 작업 6·7 보완 checks (latest state stuck on a `before` row, ledger vs
+  latest-snapshot funding mismatch, `before`/`after` halves reported
+  separately, each boundary invariant on its own, general daily rows with a
+  participant or missing performance columns, daily rows on closed accounts).
+  Still read-only, still no `--apply`; financial data and TWR boundaries are
+  never auto-corrected.
+- `pnpm tsx scripts/admin-run-batch-job.ts --job general-account-daily-snapshot
+  --snapshot-date <YYYY-MM-DD> [--dry-run]` — the general-account daily
+  snapshot job (작업 7 보완 5). Details in `docs/batch-job-foundation.md`.

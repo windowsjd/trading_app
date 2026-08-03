@@ -10,8 +10,12 @@ import {
   assertGeneralPerformanceStateConsistent,
   buildExternalFundingBoundary,
   buildGeneralPerformanceOrigin,
+  compareGeneralSnapshotOrder,
   GeneralPerformanceError,
+  pickLatestSnapshot,
+  snapshotPhaseRank,
   toReturnRatePercent,
+  type OrderableSnapshot,
 } from './general-performance.policy';
 
 const d = (value: string | number) => new Prisma.Decimal(value);
@@ -365,6 +369,136 @@ describe('general performance (TWR) policy', () => {
           'snapshot',
         ),
       ).toThrow(GeneralPerformanceError);
+    });
+  });
+
+  /**
+   * 작업 7 보완 1. The pair is written inside ONE transaction, so it shares
+   * capturedAt AND createdAt and the only thing left to separate the rows used
+   * to be a random UUID. Every case below therefore fixes the UUIDs explicitly
+   * and runs BOTH directions: whichever id happens to be larger, the answers
+   * must be identical.
+   */
+  describe('boundary ordering (작업 7 보완 1)', () => {
+    const SAME_CAPTURED_AT = new Date('2026-08-04T02:00:00.000Z');
+    const SAME_CREATED_AT = new Date('2026-08-04T02:00:00.123Z');
+    const LOW_UUID = '00000000-0000-4000-8000-000000000001';
+    const HIGH_UUID = 'ffffffff-ffff-4fff-bfff-ffffffffffff';
+
+    const pair = (
+      beforeId: string,
+      afterId: string,
+    ): { before: OrderableSnapshot; after: OrderableSnapshot } => ({
+      before: {
+        id: beforeId,
+        snapshotReason: 'external_funding_before',
+        capturedAt: SAME_CAPTURED_AT,
+        // Identical createdAt on purpose: both rows are inserted by the same
+        // transaction and can land on the same microsecond.
+        createdAt: SAME_CREATED_AT,
+      },
+      after: {
+        id: afterId,
+        snapshotReason: 'external_funding_after',
+        capturedAt: SAME_CAPTURED_AT,
+        createdAt: SAME_CREATED_AT,
+      },
+    });
+
+    const cases: Array<[string, string, string]> = [
+      ['before UUID greater than after UUID', HIGH_UUID, LOW_UUID],
+      ['after UUID greater than before UUID', LOW_UUID, HIGH_UUID],
+    ];
+
+    it.each(cases)(
+      'picks the after row as the latest state when the %s',
+      (_label, beforeId, afterId) => {
+        const { before, after } = pair(beforeId, afterId);
+
+        expect(pickLatestSnapshot([before, after])).toBe(after);
+        // Input order must not matter either.
+        expect(pickLatestSnapshot([after, before])).toBe(after);
+      },
+    );
+
+    it.each(cases)(
+      'orders history before → after when the %s',
+      (_label, beforeId, afterId) => {
+        const { before, after } = pair(beforeId, afterId);
+
+        expect([after, before].sort(compareGeneralSnapshotOrder)).toEqual([
+          before,
+          after,
+        ]);
+        expect([before, after].sort(compareGeneralSnapshotOrder)).toEqual([
+          before,
+          after,
+        ]);
+      },
+    );
+
+    it('never lets a before row win a tie against an ordinary snapshot', () => {
+      const { before } = pair(HIGH_UUID, LOW_UUID);
+      const scheduled: OrderableSnapshot = {
+        id: LOW_UUID,
+        snapshotReason: 'scheduled',
+        capturedAt: SAME_CAPTURED_AT,
+        createdAt: SAME_CREATED_AT,
+      };
+
+      expect(pickLatestSnapshot([before, scheduled])).toBe(scheduled);
+    });
+
+    it('still prefers a newer capturedAt over the phase rank', () => {
+      const { before, after } = pair(LOW_UUID, HIGH_UUID);
+      const later: OrderableSnapshot = {
+        id: LOW_UUID,
+        snapshotReason: 'scheduled',
+        capturedAt: new Date(SAME_CAPTURED_AT.getTime() + 1000),
+        createdAt: SAME_CREATED_AT,
+      };
+
+      expect(pickLatestSnapshot([before, after, later])).toBe(later);
+    });
+
+    it('keeps ordinary snapshots on their existing createdAt → id order', () => {
+      const base = {
+        snapshotReason: 'scheduled' as const,
+        capturedAt: SAME_CAPTURED_AT,
+      };
+      const older = { ...base, id: HIGH_UUID, createdAt: SAME_CREATED_AT };
+      const newer = {
+        ...base,
+        id: LOW_UUID,
+        createdAt: new Date(SAME_CREATED_AT.getTime() + 5),
+      };
+
+      expect([newer, older].sort(compareGeneralSnapshotOrder)).toEqual([
+        older,
+        newer,
+      ]);
+      expect(pickLatestSnapshot([older, newer])).toBe(newer);
+    });
+
+    it('ranks the three phases before < ordinary < after', () => {
+      expect(snapshotPhaseRank('external_funding_before')).toBeLessThan(
+        snapshotPhaseRank('scheduled'),
+      );
+      expect(snapshotPhaseRank('scheduled')).toBeLessThan(
+        snapshotPhaseRank('external_funding_after'),
+      );
+      // Every non-boundary reason shares one rank, so their relative order is
+      // decided exactly as it was before this change.
+      expect(snapshotPhaseRank('general_account_open')).toBe(
+        snapshotPhaseRank('performance_baseline'),
+      );
+      expect(snapshotPhaseRank('order_executed')).toBe(
+        snapshotPhaseRank('scheduled'),
+      );
+    });
+
+    it('returns null for an empty candidate set', () => {
+      expect(pickLatestSnapshot([])).toBeNull();
     });
   });
 

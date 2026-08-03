@@ -13,7 +13,11 @@ import {
   GeneralAccountPerformanceService,
   toGeneralPerformanceHttpException,
 } from './general-account-performance.service';
-import { MONEY_SCALE, RETURN_RATE_SCALE } from './general-performance.policy';
+import {
+  compareGeneralSnapshotOrder,
+  MONEY_SCALE,
+  RETURN_RATE_SCALE,
+} from './general-performance.policy';
 import { PortfolioValuationError } from './portfolio-valuation.policy';
 import { PortfolioValuationService } from './portfolio-valuation.service';
 
@@ -83,8 +87,16 @@ export class TradingAccountPortfolioService {
     if (account.mode === TradingAccountMode.general) {
       // An account with no origin must not read as an empty history: that
       // looks like "nothing happened yet" when the truth is "performance was
-      // never initialized".
-      await this.performanceService.requirePerformanceState(account.id);
+      // never initialized". The continuity check comes with it (작업 7 보완 2)
+      // — a history whose latest state already disagrees with the ledger is
+      // not a chart to render, it is damage to report.
+      try {
+        await this.performanceService.requireContinuousPerformanceState({
+          account,
+        });
+      } catch (error) {
+        throw this.rethrowStructuralError(error);
+      }
     }
 
     const since = this.resolveSince(range, account.openedAt);
@@ -289,9 +301,9 @@ export class TradingAccountPortfolioService {
   private async findEquityPoints(tradingAccountId: string, since: Date) {
     const rows = await this.prisma.equitySnapshot.findMany({
       where: { tradingAccountId, capturedAt: { gte: since } },
-      // Deterministic even when a before/after pair shares one capturedAt.
       orderBy: [{ capturedAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
       select: {
+        id: true,
         seasonParticipantId: true,
         totalAssetKrw: true,
         returnRate: true,
@@ -300,8 +312,17 @@ export class TradingAccountPortfolioService {
         investmentPnlKrw: true,
         externalFundingAmountKrw: true,
         capturedAt: true,
+        createdAt: true,
       },
     });
+
+    // SQL cannot express the boundary phase order, and it is not safe to let
+    // createdAt/UUID decide it: a before/after pair is written in one
+    // transaction and routinely shares both (작업 7 보완 1). The page just
+    // fetched is re-ordered by the same total order the latest-state resolver
+    // uses, so history always reads before → after. Ordinary rows share one
+    // rank and keep exactly the ordering they had.
+    rows.sort(compareGeneralSnapshotOrder);
 
     return rows.map((row) => ({
       time: row.capturedAt.toISOString(),

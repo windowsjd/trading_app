@@ -11,7 +11,7 @@ This service owns backend APIs, database access, financial calculations, and ser
 - Internal reward fulfillment foundation: operator/admin managed request queue/status APIs, idempotent internal reward requests, fulfillment into `SeasonReward`, and fulfilled-only user reward visibility. This does not call or implement external cash, point, coupon, gifticon, payment, or delivery APIs.
 - Admin/operator runtime DBs must have migration `20260601090000_add_user_role_operator_audit_logs` applied so `users.role` and `operator_audit_logs` exist.
 - Current season lookup and season join.
-- TradingAccount foundation shared by season mode and the future general (non-season) mode: season join creates a season-scoped `trading_accounts` row in the same transaction as the participant/wallets/initial grant, existing participants are backfilled 1:1, and at most one `mode=general` account per user is enforced by a partial unique index. General-mode entry (`POST /api/v1/trading-accounts/general`), its KRW/USD wallets, the one-time 10,000,000 KRW grant, and the rewarded-ad funding layer are implemented as of 작업 6 — see `docs/general-account-and-ad-rewards-api-contract.md`. Ad rewards are DISABLED by default (`AD_REWARD_ENABLED`) and no real ad-network adapter exists yet, so a claim answers 503 `AD_REWARD_PROVIDER_UNAVAILABLE`. General-mode performance is implemented as of 작업 7: account-scoped `GET /api/v1/trading-accounts/:accountId/portfolio` and `.../portfolio/equity`, time-weighted return (an ad reward moves total assets and cumulative external funding but NOT the return rate), external-funding boundary snapshots, and the EquitySnapshot/DailyPortfolioSnapshot account transition. General-mode ORDERS, FX, and positions are still NOT implemented, and there is no general daily-snapshot batch yet (wider equity ranges fall back to EquitySnapshot) — rules and contract in `docs/trading-modes-and-accounts.md`.
+- TradingAccount foundation shared by season mode and the future general (non-season) mode: season join creates a season-scoped `trading_accounts` row in the same transaction as the participant/wallets/initial grant, existing participants are backfilled 1:1, and at most one `mode=general` account per user is enforced by a partial unique index. General-mode entry (`POST /api/v1/trading-accounts/general`), its KRW/USD wallets, the one-time 10,000,000 KRW grant, and the rewarded-ad funding layer are implemented as of 작업 6 — see `docs/general-account-and-ad-rewards-api-contract.md`. Ad rewards are DISABLED by default (`AD_REWARD_ENABLED`) and no real ad-network adapter exists yet, so a claim answers 503 `AD_REWARD_PROVIDER_UNAVAILABLE`. General-mode performance is implemented as of 작업 7: account-scoped `GET /api/v1/trading-accounts/:accountId/portfolio` and `.../portfolio/equity`, time-weighted return (an ad reward moves total assets and cumulative external funding but NOT the return rate), external-funding boundary snapshots, and the EquitySnapshot/DailyPortfolioSnapshot account transition. 작업 6·7 보완 adds: an external-funding before/after order that does not depend on UUID or createdAt, a ledger↔snapshot cumulative-external-funding continuity invariant that stops a TWR advance when a boundary is missing, one shared full-integrity validator across every ad-claim replay path, an eligibility check that runs the general-account financial integrity BEFORE the feature/provider/status gates, and the general-account daily snapshot job (`--job general-account-daily-snapshot`), which writes the DailyPortfolioSnapshot and its scheduled EquitySnapshot in one per-account transaction. General-mode ORDERS, FX, and positions are still NOT implemented — rules and contract in `docs/trading-modes-and-accounts.md`.
 - Season write paths require effective active season state: `status=active` and `startAt <= now < endAt` for join, FX quote/execute, and orders quote/create/execute. Public order cancel is currently blocked with `ORDER_CANCEL_NOT_SUPPORTED`.
 - Home as one aggregate API.
 - Home settled final-result read model from existing `rankType=final` `season_rankings`.
@@ -492,8 +492,19 @@ attached, missing/duplicate KRW-USD wallets, general wallets or ledger rows
 carrying a `seasonParticipantId`, missing/duplicate/wrong-amount initial
 grants, wrong `initialCapitalKrw`, granted claims with no wallet
 transaction, claim↔ledger mismatches, `ad_reward` ledger rows with no claim,
-and duplicate `(provider, providerEventId)` groups. Exit code 1 when
-anything is found.
+and duplicate `(provider, providerEventId)` groups.
+
+작업 6·7 보완 adds a boundary-order + funding-continuity section: accounts
+whose newest performance state is an unpaired `external_funding_before` row,
+accounts whose latest snapshot's cumulative external funding disagrees with
+the ledger total, keyed granted claims missing the `before` or the `after`
+half (reported separately), each boundary invariant on its own (amount,
+account scope, factor/returnRate, investment PnL, after-total), general daily
+rows polluted with a `seasonParticipantId` or missing their performance
+columns, and daily rows written to a closed general account. The audit ranks
+"latest" with the SAME before/ordinary/after phase rank the runtime uses, so
+it can never disagree with the service about which row is current. Exit code
+1 when anything is found.
 
 There is deliberately **no `--apply`**: a damaged general account is never
 re-granted, topped up, or "repaired" automatically, and re-calling the
@@ -546,6 +557,8 @@ pnpm tsx scripts/admin-run-batch-job.ts --job noop --idempotency-key noop:local-
 pnpm tsx scripts/admin-run-batch-job.ts --job daily-portfolio-snapshot --season-id <SEASON_ID> --snapshot-date <YYYY-MM-DD> --dry-run --requested-by local-operator
 
 # operator-run season ranking dry-run from existing daily snapshots, no provider calls
+pnpm tsx scripts/admin-run-batch-job.ts --job general-account-daily-snapshot --snapshot-date <YYYY-MM-DD> --dry-run --requested-by local-operator
+
 pnpm tsx scripts/admin-run-batch-job.ts --job season-ranking --season-id <SEASON_ID> --snapshot-date <YYYY-MM-DD> --dry-run --requested-by local-operator
 
 # operator-run daily season cycle dry-run: daily snapshot, then ranking
@@ -570,6 +583,8 @@ pnpm tsx scripts/admin-run-batch-job.ts --job season-lifecycle-transition --now 
 `daily-portfolio-snapshot` uses the idempotency key `daily-portfolio-snapshot:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. Dry-run reports `wouldCreate`, `existing`, participant-level failures, and `sourceSummary` without inserting snapshots. Non-dry-run inserts only available participant snapshots, skips existing `(seasonParticipantId, snapshotDate)` rows without overwrite, and uses fresh eligible `provider_api` rows first with explicit `admin_manual` fallback. It does not call external providers, create provider/price/FX rows, schedule cron, generate rankings, settle seasons, or grant rewards.
 
 `season-ranking` uses the idempotency key `season-ranking:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. Dry-run reads existing `daily_portfolio_snapshots` and reports planned rankings without inserting rows. Non-dry-run creates `season_rankings` only when no rows already exist for the same season/date/type; existing rankings are skipped without overwrite. It does not call providers, create daily snapshots, mutate wallets/orders/positions, settle seasons, or grant rewards. Ranking is `totalAssetKrw desc` with stable user/participant ordering; the current schema requires unique persisted ranks, so true same-rank competition ties need a future schema gate.
+
+`general-account-daily-snapshot` uses the idempotency key `general-account-daily-snapshot:<YYYY-MM-DD>` when `--idempotency-key` is omitted, and takes NO `--season-id`. It processes `mode=general` accounts with status `active` or `suspended`, excludes `closed` accounts entirely, and writes the `scheduled` EquitySnapshot and the DailyPortfolioSnapshot in one transaction per account — the daily row second, so a concurrent run that loses the `(tradingAccountId, snapshotDate)` unique leaves neither row. Dry-run reports `wouldCreate`, `existing`, `excludedClosed`, `integrityFailed`, and `valuationFailed` without writing. Damaged accounts are reported with their structured code and get no partial snapshot. Snapshots are generated on weekends and holidays too; no market calendar is consulted. As with every batch job, a dry run consumes the default business key, so pass an explicit `--idempotency-key` to apply for the same date afterwards.
 
 `daily-season-cycle` uses the idempotency key `daily-season-cycle:<season-id>:<YYYY-MM-DD>` when `--idempotency-key` is omitted. It runs `daily-portfolio-snapshot` first and `season-ranking` second through their existing services. Dry-run is passed to both child jobs. A daily snapshot job-level failure stops ranking and fails the cycle; participant-level snapshot failures are summarized but ranking still runs against existing snapshots. A season ranking job-level failure fails the cycle. It is not cron scheduling, provider ingestion, settlement, or reward.
 

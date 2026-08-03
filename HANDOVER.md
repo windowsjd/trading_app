@@ -12,6 +12,58 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 성과 경계 순서·외부자금 연속성·광고 replay 통합 + 일반계정 일별 snapshot job (2026-08-04, 작업 6·7 보완, WORK-ID GENERAL-PERFORMANCE-AND-AD-REPLAY-HARDENING-V1)
+
+**기준 커밋** `d2713a9dfe69b835d5d244df955233b8f2b77e08`
+
+**목적**
+
+작업 6·7이 남긴 결함 5종을 함께 보완한다: ① 외부자금 before/after 정렬이
+UUID·createdAt에 의존해 비결정적, ② 원장 외부자금과 최신 성과 snapshot
+누적자금이 어긋나도 TWR advance가 진행됨, ③ 광고 claim replay 경로마다 검증
+수준이 다름, ④ eligibility가 계정 금융 손상을 검사하지 않음, ⑤ 일반계정 일별
+snapshot job 미구현.
+
+**핵심 변경**
+
+- 보완 ①: snapshot reason에 phase rank(before 0 / 일반 1 / after 2)를 부여해
+  순서를 명시한다. 이력은 `capturedAt → phase → createdAt → id` 오름차순
+  (항상 before → after), 최신 상태는 최대 `capturedAt` 후보만 조회해 rank로
+  확정한다. `id`는 그 외 구분 불가능한 두 행 사이의 최후 tie-break로만 남고
+  경계 pair를 결정하지 않는다. 전체 이력을 메모리에 올리지 않으며 스키마
+  컬럼을 추가하지 않는다. audit 스크립트도 동일한 CASE rank를 쓴다.
+- 보완 ②: ordinary TWR advance 전에
+  `latest.cumulativeExternalFundingKrw == 검증된 외부자금 원장 합계`를
+  요구한다. 불일치면 advance 중단 + 기존 `GENERAL_PERFORMANCE_INTEGRITY`
+  구조화 500(신규 코드 없음). 지급 트랜잭션 안에서는 지급 전 원장과의 일치를
+  before 생성 시점에, 지급 후 원장과의 일치를 claim granted 확정 뒤 커밋
+  직전에 확인한다. keyed granted claim은 replay 시 경계 pair 전체(개수·account
+  scope·participant null·referenceType·amount·factor·returnRate·investment
+  PnL·after 총자산/누적자금)를 검증하고, 작업 7 이전 unkeyed claim은 경계를
+  기대하지도 생성하지도 않는다.
+- 보완 ③: replay 5경로(사전 명령키·경쟁 명령키·provider event·명령키
+  P2002·provider event P2002)를 공통 async validator로 통합했다.
+  `responsePayloadJson`은 저장 전용이 아니라 실제 대조에 쓴다. 두 unique 축은
+  계속 분리한다. 계약 변경 1건: 허용되지 않은 failureCode를 가진 rejected
+  claim의 provider event 경로 replay가 409 → 500
+  `AD_REWARD_CLAIM_INTEGRITY`.
+- 보완 ④: eligibility 순서를 인증 → 소유권·general → **전체 금융 integrity**
+  → feature → provider → status → 한도·cooldown으로 바꿨다.
+- 보완 ⑤: `general-account-daily-snapshot` job. 기존 BatchService·dry-run·
+  idempotency·admin CLI 재사용, active·suspended 포함/closed 제외, 계정당 1
+  트랜잭션에서 scheduled EquitySnapshot + DailyPortfolioSnapshot 원자 생성,
+  daily 행을 뒤에 써서 동시 실행 패자가 둘 다 rollback되게 한다.
+
+**migration** 없음. 스키마를 바꾸지 않고 애플리케이션 정렬·runtime 불변식·
+batch job으로 해결했다.
+
+**API 계약** 위 1건(rejected claim 손상 시 409 → 500)을 제외하면 기존 외부
+계약·HTTP status·오류코드는 유지된다. legacy portfolio API와 시즌 daily job은
+손대지 않았다.
+
+**실제 광고 provider는 여전히 미연동**이며 운영 registry는 비어 있다.
+
+
 ### 작업 단위: 일반모드 성과·TWR·snapshot 전환 + 작업 6 결함 3종 보완 (2026-08-03, 작업 7, WORK-ID GENERAL-PERFORMANCE-TWR-AND-AD-REPLAY-V1)
 
 **목적**
@@ -1392,6 +1444,78 @@ cd frontend && npm run typecheck && npm test
 ---
 
 ## 2. 최신 작업 시간순 기록
+
+### 2026-08-04 — 성과 경계 순서·외부자금 연속성·광고 replay 통합 + 일반계정 일별 snapshot job (작업 6·7 보완)
+
+- **외부자금 before/after 정렬 결함 수정.** 지급 트랜잭션이 두 행을 같은
+  `capturedAt`·같은 `createdAt`으로 쓰기 때문에 `capturedAt, createdAt, id`
+  정렬은 사실상 UUID 동전던지기였고, 절반 정도의 계정에서 `before`가 최신
+  상태로 뽑혀 정상 커밋된 지급이 500 `GENERAL_PERFORMANCE_INTEGRITY`가 되고
+  이력이 `after → before`로 나왔다. 이제 snapshot reason에 phase rank
+  (before 0 / 일반 1 / after 2)를 부여해 순서를 **명시**한다. 이력은
+  `capturedAt → phase → createdAt → id` 오름차순, 최신 상태는 최대
+  `capturedAt` 후보만 조회해 rank로 확정(전체 이력 미적재, 한 시점에 32행을
+  넘으면 잘린 후보를 추측하지 않고 fail-closed). 일반 snapshot끼리의 기존
+  정렬은 rank 1을 공유하므로 그대로다. **스키마 컬럼 추가 없음.**
+- **외부자금 원장 ↔ 최신 성과 snapshot 연속성 불변식.** ordinary TWR advance
+  전에 `latest.cumulativeExternalFundingKrw == 검증된 원장 합계`를 요구하고,
+  불일치면 advance를 중단한 뒤 기존 `GENERAL_PERFORMANCE_INTEGRITY`로 500을
+  반환한다(신규 오류코드 없음). 이것이 없으면 원장·지갑은 커밋됐는데 after
+  경계만 유실된 계정에서 광고 지급액이 **투자수익으로** 계산됐다. 적용:
+  portfolio·equity 조회, ordinary snapshot 생성, 지급 직전 before snapshot,
+  일반 daily job. 지급 트랜잭션 안에서는 claim을 granted로 확정한 **뒤**
+  커밋 직전에 after 경계 == 원장을 한 번 더 확인하고, 어긋나면 credit·원장·
+  claim·경계 2행이 함께 rollback된다.
+- **광고 claim replay 5경로 통합.** 사전 명령키 / 경쟁 명령키 / provider
+  event / 명령키 P2002 / provider event P2002가 서로 다른 수준으로 검사하고
+  있었고(특히 provider event 경로는 `walletBalanceAfter: null`인 성공 응답을
+  만들 수 있었다), 어떤 검증을 받는지가 요청이 어떻게 경쟁했는지에 달려
+  있었다. 이제 공통 async validator 하나를 통과한다: 소유권 → terminal 상태
+  → keyed 명령 상태 → 거절이면 원장 미연결·허용 limit code·저장된 거절
+  payload → 지급이면 계정 전체 금융 구조·원장 전 필드·keyed claim의 경계
+  pair·`responsePayloadJson` 대조. `responsePayloadJson`은 저장만 하지 않고
+  실제 대조에 쓴다. 두 unique 축(명령 멱등 / provider event 중복)은 계속
+  분리 유지한다. **계약 변경 1건:** 허용되지 않은 failureCode를 가진
+  rejected claim이 provider event 경로에서 409로 replay되던 것이 500
+  `AD_REWARD_CLAIM_INTEGRITY`가 됐다(손상을 409로 감추지 않기 위함).
+- **eligibility가 config보다 먼저 계정 구조를 본다.** disabled / provider
+  미등록 / not-active 응답이 먼저 return되던 탓에 USD 지갑이나 최초 지급
+  원장이 사라진 계정도 정상적인 `eligible=false`로 보였다. 이제 소유권 확인
+  직후 일반계정 전체 금융 integrity를 검사하고, 손상은 광고 기능이 꺼져
+  있어도·provider가 없어도·suspended/closed여도 500으로 드러난다. 지갑이나
+  원장을 자동 생성하지 않는다.
+- **일반계정 일별 snapshot job 구현**(`general-account-daily-snapshot`).
+  신규 스케줄러를 만들지 않고 기존 BatchService·`batch_job_runs`·
+  `(jobName, idempotencyKey)` unique·dry-run·admin CLI를 그대로 쓴다. 날짜
+  파싱과 timezone 의미는 시즌 daily job과 동일. active·suspended 포함,
+  closed 제외(어떤 write도 없음). 계정당 1 트랜잭션에서 scheduled
+  EquitySnapshot → DailyPortfolioSnapshot 순으로 쓰고, 후자가
+  `(tradingAccountId, snapshotDate)` unique를 들고 있으므로 동시 실행의
+  패자는 EquitySnapshot까지 함께 rollback된다. 전역 분산 락 없음.
+  dry-run은 무변경으로 wouldCreate·excludedClosed·integrityFailed·
+  valuationFailed·existing을 보고하고, 손상 계정에는 부분/0원 snapshot을
+  만들지 않는다. 휴장일·주말에도 생성한다.
+- `audit-general`에 경계 순서(latest가 before), 원장↔snapshot 자금 불일치,
+  before/after 누락 분리 보고, 경계 세부 불변식 5종, 일반 daily 행의
+  participant 오염·성과 컬럼 null, closed 계정 daily 행 검사를 추가했다.
+  여전히 read-only이며 `--apply`는 없다.
+- **migration 없음**(`git diff prisma/` 빈 결과). 이번 결함은 전부 애플리케이션
+  정렬·runtime 불변식·batch job으로 해결했다.
+- 검증(로컬): typecheck·build PASS, unit 178 suite / 2,413 pass,
+  opt-in DB 통합 15종 중 14종 PASS(`limit-order-transaction-time`은 기준
+  커밋에서도 재현되는 flaky), 신규 `general-performance-hardening` DB 통합
+  PASS, e2e 119/122(실패 3건은 기준 커밋 동일 재현 BASELINE_FAIL),
+  운영 CLI 4종(audit-general / repair-snapshot-scope dry-run /
+  backfill-general-performance dry-run / 일반 daily job dry-run + 실제 실행)
+  PASS. 상세 표는 `backend/docs/trading-modes-and-accounts.md` §7.
+- hosted CI(`.github/workflows/ci.yml`)는 존재하지만 이번 커밋은 push
+  자격증명이 없어 **NOT_RUN**. 기준 커밋 `d2713a9d`의 hosted run은 이미
+  failure이며(candle lint gate, schema drift gate) 두 실패 모두 로컬에서
+  변경 전후 동일하게 재현된다.
+- **실제 광고 provider는 여전히 미연동**이다. 운영 registry는 비어 있고 모든
+  검증은 테스트 전용 fake verifier 기반이다.
+- 남은 미구현: 일반계정 주문·환전·Position·실제 거래 활성화, SeasonRanking
+  TradingAccount 전환, 실제 광고 provider adapter, 프런트엔드 모드 선택.
 
 ### 2026-08-03 — 일반모드 성과·TWR·snapshot 전환 + 작업 6 결함 3종 보완 (작업 7)
 

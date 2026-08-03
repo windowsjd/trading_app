@@ -1,11 +1,15 @@
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client';
+import { GeneralAccountPerformanceService } from '../portfolio/general-account-performance.service';
+import { GeneralExternalFundingService } from '../portfolio/general-external-funding.service';
 import { PortfolioValuationService } from '../portfolio/portfolio-valuation.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { DailyPortfolioSnapshotJobService } from './daily-portfolio-snapshot-job.service';
 import { BatchService } from './batch.service';
 import { DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME } from './daily-portfolio-snapshot-job.types';
+import { GeneralDailySnapshotJobService } from './general-daily-snapshot-job.service';
+import { GENERAL_DAILY_SNAPSHOT_JOB_NAME } from './general-daily-snapshot-job.types';
 import { DailySeasonCycleJobService } from './daily-season-cycle-job.service';
 import { DAILY_SEASON_CYCLE_JOB_NAME } from './daily-season-cycle-job.types';
 import { FinalTierAssignmentJobService } from './final-tier-assignment-job.service';
@@ -23,6 +27,7 @@ type SupportedAdminBatchJob =
   | 'noop'
   | 'health-check'
   | typeof DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME
+  | typeof GENERAL_DAILY_SNAPSHOT_JOB_NAME
   | typeof SEASON_RANKING_JOB_NAME
   | typeof DAILY_SEASON_CYCLE_JOB_NAME
   | typeof SEASON_LIFECYCLE_TRANSITION_JOB_NAME
@@ -131,6 +136,16 @@ export function parseAdminRunBatchJobArgs(
     parsed.idempotencyKey =
       parseOptionalText(parsed.idempotencyKey) ??
       `${parsed.job}:${parsed.now ?? 'auto-now'}`;
+  } else if (parsed.job === GENERAL_DAILY_SNAPSHOT_JOB_NAME) {
+    // No --season-id: a general account has no season. Same date parsing and
+    // same default business key shape as the season daily job.
+    parsed.snapshotDate = parseDateOnlyText(
+      parsed.snapshotDate,
+      'snapshot-date',
+    );
+    parsed.idempotencyKey =
+      parseOptionalText(parsed.idempotencyKey) ??
+      `${parsed.job}:${parsed.snapshotDate}`;
   } else if (isSeasonDateJob(parsed.job)) {
     parsed.seasonId = parseRequiredText(parsed.seasonId, 'season-id');
     parsed.snapshotDate = parseDateOnlyText(
@@ -170,6 +185,19 @@ export async function runAdminRunBatchJob(argv: string[]) {
     batchService,
     prisma as unknown as PrismaService,
     portfolioValuationService,
+  );
+  const generalExternalFundingService = new GeneralExternalFundingService(
+    prisma as unknown as PrismaService,
+  );
+  const generalAccountPerformanceService = new GeneralAccountPerformanceService(
+    prisma as unknown as PrismaService,
+    portfolioValuationService,
+    generalExternalFundingService,
+  );
+  const generalDailySnapshotJobService = new GeneralDailySnapshotJobService(
+    batchService,
+    prisma as unknown as PrismaService,
+    generalAccountPerformanceService,
   );
   const seasonRankingJobService = new SeasonRankingJobService(
     batchService,
@@ -248,6 +276,13 @@ export async function runAdminRunBatchJob(argv: string[]) {
         dryRun: args.dryRun === true,
         requestedBy: args.requestedBy,
       });
+    } else if (args.job === GENERAL_DAILY_SNAPSHOT_JOB_NAME) {
+      response = await generalDailySnapshotJobService.run({
+        snapshotDate: args.snapshotDate,
+        idempotencyKey: args.idempotencyKey,
+        dryRun: args.dryRun === true,
+        requestedBy: args.requestedBy,
+      });
     } else if (args.job === SEASON_RANKING_JOB_NAME) {
       response = await seasonRankingJobService.run({
         seasonId: args.seasonId,
@@ -316,6 +351,7 @@ function parseJob(value: string | undefined): SupportedAdminBatchJob {
     text === 'noop' ||
     text === 'health-check' ||
     text === DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME ||
+    text === GENERAL_DAILY_SNAPSHOT_JOB_NAME ||
     text === SEASON_RANKING_JOB_NAME ||
     text === DAILY_SEASON_CYCLE_JOB_NAME ||
     text === SEASON_LIFECYCLE_TRANSITION_JOB_NAME ||
@@ -395,6 +431,7 @@ function isSeasonDateJob(
   job: SupportedAdminBatchJob | undefined,
 ): job is
   | typeof DAILY_PORTFOLIO_SNAPSHOT_JOB_NAME
+  | typeof GENERAL_DAILY_SNAPSHOT_JOB_NAME
   | typeof SEASON_RANKING_JOB_NAME
   | typeof DAILY_SEASON_CYCLE_JOB_NAME {
   return (

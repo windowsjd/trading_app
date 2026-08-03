@@ -12,8 +12,9 @@
   create a general account, a wallet, or a grant — a GET must not mutate
   anything, and a general account exists only after the explicit POST.
 - Wallet balances, positions, orders, FX, portfolio valuation, returns, and
-  ad-reward data are NOT part of these responses (they are still
-  seasonParticipant-based; they move here only after the accountId migration).
+  ad-reward data are NOT part of THESE responses. They are served by the
+  account-scoped sub-resources listed below, not by the account detail
+  payload.
 - Ad-reward sub-resources
   (`/api/v1/trading-accounts/:accountId/ad-rewards/eligibility|claim|claims`)
   are implemented for GENERAL accounts (작업 6); ad rewards are disabled by
@@ -24,8 +25,13 @@
   `docs/trading-account-finance-api-contract.md`. Account-scoped order and
   position sub-resources (`orders`, `orders/:orderId`, `orders/quote`,
   `orders/:orderId/cancel`, `positions`) are implemented (작업 5) — see
-  `docs/trading-account-orders-api-contract.md`. Portfolio sub-resources are
-  still NOT implemented.
+  `docs/trading-account-orders-api-contract.md`. Account-scoped portfolio
+  sub-resources (`portfolio`, `portfolio/equity`) are implemented (작업 7) —
+  see the second half of
+  `docs/general-account-and-ad-rewards-api-contract.md`. General accounts
+  report `returnRateMethod: "time_weighted"` (TWR) and season accounts keep
+  `initial_capital`; the two are different numbers and are never presented as
+  the same thing.
 
 ## Source Rules
 - Source of truth is `trading_accounts` (+ `season_participants`/`seasons` for

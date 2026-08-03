@@ -82,18 +82,40 @@
     확장
   (계약: `docs/general-account-and-ad-rewards-api-contract.md`)
 
+- **작업 6·7 보완 (2026-08-04):**
+  - 외부자금 before/after 정렬을 UUID·createdAt에서 분리 — snapshot reason에
+    phase rank(before 0 / 일반 1 / after 2)를 부여해 이력 오름차순은 항상
+    before → after, 최신 상태 판정은 항상 after 우선. 최신 상태는 최대
+    capturedAt 후보만 조회해 결정하며 전체 이력을 메모리에 올리지 않는다.
+    스키마 컬럼 추가 없음
+  - 외부자금 원장 합계와 최신 성과 snapshot 누적자금의 연속성 불변식 —
+    불일치 시 ordinary TWR advance를 중단하고 기존
+    `GENERAL_PERFORMANCE_INTEGRITY` 구조화 500 반환(신규 오류코드 없음).
+    portfolio/equity 조회, ordinary snapshot 생성, 광고 지급 직전 before
+    snapshot, 일반계정 daily job에 적용. 지급 트랜잭션 안에서는 커밋 직전
+    after 경계 == 커밋된 원장까지 확인
+  - 광고 claim replay 5경로(사전 명령키·경쟁 명령키·provider event·명령키
+    P2002·provider event P2002)를 공통 async validator로 통합 — 소유권,
+    terminal 상태, keyed 명령 상태, 원장 전 필드, keyed granted claim의
+    경계 pair, `responsePayloadJson` 대조를 모든 경로에서 동일하게 수행
+  - eligibility가 config·provider·status보다 먼저 일반계정 전체 금융
+    integrity를 검사
+  - 일반계정 일별 snapshot job(`general-account-daily-snapshot`) — 기존
+    BatchService·dry-run·idempotency 구조 재사용, 계정당 1 트랜잭션으로
+    scheduled EquitySnapshot + DailyPortfolioSnapshot 원자 생성
+  - `audit-general`에 경계 순서·자금 연속성·경계 세부 불변식·일반 daily 행
+    오염·closed 계정 daily 행 검사 추가(여전히 read-only, `--apply` 없음)
+  (계약: `docs/general-account-and-ad-rewards-api-contract.md`,
+   `docs/batch-job-foundation.md`)
+
 **아직 구현되지 않음 (문서만 보고 사용 가능하다고 오해하지 말 것):**
 
 - 일반계정의 실제 주식·암호화폐 주문(409
   `GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED` 유지)과 실제 환전(409
   `GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED` 유지), 일반계정 Position 생성
 - 로그인 후 모드 선택 화면, 앱 내 모드 전환, 프런트엔드 연결 일체
-- 스냅샷 3모델(EquitySnapshot·DailyPortfolioSnapshot·SeasonRanking)의
-  accountId 전환, 일반모드 포트폴리오 평가·스냅샷
-- **일반계정 일별 snapshot job (작업 7 잔여)** — 일반계정
-  DailyPortfolioSnapshot을 주기 생성하는 배치는 아직 없다. 7d/30d/all
-  이력은 현재 EquitySnapshot fallback으로 서빙된다.
-- SeasonRanking의 TradingAccount 전환
+- SeasonRanking의 TradingAccount 전환 (EquitySnapshot과
+  DailyPortfolioSnapshot은 작업 7에서 전환 완료)
 - 광고 SDK, 광고 시청 UI, **실제 광고 네트워크의 provider 전용 서버 검증
   어댑터** (인터페이스와 registry만 존재하며 운영 registry는 비어 있음),
   광고 1회당 지급액·일일 한도·대기시간의 확정값
@@ -962,7 +984,7 @@ TradingAccount를 지우지 않아 해당 커밋 상태에서는 FK 오류로 �
 | 7.1 opt-in DB 통합 (`TRADING_ACCOUNT_DB_INTEGRATION=1`) | PASS | 로컬 PostgreSQL 16 |
 | 7.2 opt-in DB 통합 (`trading-account-link.integration.spec.ts`) | PASS | 결정적 ID Postgres 대조·복구·race·rollback·404 등 12 케이스 |
 | 시즌 참가 / FX / 시장가·지정가 주문 DB 통합 (opt-in 5종) | PASS | `--runInBand` 직렬 실행 |
-| e2e (`pnpm test:e2e`) | PASS(조건부) | 109/112 pass; 나머지 3건(readiness/wallets/orders-cancel)은 `.env.local` env 기인으로 HEAD와 동일 |
+| e2e (`pnpm test:e2e`) | 109/112 PASS | 실패 3건(readiness/wallets/orders-cancel)은 **BASELINE_FAIL** — `.env.local` env 기인으로 기준 커밋에서 동일 재현 |
 | 운영 복구 시나리오 A (스크립트 dry-run→apply→재실행) | PASS | 격리 dev DB, 금융 데이터 불변 확인 |
 | 운영 복구 시나리오 B (join 재요청 409+복구) / C (제외 시 복구+suspended) | PASS | 7.2 DB 통합 케이스로 실행 |
 
@@ -1009,6 +1031,29 @@ TradingAccount를 지우지 않아 해당 커밋 상태에서는 FK 오류로 �
 | `pnpm trading-accounts:audit-general` | PASS | dev DB findings 0, exit 0 |
 | 실제 광고 provider 연동 | **PROVIDER_NOT_CONFIGURED** | provider 미확정, 운영 registry 비어 있음. backend 검증은 테스트 전용 fake verifier 기반이며 실제 provider end-to-end 검증이 아니다 |
 
+**2026-08-04 (작업 6·7 보완, 로컬 실행 — hosted CI는 이번 커밋 미실행):**
+
+기준 커밋 `d2713a9d` / 완료 커밋은 이 문서와 같은 커밋.
+
+| 검증 | 결과 | 근거 |
+| --- | --- | --- |
+| prisma format / validate / generate | PASS | schema 변경 없음(`git diff prisma/` 빈 결과), client 재생성 |
+| typecheck (`tsc --noEmit -p tsconfig.build.json`) | PASS | 오류 0 |
+| build (`nest build`) | PASS | exit 0 |
+| lint (`eslint --no-fix "{src,apps,libs,test}/**/*.ts"`) | BASELINE_FAIL | 944 error. 기준 커밋 936 error 대비 +8이며 전부 신규 spec 3종의 `jest.mock` 헤더에 대한 `no-unsafe-assignment`(기존 모든 spec과 동일 패턴). 저장소는 HEAD에서도 lint clean이 아니다 |
+| unit + script spec (`pnpm test`) | PASS | 178 suite / 2,413 pass, 35 skipped(opt-in DB). 신규 +30 (경계 정렬 12, claim 정합성 16 중 신규 16, daily job 9, 성과 서비스 10 — 합산 후 총계 기준 +30) |
+| opt-in DB 통합 15종 직렬 (`--runInBand`) | PASS | 최종 실행 15/15 PASS(기존 14종 + 신규 `general-performance-hardening`). 도중 1회 `limit-order-transaction-time`이 Prisma interactive transaction 5,000ms 초과로 실패했으나, 변경을 stash한 기준 커밋에서 1회차 PASS / 2회차 동일 실패, 변경 적용 상태에서 1·2회차 PASS / 3회차 동일 실패로 재현되는 **환경 기인 flaky**이며 본 작업과 무관하다. 별도로 `trading-account-financial-scope` 1회 실패는 운영 CLI 검증용으로 심어둔 일반계정 3건이 남아 있어 해당 suite의 전역 "general 계정 0" 단언을 건드린 것으로, 시드 정리 후 재실행에서 해소됐다(코드 회귀 아님) |
+| 신규 `general-performance-hardening` DB 통합 | PASS | 경계 UUID 양방향 정렬·연속성 5종·replay 16종·eligibility 6종·daily job 8종(동시 실행, 롤백, 시즌 행 불변 포함) |
+| e2e (`pnpm test:e2e`, `JWT_ACCESS_SECRET=test-secret`) | 119/122 PASS | 실패 3건(readiness/wallets/orders-cancel)은 **BASELINE_FAIL** — 기준 커밋 d2713a9d에서 `git stash`로 동일 명령·환경 재현, 실패 목록 완전 동일 |
+| `pnpm trading-accounts:audit-general` | PASS | dev DB findings 0, exit 0. 신규 검사 동작 확인: after 행 누적자금을 훼손하면 `GENERAL_PERFORMANCE_EXTERNAL_FUNDING_MISMATCH`·`EXTERNAL_FUNDING_PAIR_TOTAL_ASSET_MISMATCH` 포함 4건 검출, 복구 후 0건 |
+| `trading-accounts:repair-snapshot-scope` dry-run | PASS | null·mismatch 0, exit 0, 무변경 |
+| `trading-accounts:backfill-general-performance` dry-run | PASS | general 3계정 전부 already initialized, skipped 0, exit 0 |
+| 일반 daily snapshot job dry-run | PASS | total 2 / wouldCreate 2 / excludedClosed 1 / integrityFailed 0 / valuationFailed 0, daily·scheduled equity 행 0건 유지 |
+| 일반 daily snapshot job 실제 실행 | PASS | created 2(active·suspended), closed 계정 daily 0·scheduled equity 0, daily 행의 `seasonParticipantId` null·TWR 0%·누적자금·투자손익·factor 정상. 재실행 시 existing 2 / created 0 |
+| 실제 광고 provider 연동 | **PROVIDER_NOT_CONFIGURED** | provider 미확정, 운영 registry 비어 있음. 모든 검증은 테스트 전용 fake verifier 기반이며 실제 provider end-to-end 검증이 아니다 |
+| hosted CI (`.github/workflows/ci.yml`) | NOT_RUN (이번 커밋) / BASELINE_FAIL (기준 커밋) | workflow는 존재하며 `push`(main)·PR에서 동작한다. 이번 커밋은 push 자격증명이 없어 hosted 실행 결과가 없다(NOT_RUN). 기준 커밋 `d2713a9d`의 hosted run(id 30803274726)은 **failure**: `Backend quality → Candle-layer lint (check only, no fix)`, `Limit order PostgreSQL integration → Verify no schema drift against the deployed database`. 두 실패는 로컬에서 그대로 재현되며 이번 변경과 무관하다 — candle lint는 변경 전후 모두 15 error로 동일(`scripts/lib/repair-trading-scope.ts` 등), schema drift는 작업 7 migration이 만든 `equity_snapshots` 인덱스 3개의 **이름**이 schema.prisma에서 파생되는 이름과 달라 `migrate diff --exit-code`가 2를 반환하는 것으로, 컬럼·제약 자체의 차이는 없고 이번 작업은 schema를 변경하지 않았다. `Candle fixture integration`·`Frontend quality`는 기준 커밋에서 success. 위 표의 나머지 결과는 전부 로컬 실행이며 CI 결과가 아니다 |
+| CI에서 신규 DB 통합 suite 실행 여부 | NOT_RUN | `limit-order-db-integration` job은 `TRADING_ACCOUNT_DB_INTEGRATION`을 설정하지 않으므로 기존 `general-account`와 마찬가지로 신규 `general-performance-hardening` suite도 hosted CI에서는 skip된다. 로컬 opt-in 실행 결과만 존재한다 |
+
 ### 7.4 일반계정·광고 영구 체크리스트 (작업 6에서 구현됨)
 
 일반계정 provisioning:
@@ -1046,6 +1091,67 @@ TradingAccount를 지우지 않아 해당 커밋 상태에서는 FK 오류로 �
 - [ ] claim 응답에 providerEventId·verificationFingerprint·metadata 미노출
 - [ ] 일일 경계가 서버 로컬 timezone이 아닌 `AD_REWARD_DAY_TIME_ZONE`을 따름
 - [ ] 광고 보상금이 `ad_reward` 원장으로 구분 가능하고 투자손익이 아님
+
+### 7.5 성과 경계·replay·일반 daily snapshot 영구 체크리스트 (작업 6·7 보완)
+
+외부자금 before/after 정렬:
+
+- [ ] before UUID > after UUID인 경우와 after UUID > before UUID인 경우 모두
+      최신 상태가 after로 선택됨
+- [ ] 두 경우 모두 이력이 before → after 순으로 반환됨
+- [ ] 두 경우 모두 다음 TWR 계산이 정상 진행되고 `GENERAL_PERFORMANCE_INTEGRITY`가
+      잘못 발생하지 않음
+- [ ] before와 after가 같은 capturedAt뿐 아니라 같은 createdAt을 가져도 안전
+- [ ] 일반 snapshot끼리의 기존 시간순 정렬은 변하지 않음
+- [ ] 최신 상태 판정이 전체 이력을 메모리에 올리지 않음(최대 capturedAt 후보만)
+
+외부자금 연속성:
+
+- [ ] 원장 합계는 증가했는데 after snapshot이 없으면 portfolio가 성공 envelope가
+      아니라 500 `GENERAL_PERFORMANCE_INTEGRITY`
+- [ ] before만 있는 상태·after만 있는 상태 모두 fail-closed
+- [ ] keyed granted claim의 경계 amount/account/factor/PnL/after 총자산 불일치가
+      각각 검출됨
+- [ ] 정상 경계 pair는 통과
+- [ ] 과거 unkeyed claim + 검증된 `performance_baseline` 계정은 정상 동작하고
+      과거 경계를 임의 생성하지 않음
+
+광고 claim replay:
+
+- [ ] 같은 idempotencyKey 정상 재시도 → duplicate=true, walletBalanceAfter non-null
+- [ ] 같은 idempotencyKey + 다른 requestHash → 409 `AD_REWARD_IDEMPOTENCY_CONFLICT`
+- [ ] 같은 providerEventId + 다른 idempotencyKey → duplicate=true
+- [ ] account idempotency unique 동시 경쟁·provider event unique 동시 경쟁 모두
+      지급 1회, 원장 1행, 경계 pair 1쌍
+- [ ] granted claim의 원장 누락/금액 불일치/다른 account 연결/USD 지갑 연결/
+      referenceId 불일치/경계 pair 누락 → 성공 replay 없음
+- [ ] rejected claim에 원장이 잘못 연결되면 성공 replay 없음
+- [ ] pending·verified·failed claim은 성공 replay되지 않음
+- [ ] suspended·closed·기능 비활성·provider registry 제거 이후에도 이미 커밋된
+      동일 command는 verifier 재호출 없이 최초 결과 반환
+
+eligibility:
+
+- [ ] 광고 disabled + 정상 계정 → 기존 정상 응답 유지
+- [ ] 광고 disabled + USD 지갑 누락 → 500
+- [ ] provider 미등록 + 초기 지급 원장 누락 → 500
+- [ ] suspended + 지갑 scope 손상 → 500
+- [ ] closed + 정상 계정 → 상태 기반 응답 유지
+- [ ] 정상 active 계정 → 기존 한도·cooldown 계산 유지
+
+일반계정 일별 snapshot job:
+
+- [ ] active·suspended 계정에 daily 행 생성, closed 계정은 제외되고 어떤 write도 없음
+- [ ] 시즌계정 기존 daily 행이 변경되지 않고 일반 job이 시즌 행을 만들지 않음
+- [ ] 현금 전용 계정도 정상 생성되고 휴장일·주말에도 생성됨
+- [ ] dry-run은 DB 무변경이며 wouldCreate/excludedClosed/integrityFailed/
+      valuationFailed/existing을 보고
+- [ ] 같은 account/date 재실행 멱등(daily 1행, scheduled equity 1행)
+- [ ] 동시 실행에서 daily 1행 + scheduled equity 1행만 남음
+- [ ] DailyPortfolioSnapshot 생성 실패 시 같은 트랜잭션의 EquitySnapshot도 남지 않음
+- [ ] performance origin 누락·외부자금 불일치 계정은 실패로 보고되고 부분 snapshot 없음
+- [ ] 일반 daily 행의 `seasonParticipantId`가 null이고 TWR·외부자금·투자손익
+      컬럼이 채워짐
 
 ## 8. 배포 순서 (작업 6 migration 포함)
 

@@ -1,4 +1,4 @@
-import { Prisma } from '../generated/prisma/client';
+import { Prisma, type SnapshotReason } from '../generated/prisma/client';
 
 /**
  * Time-weighted return (TWR) for general-mode accounts — a PURE policy
@@ -307,6 +307,100 @@ export function assertGeneralPerformanceStateConsistent(
     investmentPnlKrw: state.investmentPnlKrw,
     timeWeightedReturnFactor: state.timeWeightedReturnFactor,
   };
+}
+
+// ---------------------------------------------------------------- ordering
+
+/**
+ * Ordering rank of a snapshot WITHIN one capturedAt instant.
+ *
+ * WHY THIS EXISTS
+ * ---------------
+ * The external-funding pair is written inside ONE transaction, so `before` and
+ * `after` can share the same capturedAt AND the same createdAt (both default to
+ * the statement/transaction clock at microsecond precision). Their ids are
+ * random UUIDv4, which carry no creation order at all. Ordering by
+ * `capturedAt, createdAt, id` therefore decided the pair by coin flip: roughly
+ * half the accounts would report the `before` row as their latest state, which
+ * fails closed as GENERAL_PERFORMANCE_INTEGRITY, and their history would render
+ * `after → before`.
+ *
+ * The fix is to stop asking the storage layer which row came first and to state
+ * it: an inflow boundary has a defined phase order. `before` is the state the
+ * account was in on the way INTO the inflow, `after` is the committed state on
+ * the way out, so at one instant `after` is always the newer state and `before`
+ * is always the older one — regardless of UUID or createdAt.
+ *
+ * Ordinary snapshots (scheduled / order_executed / origins …) sit BETWEEN the
+ * two: a `before` row is a transient intermediate state that must never win a
+ * tie, and an `after` row is the committed end state of that instant. Ordinary
+ * rows keep their existing relative ordering, because they all share rank 1 and
+ * fall through to the createdAt/id tie-breakers exactly as before.
+ */
+const SNAPSHOT_PHASE_RANK_BEFORE = 0;
+const SNAPSHOT_PHASE_RANK_ORDINARY = 1;
+const SNAPSHOT_PHASE_RANK_AFTER = 2;
+
+// Compared as literals, not via the generated enum object: this file is a PURE
+// policy and must stay importable without the Prisma runtime enums. TypeScript
+// still checks both literals against the SnapshotReason union, so a typo is a
+// compile error rather than a silently mis-ranked row.
+export function snapshotPhaseRank(reason: SnapshotReason): number {
+  if (reason === 'external_funding_before') {
+    return SNAPSHOT_PHASE_RANK_BEFORE;
+  }
+  if (reason === 'external_funding_after') {
+    return SNAPSHOT_PHASE_RANK_AFTER;
+  }
+  return SNAPSHOT_PHASE_RANK_ORDINARY;
+}
+
+/** The columns any ordering decision is allowed to look at. */
+export type OrderableSnapshot = {
+  id: string;
+  snapshotReason: SnapshotReason;
+  capturedAt: Date;
+  createdAt: Date;
+};
+
+/**
+ * Total, deterministic ASCENDING order for one account's snapshots:
+ * capturedAt → boundary phase → createdAt → id.
+ *
+ * id is only ever the LAST resort between two rows that are otherwise
+ * indistinguishable; it never decides a before/after pair.
+ */
+export function compareGeneralSnapshotOrder(
+  a: OrderableSnapshot,
+  b: OrderableSnapshot,
+): number {
+  const capturedAt = a.capturedAt.getTime() - b.capturedAt.getTime();
+  if (capturedAt !== 0) return capturedAt;
+
+  const phase =
+    snapshotPhaseRank(a.snapshotReason) - snapshotPhaseRank(b.snapshotReason);
+  if (phase !== 0) return phase;
+
+  const createdAt = a.createdAt.getTime() - b.createdAt.getTime();
+  if (createdAt !== 0) return createdAt;
+
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+/**
+ * The newest state among rows that all share the account's maximum capturedAt.
+ * Pure so the UUID-order regression tests can drive it directly.
+ */
+export function pickLatestSnapshot<T extends OrderableSnapshot>(
+  candidates: readonly T[],
+): T | null {
+  let latest: T | null = null;
+  for (const candidate of candidates) {
+    if (latest === null || compareGeneralSnapshotOrder(latest, candidate) < 0) {
+      latest = candidate;
+    }
+  }
+  return latest;
 }
 
 /** Formats a performance state for snapshot columns / API responses. */

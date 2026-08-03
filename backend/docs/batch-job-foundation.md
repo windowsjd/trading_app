@@ -45,6 +45,7 @@ Each run is keyed by `(jobName, idempotencyKey)`.
 Current business key examples:
 
 - `daily-portfolio-snapshot:<season-id>:<YYYY-MM-DD>`
+- `general-account-daily-snapshot:<YYYY-MM-DD>` (no season id: a general account has no season)
 - `season-ranking:<season-id>:<YYYY-MM-DD>`
 - `daily-season-cycle:<season-id>:<YYYY-MM-DD>`
 - `season-settlement:<season-id>:<YYYY-MM-DD>`
@@ -58,6 +59,7 @@ Supported jobs now:
 - `noop`: records the batch run lifecycle only.
 - `health-check`: checks DB reachability only.
 - `daily-portfolio-snapshot`: creates `daily_portfolio_snapshots` for active participants of one season/date using existing fresh eligible `provider_api` price/FX data first, then existing safe `admin_manual` fallback.
+- `general-account-daily-snapshot`: creates one `daily_portfolio_snapshots` row plus one `scheduled` `equity_snapshots` row per ACTIVE or SUSPENDED general account for one date, in a single per-account transaction. Closed general accounts are excluded and never written to. Season accounts are out of scope.
 - `season-ranking`: creates `season_rankings` for one season/date from existing `daily_portfolio_snapshots` only.
 - `daily-season-cycle`: runs daily portfolio snapshot, then season ranking, for one season/date.
 - `season-settlement`: creates final `season_rankings` from existing `daily_portfolio_snapshots` for one ended season/date and transitions the season to `settled`.
@@ -98,6 +100,28 @@ Daily snapshot policy:
 - Missing, stale, future, non-positive, wrong-source, wrong-type, or ineligible provider rows fall back to existing safe `admin_manual` selection where available.
 - Provider missing/rejected plus missing/stale admin_manual evidence is participant-level failure with no fake fallback.
 - `sourceSummary` records participant counts for provider_api/admin_manual/fallback use plus fallback and rejected-provider reasons in the batch result payload. Raw provider payloads and secrets are not included.
+
+General-account daily snapshot example:
+
+```bash
+pnpm tsx scripts/admin-run-batch-job.ts \
+  --job general-account-daily-snapshot \
+  --snapshot-date <YYYY-MM-DD> \
+  --dry-run \
+  --requested-by local-operator
+```
+
+General-account daily snapshot policy (작업 7 보완 5):
+
+- If `--idempotency-key` is omitted, it is generated as `general-account-daily-snapshot:<YYYY-MM-DD>`. As with every other job, a dry run CONSUMES that business key, so an operator who wants to dry-run and then apply for the same date must pass an explicit `--idempotency-key` for the second call.
+- `snapshotDate` parsing and its timezone meaning are IDENTICAL to `daily-portfolio-snapshot` (`YYYY-MM-DD` read as UTC midnight); `capturedAt` is the batch run's `startedAt`. No new timezone policy exists.
+- Account selection: `mode=general` AND `status IN (active, suspended)`. `closed` accounts are excluded, counted as `excludedClosed`, and receive no write of any kind.
+- Values come from the SAME performance path the account-scoped portfolio API uses (`GeneralAccountPerformanceService.buildOrdinarySnapshotValues`), so a daily row can never disagree with what the user sees. `returnRate` is the TWR percent.
+- Each account is one transaction: the `scheduled` EquitySnapshot is inserted first and the DailyPortfolioSnapshot second. The daily row carries the `(tradingAccountId, snapshotDate)` unique, so a concurrent run that loses the race aborts the whole transaction and leaves NEITHER row behind. No new global or distributed lock is introduced.
+- `--dry-run` runs the full per-account computation, writes nothing, and reports `wouldCreate`, `existing`, `excludedClosed`, `integrityFailed`, and `valuationFailed`.
+- An account whose structure, performance origin, or funding continuity is broken is reported as `integrityFailed` with its structured code (`GENERAL_ACCOUNT_INTEGRITY`, `GENERAL_PERFORMANCE_NOT_INITIALIZED`, `GENERAL_PERFORMANCE_INTEGRITY`, `GENERAL_PERFORMANCE_DISCONTINUITY`, `AD_REWARD_CLAIM_INTEGRITY`) and gets NO partial snapshot. Price/FX gaps are `valuationFailed` under the existing valuation policy. Neither produces a fabricated 0 KRW row.
+- One account's failure never aborts the run — same fail/partial rule as the season daily job.
+- Market closure is irrelevant: a general cash account's daily snapshot is generated on weekends and holidays too. No market calendar and no per-exchange scheduler is introduced.
 - `daily_portfolio_snapshots` row schema is unchanged and does not store source metadata.
 - `official_batch` remains not allowed for the current daily snapshot valuation workflow.
 - The job does not generate rankings, settlement, rewards, provider rows, price/FX rows, or scheduler registrations.

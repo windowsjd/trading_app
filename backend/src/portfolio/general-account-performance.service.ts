@@ -24,6 +24,7 @@ import {
   generalPerformanceErrorCodes,
   GeneralPerformanceError,
   MONEY_SCALE,
+  pickLatestSnapshot,
   RETURN_RATE_SCALE,
   TWR_FACTOR_SCALE,
   type GeneralPerformanceAdvance,
@@ -72,6 +73,12 @@ type PerformanceSnapshotRow = Prisma.EquitySnapshotGetPayload<{
 }>;
 
 type PerformanceClient = Prisma.TransactionClient | PrismaService;
+
+/**
+ * How many snapshots may legitimately share one account's newest capturedAt.
+ * A boundary pair is 2; anything near this bound is data corruption.
+ */
+export const LATEST_SNAPSHOT_CANDIDATE_LIMIT = 32;
 
 export type GeneralLivePerformance = {
   valuation: PortfolioValuationResult;
@@ -146,22 +153,55 @@ export class GeneralAccountPerformanceService {
   // ------------------------------------------------------------- reads
 
   /**
-   * Latest performance snapshot, in a DETERMINISTIC order.
+   * Latest performance snapshot, resolved in TWO bounded steps instead of one
+   * ORDER BY (작업 7 보완 1).
    *
-   * The tie-breakers matter: an external-funding before/after pair is written
-   * with the SAME capturedAt inside one transaction, so ordering by
-   * capturedAt alone could return `before` and make the next advance
-   * double-count the inflow. createdAt then id makes the winner unambiguous.
+   * The previous `capturedAt desc, createdAt desc, id desc` was not
+   * deterministic for the case it was written for: the external-funding pair is
+   * created inside ONE transaction, so `before` and `after` routinely share
+   * both capturedAt AND createdAt, and a random UUIDv4 then decided which of
+   * them was "latest". When `before` won, the account read as an unpaired
+   * boundary (500 GENERAL_PERFORMANCE_INTEGRITY) even though the payout had
+   * committed perfectly.
+   *
+   * So the maximum capturedAt is resolved first, and only the rows AT that
+   * instant — two in the worst realistic case — are loaded and ranked by
+   * `snapshotPhaseRank`, which says outright that `after` is the committed end
+   * state of an instant. No history is loaded into memory, and no ordering
+   * meaning is read out of a UUID.
    */
   async findLatestPerformanceSnapshot(
     tradingAccountId: string,
     client: PerformanceClient = this.prisma,
   ): Promise<PerformanceSnapshotRow | null> {
-    return client.equitySnapshot.findFirst({
+    const newest = await client.equitySnapshot.findFirst({
       where: { tradingAccountId },
-      orderBy: [{ capturedAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
+      orderBy: { capturedAt: 'desc' },
+      select: { capturedAt: true },
+    });
+    if (!newest) {
+      return null;
+    }
+
+    const candidates = await client.equitySnapshot.findMany({
+      where: { tradingAccountId, capturedAt: newest.capturedAt },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: LATEST_SNAPSHOT_CANDIDATE_LIMIT + 1,
       select: PERFORMANCE_SNAPSHOT_SELECT,
     });
+
+    if (candidates.length > LATEST_SNAPSHOT_CANDIDATE_LIMIT) {
+      // One instant legitimately holds an origin, an ordinary capture, or a
+      // boundary pair. Dozens means something wrote in bulk with a shared
+      // timestamp, and picking a "latest" out of a truncated page would be a
+      // guess. Fail closed rather than rank an incomplete candidate set.
+      this.throwPerformance(
+        generalPerformanceErrorCodes.GENERAL_PERFORMANCE_INTEGRITY,
+        `More than ${LATEST_SNAPSHOT_CANDIDATE_LIMIT} performance snapshots share the newest capturedAt; the latest state cannot be determined.`,
+      );
+    }
+
+    return pickLatestSnapshot(candidates);
   }
 
   /**
@@ -224,6 +264,78 @@ export class GeneralAccountPerformanceService {
   }
 
   /**
+   * The stored state an ordinary TWR advance may CONTINUE from: structurally
+   * verified account + verified performance origin + a latest snapshot whose
+   * cumulative external funding still matches the ledger (작업 7 보완 2).
+   *
+   * THE INVARIANT AND WHY IT IS NOT OPTIONAL
+   * ----------------------------------------
+   * An ordinary advance is `factor × currentTotal / previousTotal`. It assumes
+   * every KRW between the two totals was earned. That assumption only holds
+   * while no external funding arrived since the snapshot it advances from.
+   *
+   * Before this check, an ad payout whose ledger + wallet credit committed but
+   * whose `after` boundary went missing left exactly that state: the ledger sum
+   * had grown, the latest snapshot had not, and the very next portfolio read
+   * silently reported the reward as INVESTMENT PROFIT. That is a wrong number
+   * presented confidently, which is worse than an error — so the two sums must
+   * agree or nothing advances.
+   */
+  async requireContinuousPerformanceState(input: {
+    account: GeneralAccountIntegrityTarget;
+    client?: PerformanceClient;
+  }): Promise<{
+    wallets: VerifiedGeneralAccountWallets;
+    snapshot: PerformanceSnapshotRow;
+    state: GeneralPerformanceState;
+    funding: GeneralExternalFundingSummary;
+  }> {
+    const client = input.client ?? this.prisma;
+    const wallets = await this.assertGeneralAccountReady(input.account, client);
+    const { snapshot, state } = await this.requirePerformanceState(
+      input.account.id,
+      client,
+    );
+    const funding = await this.externalFundingService.summarize(
+      input.account.id,
+      wallets.krwWalletId,
+      client,
+    );
+
+    this.assertExternalFundingContinuity(
+      snapshot.cumulativeExternalFundingKrw,
+      funding.cumulativeExternalFundingKrw,
+      `Latest general performance snapshot ${snapshot.id}`,
+    );
+
+    return { wallets, snapshot, state, funding };
+  }
+
+  /**
+   * The one place the "no funding arrived behind performance's back" rule is
+   * stated. Reported as GENERAL_PERFORMANCE_INTEGRITY on purpose: it is the
+   * existing code for "stored performance state cannot be trusted", and a new
+   * error code would only fragment the contract clients already handle.
+   */
+  assertExternalFundingContinuity(
+    snapshotCumulativeKrw: Prisma.Decimal | null,
+    ledgerCumulativeKrw: Prisma.Decimal,
+    label: string,
+  ): void {
+    if (
+      snapshotCumulativeKrw === null ||
+      !snapshotCumulativeKrw
+        .toDecimalPlaces(MONEY_SCALE)
+        .equals(ledgerCumulativeKrw.toDecimalPlaces(MONEY_SCALE))
+    ) {
+      this.throwPerformance(
+        generalPerformanceErrorCodes.GENERAL_PERFORMANCE_INTEGRITY,
+        `${label} records cumulative external funding ${snapshotCumulativeKrw?.toFixed(MONEY_SCALE) ?? 'null'} but the verified external-funding ledger totals ${ledgerCumulativeKrw.toFixed(MONEY_SCALE)}. An external-funding boundary is missing, so the difference must not be advanced as investment performance.`,
+      );
+    }
+  }
+
+  /**
    * Live performance for a GET: current valuation advanced from the stored
    * factor. Writes nothing.
    */
@@ -235,16 +347,11 @@ export class GeneralAccountPerformanceService {
     const client = input.client ?? this.prisma;
     const valuationAt = input.valuationAt ?? new Date();
 
-    const wallets = await this.assertGeneralAccountReady(input.account, client);
-    const { snapshot, state } = await this.requirePerformanceState(
-      input.account.id,
-      client,
-    );
-    const funding = await this.externalFundingService.summarize(
-      input.account.id,
-      wallets.krwWalletId,
-      client,
-    );
+    const { snapshot, state, funding } =
+      await this.requireContinuousPerformanceState({
+        account: input.account,
+        client,
+      });
     const valuation =
       await this.valuationService.calculateTradingAccountValuation(
         input.account.id,
@@ -312,7 +419,7 @@ export class GeneralAccountPerformanceService {
     after: Prisma.EquitySnapshotUncheckedCreateInput;
     afterState: GeneralPerformanceAdvance;
   }> {
-    const { state } = await this.requirePerformanceState(
+    const { snapshot, state } = await this.requirePerformanceState(
       input.account.id,
       input.client,
     );
@@ -321,6 +428,17 @@ export class GeneralAccountPerformanceService {
       input.wallets.krwWalletId,
       input.client,
     );
+
+    // Inside the payout transaction the NEW ledger row does not exist yet, so
+    // the stored state must still match the pre-payout ledger exactly. If it
+    // does not, an earlier inflow is already unaccounted for and bracketing a
+    // second one on top would bury the first (작업 7 보완 2).
+    this.assertExternalFundingContinuity(
+      snapshot.cumulativeExternalFundingKrw,
+      fundingBefore.cumulativeExternalFundingKrw,
+      `Latest general performance snapshot ${snapshot.id}`,
+    );
+
     const valuation =
       await this.valuationService.calculateTradingAccountValuation(
         input.account.id,
@@ -368,6 +486,34 @@ export class GeneralAccountPerformanceService {
       }),
       afterState: after,
     };
+  }
+
+  /**
+   * The other half of the continuity invariant, asserted INSIDE the payout
+   * transaction once the ledger row and the `after` row both exist: the
+   * committed boundary must equal the committed ledger (작업 7 보완 2 항목 7).
+   *
+   * Running it before COMMIT is what makes it useful — a mismatch rolls the
+   * credit, the ledger row, the claim, and both boundary rows back together
+   * instead of leaving the account in the exact state this work removes.
+   */
+  async assertExternalFundingSettled(input: {
+    accountId: string;
+    krwWalletId: string;
+    expectedCumulativeKrw: Prisma.Decimal;
+    client: PerformanceClient;
+  }): Promise<void> {
+    const funding = await this.externalFundingService.summarize(
+      input.accountId,
+      input.krwWalletId,
+      input.client,
+    );
+
+    this.assertExternalFundingContinuity(
+      input.expectedCumulativeKrw,
+      funding.cumulativeExternalFundingKrw,
+      `Committed external-funding "after" boundary of account ${input.accountId}`,
+    );
   }
 
   // ------------------------------------------------------------ helpers

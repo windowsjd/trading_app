@@ -31,6 +31,38 @@ jest.mock('../generated/prisma/client', () => ({
     ended: 'ended',
     settled: 'settled',
   },
+  SnapshotReason: {
+    season_join: 'season_join',
+    exchange_executed: 'exchange_executed',
+    order_executed: 'order_executed',
+    scheduled: 'scheduled',
+    settlement: 'settlement',
+    general_account_open: 'general_account_open',
+    performance_baseline: 'performance_baseline',
+    external_funding_before: 'external_funding_before',
+    external_funding_after: 'external_funding_after',
+  },
+  TradingAccountMode: {
+    season: 'season',
+    general: 'general',
+  },
+  TradingAccountStatus: {
+    active: 'active',
+    suspended: 'suspended',
+    closed: 'closed',
+  },
+  WalletTransactionDirection: {
+    credit: 'credit',
+    debit: 'debit',
+  },
+  WalletTransactionReferenceType: {
+    general_account_open: 'general_account_open',
+    ad_reward_claim: 'ad_reward_claim',
+  },
+  WalletTransactionType: {
+    initial_grant: 'initial_grant',
+    ad_reward: 'ad_reward',
+  },
 }));
 
 import { parseAdminRunBatchJobArgs } from './batch-admin-runner';
