@@ -11,7 +11,7 @@ This service owns backend APIs, database access, financial calculations, and ser
 - Internal reward fulfillment foundation: operator/admin managed request queue/status APIs, idempotent internal reward requests, fulfillment into `SeasonReward`, and fulfilled-only user reward visibility. This does not call or implement external cash, point, coupon, gifticon, payment, or delivery APIs.
 - Admin/operator runtime DBs must have migration `20260601090000_add_user_role_operator_audit_logs` applied so `users.role` and `operator_audit_logs` exist.
 - Current season lookup and season join.
-- TradingAccount foundation shared by season mode and the future general (non-season) mode: season join creates a season-scoped `trading_accounts` row in the same transaction as the participant/wallets/initial grant, existing participants are backfilled 1:1, and at most one `mode=general` account per user is enforced by a partial unique index. General-mode entry (`POST /api/v1/trading-accounts/general`), its KRW/USD wallets, the one-time 10,000,000 KRW grant, and the rewarded-ad funding layer are implemented as of 작업 6 — see `docs/general-account-and-ad-rewards-api-contract.md`. Ad rewards are DISABLED by default (`AD_REWARD_ENABLED`) and no real ad-network adapter exists yet, so a claim answers 503 `AD_REWARD_PROVIDER_UNAVAILABLE`. General-mode ORDERS, FX, positions, portfolio valuation, and time-weighted return are still NOT implemented — rules and contract in `docs/trading-modes-and-accounts.md`.
+- TradingAccount foundation shared by season mode and the future general (non-season) mode: season join creates a season-scoped `trading_accounts` row in the same transaction as the participant/wallets/initial grant, existing participants are backfilled 1:1, and at most one `mode=general` account per user is enforced by a partial unique index. General-mode entry (`POST /api/v1/trading-accounts/general`), its KRW/USD wallets, the one-time 10,000,000 KRW grant, and the rewarded-ad funding layer are implemented as of 작업 6 — see `docs/general-account-and-ad-rewards-api-contract.md`. Ad rewards are DISABLED by default (`AD_REWARD_ENABLED`) and no real ad-network adapter exists yet, so a claim answers 503 `AD_REWARD_PROVIDER_UNAVAILABLE`. General-mode performance is implemented as of 작업 7: account-scoped `GET /api/v1/trading-accounts/:accountId/portfolio` and `.../portfolio/equity`, time-weighted return (an ad reward moves total assets and cumulative external funding but NOT the return rate), external-funding boundary snapshots, and the EquitySnapshot/DailyPortfolioSnapshot account transition. General-mode ORDERS, FX, and positions are still NOT implemented, and there is no general daily-snapshot batch yet (wider equity ranges fall back to EquitySnapshot) — rules and contract in `docs/trading-modes-and-accounts.md`.
 - Season write paths require effective active season state: `status=active` and `startAt <= now < endAt` for join, FX quote/execute, and orders quote/create/execute. Public order cancel is currently blocked with `ORDER_CANCEL_NOT_SUPPORTED`.
 - Home as one aggregate API.
 - Home settled final-result read model from existing `rankType=final` `season_rankings`.
@@ -456,6 +456,28 @@ quotes (`QUOTE_PARTICIPANT_SCOPE_MISSING`, never guessed) are reported and
 never auto-corrected; `--apply` exits non-zero while any null/mismatch
 remains. Deployment order and the NOT NULL preconditions:
 `docs/trading-modes-and-accounts.md` §3.5–§3.7.
+
+### Snapshot scope + general performance repair
+
+```bash
+pnpm trading-accounts:repair-snapshot-scope             # dry-run
+pnpm trading-accounts:repair-snapshot-scope --apply     # backfill season snapshots
+pnpm trading-accounts:backfill-general-performance          # dry-run
+pnpm trading-accounts:backfill-general-performance --apply  # create origins
+```
+
+`repair-snapshot-scope` fills a SEASON snapshot's null `tradingAccountId`
+from its participant link and nothing else — amounts, return rates, captured
+times, snapshot dates, and reasons are never modified. Mismatches and
+general-account rows are reported and never guessed. Run it after
+`repair-links` has converged.
+
+`backfill-general-performance` creates the `performance_baseline` origin for
+general accounts opened before 작업 7, and ONLY where the baseline is
+provable: no trading rows, wallets intact, claims consistent with their
+ledger, no USD cash, and total assets exactly equal to external funding — so
+investment PnL really is 0 and a TWR factor of 1 is the truth rather than an
+assumption. Anything else is reported and skipped; there is no `--force`.
 
 ### General-account + ad-reward audit (read-only)
 

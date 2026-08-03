@@ -298,9 +298,9 @@ describe('SeasonsService', () => {
       409,
     );
 
-    expect((error.getResponse() as { error: { code: string } }).error.code).toBe(
-      'SEASON_ALREADY_JOINED',
-    );
+    expect(
+      (error.getResponse() as { error: { code: string } }).error.code,
+    ).toBe('SEASON_ALREADY_JOINED');
     expect(prisma.tradingAccount.create).not.toHaveBeenCalled();
     expect(prisma.$executeRaw).not.toHaveBeenCalled();
     expect(prisma.tradingAccount.findUnique).not.toHaveBeenCalled();
@@ -340,9 +340,9 @@ describe('SeasonsService', () => {
     );
 
     const deterministicId = deriveSeasonTradingAccountId('sp-existing');
-    expect((error.getResponse() as { error: { code: string } }).error.code).toBe(
-      'SEASON_ALREADY_JOINED',
-    );
+    expect(
+      (error.getResponse() as { error: { code: string } }).error.code,
+    ).toBe('SEASON_ALREADY_JOINED');
     expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
     expect(prisma.$executeRaw.mock.calls[0].slice(1)).toEqual([
       deterministicId,
@@ -389,9 +389,9 @@ describe('SeasonsService', () => {
       500,
     );
 
-    expect((error.getResponse() as { error: { code: string } }).error.code).toBe(
-      'TRADING_ACCOUNT_LINK_INTEGRITY',
-    );
+    expect(
+      (error.getResponse() as { error: { code: string } }).error.code,
+    ).toBe('TRADING_ACCOUNT_LINK_INTEGRITY');
     expect(prisma.seasonParticipant.updateMany).not.toHaveBeenCalled();
   });
 

@@ -17,9 +17,7 @@ jest.mock('../generated/prisma/client', () => {
   };
 });
 
-import {
-  buildAdminFxRateSnapshotPayload,
-} from './fx-rate-input.validation';
+import { buildAdminFxRateSnapshotPayload } from './fx-rate-input.validation';
 import { CurrencyCode, FxRateSourceType } from '../generated/prisma/client';
 
 describe('buildAdminFxRateSnapshotPayload', () => {
@@ -45,9 +43,7 @@ describe('buildAdminFxRateSnapshotPayload', () => {
       capturedAt: now,
       note: 'approved operating input',
     });
-    expect(payload.effectiveAt.toISOString()).toBe(
-      '2026-05-01T00:00:00.000Z',
-    );
+    expect(payload.effectiveAt.toISOString()).toBe('2026-05-01T00:00:00.000Z');
   });
 
   it('accepts strict UTC ISO timestamps for capturedAt and sourceTimestamp', () => {
@@ -59,12 +55,8 @@ describe('buildAdminFxRateSnapshotPayload', () => {
       sourceTimestamp: '2026-05-01T00:30:00.005Z',
     });
 
-    expect(payload.effectiveAt.toISOString()).toBe(
-      '2026-05-01T00:00:00.000Z',
-    );
-    expect(payload.capturedAt.toISOString()).toBe(
-      '2026-05-01T01:02:03.004Z',
-    );
+    expect(payload.effectiveAt.toISOString()).toBe('2026-05-01T00:00:00.000Z');
+    expect(payload.capturedAt.toISOString()).toBe('2026-05-01T01:02:03.004Z');
     expect(payload.sourceTimestamp?.toISOString()).toBe(
       '2026-05-01T00:30:00.005Z',
     );

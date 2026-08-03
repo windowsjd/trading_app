@@ -3315,6 +3315,8 @@ describe('OrdersService', () => {
       expect(prisma.equitySnapshot.create).toHaveBeenCalledWith({
         data: {
           seasonParticipantId: 'sp-1',
+          // 작업 7 dual-write: the order's already-verified account scope.
+          tradingAccountId: 'trading-account-1',
           totalAssetKrw: '1399300.00000000',
           returnRate: '39.93000000',
           krwCash: '0.00000000',

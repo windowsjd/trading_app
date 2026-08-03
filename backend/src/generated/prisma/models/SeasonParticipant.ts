@@ -1237,10 +1237,12 @@ export type SeasonParticipantCreateNestedOneWithoutEquitySnapshotsInput = {
   connect?: Prisma.SeasonParticipantWhereUniqueInput
 }
 
-export type SeasonParticipantUpdateOneRequiredWithoutEquitySnapshotsNestedInput = {
+export type SeasonParticipantUpdateOneWithoutEquitySnapshotsNestedInput = {
   create?: Prisma.XOR<Prisma.SeasonParticipantCreateWithoutEquitySnapshotsInput, Prisma.SeasonParticipantUncheckedCreateWithoutEquitySnapshotsInput>
   connectOrCreate?: Prisma.SeasonParticipantCreateOrConnectWithoutEquitySnapshotsInput
   upsert?: Prisma.SeasonParticipantUpsertWithoutEquitySnapshotsInput
+  disconnect?: Prisma.SeasonParticipantWhereInput | boolean
+  delete?: Prisma.SeasonParticipantWhereInput | boolean
   connect?: Prisma.SeasonParticipantWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.SeasonParticipantUpdateToOneWithWhereWithoutEquitySnapshotsInput, Prisma.SeasonParticipantUpdateWithoutEquitySnapshotsInput>, Prisma.SeasonParticipantUncheckedUpdateWithoutEquitySnapshotsInput>
 }
@@ -1251,10 +1253,12 @@ export type SeasonParticipantCreateNestedOneWithoutDailyPortfolioSnapshotsInput 
   connect?: Prisma.SeasonParticipantWhereUniqueInput
 }
 
-export type SeasonParticipantUpdateOneRequiredWithoutDailyPortfolioSnapshotsNestedInput = {
+export type SeasonParticipantUpdateOneWithoutDailyPortfolioSnapshotsNestedInput = {
   create?: Prisma.XOR<Prisma.SeasonParticipantCreateWithoutDailyPortfolioSnapshotsInput, Prisma.SeasonParticipantUncheckedCreateWithoutDailyPortfolioSnapshotsInput>
   connectOrCreate?: Prisma.SeasonParticipantCreateOrConnectWithoutDailyPortfolioSnapshotsInput
   upsert?: Prisma.SeasonParticipantUpsertWithoutDailyPortfolioSnapshotsInput
+  disconnect?: Prisma.SeasonParticipantWhereInput | boolean
+  delete?: Prisma.SeasonParticipantWhereInput | boolean
   connect?: Prisma.SeasonParticipantWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.SeasonParticipantUpdateToOneWithWhereWithoutDailyPortfolioSnapshotsInput, Prisma.SeasonParticipantUpdateWithoutDailyPortfolioSnapshotsInput>, Prisma.SeasonParticipantUncheckedUpdateWithoutDailyPortfolioSnapshotsInput>
 }

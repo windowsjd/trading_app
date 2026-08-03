@@ -17,6 +17,11 @@ import {
 import { PortfolioValuationService } from '../portfolio/portfolio-valuation.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  requireParticipantTradingAccountIdForSnapshot,
+  requireSeasonSnapshotParticipantId,
+  seasonSnapshotWhere,
+} from '../portfolio/season-snapshot-scope';
+import {
   assignSequentialRanks,
   compareRankingRows,
 } from '../ranking/ranking-calculation.policy';
@@ -434,6 +439,8 @@ export class SeasonSettlementJobService {
     const snapshots = await this.prisma.dailyPortfolioSnapshot.findMany({
       where: {
         snapshotDate: input.settlementDate,
+        // Season-only: general-mode daily rows must never reach settlement.
+        ...seasonSnapshotWhere,
         seasonParticipant: {
           id: {
             in: input.participants.map((participant) => participant.id),
@@ -470,10 +477,13 @@ export class SeasonSettlementJobService {
         capturedAt: snapshot.capturedAt,
         createdAt: snapshot.createdAt,
       };
+      const seasonParticipantId = requireSeasonSnapshotParticipantId(
+        snapshot.seasonParticipantId,
+      );
 
       return {
-        seasonParticipantId: snapshot.seasonParticipantId,
-        userId: snapshot.seasonParticipant.userId,
+        seasonParticipantId,
+        userId: snapshot.seasonParticipant?.userId ?? '',
         totalAssetKrw: formatMoneyScale8(snapshot.totalAssetKrw),
         returnRate: formatDecimalScale(snapshot.returnRate, returnRateScale),
         krwCash: formatMoneyScale8(snapshot.krwCash ?? '0'),
@@ -482,8 +492,7 @@ export class SeasonSettlementJobService {
         usStockValueKrw: '0.00000000',
         cryptoValueKrw: '0.00000000',
         maxDrawdown: formatDecimalScale(calculateMaxDrawdown([point]), 8),
-        totalFillCount:
-          fillCountByParticipant.get(snapshot.seasonParticipantId) ?? 0,
+        totalFillCount: fillCountByParticipant.get(seasonParticipantId) ?? 0,
         reachedReturnAt: snapshot.capturedAt ?? input.settlementAt,
       };
     });
@@ -618,6 +627,12 @@ export class SeasonSettlementJobService {
           const createdSnapshot = await tx.equitySnapshot.create({
             data: {
               seasonParticipantId: row.seasonParticipantId,
+              // 작업 7 dual-write.
+              tradingAccountId:
+                await requireParticipantTradingAccountIdForSnapshot(
+                  tx,
+                  row.seasonParticipantId,
+                ),
               ...snapshotData,
               snapshotReason: SnapshotReason.settlement,
             },

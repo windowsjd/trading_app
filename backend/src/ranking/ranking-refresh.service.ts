@@ -8,6 +8,7 @@ import {
 } from '../generated/prisma/client';
 import { PortfolioValuationService } from '../portfolio/portfolio-valuation.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { requireParticipantTradingAccountIdForSnapshot } from '../portfolio/season-snapshot-scope';
 import {
   assignSequentialRanks,
   compareRankingRows,
@@ -305,6 +306,12 @@ export class RankingRefreshService {
           await tx.equitySnapshot.create({
             data: {
               seasonParticipantId: valuation.participant.id,
+              // 작업 7 dual-write.
+              tradingAccountId:
+                await requireParticipantTradingAccountIdForSnapshot(
+                  tx,
+                  valuation.participant.id,
+                ),
               totalAssetKrw: valuation.totalAssetKrw,
               returnRate: valuation.returnRate,
               krwCash: valuation.krwCash,

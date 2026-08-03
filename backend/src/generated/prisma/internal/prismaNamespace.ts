@@ -3270,6 +3270,9 @@ export const AdRewardClaimScalarFieldEnum = {
   failureCode: 'failureCode',
   failureReason: 'failureReason',
   walletTransactionId: 'walletTransactionId',
+  idempotencyKey: 'idempotencyKey',
+  requestHash: 'requestHash',
+  responsePayloadJson: 'responsePayloadJson',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -3382,6 +3385,7 @@ export type FxExecuteRequestScalarFieldEnum = (typeof FxExecuteRequestScalarFiel
 export const EquitySnapshotScalarFieldEnum = {
   id: 'id',
   seasonParticipantId: 'seasonParticipantId',
+  tradingAccountId: 'tradingAccountId',
   totalAssetKrw: 'totalAssetKrw',
   returnRate: 'returnRate',
   krwCash: 'krwCash',
@@ -3390,6 +3394,12 @@ export const EquitySnapshotScalarFieldEnum = {
   usStockValueKrw: 'usStockValueKrw',
   cryptoValueKrw: 'cryptoValueKrw',
   snapshotReason: 'snapshotReason',
+  cumulativeExternalFundingKrw: 'cumulativeExternalFundingKrw',
+  investmentPnlKrw: 'investmentPnlKrw',
+  timeWeightedReturnFactor: 'timeWeightedReturnFactor',
+  externalFundingAmountKrw: 'externalFundingAmountKrw',
+  externalFundingReferenceType: 'externalFundingReferenceType',
+  externalFundingReferenceId: 'externalFundingReferenceId',
   capturedAt: 'capturedAt',
   createdAt: 'createdAt'
 } as const
@@ -3400,6 +3410,7 @@ export type EquitySnapshotScalarFieldEnum = (typeof EquitySnapshotScalarFieldEnu
 export const DailyPortfolioSnapshotScalarFieldEnum = {
   id: 'id',
   seasonParticipantId: 'seasonParticipantId',
+  tradingAccountId: 'tradingAccountId',
   snapshotDate: 'snapshotDate',
   totalAssetKrw: 'totalAssetKrw',
   returnRate: 'returnRate',
@@ -3408,6 +3419,9 @@ export const DailyPortfolioSnapshotScalarFieldEnum = {
   assetValueKrw: 'assetValueKrw',
   realizedPnlKrw: 'realizedPnlKrw',
   unrealizedPnlKrw: 'unrealizedPnlKrw',
+  cumulativeExternalFundingKrw: 'cumulativeExternalFundingKrw',
+  investmentPnlKrw: 'investmentPnlKrw',
+  timeWeightedReturnFactor: 'timeWeightedReturnFactor',
   capturedAt: 'capturedAt',
   createdAt: 'createdAt'
 } as const

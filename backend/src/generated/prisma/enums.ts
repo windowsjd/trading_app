@@ -133,7 +133,11 @@ export const SnapshotReason = {
   exchange_executed: 'exchange_executed',
   order_executed: 'order_executed',
   scheduled: 'scheduled',
-  settlement: 'settlement'
+  settlement: 'settlement',
+  general_account_open: 'general_account_open',
+  performance_baseline: 'performance_baseline',
+  external_funding_before: 'external_funding_before',
+  external_funding_after: 'external_funding_after'
 } as const
 
 export type SnapshotReason = (typeof SnapshotReason)[keyof typeof SnapshotReason]

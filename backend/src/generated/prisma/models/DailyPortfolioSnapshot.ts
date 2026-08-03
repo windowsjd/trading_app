@@ -14,7 +14,9 @@ import type * as Prisma from "../internal/prismaNamespace.js"
 
 /**
  * Model DailyPortfolioSnapshot
- * 
+ * One row per subject per calendar day. Same season/general split as
+ * EquitySnapshot: returnRate is the initial-capital return for season rows
+ * and the TWR percent for general rows.
  */
 export type DailyPortfolioSnapshotModel = runtime.Types.Result.DefaultSelection<Prisma.$DailyPortfolioSnapshotPayload>
 
@@ -34,6 +36,9 @@ export type DailyPortfolioSnapshotAvgAggregateOutputType = {
   assetValueKrw: runtime.Decimal | null
   realizedPnlKrw: runtime.Decimal | null
   unrealizedPnlKrw: runtime.Decimal | null
+  cumulativeExternalFundingKrw: runtime.Decimal | null
+  investmentPnlKrw: runtime.Decimal | null
+  timeWeightedReturnFactor: runtime.Decimal | null
 }
 
 export type DailyPortfolioSnapshotSumAggregateOutputType = {
@@ -44,11 +49,15 @@ export type DailyPortfolioSnapshotSumAggregateOutputType = {
   assetValueKrw: runtime.Decimal | null
   realizedPnlKrw: runtime.Decimal | null
   unrealizedPnlKrw: runtime.Decimal | null
+  cumulativeExternalFundingKrw: runtime.Decimal | null
+  investmentPnlKrw: runtime.Decimal | null
+  timeWeightedReturnFactor: runtime.Decimal | null
 }
 
 export type DailyPortfolioSnapshotMinAggregateOutputType = {
   id: string | null
   seasonParticipantId: string | null
+  tradingAccountId: string | null
   snapshotDate: Date | null
   totalAssetKrw: runtime.Decimal | null
   returnRate: runtime.Decimal | null
@@ -57,6 +66,9 @@ export type DailyPortfolioSnapshotMinAggregateOutputType = {
   assetValueKrw: runtime.Decimal | null
   realizedPnlKrw: runtime.Decimal | null
   unrealizedPnlKrw: runtime.Decimal | null
+  cumulativeExternalFundingKrw: runtime.Decimal | null
+  investmentPnlKrw: runtime.Decimal | null
+  timeWeightedReturnFactor: runtime.Decimal | null
   capturedAt: Date | null
   createdAt: Date | null
 }
@@ -64,6 +76,7 @@ export type DailyPortfolioSnapshotMinAggregateOutputType = {
 export type DailyPortfolioSnapshotMaxAggregateOutputType = {
   id: string | null
   seasonParticipantId: string | null
+  tradingAccountId: string | null
   snapshotDate: Date | null
   totalAssetKrw: runtime.Decimal | null
   returnRate: runtime.Decimal | null
@@ -72,6 +85,9 @@ export type DailyPortfolioSnapshotMaxAggregateOutputType = {
   assetValueKrw: runtime.Decimal | null
   realizedPnlKrw: runtime.Decimal | null
   unrealizedPnlKrw: runtime.Decimal | null
+  cumulativeExternalFundingKrw: runtime.Decimal | null
+  investmentPnlKrw: runtime.Decimal | null
+  timeWeightedReturnFactor: runtime.Decimal | null
   capturedAt: Date | null
   createdAt: Date | null
 }
@@ -79,6 +95,7 @@ export type DailyPortfolioSnapshotMaxAggregateOutputType = {
 export type DailyPortfolioSnapshotCountAggregateOutputType = {
   id: number
   seasonParticipantId: number
+  tradingAccountId: number
   snapshotDate: number
   totalAssetKrw: number
   returnRate: number
@@ -87,6 +104,9 @@ export type DailyPortfolioSnapshotCountAggregateOutputType = {
   assetValueKrw: number
   realizedPnlKrw: number
   unrealizedPnlKrw: number
+  cumulativeExternalFundingKrw: number
+  investmentPnlKrw: number
+  timeWeightedReturnFactor: number
   capturedAt: number
   createdAt: number
   _all: number
@@ -101,6 +121,9 @@ export type DailyPortfolioSnapshotAvgAggregateInputType = {
   assetValueKrw?: true
   realizedPnlKrw?: true
   unrealizedPnlKrw?: true
+  cumulativeExternalFundingKrw?: true
+  investmentPnlKrw?: true
+  timeWeightedReturnFactor?: true
 }
 
 export type DailyPortfolioSnapshotSumAggregateInputType = {
@@ -111,11 +134,15 @@ export type DailyPortfolioSnapshotSumAggregateInputType = {
   assetValueKrw?: true
   realizedPnlKrw?: true
   unrealizedPnlKrw?: true
+  cumulativeExternalFundingKrw?: true
+  investmentPnlKrw?: true
+  timeWeightedReturnFactor?: true
 }
 
 export type DailyPortfolioSnapshotMinAggregateInputType = {
   id?: true
   seasonParticipantId?: true
+  tradingAccountId?: true
   snapshotDate?: true
   totalAssetKrw?: true
   returnRate?: true
@@ -124,6 +151,9 @@ export type DailyPortfolioSnapshotMinAggregateInputType = {
   assetValueKrw?: true
   realizedPnlKrw?: true
   unrealizedPnlKrw?: true
+  cumulativeExternalFundingKrw?: true
+  investmentPnlKrw?: true
+  timeWeightedReturnFactor?: true
   capturedAt?: true
   createdAt?: true
 }
@@ -131,6 +161,7 @@ export type DailyPortfolioSnapshotMinAggregateInputType = {
 export type DailyPortfolioSnapshotMaxAggregateInputType = {
   id?: true
   seasonParticipantId?: true
+  tradingAccountId?: true
   snapshotDate?: true
   totalAssetKrw?: true
   returnRate?: true
@@ -139,6 +170,9 @@ export type DailyPortfolioSnapshotMaxAggregateInputType = {
   assetValueKrw?: true
   realizedPnlKrw?: true
   unrealizedPnlKrw?: true
+  cumulativeExternalFundingKrw?: true
+  investmentPnlKrw?: true
+  timeWeightedReturnFactor?: true
   capturedAt?: true
   createdAt?: true
 }
@@ -146,6 +180,7 @@ export type DailyPortfolioSnapshotMaxAggregateInputType = {
 export type DailyPortfolioSnapshotCountAggregateInputType = {
   id?: true
   seasonParticipantId?: true
+  tradingAccountId?: true
   snapshotDate?: true
   totalAssetKrw?: true
   returnRate?: true
@@ -154,6 +189,9 @@ export type DailyPortfolioSnapshotCountAggregateInputType = {
   assetValueKrw?: true
   realizedPnlKrw?: true
   unrealizedPnlKrw?: true
+  cumulativeExternalFundingKrw?: true
+  investmentPnlKrw?: true
+  timeWeightedReturnFactor?: true
   capturedAt?: true
   createdAt?: true
   _all?: true
@@ -247,7 +285,8 @@ export type DailyPortfolioSnapshotGroupByArgs<ExtArgs extends runtime.Types.Exte
 
 export type DailyPortfolioSnapshotGroupByOutputType = {
   id: string
-  seasonParticipantId: string
+  seasonParticipantId: string | null
+  tradingAccountId: string | null
   snapshotDate: Date
   totalAssetKrw: runtime.Decimal
   returnRate: runtime.Decimal
@@ -256,6 +295,9 @@ export type DailyPortfolioSnapshotGroupByOutputType = {
   assetValueKrw: runtime.Decimal
   realizedPnlKrw: runtime.Decimal
   unrealizedPnlKrw: runtime.Decimal
+  cumulativeExternalFundingKrw: runtime.Decimal | null
+  investmentPnlKrw: runtime.Decimal | null
+  timeWeightedReturnFactor: runtime.Decimal | null
   capturedAt: Date
   createdAt: Date
   _count: DailyPortfolioSnapshotCountAggregateOutputType | null
@@ -285,7 +327,8 @@ export type DailyPortfolioSnapshotWhereInput = {
   OR?: Prisma.DailyPortfolioSnapshotWhereInput[]
   NOT?: Prisma.DailyPortfolioSnapshotWhereInput | Prisma.DailyPortfolioSnapshotWhereInput[]
   id?: Prisma.StringFilter<"DailyPortfolioSnapshot"> | string
-  seasonParticipantId?: Prisma.StringFilter<"DailyPortfolioSnapshot"> | string
+  seasonParticipantId?: Prisma.StringNullableFilter<"DailyPortfolioSnapshot"> | string | null
+  tradingAccountId?: Prisma.StringNullableFilter<"DailyPortfolioSnapshot"> | string | null
   snapshotDate?: Prisma.DateTimeFilter<"DailyPortfolioSnapshot"> | Date | string
   totalAssetKrw?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   returnRate?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -294,14 +337,19 @@ export type DailyPortfolioSnapshotWhereInput = {
   assetValueKrw?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  cumulativeExternalFundingKrw?: Prisma.DecimalNullableFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  investmentPnlKrw?: Prisma.DecimalNullableFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  timeWeightedReturnFactor?: Prisma.DecimalNullableFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   capturedAt?: Prisma.DateTimeFilter<"DailyPortfolioSnapshot"> | Date | string
   createdAt?: Prisma.DateTimeFilter<"DailyPortfolioSnapshot"> | Date | string
-  seasonParticipant?: Prisma.XOR<Prisma.SeasonParticipantScalarRelationFilter, Prisma.SeasonParticipantWhereInput>
+  seasonParticipant?: Prisma.XOR<Prisma.SeasonParticipantNullableScalarRelationFilter, Prisma.SeasonParticipantWhereInput> | null
+  tradingAccount?: Prisma.XOR<Prisma.TradingAccountNullableScalarRelationFilter, Prisma.TradingAccountWhereInput> | null
 }
 
 export type DailyPortfolioSnapshotOrderByWithRelationInput = {
   id?: Prisma.SortOrder
-  seasonParticipantId?: Prisma.SortOrder
+  seasonParticipantId?: Prisma.SortOrderInput | Prisma.SortOrder
+  tradingAccountId?: Prisma.SortOrderInput | Prisma.SortOrder
   snapshotDate?: Prisma.SortOrder
   totalAssetKrw?: Prisma.SortOrder
   returnRate?: Prisma.SortOrder
@@ -310,18 +358,24 @@ export type DailyPortfolioSnapshotOrderByWithRelationInput = {
   assetValueKrw?: Prisma.SortOrder
   realizedPnlKrw?: Prisma.SortOrder
   unrealizedPnlKrw?: Prisma.SortOrder
+  cumulativeExternalFundingKrw?: Prisma.SortOrderInput | Prisma.SortOrder
+  investmentPnlKrw?: Prisma.SortOrderInput | Prisma.SortOrder
+  timeWeightedReturnFactor?: Prisma.SortOrderInput | Prisma.SortOrder
   capturedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   seasonParticipant?: Prisma.SeasonParticipantOrderByWithRelationInput
+  tradingAccount?: Prisma.TradingAccountOrderByWithRelationInput
 }
 
 export type DailyPortfolioSnapshotWhereUniqueInput = Prisma.AtLeast<{
   id?: string
   seasonParticipantId_snapshotDate?: Prisma.DailyPortfolioSnapshotSeasonParticipantIdSnapshotDateCompoundUniqueInput
+  tradingAccountId_snapshotDate?: Prisma.DailyPortfolioSnapshotTradingAccountIdSnapshotDateCompoundUniqueInput
   AND?: Prisma.DailyPortfolioSnapshotWhereInput | Prisma.DailyPortfolioSnapshotWhereInput[]
   OR?: Prisma.DailyPortfolioSnapshotWhereInput[]
   NOT?: Prisma.DailyPortfolioSnapshotWhereInput | Prisma.DailyPortfolioSnapshotWhereInput[]
-  seasonParticipantId?: Prisma.StringFilter<"DailyPortfolioSnapshot"> | string
+  seasonParticipantId?: Prisma.StringNullableFilter<"DailyPortfolioSnapshot"> | string | null
+  tradingAccountId?: Prisma.StringNullableFilter<"DailyPortfolioSnapshot"> | string | null
   snapshotDate?: Prisma.DateTimeFilter<"DailyPortfolioSnapshot"> | Date | string
   totalAssetKrw?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   returnRate?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -330,14 +384,19 @@ export type DailyPortfolioSnapshotWhereUniqueInput = Prisma.AtLeast<{
   assetValueKrw?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  cumulativeExternalFundingKrw?: Prisma.DecimalNullableFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  investmentPnlKrw?: Prisma.DecimalNullableFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  timeWeightedReturnFactor?: Prisma.DecimalNullableFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   capturedAt?: Prisma.DateTimeFilter<"DailyPortfolioSnapshot"> | Date | string
   createdAt?: Prisma.DateTimeFilter<"DailyPortfolioSnapshot"> | Date | string
-  seasonParticipant?: Prisma.XOR<Prisma.SeasonParticipantScalarRelationFilter, Prisma.SeasonParticipantWhereInput>
-}, "id" | "seasonParticipantId_snapshotDate">
+  seasonParticipant?: Prisma.XOR<Prisma.SeasonParticipantNullableScalarRelationFilter, Prisma.SeasonParticipantWhereInput> | null
+  tradingAccount?: Prisma.XOR<Prisma.TradingAccountNullableScalarRelationFilter, Prisma.TradingAccountWhereInput> | null
+}, "id" | "seasonParticipantId_snapshotDate" | "tradingAccountId_snapshotDate">
 
 export type DailyPortfolioSnapshotOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
-  seasonParticipantId?: Prisma.SortOrder
+  seasonParticipantId?: Prisma.SortOrderInput | Prisma.SortOrder
+  tradingAccountId?: Prisma.SortOrderInput | Prisma.SortOrder
   snapshotDate?: Prisma.SortOrder
   totalAssetKrw?: Prisma.SortOrder
   returnRate?: Prisma.SortOrder
@@ -346,6 +405,9 @@ export type DailyPortfolioSnapshotOrderByWithAggregationInput = {
   assetValueKrw?: Prisma.SortOrder
   realizedPnlKrw?: Prisma.SortOrder
   unrealizedPnlKrw?: Prisma.SortOrder
+  cumulativeExternalFundingKrw?: Prisma.SortOrderInput | Prisma.SortOrder
+  investmentPnlKrw?: Prisma.SortOrderInput | Prisma.SortOrder
+  timeWeightedReturnFactor?: Prisma.SortOrderInput | Prisma.SortOrder
   capturedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.DailyPortfolioSnapshotCountOrderByAggregateInput
@@ -360,7 +422,8 @@ export type DailyPortfolioSnapshotScalarWhereWithAggregatesInput = {
   OR?: Prisma.DailyPortfolioSnapshotScalarWhereWithAggregatesInput[]
   NOT?: Prisma.DailyPortfolioSnapshotScalarWhereWithAggregatesInput | Prisma.DailyPortfolioSnapshotScalarWhereWithAggregatesInput[]
   id?: Prisma.StringWithAggregatesFilter<"DailyPortfolioSnapshot"> | string
-  seasonParticipantId?: Prisma.StringWithAggregatesFilter<"DailyPortfolioSnapshot"> | string
+  seasonParticipantId?: Prisma.StringNullableWithAggregatesFilter<"DailyPortfolioSnapshot"> | string | null
+  tradingAccountId?: Prisma.StringNullableWithAggregatesFilter<"DailyPortfolioSnapshot"> | string | null
   snapshotDate?: Prisma.DateTimeWithAggregatesFilter<"DailyPortfolioSnapshot"> | Date | string
   totalAssetKrw?: Prisma.DecimalWithAggregatesFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   returnRate?: Prisma.DecimalWithAggregatesFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -369,6 +432,9 @@ export type DailyPortfolioSnapshotScalarWhereWithAggregatesInput = {
   assetValueKrw?: Prisma.DecimalWithAggregatesFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalWithAggregatesFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw?: Prisma.DecimalWithAggregatesFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  cumulativeExternalFundingKrw?: Prisma.DecimalNullableWithAggregatesFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  investmentPnlKrw?: Prisma.DecimalNullableWithAggregatesFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  timeWeightedReturnFactor?: Prisma.DecimalNullableWithAggregatesFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   capturedAt?: Prisma.DateTimeWithAggregatesFilter<"DailyPortfolioSnapshot"> | Date | string
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"DailyPortfolioSnapshot"> | Date | string
 }
@@ -383,14 +449,19 @@ export type DailyPortfolioSnapshotCreateInput = {
   assetValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  cumulativeExternalFundingKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  investmentPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  timeWeightedReturnFactor?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   capturedAt: Date | string
   createdAt?: Date | string
-  seasonParticipant: Prisma.SeasonParticipantCreateNestedOneWithoutDailyPortfolioSnapshotsInput
+  seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutDailyPortfolioSnapshotsInput
+  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutDailyPortfolioSnapshotsInput
 }
 
 export type DailyPortfolioSnapshotUncheckedCreateInput = {
   id?: string
-  seasonParticipantId: string
+  seasonParticipantId?: string | null
+  tradingAccountId?: string | null
   snapshotDate: Date | string
   totalAssetKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   returnRate: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -399,6 +470,9 @@ export type DailyPortfolioSnapshotUncheckedCreateInput = {
   assetValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  cumulativeExternalFundingKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  investmentPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  timeWeightedReturnFactor?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   capturedAt: Date | string
   createdAt?: Date | string
 }
@@ -413,14 +487,19 @@ export type DailyPortfolioSnapshotUpdateInput = {
   assetValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  cumulativeExternalFundingKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  investmentPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  timeWeightedReturnFactor?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  seasonParticipant?: Prisma.SeasonParticipantUpdateOneRequiredWithoutDailyPortfolioSnapshotsNestedInput
+  seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutDailyPortfolioSnapshotsNestedInput
+  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutDailyPortfolioSnapshotsNestedInput
 }
 
 export type DailyPortfolioSnapshotUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   snapshotDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   totalAssetKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   returnRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -429,13 +508,17 @@ export type DailyPortfolioSnapshotUncheckedUpdateInput = {
   assetValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  cumulativeExternalFundingKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  investmentPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  timeWeightedReturnFactor?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type DailyPortfolioSnapshotCreateManyInput = {
   id?: string
-  seasonParticipantId: string
+  seasonParticipantId?: string | null
+  tradingAccountId?: string | null
   snapshotDate: Date | string
   totalAssetKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   returnRate: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -444,6 +527,9 @@ export type DailyPortfolioSnapshotCreateManyInput = {
   assetValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  cumulativeExternalFundingKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  investmentPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  timeWeightedReturnFactor?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   capturedAt: Date | string
   createdAt?: Date | string
 }
@@ -458,13 +544,17 @@ export type DailyPortfolioSnapshotUpdateManyMutationInput = {
   assetValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  cumulativeExternalFundingKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  investmentPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  timeWeightedReturnFactor?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type DailyPortfolioSnapshotUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  seasonParticipantId?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   snapshotDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   totalAssetKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   returnRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -473,6 +563,9 @@ export type DailyPortfolioSnapshotUncheckedUpdateManyInput = {
   assetValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  cumulativeExternalFundingKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  investmentPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  timeWeightedReturnFactor?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -492,9 +585,15 @@ export type DailyPortfolioSnapshotSeasonParticipantIdSnapshotDateCompoundUniqueI
   snapshotDate: Date | string
 }
 
+export type DailyPortfolioSnapshotTradingAccountIdSnapshotDateCompoundUniqueInput = {
+  tradingAccountId: string
+  snapshotDate: Date | string
+}
+
 export type DailyPortfolioSnapshotCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   seasonParticipantId?: Prisma.SortOrder
+  tradingAccountId?: Prisma.SortOrder
   snapshotDate?: Prisma.SortOrder
   totalAssetKrw?: Prisma.SortOrder
   returnRate?: Prisma.SortOrder
@@ -503,6 +602,9 @@ export type DailyPortfolioSnapshotCountOrderByAggregateInput = {
   assetValueKrw?: Prisma.SortOrder
   realizedPnlKrw?: Prisma.SortOrder
   unrealizedPnlKrw?: Prisma.SortOrder
+  cumulativeExternalFundingKrw?: Prisma.SortOrder
+  investmentPnlKrw?: Prisma.SortOrder
+  timeWeightedReturnFactor?: Prisma.SortOrder
   capturedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
@@ -515,11 +617,15 @@ export type DailyPortfolioSnapshotAvgOrderByAggregateInput = {
   assetValueKrw?: Prisma.SortOrder
   realizedPnlKrw?: Prisma.SortOrder
   unrealizedPnlKrw?: Prisma.SortOrder
+  cumulativeExternalFundingKrw?: Prisma.SortOrder
+  investmentPnlKrw?: Prisma.SortOrder
+  timeWeightedReturnFactor?: Prisma.SortOrder
 }
 
 export type DailyPortfolioSnapshotMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   seasonParticipantId?: Prisma.SortOrder
+  tradingAccountId?: Prisma.SortOrder
   snapshotDate?: Prisma.SortOrder
   totalAssetKrw?: Prisma.SortOrder
   returnRate?: Prisma.SortOrder
@@ -528,6 +634,9 @@ export type DailyPortfolioSnapshotMaxOrderByAggregateInput = {
   assetValueKrw?: Prisma.SortOrder
   realizedPnlKrw?: Prisma.SortOrder
   unrealizedPnlKrw?: Prisma.SortOrder
+  cumulativeExternalFundingKrw?: Prisma.SortOrder
+  investmentPnlKrw?: Prisma.SortOrder
+  timeWeightedReturnFactor?: Prisma.SortOrder
   capturedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
@@ -535,6 +644,7 @@ export type DailyPortfolioSnapshotMaxOrderByAggregateInput = {
 export type DailyPortfolioSnapshotMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   seasonParticipantId?: Prisma.SortOrder
+  tradingAccountId?: Prisma.SortOrder
   snapshotDate?: Prisma.SortOrder
   totalAssetKrw?: Prisma.SortOrder
   returnRate?: Prisma.SortOrder
@@ -543,6 +653,9 @@ export type DailyPortfolioSnapshotMinOrderByAggregateInput = {
   assetValueKrw?: Prisma.SortOrder
   realizedPnlKrw?: Prisma.SortOrder
   unrealizedPnlKrw?: Prisma.SortOrder
+  cumulativeExternalFundingKrw?: Prisma.SortOrder
+  investmentPnlKrw?: Prisma.SortOrder
+  timeWeightedReturnFactor?: Prisma.SortOrder
   capturedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
@@ -555,6 +668,51 @@ export type DailyPortfolioSnapshotSumOrderByAggregateInput = {
   assetValueKrw?: Prisma.SortOrder
   realizedPnlKrw?: Prisma.SortOrder
   unrealizedPnlKrw?: Prisma.SortOrder
+  cumulativeExternalFundingKrw?: Prisma.SortOrder
+  investmentPnlKrw?: Prisma.SortOrder
+  timeWeightedReturnFactor?: Prisma.SortOrder
+}
+
+export type DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput = {
+  create?: Prisma.XOR<Prisma.DailyPortfolioSnapshotCreateWithoutTradingAccountInput, Prisma.DailyPortfolioSnapshotUncheckedCreateWithoutTradingAccountInput> | Prisma.DailyPortfolioSnapshotCreateWithoutTradingAccountInput[] | Prisma.DailyPortfolioSnapshotUncheckedCreateWithoutTradingAccountInput[]
+  connectOrCreate?: Prisma.DailyPortfolioSnapshotCreateOrConnectWithoutTradingAccountInput | Prisma.DailyPortfolioSnapshotCreateOrConnectWithoutTradingAccountInput[]
+  createMany?: Prisma.DailyPortfolioSnapshotCreateManyTradingAccountInputEnvelope
+  connect?: Prisma.DailyPortfolioSnapshotWhereUniqueInput | Prisma.DailyPortfolioSnapshotWhereUniqueInput[]
+}
+
+export type DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput = {
+  create?: Prisma.XOR<Prisma.DailyPortfolioSnapshotCreateWithoutTradingAccountInput, Prisma.DailyPortfolioSnapshotUncheckedCreateWithoutTradingAccountInput> | Prisma.DailyPortfolioSnapshotCreateWithoutTradingAccountInput[] | Prisma.DailyPortfolioSnapshotUncheckedCreateWithoutTradingAccountInput[]
+  connectOrCreate?: Prisma.DailyPortfolioSnapshotCreateOrConnectWithoutTradingAccountInput | Prisma.DailyPortfolioSnapshotCreateOrConnectWithoutTradingAccountInput[]
+  createMany?: Prisma.DailyPortfolioSnapshotCreateManyTradingAccountInputEnvelope
+  connect?: Prisma.DailyPortfolioSnapshotWhereUniqueInput | Prisma.DailyPortfolioSnapshotWhereUniqueInput[]
+}
+
+export type DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput = {
+  create?: Prisma.XOR<Prisma.DailyPortfolioSnapshotCreateWithoutTradingAccountInput, Prisma.DailyPortfolioSnapshotUncheckedCreateWithoutTradingAccountInput> | Prisma.DailyPortfolioSnapshotCreateWithoutTradingAccountInput[] | Prisma.DailyPortfolioSnapshotUncheckedCreateWithoutTradingAccountInput[]
+  connectOrCreate?: Prisma.DailyPortfolioSnapshotCreateOrConnectWithoutTradingAccountInput | Prisma.DailyPortfolioSnapshotCreateOrConnectWithoutTradingAccountInput[]
+  upsert?: Prisma.DailyPortfolioSnapshotUpsertWithWhereUniqueWithoutTradingAccountInput | Prisma.DailyPortfolioSnapshotUpsertWithWhereUniqueWithoutTradingAccountInput[]
+  createMany?: Prisma.DailyPortfolioSnapshotCreateManyTradingAccountInputEnvelope
+  set?: Prisma.DailyPortfolioSnapshotWhereUniqueInput | Prisma.DailyPortfolioSnapshotWhereUniqueInput[]
+  disconnect?: Prisma.DailyPortfolioSnapshotWhereUniqueInput | Prisma.DailyPortfolioSnapshotWhereUniqueInput[]
+  delete?: Prisma.DailyPortfolioSnapshotWhereUniqueInput | Prisma.DailyPortfolioSnapshotWhereUniqueInput[]
+  connect?: Prisma.DailyPortfolioSnapshotWhereUniqueInput | Prisma.DailyPortfolioSnapshotWhereUniqueInput[]
+  update?: Prisma.DailyPortfolioSnapshotUpdateWithWhereUniqueWithoutTradingAccountInput | Prisma.DailyPortfolioSnapshotUpdateWithWhereUniqueWithoutTradingAccountInput[]
+  updateMany?: Prisma.DailyPortfolioSnapshotUpdateManyWithWhereWithoutTradingAccountInput | Prisma.DailyPortfolioSnapshotUpdateManyWithWhereWithoutTradingAccountInput[]
+  deleteMany?: Prisma.DailyPortfolioSnapshotScalarWhereInput | Prisma.DailyPortfolioSnapshotScalarWhereInput[]
+}
+
+export type DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput = {
+  create?: Prisma.XOR<Prisma.DailyPortfolioSnapshotCreateWithoutTradingAccountInput, Prisma.DailyPortfolioSnapshotUncheckedCreateWithoutTradingAccountInput> | Prisma.DailyPortfolioSnapshotCreateWithoutTradingAccountInput[] | Prisma.DailyPortfolioSnapshotUncheckedCreateWithoutTradingAccountInput[]
+  connectOrCreate?: Prisma.DailyPortfolioSnapshotCreateOrConnectWithoutTradingAccountInput | Prisma.DailyPortfolioSnapshotCreateOrConnectWithoutTradingAccountInput[]
+  upsert?: Prisma.DailyPortfolioSnapshotUpsertWithWhereUniqueWithoutTradingAccountInput | Prisma.DailyPortfolioSnapshotUpsertWithWhereUniqueWithoutTradingAccountInput[]
+  createMany?: Prisma.DailyPortfolioSnapshotCreateManyTradingAccountInputEnvelope
+  set?: Prisma.DailyPortfolioSnapshotWhereUniqueInput | Prisma.DailyPortfolioSnapshotWhereUniqueInput[]
+  disconnect?: Prisma.DailyPortfolioSnapshotWhereUniqueInput | Prisma.DailyPortfolioSnapshotWhereUniqueInput[]
+  delete?: Prisma.DailyPortfolioSnapshotWhereUniqueInput | Prisma.DailyPortfolioSnapshotWhereUniqueInput[]
+  connect?: Prisma.DailyPortfolioSnapshotWhereUniqueInput | Prisma.DailyPortfolioSnapshotWhereUniqueInput[]
+  update?: Prisma.DailyPortfolioSnapshotUpdateWithWhereUniqueWithoutTradingAccountInput | Prisma.DailyPortfolioSnapshotUpdateWithWhereUniqueWithoutTradingAccountInput[]
+  updateMany?: Prisma.DailyPortfolioSnapshotUpdateManyWithWhereWithoutTradingAccountInput | Prisma.DailyPortfolioSnapshotUpdateManyWithWhereWithoutTradingAccountInput[]
+  deleteMany?: Prisma.DailyPortfolioSnapshotScalarWhereInput | Prisma.DailyPortfolioSnapshotScalarWhereInput[]
 }
 
 export type DailyPortfolioSnapshotCreateNestedManyWithoutSeasonParticipantInput = {
@@ -599,6 +757,90 @@ export type DailyPortfolioSnapshotUncheckedUpdateManyWithoutSeasonParticipantNes
   deleteMany?: Prisma.DailyPortfolioSnapshotScalarWhereInput | Prisma.DailyPortfolioSnapshotScalarWhereInput[]
 }
 
+export type DailyPortfolioSnapshotCreateWithoutTradingAccountInput = {
+  id?: string
+  snapshotDate: Date | string
+  totalAssetKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  returnRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  krwCash: runtime.Decimal | runtime.DecimalJsLike | number | string
+  usdCashKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  assetValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  realizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  unrealizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  cumulativeExternalFundingKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  investmentPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  timeWeightedReturnFactor?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  capturedAt: Date | string
+  createdAt?: Date | string
+  seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutDailyPortfolioSnapshotsInput
+}
+
+export type DailyPortfolioSnapshotUncheckedCreateWithoutTradingAccountInput = {
+  id?: string
+  seasonParticipantId?: string | null
+  snapshotDate: Date | string
+  totalAssetKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  returnRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  krwCash: runtime.Decimal | runtime.DecimalJsLike | number | string
+  usdCashKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  assetValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  realizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  unrealizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  cumulativeExternalFundingKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  investmentPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  timeWeightedReturnFactor?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  capturedAt: Date | string
+  createdAt?: Date | string
+}
+
+export type DailyPortfolioSnapshotCreateOrConnectWithoutTradingAccountInput = {
+  where: Prisma.DailyPortfolioSnapshotWhereUniqueInput
+  create: Prisma.XOR<Prisma.DailyPortfolioSnapshotCreateWithoutTradingAccountInput, Prisma.DailyPortfolioSnapshotUncheckedCreateWithoutTradingAccountInput>
+}
+
+export type DailyPortfolioSnapshotCreateManyTradingAccountInputEnvelope = {
+  data: Prisma.DailyPortfolioSnapshotCreateManyTradingAccountInput | Prisma.DailyPortfolioSnapshotCreateManyTradingAccountInput[]
+  skipDuplicates?: boolean
+}
+
+export type DailyPortfolioSnapshotUpsertWithWhereUniqueWithoutTradingAccountInput = {
+  where: Prisma.DailyPortfolioSnapshotWhereUniqueInput
+  update: Prisma.XOR<Prisma.DailyPortfolioSnapshotUpdateWithoutTradingAccountInput, Prisma.DailyPortfolioSnapshotUncheckedUpdateWithoutTradingAccountInput>
+  create: Prisma.XOR<Prisma.DailyPortfolioSnapshotCreateWithoutTradingAccountInput, Prisma.DailyPortfolioSnapshotUncheckedCreateWithoutTradingAccountInput>
+}
+
+export type DailyPortfolioSnapshotUpdateWithWhereUniqueWithoutTradingAccountInput = {
+  where: Prisma.DailyPortfolioSnapshotWhereUniqueInput
+  data: Prisma.XOR<Prisma.DailyPortfolioSnapshotUpdateWithoutTradingAccountInput, Prisma.DailyPortfolioSnapshotUncheckedUpdateWithoutTradingAccountInput>
+}
+
+export type DailyPortfolioSnapshotUpdateManyWithWhereWithoutTradingAccountInput = {
+  where: Prisma.DailyPortfolioSnapshotScalarWhereInput
+  data: Prisma.XOR<Prisma.DailyPortfolioSnapshotUpdateManyMutationInput, Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountInput>
+}
+
+export type DailyPortfolioSnapshotScalarWhereInput = {
+  AND?: Prisma.DailyPortfolioSnapshotScalarWhereInput | Prisma.DailyPortfolioSnapshotScalarWhereInput[]
+  OR?: Prisma.DailyPortfolioSnapshotScalarWhereInput[]
+  NOT?: Prisma.DailyPortfolioSnapshotScalarWhereInput | Prisma.DailyPortfolioSnapshotScalarWhereInput[]
+  id?: Prisma.StringFilter<"DailyPortfolioSnapshot"> | string
+  seasonParticipantId?: Prisma.StringNullableFilter<"DailyPortfolioSnapshot"> | string | null
+  tradingAccountId?: Prisma.StringNullableFilter<"DailyPortfolioSnapshot"> | string | null
+  snapshotDate?: Prisma.DateTimeFilter<"DailyPortfolioSnapshot"> | Date | string
+  totalAssetKrw?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  returnRate?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  krwCash?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  usdCashKrw?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  assetValueKrw?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  realizedPnlKrw?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  unrealizedPnlKrw?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  cumulativeExternalFundingKrw?: Prisma.DecimalNullableFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  investmentPnlKrw?: Prisma.DecimalNullableFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  timeWeightedReturnFactor?: Prisma.DecimalNullableFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  capturedAt?: Prisma.DateTimeFilter<"DailyPortfolioSnapshot"> | Date | string
+  createdAt?: Prisma.DateTimeFilter<"DailyPortfolioSnapshot"> | Date | string
+}
+
 export type DailyPortfolioSnapshotCreateWithoutSeasonParticipantInput = {
   id?: string
   snapshotDate: Date | string
@@ -609,12 +851,17 @@ export type DailyPortfolioSnapshotCreateWithoutSeasonParticipantInput = {
   assetValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  cumulativeExternalFundingKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  investmentPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  timeWeightedReturnFactor?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   capturedAt: Date | string
   createdAt?: Date | string
+  tradingAccount?: Prisma.TradingAccountCreateNestedOneWithoutDailyPortfolioSnapshotsInput
 }
 
 export type DailyPortfolioSnapshotUncheckedCreateWithoutSeasonParticipantInput = {
   id?: string
+  tradingAccountId?: string | null
   snapshotDate: Date | string
   totalAssetKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   returnRate: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -623,6 +870,9 @@ export type DailyPortfolioSnapshotUncheckedCreateWithoutSeasonParticipantInput =
   assetValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  cumulativeExternalFundingKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  investmentPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  timeWeightedReturnFactor?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   capturedAt: Date | string
   createdAt?: Date | string
 }
@@ -653,26 +903,9 @@ export type DailyPortfolioSnapshotUpdateManyWithWhereWithoutSeasonParticipantInp
   data: Prisma.XOR<Prisma.DailyPortfolioSnapshotUpdateManyMutationInput, Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutSeasonParticipantInput>
 }
 
-export type DailyPortfolioSnapshotScalarWhereInput = {
-  AND?: Prisma.DailyPortfolioSnapshotScalarWhereInput | Prisma.DailyPortfolioSnapshotScalarWhereInput[]
-  OR?: Prisma.DailyPortfolioSnapshotScalarWhereInput[]
-  NOT?: Prisma.DailyPortfolioSnapshotScalarWhereInput | Prisma.DailyPortfolioSnapshotScalarWhereInput[]
-  id?: Prisma.StringFilter<"DailyPortfolioSnapshot"> | string
-  seasonParticipantId?: Prisma.StringFilter<"DailyPortfolioSnapshot"> | string
-  snapshotDate?: Prisma.DateTimeFilter<"DailyPortfolioSnapshot"> | Date | string
-  totalAssetKrw?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  returnRate?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  krwCash?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  usdCashKrw?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  assetValueKrw?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  realizedPnlKrw?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unrealizedPnlKrw?: Prisma.DecimalFilter<"DailyPortfolioSnapshot"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  capturedAt?: Prisma.DateTimeFilter<"DailyPortfolioSnapshot"> | Date | string
-  createdAt?: Prisma.DateTimeFilter<"DailyPortfolioSnapshot"> | Date | string
-}
-
-export type DailyPortfolioSnapshotCreateManySeasonParticipantInput = {
+export type DailyPortfolioSnapshotCreateManyTradingAccountInput = {
   id?: string
+  seasonParticipantId?: string | null
   snapshotDate: Date | string
   totalAssetKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   returnRate: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -681,6 +914,81 @@ export type DailyPortfolioSnapshotCreateManySeasonParticipantInput = {
   assetValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  cumulativeExternalFundingKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  investmentPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  timeWeightedReturnFactor?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  capturedAt: Date | string
+  createdAt?: Date | string
+}
+
+export type DailyPortfolioSnapshotUpdateWithoutTradingAccountInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  snapshotDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  totalAssetKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  returnRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  krwCash?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  usdCashKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  assetValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  unrealizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  cumulativeExternalFundingKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  investmentPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  timeWeightedReturnFactor?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutDailyPortfolioSnapshotsNestedInput
+}
+
+export type DailyPortfolioSnapshotUncheckedUpdateWithoutTradingAccountInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  snapshotDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  totalAssetKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  returnRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  krwCash?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  usdCashKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  assetValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  unrealizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  cumulativeExternalFundingKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  investmentPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  timeWeightedReturnFactor?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonParticipantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  snapshotDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  totalAssetKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  returnRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  krwCash?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  usdCashKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  assetValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  unrealizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  cumulativeExternalFundingKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  investmentPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  timeWeightedReturnFactor?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type DailyPortfolioSnapshotCreateManySeasonParticipantInput = {
+  id?: string
+  tradingAccountId?: string | null
+  snapshotDate: Date | string
+  totalAssetKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  returnRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  krwCash: runtime.Decimal | runtime.DecimalJsLike | number | string
+  usdCashKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  assetValueKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  realizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  unrealizedPnlKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  cumulativeExternalFundingKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  investmentPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  timeWeightedReturnFactor?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   capturedAt: Date | string
   createdAt?: Date | string
 }
@@ -695,12 +1003,17 @@ export type DailyPortfolioSnapshotUpdateWithoutSeasonParticipantInput = {
   assetValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  cumulativeExternalFundingKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  investmentPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  timeWeightedReturnFactor?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  tradingAccount?: Prisma.TradingAccountUpdateOneWithoutDailyPortfolioSnapshotsNestedInput
 }
 
 export type DailyPortfolioSnapshotUncheckedUpdateWithoutSeasonParticipantInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   snapshotDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   totalAssetKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   returnRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -709,12 +1022,16 @@ export type DailyPortfolioSnapshotUncheckedUpdateWithoutSeasonParticipantInput =
   assetValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  cumulativeExternalFundingKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  investmentPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  timeWeightedReturnFactor?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type DailyPortfolioSnapshotUncheckedUpdateManyWithoutSeasonParticipantInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  tradingAccountId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   snapshotDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   totalAssetKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   returnRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -723,6 +1040,9 @@ export type DailyPortfolioSnapshotUncheckedUpdateManyWithoutSeasonParticipantInp
   assetValueKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   unrealizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  cumulativeExternalFundingKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  investmentPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  timeWeightedReturnFactor?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -732,6 +1052,7 @@ export type DailyPortfolioSnapshotUncheckedUpdateManyWithoutSeasonParticipantInp
 export type DailyPortfolioSnapshotSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   seasonParticipantId?: boolean
+  tradingAccountId?: boolean
   snapshotDate?: boolean
   totalAssetKrw?: boolean
   returnRate?: boolean
@@ -740,14 +1061,19 @@ export type DailyPortfolioSnapshotSelect<ExtArgs extends runtime.Types.Extension
   assetValueKrw?: boolean
   realizedPnlKrw?: boolean
   unrealizedPnlKrw?: boolean
+  cumulativeExternalFundingKrw?: boolean
+  investmentPnlKrw?: boolean
+  timeWeightedReturnFactor?: boolean
   capturedAt?: boolean
   createdAt?: boolean
-  seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
+  seasonParticipant?: boolean | Prisma.DailyPortfolioSnapshot$seasonParticipantArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.DailyPortfolioSnapshot$tradingAccountArgs<ExtArgs>
 }, ExtArgs["result"]["dailyPortfolioSnapshot"]>
 
 export type DailyPortfolioSnapshotSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   seasonParticipantId?: boolean
+  tradingAccountId?: boolean
   snapshotDate?: boolean
   totalAssetKrw?: boolean
   returnRate?: boolean
@@ -756,14 +1082,19 @@ export type DailyPortfolioSnapshotSelectCreateManyAndReturn<ExtArgs extends runt
   assetValueKrw?: boolean
   realizedPnlKrw?: boolean
   unrealizedPnlKrw?: boolean
+  cumulativeExternalFundingKrw?: boolean
+  investmentPnlKrw?: boolean
+  timeWeightedReturnFactor?: boolean
   capturedAt?: boolean
   createdAt?: boolean
-  seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
+  seasonParticipant?: boolean | Prisma.DailyPortfolioSnapshot$seasonParticipantArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.DailyPortfolioSnapshot$tradingAccountArgs<ExtArgs>
 }, ExtArgs["result"]["dailyPortfolioSnapshot"]>
 
 export type DailyPortfolioSnapshotSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   seasonParticipantId?: boolean
+  tradingAccountId?: boolean
   snapshotDate?: boolean
   totalAssetKrw?: boolean
   returnRate?: boolean
@@ -772,14 +1103,19 @@ export type DailyPortfolioSnapshotSelectUpdateManyAndReturn<ExtArgs extends runt
   assetValueKrw?: boolean
   realizedPnlKrw?: boolean
   unrealizedPnlKrw?: boolean
+  cumulativeExternalFundingKrw?: boolean
+  investmentPnlKrw?: boolean
+  timeWeightedReturnFactor?: boolean
   capturedAt?: boolean
   createdAt?: boolean
-  seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
+  seasonParticipant?: boolean | Prisma.DailyPortfolioSnapshot$seasonParticipantArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.DailyPortfolioSnapshot$tradingAccountArgs<ExtArgs>
 }, ExtArgs["result"]["dailyPortfolioSnapshot"]>
 
 export type DailyPortfolioSnapshotSelectScalar = {
   id?: boolean
   seasonParticipantId?: boolean
+  tradingAccountId?: boolean
   snapshotDate?: boolean
   totalAssetKrw?: boolean
   returnRate?: boolean
@@ -788,29 +1124,40 @@ export type DailyPortfolioSnapshotSelectScalar = {
   assetValueKrw?: boolean
   realizedPnlKrw?: boolean
   unrealizedPnlKrw?: boolean
+  cumulativeExternalFundingKrw?: boolean
+  investmentPnlKrw?: boolean
+  timeWeightedReturnFactor?: boolean
   capturedAt?: boolean
   createdAt?: boolean
 }
 
-export type DailyPortfolioSnapshotOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "seasonParticipantId" | "snapshotDate" | "totalAssetKrw" | "returnRate" | "krwCash" | "usdCashKrw" | "assetValueKrw" | "realizedPnlKrw" | "unrealizedPnlKrw" | "capturedAt" | "createdAt", ExtArgs["result"]["dailyPortfolioSnapshot"]>
+export type DailyPortfolioSnapshotOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "seasonParticipantId" | "tradingAccountId" | "snapshotDate" | "totalAssetKrw" | "returnRate" | "krwCash" | "usdCashKrw" | "assetValueKrw" | "realizedPnlKrw" | "unrealizedPnlKrw" | "cumulativeExternalFundingKrw" | "investmentPnlKrw" | "timeWeightedReturnFactor" | "capturedAt" | "createdAt", ExtArgs["result"]["dailyPortfolioSnapshot"]>
 export type DailyPortfolioSnapshotInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
+  seasonParticipant?: boolean | Prisma.DailyPortfolioSnapshot$seasonParticipantArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.DailyPortfolioSnapshot$tradingAccountArgs<ExtArgs>
 }
 export type DailyPortfolioSnapshotIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
+  seasonParticipant?: boolean | Prisma.DailyPortfolioSnapshot$seasonParticipantArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.DailyPortfolioSnapshot$tradingAccountArgs<ExtArgs>
 }
 export type DailyPortfolioSnapshotIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  seasonParticipant?: boolean | Prisma.SeasonParticipantDefaultArgs<ExtArgs>
+  seasonParticipant?: boolean | Prisma.DailyPortfolioSnapshot$seasonParticipantArgs<ExtArgs>
+  tradingAccount?: boolean | Prisma.DailyPortfolioSnapshot$tradingAccountArgs<ExtArgs>
 }
 
 export type $DailyPortfolioSnapshotPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "DailyPortfolioSnapshot"
   objects: {
-    seasonParticipant: Prisma.$SeasonParticipantPayload<ExtArgs>
+    seasonParticipant: Prisma.$SeasonParticipantPayload<ExtArgs> | null
+    tradingAccount: Prisma.$TradingAccountPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
-    seasonParticipantId: string
+    /**
+     * NULL for general-mode snapshots (no participant exists).
+     */
+    seasonParticipantId: string | null
+    tradingAccountId: string | null
     snapshotDate: Date
     totalAssetKrw: runtime.Decimal
     returnRate: runtime.Decimal
@@ -819,6 +1166,9 @@ export type $DailyPortfolioSnapshotPayload<ExtArgs extends runtime.Types.Extensi
     assetValueKrw: runtime.Decimal
     realizedPnlKrw: runtime.Decimal
     unrealizedPnlKrw: runtime.Decimal
+    cumulativeExternalFundingKrw: runtime.Decimal | null
+    investmentPnlKrw: runtime.Decimal | null
+    timeWeightedReturnFactor: runtime.Decimal | null
     capturedAt: Date
     createdAt: Date
   }, ExtArgs["result"]["dailyPortfolioSnapshot"]>
@@ -1215,7 +1565,8 @@ readonly fields: DailyPortfolioSnapshotFieldRefs;
  */
 export interface Prisma__DailyPortfolioSnapshotClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
-  seasonParticipant<T extends Prisma.SeasonParticipantDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.SeasonParticipantDefaultArgs<ExtArgs>>): Prisma.Prisma__SeasonParticipantClient<runtime.Types.Result.GetResult<Prisma.$SeasonParticipantPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  seasonParticipant<T extends Prisma.DailyPortfolioSnapshot$seasonParticipantArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.DailyPortfolioSnapshot$seasonParticipantArgs<ExtArgs>>): Prisma.Prisma__SeasonParticipantClient<runtime.Types.Result.GetResult<Prisma.$SeasonParticipantPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  tradingAccount<T extends Prisma.DailyPortfolioSnapshot$tradingAccountArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.DailyPortfolioSnapshot$tradingAccountArgs<ExtArgs>>): Prisma.Prisma__TradingAccountClient<runtime.Types.Result.GetResult<Prisma.$TradingAccountPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1247,6 +1598,7 @@ export interface Prisma__DailyPortfolioSnapshotClient<T, Null = never, ExtArgs e
 export interface DailyPortfolioSnapshotFieldRefs {
   readonly id: Prisma.FieldRef<"DailyPortfolioSnapshot", 'String'>
   readonly seasonParticipantId: Prisma.FieldRef<"DailyPortfolioSnapshot", 'String'>
+  readonly tradingAccountId: Prisma.FieldRef<"DailyPortfolioSnapshot", 'String'>
   readonly snapshotDate: Prisma.FieldRef<"DailyPortfolioSnapshot", 'DateTime'>
   readonly totalAssetKrw: Prisma.FieldRef<"DailyPortfolioSnapshot", 'Decimal'>
   readonly returnRate: Prisma.FieldRef<"DailyPortfolioSnapshot", 'Decimal'>
@@ -1255,6 +1607,9 @@ export interface DailyPortfolioSnapshotFieldRefs {
   readonly assetValueKrw: Prisma.FieldRef<"DailyPortfolioSnapshot", 'Decimal'>
   readonly realizedPnlKrw: Prisma.FieldRef<"DailyPortfolioSnapshot", 'Decimal'>
   readonly unrealizedPnlKrw: Prisma.FieldRef<"DailyPortfolioSnapshot", 'Decimal'>
+  readonly cumulativeExternalFundingKrw: Prisma.FieldRef<"DailyPortfolioSnapshot", 'Decimal'>
+  readonly investmentPnlKrw: Prisma.FieldRef<"DailyPortfolioSnapshot", 'Decimal'>
+  readonly timeWeightedReturnFactor: Prisma.FieldRef<"DailyPortfolioSnapshot", 'Decimal'>
   readonly capturedAt: Prisma.FieldRef<"DailyPortfolioSnapshot", 'DateTime'>
   readonly createdAt: Prisma.FieldRef<"DailyPortfolioSnapshot", 'DateTime'>
 }
@@ -1655,6 +2010,44 @@ export type DailyPortfolioSnapshotDeleteManyArgs<ExtArgs extends runtime.Types.E
    * Limit how many DailyPortfolioSnapshots to delete.
    */
   limit?: number
+}
+
+/**
+ * DailyPortfolioSnapshot.seasonParticipant
+ */
+export type DailyPortfolioSnapshot$seasonParticipantArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the SeasonParticipant
+   */
+  select?: Prisma.SeasonParticipantSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the SeasonParticipant
+   */
+  omit?: Prisma.SeasonParticipantOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.SeasonParticipantInclude<ExtArgs> | null
+  where?: Prisma.SeasonParticipantWhereInput
+}
+
+/**
+ * DailyPortfolioSnapshot.tradingAccount
+ */
+export type DailyPortfolioSnapshot$tradingAccountArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the TradingAccount
+   */
+  select?: Prisma.TradingAccountSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the TradingAccount
+   */
+  omit?: Prisma.TradingAccountOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.TradingAccountInclude<ExtArgs> | null
+  where?: Prisma.TradingAccountWhereInput
 }
 
 /**

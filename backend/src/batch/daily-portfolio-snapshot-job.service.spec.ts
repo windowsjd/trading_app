@@ -843,9 +843,21 @@ function mockSeason(prisma: PrismaMock, status: SeasonStatus) {
 
 function mockParticipants(
   prisma: PrismaMock,
-  participants: Array<{ id: string; userId: string }>,
+  participants: Array<{
+    id: string;
+    userId: string;
+    tradingAccountId?: string | null;
+  }>,
 ) {
-  prisma.seasonParticipant.findMany.mockResolvedValue(participants);
+  prisma.seasonParticipant.findMany.mockResolvedValue(
+    participants.map((participant) => ({
+      // 작업 7 dual-write: every snapshot records the account too, so the
+      // default fixture has a link. Pass `tradingAccountId: null` explicitly
+      // to exercise the fail-closed path.
+      tradingAccountId: `account-of-${participant.id}`,
+      ...participant,
+    })),
+  );
 }
 
 function valuation(

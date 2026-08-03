@@ -2569,6 +2569,7 @@ export class OrdersService {
       tx,
       order.seasonParticipantId,
       plan.executedAt,
+      tradingAccountId,
     );
 
     return {
@@ -2735,6 +2736,7 @@ export class OrdersService {
       tx,
       order.seasonParticipantId,
       plan.executedAt,
+      tradingAccountId,
     );
 
     return {
@@ -3049,6 +3051,8 @@ export class OrdersService {
     tx: OrderExecuteTransactionClient,
     seasonParticipantId: string,
     capturedAt: Date,
+    /** The order's ALREADY-VERIFIED account scope (작업 7 dual-write). */
+    tradingAccountId: string,
   ): Promise<string | null> {
     let valuation: Awaited<
       ReturnType<OrdersService['calculateParticipantValuationInTransaction']>
@@ -3073,6 +3077,10 @@ export class OrdersService {
     const snapshot = await tx.equitySnapshot.create({
       data: {
         seasonParticipantId,
+        // 작업 7 dual-write. The account was already verified against the
+        // order and the participant link earlier in this transaction, so it
+        // is passed down rather than re-queried.
+        tradingAccountId,
         totalAssetKrw: valuation.totalAssetKrw,
         returnRate: valuation.returnRate,
         krwCash: valuation.krwCash,
@@ -5771,11 +5779,14 @@ export class OrdersService {
     tx: Prisma.TransactionClient,
     seasonParticipantId: string,
     capturedAt: Date,
+    /** The fill's verified account scope (작업 7 dual-write). */
+    tradingAccountId: string,
   ): Promise<string | null> {
     return this.recordOrderExecutedPortfolioSnapshot(
       tx as OrderExecuteTransactionClient,
       seasonParticipantId,
       capturedAt,
+      tradingAccountId,
     );
   }
 

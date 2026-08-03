@@ -2729,7 +2729,13 @@ describe('AppController (e2e)', () => {
     await request(app.getHttpServer())
       .post('/api/v1/trading-accounts/general-account-1/ad-rewards/claim')
       .set('Authorization', `Bearer ${token}`)
-      .send({ provider: 'anything', proof: 'anything' })
+      // idempotencyKey is REQUIRED as of 작업 6 보완 1; the disabled check
+      // still happens before any verifier work.
+      .send({
+        provider: 'anything',
+        proof: 'anything',
+        idempotencyKey: 'e2e-ad-claim-key-1',
+      })
       .expect(503)
       .expect((response) => {
         expect(response.body).toMatchObject({

@@ -13,6 +13,10 @@ import {
 } from '../fx/fx-decimal-policy';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  requireSeasonSnapshotParticipantId,
+  seasonSnapshotWhere,
+} from '../portfolio/season-snapshot-scope';
+import {
   buildRankingRowsForSnapshots,
   RankingCalculatedRow,
 } from '../ranking/ranking-calculation.policy';
@@ -114,6 +118,7 @@ export class SeasonRankingJobService {
     const snapshots = await this.prisma.dailyPortfolioSnapshot.findMany({
       where: {
         snapshotDate,
+        ...seasonSnapshotWhere,
         seasonParticipant: {
           seasonId,
           participantStatus: {
@@ -176,8 +181,11 @@ export class SeasonRankingJobService {
     ]);
     const rows = buildRankingRowsForSnapshots({
       rankingSnapshots: snapshots.map((snapshot) => ({
-        seasonParticipantId: snapshot.seasonParticipantId,
-        userId: snapshot.seasonParticipant.userId,
+        // Season-only by query; narrowed here now that the column is nullable.
+        seasonParticipantId: requireSeasonSnapshotParticipantId(
+          snapshot.seasonParticipantId,
+        ),
+        userId: snapshot.seasonParticipant?.userId ?? '',
         snapshotDate: snapshot.snapshotDate,
         totalAssetKrw: snapshot.totalAssetKrw,
         returnRate: snapshot.returnRate,
@@ -323,11 +331,12 @@ export class SeasonRankingJobService {
   }
 
   private async findHistoricalSnapshots(seasonId: string, rankingDate: Date) {
-    return this.prisma.dailyPortfolioSnapshot.findMany({
+    const rows = await this.prisma.dailyPortfolioSnapshot.findMany({
       where: {
         snapshotDate: {
           lte: rankingDate,
         },
+        ...seasonSnapshotWhere,
         seasonParticipant: {
           seasonId,
           participantStatus: {
@@ -344,6 +353,15 @@ export class SeasonRankingJobService {
         createdAt: true,
       },
     });
+
+    // Season-only by query (seasonSnapshotWhere); narrowed here because the
+    // column is nullable for general-mode rows.
+    return rows.map((row) => ({
+      ...row,
+      seasonParticipantId: requireSeasonSnapshotParticipantId(
+        row.seasonParticipantId,
+      ),
+    }));
   }
 
   private async findExecutedOrdersThroughLatestSnapshot(

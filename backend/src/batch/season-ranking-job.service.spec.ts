@@ -195,8 +195,8 @@ describe('SeasonRankingJobService', () => {
       }),
     );
     expect(
-      prisma.seasonParticipant.findMany.mock.calls[0][0].where
-        .participantStatus.in,
+      prisma.seasonParticipant.findMany.mock.calls[0][0].where.participantStatus
+        .in,
     ).not.toContain(ParticipantStatus.excluded);
     expect(prisma.$transaction).toHaveBeenCalled();
     expect(prisma.__tx.seasonRanking.create).toHaveBeenCalledWith({

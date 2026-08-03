@@ -63,6 +63,8 @@ export type AdRewardClaimMinAggregateOutputType = {
   failureCode: string | null
   failureReason: string | null
   walletTransactionId: string | null
+  idempotencyKey: string | null
+  requestHash: string | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -84,6 +86,8 @@ export type AdRewardClaimMaxAggregateOutputType = {
   failureCode: string | null
   failureReason: string | null
   walletTransactionId: string | null
+  idempotencyKey: string | null
+  requestHash: string | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -106,6 +110,9 @@ export type AdRewardClaimCountAggregateOutputType = {
   failureCode: number
   failureReason: number
   walletTransactionId: number
+  idempotencyKey: number
+  requestHash: number
+  responsePayloadJson: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -137,6 +144,8 @@ export type AdRewardClaimMinAggregateInputType = {
   failureCode?: true
   failureReason?: true
   walletTransactionId?: true
+  idempotencyKey?: true
+  requestHash?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -158,6 +167,8 @@ export type AdRewardClaimMaxAggregateInputType = {
   failureCode?: true
   failureReason?: true
   walletTransactionId?: true
+  idempotencyKey?: true
+  requestHash?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -180,6 +191,9 @@ export type AdRewardClaimCountAggregateInputType = {
   failureCode?: true
   failureReason?: true
   walletTransactionId?: true
+  idempotencyKey?: true
+  requestHash?: true
+  responsePayloadJson?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -289,6 +303,9 @@ export type AdRewardClaimGroupByOutputType = {
   failureCode: string | null
   failureReason: string | null
   walletTransactionId: string | null
+  idempotencyKey: string | null
+  requestHash: string | null
+  responsePayloadJson: runtime.JsonValue | null
   createdAt: Date
   updatedAt: Date
   _count: AdRewardClaimCountAggregateOutputType | null
@@ -334,6 +351,9 @@ export type AdRewardClaimWhereInput = {
   failureCode?: Prisma.StringNullableFilter<"AdRewardClaim"> | string | null
   failureReason?: Prisma.StringNullableFilter<"AdRewardClaim"> | string | null
   walletTransactionId?: Prisma.StringNullableFilter<"AdRewardClaim"> | string | null
+  idempotencyKey?: Prisma.StringNullableFilter<"AdRewardClaim"> | string | null
+  requestHash?: Prisma.StringNullableFilter<"AdRewardClaim"> | string | null
+  responsePayloadJson?: Prisma.JsonNullableFilter<"AdRewardClaim">
   createdAt?: Prisma.DateTimeFilter<"AdRewardClaim"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"AdRewardClaim"> | Date | string
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
@@ -359,6 +379,9 @@ export type AdRewardClaimOrderByWithRelationInput = {
   failureCode?: Prisma.SortOrderInput | Prisma.SortOrder
   failureReason?: Prisma.SortOrderInput | Prisma.SortOrder
   walletTransactionId?: Prisma.SortOrderInput | Prisma.SortOrder
+  idempotencyKey?: Prisma.SortOrderInput | Prisma.SortOrder
+  requestHash?: Prisma.SortOrderInput | Prisma.SortOrder
+  responsePayloadJson?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   user?: Prisma.UserOrderByWithRelationInput
@@ -370,6 +393,7 @@ export type AdRewardClaimWhereUniqueInput = Prisma.AtLeast<{
   id?: string
   walletTransactionId?: string
   provider_providerEventId?: Prisma.AdRewardClaimProviderProviderEventIdCompoundUniqueInput
+  tradingAccountId_idempotencyKey?: Prisma.AdRewardClaimTradingAccountIdIdempotencyKeyCompoundUniqueInput
   AND?: Prisma.AdRewardClaimWhereInput | Prisma.AdRewardClaimWhereInput[]
   OR?: Prisma.AdRewardClaimWhereInput[]
   NOT?: Prisma.AdRewardClaimWhereInput | Prisma.AdRewardClaimWhereInput[]
@@ -388,12 +412,15 @@ export type AdRewardClaimWhereUniqueInput = Prisma.AtLeast<{
   failedAt?: Prisma.DateTimeNullableFilter<"AdRewardClaim"> | Date | string | null
   failureCode?: Prisma.StringNullableFilter<"AdRewardClaim"> | string | null
   failureReason?: Prisma.StringNullableFilter<"AdRewardClaim"> | string | null
+  idempotencyKey?: Prisma.StringNullableFilter<"AdRewardClaim"> | string | null
+  requestHash?: Prisma.StringNullableFilter<"AdRewardClaim"> | string | null
+  responsePayloadJson?: Prisma.JsonNullableFilter<"AdRewardClaim">
   createdAt?: Prisma.DateTimeFilter<"AdRewardClaim"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"AdRewardClaim"> | Date | string
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
   walletTransaction?: Prisma.XOR<Prisma.WalletTransactionNullableScalarRelationFilter, Prisma.WalletTransactionWhereInput> | null
-}, "id" | "walletTransactionId" | "provider_providerEventId">
+}, "id" | "walletTransactionId" | "provider_providerEventId" | "tradingAccountId_idempotencyKey">
 
 export type AdRewardClaimOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
@@ -413,6 +440,9 @@ export type AdRewardClaimOrderByWithAggregationInput = {
   failureCode?: Prisma.SortOrderInput | Prisma.SortOrder
   failureReason?: Prisma.SortOrderInput | Prisma.SortOrder
   walletTransactionId?: Prisma.SortOrderInput | Prisma.SortOrder
+  idempotencyKey?: Prisma.SortOrderInput | Prisma.SortOrder
+  requestHash?: Prisma.SortOrderInput | Prisma.SortOrder
+  responsePayloadJson?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.AdRewardClaimCountOrderByAggregateInput
@@ -443,6 +473,9 @@ export type AdRewardClaimScalarWhereWithAggregatesInput = {
   failureCode?: Prisma.StringNullableWithAggregatesFilter<"AdRewardClaim"> | string | null
   failureReason?: Prisma.StringNullableWithAggregatesFilter<"AdRewardClaim"> | string | null
   walletTransactionId?: Prisma.StringNullableWithAggregatesFilter<"AdRewardClaim"> | string | null
+  idempotencyKey?: Prisma.StringNullableWithAggregatesFilter<"AdRewardClaim"> | string | null
+  requestHash?: Prisma.StringNullableWithAggregatesFilter<"AdRewardClaim"> | string | null
+  responsePayloadJson?: Prisma.JsonNullableWithAggregatesFilter<"AdRewardClaim">
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"AdRewardClaim"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"AdRewardClaim"> | Date | string
 }
@@ -462,6 +495,9 @@ export type AdRewardClaimCreateInput = {
   failedAt?: Date | string | null
   failureCode?: string | null
   failureReason?: string | null
+  idempotencyKey?: string | null
+  requestHash?: string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
   user: Prisma.UserCreateNestedOneWithoutAdRewardClaimsInput
@@ -487,6 +523,9 @@ export type AdRewardClaimUncheckedCreateInput = {
   failureCode?: string | null
   failureReason?: string | null
   walletTransactionId?: string | null
+  idempotencyKey?: string | null
+  requestHash?: string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -506,6 +545,9 @@ export type AdRewardClaimUpdateInput = {
   failedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   failureCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   failureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   user?: Prisma.UserUpdateOneRequiredWithoutAdRewardClaimsNestedInput
@@ -531,6 +573,9 @@ export type AdRewardClaimUncheckedUpdateInput = {
   failureCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   failureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   walletTransactionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -553,6 +598,9 @@ export type AdRewardClaimCreateManyInput = {
   failureCode?: string | null
   failureReason?: string | null
   walletTransactionId?: string | null
+  idempotencyKey?: string | null
+  requestHash?: string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -572,6 +620,9 @@ export type AdRewardClaimUpdateManyMutationInput = {
   failedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   failureCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   failureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -594,6 +645,9 @@ export type AdRewardClaimUncheckedUpdateManyInput = {
   failureCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   failureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   walletTransactionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -618,6 +672,11 @@ export type AdRewardClaimProviderProviderEventIdCompoundUniqueInput = {
   providerEventId: string
 }
 
+export type AdRewardClaimTradingAccountIdIdempotencyKeyCompoundUniqueInput = {
+  tradingAccountId: string
+  idempotencyKey: string
+}
+
 export type AdRewardClaimCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   userId?: Prisma.SortOrder
@@ -636,6 +695,9 @@ export type AdRewardClaimCountOrderByAggregateInput = {
   failureCode?: Prisma.SortOrder
   failureReason?: Prisma.SortOrder
   walletTransactionId?: Prisma.SortOrder
+  idempotencyKey?: Prisma.SortOrder
+  requestHash?: Prisma.SortOrder
+  responsePayloadJson?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -661,6 +723,8 @@ export type AdRewardClaimMaxOrderByAggregateInput = {
   failureCode?: Prisma.SortOrder
   failureReason?: Prisma.SortOrder
   walletTransactionId?: Prisma.SortOrder
+  idempotencyKey?: Prisma.SortOrder
+  requestHash?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -682,6 +746,8 @@ export type AdRewardClaimMinOrderByAggregateInput = {
   failureCode?: Prisma.SortOrder
   failureReason?: Prisma.SortOrder
   walletTransactionId?: Prisma.SortOrder
+  idempotencyKey?: Prisma.SortOrder
+  requestHash?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -825,6 +891,9 @@ export type AdRewardClaimCreateWithoutUserInput = {
   failedAt?: Date | string | null
   failureCode?: string | null
   failureReason?: string | null
+  idempotencyKey?: string | null
+  requestHash?: string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutAdRewardClaimsInput
@@ -848,6 +917,9 @@ export type AdRewardClaimUncheckedCreateWithoutUserInput = {
   failureCode?: string | null
   failureReason?: string | null
   walletTransactionId?: string | null
+  idempotencyKey?: string | null
+  requestHash?: string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -899,6 +971,9 @@ export type AdRewardClaimScalarWhereInput = {
   failureCode?: Prisma.StringNullableFilter<"AdRewardClaim"> | string | null
   failureReason?: Prisma.StringNullableFilter<"AdRewardClaim"> | string | null
   walletTransactionId?: Prisma.StringNullableFilter<"AdRewardClaim"> | string | null
+  idempotencyKey?: Prisma.StringNullableFilter<"AdRewardClaim"> | string | null
+  requestHash?: Prisma.StringNullableFilter<"AdRewardClaim"> | string | null
+  responsePayloadJson?: Prisma.JsonNullableFilter<"AdRewardClaim">
   createdAt?: Prisma.DateTimeFilter<"AdRewardClaim"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"AdRewardClaim"> | Date | string
 }
@@ -918,6 +993,9 @@ export type AdRewardClaimCreateWithoutTradingAccountInput = {
   failedAt?: Date | string | null
   failureCode?: string | null
   failureReason?: string | null
+  idempotencyKey?: string | null
+  requestHash?: string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
   user: Prisma.UserCreateNestedOneWithoutAdRewardClaimsInput
@@ -941,6 +1019,9 @@ export type AdRewardClaimUncheckedCreateWithoutTradingAccountInput = {
   failureCode?: string | null
   failureReason?: string | null
   walletTransactionId?: string | null
+  idempotencyKey?: string | null
+  requestHash?: string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -986,6 +1067,9 @@ export type AdRewardClaimCreateWithoutWalletTransactionInput = {
   failedAt?: Date | string | null
   failureCode?: string | null
   failureReason?: string | null
+  idempotencyKey?: string | null
+  requestHash?: string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
   user: Prisma.UserCreateNestedOneWithoutAdRewardClaimsInput
@@ -1009,6 +1093,9 @@ export type AdRewardClaimUncheckedCreateWithoutWalletTransactionInput = {
   failedAt?: Date | string | null
   failureCode?: string | null
   failureReason?: string | null
+  idempotencyKey?: string | null
+  requestHash?: string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -1044,6 +1131,9 @@ export type AdRewardClaimUpdateWithoutWalletTransactionInput = {
   failedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   failureCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   failureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   user?: Prisma.UserUpdateOneRequiredWithoutAdRewardClaimsNestedInput
@@ -1067,6 +1157,9 @@ export type AdRewardClaimUncheckedUpdateWithoutWalletTransactionInput = {
   failedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   failureCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   failureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -1088,6 +1181,9 @@ export type AdRewardClaimCreateManyUserInput = {
   failureCode?: string | null
   failureReason?: string | null
   walletTransactionId?: string | null
+  idempotencyKey?: string | null
+  requestHash?: string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -1107,6 +1203,9 @@ export type AdRewardClaimUpdateWithoutUserInput = {
   failedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   failureCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   failureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutAdRewardClaimsNestedInput
@@ -1130,6 +1229,9 @@ export type AdRewardClaimUncheckedUpdateWithoutUserInput = {
   failureCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   failureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   walletTransactionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -1151,6 +1253,9 @@ export type AdRewardClaimUncheckedUpdateManyWithoutUserInput = {
   failureCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   failureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   walletTransactionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -1172,6 +1277,9 @@ export type AdRewardClaimCreateManyTradingAccountInput = {
   failureCode?: string | null
   failureReason?: string | null
   walletTransactionId?: string | null
+  idempotencyKey?: string | null
+  requestHash?: string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -1191,6 +1299,9 @@ export type AdRewardClaimUpdateWithoutTradingAccountInput = {
   failedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   failureCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   failureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   user?: Prisma.UserUpdateOneRequiredWithoutAdRewardClaimsNestedInput
@@ -1214,6 +1325,9 @@ export type AdRewardClaimUncheckedUpdateWithoutTradingAccountInput = {
   failureCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   failureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   walletTransactionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -1235,6 +1349,9 @@ export type AdRewardClaimUncheckedUpdateManyWithoutTradingAccountInput = {
   failureCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   failureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   walletTransactionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -1259,6 +1376,9 @@ export type AdRewardClaimSelect<ExtArgs extends runtime.Types.Extensions.Interna
   failureCode?: boolean
   failureReason?: boolean
   walletTransactionId?: boolean
+  idempotencyKey?: boolean
+  requestHash?: boolean
+  responsePayloadJson?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -1284,6 +1404,9 @@ export type AdRewardClaimSelectCreateManyAndReturn<ExtArgs extends runtime.Types
   failureCode?: boolean
   failureReason?: boolean
   walletTransactionId?: boolean
+  idempotencyKey?: boolean
+  requestHash?: boolean
+  responsePayloadJson?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -1309,6 +1432,9 @@ export type AdRewardClaimSelectUpdateManyAndReturn<ExtArgs extends runtime.Types
   failureCode?: boolean
   failureReason?: boolean
   walletTransactionId?: boolean
+  idempotencyKey?: boolean
+  requestHash?: boolean
+  responsePayloadJson?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -1334,11 +1460,14 @@ export type AdRewardClaimSelectScalar = {
   failureCode?: boolean
   failureReason?: boolean
   walletTransactionId?: boolean
+  idempotencyKey?: boolean
+  requestHash?: boolean
+  responsePayloadJson?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type AdRewardClaimOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "tradingAccountId" | "provider" | "providerEventId" | "status" | "rewardAmountKrw" | "verificationFingerprint" | "verificationMetadataJson" | "requestedAt" | "verifiedAt" | "grantedAt" | "rejectedAt" | "failedAt" | "failureCode" | "failureReason" | "walletTransactionId" | "createdAt" | "updatedAt", ExtArgs["result"]["adRewardClaim"]>
+export type AdRewardClaimOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "tradingAccountId" | "provider" | "providerEventId" | "status" | "rewardAmountKrw" | "verificationFingerprint" | "verificationMetadataJson" | "requestedAt" | "verifiedAt" | "grantedAt" | "rejectedAt" | "failedAt" | "failureCode" | "failureReason" | "walletTransactionId" | "idempotencyKey" | "requestHash" | "responsePayloadJson" | "createdAt" | "updatedAt", ExtArgs["result"]["adRewardClaim"]>
 export type AdRewardClaimInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
@@ -1383,6 +1512,24 @@ export type $AdRewardClaimPayload<ExtArgs extends runtime.Types.Extensions.Inter
      * Set only for granted claims; 1:1 with the ad_reward ledger row.
      */
     walletTransactionId: string | null
+    /**
+     * COMMAND idempotency (작업 6 보완). Distinct from (provider,
+     * providerEventId): that one stops the same AD EVENT from paying twice,
+     * this one lets a client safely RETRY the same request without another
+     * verifier round trip. Nullable so pre-작업 7 rows stay valid; PostgreSQL
+     * treats NULLs as distinct, so only keyed claims are constrained.
+     */
+    idempotencyKey: string | null
+    /**
+     * sha256 over (api version, provider, proof fingerprint). Same key +
+     * different hash is AD_REWARD_IDEMPOTENCY_CONFLICT. The raw proof is never
+     * an input to anything stored.
+     */
+    requestHash: string | null
+    /**
+     * The first committed success/refusal payload, replayed verbatim on retry.
+     */
+    responsePayloadJson: runtime.JsonValue | null
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["adRewardClaim"]>
@@ -1828,6 +1975,9 @@ export interface AdRewardClaimFieldRefs {
   readonly failureCode: Prisma.FieldRef<"AdRewardClaim", 'String'>
   readonly failureReason: Prisma.FieldRef<"AdRewardClaim", 'String'>
   readonly walletTransactionId: Prisma.FieldRef<"AdRewardClaim", 'String'>
+  readonly idempotencyKey: Prisma.FieldRef<"AdRewardClaim", 'String'>
+  readonly requestHash: Prisma.FieldRef<"AdRewardClaim", 'String'>
+  readonly responsePayloadJson: Prisma.FieldRef<"AdRewardClaim", 'Json'>
   readonly createdAt: Prisma.FieldRef<"AdRewardClaim", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"AdRewardClaim", 'DateTime'>
 }

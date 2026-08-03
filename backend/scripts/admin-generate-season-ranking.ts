@@ -6,6 +6,10 @@ import {
   SeasonRankingType,
 } from '../src/generated/prisma/client';
 import { writeSeasonRankings } from '../src/portfolio/season-ranking-generation';
+import {
+  requireSeasonSnapshotParticipantId,
+  seasonSnapshotWhere,
+} from '../src/portfolio/season-snapshot-scope';
 import { buildRankingRowsForSnapshots } from '../src/ranking/ranking-calculation.policy';
 
 type SeasonRankingCliArgs = {
@@ -83,6 +87,8 @@ export async function runAdminGenerateSeasonRanking(argv: string[]) {
     const snapshots = await prisma.dailyPortfolioSnapshot.findMany({
       where: {
         snapshotDate: rankingDate,
+        // Season-only: general-mode daily rows never enter a season ranking.
+        ...seasonSnapshotWhere,
         seasonParticipant: {
           seasonId,
         },
@@ -119,6 +125,7 @@ export async function runAdminGenerateSeasonRanking(argv: string[]) {
           snapshotDate: {
             lte: rankingDate,
           },
+          ...seasonSnapshotWhere,
           seasonParticipant: {
             seasonId,
           },
@@ -151,15 +158,22 @@ export async function runAdminGenerateSeasonRanking(argv: string[]) {
     ]);
     const rows = buildRankingRowsForSnapshots({
       rankingSnapshots: snapshots.map((snapshot) => ({
-        seasonParticipantId: snapshot.seasonParticipantId,
-        userId: snapshot.seasonParticipant.userId,
+        seasonParticipantId: requireSeasonSnapshotParticipantId(
+          snapshot.seasonParticipantId,
+        ),
+        userId: snapshot.seasonParticipant?.userId ?? '',
         snapshotDate: snapshot.snapshotDate,
         totalAssetKrw: snapshot.totalAssetKrw,
         returnRate: snapshot.returnRate,
         capturedAt: snapshot.capturedAt,
         createdAt: snapshot.createdAt,
       })),
-      historicalSnapshots,
+      historicalSnapshots: historicalSnapshots.map((snapshot) => ({
+        ...snapshot,
+        seasonParticipantId: requireSeasonSnapshotParticipantId(
+          snapshot.seasonParticipantId,
+        ),
+      })),
       executedOrders,
     });
     const writeResult = await writeSeasonRankings(prisma, {

@@ -116,3 +116,32 @@ export const AD_REWARD_VERIFICATION_REGISTRY =
 export function buildAdRewardProofFingerprint(proof: string): string {
   return createHash('sha256').update(proof, 'utf8').digest('hex');
 }
+
+/**
+ * Canonical request hash for ad-reward COMMAND idempotency (작업 6 보완 1).
+ *
+ * Inputs are the API contract version, the provider key, and the proof's
+ * FINGERPRINT — never the raw proof. That keeps the hash stable across
+ * retries while ensuring the raw token is not an input to anything persisted,
+ * logged, or comparable outside the server.
+ *
+ * The version prefix means a future change to what a claim request means
+ * cannot silently collide with keys issued under the old meaning.
+ */
+export const AD_REWARD_CLAIM_REQUEST_HASH_VERSION = 'ad-reward-claim:v1';
+
+export function buildAdRewardClaimRequestHash(input: {
+  provider: string;
+  proofFingerprint: string;
+}): string {
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        version: AD_REWARD_CLAIM_REQUEST_HASH_VERSION,
+        provider: input.provider,
+        proofFingerprint: input.proofFingerprint,
+      }),
+      'utf8',
+    )
+    .digest('hex');
+}

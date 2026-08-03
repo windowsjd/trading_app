@@ -22,6 +22,17 @@ export const adRewardErrorCodes = {
   AD_REWARD_DAILY_AMOUNT_LIMIT: 'AD_REWARD_DAILY_AMOUNT_LIMIT',
   AD_REWARD_COOLDOWN_ACTIVE: 'AD_REWARD_COOLDOWN_ACTIVE',
   AD_REWARD_INVALID_REQUEST: 'AD_REWARD_INVALID_REQUEST',
+  /**
+   * Same (account, idempotencyKey) submitted with a DIFFERENT request. Never
+   * silently re-verified or re-granted — the key already means something.
+   */
+  AD_REWARD_IDEMPOTENCY_CONFLICT: 'AD_REWARD_IDEMPOTENCY_CONFLICT',
+  /**
+   * A stored claim disagrees with its ledger row / wallet / boundary
+   * snapshots. Replaying it as a success would report money that may not
+   * exist, so it fails closed instead.
+   */
+  AD_REWARD_CLAIM_INTEGRITY: 'AD_REWARD_CLAIM_INTEGRITY',
 } as const;
 
 export type AdRewardErrorCode =
@@ -38,6 +49,8 @@ export const adRewardErrorHttpStatus: Record<AdRewardErrorCode, HttpStatus> = {
   AD_REWARD_DAILY_AMOUNT_LIMIT: HttpStatus.TOO_MANY_REQUESTS,
   AD_REWARD_COOLDOWN_ACTIVE: HttpStatus.TOO_MANY_REQUESTS,
   AD_REWARD_INVALID_REQUEST: HttpStatus.BAD_REQUEST,
+  AD_REWARD_IDEMPOTENCY_CONFLICT: HttpStatus.CONFLICT,
+  AD_REWARD_CLAIM_INTEGRITY: HttpStatus.INTERNAL_SERVER_ERROR,
 };
 
 /** The three codes a claim can be permanently REJECTED with. */

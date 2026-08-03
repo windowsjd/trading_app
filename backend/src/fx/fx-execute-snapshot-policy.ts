@@ -31,10 +31,7 @@ export function isAllowedExecuteSourceType(
   );
 }
 
-export function isFutureSnapshot(
-  effectiveAt: Date,
-  executeNow: Date,
-): boolean {
+export function isFutureSnapshot(effectiveAt: Date, executeNow: Date): boolean {
   return effectiveAt.getTime() > executeNow.getTime();
 }
 
@@ -53,8 +50,14 @@ export function isFxSnapshotStale(
 }
 
 export function compareFxSnapshotsForExecute(
-  a: Pick<FxExecuteSnapshotCandidate, 'effectiveAt' | 'capturedAt' | 'createdAt'>,
-  b: Pick<FxExecuteSnapshotCandidate, 'effectiveAt' | 'capturedAt' | 'createdAt'>,
+  a: Pick<
+    FxExecuteSnapshotCandidate,
+    'effectiveAt' | 'capturedAt' | 'createdAt'
+  >,
+  b: Pick<
+    FxExecuteSnapshotCandidate,
+    'effectiveAt' | 'capturedAt' | 'createdAt'
+  >,
 ): number {
   return (
     b.effectiveAt.getTime() - a.effectiveAt.getTime() ||
@@ -68,7 +71,9 @@ export function selectEligibleFxSnapshotForExecute<
 >(snapshots: readonly T[], executeNow: Date): T | null {
   return (
     snapshots
-      .filter((snapshot) => isEligibleFxSnapshotForExecute(snapshot, executeNow))
+      .filter((snapshot) =>
+        isEligibleFxSnapshotForExecute(snapshot, executeNow),
+      )
       .toSorted(compareFxSnapshotsForExecute)
       .at(0) ?? null
   );

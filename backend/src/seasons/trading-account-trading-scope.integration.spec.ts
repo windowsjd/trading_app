@@ -1177,11 +1177,26 @@ async function testLimitLifecycleAndFill() {
     'GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED',
     'general account create',
   );
-  const generalWallets = await walletsService.getWalletsForTradingAccount(
-    user.id,
-    generalAccount.id,
+  // 작업 6 보완 2: this general account was created RAW (no wallets, no
+  // initial grant), i.e. exactly the structurally incomplete shape the
+  // account-open endpoint can never produce. It used to read as a normal
+  // empty wallet list; it must now fail closed instead of presenting missing
+  // wallets and a missing grant as "nothing here yet".
+  await expectHttpError(
+    walletsService.getWalletsForTradingAccount(user.id, generalAccount.id),
+    500,
+    'GENERAL_ACCOUNT_INTEGRITY',
+    'incomplete general account wallet read',
   );
-  assert.equal(generalWallets.data.wallets.length, 0, 'general wallets empty');
+  await expectHttpError(
+    walletsService.getWalletTransactionsForTradingAccount(
+      user.id,
+      generalAccount.id,
+    ),
+    500,
+    'GENERAL_ACCOUNT_INTEGRITY',
+    'incomplete general account ledger read',
+  );
   const generalPositions = await positionsService.getPositionsForTradingAccount(
     user.id,
     generalAccount.id,

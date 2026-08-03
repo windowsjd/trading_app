@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { GeneralPerformanceModule } from '../portfolio/general-performance.module';
 import { TradingAccountsModule } from '../trading-accounts/trading-accounts.module';
 import { AdRewardController } from './ad-reward.controller';
 import { AdRewardService } from './ad-reward.service';
@@ -23,7 +24,9 @@ import {
  * in the factory below.
  */
 @Module({
-  imports: [TradingAccountsModule],
+  // GeneralPerformanceModule supplies the external-funding boundary snapshots
+  // written inside the payout transaction (작업 7).
+  imports: [GeneralPerformanceModule, TradingAccountsModule],
   controllers: [AdRewardController],
   providers: [
     AdRewardService,

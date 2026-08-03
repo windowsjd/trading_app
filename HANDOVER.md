@@ -12,6 +12,110 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 일반모드 성과·TWR·snapshot 전환 + 작업 6 결함 3종 보완 (2026-08-03, 작업 7, WORK-ID GENERAL-PERFORMANCE-TWR-AND-AD-REPLAY-V1)
+
+**목적**
+
+작업 7(일반모드 포트폴리오 평가·투자손익·외부자금 경계 snapshot·시간가중
+수익률·account-scoped 포트폴리오 API)과 작업 6 검토 결함 3종(① 커밋된 광고
+지급이 상태·설정 변화 이후 재현되지 않음, ② 일반계정 조회/eligibility가 부분
+integrity만 검사, ③ granted claim을 원장 검증 없이 성공 replay) 보완을 함께
+수행.
+
+**핵심 변경**
+
+- 보완 ①(광고 명령 멱등성): `AdRewardClaim`에 `idempotencyKey`·`requestHash`·
+  `responsePayloadJson`을 additive 추가하고 `(tradingAccountId,
+  idempotencyKey)` unique를 신설했다. 기존 `(provider, providerEventId)`
+  unique와 **합치지 않는다** — 전자는 클라이언트 명령 재시도, 후자는 광고
+  이벤트 중복 지급이라는 다른 축이며 P2002는 두 축을 각각 재조회해 판정한다.
+  claim 순서는 소유권 → 파싱 → keyed claim 조회 → replay로 바뀌었고, 계정
+  status·`AD_REWARD_ENABLED`·provider·registry·verifier 검사는 keyed claim이
+  없을 때만 실행한다. `provider`는 요청 필수(config fallback 제거),
+  `requestHash`는 `sha256({version, provider, proof fingerprint})`이고 proof
+  원문은 저장·로그하지 않는다. 같은 키 다른 요청은 409
+  `AD_REWARD_IDEMPOTENCY_CONFLICT`.
+- 보완 ②(전체 integrity): `assertGeneralAccountFinancialIntegrity` =
+  foundation(계정·지갑 2개·최초 지급 원장의 direction·balanceAfter·계정 scope
+  포함) + row scope. 계정 재호출·`GET wallets`·`GET wallet-transactions`·
+  eligibility·신규 claim·성과 경로 전부에 적용했다. 현재 잔액과
+  `reservedAmount`는 검사하지 않는다.
+- 보완 ③(claim replay 정합성): granted는 원장·지갑과의 1:1 정합성(계정·
+  participant null·KRW 지갑·credit·`ad_reward`·`ad_reward_claim`·referenceId·
+  금액·지갑 scope, keyed면 hash·payload·경계 snapshot 쌍)을, rejected는 ledger
+  없음·한도 failureCode를 검증한다. pending/verified/failed는 성공 replay하지
+  않는다. 위반은 500 `AD_REWARD_CLAIM_INTEGRITY`.
+- 작업 7 schema/migration 2건
+  (`…210000_add_general_performance_snapshot_enums` = enum 전용,
+  `…211000_add_general_performance_snapshot_foundation`):
+  `SnapshotReason`에 `general_account_open`·`performance_baseline`·
+  `external_funding_before`·`external_funding_after` 추가, Equity·Daily
+  snapshot의 `seasonParticipantId` DROP NOT NULL + nullable
+  `tradingAccountId` + Restrict FK + 일반 성과 3열(+Equity는 외부자금 참조
+  3열), 외부자금 경계 partial unique, daily `(account, date)` unique,
+  CHECK 7종, `wallet_transactions(account, txType, occurredAt)` 인덱스.
+  기존 시즌 snapshot은 IS NULL 가드 backfill만 하고 금액·수익률·시각·reason·
+  ID는 불변이며, participant 링크가 없는 행은 null 유지.
+- snapshot dual-write: 시즌 참가·시장가 체결·지정가 체결·FX 실행·scheduled·
+  정산·daily job·admin script 전부 participant + 검증된 accountId를 기록하고,
+  링크가 null이면 `TRADING_ACCOUNT_LINK_INTEGRITY`로 중단한다. 계정 ID는 이미
+  검증된 값을 인자로 전달(재조회 없음).
+- 성과 계층: `general-performance.policy.ts`(순수 TWR — origin/ordinary/
+  external-funding boundary/state 검증), `general-external-funding.service.ts`
+  (외부자금 allow-list 집계 + claim·원장 교차검증),
+  `general-account-performance.service.ts`(무결성 + valuation + live TWR +
+  origin/boundary snapshot 생성), `portfolio-valuation.service.ts`에
+  `calculateTradingAccountValuation` 추가(시즌 경로와 동일한 공통 core).
+- 일반계정 생성 트랜잭션이 계정·KRW 지갑·USD 지갑·최초 지급 원장·
+  `general_account_open` origin snapshot 5행을 원자 처리한다. 광고 지급
+  트랜잭션은 before snapshot → 지갑 credit → `ad_reward` 원장 → claim granted
+  (+response payload) → after snapshot을 원자 처리한다.
+- account-scoped `GET /api/v1/trading-accounts/:accountId/portfolio`와
+  `.../portfolio/equity` 추가. 응답은 항상 `returnRateMethod`
+  (`time_weighted`/`initial_capital`)를 포함하고 시즌 계정의 외부자금 필드는
+  null이다. 가격·환율 부재는 기존 sectionErrors, 정합성 손상은 구조화된 500.
+  legacy `/api/v1/portfolio`·`/portfolio/equity`는 계약 불변.
+- 운영 스크립트: `trading-accounts:repair-snapshot-scope`(기본 dry-run,
+  참가자 링크에서만 backfill, mismatch·general 행은 보고만),
+  `trading-accounts:backfill-general-performance`(총자산 = 외부자금이
+  증명되는 계정에만 0% baseline, `--force` 없음), `audit-general` 성과 검사
+  15종 확장.
+
+**검증**(로컬 실행, hosted CI 없음)
+
+- prisma format/validate/generate PASS, typecheck PASS, build PASS.
+- unit `pnpm test` PASS — 175 suite / 2,369 test(신규 +54: TWR 정책 28,
+  성과 schema contract 26).
+- migration 비파괴: dev DB에 시즌 snapshot(equity 9·daily 3·ranking 3, 그 중
+  한 참가자는 링크 null) 심고 전후 fingerprint 비교 — snapshotReason별 수,
+  총자산·수익률·현금·자산군 합계, 전체 ID·capturedAt·seasonParticipantId,
+  daily·ranking fingerprint, 지갑·원장 합계 모두 동일. 유일한 변화는 링크가
+  있는 시즌 행 6/3건에 `tradingAccountId`가 채워진 것이고, 링크 없는 행은
+  null 유지.
+- opt-in DB 통합 16종 `--runInBand` 직렬 PASS.
+- 운영 CLI 실측: repair-snapshot-scope dry-run이 링크 없는 4행을 fail-closed
+  보고(exit 1) → repair-links --apply → repair-snapshot-scope --apply로 4행
+  backfill, 잔여 null/mismatch 0, exit 0. audit-general findings 0.
+- e2e 119/122 pass. 실패 3건(readiness/wallets/orders-cancel)은 기준 커밋
+  bf6d568e에서 동일 명령·환경으로 재현 확인한 **BASELINE_FAIL**.
+- 실제 광고 provider 연동은 여전히 **PROVIDER_NOT_CONFIGURED**.
+
+**주의사항**
+
+- **일반계정 일별 snapshot job(작업 7 §21)은 이번 작업에서 구현하지
+  않았다.** 일반계정 DailyPortfolioSnapshot을 주기 생성하는 배치가 없으므로
+  7d/30d/all 이력은 EquitySnapshot fallback으로 서빙된다. 스키마·unique·
+  성과 계층은 모두 준비되어 있어 job만 추가하면 된다.
+- 광고 claim API가 **파괴적으로 변경**되었다: `idempotencyKey`와 `provider`가
+  필수다. 프런트 연동 전이라 호환 계층은 두지 않았다.
+- 구조적으로 불완전한 general 계정(지갑·최초 지급 누락)의 지갑/원장 조회는
+  이제 200 빈 결과가 아니라 500 `GENERAL_ACCOUNT_INTEGRITY`다. 기존
+  trading-scope 통합 테스트의 해당 단언을 이 계약에 맞게 갱신했다.
+- 작업 7 이전에 만들어진 general 계정은 origin이 없어 포트폴리오·이력이 500
+  `GENERAL_PERFORMANCE_NOT_INITIALIZED`다. 배포 시
+  `backfill-general-performance --apply`가 선행되어야 한다(현재 운영 general
+  계정 수는 0).
+
 ### 작업 단위: 일반모드 계정·최초 지급·광고 보상 기반 + 작업 5 결함 3종 보완 (2026-08-03, 작업 6)
 
 **목적**
@@ -1288,6 +1392,44 @@ cd frontend && npm run typecheck && npm test
 ---
 
 ## 2. 최신 작업 시간순 기록
+
+### 2026-08-03 — 일반모드 성과·TWR·snapshot 전환 + 작업 6 결함 3종 보완 (작업 7)
+
+- 작업 6 결함 보완: ① 광고 claim에 계정 단위 명령 멱등성 추가
+  (`idempotencyKey`+`requestHash`+`responsePayloadJson`,
+  `(account, key)` unique를 provider event unique와 **분리** 유지). 커밋된
+  지급은 계정 suspended/closed·기능 비활성·provider 미등록 이후에도 verifier
+  재호출 없이 최초 결과를 replay하고, 같은 키 다른 요청은 409
+  `AD_REWARD_IDEMPOTENCY_CONFLICT`. ② 일반계정 조회·eligibility·claim이
+  부분 검사 대신 전체 금융 구조(지갑 2개·최초 지급 원장 전 필드 포함)를
+  검사한다. ③ granted/rejected claim은 원장·지갑 1:1 정합성 검증 후에만
+  replay하며 위반은 500 `AD_REWARD_CLAIM_INTEGRITY`.
+- 작업 7: Equity·Daily snapshot을 TradingAccount 기준으로 전환(additive
+  migration 2건, 시즌 행 IS NULL 가드 backfill, 신규 writer 전부 dual-write,
+  링크 null이면 `TRADING_ACCOUNT_LINK_INTEGRITY`로 중단). 기존 금액·수익률·
+  시각·reason·ID는 fingerprint로 불변 확인.
+- 일반모드 성과: 외부자금 allow-list 집계(`initial_grant`+
+  `general_account_open`, `ad_reward`+`ad_reward_claim`만), 투자손익 =
+  총자산 − 외부자금, 대표 수익률은 TWR. 광고 유입은 before/after 경계로
+  처리해 총자산·누적 외부자금만 늘리고 투자손익·factor·returnRate는 불변
+  (28개 순수 정책 테스트로 고정). 완전 손실 후 -100% 유지, 0에서의 무경계
+  회복은 `GENERAL_PERFORMANCE_DISCONTINUITY`.
+- 일반계정 생성은 계정·지갑 2개·최초 지급 원장·origin snapshot 5행 원자 처리,
+  광고 지급은 before·credit·ledger·claim granted·after 원자 처리.
+  origin 없는 기존 계정은 자동 생성하지 않고 500
+  `GENERAL_PERFORMANCE_NOT_INITIALIZED`.
+- account-scoped `GET .../portfolio`·`.../portfolio/equity` 추가
+  (`returnRateMethod`로 TWR/초기자본 구분, 시즌 외부자금 필드는 null,
+  정합성 손상은 성공 envelope로 감추지 않음). legacy portfolio API 불변.
+- 운영: `repair-snapshot-scope`, `backfill-general-performance`(증명 가능한
+  계정에만 0% baseline, `--force` 없음), `audit-general` 성과 검사 확장.
+- **미구현(다음 작업)**: 일반계정 일별 snapshot job. 7d/30d/all 이력은 현재
+  EquitySnapshot fallback으로 서빙된다.
+- 검증: unit 2,369 pass, opt-in DB 통합 16종 직렬 PASS, e2e 119/122(실패 3건은
+  기준 커밋 bf6d568e에서 동일 재현한 BASELINE_FAIL), migration 전후 fingerprint
+  불변 + 복구 CLI 실측(dry-run fail-closed → repair-links → apply 4행 backfill,
+  잔여 0, exit 0), audit-general findings 0. 실제 광고 provider는
+  PROVIDER_NOT_CONFIGURED.
 
 ### 2026-08-03 — 일반모드 계정·최초 지급·광고 보상 기반 + 작업 5 결함 3종 보완 (작업 6)
 

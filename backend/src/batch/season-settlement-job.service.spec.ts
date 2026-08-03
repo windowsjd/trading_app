@@ -687,6 +687,11 @@ function createPrismaMock() {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     seasonParticipant: {
+      // 작업 7 dual-write: the settlement snapshot writer resolves the
+      // participant's verified account inside the transaction.
+      findUnique: jest.fn(async (args: { where: { id: string } }) => ({
+        tradingAccountId: `account-of-${args.where.id}`,
+      })),
       update: jest.fn(),
       updateMany: jest.fn(),
       count: jest.fn(),

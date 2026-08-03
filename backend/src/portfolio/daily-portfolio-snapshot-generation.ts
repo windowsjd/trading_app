@@ -1,11 +1,29 @@
 import { Prisma } from '../generated/prisma/client';
 import { PortfolioValuationResult } from './portfolio-valuation.policy';
+import { requireSeasonSnapshotParticipantId } from './season-snapshot-scope';
+
+/**
+ * This writer is the SEASON daily-snapshot path. General-mode daily snapshots
+ * are written by GeneralAccountPerformanceService instead, because they carry
+ * time-weighted performance columns this shape does not have.
+ */
+function requireSeasonValuationParticipantId(
+  valuation: PortfolioValuationResult,
+): string {
+  return requireSeasonSnapshotParticipantId(valuation.seasonParticipantId);
+}
 
 export type DailyPortfolioSnapshotWriteInput = {
   valuation: PortfolioValuationResult;
   snapshotDate: Date;
   capturedAt: Date;
   dryRun: boolean;
+  /**
+   * The participant's verified trading account (작업 7 dual-write). Season
+   * writers MUST supply it; a null link is a caller-side integrity failure,
+   * never a reason to write an unscoped snapshot.
+   */
+  tradingAccountId: string;
 };
 
 export type DailyPortfolioSnapshotWriteResult = {
@@ -23,6 +41,7 @@ export type DailyPortfolioSnapshotWriteResult = {
 
 export type DailyPortfolioSnapshotPersistenceData = {
   seasonParticipantId: string;
+  tradingAccountId: string;
   snapshotDate: Date;
   totalAssetKrw: string;
   returnRate: string;
@@ -37,7 +56,7 @@ export type DailyPortfolioSnapshotPersistenceData = {
 type DailyPortfolioSnapshotWriter = {
   dailyPortfolioSnapshot: {
     upsert: (args: unknown) => Promise<{
-      seasonParticipantId: string;
+      seasonParticipantId: string | null;
       totalAssetKrw: Prisma.Decimal;
       returnRate: Prisma.Decimal;
       krwCash: Prisma.Decimal;
@@ -61,7 +80,9 @@ export async function writeDailyPortfolioSnapshot(
   const row = await prisma.dailyPortfolioSnapshot.upsert({
     where: {
       seasonParticipantId_snapshotDate: {
-        seasonParticipantId: input.valuation.seasonParticipantId,
+        seasonParticipantId: requireSeasonValuationParticipantId(
+          input.valuation,
+        ),
         snapshotDate: input.snapshotDate,
       },
     },
@@ -81,7 +102,9 @@ export async function writeDailyPortfolioSnapshot(
   });
 
   return {
-    seasonParticipantId: row.seasonParticipantId,
+    seasonParticipantId: requireSeasonSnapshotParticipantId(
+      row.seasonParticipantId,
+    ),
     totalAssetKrw: row.totalAssetKrw.toFixed(8),
     returnRate: row.returnRate.toFixed(8),
     krwCash: row.krwCash.toFixed(8),
@@ -98,7 +121,8 @@ export function buildDailyPortfolioSnapshotData(
   input: DailyPortfolioSnapshotWriteInput,
 ): DailyPortfolioSnapshotPersistenceData {
   return {
-    seasonParticipantId: input.valuation.seasonParticipantId,
+    seasonParticipantId: requireSeasonValuationParticipantId(input.valuation),
+    tradingAccountId: input.tradingAccountId,
     snapshotDate: input.snapshotDate,
     totalAssetKrw: input.valuation.totalAssetKrw,
     returnRate: input.valuation.returnRate,
@@ -117,7 +141,7 @@ function toWriteResult(
   dryRun: boolean,
 ): DailyPortfolioSnapshotWriteResult {
   return {
-    seasonParticipantId: valuation.seasonParticipantId,
+    seasonParticipantId: requireSeasonValuationParticipantId(valuation),
     totalAssetKrw: valuation.totalAssetKrw,
     returnRate: valuation.returnRate,
     krwCash: valuation.krwCash,

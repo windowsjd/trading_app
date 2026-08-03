@@ -15,7 +15,7 @@ import {
 import { buildPagination, type Pagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { TradingAccountAccessService } from '../trading-accounts/trading-account-access.service';
-import { assertGeneralAccountFinancialRowsUnscoped } from '../trading-accounts/general-account-integrity';
+import { assertGeneralAccountFinancialIntegrity } from '../trading-accounts/general-account-integrity';
 import { assertSeasonAccountFinancialScopeIntegrity } from '../trading-accounts/trading-account-financial-integrity';
 
 export type WalletTransactionsQuery = {
@@ -268,10 +268,14 @@ export class WalletsService {
   private async assertAccountFinancialReadIntegrity(account: {
     id: string;
     mode: TradingAccountMode;
+    initialCapitalKrw: Prisma.Decimal;
     seasonParticipant: { id: string } | null;
   }) {
     if (account.mode === TradingAccountMode.general) {
-      await assertGeneralAccountFinancialRowsUnscoped(this.prisma, account.id);
+      // 작업 6 보완 2: the FULL structural check, not just row scope. The
+      // previous row-only probe passed an account whose USD wallet or initial
+      // grant had vanished, and answered 200 with a normal-looking payload.
+      await assertGeneralAccountFinancialIntegrity(this.prisma, account);
       return;
     }
 

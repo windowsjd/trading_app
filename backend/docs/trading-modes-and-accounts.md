@@ -59,6 +59,29 @@
   `pnpm trading-accounts:audit-general`
   (계약: `docs/general-account-and-ad-rewards-api-contract.md`)
 
+- **작업 6 보완 + 작업 7 (2026-08-03):**
+  - 광고 claim 명령 멱등성 — `provider`·`proof`·`idempotencyKey` 필수,
+    `(tradingAccountId, idempotencyKey)` unique(기존 provider event unique와
+    분리 유지), 커밋된 지급은 계정 상태·기능 설정·provider 등록 상태와
+    무관하게 최초 결과 replay, 같은 키 다른 요청은 409
+    `AD_REWARD_IDEMPOTENCY_CONFLICT`
+  - 일반계정 전체 금융 integrity(계정·지갑 2개·최초 지급 원장 전 필드 +
+    row scope)를 계정 재호출·지갑/원장 조회·eligibility·claim·성과 경로 전부에
+    적용
+  - granted/rejected claim replay 전 원장·지갑 1:1 정합성 검증
+    (500 `AD_REWARD_CLAIM_INTEGRITY`)
+  - EquitySnapshot·DailyPortfolioSnapshot의 TradingAccount 전환(시즌 행
+    backfill + 신규 writer dual-write + 일반 행은 participant 없이 계정만)
+  - 일반모드 시간가중수익률(TWR), 외부자금 allow-list 집계, 투자손익,
+    외부자금 before/after 경계 snapshot(광고 지급 트랜잭션 내 원자 처리)
+  - 일반계정 생성 트랜잭션에 최초 성과 기준점 포함(5행 원자)
+  - account-scoped `GET .../portfolio`·`GET .../portfolio/equity`
+    (`returnRateMethod`로 TWR/초기자본 수익률 구분)
+  - 운영 스크립트 `trading-accounts:repair-snapshot-scope`,
+    `trading-accounts:backfill-general-performance`, `audit-general` 성과 검사
+    확장
+  (계약: `docs/general-account-and-ad-rewards-api-contract.md`)
+
 **아직 구현되지 않음 (문서만 보고 사용 가능하다고 오해하지 말 것):**
 
 - 일반계정의 실제 주식·암호화폐 주문(409
@@ -67,7 +90,10 @@
 - 로그인 후 모드 선택 화면, 앱 내 모드 전환, 프런트엔드 연결 일체
 - 스냅샷 3모델(EquitySnapshot·DailyPortfolioSnapshot·SeasonRanking)의
   accountId 전환, 일반모드 포트폴리오 평가·스냅샷
-- 시간가중수익률(TWR) 계산 코드, 일반모드 투자손익 표시
+- **일반계정 일별 snapshot job (작업 7 잔여)** — 일반계정
+  DailyPortfolioSnapshot을 주기 생성하는 배치는 아직 없다. 7d/30d/all
+  이력은 현재 EquitySnapshot fallback으로 서빙된다.
+- SeasonRanking의 TradingAccount 전환
 - 광고 SDK, 광고 시청 UI, **실제 광고 네트워크의 provider 전용 서버 검증
   어댑터** (인터페이스와 registry만 존재하며 운영 registry는 비어 있음),
   광고 1회당 지급액·일일 한도·대기시간의 확정값

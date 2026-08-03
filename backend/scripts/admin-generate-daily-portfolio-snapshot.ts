@@ -117,11 +117,23 @@ export async function runAdminGenerateDailyPortfolioSnapshot(argv: string[]) {
             seasonParticipantId,
             capturedAt,
           );
+        // 작업 7 dual-write: never write an unscoped snapshot from a script
+        // either — a missing link means repair-links has not converged yet.
+        const participant = await prisma.seasonParticipant.findUnique({
+          where: { id: seasonParticipantId },
+          select: { tradingAccountId: true },
+        });
+        if (!participant?.tradingAccountId) {
+          throw new Error(
+            'TRADING_ACCOUNT_LINK_INTEGRITY: season participant has no trading account link; run trading-accounts:repair-links --apply first.',
+          );
+        }
         const writeResult = await writeDailyPortfolioSnapshot(prisma, {
           valuation,
           snapshotDate,
           capturedAt,
           dryRun: args.dryRun === true,
+          tradingAccountId: participant.tradingAccountId,
         });
 
         successes.push(writeResult);

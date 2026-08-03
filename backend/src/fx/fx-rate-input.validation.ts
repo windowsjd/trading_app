@@ -163,10 +163,7 @@ function parseRawPayloadJson(value: string | undefined): unknown {
   }
 }
 
-function assertNoForbiddenTerms(
-  fieldName: string,
-  value: string | undefined,
-) {
+function assertNoForbiddenTerms(fieldName: string, value: string | undefined) {
   if (!value) {
     return;
   }
@@ -177,6 +174,8 @@ function assertNoForbiddenTerms(
   );
 
   if (term) {
-    throw new Error(`Invalid --${fieldName}: contains forbidden term "${term}".`);
+    throw new Error(
+      `Invalid --${fieldName}: contains forbidden term "${term}".`,
+    );
   }
 }

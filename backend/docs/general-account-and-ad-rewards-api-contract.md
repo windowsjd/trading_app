@@ -422,3 +422,237 @@ duplicate provider events. Exit code 1 when anything is found.
 There is deliberately **no `--apply`**: automatic financial correction of
 damaged data is more dangerous than the damage. Damaged general accounts are
 reported, never re-funded.
+
+---
+
+# 작업 7: General-mode performance (TWR) + account-scoped portfolio
+
+## Status
+
+Implemented:
+
+- `GET /api/v1/trading-accounts/:accountId/portfolio`
+- `GET /api/v1/trading-accounts/:accountId/portfolio/equity`
+- EquitySnapshot / DailyPortfolioSnapshot moved to the transitional
+  TradingAccount scope (season rows backfilled, every new season writer
+  dual-writes, general rows carry no participant at all)
+- the general-account performance origin, written in the SAME transaction as
+  the account
+- external-funding before/after boundary snapshots, written in the SAME
+  transaction as an ad payout
+- `pnpm trading-accounts:repair-snapshot-scope`
+- `pnpm trading-accounts:backfill-general-performance`
+- ad-reward COMMAND idempotency (`idempotencyKey` + `requestHash` +
+  `responsePayloadJson`)
+
+The legacy `GET /api/v1/portfolio` and `GET /api/v1/portfolio/equity` are
+UNCHANGED (current-season selection, response shape, range meaning), and no
+season calculation, ranking, or settlement behavior was altered.
+
+NOT implemented (still): general-mode orders / FX / positions, the general
+DAILY snapshot job, SeasonRanking's account transition, and any frontend.
+
+## Ad reward command idempotency (작업 6 보완 1)
+
+`providerEventId` uniqueness stops one AD EVENT from paying twice. It does
+NOT let a client safely retry: before this change, a payout that committed and
+then lost its response could come back as 409, 503, or a verifier failure once
+the account was suspended, the feature was switched off, or the adapter was
+removed.
+
+`POST .../ad-rewards/claim` now REQUIRES three fields:
+
+| Field | Meaning |
+| --- | --- |
+| `provider` | Required. Never defaulted from config, so a replay does not depend on what `AD_REWARD_PROVIDER` says at retry time. |
+| `proof` (or `verificationToken`) | Opaque provider proof. |
+| `idempotencyKey` | Client command key. Non-empty, ≤255 chars, no control characters. Never server-generated. |
+
+`requestHash = sha256({version: "ad-reward-claim:v1", provider, proofFingerprint})`.
+The RAW proof is never an input to anything stored, logged, or compared.
+
+Order of work:
+
+1. authentication
+2. account ownership (unknown/foreign → the same 404; status NOT checked yet)
+3. parse provider / proof / idempotencyKey
+4. proof fingerprint + requestHash
+5. lookup by `(tradingAccountId, idempotencyKey)`
+6. if found → verify ownership, compare requestHash, check claim integrity,
+   then replay the first result. Account status, `AD_REWARD_ENABLED`, the
+   configured provider, the registry, and the verifier are NOT re-checked.
+7. only if absent → general mode, account active, feature enabled, configured
+   provider, registry, external verifier
+8. grant transaction (account row `FOR UPDATE`, keyed claim re-read for the
+   concurrent case, integrity, duplicate event, limits, before snapshot,
+   credit, ledger, claim granted + `responsePayloadJson`, after snapshot)
+
+Same key + different request → **409 `AD_REWARD_IDEMPOTENCY_CONFLICT`**.
+
+Two DB uniques, deliberately NOT merged:
+
+- `(tradingAccountId, idempotencyKey)` — client command retry
+- `(provider, providerEventId)` — duplicate ad event
+
+A P2002 is resolved by re-reading BOTH axes, not by one generic replay. The
+same event under a DIFFERENT key still replays for the same user+account and
+is still 409 `AD_REWARD_EVENT_ALREADY_USED` for anyone else; a claim's stored
+`idempotencyKey` is never overwritten and there is no alias table.
+
+## Claim integrity before replay (작업 6 보완 3)
+
+A granted claim used to replay as `{ duplicate: true, walletBalanceAfter: null }`
+when its ledger link was missing — a success response for a payout the server
+could not evidence. Before any replay the claim is now validated:
+
+- **granted**: `grantedAt` and `walletTransactionId` set; the linked ledger row
+  exists and is on THIS account's general KRW wallet, `credit`, `ad_reward`,
+  `ad_reward_claim`, references this claim, has the claim's exact amount, and
+  its wallet has no participant link. Keyed claims must also carry
+  `requestHash` and `responsePayloadJson`, plus a complete before/after
+  boundary pair.
+- **rejected**: `rejectedAt` set, no ledger link, a recognised limit
+  `failureCode`. The original 429 is replayed, never re-evaluated.
+- **pending / verified / failed**: not a committed end state in the
+  synchronous flow — never replayed as success.
+
+Violations are **500 `AD_REWARD_CLAIM_INTEGRITY`**, never repaired.
+
+## Full general-account integrity (작업 6 보완 2)
+
+`assertGeneralAccountFinancialIntegrity` = foundation check (mode, no
+participant, `initialCapitalKrw`, exactly one KRW + one USD wallet, the single
+initial grant incl. its `direction`, `balanceAfter`, and account scope) + row
+check (no wallet or ledger row carries a `seasonParticipantId`, no ledger row
+points at another account's wallet).
+
+It now runs on the account-open replay, `GET .../wallets`,
+`GET .../wallet-transactions`, `GET .../ad-rewards/eligibility`, every new
+claim, and every performance path. Previously the reads ran only the row half,
+so a missing USD wallet or a missing initial grant answered 200 with a
+normal-looking payload.
+
+Current balance and `reservedAmount` are deliberately NOT constrained — a used
+account holds a different balance, and reservations will exist once general
+limit orders are enabled.
+
+## Performance model
+
+| Value | Definition |
+| --- | --- |
+| 현재 총자산 | KRW cash + USD cash in KRW + domestic + US (KRW) + crypto (KRW) |
+| 누적 광고 보상금 | sum of valid `ad_reward` credits |
+| 누적 외부 가상자금 | `initial_grant`/`general_account_open` + `ad_reward`/`ad_reward_claim` — an ALLOW-LIST, never inferred |
+| 누적 투자손익 | 현재 총자산 − 누적 외부 가상자금 |
+| 대표 수익률 | **TWR** |
+
+`exchange_target`, `order_sell`, `settlement`, `adjustment`, and
+`manual_adjustment` are explicitly NOT external funding. `initialCapitalKrw`
+stays 10,000,000 and no cumulative value is cached on TradingAccount.
+
+`(현재 총자산 − 외부자금) / 외부자금` is NOT the headline return: it moves the
+moment an ad reward lands.
+
+### TWR
+
+`returnRatePercent = (timeWeightedReturnFactor - 1) × 100`; the factor is the
+source of truth and a rounded percent is never fed back into the next factor.
+
+- origin: total = funding, PnL 0, factor 1, return 0%
+- ordinary segment: `factor = previousFactor × currentTotal / previousTotal`
+- external funding: BEFORE absorbs market performance up to the inflow; AFTER
+  adds only the money.
+
+After an inflow, all four hold exactly:
+
+```
+after.total  - before.total  = amount
+after.funding - before.funding = amount
+after.investmentPnl  = before.investmentPnl
+after.factor         = before.factor
+```
+
+Total loss → factor 0 / −100%, and a later ad reward keeps it at −100% (money
+returns, the cumulative return does not). Value reappearing from zero with no
+boundary is `GENERAL_PERFORMANCE_DISCONTINUITY`; a negative total is
+`GENERAL_PERFORMANCE_INTEGRITY`. All arithmetic is `Prisma.Decimal`.
+
+### Origin and boundaries
+
+The account-open transaction now writes FIVE rows: account, KRW wallet, USD
+wallet, initial-grant ledger, and the `general_account_open` EquitySnapshot. A
+failure in any of them rolls back all five. A re-open never adds a snapshot,
+and an account with no origin is **500 `GENERAL_PERFORMANCE_NOT_INITIALIZED`**
+— never auto-created.
+
+The ad payout transaction writes, atomically: before snapshot → KRW credit →
+`ad_reward` ledger → claim granted (+ response payload) → after snapshot.
+Rejected claims and replays write no boundary rows at all. The partial unique
+`(tradingAccountId, externalFundingReferenceType, externalFundingReferenceId,
+snapshotReason)` guarantees one before and one after per claim.
+
+## GET .../portfolio
+
+Ownership → the same 404 for unknown/foreign; readable for active, suspended,
+and closed alike; writes nothing.
+
+`data.summary` carries `totalAssetKrw`, `cumulativeExternalFundingKrw`,
+`initialFundingKrw`, `cumulativeAdRewardKrw`, `investmentPnlKrw`,
+`returnRate`, **`returnRateMethod`**, `krwCash`, `usdCashKrw`,
+`assetValueKrw`, `realizedPnlKrw`, `unrealizedPnlKrw`, `valuedAt`.
+
+- general → `returnRateMethod: "time_weighted"`
+- season → `returnRateMethod: "initial_capital"`, existing valuation
+  unchanged, and the external-funding fields are `null` (not 0 — a season
+  account has no external-funding concept, and 0 would read as "none
+  received")
+
+`allocation.cashKrwValue = krwCash + usdCashKrw`; `reservedAmount` is never
+subtracted from valuation.
+
+Price/FX gaps (`FX_RATE_UNAVAILABLE`, `FX_RATE_STALE`,
+`ASSET_PRICE_UNAVAILABLE`) keep the existing `sectionErrors` success envelope.
+`GENERAL_ACCOUNT_INTEGRITY`, `GENERAL_PERFORMANCE_*`,
+`AD_REWARD_CLAIM_INTEGRITY`, and snapshot scope mismatches do NOT — they are
+structured 500s, because rendering damage as "temporarily unavailable" hides
+it.
+
+General trading is not enabled, so a general account holding an Order,
+Position, ExchangeTransaction, or FxExecuteRequest fails closed with
+`GENERAL_ACCOUNT_INTEGRITY` rather than being valued as if it were normal.
+
+## GET .../portfolio/equity
+
+`range` ∈ `1d` (default) | `7d` | `30d` | `all`; for a general account `all`
+means since `openedAt`. `1d` reads EquitySnapshot; the wider ranges prefer
+DailyPortfolioSnapshot and fall back to EquitySnapshot when there is none.
+
+Points carry `time`, `totalAssetKrw`, `returnRate`, `returnRateMethod`,
+`cumulativeExternalFundingKrw`, `investmentPnlKrw`, `snapshotReason`,
+`externalFundingAmountKrw`. Ordering is `capturedAt, createdAt, id` ascending
+— a before/after pair shares one `capturedAt`, so the tie-breakers are
+required, and the same rule makes "latest snapshot" resolution unambiguous
+(the latest can never be an unpaired `before`).
+
+A general account with no origin is `GENERAL_PERFORMANCE_NOT_INITIALIZED`,
+never an empty chart.
+
+## Operations
+
+- `pnpm trading-accounts:repair-snapshot-scope [--apply]` — fills a season
+  snapshot's null `tradingAccountId` from its participant link. Amounts,
+  rates, times, dates, and reasons are never touched; mismatches and general
+  rows are reported and never guessed; `--apply` exits non-zero while anything
+  is unresolved.
+- `pnpm trading-accounts:backfill-general-performance [--apply]` — creates a
+  `performance_baseline` origin for pre-작업 7 general accounts, ONLY where it
+  is provable: no trading rows, wallets intact, claims consistent, no USD
+  cash, and total assets exactly equal to external funding (so PnL really is
+  0 and factor really is 1). Partial state, trading rows, unknown credits, or
+  any mismatch is reported and skipped. No `--force`.
+- `pnpm trading-accounts:audit-general` — extended with the performance
+  checks (origin presence/uniqueness, participant leakage, missing columns,
+  PnL and factor/return disagreement, negative values, unpaired or
+  inconsistent boundary pairs, keyed claims without a boundary pair, duplicate
+  account/date daily rows, unscoped or mis-scoped season snapshots). Still
+  read-only, still no `--apply`.

@@ -128,7 +128,10 @@ export function calculateFeeAmount({
   grossTargetAmount,
   feeRate,
 }: CalculateFeeAmountInput): string {
-  const gross = parsePositiveDecimalInput(grossTargetAmount, 'grossTargetAmount');
+  const gross = parsePositiveDecimalInput(
+    grossTargetAmount,
+    'grossTargetAmount',
+  );
   const rate = parseDecimalInput(feeRate, 'feeRate');
 
   if (rate.lt(0)) {
@@ -142,7 +145,10 @@ export function calculateNetTargetAmount({
   grossTargetAmount,
   feeAmount,
 }: CalculateNetTargetAmountInput): string {
-  const gross = parsePositiveDecimalInput(grossTargetAmount, 'grossTargetAmount');
+  const gross = parsePositiveDecimalInput(
+    grossTargetAmount,
+    'grossTargetAmount',
+  );
   const fee = parseDecimalInput(feeAmount, 'feeAmount');
 
   if (fee.lt(0) || fee.gt(gross)) {
@@ -152,7 +158,10 @@ export function calculateNetTargetAmount({
   return formatMoneyScale8(gross.sub(fee));
 }
 
-function parseDecimalInput(value: DecimalInput, fieldName: string): Prisma.Decimal {
+function parseDecimalInput(
+  value: DecimalInput,
+  fieldName: string,
+): Prisma.Decimal {
   if (typeof value === 'string') {
     return parseDecimalString(value);
   }

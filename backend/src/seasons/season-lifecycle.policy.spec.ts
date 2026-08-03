@@ -54,12 +54,12 @@ describe('season lifecycle policy', () => {
   });
 
   it('blocks active status before startAt', () => {
-    expect(isSeasonCurrentlyActive(season(SeasonStatus.active), beforeStart)).toBe(
-      false,
-    );
-    expect(getEffectiveSeasonMode(season(SeasonStatus.active), beforeStart)).toBe(
-      'upcoming',
-    );
+    expect(
+      isSeasonCurrentlyActive(season(SeasonStatus.active), beforeStart),
+    ).toBe(false);
+    expect(
+      getEffectiveSeasonMode(season(SeasonStatus.active), beforeStart),
+    ).toBe('upcoming');
     expect(() =>
       assertSeasonJoinable(season(SeasonStatus.active), beforeStart),
     ).toThrow(

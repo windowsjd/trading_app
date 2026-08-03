@@ -3,6 +3,7 @@ import {
   CurrencyCode,
   Prisma,
   TradingAccountMode,
+  WalletTransactionDirection,
   WalletTransactionReferenceType,
   WalletTransactionType,
 } from '../generated/prisma/client';
@@ -73,7 +74,7 @@ export function throwGeneralAccountIntegrity(
  * (idempotent) open endpoint before replaying an account and by the ad-reward
  * grant path before crediting anything.
  */
-export async function assertGeneralAccountIntegrity(
+export async function assertGeneralAccountFoundationIntegrity(
   prisma: GeneralIntegrityClient,
   account: GeneralAccountIntegrityTarget,
 ): Promise<VerifiedGeneralAccountWallets> {
@@ -153,11 +154,14 @@ export async function assertGeneralAccountIntegrity(
     select: {
       id: true,
       walletId: true,
+      tradingAccountId: true,
       seasonParticipantId: true,
       currencyCode: true,
+      direction: true,
       txType: true,
       referenceId: true,
       amount: true,
+      balanceAfter: true,
     },
     orderBy: { id: 'asc' },
   });
@@ -219,12 +223,15 @@ export async function assertGeneralAccountIntegrity(
 }
 
 /**
- * Read-path guard for account-scoped financial views of a GENERAL account.
- * Cheaper than the full structural check (two indexed existence queries) and
- * answers only the question a read must not get wrong: is a season link
- * bleeding into this account's financial rows?
+ * Row-scope half of the check: every wallet and ledger row that belongs to
+ * this account must be purely account-scoped.
+ *
+ * 작업 6 보완 2 renamed this from "…Unscoped" because it is only HALF the
+ * story — on its own it happily passes an account whose USD wallet or initial
+ * grant is missing entirely. Callers should use
+ * `assertGeneralAccountFinancialIntegrity`, which runs both halves.
  */
-export async function assertGeneralAccountFinancialRowsUnscoped(
+export async function assertGeneralAccountFinancialRowsIntegrity(
   prisma: GeneralIntegrityClient,
   accountId: string,
 ): Promise<void> {
@@ -271,4 +278,29 @@ export async function assertGeneralAccountFinancialRowsUnscoped(
       'a ledger row points at a wallet of a different trading account',
     );
   }
+}
+
+/**
+ * THE entry point for every general-account financial read and write
+ * (작업 6 보완 2): account shape + both wallets + the initial grant + every
+ * row's scope.
+ *
+ * Before this existed, the wallet/ledger GETs and the ad-reward eligibility
+ * check only ran the row-scope half, so an account whose USD wallet or
+ * initial-grant ledger row had vanished answered 200 with a perfectly
+ * normal-looking payload. Structural absence is exactly the kind of damage a
+ * read must not present as normal.
+ *
+ * Read-only: it never creates, repairs, or re-grants anything.
+ */
+export async function assertGeneralAccountFinancialIntegrity(
+  prisma: GeneralIntegrityClient,
+  account: GeneralAccountIntegrityTarget,
+): Promise<VerifiedGeneralAccountWallets> {
+  const wallets = await assertGeneralAccountFoundationIntegrity(
+    prisma,
+    account,
+  );
+  await assertGeneralAccountFinancialRowsIntegrity(prisma, account.id);
+  return wallets;
 }

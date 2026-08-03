@@ -154,8 +154,7 @@ describe('parseAdminRunBatchJobArgs', () => {
     ).toMatchObject({
       job: 'season-lifecycle-transition',
       now: '2026-06-08T00:00:00.000Z',
-      idempotencyKey:
-        'season-lifecycle-transition:2026-06-08T00:00:00.000Z',
+      idempotencyKey: 'season-lifecycle-transition:2026-06-08T00:00:00.000Z',
       dryRun: true,
       requestedBy: 'operator',
     });

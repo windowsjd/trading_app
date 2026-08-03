@@ -276,3 +276,38 @@ OpsJobLockService + ops_job_locks다(Redis lock 아님). 실제 거래소 주문
   근거: 캐시된 금융 집계는 원장과 어긋나는 순간 어느 쪽이 진실인지 판정할 수 없다.
 - 일반계정 운영 점검 `pnpm trading-accounts:audit-general`은 read-only 전용이며 `--apply` 복구를 만들지 않는다.
   근거: 손상된 계정을 자동으로 다시 충전하는 스크립트는 실수 한 번으로 전 사용자에게 자금을 재지급한다.
+
+
+## 작업 6 보완 (광고 명령 멱등성 / 전체 integrity / claim replay 정합성)
+
+- 광고 claim은 `provider`·`proof`·`idempotencyKey`를 모두 필수로 받고, `(tradingAccountId, idempotencyKey)` unique로 명령 재시도를 보호한다. 이 unique는 `(provider, providerEventId)`와 **합치지 않는다**: 전자는 클라이언트 명령 재시도, 후자는 실제 광고 이벤트 중복 지급을 막는 서로 다른 축이다. P2002는 두 축을 각각 재조회해 원인을 판정한다.
+  근거: 하나로 합치면 같은 광고 이벤트가 서로 다른 키로 두 번 지급되거나, 정상 재시도가 이벤트 중복으로 오분류된다.
+- claim 처리 순서는 소유권 확인 → 파싱 → keyed claim 조회 → replay이며, 계정 status·`AD_REWARD_ENABLED`·configured provider·registry·verifier 검사는 keyed claim이 없을 때만 실행한다. `provider`는 요청에서 필수로 받고 config 기본값으로 대체하지 않는다.
+  근거: 이미 커밋된 지급에 상태·설정 오류를 돌려주는 것은 사실과 다르고, provider를 config에서 채우면 replay 결과가 재시도 시점의 운영 설정에 의존하게 된다.
+- `requestHash`는 `sha256({version, provider, proof fingerprint})`이며 proof 원문은 hash 입력·로그·DB 어디에도 남기지 않는다. 같은 키·다른 요청은 409 `AD_REWARD_IDEMPOTENCY_CONFLICT`다.
+  근거: 저장된 proof는 그 자체로 재사용 가능한 자격증명이고, 키 재사용을 조용히 재검증하면 멱등성이 의미를 잃는다.
+- granted claim은 replay 전에 원장·지갑과의 1:1 정합성을 검증한다(계정·participant null·KRW 지갑·credit·`ad_reward`·`ad_reward_claim`·referenceId·금액·지갑 scope, keyed면 hash·payload·경계 snapshot 쌍까지). rejected는 ledger 없음·한도 failureCode를, pending/verified/failed는 성공 replay 금지를 요구한다. 위반은 500 `AD_REWARD_CLAIM_INTEGRITY`.
+  근거: `duplicate=true, walletBalanceAfter=null`은 서버가 증명할 수 없는 지급을 성공으로 보고하는 응답이다.
+- 일반계정 금융 검사는 foundation(계정·지갑 2개·최초 지급 원장 전체 필드) + row scope 두 단계를 **항상 함께** 수행하고, 계정 재호출·지갑 조회·원장 조회·eligibility·claim·성과 경로 전부에 적용한다. 현재 잔액과 `reservedAmount`는 검사 대상이 아니다.
+  근거: row scope만 검사하면 USD 지갑이나 최초 지급 원장이 통째로 사라진 계정이 정상 200으로 응답한다. 반대로 잔액을 고정값으로 강제하면 정상적으로 사용된 계정이 손상으로 오판된다.
+
+## 작업 7 (일반모드 성과·TWR·snapshot 전환)
+
+- EquitySnapshot·DailyPortfolioSnapshot의 `seasonParticipantId`를 nullable로 완화하고 nullable `tradingAccountId`를 추가한다. 기존 시즌 행은 참가자 링크에서 IS NULL 가드 backfill만 하고 금액·수익률·시각·reason·ID는 건드리지 않는다. SeasonRanking과 Order·Position·Exchange·FxExecuteRequest는 이번 작업에서 변경하지 않는다.
+  근거: 일반계정은 SeasonParticipant가 없어 snapshot을 소유할 수 없었고, 랭킹·정산 전환은 검증 단위가 다르다.
+- 시즌 snapshot writer는 전부 participant + 검증된 accountId를 dual-write하고, 링크가 null이면 조용히 unscoped snapshot을 만들지 않고 `TRADING_ACCOUNT_LINK_INTEGRITY`로 중단한다. 계정 ID는 이미 검증된 값을 인자로 넘기고 재조회하지 않는다.
+  근거: unscoped snapshot은 이후 account-scoped 조회에서 통째로 보이지 않고, 그 계정 전체의 read-integrity를 fail-closed로 만든다.
+- 누적 외부 가상자금은 `initial_grant`+`general_account_open`과 `ad_reward`+`ad_reward_claim` **두 종류만** 합산하는 allow-list다. `exchange_target`·`order_sell`·`settlement`·`adjustment`·`manual_adjustment`는 외부자금이 아니며, 원장과 claim 정합성이 깨지면 일부만 합산하지 않고 fail-closed 한다.
+  근거: 외부자금을 추측하면 투자손익이 조용히 왜곡되고, 그 왜곡은 수익률로 그대로 전파된다.
+- 일반모드 대표 수익률은 TWR이고 `timeWeightedReturnFactor`가 source of truth다. `returnRate`는 표시용 반올림이며 다음 factor 계산에 재사용하지 않는다. 외부자금 유입은 before/after 경계로 처리해 총자산과 누적 외부자금만 증가시키고 투자손익·factor·returnRate는 그대로 둔다. 모든 계산은 Prisma Decimal이다.
+  근거: 단순 외부자금 대비 손익률은 광고를 볼 때마다 수익률이 변해 실력과 무관해지고, 반올림된 퍼센트를 되먹이면 구간이 쌓일수록 드리프트한다.
+- 완전 손실(총자산 0) 이후 factor는 0으로 고정되고 이후 외부자금이 들어와도 -100%를 유지한다. 총자산 0에서 경계 없이 양수로 변하면 `GENERAL_PERFORMANCE_DISCONTINUITY`, 음수 총자산은 `GENERAL_PERFORMANCE_INTEGRITY`다.
+  근거: 자동 재기준선은 사용자의 누적 손실을 지워 없던 일로 만든다.
+- 일반계정 최초 성과 기준점은 계정 생성 트랜잭션 안에서 함께 만든다(계정·지갑 2개·최초 지급 원장·origin snapshot 5행 원자). 기존 계정에 origin이 없으면 자동 생성하지 않고 500 `GENERAL_PERFORMANCE_NOT_INITIALIZED`이며, 복구는 명시적 backfill script로만 한다.
+  근거: 기준점을 자동으로 만들면 그 시점 이전의 성과가 조용히 사라진다.
+- backfill script는 일반거래가 비활성이라 총자산 = 누적 외부자금이 **증명되는** 계정에만 0% baseline을 만든다. 거래 행·부분 snapshot·claim 불일치·USD 현금·알 수 없는 credit·총자산 불일치는 보고만 하고 건너뛰며 `--force`는 없다.
+  근거: 0% 기준선은 "아무 것도 벌거나 잃지 않았다"는 주장이고, 그 주장이 검증되지 않는 계정에서는 거짓이 된다.
+- account-scoped 포트폴리오·수익률 응답은 항상 `returnRateMethod`(`time_weighted` / `initial_capital`)를 함께 반환하고, 시즌 계정의 외부자금 필드는 0이 아니라 null이다. 가격·환율 부재는 기존 sectionErrors로, 정합성 손상은 구조화된 500으로 구분한다.
+  근거: 의미가 다른 두 수익률을 같은 필드명으로 내보내면 프런트가 구분할 방법이 없고, 손상을 "일시적 불가"로 표시하면 아무도 고치지 않는다.
+- equity 이력 정렬과 최신 snapshot 조회는 `capturedAt` → `createdAt` → `id`로 결정적이어야 한다. before/after 쌍은 같은 `capturedAt`을 가지므로 tie-breaker 없이는 다음 구간 계산이 유입을 이중 계산할 수 있고, 커밋된 상태의 최신 snapshot이 unpaired before면 정합성 오류다.
+  근거: 정렬이 흔들리면 같은 데이터에서 다른 수익률이 나온다.

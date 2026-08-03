@@ -94,6 +94,8 @@ export class DailyPortfolioSnapshotJobService {
       select: {
         id: true,
         userId: true,
+        // 작업 7 dual-write: every new snapshot records the account too.
+        tradingAccountId: true,
       },
     });
     const result: DailyPortfolioSnapshotJobResult = {
@@ -150,6 +152,21 @@ export class DailyPortfolioSnapshotJobService {
         continue;
       }
 
+      // A participant with no account link must NOT produce a silently
+      // unscoped snapshot — that is exactly the corruption the account-scoped
+      // reads later have to fail closed on. Run
+      // `pnpm trading-accounts:repair-links --apply` first.
+      if (!participant.tradingAccountId) {
+        this.recordParticipantError(
+          result,
+          participant,
+          new Error(
+            'TRADING_ACCOUNT_LINK_INTEGRITY: season participant has no trading account link; run trading-accounts:repair-links before generating snapshots.',
+          ),
+        );
+        continue;
+      }
+
       try {
         const snapshot = await this.prisma.dailyPortfolioSnapshot.create({
           data: buildDailyPortfolioSnapshotData({
@@ -157,6 +174,7 @@ export class DailyPortfolioSnapshotJobService {
             snapshotDate,
             capturedAt,
             dryRun: false,
+            tradingAccountId: participant.tradingAccountId,
           }),
           select: {
             id: true,

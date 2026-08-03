@@ -8,8 +8,9 @@ import {
   WalletTransactionReferenceType,
   WalletTransactionType,
 } from '../generated/prisma/client';
+import { GeneralAccountPerformanceService } from '../portfolio/general-account-performance.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { assertGeneralAccountIntegrity } from './general-account-integrity';
+import { assertGeneralAccountFinancialIntegrity } from './general-account-integrity';
 import {
   GENERAL_ACCOUNT_INITIAL_CAPITAL_KRW,
   GENERAL_ACCOUNT_INITIAL_USD_BALANCE,
@@ -87,7 +88,10 @@ export type OpenGeneralAccountResponse = {
 export class GeneralAccountsService {
   private readonly logger = new Logger(GeneralAccountsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly performanceService: GeneralAccountPerformanceService,
+  ) {}
 
   async openGeneralAccount(
     userId: string | undefined,
@@ -186,6 +190,19 @@ export class GeneralAccountsService {
         select: { id: true },
       });
 
+      // The performance ORIGIN (작업 7). It lives in this same transaction so
+      // a general account can never exist without the baseline every later
+      // TWR advance is measured from — and so a failure here rolls the
+      // account, both wallets, and the grant back with it.
+      await tx.equitySnapshot.create({
+        data: this.performanceService.buildOriginSnapshotData({
+          tradingAccountId: account.id,
+          initialFundingKrw: GENERAL_ACCOUNT_INITIAL_CAPITAL_KRW,
+          openedAt,
+        }),
+        select: { id: true },
+      });
+
       const persisted = await tx.tradingAccount.findUnique({
         where: { id: account.id },
         select: ACCOUNT_SELECT,
@@ -212,7 +229,7 @@ export class GeneralAccountsService {
   private async buildReplayResponse(
     account: GeneralAccountRecord,
   ): Promise<OpenGeneralAccountResponse> {
-    await assertGeneralAccountIntegrity(this.prisma, account);
+    await assertGeneralAccountFinancialIntegrity(this.prisma, account);
     return this.buildResponse(account, false);
   }
 

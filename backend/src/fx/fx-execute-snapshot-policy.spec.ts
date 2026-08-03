@@ -57,8 +57,12 @@ describe('fx execute snapshot policy', () => {
   });
 
   it('allows only admin_manual as the near-term execute sourceType', () => {
-    expect(isAllowedExecuteSourceType(FxRateSourceType.admin_manual)).toBe(true);
-    expect(isAllowedExecuteSourceType(FxRateSourceType.provider_api)).toBe(false);
+    expect(isAllowedExecuteSourceType(FxRateSourceType.admin_manual)).toBe(
+      true,
+    );
+    expect(isAllowedExecuteSourceType(FxRateSourceType.provider_api)).toBe(
+      false,
+    );
     expect(isAllowedExecuteSourceType(FxRateSourceType.official_batch)).toBe(
       false,
     );
@@ -91,9 +95,9 @@ describe('fx execute snapshot policy', () => {
       effectiveAt: new Date('2026-05-01T00:00:50.000Z'),
     });
 
-    expect(selectEligibleFxSnapshotForExecute([older, latest], executeNow)).toBe(
-      latest,
-    );
+    expect(
+      selectEligibleFxSnapshotForExecute([older, latest], executeNow),
+    ).toBe(latest);
   });
 
   it('tie-breaks by capturedAt desc and then createdAt desc', () => {

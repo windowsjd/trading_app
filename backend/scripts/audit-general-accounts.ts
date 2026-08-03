@@ -76,6 +76,53 @@ async function main() {
       `  duplicate (provider, providerEventId) groups: ${summary.duplicateProviderEventGroups}`,
     );
 
+    console.log('\nperformance (작업 7):');
+    console.log(
+      `  accounts without a performance origin: ${summary.accountsWithoutPerformanceOrigin}`,
+    );
+    console.log(
+      `  accounts with duplicate origins: ${summary.accountsWithDuplicatePerformanceOrigin}`,
+    );
+    console.log(
+      `  general snapshots with a season participant: ${summary.generalSnapshotsWithSeasonParticipant}`,
+    );
+    console.log(
+      `  snapshots with no scope at all: ${summary.generalSnapshotsWithoutAccountScope}`,
+    );
+    console.log(
+      `  general snapshots missing performance values: ${summary.snapshotsMissingPerformanceValues}`,
+    );
+    console.log(
+      `  investmentPnl mismatches: ${summary.snapshotsWithInvestmentPnlMismatch}`,
+    );
+    console.log(
+      `  returnRate/factor mismatches: ${summary.snapshotsWithReturnRateMismatch}`,
+    );
+    console.log(
+      `  negative factor or total: ${summary.snapshotsWithNegativeFactorOrTotal}`,
+    );
+    console.log(
+      `  unpaired external_funding_before: ${summary.unpairedExternalFundingBefore}`,
+    );
+    console.log(
+      `  unpaired external_funding_after: ${summary.unpairedExternalFundingAfter}`,
+    );
+    console.log(
+      `  external-funding pair inconsistencies: ${summary.externalFundingPairInconsistencies}`,
+    );
+    console.log(
+      `  keyed granted claims without a boundary pair: ${summary.keyedGrantedClaimsWithoutBoundaryPair}`,
+    );
+    console.log(
+      `  duplicate (account, date) daily snapshots: ${summary.duplicateAccountDateDailySnapshots}`,
+    );
+    console.log(
+      `  season snapshots without an account scope: ${summary.seasonSnapshotsWithoutAccountScope}`,
+    );
+    console.log(
+      `  season snapshots with a scope mismatch: ${summary.seasonSnapshotsWithScopeMismatch}`,
+    );
+
     if (summary.findings.length > 0) {
       console.error(`\nFindings: ${summary.findings.length}`);
       for (const finding of summary.findings.slice(0, 50)) {

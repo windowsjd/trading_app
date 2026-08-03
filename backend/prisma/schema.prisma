@@ -105,6 +105,19 @@ enum SnapshotReason {
   order_executed
   scheduled
   settlement
+  // General-mode performance origins and external-funding boundaries (작업 7).
+  // general_account_open      — the origin snapshot written in the same
+  //                             transaction as a new general account.
+  // performance_baseline      — an origin created for a PRE-작업 7 general
+  //                             account by the explicit operational backfill.
+  // external_funding_before /
+  // external_funding_after    — the pair bracketing an external virtual-funding
+  //                             inflow (ad reward), so the inflow itself moves
+  //                             neither the TWR factor nor investment PnL.
+  general_account_open
+  performance_baseline
+  external_funding_before
+  external_funding_after
 }
 
 enum FxRateSourceType {
@@ -354,20 +367,22 @@ model TradingAccount {
   createdAt         DateTime             @default(now()) @map("created_at")
   updatedAt         DateTime             @updatedAt @map("updated_at")
 
-  user                 User                  @relation(fields: [userId], references: [id], onDelete: Restrict)
-  seasonParticipant    SeasonParticipant?
+  user                    User                     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  seasonParticipant       SeasonParticipant?
   // Financial + trading back-relations (transitional accountId scope; rows
   // also keep their legacy seasonParticipantId until the removal work unit).
   // NO aggregate/cached value columns live here — balances, ledgers,
   // positions, and returns are always derived from the source tables.
-  cashWallets          CashWallet[]
-  walletTransactions   WalletTransaction[]
-  exchangeTransactions ExchangeTransaction[]
-  fxExecuteRequests    FxExecuteRequest[]
-  orders               Order[]
-  positions            Position[]
-  quotes               Quote[]
-  adRewardClaims       AdRewardClaim[]
+  cashWallets             CashWallet[]
+  walletTransactions      WalletTransaction[]
+  exchangeTransactions    ExchangeTransaction[]
+  fxExecuteRequests       FxExecuteRequest[]
+  orders                  Order[]
+  positions               Position[]
+  quotes                  Quote[]
+  adRewardClaims          AdRewardClaim[]
+  equitySnapshots         EquitySnapshot[]
+  dailyPortfolioSnapshots DailyPortfolioSnapshot[]
 
   @@index([userId, mode])
   @@index([mode, status])
@@ -929,6 +944,9 @@ model WalletTransaction {
   //     UNIQUE (reference_id) WHERE reference_type = 'ad_reward_claim'
   @@index([seasonParticipantId, occurredAt])
   @@index([tradingAccountId, occurredAt])
+  // External-funding aggregation for general accounts filters by txType
+  // (initial_grant / ad_reward) within an account.
+  @@index([tradingAccountId, txType, occurredAt])
   @@index([walletId, occurredAt])
   @@index([referenceType, referenceId])
   @@map("wallet_transactions")
@@ -966,6 +984,18 @@ model AdRewardClaim {
   failureReason            String?             @map("failure_reason")
   /// Set only for granted claims; 1:1 with the ad_reward ledger row.
   walletTransactionId      String?             @unique @map("wallet_transaction_id")
+  /// COMMAND idempotency (작업 6 보완). Distinct from (provider,
+  /// providerEventId): that one stops the same AD EVENT from paying twice,
+  /// this one lets a client safely RETRY the same request without another
+  /// verifier round trip. Nullable so pre-작업 7 rows stay valid; PostgreSQL
+  /// treats NULLs as distinct, so only keyed claims are constrained.
+  idempotencyKey           String?             @map("idempotency_key")
+  /// sha256 over (api version, provider, proof fingerprint). Same key +
+  /// different hash is AD_REWARD_IDEMPOTENCY_CONFLICT. The raw proof is never
+  /// an input to anything stored.
+  requestHash              String?             @map("request_hash")
+  /// The first committed success/refusal payload, replayed verbatim on retry.
+  responsePayloadJson      Json?               @map("response_payload_json")
   createdAt                DateTime            @default(now()) @map("created_at")
   updatedAt                DateTime            @updatedAt @map("updated_at")
 
@@ -975,7 +1005,11 @@ model AdRewardClaim {
 
   /// The duplicate-payout guard: one provider event can be granted once.
   @@unique([provider, providerEventId])
+  /// The command-retry guard. Deliberately SEPARATE from the guard above —
+  /// they protect different things and must never be merged.
+  @@unique([tradingAccountId, idempotencyKey])
   @@index([tradingAccountId, grantedAt])
+  @@index([tradingAccountId, createdAt])
   @@index([userId, grantedAt])
   @@index([status, createdAt])
   @@map("ad_reward_claims")
@@ -1142,46 +1176,99 @@ model FxExecuteRequest {
   @@map("fx_execute_requests")
 }
 
+/// Point-in-time equity/performance record.
+///
+/// SEASON rows keep their historical meaning: returnRate is the simple
+/// initial-capital return and the general-performance columns stay NULL.
+/// GENERAL rows (작업 7) have no SeasonParticipant at all and carry the
+/// time-weighted performance state instead — returnRate is the TWR percent,
+/// i.e. (timeWeightedReturnFactor - 1) * 100. The two meanings are never
+/// mixed; API responses always name which one applies via returnRateMethod.
+///
+/// timeWeightedReturnFactor is the SOURCE OF TRUTH for general performance;
+/// returnRate is a rounded presentation of it and is never fed back into the
+/// next factor calculation.
 model EquitySnapshot {
-  id                    String         @id @default(uuid())
-  seasonParticipantId   String         @map("season_participant_id")
-  totalAssetKrw         Decimal        @map("total_asset_krw") @db.Decimal(24, 8)
-  returnRate            Decimal        @map("return_rate") @db.Decimal(12, 8)
-  krwCash               Decimal        @map("krw_cash") @db.Decimal(24, 8)
-  usdCashKrw            Decimal        @map("usd_cash_krw") @db.Decimal(24, 8)
-  domesticStockValueKrw Decimal        @map("domestic_stock_value_krw") @db.Decimal(24, 8)
-  usStockValueKrw       Decimal        @map("us_stock_value_krw") @db.Decimal(24, 8)
-  cryptoValueKrw        Decimal        @map("crypto_value_krw") @db.Decimal(24, 8)
-  snapshotReason        SnapshotReason @map("snapshot_reason")
-  capturedAt            DateTime       @map("captured_at")
-  createdAt             DateTime       @default(now()) @map("created_at")
+  id                           String                          @id @default(uuid())
+  /// NULL for general-mode snapshots (no participant exists).
+  seasonParticipantId          String?                         @map("season_participant_id")
+  /// Transitional dual identity: backfilled for existing season rows, always
+  /// written by new writers, and the ONLY scope a general row has.
+  tradingAccountId             String?                         @map("trading_account_id")
+  totalAssetKrw                Decimal                         @map("total_asset_krw") @db.Decimal(24, 8)
+  returnRate                   Decimal                         @map("return_rate") @db.Decimal(12, 8)
+  krwCash                      Decimal                         @map("krw_cash") @db.Decimal(24, 8)
+  usdCashKrw                   Decimal                         @map("usd_cash_krw") @db.Decimal(24, 8)
+  domesticStockValueKrw        Decimal                         @map("domestic_stock_value_krw") @db.Decimal(24, 8)
+  usStockValueKrw              Decimal                         @map("us_stock_value_krw") @db.Decimal(24, 8)
+  cryptoValueKrw               Decimal                         @map("crypto_value_krw") @db.Decimal(24, 8)
+  snapshotReason               SnapshotReason                  @map("snapshot_reason")
+  // ---- general-mode performance state (NULL on season rows) ----
+  /// initial_grant + ad_reward inflows to date. Never a guess: only the two
+  /// explicitly external ledger reference types count.
+  cumulativeExternalFundingKrw Decimal?                        @map("cumulative_external_funding_krw") @db.Decimal(24, 8)
+  /// totalAssetKrw - cumulativeExternalFundingKrw.
+  investmentPnlKrw             Decimal?                        @map("investment_pnl_krw") @db.Decimal(24, 8)
+  /// Cumulative time-weighted return factor (1 = flat). High precision so
+  /// chained segments do not drift.
+  timeWeightedReturnFactor     Decimal?                        @map("time_weighted_return_factor") @db.Decimal(38, 18)
+  // ---- external-funding boundary (set ONLY on the before/after pair and on
+  // the general_account_open origin) ----
+  externalFundingAmountKrw     Decimal?                        @map("external_funding_amount_krw") @db.Decimal(24, 8)
+  externalFundingReferenceType WalletTransactionReferenceType? @map("external_funding_reference_type")
+  externalFundingReferenceId   String?                         @map("external_funding_reference_id")
+  capturedAt                   DateTime                        @map("captured_at")
+  createdAt                    DateTime                        @default(now()) @map("created_at")
 
-  seasonParticipant SeasonParticipant @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
+  seasonParticipant SeasonParticipant? @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
+  tradingAccount    TradingAccount?    @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
 
+  // A boundary snapshot exists at most once per (account, reference, phase).
+  // Prisma CAN express this one as a plain composite unique because all four
+  // columns are nullable and PostgreSQL treats NULLs as distinct, so ordinary
+  // season/ordinary rows are unaffected.
+  @@unique([tradingAccountId, externalFundingReferenceType, externalFundingReferenceId, snapshotReason], name: "equity_snapshot_external_funding_boundary")
   @@index([seasonParticipantId, capturedAt])
+  @@index([tradingAccountId, capturedAt])
+  @@index([tradingAccountId, snapshotReason, capturedAt])
+  @@index([externalFundingReferenceType, externalFundingReferenceId])
   @@index([snapshotReason, capturedAt])
   @@map("equity_snapshots")
 }
 
+/// One row per subject per calendar day. Same season/general split as
+/// EquitySnapshot: returnRate is the initial-capital return for season rows
+/// and the TWR percent for general rows.
 model DailyPortfolioSnapshot {
-  id                  String   @id @default(uuid())
-  seasonParticipantId String   @map("season_participant_id")
-  snapshotDate        DateTime @map("snapshot_date") @db.Date
-  totalAssetKrw       Decimal  @map("total_asset_krw") @db.Decimal(24, 8)
-  returnRate          Decimal  @map("return_rate") @db.Decimal(12, 8)
-  krwCash             Decimal  @map("krw_cash") @db.Decimal(24, 8)
-  usdCashKrw          Decimal  @map("usd_cash_krw") @db.Decimal(24, 8)
-  assetValueKrw       Decimal  @map("asset_value_krw") @db.Decimal(24, 8)
-  realizedPnlKrw      Decimal  @map("realized_pnl_krw") @db.Decimal(24, 8)
-  unrealizedPnlKrw    Decimal  @map("unrealized_pnl_krw") @db.Decimal(24, 8)
-  capturedAt          DateTime @map("captured_at")
-  createdAt           DateTime @default(now()) @map("created_at")
+  id                           String   @id @default(uuid())
+  /// NULL for general-mode snapshots (no participant exists).
+  seasonParticipantId          String?  @map("season_participant_id")
+  tradingAccountId             String?  @map("trading_account_id")
+  snapshotDate                 DateTime @map("snapshot_date") @db.Date
+  totalAssetKrw                Decimal  @map("total_asset_krw") @db.Decimal(24, 8)
+  returnRate                   Decimal  @map("return_rate") @db.Decimal(12, 8)
+  krwCash                      Decimal  @map("krw_cash") @db.Decimal(24, 8)
+  usdCashKrw                   Decimal  @map("usd_cash_krw") @db.Decimal(24, 8)
+  assetValueKrw                Decimal  @map("asset_value_krw") @db.Decimal(24, 8)
+  realizedPnlKrw               Decimal  @map("realized_pnl_krw") @db.Decimal(24, 8)
+  unrealizedPnlKrw             Decimal  @map("unrealized_pnl_krw") @db.Decimal(24, 8)
+  // ---- general-mode performance state (NULL on season rows) ----
+  cumulativeExternalFundingKrw Decimal? @map("cumulative_external_funding_krw") @db.Decimal(24, 8)
+  investmentPnlKrw             Decimal? @map("investment_pnl_krw") @db.Decimal(24, 8)
+  timeWeightedReturnFactor     Decimal? @map("time_weighted_return_factor") @db.Decimal(38, 18)
+  capturedAt                   DateTime @map("captured_at")
+  createdAt                    DateTime @default(now()) @map("created_at")
 
-  seasonParticipant SeasonParticipant @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
+  seasonParticipant SeasonParticipant? @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
+  tradingAccount    TradingAccount?    @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
 
   @@unique([seasonParticipantId, snapshotDate])
+  /// One daily row per account per date; NULL legacy rows stay allowed.
+  @@unique([tradingAccountId, snapshotDate])
   @@index([snapshotDate])
   @@index([seasonParticipantId, capturedAt])
+  @@index([tradingAccountId, capturedAt])
+  @@index([tradingAccountId, snapshotDate])
   @@map("daily_portfolio_snapshots")
 }
 

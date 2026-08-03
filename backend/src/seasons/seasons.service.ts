@@ -379,6 +379,9 @@ export class SeasonsService {
         await tx.equitySnapshot.create({
           data: {
             seasonParticipantId: participant.id,
+            // 작업 7 dual-write: the account created above in this same
+            // transaction.
+            tradingAccountId: tradingAccount.id,
             totalAssetKrw: initialCapitalKrw,
             returnRate: ZERO_AMOUNT,
             krwCash: initialCapitalKrw,

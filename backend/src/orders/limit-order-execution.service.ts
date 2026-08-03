@@ -428,6 +428,8 @@ export class LimitOrderExecutionService {
         tx,
         order.seasonParticipantId,
         now,
+        // The fill's verified account scope (작업 7 dual-write).
+        tradingAccountId,
       );
 
       return {

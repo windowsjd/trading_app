@@ -25,6 +25,7 @@ import {
 } from '../portfolio/portfolio-valuation.policy';
 import { PortfolioValuationService } from '../portfolio/portfolio-valuation.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { requireSeasonSnapshotParticipantId } from '../portfolio/season-snapshot-scope';
 import {
   calculateMaxDrawdownPercent,
   type RankingHistoricalSnapshotInput,
@@ -3020,7 +3021,7 @@ export class RecordsService {
   private async findSnapshotHistory(
     seasonParticipantId: string,
   ): Promise<RankingHistoricalSnapshotInput[]> {
-    return this.prisma.dailyPortfolioSnapshot.findMany({
+    const rows = await this.prisma.dailyPortfolioSnapshot.findMany({
       where: {
         seasonParticipantId,
       },
@@ -3038,6 +3039,15 @@ export class RecordsService {
         createdAt: true,
       },
     });
+
+    // Filtered by a concrete participant id, so the nullable column (general
+    // rows) cannot appear here; narrowed rather than asserted ad hoc.
+    return rows.map((row) => ({
+      ...row,
+      seasonParticipantId: requireSeasonSnapshotParticipantId(
+        row.seasonParticipantId,
+      ),
+    }));
   }
 
   private calculateMdd(

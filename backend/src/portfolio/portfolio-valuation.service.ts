@@ -89,8 +89,118 @@ export class PortfolioValuationService {
       );
     }
 
+    return this.calculateValuationForHoldings({
+      subject: { seasonParticipantId: participant.id, tradingAccountId: null },
+      initialCapitalKrw: participant.initialCapitalKrw,
+      cashWallets: participant.cashWallets,
+      positions: participant.positions,
+      valuationAt,
+      sourceEligibilityWorkflow,
+      useSettlementPricePolicy,
+      client,
+    });
+  }
+
+  /**
+   * Account-scoped valuation (작업 7). Same holdings → same numbers as the
+   * season path: both funnel into calculateValuationForHoldings and the
+   * unchanged pure `calculatePortfolioValuation`. Only the LOOKUP differs —
+   * wallets and positions are selected by their own `tradingAccountId`
+   * instead of through a participant.
+   *
+   * The returned `returnRate` is the simple initial-capital ratio and is NOT
+   * the headline number for general accounts; GeneralAccountPerformanceService
+   * replaces it with the time-weighted return.
+   */
+  async calculateTradingAccountValuation(
+    tradingAccountId: string,
+    valuationAt = new Date(),
+    sourceEligibilityWorkflow: PortfolioSourceWorkflow = 'home_live_valuation',
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
+  ): Promise<PortfolioValuationResult> {
+    const useSettlementPricePolicy =
+      sourceEligibilityWorkflow === 'season_settlement';
+    const account = await client.tradingAccount.findUnique({
+      where: { id: tradingAccountId },
+      select: {
+        id: true,
+        initialCapitalKrw: true,
+        cashWallets: {
+          select: { currencyCode: true, balanceAmount: true },
+        },
+        positions: {
+          select: {
+            assetId: true,
+            quantity: true,
+            averageCost: true,
+            currencyCode: true,
+            realizedPnl: true,
+            realizedPnlKrw: true,
+            asset: {
+              select: {
+                id: true,
+                assetType: true,
+                market: true,
+                currencyCode: true,
+                priceCurrency: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!account) {
+      throw new PortfolioValuationError(
+        'TRADING_ACCOUNT_NOT_FOUND',
+        'Trading account not found.',
+      );
+    }
+
+    return this.calculateValuationForHoldings({
+      subject: { seasonParticipantId: null, tradingAccountId: account.id },
+      initialCapitalKrw: account.initialCapitalKrw,
+      cashWallets: account.cashWallets,
+      positions: account.positions,
+      valuationAt,
+      sourceEligibilityWorkflow,
+      useSettlementPricePolicy,
+      client,
+    });
+  }
+
+  /**
+   * The shared core: price/FX source selection + the pure valuation policy.
+   * Extracted so the season and account paths cannot drift apart — a change
+   * to freshness, market-awareness, admin_manual fallback, or USD conversion
+   * applies to both by construction.
+   */
+  private async calculateValuationForHoldings(input: {
+    subject: {
+      seasonParticipantId: string | null;
+      tradingAccountId: string | null;
+    };
+    initialCapitalKrw: Prisma.Decimal;
+    cashWallets: readonly {
+      currencyCode: CurrencyCode;
+      balanceAmount: Prisma.Decimal;
+    }[];
+    positions: readonly {
+      assetId: string;
+      quantity: Prisma.Decimal;
+      averageCost: Prisma.Decimal;
+      currencyCode: CurrencyCode;
+      realizedPnl: Prisma.Decimal;
+      realizedPnlKrw: Prisma.Decimal;
+      asset: PositionAssetForSourceSelection;
+    }[];
+    valuationAt: Date;
+    sourceEligibilityWorkflow: PortfolioSourceWorkflow;
+    useSettlementPricePolicy: boolean;
+    client: Prisma.TransactionClient | PrismaService;
+  }): Promise<PortfolioValuationResult> {
     const positions = await Promise.all(
-      participant.positions.map(async (position) => ({
+      input.positions.map(async (position) => ({
         assetId: position.assetId,
         assetType: position.asset.assetType,
         quantity: position.quantity,
@@ -100,21 +210,23 @@ export class PortfolioValuationService {
         realizedPnlKrw: position.realizedPnlKrw,
         latestPriceSnapshot: await this.findLatestEligibleAssetPriceSnapshot(
           position.asset,
-          valuationAt,
-          sourceEligibilityWorkflow,
-          useSettlementPricePolicy,
-          client,
+          input.valuationAt,
+          input.sourceEligibilityWorkflow,
+          input.useSettlementPricePolicy,
+          input.client,
         ),
       })),
     );
 
+    // No USD cash and no USD position → no FX snapshot is needed at all, so a
+    // KRW-only general account never fails on a missing/stale USD rate.
     const needsUsdConversion =
-      participant.cashWallets.some(
+      input.cashWallets.some(
         (wallet) =>
           wallet.currencyCode === CurrencyCode.USD &&
           !wallet.balanceAmount.eq(0),
       ) ||
-      participant.positions.some(
+      input.positions.some(
         (position) =>
           position.currencyCode === CurrencyCode.USD &&
           !position.quantity.eq(0),
@@ -122,26 +234,27 @@ export class PortfolioValuationService {
 
     const usdKrwSnapshot = needsUsdConversion
       ? await this.findLatestEligibleUsdKrwSnapshot(
-          valuationAt,
-          sourceEligibilityWorkflow,
-          useSettlementPricePolicy,
-          client,
+          input.valuationAt,
+          input.sourceEligibilityWorkflow,
+          input.useSettlementPricePolicy,
+          input.client,
         )
       : null;
 
     return calculatePortfolioValuation({
-      seasonParticipantId: participant.id,
-      initialCapitalKrw: participant.initialCapitalKrw,
-      cashWallets: participant.cashWallets,
+      seasonParticipantId: input.subject.seasonParticipantId,
+      tradingAccountId: input.subject.tradingAccountId,
+      initialCapitalKrw: input.initialCapitalKrw,
+      cashWallets: input.cashWallets,
       positions,
       usdKrwSnapshot,
-      valuationAt,
+      valuationAt: input.valuationAt,
       sourceEligibilityWorkflow: isProviderWorkflowAllowed(
-        sourceEligibilityWorkflow,
+        input.sourceEligibilityWorkflow,
       )
-        ? sourceEligibilityWorkflow
+        ? input.sourceEligibilityWorkflow
         : undefined,
-      enforceAdminManualFxFreshness: !useSettlementPricePolicy,
+      enforceAdminManualFxFreshness: !input.useSettlementPricePolicy,
     });
   }
 

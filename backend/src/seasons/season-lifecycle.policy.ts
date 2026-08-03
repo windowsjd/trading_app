@@ -1,10 +1,6 @@
 import { SeasonStatus } from '../generated/prisma/client';
 
-export type SeasonLifecycleMode =
-  | 'upcoming'
-  | 'active'
-  | 'ended'
-  | 'settled';
+export type SeasonLifecycleMode = 'upcoming' | 'active' | 'ended' | 'settled';
 
 export type SeasonLifecycleErrorCode =
   | 'SEASON_NOT_ACTIVE'

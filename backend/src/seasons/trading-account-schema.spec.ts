@@ -189,17 +189,22 @@ describe('TradingAccount schema contract', () => {
       /tradingAccount\s+TradingAccount\?\s+@relation\([^)]*onDelete: Restrict/,
     );
 
-    // Snapshots/rankings stay participant-only until their own migration
-    // work units.
-    for (const model of [
-      'EquitySnapshot',
-      'DailyPortfolioSnapshot',
-      'SeasonRanking',
-    ]) {
+    // EquitySnapshot / DailyPortfolioSnapshot moved to the transitional dual
+    // identity in 작업 7 (general accounts own snapshots with no participant).
+    for (const model of ['EquitySnapshot', 'DailyPortfolioSnapshot']) {
       const block = modelBlock(model);
-      expect(block).toContain('seasonParticipantId');
-      expect(block).not.toContain('tradingAccountId');
+      expect(block).toMatch(/seasonParticipantId\s+String\?/);
+      expect(block).toMatch(/tradingAccountId\s+String\?/);
+      expect(block).toMatch(
+        /tradingAccount\s+TradingAccount\?\s+@relation\([^)]*onDelete: Restrict/,
+      );
     }
+
+    // SeasonRanking stays participant-only; its transition is a later work
+    // unit and this work explicitly did not touch it.
+    const rankingBlock = modelBlock('SeasonRanking');
+    expect(rankingBlock).toContain('seasonParticipantId');
+    expect(rankingBlock).not.toContain('tradingAccountId');
 
     // LimitOrderCandleEvidence is reached through the Order relation and
     // must not gain a duplicated account FK.

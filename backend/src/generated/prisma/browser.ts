@@ -156,12 +156,25 @@ export type Quote = Prisma.QuoteModel
 export type FxExecuteRequest = Prisma.FxExecuteRequestModel
 /**
  * Model EquitySnapshot
+ * Point-in-time equity/performance record.
  * 
+ * SEASON rows keep their historical meaning: returnRate is the simple
+ * initial-capital return and the general-performance columns stay NULL.
+ * GENERAL rows (작업 7) have no SeasonParticipant at all and carry the
+ * time-weighted performance state instead — returnRate is the TWR percent,
+ * i.e. (timeWeightedReturnFactor - 1) * 100. The two meanings are never
+ * mixed; API responses always name which one applies via returnRateMethod.
+ * 
+ * timeWeightedReturnFactor is the SOURCE OF TRUTH for general performance;
+ * returnRate is a rounded presentation of it and is never fed back into the
+ * next factor calculation.
  */
 export type EquitySnapshot = Prisma.EquitySnapshotModel
 /**
  * Model DailyPortfolioSnapshot
- * 
+ * One row per subject per calendar day. Same season/general split as
+ * EquitySnapshot: returnRate is the initial-capital return for season rows
+ * and the TWR percent for general rows.
  */
 export type DailyPortfolioSnapshot = Prisma.DailyPortfolioSnapshotModel
 /**

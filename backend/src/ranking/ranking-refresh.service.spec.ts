@@ -105,8 +105,8 @@ describe('RankingRefreshService', () => {
       }),
     );
     expect(
-      prisma.seasonParticipant.findMany.mock.calls[0][0].where
-        .participantStatus.in,
+      prisma.seasonParticipant.findMany.mock.calls[0][0].where.participantStatus
+        .in,
     ).not.toContain(ParticipantStatus.excluded);
     expect(prisma.seasonRanking.deleteMany).toHaveBeenCalledWith({
       where: {

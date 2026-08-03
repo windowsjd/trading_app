@@ -95,10 +95,20 @@ import { TradingAccountAccessService } from './src/trading-accounts/trading-acco
 import { WalletsService } from './src/wallets/wallets.service';
 import { AdRewardService } from './src/ad-rewards/ad-reward.service';
 import { AdRewardVerificationRegistry } from './src/ad-rewards/ad-reward-verifier';
+import { PortfolioValuationService } from './src/portfolio/portfolio-valuation.service';
+import { GeneralExternalFundingService } from './src/portfolio/general-external-funding.service';
+import { GeneralAccountPerformanceService } from './src/portfolio/general-account-performance.service';
 
 const prisma = new PrismaService();
 const access = new TradingAccountAccessService(prisma);
-const generalAccounts = new GeneralAccountsService(prisma);
+const valuation = new PortfolioValuationService(prisma);
+const externalFunding = new GeneralExternalFundingService(prisma);
+const performance = new GeneralAccountPerformanceService(
+  prisma,
+  valuation,
+  externalFunding,
+);
+const generalAccounts = new GeneralAccountsService(prisma, performance);
 const wallets = new WalletsService(prisma, access);
 
 const REWARD = '50000.00000000';
@@ -158,6 +168,19 @@ function adRewardService(providers) {
     prisma,
     access,
     new AdRewardVerificationRegistry(providers),
+    performance,
+  );
+}
+
+/** Every claim now needs a client command key (작업 6 보완 1). */
+function claimBody(proof, overrides) {
+  return Object.assign(
+    {
+      provider: 'test-provider',
+      proof,
+      idempotencyKey: 'key-' + randomUUID(),
+    },
+    overrides || {},
   );
 }
 
@@ -333,7 +356,10 @@ function failingPrisma(delegateName, methodName) {
 
 async function verifyMidTransactionFailureRollsEverythingBack(delegateName, methodName) {
   const userId = await createUser();
-  const service = new GeneralAccountsService(failingPrisma(delegateName, methodName));
+  const service = new GeneralAccountsService(
+    failingPrisma(delegateName, methodName),
+    performance,
+  );
 
   let threw = false;
   try {
@@ -548,20 +574,14 @@ async function verifyGeneralReadFailsClosedOnSeasonLinkBleed() {
 async function verifyAdRewardDisabledAndProviderGates(userId, accountId) {
   disableAdRewards();
   await expectCode(
-    adRewardService([fakeVerifier('test-provider')]).claim(userId, accountId, {
-      provider: 'test-provider',
-      proof: randomUUID(),
-    }),
+    adRewardService([fakeVerifier('test-provider')]).claim(userId, accountId, claimBody(randomUUID())),
     'AD_REWARD_DISABLED',
   );
 
   enableAdRewards();
   // Registry EMPTY = production wiring: an ad completion is never trusted.
   await expectCode(
-    adRewardService([]).claim(userId, accountId, {
-      provider: 'test-provider',
-      proof: randomUUID(),
-    }),
+    adRewardService([]).claim(userId, accountId, claimBody(randomUUID())),
     'AD_REWARD_PROVIDER_UNAVAILABLE',
   );
 
@@ -573,10 +593,7 @@ async function verifyVerificationFailureWritesNothing(userId, accountId) {
   const before = await readGeneralShape(accountId);
 
   await expectCode(
-    adRewardService([fakeVerifier('test-provider')]).claim(userId, accountId, {
-      provider: 'test-provider',
-      proof: 'invalid-' + randomUUID(),
-    }),
+    adRewardService([fakeVerifier('test-provider')]).claim(userId, accountId, claimBody('invalid-' + randomUUID())),
     'AD_REWARD_VERIFICATION_FAILED',
   );
 
@@ -596,10 +613,7 @@ async function verifyGrantIsAtomicAndLedgered(userId, accountId) {
   const beforeKrw = before.wallets.find((w) => w.currencyCode === 'KRW').balanceAmount;
   const eventId = 'event-' + randomUUID();
 
-  const response = await service.claim(userId, accountId, {
-    provider: 'test-provider',
-    proof: eventId,
-  });
+  const response = await service.claim(userId, accountId, claimBody(eventId));
   assert.equal(response.data.granted, true);
   assert.equal(response.data.duplicate, false);
 
@@ -656,10 +670,7 @@ async function verifyDuplicateEventReplays(userId, accountId, eventId) {
   const service = adRewardService([fakeVerifier('test-provider')]);
   const before = await readGeneralShape(accountId);
 
-  const replay = await service.claim(userId, accountId, {
-    provider: 'test-provider',
-    proof: eventId,
-  });
+  const replay = await service.claim(userId, accountId, claimBody(eventId));
   assert.equal(replay.data.granted, false);
   assert.equal(replay.data.duplicate, true);
 
@@ -688,7 +699,7 @@ async function verifyEventCannotBeReusedByAnotherAccount(eventId) {
     adRewardService([fakeVerifier('test-provider')]).claim(
       otherUserId,
       otherAccountId,
-      { provider: 'test-provider', proof: eventId },
+      claimBody(eventId),
     ),
     'AD_REWARD_EVENT_ALREADY_USED',
   );
@@ -710,9 +721,9 @@ async function verifyConcurrentSameEventGrantsOnce() {
   const eventId = 'race-' + randomUUID();
 
   const results = await Promise.allSettled([
-    service.claim(userId, accountId, { provider: 'test-provider', proof: eventId }),
-    service.claim(userId, accountId, { provider: 'test-provider', proof: eventId }),
-    service.claim(userId, accountId, { provider: 'test-provider', proof: eventId }),
+    service.claim(userId, accountId, claimBody(eventId)),
+    service.claim(userId, accountId, claimBody(eventId)),
+    service.claim(userId, accountId, claimBody(eventId)),
   ]);
 
   const fulfilled = results.filter((r) => r.status === 'fulfilled');
@@ -748,9 +759,9 @@ async function verifyDailyCountRaceCannotOverpay() {
   const service = adRewardService([fakeVerifier('test-provider')]);
 
   const results = await Promise.allSettled([
-    service.claim(userId, accountId, { provider: 'test-provider', proof: 'count-a-' + randomUUID() }),
-    service.claim(userId, accountId, { provider: 'test-provider', proof: 'count-b-' + randomUUID() }),
-    service.claim(userId, accountId, { provider: 'test-provider', proof: 'count-c-' + randomUUID() }),
+    service.claim(userId, accountId, claimBody('count-a-' + randomUUID())),
+    service.claim(userId, accountId, claimBody('count-b-' + randomUUID())),
+    service.claim(userId, accountId, claimBody('count-c-' + randomUUID())),
   ]);
 
   const granted = results.filter((r) => r.status === 'fulfilled');
@@ -794,10 +805,7 @@ async function verifyRejectedEventIsNeverPaidLater(userId, accountId, rejectedEv
   const before = await readGeneralShape(accountId);
 
   await expectCode(
-    service.claim(userId, accountId, {
-      provider: 'test-provider',
-      proof: rejectedEventId,
-    }),
+    service.claim(userId, accountId, claimBody(rejectedEventId)),
     'AD_REWARD_DAILY_COUNT_LIMIT',
   );
 
@@ -829,8 +837,8 @@ async function verifyDailyAmountRaceCannotOverpay() {
   const service = adRewardService([fakeVerifier('test-provider')]);
 
   const results = await Promise.allSettled([
-    service.claim(userId, accountId, { provider: 'test-provider', proof: 'amount-a-' + randomUUID() }),
-    service.claim(userId, accountId, { provider: 'test-provider', proof: 'amount-b-' + randomUUID() }),
+    service.claim(userId, accountId, claimBody('amount-a-' + randomUUID())),
+    service.claim(userId, accountId, claimBody('amount-b-' + randomUUID())),
   ]);
   assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1);
   for (const rejection of results.filter((r) => r.status === 'rejected')) {
@@ -849,15 +857,9 @@ async function verifyCooldownBlocksAndThenAllows() {
   enableAdRewards({ AD_REWARD_COOLDOWN_SECONDS: '3600' });
   const service = adRewardService([fakeVerifier('test-provider')]);
 
-  await service.claim(userId, accountId, {
-    provider: 'test-provider',
-    proof: 'cooldown-1-' + randomUUID(),
-  });
+  await service.claim(userId, accountId, claimBody('cooldown-1-' + randomUUID()));
   await expectCode(
-    service.claim(userId, accountId, {
-      provider: 'test-provider',
-      proof: 'cooldown-2-' + randomUUID(),
-    }),
+    service.claim(userId, accountId, claimBody('cooldown-2-' + randomUUID())),
     'AD_REWARD_COOLDOWN_ACTIVE',
   );
 
@@ -871,10 +873,7 @@ async function verifyCooldownBlocksAndThenAllows() {
     where: { tradingAccountId: accountId, status: 'granted' },
     data: { grantedAt: new Date(Date.now() - 7200000) },
   });
-  const after = await service.claim(userId, accountId, {
-    provider: 'test-provider',
-    proof: 'cooldown-3-' + randomUUID(),
-  });
+  const after = await service.claim(userId, accountId, claimBody('cooldown-3-' + randomUUID()));
   assert.equal(after.data.granted, true);
   const shape = await readGeneralShape(accountId);
   assert.equal(
@@ -898,7 +897,7 @@ async function verifySeasonAccountsAndForeignAccountsAreRefused(userId, accountI
     'TRADING_ACCOUNT_NOT_FOUND',
   );
   await expectCode(
-    service.claim(strangerId, accountId, { provider: 'test-provider', proof: randomUUID() }),
+    service.claim(strangerId, accountId, claimBody(randomUUID())),
     'TRADING_ACCOUNT_NOT_FOUND',
   );
   await expectCode(
@@ -946,10 +945,7 @@ async function verifySeasonAccountsAndForeignAccountsAreRefused(userId, accountI
     () => service.getEligibility(seasonUserId, seasonAccount.id),
     () => service.listClaims(seasonUserId, seasonAccount.id),
     () =>
-      service.claim(seasonUserId, seasonAccount.id, {
-        provider: 'test-provider',
-        proof: randomUUID(),
-      }),
+      service.claim(seasonUserId, seasonAccount.id, claimBody(randomUUID())),
   ]) {
     await expectCode(call(), 'AD_REWARD_GENERAL_ACCOUNT_ONLY');
   }
@@ -968,16 +964,13 @@ async function verifySuspendedAndClosedClaimRules() {
   const accountId = (await generalAccounts.openGeneralAccount(userId)).data.account.id;
   enableAdRewards();
   const service = adRewardService([fakeVerifier('test-provider')]);
-  await service.claim(userId, accountId, {
-    provider: 'test-provider',
-    proof: 'history-' + randomUUID(),
-  });
+  await service.claim(userId, accountId, claimBody('history-' + randomUUID()));
 
   for (const status of ['suspended', 'closed']) {
     await prisma.tradingAccount.update({ where: { id: accountId }, data: { status } });
 
     await expectCode(
-      service.claim(userId, accountId, { provider: 'test-provider', proof: randomUUID() }),
+      service.claim(userId, accountId, claimBody(randomUUID())),
       'TRADING_ACCOUNT_NOT_ACTIVE',
     );
 
@@ -1034,6 +1027,14 @@ async function cleanup() {
     });
     const accountIds = accounts.map((a) => a.id);
     if (accountIds.length > 0) {
+      // Performance snapshots hold a Restrict FK to the account (작업 7), so
+      // they must go before the account itself.
+      await prisma.equitySnapshot.deleteMany({
+        where: { tradingAccountId: { in: accountIds } },
+      });
+      await prisma.dailyPortfolioSnapshot.deleteMany({
+        where: { tradingAccountId: { in: accountIds } },
+      });
       await prisma.walletTransaction.deleteMany({
         where: { tradingAccountId: { in: accountIds } },
       });

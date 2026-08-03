@@ -2426,7 +2426,12 @@ export class FxService {
       },
     });
 
-    await this.recordExchangeExecutedPortfolioSnapshot(tx, plan, executeNow);
+    await this.recordExchangeExecutedPortfolioSnapshot(
+      tx,
+      plan,
+      executeNow,
+      tradingAccountId,
+    );
 
     const responsePayloadJson = this.buildFxExecuteSuccessResponse({
       exchangeId: exchangeTransaction.id,
@@ -2458,6 +2463,8 @@ export class FxService {
     tx: FxExecuteTransactionClient,
     plan: ProviderFxExecutePlan,
     capturedAt: Date,
+    /** The execution's ALREADY-VERIFIED account scope (작업 7 dual-write). */
+    tradingAccountId: string,
   ): Promise<void> {
     const valuation = await this.calculateParticipantValuationInTransaction(
       tx,
@@ -2469,6 +2476,9 @@ export class FxService {
     await tx.equitySnapshot.create({
       data: {
         seasonParticipantId: plan.seasonParticipantId,
+        // 작업 7 dual-write, using the account already verified against the
+        // wallets earlier in this transaction.
+        tradingAccountId,
         totalAssetKrw: valuation.totalAssetKrw,
         returnRate: valuation.returnRate,
         krwCash: valuation.krwCash,

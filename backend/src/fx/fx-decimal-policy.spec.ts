@@ -35,12 +35,8 @@ describe('fx decimal policy', () => {
   });
 
   it('rounds half-up at scale 8 boundaries', () => {
-    expect(formatDecimalScale('1.000000004', monetaryScale)).toBe(
-      '1.00000000',
-    );
-    expect(formatDecimalScale('1.000000005', monetaryScale)).toBe(
-      '1.00000001',
-    );
+    expect(formatDecimalScale('1.000000004', monetaryScale)).toBe('1.00000000');
+    expect(formatDecimalScale('1.000000005', monetaryScale)).toBe('1.00000001');
   });
 
   it('formats fee rate at scale 6', () => {

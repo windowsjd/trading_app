@@ -72,7 +72,19 @@ export type PortfolioSourceSummary = {
 };
 
 export type PortfolioValuationInput = {
-  seasonParticipantId: string;
+  /**
+   * Null for a general-mode (account-scoped) valuation: general accounts have
+   * no SeasonParticipant. Exactly one of seasonParticipantId /
+   * tradingAccountId identifies the subject.
+   */
+  seasonParticipantId: string | null;
+  /** Set on the account-scoped path (작업 7); null on the legacy season path. */
+  tradingAccountId?: string | null;
+  /**
+   * Basis of the SIMPLE returnRate below. Meaningful for season accounts
+   * only — the general path ignores the resulting returnRate entirely and
+   * uses the time-weighted factor from GeneralAccountPerformanceService.
+   */
   initialCapitalKrw: DecimalInput;
   cashWallets: readonly PortfolioCashWalletInput[];
   positions: readonly PortfolioPositionInput[];
@@ -83,7 +95,8 @@ export type PortfolioValuationInput = {
 };
 
 export type PortfolioValuationResult = {
-  seasonParticipantId: string;
+  seasonParticipantId: string | null;
+  tradingAccountId: string | null;
   totalAssetKrw: string;
   returnRate: string;
   krwCash: string;
@@ -205,11 +218,7 @@ export function calculatePortfolioValuation(
       priceSnapshot.currencyCode === CurrencyCode.USD ? usdKrwRate : null;
     const positionValueKrw = priceSnapshot.priceKrw
       ? quantity.mul(toDecimal(priceSnapshot.priceKrw, 'assetPrice.priceKrw'))
-      : convertToKrw(
-          positionValue,
-          priceSnapshot.currencyCode,
-          conversionRate,
-        );
+      : convertToKrw(positionValue, priceSnapshot.currencyCode, conversionRate);
 
     assetValueKrw = assetValueKrw.add(positionValueKrw);
     switch (position.assetType) {
@@ -236,6 +245,7 @@ export function calculatePortfolioValuation(
 
   return {
     seasonParticipantId: input.seasonParticipantId,
+    tradingAccountId: input.tradingAccountId ?? null,
     totalAssetKrw: formatMoneyScale8(totalAssetKrw),
     returnRate: formatDecimalScale(returnRate, returnRateScale),
     krwCash: formatMoneyScale8(krwCash),

@@ -11,7 +11,7 @@ import {
 } from '../generated/prisma/client';
 import { buildPagination, type Pagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
-import { assertGeneralAccountIntegrity } from '../trading-accounts/general-account-integrity';
+import { assertGeneralAccountFinancialIntegrity } from '../trading-accounts/general-account-integrity';
 import {
   TradingAccountAccessService,
   type OwnedTradingAccount,
@@ -30,9 +30,18 @@ import {
 import {
   AD_REWARD_VERIFICATION_REGISTRY,
   AdRewardVerificationRegistry,
+  buildAdRewardClaimRequestHash,
   buildAdRewardProofFingerprint,
   type AdRewardVerificationSuccess,
 } from './ad-reward-verifier';
+import {
+  assertGrantedClaimIntegrity,
+  assertKeyedClaimIntegrity,
+  assertRejectedClaimIntegrity,
+  assertReplayableClaimStatus,
+  type StoredClaimForIntegrity,
+} from './ad-reward-claim-integrity';
+import { GeneralAccountPerformanceService } from '../portfolio/general-account-performance.service';
 
 /**
  * Rewarded-ad funding for GENERAL accounts (작업 6).
@@ -59,6 +68,46 @@ import {
  *    is durable, and the 429 is raised outside it.
  */
 
+/** Everything the integrity checks and the replay response need. */
+const STORED_CLAIM_SELECT = {
+  id: true,
+  userId: true,
+  tradingAccountId: true,
+  status: true,
+  rewardAmountKrw: true,
+  grantedAt: true,
+  rejectedAt: true,
+  failureCode: true,
+  failureReason: true,
+  idempotencyKey: true,
+  requestHash: true,
+  responsePayloadJson: true,
+  walletTransactionId: true,
+  walletTransaction: {
+    select: {
+      id: true,
+      tradingAccountId: true,
+      seasonParticipantId: true,
+      walletId: true,
+      currencyCode: true,
+      direction: true,
+      txType: true,
+      referenceType: true,
+      referenceId: true,
+      amount: true,
+      balanceAfter: true,
+      wallet: {
+        select: {
+          id: true,
+          tradingAccountId: true,
+          seasonParticipantId: true,
+          currencyCode: true,
+        },
+      },
+    },
+  },
+} satisfies Prisma.AdRewardClaimSelect;
+
 const CLAIM_LIST_DEFAULT_LIMIT = 50;
 const CLAIM_LIST_MAX_LIMIT = 100;
 
@@ -66,6 +115,7 @@ export type AdRewardClaimRequestBody = {
   provider?: unknown;
   proof?: unknown;
   verificationToken?: unknown;
+  idempotencyKey?: unknown;
 };
 
 export type AdRewardClaimsQuery = {
@@ -110,6 +160,7 @@ export class AdRewardService {
     private readonly accessService: TradingAccountAccessService,
     @Inject(AD_REWARD_VERIFICATION_REGISTRY)
     private readonly registry: AdRewardVerificationRegistry,
+    private readonly performanceService: GeneralAccountPerformanceService,
   ) {}
 
   // ---------------------------------------------------------------- reads
@@ -214,12 +265,44 @@ export class AdRewardService {
 
   // --------------------------------------------------------------- claim
 
+  /**
+   * Claim ordering is deliberate and load-bearing (작업 6 보완 1).
+   *
+   * Ownership is checked FIRST so a borrowed accountId can never reach
+   * another user's claim. Then the COMMAND-idempotency lookup runs, BEFORE
+   * account status, before AD_REWARD_ENABLED, before the provider registry,
+   * and before the verifier: a payout that already committed owes its caller
+   * the first result even if the account was suspended since, the feature was
+   * switched off, or the provider adapter was removed. Re-running those gates
+   * would fail a retry whose money has already moved — and a retry storm
+   * happens exactly when one of them has started failing.
+   *
+   * Only when no keyed claim exists do the state gates and the external
+   * verifier run.
+   */
   async claim(
     userId: string | undefined,
     accountId: string,
     body: AdRewardClaimRequestBody = {},
   ) {
     const account = await this.resolveGeneralAccount(userId, accountId);
+    const request = this.parseClaimRequest(body);
+    const proofFingerprint = buildAdRewardProofFingerprint(request.proof);
+    const requestHash = buildAdRewardClaimRequestHash({
+      provider: request.provider,
+      proofFingerprint,
+    });
+
+    const keyed = await this.findKeyedClaim(
+      account.id,
+      request.idempotencyKey,
+      this.prisma,
+    );
+    if (keyed) {
+      return this.replayKeyedClaim(account, keyed, requestHash);
+    }
+
+    // ---- from here on this is a NEW command ----
     this.assertAccountActive(account);
 
     const config = this.readConfig();
@@ -229,8 +312,13 @@ export class AdRewardService {
         'Ad rewards are disabled.',
       );
     }
+    if (request.provider !== config.provider) {
+      throwAdRewardError(
+        adRewardErrorCodes.AD_REWARD_PROVIDER_UNAVAILABLE,
+        'Requested ad provider is not the configured provider.',
+      );
+    }
 
-    const request = this.parseClaimRequest(body, config);
     const verifier = this.registry.resolve(request.provider);
     if (!verifier) {
       // No real provider adapter is registered anywhere in production
@@ -268,12 +356,13 @@ export class AdRewardService {
       );
     }
 
-    const proofFingerprint = buildAdRewardProofFingerprint(request.proof);
     const outcome = await this.runGrantTransaction({
       account,
       config,
       verification,
       proofFingerprint,
+      idempotencyKey: request.idempotencyKey,
+      requestHash,
     });
 
     if (outcome.kind === 'rejected') {
@@ -285,11 +374,84 @@ export class AdRewardService {
     return this.buildClaimResponse(outcome);
   }
 
+  private findKeyedClaim(
+    tradingAccountId: string,
+    idempotencyKey: string,
+    client: Pick<Prisma.TransactionClient, 'adRewardClaim'> | PrismaService,
+  ) {
+    return client.adRewardClaim.findUnique({
+      where: {
+        tradingAccountId_idempotencyKey: { tradingAccountId, idempotencyKey },
+      },
+      select: STORED_CLAIM_SELECT,
+    });
+  }
+
+  /**
+   * Replays a claim found by (account, idempotencyKey). No verifier call, no
+   * wallet change, no ledger row, no snapshot — and the stored claim is
+   * validated against its ledger first, so a damaged payout is never reported
+   * as a success.
+   */
+  private async replayKeyedClaim(
+    account: OwnedTradingAccount,
+    claim: StoredClaimForIntegrity,
+    requestHash: string,
+  ) {
+    if (
+      claim.userId !== account.userId ||
+      claim.tradingAccountId !== account.id
+    ) {
+      // The unique is per account, so this is corruption rather than a
+      // cross-account probe; still answered without leaking the other claim.
+      throwAdRewardError(
+        adRewardErrorCodes.AD_REWARD_EVENT_ALREADY_USED,
+        'This ad completion event has already been used.',
+      );
+    }
+
+    if (claim.requestHash !== requestHash) {
+      // The key already means a different request. Never re-verify or
+      // re-grant under it.
+      throwAdRewardError(
+        adRewardErrorCodes.AD_REWARD_IDEMPOTENCY_CONFLICT,
+        'Same idempotencyKey was used with a different ad reward claim request.',
+      );
+    }
+
+    assertReplayableClaimStatus(claim);
+    assertKeyedClaimIntegrity(claim);
+
+    if (claim.status === AdRewardClaimStatus.rejected) {
+      assertRejectedClaimIntegrity(claim);
+      throwAdRewardError(
+        claim.failureCode as never,
+        claim.failureReason ??
+          'This ad completion event was already refused and cannot be granted later.',
+      );
+    }
+
+    const wallets = await this.performanceService.assertGeneralAccountReady(
+      account,
+      this.prisma,
+    );
+    const ledger = assertGrantedClaimIntegrity(claim, wallets.krwWalletId);
+
+    return this.buildClaimResponse({
+      kind: 'replayed',
+      claimId: claim.id,
+      balanceAfter: ledger.balanceAfter.toFixed(8),
+      grantedAt: claim.grantedAt,
+    });
+  }
+
   private async runGrantTransaction(input: {
     account: OwnedTradingAccount;
     config: Extract<AdRewardConfig, { enabled: true }>;
     verification: AdRewardVerificationSuccess;
     proofFingerprint: string;
+    idempotencyKey: string;
+    requestHash: string;
   }): Promise<GrantOutcome> {
     const { account, config, verification, proofFingerprint } = input;
 
@@ -331,10 +493,27 @@ export class AdRewardService {
           );
         }
 
+        // A concurrent request with the SAME command key may have won while
+        // this one waited on the account lock. Re-checking here (not just
+        // before the transaction) is what makes two simultaneous identical
+        // commands pay exactly once.
+        const racedKeyed = await this.findKeyedClaim(
+          account.id,
+          input.idempotencyKey,
+          tx,
+        );
+        if (racedKeyed) {
+          return this.resolveKeyedClaimOutcomeInTransaction(
+            racedKeyed,
+            account,
+            input.requestHash,
+          );
+        }
+
         // Structural check of the account's wallets and initial grant. A
         // damaged account is reported (500 GENERAL_ACCOUNT_INTEGRITY), never
         // repaired and never auto-provisioned mid-claim.
-        const verified = await assertGeneralAccountIntegrity(tx, {
+        const verified = await assertGeneralAccountFinancialIntegrity(tx, {
           id: account.id,
           mode: account.mode,
           initialCapitalKrw: account.initialCapitalKrw,
@@ -348,16 +527,7 @@ export class AdRewardService {
               providerEventId: verification.providerEventId,
             },
           },
-          select: {
-            id: true,
-            userId: true,
-            tradingAccountId: true,
-            status: true,
-            grantedAt: true,
-            failureCode: true,
-            failureReason: true,
-            walletTransaction: { select: { balanceAfter: true } },
-          },
+          select: STORED_CLAIM_SELECT,
         });
 
         if (existing) {
@@ -387,6 +557,13 @@ export class AdRewardService {
               rejectedAt: now,
               failureCode: limitViolation.code,
               failureReason: limitViolation.message,
+              idempotencyKey: input.idempotencyKey,
+              requestHash: input.requestHash,
+              responsePayloadJson: {
+                refused: true,
+                code: limitViolation.code,
+                message: limitViolation.message,
+              } as Prisma.InputJsonValue,
               // No walletTransactionId: nothing was paid.
             },
             select: { id: true },
@@ -411,7 +588,27 @@ export class AdRewardService {
             verificationMetadataJson: this.buildMetadataJson(verification),
             requestedAt: now,
             verifiedAt: now,
+            idempotencyKey: input.idempotencyKey,
+            requestHash: input.requestHash,
           },
+          select: { id: true },
+        });
+
+        // ---- external-funding boundary, BEFORE the money lands (작업 7) ----
+        // Captures every bit of market performance up to this instant so the
+        // inflow itself changes neither the TWR factor nor investment PnL.
+        const boundary =
+          await this.performanceService.buildExternalFundingSnapshots({
+            account,
+            wallets: verified,
+            externalFundingAmountKrw: config.rewardAmountKrw,
+            referenceType: WalletTransactionReferenceType.ad_reward_claim,
+            referenceId: claim.id,
+            capturedAt: now,
+            client: tx,
+          });
+        await tx.equitySnapshot.create({
+          data: boundary.before,
           select: { id: true },
         });
 
@@ -467,12 +664,33 @@ export class AdRewardService {
           select: { id: true },
         });
 
+        // ---- external-funding boundary, AFTER the money landed ----
+        // Same investment PnL, same factor, same return rate as `before`;
+        // only totalAsset and cumulative external funding move.
+        await tx.equitySnapshot.create({
+          data: boundary.after,
+          select: { id: true },
+        });
+
+        const responsePayloadJson = this.buildClaimResponse({
+          kind: 'granted',
+          claimId: claim.id,
+          balanceAfter: walletAfter.balanceAmount.toFixed(8),
+          grantedAt: now,
+        });
+
         await tx.adRewardClaim.update({
           where: { id: claim.id },
           data: {
             status: AdRewardClaimStatus.granted,
             grantedAt: now,
             walletTransactionId: ledger.id,
+            // Stored INSIDE the payout transaction: a committed grant always
+            // has the exact response its retries will be answered with, and a
+            // failure here rolls the credit, ledger, claim, and both boundary
+            // snapshots back together.
+            responsePayloadJson:
+              responsePayloadJson as unknown as Prisma.InputJsonValue,
           },
           select: { id: true },
         });
@@ -492,6 +710,24 @@ export class AdRewardService {
       // A concurrent request for the SAME provider event won the unique
       // index. Re-read it and answer exactly as the winner did instead of
       // surfacing a raw 500 — one claim, one ledger row, one credit.
+      // Two different uniques can raise here and they mean different things:
+      // (tradingAccountId, idempotencyKey) is a raced COMMAND retry, while
+      // (provider, providerEventId) is the same AD EVENT arriving under a
+      // different key. Each is re-read on its own axis rather than collapsed
+      // into one generic P2002 replay.
+      const racedKeyed = await this.findKeyedClaim(
+        account.id,
+        input.idempotencyKey,
+        this.prisma,
+      );
+      if (racedKeyed) {
+        return this.resolveKeyedClaimOutcomeInTransaction(
+          racedKeyed,
+          account,
+          input.requestHash,
+        );
+      }
+
       const raced = await this.prisma.adRewardClaim.findUnique({
         where: {
           provider_providerEventId: {
@@ -499,16 +735,7 @@ export class AdRewardService {
             providerEventId: verification.providerEventId,
           },
         },
-        select: {
-          id: true,
-          userId: true,
-          tradingAccountId: true,
-          status: true,
-          grantedAt: true,
-          failureCode: true,
-          failureReason: true,
-          walletTransaction: { select: { balanceAfter: true } },
-        },
+        select: STORED_CLAIM_SELECT,
       });
       if (!raced) {
         throw error;
@@ -518,23 +745,70 @@ export class AdRewardService {
   }
 
   /**
+   * In-transaction resolution of a raced command key. Mirrors
+   * replayKeyedClaim but returns a GrantOutcome sentinel so the caller keeps
+   * control of committing vs. throwing.
+   */
+  private resolveKeyedClaimOutcomeInTransaction(
+    claim: StoredClaimForIntegrity,
+    account: OwnedTradingAccount,
+    requestHash: string,
+  ): GrantOutcome {
+    if (
+      claim.userId !== account.userId ||
+      claim.tradingAccountId !== account.id
+    ) {
+      throwAdRewardError(
+        adRewardErrorCodes.AD_REWARD_EVENT_ALREADY_USED,
+        'This ad completion event has already been used.',
+      );
+    }
+    if (claim.requestHash !== requestHash) {
+      throwAdRewardError(
+        adRewardErrorCodes.AD_REWARD_IDEMPOTENCY_CONFLICT,
+        'Same idempotencyKey was used with a different ad reward claim request.',
+      );
+    }
+
+    assertReplayableClaimStatus(claim);
+    assertKeyedClaimIntegrity(claim);
+
+    if (claim.status === AdRewardClaimStatus.rejected) {
+      assertRejectedClaimIntegrity(claim);
+      return {
+        kind: 'rejected',
+        code: claim.failureCode as never,
+        message:
+          claim.failureReason ??
+          'This ad completion event was already refused and cannot be granted later.',
+      };
+    }
+
+    if (!claim.walletTransaction) {
+      throwAdRewardError(
+        adRewardErrorCodes.AD_REWARD_CLAIM_INTEGRITY,
+        'Granted ad reward claim has no linked ledger row.',
+      );
+    }
+
+    return {
+      kind: 'replayed',
+      claimId: claim.id,
+      balanceAfter: claim.walletTransaction.balanceAfter.toFixed(8),
+      grantedAt: claim.grantedAt,
+    };
+  }
+
+  /**
    * What a previously-recorded claim for the same provider event means for
    * THIS request. Another user's or account's claim is a flat 409 with no
    * detail — the existence of someone else's claim is not disclosed.
    */
   private resolveExistingClaimOutcome(
-    existing: {
-      id: string;
-      userId: string;
-      tradingAccountId: string;
-      status: AdRewardClaimStatus;
-      grantedAt: Date | null;
-      failureCode: string | null;
-      failureReason: string | null;
-      walletTransaction: { balanceAfter: Prisma.Decimal } | null;
-    },
+    existing: StoredClaimForIntegrity,
     account: OwnedTradingAccount,
   ): GrantOutcome {
+    assertReplayableClaimStatus(existing);
     if (
       existing.userId !== account.userId ||
       existing.tradingAccountId !== account.id
@@ -722,15 +996,32 @@ export class AdRewardService {
    * deliberately no reward amount, event id, user id, account id, or granted
    * timestamp field — a client cannot influence what it is paid.
    */
-  private parseClaimRequest(
-    body: AdRewardClaimRequestBody,
-    config: Extract<AdRewardConfig, { enabled: true }>,
-  ): { provider: string; proof: string } {
-    const provider = this.parseText(body.provider) ?? config.provider;
-    if (provider !== config.provider) {
+  /**
+   * The request may carry ONLY a provider key, an opaque proof, and a client
+   * idempotency key. There is deliberately no reward amount, provider event
+   * id, user id, account id, granted timestamp, request hash, or response
+   * payload field — a client cannot influence what it is paid.
+   *
+   * `provider` is REQUIRED (작업 6 보완 1): a replay must not depend on what
+   * AD_REWARD_PROVIDER happens to say at retry time. No real provider exists
+   * yet, so there is no frontend compatibility reason to keep a fallback.
+   */
+  private parseClaimRequest(body: AdRewardClaimRequestBody): {
+    provider: string;
+    proof: string;
+    idempotencyKey: string;
+  } {
+    const provider = this.parseText(body.provider);
+    if (!provider) {
       throwAdRewardError(
-        adRewardErrorCodes.AD_REWARD_PROVIDER_UNAVAILABLE,
-        'Requested ad provider is not the configured provider.',
+        adRewardErrorCodes.AD_REWARD_INVALID_REQUEST,
+        'provider is required.',
+      );
+    }
+    if (provider.length > 64) {
+      throwAdRewardError(
+        adRewardErrorCodes.AD_REWARD_INVALID_REQUEST,
+        'provider is too long.',
       );
     }
 
@@ -749,7 +1040,28 @@ export class AdRewardService {
       );
     }
 
-    return { provider, proof };
+    const idempotencyKey = this.parseText(body.idempotencyKey);
+    if (!idempotencyKey) {
+      throwAdRewardError(
+        adRewardErrorCodes.AD_REWARD_INVALID_REQUEST,
+        'idempotencyKey is required.',
+      );
+    }
+    if (idempotencyKey.length > 255) {
+      throwAdRewardError(
+        adRewardErrorCodes.AD_REWARD_INVALID_REQUEST,
+        'idempotencyKey is too long.',
+      );
+    }
+    // Control characters would make the key unloggable and unsafe to echo.
+    if (/[\u0000-\u001f\u007f]/u.test(idempotencyKey)) {
+      throwAdRewardError(
+        adRewardErrorCodes.AD_REWARD_INVALID_REQUEST,
+        'idempotencyKey must not contain control characters.',
+      );
+    }
+
+    return { provider, proof, idempotencyKey };
   }
 
   private parseText(value: unknown): string | undefined {
