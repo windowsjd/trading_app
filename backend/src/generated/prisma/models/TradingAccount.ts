@@ -257,6 +257,7 @@ export type TradingAccountWhereInput = {
   orders?: Prisma.OrderListRelationFilter
   positions?: Prisma.PositionListRelationFilter
   quotes?: Prisma.QuoteListRelationFilter
+  adRewardClaims?: Prisma.AdRewardClaimListRelationFilter
 }
 
 export type TradingAccountOrderByWithRelationInput = {
@@ -278,6 +279,7 @@ export type TradingAccountOrderByWithRelationInput = {
   orders?: Prisma.OrderOrderByRelationAggregateInput
   positions?: Prisma.PositionOrderByRelationAggregateInput
   quotes?: Prisma.QuoteOrderByRelationAggregateInput
+  adRewardClaims?: Prisma.AdRewardClaimOrderByRelationAggregateInput
 }
 
 export type TradingAccountWhereUniqueInput = Prisma.AtLeast<{
@@ -302,6 +304,7 @@ export type TradingAccountWhereUniqueInput = Prisma.AtLeast<{
   orders?: Prisma.OrderListRelationFilter
   positions?: Prisma.PositionListRelationFilter
   quotes?: Prisma.QuoteListRelationFilter
+  adRewardClaims?: Prisma.AdRewardClaimListRelationFilter
 }, "id">
 
 export type TradingAccountOrderByWithAggregationInput = {
@@ -354,6 +357,7 @@ export type TradingAccountCreateInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
   positions?: Prisma.PositionCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateInput = {
@@ -374,6 +378,7 @@ export type TradingAccountUncheckedCreateInput = {
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
   positions?: Prisma.PositionUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUpdateInput = {
@@ -394,6 +399,7 @@ export type TradingAccountUpdateInput = {
   orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
   positions?: Prisma.PositionUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateInput = {
@@ -414,6 +420,7 @@ export type TradingAccountUncheckedUpdateInput = {
   orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   positions?: Prisma.PositionUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateManyInput = {
@@ -508,6 +515,11 @@ export type TradingAccountSumOrderByAggregateInput = {
 export type TradingAccountNullableScalarRelationFilter = {
   is?: Prisma.TradingAccountWhereInput | null
   isNot?: Prisma.TradingAccountWhereInput | null
+}
+
+export type TradingAccountScalarRelationFilter = {
+  is?: Prisma.TradingAccountWhereInput
+  isNot?: Prisma.TradingAccountWhereInput
 }
 
 export type TradingAccountCreateNestedManyWithoutUserInput = {
@@ -648,6 +660,20 @@ export type TradingAccountUpdateOneWithoutWalletTransactionsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.TradingAccountUpdateToOneWithWhereWithoutWalletTransactionsInput, Prisma.TradingAccountUpdateWithoutWalletTransactionsInput>, Prisma.TradingAccountUncheckedUpdateWithoutWalletTransactionsInput>
 }
 
+export type TradingAccountCreateNestedOneWithoutAdRewardClaimsInput = {
+  create?: Prisma.XOR<Prisma.TradingAccountCreateWithoutAdRewardClaimsInput, Prisma.TradingAccountUncheckedCreateWithoutAdRewardClaimsInput>
+  connectOrCreate?: Prisma.TradingAccountCreateOrConnectWithoutAdRewardClaimsInput
+  connect?: Prisma.TradingAccountWhereUniqueInput
+}
+
+export type TradingAccountUpdateOneRequiredWithoutAdRewardClaimsNestedInput = {
+  create?: Prisma.XOR<Prisma.TradingAccountCreateWithoutAdRewardClaimsInput, Prisma.TradingAccountUncheckedCreateWithoutAdRewardClaimsInput>
+  connectOrCreate?: Prisma.TradingAccountCreateOrConnectWithoutAdRewardClaimsInput
+  upsert?: Prisma.TradingAccountUpsertWithoutAdRewardClaimsInput
+  connect?: Prisma.TradingAccountWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TradingAccountUpdateToOneWithWhereWithoutAdRewardClaimsInput, Prisma.TradingAccountUpdateWithoutAdRewardClaimsInput>, Prisma.TradingAccountUncheckedUpdateWithoutAdRewardClaimsInput>
+}
+
 export type TradingAccountCreateNestedOneWithoutExchangeTransactionsInput = {
   create?: Prisma.XOR<Prisma.TradingAccountCreateWithoutExchangeTransactionsInput, Prisma.TradingAccountUncheckedCreateWithoutExchangeTransactionsInput>
   connectOrCreate?: Prisma.TradingAccountCreateOrConnectWithoutExchangeTransactionsInput
@@ -713,6 +739,7 @@ export type TradingAccountCreateWithoutUserInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
   positions?: Prisma.PositionCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutUserInput = {
@@ -732,6 +759,7 @@ export type TradingAccountUncheckedCreateWithoutUserInput = {
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
   positions?: Prisma.PositionUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutUserInput = {
@@ -792,6 +820,7 @@ export type TradingAccountCreateWithoutSeasonParticipantInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
   positions?: Prisma.PositionCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutSeasonParticipantInput = {
@@ -811,6 +840,7 @@ export type TradingAccountUncheckedCreateWithoutSeasonParticipantInput = {
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
   positions?: Prisma.PositionUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutSeasonParticipantInput = {
@@ -846,6 +876,7 @@ export type TradingAccountUpdateWithoutSeasonParticipantInput = {
   orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
   positions?: Prisma.PositionUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutSeasonParticipantInput = {
@@ -865,6 +896,7 @@ export type TradingAccountUncheckedUpdateWithoutSeasonParticipantInput = {
   orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   positions?: Prisma.PositionUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutPositionsInput = {
@@ -884,6 +916,7 @@ export type TradingAccountCreateWithoutPositionsInput = {
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutPositionsInput = {
@@ -903,6 +936,7 @@ export type TradingAccountUncheckedCreateWithoutPositionsInput = {
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutPositionsInput = {
@@ -938,6 +972,7 @@ export type TradingAccountUpdateWithoutPositionsInput = {
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutPositionsInput = {
@@ -957,6 +992,7 @@ export type TradingAccountUncheckedUpdateWithoutPositionsInput = {
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutOrdersInput = {
@@ -976,6 +1012,7 @@ export type TradingAccountCreateWithoutOrdersInput = {
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutTradingAccountInput
   positions?: Prisma.PositionCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutOrdersInput = {
@@ -995,6 +1032,7 @@ export type TradingAccountUncheckedCreateWithoutOrdersInput = {
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   positions?: Prisma.PositionUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutOrdersInput = {
@@ -1030,6 +1068,7 @@ export type TradingAccountUpdateWithoutOrdersInput = {
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   positions?: Prisma.PositionUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutOrdersInput = {
@@ -1049,6 +1088,7 @@ export type TradingAccountUncheckedUpdateWithoutOrdersInput = {
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   positions?: Prisma.PositionUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutCashWalletsInput = {
@@ -1068,6 +1108,7 @@ export type TradingAccountCreateWithoutCashWalletsInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
   positions?: Prisma.PositionCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutCashWalletsInput = {
@@ -1087,6 +1128,7 @@ export type TradingAccountUncheckedCreateWithoutCashWalletsInput = {
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
   positions?: Prisma.PositionUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutCashWalletsInput = {
@@ -1122,6 +1164,7 @@ export type TradingAccountUpdateWithoutCashWalletsInput = {
   orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
   positions?: Prisma.PositionUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutCashWalletsInput = {
@@ -1141,6 +1184,7 @@ export type TradingAccountUncheckedUpdateWithoutCashWalletsInput = {
   orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   positions?: Prisma.PositionUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutWalletTransactionsInput = {
@@ -1160,6 +1204,7 @@ export type TradingAccountCreateWithoutWalletTransactionsInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
   positions?: Prisma.PositionCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutWalletTransactionsInput = {
@@ -1179,6 +1224,7 @@ export type TradingAccountUncheckedCreateWithoutWalletTransactionsInput = {
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
   positions?: Prisma.PositionUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutWalletTransactionsInput = {
@@ -1214,6 +1260,7 @@ export type TradingAccountUpdateWithoutWalletTransactionsInput = {
   orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
   positions?: Prisma.PositionUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutWalletTransactionsInput = {
@@ -1228,6 +1275,103 @@ export type TradingAccountUncheckedUpdateWithoutWalletTransactionsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonParticipant?: Prisma.SeasonParticipantUncheckedUpdateOneWithoutTradingAccountNestedInput
   cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutTradingAccountNestedInput
+  exchangeTransactions?: Prisma.ExchangeTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  positions?: Prisma.PositionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
+}
+
+export type TradingAccountCreateWithoutAdRewardClaimsInput = {
+  id?: string
+  mode: $Enums.TradingAccountMode
+  status?: $Enums.TradingAccountStatus
+  initialCapitalKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  openedAt: Date | string
+  closedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  user: Prisma.UserCreateNestedOneWithoutTradingAccountsInput
+  seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutTradingAccountInput
+  cashWallets?: Prisma.CashWalletCreateNestedManyWithoutTradingAccountInput
+  walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutTradingAccountInput
+  exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutTradingAccountInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutTradingAccountInput
+  orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
+  positions?: Prisma.PositionCreateNestedManyWithoutTradingAccountInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
+}
+
+export type TradingAccountUncheckedCreateWithoutAdRewardClaimsInput = {
+  id?: string
+  userId: string
+  mode: $Enums.TradingAccountMode
+  status?: $Enums.TradingAccountStatus
+  initialCapitalKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  openedAt: Date | string
+  closedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  seasonParticipant?: Prisma.SeasonParticipantUncheckedCreateNestedOneWithoutTradingAccountInput
+  cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
+  exchangeTransactions?: Prisma.ExchangeTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  positions?: Prisma.PositionUncheckedCreateNestedManyWithoutTradingAccountInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
+}
+
+export type TradingAccountCreateOrConnectWithoutAdRewardClaimsInput = {
+  where: Prisma.TradingAccountWhereUniqueInput
+  create: Prisma.XOR<Prisma.TradingAccountCreateWithoutAdRewardClaimsInput, Prisma.TradingAccountUncheckedCreateWithoutAdRewardClaimsInput>
+}
+
+export type TradingAccountUpsertWithoutAdRewardClaimsInput = {
+  update: Prisma.XOR<Prisma.TradingAccountUpdateWithoutAdRewardClaimsInput, Prisma.TradingAccountUncheckedUpdateWithoutAdRewardClaimsInput>
+  create: Prisma.XOR<Prisma.TradingAccountCreateWithoutAdRewardClaimsInput, Prisma.TradingAccountUncheckedCreateWithoutAdRewardClaimsInput>
+  where?: Prisma.TradingAccountWhereInput
+}
+
+export type TradingAccountUpdateToOneWithWhereWithoutAdRewardClaimsInput = {
+  where?: Prisma.TradingAccountWhereInput
+  data: Prisma.XOR<Prisma.TradingAccountUpdateWithoutAdRewardClaimsInput, Prisma.TradingAccountUncheckedUpdateWithoutAdRewardClaimsInput>
+}
+
+export type TradingAccountUpdateWithoutAdRewardClaimsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  mode?: Prisma.EnumTradingAccountModeFieldUpdateOperationsInput | $Enums.TradingAccountMode
+  status?: Prisma.EnumTradingAccountStatusFieldUpdateOperationsInput | $Enums.TradingAccountStatus
+  initialCapitalKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  openedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  closedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  user?: Prisma.UserUpdateOneRequiredWithoutTradingAccountsNestedInput
+  seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutTradingAccountNestedInput
+  cashWallets?: Prisma.CashWalletUpdateManyWithoutTradingAccountNestedInput
+  walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutTradingAccountNestedInput
+  exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutTradingAccountNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutTradingAccountNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
+  positions?: Prisma.PositionUpdateManyWithoutTradingAccountNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
+}
+
+export type TradingAccountUncheckedUpdateWithoutAdRewardClaimsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  mode?: Prisma.EnumTradingAccountModeFieldUpdateOperationsInput | $Enums.TradingAccountMode
+  status?: Prisma.EnumTradingAccountStatusFieldUpdateOperationsInput | $Enums.TradingAccountStatus
+  initialCapitalKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  openedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  closedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonParticipant?: Prisma.SeasonParticipantUncheckedUpdateOneWithoutTradingAccountNestedInput
+  cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -1252,6 +1396,7 @@ export type TradingAccountCreateWithoutExchangeTransactionsInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
   positions?: Prisma.PositionCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutExchangeTransactionsInput = {
@@ -1271,6 +1416,7 @@ export type TradingAccountUncheckedCreateWithoutExchangeTransactionsInput = {
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
   positions?: Prisma.PositionUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutExchangeTransactionsInput = {
@@ -1306,6 +1452,7 @@ export type TradingAccountUpdateWithoutExchangeTransactionsInput = {
   orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
   positions?: Prisma.PositionUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutExchangeTransactionsInput = {
@@ -1325,6 +1472,7 @@ export type TradingAccountUncheckedUpdateWithoutExchangeTransactionsInput = {
   orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   positions?: Prisma.PositionUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutQuotesInput = {
@@ -1344,6 +1492,7 @@ export type TradingAccountCreateWithoutQuotesInput = {
   fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
   positions?: Prisma.PositionCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutQuotesInput = {
@@ -1363,6 +1512,7 @@ export type TradingAccountUncheckedCreateWithoutQuotesInput = {
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
   positions?: Prisma.PositionUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutQuotesInput = {
@@ -1398,6 +1548,7 @@ export type TradingAccountUpdateWithoutQuotesInput = {
   fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
   positions?: Prisma.PositionUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutQuotesInput = {
@@ -1417,6 +1568,7 @@ export type TradingAccountUncheckedUpdateWithoutQuotesInput = {
   fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   positions?: Prisma.PositionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateWithoutFxExecuteRequestsInput = {
@@ -1436,6 +1588,7 @@ export type TradingAccountCreateWithoutFxExecuteRequestsInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
   positions?: Prisma.PositionCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountUncheckedCreateWithoutFxExecuteRequestsInput = {
@@ -1455,6 +1608,7 @@ export type TradingAccountUncheckedCreateWithoutFxExecuteRequestsInput = {
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
   positions?: Prisma.PositionUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
 }
 
 export type TradingAccountCreateOrConnectWithoutFxExecuteRequestsInput = {
@@ -1490,6 +1644,7 @@ export type TradingAccountUpdateWithoutFxExecuteRequestsInput = {
   orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
   positions?: Prisma.PositionUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutFxExecuteRequestsInput = {
@@ -1509,6 +1664,7 @@ export type TradingAccountUncheckedUpdateWithoutFxExecuteRequestsInput = {
   orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   positions?: Prisma.PositionUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountCreateManyUserInput = {
@@ -1539,6 +1695,7 @@ export type TradingAccountUpdateWithoutUserInput = {
   orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
   positions?: Prisma.PositionUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateWithoutUserInput = {
@@ -1558,6 +1715,7 @@ export type TradingAccountUncheckedUpdateWithoutUserInput = {
   orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   positions?: Prisma.PositionUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
 }
 
 export type TradingAccountUncheckedUpdateManyWithoutUserInput = {
@@ -1584,6 +1742,7 @@ export type TradingAccountCountOutputType = {
   orders: number
   positions: number
   quotes: number
+  adRewardClaims: number
 }
 
 export type TradingAccountCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1594,6 +1753,7 @@ export type TradingAccountCountOutputTypeSelect<ExtArgs extends runtime.Types.Ex
   orders?: boolean | TradingAccountCountOutputTypeCountOrdersArgs
   positions?: boolean | TradingAccountCountOutputTypeCountPositionsArgs
   quotes?: boolean | TradingAccountCountOutputTypeCountQuotesArgs
+  adRewardClaims?: boolean | TradingAccountCountOutputTypeCountAdRewardClaimsArgs
 }
 
 /**
@@ -1655,6 +1815,13 @@ export type TradingAccountCountOutputTypeCountQuotesArgs<ExtArgs extends runtime
   where?: Prisma.QuoteWhereInput
 }
 
+/**
+ * TradingAccountCountOutputType without action
+ */
+export type TradingAccountCountOutputTypeCountAdRewardClaimsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.AdRewardClaimWhereInput
+}
+
 
 export type TradingAccountSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -1675,6 +1842,7 @@ export type TradingAccountSelect<ExtArgs extends runtime.Types.Extensions.Intern
   orders?: boolean | Prisma.TradingAccount$ordersArgs<ExtArgs>
   positions?: boolean | Prisma.TradingAccount$positionsArgs<ExtArgs>
   quotes?: boolean | Prisma.TradingAccount$quotesArgs<ExtArgs>
+  adRewardClaims?: boolean | Prisma.TradingAccount$adRewardClaimsArgs<ExtArgs>
   _count?: boolean | Prisma.TradingAccountCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["tradingAccount"]>
 
@@ -1727,6 +1895,7 @@ export type TradingAccountInclude<ExtArgs extends runtime.Types.Extensions.Inter
   orders?: boolean | Prisma.TradingAccount$ordersArgs<ExtArgs>
   positions?: boolean | Prisma.TradingAccount$positionsArgs<ExtArgs>
   quotes?: boolean | Prisma.TradingAccount$quotesArgs<ExtArgs>
+  adRewardClaims?: boolean | Prisma.TradingAccount$adRewardClaimsArgs<ExtArgs>
   _count?: boolean | Prisma.TradingAccountCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type TradingAccountIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1748,6 +1917,7 @@ export type $TradingAccountPayload<ExtArgs extends runtime.Types.Extensions.Inte
     orders: Prisma.$OrderPayload<ExtArgs>[]
     positions: Prisma.$PositionPayload<ExtArgs>[]
     quotes: Prisma.$QuotePayload<ExtArgs>[]
+    adRewardClaims: Prisma.$AdRewardClaimPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -2162,6 +2332,7 @@ export interface Prisma__TradingAccountClient<T, Null = never, ExtArgs extends r
   orders<T extends Prisma.TradingAccount$ordersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$ordersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   positions<T extends Prisma.TradingAccount$positionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$positionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PositionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   quotes<T extends Prisma.TradingAccount$quotesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$quotesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$QuotePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  adRewardClaims<T extends Prisma.TradingAccount$adRewardClaimsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$adRewardClaimsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AdRewardClaimPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2785,6 +2956,30 @@ export type TradingAccount$quotesArgs<ExtArgs extends runtime.Types.Extensions.I
   take?: number
   skip?: number
   distinct?: Prisma.QuoteScalarFieldEnum | Prisma.QuoteScalarFieldEnum[]
+}
+
+/**
+ * TradingAccount.adRewardClaims
+ */
+export type TradingAccount$adRewardClaimsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the AdRewardClaim
+   */
+  select?: Prisma.AdRewardClaimSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the AdRewardClaim
+   */
+  omit?: Prisma.AdRewardClaimOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.AdRewardClaimInclude<ExtArgs> | null
+  where?: Prisma.AdRewardClaimWhereInput
+  orderBy?: Prisma.AdRewardClaimOrderByWithRelationInput | Prisma.AdRewardClaimOrderByWithRelationInput[]
+  cursor?: Prisma.AdRewardClaimWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.AdRewardClaimScalarFieldEnum | Prisma.AdRewardClaimScalarFieldEnum[]
 }
 
 /**

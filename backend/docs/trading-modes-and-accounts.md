@@ -35,20 +35,49 @@
   `GET /api/v1/trading-accounts/:accountId/wallets`·`wallet-transactions`,
   `POST .../fx/quote`·`fx/execute`, `GET .../fx/transactions`
   (계약: `docs/trading-account-finance-api-contract.md`)
+- Order·Position·Quote의 transitional `tradingAccountId` 전환 + dual-write +
+  account-scoped 주문·포지션 API + 거래 scope 복구 스크립트
+  `pnpm trading-accounts:repair-trading-scope` (작업 5, 계약:
+  `docs/trading-account-orders-api-contract.md`)
+- **작업 5 보완 (2026-08-03):**
+  - account-scoped 주문 취소의 scope 오류 분류 — 잠금 SQL에서
+    `trading_account_id` 조건을 제거하고, 자기 주문의 null/불일치 scope를
+    404가 아닌 500 `TRADING_SCOPE_REPAIR_REQUIRED`/
+    `TRADING_ACCOUNT_SCOPE_MISMATCH`로 노출 (다른 계정의 정상 주문은 404 유지,
+    오류 시 주문 상태·예약금 불변)
+  - 시장가 주문 committed replay first — 이미 커밋된 주문은 계정 suspended·
+    closed, 시즌 종료, 참가자 제외, 시장 종료 이후에도 저장된 최초
+    `responsePayloadJson`을 재생 (신규 주문 gate는 기존 주문이 없을 때만 실행)
+  - 원자 지갑 변경 실패 진단 정밀화 — 0행 UPDATE를 wallet id 단독 재조회로
+    분류(scope 손상 / 잔액 부족 / 실제 동시성 충돌), debit·credit·reserve·
+    settle·release·cleanup·FX source·FX target 전 경로 적용
+- **작업 6 (2026-08-03):** 일반모드 계정 생성 API
+  `POST /api/v1/trading-accounts/general` + KRW/USD 지갑 + 최초 1,000만 원
+  1회 지급(하나의 트랜잭션, partial unique 기반 멱등), account-scoped 금융
+  조회의 일반계정 지원, `AdRewardClaim` + provider-neutral 광고 검증
+  인터페이스 + 광고 보상 지급/한도/멱등 계층, 읽기 전용 운영 점검
+  `pnpm trading-accounts:audit-general`
+  (계약: `docs/general-account-and-ad-rewards-api-contract.md`)
 
 **아직 구현되지 않음 (문서만 보고 사용 가능하다고 오해하지 말 것):**
 
-- 일반모드 계정 생성(진입) API, 일반모드 지갑, 최초 1,000만 원 실제 지급
-- 로그인 후 모드 선택 화면, 앱 내 모드 전환
-- Order·Position·Quote·스냅샷의 accountId 전환 (주문·포지션 거래 주체는 여전히
-  seasonParticipantId 기준; 지갑·원장·환전만 §3.6의 dual-write 전환 완료)
-- 광고 SDK, 광고 시청 UI, 광고 보상 검증·지급 API, 광고 보상 이력 테이블,
-  광고 보상 WalletTransactionType, 광고 1회당 지급액·일일 한도 확정
-- 시간가중수익률 계산 코드
-- 일반모드 포트폴리오·주문·포지션·스냅샷
+- 일반계정의 실제 주식·암호화폐 주문(409
+  `GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED` 유지)과 실제 환전(409
+  `GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED` 유지), 일반계정 Position 생성
+- 로그인 후 모드 선택 화면, 앱 내 모드 전환, 프런트엔드 연결 일체
+- 스냅샷 3모델(EquitySnapshot·DailyPortfolioSnapshot·SeasonRanking)의
+  accountId 전환, 일반모드 포트폴리오 평가·스냅샷
+- 시간가중수익률(TWR) 계산 코드, 일반모드 투자손익 표시
+- 광고 SDK, 광고 시청 UI, **실제 광고 네트워크의 provider 전용 서버 검증
+  어댑터** (인터페이스와 registry만 존재하며 운영 registry는 비어 있음),
+  광고 1회당 지급액·일일 한도·대기시간의 확정값
+- Order·Position·ExchangeTransaction·FxExecuteRequest의
+  `seasonParticipantId` optional 전환 (작업 6에서는 CashWallet·
+  WalletTransaction만 nullable로 전환)
 - `tradingAccountId` NOT NULL 강화 (참가자: §3.5.5, 금융 4모델: §3.6.5)
 - 시즌 finished/rewarded/settled 전환 시 account `closed` 일괄 동기화,
   suspended 계정 재활성화, 운영자 일반계정 정지 API (§4.4의 잔여 범위)
+- 기존 `seasonParticipantId` 컬럼 제거
 
 ## 1. 게임규칙 (01 게임규칙서 대응)
 
@@ -92,7 +121,7 @@
 - 사용자당 일반모드 거래계정은 **하나만** 존재한다 (DB partial unique index로 강제).
 - 일반모드 거래계정의 자산은 기한 없이 유지되고, 계정이 정지·종료되지 않는 한 계속 투자할 수 있다.
 - 새로운 시즌이 시작·종료되어도 일반모드 자산은 유지된다.
-- 일반모드 계정은 향후 사용자가 일반모드에 **최초 진입할 때** 생성한다. (이번 작업에서는 생성 API와 실제 계정 생성을 구현하지 않았다.)
+- 일반모드 계정은 사용자가 일반모드에 **최초 진입할 때** 생성한다. 구현됨(작업 6): `POST /api/v1/trading-accounts/general`만이 general 계정을 만든다. migration·GET·거래 경로·광고 claim은 절대 계정을 만들지 않는다.
 
 ### 1.5 일반모드 최초 가상자금
 
@@ -116,6 +145,8 @@
 - 광고 완료가 확인되지 않으면 보상하지 않는다. 같은 광고 완료 이벤트에 대해 두 번 지급하지 않는다.
 - 클라이언트가 직접 지갑 잔액을 증가시킬 수 없다. 광고 보상 지급은 서버가 최종 결정한다.
 - 광고 보상 지급과 지갑 원장 기록은 하나의 DB 트랜잭션으로 처리해야 한다.
+
+**구현 상태(작업 6):** 광고 보상 백엔드 기반은 구현되어 있다 — `AdRewardClaim` 모델, provider-neutral 검증 인터페이스/registry, 소유권·general 한정·활성 계정 확인, 동일 provider 이벤트 중복 차단(`UNIQUE(provider, providerEventId)`), 계정 행 `FOR UPDATE` 직렬화, 일일 횟수·금액·cooldown 재검증, KRW 지갑 지급 + `ad_reward` 원장 + claim granted의 단일 트랜잭션, 재시도 멱등성. **실제 광고 제공자는 여전히 미정이며 운영 registry는 비어 있다**(모든 claim이 503 `AD_REWARD_PROVIDER_UNAVAILABLE`). 기능 기본값은 `AD_REWARD_ENABLED=false`이고, 운영 환경에는 fake verifier를 등록하지 않는다. 상세 계약: `docs/general-account-and-ad-rewards-api-contract.md`.
 
 **광고 1회당 지급액은 아직 확정하지 않았다.** 다음 값은 향후 운영 설정값으로 관리한다: 광고 1회당 지급액, 하루 최대 광고 보상 횟수, 광고 보상 간 최소 대기시간, 사용자당 하루 최대 보상금, 광고 제공자, 광고 보상 활성화 여부. 초기 구현에서 거래소급 부정행위 탐지 시스템은 만들지 않되, 향후 광고 구현 시 최소한 서버 검증, 광고 완료 이벤트 고유 ID, 동일 이벤트 중복 지급 차단, 사용자·거래계정 소유권 확인, 일반모드 계정 한정 지급, 일일 한도 확인, 지급·원장 기록의 원자성, 재시도 멱등성을 보장한다. 광고 SDK와 제공자별 서버 검증 방식은 광고 기능 작업에서 결정한다.
 
@@ -629,7 +660,7 @@ NULL은 후속 작업으로 보류. **구버전 writer가 실행 중인 상태�
 | finished | closed |
 | rewarded | closed |
 
-기존 `SeasonStatus`·`ParticipantStatus`는 삭제·대체하지 않는다. `WalletTransactionType`에 `ad_reward`류 값은 이번 작업에서 추가하지 않았다(광고 보상 실제 구현 작업에서 추가).
+기존 `SeasonStatus`·`ParticipantStatus`는 삭제·대체하지 않는다. `WalletTransactionType.ad_reward`와 `WalletTransactionReferenceType.general_account_open`·`ad_reward_claim`, 그리고 `AdRewardClaimStatus`는 작업 6에서 추가했다(§6).
 
 ### 4.4 참가자 제외 ↔ TradingAccount 상태 동기화 (구현됨)
 
@@ -718,26 +749,97 @@ singleton 어디에도 currentTradingAccountId/currentMode를 두지 않는다. 
 (`/api/v1/trading-accounts/:accountId/...`)로 accountId를 전달하며 서버는
 요청마다 소유권을 다시 검증한다.
 
-### 5.3 향후 예정 (미구현)
+### 5.3 일반계정·광고 API (작업 6에서 추가, 구현됨)
 
-- 일반계정 최초 생성 또는 조회 (최초 진입 시 생성 + 1,000만 원 1회 지급)
+- `POST /api/v1/trading-accounts/general` — 일반계정 최초 생성 + KRW/USD
+  지갑 + 최초 1,000만 원 1회 지급. body 없음, 항상 200, `data.created`로
+  최초 생성/재요청 구분. 재요청·동시 요청·네트워크 재시도에서 계정 1개,
+  통화별 지갑 1개, initial grant 1건만 존재한다.
+- `GET /api/v1/trading-accounts/:accountId/ad-rewards/eligibility` — 안내용
+  조회(지급하지 않음).
+- `POST /api/v1/trading-accounts/:accountId/ad-rewards/claim` — 검증된 광고
+  완료 이벤트에 대한 KRW 지급.
+- `GET /api/v1/trading-accounts/:accountId/ad-rewards/claims` — 소유 계정의
+  claim 이력. 시즌계정은 세 경로 모두 409
+  `AD_REWARD_GENERAL_ACCOUNT_ONLY`(시즌계정에는 광고 이력이 존재하지 않는다).
+
+상세 계약: `docs/general-account-and-ad-rewards-api-contract.md`.
+
+### 5.4 향후 예정 (미구현)
+
 - accountId 기반 portfolio API (EquitySnapshot·DailyPortfolioSnapshot·
   SeasonRanking의 accountId 전환 포함)
-- 프런트엔드 accountId 연결·로그인 후 모드 선택 화면
-- 광고 보상 시작/claim API, 광고 완료 검증 callback 또는 server verification API, 광고 보상 내역 API
-  (광고 제공자가 미정이므로 provider별 endpoint는 확정하지 않는다)
+- 프런트엔드 accountId 연결·로그인 후 모드 선택 화면·광고 시청 화면
+- 실제 광고 네트워크 provider adapter (provider 확정 후 `AdRewardVerifier`
+  구현체를 `AdRewardsModule`에 등록하는 additive 변경)
 
-## 6. 향후 광고 보상 데이터 구조 초안 (설계 예정 — 현재 schema/migration에 없음)
+## 6. 일반계정·광고 보상 데이터 구조 (작업 6에서 구현됨)
 
-`AdRewardClaim`(가칭): `id`, `userId`, `tradingAccountId`, `provider`, `providerEventId`, `rewardAmountKrw`, `status`, `requestedAt`, `verifiedAt`, `grantedAt`, `failureReason`, `createdAt`, `updatedAt`.
+migration: `20260803180000_add_general_account_and_ad_reward_enums`(enum 전용,
+PostgreSQL이 같은 트랜잭션에서 새 enum 값을 사용할 수 없어 분리) +
+`20260803181000_add_general_account_and_ad_reward_foundation`.
 
-핵심 제약(구현 시):
+**CashWallet·WalletTransaction:** `seasonParticipantId`를 `String?`로 완화
+(`DROP NOT NULL`)하고 관계도 optional. 일반계정에는 SeasonParticipant가
+없으므로 일반 지갑·원장은 `seasonParticipantId = null`,
+`tradingAccountId = general account id`다. **기존 시즌 행의
+`seasonParticipantId`는 변경하지 않는다.** Order·Position·
+ExchangeTransaction·FxExecuteRequest는 일반 주문·환전이 아직 비활성이므로
+이번 작업에서 변경하지 않았다.
+
+**enum 추가:** `WalletTransactionType.ad_reward`,
+`WalletTransactionReferenceType.general_account_open`·`ad_reward_claim`,
+`AdRewardClaimStatus(pending|verified|granted|rejected|failed)`.
+기존 `initial_grant`·`season_join` 의미는 변경하지 않았다.
+
+- 일반계정 최초 지급 원장: `txType=initial_grant`,
+  `referenceType=general_account_open`, `referenceId=general account id`
+- 광고 보상 원장: `txType=ad_reward`,
+  `referenceType=ad_reward_claim`, `referenceId=AdRewardClaim.id`
+
+**partial unique (Prisma DSL로 표현 불가 → migration SQL + schema 주석 +
+schema contract 테스트로 관리):** `wallet_transactions` 전체에
+`unique(referenceType, referenceId)`는 **추가할 수 없다** — 하나의 order·
+exchange reference에 여러 원장 행이 정상적으로 존재하기 때문이다. 대신
+1행짜리 reference 두 종류만 부분 인덱스로 강제한다.
+
+- `wallet_transactions_general_account_open_reference_unique`:
+  `UNIQUE (reference_id) WHERE reference_type = 'general_account_open'`
+- `wallet_transactions_ad_reward_claim_reference_unique`:
+  `UNIQUE (reference_id) WHERE reference_type = 'ad_reward_claim'`
+
+**AdRewardClaim:** `id`, `userId`, `tradingAccountId`, `provider`,
+`providerEventId`, `status`, `rewardAmountKrw(24,8)`,
+`verificationFingerprint?`, `verificationMetadataJson?`, `requestedAt`,
+`verifiedAt?`, `grantedAt?`, `rejectedAt?`, `failedAt?`, `failureCode?`,
+`failureReason?`, `walletTransactionId? @unique`, `createdAt`, `updatedAt`.
+관계 3종 모두 `onDelete: Restrict`(감사 기록이 사용자·계정·원장 삭제를
+막는다). 제약: `@@unique([provider, providerEventId])`,
+`@@index([tradingAccountId, grantedAt])`, `@@index([userId, grantedAt])`,
+`@@index([status, createdAt])`.
+
+핵심 규칙:
 
 - `(provider, providerEventId)` unique — 동일 광고 이벤트 중복 지급 금지
-- 일반모드(`mode=general`) TradingAccount에만 지급
-- 지급 완료 상태에서만 WalletTransaction 생성, WalletTransaction과 지갑 증액은 하나의 트랜잭션
-- 클라이언트가 rewardAmount를 결정하지 않음 — 서버 운영 설정값 사용
-- 누적 광고 보상금은 완료된 광고 보상 원장 거래의 집계로 계산 (TradingAccount 컬럼 누적 금지)
+- 일반모드(`mode=general`) TradingAccount에만 지급, KRW 지갑만 증액
+- `providerEventId`는 클라이언트 문자열이 아니라 **등록된 서버 verifier가
+  반환한 값**만 저장한다
+- `verificationFingerprint`는 proof 원문이 아닌 SHA-256 단방향 fingerprint다.
+  광고 토큰·서명 비밀·raw callback·민감 식별자는 저장하지 않으며,
+  `verificationMetadataJson`에는 어댑터가 허용한 비민감 최소 정보만 담는다
+- 지갑 증액 + `ad_reward` 원장 + claim granted는 하나의 트랜잭션
+- 클라이언트가 rewardAmount·providerEventId·userId·tradingAccountId·
+  grantedAt·balanceAfter·일일 카운트·cooldown을 결정하지 않는다
+- 누적 광고 보상금은 granted claim 또는 `ad_reward` 원장의 집계로 계산한다
+  (TradingAccount에 `cumulativeAdReward`류 누적 컬럼 금지)
+- **migration은 general 계정·지갑·지급·claim을 일절 생성하지 않는다.**
+  적용 후에도 general 계정 수는 적용 전과 동일해야 한다(현재 모든 환경에서 0).
+
+migration 전후 fingerprint(§8 배포 절차와 동일): TradingAccount 총수·mode별
+수, CashWallet 총수·participant null 수·통화별 balance/reserved 합계,
+WalletTransaction 총수·participant null 수·txType별 amount 합계·
+referenceType별 건수, 기존 ID와 seasonParticipantId, general 계정 수,
+AdRewardClaim 수.
 
 ## 7. QA 체크리스트 (05 QA 체크리스트 대응)
 
@@ -865,22 +967,95 @@ TradingAccount를 지우지 않아 해당 커밋 상태에서는 FK 오류로 �
 | 운영 CLI 시나리오 (repair-trading-scope dry→apply→verify→재실행) | PASS | dev DB에 old-writer null scope 3행 심기 → dry-run 보고(변경 없음) → apply(3행 backfill, 잔여 0/0, exit 0) → 값 불변 확인 → 재실행 멱등 exit 0 |
 | §20 완료 기준 검증 쿼리 | PASS | null·mismatch·order-quote 불일치·계정별 idempotency/position 중복·legacy partial 위반·orphan/general 계정 전부 0 |
 
-### 7.4 향후 광고 QA 초안 (전부 NOT_IMPLEMENTED)
+**2026-08-03 (작업 5 보완 3종 + 작업 6, 로컬 실행 — hosted CI 없음):**
 
-- [ ] NOT_IMPLEMENTED — 광고 완료 검증 실패 시 지급 없음
-- [ ] NOT_IMPLEMENTED — 동일 광고 이벤트 재전송 시 중복 지급 없음
-- [ ] NOT_IMPLEMENTED — 시즌계정에는 광고 보상 지급 불가
-- [ ] NOT_IMPLEMENTED — 다른 사용자의 거래계정에 지급 불가
-- [ ] NOT_IMPLEMENTED — 광고 보상금이 투자손익으로 집계되지 않음
-- [ ] NOT_IMPLEMENTED — 광고 지급 직후 가격 변동이 없다면 대표 수익률 불변
+| 검증 | 결과 | 근거 |
+| --- | --- | --- |
+| prisma format / validate / generate | PASS | 신규 migration 2건 포함 |
+| typecheck / build | PASS | `pnpm typecheck`, `pnpm build` |
+| unit + script spec (`pnpm test`) | PASS | 2,315 pass (신규 +72: 광고 config, 지갑 실패 진단, 취소 scope 분류, general/ad schema contract) |
+| migration 적용·비파괴 (dev DB fingerprint 전후) | PASS | 시즌 데이터(계정 3, 지갑 6, 원장 15) 심은 뒤 `migrate deploy`; 통화별 balance/reserved 합계·txType별 amount·referenceType별 건수·전체 ID·seasonParticipantId 모두 동일. 유일한 차이는 빈 `ad_reward_claims` 테이블 |
+| opt-in DB 통합 16종 직렬 (`--runInBand`) | PASS | 기존 14종 + 신규 `general-account`·`order-replay-and-cancel-scope` |
+| 신규 general-account DB 통합 | PASS | 최초 생성 원자성·재호출 멱등·동시 생성 1건 수렴·지갑/원장 생성 실패 rollback·손상 계정 fail-closed·suspended/closed 미복구·partial unique·account-scoped 조회·season link 오염 fail-closed |
+| 신규 ad-reward DB 통합 | PASS | disabled/provider 미등록 차단·검증 실패 무기록·지급 원자성·중복 이벤트 replay·타 계정 재사용 409·동시 동일 이벤트 1회 지급·일일 count/amount race·cooldown·rejected 영구성·시즌계정/타인 차단·응답 비밀 미노출 |
+| 신규 market replay + cancel scope DB 통합 | PASS | responsePayloadJson 원자 저장, suspended/closed/ended/excluded/자산 비활성 이후 replay 및 금융 상태 불변, 다른 hash 409, 신규 주문 gate 유지, 취소 scope 6분기 + 지갑 scope 2종 fail-closed(상태·예약금 불변) |
+| e2e (`pnpm test:e2e`, `JWT_ACCESS_SECRET=test-secret`) | 119/122 PASS | 신규 4건 추가 통과. 실패 3건(readiness/wallets/orders-cancel)은 **BASELINE_FAIL** — 기준 커밋 c08ddc70에서 git stash로 동일 명령·환경 재현 확인 |
+| `pnpm trading-accounts:audit-general` | PASS | dev DB findings 0, exit 0 |
+| 실제 광고 provider 연동 | **PROVIDER_NOT_CONFIGURED** | provider 미확정, 운영 registry 비어 있음. backend 검증은 테스트 전용 fake verifier 기반이며 실제 provider end-to-end 검증이 아니다 |
 
-## 8. 후속 작업 권장 순서
+### 7.4 일반계정·광고 영구 체크리스트 (작업 6에서 구현됨)
+
+일반계정 provisioning:
+
+- [ ] 인증 없이 `POST /trading-accounts/general` 호출 시 401, 계정·지갑·원장 미생성
+- [ ] 최초 호출에서 general/active/1,000만 원 계정 + KRW 1,000만 + USD 0 지갑 + initial grant 1건
+- [ ] SeasonParticipant 미생성, 두 지갑 모두 `seasonParticipantId = null`
+- [ ] 원장 `referenceType=general_account_open`, `referenceId=account id`, amount=balanceAfter=1,000만
+- [ ] 중간 단계(지갑/원장) 실패 시 계정까지 전체 rollback
+- [ ] 재호출 시 `created=false`, 계정·지갑·원장 수 불변
+- [ ] 동시 호출에서도 계정 1개, 통화별 지갑 1개, initial grant 1건
+- [ ] suspended·closed general 계정 재활성화·재생성·재지급 없음
+- [ ] 손상 계정(지갑 누락 등)은 500 `GENERAL_ACCOUNT_INTEGRITY`, 자동 재충전 없음
+- [ ] general_account_open partial unique가 두 번째 grant 행을 거부
+- [ ] account-scoped wallets/wallet-transactions가 일반계정 데이터를 반환하고 GET이 아무것도 생성하지 않음
+- [ ] 일반 금융 행에 seasonParticipantId가 섞이면 500 `GENERAL_ACCOUNT_INTEGRITY`
+
+광고 보상:
+
+- [ ] `AD_REWARD_ENABLED=false`(기본값)에서 claim 503 `AD_REWARD_DISABLED`
+- [ ] enabled=true인데 필수 설정 누락 시 부팅 실패
+- [ ] provider adapter 미등록 시 503 `AD_REWARD_PROVIDER_UNAVAILABLE`
+- [ ] 검증 실패 시 claim·지갑·원장 변화 없음 (422)
+- [ ] 지급 성공 시 KRW 지갑만 증액, USD·reservedAmount·initialCapitalKrw 불변
+- [ ] claim granted ↔ `ad_reward` 원장 1:1, amount 일치, balanceAfter 정확
+- [ ] 동일 이벤트 재요청은 replay(지갑·원장 불변), 다른 계정/사용자는 409 `AD_REWARD_EVENT_ALREADY_USED`
+- [ ] 동시 동일 이벤트에서 claim 1건·원장 1건·지급 1회
+- [ ] 일일 횟수/금액 경계 동시 요청에서도 한도 초과 지급 없음
+- [ ] cooldown 미경과 시 429, 경과 후 새 이벤트 지급 가능
+- [ ] 한도·cooldown에 걸린 검증 완료 이벤트는 rejected claim으로 기록되고 이후에도 지급되지 않음
+- [ ] rejected claim에 walletTransactionId 없음
+- [ ] 시즌계정은 eligibility/claim/claims 전부 409 `AD_REWARD_GENERAL_ACCOUNT_ONLY`
+- [ ] 타인 계정은 404 `TRADING_ACCOUNT_NOT_FOUND`
+- [ ] suspended·closed 계정은 조회 가능·지급 불가(409 `TRADING_ACCOUNT_NOT_ACTIVE`)
+- [ ] claim 응답에 providerEventId·verificationFingerprint·metadata 미노출
+- [ ] 일일 경계가 서버 로컬 timezone이 아닌 `AD_REWARD_DAY_TIME_ZONE`을 따름
+- [ ] 광고 보상금이 `ad_reward` 원장으로 구분 가능하고 투자손익이 아님
+
+## 8. 배포 순서 (작업 6 migration 포함)
+
+1. DB 백업 + 최신 main 확인
+2. additive migration 2건 검토
+   (`…180000_add_general_account_and_ad_reward_enums`,
+   `…181000_add_general_account_and_ad_reward_foundation`) — enum 추가,
+   `DROP NOT NULL` 2건, partial unique 2건, `ad_reward_claims` 테이블만
+3. migration 전 fingerprint 수집 (§6 목록) → `prisma migrate deploy` →
+   migration 후 fingerprint 비교. 기존 금융 값·행 수·ID·seasonParticipantId는
+   **완전히 동일해야 한다.** 유일한 차이는 빈 `ad_reward_claims` 테이블이다.
+4. 신버전 backend 배포
+5. 기존 시즌 API smoke: 참가·지갑 조회·FX quote/execute·시장가/지정가 주문
+6. `POST /api/v1/trading-accounts/general` smoke (신규 테스트 계정)
+7. 같은 사용자 재호출에서 `created=false` + 중복 지급 없음 확인
+8. account-scoped `wallets`·`wallet-transactions`로 KRW 1,000만/USD 0/
+   initial grant 1건 확인
+9. 광고 기능이 기본 비활성인지 확인 (`AD_REWARD_ENABLED` 미설정 → claim 503
+   `AD_REWARD_DISABLED`)
+10. **실제 provider adapter와 운영 정책값이 확정된 뒤에만** 광고 기능 enable
+11. enable 전 reward amount·일일 횟수·일일 금액·cooldown·timezone 검토
+12. enable 후에는 테스트용 이벤트가 아니라 provider sandbox 이벤트로 검증
+13. `pnpm trading-accounts:audit-general` 실행 (findings 0 기대)
+14. 일반계정 주문·FX가 계속 차단되는지 확인
+
+**migration만 적용한 상태에서 기존 사용자에게 general account를 자동 생성하지
+않는다.** general 계정은 사용자가 명시적으로 POST를 호출할 때만 생긴다.
+
+## 9. 후속 작업 권장 순서
 
 1. `season_participants.trading_account_id` NOT NULL 강화 (§3.5.5의 전제조건 5가지 확인 후)
-2. 일반모드 계정 최초 생성 API + 일반모드 지갑 + 최초 1,000만 원 1회 지급 (지급·원장 원자성, 재지급 차단)
-3. 스냅샷 3모델(EquitySnapshot·DailyPortfolioSnapshot·SeasonRanking)의 accountId 전환 + accountId 기반 portfolio API
+2. 스냅샷 3모델(EquitySnapshot·DailyPortfolioSnapshot·SeasonRanking)의 accountId 전환 + accountId 기반 portfolio API
    (지갑·원장·환전과 주문·포지션·Quote는 2026-08-03 완료; 소유권 판정은 `TradingAccountAccessService` 재사용)
+3. 일반모드 거래 활성화: Order·Position·ExchangeTransaction·FxExecuteRequest의
+   `seasonParticipantId` optional 전환 + 일반모드 주문·환전 정책 + 일반 Position
 4. 시즌 lifecycle 격리: finished/rewarded/settled 전환 시 account closed 동기화, suspended 재활성화, 운영자 일반계정 정지
-5. 광고 보상: 제공자 선정 → AdRewardClaim 테이블 + `ad_reward` WalletTransactionType + 서버 검증·지급 API + 운영 설정값
-6. 시간가중수익률 계산 + 외부자금 유입 경계 스냅샷
+5. 광고 제공자 선정 → `AdRewardVerifier` 구현체를 `AdRewardsModule`에 등록(additive) + 운영 설정값 확정 + sandbox 검증
+6. 시간가중수익률 계산 + 외부자금 유입 경계 스냅샷 (`initial_grant`/`ad_reward` 원장을 외부 유입으로 분리)
 7. tradingAccountId NOT NULL 강화·seasonParticipantId 제거(작업 10)는 스냅샷 전환과 구버전 writer 완전 종료 이후에만 검토

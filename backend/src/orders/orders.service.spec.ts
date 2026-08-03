@@ -567,31 +567,38 @@ describe('OrdersService', () => {
     );
   };
 
+  /**
+   * A COMMITTED market create being replayed: same orderType and
+   * idempotencyKey as `orderCreateBody`, with a stored response payload. The
+   * quote-scoped replay-first lookup (작업 5 보완 2) matches on quoteId +
+   * orderType + idempotencyKey, so all three must line up here.
+   */
   const idempotentOrderRecord = (requestHash: string) => ({
     id: 'order-idempotent-1',
     tradingAccountId: 'trading-account-1',
+    quoteId: 'quote-order-create-1',
+    idempotencyKey: orderCreateBody.idempotencyKey,
     requestHash,
     responsePayloadJson: {
       success: true,
       data: {
         order: {
           orderId: 'order-idempotent-1',
-          status: OrderStatus.submitted,
+          status: OrderStatus.executed,
         },
         execution: {
-          state: 'not_executed',
-          reason: 'ORDER_SUBMITTED_NOT_EXECUTED',
-          message:
-            'Order was submitted and can be executed through the execute endpoint.',
+          state: 'executed',
+          reason: 'ORDER_EXECUTED',
+          message: 'Order was executed.',
         },
       },
     },
     side: OrderSide.buy,
-    orderType: OrderType.limit,
-    status: OrderStatus.submitted,
+    orderType: OrderType.market,
+    status: OrderStatus.executed,
     quantity: new Prisma.Decimal('1.00000000'),
-    limitPrice: new Prisma.Decimal('50000.00000000'),
-    executedPrice: null,
+    limitPrice: null,
+    executedPrice: new Prisma.Decimal('50000.00000000'),
     currencyCode: CurrencyCode.KRW,
     grossAmount: new Prisma.Decimal('50000.00000000'),
     feeAmount: new Prisma.Decimal('50.00000000'),
@@ -2339,8 +2346,10 @@ describe('OrdersService', () => {
       fxRateSnapshotId: null,
     });
     let racedRequestHash = '';
-    // Pre-transaction idempotent lookup probes the account scope first and
-    // the legacy null scope second — both must miss to reach the create.
+    // Pre-transaction lookups: the quote-scoped committed replay first, then
+    // the account scope, then the legacy null scope — all three must miss to
+    // reach the create.
+    prisma.order.findFirst.mockResolvedValueOnce(null);
     prisma.order.findFirst.mockResolvedValueOnce(null);
     prisma.order.findFirst.mockResolvedValueOnce(null);
     prisma.order.create.mockImplementationOnce((args) => {
@@ -2381,8 +2390,10 @@ describe('OrdersService', () => {
       assetPriceSnapshotId: 'aps-1',
       fxRateSnapshotId: null,
     });
-    // Pre-transaction idempotent lookup probes the account scope first and
-    // the legacy null scope second — both must miss to reach the create.
+    // Pre-transaction lookups: the quote-scoped committed replay first, then
+    // the account scope, then the legacy null scope — all three must miss to
+    // reach the create.
+    prisma.order.findFirst.mockResolvedValueOnce(null);
     prisma.order.findFirst.mockResolvedValueOnce(null);
     prisma.order.findFirst.mockResolvedValueOnce(null);
     prisma.order.create.mockRejectedValueOnce({ code: 'P2002' });

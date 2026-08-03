@@ -25,6 +25,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TradingAccountAccessService } from '../trading-accounts/trading-account-access.service';
 import { assertSeasonAccountFinancialScopeIntegrity } from '../trading-accounts/trading-account-financial-integrity';
 import { debitAvailableCash } from '../wallets/cash-wallet-atomic';
+import { diagnoseCashWalletMutationFailure } from '../wallets/cash-wallet-failure-diagnosis';
 import { assertCashWalletTradingAccountScope } from '../wallets/cash-wallet-scope';
 import {
   buildFxExecuteErrorEnvelope,
@@ -280,7 +281,8 @@ type FxExecuteTransactionClient = Prisma.TransactionClient;
 
 type FxExecutePostUpdateWallet = {
   id: string;
-  seasonParticipantId: string;
+  /** Nullable since 작업 6; always non-null on the season FX path. */
+  seasonParticipantId: string | null;
   currencyCode: CurrencyCode;
   balanceAmount: Prisma.Decimal;
 };
@@ -2675,7 +2677,7 @@ export class FxService {
     });
 
     if (debitCount !== 1) {
-      await this.throwSourceDebitFailure(tx, plan);
+      await this.throwSourceDebitFailure(tx, plan, tradingAccountId);
     }
 
     return this.findPostUpdateWalletOrThrow(tx, {
@@ -2706,7 +2708,25 @@ export class FxService {
     });
 
     if (creditResult.count !== 1) {
-      this.throwFxExecuteError(fxExecuteErrorCodes.TARGET_WALLET_NOT_FOUND);
+      // 작업 5 보완 3: a 0-row credit was always reported as "target wallet
+      // not found", which silently absorbed scope corruption. Diagnose by
+      // wallet id first — a null/mismatched scope raises its own structured
+      // 500 and rolls the FX execution back.
+      const reason = await diagnoseCashWalletMutationFailure(tx, {
+        walletId: plan.targetWalletId,
+        expected: {
+          seasonParticipantId: plan.seasonParticipantId,
+          tradingAccountId,
+          currencyCode: plan.toCurrency,
+        },
+        // A credit carries no amount guard; only scope can fail it.
+      });
+
+      this.throwFxExecuteError(
+        reason === 'conflict'
+          ? fxExecuteErrorCodes.CONCURRENT_WALLET_UPDATE
+          : fxExecuteErrorCodes.TARGET_WALLET_NOT_FOUND,
+      );
     }
 
     return this.findPostUpdateWalletOrThrow(tx, {
@@ -2717,31 +2737,32 @@ export class FxService {
     });
   }
 
+  /**
+   * 작업 5 보완 3: the shared diagnosis re-reads the wallet by id ALONE, so a
+   * wallet whose trading-account scope became null/mismatched no longer looks
+   * like a missing wallet — it raises FINANCIAL_SCOPE_REPAIR_REQUIRED /
+   * FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH and rolls the FX back.
+   */
   private async throwSourceDebitFailure(
     tx: FxExecuteTransactionClient,
     plan: FxExecutePlan,
+    tradingAccountId: string,
   ): Promise<never> {
-    const sourceWallet = await tx.cashWallet.findFirst({
-      where: {
-        id: plan.sourceWalletId,
+    const reason = await diagnoseCashWalletMutationFailure(tx, {
+      walletId: plan.sourceWalletId,
+      expected: {
         seasonParticipantId: plan.seasonParticipantId,
+        tradingAccountId,
         currencyCode: plan.fromCurrency,
       },
-      select: {
-        balanceAmount: true,
-        reservedAmount: true,
-      },
+      requires: { available: plan.sourceDebitAmount },
     });
 
-    if (!sourceWallet) {
+    if (reason === 'wallet_not_found') {
       this.throwFxExecuteError(fxExecuteErrorCodes.SOURCE_WALLET_NOT_FOUND);
     }
 
-    if (
-      this.toDecimal(sourceWallet.balanceAmount)
-        .sub(this.toDecimal(sourceWallet.reservedAmount ?? '0'))
-        .lt(this.toDecimal(plan.sourceDebitAmount))
-    ) {
+    if (reason !== 'conflict') {
       this.throwFxExecuteError(fxExecuteErrorCodes.INSUFFICIENT_BALANCE);
     }
 

@@ -11,7 +11,7 @@ This service owns backend APIs, database access, financial calculations, and ser
 - Internal reward fulfillment foundation: operator/admin managed request queue/status APIs, idempotent internal reward requests, fulfillment into `SeasonReward`, and fulfilled-only user reward visibility. This does not call or implement external cash, point, coupon, gifticon, payment, or delivery APIs.
 - Admin/operator runtime DBs must have migration `20260601090000_add_user_role_operator_audit_logs` applied so `users.role` and `operator_audit_logs` exist.
 - Current season lookup and season join.
-- TradingAccount foundation shared by season mode and the future general (non-season) mode: season join creates a season-scoped `trading_accounts` row in the same transaction as the participant/wallets/initial grant, existing participants are backfilled 1:1, and at most one `mode=general` account per user is enforced by a partial unique index. General-mode entry/wallets/grant and rewarded-ad funding are NOT implemented yet — rules and contract in `docs/trading-modes-and-accounts.md`.
+- TradingAccount foundation shared by season mode and the future general (non-season) mode: season join creates a season-scoped `trading_accounts` row in the same transaction as the participant/wallets/initial grant, existing participants are backfilled 1:1, and at most one `mode=general` account per user is enforced by a partial unique index. General-mode entry (`POST /api/v1/trading-accounts/general`), its KRW/USD wallets, the one-time 10,000,000 KRW grant, and the rewarded-ad funding layer are implemented as of 작업 6 — see `docs/general-account-and-ad-rewards-api-contract.md`. Ad rewards are DISABLED by default (`AD_REWARD_ENABLED`) and no real ad-network adapter exists yet, so a claim answers 503 `AD_REWARD_PROVIDER_UNAVAILABLE`. General-mode ORDERS, FX, positions, portfolio valuation, and time-weighted return are still NOT implemented — rules and contract in `docs/trading-modes-and-accounts.md`.
 - Season write paths require effective active season state: `status=active` and `startAt <= now < endAt` for join, FX quote/execute, and orders quote/create/execute. Public order cancel is currently blocked with `ORDER_CANCEL_NOT_SUPPORTED`.
 - Home as one aggregate API.
 - Home settled final-result read model from existing `rankType=final` `season_rankings`.
@@ -457,6 +457,38 @@ never auto-corrected; `--apply` exits non-zero while any null/mismatch
 remains. Deployment order and the NOT NULL preconditions:
 `docs/trading-modes-and-accounts.md` §3.5–§3.7.
 
+### General-account + ad-reward audit (read-only)
+
+Report structural problems in general accounts and ad-reward payouts:
+
+```bash
+pnpm trading-accounts:audit-general
+```
+
+It reports general account counts, accounts with a SeasonParticipant
+attached, missing/duplicate KRW-USD wallets, general wallets or ledger rows
+carrying a `seasonParticipantId`, missing/duplicate/wrong-amount initial
+grants, wrong `initialCapitalKrw`, granted claims with no wallet
+transaction, claim↔ledger mismatches, `ad_reward` ledger rows with no claim,
+and duplicate `(provider, providerEventId)` groups. Exit code 1 when
+anything is found.
+
+There is deliberately **no `--apply`**: a damaged general account is never
+re-granted, topped up, or "repaired" automatically, and re-calling the
+general-account endpoint is not a recovery mechanism.
+
+### Ad reward configuration
+
+All values are operational settings with NO product default. Absent
+`AD_REWARD_ENABLED` means disabled, which is a complete valid state; with
+`AD_REWARD_ENABLED=true` every other variable is required and strictly
+validated at boot (`AD_REWARD_PROVIDER`, `AD_REWARD_AMOUNT_KRW`,
+`AD_REWARD_DAILY_MAX_COUNT`, `AD_REWARD_DAILY_MAX_AMOUNT_KRW`,
+`AD_REWARD_COOLDOWN_SECONDS`, `AD_REWARD_DAY_TIME_ZONE`). Enabling the
+feature without a registered provider adapter is valid but inert — every
+claim answers 503 `AD_REWARD_PROVIDER_UNAVAILABLE`, and no fake verifier is
+ever registered in production wiring.
+
 When the app shows market data as preparing or unavailable, verify that the backend has rows in:
 
 ```text
@@ -534,7 +566,7 @@ AUTH_DB_SMOKE=1 pnpm test -- auth.integration.spec.ts
 SEASON_JOIN_DB_INTEGRATION=1 pnpm test -- seasons.join.integration.spec.ts
 FX_EXECUTE_DB_INTEGRATION=1 pnpm test -- fx.execute.integration.spec.ts
 ORDER_EXECUTE_DB_INTEGRATION=1 pnpm test -- orders.execute.integration.spec.ts
-TRADING_ACCOUNT_DB_INTEGRATION=1 pnpm test -- trading-account.integration.spec.ts trading-account-link.integration.spec.ts trading-account-financial-scope.integration.spec.ts
+TRADING_ACCOUNT_DB_INTEGRATION=1 pnpm test -- trading-account.integration.spec.ts trading-account-link.integration.spec.ts trading-account-financial-scope.integration.spec.ts trading-account-trading-scope.integration.spec.ts general-account.integration.spec.ts order-replay-and-cancel-scope.integration.spec.ts
 MVP_FLOW_DB_SMOKE=1 pnpm test -- mvp-flow.integration.spec.ts
 OPS_JOB_LOCK_DB_SMOKE=1 pnpm test -- ops-job-lock.integration.spec.ts
 MARKET_CANDLES_DB_SMOKE=1 pnpm test -- market-candles.integration.spec.ts

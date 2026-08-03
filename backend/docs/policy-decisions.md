@@ -233,3 +233,46 @@ OpsJobLockService + ops_job_locks다(Redis lock 아님). 실제 거래소 주문
   근거: 복구 단계가 의존 순서를 갖고(계정 링크 없이는 어떤 backfill도 불가), 추측 backfill은 잘못된 계정 귀속이라는 최악의 손상을 만든다.
 - EquitySnapshot·DailyPortfolioSnapshot·SeasonRanking의 accountId 전환과 tradingAccountId NOT NULL 강화·seasonParticipantId 제거는 후속 작업으로 보류한다.
   근거: 스냅샷은 랭킹·정산과 얽혀 있어 별도 검증 단위가 필요하고, NOT NULL은 구버전 writer 완전 종료 + 복구 수렴 증빙 없이는 롤링 배포를 깨뜨린다.
+
+
+## 작업 5 보완 (취소 scope 분류 / 시장가 replay / 지갑 실패 진단)
+
+- account-scoped 주문 취소의 잠금 SQL에는 `trading_account_id` 조건을 넣지 않는다. 주문은 orderId + 사용자 소유권으로만 잠그고, 계정 소속은 조회된 행으로 분류한다: 참가자 링크가 요청 계정이면 order scope null → 500 `TRADING_SCOPE_REPAIR_REQUIRED`, 불일치 → 500 `TRADING_ACCOUNT_SCOPE_MISMATCH`; 참가자 링크가 다른 계정이라도 order scope가 요청 계정을 가리키면 500 mismatch; 둘 다 다르면 404 `ORDER_NOT_FOUND`. 분류는 시장가 410 판정보다 먼저 수행하고 어떤 오류 경로에서도 주문 상태·예약금을 바꾸지 않는다.
+  근거: 타인의 주문(숨겨야 함)과 자기 주문의 scope 손상(드러내야 함)은 정반대 성격인데, 잠금 조건에 계정을 넣으면 둘이 같은 404로 붕괴하고 사용자는 자기 주문이 사라진 이유를 알 수 없다.
+- 이미 커밋된 주문 생성의 재시도는 현재 상태 gate보다 먼저 저장된 최초 응답을 재생한다. 시장가·지정가 모두 적용되며, 신규 주문 gate(general 차단, account active, 시즌 status·기간, participant status, 시장 개장, quote, wallet scope, 잔액, 가격 freshness)는 기존 주문이 하나도 없을 때만 실행한다. 계정 소유권 확인만은 replay보다 먼저 수행한다.
+  근거: 이미 돈이 움직인 요청에 상태 오류를 돌려주는 것은 사실과 다르고, 재시도 폭주는 바로 그 gate가 실패하기 시작할 때 일어난다. 소유권을 먼저 보지 않으면 남의 accountId로 주문 정보를 열람할 수 있다.
+- 시장가 주문의 `responsePayloadJson`은 생성·체결 트랜잭션 안에서 저장한다. 저장 실패 시 주문·체결·지갑·원장·포지션이 함께 rollback 된다. 재시도는 현재 데이터로 응답을 재구성하지 않고 저장된 payload를 반환한다(payload 없는 legacy 행만 기존 fallback 유지).
+  근거: 응답 없이 커밋된 주문은 어떤 재시도로도 정확히 재현할 수 없다.
+- legacy 시장가 replay 조회는 실제 DB unique와 범위가 같은 축만 사용한다(고유 `Order.quoteId` + 사용자 소유권). `userId + idempotencyKey` 같은 넓은 조회는 금지한다.
+  근거: idempotencyKey는 시즌 참가 단위로만 unique이므로, 더 넓은 조회는 다른 시즌의 주문을 replay하거나 정상 요청을 충돌로 만든다.
+- 원자 지갑 UPDATE가 0행이면 wallet id 단독으로 재조회해 원인을 분류한다: 행 없음 → 기존 not-found/잔액 오류, participant 불일치·account null·account 불일치·통화 불일치 → 각각의 구조화된 500, 금액 조건 미달 → 기존 잔액/예약금 오류, 전부 정상 → 실제 동시성 CONFLICT. scope는 항상 금액보다 먼저 검사하며, 진단은 읽기 전용이다. 시장가 debit/credit, 지정가 reserve/settle/release(취소·만료·운영자 제외 cleanup 공용), FX source debit/target credit 전 경로에 동일하게 적용한다.
+  근거: 재조회 WHERE에 scope 컬럼을 다시 넣으면 손상된 지갑이 "없는 지갑"으로 보여 손상이 스스로를 은폐한다. 일부 helper만 고치면 같은 결함이 나머지 경로에 남는다.
+
+## 일반모드 계정·자금·광고 보상 (작업 6)
+
+- general TradingAccount는 사용자당 하나이며 `POST /api/v1/trading-accounts/general`에서만 생성된다. migration·GET·거래 경로·광고 claim은 계정·지갑·자금을 만들지 않는다. 응답 status는 200으로 고정하고 `created` boolean으로 최초 생성과 replay를 구분한다.
+  근거: 자금이 생기는 사건은 사용자의 명시적 행위 하나로 좁혀야 추적·감사·중복 방지가 가능하고, status code로 생성 여부를 구분하면 재시도 시 클라이언트 분기가 흔들린다.
+- 계정·KRW 지갑·USD 지갑·최초 지급 원장은 하나의 트랜잭션이며, 멱등성 근거는 기존 partial unique `trading_accounts_general_owner_unique`다. unique 충돌은 500이 아니라 승리한 트랜잭션의 계정 재조회 후 replay로 처리한다.
+  근거: 부분 생성된 계정(지갑 없는 계정, 지급 없는 지갑)은 이후 모든 판정을 오염시키고, 동시 요청에서 500을 돌려주면 클라이언트가 재시도해 상태를 더 악화시킨다.
+- 최초 1,000만 원은 계정 생성 시 1회만 지급한다. 월별·정기·가입일 기준·말일 보정·누락 소급 지급과 그 스케줄러, 자금 고갈 시 자동 초기화, 계정 간 자금 이동은 전부 없다. `grantAnchorDay`·`nextGrantAt`·`lastMonthlyGrantAt`·`monthlyGrantCount`·`catchUpGrant`·`recurringGrant`류 필드는 금지한다.
+  근거: 정기 지급은 랭킹·수익률 의미를 무너뜨리고, 필드가 생기는 순간 스케줄러가 따라온다.
+- 손상된 general 계정은 자동 복구하지 않는다. 구조 검사(mode·participant 없음·initialCapitalKrw 1,000만·KRW/USD 지갑 각 1개·participant null·initial grant 1건 1,000만) 실패는 500 `GENERAL_ACCOUNT_INTEGRITY`이고 POST 재호출은 복구 수단이 아니다. 무결성 판정에 **현재 잔액을 사용하지 않는다.**
+  근거: 손상 데이터의 자동 금융 보정은 손상 자체보다 위험하며, 사용된 계정의 잔액은 1,000만이 아닌 것이 정상이다(광고 보상 후에는 더 클 수도 있다).
+- `wallet_transactions` 전체에 `unique(referenceType, referenceId)`를 두지 않는다. 1행짜리 reference(`general_account_open`, `ad_reward_claim`)만 PostgreSQL partial unique로 강제하고, Prisma DSL로 표현할 수 없으므로 migration SQL + schema 주석 + schema contract 테스트로 관리한다.
+  근거: 하나의 order·exchange reference에는 정상적으로 여러 원장 행이 존재하므로 전역 unique는 기존 거래를 깨뜨린다.
+- 광고 보상은 검증된 이벤트에 대해서만, 일반모드 KRW 지갑에만 지급한다. 시즌계정은 세 endpoint 모두 409 `AD_REWARD_GENERAL_ACCOUNT_ONLY`이고 USD는 지급하지 않으며 `reservedAmount`와 `TradingAccount.initialCapitalKrw`는 변하지 않는다. 광고 보상은 투자수익이 아니라 외부 가상자금 유입이며 `txType=ad_reward`로 식별한다.
+  근거: 광고 자금이 투자 성과에 섞이면 수익률과 랭킹이 실력과 무관해진다.
+- 클라이언트는 `provider`와 opaque proof만 보낸다. rewardAmountKrw·providerEventId·userId·tradingAccountId·grantedAt·balanceAfter·일일 카운트·cooldown은 전부 서버가 결정하며, providerEventId는 등록된 서버 verifier가 반환한 값만 저장한다. proof 원문·광고 토큰·서명 비밀·raw callback은 저장하지 않고 SHA-256 fingerprint만 남긴다.
+  근거: 클라이언트가 정할 수 있는 값은 전부 조작 가능하고, 저장된 proof는 그 자체로 재사용 가능한 자격증명이 된다.
+- 광고 정책값(제공자, 1회 지급액, 일일 횟수·금액, cooldown, 일일 경계 timezone)은 운영 설정이며 코드에 제품 기본값을 넣지 않는다. `AD_REWARD_ENABLED` 기본값은 false이고, enabled=true인데 필수값이 없으면 부팅을 거부한다. 일일 경계는 서버 로컬 timezone이 아니라 설정된 IANA zone으로 계산한다.
+  근거: 정해지지 않은 정책을 코드가 대신 정하면 그 값이 사실상의 결정이 되고, 서버 위치가 사용자의 "오늘"을 바꿔서는 안 된다.
+- 운영 환경에는 fake verifier를 등록하지 않는다. provider adapter가 없으면 503 `AD_REWARD_PROVIDER_UNAVAILABLE`이고 광고 완료를 가짜로 인정하지 않는다. deterministic fake는 테스트에서 DI로만 주입한다.
+  근거: 검증 없는 지급 경로가 운영에 한 번이라도 존재하면 그것이 취약점 자체다.
+- 광고 지급은 계정 행 `SELECT … FOR UPDATE`로 계정 단위 직렬화한 뒤 한도·cooldown·중복 이벤트를 트랜잭션 안에서 재검증하고, 지갑 증액·원장·claim granted를 한 트랜잭션으로 처리한다. 전역·분산 락은 만들지 않는다. eligibility 응답은 안내용이며 예약이 아니다.
+  근거: 사전 count 조회만으로는 동시 요청이 한도를 넘고, 한 계정의 지급끼리만 직렬화하면 충분하다.
+- 한도·cooldown에 걸린 **검증 완료** 이벤트는 rejected claim으로 기록하고 트랜잭션을 commit한 뒤 429를 던진다. 같은 providerEventId는 이후에도 지급하지 않는다(재요청 시 최초 거절을 replay). rejected claim에는 walletTransactionId가 없고 지갑·원장은 변하지 않는다. 검증 자체가 실패한 요청은 신뢰 가능한 event ID가 없으므로 claim 행을 만들지 않는다.
+  근거: "나중에 한도가 풀리면 지급"은 이벤트 저장 후 재사용 공격을 허용하고, 거절 기록이 rollback 되면 같은 이벤트가 다음 날 다시 지급된다.
+- 누적 광고 보상금은 granted claim 또는 `ad_reward` 원장의 집계로 계산한다. `cumulativeAdReward`·`cumulativeExternalFunding`·`totalDeposits`·`currentProfit`·`currentReturnRate`·`twr` 컬럼은 만들지 않는다.
+  근거: 캐시된 금융 집계는 원장과 어긋나는 순간 어느 쪽이 진실인지 판정할 수 없다.
+- 일반계정 운영 점검 `pnpm trading-accounts:audit-general`은 read-only 전용이며 `--apply` 복구를 만들지 않는다.
+  근거: 손상된 계정을 자동으로 다시 충전하는 스크립트는 실수 한 번으로 전 사용자에게 자금을 재지급한다.

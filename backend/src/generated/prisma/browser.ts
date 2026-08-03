@@ -118,6 +118,23 @@ export type CashWallet = Prisma.CashWalletModel
  */
 export type WalletTransaction = Prisma.WalletTransactionModel
 /**
+ * Model AdRewardClaim
+ * Rewarded-ad funding events for GENERAL-mode accounts only.
+ * 
+ * A claim row is created ONLY after a registered server-side verifier
+ * accepted the ad proof: providerEventId is the verifier's identifier, never
+ * a client-supplied string, and rewardAmountKrw always comes from server
+ * configuration. verificationFingerprint stores a one-way SHA-256 digest of
+ * the proof — never the proof, provider token, signing secret, or raw
+ * callback body. verificationMetadataJson holds only the non-sensitive
+ * fields the adapter explicitly allowed.
+ * 
+ * Cumulative ad funding is DERIVED (sum of granted claims / ad_reward ledger
+ * rows); no aggregate column lives on TradingAccount, and a reward never
+ * changes TradingAccount.initialCapitalKrw.
+ */
+export type AdRewardClaim = Prisma.AdRewardClaimModel
+/**
  * Model ExchangeTransaction
  * 
  */

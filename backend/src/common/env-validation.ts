@@ -1,3 +1,4 @@
+import { readAdRewardConfig } from '../ad-rewards/ad-reward.config';
 import { parseLimitOrderEnabled } from '../orders/limit-order.config';
 import { readLimitOrderMatchingConfig } from '../orders/limit-order-matching.config';
 import { readLiveCandleConfig } from '../assets/live-candle.config';
@@ -38,6 +39,14 @@ export function validateEnv(
 
   collect(errors, () => readLiveCandleConfig(env));
 
+  // AD_REWARD_*: absent → disabled, which is a complete valid state. With
+  // AD_REWARD_ENABLED=true every operational value (provider, amount, daily
+  // count/amount caps, cooldown, day timezone) is REQUIRED and strictly
+  // validated — none of them has a product default, so a missing or
+  // nonsensical value refuses to boot rather than paying out a number nobody
+  // decided.
+  const adReward = collect(errors, () => readAdRewardConfig(env));
+
   if (errors.length > 0) {
     throw new Error(
       `Invalid environment configuration:\n- ${errors.join('\n- ')}`,
@@ -54,6 +63,20 @@ export function validateEnv(
         event: 'limit_order_matching_without_registration',
         message:
           'SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED=true while LIMIT_ORDER_ENABLED=false: no new limit orders can be registered, but existing submitted orders will still be auto-filled.',
+      }),
+    );
+  }
+
+  // Enabling ad rewards without a registered provider adapter is a valid but
+  // inert state (every claim answers 503 AD_REWARD_PROVIDER_UNAVAILABLE), so
+  // it is flagged rather than fatal — no real provider adapter exists yet.
+  if (adReward?.enabled) {
+    console.warn(
+      JSON.stringify({
+        event: 'ad_reward_enabled',
+        provider: adReward.provider,
+        message:
+          'AD_REWARD_ENABLED=true: claims are still refused with AD_REWARD_PROVIDER_UNAVAILABLE until a real verifier adapter for this provider is registered in AdRewardsModule.',
       }),
     );
   }

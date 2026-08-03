@@ -660,4 +660,234 @@ describe('LimitOrderCancelService', () => {
       );
     });
   });
+
+  /**
+   * 작업 5 보완 1. The account-scoped cancel used to put
+   * `o.trading_account_id = :accountId` in the LOCKING statement, which
+   * collapsed three different situations into one 404: another user's order,
+   * another account's order, and the caller's OWN order with a null or
+   * corrupted scope. Only the middle case may stay a 404.
+   */
+  describe('account-scoped cancel scope classification', () => {
+    const scopedCancel = (
+      service: LimitOrderCancelService,
+      expectedTradingAccountId = 'trading-account-1',
+    ) =>
+      service.cancelOwnedLimitBuyOrder({
+        userId: 'user-1',
+        orderId: 'order-1',
+        canceledAt,
+        expectedTradingAccountId,
+      });
+
+    const expectNoReservationOrStatusChange = (
+      prisma: ReturnType<typeof createPrisma>,
+    ) => {
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
+      expect(prisma.order.updateMany).not.toHaveBeenCalled();
+    };
+
+    it('locks on orderId + user ownership only, never on the requested account', async () => {
+      const { prisma, service } = createService();
+      prisma.$queryRaw.mockResolvedValueOnce([{ id: 'order-1' }]);
+      prisma.order.findUnique
+        .mockResolvedValueOnce(orderRecord())
+        .mockResolvedValueOnce(
+          orderRecord({
+            status: OrderStatus.canceled,
+            canceledAt,
+            cancelReason: LIMIT_ORDER_CANCEL_REASONS.userCanceled,
+            reservationReleasedAt: canceledAt,
+          }),
+        );
+      prisma.cashWallet.findUnique.mockResolvedValueOnce({
+        id: 'wallet-1',
+        seasonParticipantId: 'sp-1',
+        tradingAccountId: 'trading-account-1',
+      });
+      prisma.$executeRaw.mockResolvedValueOnce(1);
+      prisma.order.updateMany.mockResolvedValueOnce({ count: 1 });
+
+      await scopedCancel(service);
+
+      const lockValues = (prisma.$queryRaw.mock.calls[0] as unknown[]).slice(1);
+      expect(lockValues).toEqual(['order-1', 'user-1']);
+      expect(lockValues).not.toContain('trading-account-1');
+    });
+
+    it('cancels normally when order, participant, and requested account all agree', async () => {
+      const { prisma, service } = createService();
+      prisma.$queryRaw.mockResolvedValueOnce([{ id: 'order-1' }]);
+      prisma.order.findUnique
+        .mockResolvedValueOnce(orderRecord())
+        .mockResolvedValueOnce(
+          orderRecord({
+            status: OrderStatus.canceled,
+            canceledAt,
+            cancelReason: LIMIT_ORDER_CANCEL_REASONS.userCanceled,
+            reservationReleasedAt: canceledAt,
+          }),
+        );
+      prisma.cashWallet.findUnique.mockResolvedValueOnce({
+        id: 'wallet-1',
+        seasonParticipantId: 'sp-1',
+        tradingAccountId: 'trading-account-1',
+      });
+      prisma.$executeRaw.mockResolvedValueOnce(1);
+      prisma.order.updateMany.mockResolvedValueOnce({ count: 1 });
+
+      const response = await scopedCancel(service);
+      expect(response.data.execution.reservedAmountReleased).toBe(
+        '150150.00000000',
+      );
+    });
+
+    it('returns 404 for an orderId that does not belong to the caller', async () => {
+      const { prisma, service } = createService();
+      prisma.$queryRaw.mockResolvedValueOnce([]);
+
+      await expectErrorCode(scopedCancel(service), 'ORDER_NOT_FOUND');
+      expectNoReservationOrStatusChange(prisma);
+    });
+
+    it("returns 404 for the caller's own NORMAL order on a different account", async () => {
+      const { prisma, service } = createService();
+      prisma.$queryRaw.mockResolvedValueOnce([{ id: 'order-1' }]);
+      prisma.order.findUnique.mockResolvedValueOnce(
+        orderRecord({
+          tradingAccountId: 'trading-account-2',
+          seasonParticipant: { tradingAccountId: 'trading-account-2' },
+        }),
+      );
+
+      await expectErrorCode(scopedCancel(service), 'ORDER_NOT_FOUND');
+      expectNoReservationOrStatusChange(prisma);
+    });
+
+    it("surfaces the caller's own NULL-scope order as TRADING_SCOPE_REPAIR_REQUIRED", async () => {
+      const { prisma, service } = createService();
+      prisma.$queryRaw.mockResolvedValueOnce([{ id: 'order-1' }]);
+      prisma.order.findUnique.mockResolvedValueOnce(
+        orderRecord({ tradingAccountId: null }),
+      );
+
+      await expectErrorCode(
+        scopedCancel(service),
+        'TRADING_SCOPE_REPAIR_REQUIRED',
+      );
+      expectNoReservationOrStatusChange(prisma);
+    });
+
+    it('surfaces a mis-scoped order of the requested participant as TRADING_ACCOUNT_SCOPE_MISMATCH', async () => {
+      const { prisma, service } = createService();
+      prisma.$queryRaw.mockResolvedValueOnce([{ id: 'order-1' }]);
+      prisma.order.findUnique.mockResolvedValueOnce(
+        orderRecord({ tradingAccountId: 'trading-account-9' }),
+      );
+
+      await expectErrorCode(
+        scopedCancel(service),
+        'TRADING_ACCOUNT_SCOPE_MISMATCH',
+      );
+      expectNoReservationOrStatusChange(prisma);
+    });
+
+    it('does not hide an order scoped to THIS account whose participant link disagrees', async () => {
+      const { prisma, service } = createService();
+      prisma.$queryRaw.mockResolvedValueOnce([{ id: 'order-1' }]);
+      prisma.order.findUnique.mockResolvedValueOnce(
+        orderRecord({
+          tradingAccountId: 'trading-account-1',
+          seasonParticipant: { tradingAccountId: null },
+        }),
+      );
+
+      await expectErrorCode(
+        scopedCancel(service),
+        'TRADING_ACCOUNT_SCOPE_MISMATCH',
+      );
+      expectNoReservationOrStatusChange(prisma);
+    });
+
+    it('classifies scope BEFORE the market-order 410, so corruption is never masked', async () => {
+      const { prisma, service } = createService();
+      prisma.$queryRaw.mockResolvedValueOnce([{ id: 'order-1' }]);
+      prisma.order.findUnique.mockResolvedValueOnce(
+        orderRecord({ orderType: OrderType.market, tradingAccountId: null }),
+      );
+
+      await expectErrorCode(
+        scopedCancel(service),
+        'TRADING_SCOPE_REPAIR_REQUIRED',
+      );
+      expectNoReservationOrStatusChange(prisma);
+    });
+
+    it('keeps the LEGACY cancel contract: another user is still a plain 404', async () => {
+      const { prisma, service } = createService();
+      prisma.$queryRaw.mockResolvedValueOnce([]);
+
+      await expectErrorCode(
+        service.cancelOwnedLimitBuyOrder({
+          userId: 'user-1',
+          orderId: 'order-1',
+          canceledAt,
+        }),
+        'ORDER_NOT_FOUND',
+      );
+      expectNoReservationOrStatusChange(prisma);
+    });
+
+    it('keeps the LEGACY cancel fail-closed on a null own-order scope', async () => {
+      const { prisma, service } = createService();
+      prisma.$queryRaw.mockResolvedValueOnce([{ id: 'order-1' }]);
+      prisma.order.findUnique.mockResolvedValueOnce(
+        orderRecord({ tradingAccountId: null }),
+      );
+
+      await expectErrorCode(
+        service.cancelOwnedLimitBuyOrder({
+          userId: 'user-1',
+          orderId: 'order-1',
+          canceledAt,
+        }),
+        'TRADING_SCOPE_REPAIR_REQUIRED',
+      );
+      expectNoReservationOrStatusChange(prisma);
+    });
+
+    it('fails closed with FINANCIAL_SCOPE_REPAIR_REQUIRED on a null-scope wallet', async () => {
+      const { prisma, service } = createService();
+      prisma.$queryRaw.mockResolvedValueOnce([{ id: 'order-1' }]);
+      prisma.order.findUnique.mockResolvedValueOnce(orderRecord());
+      prisma.cashWallet.findUnique.mockResolvedValueOnce({
+        id: 'wallet-1',
+        seasonParticipantId: 'sp-1',
+        tradingAccountId: null,
+      });
+
+      await expectErrorCode(
+        scopedCancel(service),
+        'FINANCIAL_SCOPE_REPAIR_REQUIRED',
+      );
+      expectNoReservationOrStatusChange(prisma);
+    });
+
+    it('fails closed with FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH on a foreign wallet', async () => {
+      const { prisma, service } = createService();
+      prisma.$queryRaw.mockResolvedValueOnce([{ id: 'order-1' }]);
+      prisma.order.findUnique.mockResolvedValueOnce(orderRecord());
+      prisma.cashWallet.findUnique.mockResolvedValueOnce({
+        id: 'wallet-1',
+        seasonParticipantId: 'sp-1',
+        tradingAccountId: 'trading-account-7',
+      });
+
+      await expectErrorCode(
+        scopedCancel(service),
+        'FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH',
+      );
+      expectNoReservationOrStatusChange(prisma);
+    });
+  });
 });

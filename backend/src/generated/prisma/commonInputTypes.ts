@@ -715,6 +715,23 @@ export type EnumWalletTransactionReferenceTypeWithAggregatesFilter<$PrismaModel 
   _max?: Prisma.NestedEnumWalletTransactionReferenceTypeFilter<$PrismaModel>
 }
 
+export type EnumAdRewardClaimStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.AdRewardClaimStatus | Prisma.EnumAdRewardClaimStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.AdRewardClaimStatus[] | Prisma.ListEnumAdRewardClaimStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.AdRewardClaimStatus[] | Prisma.ListEnumAdRewardClaimStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumAdRewardClaimStatusFilter<$PrismaModel> | $Enums.AdRewardClaimStatus
+}
+
+export type EnumAdRewardClaimStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.AdRewardClaimStatus | Prisma.EnumAdRewardClaimStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.AdRewardClaimStatus[] | Prisma.ListEnumAdRewardClaimStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.AdRewardClaimStatus[] | Prisma.ListEnumAdRewardClaimStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumAdRewardClaimStatusWithAggregatesFilter<$PrismaModel> | $Enums.AdRewardClaimStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumAdRewardClaimStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumAdRewardClaimStatusFilter<$PrismaModel>
+}
+
 export type EnumFxRateSourceTypeFilter<$PrismaModel = never> = {
   equals?: $Enums.FxRateSourceType | Prisma.EnumFxRateSourceTypeFieldRefInput<$PrismaModel>
   in?: $Enums.FxRateSourceType[] | Prisma.ListEnumFxRateSourceTypeFieldRefInput<$PrismaModel>
@@ -1621,6 +1638,23 @@ export type NestedEnumWalletTransactionReferenceTypeWithAggregatesFilter<$Prisma
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumWalletTransactionReferenceTypeFilter<$PrismaModel>
   _max?: Prisma.NestedEnumWalletTransactionReferenceTypeFilter<$PrismaModel>
+}
+
+export type NestedEnumAdRewardClaimStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.AdRewardClaimStatus | Prisma.EnumAdRewardClaimStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.AdRewardClaimStatus[] | Prisma.ListEnumAdRewardClaimStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.AdRewardClaimStatus[] | Prisma.ListEnumAdRewardClaimStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumAdRewardClaimStatusFilter<$PrismaModel> | $Enums.AdRewardClaimStatus
+}
+
+export type NestedEnumAdRewardClaimStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.AdRewardClaimStatus | Prisma.EnumAdRewardClaimStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.AdRewardClaimStatus[] | Prisma.ListEnumAdRewardClaimStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.AdRewardClaimStatus[] | Prisma.ListEnumAdRewardClaimStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumAdRewardClaimStatusWithAggregatesFilter<$PrismaModel> | $Enums.AdRewardClaimStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumAdRewardClaimStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumAdRewardClaimStatusFilter<$PrismaModel>
 }
 
 export type NestedEnumFxRateSourceTypeFilter<$PrismaModel = never> = {

@@ -104,16 +104,26 @@ describe('TradingAccount schema contract', () => {
     }
   });
 
-  it('does not store a cumulative ad-reward column on TradingAccount', () => {
+  it('stores no cumulative/aggregate ad-reward value column on TradingAccount', () => {
+    // 작업 6 adds an adRewardClaims BACK-RELATION (rows live in their own
+    // table); what stays forbidden is a cached aggregate column. Cumulative ad
+    // funding must always be derived from granted claims / ad_reward ledger
+    // rows.
     const block = modelBlock('TradingAccount');
-    expect(block.toLowerCase()).not.toContain('adreward');
-    expect(block.toLowerCase()).not.toContain('ad_reward');
-  });
-
-  it('does not add an ad reward wallet transaction type yet', () => {
-    const block = enumBlock('WalletTransactionType');
-    expect(block).not.toContain('ad_reward');
-    expect(block).not.toContain('advertisement_reward');
+    const fieldLines = block
+      .split('\n')
+      .filter((line) => !line.includes('AdRewardClaim[]'));
+    for (const forbidden of [
+      'cumulativeAdReward',
+      'cumulativeExternalFunding',
+      'totalDeposits',
+      'currentProfit',
+      'currentReturnRate',
+      'twr',
+    ]) {
+      expect(fieldLines.join('\n')).not.toContain(forbidden);
+    }
+    expect(fieldLines.join('\n').toLowerCase()).not.toContain('ad_reward');
   });
 
   it('links SeasonParticipant 1:1 via nullable unique tradingAccountId', () => {
@@ -138,13 +148,25 @@ describe('TradingAccount schema contract', () => {
 
   it('keeps the transitional dual identity on the financial AND trading tables', () => {
     // Financial + trading tables carry BOTH identifiers during the
-    // transition: the legacy participant id keeps its previous meaning
-    // (required on financial tables/Order/Position, nullable on Quote) and
-    // the account scope is a NULLABLE addition (NOT NULL tightening is a
-    // later work unit).
+    // transition. CashWallet/WalletTransaction became OPTIONAL on the
+    // participant in 작업 6 (general-mode rows have no participant at all);
+    // ExchangeTransaction / FxExecuteRequest / Order / Position keep the
+    // participant REQUIRED because general-mode trading and FX are still
+    // disabled. The account scope stays a NULLABLE addition everywhere
+    // (NOT NULL tightening is a later work unit).
+    for (const model of ['CashWallet', 'WalletTransaction']) {
+      const block = modelBlock(model);
+      expect(block).toMatch(/seasonParticipantId\s+String\?/);
+      expect(block).toMatch(
+        /seasonParticipant\s+SeasonParticipant\?\s+@relation\(/,
+      );
+      expect(block).toMatch(/tradingAccountId\s+String\?/);
+      expect(block).toMatch(
+        /tradingAccount\s+TradingAccount\?\s+@relation\([^)]*onDelete: Restrict/,
+      );
+    }
+
     for (const model of [
-      'CashWallet',
-      'WalletTransaction',
       'ExchangeTransaction',
       'FxExecuteRequest',
       'Order',

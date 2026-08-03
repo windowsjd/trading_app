@@ -1,14 +1,23 @@
-# GET /api/v1/trading-accounts API Contract
+# /api/v1/trading-accounts API Contract
 
 ## Status
 - `GET /api/v1/trading-accounts` (owned account list) and
   `GET /api/v1/trading-accounts/:accountId` (owned account detail) are
   implemented, read-only.
-- The API reads existing `trading_accounts` rows only. It never creates a
-  general account, a wallet, or a grant — a GET must not mutate anything.
+- `POST /api/v1/trading-accounts/general` (general-mode entry: create the
+  user's single general account + KRW/USD wallets + the one-time
+  10,000,000 KRW grant, idempotently) is implemented as of 작업 6. Full
+  contract: `docs/general-account-and-ad-rewards-api-contract.md`.
+- The GET routes read existing `trading_accounts` rows only. They never
+  create a general account, a wallet, or a grant — a GET must not mutate
+  anything, and a general account exists only after the explicit POST.
 - Wallet balances, positions, orders, FX, portfolio valuation, returns, and
   ad-reward data are NOT part of these responses (they are still
   seasonParticipant-based; they move here only after the accountId migration).
+- Ad-reward sub-resources
+  (`/api/v1/trading-accounts/:accountId/ad-rewards/eligibility|claim|claims`)
+  are implemented for GENERAL accounts (작업 6); ad rewards are disabled by
+  default and no real provider adapter exists yet.
 - Account-scoped finance sub-resources
   (`/api/v1/trading-accounts/:accountId/wallets`, `wallet-transactions`,
   `fx/quote|execute|transactions`) are implemented — see
@@ -36,6 +45,10 @@
 `GET /api/v1/trading-accounts`
 
 `GET /api/v1/trading-accounts/:accountId`
+
+`POST /api/v1/trading-accounts/general` — no body, always HTTP 200, response
+`{ created, account, wallets }`. See
+`docs/general-account-and-ad-rewards-api-contract.md`.
 
 ## List Response
 

@@ -12,6 +12,126 @@
 
 ## 1. 작업 단위 기록
 
+### 작업 단위: 일반모드 계정·최초 지급·광고 보상 기반 + 작업 5 결함 3종 보완 (2026-08-03, 작업 6)
+
+**목적**
+
+작업 6(일반모드 계정 생성, 최초 10,000,000 KRW 1회 지급, 보상형 광고 자금
+지급 백엔드 기반)과 작업 5 검토에서 발견된 세 결함(① account-scoped 주문
+취소가 자기 주문의 손상된 scope를 타인 주문과 같은 404로 은폐, ② 이미 커밋된
+시장가 주문의 멱등 재시도가 현재 상태 gate에 막힘, ③ 원자 지갑 변경 0행 실패를
+일반 CONFLICT/not-found로 뭉뚱그려 scope 손상을 은폐) 보완을 함께 수행.
+
+**이번 작업에서 하지 않은 것**(계속 비활성): 일반계정 실제 주문·환전·Position,
+일반모드 포트폴리오 평가·EquitySnapshot·DailyPortfolioSnapshot, 시간가중
+수익률, 일반모드 투자손익 표시, 모드 선택·모드 전환 프런트엔드, 광고 SDK,
+실제 광고 네트워크 provider adapter, 광고 시청 화면, 시즌 lifecycle 개편,
+seasonParticipantId 제거, tradingAccountId NOT NULL 일괄 강화.
+
+**핵심 변경**
+
+- 보완 ①(취소 scope 분류, `src/orders/limit-order-cancel.service.ts`):
+  account-scoped 취소의 행 잠금 SQL에서 `o.trading_account_id` 조건을 제거하고
+  orderId + 사용자 소유권으로만 잠근 뒤 `assertRequestedAccountScope`가 분류한다.
+  참가자 링크=요청 계정 & order scope null → 500
+  `TRADING_SCOPE_REPAIR_REQUIRED`, 불일치 → 500
+  `TRADING_ACCOUNT_SCOPE_MISMATCH`, 참가자 링크가 달라도 order scope가 요청
+  계정을 가리키면 500 mismatch, 둘 다 다르면 404 `ORDER_NOT_FOUND`. 분류는
+  시장가 410보다 먼저 실행되고 어떤 오류 경로에서도 주문 상태·예약금이
+  변하지 않는다. legacy 취소는 계약(타인 404) 유지 + 자기 주문 scope 손상 시
+  기존 fail-closed 유지.
+- 보완 ②(시장가 committed replay first, `src/orders/orders.service.ts`):
+  account-scoped 경로는 소유권 확인 → `(tradingAccountId, idempotencyKey)`
+  조회(+participant·user 고정 legacy null fallback) → replay 순으로 진행하고,
+  기존 주문이 없을 때만 general 차단·account active·시즌·참가자·시장·quote·
+  지갑·잔액·freshness gate를 실행한다. legacy 경로는 고유 `Order.quoteId` +
+  사용자 소유권 기준 replay-first(넓은 `userId+key` 조회 금지). 시장가
+  `responsePayloadJson`은 생성·체결 트랜잭션 안에서 저장되며 저장 실패 시
+  전체 rollback. 지정가의 quote-scoped replay·예약금·feature flag 정책은
+  그대로.
+- 보완 ③(지갑 실패 진단, `src/wallets/cash-wallet-failure-diagnosis.ts` 신규):
+  0행 UPDATE를 wallet id 단독 재조회로 분류한다(행 없음 → 기존 오류,
+  participant/account null/account 불일치/통화 불일치 → 구조화된 500,
+  금액 조건 미달 → 기존 잔액·예약금 오류, 전부 정상 → CONFLICT). scope를 금액
+  보다 먼저 검사하고 읽기 전용이다. 시장가 debit/credit, 지정가
+  reserve/settle/release(취소·만료·운영자 제외 cleanup 공용), FX source
+  debit/target credit 전 경로 적용.
+- 작업 6 schema/migration 2건
+  (`…180000_add_general_account_and_ad_reward_enums` = enum 전용,
+  `…181000_add_general_account_and_ad_reward_foundation`): CashWallet·
+  WalletTransaction `seasonParticipantId` DROP NOT NULL + 관계 optional,
+  `WalletTransactionType.ad_reward`,
+  `WalletTransactionReferenceType.general_account_open`·`ad_reward_claim`,
+  `AdRewardClaimStatus`, `ad_reward_claims` 테이블(FK 3종 Restrict,
+  `(provider, providerEventId)` unique, `walletTransactionId` unique, 인덱스
+  3종), partial unique 2종(`general_account_open`/`ad_reward_claim` reference
+  단일 행). enum을 별도 migration으로 분리한 이유는 PostgreSQL이 같은
+  트랜잭션에서 새 enum 값을 사용하지 못하기 때문이다. Order·Position·
+  ExchangeTransaction·FxExecuteRequest는 변경하지 않았다.
+- 일반계정 생성(`src/trading-accounts/general-accounts.service.ts`,
+  `POST /api/v1/trading-accounts/general`, 200 고정 + `created` boolean):
+  계정 + KRW 지갑(1,000만) + USD 지갑(0) + initial grant 원장을 하나의
+  트랜잭션으로 생성. 멱등 근거는 기존 partial unique
+  `trading_accounts_general_owner_unique`이며 unique 충돌은 승자 재조회 후
+  replay. 손상 계정은 `general-account-integrity.ts`의 구조 검사 실패 →
+  500 `GENERAL_ACCOUNT_INTEGRITY`(현재 잔액으로 판정하지 않음, 자동 재지급
+  없음). suspended/closed 계정은 재활성화·재생성·재지급 없이 그대로 반환.
+- account-scoped `wallets`·`wallet-transactions`가 일반계정을 지원한다.
+  general은 참가자가 없으므로 시즌 probe 대신 역방향 검사(계정의 지갑·원장에
+  seasonParticipantId 존재 금지, 원장의 wallet이 타 계정 금지)를 수행하고
+  위반 시 500 `GENERAL_ACCOUNT_INTEGRITY`.
+- 광고 보상(`src/ad-rewards/`): provider-neutral `AdRewardVerifier` +
+  registry + SHA-256 proof fingerprint, 운영 설정 파서
+  `readAdRewardConfig`(기본 disabled, enabled 시 전 항목 필수·엄격 검증,
+  일일 경계는 설정 IANA timezone), eligibility/claim/claims 3개 endpoint.
+  claim은 외부 verifier 호출을 트랜잭션 밖에서 수행하고, 트랜잭션 안에서
+  계정 행 `FOR UPDATE` → 구조 무결성 → 중복 이벤트 → 일일 횟수·금액·cooldown
+  재검증 → KRW 지갑 증액(계정+participant null+통화 조건 포함) → `ad_reward`
+  원장 → claim granted를 원자적으로 처리한다. 한도에 걸린 검증 완료 이벤트는
+  rejected claim으로 commit 후 429(이후 영구 미지급). **운영 registry는
+  비어 있어 실제 claim은 503 `AD_REWARD_PROVIDER_UNAVAILABLE`이며 fake
+  verifier는 테스트에서만 DI로 주입한다.**
+- 운영 점검 `pnpm trading-accounts:audit-general` 추가(read-only 전용,
+  `--apply` 없음, findings 발생 시 exit 1).
+
+**검증**(로컬 실행, hosted CI 없음)
+
+- prisma format/validate/generate PASS, typecheck PASS, build PASS.
+- unit `pnpm test` PASS — 173 suite / 2,315 test(신규 +72).
+- migration 비파괴: dev DB에 시즌 데이터(계정 3·지갑 6·원장 15) 심고 전후
+  fingerprint 비교 — 통화별 balance/reserved 합계, txType별 amount,
+  referenceType별 건수, 전체 ID·seasonParticipantId 전부 동일. 유일한 차이는
+  빈 `ad_reward_claims` 테이블. general 계정 0건 유지.
+- opt-in DB 통합 16종 `--runInBand` 직렬 PASS(기존 14종 + 신규
+  `general-account.integration.spec.ts`,
+  `order-replay-and-cancel-scope.integration.spec.ts`).
+- e2e 119/122 pass(신규 4건 포함). 실패 3건(readiness/wallets/orders-cancel)은
+  기준 커밋 c08ddc70에서 git stash로 동일 명령·환경 재현 확인한
+  **BASELINE_FAIL**.
+- `pnpm trading-accounts:audit-general` findings 0, exit 0.
+- 실제 광고 provider 연동은 **PROVIDER_NOT_CONFIGURED** — provider 미확정,
+  운영 registry 비어 있음. backend 검증은 테스트 전용 fake verifier 기반이며
+  실제 provider end-to-end 검증이 아니다.
+
+**주의사항**
+
+- 광고 기능을 켜기 전에 provider adapter 등록이 선행되어야 한다.
+  `AD_REWARD_ENABLED=true`만으로는 지급되지 않고 503이 계속 반환된다(부팅 시
+  경고 로그로도 알린다).
+- 일반계정은 POST 호출로만 생성된다. migration·GET·거래·광고 claim 어디서도
+  계정·지갑·자금을 만들지 않으며, 손상 계정에 POST를 다시 호출해도 복구되지
+  않는다(500 유지). 복구는 `audit-general` 보고 후 수동 판단이다.
+- CashWallet·WalletTransaction의 `seasonParticipantId`가 nullable이 되었으므로
+  이 두 모델을 읽는 신규 코드는 null을 시즌 경로 불일치로 취급해야 한다
+  (기존 시즌 경로는 `assertCashWalletTradingAccountScope`가 이미 그렇게
+  동작한다).
+- `limit-order-transaction-time.integration.spec.ts`의 market-close 케이스가
+  전체 스위트 직후 1회 flaky 실패했으나, 기준 커밋과 이번 변경 모두에서
+  단독 실행·재실행 시 PASS했다(회귀 아님, 타이밍 의존).
+- eslint는 HEAD에서도 클린이 아니며(기존 `trading-accounts.service.spec.ts`
+  3건) 이번 작업에서도 전체 lint를 통과 조건으로 삼지 않았다. 신규 파일은
+  lint 클린이다.
+
 ### 작업 단위: 주문·포지션·Quote TradingAccount 전환 + 직전 작업 결함 3종 보완 (2026-08-03, 작업 5)
 
 **목적**
@@ -1168,6 +1288,46 @@ cd frontend && npm run typecheck && npm test
 ---
 
 ## 2. 최신 작업 시간순 기록
+
+### 2026-08-03 — 일반모드 계정·최초 지급·광고 보상 기반 + 작업 5 결함 3종 보완 (작업 6)
+
+- 작업 5 결함 보완: ① account-scoped 주문 취소의 잠금 SQL에서 계정 조건을
+  제거하고 자기 주문의 null/불일치 scope를 404가 아닌 500
+  `TRADING_SCOPE_REPAIR_REQUIRED`/`TRADING_ACCOUNT_SCOPE_MISMATCH`로 노출
+  (다른 계정의 정상 주문은 404 유지, 오류 시 상태·예약금 불변),
+  ② 시장가 주문 committed replay first — 소유권 확인 후 계정 기준 멱등 조회를
+  먼저 수행하고 기존 주문이 없을 때만 신규 거래 gate 실행(계정 suspended·
+  closed, 시즌 종료, 참가자 제외, 자산 비활성 이후에도 저장된 최초 응답 재생),
+  ③ 원자 지갑 UPDATE 0행을 wallet id 단독 재조회로 분류해 scope 손상·잔액
+  부족·실제 동시성 충돌을 구분(시장가 debit/credit, 지정가 reserve/settle/
+  release, 운영자 제외 cleanup, FX source/target 전 경로).
+- 작업 6: additive migration 2건(enum 전용 + foundation)으로 CashWallet·
+  WalletTransaction `seasonParticipantId` nullable 전환, `ad_reward`·
+  `general_account_open`·`ad_reward_claim` enum, `AdRewardClaimStatus`,
+  `ad_reward_claims` 테이블, 단일 행 reference용 partial unique 2종 추가.
+  기존 지갑·원장 행 수와 금액은 불변(fingerprint 실측).
+- `POST /api/v1/trading-accounts/general`: 계정 + KRW/USD 지갑 + 최초
+  10,000,000 KRW initial grant를 하나의 트랜잭션으로 생성. partial unique
+  기반 멱등으로 재호출·동시 호출에서도 계정 1개·통화별 지갑 1개·지급 1건.
+  월별/정기 지급·스케줄러·자동 초기화 없음. 손상 계정은 500
+  `GENERAL_ACCOUNT_INTEGRITY`로 fail-closed(자동 재지급 금지),
+  suspended/closed는 재활성화하지 않는다.
+- 광고 보상 기반: provider-neutral 검증 인터페이스·registry, 운영 설정
+  전용 config(기본 disabled, enabled 시 필수값 엄격 검증, 일일 경계는 설정
+  timezone), eligibility/claim/claims endpoint, 계정 행 FOR UPDATE 직렬화,
+  동일 provider 이벤트 중복 차단, 일일 횟수·금액·cooldown 재검증, KRW 지갑
+  지급 + `ad_reward` 원장 + claim granted 원자 처리, rejected 이벤트 영구
+  미지급. 시즌계정 지급 차단, USD 미지급, initialCapitalKrw 불변.
+  **실제 광고 provider 미확정 — 운영 registry 비어 있어 503
+  `AD_REWARD_PROVIDER_UNAVAILABLE`, fake verifier는 테스트 전용.**
+- 일반모드 주문·환전은 계속 차단(`GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED`/
+  `GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED`), TWR·투자손익·프런트엔드 미구현.
+  read-only 운영 점검 `pnpm trading-accounts:audit-general` 추가.
+- 검증: unit 2,315 pass, opt-in DB 통합 16종 직렬 PASS(신규 general-account·
+  order-replay-and-cancel-scope 포함), e2e 119/122(실패 3건은 기준 커밋
+  c08ddc70에서 동일 재현 확인한 BASELINE_FAIL), migration 전후 fingerprint
+  불변, audit-general findings 0. 실제 광고 provider 연동은
+  PROVIDER_NOT_CONFIGURED.
 
 ### 2026-08-03 — 주문·포지션·Quote TradingAccount 전환 + 복구 결함 3종 보완 (작업 5)
 

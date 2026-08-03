@@ -70,6 +70,10 @@ enum WalletTransactionType {
   fee
   adjustment
   settlement
+  // External virtual-funding inflow earned by watching a rewarded ad. NOT an
+  // investment return: return/PnL work units must exclude it from trading
+  // performance and treat it like a deposit.
+  ad_reward
 }
 
 enum WalletTransactionReferenceType {
@@ -78,6 +82,21 @@ enum WalletTransactionReferenceType {
   order
   manual_adjustment
   settlement
+  // referenceId = the general TradingAccount id. Exactly one such ledger row
+  // may exist per account (partial unique index, see the
+  // add_general_account_and_ad_reward_foundation migration).
+  general_account_open
+  // referenceId = AdRewardClaim.id, one ledger row per granted claim
+  // (partial unique index; claim.walletTransactionId is the reverse link).
+  ad_reward_claim
+}
+
+enum AdRewardClaimStatus {
+  pending
+  verified
+  granted
+  rejected
+  failed
 }
 
 enum SnapshotReason {
@@ -255,6 +274,7 @@ model User {
   seasonRewards               SeasonReward[]
   operatorAuditLogs           OperatorAuditLog[]
   quotes                      Quote[]
+  adRewardClaims              AdRewardClaim[]
   rewardFulfillmentTargets    RewardFulfillmentRequest[] @relation("RewardFulfillmentTargetUser")
   rewardFulfillmentsRequested RewardFulfillmentRequest[] @relation("RewardFulfillmentRequestedBy")
   rewardFulfillmentsProcessed RewardFulfillmentRequest[] @relation("RewardFulfillmentProcessedBy")
@@ -312,10 +332,12 @@ model RefreshTokenSession {
 // Common trading-account foundation shared by season mode and the future
 // general (non-season) mode. Wallets/orders/positions/exchanges/snapshots
 // still reference SeasonParticipant during the transition; only the account
-// identity layer lives here today. General-mode accounts are NOT created yet
-// (no rows with mode=general exist until the general-mode entry API ships).
-// initialCapitalKrw is the account's initial external grant only — future ad
-// rewards are ledgered as WalletTransaction rows and must never mutate it.
+// identity layer lives here today. General-mode accounts are created ONLY by
+// an explicit POST /api/v1/trading-accounts/general (작업 6) — never by a
+// migration, a GET, or a trading path.
+// initialCapitalKrw is the account's initial external grant only (10,000,000
+// KRW for general accounts) — ad rewards are ledgered as WalletTransaction
+// rows (txType=ad_reward) and must never mutate it.
 // "At most one general account per user" is enforced by a partial unique
 // index that Prisma cannot express; see the migration SQL
 // (trading_accounts_general_owner_unique). status=active does not by itself
@@ -345,6 +367,7 @@ model TradingAccount {
   orders               Order[]
   positions            Position[]
   quotes               Quote[]
+  adRewardClaims       AdRewardClaim[]
 
   @@index([userId, mode])
   @@index([mode, status])
@@ -838,11 +861,15 @@ model Order {
 
 model CashWallet {
   id                  String       @id @default(uuid())
-  seasonParticipantId String       @map("season_participant_id")
+  // NULL for general-mode wallets, which have no SeasonParticipant at all
+  // (작업 6). Season wallets keep their existing non-null link unchanged;
+  // nothing in the general-account path ever fabricates a participant.
+  seasonParticipantId String?      @map("season_participant_id")
   // Transitional dual identity: nullable trading-account scope added next to
   // the legacy seasonParticipantId. Backfilled from the participant link by
   // the add_financial_trading_account_scope migration; every new writer sets
-  // BOTH. Tightened to NOT NULL only in a follow-up work unit.
+  // BOTH. Tightened to NOT NULL only in a follow-up work unit. General
+  // wallets are ALWAYS created with a non-null tradingAccountId.
   tradingAccountId    String?      @map("trading_account_id")
   currencyCode        CurrencyCode @map("currency_code")
   balanceAmount       Decimal      @map("balance_amount") @db.Decimal(24, 8)
@@ -853,7 +880,7 @@ model CashWallet {
   createdAt           DateTime     @default(now()) @map("created_at")
   updatedAt           DateTime     @updatedAt @map("updated_at")
 
-  seasonParticipant  SeasonParticipant   @relation(fields: [seasonParticipantId], references: [id], onDelete: Cascade)
+  seasonParticipant  SeasonParticipant?  @relation(fields: [seasonParticipantId], references: [id], onDelete: Cascade)
   tradingAccount     TradingAccount?     @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   walletTransactions WalletTransaction[]
 
@@ -868,7 +895,9 @@ model CashWallet {
 
 model WalletTransaction {
   id                  String                         @id @default(uuid())
-  seasonParticipantId String                         @map("season_participant_id")
+  // NULL for general-mode ledger rows (작업 6): a general account has no
+  // SeasonParticipant. Season ledger rows keep their existing link.
+  seasonParticipantId String?                        @map("season_participant_id")
   // Transitional dual identity (see CashWallet). Stored directly on the
   // ledger row — account-level ledger reads/audits/aggregations must not
   // depend on walking the wallet relation.
@@ -884,15 +913,72 @@ model WalletTransaction {
   occurredAt          DateTime                       @map("occurred_at")
   createdAt           DateTime                       @default(now()) @map("created_at")
 
-  seasonParticipant SeasonParticipant @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
-  tradingAccount    TradingAccount?   @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
-  wallet            CashWallet        @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  seasonParticipant SeasonParticipant? @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
+  tradingAccount    TradingAccount?    @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  wallet            CashWallet         @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  adRewardClaim     AdRewardClaim?
 
+  // NO global @@unique([referenceType, referenceId]): one order or one
+  // exchange legitimately produces several ledger rows. Single-row
+  // references are protected by PARTIAL unique indexes instead, which
+  // Prisma's DSL cannot express — see the
+  // add_general_account_and_ad_reward_foundation migration:
+  //   wallet_transactions_general_account_open_reference_unique
+  //     UNIQUE (reference_id) WHERE reference_type = 'general_account_open'
+  //   wallet_transactions_ad_reward_claim_reference_unique
+  //     UNIQUE (reference_id) WHERE reference_type = 'ad_reward_claim'
   @@index([seasonParticipantId, occurredAt])
   @@index([tradingAccountId, occurredAt])
   @@index([walletId, occurredAt])
   @@index([referenceType, referenceId])
   @@map("wallet_transactions")
+}
+
+/// Rewarded-ad funding events for GENERAL-mode accounts only.
+///
+/// A claim row is created ONLY after a registered server-side verifier
+/// accepted the ad proof: providerEventId is the verifier's identifier, never
+/// a client-supplied string, and rewardAmountKrw always comes from server
+/// configuration. verificationFingerprint stores a one-way SHA-256 digest of
+/// the proof — never the proof, provider token, signing secret, or raw
+/// callback body. verificationMetadataJson holds only the non-sensitive
+/// fields the adapter explicitly allowed.
+///
+/// Cumulative ad funding is DERIVED (sum of granted claims / ad_reward ledger
+/// rows); no aggregate column lives on TradingAccount, and a reward never
+/// changes TradingAccount.initialCapitalKrw.
+model AdRewardClaim {
+  id                       String              @id @default(uuid())
+  userId                   String              @map("user_id")
+  tradingAccountId         String              @map("trading_account_id")
+  provider                 String
+  providerEventId          String              @map("provider_event_id")
+  status                   AdRewardClaimStatus
+  rewardAmountKrw          Decimal             @map("reward_amount_krw") @db.Decimal(24, 8)
+  verificationFingerprint  String?             @map("verification_fingerprint")
+  verificationMetadataJson Json?               @map("verification_metadata_json")
+  requestedAt              DateTime            @map("requested_at")
+  verifiedAt               DateTime?           @map("verified_at")
+  grantedAt                DateTime?           @map("granted_at")
+  rejectedAt               DateTime?           @map("rejected_at")
+  failedAt                 DateTime?           @map("failed_at")
+  failureCode              String?             @map("failure_code")
+  failureReason            String?             @map("failure_reason")
+  /// Set only for granted claims; 1:1 with the ad_reward ledger row.
+  walletTransactionId      String?             @unique @map("wallet_transaction_id")
+  createdAt                DateTime            @default(now()) @map("created_at")
+  updatedAt                DateTime            @updatedAt @map("updated_at")
+
+  user              User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  tradingAccount    TradingAccount     @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  walletTransaction WalletTransaction? @relation(fields: [walletTransactionId], references: [id], onDelete: Restrict)
+
+  /// The duplicate-payout guard: one provider event can be granted once.
+  @@unique([provider, providerEventId])
+  @@index([tradingAccountId, grantedAt])
+  @@index([userId, grantedAt])
+  @@index([status, createdAt])
+  @@map("ad_reward_claims")
 }
 
 model ExchangeTransaction {

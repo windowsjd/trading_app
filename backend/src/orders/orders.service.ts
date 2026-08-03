@@ -67,6 +67,7 @@ import {
 import { TradingAccountAccessService } from '../trading-accounts/trading-account-access.service';
 import { assertSeasonAccountOrderScopeIntegrity } from '../trading-accounts/trading-account-financial-integrity';
 import { debitAvailableCash } from '../wallets/cash-wallet-atomic';
+import { diagnoseCashWalletMutationFailure } from '../wallets/cash-wallet-failure-diagnosis';
 import { assertCashWalletTradingAccountScope } from '../wallets/cash-wallet-scope';
 import { assertAssetTradable, MarketHoursError } from './market-hours.policy';
 import { isLimitOrderEnabled } from './limit-order.config';
@@ -947,6 +948,33 @@ export class OrdersService {
       request,
       quoteId,
     });
+
+    // COMMITTED REPLAY FIRST (작업 5 보완 2) — before season, participant, and
+    // market gates.
+    //
+    // A market create that already COMMITTED (order + fills + wallet + ledger
+    // + position) owes its caller the stored first response no matter what
+    // has happened since: the season ended, the participant was excluded, the
+    // market closed. Re-running those gates would fail a retry whose money has
+    // ALREADY moved, and the retry storm this absorbs happens exactly when
+    // such a gate has just started failing.
+    //
+    // The lookup is keyed on the QUOTE, which is user-scoped, single-use, and
+    // UNIQUE on Order — so the replay scope equals a real DB uniqueness
+    // constraint, needs no active season, and can never resolve to another
+    // season's or another user's order. A key reused with a DIFFERENT quote is
+    // not visible here; it is caught by the participant/account-scoped lookup
+    // and the request-hash comparison further down.
+    const replayedOrder = await this.findIdempotentCreateOrderForQuote({
+      userId,
+      quoteId,
+      idempotencyKey: idempotency.idempotencyKey,
+      expectedOrderType: OrderType.market,
+    });
+    if (replayedOrder) {
+      return this.replayIdempotentCreateOrder(replayedOrder, idempotency);
+    }
+
     const submittedAt = new Date();
     const season = await this.findActiveSeasonOrThrow();
     this.assertSeasonTradable(season, submittedAt);
@@ -1000,9 +1028,37 @@ export class OrdersService {
       request,
       quoteId,
     });
-    const context = await this.resolveAccountSeasonTradingContext(
+
+    // Ownership FIRST: an unknown or foreign accountId is the same 404 before
+    // anything is replayed, so no other user's order can ever be reached
+    // through a borrowed accountId.
+    const account =
+      await this.requireTradingAccountAccessService().getOwnedAccountOrThrow(
+        userId,
+        tradingAccountId.trim(),
+      );
+
+    // COMMITTED REPLAY FIRST (작업 5 보완 2). The lookup replays exactly what
+    // the DB uniquely enforces — (tradingAccountId, idempotencyKey), plus the
+    // legacy null-scope row pinned to this participant AND user — and runs
+    // BEFORE the general-mode block, account status, season status/window,
+    // participant status, market hours, quote, wallet scope, balance, and
+    // price freshness. Those gates decide whether a NEW order may be created;
+    // they must not withhold a response the system already committed to.
+    // The request-hash comparison inside replayIdempotentCreateOrder still
+    // turns a key reused with a different request into a 409.
+    const existingOrder = await this.findIdempotentCreateOrder({
+      tradingAccountId: account.id,
+      seasonParticipantId: account.seasonParticipant?.id ?? null,
       userId,
-      tradingAccountId,
+      idempotencyKey: idempotency.idempotencyKey,
+    });
+    if (existingOrder) {
+      return this.replayIdempotentCreateOrder(existingOrder, idempotency);
+    }
+
+    const context = await this.resolveAccountSeasonTradingContextForAccount(
+      account,
       submittedAt,
     );
 
@@ -1130,6 +1186,12 @@ export class OrdersService {
               );
         const responsePayloadJson = this.buildExecutedOrderResponse(result);
 
+        // The response payload is persisted INSIDE the execution transaction,
+        // so a committed market order always has a stored first response for
+        // later replays (작업 5 보완 2). If this write fails, the order, the
+        // fill, the wallet debit/credit, the ledger row, and the position all
+        // roll back with it: a market order can never commit without the
+        // response its retries will be answered with.
         await tx.order.update({
           where: {
             id: result.order.orderId,
@@ -1209,10 +1271,11 @@ export class OrdersService {
     // season's own order instead of colliding. It never returns another
     // user's order. A different request under the same quote is a conflict;
     // only a genuinely new quote proceeds to the gates below.
-    const replayedOrder = await this.findIdempotentLimitCreateOrderForQuote({
+    const replayedOrder = await this.findIdempotentCreateOrderForQuote({
       userId,
       quoteId,
       idempotencyKey: idempotency.idempotencyKey,
+      expectedOrderType: OrderType.limit,
     });
     if (replayedOrder) {
       return this.replayIdempotentCreateOrder(replayedOrder, idempotency);
@@ -1264,10 +1327,11 @@ export class OrdersService {
         tradingAccountId.trim(),
       );
 
-    const replayedOrder = await this.findIdempotentLimitCreateOrderForQuote({
+    const replayedOrder = await this.findIdempotentCreateOrderForQuote({
       userId,
       quoteId,
       idempotencyKey: idempotency.idempotencyKey,
+      expectedOrderType: OrderType.limit,
     });
     if (replayedOrder) {
       if (replayedOrder.tradingAccountId !== account.id) {
@@ -1413,10 +1477,11 @@ export class OrdersService {
       // cannot see; the account-scoped fallback finds that order and the
       // request-hash comparison turns it into the conflict it is.
       const racedOrder =
-        (await this.findIdempotentLimitCreateOrderForQuote({
+        (await this.findIdempotentCreateOrderForQuote({
           userId,
           quoteId,
           idempotencyKey: idempotency.idempotencyKey,
+          expectedOrderType: OrderType.limit,
         })) ??
         (await this.findIdempotentCreateOrder({
           tradingAccountId,
@@ -2461,6 +2526,7 @@ export class OrdersService {
       await this.throwCashDebitFailure(tx, {
         walletId: wallet.id,
         seasonParticipantId: order.seasonParticipantId,
+        tradingAccountId,
         currencyCode: order.currencyCode,
         amount: plan.netAmount,
       });
@@ -2633,6 +2699,7 @@ export class OrdersService {
       await this.throwCashCreditFailure(tx, {
         walletId: wallet.id,
         seasonParticipantId: order.seasonParticipantId,
+        tradingAccountId,
         currencyCode: order.currencyCode,
       });
     }
@@ -2798,28 +2865,32 @@ export class OrdersService {
     return wallet;
   }
 
+  /**
+   * Market-buy debit failure. The shared diagnosis re-reads the wallet by id
+   * alone, so a corrupted scope raises its own 500 (repair-required /
+   * mismatch) instead of hiding behind INSUFFICIENT_BALANCE or CONFLICT.
+   */
   private async throwCashDebitFailure(
     tx: OrderExecuteTransactionClient,
     input: {
       walletId: string;
       seasonParticipantId: string;
+      tradingAccountId: string;
       currencyCode: CurrencyCode;
       amount: Prisma.Decimal;
     },
   ): Promise<never> {
-    const wallet = await tx.cashWallet.findFirst({
-      where: {
-        id: input.walletId,
+    const reason = await diagnoseCashWalletMutationFailure(tx, {
+      walletId: input.walletId,
+      expected: {
         seasonParticipantId: input.seasonParticipantId,
+        tradingAccountId: input.tradingAccountId,
         currencyCode: input.currencyCode,
       },
-      select: {
-        balanceAmount: true,
-        reservedAmount: true,
-      },
+      requires: { available: input.amount },
     });
 
-    if (!wallet) {
+    if (reason === 'wallet_not_found') {
       this.throwApiError(
         HttpStatus.CONFLICT,
         'INSUFFICIENT_BALANCE',
@@ -2827,11 +2898,7 @@ export class OrdersService {
       );
     }
 
-    if (
-      wallet.balanceAmount
-        .sub(wallet.reservedAmount ?? new Prisma.Decimal(0))
-        .lt(input.amount)
-    ) {
+    if (reason !== 'conflict') {
       this.throwApiError(
         HttpStatus.CONFLICT,
         'INSUFFICIENT_BALANCE',
@@ -2846,26 +2913,27 @@ export class OrdersService {
     );
   }
 
+  /** Market-sell credit failure; same scope-visible diagnosis as the debit. */
   private async throwCashCreditFailure(
     tx: OrderExecuteTransactionClient,
     input: {
       walletId: string;
       seasonParticipantId: string;
+      tradingAccountId: string;
       currencyCode: CurrencyCode;
     },
   ): Promise<never> {
-    const wallet = await tx.cashWallet.findFirst({
-      where: {
-        id: input.walletId,
+    const reason = await diagnoseCashWalletMutationFailure(tx, {
+      walletId: input.walletId,
+      expected: {
         seasonParticipantId: input.seasonParticipantId,
+        tradingAccountId: input.tradingAccountId,
         currencyCode: input.currencyCode,
       },
-      select: {
-        id: true,
-      },
+      // A credit has no amount guard: only scope can fail it.
     });
 
-    if (!wallet) {
+    if (reason === 'wallet_not_found') {
       this.throwApiError(
         HttpStatus.CONFLICT,
         'INSUFFICIENT_BALANCE',
@@ -4421,10 +4489,11 @@ export class OrdersService {
    * The request-hash comparison then happens in replayIdempotentCreateOrder,
    * exactly as on the participant-scoped path.
    */
-  private async findIdempotentLimitCreateOrderForQuote(input: {
+  private async findIdempotentCreateOrderForQuote(input: {
     userId: string;
     quoteId: string;
     idempotencyKey: string;
+    expectedOrderType: OrderType;
   }) {
     const order = await this.prisma.order.findFirst({
       where: {
@@ -4440,7 +4509,7 @@ export class OrdersService {
     if (!order) return null;
 
     if (
-      order.orderType !== OrderType.limit ||
+      order.orderType !== input.expectedOrderType ||
       order.idempotencyKey !== input.idempotencyKey
     ) {
       this.throwApiError(
@@ -4463,7 +4532,11 @@ export class OrdersService {
    */
   private async findIdempotentCreateOrder(input: {
     tradingAccountId: string;
-    seasonParticipantId: string;
+    /**
+     * Null for a general account (no participant exists), which simply skips
+     * the legacy null-scope fallback — a general account has no legacy rows.
+     */
+    seasonParticipantId: string | null;
     userId: string;
     idempotencyKey: string;
   }) {
@@ -4477,6 +4550,10 @@ export class OrdersService {
 
     if (accountOrder) {
       return accountOrder;
+    }
+
+    if (!input.seasonParticipantId) {
+      return null;
     }
 
     return this.prisma.order.findFirst({

@@ -9,11 +9,13 @@ import {
   ParticipantStatus,
   Prisma,
   SeasonStatus,
+  TradingAccountMode,
   WalletTransactionType,
 } from '../generated/prisma/client';
 import { buildPagination, type Pagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { TradingAccountAccessService } from '../trading-accounts/trading-account-access.service';
+import { assertGeneralAccountFinancialRowsUnscoped } from '../trading-accounts/general-account-integrity';
 import { assertSeasonAccountFinancialScopeIntegrity } from '../trading-accounts/trading-account-financial-integrity';
 
 export type WalletTransactionsQuery = {
@@ -136,12 +138,9 @@ export class WalletsService {
 
     // A season participant whose financial rows lost their account scope
     // must NOT read as a normally-empty account — fail closed instead of
-    // silently omitting wallets. General accounts (no participant) skip
-    // this and legitimately return an empty array.
-    await assertSeasonAccountFinancialScopeIntegrity(this.prisma, {
-      tradingAccountId: account.id,
-      seasonParticipantId: account.seasonParticipant?.id ?? null,
-    });
+    // silently omitting wallets. General accounts have no participant, so
+    // they get the general-shape probe instead.
+    await this.assertAccountFinancialReadIntegrity(account);
 
     const wallets = await this.prisma.cashWallet.findMany({
       where: {
@@ -202,10 +201,7 @@ export class WalletsService {
 
     // Same fail-closed rule as the wallet view: unscoped/mis-scoped ledger
     // rows must never be silently dropped from an account-scoped read.
-    await assertSeasonAccountFinancialScopeIntegrity(this.prisma, {
-      tradingAccountId: account.id,
-      seasonParticipantId: account.seasonParticipant?.id ?? null,
-    });
+    await this.assertAccountFinancialReadIntegrity(account);
 
     const where = {
       tradingAccountId: account.id,
@@ -255,6 +251,34 @@ export class WalletsService {
         pagination: this.pagination(parsedQuery, total, transactions.length),
       },
     };
+  }
+
+  /**
+   * Read-integrity gate for account-scoped financial views, split by mode:
+   *
+   *  - season account → probe the linked participant's rows for null /
+   *    mismatched trading-account scope (작업 5 보완 2). Unchanged behavior.
+   *  - general account → there IS no participant, so instead assert the
+   *    inverse: none of this account's wallets/ledger rows may carry a
+   *    seasonParticipantId, and no ledger row may point at another account's
+   *    wallet. Any violation is 500 GENERAL_ACCOUNT_INTEGRITY.
+   *
+   * Neither branch repairs anything; a GET never writes.
+   */
+  private async assertAccountFinancialReadIntegrity(account: {
+    id: string;
+    mode: TradingAccountMode;
+    seasonParticipant: { id: string } | null;
+  }) {
+    if (account.mode === TradingAccountMode.general) {
+      await assertGeneralAccountFinancialRowsUnscoped(this.prisma, account.id);
+      return;
+    }
+
+    await assertSeasonAccountFinancialScopeIntegrity(this.prisma, {
+      tradingAccountId: account.id,
+      seasonParticipantId: account.seasonParticipant?.id ?? null,
+    });
   }
 
   private async resolveOwnedAccount(

@@ -404,6 +404,7 @@ export const ModelName = {
   Order: 'Order',
   CashWallet: 'CashWallet',
   WalletTransaction: 'WalletTransaction',
+  AdRewardClaim: 'AdRewardClaim',
   ExchangeTransaction: 'ExchangeTransaction',
   FxRateSnapshot: 'FxRateSnapshot',
   Quote: 'Quote',
@@ -430,7 +431,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "position" | "order" | "cashWallet" | "walletTransaction" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence"
+    modelProps: "user" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "position" | "order" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1914,6 +1915,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    AdRewardClaim: {
+      payload: Prisma.$AdRewardClaimPayload<ExtArgs>
+      fields: Prisma.AdRewardClaimFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.AdRewardClaimFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdRewardClaimPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.AdRewardClaimFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdRewardClaimPayload>
+        }
+        findFirst: {
+          args: Prisma.AdRewardClaimFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdRewardClaimPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.AdRewardClaimFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdRewardClaimPayload>
+        }
+        findMany: {
+          args: Prisma.AdRewardClaimFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdRewardClaimPayload>[]
+        }
+        create: {
+          args: Prisma.AdRewardClaimCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdRewardClaimPayload>
+        }
+        createMany: {
+          args: Prisma.AdRewardClaimCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.AdRewardClaimCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdRewardClaimPayload>[]
+        }
+        delete: {
+          args: Prisma.AdRewardClaimDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdRewardClaimPayload>
+        }
+        update: {
+          args: Prisma.AdRewardClaimUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdRewardClaimPayload>
+        }
+        deleteMany: {
+          args: Prisma.AdRewardClaimDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.AdRewardClaimUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.AdRewardClaimUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdRewardClaimPayload>[]
+        }
+        upsert: {
+          args: Prisma.AdRewardClaimUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdRewardClaimPayload>
+        }
+        aggregate: {
+          args: Prisma.AdRewardClaimAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateAdRewardClaim>
+        }
+        groupBy: {
+          args: Prisma.AdRewardClaimGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AdRewardClaimGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.AdRewardClaimCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AdRewardClaimCountAggregateOutputType> | number
+        }
+      }
+    }
     ExchangeTransaction: {
       payload: Prisma.$ExchangeTransactionPayload<ExtArgs>
       fields: Prisma.ExchangeTransactionFieldRefs
@@ -3177,6 +3252,31 @@ export const WalletTransactionScalarFieldEnum = {
 export type WalletTransactionScalarFieldEnum = (typeof WalletTransactionScalarFieldEnum)[keyof typeof WalletTransactionScalarFieldEnum]
 
 
+export const AdRewardClaimScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  tradingAccountId: 'tradingAccountId',
+  provider: 'provider',
+  providerEventId: 'providerEventId',
+  status: 'status',
+  rewardAmountKrw: 'rewardAmountKrw',
+  verificationFingerprint: 'verificationFingerprint',
+  verificationMetadataJson: 'verificationMetadataJson',
+  requestedAt: 'requestedAt',
+  verifiedAt: 'verifiedAt',
+  grantedAt: 'grantedAt',
+  rejectedAt: 'rejectedAt',
+  failedAt: 'failedAt',
+  failureCode: 'failureCode',
+  failureReason: 'failureReason',
+  walletTransactionId: 'walletTransactionId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type AdRewardClaimScalarFieldEnum = (typeof AdRewardClaimScalarFieldEnum)[keyof typeof AdRewardClaimScalarFieldEnum]
+
+
 export const ExchangeTransactionScalarFieldEnum = {
   id: 'id',
   seasonParticipantId: 'seasonParticipantId',
@@ -3875,6 +3975,20 @@ export type ListEnumWalletTransactionReferenceTypeFieldRefInput<$PrismaModel> = 
 
 
 /**
+ * Reference to a field of type 'AdRewardClaimStatus'
+ */
+export type EnumAdRewardClaimStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AdRewardClaimStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'AdRewardClaimStatus[]'
+ */
+export type ListEnumAdRewardClaimStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AdRewardClaimStatus[]'>
+    
+
+
+/**
  * Reference to a field of type 'FxRateSourceType'
  */
 export type EnumFxRateSourceTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FxRateSourceType'>
@@ -4142,6 +4256,7 @@ export type GlobalOmitConfig = {
   order?: Prisma.OrderOmit
   cashWallet?: Prisma.CashWalletOmit
   walletTransaction?: Prisma.WalletTransactionOmit
+  adRewardClaim?: Prisma.AdRewardClaimOmit
   exchangeTransaction?: Prisma.ExchangeTransactionOmit
   fxRateSnapshot?: Prisma.FxRateSnapshotOmit
   quote?: Prisma.QuoteOmit

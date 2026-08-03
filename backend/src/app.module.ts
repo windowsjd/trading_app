@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AdRewardsModule } from './ad-rewards/ad-rewards.module';
 import { AssetsModule } from './assets/assets.module';
 import { AuthModule } from './auth/auth.module';
 import { BatchModule } from './batch/batch.module';
@@ -35,6 +36,7 @@ import { WalletsModule } from './wallets/wallets.module';
       // silently at request time (e.g. LIMIT_ORDER_ENABLED=yes).
       validate: validateEnv,
     }),
+    AdRewardsModule,
     AssetsModule,
     AuthModule,
     BatchModule,

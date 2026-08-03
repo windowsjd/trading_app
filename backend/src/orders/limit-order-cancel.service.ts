@@ -119,34 +119,28 @@ export class LimitOrderCancelService {
     orderId: string;
     canceledAt: Date;
     /**
-     * Account-scoped cancel only: restricts the cancel to orders whose own
-     * tradingAccountId equals this id, so another account's orderId (and a
-     * legacy null-scope order) is the same 404 as a nonexistent one.
+     * Account-scoped cancel only: the resolved, owned account this cancel is
+     * addressed to. It is NOT part of the locking WHERE (see
+     * assertRequestedAccountScope) — filtering on it there would turn the
+     * caller's OWN corrupted order into an indistinguishable 404.
      */
     expectedTradingAccountId?: string;
   }): Promise<CancelLimitOrderResponse> {
     return this.prisma.$transaction(async (tx) => {
-      // Lock the order row first (Order → CashWallet lock order). Ownership
-      // (and, on the account-scoped path, account membership) is enforced in
-      // the same locking statement.
-      const lockedRows = input.expectedTradingAccountId
-        ? await tx.$queryRaw<Array<{ id: string }>>`
-            SELECT o."id"
-            FROM "orders" o
-            JOIN "season_participants" sp ON sp."id" = o."season_participant_id"
-            WHERE o."id" = ${input.orderId}
-              AND sp."user_id" = ${input.userId}
-              AND o."trading_account_id" = ${input.expectedTradingAccountId}
-            FOR UPDATE OF o
-          `
-        : await tx.$queryRaw<Array<{ id: string }>>`
-            SELECT o."id"
-            FROM "orders" o
-            JOIN "season_participants" sp ON sp."id" = o."season_participant_id"
-            WHERE o."id" = ${input.orderId}
-              AND sp."user_id" = ${input.userId}
-            FOR UPDATE OF o
-          `;
+      // Lock the order row first (Order → CashWallet lock order). The locking
+      // statement enforces ONLY orderId + user ownership — deliberately not
+      // the requested account. Account membership is classified afterwards
+      // against the loaded row, so "someone else's order" (404) stays
+      // distinguishable from "my own order with a broken account scope"
+      // (500), which the old account-filtered lock could not do.
+      const lockedRows = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT o."id"
+        FROM "orders" o
+        JOIN "season_participants" sp ON sp."id" = o."season_participant_id"
+        WHERE o."id" = ${input.orderId}
+          AND sp."user_id" = ${input.userId}
+        FOR UPDATE OF o
+      `;
 
       if (lockedRows.length !== 1) {
         throw new HttpException(
@@ -177,6 +171,12 @@ export class LimitOrderCancelService {
           },
           HttpStatus.NOT_FOUND,
         );
+      }
+
+      // Account membership / scope classification runs before ANY cancel work
+      // so a scope error can never change order status or reservedAmount.
+      if (input.expectedTradingAccountId) {
+        this.assertRequestedAccountScope(order, input.expectedTradingAccountId);
       }
 
       if (order.orderType === OrderType.market) {
@@ -531,6 +531,89 @@ export class LimitOrderCancelService {
   }
 
   /**
+   * Account-scoped cancel: decide what the requested accountId means for an
+   * order the caller PROVABLY owns (ownership was part of the locking SQL).
+   * 작업 5 보완 1.
+   *
+   * The old shape put `o.trading_account_id = :accountId` in the locking
+   * WHERE, so three very different situations collapsed into one 404:
+   * another user's order, another account's order, and the caller's OWN
+   * order whose scope was null or corrupted. The last one is a server data
+   * problem and must not be hidden as "not found".
+   *
+   * With `req` = requested account, `part` = the order participant's account
+   * link, `ord` = the order's own scope:
+   *
+   *   part = req, ord = req   → normal; proceed to cancel
+   *   part = req, ord = null  → 500 TRADING_SCOPE_REPAIR_REQUIRED
+   *   part = req, ord ≠ req   → 500 TRADING_ACCOUNT_SCOPE_MISMATCH
+   *   part ≠ req, ord = req   → 500 TRADING_ACCOUNT_SCOPE_MISMATCH — the row
+   *                             names THIS account, so it is ours and must
+   *                             not be concealed either
+   *   part ≠ req, ord ≠ req   → 404 ORDER_NOT_FOUND (genuinely another
+   *                             account's order; its existence stays hidden)
+   *
+   * No branch writes anything: order status and reservedAmount are untouched
+   * and the transaction rolls back.
+   */
+  private assertRequestedAccountScope(
+    order: {
+      tradingAccountId: string | null;
+      seasonParticipant: { tradingAccountId: string | null };
+    },
+    requestedTradingAccountId: string,
+  ): void {
+    const participantAccountId = order.seasonParticipant.tradingAccountId;
+    const orderAccountId = order.tradingAccountId;
+
+    if (participantAccountId === requestedTradingAccountId) {
+      if (orderAccountId === null) {
+        this.throwScopeIntegrity(
+          'TRADING_SCOPE_REPAIR_REQUIRED',
+          'Order has no trading account scope; run trading-accounts:repair-trading-scope before canceling it.',
+        );
+      }
+      if (orderAccountId !== requestedTradingAccountId) {
+        this.throwScopeIntegrity(
+          'TRADING_ACCOUNT_SCOPE_MISMATCH',
+          'Order is scoped to a different trading account than its participant; investigate before canceling it.',
+        );
+      }
+      return;
+    }
+
+    if (orderAccountId === requestedTradingAccountId) {
+      this.throwScopeIntegrity(
+        'TRADING_ACCOUNT_SCOPE_MISMATCH',
+        'Order is scoped to this trading account but its participant is linked elsewhere; investigate before canceling it.',
+      );
+    }
+
+    // A normal order of another account of the same user: same 404 as an
+    // unknown orderId, so no other account's contents are disclosed.
+    throw new HttpException(
+      {
+        success: false,
+        error: {
+          code: 'ORDER_NOT_FOUND',
+          message: 'Order not found.',
+        },
+      },
+      HttpStatus.NOT_FOUND,
+    );
+  }
+
+  private throwScopeIntegrity(code: string, message: string): never {
+    throw new HttpException(
+      {
+        success: false,
+        error: { code, message },
+      },
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
+  }
+
+  /**
    * A release may only move the reservation of the ORDER's own account.
    * The order's scope must exist (else run
    * trading-accounts:repair-trading-scope first — a release is protective,
@@ -542,30 +625,16 @@ export class LimitOrderCancelService {
     seasonParticipant: { tradingAccountId: string | null };
   }): string {
     if (!order.tradingAccountId) {
-      throw new HttpException(
-        {
-          success: false,
-          error: {
-            code: 'TRADING_SCOPE_REPAIR_REQUIRED',
-            message:
-              'Order has no trading account scope; run trading-accounts:repair-trading-scope before releasing its reservation.',
-          },
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
+      this.throwScopeIntegrity(
+        'TRADING_SCOPE_REPAIR_REQUIRED',
+        'Order has no trading account scope; run trading-accounts:repair-trading-scope before releasing its reservation.',
       );
     }
 
     if (order.tradingAccountId !== order.seasonParticipant.tradingAccountId) {
-      throw new HttpException(
-        {
-          success: false,
-          error: {
-            code: 'TRADING_ACCOUNT_SCOPE_MISMATCH',
-            message:
-              'Order is scoped to a different trading account than its participant.',
-          },
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
+      this.throwScopeIntegrity(
+        'TRADING_ACCOUNT_SCOPE_MISMATCH',
+        'Order is scoped to a different trading account than its participant.',
       );
     }
 

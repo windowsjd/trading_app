@@ -298,6 +298,16 @@ type PrismaMock = {
   };
   tradingAccount: {
     create: jest.Mock;
+    count: jest.Mock;
+    findFirst: jest.Mock;
+    findMany: jest.Mock;
+    findUnique: jest.Mock;
+    update: jest.Mock;
+  };
+  adRewardClaim: {
+    aggregate: jest.Mock;
+    count: jest.Mock;
+    create: jest.Mock;
     findFirst: jest.Mock;
     findMany: jest.Mock;
     findUnique: jest.Mock;
@@ -547,8 +557,18 @@ describe('AppController (e2e)', () => {
         findFirst: jest.fn(),
         update: jest.fn(),
       },
+      adRewardClaim: {
+        aggregate: jest.fn(),
+        count: jest.fn(),
+        create: jest.fn(),
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
       tradingAccount: {
         create: jest.fn(),
+        count: jest.fn(),
         findFirst: jest.fn(),
         findMany: jest.fn(),
         findUnique: jest.fn(),
@@ -2557,6 +2577,170 @@ describe('AppController (e2e)', () => {
         where: { id: 'other-users-account', userId: user.id },
       }),
     );
+  });
+
+  it('/api/v1/trading-accounts/general (POST) rejects unauthenticated requests before any write', () => {
+    // A general account, its wallets, and its 10,000,000 KRW grant may only
+    // ever be created for an AUTHENTICATED owner.
+    return request(app.getHttpServer())
+      .post('/api/v1/trading-accounts/general')
+      .expect(401)
+      .expect((response) => {
+        expectUnauthorizedBody(response.body);
+        expect(prisma.tradingAccount.create).not.toHaveBeenCalled();
+        expect(prisma.cashWallet.create).not.toHaveBeenCalled();
+        expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+      });
+  });
+
+  it('/api/v1/trading-accounts/general (POST) replays an existing account without re-granting', async () => {
+    resetPrismaMocks();
+    mockActiveUser();
+    const openedAt = new Date('2026-08-01T00:00:00.000Z');
+    const existingAccount = {
+      id: 'general-account-1',
+      userId: user.id,
+      mode: 'general',
+      status: 'active',
+      initialCapitalKrw: new Prisma.Decimal('10000000.00000000'),
+      openedAt,
+      closedAt: null,
+      createdAt: openedAt,
+      updatedAt: openedAt,
+      seasonParticipant: null,
+    };
+    prisma.tradingAccount.findFirst.mockResolvedValue(existingAccount);
+    prisma.cashWallet.findMany.mockResolvedValue([
+      {
+        id: 'general-krw',
+        currencyCode: 'KRW',
+        seasonParticipantId: null,
+        tradingAccountId: 'general-account-1',
+        balanceAmount: new Prisma.Decimal('10000000.00000000'),
+        reservedAmount: new Prisma.Decimal('0'),
+        updatedAt: openedAt,
+      },
+      {
+        id: 'general-usd',
+        currencyCode: 'USD',
+        seasonParticipantId: null,
+        tradingAccountId: 'general-account-1',
+        balanceAmount: new Prisma.Decimal('0'),
+        reservedAmount: new Prisma.Decimal('0'),
+        updatedAt: openedAt,
+      },
+    ]);
+    prisma.walletTransaction.findMany.mockResolvedValue([
+      {
+        id: 'general-grant',
+        walletId: 'general-krw',
+        seasonParticipantId: null,
+        currencyCode: 'KRW',
+        txType: 'initial_grant',
+        referenceId: 'general-account-1',
+        amount: new Prisma.Decimal('10000000.00000000'),
+      },
+    ]);
+    const token = await createValidAccessToken();
+
+    await request(app.getHttpServer())
+      .post('/api/v1/trading-accounts/general')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: true,
+          data: {
+            created: false,
+            account: {
+              id: 'general-account-1',
+              mode: 'general',
+              status: 'active',
+              initialCapitalKrw: '10000000.00000000',
+              season: null,
+            },
+          },
+        });
+        expect(response.body.data.wallets).toEqual([
+          expect.objectContaining({
+            currencyCode: 'KRW',
+            balanceAmount: '10000000.00000000',
+            availableAmount: '10000000.00000000',
+          }),
+          expect.objectContaining({
+            currencyCode: 'USD',
+            balanceAmount: '0.00000000',
+          }),
+        ]);
+      });
+
+    // No second account, wallet, or grant is written on a replay.
+    expect(prisma.tradingAccount.create).not.toHaveBeenCalled();
+    expect(prisma.cashWallet.create).not.toHaveBeenCalled();
+    expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
+  });
+
+  it('/api/v1/trading-accounts/:accountId/ad-rewards/* rejects unauthenticated requests', async () => {
+    resetPrismaMocks();
+    for (const call of [
+      () =>
+        request(app.getHttpServer()).get(
+          '/api/v1/trading-accounts/general-account-1/ad-rewards/eligibility',
+        ),
+      () =>
+        request(app.getHttpServer()).get(
+          '/api/v1/trading-accounts/general-account-1/ad-rewards/claims',
+        ),
+      () =>
+        request(app.getHttpServer())
+          .post('/api/v1/trading-accounts/general-account-1/ad-rewards/claim')
+          .send({ provider: 'x', proof: 'y' }),
+    ]) {
+      await call()
+        .expect(401)
+        .expect((response) => {
+          expectUnauthorizedBody(response.body);
+        });
+    }
+    expect(prisma.adRewardClaim.create).not.toHaveBeenCalled();
+    expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('/api/v1/trading-accounts/:accountId/ad-rewards/claim is refused while ad rewards are disabled', async () => {
+    resetPrismaMocks();
+    mockActiveUser();
+    const openedAt = new Date('2026-08-01T00:00:00.000Z');
+    prisma.tradingAccount.findFirst.mockResolvedValue({
+      id: 'general-account-1',
+      userId: user.id,
+      mode: 'general',
+      status: 'active',
+      initialCapitalKrw: new Prisma.Decimal('10000000.00000000'),
+      openedAt,
+      closedAt: null,
+      createdAt: openedAt,
+      updatedAt: openedAt,
+      seasonParticipant: null,
+    });
+    const token = await createValidAccessToken();
+
+    // AD_REWARD_ENABLED is unset in the test environment: disabled is the
+    // default, and nothing may be paid out.
+    await request(app.getHttpServer())
+      .post('/api/v1/trading-accounts/general-account-1/ad-rewards/claim')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ provider: 'anything', proof: 'anything' })
+      .expect(503)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          success: false,
+          error: { code: 'AD_REWARD_DISABLED' },
+        });
+      });
+
+    expect(prisma.adRewardClaim.create).not.toHaveBeenCalled();
+    expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
+    expect(prisma.walletTransaction.create).not.toHaveBeenCalled();
   });
 
   it('/api/v1/trading-accounts/:accountId/wallets (GET) rejects unauthenticated requests', () => {

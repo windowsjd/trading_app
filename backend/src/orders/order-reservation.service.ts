@@ -4,6 +4,7 @@ import {
   releaseReservedCash,
   reserveAvailableCash,
 } from '../wallets/cash-wallet-atomic';
+import { diagnoseCashWalletMutationFailure } from '../wallets/cash-wallet-failure-diagnosis';
 import { assertCashWalletTradingAccountScope } from '../wallets/cash-wallet-scope';
 import {
   limitOrderErrorCodes,
@@ -79,6 +80,7 @@ export class OrderReservationService {
       await this.throwReservationFailure(tx, {
         walletId: wallet.id,
         seasonParticipantId: input.seasonParticipantId,
+        tradingAccountId: input.tradingAccountId,
         currencyCode: input.currencyCode,
         amount: input.amount,
       });
@@ -109,9 +111,27 @@ export class OrderReservationService {
   ): Promise<void> {
     const releasedCount = await releaseReservedCash(tx, input);
     if (releasedCount !== 1) {
+      // 작업 5 보완 3: a failed release used to be reported as a flat
+      // reservation inconsistency, which hid wallet-scope corruption behind a
+      // business error. Diagnose first — a null/mismatched scope throws its
+      // own structured 500 and rolls the whole cancel back untouched.
+      const reason = await diagnoseCashWalletMutationFailure(tx, {
+        walletId: input.walletId,
+        expected: {
+          seasonParticipantId: input.seasonParticipantId,
+          tradingAccountId: input.tradingAccountId,
+          currencyCode: input.currencyCode,
+        },
+        requires: { reserved: input.amount },
+      });
+
       this.throwLimitOrderError(
-        limitOrderErrorCodes.ORDER_RESERVATION_INCONSISTENT,
-        'Wallet reservation does not cover the order reservation.',
+        reason === 'conflict'
+          ? limitOrderErrorCodes.ORDER_RESERVATION_CONFLICT
+          : limitOrderErrorCodes.ORDER_RESERVATION_INCONSISTENT,
+        reason === 'conflict'
+          ? 'Reservation release failed due to a concurrent wallet update.'
+          : 'Wallet reservation does not cover the order reservation.',
       );
     }
   }
@@ -121,34 +141,29 @@ export class OrderReservationService {
     input: {
       walletId: string;
       seasonParticipantId: string;
+      tradingAccountId: string;
       currencyCode: CurrencyCode;
       amount: string;
     },
   ): Promise<never> {
-    const wallet = await tx.cashWallet.findFirst({
-      where: {
-        id: input.walletId,
+    const reason = await diagnoseCashWalletMutationFailure(tx, {
+      walletId: input.walletId,
+      expected: {
         seasonParticipantId: input.seasonParticipantId,
+        tradingAccountId: input.tradingAccountId,
         currencyCode: input.currencyCode,
       },
-      select: {
-        balanceAmount: true,
-        reservedAmount: true,
-      },
+      requires: { available: input.amount },
     });
 
-    if (!wallet) {
+    if (reason === 'wallet_not_found') {
       this.throwLimitOrderError(
         limitOrderErrorCodes.INSUFFICIENT_AVAILABLE_BALANCE,
         'Cash wallet was not found.',
       );
     }
 
-    if (
-      wallet.balanceAmount
-        .sub(wallet.reservedAmount)
-        .lt(new Prisma.Decimal(input.amount))
-    ) {
+    if (reason !== 'conflict') {
       this.throwLimitOrderError(
         limitOrderErrorCodes.INSUFFICIENT_AVAILABLE_BALANCE,
         'Available cash balance is insufficient for the reservation.',

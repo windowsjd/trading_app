@@ -15,8 +15,11 @@
 - Market-rate reads stay on the public `GET /api/v1/fx/rates/current`
   (not duplicated per account).
 - Orders/positions ARE account-scoped as of 작업 5 — see
-  `docs/trading-account-orders-api-contract.md`. General-mode FX/wallets are
-  still NOT implemented (see gating below).
+  `docs/trading-account-orders-api-contract.md`.
+- As of 작업 6 the two READ routes also serve GENERAL accounts (KRW/USD
+  wallets + the one-time `initial_grant` and any `ad_reward` ledger rows) —
+  see `docs/general-account-and-ad-rewards-api-contract.md`. General-mode FX
+  is still NOT implemented (409 `GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED`).
 
 ## Common Rules
 - Authentication required on every route (401 `UNAUTHORIZED` without a valid
@@ -47,9 +50,15 @@
   Any anomaly fails closed with 500 `FINANCIAL_SCOPE_REPAIR_REQUIRED`
   (null — run `pnpm trading-accounts:repair-financial-scope`) or 500
   `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH` (non-null mismatch) instead of
-  presenting a partial/empty result as a normally-empty account. General
-  accounts have no participant, so the probe is skipped and a genuinely
-  empty account stays a normal empty response.
+  presenting a partial/empty result as a normally-empty account.
+- General-account read integrity (작업 6): a general account has no
+  participant, so the season probe does not apply. The read asserts the
+  INVERSE instead — no wallet and no ledger row of this account may carry a
+  `seasonParticipantId`, and no ledger row may point at another account's
+  wallet. A violation is 500 `GENERAL_ACCOUNT_INTEGRITY`. A genuinely empty
+  general account (none exists after the one-time grant, but a future state
+  could) still returns a normal empty response, and a GET never creates a
+  wallet, account, or grant.
 
 `GET .../wallets` response data:
 ```json
@@ -133,3 +142,45 @@ and target WalletTransaction) records BOTH `seasonParticipantId` and the same
 verified `tradingAccountId`, inside one DB transaction — a mid-transaction
 failure rolls back the request row, wallet balance changes, exchange row,
 ledger rows, and snapshot together.
+
+## Atomic wallet-mutation failure diagnosis (작업 5 보완 3)
+
+Every guarded cash mutation carries the wallet id, participant, VERIFIED
+trading account, currency, AND an amount guard in one WHERE. When it matches
+0 rows, any of those could be the reason — but the old per-caller
+diagnostics re-read the wallet with the scope columns STILL in the WHERE, so
+a wallet whose scope had become null or mismatched simply "disappeared" and
+was reported as a missing wallet or a generic concurrency CONFLICT.
+
+`diagnoseCashWalletMutationFailure` (`src/wallets/cash-wallet-failure-diagnosis.ts`)
+now re-reads the wallet BY ID ALONE inside the same transaction and
+classifies in a fixed order:
+
+1. wallet row gone → the caller's existing "not found"/balance error
+2. `seasonParticipantId` ≠ expected → 500 `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`
+3. `tradingAccountId IS NULL` → 500 `FINANCIAL_SCOPE_REPAIR_REQUIRED`
+4. `tradingAccountId` ≠ expected → 500 `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`
+5. `currencyCode` ≠ expected → 500 `FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`
+6. amount guard cannot hold → the caller's existing `INSUFFICIENT_BALANCE` /
+   `INSUFFICIENT_AVAILABLE_BALANCE` / `ORDER_RESERVATION_INCONSISTENT`
+7. scope AND amounts both fine → a real concurrency `CONFLICT`
+
+Scope is always checked BEFORE amounts, so corruption is never reported as a
+shortfall. The diagnosis is read-only: it never writes, repairs, or
+backfills, and the caller's transaction still rolls back.
+
+Applied to every 0-row path, not a subset:
+
+| Path | Amount guard | Codes on failure |
+| --- | --- | --- |
+| market buy debit | available ≥ net | `INSUFFICIENT_BALANCE` / `CONFLICT` |
+| market sell credit | (none) | `INSUFFICIENT_BALANCE` / `CONFLICT` |
+| limit-buy reserve | available ≥ reservation | `INSUFFICIENT_AVAILABLE_BALANCE` / `ORDER_RESERVATION_CONFLICT` |
+| limit-buy fill settle | reserved ≥ reservation, balance ≥ net | `ORDER_RESERVATION_INCONSISTENT` / `ORDER_RESERVATION_CONFLICT` |
+| cancel release | reserved ≥ reservation | `ORDER_RESERVATION_INCONSISTENT` / `ORDER_RESERVATION_CONFLICT` |
+| expiry / operator-exclusion cleanup release | reserved ≥ reservation | same as cancel (shared release path) |
+| FX source debit | available ≥ source amount | `INSUFFICIENT_BALANCE` / `CONCURRENT_WALLET_UPDATE` |
+| FX target credit | (none) | `TARGET_WALLET_NOT_FOUND` / `CONCURRENT_WALLET_UPDATE` |
+
+The `tradingAccountId` in each atomic UPDATE's WHERE is unchanged — the
+diagnosis explains a 0-row result, it never relaxes the guard.

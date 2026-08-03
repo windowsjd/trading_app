@@ -17,6 +17,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { formatDecimalScale, monetaryScale } from '../fx/fx-decimal-policy';
 import { settleLimitBuyReservedCash } from '../wallets/cash-wallet-atomic';
+import { diagnoseCashWalletMutationFailure } from '../wallets/cash-wallet-failure-diagnosis';
 import { assertCashWalletTradingAccountScope } from '../wallets/cash-wallet-scope';
 import {
   resolveFxProviderEligibility,
@@ -316,9 +317,31 @@ export class LimitOrderExecutionService {
         orderReservation: reservedAmountText,
       });
       if (settled !== 1) {
+        // 작업 5 보완 3: classify before reporting. Scope corruption throws
+        // its own structured 500 (repair-required / mismatch) from the shared
+        // diagnosis; only genuinely concurrent updates or an actually
+        // uncovered reservation reach the limit-order error codes below. The
+        // whole fill rolls back either way.
+        const reason = await diagnoseCashWalletMutationFailure(tx, {
+          walletId: wallet.id,
+          expected: {
+            seasonParticipantId: order.seasonParticipantId,
+            tradingAccountId,
+            currencyCode: order.currencyCode,
+          },
+          requires: {
+            reserved: reservedAmountText,
+            balance: netAmountText,
+          },
+        });
+
         this.throwLimitOrderError(
-          limitOrderErrorCodes.ORDER_RESERVATION_INCONSISTENT,
-          'Wallet settlement guard failed for the limit fill.',
+          reason === 'conflict'
+            ? limitOrderErrorCodes.ORDER_RESERVATION_CONFLICT
+            : limitOrderErrorCodes.ORDER_RESERVATION_INCONSISTENT,
+          reason === 'conflict'
+            ? 'Wallet settlement failed due to a concurrent wallet update.'
+            : 'Wallet settlement guard failed for the limit fill.',
         );
       }
 

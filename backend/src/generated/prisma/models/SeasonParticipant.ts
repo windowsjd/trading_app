@@ -1161,10 +1161,12 @@ export type SeasonParticipantCreateNestedOneWithoutCashWalletsInput = {
   connect?: Prisma.SeasonParticipantWhereUniqueInput
 }
 
-export type SeasonParticipantUpdateOneRequiredWithoutCashWalletsNestedInput = {
+export type SeasonParticipantUpdateOneWithoutCashWalletsNestedInput = {
   create?: Prisma.XOR<Prisma.SeasonParticipantCreateWithoutCashWalletsInput, Prisma.SeasonParticipantUncheckedCreateWithoutCashWalletsInput>
   connectOrCreate?: Prisma.SeasonParticipantCreateOrConnectWithoutCashWalletsInput
   upsert?: Prisma.SeasonParticipantUpsertWithoutCashWalletsInput
+  disconnect?: Prisma.SeasonParticipantWhereInput | boolean
+  delete?: Prisma.SeasonParticipantWhereInput | boolean
   connect?: Prisma.SeasonParticipantWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.SeasonParticipantUpdateToOneWithWhereWithoutCashWalletsInput, Prisma.SeasonParticipantUpdateWithoutCashWalletsInput>, Prisma.SeasonParticipantUncheckedUpdateWithoutCashWalletsInput>
 }
@@ -1175,10 +1177,12 @@ export type SeasonParticipantCreateNestedOneWithoutWalletTransactionsInput = {
   connect?: Prisma.SeasonParticipantWhereUniqueInput
 }
 
-export type SeasonParticipantUpdateOneRequiredWithoutWalletTransactionsNestedInput = {
+export type SeasonParticipantUpdateOneWithoutWalletTransactionsNestedInput = {
   create?: Prisma.XOR<Prisma.SeasonParticipantCreateWithoutWalletTransactionsInput, Prisma.SeasonParticipantUncheckedCreateWithoutWalletTransactionsInput>
   connectOrCreate?: Prisma.SeasonParticipantCreateOrConnectWithoutWalletTransactionsInput
   upsert?: Prisma.SeasonParticipantUpsertWithoutWalletTransactionsInput
+  disconnect?: Prisma.SeasonParticipantWhereInput | boolean
+  delete?: Prisma.SeasonParticipantWhereInput | boolean
   connect?: Prisma.SeasonParticipantWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.SeasonParticipantUpdateToOneWithWhereWithoutWalletTransactionsInput, Prisma.SeasonParticipantUpdateWithoutWalletTransactionsInput>, Prisma.SeasonParticipantUncheckedUpdateWithoutWalletTransactionsInput>
 }

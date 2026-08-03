@@ -52,20 +52,104 @@ opt-in PostgreSQL integration suite
   durable quote row records the verified `tradingAccountId`.
 - `POST /api/v1/trading-accounts/:accountId/orders`
   — market create(+immediate execution) / limit create(+reservation),
-  identical to legacy including the committed-replay-first rule for limit
-  creates (an already-committed create replays its STORED first response;
-  a replayed order must belong to the named account, otherwise 409
-  `ORDER_IDEMPOTENCY_CONFLICT`).
+  identical to legacy. BOTH order types are committed-replay-first: an
+  already-committed create replays its STORED first response, and a replayed
+  order must belong to the named account (otherwise 409
+  `ORDER_IDEMPOTENCY_CONFLICT`). See "Committed replay first" below.
 - `POST /api/v1/trading-accounts/:accountId/orders/:orderId/cancel`
   — cancel releases a reservation (protective), so like the legacy cancel it
   is NOT gated on account/participant status: owners may cancel their own
-  submitted limit orders on suspended/closed accounts too. The order must
-  belong to the named account (else the same 404). Null/mismatched
-  order/wallet scope aborts with a structured 500 (repair required) and the
-  order status + reservation roll back together.
+  submitted limit orders on suspended/closed accounts too. Scope
+  classification is described below.
 - There is deliberately NO account-scoped execute endpoint: the legacy API
   exposes none either (market orders execute inside create; limit orders
   fill via the scheduler matcher).
+
+### Cancel scope classification (작업 5 보완 1)
+
+The account-scoped cancel used to carry `order.tradingAccountId = :accountId`
+in the row-LOCKING statement. That collapsed three very different situations
+into one 404 — another user's order, another account's order, and the
+CALLER'S OWN order whose account scope was null or corrupted. Hiding the last
+one as "not found" is wrong: it is server-side data corruption, and the user
+is left unable to explain why their own order vanished.
+
+The lock now uses `orderId + user ownership` only, and account membership is
+classified afterwards against the loaded row (`req` = requested account,
+`part` = the order participant's link, `ord` = the order's own scope):
+
+| Case | Result |
+| --- | --- |
+| `part = req`, `ord = req` | proceed with the cancel |
+| `part = req`, `ord = null` | 500 `TRADING_SCOPE_REPAIR_REQUIRED` (run `pnpm trading-accounts:repair-trading-scope`) |
+| `part = req`, `ord ≠ req` | 500 `TRADING_ACCOUNT_SCOPE_MISMATCH` (never auto-overwritten) |
+| `part ≠ req`, `ord = req` | 500 `TRADING_ACCOUNT_SCOPE_MISMATCH` — the row names THIS account, so it is not concealed either |
+| `part ≠ req`, `ord ≠ req` | 404 `ORDER_NOT_FOUND` — a genuinely other-account order; its existence stays hidden |
+| unknown id / another user | 404 `ORDER_NOT_FOUND` (unchanged) |
+
+Classification runs BEFORE any cancel work — including before the market-order
+410 — so no error path can change order status or `reservedAmount`; the whole
+transaction rolls back.
+
+Wallet checks are unchanged and still required before a release:
+`wallet.seasonParticipantId = order.seasonParticipantId`,
+`wallet.tradingAccountId = order.tradingAccountId`,
+`wallet.currencyCode = order.currencyCode`. A null wallet scope is 500
+`FINANCIAL_SCOPE_REPAIR_REQUIRED`, a mismatch is 500
+`FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH`, and either rolls the whole
+transaction back.
+
+**Legacy cancel** keeps its route and response contract: another user's order
+is still a plain 404. It also still fails closed with a structured 500 —
+without changing the reservation — when the caller's OWN order has a null
+scope or one that disagrees with its participant link.
+
+### Committed replay first (작업 5 보완 2)
+
+A create that already COMMITTED owes its caller the stored first response,
+whatever has happened since. Previously the market path ran the account,
+season, participant, market, quote, wallet, balance, and freshness gates
+BEFORE looking for an existing order, so a retry whose money had already
+moved could be answered with a state error — exactly when a retry storm is
+most likely.
+
+Account-scoped market create order of work:
+
+1. authentication
+2. request body parsing
+3. accountId ownership (a foreign accountId is the same 404 BEFORE any
+   replay, so no other user's order is reachable through a borrowed id)
+4. idempotencyKey + requestHash
+5. lookup by `(tradingAccountId, idempotencyKey)`
+6. if absent, the pinned legacy fallback (`seasonParticipantId + key +
+   tradingAccountId IS NULL + user ownership`)
+7. if found: same requestHash → return the stored `responsePayloadJson`;
+   different requestHash → 409 `ORDER_IDEMPOTENCY_CONFLICT`. Account status,
+   season status, participant status, and market state are NOT re-checked.
+8. ONLY when no order exists: general-mode block, account active, season
+   status/window, participant status, market open, quote, wallet scope,
+   balance, price freshness, then the create transaction.
+
+So a committed market order still replays after the account was suspended or
+closed, the season ended, the participant was excluded, or the asset stopped
+trading — while an unknown key on a suspended account or in an ended season is
+still refused (409 `TRADING_ACCOUNT_NOT_ACTIVE` / `SEASON_NOT_ACTIVE`).
+
+`responsePayloadJson` is written INSIDE the create+execute transaction: if
+that write fails, the order, fill, wallet movement, ledger row, and position
+roll back with it. A market order can never commit without the response its
+retries will be answered with. Legacy market rows created before this
+guarantee have no payload; they keep the existing rebuilt-response fallback.
+
+The LEGACY market create is replay-first too, but only over a lookup whose
+scope equals a real DB uniqueness constraint: the UNIQUE `Order.quoteId`
+plus user ownership (a market create always carries a durable single-use
+quote). A broad `userId + idempotencyKey` lookup is deliberately NOT used —
+`idempotencyKey` is unique only within a season participation, so such a
+lookup could resolve a retry to a different season's order.
+
+Limit creates keep their existing quote-scoped committed-replay-first
+behavior, reservation semantics, and `LIMIT_ORDER_ENABLED` policy unchanged.
 
 ### Order idempotency
 

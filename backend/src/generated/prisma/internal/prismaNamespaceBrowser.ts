@@ -71,6 +71,7 @@ export const ModelName = {
   Order: 'Order',
   CashWallet: 'CashWallet',
   WalletTransaction: 'WalletTransaction',
+  AdRewardClaim: 'AdRewardClaim',
   ExchangeTransaction: 'ExchangeTransaction',
   FxRateSnapshot: 'FxRateSnapshot',
   Quote: 'Quote',
@@ -508,6 +509,31 @@ export const WalletTransactionScalarFieldEnum = {
 } as const
 
 export type WalletTransactionScalarFieldEnum = (typeof WalletTransactionScalarFieldEnum)[keyof typeof WalletTransactionScalarFieldEnum]
+
+
+export const AdRewardClaimScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  tradingAccountId: 'tradingAccountId',
+  provider: 'provider',
+  providerEventId: 'providerEventId',
+  status: 'status',
+  rewardAmountKrw: 'rewardAmountKrw',
+  verificationFingerprint: 'verificationFingerprint',
+  verificationMetadataJson: 'verificationMetadataJson',
+  requestedAt: 'requestedAt',
+  verifiedAt: 'verifiedAt',
+  grantedAt: 'grantedAt',
+  rejectedAt: 'rejectedAt',
+  failedAt: 'failedAt',
+  failureCode: 'failureCode',
+  failureReason: 'failureReason',
+  walletTransactionId: 'walletTransactionId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type AdRewardClaimScalarFieldEnum = (typeof AdRewardClaimScalarFieldEnum)[keyof typeof AdRewardClaimScalarFieldEnum]
 
 
 export const ExchangeTransactionScalarFieldEnum = {

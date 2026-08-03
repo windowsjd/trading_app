@@ -97,7 +97,8 @@ export const WalletTransactionType = {
   order_sell: 'order_sell',
   fee: 'fee',
   adjustment: 'adjustment',
-  settlement: 'settlement'
+  settlement: 'settlement',
+  ad_reward: 'ad_reward'
 } as const
 
 export type WalletTransactionType = (typeof WalletTransactionType)[keyof typeof WalletTransactionType]
@@ -108,10 +109,23 @@ export const WalletTransactionReferenceType = {
   exchange_transaction: 'exchange_transaction',
   order: 'order',
   manual_adjustment: 'manual_adjustment',
-  settlement: 'settlement'
+  settlement: 'settlement',
+  general_account_open: 'general_account_open',
+  ad_reward_claim: 'ad_reward_claim'
 } as const
 
 export type WalletTransactionReferenceType = (typeof WalletTransactionReferenceType)[keyof typeof WalletTransactionReferenceType]
+
+
+export const AdRewardClaimStatus = {
+  pending: 'pending',
+  verified: 'verified',
+  granted: 'granted',
+  rejected: 'rejected',
+  failed: 'failed'
+} as const
+
+export type AdRewardClaimStatus = (typeof AdRewardClaimStatus)[keyof typeof AdRewardClaimStatus]
 
 
 export const SnapshotReason = {

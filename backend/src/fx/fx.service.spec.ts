@@ -2356,13 +2356,15 @@ describe('FxService', () => {
       mockExecuteReadCandidates(prisma);
       prisma.fxExecuteRequest.create.mockResolvedValueOnce({ id: 'command-1' });
       prisma.$executeRaw.mockResolvedValueOnce(0);
-      prisma.cashWallet.findFirst.mockResolvedValueOnce(null);
+      // The shared diagnosis re-reads the wallet BY ID (findUnique), so a
+      // vanished row is a third findUnique call returning null.
+      prisma.cashWallet.findUnique.mockResolvedValueOnce(null);
 
       await expectExecuteErrorCode(
         service.execute('user-1', validExecuteBody),
         'INSUFFICIENT_BALANCE',
       );
-      expectExecutePlanReads(prisma);
+      expect(prisma.cashWallet.findUnique).toHaveBeenCalledTimes(3);
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
       expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
       expect(prisma.cashWallet.updateMany).not.toHaveBeenCalled();
@@ -2378,7 +2380,9 @@ describe('FxService', () => {
       mockExecuteReadCandidates(prisma);
       prisma.fxExecuteRequest.create.mockResolvedValueOnce({ id: 'command-1' });
       prisma.$executeRaw.mockResolvedValueOnce(0);
-      prisma.cashWallet.findFirst.mockResolvedValueOnce({
+      prisma.cashWallet.findUnique.mockResolvedValueOnce({
+        ...sourceWallet,
+        reservedAmount: new Prisma.Decimal('0.00000000'),
         balanceAmount: new Prisma.Decimal('999.99999999'),
       });
 
@@ -2400,7 +2404,9 @@ describe('FxService', () => {
       mockExecuteReadCandidates(prisma);
       prisma.fxExecuteRequest.create.mockResolvedValueOnce({ id: 'command-1' });
       prisma.$executeRaw.mockResolvedValueOnce(0);
-      prisma.cashWallet.findFirst.mockResolvedValueOnce({
+      prisma.cashWallet.findUnique.mockResolvedValueOnce({
+        ...sourceWallet,
+        reservedAmount: new Prisma.Decimal('0.00000000'),
         balanceAmount: new Prisma.Decimal('1000.00000000'),
       });
 

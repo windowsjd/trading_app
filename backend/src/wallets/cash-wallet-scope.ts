@@ -41,7 +41,13 @@ export type CashWalletScopeErrorCode =
 
 export type CashWalletScopeCandidate = {
   id: string;
-  seasonParticipantId: string;
+  /**
+   * Nullable since 작업 6: general-mode wallets have no SeasonParticipant.
+   * Every caller of this guard is a SEASON path with a non-null expected
+   * participant, so a null here is a mismatch — which is exactly right: a
+   * season trade must never reach a general wallet.
+   */
+  seasonParticipantId: string | null;
   tradingAccountId: string | null;
 };
 
@@ -84,6 +90,18 @@ export function assertCashWalletTradingAccountScope<
   }
 
   return wallet as ScopeVerifiedCashWallet<T>;
+}
+
+/**
+ * Reports a wallet-scope corruption that is not one of the three linkage
+ * cases above (e.g. the resolved wallet's currency does not match the
+ * settlement currency) with the SAME structured 500 the linkage checks use.
+ */
+export function throwCashWalletScopeMismatch(message: string): never {
+  throwScopeError(
+    cashWalletScopeErrorCodes.FINANCIAL_TRADING_ACCOUNT_SCOPE_MISMATCH,
+    message,
+  );
 }
 
 function throwScopeError(

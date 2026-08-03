@@ -26,7 +26,12 @@ type DecimalInput = string | Prisma.Decimal;
 
 export type FxExecuteWalletCandidate = {
   id: string;
-  seasonParticipantId: string;
+  /**
+   * Nullable since 작업 6 (general-mode wallets have no SeasonParticipant).
+   * FX is season-only today, so a null here never satisfies the season
+   * participant scope guard and the execution fails closed.
+   */
+  seasonParticipantId: string | null;
   currencyCode: FxExecuteCurrency;
   balanceAmount: DecimalInput;
   /**
