@@ -1,5 +1,9 @@
 jest.mock('../generated/prisma/client', () => {
-  const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
+  // Typed so the mocked module's Decimal is not an `any` leaking into every
+  // fixture in the file.
+  const { Decimal } = jest.requireActual<
+    typeof import('@prisma/client/runtime/client')
+  >('@prisma/client/runtime/client');
 
   return { Prisma: { Decimal }, PrismaClient: class PrismaClient {} };
 });

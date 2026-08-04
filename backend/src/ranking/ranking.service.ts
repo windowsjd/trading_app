@@ -12,6 +12,12 @@ import {
   calculateRankingPercentile,
   type RankingTier,
 } from './ranking-tier.policy';
+import {
+  assertSeasonRankingScope,
+  assertSeasonRankingScopes,
+  SEASON_RANKING_SCOPE_SELECT,
+  type SeasonRankingScopeRow,
+} from './season-ranking-scope';
 
 export type RankingQuery = {
   seasonId?: string;
@@ -44,7 +50,13 @@ type ParsedRankingQuery = {
   scope: RankingScope;
 };
 
-type RankingRow = {
+/**
+ * Both row shapes extend `SeasonRankingScopeRow`: the account scope is SELECTED
+ * and VERIFIED on every read, and is deliberately absent from the formatters
+ * below — a public leaderboard never exposes another user's tradingAccountId
+ * (작업 8 §10).
+ */
+type RankingRow = SeasonRankingScopeRow & {
   rank: number;
   seasonParticipantId: string;
   totalAssetKrw: Prisma.Decimal;
@@ -53,7 +65,7 @@ type RankingRow = {
   totalFillCount: number;
   reachedReturnAt: Date | null;
   capturedAt: Date;
-  seasonParticipant: {
+  seasonParticipant: SeasonRankingScopeRow['seasonParticipant'] & {
     userId: string;
     finalTier: string | null;
     user: {
@@ -63,7 +75,7 @@ type RankingRow = {
   };
 };
 
-type MyRankingRow = {
+type MyRankingRow = SeasonRankingScopeRow & {
   rank: number;
   seasonParticipantId: string;
   totalAssetKrw: Prisma.Decimal;
@@ -72,7 +84,7 @@ type MyRankingRow = {
   totalFillCount: number;
   reachedReturnAt: Date | null;
   capturedAt: Date;
-  seasonParticipant: {
+  seasonParticipant: SeasonRankingScopeRow['seasonParticipant'] & {
     finalTier: string | null;
   };
 };
@@ -249,8 +261,9 @@ export class RankingService {
               },
             },
             select: {
+              ...SEASON_RANKING_SCOPE_SELECT,
+              id: true,
               rank: true,
-              seasonParticipantId: true,
               totalAssetKrw: true,
               returnRate: true,
               maxDrawdown: true,
@@ -259,6 +272,7 @@ export class RankingService {
               capturedAt: true,
               seasonParticipant: {
                 select: {
+                  ...SEASON_RANKING_SCOPE_SELECT.seasonParticipant.select,
                   finalTier: true,
                 },
               },
@@ -266,6 +280,11 @@ export class RankingService {
           })
         : Promise.resolve(null),
     ]);
+
+    // The caller's OWN row is verified before it is shown to them (작업 8 §11).
+    if (myRankingRow) {
+      assertSeasonRankingScope(myRankingRow);
+    }
     const window = this.resolveRankingWindow({
       query: parsedQuery,
       totalParticipants,
@@ -280,8 +299,9 @@ export class RankingService {
       skip: window.offset,
       take: window.limit,
       select: {
+        ...SEASON_RANKING_SCOPE_SELECT,
+        id: true,
         rank: true,
-        seasonParticipantId: true,
         totalAssetKrw: true,
         returnRate: true,
         maxDrawdown: true,
@@ -290,7 +310,7 @@ export class RankingService {
         capturedAt: true,
         seasonParticipant: {
           select: {
-            userId: true,
+            ...SEASON_RANKING_SCOPE_SELECT.seasonParticipant.select,
             finalTier: true,
             user: {
               select: {
@@ -302,6 +322,11 @@ export class RankingService {
         },
       },
     });
+
+    // The whole page is verified before ANY of it is returned. A damaged row is
+    // never dropped and the survivors are never renumbered — that would shift
+    // every rank below it and hand out placements nobody earned (작업 8 §11).
+    assertSeasonRankingScopes(rankingRows);
 
     return {
       success: true,

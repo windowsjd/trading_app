@@ -3433,6 +3433,7 @@ export const SeasonRankingScalarFieldEnum = {
   id: 'id',
   seasonId: 'seasonId',
   seasonParticipantId: 'seasonParticipantId',
+  tradingAccountId: 'tradingAccountId',
   rankType: 'rankType',
   rank: 'rank',
   totalAssetKrw: 'totalAssetKrw',

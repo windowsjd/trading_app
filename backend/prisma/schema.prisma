@@ -383,6 +383,9 @@ model TradingAccount {
   adRewardClaims          AdRewardClaim[]
   equitySnapshots         EquitySnapshot[]
   dailyPortfolioSnapshots DailyPortfolioSnapshot[]
+  // Season accounts only — a general account attached here is an integrity
+  // violation, never a supported ranking scope (작업 8).
+  seasonRankings          SeasonRanking[]
 
   @@index([userId, mode])
   @@index([mode, status])
@@ -1276,6 +1279,12 @@ model SeasonRanking {
   id                  String            @id @default(uuid())
   seasonId            String            @map("season_id")
   seasonParticipantId String            @map("season_participant_id")
+  // Transitional SECOND identity (작업 8). SeasonRanking stays a season-only
+  // model — the participant relation is NOT relaxed — and this column exists
+  // to make the row's asset-isolation scope explicit and verifiable. Nullable
+  // only until every legacy row is repaired; NOT NULL is a later hardening
+  // unit. A general-mode account must NEVER appear here.
+  tradingAccountId    String?           @map("trading_account_id")
   rankType            SeasonRankingType @default(daily) @map("rank_type")
   rank                Int
   totalAssetKrw       Decimal           @map("total_asset_krw") @db.Decimal(24, 8)
@@ -1289,11 +1298,17 @@ model SeasonRanking {
 
   season            Season            @relation(fields: [seasonId], references: [id], onDelete: Restrict)
   seasonParticipant SeasonParticipant @relation(fields: [seasonParticipantId], references: [id], onDelete: Restrict)
+  tradingAccount    TradingAccount?   @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
 
   @@unique([seasonId, rankType, rankingDate, seasonParticipantId])
   @@unique([seasonId, rankType, rankingDate, rank])
+  // One ranking row per ACCOUNT per (season, rankType, date), the account-scoped
+  // twin of the participant unique. NULLs are distinct in PostgreSQL, so legacy
+  // unrepaired rows are unaffected.
+  @@unique([seasonId, rankType, rankingDate, tradingAccountId])
   @@index([seasonId, rankType, rankingDate, rank])
   @@index([seasonParticipantId, rankingDate])
+  @@index([tradingAccountId, rankingDate])
   @@map("season_rankings")
 }
 

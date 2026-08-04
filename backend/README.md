@@ -11,7 +11,7 @@ This service owns backend APIs, database access, financial calculations, and ser
 - Internal reward fulfillment foundation: operator/admin managed request queue/status APIs, idempotent internal reward requests, fulfillment into `SeasonReward`, and fulfilled-only user reward visibility. This does not call or implement external cash, point, coupon, gifticon, payment, or delivery APIs.
 - Admin/operator runtime DBs must have migration `20260601090000_add_user_role_operator_audit_logs` applied so `users.role` and `operator_audit_logs` exist.
 - Current season lookup and season join.
-- TradingAccount foundation shared by season mode and the future general (non-season) mode: season join creates a season-scoped `trading_accounts` row in the same transaction as the participant/wallets/initial grant, existing participants are backfilled 1:1, and at most one `mode=general` account per user is enforced by a partial unique index. General-mode entry (`POST /api/v1/trading-accounts/general`), its KRW/USD wallets, the one-time 10,000,000 KRW grant, and the rewarded-ad funding layer are implemented as of 작업 6 — see `docs/general-account-and-ad-rewards-api-contract.md`. Ad rewards are DISABLED by default (`AD_REWARD_ENABLED`) and no real ad-network adapter exists yet, so a claim answers 503 `AD_REWARD_PROVIDER_UNAVAILABLE`. General-mode performance is implemented as of 작업 7: account-scoped `GET /api/v1/trading-accounts/:accountId/portfolio` and `.../portfolio/equity`, time-weighted return (an ad reward moves total assets and cumulative external funding but NOT the return rate), external-funding boundary snapshots, and the EquitySnapshot/DailyPortfolioSnapshot account transition. 작업 6·7 보완 adds: an external-funding before/after order that does not depend on UUID or createdAt, a ledger↔snapshot cumulative-external-funding continuity invariant that stops a TWR advance when a boundary is missing, one shared full-integrity validator across every ad-claim replay path, an eligibility check that runs the general-account financial integrity BEFORE the feature/provider/status gates, and the general-account daily snapshot job (`--job general-account-daily-snapshot`), which writes the DailyPortfolioSnapshot and its scheduled EquitySnapshot in one per-account transaction. General-mode ORDERS, FX, and positions are still NOT implemented — rules and contract in `docs/trading-modes-and-accounts.md`.
+- TradingAccount foundation shared by season mode and the future general (non-season) mode: season join creates a season-scoped `trading_accounts` row in the same transaction as the participant/wallets/initial grant, existing participants are backfilled 1:1, and at most one `mode=general` account per user is enforced by a partial unique index. General-mode entry (`POST /api/v1/trading-accounts/general`), its KRW/USD wallets, the one-time 10,000,000 KRW grant, and the rewarded-ad funding layer are implemented as of 작업 6 — see `docs/general-account-and-ad-rewards-api-contract.md`. Ad rewards are DISABLED by default (`AD_REWARD_ENABLED`) and no real ad-network adapter exists yet, so a claim answers 503 `AD_REWARD_PROVIDER_UNAVAILABLE`. General-mode performance is implemented as of 작업 7: account-scoped `GET /api/v1/trading-accounts/:accountId/portfolio` and `.../portfolio/equity`, time-weighted return (an ad reward moves total assets and cumulative external funding but NOT the return rate), external-funding boundary snapshots, and the EquitySnapshot/DailyPortfolioSnapshot account transition. 작업 6·7 보완 adds: an external-funding before/after order that does not depend on UUID or createdAt, a ledger↔snapshot cumulative-external-funding continuity invariant that stops a TWR advance when a boundary is missing, one shared full-integrity validator across every ad-claim replay path, an eligibility check that runs the general-account financial integrity BEFORE the feature/provider/status gates, and the general-account daily snapshot job (`--job general-account-daily-snapshot`), which writes the DailyPortfolioSnapshot and its scheduled EquitySnapshot in one per-account transaction. 작업 8 adds the concurrency and ranking-scope layer: the general portfolio and equity GETs read everything in one `RepeatableRead` transaction (so an ad payout can never be half-visible and show up as investment profit), the general daily snapshot job takes the SAME per-account `trading_accounts ... FOR UPDATE` lock the payout takes and decides `capturedAt` after it, every returned history row is verified (a damaged row is a 500, never a `null` chart point), a keyed claim's stored replay payload must be structurally complete, `SeasonRanking` gains a nullable `tradingAccountId` that every writer dual-writes and every reader verifies fail-closed, ranking calculation INPUTS (daily/equity snapshots and executed orders) are scope-verified rather than silently excluded, ranking refresh / the daily ranking job / settlement all serialise on the same `seasons` row lock, and a successful settlement atomically writes the final ranking, the participant results, the participant status transitions, and the closure of EVERY linked season account (`closedAt = COALESCE(existing, Season.endAt)`) before `Season.status = settled`. Recovery tooling: `pnpm trading-accounts:repair-ranking-scope`. General-mode ORDERS, FX, positions, and general-mode RANKING are still NOT implemented, `tradingAccountId` is still nullable everywhere, and the reward-grant gate is still closed — rules and contract in `docs/trading-modes-and-accounts.md`.
 - Season write paths require effective active season state: `status=active` and `startAt <= now < endAt` for join, FX quote/execute, and orders quote/create/execute. Public order cancel is currently blocked with `ORDER_CANCEL_NOT_SUPPORTED`.
 - Home as one aggregate API.
 - Home settled final-result read model from existing `rankType=final` `season_rankings`.
@@ -478,6 +478,35 @@ provable: no trading rows, wallets intact, claims consistent with their
 ledger, no USD cash, and total assets exactly equal to external funding — so
 investment PnL really is 0 and a TWR factor of 1 is the truth rather than an
 assumption. Anything else is reported and skipped; there is no `--force`.
+
+### Ranking scope repair + ranking/settlement audit
+
+```bash
+pnpm trading-accounts:repair-ranking-scope           # dry-run
+pnpm trading-accounts:repair-ranking-scope --apply   # backfill ranking scopes
+```
+
+`repair-ranking-scope` fills a SeasonRanking's null `tradingAccountId` from its
+participant link and nothing else — rank, amounts, return rates, drawdowns, fill
+counts, and timestamps are never modified, and neither are participant results,
+`Season.status`, or `TradingAccount.status`. A NON-NULL value that disagrees
+with the participant is reported and NEVER overwritten: one of the two is wrong
+and a script cannot know which. Participant links that are themselves null,
+general-mode accounts, user mismatches, and season mismatches are reported and
+left alone.
+
+Run it AFTER `repair-links` has converged and AFTER every old backend instance
+has shut down — a running old writer keeps creating new null-scoped rows behind
+the script. `--apply` exits non-zero while any null or mismatch remains.
+
+Both modes also print a READ-ONLY ranking + settlement audit: null/mismatched
+ranking scopes, general accounts in a season ranking, duplicate accounts or
+ranks in one set, broken 1..N rank sequences, final rankings disagreeing with
+`participant.finalRank`, missing final tiers, settled seasons still holding an
+open or `closedAt`-less season account, eligible participants with no final
+ranking, excluded participants holding one, and damaged snapshot/order ranking
+inputs. The audit recomputes nothing and renumbers nothing — several of its
+findings are fixed by re-running the owning job, not by patching rows.
 
 ### General-account + ad-reward audit (read-only)
 

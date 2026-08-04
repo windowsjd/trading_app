@@ -2,6 +2,12 @@ jest.mock('../generated/prisma/client', () => {
   const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
 
   return {
+    TradingAccountMode: { season: 'season', general: 'general' },
+    TradingAccountStatus: {
+      active: 'active',
+      suspended: 'suspended',
+      closed: 'closed',
+    },
     AssetPriceSourceType: {
       admin_manual: 'admin_manual',
       official_batch: 'official_batch',
@@ -116,8 +122,20 @@ describe('RecordsService', () => {
     endAt,
   };
 
+  // 작업 8 §11: every ranking reader selects and verifies the row's account
+  // scope against its participant, so the fixtures carry both sides.
+  const participantAccount = {
+    id: 'account-sp-1',
+    mode: 'season',
+    userId: 'user-1',
+  };
+
   const participant = {
     id: 'sp-1',
+    seasonId: 'season-1',
+    userId: 'user-1',
+    tradingAccountId: participantAccount.id,
+    tradingAccount: participantAccount,
     participantStatus: ParticipantStatus.active,
     joinedAt,
     rankingHiddenAt: null,
@@ -135,6 +153,9 @@ describe('RecordsService', () => {
     rewardGrantedAt: new Date('2026-05-31T00:00:00.000Z'),
     seasonRankings: [
       {
+        id: 'ranking-1',
+        seasonId: 'season-1',
+        tradingAccountId: participantAccount.id,
         totalAssetKrw: new Prisma.Decimal('12000000.00000000'),
         returnRate: new Prisma.Decimal('20.00000000'),
         rankingDate: snapshotDate,
@@ -1563,6 +1584,17 @@ describe('RecordsService', () => {
     mockCurrentSeason(prisma);
     mockDetailedParticipant(prisma);
     prisma.seasonRanking.findFirst.mockResolvedValueOnce({
+      id: 'ranking-public-1',
+      seasonId: 'season-1',
+      seasonParticipantId: participant.id,
+      tradingAccountId: participantAccount.id,
+      seasonParticipant: {
+        id: participant.id,
+        seasonId: 'season-1',
+        userId: 'user-1',
+        tradingAccountId: participantAccount.id,
+        tradingAccount: participantAccount,
+      },
       rankType: SeasonRankingType.daily,
       rank: 1,
       rankingDate: snapshotDate,

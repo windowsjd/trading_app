@@ -54,6 +54,23 @@ import {
  * that when a concurrent run has already claimed (tradingAccountId,
  * snapshotDate), the unique violation aborts this transaction and takes its
  * EquitySnapshot down with it — the loser leaves nothing behind.
+ *
+ * CONCURRENCY WITH AD PAYOUTS (작업 6·7 보완 2)
+ * -------------------------------------------
+ * The ad-reward payout locks the TradingAccount row `FOR UPDATE` before it
+ * credits the wallet and writes its before/after boundary. This job takes the
+ * SAME lock, first thing inside each account's transaction, so the two are
+ * strictly serialised per account. Only two orderings remain possible:
+ *
+ *   daily first  → the daily row captures the pre-payout state, and the payout
+ *                  then brackets it with its own boundary pair;
+ *   payout first → the daily row captures the post-payout state, whose
+ *                  cumulative external funding already includes the reward.
+ *
+ * Neither produces the mixed state this work removes (post-payout wallet with
+ * pre-payout funding sum), where the reward would be recorded as investment
+ * profit in a snapshot that lives forever. No global lock and no all-accounts
+ * transaction: one account at a time, exactly as the payout does.
  */
 
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -154,6 +171,7 @@ export class GeneralDailySnapshotJobService {
         integrityFailed: 0,
         valuationFailed: 0,
         excludedClosed,
+        skippedClosedDuringRun: 0,
       },
       createdSnapshotIds: [],
       createdEquitySnapshotIds: [],
@@ -215,13 +233,42 @@ export class GeneralDailySnapshotJobService {
 
     try {
       const written = await this.prisma.$transaction(async (tx) => {
+        // ---- 1) SERIALIZATION POINT: the same row lock the ad payout takes.
+        const locked = await this.lockGeneralAccount(tx, account.id);
+        if (!locked) {
+          return { skippedClosed: true as const };
+        }
+
+        // ---- 2) Re-checked from the LOCKED row, not from the list read at
+        // the top of the run. An account can be closed, suspended, or
+        // re-scoped between the two, and a snapshot written for a closed
+        // account is permanent damage.
+        const reloaded = await tx.tradingAccount.findFirst({
+          where: { id: account.id, mode: TradingAccountMode.general },
+          select: GENERAL_ACCOUNT_SELECT,
+        });
+        if (
+          !reloaded ||
+          reloaded.status === TradingAccountStatus.closed ||
+          reloaded.seasonParticipant !== null
+        ) {
+          return { skippedClosed: true as const };
+        }
+
+        // ---- 3) capturedAt is decided AFTER the lock, per account.
+        // The batch's startedAt could be far in the past by the time this
+        // account's turn arrives — earlier accounts take time, and this one may
+        // have waited behind an ad payout. Stamping every account with the run
+        // clock would date a valuation to an instant its wallets never held.
+        const capturedAt = new Date();
+
         // Computed INSIDE the transaction so the values written are the ones
         // read from a single consistent snapshot of wallets, ledger, and
-        // performance state.
+        // performance state — and, under the lock, one the payout cannot move.
         const { values, valuation } =
           await this.performanceService.buildOrdinarySnapshotValues({
-            account,
-            valuationAt: input.capturedAt,
+            account: reloaded,
+            valuationAt: capturedAt,
             client: tx,
           });
 
@@ -246,7 +293,7 @@ export class GeneralDailySnapshotJobService {
             externalFundingAmountKrw: null,
             externalFundingReferenceType: null,
             externalFundingReferenceId: null,
-            capturedAt: input.capturedAt,
+            capturedAt,
           },
           select: { id: true },
         });
@@ -260,13 +307,24 @@ export class GeneralDailySnapshotJobService {
             values,
             valuation,
             snapshotDate: input.snapshotDate,
-            capturedAt: input.capturedAt,
+            // The SAME capturedAt as the EquitySnapshot beside it: two rows
+            // describing one valuation instant never disagree about when.
+            capturedAt,
           }),
           select: { id: true },
         });
 
         return { equityId: equity.id, dailyId: daily.id };
       });
+
+      if ('skippedClosed' in written) {
+        // Counted with the accounts excluded up front. The account was live
+        // when the run listed it and closed before its turn; that is a normal
+        // race, not a failure, and it must leave NO snapshot behind.
+        result.accounts.excludedClosed += 1;
+        result.accounts.skippedClosedDuringRun += 1;
+        return;
+      }
 
       result.accounts.created += 1;
       result.createdEquitySnapshotIds.push(written.equityId);
@@ -281,6 +339,31 @@ export class GeneralDailySnapshotJobService {
 
       this.recordAccountError(result, account, error);
     }
+  }
+
+  /**
+   * The SAME lock the ad-reward payout takes: `trading_accounts` row, pinned to
+   * `mode = 'general'`, `FOR UPDATE`. Returns null when the row no longer
+   * matches, so the caller skips the account instead of writing to it.
+   *
+   * Only ONE account is ever locked at a time, and only for the duration of its
+   * own transaction — never a global or all-accounts lock.
+   */
+  private async lockGeneralAccount(
+    tx: Prisma.TransactionClient,
+    accountId: string,
+  ): Promise<{ id: string; status: TradingAccountStatus } | null> {
+    const rows = await tx.$queryRaw<
+      Array<{ id: string; status: TradingAccountStatus }>
+    >`
+      SELECT "id", "status"
+      FROM "trading_accounts"
+      WHERE "id" = ${accountId}
+        AND "mode" = 'general'
+      FOR UPDATE
+    `;
+
+    return rows[0] ?? null;
   }
 
   private buildDailyData(input: {

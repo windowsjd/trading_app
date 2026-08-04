@@ -88,6 +88,9 @@ describe('snapshot and ranking generation dry-run behavior', () => {
         totalFillCount: 0,
         reachedReturnAt: new Date('2026-05-07T00:00:01.000Z'),
         dryRun: true,
+        // A dry run opens no transaction, so it resolves no account scope.
+        // Reported as unknown rather than guessed (작업 8 §8).
+        tradingAccountId: null,
       },
     ]);
   });

@@ -311,3 +311,38 @@ OpsJobLockService + ops_job_locks다(Redis lock 아님). 실제 거래소 주문
   근거: 의미가 다른 두 수익률을 같은 필드명으로 내보내면 프런트가 구분할 방법이 없고, 손상을 "일시적 불가"로 표시하면 아무도 고치지 않는다.
 - equity 이력 정렬과 최신 snapshot 조회는 `capturedAt` → `createdAt` → `id`로 결정적이어야 한다. before/after 쌍은 같은 `capturedAt`을 가지므로 tie-breaker 없이는 다음 구간 계산이 유입을 이중 계산할 수 있고, 커밋된 상태의 최신 snapshot이 unpaired before면 정합성 오류다.
   근거: 정렬이 흔들리면 같은 데이터에서 다른 수익률이 나온다.
+
+## 작업 8 (일반계정 동시성 · SeasonRanking TradingAccount scope)
+
+- 일반계정 portfolio·equity GET은 Prisma `RepeatableRead` 트랜잭션 하나에서 성과 snapshot·외부자금 원장·지갑·Position·가격·환율을 모두 읽고, 그 안에서 account를 다시 확인한다. GET은 lock을 잡지 않고 아무것도 쓰지 않으며 외부 호출도 하지 않는다. 시즌 경로와 legacy `/api/v1/portfolio*`는 변경하지 않는다.
+  근거: 6개 read가 각각 별도 트랜잭션이면 "지갑은 지급 후, 외부자금 합계는 지급 전"인 조합이 가능하고, TWR은 그 차액 전부를 투자수익으로 계산한다 — 광고 시청이 수익률로 표시된다.
+- 일반 daily snapshot job은 계정별 트랜잭션 시작 직후 광고 지급과 **동일한** `trading_accounts` row를 `FOR UPDATE`로 잠그고, 잠금 후 DB에서 다시 읽은 값으로 mode·status·participant·금융 integrity·외부자금 연속성을 재검사한다. 전역 락도, 전체 계정 단일 트랜잭션도 아니다.
+  근거: 잘못된 조합으로 만들어진 snapshot은 요청 하나가 아니라 영구 기록으로 남는다. 목록 조회 시점의 status를 믿으면 그 사이 closed된 계정에 snapshot을 쓴다.
+- 계정별 `capturedAt`은 lock 획득 이후 결정하며, 같은 트랜잭션의 scheduled EquitySnapshot과 DailyPortfolioSnapshot이 같은 값을 공유한다. batch `startedAt`을 모든 계정에 강제하지 않는다.
+  근거: 앞 계정 처리와 광고 지급 대기로 시간이 흐르면, 실제 지갑을 읽은 시각과 기록된 시각이 어긋난다.
+- 일반 history는 반환할 **모든** 행을 검증한다(scope·성과 3컬럼 non-null·PnL 항등식·returnRate↔factor·origin factor 1·ordinary reference null·boundary pair 완전성). claim 대조는 요청당 1회 batch 조회다. legacy unkeyed claim에 없는 경계를 요구하거나 만들지 않되, 경계가 실제로 있으면 불완전한 pair를 정상으로 반환하지 않는다.
+  근거: 최신 상태만 검사하면 손상된 과거 행이 `"investmentPnlKrw": null`로 200에 실리고, 짝 잃은 `after`는 차트에서 거래 수익과 구분되지 않는 수직 상승이 된다.
+- keyed claim의 `responsePayloadJson`은 shape를 엄격히 검증한다(`success=true`, `data.granted`/`duplicate` boolean, claimId·grantedAt·walletBalanceAfter 존재 및 원장 일치). 저장 payload는 최초 사실이므로 항상 `granted=true, duplicate=false`다. legacy unkeyed claim에는 강제하지 않는다.
+  근거: "null이 아니기만 하면 된다"는 검사는 `{}`나 `{data:{}}`가 모든 필드 비교를 공허하게 통과시켜, 증거 없는 지급을 성공으로 replay한다.
+- SeasonRanking은 시즌 전용 모델로 유지하고(`seasonParticipantId` NOT NULL 그대로), `tradingAccountId`를 nullable 두 번째 식별자로 additive 추가한다. 일반계정 account가 연결되면 무결성 오류다. NOT NULL 강화는 repair 수렴 이후의 별도 작업이다.
+  근거: 랭킹 행이 어느 격리 계정에서 나왔는지 명시되지 않으면 일반계정 오염과 계정 불일치를 탐지할 방법 자체가 없다.
+- 모든 ranking writer는 participant + 검증된 accountId를 dual-write하고, participant link가 null이면 **한 행도** 만들지 않는다. 기존 행의 null scope나 non-null mismatch는 일상 write로 덮어쓰지 않고 repair 필요 오류를 낸다.
+  근거: 한 명이 빠진 랭킹은 더 작은 정상 랭킹이 아니라 그 아래 전원의 순위가 밀린 틀린 랭킹이다. mismatch는 둘 중 무엇이 맞는지 writer가 알 수 없다.
+- 랭킹 계산 입력(DailyPortfolioSnapshot·EquitySnapshot·executed Order)의 scope 손상은 해당 행 제외가 아니라 job 전체 fail-closed다.
+  근거: 제외는 중립적이지 않다. equity 저점이 빠지면 MDD(tie-break #2)가, executed order가 빠지면 fill count(tie-break #3)가 낮아져 손상된 계정이 위로 올라간다.
+- 모든 ranking reader는 scope 컬럼을 select하고 검증한다. 손상이 하나라도 있으면 전체 set을 구조화된 500으로 낸다 — 빈 결과로 숨기거나, 해당 행만 빼거나, rank를 다시 매기지 않는다. row 자체가 없는 것(부재)만 기존 unavailable 응답이다. `tradingAccountId`는 공개 응답에 노출하지 않는다.
+  근거: 손상을 "일시적 불가"로 표시하면 아무도 고치지 않고, 한 명을 조용히 빼면 아무도 볼 수 없는 방식으로 틀린 리더보드가 된다.
+- ranking refresh·daily ranking job·settlement는 모두 같은 `seasons` row를 `FOR UPDATE`로 잠가 직렬화한다. `RankingRefreshService`의 in-memory Set은 같은 프로세스 보조 장치로만 남는다. Redis 분산락·큐는 도입하지 않는다.
+  근거: 실제 문제가 되는 경쟁은 live refresh vs settlement이고, 두 instance나 API 옆의 batch는 메모리를 공유하지 않는다. settled season의 확정 결과를 refresh가 지우고 다시 쓸 수 있었다.
+- season settlement는 final ranking·participant 결과·participant 상태 전환·**모든** 연결 season account 종료·`Season.status=settled`를 한 트랜잭션에서 원자 처리하고, open limit reservation을 트랜잭션 **안에서** 재검사한다. 일부 account만 closed된 상태로 settled가 되지 않는다.
+  근거: 사전 검사 이후 지정가 주문이 들어와 현금이 다시 예약되면 미완결 주문서 위에서 정산하게 된다. 시즌이 끝났는데 그 시즌 계정 하나가 거래 가능해 보이면 안 된다.
+- account 종료 시각은 `COALESCE(기존 closedAt, Season.endAt)`이며 `mode='season'`을 모든 WHERE에 고정한다. status는 오직 `closed`로만 쓴다.
+  근거: 실제 거래 가능 기간은 `endAt`에 끝났다. 정산 job이 늦게 돌았다고 계정이 그때까지 살아 있던 것으로 만들면 안 되고, 이미 더 이른 종료 시각이 있으면 그쪽이 사실이다.
+- 정산 시점에 `registered`로 남은 participant는 상태를 유지하고 final rank·tier를 받지 않으며 로그로 보고된다. 계정은 시즌의 나머지와 함께 closed된다.
+  근거: 가입 흐름은 진입 시 활성화하므로 registered 잔존은 이상 상태이고, 조용히 finished로 바꾸는 것은 "경쟁했다"는 주장을 서버가 대신 하는 것이다.
+- FinalTierAssignmentJob은 finalRank/finalTier가 절반만 설정됐거나 ranking.rank·정책 계산과 다른 상태를 `FINAL_TIER_ASSIGNMENT_CONFLICT`로 중단한다. 완전히 동일한 값이면 기존대로 idempotent existing이다.
+  근거: 절반짜리 결과를 existing으로 건너뛰면 사용자는 리더보드가 부정하는 결과를 영구히 갖고, job은 성공을 보고한다.
+- `repair-ranking-scope`는 기본 dry-run이며 `ranking.tradingAccountId`만 채운다. non-null mismatch·participant link null·general account·user/season 불일치는 보고만 하고 절대 고치지 않는다. 함께 출력되는 audit는 read-only이며 rank 재계산이나 재번호 매기기를 하지 않는다.
+  근거: 추측으로 채운 scope는 잘못된 계정에 성적을 귀속시킨다. rank gap이나 tier 불일치는 스크립트가 아니라 해당 job 재실행으로 고쳐야 한다.
+- 랭킹 계산 정책·순위 방식(sequential 1,2,3,4)·티어 비율·시즌 초기자본 기준 수익률은 이번 작업에서 변경하지 않는다. reward 지급 gate는 계속 닫혀 있고, 실제 광고 provider는 계속 미연동이다.
+

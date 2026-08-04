@@ -2,6 +2,12 @@ jest.mock('../generated/prisma/client', () => {
   const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
 
   return {
+    TradingAccountMode: { season: 'season', general: 'general' },
+    TradingAccountStatus: {
+      active: 'active',
+      suspended: 'suspended',
+      closed: 'closed',
+    },
     BatchJobStatus: {
       pending: 'pending',
       running: 'running',
@@ -241,6 +247,8 @@ describe('SeasonSettlementJobService', () => {
       data: {
         seasonId: 'season-1',
         seasonParticipantId: 'sp-2',
+        // 작업 8 dual-write.
+        tradingAccountId: 'account-of-sp-2',
         rankType: SeasonRankingType.final,
         rank: 1,
         totalAssetKrw: '2000.00000000',
@@ -683,8 +691,26 @@ function createService(portfolioValuationService?: {
 
 function createPrismaMock() {
   const tx = {
+    // The season row lock taken first inside the settlement transaction
+    // (작업 8 §13.3 / §14.1).
+    $queryRaw: jest.fn().mockResolvedValue([
+      {
+        id: 'season-1',
+        status: 'ended',
+        start_at: new Date('2026-05-01T00:00:00.000Z'),
+        end_at: SEASON_END_AT,
+      },
+    ]),
     season: {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+    order: { count: jest.fn().mockResolvedValue(0) },
+    cashWallet: { count: jest.fn().mockResolvedValue(0) },
+    // Settlement closes EVERY season account, so it re-reads all participants
+    // with their account link under the lock (작업 8 §14.2).
+    tradingAccount: {
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      count: jest.fn().mockResolvedValue(0),
     },
     seasonParticipant: {
       // 작업 7 dual-write: the settlement snapshot writer resolves the
@@ -692,9 +718,24 @@ function createPrismaMock() {
       findUnique: jest.fn(async (args: { where: { id: string } }) => ({
         tradingAccountId: `account-of-${args.where.id}`,
       })),
+      // Two different reads hit this delegate: the season-wide account list
+      // (`where.seasonId`) and the ranking scope resolution (`where.id.in`).
+      findMany: jest.fn(
+        (args: { where: { id?: { in: string[] }; seasonId?: string } }) => {
+          const ids = args.where.id?.in;
+          const rows = settlementAccountParticipants();
+          return Promise.resolve(
+            ids
+              ? rows
+                  .filter((row) => ids.includes(row.id))
+                  .map((row) => ({ ...row, seasonId: 'season-1' }))
+              : rows,
+          );
+        },
+      ),
       update: jest.fn(),
       updateMany: jest.fn(),
-      count: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
     },
     equitySnapshot: {
       findFirst: jest.fn().mockResolvedValue(null),
@@ -718,6 +759,7 @@ function createPrismaMock() {
     seasonParticipant: {
       findMany: jest.fn(),
       update: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
     },
     dailyPortfolioSnapshot: {
       findMany: jest.fn(),
@@ -846,12 +888,67 @@ async function captureHttpExceptionResponse(promise: Promise<unknown>) {
   throw new Error('Expected HttpException.');
 }
 
+const SEASON_END_AT = new Date('2026-05-21T00:00:00.000Z');
+
+/**
+ * The participants settlement re-reads under the season lock to close their
+ * accounts (작업 8 §14.2). Season-wide by design, so the default fixture covers
+ * the two eligible participants every test in this file uses.
+ */
+let accountParticipants: Array<{
+  id: string;
+  userId: string;
+  participantStatus: string;
+  tradingAccountId: string;
+  tradingAccount: {
+    id: string;
+    mode: string;
+    status: string;
+    userId: string;
+    closedAt: Date | null;
+    seasonParticipant: { id: string };
+  };
+}> = [];
+
+function settlementAccountParticipants() {
+  return accountParticipants;
+}
+
+function accountParticipant(
+  id: string,
+  userId: string,
+  participantStatus = 'active',
+) {
+  return {
+    id,
+    userId,
+    participantStatus,
+    tradingAccountId: `account-of-${id}`,
+    tradingAccount: {
+      id: `account-of-${id}`,
+      mode: 'season',
+      status: 'active',
+      userId,
+      closedAt: null,
+      seasonParticipant: { id },
+    },
+  };
+}
+
 function mockSeason(prisma: PrismaMock, status: SeasonStatus) {
   prisma.season.findUnique.mockResolvedValue({
     id: 'season-1',
     status,
-    endAt: new Date('2026-05-21T00:00:00.000Z'),
+    endAt: SEASON_END_AT,
   });
+  prisma.__tx.$queryRaw.mockResolvedValue([
+    {
+      id: 'season-1',
+      status,
+      start_at: new Date('2026-05-01T00:00:00.000Z'),
+      end_at: SEASON_END_AT,
+    },
+  ]);
 }
 
 function mockParticipants(
@@ -863,6 +960,10 @@ function mockParticipants(
       totalFillCount: 0,
       ...participant,
     })),
+  );
+  prisma.seasonParticipant.count.mockResolvedValue(participants.length);
+  accountParticipants = participants.map((participant) =>
+    accountParticipant(participant.id, participant.userId),
   );
 }
 
@@ -916,7 +1017,11 @@ function existingRanking(
 ) {
   return {
     id,
+    seasonId: 'season-1',
     seasonParticipantId,
+    // Existing final rankings are re-verified before they are reused as a
+    // settlement result (작업 8 §14.5), so the fixture carries its scope.
+    tradingAccountId: `account-of-${seasonParticipantId}`,
     rank,
     totalAssetKrw: new Prisma.Decimal('1000.00000000'),
     returnRate: new Prisma.Decimal('0.00000000'),
@@ -924,7 +1029,15 @@ function existingRanking(
     totalFillCount: 0,
     reachedReturnAt: null,
     seasonParticipant: {
+      id: seasonParticipantId,
+      seasonId: 'season-1',
       userId,
+      tradingAccountId: `account-of-${seasonParticipantId}`,
+      tradingAccount: {
+        id: `account-of-${seasonParticipantId}`,
+        mode: 'season',
+        userId,
+      },
     },
   };
 }

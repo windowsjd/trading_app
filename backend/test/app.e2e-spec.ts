@@ -2975,6 +2975,24 @@ describe('AppController (e2e)', () => {
       rewardGrantedAt: null,
     });
     prisma.seasonRanking.findFirst.mockResolvedValueOnce({
+      // 작업 8: every ranking reader selects and verifies the row's account
+      // scope against its participant before returning it, so the fixture
+      // carries both sides. A row without them is now a structured 500.
+      id: 'ranking-final-1',
+      seasonId: season.id,
+      seasonParticipantId: participant.id,
+      tradingAccountId: 'trading-account-1',
+      seasonParticipant: {
+        id: participant.id,
+        seasonId: season.id,
+        userId: user.id,
+        tradingAccountId: 'trading-account-1',
+        tradingAccount: {
+          id: 'trading-account-1',
+          mode: 'season',
+          userId: user.id,
+        },
+      },
       rank: 1,
       totalAssetKrw: new Prisma.Decimal('10100000.00000000'),
       returnRate: new Prisma.Decimal('0.01000000'),

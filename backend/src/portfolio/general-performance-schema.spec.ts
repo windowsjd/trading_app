@@ -229,10 +229,12 @@ describe('General performance schema contract', () => {
       );
     });
 
-    it('leaves SeasonRanking entirely alone (그 전환은 별도 작업)', () => {
+    // 작업 8 moved SeasonRanking's own transition into a SEPARATE migration.
+    // What this work's foundation migration must still never do is touch
+    // season_rankings — that assertion is the point of the test and stays.
+    it('leaves SeasonRanking out of the general-performance foundation migration', () => {
       const block = modelBlock('SeasonRanking');
       expect(block).toMatch(/seasonParticipantId\s+String\s/);
-      expect(block).not.toContain('tradingAccountId');
       expect(foundationSql).not.toContain('season_rankings');
     });
 

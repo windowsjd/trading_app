@@ -377,11 +377,143 @@ export function assertStoredGrantedResponse(
   claim: StoredClaimForIntegrity,
   ledgerBalanceAfter: string,
 ): void {
+  // KEYED claims get the STRICT shape check (작업 6 보완).
+  //
+  // "not null" was never enough. `{}`, `{ data: {} }`, and
+  // `{ success: false, data: { granted: true } }` all satisfied the old
+  // null-check and then satisfied every field comparison below vacuously,
+  // because each one was written as "if present, it must match". A payload with
+  // no claimId, no grantedAt, and no walletBalanceAfter therefore replayed as a
+  // clean success — the exact confirmation-without-evidence this file exists to
+  // prevent. A keyed claim's payload was written by the payout transaction and
+  // is complete by construction, so an incomplete one is damage.
+  if (claim.idempotencyKey) {
+    assertKeyedGrantedResponseShape(claim, ledgerBalanceAfter);
+    return;
+  }
+
+  // LEGACY unkeyed claims predate the stored payload entirely (§5.3). Their
+  // payload may be null or partial; whatever IS present must still agree, and
+  // the claim/ledger/wallet checks above already ran regardless.
   const data = readStoredResponseData(claim);
   if (!data) {
     return;
   }
 
+  assertLegacyGrantedFieldsAgree(claim, data, ledgerBalanceAfter);
+}
+
+/**
+ * The canonical first-response shape of a KEYED granted claim.
+ *
+ * `granted` / `duplicate` describe THE ORIGINAL call, which by definition
+ * granted rather than replayed — so the stored pair is always
+ * `granted: true, duplicate: false`. The outward response of a *retry* flips
+ * them (that is the API contract for a duplicate), but the stored record of
+ * what first happened must not.
+ */
+function assertKeyedGrantedResponseShape(
+  claim: StoredClaimForIntegrity,
+  ledgerBalanceAfter: string,
+): void {
+  const payload = claim.responsePayloadJson;
+  if (
+    payload === null ||
+    typeof payload !== 'object' ||
+    Array.isArray(payload)
+  ) {
+    throwAdRewardClaimIntegrity(
+      claim.id,
+      'keyed granted claim has no stored response payload object',
+    );
+  }
+
+  const root = payload as Record<string, unknown>;
+  if (root.success !== true) {
+    throwAdRewardClaimIntegrity(
+      claim.id,
+      `stored response payload has success=${JSON.stringify(root.success)}; a granted claim's canonical response is success=true`,
+    );
+  }
+
+  const data = root.data;
+  if (data === null || typeof data !== 'object' || Array.isArray(data)) {
+    throwAdRewardClaimIntegrity(
+      claim.id,
+      'stored response payload has no data object',
+    );
+  }
+
+  const fields = data as Record<string, unknown>;
+
+  if (typeof fields.granted !== 'boolean') {
+    throwAdRewardClaimIntegrity(
+      claim.id,
+      'stored response payload is missing a boolean data.granted',
+    );
+  }
+  if (typeof fields.duplicate !== 'boolean') {
+    throwAdRewardClaimIntegrity(
+      claim.id,
+      'stored response payload is missing a boolean data.duplicate',
+    );
+  }
+  if (fields.granted !== true || fields.duplicate !== false) {
+    throwAdRewardClaimIntegrity(
+      claim.id,
+      `stored response payload records granted=${String(fields.granted)}, duplicate=${String(fields.duplicate)}; the canonical FIRST response of a granted claim is granted=true, duplicate=false`,
+    );
+  }
+
+  const storedClaimId = readString(fields.claimId);
+  if (storedClaimId === null) {
+    throwAdRewardClaimIntegrity(
+      claim.id,
+      'stored response payload is missing data.claimId',
+    );
+  }
+  if (storedClaimId !== claim.id) {
+    throwAdRewardClaimIntegrity(
+      claim.id,
+      'stored response payload names a different claim',
+    );
+  }
+
+  const storedGrantedAt = readString(fields.grantedAt);
+  if (storedGrantedAt === null) {
+    throwAdRewardClaimIntegrity(
+      claim.id,
+      'stored response payload is missing data.grantedAt',
+    );
+  }
+  // assertGrantedClaimIntegrity has already proven grantedAt is set.
+  if (storedGrantedAt !== claim.grantedAt?.toISOString()) {
+    throwAdRewardClaimIntegrity(
+      claim.id,
+      'stored response payload grantedAt disagrees with the claim',
+    );
+  }
+
+  const storedBalance = readString(fields.walletBalanceAfter);
+  if (storedBalance === null) {
+    throwAdRewardClaimIntegrity(
+      claim.id,
+      'stored response payload is missing data.walletBalanceAfter',
+    );
+  }
+  if (storedBalance !== ledgerBalanceAfter) {
+    throwAdRewardClaimIntegrity(
+      claim.id,
+      `stored response payload balance ${storedBalance} disagrees with the ledger balance ${ledgerBalanceAfter}`,
+    );
+  }
+}
+
+function assertLegacyGrantedFieldsAgree(
+  claim: StoredClaimForIntegrity,
+  data: Record<string, unknown>,
+  ledgerBalanceAfter: string,
+): void {
   const storedClaimId = readString(data.claimId);
   if (storedClaimId !== null && storedClaimId !== claim.id) {
     throwAdRewardClaimIntegrity(
@@ -414,16 +546,72 @@ function readString(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
 }
 
-/** The refusal payload must still name the failure the claim was rejected with. */
+/**
+ * The refusal payload must still name the failure the claim was rejected with.
+ *
+ * KEYED refusals get the same strict treatment as keyed grants (§5.2): the
+ * refusal record is what every retry of that command is answered with, so a
+ * refusal payload missing its code or message would replay as a refusal nobody
+ * can explain.
+ */
 export function assertStoredRejectedResponse(
   claim: StoredClaimForIntegrity,
 ): void {
   const payload = claim.responsePayloadJson;
-  if (
-    payload === null ||
-    typeof payload !== 'object' ||
-    Array.isArray(payload)
-  ) {
+  const isObject =
+    payload !== null && typeof payload === 'object' && !Array.isArray(payload);
+
+  if (claim.idempotencyKey) {
+    if (!isObject) {
+      throwAdRewardClaimIntegrity(
+        claim.id,
+        'keyed rejected claim has no stored refusal payload object',
+      );
+    }
+
+    const root = payload as Record<string, unknown>;
+    if (root.refused !== true) {
+      throwAdRewardClaimIntegrity(
+        claim.id,
+        `stored refusal payload has refused=${JSON.stringify(root.refused)}; a rejected claim's canonical response is refused=true`,
+      );
+    }
+
+    const code = readString(root.code);
+    if (code === null) {
+      throwAdRewardClaimIntegrity(
+        claim.id,
+        'stored refusal payload is missing a failure code',
+      );
+    }
+    if (code !== claim.failureCode) {
+      throwAdRewardClaimIntegrity(
+        claim.id,
+        'stored refusal payload names a different failure code than the claim',
+      );
+    }
+
+    const message = readString(root.message);
+    if (message === null || message.trim() === '') {
+      throwAdRewardClaimIntegrity(
+        claim.id,
+        'stored refusal payload is missing a message',
+      );
+    }
+    // The claim's own reason is the authority. A payload that says something
+    // else would answer a retry with a refusal the record does not support.
+    if (claim.failureReason !== null && message !== claim.failureReason) {
+      throwAdRewardClaimIntegrity(
+        claim.id,
+        'stored refusal payload message contradicts the claim failure reason',
+      );
+    }
+
+    return;
+  }
+
+  // LEGACY unkeyed refusals: only what is present has to agree.
+  if (!isObject) {
     return;
   }
 

@@ -19,6 +19,10 @@ import { LimitOrderCancelService } from '../orders/limit-order-cancel.service';
 import { LIMIT_ORDER_CANCEL_REASONS } from '../orders/limit-order-policy';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  assertExistingRankingRowScopeWritable,
+  requireSeasonRankingAccountScope,
+} from '../ranking/season-ranking-scope';
+import {
   ensureSeasonTradingAccountLink,
   SeasonTradingAccountLinkIntegrityError,
 } from '../seasons/season-trading-account-link';
@@ -103,6 +107,7 @@ type FinalRankingRow = {
   rank: number;
   rankingDate: Date;
   capturedAt: Date;
+  tradingAccountId: string | null;
 };
 
 @Injectable()
@@ -628,6 +633,13 @@ export class OperatorSeasonModerationService {
       this.toDateOnly(input.participant.season.endAt);
     const capturedAt = rankingMetadata?.capturedAt ?? new Date();
 
+    // Operator rank corrections are still ranking WRITES, so they carry the
+    // same account scope as every other writer (작업 8 §8).
+    const scope = await requireSeasonRankingAccountScope(client, {
+      seasonId: input.participant.seasonId,
+      seasonParticipantId: input.participant.id,
+    });
+
     const conflict = await client.seasonRanking.findFirst({
       where: {
         seasonId: input.participant.seasonId,
@@ -653,6 +665,14 @@ export class OperatorSeasonModerationService {
     }
 
     if (input.existingRanking) {
+      // A legacy null scope or a mismatch is surfaced instead of being quietly
+      // fixed by an unrelated rank correction.
+      assertExistingRankingRowScopeWritable({
+        rankingId: input.existingRanking.id,
+        storedTradingAccountId: input.existingRanking.tradingAccountId,
+        expectedTradingAccountId: scope.tradingAccountId,
+      });
+
       if (input.existingRanking.rank === input.requestedRank) {
         return {
           action: 'none' as const,
@@ -688,6 +708,8 @@ export class OperatorSeasonModerationService {
       data: {
         seasonId: input.participant.seasonId,
         seasonParticipantId: input.participant.id,
+        // 작업 8 dual-write.
+        tradingAccountId: scope.tradingAccountId,
         rankType: SeasonRankingType.final,
         rank: input.requestedRank,
         totalAssetKrw: input.participant.totalAssetKrw,
@@ -733,6 +755,7 @@ export class OperatorSeasonModerationService {
         rank: true,
         rankingDate: true,
         capturedAt: true,
+        tradingAccountId: true,
       },
     });
   }
@@ -797,11 +820,7 @@ export class OperatorSeasonModerationService {
           ? Number(value.trim())
           : Number.NaN;
 
-    if (
-      Number.isSafeInteger(parsed) &&
-      parsed > 0 &&
-      parsed <= 1_000_000
-    ) {
+    if (Number.isSafeInteger(parsed) && parsed > 0 && parsed <= 1_000_000) {
       return parsed;
     }
 
@@ -855,7 +874,11 @@ export class OperatorSeasonModerationService {
     return text.length === 0 ? null : text.slice(0, maxLength);
   }
 
-  private parseRequiredPathText(value: string, code: string, fieldName: string) {
+  private parseRequiredPathText(
+    value: string,
+    code: string,
+    fieldName: string,
+  ) {
     const text = typeof value === 'string' ? value.trim() : '';
     if (!text) {
       this.throwApiError(
@@ -888,14 +911,13 @@ export class OperatorSeasonModerationService {
     error: unknown;
   }) {
     try {
-      const errorCode =
-        this.isUniqueConstraintError(input.error)
-          ? 'FINAL_RANK_CONFLICT'
-          : input.error instanceof SeasonTradingAccountLinkIntegrityError
-            ? input.error.code
-            : input.error instanceof HttpException
-              ? this.extractErrorCode(input.error)
-              : 'OPERATOR_SEASON_MODERATION_FAILED';
+      const errorCode = this.isUniqueConstraintError(input.error)
+        ? 'FINAL_RANK_CONFLICT'
+        : input.error instanceof SeasonTradingAccountLinkIntegrityError
+          ? input.error.code
+          : input.error instanceof HttpException
+            ? this.extractErrorCode(input.error)
+            : 'OPERATOR_SEASON_MODERATION_FAILED';
 
       await this.auditService.recordFailure({
         actorUserId: input.actor.userId,

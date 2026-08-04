@@ -837,3 +837,80 @@ never an empty chart.
 - `pnpm tsx scripts/admin-run-batch-job.ts --job general-account-daily-snapshot
   --snapshot-date <YYYY-MM-DD> [--dry-run]` — the general-account daily
   snapshot job (작업 7 보완 5). Details in `docs/batch-job-foundation.md`.
+
+## 작업 8 — consistent reads, per-account serialization, strict replay payload
+
+### Consistent portfolio reads
+
+`GET /api/v1/trading-accounts/:accountId/portfolio` and
+`GET /api/v1/trading-accounts/:accountId/portfolio/equity` run their GENERAL
+path inside one Prisma `RepeatableRead` transaction. Season accounts and the
+legacy `/api/v1/portfolio*` endpoints are unchanged.
+
+The externally visible contract is identical — 401 unauthenticated, the same
+404 `TRADING_ACCOUNT_NOT_FOUND` for unknown and foreign accounts, and
+active/suspended/closed all readable. What changed is that a payout committing
+mid-request can no longer be half-visible: `totalAssetKrw`,
+`cumulativeExternalFundingKrw`, `investmentPnlKrw`, and `returnRate` always
+describe ONE committed instant, so an ad reward never appears as investment
+profit.
+
+These GETs still write nothing: no snapshot, wallet, ledger row, claim, or
+repair, and no row lock.
+
+### History integrity
+
+Every returned history point is verified before any of it is serialised.
+`cumulativeExternalFundingKrw` and `investmentPnlKrw` are never `null` on a
+general history point — a row that cannot produce them is damage, reported as
+500 `GENERAL_PERFORMANCE_INTEGRITY`, not rendered as a gap.
+
+Verified per row: account scope, `seasonParticipantId = null`, the three
+performance columns non-null and non-negative,
+`investmentPnl = totalAsset - cumulativeExternalFunding`,
+`returnRate = (factor - 1) × 100`, origin rows at factor 1 / return 0, ordinary
+rows with no external-funding reference columns, and boundary pairs that are
+complete and performance-neutral. `ad_reward_claim` boundaries are cross-checked
+against their claims in ONE batched query per request.
+
+Legacy (pre-작업 7) unkeyed claims are NOT required to have boundaries. A
+boundary that does exist must still be a complete pair.
+
+### Keyed claim replay payload
+
+A keyed claim's stored `responsePayloadJson` must be structurally complete
+before it can answer a retry:
+
+```json
+{
+  "success": true,
+  "data": {
+    "granted": true,
+    "duplicate": false,
+    "claimId": "<claim id>",
+    "grantedAt": "<UTC ISO>",
+    "walletBalanceAfter": "<ledger balanceAfter>"
+  }
+}
+```
+
+`granted`/`duplicate` describe the ORIGINAL call, so the stored record is always
+`true`/`false`; the outward response of a retry flips them, which is the
+existing API contract. A keyed refusal payload must carry
+`refused: true`, a `code` equal to `claim.failureCode`, and a non-empty
+`message` that does not contradict `claim.failureReason`.
+
+Anything missing, mistyped, or disagreeing with the ledger is 500
+`AD_REWARD_CLAIM_INTEGRITY` — never a `duplicate: true` success. Legacy unkeyed
+claims are exempt from the shape (their payload may be null or partial), but any
+field they DO carry must still agree with the ledger.
+
+### Daily snapshot serialization
+
+`general-account-daily-snapshot` takes the same `trading_accounts` row lock the
+payout takes, so for one account the two are strictly serialised. Only two
+orderings are possible — daily-then-payout or payout-then-daily — and neither
+produces a snapshot mixing a post-payout wallet with a pre-payout funding total.
+An account closed after the run listed it gets no snapshot at all and is counted
+in `excludedClosed` / `skippedClosedDuringRun`.
+

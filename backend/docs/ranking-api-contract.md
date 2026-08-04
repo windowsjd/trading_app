@@ -213,9 +213,52 @@ Implemented error codes:
 - `INVALID_LIMIT`
 - `INVALID_OFFSET`
 
+## Account scope integrity (작업 8)
+
+Every SeasonRanking row carries BOTH `seasonParticipantId` (required) and
+`tradingAccountId` (nullable until the repair converges). Every reader in this
+API selects the scope columns and verifies them before returning anything.
+
+`tradingAccountId` is INTERNAL. It is never present in a ranking, myRanking, or
+near_me response — a public leaderboard does not expose another user's account
+id.
+
+Absence vs damage are different answers:
+
+| situation | response |
+| --- | --- |
+| no ranking row exists for the season/date | existing `state: "unavailable"` + `RANKING_UNAVAILABLE` |
+| rows exist but one has `tradingAccountId = null` | 500 `SEASON_RANKING_SCOPE_REPAIR_REQUIRED` |
+| a row's account disagrees with its participant's link | 500 `SEASON_RANKING_SCOPE_MISMATCH` |
+| a row is filed under a different season than its participant | 500 `SEASON_RANKING_SCOPE_MISMATCH` |
+| a row is scoped to a GENERAL-mode account | 500 `SEASON_RANKING_SCOPE_MISMATCH` |
+| a row's account owner differs from its participant's user | 500 `SEASON_RANKING_SCOPE_MISMATCH` |
+| two rows in one set share one account | 500 `SEASON_RANKING_SCOPE_MISMATCH` |
+| a row's participant has no account link at all | 500 `TRADING_ACCOUNT_LINK_INTEGRITY` |
+
+A damaged row is NOT dropped from the page and the survivors are NOT renumbered.
+Omitting one competitor shifts every rank below them and produces a leaderboard
+that is wrong in a way nobody can see, so the whole set fails closed instead.
+
+Recovery is operator-driven: `pnpm trading-accounts:repair-links --apply` then
+`pnpm trading-accounts:repair-ranking-scope --apply`. Nothing here is
+auto-corrected.
+
+Additional error codes:
+
+- `SEASON_RANKING_SCOPE_REPAIR_REQUIRED` (500)
+- `SEASON_RANKING_SCOPE_MISMATCH` (500)
+- `TRADING_ACCOUNT_LINK_INTEGRITY` (500)
+
+Ranking ORDER is unchanged by this work: returnRate desc → maxDrawdown asc →
+totalFillCount asc → target-return reach time → userId → seasonParticipantId,
+with sequential ranks (1, 2, 3, 4) and no competition ties. Season returnRate is
+still the initial-capital ratio, never TWR. Tier ratios are unchanged.
+
 ## Not Implemented
 
 - Ranking calculation in the API request path.
 - Ranking generation in the API request path.
 - Scheduler/batch execution inside this read API request path; automatic generation is handled by the ops scheduler.
 - Advanced ranking filters, periods, season history views, reward/settlement integration.
+- General-mode ranking, and any combined season + general ranking.

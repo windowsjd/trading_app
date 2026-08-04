@@ -1,5 +1,9 @@
 jest.mock('../generated/prisma/client', () => {
-  const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
+  // Typed so the mocked module's Decimal is not an `any` leaking into every
+  // fixture in the file.
+  const { Decimal } = jest.requireActual<
+    typeof import('@prisma/client/runtime/client')
+  >('@prisma/client/runtime/client');
 
   return {
     AdRewardClaimStatus: {
@@ -413,5 +417,259 @@ describe('stored response payload', () => {
         ),
       ),
     ).toBe('AD_REWARD_CLAIM_INTEGRITY');
+  });
+  /**
+   * 작업 6 보완 §5.1 — STRICT shape for a KEYED claim.
+   *
+   * The regression: `{}`, `{ data: {} }`, and `{ success: false, data: {...} }`
+   * all passed the old "responsePayloadJson !== null" check, and then passed
+   * every field comparison vacuously because each was "if present, must match".
+   * A payload with no claimId, no grantedAt, and no walletBalanceAfter replayed
+   * as a clean success — a payout confirmed with no evidence it happened.
+   */
+  const KEYED_BALANCE = '10050000.00000000';
+
+  const expectKeyedGrantedRejection = (
+    responsePayloadJson: unknown,
+    balance = KEYED_BALANCE,
+  ) =>
+    expect(
+      expectThrownCode(() =>
+        assertStoredGrantedResponse(
+          grantedClaim({
+            responsePayloadJson: responsePayloadJson as Prisma.JsonValue,
+          }),
+          balance,
+        ),
+      ),
+    ).toBe('AD_REWARD_CLAIM_INTEGRITY');
+
+  it('refuses an EMPTY keyed granted payload', () => {
+    expectKeyedGrantedRejection({});
+  });
+
+  it('refuses a keyed granted payload with an empty data object', () => {
+    expectKeyedGrantedRejection({ success: true, data: {} });
+  });
+
+  it('refuses a keyed granted payload missing claimId', () => {
+    expectKeyedGrantedRejection(
+      payload({
+        granted: true,
+        duplicate: false,
+        grantedAt: '2026-08-04T02:00:00.000Z',
+        walletBalanceAfter: KEYED_BALANCE,
+      }),
+    );
+  });
+
+  it('refuses a keyed granted payload missing walletBalanceAfter', () => {
+    expectKeyedGrantedRejection(
+      payload({
+        granted: true,
+        duplicate: false,
+        claimId: CLAIM_ID,
+        grantedAt: '2026-08-04T02:00:00.000Z',
+      }),
+    );
+  });
+
+  it('refuses a keyed granted payload missing grantedAt', () => {
+    expectKeyedGrantedRejection(
+      payload({
+        granted: true,
+        duplicate: false,
+        claimId: CLAIM_ID,
+        walletBalanceAfter: KEYED_BALANCE,
+      }),
+    );
+  });
+
+  it('refuses a keyed granted payload whose success is not true', () => {
+    expectKeyedGrantedRejection({
+      success: false,
+      data: {
+        granted: true,
+        duplicate: false,
+        claimId: CLAIM_ID,
+        grantedAt: '2026-08-04T02:00:00.000Z',
+        walletBalanceAfter: KEYED_BALANCE,
+      },
+    });
+  });
+
+  it('refuses non-boolean granted/duplicate flags', () => {
+    expectKeyedGrantedRejection(
+      payload({
+        granted: 'yes',
+        duplicate: false,
+        claimId: CLAIM_ID,
+        grantedAt: '2026-08-04T02:00:00.000Z',
+        walletBalanceAfter: KEYED_BALANCE,
+      }),
+    );
+  });
+
+  it('refuses a stored payload that records itself as a DUPLICATE', () => {
+    // The stored record is the canonical FIRST response, which by definition
+    // granted rather than replayed.
+    expectKeyedGrantedRejection(
+      payload({
+        granted: false,
+        duplicate: true,
+        claimId: CLAIM_ID,
+        grantedAt: '2026-08-04T02:00:00.000Z',
+        walletBalanceAfter: KEYED_BALANCE,
+      }),
+    );
+  });
+
+  it('refuses a keyed payload whose balance disagrees with the ledger', () => {
+    expectKeyedGrantedRejection(
+      payload({
+        granted: true,
+        duplicate: false,
+        claimId: CLAIM_ID,
+        grantedAt: '2026-08-04T02:00:00.000Z',
+        walletBalanceAfter: '999.00000000',
+      }),
+    );
+  });
+
+  it('accepts a complete keyed granted payload', () => {
+    expect(() =>
+      assertStoredGrantedResponse(
+        grantedClaim({
+          responsePayloadJson: payload({
+            granted: true,
+            duplicate: false,
+            claimId: CLAIM_ID,
+            grantedAt: '2026-08-04T02:00:00.000Z',
+            walletBalanceAfter: KEYED_BALANCE,
+          }),
+        }),
+        KEYED_BALANCE,
+      ),
+    ).not.toThrow();
+  });
+
+  /**
+   * 작업 6 보완 §5.3 — LEGACY unkeyed claims predate the stored payload
+   * entirely. The strict shape is NOT retro-applied to them; only what is
+   * actually present has to agree.
+   */
+  it('accepts a legacy unkeyed claim with NO stored payload', () => {
+    expect(() =>
+      assertStoredGrantedResponse(
+        grantedClaim({ idempotencyKey: null, responsePayloadJson: null }),
+        KEYED_BALANCE,
+      ),
+    ).not.toThrow();
+  });
+
+  it('accepts a legacy unkeyed claim with a PARTIAL stored payload', () => {
+    expect(() =>
+      assertStoredGrantedResponse(
+        grantedClaim({
+          idempotencyKey: null,
+          responsePayloadJson: payload({ claimId: CLAIM_ID }),
+        }),
+        KEYED_BALANCE,
+      ),
+    ).not.toThrow();
+  });
+
+  it('still catches a legacy payload that contradicts the ledger', () => {
+    expect(
+      expectThrownCode(() =>
+        assertStoredGrantedResponse(
+          grantedClaim({
+            idempotencyKey: null,
+            responsePayloadJson: payload({ walletBalanceAfter: '1.00000000' }),
+          }),
+          KEYED_BALANCE,
+        ),
+      ),
+    ).toBe('AD_REWARD_CLAIM_INTEGRITY');
+  });
+
+  // ------------------------------------------------ keyed refusal payload
+
+  const rejectedKeyedClaim = (responsePayloadJson: unknown) =>
+    grantedClaim({
+      status: 'rejected',
+      grantedAt: null,
+      rejectedAt: new Date('2026-08-04T02:00:00.000Z'),
+      failureCode: 'AD_REWARD_COOLDOWN_ACTIVE',
+      failureReason: 'Cooldown is active.',
+      walletTransactionId: null,
+      walletTransaction: null,
+      responsePayloadJson: responsePayloadJson as Prisma.JsonValue,
+    });
+
+  it('refuses a keyed refusal payload with no stored object', () => {
+    expect(
+      expectThrownCode(() =>
+        assertStoredRejectedResponse(rejectedKeyedClaim(null)),
+      ),
+    ).toBe('AD_REWARD_CLAIM_INTEGRITY');
+  });
+
+  it('refuses a keyed refusal payload missing its failure code', () => {
+    expect(
+      expectThrownCode(() =>
+        assertStoredRejectedResponse(
+          rejectedKeyedClaim({ refused: true, message: 'Cooldown is active.' }),
+        ),
+      ),
+    ).toBe('AD_REWARD_CLAIM_INTEGRITY');
+  });
+
+  it('refuses a keyed refusal payload missing its message', () => {
+    expect(
+      expectThrownCode(() =>
+        assertStoredRejectedResponse(
+          rejectedKeyedClaim({
+            refused: true,
+            code: 'AD_REWARD_COOLDOWN_ACTIVE',
+          }),
+        ),
+      ),
+    ).toBe('AD_REWARD_CLAIM_INTEGRITY');
+  });
+
+  it('refuses a keyed refusal payload whose message contradicts the claim', () => {
+    expect(
+      expectThrownCode(() =>
+        assertStoredRejectedResponse(
+          rejectedKeyedClaim({
+            refused: true,
+            code: 'AD_REWARD_COOLDOWN_ACTIVE',
+            message: 'Something else entirely.',
+          }),
+        ),
+      ),
+    ).toBe('AD_REWARD_CLAIM_INTEGRITY');
+  });
+
+  it('accepts a complete keyed refusal payload', () => {
+    expect(() =>
+      assertStoredRejectedResponse(
+        rejectedKeyedClaim({
+          refused: true,
+          code: 'AD_REWARD_COOLDOWN_ACTIVE',
+          message: 'Cooldown is active.',
+        }),
+      ),
+    ).not.toThrow();
+  });
+
+  it('does not force the keyed refusal shape on a legacy unkeyed claim', () => {
+    expect(() =>
+      assertStoredRejectedResponse({
+        ...rejectedKeyedClaim(null),
+        idempotencyKey: null,
+      }),
+    ).not.toThrow();
   });
 });

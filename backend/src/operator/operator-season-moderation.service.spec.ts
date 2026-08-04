@@ -115,6 +115,25 @@ describe('OperatorSeasonModerationService', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),
+        // An operator rank correction resolves the participant's verified
+        // season account before writing (작업 8 §8).
+        findMany: jest.fn(() =>
+          Promise.resolve([
+            {
+              id: 'sp-1',
+              seasonId: 'season-1',
+              userId: 'user-1',
+              tradingAccountId: 'ta-1',
+              tradingAccount: {
+                id: 'ta-1',
+                mode: 'season',
+                userId: 'user-1',
+                status: 'active',
+                seasonParticipant: { id: 'sp-1' },
+              },
+            },
+          ]),
+        ),
       },
       seasonRanking: {
         findFirst: jest.fn(),
@@ -604,6 +623,9 @@ describe('OperatorSeasonModerationService', () => {
         rank: 3,
         rankingDate,
         capturedAt,
+        // Already correctly scoped: an operator correction never repairs a
+        // null or mismatched scope as a side effect (작업 8 §8).
+        tradingAccountId: 'ta-1',
       })
       .mockResolvedValueOnce(null);
     prisma.seasonRanking.update.mockResolvedValueOnce({ id: 'ranking-1' });

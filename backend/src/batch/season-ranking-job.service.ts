@@ -20,6 +20,18 @@ import {
   buildRankingRowsForSnapshots,
   RankingCalculatedRow,
 } from '../ranking/ranking-calculation.policy';
+import {
+  assertRankingSourceOrderScopes,
+  assertRankingSourceSnapshotScopes,
+  buildRankingParticipantScopes,
+  RANKING_PARTICIPANT_SCOPE_SELECT,
+} from '../ranking/ranking-source-scope';
+import {
+  assertSeasonRankingScopes,
+  resolveSeasonRankingAccountScopes,
+  SEASON_RANKING_SCOPE_SELECT,
+} from '../ranking/season-ranking-scope';
+import { lockSeasonForWriteOrThrow } from '../ranking/season-write-lock';
 import { BatchService } from './batch.service';
 import {
   SEASON_RANKING_JOB_NAME,
@@ -110,11 +122,15 @@ export class SeasonRankingJobService {
         },
       },
       orderBy: [{ userId: 'asc' }, { id: 'asc' }],
-      select: {
-        id: true,
-        userId: true,
-      },
+      select: RANKING_PARTICIPANT_SCOPE_SELECT,
     });
+    // The verified participant → season account map every source row below is
+    // measured against (작업 8 §9.4). One query, no per-row lookup.
+    const participantScopes = buildRankingParticipantScopes(
+      seasonId,
+      participants,
+    );
+
     const snapshots = await this.prisma.dailyPortfolioSnapshot.findMany({
       where: {
         snapshotDate,
@@ -127,7 +143,12 @@ export class SeasonRankingJobService {
         },
       },
       select: {
+        id: true,
         seasonParticipantId: true,
+        tradingAccountId: true,
+        cumulativeExternalFundingKrw: true,
+        investmentPnlKrw: true,
+        timeWeightedReturnFactor: true,
         snapshotDate: true,
         totalAssetKrw: true,
         returnRate: true,
@@ -140,6 +161,12 @@ export class SeasonRankingJobService {
         },
       },
     });
+    assertRankingSourceSnapshotScopes({
+      kind: 'daily portfolio snapshot',
+      rows: snapshots,
+      participantScopes,
+    });
+
     const result = this.createBaseResult({
       seasonId,
       snapshotDate: snapshotDateText,
@@ -148,8 +175,8 @@ export class SeasonRankingJobService {
       missingSnapshots: Math.max(participants.length - snapshots.length, 0),
     });
     const existingRows = await this.findExistingRankingRows(
-      seasonId,
       snapshotDate,
+      seasonId,
     );
 
     if (existingRows.length > 0) {
@@ -173,10 +200,11 @@ export class SeasonRankingJobService {
     }
 
     const [historicalSnapshots, executedOrders] = await Promise.all([
-      this.findHistoricalSnapshots(seasonId, snapshotDate),
+      this.findHistoricalSnapshots(seasonId, snapshotDate, participantScopes),
       this.findExecutedOrdersThroughLatestSnapshot(
         seasonId,
         snapshots.map((snapshot) => snapshot.capturedAt),
+        participantScopes,
       ),
     ]);
     const rows = buildRankingRowsForSnapshots({
@@ -243,36 +271,41 @@ export class SeasonRankingJobService {
     >;
   }> {
     return this.prisma.$transaction(async (tx) => {
-      const existingRows = await tx.seasonRanking.findMany({
-        where: {
-          seasonId: input.seasonId,
-          rankType: RANK_TYPE,
-          rankingDate: input.rankingDate,
-        },
-        orderBy: [{ rank: 'asc' }, { seasonParticipantId: 'asc' }],
-        select: {
-          id: true,
-          seasonParticipantId: true,
-          rank: true,
-          totalAssetKrw: true,
-          returnRate: true,
-          maxDrawdown: true,
-          totalFillCount: true,
-          reachedReturnAt: true,
-          seasonParticipant: {
-            select: {
-              userId: true,
-            },
-          },
-        },
-      });
+      // SERIALIZATION POINT (작업 8 §13.2). The status check before the
+      // transaction is a read; settlement may have closed the season since.
+      const season = await lockSeasonForWriteOrThrow(tx, input.seasonId);
+      if (season.status === SeasonStatus.settled) {
+        // A settled season's results are final. Adding daily rows now would
+        // reopen a leaderboard that settlement already closed.
+        this.throwJobError(
+          HttpStatus.CONFLICT,
+          'SEASON_ALREADY_SETTLED',
+          'Season was settled before this ranking write could commit; settled seasons never receive new daily rankings.',
+        );
+      }
+      this.assertSeasonStatusAllowed(season.status);
+
+      const existingRows = await this.findExistingRankingRows(
+        input.rankingDate,
+        input.seasonId,
+        tx,
+      );
 
       if (existingRows.length > 0) {
+        // Existing rows keep the current immutable/skip contract — but they are
+        // still verified, because reporting a damaged set as "already exists"
+        // would present it as a healthy result (작업 8 §11).
+        assertSeasonRankingScopes(existingRows);
         return {
           createdRankingIds: [],
           existingRows,
         };
       }
+
+      const scopes = await resolveSeasonRankingAccountScopes(tx, {
+        seasonId: input.seasonId,
+        seasonParticipantIds: input.rows.map((row) => row.seasonParticipantId),
+      });
 
       const createdRankingIds: string[] = [];
       for (const row of input.rows) {
@@ -280,6 +313,8 @@ export class SeasonRankingJobService {
           data: {
             seasonId: input.seasonId,
             seasonParticipantId: row.seasonParticipantId,
+            tradingAccountId: scopes.get(row.seasonParticipantId)!
+              .tradingAccountId,
             rankType: RANK_TYPE,
             rank: row.rank,
             totalAssetKrw: row.totalAssetKrw,
@@ -304,8 +339,12 @@ export class SeasonRankingJobService {
     });
   }
 
-  private async findExistingRankingRows(seasonId: string, rankingDate: Date) {
-    return this.prisma.seasonRanking.findMany({
+  private async findExistingRankingRows(
+    rankingDate: Date,
+    seasonId: string,
+    client: PrismaService | Prisma.TransactionClient = this.prisma,
+  ) {
+    const rows = await client.seasonRanking.findMany({
       where: {
         seasonId,
         rankType: RANK_TYPE,
@@ -313,8 +352,8 @@ export class SeasonRankingJobService {
       },
       orderBy: [{ rank: 'asc' }, { seasonParticipantId: 'asc' }],
       select: {
+        ...SEASON_RANKING_SCOPE_SELECT,
         id: true,
-        seasonParticipantId: true,
         rank: true,
         totalAssetKrw: true,
         returnRate: true,
@@ -323,14 +362,28 @@ export class SeasonRankingJobService {
         reachedReturnAt: true,
         seasonParticipant: {
           select: {
+            ...SEASON_RANKING_SCOPE_SELECT.seasonParticipant.select,
             userId: true,
           },
         },
       },
     });
+
+    assertSeasonRankingScopes(rows);
+
+    return rows;
   }
 
-  private async findHistoricalSnapshots(seasonId: string, rankingDate: Date) {
+  /**
+   * Max-drawdown history. Scope-checked before use: dropping a damaged low
+   * point would LOWER that participant's max drawdown, which is tie-break #2
+   * (작업 8 §9.1).
+   */
+  private async findHistoricalSnapshots(
+    seasonId: string,
+    rankingDate: Date,
+    participantScopes: ReadonlyMap<string, string>,
+  ) {
     const rows = await this.prisma.dailyPortfolioSnapshot.findMany({
       where: {
         snapshotDate: {
@@ -345,13 +398,24 @@ export class SeasonRankingJobService {
         },
       },
       select: {
+        id: true,
         seasonParticipantId: true,
+        tradingAccountId: true,
+        cumulativeExternalFundingKrw: true,
+        investmentPnlKrw: true,
+        timeWeightedReturnFactor: true,
         snapshotDate: true,
         totalAssetKrw: true,
         returnRate: true,
         capturedAt: true,
         createdAt: true,
       },
+    });
+
+    assertRankingSourceSnapshotScopes({
+      kind: 'daily portfolio snapshot',
+      rows,
+      participantScopes,
     });
 
     // Season-only by query (seasonSnapshotWhere); narrowed here because the
@@ -364,9 +428,14 @@ export class SeasonRankingJobService {
     }));
   }
 
+  /**
+   * totalFillCount source. Scope-checked before counting: dropping a damaged
+   * order would LOWER a fill count, which is tie-break #3 (작업 8 §9.3).
+   */
   private async findExecutedOrdersThroughLatestSnapshot(
     seasonId: string,
     capturedAtValues: readonly Date[],
+    participantScopes: ReadonlyMap<string, string>,
   ) {
     const latestCapturedAt = capturedAtValues.reduce<Date | null>(
       (latest, capturedAt) =>
@@ -380,7 +449,7 @@ export class SeasonRankingJobService {
       return [];
     }
 
-    return this.prisma.order.findMany({
+    const rows = await this.prisma.order.findMany({
       where: {
         status: OrderStatus.executed,
         executedAt: {
@@ -395,10 +464,16 @@ export class SeasonRankingJobService {
         },
       },
       select: {
+        id: true,
         seasonParticipantId: true,
+        tradingAccountId: true,
         executedAt: true,
       },
     });
+
+    assertRankingSourceOrderScopes({ rows, participantScopes });
+
+    return rows;
   }
 
   private formatCalculatedRankingRow(

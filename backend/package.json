@@ -34,6 +34,7 @@
     "trading-accounts:repair-financial-scope": "tsx scripts/repair-financial-trading-account-scope.ts",
     "trading-accounts:repair-trading-scope": "tsx scripts/repair-trading-scope.ts",
     "trading-accounts:repair-snapshot-scope": "tsx scripts/repair-snapshot-scope.ts",
+    "trading-accounts:repair-ranking-scope": "tsx scripts/repair-ranking-scope.ts",
     "trading-accounts:backfill-general-performance": "tsx scripts/backfill-general-performance.ts",
     "trading-accounts:audit-general": "tsx scripts/audit-general-accounts.ts",
     "candle:baseline": "tsx scripts/candle-baseline-sync.ts",

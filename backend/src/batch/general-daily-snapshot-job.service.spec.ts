@@ -1,5 +1,9 @@
 jest.mock('../generated/prisma/client', () => {
-  const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
+  // Typed so the mocked module's Decimal is not an `any` leaking into every
+  // fixture in the file.
+  const { Decimal } = jest.requireActual<
+    typeof import('@prisma/client/runtime/client')
+  >('@prisma/client/runtime/client');
 
   return {
     AssetPriceSourceType: {
@@ -97,6 +101,20 @@ const VALUATION = {
   unrealizedPnlKrw: '0.00000000',
 };
 
+/**
+ * `expect.objectContaining` is typed `any`, which makes every assertion that
+ * uses it an unsafe assignment. This narrows it once, here.
+ */
+function containing(shape: Record<string, unknown>): Record<string, unknown> {
+  return expect.objectContaining(shape) as Record<string, unknown>;
+}
+
+/** First `data.capturedAt` a create mock was called with. */
+function firstCapturedAt(create: jest.Mock): Date {
+  const call = create.mock.calls[0] as [{ data: { capturedAt: Date } }];
+  return call[0].data.capturedAt;
+}
+
 function createService() {
   const batchService = {
     runJob: jest.fn(
@@ -114,17 +132,41 @@ function createService() {
     dailyPortfolioSnapshot: {
       create: jest.fn().mockResolvedValue({ id: 'daily-1' }),
     },
+    // The per-account `FOR UPDATE` lock (작업 6·7 보완 2). Returning a row means
+    // "the account is still a general account"; a test that wants the
+    // closed-race path overrides this with [].
+    $queryRaw: jest
+      .fn()
+      .mockResolvedValue([{ id: 'locked', status: 'active' }]),
+    tradingAccount: {
+      // Re-read AFTER the lock, so the job never trusts the list it read at
+      // the top of the run. By default it returns the same row the list did.
+      findFirst: jest.fn((args: { where: { id: string } }) =>
+        Promise.resolve(
+          listedAccounts.find((row) => row.id === args.where.id) ?? null,
+        ),
+      ),
+    },
   };
+
+  let listedAccounts: Array<ReturnType<typeof account>> = [];
 
   const prisma = {
     tradingAccount: {
-      findMany: jest.fn().mockResolvedValue([]),
+      findMany: jest.fn(() => Promise.resolve(listedAccounts)),
       count: jest.fn().mockResolvedValue(0),
     },
     dailyPortfolioSnapshot: { findUnique: jest.fn().mockResolvedValue(null) },
-    $transaction: jest.fn(
-      async (run: (client: typeof tx) => Promise<unknown>) => run(tx),
+    $transaction: jest.fn((run: (client: typeof tx) => Promise<unknown>) =>
+      run(tx),
     ),
+  };
+  // Keeps the post-lock re-read in step with whatever a test lists.
+  prisma.tradingAccount.findMany.mockImplementation(() =>
+    Promise.resolve(listedAccounts),
+  );
+  const setAccounts = (rows: Array<ReturnType<typeof account>>) => {
+    listedAccounts = rows;
   };
 
   const performanceService = {
@@ -139,7 +181,7 @@ function createService() {
     performanceService as unknown as GeneralAccountPerformanceService,
   );
 
-  return { service, batchService, prisma, performanceService, tx };
+  return { service, batchService, prisma, performanceService, tx, setAccounts };
 }
 
 async function runAndGetResult(
@@ -181,8 +223,8 @@ describe('GeneralDailySnapshotJobService', () => {
   });
 
   it('selects active and suspended general accounts and excludes closed ones', async () => {
-    const { service, prisma } = createService();
-    prisma.tradingAccount.findMany.mockResolvedValue([
+    const { service, prisma, setAccounts } = createService();
+    setAccounts([
       account('account-1', 'active'),
       account('account-2', 'suspended'),
     ]);
@@ -213,8 +255,8 @@ describe('GeneralDailySnapshotJobService', () => {
   });
 
   it('writes the scheduled EquitySnapshot and the daily row in ONE transaction', async () => {
-    const { service, prisma, tx } = createService();
-    prisma.tradingAccount.findMany.mockResolvedValue([account('account-1')]);
+    const { service, prisma, tx, setAccounts } = createService();
+    setAccounts([account('account-1')]);
 
     const result = await runAndGetResult(service, {
       snapshotDate: SNAPSHOT_DATE,
@@ -222,7 +264,7 @@ describe('GeneralDailySnapshotJobService', () => {
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(tx.equitySnapshot.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
+      data: containing({
         seasonParticipantId: null,
         tradingAccountId: 'account-1',
         snapshotReason: 'scheduled',
@@ -232,12 +274,11 @@ describe('GeneralDailySnapshotJobService', () => {
         investmentPnlKrw: WRITE_VALUES.investmentPnlKrw,
         timeWeightedReturnFactor: WRITE_VALUES.timeWeightedReturnFactor,
         externalFundingReferenceId: null,
-        capturedAt: STARTED_AT,
       }),
       select: { id: true },
     });
     expect(tx.dailyPortfolioSnapshot.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
+      data: containing({
         seasonParticipantId: null,
         tradingAccountId: 'account-1',
         snapshotDate: SNAPSHOT_DATE_UTC,
@@ -246,17 +287,76 @@ describe('GeneralDailySnapshotJobService', () => {
         cumulativeExternalFundingKrw: WRITE_VALUES.cumulativeExternalFundingKrw,
         investmentPnlKrw: WRITE_VALUES.investmentPnlKrw,
         timeWeightedReturnFactor: WRITE_VALUES.timeWeightedReturnFactor,
-        capturedAt: STARTED_AT,
       }),
       select: { id: true },
     });
+
+    // capturedAt is deliberately NOT asserted above: it is decided AFTER this
+    // account's row lock rather than taken from the batch clock (작업 6·7 보완
+    // 2 §3.3). What matters is asserted directly below.
+    //
+    // ONE valuation instant per account: the scheduled EquitySnapshot and the
+    // DailyPortfolioSnapshot beside it never disagree about when they were
+    // taken, and neither is stamped with the batch's startedAt.
+    const equityCapturedAt = firstCapturedAt(tx.equitySnapshot.create);
+    const dailyCapturedAt = firstCapturedAt(tx.dailyPortfolioSnapshot.create);
+    expect(dailyCapturedAt.getTime()).toBe(equityCapturedAt.getTime());
+    expect(equityCapturedAt.getTime()).toBeGreaterThan(STARTED_AT.getTime());
+
+    // The account row was locked BEFORE anything was computed or written.
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
     expect(result.createdSnapshotIds).toEqual(['daily-1']);
     expect(result.createdEquitySnapshotIds).toEqual(['equity-1']);
   });
 
+  it('skips an account that was closed after the run listed it, writing nothing', async () => {
+    const { service, tx, setAccounts } = createService();
+    setAccounts([account('account-1')]);
+    // Closed between the list read and this account's turn: the lock still
+    // finds the row (it is still a general account), but the post-lock re-read
+    // reports it closed.
+    tx.tradingAccount.findFirst.mockResolvedValueOnce({
+      ...account('account-1'),
+      status: 'closed',
+    });
+
+    const result = await runAndGetResult(service, {
+      snapshotDate: SNAPSHOT_DATE,
+    });
+
+    expect(tx.equitySnapshot.create).not.toHaveBeenCalled();
+    expect(tx.dailyPortfolioSnapshot.create).not.toHaveBeenCalled();
+    expect(result.accounts).toMatchObject({
+      created: 0,
+      failed: 0,
+      excludedClosed: 1,
+      skippedClosedDuringRun: 1,
+    });
+    expect(result.createdSnapshotIds).toEqual([]);
+    expect(result.createdEquitySnapshotIds).toEqual([]);
+  });
+
+  it('skips an account whose row disappeared from the general-account lock', async () => {
+    const { service, tx, setAccounts } = createService();
+    setAccounts([account('account-1')]);
+    tx.$queryRaw.mockResolvedValueOnce([]);
+
+    const result = await runAndGetResult(service, {
+      snapshotDate: SNAPSHOT_DATE,
+    });
+
+    expect(tx.equitySnapshot.create).not.toHaveBeenCalled();
+    expect(tx.dailyPortfolioSnapshot.create).not.toHaveBeenCalled();
+    expect(result.accounts).toMatchObject({
+      created: 0,
+      excludedClosed: 1,
+      skippedClosedDuringRun: 1,
+    });
+  });
+
   it('writes the daily row SECOND so a unique conflict rolls the equity row back', async () => {
-    const { service, prisma, tx } = createService();
-    prisma.tradingAccount.findMany.mockResolvedValue([account('account-1')]);
+    const { service, tx, setAccounts } = createService();
+    setAccounts([account('account-1')]);
     const order: string[] = [];
     tx.equitySnapshot.create.mockImplementation(() => {
       order.push('equity');
@@ -284,8 +384,8 @@ describe('GeneralDailySnapshotJobService', () => {
   });
 
   it('skips an account that already has a row for the date', async () => {
-    const { service, prisma } = createService();
-    prisma.tradingAccount.findMany.mockResolvedValue([account('account-1')]);
+    const { service, prisma, setAccounts } = createService();
+    setAccounts([account('account-1')]);
     prisma.dailyPortfolioSnapshot.findUnique.mockResolvedValue({
       id: 'existing',
     });
@@ -299,11 +399,8 @@ describe('GeneralDailySnapshotJobService', () => {
   });
 
   it('reports a dry run without opening a transaction or writing anything', async () => {
-    const { service, prisma } = createService();
-    prisma.tradingAccount.findMany.mockResolvedValue([
-      account('account-1'),
-      account('account-2', 'suspended'),
-    ]);
+    const { service, prisma, setAccounts } = createService();
+    setAccounts([account('account-1'), account('account-2', 'suspended')]);
     prisma.tradingAccount.count.mockResolvedValue(2);
 
     const result = await runAndGetResult(service, {
@@ -330,8 +427,8 @@ describe('GeneralDailySnapshotJobService', () => {
   });
 
   it('separates integrity failures from valuation failures', async () => {
-    const { service, prisma, performanceService } = createService();
-    prisma.tradingAccount.findMany.mockResolvedValue([
+    const { service, performanceService, setAccounts } = createService();
+    setAccounts([
       account('account-1'),
       account('account-2'),
       account('account-3'),
@@ -365,11 +462,8 @@ describe('GeneralDailySnapshotJobService', () => {
   });
 
   it('keeps going after one account fails', async () => {
-    const { service, prisma, performanceService } = createService();
-    prisma.tradingAccount.findMany.mockResolvedValue([
-      account('account-1'),
-      account('account-2'),
-    ]);
+    const { service, performanceService, setAccounts } = createService();
+    setAccounts([account('account-1'), account('account-2')]);
     performanceService.buildOrdinarySnapshotValues.mockRejectedValueOnce(
       structuredError('GENERAL_ACCOUNT_INTEGRITY'),
     );

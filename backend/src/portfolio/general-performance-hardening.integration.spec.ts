@@ -1273,6 +1273,391 @@ async function cleanup() {
   await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
 }
 
+// ==================================================================
+// 작업 6·7 보완 — consistent reads, per-account lock, history integrity
+// ==================================================================
+
+/**
+ * §2 / §18.1. A general portfolio GET must see ONE committed instant.
+ *
+ * The bug this replaces: the six reads behind a general summary each ran in
+ * their own implicit transaction, so an ad payout committing mid-request could
+ * be visible to the WALLET read but not to the external-funding ledger read.
+ * TWR then measured a post-payout total against a pre-payout funding sum and
+ * reported the reward as investment profit.
+ *
+ * What is asserted is the outcome that mattered: across a payout, investment
+ * PnL and the TWR percent do not move, and the money shows up only alongside
+ * the funding total that explains it.
+ */
+async function verifyPortfolioReadIsConsistentAcrossAPayout() {
+  const { userId, accountId } = await openAccount();
+
+  const beforeView = await portfolio.getPortfolio(userId, accountId);
+  assert.equal(beforeView.data.summary.totalAssetKrw, '10000000.00000000');
+  assert.equal(beforeView.data.summary.investmentPnlKrw, '0.00000000');
+  assert.equal(beforeView.data.summary.returnRate, '0.00000000');
+
+  await grantReward(userId, accountId);
+
+  const afterView = await portfolio.getPortfolio(userId, accountId);
+  assert.equal(afterView.data.summary.totalAssetKrw, '10050000.00000000');
+  assert.equal(
+    afterView.data.summary.cumulativeExternalFundingKrw,
+    '10050000.00000000',
+    'the wallet and the funding ledger must move together',
+  );
+  assert.equal(
+    afterView.data.summary.investmentPnlKrw,
+    '0.00000000',
+    'an ad reward must never appear as investment profit',
+  );
+  assert.equal(
+    afterView.data.summary.returnRate,
+    '0.00000000',
+    'an ad reward must never move the time-weighted return',
+  );
+
+  // The GET wrote NOTHING: same row counts before and after a read.
+  const equityBefore = await prisma.equitySnapshot.count({
+    where: { tradingAccountId: accountId },
+  });
+  const dailyBefore = await prisma.dailyPortfolioSnapshot.count({
+    where: { tradingAccountId: accountId },
+  });
+  await portfolio.getPortfolio(userId, accountId);
+  await portfolio.getEquity(userId, accountId, { range: 'all' });
+  assert.equal(
+    await prisma.equitySnapshot.count({ where: { tradingAccountId: accountId } }),
+    equityBefore,
+    'a portfolio GET must not create an EquitySnapshot',
+  );
+  assert.equal(
+    await prisma.dailyPortfolioSnapshot.count({
+      where: { tradingAccountId: accountId },
+    }),
+    dailyBefore,
+    'a portfolio GET must not create a DailyPortfolioSnapshot',
+  );
+
+  // Ownership contract is unchanged by the transaction wrapper.
+  const strangerId = await createUser();
+  await expectCode(
+    portfolio.getPortfolio(strangerId, accountId),
+    'TRADING_ACCOUNT_NOT_FOUND',
+  );
+  await expectCode(
+    portfolio.getPortfolio(userId, randomUUID()),
+    'TRADING_ACCOUNT_NOT_FOUND',
+  );
+
+  // suspended and closed accounts stay READABLE.
+  await prisma.tradingAccount.update({
+    where: { id: accountId },
+    data: { status: 'suspended' },
+  });
+  const suspended = await portfolio.getPortfolio(userId, accountId);
+  assert.equal(suspended.data.status, 'suspended');
+  assert.equal(suspended.data.state, 'available');
+
+  await prisma.tradingAccount.update({
+    where: { id: accountId },
+    data: { status: 'closed', closedAt: new Date() },
+  });
+  const closed = await portfolio.getPortfolio(userId, accountId);
+  assert.equal(closed.data.status, 'closed');
+  assert.equal(closed.data.state, 'available');
+  const closedEquity = await portfolio.getEquity(userId, accountId, {
+    range: 'all',
+  });
+  assert.equal(closedEquity.success, true);
+
+  await prisma.tradingAccount.update({
+    where: { id: accountId },
+    data: { status: 'active', closedAt: null },
+  });
+
+  console.log('  consistent portfolio read across a payout ok');
+}
+
+/**
+ * §3 / §18.2. The daily job takes the SAME account row lock the ad payout
+ * takes, so the two are strictly serialised per account.
+ *
+ * The proof is a real lock: a transaction holds \`FOR UPDATE\` on the account for
+ * ~400ms while the job runs concurrently. If the job did not take the lock it
+ * would finish immediately; because it does, its snapshot is stamped after the
+ * holder committed.
+ */
+async function verifyDailyJobWaitsForTheAccountRowLock() {
+  const { userId, accountId } = await openAccount();
+  const snapshotDate = '2026-09-01';
+
+  let lockReleasedAt = null;
+  const holder = prisma.$transaction(async (tx) => {
+    await tx.$queryRaw\`
+      SELECT "id" FROM "trading_accounts" WHERE "id" = \${accountId} FOR UPDATE
+    \`;
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    lockReleasedAt = new Date();
+  });
+
+  // Give the holder a moment to actually take the lock before the job starts.
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  const jobRun = runDailyJob(snapshotDate);
+
+  await holder;
+  const result = await jobRun;
+
+  assert.equal(result.accounts.created >= 1, true, 'the job must eventually run');
+  const snapshot = await prisma.dailyPortfolioSnapshot.findFirst({
+    where: { tradingAccountId: accountId },
+  });
+  assert.ok(snapshot, 'a snapshot must exist for the locked account');
+  assert.ok(
+    snapshot.capturedAt.getTime() >= lockReleasedAt.getTime() - 50,
+    'the daily job must have WAITED for the account row lock; capturedAt=' +
+      snapshot.capturedAt.toISOString() +
+      ' lockReleased=' +
+      lockReleasedAt.toISOString(),
+  );
+
+  // capturedAt is decided per account AFTER the lock, and both rows share it.
+  const equity = await prisma.equitySnapshot.findFirst({
+    where: { tradingAccountId: accountId, snapshotReason: 'scheduled' },
+  });
+  assert.ok(equity, 'a scheduled EquitySnapshot must exist');
+  assert.equal(
+    equity.capturedAt.getTime(),
+    snapshot.capturedAt.getTime(),
+    'the two rows of one valuation instant must share capturedAt',
+  );
+
+  console.log('  daily job waits for the account row lock ok');
+}
+
+/**
+ * §3.2 / §18.3. An account closed AFTER the run listed it must get no snapshot
+ * at all — the status is re-read from the LOCKED row, not from the list.
+ */
+async function verifyClosedDuringRunLeavesNoSnapshot() {
+  const { userId, accountId } = await openAccount();
+  const snapshotDate = '2026-09-02';
+
+  // Hold the account lock, close the account inside the same transaction, then
+  // commit. The job is already waiting on the lock and sees \`closed\` the moment
+  // it acquires it.
+  const holder = prisma.$transaction(async (tx) => {
+    await tx.$queryRaw\`
+      SELECT "id" FROM "trading_accounts" WHERE "id" = \${accountId} FOR UPDATE
+    \`;
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await tx.tradingAccount.update({
+      where: { id: accountId },
+      data: { status: 'closed', closedAt: new Date() },
+    });
+  });
+
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  const jobRun = runDailyJob(snapshotDate);
+
+  await holder;
+  const result = await jobRun;
+
+  assert.equal(
+    await prisma.dailyPortfolioSnapshot.count({
+      where: { tradingAccountId: accountId },
+    }),
+    0,
+    'a closed account must get NO daily snapshot',
+  );
+  assert.equal(
+    await prisma.equitySnapshot.count({
+      where: { tradingAccountId: accountId, snapshotReason: 'scheduled' },
+    }),
+    0,
+    'a closed account must get NO scheduled EquitySnapshot',
+  );
+  assert.ok(
+    result.accounts.skippedClosedDuringRun >= 1,
+    'the close race must be reported, got ' +
+      JSON.stringify(result.accounts),
+  );
+
+  console.log('  closed-during-run leaves no snapshot ok');
+}
+
+/**
+ * §4 / §18.4. Every returned history row is verified. A damaged historical row
+ * is a structured 500, never a chart point with \`null\` in it.
+ */
+async function verifyHistoryIntegrityIsCheckedRowByRow() {
+  const { userId, accountId } = await openAccount();
+  await grantReward(userId, accountId);
+
+  // Healthy first.
+  const healthy = await portfolio.getEquity(userId, accountId, { range: 'all' });
+  assert.equal(healthy.success, true);
+  assert.ok(healthy.data.points.length >= 3, 'origin + boundary pair at least');
+  for (const point of healthy.data.points) {
+    assert.notEqual(
+      point.investmentPnlKrw,
+      null,
+      'a general history point must never serialise a null performance field',
+    );
+    assert.notEqual(point.cumulativeExternalFundingKrw, null);
+  }
+
+  // From here the checks use range '1d', which is the range that reads
+  // EquitySnapshot; '7d'/'30d'/'all' prefer DailyPortfolioSnapshot once a daily
+  // row exists, and the daily table gets its own case at the end.
+  //
+  // The damaged-row cases target an ORDINARY scheduled capture. The origin and
+  // the boundary rows are already protected by DB CHECK constraints (a null
+  // performance column there is rejected by PostgreSQL itself), so the
+  // application-level check is what covers the rows the database allows.
+  await runDailyJob('2026-09-03');
+  const ordinary = await prisma.equitySnapshot.findFirstOrThrow({
+    where: { tradingAccountId: accountId, snapshotReason: 'scheduled' },
+  });
+
+  // (a) a null performance column on a historical ordinary row.
+  const savedFactor = ordinary.timeWeightedReturnFactor;
+  await prisma.$executeRaw\`
+    UPDATE "equity_snapshots" SET "time_weighted_return_factor" = NULL WHERE "id" = \${ordinary.id}
+  \`;
+  await expectCode(
+    portfolio.getEquity(userId, accountId, { range: '1d' }),
+    'GENERAL_PERFORMANCE_INTEGRITY',
+  );
+  await prisma.$executeRaw\`
+    UPDATE "equity_snapshots" SET "time_weighted_return_factor" = \${savedFactor}
+    WHERE "id" = \${ordinary.id}
+  \`;
+
+  // (b) an investment PnL that no longer reconciles.
+  const savedPnl = ordinary.investmentPnlKrw;
+  await prisma.$executeRaw\`
+    UPDATE "equity_snapshots" SET "investment_pnl_krw" = 123456 WHERE "id" = \${ordinary.id}
+  \`;
+  await expectCode(
+    portfolio.getEquity(userId, accountId, { range: '1d' }),
+    'GENERAL_PERFORMANCE_INTEGRITY',
+  );
+  await prisma.$executeRaw\`
+    UPDATE "equity_snapshots" SET "investment_pnl_krw" = \${savedPnl} WHERE "id" = \${ordinary.id}
+  \`;
+
+  // (b2) a return rate that no longer matches its factor.
+  await prisma.$executeRaw\`
+    UPDATE "equity_snapshots" SET "return_rate" = 42 WHERE "id" = \${ordinary.id}
+  \`;
+  await expectCode(
+    portfolio.getEquity(userId, accountId, { range: '1d' }),
+    'GENERAL_PERFORMANCE_INTEGRITY',
+  );
+  await prisma.$executeRaw\`
+    UPDATE "equity_snapshots" SET "return_rate" = \${ordinary.returnRate} WHERE "id" = \${ordinary.id}
+  \`;
+
+  // (c) an ORPHANED \`after\` boundary. This is the dangerous one: on a chart it
+  // draws a vertical jump indistinguishable from a trading gain.
+  const rows = await boundaryRows(accountId);
+  const before = rows.find((r) => r.snapshotReason === 'external_funding_before');
+  await prisma.$executeRaw\`
+    DELETE FROM "equity_snapshots" WHERE "id" = \${before.id}
+  \`;
+  await expectCode(
+    portfolio.getEquity(userId, accountId, { range: '1d' }),
+    'GENERAL_PERFORMANCE_INTEGRITY',
+  );
+
+
+  // (d) the DAILY table, read by the 7d/30d/all ranges.
+  const dailyRow = await prisma.dailyPortfolioSnapshot.findFirstOrThrow({
+    where: { tradingAccountId: accountId },
+  });
+  const savedDailyPnl = dailyRow.investmentPnlKrw;
+  await prisma.$executeRaw\`
+    UPDATE "daily_portfolio_snapshots" SET "investment_pnl_krw" = 987654 WHERE "id" = \${dailyRow.id}
+  \`;
+  await expectCode(
+    portfolio.getEquity(userId, accountId, { range: 'all' }),
+    'GENERAL_PERFORMANCE_INTEGRITY',
+  );
+  await prisma.$executeRaw\`
+    UPDATE "daily_portfolio_snapshots" SET "investment_pnl_krw" = \${savedDailyPnl}
+    WHERE "id" = \${dailyRow.id}
+  \`;
+  const healthyDaily = await portfolio.getEquity(userId, accountId, {
+    range: 'all',
+  });
+  assert.equal(healthyDaily.success, true, 'a healthy daily history must render');
+
+  console.log('  history row + boundary pair integrity ok');
+}
+
+/**
+ * §5 / §18.5. A keyed claim's stored response is the canonical first result.
+ * A structurally incomplete one must never replay as a success.
+ */
+async function verifyKeyedResponsePayloadShapeIsEnforced() {
+  const { userId, accountId } = await openAccount();
+  const body = claimBody('event-' + randomUUID());
+  await grantReward(userId, accountId, body);
+
+  const claim = await prisma.adRewardClaim.findFirstOrThrow({
+    where: { tradingAccountId: accountId, status: 'granted' },
+  });
+  const savedPayload = claim.responsePayloadJson;
+
+  // A healthy replay first.
+  const replay = await adRewardService().claim(userId, accountId, body);
+  assert.equal(replay.data.duplicate, true);
+  assert.equal(replay.data.granted, false);
+
+  for (const broken of [
+    {},
+    { success: true, data: {} },
+    { success: false, data: savedPayload.data },
+    {
+      success: true,
+      data: { ...savedPayload.data, claimId: undefined },
+    },
+    {
+      success: true,
+      data: { ...savedPayload.data, walletBalanceAfter: undefined },
+    },
+    {
+      success: true,
+      data: { ...savedPayload.data, grantedAt: undefined },
+    },
+    {
+      success: true,
+      data: { ...savedPayload.data, walletBalanceAfter: '1.00000000' },
+    },
+  ]) {
+    await prisma.adRewardClaim.update({
+      where: { id: claim.id },
+      data: { responsePayloadJson: broken },
+    });
+    await expectCode(
+      adRewardService().claim(userId, accountId, body),
+      'AD_REWARD_CLAIM_INTEGRITY',
+    );
+  }
+
+  // Restored, the replay works again.
+  await prisma.adRewardClaim.update({
+    where: { id: claim.id },
+    data: { responsePayloadJson: savedPayload },
+  });
+  const restored = await adRewardService().claim(userId, accountId, body);
+  assert.equal(restored.data.duplicate, true);
+
+  console.log('  keyed response payload shape enforcement ok');
+}
+
 async function main() {
   try {
     const first = fixedIds('a1');
@@ -1301,6 +1686,12 @@ async function main() {
     await verifyDailyFailureRollsBackTheEquitySnapshot();
     await verifyDamagedAccountsAreReportedNotSnapshotted();
     await verifySeasonDailyRowsAreUntouched();
+
+    await verifyPortfolioReadIsConsistentAcrossAPayout();
+    await verifyDailyJobWaitsForTheAccountRowLock();
+    await verifyClosedDuringRunLeavesNoSnapshot();
+    await verifyHistoryIntegrityIsCheckedRowByRow();
+    await verifyKeyedResponsePayloadShapeIsEnforced();
 
     console.log('general performance hardening ok');
   } finally {

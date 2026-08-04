@@ -280,6 +280,41 @@ Reward grant gate-closed policy:
 - The job does not call providers, create price/FX rows, register a scheduler, expose an HTTP batch execution API, mutate wallets/orders/positions/snapshots/rankings, or change settlement/final-tier policy.
 - Settled joined `GET /api/v1/home` reads `season_participants.rewardGrantedAt`; after this job sets it, `finalResult.reward.state` becomes `granted`. Missing `rewardGrantedAt` remains `REWARD_NOT_GRANTED`.
 
+## 작업 8 — season write lock · settlement account closure · general daily lock
+
+`season-ranking`, `season-settlement`, and the live `RankingRefreshService` all
+take the SAME `SELECT ... FROM "seasons" WHERE id = $1 FOR UPDATE` inside their
+write transaction, then RE-CHECK the season's state from that locked row. No
+Redis lock, no advisory-lock namespace, no queue — the row lock is released by
+COMMIT/ROLLBACK and works across instances, which the existing in-memory
+`Set` in `RankingRefreshService` never did.
+
+- `season-ranking` refuses a `settled` season (`SEASON_ALREADY_SETTLED`) and
+  keeps its existing skip/immutable contract for a date that already has rows.
+  Existing rows are still scope-verified before being reported as "already
+  exists", so a damaged set is never presented as a healthy result.
+- `RankingRefreshService` skips (does not write) when the locked season is no
+  longer `active` inside its ranking window. A settled season keeps its rows.
+- `season-settlement` re-checks open limit-buy orders and reserved wallets
+  INSIDE the write transaction, not only before it, then writes the settlement
+  EquitySnapshot, the final SeasonRanking (with `tradingAccountId`), the
+  participant final results, the participant status transitions, the closure of
+  EVERY linked season TradingAccount, and `Season.status = settled` — all or
+  nothing. Result payload gains `seasonAccounts { linked, closed, wouldClose }`,
+  `closedTradingAccountIds`, and `finishedParticipantIds`.
+- `final-tier-assignment` additionally verifies the final ranking's account
+  scope, that a settled season's linked accounts are actually closed with a
+  `closedAt`, and that no participant holds a HALF-assigned or disagreeing
+  final result (`FINAL_TIER_ASSIGNMENT_CONFLICT`).
+
+`general-account-daily-snapshot` takes the same per-account
+`trading_accounts ... FOR UPDATE` lock the ad-reward payout takes, first thing
+inside each account's transaction, and re-reads mode/status from the LOCKED row
+rather than trusting the list read at the top of the run. `capturedAt` is
+decided per account AFTER the lock and shared by both rows it writes. Accounts
+closed mid-run are counted in `excludedClosed` with the racing subset broken out
+as `skippedClosedDuringRun`, and no row of any kind is written for them.
+
 ## Future Work
 
 Cron scheduling, provider ingestion, daily snapshot automation, ranking overwrite/regeneration, settlement extensions beyond final tier assignment, true competition tie rank, reward amount policy, and actual payment/point/delivery/external fulfillment remain separate gates.

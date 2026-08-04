@@ -2,6 +2,12 @@ jest.mock('../generated/prisma/client', () => {
   const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
 
   return {
+    TradingAccountMode: { season: 'season', general: 'general' },
+    TradingAccountStatus: {
+      active: 'active',
+      suspended: 'suspended',
+      closed: 'closed',
+    },
     BatchJobStatus: {
       pending: 'pending',
       running: 'running',
@@ -104,9 +110,12 @@ describe('FinalTierAssignmentJobService', () => {
     mockSeason(prisma, SeasonStatus.settled);
     mockFinalRankings(prisma, [
       finalRanking('sp-1', 'user-1', 1),
+      // Already assigned, and CONSISTENT with the policy: rank 2 of 2 falls in
+      // the silver cutoff. An inconsistent stored tier is now a conflict
+      // (작업 8 §16), which the dedicated test below covers.
       finalRanking('sp-2', 'user-2', 2, {
         finalRank: 2,
-        finalTier: 'diamond',
+        finalTier: 'silver',
       }),
     ]);
 
@@ -150,7 +159,7 @@ describe('FinalTierAssignmentJobService', () => {
         finalRank: 2,
         finalTier: 'silver',
         existingFinalRank: 2,
-        existingFinalTier: 'diamond',
+        existingFinalTier: 'silver',
         computedFinalTier: 'silver',
         willAssign: false,
         skipReason: 'FINAL_RESULT_ALREADY_EXISTS',
@@ -387,13 +396,78 @@ describe('FinalTierAssignmentJobService', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it('treats finalRank-only or finalTier-only participants as existing and does not overwrite them', async () => {
+  /**
+   * 작업 8 §16 REPLACES the old behaviour here.
+   *
+   * A participant holding a finalRank with no finalTier (or the reverse) used
+   * to be counted as "already assigned" and skipped, which left that user with
+   * half a result forever and made the job report success. Each of these three
+   * states is now a conflict the operator has to resolve by re-running
+   * settlement, not something the tier job papers over.
+   */
+  it('refuses to complete a HALF-assigned final result instead of skipping it', async () => {
     const { service, prisma } = createService();
     mockSeason(prisma, SeasonStatus.settled);
     mockFinalRankings(prisma, [
-      finalRanking('sp-final-rank', 'user-1', 1, { finalRank: 99 }),
-      finalRanking('sp-final-tier', 'user-2', 2, { finalTier: 'gold' }),
-      finalRanking('sp-new', 'user-3', 3),
+      finalRanking('sp-rank-only', 'user-1', 1, { finalRank: 1 }),
+      finalRanking('sp-new', 'user-2', 2),
+    ]);
+
+    await expect(
+      service.run({ seasonId: 'season-1', rankingDate }),
+    ).rejects.toMatchObject({
+      status: HttpStatus.CONFLICT,
+      response: {
+        error: { code: 'FINAL_TIER_ASSIGNMENT_CONFLICT' },
+      },
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('refuses a stored finalRank that disagrees with the final ranking row', async () => {
+    const { service, prisma } = createService();
+    mockSeason(prisma, SeasonStatus.settled);
+    mockFinalRankings(prisma, [
+      finalRanking('sp-1', 'user-1', 1, { finalRank: 99, finalTier: 'master' }),
+      finalRanking('sp-2', 'user-2', 2),
+    ]);
+
+    await expect(
+      service.run({ seasonId: 'season-1', rankingDate }),
+    ).rejects.toMatchObject({
+      status: HttpStatus.CONFLICT,
+      response: {
+        error: { code: 'FINAL_TIER_ASSIGNMENT_CONFLICT' },
+      },
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('refuses a stored finalTier that disagrees with the tier policy', async () => {
+    const { service, prisma } = createService();
+    mockSeason(prisma, SeasonStatus.settled);
+    mockFinalRankings(prisma, [
+      // rank 1 of 2 computes to master, not bronze.
+      finalRanking('sp-1', 'user-1', 1, { finalRank: 1, finalTier: 'bronze' }),
+      finalRanking('sp-2', 'user-2', 2),
+    ]);
+
+    await expect(
+      service.run({ seasonId: 'season-1', rankingDate }),
+    ).rejects.toMatchObject({
+      status: HttpStatus.CONFLICT,
+      response: {
+        error: { code: 'FINAL_TIER_ASSIGNMENT_CONFLICT' },
+      },
+    });
+  });
+
+  it('still treats a fully consistent existing result as idempotent', async () => {
+    const { service, prisma } = createService();
+    mockSeason(prisma, SeasonStatus.settled);
+    mockFinalRankings(prisma, [
+      finalRanking('sp-1', 'user-1', 1, { finalRank: 1, finalTier: 'master' }),
+      finalRanking('sp-new', 'user-2', 2),
     ]);
 
     const result = await runAndGetResult(service, {
@@ -402,40 +476,32 @@ describe('FinalTierAssignmentJobService', () => {
     });
 
     expect(prisma.__tx.seasonParticipant.updateMany).toHaveBeenCalledTimes(1);
-    expect(prisma.__tx.seasonParticipant.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          id: 'sp-new',
-        }),
-      }),
-    );
     expect(result.participants).toEqual({
-      totalFinalRanked: 3,
+      totalFinalRanked: 2,
       wouldAssign: 1,
       assigned: 1,
-      existing: 2,
-      skipped: 2,
+      existing: 1,
+      skipped: 1,
     });
-    expect(result.topAssignments).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          seasonParticipantId: 'sp-final-rank',
-          existingFinalRank: 99,
-          existingFinalTier: null,
-          willAssign: false,
-          skipReason: 'FINAL_RESULT_ALREADY_EXISTS',
-        }),
-        expect.objectContaining({
-          seasonParticipantId: 'sp-final-tier',
-          existingFinalRank: null,
-          existingFinalTier: 'gold',
-          computedFinalTier: 'gold',
-          willAssign: false,
-          skipReason: 'FINAL_RESULT_ALREADY_EXISTS',
-        }),
-      ]),
-    );
     expect(result.assignedParticipantIds).toEqual(['sp-new']);
+  });
+
+  it('refuses to assign tiers while a settled season still holds an open account', async () => {
+    const { service, prisma } = createService();
+    mockSeason(prisma, SeasonStatus.settled);
+    const row = finalRanking('sp-1', 'user-1', 1);
+    row.seasonParticipant.tradingAccount.status = 'active';
+    row.seasonParticipant.tradingAccount.closedAt = null;
+    mockFinalRankings(prisma, [row, finalRanking('sp-2', 'user-2', 2)]);
+
+    await expect(
+      service.run({ seasonId: 'season-1', rankingDate }),
+    ).rejects.toMatchObject({
+      status: HttpStatus.CONFLICT,
+      response: {
+        error: { code: 'SEASON_ACCOUNT_CLOSE_INCOMPLETE' },
+      },
+    });
   });
 
   it('treats missing season as a job-level error inside the batch envelope', async () => {
@@ -793,8 +859,15 @@ function finalRanking(
     rewardGrantedAt?: Date | null;
   } = {},
 ) {
+  const accountId = `account-of-${seasonParticipantId}`;
+
   return {
+    id: `ranking-${seasonParticipantId}`,
+    seasonId: 'season-1',
     seasonParticipantId,
+    // 작업 8: final rankings are account-scoped, and this job re-verifies both
+    // the scope and that the settled season's accounts are already closed.
+    tradingAccountId: accountId,
     rank,
     totalAssetKrw: new Prisma.Decimal(
       options.totalAssetKrw ?? `${(1000 - rank).toFixed(8)}`,
@@ -802,10 +875,19 @@ function finalRanking(
     returnRate: new Prisma.Decimal(options.returnRate ?? '0.00000000'),
     seasonParticipant: {
       id: seasonParticipantId,
+      seasonId: 'season-1',
       userId,
+      tradingAccountId: accountId,
       finalRank: options.finalRank ?? null,
       finalTier: options.finalTier ?? null,
       rewardGrantedAt: options.rewardGrantedAt ?? null,
+      tradingAccount: {
+        id: accountId,
+        mode: 'season',
+        status: 'closed',
+        userId,
+        closedAt: new Date('2026-05-21T00:00:00.000Z'),
+      },
     },
   };
 }

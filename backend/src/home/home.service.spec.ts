@@ -2,6 +2,12 @@ jest.mock('../generated/prisma/client', () => {
   const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
 
   return {
+    TradingAccountMode: { season: 'season', general: 'general' },
+    TradingAccountStatus: {
+      active: 'active',
+      suspended: 'suspended',
+      closed: 'closed',
+    },
     AssetType: {
       domestic_stock: 'domestic_stock',
       us_stock: 'us_stock',
@@ -58,6 +64,14 @@ import {
 } from '../generated/prisma/client';
 import { PortfolioValuationError } from '../portfolio/portfolio-valuation.policy';
 import { HomeService } from './home.service';
+
+/**
+ * `expect.objectContaining` is typed `any`, which would make every assertion
+ * that uses it an unsafe assignment. This narrows it once, here.
+ */
+function containing(shape: Record<string, unknown>): Record<string, unknown> {
+  return expect.objectContaining(shape) as Record<string, unknown>;
+}
 
 describe('HomeService', () => {
   const startAt = new Date(Date.now() - 86_400_000);
@@ -264,7 +278,29 @@ describe('HomeService', () => {
     rewardGrantedAt: null,
   };
 
+  // 작업 8 §11: readers select the scope columns and verify them, so the
+  // fixture carries both the row's account and its participant's.
+  const rankingAccount = {
+    id: 'account-participant-1',
+    mode: 'season',
+    userId: 'user-1',
+  };
+  const rankingScopeFixture = {
+    seasonId: 'season-1',
+    seasonParticipantId: 'participant-1',
+    tradingAccountId: rankingAccount.id,
+    seasonParticipant: {
+      id: 'participant-1',
+      seasonId: 'season-1',
+      userId: 'user-1',
+      tradingAccountId: rankingAccount.id,
+      tradingAccount: rankingAccount,
+    },
+  };
+
   const finalRanking = {
+    id: 'ranking-final-1',
+    ...rankingScopeFixture,
     rank: 12,
     totalAssetKrw: new Prisma.Decimal('11230000.00000000'),
     returnRate: new Prisma.Decimal('12.30000000'),
@@ -527,6 +563,8 @@ describe('HomeService', () => {
       },
     });
     prisma.seasonRanking.findFirst.mockResolvedValueOnce({
+      id: 'ranking-daily-1',
+      ...rankingScopeFixture,
       rank: 3,
       rankType: SeasonRankingType.daily,
       rankingDate: new Date('2026-05-07T00:00:00.000Z'),
@@ -1218,7 +1256,11 @@ describe('HomeService', () => {
         { capturedAt: 'desc' },
         { createdAt: 'desc' },
       ],
-      select: {
+      // The account-scope columns are selected too (작업 8 §11); the
+      // presentation fields below are what the response is built from.
+      select: containing({
+        tradingAccountId: true,
+        seasonParticipantId: true,
         rank: true,
         totalAssetKrw: true,
         returnRate: true,
@@ -1227,7 +1269,7 @@ describe('HomeService', () => {
         reachedReturnAt: true,
         rankingDate: true,
         capturedAt: true,
-      },
+      }),
     });
     expect(prisma.seasonRanking.count).toHaveBeenCalledWith({
       where: {

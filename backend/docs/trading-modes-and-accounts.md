@@ -1180,11 +1180,470 @@ eligibility:
 **migration만 적용한 상태에서 기존 사용자에게 general account를 자동 생성하지
 않는다.** general 계정은 사용자가 명시적으로 POST를 호출할 때만 생긴다.
 
+## 8-A. 작업 8 — SeasonRanking TradingAccount scope · 성과 조회 일관성
+
+WORK-ID `GENERAL-PERFORMANCE-CONCURRENCY-AND-SEASON-RANKING-V1`.
+
+### 8-A.1 일반계정 GET RepeatableRead
+
+`GET /api/v1/trading-accounts/:accountId/portfolio` 와 `.../portfolio/equity`
+의 **일반계정 경로만** Prisma interactive transaction(`RepeatableRead`)으로
+감싼다. 시즌계정 경로와 legacy `/api/v1/portfolio*`는 변경하지 않는다.
+
+이전에는 한 응답을 만드는 6개 read(최신 성과 snapshot·외부자금 원장·KRW/USD
+지갑·Position·가격 snapshot·FX snapshot)가 각각 별도 암묵 트랜잭션이었다.
+요청 도중 광고 지급이 커밋되면 **지갑은 지급 후, 외부자금 합계는 지급 전**을
+읽는 조합이 가능했고, TWR은 그 차액을 전부 `investmentPnlKrw`로 계산했다 —
+광고 시청이 투자수익으로 표시된다.
+
+한 트랜잭션 안에서 읽는 것:
+
+- TradingAccount (소유권·mode·status·initialCapitalKrw·participant link 재확인)
+- 일반계정 금융 integrity, 최신 performance snapshot, 외부자금 원장
+- wallet, Position, AssetPriceSnapshot, FxRateSnapshot
+- equity/daily history, boundary pair 검증에 필요한 claim
+
+GET 트랜잭션이 **하지 않는 것**: row lock, DB write, snapshot·지갑·원장·claim
+생성, 성과 복구, 외부 네트워크 호출. valuation은 저장된 가격·환율 snapshot만
+사용하므로 트랜잭션 안에서 안전하다.
+
+`valuationAt`/`now`/range 기준시각은 요청당 **한 번만** 결정한다.
+
+외부 계약은 유지: 미인증 401, 미존재·타인 account 동일 404
+`TRADING_ACCOUNT_NOT_FOUND`, active·suspended·closed 모두 조회 가능.
+
+### 8-A.2 일반 daily snapshot의 account row lock
+
+`GeneralDailySnapshotJobService`는 계정별 트랜잭션 **시작 직후** 광고 지급과
+동일한 잠금을 잡는다:
+
+```sql
+SELECT "id", "status" FROM "trading_accounts"
+WHERE "id" = $1 AND "mode" = 'general' FOR UPDATE
+```
+
+전역 락도, 모든 계정을 한 트랜잭션에 넣는 것도 아니다 — 한 번에 한 계정.
+
+잠금 후 **DB에서 다시 읽은 값**으로 재검사한다: 존재·mode=general·
+status != closed·seasonParticipant=null·userId·initialCapitalKrw·금융
+integrity·performance origin·외부자금 연속성. job 시작 시 목록에서 읽어둔
+status는 신뢰하지 않는다.
+
+목록 조회 후 closed로 전환된 계정은 **어떤 write도 없이** 건너뛰고
+`excludedClosed`에 합산되며, 그중 실행 중 경쟁으로 건너뛴 수는
+`skippedClosedDuringRun`으로 따로 보고된다(두 값 모두 결과에 포함).
+
+`capturedAt`은 **계정 lock 획득 이후** 계정마다 한 번 결정한다. batch의
+`startedAt`을 모든 계정에 강제하면, 앞 계정 처리나 광고 지급 대기로 시간이
+흐른 뒤의 valuation이 실제와 다른 시각으로 기록된다. 같은 계정 트랜잭션에서
+만드는 scheduled EquitySnapshot과 DailyPortfolioSnapshot은 **같은
+capturedAt**을 쓴다.
+
+가능한 정상 결과는 두 가지뿐이다:
+
+- daily 선점 → 지급 전 상태로 daily commit, 이후 광고가 before/after 경계 생성
+- 지급 선점 → 지급과 경계 commit, daily는 지급 후 상태 기준
+
+혼합 상태(지급 후 wallet + 지급 전 외부자금 합계 등)는 발생하지 않는다.
+
+### 8-A.3 일반 history 전체 무결성
+
+반환할 **모든** EquitySnapshot·DailyPortfolioSnapshot 행을 검증한다
+(`src/portfolio/general-history-integrity.ts`). 이전에는 최신 성과 상태만
+검사하고 과거 행은 그대로 직렬화했기 때문에, 손상된 컬럼이
+`"investmentPnlKrw": null`로 200에 실려 나갔고, 짝 잃은 `after` 경계는 차트에서
+거래 수익과 구분되지 않는 수직 상승으로 그려졌다.
+
+행 단위 요구사항:
+
+- `tradingAccountId` = 요청 accountId, `seasonParticipantId` = null
+- 누적 외부자금·투자손익·TWR factor 모두 non-null, 각각 >= 0
+- `investmentPnlKrw = totalAssetKrw - cumulativeExternalFundingKrw`
+- `returnRate = (factor - 1) × 100` (기존 scale 반올림)
+- origin(`general_account_open`/`performance_baseline`): factor = 1,
+  returnRate = 0, 계정당 1개
+- ordinary: 외부자금 reference 3컬럼 모두 null
+- boundary: before/after 완전 pair, 동일 account·referenceType·referenceId·
+  amount·factor·returnRate·investmentPnl, after total = before + amount,
+  after 누적자금 = before 누적자금 + amount
+
+`ad_reward_claim` 경계는 관련 claim을 **1회 batch 조회**해 status=granted·
+account 일치·금액 일치·원장 존재를 확인한다. history point마다 개별 조회하지
+않는다. range 정책과 조회 범위는 그대로다.
+
+작업 7 이전 legacy unkeyed claim에는 존재하지 않는 경계를 요구하거나 만들지
+않는다. 다만 boundary 행이 실제로 하나라도 있으면 불완전한 pair는 정상으로
+반환하지 않는다.
+
+정렬은 기존 phase 순서 유지: 동일 capturedAt에서
+`external_funding_before` → ordinary → `external_funding_after`. UUID는
+before/after 순서를 결정하지 않는다.
+
+오류: `GENERAL_PERFORMANCE_INTEGRITY` / HTTP 500.
+
+### 8-A.4 keyed claim responsePayloadJson 필수 shape
+
+`responsePayloadJson`은 최초 응답의 canonical 기록이다. "null이 아니기만 하면
+된다"는 검사로는 `{}`, `{ data: {} }` 같은 payload가 모든 필드 비교를
+공허하게 통과해 **증거 없는 성공 replay**가 됐다.
+
+keyed granted claim에 요구하는 shape:
+
+- top-level object, `success = true`
+- `data` object, `data.granted`/`data.duplicate` boolean
+- `data.claimId` string = claim.id
+- `data.grantedAt` UTC ISO = claim.grantedAt
+- `data.walletBalanceAfter` 금액 문자열 = ledger.balanceAfter
+- 저장 payload는 **최초 사실**이므로 항상 `granted=true, duplicate=false`
+  (재시도 응답이 뒤집히는 것은 API 계약이며 저장 기록은 뒤집지 않는다)
+
+keyed rejected claim: object, `refused = true`, `code` = claim.failureCode,
+`message` non-empty이며 claim.failureReason과 모순되지 않을 것.
+
+legacy unkeyed claim에는 이 shape를 강제하지 않는다(payload가 null이거나
+부분적일 수 있음). 단, 존재하는 필드가 원장과 어긋나면 여전히 오류다.
+claim·ledger·wallet 금융 정합성 검사는 legacy에도 계속 수행한다.
+
+오류: `AD_REWARD_CLAIM_INTEGRITY` / HTTP 500.
+
+### 8-A.5 SeasonRanking.tradingAccountId
+
+SeasonRanking은 **시즌 전용 모델로 유지**된다. `seasonParticipantId`는
+NOT NULL이고 관계도 그대로다. `tradingAccountId`는 행의 자산 격리·소유권
+scope를 명시하는 **두 번째 식별자**로 additive하게 추가됐다. 이번 작업에서
+SeasonRanking을 일반계정 랭킹 모델로 확장하지 않는다.
+
+schema:
+
+- `tradingAccountId String? @map("trading_account_id")`
+- `tradingAccount TradingAccount? @relation(onDelete: Restrict)`
+- `TradingAccount.seasonRankings SeasonRanking[]` 역관계
+- 기존 unique 2건 유지 + `@@unique([seasonId, rankType, rankingDate, tradingAccountId])`
+- `@@index([tradingAccountId, rankingDate])`
+
+`tradingAccountId`는 이번 작업에서 nullable로 유지한다. NOT NULL 강화는
+repair 수렴 이후의 후속 hardening 작업이다.
+
+정상 행 invariant:
+
+- participant·account 모두 non-null
+- ranking.seasonId = participant.seasonId
+- ranking.tradingAccountId = participant.tradingAccountId
+- account.mode = season, account.userId = participant.userId,
+  account.seasonParticipant.id = participant.id
+- 일반계정 TradingAccount 참조 금지
+
+오류 코드: null scope → `SEASON_RANKING_SCOPE_REPAIR_REQUIRED`,
+participant account 불일치 → `SEASON_RANKING_SCOPE_MISMATCH`,
+participant link 자체 손상 → `TRADING_ACCOUNT_LINK_INTEGRITY`. 모두 HTTP 500
+fail-closed이며, 구조 손상을 404·빈 배열·ranking unavailable로 감추지 않는다.
+
+### 8-A.6 migration `…20260804120000_add_season_ranking_trading_account_scope`
+
+additive only. 순서: nullable 컬럼 추가 → 기존 행 backfill → FK → unique →
+index.
+
+backfill source는 `season_rankings.season_participant_id` →
+`season_participants.trading_account_id`이며, 양쪽 IS NULL/IS NOT NULL로
+guard해 재실행이 no-op이다. participant link가 null이면 ranking도 null로
+남긴다 — fail-open으로 잘못된 account를 연결하지 않는다.
+
+이 migration이 **하지 않는 것**: rank·금액·수익률·MDD·fill count·시각·
+createdAt·seasonParticipantId 재계산이나 재작성, ranking 삭제/재생성,
+SeasonParticipant 결과 변경, Season.status 변경, TradingAccount status/closedAt
+변경, TradingAccount·SeasonParticipant 생성, 정산 실행, 티어 계산.
+
+migration 전후 fingerprint (§6 목록에 추가):
+
+season_rankings 총 행 수, rankType별·seasonId별·rankingDate별 행 수,
+SUM(rank)/SUM(total_asset_krw)/SUM(return_rate)/SUM(max_drawdown)/
+SUM(total_fill_count), MAX(reached_return_at)/MAX(captured_at)/MAX(created_at),
+season_participant_id multiset, SeasonParticipant current_rank/final_rank/
+final_tier, Season status, TradingAccount status, wallet balance,
+order·position 수.
+
+허용되는 변화는 **기존 ranking의 tradingAccountId backfill과 FK·index·unique
+추가뿐이다.**
+
+### 8-A.7 ranking writer dual-write
+
+모든 writer가 `seasonParticipantId`와 `tradingAccountId`를 함께 기록한다:
+
+- `RankingRefreshService.replaceCurrentRankings`
+- `SeasonRankingJobService.createRankingRowsAtomically`
+- `writeSeasonRankings` (admin script 경로)
+- `SeasonSettlementJobService` final ranking 생성
+- `OperatorSeasonModerationService.upsertFinalRankingRank`
+- 테스트 fixture 전부
+
+공용 helper는 `src/ranking/season-ranking-scope.ts`:
+`resolveSeasonRankingAccountScopes`(participant 목록 → 검증된 accountId map,
+**1회 쿼리**), `requireSeasonRankingAccountScope`,
+`assertExistingRankingRowScopeWritable`.
+
+participant.tradingAccountId가 null이면 ranking을 **하나도** 만들지 않는다 —
+한 명이 빠진 랭킹은 더 작은 정상 랭킹이 아니라 틀린 랭킹이다.
+
+기존 행 update/upsert 시:
+
+- 기존 null scope는 정상 row처럼 업데이트하지 않고 repair 필요 오류
+- 기존 non-null mismatch도 덮어쓰지 않음 (둘 중 무엇이 맞는지 writer는 모른다)
+
+### 8-A.8 ranking 입력 데이터 scope 검증
+
+`src/ranking/ranking-source-scope.ts`. ranking 행만 dual-write하고 입력이
+손상되면 scope는 완벽하고 숫자가 틀린 결과가 나온다.
+
+검증 대상:
+
+- daily ranking 기준 DailyPortfolioSnapshot: participant·account non-null,
+  participant.seasonId = 대상 season, snapshot.account = participant.account,
+  account.mode = season, 일반계정 성과 컬럼 3종 모두 null
+- MDD·reachedReturnAt용 EquitySnapshot: 동일 조건
+- totalFillCount용 executed Order: participant·account non-null, 일치,
+  account mode season
+
+**손상 행을 조용히 제외하지 않는다.** 제외는 중립적이지 않다: equity 저점
+하나가 빠지면 MDD(tie-break #2)가 낮아지고, executed order 하나가 빠지면
+fill count(tie-break #3)가 낮아진다 — 둘 다 손상된 계정을 **위로** 올린다.
+해당 ranking job 전체를 fail-closed한다.
+
+`seasonSnapshotWhere` 필터는 쿼리 필터로 유지하되, 필터만으로 무결성 검사를
+대신하지 않는다.
+
+participant 목록은 `RANKING_PARTICIPANT_SCOPE_SELECT`로 id·userId·seasonId·
+participantStatus·tradingAccountId·account(mode/status/userId)를 **한 번에**
+select한다 (N+1 금지).
+
+오류: `SEASON_RANKING_SOURCE_SCOPE_REPAIR_REQUIRED` /
+`SEASON_RANKING_SOURCE_SCOPE_MISMATCH`, HTTP 500.
+
+### 8-A.9 ranking reader fail-closed
+
+모든 reader가 `SEASON_RANKING_SCOPE_SELECT`를 spread해 scope 컬럼을 select하고
+`assertSeasonRankingScope(s)`로 검증한다: RankingService(목록·myRanking),
+HomeService(daily/final), RecordsService(목록·상세·public summary),
+FinalTierAssignmentJobService, SeasonSettlementJobService(기존 final ranking
+재사용), SeasonRankingJobService(기존 행 skip 경로).
+
+정상 set 안에 하나라도 null·mismatch가 있으면 **전체 set을 정상 응답으로
+제공하지 않는다.** 빈 ranking으로 숨기지 않고, 해당 행만 제외하지 않고, rank를
+재번호 매기지 않고, 자동 수정하지 않는다. 한 명을 조용히 빼면 그 아래 모든
+순위가 밀리고, 아무도 볼 수 없는 방식으로 틀린 리더보드가 된다.
+
+- 데이터 **부재** = ranking row 자체가 없음 → 기존 unavailable 응답 유지
+- 데이터 **손상** = row는 있는데 accountId null / account·participant 불일치 /
+  season 불일치 / account mode general / user 불일치 → 구조화된 500
+
+같은 ranking set 안에서 한 account가 두 행을 차지하는 것도 손상이다.
+
+`tradingAccountId`는 내부 scope 검증용이며 **공개 ranking 응답에 노출되지
+않는다** (`formatRankingRow`/`formatMyRanking`에 없음).
+
+### 8-A.10 ranking 계산 정책 불변
+
+변경 없음: returnRate desc → maxDrawdown asc → totalFillCount asc → target
+return 도달 시각 → userId → seasonParticipantId. 순위는 sequential(1,2,3,4)
+유지이며 공동순위를 도입하지 않는다. 시즌 returnRate는 초기자본 기준이고 TWR을
+쓰지 않는다. hidden·excluded 공개 필터, near_me·top10·pagination, provisional
+tier, final tier cutoff 비율 모두 그대로다.
+
+### 8-A.11 ranking writer 동시성 (season row lock)
+
+`src/ranking/season-write-lock.ts`.
+`SELECT ... FROM "seasons" WHERE "id" = $1 FOR UPDATE`.
+
+`RankingRefreshService`의 in-memory Set은 단일 프로세스 중복 실행만 줄인다.
+실제로 문제가 되는 경쟁은 **live refresh vs settlement**이며, 두 backend
+instance나 API 옆에서 도는 batch는 메모리를 공유하지 않는다. in-memory Set은
+같은 프로세스 안 보조 장치로 남고, **DB row lock이 최종 직렬화 수단**이다.
+Redis lock·advisory lock namespace·큐를 도입하지 않는다.
+
+같은 season lock을 쓰는 writer:
+
+- current ranking refresh write — 잠금 후 season 존재·status=active·
+  capturedAt이 [startAt, endAt) 안인지 재확인. settled면 write하지 않고 skip.
+- snapshot 기반 daily ranking job write — 잠금 후 status 재검사. settled
+  season에 daily ranking을 새로 만들거나 덮어쓰지 않는다
+  (`SEASON_ALREADY_SETTLED`). 기존 ranking이 있으면 현재 skip/immutable
+  계약 유지.
+- season settlement write
+
+settlement가 lock을 잡은 뒤에는 final result 작성·season account 종료·
+settled 전환이 끝날 때까지 다른 ranking writer가 같은 season 결과를 바꾸지
+못한다.
+
+### 8-A.12 정산 시 season account 종료
+
+settlement write 트랜잭션 순서:
+
+1. Season row `FOR UPDATE`
+2. status 재검사 (ended 또는 idempotent settled)
+3. **open limit reservation 재검사** — 트랜잭션 밖 사전 검사만으로 끝내지
+   않는다. 그 사이 지정가 주문이 들어와 현금이 다시 예약될 수 있고, 그러면
+   미완결 주문서 위에서 정산하게 된다.
+4. 시즌의 **모든** participant + account link 재조회·검증
+5. 기존 final ranking scope 검증 (재사용 시)
+6. settlement EquitySnapshot → final SeasonRanking(account dual-write) →
+   participant final 결과 → participant 상태 전환 → season account 종료 →
+   `Season.status = settled`
+
+전부 한 트랜잭션이며, 하나라도 실패하면 **전체 rollback**이다.
+
+final ranking 대상은 기존 정책 유지(active·finished·rewarded). 그러나
+`Season.status`가 settled로 갈 때 **해당 시즌에 연결된 모든 season
+TradingAccount**가 종료된다 — excluded participant의 계정도 포함. 시즌이
+끝났는데 그 시즌 계정 하나가 거래 가능해 보이는 상태로 남으면 안 된다.
+
+participant 중 하나라도 link null / account 없음 / mode != season /
+userId 불일치 / 다른 participant와 연결이면 `SETTLEMENT_ACCOUNT_LINK_INTEGRITY`
+로 정산을 중단한다. 일부 account만 closed하고 season을 settled로 만들지 않는다.
+
+participant 상태: active → finished. finished·rewarded·excluded는 그대로.
+**registered는 그대로 둔다** — 정산 시점에 registered로 남아 있는 것은 이상
+상태이고(가입 흐름은 진입 시 활성화한다), 조용히 finished로 바꾸면 "경쟁했다"고
+주장하는 셈이다. 상태를 유지하고 final rank·tier를 주지 않으며 구조화된 로그를
+남긴다. 그 계정은 시즌의 나머지와 함께 closed된다.
+
+account 종료:
+
+- `status = closed`
+- `closedAt = COALESCE(기존 closedAt, Season.endAt)` — 실제 거래 가능 기간은
+  `endAt`에 끝났으므로, 정산 job이 3일 늦게 돌아도 그때까지 계정이 살아 있던
+  것처럼 만들지 않는다. 이미 더 이른 closedAt이 있으면 보존한다.
+- 모든 WHERE에 `mode = 'season'`을 고정해 general account는 절대 건드리지
+  않는다. status는 오직 `closed`로만 쓰므로 재활성화도 없다.
+- 종료 후 잔여 검사에서 active/suspended이거나 closedAt이 null인 연결 계정이
+  하나라도 있으면 `SEASON_ACCOUNT_CLOSE_INCOMPLETE`로 전체 rollback.
+
+기존 final ranking을 재사용하는 idempotent 정산에서도 모든 row의 account scope를
+검증한다. null·mismatch면 재사용하지 않고 repair 실행을 요구하는 오류를 낸다.
+
+settlement EquitySnapshot은 작업 7 계약 유지(participant·account non-null,
+scope 일치, general 성과 컬럼 null, reason=settlement). 기존 snapshot을
+update하는 현재 정책은 유지하되 **먼저 scope를 검증**한다: non-null mismatch
+덮어쓰기 금지, null scope를 update로 조용히 고치지 않음
+(`SETTLEMENT_SNAPSHOT_SCOPE_REPAIR_REQUIRED` /
+`SETTLEMENT_SNAPSHOT_SCOPE_MISMATCH`). snapshot immutability 정책 자체는 이번
+작업에서 바꾸지 않는다.
+
+### 8-A.13 FinalTierAssignmentJob 보완
+
+기존 역할 유지 + 다음 검증 추가:
+
+- final ranking tradingAccountId non-null, participant account와 일치,
+  account mode season
+- settled season의 연결 account가 실제로 closed이고 closedAt이 있는지
+  (`SEASON_ACCOUNT_CLOSE_INCOMPLETE`)
+- participant final 결과와 ranking 불일치 감지
+
+이전에는 finalRank 또는 finalTier가 **일부만** 설정된 participant를 단순
+existing으로 건너뛰었다. 그 결과 사용자는 리더보드가 부정하는 절반짜리 결과를
+영구히 갖고, job은 성공을 보고했다. 이제 다음 세 상태는
+`FINAL_TIER_ASSIGNMENT_CONFLICT`로 중단한다:
+
+- finalRank non-null인데 finalTier null (또는 그 반대)
+- 저장된 finalRank가 ranking.rank와 다름
+- 저장된 finalTier가 정책 계산 결과와 다름
+
+완전히 동일한 finalRank·finalTier가 이미 있으면 기존대로 idempotent existing.
+
+### 8-A.14 정산 완료 불변식
+
+eligible participant마다: final SeasonRanking 정확히 1개, ranking.account =
+participant.account, participant.finalRank = ranking.rank, finalTier = 정책
+결과, currentRank = ranking.rank, totalAsset·returnRate·maxDrawdown 일치.
+
+season: `status = settled`. 모든 linked season account: `status = closed`,
+`closedAt` non-null.
+
+final ranking set: rank 1..N 연속, rank·participant·account 중복 없음,
+일반계정 없음.
+
+final tier 비율 불변: master 4% / diamond 누적 11% / platinum 23% / gold 40% /
+silver 70% / bronze 나머지.
+
+### 8-A.15 repair-ranking-scope
+
+`pnpm trading-accounts:repair-ranking-scope` (기본 dry-run, `--apply`로만 수정).
+
+기존 repair-links / repair-financial-scope / repair-trading-scope /
+repair-snapshot-scope와 역할을 섞지 않는다 — 각각 한 테이블 계열을 소유하므로
+운영자가 어느 것을 돌려야 하는지 항상 명확하다.
+
+apply 가능한 행: `ranking.tradingAccountId IS NULL` +
+participant.tradingAccountId non-null + participant account가 정상 season
+account + user 일치 + season 일치. **`ranking.tradingAccountId`만** 채운다.
+
+수정 금지(보고만): non-null mismatch, participant link null, account mode
+general, user 불일치, season 불일치, rank·금액·수익률·시각, participant 결과,
+account status.
+
+요건: batch·cursor 기반, 멱등(IS NULL guard), 변경 전후 count 보고, apply 후
+null·mismatch 잔여 재검증, 잔여 문제 시 exit 1.
+
+같은 스크립트가 **read-only audit**도 함께 출력한다(dry-run·apply 양쪽):
+ranking scope null/mismatch/general account/중복 account, rank 중복,
+rank sequence 누락, final ranking vs participant.finalRank 불일치, final tier
+누락, settled season의 미종료 account, closedAt null, eligible participant final
+ranking 누락, excluded participant의 final ranking, season snapshot scope 손상,
+executed order scope 손상. audit는 재계산도 재번호 매기기도 하지 않는다 — 여러
+findings(rank gap, tier 불일치)는 이 스크립트의 소관이 아니라 해당 job 재실행
+대상이다.
+
+### 8-A.16 배포 순서 (작업 8)
+
+1. DB 백업 + 최신 main SHA 확인
+2. migration SQL 검토
+3. migration 전 SeasonRanking fingerprint 저장 (§8-A.6)
+4. `prisma migrate deploy`
+5. migration 후 fingerprint 비교 — tradingAccountId backfill과 FK/index/unique
+   외에는 차이가 없어야 한다
+6. 신버전 backend 배포
+7. **구버전 backend 완전 종료** — 구버전 writer가 살아 있으면 repair 뒤에도
+   null scope 행이 다시 생긴다
+8. `repair-links` dry-run → `--apply` → 잔여 0
+9. `repair-financial-scope` dry-run → `--apply` → 잔여 0
+10. `repair-trading-scope` dry-run → `--apply` → 잔여 0
+11. `repair-snapshot-scope` dry-run → `--apply` → 잔여 0
+12. `repair-ranking-scope` dry-run → `--apply`
+13. ranking null scope 0 / mismatch 0 확인
+14. `trading-accounts:audit-general` findings 0
+15. ranking·settlement audit findings 0
+16. active season current ranking smoke
+17. snapshot 기반 daily ranking dry-run
+18. final settlement dry-run
+19. 실제 종료된 테스트 season settlement smoke
+20. settled season의 active/suspended linked account 0 확인
+21. ranking API smoke / Home·Records smoke
+22. 일반계정 portfolio concurrency smoke
+23. 일반 daily snapshot dry-run
+24. 실제 광고 provider가 계속 비활성·미등록인지 확인
+
+repair가 끝나기 전에 NOT NULL을 적용하지 않는다.
+
+### 8-A.17 이번 작업에서 하지 않은 것
+
+일반계정 실제 주문·환전·Position 활성화, 일반모드 랭킹, 시즌+일반 통합 랭킹,
+프런트엔드 변경(모드 선택·랭킹 화면·일반계정 portfolio 연결), 광고 SDK·실제
+provider adapter·광고 정책값 확정, SeasonReward 지급 활성화 및 reward-grant
+gate 개방, 경쟁 순위(1,2,2,4) 도입, 랭킹 계산 규칙·티어 비율 변경, 시즌
+초기자금 수익률의 TWR 전환, SeasonParticipant 랭킹 캐시 컬럼 제거,
+SeasonParticipant 제거, `SeasonRanking.seasonParticipantId` nullable 전환,
+기존 `seasonParticipantId` 컬럼 제거, 모든 `tradingAccountId` NOT NULL 강화,
+Order·Position·ExchangeTransaction·FxExecuteRequest의 participant FK 제거,
+별도 랭킹 이벤트 로그 테이블, 랭킹 결과 무제한 버전 보관, Redis 분산락,
+메시지 브로커, 범용 작업 큐.
+
+기존 차단 유지: `GENERAL_ACCOUNT_TRADING_NOT_IMPLEMENTED`,
+`GENERAL_ACCOUNT_FX_NOT_IMPLEMENTED`.
+
 ## 9. 후속 작업 권장 순서
 
 1. `season_participants.trading_account_id` NOT NULL 강화 (§3.5.5의 전제조건 5가지 확인 후)
-2. 스냅샷 3모델(EquitySnapshot·DailyPortfolioSnapshot·SeasonRanking)의 accountId 전환 + accountId 기반 portfolio API
-   (지갑·원장·환전과 주문·포지션·Quote는 2026-08-03 완료; 소유권 판정은 `TradingAccountAccessService` 재사용)
+2. ~~스냅샷 3모델(EquitySnapshot·DailyPortfolioSnapshot·SeasonRanking)의 accountId 전환~~
+   — EquitySnapshot·DailyPortfolioSnapshot은 작업 7, SeasonRanking은 작업 8에서
+   완료. 남은 것은 repair 수렴 이후의 `tradingAccountId` NOT NULL 강화
 3. 일반모드 거래 활성화: Order·Position·ExchangeTransaction·FxExecuteRequest의
    `seasonParticipantId` optional 전환 + 일반모드 주문·환전 정책 + 일반 Position
 4. 시즌 lifecycle 격리: finished/rewarded/settled 전환 시 account closed 동기화, suspended 재활성화, 운영자 일반계정 정지

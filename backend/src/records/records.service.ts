@@ -25,6 +25,11 @@ import {
 } from '../portfolio/portfolio-valuation.policy';
 import { PortfolioValuationService } from '../portfolio/portfolio-valuation.service';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  assertSeasonRankingScope,
+  assertSeasonRankingScopeForParticipant,
+  SEASON_RANKING_SCOPE_SELECT,
+} from '../ranking/season-ranking-scope';
 import { requireSeasonSnapshotParticipantId } from '../portfolio/season-snapshot-scope';
 import {
   calculateMaxDrawdownPercent,
@@ -716,6 +721,11 @@ export class RecordsService {
       skip: parsedQuery.offset,
       take: parsedQuery.limit,
       select: {
+        // Scope columns for the ranking verification below (작업 8 §11).
+        id: true,
+        userId: true,
+        tradingAccountId: true,
+        tradingAccount: { select: { id: true, mode: true, userId: true } },
         seasonId: true,
         joinedAt: true,
         participantStatus: true,
@@ -744,6 +754,11 @@ export class RecordsService {
           ],
           take: 1,
           select: {
+            // Scope columns for assertSeasonRankingScopeForParticipant
+            // (작업 8 §11); never rendered into a response.
+            id: true,
+            seasonId: true,
+            tradingAccountId: true,
             totalAssetKrw: true,
             returnRate: true,
             rankingDate: true,
@@ -773,6 +788,16 @@ export class RecordsService {
         },
       },
     });
+
+    // Every ranking row backing a record card is verified before ANY card is
+    // returned: a mis-scoped row would attribute one account's result to
+    // another user's season history (작업 8 §11).
+    for (const participant of participants) {
+      assertSeasonRankingScopeForParticipant(
+        participant,
+        participant.seasonRankings,
+      );
+    }
 
     return {
       success: true,
@@ -1928,7 +1953,7 @@ export class RecordsService {
     seasonParticipantId: string,
     rankType: SeasonRankingType,
   ) {
-    return this.prisma.seasonRanking.findFirst({
+    const ranking = await this.prisma.seasonRanking.findFirst({
       where: {
         seasonId,
         seasonParticipantId,
@@ -1941,6 +1966,8 @@ export class RecordsService {
         { createdAt: 'desc' },
       ],
       select: {
+        ...SEASON_RANKING_SCOPE_SELECT,
+        id: true,
         rankType: true,
         rank: true,
         rankingDate: true,
@@ -1950,6 +1977,14 @@ export class RecordsService {
         capturedAt: true,
       },
     });
+
+    // A hidden/excluded participant legitimately yields null here (the WHERE
+    // filters them out). A row that came back but is mis-scoped is damage.
+    if (ranking) {
+      assertSeasonRankingScope(ranking);
+    }
+
+    return ranking;
   }
 
   private async buildPublicSeasonSummaryPortfolio(
@@ -2945,7 +2980,7 @@ export class RecordsService {
   }
 
   private async findDetailedParticipant(seasonId: string, userId: string) {
-    return this.prisma.seasonParticipant.findUnique({
+    const participant = await this.prisma.seasonParticipant.findUnique({
       where: {
         seasonId_userId: {
           seasonId,
@@ -2954,6 +2989,11 @@ export class RecordsService {
       },
       select: {
         id: true,
+        // Scope columns for the ranking verification below (작업 8 §11).
+        userId: true,
+        seasonId: true,
+        tradingAccountId: true,
+        tradingAccount: { select: { id: true, mode: true, userId: true } },
         participantStatus: true,
         joinedAt: true,
         rankingHiddenAt: true,
@@ -2975,6 +3015,11 @@ export class RecordsService {
           ],
           take: 1,
           select: {
+            // Scope columns for assertSeasonRankingScopeForParticipant
+            // (작업 8 §11); never rendered into a response.
+            id: true,
+            seasonId: true,
+            tradingAccountId: true,
             totalAssetKrw: true,
             returnRate: true,
             rankingDate: true,
@@ -3004,6 +3049,15 @@ export class RecordsService {
         },
       },
     });
+
+    if (participant) {
+      assertSeasonRankingScopeForParticipant(
+        participant,
+        participant.seasonRankings,
+      );
+    }
+
+    return participant;
   }
 
   private countOrders(

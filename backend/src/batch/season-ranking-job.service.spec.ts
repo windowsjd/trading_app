@@ -2,6 +2,12 @@ jest.mock('../generated/prisma/client', () => {
   const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
 
   return {
+    TradingAccountMode: { season: 'season', general: 'general' },
+    TradingAccountStatus: {
+      active: 'active',
+      suspended: 'suspended',
+      closed: 'closed',
+    },
     BatchJobStatus: {
       pending: 'pending',
       running: 'running',
@@ -203,6 +209,8 @@ describe('SeasonRankingJobService', () => {
       data: {
         seasonId: 'season-1',
         seasonParticipantId: 'sp-2',
+        // 작업 8 dual-write: participant AND the account it traded on.
+        tradingAccountId: 'account-sp-2',
         rankType: SeasonRankingType.daily,
         rank: 1,
         totalAssetKrw: '2000.00000000',
@@ -522,6 +530,21 @@ function createService() {
 
 function createPrismaMock() {
   const tx = {
+    // The season row lock taken before any ranking write (작업 8 §13.2).
+    $queryRaw: jest.fn().mockResolvedValue([
+      {
+        id: 'season-1',
+        status: 'active',
+        start_at: new Date('2026-05-01T00:00:00.000Z'),
+        end_at: new Date('2026-06-01T00:00:00.000Z'),
+      },
+    ]),
+    // Account-scope resolution for the dual-write (작업 8 §8).
+    seasonParticipant: {
+      findMany: jest.fn((args: { where: { id: { in: string[] } } }) =>
+        Promise.resolve(args.where.id.in.map((id) => participantScope(id))),
+      ),
+    },
     seasonRanking: {
       findMany: jest.fn(),
       create: jest.fn(),
@@ -635,11 +658,41 @@ function mockSeason(prisma: PrismaMock, status: SeasonStatus) {
   });
 }
 
+/**
+ * Ranking participants are selected WITH their verified account scope
+ * (작업 8 §9.4), so the fixture carries it too — a participant without one now
+ * legitimately fails the job.
+ */
 function mockParticipants(
   prisma: PrismaMock,
   participants: Array<{ id: string; userId: string }>,
 ) {
-  prisma.seasonParticipant.findMany.mockResolvedValue(participants);
+  prisma.seasonParticipant.findMany.mockResolvedValue(
+    participants.map((participant) =>
+      participantScope(participant.id, participant.userId),
+    ),
+  );
+}
+
+function participantScope(id: string, userId = `user-${id.split('-')[1]}`) {
+  return {
+    id,
+    seasonId: 'season-1',
+    userId,
+    participantStatus: 'active',
+    tradingAccountId: accountIdFor(id),
+    tradingAccount: {
+      id: accountIdFor(id),
+      mode: 'season',
+      status: 'active',
+      userId,
+      seasonParticipant: { id },
+    },
+  };
+}
+
+function accountIdFor(seasonParticipantId: string) {
+  return `account-${seasonParticipantId}`;
 }
 
 function mockSnapshots(
@@ -664,7 +717,14 @@ function snapshot(
   capturedAt = new Date('2026-05-20T00:00:10.000Z'),
 ) {
   return {
+    id: `daily-${seasonParticipantId}`,
     seasonParticipantId,
+    // Season snapshots feeding a ranking are account-scoped and carry NO
+    // general-mode performance columns (작업 8 §9.1).
+    tradingAccountId: accountIdFor(seasonParticipantId),
+    cumulativeExternalFundingKrw: null,
+    investmentPnlKrw: null,
+    timeWeightedReturnFactor: null,
     snapshotDate: new Date('2026-05-20T00:00:00.000Z'),
     totalAssetKrw: new Prisma.Decimal(totalAssetKrw),
     returnRate: new Prisma.Decimal(returnRate),
@@ -684,7 +744,9 @@ function existingRanking(
 ) {
   return {
     id,
+    seasonId: 'season-1',
     seasonParticipantId,
+    tradingAccountId: accountIdFor(seasonParticipantId),
     rank,
     totalAssetKrw: new Prisma.Decimal('1000.00000000'),
     returnRate: new Prisma.Decimal('0.00000000'),
@@ -692,7 +754,15 @@ function existingRanking(
     totalFillCount: 0,
     reachedReturnAt: null,
     seasonParticipant: {
+      id: seasonParticipantId,
+      seasonId: 'season-1',
       userId,
+      tradingAccountId: accountIdFor(seasonParticipantId),
+      tradingAccount: {
+        id: accountIdFor(seasonParticipantId),
+        mode: 'season',
+        userId,
+      },
     },
   };
 }

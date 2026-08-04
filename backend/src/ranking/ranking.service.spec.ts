@@ -2,6 +2,12 @@ jest.mock('../generated/prisma/client', () => {
   const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
 
   return {
+    TradingAccountMode: { season: 'season', general: 'general' },
+    TradingAccountStatus: {
+      active: 'active',
+      suspended: 'suspended',
+      closed: 'closed',
+    },
     Prisma: {
       Decimal,
     },
@@ -131,12 +137,38 @@ describe('RankingService', () => {
     prisma.season.findFirst.mockResolvedValueOnce(season);
   };
 
+  /**
+   * 작업 8 §11: every ranking row is selected WITH its account scope and
+   * verified against its participant before the page is returned. The scope
+   * columns below are internal — `formatRankingRow` never emits them, which the
+   * "no tradingAccountId in the public response" test asserts directly.
+   */
+  const rankingScopeFor = (seasonParticipantId: string, userId: string) => ({
+    seasonId: 'season-1',
+    seasonParticipantId,
+    tradingAccountId: `account-${seasonParticipantId}`,
+    seasonParticipant: {
+      id: seasonParticipantId,
+      seasonId: 'season-1',
+      userId,
+      tradingAccountId: `account-${seasonParticipantId}`,
+      tradingAccount: {
+        id: `account-${seasonParticipantId}`,
+        mode: 'season',
+        userId,
+      },
+    },
+  });
+
   const rankingRow = (rank: number, seasonParticipantId = `sp-${rank}`) => {
     const day = Math.min(rank, 9).toString().padStart(2, '0');
+    const userId = `user-${rank}`;
+    const scope = rankingScopeFor(seasonParticipantId, userId);
 
     return {
+      ...scope,
+      id: `ranking-${seasonParticipantId}`,
       rank,
-      seasonParticipantId,
       totalAssetKrw: new Prisma.Decimal(`${1000000 - rank}.00000000`),
       returnRate: new Prisma.Decimal('10.00000000'),
       maxDrawdown: new Prisma.Decimal('2.50000000'),
@@ -145,7 +177,7 @@ describe('RankingService', () => {
         rank === 2 ? null : new Date(`2026-05-${day}T00:10:00.000Z`),
       capturedAt,
       seasonParticipant: {
-        userId: `user-${rank}`,
+        ...scope.seasonParticipant,
         finalTier: null,
         user: {
           nickname: `trader-${rank}`,
@@ -170,9 +202,11 @@ describe('RankingService', () => {
       rankingRow(1),
       rankingRow(2),
     ]);
+    const myScope = rankingScopeFor('sp-2', 'user-2');
     prisma.seasonRanking.findUnique.mockResolvedValueOnce({
+      ...myScope,
+      id: 'ranking-sp-2',
       rank: 2,
-      seasonParticipantId: 'sp-2',
       totalAssetKrw: new Prisma.Decimal('999998.00000000'),
       returnRate: new Prisma.Decimal('9.00000000'),
       maxDrawdown: new Prisma.Decimal('3.00000000'),
@@ -180,6 +214,7 @@ describe('RankingService', () => {
       reachedReturnAt: null,
       capturedAt,
       seasonParticipant: {
+        ...myScope.seasonParticipant,
         finalTier: null,
       },
     });
@@ -426,8 +461,9 @@ describe('RankingService', () => {
     });
     prisma.seasonRanking.count.mockResolvedValueOnce(25);
     prisma.seasonRanking.findUnique.mockResolvedValueOnce({
+      ...rankingScopeFor('sp-15', 'user-15'),
+      id: 'ranking-sp-15',
       rank: 15,
-      seasonParticipantId: 'sp-15',
       totalAssetKrw: new Prisma.Decimal('999985.00000000'),
       returnRate: new Prisma.Decimal('5.00000000'),
       maxDrawdown: new Prisma.Decimal('4.00000000'),
@@ -435,6 +471,7 @@ describe('RankingService', () => {
       reachedReturnAt: null,
       capturedAt,
       seasonParticipant: {
+        ...rankingScopeFor('sp-15', 'user-15').seasonParticipant,
         finalTier: null,
       },
     });
@@ -484,8 +521,9 @@ describe('RankingService', () => {
     });
     prisma.seasonRanking.count.mockResolvedValueOnce(100);
     prisma.seasonRanking.findUnique.mockResolvedValueOnce({
+      ...rankingScopeFor('sp-50', 'user-50'),
+      id: 'ranking-sp-50',
       rank: 50,
-      seasonParticipantId: 'sp-50',
       totalAssetKrw: new Prisma.Decimal('999950.00000000'),
       returnRate: new Prisma.Decimal('5.00000000'),
       maxDrawdown: new Prisma.Decimal('4.00000000'),
@@ -493,6 +531,7 @@ describe('RankingService', () => {
       reachedReturnAt: null,
       capturedAt,
       seasonParticipant: {
+        ...rankingScopeFor('sp-50', 'user-50').seasonParticipant,
         finalTier: null,
       },
     });
@@ -538,8 +577,9 @@ describe('RankingService', () => {
     });
     prisma.seasonRanking.count.mockResolvedValueOnce(100);
     prisma.seasonRanking.findUnique.mockResolvedValueOnce({
+      ...rankingScopeFor('sp-11', 'user-11'),
+      id: 'ranking-sp-11',
       rank: 11,
-      seasonParticipantId: 'sp-11',
       totalAssetKrw: new Prisma.Decimal('999989.00000000'),
       returnRate: new Prisma.Decimal('8.00000000'),
       maxDrawdown: new Prisma.Decimal('2.00000000'),
@@ -547,6 +587,7 @@ describe('RankingService', () => {
       reachedReturnAt: null,
       capturedAt,
       seasonParticipant: {
+        ...rankingScopeFor('sp-11', 'user-11').seasonParticipant,
         finalTier: 'diamond',
       },
     });

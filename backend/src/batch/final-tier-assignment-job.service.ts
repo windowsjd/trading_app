@@ -3,6 +3,8 @@ import {
   Prisma,
   SeasonRankingType,
   SeasonStatus,
+  TradingAccountMode,
+  TradingAccountStatus,
 } from '../generated/prisma/client';
 import {
   formatDecimalScale,
@@ -10,6 +12,10 @@ import {
   returnRateScale,
 } from '../fx/fx-decimal-policy';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  assertSeasonRankingScopes,
+  SEASON_RANKING_SCOPE_SELECT,
+} from '../ranking/season-ranking-scope';
 import { BatchService } from './batch.service';
 import {
   FINAL_TIER_ASSIGNMENT_JOB_NAME,
@@ -52,15 +58,27 @@ type ResolvedTierPolicy = {
   assignTier: (rank: number, totalParticipants: number) => FinalTier;
 };
 type FinalRankingRow = {
+  id: string;
+  seasonId: string;
   seasonParticipantId: string;
+  tradingAccountId: string | null;
   rank: number;
   totalAssetKrw: Prisma.Decimal;
   returnRate: Prisma.Decimal;
   seasonParticipant: {
     id: string;
+    seasonId: string;
     userId: string;
+    tradingAccountId: string | null;
     finalRank: number | null;
     finalTier: string | null;
+    tradingAccount: {
+      id: string;
+      mode: TradingAccountMode;
+      status: TradingAccountStatus;
+      userId: string;
+      closedAt: Date | null;
+    } | null;
   };
 };
 
@@ -145,6 +163,9 @@ export class FinalTierAssignmentJobService {
       );
     }
 
+    this.assertSettledSeasonAccountsClosed(seasonId, rows);
+    this.assertFinalResultConsistency(rows, policy);
+
     const assignments = rows.map((row) =>
       this.buildAssignment(row, rows.length, policy),
     );
@@ -177,8 +198,11 @@ export class FinalTierAssignmentJobService {
     return result;
   }
 
-  private async findFinalRankingRows(seasonId: string, rankingDate: Date) {
-    return this.prisma.seasonRanking.findMany({
+  private async findFinalRankingRows(
+    seasonId: string,
+    rankingDate: Date,
+  ): Promise<FinalRankingRow[]> {
+    const rows = await this.prisma.seasonRanking.findMany({
       where: {
         seasonId,
         rankType: FINAL_RANK_TYPE,
@@ -186,20 +210,108 @@ export class FinalTierAssignmentJobService {
       },
       orderBy: [{ rank: 'asc' }, { seasonParticipantId: 'asc' }],
       select: {
-        seasonParticipantId: true,
+        ...SEASON_RANKING_SCOPE_SELECT,
+        id: true,
         rank: true,
         totalAssetKrw: true,
         returnRate: true,
         seasonParticipant: {
           select: {
-            id: true,
-            userId: true,
+            ...SEASON_RANKING_SCOPE_SELECT.seasonParticipant.select,
             finalRank: true,
             finalTier: true,
+            tradingAccount: {
+              select: {
+                id: true,
+                mode: true,
+                status: true,
+                userId: true,
+                closedAt: true,
+              },
+            },
           },
         },
       },
     });
+
+    assertSeasonRankingScopes(rows);
+
+    return rows;
+  }
+
+  /**
+   * A PARTIALLY assigned participant is not "already done" (작업 8 §16).
+   *
+   * The old `hasExistingFinalResult` treated any non-null finalRank OR
+   * finalTier as existing and skipped the row. That silently accepted three
+   * genuinely broken states: a rank with no tier, a tier with no rank, and a
+   * stored rank that disagrees with the final ranking the tier is computed
+   * from. Each leaves a user with a result the leaderboard contradicts.
+   *
+   * Identical values are still idempotent and still skipped.
+   */
+  private assertFinalResultConsistency(
+    rows: readonly FinalRankingRow[],
+    policy: ResolvedTierPolicy,
+  ): void {
+    for (const row of rows) {
+      const participant = row.seasonParticipant;
+      const expectedTier = policy.assignTier(row.rank, rows.length);
+      const hasRank = participant.finalRank !== null;
+      const hasTier = participant.finalTier !== null;
+
+      if (hasRank !== hasTier) {
+        this.throwJobError(
+          HttpStatus.CONFLICT,
+          'FINAL_TIER_ASSIGNMENT_CONFLICT',
+          `Season participant ${participant.id} has finalRank=${participant.finalRank ?? 'null'} and finalTier=${participant.finalTier ?? 'null'}; a half-assigned final result is never completed silently.`,
+        );
+      }
+      if (!hasRank) {
+        continue;
+      }
+      if (participant.finalRank !== row.rank) {
+        this.throwJobError(
+          HttpStatus.CONFLICT,
+          'FINAL_TIER_ASSIGNMENT_CONFLICT',
+          `Season participant ${participant.id} stores finalRank=${participant.finalRank} but its final ranking row is rank ${row.rank}.`,
+        );
+      }
+      if (participant.finalTier !== expectedTier) {
+        this.throwJobError(
+          HttpStatus.CONFLICT,
+          'FINAL_TIER_ASSIGNMENT_CONFLICT',
+          `Season participant ${participant.id} stores finalTier="${participant.finalTier}" but rank ${row.rank} of ${rows.length} computes to "${expectedTier}".`,
+        );
+      }
+    }
+  }
+
+  /**
+   * A settled season must not still be holding live accounts. This job runs
+   * only on settled seasons, so finding one means settlement's account closure
+   * was rolled back or bypassed (작업 8 §16).
+   */
+  private assertSettledSeasonAccountsClosed(
+    seasonId: string,
+    rows: readonly FinalRankingRow[],
+  ): void {
+    for (const row of rows) {
+      const account = row.seasonParticipant.tradingAccount;
+      if (!account) {
+        continue; // already reported by assertSeasonRankingScopes
+      }
+      if (
+        account.status !== TradingAccountStatus.closed ||
+        account.closedAt === null
+      ) {
+        this.throwJobError(
+          HttpStatus.CONFLICT,
+          'SEASON_ACCOUNT_CLOSE_INCOMPLETE',
+          `Season ${seasonId} is settled but trading account ${account.id} is status="${account.status}" with closedAt=${account.closedAt?.toISOString() ?? 'null'}; re-run the season settlement job.`,
+        );
+      }
+    }
   }
 
   private async assignFinalTiersAtomically(

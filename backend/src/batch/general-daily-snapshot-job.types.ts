@@ -33,7 +33,19 @@ export type GeneralDailySnapshotJobAccountSummary = {
   failed: number;
   integrityFailed: number;
   valuationFailed: number;
+  /**
+   * Accounts not snapshotted because they are closed.
+   *
+   * Counts BOTH the accounts already closed when the run listed them and the
+   * ones closed after listing but before their own row lock was acquired
+   * (작업 6·7 보완 2). The two are the same outcome — no snapshot exists for a
+   * closed account — so they share one total, and `skippedClosedDuringRun`
+   * below breaks out how many lost the race, which is what distinguishes a
+   * quiet day from a busy one.
+   */
   excludedClosed: number;
+  /** Subset of `excludedClosed` that closed mid-run, after the account list. */
+  skippedClosedDuringRun: number;
 };
 
 export type GeneralDailySnapshotJobErrorCode =

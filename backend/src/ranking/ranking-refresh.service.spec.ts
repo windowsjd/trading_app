@@ -2,6 +2,12 @@ jest.mock('../generated/prisma/client', () => {
   const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
 
   return {
+    TradingAccountMode: { season: 'season', general: 'general' },
+    TradingAccountStatus: {
+      active: 'active',
+      suspended: 'suspended',
+      closed: 'closed',
+    },
     ParticipantStatus: {
       registered: 'registered',
       active: 'active',
@@ -46,6 +52,17 @@ describe('RankingRefreshService', () => {
   const createPrisma = () => {
     const prisma = {
       $transaction: jest.fn(),
+      // The write transaction takes the season row lock before it touches
+      // anything (작업 8 §13.1); the mock returns the season as still active so
+      // this suite keeps testing candidate selection, not the lock.
+      $queryRaw: jest.fn().mockResolvedValue([
+        {
+          id: 'season-1',
+          status: SeasonStatus.active,
+          start_at: new Date('2026-06-01T00:00:00.000Z'),
+          end_at: new Date('2026-06-30T00:00:00.000Z'),
+        },
+      ]),
       season: {
         findUnique: jest.fn(),
       },

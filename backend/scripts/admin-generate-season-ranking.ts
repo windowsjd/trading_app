@@ -11,6 +11,12 @@ import {
   seasonSnapshotWhere,
 } from '../src/portfolio/season-snapshot-scope';
 import { buildRankingRowsForSnapshots } from '../src/ranking/ranking-calculation.policy';
+import {
+  assertRankingSourceOrderScopes,
+  assertRankingSourceSnapshotScopes,
+  buildRankingParticipantScopes,
+  RANKING_PARTICIPANT_SCOPE_SELECT,
+} from '../src/ranking/ranking-source-scope';
 
 type SeasonRankingCliArgs = {
   seasonId?: string;
@@ -84,6 +90,17 @@ export async function runAdminGenerateSeasonRanking(argv: string[]) {
   const prisma = new PrismaClient({ adapter });
 
   try {
+    // The verified participant -> season account map every source row below is
+    // measured against (작업 8 §9.4). One query, no per-row lookup.
+    const participants = await prisma.seasonParticipant.findMany({
+      where: { seasonId },
+      select: RANKING_PARTICIPANT_SCOPE_SELECT,
+    });
+    const participantScopes = buildRankingParticipantScopes(
+      seasonId,
+      participants,
+    );
+
     const snapshots = await prisma.dailyPortfolioSnapshot.findMany({
       where: {
         snapshotDate: rankingDate,
@@ -94,7 +111,12 @@ export async function runAdminGenerateSeasonRanking(argv: string[]) {
         },
       },
       select: {
+        id: true,
         seasonParticipantId: true,
+        tradingAccountId: true,
+        cumulativeExternalFundingKrw: true,
+        investmentPnlKrw: true,
+        timeWeightedReturnFactor: true,
         snapshotDate: true,
         totalAssetKrw: true,
         returnRate: true,
@@ -106,6 +128,11 @@ export async function runAdminGenerateSeasonRanking(argv: string[]) {
           },
         },
       },
+    });
+    assertRankingSourceSnapshotScopes({
+      kind: 'daily portfolio snapshot',
+      rows: snapshots,
+      participantScopes,
     });
 
     if (snapshots.length === 0) {
@@ -131,7 +158,12 @@ export async function runAdminGenerateSeasonRanking(argv: string[]) {
           },
         },
         select: {
+          id: true,
           seasonParticipantId: true,
+          tradingAccountId: true,
+          cumulativeExternalFundingKrw: true,
+          investmentPnlKrw: true,
+          timeWeightedReturnFactor: true,
           snapshotDate: true,
           totalAssetKrw: true,
           returnRate: true,
@@ -151,11 +183,22 @@ export async function runAdminGenerateSeasonRanking(argv: string[]) {
           },
         },
         select: {
+          id: true,
           seasonParticipantId: true,
+          tradingAccountId: true,
           executedAt: true,
         },
       }),
     ]);
+    assertRankingSourceSnapshotScopes({
+      kind: 'daily portfolio snapshot',
+      rows: historicalSnapshots,
+      participantScopes,
+    });
+    assertRankingSourceOrderScopes({
+      rows: executedOrders,
+      participantScopes,
+    });
     const rows = buildRankingRowsForSnapshots({
       rankingSnapshots: snapshots.map((snapshot) => ({
         seasonParticipantId: requireSeasonSnapshotParticipantId(

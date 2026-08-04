@@ -14,6 +14,11 @@ import {
   toGeneralPerformanceHttpException,
 } from './general-account-performance.service';
 import {
+  assertGeneralDailyHistoryRows,
+  assertGeneralEquityHistoryRows,
+  assertGeneralHistoryBoundaryPairs,
+} from './general-history-integrity';
+import {
   compareGeneralSnapshotOrder,
   MONEY_SCALE,
   RETURN_RATE_SCALE,
@@ -44,6 +49,17 @@ export type TradingAccountEquityQuery = {
 
 type EquityRange = '1d' | '7d' | '30d' | 'all';
 
+type EquityHistoryPoint = {
+  time: string;
+  totalAssetKrw: string;
+  returnRate: string;
+  returnRateMethod: 'time_weighted' | 'initial_capital';
+  cumulativeExternalFundingKrw: string | null;
+  investmentPnlKrw: string | null;
+  snapshotReason: SnapshotReason;
+  externalFundingAmountKrw: string | null;
+};
+
 const ZERO_MONEY = '0.00000000';
 
 /**
@@ -69,10 +85,13 @@ export class TradingAccountPortfolioService {
   ) {}
 
   async getPortfolio(userId: string | undefined, accountId: string) {
-    const account = await this.resolveOwnedAccount(userId, accountId);
+    const owner = this.requireUserId(userId);
+    const account = await this.resolveOwnedAccount(owner, accountId);
 
     return account.mode === TradingAccountMode.general
-      ? this.getGeneralPortfolio(account)
+      ? this.readGeneralConsistently(owner, account.id, (tx, locked, now) =>
+          this.getGeneralPortfolio(locked, tx, now),
+        )
       : this.getSeasonPortfolio(account);
   }
 
@@ -81,31 +100,52 @@ export class TradingAccountPortfolioService {
     accountId: string,
     query: TradingAccountEquityQuery = {},
   ) {
-    const account = await this.resolveOwnedAccount(userId, accountId);
+    const owner = this.requireUserId(userId);
+    const account = await this.resolveOwnedAccount(owner, accountId);
     const range = this.parseRange(query.range);
 
-    if (account.mode === TradingAccountMode.general) {
-      // An account with no origin must not read as an empty history: that
-      // looks like "nothing happened yet" when the truth is "performance was
-      // never initialized". The continuity check comes with it (작업 7 보완 2)
-      // — a history whose latest state already disagrees with the ledger is
-      // not a chart to render, it is damage to report.
-      try {
-        await this.performanceService.requireContinuousPerformanceState({
-          account,
-        });
-      } catch (error) {
-        throw this.rethrowStructuralError(error);
-      }
+    if (account.mode !== TradingAccountMode.general) {
+      return this.buildEquityResponse(
+        account,
+        range,
+        await this.findEquityPointsForSeason(
+          account.id,
+          this.resolveSince(range, account.openedAt, Date.now()),
+        ),
+      );
     }
 
-    const since = this.resolveSince(range, account.openedAt);
-    const points =
-      range === '1d'
-        ? await this.findEquityPoints(account.id, since)
-        : ((await this.findDailyPoints(account.id, since)) ??
-          (await this.findEquityPoints(account.id, since)));
+    return this.readGeneralConsistently(
+      owner,
+      account.id,
+      async (tx, locked, now) => {
+        // An account with no origin must not read as an empty history: that
+        // looks like "nothing happened yet" when the truth is "performance was
+        // never initialized". The continuity check comes with it (작업 7 보완 2)
+        // — a history whose latest state already disagrees with the ledger is
+        // not a chart to render, it is damage to report.
+        await this.performanceService.requireContinuousPerformanceState({
+          account: locked,
+          client: tx,
+        });
 
+        const since = this.resolveSince(range, locked.openedAt, now.getTime());
+        const points =
+          range === '1d'
+            ? await this.findGeneralEquityPoints(tx, locked.id, since)
+            : ((await this.findGeneralDailyPoints(tx, locked.id, since)) ??
+              (await this.findGeneralEquityPoints(tx, locked.id, since)));
+
+        return this.buildEquityResponse(locked, range, points);
+      },
+    );
+  }
+
+  private buildEquityResponse(
+    account: Pick<OwnedTradingAccount, 'id' | 'mode'>,
+    range: EquityRange,
+    points: EquityHistoryPoint[],
+  ) {
     return {
       success: true as const,
       data: {
@@ -120,12 +160,79 @@ export class TradingAccountPortfolioService {
     };
   }
 
+  /**
+   * THE consistent-read wrapper for every general-account GET
+   * (작업 6·7 보완 1).
+   *
+   * WHY A TRANSACTION IS NOT OPTIONAL HERE
+   * --------------------------------------
+   * A general portfolio answer is assembled from six independent reads: the
+   * latest performance snapshot, the external-funding ledger, the KRW and USD
+   * wallets, positions, and the price/FX snapshots. Each ran in its own
+   * implicit transaction, so an ad payout committing mid-request could be
+   * observed by SOME of them:
+   *
+   *     snapshot: pre-payout · ledger: pre-payout · wallet: POST-payout
+   *
+   * TWR is `factor × currentTotal / previousTotal` measured against cumulative
+   * external funding. With a post-payout wallet and a pre-payout funding sum,
+   * the reward lands entirely in `investmentPnlKrw` — the app tells the user
+   * that watching an advert earned them money. RepeatableRead makes all six
+   * reads see one committed instant, so the reward is either fully visible
+   * (with its funding boundary) or not visible at all.
+   *
+   * WHAT THIS TRANSACTION MUST NOT DO
+   * ---------------------------------
+   * It is a READ. It takes no row lock, writes nothing, creates no snapshot,
+   * wallet, ledger row, or claim, repairs nothing, and makes no network call —
+   * valuation reads only stored price/FX snapshots, so it is safe to hold open.
+   */
+  private async readGeneralConsistently<T>(
+    userId: string,
+    accountId: string,
+    handler: (
+      tx: Prisma.TransactionClient,
+      account: OwnedTradingAccount,
+      now: Date,
+    ) => Promise<T>,
+  ): Promise<T> {
+    // ONE clock for the whole request. Re-calling `new Date()` inside would
+    // let the valuation instant and the history range drift apart.
+    const now = new Date();
+
+    try {
+      return await this.prisma.$transaction(
+        async (tx) => {
+          // Re-read under the snapshot: the pre-transaction copy answered
+          // 401/404 and chose the mode branch, but the row that gets valued
+          // must come from the same consistent view as everything else.
+          const account = await this.accessService.getOwnedAccountOrThrow(
+            userId,
+            accountId,
+            tx,
+          );
+
+          return await handler(tx, account, now);
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+      );
+    } catch (error) {
+      throw this.rethrowStructuralError(error);
+    }
+  }
+
   // ------------------------------------------------------------- general
 
-  private async getGeneralPortfolio(account: OwnedTradingAccount) {
+  private async getGeneralPortfolio(
+    account: OwnedTradingAccount,
+    client: Prisma.TransactionClient,
+    valuationAt: Date,
+  ) {
     try {
       const live = await this.performanceService.resolveLivePerformance({
         account,
+        valuationAt,
+        client,
       });
 
       return {
@@ -298,7 +405,116 @@ export class TradingAccountPortfolioService {
     };
   }
 
-  private async findEquityPoints(tradingAccountId: string, since: Date) {
+  /**
+   * General equity history: every returned row is verified before ANY of it is
+   * serialised (작업 6·7 보완 3). A damaged row is never emitted with `null`
+   * performance fields as though that were a legitimate data point.
+   */
+  private async findGeneralEquityPoints(
+    client: Prisma.TransactionClient,
+    tradingAccountId: string,
+    since: Date,
+  ): Promise<EquityHistoryPoint[]> {
+    const rows = await client.equitySnapshot.findMany({
+      where: { tradingAccountId, capturedAt: { gte: since } },
+      orderBy: [{ capturedAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        seasonParticipantId: true,
+        tradingAccountId: true,
+        totalAssetKrw: true,
+        returnRate: true,
+        snapshotReason: true,
+        cumulativeExternalFundingKrw: true,
+        investmentPnlKrw: true,
+        timeWeightedReturnFactor: true,
+        externalFundingAmountKrw: true,
+        externalFundingReferenceType: true,
+        externalFundingReferenceId: true,
+        capturedAt: true,
+        createdAt: true,
+      },
+    });
+
+    assertGeneralEquityHistoryRows(tradingAccountId, rows);
+    // ONE batched claim/ledger lookup for the whole page — not one per point.
+    await assertGeneralHistoryBoundaryPairs(client, tradingAccountId, rows);
+
+    // SQL cannot express the boundary phase order, and it is not safe to let
+    // createdAt/UUID decide it: a before/after pair is written in one
+    // transaction and routinely shares both (작업 7 보완 1). The page just
+    // fetched is re-ordered by the same total order the latest-state resolver
+    // uses, so history always reads before → after. Ordinary rows share one
+    // rank and keep exactly the ordering they had.
+    rows.sort(compareGeneralSnapshotOrder);
+
+    return rows.map((row) => ({
+      time: row.capturedAt.toISOString(),
+      totalAssetKrw: row.totalAssetKrw.toFixed(MONEY_SCALE),
+      returnRate: row.returnRate.toFixed(RETURN_RATE_SCALE),
+      returnRateMethod: 'time_weighted' as const,
+      // Non-null by assertGeneralEquityHistoryRows: a general history point
+      // never serialises a damaged column as `null`.
+      cumulativeExternalFundingKrw:
+        row.cumulativeExternalFundingKrw!.toFixed(MONEY_SCALE),
+      investmentPnlKrw: row.investmentPnlKrw!.toFixed(MONEY_SCALE),
+      snapshotReason: row.snapshotReason,
+      externalFundingAmountKrw:
+        row.externalFundingAmountKrw?.toFixed(MONEY_SCALE) ?? null,
+    }));
+  }
+
+  /** Returns null (not []) when there are no daily rows, so the caller can
+   * fall back to EquitySnapshot instead of showing an empty chart. */
+  private async findGeneralDailyPoints(
+    client: Prisma.TransactionClient,
+    tradingAccountId: string,
+    since: Date,
+  ): Promise<EquityHistoryPoint[] | null> {
+    const rows = await client.dailyPortfolioSnapshot.findMany({
+      where: { tradingAccountId, capturedAt: { gte: since } },
+      orderBy: [{ capturedAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        seasonParticipantId: true,
+        tradingAccountId: true,
+        totalAssetKrw: true,
+        returnRate: true,
+        cumulativeExternalFundingKrw: true,
+        investmentPnlKrw: true,
+        timeWeightedReturnFactor: true,
+        capturedAt: true,
+      },
+    });
+
+    if (rows.length === 0) {
+      return null;
+    }
+
+    assertGeneralDailyHistoryRows(tradingAccountId, rows);
+
+    return rows.map((row) => ({
+      time: row.capturedAt.toISOString(),
+      totalAssetKrw: row.totalAssetKrw.toFixed(MONEY_SCALE),
+      returnRate: row.returnRate.toFixed(RETURN_RATE_SCALE),
+      returnRateMethod: 'time_weighted' as const,
+      cumulativeExternalFundingKrw:
+        row.cumulativeExternalFundingKrw!.toFixed(MONEY_SCALE),
+      investmentPnlKrw: row.investmentPnlKrw!.toFixed(MONEY_SCALE),
+      snapshotReason: SnapshotReason.scheduled,
+      externalFundingAmountKrw: null,
+    }));
+  }
+
+  /**
+   * Season history is UNCHANGED by this work: same query, same shape, same
+   * `initial_capital` meaning, no transaction and no general integrity checks
+   * (a season row legitimately has null general performance columns).
+   */
+  private async findEquityPointsForSeason(
+    tradingAccountId: string,
+    since: Date,
+  ): Promise<EquityHistoryPoint[]> {
     const rows = await this.prisma.equitySnapshot.findMany({
       where: { tradingAccountId, capturedAt: { gte: since } },
       orderBy: [{ capturedAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
@@ -316,12 +532,6 @@ export class TradingAccountPortfolioService {
       },
     });
 
-    // SQL cannot express the boundary phase order, and it is not safe to let
-    // createdAt/UUID decide it: a before/after pair is written in one
-    // transaction and routinely shares both (작업 7 보완 1). The page just
-    // fetched is re-ordered by the same total order the latest-state resolver
-    // uses, so history always reads before → after. Ordinary rows share one
-    // rank and keep exactly the ordering they had.
     rows.sort(compareGeneralSnapshotOrder);
 
     return rows.map((row) => ({
@@ -341,50 +551,14 @@ export class TradingAccountPortfolioService {
     }));
   }
 
-  /** Returns null (not []) when there are no daily rows, so the caller can
-   * fall back to EquitySnapshot instead of showing an empty chart. */
-  private async findDailyPoints(tradingAccountId: string, since: Date) {
-    const rows = await this.prisma.dailyPortfolioSnapshot.findMany({
-      where: { tradingAccountId, capturedAt: { gte: since } },
-      orderBy: [{ capturedAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
-      select: {
-        seasonParticipantId: true,
-        totalAssetKrw: true,
-        returnRate: true,
-        cumulativeExternalFundingKrw: true,
-        investmentPnlKrw: true,
-        capturedAt: true,
-      },
-    });
-
-    if (rows.length === 0) {
-      return null;
-    }
-
-    return rows.map((row) => ({
-      time: row.capturedAt.toISOString(),
-      totalAssetKrw: row.totalAssetKrw.toFixed(MONEY_SCALE),
-      returnRate: row.returnRate.toFixed(RETURN_RATE_SCALE),
-      returnRateMethod:
-        row.seasonParticipantId === null
-          ? ('time_weighted' as const)
-          : ('initial_capital' as const),
-      cumulativeExternalFundingKrw:
-        row.cumulativeExternalFundingKrw?.toFixed(MONEY_SCALE) ?? null,
-      investmentPnlKrw: row.investmentPnlKrw?.toFixed(MONEY_SCALE) ?? null,
-      snapshotReason: SnapshotReason.scheduled,
-      externalFundingAmountKrw: null,
-    }));
-  }
-
   private returnRateMethod(mode: TradingAccountMode) {
     return mode === TradingAccountMode.general
       ? ('time_weighted' as const)
       : ('initial_capital' as const);
   }
 
-  private resolveSince(range: EquityRange, openedAt: Date): Date {
-    const now = Date.now();
+  /** `now` is passed in, never read here: one request, one clock. */
+  private resolveSince(range: EquityRange, openedAt: Date, now: number): Date {
     switch (range) {
       case '1d':
         return new Date(now - 24 * 60 * 60 * 1000);
@@ -440,10 +614,7 @@ export class TradingAccountPortfolioService {
     return toGeneralPerformanceHttpException(error) ?? error;
   }
 
-  private async resolveOwnedAccount(
-    userId: string | undefined,
-    accountId: string,
-  ): Promise<OwnedTradingAccount> {
+  private requireUserId(userId: string | undefined): string {
     if (!userId) {
       throw new HttpException(
         {
@@ -454,6 +625,13 @@ export class TradingAccountPortfolioService {
       );
     }
 
+    return userId;
+  }
+
+  private async resolveOwnedAccount(
+    userId: string,
+    accountId: string,
+  ): Promise<OwnedTradingAccount> {
     // Unknown and foreign accountIds are the SAME 404. Reads are allowed for
     // active, suspended, and closed accounts alike.
     return this.accessService.getOwnedAccountOrThrow(

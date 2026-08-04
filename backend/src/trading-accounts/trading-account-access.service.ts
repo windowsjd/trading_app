@@ -70,11 +70,20 @@ export class TradingAccountAccessService {
     return accounts;
   }
 
+  /**
+   * `client` lets a caller re-resolve the account INSIDE its own transaction
+   * (작업 6·7 보완 1). A general portfolio read checks ownership once to answer
+   * 401/404 fast, then re-reads the account under RepeatableRead so the row it
+   * values is the same one its wallets, ledger, and snapshots come from — a
+   * stale copy could otherwise be valued after the account was closed or
+   * re-scoped.
+   */
   async getOwnedAccountOrThrow(
     userId: string,
     accountId: string,
+    client: PrismaService | Prisma.TransactionClient = this.prisma,
   ): Promise<OwnedTradingAccount> {
-    const account = await this.prisma.tradingAccount.findFirst({
+    const account = await client.tradingAccount.findFirst({
       where: {
         id: accountId,
         userId,

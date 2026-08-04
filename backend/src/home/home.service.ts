@@ -17,6 +17,10 @@ import {
 import { PortfolioValuationService } from '../portfolio/portfolio-valuation.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  assertSeasonRankingScope,
+  SEASON_RANKING_SCOPE_SELECT,
+} from '../ranking/season-ranking-scope';
+import {
   buildAdminManualFallbackDecision,
   isPositiveDecimal,
   resolveAssetProviderEligibility,
@@ -485,7 +489,7 @@ export class HomeService {
     seasonId: string,
     seasonParticipantId: string,
   ) {
-    return this.prisma.seasonRanking.findFirst({
+    const ranking = await this.prisma.seasonRanking.findFirst({
       where: {
         seasonId,
         seasonParticipantId,
@@ -497,6 +501,8 @@ export class HomeService {
         { createdAt: 'desc' },
       ],
       select: {
+        ...SEASON_RANKING_SCOPE_SELECT,
+        id: true,
         rank: true,
         totalAssetKrw: true,
         returnRate: true,
@@ -507,6 +513,15 @@ export class HomeService {
         capturedAt: true,
       },
     });
+
+    // "No final ranking yet" stays the existing FINAL_RANKING_UNAVAILABLE
+    // section; a ranking row that EXISTS but is mis-scoped is damage and is
+    // reported as such (작업 8 §11).
+    if (ranking) {
+      assertSeasonRankingScope(ranking);
+    }
+
+    return ranking;
   }
 
   private buildFinalTier(
@@ -959,6 +974,8 @@ export class HomeService {
         { createdAt: 'desc' },
       ],
       select: {
+        ...SEASON_RANKING_SCOPE_SELECT,
+        id: true,
         rank: true,
         rankType: true,
         rankingDate: true,
@@ -981,6 +998,8 @@ export class HomeService {
         rankingSource: 'unavailable',
       };
     }
+
+    assertSeasonRankingScope(ranking);
 
     const rankedParticipants = await this.prisma.seasonRanking.count({
       where: {

@@ -52,6 +52,21 @@ export type SeasonSettlementJobFinalTierSummary = {
   skipped: number;
 };
 
+/**
+ * Season TradingAccount lifecycle (작업 8 §14.4).
+ *
+ * `linked` counts every participant account of the season, including excluded
+ * ones — closure is season-wide, unlike final ranking which is eligible-only.
+ * `closed` is what this run actually closed or completed (already-closed
+ * accounts with a closedAt are left untouched and still counted here, because
+ * the post-condition being reported is "all of them are closed").
+ */
+export type SeasonSettlementJobAccountSummary = {
+  linked: number;
+  closed: number;
+  wouldClose: number;
+};
+
 export type SeasonSettlementJobTopRank = {
   seasonParticipantId: string;
   userId: string;
@@ -77,10 +92,13 @@ export type SeasonSettlementJobResult = {
   finalSnapshots: SeasonSettlementJobFinalSnapshotSummary;
   finalRankings: SeasonSettlementJobFinalRankingSummary;
   finalTiers: SeasonSettlementJobFinalTierSummary;
+  seasonAccounts: SeasonSettlementJobAccountSummary;
   createdFinalSnapshotIds: string[];
   updatedFinalSnapshotIds: string[];
   createdFinalRankingIds: string[];
   assignedFinalTierParticipantIds: string[];
+  closedTradingAccountIds: string[];
+  finishedParticipantIds: string[];
   topRanks: SeasonSettlementJobTopRank[];
   errors: SeasonSettlementJobError[];
   reason?: string;

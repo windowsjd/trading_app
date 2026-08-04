@@ -200,11 +200,11 @@ describe('TradingAccount schema contract', () => {
       );
     }
 
-    // SeasonRanking stays participant-only; its transition is a later work
-    // unit and this work explicitly did not touch it.
+    // SeasonRanking gained its account scope in 작업 8, but the participant
+    // link stays REQUIRED: it is still a season-only model.
     const rankingBlock = modelBlock('SeasonRanking');
-    expect(rankingBlock).toContain('seasonParticipantId');
-    expect(rankingBlock).not.toContain('tradingAccountId');
+    expect(rankingBlock).toMatch(/seasonParticipantId\s+String\s/);
+    expect(rankingBlock).toMatch(/tradingAccountId\s+String\?/);
 
     // LimitOrderCandleEvidence is reached through the Order relation and
     // must not gain a duplicated account FK.

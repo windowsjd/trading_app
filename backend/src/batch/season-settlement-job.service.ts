@@ -8,6 +8,8 @@ import {
   SeasonRankingType,
   SeasonStatus,
   SnapshotReason,
+  TradingAccountMode,
+  TradingAccountStatus,
 } from '../generated/prisma/client';
 import {
   formatDecimalScale,
@@ -29,6 +31,12 @@ import {
   calculateMaxDrawdown,
   calculateReachedReturnAt,
 } from '../ranking/ranking-refresh.service';
+import {
+  assertSeasonRankingScopes,
+  resolveSeasonRankingAccountScopes,
+  SEASON_RANKING_SCOPE_SELECT,
+} from '../ranking/season-ranking-scope';
+import { lockSeasonForWriteOrThrow } from '../ranking/season-write-lock';
 import { BatchService } from './batch.service';
 import {
   SEASON_SETTLEMENT_JOB_NAME,
@@ -97,7 +105,9 @@ type FinalRankingRow = FinalValuation & {
 
 type ExistingFinalRankingRow = {
   id: string;
+  seasonId: string;
   seasonParticipantId: string;
+  tradingAccountId: string | null;
   rank: number;
   totalAssetKrw: Prisma.Decimal;
   returnRate: Prisma.Decimal;
@@ -105,8 +115,40 @@ type ExistingFinalRankingRow = {
   totalFillCount: number;
   reachedReturnAt: Date | null;
   seasonParticipant: {
+    id: string;
+    seasonId: string;
     userId: string;
+    tradingAccountId: string | null;
+    tradingAccount: {
+      id: string;
+      mode: TradingAccountMode;
+      userId: string;
+    } | null;
   };
+};
+
+/**
+ * Every participant of the season being settled, WHATEVER its status.
+ *
+ * Final RANKING is still eligible-only (active/finished/rewarded). Account
+ * CLOSURE is not: when a season becomes `settled`, every trading account that
+ * belonged to it stops being a live account, including an excluded
+ * participant's. Leaving one open would mean a settled season still has an
+ * account that reads as tradable (작업 8 §14.2).
+ */
+type SettlementAccountParticipant = {
+  id: string;
+  userId: string;
+  participantStatus: ParticipantStatus;
+  tradingAccountId: string | null;
+  tradingAccount: {
+    id: string;
+    mode: TradingAccountMode;
+    status: TradingAccountStatus;
+    userId: string;
+    closedAt: Date | null;
+    seasonParticipant: { id: string } | null;
+  } | null;
 };
 
 @Injectable()
@@ -242,6 +284,13 @@ export class SeasonSettlementJobService {
       );
     }
 
+    // Season-wide, not eligible-only: settlement closes excluded participants'
+    // accounts too (작업 8 §14.2).
+    result.seasonAccounts.linked = await this.prisma.seasonParticipant.count({
+      where: { seasonId, tradingAccountId: { not: null } },
+    });
+    result.seasonAccounts.wouldClose = result.seasonAccounts.linked;
+
     if (dryRun) {
       return result;
     }
@@ -263,9 +312,13 @@ export class SeasonSettlementJobService {
     result.createdFinalRankingIds = writeResult.createdFinalRankingIds;
     result.assignedFinalTierParticipantIds =
       writeResult.assignedFinalTierParticipantIds;
+    result.closedTradingAccountIds = writeResult.closedTradingAccountIds;
+    result.finishedParticipantIds = writeResult.finishedParticipantIds;
+    result.seasonAccounts.linked = writeResult.closedTradingAccountIds.length;
+    result.seasonAccounts.closed = writeResult.closedTradingAccountIds.length;
     result.season.updated = writeResult.seasonUpdated;
     result.message =
-      'Season settlement completed through final ranking and final tier assignment. Rewards remain pending.';
+      'Season settlement completed through final ranking, final tier assignment, and season account closure. Rewards remain pending.';
 
     return result;
   }
@@ -321,9 +374,12 @@ export class SeasonSettlementJobService {
    * cleanup (which cancels open limit buys of ended seasons on every tick)
    * must run first. Fails closed with a structured operational log.
    */
-  private async assertNoOpenLimitReservations(seasonId: string) {
+  private async assertNoOpenLimitReservations(
+    seasonId: string,
+    client: PrismaService | Prisma.TransactionClient = this.prisma,
+  ) {
     const [openLimitBuyOrderCount, reservedWalletCount] = await Promise.all([
-      this.prisma.order.count({
+      client.order.count({
         where: {
           status: OrderStatus.submitted,
           orderType: OrderType.limit,
@@ -331,7 +387,7 @@ export class SeasonSettlementJobService {
           seasonParticipant: { seasonId },
         },
       }),
-      this.prisma.cashWallet.count({
+      client.cashWallet.count({
         where: {
           seasonParticipant: { seasonId },
           reservedAmount: { gt: 0 },
@@ -533,6 +589,23 @@ export class SeasonSettlementJobService {
     }));
   }
 
+  /**
+   * THE settlement write. One transaction, one season row lock, and either
+   * everything below commits or none of it does (작업 8 §14):
+   *
+   *   season row FOR UPDATE → status re-check → reservation re-check →
+   *   participant/account link verification → settlement EquitySnapshot →
+   *   final SeasonRanking (account dual-write) → participant final results →
+   *   participant status transitions → season account closure →
+   *   Season.status = settled
+   *
+   * WHY THE PRE-TRANSACTION CHECKS ARE REPEATED HERE
+   * -----------------------------------------------
+   * `assertNoOpenLimitReservations` and the status check ran against state read
+   * BEFORE the lock. In between, a limit order could have been submitted and
+   * cash re-reserved, and settling then would value accounts against an
+   * unfinished order book. Under the season row lock the answers are stable.
+   */
   private async createFinalSettlementAtomically(input: {
     seasonId: string;
     settlementDate: Date;
@@ -544,8 +617,26 @@ export class SeasonSettlementJobService {
     createdFinalRankingIds: string[];
     assignedFinalTierParticipantIds: string[];
     seasonUpdated: boolean;
+    closedTradingAccountIds: string[];
+    finishedParticipantIds: string[];
   }> {
     return this.prisma.$transaction(async (tx) => {
+      // 1) SERIALIZATION POINT (작업 8 §13.3). Ranking refresh and the daily
+      //    ranking job take the same lock, so neither can rewrite this season's
+      //    rows while the final result is being fixed.
+      const season = await lockSeasonForWriteOrThrow(tx, input.seasonId);
+      this.assertSeasonStatusAllowed(season.status);
+
+      // 2) Preconditions re-verified under the lock, not merely before it.
+      await this.assertNoOpenLimitReservations(input.seasonId, tx);
+
+      // 3) EVERY participant of this season and its account, whatever status.
+      const accountParticipants = await this.findSettlementAccountParticipants(
+        tx,
+        input.seasonId,
+      );
+      this.assertSettlementAccountLinks(input.seasonId, accountParticipants);
+
       const existingRows = await this.findExistingFinalRankingRows(
         tx,
         input.seasonId,
@@ -553,15 +644,29 @@ export class SeasonSettlementJobService {
       );
 
       if (existingRows.length > 0) {
+        // Idempotent replay. The existing rows are re-verified rather than
+        // trusted: assigning participant results from a mis-scoped final
+        // ranking would hand one account another's placement (작업 8 §14.5).
+        assertSeasonRankingScopes(existingRows);
+
         const assigned = await this.assignFinalResultsForExistingRows(
           tx,
           input.seasonId,
           existingRows,
         );
+        const finishedParticipantIds = await this.finishActiveParticipants(
+          tx,
+          input.seasonId,
+        );
+        const closedTradingAccountIds = await this.closeSeasonTradingAccounts(
+          tx,
+          { season, participants: accountParticipants },
+        );
         const seasonUpdated = await this.transitionSeasonToSettledIfReady(tx, {
           seasonId: input.seasonId,
           settlementDate: input.settlementDate,
           expectedParticipants: existingRows.length,
+          accountParticipants,
         });
 
         return {
@@ -570,6 +675,8 @@ export class SeasonSettlementJobService {
           createdFinalRankingIds: [],
           assignedFinalTierParticipantIds: assigned,
           seasonUpdated,
+          closedTradingAccountIds,
+          finishedParticipantIds,
         };
       }
 
@@ -581,12 +688,25 @@ export class SeasonSettlementJobService {
         );
       }
 
+      // Resolved for ALL ranked participants up front; a broken link aborts the
+      // settlement rather than producing a partial final ranking.
+      const rankingScopes = await resolveSeasonRankingAccountScopes(tx, {
+        seasonId: input.seasonId,
+        seasonParticipantIds: input.finalRows.map(
+          (row) => row.seasonParticipantId,
+        ),
+      });
+
       const createdFinalSnapshotIds: string[] = [];
       const updatedFinalSnapshotIds: string[] = [];
       const createdFinalRankingIds: string[] = [];
       const assignedFinalTierParticipantIds: string[] = [];
 
       for (const row of input.finalRows) {
+        const tradingAccountId = rankingScopes.get(
+          row.seasonParticipantId,
+        )!.tradingAccountId;
+
         const existingSnapshot = await tx.equitySnapshot.findFirst({
           where: {
             seasonParticipantId: row.seasonParticipantId,
@@ -599,6 +719,10 @@ export class SeasonSettlementJobService {
           ],
           select: {
             id: true,
+            tradingAccountId: true,
+            cumulativeExternalFundingKrw: true,
+            investmentPnlKrw: true,
+            timeWeightedReturnFactor: true,
           },
         });
         const snapshotData = {
@@ -613,6 +737,15 @@ export class SeasonSettlementJobService {
         };
 
         if (existingSnapshot) {
+          // The existing update-in-place policy is kept, but its SCOPE is
+          // verified first: overwriting a row that belongs to another account,
+          // or quietly filling a null scope through a routine settlement,
+          // would launder damage the snapshot repair exists to surface.
+          this.assertSettlementSnapshotScope(
+            existingSnapshot,
+            tradingAccountId,
+          );
+
           await tx.equitySnapshot.update({
             where: {
               id: existingSnapshot.id,
@@ -665,6 +798,8 @@ export class SeasonSettlementJobService {
           data: {
             seasonId: input.seasonId,
             seasonParticipantId: row.seasonParticipantId,
+            // 작업 8 dual-write.
+            tradingAccountId,
             rankType: FINAL_RANK_TYPE,
             rank: row.rank,
             totalAssetKrw: row.totalAssetKrw,
@@ -682,10 +817,19 @@ export class SeasonSettlementJobService {
         createdFinalRankingIds.push(createdRanking.id);
       }
 
+      const finishedParticipantIds = await this.finishActiveParticipants(
+        tx,
+        input.seasonId,
+      );
+      const closedTradingAccountIds = await this.closeSeasonTradingAccounts(
+        tx,
+        { season, participants: accountParticipants },
+      );
       const seasonUpdated = await this.transitionSeasonToSettledIfReady(tx, {
         seasonId: input.seasonId,
         settlementDate: input.settlementDate,
         expectedParticipants: input.finalRows.length,
+        accountParticipants,
       });
 
       return {
@@ -694,8 +838,235 @@ export class SeasonSettlementJobService {
         createdFinalRankingIds,
         assignedFinalTierParticipantIds,
         seasonUpdated,
+        closedTradingAccountIds,
+        finishedParticipantIds,
       };
     });
+  }
+
+  // ------------------------------------------- season account lifecycle
+
+  private async findSettlementAccountParticipants(
+    tx: Prisma.TransactionClient,
+    seasonId: string,
+  ): Promise<SettlementAccountParticipant[]> {
+    return tx.seasonParticipant.findMany({
+      where: { seasonId },
+      orderBy: [{ userId: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        userId: true,
+        participantStatus: true,
+        tradingAccountId: true,
+        tradingAccount: {
+          select: {
+            id: true,
+            mode: true,
+            status: true,
+            userId: true,
+            closedAt: true,
+            seasonParticipant: { select: { id: true } },
+          },
+        },
+      },
+    });
+  }
+
+  /**
+   * Settlement closes accounts, so it must know EXACTLY which accounts belong
+   * to this season before it changes any of them. One unresolvable participant
+   * aborts the whole settlement — closing "most" of a season's accounts and
+   * marking it settled is precisely the half-finished state §14.2 forbids.
+   */
+  private assertSettlementAccountLinks(
+    seasonId: string,
+    participants: readonly SettlementAccountParticipant[],
+  ): void {
+    for (const participant of participants) {
+      const fail = (reason: string): never =>
+        this.throwJobError(
+          HttpStatus.INTERNAL_SERVER_ERROR,
+          'SETTLEMENT_ACCOUNT_LINK_INTEGRITY',
+          `Season ${seasonId} cannot be settled: participant ${participant.id} ${reason}. Run "pnpm trading-accounts:repair-links --apply" and investigate; settlement never guesses an account.`,
+        );
+
+      if (!participant.tradingAccountId || !participant.tradingAccount) {
+        fail('has no trading account link');
+        continue;
+      }
+
+      const account = participant.tradingAccount;
+      if (account.mode !== TradingAccountMode.season) {
+        fail(`is linked to a "${account.mode}" account (${account.id})`);
+      }
+      if (account.userId !== participant.userId) {
+        fail(`is linked to account ${account.id}, owned by a different user`);
+      }
+      if (account.seasonParticipant?.id !== participant.id) {
+        fail(
+          `is linked to account ${account.id}, which points back at participant ${account.seasonParticipant?.id ?? 'none'}`,
+        );
+      }
+    }
+  }
+
+  /**
+   * `active` → `finished`. Nothing else moves: `finished` and `rewarded` are
+   * already terminal, `excluded` stays excluded (settlement never rehabilitates
+   * a removed participant), and `registered` is left ALONE on purpose.
+   *
+   * A `registered` participant at settlement time is an anomaly — the join flow
+   * activates on entry — and silently promoting it to `finished` would assert
+   * it competed. It keeps its status, receives no final rank or tier, and is
+   * logged; its ACCOUNT is still closed with the rest of the season
+   * (작업 8 §14.3).
+   */
+  private async finishActiveParticipants(
+    tx: Prisma.TransactionClient,
+    seasonId: string,
+  ): Promise<string[]> {
+    const active = await tx.seasonParticipant.findMany({
+      where: { seasonId, participantStatus: ParticipantStatus.active },
+      select: { id: true },
+    });
+
+    if (active.length > 0) {
+      await tx.seasonParticipant.updateMany({
+        where: { seasonId, participantStatus: ParticipantStatus.active },
+        data: { participantStatus: ParticipantStatus.finished },
+      });
+    }
+
+    const registered = await tx.seasonParticipant.count({
+      where: { seasonId, participantStatus: ParticipantStatus.registered },
+    });
+    if (registered > 0) {
+      this.logger.warn(
+        JSON.stringify({
+          event: 'season_settlement_registered_participants_left_as_is',
+          seasonId,
+          registeredParticipantCount: registered,
+          policy:
+            'registered participants are not promoted to finished and receive no final rank or tier; their season accounts are still closed',
+        }),
+      );
+    }
+
+    return active.map((participant) => participant.id);
+  }
+
+  /**
+   * Closes every season account linked to this season.
+   *
+   * closedAt = COALESCE(existing closedAt, Season.endAt). The season stopped
+   * being tradable at `endAt`; a settlement job that runs three days late must
+   * not make the accounts look like they were live until then. An account that
+   * already carries an earlier closedAt keeps it.
+   *
+   * `mode: season` is pinned in every WHERE, so a general account can never be
+   * touched by settlement, and no account is ever re-activated: status is only
+   * ever written as `closed`.
+   */
+  private async closeSeasonTradingAccounts(
+    tx: Prisma.TransactionClient,
+    input: {
+      season: { id: string; endAt: Date };
+      participants: readonly SettlementAccountParticipant[];
+    },
+  ): Promise<string[]> {
+    const accountIds = input.participants
+      .map((participant) => participant.tradingAccountId)
+      .filter((id): id is string => id !== null);
+
+    if (accountIds.length === 0) {
+      return [];
+    }
+
+    // Never-closed accounts: close them and stamp the season's end.
+    await tx.tradingAccount.updateMany({
+      where: {
+        id: { in: accountIds },
+        mode: TradingAccountMode.season,
+        closedAt: null,
+      },
+      data: {
+        status: TradingAccountStatus.closed,
+        closedAt: input.season.endAt,
+      },
+    });
+
+    // Already carry a closedAt but are not marked closed: preserve the earlier
+    // timestamp, only fix the status.
+    await tx.tradingAccount.updateMany({
+      where: {
+        id: { in: accountIds },
+        mode: TradingAccountMode.season,
+        closedAt: { not: null },
+        status: { not: TradingAccountStatus.closed },
+      },
+      data: { status: TradingAccountStatus.closed },
+    });
+
+    // Fail closed rather than leave a settled season holding a live account.
+    const unclosed = await tx.tradingAccount.count({
+      where: {
+        id: { in: accountIds },
+        OR: [
+          { status: { not: TradingAccountStatus.closed } },
+          { closedAt: null },
+        ],
+      },
+    });
+    if (unclosed > 0) {
+      this.throwJobError(
+        HttpStatus.CONFLICT,
+        'SEASON_ACCOUNT_CLOSE_INCOMPLETE',
+        `${unclosed} season trading account(s) could not be closed; the whole settlement is rolled back rather than leaving a settled season with live accounts.`,
+      );
+    }
+
+    return accountIds;
+  }
+
+  /**
+   * A settlement snapshot that already exists must belong to the same account
+   * the final ranking is being written for.
+   */
+  private assertSettlementSnapshotScope(
+    snapshot: {
+      id: string;
+      tradingAccountId: string | null;
+      cumulativeExternalFundingKrw: Prisma.Decimal | null;
+      investmentPnlKrw: Prisma.Decimal | null;
+      timeWeightedReturnFactor: Prisma.Decimal | null;
+    },
+    expectedTradingAccountId: string,
+  ): void {
+    if (snapshot.tradingAccountId === null) {
+      this.throwJobError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'SETTLEMENT_SNAPSHOT_SCOPE_REPAIR_REQUIRED',
+        `Settlement snapshot ${snapshot.id} has no trading account scope. Run "pnpm trading-accounts:repair-snapshot-scope --apply" first; settlement never fills it in as a side effect.`,
+      );
+    }
+    if (snapshot.tradingAccountId !== expectedTradingAccountId) {
+      this.throwJobError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'SETTLEMENT_SNAPSHOT_SCOPE_MISMATCH',
+        `Settlement snapshot ${snapshot.id} is scoped to account ${snapshot.tradingAccountId} but its participant is linked to ${expectedTradingAccountId}; it is never overwritten.`,
+      );
+    }
+    if (
+      snapshot.cumulativeExternalFundingKrw !== null ||
+      snapshot.investmentPnlKrw !== null ||
+      snapshot.timeWeightedReturnFactor !== null
+    ) {
+      this.throwJobError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'SETTLEMENT_SNAPSHOT_SCOPE_MISMATCH',
+        `Settlement snapshot ${snapshot.id} carries general-mode performance columns; a season settlement snapshot never does.`,
+      );
+    }
   }
 
   private async handleExistingFinalRankings(input: {
@@ -727,6 +1098,10 @@ export class SeasonSettlementJobService {
       );
     }
 
+    // Verified even on the dry-run path, so an operator planning a settlement
+    // sees the damage instead of a clean-looking preview (작업 8 §11).
+    assertSeasonRankingScopes(input.existingFinalRankings);
+
     if (input.dryRun) {
       input.result.message =
         'Final rankings already exist; dry-run did not assign tiers or update season status.';
@@ -744,6 +1119,12 @@ export class SeasonSettlementJobService {
       writeResult.assignedFinalTierParticipantIds.length;
     input.result.assignedFinalTierParticipantIds =
       writeResult.assignedFinalTierParticipantIds;
+    input.result.closedTradingAccountIds = writeResult.closedTradingAccountIds;
+    input.result.finishedParticipantIds = writeResult.finishedParticipantIds;
+    input.result.seasonAccounts.linked =
+      writeResult.closedTradingAccountIds.length;
+    input.result.seasonAccounts.closed =
+      writeResult.closedTradingAccountIds.length;
     input.result.season.updated = writeResult.seasonUpdated;
     input.result.message =
       input.season.status === SeasonStatus.settled
@@ -766,8 +1147,8 @@ export class SeasonSettlementJobService {
       },
       orderBy: [{ rank: 'asc' }, { seasonParticipantId: 'asc' }],
       select: {
+        ...SEASON_RANKING_SCOPE_SELECT,
         id: true,
-        seasonParticipantId: true,
         rank: true,
         totalAssetKrw: true,
         returnRate: true,
@@ -776,6 +1157,7 @@ export class SeasonSettlementJobService {
         reachedReturnAt: true,
         seasonParticipant: {
           select: {
+            ...SEASON_RANKING_SCOPE_SELECT.seasonParticipant.select,
             userId: true,
           },
         },
@@ -815,26 +1197,45 @@ export class SeasonSettlementJobService {
       seasonId: string;
       settlementDate: Date;
       expectedParticipants: number;
+      accountParticipants: readonly SettlementAccountParticipant[];
     },
   ): Promise<boolean> {
-    const [finalRankingCount, missingFinalResultCount] = await Promise.all([
-      tx.seasonRanking.count({
-        where: {
-          seasonId: input.seasonId,
-          rankType: FINAL_RANK_TYPE,
-          rankingDate: input.settlementDate,
-        },
-      }),
-      tx.seasonParticipant.count({
-        where: {
-          seasonId: input.seasonId,
-          participantStatus: {
-            in: [...SETTLEMENT_PARTICIPANT_STATUSES],
+    const accountIds = input.accountParticipants
+      .map((participant) => participant.tradingAccountId)
+      .filter((id): id is string => id !== null);
+
+    const [finalRankingCount, missingFinalResultCount, liveAccountCount] =
+      await Promise.all([
+        tx.seasonRanking.count({
+          where: {
+            seasonId: input.seasonId,
+            rankType: FINAL_RANK_TYPE,
+            rankingDate: input.settlementDate,
           },
-          OR: [{ finalRank: null }, { finalTier: null }],
-        },
-      }),
-    ]);
+        }),
+        tx.seasonParticipant.count({
+          where: {
+            seasonId: input.seasonId,
+            participantStatus: {
+              in: [...SETTLEMENT_PARTICIPANT_STATUSES],
+            },
+            OR: [{ finalRank: null }, { finalTier: null }],
+          },
+        }),
+        // §15: a settled season must have NO active/suspended linked account
+        // and no linked account without a closedAt.
+        accountIds.length === 0
+          ? Promise.resolve(0)
+          : tx.tradingAccount.count({
+              where: {
+                id: { in: accountIds },
+                OR: [
+                  { status: { not: TradingAccountStatus.closed } },
+                  { closedAt: null },
+                ],
+              },
+            }),
+      ]);
 
     if (
       finalRankingCount !== input.expectedParticipants ||
@@ -844,6 +1245,14 @@ export class SeasonSettlementJobService {
         HttpStatus.CONFLICT,
         'FINAL_RESULTS_NOT_READY',
         'Final rankings and final tiers must be ready before settled status.',
+      );
+    }
+
+    if (liveAccountCount !== 0) {
+      this.throwJobError(
+        HttpStatus.CONFLICT,
+        'SEASON_ACCOUNT_CLOSE_INCOMPLETE',
+        `${liveAccountCount} linked season trading account(s) are still open; a season is never marked settled while one of its accounts reads as live.`,
       );
     }
 
@@ -943,10 +1352,17 @@ export class SeasonSettlementJobService {
         existing: 0,
         skipped: 0,
       },
+      seasonAccounts: {
+        linked: 0,
+        closed: 0,
+        wouldClose: 0,
+      },
       createdFinalSnapshotIds: [],
       updatedFinalSnapshotIds: [],
       createdFinalRankingIds: [],
       assignedFinalTierParticipantIds: [],
+      closedTradingAccountIds: [],
+      finishedParticipantIds: [],
       topRanks: [],
       errors: [],
     };

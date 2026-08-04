@@ -13,6 +13,13 @@ import {
   assignSequentialRanks,
   compareRankingRows,
 } from './ranking-calculation.policy';
+import {
+  assertRankingSourceSnapshotScopes,
+  buildRankingParticipantScopes,
+  RANKING_PARTICIPANT_SCOPE_SELECT,
+} from './ranking-source-scope';
+import { resolveSeasonRankingAccountScopes } from './season-ranking-scope';
+import { lockSeasonForWrite } from './season-write-lock';
 
 type RankableParticipant = {
   id: string;
@@ -20,6 +27,8 @@ type RankableParticipant = {
   userId: string;
   initialCapitalKrw: Prisma.Decimal;
   totalFillCount: number;
+  /** Verified into a non-null scope by `buildRankingParticipantScopes`. */
+  tradingAccountId: string | null;
 };
 
 type EquityPoint = {
@@ -130,6 +139,13 @@ export class RankingRefreshService {
         });
       }
 
+      // Verified participant → season account map, built ONCE (작업 8 §9.4).
+      // Every equity row read below is measured against it.
+      const participantScopes = buildRankingParticipantScopes(
+        seasonId,
+        participants,
+      );
+
       const valuations: CurrentRankingValuation[] = [];
       for (const participant of participants) {
         const valuation =
@@ -138,7 +154,10 @@ export class RankingRefreshService {
             capturedAt,
             'live_portfolio_valuation',
           );
-        const history = await this.findEquityHistory(participant.id);
+        const history = await this.findEquityHistory(
+          participant.id,
+          participantScopes,
+        );
         const currentPoint = {
           totalAssetKrw: new Prisma.Decimal(valuation.totalAssetKrw),
           returnRate: new Prisma.Decimal(valuation.returnRate),
@@ -222,9 +241,11 @@ export class RankingRefreshService {
     };
   }
 
-  private async findRankableParticipants(
-    seasonId: string,
-  ): Promise<RankableParticipant[]> {
+  /**
+   * Participants AND their account scope in one query — the account id is never
+   * looked up per row (작업 8 §9.4).
+   */
+  private async findRankableParticipants(seasonId: string) {
     return this.prisma.seasonParticipant.findMany({
       where: {
         seasonId,
@@ -234,30 +255,51 @@ export class RankingRefreshService {
       },
       orderBy: [{ userId: 'asc' }, { id: 'asc' }],
       select: {
-        id: true,
-        seasonId: true,
-        userId: true,
+        ...RANKING_PARTICIPANT_SCOPE_SELECT,
         initialCapitalKrw: true,
         totalFillCount: true,
       },
     });
   }
 
+  /**
+   * Max-drawdown / reached-return history for ONE participant.
+   *
+   * Every row is scope-checked before it is used. A mis-scoped row is not
+   * dropped: silently excluding a low point would LOWER this participant's max
+   * drawdown, which is tie-break #2 and can move them up the leaderboard
+   * (작업 8 §9.2).
+   */
   private async findEquityHistory(
     seasonParticipantId: string,
+    participantScopes: ReadonlyMap<string, string>,
   ): Promise<EquityPoint[]> {
-    return this.prisma.equitySnapshot.findMany({
+    const rows = await this.prisma.equitySnapshot.findMany({
       where: {
         seasonParticipantId,
       },
       orderBy: [{ capturedAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
       select: {
+        id: true,
+        seasonParticipantId: true,
+        tradingAccountId: true,
+        cumulativeExternalFundingKrw: true,
+        investmentPnlKrw: true,
+        timeWeightedReturnFactor: true,
         totalAssetKrw: true,
         returnRate: true,
         capturedAt: true,
         createdAt: true,
       },
     });
+
+    assertRankingSourceSnapshotScopes({
+      kind: 'equity snapshot',
+      rows,
+      participantScopes,
+    });
+
+    return rows;
   }
 
   private async replaceCurrentRankings(input: {
@@ -281,7 +323,23 @@ export class RankingRefreshService {
         .toSorted(compareRankingRows),
     );
 
-    await this.prisma.$transaction(async (tx) => {
+    const outcome = await this.prisma.$transaction(async (tx) => {
+      // SERIALIZATION POINT (작업 8 §13.1). The status check before the
+      // transaction was a read of state that settlement may have changed since.
+      // Holding the season row means settlement either finished before this
+      // write started (and the re-check below stops it) or waits until it ends.
+      const season = await lockSeasonForWrite(tx, input.seasonId);
+      if (
+        !season ||
+        season.status !== SeasonStatus.active ||
+        input.capturedAt.getTime() < season.startAt.getTime() ||
+        input.capturedAt.getTime() >= season.endAt.getTime()
+      ) {
+        // A settled/ended season's results are final. Writing daily rows now
+        // would resurrect a leaderboard that has already been closed out.
+        return { wrote: false as const };
+      }
+
       if (input.createEquitySnapshots) {
         const bucketStart = floorToFiveMinuteBucket(input.capturedAt);
         const bucketEnd = new Date(bucketStart.getTime() + 5 * 60_000);
@@ -355,11 +413,21 @@ export class RankingRefreshService {
         },
       });
 
+      // Resolved for ALL rows before any insert (작업 8 §8): a participant with
+      // a broken account link aborts the whole refresh rather than leaving a
+      // leaderboard that is missing one competitor.
+      const scopes = await resolveSeasonRankingAccountScopes(tx, {
+        seasonId: input.seasonId,
+        seasonParticipantIds: rows.map((row) => row.seasonParticipantId),
+      });
+
       for (const row of rows) {
         await tx.seasonRanking.create({
           data: {
             seasonId: input.seasonId,
             seasonParticipantId: row.seasonParticipantId,
+            tradingAccountId: scopes.get(row.seasonParticipantId)!
+              .tradingAccountId,
             rankType: CURRENT_RANK_TYPE,
             rank: row.rank,
             totalAssetKrw: row.totalAssetKrw,
@@ -375,7 +443,16 @@ export class RankingRefreshService {
           },
         });
       }
+
+      return { wrote: true as const };
     });
+
+    if (!outcome.wrote) {
+      this.logger.warn(
+        `Current ranking refresh for season ${input.seasonId} was skipped: the season was no longer active in its ranking window when its row lock was acquired.`,
+      );
+      return { skipped: true as const, reason: 'season_not_active' as const };
+    }
 
     this.logger.log(
       `Current ranking refreshed for season ${input.seasonId}: ${rows.length} participants.`,
